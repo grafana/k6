@@ -3,12 +3,9 @@
     src="logo.png" 
     width="240" height="78" border="0" alt="GJSON">
 <br>
-<a href="https://travis-ci.org/tidwall/gjson"><img src="https://img.shields.io/travis/tidwall/gjson.svg?style=flat-square" alt="Build Status"></a>
 <a href="https://godoc.org/github.com/tidwall/gjson"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square" alt="GoDoc"></a>
 <a href="http://tidwall.com/gjson-play"><img src="https://img.shields.io/badge/%F0%9F%8F%90-playground-9900cc.svg?style=flat-square" alt="GJSON Playground"></a>
 </p>
-
-
 
 <p align="center">get json values quickly</a></p>
 
@@ -476,7 +473,7 @@ JSON document used:
 }    
 ```
 
-Each operation was rotated though one of the following search paths:
+Each operation was rotated through one of the following search paths:
 
 ```
 widget.window.name
@@ -484,7 +481,7 @@ widget.image.hOffset
 widget.text.onMouseUp
 ```
 
-*These benchmarks were run on a MacBook Pro 15" 2.8 GHz Intel Core i7 using Go 1.8 and can be be found [here](https://github.com/tidwall/gjson-benchmarks).*
+*These benchmarks were run on a MacBook Pro 15" 2.8 GHz Intel Core i7 using Go 1.8 and can be found [here](https://github.com/tidwall/gjson-benchmarks).*
 
 
 ## Contact

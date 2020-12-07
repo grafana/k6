@@ -29,3 +29,6 @@ Temporary Items
 .apdisk
 
 # End of https://www.gitignore.io/api/macos
+
+cmd/*/*exe
+.idea

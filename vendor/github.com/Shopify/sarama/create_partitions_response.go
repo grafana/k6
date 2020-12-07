@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type CreatePartitionsResponse struct {
 	ThrottleTime         time.Duration
@@ -60,6 +63,10 @@ func (r *CreatePartitionsResponse) version() int16 {
 	return 0
 }
 
+func (r *CreatePartitionsResponse) headerVersion() int16 {
+	return 0
+}
+
 func (r *CreatePartitionsResponse) requiredVersion() KafkaVersion {
 	return V1_0_0_0
 }
@@ -67,6 +74,14 @@ func (r *CreatePartitionsResponse) requiredVersion() KafkaVersion {
 type TopicPartitionError struct {
 	Err    KError
 	ErrMsg *string
+}
+
+func (t *TopicPartitionError) Error() string {
+	text := t.Err.Error()
+	if t.ErrMsg != nil {
+		text = fmt.Sprintf("%s - %s", text, *t.ErrMsg)
+	}
+	return text
 }
 
 func (t *TopicPartitionError) encode(pe packetEncoder) error {

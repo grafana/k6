@@ -23,7 +23,7 @@ func (g ginRouter) Handle(protocol, route string, handler HandlerFunc) {
 			params[p.Key] = p.Value
 		}
 
-		handler(c.Writer, c.Request, params)
+		handler(c.Writer, c.Request, params, c.Keys)
 	}
 
 	g.router.Handle(protocol, route, wrappedCallback)

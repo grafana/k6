@@ -520,11 +520,22 @@ func (r *Runtime) newNativeConstructor(call func(ConstructorCall) *Object, name 
 	}
 
 	f.f = func(c FunctionCall) Value {
-		return f.defaultConstruct(call, c.Arguments)
+		thisObj, _ := c.This.(*Object)
+		if thisObj != nil {
+			res := call(ConstructorCall{
+				This:      thisObj,
+				Arguments: c.Arguments,
+			})
+			if res == nil {
+				return _undefined
+			}
+			return res
+		}
+		return f.defaultConstruct(call, c.Arguments, nil)
 	}
 
-	f.construct = func(args []Value, proto *Object) *Object {
-		return f.defaultConstruct(call, args)
+	f.construct = func(args []Value, newTarget *Object) *Object {
+		return f.defaultConstruct(call, args, newTarget)
 	}
 
 	v.self = f
@@ -1270,7 +1281,38 @@ Nil is converted to null.
 Functions
 
 func(FunctionCall) Value is treated as a native JavaScript function. This increases performance because there are no
-automatic argument and return value type conversions (which involves reflect).
+automatic argument and return value type conversions (which involves reflect). Attempting to use
+the function as a constructor will result in a TypeError.
+
+func(ConstructorCall) *Object is treated as a native constructor, allowing to use it with the new
+operator:
+
+ func MyObject(call goja.ConstructorCall) *goja.Object {
+    // call.This contains the newly created object as per http://www.ecma-international.org/ecma-262/5.1/index.html#sec-13.2.2
+    // call.Arguments contain arguments passed to the function
+
+    call.This.Set("method", method)
+
+    //...
+
+    // If return value is a non-nil *Object, it will be used instead of call.This
+    // This way it is possible to return a Go struct or a map converted
+    // into goja.Value using runtime.ToValue(), however in this case
+    // instanceof will not work as expected.
+    return nil
+ }
+
+ runtime.Set("MyObject", MyObject)
+
+Then it can be used in JS as follows:
+
+ var o = new MyObject(arg);
+ var o1 = MyObject(arg); // same thing
+ o instanceof MyObject && o1 instanceof MyObject; // true
+
+When a native constructor is called directory (without the new operator) its behavior depends on
+this value: if it's an Object, it is passed through, otherwise a new one is created exactly as
+if it was called with the new operator. In either case call.NewTarget will be nil.
 
 Any other Go function is wrapped so that the arguments are automatically converted into the required Go types and the
 return value is converted to a JavaScript value (using this method).  If conversion is not possible, a TypeError is

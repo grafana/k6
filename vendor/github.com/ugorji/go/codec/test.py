@@ -5,13 +5,16 @@
 # So it can process them (so we don't have to checkin the files).
 
 # Ensure msgpack-python and cbor are installed first, using:
-#   sudo apt-get install python-dev
-#   sudo apt-get install python-pip
+#   sudo apt install python-dev (may not be necessary)
+#   sudo apt install python-pip # or python3-pip
 #   pip install --user msgpack-python msgpack-rpc-python cbor
 
 # Ensure all "string" keys are utf strings (else encoded as bytes)
 
+from __future__ import print_function
 import cbor, msgpack, msgpackrpc, sys, os, threading
+
+mylocaladdr="127.0.0.1" # localhost.localdomain localhost 127.0.0.1
 
 def get_test_data_list():
     # get list with all primitive types, and a combo type
@@ -69,22 +72,20 @@ def build_test_data(destdir):
     for i in range(len(l)):
         # packer = msgpack.Packer()
         serialized = msgpack.dumps(l[i])
-        f = open(os.path.join(destdir, str(i) + '.msgpack.golden'), 'wb')
-        f.write(serialized)
-        f.close()
+        with open(os.path.join(destdir, str(i) + '.msgpack.golden'), 'wb') as f:
+            f.write(serialized)
         serialized = cbor.dumps(l[i])
-        f = open(os.path.join(destdir, str(i) + '.cbor.golden'), 'wb')
-        f.write(serialized)
-        f.close()
+        with open(os.path.join(destdir, str(i) + '.cbor.golden'), 'wb') as f:
+            f.write(serialized)
 
 def doRpcServer(port, stopTimeSec):
     class EchoHandler(object):
         def Echo123(self, msg1, msg2, msg3):
-            return ("1:%s 2:%s 3:%s" % (msg1, msg2, msg3))
+            return ("1:%s 2:%s 3:%s" % (msg1.decode("utf-8"), msg2.decode("utf-8"), msg3.decode("utf-8")))
         def EchoStruct(self, msg):
             return ("%s" % msg)
     
-    addr = msgpackrpc.Address('127.0.0.1', port)
+    addr = msgpackrpc.Address(mylocaladdr, port)
     server = msgpackrpc.Server(EchoHandler())
     server.listen(addr)
     # run thread to stop it after stopTimeSec seconds if > 0
@@ -96,17 +97,27 @@ def doRpcServer(port, stopTimeSec):
     server.start()
 
 def doRpcClientToPythonSvc(port):
-    address = msgpackrpc.Address('127.0.0.1', port)
+    address = msgpackrpc.Address(mylocaladdr, port)
     client = msgpackrpc.Client(address, unpack_encoding='utf-8')
-    print client.call("Echo123", "A1", "B2", "C3")
-    print client.call("EchoStruct", {"A" :"Aa", "B":"Bb", "C":"Cc"})
-   
+    print(client.call("Echo123", "A1", "B2", "C3"))
+    print(client.call("EchoStruct", {"A" :"Aa", "B":"Bb", "C":"Cc"}))
+
+# def doCheckSocket(port):
+#     print(">>>> port: ", port, " <<<<<")
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#     result = sock.connect_ex(('127.0.0.1', port))
+#     if result == 0:
+#         print("\t>>>> Port is open")
+#     else:
+#         print("\t>>>> Port is not open")
+#     sock.close()
+    
 def doRpcClientToGoSvc(port):
-    # print ">>>> port: ", port, " <<<<<"
-    address = msgpackrpc.Address('127.0.0.1', port)
+    # doCheckSocket(port)
+    address = msgpackrpc.Address(mylocaladdr, port)
     client = msgpackrpc.Client(address, unpack_encoding='utf-8')
-    print client.call("TestRpcInt.Echo123", ["A1", "B2", "C3"])
-    print client.call("TestRpcInt.EchoStruct", {"A" :"Aa", "B":"Bb", "C":"Cc"})
+    print(client.call("TestRpcInt.Echo123", ["A1", "B2", "C3"]))
+    print(client.call("TestRpcInt.EchoStruct", {"A" :"Aa", "B":"Bb", "C":"Cc"}))
 
 def doMain(args):
     if len(args) == 2 and args[0] == "testdata":
@@ -123,4 +134,3 @@ def doMain(args):
     
 if __name__ == "__main__":
     doMain(sys.argv[1:])
-

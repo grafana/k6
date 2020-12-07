@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/daaku/go.zipexe"
-	"github.com/kardianos/osext"
 )
 
 // appendedBox defines an appended box
@@ -31,9 +30,13 @@ var appendedBoxes = make(map[string]*appendedBox)
 
 func init() {
 	// find if exec is appended
-	thisFile, err := osext.Executable()
+	thisFile, err := os.Executable()
 	if err != nil {
 		return // not appended or cant find self executable
+	}
+	thisFile, err = filepath.EvalSymlinks(thisFile)
+	if err != nil {
+		return
 	}
 	closer, rd, err := zipexe.OpenCloser(thisFile)
 	if err != nil {

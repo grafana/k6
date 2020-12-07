@@ -58,6 +58,12 @@ type Link struct {
 // UnmarshalJSON marshals a string value into the Href field or marshals an
 // object value into the whole struct.
 func (l *Link) UnmarshalJSON(payload []byte) error {
+	// Links may be null in certain cases, mainly noted in the JSONAPI spec
+	// with pagination links (http://jsonapi.org/format/#fetching-pagination).
+	if len(payload) == 4 && string(payload) == "null" {
+		return nil
+	}
+
 	if bytes.HasPrefix(payload, stringSuffix) {
 		return json.Unmarshal(payload, &l.Href)
 	}
@@ -84,6 +90,9 @@ func (l *Link) UnmarshalJSON(payload []byte) error {
 // MarshalJSON returns the JSON encoding of only the Href field if the Meta
 // field is empty, otherwise it marshals the whole struct.
 func (l Link) MarshalJSON() ([]byte, error) {
+	if l.Empty() {
+		return json.Marshal(nil)
+	}
 	if len(l.Meta) == 0 {
 		return json.Marshal(l.Href)
 	}
@@ -91,6 +100,11 @@ func (l Link) MarshalJSON() ([]byte, error) {
 		"href": l.Href,
 		"meta": l.Meta,
 	})
+}
+
+// Empty returns true if the link has no href and no metadata.
+func (l Link) Empty() bool {
+	return len(l.Meta) == 0 && l.Href == ""
 }
 
 // Links contains a map of custom Link objects as given by an element.
@@ -106,6 +120,7 @@ type Data struct {
 	Attributes    json.RawMessage         `json:"attributes"`
 	Relationships map[string]Relationship `json:"relationships,omitempty"`
 	Links         Links                   `json:"links,omitempty"`
+	Meta          json.RawMessage         `json:"meta,omitempty"`
 }
 
 // Relationship contains reference IDs to the related structs

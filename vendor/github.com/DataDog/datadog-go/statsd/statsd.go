@@ -24,27 +24,21 @@ statsd is based on go-statsd-client.
 package statsd
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
-	"io"
-	"math/rand"
-	"strconv"
+	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 /*
-OptimalPayloadSize defines the optimal payload size for a UDP datagram, 1432 bytes
+OptimalUDPPayloadSize defines the optimal payload size for a UDP datagram, 1432 bytes
 is optimal for regular networks with an MTU of 1500 so datagrams don't get
 fragmented. It's generally recommended not to fragment UDP datagrams as losing
 a single fragment will cause the entire datagram to be lost.
-
-This can be increased if your network has a greater MTU or you don't mind UDP
-datagrams getting fragmented. The practical limit is MaxUDPPayloadSize
 */
-const OptimalPayloadSize = 1432
+const OptimalUDPPayloadSize = 1432
 
 /*
 MaxUDPPayloadSize defines the maximum payload size for a UDP datagram.
@@ -54,6 +48,20 @@ any number greater than that will see frames being cut out.
 */
 const MaxUDPPayloadSize = 65467
 
+// DefaultUDPBufferPoolSize is the default size of the buffer pool for UDP clients.
+const DefaultUDPBufferPoolSize = 2048
+
+// DefaultUDSBufferPoolSize is the default size of the buffer pool for UDS clients.
+const DefaultUDSBufferPoolSize = 512
+
+/*
+DefaultMaxAgentPayloadSize is the default maximum payload size the agent
+can receive. This can be adjusted by changing dogstatsd_buffer_size in the
+agent configuration file datadog.yaml. This is also used as the optimal payload size
+for UDS datagrams.
+*/
+const DefaultMaxAgentPayloadSize = 8192
+
 /*
 UnixAddressPrefix holds the prefix to use to enable Unix Domain Socket
 traffic instead of UDP.
@@ -61,127 +69,313 @@ traffic instead of UDP.
 const UnixAddressPrefix = "unix://"
 
 /*
-Stat suffixes
+ddEnvTagsMapping is a mapping of each "DD_" prefixed environment variable
+to a specific tag name.
 */
-var (
-	gaugeSuffix        = []byte("|g")
-	countSuffix        = []byte("|c")
-	histogramSuffix    = []byte("|h")
-	distributionSuffix = []byte("|d")
-	decrSuffix         = []byte("-1|c")
-	incrSuffix         = []byte("1|c")
-	setSuffix          = []byte("|s")
-	timingSuffix       = []byte("|ms")
+var ddEnvTagsMapping = map[string]string{
+	// Client-side entity ID injection for container tagging.
+	"DD_ENTITY_ID": "dd.internal.entity_id",
+	// The name of the env in which the service runs.
+	"DD_ENV": "env",
+	// The name of the running service.
+	"DD_SERVICE": "service",
+	// The current version of the running service.
+	"DD_VERSION": "version",
+}
+
+type metricType int
+
+const (
+	gauge metricType = iota
+	count
+	histogram
+	distribution
+	set
+	timing
+	event
+	serviceCheck
 )
 
-// A statsdWriter offers a standard interface regardless of the underlying
-// protocol. For now UDS and UPD writers are available.
-type statsdWriter interface {
-	Write(data []byte) (n int, err error)
-	SetWriteTimeout(time.Duration) error
+type ReceivingMode int
+
+const (
+	MutexMode ReceivingMode = iota
+	ChannelMode
+)
+
+const (
+	WriterNameUDP string = "udp"
+	WriterNameUDS string = "uds"
+)
+
+type metric struct {
+	metricType metricType
+	namespace  string
+	globalTags []string
+	name       string
+	fvalue     float64
+	ivalue     int64
+	svalue     string
+	evalue     *Event
+	scvalue    *ServiceCheck
+	tags       []string
+	rate       float64
+}
+
+type noClientErr string
+
+// ErrNoClient is returned if statsd reporting methods are invoked on
+// a nil client.
+const ErrNoClient = noClientErr("statsd client is nil")
+
+func (e noClientErr) Error() string {
+	return string(e)
+}
+
+// ClientInterface is an interface that exposes the common client functions for the
+// purpose of being able to provide a no-op client or even mocking. This can aid
+// downstream users' with their testing.
+type ClientInterface interface {
+	// Gauge measures the value of a metric at a particular time.
+	Gauge(name string, value float64, tags []string, rate float64) error
+
+	// Count tracks how many times something happened per second.
+	Count(name string, value int64, tags []string, rate float64) error
+
+	// Histogram tracks the statistical distribution of a set of values on each host.
+	Histogram(name string, value float64, tags []string, rate float64) error
+
+	// Distribution tracks the statistical distribution of a set of values across your infrastructure.
+	Distribution(name string, value float64, tags []string, rate float64) error
+
+	// Decr is just Count of -1
+	Decr(name string, tags []string, rate float64) error
+
+	// Incr is just Count of 1
+	Incr(name string, tags []string, rate float64) error
+
+	// Set counts the number of unique elements in a group.
+	Set(name string, value string, tags []string, rate float64) error
+
+	// Timing sends timing information, it is an alias for TimeInMilliseconds
+	Timing(name string, value time.Duration, tags []string, rate float64) error
+
+	// TimeInMilliseconds sends timing information in milliseconds.
+	// It is flushed by statsd with percentiles, mean and other info (https://github.com/etsy/statsd/blob/master/docs/metric_types.md#timing)
+	TimeInMilliseconds(name string, value float64, tags []string, rate float64) error
+
+	// Event sends the provided Event.
+	Event(e *Event) error
+
+	// SimpleEvent sends an event with the provided title and text.
+	SimpleEvent(title, text string) error
+
+	// ServiceCheck sends the provided ServiceCheck.
+	ServiceCheck(sc *ServiceCheck) error
+
+	// SimpleServiceCheck sends an serviceCheck with the provided name and status.
+	SimpleServiceCheck(name string, status ServiceCheckStatus) error
+
+	// Close the client connection.
 	Close() error
+
+	// Flush forces a flush of all the queued dogstatsd payloads.
+	Flush() error
+
+	// SetWriteTimeout allows the user to set a custom write timeout.
+	SetWriteTimeout(d time.Duration) error
 }
 
 // A Client is a handle for sending messages to dogstatsd.  It is safe to
 // use one Client from multiple goroutines simultaneously.
 type Client struct {
-	// Writer handles the underlying networking protocol
-	writer statsdWriter
+	// Sender handles the underlying networking protocol
+	sender *sender
 	// Namespace to prepend to all statsd calls
 	Namespace string
 	// Tags are global tags to be added to every statsd call
 	Tags []string
 	// skipErrors turns off error passing and allows UDS to emulate UDP behaviour
-	SkipErrors bool
-	// BufferLength is the length of the buffer in commands.
-	bufferLength int
-	flushTime    time.Duration
-	commands     []string
-	buffer       bytes.Buffer
-	stop         chan struct{}
-	sync.Mutex
+	SkipErrors  bool
+	flushTime   time.Duration
+	metrics     *ClientMetrics
+	telemetry   *telemetryClient
+	stop        chan struct{}
+	wg          sync.WaitGroup
+	workers     []*worker
+	closerLock  sync.Mutex
+	receiveMode ReceivingMode
+	agg         *aggregator
+	options     []Option
+	addrOption  string
+}
+
+// ClientMetrics contains metrics about the client
+type ClientMetrics struct {
+	TotalMetrics             uint64
+	TotalMetricsGauge        uint64
+	TotalMetricsCount        uint64
+	TotalMetricsHistogram    uint64
+	TotalMetricsDistribution uint64
+	TotalMetricsSet          uint64
+	TotalMetricsTiming       uint64
+	TotalEvents              uint64
+	TotalServiceChecks       uint64
+	TotalDroppedOnReceive    uint64
+}
+
+// Verify that Client implements the ClientInterface.
+// https://golang.org/doc/faq#guarantee_satisfies_interface
+var _ ClientInterface = &Client{}
+
+func resolveAddr(addr string) (statsdWriter, string, error) {
+	if !strings.HasPrefix(addr, UnixAddressPrefix) {
+		w, err := newUDPWriter(addr)
+		return w, WriterNameUDP, err
+	}
+
+	w, err := newUDSWriter(addr[len(UnixAddressPrefix):])
+	return w, WriterNameUDS, err
 }
 
 // New returns a pointer to a new Client given an addr in the format "hostname:port" or
 // "unix:///path/to/socket".
-func New(addr string) (*Client, error) {
-	if strings.HasPrefix(addr, UnixAddressPrefix) {
-		w, err := newUdsWriter(addr[len(UnixAddressPrefix)-1:])
-		if err != nil {
-			return nil, err
-		}
-		return NewWithWriter(w)
-	}
-	w, err := newUDPWriter(addr)
+func New(addr string, options ...Option) (*Client, error) {
+	o, err := resolveOptions(options)
 	if err != nil {
 		return nil, err
 	}
-	return NewWithWriter(w)
+
+	w, writerType, err := resolveAddr(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := newWithWriter(w, o, writerType)
+	if err == nil {
+		client.options = append(client.options, options...)
+		client.addrOption = addr
+	}
+	return client, err
 }
 
 // NewWithWriter creates a new Client with given writer. Writer is a
 // io.WriteCloser + SetWriteTimeout(time.Duration) error
-func NewWithWriter(w statsdWriter) (*Client, error) {
-	client := &Client{writer: w, SkipErrors: false}
-	return client, nil
+func NewWithWriter(w statsdWriter, options ...Option) (*Client, error) {
+	o, err := resolveOptions(options)
+	if err != nil {
+		return nil, err
+	}
+	return newWithWriter(w, o, "custom")
+}
+
+// CloneWithExtraOptions create a new Client with extra options
+func CloneWithExtraOptions(c *Client, options ...Option) (*Client, error) {
+	if c == nil {
+		return nil, ErrNoClient
+	}
+
+	if c.addrOption == "" {
+		return nil, fmt.Errorf("can't clone client with no addrOption")
+	}
+	opt := append(c.options, options...)
+	return New(c.addrOption, opt...)
+}
+
+func newWithWriter(w statsdWriter, o *Options, writerName string) (*Client, error) {
+
+	w.SetWriteTimeout(o.WriteTimeoutUDS)
+
+	c := Client{
+		Namespace: o.Namespace,
+		Tags:      o.Tags,
+		metrics:   &ClientMetrics{},
+	}
+	if o.Aggregation {
+		c.agg = newAggregator(&c)
+		c.agg.start(o.AggregationFlushInterval)
+	}
+
+	// Inject values of DD_* environment variables as global tags.
+	for envName, tagName := range ddEnvTagsMapping {
+		if value := os.Getenv(envName); value != "" {
+			c.Tags = append(c.Tags, fmt.Sprintf("%s:%s", tagName, value))
+		}
+	}
+
+	if o.MaxBytesPerPayload == 0 {
+		if writerName == WriterNameUDS {
+			o.MaxBytesPerPayload = DefaultMaxAgentPayloadSize
+		} else {
+			o.MaxBytesPerPayload = OptimalUDPPayloadSize
+		}
+	}
+	if o.BufferPoolSize == 0 {
+		if writerName == WriterNameUDS {
+			o.BufferPoolSize = DefaultUDSBufferPoolSize
+		} else {
+			o.BufferPoolSize = DefaultUDPBufferPoolSize
+		}
+	}
+	if o.SenderQueueSize == 0 {
+		if writerName == WriterNameUDS {
+			o.SenderQueueSize = DefaultUDSBufferPoolSize
+		} else {
+			o.SenderQueueSize = DefaultUDPBufferPoolSize
+		}
+	}
+
+	bufferPool := newBufferPool(o.BufferPoolSize, o.MaxBytesPerPayload, o.MaxMessagesPerPayload)
+	c.sender = newSender(w, o.SenderQueueSize, bufferPool)
+	c.receiveMode = o.ReceiveMode
+	for i := 0; i < o.BufferShardCount; i++ {
+		w := newWorker(bufferPool, c.sender)
+		c.workers = append(c.workers, w)
+		if c.receiveMode == ChannelMode {
+			w.startReceivingMetric(o.ChannelModeBufferSize)
+		}
+	}
+
+	c.flushTime = o.BufferFlushInterval
+	c.stop = make(chan struct{}, 1)
+
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		c.watch()
+	}()
+
+	if o.Telemetry {
+		if o.TelemetryAddr == "" {
+			c.telemetry = newTelemetryClient(&c, writerName, o.DevMode)
+		} else {
+			var err error
+			c.telemetry, err = newTelemetryClientWithCustomAddr(&c, writerName, o.DevMode, o.TelemetryAddr, bufferPool)
+			if err != nil {
+				return nil, err
+			}
+		}
+		c.telemetry.run(&c.wg, c.stop)
+	}
+
+	return &c, nil
 }
 
 // NewBuffered returns a Client that buffers its output and sends it in chunks.
 // Buflen is the length of the buffer in number of commands.
+//
+// When addr is empty, the client will default to a UDP client and use the DD_AGENT_HOST
+// and (optionally) the DD_DOGSTATSD_PORT environment variables to build the target address.
 func NewBuffered(addr string, buflen int) (*Client, error) {
-	client, err := New(addr)
-	if err != nil {
-		return nil, err
-	}
-	client.bufferLength = buflen
-	client.commands = make([]string, 0, buflen)
-	client.flushTime = time.Millisecond * 100
-	client.stop = make(chan struct{}, 1)
-	go client.watch()
-	return client, nil
-}
-
-// format a message from its name, value, tags and rate.  Also adds global
-// namespace and tags.
-func (c *Client) format(name string, value interface{}, suffix []byte, tags []string, rate float64) string {
-	var buf bytes.Buffer
-	if c.Namespace != "" {
-		buf.WriteString(c.Namespace)
-	}
-	buf.WriteString(name)
-	buf.WriteString(":")
-
-	switch val := value.(type) {
-	case float64:
-		buf.Write(strconv.AppendFloat([]byte{}, val, 'f', 6, 64))
-
-	case int64:
-		buf.Write(strconv.AppendInt([]byte{}, val, 10))
-
-	case string:
-		buf.WriteString(val)
-
-	default:
-		// do nothing
-	}
-	buf.Write(suffix)
-
-	if rate < 1 {
-		buf.WriteString(`|@`)
-		buf.WriteString(strconv.FormatFloat(rate, 'f', -1, 64))
-	}
-
-	writeTagString(&buf, c.Tags, tags)
-
-	return buf.String()
+	return New(addr, WithMaxMessagesPerPayload(buflen))
 }
 
 // SetWriteTimeout allows the user to set a custom UDS write timeout. Not supported for UDP.
 func (c *Client) SetWriteTimeout(d time.Duration) error {
 	if c == nil {
-		return nil
+		return ErrNoClient
 	}
-	return c.writer.SetWriteTimeout(d)
+	return c.sender.transport.SetWriteTimeout(d)
 }
 
 func (c *Client) watch() {
@@ -190,12 +384,9 @@ func (c *Client) watch() {
 	for {
 		select {
 		case <-ticker.C:
-			c.Lock()
-			if len(c.commands) > 0 {
-				// FIXME: eating error here
-				c.flushLocked()
+			for _, w := range c.workers {
+				w.flush()
 			}
-			c.Unlock()
 		case <-c.stop:
 			ticker.Stop()
 			return
@@ -203,165 +394,132 @@ func (c *Client) watch() {
 	}
 }
 
-func (c *Client) append(cmd string) error {
-	c.Lock()
-	defer c.Unlock()
-	c.commands = append(c.commands, cmd)
-	// if we should flush, lets do it
-	if len(c.commands) == c.bufferLength {
-		if err := c.flushLocked(); err != nil {
-			return err
-		}
+// Flush forces a flush of all the queued dogstatsd payloads This method is
+// blocking and will not return until everything is sent through the network.
+// In MutexMode, this will also block sampling new data to the client while the
+// workers and sender are flushed.
+func (c *Client) Flush() error {
+	if c == nil {
+		return ErrNoClient
 	}
+	if c.agg != nil {
+		c.agg.sendMetrics()
+	}
+	for _, w := range c.workers {
+		w.pause()
+		defer w.unpause()
+		w.flushUnsafe()
+	}
+	// Now that the worker are pause the sender can flush the queue between
+	// worker and senders
+	c.sender.flush()
 	return nil
 }
 
-func (c *Client) joinMaxSize(cmds []string, sep string, maxSize int) ([][]byte, []int) {
-	c.buffer.Reset() //clear buffer
-
-	var frames [][]byte
-	var ncmds []int
-	sepBytes := []byte(sep)
-	sepLen := len(sep)
-
-	elem := 0
-	for _, cmd := range cmds {
-		needed := len(cmd)
-
-		if elem != 0 {
-			needed = needed + sepLen
-		}
-
-		if c.buffer.Len()+needed <= maxSize {
-			if elem != 0 {
-				c.buffer.Write(sepBytes)
-			}
-			c.buffer.WriteString(cmd)
-			elem++
-		} else {
-			frames = append(frames, copyAndResetBuffer(&c.buffer))
-			ncmds = append(ncmds, elem)
-			// if cmd is bigger than maxSize it will get flushed on next loop
-			c.buffer.WriteString(cmd)
-			elem = 1
-		}
+func (c *Client) FlushTelemetryMetrics() ClientMetrics {
+	cm := ClientMetrics{
+		TotalMetricsGauge:        atomic.SwapUint64(&c.metrics.TotalMetricsGauge, 0),
+		TotalMetricsCount:        atomic.SwapUint64(&c.metrics.TotalMetricsCount, 0),
+		TotalMetricsSet:          atomic.SwapUint64(&c.metrics.TotalMetricsSet, 0),
+		TotalMetricsHistogram:    atomic.SwapUint64(&c.metrics.TotalMetricsHistogram, 0),
+		TotalMetricsDistribution: atomic.SwapUint64(&c.metrics.TotalMetricsDistribution, 0),
+		TotalMetricsTiming:       atomic.SwapUint64(&c.metrics.TotalMetricsTiming, 0),
+		TotalEvents:              atomic.SwapUint64(&c.metrics.TotalEvents, 0),
+		TotalServiceChecks:       atomic.SwapUint64(&c.metrics.TotalServiceChecks, 0),
+		TotalDroppedOnReceive:    atomic.SwapUint64(&c.metrics.TotalDroppedOnReceive, 0),
 	}
 
-	//add whatever is left! if there's actually something
-	if c.buffer.Len() > 0 {
-		frames = append(frames, copyAndResetBuffer(&c.buffer))
-		ncmds = append(ncmds, elem)
-	}
+	cm.TotalMetrics = cm.TotalMetricsGauge + cm.TotalMetricsCount +
+		cm.TotalMetricsSet + cm.TotalMetricsHistogram +
+		cm.TotalMetricsDistribution + cm.TotalMetricsTiming
 
-	return frames, ncmds
+	return cm
 }
 
-func copyAndResetBuffer(buf *bytes.Buffer) []byte {
-	tmpBuf := make([]byte, buf.Len())
-	copy(tmpBuf, buf.Bytes())
-	buf.Reset()
-	return tmpBuf
-}
-
-// Flush forces a flush of the pending commands in the buffer
-func (c *Client) Flush() error {
+func (c *Client) send(m metric) error {
 	if c == nil {
-		return nil
+		return ErrNoClient
 	}
-	c.Lock()
-	defer c.Unlock()
-	return c.flushLocked()
-}
 
-// flush the commands in the buffer.  Lock must be held by caller.
-func (c *Client) flushLocked() error {
-	frames, flushable := c.joinMaxSize(c.commands, "\n", OptimalPayloadSize)
-	var err error
-	cmdsFlushed := 0
-	for i, data := range frames {
-		_, e := c.writer.Write(data)
-		if e != nil {
-			err = e
-			break
+	m.globalTags = c.Tags
+	m.namespace = c.Namespace
+
+	h := hashString32(m.name)
+	worker := c.workers[h%uint32(len(c.workers))]
+
+	if c.receiveMode == ChannelMode {
+		select {
+		case worker.inputMetrics <- m:
+		default:
+			atomic.AddUint64(&c.metrics.TotalDroppedOnReceive, 1)
 		}
-		cmdsFlushed += flushable[i]
-	}
-
-	// clear the slice with a slice op, doesn't realloc
-	if cmdsFlushed == len(c.commands) {
-		c.commands = c.commands[:0]
-	} else {
-		//this case will cause a future realloc...
-		// drop problematic command though (sorry).
-		c.commands = c.commands[cmdsFlushed+1:]
-	}
-	return err
-}
-
-func (c *Client) sendMsg(msg string) error {
-	// return an error if message is bigger than MaxUDPPayloadSize
-	if len(msg) > MaxUDPPayloadSize {
-		return errors.New("message size exceeds MaxUDPPayloadSize")
-	}
-
-	// if this client is buffered, then we'll just append this
-	if c.bufferLength > 0 {
-		return c.append(msg)
-	}
-
-	_, err := c.writer.Write([]byte(msg))
-
-	if c.SkipErrors {
 		return nil
 	}
-	return err
-}
-
-// send handles sampling and sends the message over UDP. It also adds global namespace prefixes and tags.
-func (c *Client) send(name string, value interface{}, suffix []byte, tags []string, rate float64) error {
-	if c == nil {
-		return nil
-	}
-	if rate < 1 && rand.Float64() > rate {
-		return nil
-	}
-	data := c.format(name, value, suffix, tags, rate)
-	return c.sendMsg(data)
+	return worker.processMetric(m)
 }
 
 // Gauge measures the value of a metric at a particular time.
 func (c *Client) Gauge(name string, value float64, tags []string, rate float64) error {
-	return c.send(name, value, gaugeSuffix, tags, rate)
+	if c == nil {
+		return ErrNoClient
+	}
+	atomic.AddUint64(&c.metrics.TotalMetricsGauge, 1)
+	if c.agg != nil {
+		return c.agg.gauge(name, value, tags)
+	}
+	return c.send(metric{metricType: gauge, name: name, fvalue: value, tags: tags, rate: rate})
 }
 
 // Count tracks how many times something happened per second.
 func (c *Client) Count(name string, value int64, tags []string, rate float64) error {
-	return c.send(name, value, countSuffix, tags, rate)
+	if c == nil {
+		return ErrNoClient
+	}
+	atomic.AddUint64(&c.metrics.TotalMetricsCount, 1)
+	if c.agg != nil {
+		return c.agg.count(name, value, tags)
+	}
+	return c.send(metric{metricType: count, name: name, ivalue: value, tags: tags, rate: rate})
 }
 
 // Histogram tracks the statistical distribution of a set of values on each host.
 func (c *Client) Histogram(name string, value float64, tags []string, rate float64) error {
-	return c.send(name, value, histogramSuffix, tags, rate)
+	if c == nil {
+		return ErrNoClient
+	}
+	atomic.AddUint64(&c.metrics.TotalMetricsHistogram, 1)
+	return c.send(metric{metricType: histogram, name: name, fvalue: value, tags: tags, rate: rate})
 }
 
 // Distribution tracks the statistical distribution of a set of values across your infrastructure.
 func (c *Client) Distribution(name string, value float64, tags []string, rate float64) error {
-	return c.send(name, value, distributionSuffix, tags, rate)
+	if c == nil {
+		return ErrNoClient
+	}
+	atomic.AddUint64(&c.metrics.TotalMetricsDistribution, 1)
+	return c.send(metric{metricType: distribution, name: name, fvalue: value, tags: tags, rate: rate})
 }
 
 // Decr is just Count of -1
 func (c *Client) Decr(name string, tags []string, rate float64) error {
-	return c.send(name, nil, decrSuffix, tags, rate)
+	return c.Count(name, -1, tags, rate)
 }
 
 // Incr is just Count of 1
 func (c *Client) Incr(name string, tags []string, rate float64) error {
-	return c.send(name, nil, incrSuffix, tags, rate)
+	return c.Count(name, 1, tags, rate)
 }
 
 // Set counts the number of unique elements in a group.
 func (c *Client) Set(name string, value string, tags []string, rate float64) error {
-	return c.send(name, value, setSuffix, tags, rate)
+	if c == nil {
+		return ErrNoClient
+	}
+	atomic.AddUint64(&c.metrics.TotalMetricsSet, 1)
+	if c.agg != nil {
+		return c.agg.set(name, value, tags)
+	}
+	return c.send(metric{metricType: set, name: name, svalue: value, tags: tags, rate: rate})
 }
 
 // Timing sends timing information, it is an alias for TimeInMilliseconds
@@ -372,19 +530,20 @@ func (c *Client) Timing(name string, value time.Duration, tags []string, rate fl
 // TimeInMilliseconds sends timing information in milliseconds.
 // It is flushed by statsd with percentiles, mean and other info (https://github.com/etsy/statsd/blob/master/docs/metric_types.md#timing)
 func (c *Client) TimeInMilliseconds(name string, value float64, tags []string, rate float64) error {
-	return c.send(name, value, timingSuffix, tags, rate)
+	if c == nil {
+		return ErrNoClient
+	}
+	atomic.AddUint64(&c.metrics.TotalMetricsTiming, 1)
+	return c.send(metric{metricType: timing, name: name, fvalue: value, tags: tags, rate: rate})
 }
 
 // Event sends the provided Event.
 func (c *Client) Event(e *Event) error {
 	if c == nil {
-		return nil
+		return ErrNoClient
 	}
-	stat, err := e.Encode(c.Tags...)
-	if err != nil {
-		return err
-	}
-	return c.sendMsg(stat)
+	atomic.AddUint64(&c.metrics.TotalEvents, 1)
+	return c.send(metric{metricType: event, evalue: e, rate: 1})
 }
 
 // SimpleEvent sends an event with the provided title and text.
@@ -396,13 +555,10 @@ func (c *Client) SimpleEvent(title, text string) error {
 // ServiceCheck sends the provided ServiceCheck.
 func (c *Client) ServiceCheck(sc *ServiceCheck) error {
 	if c == nil {
-		return nil
+		return ErrNoClient
 	}
-	stat, err := sc.Encode(c.Tags...)
-	if err != nil {
-		return err
-	}
-	return c.sendMsg(stat)
+	atomic.AddUint64(&c.metrics.TotalServiceChecks, 1)
+	return c.send(metric{metricType: serviceCheck, scvalue: sc, rate: 1})
 }
 
 // SimpleServiceCheck sends an serviceCheck with the provided name and status.
@@ -414,267 +570,35 @@ func (c *Client) SimpleServiceCheck(name string, status ServiceCheckStatus) erro
 // Close the client connection.
 func (c *Client) Close() error {
 	if c == nil {
-		return nil
-	}
-	select {
-	case c.stop <- struct{}{}:
-	default:
+		return ErrNoClient
 	}
 
-	// if this client is buffered, flush before closing the writer
-	if c.bufferLength > 0 {
-		if err := c.Flush(); err != nil {
-			return err
+	// Acquire closer lock to ensure only one thread can close the stop channel
+	c.closerLock.Lock()
+	defer c.closerLock.Unlock()
+
+	// Notify all other threads that they should stop
+	select {
+	case <-c.stop:
+		return nil
+	default:
+	}
+	close(c.stop)
+
+	if c.receiveMode == ChannelMode {
+		for _, w := range c.workers {
+			w.stopReceivingMetric()
 		}
 	}
 
-	return c.writer.Close()
-}
+	// Wait for the threads to stop
+	c.wg.Wait()
 
-// Events support
-// EventAlertType and EventAlertPriority became exported types after this issue was submitted: https://github.com/DataDog/datadog-go/issues/41
-// The reason why they got exported is so that client code can directly use the types.
-
-// EventAlertType is the alert type for events
-type EventAlertType string
-
-const (
-	// Info is the "info" AlertType for events
-	Info EventAlertType = "info"
-	// Error is the "error" AlertType for events
-	Error EventAlertType = "error"
-	// Warning is the "warning" AlertType for events
-	Warning EventAlertType = "warning"
-	// Success is the "success" AlertType for events
-	Success EventAlertType = "success"
-)
-
-// EventPriority is the event priority for events
-type EventPriority string
-
-const (
-	// Normal is the "normal" Priority for events
-	Normal EventPriority = "normal"
-	// Low is the "low" Priority for events
-	Low EventPriority = "low"
-)
-
-// An Event is an object that can be posted to your DataDog event stream.
-type Event struct {
-	// Title of the event.  Required.
-	Title string
-	// Text is the description of the event.  Required.
-	Text string
-	// Timestamp is a timestamp for the event.  If not provided, the dogstatsd
-	// server will set this to the current time.
-	Timestamp time.Time
-	// Hostname for the event.
-	Hostname string
-	// AggregationKey groups this event with others of the same key.
-	AggregationKey string
-	// Priority of the event.  Can be statsd.Low or statsd.Normal.
-	Priority EventPriority
-	// SourceTypeName is a source type for the event.
-	SourceTypeName string
-	// AlertType can be statsd.Info, statsd.Error, statsd.Warning, or statsd.Success.
-	// If absent, the default value applied by the dogstatsd server is Info.
-	AlertType EventAlertType
-	// Tags for the event.
-	Tags []string
-}
-
-// NewEvent creates a new event with the given title and text.  Error checking
-// against these values is done at send-time, or upon running e.Check.
-func NewEvent(title, text string) *Event {
-	return &Event{
-		Title: title,
-		Text:  text,
+	// Finally flush any remaining metrics that may have come in at the last moment
+	if c.agg != nil {
+		c.agg.stop()
 	}
-}
+	c.Flush()
 
-// Check verifies that an event is valid.
-func (e Event) Check() error {
-	if len(e.Title) == 0 {
-		return fmt.Errorf("statsd.Event title is required")
-	}
-	if len(e.Text) == 0 {
-		return fmt.Errorf("statsd.Event text is required")
-	}
-	return nil
-}
-
-// Encode returns the dogstatsd wire protocol representation for an event.
-// Tags may be passed which will be added to the encoded output but not to
-// the Event's list of tags, eg. for default tags.
-func (e Event) Encode(tags ...string) (string, error) {
-	err := e.Check()
-	if err != nil {
-		return "", err
-	}
-	text := e.escapedText()
-
-	var buffer bytes.Buffer
-	buffer.WriteString("_e{")
-	buffer.WriteString(strconv.FormatInt(int64(len(e.Title)), 10))
-	buffer.WriteRune(',')
-	buffer.WriteString(strconv.FormatInt(int64(len(text)), 10))
-	buffer.WriteString("}:")
-	buffer.WriteString(e.Title)
-	buffer.WriteRune('|')
-	buffer.WriteString(text)
-
-	if !e.Timestamp.IsZero() {
-		buffer.WriteString("|d:")
-		buffer.WriteString(strconv.FormatInt(int64(e.Timestamp.Unix()), 10))
-	}
-
-	if len(e.Hostname) != 0 {
-		buffer.WriteString("|h:")
-		buffer.WriteString(e.Hostname)
-	}
-
-	if len(e.AggregationKey) != 0 {
-		buffer.WriteString("|k:")
-		buffer.WriteString(e.AggregationKey)
-
-	}
-
-	if len(e.Priority) != 0 {
-		buffer.WriteString("|p:")
-		buffer.WriteString(string(e.Priority))
-	}
-
-	if len(e.SourceTypeName) != 0 {
-		buffer.WriteString("|s:")
-		buffer.WriteString(e.SourceTypeName)
-	}
-
-	if len(e.AlertType) != 0 {
-		buffer.WriteString("|t:")
-		buffer.WriteString(string(e.AlertType))
-	}
-
-	writeTagString(&buffer, tags, e.Tags)
-
-	return buffer.String(), nil
-}
-
-// ServiceCheckStatus support
-type ServiceCheckStatus byte
-
-const (
-	// Ok is the "ok" ServiceCheck status
-	Ok ServiceCheckStatus = 0
-	// Warn is the "warning" ServiceCheck status
-	Warn ServiceCheckStatus = 1
-	// Critical is the "critical" ServiceCheck status
-	Critical ServiceCheckStatus = 2
-	// Unknown is the "unknown" ServiceCheck status
-	Unknown ServiceCheckStatus = 3
-)
-
-// An ServiceCheck is an object that contains status of DataDog service check.
-type ServiceCheck struct {
-	// Name of the service check.  Required.
-	Name string
-	// Status of service check.  Required.
-	Status ServiceCheckStatus
-	// Timestamp is a timestamp for the serviceCheck.  If not provided, the dogstatsd
-	// server will set this to the current time.
-	Timestamp time.Time
-	// Hostname for the serviceCheck.
-	Hostname string
-	// A message describing the current state of the serviceCheck.
-	Message string
-	// Tags for the serviceCheck.
-	Tags []string
-}
-
-// NewServiceCheck creates a new serviceCheck with the given name and status.  Error checking
-// against these values is done at send-time, or upon running sc.Check.
-func NewServiceCheck(name string, status ServiceCheckStatus) *ServiceCheck {
-	return &ServiceCheck{
-		Name:   name,
-		Status: status,
-	}
-}
-
-// Check verifies that an event is valid.
-func (sc ServiceCheck) Check() error {
-	if len(sc.Name) == 0 {
-		return fmt.Errorf("statsd.ServiceCheck name is required")
-	}
-	if byte(sc.Status) < 0 || byte(sc.Status) > 3 {
-		return fmt.Errorf("statsd.ServiceCheck status has invalid value")
-	}
-	return nil
-}
-
-// Encode returns the dogstatsd wire protocol representation for an serviceCheck.
-// Tags may be passed which will be added to the encoded output but not to
-// the Event's list of tags, eg. for default tags.
-func (sc ServiceCheck) Encode(tags ...string) (string, error) {
-	err := sc.Check()
-	if err != nil {
-		return "", err
-	}
-	message := sc.escapedMessage()
-
-	var buffer bytes.Buffer
-	buffer.WriteString("_sc|")
-	buffer.WriteString(sc.Name)
-	buffer.WriteRune('|')
-	buffer.WriteString(strconv.FormatInt(int64(sc.Status), 10))
-
-	if !sc.Timestamp.IsZero() {
-		buffer.WriteString("|d:")
-		buffer.WriteString(strconv.FormatInt(int64(sc.Timestamp.Unix()), 10))
-	}
-
-	if len(sc.Hostname) != 0 {
-		buffer.WriteString("|h:")
-		buffer.WriteString(sc.Hostname)
-	}
-
-	writeTagString(&buffer, tags, sc.Tags)
-
-	if len(message) != 0 {
-		buffer.WriteString("|m:")
-		buffer.WriteString(message)
-	}
-
-	return buffer.String(), nil
-}
-
-func (e Event) escapedText() string {
-	return strings.Replace(e.Text, "\n", "\\n", -1)
-}
-
-func (sc ServiceCheck) escapedMessage() string {
-	msg := strings.Replace(sc.Message, "\n", "\\n", -1)
-	return strings.Replace(msg, "m:", `m\:`, -1)
-}
-
-func removeNewlines(str string) string {
-	return strings.Replace(str, "\n", "", -1)
-}
-
-func writeTagString(w io.Writer, tagList1, tagList2 []string) {
-	// the tag lists may be shared with other callers, so we cannot modify
-	// them in any way (which means we cannot append to them either)
-	// therefore we must make an entirely separate copy just for this call
-	totalLen := len(tagList1) + len(tagList2)
-	if totalLen == 0 {
-		return
-	}
-	tags := make([]string, 0, totalLen)
-	tags = append(tags, tagList1...)
-	tags = append(tags, tagList2...)
-
-	io.WriteString(w, "|#")
-	io.WriteString(w, removeNewlines(tags[0]))
-	for _, tag := range tags[1:] {
-		io.WriteString(w, ",")
-		io.WriteString(w, removeNewlines(tag))
-	}
+	return c.sender.close()
 }

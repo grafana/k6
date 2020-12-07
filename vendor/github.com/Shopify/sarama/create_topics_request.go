@@ -79,6 +79,10 @@ func (c *CreateTopicsRequest) version() int16 {
 	return c.Version
 }
 
+func (r *CreateTopicsRequest) headerVersion() int16 {
+	return 1
+}
+
 func (c *CreateTopicsRequest) requiredVersion() KafkaVersion {
 	switch c.Version {
 	case 2:

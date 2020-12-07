@@ -38,7 +38,7 @@ func TestRun(t *testing.T) {
 	coordinator := sarama.NewMockBroker(t, 2)
 	seedMeta := new(sarama.MetadataResponse)
 	seedMeta.AddBroker(coordinator.Addr(), coordinator.BrokerID())
-	seedMeta.AddTopicPartition("my_topic", 0, 1, []int32{}, []int32{}, sarama.ErrNoError)
+	seedMeta.AddTopicPartition("my_topic", 0, 1, []int32{}, []int32{}, []int32{}, sarama.ErrNoError)
 	broker.Returns(seedMeta)
 
 	cfg := Config{

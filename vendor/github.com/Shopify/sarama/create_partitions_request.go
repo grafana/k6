@@ -67,6 +67,10 @@ func (r *CreatePartitionsRequest) version() int16 {
 	return 0
 }
 
+func (r *CreatePartitionsRequest) headerVersion() int16 {
+	return 1
+}
+
 func (r *CreatePartitionsRequest) requiredVersion() KafkaVersion {
 	return V1_0_0_0
 }

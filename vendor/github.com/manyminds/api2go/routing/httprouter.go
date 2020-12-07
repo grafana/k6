@@ -19,7 +19,7 @@ func (h HTTPRouter) Handle(protocol, route string, handler HandlerFunc) {
 			params[p.Key] = p.Value
 		}
 
-		handler(w, r, params)
+		handler(w, r, params, make(map[string]interface{}))
 	}
 
 	h.router.Handle(protocol, route, wrappedCallback)

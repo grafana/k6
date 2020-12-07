@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"runtime/debug"
+	"sync"
 	"time"
 )
 
@@ -16,7 +17,8 @@ var (
 		}
 		ReadGCStats Timer
 	}
-	gcStats debug.GCStats
+	gcStats                  debug.GCStats
+	registerDebugMetricsOnce = sync.Once{}
 )
 
 // Capture new values for the Go garbage collector statistics exported in
@@ -54,19 +56,21 @@ func CaptureDebugGCStatsOnce(r Registry) {
 // debug.GCStats.  The metrics are named by their fully-qualified Go symbols,
 // i.e. debug.GCStats.PauseTotal.
 func RegisterDebugGCStats(r Registry) {
-	debugMetrics.GCStats.LastGC = NewGauge()
-	debugMetrics.GCStats.NumGC = NewGauge()
-	debugMetrics.GCStats.Pause = NewHistogram(NewExpDecaySample(1028, 0.015))
-	//debugMetrics.GCStats.PauseQuantiles = NewHistogram(NewExpDecaySample(1028, 0.015))
-	debugMetrics.GCStats.PauseTotal = NewGauge()
-	debugMetrics.ReadGCStats = NewTimer()
+	registerDebugMetricsOnce.Do(func() {
+		debugMetrics.GCStats.LastGC = NewGauge()
+		debugMetrics.GCStats.NumGC = NewGauge()
+		debugMetrics.GCStats.Pause = NewHistogram(NewExpDecaySample(1028, 0.015))
+		//debugMetrics.GCStats.PauseQuantiles = NewHistogram(NewExpDecaySample(1028, 0.015))
+		debugMetrics.GCStats.PauseTotal = NewGauge()
+		debugMetrics.ReadGCStats = NewTimer()
 
-	r.Register("debug.GCStats.LastGC", debugMetrics.GCStats.LastGC)
-	r.Register("debug.GCStats.NumGC", debugMetrics.GCStats.NumGC)
-	r.Register("debug.GCStats.Pause", debugMetrics.GCStats.Pause)
-	//r.Register("debug.GCStats.PauseQuantiles", debugMetrics.GCStats.PauseQuantiles)
-	r.Register("debug.GCStats.PauseTotal", debugMetrics.GCStats.PauseTotal)
-	r.Register("debug.ReadGCStats", debugMetrics.ReadGCStats)
+		r.Register("debug.GCStats.LastGC", debugMetrics.GCStats.LastGC)
+		r.Register("debug.GCStats.NumGC", debugMetrics.GCStats.NumGC)
+		r.Register("debug.GCStats.Pause", debugMetrics.GCStats.Pause)
+		//r.Register("debug.GCStats.PauseQuantiles", debugMetrics.GCStats.PauseQuantiles)
+		r.Register("debug.GCStats.PauseTotal", debugMetrics.GCStats.PauseTotal)
+		r.Register("debug.ReadGCStats", debugMetrics.ReadGCStats)
+	})
 }
 
 // Allocate an initial slice for gcStats.Pause to avoid allocations during

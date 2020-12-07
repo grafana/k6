@@ -12,9 +12,6 @@ import (
 
 //++ TODO: IDEA: merge virtualFile and virtualDir, this decreases work done by rice.File
 
-// Error indicating some function is not implemented yet (but available to satisfy an interface)
-var ErrNotImplemented = errors.New("not implemented yet")
-
 // virtualFile is a 'stateful' virtual file.
 // virtualFile wraps an *EmbeddedFile for a call to Box.Open() and virtualizes 'read cursor' (offset) and 'closing'.
 // virtualFile is only internally visible and should be exposed through rice.File
@@ -68,8 +65,18 @@ func (vf *virtualFile) readdir(count int) ([]os.FileInfo, error) {
 			Err:  errors.New("bad file descriptor"),
 		}
 	}
-	//TODO: return proper error for a readdir() call on a file
-	return nil, ErrNotImplemented
+	return nil, os.ErrInvalid
+}
+
+func (vf *virtualFile) readdirnames(count int) ([]string, error) {
+	if vf.closed {
+		return nil, &os.PathError{
+			Op:   "readdirnames",
+			Path: vf.EmbeddedFile.Filename,
+			Err:  errors.New("bad file descriptor"),
+		}
+	}
+	return nil, os.ErrInvalid
 }
 
 func (vf *virtualFile) read(bts []byte) (int, error) {
@@ -173,7 +180,7 @@ func (vd *virtualDir) stat() (os.FileInfo, error) {
 	return (*embeddedDirInfo)(vd.EmbeddedDir), nil
 }
 
-func (vd *virtualDir) readdir(n int) (fi []os.FileInfo, err error) {
+func (vd *virtualDir) readdir(n int) ([]os.FileInfo, error) {
 
 	if vd.closed {
 		return nil, &os.PathError{
@@ -219,6 +226,51 @@ func (vd *virtualDir) readdir(n int) (fi []os.FileInfo, err error) {
 	vd.offset += n
 	return files[offset : offset+n], nil
 
+}
+
+func (vd *virtualDir) readdirnames(n int) ([]string, error) {
+
+	if vd.closed {
+		return nil, &os.PathError{
+			Op:   "readdir",
+			Path: vd.EmbeddedDir.Filename,
+			Err:  errors.New("bad file descriptor"),
+		}
+	}
+
+	// Build up the array of our contents
+	var files []string
+
+	// Add the child directories
+	for _, child := range vd.ChildDirs {
+		files = append(files, filepath.Base(child.Filename))
+	}
+
+	// Add the child files
+	for _, child := range vd.ChildFiles {
+		files = append(files, filepath.Base(child.Filename))
+	}
+
+	// Sort it by filename (lexical order)
+	sort.Strings(files)
+
+	// Return all contents if that's what is requested
+	if n <= 0 {
+		vd.offset = 0
+		return files, nil
+	}
+
+	// If user has requested past the end of our list
+	// return what we can and send an EOF
+	if vd.offset+n >= len(files) {
+		offset := vd.offset
+		vd.offset = 0
+		return files[offset:], io.EOF
+	}
+
+	offset := vd.offset
+	vd.offset += n
+	return files[offset : offset+n], nil
 }
 
 func (vd *virtualDir) read(bts []byte) (int, error) {

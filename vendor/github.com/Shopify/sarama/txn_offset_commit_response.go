@@ -78,6 +78,10 @@ func (a *TxnOffsetCommitResponse) version() int16 {
 	return 0
 }
 
+func (a *TxnOffsetCommitResponse) headerVersion() int16 {
+	return 0
+}
+
 func (a *TxnOffsetCommitResponse) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }

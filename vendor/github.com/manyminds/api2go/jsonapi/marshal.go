@@ -80,6 +80,13 @@ type MarshalCustomLinks interface {
 	GetCustomLinks(string) Links
 }
 
+// The MarshalMeta interface can be implemented if the struct should
+// want any meta.
+type MarshalMeta interface {
+	MarshalIdentifier
+	Meta() Meta
+}
+
 // The MarshalCustomRelationshipMeta interface can be implemented if the struct should
 // want a custom meta in a relationship.
 type MarshalCustomRelationshipMeta interface {
@@ -251,6 +258,14 @@ func marshalData(element MarshalIdentifier, data *Data, information ServerInform
 					data.Links[k] = v
 				}
 			}
+		}
+	}
+
+	if casteMetaTarget, ok := element.(MarshalMeta); ok {
+		meta := casteMetaTarget.Meta()
+		data.Meta, err = json.Marshal(meta)
+		if err != nil {
+			return err
 		}
 	}
 

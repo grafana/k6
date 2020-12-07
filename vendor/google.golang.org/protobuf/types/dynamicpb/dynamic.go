@@ -14,6 +14,39 @@ import (
 	"google.golang.org/protobuf/runtime/protoimpl"
 )
 
+// enum is a dynamic protoreflect.Enum.
+type enum struct {
+	num pref.EnumNumber
+	typ pref.EnumType
+}
+
+func (e enum) Descriptor() pref.EnumDescriptor { return e.typ.Descriptor() }
+func (e enum) Type() pref.EnumType             { return e.typ }
+func (e enum) Number() pref.EnumNumber         { return e.num }
+
+// enumType is a dynamic protoreflect.EnumType.
+type enumType struct {
+	desc pref.EnumDescriptor
+}
+
+// NewEnumType creates a new EnumType with the provided descriptor.
+//
+// EnumTypes created by this package are equal if their descriptors are equal.
+// That is, if ed1 == ed2, then NewEnumType(ed1) == NewEnumType(ed2).
+//
+// Enum values created by the EnumType are equal if their numbers are equal.
+func NewEnumType(desc pref.EnumDescriptor) pref.EnumType {
+	return enumType{desc}
+}
+
+func (et enumType) New(n pref.EnumNumber) pref.Enum { return enum{n, et} }
+func (et enumType) Descriptor() pref.EnumDescriptor { return et.desc }
+
+// extensionType is a dynamic protoreflect.ExtensionType.
+type extensionType struct {
+	desc extensionTypeDescriptor
+}
+
 // A Message is a dynamically constructed protocol buffer message.
 //
 // Message implements the proto.Message interface, and may be used with all
@@ -575,11 +608,6 @@ func newListEntry(fd pref.FieldDescriptor) pref.Value {
 		return pref.ValueOfMessage(NewMessage(fd.Message()).ProtoReflect())
 	}
 	panic(errors.New("%v: unknown kind %v", fd.FullName(), fd.Kind()))
-}
-
-// extensionType is a dynamic protoreflect.ExtensionType.
-type extensionType struct {
-	desc extensionTypeDescriptor
 }
 
 // NewExtensionType creates a new ExtensionType with the provided descriptor.

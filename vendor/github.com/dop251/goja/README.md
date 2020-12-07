@@ -212,34 +212,8 @@ There are two standard mappers: [TagFieldNameMapper](https://godoc.org/github.co
 Native Constructors
 -------------------
 
-In order to implement a constructor function in Go:
-```go
-func MyObject(call goja.ConstructorCall) *Object {
-    // call.This contains the newly created object as per http://www.ecma-international.org/ecma-262/5.1/index.html#sec-13.2.2
-    // call.Arguments contain arguments passed to the function
-
-    call.This.Set("method", method)
-
-    //...
-
-    // If return value is a non-nil *Object, it will be used instead of call.This
-    // This way it is possible to return a Go struct or a map converted
-    // into goja.Value using runtime.ToValue(), however in this case
-    // instanceof will not work as expected.
-    return nil
-}
-
-runtime.Set("MyObject", MyObject)
-
-```
-
-Then it can be used in JS as follows:
-
-```js
-var o = new MyObject(arg);
-var o1 = MyObject(arg); // same thing
-o instanceof MyObject && o1 instanceof MyObject; // true
-```
+In order to implement a constructor function in Go use `func (goja.ConstructorCall) *goja.Object`.
+See [Runtime.ToValue()](https://godoc.org/github.com/dop251/goja#Runtime.ToValue) documentation for more details.
 
 Regular Expressions
 -------------------

@@ -1,9 +1,11 @@
-// Copyright (c) 2012-2018 Ugorji Nwoke. All rights reserved.
+// Copyright (c) 2012-2020 Ugorji Nwoke. All rights reserved.
 // Use of this source code is governed by a MIT license found in the LICENSE file.
 
 // +build !go1.4
 
 package codec
+
+import "errors"
 
 // This codec package will only work for go1.4 and above.
 // This is for the following reasons:
@@ -12,6 +14,8 @@ package codec
 //   - interface only holds pointers
 //   - reflect.Value is stabilized as 3 words
 
+var errCodecSupportedOnlyFromGo14 = errors.New("codec: go 1.3 and below are not supported")
+
 func init() {
-	panic("codec: go 1.3 and below are not supported")
+	panic(errCodecSupportedOnlyFromGo14)
 }

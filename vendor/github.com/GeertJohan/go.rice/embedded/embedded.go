@@ -24,12 +24,15 @@ type EmbeddedBox struct {
 
 // Link creates the ChildDirs and ChildFiles links in all EmbeddedDir's
 func (e *EmbeddedBox) Link() {
-	for path, ed := range e.Dirs {
-		fmt.Println(path)
+	for _, ed := range e.Dirs {
 		ed.ChildDirs = make([]*EmbeddedDir, 0)
 		ed.ChildFiles = make([]*EmbeddedFile, 0)
 	}
 	for path, ed := range e.Dirs {
+		// skip for root, it'll create a recursion
+		if path == "" {
+			continue
+		}
 		parentDirpath, _ := filepath.Split(path)
 		if strings.HasSuffix(parentDirpath, "/") {
 			parentDirpath = parentDirpath[:len(parentDirpath)-1]

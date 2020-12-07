@@ -132,3 +132,8 @@ func (b Bool) Ptr() *bool {
 func (b Bool) IsZero() bool {
 	return !b.Valid
 }
+
+// Equal returns true if both booleans have the same value or are both null.
+func (b Bool) Equal(other Bool) bool {
+	return b.Valid == other.Valid && (!b.Valid || b.Bool == other.Bool)
+}

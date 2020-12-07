@@ -113,9 +113,9 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 			}
 			if metricRegistry != nil {
 				if r.Version >= 3 {
-					topicRecordCount += updateBatchMetrics(records.recordBatch, compressionRatioMetric, topicCompressionRatioMetric)
+					topicRecordCount += updateBatchMetrics(records.RecordBatch, compressionRatioMetric, topicCompressionRatioMetric)
 				} else {
-					topicRecordCount += updateMsgSetMetrics(records.msgSet, compressionRatioMetric, topicCompressionRatioMetric)
+					topicRecordCount += updateMsgSetMetrics(records.MsgSet, compressionRatioMetric, topicCompressionRatioMetric)
 				}
 				batchSize := int64(pe.offset() - startOffset)
 				batchSizeMetric.Update(batchSize)
@@ -206,6 +206,10 @@ func (r *ProduceRequest) version() int16 {
 	return r.Version
 }
 
+func (r *ProduceRequest) headerVersion() int16 {
+	return 1
+}
+
 func (r *ProduceRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 1:
@@ -214,8 +218,10 @@ func (r *ProduceRequest) requiredVersion() KafkaVersion {
 		return V0_10_0_0
 	case 3:
 		return V0_11_0_0
+	case 7:
+		return V2_1_0_0
 	default:
-		return minVersion
+		return MinVersion
 	}
 }
 
@@ -231,7 +237,7 @@ func (r *ProduceRequest) ensureRecords(topic string, partition int32) {
 
 func (r *ProduceRequest) AddMessage(topic string, partition int32, msg *Message) {
 	r.ensureRecords(topic, partition)
-	set := r.records[topic][partition].msgSet
+	set := r.records[topic][partition].MsgSet
 
 	if set == nil {
 		set = new(MessageSet)

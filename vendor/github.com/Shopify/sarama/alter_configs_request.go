@@ -1,45 +1,47 @@
 package sarama
 
+//AlterConfigsRequest is an alter config request type
 type AlterConfigsRequest struct {
 	Resources    []*AlterConfigsResource
 	ValidateOnly bool
 }
 
+//AlterConfigsResource is an alter config resource type
 type AlterConfigsResource struct {
 	Type          ConfigResourceType
 	Name          string
 	ConfigEntries map[string]*string
 }
 
-func (acr *AlterConfigsRequest) encode(pe packetEncoder) error {
-	if err := pe.putArrayLength(len(acr.Resources)); err != nil {
+func (a *AlterConfigsRequest) encode(pe packetEncoder) error {
+	if err := pe.putArrayLength(len(a.Resources)); err != nil {
 		return err
 	}
 
-	for _, r := range acr.Resources {
+	for _, r := range a.Resources {
 		if err := r.encode(pe); err != nil {
 			return err
 		}
 	}
 
-	pe.putBool(acr.ValidateOnly)
+	pe.putBool(a.ValidateOnly)
 	return nil
 }
 
-func (acr *AlterConfigsRequest) decode(pd packetDecoder, version int16) error {
+func (a *AlterConfigsRequest) decode(pd packetDecoder, version int16) error {
 	resourceCount, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
 
-	acr.Resources = make([]*AlterConfigsResource, resourceCount)
-	for i := range acr.Resources {
+	a.Resources = make([]*AlterConfigsResource, resourceCount)
+	for i := range a.Resources {
 		r := &AlterConfigsResource{}
 		err = r.decode(pd, version)
 		if err != nil {
 			return err
 		}
-		acr.Resources[i] = r
+		a.Resources[i] = r
 	}
 
 	validateOnly, err := pd.getBool()
@@ -47,22 +49,22 @@ func (acr *AlterConfigsRequest) decode(pd packetDecoder, version int16) error {
 		return err
 	}
 
-	acr.ValidateOnly = validateOnly
+	a.ValidateOnly = validateOnly
 
 	return nil
 }
 
-func (ac *AlterConfigsResource) encode(pe packetEncoder) error {
-	pe.putInt8(int8(ac.Type))
+func (a *AlterConfigsResource) encode(pe packetEncoder) error {
+	pe.putInt8(int8(a.Type))
 
-	if err := pe.putString(ac.Name); err != nil {
+	if err := pe.putString(a.Name); err != nil {
 		return err
 	}
 
-	if err := pe.putArrayLength(len(ac.ConfigEntries)); err != nil {
+	if err := pe.putArrayLength(len(a.ConfigEntries)); err != nil {
 		return err
 	}
-	for configKey, configValue := range ac.ConfigEntries {
+	for configKey, configValue := range a.ConfigEntries {
 		if err := pe.putString(configKey); err != nil {
 			return err
 		}
@@ -74,18 +76,18 @@ func (ac *AlterConfigsResource) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (ac *AlterConfigsResource) decode(pd packetDecoder, version int16) error {
+func (a *AlterConfigsResource) decode(pd packetDecoder, version int16) error {
 	t, err := pd.getInt8()
 	if err != nil {
 		return err
 	}
-	ac.Type = ConfigResourceType(t)
+	a.Type = ConfigResourceType(t)
 
 	name, err := pd.getString()
 	if err != nil {
 		return err
 	}
-	ac.Name = name
+	a.Name = name
 
 	n, err := pd.getArrayLength()
 	if err != nil {
@@ -93,13 +95,13 @@ func (ac *AlterConfigsResource) decode(pd packetDecoder, version int16) error {
 	}
 
 	if n > 0 {
-		ac.ConfigEntries = make(map[string]*string, n)
+		a.ConfigEntries = make(map[string]*string, n)
 		for i := 0; i < n; i++ {
 			configKey, err := pd.getString()
 			if err != nil {
 				return err
 			}
-			if ac.ConfigEntries[configKey], err = pd.getNullableString(); err != nil {
+			if a.ConfigEntries[configKey], err = pd.getNullableString(); err != nil {
 				return err
 			}
 		}
@@ -107,14 +109,18 @@ func (ac *AlterConfigsResource) decode(pd packetDecoder, version int16) error {
 	return err
 }
 
-func (acr *AlterConfigsRequest) key() int16 {
+func (a *AlterConfigsRequest) key() int16 {
 	return 33
 }
 
-func (acr *AlterConfigsRequest) version() int16 {
+func (a *AlterConfigsRequest) version() int16 {
 	return 0
 }
 
-func (acr *AlterConfigsRequest) requiredVersion() KafkaVersion {
+func (a *AlterConfigsRequest) headerVersion() int16 {
+	return 1
+}
+
+func (a *AlterConfigsRequest) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }

@@ -119,7 +119,7 @@ func BaseTest(t *testing.T,
 					"tag3": "value3",
 				}),
 			},
-			output: "testing.things.my_gauge:13.000000|g",
+			output: "testing.things.my_gauge:13|g",
 		},
 		{
 			input: []stats.SampleContainer{

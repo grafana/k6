@@ -6,7 +6,7 @@ type offsetRequestBlock struct {
 }
 
 func (b *offsetRequestBlock) encode(pe packetEncoder, version int16) error {
-	pe.putInt64(int64(b.time))
+	pe.putInt64(b.time)
 	if version == 0 {
 		pe.putInt32(b.maxOffsets)
 	}
@@ -27,12 +27,20 @@ func (b *offsetRequestBlock) decode(pd packetDecoder, version int16) (err error)
 }
 
 type OffsetRequest struct {
-	Version int16
-	blocks  map[string]map[int32]*offsetRequestBlock
+	Version        int16
+	replicaID      int32
+	isReplicaIDSet bool
+	blocks         map[string]map[int32]*offsetRequestBlock
 }
 
 func (r *OffsetRequest) encode(pe packetEncoder) error {
-	pe.putInt32(-1) // replica ID is always -1 for clients
+	if r.isReplicaIDSet {
+		pe.putInt32(r.replicaID)
+	} else {
+		// default replica ID is always -1 for clients
+		pe.putInt32(-1)
+	}
+
 	err := pe.putArrayLength(len(r.blocks))
 	if err != nil {
 		return err
@@ -59,10 +67,14 @@ func (r *OffsetRequest) encode(pe packetEncoder) error {
 func (r *OffsetRequest) decode(pd packetDecoder, version int16) error {
 	r.Version = version
 
-	// Ignore replica ID
-	if _, err := pd.getInt32(); err != nil {
+	replicaID, err := pd.getInt32()
+	if err != nil {
 		return err
 	}
+	if replicaID >= 0 {
+		r.SetReplicaID(replicaID)
+	}
+
 	blockCount, err := pd.getArrayLength()
 	if err != nil {
 		return err
@@ -104,13 +116,29 @@ func (r *OffsetRequest) version() int16 {
 	return r.Version
 }
 
+func (r *OffsetRequest) headerVersion() int16 {
+	return 1
+}
+
 func (r *OffsetRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 1:
 		return V0_10_1_0
 	default:
-		return minVersion
+		return MinVersion
 	}
+}
+
+func (r *OffsetRequest) SetReplicaID(id int32) {
+	r.replicaID = id
+	r.isReplicaIDSet = true
+}
+
+func (r *OffsetRequest) ReplicaID() int32 {
+	if r.isReplicaIDSet {
+		return r.replicaID
+	}
+	return -1
 }
 
 func (r *OffsetRequest) AddBlock(topic string, partitionID int32, time int64, maxOffsets int32) {

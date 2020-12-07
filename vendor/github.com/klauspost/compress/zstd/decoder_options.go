@@ -18,6 +18,7 @@ type decoderOptions struct {
 	lowMem         bool
 	concurrent     int
 	maxDecodedSize uint64
+	dicts          []dict
 }
 
 func (o *decoderOptions) setDefault() {
@@ -50,17 +51,34 @@ func WithDecoderConcurrency(n int) DOption {
 }
 
 // WithDecoderMaxMemory allows to set a maximum decoded size for in-memory
-// (non-streaming) operations.
-// Maxmimum and default is 1 << 63 bytes.
+// non-streaming operations or maximum window size for streaming operations.
+// This can be used to control memory usage of potentially hostile content.
+// For streaming operations, the maximum window size is capped at 1<<30 bytes.
+// Maximum and default is 1 << 63 bytes.
 func WithDecoderMaxMemory(n uint64) DOption {
 	return func(o *decoderOptions) error {
 		if n == 0 {
-			return errors.New("WithDecoderMaxmemory must be at least 1")
+			return errors.New("WithDecoderMaxMemory must be at least 1")
 		}
 		if n > 1<<63 {
-			return fmt.Errorf("WithDecoderMaxmemorymust be less than 1 << 63")
+			return fmt.Errorf("WithDecoderMaxmemory must be less than 1 << 63")
 		}
 		o.maxDecodedSize = n
+		return nil
+	}
+}
+
+// WithDecoderDicts allows to register one or more dictionaries for the decoder.
+// If several dictionaries with the same ID is provided the last one will be used.
+func WithDecoderDicts(dicts ...[]byte) DOption {
+	return func(o *decoderOptions) error {
+		for _, b := range dicts {
+			d, err := loadDict(b)
+			if err != nil {
+				return err
+			}
+			o.dicts = append(o.dicts, *d)
+		}
 		return nil
 	}
 }

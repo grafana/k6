@@ -47,18 +47,78 @@ type AsyncProducer interface {
 	Errors() <-chan *ProducerError
 }
 
+// transactionManager keeps the state necessary to ensure idempotent production
+type transactionManager struct {
+	producerID      int64
+	producerEpoch   int16
+	sequenceNumbers map[string]int32
+	mutex           sync.Mutex
+}
+
+const (
+	noProducerID    = -1
+	noProducerEpoch = -1
+)
+
+func (t *transactionManager) getAndIncrementSequenceNumber(topic string, partition int32) (int32, int16) {
+	key := fmt.Sprintf("%s-%d", topic, partition)
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	sequence := t.sequenceNumbers[key]
+	t.sequenceNumbers[key] = sequence + 1
+	return sequence, t.producerEpoch
+}
+
+func (t *transactionManager) bumpEpoch() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	t.producerEpoch++
+	for k := range t.sequenceNumbers {
+		t.sequenceNumbers[k] = 0
+	}
+}
+
+func (t *transactionManager) getProducerID() (int64, int16) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	return t.producerID, t.producerEpoch
+}
+
+func newTransactionManager(conf *Config, client Client) (*transactionManager, error) {
+	txnmgr := &transactionManager{
+		producerID:    noProducerID,
+		producerEpoch: noProducerEpoch,
+	}
+
+	if conf.Producer.Idempotent {
+		initProducerIDResponse, err := client.InitProducerID()
+		if err != nil {
+			return nil, err
+		}
+		txnmgr.producerID = initProducerIDResponse.ProducerID
+		txnmgr.producerEpoch = initProducerIDResponse.ProducerEpoch
+		txnmgr.sequenceNumbers = make(map[string]int32)
+		txnmgr.mutex = sync.Mutex{}
+
+		Logger.Printf("Obtained a ProducerId: %d and ProducerEpoch: %d\n", txnmgr.producerID, txnmgr.producerEpoch)
+	}
+
+	return txnmgr, nil
+}
+
 type asyncProducer struct {
-	client    Client
-	conf      *Config
-	ownClient bool
+	client Client
+	conf   *Config
 
 	errors                    chan *ProducerError
 	input, successes, retries chan *ProducerMessage
 	inFlight                  sync.WaitGroup
 
-	brokers    map[*Broker]chan<- *ProducerMessage
-	brokerRefs map[chan<- *ProducerMessage]int
+	brokers    map[*Broker]*brokerProducer
+	brokerRefs map[*brokerProducer]int
 	brokerLock sync.Mutex
+
+	txnmgr *transactionManager
 }
 
 // NewAsyncProducer creates a new AsyncProducer using the given broker addresses and configuration.
@@ -67,21 +127,27 @@ func NewAsyncProducer(addrs []string, conf *Config) (AsyncProducer, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	p, err := NewAsyncProducerFromClient(client)
-	if err != nil {
-		return nil, err
-	}
-	p.(*asyncProducer).ownClient = true
-	return p, nil
+	return newAsyncProducer(client)
 }
 
 // NewAsyncProducerFromClient creates a new Producer using the given client. It is still
 // necessary to call Close() on the underlying client when shutting down this producer.
 func NewAsyncProducerFromClient(client Client) (AsyncProducer, error) {
+	// For clients passed in by the client, ensure we don't
+	// call Close() on it.
+	cli := &nopCloserClient{client}
+	return newAsyncProducer(cli)
+}
+
+func newAsyncProducer(client Client) (AsyncProducer, error) {
 	// Check that we are not dealing with a closed Client before processing any other arguments
 	if client.Closed() {
 		return nil, ErrClosedClient
+	}
+
+	txnmgr, err := newTransactionManager(client.Config(), client)
+	if err != nil {
+		return nil, err
 	}
 
 	p := &asyncProducer{
@@ -91,8 +157,9 @@ func NewAsyncProducerFromClient(client Client) (AsyncProducer, error) {
 		input:      make(chan *ProducerMessage),
 		successes:  make(chan *ProducerMessage),
 		retries:    make(chan *ProducerMessage),
-		brokers:    make(map[*Broker]chan<- *ProducerMessage),
-		brokerRefs: make(map[chan<- *ProducerMessage]int),
+		brokers:    make(map[*Broker]*brokerProducer),
+		brokerRefs: make(map[*brokerProducer]int),
+		txnmgr:     txnmgr,
 	}
 
 	// launch our singleton dispatchers
@@ -139,14 +206,25 @@ type ProducerMessage struct {
 	// Partition is the partition that the message was sent to. This is only
 	// guaranteed to be defined if the message was successfully delivered.
 	Partition int32
-	// Timestamp is the timestamp assigned to the message by the broker. This
-	// is only guaranteed to be defined if the message was successfully
-	// delivered, RequiredAcks is not NoResponse, and the Kafka broker is at
-	// least version 0.10.0.
+	// Timestamp can vary in behaviour depending on broker configuration, being
+	// in either one of the CreateTime or LogAppendTime modes (default CreateTime),
+	// and requiring version at least 0.10.0.
+	//
+	// When configured to CreateTime, the timestamp is specified by the producer
+	// either by explicitly setting this field, or when the message is added
+	// to a produce set.
+	//
+	// When configured to LogAppendTime, the timestamp assigned to the message
+	// by the broker. This is only guaranteed to be defined if the message was
+	// successfully delivered and RequiredAcks is not NoResponse.
 	Timestamp time.Time
 
-	retries int
-	flags   flagSet
+	retries        int
+	flags          flagSet
+	expectation    chan *ProducerError
+	sequenceNumber int32
+	producerEpoch  int16
+	hasSequence    bool
 }
 
 const producerMessageOverhead = 26 // the metadata overhead of CRC, flags, etc.
@@ -173,6 +251,9 @@ func (m *ProducerMessage) byteSize(version int) int {
 func (m *ProducerMessage) clear() {
 	m.flags = 0
 	m.retries = 0
+	m.sequenceNumber = 0
+	m.producerEpoch = 0
+	m.hasSequence = false
 }
 
 // ProducerError is the type of error generated when the producer fails to deliver a message.
@@ -184,6 +265,10 @@ type ProducerError struct {
 
 func (pe ProducerError) Error() string {
 	return fmt.Sprintf("kafka: Failed to produce message to topic %s: %s", pe.Msg.Topic, pe.Err)
+}
+
+func (pe ProducerError) Unwrap() error {
+	return pe.Err
 }
 
 // ProducerErrors is a type that wraps a batch of "ProducerError"s and implements the Error interface.
@@ -267,9 +352,16 @@ func (p *asyncProducer) dispatcher() {
 			p.inFlight.Add(1)
 		}
 
+		for _, interceptor := range p.conf.Producer.Interceptors {
+			msg.safelyApplyInterceptor(interceptor)
+		}
+
 		version := 1
 		if p.conf.Version.IsAtLeast(V0_11_0_0) {
 			version = 2
+		} else if msg.Headers != nil {
+			p.returnError(msg, ConfigurationError("Producing headers requires Kafka at least v0.11"))
+			continue
 		}
 		if msg.byteSize(version) > p.conf.Producer.MaxMessageBytes {
 			p.returnError(msg, ErrMessageSizeTooLarge)
@@ -343,7 +435,14 @@ func (tp *topicProducer) partitionMessage(msg *ProducerMessage) error {
 	var partitions []int32
 
 	err := tp.breaker.Run(func() (err error) {
-		if tp.partitioner.RequiresConsistency() {
+		requiresConsistency := false
+		if ep, ok := tp.partitioner.(DynamicConsistencyPartitioner); ok {
+			requiresConsistency = ep.MessageRequiresConsistency(msg)
+		} else {
+			requiresConsistency = tp.partitioner.RequiresConsistency()
+		}
+
+		if requiresConsistency {
 			partitions, err = tp.parent.client.Partitions(msg.Topic)
 		} else {
 			partitions, err = tp.parent.client.WritablePartitions(msg.Topic)
@@ -383,9 +482,9 @@ type partitionProducer struct {
 	partition int32
 	input     <-chan *ProducerMessage
 
-	leader  *Broker
-	breaker *breaker.Breaker
-	output  chan<- *ProducerMessage
+	leader         *Broker
+	breaker        *breaker.Breaker
+	brokerProducer *brokerProducer
 
 	// highWatermark tracks the "current" retry level, which is the only one where we actually let messages through,
 	// all other messages get buffered in retryState[msg.retries].buf to preserve ordering
@@ -415,21 +514,53 @@ func (p *asyncProducer) newPartitionProducer(topic string, partition int32) chan
 	return input
 }
 
+func (pp *partitionProducer) backoff(retries int) {
+	var backoff time.Duration
+	if pp.parent.conf.Producer.Retry.BackoffFunc != nil {
+		maxRetries := pp.parent.conf.Producer.Retry.Max
+		backoff = pp.parent.conf.Producer.Retry.BackoffFunc(retries, maxRetries)
+	} else {
+		backoff = pp.parent.conf.Producer.Retry.Backoff
+	}
+	if backoff > 0 {
+		time.Sleep(backoff)
+	}
+}
+
 func (pp *partitionProducer) dispatch() {
 	// try to prefetch the leader; if this doesn't work, we'll do a proper call to `updateLeader`
 	// on the first message
 	pp.leader, _ = pp.parent.client.Leader(pp.topic, pp.partition)
 	if pp.leader != nil {
-		pp.output = pp.parent.getBrokerProducer(pp.leader)
+		pp.brokerProducer = pp.parent.getBrokerProducer(pp.leader)
 		pp.parent.inFlight.Add(1) // we're generating a syn message; track it so we don't shut down while it's still inflight
-		pp.output <- &ProducerMessage{Topic: pp.topic, Partition: pp.partition, flags: syn}
+		pp.brokerProducer.input <- &ProducerMessage{Topic: pp.topic, Partition: pp.partition, flags: syn}
 	}
 
+	defer func() {
+		if pp.brokerProducer != nil {
+			pp.parent.unrefBrokerProducer(pp.leader, pp.brokerProducer)
+		}
+	}()
+
 	for msg := range pp.input {
+		if pp.brokerProducer != nil && pp.brokerProducer.abandoned != nil {
+			select {
+			case <-pp.brokerProducer.abandoned:
+				// a message on the abandoned channel means that our current broker selection is out of date
+				Logger.Printf("producer/leader/%s/%d abandoning broker %d\n", pp.topic, pp.partition, pp.leader.ID())
+				pp.parent.unrefBrokerProducer(pp.leader, pp.brokerProducer)
+				pp.brokerProducer = nil
+				time.Sleep(pp.parent.conf.Producer.Retry.Backoff)
+			default:
+				// producer connection is still open.
+			}
+		}
+
 		if msg.retries > pp.highWatermark {
 			// a new, higher, retry level; handle it and then back off
 			pp.newHighWatermark(msg.retries)
-			time.Sleep(pp.parent.conf.Producer.Retry.Backoff)
+			pp.backoff(msg.retries)
 		} else if pp.highWatermark > 0 {
 			// we are retrying something (else highWatermark would be 0) but this message is not a *new* retry level
 			if msg.retries < pp.highWatermark {
@@ -454,20 +585,25 @@ func (pp *partitionProducer) dispatch() {
 		// if we made it this far then the current msg contains real data, and can be sent to the next goroutine
 		// without breaking any of our ordering guarantees
 
-		if pp.output == nil {
+		if pp.brokerProducer == nil {
 			if err := pp.updateLeader(); err != nil {
 				pp.parent.returnError(msg, err)
-				time.Sleep(pp.parent.conf.Producer.Retry.Backoff)
+				pp.backoff(msg.retries)
 				continue
 			}
 			Logger.Printf("producer/leader/%s/%d selected broker %d\n", pp.topic, pp.partition, pp.leader.ID())
 		}
 
-		pp.output <- msg
-	}
+		// Now that we know we have a broker to actually try and send this message to, generate the sequence
+		// number for it.
+		// All messages being retried (sent or not) have already had their retry count updated
+		// Also, ignore "special" syn/fin messages used to sync the brokerProducer and the topicProducer.
+		if pp.parent.conf.Producer.Idempotent && msg.retries == 0 && msg.flags == 0 {
+			msg.sequenceNumber, msg.producerEpoch = pp.parent.txnmgr.getAndIncrementSequenceNumber(msg.Topic, msg.Partition)
+			msg.hasSequence = true
+		}
 
-	if pp.output != nil {
-		pp.parent.unrefBrokerProducer(pp.leader, pp.output)
+		pp.brokerProducer.input <- msg
 	}
 }
 
@@ -479,12 +615,12 @@ func (pp *partitionProducer) newHighWatermark(hwm int) {
 	// back to us and we can safely flush the backlog (otherwise we risk re-ordering messages)
 	pp.retryState[pp.highWatermark].expectChaser = true
 	pp.parent.inFlight.Add(1) // we're generating a fin message; track it so we don't shut down while it's still inflight
-	pp.output <- &ProducerMessage{Topic: pp.topic, Partition: pp.partition, flags: fin, retries: pp.highWatermark - 1}
+	pp.brokerProducer.input <- &ProducerMessage{Topic: pp.topic, Partition: pp.partition, flags: fin, retries: pp.highWatermark - 1}
 
 	// a new HWM means that our current broker selection is out of date
 	Logger.Printf("producer/leader/%s/%d abandoning broker %d\n", pp.topic, pp.partition, pp.leader.ID())
-	pp.parent.unrefBrokerProducer(pp.leader, pp.output)
-	pp.output = nil
+	pp.parent.unrefBrokerProducer(pp.leader, pp.brokerProducer)
+	pp.brokerProducer = nil
 }
 
 func (pp *partitionProducer) flushRetryBuffers() {
@@ -492,7 +628,7 @@ func (pp *partitionProducer) flushRetryBuffers() {
 	for {
 		pp.highWatermark--
 
-		if pp.output == nil {
+		if pp.brokerProducer == nil {
 			if err := pp.updateLeader(); err != nil {
 				pp.parent.returnErrors(pp.retryState[pp.highWatermark].buf, err)
 				goto flushDone
@@ -501,7 +637,7 @@ func (pp *partitionProducer) flushRetryBuffers() {
 		}
 
 		for _, msg := range pp.retryState[pp.highWatermark].buf {
-			pp.output <- msg
+			pp.brokerProducer.input <- msg
 		}
 
 	flushDone:
@@ -526,16 +662,16 @@ func (pp *partitionProducer) updateLeader() error {
 			return err
 		}
 
-		pp.output = pp.parent.getBrokerProducer(pp.leader)
+		pp.brokerProducer = pp.parent.getBrokerProducer(pp.leader)
 		pp.parent.inFlight.Add(1) // we're generating a syn message; track it so we don't shut down while it's still inflight
-		pp.output <- &ProducerMessage{Topic: pp.topic, Partition: pp.partition, flags: syn}
+		pp.brokerProducer.input <- &ProducerMessage{Topic: pp.topic, Partition: pp.partition, flags: syn}
 
 		return nil
 	})
 }
 
 // one per broker; also constructs an associated flusher
-func (p *asyncProducer) newBrokerProducer(broker *Broker) chan<- *ProducerMessage {
+func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 	var (
 		input     = make(chan *ProducerMessage)
 		bridge    = make(chan *produceSet)
@@ -548,6 +684,7 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) chan<- *ProducerMessag
 		input:          input,
 		output:         bridge,
 		responses:      responses,
+		stopchan:       make(chan struct{}),
 		buffer:         newProduceSet(p),
 		currentRetries: make(map[string]map[int32]error),
 	}
@@ -569,7 +706,11 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) chan<- *ProducerMessag
 		close(responses)
 	})
 
-	return input
+	if p.conf.Producer.Retry.Max <= 0 {
+		bp.abandoned = make(chan struct{})
+	}
+
+	return bp
 }
 
 type brokerProducerResponse struct {
@@ -584,9 +725,11 @@ type brokerProducer struct {
 	parent *asyncProducer
 	broker *Broker
 
-	input     <-chan *ProducerMessage
+	input     chan *ProducerMessage
 	output    chan<- *produceSet
 	responses <-chan *brokerProducerResponse
+	abandoned chan struct{}
+	stopchan  chan struct{}
 
 	buffer     *produceSet
 	timer      <-chan time.Time
@@ -602,10 +745,15 @@ func (bp *brokerProducer) run() {
 
 	for {
 		select {
-		case msg := <-bp.input:
-			if msg == nil {
+		case msg, ok := <-bp.input:
+			if !ok {
+				Logger.Printf("producer/broker/%d input chan closed\n", bp.broker.ID())
 				bp.shutdown()
 				return
+			}
+
+			if msg == nil {
+				continue
 			}
 
 			if msg.flags&syn == syn {
@@ -633,12 +781,21 @@ func (bp *brokerProducer) run() {
 			}
 
 			if bp.buffer.wouldOverflow(msg) {
-				if err := bp.waitForSpace(msg); err != nil {
+				Logger.Printf("producer/broker/%d maximum request accumulated, waiting for space\n", bp.broker.ID())
+				if err := bp.waitForSpace(msg, false); err != nil {
 					bp.parent.retryMessage(msg, err)
 					continue
 				}
 			}
 
+			if bp.parent.txnmgr.producerID != noProducerID && bp.buffer.producerEpoch != msg.producerEpoch {
+				// The epoch was reset, need to roll the buffer over
+				Logger.Printf("producer/broker/%d detected epoch rollover, waiting for new buffer\n", bp.broker.ID())
+				if err := bp.waitForSpace(msg, true); err != nil {
+					bp.parent.retryMessage(msg, err)
+					continue
+				}
+			}
 			if err := bp.buffer.add(msg); err != nil {
 				bp.parent.returnError(msg, err)
 				continue
@@ -651,8 +808,14 @@ func (bp *brokerProducer) run() {
 			bp.timerFired = true
 		case output <- bp.buffer:
 			bp.rollOver()
-		case response := <-bp.responses:
-			bp.handleResponse(response)
+		case response, ok := <-bp.responses:
+			if ok {
+				bp.handleResponse(response)
+			}
+		case <-bp.stopchan:
+			Logger.Printf(
+				"producer/broker/%d run loop asked to stop\n", bp.broker.ID())
+			return
 		}
 
 		if bp.timerFired || bp.buffer.readyToFlush() {
@@ -676,7 +839,7 @@ func (bp *brokerProducer) shutdown() {
 	for response := range bp.responses {
 		bp.handleResponse(response)
 	}
-
+	close(bp.stopchan)
 	Logger.Printf("producer/broker/%d shut down\n", bp.broker.ID())
 }
 
@@ -688,9 +851,7 @@ func (bp *brokerProducer) needsRetry(msg *ProducerMessage) error {
 	return bp.currentRetries[msg.Topic][msg.Partition]
 }
 
-func (bp *brokerProducer) waitForSpace(msg *ProducerMessage) error {
-	Logger.Printf("producer/broker/%d maximum request accumulated, waiting for space\n", bp.broker.ID())
-
+func (bp *brokerProducer) waitForSpace(msg *ProducerMessage, forceRollover bool) error {
 	for {
 		select {
 		case response := <-bp.responses:
@@ -698,7 +859,7 @@ func (bp *brokerProducer) waitForSpace(msg *ProducerMessage) error {
 			// handling a response can change our state, so re-check some things
 			if reason := bp.needsRetry(msg); reason != nil {
 				return reason
-			} else if !bp.buffer.wouldOverflow(msg) {
+			} else if !bp.buffer.wouldOverflow(msg) && !forceRollover {
 				return nil
 			}
 		case bp.output <- bp.buffer:
@@ -729,16 +890,17 @@ func (bp *brokerProducer) handleResponse(response *brokerProducerResponse) {
 func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceResponse) {
 	// we iterate through the blocks in the request set, not the response, so that we notice
 	// if the response is missing a block completely
-	sent.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
+	var retryTopics []string
+	sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
 		if response == nil {
 			// this only happens when RequiredAcks is NoResponse, so we have to assume success
-			bp.parent.returnSuccesses(msgs)
+			bp.parent.returnSuccesses(pSet.msgs)
 			return
 		}
 
 		block := response.GetBlock(topic, partition)
 		if block == nil {
-			bp.parent.returnErrors(msgs, ErrIncompleteResponse)
+			bp.parent.returnErrors(pSet.msgs, ErrIncompleteResponse)
 			return
 		}
 
@@ -746,45 +908,115 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 		// Success
 		case ErrNoError:
 			if bp.parent.conf.Version.IsAtLeast(V0_10_0_0) && !block.Timestamp.IsZero() {
-				for _, msg := range msgs {
+				for _, msg := range pSet.msgs {
 					msg.Timestamp = block.Timestamp
 				}
 			}
-			for i, msg := range msgs {
+			for i, msg := range pSet.msgs {
 				msg.Offset = block.Offset + int64(i)
 			}
-			bp.parent.returnSuccesses(msgs)
+			bp.parent.returnSuccesses(pSet.msgs)
+		// Duplicate
+		case ErrDuplicateSequenceNumber:
+			bp.parent.returnSuccesses(pSet.msgs)
 		// Retriable errors
 		case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition,
 			ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend:
-			Logger.Printf("producer/broker/%d state change to [retrying] on %s/%d because %v\n",
-				bp.broker.ID(), topic, partition, block.Err)
-			bp.currentRetries[topic][partition] = block.Err
-			bp.parent.retryMessages(msgs, block.Err)
-			bp.parent.retryMessages(bp.buffer.dropPartition(topic, partition), block.Err)
+			if bp.parent.conf.Producer.Retry.Max <= 0 {
+				bp.parent.abandonBrokerConnection(bp.broker)
+				bp.parent.returnErrors(pSet.msgs, block.Err)
+			} else {
+				retryTopics = append(retryTopics, topic)
+			}
 		// Other non-retriable errors
 		default:
-			bp.parent.returnErrors(msgs, block.Err)
+			if bp.parent.conf.Producer.Retry.Max <= 0 {
+				bp.parent.abandonBrokerConnection(bp.broker)
+			}
+			bp.parent.returnErrors(pSet.msgs, block.Err)
 		}
 	})
+
+	if len(retryTopics) > 0 {
+		if bp.parent.conf.Producer.Idempotent {
+			err := bp.parent.client.RefreshMetadata(retryTopics...)
+			if err != nil {
+				Logger.Printf("Failed refreshing metadata because of %v\n", err)
+			}
+		}
+
+		sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
+			block := response.GetBlock(topic, partition)
+			if block == nil {
+				// handled in the previous "eachPartition" loop
+				return
+			}
+
+			switch block.Err {
+			case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition,
+				ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend:
+				Logger.Printf("producer/broker/%d state change to [retrying] on %s/%d because %v\n",
+					bp.broker.ID(), topic, partition, block.Err)
+				if bp.currentRetries[topic] == nil {
+					bp.currentRetries[topic] = make(map[int32]error)
+				}
+				bp.currentRetries[topic][partition] = block.Err
+				if bp.parent.conf.Producer.Idempotent {
+					go bp.parent.retryBatch(topic, partition, pSet, block.Err)
+				} else {
+					bp.parent.retryMessages(pSet.msgs, block.Err)
+				}
+				// dropping the following messages has the side effect of incrementing their retry count
+				bp.parent.retryMessages(bp.buffer.dropPartition(topic, partition), block.Err)
+			}
+		})
+	}
+}
+
+func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitionSet, kerr KError) {
+	Logger.Printf("Retrying batch for %v-%d because of %s\n", topic, partition, kerr)
+	produceSet := newProduceSet(p)
+	produceSet.msgs[topic] = make(map[int32]*partitionSet)
+	produceSet.msgs[topic][partition] = pSet
+	produceSet.bufferBytes += pSet.bufferBytes
+	produceSet.bufferCount += len(pSet.msgs)
+	for _, msg := range pSet.msgs {
+		if msg.retries >= p.conf.Producer.Retry.Max {
+			p.returnError(msg, kerr)
+			return
+		}
+		msg.retries++
+	}
+
+	// it's expected that a metadata refresh has been requested prior to calling retryBatch
+	leader, err := p.client.Leader(topic, partition)
+	if err != nil {
+		Logger.Printf("Failed retrying batch for %v-%d because of %v while looking up for new leader\n", topic, partition, err)
+		for _, msg := range pSet.msgs {
+			p.returnError(msg, kerr)
+		}
+		return
+	}
+	bp := p.getBrokerProducer(leader)
+	bp.output <- produceSet
 }
 
 func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 	switch err.(type) {
 	case PacketEncodingError:
-		sent.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
-			bp.parent.returnErrors(msgs, err)
+		sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
+			bp.parent.returnErrors(pSet.msgs, err)
 		})
 	default:
 		Logger.Printf("producer/broker/%d state change to [closing] because %s\n", bp.broker.ID(), err)
 		bp.parent.abandonBrokerConnection(bp.broker)
 		_ = bp.broker.Close()
 		bp.closing = err
-		sent.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
-			bp.parent.retryMessages(msgs, err)
+		sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
+			bp.parent.retryMessages(pSet.msgs, err)
 		})
-		bp.buffer.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
-			bp.parent.retryMessages(msgs, err)
+		bp.buffer.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
+			bp.parent.retryMessages(pSet.msgs, err)
 		})
 		bp.rollOver()
 	}
@@ -826,11 +1058,9 @@ func (p *asyncProducer) shutdown() {
 
 	p.inFlight.Wait()
 
-	if p.ownClient {
-		err := p.client.Close()
-		if err != nil {
-			Logger.Println("producer/shutdown failed to close the embedded client:", err)
-		}
+	err := p.client.Close()
+	if err != nil {
+		Logger.Println("producer/shutdown failed to close the embedded client:", err)
 	}
 
 	close(p.input)
@@ -840,6 +1070,12 @@ func (p *asyncProducer) shutdown() {
 }
 
 func (p *asyncProducer) returnError(msg *ProducerMessage, err error) {
+	// We need to reset the producer ID epoch if we set a sequence number on it, because the broker
+	// will never see a message with this number, so we can never continue the sequence.
+	if msg.hasSequence {
+		Logger.Printf("producer/txnmanager rolling over epoch due to publish failure on %s/%d", msg.Topic, msg.Partition)
+		p.txnmgr.bumpEpoch()
+	}
 	msg.clear()
 	pErr := &ProducerError{Msg: msg, Err: err}
 	if p.conf.Producer.Return.Errors {
@@ -881,7 +1117,7 @@ func (p *asyncProducer) retryMessages(batch []*ProducerMessage, err error) {
 	}
 }
 
-func (p *asyncProducer) getBrokerProducer(broker *Broker) chan<- *ProducerMessage {
+func (p *asyncProducer) getBrokerProducer(broker *Broker) *brokerProducer {
 	p.brokerLock.Lock()
 	defer p.brokerLock.Unlock()
 
@@ -898,13 +1134,13 @@ func (p *asyncProducer) getBrokerProducer(broker *Broker) chan<- *ProducerMessag
 	return bp
 }
 
-func (p *asyncProducer) unrefBrokerProducer(broker *Broker, bp chan<- *ProducerMessage) {
+func (p *asyncProducer) unrefBrokerProducer(broker *Broker, bp *brokerProducer) {
 	p.brokerLock.Lock()
 	defer p.brokerLock.Unlock()
 
 	p.brokerRefs[bp]--
 	if p.brokerRefs[bp] == 0 {
-		close(bp)
+		close(bp.input)
 		delete(p.brokerRefs, bp)
 
 		if p.brokers[broker] == bp {
@@ -916,6 +1152,11 @@ func (p *asyncProducer) unrefBrokerProducer(broker *Broker, bp chan<- *ProducerM
 func (p *asyncProducer) abandonBrokerConnection(broker *Broker) {
 	p.brokerLock.Lock()
 	defer p.brokerLock.Unlock()
+
+	bc, ok := p.brokers[broker]
+	if ok && bc.abandoned != nil {
+		close(bc.abandoned)
+	}
 
 	delete(p.brokers, broker)
 }

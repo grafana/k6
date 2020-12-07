@@ -24,7 +24,7 @@ func (e echoRouter) Handle(protocol, route string, handler HandlerFunc) {
 			params[p] = c.ParamValues()[i]
 		}
 
-		handler(c.Response(), c.Request(), params)
+		handler(c.Response(), c.Request(), params, make(map[string]interface{}))
 
 		return nil
 	}

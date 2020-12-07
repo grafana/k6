@@ -46,8 +46,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	grpctest "google.golang.org/grpc/test/grpc_testing"
 
 	"github.com/loadimpact/k6/lib"
@@ -210,6 +208,7 @@ func getZstdBrHandler(t testing.TB) http.Handler {
 
 // GRPCStub is an easily customisable TestServiceServer
 type GRPCStub struct {
+	grpctest.UnimplementedTestServiceServer
 	EmptyCallFunc func(context.Context, *grpctest.Empty) (*grpctest.Empty, error)
 	UnaryCallFunc func(context.Context, *grpctest.SimpleRequest) (*grpctest.SimpleResponse, error)
 }
@@ -219,8 +218,7 @@ func (s *GRPCStub) EmptyCall(ctx context.Context, req *grpctest.Empty) (*grpctes
 	if s.EmptyCallFunc != nil {
 		return s.EmptyCallFunc(ctx, req)
 	}
-
-	return nil, status.Errorf(codes.Unimplemented, "method EmptyCall not implemented")
+	return s.UnimplementedTestServiceServer.EmptyCall(ctx, req)
 }
 
 // UnaryCall implements the interface for the gRPC TestServiceServer
@@ -228,29 +226,7 @@ func (s *GRPCStub) UnaryCall(ctx context.Context, req *grpctest.SimpleRequest) (
 	if s.UnaryCallFunc != nil {
 		return s.UnaryCallFunc(ctx, req)
 	}
-
-	return nil, status.Errorf(codes.Unimplemented, "method UnaryCall not implemented")
-}
-
-// StreamingOutputCall implements the interface for the gRPC TestServiceServer
-func (*GRPCStub) StreamingOutputCall(*grpctest.StreamingOutputCallRequest,
-	grpctest.TestService_StreamingOutputCallServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamingOutputCall not implemented")
-}
-
-// StreamingInputCall implements the interface for the gRPC TestServiceServer
-func (*GRPCStub) StreamingInputCall(grpctest.TestService_StreamingInputCallServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamingInputCall not implemented")
-}
-
-// FullDuplexCall implements the interface for the gRPC TestServiceServer
-func (*GRPCStub) FullDuplexCall(grpctest.TestService_FullDuplexCallServer) error {
-	return status.Errorf(codes.Unimplemented, "method FullDuplexCall not implemented")
-}
-
-// HalfDuplexCall implements the interface for the gRPC TestServiceServer
-func (*GRPCStub) HalfDuplexCall(grpctest.TestService_HalfDuplexCallServer) error {
-	return status.Errorf(codes.Unimplemented, "method HalfDuplexCall not implemented")
+	return s.UnimplementedTestServiceServer.UnaryCall(ctx, req)
 }
 
 // NewHTTPMultiBin returns a fully configured and running HTTPMultiBin

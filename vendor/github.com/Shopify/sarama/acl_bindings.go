@@ -1,15 +1,25 @@
 package sarama
 
+//Resource holds information about acl resource type
 type Resource struct {
-	ResourceType AclResourceType
-	ResourceName string
+	ResourceType        AclResourceType
+	ResourceName        string
+	ResourcePatternType AclResourcePatternType
 }
 
-func (r *Resource) encode(pe packetEncoder) error {
+func (r *Resource) encode(pe packetEncoder, version int16) error {
 	pe.putInt8(int8(r.ResourceType))
 
 	if err := pe.putString(r.ResourceName); err != nil {
 		return err
+	}
+
+	if version == 1 {
+		if r.ResourcePatternType == AclPatternUnknown {
+			Logger.Print("Cannot encode an unknown resource pattern type, using Literal instead")
+			r.ResourcePatternType = AclPatternLiteral
+		}
+		pe.putInt8(int8(r.ResourcePatternType))
 	}
 
 	return nil
@@ -25,10 +35,18 @@ func (r *Resource) decode(pd packetDecoder, version int16) (err error) {
 	if r.ResourceName, err = pd.getString(); err != nil {
 		return err
 	}
+	if version == 1 {
+		pattern, err := pd.getInt8()
+		if err != nil {
+			return err
+		}
+		r.ResourcePatternType = AclResourcePatternType(pattern)
+	}
 
 	return nil
 }
 
+//Acl holds information about acl type
 type Acl struct {
 	Principal      string
 	Host           string
@@ -75,13 +93,14 @@ func (a *Acl) decode(pd packetDecoder, version int16) (err error) {
 	return nil
 }
 
+//ResourceAcls is an acl resource type
 type ResourceAcls struct {
 	Resource
 	Acls []*Acl
 }
 
-func (r *ResourceAcls) encode(pe packetEncoder) error {
-	if err := r.Resource.encode(pe); err != nil {
+func (r *ResourceAcls) encode(pe packetEncoder, version int16) error {
+	if err := r.Resource.encode(pe, version); err != nil {
 		return err
 	}
 

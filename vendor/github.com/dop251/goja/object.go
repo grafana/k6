@@ -295,6 +295,7 @@ type FunctionCall struct {
 type ConstructorCall struct {
 	This      *Object
 	Arguments []Value
+	NewTarget *Object
 }
 
 func (f FunctionCall) Argument(idx int) Value {

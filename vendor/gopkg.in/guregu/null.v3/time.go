@@ -141,3 +141,23 @@ func (t Time) Ptr() *time.Time {
 	}
 	return &t.Time
 }
+
+// IsZero returns true for invalid Times, hopefully for future omitempty support.
+// A non-null Time with a zero value will not be considered zero.
+func (t Time) IsZero() bool {
+	return !t.Valid
+}
+
+// Equal returns true if both Time objects encode the same time or are both null.
+// Two times can be equal even if they are in different locations.
+// For example, 6:00 +0200 CEST and 4:00 UTC are Equal.
+func (t Time) Equal(other Time) bool {
+	return t.Valid == other.Valid && (!t.Valid || t.Time.Equal(other.Time))
+}
+
+// ExactEqual returns true if both Time objects are equal or both null.
+// ExactEqual returns false for times that are in different locations or
+// have a different monotonic clock reading.
+func (t Time) ExactEqual(other Time) bool {
+	return t.Valid == other.Valid && (!t.Valid || t.Time == other.Time)
+}

@@ -1,4 +1,4 @@
-// Match provides a simple pattern matcher with unicode support.
+// Package match provides a simple pattern matcher with unicode support.
 package match
 
 import "unicode/utf8"
@@ -6,7 +6,7 @@ import "unicode/utf8"
 // Match returns true if str matches pattern. This is a very
 // simple wildcard match where '*' matches on any number characters
 // and '?' matches on any one character.
-
+//
 // pattern:
 // 	{ term }
 // term:

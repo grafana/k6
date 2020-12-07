@@ -38,3 +38,8 @@ func (bp *BufferPool) Put(b *bytes.Buffer) {
 	default: // Discard the buffer if the pool is full.
 	}
 }
+
+// NumPooled returns the number of items currently pooled.
+func (bp *BufferPool) NumPooled() int {
+	return len(bp.c)
+}

@@ -150,12 +150,16 @@ func (r *OffsetResponse) version() int16 {
 	return r.Version
 }
 
+func (r *OffsetResponse) headerVersion() int16 {
+	return 0
+}
+
 func (r *OffsetResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 1:
 		return V0_10_1_0
 	default:
-		return minVersion
+		return MinVersion
 	}
 }
 

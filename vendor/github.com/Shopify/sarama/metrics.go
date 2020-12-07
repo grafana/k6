@@ -28,14 +28,6 @@ func getMetricNameForBroker(name string, broker *Broker) string {
 	return fmt.Sprintf(name+"-for-broker-%d", broker.ID())
 }
 
-func getOrRegisterBrokerMeter(name string, broker *Broker, r metrics.Registry) metrics.Meter {
-	return metrics.GetOrRegisterMeter(getMetricNameForBroker(name, broker), r)
-}
-
-func getOrRegisterBrokerHistogram(name string, broker *Broker, r metrics.Registry) metrics.Histogram {
-	return getOrRegisterHistogram(getMetricNameForBroker(name, broker), r)
-}
-
 func getMetricNameForTopic(name string, topic string) string {
 	// Convert dot to _ since reporters like Graphite typically use dot to represent hierarchy
 	// cf. KAFKA-1902 and KAFKA-2337

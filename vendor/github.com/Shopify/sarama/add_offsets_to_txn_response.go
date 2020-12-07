@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+//AddOffsetsToTxnResponse is a response type for adding offsets to txns
 type AddOffsetsToTxnResponse struct {
 	ThrottleTime time.Duration
 	Err          KError
@@ -36,6 +37,10 @@ func (a *AddOffsetsToTxnResponse) key() int16 {
 }
 
 func (a *AddOffsetsToTxnResponse) version() int16 {
+	return 0
+}
+
+func (a *AddOffsetsToTxnResponse) headerVersion() int16 {
 	return 0
 }
 

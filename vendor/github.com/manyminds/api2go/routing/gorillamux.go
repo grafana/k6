@@ -20,7 +20,7 @@ func (gm gorillamuxRouter) Handler() http.Handler {
 
 func (gm gorillamuxRouter) Handle(protocol, route string, handler HandlerFunc) {
 	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
-		handler(w, r, mux.Vars(r))
+		handler(w, r, mux.Vars(r), make(map[string]interface{}))
 	}
 
 	// The request path will have parameterized segments indicated as :name.  Convert

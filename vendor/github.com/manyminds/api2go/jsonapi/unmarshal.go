@@ -187,7 +187,10 @@ func setRelationshipIDs(relationships map[string]Relationship, target UnmarshalI
 				return fmt.Errorf("struct %s does not implement UnmarshalToOneRelations", reflect.TypeOf(target))
 			}
 
-			castedToOne.SetToOneReferenceID(name, "")
+			err := castedToOne.SetToOneReferenceID(name, "")
+			if err != nil {
+				return err
+			}
 			continue
 		}
 

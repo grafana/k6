@@ -2,11 +2,13 @@ package sarama
 
 import "time"
 
+//AlterConfigsResponse is a response type for alter config
 type AlterConfigsResponse struct {
 	ThrottleTime time.Duration
 	Resources    []*AlterConfigsResourceResponse
 }
 
+//AlterConfigsResourceResponse is a response type for alter config resource
 type AlterConfigsResourceResponse struct {
 	ErrorCode int16
 	ErrorMsg  string
@@ -14,21 +16,21 @@ type AlterConfigsResourceResponse struct {
 	Name      string
 }
 
-func (ct *AlterConfigsResponse) encode(pe packetEncoder) error {
-	pe.putInt32(int32(ct.ThrottleTime / time.Millisecond))
+func (a *AlterConfigsResponse) encode(pe packetEncoder) error {
+	pe.putInt32(int32(a.ThrottleTime / time.Millisecond))
 
-	if err := pe.putArrayLength(len(ct.Resources)); err != nil {
+	if err := pe.putArrayLength(len(a.Resources)); err != nil {
 		return err
 	}
 
-	for i := range ct.Resources {
-		pe.putInt16(ct.Resources[i].ErrorCode)
-		err := pe.putString(ct.Resources[i].ErrorMsg)
+	for i := range a.Resources {
+		pe.putInt16(a.Resources[i].ErrorCode)
+		err := pe.putString(a.Resources[i].ErrorMsg)
 		if err != nil {
 			return nil
 		}
-		pe.putInt8(int8(ct.Resources[i].Type))
-		err = pe.putString(ct.Resources[i].Name)
+		pe.putInt8(int8(a.Resources[i].Type))
+		err = pe.putString(a.Resources[i].Name)
 		if err != nil {
 			return nil
 		}
@@ -37,59 +39,63 @@ func (ct *AlterConfigsResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (acr *AlterConfigsResponse) decode(pd packetDecoder, version int16) error {
+func (a *AlterConfigsResponse) decode(pd packetDecoder, version int16) error {
 	throttleTime, err := pd.getInt32()
 	if err != nil {
 		return err
 	}
-	acr.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
+	a.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	responseCount, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
 
-	acr.Resources = make([]*AlterConfigsResourceResponse, responseCount)
+	a.Resources = make([]*AlterConfigsResourceResponse, responseCount)
 
-	for i := range acr.Resources {
-		acr.Resources[i] = new(AlterConfigsResourceResponse)
+	for i := range a.Resources {
+		a.Resources[i] = new(AlterConfigsResourceResponse)
 
 		errCode, err := pd.getInt16()
 		if err != nil {
 			return err
 		}
-		acr.Resources[i].ErrorCode = errCode
+		a.Resources[i].ErrorCode = errCode
 
 		e, err := pd.getString()
 		if err != nil {
 			return err
 		}
-		acr.Resources[i].ErrorMsg = e
+		a.Resources[i].ErrorMsg = e
 
 		t, err := pd.getInt8()
 		if err != nil {
 			return err
 		}
-		acr.Resources[i].Type = ConfigResourceType(t)
+		a.Resources[i].Type = ConfigResourceType(t)
 
 		name, err := pd.getString()
 		if err != nil {
 			return err
 		}
-		acr.Resources[i].Name = name
+		a.Resources[i].Name = name
 	}
 
 	return nil
 }
 
-func (r *AlterConfigsResponse) key() int16 {
+func (a *AlterConfigsResponse) key() int16 {
 	return 32
 }
 
-func (r *AlterConfigsResponse) version() int16 {
+func (a *AlterConfigsResponse) version() int16 {
 	return 0
 }
 
-func (r *AlterConfigsResponse) requiredVersion() KafkaVersion {
+func (a *AlterConfigsResponse) headerVersion() int16 {
+	return 0
+}
+
+func (a *AlterConfigsResponse) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }

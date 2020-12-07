@@ -45,6 +45,10 @@ func (a *EndTxnRequest) version() int16 {
 	return 0
 }
 
+func (r *EndTxnRequest) headerVersion() int16 {
+	return 1
+}
+
 func (a *EndTxnRequest) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }

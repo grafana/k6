@@ -92,6 +92,33 @@ func (f *File) Readdir(count int) ([]os.FileInfo, error) {
 	return f.realF.Readdir(count)
 }
 
+// Readdirnames is like (*os.File).Readdirnames()
+// Visit http://golang.org/pkg/os/#File.Readdirnames for more information
+func (f *File) Readdirnames(count int) ([]string, error) {
+	if f.appendedF != nil {
+		if f.appendedF.dir {
+			names := make([]string, 0, len(f.appendedF.children))
+			for _, childAppendedFile := range f.appendedF.children {
+				if childAppendedFile.dir {
+					names = append(names, childAppendedFile.dirInfo.name)
+				} else {
+					names = append(names, childAppendedFile.zipFile.FileInfo().Name())
+				}
+			}
+			return names, nil
+		}
+		// os.ErrInvalid to match the os.SyscallError (readdirent: invalid argument) that os.File returns
+		return nil, os.ErrInvalid
+	}
+	if f.virtualF != nil {
+		return f.virtualF.readdirnames(count)
+	}
+	if f.virtualD != nil {
+		return f.virtualD.readdirnames(count)
+	}
+	return f.realF.Readdirnames(count)
+}
+
 // Read is like (*os.File).Read()
 // Visit http://golang.org/pkg/os/#File.Read for more information
 func (f *File) Read(bts []byte) (int, error) {

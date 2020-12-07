@@ -116,3 +116,8 @@ func (s String) Ptr() *string {
 func (s String) IsZero() bool {
 	return !s.Valid
 }
+
+// Equal returns true if both strings have the same value or are both null.
+func (s String) Equal(other String) bool {
+	return s.Valid == other.Valid && (!s.Valid || s.String == other.String)
+}

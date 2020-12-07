@@ -9,8 +9,9 @@ package fasttemplate
 import (
 	"bytes"
 	"fmt"
-	"github.com/valyala/bytebufferpool"
 	"io"
+
+	"github.com/valyala/bytebufferpool"
 )
 
 // ExecuteFunc calls f on each template tag (placeholder) occurrence.
@@ -49,6 +50,9 @@ func ExecuteFunc(template, startTag, endTag string, w io.Writer, f TagFunc) (int
 
 		ni, err = f(w, unsafeBytes2String(s[:n]))
 		nn += int64(ni)
+		if err != nil {
+			return nn, err
+		}
 		s = s[n+len(b):]
 	}
 	ni, err = w.Write(s)
@@ -73,6 +77,22 @@ func Execute(template, startTag, endTag string, w io.Writer, m map[string]interf
 	return ExecuteFunc(template, startTag, endTag, w, func(w io.Writer, tag string) (int, error) { return stdTagFunc(w, tag, m) })
 }
 
+// ExecuteStd works the same way as Execute, but keeps the unknown placeholders.
+// This can be used as a drop-in replacement for strings.Replacer
+//
+// Substitution map m may contain values with the following types:
+//   * []byte - the fastest value type
+//   * string - convenient value type
+//   * TagFunc - flexible value type
+//
+// Returns the number of bytes written to w.
+//
+// This function is optimized for constantly changing templates.
+// Use Template.ExecuteStd for frozen templates.
+func ExecuteStd(template, startTag, endTag string, w io.Writer, m map[string]interface{}) (int64, error) {
+	return ExecuteFunc(template, startTag, endTag, w, func(w io.Writer, tag string) (int, error) { return keepUnknownTagFunc(w, startTag, endTag, tag, m) })
+}
+
 // ExecuteFuncString calls f on each template tag (placeholder) occurrence
 // and substitutes it with the data written to TagFunc's w.
 //
@@ -81,19 +101,32 @@ func Execute(template, startTag, endTag string, w io.Writer, m map[string]interf
 // This function is optimized for constantly changing templates.
 // Use Template.ExecuteFuncString for frozen templates.
 func ExecuteFuncString(template, startTag, endTag string, f TagFunc) string {
+	s, err := ExecuteFuncStringWithErr(template, startTag, endTag, f)
+	if err != nil {
+		panic(fmt.Sprintf("unexpected error: %s", err))
+	}
+	return s
+}
+
+// ExecuteFuncStringWithErr is nearly the same as ExecuteFuncString
+// but when f returns an error, ExecuteFuncStringWithErr won't panic like ExecuteFuncString
+// it just returns an empty string and the error f returned
+func ExecuteFuncStringWithErr(template, startTag, endTag string, f TagFunc) (string, error) {
 	tagsCount := bytes.Count(unsafeString2Bytes(template), unsafeString2Bytes(startTag))
 	if tagsCount == 0 {
-		return template
+		return template, nil
 	}
 
 	bb := byteBufferPool.Get()
 	if _, err := ExecuteFunc(template, startTag, endTag, bb, f); err != nil {
-		panic(fmt.Sprintf("unexpected error: %s", err))
+		bb.Reset()
+		byteBufferPool.Put(bb)
+		return "", err
 	}
 	s := string(bb.B)
 	bb.Reset()
 	byteBufferPool.Put(bb)
-	return s
+	return s, nil
 }
 
 var byteBufferPool bytebufferpool.Pool
@@ -110,6 +143,20 @@ var byteBufferPool bytebufferpool.Pool
 // Use Template.ExecuteString for frozen templates.
 func ExecuteString(template, startTag, endTag string, m map[string]interface{}) string {
 	return ExecuteFuncString(template, startTag, endTag, func(w io.Writer, tag string) (int, error) { return stdTagFunc(w, tag, m) })
+}
+
+// ExecuteStringStd works the same way as ExecuteString, but keeps the unknown placeholders.
+// This can be used as a drop-in replacement for strings.Replacer
+//
+// Substitution map m may contain values with the following types:
+//   * []byte - the fastest value type
+//   * string - convenient value type
+//   * TagFunc - flexible value type
+//
+// This function is optimized for constantly changing templates.
+// Use Template.ExecuteStringStd for frozen templates.
+func ExecuteStringStd(template, startTag, endTag string, m map[string]interface{}) string {
+	return ExecuteFuncString(template, startTag, endTag, func(w io.Writer, tag string) (int, error) { return keepUnknownTagFunc(w, startTag, endTag, tag, m) })
 }
 
 // Template implements simple template engine, which can be used for fast
@@ -267,6 +314,19 @@ func (t *Template) Execute(w io.Writer, m map[string]interface{}) (int64, error)
 	return t.ExecuteFunc(w, func(w io.Writer, tag string) (int, error) { return stdTagFunc(w, tag, m) })
 }
 
+// ExecuteStd works the same way as Execute, but keeps the unknown placeholders.
+// This can be used as a drop-in replacement for strings.Replacer
+//
+// Substitution map m may contain values with the following types:
+//   * []byte - the fastest value type
+//   * string - convenient value type
+//   * TagFunc - flexible value type
+//
+// Returns the number of bytes written to w.
+func (t *Template) ExecuteStd(w io.Writer, m map[string]interface{}) (int64, error) {
+	return t.ExecuteFunc(w, func(w io.Writer, tag string) (int, error) { return keepUnknownTagFunc(w, t.startTag, t.endTag, tag, m) })
+}
+
 // ExecuteFuncString calls f on each template tag (placeholder) occurrence
 // and substitutes it with the data written to TagFunc's w.
 //
@@ -275,14 +335,31 @@ func (t *Template) Execute(w io.Writer, m map[string]interface{}) (int64, error)
 // This function is optimized for frozen templates.
 // Use ExecuteFuncString for constantly changing templates.
 func (t *Template) ExecuteFuncString(f TagFunc) string {
+	s, err := t.ExecuteFuncStringWithErr(f)
+	if err != nil {
+		panic(fmt.Sprintf("unexpected error: %s", err))
+	}
+	return s
+}
+
+// ExecuteFuncStringWithErr calls f on each template tag (placeholder) occurrence
+// and substitutes it with the data written to TagFunc's w.
+//
+// Returns the resulting string.
+//
+// This function is optimized for frozen templates.
+// Use ExecuteFuncString for constantly changing templates.
+func (t *Template) ExecuteFuncStringWithErr(f TagFunc) (string, error) {
 	bb := t.byteBufferPool.Get()
 	if _, err := t.ExecuteFunc(bb, f); err != nil {
-		panic(fmt.Sprintf("unexpected error: %s", err))
+		bb.Reset()
+		t.byteBufferPool.Put(bb)
+		return "", err
 	}
 	s := string(bb.Bytes())
 	bb.Reset()
 	t.byteBufferPool.Put(bb)
-	return s
+	return s, nil
 }
 
 // ExecuteString substitutes template tags (placeholders) with the corresponding
@@ -299,8 +376,51 @@ func (t *Template) ExecuteString(m map[string]interface{}) string {
 	return t.ExecuteFuncString(func(w io.Writer, tag string) (int, error) { return stdTagFunc(w, tag, m) })
 }
 
+// ExecuteStringStd works the same way as ExecuteString, but keeps the unknown placeholders.
+// This can be used as a drop-in replacement for strings.Replacer
+//
+// Substitution map m may contain values with the following types:
+//   * []byte - the fastest value type
+//   * string - convenient value type
+//   * TagFunc - flexible value type
+//
+// This function is optimized for frozen templates.
+// Use ExecuteStringStd for constantly changing templates.
+func (t *Template) ExecuteStringStd(m map[string]interface{}) string {
+	return t.ExecuteFuncString(func(w io.Writer, tag string) (int, error) { return keepUnknownTagFunc(w, t.startTag, t.endTag, tag, m) })
+}
+
 func stdTagFunc(w io.Writer, tag string, m map[string]interface{}) (int, error) {
 	v := m[tag]
+	if v == nil {
+		return 0, nil
+	}
+	switch value := v.(type) {
+	case []byte:
+		return w.Write(value)
+	case string:
+		return w.Write([]byte(value))
+	case TagFunc:
+		return value(w, tag)
+	default:
+		panic(fmt.Sprintf("tag=%q contains unexpected value type=%#v. Expected []byte, string or TagFunc", tag, v))
+	}
+}
+
+func keepUnknownTagFunc(w io.Writer, startTag, endTag, tag string, m map[string]interface{}) (int, error) {
+	v, ok := m[tag]
+	if !ok {
+		if _, err := w.Write(unsafeString2Bytes(startTag)); err != nil {
+			return 0, err
+		}
+		if _, err := w.Write(unsafeString2Bytes(tag)); err != nil {
+			return 0, err
+		}
+		if _, err := w.Write(unsafeString2Bytes(endTag)); err != nil {
+			return 0, err
+		}
+		return len(startTag) + len(tag) + len(endTag), nil
+	}
 	if v == nil {
 		return 0, nil
 	}

@@ -1,6 +1,6 @@
 // +build codecgen.exec
 
-// Copyright (c) 2012-2018 Ugorji Nwoke. All rights reserved.
+// Copyright (c) 2012-2020 Ugorji Nwoke. All rights reserved.
 // Use of this source code is governed by a MIT license found in the LICENSE file.
 
 package codec
@@ -14,6 +14,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"os"
 	"reflect"
 	"regexp"
 	"sort"
@@ -41,6 +42,10 @@ import (
 // However, codecgen doesn't support the following:
 //   - Canonical option. (codecgen IGNORES it currently)
 //     This is just because it has not been implemented.
+//   - MissingFielder implementation.
+//     If a type implements MissingFielder, it is completely ignored by codecgen.
+//   - CheckCircularReference.
+//     When encoding, if a circular reference is encountered, it will cause a stack overflow.
 //
 // During encode/decode, Selfer takes precedence.
 // A type implementing Selfer will know how to encode/decode itself statically.
@@ -88,24 +93,36 @@ import (
 
 // GenVersion is the current version of codecgen.
 //
-// NOTE: Increment this value each time codecgen changes fundamentally.
+// MARKER: Increment this value each time codecgen changes fundamentally.
 // Fundamental changes are:
 //   - helper methods change (signature change, new ones added, some removed, etc)
 //   - codecgen command line changes
 //
 // v1: Initial Version
-// v2:
+// v2: -
 // v3: Changes for Kubernetes:
 //     changes in signature of some unpublished helper methods and codecgen cmdline arguments.
 // v4: Removed separator support from (en|de)cDriver, and refactored codec(gen)
 // v5: changes to support faster json decoding. Let encoder/decoder maintain state of collections.
 // v6: removed unsafe from gen, and now uses codecgen.exec tag
-// v7:
+// v7: -
 // v8: current - we now maintain compatibility with old generated code.
-const genVersion = 8
+// v9: skipped
+// v10: modified encDriver and decDriver interfaces.
+// v11: remove deprecated methods of encDriver and decDriver.
+// v12: removed deprecated methods from genHelper and changed container tracking logic
+// v13: 20190603 removed DecodeString - use DecodeStringAsBytes instead
+// v14: 20190611 refactored nil handling: TryDecodeAsNil -> selective TryNil, etc
+// v15: 20190626 encDriver.EncodeString handles StringToRaw flag inside handle
+// v16: 20190629 refactoring for v1.1.6
+// v17: 20200911 reduce number of types for which we generate fast path functions (v1.1.8)
+// v18: 20201004 changed definition of genHelper...Extension (to take interface{}) and eliminated I2Rtid method
+// v19: 20201115 updated codecgen cmdline flags and optimized output
+// v20: 20201120 refactored GenHelper to one exported function
+const genVersion = 20
 
 const (
-	genCodecPkg        = "codec1978"
+	genCodecPkg        = "codec1978" // MARKER: keep in sync with codecgen/gen.go
 	genTempVarPfx      = "yy"
 	genTopLevelVarName = "x"
 
@@ -119,6 +136,21 @@ const (
 	//
 	// From testing, it didn't make much difference in runtime, so keep as true (one function only)
 	genUseOneFunctionForDecStructMap = true
+
+	// genFastpathCanonical configures whether we support Canonical in fast path.
+	// The savings is not much.
+	//
+	// MARKER: This MUST ALWAYS BE TRUE. fast-path.go.tmp doesn't handle it being false.
+	genFastpathCanonical = true
+
+	// genFastpathTrimTypes configures whether we trim uncommon fastpath types.
+	genFastpathTrimTypes = true
+
+	// genDecStructArrayInlineLoopCheck configures whether we create a next function
+	// for each iteration in the loop and call it, or just inline it.
+	//
+	// with inlining, we get better performance but about 10% larger files.
+	genDecStructArrayInlineLoopCheck = true
 )
 
 type genStructMapStyle uint8
@@ -130,8 +162,9 @@ const (
 )
 
 var (
-	errGenAllTypesSamePkg  = errors.New("All types must be in the same package")
-	errGenExpectArrayOrMap = errors.New("unexpected type. Expecting array/map/slice")
+	errGenAllTypesSamePkg        = errors.New("All types must be in the same package")
+	errGenExpectArrayOrMap       = errors.New("unexpected type - expecting array/map/slice")
+	errGenUnexpectedTypeFastpath = errors.New("fast-path: unexpected type - requires map or slice")
 
 	genBase64enc  = base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789__")
 	genQNameRegex = regexp.MustCompile(`[A-Za-z_.]+`)
@@ -141,6 +174,14 @@ type genBuf struct {
 	buf []byte
 }
 
+func (x *genBuf) sIf(b bool, s, t string) *genBuf {
+	if b {
+		x.buf = append(x.buf, s...)
+	} else {
+		x.buf = append(x.buf, t...)
+	}
+	return x
+}
 func (x *genBuf) s(s string) *genBuf              { x.buf = append(x.buf, s...); return x }
 func (x *genBuf) b(s []byte) *genBuf              { x.buf = append(x.buf, s...); return x }
 func (x *genBuf) v() string                       { return string(x.buf) }
@@ -153,14 +194,17 @@ func (x *genBuf) reset() {
 
 // genRunner holds some state used during a Gen run.
 type genRunner struct {
-	w io.Writer      // output
-	c uint64         // counter used for generating varsfx
-	t []reflect.Type // list of types to run selfer on
+	w io.Writer // output
+	c uint64    // counter used for generating varsfx
+	f uint64    // counter used for saying false
 
+	t  []reflect.Type   // list of types to run selfer on
 	tc reflect.Type     // currently running selfer on this type
 	te map[uintptr]bool // types for which the encoder has been created
 	td map[uintptr]bool // types for which the decoder has been created
-	cp string           // codec import path
+	tz map[uintptr]bool // types for which GenIsZero has been created
+
+	cp string // codec import path
 
 	im  map[string]reflect.Type // imports to add
 	imn map[string]string       // package names of imports to add
@@ -171,6 +215,7 @@ type genRunner struct {
 
 	cpfx string // codec package prefix
 
+	ty map[reflect.Type]struct{} // types for which GenIsZero *should* be created
 	tm map[reflect.Type]struct{} // types for which enc/dec must be generated
 	ts []reflect.Type            // types for which enc/dec must be generated
 
@@ -180,7 +225,33 @@ type genRunner struct {
 	ti *TypeInfos
 	// rr *rand.Rand // random generator for file-specific types
 
+	jsonOnlyWhen, toArrayWhen, omitEmptyWhen *bool
+
 	nx bool // no extensions
+}
+
+type genIfClause struct {
+	hasIf bool
+}
+
+func (g *genIfClause) end(x *genRunner) {
+	if g.hasIf {
+		x.line("}")
+	}
+}
+
+func (g *genIfClause) c(last bool) (v string) {
+	if last {
+		if g.hasIf {
+			v = " } else { "
+		}
+	} else if g.hasIf {
+		v = " } else if "
+	} else {
+		v = "if "
+		g.hasIf = true
+	}
+	return
 }
 
 // Gen will write a complete go file containing Selfer implementations for each
@@ -188,6 +259,7 @@ type genRunner struct {
 //
 // Library users: DO NOT USE IT DIRECTLY. IT WILL CHANGE CONTINUOUSLY WITHOUT NOTICE.
 func Gen(w io.Writer, buildTags, pkgName, uid string, noExtensions bool,
+	jsonOnlyWhen, toArrayWhen, omitEmptyWhen *bool,
 	ti *TypeInfos, typ ...reflect.Type) {
 	// All types passed to this method do not have a codec.Selfer method implemented directly.
 	// codecgen already checks the AST and skips any types that define the codec.Selfer methods.
@@ -197,19 +269,25 @@ func Gen(w io.Writer, buildTags, pkgName, uid string, noExtensions bool,
 		return
 	}
 	x := genRunner{
-		w:   w,
-		t:   typ,
-		te:  make(map[uintptr]bool),
-		td:  make(map[uintptr]bool),
-		im:  make(map[string]reflect.Type),
-		imn: make(map[string]string),
-		is:  make(map[reflect.Type]struct{}),
-		tm:  make(map[reflect.Type]struct{}),
-		ts:  []reflect.Type{},
-		bp:  genImportPath(typ[0]),
-		xs:  uid,
-		ti:  ti,
-		nx:  noExtensions,
+		w:             w,
+		t:             typ,
+		te:            make(map[uintptr]bool),
+		td:            make(map[uintptr]bool),
+		tz:            make(map[uintptr]bool),
+		im:            make(map[string]reflect.Type),
+		imn:           make(map[string]string),
+		is:            make(map[reflect.Type]struct{}),
+		tm:            make(map[reflect.Type]struct{}),
+		ty:            make(map[reflect.Type]struct{}),
+		ts:            []reflect.Type{},
+		bp:            genImportPath(typ[0]),
+		xs:            uid,
+		ti:            ti,
+		jsonOnlyWhen:  jsonOnlyWhen,
+		toArrayWhen:   toArrayWhen,
+		omitEmptyWhen: omitEmptyWhen,
+
+		nx: noExtensions,
 	}
 	if x.ti == nil {
 		x.ti = defTypeInfos
@@ -223,15 +301,15 @@ func Gen(w io.Writer, buildTags, pkgName, uid string, noExtensions bool,
 	x.cp = genImportPath(reflect.TypeOf(x))
 	x.imn[x.cp] = genCodecPkg
 	for _, t := range typ {
-		// fmt.Printf("###########: PkgPath: '%v', Name: '%s'\n", genImportPath(t), t.Name())
+		// xdebugf("###########: PkgPath: '%v', Name: '%s'\n", genImportPath(t), t.Name())
 		if genImportPath(t) != x.bp {
-			panic(errGenAllTypesSamePkg)
+			halt.onerror(errGenAllTypesSamePkg)
 		}
 		x.genRefPkgs(t)
 	}
+	x.line("// +build go1.6")
 	if buildTags != "" {
 		x.line("// +build " + buildTags)
-		x.line("")
 	}
 	x.line(`
 
@@ -274,50 +352,42 @@ func Gen(w io.Writer, buildTags, pkgName, uid string, noExtensions bool,
 	x.linef("// ----- value types used ----")
 	for _, vt := range [...]valueType{
 		valueTypeArray, valueTypeMap, valueTypeString,
-		valueTypeInt, valueTypeUint, valueTypeFloat} {
+		valueTypeInt, valueTypeUint, valueTypeFloat,
+		valueTypeNil,
+	} {
 		x.linef("codecSelferValueType%s%s = %v", vt.String(), x.xs, int64(vt))
 	}
 
 	x.linef("codecSelferBitsize%s = uint8(32 << (^uint(0) >> 63))", x.xs)
+	x.linef("codecSelferDecContainerLenNil%s = %d", x.xs, int64(containerLenNil))
 	x.line(")")
 	x.line("var (")
-	x.line("errCodecSelferOnlyMapOrArrayEncodeToStruct" + x.xs + " = errors.New(`only encoded map or array can be decoded into a struct`)")
+	x.line("errCodecSelferOnlyMapOrArrayEncodeToStruct" + x.xs + " = " + "errors.New(`only encoded map or array can be decoded into a struct`)")
 	x.line(")")
 	x.line("")
 
 	x.hn = "codecSelfer" + x.xs
 	x.line("type " + x.hn + " struct{}")
 	x.line("")
-
+	x.linef("func %sFalse() bool { return false }", x.hn)
+	x.linef("func %sTrue() bool { return true }", x.hn)
+	x.line("")
 	x.varsfxreset()
 	x.line("func init() {")
 	x.linef("if %sGenVersion != %v {", x.cpfx, genVersion)
 	x.line("_, file, _, _ := runtime.Caller(0)")
-	x.outf(`panic("codecgen version mismatch: current: %v, need " + strconv.FormatInt(int64(%sGenVersion), 10) + ". Re-generate file: " + file)`, genVersion, x.cpfx)
-	// x.out(`panic(fmt.Errorf("codecgen version mismatch: current: %v, need %v. Re-generate file: %v", `)
-	// x.linef(`%v, %sGenVersion, file))`, genVersion, x.cpfx)
+	x.linef("ver := strconv.FormatInt(int64(%sGenVersion), 10)", x.cpfx)
+	x.outf(`panic(errors.New("codecgen version mismatch: current: %v, need " + ver + ". Re-generate file: " + file))`, genVersion)
 	x.linef("}")
-	x.line("if false { // reference the types, but skip this branch at build/run time")
-	// x.line("_ = strconv.ParseInt")
-	var n int
-	// for k, t := range x.im {
-	for _, k := range imKeys {
-		t := x.im[k]
-		x.linef("var v%v %s.%s", n, x.imn[k], t.Name())
-		n++
-	}
-	if n > 0 {
-		x.out("_")
-		for i := 1; i < n; i++ {
-			x.out(", _")
+	if len(imKeys) > 0 {
+		x.line("if false { // reference the types, but skip this branch at build/run time")
+		for _, k := range imKeys {
+			t := x.im[k]
+			x.linef("var _ %s.%s", x.imn[k], t.Name())
 		}
-		x.out(" = v0")
-		for i := 1; i < n; i++ {
-			x.outf(", v%v", i)
-		}
+		x.line("} ") // close if false
 	}
-	x.line("} ") // close if false
-	x.line("}")  // close init
+	x.line("}") // close init
 	x.line("")
 
 	// generate rest of type info
@@ -325,6 +395,7 @@ func Gen(w io.Writer, buildTags, pkgName, uid string, noExtensions bool,
 		x.tc = t
 		x.selfer(true)
 		x.selfer(false)
+		x.tryGenIsZero(t)
 	}
 
 	for _, t := range x.ts {
@@ -339,7 +410,7 @@ func Gen(w io.Writer, buildTags, pkgName, uid string, noExtensions bool,
 		case reflect.Map:
 			x.encMapFallback("v", t)
 		default:
-			panic(errGenExpectArrayOrMap)
+			halt.onerror(errGenExpectArrayOrMap)
 		}
 		x.line("}")
 		x.line("")
@@ -354,9 +425,14 @@ func Gen(w io.Writer, buildTags, pkgName, uid string, noExtensions bool,
 		case reflect.Map:
 			x.decMapFallback("v", rtid, t)
 		default:
-			panic(errGenExpectArrayOrMap)
+			halt.onerror(errGenExpectArrayOrMap)
 		}
 		x.line("}")
+		x.line("")
+	}
+
+	for t := range x.ty {
+		x.tryGenIsZero(t)
 		x.line("")
 	}
 
@@ -379,9 +455,9 @@ func (x *genRunner) arr2str(t reflect.Type, s string) string {
 func (x *genRunner) genRequiredMethodVars(encode bool) {
 	x.line("var h " + x.hn)
 	if encode {
-		x.line("z, r := " + x.cpfx + "GenHelperEncoder(e)")
+		x.line("z, r := " + x.cpfx + "GenHelper().Encoder(e)")
 	} else {
-		x.line("z, r := " + x.cpfx + "GenHelperDecoder(d)")
+		x.line("z, r := " + x.cpfx + "GenHelper().Decoder(d)")
 	}
 	x.line("_, _, _ = h, z, r")
 }
@@ -418,6 +494,24 @@ func (x *genRunner) genRefPkgs(t reflect.Type) {
 	}
 }
 
+// sayFalse will either say "false" or use a function call that returns false.
+func (x *genRunner) sayFalse() string {
+	x.f++
+	if x.f%2 == 0 {
+		return x.hn + "False()"
+	}
+	return "false"
+}
+
+// sayFalse will either say "true" or use a function call that returns true.
+func (x *genRunner) sayTrue() string {
+	x.f++
+	if x.f%2 == 0 {
+		return x.hn + "True()"
+	}
+	return "true"
+}
+
 func (x *genRunner) varsfx() string {
 	x.c++
 	return strconv.FormatUint(x.c, 10)
@@ -429,22 +523,24 @@ func (x *genRunner) varsfxreset() {
 
 func (x *genRunner) out(s string) {
 	_, err := io.WriteString(x.w, s)
-	if err != nil {
-		panic(err)
-	}
+	genCheckErr(err)
 }
 
 func (x *genRunner) outf(s string, params ...interface{}) {
 	_, err := fmt.Fprintf(x.w, s, params...)
-	if err != nil {
-		panic(err)
-	}
+	genCheckErr(err)
 }
 
 func (x *genRunner) line(s string) {
 	x.out(s)
 	if len(s) == 0 || s[len(s)-1] != '\n' {
 		x.out("\n")
+	}
+}
+
+func (x *genRunner) lineIf(s string) {
+	if s != "" {
+		x.line(s)
 	}
 }
 
@@ -456,8 +552,6 @@ func (x *genRunner) linef(s string, params ...interface{}) {
 }
 
 func (x *genRunner) genTypeName(t reflect.Type) (n string) {
-	// defer func() { fmt.Printf(">>>> ####: genTypeName: t: %v, name: '%s'\n", t, n) }()
-
 	// if the type has a PkgPath, which doesn't match the current package,
 	// then include it.
 	// We cannot depend on t.String() because it includes current package,
@@ -521,6 +615,52 @@ func (x *genRunner) genMethodNameT(t reflect.Type) (s string) {
 	return genMethodNameT(t, x.tc)
 }
 
+func (x *genRunner) tryGenIsZero(t reflect.Type) (done bool) {
+	if t.Kind() != reflect.Struct || t.Implements(isCodecEmptyerTyp) {
+		return
+	}
+
+	rtid := rt2id(t)
+
+	if _, ok := x.tz[rtid]; ok {
+		delete(x.ty, t)
+		return
+	}
+
+	x.tz[rtid] = true
+	delete(x.ty, t)
+
+	ti := x.ti.get(rtid, t)
+	tisfi := ti.sfiSrc // always use sequence from file. decStruct expects same thing.
+	varname := genTopLevelVarName
+
+	x.linef("func (%s *%s) IsCodecEmpty() bool {", varname, x.genTypeName(t))
+
+	anonSeen := make(map[reflect.Type]bool)
+	var omitline genBuf
+	for _, si := range tisfi {
+		if si.path.parent != nil {
+			root := si.path.root()
+			if anonSeen[root.typ] {
+				continue
+			}
+			anonSeen[root.typ] = true
+		}
+		t2 := genOmitEmptyLinePreChecks(varname, t, si, &omitline, true)
+		// if Ptr, we already checked if nil above
+		if t2.Type.Kind() != reflect.Ptr {
+			x.doEncOmitEmptyLine(t2, varname, &omitline)
+			omitline.s(" || ")
+		}
+	}
+	omitline.s(" false")
+	x.linef("return !(%s)", omitline.v())
+
+	x.line("}")
+	x.line("")
+	return true
+}
+
 func (x *genRunner) selfer(encode bool) {
 	t := x.tc
 	t0 := t
@@ -542,7 +682,6 @@ func (x *genRunner) selfer(encode bool) {
 	if encode {
 		x.line(") CodecEncodeSelf(e *" + x.cpfx + "Encoder) {")
 		x.genRequiredMethodVars(true)
-		// x.enc(genTopLevelVarName, t)
 		x.encVar(genTopLevelVarName, t)
 	} else {
 		x.line(") CodecDecodeSelf(d *" + x.cpfx + "Decoder) {")
@@ -635,50 +774,54 @@ func (x *genRunner) registerXtraT(t reflect.Type) {
 // encVar will encode a variable.
 // The parameter, t, is the reflect.Type of the variable itself
 func (x *genRunner) encVar(varname string, t reflect.Type) {
-	// fmt.Printf(">>>>>> varname: %s, t: %v\n", varname, t)
 	var checkNil bool
+	// case reflect.Ptr, reflect.Interface, reflect.Slice, reflect.Map, reflect.Chan:
+	// do not include checkNil for slice and maps, as we already checkNil below it
 	switch t.Kind() {
-	case reflect.Ptr, reflect.Interface, reflect.Slice, reflect.Map, reflect.Chan:
+	case reflect.Ptr, reflect.Interface, reflect.Chan:
 		checkNil = true
 	}
+	x.encVarChkNil(varname, t, checkNil)
+}
+
+func (x *genRunner) encVarChkNil(varname string, t reflect.Type, checkNil bool) {
 	if checkNil {
-		x.linef("if %s == nil { r.EncodeNil() } else { ", varname)
+		x.linef("if %s == nil { r.EncodeNil() } else {", varname)
 	}
 
 	switch t.Kind() {
 	case reflect.Ptr:
 		telem := t.Elem()
 		tek := telem.Kind()
-		if tek == reflect.Array || (tek == reflect.Struct && t != timeTyp) {
-			x.enc(varname, genNonPtr(t))
+		if tek == reflect.Array || (tek == reflect.Struct && telem != timeTyp) {
+			x.enc(varname, genNonPtr(t), true)
 			break
 		}
 		i := x.varsfx()
 		x.line(genTempVarPfx + i + " := *" + varname)
-		x.enc(genTempVarPfx+i, genNonPtr(t))
+		x.enc(genTempVarPfx+i, genNonPtr(t), false)
 	case reflect.Struct, reflect.Array:
 		if t == timeTyp {
-			x.enc(varname, t)
+			x.enc(varname, t, false)
 			break
 		}
 		i := x.varsfx()
 		x.line(genTempVarPfx + i + " := &" + varname)
-		x.enc(genTempVarPfx+i, t)
+		x.enc(genTempVarPfx+i, t, true)
 	default:
-		x.enc(varname, t)
+		x.enc(varname, t, false)
 	}
 
 	if checkNil {
 		x.line("}")
 	}
-
 }
 
 // enc will encode a variable (varname) of type t, where t represents T.
 // if t is !time.Time and t is of kind reflect.Struct or reflect.Array, varname is of type *T
 // (to prevent copying),
 // else t is of type T
-func (x *genRunner) enc(varname string, t reflect.Type) {
+func (x *genRunner) enc(varname string, t reflect.Type, isptr bool) {
 	rtid := rt2id(t)
 	ti2 := x.ti.get(rtid, t)
 	// We call CodecEncodeSelf if one of the following are honored:
@@ -688,27 +831,55 @@ func (x *genRunner) enc(varname string, t reflect.Type) {
 
 	mi := x.varsfx()
 	// tptr := reflect.PtrTo(t)
-	tk := t.Kind()
+	// tk := t.Kind()
+
+	// check if
+	//   - type is time.Time, RawExt, Raw
+	//   - the type implements (Text|JSON|Binary)(Unm|M)arshal
+
+	var hasIf genIfClause
+	defer hasIf.end(x) // end if block (if necessary)
+
+	var ptrPfx, addrPfx string
+	if isptr {
+		ptrPfx = "*"
+	} else {
+		addrPfx = "&"
+	}
+
+	if t == timeTyp {
+		x.linef("%s !z.EncBasicHandle().TimeNotBuiltin { r.EncodeTime(%s%s)", hasIf.c(false), ptrPfx, varname)
+		// return
+	}
+	if t == rawTyp {
+		x.linef("%s z.EncRaw(%s%s)", hasIf.c(true), ptrPfx, varname)
+		return
+	}
+	if t == rawExtTyp {
+		x.linef("%s r.EncodeRawExt(%s%s)", hasIf.c(true), addrPfx, varname)
+		return
+	}
+	// only check for extensions if extensions are configured,
+	// and the type is named, and has a packagePath,
+	// and this is not the CodecEncodeSelf or CodecDecodeSelf method (i.e. it is not a Selfer)
+	if !x.nx && varname != genTopLevelVarName && genImportPath(t) != "" && t.Name() != "" {
+		yy := fmt.Sprintf("%sxt%s", genTempVarPfx, mi)
+		x.linef("%s %s := z.Extension(%s); %s != nil { z.EncExtension(%s, %s) ",
+			hasIf.c(false), yy, varname, yy, varname, yy)
+	}
+
 	if x.checkForSelfer(t, varname) {
-		if tk == reflect.Array || (tk == reflect.Struct && rtid != timeTypId) { // varname is of type *T
-			// if tptr.Implements(selferTyp) || t.Implements(selferTyp) {
-			if ti2.isFlag(typeInfoFlagIsZeroerPtr) || ti2.isFlag(typeInfoFlagIsZeroer) {
-				x.line(varname + ".CodecEncodeSelf(e)")
-				return
-			}
-		} else { // varname is of type T
-			if ti2.cs { // t.Implements(selferTyp) {
-				x.line(varname + ".CodecEncodeSelf(e)")
-				return
-			} else if ti2.csp { // tptr.Implements(selferTyp) {
-				x.linef("%ssf%s := &%s", genTempVarPfx, mi, varname)
-				x.linef("%ssf%s.CodecEncodeSelf(e)", genTempVarPfx, mi)
-				return
-			}
+		if ti2.flagSelfer {
+			x.linef("%s %s.CodecEncodeSelf(e)", hasIf.c(true), varname)
+			return
+		} else if ti2.flagSelferPtr {
+			x.linef("%s %ssf%s := &%s", hasIf.c(true), genTempVarPfx, mi, varname)
+			x.linef("%ssf%s.CodecEncodeSelf(e)", genTempVarPfx, mi)
+			return
 		}
 
 		if _, ok := x.te[rtid]; ok {
-			x.line(varname + ".CodecEncodeSelf(e)")
+			x.linef("%s %s.CodecEncodeSelf(e)", hasIf.c(true), varname)
 			return
 		}
 	}
@@ -731,57 +902,23 @@ func (x *genRunner) enc(varname string, t reflect.Type) {
 		rtidAdded = true
 	}
 
-	// check if
-	//   - type is time.Time, RawExt, Raw
-	//   - the type implements (Text|JSON|Binary)(Unm|M)arshal
+	if ti2.flagBinaryMarshaler {
+		x.linef("%s z.EncBinary() { z.EncBinaryMarshal(%s%v) ", hasIf.c(false), ptrPfx, varname)
+	} else if ti2.flagBinaryMarshalerPtr {
+		x.linef("%s z.EncBinary() { z.EncBinaryMarshal(%s%v) ", hasIf.c(false), addrPfx, varname)
+	}
 
-	x.line("if false {")           //start if block
-	defer func() { x.line("}") }() //end if block
+	if ti2.flagJsonMarshaler {
+		x.linef("%s !z.EncBinary() && z.IsJSONHandle() { z.EncJSONMarshal(%s%v) ", hasIf.c(false), ptrPfx, varname)
+	} else if ti2.flagJsonMarshalerPtr {
+		x.linef("%s !z.EncBinary() && z.IsJSONHandle() { z.EncJSONMarshal(%s%v) ", hasIf.c(false), addrPfx, varname)
+	} else if ti2.flagTextMarshaler {
+		x.linef("%s !z.EncBinary() { z.EncTextMarshal(%s%v) ", hasIf.c(false), ptrPfx, varname)
+	} else if ti2.flagTextMarshalerPtr {
+		x.linef("%s !z.EncBinary() { z.EncTextMarshal(%s%v) ", hasIf.c(false), addrPfx, varname)
+	}
 
-	if t == timeTyp {
-		x.linef("} else { r.EncodeTime(%s)", varname)
-		return
-	}
-	if t == rawTyp {
-		x.linef("} else { z.EncRaw(%s)", varname)
-		return
-	}
-	if t == rawExtTyp {
-		x.linef("} else { r.EncodeRawExt(%s, e)", varname)
-		return
-	}
-	// only check for extensions if the type is named, and has a packagePath.
-	var arrayOrStruct = tk == reflect.Array || tk == reflect.Struct // meaning varname if of type *T
-	if !x.nx && genImportPath(t) != "" && t.Name() != "" {
-		yy := fmt.Sprintf("%sxt%s", genTempVarPfx, mi)
-		x.linef("} else if %s := z.Extension(z.I2Rtid(%s)); %s != nil { z.EncExtension(%s, %s) ", yy, varname, yy, varname, yy)
-	}
-	if arrayOrStruct { // varname is of type *T
-		if ti2.bm || ti2.bmp { // t.Implements(binaryMarshalerTyp) || tptr.Implements(binaryMarshalerTyp) {
-			x.linef("} else if z.EncBinary() { z.EncBinaryMarshal(%v) ", varname)
-		}
-		if ti2.jm || ti2.jmp { // t.Implements(jsonMarshalerTyp) || tptr.Implements(jsonMarshalerTyp) {
-			x.linef("} else if !z.EncBinary() && z.IsJSONHandle() { z.EncJSONMarshal(%v) ", varname)
-		} else if ti2.tm || ti2.tmp { // t.Implements(textMarshalerTyp) || tptr.Implements(textMarshalerTyp) {
-			x.linef("} else if !z.EncBinary() { z.EncTextMarshal(%v) ", varname)
-		}
-	} else { // varname is of type T
-		if ti2.bm { // t.Implements(binaryMarshalerTyp) {
-			x.linef("} else if z.EncBinary() { z.EncBinaryMarshal(%v) ", varname)
-		} else if ti2.bmp { // tptr.Implements(binaryMarshalerTyp) {
-			x.linef("} else if z.EncBinary() { z.EncBinaryMarshal(&%v) ", varname)
-		}
-		if ti2.jm { // t.Implements(jsonMarshalerTyp) {
-			x.linef("} else if !z.EncBinary() && z.IsJSONHandle() { z.EncJSONMarshal(%v) ", varname)
-		} else if ti2.jmp { // tptr.Implements(jsonMarshalerTyp) {
-			x.linef("} else if !z.EncBinary() && z.IsJSONHandle() { z.EncJSONMarshal(&%v) ", varname)
-		} else if ti2.tm { // t.Implements(textMarshalerTyp) {
-			x.linef("} else if !z.EncBinary() { z.EncTextMarshal(%v) ", varname)
-		} else if ti2.tmp { // tptr.Implements(textMarshalerTyp) {
-			x.linef("} else if !z.EncBinary() { z.EncTextMarshal(&%v) ", varname)
-		}
-	}
-	x.line("} else {")
+	x.lineIf(hasIf.c(true))
 
 	switch t.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -795,7 +932,7 @@ func (x *genRunner) enc(varname string, t reflect.Type) {
 	case reflect.Bool:
 		x.line("r.EncodeBool(bool(" + varname + "))")
 	case reflect.String:
-		x.line("r.EncodeString(codecSelferCcUTF8" + x.xs + ", string(" + varname + "))")
+		x.linef("r.EncodeString(string(%s))", varname)
 	case reflect.Chan:
 		x.xtraSM(varname, t, true, false)
 		// x.encListFallback(varname, rtid, t)
@@ -803,34 +940,35 @@ func (x *genRunner) enc(varname string, t reflect.Type) {
 		x.xtraSM(varname, t, true, true)
 	case reflect.Slice:
 		// if nil, call dedicated function
-		// if a []uint8, call dedicated function
+		// if a []byte, call dedicated function
 		// if a known fastpath slice, call dedicated function
 		// else write encode function in-line.
 		// - if elements are primitives or Selfers, call dedicated function on each member.
 		// - else call Encoder.encode(XXX) on it.
+		x.linef("if %s == nil { r.EncodeNil() } else {", varname)
 		if rtid == uint8SliceTypId {
-			x.line("r.EncodeStringBytes(codecSelferCcRAW" + x.xs + ", []byte(" + varname + "))")
-		} else if fastpathAV.index(rtid) != -1 {
-			g := x.newGenV(t)
+			x.line("r.EncodeStringBytesRaw([]byte(" + varname + "))")
+		} else if fastpathAvIndex(rtid) != -1 {
+			g := x.newFastpathGenV(t)
 			x.line("z.F." + g.MethodNamePfx("Enc", false) + "V(" + varname + ", e)")
 		} else {
 			x.xtraSM(varname, t, true, false)
-			// x.encListFallback(varname, rtid, t)
 		}
+		x.linef("} // end block: if %s slice == nil", varname)
 	case reflect.Map:
 		// if nil, call dedicated function
 		// if a known fastpath map, call dedicated function
 		// else write encode function in-line.
 		// - if elements are primitives or Selfers, call dedicated function on each member.
 		// - else call Encoder.encode(XXX) on it.
-		// x.line("if " + varname + " == nil { \nr.EncodeNil()\n } else { ")
-		if fastpathAV.index(rtid) != -1 {
-			g := x.newGenV(t)
+		x.linef("if %s == nil { r.EncodeNil() } else {", varname)
+		if fastpathAvIndex(rtid) != -1 {
+			g := x.newFastpathGenV(t)
 			x.line("z.F." + g.MethodNamePfx("Enc", false) + "V(" + varname + ", e)")
 		} else {
 			x.xtraSM(varname, t, true, false)
-			// x.encMapFallback(varname, rtid, t)
 		}
+		x.linef("} // end block: if %s map == nil", varname)
 	case reflect.Struct:
 		if !inlist {
 			delete(x.te, rtid)
@@ -859,13 +997,45 @@ func (x *genRunner) encZero(t reflect.Type) {
 	case reflect.Bool:
 		x.line("r.EncodeBool(false)")
 	case reflect.String:
-		x.line("r.EncodeString(codecSelferCcUTF8" + x.xs + `, "")`)
+		x.linef(`r.EncodeString("")`)
 	default:
 		x.line("r.EncodeNil()")
 	}
 }
 
+func genOmitEmptyLinePreChecks(varname string, t reflect.Type, si *structFieldInfo, omitline *genBuf, oneLevel bool) (t2 reflect.StructField) {
+	// xdebug2f("calling genOmitEmptyLinePreChecks on: %v", t)
+	t2typ := t
+	varname3 := varname
+	// go through the loop, record the t2 field explicitly,
+	// and gather the omit line if embedded in pointers.
+	fullpath := si.path.fullpath()
+	for i, path := range fullpath {
+		for t2typ.Kind() == reflect.Ptr {
+			t2typ = t2typ.Elem()
+		}
+		t2 = t2typ.Field(int(path.index))
+		t2typ = t2.Type
+		varname3 = varname3 + "." + t2.Name
+		// do not include actual field in the omit line.
+		// that is done subsequently (right after - below).
+		if i+1 < len(fullpath) && t2typ.Kind() == reflect.Ptr {
+			omitline.s(varname3).s(" != nil && ")
+		}
+		if oneLevel {
+			break
+		}
+	}
+	return
+}
+
+func (x *genRunner) doEncOmitEmptyLine(t2 reflect.StructField, varname string, buf *genBuf) {
+	x.f = 0
+	x.encOmitEmptyLine(t2, varname, buf)
+}
+
 func (x *genRunner) encOmitEmptyLine(t2 reflect.StructField, varname string, buf *genBuf) {
+	// xdebugf("calling encOmitEmptyLine on: %v", t2.Type)
 	// smartly check omitEmpty on a struct type, as it may contain uncomparable map/slice/etc.
 	// also, for maps/slices/arrays, check if len ! 0 (not if == zero value)
 	varname2 := varname + "." + t2.Name
@@ -873,21 +1043,39 @@ func (x *genRunner) encOmitEmptyLine(t2 reflect.StructField, varname string, buf
 	case reflect.Struct:
 		rtid2 := rt2id(t2.Type)
 		ti2 := x.ti.get(rtid2, t2.Type)
-		// fmt.Printf(">>>> structfield: omitempty: type: %s, field: %s\n", t2.Type.Name(), t2.Name)
+		// xdebugf(">>>> structfield: omitempty: type: %s, field: %s\n", t2.Type.Name(), t2.Name)
 		if ti2.rtid == timeTypId {
 			buf.s("!(").s(varname2).s(".IsZero())")
 			break
 		}
-		if ti2.isFlag(typeInfoFlagIsZeroerPtr) || ti2.isFlag(typeInfoFlagIsZeroer) {
+		if ti2.flagIsZeroerPtr || ti2.flagIsZeroer {
 			buf.s("!(").s(varname2).s(".IsZero())")
 			break
 		}
-		if ti2.isFlag(typeInfoFlagComparable) {
+		if t2.Type.Implements(isCodecEmptyerTyp) {
+			buf.s("!(").s(varname2).s(".IsCodecEmpty())")
+			break
+		}
+		_, ok := x.tz[rtid2]
+		if ok {
+			buf.s("!(").s(varname2).s(".IsCodecEmpty())")
+			break
+		}
+		// if we *should* create a IsCodecEmpty for it, but haven't yet, add it here
+		// _, ok = x.ty[rtid2]
+		if genImportPath(t2.Type) == x.bp {
+			x.ty[t2.Type] = struct{}{}
+			buf.s("!(").s(varname2).s(".IsCodecEmpty())")
+			break
+		}
+		if ti2.flagComparable {
 			buf.s(varname2).s(" != ").s(x.genZeroValueR(t2.Type))
 			break
 		}
+		// MARKER: we shouldn't get here at all ...
+		fmt.Printf("???? !!!! We shouldn't get to this point !!!! ????")
 		// buf.s("(")
-		buf.s("false")
+		buf.s(x.sayFalse()) // buf.s("false")
 		for i, n := 0, t2.Type.NumField(); i < n; i++ {
 			f := t2.Type.Field(i)
 			if f.PkgPath != "" { // unexported
@@ -898,7 +1086,7 @@ func (x *genRunner) encOmitEmptyLine(t2 reflect.StructField, varname string, buf
 		}
 		//buf.s(")")
 	case reflect.Bool:
-		buf.s(varname2)
+		buf.s("bool(").s(varname2).s(")")
 	case reflect.Map, reflect.Slice, reflect.Array, reflect.Chan:
 		buf.s("len(").s(varname2).s(") != 0")
 	default:
@@ -913,230 +1101,263 @@ func (x *genRunner) encStruct(varname string, rtid uintptr, t reflect.Type) {
 	// if t === type currently running selfer on, do for all
 	ti := x.ti.get(rtid, t)
 	i := x.varsfx()
-	sepVarname := genTempVarPfx + "sep" + i
+	// sepVarname := genTempVarPfx + "sep" + i
 	numfieldsvar := genTempVarPfx + "q" + i
 	ti2arrayvar := genTempVarPfx + "r" + i
 	struct2arrvar := genTempVarPfx + "2arr" + i
 
-	x.line(sepVarname + " := !z.EncBinary()")
+	tisfi := ti.sfiSrc // always use sequence from file. decStruct expects same thing.
+
+	type genFQN struct {
+		i       string
+		fqname  string
+		nilLine genBuf
+		nilVar  string
+		canNil  bool
+		sf      reflect.StructField
+	}
+
+	genFQNs := make([]genFQN, len(tisfi))
+	for j, si := range tisfi {
+		q := &genFQNs[j]
+		q.i = x.varsfx()
+		q.nilVar = genTempVarPfx + "n" + q.i
+		q.canNil = false
+		q.fqname = varname
+		{
+			t2typ := t
+			fullpath := si.path.fullpath()
+			for _, path := range fullpath {
+				for t2typ.Kind() == reflect.Ptr {
+					t2typ = t2typ.Elem()
+				}
+				q.sf = t2typ.Field(int(path.index))
+				t2typ = q.sf.Type
+				q.fqname += "." + q.sf.Name
+				if t2typ.Kind() == reflect.Ptr {
+					if !q.canNil {
+						q.nilLine.f("%s == nil", q.fqname)
+						q.canNil = true
+					} else {
+						q.nilLine.f(" || %s == nil", q.fqname)
+					}
+				}
+			}
+		}
+	}
+
+	// x.line(sepVarname + " := !z.EncBinary()")
 	x.linef("%s := z.EncBasicHandle().StructToArray", struct2arrvar)
-	x.linef("_, _ = %s, %s", sepVarname, struct2arrvar)
+	// x.linef("_, _ = %s, %s", sepVarname, struct2arrvar)
+	x.linef("_ = %s", struct2arrvar)
 	x.linef("const %s bool = %v // struct tag has 'toArray'", ti2arrayvar, ti.toArray)
 
-	tisfi := ti.sfiSrc // always use sequence from file. decStruct expects same thing.
+	for j := range genFQNs {
+		q := &genFQNs[j]
+		if q.canNil {
+			x.linef("var %s bool = %s", q.nilVar, q.nilLine.v())
+		}
+	}
 
 	// var nn int
 	// due to omitEmpty, we need to calculate the
 	// number of non-empty things we write out first.
 	// This is required as we need to pre-determine the size of the container,
 	// to support length-prefixing.
-	if ti.anyOmitEmpty {
+	omitEmptySometimes := x.omitEmptyWhen == nil
+	omitEmptyAlways := (x.omitEmptyWhen != nil && *(x.omitEmptyWhen))
+	// omitEmptyNever := (x.omitEmptyWhen != nil && !*(x.omitEmptyWhen))
+
+	toArraySometimes := x.toArrayWhen == nil
+	toArrayAlways := (x.toArrayWhen != nil && *(x.toArrayWhen))
+	toArrayNever := (x.toArrayWhen != nil && !(*(x.toArrayWhen)))
+
+	if (omitEmptySometimes && ti.anyOmitEmpty) || omitEmptyAlways {
 		x.linef("var %s = [%v]bool{ // should field at this index be written?", numfieldsvar, len(tisfi))
 
-		for j, si := range tisfi {
-			_ = j
-			if !si.omitEmpty() {
-				// x.linef("%s[%v] = true // %s", numfieldsvar, j, si.fieldName)
-				x.linef("true, // %s", si.fieldName)
-				// nn++
+		for _, si := range tisfi {
+			if omitEmptySometimes && !si.path.omitEmpty {
+				x.linef("true, // %s", si.encName) // si.fieldName)
 				continue
 			}
-			var t2 reflect.StructField
 			var omitline genBuf
-			{
-				t2typ := t
-				varname3 := varname
-				// go through the loop, record the t2 field explicitly,
-				// and gather the omit line if embedded in pointers.
-				for ij, ix := range si.is {
-					if uint8(ij) == si.nis {
-						break
-					}
-					for t2typ.Kind() == reflect.Ptr {
-						t2typ = t2typ.Elem()
-					}
-					t2 = t2typ.Field(int(ix))
-					t2typ = t2.Type
-					varname3 = varname3 + "." + t2.Name
-					// do not include actual field in the omit line.
-					// that is done subsequently (right after - below).
-					if uint8(ij+1) < si.nis && t2typ.Kind() == reflect.Ptr {
-						omitline.s(varname3).s(" != nil && ")
-					}
-				}
-			}
-			x.encOmitEmptyLine(t2, varname, &omitline)
-			x.linef("%s, // %s", omitline.v(), si.fieldName)
+			t2 := genOmitEmptyLinePreChecks(varname, t, si, &omitline, false)
+			x.doEncOmitEmptyLine(t2, varname, &omitline)
+			x.linef("%s, // %s", omitline.v(), si.encName) // si.fieldName)
 		}
 		x.line("}")
 		x.linef("_ = %s", numfieldsvar)
 	}
-	// x.linef("var %snn%s int", genTempVarPfx, i)
-	x.linef("if %s || %s {", ti2arrayvar, struct2arrvar) // if ti.toArray {
-	x.linef("r.WriteArrayStart(%d)", len(tisfi))
-	x.linef("} else {") // if not ti.toArray
-	if ti.anyOmitEmpty {
-		// nn = 0
-		// x.linef("var %snn%s = %v", genTempVarPfx, i, nn)
-		x.linef("var %snn%s int", genTempVarPfx, i)
-		x.linef("for _, b := range %s { if b { %snn%s++ } }", numfieldsvar, genTempVarPfx, i)
-		x.linef("r.WriteMapStart(%snn%s)", genTempVarPfx, i)
-		x.linef("%snn%s = %v", genTempVarPfx, i, 0)
-	} else {
-		x.linef("r.WriteMapStart(%d)", len(tisfi))
-	}
-	x.line("}") // close if not StructToArray
 
-	for j, si := range tisfi {
-		i := x.varsfx()
-		isNilVarName := genTempVarPfx + "n" + i
-		var labelUsed bool
-		var t2 reflect.StructField
-		{
-			t2typ := t
-			varname3 := varname
-			for ij, ix := range si.is {
-				if uint8(ij) == si.nis {
-					break
-				}
-				for t2typ.Kind() == reflect.Ptr {
-					t2typ = t2typ.Elem()
-				}
-				t2 = t2typ.Field(int(ix))
-				t2typ = t2.Type
-				varname3 = varname3 + "." + t2.Name
-				if t2typ.Kind() == reflect.Ptr {
-					if !labelUsed {
-						x.line("var " + isNilVarName + " bool")
+	if toArraySometimes {
+		x.linef("if %s || %s {", ti2arrayvar, struct2arrvar) // if ti.toArray
+	}
+	if toArraySometimes || toArrayAlways {
+		x.linef("z.EncWriteArrayStart(%d)", len(tisfi))
+
+		for j, si := range tisfi {
+			doOmitEmptyCheck := (omitEmptySometimes && si.path.omitEmpty) || omitEmptyAlways
+			q := &genFQNs[j]
+			// if the type of the field is a Selfer, or one of the ones
+			if q.canNil {
+				x.linef("if %s { z.EncWriteArrayElem(); r.EncodeNil() } else { ", q.nilVar)
+			}
+			x.linef("z.EncWriteArrayElem()")
+			if doOmitEmptyCheck {
+				x.linef("if %s[%v] {", numfieldsvar, j)
+			}
+			x.encVarChkNil(q.fqname, q.sf.Type, false)
+			if doOmitEmptyCheck {
+				x.linef("} else {")
+				x.encZero(q.sf.Type)
+				x.linef("}")
+			}
+			if q.canNil {
+				x.line("}")
+			}
+		}
+
+		x.line("z.EncWriteArrayEnd()")
+	}
+	if toArraySometimes {
+		x.linef("} else {") // if not ti.toArray
+	}
+	if toArraySometimes || toArrayNever {
+		if (omitEmptySometimes && ti.anyOmitEmpty) || omitEmptyAlways {
+			x.linef("var %snn%s int", genTempVarPfx, i)
+			x.linef("for _, b := range %s { if b { %snn%s++ } }", numfieldsvar, genTempVarPfx, i)
+			x.linef("z.EncWriteMapStart(%snn%s)", genTempVarPfx, i)
+			x.linef("%snn%s = %v", genTempVarPfx, i, 0)
+		} else {
+			x.linef("z.EncWriteMapStart(%d)", len(tisfi))
+		}
+
+		for j, si := range tisfi {
+			q := &genFQNs[j]
+			doOmitEmptyCheck := (omitEmptySometimes && si.path.omitEmpty) || omitEmptyAlways
+			if doOmitEmptyCheck {
+				x.linef("if %s[%v] {", numfieldsvar, j)
+			}
+			x.linef("z.EncWriteMapElemKey()")
+
+			// emulate EncStructFieldKey
+			switch ti.keyType {
+			case valueTypeInt:
+				x.linef("r.EncodeInt(z.M.Int(strconv.ParseInt(`%s`, 10, 64)))", si.encName)
+			case valueTypeUint:
+				x.linef("r.EncodeUint(z.M.Uint(strconv.ParseUint(`%s`, 10, 64)))", si.encName)
+			case valueTypeFloat:
+				x.linef("r.EncodeFloat64(z.M.Float(strconv.ParseFloat(`%s`, 64)))", si.encName)
+			default: // string
+				if x.jsonOnlyWhen == nil {
+					if si.path.encNameAsciiAlphaNum {
+						x.linef(`if z.IsJSONHandle() { z.WriteStr("\"%s\"") } else { `, si.encName)
 					}
-					x.line("if " + varname3 + " == nil { " + isNilVarName + " = true ")
-					x.line("goto LABEL" + i)
-					x.line("}")
-					labelUsed = true
-					// "varname3 = new(" + x.genTypeName(t3.Elem()) + ") }")
+					x.linef("r.EncodeString(`%s`)", si.encName)
+					if si.path.encNameAsciiAlphaNum {
+						x.linef("}")
+					}
+				} else if *(x.jsonOnlyWhen) {
+					if si.path.encNameAsciiAlphaNum {
+						x.linef(`z.WriteStr("\"%s\"")`, si.encName)
+					} else {
+						x.linef("r.EncodeString(`%s`)", si.encName)
+					}
+				} else {
+					x.linef("r.EncodeString(`%s`)", si.encName)
 				}
 			}
-			// t2 = t.FieldByIndex(si.is)
+			x.line("z.EncWriteMapElemValue()")
+			if q.canNil {
+				x.line("if " + q.nilVar + " { r.EncodeNil() } else { ")
+				x.encVarChkNil(q.fqname, q.sf.Type, false)
+				x.line("}")
+			} else {
+				x.encVarChkNil(q.fqname, q.sf.Type, false)
+			}
+			if doOmitEmptyCheck {
+				x.line("}")
+			}
 		}
-		if labelUsed {
-			x.line("LABEL" + i + ":")
-		}
-		// if the type of the field is a Selfer, or one of the ones
-
-		x.linef("if %s || %s {", ti2arrayvar, struct2arrvar) // if ti.toArray
-		if labelUsed {
-			x.linef("if %s { r.WriteArrayElem(); r.EncodeNil() } else { ", isNilVarName)
-		}
-		x.line("r.WriteArrayElem()")
-		if si.omitEmpty() {
-			x.linef("if %s[%v] {", numfieldsvar, j)
-		}
-		x.encVar(varname+"."+t2.Name, t2.Type)
-		if si.omitEmpty() {
-			x.linef("} else {")
-			x.encZero(t2.Type)
-			x.linef("}")
-		}
-		if labelUsed {
-			x.line("}")
-		}
-
-		x.linef("} else {") // if not ti.toArray
-
-		if si.omitEmpty() {
-			x.linef("if %s[%v] {", numfieldsvar, j)
-		}
-		x.line("r.WriteMapElemKey()")
-
-		// x.line("r.EncodeString(codecSelferCcUTF8" + x.xs + ", `" + si.encName + "`)")
-		// emulate EncStructFieldKey
-		switch ti.keyType {
-		case valueTypeInt:
-			x.linef("r.EncodeInt(z.M.Int(strconv.ParseInt(`%s`, 10, 64)))", si.encName)
-		case valueTypeUint:
-			x.linef("r.EncodeUint(z.M.Uint(strconv.ParseUint(`%s`, 10, 64)))", si.encName)
-		case valueTypeFloat:
-			x.linef("r.EncodeFloat64(z.M.Float(strconv.ParseFloat(`%s`, 64)))", si.encName)
-		default: // string
-			x.linef("r.EncodeString(codecSelferCcUTF8%s, `%s`)", x.xs, si.encName)
-		}
-		// x.linef("r.EncStructFieldKey(codecSelferValueType%s%s, `%s`)", ti.keyType.String(), x.xs, si.encName)
-		x.line("r.WriteMapElemValue()")
-		if labelUsed {
-			x.line("if " + isNilVarName + " { r.EncodeNil() } else { ")
-			x.encVar(varname+"."+t2.Name, t2.Type)
-			x.line("}")
-		} else {
-			x.encVar(varname+"."+t2.Name, t2.Type)
-		}
-		if si.omitEmpty() {
-			x.line("}")
-		}
+		x.line("z.EncWriteMapEnd()")
+	}
+	if toArraySometimes {
 		x.linef("} ") // end if/else ti.toArray
 	}
-	x.linef("if %s || %s {", ti2arrayvar, struct2arrvar) // if ti.toArray {
-	x.line("r.WriteArrayEnd()")
-	x.line("} else {")
-	x.line("r.WriteMapEnd()")
-	x.line("}")
-
 }
 
 func (x *genRunner) encListFallback(varname string, t reflect.Type) {
+	x.linef("if %s == nil { r.EncodeNil(); return }", varname)
+	elemBytes := t.Elem().Kind() == reflect.Uint8
 	if t.AssignableTo(uint8SliceTyp) {
-		x.linef("r.EncodeStringBytes(codecSelferCcRAW%s, []byte(%s))", x.xs, varname)
+		x.linef("r.EncodeStringBytesRaw([]byte(%s))", varname)
 		return
 	}
-	if t.Kind() == reflect.Array && t.Elem().Kind() == reflect.Uint8 {
-		x.linef("r.EncodeStringBytes(codecSelferCcRAW%s, ((*[%d]byte)(%s))[:])", x.xs, t.Len(), varname)
+	if t.Kind() == reflect.Array && elemBytes {
+		x.linef("r.EncodeStringBytesRaw(((*[%d]byte)(%s))[:])", t.Len(), varname)
 		return
 	}
 	i := x.varsfx()
-	g := genTempVarPfx
-	x.line("r.WriteArrayStart(len(" + varname + "))")
 	if t.Kind() == reflect.Chan {
-		x.linef("for %si%s, %si2%s := 0, len(%s); %si%s < %si2%s; %si%s++ {", g, i, g, i, varname, g, i, g, i, g, i)
-		x.line("r.WriteArrayElem()")
-		x.linef("%sv%s := <-%s", g, i, varname)
-	} else {
-		x.linef("for _, %sv%s := range %s {", genTempVarPfx, i, varname)
-		x.line("r.WriteArrayElem()")
+		type ts struct {
+			Label, Chan, Slice, Sfx string
+		}
+		tm, err := template.New("").Parse(genEncChanTmpl)
+		genCheckErr(err)
+		x.linef("if %s == nil { r.EncodeNil() } else { ", varname)
+		x.linef("var sch%s []%s", i, x.genTypeName(t.Elem()))
+		err = tm.Execute(x.w, &ts{"Lsch" + i, varname, "sch" + i, i})
+		genCheckErr(err)
+		if elemBytes {
+			x.linef("r.EncodeStringBytesRaw([]byte(%s))", "sch"+i)
+			x.line("}")
+			return
+		}
+		varname = "sch" + i
 	}
+
+	x.line("z.EncWriteArrayStart(len(" + varname + "))")
+	x.linef("for _, %sv%s := range %s {", genTempVarPfx, i, varname)
+	x.linef("z.EncWriteArrayElem()")
+
 	x.encVar(genTempVarPfx+"v"+i, t.Elem())
 	x.line("}")
-	x.line("r.WriteArrayEnd()")
+	x.line("z.EncWriteArrayEnd()")
+	if t.Kind() == reflect.Chan {
+		x.line("}")
+	}
 }
 
 func (x *genRunner) encMapFallback(varname string, t reflect.Type) {
-	// TODO: expand this to handle canonical.
+	x.linef("if %s == nil { r.EncodeNil(); return }", varname)
+	// MARKER: Canonical Option is not honored
 	i := x.varsfx()
-	x.line("r.WriteMapStart(len(" + varname + "))")
+	x.line("z.EncWriteMapStart(len(" + varname + "))")
 	x.linef("for %sk%s, %sv%s := range %s {", genTempVarPfx, i, genTempVarPfx, i, varname)
-	x.line("r.WriteMapElemKey()")
+	x.linef("z.EncWriteMapElemKey()")
 	x.encVar(genTempVarPfx+"k"+i, t.Key())
-	x.line("r.WriteMapElemValue()")
+	x.line("z.EncWriteMapElemValue()")
 	x.encVar(genTempVarPfx+"v"+i, t.Elem())
 	x.line("}")
-	x.line("r.WriteMapEnd()")
+	x.line("z.EncWriteMapEnd()")
 }
 
 func (x *genRunner) decVarInitPtr(varname, nilvar string, t reflect.Type, si *structFieldInfo,
-	newbuf, nilbuf *genBuf) (t2 reflect.StructField) {
+	newbuf, nilbuf *genBuf) (varname3 string, t2 reflect.StructField) {
 	//we must accommodate anonymous fields, where the embedded field is a nil pointer in the value.
 	// t2 = t.FieldByIndex(si.is)
+	varname3 = varname
 	t2typ := t
-	varname3 := varname
 	t2kind := t2typ.Kind()
 	var nilbufed bool
 	if si != nil {
-		for ij, ix := range si.is {
-			if uint8(ij) == si.nis {
-				break
-			}
-			for t2typ.Kind() == reflect.Ptr {
+		fullpath := si.path.fullpath()
+		for _, path := range fullpath {
+			// only one-level pointers can be seen in a type
+			if t2typ.Kind() == reflect.Ptr {
 				t2typ = t2typ.Elem()
 			}
-			t2 = t2typ.Field(int(ix))
+			t2 = t2typ.Field(int(path.index))
 			t2typ = t2.Type
 			varname3 = varname3 + "." + t2.Name
 			t2kind = t2typ.Kind()
@@ -1144,23 +1365,24 @@ func (x *genRunner) decVarInitPtr(varname, nilvar string, t reflect.Type, si *st
 				continue
 			}
 			if newbuf != nil {
-				newbuf.f("if %s == nil { %s = new(%s) }\n", varname3, varname3, x.genTypeName(t2typ.Elem()))
+				if len(newbuf.buf) > 0 {
+					newbuf.s("\n")
+				}
+				newbuf.f("if %s == nil { %s = new(%s) }", varname3, varname3, x.genTypeName(t2typ.Elem()))
 			}
 			if nilbuf != nil {
 				if !nilbufed {
-					nilbuf.s("if true")
+					nilbuf.s("if ").s(varname3).s(" != nil")
 					nilbufed = true
+				} else {
+					nilbuf.s(" && ").s(varname3).s(" != nil")
 				}
-				nilbuf.s(" && ").s(varname3).s(" != nil")
 			}
 		}
 	}
-	// if t2typ.Kind() == reflect.Ptr {
-	// 	varname3 = varname3 + t2.Name
-	// }
 	if nilbuf != nil {
 		if nilbufed {
-			nilbuf.s(" { ")
+			nilbuf.s(" { ").s("// remove the if-true\n")
 		}
 		if nilvar != "" {
 			nilbuf.s(nilvar).s(" = true")
@@ -1177,7 +1399,7 @@ func (x *genRunner) decVarInitPtr(varname, nilvar string, t reflect.Type, si *st
 			nilbuf.s("}")
 		}
 	}
-	return t2
+	return
 }
 
 // decVar takes a variable called varname, of type t
@@ -1203,8 +1425,7 @@ func (x *genRunner) decVarMain(varname, rand string, t reflect.Type, checkNotNil
 		for t = t.Elem(); t.Kind() == reflect.Ptr; t = t.Elem() {
 			ptrPfx += "*"
 			if checkNotNil {
-				x.linef("if %s%s == nil { %s%s = new(%s)}",
-					ptrPfx, varname, ptrPfx, varname, x.genTypeName(t))
+				x.linef("if %s%s == nil { %s%s = new(%s)}", ptrPfx, varname, ptrPfx, varname, x.genTypeName(t))
 			}
 		}
 		// Should we create temp var if a slice/map indexing? No. dec(...) can now handle it.
@@ -1221,7 +1442,6 @@ func (x *genRunner) decVarMain(varname, rand string, t reflect.Type, checkNotNil
 
 // decVar takes a variable called varname, of type t
 func (x *genRunner) decVar(varname, nilvar string, t reflect.Type, canBeNil, checkNotNil bool) {
-	i := x.varsfx()
 
 	// We only encode as nil if a nillable value.
 	// This removes some of the wasted checks for TryDecodeAsNil.
@@ -1230,41 +1450,76 @@ func (x *genRunner) decVar(varname, nilvar string, t reflect.Type, canBeNil, che
 	// This could happen when decoding from a struct encoded as an array.
 	// For that, decVar should be called with canNil=true, to force true as its value.
 
-	if !canBeNil {
-		canBeNil = genAnythingCanBeNil || !genIsImmutable(t)
-	}
-
-	if canBeNil {
+	i := x.varsfx()
+	if t.Kind() == reflect.Ptr {
 		var buf genBuf
 		x.decVarInitPtr(varname, nilvar, t, nil, nil, &buf)
-		x.linef("if r.TryDecodeAsNil() { %s } else {", buf.buf)
-	} else {
-		x.line("// cannot be nil")
-	}
-
-	x.decVarMain(varname, i, t, checkNotNil)
-
-	if canBeNil {
+		x.linef("if r.TryNil() { %s } else {", buf.buf)
+		x.decVarMain(varname, i, t, checkNotNil)
 		x.line("} ")
+	} else {
+		x.decVarMain(varname, i, t, checkNotNil)
 	}
 }
 
 // dec will decode a variable (varname) of type t or ptrTo(t) if isptr==true.
-// t is always a basetype (i.e. not of kind reflect.Ptr).
 func (x *genRunner) dec(varname string, t reflect.Type, isptr bool) {
 	// assumptions:
 	//   - the varname is to a pointer already. No need to take address of it
 	//   - t is always a baseType T (not a *T, etc).
 	rtid := rt2id(t)
 	ti2 := x.ti.get(rtid, t)
-	// tptr := reflect.PtrTo(t)
+
+	// check if
+	//   - type is time.Time, Raw, RawExt
+	//   - the type implements (Text|JSON|Binary)(Unm|M)arshal
+
+	mi := x.varsfx()
+
+	var hasIf genIfClause
+	defer hasIf.end(x)
+
+	var ptrPfx, addrPfx string
+	if isptr {
+		ptrPfx = "*"
+	} else {
+		addrPfx = "&"
+	}
+	if t == timeTyp {
+		x.linef("%s !z.DecBasicHandle().TimeNotBuiltin { %s%v = r.DecodeTime()", hasIf.c(false), ptrPfx, varname)
+		// return
+	}
+	if t == rawTyp {
+		x.linef("%s %s%v = z.DecRaw()", hasIf.c(true), ptrPfx, varname)
+		return
+	}
+
+	if t == rawExtTyp {
+		x.linef("%s r.DecodeExt(%s%v, 0, nil)", hasIf.c(true), addrPfx, varname)
+		return
+	}
+
+	// only check for extensions if extensions are configured,
+	// and the type is named, and has a packagePath,
+	// and this is not the CodecEncodeSelf or CodecDecodeSelf method (i.e. it is not a Selfer)
+	// xdebugf("genRunner.dec: varname: %v, t: %v, genImportPath: %v, t.Name: %v", varname, t, genImportPath(t), t.Name())
+	if !x.nx && varname != genTopLevelVarName && genImportPath(t) != "" && t.Name() != "" {
+		// first check if extensions are configued, before doing the interface conversion
+		yy := fmt.Sprintf("%sxt%s", genTempVarPfx, mi)
+		x.linef("%s %s := z.Extension(%s); %s != nil { z.DecExtension(%s%s, %s) ", hasIf.c(false), yy, varname, yy, addrPfx, varname, yy)
+	}
+
 	if x.checkForSelfer(t, varname) {
-		if ti2.cs || ti2.csp { // t.Implements(selferTyp) || tptr.Implements(selferTyp) {
-			x.line(varname + ".CodecDecodeSelf(d)")
+		if ti2.flagSelfer {
+			x.linef("%s %s.CodecDecodeSelf(d)", hasIf.c(true), varname)
+			return
+		}
+		if ti2.flagSelferPtr {
+			x.linef("%s %s.CodecDecodeSelf(d)", hasIf.c(true), varname)
 			return
 		}
 		if _, ok := x.td[rtid]; ok {
-			x.line(varname + ".CodecDecodeSelf(d)")
+			x.linef("%s %s.CodecDecodeSelf(d)", hasIf.c(true), varname)
 			return
 		}
 	}
@@ -1274,7 +1529,7 @@ func (x *genRunner) dec(varname string, t reflect.Type, isptr bool) {
 		if t == t0 {
 			inlist = true
 			if x.checkForSelfer(t, varname) {
-				x.line(varname + ".CodecDecodeSelf(d)")
+				x.linef("%s %s.CodecDecodeSelf(d)", hasIf.c(true), varname)
 				return
 			}
 			break
@@ -1287,54 +1542,22 @@ func (x *genRunner) dec(varname string, t reflect.Type, isptr bool) {
 		rtidAdded = true
 	}
 
-	// check if
-	//   - type is time.Time, Raw, RawExt
-	//   - the type implements (Text|JSON|Binary)(Unm|M)arshal
-
-	mi := x.varsfx()
-	// x.linef("%sm%s := z.DecBinary()", genTempVarPfx, mi)
-	// x.linef("_ = %sm%s", genTempVarPfx, mi)
-	x.line("if false {")           //start if block
-	defer func() { x.line("}") }() //end if block
-
-	var ptrPfx, addrPfx string
-	if isptr {
-		ptrPfx = "*"
-	} else {
-		addrPfx = "&"
+	if ti2.flagBinaryUnmarshaler {
+		x.linef("%s z.DecBinary() { z.DecBinaryUnmarshal(%s%v) ", hasIf.c(false), ptrPfx, varname)
+	} else if ti2.flagBinaryUnmarshalerPtr {
+		x.linef("%s z.DecBinary() { z.DecBinaryUnmarshal(%s%v) ", hasIf.c(false), addrPfx, varname)
 	}
-	if t == timeTyp {
-		x.linef("} else { %s%v = r.DecodeTime()", ptrPfx, varname)
-		return
-	}
-	if t == rawTyp {
-		x.linef("} else { %s%v = z.DecRaw()", ptrPfx, varname)
-		return
+	if ti2.flagJsonUnmarshaler {
+		x.linef("%s !z.DecBinary() && z.IsJSONHandle() { z.DecJSONUnmarshal(%s%v)", hasIf.c(false), ptrPfx, varname)
+	} else if ti2.flagJsonUnmarshalerPtr {
+		x.linef("%s !z.DecBinary() && z.IsJSONHandle() { z.DecJSONUnmarshal(%s%v)", hasIf.c(false), addrPfx, varname)
+	} else if ti2.flagTextUnmarshaler {
+		x.linef("%s !z.DecBinary() { z.DecTextUnmarshal(%s%v)", hasIf.c(false), ptrPfx, varname)
+	} else if ti2.flagTextUnmarshalerPtr {
+		x.linef("%s !z.DecBinary() { z.DecTextUnmarshal(%s%v)", hasIf.c(false), addrPfx, varname)
 	}
 
-	if t == rawExtTyp {
-		x.linef("} else { r.DecodeExt(%s%v, 0, nil)", addrPfx, varname)
-		return
-	}
-
-	// only check for extensions if the type is named, and has a packagePath.
-	if !x.nx && genImportPath(t) != "" && t.Name() != "" {
-		// first check if extensions are configued, before doing the interface conversion
-		// x.linef("} else if z.HasExtensions() && z.DecExt(%s) {", varname)
-		yy := fmt.Sprintf("%sxt%s", genTempVarPfx, mi)
-		x.linef("} else if %s := z.Extension(z.I2Rtid(%s)); %s != nil { z.DecExtension(%s, %s) ", yy, varname, yy, varname, yy)
-	}
-
-	if ti2.bu || ti2.bup { // t.Implements(binaryUnmarshalerTyp) || tptr.Implements(binaryUnmarshalerTyp) {
-		x.linef("} else if z.DecBinary() { z.DecBinaryUnmarshal(%s%v) ", addrPfx, varname)
-	}
-	if ti2.ju || ti2.jup { // t.Implements(jsonUnmarshalerTyp) || tptr.Implements(jsonUnmarshalerTyp) {
-		x.linef("} else if !z.DecBinary() && z.IsJSONHandle() { z.DecJSONUnmarshal(%s%v)", addrPfx, varname)
-	} else if ti2.tu || ti2.tup { // t.Implements(textUnmarshalerTyp) || tptr.Implements(textUnmarshalerTyp) {
-		x.linef("} else if !z.DecBinary() { z.DecTextUnmarshal(%s%v)", addrPfx, varname)
-	}
-
-	x.line("} else {")
+	x.lineIf(hasIf.c(true))
 
 	if x.decTryAssignPrimitive(varname, t, isptr) {
 		return
@@ -1344,7 +1567,7 @@ func (x *genRunner) dec(varname string, t reflect.Type, isptr bool) {
 	case reflect.Array, reflect.Chan:
 		x.xtraSM(varname, t, false, isptr)
 	case reflect.Slice:
-		// if a []uint8, call dedicated function
+		// if a []byte, call dedicated function
 		// if a known fastpath slice, call dedicated function
 		// else write encode function in-line.
 		// - if elements are primitives or Selfers, call dedicated function on each member.
@@ -1352,8 +1575,8 @@ func (x *genRunner) dec(varname string, t reflect.Type, isptr bool) {
 		if rtid == uint8SliceTypId {
 			x.linef("%s%s = r.DecodeBytes(%s(%s[]byte)(%s), false)",
 				ptrPfx, varname, ptrPfx, ptrPfx, varname)
-		} else if fastpathAV.index(rtid) != -1 {
-			g := x.newGenV(t)
+		} else if fastpathAvIndex(rtid) != -1 {
+			g := x.newFastpathGenV(t)
 			x.linef("z.F.%sX(%s%s, d)", g.MethodNamePfx("Dec", false), addrPfx, varname)
 		} else {
 			x.xtraSM(varname, t, false, isptr)
@@ -1364,12 +1587,11 @@ func (x *genRunner) dec(varname string, t reflect.Type, isptr bool) {
 		// else write encode function in-line.
 		// - if elements are primitives or Selfers, call dedicated function on each member.
 		// - else call Encoder.encode(XXX) on it.
-		if fastpathAV.index(rtid) != -1 {
-			g := x.newGenV(t)
+		if fastpathAvIndex(rtid) != -1 {
+			g := x.newFastpathGenV(t)
 			x.linef("z.F.%sX(%s%s, d)", g.MethodNamePfx("Dec", false), addrPfx, varname)
 		} else {
 			x.xtraSM(varname, t, false, isptr)
-			// x.decMapFallback(varname, rtid, t)
 		}
 	case reflect.Struct:
 		if inlist {
@@ -1428,14 +1650,14 @@ func (x *genRunner) decTryAssignPrimitive(varname string, t reflect.Type, isptr 
 		x.linef("%s%s = (%s)(z.C.UintV(r.DecodeUint64(), codecSelferBitsize%s))", ptr, varname, x.genTypeName(t), x.xs)
 
 	case reflect.Float32:
-		x.linef("%s%s = (%s)(r.DecodeFloat32As64())", ptr, varname, x.genTypeName(t))
+		x.linef("%s%s = (%s)(z.DecDecodeFloat32())", ptr, varname, x.genTypeName(t))
 	case reflect.Float64:
 		x.linef("%s%s = (%s)(r.DecodeFloat64())", ptr, varname, x.genTypeName(t))
 
 	case reflect.Bool:
 		x.linef("%s%s = (%s)(r.DecodeBool())", ptr, varname, x.genTypeName(t))
 	case reflect.String:
-		x.linef("%s%s = (%s)(r.DecodeString())", ptr, varname, x.genTypeName(t))
+		x.linef("%s%s = (%s)(string(r.DecodeStringAsBytes()))", ptr, varname, x.genTypeName(t))
 	default:
 		return false
 	}
@@ -1453,6 +1675,7 @@ func (x *genRunner) decListFallback(varname string, rtid uintptr, t reflect.Type
 	}
 	type tstruc struct {
 		TempVar   string
+		Sfx       string
 		Rand      string
 		Varname   string
 		CTyp      string
@@ -1461,7 +1684,7 @@ func (x *genRunner) decListFallback(varname string, rtid uintptr, t reflect.Type
 		Size      int
 	}
 	telem := t.Elem()
-	ts := tstruc{genTempVarPfx, x.varsfx(), varname, x.genTypeName(t), x.genTypeName(telem), genIsImmutable(telem), int(telem.Size())}
+	ts := tstruc{genTempVarPfx, x.xs, x.varsfx(), varname, x.genTypeName(t), x.genTypeName(telem), genIsImmutable(telem), int(telem.Size())}
 
 	funcs := make(template.FuncMap)
 
@@ -1471,6 +1694,9 @@ func (x *genRunner) decListFallback(varname string, rtid uintptr, t reflect.Type
 	}
 	funcs["var"] = func(s string) string {
 		return ts.TempVar + s + ts.Rand
+	}
+	funcs["xs"] = func() string {
+		return ts.Sfx
 	}
 	funcs["zero"] = func() string {
 		return x.genZeroValueR(telem)
@@ -1485,12 +1711,8 @@ func (x *genRunner) decListFallback(varname string, rtid uintptr, t reflect.Type
 		return t.Kind() == reflect.Chan
 	}
 	tm, err := template.New("").Funcs(funcs).Parse(genDecListTmpl)
-	if err != nil {
-		panic(err)
-	}
-	if err = tm.Execute(x.w, &ts); err != nil {
-		panic(err)
-	}
+	genCheckErr(err)
+	genCheckErr(tm.Execute(x.w, &ts))
 }
 
 func (x *genRunner) decMapFallback(varname string, rtid uintptr, t reflect.Type) {
@@ -1534,14 +1756,13 @@ func (x *genRunner) decMapFallback(varname string, rtid uintptr, t reflect.Type)
 	funcs["var"] = func(s string) string {
 		return ts.TempVar + s + ts.Rand
 	}
+	funcs["xs"] = func() string {
+		return ts.Sfx
+	}
 
 	tm, err := template.New("").Funcs(funcs).Parse(genDecMapTmpl)
-	if err != nil {
-		panic(err)
-	}
-	if err = tm.Execute(x.w, &ts); err != nil {
-		panic(err)
-	}
+	genCheckErr(err)
+	genCheckErr(tm.Execute(x.w, &ts))
 }
 
 func (x *genRunner) decStructMapSwitch(kName string, varname string, rtid uintptr, t reflect.Type) {
@@ -1553,15 +1774,19 @@ func (x *genRunner) decStructMapSwitch(kName string, varname string, rtid uintpt
 		x.line("case \"" + si.encName + "\":")
 		newbuf.reset()
 		nilbuf.reset()
-		t2 := x.decVarInitPtr(varname, "", t, si, &newbuf, &nilbuf)
-		x.linef("if r.TryDecodeAsNil() { %s } else { %s", nilbuf.buf, newbuf.buf)
-		x.decVarMain(varname+"."+t2.Name, x.varsfx(), t2.Type, false)
-		x.line("}")
+		varname3, t2 := x.decVarInitPtr(varname, "", t, si, &newbuf, &nilbuf)
+		if len(newbuf.buf) > 0 {
+			x.linef("if r.TryNil() { %s } else { %s", nilbuf.buf, newbuf.buf)
+		}
+		x.decVarMain(varname3, x.varsfx(), t2.Type, false)
+		if len(newbuf.buf) > 0 {
+			x.line("}")
+		}
 	}
 	x.line("default:")
 	// pass the slice here, so that the string will not escape, and maybe save allocation
-	x.line("z.DecStructFieldNotFound(-1, " + kName + ")")
-	x.line("} // end switch " + kName)
+	x.linef("z.DecStructFieldNotFound(-1, %s)", kName)
+	x.linef("} // end switch %s", kName)
 }
 
 func (x *genRunner) decStructMap(varname, lenvarname string, rtid uintptr, t reflect.Type, style genStructMapStyle) {
@@ -1574,14 +1799,14 @@ func (x *genRunner) decStructMap(varname, lenvarname string, rtid uintptr, t ref
 	case genStructMapStyleLenPrefix:
 		x.linef("for %sj%s := 0; %sj%s < %s; %sj%s++ {", tpfx, i, tpfx, i, lenvarname, tpfx, i)
 	case genStructMapStyleCheckBreak:
-		x.linef("for %sj%s := 0; !r.CheckBreak(); %sj%s++ {", tpfx, i, tpfx, i)
+		x.linef("for %sj%s := 0; !z.DecCheckBreak(); %sj%s++ {", tpfx, i, tpfx, i)
 	default: // 0, otherwise.
 		x.linef("var %shl%s bool = %s >= 0", tpfx, i, lenvarname) // has length
 		x.linef("for %sj%s := 0; ; %sj%s++ {", tpfx, i, tpfx, i)
 		x.linef("if %shl%s { if %sj%s >= %s { break }", tpfx, i, tpfx, i, lenvarname)
-		x.line("} else { if r.CheckBreak() { break }; }")
+		x.line("} else { if z.DecCheckBreak() { break }; }")
 	}
-	x.line("r.ReadMapElemKey()")
+	x.line("z.DecReadMapElemKey()")
 
 	// emulate decstructfieldkey
 	switch ti.keyType {
@@ -1594,13 +1819,11 @@ func (x *genRunner) decStructMap(varname, lenvarname string, rtid uintptr, t ref
 	default: // string
 		x.linef("%s := z.StringView(r.DecodeStringAsBytes())", kName)
 	}
-	// x.linef("%s := z.StringView(r.DecStructFieldKey(codecSelferValueType%s%s, z.DecScratchArrayBuffer()))", kName, ti.keyType.String(), x.xs)
 
-	x.line("r.ReadMapElemValue()")
+	x.line("z.DecReadMapElemValue()")
 	x.decStructMapSwitch(kName, varname, rtid, t)
 
 	x.line("} // end for " + tpfx + "j" + i)
-	x.line("r.ReadMapEnd()")
 }
 
 func (x *genRunner) decStructArray(varname, lenvarname, breakString string, rtid uintptr, t reflect.Type) {
@@ -1611,40 +1834,56 @@ func (x *genRunner) decStructArray(varname, lenvarname, breakString string, rtid
 	x.linef("var %sj%s int", tpfx, i)
 	x.linef("var %sb%s bool", tpfx, i)                        // break
 	x.linef("var %shl%s bool = %s >= 0", tpfx, i, lenvarname) // has length
-	var newbuf, nilbuf genBuf
-	for _, si := range tisfi {
-		x.linef("%sj%s++; if %shl%s { %sb%s = %sj%s > %s } else { %sb%s = r.CheckBreak() }",
+	if !genDecStructArrayInlineLoopCheck {
+		x.linef("var %sfn%s = func() bool { ", tpfx, i)
+		x.linef("%sj%s++; if %shl%s { %sb%s = %sj%s > %s } else { %sb%s = z.DecCheckBreak() };",
 			tpfx, i, tpfx, i, tpfx, i,
 			tpfx, i, lenvarname, tpfx, i)
-		x.linef("if %sb%s { r.ReadArrayEnd(); %s }", tpfx, i, breakString)
-		x.line("r.ReadArrayElem()")
+		x.linef("if %sb%s { z.DecReadArrayEnd(); return true }; return false", tpfx, i)
+		x.linef("} // end func %sfn%s", tpfx, i)
+	}
+	var newbuf, nilbuf genBuf
+	for _, si := range tisfi {
+		if genDecStructArrayInlineLoopCheck {
+			x.linef("%sj%s++; if %shl%s { %sb%s = %sj%s > %s } else { %sb%s = z.DecCheckBreak() }",
+				tpfx, i, tpfx, i, tpfx, i,
+				tpfx, i, lenvarname, tpfx, i)
+			x.linef("if %sb%s { z.DecReadArrayEnd(); %s }", tpfx, i, breakString)
+		} else {
+			x.linef("if %sfn%s() { %s }", tpfx, i, breakString)
+		}
+		x.line("z.DecReadArrayElem()")
 		newbuf.reset()
 		nilbuf.reset()
-		t2 := x.decVarInitPtr(varname, "", t, si, &newbuf, &nilbuf)
-		x.linef("if r.TryDecodeAsNil() { %s } else { %s", nilbuf.buf, newbuf.buf)
-		x.decVarMain(varname+"."+t2.Name, x.varsfx(), t2.Type, false)
-		x.line("}")
+		varname3, t2 := x.decVarInitPtr(varname, "", t, si, &newbuf, &nilbuf)
+		if len(newbuf.buf) > 0 {
+			x.linef("if r.TryNil() { %s } else { %s", nilbuf.buf, newbuf.buf)
+		}
+		x.decVarMain(varname3, x.varsfx(), t2.Type, false)
+		if len(newbuf.buf) > 0 {
+			x.line("}")
+		}
 	}
 	// read remaining values and throw away.
 	x.line("for {")
-	x.linef("%sj%s++; if %shl%s { %sb%s = %sj%s > %s } else { %sb%s = r.CheckBreak() }",
+	x.linef("%sj%s++; if %shl%s { %sb%s = %sj%s > %s } else { %sb%s = z.DecCheckBreak() }",
 		tpfx, i, tpfx, i, tpfx, i,
 		tpfx, i, lenvarname, tpfx, i)
 	x.linef("if %sb%s { break }", tpfx, i)
-	x.line("r.ReadArrayElem()")
+	x.line("z.DecReadArrayElem()")
 	x.linef(`z.DecStructFieldNotFound(%sj%s - 1, "")`, tpfx, i)
 	x.line("}")
-	x.line("r.ReadArrayEnd()")
 }
 
 func (x *genRunner) decStruct(varname string, rtid uintptr, t reflect.Type) {
 	// varname MUST be a ptr, or a struct field or a slice element.
 	i := x.varsfx()
 	x.linef("%sct%s := r.ContainerType()", genTempVarPfx, i)
-	x.linef("if %sct%s == codecSelferValueTypeMap%s {", genTempVarPfx, i, x.xs)
-	x.line(genTempVarPfx + "l" + i + " := r.ReadMapStart()")
+	x.linef("if %sct%s == codecSelferValueTypeNil%s {", genTempVarPfx, i, x.xs)
+	x.linef("*(%s) = %s{}", varname, x.genTypeName(t))
+	x.linef("} else if %sct%s == codecSelferValueTypeMap%s {", genTempVarPfx, i, x.xs)
+	x.line(genTempVarPfx + "l" + i + " := z.DecReadMapStart()")
 	x.linef("if %sl%s == 0 {", genTempVarPfx, i)
-	x.line("r.ReadMapEnd()")
 	if genUseOneFunctionForDecStructMap {
 		x.line("} else { ")
 		x.linef("%s.codecDecodeSelfFromMap(%sl%s, d)", varname, genTempVarPfx, i)
@@ -1655,15 +1894,15 @@ func (x *genRunner) decStruct(varname string, rtid uintptr, t reflect.Type) {
 		x.line(varname + ".codecDecodeSelfFromMapCheckBreak(" + genTempVarPfx + "l" + i + ", d)")
 	}
 	x.line("}")
+	x.line("z.DecReadMapEnd()")
 
 	// else if container is array
 	x.linef("} else if %sct%s == codecSelferValueTypeArray%s {", genTempVarPfx, i, x.xs)
-	x.line(genTempVarPfx + "l" + i + " := r.ReadArrayStart()")
-	x.linef("if %sl%s == 0 {", genTempVarPfx, i)
-	x.line("r.ReadArrayEnd()")
-	x.line("} else { ")
+	x.line(genTempVarPfx + "l" + i + " := z.DecReadArrayStart()")
+	x.linef("if %sl%s != 0 {", genTempVarPfx, i)
 	x.linef("%s.codecDecodeSelfFromArray(%sl%s, d)", varname, genTempVarPfx, i)
 	x.line("}")
+	x.line("z.DecReadArrayEnd()")
 	// else panic
 	x.line("} else { ")
 	x.line("panic(errCodecSelferOnlyMapOrArrayEncodeToStruct" + x.xs + ")")
@@ -1672,15 +1911,17 @@ func (x *genRunner) decStruct(varname string, rtid uintptr, t reflect.Type) {
 
 // --------
 
-type genV struct {
-	// genV is either a primitive (Primitive != "") or a map (MapKey != "") or a slice
-	MapKey    string
-	Elem      string
-	Primitive string
-	Size      int
+type fastpathGenV struct {
+	// fastpathGenV is either a primitive (Primitive != "") or a map (MapKey != "") or a slice
+	MapKey      string
+	Elem        string
+	Primitive   string
+	Size        int
+	NoCanonical bool
 }
 
-func (x *genRunner) newGenV(t reflect.Type) (v genV) {
+func (x *genRunner) newFastpathGenV(t reflect.Type) (v fastpathGenV) {
+	v.NoCanonical = !genFastpathCanonical
 	switch t.Kind() {
 	case reflect.Slice, reflect.Array:
 		te := t.Elem()
@@ -1692,12 +1933,12 @@ func (x *genRunner) newGenV(t reflect.Type) (v genV) {
 		v.MapKey = x.genTypeName(tk)
 		v.Size = int(te.Size() + tk.Size())
 	default:
-		panic("unexpected type for newGenV. Requires map or slice type")
+		halt.onerror(errGenUnexpectedTypeFastpath)
 	}
 	return
 }
 
-func (x *genV) MethodNamePfx(prefix string, prim bool) string {
+func (x *fastpathGenV) MethodNamePfx(prefix string, prim bool) string {
 	var name []byte
 	if prefix != "" {
 		name = append(name, prefix...)
@@ -1714,7 +1955,6 @@ func (x *genV) MethodNamePfx(prefix string, prim bool) string {
 		name = append(name, genTitleCaseName(x.Elem)...)
 	}
 	return string(name)
-
 }
 
 // genImportPath returns import path of a non-predeclared named typed, or an empty string otherwise.
@@ -1762,6 +2002,8 @@ func genTitleCaseName(s string) string {
 	switch s {
 	case "interface{}", "interface {}":
 		return "Intf"
+	case "[]byte", "[]uint8", "bytes":
+		return "Bytes"
 	default:
 		return strings.ToUpper(s[0:1]) + s[1:]
 	}
@@ -1849,7 +2091,7 @@ func genIsImmutable(t reflect.Type) (v bool) {
 
 type genInternal struct {
 	Version int
-	Values  []genV
+	Values  []fastpathGenV
 }
 
 func (x genInternal) FastpathLen() (l int) {
@@ -1865,6 +2107,8 @@ func genInternalZeroValue(s string) string {
 	switch s {
 	case "interface{}", "interface {}":
 		return "nil"
+	case "[]byte", "[]uint8", "bytes":
+		return "nil"
 	case "bool":
 		return "false"
 	case "string":
@@ -1874,48 +2118,59 @@ func genInternalZeroValue(s string) string {
 	}
 }
 
-var genInternalNonZeroValueIdx [5]uint64
-var genInternalNonZeroValueStrs = [2][5]string{
-	{`"string-is-an-interface"`, "true", `"some-string"`, "11.1", "33"},
-	{`"string-is-an-interface-2"`, "true", `"some-string-2"`, "22.2", "44"},
+var genInternalNonZeroValueIdx [6]uint64
+var genInternalNonZeroValueStrs = [...][6]string{
+	{`"string-is-an-interface-1"`, "true", `"some-string-1"`, `[]byte("some-string-1")`, "11.1", "111"},
+	{`"string-is-an-interface-2"`, "false", `"some-string-2"`, `[]byte("some-string-2")`, "22.2", "77"},
+	{`"string-is-an-interface-3"`, "true", `"some-string-3"`, `[]byte("some-string-3")`, "33.3e3", "127"},
 }
 
+// Note: last numbers must be in range: 0-127 (as they may be put into a int8, uint8, etc)
+
 func genInternalNonZeroValue(s string) string {
+	var i int
 	switch s {
 	case "interface{}", "interface {}":
-		genInternalNonZeroValueIdx[0]++
-		return genInternalNonZeroValueStrs[genInternalNonZeroValueIdx[0]%2][0] // return string, to remove ambiguity
+		i = 0
 	case "bool":
-		genInternalNonZeroValueIdx[1]++
-		return genInternalNonZeroValueStrs[genInternalNonZeroValueIdx[1]%2][1]
+		i = 1
 	case "string":
-		genInternalNonZeroValueIdx[2]++
-		return genInternalNonZeroValueStrs[genInternalNonZeroValueIdx[2]%2][2]
+		i = 2
+	case "bytes", "[]byte", "[]uint8":
+		i = 3
 	case "float32", "float64", "float", "double":
-		genInternalNonZeroValueIdx[3]++
-		return genInternalNonZeroValueStrs[genInternalNonZeroValueIdx[3]%2][3]
+		i = 4
 	default:
-		genInternalNonZeroValueIdx[4]++
-		return genInternalNonZeroValueStrs[genInternalNonZeroValueIdx[4]%2][4]
+		i = 5
 	}
+	genInternalNonZeroValueIdx[i]++
+	idx := genInternalNonZeroValueIdx[i]
+	slen := uint64(len(genInternalNonZeroValueStrs))
+	return genInternalNonZeroValueStrs[idx%slen][i] // return string, to remove ambiguity
 }
 
 func genInternalEncCommandAsString(s string, vname string) string {
 	switch s {
-	case "uint", "uint8", "uint16", "uint32", "uint64":
-		return "ee.EncodeUint(uint64(" + vname + "))"
-	case "int", "int8", "int16", "int32", "int64":
-		return "ee.EncodeInt(int64(" + vname + "))"
+	case "uint64":
+		return "e.e.EncodeUint(" + vname + ")"
+	case "uint", "uint8", "uint16", "uint32":
+		return "e.e.EncodeUint(uint64(" + vname + "))"
+	case "int64":
+		return "e.e.EncodeInt(" + vname + ")"
+	case "int", "int8", "int16", "int32":
+		return "e.e.EncodeInt(int64(" + vname + "))"
+	case "[]byte", "[]uint8", "bytes":
+		return "e.e.EncodeStringBytesRaw(" + vname + ")"
 	case "string":
-		return "ee.EncodeString(cUTF8, " + vname + ")"
+		return "e.e.EncodeString(" + vname + ")"
 	case "float32":
-		return "ee.EncodeFloat32(" + vname + ")"
+		return "e.e.EncodeFloat32(" + vname + ")"
 	case "float64":
-		return "ee.EncodeFloat64(" + vname + ")"
+		return "e.e.EncodeFloat64(" + vname + ")"
 	case "bool":
-		return "ee.EncodeBool(" + vname + ")"
+		return "e.e.EncodeBool(" + vname + ")"
 	// case "symbol":
-	// 	return "ee.EncodeSymbol(" + vname + ")"
+	// 	return "e.e.EncodeSymbol(" + vname + ")"
 	default:
 		return "e.encode(" + vname + ")"
 	}
@@ -1924,57 +2179,77 @@ func genInternalEncCommandAsString(s string, vname string) string {
 func genInternalDecCommandAsString(s string) string {
 	switch s {
 	case "uint":
-		return "uint(chkOvf.UintV(dd.DecodeUint64(), uintBitsize))"
+		return "uint(chkOvf.UintV(d.d.DecodeUint64(), uintBitsize))"
 	case "uint8":
-		return "uint8(chkOvf.UintV(dd.DecodeUint64(), 8))"
+		return "uint8(chkOvf.UintV(d.d.DecodeUint64(), 8))"
 	case "uint16":
-		return "uint16(chkOvf.UintV(dd.DecodeUint64(), 16))"
+		return "uint16(chkOvf.UintV(d.d.DecodeUint64(), 16))"
 	case "uint32":
-		return "uint32(chkOvf.UintV(dd.DecodeUint64(), 32))"
+		return "uint32(chkOvf.UintV(d.d.DecodeUint64(), 32))"
 	case "uint64":
-		return "dd.DecodeUint64()"
+		return "d.d.DecodeUint64()"
 	case "uintptr":
-		return "uintptr(chkOvf.UintV(dd.DecodeUint64(), uintBitsize))"
+		return "uintptr(chkOvf.UintV(d.d.DecodeUint64(), uintBitsize))"
 	case "int":
-		return "int(chkOvf.IntV(dd.DecodeInt64(), intBitsize))"
+		return "int(chkOvf.IntV(d.d.DecodeInt64(), intBitsize))"
 	case "int8":
-		return "int8(chkOvf.IntV(dd.DecodeInt64(), 8))"
+		return "int8(chkOvf.IntV(d.d.DecodeInt64(), 8))"
 	case "int16":
-		return "int16(chkOvf.IntV(dd.DecodeInt64(), 16))"
+		return "int16(chkOvf.IntV(d.d.DecodeInt64(), 16))"
 	case "int32":
-		return "int32(chkOvf.IntV(dd.DecodeInt64(), 32))"
+		return "int32(chkOvf.IntV(d.d.DecodeInt64(), 32))"
 	case "int64":
-		return "dd.DecodeInt64()"
+		return "d.d.DecodeInt64()"
 
 	case "string":
-		return "dd.DecodeString()"
+		return "string(d.d.DecodeStringAsBytes())"
+	case "[]byte", "[]uint8", "bytes":
+		return "d.d.DecodeBytes(nil, false)"
 	case "float32":
-		return "float32(chkOvf.Float32V(dd.DecodeFloat64()))"
+		return "float32(d.decodeFloat32())"
 	case "float64":
-		return "dd.DecodeFloat64()"
+		return "d.d.DecodeFloat64()"
 	case "bool":
-		return "dd.DecodeBool()"
+		return "d.d.DecodeBool()"
 	default:
-		panic(errors.New("gen internal: unknown type for decode: " + s))
+		halt.onerror(errors.New("gen internal: unknown type for decode: " + s))
 	}
+	return ""
 }
+
+// func genInternalSortType(s string, elem bool) string {
+// 	for _, v := range [...]string{
+// 		"int",
+// 		"uint",
+// 		"float",
+// 		"bool",
+// 		"string",
+// 		"bytes", "[]uint8", "[]byte",
+// 	} {
+// 		if v == "[]byte" || v == "[]uint8" {
+// 			v = "bytes"
+// 		}
+// 		if strings.HasPrefix(s, v) {
+// 			if v == "int" || v == "uint" || v == "float" {
+// 				v += "64"
+// 			}
+// 			if elem {
+// 				return v
+// 			}
+// 			return v + "Slice"
+// 		}
+// 	}
+// 	halt.onerror(errors.New("sorttype: unexpected type: " + s))
+// }
 
 func genInternalSortType(s string, elem bool) string {
-	for _, v := range [...]string{"int", "uint", "float", "bool", "string"} {
-		if strings.HasPrefix(s, v) {
-			if elem {
-				if v == "int" || v == "uint" || v == "float" {
-					return v + "64"
-				} else {
-					return v
-				}
-			}
-			return v + "Slice"
-		}
+	if elem {
+		return s
 	}
-	panic("sorttype: unexpected type: " + s)
+	return s + "Slice"
 }
 
+// MARKER: keep in sync with codecgen/gen.go
 func genStripVendor(s string) string {
 	// HACK: Misbehaviour occurs in go 1.5. May have to re-visit this later.
 	// if s contains /vendor/ OR startsWith vendor/, then return everything after it.
@@ -1994,49 +2269,12 @@ var genInternalTmplFuncs template.FuncMap
 var genInternalOnce sync.Once
 
 func genInternalInit() {
-	types := [...]string{
-		"interface{}",
-		"string",
-		"float32",
-		"float64",
-		"uint",
-		"uint8",
-		"uint16",
-		"uint32",
-		"uint64",
-		"uintptr",
-		"int",
-		"int8",
-		"int16",
-		"int32",
-		"int64",
-		"bool",
-	}
-	// keep as slice, so it is in specific iteration order.
-	// Initial order was uint64, string, interface{}, int, int64
-	mapvaltypes := [...]string{
-		"interface{}",
-		"string",
-		"uint",
-		"uint8",
-		"uint16",
-		"uint32",
-		"uint64",
-		"uintptr",
-		"int",
-		"int8",
-		"int16",
-		"int32",
-		"int64",
-		"float32",
-		"float64",
-		"bool",
-	}
 	wordSizeBytes := int(intBitsize) / 8
 
-	mapvaltypes2 := map[string]int{
+	typesizes := map[string]int{
 		"interface{}": 2 * wordSizeBytes,
 		"string":      2 * wordSizeBytes,
+		"[]byte":      3 * wordSizeBytes,
 		"uint":        1 * wordSizeBytes,
 		"uint8":       1,
 		"uint16":      2,
@@ -2052,20 +2290,80 @@ func genInternalInit() {
 		"float64":     8,
 		"bool":        1,
 	}
+
+	// keep as slice, so it is in specific iteration order.
+	// Initial order was uint64, string, interface{}, int, int64, ...
+
+	var types = [...]string{
+		"interface{}",
+		"string",
+		"[]byte",
+		"float32",
+		"float64",
+		"uint",
+		"uint8",
+		"uint16",
+		"uint32",
+		"uint64",
+		"uintptr",
+		"int",
+		"int8",
+		"int16",
+		"int32",
+		"int64",
+		"bool",
+	}
+
+	var primitivetypes, slicetypes, mapkeytypes, mapvaltypes []string
+
+	primitivetypes = types[:]
+	slicetypes = types[:]
+	mapkeytypes = types[:]
+	mapvaltypes = types[:]
+
+	if genFastpathTrimTypes {
+		// Note: we only create fast-paths for commonly used types.
+		// Consequently, things like int8, uint16, uint, etc are commented out.
+
+		slicetypes = genInternalFastpathSliceTypes()
+		mapkeytypes = genInternalFastpathMapKeyTypes()
+		mapvaltypes = genInternalFastpathMapValueTypes()
+	}
+
+	// var mapkeytypes [len(&types) - 1]string // skip bool
+	// copy(mapkeytypes[:], types[:])
+
+	// var mb []byte
+	// mb = append(mb, '|')
+	// for _, s := range mapkeytypes {
+	// 	mb = append(mb, s...)
+	// 	mb = append(mb, '|')
+	// }
+	// var mapkeytypestr = string(mb)
+
 	var gt = genInternal{Version: genVersion}
 
 	// For each slice or map type, there must be a (symmetrical) Encode and Decode fast-path function
-	for _, s := range types {
-		gt.Values = append(gt.Values, genV{Primitive: s, Size: mapvaltypes2[s]})
+
+	for _, s := range primitivetypes {
+		gt.Values = append(gt.Values,
+			fastpathGenV{Primitive: s, Size: typesizes[s], NoCanonical: !genFastpathCanonical})
+	}
+	for _, s := range slicetypes {
 		// if s != "uint8" { // do not generate fast path for slice of bytes. Treat specially already.
-		// 	gt.Values = append(gt.Values, genV{Elem: s, Size: mapvaltypes2[s]})
+		// 	gt.Values = append(gt.Values, fastpathGenV{Elem: s, Size: typesizes[s]})
 		// }
-		gt.Values = append(gt.Values, genV{Elem: s, Size: mapvaltypes2[s]})
-		if _, ok := mapvaltypes2[s]; !ok {
-			gt.Values = append(gt.Values, genV{MapKey: s, Elem: s, Size: 2 * mapvaltypes2[s]})
-		}
+		gt.Values = append(gt.Values,
+			fastpathGenV{Elem: s, Size: typesizes[s], NoCanonical: !genFastpathCanonical})
+	}
+	for _, s := range mapkeytypes {
+		// if _, ok := typesizes[s]; !ok {
+		// if strings.Contains(mapkeytypestr, "|"+s+"|") {
+		// 	gt.Values = append(gt.Values, fastpathGenV{MapKey: s, Elem: s, Size: 2 * typesizes[s]})
+		// }
 		for _, ms := range mapvaltypes {
-			gt.Values = append(gt.Values, genV{MapKey: s, Elem: ms, Size: mapvaltypes2[s] + mapvaltypes2[ms]})
+			gt.Values = append(gt.Values,
+				fastpathGenV{MapKey: s, Elem: ms, Size: typesizes[s] + typesizes[ms], NoCanonical: !genFastpathCanonical})
 		}
 	}
 
@@ -2083,9 +2381,6 @@ func genInternalInit() {
 }
 
 // genInternalGoFile is used to generate source files from templates.
-// It is run by the program author alone.
-// Unfortunately, it has to be exported so that it can be called from a command line tool.
-// *** DO NOT USE ***
 func genInternalGoFile(r io.Reader, w io.Writer) (err error) {
 	genInternalOnce.Do(genInternalInit)
 
@@ -2115,5 +2410,208 @@ func genInternalGoFile(r io.Reader, w io.Writer) (err error) {
 		return
 	}
 	w.Write(bout)
+	return
+}
+
+func genInternalFastpathSliceTypes() []string {
+	return []string{
+		"interface{}",
+		"string",
+		"[]byte",
+		// "float32",
+		"float64",
+		// "uint",
+		// "uint8", // no need for fastpath of []uint8, as it is handled specially
+		// "uint16",
+		// "uint32",
+		"uint64",
+		// "uintptr",
+		"int",
+		// "int8",
+		// "int16",
+		"int32", // rune
+		"int64",
+		"bool",
+	}
+}
+
+func genInternalFastpathMapKeyTypes() []string {
+	return []string{
+		// "interface{}",
+		"string",
+		// "[]byte",
+		// "float32",
+		// "float64",
+		// "uint",
+		"uint8",
+		// "uint16",
+		// "uint32",
+		"uint64",
+		// "uintptr",
+		"int",
+		// "int8",
+		// "int16",
+		// "int32",
+		"int64",
+		// "bool",
+	}
+}
+
+func genInternalFastpathMapValueTypes() []string {
+	return []string{
+		"interface{}",
+		"string",
+		"[]byte",
+		// "uint",
+		"uint8",
+		// "uint16",
+		// "uint32",
+		"uint64",
+		// "uintptr",
+		"int",
+		//"int8",
+		// "int16",
+		// "int32", // rune (mostly used for unicode)
+		"int64",
+		// "float32",
+		"float64",
+		"bool",
+	}
+}
+
+// sort-slice ...
+// generates sort implementations for
+// various slice types and combination slice+reflect.Value types.
+//
+// The combination slice+reflect.Value types are used
+// during canonical encode, and the others are used during fast-path
+// encoding of map keys.
+
+// genInternalSortableTypes returns the types
+// that are used for fast-path canonical's encoding of maps.
+//
+// For now, we only support the highest sizes for
+// int64, uint64, float64, bool, string, bytes.
+func genInternalSortableTypes() []string {
+	return genInternalFastpathMapKeyTypes()
+}
+
+// genInternalSortablePlusTypes returns the types
+// that are used for reflection-based canonical's encoding of maps.
+//
+// For now, we only support the highest sizes for
+// int64, uint64, float64, bool, string, bytes.
+func genInternalSortablePlusTypes() []string {
+	return []string{
+		"string",
+		"float64",
+		"uint64",
+		// "uintptr",
+		"int64",
+		"bool",
+		"time",
+		"bytes",
+	}
+}
+
+func genTypeForShortName(s string) string {
+	switch s {
+	case "time":
+		return "time.Time"
+	case "bytes":
+		return "[]byte"
+	}
+	return s
+}
+
+func genArgs(args ...interface{}) map[string]interface{} {
+	m := make(map[string]interface{}, len(args)/2)
+	for i := 0; i < len(args); {
+		m[args[i].(string)] = args[i+1]
+		i += 2
+	}
+	return m
+}
+
+func genEndsWith(s0 string, sn ...string) bool {
+	for _, s := range sn {
+		if strings.HasSuffix(s0, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func genCheckErr(err error) {
+	halt.onerror(err)
+}
+
+func genRunSortTmpl2Go(fnameIn, fnameOut string) {
+	var err error
+
+	funcs := make(template.FuncMap)
+	funcs["sortables"] = genInternalSortableTypes
+	funcs["sortablesplus"] = genInternalSortablePlusTypes
+	funcs["tshort"] = genTypeForShortName
+	funcs["endswith"] = genEndsWith
+	funcs["args"] = genArgs
+
+	t := template.New("").Funcs(funcs)
+	fin, err := os.Open(fnameIn)
+	genCheckErr(err)
+	defer fin.Close()
+	fout, err := os.Create(fnameOut)
+	genCheckErr(err)
+	defer fout.Close()
+	tmplstr, err := ioutil.ReadAll(fin)
+	genCheckErr(err)
+	t, err = t.Parse(string(tmplstr))
+	genCheckErr(err)
+	var out bytes.Buffer
+	err = t.Execute(&out, 0)
+	genCheckErr(err)
+	bout, err := format.Source(out.Bytes())
+	if err != nil {
+		fout.Write(out.Bytes()) // write out if error, so we can still see.
+	}
+	genCheckErr(err)
+	// write out if error, as much as possible, so we can still see.
+	_, err = fout.Write(bout)
+	genCheckErr(err)
+}
+
+func genRunTmpl2Go(fnameIn, fnameOut string) {
+	// println("____ " + fnameIn + " --> " + fnameOut + " ______")
+	fin, err := os.Open(fnameIn)
+	genCheckErr(err)
+	defer fin.Close()
+	fout, err := os.Create(fnameOut)
+	genCheckErr(err)
+	defer fout.Close()
+	err = genInternalGoFile(fin, fout)
+	genCheckErr(err)
+}
+
+// --- some methods here for other types, which are only used in codecgen
+
+// depth returns number of valid nodes in the hierachy
+func (path *structFieldInfoPathNode) root() *structFieldInfoPathNode {
+TOP:
+	if path.parent != nil {
+		path = path.parent
+		goto TOP
+	}
+	return path
+}
+
+func (path *structFieldInfoPathNode) fullpath() (p []*structFieldInfoPathNode) {
+	// this method is mostly called by a command-line tool - it's not optimized, and that's ok.
+	// it shouldn't be used in typical runtime use - as it does unnecessary allocation.
+	d := path.depth()
+	p = make([]*structFieldInfoPathNode, d)
+	for d--; d >= 0; d-- {
+		p[d] = path
+		path = path.parent
+	}
 	return
 }

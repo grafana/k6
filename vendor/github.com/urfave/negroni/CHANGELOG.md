@@ -4,6 +4,11 @@
 
 ## [Unreleased] -
 
+## [1.0.0] - 2018-09-01
+
+### Fixed
+- `Logger` middleware now correctly handles paths containing a `%` instead of trying to treat it as a format specifier
+
 ## [0.3.0] - 2017-11-11
 ### Added
 - `With()` helper for building a new `Negroni` struct chaining handlers from

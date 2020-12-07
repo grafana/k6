@@ -1,10 +1,40 @@
 package sarama
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"sync"
+)
 
 // LengthField implements the PushEncoder and PushDecoder interfaces for calculating 4-byte lengths.
 type lengthField struct {
 	startOffset int
+	length      int32
+}
+
+var lengthFieldPool = sync.Pool{}
+
+func acquireLengthField() *lengthField {
+	val := lengthFieldPool.Get()
+	if val != nil {
+		return val.(*lengthField)
+	}
+	return &lengthField{}
+}
+
+func releaseLengthField(m *lengthField) {
+	lengthFieldPool.Put(m)
+}
+
+func (l *lengthField) decode(pd packetDecoder) error {
+	var err error
+	l.length, err = pd.getInt32()
+	if err != nil {
+		return err
+	}
+	if l.length > int32(pd.remaining()) {
+		return ErrInsufficientData
+	}
+	return nil
 }
 
 func (l *lengthField) saveOffset(in int) {
@@ -21,7 +51,7 @@ func (l *lengthField) run(curOffset int, buf []byte) error {
 }
 
 func (l *lengthField) check(curOffset int, buf []byte) error {
-	if uint32(curOffset-l.startOffset-4) != binary.BigEndian.Uint32(buf[l.startOffset:]) {
+	if int32(curOffset-l.startOffset-4) != l.length {
 		return PacketDecodingError{"length field invalid"}
 	}
 

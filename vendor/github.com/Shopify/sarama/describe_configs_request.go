@@ -1,13 +1,15 @@
 package sarama
 
+type DescribeConfigsRequest struct {
+	Version         int16
+	Resources       []*ConfigResource
+	IncludeSynonyms bool
+}
+
 type ConfigResource struct {
 	Type        ConfigResourceType
 	Name        string
 	ConfigNames []string
-}
-
-type DescribeConfigsRequest struct {
-	Resources []*ConfigResource
 }
 
 func (r *DescribeConfigsRequest) encode(pe packetEncoder) error {
@@ -28,6 +30,10 @@ func (r *DescribeConfigsRequest) encode(pe packetEncoder) error {
 		if err := pe.putStringArray(c.ConfigNames); err != nil {
 			return err
 		}
+	}
+
+	if r.Version >= 1 {
+		pe.putBool(r.IncludeSynonyms)
 	}
 
 	return nil
@@ -74,6 +80,14 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 		}
 		r.Resources[i].ConfigNames = cfnames
 	}
+	r.Version = version
+	if r.Version >= 1 {
+		b, err := pd.getBool()
+		if err != nil {
+			return err
+		}
+		r.IncludeSynonyms = b
+	}
 
 	return nil
 }
@@ -83,9 +97,20 @@ func (r *DescribeConfigsRequest) key() int16 {
 }
 
 func (r *DescribeConfigsRequest) version() int16 {
-	return 0
+	return r.Version
+}
+
+func (r *DescribeConfigsRequest) headerVersion() int16 {
+	return 1
 }
 
 func (r *DescribeConfigsRequest) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch r.Version {
+	case 1:
+		return V1_1_0_0
+	case 2:
+		return V2_0_0_0
+	default:
+		return V0_11_0_0
+	}
 }

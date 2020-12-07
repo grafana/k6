@@ -69,7 +69,7 @@ Will marshal to the zero time if null. Uses `time.Time`'s marshaler. Can unmarsh
 
 
 ### Bugs
-`json`'s `",omitempty"` struct tag does not work correctly right now. It will never omit a null or empty String. This might be [fixed eventually](https://github.com/golang/go/issues/4357).
+`json`'s `",omitempty"` struct tag does not work correctly right now. It will never omit a null or empty String. This might be [fixed eventually](https://github.com/golang/go/issues/11939).
 
 ### License
 BSD

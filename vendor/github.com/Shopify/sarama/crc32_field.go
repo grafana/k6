@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
+	"sync"
 )
 
 type crcPolynomial int8
@@ -12,6 +13,22 @@ const (
 	crcIEEE crcPolynomial = iota
 	crcCastagnoli
 )
+
+var crc32FieldPool = sync.Pool{}
+
+func acquireCrc32Field(polynomial crcPolynomial) *crc32Field {
+	val := crc32FieldPool.Get()
+	if val != nil {
+		c := val.(*crc32Field)
+		c.polynomial = polynomial
+		return c
+	}
+	return newCRC32Field(polynomial)
+}
+
+func releaseCrc32Field(c *crc32Field) {
+	crc32FieldPool.Put(c)
+}
 
 var castagnoliTable = crc32.MakeTable(crc32.Castagnoli)
 

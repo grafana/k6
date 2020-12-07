@@ -1,5 +1,7 @@
 package sarama
 
+import "errors"
+
 // ReceiveTime is a special value for the timestamp field of Offset Commit Requests which
 // tells the broker to set the timestamp to the time at which the request was received.
 // The timestamp is only used if message version 1 is used, which requires kafka 0.8.2.
@@ -50,12 +52,14 @@ type OffsetCommitRequest struct {
 	// - 0 (kafka 0.8.1 and later)
 	// - 1 (kafka 0.8.2 and later)
 	// - 2 (kafka 0.9.0 and later)
+	// - 3 (kafka 0.11.0 and later)
+	// - 4 (kafka 2.0.0 and later)
 	Version int16
 	blocks  map[string]map[int32]*offsetCommitRequestBlock
 }
 
 func (r *OffsetCommitRequest) encode(pe packetEncoder) error {
-	if r.Version < 0 || r.Version > 2 {
+	if r.Version < 0 || r.Version > 4 {
 		return PacketEncodingError{"invalid or unsupported OffsetCommitRequest version field"}
 	}
 
@@ -166,14 +170,22 @@ func (r *OffsetCommitRequest) version() int16 {
 	return r.Version
 }
 
+func (r *OffsetCommitRequest) headerVersion() int16 {
+	return 1
+}
+
 func (r *OffsetCommitRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 1:
 		return V0_8_2_0
 	case 2:
 		return V0_9_0_0
+	case 3:
+		return V0_11_0_0
+	case 4:
+		return V2_0_0_0
 	default:
-		return minVersion
+		return MinVersion
 	}
 }
 
@@ -187,4 +199,16 @@ func (r *OffsetCommitRequest) AddBlock(topic string, partitionID int32, offset i
 	}
 
 	r.blocks[topic][partitionID] = &offsetCommitRequestBlock{offset, timestamp, metadata}
+}
+
+func (r *OffsetCommitRequest) Offset(topic string, partitionID int32) (int64, string, error) {
+	partitions := r.blocks[topic]
+	if partitions == nil {
+		return 0, "", errors.New("no such offset")
+	}
+	block := partitions[partitionID]
+	if block == nil {
+		return 0, "", errors.New("no such offset")
+	}
+	return block.offset, block.metadata, nil
 }

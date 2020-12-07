@@ -5,6 +5,7 @@ import (
 	"strconv"
 )
 
+//ConsumerMetadataResponse holds the response for a consumer group meta data requests
 type ConsumerMetadataResponse struct {
 	Err             KError
 	Coordinator     *Broker
@@ -14,20 +15,18 @@ type ConsumerMetadataResponse struct {
 }
 
 func (r *ConsumerMetadataResponse) decode(pd packetDecoder, version int16) (err error) {
-	tmp, err := pd.getInt16()
-	if err != nil {
-		return err
-	}
-	r.Err = KError(tmp)
+	tmp := new(FindCoordinatorResponse)
 
-	coordinator := new(Broker)
-	if err := coordinator.decode(pd); err != nil {
+	if err := tmp.decode(pd, version); err != nil {
 		return err
 	}
-	if coordinator.addr == ":0" {
+
+	r.Err = tmp.Err
+
+	r.Coordinator = tmp.Coordinator
+	if tmp.Coordinator == nil {
 		return nil
 	}
-	r.Coordinator = coordinator
 
 	// this can all go away in 2.0, but we have to fill in deprecated fields to maintain
 	// backwards compatibility
@@ -47,28 +46,22 @@ func (r *ConsumerMetadataResponse) decode(pd packetDecoder, version int16) (err 
 }
 
 func (r *ConsumerMetadataResponse) encode(pe packetEncoder) error {
-	pe.putInt16(int16(r.Err))
-	if r.Coordinator != nil {
-		host, portstr, err := net.SplitHostPort(r.Coordinator.Addr())
-		if err != nil {
-			return err
-		}
-		port, err := strconv.ParseInt(portstr, 10, 32)
-		if err != nil {
-			return err
-		}
-		pe.putInt32(r.Coordinator.ID())
-		if err := pe.putString(host); err != nil {
-			return err
-		}
-		pe.putInt32(int32(port))
-		return nil
+	if r.Coordinator == nil {
+		r.Coordinator = new(Broker)
+		r.Coordinator.id = r.CoordinatorID
+		r.Coordinator.addr = net.JoinHostPort(r.CoordinatorHost, strconv.Itoa(int(r.CoordinatorPort)))
 	}
-	pe.putInt32(r.CoordinatorID)
-	if err := pe.putString(r.CoordinatorHost); err != nil {
+
+	tmp := &FindCoordinatorResponse{
+		Version:     0,
+		Err:         r.Err,
+		Coordinator: r.Coordinator,
+	}
+
+	if err := tmp.encode(pe); err != nil {
 		return err
 	}
-	pe.putInt32(r.CoordinatorPort)
+
 	return nil
 }
 
@@ -77,6 +70,10 @@ func (r *ConsumerMetadataResponse) key() int16 {
 }
 
 func (r *ConsumerMetadataResponse) version() int16 {
+	return 0
+}
+
+func (r *ConsumerMetadataResponse) headerVersion() int16 {
 	return 0
 }
 

@@ -23,17 +23,15 @@ type Decoder struct {
 	// Unreferenced decoders, ready for use.
 	decoders chan *blockDec
 
-	// Unreferenced decoders, ready for use.
-	frames chan *frameDec
-
 	// Streams ready to be decoded.
 	stream chan decodeStream
 
 	// Current read position used for Reader functionality.
 	current decoderState
 
-	// Custom dictionaries
-	dicts map[uint32]struct{}
+	// Custom dictionaries.
+	// Always uses copies.
+	dicts map[uint32]dict
 
 	// streamWg is the waitgroup for all streams
 	streamWg sync.WaitGroup
@@ -66,7 +64,7 @@ var (
 // A Decoder can be used in two modes:
 //
 // 1) As a stream, or
-// 2) For stateless decoding using DecodeAll or DecodeBuffer.
+// 2) For stateless decoding using DecodeAll.
 //
 // Only a single stream can be decoded concurrently, but the same decoder
 // can run multiple concurrent stateless decodes. It is even possible to
@@ -75,6 +73,7 @@ var (
 // The Reset function can be used to initiate a new stream, which is will considerably
 // reduce the allocations normally caused by NewReader.
 func NewReader(r io.Reader, opts ...DOption) (*Decoder, error) {
+	initPredefined()
 	var d Decoder
 	d.o.setDefault()
 	for _, o := range opts {
@@ -86,12 +85,19 @@ func NewReader(r io.Reader, opts ...DOption) (*Decoder, error) {
 	d.current.output = make(chan decodeOutput, d.o.concurrent)
 	d.current.flushed = true
 
+	// Transfer option dicts.
+	d.dicts = make(map[uint32]dict, len(d.o.dicts))
+	for _, dc := range d.o.dicts {
+		d.dicts[dc.id] = dc
+	}
+	d.o.dicts = nil
+
 	// Create decoders
 	d.decoders = make(chan *blockDec, d.o.concurrent)
-	d.frames = make(chan *frameDec, d.o.concurrent)
 	for i := 0; i < d.o.concurrent; i++ {
-		d.frames <- newFrameDec(d.o)
-		d.decoders <- newBlockDec(d.o.lowMem)
+		dec := newBlockDec(d.o.lowMem)
+		dec.localFrame = newFrameDec(d.o)
+		d.decoders <- dec
 	}
 
 	if r == nil {
@@ -123,10 +129,15 @@ func (d *Decoder) Read(p []byte) (int, error) {
 			if d.current.err != nil {
 				break
 			}
-			d.nextBlock()
+			if !d.nextBlock(n == 0) {
+				return n, nil
+			}
 		}
 	}
 	if len(d.current.b) > 0 {
+		if debug {
+			println("returning", n, "still bytes left:", len(d.current.b))
+		}
 		// Only return error at end of block
 		return n, nil
 	}
@@ -159,14 +170,25 @@ func (d *Decoder) Reset(r io.Reader) error {
 
 	// If bytes buffer and < 1MB, do sync decoding anyway.
 	if bb, ok := r.(*bytes.Buffer); ok && bb.Len() < 1<<20 {
+		if debug {
+			println("*bytes.Buffer detected, doing sync decode, len:", bb.Len())
+		}
 		b := bb.Bytes()
-		dst, err := d.DecodeAll(b, nil)
+		var dst []byte
+		if cap(d.current.b) > 0 {
+			dst = d.current.b
+		}
+
+		dst, err := d.DecodeAll(b, dst[:0])
 		if err == nil {
 			err = io.EOF
 		}
 		d.current.b = dst
 		d.current.err = err
 		d.current.flushed = true
+		if debug {
+			println("sync decode to", len(dst), "bytes, err:", err)
+		}
 		return nil
 	}
 
@@ -193,7 +215,9 @@ func (d *Decoder) drainOutput() {
 		d.current.cancel = nil
 	}
 	if d.current.d != nil {
-		println("re-adding current decoder", d.current.d, len(d.decoders))
+		if debug {
+			printf("re-adding current decoder %p, decoders: %d", d.current.d, len(d.decoders))
+		}
 		d.decoders <- d.current.d
 		d.current.d = nil
 		d.current.b = nil
@@ -206,7 +230,9 @@ func (d *Decoder) drainOutput() {
 		select {
 		case v := <-d.current.output:
 			if v.d != nil {
-				println("got decoder", v.d)
+				if debug {
+					printf("re-adding decoder %p", v.d)
+				}
 				d.decoders <- v.d
 			}
 			if v.err == errEndOfStream {
@@ -238,7 +264,7 @@ func (d *Decoder) WriteTo(w io.Writer) (int64, error) {
 		if d.current.err != nil {
 			break
 		}
-		d.nextBlock()
+		d.nextBlock(true)
 	}
 	err := d.current.err
 	if err != nil {
@@ -259,22 +285,35 @@ func (d *Decoder) DecodeAll(input, dst []byte) ([]byte, error) {
 	if d.current.err == ErrDecoderClosed {
 		return dst, ErrDecoderClosed
 	}
-	//println(len(d.frames), len(d.decoders), d.current)
-	block, frame := <-d.decoders, <-d.frames
+
+	// Grab a block decoder and frame decoder.
+	block := <-d.decoders
+	frame := block.localFrame
 	defer func() {
-		d.decoders <- block
+		if debug {
+			printf("re-adding decoder: %p", block)
+		}
 		frame.rawInput = nil
-		d.frames <- frame
+		frame.bBuf = nil
+		d.decoders <- block
 	}()
-	if cap(dst) == 0 {
-		// Allocate 1MB by default.
-		dst = make([]byte, 0, 1<<20)
-	}
-	br := byteBuf(input)
+	frame.bBuf = input
+
 	for {
-		err := frame.reset(&br)
+		frame.history.reset()
+		err := frame.reset(&frame.bBuf)
 		if err == io.EOF {
+			if debug {
+				println("frame reset return EOF")
+			}
 			return dst, nil
+		}
+		if frame.DictionaryID != nil {
+			dict, ok := d.dicts[*frame.DictionaryID]
+			if !ok {
+				return nil, ErrUnknownDictionary
+			}
+			frame.history.setDict(&dict)
 		}
 		if err != nil {
 			return dst, err
@@ -284,17 +323,34 @@ func (d *Decoder) DecodeAll(input, dst []byte) ([]byte, error) {
 		}
 		if frame.FrameContentSize > 0 && frame.FrameContentSize < 1<<30 {
 			// Never preallocate moe than 1 GB up front.
-			if uint64(cap(dst)) < frame.FrameContentSize {
+			if cap(dst)-len(dst) < int(frame.FrameContentSize) {
 				dst2 := make([]byte, len(dst), len(dst)+int(frame.FrameContentSize))
 				copy(dst2, dst)
 				dst = dst2
 			}
 		}
+		if cap(dst) == 0 {
+			// Allocate len(input) * 2 by default if nothing is provided
+			// and we didn't get frame content size.
+			size := len(input) * 2
+			// Cap to 1 MB.
+			if size > 1<<20 {
+				size = 1 << 20
+			}
+			if uint64(size) > d.o.maxDecodedSize {
+				size = int(d.o.maxDecodedSize)
+			}
+			dst = make([]byte, 0, size)
+		}
+
 		dst, err = frame.runDecoder(dst, block)
 		if err != nil {
 			return dst, err
 		}
-		if len(br) == 0 {
+		if len(frame.bBuf) == 0 {
+			if debug {
+				println("frame dbuf empty")
+			}
 			break
 		}
 	}
@@ -303,19 +359,35 @@ func (d *Decoder) DecodeAll(input, dst []byte) ([]byte, error) {
 
 // nextBlock returns the next block.
 // If an error occurs d.err will be set.
-func (d *Decoder) nextBlock() {
+// Optionally the function can block for new output.
+// If non-blocking mode is used the returned boolean will be false
+// if no data was available without blocking.
+func (d *Decoder) nextBlock(blocking bool) (ok bool) {
 	if d.current.d != nil {
+		if debug {
+			printf("re-adding current decoder %p", d.current.d)
+		}
 		d.decoders <- d.current.d
 		d.current.d = nil
 	}
 	if d.current.err != nil {
 		// Keep error state.
-		return
+		return blocking
 	}
-	d.current.decodeOutput = <-d.current.output
+
+	if blocking {
+		d.current.decodeOutput = <-d.current.output
+	} else {
+		select {
+		case d.current.decodeOutput = <-d.current.output:
+		default:
+			return false
+		}
+	}
 	if debug {
 		println("got", len(d.current.b), "bytes, error:", d.current.err)
 	}
+	return true
 }
 
 // Close will release all resources.
@@ -342,6 +414,35 @@ func (d *Decoder) Close() {
 		d.current.d = nil
 	}
 	d.current.err = ErrDecoderClosed
+}
+
+// IOReadCloser returns the decoder as an io.ReadCloser for convenience.
+// Any changes to the decoder will be reflected, so the returned ReadCloser
+// can be reused along with the decoder.
+// io.WriterTo is also supported by the returned ReadCloser.
+func (d *Decoder) IOReadCloser() io.ReadCloser {
+	return closeWrapper{d: d}
+}
+
+// closeWrapper wraps a function call as a closer.
+type closeWrapper struct {
+	d *Decoder
+}
+
+// WriteTo forwards WriteTo calls to the decoder.
+func (c closeWrapper) WriteTo(w io.Writer) (n int64, err error) {
+	return c.d.WriteTo(w)
+}
+
+// Read forwards read calls to the decoder.
+func (c closeWrapper) Read(p []byte) (n int, err error) {
+	return c.d.Read(p)
+}
+
+// Close closes the decoder.
+func (c closeWrapper) Close() error {
+	c.d.Close()
+	return nil
 }
 
 type decodeOutput struct {
@@ -377,12 +478,24 @@ func (d *Decoder) startStreamDecoder(inStream chan decodeStream) {
 	defer d.streamWg.Done()
 	frame := newFrameDec(d.o)
 	for stream := range inStream {
+		if debug {
+			println("got new stream")
+		}
 		br := readerWrapper{r: stream.r}
 	decodeStream:
 		for {
+			frame.history.reset()
 			err := frame.reset(&br)
 			if debug && err != nil {
 				println("Frame decoder returned", err)
+			}
+			if err == nil && frame.DictionaryID != nil {
+				dict, ok := d.dicts[*frame.DictionaryID]
+				if !ok {
+					err = ErrUnknownDictionary
+				} else {
+					frame.history.setDict(&dict)
+				}
 			}
 			if err != nil {
 				stream.output <- decodeOutput{

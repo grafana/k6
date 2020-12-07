@@ -101,9 +101,10 @@ func TestChangePathFs(t *testing.T) {
 		require.NoError(t, c.Chtimes(filePath, time.Now(), sometime))
 		require.Equal(t, sometime, info.ModTime())
 
-		mode := os.FileMode(0007)
+		mode := os.ModeTemporary | 0007 // We can't get rid of temporary bit set by memmapfs anyway
 		require.NotEqual(t, mode, info.Mode())
 		require.NoError(t, c.Chmod(filePath, mode))
+		require.Equal(t, "T------rwx", info.Mode().String())
 		require.Equal(t, mode, info.Mode())
 
 		_, err = c.Stat("/notanother/path/to/file.txt")

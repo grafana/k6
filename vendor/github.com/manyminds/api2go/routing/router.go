@@ -4,7 +4,7 @@ import "net/http"
 
 // HandlerFunc must contain all params from the route
 // in the form key,value
-type HandlerFunc func(w http.ResponseWriter, r *http.Request, params map[string]string)
+type HandlerFunc func(w http.ResponseWriter, r *http.Request, params map[string]string, context map[string]interface{})
 
 // Routeable allows drop in replacement for api2go's router
 // by default, we are using julienschmidt/httprouter

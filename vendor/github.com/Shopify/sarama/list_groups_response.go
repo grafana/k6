@@ -64,6 +64,10 @@ func (r *ListGroupsResponse) version() int16 {
 	return 0
 }
 
+func (r *ListGroupsResponse) headerVersion() int16 {
+	return 0
+}
+
 func (r *ListGroupsResponse) requiredVersion() KafkaVersion {
 	return V0_9_0_0
 }

@@ -43,6 +43,10 @@ func (r *DescribeGroupsResponse) version() int16 {
 	return 0
 }
 
+func (r *DescribeGroupsResponse) headerVersion() int16 {
+	return 0
+}
+
 func (r *DescribeGroupsResponse) requiredVersion() KafkaVersion {
 	return V0_9_0_0
 }

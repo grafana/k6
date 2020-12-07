@@ -131,3 +131,8 @@ func (i Int) Ptr() *int64 {
 func (i Int) IsZero() bool {
 	return !i.Valid
 }
+
+// Equal returns true if both ints have the same value or are both null.
+func (i Int) Equal(other Int) bool {
+	return i.Valid == other.Valid && (!i.Valid || i.Int64 == other.Int64)
+}

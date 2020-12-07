@@ -3,7 +3,7 @@ fasttemplate
 
 Simple and fast template engine for Go.
 
-Fasttemplate peforms only a single task - it substitutes template placeholders
+Fasttemplate performs only a single task - it substitutes template placeholders
 with user-defined values. At high speed :)
 
 Take a look at [quicktemplate](https://github.com/valyala/quicktemplate) if you  need fast yet powerful html template engine.

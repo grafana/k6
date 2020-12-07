@@ -27,6 +27,10 @@ func (r *LeaveGroupResponse) version() int16 {
 	return 0
 }
 
+func (r *LeaveGroupResponse) headerVersion() int16 {
+	return 0
+}
+
 func (r *LeaveGroupResponse) requiredVersion() KafkaVersion {
 	return V0_9_0_0
 }

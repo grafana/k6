@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"encoding/binary"
+	"errors"
 
 	"github.com/rcrowley/go-metrics"
 )
@@ -39,9 +40,18 @@ func (re *realEncoder) putVarint(in int64) {
 	re.off += binary.PutVarint(re.raw[re.off:], in)
 }
 
+func (re *realEncoder) putUVarint(in uint64) {
+	re.off += binary.PutUvarint(re.raw[re.off:], in)
+}
+
 func (re *realEncoder) putArrayLength(in int) error {
 	re.putInt32(int32(in))
 	return nil
+}
+
+func (re *realEncoder) putCompactArrayLength(in int) {
+	// 0 represents a null array, so +1 has to be added
+	re.putUVarint(uint64(in + 1))
 }
 
 func (re *realEncoder) putBool(in bool) {
@@ -78,6 +88,19 @@ func (re *realEncoder) putVarintBytes(in []byte) error {
 	return re.putRawBytes(in)
 }
 
+func (re *realEncoder) putCompactString(in string) error {
+	re.putCompactArrayLength(len(in))
+	return re.putRawBytes([]byte(in))
+}
+
+func (re *realEncoder) putNullableCompactString(in *string) error {
+	if in == nil {
+		re.putInt8(0)
+		return nil
+	}
+	return re.putCompactString(*in)
+}
+
 func (re *realEncoder) putString(in string) error {
 	re.putInt16(int16(len(in)))
 	copy(re.raw[re.off:], in)
@@ -108,6 +131,31 @@ func (re *realEncoder) putStringArray(in []string) error {
 	return nil
 }
 
+func (re *realEncoder) putCompactInt32Array(in []int32) error {
+	if in == nil {
+		return errors.New("expected int32 array to be non null")
+	}
+	// 0 represents a null array, so +1 has to be added
+	re.putUVarint(uint64(len(in)) + 1)
+	for _, val := range in {
+		re.putInt32(val)
+	}
+	return nil
+}
+
+func (re *realEncoder) putNullableCompactInt32Array(in []int32) error {
+	if in == nil {
+		re.putUVarint(0)
+		return nil
+	}
+	// 0 represents a null array, so +1 has to be added
+	re.putUVarint(uint64(len(in)) + 1)
+	for _, val := range in {
+		re.putInt32(val)
+	}
+	return nil
+}
+
 func (re *realEncoder) putInt32Array(in []int32) error {
 	err := re.putArrayLength(len(in))
 	if err != nil {
@@ -128,6 +176,10 @@ func (re *realEncoder) putInt64Array(in []int64) error {
 		re.putInt64(val)
 	}
 	return nil
+}
+
+func (re *realEncoder) putEmptyTaggedFieldArray() {
+	re.putUVarint(0)
 }
 
 func (re *realEncoder) offset() int {
