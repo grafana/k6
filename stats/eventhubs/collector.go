@@ -111,7 +111,7 @@ func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
 	for _, sampleContainer := range sampleContainers {
 		for _, sample := range sampleContainer.GetSamples() {
 			if &sample == nil {
-				fmt.Println("sample is null")
+				c.logger.Println("sample is null")
 
 				continue
 			}
