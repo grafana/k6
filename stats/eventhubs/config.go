@@ -37,8 +37,8 @@ type Config struct {
 // NewConfig creates a new Config instance with default values for some fields.
 func NewConfig() Config {
 	return Config{
-		ConnectionString: null.StringFrom(""),
-		BufferEnabled:    null.BoolFrom(true),
+		ConnectionString: null.NewString("", false),
+		BufferEnabled:    null.NewBool(true, false),
 		PushInterval:     types.NewNullDuration(1*time.Second, false),
 	}
 }
