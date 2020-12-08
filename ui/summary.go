@@ -414,8 +414,21 @@ func (s *Summary) SummarizeMetricsJSON(w io.Writer, data SummaryData) error {
 	metricsData := make(map[string]interface{})
 	for name, m := range data.Metrics {
 		m.Sink.Calc()
-
-		sinkData := m.Sink.Format(data.Time)
+		sinkData := make(map[string]float64)
+		if tt, ok := m.Sink.(*stats.TrendSink); ok {
+			for k, v := range s.trendValueResolvers {
+				var value float64
+				switch a := v(tt).(type) {
+				case float64:
+					value = a
+				case uint64:
+					value = float64(a)
+				}
+				sinkData[k] = value
+			}
+		} else {
+			sinkData = m.Sink.Format(data.Time)
+		}
 		metricsData[name] = sinkData
 
 		var thresholds map[string]interface{}
