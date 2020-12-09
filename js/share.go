@@ -92,30 +92,18 @@ func (s sharedArray) Iterator() *sharedArrayIterator {
 const arrayWrapperCode = `(function(val) {
 	var arrayHandler = {
 		get: function(target, property, receiver) {
-			// console.log("accessing ", property)
 			switch (property){
 			case "length":
 				return target.length()
 			case Symbol.iterator:
 				return function() {return target.iterator()}
-			/*
-			return function(){
+			}
+			var i = parseInt(property);
+			if (isNaN(i)) {
+				return undefined;
+			}
 
-				var index = 0;
-				return {
-					"next": function() {
-						if (index >= target.length()) {
-							return {done: true}
-						}
-						var result = {value:target.get(index)};
-						index++;
-						return result;
-					}
-				}
-			}
-			*/
-			}
-			return target.get(property);
+			return target.get(i);
 		}
 	};
 	return new Proxy(val, arrayHandler)

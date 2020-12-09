@@ -34,7 +34,7 @@ import (
 )
 
 func TestInitContextNewShareable(t *testing.T) {
-	data := `
+	data := `'use strict';
 function generateArray() {
     console.log("once");
     var n = 50;
@@ -46,6 +46,20 @@ function generateArray() {
 }
 
 var s = newShare("something", generateArray);
+
+var er = "";
+try {
+	var p = newShare("wat", function() {return "whatever"});
+	throw "the previous line should've errored";
+} catch (e) {
+	if (!e.toString().includes("only arrays can be made into shared objects")) {
+		er = "wrong error " + e.toString()
+	}
+}
+
+if (er != "") {
+	throw er
+}
 
 exports.default = function() {
 	if (s[2] !== "something2") {
@@ -61,6 +75,37 @@ exports.default = function() {
 			throw new Error("bad v="+v+" for i="+i)
 		}
 		i++;
+	}
+
+	if (s.something != undefined) {
+		throw "s.something should've been undefined but was " + s.something;
+	}
+
+	try {
+		s.something = 21
+		throw "the previous line should've errored s.something = 21"
+	} catch(e) {
+		if (!e.toString().includes("Host object field something cannot be made configurable")) {
+			er = "wrong error " + e.toString()
+		}
+	}
+
+	if (er != "") {
+		throw er
+	}
+
+	try {
+		s[1]= "21"
+
+		throw "the previous line should've errored"
+	} catch(e) {
+		if (!e.toString().includes("Host object field 1 cannot be made configurable")) {
+			er = "wrong error " + e.toString()
+		}
+	}
+
+	if (er != "") {
+		throw er
 	}
 }`
 
