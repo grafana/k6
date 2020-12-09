@@ -28,7 +28,7 @@ repo](https://github.com/dop251/goja/blob/master/tc39_test.go)
 
 Unfortunately k6 doesn't pass all the test that are currently defined as "interesting" and probably
 won't even more. Goja decided to just not run the ones that it knows it fails currently, but this
-means that if they stop fail, someone needs to go re-enable that test. This also means that if the
+means that if they stop failing, someone needs to go re-enable these tests. This also means that, if the
 previous breakage was something a user can work around in a certain way, it now might be something
 else that the user can't workaround or have another problem. For this reasons I decided that
 actually recording what breaks and checking that it doesn't change is a better idea.
