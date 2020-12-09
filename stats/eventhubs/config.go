@@ -45,7 +45,6 @@ func NewConfig() Config {
 
 // Apply saves config non-zero config values from the passed config in the receiver.
 func (c Config) Apply(cfg Config) Config {
-
 	if cfg.ConnectionString.Valid {
 		c.ConnectionString = cfg.ConnectionString
 	}
