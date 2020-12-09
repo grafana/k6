@@ -34,31 +34,22 @@ import (
 // TODO rename
 // TODO check how it works with setup data
 // TODO check how it works if logged
-// TODO maybe drop it and leave the sharedArray only for now
-type shared struct {
-	value *goja.Object
-}
-
-func (s shared) Get(ctx context.Context, index goja.Value) (interface{}, error) {
-	rt := common.GetRuntime(ctx)
-	// TODO other index
-	val := s.value.Get(index.String())
-	if val == nil {
-		return goja.Undefined(), nil
-	}
-	b, err := val.ToObject(rt).MarshalJSON()
-	if err != nil { // cache bytes, pre marshal
-		return goja.Undefined(), err
-	}
-	var tmp interface{}
-	if err = json.Unmarshal(b, &tmp); err != nil {
-		return goja.Undefined(), err
-	}
-	return tmp, nil
-}
-
 type sharedArray struct {
 	arr [][]byte
+}
+
+func (s sharedArray) wrap(ctxPtr *context.Context, rt *goja.Runtime) goja.Value {
+	cal, err := rt.RunString(arrayWrapperCode)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	call, _ := goja.AssertFunction(cal)
+	wrapped, err := call(goja.Undefined(), rt.ToValue(common.Bind(rt, s, ctxPtr)))
+	if err != nil {
+		common.Throw(rt, err)
+	}
+
+	return wrapped
 }
 
 func (s sharedArray) Get(index int) (interface{}, error) {
@@ -97,3 +88,35 @@ func (sai *sharedArrayIterator) Next() (interface{}, error) {
 func (s sharedArray) Iterator() *sharedArrayIterator {
 	return &sharedArrayIterator{a: &s, index: -1}
 }
+
+const arrayWrapperCode = `(function(val) {
+	var arrayHandler = {
+		get: function(target, property, receiver) {
+			// console.log("accessing ", property)
+			switch (property){
+			case "length":
+				return target.length()
+			case Symbol.iterator:
+				return function() {return target.iterator()}
+			/*
+			return function(){
+
+				var index = 0;
+				return {
+					"next": function() {
+						if (index >= target.length()) {
+							return {done: true}
+						}
+						var result = {value:target.get(index)};
+						index++;
+						return result;
+					}
+				}
+			}
+			*/
+			}
+			return target.get(property);
+		}
+	};
+	return new Proxy(val, arrayHandler)
+})`

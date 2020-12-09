@@ -73,7 +73,7 @@ type InitContext struct {
 
 	logger logrus.FieldLogger
 
-	shares     map[string]interface{}
+	shares     map[string]sharedArray
 	sharesLock *sync.Mutex
 }
 
@@ -92,7 +92,7 @@ func NewInitContext(
 		compatibilityMode: compatMode,
 		logger:            logger,
 
-		shares:     make(map[string]interface{}),
+		shares:     make(map[string]sharedArray),
 		sharesLock: new(sync.Mutex),
 	}
 }
@@ -127,87 +127,39 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 
 // NewShare ...
 // TODO rename
-func (i *InitContext) NewShare(ctx context.Context, name string, call goja.Callable) goja.Value {
+// TODO constructor?
+func (i *InitContext) NewShare(name string, call goja.Callable) goja.Value {
 	i.sharesLock.Lock()
 	defer i.sharesLock.Unlock()
 	value, ok := i.shares[name]
-	rt := common.GetRuntime(ctx)
 	if !ok { //nolint:nestif
 		gojaValue, err := call(goja.Undefined())
 		if err != nil {
-			common.Throw(rt, err)
+			common.Throw(i.runtime, err)
 		}
-		if gojaValue.ExportType().Kind() == reflect.Slice {
-			// fmt.Println("it's a slice")
-			var tmpArr []interface{}
-			if err = rt.ExportTo(gojaValue, &tmpArr); err != nil {
-				common.Throw(rt, err)
-			}
+		// TODO this can probably be better handled
+		if gojaValue.ExportType().Kind() != reflect.Slice {
+			common.Throw(i.runtime, errors.New("only arrays can be made into shared objects")) // TODO better error
+		}
 
-			arr := make([][]byte, len(tmpArr))
-			for i := range arr {
-				arr[i], err = json.Marshal(tmpArr[i])
-				if err != nil {
-					common.Throw(rt, err)
-				}
-			}
-			value = sharedArray{arr: arr}
-		} else {
-			// fmt.Println("it's an object")
-			value = shared{gojaValue.ToObject(rt)}
+		// TODO this can probably be done better if we just iterate over the internal array, but ...
+		// that might be a bit harder given what currently goja provides
+		var tmpArr []interface{}
+		if err = i.runtime.ExportTo(gojaValue, &tmpArr); err != nil {
+			common.Throw(i.runtime, err)
 		}
+
+		arr := make([][]byte, len(tmpArr))
+		for index := range arr {
+			arr[index], err = json.Marshal(tmpArr[index])
+			if err != nil {
+				common.Throw(i.runtime, err)
+			}
+		}
+		value = sharedArray{arr: arr}
 		i.shares[name] = value
 	}
-	switch value.(type) {
-	case sharedArray:
-		// fmt.Println("wrapping array/slice")
-		// TODO cache this
-		cal, err := rt.RunString(`(function(val) {
-	var arrayHandler = {
-		get: function(target, property, receiver) {
-			// console.log("accessing ", property)
-			switch (property){
-			case "length":
-				return target.length()
-			case Symbol.iterator:
-				return function() {return target.iterator()}
-			/*
-			return function(){
-
-				var index = 0;
-				return {
-					"next": function() {
-						if (index >= target.length()) {
-							return {done: true}
-						}
-						var result = {value:target.get(index)};
-						index++;
-						return result;
-					}
-				}
-			}
-			*/
-			}
-			return target.get(property);
-		}
-	};
-	return new Proxy(val, arrayHandler)
-})`)
-		if err != nil {
-			common.Throw(rt, err)
-		}
-		call, _ := goja.AssertFunction(cal)
-		wrapped, err := call(goja.Undefined(), i.runtime.ToValue(common.Bind(i.runtime, value, i.ctxPtr)))
-		if err != nil {
-			common.Throw(rt, err)
-		}
-
-		return wrapped
-	case shared:
-		// TODO
-	}
-
-	return i.runtime.ToValue(common.Bind(i.runtime, value, i.ctxPtr))
+	return value.wrap(i.ctxPtr, i.runtime)
 }
 
 // Require is called when a module/file needs to be loaded by a script
@@ -259,7 +211,6 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 
 		if pgm.pgm == nil {
 			// Load the sources; the loader takes care of remote loading, etc.
-			// TODO: don't use the Global logger
 			data, err := loader.Load(i.logger, i.filesystems, fileURL, name)
 			if err != nil {
 				return goja.Undefined(), err
