@@ -96,13 +96,7 @@ jobs:
         run: |
           set -x
           cd js/tc39
-          mkdir -p TestTC39/test262
-          cd TestTC39/test262
-          git init
-          git remote add origin https://github.com/tc39/test262.git
-          git fetch origin --depth=1 72154b17fc99a26e79b2586960f059360d4ce43d
-          git reset --hard 72154b17fc99a26e79b2586960f059360d4ce43d
-          cd -
+          sh checkout.sh
           go test -timeout 1h
 
   test-cov:

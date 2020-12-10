@@ -2,10 +2,9 @@
 The point of this repo is to test k6 goja+babel+core.js combo against the tc39 test suite.
 
 Ways to use it:
-1. mkdir TestTC39
-2. Checkout [test262](https://github.com/tc39/test262) in TestTC39 directory, this was tested
-   against 72154b17fc
-3. Run `go test &> out.log`
+1. run ./checkout.sh to checkout the last commit sha of [test262](https://github.com/tc39/test262)
+   that was tested with
+2. Run `go test &> out.log`
 
 if there are failures there will be a JSON with what failed. 
 The full list of failing tests is in `breaking_test_errors.json` in order to regenerate it (in case
