@@ -9,7 +9,6 @@
 *.log
 *.syso
 .idea
-
 *.DS_Store
 
 /versioninfo.json
