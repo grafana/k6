@@ -6,8 +6,6 @@ on:
       - master
     tags:
       - v*
-    paths:
-        - 'js/**'
   pull_request:
       paths:
           - 'js/**'
