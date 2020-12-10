@@ -1,12 +1,13 @@
 # This a WIP 
-The point of this repo is to test k6 goja+babel+core.js combo against the tc39 test suite.
+
+The point of this module is to test k6 goja+babel+core.js combo against the tc39 test suite.
 
 Ways to use it:
 1. run ./checkout.sh to checkout the last commit sha of [test262](https://github.com/tc39/test262)
    that was tested with
 2. Run `go test &> out.log`
 
-if there are failures there will be a JSON with what failed. 
+If there are failures there will be a JSON with what failed.
 The full list of failing tests is in `breaking_test_errors.json` in order to regenerate it (in case
 of changes) it needs to become an empty JSON object `{}` and then the test should be rerun and the
 new json should be put there.
