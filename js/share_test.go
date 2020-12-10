@@ -45,34 +45,34 @@ function generateArray() {
     return arr;
 }
 
-var s = newShare("something", generateArray);
+var s = new Share("something", generateArray);
 
 var er = "";
 try {
-	var p = newShare("wat", function() {return "whatever"});
+	var p = new Share("wat", function() {return "whatever"});
 	throw "the previous line should've errored";
 } catch (e) {
 	if (!e.toString().includes("only arrays can be made into shared objects")) {
-		er = "wrong error " + e.toString()
+		er = "wrong error " + e.toString();
 	}
 }
 
 if (er != "") {
-	throw er
+	throw er;
 }
 
 exports.default = function() {
 	if (s[2] !== "something2") {
-		throw new Error("bad s[2]="+s[2])
+		throw new Error("bad s[2]="+s[2]);
 	}
 	if (s.length != 50) {
-		throw new Error("bad length " +_s.length)
+		throw new Error("bad length " +_s.length);
 	}
 
 	var i = 0;
 	for (var v of s) {
 		if (v !== "something"+i) {
-			throw new Error("bad v="+v+" for i="+i)
+			throw new Error("bad v="+v+" for i="+i);
 		}
 		i++;
 	}
@@ -83,29 +83,29 @@ exports.default = function() {
 
 	try {
 		s.something = 21
-		throw "the previous line should've errored s.something = 21"
+		throw "the previous line should've errored s.something = 21";
 	} catch(e) {
 		if (!e.toString().includes("Host object field something cannot be made configurable")) {
-			er = "wrong error " + e.toString()
+			er = "wrong error " + e.toString();
 		}
 	}
 
 	if (er != "") {
-		throw er
+		throw er;
 	}
 
 	try {
-		s[1]= "21"
+		s[1]= "21";
 
-		throw "the previous line should've errored"
+		throw "the previous line should've errored";
 	} catch(e) {
 		if (!e.toString().includes("Host object field 1 cannot be made configurable")) {
-			er = "wrong error " + e.toString()
+			er = "wrong error " + e.toString();
 		}
 	}
 
 	if (er != "") {
-		throw er
+		throw er;
 	}
 }`
 

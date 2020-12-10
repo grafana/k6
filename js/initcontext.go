@@ -125,10 +125,10 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 	}
 }
 
-// NewShare ...
-// TODO rename
-// TODO constructor?
-func (i *InitContext) NewShare(name string, call goja.Callable) goja.Value {
+// XShare is a constructor returning a shareable read-only array (general objects coming)
+// indentified by the name and having their contents be whatever the call returns - again only
+// arrays currently supported.
+func (i *InitContext) XShare(name string, call goja.Callable) goja.Value {
 	i.sharesLock.Lock()
 	defer i.sharesLock.Unlock()
 	value, ok := i.shares[name]

@@ -94,9 +94,11 @@ const arrayWrapperCode = `(function(val) {
 		get: function(target, property, receiver) {
 			switch (property){
 			case "length":
-				return target.length()
+				return target.length();
 			case Symbol.iterator:
-				return function() {return target.iterator()}
+				return function() {
+					return target.iterator();
+				};
 			}
 			var i = parseInt(property);
 			if (isNaN(i)) {
@@ -106,5 +108,5 @@ const arrayWrapperCode = `(function(val) {
 			return target.get(i);
 		}
 	};
-	return new Proxy(val, arrayHandler)
+	return new Proxy(val, arrayHandler);
 })`
