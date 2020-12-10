@@ -31,7 +31,7 @@ import (
 
 func TestNewConfig(t *testing.T) {
 	config := NewConfig()
-	assert.Equal(t, sql.NullString(sql.NullString{String: "", Valid: true}), config.ConnectionString.NullString)
+	assert.Equal(t, null.NewString("", false), config.ConnectionString)
 	assert.Equal(t, "", config.ConnectionString.String)
 	assert.Equal(t, types.NullDuration(types.NullDuration{Duration: 1000000000, Valid: false}), config.PushInterval)
 	assert.Equal(t, null.Bool(null.Bool{NullBool: sql.NullBool{Bool: true, Valid: true}}), config.BufferEnabled)
