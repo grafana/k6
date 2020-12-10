@@ -7,6 +7,7 @@ Ways to use it:
    that was tested with
 2. Run `go test &> out.log`
 
+test
 If there are failures there will be a JSON with what failed.
 The full list of failing tests is in `breaking_test_errors.json` in order to regenerate it (in case
 of changes) it needs to become an empty JSON object `{}` and then the test should be rerun and the
