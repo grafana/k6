@@ -18,10 +18,7 @@
  *
  */
 
-package js
-
-// TODO move this to another package
-// it can possibly be even in a separate repo if the error handling is fixed
+package data
 
 import (
 	"context"
@@ -31,9 +28,8 @@ import (
 	"github.com/loadimpact/k6/js/common"
 )
 
-// TODO rename
-// TODO check how it works with setup data
-// TODO check how it works if logged
+// TODO fix it not working really well with setupData or just make it more broken
+// TODO fix it working with console.log
 type sharedArray struct {
 	arr [][]byte
 }

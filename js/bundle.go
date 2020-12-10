@@ -302,9 +302,10 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	// TODO: get rid of the unused ctxPtr, use a real external context (so we
 	// can interrupt), build the common.InitEnvironment earlier and reuse it
 	initenv := &common.InitEnvironment{
-		Logger:      logger,
-		FileSystems: init.filesystems,
-		CWD:         init.pwd,
+		SharedObjects: init.sharedObjects,
+		Logger:        logger,
+		FileSystems:   init.filesystems,
+		CWD:           init.pwd,
 	}
 	ctx := common.WithInitEnv(context.Background(), initenv)
 	*init.ctxPtr = common.WithRuntime(ctx, rt)

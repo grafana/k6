@@ -22,13 +22,10 @@ package js
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"path/filepath"
-	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/dop251/goja"
 	"github.com/pkg/errors"
@@ -73,8 +70,7 @@ type InitContext struct {
 
 	logger logrus.FieldLogger
 
-	shares     map[string]sharedArray
-	sharesLock *sync.Mutex
+	sharedObjects *common.SharedObjects
 }
 
 // NewInitContext creates a new initcontext with the provided arguments
@@ -91,9 +87,7 @@ func NewInitContext(
 		programs:          make(map[string]programWithSource),
 		compatibilityMode: compatMode,
 		logger:            logger,
-
-		shares:     make(map[string]sharedArray),
-		sharesLock: new(sync.Mutex),
+		sharedObjects:     common.NewSharedObjects(),
 	}
 }
 
@@ -119,47 +113,8 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 		programs:          programs,
 		compatibilityMode: base.compatibilityMode,
 		logger:            base.logger,
-
-		shares:     base.shares,
-		sharesLock: base.sharesLock,
+		sharedObjects:     base.sharedObjects,
 	}
-}
-
-// XShare is a constructor returning a shareable read-only array (general objects coming)
-// indentified by the name and having their contents be whatever the call returns - again only
-// arrays currently supported.
-func (i *InitContext) XShare(name string, call goja.Callable) goja.Value {
-	i.sharesLock.Lock()
-	defer i.sharesLock.Unlock()
-	value, ok := i.shares[name]
-	if !ok { //nolint:nestif
-		gojaValue, err := call(goja.Undefined())
-		if err != nil {
-			common.Throw(i.runtime, err)
-		}
-		// TODO this can probably be better handled
-		if gojaValue.ExportType().Kind() != reflect.Slice {
-			common.Throw(i.runtime, errors.New("only arrays can be made into shared objects")) // TODO better error
-		}
-
-		// TODO this can probably be done better if we just iterate over the internal array, but ...
-		// that might be a bit harder given what currently goja provides
-		var tmpArr []interface{}
-		if err = i.runtime.ExportTo(gojaValue, &tmpArr); err != nil {
-			common.Throw(i.runtime, err)
-		}
-
-		arr := make([][]byte, len(tmpArr))
-		for index := range arr {
-			arr[index], err = json.Marshal(tmpArr[index])
-			if err != nil {
-				common.Throw(i.runtime, err)
-			}
-		}
-		value = sharedArray{arr: arr}
-		i.shares[name] = value
-	}
-	return value.wrap(i.ctxPtr, i.runtime)
 }
 
 // Require is called when a module/file needs to be loaded by a script

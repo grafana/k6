@@ -33,8 +33,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestInitContextNewShareable(t *testing.T) {
+func TestInitContextNewSharedArray(t *testing.T) {
 	data := `'use strict';
+var SharedArray = require("k6/data").SharedArray;
 function generateArray() {
     console.log("once");
     var n = 50;
@@ -45,14 +46,14 @@ function generateArray() {
     return arr;
 }
 
-var s = new Share("something", generateArray);
+var s = new SharedArray("something", generateArray);
 
 var er = "";
 try {
-	var p = new Share("wat", function() {return "whatever"});
+	var p = new SharedArray("wat", function() {return "whatever"});
 	throw "the previous line should've errored";
 } catch (e) {
-	if (!e.toString().includes("only arrays can be made into shared objects")) {
+	if (!e.toString().includes("only arrays can be made into SharedArray")) {
 		er = "wrong error " + e.toString();
 	}
 }
