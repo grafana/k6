@@ -83,22 +83,6 @@ jobs:
           fi
           go test "${args[@]}" -timeout 800s ./...
 
-  tc39:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.15.x
-      - name: Run tests
-        run: |
-          set -x
-          cd js/tc39
-          sh checkout.sh
-          go test -timeout 1h
-
   test-cov:
     strategy:
       matrix:
