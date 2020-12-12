@@ -59,7 +59,7 @@ func GetFixedLengthFloatFormat(maxValue float64, precision uint) (formatStr stri
 		value := maxValue
 		for value < 1 {
 			value *= 10
-			decimalPlacesCount += 1
+			decimalPlacesCount++
 		}
 		precision = decimalPlacesCount
 	}
