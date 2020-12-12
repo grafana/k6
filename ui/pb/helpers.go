@@ -49,9 +49,6 @@ func GetFixedLengthIntFormat(maxValue int64) (formatStr string) {
 // precision + how many zeros it will be padded on the left with) in the
 // returned string corresponds to the number of digits in the supplied maxValue
 // and the desired precision.
-// if the precision is 0 and the maxValue is between 0 and 1, the number of decimal
-// places required to show the first non-zero digit is calculated and that is set 
-// to the precision.
 func GetFixedLengthFloatFormat(maxValue float64, precision uint) (formatStr string) {
 	resLen := 1
 	if maxValue < 0 {
