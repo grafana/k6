@@ -54,15 +54,6 @@ func GetFixedLengthIntFormat(maxValue int64) (formatStr string) {
 // to the precision.
 func GetFixedLengthFloatFormat(maxValue float64, precision uint) (formatStr string) {
 	resLen := 1
-	var decimalPlacesCount uint = 0
-	if precision == 0 && maxValue < 1 && maxValue > 0 {
-		value := maxValue
-		for value < 1 {
-			value *= 10
-			decimalPlacesCount++
-		}
-		precision = decimalPlacesCount
-	}
 	if maxValue < 0 {
 		maxValue = -maxValue
 		resLen++

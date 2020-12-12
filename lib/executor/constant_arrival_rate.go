@@ -289,8 +289,20 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	}
 
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
+	var precision uint = 0
+	// if the arrivalRatePerSec is between 0 and 1, find the minimum precision
+	// to make the rate show the first non-zero digit.
+	if arrivalRatePerSec > 0 && arrivalRatePerSec < 1 {
+		var decimalPlacesCount uint = 0
+		temporaryArrivalValue := arrivalRatePerSec
+		for temporaryArrivalValue < 1 {
+			temporaryArrivalValue *= 10
+			decimalPlacesCount++
+		}
+		precision = decimalPlacesCount
+	}
 	progIters := fmt.Sprintf(
-		pb.GetFixedLengthFloatFormat(arrivalRatePerSec, 0)+" iters/s", arrivalRatePerSec)
+		pb.GetFixedLengthFloatFormat(arrivalRatePerSec, precision)+" iters/s", arrivalRatePerSec)
 	progressFn := func() (float64, []string) {
 		spent := time.Since(startTime)
 		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
