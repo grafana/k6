@@ -288,6 +288,14 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 			if !e.NoThresholds {
 				e.processThresholds()
 			}
+			if iim, ok := e.Metrics[metrics.InterruptedIterations.Name]; ok {
+				if sink, ok := iim.Sink.(*stats.RateSink); ok {
+					// HACK: This is done to avoid emitting a 0 value for this
+					// metric on each iteration but still get a correct
+					// calculation in the summary.
+					sink.Total += int64(e.executionState.GetFullIterationCount())
+				}
+			}
 			processMetricsAfterRun <- struct{}{}
 
 		case sc := <-e.Samples:
