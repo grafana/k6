@@ -7,13 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/minirunner"
 	"github.com/loadimpact/k6/stats"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // this test is mostly interesting when -race is enabled
@@ -31,16 +32,9 @@ func TestVUHandleRace(t *testing.T) {
 
 	var getVUCount int64
 	var returnVUCount int64
+	runner := &minirunner.MiniRunner{}
 	getVU := func() (lib.InitializedVU, error) {
-		atomic.AddInt64(&getVUCount, 1)
-		return &minirunner.VU{
-			R: &minirunner.MiniRunner{
-				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-					// TODO: do something
-					return nil
-				},
-			},
-		}, nil
+		return runner.NewVU(atomic.AddInt64(&getVUCount, 1), nil)
 	}
 
 	returnVU := func(_ lib.InitializedVU) {
@@ -121,21 +115,14 @@ func TestVUHandleStartStopRace(t *testing.T) {
 	// testLog.Level = logrus.DebugLevel
 	logEntry := logrus.NewEntry(testLog)
 
-	var vuID int64 = -1
-
-	var testIterations = 10000
-	returned := make(chan struct{})
+	var (
+		returned       = make(chan struct{})
+		runner         = &minirunner.MiniRunner{}
+		vuID     int64 = -1
+	)
 	getVU := func() (lib.InitializedVU, error) {
 		returned = make(chan struct{})
-		return &minirunner.VU{
-			ID: atomic.AddInt64(&vuID, 1),
-			R: &minirunner.MiniRunner{
-				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-					// TODO: do something
-					return nil
-				},
-			},
-		}, nil
+		return runner.NewVU(atomic.AddInt64(&vuID, 1), nil)
 	}
 
 	returnVU := func(v lib.InitializedVU) {
@@ -160,7 +147,8 @@ func TestVUHandleStartStopRace(t *testing.T) {
 
 	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, &BaseConfig{}, logEntry)
 	go vuHandle.runLoopsIfPossible(runIter)
-	for i := 0; i < testIterations; i++ {
+
+	for i := 0; i < 10000; i++ {
 		err := vuHandle.start()
 		vuHandle.gracefulStop()
 		require.NoError(t, err)
