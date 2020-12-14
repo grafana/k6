@@ -2,8 +2,6 @@ package data
 
 import (
 	"context"
-	"encoding/json"
-	"reflect"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
@@ -53,24 +51,24 @@ func getShareArrayFromCall(rt *goja.Runtime, call goja.Callable) sharedArray {
 	if err != nil {
 		common.Throw(rt, err)
 	}
-	// TODO this can probably be better handled
-	if gojaValue.ExportType().Kind() != reflect.Slice {
+	obj := gojaValue.ToObject(rt)
+	if obj.ClassName() != "Array" {
 		common.Throw(rt, errors.New("only arrays can be made into SharedArray")) // TODO better error
 	}
+	arr := make([]string, obj.Get("length").ToInteger())
 
-	// TODO this can probably be done better if we just iterate over the internal array, but ...
-	// that might be a bit harder given what currently goja provides
-	var tmpArr []interface{}
-	if err = rt.ExportTo(gojaValue, &tmpArr); err != nil {
+	cal, err := rt.RunString(`(function(input, output) {
+		for (var i = 0; i < input.length; i++) {
+			output[i] = JSON.stringify(input[i])
+		}
+	})`)
+	if err != nil {
 		common.Throw(rt, err)
 	}
-
-	arr := make([][]byte, len(tmpArr))
-	for index := range arr {
-		arr[index], err = json.Marshal(tmpArr[index])
-		if err != nil {
-			common.Throw(rt, err)
-		}
+	newCall, _ := goja.AssertFunction(cal)
+	_, err = newCall(goja.Undefined(), gojaValue, rt.ToValue(arr))
+	if err != nil {
+		common.Throw(rt, err)
 	}
 	return sharedArray{arr: arr}
 }

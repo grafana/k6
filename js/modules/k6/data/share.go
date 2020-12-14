@@ -22,7 +22,6 @@ package data
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
@@ -31,7 +30,7 @@ import (
 // TODO fix it not working really well with setupData or just make it more broken
 // TODO fix it working with console.log
 type sharedArray struct {
-	arr [][]byte
+	arr []string
 }
 
 func (s sharedArray) wrap(ctxPtr *context.Context, rt *goja.Runtime) goja.Value {
@@ -53,17 +52,14 @@ func (s sharedArray) Get(index int) (interface{}, error) {
 		return goja.Undefined(), nil
 	}
 
-	var tmp interface{}
-	if err := json.Unmarshal(s.arr[index], &tmp); err != nil {
-		return goja.Undefined(), err
-	}
-	return tmp, nil
+	return s.arr[index], nil
 }
 
 func (s sharedArray) Length() int {
 	return len(s.arr)
 }
 
+/* This implementation is commented as with it - it is harder to deepFreeze it with this implementation.
 type sharedArrayIterator struct {
 	a     *sharedArray
 	index int
@@ -84,24 +80,52 @@ func (sai *sharedArrayIterator) Next() (interface{}, error) {
 func (s sharedArray) Iterator() *sharedArrayIterator {
 	return &sharedArrayIterator{a: &s, index: -1}
 }
+*/
 
 const arrayWrapperCode = `(function(val) {
+	function deepFreeze(o) {
+		Object.freeze(o);
+		if (o === undefined) {
+			return o;
+		}
+
+		Object.getOwnPropertyNames(o).forEach(function (prop) {
+			if (o[prop] !== null
+				&& (typeof o[prop] === "object" || typeof o[prop] === "function")
+				&& !Object.isFrozen(o[prop])) {
+				deepFreeze(o[prop]);
+			}
+		});
+
+		return o;
+	};
+
 	var arrayHandler = {
 		get: function(target, property, receiver) {
 			switch (property){
 			case "length":
 				return target.length();
 			case Symbol.iterator:
-				return function() {
-					return target.iterator();
-				};
+				return function(){
+					var index = 0;
+					return {
+						"next": function() {
+							if (index >= target.length()) {
+								return {done: true}
+							}
+							var result = {value: deepFreeze(JSON.parse(target.get(index)))};
+							index++;
+							return result;
+						}
+					}
+				}
 			}
 			var i = parseInt(property);
 			if (isNaN(i)) {
 				return undefined;
 			}
 
-			return target.get(i);
+			return deepFreeze(JSON.parse(target.get(i)));
 		}
 	};
 	return new Proxy(val, arrayHandler);

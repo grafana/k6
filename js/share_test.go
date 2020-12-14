@@ -41,30 +41,40 @@ function generateArray() {
     var n = 50;
     var arr = new Array(n);
     for (var i = 0 ; i <n; i++) {
-        arr[i] = "something" +i;
+        arr[i] = {value: "something" +i};
     }
     return arr;
 }
 
 var s = new SharedArray("something", generateArray);
 
-var er = "";
 try {
 	var p = new SharedArray("wat", function() {return "whatever"});
-	throw "the previous line should've errored";
+	throw "the previous line should've errored as we returned a string not array";
 } catch (e) {
 	if (!e.toString().includes("only arrays can be made into SharedArray")) {
-		er = "wrong error " + e.toString();
+		throw "wrong error " + e.toString();
 	}
 }
 
-if (er != "") {
-	throw er;
+try {
+	var p = new SharedArray("wat2", function() {return [{s: function() {return "whatever"}}]});
+	// throw "the previous line should've errored as function was stringified";
+	// unfortunately JSON.stringify is defined that it will acctually just remove stuff (or make them null)
+	// that can't be JSONified like functions
+	if (p[0].s != undefined) {
+		throw "only arrays can be made into SharedArray";
+	}
+} catch (e) {
+	if (!e.toString().includes("only arrays can be made into SharedArray")) {
+		throw "wrong error " + e.toString();
+	}
 }
 
+
 exports.default = function() {
-	if (s[2] !== "something2") {
-		throw new Error("bad s[2]="+s[2]);
+	if (s[2].value !== "something2") {
+		throw new Error("bad s[2]="+s[2].value);
 	}
 	if (s.length != 50) {
 		throw new Error("bad length " +_s.length);
@@ -72,10 +82,28 @@ exports.default = function() {
 
 	var i = 0;
 	for (var v of s) {
-		if (v !== "something"+i) {
-			throw new Error("bad v="+v+" for i="+i);
+		if (v.value !== "something"+i) {
+			throw new Error("bad v.value="+v.value+" for i="+i);
 		}
 		i++;
+
+		try {
+			v.data = "help";
+			throw "the previous line should've errored v.data = 'help'";
+		} catch(e) {
+			if (!e.toString().includes("TypeError: Cannot add property data, object is not extensible")) {
+				throw "wrong error " + e.toString();
+			}
+		}
+	}
+
+	try {
+		s[2].data = "help";
+		throw "the previous line should've errored s[2].data = 'help'";
+	} catch(e) {
+		if (!e.toString().includes("TypeError: Cannot add property data, object is not extensible")) {
+			throw "wrong error " + e.toString();
+		}
 	}
 
 	if (s.something != undefined) {
@@ -87,12 +115,8 @@ exports.default = function() {
 		throw "the previous line should've errored s.something = 21";
 	} catch(e) {
 		if (!e.toString().includes("Host object field something cannot be made configurable")) {
-			er = "wrong error " + e.toString();
+			throw "wrong error " + e.toString();
 		}
-	}
-
-	if (er != "") {
-		throw er;
 	}
 
 	try {
@@ -101,12 +125,8 @@ exports.default = function() {
 		throw "the previous line should've errored";
 	} catch(e) {
 		if (!e.toString().includes("Host object field 1 cannot be made configurable")) {
-			er = "wrong error " + e.toString();
+			throw "wrong error " + e.toString();
 		}
-	}
-
-	if (er != "") {
-		throw er;
 	}
 }`
 
