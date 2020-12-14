@@ -33,7 +33,7 @@ func Throw(rt *goja.Runtime, err error) {
 	if e, ok := err.(*goja.Exception); ok {
 		panic(e)
 	}
-	panic(rt.NewGoError(err))
+	panic(rt.ToValue(err))
 }
 
 // GetReader tries to return an io.Reader value from an exported goja value.

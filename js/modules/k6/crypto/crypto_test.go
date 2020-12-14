@@ -318,7 +318,7 @@ func TestOutputEncoding(t *testing.T) {
 		hasher.update("hello world");
 		hasher.digest("someInvalidEncoding");
 		`)
-		assert.Contains(t, err.Error(), "GoError: Invalid output encoding: someInvalidEncoding")
+		assert.Contains(t, err.Error(), "Invalid output encoding: someInvalidEncoding")
 	})
 }
 
@@ -409,7 +409,7 @@ func TestHMac(t *testing.T) {
 				throw new Error("Hex encoding mismatch: " + resultHex);
 			}`)
 
-			assert.Contains(t, err.Error(), "GoError: Invalid algorithm: "+algorithm)
+			assert.Contains(t, err.Error(), "Invalid algorithm: "+algorithm)
 		})
 
 		t.Run(algorithm+" wrapper: invalid", func(t *testing.T) {
@@ -419,7 +419,7 @@ func TestHMac(t *testing.T) {
 				throw new Error("Hex encoding mismatch: " + resultHex);
 			}`)
 
-			assert.Contains(t, err.Error(), "GoError: Invalid algorithm: "+algorithm)
+			assert.Contains(t, err.Error(), "Invalid algorithm: "+algorithm)
 		})
 	}
 }
@@ -450,9 +450,8 @@ func TestHexEncodeError(t *testing.T) {
 		err := recover()
 		require.NotNil(t, err)
 		require.IsType(t, &goja.Object{}, err)
-		require.IsType(t, map[string]interface{}{}, err.(*goja.Object).Export())
-		val := err.(*goja.Object).Export().(map[string]interface{})
-		assert.Equal(t, expErr, fmt.Sprintf("%s", val["value"]))
+		val := err.(*goja.Object).Export()
+		require.EqualError(t, val.(error), expErr)
 	}()
 
 	c := New()
