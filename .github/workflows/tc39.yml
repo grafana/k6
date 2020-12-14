@@ -1,0 +1,32 @@
+name: TC39
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    tags:
+      - v*
+  pull_request:
+      paths:
+          - 'js/**'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  tc39:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15.x
+      - name: Run tests
+        run: |
+          set -x
+          cd js/tc39
+          sh checkout.sh
+          go test -timeout 1h

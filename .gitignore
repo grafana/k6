@@ -2,13 +2,13 @@
 /k6.exe
 /dist
 /pkg-build
+/js/tc39/TestTC39
 
 .vscode
 *.sublime-workspace
 *.log
 *.syso
 .idea
-
 *.DS_Store
 
 /versioninfo.json
