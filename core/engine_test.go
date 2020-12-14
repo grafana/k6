@@ -791,21 +791,24 @@ func TestMetricsEmission(t *testing.T) {
 	}
 
 	testCases := []struct {
-		method             string
-		minIterDuration    string
-		defaultBody        string
-		expCount, expIters float64
+		method                             string
+		minIterDuration                    string
+		defaultBody                        string
+		expCount, expIters, expInterrupted float64
 	}{
 		// Since emission of Iterations happens before the minIterationDuration
 		// sleep is done, we expect to receive metrics for all executions of
 		// the `default` function, despite of the lower overall duration setting.
-		{"minIterationDuration", `"300ms"`, "testCounter.add(1);", 16.0, 16.0},
+		{"minIterationDuration", `"300ms"`, "testCounter.add(1);", 16.0, 16.0, 4.0},
 		// With the manual sleep method and no minIterationDuration, the last
 		// `default` execution will be cutoff by the duration setting, so only
 		// 3 sets of metrics are expected.
-		{"sleepBeforeCounterAdd", "null", "sleep(0.3); testCounter.add(1); ", 12.0, 12.0},
-		// The counter should be sent, but the last iteration will be incomplete
-		{"sleepAfterCounterAdd", "null", "testCounter.add(1); sleep(0.3); ", 16.0, 12.0},
+		{"sleepBeforeCounterAdd", "null", "sleep(0.3); testCounter.add(1); ", 12.0, 12.0, 4.0},
+		// The counter should be sent, but the last iteration will be incomplete.
+		{"sleepAfterCounterAdd", "null", "testCounter.add(1); sleep(0.3); ", 16.0, 12.0, 4.0},
+		// All iterations should fail, but only 12 will be counted as complete.
+		{"fail", "null", "sleep(0.3); fail('test'); ", 0, 12.0, 16.0},
+		{"throw", "null", "sleep(0.3); throw 'test'; ", 0, 12.0, 16.0},
 	}
 
 	for _, tc := range testCases {
@@ -817,7 +820,7 @@ func TestMetricsEmission(t *testing.T) {
 			runner, err := js.New(
 				testutils.NewLogger(t),
 				&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(fmt.Sprintf(`
-				import { sleep } from "k6";
+				import { fail, sleep } from "k6";
 				import { Counter } from "k6/metrics";
 
 				let testCounter = new Counter("testcounter");
@@ -860,6 +863,7 @@ func TestMetricsEmission(t *testing.T) {
 
 			assert.Equal(t, tc.expIters, getMetricSum(collector, metrics.Iterations.Name))
 			assert.Equal(t, tc.expCount, getMetricSum(collector, "testcounter"))
+			assert.Equal(t, tc.expInterrupted, getMetricSum(collector, metrics.InterruptedIterations.Name))
 		})
 	}
 }
