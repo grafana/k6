@@ -150,7 +150,7 @@ func TestParse(t *testing.T) {
 		_, err := common.RunString(rt, `
 		x509.parse("bad-certificate");`)
 		assert.Contains(
-			t, err.Error(), "GoError: failed to decode certificate PEM file")
+			t, err.Error(), "failed to decode certificate PEM file")
 	})
 
 	t.Run("ParseFailure", func(t *testing.T) {
@@ -160,7 +160,7 @@ func TestParse(t *testing.T) {
 		if assert.Error(t, err) {
 			assert.Contains(t,
 				err.Error(),
-				"GoError: failed to parse certificate",
+				"failed to parse certificate",
 			)
 		}
 	})

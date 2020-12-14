@@ -33,12 +33,12 @@ func TestThrow(t *testing.T) {
 	fn1, ok := goja.AssertFunction(rt.ToValue(func() { Throw(rt, errors.New("aaaa")) }))
 	if assert.True(t, ok, "fn1 is invalid") {
 		_, err := fn1(goja.Undefined())
-		assert.EqualError(t, err, "GoError: aaaa")
+		assert.EqualError(t, err, "aaaa")
 
 		fn2, ok := goja.AssertFunction(rt.ToValue(func() { Throw(rt, err) }))
 		if assert.True(t, ok, "fn1 is invalid") {
 			_, err := fn2(goja.Undefined())
-			assert.EqualError(t, err, "GoError: aaaa")
+			assert.EqualError(t, err, "aaaa")
 		}
 	}
 }

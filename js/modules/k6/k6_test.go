@@ -41,7 +41,7 @@ func TestFail(t *testing.T) {
 	rt := goja.New()
 	rt.Set("k6", common.Bind(rt, New(), nil))
 	_, err := common.RunString(rt, `k6.fail("blah")`)
-	assert.Contains(t, err.Error(), "GoError: blah")
+	assert.Contains(t, err.Error(), "blah")
 }
 
 func TestSleep(t *testing.T) {
@@ -132,7 +132,7 @@ func TestGroup(t *testing.T) {
 
 	t.Run("Invalid", func(t *testing.T) {
 		_, err := common.RunString(rt, `k6.group("::", function() { throw new Error("nooo") })`)
-		assert.Contains(t, err.Error(), "GoError: group and check names may not contain '::'")
+		assert.Contains(t, err.Error(), "group and check names may not contain '::'")
 	})
 }
 func TestCheck(t *testing.T) {
@@ -211,7 +211,7 @@ func TestCheck(t *testing.T) {
 
 		t.Run("Invalid", func(t *testing.T) {
 			_, err := common.RunString(rt, `k6.check(null, { "::": true })`)
-			assert.Contains(t, err.Error(), "GoError: group and check names may not contain '::'")
+			assert.Contains(t, err.Error(), "group and check names may not contain '::'")
 		})
 	})
 

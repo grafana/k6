@@ -316,7 +316,7 @@ func TestOutputEncoding(t *testing.T) {
 		hasher.update("hello world");
 		hasher.digest("someInvalidEncoding");
 		`)
-		assert.Contains(t, err.Error(), "GoError: Invalid output encoding: someInvalidEncoding")
+		assert.Contains(t, err.Error(), "Invalid output encoding: someInvalidEncoding")
 	})
 }
 
@@ -395,7 +395,7 @@ func TestHMac(t *testing.T) {
 				throw new Error("Hex encoding mismatch: " + resultHex);
 			}`)
 
-			assert.Contains(t, err.Error(), "GoError: Invalid algorithm: "+algorithm)
+			assert.Contains(t, err.Error(), "Invalid algorithm: "+algorithm)
 		})
 
 		t.Run(algorithm+" wrapper: invalid", func(t *testing.T) {
@@ -405,7 +405,7 @@ func TestHMac(t *testing.T) {
 				throw new Error("Hex encoding mismatch: " + resultHex);
 			}`)
 
-			assert.Contains(t, err.Error(), "GoError: Invalid algorithm: "+algorithm)
+			assert.Contains(t, err.Error(), "Invalid algorithm: "+algorithm)
 		})
 	}
 }
