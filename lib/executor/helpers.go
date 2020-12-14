@@ -100,13 +100,13 @@ func getIterationRunner(
 			// Engine.processMetrics() as the channel could be closed at this point.
 			// TODO: Use enum?
 			// TODO: How to distinguish interruptions from signal (^C)?
-			tags["cause"] = "duration"
-			state.Samples <- stats.Sample{
-				Time:   time.Now(),
-				Metric: metrics.InterruptedIterations,
-				Tags:   stats.IntoSampleTags(&tags),
-				Value:  1,
-			}
+			// tags["cause"] = "duration"
+			// state.Samples <- stats.Sample{
+			// 	Time:   time.Now(),
+			// 	Metric: metrics.InterruptedIterations,
+			// 	Tags:   stats.IntoSampleTags(&tags),
+			// 	Value:  1,
+			// }
 			executionState.AddInterruptedIterations(1)
 			return false
 		default:
