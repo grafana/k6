@@ -103,10 +103,17 @@ func TestPatchStatus(t *testing.T) {
 			require.NoError(t, err)
 			engine, err := core.NewEngine(execScheduler, options, logger)
 			require.NoError(t, err)
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			run, _, err := engine.Init(ctx, ctx)
+			globalCtx, globalCancel := context.WithTimeout(context.Background(), 2*time.Second)
+			runCtx, runCancel := context.WithCancel(globalCtx)
+			run, waitFn, err := engine.Init(globalCtx, runCtx)
 			require.NoError(t, err)
+			defer func() {
+				runCancel()
+				// Wait for metrics processing to finish
+				time.Sleep(100 * time.Millisecond)
+				globalCancel()
+				waitFn()
+			}()
 
 			go func() { _ = run() }()
 			// wait for the executor to initialize to avoid a potential data race below

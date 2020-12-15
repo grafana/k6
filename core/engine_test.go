@@ -88,6 +88,8 @@ func newTestEngine( //nolint:golint
 		if runCancel != nil {
 			runCancel()
 		}
+		// Wait for metrics processing to finish
+		time.Sleep(100 * time.Millisecond)
 		globalCancel()
 		waitFn()
 	}
