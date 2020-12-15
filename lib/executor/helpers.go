@@ -88,7 +88,6 @@ func getIterationRunner(
 	return func(ctx context.Context, vu lib.ActiveVU) bool {
 		err := vu.RunOnce()
 		state := vu.GetState()
-		tags := make(map[string]string, 1)
 
 		// TODO: track (non-ramp-down) errors from script iterations as a metric,
 		// and have a default threshold that will abort the script when the error
@@ -96,23 +95,21 @@ func getIterationRunner(
 
 		select {
 		case <-ctx.Done():
-			// TODO: Do this elsewhere? It might be racy with
-			// Engine.processMetrics() as the channel could be closed at this point.
 			// TODO: Use enum?
 			// TODO: How to distinguish interruptions from signal (^C)?
-			// tags["cause"] = "duration"
-			// state.Samples <- stats.Sample{
-			// 	Time:   time.Now(),
-			// 	Metric: metrics.InterruptedIterations,
-			// 	Tags:   stats.IntoSampleTags(&tags),
-			// 	Value:  1,
-			// }
+			tags := map[string]string{"cause": "duration"}
+			state.Samples <- stats.Sample{
+				Time:   time.Now(),
+				Metric: metrics.InterruptedIterations,
+				Tags:   stats.IntoSampleTags(&tags),
+				Value:  1,
+			}
 			executionState.AddInterruptedIterations(1)
 			return false
 		default:
 			if err != nil {
 				// TODO: Use enum?
-				tags["cause"] = "error"
+				tags := map[string]string{"cause": "error"}
 
 				// TODO: investigate context cancelled errors
 				switch e := err.(type) {
