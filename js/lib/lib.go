@@ -18,8 +18,6 @@
  *
  */
 
-//go:generate rice embed-go
-
 package lib
 
 import (

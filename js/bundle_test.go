@@ -114,12 +114,18 @@ func TestNewBundle(t *testing.T) {
 		}
 	})
 	t.Run("CompatibilityMode", func(t *testing.T) {
+		compatibilityTestSrc := `
+		module.exports.default = function() {};
+		if ([[1,2],[3,4]].flatten()[4]  == 4) {
+			throw Error("Array.flatten doesn't work")
+		}
+		`
+
 		t.Run("Extended/ok/CoreJS", func(t *testing.T) {
 			rtOpts := lib.RuntimeOptions{
 				CompatibilityMode: null.StringFrom(lib.CompatibilityModeExtended.String()),
 			}
-			_, err := getSimpleBundle(t, "/script.js",
-				`module.exports.default = function() {}; new Promise(function(resolve, reject){});`, rtOpts)
+			_, err := getSimpleBundle(t, "/script.js", compatibilityTestSrc, rtOpts)
 
 			assert.NoError(t, err)
 		})
@@ -156,8 +162,8 @@ func TestNewBundle(t *testing.T) {
 				// some ES2015 objects polyfilled by core.js are not supported
 				{
 					"CoreJS", "base",
-					`module.exports.default = function() {}; new Promise(function(resolve, reject){});`,
-					"ReferenceError: Promise is not defined at file:///script.js:1:45(5)",
+					compatibilityTestSrc,
+					"TypeError: Object has no member 'flatten' at file:///script.js:3:28(14)",
 				},
 			}
 
