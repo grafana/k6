@@ -88,7 +88,7 @@ func getIterationRunner(
 	return func(ctx context.Context, vu lib.ActiveVU) bool {
 		err := vu.RunOnce()
 		state := vu.GetState()
-		tags := state.CloneTags()
+		tags := make(map[string]string, 1)
 
 		// TODO: track (non-ramp-down) errors from script iterations as a metric,
 		// and have a default threshold that will abort the script when the error
