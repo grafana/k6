@@ -116,8 +116,8 @@ func TestNewBundle(t *testing.T) {
 	t.Run("CompatibilityMode", func(t *testing.T) {
 		compatibilityTestSrc := `
 		module.exports.default = function() {};
-		if ([[1,2],[3,4]].flatten()[4]  == 4) {
-			throw Error("Array.flatten doesn't work")
+		if (typeof Object.values != "function") {
+			throw Error("Object.values isn't a function")
 		}
 		`
 
@@ -163,7 +163,7 @@ func TestNewBundle(t *testing.T) {
 				{
 					"CoreJS", "base",
 					compatibilityTestSrc,
-					"TypeError: Object has no member 'flatten' at file:///script.js:3:28(14)",
+					"Error: Object.values isn't a function at file:///script.js:4:15(14)",
 				},
 			}
 
