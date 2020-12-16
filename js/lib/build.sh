@@ -9,7 +9,7 @@ git fetch origin --depth=1 "${sha}"
 git reset --hard "${sha}"
 cp ../k6-shim.js shim.js
 cp ../corejs-build.sh corejs-build.sh
-docker run --user "$UID:$GID" --rm -ti  -v $(pwd):/opt/g --entrypoint /opt/g/corejs-build.sh --workdir /opt/g node
+docker run --user "$(id -u):$(id -g)" --rm -ti  -v "$(pwd):/opt/g" --entrypoint /opt/g/corejs-build.sh --workdir /opt/g node
 cp custom.min.js ../shim.min.js
 cd -
 rm -rf corejs-repo
