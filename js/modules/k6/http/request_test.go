@@ -1416,6 +1416,45 @@ func TestRequestAndBatch(t *testing.T) {
 	})
 }
 
+func TestRequestArrayBufferBody(t *testing.T) {
+	t.Parallel()
+	tb, _, _, rt, _ := newRuntime(t) //nolint: dogsled
+	defer tb.Cleanup()
+	sr := tb.Replacer.Replace
+
+	tb.Mux.HandleFunc("/post-arraybuffer", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "POST", r.Method)
+		var in bytes.Buffer
+		_, err := io.Copy(&in, r.Body)
+		require.NoError(t, err)
+		_, err = w.Write(in.Bytes())
+		require.NoError(t, err)
+	}))
+
+	testCases := []struct {
+		arr, expected string
+	}{
+		{"Uint8Array", "104,101,108,108,111"},
+		{"Uint16Array", "104,0,101,0,108,0,108,0,111,0"},
+		{"Uint32Array", "104,0,0,0,101,0,0,0,108,0,0,0,108,0,0,0,111,0,0,0"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.arr, func(t *testing.T) {
+			_, err := common.RunString(rt, sr(fmt.Sprintf(`
+			var arr = new %[1]s([104, 101, 108, 108, 111]); // "hello"
+			var res = http.post("HTTPBIN_URL/post-arraybuffer", arr.buffer, { responseType: 'binary' });
+
+			if (res.status != 200) { throw new Error("wrong status: " + res.status) }
+			if (res.body != "%[2]s") { throw new Error(
+				"incorrect data: expected '%[2]s', received '" + res.body + "'") }
+			`, tc.arr, tc.expected)))
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func TestRequestCompression(t *testing.T) {
 	t.Parallel()
 	tb, state, _, rt, _ := newRuntime(t)
