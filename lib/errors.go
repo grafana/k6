@@ -27,6 +27,27 @@ import (
 	"github.com/loadimpact/k6/lib/consts"
 )
 
+// Exception represents an internal JS error or unexpected panic in VU code.
+type Exception struct {
+	Err              interface{}
+	StackGo, StackJS string
+}
+
+// Error implements the error interface.
+func (exc Exception) Error() string {
+	out := fmt.Sprintf("%s", exc.Err)
+	if exc.StackGo != "" {
+		out += fmt.Sprintf("\n%s", exc.StackGo)
+	}
+	if exc.StackJS != "" {
+		if exc.StackGo != "" {
+			out += "\nJavaScript stack:"
+		}
+		out += fmt.Sprintf("\n%s", exc.StackJS)
+	}
+	return out
+}
+
 // IterationInterruptedError is used when an iteration is interrupted due to
 // one of the following:
 // - normal JS exceptions, throw(), etc., with cause: error

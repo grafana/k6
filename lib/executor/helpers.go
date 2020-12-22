@@ -26,7 +26,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
 
 	"github.com/loadimpact/k6/lib"
@@ -113,14 +112,17 @@ func getIterationRunner(
 
 				// TODO: investigate context cancelled errors
 				switch e := err.(type) {
-				case *goja.Exception:
-					if er, ok := e.Value().Export().(lib.IterationInterruptedError); ok {
-						tags["cause"] = er.Cause()
+				case lib.Exception:
+					if e2, ok := e.Err.(lib.IterationInterruptedError); ok {
+						tags["cause"] = e2.Cause()
+						logger.Error(e.Error())
+					} else {
+						// TODO figure out how to use PanicLevel without panicing .. this might require changing
+						// the logger we use see
+						// https://github.com/sirupsen/logrus/issues/1028
+						// https://github.com/sirupsen/logrus/issues/993
+						logger.WithField("source", "stacktrace").Error(e.Error())
 					}
-					logger.Error(err.Error())
-				case fmt.Stringer:
-					// TODO better detection for stack traces
-					logger.WithField("source", "stacktrace").Error(e.String())
 				default:
 					logger.Error(err.Error())
 				}

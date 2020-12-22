@@ -31,6 +31,7 @@ import (
 	"net/http/cookiejar"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dop251/goja"
@@ -630,22 +631,40 @@ func (u *VU) runFn(
 	defer func() {
 		if r := recover(); r != nil {
 			gojaStack := u.Runtime.CaptureCallStack(20, nil)
-			err = fmt.Errorf("a panic occurred in VU code but was caught: %s", r)
-			// TODO figure out how to use PanicLevel without panicing .. this might require changing
-			// the logger we use see
-			// https://github.com/sirupsen/logrus/issues/1028
-			// https://github.com/sirupsen/logrus/issues/993
 			b := new(bytes.Buffer)
 			for _, s := range gojaStack {
 				s.Write(b)
 			}
-			u.state.Logger.Log(logrus.ErrorLevel, "panic: ", r, "\n", string(debug.Stack()), "\nGoja stack:\n", b.String())
+			err = lib.Exception{
+				Err:     fmt.Errorf("a panic occurred in VU code but was caught: %s", r),
+				StackGo: string(debug.Stack()),
+				StackJS: b.String(),
+			}
 		}
 	}()
 
 	startTime := time.Now()
 	v, err = fn(goja.Undefined(), args...) // Actually run the JS script
 	endTime := time.Now()
+
+	// Wrap goja.Exception in an internal type to avoid making goja a dependency
+	// in other packages.
+	if e, ok := err.(*goja.Exception); ok {
+		stack := e.String()
+		val := e.Value().Export()
+		eolIdx := strings.IndexByte(stack, '\n')
+		// HACK: Reuse the stack dump formatting, but remove the first redundant
+		// error line and reuse the first line in *some* cases, e.g.
+		// ReferenceErrors. :-/
+		firstLine, rest := stack[:eolIdx], stack[eolIdx+1:]
+		if _, ok := val.(map[string]interface{}); ok {
+			val = errors.New(firstLine)
+		}
+		err = lib.Exception{
+			Err:     val,
+			StackJS: rest,
+		}
+	}
 
 	select {
 	case <-ctx.Done():
