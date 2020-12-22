@@ -222,6 +222,8 @@ func (h *HTTP) parseRequest(
 			if err := handleObjectBody(newData); err != nil {
 				return nil, err
 			}
+		case goja.ArrayBuffer:
+			result.Body = bytes.NewBuffer(data.Bytes())
 		case map[string]interface{}:
 			if err := handleObjectBody(data); err != nil {
 				return nil, err
