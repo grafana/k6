@@ -1,7 +1,7 @@
 FROM golang:1.15-alpine as builder
 WORKDIR $GOPATH/src/github.com/loadimpact/k6
 ADD . .
-RUN apk --no-cache add git
+RUN apk --no-cache add git git-lfs
 RUN CGO_ENABLED=0 go install -a -trimpath -ldflags "-s -w -X github.com/loadimpact/k6/lib/consts.VersionDetails=$(date -u +"%FT%T%z")/$(git describe --always --long --dirty)"
 
 FROM alpine:3.11
