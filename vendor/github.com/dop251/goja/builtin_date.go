@@ -991,7 +991,7 @@ func (r *Runtime) createDateProto(val *Object) objectImpl {
 	o._putProp("toISOString", r.newNativeFunc(r.dateproto_toISOString, nil, "toISOString", nil, 0), true, false, true)
 	o._putProp("toJSON", r.newNativeFunc(r.dateproto_toJSON, nil, "toJSON", nil, 1), true, false, true)
 
-	o._putSym(symToPrimitive, valueProp(r.newNativeFunc(r.dateproto_toPrimitive, nil, "[Symbol.toPrimitive]", nil, 1), false, false, true))
+	o._putSym(SymToPrimitive, valueProp(r.newNativeFunc(r.dateproto_toPrimitive, nil, "[Symbol.toPrimitive]", nil, 1), false, false, true))
 
 	return o
 }

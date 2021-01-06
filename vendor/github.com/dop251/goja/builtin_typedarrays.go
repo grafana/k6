@@ -1090,7 +1090,7 @@ func (r *Runtime) typedArrayFrom(ctor, items *Object, mapFn, thisValue Value) *O
 			thisValue = _undefined
 		}
 	}
-	usingIter := toMethod(items.self.getSym(symIterator, nil))
+	usingIter := toMethod(items.self.getSym(SymIterator, nil))
 	if usingIter != nil {
 		iter := r.getIterator(items, usingIter)
 		var values []Value
@@ -1251,14 +1251,14 @@ func (r *Runtime) createArrayBufferProto(val *Object) objectImpl {
 	b._put("byteLength", byteLengthProp)
 	b._putProp("constructor", r.global.ArrayBuffer, true, false, true)
 	b._putProp("slice", r.newNativeFunc(r.arrayBufferProto_slice, nil, "slice", nil, 2), true, false, true)
-	b._putSym(symToStringTag, valueProp(asciiString("ArrayBuffer"), false, false, true))
+	b._putSym(SymToStringTag, valueProp(asciiString("ArrayBuffer"), false, false, true))
 	return b
 }
 
 func (r *Runtime) createArrayBuffer(val *Object) objectImpl {
 	o := r.newNativeConstructOnly(val, r.builtin_newArrayBuffer, r.global.ArrayBufferPrototype, "ArrayBuffer", 1)
 	o._putProp("isView", r.newNativeFunc(r.arrayBuffer_isView, nil, "isView", nil, 1), true, false, true)
-	o._putSym(symSpecies, &valueProperty{
+	o._putSym(SymSpecies, &valueProperty{
 		getterFunc:   r.newNativeFunc(r.returnThis, nil, "get [Symbol.species]", nil, 0),
 		accessor:     true,
 		configurable: true,
@@ -1300,7 +1300,7 @@ func (r *Runtime) createDataViewProto(val *Object) objectImpl {
 	b._putProp("setUint8", r.newNativeFunc(r.dataViewProto_setUint8, nil, "setUint8", nil, 2), true, false, true)
 	b._putProp("setUint16", r.newNativeFunc(r.dataViewProto_setUint16, nil, "setUint16", nil, 2), true, false, true)
 	b._putProp("setUint32", r.newNativeFunc(r.dataViewProto_setUint32, nil, "setUint32", nil, 2), true, false, true)
-	b._putSym(symToStringTag, valueProp(asciiString("DataView"), false, false, true))
+	b._putSym(SymToStringTag, valueProp(asciiString("DataView"), false, false, true))
 
 	return b
 }
@@ -1359,8 +1359,8 @@ func (r *Runtime) createTypedArrayProto(val *Object) objectImpl {
 	b._putProp("toString", r.global.arrayToString, true, false, true)
 	valuesFunc := r.newNativeFunc(r.typedArrayProto_values, nil, "values", nil, 0)
 	b._putProp("values", valuesFunc, true, false, true)
-	b._putSym(symIterator, valueProp(valuesFunc, true, false, true))
-	b._putSym(symToStringTag, &valueProperty{
+	b._putSym(SymIterator, valueProp(valuesFunc, true, false, true))
+	b._putSym(SymToStringTag, &valueProperty{
 		getterFunc:   r.newNativeFunc(r.typedArrayProto_toStringTag, nil, "get [Symbol.toStringTag]", nil, 0),
 		accessor:     true,
 		configurable: true,
@@ -1373,7 +1373,7 @@ func (r *Runtime) createTypedArray(val *Object) objectImpl {
 	o := r.newNativeConstructOnly(val, r.newTypedArray, r.global.TypedArrayPrototype, "TypedArray", 0)
 	o._putProp("from", r.newNativeFunc(r.typedArray_from, nil, "from", nil, 1), true, false, true)
 	o._putProp("of", r.newNativeFunc(r.typedArray_of, nil, "of", nil, 0), true, false, true)
-	o._putSym(symSpecies, &valueProperty{
+	o._putSym(SymSpecies, &valueProperty{
 		getterFunc:   r.newNativeFunc(r.returnThis, nil, "get [Symbol.species]", nil, 0),
 		accessor:     true,
 		configurable: true,

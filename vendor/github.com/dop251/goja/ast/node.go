@@ -13,7 +13,6 @@ import (
 	"github.com/dop251/goja/file"
 	"github.com/dop251/goja/token"
 	"github.com/dop251/goja/unistring"
-	"github.com/go-sourcemap/sourcemap"
 )
 
 // All nodes implement the Node interface.
@@ -399,8 +398,6 @@ type Program struct {
 	DeclarationList []Declaration
 
 	File *file.File
-
-	SourceMap *sourcemap.Consumer
 }
 
 // ==== //

@@ -205,7 +205,7 @@ func (s *valueStack) expand(idx int) {
 
 func stashObjHas(obj *Object, name unistring.String) bool {
 	if obj.self.hasPropertyStr(name) {
-		if unscopables, ok := obj.self.getSym(symUnscopables, nil).(*Object); ok {
+		if unscopables, ok := obj.self.getSym(SymUnscopables, nil).(*Object); ok {
 			if b := unscopables.self.getStr(name, nil); b != nil {
 				return !b.ToBoolean()
 			}
@@ -1278,7 +1278,7 @@ type newRegexp struct {
 }
 
 func (n *newRegexp) exec(vm *vm) {
-	vm.push(vm.r.newRegExpp(n.pattern, n.src, vm.r.global.RegExpPrototype))
+	vm.push(vm.r.newRegExpp(n.pattern.clone(), n.src, vm.r.global.RegExpPrototype))
 	vm.pc++
 }
 
@@ -1946,7 +1946,7 @@ func (n *newFunc) exec(vm *vm) {
 	obj := vm.r.newFunc(n.name, int(n.length), n.strict)
 	obj.prg = n.prg
 	obj.stash = vm.stash
-	obj.src = n.prg.src.src[n.srcStart:n.srcEnd]
+	obj.src = n.prg.src.Source()[n.srcStart:n.srcEnd]
 	vm.push(obj.val)
 	vm.pc++
 }
@@ -2356,7 +2356,7 @@ func (_typeof) exec(vm *vm) {
 		r = stringString
 	case valueInt, valueFloat:
 		r = stringNumber
-	case *valueSymbol:
+	case *Symbol:
 		r = stringSymbol
 	default:
 		panic(fmt.Errorf("Unknown type: %T", v))

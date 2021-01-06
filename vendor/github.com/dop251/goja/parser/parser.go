@@ -52,6 +52,32 @@ const (
 	IgnoreRegExpErrors Mode = 1 << iota // Ignore RegExp compatibility errors (allow backtracking)
 )
 
+type options struct {
+	disableSourceMaps bool
+	sourceMapLoader   func(path string) ([]byte, error)
+}
+
+// Option represents one of the options for the parser to use in the Parse methods. Currently supported are:
+// WithDisableSourceMaps and WithSourceMapLoader.
+type Option func(*options)
+
+// WithDisableSourceMaps is an option to disable source maps support. May save a bit of time when source maps
+// are not in use.
+func WithDisableSourceMaps(opts *options) {
+	opts.disableSourceMaps = true
+}
+
+// WithSourceMapLoader is an option to set a custom source map loader. The loader will be given a path or a
+// URL from the sourceMappingURL. If sourceMappingURL is not absolute it is resolved relatively to the name
+// of the file being parsed. Any error returned by the loader will fail the parsing.
+// Note that setting this to nil does not disable source map support, there is a default loader which reads
+// from the filesystem. Use WithDisableSourceMaps to disable source map support.
+func WithSourceMapLoader(loader func(path string) ([]byte, error)) Option {
+	return func(opts *options) {
+		opts.sourceMapLoader = loader
+	}
+}
+
 type _parser struct {
 	str    string
 	length int
@@ -79,18 +105,23 @@ type _parser struct {
 	}
 
 	mode Mode
+	opts options
 
 	file *file.File
 }
 
-func _newParser(filename, src string, base int) *_parser {
-	return &_parser{
+func _newParser(filename, src string, base int, opts ...Option) *_parser {
+	p := &_parser{
 		chr:    ' ', // This is set so we can start scanning by skipping whitespace
 		str:    src,
 		length: len(src),
 		base:   base,
 		file:   file.NewFile(filename, src, base),
 	}
+	for _, opt := range opts {
+		opt(&p.opts)
+	}
+	return p
 }
 
 func newParser(filename, src string) *_parser {
@@ -133,7 +164,7 @@ func ReadSource(filename string, src interface{}) ([]byte, error) {
 //      // Parse some JavaScript, yielding a *ast.Program and/or an ErrorList
 //      program, err := parser.ParseFile(nil, "", `if (abc > 1) {}`, 0)
 //
-func ParseFile(fileSet *file.FileSet, filename string, src interface{}, mode Mode) (*ast.Program, error) {
+func ParseFile(fileSet *file.FileSet, filename string, src interface{}, mode Mode, options ...Option) (*ast.Program, error) {
 	str, err := ReadSource(filename, src)
 	if err != nil {
 		return nil, err
@@ -146,7 +177,7 @@ func ParseFile(fileSet *file.FileSet, filename string, src interface{}, mode Mod
 			base = fileSet.AddFile(filename, str)
 		}
 
-		parser := _newParser(filename, str, base)
+		parser := _newParser(filename, str, base, options...)
 		parser.mode = mode
 		return parser.parse()
 	}
@@ -157,11 +188,11 @@ func ParseFile(fileSet *file.FileSet, filename string, src interface{}, mode Mod
 //
 // The parameter list, if any, should be a comma-separated list of identifiers.
 //
-func ParseFunction(parameterList, body string) (*ast.FunctionLiteral, error) {
+func ParseFunction(parameterList, body string, options ...Option) (*ast.FunctionLiteral, error) {
 
 	src := "(function(" + parameterList + ") {\n" + body + "\n})"
 
-	parser := _newParser("", src, 1)
+	parser := _newParser("", src, 1, options...)
 	program, err := parser.parse()
 	if err != nil {
 		return nil, err
@@ -233,42 +264,6 @@ func (self *_parser) expect(value token.Token) file.Idx {
 	return idx
 }
 
-func lineCount(str string) (int, int) {
-	line, last := 0, -1
-	pair := false
-	for index, chr := range str {
-		switch chr {
-		case '\r':
-			line += 1
-			last = index
-			pair = true
-			continue
-		case '\n':
-			if !pair {
-				line += 1
-			}
-			last = index
-		case '\u2028', '\u2029':
-			line += 1
-			last = index + 2
-		}
-		pair = false
-	}
-	return line, last
-}
-
 func (self *_parser) position(idx file.Idx) file.Position {
-	position := file.Position{}
-	offset := int(idx) - self.base
-	str := self.str[:offset]
-	position.Filename = self.file.Name()
-	line, last := lineCount(str)
-	position.Line = 1 + line
-	if last >= 0 {
-		position.Column = offset - last
-	} else {
-		position.Column = 1 + len(str)
-	}
-
-	return position
+	return self.file.Position(int(idx) - self.base)
 }

@@ -235,15 +235,15 @@ func (r *Runtime) createMapProto(val *Object) objectImpl {
 
 	entriesFunc := r.newNativeFunc(r.mapProto_entries, nil, "entries", nil, 0)
 	o._putProp("entries", entriesFunc, true, false, true)
-	o._putSym(symIterator, valueProp(entriesFunc, true, false, true))
-	o._putSym(symToStringTag, valueProp(asciiString(classMap), false, false, true))
+	o._putSym(SymIterator, valueProp(entriesFunc, true, false, true))
+	o._putSym(SymToStringTag, valueProp(asciiString(classMap), false, false, true))
 
 	return o
 }
 
 func (r *Runtime) createMap(val *Object) objectImpl {
 	o := r.newNativeConstructOnly(val, r.builtin_newMap, r.global.MapPrototype, "Map", 0)
-	o._putSym(symSpecies, &valueProperty{
+	o._putSym(SymSpecies, &valueProperty{
 		getterFunc:   r.newNativeFunc(r.returnThis, nil, "get [Symbol.species]", nil, 0),
 		accessor:     true,
 		configurable: true,
@@ -256,7 +256,7 @@ func (r *Runtime) createMapIterProto(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.global.IteratorPrototype, classObject)
 
 	o._putProp("next", r.newNativeFunc(r.mapIterProto_next, nil, "next", nil, 0), true, false, true)
-	o._putSym(symToStringTag, valueProp(asciiString(classMapIterator), false, false, true))
+	o._putSym(SymToStringTag, valueProp(asciiString(classMapIterator), false, false, true))
 
 	return o
 }

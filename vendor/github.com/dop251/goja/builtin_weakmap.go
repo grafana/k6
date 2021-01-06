@@ -183,7 +183,7 @@ func (r *Runtime) createWeakMapProto(val *Object) objectImpl {
 	o._putProp("has", r.newNativeFunc(r.weakMapProto_has, nil, "has", nil, 1), true, false, true)
 	o._putProp("get", r.newNativeFunc(r.weakMapProto_get, nil, "get", nil, 1), true, false, true)
 
-	o._putSym(symToStringTag, valueProp(asciiString(classWeakMap), false, false, true))
+	o._putSym(SymToStringTag, valueProp(asciiString(classWeakMap), false, false, true))
 
 	return o
 }

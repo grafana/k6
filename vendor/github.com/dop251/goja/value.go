@@ -88,7 +88,12 @@ type valueNull struct{}
 type valueUndefined struct {
 	valueNull
 }
-type valueSymbol struct {
+
+// *Symbol is a Value containing ECMAScript Symbol primitive. Symbols must only be created
+// using NewSymbol(). Zero values and copying of values (i.e. *s1 = *s2) are not permitted.
+// Well-known Symbols can be accessed using Sym* package variables (SymIterator, etc...)
+// Symbols can be shared by multiple Runtimes.
+type Symbol struct {
 	h    uintptr
 	desc valueString
 }
@@ -736,6 +741,12 @@ func (o *Object) Get(name string) Value {
 	return o.self.getStr(unistring.NewFromString(name), nil)
 }
 
+// GetSymbol returns the value of a symbol property. Use one of the Sym* values for well-known
+// symbols (such as SymIterator, SymToStringTag, etc...).
+func (o *Object) GetSymbol(sym *Symbol) Value {
+	return o.self.getSym(sym, nil)
+}
+
 func (o *Object) Keys() (keys []string) {
 	names := o.self.ownKeys(false, nil)
 	keys = make([]string, 0, len(names))
@@ -744,6 +755,15 @@ func (o *Object) Keys() (keys []string) {
 	}
 
 	return
+}
+
+func (o *Object) Symbols() []*Symbol {
+	symbols := o.self.ownSymbols(false, nil)
+	ret := make([]*Symbol, len(symbols))
+	for i, sym := range symbols {
+		ret[i], _ = sym.(*Symbol)
+	}
+	return ret
 }
 
 // DefineDataProperty is a Go equivalent of Object.defineProperty(o, name, {value: value, writable: writable,
@@ -772,15 +792,53 @@ func (o *Object) DefineAccessorProperty(name string, getter, setter Value, confi
 	})
 }
 
+// DefineDataPropertySymbol is a Go equivalent of Object.defineProperty(o, name, {value: value, writable: writable,
+// configurable: configurable, enumerable: enumerable})
+func (o *Object) DefineDataPropertySymbol(name *Symbol, value Value, writable, configurable, enumerable Flag) error {
+	return tryFunc(func() {
+		o.self.defineOwnPropertySym(name, PropertyDescriptor{
+			Value:        value,
+			Writable:     writable,
+			Configurable: configurable,
+			Enumerable:   enumerable,
+		}, true)
+	})
+}
+
+// DefineAccessorPropertySymbol is a Go equivalent of Object.defineProperty(o, name, {get: getter, set: setter,
+// configurable: configurable, enumerable: enumerable})
+func (o *Object) DefineAccessorPropertySymbol(name *Symbol, getter, setter Value, configurable, enumerable Flag) error {
+	return tryFunc(func() {
+		o.self.defineOwnPropertySym(name, PropertyDescriptor{
+			Getter:       getter,
+			Setter:       setter,
+			Configurable: configurable,
+			Enumerable:   enumerable,
+		}, true)
+	})
+}
+
 func (o *Object) Set(name string, value interface{}) error {
 	return tryFunc(func() {
 		o.self.setOwnStr(unistring.NewFromString(name), o.runtime.ToValue(value), true)
 	})
 }
 
+func (o *Object) SetSymbol(name *Symbol, value interface{}) error {
+	return tryFunc(func() {
+		o.self.setOwnSym(name, o.runtime.ToValue(value), true)
+	})
+}
+
 func (o *Object) Delete(name string) error {
 	return tryFunc(func() {
 		o.self.deleteStr(unistring.NewFromString(name), true)
+	})
+}
+
+func (o *Object) DeleteSymbol(name *Symbol) error {
+	return tryFunc(func() {
+		o.self.deleteSym(name, true)
 	})
 }
 
@@ -890,70 +948,70 @@ func (o valueUnresolved) hash(*maphash.Hash) uint64 {
 	return 0
 }
 
-func (s *valueSymbol) ToInteger() int64 {
+func (s *Symbol) ToInteger() int64 {
 	panic(typeError("Cannot convert a Symbol value to a number"))
 }
 
-func (s *valueSymbol) toString() valueString {
+func (s *Symbol) toString() valueString {
 	panic(typeError("Cannot convert a Symbol value to a string"))
 }
 
-func (s *valueSymbol) ToString() Value {
+func (s *Symbol) ToString() Value {
 	return s
 }
 
-func (s *valueSymbol) String() string {
+func (s *Symbol) String() string {
 	return s.desc.String()
 }
 
-func (s *valueSymbol) string() unistring.String {
+func (s *Symbol) string() unistring.String {
 	return s.desc.string()
 }
 
-func (s *valueSymbol) ToFloat() float64 {
+func (s *Symbol) ToFloat() float64 {
 	panic(typeError("Cannot convert a Symbol value to a number"))
 }
 
-func (s *valueSymbol) ToNumber() Value {
+func (s *Symbol) ToNumber() Value {
 	panic(typeError("Cannot convert a Symbol value to a number"))
 }
 
-func (s *valueSymbol) ToBoolean() bool {
+func (s *Symbol) ToBoolean() bool {
 	return true
 }
 
-func (s *valueSymbol) ToObject(r *Runtime) *Object {
+func (s *Symbol) ToObject(r *Runtime) *Object {
 	return s.baseObject(r)
 }
 
-func (s *valueSymbol) SameAs(other Value) bool {
-	if s1, ok := other.(*valueSymbol); ok {
+func (s *Symbol) SameAs(other Value) bool {
+	if s1, ok := other.(*Symbol); ok {
 		return s == s1
 	}
 	return false
 }
 
-func (s *valueSymbol) Equals(o Value) bool {
+func (s *Symbol) Equals(o Value) bool {
 	return s.SameAs(o)
 }
 
-func (s *valueSymbol) StrictEquals(o Value) bool {
+func (s *Symbol) StrictEquals(o Value) bool {
 	return s.SameAs(o)
 }
 
-func (s *valueSymbol) Export() interface{} {
+func (s *Symbol) Export() interface{} {
 	return s.String()
 }
 
-func (s *valueSymbol) ExportType() reflect.Type {
+func (s *Symbol) ExportType() reflect.Type {
 	return reflectTypeString
 }
 
-func (s *valueSymbol) baseObject(r *Runtime) *Object {
+func (s *Symbol) baseObject(r *Runtime) *Object {
 	return r.newPrimitiveObject(s, r.global.SymbolPrototype, "Symbol")
 }
 
-func (s *valueSymbol) hash(*maphash.Hash) uint64 {
+func (s *Symbol) hash(*maphash.Hash) uint64 {
 	return uint64(s.h)
 }
 
@@ -964,9 +1022,9 @@ func exportValue(v Value, ctx *objectExportCtx) interface{} {
 	return v.Export()
 }
 
-func newSymbol(s valueString) *valueSymbol {
-	r := &valueSymbol{
-		desc: asciiString("Symbol(").concat(s).concat(asciiString(")")),
+func newSymbol(s valueString) *Symbol {
+	r := &Symbol{
+		desc: s,
 	}
 	// This may need to be reconsidered in the future.
 	// Depending on changes in Go's allocation policy and/or introduction of a compacting GC
@@ -974,6 +1032,17 @@ func newSymbol(s valueString) *valueSymbol {
 	// synchronised random generator/hasher/sequencer and I don't want to go down that route just yet.
 	r.h = uintptr(unsafe.Pointer(r))
 	return r
+}
+
+func NewSymbol(s string) *Symbol {
+	return newSymbol(newStringValue(s))
+}
+
+func (s *Symbol) descriptiveString() valueString {
+	if s.desc == nil {
+		return stringEmpty
+	}
+	return asciiString("Symbol(").concat(s.desc).concat(asciiString(")"))
 }
 
 func init() {

@@ -14,7 +14,7 @@ require (
 	github.com/andybalholm/cascadia v1.0.0 // indirect
 	github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb // indirect
 	github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91 // indirect
-	github.com/dop251/goja v0.0.0-20201107160812-7545ac6de48a
+	github.com/dop251/goja v0.0.0-20210106133455-27b0a7dc4c7f
 	github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4
 	github.com/eapache/go-resiliency v1.1.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20160609142408-bb955e01b934 // indirect
