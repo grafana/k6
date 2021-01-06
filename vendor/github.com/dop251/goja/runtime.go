@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/dop251/goja/file"
 	"go/ast"
 	"hash/maphash"
 	"math"
@@ -161,8 +162,9 @@ type Runtime struct {
 	rand            RandSource
 	now             Now
 	_collator       *collate.Collator
+	parserOptions   []parser.Option
 
-	symbolRegistry map[unistring.String]*valueSymbol
+	symbolRegistry map[unistring.String]*Symbol
 
 	typeInfoCache   map[reflect.Type]*reflectTypeInfo
 	fieldNameMapper FieldNameMapper
@@ -192,7 +194,7 @@ func (f *StackFrame) SrcName() string {
 	if f.prg == nil {
 		return "<native>"
 	}
-	return f.prg.src.name
+	return f.prg.src.Name()
 }
 
 func (f *StackFrame) FuncName() string {
@@ -205,12 +207,9 @@ func (f *StackFrame) FuncName() string {
 	return f.funcName.String()
 }
 
-func (f *StackFrame) Position() Position {
+func (f *StackFrame) Position() file.Position {
 	if f.prg == nil || f.prg.src == nil {
-		return Position{
-			0,
-			0,
-		}
+		return file.Position{}
 	}
 	return f.prg.src.Position(f.prg.sourceOffset(f.pc))
 }
@@ -221,13 +220,16 @@ func (f *StackFrame) Write(b *bytes.Buffer) {
 			b.WriteString(n.String())
 			b.WriteString(" (")
 		}
-		if n := f.prg.src.name; n != "" {
-			b.WriteString(n)
+		p := f.Position()
+		if p.Filename != "" {
+			b.WriteString(p.Filename)
 		} else {
 			b.WriteString("<eval>")
 		}
 		b.WriteByte(':')
-		b.WriteString(f.Position().String())
+		b.WriteString(strconv.Itoa(p.Line))
+		b.WriteByte(':')
+		b.WriteString(strconv.Itoa(p.Column))
 		b.WriteByte('(')
 		b.WriteString(strconv.Itoa(f.pc))
 		b.WriteByte(')')
@@ -332,7 +334,7 @@ func (r *Runtime) addToGlobal(name string, value Value) {
 func (r *Runtime) createIterProto(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.global.ObjectPrototype, classObject)
 
-	o._putSym(symIterator, valueProp(r.newNativeFunc(r.returnThis, nil, "[Symbol.iterator]", nil, 0), true, false, true))
+	o._putSym(SymIterator, valueProp(r.newNativeFunc(r.returnThis, nil, "[Symbol.iterator]", nil, 0), true, false, true))
 	return o
 }
 
@@ -452,6 +454,14 @@ func (r *Runtime) CreateObject(proto *Object) *Object {
 	return r.newBaseObject(proto, classObject).val
 }
 
+func (r *Runtime) NewArray(items ...interface{}) *Object {
+	values := make([]Value, len(items))
+	for i, item := range items {
+		values[i] = r.ToValue(item)
+	}
+	return r.newArrayValues(values)
+}
+
 func (r *Runtime) NewTypeError(args ...interface{}) *Object {
 	msg := ""
 	if len(args) > 0 {
@@ -520,11 +530,22 @@ func (r *Runtime) newNativeConstructor(call func(ConstructorCall) *Object, name 
 	}
 
 	f.f = func(c FunctionCall) Value {
-		return f.defaultConstruct(call, c.Arguments)
+		thisObj, _ := c.This.(*Object)
+		if thisObj != nil {
+			res := call(ConstructorCall{
+				This:      thisObj,
+				Arguments: c.Arguments,
+			})
+			if res == nil {
+				return _undefined
+			}
+			return res
+		}
+		return f.defaultConstruct(call, c.Arguments, nil)
 	}
 
-	f.construct = func(args []Value, proto *Object) *Object {
-		return f.defaultConstruct(call, args)
+	f.construct = func(args []Value, newTarget *Object) *Object {
+		return f.defaultConstruct(call, args, newTarget)
 	}
 
 	v.self = f
@@ -1092,8 +1113,17 @@ func MustCompile(name, src string, strict bool) *Program {
 	return prg
 }
 
-func compile(name, src string, strict, eval bool) (p *Program, err error) {
-	prg, err1 := parser.ParseFile(nil, name, src, 0)
+// Parse takes a source string and produces a parsed AST. Use this function if you want to pass options
+// to the parser, e.g.:
+//
+//  p, err := Parse("test.js", "var a = true", parser.WithDisableSourceMaps)
+//  if err != nil { /* ... */ }
+//  prg, err := CompileAST(p, true)
+//  // ...
+//
+// Otherwise use Compile which combines both steps.
+func Parse(name, src string, options ...parser.Option) (prg *js_ast.Program, err error) {
+	prg, err1 := parser.ParseFile(nil, name, src, 0, options...)
 	if err1 != nil {
 		switch err1 := err1.(type) {
 		case parser.ErrorList:
@@ -1112,12 +1142,17 @@ func compile(name, src string, strict, eval bool) (p *Program, err error) {
 				Message: err1.Error(),
 			},
 		}
+	}
+	return
+}
+
+func compile(name, src string, strict, eval bool, parserOptions ...parser.Option) (p *Program, err error) {
+	prg, err := Parse(name, src, parserOptions...)
+	if err != nil {
 		return
 	}
 
-	p, err = compileAST(prg, strict, eval)
-
-	return
+	return compileAST(prg, strict, eval)
 }
 
 func compileAST(prg *js_ast.Program, strict, eval bool) (p *Program, err error) {
@@ -1143,7 +1178,7 @@ func compileAST(prg *js_ast.Program, strict, eval bool) (p *Program, err error) 
 }
 
 func (r *Runtime) compile(name, src string, strict, eval bool) (p *Program, err error) {
-	p, err = compile(name, src, strict, eval)
+	p, err = compile(name, src, strict, eval, r.parserOptions...)
 	if err != nil {
 		switch x1 := err.(type) {
 		case *CompilerSyntaxError:
@@ -1166,7 +1201,7 @@ func (r *Runtime) RunString(str string) (Value, error) {
 
 // RunScript executes the given string in the global context.
 func (r *Runtime) RunScript(name, src string) (Value, error) {
-	p, err := Compile(name, src, false)
+	p, err := r.compile(name, src, false, false)
 
 	if err != nil {
 		return nil, err
@@ -1270,7 +1305,38 @@ Nil is converted to null.
 Functions
 
 func(FunctionCall) Value is treated as a native JavaScript function. This increases performance because there are no
-automatic argument and return value type conversions (which involves reflect).
+automatic argument and return value type conversions (which involves reflect). Attempting to use
+the function as a constructor will result in a TypeError.
+
+func(ConstructorCall) *Object is treated as a native constructor, allowing to use it with the new
+operator:
+
+ func MyObject(call goja.ConstructorCall) *goja.Object {
+    // call.This contains the newly created object as per http://www.ecma-international.org/ecma-262/5.1/index.html#sec-13.2.2
+    // call.Arguments contain arguments passed to the function
+
+    call.This.Set("method", method)
+
+    //...
+
+    // If return value is a non-nil *Object, it will be used instead of call.This
+    // This way it is possible to return a Go struct or a map converted
+    // into goja.Value using runtime.ToValue(), however in this case
+    // instanceof will not work as expected.
+    return nil
+ }
+
+ runtime.Set("MyObject", MyObject)
+
+Then it can be used in JS as follows:
+
+ var o = new MyObject(arg);
+ var o1 = MyObject(arg); // same thing
+ o instanceof MyObject && o1 instanceof MyObject; // true
+
+When a native constructor is called directly (without the new operator) its behavior depends on
+this value: if it's an Object, it is passed through, otherwise a new one is created exactly as
+if it was called with the new operator. In either case call.NewTarget will be nil.
 
 Any other Go function is wrapped so that the arguments are automatically converted into the required Go types and the
 return value is converted to a JavaScript value (using this method).  If conversion is not possible, a TypeError is
@@ -1934,6 +2000,11 @@ func (r *Runtime) SetTimeSource(now Now) {
 	r.now = now
 }
 
+// SetParserOptions sets parser options to be used by RunString, RunScript and eval() within the code.
+func (r *Runtime) SetParserOptions(opts ...parser.Option) {
+	r.parserOptions = opts
+}
+
 // New is an equivalent of the 'new' operator allowing to call it directly from Go.
 func (r *Runtime) New(construct Value, args ...Value) (o *Object, err error) {
 	err = tryFunc(func() {
@@ -2082,7 +2153,7 @@ func (r *Runtime) toNumber(v Value) Value {
 func (r *Runtime) speciesConstructor(o, defaultConstructor *Object) func(args []Value, newTarget *Object) *Object {
 	c := o.self.getStr("constructor", nil)
 	if c != nil && c != _undefined {
-		c = r.toObject(c).self.getSym(symSpecies, nil)
+		c = r.toObject(c).self.getSym(SymSpecies, nil)
 	}
 	if c == nil || c == _undefined || c == _null {
 		c = defaultConstructor
@@ -2093,7 +2164,7 @@ func (r *Runtime) speciesConstructor(o, defaultConstructor *Object) func(args []
 func (r *Runtime) speciesConstructorObj(o, defaultConstructor *Object) *Object {
 	c := o.self.getStr("constructor", nil)
 	if c != nil && c != _undefined {
-		c = r.toObject(c).self.getSym(symSpecies, nil)
+		c = r.toObject(c).self.getSym(SymSpecies, nil)
 	}
 	if c == nil || c == _undefined || c == _null {
 		return defaultConstructor
@@ -2130,7 +2201,7 @@ func (r *Runtime) getV(v Value, p Value) Value {
 
 func (r *Runtime) getIterator(obj Value, method func(FunctionCall) Value) *Object {
 	if method == nil {
-		method = toMethod(r.getV(obj, symIterator))
+		method = toMethod(r.getV(obj, SymIterator))
 		if method == nil {
 			panic(r.NewTypeError("object is not iterable"))
 		}
@@ -2268,7 +2339,7 @@ func isArray(object *Object) bool {
 
 func isRegexp(v Value) bool {
 	if o, ok := v.(*Object); ok {
-		matcher := o.self.getSym(symMatch, nil)
+		matcher := o.self.getSym(SymMatch, nil)
 		if matcher != nil && matcher != _undefined {
 			return matcher.ToBoolean()
 		}

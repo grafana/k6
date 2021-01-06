@@ -282,7 +282,7 @@ func (r *Runtime) createMath(val *Object) objectImpl {
 	m._putProp("PI", valueFloat(math.Pi), false, false, false)
 	m._putProp("SQRT1_2", valueFloat(sqrt1_2), false, false, false)
 	m._putProp("SQRT2", valueFloat(math.Sqrt2), false, false, false)
-	m._putSym(symToStringTag, valueProp(asciiString(classMath), false, false, true))
+	m._putSym(SymToStringTag, valueProp(asciiString(classMath), false, false, true))
 
 	m._putProp("abs", r.newNativeFunc(r.math_abs, nil, "abs", nil, 1), true, false, true)
 	m._putProp("acos", r.newNativeFunc(r.math_acos, nil, "acos", nil, 1), true, false, true)

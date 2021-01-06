@@ -27,6 +27,7 @@ import (
 
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/dop251/goja"
+	"github.com/dop251/goja/parser"
 )
 
 //nolint:gochecknoglobals
@@ -37,11 +38,17 @@ var (
 
 func GetCoreJS() *goja.Program {
 	once.Do(func() {
-		coreJs = goja.MustCompile(
+		program, err := goja.Parse(
 			"core-js/shim.min.js",
 			rice.MustFindBox("core-js").MustString("shim.min.js"),
-			true,
-		)
+			parser.WithDisableSourceMaps)
+		if err != nil {
+			panic(err)
+		}
+		coreJs, err = goja.CompileAST(program, false)
+		if err != nil {
+			panic(err)
+		}
 	})
 
 	return coreJs

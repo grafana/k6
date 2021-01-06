@@ -73,7 +73,7 @@ func (r *Runtime) proxyproto_nativehandler_getOwnPropertyDescriptor(native func(
 			if len(call.Arguments) >= 2 {
 				if t, ok := call.Argument(0).(*Object); ok {
 					switch p := call.Argument(1).(type) {
-					case *valueSymbol:
+					case *Symbol:
 						return _undefined
 					default:
 						desc := native(t, p.String())
@@ -109,7 +109,7 @@ func (r *Runtime) proxyproto_nativehandler_gen_obj_string_bool(name proxyTrap, n
 			if len(call.Arguments) >= 2 {
 				if t, ok := call.Argument(0).(*Object); ok {
 					switch p := call.Argument(1).(type) {
-					case *valueSymbol:
+					case *Symbol:
 						return valueFalse
 					default:
 						o := native(t, p.String())
@@ -129,7 +129,7 @@ func (r *Runtime) proxyproto_nativehandler_get(native func(*Object, string, *Obj
 				if t, ok := call.Argument(0).(*Object); ok {
 					if r, ok := call.Argument(2).(*Object); ok {
 						switch p := call.Argument(1).(type) {
-						case *valueSymbol:
+						case *Symbol:
 							return _undefined
 						default:
 							return native(t, p.String(), r)

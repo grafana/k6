@@ -26,8 +26,8 @@ func toString(arg Value) valueString {
 	if s, ok := arg.(valueString); ok {
 		return s
 	}
-	if s, ok := arg.(*valueSymbol); ok {
-		return s.desc
+	if s, ok := arg.(*Symbol); ok {
+		return s.descriptiveString()
 	}
 	return arg.toString()
 }
@@ -344,7 +344,7 @@ func (r *Runtime) stringproto_match(call FunctionCall) Value {
 	r.checkObjectCoercible(call.This)
 	regexp := call.Argument(0)
 	if regexp != _undefined && regexp != _null {
-		if matcher := toMethod(r.getV(regexp, symMatch)); matcher != nil {
+		if matcher := toMethod(r.getV(regexp, SymMatch)); matcher != nil {
 			return matcher(FunctionCall{
 				This:      regexp,
 				Arguments: []Value{call.This},
@@ -361,7 +361,7 @@ func (r *Runtime) stringproto_match(call FunctionCall) Value {
 		rx = r.newRegExp(regexp, nil, r.global.RegExpPrototype).self.(*regexpObject)
 	}
 
-	if matcher, ok := r.toObject(rx.getSym(symMatch, nil)).self.assertCallable(); ok {
+	if matcher, ok := r.toObject(rx.getSym(SymMatch, nil)).self.assertCallable(); ok {
 		return matcher(FunctionCall{
 			This:      rx.val,
 			Arguments: []Value{call.This.toString()},
@@ -624,7 +624,7 @@ func (r *Runtime) stringproto_replace(call FunctionCall) Value {
 	searchValue := call.Argument(0)
 	replaceValue := call.Argument(1)
 	if searchValue != _undefined && searchValue != _null {
-		if replacer := toMethod(r.getV(searchValue, symReplace)); replacer != nil {
+		if replacer := toMethod(r.getV(searchValue, SymReplace)); replacer != nil {
 			return replacer(FunctionCall{
 				This:      searchValue,
 				Arguments: []Value{call.This, replaceValue},
@@ -648,7 +648,7 @@ func (r *Runtime) stringproto_search(call FunctionCall) Value {
 	r.checkObjectCoercible(call.This)
 	regexp := call.Argument(0)
 	if regexp != _undefined && regexp != _null {
-		if searcher := toMethod(r.getV(regexp, symSearch)); searcher != nil {
+		if searcher := toMethod(r.getV(regexp, SymSearch)); searcher != nil {
 			return searcher(FunctionCall{
 				This:      regexp,
 				Arguments: []Value{call.This},
@@ -665,7 +665,7 @@ func (r *Runtime) stringproto_search(call FunctionCall) Value {
 		rx = r.newRegExp(regexp, nil, r.global.RegExpPrototype).self.(*regexpObject)
 	}
 
-	if searcher, ok := r.toObject(rx.getSym(symSearch, nil)).self.assertCallable(); ok {
+	if searcher, ok := r.toObject(rx.getSym(SymSearch, nil)).self.assertCallable(); ok {
 		return searcher(FunctionCall{
 			This:      rx.val,
 			Arguments: []Value{call.This.toString()},
@@ -721,7 +721,7 @@ func (r *Runtime) stringproto_split(call FunctionCall) Value {
 	separatorValue := call.Argument(0)
 	limitValue := call.Argument(1)
 	if separatorValue != _undefined && separatorValue != _null {
-		if splitter := toMethod(r.getV(separatorValue, symSplit)); splitter != nil {
+		if splitter := toMethod(r.getV(separatorValue, SymSplit)); splitter != nil {
 			return splitter(FunctionCall{
 				This:      separatorValue,
 				Arguments: []Value{call.This, limitValue},
@@ -902,7 +902,7 @@ func (r *Runtime) createStringIterProto(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.global.IteratorPrototype, classObject)
 
 	o._putProp("next", r.newNativeFunc(r.stringIterProto_next, nil, "next", nil, 0), true, false, true)
-	o._putSym(symToStringTag, valueProp(asciiString(classStringIterator), false, false, true))
+	o._putSym(SymToStringTag, valueProp(asciiString(classStringIterator), false, false, true))
 
 	return o
 }
@@ -942,7 +942,7 @@ func (r *Runtime) initString() {
 	o._putProp("trimStart", r.newNativeFunc(r.stringproto_trimStart, nil, "trimStart", nil, 0), true, false, true)
 	o._putProp("valueOf", r.newNativeFunc(r.stringproto_valueOf, nil, "valueOf", nil, 0), true, false, true)
 
-	o._putSym(symIterator, valueProp(r.newNativeFunc(r.stringproto_iterator, nil, "[Symbol.iterator]", nil, 0), true, false, true))
+	o._putSym(SymIterator, valueProp(r.newNativeFunc(r.stringproto_iterator, nil, "[Symbol.iterator]", nil, 0), true, false, true))
 
 	// Annex B
 	o._putProp("substr", r.newNativeFunc(r.stringproto_substr, nil, "substr", nil, 2), true, false, true)

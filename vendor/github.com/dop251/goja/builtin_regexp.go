@@ -1144,15 +1144,15 @@ func (r *Runtime) initRegExp() {
 		accessor:     true,
 	}, false)
 
-	o._putSym(symMatch, valueProp(r.newNativeFunc(r.regexpproto_stdMatcher, nil, "[Symbol.match]", nil, 1), true, false, true))
-	o._putSym(symSearch, valueProp(r.newNativeFunc(r.regexpproto_stdSearch, nil, "[Symbol.search]", nil, 1), true, false, true))
-	o._putSym(symSplit, valueProp(r.newNativeFunc(r.regexpproto_stdSplitter, nil, "[Symbol.split]", nil, 2), true, false, true))
-	o._putSym(symReplace, valueProp(r.newNativeFunc(r.regexpproto_stdReplacer, nil, "[Symbol.replace]", nil, 2), true, false, true))
+	o._putSym(SymMatch, valueProp(r.newNativeFunc(r.regexpproto_stdMatcher, nil, "[Symbol.match]", nil, 1), true, false, true))
+	o._putSym(SymSearch, valueProp(r.newNativeFunc(r.regexpproto_stdSearch, nil, "[Symbol.search]", nil, 1), true, false, true))
+	o._putSym(SymSplit, valueProp(r.newNativeFunc(r.regexpproto_stdSplitter, nil, "[Symbol.split]", nil, 2), true, false, true))
+	o._putSym(SymReplace, valueProp(r.newNativeFunc(r.regexpproto_stdReplacer, nil, "[Symbol.replace]", nil, 2), true, false, true))
 	o.guard("exec", "global", "multiline", "ignoreCase", "unicode", "sticky")
 
 	r.global.RegExp = r.newNativeFunc(r.builtin_RegExp, r.builtin_newRegExp, "RegExp", r.global.RegExpPrototype, 2)
 	rx := r.global.RegExp.self
-	rx._putSym(symSpecies, &valueProperty{
+	rx._putSym(SymSpecies, &valueProperty{
 		getterFunc:   r.newNativeFunc(r.returnThis, nil, "get [Symbol.species]", nil, 0),
 		accessor:     true,
 		configurable: true,

@@ -139,7 +139,7 @@ func (r *Runtime) createWeakSetProto(val *Object) objectImpl {
 	o._putProp("delete", r.newNativeFunc(r.weakSetProto_delete, nil, "delete", nil, 1), true, false, true)
 	o._putProp("has", r.newNativeFunc(r.weakSetProto_has, nil, "has", nil, 1), true, false, true)
 
-	o._putSym(symToStringTag, valueProp(asciiString(classWeakSet), false, false, true))
+	o._putSym(SymToStringTag, valueProp(asciiString(classWeakSet), false, false, true))
 
 	return o
 }

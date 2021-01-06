@@ -17,6 +17,7 @@ type regexp2MatchCache struct {
 	posMap []int
 }
 
+// Not goroutine-safe. Use regexp2Wrapper.clone()
 type regexp2Wrapper struct {
 	rx    *regexp2.Regexp
 	cache *regexp2MatchCache
@@ -56,6 +57,7 @@ func (rd *arrayRuneReader) ReadRune() (r rune, size int, err error) {
 	return
 }
 
+// Not goroutine-safe. Use regexpPattern.clone()
 type regexpPattern struct {
 	src string
 
@@ -163,6 +165,25 @@ func (p *regexpPattern) findAllSubmatchIndex(s valueString, start int, limit int
 
 	p.createRegexp2()
 	return p.regexp2Wrapper.findAllSubmatchIndex(s, start, limit, sticky, p.unicode)
+}
+
+// clone creates a copy of the regexpPattern which can be used concurrently.
+func (p *regexpPattern) clone() *regexpPattern {
+	ret := &regexpPattern{
+		src:        p.src,
+		global:     p.global,
+		ignoreCase: p.ignoreCase,
+		multiline:  p.multiline,
+		sticky:     p.sticky,
+		unicode:    p.unicode,
+	}
+	if p.regexpWrapper != nil {
+		ret.regexpWrapper = p.regexpWrapper.clone()
+	}
+	if p.regexp2Wrapper != nil {
+		ret.regexp2Wrapper = p.regexp2Wrapper.clone()
+	}
+	return ret
 }
 
 type regexpObject struct {
@@ -428,6 +449,12 @@ func (r *regexp2Wrapper) findAllSubmatchIndex(s valueString, start, limit int, s
 	}
 }
 
+func (r *regexp2Wrapper) clone() *regexp2Wrapper {
+	return &regexp2Wrapper{
+		rx: r.rx,
+	}
+}
+
 func (r *regexpWrapper) findAllSubmatchIndex(s string, limit int, sticky bool) (results [][]int) {
 	wrapped := (*regexp.Regexp)(r)
 	results = wrapped.FindAllStringSubmatchIndex(s, limit)
@@ -474,6 +501,10 @@ func (r *regexpWrapper) findSubmatchIndexUnicode(s unicodeString, fullUnicode bo
 		return res
 	}
 	return wrapped.FindReaderSubmatchIndex(s.utf16Reader(0))
+}
+
+func (r *regexpWrapper) clone() *regexpWrapper {
+	return r
 }
 
 func (r *regexpObject) execResultToArray(target valueString, result []int) Value {

@@ -248,7 +248,7 @@ func (p *proxyObject) defineOwnPropertyIdx(idx valueInt, descr PropertyDescripto
 	return p.target.self.defineOwnPropertyIdx(idx, descr, throw)
 }
 
-func (p *proxyObject) defineOwnPropertySym(s *valueSymbol, descr PropertyDescriptor, throw bool) bool {
+func (p *proxyObject) defineOwnPropertySym(s *Symbol, descr PropertyDescriptor, throw bool) bool {
 	if v, ok := p.proxyDefineOwnProperty(s, descr, throw); ok {
 		return v
 	}
@@ -291,7 +291,7 @@ func (p *proxyObject) hasPropertyIdx(idx valueInt) bool {
 	return p.target.self.hasPropertyIdx(idx)
 }
 
-func (p *proxyObject) hasPropertySym(s *valueSymbol) bool {
+func (p *proxyObject) hasPropertySym(s *Symbol) bool {
 	if b, ok := p.proxyHas(s); ok {
 		return b
 	}
@@ -307,7 +307,7 @@ func (p *proxyObject) hasOwnPropertyIdx(idx valueInt) bool {
 	return p.getOwnPropIdx(idx) != nil
 }
 
-func (p *proxyObject) hasOwnPropertySym(s *valueSymbol) bool {
+func (p *proxyObject) hasOwnPropertySym(s *Symbol) bool {
 	return p.getOwnPropSym(s) != nil
 }
 
@@ -381,7 +381,7 @@ func (p *proxyObject) getOwnPropIdx(idx valueInt) Value {
 	return p.target.self.getOwnPropIdx(idx)
 }
 
-func (p *proxyObject) getOwnPropSym(s *valueSymbol) Value {
+func (p *proxyObject) getOwnPropSym(s *Symbol) Value {
 	if v, ok := p.proxyGetOwnPropertyDescriptor(s); ok {
 		return v
 	}
@@ -403,7 +403,7 @@ func (p *proxyObject) getIdx(idx valueInt, receiver Value) Value {
 	return p.target.self.getIdx(idx, receiver)
 }
 
-func (p *proxyObject) getSym(s *valueSymbol, receiver Value) Value {
+func (p *proxyObject) getSym(s *Symbol, receiver Value) Value {
 	if v, ok := p.proxyGet(s, receiver); ok {
 		return v
 	}
@@ -472,7 +472,7 @@ func (p *proxyObject) setOwnIdx(idx valueInt, v Value, throw bool) bool {
 	return p.target.setIdx(idx, v, p.val, throw)
 }
 
-func (p *proxyObject) setOwnSym(s *valueSymbol, v Value, throw bool) bool {
+func (p *proxyObject) setOwnSym(s *Symbol, v Value, throw bool) bool {
 	if res, ok := p.proxySet(s, v, p.val, throw); ok {
 		return res
 	}
@@ -493,7 +493,7 @@ func (p *proxyObject) setForeignIdx(idx valueInt, v, receiver Value, throw bool)
 	return p.target.setIdx(idx, v, receiver, throw), true
 }
 
-func (p *proxyObject) setForeignSym(s *valueSymbol, v, receiver Value, throw bool) (bool, bool) {
+func (p *proxyObject) setForeignSym(s *Symbol, v, receiver Value, throw bool) (bool, bool) {
 	if res, ok := p.proxySet(s, v, receiver, throw); ok {
 		return res, true
 	}
@@ -532,7 +532,7 @@ func (p *proxyObject) deleteIdx(idx valueInt, throw bool) bool {
 	return p.target.self.deleteIdx(idx, throw)
 }
 
-func (p *proxyObject) deleteSym(s *valueSymbol, throw bool) bool {
+func (p *proxyObject) deleteSym(s *Symbol, throw bool) bool {
 	if ret, ok := p.proxyDelete(s); ok {
 		return ret
 	}
@@ -557,7 +557,7 @@ func (p *proxyObject) proxyOwnKeys() ([]Value, bool) {
 		for k := int64(0); k < l; k++ {
 			item := keys.self.getIdx(valueInt(k), nil)
 			if _, ok := item.(valueString); !ok {
-				if _, ok := item.(*valueSymbol); !ok {
+				if _, ok := item.(*Symbol); !ok {
 					panic(p.val.runtime.NewTypeError("%s is not a valid property name", item.String()))
 				}
 			}
@@ -719,13 +719,13 @@ func (p *proxyObject) filterKeys(vals []Value, all, symbols bool) []Value {
 		for i, val := range vals {
 			var prop Value
 			if symbols {
-				if s, ok := val.(*valueSymbol); ok {
+				if s, ok := val.(*Symbol); ok {
 					prop = p.getOwnPropSym(s)
 				} else {
 					continue
 				}
 			} else {
-				if _, ok := val.(*valueSymbol); !ok {
+				if _, ok := val.(*Symbol); !ok {
 					prop = p.getOwnPropStr(val.string())
 				} else {
 					continue
@@ -746,7 +746,7 @@ func (p *proxyObject) filterKeys(vals []Value, all, symbols bool) []Value {
 	} else {
 		k := 0
 		for i, val := range vals {
-			if _, ok := val.(*valueSymbol); ok != symbols {
+			if _, ok := val.(*Symbol); ok != symbols {
 				continue
 			}
 			if k != i {
