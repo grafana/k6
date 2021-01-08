@@ -33,11 +33,7 @@ import (
 type data struct{}
 
 func init() {
-	modules.Register("k6/data", new())
-}
-
-func new() *data {
-	return &data{}
+	modules.Register("k6/data", new(data))
 }
 
 const sharedArrayNamePrefix = "k6/data/SharedArray."
