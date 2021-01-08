@@ -58,6 +58,15 @@ try {
 }
 
 try {
+	var p = new SharedArray("", generateArray);
+	throw "the previous line should've errored as we provided an empty name";
+} catch (e){
+	if (!e.toString().includes("empty name provided to SharedArray's constructor")) {
+		throw "wrong error " + e.toString();
+	}
+}
+
+try {
 	var p = new SharedArray("wat2", function() {return [{s: function() {return "whatever"}}]});
 	// throw "the previous line should've errored as function was stringified";
 	// unfortunately JSON.stringify is defined that it will acctually just remove stuff (or make them null)

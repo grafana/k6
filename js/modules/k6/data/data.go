@@ -49,6 +49,9 @@ func (d *data) XSharedArray(ctx context.Context, name string, call goja.Callable
 	if initEnv == nil {
 		return nil, errors.New("missing init environment")
 	}
+	if len(name) == 0 {
+		return nil, errors.New("empty name provided to SharedArray's constructor")
+	}
 
 	name = sharedArrayNamePrefix + name
 	value := initEnv.SharedObjects.GetOrCreateShare(name, func() interface{} {
