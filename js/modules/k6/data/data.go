@@ -76,6 +76,8 @@ func getShareArrayFromCall(rt *goja.Runtime, call goja.Callable) sharedArray {
 	}
 	arr := make([]string, obj.Get("length").ToInteger())
 
+	// We specifically use JSON.stringify here as we need to use JSON.parse on the way out
+	// it also has the benefit of needing only one loop and being more JS then using golang's json
 	cal, err := rt.RunString(`(function(input, output) {
 		for (var i = 0; i < input.length; i++) {
 			output[i] = JSON.stringify(input[i])

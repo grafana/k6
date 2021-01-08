@@ -52,6 +52,9 @@ func (s sharedArray) Get(index int) (interface{}, error) {
 		return goja.Undefined(), nil
 	}
 
+	// we specifically use JSON.parse to get the json to an object inside as otherwise we won't be
+	// able to freeze it as goja doesn't let us unless it is a pure goja object and this is the
+	// easiest way to get one.
 	return s.arr[index], nil
 }
 
