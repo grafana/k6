@@ -54,6 +54,10 @@ type RuntimeOptions struct {
 
 	// Environment variables passed onto the runner
 	Env map[string]string `json:"env"`
+
+	NoThresholds  null.Bool   `json:"noThresholds"`
+	NoSummary     null.Bool   `json:"noSummary"`
+	SummaryExport null.String `json:"summaryExport"`
 }
 
 // ValidateCompatibilityMode checks if the provided val is a valid compatibility mode

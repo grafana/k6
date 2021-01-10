@@ -76,7 +76,7 @@ func newTestEngine( //nolint:golint
 	execScheduler, err := local.NewExecutionScheduler(runner, logger)
 	require.NoError(t, err)
 
-	engine, err = NewEngine(execScheduler, opts, logger)
+	engine, err = NewEngine(execScheduler, opts, lib.RuntimeOptions{}, logger)
 	require.NoError(t, err)
 
 	engine.Collectors = collectors

@@ -51,7 +51,7 @@ func TestGetGroups(t *testing.T) {
 
 	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Group: g0}, logger)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, logger)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, logger)
 	require.NoError(t, err)
 
 	t.Run("list", func(t *testing.T) {
