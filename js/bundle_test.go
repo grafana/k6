@@ -774,8 +774,8 @@ func TestBundleEnv(t *testing.T) {
 	for name, b := range bundles {
 		b := b
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, "1", b.Env["TEST_A"])
-			assert.Equal(t, "", b.Env["TEST_B"])
+			assert.Equal(t, "1", b.RuntimeOptions.Env["TEST_A"])
+			assert.Equal(t, "", b.RuntimeOptions.Env["TEST_B"])
 
 			bi, err := b.Instantiate(logger, 0)
 			if assert.NoError(t, err) {
