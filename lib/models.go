@@ -109,8 +109,11 @@ type Group struct {
 	ID string `json:"id"`
 
 	// Groups and checks that are children of this group.
-	Groups map[string]*Group `json:"groups"`
-	Checks map[string]*Check `json:"checks"`
+	Groups        map[string]*Group `json:"groups"`
+	OrderedGroups []*Group          `json:"-"`
+
+	Checks        map[string]*Check `json:"checks"`
+	OrderedChecks []*Check          `json:"-"`
 
 	groupMutex sync.Mutex
 	checkMutex sync.Mutex
@@ -155,6 +158,7 @@ func (g *Group) Group(name string) (*Group, error) {
 			return nil, err
 		}
 		g.Groups[name] = group
+		g.OrderedGroups = append(g.OrderedGroups, group)
 		return group, nil
 	}
 	return group, nil
@@ -172,6 +176,7 @@ func (g *Group) Check(name string) (*Check, error) {
 			return nil, err
 		}
 		g.Checks[name] = check
+		g.OrderedChecks = append(g.OrderedChecks, check)
 		return check, nil
 	}
 	return check, nil
