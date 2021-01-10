@@ -2,7 +2,7 @@ import grpc from 'k6/net/grpc';
 import { check } from "k6";
 
 let client = new grpc.Client();
-client.load([], "samples/grpc_server/route_guide.proto")
+client.load([], "./grpc_server/route_guide.proto")
 
 
 export default () => {
