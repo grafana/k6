@@ -35,14 +35,14 @@ import (
 )
 
 const (
-	counterString = `"counter"`
-	gaugeString   = `"gauge"`
-	trendString   = `"trend"`
-	rateString    = `"rate"`
+	counterString = "counter"
+	gaugeString   = "gauge"
+	trendString   = "trend"
+	rateString    = "rate"
 
-	defaultString = `"default"`
-	timeString    = `"time"`
-	dataString    = `"data"`
+	defaultString = "default"
+	timeString    = "time"
+	dataString    = "data"
 )
 
 // Possible values for MetricType.
@@ -71,6 +71,15 @@ type MetricType int
 
 // MarshalJSON serializes a MetricType as a human readable string.
 func (t MetricType) MarshalJSON() ([]byte, error) {
+	txt, err := t.MarshalText()
+	if err != nil {
+		return nil, err
+	}
+	return []byte(`"` + string(txt) + `"`), nil
+}
+
+// MarshalText serializes a MetricType as a human readable string.
+func (t MetricType) MarshalText() ([]byte, error) {
 	switch t {
 	case Counter:
 		return []byte(counterString), nil
@@ -85,8 +94,8 @@ func (t MetricType) MarshalJSON() ([]byte, error) {
 	}
 }
 
-// UnmarshalJSON deserializes a MetricType from a string representation.
-func (t *MetricType) UnmarshalJSON(data []byte) error {
+// UnmarshalText deserializes a MetricType from a string representation.
+func (t *MetricType) UnmarshalText(data []byte) error {
 	switch string(data) {
 	case counterString:
 		*t = Counter
@@ -121,8 +130,17 @@ func (t MetricType) String() string {
 // The type of values a metric contains.
 type ValueType int
 
-// MarshalJSON serializes a ValueType as a human readable string.
+// MarshalJSON serializes a ValueType to a JSON string.
 func (t ValueType) MarshalJSON() ([]byte, error) {
+	txt, err := t.MarshalText()
+	if err != nil {
+		return nil, err
+	}
+	return []byte(`"` + string(txt) + `"`), nil
+}
+
+// MarshalText serializes a ValueType as a human readable string.
+func (t ValueType) MarshalText() ([]byte, error) {
 	switch t {
 	case Default:
 		return []byte(defaultString), nil
@@ -135,8 +153,8 @@ func (t ValueType) MarshalJSON() ([]byte, error) {
 	}
 }
 
-// UnmarshalJSON deserializes a ValueType from a string representation.
-func (t *ValueType) UnmarshalJSON(data []byte) error {
+// UnmarshalText deserializes a ValueType from a string representation.
+func (t *ValueType) UnmarshalText(data []byte) error {
 	switch string(data) {
 	case defaultString:
 		*t = Default
