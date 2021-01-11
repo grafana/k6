@@ -22,6 +22,8 @@ package lib
 
 import (
 	"context"
+	"io"
+	"time"
 
 	"github.com/loadimpact/k6/stats"
 )
@@ -97,4 +99,13 @@ type Runner interface {
 	// Returns whether the given name is an exported and executable
 	// function in the script.
 	IsExecutable(string) bool
+
+	HandleSummary(context.Context, *Summary) (map[string]io.Reader, error)
+}
+
+// Summary contains all of the data the summary handler gets.
+type Summary struct {
+	Metrics         map[string]*stats.Metric
+	RootGroup       *Group
+	TestRunDuration time.Duration // TODO: use lib.ExecutionState-based interface instead?
 }

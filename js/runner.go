@@ -26,6 +26,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -244,10 +245,7 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 }
 
 func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) error {
-	setupCtx, setupCancel := context.WithTimeout(
-		ctx,
-		time.Duration(r.Bundle.Options.SetupTimeout.Duration),
-	)
+	setupCtx, setupCancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.SetupFn))
 	defer setupCancel()
 
 	v, err := r.runPart(setupCtx, out, consts.SetupFn, nil)
@@ -279,10 +277,7 @@ func (r *Runner) SetSetupData(data []byte) {
 }
 
 func (r *Runner) Teardown(ctx context.Context, out chan<- stats.SampleContainer) error {
-	teardownCtx, teardownCancel := context.WithTimeout(
-		ctx,
-		time.Duration(r.Bundle.Options.TeardownTimeout.Duration),
-	)
+	teardownCtx, teardownCancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.TeardownFn))
 	defer teardownCancel()
 
 	var data interface{}
@@ -310,6 +305,77 @@ func (r *Runner) GetOptions() lib.Options {
 func (r *Runner) IsExecutable(name string) bool {
 	_, exists := r.Bundle.exports[name]
 	return exists
+}
+
+// HandleSummary calls the specified summary callback, if supplied.
+func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[string]io.Reader, error) {
+	summaryDataForJS := summarizeMetricsToObject(summary, r.Bundle.Options)
+
+	out := make(chan stats.SampleContainer, 100)
+	defer close(out)
+
+	go func() { // discard all metrics
+		for range out {
+		}
+	}()
+
+	vu, err := r.newVU(0, out)
+	if err != nil {
+		return nil, err
+	}
+
+	handleSummaryFn := goja.Undefined()
+	if exported := vu.Runtime.Get("exports").ToObject(vu.Runtime); exported != nil {
+		fn := exported.Get(consts.HandleSummaryFn)
+		if _, ok := goja.AssertFunction(fn); ok {
+			handleSummaryFn = fn
+		} else if fn != nil && !goja.IsUndefined(fn) && !goja.IsNull(fn) {
+			return nil, fmt.Errorf("exported identfier %s must be a function", consts.HandleSummaryFn)
+		}
+	}
+	ctx = common.WithRuntime(ctx, vu.Runtime)
+	ctx = lib.WithState(ctx, vu.state)
+	ctx, cancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.HandleSummaryFn))
+	defer cancel()
+	go func() {
+		<-ctx.Done()
+		vu.Runtime.Interrupt(context.Canceled)
+	}()
+	*vu.Context = ctx
+
+	handleSummaryWrapperRaw, err := vu.Runtime.RunString(summaryWrapperLambdaCode)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error while getting the summary wrapper: %w", err)
+	}
+	handleSummaryWrapper, ok := goja.AssertFunction(handleSummaryWrapperRaw)
+	if !ok {
+		return nil, fmt.Errorf("unexpected error did not get a callable summary wrapper")
+	}
+
+	wrapperArgs := []goja.Value{
+		handleSummaryFn,
+		vu.Runtime.ToValue(r.Bundle.RuntimeOptions.SummaryExport.String),
+		vu.Runtime.ToValue(summaryDataForJS),
+		vu.Runtime.ToValue(getOldTextSummaryFunc(summary, r.Bundle.Options)), // TODO: remove
+	}
+	rawResult, _, _, err := vu.runFn(ctx, false, handleSummaryWrapper, wrapperArgs...)
+
+	// TODO: refactor the whole JS runner to avoid copy-pasting these complicated bits...
+	// deadline is reached so we have timeouted but this might've not been registered correctly
+	if deadline, ok := ctx.Deadline(); ok && time.Now().After(deadline) {
+		// we could have an error that is not context.Canceled in which case we should return it instead
+		if err, ok := err.(*goja.InterruptedError); ok && rawResult != nil && err.Value() != context.Canceled {
+			// TODO: silence this error?
+			return nil, err
+		}
+		// otherwise we have timeouted
+		return nil, lib.NewTimeoutError(consts.HandleSummaryFn, r.getTimeoutFor(consts.HandleSummaryFn))
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error while generating the summary: %w", err)
+	}
+	return getSummaryResult(rawResult)
 }
 
 func (r *Runner) SetOptions(opts lib.Options) error {
@@ -434,19 +500,21 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 			return v, err
 		}
 		// otherwise we have timeouted
-		return v, lib.NewTimeoutError(name, r.timeoutErrorDuration(name))
+		return v, lib.NewTimeoutError(name, r.getTimeoutFor(name))
 	}
 	return v, err
 }
 
-// timeoutErrorDuration returns the timeout duration for given stage.
-func (r *Runner) timeoutErrorDuration(stage string) time.Duration {
+// getTimeoutFor returns the timeout duration for given special script function.
+func (r *Runner) getTimeoutFor(stage string) time.Duration {
 	d := time.Duration(0)
 	switch stage {
 	case consts.SetupFn:
 		return time.Duration(r.Bundle.Options.SetupTimeout.Duration)
 	case consts.TeardownFn:
 		return time.Duration(r.Bundle.Options.TeardownTimeout.Duration)
+	case consts.HandleSummaryFn:
+		return 2 * time.Minute // TODO: make configurable
 	}
 	return d
 }

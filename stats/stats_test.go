@@ -281,3 +281,72 @@ func TestSampleImplementations(t *testing.T) {
 	assert.Equal(t, now, cSamples.GetTime())
 	assert.Equal(t, sample.GetTags(), sample.GetTags())
 }
+
+func TestGetResolversForTrendColumnsValidation(t *testing.T) {
+	validateTests := []struct {
+		stats  []string
+		expErr bool
+	}{
+		{[]string{}, false},
+		{[]string{"avg", "min", "med", "max", "p(0)", "p(99)", "p(99.999)", "count"}, false},
+		{[]string{"avg", "p(err)"}, true},
+		{[]string{"nil", "p(err)"}, true},
+		{[]string{"p90"}, true},
+		{[]string{"p(90"}, true},
+		{[]string{" avg"}, true},
+		{[]string{"avg "}, true},
+		{[]string{"", "avg "}, true},
+		{[]string{"p(-1)"}, true},
+		{[]string{"p(101)"}, true},
+		{[]string{"p(1)"}, false},
+	}
+
+	for _, tc := range validateTests {
+		tc := tc
+		t.Run(fmt.Sprintf("%v", tc.stats), func(t *testing.T) {
+			_, err := GetResolversForTrendColumns(tc.stats)
+			if tc.expErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func createTestTrendSink(count int) *TrendSink {
+	sink := TrendSink{}
+
+	for i := 0; i < count; i++ {
+		sink.Add(Sample{Value: float64(i)})
+	}
+
+	return &sink
+}
+
+func TestResolversForTrendColumnsCalculation(t *testing.T) {
+	customResolversTests := []struct {
+		stats      string
+		percentile float64
+	}{
+		{"p(50)", 0.5},
+		{"p(99)", 0.99},
+		{"p(99.9)", 0.999},
+		{"p(99.99)", 0.9999},
+		{"p(99.999)", 0.99999},
+	}
+
+	sink := createTestTrendSink(100)
+
+	for _, tc := range customResolversTests {
+		tc := tc
+		t.Run(fmt.Sprintf("%v", tc.stats), func(t *testing.T) {
+			res, err := GetResolversForTrendColumns([]string{tc.stats})
+			assert.NoError(t, err)
+			assert.Len(t, res, 1)
+			for k := range res {
+				assert.InDelta(t, sink.P(tc.percentile), res[k](sink), 0.000001)
+			}
+		})
+	}
+}
