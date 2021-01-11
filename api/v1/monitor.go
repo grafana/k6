@@ -29,14 +29,15 @@ import (
 	"github.com/prometheus/common/expfmt"
 )
 
-func NewMetricFamily(m *stats.Metric, t time.Duration) []dto.MetricFamily {
+func newMetricFamily(m *stats.Metric, t time.Duration) []dto.MetricFamily {
 	metrics := make([]dto.MetricFamily, 0)
 
 	switch m.Type {
 	case stats.Counter:
 		counter := m.Sink.(*stats.CounterSink)
 		metrics = append(metrics, newCounter(m.Name+"_count", counter.Value, m.Name+" cumulative value"))
-		metrics = append(metrics, newGauge(m.Name+"_rate", float64(counter.Value)/(float64(t)/float64(time.Second)), m.Name+" value per seconds"))
+		metrics = append(metrics, newGauge(m.Name+"_rate", float64(counter.Value)/(float64(t)/float64(time.Second)),
+			m.Name+" value per seconds"))
 	case stats.Gauge:
 		gauge := m.Sink.(*stats.GaugeSink)
 		metrics = append(metrics, newGauge(m.Name+"_value", gauge.Value, m.Name+" latest value"))
@@ -51,7 +52,8 @@ func NewMetricFamily(m *stats.Metric, t time.Duration) []dto.MetricFamily {
 		metrics = append(metrics, newGauge(m.Name+"_p95", trend.P(0.95), m.Name+" 95 percentile value"))
 	case stats.Rate:
 		rate := m.Sink.(*stats.RateSink)
-		metrics = append(metrics, newGauge(m.Name+"_rate", float64(rate.Trues)/float64(rate.Total), m.Name+" percentage of non-zero values"))
+		metrics = append(metrics, newGauge(m.Name+"_rate", float64(rate.Trues)/float64(rate.Total),
+			m.Name+" percentage of non-zero values"))
 	}
 	return metrics
 }
@@ -76,8 +78,8 @@ func newCounter(name string, value float64, help string) dto.MetricFamily {
 
 func marshallMetricFamily(metrics []dto.MetricFamily) ([]byte, error) {
 	var b bytes.Buffer
-	for _, m := range metrics {
-		_, err := expfmt.MetricFamilyToText(&b, &m)
+	for i := range metrics {
+		_, err := expfmt.MetricFamilyToText(&b, &metrics[i])
 		if err != nil {
 			return nil, err
 		}

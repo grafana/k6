@@ -36,7 +36,7 @@ func TestNewMetricFamilyTrend(t *testing.T) {
 	sink.Avg = 5
 	sink.Med = 4
 
-	m := NewMetricFamily(trend, 0)
+	m := newMetricFamily(trend, 0)
 	assert.Len(t, m, 6)
 
 	assert.Equal(t, "name_min", *m[0].Name)
@@ -60,7 +60,7 @@ func TestNewMetricFamilyCounter(t *testing.T) {
 	sink := counter.Sink.(*stats.CounterSink)
 	sink.Value = 42
 
-	m := NewMetricFamily(counter, 0)
+	m := newMetricFamily(counter, 0)
 	assert.Len(t, m, 2)
 
 	assert.Equal(t, "name_count", *m[0].Name)
@@ -74,7 +74,7 @@ func TestNewMetricFamilyGauge(t *testing.T) {
 	sink := gauge.Sink.(*stats.GaugeSink)
 	sink.Value = 42
 
-	m := NewMetricFamily(gauge, 0)
+	m := newMetricFamily(gauge, 0)
 	assert.Len(t, m, 1)
 
 	assert.Equal(t, "name_value", *m[0].Name)
@@ -87,7 +87,7 @@ func TestNewMetricFamilyRate(t *testing.T) {
 	sink.Total = 42
 	sink.Trues = 42 * 42
 
-	m := NewMetricFamily(rate, 0)
+	m := newMetricFamily(rate, 0)
 	assert.Len(t, m, 1)
 
 	assert.Equal(t, "name_rate", *m[0].Name)

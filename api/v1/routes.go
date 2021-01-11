@@ -44,7 +44,7 @@ func NewHandler() http.Handler {
 
 	router.POST("/v1/teardown", HandleRunTeardown)
 
-	router.GET("/v1/monitor", HandleGetMonitor)
+	router.GET("/v1/monitor", handleGetMonitor)
 
 	return router
 }

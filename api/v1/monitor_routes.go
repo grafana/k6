@@ -30,7 +30,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
-func HandleGetMonitor(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func handleGetMonitor(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	engine := common.GetEngine(r.Context())
 
 	var t time.Duration
@@ -40,7 +40,7 @@ func HandleGetMonitor(rw http.ResponseWriter, r *http.Request, p httprouter.Para
 
 	metrics := make([]dto.MetricFamily, 0)
 	for _, m := range engine.Metrics {
-		metrics = append(metrics, NewMetricFamily(m, t)...)
+		metrics = append(metrics, newMetricFamily(m, t)...)
 	}
 
 	data, err := marshallMetricFamily(metrics)
