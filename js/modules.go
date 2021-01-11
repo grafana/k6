@@ -25,6 +25,7 @@ import (
 	_ "github.com/loadimpact/k6/js/modules/k6"
 	_ "github.com/loadimpact/k6/js/modules/k6/crypto"
 	_ "github.com/loadimpact/k6/js/modules/k6/crypto/x509"
+	_ "github.com/loadimpact/k6/js/modules/k6/data"
 	_ "github.com/loadimpact/k6/js/modules/k6/encoding"
 	_ "github.com/loadimpact/k6/js/modules/k6/grpc"
 	_ "github.com/loadimpact/k6/js/modules/k6/http"
