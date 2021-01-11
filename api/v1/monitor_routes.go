@@ -22,29 +22,32 @@ package v1
 
 import (
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/loadimpact/k6/api/common"
+	dto "github.com/prometheus/client_model/go"
 )
 
-func NewHandler() http.Handler {
-	router := httprouter.New()
+func HandleGetMonitor(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	engine := common.GetEngine(r.Context())
 
-	router.GET("/v1/status", HandleGetStatus)
-	router.PATCH("/v1/status", HandlePatchStatus)
+	var t time.Duration
+	if engine.ExecutionScheduler != nil {
+		t = engine.ExecutionScheduler.GetState().GetCurrentTestRunDuration()
+	}
 
-	router.GET("/v1/metrics", HandleGetMetrics)
-	router.GET("/v1/metrics/:id", HandleGetMetric)
+	metrics := make([]dto.MetricFamily, 0)
+	for _, m := range engine.Metrics {
+		metrics = append(metrics, NewMetricFamily(m, t)...)
+	}
 
-	router.GET("/v1/groups", HandleGetGroups)
-	router.GET("/v1/groups/:id", HandleGetGroup)
-
-	router.POST("/v1/setup", HandleRunSetup)
-	router.PUT("/v1/setup", HandleSetSetupData)
-	router.GET("/v1/setup", HandleGetSetupData)
-
-	router.POST("/v1/teardown", HandleRunTeardown)
-
-	router.GET("/v1/monitor", HandleGetMonitor)
-
-	return router
+	data, err := marshallMetricFamily(metrics)
+	if err != nil {
+		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
+		return
+	}
+	rw.Header().Add("Content-Length", strconv.Itoa(len(data)))
+	_, _ = rw.Write(data)
 }
