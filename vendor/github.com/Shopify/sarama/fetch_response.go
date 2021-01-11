@@ -104,15 +104,26 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 			return err
 		}
 
-		// If we have at least one full records, we skip incomplete ones
-		if partial && len(b.RecordsSet) > 0 {
-			break
+		n, err := records.numRecords()
+		if err != nil {
+			return err
 		}
 
-		b.RecordsSet = append(b.RecordsSet, records)
+		if n > 0 || (partial && len(b.RecordsSet) == 0) {
+			b.RecordsSet = append(b.RecordsSet, records)
 
-		if b.Records == nil {
-			b.Records = records
+			if b.Records == nil {
+				b.Records = records
+			}
+		}
+
+		overflow, err := records.isOverflow()
+		if err != nil {
+			return err
+		}
+
+		if partial || overflow {
+			break
 		}
 	}
 
@@ -280,7 +291,7 @@ func (r *FetchResponse) requiredVersion() KafkaVersion {
 	case 4:
 		return V0_11_0_0
 	default:
-		return minVersion
+		return MinVersion
 	}
 }
 
@@ -353,7 +364,7 @@ func (r *FetchResponse) AddMessage(topic string, partition int32, key, value Enc
 		records := newLegacyRecords(&MessageSet{})
 		frb.RecordsSet = []*Records{&records}
 	}
-	set := frb.RecordsSet[0].msgSet
+	set := frb.RecordsSet[0].MsgSet
 	set.Messages = append(set.Messages, msgBlock)
 }
 
@@ -365,7 +376,7 @@ func (r *FetchResponse) AddRecord(topic string, partition int32, key, value Enco
 		records := newDefaultRecords(&RecordBatch{Version: 2})
 		frb.RecordsSet = []*Records{&records}
 	}
-	batch := frb.RecordsSet[0].recordBatch
+	batch := frb.RecordsSet[0].RecordBatch
 	batch.addRecord(rec)
 }
 
@@ -375,7 +386,7 @@ func (r *FetchResponse) SetLastOffsetDelta(topic string, partition int32, offset
 		records := newDefaultRecords(&RecordBatch{Version: 2})
 		frb.RecordsSet = []*Records{&records}
 	}
-	batch := frb.RecordsSet[0].recordBatch
+	batch := frb.RecordsSet[0].RecordBatch
 	batch.LastOffsetDelta = offset
 }
 

@@ -22,10 +22,50 @@ type Partitioner interface {
 	RequiresConsistency() bool
 }
 
+// DynamicConsistencyPartitioner can optionally be implemented by Partitioners
+// in order to allow more flexibility than is originally allowed by the
+// RequiresConsistency method in the Partitioner interface. This allows
+// partitioners to require consistency sometimes, but not all times. It's useful
+// for, e.g., the HashPartitioner, which does not require consistency if the
+// message key is nil.
+type DynamicConsistencyPartitioner interface {
+	Partitioner
+
+	// MessageRequiresConsistency is similar to Partitioner.RequiresConsistency,
+	// but takes in the message being partitioned so that the partitioner can
+	// make a per-message determination.
+	MessageRequiresConsistency(message *ProducerMessage) bool
+}
+
 // PartitionerConstructor is the type for a function capable of constructing new Partitioners.
 type PartitionerConstructor func(topic string) Partitioner
 
 type manualPartitioner struct{}
+
+// HashPartitionOption lets you modify default values of the partitioner
+type HashPartitionerOption func(*hashPartitioner)
+
+// WithAbsFirst means that the partitioner handles absolute values
+// in the same way as the reference Java implementation
+func WithAbsFirst() HashPartitionerOption {
+	return func(hp *hashPartitioner) {
+		hp.referenceAbs = true
+	}
+}
+
+// WithCustomHashFunction lets you specify what hash function to use for the partitioning
+func WithCustomHashFunction(hasher func() hash.Hash32) HashPartitionerOption {
+	return func(hp *hashPartitioner) {
+		hp.hasher = hasher()
+	}
+}
+
+// WithCustomFallbackPartitioner lets you specify what HashPartitioner should be used in case a Distribution Key is empty
+func WithCustomFallbackPartitioner(randomHP *hashPartitioner) HashPartitionerOption {
+	return func(hp *hashPartitioner) {
+		hp.random = hp
+	}
+}
 
 // NewManualPartitioner returns a Partitioner which uses the partition manually set in the provided
 // ProducerMessage's Partition field as the partition to produce to.
@@ -83,8 +123,9 @@ func (p *roundRobinPartitioner) RequiresConsistency() bool {
 }
 
 type hashPartitioner struct {
-	random Partitioner
-	hasher hash.Hash32
+	random       Partitioner
+	hasher       hash.Hash32
+	referenceAbs bool
 }
 
 // NewCustomHashPartitioner is a wrapper around NewHashPartitioner, allowing the use of custom hasher.
@@ -95,6 +136,21 @@ func NewCustomHashPartitioner(hasher func() hash.Hash32) PartitionerConstructor 
 		p := new(hashPartitioner)
 		p.random = NewRandomPartitioner(topic)
 		p.hasher = hasher()
+		p.referenceAbs = false
+		return p
+	}
+}
+
+// NewCustomPartitioner creates a default Partitioner but lets you specify the behavior of each component via options
+func NewCustomPartitioner(options ...HashPartitionerOption) PartitionerConstructor {
+	return func(topic string) Partitioner {
+		p := new(hashPartitioner)
+		p.random = NewRandomPartitioner(topic)
+		p.hasher = fnv.New32a()
+		p.referenceAbs = false
+		for _, option := range options {
+			option(p)
+		}
 		return p
 	}
 }
@@ -107,6 +163,19 @@ func NewHashPartitioner(topic string) Partitioner {
 	p := new(hashPartitioner)
 	p.random = NewRandomPartitioner(topic)
 	p.hasher = fnv.New32a()
+	p.referenceAbs = false
+	return p
+}
+
+// NewReferenceHashPartitioner is like NewHashPartitioner except that it handles absolute values
+// in the same way as the reference Java implementation. NewHashPartitioner was supposed to do
+// that but it had a mistake and now there are people depending on both behaviours. This will
+// all go away on the next major version bump.
+func NewReferenceHashPartitioner(topic string) Partitioner {
+	p := new(hashPartitioner)
+	p.random = NewRandomPartitioner(topic)
+	p.hasher = fnv.New32a()
+	p.referenceAbs = true
 	return p
 }
 
@@ -123,13 +192,26 @@ func (p *hashPartitioner) Partition(message *ProducerMessage, numPartitions int3
 	if err != nil {
 		return -1, err
 	}
-	partition := int32(p.hasher.Sum32()) % numPartitions
-	if partition < 0 {
-		partition = -partition
+	var partition int32
+	// Turns out we were doing our absolute value in a subtly different way from the upstream
+	// implementation, but now we need to maintain backwards compat for people who started using
+	// the old version; if referenceAbs is set we are compatible with the reference java client
+	// but not past Sarama versions
+	if p.referenceAbs {
+		partition = (int32(p.hasher.Sum32()) & 0x7fffffff) % numPartitions
+	} else {
+		partition = int32(p.hasher.Sum32()) % numPartitions
+		if partition < 0 {
+			partition = -partition
+		}
 	}
 	return partition, nil
 }
 
 func (p *hashPartitioner) RequiresConsistency() bool {
 	return true
+}
+
+func (p *hashPartitioner) MessageRequiresConsistency(message *ProducerMessage) bool {
+	return message.Key != nil
 }

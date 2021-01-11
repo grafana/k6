@@ -5,188 +5,164 @@ import (
 	"errors"
 )
 
-// block represents a frame data block.
-// Used when compressing or decompressing frame blocks concurrently.
-type block struct {
-	compressed bool
-	zdata      []byte // compressed data
-	data       []byte // decompressed data
-	offset     int    // offset within the data as with block dependency the 64Kb window is prepended to it
-	checksum   uint32 // compressed data checksum
-	err        error  // error while [de]compressing
-}
-
 var (
-	// ErrInvalidSource is returned by UncompressBlock when a compressed block is corrupted.
-	ErrInvalidSource = errors.New("lz4: invalid source")
-	// ErrShortBuffer is returned by UncompressBlock, CompressBlock or CompressBlockHC when
-	// the supplied buffer for [de]compression is too small.
-	ErrShortBuffer = errors.New("lz4: short buffer")
+	// ErrInvalidSourceShortBuffer is returned by UncompressBlock or CompressBLock when a compressed
+	// block is corrupted or the destination buffer is not large enough for the uncompressed data.
+	ErrInvalidSourceShortBuffer = errors.New("lz4: invalid source or destination buffer too short")
+	// ErrInvalid is returned when reading an invalid LZ4 archive.
+	ErrInvalid = errors.New("lz4: bad magic number")
 )
+
+// blockHash hashes 4 bytes into a value < winSize.
+func blockHash(x uint32) uint32 {
+	const hasher uint32 = 2654435761 // Knuth multiplicative hash.
+	return x * hasher >> hashShift
+}
 
 // CompressBlockBound returns the maximum size of a given buffer of size n, when not compressible.
 func CompressBlockBound(n int) int {
 	return n + n/255 + 16
 }
 
-// UncompressBlock decompresses the source buffer into the destination one,
-// starting at the di index and returning the decompressed size.
+// UncompressBlock uncompresses the source buffer into the destination one,
+// and returns the uncompressed size.
 //
 // The destination buffer must be sized appropriately.
 //
 // An error is returned if the source data is invalid or the destination buffer is too small.
-func UncompressBlock(src, dst []byte, di int) (int, error) {
-	si, sn, di0 := 0, len(src), di
+func UncompressBlock(src, dst []byte) (si int, err error) {
+	defer func() {
+		// It is now faster to let the runtime panic and recover on out of bound slice access
+		// than checking indices as we go along.
+		if recover() != nil {
+			err = ErrInvalidSourceShortBuffer
+		}
+	}()
+	sn := len(src)
 	if sn == 0 {
 		return 0, nil
 	}
+	var di int
 
 	for {
-		// literals and match lengths (token)
-		lLen := int(src[si] >> 4)
-		mLen := int(src[si] & 0xF)
-		if si++; si == sn {
-			return di, ErrInvalidSource
-		}
+		// Literals and match lengths (token).
+		b := int(src[si])
+		si++
 
-		// literals
-		if lLen > 0 {
+		// Literals.
+		if lLen := b >> 4; lLen > 0 {
 			if lLen == 0xF {
 				for src[si] == 0xFF {
 					lLen += 0xFF
-					if si++; si == sn {
-						return di - di0, ErrInvalidSource
-					}
+					si++
 				}
 				lLen += int(src[si])
-				if si++; si == sn {
-					return di - di0, ErrInvalidSource
-				}
+				si++
 			}
-			if len(dst)-di < lLen || si+lLen > sn {
-				return di - di0, ErrShortBuffer
-			}
-			di += copy(dst[di:], src[si:si+lLen])
+			i := si
+			si += lLen
+			di += copy(dst[di:], src[i:si])
 
-			if si += lLen; si >= sn {
-				return di - di0, nil
+			if si >= sn {
+				return di, nil
 			}
 		}
 
-		if si += 2; si >= sn {
-			return di, ErrInvalidSource
-		}
-		offset := int(src[si-2]) | int(src[si-1])<<8
-		if di-offset < 0 || offset == 0 {
-			return di - di0, ErrInvalidSource
-		}
+		si++
+		_ = src[si] // Bound check elimination.
+		offset := int(src[si-1]) | int(src[si])<<8
+		si++
 
-		// match
+		// Match.
+		mLen := b & 0xF
 		if mLen == 0xF {
 			for src[si] == 0xFF {
 				mLen += 0xFF
-				if si++; si == sn {
-					return di - di0, ErrInvalidSource
-				}
+				si++
 			}
 			mLen += int(src[si])
-			if si++; si == sn {
-				return di - di0, ErrInvalidSource
-			}
+			si++
 		}
-		// minimum match length is 4
-		mLen += 4
-		if len(dst)-di <= mLen {
-			return di - di0, ErrShortBuffer
-		}
+		mLen += minMatch
 
-		// copy the match (NB. match is at least 4 bytes long)
-		if mLen >= offset {
+		// Copy the match.
+		i := di - offset
+		if offset > 0 && mLen >= offset {
+			// Efficiently copy the match dst[di-offset:di] into the dst slice.
 			bytesToCopy := offset * (mLen / offset)
-			// Efficiently copy the match dst[di-offset:di] into the slice
-			// dst[di:di+bytesToCopy]
-			expanded := dst[di-offset : di+bytesToCopy]
-			n := offset
-			for n <= bytesToCopy+offset {
+			expanded := dst[i:]
+			for n := offset; n <= bytesToCopy+offset; n *= 2 {
 				copy(expanded[n:], expanded[:n])
-				n *= 2
 			}
 			di += bytesToCopy
 			mLen -= bytesToCopy
 		}
-
-		di += copy(dst[di:], dst[di-offset:di-offset+mLen])
+		di += copy(dst[di:], dst[i:i+mLen])
 	}
 }
 
-// CompressBlock compresses the source buffer starting at soffet into the destination one.
+// CompressBlock compresses the source buffer into the destination one.
 // This is the fast version of LZ4 compression and also the default one.
+// The size of hashTable must be at least 64Kb.
 //
 // The size of the compressed data is returned. If it is 0 and no error, then the data is incompressible.
 //
 // An error is returned if the destination buffer is too small.
-func CompressBlock(src, dst []byte, soffset int) (int, error) {
+func CompressBlock(src, dst []byte, hashTable []int) (di int, err error) {
+	defer func() {
+		if recover() != nil {
+			err = ErrInvalidSourceShortBuffer
+		}
+	}()
+
 	sn, dn := len(src)-mfLimit, len(dst)
-	if sn <= 0 || dn == 0 || soffset >= sn {
+	if sn <= 0 || dn == 0 {
 		return 0, nil
 	}
-	var si, di int
+	var si int
 
-	// fast scan strategy:
-	// we only need a hash table to store the last sequences (4 bytes)
-	var hashTable [1 << hashLog]int
-	var hashShift = uint((minMatch * 8) - hashLog)
+	// Fast scan strategy: the hash table only stores the last 4 bytes sequences.
+	// const accInit = 1 << skipStrength
 
-	// Initialise the hash table with the first 64Kb of the input buffer
-	// (used when compressing dependent blocks)
-	for si < soffset {
-		h := binary.LittleEndian.Uint32(src[si:]) * hasher >> hashShift
-		si++
+	anchor := si // Position of the current literals.
+	// acc := accInit // Variable step: improves performance on non-compressible data.
+
+	for si < sn {
+		// Hash the next 4 bytes (sequence)...
+		match := binary.LittleEndian.Uint32(src[si:])
+		h := blockHash(match)
+
+		ref := hashTable[h]
 		hashTable[h] = si
-	}
-
-	anchor := si
-	fma := 1 << skipStrength
-	for si < sn-minMatch {
-		// hash the next 4 bytes (sequence)...
-		h := binary.LittleEndian.Uint32(src[si:]) * hasher >> hashShift
-		// -1 to separate existing entries from new ones
-		ref := hashTable[h] - 1
-		// ...and store the position of the hash in the hash table (+1 to compensate the -1 upon saving)
-		hashTable[h] = si + 1
-		// no need to check the last 3 bytes in the first literal 4 bytes as
-		// this guarantees that the next match, if any, is compressed with
-		// a lower size, since to have some compression we must have:
-		// ll+ml-overlap > 1 + (ll-15)/255 + (ml-4-15)/255 + 2 (uncompressed size>compressed size)
-		// => ll+ml>3+2*overlap => ll+ml>= 4+2*overlap
-		// and by definition we do have:
-		// ll >= 1, ml >= 4
-		// => ll+ml >= 5
-		// => so overlap must be 0
-
-		// the sequence is new, out of bound (64kb) or not valid: try next sequence
-		if ref < 0 || fma&(1<<skipStrength-1) < 4 ||
-			(si-ref)>>winSizeLog > 0 ||
-			src[ref] != src[si] ||
-			src[ref+1] != src[si+1] ||
-			src[ref+2] != src[si+2] ||
-			src[ref+3] != src[si+3] {
-			// variable step: improves performance on non-compressible data
-			si += fma >> skipStrength
-			fma++
+		if ref >= sn { // Invalid reference (dirty hashtable).
+			si++
 			continue
 		}
-		// match found
-		fma = 1 << skipStrength
-		lLen := si - anchor
 		offset := si - ref
+		if offset <= 0 || offset >= winSize || // Out of window.
+			match != binary.LittleEndian.Uint32(src[ref:]) { // Hash collision on different matches.
+			// si += acc >> skipStrength
+			// acc++
+			si++
+			continue
+		}
 
-		// encode match length part 1
+		// Match found.
+		// acc = accInit
+		lLen := si - anchor // Literal length.
+
+		// Encode match length part 1.
 		si += minMatch
-		mLen := si // match length has minMatch already
-		for si <= sn && src[si] == src[si-offset] {
+		mLen := si // Match length has minMatch already.
+		// Find the longest match, first looking by batches of 8 bytes.
+		for si < sn && binary.LittleEndian.Uint64(src[si:]) == binary.LittleEndian.Uint64(src[si-offset:]) {
+			si += 8
+		}
+		// Then byte by byte.
+		for si < sn && src[si] == src[si-offset] {
 			si++
 		}
+
 		mLen = si - mLen
 		if mLen < 0xF {
 			dst[di] = byte(mLen)
@@ -194,169 +170,160 @@ func CompressBlock(src, dst []byte, soffset int) (int, error) {
 			dst[di] = 0xF
 		}
 
-		// encode literals length
+		// Encode literals length.
 		if lLen < 0xF {
 			dst[di] |= byte(lLen << 4)
 		} else {
 			dst[di] |= 0xF0
-			if di++; di == dn {
-				return di, ErrShortBuffer
-			}
+			di++
 			l := lLen - 0xF
 			for ; l >= 0xFF; l -= 0xFF {
 				dst[di] = 0xFF
-				if di++; di == dn {
-					return di, ErrShortBuffer
-				}
+				di++
 			}
 			dst[di] = byte(l)
 		}
-		if di++; di == dn {
-			return di, ErrShortBuffer
-		}
+		di++
 
-		// literals
-		if di+lLen >= dn {
-			return di, ErrShortBuffer
-		}
-		di += copy(dst[di:], src[anchor:anchor+lLen])
+		// Literals.
+		copy(dst[di:], src[anchor:anchor+lLen])
+		di += lLen + 2
 		anchor = si
 
-		// encode offset
-		if di += 2; di >= dn {
-			return di, ErrShortBuffer
-		}
+		// Encode offset.
+		_ = dst[di] // Bound check elimination.
 		dst[di-2], dst[di-1] = byte(offset), byte(offset>>8)
 
-		// encode match length part 2
+		// Encode match length part 2.
 		if mLen >= 0xF {
 			for mLen -= 0xF; mLen >= 0xFF; mLen -= 0xFF {
 				dst[di] = 0xFF
-				if di++; di == dn {
-					return di, ErrShortBuffer
-				}
+				di++
 			}
 			dst[di] = byte(mLen)
-			if di++; di == dn {
-				return di, ErrShortBuffer
-			}
+			di++
 		}
 	}
 
 	if anchor == 0 {
-		// incompressible
+		// Incompressible.
 		return 0, nil
 	}
 
-	// last literals
+	// Last literals.
 	lLen := len(src) - anchor
 	if lLen < 0xF {
 		dst[di] = byte(lLen << 4)
 	} else {
 		dst[di] = 0xF0
-		if di++; di == dn {
-			return di, ErrShortBuffer
-		}
-		lLen -= 0xF
-		for ; lLen >= 0xFF; lLen -= 0xFF {
+		di++
+		for lLen -= 0xF; lLen >= 0xFF; lLen -= 0xFF {
 			dst[di] = 0xFF
-			if di++; di == dn {
-				return di, ErrShortBuffer
-			}
+			di++
 		}
 		dst[di] = byte(lLen)
 	}
-	if di++; di == dn {
-		return di, ErrShortBuffer
-	}
+	di++
 
-	// write literals
-	src = src[anchor:]
-	switch n := di + len(src); {
-	case n > dn:
-		return di, ErrShortBuffer
-	case n >= sn:
-		// incompressible
+	// Write the last literals.
+	if di >= anchor {
+		// Incompressible.
 		return 0, nil
 	}
-	di += copy(dst[di:], src)
+	di += copy(dst[di:], src[anchor:])
 	return di, nil
 }
 
-// CompressBlockHC compresses the source buffer starting at soffet into the destination one.
+// CompressBlockHC compresses the source buffer src into the destination dst
+// with max search depth (use 0 or negative value for no max).
+//
 // CompressBlockHC compression ratio is better than CompressBlock but it is also slower.
 //
 // The size of the compressed data is returned. If it is 0 and no error, then the data is not compressible.
 //
 // An error is returned if the destination buffer is too small.
-func CompressBlockHC(src, dst []byte, soffset int) (int, error) {
+func CompressBlockHC(src, dst []byte, depth int) (di int, err error) {
+	defer func() {
+		if recover() != nil {
+			err = ErrInvalidSourceShortBuffer
+		}
+	}()
+
 	sn, dn := len(src)-mfLimit, len(dst)
-	if sn <= 0 || dn == 0 || soffset >= sn {
+	if sn <= 0 || dn == 0 {
 		return 0, nil
 	}
-	var si, di int
+	var si int
 
-	// Hash Chain strategy:
-	// we need a hash table and a chain table
-	// the chain table cannot contain more entries than the window size (64Kb entries)
-	var hashTable [1 << hashLog]int
-	var chainTable [winSize]int
-	var hashShift = uint((minMatch * 8) - hashLog)
+	// hashTable: stores the last position found for a given hash
+	// chaingTable: stores previous positions for a given hash
+	var hashTable, chainTable [winSize]int
 
-	// Initialise the hash table with the first 64Kb of the input buffer
-	// (used when compressing dependent blocks)
-	for si < soffset {
-		h := binary.LittleEndian.Uint32(src[si:]) * hasher >> hashShift
-		chainTable[si&winMask] = hashTable[h]
-		si++
-		hashTable[h] = si
+	if depth <= 0 {
+		depth = winSize
 	}
 
 	anchor := si
-	for si < sn-minMatch {
-		// hash the next 4 bytes (sequence)...
-		h := binary.LittleEndian.Uint32(src[si:]) * hasher >> hashShift
+	for si < sn {
+		// Hash the next 4 bytes (sequence).
+		match := binary.LittleEndian.Uint32(src[si:])
+		h := blockHash(match)
 
-		// follow the chain until out of window and give the longest match
+		// Follow the chain until out of window and give the longest match.
 		mLen := 0
 		offset := 0
-		for next := hashTable[h] - 1; next > 0 && next > si-winSize; next = chainTable[next&winMask] - 1 {
-			// the first (mLen==0) or next byte (mLen>=minMatch) at current match length must match to improve on the match length
-			if src[next+mLen] == src[si+mLen] {
-				for ml := 0; ; ml++ {
-					if src[next+ml] != src[si+ml] || si+ml > sn {
-						// found a longer match, keep its position and length
-						if mLen < ml && ml >= minMatch {
-							mLen = ml
-							offset = si - next
-						}
-						break
-					}
-				}
+		for next, try := hashTable[h], depth; try > 0 && next > 0 && si-next < winSize; next = chainTable[next&winMask] {
+			// The first (mLen==0) or next byte (mLen>=minMatch) at current match length
+			// must match to improve on the match length.
+			if src[next+mLen] != src[si+mLen] {
+				continue
 			}
+			ml := 0
+			// Compare the current position with a previous with the same hash.
+			for ml < sn-si && binary.LittleEndian.Uint64(src[next+ml:]) == binary.LittleEndian.Uint64(src[si+ml:]) {
+				ml += 8
+			}
+			for ml < sn-si && src[next+ml] == src[si+ml] {
+				ml++
+			}
+			if ml+1 < minMatch || ml <= mLen {
+				// Match too small (<minMath) or smaller than the current match.
+				continue
+			}
+			// Found a longer match, keep its position and length.
+			mLen = ml
+			offset = si - next
+			// Try another previous position with the same hash.
+			try--
 		}
 		chainTable[si&winMask] = hashTable[h]
-		hashTable[h] = si + 1
+		hashTable[h] = si
 
-		// no match found
+		// No match found.
 		if mLen == 0 {
 			si++
 			continue
 		}
 
-		// match found
-		// update hash/chain tables with overlaping bytes:
-		// si already hashed, add everything from si+1 up to the match length
-		for si, ml := si+1, si+mLen; si < ml; {
-			h := binary.LittleEndian.Uint32(src[si:]) * hasher >> hashShift
+		// Match found.
+		// Update hash/chain tables with overlapping bytes:
+		// si already hashed, add everything from si+1 up to the match length.
+		winStart := si + 1
+		if ws := si + mLen - winSize; ws > winStart {
+			winStart = ws
+		}
+		for si, ml := winStart, si+mLen; si < ml; {
+			match >>= 8
+			match |= uint32(src[si+3]) << 24
+			h := blockHash(match)
 			chainTable[si&winMask] = hashTable[h]
-			si++
 			hashTable[h] = si
+			si++
 		}
 
 		lLen := si - anchor
 		si += mLen
-		mLen -= minMatch // match length does not include minMatch
+		mLen -= minMatch // Match length does not include minMatch.
 
 		if mLen < 0xF {
 			dst[di] = byte(mLen)
@@ -364,91 +331,67 @@ func CompressBlockHC(src, dst []byte, soffset int) (int, error) {
 			dst[di] = 0xF
 		}
 
-		// encode literals length
+		// Encode literals length.
 		if lLen < 0xF {
 			dst[di] |= byte(lLen << 4)
 		} else {
 			dst[di] |= 0xF0
-			if di++; di == dn {
-				return di, ErrShortBuffer
-			}
+			di++
 			l := lLen - 0xF
 			for ; l >= 0xFF; l -= 0xFF {
 				dst[di] = 0xFF
-				if di++; di == dn {
-					return di, ErrShortBuffer
-				}
+				di++
 			}
 			dst[di] = byte(l)
 		}
-		if di++; di == dn {
-			return di, ErrShortBuffer
-		}
+		di++
 
-		// literals
-		if di+lLen >= dn {
-			return di, ErrShortBuffer
-		}
-		di += copy(dst[di:], src[anchor:anchor+lLen])
+		// Literals.
+		copy(dst[di:], src[anchor:anchor+lLen])
+		di += lLen
 		anchor = si
 
-		// encode offset
-		if di += 2; di >= dn {
-			return di, ErrShortBuffer
-		}
+		// Encode offset.
+		di += 2
 		dst[di-2], dst[di-1] = byte(offset), byte(offset>>8)
 
-		// encode match length part 2
+		// Encode match length part 2.
 		if mLen >= 0xF {
 			for mLen -= 0xF; mLen >= 0xFF; mLen -= 0xFF {
 				dst[di] = 0xFF
-				if di++; di == dn {
-					return di, ErrShortBuffer
-				}
+				di++
 			}
 			dst[di] = byte(mLen)
-			if di++; di == dn {
-				return di, ErrShortBuffer
-			}
+			di++
 		}
 	}
 
 	if anchor == 0 {
-		// incompressible
+		// Incompressible.
 		return 0, nil
 	}
 
-	// last literals
+	// Last literals.
 	lLen := len(src) - anchor
 	if lLen < 0xF {
 		dst[di] = byte(lLen << 4)
 	} else {
 		dst[di] = 0xF0
-		if di++; di == dn {
-			return di, ErrShortBuffer
-		}
+		di++
 		lLen -= 0xF
 		for ; lLen >= 0xFF; lLen -= 0xFF {
 			dst[di] = 0xFF
-			if di++; di == dn {
-				return di, ErrShortBuffer
-			}
+			di++
 		}
 		dst[di] = byte(lLen)
 	}
-	if di++; di == dn {
-		return di, ErrShortBuffer
-	}
+	di++
 
-	// write literals
-	src = src[anchor:]
-	switch n := di + len(src); {
-	case n > dn:
-		return di, ErrShortBuffer
-	case n >= sn:
-		// incompressible
+	// Write the last literals.
+	if di >= anchor {
+		// Incompressible.
 		return 0, nil
 	}
-	di += copy(dst[di:], src)
+	di += copy(dst[di:], src[anchor:])
 	return di, nil
 }

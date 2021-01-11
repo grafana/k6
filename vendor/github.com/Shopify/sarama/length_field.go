@@ -5,6 +5,19 @@ import "encoding/binary"
 // LengthField implements the PushEncoder and PushDecoder interfaces for calculating 4-byte lengths.
 type lengthField struct {
 	startOffset int
+	length      int32
+}
+
+func (l *lengthField) decode(pd packetDecoder) error {
+	var err error
+	l.length, err = pd.getInt32()
+	if err != nil {
+		return err
+	}
+	if l.length > int32(pd.remaining()) {
+		return ErrInsufficientData
+	}
+	return nil
 }
 
 func (l *lengthField) saveOffset(in int) {
@@ -21,7 +34,7 @@ func (l *lengthField) run(curOffset int, buf []byte) error {
 }
 
 func (l *lengthField) check(curOffset int, buf []byte) error {
-	if uint32(curOffset-l.startOffset-4) != binary.BigEndian.Uint32(buf[l.startOffset:]) {
+	if int32(curOffset-l.startOffset-4) != l.length {
 		return PacketDecodingError{"length field invalid"}
 	}
 

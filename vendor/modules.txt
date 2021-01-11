@@ -11,7 +11,7 @@ github.com/GeertJohan/go.rice/embedded
 # github.com/PuerkitoBio/goquery v1.3.0
 ## explicit
 github.com/PuerkitoBio/goquery
-# github.com/Shopify/sarama v1.16.0
+# github.com/Shopify/sarama v1.19.0
 ## explicit
 github.com/Shopify/sarama
 # github.com/Shopify/toxiproxy v2.1.4+incompatible
@@ -50,13 +50,12 @@ github.com/dustin/go-humanize
 # github.com/eapache/go-resiliency v1.1.0
 ## explicit
 github.com/eapache/go-resiliency/breaker
-# github.com/eapache/go-xerial-snappy v0.0.0-20160609142408-bb955e01b934
-## explicit
+# github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21
 github.com/eapache/go-xerial-snappy
 # github.com/eapache/queue v1.1.0
 ## explicit
 github.com/eapache/queue
-# github.com/fatih/color v1.5.0
+# github.com/fatih/color v1.7.0
 ## explicit
 github.com/fatih/color
 # github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813
@@ -93,16 +92,11 @@ github.com/golang/protobuf/ptypes/empty
 github.com/golang/protobuf/ptypes/struct
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
-# github.com/golang/snappy v0.0.0-20170215233205-553a64147049
-## explicit
+# github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db
 github.com/golang/snappy
 # github.com/google/go-cmp v0.5.1
 ## explicit
-# github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f
-## explicit
-github.com/gorilla/context
-# github.com/gorilla/mux v1.6.1
-## explicit
+# github.com/gorilla/mux v1.7.3
 github.com/gorilla/mux
 # github.com/gorilla/websocket v1.4.2
 ## explicit
@@ -110,7 +104,7 @@ github.com/gorilla/websocket
 # github.com/inconshreveable/mousetrap v1.0.0
 ## explicit
 github.com/inconshreveable/mousetrap
-# github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
+# github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d
 ## explicit
 github.com/influxdata/influxdb1-client/models
 github.com/influxdata/influxdb1-client/pkg/escape
@@ -126,7 +120,7 @@ github.com/jhump/protoreflect/internal
 github.com/jhump/protoreflect/internal/codec
 # github.com/josharian/intern v1.0.0
 github.com/josharian/intern
-# github.com/julienschmidt/httprouter v1.1.1-0.20180222160526-d18983907793
+# github.com/julienschmidt/httprouter v1.3.0
 ## explicit
 github.com/julienschmidt/httprouter
 # github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
@@ -173,12 +167,14 @@ github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.4
 ## explicit
 github.com/mattn/go-isatty
+# github.com/matttproud/golang_protobuf_extensions v1.0.1
+github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 ## explicit
 github.com/mccutchen/go-httpbin/httpbin
 github.com/mccutchen/go-httpbin/httpbin/assets
 github.com/mccutchen/go-httpbin/httpbin/digest
-# github.com/mitchellh/mapstructure v0.0.0-20180220230111-00c29f56e238
+# github.com/mitchellh/mapstructure v1.1.2
 ## explicit
 github.com/mitchellh/mapstructure
 # github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
@@ -189,20 +185,26 @@ github.com/nu7hatch/gouuid
 # github.com/oxtoacart/bpool v0.0.0-20150712133111-4e1c5567d7c2
 ## explicit
 github.com/oxtoacart/bpool
-# github.com/pierrec/lz4 v1.0.2-0.20171218195038-2fcda4cb7018
-## explicit
+# github.com/pierrec/lz4 v2.0.5+incompatible
 github.com/pierrec/lz4
+github.com/pierrec/lz4/internal/xxh32
 # github.com/pierrec/xxHash v0.1.1
 ## explicit
-github.com/pierrec/xxHash/xxHash32
-# github.com/pkg/errors v0.8.0
+# github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
-# github.com/rcrowley/go-metrics v0.0.0-20180503174638-e2704e165165
+# github.com/prometheus/client_model v0.2.0
 ## explicit
+github.com/prometheus/client_model/go
+# github.com/prometheus/common v0.15.0
+## explicit
+github.com/prometheus/common/expfmt
+github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
+github.com/prometheus/common/model
+# github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
 github.com/rcrowley/go-metrics
 # github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 ## explicit
@@ -221,7 +223,7 @@ github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.1
 ## explicit
 github.com/spf13/pflag
-# github.com/stretchr/testify v1.2.2 => github.com/stretchr/testify v1.2.1
+# github.com/stretchr/testify v1.4.0 => github.com/stretchr/testify v1.2.1
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
@@ -258,7 +260,6 @@ golang.org/x/crypto/ripemd160
 golang.org/x/crypto/ssh/terminal
 # golang.org/x/net v0.0.0-20201008223702-a5fa9d4b7c91
 ## explicit
-golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/http/httpguts
@@ -284,7 +285,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
+# golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 ## explicit
 golang.org/x/time/rate
 # golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1

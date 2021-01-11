@@ -493,9 +493,10 @@ type Message struct {
 
 // Result represents a resultset returned from a single statement.
 type Result struct {
-	Series   []models.Row
-	Messages []*Message
-	Err      string `json:"error,omitempty"`
+	StatementId int `json:"statement_id"`
+	Series      []models.Row
+	Messages    []*Message
+	Err         string `json:"error,omitempty"`
 }
 
 // Query sends a command to the server and returns the Response.
