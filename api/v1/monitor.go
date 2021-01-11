@@ -36,7 +36,7 @@ func newMetricFamily(m *stats.Metric, t time.Duration) []dto.MetricFamily {
 	case stats.Counter:
 		counter := m.Sink.(*stats.CounterSink)
 		metrics = append(metrics, newCounter(m.Name+"_count", counter.Value, m.Name+" cumulative value"))
-		metrics = append(metrics, newGauge(m.Name+"_rate", float64(counter.Value)/(float64(t)/float64(time.Second)),
+		metrics = append(metrics, newGauge(m.Name+"_rate", counter.Value/(float64(t)/float64(time.Second)),
 			m.Name+" value per seconds"))
 	case stats.Gauge:
 		gauge := m.Sink.(*stats.GaugeSink)

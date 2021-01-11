@@ -56,7 +56,7 @@ func TestGetMonitor(t *testing.T) {
 	rw := httptest.NewRecorder()
 	NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/monitor", nil))
 	res := rw.Result()
-	defer res.Body.Close()
+
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, "text/plain; charset=utf-8", res.Header.Get("Content-Type"))
 
@@ -72,4 +72,6 @@ func TestGetMonitor(t *testing.T) {
 			assert.Equal(t, name, metrics[name].GetName())
 		}
 	})
+
+	assert.NoError(t, res.Body.Close())
 }
