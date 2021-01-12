@@ -68,4 +68,5 @@ linters:
   - gomnd
   - goerr113 # most of the errors here are meant for humans
   - nlreturn
+  - goheader
   fast: false
