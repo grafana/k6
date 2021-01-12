@@ -59,6 +59,7 @@ func TestGetMonitor(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, "text/plain; charset=utf-8", res.Header.Get("Content-Type"))
+	assert.NotEmpty(t, res.Header.Get("Content-Length"))
 
 	t.Run("metrics", func(t *testing.T) {
 		parser := expfmt.TextParser{}
