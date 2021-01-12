@@ -39,16 +39,17 @@ import (
 func TestTextSummary(t *testing.T) {
 	var (
 		checksOut = "     █ child\n\n" +
-			"       ✗ check1\n        ↳  33% — ✓ 5 / ✗ 10\n" +
-			"       ✗ check2\n        ↳  66% — ✓ 10 / ✗ 5\n\n" +
-			"   ✓ checks......: 100.00% ✓ 3   ✗ 0  \n"
-		countOut = "   ✗ http_reqs...: 3       3/s\n"
-		gaugeOut = "     vus.........: 1       min=1 max=1\n"
+			"       ✓ check1\n" +
+			"       ✗ check3\n        ↳  66% — ✓ 10 / ✗ 5\n" +
+			"       ✗ check2\n        ↳  33% — ✓ 5 / ✗ 10\n\n" +
+			"   ✓ checks......: 75.00% ✓ 45  ✗ 15 \n"
+		countOut = "   ✗ http_reqs...: 3      3/s\n"
+		gaugeOut = "     vus.........: 1      min=1 max=1\n"
 		trendOut = "   ✗ my_trend....: avg=15ms min=10ms med=15ms max=20ms p(90)=19ms " +
 			"p(95)=19.5ms p(99.9)=19.99ms\n"
 	)
 
-	metrics := createTestMetrics()
+	metrics, rootG := createTestMetrics(t)
 	testCases := []struct {
 		stats    []string
 		expected string
@@ -61,18 +62,6 @@ func TestTextSummary(t *testing.T) {
 		{[]string{"avg", "count"}, checksOut + countOut + "   ✗ my_trend....: avg=15ms count=3\n" + gaugeOut},
 	}
 
-	rootG, err := lib.NewGroup("", nil)
-	require.NoError(t, err)
-	childG, err := rootG.Group("child")
-	require.NoError(t, err)
-	check1, err := childG.Check("check1")
-	require.NoError(t, err)
-	check1.Passes = 5
-	check1.Fails = 10
-	check2, err := childG.Check("check2")
-	require.NoError(t, err)
-	check2.Passes = 10
-	check2.Fails = 5
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(fmt.Sprintf("%v", tc.stats), func(t *testing.T) {
@@ -107,7 +96,7 @@ func TestTextSummary(t *testing.T) {
 	}
 }
 
-func createTestMetrics() map[string]*stats.Metric {
+func createTestMetrics(t *testing.T) (map[string]*stats.Metric, *lib.Group) {
 	metrics := make(map[string]*stats.Metric)
 	gaugeMetric := stats.New("vus", stats.Gauge)
 	gaugeMetric.Sink.Add(stats.Sample{Value: 1})
@@ -123,7 +112,6 @@ func createTestMetrics() map[string]*stats.Metric {
 	samples := []float64{10.0, 15.0, 20.0}
 	for _, s := range samples {
 		sink.Add(stats.Sample{Value: s})
-		checksMetric.Sink.Add(stats.Sample{Value: 1})
 		countMetric.Sink.Add(stats.Sample{Value: 1})
 	}
 
@@ -146,11 +134,36 @@ func createTestMetrics() map[string]*stats.Metric {
 		},
 	}
 
-	return metrics
+	rootG, err := lib.NewGroup("", nil)
+	require.NoError(t, err)
+	childG, err := rootG.Group("child")
+	require.NoError(t, err)
+	check1, err := childG.Check("check1")
+	require.NoError(t, err)
+	check1.Passes = 30
+
+	check3, err := childG.Check("check3") // intentionally before check2
+	require.NoError(t, err)
+	check3.Passes = 10
+	check3.Fails = 5
+
+	check2, err := childG.Check("check2")
+	require.NoError(t, err)
+	check2.Passes = 5
+	check2.Fails = 10
+
+	for i := 0; i < int(check1.Passes+check2.Passes+check3.Passes); i++ {
+		checksMetric.Sink.Add(stats.Sample{Value: 1})
+	}
+	for i := 0; i < int(check1.Fails+check2.Fails+check3.Fails); i++ {
+		checksMetric.Sink.Add(stats.Sample{Value: 0})
+	}
+
+	return metrics, rootG
 }
 
 func TestSummarizeMetricsJSON(t *testing.T) {
-	metrics := createTestMetrics()
+	metrics, rootG := createTestMetrics(t)
 	expected := `{
     "root_group": {
         "name": "",
@@ -167,8 +180,22 @@ func TestSummarizeMetricsJSON(t *testing.T) {
                         "name": "check1",
                         "path": "::child::check1",
                         "id": "6289a7a06253a1c3f6137dfb25695563",
-                        "passes": 8,
-                        "fails": 2
+                        "passes":30,
+                        "fails": 0
+                    },
+                    "check2": {
+                        "name": "check2",
+                        "path": "::child::check2",
+                        "id": "06f5922794bef0d4584ba76a49893e1f",
+                        "passes": 5,
+                        "fails": 10
+                    },
+                    "check3": {
+                        "name": "check3",
+                        "path": "::child::check3",
+                        "id": "c7553eca92d3e034b5808332296d304a",
+                        "passes": 10,
+                        "fails": 5
                     }
                 }
             }
@@ -177,9 +204,9 @@ func TestSummarizeMetricsJSON(t *testing.T) {
     },
     "metrics": {
         "checks": {
-            "value": 1,
-            "passes": 3,
-            "fails": 0
+            "value": 0.75,
+            "passes": 45,
+            "fails": 15
         },
         "http_reqs": {
             "count": 3,
@@ -196,6 +223,7 @@ func TestSummarizeMetricsJSON(t *testing.T) {
             "p(90)": 19,
             "p(95)": 19.5,
             "p(99)": 19.9,
+			"count": 3,
             "thresholds": {
                 "my_trend<1000": true
             }
@@ -208,20 +236,11 @@ func TestSummarizeMetricsJSON(t *testing.T) {
     }
 }
 `
-	rootG, err := lib.NewGroup("", nil)
-	require.NoError(t, err)
-	childG, err := rootG.Group("child")
-	require.NoError(t, err)
-	// TODO: actually have a better example without conflicting check metrics...
-	check, err := childG.Check("check1")
-	require.NoError(t, err)
-	check.Passes = 8
-	check.Fails = 2
 
 	runner, err := getSimpleRunner(
 		t, "/script.js",
 		`
-		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)"]};
+		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
 		exports.default = function() {};
 		`,
 		lib.RuntimeOptions{
