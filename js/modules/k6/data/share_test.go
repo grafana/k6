@@ -174,7 +174,7 @@ func TestSharedArrayAnotherRuntimeWorking(t *testing.T) {
 		throw new Error("bad array[2]="+array[2].value);
 	}
 	if (array.length != 50) {
-		throw new Error("bad length " +_array.length);
+		throw new Error("bad length " +array.length);
 	}
 
 	var i = 0;
