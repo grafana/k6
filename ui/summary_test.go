@@ -37,7 +37,9 @@ import (
 func TestSummary(t *testing.T) {
 	t.Run("SummarizeMetrics", func(t *testing.T) {
 		var (
-			checksOut = "     █ child\n\n       ✗ check1\n        ↳  33% — ✓ 5 / ✗ 10\n\n" +
+			checksOut = "     █ child\n\n" +
+				"       ✗ check1\n        ↳  33% — ✓ 5 / ✗ 10\n" +
+				"       ✗ check2\n        ↳  66% — ✓ 10 / ✗ 5\n\n" +
 				"   ✓ checks......: 100.00% ✓ 3   ✗ 0  \n"
 			countOut = "   ✗ http_reqs...: 3       3/s\n"
 			gaugeOut = "     vus.........: 1       min=1 max=1\n"
@@ -58,10 +60,12 @@ func TestSummary(t *testing.T) {
 
 		rootG, _ := lib.NewGroup("", nil)
 		childG, _ := rootG.Group("child")
-		check, _ := lib.NewCheck("check1", childG)
-		check.Passes = 5
-		check.Fails = 10
-		childG.Checks["check1"] = check
+		check1, _ := childG.Check("check1")
+		check1.Passes = 5
+		check1.Fails = 10
+		check2, _ := childG.Check("check2")
+		check2.Passes = 10
+		check2.Fails = 5
 		for _, tc := range testCases {
 			tc := tc
 			t.Run(fmt.Sprintf("%v", tc.stats), func(t *testing.T) {

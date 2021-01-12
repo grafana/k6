@@ -459,8 +459,8 @@ func easyjson9def2ecdDecodeGithubComLoadimpactK6StatsCloud4(in *jlexer.Lexer, ou
 		case "time":
 			out.Time = int64(in.Int64Str())
 		case "type":
-			if data := in.Raw(); in.Ok() {
-				in.AddError((out.Type).UnmarshalJSON(data))
+			if data := in.UnsafeBytes(); in.Ok() {
+				in.AddError((out.Type).UnmarshalText(data))
 			}
 		case "tags":
 			if in.IsNull() {
@@ -544,8 +544,8 @@ func easyjson9def2ecdDecodeGithubComLoadimpactK6StatsCloud5(in *jlexer.Lexer, ou
 		case "time":
 			out.Time = int64(in.Int64Str())
 		case "type":
-			if data := in.Raw(); in.Ok() {
-				in.AddError((out.Type).UnmarshalJSON(data))
+			if data := in.UnsafeBytes(); in.Ok() {
+				in.AddError((out.Type).UnmarshalText(data))
 			}
 		case "tags":
 			if in.IsNull() {
