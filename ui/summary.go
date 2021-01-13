@@ -21,7 +21,6 @@
 package ui
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -29,12 +28,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"golang.org/x/text/unicode/norm"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 )
+
+// TODO: delete everything here after we move it to a JS function
 
 const (
 	groupPrefix   = "█"
@@ -44,97 +44,19 @@ const (
 	failMark = "✗"
 )
 
-//nolint: gochecknoglobals
-var (
-	errStatEmptyString            = errors.New("invalid stat, empty string")
-	errStatUnknownFormat          = errors.New("invalid stat, unknown format")
-	errPercentileStatInvalidValue = errors.New(
-		"invalid percentile stat value, accepts a number between 0 and 100")
-	staticResolvers = map[string]func(s *stats.TrendSink) interface{}{
-		"avg":   func(s *stats.TrendSink) interface{} { return s.Avg },
-		"min":   func(s *stats.TrendSink) interface{} { return s.Min },
-		"med":   func(s *stats.TrendSink) interface{} { return s.Med },
-		"max":   func(s *stats.TrendSink) interface{} { return s.Max },
-		"count": func(s *stats.TrendSink) interface{} { return s.Count },
-	}
-)
-
-// ErrInvalidStat represents an invalid trend column stat
-type ErrInvalidStat struct {
-	name string
-	err  error
-}
-
-func (e ErrInvalidStat) Error() string {
-	return errors.Wrapf(e.err, "'%s'", e.name).Error()
-}
-
 // Summary handles test summary output
 type Summary struct {
 	trendColumns        []string
-	trendValueResolvers map[string]func(s *stats.TrendSink) interface{}
+	trendValueResolvers map[string]func(s *stats.TrendSink) float64
 }
 
 // NewSummary returns a new Summary instance, used for writing a
 // summary/report of the test metrics data.
 func NewSummary(cols []string) *Summary {
-	s := Summary{trendColumns: cols, trendValueResolvers: staticResolvers}
+	s := Summary{trendColumns: cols}
 
-	customResolvers := s.generateCustomTrendValueResolvers(cols)
-	for name, res := range customResolvers {
-		s.trendValueResolvers[name] = res
-	}
-
+	s.trendValueResolvers, _ = stats.GetResolversForTrendColumns(cols)
 	return &s
-}
-
-func (s *Summary) generateCustomTrendValueResolvers(cols []string) map[string]func(s *stats.TrendSink) interface{} {
-	resolvers := make(map[string]func(s *stats.TrendSink) interface{})
-
-	for _, stat := range cols {
-		if _, exists := s.trendValueResolvers[stat]; !exists {
-			percentile, err := validatePercentile(stat)
-			if err == nil {
-				resolvers[stat] = func(s *stats.TrendSink) interface{} { return s.P(percentile / 100) }
-			}
-		}
-	}
-
-	return resolvers
-}
-
-// ValidateSummary checks if passed trend columns are valid for use in
-// the summary output.
-func ValidateSummary(trendColumns []string) error {
-	for _, stat := range trendColumns {
-		if stat == "" {
-			return ErrInvalidStat{stat, errStatEmptyString}
-		}
-
-		if _, exists := staticResolvers[stat]; exists {
-			continue
-		}
-
-		if _, err := validatePercentile(stat); err != nil {
-			return ErrInvalidStat{stat, err}
-		}
-	}
-
-	return nil
-}
-
-func validatePercentile(stat string) (float64, error) {
-	if !strings.HasPrefix(stat, "p(") || !strings.HasSuffix(stat, ")") {
-		return 0, errStatUnknownFormat
-	}
-
-	percentile, err := strconv.ParseFloat(stat[2:len(stat)-1], 64)
-
-	if err != nil || ((0 > percentile) || (percentile > 100)) {
-		return 0, errPercentileStatInvalidValue
-	}
-
-	return percentile, nil
 }
 
 // StrWidth returns the actual width of the string.
@@ -244,25 +166,6 @@ func nonTrendMetricValueForSum(t time.Duration, timeUnit string, m *stats.Metric
 	}
 }
 
-func nonTrendMetricValueForSumJSON(t time.Duration, m *stats.Metric) map[string]interface{} {
-	data := make(map[string]interface{})
-	switch sink := m.Sink.(type) {
-	case *stats.CounterSink:
-		rate := 0.0
-		if t > 0 {
-			rate = sink.Value / (float64(t) / float64(time.Second))
-		}
-		data["rate"] = rate
-	case *stats.GaugeSink:
-		data["min"] = sink.Min
-		data["max"] = sink.Max
-	case *stats.RateSink:
-		data["passes"] = sink.Trues
-		data["fails"] = sink.Total - sink.Trues
-	}
-	return data
-}
-
 func displayNameForMetric(m *stats.Metric) string {
 	if m.Sub.Parent != "" {
 		return "{ " + m.Sub.Suffix + " }"
@@ -309,11 +212,11 @@ func (s *Summary) summarizeMetrics(w io.Writer, indent string, t time.Duration,
 
 				resolver := s.trendValueResolvers[tc]
 
-				switch v := resolver(sink).(type) {
-				case float64:
+				v := resolver(sink)
+				if tc != "count" { // sigh
 					value = m.HumanizeValue(v, timeUnit)
-				case uint64:
-					value = strconv.FormatUint(v, 10)
+				} else {
+					value = strconv.FormatInt(int64(v), 10)
 				}
 				if l := StrWidth(value); l > trendColMaxLens[i] {
 					trendColMaxLens[i] = l
@@ -404,55 +307,4 @@ func (s *Summary) SummarizeMetrics(w io.Writer, indent string, data SummaryData)
 	}
 
 	s.summarizeMetrics(w, indent+"  ", data.Time, data.TimeUnit, data.Metrics)
-}
-
-// SummarizeMetricsJSON summarizes a dataset in JSON format.
-func (s *Summary) SummarizeMetricsJSON(w io.Writer, data SummaryData) error {
-	m := make(map[string]interface{})
-	m["root_group"] = data.RootGroup
-
-	metricsData := make(map[string]interface{})
-	for name, m := range data.Metrics {
-		m.Sink.Calc()
-
-		sinkData := m.Sink.Format(data.Time)
-		metricsData[name] = sinkData
-
-		var thresholds map[string]interface{}
-		if len(m.Thresholds.Thresholds) > 0 {
-			sinkDataWithThreshold := make(map[string]interface{})
-			for k, v := range sinkData {
-				sinkDataWithThreshold[k] = v
-			}
-			thresholds = make(map[string]interface{})
-			for _, threshold := range m.Thresholds.Thresholds {
-				thresholds[threshold.Source] = threshold.LastFailed
-			}
-			sinkDataWithThreshold["thresholds"] = thresholds
-			metricsData[name] = sinkDataWithThreshold
-		}
-
-		if _, ok := m.Sink.(*stats.TrendSink); ok {
-			continue
-		}
-
-		extra := nonTrendMetricValueForSumJSON(data.Time, m)
-		if len(extra) > 1 {
-			extraData := make(map[string]interface{})
-			extraData["value"] = sinkData["value"]
-			if thresholds != nil {
-				extraData["thresholds"] = thresholds
-			}
-			for k, v := range extra {
-				extraData[k] = v
-			}
-			metricsData[name] = extraData
-		}
-	}
-	m["metrics"] = metricsData
-	encoder := json.NewEncoder(w)
-	encoder.SetEscapeHTML(false)
-	encoder.SetIndent("", "    ")
-
-	return encoder.Encode(m)
 }

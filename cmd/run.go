@@ -25,6 +25,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -46,7 +48,6 @@ import (
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
-	"github.com/loadimpact/k6/ui"
 	"github.com/loadimpact/k6/ui/pb"
 )
 
@@ -120,7 +121,7 @@ a commandline interface for interacting with it.`,
 				return err
 			}
 
-			r, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
+			initRunner, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
 			if err != nil {
 				return err
 			}
@@ -131,18 +132,18 @@ a commandline interface for interacting with it.`,
 			if err != nil {
 				return err
 			}
-			conf, err := getConsolidatedConfig(afero.NewOsFs(), cliConf, r)
+			conf, err := getConsolidatedConfig(afero.NewOsFs(), cliConf, initRunner)
 			if err != nil {
 				return err
 			}
 
-			conf, cerr := deriveAndValidateConfig(conf, r.IsExecutable)
+			conf, cerr := deriveAndValidateConfig(conf, initRunner.IsExecutable)
 			if cerr != nil {
 				return ExitCode{error: cerr, Code: invalidConfigErrorCode}
 			}
 
 			// Write options back to the runner too.
-			if err = r.SetOptions(conf.Options); err != nil {
+			if err = initRunner.SetOptions(conf.Options); err != nil {
 				return err
 			}
 
@@ -165,7 +166,7 @@ a commandline interface for interacting with it.`,
 
 			// Create a local execution scheduler wrapping the runner.
 			logger.Debug("Initializing the execution scheduler...")
-			execScheduler, err := local.NewExecutionScheduler(r, logger)
+			execScheduler, err := local.NewExecutionScheduler(initRunner, logger)
 			if err != nil {
 				return err
 			}
@@ -290,36 +291,18 @@ a commandline interface for interacting with it.`,
 				logger.Warn("No script iterations finished, consider making the test duration longer")
 			}
 
-			data := ui.SummaryData{
-				Metrics:   engine.Metrics,
-				RootGroup: engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
-				Time:      executionState.GetCurrentTestRunDuration(),
-				TimeUnit:  conf.Options.SummaryTimeUnit.String,
-			}
-			// Print the end-of-test summary.
+			// Handle the end-of-test summary.
 			if !runtimeOptions.NoSummary.Bool {
-				fprintf(stdout, "\n")
-
-				s := ui.NewSummary(conf.SummaryTrendStats)
-				s.SummarizeMetrics(stdout, "", data)
-
-				fprintf(stdout, "\n")
-			}
-
-			if runtimeOptions.SummaryExport.ValueOrZero() != "" { //nolint:nestif
-				f, err := os.Create(runtimeOptions.SummaryExport.String)
+				summaryResult, err := initRunner.HandleSummary(globalCtx, &lib.Summary{
+					Metrics:         engine.Metrics,
+					RootGroup:       engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
+					TestRunDuration: executionState.GetCurrentTestRunDuration(),
+				})
+				if err == nil {
+					err = handleSummaryResult(afero.NewOsFs(), os.Stdout, os.Stderr, summaryResult)
+				}
 				if err != nil {
-					logger.WithError(err).Error("failed to create summary export file")
-				} else {
-					defer func() {
-						if err := f.Close(); err != nil {
-							logger.WithError(err).Error("failed to close summary export file")
-						}
-					}()
-					s := ui.NewSummary(conf.SummaryTrendStats)
-					if err := s.SummarizeMetricsJSON(f, data); err != nil {
-						logger.WithError(err).Error("failed to make summary export file")
-					}
+					logger.WithError(err).Error("failed to handle the end-of-test summary")
 				}
 			}
 
@@ -448,4 +431,29 @@ func detectType(data []byte) string {
 		return typeArchive
 	}
 	return typeJS
+}
+
+func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[string]io.Reader) error {
+	var errs []error
+
+	getWriter := func(path string) (io.Writer, error) {
+		switch path {
+		case "stdout":
+			return stdOut, nil
+		case "stderr":
+			return stdErr, nil
+		default:
+			return fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		}
+	}
+
+	for path, value := range result {
+		if writer, err := getWriter(path); err != nil {
+			errs = append(errs, fmt.Errorf("could not open '%s': %w", path, err))
+		} else if n, err := io.Copy(writer, value); err != nil {
+			errs = append(errs, fmt.Errorf("error saving summary to '%s' after %d bytes: %w", path, n, err))
+		}
+	}
+
+	return consolidateErrorMessage(errs, "Could not save some summary information:")
 }

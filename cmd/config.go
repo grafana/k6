@@ -43,7 +43,6 @@ import (
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd"
-	"github.com/loadimpact/k6/ui"
 )
 
 // configFlagSet returns a FlagSet with the default run configuration flags.
@@ -220,7 +219,7 @@ func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf
 	// for CLI flags in cmd.getOptions, in case other configuration sources
 	// (e.g. env vars) overrode our default value. This is not done in
 	// lib.Options.Validate to avoid circular imports.
-	if err = ui.ValidateSummary(conf.SummaryTrendStats); err != nil {
+	if _, err = stats.GetResolversForTrendColumns(conf.SummaryTrendStats); err != nil {
 		return conf, err
 	}
 
@@ -270,11 +269,15 @@ func validateConfig(conf Config, isExecutable func(string) bool) error {
 		}
 	}
 
+	return consolidateErrorMessage(errList, "There were problems with the specified script configuration:")
+}
+
+func consolidateErrorMessage(errList []error, title string) error {
 	if len(errList) == 0 {
 		return nil
 	}
 
-	errMsgParts := []string{"There were problems with the specified script configuration:"}
+	errMsgParts := []string{title}
 	for _, err := range errList {
 		errMsgParts = append(errMsgParts, fmt.Sprintf("\t- %s", err.Error()))
 	}

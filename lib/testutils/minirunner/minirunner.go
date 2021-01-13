@@ -22,6 +22,7 @@ package minirunner
 
 import (
 	"context"
+	"io"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
@@ -38,9 +39,10 @@ var (
 // using a real JS runtime, it allows us to directly specify the options and
 // functions with Go code.
 type MiniRunner struct {
-	Fn         func(ctx context.Context, out chan<- stats.SampleContainer) error
-	SetupFn    func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error)
-	TeardownFn func(ctx context.Context, out chan<- stats.SampleContainer) error
+	Fn              func(ctx context.Context, out chan<- stats.SampleContainer) error
+	SetupFn         func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error)
+	TeardownFn      func(ctx context.Context, out chan<- stats.SampleContainer) error
+	HandleSummaryFn func(context.Context, *lib.Summary) (map[string]io.Reader, error)
 
 	SetupData []byte
 
@@ -110,6 +112,14 @@ func (r MiniRunner) GetOptions() lib.Options {
 func (r *MiniRunner) SetOptions(opts lib.Options) error {
 	r.Options = opts
 	return nil
+}
+
+// HandleSummary calls the specified summary callback, if supplied.
+func (r *MiniRunner) HandleSummary(ctx context.Context, s *lib.Summary) (map[string]io.Reader, error) {
+	if r.HandleSummaryFn != nil {
+		return r.HandleSummaryFn(ctx, s)
+	}
+	return nil, nil
 }
 
 // VU is a mock VU, spawned by a MiniRunner.

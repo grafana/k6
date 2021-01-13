@@ -33,7 +33,6 @@ import (
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/ui"
 )
 
 var (
@@ -223,7 +222,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		if errSts != nil {
 			return opts, errSts
 		}
-		if errSts = ui.ValidateSummary(trendStats); err != nil {
+		if _, errSts = stats.GetResolversForTrendColumns(trendStats); err != nil {
 			return opts, errSts
 		}
 		opts.SummaryTrendStats = trendStats
