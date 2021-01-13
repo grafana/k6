@@ -74,7 +74,7 @@ func (c *Compiler) Transform(src, filename string) (code string, srcmap *SourceM
 func (c *Compiler) Compile(src, filename, pre, post string,
 	strict bool, compatMode lib.CompatibilityMode) (*goja.Program, string, error) {
 	code := pre + src + post
-	ast, err := parser.ParseFile(nil, filename, code, 0)
+	ast, err := parser.ParseFile(nil, filename, code, 0, parser.WithDisableSourceMaps)
 	if err != nil {
 		if compatMode == lib.CompatibilityModeExtended {
 			code, _, err = c.Transform(src, filename)
