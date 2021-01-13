@@ -735,6 +735,8 @@ func (r *Runtime) stringproto_split(call FunctionCall) Value {
 		limit = int(toUint32(limitValue))
 	}
 
+	separatorValue = separatorValue.ToString()
+
 	if limit == 0 {
 		return r.newArrayValues(nil)
 	}
@@ -743,7 +745,7 @@ func (r *Runtime) stringproto_split(call FunctionCall) Value {
 		return r.newArrayValues([]Value{s})
 	}
 
-	separator := separatorValue.toString().String()
+	separator := separatorValue.String()
 
 	excess := false
 	str := s.String()

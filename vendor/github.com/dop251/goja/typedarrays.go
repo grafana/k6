@@ -385,19 +385,15 @@ func (a *float32Array) setRaw(idx int, v uint64) {
 func typedFloatLess(x, y float64) bool {
 	xNan := math.IsNaN(x)
 	yNan := math.IsNaN(y)
-	if xNan && yNan {
-		return false
-	}
-	if xNan {
-		return false
-	}
 	if yNan {
-		return true
-	}
-	if x >= y {
+		return !xNan
+	} else if xNan {
 		return false
 	}
-	return true
+	if x == 0 && y == 0 { // handle neg zero
+		return math.Signbit(x)
+	}
+	return x < y
 }
 
 func (a *float32Array) less(i, j int) bool {

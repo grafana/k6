@@ -1125,17 +1125,6 @@ func MustCompile(name, src string, strict bool) *Program {
 func Parse(name, src string, options ...parser.Option) (prg *js_ast.Program, err error) {
 	prg, err1 := parser.ParseFile(nil, name, src, 0, options...)
 	if err1 != nil {
-		switch err1 := err1.(type) {
-		case parser.ErrorList:
-			if len(err1) > 0 && err1[0].Message == "Invalid left-hand side in assignment" {
-				err = &CompilerReferenceError{
-					CompilerError: CompilerError{
-						Message: err1.Error(),
-					},
-				}
-				return
-			}
-		}
 		// FIXME offset
 		err = &CompilerSyntaxError{
 			CompilerError: CompilerError{
