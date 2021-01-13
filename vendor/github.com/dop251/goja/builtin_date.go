@@ -140,7 +140,7 @@ func (r *Runtime) dateproto_toISOString(call FunctionCall) Value {
 }
 
 func (r *Runtime) dateproto_toJSON(call FunctionCall) Value {
-	obj := r.toObject(call.This)
+	obj := call.This.ToObject(r)
 	tv := obj.toPrimitiveNumber()
 	if f, ok := tv.(valueFloat); ok {
 		f := float64(f)

@@ -44,7 +44,6 @@ var (
 	stringObjectNull      valueString = asciiString("[object Null]")
 	stringObjectObject    valueString = asciiString("[object Object]")
 	stringObjectUndefined valueString = asciiString("[object Undefined]")
-	stringGlobalObject    valueString = asciiString("Global Object")
 	stringInvalidDate     valueString = asciiString("Invalid Date")
 )
 

@@ -440,8 +440,8 @@ func (self *_parser) switch6(tkn0, tkn1 token.Token, chr2 rune, tkn2, tkn3 token
 }
 
 func (self *_parser) _peek() rune {
-	if self.offset+1 < self.length {
-		return rune(self.str[self.offset+1])
+	if self.offset < self.length {
+		return rune(self.str[self.offset])
 	}
 	return -1
 }

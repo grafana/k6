@@ -298,15 +298,15 @@ func (r *Runtime) builtin_newRegExp(args []Value, proto *Object) *Object {
 func (r *Runtime) newRegExp(patternVal, flagsVal Value, proto *Object) *Object {
 	var pattern valueString
 	var flags string
-	if obj, ok := patternVal.(*Object); ok {
-		if rx, ok := obj.self.(*regexpObject); ok {
-			if flagsVal == nil || flagsVal == _undefined {
-				return rx.clone()
+	if isRegexp(patternVal) { // this may have side effects so need to call it anyway
+		if obj, ok := patternVal.(*Object); ok {
+			if rx, ok := obj.self.(*regexpObject); ok {
+				if flagsVal == nil || flagsVal == _undefined {
+					return rx.clone()
+				} else {
+					return r._newRegExp(rx.source, flagsVal.toString().String(), proto)
+				}
 			} else {
-				return r._newRegExp(rx.source, flagsVal.toString().String(), proto)
-			}
-		} else {
-			if isRegexp(patternVal) {
 				pattern = nilSafe(obj.self.getStr("source", nil)).toString()
 				if flagsVal == nil || flagsVal == _undefined {
 					flags = nilSafe(obj.self.getStr("flags", nil)).toString().String()
@@ -660,8 +660,8 @@ func (r *Runtime) getGlobalRegexpMatches(rxObj *Object, s valueString) []Value {
 		a = append(a, res)
 		matchStr := nilSafe(r.toObject(res).self.getIdx(valueInt(0), nil)).toString()
 		if matchStr.length() == 0 {
-			thisIndex := toIntStrict(nilSafe(rxObj.self.getStr("lastIndex", nil)).ToInteger())
-			rxObj.self.setOwnStr("lastIndex", valueInt(advanceStringIndex(s, thisIndex, fullUnicode)), true)
+			thisIndex := toLength(rxObj.self.getStr("lastIndex", nil))
+			rxObj.self.setOwnStr("lastIndex", valueInt(advanceStringIndex64(s, thisIndex, fullUnicode)), true)
 		}
 	}
 
@@ -855,6 +855,24 @@ func advanceStringIndex(s valueString, pos int, unicode bool) int {
 	return next + 1
 }
 
+func advanceStringIndex64(s valueString, pos int64, unicode bool) int64 {
+	next := pos + 1
+	if !unicode {
+		return next
+	}
+	l := int64(s.length())
+	if next >= l {
+		return next
+	}
+	if !isUTF16FirstSurrogate(s.charAt(int(pos))) {
+		return next
+	}
+	if !isUTF16SecondSurrogate(s.charAt(int(next))) {
+		return next
+	}
+	return next + 1
+}
+
 func (r *Runtime) regexpproto_stdSplitter(call FunctionCall) Value {
 	rxObj := r.toObject(call.This)
 	s := call.Argument(0).toString()
@@ -877,6 +895,7 @@ func (r *Runtime) regexpproto_stdSplitter(call FunctionCall) Value {
 		}
 	}
 
+	pattern := search.pattern // toUint32() may recompile the pattern, but we still need to use the original
 	limit := -1
 	if limitValue != _undefined {
 		limit = int(toUint32(limitValue))
@@ -891,7 +910,7 @@ func (r *Runtime) regexpproto_stdSplitter(call FunctionCall) Value {
 	lastIndex := 0
 	found := 0
 
-	result := search.pattern.findAllSubmatchIndex(s, 0, -1, false)
+	result := pattern.findAllSubmatchIndex(s, 0, -1, false)
 	if targetLength == 0 {
 		if result == nil {
 			valueArray = append(valueArray, s)
