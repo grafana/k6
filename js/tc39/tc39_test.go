@@ -56,6 +56,14 @@ var (
 		"sec-regexp",
 		"sec-variable-statement",
 		"sec-ecmascript-standard-built-in-objects",
+		"sec-object",
+	}
+
+	featuresAllowList = []string{
+		"Array.prototype.flat",
+		"Array.prototype.flatMap",
+		"String.prototype.matchAll",
+		"Symbol.matchAll",
 	}
 
 	featuresBlockList = []string{
@@ -345,6 +353,15 @@ func shouldBeSkipped(t testing.TB, meta *tc39Meta) {
 				}
 			}
 		}
+
+		for _, feature := range meta.Features {
+			for _, bl := range featuresAllowList {
+				if feature == bl {
+					skip = false
+				}
+			}
+		}
+
 		for _, feature := range meta.Features {
 			for _, bl := range featuresBlockList {
 				if feature == bl {
@@ -352,6 +369,7 @@ func shouldBeSkipped(t testing.TB, meta *tc39Meta) {
 				}
 			}
 		}
+
 		if skip {
 			t.Skipf("Not ES6 or ES5 esid: %s", meta.Esid)
 		}
