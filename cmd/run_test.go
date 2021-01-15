@@ -27,7 +27,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/loadimpact/k6/lib/fsext"
@@ -79,9 +78,6 @@ func initVars() (
 	content map[string]io.Reader, stdout *bytes.Buffer, stderr *bytes.Buffer, fs afero.Fs,
 ) {
 	fs = afero.NewMemMapFs()
-	if runtime.GOOS == "windows" {
-		fs = fsext.NewTrimFilePathSeparatorFs(fs)
-	}
 
 	return map[string]io.Reader{}, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), fs
 }
@@ -113,12 +109,12 @@ func TestHandleSummaryResultError(t *testing.T) {
 
 	content["stdout"] = bytes.NewBufferString("some stdout summary")
 	content["stderr"] = bytes.NewBufferString("some stderr summary")
-	content["/path/file1"] = bytes.NewBufferString("file summary 1")
-	content["/path/file2"] = bytes.NewBufferString("file summary 2")
+	content["path/file1"] = bytes.NewBufferString("file summary 1")
+	content["path/file2"] = bytes.NewBufferString("file summary 2")
 	err := handleSummaryResult(fs, stdout, stderr, content)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), expErr.Error())
 	files := getFiles(t, fs)
-	assertEqual(t, "file summary 1", files["/path/file1"])
-	assertEqual(t, "file summary 2", files["/path/file2"])
+	assertEqual(t, "file summary 1", files["path/file1"])
+	assertEqual(t, "file summary 2", files["path/file2"])
 }
