@@ -27,6 +27,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/loadimpact/k6/lib/fsext"
@@ -107,14 +108,21 @@ func TestHandleSummaryResultError(t *testing.T) {
 	expErr := errors.New("test error")
 	stdout := mockWriter{err: expErr, errAfter: 10}
 
+	filePath1 := "/path/file1"
+	filePath2 := "/path/file2"
+	if runtime.GOOS == "windows" {
+		filePath1 = "c:\\path\\file1"
+		filePath2 = "c:\\path\\file2"
+	}
+
 	content["stdout"] = bytes.NewBufferString("some stdout summary")
 	content["stderr"] = bytes.NewBufferString("some stderr summary")
-	content["path/file1"] = bytes.NewBufferString("file summary 1")
-	content["path/file2"] = bytes.NewBufferString("file summary 2")
+	content[filePath1] = bytes.NewBufferString("file summary 1")
+	content[filePath2] = bytes.NewBufferString("file summary 2")
 	err := handleSummaryResult(fs, stdout, stderr, content)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), expErr.Error())
 	files := getFiles(t, fs)
-	assertEqual(t, "file summary 1", files["path/file1"])
-	assertEqual(t, "file summary 2", files["path/file2"])
+	assertEqual(t, "file summary 1", files[filePath1])
+	assertEqual(t, "file summary 2", files[filePath2])
 }
