@@ -36,10 +36,12 @@ import (
 // TODO: move this to a separate JS file and use go.rice to embed it
 const summaryWrapperLambdaCode = `
 (function() {
-	var forEach = function(obj, callback) {
+	var forEach = function (obj, callback) {
 		for (var key in obj) {
 			if (obj.hasOwnProperty(key)) {
-				callback(key, obj[key]);
+				if (callback(key, obj[key])) {
+					break;
+				}
 			}
 		}
 	}
@@ -88,9 +90,7 @@ const summaryWrapperLambdaCode = `
 		return JSON.stringify(results, null, 4);
 	};
 
-	var oldTextSummary = function(data) {
-		// TODO: implement something like the current end of test summary
-	};
+	// TODO: bundle the text summary generation from jslib and get rid of oldCallback
 
 	return function(exportedSummaryCallback, jsonSummaryPath, data, oldCallback) {
 		var result = {};
@@ -99,12 +99,10 @@ const summaryWrapperLambdaCode = `
 				result = exportedSummaryCallback(data, oldCallback);
 			} catch (e) {
 				console.error('handleSummary() failed with error "' + e + '", falling back to the default summary');
-				//result["stdout"] = oldTextSummary(data);
-				result["stdout"] = oldCallback(); // TODO: delete
+				result["stdout"] = oldCallback(); // TODO: replace with JS function
 			}
 		} else {
-			// result["stdout"] = oldTextSummary(data);
-			result["stdout"] = oldCallback(); // TODO: delete
+			result["stdout"] = oldCallback(); // TODO: replace with JS function
 		}
 
 		// TODO: ensure we're returning a map of strings or null/undefined...
