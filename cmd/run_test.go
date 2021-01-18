@@ -53,7 +53,7 @@ var _ io.Writer = mockWriter{}
 func getFiles(t *testing.T, fs afero.Fs) map[string]*bytes.Buffer {
 	result := map[string]*bytes.Buffer{}
 	walkFn := func(filePath string, info os.FileInfo, err error) error {
-		if filePath == "/" {
+		if filePath == "/" || filePath == "\\" {
 			return nil
 		}
 		require.NoError(t, err)
@@ -78,9 +78,7 @@ func assertEqual(t *testing.T, exp string, actual io.Reader) {
 func initVars() (
 	content map[string]io.Reader, stdout *bytes.Buffer, stderr *bytes.Buffer, fs afero.Fs,
 ) {
-	fs = afero.NewMemMapFs()
-
-	return map[string]io.Reader{}, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), fs
+	return map[string]io.Reader{}, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), afero.NewMemMapFs()
 }
 
 func TestHandleSummaryResultSimple(t *testing.T) {
