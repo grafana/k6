@@ -474,6 +474,8 @@ var unitMap = map[string][]interface{}{
 	"us": {"µs", time.Microsecond},
 }
 
+// HumanizeValue makes the value human-readable
+// TODO: get rid of this after we remove the Go-based summary
 func (m *Metric) HumanizeValue(v float64, timeUnit string) string {
 	switch m.Type {
 	case Rate:
