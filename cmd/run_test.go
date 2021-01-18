@@ -111,8 +111,8 @@ func TestHandleSummaryResultError(t *testing.T) {
 	filePath1 := "/path/file1"
 	filePath2 := "/path/file2"
 	if runtime.GOOS == "windows" {
-		filePath1 = "c:\\path\\file1"
-		filePath2 = "c:\\path\\file2"
+		filePath1 = "\\path\\file1"
+		filePath2 = "\\path\\file2"
 	}
 
 	content["stdout"] = bytes.NewBufferString("some stdout summary")
