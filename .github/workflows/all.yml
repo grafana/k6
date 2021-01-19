@@ -348,6 +348,8 @@ jobs:
         with:
           name: binaries-windows
           path: dist
+      - name: Remove Chocolatey package
+        run: rm dist/k6*.nupkg
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
