@@ -350,6 +350,8 @@ jobs:
           path: dist
       - name: Remove Chocolatey package
         run: rm dist/k6*.nupkg
+      - name: Generate checksum file
+        run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
