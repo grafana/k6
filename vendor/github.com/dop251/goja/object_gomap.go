@@ -138,7 +138,7 @@ func (i *gomapPropIter) next() (propIterItem, iterNextFunc) {
 	return propIterItem{}, nil
 }
 
-func (o *objectGoMapSimple) enumerateUnfiltered() iterNextFunc {
+func (o *objectGoMapSimple) enumerateOwnKeys() iterNextFunc {
 	propNames := make([]string, len(o.data))
 	i := 0
 	for key := range o.data {
@@ -146,10 +146,10 @@ func (o *objectGoMapSimple) enumerateUnfiltered() iterNextFunc {
 		i++
 	}
 
-	return o.recursiveIter((&gomapPropIter{
+	return (&gomapPropIter{
 		o:         o,
 		propNames: propNames,
-	}).next)
+	}).next
 }
 
 func (o *objectGoMapSimple) ownKeys(_ bool, accum []Value) []Value {

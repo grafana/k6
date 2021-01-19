@@ -31,9 +31,6 @@ func (i *proxyPropIter) next() (propIterItem, iterNextFunc) {
 			return propIterItem{name: name.string(), value: prop}, i.next
 		}
 	}
-	if proto := i.p.proto(); proto != nil {
-		return proto.self.enumerateUnfiltered()()
-	}
 	return propIterItem{}, nil
 }
 
@@ -73,6 +70,14 @@ func (r *Runtime) newProxyObject(target, handler, proto *Object) *proxyObject {
 
 func (p Proxy) Revoke() {
 	p.proxy.revoke()
+}
+
+func (p Proxy) Handler() *Object {
+	return p.proxy.handler
+}
+
+func (p Proxy) Target() *Object {
+	return p.proxy.target
 }
 
 func (p Proxy) toValue(r *Runtime) Value {
@@ -561,6 +566,9 @@ func (p *proxyObject) proxyOwnKeys() ([]Value, bool) {
 					panic(p.val.runtime.NewTypeError("%s is not a valid property name", item.String()))
 				}
 			}
+			if _, exists := keySet[item]; exists {
+				panic(p.val.runtime.NewTypeError("'ownKeys' on proxy: trap returned duplicate entries"))
+			}
 			keyList = append(keyList, item)
 			keySet[item] = struct{}{}
 		}
@@ -588,7 +596,7 @@ func (p *proxyObject) proxyOwnKeys() ([]Value, bool) {
 	return nil, false
 }
 
-func (p *proxyObject) enumerateUnfiltered() iterNextFunc {
+func (p *proxyObject) enumerateOwnKeys() iterNextFunc {
 	return (&proxyPropIter{
 		p:     p,
 		names: p.ownKeys(true, nil),

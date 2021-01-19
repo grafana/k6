@@ -371,6 +371,46 @@ func (r *Runtime) stringproto_match(call FunctionCall) Value {
 	panic(r.NewTypeError("RegExp matcher is not a function"))
 }
 
+func (r *Runtime) stringproto_matchAll(call FunctionCall) Value {
+	r.checkObjectCoercible(call.This)
+	regexp := call.Argument(0)
+	if regexp != _undefined && regexp != _null {
+		if isRegexp(regexp) {
+			if o, ok := regexp.(*Object); ok {
+				flags := o.Get("flags")
+				r.checkObjectCoercible(flags)
+				if !strings.Contains(flags.String(), "g") {
+					panic(r.NewTypeError("RegExp doesn't have global flag set"))
+				}
+			}
+		}
+		if matcher := toMethod(r.getV(regexp, SymMatchAll)); matcher != nil {
+			return matcher(FunctionCall{
+				This:      regexp,
+				Arguments: []Value{call.This},
+			})
+		}
+	}
+
+	var rx *regexpObject
+	if regexp, ok := regexp.(*Object); ok {
+		rx, _ = regexp.self.(*regexpObject)
+	}
+
+	if rx == nil {
+		rx = r.newRegExp(regexp, stringFromRune('g'), r.global.RegExpPrototype).self.(*regexpObject)
+	}
+
+	if matcher, ok := r.toObject(rx.getSym(SymMatchAll, nil)).self.assertCallable(); ok {
+		return matcher(FunctionCall{
+			This:      rx.val,
+			Arguments: []Value{call.This.toString()},
+		})
+	}
+
+	panic(r.NewTypeError("RegExp matcher is not a function"))
+}
+
 func (r *Runtime) stringproto_normalize(call FunctionCall) Value {
 	r.checkObjectCoercible(call.This)
 	s := call.This.toString()
@@ -924,6 +964,7 @@ func (r *Runtime) initString() {
 	o._putProp("lastIndexOf", r.newNativeFunc(r.stringproto_lastIndexOf, nil, "lastIndexOf", nil, 1), true, false, true)
 	o._putProp("localeCompare", r.newNativeFunc(r.stringproto_localeCompare, nil, "localeCompare", nil, 1), true, false, true)
 	o._putProp("match", r.newNativeFunc(r.stringproto_match, nil, "match", nil, 1), true, false, true)
+	o._putProp("matchAll", r.newNativeFunc(r.stringproto_matchAll, nil, "matchAll", nil, 1), true, false, true)
 	o._putProp("normalize", r.newNativeFunc(r.stringproto_normalize, nil, "normalize", nil, 0), true, false, true)
 	o._putProp("padEnd", r.newNativeFunc(r.stringproto_padEnd, nil, "padEnd", nil, 1), true, false, true)
 	o._putProp("padStart", r.newNativeFunc(r.stringproto_padStart, nil, "padStart", nil, 1), true, false, true)
@@ -940,8 +981,12 @@ func (r *Runtime) initString() {
 	o._putProp("toString", r.newNativeFunc(r.stringproto_toString, nil, "toString", nil, 0), true, false, true)
 	o._putProp("toUpperCase", r.newNativeFunc(r.stringproto_toUpperCase, nil, "toUpperCase", nil, 0), true, false, true)
 	o._putProp("trim", r.newNativeFunc(r.stringproto_trim, nil, "trim", nil, 0), true, false, true)
-	o._putProp("trimEnd", r.newNativeFunc(r.stringproto_trimEnd, nil, "trimEnd", nil, 0), true, false, true)
-	o._putProp("trimStart", r.newNativeFunc(r.stringproto_trimStart, nil, "trimStart", nil, 0), true, false, true)
+	trimEnd := r.newNativeFunc(r.stringproto_trimEnd, nil, "trimEnd", nil, 0)
+	trimStart := r.newNativeFunc(r.stringproto_trimStart, nil, "trimStart", nil, 0)
+	o._putProp("trimEnd", trimEnd, true, false, true)
+	o._putProp("trimStart", trimStart, true, false, true)
+	o._putProp("trimRight", trimEnd, true, false, true)
+	o._putProp("trimLeft", trimStart, true, false, true)
 	o._putProp("valueOf", r.newNativeFunc(r.stringproto_valueOf, nil, "valueOf", nil, 0), true, false, true)
 
 	o._putSym(SymIterator, valueProp(r.newNativeFunc(r.stringproto_iterator, nil, "[Symbol.iterator]", nil, 0), true, false, true))

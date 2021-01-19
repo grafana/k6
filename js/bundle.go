@@ -35,7 +35,6 @@ import (
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/compiler"
-	jslib "github.com/loadimpact/k6/js/lib"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
@@ -281,12 +280,6 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	rt.SetParserOptions(parser.WithDisableSourceMaps)
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
-
-	if init.compatibilityMode == lib.CompatibilityModeExtended {
-		if _, err := rt.RunProgram(jslib.GetCoreJS()); err != nil {
-			return err
-		}
-	}
 
 	exports := rt.NewObject()
 	rt.Set("exports", exports)

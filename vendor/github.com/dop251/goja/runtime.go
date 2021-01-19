@@ -101,11 +101,12 @@ type global struct {
 	MapPrototype         *Object
 	SetPrototype         *Object
 
-	IteratorPrototype       *Object
-	ArrayIteratorPrototype  *Object
-	MapIteratorPrototype    *Object
-	SetIteratorPrototype    *Object
-	StringIteratorPrototype *Object
+	IteratorPrototype             *Object
+	ArrayIteratorPrototype        *Object
+	MapIteratorPrototype          *Object
+	SetIteratorPrototype          *Object
+	StringIteratorPrototype       *Object
+	RegExpStringIteratorPrototype *Object
 
 	ErrorPrototype          *Object
 	TypeErrorPrototype      *Object
@@ -1297,6 +1298,8 @@ func(FunctionCall) Value is treated as a native JavaScript function. This increa
 automatic argument and return value type conversions (which involves reflect). Attempting to use
 the function as a constructor will result in a TypeError.
 
+func(FunctionCall, *Runtime) Value is treated as above, except the *Runtime is also passed as a parameter.
+
 func(ConstructorCall) *Object is treated as a native constructor, allowing to use it with the new
 operator:
 
@@ -1326,6 +1329,8 @@ Then it can be used in JS as follows:
 When a native constructor is called directly (without the new operator) its behavior depends on
 this value: if it's an Object, it is passed through, otherwise a new one is created exactly as
 if it was called with the new operator. In either case call.NewTarget will be nil.
+
+func(ConstructorCall, *Runtime) *Object is treated as above, except the *Runtime is also passed as a parameter.
 
 Any other Go function is wrapped so that the arguments are automatically converted into the required Go types and the
 return value is converted to a JavaScript value (using this method).  If conversion is not possible, a TypeError is
@@ -1449,9 +1454,19 @@ func (r *Runtime) ToValue(i interface{}) Value {
 	case func(FunctionCall) Value:
 		name := unistring.NewFromString(runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name())
 		return r.newNativeFunc(i, nil, name, nil, 0)
+	case func(FunctionCall, *Runtime) Value:
+		name := unistring.NewFromString(runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name())
+		return r.newNativeFunc(func(call FunctionCall) Value {
+			return i(call, r)
+		}, nil, name, nil, 0)
 	case func(ConstructorCall) *Object:
 		name := unistring.NewFromString(runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name())
 		return r.newNativeConstructor(i, name, 0)
+	case func(ConstructorCall, *Runtime) *Object:
+		name := unistring.NewFromString(runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name())
+		return r.newNativeConstructor(func(call ConstructorCall) *Object {
+			return i(call, r)
+		}, name, 0)
 	case int:
 		return intToValue(int64(i))
 	case int8:
@@ -1829,32 +1844,35 @@ func (r *Runtime) toReflectValue(v Value, dst reflect.Value, ctx *objectExportCt
 			keyTyp := typ.Key()
 			elemTyp := typ.Elem()
 			needConvertKeys := !reflect.ValueOf("").Type().AssignableTo(keyTyp)
-			for _, itemName := range o.self.ownKeys(false, nil) {
+			iter := &enumerableIter{
+				wrapped: o.self.enumerateOwnKeys(),
+			}
+			for item, next := iter.next(); next != nil; item, next = next() {
 				var kv reflect.Value
 				var err error
 				if needConvertKeys {
 					kv = reflect.New(keyTyp).Elem()
-					err = r.toReflectValue(itemName, kv, ctx)
+					err = r.toReflectValue(stringValueFromRaw(item.name), kv, ctx)
 					if err != nil {
-						return fmt.Errorf("could not convert map key %s to %v", itemName.String(), typ)
+						return fmt.Errorf("could not convert map key %s to %v", item.name.String(), typ)
 					}
 				} else {
-					kv = reflect.ValueOf(itemName.String())
+					kv = reflect.ValueOf(item.name.String())
 				}
 
-				ival := o.get(itemName, nil)
+				ival := o.self.getStr(item.name, nil)
 				if ival != nil {
 					vv := reflect.New(elemTyp).Elem()
 					err := r.toReflectValue(ival, vv, ctx)
 					if err != nil {
-						return fmt.Errorf("could not convert map value %v to %v at key %s", ival, typ, itemName.String())
+						return fmt.Errorf("could not convert map value %v to %v at key %s", ival, typ, item.name.String())
 					}
 					m.SetMapIndex(kv, vv)
 				} else {
 					m.SetMapIndex(kv, reflect.Zero(elemTyp))
 				}
-
 			}
+
 			return nil
 		}
 	case reflect.Struct:
@@ -2343,5 +2361,39 @@ func limitCallArgs(call FunctionCall, n int) FunctionCall {
 		return FunctionCall{This: call.This, Arguments: call.Arguments[:n]}
 	} else {
 		return call
+	}
+}
+
+func shrinkCap(newSize, oldCap int) int {
+	if oldCap > 8 {
+		if cap := oldCap / 2; cap >= newSize {
+			return cap
+		}
+	}
+	return oldCap
+}
+
+func growCap(newSize, oldSize, oldCap int) int {
+	// Use the same algorithm as in runtime.growSlice
+	doublecap := oldCap + oldCap
+	if newSize > doublecap {
+		return newSize
+	} else {
+		if oldSize < 1024 {
+			return doublecap
+		} else {
+			cap := oldCap
+			// Check 0 < cap to detect overflow
+			// and prevent an infinite loop.
+			for 0 < cap && cap < newSize {
+				cap += cap / 4
+			}
+			// Return the requested cap when
+			// the calculation overflowed.
+			if cap <= 0 {
+				return newSize
+			}
+			return cap
+		}
 	}
 }

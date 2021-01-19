@@ -246,13 +246,10 @@ func (i *gomapReflectPropIter) next() (propIterItem, iterNextFunc) {
 		}
 	}
 
-	if i.o.prototype != nil {
-		return i.o.prototype.self.enumerateUnfiltered()()
-	}
 	return propIterItem{}, nil
 }
 
-func (o *objectGoMapReflect) enumerateUnfiltered() iterNextFunc {
+func (o *objectGoMapReflect) enumerateOwnKeys() iterNextFunc {
 	return (&gomapReflectPropIter{
 		o:    o,
 		keys: o.value.MapKeys(),

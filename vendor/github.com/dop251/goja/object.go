@@ -29,10 +29,11 @@ const (
 	classJSON     = "JSON"
 	classGlobal   = "global"
 
-	classArrayIterator  = "Array Iterator"
-	classMapIterator    = "Map Iterator"
-	classSetIterator    = "Set Iterator"
-	classStringIterator = "String Iterator"
+	classArrayIterator                 = "Array Iterator"
+	classMapIterator                   = "Map Iterator"
+	classSetIterator                   = "Set Iterator"
+	classStringIterator                = "String Iterator"
+	classRegExpStringIteratorPrototype = "RegExp String Iterator"
 )
 
 var (
@@ -243,8 +244,7 @@ type objectImpl interface {
 	hasInstance(v Value) bool
 	isExtensible() bool
 	preventExtensions(throw bool) bool
-	enumerate() iterNextFunc
-	enumerateUnfiltered() iterNextFunc
+	enumerateOwnKeys() iterNextFunc
 	export(ctx *objectExportCtx) interface{}
 	exportType() reflect.Type
 	equal(objectImpl) bool
@@ -438,8 +438,17 @@ func (o *baseObject) _delete(name unistring.String) {
 	delete(o.values, name)
 	for i, n := range o.propNames {
 		if n == name {
-			copy(o.propNames[i:], o.propNames[i+1:])
-			o.propNames = o.propNames[:len(o.propNames)-1]
+			names := o.propNames
+			if namesMarkedForCopy(names) {
+				newNames := make([]unistring.String, len(names)-1, shrinkCap(len(names), cap(names)))
+				copy(newNames, names[:i])
+				copy(newNames[i:], names[i+1:])
+				o.propNames = newNames
+			} else {
+				copy(names[i:], names[i+1:])
+				names[len(names)-1] = ""
+				o.propNames = names[:len(names)-1]
+			}
 			if i < o.lastSortedPropLen {
 				o.lastSortedPropLen--
 				if i < o.idxPropCount {
@@ -514,7 +523,8 @@ func (o *baseObject) setOwnStr(name unistring.String, val Value, throw bool) boo
 			return false
 		} else {
 			o.values[name] = val
-			o.propNames = append(o.propNames, name)
+			names := copyNamesIfNeeded(o.propNames, 1)
+			o.propNames = append(names, name)
 		}
 		return true
 	}
@@ -777,7 +787,8 @@ func (o *baseObject) defineOwnPropertyStr(name unistring.String, descr PropertyD
 	if v, ok := o._defineOwnProperty(name, existingVal, descr, throw); ok {
 		o.values[name] = v
 		if existingVal == nil {
-			o.propNames = append(o.propNames, name)
+			names := copyNamesIfNeeded(o.propNames, 1)
+			o.propNames = append(names, name)
 		}
 		return true
 	}
@@ -805,7 +816,8 @@ func (o *baseObject) defineOwnPropertySym(s *Symbol, descr PropertyDescriptor, t
 
 func (o *baseObject) _put(name unistring.String, v Value) {
 	if _, exists := o.values[name]; !exists {
-		o.propNames = append(o.propNames, name)
+		names := copyNamesIfNeeded(o.propNames, 1)
+		o.propNames = append(names, name)
 	}
 
 	o.values[name] = v
@@ -1011,37 +1023,64 @@ type objectPropIter struct {
 	idx       int
 }
 
-type propFilterIter struct {
-	wrapped iterNextFunc
-	all     bool
-	seen    map[unistring.String]bool
+type recursivePropIter struct {
+	o    objectImpl
+	cur  iterNextFunc
+	seen map[unistring.String]struct{}
 }
 
-func (i *propFilterIter) next() (propIterItem, iterNextFunc) {
+type enumerableIter struct {
+	wrapped iterNextFunc
+}
+
+func (i *enumerableIter) next() (propIterItem, iterNextFunc) {
 	for {
 		var item propIterItem
 		item, i.wrapped = i.wrapped()
 		if i.wrapped == nil {
-			return propIterItem{}, nil
+			return item, nil
 		}
-
-		if !i.seen[item.name] {
-			i.seen[item.name] = true
-			if !i.all {
-				if item.enumerable == _ENUM_FALSE {
+		if item.enumerable == _ENUM_FALSE {
+			continue
+		}
+		if item.enumerable == _ENUM_UNKNOWN {
+			if prop, ok := item.value.(*valueProperty); ok {
+				if !prop.enumerable {
 					continue
 				}
-				if item.enumerable == _ENUM_UNKNOWN {
-					if prop, ok := item.value.(*valueProperty); ok {
-						if !prop.enumerable {
-							continue
-						}
-					}
-				}
 			}
+		}
+		return item, i.next
+	}
+}
+
+func (i *recursivePropIter) next() (propIterItem, iterNextFunc) {
+	for {
+		var item propIterItem
+		item, i.cur = i.cur()
+		if i.cur == nil {
+			if proto := i.o.proto(); proto != nil {
+				i.cur = proto.self.enumerateOwnKeys()
+				i.o = proto.self
+				continue
+			}
+			return propIterItem{}, nil
+		}
+		if _, exists := i.seen[item.name]; !exists {
+			i.seen[item.name] = struct{}{}
 			return item, i.next
 		}
 	}
+}
+
+func enumerateRecursive(o *Object) iterNextFunc {
+	return (&enumerableIter{
+		wrapped: (&recursivePropIter{
+			o:    o.self,
+			cur:  o.self.enumerateOwnKeys(),
+			seen: make(map[unistring.String]struct{}),
+		}).next,
+	}).next
 }
 
 func (i *objectPropIter) next() (propIterItem, iterNextFunc) {
@@ -1053,55 +1092,76 @@ func (i *objectPropIter) next() (propIterItem, iterNextFunc) {
 			return propIterItem{name: name, value: prop}, i.next
 		}
 	}
-
+	clearNamesCopyMarker(i.propNames)
 	return propIterItem{}, nil
 }
 
-func (o *baseObject) enumerate() iterNextFunc {
-	return (&propFilterIter{
-		wrapped: o.val.self.enumerateUnfiltered(),
-		seen:    make(map[unistring.String]bool),
-	}).next
+var copyMarker = unistring.String(" ")
+
+// Set a copy-on-write flag so that any subsequent modifications of anything below the current length
+// trigger a copy.
+// The marker is a special value put at the index position of cap-1. Capacity is set so that the marker is
+// beyond the current length (therefore invisible to normal slice operations).
+// This function is called before an iteration begins to avoid copying of the names array if
+// there are no modifications within the iteration.
+// Note that the copying also occurs in two cases: nested iterations (on the same object) and
+// iterations after a previously abandoned iteration (because there is currently no mechanism to close an
+// iterator). It is still better than copying every time.
+func prepareNamesForCopy(names []unistring.String) []unistring.String {
+	if len(names) == 0 {
+		return names
+	}
+	if namesMarkedForCopy(names) || cap(names) == len(names) {
+		var newcap int
+		if cap(names) == len(names) {
+			newcap = growCap(len(names)+1, len(names), cap(names))
+		} else {
+			newcap = cap(names)
+		}
+		newNames := make([]unistring.String, len(names), newcap)
+		copy(newNames, names)
+		names = newNames
+	}
+	names[cap(names)-1 : cap(names)][0] = copyMarker
+	return names
 }
 
-func (o *baseObject) ownIter() iterNextFunc {
+func namesMarkedForCopy(names []unistring.String) bool {
+	return cap(names) > len(names) && names[cap(names)-1 : cap(names)][0] == copyMarker
+}
+
+func clearNamesCopyMarker(names []unistring.String) {
+	if cap(names) > len(names) {
+		names[cap(names)-1 : cap(names)][0] = ""
+	}
+}
+
+func copyNamesIfNeeded(names []unistring.String, extraCap int) []unistring.String {
+	if namesMarkedForCopy(names) && len(names)+extraCap >= cap(names) {
+		var newcap int
+		newsize := len(names) + extraCap + 1
+		if newsize > cap(names) {
+			newcap = growCap(newsize, len(names), cap(names))
+		} else {
+			newcap = cap(names)
+		}
+		newNames := make([]unistring.String, len(names), newcap)
+		copy(newNames, names)
+		return newNames
+	}
+	return names
+}
+
+func (o *baseObject) enumerateOwnKeys() iterNextFunc {
 	if len(o.propNames) > o.lastSortedPropLen {
 		o.fixPropOrder()
 	}
-	propNames := make([]unistring.String, len(o.propNames))
-	copy(propNames, o.propNames)
+	propNames := prepareNamesForCopy(o.propNames)
+	o.propNames = propNames
 	return (&objectPropIter{
 		o:         o,
 		propNames: propNames,
 	}).next
-}
-
-func (o *baseObject) recursiveIter(iter iterNextFunc) iterNextFunc {
-	return (&recursiveIter{
-		o:       o,
-		wrapped: iter,
-	}).next
-}
-
-func (o *baseObject) enumerateUnfiltered() iterNextFunc {
-	return o.recursiveIter(o.ownIter())
-}
-
-type recursiveIter struct {
-	o       *baseObject
-	wrapped iterNextFunc
-}
-
-func (iter *recursiveIter) next() (propIterItem, iterNextFunc) {
-	item, next := iter.wrapped()
-	if next != nil {
-		iter.wrapped = next
-		return item, iter.next
-	}
-	if proto := iter.o.prototype; proto != nil {
-		return proto.self.enumerateUnfiltered()()
-	}
-	return propIterItem{}, nil
 }
 
 func (o *baseObject) equal(objectImpl) bool {
@@ -1125,7 +1185,16 @@ func (o *baseObject) fixPropOrder() {
 				return strToIdx(names[j]) >= idx
 			})
 			if k < i {
-				copy(names[k+1:i+1], names[k:i])
+				if namesMarkedForCopy(names) {
+					newNames := make([]unistring.String, len(names), cap(names))
+					copy(newNames[:k], names)
+					copy(newNames[k+1:i+1], names[k:i])
+					copy(newNames[i+1:], names[i+1:])
+					names = newNames
+					o.propNames = names
+				} else {
+					copy(names[k+1:i+1], names[k:i])
+				}
 				names[k] = name
 			}
 			o.idxPropCount++

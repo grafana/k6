@@ -612,7 +612,7 @@ func (r *regexpObject) defineOwnPropertySym(name *Symbol, desc PropertyDescripto
 	res := r.baseObject.defineOwnPropertySym(name, desc, throw)
 	if res && r.standard {
 		switch name {
-		case SymMatch, SymSearch, SymSplit, SymReplace:
+		case SymMatch, SymMatchAll, SymSearch, SymSplit, SymReplace:
 			r.standard = false
 		}
 	}
@@ -639,7 +639,7 @@ func (r *regexpObject) setOwnSym(name *Symbol, value Value, throw bool) bool {
 	res := r.baseObject.setOwnSym(name, value, throw)
 	if res && r.standard {
 		switch name {
-		case SymMatch, SymSearch, SymSplit, SymReplace:
+		case SymMatch, SymMatchAll, SymSearch, SymSplit, SymReplace:
 			r.standard = false
 		}
 	}

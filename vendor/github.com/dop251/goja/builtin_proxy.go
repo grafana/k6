@@ -77,6 +77,9 @@ func (r *Runtime) proxyproto_nativehandler_getOwnPropertyDescriptor(native func(
 						return _undefined
 					default:
 						desc := native(t, p.String())
+						if desc.Empty() {
+							return _undefined
+						}
 						return desc.toValue(r)
 					}
 				}

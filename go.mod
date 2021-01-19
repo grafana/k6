@@ -72,7 +72,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/net v0.0.0-20201008223702-a5fa9d4b7c91
 	golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f // indirect
-	golang.org/x/text v0.3.3
+	golang.org/x/text v0.3.5
 	golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336 // indirect
@@ -82,7 +82,7 @@ require (
 	gopkg.in/go-playground/validator.v8 v8.18.2 // indirect
 	gopkg.in/guregu/null.v2 v2.1.2 // indirect
 	gopkg.in/guregu/null.v3 v3.3.0
-	gopkg.in/yaml.v2 v2.3.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 replace (
@@ -92,3 +92,5 @@ replace (
 	golang.org/x/text => golang.org/x/text v0.3.0
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.1.1
 )
+
+replace github.com/dop251/goja => github.com/mstoykov/goja v0.0.0-20210119163707-5970a22b3d75

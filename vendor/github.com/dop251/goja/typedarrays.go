@@ -628,10 +628,10 @@ func (i *typedArrayPropIter) next() (propIterItem, iterNextFunc) {
 		return propIterItem{name: unistring.String(name), value: prop}, i.next
 	}
 
-	return i.a.baseObject.enumerateUnfiltered()()
+	return i.a.baseObject.enumerateOwnKeys()()
 }
 
-func (a *typedArrayObject) enumerateUnfiltered() iterNextFunc {
+func (a *typedArrayObject) enumerateOwnKeys() iterNextFunc {
 	return (&typedArrayPropIter{
 		a: a,
 	}).next

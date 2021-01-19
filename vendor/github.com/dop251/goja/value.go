@@ -748,10 +748,11 @@ func (o *Object) GetSymbol(sym *Symbol) Value {
 }
 
 func (o *Object) Keys() (keys []string) {
-	names := o.self.ownKeys(false, nil)
-	keys = make([]string, 0, len(names))
-	for _, name := range names {
-		keys = append(keys, name.String())
+	iter := &enumerableIter{
+		wrapped: o.self.enumerateOwnKeys(),
+	}
+	for item, next := iter.next(); next != nil; item, next = next() {
+		keys = append(keys, item.name.String())
 	}
 
 	return

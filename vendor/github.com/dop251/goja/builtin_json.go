@@ -150,12 +150,15 @@ func (r *Runtime) builtinJSON_reviveWalk(reviver func(FunctionCall) Value, holde
 				}
 			}
 		} else {
-			for _, itemName := range object.self.ownKeys(false, nil) {
-				value := r.builtinJSON_reviveWalk(reviver, object, itemName)
+			iter := &enumerableIter{
+				wrapped: object.self.enumerateOwnKeys(),
+			}
+			for item, next := iter.next(); next != nil; item, next = next() {
+				value := r.builtinJSON_reviveWalk(reviver, object, stringValueFromRaw(item.name))
 				if value == _undefined {
-					object.self.deleteStr(itemName.string(), false)
+					object.self.deleteStr(item.name, false)
 				} else {
-					object.self.setOwnStr(itemName.string(), value, false)
+					object.self.setOwnStr(item.name, value, false)
 				}
 			}
 		}
@@ -417,7 +420,7 @@ func (ctx *_builtinJSON_stringifyContext) jo(object *Object) {
 
 	var props []Value
 	if ctx.propertyList == nil {
-		props = append(props, object.self.ownKeys(false, nil)...)
+		props = object.self.ownKeys(false, nil)
 	} else {
 		props = ctx.propertyList
 	}

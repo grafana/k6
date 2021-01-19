@@ -296,10 +296,10 @@ func (i *arrayPropIter) next() (propIterItem, iterNextFunc) {
 		}
 	}
 
-	return i.a.baseObject.enumerateUnfiltered()()
+	return i.a.baseObject.enumerateOwnKeys()()
 }
 
-func (a *arrayObject) enumerateUnfiltered() iterNextFunc {
+func (a *arrayObject) enumerateOwnKeys() iterNextFunc {
 	return (&arrayPropIter{
 		a: a,
 	}).next
@@ -345,13 +345,13 @@ func (a *arrayObject) expand(idx uint32) bool {
 				//log.Println("Switching standard->sparse")
 				sa := &sparseArrayObject{
 					baseObject:     a.baseObject,
-					length:         uint32(a.length),
+					length:         a.length,
 					propValueCount: a.propValueCount,
 				}
 				sa.setValues(a.values, a.objCount+1)
 				sa.val.self = sa
-				sa.init()
 				sa.lengthProp.writable = a.lengthProp.writable
+				sa._put("length", &sa.lengthProp)
 				return false
 			} else {
 				if bits.UintSize == 32 {
