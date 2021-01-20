@@ -326,8 +326,10 @@ jobs:
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@2eb78889a50ba021d744837934f1af2d8c4458ec
       - name: Create version bump PR
-        run: brew bump-formula-pr k6 --url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/archive/${VERSION}.tar.gz" \
-               --sha256="$(shasum -a 256 ${VERSION}.tar.gz | cut -d' ' -f1)"
+        run: |
+          brew bump-formula-pr k6 \
+            --url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/archive/${VERSION}.tar.gz" \
+            --sha256="$(shasum -a 256 ${VERSION}.tar.gz | cut -d' ' -f1)"
 
   publish-github:
     runs-on: ubuntu-latest
