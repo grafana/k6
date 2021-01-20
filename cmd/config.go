@@ -78,7 +78,7 @@ type Config struct {
 		InfluxDB  influxdb.Config  `json:"influxdb"`
 		Kafka     kafka.Config     `json:"kafka"`
 		Cloud     cloud.Config     `json:"cloud"`
-		StatsD    common.Config    `json:"statsd"`
+		StatsD    statsd.Config    `json:"statsd"`
 		Datadog   datadog.Config   `json:"datadog"`
 		CSV       csv.Config       `json:"csv"`
 		EventHubs eventhubs.Config `json:"eventhubs"`
