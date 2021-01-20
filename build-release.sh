@@ -58,22 +58,6 @@ package() {
     esac
 }
 
-CHECKSUM_FILE="k6-${VERSION}-checksums.txt"
-checksum() {
-    if command -v sha256sum > /dev/null; then
-        CHECKSUM_CMD=("sha256sum")
-    elif command -v shasum > /dev/null; then
-        CHECKSUM_CMD=("shasum" "-a" "256")
-    else
-        echo "ERROR: unable to find a command to compute sha-256 hash"
-        exit 1
-    fi
-
-    echo "--- Generating checksum file..."
-    rm -f "${OUT_DIR}/$CHECKSUM_FILE"
-    (cd "$OUT_DIR" && find . -maxdepth 1 -type f -printf '%P\n' | sort | xargs "${CHECKSUM_CMD[@]}" > "$CHECKSUM_FILE")
-}
-
 cleanup() {
     find "$OUT_DIR" -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} \;
     echo "--- Cleaned ${OUT_DIR}"
@@ -97,5 +81,3 @@ package linux64 deb
 package mac     zip
 package win32   zip
 package win64   zip
-
-checksum

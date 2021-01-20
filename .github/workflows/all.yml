@@ -243,40 +243,7 @@ jobs:
             docker push "$DOCKER_IMAGE_ID:latest"
           fi
 
-  publish-github:
-    runs-on: ubuntu-latest
-    needs: [deps, lint, test, test-cov, configure, build]
-    if: startsWith(github.ref, 'refs/tags/v')
-    env:
-      VERSION: ${{ needs.configure.outputs.version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Download binaries
-        uses: actions/download-artifact@v2
-        with:
-          name: binaries
-          path: dist
-      - name: Create release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -x
-          assets=()
-          for asset in ./dist/*; do
-            assets+=("-a" "$asset")
-          done
-          hub release create "${assets[@]}" -m "$VERSION" -m "$(cat ./release\ notes/${VERSION}.md)" "$VERSION"
-      - name: Upload packages to Bintray
-        run: |
-          # Publishing deb
-          curl --fail -H "X-GPG-PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}" -T "dist/k6-$VERSION-amd64.deb" \
-            "https://${{ secrets.BINTRAY_USER }}:${{ secrets.BINTRAY_KEY }}@api.bintray.com/content/loadimpact/deb/k6/${VERSION#v}/k6-${VERSION}-amd64.deb;deb_distribution=stable;deb_component=main;deb_architecture=amd64;publish=1;override=1"
-          # Publishing rpm
-          curl --fail -H "X-GPG-PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}" -T "dist/k6-$VERSION-amd64.rpm" \
-            "https://${{ secrets.BINTRAY_USER }}:${{ secrets.BINTRAY_KEY }}@api.bintray.com/content/loadimpact/rpm/k6/${VERSION#v}/k6-${VERSION}-amd64.rpm?publish=1&override=1"
-
-  publish-windows:
+  package-windows:
     runs-on: windows-latest
     defaults:
       run:
@@ -335,12 +302,17 @@ jobs:
         uses: crazy-max/ghaction-chocolatey@b6061d587628735be315d74358228b83a7dba9a7
         with:
           args: pack --verbose --outputdirectory .\packaging .\packaging\k6.portable.nuspec
-      - name: Upload packages to Bintray
-        run: |
-          cd .\packaging
-          $env:VERSION = $env:VERSION.TrimStart("v", " ")
-          curl.exe --fail -H "X-GPG-PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}" -T .\k6.msi "https://${{ secrets.BINTRAY_USER }}:${{ secrets.BINTRAY_KEY }}@api.bintray.com/content/loadimpact/windows/k6/$env:VERSION/k6-v$env:VERSION-amd64.msi?publish=1&override=1"
-          curl.exe --fail -H "X-GPG-PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}" -T .\k6.portable.$env:VERSION.nupkg "https://${{ secrets.BINTRAY_USER }}:${{ secrets.BINTRAY_KEY }}@api.bintray.com/content/loadimpact/choco/k6.portable/$env:VERSION/k6.portable.$env:VERSION.nupkg?publish=1&override=1"
+      - name: Rename MSI package
+        # To keep it consistent with the other artifacts
+        run: move "packaging\k6.msi" "packaging\k6-$env:VERSION-win64.msi"
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: binaries-windows
+          path: |
+            packaging/k6-*.msi
+            packaging/k6.*.nupkg
+          retention-days: 7
 
   publish-macos:
     runs-on: macos-latest
@@ -349,7 +321,72 @@ jobs:
     env:
       VERSION: ${{ needs.configure.outputs.version }}
     steps:
+      - name: Download source code archive
+        run: curl -fsSL "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/archive/${VERSION}.tar.gz" -o "${VERSION}.tar.gz"
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@2eb78889a50ba021d744837934f1af2d8c4458ec
       - name: Create version bump PR
-        run: brew bump-formula-pr k6 --tag="$VERSION" --revision="$GITHUB_SHA"
+        run: brew bump-formula-pr k6 --url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/archive/${VERSION}.tar.gz" \
+               --sha256="$(shasum -a 256 ${VERSION}.tar.gz | cut -d' ' -f1)"
+
+  publish-github:
+    runs-on: ubuntu-latest
+    needs: [configure, deps, lint, test, test-cov, build, package-windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    env:
+      VERSION: ${{ needs.configure.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Download binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries
+          path: dist
+      - name: Download Windows binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries-windows
+          path: dist
+      - name: Remove Chocolatey package
+        run: rm dist/k6*.nupkg
+      - name: Generate checksum file
+        run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -x
+          assets=()
+          for asset in ./dist/*; do
+            assets+=("-a" "$asset")
+          done
+          hub release create "${assets[@]}" -m "$VERSION" -m "$(cat ./release\ notes/${VERSION}.md)" "$VERSION"
+
+  publish-bintray:
+    runs-on: ubuntu-latest
+    needs: [configure, build, package-windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    env:
+      VERSION: ${{ needs.configure.outputs.version }}
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries
+          path: dist
+      - name: Download Windows binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries-windows
+          path: dist
+      - name: Upload packages to Bintray
+        run: |
+          curl -fsS -H "X-GPG-PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}" -T "dist/k6-$VERSION-amd64.deb" \
+            "https://${{ secrets.BINTRAY_USER }}:${{ secrets.BINTRAY_KEY }}@api.bintray.com/content/loadimpact/deb/k6/${VERSION#v}/k6-${VERSION}-amd64.deb;deb_distribution=stable;deb_component=main;deb_architecture=amd64;publish=1;override=1"
+          curl -fsS -H "X-GPG-PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}" -T "dist/k6-$VERSION-amd64.rpm" \
+            "https://${{ secrets.BINTRAY_USER }}:${{ secrets.BINTRAY_KEY }}@api.bintray.com/content/loadimpact/rpm/k6/${VERSION#v}/k6-${VERSION}-amd64.rpm?publish=1&override=1"
+          curl -fsS -H "X-GPG-PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}" -T "dist/k6-$VERSION-win64.msi" \
+            "https://${{ secrets.BINTRAY_USER }}:${{ secrets.BINTRAY_KEY }}@api.bintray.com/content/loadimpact/windows/k6/${VERSION#v}/k6-${VERSION}-amd64.msi?publish=1&override=1"
+          curl -fsS -H "X-GPG-PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}" -T "dist/k6.portable.${VERSION#v}.nupkg" \
+            "https://${{ secrets.BINTRAY_USER }}:${{ secrets.BINTRAY_KEY }}@api.bintray.com/content/loadimpact/choco/k6.portable/${VERSION#v}/k6.portable.${VERSION}.nupkg?publish=1&override=1"
