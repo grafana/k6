@@ -392,14 +392,7 @@ func (r *Runtime) stringproto_matchAll(call FunctionCall) Value {
 		}
 	}
 
-	var rx *regexpObject
-	if regexp, ok := regexp.(*Object); ok {
-		rx, _ = regexp.self.(*regexpObject)
-	}
-
-	if rx == nil {
-		rx = r.newRegExp(regexp, stringFromRune('g'), r.global.RegExpPrototype).self.(*regexpObject)
-	}
+	rx := r.newRegExp(regexp, stringFromRune('g'), r.global.RegExpPrototype).self.(*regexpObject)
 
 	if matcher, ok := r.toObject(rx.getSym(SymMatchAll, nil)).self.assertCallable(); ok {
 		return matcher(FunctionCall{

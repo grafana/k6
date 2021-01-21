@@ -771,7 +771,7 @@ func (r *Runtime) regexpproto_stdMatcherAll(call FunctionCall) Value {
 	flags := nilSafe(thisObj.self.getStr("flags", nil)).toString()
 	c := r.speciesConstructorObj(call.This.(*Object), r.global.RegExp)
 	matcher := r.toConstructor(c)([]Value{call.This, flags}, nil)
-	matcher.self.setOwnStr("lastIndex", nilSafe(thisObj.self.getStr("lastIndex", nil)), true)
+	matcher.self.setOwnStr("lastIndex", valueInt(toLength(thisObj.Get("lastIndex"))), true)
 	flagsStr := flags.String()
 	global := strings.Contains(flagsStr, "g")
 	fullUnicode := strings.Contains(flagsStr, "u")

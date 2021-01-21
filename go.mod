@@ -93,4 +93,4 @@ replace (
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.1.1
 )
 
-replace github.com/dop251/goja => github.com/mstoykov/goja v0.0.0-20210119163707-5970a22b3d75
+replace github.com/dop251/goja => github.com/mstoykov/goja v0.0.0-20210120184035-e29bb8127e9e

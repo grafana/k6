@@ -105,6 +105,12 @@ var (
 		"test/built-ins/Array/prototype/splice/throws-if-integer-limit-exceeded.js":   true, // takes forever and is broken
 		"test/built-ins/Array/prototype/unshift/clamps-to-integer-limit.js":           true, // takes forever and is broken
 		"test/built-ins/Array/prototype/unshift/throws-if-integer-limit-exceeded.js":  true, // takes forever and is broken
+
+		// problems with babel
+		"test/built-ins/RegExp/prototype/Symbol.matchAll/isregexp-called-once.js":                   true, // babel transformation breaks it
+		"test/built-ins/RegExp/prototype/Symbol.matchAll/isregexp-this-throws.js":                   true, // babel transformation breaks it ... but work in goja if simpler syntax is used
+		"test/built-ins/RegExp/prototype/Symbol.matchAll/species-constructor-get-species-throws.js": true, // babel transformation breaks it ...
+		"test/built-ins/RegExp/prototype/Symbol.matchAll/species-constructor.js":                    true, // babel transformation breaks it ... but works in goja if simpler syntax is used
 	}
 )
 
