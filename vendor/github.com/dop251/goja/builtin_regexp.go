@@ -762,12 +762,6 @@ func (r *Runtime) regexpproto_stdSearchGeneric(rxObj *Object, arg valueString) V
 func (r *Runtime) regexpproto_stdMatcherAll(call FunctionCall) Value {
 	thisObj := r.toObject(call.This)
 	s := call.Argument(0).toString()
-	/* TODO later
-	rx := r.checkStdRegexp(thisObj)
-	if rx == nil {
-		return r.regexpproto_stdMatcherGeneric(thisObj, s)
-	}
-	*/
 	flags := nilSafe(thisObj.self.getStr("flags", nil)).toString()
 	c := r.speciesConstructorObj(call.This.(*Object), r.global.RegExp)
 	matcher := r.toConstructor(c)([]Value{call.This, flags}, nil)
@@ -804,17 +798,32 @@ type regExpStringIterObject struct {
 	global, fullUnicode, done bool
 }
 
+// RegExpExec as defined in 21.2.5.2.1
+func regExpExec(r *Object, s valueString) Value {
+	exec := r.Get("exec")
+	if execObject, ok := exec.(*Object); ok {
+		if execFn, ok := execObject.self.assertCallable(); ok {
+			return r.runtime.regExpExec(execFn, r, s)
+		}
+	}
+	// This is not what the spec says, but I don't know what should be done, and this "works"
+	// Specifically:
+	// 21.2.5.2.1
+	// ...
+	// 5. Perform ? RequireInternalSlot(R, [[RegExpMatcher]]).
+	// 6. Return ? RegExpBuiltinExec(R, S).
+	if rx, ok := r.self.(*regexpObject); ok {
+		return rx.exec(s)
+	}
+	panic(r.runtime.NewTypeError("no RegExpMatcher internal slot"))
+}
+
 func (ri *regExpStringIterObject) next() (v Value) {
 	if ri.done {
 		return ri.val.runtime.createIterResultObject(_undefined, true)
 	}
 
-	execFn, ok := ri.val.runtime.toObject(ri.matcher.self.getStr("exec", nil)).self.assertCallable()
-	if !ok {
-		panic(ri.val.runtime.NewTypeError("exec is not a function"))
-	}
-
-	match := ri.val.runtime.regExpExec(execFn, ri.matcher, ri.s)
+	match := regExpExec(ri.matcher, ri.s)
 	if IsNull(match) {
 		ri.done = true
 		return ri.val.runtime.createIterResultObject(_undefined, true)
@@ -1201,7 +1210,7 @@ func (r *Runtime) regExpStringIteratorProto_next(call FunctionCall) Value {
 }
 
 func (r *Runtime) createRegExpStringIteratorPrototype(val *Object) objectImpl {
-	o := newBaseObjectObj(val, r.global.ArrayIteratorPrototype, classObject)
+	o := newBaseObjectObj(val, r.global.IteratorPrototype, classObject)
 
 	o._putProp("next", r.newNativeFunc(r.regExpStringIteratorProto_next, nil, "next", nil, 0), true, false, true)
 	o._putSym(SymToStringTag, valueProp(asciiString(classRegExpStringIteratorPrototype), false, false, true))
