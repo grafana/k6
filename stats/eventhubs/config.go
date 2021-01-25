@@ -30,7 +30,6 @@ import (
 // Config struct for EventHubs
 type Config struct {
 	ConnectionString null.String        `json:"connection_string,omitempty" envconfig:"K6_EVENTHUBS_CONNECTION_STRING"`
-	BufferEnabled    null.Bool          `json:"buffer_enabled,omitempty" envconfig:"K6_EVENTHUBS_BUFFER_ENABLED"`
 	PushInterval     types.NullDuration `json:"push_interval,omitempty" envconfig:"K6_EVENTHUBS_PUSH_INTERVAL"`
 }
 
@@ -38,7 +37,6 @@ type Config struct {
 func NewConfig() Config {
 	return Config{
 		ConnectionString: null.NewString("", false),
-		BufferEnabled:    null.NewBool(true, false),
 		PushInterval:     types.NewNullDuration(1*time.Second, false),
 	}
 }
@@ -50,9 +48,6 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.PushInterval.Valid {
 		c.PushInterval = cfg.PushInterval
-	}
-	if cfg.BufferEnabled.Valid {
-		c.BufferEnabled = cfg.BufferEnabled
 	}
 	return c
 }
