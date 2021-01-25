@@ -33,5 +33,4 @@ func TestNewConfig(t *testing.T) {
 	assert.Equal(t, null.NewString("", false), config.ConnectionString)
 	assert.Equal(t, "", config.ConnectionString.String)
 	assert.Equal(t, types.NullDuration(types.NullDuration{Duration: 1000000000, Valid: false}), config.PushInterval)
-	assert.Equal(t, null.NewBool(true, true), config.BufferEnabled)
 }
