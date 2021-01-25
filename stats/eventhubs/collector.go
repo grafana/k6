@@ -33,6 +33,8 @@ import (
 	"github.com/loadimpact/k6/stats"
 
 	eh "github.com/Azure/azure-event-hubs-go/v3"
+
+	jsonc "github.com/loadimpact/k6/stats/json"
 )
 
 // Collector sends result data to the Load Impact cloud service.
@@ -43,7 +45,7 @@ type Collector struct {
 
 	ctx context.Context
 
-	buffer     []*eh.Event
+	buffer     []stats.Sample
 	bufferLock sync.Mutex
 
 	logger logrus.FieldLogger
@@ -59,7 +61,7 @@ func New(logger logrus.FieldLogger, conf Config) (*Collector, error) {
 	return &Collector{
 		config: conf,
 		client: hub,
-		buffer: make([]*eh.Event, 0),
+		buffer: make([]stats.Sample, 0),
 		logger: logger,
 	}, nil
 }
@@ -80,82 +82,77 @@ func (c *Collector) Link() string {
 func (c *Collector) Run(ctx context.Context) {
 	c.ctx = ctx
 
-	if c.config.BufferEnabled.Bool {
-		ticker := time.NewTicker(time.Duration(c.config.PushInterval.Duration))
+	ticker := time.NewTicker(time.Duration(c.config.PushInterval.Duration))
 
-		for {
-			select {
-			case <-ticker.C:
-				c.pushMetrics()
-			case <-ctx.Done():
-				c.pushMetrics()
-				c.finish()
-				return
-			}
+	for {
+		select {
+		case <-ticker.C:
+			c.pushMetrics()
+		case <-ctx.Done():
+			c.pushMetrics()
+			c.finish()
+			return
 		}
 	}
 }
 
 // HubEvent holds data to be sent to EventHubs
 type HubEvent struct {
-	Time     time.Time         `json:"time"`
-	Value    float64           `json:"value"`
-	Tags     *stats.SampleTags `json:"tags"`
-	Name     string            `json:"name"`
-	Contains string            `json:"contains"`
+	Time        time.Time         `json:"time"`
+	Value       float64           `json:"value"`
+	Tags        *stats.SampleTags `json:"tags"`
+	Name        string            `json:"name"`
+	Contains    string            `json:"contains"`
+	JSONContent *jsonc.Envelope   `json:"jsoncontent"`
 }
 
 // Collect receives a set of samples. This method is never called concurrently, and only while
 // the context for Run() is valid, but should defer as much work as possible to Run().
 func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
+	c.bufferLock.Lock()
 	for _, sampleContainer := range sampleContainers {
-		for _, sample := range sampleContainer.GetSamples() {
-			if &sample == nil {
-				c.logger.Println("sample is null")
-
-				continue
-			}
-
-			data := HubEvent{
-				Time:     sample.Time,
-				Value:    sample.Value,
-				Tags:     sample.Tags,
-				Name:     sample.Metric.Name,
-				Contains: sample.Metric.Contains.String(),
-			}
-
-			m, _ := json.Marshal(data)
-
-			p := make(map[string]interface{})
-			for key, value := range sample.Tags.CloneTags() {
-				p[key] = value
-			}
-
-			event := eh.NewEvent(m)
-			event.Properties = p
-
-			if c.config.BufferEnabled.Bool {
-				c.buffer = append(c.buffer, event)
-			} else {
-				c.client.Send(c.ctx, event)
-			}
-		}
+		c.buffer = append(c.buffer, sampleContainer.GetSamples()...)
 	}
+	c.bufferLock.Unlock()
 }
 
 func (c *Collector) pushMetrics() {
-	c.bufferLock.Lock()
 	if len(c.buffer) == 0 {
-		c.bufferLock.Unlock()
 		return
 	}
+	c.bufferLock.Lock()
 	buffer := c.buffer
 	c.buffer = nil
 	c.bufferLock.Unlock()
 
-	fmt.Printf("pushing (%d)......\n", len(buffer))
+	events := make([]*eh.Event, 0)
 
-	c.client.SendBatch(c.ctx, eh.NewEventBatchIterator(buffer...))
+	for _, sample := range buffer {
+		env := jsonc.WrapSample(&sample)
+
+		data := HubEvent{
+			Time:        sample.Time,
+			Value:       sample.Value,
+			Tags:        sample.Tags,
+			Name:        sample.Metric.Name,
+			Contains:    sample.Metric.Contains.String(),
+			JSONContent: env,
+		}
+
+		m, _ := json.Marshal(data)
+
+		p := make(map[string]interface{})
+		for key, value := range sample.Tags.CloneTags() {
+			p[key] = value
+		}
+
+		event := eh.NewEvent(m)
+		event.Properties = p
+
+		events = append(events, event)
+	}
+
+	c.client.SendBatch(c.ctx, eh.NewEventBatchIterator(events...))
 }
 
 func (c *Collector) finish() {
