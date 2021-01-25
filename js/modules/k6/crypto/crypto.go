@@ -36,6 +36,8 @@ import (
 	"golang.org/x/crypto/md4"
 	"golang.org/x/crypto/ripemd160"
 
+	"github.com/dop251/goja"
+
 	"github.com/loadimpact/k6/js/common"
 )
 
@@ -52,16 +54,18 @@ func New() *Crypto {
 }
 
 // RandomBytes returns random data of the given size.
-func (*Crypto) RandomBytes(ctx context.Context, size int) []byte {
+func (*Crypto) RandomBytes(ctx context.Context, size int) *goja.ArrayBuffer {
+	rt := common.GetRuntime(ctx)
 	if size < 1 {
-		common.Throw(common.GetRuntime(ctx), errors.New("invalid size"))
+		common.Throw(rt, errors.New("invalid size"))
 	}
 	bytes := make([]byte, size)
 	_, err := rand.Read(bytes)
 	if err != nil {
-		common.Throw(common.GetRuntime(ctx), err)
+		common.Throw(rt, err)
 	}
-	return bytes
+	ab := rt.NewArrayBuffer(bytes)
+	return &ab
 }
 
 // Md4 returns the MD4 hash of input in the given encoding.

@@ -54,9 +54,9 @@ func TestCryptoAlgorithms(t *testing.T) {
 
 	t.Run("RandomBytesSuccess", func(t *testing.T) {
 		_, err := rt.RunString(`
-		var bytes = crypto.randomBytes(5);
-		if (bytes.length !== 5) {
-			throw new Error("Incorrect size: " + bytes.length);
+		var buf = crypto.randomBytes(5);
+		if (buf.byteLength !== 5) {
+			throw new Error("Incorrect size: " + buf.byteLength);
 		}`)
 
 		assert.NoError(t, err)
