@@ -1,212 +1,254 @@
 package goja
 
 import (
-	"fmt"
-
 	"github.com/dop251/goja/unistring"
 )
 
-func (r *Runtime) newNativeProxyHandler(nativeHandler *ProxyTrapConfig) *Object {
-	handler := r.NewObject()
-	r.proxyproto_nativehandler_gen_obj_obj(proxy_trap_getPrototypeOf, nativeHandler.GetPrototypeOf, handler)
-	r.proxyproto_nativehandler_setPrototypeOf(nativeHandler.SetPrototypeOf, handler)
-	r.proxyproto_nativehandler_gen_obj_bool(proxy_trap_isExtensible, nativeHandler.IsExtensible, handler)
-	r.proxyproto_nativehandler_gen_obj_bool(proxy_trap_preventExtensions, nativeHandler.PreventExtensions, handler)
-	r.proxyproto_nativehandler_getOwnPropertyDescriptor(nativeHandler.GetOwnPropertyDescriptor, handler)
-	r.proxyproto_nativehandler_defineProperty(nativeHandler.DefineProperty, handler)
-	r.proxyproto_nativehandler_gen_obj_string_bool(proxy_trap_has, nativeHandler.Has, handler)
-	r.proxyproto_nativehandler_get(nativeHandler.Get, handler)
-	r.proxyproto_nativehandler_set(nativeHandler.Set, handler)
-	r.proxyproto_nativehandler_gen_obj_string_bool(proxy_trap_deleteProperty, nativeHandler.DeleteProperty, handler)
-	r.proxyproto_nativehandler_gen_obj_obj(proxy_trap_ownKeys, nativeHandler.OwnKeys, handler)
-	r.proxyproto_nativehandler_apply(nativeHandler.Apply, handler)
-	r.proxyproto_nativehandler_construct(nativeHandler.Construct, handler)
-	return handler
+type nativeProxyHandler struct {
+	handler *ProxyTrapConfig
 }
 
-func (r *Runtime) proxyproto_nativehandler_gen_obj_obj(name proxyTrap, native func(*Object) *Object, handler *Object) {
-	if native != nil {
-		handler.self._putProp(unistring.String(name), r.newNativeFunc(func(call FunctionCall) Value {
-			if len(call.Arguments) >= 1 {
-				if t, ok := call.Argument(0).(*Object); ok {
-					return native(t)
-				}
-			}
-			panic(r.NewTypeError("%s needs to be called with target as Object", name))
-		}, nil, unistring.String(fmt.Sprintf("[native %s]", name)), nil, 1), true, true, true)
+func (h *nativeProxyHandler) getPrototypeOf(target *Object) (Value, bool) {
+	if trap := h.handler.GetPrototypeOf; trap != nil {
+		return trap(target), true
 	}
+	return nil, false
 }
 
-func (r *Runtime) proxyproto_nativehandler_setPrototypeOf(native func(*Object, *Object) bool, handler *Object) {
-	if native != nil {
-		handler.self._putProp("setPrototypeOf", r.newNativeFunc(func(call FunctionCall) Value {
-			if len(call.Arguments) >= 2 {
-				if t, ok := call.Argument(0).(*Object); ok {
-					if p, ok := call.Argument(1).(*Object); ok {
-						s := native(t, p)
-						return r.ToValue(s)
-					}
-				}
-			}
-			panic(r.NewTypeError("setPrototypeOf needs to be called with target and prototype as Object"))
-		}, nil, "[native setPrototypeOf]", nil, 2), true, true, true)
+func (h *nativeProxyHandler) setPrototypeOf(target *Object, proto *Object) (bool, bool) {
+	if trap := h.handler.SetPrototypeOf; trap != nil {
+		return trap(target, proto), true
 	}
+	return false, false
 }
 
-func (r *Runtime) proxyproto_nativehandler_gen_obj_bool(name proxyTrap, native func(*Object) bool, handler *Object) {
-	if native != nil {
-		handler.self._putProp(unistring.String(name), r.newNativeFunc(func(call FunctionCall) Value {
-			if len(call.Arguments) >= 1 {
-				if t, ok := call.Argument(0).(*Object); ok {
-					s := native(t)
-					return r.ToValue(s)
-				}
-			}
-			panic(r.NewTypeError("%s needs to be called with target as Object", name))
-		}, nil, unistring.String(fmt.Sprintf("[native %s]", name)), nil, 1), true, true, true)
+func (h *nativeProxyHandler) isExtensible(target *Object) (bool, bool) {
+	if trap := h.handler.IsExtensible; trap != nil {
+		return trap(target), true
 	}
+	return false, false
 }
 
-func (r *Runtime) proxyproto_nativehandler_getOwnPropertyDescriptor(native func(*Object, string) PropertyDescriptor, handler *Object) {
-	if native != nil {
-		handler.self._putProp("getOwnPropertyDescriptor", r.newNativeFunc(func(call FunctionCall) Value {
-			if len(call.Arguments) >= 2 {
-				if t, ok := call.Argument(0).(*Object); ok {
-					switch p := call.Argument(1).(type) {
-					case *Symbol:
-						return _undefined
-					default:
-						desc := native(t, p.String())
-						return desc.toValue(r)
-					}
-				}
-			}
-			panic(r.NewTypeError("getOwnPropertyDescriptor needs to be called with target as Object and prop as string"))
-		}, nil, "[native getOwnPropertyDescriptor]", nil, 2), true, true, true)
+func (h *nativeProxyHandler) preventExtensions(target *Object) (bool, bool) {
+	if trap := h.handler.PreventExtensions; trap != nil {
+		return trap(target), true
 	}
+	return false, false
 }
 
-func (r *Runtime) proxyproto_nativehandler_defineProperty(native func(*Object, string, PropertyDescriptor) bool, handler *Object) {
-	if native != nil {
-		handler.self._putProp("defineProperty", r.newNativeFunc(func(call FunctionCall) Value {
-			if len(call.Arguments) >= 3 {
-				if t, ok := call.Argument(0).(*Object); ok {
-					if k, ok := call.Argument(1).(valueString); ok {
-						propertyDescriptor := r.toPropertyDescriptor(call.Argument(2))
-						s := native(t, k.String(), propertyDescriptor)
-						return r.ToValue(s)
-					}
-				}
-			}
-			panic(r.NewTypeError("defineProperty needs to be called with target as Object and propertyDescriptor as string and key as string"))
-		}, nil, "[native defineProperty]", nil, 3), true, true, true)
+func (h *nativeProxyHandler) getOwnPropertyDescriptorStr(target *Object, prop unistring.String) (Value, bool) {
+	if trap := h.handler.GetOwnPropertyDescriptorIdx; trap != nil {
+		if idx, ok := strPropToInt(prop); ok {
+			desc := trap(target, idx)
+			return desc.toValue(target.runtime), true
+		}
 	}
+	if trap := h.handler.GetOwnPropertyDescriptor; trap != nil {
+		desc := trap(target, prop.String())
+		return desc.toValue(target.runtime), true
+	}
+	return nil, false
 }
 
-func (r *Runtime) proxyproto_nativehandler_gen_obj_string_bool(name proxyTrap, native func(*Object, string) bool, handler *Object) {
-	if native != nil {
-		handler.self._putProp(unistring.String(name), r.newNativeFunc(func(call FunctionCall) Value {
-			if len(call.Arguments) >= 2 {
-				if t, ok := call.Argument(0).(*Object); ok {
-					switch p := call.Argument(1).(type) {
-					case *Symbol:
-						return valueFalse
-					default:
-						o := native(t, p.String())
-						return r.ToValue(o)
-					}
-				}
-			}
-			panic(r.NewTypeError("%s needs to be called with target as Object and property as string", name))
-		}, nil, unistring.String(fmt.Sprintf("[native %s]", name)), nil, 2), true, true, true)
+func (h *nativeProxyHandler) getOwnPropertyDescriptorIdx(target *Object, prop valueInt) (Value, bool) {
+	if trap := h.handler.GetOwnPropertyDescriptorIdx; trap != nil {
+		desc := trap(target, toIntStrict(int64(prop)))
+		return desc.toValue(target.runtime), true
 	}
+	if trap := h.handler.GetOwnPropertyDescriptor; trap != nil {
+		desc := trap(target, prop.String())
+		return desc.toValue(target.runtime), true
+	}
+	return nil, false
 }
 
-func (r *Runtime) proxyproto_nativehandler_get(native func(*Object, string, *Object) Value, handler *Object) {
-	if native != nil {
-		handler.self._putProp("get", r.newNativeFunc(func(call FunctionCall) Value {
-			if len(call.Arguments) >= 3 {
-				if t, ok := call.Argument(0).(*Object); ok {
-					if r, ok := call.Argument(2).(*Object); ok {
-						switch p := call.Argument(1).(type) {
-						case *Symbol:
-							return _undefined
-						default:
-							return native(t, p.String(), r)
-						}
-					}
-				}
-			}
-			panic(r.NewTypeError("get needs to be called with target and receiver as Object and property as string"))
-		}, nil, "[native get]", nil, 3), true, true, true)
+func (h *nativeProxyHandler) getOwnPropertyDescriptorSym(target *Object, prop *Symbol) (Value, bool) {
+	if trap := h.handler.GetOwnPropertyDescriptorSym; trap != nil {
+		desc := trap(target, prop)
+		return desc.toValue(target.runtime), true
 	}
+	return nil, false
 }
 
-func (r *Runtime) proxyproto_nativehandler_set(native func(*Object, string, Value, *Object) bool, handler *Object) {
-	if native != nil {
-		handler.self._putProp("set", r.newNativeFunc(func(call FunctionCall) Value {
-			if len(call.Arguments) >= 4 {
-				if t, ok := call.Argument(0).(*Object); ok {
-					if p, ok := call.Argument(1).(valueString); ok {
-						v := call.Argument(2)
-						if re, ok := call.Argument(3).(*Object); ok {
-							s := native(t, p.String(), v, re)
-							return r.ToValue(s)
-						}
-					}
-				}
-			}
-			panic(r.NewTypeError("set needs to be called with target and receiver as Object, property as string and value as a legal javascript value"))
-		}, nil, "[native set]", nil, 4), true, true, true)
+func (h *nativeProxyHandler) definePropertyStr(target *Object, prop unistring.String, desc PropertyDescriptor) (bool, bool) {
+	if trap := h.handler.DefinePropertyIdx; trap != nil {
+		if idx, ok := strPropToInt(prop); ok {
+			return trap(target, idx, desc), true
+		}
 	}
+	if trap := h.handler.DefineProperty; trap != nil {
+		return trap(target, prop.String(), desc), true
+	}
+	return false, false
 }
 
-func (r *Runtime) proxyproto_nativehandler_apply(native func(*Object, *Object, []Value) Value, handler *Object) {
-	if native != nil {
-		handler.self._putProp("apply", r.newNativeFunc(func(call FunctionCall) Value {
-			if len(call.Arguments) >= 3 {
-				if t, ok := call.Argument(0).(*Object); ok {
-					if this, ok := call.Argument(1).(*Object); ok {
-						if v, ok := call.Argument(2).(*Object); ok {
-							if a, ok := v.self.(*arrayObject); ok {
-								v := native(t, this, a.values)
-								return r.ToValue(v)
-							}
-						}
-					}
-				}
-			}
-			panic(r.NewTypeError("apply needs to be called with target and this as Object and argumentsList as an array of legal javascript values"))
-		}, nil, "[native apply]", nil, 3), true, true, true)
+func (h *nativeProxyHandler) definePropertyIdx(target *Object, prop valueInt, desc PropertyDescriptor) (bool, bool) {
+	if trap := h.handler.DefinePropertyIdx; trap != nil {
+		return trap(target, toIntStrict(int64(prop)), desc), true
 	}
+	if trap := h.handler.DefineProperty; trap != nil {
+		return trap(target, prop.String(), desc), true
+	}
+	return false, false
 }
 
-func (r *Runtime) proxyproto_nativehandler_construct(native func(*Object, []Value, *Object) *Object, handler *Object) {
-	if native != nil {
-		handler.self._putProp("construct", r.newNativeFunc(func(call FunctionCall) Value {
-			if len(call.Arguments) >= 3 {
-				if t, ok := call.Argument(0).(*Object); ok {
-					if v, ok := call.Argument(1).(*Object); ok {
-						if newTarget, ok := call.Argument(2).(*Object); ok {
-							if a, ok := v.self.(*arrayObject); ok {
-								return native(t, a.values, newTarget)
-							}
-						}
-					}
-				}
-			}
-			panic(r.NewTypeError("construct needs to be called with target and newTarget as Object and argumentsList as an array of legal javascript values"))
-		}, nil, "[native construct]", nil, 3), true, true, true)
+func (h *nativeProxyHandler) definePropertySym(target *Object, prop *Symbol, desc PropertyDescriptor) (bool, bool) {
+	if trap := h.handler.DefinePropertySym; trap != nil {
+		return trap(target, prop, desc), true
 	}
+	return false, false
+}
+
+func (h *nativeProxyHandler) hasStr(target *Object, prop unistring.String) (bool, bool) {
+	if trap := h.handler.HasIdx; trap != nil {
+		if idx, ok := strPropToInt(prop); ok {
+			return trap(target, idx), true
+		}
+	}
+	if trap := h.handler.Has; trap != nil {
+		return trap(target, prop.String()), true
+	}
+	return false, false
+}
+
+func (h *nativeProxyHandler) hasIdx(target *Object, prop valueInt) (bool, bool) {
+	if trap := h.handler.HasIdx; trap != nil {
+		return trap(target, toIntStrict(int64(prop))), true
+	}
+	if trap := h.handler.Has; trap != nil {
+		return trap(target, prop.String()), true
+	}
+	return false, false
+}
+
+func (h *nativeProxyHandler) hasSym(target *Object, prop *Symbol) (bool, bool) {
+	if trap := h.handler.HasSym; trap != nil {
+		return trap(target, prop), true
+	}
+	return false, false
+}
+
+func (h *nativeProxyHandler) getStr(target *Object, prop unistring.String, receiver Value) (Value, bool) {
+	if trap := h.handler.GetIdx; trap != nil {
+		if idx, ok := strPropToInt(prop); ok {
+			return trap(target, idx, receiver), true
+		}
+	}
+	if trap := h.handler.Get; trap != nil {
+		return trap(target, prop.String(), receiver), true
+	}
+	return nil, false
+}
+
+func (h *nativeProxyHandler) getIdx(target *Object, prop valueInt, receiver Value) (Value, bool) {
+	if trap := h.handler.GetIdx; trap != nil {
+		return trap(target, toIntStrict(int64(prop)), receiver), true
+	}
+	if trap := h.handler.Get; trap != nil {
+		return trap(target, prop.String(), receiver), true
+	}
+	return nil, false
+}
+
+func (h *nativeProxyHandler) getSym(target *Object, prop *Symbol, receiver Value) (Value, bool) {
+	if trap := h.handler.GetSym; trap != nil {
+		return trap(target, prop, receiver), true
+	}
+	return nil, false
+}
+
+func (h *nativeProxyHandler) setStr(target *Object, prop unistring.String, value Value, receiver Value) (bool, bool) {
+	if trap := h.handler.SetIdx; trap != nil {
+		if idx, ok := strPropToInt(prop); ok {
+			return trap(target, idx, value, receiver), true
+		}
+	}
+	if trap := h.handler.Set; trap != nil {
+		return trap(target, prop.String(), value, receiver), true
+	}
+	return false, false
+}
+
+func (h *nativeProxyHandler) setIdx(target *Object, prop valueInt, value Value, receiver Value) (bool, bool) {
+	if trap := h.handler.SetIdx; trap != nil {
+		return trap(target, toIntStrict(int64(prop)), value, receiver), true
+	}
+	if trap := h.handler.Set; trap != nil {
+		return trap(target, prop.String(), value, receiver), true
+	}
+	return false, false
+}
+
+func (h *nativeProxyHandler) setSym(target *Object, prop *Symbol, value Value, receiver Value) (bool, bool) {
+	if trap := h.handler.SetSym; trap != nil {
+		return trap(target, prop, value, receiver), true
+	}
+	return false, false
+}
+
+func (h *nativeProxyHandler) deleteStr(target *Object, prop unistring.String) (bool, bool) {
+	if trap := h.handler.DeletePropertyIdx; trap != nil {
+		if idx, ok := strPropToInt(prop); ok {
+			return trap(target, idx), true
+		}
+	}
+	if trap := h.handler.DeleteProperty; trap != nil {
+		return trap(target, prop.String()), true
+	}
+	return false, false
+}
+
+func (h *nativeProxyHandler) deleteIdx(target *Object, prop valueInt) (bool, bool) {
+	if trap := h.handler.DeletePropertyIdx; trap != nil {
+		return trap(target, toIntStrict(int64(prop))), true
+	}
+	if trap := h.handler.DeleteProperty; trap != nil {
+		return trap(target, prop.String()), true
+	}
+	return false, false
+}
+
+func (h *nativeProxyHandler) deleteSym(target *Object, prop *Symbol) (bool, bool) {
+	if trap := h.handler.DeletePropertySym; trap != nil {
+		return trap(target, prop), true
+	}
+	return false, false
+}
+
+func (h *nativeProxyHandler) ownKeys(target *Object) (*Object, bool) {
+	if trap := h.handler.OwnKeys; trap != nil {
+		return trap(target), true
+	}
+	return nil, false
+}
+
+func (h *nativeProxyHandler) apply(target *Object, this Value, args []Value) (Value, bool) {
+	if trap := h.handler.Apply; trap != nil {
+		return trap(target, this, args), true
+	}
+	return nil, false
+}
+
+func (h *nativeProxyHandler) construct(target *Object, args []Value, newTarget *Object) (Value, bool) {
+	if trap := h.handler.Construct; trap != nil {
+		return trap(target, args, newTarget), true
+	}
+	return nil, false
+}
+
+func (h *nativeProxyHandler) toObject(runtime *Runtime) *Object {
+	return runtime.ToValue(h.handler).ToObject(runtime)
+}
+
+func (r *Runtime) newNativeProxyHandler(nativeHandler *ProxyTrapConfig) proxyHandler {
+	return &nativeProxyHandler{handler: nativeHandler}
 }
 
 // ProxyTrapConfig provides a simplified Go-friendly API for implementing Proxy traps.
-// Note that the Proxy may not have Symbol properties when using this as a handler because property keys are
-// passed as strings.
-// get() and getOwnPropertyDescriptor() for Symbol properties will always return undefined;
-// has() and deleteProperty() for Symbol properties will always return false;
-// set() and defineProperty() for Symbol properties will throw a TypeError.
-// If you need Symbol properties implement the handler in JavaScript.
+// If an *Idx trap is defined it gets called for integer property keys, including negative ones. Note that
+// this also includes string property keys that can be parsed into an integer. This allows more efficient
+// array operations.
+// If an *Idx trap is not set, the corresponding string one is used.
 type ProxyTrapConfig struct {
 	// A trap for Object.getPrototypeOf, Reflect.getPrototypeOf, __proto__, Object.prototype.isPrototypeOf, instanceof
 	GetPrototypeOf func(target *Object) (prototype *Object)
@@ -220,29 +262,65 @@ type ProxyTrapConfig struct {
 	// A trap for Object.preventExtensions, Reflect.preventExtensions
 	PreventExtensions func(target *Object) (success bool)
 
-	// A trap for Object.getOwnPropertyDescriptor, Reflect.getOwnPropertyDescriptor
+	// A trap for Object.getOwnPropertyDescriptor, Reflect.getOwnPropertyDescriptor (string properties)
 	GetOwnPropertyDescriptor func(target *Object, prop string) (propertyDescriptor PropertyDescriptor)
 
-	// A trap for Object.defineProperty, Reflect.defineProperty
+	// A trap for Object.getOwnPropertyDescriptor, Reflect.getOwnPropertyDescriptor (integer properties)
+	GetOwnPropertyDescriptorIdx func(target *Object, prop int) (propertyDescriptor PropertyDescriptor)
+
+	// A trap for Object.getOwnPropertyDescriptor, Reflect.getOwnPropertyDescriptor (Symbol properties)
+	GetOwnPropertyDescriptorSym func(target *Object, prop *Symbol) (propertyDescriptor PropertyDescriptor)
+
+	// A trap for Object.defineProperty, Reflect.defineProperty (string properties)
 	DefineProperty func(target *Object, key string, propertyDescriptor PropertyDescriptor) (success bool)
 
-	// A trap for the in operator, with operator, Reflect.has
+	// A trap for Object.defineProperty, Reflect.defineProperty (integer properties)
+	DefinePropertyIdx func(target *Object, key int, propertyDescriptor PropertyDescriptor) (success bool)
+
+	// A trap for Object.defineProperty, Reflect.defineProperty (Symbol properties)
+	DefinePropertySym func(target *Object, key *Symbol, propertyDescriptor PropertyDescriptor) (success bool)
+
+	// A trap for the in operator, with operator, Reflect.has (string properties)
 	Has func(target *Object, property string) (available bool)
 
-	// A trap for getting property values, Reflect.get
-	Get func(target *Object, property string, receiver *Object) (value Value)
+	// A trap for the in operator, with operator, Reflect.has (integer properties)
+	HasIdx func(target *Object, property int) (available bool)
 
-	// A trap for setting property values, Reflect.set
-	Set func(target *Object, property string, value Value, receiver *Object) (success bool)
+	// A trap for the in operator, with operator, Reflect.has (Symbol properties)
+	HasSym func(target *Object, property *Symbol) (available bool)
 
-	// A trap for the delete operator, Reflect.deleteProperty
+	// A trap for getting property values, Reflect.get (string properties)
+	Get func(target *Object, property string, receiver Value) (value Value)
+
+	// A trap for getting property values, Reflect.get (integer properties)
+	GetIdx func(target *Object, property int, receiver Value) (value Value)
+
+	// A trap for getting property values, Reflect.get (Symbol properties)
+	GetSym func(target *Object, property *Symbol, receiver Value) (value Value)
+
+	// A trap for setting property values, Reflect.set (string properties)
+	Set func(target *Object, property string, value Value, receiver Value) (success bool)
+
+	// A trap for setting property values, Reflect.set (integer properties)
+	SetIdx func(target *Object, property int, value Value, receiver Value) (success bool)
+
+	// A trap for setting property values, Reflect.set (Symbol properties)
+	SetSym func(target *Object, property *Symbol, value Value, receiver Value) (success bool)
+
+	// A trap for the delete operator, Reflect.deleteProperty (string properties)
 	DeleteProperty func(target *Object, property string) (success bool)
+
+	// A trap for the delete operator, Reflect.deleteProperty (integer properties)
+	DeletePropertyIdx func(target *Object, property int) (success bool)
+
+	// A trap for the delete operator, Reflect.deleteProperty (Symbol properties)
+	DeletePropertySym func(target *Object, property *Symbol) (success bool)
 
 	// A trap for Object.getOwnPropertyNames, Object.getOwnPropertySymbols, Object.keys, Reflect.ownKeys
 	OwnKeys func(target *Object) (object *Object)
 
 	// A trap for a function call, Function.prototype.apply, Function.prototype.call, Reflect.apply
-	Apply func(target *Object, this *Object, argumentsList []Value) (value Value)
+	Apply func(target *Object, this Value, argumentsList []Value) (value Value)
 
 	// A trap for the new operator, Reflect.construct
 	Construct func(target *Object, argumentsList []Value, newTarget *Object) (value *Object)
@@ -267,8 +345,13 @@ func (r *Runtime) builtin_newProxy(args []Value, newTarget *Object) *Object {
 }
 
 func (r *Runtime) NewProxy(target *Object, nativeHandler *ProxyTrapConfig) Proxy {
+	if p, ok := target.self.(*proxyObject); ok {
+		if p.handler == nil {
+			panic(r.NewTypeError("Cannot create proxy with a revoked proxy as target"))
+		}
+	}
 	handler := r.newNativeProxyHandler(nativeHandler)
-	proxy := r.newProxyObject(target, handler, nil)
+	proxy := r._newProxyObject(target, handler, nil)
 	return Proxy{proxy: proxy}
 }
 

@@ -85,10 +85,10 @@ func (i *argumentsPropIter) next() (propIterItem, iterNextFunc) {
 	return item, i.next
 }
 
-func (a *argumentsObject) enumerateUnfiltered() iterNextFunc {
-	return a.recursiveIter((&argumentsPropIter{
-		wrapped: a.ownIter(),
-	}).next)
+func (a *argumentsObject) enumerateOwnKeys() iterNextFunc {
+	return (&argumentsPropIter{
+		wrapped: a.baseObject.enumerateOwnKeys(),
+	}).next
 }
 
 func (a *argumentsObject) defineOwnPropertyStr(name unistring.String, descr PropertyDescriptor, throw bool) bool {

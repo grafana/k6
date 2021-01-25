@@ -290,10 +290,10 @@ func (i *stringPropIter) next() (propIterItem, iterNextFunc) {
 		return propIterItem{name: unistring.String(name), enumerable: _ENUM_TRUE}, i.next
 	}
 
-	return i.obj.baseObject.enumerateUnfiltered()()
+	return i.obj.baseObject.enumerateOwnKeys()()
 }
 
-func (s *stringObject) enumerateUnfiltered() iterNextFunc {
+func (s *stringObject) enumerateOwnKeys() iterNextFunc {
 	return (&stringPropIter{
 		str:    s.value,
 		obj:    s,

@@ -101,11 +101,12 @@ type global struct {
 	MapPrototype         *Object
 	SetPrototype         *Object
 
-	IteratorPrototype       *Object
-	ArrayIteratorPrototype  *Object
-	MapIteratorPrototype    *Object
-	SetIteratorPrototype    *Object
-	StringIteratorPrototype *Object
+	IteratorPrototype             *Object
+	ArrayIteratorPrototype        *Object
+	MapIteratorPrototype          *Object
+	SetIteratorPrototype          *Object
+	StringIteratorPrototype       *Object
+	RegExpStringIteratorPrototype *Object
 
 	ErrorPrototype          *Object
 	TypeErrorPrototype      *Object
@@ -172,16 +173,6 @@ type Runtime struct {
 	vm    *vm
 	hash  *maphash.Hash
 	idSeq uint64
-
-	// Contains a list of ids of finalized weak keys so that the runtime could pick it up and remove from
-	// all weak collections using the weakKeys map. The runtime picks it up either when the topmost function
-	// returns (i.e. the callstack becomes empty) or every 10000 'ticks' (vm instructions).
-	// It is implemented this way to avoid circular references which at the time of writing (go 1.15) causes
-	// the whole structure to become not garbage-collectable.
-	weakRefTracker *weakRefTracker
-
-	// Contains a list of weak collections that contain the key with the id.
-	weakKeys map[uint64]*weakCollections
 }
 
 type StackFrame struct {
@@ -1297,6 +1288,8 @@ func(FunctionCall) Value is treated as a native JavaScript function. This increa
 automatic argument and return value type conversions (which involves reflect). Attempting to use
 the function as a constructor will result in a TypeError.
 
+func(FunctionCall, *Runtime) Value is treated as above, except the *Runtime is also passed as a parameter.
+
 func(ConstructorCall) *Object is treated as a native constructor, allowing to use it with the new
 operator:
 
@@ -1326,6 +1319,8 @@ Then it can be used in JS as follows:
 When a native constructor is called directly (without the new operator) its behavior depends on
 this value: if it's an Object, it is passed through, otherwise a new one is created exactly as
 if it was called with the new operator. In either case call.NewTarget will be nil.
+
+func(ConstructorCall, *Runtime) *Object is treated as above, except the *Runtime is also passed as a parameter.
 
 Any other Go function is wrapped so that the arguments are automatically converted into the required Go types and the
 return value is converted to a JavaScript value (using this method).  If conversion is not possible, a TypeError is
@@ -1449,9 +1444,19 @@ func (r *Runtime) ToValue(i interface{}) Value {
 	case func(FunctionCall) Value:
 		name := unistring.NewFromString(runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name())
 		return r.newNativeFunc(i, nil, name, nil, 0)
+	case func(FunctionCall, *Runtime) Value:
+		name := unistring.NewFromString(runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name())
+		return r.newNativeFunc(func(call FunctionCall) Value {
+			return i(call, r)
+		}, nil, name, nil, 0)
 	case func(ConstructorCall) *Object:
 		name := unistring.NewFromString(runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name())
 		return r.newNativeConstructor(i, name, 0)
+	case func(ConstructorCall, *Runtime) *Object:
+		name := unistring.NewFromString(runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name())
+		return r.newNativeConstructor(func(call ConstructorCall) *Object {
+			return i(call, r)
+		}, name, 0)
 	case int:
 		return intToValue(int64(i))
 	case int8:
@@ -1829,32 +1834,35 @@ func (r *Runtime) toReflectValue(v Value, dst reflect.Value, ctx *objectExportCt
 			keyTyp := typ.Key()
 			elemTyp := typ.Elem()
 			needConvertKeys := !reflect.ValueOf("").Type().AssignableTo(keyTyp)
-			for _, itemName := range o.self.ownKeys(false, nil) {
+			iter := &enumerableIter{
+				wrapped: o.self.enumerateOwnKeys(),
+			}
+			for item, next := iter.next(); next != nil; item, next = next() {
 				var kv reflect.Value
 				var err error
 				if needConvertKeys {
 					kv = reflect.New(keyTyp).Elem()
-					err = r.toReflectValue(itemName, kv, ctx)
+					err = r.toReflectValue(stringValueFromRaw(item.name), kv, ctx)
 					if err != nil {
-						return fmt.Errorf("could not convert map key %s to %v", itemName.String(), typ)
+						return fmt.Errorf("could not convert map key %s to %v", item.name.String(), typ)
 					}
 				} else {
-					kv = reflect.ValueOf(itemName.String())
+					kv = reflect.ValueOf(item.name.String())
 				}
 
-				ival := o.get(itemName, nil)
+				ival := o.self.getStr(item.name, nil)
 				if ival != nil {
 					vv := reflect.New(elemTyp).Elem()
 					err := r.toReflectValue(ival, vv, ctx)
 					if err != nil {
-						return fmt.Errorf("could not convert map value %v to %v at key %s", ival, typ, itemName.String())
+						return fmt.Errorf("could not convert map value %v to %v at key %s", ival, typ, item.name.String())
 					}
 					m.SetMapIndex(kv, vv)
 				} else {
 					m.SetMapIndex(kv, reflect.Zero(elemTyp))
 				}
-
 			}
+
 			return nil
 		}
 	case reflect.Struct:
@@ -2250,57 +2258,9 @@ func (r *Runtime) getHash() *maphash.Hash {
 	return r.hash
 }
 
-func (r *Runtime) addWeakKey(id uint64, coll weakCollection) {
-	keys := r.weakKeys
-	if keys == nil {
-		keys = make(map[uint64]*weakCollections)
-		r.weakKeys = keys
-	}
-	colls := keys[id]
-	if colls == nil {
-		colls = &weakCollections{
-			objId: id,
-		}
-		keys[id] = colls
-	}
-	colls.add(coll)
-}
-
-func (r *Runtime) removeWeakKey(id uint64, coll weakCollection) {
-	keys := r.weakKeys
-	if colls := keys[id]; colls != nil {
-		colls.remove(coll)
-		if len(colls.colls) == 0 {
-			delete(keys, id)
-		}
-	}
-}
-
-// this gets inlined so a CALL is avoided on a critical path
-func (r *Runtime) removeDeadKeys() {
-	if r.weakRefTracker != nil {
-		r.doRemoveDeadKeys()
-	}
-}
-
-func (r *Runtime) doRemoveDeadKeys() {
-	r.weakRefTracker.Lock()
-	list := r.weakRefTracker.list
-	r.weakRefTracker.list = nil
-	r.weakRefTracker.Unlock()
-	for _, id := range list {
-		if colls := r.weakKeys[id]; colls != nil {
-			for _, coll := range colls.colls {
-				coll.removeId(id)
-			}
-			delete(r.weakKeys, id)
-		}
-	}
-}
-
 // called when the top level function returns (i.e. control is passed outside the Runtime).
 func (r *Runtime) leave() {
-	r.removeDeadKeys()
+	// run jobs, etc...
 }
 
 func nilSafe(v Value) Value {
@@ -2344,4 +2304,58 @@ func limitCallArgs(call FunctionCall, n int) FunctionCall {
 	} else {
 		return call
 	}
+}
+
+func shrinkCap(newSize, oldCap int) int {
+	if oldCap > 8 {
+		if cap := oldCap / 2; cap >= newSize {
+			return cap
+		}
+	}
+	return oldCap
+}
+
+func growCap(newSize, oldSize, oldCap int) int {
+	// Use the same algorithm as in runtime.growSlice
+	doublecap := oldCap + oldCap
+	if newSize > doublecap {
+		return newSize
+	} else {
+		if oldSize < 1024 {
+			return doublecap
+		} else {
+			cap := oldCap
+			// Check 0 < cap to detect overflow
+			// and prevent an infinite loop.
+			for 0 < cap && cap < newSize {
+				cap += cap / 4
+			}
+			// Return the requested cap when
+			// the calculation overflowed.
+			if cap <= 0 {
+				return newSize
+			}
+			return cap
+		}
+	}
+}
+
+func (r *Runtime) genId() (ret uint64) {
+	if r.hash == nil {
+		h := r.getHash()
+		r.idSeq = h.Sum64()
+	}
+	if r.idSeq == 0 {
+		r.idSeq = 1
+	}
+	ret = r.idSeq
+	r.idSeq++
+	return
+}
+
+func strPropToInt(s unistring.String) (int, bool) {
+	if res, err := strconv.Atoi(string(s)); err == nil {
+		return res, true
+	}
+	return 0, false
 }
