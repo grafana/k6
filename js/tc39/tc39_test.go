@@ -44,56 +44,17 @@ var (
 		});`,
 		false)
 
-	esIDPrefixAllowList = []string{
-		"sec-array",
-		"sec-%typedarray%",
-		"sec-string",
-		"sec-date",
-		"sec-number",
-		"sec-math",
-		"sec-arraybuffer-length",
-		"sec-arraybuffer",
-		"sec-regexp",
-		"sec-variable-statement",
-		"sec-ecmascript-standard-built-in-objects",
-	}
-
 	featuresBlockList = []string{
-		"BigInt",                    // not supported at all
-		"IsHTMLDDA",                 // not supported at all
-		"generators",                // not supported in a meaningful way IMO
-		"Array.prototype.item",      // not even standard yet
-		"TypedArray.prototype.item", // not even standard yet
+		"BigInt",                      // not supported at all
+		"IsHTMLDDA",                   // not supported at all
+		"generators",                  // not supported in a meaningful way IMO
+		"Array.prototype.item",        // not even standard yet
+		"TypedArray.prototype.item",   // not even standard yet
+		"String.prototype.replaceAll", // not supported at all, Stage 4 since 2020
 	}
-	skipList       = map[string]bool{}
-	pathBasedBlock = map[string]bool{ // This completely skips any path matching it without any kind of message
-		"test/annexB/built-ins/Date":                          true,
-		"test/annexB/built-ins/RegExp/prototype/Symbol.split": true,
-		"test/annexB/built-ins/String/prototype/anchor":       true,
-		"test/annexB/built-ins/String/prototype/big":          true,
-		"test/annexB/built-ins/String/prototype/blink":        true,
-		"test/annexB/built-ins/String/prototype/bold":         true,
-		"test/annexB/built-ins/String/prototype/fixed":        true,
-		"test/annexB/built-ins/String/prototype/fontcolor":    true,
-		"test/annexB/built-ins/String/prototype/fontsize":     true,
-		"test/annexB/built-ins/String/prototype/italics":      true,
-		"test/annexB/built-ins/String/prototype/link":         true,
-		"test/annexB/built-ins/String/prototype/small":        true,
-		"test/annexB/built-ins/String/prototype/strike":       true,
-		"test/annexB/built-ins/String/prototype/sub":          true,
-		"test/annexB/built-ins/String/prototype/sup":          true,
-
-		// Async/Promise and other totally unsupported functionality
-		"test/built-ins/AsyncArrowFunction":             true,
-		"test/built-ins/AsyncFromSyncIteratorPrototype": true,
-		"test/built-ins/AsyncFunction":                  true,
-		"test/built-ins/AsyncGeneratorFunction":         true,
-		"test/built-ins/AsyncGeneratorPrototype":        true,
-		"test/built-ins/AsyncIteratorPrototype":         true,
-		"test/built-ins/Atomics":                        true,
-		"test/built-ins/BigInt":                         true,
-		"test/built-ins/Promise":                        true,
-		"test/built-ins/SharedArrayBuffer":              true,
+	skipList = map[string]bool{
+		"test/built-ins/Function/prototype/toString/AsyncFunction.js": true,
+		"test/built-ins/Object/seal/seal-generatorfunction.js":        true,
 
 		"test/built-ins/Date/parse/without-utc-offset.js": true, // some other reason ?!? depending on local time
 
@@ -101,6 +62,51 @@ var (
 		"test/built-ins/Array/prototype/splice/throws-if-integer-limit-exceeded.js":   true, // takes forever and is broken
 		"test/built-ins/Array/prototype/unshift/clamps-to-integer-limit.js":           true, // takes forever and is broken
 		"test/built-ins/Array/prototype/unshift/throws-if-integer-limit-exceeded.js":  true, // takes forever and is broken
+
+	}
+	pathBasedBlock = []string{ // This completely skips any path matching it without any kind of message
+		"test/annexB/built-ins/Date",
+		"test/annexB/built-ins/RegExp/prototype/Symbol.split",
+		"test/annexB/built-ins/String/prototype/anchor",
+		"test/annexB/built-ins/String/prototype/big",
+		"test/annexB/built-ins/String/prototype/blink",
+		"test/annexB/built-ins/String/prototype/bold",
+		"test/annexB/built-ins/String/prototype/fixed",
+		"test/annexB/built-ins/String/prototype/fontcolor",
+		"test/annexB/built-ins/String/prototype/fontsize",
+		"test/annexB/built-ins/String/prototype/italics",
+		"test/annexB/built-ins/String/prototype/link",
+		"test/annexB/built-ins/String/prototype/small",
+		"test/annexB/built-ins/String/prototype/strike",
+		"test/annexB/built-ins/String/prototype/sub",
+		"test/annexB/built-ins/String/prototype/sup",
+
+		"test/annexB/built-ins/RegExp/legacy-accessors/",
+
+		// Async/Promise and other totally unsupported functionality
+		"test/built-ins/AsyncArrowFunction",
+		"test/built-ins/AsyncFromSyncIteratorPrototype",
+		"test/built-ins/AsyncFunction",
+		"test/built-ins/AsyncGeneratorFunction",
+		"test/built-ins/AsyncGeneratorPrototype",
+		"test/built-ins/AsyncIteratorPrototype",
+		"test/built-ins/Atomics",
+		"test/built-ins/BigInt",
+		"test/built-ins/Promise",
+		"test/built-ins/SharedArrayBuffer",
+		"test/built-ins/NativeErrors/AggregateError",
+		"test/language/eval-code/direct/async",
+		"test/language/expressions/async",
+		"test/language/expressions/dynamic-import",
+		"test/language/expressions/object/dstr/async",
+		"test/language/module-code/top-level-await",
+		"test/built-ins/Function/prototype/toString/async",
+		"test/built-ins/Function/prototype/toString/async",
+		"test/built-ins/Function/prototype/toString/generator",
+		"test/built-ins/Function/prototype/toString/proxy-async",
+
+		"test/built-ins/FinalizationRegistry", // still in proposal
+
 	}
 )
 
@@ -483,16 +489,19 @@ func (ctx *tc39TestCtx) runTC39Tests(name string) {
 		ctx.t.Fatal(err)
 	}
 
+outer:
 	for _, file := range files {
 		if file.Name()[0] == '.' {
 			continue
 		}
 		newName := path.Join(name, file.Name())
-		if pathBasedBlock[newName] {
-			ctx.t.Run(newName, func(t *testing.T) {
-				t.Skipf("Skip %s beause of path based block", newName)
-			})
-			continue
+		for _, path := range pathBasedBlock { // TODO: use trie / binary search?
+			if strings.HasPrefix(newName, path) {
+				ctx.t.Run(newName, func(t *testing.T) {
+					t.Skipf("Skip %s beause of path based block", newName)
+				})
+				continue outer
+			}
 		}
 		if file.IsDir() {
 			ctx.runTC39Tests(newName)
