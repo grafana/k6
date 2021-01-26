@@ -59,8 +59,11 @@ var (
 	}
 
 	featuresBlockList = []string{
-		"BigInt",    // not supported at all
-		"IsHTMLDDA", // not supported at all
+		"BigInt",                    // not supported at all
+		"IsHTMLDDA",                 // not supported at all
+		"generators",                // not supported in a meaningful way IMO
+		"Array.prototype.item",      // not even standard yet
+		"TypedArray.prototype.item", // not even standard yet
 	}
 	skipList       = map[string]bool{}
 	pathBasedBlock = map[string]bool{ // This completely skips any path matching it without any kind of message
@@ -333,27 +336,12 @@ func shouldBeSkipped(t testing.TB, meta *tc39Meta) {
 	if meta.hasFlag("async") { // this is totally not supported
 		t.Skipf("Skipping as it has flag async")
 	}
-	if meta.Es6id == "" && meta.Es5id == "" { //nolint:nestif
-		skip := true
 
-		if skip {
-			if meta.Esid != "" {
-				for _, prefix := range esIDPrefixAllowList {
-					if strings.HasPrefix(meta.Esid, prefix) {
-						skip = false
-					}
-				}
+	for _, feature := range meta.Features {
+		for _, bl := range featuresBlockList {
+			if feature == bl {
+				t.Skipf("Blocklisted feature %s", feature)
 			}
-		}
-		for _, feature := range meta.Features {
-			for _, bl := range featuresBlockList {
-				if feature == bl {
-					t.Skipf("Blocklisted feature %s", feature)
-				}
-			}
-		}
-		if skip {
-			t.Skipf("Not ES6 or ES5 esid: %s", meta.Esid)
 		}
 	}
 }
