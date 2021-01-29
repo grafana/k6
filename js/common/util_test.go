@@ -22,6 +22,7 @@ package common
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -40,5 +41,32 @@ func TestThrow(t *testing.T) {
 			_, err := fn2(goja.Undefined())
 			assert.EqualError(t, err, "GoError: aaaa")
 		}
+	}
+}
+
+func TestToBytes(t *testing.T) {
+	rt := goja.New()
+	b := []byte("hello")
+	testCases := []struct {
+		in     interface{}
+		expOut []byte
+		expErr string
+	}{
+		{b, b, ""},
+		{"hello", b, ""},
+		{rt.NewArrayBuffer(b), b, ""},
+		{struct{}{}, nil, "invalid type struct {}, expected string, []byte or ArrayBuffer"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("%T", tc.in), func(t *testing.T) {
+			out, err := ToBytes(tc.in)
+			if tc.expErr != "" {
+				assert.EqualError(t, err, tc.expErr)
+				return
+			}
+			assert.Equal(t, tc.expOut, out)
+		})
 	}
 }
