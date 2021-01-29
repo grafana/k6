@@ -59,6 +59,8 @@ func (e *Encoding) B64encode(ctx context.Context, input interface{}, encoding st
 	}
 }
 
+// B64decode returns the decoded data of the base64 encoded input string using
+// the given encoding.
 func (e *Encoding) B64decode(ctx context.Context, input string, encoding string) string {
 	var output []byte
 	var err error
