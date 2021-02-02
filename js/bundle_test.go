@@ -114,15 +114,6 @@ func TestNewBundle(t *testing.T) {
 		}
 	})
 	t.Run("CompatibilityMode", func(t *testing.T) {
-		t.Run("Extended/ok/CoreJS", func(t *testing.T) {
-			rtOpts := lib.RuntimeOptions{
-				CompatibilityMode: null.StringFrom(lib.CompatibilityModeExtended.String()),
-			}
-			_, err := getSimpleBundle(t, "/script.js",
-				`module.exports.default = function() {}; new Promise(function(resolve, reject){});`, rtOpts)
-
-			assert.NoError(t, err)
-		})
 		t.Run("Base/ok/Minimal", func(t *testing.T) {
 			rtOpts := lib.RuntimeOptions{
 				CompatibilityMode: null.StringFrom(lib.CompatibilityModeBase.String()),
@@ -153,9 +144,9 @@ func TestNewBundle(t *testing.T) {
 					`module.exports.default = function() {}; () => {};`,
 					"file:///script.js: Line 1:42 Unexpected token ) (and 1 more errors)",
 				},
-				// some ES2015 objects polyfilled by core.js are not supported
+				// Promises are not supported
 				{
-					"CoreJS", "base",
+					"Promise", "base",
 					`module.exports.default = function() {}; new Promise(function(resolve, reject){});`,
 					"ReferenceError: Promise is not defined at file:///script.js:1:45(5)",
 				},

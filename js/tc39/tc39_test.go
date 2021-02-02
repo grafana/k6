@@ -19,7 +19,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
 	"github.com/loadimpact/k6/js/compiler"
-	jslib "github.com/loadimpact/k6/js/lib"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/stretchr/testify/assert"
@@ -254,9 +253,6 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	})
 	vm.Set("$262", _262)
 	vm.Set("print", t.Log)
-	if _, err := vm.RunProgram(jslib.GetCoreJS()); err != nil {
-		panic(err)
-	}
 	_, err := vm.RunProgram(sabStub)
 	if err != nil {
 		panic(err)
