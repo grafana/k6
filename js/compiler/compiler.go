@@ -37,7 +37,39 @@ import (
 
 var (
 	DefaultOpts = map[string]interface{}{
-		"presets":       []string{"latest"},
+		// "presets": []string{"latest"},
+		"plugins": []interface{}{
+			// es2015 https://github.com/babel/babel/blob/v6.26.0/packages/babel-preset-es2015/src/index.js
+			[]interface{}{"transform-es2015-template-literals", map[string]interface{}{"loose": false, "spec": false}},
+			"transform-es2015-literals",
+			"transform-es2015-function-name",
+			[]interface{}{"transform-es2015-arrow-functions", map[string]interface{}{"spec": false}},
+			"transform-es2015-block-scoped-functions",
+			[]interface{}{"transform-es2015-classes", map[string]interface{}{"loose": false}},
+			"transform-es2015-object-super",
+			"transform-es2015-shorthand-properties",
+			"transform-es2015-duplicate-keys",
+			[]interface{}{"transform-es2015-computed-properties", map[string]interface{}{"loose": false}},
+			// "transform-es2015-for-of", // in goja
+			// "transform-es2015-sticky-regex", // in goja
+			// "transform-es2015-unicode-regex", // in goja
+			"check-es2015-constants",
+			[]interface{}{"transform-es2015-spread", map[string]interface{}{"loose": false}},
+			"transform-es2015-parameters",
+			[]interface{}{"transform-es2015-destructuring", map[string]interface{}{"loose": false}},
+			"transform-es2015-block-scoping", // let/const which particularly slow on big inputs
+			// "transform-es2015-typeof-symbol", // in goja
+			// all the other module plugins are just dropped
+			[]interface{}{"transform-es2015-modules-commonjs", map[string]interface{}{"loose": false}},
+			// "transform-regenerator", // Doesn't really work unless regeneratorRuntime is also added
+
+			// es2016 https://github.com/babel/babel/blob/v6.26.0/packages/babel-preset-es2016/src/index.js
+			"transform-exponentiation-operator",
+
+			// es2017 https://github.com/babel/babel/blob/v6.26.0/packages/babel-preset-es2017/src/index.js
+			// "syntax-trailing-function-commas", // in goja
+			// "transform-async-to-generator", // Doesn't really work unless regeneratorRuntime is also added
+		},
 		"ast":           false,
 		"sourceMaps":    false,
 		"babelrc":       false,
