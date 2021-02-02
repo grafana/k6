@@ -85,23 +85,9 @@ func (o *objectGoSlice) getOwnPropIdx(idx valueInt) Value {
 }
 
 func (o *objectGoSlice) grow(size int) {
-	newcap := cap(*o.data)
-	if newcap < size {
-		// Use the same algorithm as in runtime.growSlice
-		doublecap := newcap + newcap
-		if size > doublecap {
-			newcap = size
-		} else {
-			if len(*o.data) < 1024 {
-				newcap = doublecap
-			} else {
-				for newcap < size {
-					newcap += newcap / 4
-				}
-			}
-		}
-
-		n := make([]interface{}, size, newcap)
+	oldcap := cap(*o.data)
+	if oldcap < size {
+		n := make([]interface{}, size, growCap(size, len(*o.data), oldcap))
 		copy(n, *o.data)
 		*o.data = n
 	} else {
@@ -303,11 +289,11 @@ func (i *goslicePropIter) next() (propIterItem, iterNextFunc) {
 	return propIterItem{}, nil
 }
 
-func (o *objectGoSlice) enumerateUnfiltered() iterNextFunc {
-	return o.recursiveIter((&goslicePropIter{
+func (o *objectGoSlice) enumerateOwnKeys() iterNextFunc {
+	return (&goslicePropIter{
 		o:     o,
 		limit: len(*o.data),
-	}).next)
+	}).next
 }
 
 func (o *objectGoSlice) ownKeys(_ bool, accum []Value) []Value {

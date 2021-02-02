@@ -308,7 +308,6 @@ func (vm *vm) run() {
 		ticks++
 		if ticks > 10000 {
 			runtime.Gosched()
-			vm.r.removeDeadKeys()
 			ticks = 0
 		}
 	}
@@ -1278,7 +1277,7 @@ type newRegexp struct {
 }
 
 func (n *newRegexp) exec(vm *vm) {
-	vm.push(vm.r.newRegExpp(n.pattern.clone(), n.src, vm.r.global.RegExpPrototype))
+	vm.push(vm.r.newRegExpp(n.pattern.clone(), n.src, vm.r.global.RegExpPrototype).val)
 	vm.pc++
 }
 
@@ -2462,7 +2461,7 @@ func (_enumerate) exec(vm *vm) {
 	if v == _undefined || v == _null {
 		vm.iterStack = append(vm.iterStack, iterStackItem{f: emptyIter})
 	} else {
-		vm.iterStack = append(vm.iterStack, iterStackItem{f: v.ToObject(vm.r).self.enumerate()})
+		vm.iterStack = append(vm.iterStack, iterStackItem{f: enumerateRecursive(v.ToObject(vm.r))})
 	}
 	vm.sp--
 	vm.pc++

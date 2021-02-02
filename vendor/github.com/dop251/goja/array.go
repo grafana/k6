@@ -161,9 +161,11 @@ func (a *arrayObject) getIdx(idx valueInt, receiver Value) Value {
 }
 
 func (a *arrayObject) getOwnPropStr(name unistring.String) Value {
-	if i := strToIdx(name); i != math.MaxUint32 {
-		if i < uint32(len(a.values)) {
-			return a.values[i]
+	if len(a.values) > 0 {
+		if i := strToIdx(name); i != math.MaxUint32 {
+			if i < uint32(len(a.values)) {
+				return a.values[i]
+			}
 		}
 	}
 	if name == "length" {
@@ -282,12 +284,13 @@ func (a *arrayObject) setForeignStr(name unistring.String, val, receiver Value, 
 }
 
 type arrayPropIter struct {
-	a   *arrayObject
-	idx int
+	a     *arrayObject
+	limit int
+	idx   int
 }
 
 func (i *arrayPropIter) next() (propIterItem, iterNextFunc) {
-	for i.idx < len(i.a.values) {
+	for i.idx < len(i.a.values) && i.idx < i.limit {
 		name := unistring.String(strconv.Itoa(i.idx))
 		prop := i.a.values[i.idx]
 		i.idx++
@@ -296,12 +299,13 @@ func (i *arrayPropIter) next() (propIterItem, iterNextFunc) {
 		}
 	}
 
-	return i.a.baseObject.enumerateUnfiltered()()
+	return i.a.baseObject.enumerateOwnKeys()()
 }
 
-func (a *arrayObject) enumerateUnfiltered() iterNextFunc {
+func (a *arrayObject) enumerateOwnKeys() iterNextFunc {
 	return (&arrayPropIter{
-		a: a,
+		a:     a,
+		limit: len(a.values),
 	}).next
 }
 
@@ -345,13 +349,13 @@ func (a *arrayObject) expand(idx uint32) bool {
 				//log.Println("Switching standard->sparse")
 				sa := &sparseArrayObject{
 					baseObject:     a.baseObject,
-					length:         uint32(a.length),
+					length:         a.length,
 					propValueCount: a.propValueCount,
 				}
 				sa.setValues(a.values, a.objCount+1)
 				sa.val.self = sa
-				sa.init()
 				sa.lengthProp.writable = a.lengthProp.writable
+				sa._put("length", &sa.lengthProp)
 				return false
 			} else {
 				if bits.UintSize == 32 {
@@ -360,21 +364,7 @@ func (a *arrayObject) expand(idx uint32) bool {
 					}
 				}
 				tl := int(targetLen)
-				// Use the same algorithm as in runtime.growSlice
-				newcap := cap(a.values)
-				doublecap := newcap + newcap
-				if tl > doublecap {
-					newcap = tl
-				} else {
-					if len(a.values) < 1024 {
-						newcap = doublecap
-					} else {
-						for newcap < tl {
-							newcap += newcap / 4
-						}
-					}
-				}
-				newValues := make([]Value, tl, newcap)
+				newValues := make([]Value, tl, growCap(tl, len(a.values), cap(a.values)))
 				copy(newValues, a.values)
 				a.values = newValues
 			}

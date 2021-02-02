@@ -23,13 +23,6 @@ type sparseArrayObject struct {
 	lengthProp     valueProperty
 }
 
-func (a *sparseArrayObject) init() {
-	a.baseObject.init()
-	a.lengthProp.writable = true
-
-	a._put("length", &a.lengthProp)
-}
-
 func (a *sparseArrayObject) findIdx(idx uint32) int {
 	return sort.Search(len(a.items), func(i int) bool {
 		return a.items[i].idx >= idx
@@ -263,10 +256,10 @@ func (i *sparseArrayPropIter) next() (propIterItem, iterNextFunc) {
 		}
 	}
 
-	return i.a.baseObject.enumerateUnfiltered()()
+	return i.a.baseObject.enumerateOwnKeys()()
 }
 
-func (a *sparseArrayObject) enumerateUnfiltered() iterNextFunc {
+func (a *sparseArrayObject) enumerateOwnKeys() iterNextFunc {
 	return (&sparseArrayPropIter{
 		a: a,
 	}).next
@@ -333,8 +326,8 @@ func (a *sparseArrayObject) expand(idx uint32) bool {
 			}
 			ar.setValuesFromSparse(a.items, int(idx))
 			ar.val.self = ar
-			ar.init()
 			ar.lengthProp.writable = a.lengthProp.writable
+			a._put("length", &ar.lengthProp)
 			return false
 		}
 	}

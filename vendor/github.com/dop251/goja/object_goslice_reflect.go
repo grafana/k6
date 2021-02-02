@@ -113,23 +113,9 @@ func (o *objectGoSliceReflect) putIdx(idx int, v Value, throw bool) bool {
 }
 
 func (o *objectGoSliceReflect) grow(size int) {
-	newcap := o.value.Cap()
-	if newcap < size {
-		// Use the same algorithm as in runtime.growSlice
-		doublecap := newcap + newcap
-		if size > doublecap {
-			newcap = size
-		} else {
-			if o.value.Len() < 1024 {
-				newcap = doublecap
-			} else {
-				for newcap < size {
-					newcap += newcap / 4
-				}
-			}
-		}
-
-		n := reflect.MakeSlice(o.value.Type(), size, newcap)
+	oldcap := o.value.Cap()
+	if oldcap < size {
+		n := reflect.MakeSlice(o.value.Type(), size, growCap(size, o.value.Len(), oldcap))
 		reflect.Copy(n, o.value)
 		o.value.Set(n)
 	} else {
@@ -314,7 +300,7 @@ func (i *gosliceReflectPropIter) next() (propIterItem, iterNextFunc) {
 		return propIterItem{name: unistring.String(name), enumerable: _ENUM_TRUE}, i.next
 	}
 
-	return i.o.objectGoReflect.enumerateUnfiltered()()
+	return i.o.objectGoReflect.enumerateOwnKeys()()
 }
 
 func (o *objectGoSliceReflect) ownKeys(all bool, accum []Value) []Value {
@@ -325,7 +311,7 @@ func (o *objectGoSliceReflect) ownKeys(all bool, accum []Value) []Value {
 	return o.objectGoReflect.ownKeys(all, accum)
 }
 
-func (o *objectGoSliceReflect) enumerateUnfiltered() iterNextFunc {
+func (o *objectGoSliceReflect) enumerateOwnKeys() iterNextFunc {
 	return (&gosliceReflectPropIter{
 		o:     o,
 		limit: o.value.Len(),

@@ -1,55 +1,13 @@
 package goja
 
-type weakSet struct {
-	data map[uint64]struct{}
-}
-
 type weakSetObject struct {
 	baseObject
-	s *weakSet
-}
-
-func newWeakSet() *weakSet {
-	return &weakSet{
-		data: make(map[uint64]struct{}),
-	}
+	s weakMap
 }
 
 func (ws *weakSetObject) init() {
 	ws.baseObject.init()
-	ws.s = newWeakSet()
-}
-
-func (ws *weakSet) removeId(id uint64) {
-	delete(ws.data, id)
-}
-
-func (ws *weakSet) add(o *Object) {
-	ref := o.getWeakRef()
-	ws.data[ref.id] = struct{}{}
-	o.runtime.addWeakKey(ref.id, ws)
-}
-
-func (ws *weakSet) remove(o *Object) bool {
-	ref := o.weakRef
-	if ref == nil {
-		return false
-	}
-	_, exists := ws.data[ref.id]
-	if exists {
-		delete(ws.data, ref.id)
-		o.runtime.removeWeakKey(ref.id, ws)
-	}
-	return exists
-}
-
-func (ws *weakSet) has(o *Object) bool {
-	ref := o.weakRef
-	if ref == nil {
-		return false
-	}
-	_, exists := ws.data[ref.id]
-	return exists
+	ws.s = weakMap(ws.val.runtime.genId())
 }
 
 func (r *Runtime) weakSetProto_add(call FunctionCall) Value {
@@ -58,7 +16,7 @@ func (r *Runtime) weakSetProto_add(call FunctionCall) Value {
 	if !ok {
 		panic(r.NewTypeError("Method WeakSet.prototype.add called on incompatible receiver %s", thisObj.String()))
 	}
-	wso.s.add(r.toObject(call.Argument(0)))
+	wso.s.set(r.toObject(call.Argument(0)), nil)
 	return call.This
 }
 
@@ -119,7 +77,7 @@ func (r *Runtime) builtin_newWeakSet(args []Value, newTarget *Object) *Object {
 			if adder == r.global.weakSetAdder {
 				if arr := r.checkStdArrayIter(arg); arr != nil {
 					for _, v := range arr.values {
-						wso.s.add(r.toObject(v))
+						wso.s.set(r.toObject(v), nil)
 					}
 					return o
 				}

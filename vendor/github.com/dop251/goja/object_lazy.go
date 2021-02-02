@@ -223,16 +223,10 @@ func (o *lazyObject) preventExtensions(throw bool) bool {
 	return obj.preventExtensions(throw)
 }
 
-func (o *lazyObject) enumerateUnfiltered() iterNextFunc {
+func (o *lazyObject) enumerateOwnKeys() iterNextFunc {
 	obj := o.create(o.val)
 	o.val.self = obj
-	return obj.enumerateUnfiltered()
-}
-
-func (o *lazyObject) enumerate() iterNextFunc {
-	obj := o.create(o.val)
-	o.val.self = obj
-	return obj.enumerate()
+	return obj.enumerateOwnKeys()
 }
 
 func (o *lazyObject) export(ctx *objectExportCtx) interface{} {
