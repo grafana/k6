@@ -50,7 +50,7 @@ func TestConsoleContext(t *testing.T) {
 	logger, hook := logtest.NewNullLogger()
 	rt.Set("console", common.Bind(rt, &console{logger}, ctxPtr))
 
-	_, err := common.RunString(rt, `console.log("a")`)
+	_, err := rt.RunString(`console.log("a")`)
 	assert.NoError(t, err)
 	if entry := hook.LastEntry(); assert.NotNil(t, entry) {
 		assert.Equal(t, "a", entry.Message)
@@ -58,14 +58,14 @@ func TestConsoleContext(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	*ctxPtr = ctx
-	_, err = common.RunString(rt, `console.log("b")`)
+	_, err = rt.RunString(`console.log("b")`)
 	assert.NoError(t, err)
 	if entry := hook.LastEntry(); assert.NotNil(t, entry) {
 		assert.Equal(t, "b", entry.Message)
 	}
 
 	cancel()
-	_, err = common.RunString(rt, `console.log("c")`)
+	_, err = rt.RunString(`console.log("c")`)
 	assert.NoError(t, err)
 	if entry := hook.LastEntry(); assert.NotNil(t, entry) {
 		assert.Equal(t, "b", entry.Message)

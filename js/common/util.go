@@ -28,11 +28,6 @@ import (
 	"github.com/dop251/goja"
 )
 
-// RunString Runs an string in the given runtime. Use this if writing ES5 in tests isn't a problem.
-func RunString(rt *goja.Runtime, src string) (goja.Value, error) {
-	return rt.RunString(src)
-}
-
 // Throw a JS error; avoids re-wrapping GoErrors.
 func Throw(rt *goja.Runtime, err error) {
 	if e, ok := err.(*goja.Exception); ok {

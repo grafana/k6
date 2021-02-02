@@ -43,7 +43,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 
 	t.Run("Base64", func(t *testing.T) {
 		t.Run("DefaultEnc", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 			var correct = "aGVsbG8gd29ybGQ=";
 			var encoded = encoding.b64encode("hello world");
 			if (encoded !== correct) {
@@ -52,7 +52,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("DefaultDec", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 			var correct = "hello world";
 			var decoded = encoding.b64decode("aGVsbG8gd29ybGQ=");
 			if (decoded !== correct) {
@@ -61,7 +61,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("DefaultArrayBufferEnc", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 			var exp = "aGVsbG8=";
 			var input = new Uint8Array([104, 101, 108, 108, 111]); // "hello"
 			var encoded = encoding.b64encode(input.buffer);
@@ -71,7 +71,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("DefaultUnicodeEnc", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 			var correct = "44GT44KT44Gr44Gh44Gv5LiW55WM";
 			var encoded = encoding.b64encode("こんにちは世界", "std");
 			if (encoded !== correct) {
@@ -80,7 +80,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("DefaultUnicodeDec", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 			var correct = "こんにちは世界";
 			var decoded = encoding.b64decode("44GT44KT44Gr44Gh44Gv5LiW55WM");
 			if (decoded !== correct) {
@@ -89,7 +89,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("StdEnc", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 			var correct = "aGVsbG8gd29ybGQ=";
 			var encoded = encoding.b64encode("hello world", "std");
 			if (encoded !== correct) {
@@ -98,7 +98,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("StdDec", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 			var correct = "hello world";
 			var decoded = encoding.b64decode("aGVsbG8gd29ybGQ=", "std");
 			if (decoded !== correct) {
@@ -107,7 +107,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("RawStdEnc", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 			var correct = "aGVsbG8gd29ybGQ";
 			var encoded = encoding.b64encode("hello world", "rawstd");
 			if (encoded !== correct) {
@@ -116,7 +116,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("RawStdDec", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 			var correct = "hello world";
 			var decoded = encoding.b64decode("aGVsbG8gd29ybGQ", "rawstd");
 			if (decoded !== correct) {
@@ -125,7 +125,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("URLEnc", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 			var correct = "5bCP6aO85by-Li4=";
 			var encoded = encoding.b64encode("小飼弾..", "url");
 			if (encoded !== correct) {
@@ -134,7 +134,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("URLDec", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 			var correct = "小飼弾..";
 			var decoded = encoding.b64decode("5bCP6aO85by-Li4=", "url");
 			if (decoded !== correct) {
@@ -143,7 +143,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("RawURLEnc", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 			var correct = "5bCP6aO85by-Li4";
 			var encoded = encoding.b64encode("小飼弾..", "rawurl");
 			if (encoded !== correct) {
@@ -152,7 +152,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("RawURLDec", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 			var correct = "小飼弾..";
 			var decoded = encoding.b64decode("5bCP6aO85by-Li4", "rawurl");
 			if (decoded !== correct) {
