@@ -29,7 +29,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib/netext/httpext"
 	"github.com/loadimpact/k6/stats"
 )
@@ -135,7 +134,7 @@ func TestResponse(t *testing.T) {
 	tb.Mux.HandleFunc("/invalidjson", invalidJSONHandler)
 
 	t.Run("Html", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
+		_, err := rt.RunString(sr(`
 			var res = http.request("GET", "HTTPBIN_URL/html");
 			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 			if (res.body.indexOf("Herman Melville - Moby-Dick") == -1) { throw new Error("wrong body: " + res.body); }
@@ -144,20 +143,20 @@ func TestResponse(t *testing.T) {
 		assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/html"), "", 200, "")
 
 		t.Run("html", func(t *testing.T) {
-			_, err := common.RunString(rt, `
+			_, err := rt.RunString(`
 				if (res.html().find("h1").text() != "Herman Melville - Moby-Dick") { throw new Error("wrong title: " + res.body); }
 			`)
 			assert.NoError(t, err)
 
 			t.Run("shorthand", func(t *testing.T) {
-				_, err := common.RunString(rt, `
+				_, err := rt.RunString(`
 					if (res.html("h1").text() != "Herman Melville - Moby-Dick") { throw new Error("wrong title: " + res.body); }
 				`)
 				assert.NoError(t, err)
 			})
 
 			t.Run("url", func(t *testing.T) {
-				_, err := common.RunString(rt, sr(`
+				_, err := rt.RunString(sr(`
 					if (res.html().url != "HTTPBIN_URL/html") { throw new Error("url incorrect: " + res.html().url); }
 				`))
 				assert.NoError(t, err)
@@ -176,7 +175,7 @@ func TestResponse(t *testing.T) {
 				}()
 			}
 
-			_, err = common.RunString(rt, sr(`
+			_, err = rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL/html");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				if (res.body.indexOf("Herman Melville - Moby-Dick") == -1) { throw new Error("wrong body: " + res.body); }
@@ -186,7 +185,7 @@ func TestResponse(t *testing.T) {
 		})
 	})
 	t.Run("Json", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
+		_, err := rt.RunString(sr(`
 			var res = http.request("GET", "HTTPBIN_URL/get?a=1&b=2");
 			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 			if (res.json().args.a != "1") { throw new Error("wrong ?a: " + res.json().args.a); }
@@ -196,19 +195,19 @@ func TestResponse(t *testing.T) {
 		assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get?a=1&b=2"), "", 200, "")
 
 		t.Run("Invalid", func(t *testing.T) {
-			_, err := common.RunString(rt, sr(`http.request("GET", "HTTPBIN_URL/html").json();`))
+			_, err := rt.RunString(sr(`http.request("GET", "HTTPBIN_URL/html").json();`))
 			//nolint:lll
 			assert.Contains(t, err.Error(), "GoError: cannot parse json due to an error at line 1, character 2 , error: invalid character '<' looking for beginning of value")
 		})
 
 		t.Run("Invalid", func(t *testing.T) {
-			_, err := common.RunString(rt, sr(`http.request("GET", "HTTPBIN_URL/invalidjson").json();`))
+			_, err := rt.RunString(sr(`http.request("GET", "HTTPBIN_URL/invalidjson").json();`))
 			//nolint:lll
 			assert.Contains(t, err.Error(), "GoError: cannot parse json due to an error at line 3, character 9 , error: invalid character 'e' in literal true (expecting 'r')")
 		})
 	})
 	t.Run("JsonSelector", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
+		_, err := rt.RunString(sr(`
 			var res = http.request("GET", "HTTPBIN_URL/json");
 			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 
@@ -252,7 +251,7 @@ func TestResponse(t *testing.T) {
 
 	t.Run("SubmitForm", func(t *testing.T) {
 		t.Run("withoutArgs", func(t *testing.T) {
-			_, err := common.RunString(rt, sr(`
+			_, err := rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL/forms/post");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				res = res.submitForm()
@@ -271,7 +270,7 @@ func TestResponse(t *testing.T) {
 		})
 
 		t.Run("withFields", func(t *testing.T) {
-			_, err := common.RunString(rt, sr(`
+			_, err := rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL/forms/post");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				res = res.submitForm({ fields: { custname: "test", extradata: "test2" } })
@@ -290,7 +289,7 @@ func TestResponse(t *testing.T) {
 		})
 
 		t.Run("withRequestParams", func(t *testing.T) {
-			_, err := common.RunString(rt, sr(`
+			_, err := rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL/forms/post");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				res = res.submitForm({ params: { headers: { "My-Fancy-Header": "SomeValue" } }})
@@ -303,7 +302,7 @@ func TestResponse(t *testing.T) {
 		})
 
 		t.Run("withFormSelector", func(t *testing.T) {
-			_, err := common.RunString(rt, sr(`
+			_, err := rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL/forms/post");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				res = res.submitForm({ formSelector: 'form[method="post"]' })
@@ -322,7 +321,7 @@ func TestResponse(t *testing.T) {
 		})
 
 		t.Run("withNonExistentForm", func(t *testing.T) {
-			_, err := common.RunString(rt, sr(`
+			_, err := rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL/forms/post");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				res.submitForm({ formSelector: "#doesNotExist" })
@@ -331,7 +330,7 @@ func TestResponse(t *testing.T) {
 		})
 
 		t.Run("withGetMethod", func(t *testing.T) {
-			_, err := common.RunString(rt, sr(`
+			_, err := rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL/myforms/get");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				res = res.submitForm()
@@ -351,7 +350,7 @@ func TestResponse(t *testing.T) {
 
 	t.Run("ClickLink", func(t *testing.T) {
 		t.Run("withoutArgs", func(t *testing.T) {
-			_, err := common.RunString(rt, sr(`
+			_, err := rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL/links/10/0");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				res = res.clickLink()
@@ -362,7 +361,7 @@ func TestResponse(t *testing.T) {
 		})
 
 		t.Run("withSelector", func(t *testing.T) {
-			_, err := common.RunString(rt, sr(`
+			_, err := rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL/links/10/0");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				res = res.clickLink({ selector: 'a:nth-child(4)' })
@@ -373,7 +372,7 @@ func TestResponse(t *testing.T) {
 		})
 
 		t.Run("withNonExistentLink", func(t *testing.T) {
-			_, err := common.RunString(rt, sr(`
+			_, err := rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL/links/10/0");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				res = res.clickLink({ selector: 'a#doesNotExist' })
@@ -382,7 +381,7 @@ func TestResponse(t *testing.T) {
 		})
 
 		t.Run("withRequestParams", func(t *testing.T) {
-			_, err := common.RunString(rt, sr(`
+			_, err := rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				res = res.clickLink({ selector: 'a[href="/get"]', params: { headers: { "My-Fancy-Header": "SomeValue" } } })

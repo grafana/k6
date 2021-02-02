@@ -411,14 +411,14 @@ func TestGenElements(t *testing.T) {
 	rt.Set("src", testGenElems)
 	rt.Set("html", common.Bind(rt, &HTML{}, &ctx))
 
-	_, err := common.RunString(rt, "var doc = html.parseHTML(src)")
+	_, err := rt.RunString("var doc = html.parseHTML(src)")
 
 	assert.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 
 	t.Run("Test text properties", func(t *testing.T) {
 		for _, test := range textTests {
-			v, err := common.RunString(rt, `doc.find("#`+test.id+`").get(0).`+test.property+`()`)
+			v, err := rt.RunString(`doc.find("#` + test.id + `").get(0).` + test.property + `()`)
 			if err != nil {
 				t.Errorf("Error for property name '%s' on element id '#%s':\n%+v ", test.id, test.property, err)
 			} else if v.Export() != test.data {
@@ -429,14 +429,14 @@ func TestGenElements(t *testing.T) {
 
 	t.Run("Test bool properties", func(t *testing.T) {
 		for _, test := range boolTests {
-			vT, errT := common.RunString(rt, `doc.find("#`+test.idTrue+`").get(0).`+test.property+`()`)
+			vT, errT := rt.RunString(`doc.find("#` + test.idTrue + `").get(0).` + test.property + `()`)
 			if errT != nil {
 				t.Errorf("Error for property name '%s' on element id '#%s':\n%+v", test.property, test.idTrue, errT)
 			} else if vT.Export() != true { // nolint: gosimple
 				t.Errorf("Expected true for property name '%s' on element id '#%s'", test.property, test.idTrue)
 			}
 
-			vF, errF := common.RunString(rt, `doc.find("#`+test.idFalse+`").get(0).`+test.property+`()`)
+			vF, errF := rt.RunString(`doc.find("#` + test.idFalse + `").get(0).` + test.property + `()`)
 			if errF != nil {
 				t.Errorf("Error for property name '%s' on element id '#%s':\n%+v", test.property, test.idFalse, errF)
 			} else if vF.Export() != false { // nolint: gosimple
@@ -447,7 +447,7 @@ func TestGenElements(t *testing.T) {
 
 	t.Run("Test int64 properties", func(t *testing.T) {
 		for _, test := range intTests {
-			v, err := common.RunString(rt, `doc.find("#`+test.id+`").get(0).`+test.property+`()`)
+			v, err := rt.RunString(`doc.find("#` + test.id + `").get(0).` + test.property + `()`)
 			if err != nil {
 				t.Errorf("Error for property name '%s' on element id '#%s':\n%+v", test.property, test.id, err)
 			} else if v.Export() != int64(test.data) {
@@ -458,7 +458,7 @@ func TestGenElements(t *testing.T) {
 
 	t.Run("Test nullable properties", func(t *testing.T) {
 		for _, test := range nullTests {
-			v, err := common.RunString(rt, `doc.find("#`+test.id+`").get(0).`+test.property+`()`)
+			v, err := rt.RunString(`doc.find("#` + test.id + `").get(0).` + test.property + `()`)
 			if err != nil {
 				t.Errorf("Error for property name '%s' on element id '#%s':\n%+v", test.property, test.id, err)
 			} else if v.Export() != nil {
@@ -478,7 +478,7 @@ func TestGenElements(t *testing.T) {
 			sel.URL = test.baseUrl
 			rt.Set("urldoc", sel)
 
-			v, err := common.RunString(rt, `urldoc.find("#`+test.id+`").get(0).`+test.property+`()`)
+			v, err := rt.RunString(`urldoc.find("#` + test.id + `").get(0).` + test.property + `()`)
 			if err != nil {
 				t.Errorf("Error for url property '%s' on element id '#%s':\n%+v", test.property, test.id, err)
 			} else if v.Export() != test.data {

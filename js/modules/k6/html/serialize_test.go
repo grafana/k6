@@ -75,13 +75,13 @@ func TestSerialize(t *testing.T) {
 	rt.Set("src", testSerializeHTML)
 	rt.Set("html", common.Bind(rt, New(), &ctx))
 
-	_, err := common.RunString(rt, `var doc = html.parseHTML(src)`)
+	_, err := rt.RunString(`var doc = html.parseHTML(src)`)
 	assert.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 
 	t.Run("SerializeArray", func(t *testing.T) {
 		t.Run("form", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("form").serializeArray()`)
+			v, err := rt.RunString(`doc.find("form").serializeArray()`)
 			if assert.NoError(t, err) {
 				arr := v.Export().([]FormValue)
 				assert.Equal(t, 11, len(arr))
@@ -125,7 +125,7 @@ func TestSerialize(t *testing.T) {
 		})
 
 		t.Run("controls", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("input").serializeArray()`)
+			v, err := rt.RunString(`doc.find("input").serializeArray()`)
 			if assert.NoError(t, err) {
 				arr := v.Export().([]FormValue)
 				assert.Equal(t, 7, len(arr))
@@ -155,7 +155,7 @@ func TestSerialize(t *testing.T) {
 	})
 
 	t.Run("SerializeObject", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("form").serializeObject()`)
+		v, err := rt.RunString(`doc.find("form").serializeObject()`)
 		if assert.NoError(t, err) {
 			obj := v.Export().(map[string]goja.Value)
 			assert.Equal(t, 11, len(obj))
@@ -178,7 +178,7 @@ func TestSerialize(t *testing.T) {
 	})
 
 	t.Run("Serialize", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("form").serialize()`)
+		v, err := rt.RunString(`doc.find("form").serialize()`)
 		if assert.NoError(t, err) {
 			url := v.String()
 			assert.Equal(t, "checkbox1=some+checkbox"+

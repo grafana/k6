@@ -117,7 +117,7 @@ func TestClient(t *testing.T) {
 	rt.Set("grpc", common.Bind(rt, New(), &ctx))
 
 	t.Run("New", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			var client = new grpc.Client();
 			if (!client) throw new Error("no client created")
 		`)
@@ -125,7 +125,7 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("LoadNotFound", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			client.load([], "./does_not_exist.proto");
 		`)
 		if !assert.Error(t, err) {
@@ -139,7 +139,7 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("Load", func(t *testing.T) {
-		respV, err := common.RunString(rt, `
+		respV, err := rt.RunString(`
 			client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");
 		`)
 		if !assert.NoError(t, err) {
@@ -151,7 +151,7 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("ConnectInit", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			client.connect();
 		`)
 		if !assert.Error(t, err) {
@@ -161,7 +161,7 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("invokeInit", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			var err = client.invoke();
 			throw new Error(err)
 		`)
@@ -174,7 +174,7 @@ func TestClient(t *testing.T) {
 	ctx = lib.WithState(ctx, state)
 
 	t.Run("NoConnect", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			client.invoke("grpc.testing.TestService/EmptyCall", {})
 		`)
 		if !assert.Error(t, err) {
@@ -184,7 +184,7 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("UnknownConnectParam", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
+		_, err := rt.RunString(sr(`
 			client.connect("GRPCBIN_ADDR", { name: "k6" });
 		`))
 		if !assert.Error(t, err) {
@@ -194,7 +194,7 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("ConnectInvalidTimeout", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
+		_, err := rt.RunString(sr(`
 			client.connect("GRPCBIN_ADDR", { timeout: "k6" });
 		`))
 		if !assert.Error(t, err) {
@@ -204,35 +204,35 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("ConnectStringTimeout", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
+		_, err := rt.RunString(sr(`
 			client.connect("GRPCBIN_ADDR", { timeout: "1h3s" });
 		`))
 		assert.NoError(t, err)
 	})
 
 	t.Run("ConnectFloatTimeout", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
+		_, err := rt.RunString(sr(`
 			client.connect("GRPCBIN_ADDR", { timeout: 3456.3 });
 		`))
 		assert.NoError(t, err)
 	})
 
 	t.Run("ConnectIntegerTimeout", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
+		_, err := rt.RunString(sr(`
 			client.connect("GRPCBIN_ADDR", { timeout: 3000 });
 		`))
 		assert.NoError(t, err)
 	})
 
 	t.Run("Connect", func(t *testing.T) {
-		_, err := common.RunString(rt, sr(`
+		_, err := rt.RunString(sr(`
 			client.connect("GRPCBIN_ADDR");
 		`))
 		assert.NoError(t, err)
 	})
 
 	t.Run("InvokeNotFound", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			client.invoke("foo/bar", {})
 		`)
 		if !assert.Error(t, err) {
@@ -242,7 +242,7 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("InvokeInvalidParam", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			client.invoke("grpc.testing.TestService/EmptyCall", {}, { void: true })
 		`)
 		if !assert.Error(t, err) {
@@ -252,7 +252,7 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("InvokeInvalidTimeoutType", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			client.invoke("grpc.testing.TestService/EmptyCall", {}, { timeout: true })
 		`)
 		if !assert.Error(t, err) {
@@ -262,7 +262,7 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("InvokeInvalidTimeout", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			client.invoke("grpc.testing.TestService/EmptyCall", {}, { timeout: "please" })
 		`)
 		if !assert.Error(t, err) {
@@ -272,21 +272,21 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("InvokeStringTimeout", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			client.invoke("grpc.testing.TestService/EmptyCall", {}, { timeout: "1h42m" })
 		`)
 		assert.NoError(t, err)
 	})
 
 	t.Run("InvokeFloatTimeout", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			client.invoke("grpc.testing.TestService/EmptyCall", {}, { timeout: 400.50 })
 		`)
 		assert.NoError(t, err)
 	})
 
 	t.Run("InvokeIntegerTimeout", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			client.invoke("grpc.testing.TestService/EmptyCall", {}, { timeout: 2000 })
 		`)
 		assert.NoError(t, err)
@@ -296,7 +296,7 @@ func TestClient(t *testing.T) {
 		tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
 			return &grpc_testing.Empty{}, nil
 		}
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			var resp = client.invoke("grpc.testing.TestService/EmptyCall", {})
 			if (resp.status !== grpc.StatusOK) {
 				throw new Error("unexpected error status: " + resp.status)
@@ -315,7 +315,7 @@ func TestClient(t *testing.T) {
 
 			return &grpc_testing.SimpleResponse{}, nil
 		}
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			var resp = client.invoke("grpc.testing.TestService/UnaryCall", { payload: { body: "6LSf6L295rWL6K+V"} })
 			if (resp.status !== grpc.StatusOK) {
 				throw new Error("server did not receive the correct request message")
@@ -333,7 +333,7 @@ func TestClient(t *testing.T) {
 
 			return &grpc_testing.Empty{}, nil
 		}
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			var resp = client.invoke("grpc.testing.TestService/EmptyCall", {}, { headers: { "X-Load-Tester": "k6" } })
 			if (resp.status !== grpc.StatusOK) {
 				throw new Error("failed to send correct headers in the request")
@@ -348,7 +348,7 @@ func TestClient(t *testing.T) {
 				OauthScope: "水",
 			}, nil
 		}
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			var resp = client.invoke("grpc.testing.TestService/UnaryCall", {})
 			if (!resp.message || resp.message.username !== "" || resp.message.oauthScope !== "水") {
 				throw new Error("unexpected response message: " + JSON.stringify(resp.message))
@@ -363,7 +363,7 @@ func TestClient(t *testing.T) {
 		tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
 			return nil, status.Error(codes.DataLoss, "foobar")
 		}
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			var resp = client.invoke("grpc.testing.TestService/EmptyCall", {})
 			if (resp.status !== grpc.StatusDataLoss) {
 				throw new Error("unexpected error status: " + resp.status)
@@ -384,7 +384,7 @@ func TestClient(t *testing.T) {
 
 			return &grpc_testing.Empty{}, nil
 		}
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			var resp = client.invoke("grpc.testing.TestService/EmptyCall", {})
 			if (resp.status !== grpc.StatusOK) {
 				throw new Error("unexpected error status: " + resp.status)
@@ -403,7 +403,7 @@ func TestClient(t *testing.T) {
 
 			return &grpc_testing.Empty{}, nil
 		}
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			var resp = client.invoke("grpc.testing.TestService/EmptyCall", {})
 			if (resp.status !== grpc.StatusOK) {
 				throw new Error("unexpected error status: " + resp.status)
@@ -416,7 +416,7 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("LoadNotInit", func(t *testing.T) {
-		_, err := common.RunString(rt, "client.load()")
+		_, err := rt.RunString("client.load()")
 		if !assert.Error(t, err) {
 			return
 		}
@@ -424,7 +424,7 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("Close", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 			client.close();
 			client.invoke();
 		`)

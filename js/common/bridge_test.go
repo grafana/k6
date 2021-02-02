@@ -297,25 +297,25 @@ func TestBind(t *testing.T) {
 	}{
 		{"Fields", bridgeTestFieldsType{"a", "b", "c", "d", "e"}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
 			t.Run("Exported", func(t *testing.T) {
-				v, err := RunString(rt, `obj.exported`)
+				v, err := rt.RunString(`obj.exported`)
 				if assert.NoError(t, err) {
 					assert.Equal(t, "a", v.Export())
 				}
 			})
 			t.Run("ExportedTag", func(t *testing.T) {
-				v, err := RunString(rt, `obj.renamed`)
+				v, err := rt.RunString(`obj.renamed`)
 				if assert.NoError(t, err) {
 					assert.Equal(t, "b", v.Export())
 				}
 			})
 			t.Run("unexported", func(t *testing.T) {
-				v, err := RunString(rt, `obj.unexported`)
+				v, err := rt.RunString(`obj.unexported`)
 				if assert.NoError(t, err) {
 					assert.Equal(t, nil, v.Export())
 				}
 			})
 			t.Run("unexportedTag", func(t *testing.T) {
-				v, err := RunString(rt, `obj.unexportedTag`)
+				v, err := rt.RunString(`obj.unexportedTag`)
 				if assert.NoError(t, err) {
 					assert.Equal(t, nil, v.Export())
 				}
@@ -323,19 +323,19 @@ func TestBind(t *testing.T) {
 		}},
 		{"Methods", bridgeTestMethodsType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
 			t.Run("unexportedFn", func(t *testing.T) {
-				_, err := RunString(rt, `obj.unexportedFn()`)
+				_, err := rt.RunString(`obj.unexportedFn()`)
 				assert.EqualError(t, err, "TypeError: Object has no member 'unexportedFn' at <eval>:1:17(3)")
 			})
 			t.Run("ExportedFn", func(t *testing.T) {
-				_, err := RunString(rt, `obj.exportedFn()`)
+				_, err := rt.RunString(`obj.exportedFn()`)
 				assert.NoError(t, err)
 			})
 			t.Run("unexportedPtrFn", func(t *testing.T) {
-				_, err := RunString(rt, `obj.unexportedPtrFn()`)
+				_, err := rt.RunString(`obj.unexportedPtrFn()`)
 				assert.EqualError(t, err, "TypeError: Object has no member 'unexportedPtrFn' at <eval>:1:20(3)")
 			})
 			t.Run("ExportedPtrFn", func(t *testing.T) {
-				_, err := RunString(rt, `obj.exportedPtrFn()`)
+				_, err := rt.RunString(`obj.exportedPtrFn()`)
 				switch obj.(type) {
 				case *bridgeTestMethodsType:
 					assert.NoError(t, err)
@@ -347,53 +347,53 @@ func TestBind(t *testing.T) {
 			})
 		}},
 		{"Error", bridgeTestErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.error()`)
+			_, err := rt.RunString(`obj.error()`)
 			assert.Contains(t, err.Error(), "GoError: error")
 		}},
 		{"JSValue", bridgeTestJSValueType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			v, err := RunString(rt, `obj.func(1234)`)
+			v, err := rt.RunString(`obj.func(1234)`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(1234), v.Export())
 			}
 		}},
 		{"JSValueError", bridgeTestJSValueErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.func()`)
+			_, err := rt.RunString(`obj.func()`)
 			assert.Contains(t, err.Error(), "GoError: missing argument")
 
 			t.Run("Valid", func(t *testing.T) {
-				v, err := RunString(rt, `obj.func(1234)`)
+				v, err := rt.RunString(`obj.func(1234)`)
 				if assert.NoError(t, err) {
 					assert.Equal(t, int64(1234), v.Export())
 				}
 			})
 		}},
 		{"JSValueContext", bridgeTestJSValueContextType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.func()`)
+			_, err := rt.RunString(`obj.func()`)
 			assert.Contains(t, err.Error(), "GoError: func() can only be called from within default()")
 
 			t.Run("Context", func(t *testing.T) {
 				*ctxPtr = context.Background()
 				defer func() { *ctxPtr = nil }()
 
-				v, err := RunString(rt, `obj.func(1234)`)
+				v, err := rt.RunString(`obj.func(1234)`)
 				if assert.NoError(t, err) {
 					assert.Equal(t, int64(1234), v.Export())
 				}
 			})
 		}},
 		{"JSValueContextError", bridgeTestJSValueContextErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.func()`)
+			_, err := rt.RunString(`obj.func()`)
 			assert.Contains(t, err.Error(), "GoError: func() can only be called from within default()")
 
 			t.Run("Context", func(t *testing.T) {
 				*ctxPtr = context.Background()
 				defer func() { *ctxPtr = nil }()
 
-				_, err := RunString(rt, `obj.func()`)
+				_, err := rt.RunString(`obj.func()`)
 				assert.Contains(t, err.Error(), "GoError: missing argument")
 
 				t.Run("Valid", func(t *testing.T) {
-					v, err := RunString(rt, `obj.func(1234)`)
+					v, err := rt.RunString(`obj.func(1234)`)
 					if assert.NoError(t, err) {
 						assert.Equal(t, int64(1234), v.Export())
 					}
@@ -401,49 +401,49 @@ func TestBind(t *testing.T) {
 			})
 		}},
 		{"NativeFunction", bridgeTestNativeFunctionType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			v, err := RunString(rt, `obj.func(1234)`)
+			v, err := rt.RunString(`obj.func(1234)`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(1234), v.Export())
 			}
 		}},
 		{"NativeFunctionError", bridgeTestNativeFunctionErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.func()`)
+			_, err := rt.RunString(`obj.func()`)
 			assert.Contains(t, err.Error(), "GoError: missing argument")
 
 			t.Run("Valid", func(t *testing.T) {
-				v, err := RunString(rt, `obj.func(1234)`)
+				v, err := rt.RunString(`obj.func(1234)`)
 				if assert.NoError(t, err) {
 					assert.Equal(t, int64(1234), v.Export())
 				}
 			})
 		}},
 		{"NativeFunctionContext", bridgeTestNativeFunctionContextType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.func()`)
+			_, err := rt.RunString(`obj.func()`)
 			assert.Contains(t, err.Error(), "GoError: func() can only be called from within default()")
 
 			t.Run("Context", func(t *testing.T) {
 				*ctxPtr = context.Background()
 				defer func() { *ctxPtr = nil }()
 
-				v, err := RunString(rt, `obj.func(1234)`)
+				v, err := rt.RunString(`obj.func(1234)`)
 				if assert.NoError(t, err) {
 					assert.Equal(t, int64(1234), v.Export())
 				}
 			})
 		}},
 		{"NativeFunctionContextError", bridgeTestNativeFunctionContextErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.func()`)
+			_, err := rt.RunString(`obj.func()`)
 			assert.Contains(t, err.Error(), "GoError: func() can only be called from within default()")
 
 			t.Run("Context", func(t *testing.T) {
 				*ctxPtr = context.Background()
 				defer func() { *ctxPtr = nil }()
 
-				_, err := RunString(rt, `obj.func()`)
+				_, err := rt.RunString(`obj.func()`)
 				assert.Contains(t, err.Error(), "GoError: missing argument")
 
 				t.Run("Valid", func(t *testing.T) {
-					v, err := RunString(rt, `obj.func(1234)`)
+					v, err := rt.RunString(`obj.func(1234)`)
 					if assert.NoError(t, err) {
 						assert.Equal(t, int64(1234), v.Export())
 					}
@@ -451,80 +451,80 @@ func TestBind(t *testing.T) {
 			})
 		}},
 		{"Add", bridgeTestAddType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			v, err := RunString(rt, `obj.add(1, 2)`)
+			v, err := rt.RunString(`obj.add(1, 2)`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(3), v.Export())
 			}
 		}},
 		{"AddWithError", bridgeTestAddWithErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			v, err := RunString(rt, `obj.addWithError(1, 2)`)
+			v, err := rt.RunString(`obj.addWithError(1, 2)`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(3), v.Export())
 			}
 
 			t.Run("Negative", func(t *testing.T) {
-				_, err := RunString(rt, `obj.addWithError(0, -1)`)
+				_, err := rt.RunString(`obj.addWithError(0, -1)`)
 				assert.Contains(t, err.Error(), "GoError: answer is negative")
 			})
 		}},
 		{"AddWithError", bridgeTestAddWithErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			v, err := RunString(rt, `obj.addWithError(1, 2)`)
+			v, err := rt.RunString(`obj.addWithError(1, 2)`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(3), v.Export())
 			}
 
 			t.Run("Negative", func(t *testing.T) {
-				_, err := RunString(rt, `obj.addWithError(0, -1)`)
+				_, err := rt.RunString(`obj.addWithError(0, -1)`)
 				assert.Contains(t, err.Error(), "GoError: answer is negative")
 			})
 		}},
 		{"Context", bridgeTestContextType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.context()`)
+			_, err := rt.RunString(`obj.context()`)
 			assert.Contains(t, err.Error(), "GoError: context() can only be called from within default()")
 
 			t.Run("Valid", func(t *testing.T) {
 				*ctxPtr = context.Background()
 				defer func() { *ctxPtr = nil }()
 
-				_, err := RunString(rt, `obj.context()`)
+				_, err := rt.RunString(`obj.context()`)
 				assert.NoError(t, err)
 			})
 		}},
 		{"ContextAdd", bridgeTestContextAddType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.contextAdd(1, 2)`)
+			_, err := rt.RunString(`obj.contextAdd(1, 2)`)
 			assert.Contains(t, err.Error(), "GoError: contextAdd() can only be called from within default()")
 
 			t.Run("Valid", func(t *testing.T) {
 				*ctxPtr = context.Background()
 				defer func() { *ctxPtr = nil }()
 
-				v, err := RunString(rt, `obj.contextAdd(1, 2)`)
+				v, err := rt.RunString(`obj.contextAdd(1, 2)`)
 				if assert.NoError(t, err) {
 					assert.Equal(t, int64(3), v.Export())
 				}
 			})
 		}},
 		{"ContextAddWithError", bridgeTestContextAddWithErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.contextAddWithError(1, 2)`)
+			_, err := rt.RunString(`obj.contextAddWithError(1, 2)`)
 			assert.Contains(t, err.Error(), "GoError: contextAddWithError() can only be called from within default()")
 
 			t.Run("Valid", func(t *testing.T) {
 				*ctxPtr = context.Background()
 				defer func() { *ctxPtr = nil }()
 
-				v, err := RunString(rt, `obj.contextAddWithError(1, 2)`)
+				v, err := rt.RunString(`obj.contextAddWithError(1, 2)`)
 				if assert.NoError(t, err) {
 					assert.Equal(t, int64(3), v.Export())
 				}
 
 				t.Run("Negative", func(t *testing.T) {
-					_, err := RunString(rt, `obj.contextAddWithError(0, -1)`)
+					_, err := rt.RunString(`obj.contextAddWithError(0, -1)`)
 					assert.Contains(t, err.Error(), "GoError: answer is negative")
 				})
 			})
 		}},
 		{"ContextInject", bridgeTestContextInjectType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.contextInject()`)
+			_, err := rt.RunString(`obj.contextInject()`)
 			switch impl := obj.(type) {
 			case bridgeTestContextInjectType:
 				assert.EqualError(t, err, "TypeError: Object has no member 'contextInject' at <eval>:1:18(3)")
@@ -536,14 +536,14 @@ func TestBind(t *testing.T) {
 					*ctxPtr = context.Background()
 					defer func() { *ctxPtr = nil }()
 
-					_, err := RunString(rt, `obj.contextInject()`)
+					_, err := rt.RunString(`obj.contextInject()`)
 					assert.NoError(t, err)
 					assert.Equal(t, *ctxPtr, impl.ctx)
 				})
 			}
 		}},
 		{"ContextInjectPtr", bridgeTestContextInjectPtrType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.contextInjectPtr()`)
+			_, err := rt.RunString(`obj.contextInjectPtr()`)
 			switch impl := obj.(type) {
 			case bridgeTestContextInjectPtrType:
 				assert.EqualError(t, err, "TypeError: Object has no member 'contextInjectPtr' at <eval>:1:21(3)")
@@ -557,7 +557,7 @@ func TestBind(t *testing.T) {
 			case *bridgeTestCounterType:
 				for i := 0; i < 10; i++ {
 					t.Run(strconv.Itoa(i), func(t *testing.T) {
-						v, err := RunString(rt, `obj.count()`)
+						v, err := rt.RunString(`obj.count()`)
 						if assert.NoError(t, err) {
 							assert.Equal(t, int64(i+1), v.Export())
 							assert.Equal(t, i+1, impl.Counter)
@@ -565,7 +565,7 @@ func TestBind(t *testing.T) {
 					})
 				}
 			case bridgeTestCounterType:
-				_, err := RunString(rt, `obj.count()`)
+				_, err := rt.RunString(`obj.count()`)
 				assert.EqualError(t, err, "TypeError: Object has no member 'count' at <eval>:1:10(3)")
 			default:
 				assert.Fail(t, "UNKNOWN TYPE")
@@ -579,7 +579,7 @@ func TestBind(t *testing.T) {
 				sum += i
 				t.Run(strconv.Itoa(i), func(t *testing.T) {
 					code := fmt.Sprintf(`obj.sum(%s)`, strings.Join(args, ", "))
-					v, err := RunString(rt, code)
+					v, err := rt.RunString(code)
 					if assert.NoError(t, err) {
 						assert.Equal(t, int64(sum), v.Export())
 					}
@@ -587,7 +587,7 @@ func TestBind(t *testing.T) {
 			}
 		}},
 		{"SumWithContext", bridgeTestSumWithContextType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.sumWithContext(1, 2)`)
+			_, err := rt.RunString(`obj.sumWithContext(1, 2)`)
 			assert.Contains(t, err.Error(), "GoError: sumWithContext() can only be called from within default()")
 
 			t.Run("Valid", func(t *testing.T) {
@@ -601,7 +601,7 @@ func TestBind(t *testing.T) {
 					sum += i
 					t.Run(strconv.Itoa(i), func(t *testing.T) {
 						code := fmt.Sprintf(`obj.sumWithContext(%s)`, strings.Join(args, ", "))
-						v, err := RunString(rt, code)
+						v, err := rt.RunString(code)
 						if assert.NoError(t, err) {
 							assert.Equal(t, int64(sum), v.Export())
 						}
@@ -617,7 +617,7 @@ func TestBind(t *testing.T) {
 				sum += i
 				t.Run(strconv.Itoa(i), func(t *testing.T) {
 					code := fmt.Sprintf(`obj.sumWithError(%s)`, strings.Join(args, ", "))
-					v, err := RunString(rt, code)
+					v, err := rt.RunString(code)
 					if assert.NoError(t, err) {
 						assert.Equal(t, int64(sum), v.Export())
 					}
@@ -625,7 +625,7 @@ func TestBind(t *testing.T) {
 			}
 		}},
 		{"SumWithContextAndError", bridgeTestSumWithContextAndErrorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			_, err := RunString(rt, `obj.sumWithContextAndError(1, 2)`)
+			_, err := rt.RunString(`obj.sumWithContextAndError(1, 2)`)
 			assert.Contains(t, err.Error(), "GoError: sumWithContextAndError() can only be called from within default()")
 
 			t.Run("Valid", func(t *testing.T) {
@@ -639,7 +639,7 @@ func TestBind(t *testing.T) {
 					sum += i
 					t.Run(strconv.Itoa(i), func(t *testing.T) {
 						code := fmt.Sprintf(`obj.sumWithContextAndError(%s)`, strings.Join(args, ", "))
-						v, err := RunString(rt, code)
+						v, err := rt.RunString(code)
 						if assert.NoError(t, err) {
 							assert.Equal(t, int64(sum), v.Export())
 						}
@@ -648,7 +648,7 @@ func TestBind(t *testing.T) {
 			})
 		}},
 		{"Constructor", bridgeTestConstructorType{}, func(t *testing.T, obj interface{}, rt *goja.Runtime) {
-			v, err := RunString(rt, `new obj.Constructor()`)
+			v, err := rt.RunString(`new obj.Constructor()`)
 			assert.NoError(t, err)
 			assert.IsType(t, bridgeTestConstructorSpawnedType{}, v.Export())
 		}},
