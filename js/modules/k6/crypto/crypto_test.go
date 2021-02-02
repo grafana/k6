@@ -24,10 +24,12 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
@@ -373,6 +375,18 @@ func TestHMac(t *testing.T) {
 
 			assert.NoError(t, err)
 		})
+
+		t.Run(algorithm+" ArrayBuffer: valid", func(t *testing.T) {
+			_, err := common.RunString(rt, `
+			var data = new Uint8Array([115,111,109,101,32,100,97,116,97,32,116,
+										111,32,104,97,115,104]).buffer;
+			var resultHex = crypto.hmac(algorithm, "a secret", data, "hex");
+			if (resultHex !== correctHex) {
+				throw new Error("Hex encoding mismatch: " + resultHex);
+			}`)
+
+			assert.NoError(t, err)
+		})
 	}
 
 	// Algorithms not supported or typing error
@@ -410,6 +424,42 @@ func TestHMac(t *testing.T) {
 	}
 }
 
+func TestHexEncodeOK(t *testing.T) {
+	rt := goja.New()
+	input := []byte{104, 101, 108, 108, 111}
+	testCases := []interface{}{
+		input, string(input), rt.NewArrayBuffer(input),
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("%T", tc), func(t *testing.T) {
+			c := New()
+			ctx := common.WithRuntime(context.Background(), rt)
+			out := c.HexEncode(ctx, tc)
+			assert.Equal(t, "68656c6c6f", out)
+		})
+	}
+}
+
+func TestHexEncodeError(t *testing.T) {
+	rt := goja.New()
+
+	expErr := "invalid type struct {}, expected string, []byte or ArrayBuffer"
+	defer func() {
+		err := recover()
+		require.NotNil(t, err)
+		require.IsType(t, &goja.Object{}, err)
+		require.IsType(t, map[string]interface{}{}, err.(*goja.Object).Export())
+		val := err.(*goja.Object).Export().(map[string]interface{})
+		assert.Equal(t, expErr, fmt.Sprintf("%s", val["value"]))
+	}()
+
+	c := New()
+	ctx := common.WithRuntime(context.Background(), rt)
+	c.HexEncode(ctx, struct{}{})
+}
+
 func TestAWSv4(t *testing.T) {
 	// example values from https://docs.aws.amazon.com/general/latest/gr/signature-v4-examples.html
 	rt := goja.New()
@@ -421,7 +471,7 @@ func TestAWSv4(t *testing.T) {
 	_, err := common.RunString(rt, `
 		var HexEncode = crypto.hexEncode;
 		var HmacSHA256 = function(data, key) {
-			return crypto.hmac("sha256",key, data, "binary");
+			return crypto.hmac("sha256", key, data, "binary");
 		};
 
 		var expectedKDate    = '969fbb94feb542b71ede6f87fe4d5fa29c789342b0f407474670f0c2489e0a0d'

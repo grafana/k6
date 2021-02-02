@@ -38,21 +38,29 @@ func New() *Encoding {
 	return &Encoding{}
 }
 
-func (e *Encoding) B64encode(ctx context.Context, input []byte, encoding string) string {
+// B64encode returns the base64 encoding of input as a string.
+// The data type of input can be a string, []byte or ArrayBuffer.
+func (e *Encoding) B64encode(ctx context.Context, input interface{}, encoding string) string {
+	data, err := common.ToBytes(input)
+	if err != nil {
+		common.Throw(common.GetRuntime(ctx), err)
+	}
 	switch encoding {
 	case "rawstd":
-		return base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(input)
+		return base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(data)
 	case "std":
-		return base64.StdEncoding.EncodeToString(input)
+		return base64.StdEncoding.EncodeToString(data)
 	case "rawurl":
-		return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(input)
+		return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(data)
 	case "url":
-		return base64.URLEncoding.EncodeToString(input)
+		return base64.URLEncoding.EncodeToString(data)
 	default:
-		return base64.StdEncoding.EncodeToString(input)
+		return base64.StdEncoding.EncodeToString(data)
 	}
 }
 
+// B64decode returns the decoded data of the base64 encoded input string using
+// the given encoding.
 func (e *Encoding) B64decode(ctx context.Context, input string, encoding string) string {
 	var output []byte
 	var err error
