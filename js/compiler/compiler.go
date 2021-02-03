@@ -79,13 +79,17 @@ var (
 		"highlightCode": false,
 	}
 
-	once        sync.Once // nolint:gochecknoglobals
-	globalBabel *babel    // nolint:gochecknoglobals
+	onceBabelCode      sync.Once     // nolint:gochecknoglobals
+	globalBabelCode    *goja.Program // nolint:gochecknoglobals
+	globalBabelCodeErr error         // nolint:gochecknoglobals
+	onceBabel          sync.Once     // nolint:gochecknoglobals
+	globalBabel        *babel        // nolint:gochecknoglobals
 )
 
 // A Compiler compiles JavaScript source code (ES5.1 or ES6) into a goja.Program
 type Compiler struct {
 	logger logrus.FieldLogger
+	babel  *babel
 }
 
 // New returns a new Compiler
@@ -93,14 +97,30 @@ func New(logger logrus.FieldLogger) *Compiler {
 	return &Compiler{logger: logger}
 }
 
+// initializeBabel initializes a separate (non-global) instance of babel specifically for this Compiler.
+// An error is returned only if babel itself couldn't be parsed/run which should never be possible.
+func (c *Compiler) initializeBabel() error {
+	var err error
+	if c.babel == nil {
+		c.babel, err = newBabel()
+	}
+	return err
+}
+
 // Transform the given code into ES5
 func (c *Compiler) Transform(src, filename string) (code string, srcmap *SourceMap, err error) {
-	var b *babel
-	if b, err = newBabel(); err != nil {
+	if c.babel == nil {
+		onceBabel.Do(func() {
+			globalBabel, err = newBabel()
+		})
+		c.babel = globalBabel
+	}
+	if err != nil {
 		return
 	}
 
-	return b.Transform(c.logger, src, filename)
+	code, srcmap, err = c.babel.Transform(c.logger, src, filename)
+	return
 }
 
 // Compile the program in the given CompatibilityMode, wrapping it between pre and post code
@@ -148,34 +168,37 @@ type babel struct {
 	vm        *goja.Runtime
 	this      goja.Value
 	transform goja.Callable
-	mutex     sync.Mutex // TODO: cache goja.CompileAST() in an init() function?
+	m         sync.Mutex
 }
 
 func newBabel() (*babel, error) {
-	var err error
-
-	once.Do(func() {
-		vm := goja.New()
-		if _, err = vm.RunString(babelSrc); err != nil {
-			return
-		}
-
-		this := vm.Get("Babel")
-		bObj := this.ToObject(vm)
-		globalBabel = &babel{vm: vm, this: this}
-		if err = vm.ExportTo(bObj.Get("transform"), &globalBabel.transform); err != nil {
-			return
-		}
+	onceBabelCode.Do(func() {
+		globalBabelCode, globalBabelCodeErr = goja.Compile("<internal/k6/compiler/lib/babel.min.js>", babelSrc, false)
 	})
+	if globalBabelCodeErr != nil {
+		return nil, globalBabelCodeErr
+	}
+	vm := goja.New()
+	_, err := vm.RunProgram(globalBabelCode)
+	if err != nil {
+		return nil, err
+	}
 
-	return globalBabel, err
+	this := vm.Get("Babel")
+	bObj := this.ToObject(vm)
+	result := &babel{vm: vm, this: this}
+	if err = vm.ExportTo(bObj.Get("transform"), &result.transform); err != nil {
+		return nil, err
+	}
+
+	return result, err
 }
 
 // Transform the given code into ES5, while synchronizing to ensure only a single
 // bundle instance / Goja VM is in use at a time.
 func (b *babel) Transform(logger logrus.FieldLogger, src, filename string) (string, *SourceMap, error) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+	b.m.Lock()
+	defer b.m.Unlock()
 	opts := make(map[string]interface{})
 	for k, v := range DefaultOpts {
 		opts[k] = v
@@ -203,4 +226,41 @@ func (b *babel) Transform(logger logrus.FieldLogger, src, filename string) (stri
 		return code, &srcMap, err
 	}
 	return code, &srcMap, err
+}
+
+// Pool is a pool of compilers so it can be used easier in parallel tests as they have their own babel.
+type Pool struct {
+	c chan *Compiler
+}
+
+// NewPool creates a Pool that will be using the provided logger and will preallocate (in parallel)
+// the count of compilers each with their own babel.
+func NewPool(logger logrus.FieldLogger, count int) *Pool {
+	c := &Pool{
+		c: make(chan *Compiler, count),
+	}
+	go func() {
+		for i := 0; i < count; i++ {
+			go func() {
+				co := New(logger)
+				err := co.initializeBabel()
+				if err != nil {
+					panic(err)
+				}
+				c.Put(co)
+			}()
+		}
+	}()
+
+	return c
+}
+
+// Get a compiler from the pool.
+func (c *Pool) Get() *Compiler {
+	return <-c.c
+}
+
+// Put a compiler back in the pool.
+func (c *Pool) Put(co *Compiler) {
+	c.c <- co
 }
