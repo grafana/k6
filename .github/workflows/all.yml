@@ -144,9 +144,6 @@ jobs:
           VERSION="${GITHUB_REF##*/}"
           echo "VERSION=${VERSION}"
           echo "::set-output name=version::${VERSION}"
-          VERSION_CI="${VERSION#v}-${GITHUB_SHA::7}"
-          echo "VERSION_CI=${VERSION_CI}"
-          echo "::set-output name=version_ci::${VERSION_CI}"
 
   build:
     runs-on: ubuntu-latest
@@ -230,88 +227,34 @@ jobs:
             docker run $DOCKER_IMAGE_ID scale --help
             docker run $DOCKER_IMAGE_ID pause --help
             docker run $DOCKER_IMAGE_ID resume --help
-      - name: Publish Docker CI
+
+      - name: Publish
+        if: |
+          github.ref == 'refs/heads/master' ||
+          startsWith(github.ref, 'refs/tags/v')
         run: |
           echo "DOCKER_IMAGE_ID=$DOCKER_IMAGE_ID"
-          # Log into GHCR
+
+          # Log into GitHub Container Registry
           echo "${{ secrets.CR_PAT }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
-          docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$DOCKER_IMAGE_ID/ci:$VERSION_CI"
-          docker push "ghcr.io/$DOCKER_IMAGE_ID/ci:$VERSION_CI"
+          docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$DOCKER_IMAGE_ID:$VERSION"
+          docker push "ghcr.io/$DOCKER_IMAGE_ID:$VERSION"
+          # We also want to tag the latest stable version as latest
+          if [[ "$VERSION" != "master" ]] && [[ ! "$VERSION" =~ (RC|rc) ]]; then
+            echo 'Publish GHCR (latest)'
+            docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$DOCKER_IMAGE_ID:latest"
+            docker push "ghcr.io/$DOCKER_IMAGE_ID:latest"
+          fi
 
-  publish-docker:
-    runs-on: ubuntu-latest
-    needs: [build-docker, configure]
-    if: github.event_name != 'pull_request'
-    env:
-      VERSION: ${{ needs.configure.outputs.version }}
-      VERSION_CI: ${{ needs.configure.outputs.version_ci }}
-    steps:
-      - name: Publish Container Registries
-        run: |
-          echo 'Publish Docker'
-          skopeo copy --src-creds ${{ github.actor }}:${{ secrets.CR_PAT }} \
-                      --dest-creds ${{ secrets.DOCKER_USER }}:${{ secrets.DOCKER_PASS }} \
-                      docker://ghcr.io/$DOCKER_IMAGE_ID/ci:$VERSION_CI \
-                      docker://$DOCKER_IMAGE_ID:$VERSION
-
-          echo 'Publish GHCR'
-          skopeo copy --src-creds ${{ github.actor }}:${{ secrets.CR_PAT }} \
-                      --dest-creds ${{ github.actor }}:${{ secrets.CR_PAT }} \
-                      docker://ghcr.io/$DOCKER_IMAGE_ID/ci:$VERSION_CI \
-                      docker://ghcr.io/$DOCKER_IMAGE_ID:$VERSION
-
+          # Log into Docker Hub Registry
+          echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+          docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:$VERSION"
+          docker push "$DOCKER_IMAGE_ID:$VERSION"
           # We also want to tag the latest stable version as latest
           if [[ "$VERSION" != "master" ]] && [[ ! "$VERSION" =~ (RC|rc) ]]; then
             echo 'Publish Docker (latest)'
-            skopeo copy --src-creds ${{ github.actor }}:${{ secrets.CR_PAT }} \
-                        --dest-creds ${{ secrets.DOCKER_USER }}:${{ secrets.DOCKER_PASS }} \
-                        docker://ghcr.io/$DOCKER_IMAGE_ID/ci:$VERSION_CI \
-                        docker://$DOCKER_IMAGE_ID:latest
-
-            echo 'Publish GHCR (latest)'
-            skopeo copy --src-creds ${{ github.actor }}:${{ secrets.CR_PAT }} \
-                        --dest-creds ${{ github.actor }}:${{ secrets.CR_PAT }} \
-                        docker://ghcr.io/$DOCKER_IMAGE_ID/ci:$VERSION_CI \
-                        docker://ghcr.io/$DOCKER_IMAGE_ID:latest
-          fi
-
-  publish-ghcr:
-    runs-on: ubuntu-latest
-    needs: [deps, lint, test, test-cov, configure]
-    env:
-      VERSION: ${{ needs.configure.outputs.version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Build
-        run: docker build -t $DOCKER_IMAGE_ID .
-      - name: Check
-        run: |
-            docker run $DOCKER_IMAGE_ID version
-            docker run $DOCKER_IMAGE_ID --help
-            docker run $DOCKER_IMAGE_ID help
-            docker run $DOCKER_IMAGE_ID run --help
-            docker run $DOCKER_IMAGE_ID inspect --help
-            docker run $DOCKER_IMAGE_ID status --help
-            docker run $DOCKER_IMAGE_ID stats --help
-            docker run $DOCKER_IMAGE_ID scale --help
-            docker run $DOCKER_IMAGE_ID pause --help
-            docker run $DOCKER_IMAGE_ID resume --help
-      - name: Publish
-        if: github.event_name != 'pull_request'
-        run: |
-          echo "REF=${{ github.ref }}"
-          echo "DOCKER_IMAGE_ID=$DOCKER_IMAGE_ID"
-          # Log into registry
-          echo "${{ secrets.CR_PAT }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
-          VERSION="${VERSION#v}"
-          echo "VERSION=$VERSION"
-          docker tag "$DOCKER_IMAGE_ID" "ghcr.io/${{ github.repository_owner }}/$DOCKER_IMAGE_ID:$VERSION"
-          docker push "ghcr.io/${{ github.repository_owner }}/$DOCKER_IMAGE_ID:$VERSION"
-          # We also want to tag the latest stable version as latest
-          if [[ "$VERSION" != "master" ]] && [[ ! "$VERSION" =~ (RC|rc) ]]; then
-            docker tag "$DOCKER_IMAGE_ID" "ghcr.io/${{ github.repository_owner }}/$DOCKER_IMAGE_ID:latest"
-            docker push "ghcr.io/${{ github.repository_owner }}/$DOCKER_IMAGE_ID:latest"
+            docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:latest"
+            docker push "$DOCKER_IMAGE_ID:latest"
           fi
 
   publish-github:
