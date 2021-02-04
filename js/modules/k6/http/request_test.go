@@ -1722,6 +1722,27 @@ func TestResponseTypes(t *testing.T) {
 			}
 		}
 		http.post("HTTPBIN_URL/compare-bin", respBin.body);
+
+		// Check ArrayBuffer response
+		var respBin = http.get("HTTPBIN_URL/get-bin", { responseType: "binary" }).body;
+		if (respBin.byteLength !== expBinLength) {
+			throw new Error("response body length should be '" + expBinLength + "' but was '" + respBin.byteLength + "'");
+		}
+
+		// Check ArrayBuffer responses with http.batch()
+		var responses = http.batch([
+			["GET", "HTTPBIN_URL/get-bin", null, { responseType: "binary" }],
+			["GET", "HTTPBIN_URL/get-bin", null, { responseType: "binary" }],
+		]);
+		if (responses.length != 2) {
+			throw new Error("expected 2 responses, received " + responses.length);
+		}
+		for (var i = 0; i < responses.length; i++) {
+			if (responses[i].body.byteLength !== expBinLength) {
+				throw new Error("response body length should be '"
+					+ expBinLength + "' but was '" + responses[i].body.byteLength + "'");
+			}
+		}
 	`))
 	assert.NoError(t, err)
 

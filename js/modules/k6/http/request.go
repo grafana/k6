@@ -451,6 +451,7 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 	errs := httpext.MakeBatchRequests(
 		ctx, batchReqs, reqCount,
 		int(state.Options.Batch.Int64), int(state.Options.BatchPerHost.Int64),
+		processResponse,
 	)
 
 	for i := 0; i < reqCount; i++ {
