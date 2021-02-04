@@ -1429,8 +1429,19 @@ func TestRequestArrayBufferBody(t *testing.T) {
 			var res = http.post("HTTPBIN_URL/post-arraybuffer", arr.buffer, { responseType: 'binary' });
 
 			if (res.status != 200) { throw new Error("wrong status: " + res.status) }
-			if (res.body != "%[2]s") { throw new Error(
-				"incorrect data: expected '%[2]s', received '" + res.body + "'") }
+
+			var resTyped = new Uint8Array(res.body);
+			var exp = new %[1]s([%[2]s]);
+			if (exp.length !== resTyped.length) {
+				throw new Error(
+					"incorrect data length: expected " + exp.length + ", received " + resTypedLength)
+			}
+			for (var i = 0; i < exp.length; i++) {
+				if (exp[i] !== resTyped[i])	{
+					throw new Error(
+						"incorrect data at index " + i + ": expected " + exp[i] + ", received " + resTyped[i])
+				}
+			}
 			`, tc.arr, tc.expected)))
 			assert.NoError(t, err)
 		})
@@ -1687,31 +1698,30 @@ func TestResponseTypes(t *testing.T) {
 		}
 
 		// Check binary transmission of the text response as well
-		var respTextInBin = http.get("HTTPBIN_URL/get-text", { responseType: "binary" }).body;
+		var respBin = http.get("HTTPBIN_URL/get-text", { responseType: "binary" });
 
-		// Hack to convert a utf-8 array to a JS string
-		var strConv = "";
-		function pad(n) { return n.length < 2 ? "0" + n : n; }
-		for( var i = 0; i < respTextInBin.length; i++ ) {
-			strConv += ( "%" + pad(respTextInBin[i].toString(16)));
-		}
-		strConv = decodeURIComponent(strConv);
+		// Convert a UTF-8 ArrayBuffer to a JS string
+		var respBinText = String.fromCharCode.apply(null, new Uint8Array(respBin.body));
+		var strConv = decodeURIComponent(escape(respBinText));
 		if (strConv !== expText) {
 			throw new Error("converted response body should be '" + expText + "' but was '" + strConv + "'");
 		}
-		http.post("HTTPBIN_URL/compare-text", respTextInBin);
+		http.post("HTTPBIN_URL/compare-text", respBin.body);
 
 		// Check binary response
-		var respBin = http.get("HTTPBIN_URL/get-bin", { responseType: "binary" }).body;
-		if (respBin.length !== expBinLength) {
-			throw new Error("response body length should be '" + expBinLength + "' but was '" + respBin.length + "'");
+		var respBin = http.get("HTTPBIN_URL/get-bin", { responseType: "binary" });
+		var respBinTyped = new Uint8Array(respBin.body);
+		if (expBinLength !== respBinTyped.length) {
+			throw new Error("response body length should be '" + expBinLength
+							+ "' but was '" + respBinTyped.length + "'");
 		}
-		for( var i = 0; i < respBin.length; i++ ) {
-			if ( respBin[i] !== i%256 ) {
-				throw new Error("expected value " + (i%256) + " to be at position " + i + " but it was " + respBin[i]);
+		for(var i = 0; i < respBinTyped.length; i++) {
+			if (respBinTyped[i] !== i%256) {
+				throw new Error("expected value " + (i%256) + " to be at position "
+								+ i + " but it was " + respBinTyped[i]);
 			}
 		}
-		http.post("HTTPBIN_URL/compare-bin", respBin);
+		http.post("HTTPBIN_URL/compare-bin", respBin.body);
 	`))
 	assert.NoError(t, err)
 
