@@ -22,6 +22,7 @@ package data
 
 import (
 	"github.com/dop251/goja"
+	"github.com/loadimpact/k6/js/common"
 )
 
 // TODO fix it not working really well with setupData or just make it more broken
@@ -66,9 +67,12 @@ func (s wrappedSharedArray) Get(index int) goja.Value {
 	}
 	val, err := s.parse(goja.Undefined(), s.rt.ToValue(s.arr[index]))
 	if err != nil {
-		panic(err)
+		common.Throw(s.rt, err)
 	}
-	s.deepFreeze(s.rt, val)
+	err = s.deepFreeze(s.rt, val)
+	if err != nil {
+		common.Throw(s.rt, err)
+	}
 
 	return val
 }
@@ -77,14 +81,14 @@ func (s wrappedSharedArray) Len() int {
 	return len(s.arr)
 }
 
-func (s wrappedSharedArray) deepFreeze(rt *goja.Runtime, val goja.Value) {
+func (s wrappedSharedArray) deepFreeze(rt *goja.Runtime, val goja.Value) error {
 	_, err := s.freeze(goja.Undefined(), val)
 	if err != nil {
-		panic(s.rt.NewTypeError(err))
+		return err
 	}
 
 	if goja.IsUndefined(val) {
-		return
+		return nil
 	}
 
 	o := val.ToObject(rt)
@@ -93,11 +97,14 @@ func (s wrappedSharedArray) deepFreeze(rt *goja.Runtime, val goja.Value) {
 		if prop != nil {
 			frozen, err := s.isFrozen(goja.Undefined(), prop)
 			if err != nil {
-				panic(s.rt.NewTypeError(err))
+				return err
 			}
 			if !frozen.ToBoolean() {
-				s.deepFreeze(rt, prop)
+				if err = s.deepFreeze(rt, prop); err != nil {
+					return err
+				}
 			}
 		}
 	}
+	return nil
 }

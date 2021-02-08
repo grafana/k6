@@ -82,7 +82,7 @@ func getShareArrayFromCall(rt *goja.Runtime, call goja.Callable) sharedArray {
 	for i := range arr {
 		val, err = stringify(goja.Undefined(), obj.Get(strconv.Itoa(i)))
 		if err != nil {
-			common.Throw(rt, err)
+			panic(err)
 		}
 		arr[i] = val.String()
 	}
