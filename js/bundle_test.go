@@ -114,6 +114,18 @@ func TestNewBundle(t *testing.T) {
 		}
 	})
 	t.Run("CompatibilityMode", func(t *testing.T) {
+		t.Run("Extended/ok/global", func(t *testing.T) {
+			rtOpts := lib.RuntimeOptions{
+				CompatibilityMode: null.StringFrom(lib.CompatibilityModeExtended.String()),
+			}
+			_, err := getSimpleBundle(t, "/script.js",
+				`module.exports.default = function() {}
+				if (global.Math != Math) {
+					throw new Error("global is not defined");
+				}`, rtOpts)
+
+			assert.NoError(t, err)
+		})
 		t.Run("Base/ok/Minimal", func(t *testing.T) {
 			rtOpts := lib.RuntimeOptions{
 				CompatibilityMode: null.StringFrom(lib.CompatibilityModeBase.String()),
