@@ -295,6 +295,10 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	rt.Set("__VU", vuID)
 	rt.Set("console", common.Bind(rt, newConsole(logger), init.ctxPtr))
 
+	if init.compatibilityMode == lib.CompatibilityModeExtended {
+		rt.Set("global", rt.GlobalObject())
+	}
+
 	// TODO: get rid of the unused ctxPtr, use a real external context (so we
 	// can interrupt), build the common.InitEnvironment earlier and reuse it
 	initenv := &common.InitEnvironment{
