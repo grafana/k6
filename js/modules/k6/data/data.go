@@ -22,6 +22,7 @@ package data
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
@@ -62,7 +63,7 @@ func (d *data) XSharedArray(ctx context.Context, name string, call goja.Callable
 		return nil, errors.New("wrong type of shared object")
 	}
 
-	return array.wrap(&ctx, common.GetRuntime(ctx)), nil
+	return array.wrap(common.GetRuntime(ctx)), nil
 }
 
 func getShareArrayFromCall(rt *goja.Runtime, call goja.Callable) sharedArray {
@@ -76,20 +77,15 @@ func getShareArrayFromCall(rt *goja.Runtime, call goja.Callable) sharedArray {
 	}
 	arr := make([]string, obj.Get("length").ToInteger())
 
-	// We specifically use JSON.stringify here as we need to use JSON.parse on the way out
-	// it also has the benefit of needing only one loop and being more JS then using golang's json
-	cal, err := rt.RunString(`(function(input, output) {
-		for (var i = 0; i < input.length; i++) {
-			output[i] = JSON.stringify(input[i])
+	stringify, _ := goja.AssertFunction(rt.GlobalObject().Get("JSON").ToObject(rt).Get("stringify"))
+	var val goja.Value
+	for i := range arr {
+		val, err = stringify(goja.Undefined(), obj.Get(strconv.Itoa(i)))
+		if err != nil {
+			common.Throw(rt, err)
 		}
-	})`)
-	if err != nil {
-		common.Throw(rt, err)
+		arr[i] = val.String()
 	}
-	newCall, _ := goja.AssertFunction(cal)
-	_, err = newCall(goja.Undefined(), gojaValue, rt.ToValue(arr))
-	if err != nil {
-		common.Throw(rt, err)
-	}
+
 	return sharedArray{arr: arr}
 }
