@@ -19,6 +19,7 @@ require (
 	github.com/eapache/go-resiliency v1.1.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20160609142408-bb955e01b934 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
+	github.com/eiannone/keyboard v0.0.0-20200508000154-caf4b762e807
 	github.com/fatih/color v1.5.0
 	github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect

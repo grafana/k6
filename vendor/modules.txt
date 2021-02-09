@@ -56,6 +56,9 @@ github.com/eapache/go-xerial-snappy
 # github.com/eapache/queue v1.1.0
 ## explicit
 github.com/eapache/queue
+# github.com/eiannone/keyboard v0.0.0-20200508000154-caf4b762e807
+## explicit
+github.com/eiannone/keyboard
 # github.com/fatih/color v1.5.0
 ## explicit
 github.com/fatih/color

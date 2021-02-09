@@ -35,6 +35,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/eiannone/keyboard"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -251,6 +252,15 @@ a commandline interface for interacting with it.`,
 				os.Exit(externalAbortErrorCode)
 			}()
 
+			// start reading user input
+			if !runtimeOptions.NoSummary.Bool {
+				go func() {
+					err := readInput(globalCtx, initRunner, engine, executionState, logger)
+					if err != nil {
+						logger.Error(err)
+					}
+				}()
+			}
 			// Initialize the engine
 			initBar.Modify(pb.WithConstProgress(0, "Init VUs..."))
 			engineRun, engineWait, err := engine.Init(globalCtx, runCtx)
@@ -293,17 +303,7 @@ a commandline interface for interacting with it.`,
 
 			// Handle the end-of-test summary.
 			if !runtimeOptions.NoSummary.Bool {
-				summaryResult, err := initRunner.HandleSummary(globalCtx, &lib.Summary{
-					Metrics:         engine.Metrics,
-					RootGroup:       engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
-					TestRunDuration: executionState.GetCurrentTestRunDuration(),
-				})
-				if err == nil {
-					err = handleSummaryResult(afero.NewOsFs(), stdout, stderr, summaryResult)
-				}
-				if err != nil {
-					logger.WithError(err).Error("failed to handle the end-of-test summary")
-				}
+				printSummaryResults(globalCtx, initRunner, engine, executionState, logger)
 			}
 
 			if conf.Linger.Bool {
@@ -456,4 +456,48 @@ func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[strin
 	}
 
 	return consolidateErrorMessage(errs, "Could not save some summary information:")
+}
+
+func printSummaryResults(globalCtx context.Context, runner lib.Runner, engine *core.Engine, executionState *lib.ExecutionState, log *logrus.Logger) {
+	summaryResult, err := runner.HandleSummary(globalCtx, &lib.Summary{
+		Metrics:         engine.Metrics,
+		RootGroup:       engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
+		TestRunDuration: executionState.GetCurrentTestRunDuration(),
+	})
+	if err == nil {
+		err = handleSummaryResult(afero.NewOsFs(), stdout, stderr, summaryResult)
+	}
+	if err != nil {
+		log.WithError(err).Error("failed to handle the end-of-test summary")
+	}
+}
+
+func readInput(globalCtx context.Context, runner lib.Runner, engine *core.Engine, executionState *lib.ExecutionState, log *logrus.Logger) error {
+	keysEvents, err := keyboard.GetKeys(1)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = keyboard.Close()
+	}()
+	fmt.Println("Press R to get summary or esc to run Ctrl-C/Ctrl-Z")
+	// Starting loop...
+forLoop:
+	for {
+		select {
+		case event := <-keysEvents:
+			if event.Err != nil {
+				return event.Err
+			}
+			if event.Rune == 'R' {
+				printSummaryResults(globalCtx, runner, engine, executionState, log)
+			}
+
+			if event.Key == keyboard.KeyEsc {
+				// Exiting loop!
+				break forLoop
+			}
+		}
+	}
+	return nil
 }
