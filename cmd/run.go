@@ -255,9 +255,9 @@ a commandline interface for interacting with it.`,
 			// start reading user input
 			if !runtimeOptions.NoSummary.Bool {
 				go func() {
-					err := readInput(globalCtx, initRunner, engine, executionState, logger)
-					if err != nil {
-						logger.Error(err)
+					riErr := readInput(globalCtx, initRunner, engine, executionState, logger)
+					if riErr != nil {
+						logger.Error(riErr)
 					}
 				}()
 			}
@@ -443,7 +443,7 @@ func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[strin
 		case "stderr":
 			return stdErr, nil
 		default:
-			return fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+			return fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o666)
 		}
 	}
 
@@ -458,7 +458,12 @@ func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[strin
 	return consolidateErrorMessage(errs, "Could not save some summary information:")
 }
 
-func printSummaryResults(globalCtx context.Context, runner lib.Runner, engine *core.Engine, executionState *lib.ExecutionState, log *logrus.Logger) {
+func printSummaryResults(globalCtx context.Context,
+	runner lib.Runner,
+	engine *core.Engine,
+	executionState *lib.ExecutionState,
+	log *logrus.Logger,
+) {
 	summaryResult, err := runner.HandleSummary(globalCtx, &lib.Summary{
 		Metrics:         engine.Metrics,
 		RootGroup:       engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
@@ -472,7 +477,12 @@ func printSummaryResults(globalCtx context.Context, runner lib.Runner, engine *c
 	}
 }
 
-func readInput(globalCtx context.Context, runner lib.Runner, engine *core.Engine, executionState *lib.ExecutionState, log *logrus.Logger) error {
+func readInput(globalCtx context.Context,
+	runner lib.Runner,
+	engine *core.Engine,
+	executionState *lib.ExecutionState,
+	log *logrus.Logger,
+) error {
 	keysEvents, err := keyboard.GetKeys(1)
 	if err != nil {
 		return err
@@ -484,19 +494,17 @@ func readInput(globalCtx context.Context, runner lib.Runner, engine *core.Engine
 	// Starting loop...
 forLoop:
 	for {
-		select {
-		case event := <-keysEvents:
-			if event.Err != nil {
-				return event.Err
-			}
-			if event.Rune == 'R' {
-				printSummaryResults(globalCtx, runner, engine, executionState, log)
-			}
+		event := <-keysEvents
+		if event.Err != nil {
+			return event.Err
+		}
+		if event.Rune == 'R' {
+			printSummaryResults(globalCtx, runner, engine, executionState, log)
+		}
 
-			if event.Key == keyboard.KeyEsc {
-				// Exiting loop!
-				break forLoop
-			}
+		if event.Key == keyboard.KeyEsc {
+			// Exiting loop!
+			break forLoop
 		}
 	}
 	return nil
