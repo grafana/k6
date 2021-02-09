@@ -82,24 +82,28 @@ func (s wrappedSharedArray) Len() int {
 }
 
 func (s wrappedSharedArray) deepFreeze(rt *goja.Runtime, val goja.Value) error {
+	if val != nil && goja.IsNull(val) {
+		return nil
+	}
+
 	_, err := s.freeze(goja.Undefined(), val)
 	if err != nil {
 		return err
 	}
 
-	if goja.IsUndefined(val) {
+	o := val.ToObject(rt)
+	if o == nil {
 		return nil
 	}
-
-	o := val.ToObject(rt)
 	for _, key := range o.Keys() {
 		prop := o.Get(key)
 		if prop != nil {
+			// isFrozen returns true for all non objects so it we don't need to check that
 			frozen, err := s.isFrozen(goja.Undefined(), prop)
 			if err != nil {
 				return err
 			}
-			if !frozen.ToBoolean() {
+			if !frozen.ToBoolean() { // prevent cycles
 				if err = s.deepFreeze(rt, prop); err != nil {
 					return err
 				}
