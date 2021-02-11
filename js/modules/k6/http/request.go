@@ -90,7 +90,10 @@ func (h *HTTP) Options(ctx context.Context, url goja.Value, args ...goja.Value) 
 // taking goja.Values as arguments
 func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args ...goja.Value) (*Response, error) {
 	state := lib.GetState(ctx)
-	throw := state.Options.Throw.Bool
+	var throw bool
+	if state != nil {
+		throw = state.Options.Throw.Bool
+	}
 	u, err := ToURL(url)
 	if err != nil {
 		if throw {
