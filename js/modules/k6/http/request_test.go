@@ -601,6 +601,35 @@ func TestRequestAndBatch(t *testing.T) {
 			}
 		})
 	})
+	t.Run("MalformedURL", func(t *testing.T) {
+		js := `
+			http.request("GET", "https:// test.k6.io");
+		`
+		t.Run("throw=true", func(t *testing.T) {
+			_, err := rt.RunString(js)
+			require.Error(t, err)
+		})
+
+		t.Run("throw=false", func(t *testing.T) {
+			// Disable throw only on this sub-test
+			state.Options.Throw.Bool = false
+			defer func() { state.Options.Throw.Bool = true }()
+
+			hook := logtest.NewLocal(state.Logger)
+			defer hook.Reset()
+
+			_, err := rt.RunString(js)
+			require.NoError(t, err)
+
+			logEntry := hook.LastEntry()
+			if assert.NotNil(t, logEntry) {
+				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+				assert.Contains(t, logEntry.Data["error"].(error).Error(), `invalid character " "`)
+				assert.Equal(t, "Request Failed", logEntry.Message)
+			}
+		})
+	})
+
 	t.Run("Unroutable", func(t *testing.T) {
 		_, err := rt.RunString(`http.request("GET", "http://sdafsgdhfjg/");`)
 		assert.Error(t, err)
