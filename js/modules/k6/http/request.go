@@ -89,9 +89,20 @@ func (h *HTTP) Options(ctx context.Context, url goja.Value, args ...goja.Value) 
 // Request makes an http request of the provided `method` and returns a corresponding response by
 // taking goja.Values as arguments
 func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args ...goja.Value) (*Response, error) {
+	state := lib.GetState(ctx)
+	var throw bool
+	if state != nil {
+		throw = state.Options.Throw.Bool
+	}
 	u, err := ToURL(url)
 	if err != nil {
-		return nil, err
+		if throw {
+			return nil, err
+		}
+		state.Logger.WithField("error", err).Warn("Request Failed")
+		return &Response{
+			Response: &httpext.Response{},
+		}, nil
 	}
 
 	var body interface{}
