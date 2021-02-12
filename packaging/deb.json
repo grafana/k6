@@ -19,5 +19,8 @@
         "license": "AGPL-3.0",
         "file": "LICENSE"
       }
+    ],
+	"depends": [
+      "ca-certificates"
     ]
   }
