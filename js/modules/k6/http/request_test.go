@@ -31,7 +31,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -175,9 +174,6 @@ func newRuntime(
 }
 
 func TestRequestAndBatch(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip()
-	}
 	t.Parallel()
 	tb, state, samples, rt, ctx := newRuntime(t)
 	defer tb.Cleanup()
