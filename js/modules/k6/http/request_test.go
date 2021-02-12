@@ -2086,6 +2086,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 		{Name: "tls12", URL: "https://badssl.com/", Version: "http.TLS_1_2"},
 	}
 	for _, versionTest := range tlsVersionTests {
+		versionTest := versionTest
 		t.Run(versionTest.Name, func(t *testing.T) {
 			_, err := rt.RunString(fmt.Sprintf(`
 					var res = http.get("%s");
@@ -2102,6 +2103,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 		{Name: "cipher_suite_ecc384", URL: "https://ecc384.badssl.com/", CipherSuite: "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"},
 	}
 	for _, cipherSuiteTest := range tlsCipherSuiteTests {
+		cipherSuiteTest := cipherSuiteTest
 		t.Run(cipherSuiteTest.Name, func(t *testing.T) {
 			_, err := rt.RunString(fmt.Sprintf(`
 					var res = http.get("%s");
