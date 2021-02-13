@@ -207,6 +207,8 @@ jobs:
   build-docker:
     runs-on: ubuntu-latest
     needs: [deps, lint, test, test-cov, configure]
+    env:
+      VERSION: ${{ needs.configure.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -230,7 +232,7 @@ jobs:
           github.ref == 'refs/heads/master' ||
           startsWith(github.ref, 'refs/tags/v')
         run: |
-          echo "DOCKER_IMAGE_ID=$DOCKER_IMAGE_ID"
+          echo "Publish GHCR ($DOCKER_IMAGE_ID:$VERSION)"
 
           # Log into GitHub Container Registry
           echo "${{ secrets.CR_PAT }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
@@ -242,6 +244,8 @@ jobs:
             docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$DOCKER_IMAGE_ID:latest"
             docker push "ghcr.io/$DOCKER_IMAGE_ID:latest"
           fi
+
+          echo "Publish Docker ($DOCKER_IMAGE_ID:$VERSION)"
 
           # Log into Docker Hub Registry
           echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
