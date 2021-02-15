@@ -21,14 +21,19 @@
 package cloud
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"sort"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -37,6 +42,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/loadimpact/k6/cloudapi"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
@@ -180,7 +186,7 @@ func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
 
-	config := NewConfig().Apply(Config{
+	config := cloudapi.NewConfig().Apply(cloudapi.Config{
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
@@ -338,7 +344,7 @@ func TestCloudCollectorMaxPerPacket(t *testing.T) {
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
 
-	config := NewConfig().Apply(Config{
+	config := cloudapi.NewConfig().Apply(cloudapi.Config{
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
@@ -430,7 +436,7 @@ func TestCloudCollectorStopSendingMetric(t *testing.T) {
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
 
-	config := NewConfig().Apply(Config{
+	config := cloudapi.NewConfig().Apply(cloudapi.Config{
 		Host:                       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress:                 null.BoolFrom(true),
 		MaxMetricSamplesPerPackage: null.IntFrom(50),
@@ -447,10 +453,10 @@ func TestCloudCollectorStopSendingMetric(t *testing.T) {
 			count++
 			if count == max {
 				type payload struct {
-					Error ErrorResponse `json:"error"`
+					Error cloudapi.ErrorResponse `json:"error"`
 				}
 				res := &payload{}
-				res.Error = ErrorResponse{Code: 4}
+				res.Error = cloudapi.ErrorResponse{Code: 4}
 				w.Header().Set("Content-Type", "application/json")
 				data, err := json.Marshal(res)
 				if err != nil {
@@ -551,7 +557,7 @@ func TestCloudCollectorAggregationPeriodZeroNoBlock(t *testing.T) {
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
 
-	config := NewConfig().Apply(Config{
+	config := cloudapi.NewConfig().Apply(cloudapi.Config{
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
@@ -610,7 +616,7 @@ func TestCloudCollectorRecvIterLIAllIterations(t *testing.T) {
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
 
-	config := NewConfig().Apply(Config{
+	config := cloudapi.NewConfig().Apply(cloudapi.Config{
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
@@ -727,11 +733,65 @@ func TestNewName(t *testing.T) {
 			script := &loader.SourceData{
 				URL: testCase.url,
 			}
-			collector, err := New(testutils.NewLogger(t), NewConfig(), script, lib.Options{
+			collector, err := New(testutils.NewLogger(t), cloudapi.NewConfig(), script, lib.Options{
 				Duration: types.NullDurationFrom(1 * time.Second),
 			}, []lib.ExecutionStep{}, "1.0")
 			require.NoError(t, err)
 			require.Equal(t, collector.config.Name.String, testCase.expected)
 		})
 	}
+}
+
+func TestPublishMetric(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		g, err := gzip.NewReader(r.Body)
+
+		require.NoError(t, err)
+		var buf bytes.Buffer
+		_, err = io.Copy(&buf, g) //nolint:gosec
+		require.NoError(t, err)
+		byteCount, err := strconv.Atoi(r.Header.Get("x-payload-byte-count"))
+		require.NoError(t, err)
+		require.Equal(t, buf.Len(), byteCount)
+
+		samplesCount, err := strconv.Atoi(r.Header.Get("x-payload-sample-count"))
+		require.NoError(t, err)
+		var samples []*Sample
+		err = json.Unmarshal(buf.Bytes(), &samples)
+		require.NoError(t, err)
+		require.Equal(t, len(samples), samplesCount)
+
+		_, err = fmt.Fprintf(w, "")
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	script := &loader.SourceData{
+		Data: []byte(""),
+		URL:  &url.URL{Path: "/script.js"},
+	}
+	options := lib.Options{
+		Duration: types.NullDurationFrom(1 * time.Second),
+	}
+	config := cloudapi.NewConfig().Apply(cloudapi.Config{
+		Host:       null.StringFrom(server.URL),
+		NoCompress: null.BoolFrom(true),
+	})
+	collector, err := New(testutils.NewLogger(t), config, script, options, []lib.ExecutionStep{}, "1.0")
+	require.NoError(t, err)
+
+	samples := []*Sample{
+		{
+			Type:   "Point",
+			Metric: "metric",
+			Data: &SampleDataSingle{
+				Type:  1,
+				Time:  toMicroSecond(time.Now()),
+				Value: 1.2,
+			},
+		},
+	}
+	err = collector.PushMetric("1", false, samples)
+
+	assert.Nil(t, err)
 }

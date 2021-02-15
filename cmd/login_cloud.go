@@ -31,8 +31,8 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/loadimpact/k6/cloudapi"
 	"github.com/loadimpact/k6/lib/consts"
-	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/ui"
 )
 
@@ -72,7 +72,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			reset := getNullBool(cmd.Flags(), "reset")
 			token := getNullString(cmd.Flags(), "token")
 
-			newCloudConf := cloud.NewConfig().Apply(currentDiskConf.Collectors.Cloud)
+			newCloudConf := cloudapi.NewConfig().Apply(currentDiskConf.Collectors.Cloud)
 
 			switch {
 			case reset.Valid:
@@ -104,7 +104,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 				email := vals["Email"].(string)
 				password := vals["Password"].(string)
 
-				client := cloud.NewClient(logger, "", k6Conf.Collectors.Cloud.Host.String, consts.Version)
+				client := cloudapi.NewClient(logger, "", k6Conf.Collectors.Cloud.Host.String, consts.Version)
 				res, err := client.Login(email, password)
 				if err != nil {
 					return err

@@ -18,7 +18,7 @@
  *
  */
 
-package cloud
+package cloudapi
 
 import (
 	"io/ioutil"

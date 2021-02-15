@@ -21,16 +21,24 @@
 package cloud
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
-	"encoding/json"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/mailru/easyjson"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
+
+	"github.com/loadimpact/k6/cloudapi"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
@@ -45,13 +53,14 @@ const TestName = "k6 test"
 
 // Collector sends result data to the Load Impact cloud service.
 type Collector struct {
-	config      Config
+	config      cloudapi.Config
 	referenceID string
 
-	executionPlan []lib.ExecutionStep
-	duration      int64 // in seconds
-	thresholds    map[string][]*stats.Threshold
-	client        *Client
+	executionPlan  []lib.ExecutionStep
+	duration       int64 // in seconds
+	thresholds     map[string][]*stats.Threshold
+	client         *cloudapi.Client
+	pushBufferPool sync.Pool
 
 	anonymous bool
 	runStatus lib.RunStatus
@@ -79,34 +88,12 @@ type Collector struct {
 // Verify that Collector implements lib.Collector
 var _ lib.Collector = &Collector{}
 
-// MergeFromExternal merges three fields from json in a loadimact key of the provided external map
-func MergeFromExternal(external map[string]json.RawMessage, conf *Config) error {
-	if val, ok := external["loadimpact"]; ok {
-		// TODO: Important! Separate configs and fix the whole 2 configs mess!
-		tmpConfig := Config{}
-		if err := json.Unmarshal(val, &tmpConfig); err != nil {
-			return err
-		}
-		// Only take out the ProjectID, Name and Token from the options.ext.loadimpact map:
-		if tmpConfig.ProjectID.Valid {
-			conf.ProjectID = tmpConfig.ProjectID
-		}
-		if tmpConfig.Name.Valid {
-			conf.Name = tmpConfig.Name
-		}
-		if tmpConfig.Token.Valid {
-			conf.Token = tmpConfig.Token
-		}
-	}
-	return nil
-}
-
 // New creates a new cloud collector
 func New(
 	logger logrus.FieldLogger,
-	conf Config, src *loader.SourceData, opts lib.Options, executionPlan []lib.ExecutionStep, version string,
+	conf cloudapi.Config, src *loader.SourceData, opts lib.Options, executionPlan []lib.ExecutionStep, version string,
 ) (*Collector, error) {
-	if err := MergeFromExternal(opts.External, &conf); err != nil {
+	if err := cloudapi.MergeFromExternal(opts.External, &conf); err != nil {
 		return nil, err
 	}
 
@@ -149,7 +136,7 @@ func New(
 	return &Collector{
 		config:               conf,
 		thresholds:           thresholds,
-		client:               NewClient(logger, conf.Token.String, conf.Host.String, version),
+		client:               cloudapi.NewClient(logger, conf.Token.String, conf.Host.String, version),
 		anonymous:            !conf.Token.Valid,
 		executionPlan:        executionPlan,
 		duration:             int64(duration / time.Second),
@@ -157,6 +144,11 @@ func New(
 		aggrBuckets:          map[int64]map[[3]string]aggregationBucket{},
 		stopSendingMetricsCh: make(chan struct{}),
 		logger:               logger,
+		pushBufferPool: sync.Pool{
+			New: func() interface{} {
+				return &bytes.Buffer{}
+			},
+		},
 	}, nil
 }
 
@@ -178,7 +170,7 @@ func (c *Collector) Init() error {
 	}
 	maxVUs := lib.GetMaxPossibleVUs(c.executionPlan)
 
-	testRun := &TestRun{
+	testRun := &cloudapi.TestRun{
 		Name:       c.config.Name.String,
 		ProjectID:  c.config.ProjectID.Int64,
 		VUsMax:     int64(maxVUs),
@@ -210,7 +202,7 @@ func (c *Collector) Init() error {
 
 // Link return a link that is shown to the user.
 func (c *Collector) Link() string {
-	return URLForResults(c.referenceID, c.config)
+	return cloudapi.URLForResults(c.referenceID, c.config)
 }
 
 // Run is called in a goroutine and starts the collector. Should commit samples to the backend
@@ -528,7 +520,7 @@ func (c *Collector) shouldStopSendingMetrics(err error) bool {
 		return false
 	}
 
-	if errResp, ok := err.(ErrorResponse); ok && errResp.Response != nil {
+	if errResp, ok := err.(cloudapi.ErrorResponse); ok && errResp.Response != nil {
 		return errResp.Response.StatusCode == http.StatusForbidden && errResp.Code == 4
 	}
 
@@ -575,7 +567,7 @@ func (c *Collector) pushMetrics() {
 	for i := 0; i < numberOfWorkers; i++ {
 		go func() {
 			for job := range ch {
-				err := c.client.PushMetric(c.referenceID, c.config.NoCompress.Bool, job.samples)
+				err := c.PushMetric(c.referenceID, c.config.NoCompress.Bool, job.samples)
 				job.done <- err
 				if c.shouldStopSendingMetrics(err) {
 					return
@@ -622,7 +614,7 @@ func (c *Collector) testFinished() {
 	}
 
 	testTainted := false
-	thresholdResults := make(ThresholdResult)
+	thresholdResults := make(cloudapi.ThresholdResult)
 	for name, thresholds := range c.thresholds {
 		thresholdResults[name] = make(map[string]bool)
 		for _, t := range thresholds {
@@ -659,4 +651,74 @@ func (c *Collector) GetRequiredSystemTags() stats.SystemTagSet {
 // SetRunStatus Set run status
 func (c *Collector) SetRunStatus(status lib.RunStatus) {
 	c.runStatus = status
+}
+
+const expectedGzipRatio = 6 // based on test it is around 6.8, but we don't need to be that accurate
+
+// PushMetric pushes the provided metric samples for the given referenceID
+func (c *Collector) PushMetric(referenceID string, noCompress bool, s []*Sample) error {
+	start := time.Now()
+	url := fmt.Sprintf("%s/v1/metrics/%s", c.config.Host.String, referenceID)
+
+	jsonStart := time.Now()
+	b, err := easyjson.Marshal(samples(s))
+	if err != nil {
+		return err
+	}
+	jsonTime := time.Since(jsonStart)
+
+	// TODO: change the context, maybe to one with a timeout
+	req, err := http.NewRequestWithContext(context.Background(), "POST", url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("X-Payload-Sample-Count", strconv.Itoa(len(s)))
+	var additionalFields logrus.Fields
+
+	if !noCompress {
+		buf := c.pushBufferPool.Get().(*bytes.Buffer)
+		buf.Reset()
+		defer c.pushBufferPool.Put(buf)
+		unzippedSize := len(b)
+		buf.Grow(unzippedSize / expectedGzipRatio)
+		gzipStart := time.Now()
+		{
+			g, _ := gzip.NewWriterLevel(buf, gzip.BestSpeed)
+			if _, err = g.Write(b); err != nil {
+				return err
+			}
+			if err = g.Close(); err != nil {
+				return err
+			}
+		}
+		gzipTime := time.Since(gzipStart)
+
+		req.Header.Set("Content-Encoding", "gzip")
+		req.Header.Set("X-Payload-Byte-Count", strconv.Itoa(unzippedSize))
+
+		additionalFields = logrus.Fields{
+			"unzipped_size":  unzippedSize,
+			"gzip_t":         gzipTime,
+			"content_length": buf.Len(),
+		}
+
+		b = buf.Bytes()
+	}
+
+	req.Header.Set("Content-Length", strconv.Itoa(len(b)))
+	req.Body = ioutil.NopCloser(bytes.NewReader(b))
+	req.GetBody = func() (io.ReadCloser, error) {
+		return ioutil.NopCloser(bytes.NewReader(b)), nil
+	}
+
+	err = c.client.Do(req, nil)
+
+	c.logger.WithFields(logrus.Fields{
+		"t":         time.Since(start),
+		"json_t":    jsonTime,
+		"part_size": len(s),
+	}).WithFields(additionalFields).Debug("Pushed part to cloud")
+
+	return err
 }
