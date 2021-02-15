@@ -232,6 +232,7 @@ jobs:
           github.ref == 'refs/heads/master' ||
           startsWith(github.ref, 'refs/tags/v')
         run: |
+          VERSION="${VERSION#v}"
           echo "Publish GHCR ($DOCKER_IMAGE_ID:$VERSION)"
 
           # Log into GitHub Container Registry
