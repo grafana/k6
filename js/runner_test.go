@@ -2021,3 +2021,48 @@ func TestMinIterationDurationIsCancellable(t *testing.T) {
 		require.NoError(t, err)
 	}
 }
+
+func TestExecutionStats(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name, script, expErr string
+	}{
+		{"vu_ok", `
+		var exec = require('k6/execution');
+
+		exports.default = function() {
+			var vuStats = exec.getVUStats();
+			if (vuStats.id !== 1) throw new Error('unexpected VU ID: '+vuStats.id);
+			if (vuStats.iteration !== 1) throw new Error('unexpected VU iteration: '+vuStats.iteration);
+		}`, ""},
+		{"vu_err", `
+		var exec = require('k6/execution');
+		exec.getVUStats();
+		`, "VU information can only be returned from an exported function"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			r, err := getSimpleRunner(t, "/script.js", tc.script)
+			if tc.expErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expErr)
+				return
+			}
+			require.NoError(t, err)
+
+			samples := make(chan stats.SampleContainer, 100)
+			initVU, err := r.newVU(1, samples)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+
+			err = vu.RunOnce()
+			assert.NoError(t, err)
+		})
+	}
+}
