@@ -26,6 +26,7 @@ type ctxKey int
 
 const (
 	ctxKeyState ctxKey = iota
+	ctxKeyScenario
 )
 
 func WithState(ctx context.Context, state *State) context.Context {
@@ -38,4 +39,18 @@ func GetState(ctx context.Context) *State {
 		return nil
 	}
 	return v.(*State)
+}
+
+// WithScenarioState embeds a ScenarioState in ctx.
+func WithScenarioState(ctx context.Context, s *ScenarioState) context.Context {
+	return context.WithValue(ctx, ctxKeyScenario, s)
+}
+
+// GetScenarioState returns a ScenarioState from ctx.
+func GetScenarioState(ctx context.Context) *ScenarioState {
+	v := ctx.Value(ctxKeyScenario)
+	if v == nil {
+		return nil
+	}
+	return v.(*ScenarioState)
 }

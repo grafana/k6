@@ -2040,6 +2040,24 @@ func TestExecutionStats(t *testing.T) {
 		var exec = require('k6/execution');
 		exec.getVUStats();
 		`, "VU information can only be returned from an exported function"},
+		{"scenario_ok", `
+		var exec = require('k6/execution');
+		var sleep = require('k6').sleep;
+
+		exports.default = function() {
+			var ss = exec.getScenarioStats();
+			sleep(0.1);
+			// goja's Date handling is weird, see https://github.com/dop251/goja/issues/170
+			var startTime = new Date(JSON.parse(JSON.stringify(ss.startTime)));
+			if (ss.name !== 'default') throw new Error('unexpected scenario name: '+ss.name);
+			if (ss.executor !== 'test-exec') throw new Error('unexpected executor: '+ss.name);
+			if (startTime > new Date()) throw new Error('unexpected startTime: '+startTime);
+			if (ss.progress !== 0.1) throw new Error('unexpected progress: '+ss.progress);
+		}`, ""},
+		{"scenario_err", `
+		var exec = require('k6/execution');
+		exec.getScenarioStats();
+		`, "scenario information can only be returned from an exported function"},
 	}
 
 	for _, tc := range testCases {
@@ -2059,7 +2077,19 @@ func TestExecutionStats(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+
+			ctx = lib.WithScenarioState(ctx, &lib.ScenarioState{
+				Name:      "default",
+				Executor:  "test-exec",
+				StartTime: time.Now(),
+				ProgressFn: func() (float64, []string) {
+					return 0.1, nil
+				},
+			})
+			vu := initVU.Activate(&lib.VUActivationParams{
+				RunContext: ctx,
+				Exec:       "default",
+			})
 
 			err = vu.RunOnce()
 			assert.NoError(t, err)

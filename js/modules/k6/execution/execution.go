@@ -49,3 +49,21 @@ func (e *Execution) GetVUStats(ctx context.Context) (map[string]interface{}, err
 
 	return out, nil
 }
+
+// GetScenarioStats returns information about the currently executing scenario.
+func (e *Execution) GetScenarioStats(ctx context.Context) (map[string]interface{}, error) {
+	ss := lib.GetScenarioState(ctx)
+	if ss == nil {
+		return nil, errors.New("scenario information can only be returned from an exported function")
+	}
+
+	progress, _ := ss.ProgressFn()
+	out := map[string]interface{}{
+		"name":      ss.Name,
+		"executor":  ss.Executor,
+		"startTime": ss.StartTime,
+		"progress":  progress,
+	}
+
+	return out, nil
+}
