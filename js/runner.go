@@ -696,6 +696,7 @@ func (u *VU) runFn(
 	// maybe move it to RunOnce ?
 	u.Runtime.Set("__ITER", u.Iteration)
 	u.Iteration++
+	u.state.Iteration = u.Iteration
 
 	defer func() {
 		if r := recover(); r != nil {
