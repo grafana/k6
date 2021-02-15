@@ -58,7 +58,6 @@ github.com/eapache/go-xerial-snappy
 github.com/eapache/queue
 # github.com/eiannone/keyboard v0.0.0-20200508000154-caf4b762e807
 ## explicit
-github.com/eiannone/keyboard
 # github.com/fatih/color v1.5.0
 ## explicit
 github.com/fatih/color
@@ -201,6 +200,8 @@ github.com/pierrec/xxHash/xxHash32
 # github.com/pkg/errors v0.8.0
 ## explicit
 github.com/pkg/errors
+# github.com/pkg/term v1.1.0
+## explicit
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
@@ -270,11 +271,14 @@ golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f
-## explicit
+# golang.org/x/sys v0.0.0-20201119102817-f84b799fce68
 golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+# golang.org/x/term v0.0.0-20201210144234-2321bbc49cbf
+## explicit
+golang.org/x/term
 # golang.org/x/text v0.3.3 => golang.org/x/text v0.3.0
 ## explicit
 golang.org/x/text/cases
