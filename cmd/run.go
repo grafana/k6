@@ -254,7 +254,7 @@ a commandline interface for interacting with it.`,
 
 			// start reading user input
 			if !runtimeOptions.NoSummary.Bool {
-				go readInput(globalCtx, initRunner, engine, executionState, logger)
+				go readInput(globalCtx, initRunner, engine, executionState, logger, os.Stdin, stdout)
 			}
 
 			// Initialize the engine
@@ -469,27 +469,38 @@ func readInput(globalCtx context.Context,
 	engine *core.Engine,
 	executionState *lib.ExecutionState,
 	log *logrus.Logger,
+	r io.Reader,
+	w io.Writer,
 ) error {
 	oldState, err := term.MakeRaw(0)
 	if err != nil {
 		return err
 	}
-	defer term.Restore(0, oldState)
+	defer func() {
+		if err := term.Restore(0, oldState); err != nil {
+			log.Println("warning, failed to restore terminal:", err)
+		}
+	}()
+
 	screen := struct {
 		io.Reader
 		io.Writer
-	}{os.Stdin, os.Stdout}
-	terminal := term.NewTerminal(screen, "")
+	}{r, w}
 
+	terminal := term.NewTerminal(screen, "")
+	var b []byte = make([]byte, 3)
 	for {
-		line, err := terminal.ReadLine()
-		if err == io.EOF {
-			return nil
-		}
+		numRead, err := os.Stdin.Read(b)
 		if err != nil {
 			return err
 		}
-		if line == "R" {
+
+		switch {
+		// ctrl+c to exit from input mode
+		case b[0:numRead][0] == 3:
+			return nil
+		// rough idea how to read
+		case b[0:numRead][0] == 82:
 			summaryResult, err := runner.HandleSummary(globalCtx, &lib.Summary{
 				Metrics:         engine.Metrics,
 				RootGroup:       engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
