@@ -22,6 +22,7 @@ package cmd
 
 import (
 	"archive/tar"
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -254,7 +255,7 @@ a commandline interface for interacting with it.`,
 
 			// start reading user input
 			if !runtimeOptions.NoSummary.Bool {
-				go readInput(globalCtx, initRunner, engine, executionState, logger, os.Stdin, stdout)
+				go readInput(globalCtx, initRunner, engine, executionState, logger, os.Stdin, stdout, sigC)
 			}
 
 			// Initialize the engine
@@ -471,7 +472,9 @@ func readInput(globalCtx context.Context,
 	log *logrus.Logger,
 	r io.Reader,
 	w io.Writer,
+	c chan os.Signal,
 ) error {
+	// these lines screw up my terminal
 	oldState, err := term.MakeRaw(0)
 	if err != nil {
 		return err
@@ -482,32 +485,29 @@ func readInput(globalCtx context.Context,
 		}
 	}()
 
-	screen := struct {
-		io.Reader
-		io.Writer
-	}{r, w}
+	// end of lines
 
-	terminal := term.NewTerminal(screen, "")
-	var b []byte = make([]byte, 3)
 	for {
-		numRead, err := os.Stdin.Read(b)
+		consoleReader := bufio.NewReaderSize(os.Stdin, 1)
+		input, err := consoleReader.ReadByte()
 		if err != nil {
 			return err
 		}
 
 		switch {
 		// ctrl+c to exit from input mode
-		case b[0:numRead][0] == 3:
+		case input == 3:
+			c <- syscall.SIGINT
 			return nil
 		// rough idea how to read
-		case b[0:numRead][0] == 82:
+		case input == 82:
 			summaryResult, err := runner.HandleSummary(globalCtx, &lib.Summary{
 				Metrics:         engine.Metrics,
 				RootGroup:       engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
 				TestRunDuration: executionState.GetCurrentTestRunDuration(),
 			})
 			if err == nil {
-				err = handleSummaryResult(afero.NewOsFs(), terminal, stderr, summaryResult)
+				err = handleSummaryResult(afero.NewOsFs(), w, stderr, summaryResult)
 			}
 			if err != nil {
 				log.WithError(err).Error("failed to handle the end-of-test summary")
