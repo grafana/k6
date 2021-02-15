@@ -18,7 +18,7 @@
  *
  */
 
-package cloud
+package cloudapi
 
 import (
 	"bytes"
@@ -29,7 +29,6 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -49,12 +48,12 @@ const (
 
 // Client handles communication with Load Impact cloud API.
 type Client struct {
-	client         *http.Client
-	token          string
-	baseURL        string
-	version        string
-	pushBufferPool sync.Pool
-	logger         logrus.FieldLogger
+	client  *http.Client
+	token   string
+	baseURL string
+	version string
+
+	logger logrus.FieldLogger
 
 	retries       int
 	retryInterval time.Duration
@@ -69,12 +68,7 @@ func NewClient(logger logrus.FieldLogger, token, host, version string) *Client {
 		version:       version,
 		retries:       MaxRetries,
 		retryInterval: RetryInterval,
-		pushBufferPool: sync.Pool{
-			New: func() interface{} {
-				return &bytes.Buffer{}
-			},
-		},
-		logger: logger,
+		logger:        logger,
 	}
 	return c
 }

@@ -18,7 +18,7 @@
  *
  */
 
-package cloud
+package cloudapi
 
 import (
 	"context"
@@ -32,6 +32,8 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/sirupsen/logrus"
 )
+
+//go:generate easyjson -pkg -no_std_marshalers -gen_build_flags -mod=mod .
 
 //easyjson:json
 type msg struct {

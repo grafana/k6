@@ -40,10 +40,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/loadimpact/k6/cloudapi"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
-	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/ui"
 	"github.com/loadimpact/k6/ui/pb"
 )
@@ -141,7 +141,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			}
 
 			// Cloud config
-			cloudConfig := cloud.NewConfig().Apply(derivedConf.Collectors.Cloud)
+			cloudConfig := cloudapi.NewConfig().Apply(derivedConf.Collectors.Cloud)
 			if err = envconfig.Process("", &cloudConfig); err != nil {
 				return err
 			}
@@ -167,7 +167,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				}
 			}
 
-			if err = cloud.MergeFromExternal(arc.Options.External, &cloudConfig); err != nil {
+			if err = cloudapi.MergeFromExternal(arc.Options.External, &cloudConfig); err != nil {
 				return err
 			}
 			if tmpCloudConfig == nil {
@@ -202,7 +202,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 
 			// Start cloud test run
 			modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Validating script options"))
-			client := cloud.NewClient(logger, cloudConfig.Token.String, cloudConfig.Host.String, consts.Version)
+			client := cloudapi.NewClient(logger, cloudConfig.Token.String, cloudConfig.Host.String, consts.Version)
 			if err = client.ValidateOptions(arc.Options); err != nil {
 				return err
 			}
@@ -240,7 +240,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			if err != nil {
 				return err
 			}
-			testURL := cloud.URLForResults(refID, cloudConfig)
+			testURL := cloudapi.URLForResults(refID, cloudConfig)
 			executionPlan := derivedConf.Scenarios.GetFullExecutionRequirements(et)
 			printExecutionDescription("cloud", filename, testURL, derivedConf, et, executionPlan, nil)
 
@@ -267,7 +267,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			maxDuration, _ = lib.GetEndOffset(executionPlan)
 
 			testProgressLock := &sync.Mutex{}
-			var testProgress *cloud.TestProgressResponse
+			var testProgress *cloudapi.TestProgressResponse
 			progressBar.Modify(
 				pb.WithProgress(func() (float64, []string) {
 					testProgressLock.Lock()
@@ -332,7 +332,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 
 			fprintf(stdout, "     test status: %s\n", ui.ValueColor.Sprint(testProgress.RunStatusText))
 
-			if testProgress.ResultStatus == cloud.ResultStatusFailed {
+			if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
 				//nolint:golint
 				return ExitCode{error: errors.New("The test has failed"), Code: cloudTestRunFailedErrorCode}
 			}

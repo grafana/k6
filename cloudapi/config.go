@@ -18,9 +18,10 @@
  *
  */
 
-package cloud
+package cloudapi
 
 import (
+	"encoding/json"
 	"time"
 
 	"gopkg.in/guregu/null.v3"
@@ -238,4 +239,26 @@ func (c Config) Apply(cfg Config) Config {
 		c.AggregationOutlierIqrCoefUpper = cfg.AggregationOutlierIqrCoefUpper
 	}
 	return c
+}
+
+// MergeFromExternal merges three fields from json in a loadimact key of the provided external map
+func MergeFromExternal(external map[string]json.RawMessage, conf *Config) error {
+	if val, ok := external["loadimpact"]; ok {
+		// TODO: Important! Separate configs and fix the whole 2 configs mess!
+		tmpConfig := Config{}
+		if err := json.Unmarshal(val, &tmpConfig); err != nil {
+			return err
+		}
+		// Only take out the ProjectID, Name and Token from the options.ext.loadimpact map:
+		if tmpConfig.ProjectID.Valid {
+			conf.ProjectID = tmpConfig.ProjectID
+		}
+		if tmpConfig.Name.Valid {
+			conf.Name = tmpConfig.Name
+		}
+		if tmpConfig.Token.Valid {
+			conf.Token = tmpConfig.Token
+		}
+	}
+	return nil
 }

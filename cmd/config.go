@@ -33,11 +33,11 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/loadimpact/k6/cloudapi"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/executor"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/csv"
 	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
@@ -65,7 +65,7 @@ type Config struct {
 	Collectors struct {
 		InfluxDB influxdb.Config `json:"influxdb"`
 		Kafka    kafka.Config    `json:"kafka"`
-		Cloud    cloud.Config    `json:"cloud"`
+		Cloud    cloudapi.Config `json:"cloud"`
 		StatsD   statsd.Config   `json:"statsd"`
 		Datadog  datadog.Config  `json:"datadog"`
 		CSV      csv.Config      `json:"csv"`
@@ -193,7 +193,7 @@ func readEnvConfig() (conf Config, err error) {
 // TODO: accumulate all errors and differentiate between the layers?
 func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf Config, err error) {
 	cliConf.Collectors.InfluxDB = influxdb.NewConfig().Apply(cliConf.Collectors.InfluxDB)
-	cliConf.Collectors.Cloud = cloud.NewConfig().Apply(cliConf.Collectors.Cloud)
+	cliConf.Collectors.Cloud = cloudapi.NewConfig().Apply(cliConf.Collectors.Cloud)
 	cliConf.Collectors.Kafka = kafka.NewConfig().Apply(cliConf.Collectors.Kafka)
 	cliConf.Collectors.StatsD = statsd.NewConfig().Apply(cliConf.Collectors.StatsD)
 	cliConf.Collectors.Datadog = datadog.NewConfig().Apply(cliConf.Collectors.Datadog)

@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
+	"github.com/loadimpact/k6/cloudapi"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
@@ -87,7 +88,7 @@ func getCollector(
 
 		return influxdb.New(logger, config)
 	case collectorCloud:
-		config := cloud.NewConfig().Apply(conf.Collectors.Cloud)
+		config := cloudapi.NewConfig().Apply(conf.Collectors.Cloud)
 		if err := envconfig.Process("", &config); err != nil {
 			return nil, err
 		}
