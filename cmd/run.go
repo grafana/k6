@@ -267,11 +267,9 @@ a commandline interface for interacting with it.`,
 
 				go func() {
 					for {
-						select {
-						case ll := <-line:
-							if ll == "R" {
-								printSummaryResults(globalCtx, initRunner, engine, executionState, logger, stdout, stderr)
-							}
+						ll := <-line
+						if ll == "R" {
+							printSummaryResults(globalCtx, initRunner, engine, executionState, logger, stdout, stderr)
 						}
 					}
 				}()
