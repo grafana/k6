@@ -488,11 +488,10 @@ func printSummaryResults(
 	engine.MetricsLock.Unlock()
 
 	if err == nil {
-		err := handleSummaryResult(afero.NewOsFs(), stdOut, stdErr, summaryResult)
-		if err != nil {
-			log.WithError(err).Error("failed to handle summary result")
+		hErr := handleSummaryResult(afero.NewOsFs(), stdOut, stdErr, summaryResult)
+		if hErr != nil {
+			log.WithError(hErr).Error("failed to handle summary result")
 		}
-
 	}
 	if err != nil {
 		log.WithError(err).Error("failed to handle the end-of-test summary")
