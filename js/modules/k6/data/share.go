@@ -21,8 +21,6 @@
 package data
 
 import (
-	"context"
-
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 )
@@ -33,103 +31,84 @@ type sharedArray struct {
 	arr []string
 }
 
-func (s sharedArray) wrap(ctxPtr *context.Context, rt *goja.Runtime) goja.Value {
-	cal, err := rt.RunString(arrayWrapperCode)
-	if err != nil {
-		common.Throw(rt, err)
-	}
-	call, _ := goja.AssertFunction(cal)
-	wrapped, err := call(goja.Undefined(), rt.ToValue(common.Bind(rt, s, ctxPtr)))
-	if err != nil {
-		common.Throw(rt, err)
-	}
+type wrappedSharedArray struct {
+	sharedArray
 
-	return wrapped
+	rt       *goja.Runtime
+	freeze   goja.Callable
+	isFrozen goja.Callable
+	parse    goja.Callable
 }
 
-func (s sharedArray) Get(index int) (interface{}, error) {
+func (s sharedArray) wrap(rt *goja.Runtime) goja.Value {
+	freeze, _ := goja.AssertFunction(rt.GlobalObject().Get("Object").ToObject(rt).Get("freeze"))
+	isFrozen, _ := goja.AssertFunction(rt.GlobalObject().Get("Object").ToObject(rt).Get("isFrozen"))
+	parse, _ := goja.AssertFunction(rt.GlobalObject().Get("JSON").ToObject(rt).Get("parse"))
+	return rt.NewDynamicArray(wrappedSharedArray{
+		sharedArray: s,
+		rt:          rt,
+		freeze:      freeze,
+		isFrozen:    isFrozen,
+		parse:       parse,
+	})
+}
+
+func (s wrappedSharedArray) Set(index int, val goja.Value) bool {
+	panic(s.rt.NewTypeError("SharedArray is immutable")) // this is specifically a type error
+}
+
+func (s wrappedSharedArray) SetLen(len int) bool {
+	panic(s.rt.NewTypeError("SharedArray is immutable")) // this is specifically a type error
+}
+
+func (s wrappedSharedArray) Get(index int) goja.Value {
 	if index < 0 || index >= len(s.arr) {
-		return goja.Undefined(), nil
+		return goja.Undefined()
+	}
+	val, err := s.parse(goja.Undefined(), s.rt.ToValue(s.arr[index]))
+	if err != nil {
+		common.Throw(s.rt, err)
+	}
+	err = s.deepFreeze(s.rt, val)
+	if err != nil {
+		common.Throw(s.rt, err)
 	}
 
-	// we specifically use JSON.parse to get the json to an object inside as otherwise we won't be
-	// able to freeze it as goja doesn't let us unless it is a pure goja object and this is the
-	// easiest way to get one.
-	return s.arr[index], nil
+	return val
 }
 
-func (s sharedArray) Length() int {
+func (s wrappedSharedArray) Len() int {
 	return len(s.arr)
 }
 
-/* This implementation is commented as with it - it is harder to deepFreeze it with this implementation.
-type sharedArrayIterator struct {
-	a     *sharedArray
-	index int
-}
-
-func (sai *sharedArrayIterator) Next() (interface{}, error) {
-	if sai.index == len(sai.a.arr)-1 {
-		return map[string]bool{"done": true}, nil
+func (s wrappedSharedArray) deepFreeze(rt *goja.Runtime, val goja.Value) error {
+	if val != nil && goja.IsNull(val) {
+		return nil
 	}
-	sai.index++
-	var tmp interface{}
-	if err := json.Unmarshal(sai.a.arr[sai.index], &tmp); err != nil {
-		return goja.Undefined(), err
+
+	_, err := s.freeze(goja.Undefined(), val)
+	if err != nil {
+		return err
 	}
-	return map[string]interface{}{"value": tmp}, nil
-}
 
-func (s sharedArray) Iterator() *sharedArrayIterator {
-	return &sharedArrayIterator{a: &s, index: -1}
-}
-*/
-
-const arrayWrapperCode = `(function(val) {
-	function deepFreeze(o) {
-		Object.freeze(o);
-		if (o === undefined) {
-			return o;
-		}
-
-		Object.getOwnPropertyNames(o).forEach(function (prop) {
-			if (o[prop] !== null
-				&& (typeof o[prop] === "object" || typeof o[prop] === "function")
-				&& !Object.isFrozen(o[prop])) {
-				deepFreeze(o[prop]);
+	o := val.ToObject(rt)
+	if o == nil {
+		return nil
+	}
+	for _, key := range o.Keys() {
+		prop := o.Get(key)
+		if prop != nil {
+			// isFrozen returns true for all non objects so it we don't need to check that
+			frozen, err := s.isFrozen(goja.Undefined(), prop)
+			if err != nil {
+				return err
 			}
-		});
-
-		return o;
-	};
-
-	var arrayHandler = {
-		get: function(target, property, receiver) {
-			switch (property){
-			case "length":
-				return target.length();
-			case Symbol.iterator:
-				return function(){
-					var index = 0;
-					return {
-						"next": function() {
-							if (index >= target.length()) {
-								return {done: true}
-							}
-							var result = {value: deepFreeze(JSON.parse(target.get(index)))};
-							index++;
-							return result;
-						}
-					}
+			if !frozen.ToBoolean() { // prevent cycles
+				if err = s.deepFreeze(rt, prop); err != nil {
+					return err
 				}
 			}
-			var i = parseInt(property);
-			if (isNaN(i)) {
-				return undefined;
-			}
-
-			return deepFreeze(JSON.parse(target.get(i)));
 		}
-	};
-	return new Proxy(val, arrayHandler);
-})`
+	}
+	return nil
+}
