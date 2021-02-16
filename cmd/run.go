@@ -257,9 +257,9 @@ a commandline interface for interacting with it.`,
 				go func() {
 					var s string
 					for {
-						_, err := fmt.Scan(&s)
-						if err != nil {
-							logger.WithError(err).Error("failed to scan user input")
+						_, scanErr := fmt.Scan(&s)
+						if scanErr != nil {
+							logger.WithError(scanErr).Error("failed to scan user input")
 						}
 						line <- s
 					}
@@ -471,7 +471,14 @@ func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[strin
 	return consolidateErrorMessage(errs, "Could not save some summary information:")
 }
 
-func printSummaryResults(globalCtx context.Context, runner lib.Runner, engine *core.Engine, executionState *lib.ExecutionState, log *logrus.Logger, stdOut, stdErr io.Writer) {
+func printSummaryResults(
+	globalCtx context.Context,
+	runner lib.Runner,
+	engine *core.Engine,
+	executionState *lib.ExecutionState,
+	log *logrus.Logger,
+	stdOut, stdErr io.Writer,
+) {
 	engine.MetricsLock.Lock()
 	summaryResult, err := runner.HandleSummary(globalCtx, &lib.Summary{
 		Metrics:         engine.Metrics,
@@ -481,7 +488,11 @@ func printSummaryResults(globalCtx context.Context, runner lib.Runner, engine *c
 	engine.MetricsLock.Unlock()
 
 	if err == nil {
-		handleSummaryResult(afero.NewOsFs(), stdOut, stdErr, summaryResult)
+		err := handleSummaryResult(afero.NewOsFs(), stdOut, stdErr, summaryResult)
+		if err != nil {
+			log.WithError(err).Error("failed to handle summary result")
+		}
+
 	}
 	if err != nil {
 		log.WithError(err).Error("failed to handle the end-of-test summary")
