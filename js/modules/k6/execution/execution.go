@@ -67,3 +67,23 @@ func (e *Execution) GetScenarioStats(ctx context.Context) (map[string]interface{
 
 	return out, nil
 }
+
+// GetTestStats returns global test information.
+func (e *Execution) GetTestStats(ctx context.Context) (map[string]interface{}, error) {
+	es := lib.GetExecutionState(ctx)
+	if es == nil {
+		return nil, errors.New("test information can only be returned from an exported function")
+	}
+
+	out := map[string]interface{}{
+		// XXX: For consistency, should this be startTime instead, or startTime
+		// in ScenarioStats be converted to duration?
+		"duration":              es.GetCurrentTestRunDuration().String(),
+		"iterationsCompleted":   es.GetFullIterationCount(),
+		"iterationsInterrupted": es.GetPartialIterationCount(),
+		"vusActive":             es.GetCurrentlyActiveVUsCount(),
+		"vusMax":                es.GetInitializedVUsCount(),
+	}
+
+	return out, nil
+}
