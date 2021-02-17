@@ -119,6 +119,17 @@ func (c *Compiler) Compile(src, filename, pre, post string,
 		return nil, code, err
 	}
 	pgm, err := goja.CompileAST(ast, strict)
+	if err != nil {
+		if compatMode == lib.CompatibilityModeExtended {
+			code, _, err = c.Transform(src, filename)
+			if err != nil {
+				return nil, code, err
+			}
+			// the compatibility mode "decreases" here as we shouldn't transform twice
+			return c.Compile(code, filename, pre, post, strict, lib.CompatibilityModeBase)
+		}
+		return nil, code, err
+	}
 	return pgm, code, err
 }
 
