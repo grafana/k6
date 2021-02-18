@@ -119,6 +119,27 @@ func (c *Compiler) Compile(src, filename, pre, post string,
 		return nil, code, err
 	}
 	pgm, err := goja.CompileAST(ast, strict)
+	// Parsing only checks the syntax, not whether what the syntax expresses
+	// is actually supported (sometimes).
+	//
+	// For example, destructuring looks a lot like an object with shorthand
+	// properties, but this is only noticeable once the code is compiled, not
+	// while parsing. Even now code such as `let [x] = [2]` doesn't return an
+	// error on the parsing stage but instead in the compilation in base mode.
+	//
+	// So, because of this, if there is an error during compilation, it still might
+	// be worth it to transform the code and try again.
+	if err != nil {
+		if compatMode == lib.CompatibilityModeExtended {
+			code, _, err = c.Transform(src, filename)
+			if err != nil {
+				return nil, code, err
+			}
+			// the compatibility mode "decreases" here as we shouldn't transform twice
+			return c.Compile(code, filename, pre, post, strict, lib.CompatibilityModeBase)
+		}
+		return nil, code, err
+	}
 	return pgm, code, err
 }
 
