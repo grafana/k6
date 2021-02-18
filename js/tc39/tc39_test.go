@@ -106,6 +106,11 @@ var (
 
 		"test/built-ins/FinalizationRegistry", // still in proposal
 
+		"test/built-ins/RegExp/property-escapes",  // none of those work
+		"test/language/identifiers/start-unicode", // tests whether some unicode can be used in identifiers, half don't work, take forever
+
+		"test/built-ins/Object/prototype/__lookup", // AnnexB lookupGetter lookupSetter
+		"test/built-ins/Object/prototype/__define", // AnnexB defineGetter defineSetter
 	}
 )
 
