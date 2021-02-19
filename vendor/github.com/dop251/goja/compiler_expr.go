@@ -98,8 +98,10 @@ type compiledIdentifierExpr struct {
 
 type compiledFunctionLiteral struct {
 	baseCompiledExpr
-	expr   *ast.FunctionLiteral
-	isExpr bool
+	expr    *ast.FunctionLiteral
+	lhsName unistring.String
+	isExpr  bool
+	strict  bool
 }
 
 type compiledBracketExpr struct {
@@ -659,6 +661,13 @@ func (e *compiledAssignExpr) emitGetter(putOnStack bool) {
 	e.addSrcMap()
 	switch e.operator {
 	case token.ASSIGN:
+		if fn, ok := e.right.(*compiledFunctionLiteral); ok {
+			if fn.expr.Name == nil {
+				if id, ok := e.left.(*compiledIdentifierExpr); ok {
+					fn.lhsName = id.name
+				}
+			}
+		}
 		e.left.emitSetter(e.right)
 	case token.PLUS:
 		e.left.emitUnary(nil, func() {
@@ -754,8 +763,15 @@ func (e *compiledFunctionLiteral) emitGetter(putOnStack bool) {
 	}
 	e.c.blockStart = 0
 
+	var name unistring.String
 	if e.expr.Name != nil {
-		e.c.p.funcName = e.expr.Name.Name
+		name = e.expr.Name.Name
+	} else {
+		name = e.lhsName
+	}
+
+	if name != "" {
+		e.c.p.funcName = name
 	}
 	block := e.c.block
 	e.c.block = nil
@@ -764,13 +780,10 @@ func (e *compiledFunctionLiteral) emitGetter(putOnStack bool) {
 	}()
 
 	if !e.c.scope.strict {
-		e.c.scope.strict = e.c.isStrictStatement(e.expr.Body)
+		e.c.scope.strict = e.strict
 	}
 
 	if e.c.scope.strict {
-		if e.expr.Name != nil {
-			e.c.checkIdentifierLName(e.expr.Name.Name, int(e.expr.Name.Idx)-1)
-		}
 		for _, item := range e.expr.ParameterList.List {
 			e.c.checkIdentifierName(item.Name, int(item.Idx)-1)
 			e.c.checkIdentifierLName(item.Name, int(item.Idx)-1)
@@ -874,10 +887,6 @@ func (e *compiledFunctionLiteral) emitGetter(putOnStack bool) {
 	e.c.popScope()
 	e.c.p = savedPrg
 	e.c.blockStart = savedBlockStart
-	var name unistring.String
-	if e.expr.Name != nil {
-		name = e.expr.Name.Name
-	}
 	e.c.emit(&newFunc{prg: p, length: uint32(length), name: name, srcStart: uint32(e.expr.Idx0() - 1), srcEnd: uint32(e.expr.Idx1() - 1), strict: strict})
 	if !putOnStack {
 		e.c.emit(pop)
@@ -885,12 +894,14 @@ func (e *compiledFunctionLiteral) emitGetter(putOnStack bool) {
 }
 
 func (c *compiler) compileFunctionLiteral(v *ast.FunctionLiteral, isExpr bool) compiledExpr {
-	if v.Name != nil && c.scope.strict {
+	strict := c.scope.strict || c.isStrictStatement(v.Body)
+	if v.Name != nil && strict {
 		c.checkIdentifierLName(v.Name.Name, int(v.Name.Idx)-1)
 	}
 	r := &compiledFunctionLiteral{
 		expr:   v,
 		isExpr: isExpr,
+		strict: strict,
 	}
 	r.init(c, v.Idx0())
 	return r
@@ -1369,6 +1380,9 @@ func (c *compiler) compileVariableExpression(v *ast.VariableExpression) compiled
 		name:        v.Name,
 		initializer: c.compileExpression(v.Initializer),
 	}
+	if fn, ok := r.initializer.(*compiledFunctionLiteral); ok {
+		fn.lhsName = v.Name
+	}
 	r.init(c, v.Idx0())
 	return r
 }
@@ -1383,7 +1397,13 @@ func (e *compiledObjectLiteral) emitGetter(putOnStack bool) {
 			e.c.throwSyntaxError(e.offset, "non-literal properties in object literal are not supported yet")
 		}
 		key := cl.val.string()
-		e.c.compileExpression(prop.Value).emitGetter(true)
+		valueExpr := e.c.compileExpression(prop.Value)
+		if fn, ok := valueExpr.(*compiledFunctionLiteral); ok {
+			if fn.expr.Name == nil {
+				fn.lhsName = key
+			}
+		}
+		valueExpr.emitGetter(true)
 		switch prop.Kind {
 		case "value":
 			if key == __proto__ {
@@ -1391,12 +1411,14 @@ func (e *compiledObjectLiteral) emitGetter(putOnStack bool) {
 			} else {
 				e.c.emit(setProp1(key))
 			}
+		case "method":
+			e.c.emit(setProp1(key))
 		case "get":
 			e.c.emit(setPropGetter(key))
 		case "set":
 			e.c.emit(setPropSetter(key))
 		default:
-			panic(fmt.Errorf("Unknown property kind: %s", prop.Kind))
+			panic(fmt.Errorf("unknown property kind: %s", prop.Kind))
 		}
 	}
 	if !putOnStack {
