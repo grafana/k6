@@ -361,7 +361,8 @@ func (rs *externallyControlledRunState) newManualVUHandle(
 	}
 	ctx, cancel := context.WithCancel(rs.ctx)
 	return &manualVUHandle{
-		vuHandle: newStoppedVUHandle(ctx, getVU, returnVU, &rs.executor.config.BaseConfig, logger),
+		vuHandle: newStoppedVUHandle(ctx, getVU, returnVU,
+			rs.executor.GetNextLocalVUID, &rs.executor.config.BaseConfig, logger),
 		initVU:   initVU,
 		wg:       &wg,
 		cancelVU: cancel,

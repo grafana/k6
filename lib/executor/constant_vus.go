@@ -192,7 +192,8 @@ func (clv ConstantVUs) Run(parentCtx context.Context, out chan<- stats.SampleCon
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
 
-		activeVU := initVU.Activate(getVUActivationParams(ctx, clv.config.BaseConfig, returnVU))
+		activeVU := initVU.Activate(
+			getVUActivationParams(ctx, clv.config.BaseConfig, returnVU, clv.GetNextLocalVUID))
 
 		for {
 			select {

@@ -218,7 +218,8 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 		defer cancel()
 
 		vuID := initVU.GetID()
-		activeVU := initVU.Activate(getVUActivationParams(ctx, pvi.config.BaseConfig, returnVU))
+		activeVU := initVU.Activate(
+			getVUActivationParams(ctx, pvi.config.BaseConfig, returnVU, pvi.GetNextLocalVUID))
 
 		for i := int64(0); i < iterations; i++ {
 			select {
