@@ -159,7 +159,7 @@ func (e *ExecutionScheduler) initVU(
 	// Get the VU ID here, so that the VUs are (mostly) ordered by their
 	// number in the channel buffer
 	vuID := e.state.GetUniqueVUIdentifier()
-	vu, err := e.runner.NewVU(int64(vuID), samplesOut)
+	vu, err := e.runner.NewVU(vuID, samplesOut)
 	if err != nil {
 		return nil, fmt.Errorf("error while initializing VU #%d: '%s'", vuID, err)
 	}

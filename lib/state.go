@@ -67,7 +67,7 @@ type State struct {
 	// TODO: maybe use https://golang.org/pkg/sync/#Pool ?
 	BPool *bpool.BufferPool
 
-	Vu, Iteration int64
+	Vu, Iteration uint64
 	Tags          map[string]string
 }
 
