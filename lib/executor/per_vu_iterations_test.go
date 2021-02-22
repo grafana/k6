@@ -83,7 +83,7 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 	t.Parallel()
 	var (
 		result   sync.Map
-		slowVUID = int64(1)
+		slowVUID = uint64(1)
 	)
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)

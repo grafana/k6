@@ -1732,7 +1732,7 @@ func TestSystemTags(t *testing.T) {
 				InsecureSkipTLSVerify: null.BoolFrom(true),
 			})))
 
-			vu, err := r.NewVU(int64(num), samples)
+			vu, err := r.NewVU(uint64(num), samples)
 			require.NoError(t, err)
 			activeVU := vu.Activate(&lib.VUActivationParams{
 				RunContext: context.Background(),
