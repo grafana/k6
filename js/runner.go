@@ -703,6 +703,7 @@ func (u *VU) runFn(
 	u.Runtime.Set("__ITER", u.Iteration)
 	u.Iteration++
 	u.state.Iteration = u.Iteration
+	u.state.IncrScenarioVUIter()
 
 	defer func() {
 		if r := recover(); r != nil {
