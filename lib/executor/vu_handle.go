@@ -88,11 +88,12 @@ short names for input:
 // - it's not required but preferable, if where possible to not reactivate VUs and to reuse context
 // as this speed ups the execution
 type vuHandle struct {
-	mutex     *sync.Mutex
-	parentCtx context.Context
-	getVU     func() (lib.InitializedVU, error)
-	returnVU  func(lib.InitializedVU)
-	config    *BaseConfig
+	mutex           *sync.Mutex
+	parentCtx       context.Context
+	getVU           func() (lib.InitializedVU, error)
+	returnVU        func(lib.InitializedVU)
+	getScenarioVUID func() uint64
+	config          *BaseConfig
 
 	initVU       lib.InitializedVU
 	activeVU     lib.ActiveVU
@@ -108,15 +109,17 @@ type vuHandle struct {
 
 func newStoppedVUHandle(
 	parentCtx context.Context, getVU func() (lib.InitializedVU, error),
-	returnVU func(lib.InitializedVU), config *BaseConfig, logger *logrus.Entry,
+	returnVU func(lib.InitializedVU), getScenarioVUID func() uint64,
+	config *BaseConfig, logger *logrus.Entry,
 ) *vuHandle {
 	ctx, cancel := context.WithCancel(parentCtx)
 
 	return &vuHandle{
-		mutex:     &sync.Mutex{},
-		parentCtx: parentCtx,
-		getVU:     getVU,
-		config:    config,
+		mutex:           &sync.Mutex{},
+		parentCtx:       parentCtx,
+		getVU:           getVU,
+		getScenarioVUID: getScenarioVUID,
+		config:          config,
 
 		canStartIter: make(chan struct{}),
 		state:        stopped,
@@ -146,7 +149,7 @@ func (vh *vuHandle) start() (err error) {
 			return err
 		}
 
-		vh.activeVU = vh.initVU.Activate(getVUActivationParams(vh.ctx, *vh.config, vh.returnVU))
+		vh.activeVU = vh.initVU.Activate(getVUActivationParams(vh.ctx, *vh.config, vh.returnVU, vh.getScenarioVUID))
 		close(vh.canStartIter)
 		vh.changeState(starting)
 	}

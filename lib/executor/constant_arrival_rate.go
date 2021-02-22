@@ -280,7 +280,8 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	}
 	activateVU := func(initVU lib.InitializedVU) lib.ActiveVU {
 		activeVUsWg.Add(1)
-		activeVU := initVU.Activate(getVUActivationParams(maxDurationCtx, car.config.BaseConfig, returnVU))
+		activeVU := initVU.Activate(getVUActivationParams(
+			maxDurationCtx, car.config.BaseConfig, returnVU, car.GetNextLocalVUID))
 		car.executionState.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddUint64(&activeVUsCount, 1)
 		vusPool.AddVU(maxDurationCtx, activeVU, runIterationBasic)

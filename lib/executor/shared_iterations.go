@@ -248,7 +248,8 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
 
-		activeVU := initVU.Activate(getVUActivationParams(ctx, si.config.BaseConfig, returnVU))
+		activeVU := initVU.Activate(getVUActivationParams(
+			ctx, si.config.BaseConfig, returnVU, si.GetNextLocalVUID))
 
 		for {
 			select {
