@@ -2105,8 +2105,9 @@ func TestExecutionStats(t *testing.T) {
 				},
 			})
 			vu := initVU.Activate(&lib.VUActivationParams{
-				RunContext: ctx,
-				Exec:       "default",
+				RunContext:      ctx,
+				Exec:            "default",
+				GetScenarioVUID: func() uint64 { return 1 },
 			})
 
 			execState := execScheduler.GetState()

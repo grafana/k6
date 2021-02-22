@@ -22,6 +22,7 @@ package local
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -1386,4 +1387,110 @@ func TestNewExecutionSchedulerHasWork(t *testing.T) {
 
 	assert.Len(t, execScheduler.executors, 2)
 	assert.Len(t, execScheduler.executorConfigs, 3)
+}
+
+func TestExecutionStatsVUSharing(t *testing.T) {
+	t.Parallel()
+	script := []byte(`
+		import exec from 'k6/execution';
+		import { sleep } from 'k6';
+
+		// The carr scenario should reuse the two VUs created for the cvus scenario.
+		export let options = {
+			scenarios: {
+			    cvus: {
+					executor: 'constant-vus',
+					exec: 'cvus',
+					vus: 2,
+					duration: '1s',
+					gracefulStop: '0s',
+			    },
+				carr: {
+					executor: 'constant-arrival-rate',
+					exec: 'carr',
+					rate: 10,
+					timeUnit: '1s',
+					duration: '1s',
+					preAllocatedVUs: 2,
+					maxVUs: 10,
+					startTime: '2s',
+					gracefulStop: '0s',
+				},
+		    },
+		};
+
+		export function cvus() {
+			console.log(JSON.stringify(Object.assign(exec.getVUStats(), {scenario: 'cvus'})));
+			sleep(0.2);
+		};
+
+		export function carr() {
+			console.log(JSON.stringify(Object.assign(exec.getVUStats(), {scenario: 'carr'})));
+		};
+`)
+
+	logger := logrus.New()
+	logger.SetOutput(ioutil.Discard)
+	logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel}}
+	logger.AddHook(&logHook)
+
+	runner, err := js.New(
+		logger,
+		&loader.SourceData{
+			URL:  &url.URL{Path: "/script.js"},
+			Data: script,
+		},
+		nil,
+		lib.RuntimeOptions{},
+	)
+	require.NoError(t, err)
+
+	ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, lib.Options{})
+	defer cancel()
+
+	type vuStat struct {
+		iteration uint64
+		scVUID    map[string]uint64
+		scIter    map[string]uint64
+	}
+	vuStats := map[uint64]vuStat{}
+
+	type logEntry struct {
+		ID, Iteration                 uint64
+		Scenario                      string
+		IDScenario, IterationScenario uint64
+	}
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+		entries := logHook.Drain()
+		assert.InDelta(t, 20, len(entries), 2)
+		le := &logEntry{}
+		for _, entry := range entries {
+			err = json.Unmarshal([]byte(entry.Message), le)
+			require.NoError(t, err)
+			if _, ok := vuStats[le.ID]; !ok {
+				vuStats[le.ID] = vuStat{0, make(map[string]uint64), make(map[string]uint64)}
+			}
+			e := vuStats[le.ID]
+			e.iteration = le.Iteration
+			e.scVUID[le.Scenario] = le.IDScenario
+			e.scIter[le.Scenario] = le.IterationScenario
+			vuStats[le.ID] = e
+		}
+		require.Len(t, vuStats, 2)
+		// Both VUs should complete 10 iterations each globally, but 5
+		// iterations each per scenario.
+		for _, v := range vuStats {
+			assert.Equal(t, uint64(10), v.iteration)
+			assert.Equal(t, uint64(5), v.scIter["cvus"])
+			assert.Equal(t, uint64(5), v.scIter["carr"])
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out")
+	}
 }
