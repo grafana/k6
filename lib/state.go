@@ -69,6 +69,13 @@ type State struct {
 
 	Vu, Iteration uint64
 	Tags          map[string]string
+	ScenarioName  string
+	scenarioVUID  map[string]uint64
+}
+
+// Init initializes some private state fields.
+func (s *State) Init() {
+	s.scenarioVUID = make(map[string]uint64)
 }
 
 // CloneTags makes a copy of the tags map and returns it.
@@ -78,4 +85,15 @@ func (s *State) CloneTags() map[string]string {
 		tags[k] = v
 	}
 	return tags
+}
+
+// GetScenarioVUID returns the scenario-specific ID of this VU.
+func (s *State) GetScenarioVUID() (uint64, bool) {
+	id, ok := s.scenarioVUID[s.ScenarioName]
+	return id, ok
+}
+
+// SetScenarioVUID sets the scenario-specific ID for this VU.
+func (s *State) SetScenarioVUID(id uint64) {
+	s.scenarioVUID[s.ScenarioName] = id
 }

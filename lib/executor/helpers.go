@@ -223,7 +223,7 @@ func getArrivalRatePerSec(scaledArrivalRate *big.Rat) *big.Rat {
 }
 
 func getVUActivationParams(
-	ctx context.Context, conf BaseConfig, deactivateCallback func(lib.InitializedVU),
+	ctx context.Context, conf BaseConfig, deactivateCallback func(lib.InitializedVU), getScenarioVUID func() uint64,
 ) *lib.VUActivationParams {
 	return &lib.VUActivationParams{
 		RunContext:         ctx,
@@ -232,5 +232,6 @@ func getVUActivationParams(
 		Env:                conf.GetEnv(),
 		Tags:               conf.GetTags(),
 		DeactivateCallback: deactivateCallback,
+		GetScenarioVUID:    getScenarioVUID,
 	}
 }

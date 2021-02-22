@@ -42,9 +42,11 @@ func (e *Execution) GetVUStats(ctx context.Context) (map[string]interface{}, err
 		return nil, errors.New("VU information can only be returned from an exported function")
 	}
 
+	scID, _ := vuState.GetScenarioVUID()
 	out := map[string]interface{}{
-		"id":        vuState.Vu,
-		"iteration": vuState.Iteration,
+		"id":         vuState.Vu,
+		"idScenario": scID,
+		"iteration":  vuState.Iteration,
 	}
 
 	return out, nil
