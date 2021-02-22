@@ -126,7 +126,7 @@ func (r *Runner) MakeArchive() *lib.Archive {
 }
 
 // NewVU returns a new initialized VU.
-func (r *Runner) NewVU(id int64, samplesOut chan<- stats.SampleContainer) (lib.InitializedVU, error) {
+func (r *Runner) NewVU(id uint64, samplesOut chan<- stats.SampleContainer) (lib.InitializedVU, error) {
 	vu, err := r.newVU(id, samplesOut)
 	if err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func (r *Runner) NewVU(id int64, samplesOut chan<- stats.SampleContainer) (lib.I
 }
 
 // nolint:funlen
-func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, error) {
+func (r *Runner) newVU(id uint64, samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
 	bi, err := r.Bundle.Instantiate(r.Logger, id)
 	if err != nil {
@@ -526,13 +526,12 @@ func (r *Runner) getTimeoutFor(stage string) time.Duration {
 type VU struct {
 	BundleInstance
 
-	Runner    *Runner
-	Transport *http.Transport
-	Dialer    *netext.Dialer
-	CookieJar *cookiejar.Jar
-	TLSConfig *tls.Config
-	ID        int64
-	Iteration int64
+	Runner        *Runner
+	Transport     *http.Transport
+	Dialer        *netext.Dialer
+	CookieJar     *cookiejar.Jar
+	TLSConfig     *tls.Config
+	ID, Iteration uint64
 
 	Console *console
 	BPool   *bpool.BufferPool
@@ -558,7 +557,7 @@ type ActiveVU struct {
 }
 
 // GetID returns the unique VU ID.
-func (u *VU) GetID() int64 {
+func (u *VU) GetID() uint64 {
 	return u.ID
 }
 
@@ -587,10 +586,10 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		u.state.Tags[k] = v
 	}
 	if opts.SystemTags.Has(stats.TagVU) {
-		u.state.Tags["vu"] = strconv.FormatInt(u.ID, 10)
+		u.state.Tags["vu"] = strconv.FormatUint(u.ID, 10)
 	}
 	if opts.SystemTags.Has(stats.TagIter) {
-		u.state.Tags["iter"] = strconv.FormatInt(u.Iteration, 10)
+		u.state.Tags["iter"] = strconv.FormatUint(u.Iteration, 10)
 	}
 	if opts.SystemTags.Has(stats.TagGroup) {
 		u.state.Tags["group"] = u.state.Group.Path
@@ -688,7 +687,7 @@ func (u *VU) runFn(
 
 	opts := &u.Runner.Bundle.Options
 	if opts.SystemTags.Has(stats.TagIter) {
-		u.state.Tags["iter"] = strconv.FormatInt(u.Iteration, 10)
+		u.state.Tags["iter"] = strconv.FormatUint(u.Iteration, 10)
 	}
 
 	// TODO: this seems like the wrong place for the iteration incrementation

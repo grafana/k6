@@ -46,7 +46,7 @@ type MiniRunner struct {
 
 	SetupData []byte
 
-	NextVUID int64
+	NextVUID uint64
 	Group    *lib.Group
 	Options  lib.Options
 }
@@ -58,7 +58,7 @@ func (r MiniRunner) MakeArchive() *lib.Archive {
 }
 
 // NewVU returns a new VU with an incremental ID.
-func (r *MiniRunner) NewVU(id int64, out chan<- stats.SampleContainer) (lib.InitializedVU, error) {
+func (r *MiniRunner) NewVU(id uint64, out chan<- stats.SampleContainer) (lib.InitializedVU, error) {
 	return &VU{R: r, Out: out, ID: id}, nil
 }
 
@@ -124,10 +124,9 @@ func (r *MiniRunner) HandleSummary(ctx context.Context, s *lib.Summary) (map[str
 
 // VU is a mock VU, spawned by a MiniRunner.
 type VU struct {
-	R         *MiniRunner
-	Out       chan<- stats.SampleContainer
-	ID        int64
-	Iteration int64
+	R             *MiniRunner
+	Out           chan<- stats.SampleContainer
+	ID, Iteration uint64
 }
 
 // ActiveVU holds a VU and its activation parameters
@@ -138,7 +137,7 @@ type ActiveVU struct {
 }
 
 // GetID returns the unique VU ID.
-func (vu *VU) GetID() int64 {
+func (vu *VU) GetID() uint64 {
 	return vu.ID
 }
 

@@ -45,7 +45,7 @@ type InitializedVU interface {
 	Activate(*VUActivationParams) ActiveVU
 
 	// GetID returns the unique VU ID
-	GetID() int64
+	GetID() uint64
 }
 
 // VUActivationParams are supplied by each executor when it retrieves a VU from
@@ -73,7 +73,7 @@ type Runner interface {
 	// Spawns a new VU. It's fine to make this function rather heavy, if it means a performance
 	// improvement at runtime. Remember, this is called once per VU and normally only at the start
 	// of a test - RunOnce() may be called hundreds of thousands of times, and must be fast.
-	NewVU(id int64, out chan<- stats.SampleContainer) (InitializedVU, error)
+	NewVU(id uint64, out chan<- stats.SampleContainer) (InitializedVU, error)
 
 	// Runs pre-test setup, if applicable.
 	Setup(ctx context.Context, out chan<- stats.SampleContainer) error
