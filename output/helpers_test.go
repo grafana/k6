@@ -1,7 +1,7 @@
 /*
  *
  * k6 - a next-generation load testing tool
- * Copyright (C) 2016 Load Impact
+ * Copyright (C) 2021 Load Impact
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,35 +18,6 @@
  *
  */
 
-package dummy
+package output
 
-import (
-	"context"
-	"sync"
-	"testing"
-
-	"github.com/loadimpact/k6/stats"
-	"github.com/stretchr/testify/assert"
-)
-
-func TestCollectorRun(t *testing.T) {
-	var wg sync.WaitGroup
-	c := &Collector{}
-	ctx, cancel := context.WithCancel(context.Background())
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		c.Run(ctx)
-	}()
-
-	c.SetRunStatus(1)
-
-	cancel()
-	wg.Wait()
-}
-
-func TestCollectorCollect(t *testing.T) {
-	c := &Collector{}
-	c.Collect([]stats.SampleContainer{stats.Sample{}})
-	assert.Len(t, c.Samples, 1)
-}
+// TODO

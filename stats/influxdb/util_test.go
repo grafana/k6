@@ -53,22 +53,22 @@ func TestFieldKinds(t *testing.T) {
 
 	// Error case 1 (duplicated bool fields)
 	conf.TagsAsFields = []string{"vu", "iter", "url", "boolField:bool", "boolField:bool"}
-	_, err = MakeFieldKinds(*conf)
+	_, err = MakeFieldKinds(conf)
 	require.Error(t, err)
 
 	// Error case 2 (duplicated fields in bool and float ields)
 	conf.TagsAsFields = []string{"vu", "iter", "url", "boolField:bool", "boolField:float"}
-	_, err = MakeFieldKinds(*conf)
+	_, err = MakeFieldKinds(conf)
 	require.Error(t, err)
 
 	// Error case 3 (duplicated fields in BoolFields and IntFields)
 	conf.TagsAsFields = []string{"vu", "iter", "url", "boolField:bool", "floatField:float", "boolField:int"}
-	_, err = MakeFieldKinds(*conf)
+	_, err = MakeFieldKinds(conf)
 	require.Error(t, err)
 
 	// Normal case
 	conf.TagsAsFields = []string{"vu", "iter", "url", "boolField:bool", "floatField:float", "intField:int"}
-	fieldKinds, err = MakeFieldKinds(*conf)
+	fieldKinds, err = MakeFieldKinds(conf)
 	require.NoError(t, err)
 
 	require.Equal(t, fieldKinds["boolField"], Bool)

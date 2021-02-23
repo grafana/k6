@@ -50,7 +50,6 @@ import (
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -177,11 +176,6 @@ func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 	}))
 	defer tb.Cleanup()
 
-	script := &loader.SourceData{
-		Data: []byte(""),
-		URL:  &url.URL{Path: "/script.js"},
-	}
-
 	options := lib.Options{
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
@@ -190,7 +184,7 @@ func runCloudCollectorTestCase(t *testing.T, minSamples int) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(testutils.NewLogger(t), config, script, options, []lib.ExecutionStep{}, "1.0")
+	collector, err := New(testutils.NewLogger(t), config, &url.URL{Path: "/script.js"}, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 
 	assert.True(t, collector.config.Host.Valid)
@@ -335,11 +329,6 @@ func TestCloudCollectorMaxPerPacket(t *testing.T) {
 	}))
 	defer tb.Cleanup()
 
-	script := &loader.SourceData{
-		Data: []byte(""),
-		URL:  &url.URL{Path: "/script.js"},
-	}
-
 	options := lib.Options{
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
@@ -348,7 +337,7 @@ func TestCloudCollectorMaxPerPacket(t *testing.T) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(testutils.NewLogger(t), config, script, options, []lib.ExecutionStep{}, "1.0")
+	collector, err := New(testutils.NewLogger(t), config, &url.URL{Path: "/script.js"}, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 	now := time.Now()
 	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
@@ -427,11 +416,6 @@ func TestCloudCollectorStopSendingMetric(t *testing.T) {
 	}))
 	defer tb.Cleanup()
 
-	script := &loader.SourceData{
-		Data: []byte(""),
-		URL:  &url.URL{Path: "/script.js"},
-	}
-
 	options := lib.Options{
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
@@ -441,7 +425,7 @@ func TestCloudCollectorStopSendingMetric(t *testing.T) {
 		NoCompress:                 null.BoolFrom(true),
 		MaxMetricSamplesPerPackage: null.IntFrom(50),
 	})
-	collector, err := New(testutils.NewLogger(t), config, script, options, []lib.ExecutionStep{}, "1.0")
+	collector, err := New(testutils.NewLogger(t), config, &url.URL{Path: ""}, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 	now := time.Now()
 	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
@@ -548,11 +532,6 @@ func TestCloudCollectorAggregationPeriodZeroNoBlock(t *testing.T) {
 	}))
 	defer tb.Cleanup()
 
-	script := &loader.SourceData{
-		Data: []byte(""),
-		URL:  &url.URL{Path: "/script.js"},
-	}
-
 	options := lib.Options{
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
@@ -561,7 +540,7 @@ func TestCloudCollectorAggregationPeriodZeroNoBlock(t *testing.T) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(testutils.NewLogger(t), config, script, options, []lib.ExecutionStep{}, "1.0")
+	collector, err := New(testutils.NewLogger(t), config, &url.URL{Path: "/script.js"}, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 
 	assert.True(t, collector.config.Host.Valid)
@@ -607,11 +586,6 @@ func TestCloudCollectorRecvIterLIAllIterations(t *testing.T) {
 	}))
 	defer tb.Cleanup()
 
-	script := &loader.SourceData{
-		Data: []byte(""),
-		URL:  &url.URL{Path: "/script.js"},
-	}
-
 	options := lib.Options{
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
@@ -620,7 +594,7 @@ func TestCloudCollectorRecvIterLIAllIterations(t *testing.T) {
 		Host:       null.StringFrom(tb.ServerHTTP.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(testutils.NewLogger(t), config, script, options, []lib.ExecutionStep{}, "1.0")
+	collector, err := New(testutils.NewLogger(t), config, &url.URL{Path: "path/to/script.js"}, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 
 	gotIterations := false
@@ -730,10 +704,7 @@ func TestNewName(t *testing.T) {
 		testCase := testCase
 
 		t.Run(testCase.url.String(), func(t *testing.T) {
-			script := &loader.SourceData{
-				URL: testCase.url,
-			}
-			collector, err := New(testutils.NewLogger(t), cloudapi.NewConfig(), script, lib.Options{
+			collector, err := New(testutils.NewLogger(t), cloudapi.NewConfig(), testCase.url, lib.Options{
 				Duration: types.NullDurationFrom(1 * time.Second),
 			}, []lib.ExecutionStep{}, "1.0")
 			require.NoError(t, err)
@@ -766,10 +737,6 @@ func TestPublishMetric(t *testing.T) {
 	}))
 	defer server.Close()
 
-	script := &loader.SourceData{
-		Data: []byte(""),
-		URL:  &url.URL{Path: "/script.js"},
-	}
 	options := lib.Options{
 		Duration: types.NullDurationFrom(1 * time.Second),
 	}
@@ -777,7 +744,7 @@ func TestPublishMetric(t *testing.T) {
 		Host:       null.StringFrom(server.URL),
 		NoCompress: null.BoolFrom(true),
 	})
-	collector, err := New(testutils.NewLogger(t), config, script, options, []lib.ExecutionStep{}, "1.0")
+	collector, err := New(testutils.NewLogger(t), config, &url.URL{Path: "/script.js"}, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(t, err)
 
 	samples := []*Sample{

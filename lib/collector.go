@@ -26,6 +26,8 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
+// TODO: move to some other package - types? models?
+
 // RunStatus values can be used by k6 to denote how a script run ends
 // and by the cloud executor and collector so that k6 knows the current
 // status of a particular script run.
@@ -45,6 +47,8 @@ const (
 	RunStatusAbortedScriptError RunStatus = 7
 	RunStatusAbortedThreshold   RunStatus = 8
 )
+
+// TODO: remove
 
 // A Collector abstracts the process of funneling samples to an external storage backend,
 // such as an InfluxDB instance.

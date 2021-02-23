@@ -33,16 +33,10 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/cloudapi"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/executor"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/stats/csv"
-	"github.com/loadimpact/k6/stats/datadog"
-	"github.com/loadimpact/k6/stats/influxdb"
-	"github.com/loadimpact/k6/stats/kafka"
-	"github.com/loadimpact/k6/stats/statsd"
 )
 
 // configFlagSet returns a FlagSet with the default run configuration flags.
@@ -62,14 +56,8 @@ type Config struct {
 	Linger        null.Bool `json:"linger" envconfig:"K6_LINGER"`
 	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
 
-	Collectors struct {
-		InfluxDB influxdb.Config `json:"influxdb"`
-		Kafka    kafka.Config    `json:"kafka"`
-		Cloud    cloudapi.Config `json:"cloud"`
-		StatsD   statsd.Config   `json:"statsd"`
-		Datadog  datadog.Config  `json:"datadog"`
-		CSV      csv.Config      `json:"csv"`
-	} `json:"collectors"`
+	// TODO: deprecate
+	Collectors map[string]json.RawMessage `json:"collectors"`
 }
 
 // Validate checks if all of the specified options make sense
@@ -92,12 +80,6 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.NoUsageReport.Valid {
 		c.NoUsageReport = cfg.NoUsageReport
 	}
-	c.Collectors.InfluxDB = c.Collectors.InfluxDB.Apply(cfg.Collectors.InfluxDB)
-	c.Collectors.Cloud = c.Collectors.Cloud.Apply(cfg.Collectors.Cloud)
-	c.Collectors.Kafka = c.Collectors.Kafka.Apply(cfg.Collectors.Kafka)
-	c.Collectors.StatsD = c.Collectors.StatsD.Apply(cfg.Collectors.StatsD)
-	c.Collectors.Datadog = c.Collectors.Datadog.Apply(cfg.Collectors.Datadog)
-	c.Collectors.CSV = c.Collectors.CSV.Apply(cfg.Collectors.CSV)
 	return c
 }
 
@@ -167,19 +149,11 @@ func writeDiskConfig(fs afero.Fs, configPath string, conf Config) error {
 }
 
 // Reads configuration variables from the environment.
-func readEnvConfig() (conf Config, err error) {
-	// TODO: replace envconfig and refactor the whole configuration from the groun up :/
-	for _, err := range []error{
-		envconfig.Process("", &conf),
-		envconfig.Process("", &conf.Collectors.Cloud),
-		envconfig.Process("", &conf.Collectors.InfluxDB),
-		envconfig.Process("", &conf.Collectors.Kafka),
-		envconfig.Process("k6_statsd", &conf.Collectors.StatsD),
-		envconfig.Process("k6_datadog", &conf.Collectors.Datadog),
-	} {
-		return conf, err
-	}
-	return conf, nil
+func readEnvConfig() (Config, error) {
+	// TODO: replace envconfig and refactor the whole configuration from the ground up :/
+	conf := Config{}
+	err := envconfig.Process("", &conf)
+	return conf, err
 }
 
 // Assemble the final consolidated configuration from all of the different sources:
@@ -192,12 +166,6 @@ func readEnvConfig() (conf Config, err error) {
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
 func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf Config, err error) {
-	cliConf.Collectors.InfluxDB = influxdb.NewConfig().Apply(cliConf.Collectors.InfluxDB)
-	cliConf.Collectors.Cloud = cloudapi.NewConfig().Apply(cliConf.Collectors.Cloud)
-	cliConf.Collectors.Kafka = kafka.NewConfig().Apply(cliConf.Collectors.Kafka)
-	cliConf.Collectors.StatsD = statsd.NewConfig().Apply(cliConf.Collectors.StatsD)
-	cliConf.Collectors.Datadog = datadog.NewConfig().Apply(cliConf.Collectors.Datadog)
-
 	fileConf, _, err := readDiskConfig(fs)
 	if err != nil {
 		return conf, err

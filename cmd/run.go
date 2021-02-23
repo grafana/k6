@@ -116,7 +116,8 @@ a commandline interface for interacting with it.`,
 				return err
 			}
 
-			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), buildEnvMap(os.Environ()))
+			osEnvironment := buildEnvMap(os.Environ())
+			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), osEnvironment)
 			if err != nil {
 				return err
 			}
@@ -171,8 +172,6 @@ a commandline interface for interacting with it.`,
 				return err
 			}
 
-			executionState := execScheduler.GetState()
-
 			// This is manually triggered after the Engine's Run() has completed,
 			// and things like a single Ctrl+C don't affect it. We use it to make
 			// sure that the progressbars finish updating with the latest execution
@@ -191,26 +190,18 @@ a commandline interface for interacting with it.`,
 				progressBarWG.Done()
 			}()
 
-			// Create an engine.
-			initBar.Modify(pb.WithConstProgress(0, "Init engine"))
-			engine, err := core.NewEngine(execScheduler, conf.Options, runtimeOptions, logger)
+			// Create all outputs.
+			executionPlan := execScheduler.GetExecutionPlan()
+			outputs, err := createOutputs(conf.Out, src, conf, runtimeOptions, executionPlan, osEnvironment, logger)
 			if err != nil {
 				return err
 			}
 
-			executionPlan := execScheduler.GetExecutionPlan()
-			// Create a collector and assign it to the engine if requested.
-			initBar.Modify(pb.WithConstProgress(0, "Init metric outputs"))
-			for _, out := range conf.Out {
-				t, arg := parseCollector(out)
-				collector, cerr := newCollector(logger, t, arg, src, conf, executionPlan)
-				if cerr != nil {
-					return cerr
-				}
-				if cerr = collector.Init(); cerr != nil {
-					return cerr
-				}
-				engine.Collectors = append(engine.Collectors, collector)
+			// Create the engine.
+			initBar.Modify(pb.WithConstProgress(0, "Init engine"))
+			engine, err := core.NewEngine(execScheduler, conf.Options, runtimeOptions, outputs, logger)
+			if err != nil {
+				return err
 			}
 
 			// Spin up the REST API server, if not disabled.
@@ -230,9 +221,17 @@ a commandline interface for interacting with it.`,
 				}()
 			}
 
+			// We do this here so we can get any output URLs below.
+			initBar.Modify(pb.WithConstProgress(0, "Starting outputs"))
+			err = engine.StartOutputs()
+			if err != nil {
+				return err
+			}
+			defer engine.StopOutputs()
+
 			printExecutionDescription(
 				"local", filename, "", conf, execScheduler.GetState().ExecutionTuple,
-				executionPlan, engine.Collectors)
+				executionPlan, outputs)
 
 			// Trap Interrupts, SIGINTs and SIGTERMs.
 			sigC := make(chan os.Signal, 1)
@@ -286,6 +285,7 @@ a commandline interface for interacting with it.`,
 			progressCancel()
 			progressBarWG.Wait()
 
+			executionState := execScheduler.GetState()
 			// Warn if no iterations could be completed.
 			if executionState.GetFullIterationCount() == 0 {
 				logger.Warn("No script iterations finished, consider making the test duration longer")

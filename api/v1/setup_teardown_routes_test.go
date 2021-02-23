@@ -155,7 +155,7 @@ func TestSetupData(t *testing.T) {
 			})
 			execScheduler, err := local.NewExecutionScheduler(runner, logger)
 			require.NoError(t, err)
-			engine, err := core.NewEngine(execScheduler, runner.GetOptions(), lib.RuntimeOptions{}, logger)
+			engine, err := core.NewEngine(execScheduler, runner.GetOptions(), lib.RuntimeOptions{}, nil, logger)
 			require.NoError(t, err)
 
 			globalCtx, globalCancel := context.WithCancel(context.Background())

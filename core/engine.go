@@ -32,6 +32,7 @@ import (
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/metrics"
+	"github.com/loadimpact/k6/output"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -56,7 +57,7 @@ type Engine struct {
 
 	Options        lib.Options
 	runtimeOptions lib.RuntimeOptions
-	Collectors     []lib.Collector
+	outputs        []output.Output
 
 	logger   *logrus.Entry
 	stopOnce sync.Once
@@ -77,7 +78,7 @@ type Engine struct {
 
 // NewEngine instantiates a new Engine, without doing any heavy initialization.
 func NewEngine(
-	ex lib.ExecutionScheduler, opts lib.Options, rtOpts lib.RuntimeOptions, logger *logrus.Logger,
+	ex lib.ExecutionScheduler, opts lib.Options, rtOpts lib.RuntimeOptions, outputs []output.Output, logger *logrus.Logger,
 ) (*Engine, error) {
 	if ex == nil {
 		return nil, errors.New("missing ExecutionScheduler instance")
@@ -89,6 +90,7 @@ func NewEngine(
 
 		Options:        opts,
 		runtimeOptions: rtOpts,
+		outputs:        outputs,
 		Metrics:        make(map[string]*stats.Metric),
 		Samples:        make(chan stats.SampleContainer, opts.MetricSamplesBufferSize.Int64),
 		stopChan:       make(chan struct{}),
@@ -109,10 +111,47 @@ func NewEngine(
 	return e, nil
 }
 
+// StartOutputs spins up all configured outputs, giving the thresholds to any
+// that can accept them. And if some output fails, stop the already started
+// ones. This may take some time, since some outpts make initial network
+// requests to set up whatever remote services are going to listen to them.
+//
+// TODO: this doesn't really need to be in the Engine, so take it out?
+func (e *Engine) StartOutputs() error {
+	e.logger.Debugf("Starting %d outputs...", len(e.outputs))
+	for i, out := range e.outputs {
+		if thresholdOut, ok := out.(output.WithThresholds); ok {
+			thresholdOut.SetThresholds(e.thresholds)
+		}
+
+		if err := out.Start(); err != nil {
+			e.stopOutputs(i)
+			return err
+		}
+	}
+	return nil
+}
+
+// StopOutputs stops all configured outputs.
+func (e *Engine) StopOutputs() {
+	e.stopOutputs(len(e.outputs))
+}
+
+func (e *Engine) stopOutputs(upToID int) {
+	e.logger.Debugf("Stopping %d outputs...", upToID)
+	for i := 0; i < upToID; i++ {
+		if err := e.outputs[i].Stop(); err != nil {
+			e.logger.WithError(err).Errorf("Stopping output %d failed", i)
+		}
+	}
+}
+
 // Init is used to initialize the execution scheduler and all metrics processing
 // in the engine. The first is a costly operation, since it initializes all of
-// the planned VUs and could potentially take a long time. It either returns an
-// error immediately, or it returns test run() and wait() functions.
+// the planned VUs and could potentially take a long time.
+//
+// This method either returns an error immediately, or it returns test run() and
+// wait() functions.
 //
 // Things to note:
 //  - The first lambda, Run(), synchronously executes the actual load test.
@@ -130,7 +169,6 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 	}
 
 	// TODO: move all of this in a separate struct? see main TODO above
-
 	runSubCtx, runSubCancel := context.WithCancel(runCtx)
 
 	resultCh := make(chan error)
@@ -154,6 +192,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 
 		return err
 	}
+
 	waitFn := e.startBackgroundProcesses(globalCtx, runCtx, resultCh, runSubCancel, processMetricsAfterRun)
 	return runFn, waitFn, nil
 }
@@ -162,19 +201,10 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 // test run status when it ends. It returns a function that can be used after
 // the provided context is called, to wait for the complete winding down of all
 // started goroutines.
-func (e *Engine) startBackgroundProcesses( //nolint:funlen
+func (e *Engine) startBackgroundProcesses(
 	globalCtx, runCtx context.Context, runResult <-chan error, runSubCancel func(), processMetricsAfterRun chan struct{},
 ) (wait func()) {
 	processes := new(sync.WaitGroup)
-
-	// Spin up all configured collectors
-	for _, collector := range e.Collectors {
-		processes.Add(1)
-		go func(collector lib.Collector) {
-			collector.Run(globalCtx)
-			processes.Done()
-		}(collector)
-	}
 
 	// Siphon and handle all produced metric samples
 	processes.Add(1)
@@ -300,8 +330,10 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 }
 
 func (e *Engine) setRunStatus(status lib.RunStatus) {
-	for _, c := range e.Collectors {
-		c.SetRunStatus(status)
+	for _, out := range e.outputs {
+		if statUpdOut, ok := out.(output.WithRunStatusUpdates); ok {
+			statUpdOut.SetRunStatus(status)
+		}
 	}
 }
 
@@ -443,7 +475,7 @@ func (e *Engine) processSamples(sampleContainers []stats.SampleContainer) {
 		e.processSamplesForMetrics(sampleContainers)
 	}
 
-	for _, collector := range e.Collectors {
-		collector.Collect(sampleContainers)
+	for _, out := range e.outputs {
+		out.AddMetricSamples(sampleContainers)
 	}
 }

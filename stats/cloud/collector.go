@@ -44,7 +44,6 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/lib/netext/httpext"
-	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -91,7 +90,7 @@ var _ lib.Collector = &Collector{}
 // New creates a new cloud collector
 func New(
 	logger logrus.FieldLogger,
-	conf cloudapi.Config, src *loader.SourceData, opts lib.Options, executionPlan []lib.ExecutionStep, version string,
+	conf cloudapi.Config, scriptURL fmt.Stringer, opts lib.Options, executionPlan []lib.ExecutionStep, version string,
 ) (*Collector, error) {
 	if err := cloudapi.MergeFromExternal(opts.External, &conf); err != nil {
 		return nil, err
@@ -102,7 +101,7 @@ func New(
 	}
 
 	if !conf.Name.Valid || conf.Name.String == "" {
-		conf.Name = null.StringFrom(filepath.Base(src.URL.String()))
+		conf.Name = null.StringFrom(filepath.Base(scriptURL.String()))
 	}
 	if conf.Name.String == "-" {
 		conf.Name = null.StringFrom(TestName)

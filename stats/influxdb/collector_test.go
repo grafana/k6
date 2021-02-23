@@ -42,21 +42,21 @@ func TestBadConcurrentWrites(t *testing.T) {
 	logger := testutils.NewLogger(t)
 	t.Run("0", func(t *testing.T) {
 		c.ConcurrentWrites = null.IntFrom(0)
-		_, err := New(logger, *c)
+		_, err := New(logger, c)
 		require.Error(t, err)
 		require.Equal(t, err.Error(), "influxdb's ConcurrentWrites must be a positive number")
 	})
 
 	t.Run("-2", func(t *testing.T) {
 		c.ConcurrentWrites = null.IntFrom(-2)
-		_, err := New(logger, *c)
+		_, err := New(logger, c)
 		require.Error(t, err)
 		require.Equal(t, err.Error(), "influxdb's ConcurrentWrites must be a positive number")
 	})
 
 	t.Run("2", func(t *testing.T) {
 		c.ConcurrentWrites = null.IntFrom(2)
-		_, err := New(logger, *c)
+		_, err := New(logger, c)
 		require.NoError(t, err)
 	})
 }
@@ -83,7 +83,7 @@ func testCollectorCycle(t testing.TB, handler http.HandlerFunc, body func(testin
 
 	config := NewConfig()
 	config.Addr = null.StringFrom("http://" + l.Addr().String())
-	c, err := New(testutils.NewLogger(t), *config)
+	c, err := New(testutils.NewLogger(t), config)
 	require.NoError(t, err)
 
 	require.NoError(t, c.Init())
@@ -149,7 +149,7 @@ func TestExtractTagsToValues(t *testing.T) {
 		"floatField:float",
 		"intField:int",
 	}
-	collector, err := New(testutils.NewLogger(t), *c)
+	collector, err := New(testutils.NewLogger(t), c)
 	require.NoError(t, err)
 	tags := map[string]string{
 		"stringField":  "string",

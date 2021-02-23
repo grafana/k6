@@ -33,7 +33,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -105,7 +104,8 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				return err
 			}
 
-			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), buildEnvMap(os.Environ()))
+			osEnvironment := buildEnvMap(os.Environ())
+			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), osEnvironment)
 			if err != nil {
 				return err
 			}
@@ -141,8 +141,8 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			}
 
 			// Cloud config
-			cloudConfig := cloudapi.NewConfig().Apply(derivedConf.Collectors.Cloud)
-			if err = envconfig.Process("", &cloudConfig); err != nil {
+			cloudConfig, err := cloudapi.GetConsolidatedConfig(derivedConf.Collectors["cloud"], osEnvironment)
+			if err != nil {
 				return err
 			}
 			if !cloudConfig.Token.Valid {
@@ -153,8 +153,8 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			arc := r.MakeArchive()
 			// TODO: Fix this
 			// We reuse cloud.Config for parsing options.ext.loadimpact, but this probably shouldn't be
-			// done as the idea of options.ext is that they are extensible without touching k6. But in
-			// order for this to happen we shouldn't actually marshall cloud.Config on top of it because
+			// done, as the idea of options.ext is that they are extensible without touching k6. But in
+			// order for this to happen, we shouldn't actually marshall cloud.Config on top of it, because
 			// it will be missing some fields that aren't actually mentioned in the struct.
 			// So in order for use to copy the fields that we need for loadimpact's api we unmarshal in
 			// map[string]interface{} and copy what we need if it isn't set already

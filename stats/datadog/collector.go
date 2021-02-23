@@ -21,8 +21,10 @@
 package datadog
 
 import (
+	"encoding/json"
 	"time"
 
+	"github.com/kelseyhightower/envconfig"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
@@ -114,4 +116,26 @@ func New(logger logrus.FieldLogger, conf Config) (*common.Collector, error) {
 		ProcessTags: tagHandler(conf.TagBlacklist).processTags,
 		Logger:      logger,
 	}, nil
+}
+
+// GetConsolidatedConfig combines {default config values + JSON config +
+// environment vars}, and returns the final result.
+func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (Config, error) {
+	result := NewConfig()
+	if jsonRawConf != nil {
+		jsonConf := Config{}
+		if err := json.Unmarshal(jsonRawConf, &jsonConf); err != nil {
+			return result, err
+		}
+		result = result.Apply(jsonConf)
+	}
+
+	envConfig := Config{}
+	if err := envconfig.Process("", &envConfig); err != nil {
+		// TODO: get rid of envconfig and actually use the env parameter...
+		return result, err
+	}
+	result = result.Apply(envConfig)
+
+	return result, nil
 }

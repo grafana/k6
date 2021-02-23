@@ -82,7 +82,7 @@ func TestWithEngine(t *testing.T) {
 	logger.SetOutput(testutils.NewTestOutput(t))
 	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, logger)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger)
 	require.NoError(t, err)
 
 	rw := httptest.NewRecorder()

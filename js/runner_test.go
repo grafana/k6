@@ -58,10 +58,11 @@ import (
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
+	"github.com/loadimpact/k6/lib/testutils/mockoutput"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
+	"github.com/loadimpact/k6/output"
 	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/stats/dummy"
 )
 
 func TestRunnerNew(t *testing.T) {
@@ -295,15 +296,17 @@ func TestSetupDataIsolation(t *testing.T) {
 
 	execScheduler, err := local.NewExecutionScheduler(runner, testutils.NewLogger(t))
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, options, lib.RuntimeOptions{}, testutils.NewLogger(t))
+
+	mockOutput := mockoutput.New()
+	engine, err := core.NewEngine(
+		execScheduler, options, lib.RuntimeOptions{}, []output.Output{mockOutput}, testutils.NewLogger(t),
+	)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	run, wait, err := engine.Init(ctx, ctx)
 	require.NoError(t, err)
 
-	collector := &dummy.Collector{}
-	engine.Collectors = []lib.Collector{collector}
 	require.Empty(t, runner.defaultGroup.Groups)
 
 	errC := make(chan error)
@@ -322,7 +325,7 @@ func TestSetupDataIsolation(t *testing.T) {
 	require.Contains(t, runner.defaultGroup.Groups, "setup")
 	require.Contains(t, runner.defaultGroup.Groups, "teardown")
 	var count int
-	for _, s := range collector.Samples {
+	for _, s := range mockOutput.Samples {
 		if s.Metric.Name == "mycounter" {
 			count += int(s.Value)
 		}
