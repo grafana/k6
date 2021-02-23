@@ -40,23 +40,32 @@ type SampleBuffer struct {
 
 // AddMetricSamples adds the given metric samples to the internal buffer.
 func (sc *SampleBuffer) AddMetricSamples(samples []stats.SampleContainer) {
+	if len(samples) == 0 {
+		return
+	}
 	sc.Lock()
 	sc.buffer = append(sc.buffer, samples...)
 	sc.Unlock()
 }
 
 // GetBufferedSamples returns the currently buffered metric samples and makes a
-// new internal buffer with some hopefully realistic size.
-func (sc *SampleBuffer) GetBufferedSamples() (buffered []stats.SampleContainer) {
+// new internal buffer with some hopefully realistic size. If the internal
+// buffer is empty, it will return nil.
+func (sc *SampleBuffer) GetBufferedSamples() []stats.SampleContainer {
 	sc.Lock()
-	buffered = sc.buffer
-	if len(buffered) > sc.maxLen {
-		sc.maxLen = len(buffered)
+	defer sc.Unlock()
+
+	buffered, bufferedLen := sc.buffer, len(sc.buffer)
+	if bufferedLen == 0 {
+		return nil
+	}
+	if bufferedLen > sc.maxLen {
+		sc.maxLen = bufferedLen
 	}
 	// Make the new buffer halfway between the previously allocated size and the
 	// maximum buffer size we've seen so far, to hopefully reduce copying a bit.
-	sc.buffer = make([]stats.SampleContainer, 0, (len(buffered)+sc.maxLen)/2)
-	sc.Unlock()
+	sc.buffer = make([]stats.SampleContainer, 0, (bufferedLen+sc.maxLen)/2)
+
 	return buffered
 }
 
