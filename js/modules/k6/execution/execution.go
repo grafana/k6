@@ -66,6 +66,7 @@ func (e *Execution) GetScenarioStats(ctx context.Context) (map[string]interface{
 		"executor":  ss.Executor,
 		"startTime": ss.StartTime,
 		"progress":  progress,
+		"iteration": ss.GetIter(),
 	}
 
 	return out, nil

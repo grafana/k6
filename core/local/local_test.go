@@ -1494,3 +1494,94 @@ func TestExecutionStatsVUSharing(t *testing.T) {
 		t.Fatal("timed out")
 	}
 }
+
+func TestExecutionStatsScenarioIter(t *testing.T) {
+	t.Parallel()
+	script := []byte(`
+		import exec from 'k6/execution';
+		import { sleep } from 'k6';
+
+		// The carr scenario should reuse the two VUs created for the pvu scenario.
+		export let options = {
+			scenarios: {
+				pvu: {
+					executor: 'per-vu-iterations',
+					exec: 'pvu',
+					vus: 2,
+					iterations: 5,
+					gracefulStop: '0s',
+				},
+				carr: {
+					executor: 'constant-arrival-rate',
+					exec: 'carr',
+					rate: 10,
+					timeUnit: '1s',
+					duration: '1s',
+					preAllocatedVUs: 2,
+					maxVUs: 10,
+					startTime: '2s',
+					gracefulStop: '0s',
+				},
+			},
+		};
+
+		export function pvu() {
+			sleep(Math.random() * 0.5);
+			console.log(JSON.stringify(exec.getScenarioStats()));
+		}
+
+		export function carr() {
+			console.log(JSON.stringify(exec.getScenarioStats()));
+		};
+`)
+
+	logger := logrus.New()
+	logger.SetOutput(ioutil.Discard)
+	logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel}}
+	logger.AddHook(&logHook)
+
+	runner, err := js.New(
+		logger,
+		&loader.SourceData{
+			URL:  &url.URL{Path: "/script.js"},
+			Data: script,
+		},
+		nil,
+		lib.RuntimeOptions{},
+	)
+	require.NoError(t, err)
+
+	ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, lib.Options{})
+	defer cancel()
+
+	scStats := map[string]uint64{}
+
+	type logEntry struct {
+		Name      string
+		Iteration uint64
+	}
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+		entries := logHook.Drain()
+		require.Len(t, entries, 20)
+		le := &logEntry{}
+		for _, entry := range entries {
+			err = json.Unmarshal([]byte(entry.Message), le)
+			require.NoError(t, err)
+			scStats[le.Name] = le.Iteration
+		}
+		require.Len(t, scStats, 2)
+		// The global per scenario iteration count should be 9 (iterations
+		// start at 0), despite VUs being shared or more than 1 being used.
+		for _, v := range scStats {
+			assert.Equal(t, uint64(9), v)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out")
+	}
+}

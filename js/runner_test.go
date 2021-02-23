@@ -2103,6 +2103,7 @@ func TestExecutionStats(t *testing.T) {
 				ProgressFn: func() (float64, []string) {
 					return 0.1, nil
 				},
+				GetIter: func() uint64 { return 1 },
 			})
 			vu := initVU.Activate(&lib.VUActivationParams{
 				RunContext:      ctx,
