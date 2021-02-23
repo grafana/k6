@@ -115,6 +115,7 @@ type ScenarioState struct {
 	Name, Executor string
 	StartTime      time.Time
 	ProgressFn     func() (float64, []string)
+	GetIter        func() uint64
 }
 
 // InitVUFunc is just a shorthand so we don't have to type the function
