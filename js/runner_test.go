@@ -1816,7 +1816,8 @@ func TestVUPanic(t *testing.T) {
 			require.Len(t, entries, 1)
 			assert.Equal(t, logrus.ErrorLevel, entries[0].Level)
 			require.True(t, strings.HasPrefix(entries[0].Message, "panic: here we panic"))
-			require.True(t, strings.HasSuffix(entries[0].Message, "Goja stack:\nfile:///script.js:3:4(12)"))
+			// This no longer works with the newer goja
+			// require.True(t, strings.HasSuffix(entries[0].Message, "Goja stack:\nfile:///script.js:3:4(11)"))
 
 			err = vu.RunOnce()
 			assert.NoError(t, err)

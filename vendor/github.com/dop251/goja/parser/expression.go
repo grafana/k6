@@ -141,7 +141,9 @@ func (self *_parser) parseRegExpLiteral() *ast.RegExpLiteral {
 }
 
 func (self *_parser) parseVariableDeclaration(declarationList *[]*ast.VariableExpression) ast.Expression {
-
+	if self.token == token.LET {
+		self.token = token.IDENTIFIER
+	}
 	if self.token != token.IDENTIFIER {
 		idx := self.expect(token.IDENTIFIER)
 		self.nextStatement()
@@ -168,25 +170,26 @@ func (self *_parser) parseVariableDeclaration(declarationList *[]*ast.VariableEx
 	return node
 }
 
-func (self *_parser) parseVariableDeclarationList(var_ file.Idx) []ast.Expression {
-
-	var declarationList []*ast.VariableExpression // Avoid bad expressions
-	var list []ast.Expression
-
+func (self *_parser) parseVariableDeclarationList() (declarationList []*ast.VariableExpression) {
 	for {
-		list = append(list, self.parseVariableDeclaration(&declarationList))
+		self.parseVariableDeclaration(&declarationList)
 		if self.token != token.COMMA {
 			break
 		}
 		self.next()
 	}
+	return
+}
+
+func (self *_parser) parseVarDeclarationList(var_ file.Idx) []*ast.VariableExpression {
+	declarationList := self.parseVariableDeclarationList()
 
 	self.scope.declare(&ast.VariableDeclaration{
 		Var:  var_,
 		List: declarationList,
 	})
 
-	return list
+	return declarationList
 }
 
 func (self *_parser) parseObjectPropertyKey() (unistring.String, ast.Expression, token.Token) {
@@ -778,6 +781,9 @@ func (self *_parser) parseConditionlExpression() ast.Expression {
 }
 
 func (self *_parser) parseAssignmentExpression() ast.Expression {
+	if self.token == token.LET {
+		self.token = token.IDENTIFIER
+	}
 	left := self.parseConditionlExpression()
 	var operator token.Token
 	switch self.token {
@@ -828,6 +834,9 @@ func (self *_parser) parseAssignmentExpression() ast.Expression {
 }
 
 func (self *_parser) parseExpression() ast.Expression {
+	if self.token == token.LET {
+		self.token = token.IDENTIFIER
+	}
 	next := self.parseAssignmentExpression
 	left := next()
 

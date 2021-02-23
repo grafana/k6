@@ -1292,11 +1292,9 @@ func (r *Runtime) createArrayProto(val *Object) objectImpl {
 	o._putProp("toLocaleString", r.newNativeFunc(r.arrayproto_toLocaleString, nil, "toLocaleString", nil, 0), true, false, true)
 	o._putProp("toString", r.global.arrayToString, true, false, true)
 	o._putProp("unshift", r.newNativeFunc(r.arrayproto_unshift, nil, "unshift", nil, 1), true, false, true)
-	valuesFunc := r.newNativeFunc(r.arrayproto_values, nil, "values", nil, 0)
-	r.global.arrayValues = valuesFunc
-	o._putProp("values", valuesFunc, true, false, true)
+	o._putProp("values", r.global.arrayValues, true, false, true)
 
-	o._putSym(SymIterator, valueProp(valuesFunc, true, false, true))
+	o._putSym(SymIterator, valueProp(r.global.arrayValues, true, false, true))
 
 	bl := r.newBaseObject(nil, classObject)
 	bl.setOwnStr("copyWithin", valueTrue, true)
@@ -1338,6 +1336,7 @@ func (r *Runtime) createArrayIterProto(val *Object) objectImpl {
 }
 
 func (r *Runtime) initArray() {
+	r.global.arrayValues = r.newNativeFunc(r.arrayproto_values, nil, "values", nil, 0)
 	r.global.arrayToString = r.newNativeFunc(r.arrayproto_toString, nil, "toString", nil, 0)
 
 	r.global.ArrayIteratorPrototype = r.newLazyObject(r.createArrayIterProto)
