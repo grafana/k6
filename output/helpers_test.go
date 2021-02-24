@@ -63,10 +63,14 @@ func TestSampleBufferBasics(t *testing.T) {
 //nolint:gosec
 func TestSampleBufferConcurrently(t *testing.T) {
 	t.Parallel()
-	rand.Seed(time.Now().UnixNano())
 
-	producersCount := 50 + rand.Intn(50)
-	sampleCount := 10 + rand.Intn(10)
+	seed := time.Now().UnixNano()
+	r := rand.New(rand.NewSource(seed))
+	t.Logf("Random source seeded with %d\n", seed)
+
+	producersCount := 50 + r.Intn(50)
+	sampleCount := 10 + r.Intn(10)
+	sleepModifier := 10 + r.Intn(10)
 	buffer := SampleBuffer{}
 
 	wg := make(chan struct{})
@@ -78,7 +82,7 @@ func TestSampleBufferConcurrently(t *testing.T) {
 				Value:  float64(i),
 				Tags:   stats.NewSampleTags(map[string]string{"tag1": "val1"}),
 			}})
-			time.Sleep(time.Duration(rand.Int63n(1000)) * time.Microsecond)
+			time.Sleep(time.Duration(i*sleepModifier) * time.Microsecond)
 		}
 		wg <- struct{}{}
 	}
