@@ -22,6 +22,7 @@ package output
 
 import (
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 )
 
 func TestSampleBufferBasics(t *testing.T) {
+	t.Parallel()
 	single := stats.Sample{
 		Time:   time.Now(),
 		Metric: stats.New("my_metric", stats.Rate),
@@ -60,12 +62,11 @@ func TestSampleBufferBasics(t *testing.T) {
 	assert.Empty(t, buffer.GetBufferedSamples())
 }
 
-//nolint:gosec
 func TestSampleBufferConcurrently(t *testing.T) {
 	t.Parallel()
 
 	seed := time.Now().UnixNano()
-	r := rand.New(rand.NewSource(seed))
+	r := rand.New(rand.NewSource(seed)) //nolint:gosec
 	t.Logf("Random source seeded with %d\n", seed)
 
 	producersCount := 50 + r.Intn(50)
@@ -119,4 +120,64 @@ loop:
 	}
 }
 
-// TODO: add tests for PeriodicFlusher
+func TestPeriodicFlusherBasics(t *testing.T) {
+	t.Parallel()
+
+	f, err := NewPeriodicFlusher(-1*time.Second, func() {})
+	assert.Error(t, err)
+	assert.Nil(t, f)
+	f, err = NewPeriodicFlusher(0, func() {})
+	assert.Error(t, err)
+	assert.Nil(t, f)
+
+	count := 0
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	f, err = NewPeriodicFlusher(100*time.Millisecond, func() {
+		count++
+		if count == 2 {
+			wg.Done()
+		}
+	})
+	assert.NotNil(t, f)
+	assert.Nil(t, err)
+	wg.Wait()
+	f.Stop()
+	assert.Equal(t, 3, count)
+}
+
+func TestPeriodicFlusherConcurrency(t *testing.T) {
+	t.Parallel()
+
+	seed := time.Now().UnixNano()
+	r := rand.New(rand.NewSource(seed)) //nolint:gosec
+	randStops := 10 + r.Intn(10)
+	t.Logf("Random source seeded with %d\n", seed)
+
+	count := 0
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	f, err := NewPeriodicFlusher(1000*time.Microsecond, func() {
+		// Sleep intentionally may be longer than the flush period. Also, this
+		// should never happen concurrently, so it's intentionally not locked.
+		time.Sleep(time.Duration(700+r.Intn(1000)) * time.Microsecond)
+		count++
+		if count == 100 {
+			wg.Done()
+		}
+	})
+	assert.NotNil(t, f)
+	assert.Nil(t, err)
+	wg.Wait()
+
+	stopWG := &sync.WaitGroup{}
+	stopWG.Add(randStops)
+	for i := 0; i < randStops; i++ {
+		go func() {
+			f.Stop()
+			stopWG.Done()
+		}()
+	}
+	stopWG.Wait()
+	assert.True(t, count >= 101) // due to the short intervals, we might not get exactly 101
+}

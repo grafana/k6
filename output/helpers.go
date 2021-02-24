@@ -77,6 +77,7 @@ type PeriodicFlusher struct {
 	flushCallback func()
 	stop          chan struct{}
 	stopped       chan struct{}
+	once          *sync.Once
 }
 
 func (pf *PeriodicFlusher) run() {
@@ -95,14 +96,12 @@ func (pf *PeriodicFlusher) run() {
 }
 
 // Stop waits for the periodic flusher flush one last time and exit. You can
-// safely call Stop() multiple times from different goroutines.
+// safely call Stop() multiple times from different goroutines, you just can't
+// call it from inside of the flushing function.
 func (pf *PeriodicFlusher) Stop() {
-	select {
-	case <-pf.stop:
-		// Aldready stopped
-	default:
+	pf.once.Do(func() {
 		close(pf.stop)
-	}
+	})
 	<-pf.stopped
 }
 
@@ -117,6 +116,7 @@ func NewPeriodicFlusher(period time.Duration, flushCallback func()) (*PeriodicFl
 		flushCallback: flushCallback,
 		stop:          make(chan struct{}),
 		stopped:       make(chan struct{}),
+		once:          &sync.Once{},
 	}
 
 	go pf.run()
