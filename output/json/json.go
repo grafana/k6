@@ -32,6 +32,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// TODO: add option for emitting proper JSON files (https://github.com/loadimpact/k6/issues/1052)
 const flushPeriod = 200 * time.Millisecond // TODO: make this configurable
 
 // Output funnels all passed metrics to an (optionally gzipped) JSON file.
