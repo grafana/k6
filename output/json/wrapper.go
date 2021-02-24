@@ -41,8 +41,8 @@ type Sample struct {
 	Tags  *stats.SampleTags `json:"tags"`
 }
 
-func newJSONSample(sample *stats.Sample) *Sample {
-	return &Sample{
+func newJSONSample(sample stats.Sample) Sample {
+	return Sample{
 		Time:  sample.Time,
 		Value: sample.Value,
 		Tags:  sample.Tags,
@@ -51,11 +51,8 @@ func newJSONSample(sample *stats.Sample) *Sample {
 
 // WrapSample is a used to package a metric sample in a way that's nice to
 // export to JSON.
-func WrapSample(sample *stats.Sample) *Envelope {
-	if sample == nil {
-		return nil
-	}
-	return &Envelope{
+func WrapSample(sample stats.Sample) Envelope {
+	return Envelope{
 		Type:   "Point",
 		Metric: sample.Metric.Name,
 		Data:   newJSONSample(sample),

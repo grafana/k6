@@ -125,7 +125,7 @@ func (c *Collector) formatSamples(samples stats.Samples) ([]string, error) {
 		}
 	default:
 		for _, sample := range samples {
-			env := jsono.WrapSample(&sample)
+			env := jsono.WrapSample(sample)
 			metric, err := json.Marshal(env)
 			if err != nil {
 				return nil, err

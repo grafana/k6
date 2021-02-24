@@ -128,7 +128,7 @@ func (o *Output) flushMetrics() {
 		for _, sample := range samples {
 			sample := sample
 			o.handleMetric(sample.Metric)
-			err := o.encoder.Encode(WrapSample(&sample))
+			err := o.encoder.Encode(WrapSample(sample))
 			if err != nil {
 				// Skip metric if it can't be made into JSON or envelope is null.
 				o.logger.WithError(err).Error("Sample couldn't be marshalled to JSON")
