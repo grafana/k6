@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -228,7 +227,11 @@ func newCollectorAdapter(params output.Params, collector lib.Collector) (output.
 		)
 	}
 
-	return &collectorAdapter{outputType: params.OutputType, collector: collector}, nil
+	return &collectorAdapter{
+		outputType: params.OutputType,
+		collector:  collector,
+		stopCh:     make(chan struct{}),
+	}, nil
 }
 
 // collectorAdapter is a _temporary_ fix until we move all of the old
@@ -238,6 +241,7 @@ type collectorAdapter struct {
 	outputType   string
 	runCtx       context.Context
 	runCtxCancel func()
+	stopCh       chan struct{}
 }
 
 func (ca *collectorAdapter) Description() string {
@@ -253,7 +257,10 @@ func (ca *collectorAdapter) Start() error {
 		return err
 	}
 	ca.runCtx, ca.runCtxCancel = context.WithCancel(context.Background())
-	go ca.collector.Run(ca.runCtx)
+	go func() {
+		ca.collector.Run(ca.runCtx)
+		close(ca.stopCh)
+	}()
 	return nil
 }
 
@@ -268,7 +275,7 @@ func (ca *collectorAdapter) SetRunStatus(latestStatus lib.RunStatus) {
 // Stop implements the new output interface.
 func (ca *collectorAdapter) Stop() error {
 	ca.runCtxCancel()
-	time.Sleep(2 * time.Second) // shrug, better than nothing...
+	<-ca.stopCh
 	return nil
 }
 
