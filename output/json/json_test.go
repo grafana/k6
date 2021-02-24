@@ -174,7 +174,7 @@ func TestJsonOutputFileGzipped(t *testing.T) {
 
 func TestWrapersWithNilArg(t *testing.T) {
 	t.Parallel()
-	out := wrapSample(nil)
+	out := WrapSample(nil)
 	assert.Equal(t, out, (*Envelope)(nil))
 	out = wrapMetric(nil)
 	assert.Equal(t, out, (*Envelope)(nil))
@@ -182,7 +182,7 @@ func TestWrapersWithNilArg(t *testing.T) {
 
 func TestWrapSampleWithSamplePointer(t *testing.T) {
 	t.Parallel()
-	out := wrapSample(&stats.Sample{
+	out := WrapSample(&stats.Sample{
 		Metric: &stats.Metric{},
 	})
 	assert.NotEqual(t, out, (*Envelope)(nil))

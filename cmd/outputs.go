@@ -41,7 +41,6 @@ import (
 	"github.com/loadimpact/k6/stats/csv"
 	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
-	oldjson "github.com/loadimpact/k6/stats/json"
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd"
 )
@@ -54,13 +53,6 @@ func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, 
 		"json": json.New,
 
 		// TODO: remove all of these
-		"oldjson": func(params output.Params) (output.Output, error) {
-			jsonc, err := oldjson.New(params.Logger, params.FS, params.ConfigArgument)
-			if err != nil {
-				return nil, err
-			}
-			return newCollectorAdapter(params, jsonc)
-		},
 		"influxdb": func(params output.Params) (output.Output, error) {
 			conf, err := influxdb.GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument)
 			if err != nil {

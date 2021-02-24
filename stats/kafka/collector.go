@@ -30,9 +30,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/loadimpact/k6/lib"
+	jsono "github.com/loadimpact/k6/output/json"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/influxdb"
-	jsonc "github.com/loadimpact/k6/stats/json"
 )
 
 // Collector implements the lib.Collector interface and should be used only for testing
@@ -125,7 +125,7 @@ func (c *Collector) formatSamples(samples stats.Samples) ([]string, error) {
 		}
 	default:
 		for _, sample := range samples {
-			env := jsonc.WrapSample(&sample)
+			env := jsono.WrapSample(&sample)
 			metric, err := json.Marshal(env)
 			if err != nil {
 				return nil, err
