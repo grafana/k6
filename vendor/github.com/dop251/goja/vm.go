@@ -2585,12 +2585,24 @@ func (vm *vm) alreadyDeclared(name unistring.String) Value {
 func (vm *vm) checkBindVarsGlobal(names []unistring.String) {
 	o := vm.r.globalObject.self
 	sn := vm.r.global.stash.names
-	for _, name := range names {
-		if !o.hasOwnPropertyStr(name) && !o.isExtensible() {
-			panic(vm.r.NewTypeError("Cannot define global variable '%s', global object is not extensible", name))
+	if o, ok := o.(*baseObject); ok {
+		// shortcut
+		for _, name := range names {
+			if !o.hasOwnPropertyStr(name) && !o.extensible {
+				panic(vm.r.NewTypeError("Cannot define global variable '%s', global object is not extensible", name))
+			}
+			if _, exists := sn[name]; exists {
+				panic(vm.alreadyDeclared(name))
+			}
 		}
-		if _, exists := sn[name]; exists {
-			panic(vm.alreadyDeclared(name))
+	} else {
+		for _, name := range names {
+			if !o.hasOwnPropertyStr(name) && !o.isExtensible() {
+				panic(vm.r.NewTypeError("Cannot define global variable '%s', global object is not extensible", name))
+			}
+			if _, exists := sn[name]; exists {
+				panic(vm.alreadyDeclared(name))
+			}
 		}
 	}
 }
@@ -2602,10 +2614,75 @@ func (vm *vm) createGlobalVarBindings(names []unistring.String, d bool) {
 		vm.r.global.varNames = globalVarNames
 	}
 	o := vm.r.globalObject.self
-	for _, name := range names {
-		o._putProp(name, _undefined, true, true, d)
+	if o, ok := o.(*baseObject); ok {
+		for _, name := range names {
+			if !o.hasOwnPropertyStr(name) && o.extensible {
+				o._putProp(name, _undefined, true, true, d)
+			}
+			globalVarNames[name] = struct{}{}
+		}
+	} else {
+		var cf Flag
+		if d {
+			cf = FLAG_TRUE
+		} else {
+			cf = FLAG_FALSE
+		}
+		for _, name := range names {
+			if !o.hasOwnPropertyStr(name) && o.isExtensible() {
+				o.defineOwnPropertyStr(name, PropertyDescriptor{
+					Value:        _undefined,
+					Writable:     FLAG_TRUE,
+					Enumerable:   FLAG_TRUE,
+					Configurable: cf,
+				}, true)
+				o.setOwnStr(name, _undefined, false)
+			}
+			globalVarNames[name] = struct{}{}
+		}
+	}
+}
+
+func (vm *vm) createGlobalFuncBindings(names []unistring.String, d bool) {
+	globalVarNames := vm.r.global.varNames
+	if globalVarNames == nil {
+		globalVarNames = make(map[unistring.String]struct{})
+		vm.r.global.varNames = globalVarNames
+	}
+	o := vm.r.globalObject.self
+	b := vm.sp - len(names)
+	var shortcutObj *baseObject
+	if o, ok := o.(*baseObject); ok {
+		shortcutObj = o
+	}
+	for i, name := range names {
+		var desc PropertyDescriptor
+		prop := o.getOwnPropStr(name)
+		desc.Value = vm.stack[b+i]
+		if shortcutObj != nil && prop == nil && shortcutObj.extensible {
+			shortcutObj._putProp(name, desc.Value, true, true, d)
+		} else {
+			if prop, ok := prop.(*valueProperty); ok && !prop.configurable {
+				// no-op
+			} else {
+				desc.Writable = FLAG_TRUE
+				desc.Enumerable = FLAG_TRUE
+				if d {
+					desc.Configurable = FLAG_TRUE
+				} else {
+					desc.Configurable = FLAG_FALSE
+				}
+			}
+			if shortcutObj != nil {
+				shortcutObj.defineOwnPropertyStr(name, desc, true)
+			} else {
+				o.defineOwnPropertyStr(name, desc, true)
+				o.setOwnStr(name, desc.Value, false) // not a bug, see https://262.ecma-international.org/#sec-createglobalfunctionbinding
+			}
+		}
 		globalVarNames[name] = struct{}{}
 	}
+	vm.sp = b
 }
 
 func (vm *vm) checkBindFuncsGlobal(names []unistring.String) {
@@ -2646,7 +2723,6 @@ func (vm *vm) checkBindLexGlobal(names []unistring.String) {
 	fail:
 		panic(vm.alreadyDeclared(name))
 	}
-	return
 }
 
 type bindVars struct {
@@ -2696,7 +2772,7 @@ func (b *bindGlobal) exec(vm *vm) {
 	for _, name := range b.consts {
 		s.createLexBinding(name, true)
 	}
-	vm.createGlobalVarBindings(b.funcs, b.deletable)
+	vm.createGlobalFuncBindings(b.funcs, b.deletable)
 	vm.createGlobalVarBindings(b.vars, b.deletable)
 	vm.pc++
 }

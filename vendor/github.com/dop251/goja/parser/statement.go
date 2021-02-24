@@ -473,6 +473,9 @@ func (self *_parser) parseForOrForInStatement() ast.Statement {
 						Binding: list[0],
 					}
 				} else {
+					if list[0].Initializer != nil {
+						self.error(list[0].Initializer.Idx0(), "for-in loop variable declaration may not have an initializer")
+					}
 					into = &ast.ForDeclaration{
 						Idx:     idx,
 						IsConst: tok == token.CONST,

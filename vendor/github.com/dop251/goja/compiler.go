@@ -642,6 +642,13 @@ func (c *compiler) compile(in *ast.Program, strict, eval, inGlobal bool) {
 	funcs := c.extractFunctions(in.Body)
 	c.createFunctionBindings(funcs)
 	numFuncs := len(scope.bindings)
+	if inGlobal && !ownVarScope {
+		if numFuncs == len(funcs) {
+			c.compileFunctionsGlobalAllUnique(funcs)
+		} else {
+			c.compileFunctionsGlobal(funcs)
+		}
+	}
 	c.compileDeclList(in.DeclarationList, false)
 	numVars := len(scope.bindings) - numFuncs
 	vars := make([]unistring.String, len(scope.bindings))
@@ -687,7 +694,9 @@ func (c *compiler) compile(in *ast.Program, strict, eval, inGlobal bool) {
 			consts: consts,
 		})
 	}
-	c.compileFunctions(funcs)
+	if !inGlobal || ownVarScope {
+		c.compileFunctions(funcs)
+	}
 	c.compileStatements(in.Body, true)
 	if enter != nil {
 		c.leaveScopeBlock(enter)
@@ -749,6 +758,31 @@ func (c *compiler) createFunctionBindings(funcs []*ast.FunctionDeclaration) {
 func (c *compiler) compileFunctions(list []*ast.FunctionDeclaration) {
 	for _, decl := range list {
 		c.compileFunction(decl)
+	}
+}
+
+func (c *compiler) compileFunctionsGlobalAllUnique(list []*ast.FunctionDeclaration) {
+	for _, decl := range list {
+		c.compileFunctionLiteral(decl.Function, false).emitGetter(true)
+	}
+}
+
+func (c *compiler) compileFunctionsGlobal(list []*ast.FunctionDeclaration) {
+	m := make(map[unistring.String]int, len(list))
+	for i := len(list) - 1; i >= 0; i-- {
+		name := list[i].Function.Name.Name
+		if _, exists := m[name]; !exists {
+			m[name] = i
+		}
+	}
+	for i, decl := range list {
+		if m[decl.Function.Name.Name] == i {
+			c.compileFunctionLiteral(decl.Function, false).emitGetter(true)
+		} else {
+			leave := c.enterDummyMode()
+			c.compileFunctionLiteral(decl.Function, false).emitGetter(false)
+			leave()
+		}
 	}
 }
 

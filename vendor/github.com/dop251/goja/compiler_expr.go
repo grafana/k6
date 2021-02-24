@@ -919,7 +919,7 @@ func (e *compiledFunctionLiteral) emitGetter(putOnStack bool) {
 	}
 }
 
-func (c *compiler) compileFunctionLiteral(v *ast.FunctionLiteral, isExpr bool) compiledExpr {
+func (c *compiler) compileFunctionLiteral(v *ast.FunctionLiteral, isExpr bool) *compiledFunctionLiteral {
 	strict := c.scope.strict || c.isStrictStatement(v.Body)
 	if v.Name != nil && strict {
 		c.checkIdentifierLName(v.Name.Name, int(v.Name.Idx)-1)
