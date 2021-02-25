@@ -67,7 +67,7 @@ func (o *Output) Description() string {
 	if o.filename == "" || o.filename == "-" {
 		return "json(stdout)"
 	}
-	return fmt.Sprintf("json(%s)", o.filename)
+	return fmt.Sprintf("json (%s)", o.filename)
 }
 
 // Start opens the tries to specified JSON file and starts the goroutine for

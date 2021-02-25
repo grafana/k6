@@ -49,8 +49,8 @@ func newJSONSample(sample stats.Sample) Sample {
 	}
 }
 
-// WrapSample is a used to package a metric sample in a way that's nice to
-// export to JSON.
+// WrapSample is used to package a metric sample in a way that's nice to export
+// to JSON.
 func WrapSample(sample stats.Sample) Envelope {
 	return Envelope{
 		Type:   "Point",

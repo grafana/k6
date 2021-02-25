@@ -130,7 +130,7 @@ func printExecutionDescription(
 		}
 	}
 
-	fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(strings.Join(outputDescriptions, ";")))
+	fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(strings.Join(outputDescriptions, ", ")))
 	fprintf(stdout, "\n")
 
 	maxDuration, _ := lib.GetEndOffset(execPlan)

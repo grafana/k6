@@ -113,7 +113,7 @@ func NewEngine(
 
 // StartOutputs spins up all configured outputs, giving the thresholds to any
 // that can accept them. And if some output fails, stop the already started
-// ones. This may take some time, since some outpts make initial network
+// ones. This may take some time, since some outputs make initial network
 // requests to set up whatever remote services are going to listen to them.
 //
 // TODO: this doesn't really need to be in the Engine, so take it out?
