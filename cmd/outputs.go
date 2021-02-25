@@ -34,7 +34,6 @@ import (
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/output"
-	"github.com/loadimpact/k6/output/extensions"
 	"github.com/loadimpact/k6/output/json"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/cloud"
@@ -123,7 +122,7 @@ func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, 
 		},
 	}
 
-	exts := extensions.GetAll()
+	exts := output.GetExtensions()
 	for k, v := range exts {
 		if _, ok := result[k]; ok {
 			return nil, fmt.Errorf("invalid output extension %s, built-in output with the same type already exists", k)

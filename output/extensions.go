@@ -18,47 +18,38 @@
  *
  */
 
-package extensions
+package output
 
 import (
 	"fmt"
 	"sync"
-
-	"github.com/loadimpact/k6/output"
 )
 
 //nolint:gochecknoglobals
 var (
-	modules = make(map[string]func(output.Params) (output.Output, error))
-	mx      sync.RWMutex
+	extensions = make(map[string]func(Params) (Output, error))
+	mx         sync.RWMutex
 )
 
-// GetAll returns all registered extensions.
-func GetAll() map[string]func(output.Params) (output.Output, error) {
+// GetExtensions returns all registered extensions.
+func GetExtensions() map[string]func(Params) (Output, error) {
 	mx.RLock()
 	defer mx.RUnlock()
-	res := make(map[string]func(output.Params) (output.Output, error), len(modules))
-	for k, v := range modules {
+	res := make(map[string]func(Params) (Output, error), len(extensions))
+	for k, v := range extensions {
 		res[k] = v
 	}
 	return res
 }
 
-// Get returns the output module constructor with the specified name.
-func Get(name string) func(output.Params) (output.Output, error) {
-	mx.RLock()
-	defer mx.RUnlock()
-	return modules[name]
-}
-
-// Register the given output module constructor. This function panics if a
-// module with the same name is already registered.
-func Register(name string, mod func(output.Params) (output.Output, error)) {
+// RegisterExtension registers the given output extension constructor. This
+// function panics if a module with the same name is already registered.
+func RegisterExtension(name string, mod func(Params) (Output, error)) {
 	mx.Lock()
 	defer mx.Unlock()
 
-	if _, ok := modules[name]; ok {
-		panic(fmt.Sprintf("output module already registered: %s", name))
+	if _, ok := extensions[name]; ok {
+		panic(fmt.Sprintf("output extension already registered: %s", name))
 	}
-	modules[name] = mod
+	extensions[name] = mod
 }
