@@ -65,7 +65,7 @@ func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, 
 			return newCollectorAdapter(params, influxc)
 		},
 		"cloud": func(params output.Params) (output.Output, error) {
-			conf, err := cloudapi.GetConsolidatedConfig(params.JSONConfig, params.Environment)
+			conf, err := cloudapi.GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument)
 			if err != nil {
 				return nil, err
 			}

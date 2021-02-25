@@ -267,7 +267,7 @@ func MergeFromExternal(external map[string]json.RawMessage, conf *Config) error 
 
 // GetConsolidatedConfig combines the default config values with the JSON config
 // values and environment variables and returns the final result.
-func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (Config, error) {
+func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, configArg string) (Config, error) {
 	result := NewConfig()
 	if jsonRawConf != nil {
 		jsonConf := Config{}
@@ -282,6 +282,11 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (
 		// TODO: get rid of envconfig and actually use the env parameter...
 		return result, err
 	}
+	result = result.Apply(envConfig)
 
-	return result.Apply(envConfig), nil
+	if configArg != "" {
+		result.Name = null.StringFrom(configArg)
+	}
+
+	return result, nil
 }

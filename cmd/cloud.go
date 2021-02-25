@@ -141,7 +141,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			}
 
 			// Cloud config
-			cloudConfig, err := cloudapi.GetConsolidatedConfig(derivedConf.Collectors["cloud"], osEnvironment)
+			cloudConfig, err := cloudapi.GetConsolidatedConfig(derivedConf.Collectors["cloud"], osEnvironment, "")
 			if err != nil {
 				return err
 			}
