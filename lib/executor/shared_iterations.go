@@ -151,6 +151,7 @@ func (sic SharedIterationsConfig) NewExecutor(
 	return &SharedIterations{
 		BaseExecutor: NewBaseExecutor(sic, es, logger),
 		config:       sic,
+		globalIter:   new(uint64),
 	}, nil
 }
 
@@ -158,8 +159,10 @@ func (sic SharedIterationsConfig) NewExecutor(
 // all shared by the configured VUs.
 type SharedIterations struct {
 	*BaseExecutor
-	config SharedIterationsConfig
-	et     *lib.ExecutionTuple
+	config     SharedIterationsConfig
+	et         *lib.ExecutionTuple
+	segIdx     *lib.SegmentedIndex
+	globalIter *uint64
 }
 
 // Make sure we implement the lib.Executor interface.
@@ -176,7 +179,22 @@ func (si *SharedIterations) Init(ctx context.Context) error {
 	// with no work, as determined by their config's HasWork() method.
 	et, err := si.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(si.config.VUs.Int64)
 	si.et = et
+	start, offsets, lcd := et.GetStripedOffsets()
+	si.segIdx = lib.NewSegmentedIndex(start, lcd, offsets)
+
 	return err
+}
+
+// incrGlobalIter increments the global iteration count for this executor,
+// taking into account the configured execution segment.
+func (si *SharedIterations) incrGlobalIter() {
+	si.segIdx.Next()
+	atomic.StoreUint64(si.globalIter, uint64(si.segIdx.GetUnscaled()))
+}
+
+// getGlobalIter returns the global iteration count for this executor.
+func (si *SharedIterations) getGlobalIter() uint64 {
+	return atomic.LoadUint64(si.globalIter)
 }
 
 // Run executes a specific total number of iterations, which are all shared by
@@ -230,14 +248,18 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 	}()
 
 	regDurationDone := regDurationCtx.Done()
-	runIteration := getIterationRunner(si.executionState, si.incrScenarioIter, si.logger)
+	runIteration := getIterationRunner(si.executionState, func() {
+		si.incrScenarioIter()
+		si.incrGlobalIter()
+	}, si.logger)
 
 	maxDurationCtx = lib.WithScenarioState(maxDurationCtx, &lib.ScenarioState{
-		Name:       si.config.Name,
-		Executor:   si.config.Type,
-		StartTime:  startTime,
-		ProgressFn: progressFn,
-		GetIter:    si.getScenarioIter,
+		Name:          si.config.Name,
+		Executor:      si.config.Type,
+		StartTime:     startTime,
+		ProgressFn:    progressFn,
+		GetIter:       si.getScenarioIter,
+		GetGlobalIter: si.getGlobalIter,
 	})
 
 	returnVU := func(u lib.InitializedVU) {
