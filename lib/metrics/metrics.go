@@ -24,7 +24,7 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-//TODO: refactor this, using non thread-safe global variables seems like a bad idea for various reasons...
+// TODO: refactor this, using non thread-safe global variables seems like a bad idea for various reasons...
 
 //nolint:gochecknoglobals
 var (
@@ -42,6 +42,7 @@ var (
 
 	// HTTP-related.
 	HTTPReqs              = stats.New("http_reqs", stats.Counter)
+	HTTPReqFailed         = stats.New("http_req_failed", stats.Rate)
 	HTTPReqDuration       = stats.New("http_req_duration", stats.Trend, stats.Time)
 	HTTPReqBlocked        = stats.New("http_req_blocked", stats.Trend, stats.Time)
 	HTTPReqConnecting     = stats.New("http_req_connecting", stats.Trend, stats.Time)

@@ -29,6 +29,7 @@ import (
 	"sync"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/stats"
 )
@@ -36,9 +37,10 @@ import (
 // transport is an implementation of http.RoundTripper that will measure and emit
 // different metrics for each roundtrip
 type transport struct {
-	ctx   context.Context
-	state *lib.State
-	tags  map[string]string
+	ctx              context.Context
+	state            *lib.State
+	tags             map[string]string
+	responseCallback func(int) bool
 
 	lastRequest     *unfinishedRequest
 	lastRequestLock *sync.Mutex
@@ -76,17 +78,20 @@ func newTransport(
 	ctx context.Context,
 	state *lib.State,
 	tags map[string]string,
+	responseCallback func(int) bool,
 ) *transport {
 	return &transport{
-		ctx:             ctx,
-		state:           state,
-		tags:            tags,
-		lastRequestLock: new(sync.Mutex),
+		ctx:              ctx,
+		state:            state,
+		tags:             tags,
+		responseCallback: responseCallback,
+		lastRequestLock:  new(sync.Mutex),
 	}
 }
 
 // Helper method to finish the tracer trail, assemble the tag values and emits
 // the metric samples for the supplied unfinished request.
+//nolint:nestif,funlen
 func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRequest {
 	trail := unfReq.tracer.Done()
 
@@ -101,7 +106,6 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 	}
 
 	enabledTags := t.state.Options.SystemTags
-
 	urlEnabled := enabledTags.Has(stats.TagURL)
 	var setName bool
 	if _, ok := tags["name"]; !ok && enabledTags.Has(stats.TagName) {
@@ -164,8 +168,35 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 			tags["ip"] = ip
 		}
 	}
+	var failed float64
+	if t.responseCallback != nil {
+		var statusCode int
+		if unfReq.response != nil {
+			statusCode = unfReq.response.StatusCode
+		}
+		expected := t.responseCallback(statusCode)
+		if !expected {
+			failed = 1
+		}
 
-	trail.SaveSamples(stats.IntoSampleTags(&tags))
+		if enabledTags.Has(stats.TagExpectedResponse) {
+			tags[stats.TagExpectedResponse.String()] = strconv.FormatBool(expected)
+		}
+	}
+
+	finalTags := stats.IntoSampleTags(&tags)
+	trail.SaveSamples(finalTags)
+	if t.responseCallback != nil {
+		trail.Failed.SetValid(true)
+		if failed == 1 {
+			trail.Failed.Bool = true
+		}
+		trail.Samples = append(trail.Samples,
+			stats.Sample{
+				Metric: metrics.HTTPReqFailed, Time: trail.EndTime, Tags: finalTags, Value: failed,
+			},
+		)
+	}
 	stats.PushIfNotDone(t.ctx, t.state.Samples, trail)
 
 	return result

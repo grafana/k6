@@ -382,6 +382,7 @@ func easyjson9def2ecdDecode(in *jlexer.Lexer, out *struct {
 	Sending        AggregatedMetric `json:"http_req_sending"`
 	Waiting        AggregatedMetric `json:"http_req_waiting"`
 	Receiving      AggregatedMetric `json:"http_req_receiving"`
+	Failed         AggregatedRate   `json:"http_req_failed,omitempty"`
 }) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
@@ -415,6 +416,8 @@ func easyjson9def2ecdDecode(in *jlexer.Lexer, out *struct {
 			easyjson9def2ecdDecodeGithubComLoadimpactK6StatsCloud4(in, &out.Waiting)
 		case "http_req_receiving":
 			easyjson9def2ecdDecodeGithubComLoadimpactK6StatsCloud4(in, &out.Receiving)
+		case "http_req_failed":
+			easyjson9def2ecdDecodeGithubComLoadimpactK6StatsCloud5(in, &out.Failed)
 		default:
 			in.SkipRecursive()
 		}
@@ -433,6 +436,7 @@ func easyjson9def2ecdEncode(out *jwriter.Writer, in struct {
 	Sending        AggregatedMetric `json:"http_req_sending"`
 	Waiting        AggregatedMetric `json:"http_req_waiting"`
 	Receiving      AggregatedMetric `json:"http_req_receiving"`
+	Failed         AggregatedRate   `json:"http_req_failed,omitempty"`
 }) {
 	out.RawByte('{')
 	first := true
@@ -471,6 +475,60 @@ func easyjson9def2ecdEncode(out *jwriter.Writer, in struct {
 		const prefix string = ",\"http_req_receiving\":"
 		out.RawString(prefix)
 		easyjson9def2ecdEncodeGithubComLoadimpactK6StatsCloud4(out, in.Receiving)
+	}
+	if (in.Failed).IsDefined() {
+		const prefix string = ",\"http_req_failed\":"
+		out.RawString(prefix)
+		easyjson9def2ecdEncodeGithubComLoadimpactK6StatsCloud5(out, in.Failed)
+	}
+	out.RawByte('}')
+}
+func easyjson9def2ecdDecodeGithubComLoadimpactK6StatsCloud5(in *jlexer.Lexer, out *AggregatedRate) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "count":
+			out.Count = float64(in.Float64())
+		case "nz_count":
+			out.NzCount = float64(in.Float64())
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson9def2ecdEncodeGithubComLoadimpactK6StatsCloud5(out *jwriter.Writer, in AggregatedRate) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"count\":"
+		out.RawString(prefix[1:])
+		out.Float64(float64(in.Count))
+	}
+	{
+		const prefix string = ",\"nz_count\":"
+		out.RawString(prefix)
+		out.Float64(float64(in.NzCount))
 	}
 	out.RawByte('}')
 }
@@ -530,7 +588,7 @@ func easyjson9def2ecdEncodeGithubComLoadimpactK6StatsCloud4(out *jwriter.Writer,
 	}
 	out.RawByte('}')
 }
-func easyjson9def2ecdDecodeGithubComLoadimpactK6StatsCloud5(in *jlexer.Lexer, out *Sample) {
+func easyjson9def2ecdDecodeGithubComLoadimpactK6StatsCloud6(in *jlexer.Lexer, out *Sample) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -571,7 +629,7 @@ func easyjson9def2ecdDecodeGithubComLoadimpactK6StatsCloud5(in *jlexer.Lexer, ou
 		in.Consumed()
 	}
 }
-func easyjson9def2ecdEncodeGithubComLoadimpactK6StatsCloud5(out *jwriter.Writer, in Sample) {
+func easyjson9def2ecdEncodeGithubComLoadimpactK6StatsCloud6(out *jwriter.Writer, in Sample) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -601,10 +659,10 @@ func easyjson9def2ecdEncodeGithubComLoadimpactK6StatsCloud5(out *jwriter.Writer,
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v Sample) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson9def2ecdEncodeGithubComLoadimpactK6StatsCloud5(w, v)
+	easyjson9def2ecdEncodeGithubComLoadimpactK6StatsCloud6(w, v)
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *Sample) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson9def2ecdDecodeGithubComLoadimpactK6StatsCloud5(l, v)
+	easyjson9def2ecdDecodeGithubComLoadimpactK6StatsCloud6(l, v)
 }

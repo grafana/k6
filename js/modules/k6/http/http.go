@@ -73,6 +73,8 @@ func (g *GlobalHTTP) NewModuleInstancePerVU() interface{} { // this here needs t
 		OCSP_REASON_REMOVE_FROM_CRL:        netext.OCSP_REASON_REMOVE_FROM_CRL,
 		OCSP_REASON_PRIVILEGE_WITHDRAWN:    netext.OCSP_REASON_PRIVILEGE_WITHDRAWN,
 		OCSP_REASON_AA_COMPROMISE:          netext.OCSP_REASON_AA_COMPROMISE,
+
+		responseCallback: defaultExpectedStatuses.match,
 	}
 }
 
@@ -97,6 +99,8 @@ type HTTP struct {
 	OCSP_REASON_REMOVE_FROM_CRL        string `js:"OCSP_REASON_REMOVE_FROM_CRL"`
 	OCSP_REASON_PRIVILEGE_WITHDRAWN    string `js:"OCSP_REASON_PRIVILEGE_WITHDRAWN"`
 	OCSP_REASON_AA_COMPROMISE          string `js:"OCSP_REASON_AA_COMPROMISE"`
+
+	responseCallback func(int) bool
 }
 
 func (*HTTP) XCookieJar(ctx *context.Context) *HTTPCookieJar {

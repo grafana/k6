@@ -329,12 +329,13 @@ func TestExecutionSchedulerSystemTags(t *testing.T) {
 	}()
 
 	expCommonTrailTags := stats.IntoSampleTags(&map[string]string{
-		"group":  "",
-		"method": "GET",
-		"name":   sr("HTTPBIN_IP_URL/"),
-		"url":    sr("HTTPBIN_IP_URL/"),
-		"proto":  "HTTP/1.1",
-		"status": "200",
+		"group":             "",
+		"method":            "GET",
+		"name":              sr("HTTPBIN_IP_URL/"),
+		"url":               sr("HTTPBIN_IP_URL/"),
+		"proto":             "HTTP/1.1",
+		"status":            "200",
+		"expected_response": "true",
 	})
 	expTrailPVUTagsRaw := expCommonTrailTags.CloneTags()
 	expTrailPVUTagsRaw["scenario"] = "per_vu_test"

@@ -103,18 +103,19 @@ type Request struct {
 
 // ParsedHTTPRequest a represantion of a request after it has been parsed from a user script
 type ParsedHTTPRequest struct {
-	URL          *URL
-	Body         *bytes.Buffer
-	Req          *http.Request
-	Timeout      time.Duration
-	Auth         string
-	Throw        bool
-	ResponseType ResponseType
-	Compressions []CompressionType
-	Redirects    null.Int
-	ActiveJar    *cookiejar.Jar
-	Cookies      map[string]*HTTPRequestCookie
-	Tags         map[string]string
+	URL              *URL
+	Body             *bytes.Buffer
+	Req              *http.Request
+	Timeout          time.Duration
+	Auth             string
+	Throw            bool
+	ResponseType     ResponseType
+	ResponseCallback func(int) bool
+	Compressions     []CompressionType
+	Redirects        null.Int
+	ActiveJar        *cookiejar.Jar
+	Cookies          map[string]*HTTPRequestCookie
+	Tags             map[string]string
 }
 
 // Matches non-compliant io.Closer implementations (e.g. zstd.Decoder)
@@ -139,7 +140,7 @@ func (r readCloser) Close() error {
 }
 
 func stdCookiesToHTTPRequestCookies(cookies []*http.Cookie) map[string][]*HTTPRequestCookie {
-	var result = make(map[string][]*HTTPRequestCookie, len(cookies))
+	result := make(map[string][]*HTTPRequestCookie, len(cookies))
 	for _, cookie := range cookies {
 		result[cookie.Name] = append(result[cookie.Name],
 			&HTTPRequestCookie{Name: cookie.Name, Value: cookie.Value})
@@ -249,7 +250,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		}
 	}
 
-	tracerTransport := newTransport(ctx, state, tags)
+	tracerTransport := newTransport(ctx, state, tags, preq.ResponseCallback)
 	var transport http.RoundTripper = tracerTransport
 
 	// Combine tags with common log fields
@@ -269,8 +270,26 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	}
 
 	if preq.Auth == "digest" {
+		// Until digest authentication is refactored, the first response will always
+		// be a 401 error, so we expect that.
+		if tracerTransport.responseCallback != nil {
+			originalResponseCallback := tracerTransport.responseCallback
+			tracerTransport.responseCallback = func(status int) bool {
+				tracerTransport.responseCallback = originalResponseCallback
+				return status == 401
+			}
+		}
 		transport = digestTransport{originalTransport: transport}
 	} else if preq.Auth == "ntlm" {
+		// The first response of NTLM auth may be a 401 error.
+		if tracerTransport.responseCallback != nil {
+			originalResponseCallback := tracerTransport.responseCallback
+			tracerTransport.responseCallback = func(status int) bool {
+				tracerTransport.responseCallback = originalResponseCallback
+				// ntlm is connection-level based so we could've already authorized the connection and to now reuse it
+				return status == 401 || originalResponseCallback(status)
+			}
+		}
 		transport = ntlmssp.Negotiator{RoundTripper: transport}
 	}
 
@@ -381,7 +400,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 // SetRequestCookies sets the cookies of the requests getting those cookies both from the jar and
 // from the reqCookies map. The Replace field of the HTTPRequestCookie will be taken into account
 func SetRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) {
-	var replacedCookies = make(map[string]struct{})
+	replacedCookies := make(map[string]struct{})
 	for key, reqCookie := range reqCookies {
 		req.AddCookie(&http.Cookie{Name: key, Value: reqCookie.Value})
 		if reqCookie.Replace {

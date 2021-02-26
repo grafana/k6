@@ -110,23 +110,30 @@ type SampleDataMap struct {
 // NewSampleFromTrail just creates a ready-to-send Sample instance
 // directly from a httpext.Trail.
 func NewSampleFromTrail(trail *httpext.Trail) *Sample {
+	length := 8
+	if trail.Failed.Valid {
+		length++
+	}
+
+	values := make(map[string]float64, length)
+	values[metrics.HTTPReqs.Name] = 1
+	values[metrics.HTTPReqDuration.Name] = stats.D(trail.Duration)
+	values[metrics.HTTPReqBlocked.Name] = stats.D(trail.Blocked)
+	values[metrics.HTTPReqConnecting.Name] = stats.D(trail.Connecting)
+	values[metrics.HTTPReqTLSHandshaking.Name] = stats.D(trail.TLSHandshaking)
+	values[metrics.HTTPReqSending.Name] = stats.D(trail.Sending)
+	values[metrics.HTTPReqWaiting.Name] = stats.D(trail.Waiting)
+	values[metrics.HTTPReqReceiving.Name] = stats.D(trail.Receiving)
+	if trail.Failed.Valid { // this is done so the adding of 1 map element doesn't reexpand the map as this is a hotpath
+		values[metrics.HTTPReqFailed.Name] = stats.B(trail.Failed.Bool)
+	}
 	return &Sample{
 		Type:   DataTypeMap,
 		Metric: "http_req_li_all",
 		Data: &SampleDataMap{
-			Time: toMicroSecond(trail.GetTime()),
-			Tags: trail.GetTags(),
-			Values: map[string]float64{
-				metrics.HTTPReqs.Name:        1,
-				metrics.HTTPReqDuration.Name: stats.D(trail.Duration),
-
-				metrics.HTTPReqBlocked.Name:        stats.D(trail.Blocked),
-				metrics.HTTPReqConnecting.Name:     stats.D(trail.Connecting),
-				metrics.HTTPReqTLSHandshaking.Name: stats.D(trail.TLSHandshaking),
-				metrics.HTTPReqSending.Name:        stats.D(trail.Sending),
-				metrics.HTTPReqWaiting.Name:        stats.D(trail.Waiting),
-				metrics.HTTPReqReceiving.Name:      stats.D(trail.Receiving),
-			},
+			Time:   toMicroSecond(trail.GetTime()),
+			Tags:   trail.GetTags(),
+			Values: values,
 		},
 	}
 }
@@ -146,6 +153,7 @@ type SampleDataAggregatedHTTPReqs struct {
 		Sending        AggregatedMetric `json:"http_req_sending"`
 		Waiting        AggregatedMetric `json:"http_req_waiting"`
 		Receiving      AggregatedMetric `json:"http_req_receiving"`
+		Failed         AggregatedRate   `json:"http_req_failed,omitempty"`
 	} `json:"values"`
 }
 
@@ -159,6 +167,9 @@ func (sdagg *SampleDataAggregatedHTTPReqs) Add(trail *httpext.Trail) {
 	sdagg.Values.Sending.Add(trail.Sending)
 	sdagg.Values.Waiting.Add(trail.Waiting)
 	sdagg.Values.Receiving.Add(trail.Receiving)
+	if trail.Failed.Valid {
+		sdagg.Values.Failed.Add(trail.Failed.Bool)
+	}
 }
 
 // CalcAverages calculates and sets all `Avg` properties in the `Values` struct
@@ -171,6 +182,25 @@ func (sdagg *SampleDataAggregatedHTTPReqs) CalcAverages() {
 	sdagg.Values.Sending.Calc(count)
 	sdagg.Values.Waiting.Calc(count)
 	sdagg.Values.Receiving.Calc(count)
+}
+
+// AggregatedRate is an aggregation of a Rate metric
+type AggregatedRate struct {
+	Count   float64 `json:"count"`
+	NzCount float64 `json:"nz_count"`
+}
+
+// Add a boolean to the aggregated rate
+func (ar *AggregatedRate) Add(b bool) {
+	ar.Count++
+	if b {
+		ar.NzCount++
+	}
+}
+
+// IsDefined implements easyjson.Optional
+func (ar AggregatedRate) IsDefined() bool {
+	return ar.Count != 0
 }
 
 // AggregatedMetric is used to store aggregated information for a

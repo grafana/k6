@@ -134,12 +134,14 @@ func (h *HTTP) parseRequest(
 			URL:    reqURL.GetURL(),
 			Header: make(http.Header),
 		},
-		Timeout:   60 * time.Second,
-		Throw:     state.Options.Throw.Bool,
-		Redirects: state.Options.MaxRedirects,
-		Cookies:   make(map[string]*httpext.HTTPRequestCookie),
-		Tags:      make(map[string]string),
+		Timeout:          60 * time.Second,
+		Throw:            state.Options.Throw.Bool,
+		Redirects:        state.Options.MaxRedirects,
+		Cookies:          make(map[string]*httpext.HTTPRequestCookie),
+		Tags:             make(map[string]string),
+		ResponseCallback: h.responseCallback,
 	}
+
 	if state.Options.DiscardResponseBodies.Bool {
 		result.ResponseType = httpext.ResponseTypeNone
 	} else {
@@ -349,6 +351,15 @@ func (h *HTTP) parseRequest(
 					return nil, err
 				}
 				result.ResponseType = responseType
+			case "responseCallback":
+				v := params.Get(k).Export()
+				if v == nil {
+					result.ResponseCallback = nil
+				} else if c, ok := v.(*expectedStatuses); ok {
+					result.ResponseCallback = c.match
+				} else {
+					return nil, fmt.Errorf("unsupported responseCallback")
+				}
 			}
 		}
 	}
