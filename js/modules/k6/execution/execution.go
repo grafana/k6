@@ -68,6 +68,9 @@ func (e *Execution) GetScenarioStats(ctx context.Context) (map[string]interface{
 		"progress":  progress,
 		"iteration": ss.GetIter(),
 	}
+	if ss.GetGlobalIter != nil {
+		out["iterationGlobal"] = ss.GetGlobalIter()
+	}
 
 	return out, nil
 }
