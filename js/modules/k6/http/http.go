@@ -30,7 +30,7 @@ import (
 )
 
 func init() {
-	modules.Register("k6/http", New())
+	modules.Register("k6/http", new(GlobalHTTP))
 }
 
 const (
@@ -45,6 +45,36 @@ const (
 
 // ErrJarForbiddenInInitContext is used when a cookie jar was made in the init context
 var ErrJarForbiddenInInitContext = common.NewInitContextError("Making cookie jars in the init context is not supported")
+
+// GlobalHTTP is a global HTTP module for a k6 instance/test run
+type GlobalHTTP struct{}
+
+var _ modules.HasModuleInstancePerVU = new(GlobalHTTP)
+
+// NewModuleInstancePerVU returns an HTTP instance for each VU
+func (g *GlobalHTTP) NewModuleInstancePerVU() interface{} { // this here needs to return interface{}
+	return &HTTP{ // change the below fields to be not writable or not fields
+		SSL_3_0:                            netext.SSL_3_0,
+		TLS_1_0:                            netext.TLS_1_0,
+		TLS_1_1:                            netext.TLS_1_1,
+		TLS_1_2:                            netext.TLS_1_2,
+		TLS_1_3:                            netext.TLS_1_3,
+		OCSP_STATUS_GOOD:                   netext.OCSP_STATUS_GOOD,
+		OCSP_STATUS_REVOKED:                netext.OCSP_STATUS_REVOKED,
+		OCSP_STATUS_SERVER_FAILED:          netext.OCSP_STATUS_SERVER_FAILED,
+		OCSP_STATUS_UNKNOWN:                netext.OCSP_STATUS_UNKNOWN,
+		OCSP_REASON_UNSPECIFIED:            netext.OCSP_REASON_UNSPECIFIED,
+		OCSP_REASON_KEY_COMPROMISE:         netext.OCSP_REASON_KEY_COMPROMISE,
+		OCSP_REASON_CA_COMPROMISE:          netext.OCSP_REASON_CA_COMPROMISE,
+		OCSP_REASON_AFFILIATION_CHANGED:    netext.OCSP_REASON_AFFILIATION_CHANGED,
+		OCSP_REASON_SUPERSEDED:             netext.OCSP_REASON_SUPERSEDED,
+		OCSP_REASON_CESSATION_OF_OPERATION: netext.OCSP_REASON_CESSATION_OF_OPERATION,
+		OCSP_REASON_CERTIFICATE_HOLD:       netext.OCSP_REASON_CERTIFICATE_HOLD,
+		OCSP_REASON_REMOVE_FROM_CRL:        netext.OCSP_REASON_REMOVE_FROM_CRL,
+		OCSP_REASON_PRIVILEGE_WITHDRAWN:    netext.OCSP_REASON_PRIVILEGE_WITHDRAWN,
+		OCSP_REASON_AA_COMPROMISE:          netext.OCSP_REASON_AA_COMPROMISE,
+	}
+}
 
 //nolint: golint
 type HTTP struct {
@@ -67,31 +97,6 @@ type HTTP struct {
 	OCSP_REASON_REMOVE_FROM_CRL        string `js:"OCSP_REASON_REMOVE_FROM_CRL"`
 	OCSP_REASON_PRIVILEGE_WITHDRAWN    string `js:"OCSP_REASON_PRIVILEGE_WITHDRAWN"`
 	OCSP_REASON_AA_COMPROMISE          string `js:"OCSP_REASON_AA_COMPROMISE"`
-}
-
-func New() *HTTP {
-	//TODO: move this as an anonymous struct somewhere...
-	return &HTTP{
-		SSL_3_0:                            netext.SSL_3_0,
-		TLS_1_0:                            netext.TLS_1_0,
-		TLS_1_1:                            netext.TLS_1_1,
-		TLS_1_2:                            netext.TLS_1_2,
-		TLS_1_3:                            netext.TLS_1_3,
-		OCSP_STATUS_GOOD:                   netext.OCSP_STATUS_GOOD,
-		OCSP_STATUS_REVOKED:                netext.OCSP_STATUS_REVOKED,
-		OCSP_STATUS_SERVER_FAILED:          netext.OCSP_STATUS_SERVER_FAILED,
-		OCSP_STATUS_UNKNOWN:                netext.OCSP_STATUS_UNKNOWN,
-		OCSP_REASON_UNSPECIFIED:            netext.OCSP_REASON_UNSPECIFIED,
-		OCSP_REASON_KEY_COMPROMISE:         netext.OCSP_REASON_KEY_COMPROMISE,
-		OCSP_REASON_CA_COMPROMISE:          netext.OCSP_REASON_CA_COMPROMISE,
-		OCSP_REASON_AFFILIATION_CHANGED:    netext.OCSP_REASON_AFFILIATION_CHANGED,
-		OCSP_REASON_SUPERSEDED:             netext.OCSP_REASON_SUPERSEDED,
-		OCSP_REASON_CESSATION_OF_OPERATION: netext.OCSP_REASON_CESSATION_OF_OPERATION,
-		OCSP_REASON_CERTIFICATE_HOLD:       netext.OCSP_REASON_CERTIFICATE_HOLD,
-		OCSP_REASON_REMOVE_FROM_CRL:        netext.OCSP_REASON_REMOVE_FROM_CRL,
-		OCSP_REASON_PRIVILEGE_WITHDRAWN:    netext.OCSP_REASON_PRIVILEGE_WITHDRAWN,
-		OCSP_REASON_AA_COMPROMISE:          netext.OCSP_REASON_AA_COMPROMISE,
-	}
 }
 
 func (*HTTP) XCookieJar(ctx *context.Context) *HTTPCookieJar {

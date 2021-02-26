@@ -169,7 +169,7 @@ func newRuntime(
 	ctx := new(context.Context)
 	*ctx = lib.WithState(tb.Context, state)
 	*ctx = common.WithRuntime(*ctx, rt)
-	rt.Set("http", common.Bind(rt, New(), ctx))
+	rt.Set("http", common.Bind(rt, new(GlobalHTTP).NewModuleInstancePerVU(), ctx))
 
 	return tb, state, samples, rt, ctx
 }

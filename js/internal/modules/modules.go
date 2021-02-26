@@ -35,7 +35,18 @@ var (
 func Get(name string) interface{} {
 	mx.RLock()
 	defer mx.RUnlock()
-	return modules[name]
+	mod := modules[name]
+	if i, ok := mod.(HasModuleInstancePerVU); ok {
+		return i.NewModuleInstancePerVU()
+	}
+	return mod
+}
+
+// HasModuleInstancePerVU should be implemented by all native Golang modules that
+// would require per-VU state. k6 will call their NewModuleInstancePerVU() methods
+// every time a VU imports the module and use its result as the returned object.
+type HasModuleInstancePerVU interface {
+	NewModuleInstancePerVU() interface{}
 }
 
 // Register the given mod as a JavaScript module, available

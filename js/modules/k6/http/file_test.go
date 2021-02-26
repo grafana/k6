@@ -80,7 +80,7 @@ func TestHTTPFile(t *testing.T) {
 					assert.Equal(t, tc.expErr, fmt.Sprintf("%s", val["value"]))
 				}()
 			}
-			h := New()
+			h := new(GlobalHTTP).NewModuleInstancePerVU().(*HTTP)
 			ctx := common.WithRuntime(context.Background(), rt)
 			out := h.File(ctx, tc.input, tc.args...)
 			assert.Equal(t, tc.expected, out)
