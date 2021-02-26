@@ -36,6 +36,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/output"
 	"github.com/loadimpact/k6/ui"
 	"github.com/loadimpact/k6/ui/pb"
 )
@@ -111,31 +112,25 @@ func modifyAndPrintBar(bar *pb.ProgressBar, options ...pb.ProgressBarOption) {
 // Print execution description for both cloud and local execution.
 // TODO: Clean this up as part of #1499 or #1427
 func printExecutionDescription(
-	execution, filename, output string, conf Config, et *lib.ExecutionTuple,
-	execPlan []lib.ExecutionStep, collectors []lib.Collector,
+	execution, filename, outputOverride string, conf Config, et *lib.ExecutionTuple,
+	execPlan []lib.ExecutionStep, outputs []output.Output,
 ) {
 	fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprint(execution))
 	fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
 
-	if execution == "local" {
-		out := "-"
-		link := ""
-
-		for idx, collector := range collectors {
-			if out != "-" {
-				out = out + "; " + conf.Out[idx]
-			} else {
-				out = conf.Out[idx]
-			}
-
-			if l := collector.Link(); l != "" {
-				link = link + " (" + l + ")"
-			}
+	var outputDescriptions []string
+	switch {
+	case outputOverride != "":
+		outputDescriptions = []string{outputOverride}
+	case len(outputs) == 0:
+		outputDescriptions = []string{"-"}
+	default:
+		for _, out := range outputs {
+			outputDescriptions = append(outputDescriptions, out.Description())
 		}
-		fprintf(stdout, "     output: %s%s\n", ui.ValueColor.Sprint(out), ui.ExtraColor.Sprint(link))
-	} else {
-		fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(output))
 	}
+
+	fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(strings.Join(outputDescriptions, ", ")))
 	fprintf(stdout, "\n")
 
 	maxDuration, _ := lib.GetEndOffset(execPlan)

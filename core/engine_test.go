@@ -41,17 +41,18 @@ import (
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/testutils/minirunner"
+	"github.com/loadimpact/k6/lib/testutils/mockoutput"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
+	"github.com/loadimpact/k6/output"
 	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/stats/dummy"
 )
 
 const isWindows = runtime.GOOS == "windows"
 
 // Wrapper around NewEngine that applies a logger and manages the options.
 func newTestEngine( //nolint:golint
-	t *testing.T, runCtx context.Context, runner lib.Runner, collectors []lib.Collector, opts lib.Options,
+	t *testing.T, runCtx context.Context, runner lib.Runner, outputs []output.Output, opts lib.Options,
 ) (engine *Engine, run func() error, wait func()) {
 	if runner == nil {
 		runner = &minirunner.MiniRunner{}
@@ -76,10 +77,8 @@ func newTestEngine( //nolint:golint
 	execScheduler, err := local.NewExecutionScheduler(runner, logger)
 	require.NoError(t, err)
 
-	engine, err = NewEngine(execScheduler, opts, lib.RuntimeOptions{}, logger)
+	engine, err = NewEngine(execScheduler, opts, lib.RuntimeOptions{}, outputs, logger)
 	require.NoError(t, err)
-
-	engine.Collectors = collectors
 
 	run, waitFn, err := engine.Init(globalCtx, runCtx)
 	require.NoError(t, err)
@@ -142,10 +141,9 @@ func TestEngineRun(t *testing.T) {
 			return nil
 		}}
 
-		c := &dummy.Collector{}
-
+		mockOutput := mockoutput.New()
 		ctx, cancel := context.WithCancel(context.Background())
-		_, run, wait := newTestEngine(t, ctx, runner, []lib.Collector{c}, lib.Options{
+		_, run, wait := newTestEngine(t, ctx, runner, []output.Output{mockOutput}, lib.Options{
 			VUs:        null.IntFrom(1),
 			Iterations: null.IntFrom(1),
 		})
@@ -158,7 +156,7 @@ func TestEngineRun(t *testing.T) {
 		wait()
 
 		found := 0
-		for _, s := range c.Samples {
+		for _, s := range mockOutput.Samples {
 			if s.Metric != testMetric {
 				continue
 			}
@@ -197,7 +195,7 @@ func TestEngineStopped(t *testing.T) {
 	e.Stop() // test that a second stop doesn't panic
 }
 
-func TestEngineCollector(t *testing.T) {
+func TestEngineOutput(t *testing.T) {
 	testMetric := stats.New("test_metric", stats.Trend)
 
 	runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
@@ -205,8 +203,8 @@ func TestEngineCollector(t *testing.T) {
 		return nil
 	}}
 
-	c := &dummy.Collector{}
-	e, run, wait := newTestEngine(t, nil, runner, []lib.Collector{c}, lib.Options{
+	mockOutput := mockoutput.New()
+	e, run, wait := newTestEngine(t, nil, runner, []output.Output{mockOutput}, lib.Options{
 		VUs:        null.IntFrom(1),
 		Iterations: null.IntFrom(1),
 	})
@@ -215,7 +213,7 @@ func TestEngineCollector(t *testing.T) {
 	wait()
 
 	cSamples := []stats.Sample{}
-	for _, sample := range c.Samples {
+	for _, sample := range mockOutput.Samples {
 		if sample.Metric == testMetric {
 			cSamples = append(cSamples, sample)
 		}
@@ -224,9 +222,9 @@ func TestEngineCollector(t *testing.T) {
 	if assert.NotNil(t, metric) {
 		sink := metric.Sink.(*stats.TrendSink)
 		if assert.NotNil(t, sink) {
-			numCollectorSamples := len(cSamples)
+			numOutputSamples := len(cSamples)
 			numEngineSamples := len(sink.Values)
-			assert.Equal(t, numEngineSamples, numCollectorSamples)
+			assert.Equal(t, numEngineSamples, numOutputSamples)
 		}
 	}
 }
@@ -361,8 +359,8 @@ func TestEngine_processThresholds(t *testing.T) {
 	}
 }
 
-func getMetricSum(collector *dummy.Collector, name string) (result float64) {
-	for _, sc := range collector.SampleContainers {
+func getMetricSum(mo *mockoutput.MockOutput, name string) (result float64) {
+	for _, sc := range mo.SampleContainers {
 		for _, s := range sc.GetSamples() {
 			if s.Metric.Name == name {
 				result += s.Value
@@ -372,8 +370,8 @@ func getMetricSum(collector *dummy.Collector, name string) (result float64) {
 	return
 }
 
-func getMetricCount(collector *dummy.Collector, name string) (result uint) {
-	for _, sc := range collector.SampleContainers {
+func getMetricCount(mo *mockoutput.MockOutput, name string) (result uint) {
+	for _, sc := range mo.SampleContainers {
 		for _, s := range sc.GetSamples() {
 			if s.Metric.Name == name {
 				result++
@@ -448,8 +446,8 @@ func TestSentReceivedMetrics(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		collector := &dummy.Collector{}
-		_, run, wait := newTestEngine(t, nil, r, []lib.Collector{collector}, lib.Options{
+		mockOutput := mockoutput.New()
+		_, run, wait := newTestEngine(t, nil, r, []output.Output{mockOutput}, lib.Options{
 			Iterations:            null.IntFrom(tc.Iterations),
 			VUs:                   null.IntFrom(tc.VUs),
 			Hosts:                 tb.Dialer.Hosts,
@@ -470,7 +468,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 		wait()
 
 		checkData := func(name string, expected int64) float64 {
-			data := getMetricSum(collector, name)
+			data := getMetricSum(mockOutput, name)
 			expectedDataMin := float64(expected * tc.Iterations)
 			expectedDataMax := float64((expected + ts.NumRequests*expectedHeaderMaxLength) * tc.Iterations)
 
@@ -582,8 +580,8 @@ func TestRunTags(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	collector := &dummy.Collector{}
-	_, run, wait := newTestEngine(t, nil, r, []lib.Collector{collector}, lib.Options{
+	mockOutput := mockoutput.New()
+	_, run, wait := newTestEngine(t, nil, r, []output.Output{mockOutput}, lib.Options{
 		Iterations:            null.IntFrom(3),
 		VUs:                   null.IntFrom(2),
 		Hosts:                 tb.Dialer.Hosts,
@@ -617,7 +615,7 @@ func TestRunTags(t *testing.T) {
 		return "the rainbow"
 	}
 
-	for _, s := range collector.Samples {
+	for _, s := range mockOutput.Samples {
 		for key, expVal := range runTagsMap {
 			val, ok := s.Tags.Get(key)
 
@@ -738,8 +736,8 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	collector := &dummy.Collector{}
-	engine, run, wait := newTestEngine(t, nil, runner, []lib.Collector{collector}, lib.Options{})
+	mockOutput := mockoutput.New()
+	engine, run, wait := newTestEngine(t, nil, runner, []output.Output{mockOutput}, lib.Options{})
 
 	errC := make(chan error)
 	go func() { errC <- run() }()
@@ -756,11 +754,11 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	// The 3.1 sleep in the default function would cause the first VU to complete 2 full iterations
 	// and stat executing its third one, while the second VU will only fully complete 1 iteration
 	// and will be canceled in the middle of its second one.
-	assert.Equal(t, 3.0, getMetricSum(collector, metrics.Iterations.Name))
+	assert.Equal(t, 3.0, getMetricSum(mockOutput, metrics.Iterations.Name))
 
 	// That means that we expect to see 8 HTTP requests in total, 3*2=6 from the complete iterations
 	// and one each from the two iterations that would be canceled in the middle of their execution
-	assert.Equal(t, 8.0, getMetricSum(collector, metrics.HTTPReqs.Name))
+	assert.Equal(t, 8.0, getMetricSum(mockOutput, metrics.HTTPReqs.Name))
 
 	// And we expect to see the data_received for all 8 of those requests. Previously, the data for
 	// the 8th request (the 3rd one in the first VU before the test ends) was cut off by the engine
@@ -769,7 +767,7 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	// it was interrupted.
 	dataReceivedExpectedMin := 15000.0 * 8
 	dataReceivedExpectedMax := (15000.0 + expectedHeaderMaxLength) * 8
-	dataReceivedActual := getMetricSum(collector, metrics.DataReceived.Name)
+	dataReceivedActual := getMetricSum(mockOutput, metrics.DataReceived.Name)
 	if dataReceivedActual < dataReceivedExpectedMin || dataReceivedActual > dataReceivedExpectedMax {
 		t.Errorf(
 			"The data_received sum should be in the interval [%f, %f] but was %f",
@@ -779,9 +777,9 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 
 	// Also, the interrupted iterations shouldn't affect the average iteration_duration in any way, only
 	// complete iterations should be taken into account
-	durationCount := float64(getMetricCount(collector, metrics.IterationDuration.Name))
+	durationCount := float64(getMetricCount(mockOutput, metrics.IterationDuration.Name))
 	assert.Equal(t, 3.0, durationCount)
-	durationSum := getMetricSum(collector, metrics.IterationDuration.Name)
+	durationSum := getMetricSum(mockOutput, metrics.IterationDuration.Name)
 	assert.InDelta(t, 3.35, durationSum/(1000*durationCount), 0.25)
 }
 
@@ -843,8 +841,8 @@ func TestMetricsEmission(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			collector := &dummy.Collector{}
-			engine, run, wait := newTestEngine(t, nil, runner, []lib.Collector{collector}, runner.GetOptions())
+			mockOutput := mockoutput.New()
+			engine, run, wait := newTestEngine(t, nil, runner, []output.Output{mockOutput}, runner.GetOptions())
 
 			errC := make(chan error)
 			go func() { errC <- run() }()
@@ -858,8 +856,8 @@ func TestMetricsEmission(t *testing.T) {
 				require.False(t, engine.IsTainted())
 			}
 
-			assert.Equal(t, tc.expIters, getMetricSum(collector, metrics.Iterations.Name))
-			assert.Equal(t, tc.expCount, getMetricSum(collector, "testcounter"))
+			assert.Equal(t, tc.expIters, getMetricSum(mockOutput, metrics.Iterations.Name))
+			assert.Equal(t, tc.expCount, getMetricSum(mockOutput, "testcounter"))
 		})
 	}
 }
@@ -961,8 +959,8 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 		},
 	}
 
-	c := &dummy.Collector{}
-	_, run, wait := newTestEngine(t, ctx, runner, []lib.Collector{c}, lib.Options{
+	mockOutput := mockoutput.New()
+	_, run, wait := newTestEngine(t, ctx, runner, []output.Output{mockOutput}, lib.Options{
 		VUs: null.IntFrom(1), Iterations: null.IntFrom(1),
 	})
 
@@ -970,7 +968,7 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 	wait()
 
 	var count float64
-	for _, sample := range c.Samples {
+	for _, sample := range mockOutput.Samples {
 		if sample.Metric == testMetric {
 			count += sample.Value
 		}

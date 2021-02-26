@@ -47,7 +47,7 @@ func TestGetStatus(t *testing.T) {
 	logger.SetOutput(testutils.NewTestOutput(t))
 	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, logger)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger)
 	require.NoError(t, err)
 
 	rw := httptest.NewRecorder()
@@ -101,7 +101,7 @@ func TestPatchStatus(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Options: options}, logger)
 			require.NoError(t, err)
-			engine, err := core.NewEngine(execScheduler, options, lib.RuntimeOptions{}, logger)
+			engine, err := core.NewEngine(execScheduler, options, lib.RuntimeOptions{}, nil, logger)
 			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()

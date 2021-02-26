@@ -21,6 +21,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
 	"syscall"
 
@@ -58,22 +59,33 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fs := afero.NewOsFs()
 
-			k6Conf, err := getConsolidatedConfig(fs, Config{}, nil)
-			if err != nil {
-				return err
-			}
-
 			currentDiskConf, configPath, err := readDiskConfig(fs)
 			if err != nil {
 				return err
 			}
 
+			currentJSONConfig := cloudapi.Config{}
+			currentJSONConfigRaw := currentDiskConf.Collectors["cloud"]
+			if currentJSONConfigRaw != nil {
+				// We only want to modify this config, see comment below
+				if jsonerr := json.Unmarshal(currentJSONConfigRaw, &currentJSONConfig); jsonerr != nil {
+					return jsonerr
+				}
+			}
+
+			// We want to use this fully consolidated config for things like
+			// host addresses, so users can overwrite them with env vars.
+			consolidatedCurrentConfig, err := cloudapi.GetConsolidatedConfig(currentJSONConfigRaw, buildEnvMap(os.Environ()), "")
+			if err != nil {
+				return err
+			}
+			// But we don't want to save them back to the JSON file, we only
+			// want to save what already existed there and the login details.
+			newCloudConf := currentJSONConfig
+
 			show := getNullBool(cmd.Flags(), "show")
 			reset := getNullBool(cmd.Flags(), "reset")
 			token := getNullString(cmd.Flags(), "token")
-
-			newCloudConf := cloudapi.NewConfig().Apply(currentDiskConf.Collectors.Cloud)
-
 			switch {
 			case reset.Valid:
 				newCloudConf.Token = null.StringFromPtr(nil)
@@ -104,7 +116,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 				email := vals["Email"].(string)
 				password := vals["Password"].(string)
 
-				client := cloudapi.NewClient(logger, "", k6Conf.Collectors.Cloud.Host.String, consts.Version)
+				client := cloudapi.NewClient(logger, "", consolidatedCurrentConfig.Host.String, consts.Version)
 				res, err := client.Login(email, password)
 				if err != nil {
 					return err
@@ -117,7 +129,10 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 				newCloudConf.Token = null.StringFrom(res.Token)
 			}
 
-			currentDiskConf.Collectors.Cloud = newCloudConf
+			currentDiskConf.Collectors["cloud"], err = json.Marshal(newCloudConf)
+			if err != nil {
+				return err
+			}
 			if err := writeDiskConfig(fs, configPath, currentDiskConf); err != nil {
 				return err
 			}

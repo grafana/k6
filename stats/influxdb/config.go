@@ -21,11 +21,13 @@
 package influxdb
 
 import (
+	"encoding/json"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/kelseyhightower/envconfig"
 	"github.com/kubernetes/helm/pkg/strvals"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
@@ -52,8 +54,9 @@ type Config struct {
 	TagsAsFields []string    `json:"tagsAsFields,omitempty" envconfig:"K6_INFLUXDB_TAGS_AS_FIELDS"`
 }
 
-func NewConfig() *Config {
-	c := &Config{
+// NewConfig creates a new InfluxDB output config with some default values.
+func NewConfig() Config {
+	c := Config{
 		Addr:             null.NewString("http://localhost:8086", false),
 		DB:               null.NewString("k6", false),
 		TagsAsFields:     []string{"vu", "iter", "url"},
@@ -135,6 +138,14 @@ func ParseMap(m map[string]interface{}) (Config, error) {
 	return c, err
 }
 
+// ParseJSON parses the supplied JSON into a Config.
+func ParseJSON(data json.RawMessage) (Config, error) {
+	conf := Config{}
+	err := json.Unmarshal(data, &conf)
+	return conf, err
+}
+
+// ParseURL parses the supplied URL into a Config.
 func ParseURL(text string) (Config, error) {
 	c := Config{}
 	u, err := url.Parse(text)
@@ -197,4 +208,34 @@ func ParseURL(text string) (Config, error) {
 		}
 	}
 	return c, err
+}
+
+// GetConsolidatedConfig combines {default config values + JSON config +
+// environment vars + URL config values}, and returns the final result.
+func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, url string) (Config, error) {
+	result := NewConfig()
+	if jsonRawConf != nil {
+		jsonConf, err := ParseJSON(jsonRawConf)
+		if err != nil {
+			return result, err
+		}
+		result = result.Apply(jsonConf)
+	}
+
+	envConfig := Config{}
+	if err := envconfig.Process("", &envConfig); err != nil {
+		// TODO: get rid of envconfig and actually use the env parameter...
+		return result, err
+	}
+	result = result.Apply(envConfig)
+
+	if url != "" {
+		urlConf, err := ParseURL(url)
+		if err != nil {
+			return result, err
+		}
+		result = result.Apply(urlConf)
+	}
+
+	return result, nil
 }
