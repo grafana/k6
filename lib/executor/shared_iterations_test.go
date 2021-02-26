@@ -22,6 +22,7 @@ package executor
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -33,6 +34,7 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/testutils/minirunner"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/stats"
 )
@@ -140,4 +142,57 @@ func TestSharedIterationsEmitDroppedIterations(t *testing.T) {
 	assert.Empty(t, logHook.Drain())
 	assert.Equal(t, int64(5), count)
 	assert.Equal(t, float64(95), sumMetricValues(engineOut, metrics.DroppedIterations.Name))
+}
+
+func TestSharedIterationsGlobalIters(t *testing.T) {
+	t.Parallel()
+
+	config := &SharedIterationsConfig{
+		VUs:         null.IntFrom(5),
+		Iterations:  null.IntFrom(50),
+		MaxDuration: types.NullDurationFrom(1 * time.Second),
+	}
+
+	testCases := []struct {
+		seq, seg string
+		expIters []uint64
+	}{
+		{"0,1/4,3/4,1", "0:1/4", []uint64{0, 2, 7, 12, 17, 22, 27, 32, 37, 42}},
+		{"0,1/4,3/4,1", "1/4:3/4", []uint64{0, 1, 3, 5, 6, 8, 10, 11, 13, 15, 16, 18, 20, 21, 23, 25, 26, 28, 30, 31, 33, 35, 36, 38, 40, 41, 43, 45, 46, 48}},
+		{"0,1/4,3/4,1", "3/4:1", []uint64{0, 4, 9, 14, 19, 24, 29, 34, 39, 44}},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("%s_%s", tc.seq, tc.seg), func(t *testing.T) {
+			ess, err := lib.NewExecutionSegmentSequenceFromString(tc.seq)
+			require.NoError(t, err)
+			seg, err := lib.NewExecutionSegmentFromString(tc.seg)
+			require.NoError(t, err)
+			et, err := lib.NewExecutionTuple(seg, &ess)
+			require.NoError(t, err)
+			es := lib.NewExecutionState(lib.Options{}, et, 5, 5)
+
+			runner := &minirunner.MiniRunner{}
+			ctx, cancel, executor, _ := setupExecutor(t, config, es, runner)
+			defer cancel()
+
+			gotIters := []uint64{}
+			var mx sync.Mutex
+			runner.Fn = func(ctx context.Context, _ chan<- stats.SampleContainer) error {
+				mx.Lock()
+				// Slight delay to ensure the lock is held long enough to
+				// minimize any chances of flakiness... :-/
+				time.Sleep(10 * time.Millisecond)
+				gotIters = append(gotIters, executor.(*SharedIterations).getGlobalIter())
+				mx.Unlock()
+				return nil
+			}
+
+			engineOut := make(chan stats.SampleContainer, 100)
+			err = executor.Run(ctx, engineOut)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expIters, gotIters)
+		})
+	}
 }
