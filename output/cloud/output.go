@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,8 +40,10 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/cloudapi"
+	"github.com/loadimpact/k6/output"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/lib/netext/httpext"
@@ -61,7 +64,6 @@ type Collector struct {
 	client         *cloudapi.Client
 	pushBufferPool sync.Pool
 
-	anonymous bool
 	runStatus lib.RunStatus
 
 	bufferMutex      sync.Mutex
@@ -81,27 +83,48 @@ type Collector struct {
 	// don't fit in the chosen ring buffer size, we could just send them along to the buffer unaggregated
 	aggrBuckets map[int64]map[[3]string]aggregationBucket
 
-	stopSendingMetricsCh chan struct{}
+	stopSendingMetrics chan struct{}
+	stopAggregation    chan struct{}
+	aggregationDone    *sync.WaitGroup
+	stopOutput         chan struct{}
+	outputDone         *sync.WaitGroup
 }
 
-// Verify that Collector implements lib.Collector
-var _ lib.Collector = &Collector{}
+// Verify that Output implements the wanted interfaces
+var _ interface {
+	output.WithRunStatusUpdates
+	output.WithThresholds
+} = &Collector{}
 
-// New creates a new cloud collector
-func New(
-	logger logrus.FieldLogger,
-	conf cloudapi.Config, scriptURL fmt.Stringer, opts lib.Options, executionPlan []lib.ExecutionStep, version string,
-) (*Collector, error) {
-	if err := cloudapi.MergeFromExternal(opts.External, &conf); err != nil {
+// New creates a new cloud collector.
+func New(params output.Params) (output.Output, error) {
+	return newOutput(params)
+}
+
+// New creates a new cloud collector.
+func newOutput(params output.Params) (*Collector, error) {
+	conf, err := cloudapi.GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument)
+	if err != nil {
 		return nil, err
 	}
 
-	if conf.AggregationPeriod.Duration > 0 && (opts.SystemTags.Has(stats.TagVU) || opts.SystemTags.Has(stats.TagIter)) {
+	if err := validateRequiredSystemTags(params.ScriptOptions.SystemTags); err != nil {
+		return nil, err
+	}
+
+	logger := params.Logger.WithFields(logrus.Fields{"output": "cloud"})
+
+	if err := cloudapi.MergeFromExternal(params.ScriptOptions.External, &conf); err != nil {
+		return nil, err
+	}
+
+	if conf.AggregationPeriod.Duration > 0 &&
+		(params.ScriptOptions.SystemTags.Has(stats.TagVU) || params.ScriptOptions.SystemTags.Has(stats.TagIter)) {
 		return nil, errors.New("aggregation cannot be enabled if the 'vu' or 'iter' system tag is also enabled")
 	}
 
 	if !conf.Name.Valid || conf.Name.String == "" {
-		scriptPath := scriptURL.String()
+		scriptPath := params.ScriptPath.String()
 		if scriptPath == "" {
 			// Script from stdin without a name, likely from stdin
 			return nil, errors.New("script name not set, please specify K6_CLOUD_NAME or options.ext.loadimpact.name")
@@ -113,12 +136,7 @@ func New(
 		conf.Name = null.StringFrom(TestName)
 	}
 
-	thresholds := make(map[string][]*stats.Threshold)
-	for name, t := range opts.Thresholds {
-		thresholds[name] = append(thresholds[name], t.Thresholds...)
-	}
-
-	duration, testEnds := lib.GetEndOffset(executionPlan)
+	duration, testEnds := lib.GetEndOffset(params.ExecutionPlan)
 	if !testEnds {
 		return nil, errors.New("tests with unspecified duration are not allowed when outputting data to k6 cloud")
 	}
@@ -139,30 +157,50 @@ func New(
 	}
 
 	return &Collector{
-		config:               conf,
-		thresholds:           thresholds,
-		client:               cloudapi.NewClient(logger, conf.Token.String, conf.Host.String, version),
-		anonymous:            !conf.Token.Valid,
-		executionPlan:        executionPlan,
-		duration:             int64(duration / time.Second),
-		opts:                 opts,
-		aggrBuckets:          map[int64]map[[3]string]aggregationBucket{},
-		stopSendingMetricsCh: make(chan struct{}),
-		logger:               logger,
+		config:        conf,
+		client:        cloudapi.NewClient(logger, conf.Token.String, conf.Host.String, consts.Version),
+		executionPlan: params.ExecutionPlan,
+		duration:      int64(duration / time.Second),
+		opts:          params.ScriptOptions,
+		aggrBuckets:   map[int64]map[[3]string]aggregationBucket{},
+		logger:        logger,
 		pushBufferPool: sync.Pool{
 			New: func() interface{} {
 				return &bytes.Buffer{}
 			},
 		},
+		stopSendingMetrics: make(chan struct{}),
+		stopAggregation:    make(chan struct{}),
+		aggregationDone:    &sync.WaitGroup{},
+		stopOutput:         make(chan struct{}),
+		outputDone:         &sync.WaitGroup{},
 	}, nil
 }
 
-// Init is called between the collector's creation and the call to Run().
-// You should do any lengthy setup here rather than in New.
-func (c *Collector) Init() error {
+// validateRequiredSystemTags checks if all required tags are present.
+func validateRequiredSystemTags(scriptTags *stats.SystemTagSet) error {
+	missingRequiredTags := []string{}
+	requiredTags := stats.TagName | stats.TagMethod | stats.TagStatus | stats.TagError | stats.TagCheck | stats.TagGroup
+	for _, tag := range stats.SystemTagSetValues() {
+		if requiredTags.Has(tag) && !scriptTags.Has(tag) {
+			missingRequiredTags = append(missingRequiredTags, tag.String())
+		}
+	}
+	if len(missingRequiredTags) > 0 {
+		return fmt.Errorf(
+			"the cloud output needs the following system tags enabled: %s",
+			strings.Join(missingRequiredTags, ", "),
+		)
+	}
+	return nil
+}
+
+// Start calls the k6 Cloud API to initialize the test run, and then starts the
+// goroutine that would listen for metric samples and send them to the cloud.
+func (c *Collector) Start() error {
 	if c.config.PushRefID.Valid {
 		c.referenceID = c.config.PushRefID.String
-		c.logger.WithField("referenceId", c.referenceID).Debug("Cloud: directly pushing metrics without init")
+		c.logger.WithField("referenceId", c.referenceID).Debug("directly pushing metrics without init")
 		return nil
 	}
 
@@ -192,76 +230,105 @@ func (c *Collector) Init() error {
 	if response.ConfigOverride != nil {
 		c.logger.WithFields(logrus.Fields{
 			"override": response.ConfigOverride,
-		}).Debug("Cloud: overriding config options")
+		}).Debug("overriding config options")
 		c.config = c.config.Apply(*response.ConfigOverride)
 	}
+
+	c.startBackgroundProcesses()
 
 	c.logger.WithFields(logrus.Fields{
 		"name":        c.config.Name,
 		"projectId":   c.config.ProjectID,
 		"duration":    c.duration,
 		"referenceId": c.referenceID,
-	}).Debug("Cloud: Initialized")
+	}).Debug("Started!")
 	return nil
 }
 
-// Link return a link that is shown to the user.
-func (c *Collector) Link() string {
-	return cloudapi.URLForResults(c.referenceID, c.config)
-}
-
-// Run is called in a goroutine and starts the collector. Should commit samples to the backend
-// at regular intervals and when the context is terminated.
-func (c *Collector) Run(ctx context.Context) {
-	wg := sync.WaitGroup{}
-	quit := ctx.Done()
+func (c *Collector) startBackgroundProcesses() {
 	aggregationPeriod := time.Duration(c.config.AggregationPeriod.Duration)
 	// If enabled, start periodically aggregating the collected HTTP trails
 	if aggregationPeriod > 0 {
-		wg.Add(1)
-		aggregationTicker := time.NewTicker(aggregationPeriod)
-		aggregationWaitPeriod := time.Duration(c.config.AggregationWaitPeriod.Duration)
-		signalQuit := make(chan struct{})
-		quit = signalQuit
-
+		c.aggregationDone.Add(1)
 		go func() {
-			defer wg.Done()
+			defer c.aggregationDone.Done()
+			aggregationWaitPeriod := time.Duration(c.config.AggregationWaitPeriod.Duration)
+			aggregationTicker := time.NewTicker(aggregationPeriod)
+			defer aggregationTicker.Stop()
+
 			for {
 				select {
-				case <-c.stopSendingMetricsCh:
+				case <-c.stopSendingMetrics:
 					return
 				case <-aggregationTicker.C:
 					c.aggregateHTTPTrails(aggregationWaitPeriod)
-				case <-ctx.Done():
+				case <-c.stopAggregation:
 					c.aggregateHTTPTrails(0)
 					c.flushHTTPTrails()
-					close(signalQuit)
 					return
 				}
 			}
 		}()
 	}
 
-	defer func() {
-		wg.Wait()
-		c.testFinished()
+	c.outputDone.Add(1)
+	go func() {
+		defer c.outputDone.Done()
+		pushTicker := time.NewTicker(time.Duration(c.config.MetricPushInterval.Duration))
+		defer pushTicker.Stop()
+		for {
+			select {
+			case <-c.stopSendingMetrics:
+				return
+			default:
+			}
+			select {
+			case <-c.stopOutput:
+				c.pushMetrics()
+				return
+			case <-pushTicker.C:
+				c.pushMetrics()
+			}
+		}
 	}()
+}
 
-	pushTicker := time.NewTicker(time.Duration(c.config.MetricPushInterval.Duration))
-	for {
-		select {
-		case <-c.stopSendingMetricsCh:
-			return
-		default:
-		}
-		select {
-		case <-quit:
-			c.pushMetrics()
-			return
-		case <-pushTicker.C:
-			c.pushMetrics()
-		}
+// Stop gracefully stops all metric emission from the output and when all metric
+// samples are emitted, it sends an API to the cloud to finish the test run.
+func (c *Collector) Stop() error {
+	c.logger.Debug("Stopping the cloud output...")
+	close(c.stopAggregation)
+	c.aggregationDone.Wait() // could be a no-op, if we have never started the aggregation
+	c.logger.Debug("Aggregation stopped, stopping metric emission...")
+	close(c.stopOutput)
+	c.outputDone.Wait()
+	c.logger.Debug("Metric emission stopped, calling cloud API...")
+	err := c.testFinished()
+	if err != nil {
+		c.logger.WithFields(logrus.Fields{"error": err}).Warn("Failed to send test finished to the cloud")
+	} else {
+		c.logger.Debug("Cloud output successfully stopped!")
 	}
+	return err
+}
+
+// Description returns the URL with the test run results.
+func (c *Collector) Description() string {
+	return fmt.Sprintf("cloud (%s)", cloudapi.URLForResults(c.referenceID, c.config))
+}
+
+// SetRunStatus receives the latest run status from the Engine.
+func (c *Collector) SetRunStatus(status lib.RunStatus) {
+	c.runStatus = status
+}
+
+// SetThresholds receives the thresholds before the output is Start()-ed.
+func (c *Collector) SetThresholds(scriptThresholds map[string]stats.Thresholds) {
+	thresholds := make(map[string][]*stats.Threshold)
+	for name, t := range scriptThresholds {
+		thresholds[name] = append(thresholds[name], t.Thresholds...)
+	}
+	c.thresholds = thresholds
 }
 
 func useCloudTags(source *httpext.Trail) *httpext.Trail {
@@ -282,11 +349,12 @@ func useCloudTags(source *httpext.Trail) *httpext.Trail {
 	return dest
 }
 
-// Collect receives a set of samples. This method is never called concurrently, and only while
-// the context for Run() is valid, but should defer as much work as possible to Run().
-func (c *Collector) Collect(sampleContainers []stats.SampleContainer) {
+// AddMetricSamples receives a set of metric samples. This method is never
+// called concurrently, so it defers as much of the work as possible to the
+// asynchronous goroutines initialized in Start().
+func (c *Collector) AddMetricSamples(sampleContainers []stats.SampleContainer) {
 	select {
-	case <-c.stopSendingMetricsCh:
+	case <-c.stopSendingMetrics:
 		return
 	default:
 	}
@@ -601,7 +669,7 @@ func (c *Collector) pushMetrics() {
 		if err != nil {
 			if c.shouldStopSendingMetrics(err) {
 				c.logger.WithError(err).Warn("Stopped sending metrics to cloud due to an error")
-				close(c.stopSendingMetricsCh)
+				close(c.stopSendingMetrics)
 				break
 			}
 			c.logger.WithError(err).Warn("Failed to send metrics to cloud")
@@ -613,9 +681,9 @@ func (c *Collector) pushMetrics() {
 	}).Debug("Pushing metrics to cloud finished")
 }
 
-func (c *Collector) testFinished() {
+func (c *Collector) testFinished() error {
 	if c.referenceID == "" || c.config.PushRefID.Valid {
-		return
+		return nil
 	}
 
 	testTainted := false
@@ -640,22 +708,7 @@ func (c *Collector) testFinished() {
 		runStatus = c.runStatus
 	}
 
-	err := c.client.TestFinished(c.referenceID, thresholdResults, testTainted, runStatus)
-	if err != nil {
-		c.logger.WithFields(logrus.Fields{
-			"error": err,
-		}).Warn("Failed to send test finished to cloud")
-	}
-}
-
-// GetRequiredSystemTags returns which sample tags are needed by this collector
-func (c *Collector) GetRequiredSystemTags() stats.SystemTagSet {
-	return stats.TagName | stats.TagMethod | stats.TagStatus | stats.TagError | stats.TagCheck | stats.TagGroup
-}
-
-// SetRunStatus Set run status
-func (c *Collector) SetRunStatus(status lib.RunStatus) {
-	c.runStatus = status
+	return c.client.TestFinished(c.referenceID, thresholdResults, testTainted, runStatus)
 }
 
 const expectedGzipRatio = 6 // based on test it is around 6.8, but we don't need to be that accurate
