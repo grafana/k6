@@ -179,7 +179,7 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 	}
 
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool,
+		InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool, //nolint:gosec
 		CipherSuites:       cipherSuites,
 		MinVersion:         uint16(tlsVersions.Min),
 		MaxVersion:         uint16(tlsVersions.Max),
@@ -244,6 +244,7 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 	return vu, nil
 }
 
+// Setup runs the setup function if there is one and sets the setupData to the returned value
 func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) error {
 	setupCtx, setupCancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.SetupFn))
 	defer setupCancel()

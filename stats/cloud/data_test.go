@@ -29,6 +29,7 @@ import (
 
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/lib/netext/httpext"
@@ -87,6 +88,105 @@ func TestSampleMarshaling(t *testing.T) {
 			}),
 			fmt.Sprintf(`{"type":"Points","metric":"http_req_li_all","data":{"time":"%d","type":"counter","values":{"http_req_blocked":0.001,"http_req_connecting":0.002,"http_req_duration":0.123,"http_req_receiving":0.006,"http_req_sending":0.004,"http_req_tls_handshaking":0.003,"http_req_waiting":0.005,"http_reqs":1}}}`, exptoMicroSecond),
 		},
+		{
+			NewSampleFromTrail(&httpext.Trail{
+				EndTime:        now,
+				Duration:       123000,
+				Blocked:        1000,
+				Connecting:     2000,
+				TLSHandshaking: 3000,
+				Sending:        4000,
+				Waiting:        5000,
+				Receiving:      6000,
+				Failed:         null.NewBool(false, true),
+			}),
+			fmt.Sprintf(`{"type":"Points","metric":"http_req_li_all","data":{"time":"%d","type":"counter","values":{"http_req_blocked":0.001,"http_req_connecting":0.002,"http_req_duration":0.123,"http_req_failed":0,"http_req_receiving":0.006,"http_req_sending":0.004,"http_req_tls_handshaking":0.003,"http_req_waiting":0.005,"http_reqs":1}}}`, exptoMicroSecond),
+		},
+		{
+			func() *Sample {
+				aggrData := &SampleDataAggregatedHTTPReqs{
+					Time: exptoMicroSecond,
+					Type: "aggregated_trend",
+					Tags: stats.IntoSampleTags(&map[string]string{"test": "mest"}),
+				}
+				aggrData.Add(
+					&httpext.Trail{
+						EndTime:        now,
+						Duration:       123000,
+						Blocked:        1000,
+						Connecting:     2000,
+						TLSHandshaking: 3000,
+						Sending:        4000,
+						Waiting:        5000,
+						Receiving:      6000,
+					},
+				)
+
+				aggrData.Add(
+					&httpext.Trail{
+						EndTime:        now,
+						Duration:       13000,
+						Blocked:        3000,
+						Connecting:     1000,
+						TLSHandshaking: 4000,
+						Sending:        5000,
+						Waiting:        8000,
+						Receiving:      8000,
+					},
+				)
+				aggrData.CalcAverages()
+
+				return &Sample{
+					Type:   DataTypeAggregatedHTTPReqs,
+					Metric: "http_req_li_all",
+					Data:   aggrData,
+				}
+			}(),
+			fmt.Sprintf(`{"type":"AggregatedPoints","metric":"http_req_li_all","data":{"time":"%d","type":"aggregated_trend","count":2,"tags":{"test":"mest"},"values":{"http_req_duration":{"min":0.013,"max":0.123,"avg":0.068},"http_req_blocked":{"min":0.001,"max":0.003,"avg":0.002},"http_req_connecting":{"min":0.001,"max":0.002,"avg":0.0015},"http_req_tls_handshaking":{"min":0.003,"max":0.004,"avg":0.0035},"http_req_sending":{"min":0.004,"max":0.005,"avg":0.0045},"http_req_waiting":{"min":0.005,"max":0.008,"avg":0.0065},"http_req_receiving":{"min":0.006,"max":0.008,"avg":0.007}}}}`, exptoMicroSecond),
+		},
+		{
+			func() *Sample {
+				aggrData := &SampleDataAggregatedHTTPReqs{
+					Time: exptoMicroSecond,
+					Type: "aggregated_trend",
+					Tags: stats.IntoSampleTags(&map[string]string{"test": "mest"}),
+				}
+				aggrData.Add(
+					&httpext.Trail{
+						EndTime:        now,
+						Duration:       123000,
+						Blocked:        1000,
+						Connecting:     2000,
+						TLSHandshaking: 3000,
+						Sending:        4000,
+						Waiting:        5000,
+						Receiving:      6000,
+						Failed:         null.BoolFrom(false),
+					},
+				)
+
+				aggrData.Add(
+					&httpext.Trail{
+						EndTime:        now,
+						Duration:       13000,
+						Blocked:        3000,
+						Connecting:     1000,
+						TLSHandshaking: 4000,
+						Sending:        5000,
+						Waiting:        8000,
+						Receiving:      8000,
+					},
+				)
+				aggrData.CalcAverages()
+
+				return &Sample{
+					Type:   DataTypeAggregatedHTTPReqs,
+					Metric: "http_req_li_all",
+					Data:   aggrData,
+				}
+			}(),
+			fmt.Sprintf(`{"type":"AggregatedPoints","metric":"http_req_li_all","data":{"time":"%d","type":"aggregated_trend","count":2,"tags":{"test":"mest"},"values":{"http_req_duration":{"min":0.013,"max":0.123,"avg":0.068},"http_req_blocked":{"min":0.001,"max":0.003,"avg":0.002},"http_req_connecting":{"min":0.001,"max":0.002,"avg":0.0015},"http_req_tls_handshaking":{"min":0.003,"max":0.004,"avg":0.0035},"http_req_sending":{"min":0.004,"max":0.005,"avg":0.0045},"http_req_waiting":{"min":0.005,"max":0.008,"avg":0.0065},"http_req_receiving":{"min":0.006,"max":0.008,"avg":0.007},"http_req_failed":{"count":1,"nz_count":0}}}}`, exptoMicroSecond),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -140,6 +240,7 @@ func getDurations(count int, min, multiplier float64) durations {
 	}
 	return data
 }
+
 func BenchmarkDurationBounds(b *testing.B) {
 	iqrRadius := 0.25 // If it's something different, the Q in IQR won't make much sense...
 	iqrLowerCoef := 1.5
@@ -223,7 +324,6 @@ func TestQuickSelectAndBounds(t *testing.T) {
 					assert.Equal(t, dataForSort[k], data.quickSelect(k))
 				})
 			}
-
 		})
 	}
 }

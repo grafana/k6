@@ -34,7 +34,7 @@ import (
 func TestTagURL(t *testing.T) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	rt.Set("http", common.Bind(rt, New(), nil))
+	rt.Set("http", common.Bind(rt, new(GlobalHTTP).NewModuleInstancePerVU(), nil))
 
 	testdata := map[string]struct{ u, n string }{
 		`http://localhost/anything/`:               {"http://localhost/anything/", "http://localhost/anything/"},

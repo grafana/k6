@@ -36,11 +36,11 @@ import (
 // Response is a representation of an HTTP response to be returned to the goja VM
 type Response struct {
 	*httpext.Response `js:"-"`
+	h                 *HTTP
 }
 
-func responseFromHttpext(resp *httpext.Response) *Response {
-	res := Response{resp}
-	return &res
+func (h *HTTP) responseFromHttpext(resp *httpext.Response) *Response {
+	return &Response{Response: resp, h: h}
 }
 
 // JSON parses the body of a response as json and returns it to the goja VM
@@ -159,9 +159,9 @@ func (res *Response) SubmitForm(args ...goja.Value) (*Response, error) {
 			q.Add(k, v.String())
 		}
 		requestURL.RawQuery = q.Encode()
-		return New().Request(res.GetCtx(), requestMethod, rt.ToValue(requestURL.String()), goja.Null(), requestParams)
+		return res.h.Request(res.GetCtx(), requestMethod, rt.ToValue(requestURL.String()), goja.Null(), requestParams)
 	}
-	return New().Request(res.GetCtx(), requestMethod, rt.ToValue(requestURL.String()), rt.ToValue(values), requestParams)
+	return res.h.Request(res.GetCtx(), requestMethod, rt.ToValue(requestURL.String()), rt.ToValue(values), requestParams)
 }
 
 // ClickLink parses the body as an html, looks for a link and than makes a request as if the link was
@@ -202,5 +202,5 @@ func (res *Response) ClickLink(args ...goja.Value) (*Response, error) {
 	}
 	requestURL := responseURL.ResolveReference(hrefURL)
 
-	return New().Get(res.GetCtx(), rt.ToValue(requestURL.String()), requestParams)
+	return res.h.Get(res.GetCtx(), rt.ToValue(requestURL.String()), requestParams)
 }

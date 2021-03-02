@@ -81,6 +81,7 @@ func TestRunES6String(t *testing.T) {
 	})
 }
 
+// TODO replace this with the Single version
 func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleContainer, method, url, name string, status int, group string) {
 	if name == "" {
 		name = url
@@ -130,6 +131,29 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleCo
 	assert.True(t, seenReceiving, "url %s didn't emit Receiving", url)
 }
 
+func assertRequestMetricsEmittedSingle(t *testing.T, sampleContainer stats.SampleContainer, expectedTags map[string]string, metrics []*stats.Metric, callback func(sample stats.Sample)) {
+	t.Helper()
+
+	metricMap := make(map[string]bool, len(metrics))
+	for _, m := range metrics {
+		metricMap[m.Name] = false
+	}
+	for _, sample := range sampleContainer.GetSamples() {
+		tags := sample.Tags.CloneTags()
+		v, ok := metricMap[sample.Metric.Name]
+		assert.True(t, ok, "unexpected metric %s", sample.Metric.Name)
+		assert.False(t, v, "second metric %s", sample.Metric.Name)
+		metricMap[sample.Metric.Name] = true
+		assert.EqualValues(t, expectedTags, tags, "%s", tags)
+		if callback != nil {
+			callback(sample)
+		}
+	}
+	for k, v := range metricMap {
+		assert.True(t, v, "didn't emit %s", k)
+	}
+}
+
 func newRuntime(
 	t testing.TB,
 ) (*httpmultibin.HTTPMultiBin, *lib.State, chan stats.SampleContainer, *goja.Runtime, *context.Context) {
@@ -169,7 +193,7 @@ func newRuntime(
 	ctx := new(context.Context)
 	*ctx = lib.WithState(tb.Context, state)
 	*ctx = common.WithRuntime(*ctx, rt)
-	rt.Set("http", common.Bind(rt, New(), ctx))
+	rt.Set("http", common.Bind(rt, new(GlobalHTTP).NewModuleInstancePerVU(), ctx))
 
 	return tb, state, samples, rt, ctx
 }
@@ -1945,26 +1969,28 @@ func TestRedirectMetricTags(t *testing.T) {
 
 	checkTags := func(sc stats.SampleContainer, expTags map[string]string) {
 		allSamples := sc.GetSamples()
-		assert.Len(t, allSamples, 8)
+		assert.Len(t, allSamples, 9)
 		for _, s := range allSamples {
 			assert.Equal(t, expTags, s.Tags.CloneTags())
 		}
 	}
 	expPOSTtags := map[string]string{
-		"group":  "",
-		"method": "POST",
-		"url":    sr("HTTPBIN_URL/redirect/post"),
-		"name":   sr("HTTPBIN_URL/redirect/post"),
-		"status": "301",
-		"proto":  "HTTP/1.1",
+		"group":             "",
+		"method":            "POST",
+		"url":               sr("HTTPBIN_URL/redirect/post"),
+		"name":              sr("HTTPBIN_URL/redirect/post"),
+		"status":            "301",
+		"proto":             "HTTP/1.1",
+		"expected_response": "true",
 	}
 	expGETtags := map[string]string{
-		"group":  "",
-		"method": "GET",
-		"url":    sr("HTTPBIN_URL/get"),
-		"name":   sr("HTTPBIN_URL/get"),
-		"status": "200",
-		"proto":  "HTTP/1.1",
+		"group":             "",
+		"method":            "GET",
+		"url":               sr("HTTPBIN_URL/get"),
+		"name":              sr("HTTPBIN_URL/get"),
+		"status":            "200",
+		"proto":             "HTTP/1.1",
+		"expected_response": "true",
 	}
 	checkTags(<-samples, expPOSTtags)
 	checkTags(<-samples, expGETtags)
