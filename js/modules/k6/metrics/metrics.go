@@ -22,6 +22,7 @@ package metrics
 
 import (
 	"errors"
+	"math"
 	"time"
 
 	"github.com/dop251/goja"
@@ -37,7 +38,10 @@ type Metric struct {
 }
 
 // ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
-var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
+var (
+	ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
+	ErrMetricsAddNan           = errors.New("adding a non number, non boolean to a metric")
+)
 
 func (mi *ModuleInstance) newMetric(call goja.ConstructorCall, t stats.MetricType) (*goja.Object, error) {
 	initEnv := mi.GetInitEnv()
@@ -89,6 +93,10 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 	vfloat := v.ToFloat()
 	if vfloat == 0 && v.ToBoolean() {
 		vfloat = 1.0
+	}
+
+	if math.IsNaN(vfloat) {
+		return false, ErrMetricsAddNan
 	}
 
 	sample := stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)}
