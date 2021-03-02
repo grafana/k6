@@ -246,7 +246,7 @@ func (b *Bundle) Instantiate(logger logrus.FieldLogger, vuID int64) (bi *BundleI
 		Runtime: rt,
 		Context: ctxPtr,
 		exports: make(map[string]goja.Callable),
-		env:     b.RuntimeOptions.Env,
+		env:     rt.Get("__ENV").Export().(map[string]string),
 	}
 
 	// Grab any exported functions that could be executed. These were

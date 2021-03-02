@@ -2004,3 +2004,26 @@ func TestComplicatedFileImportsForGRPC(t *testing.T) {
 		})
 	}
 }
+
+func TestSettingENVInInitContext(t *testing.T) {
+	script := `
+		__ENV.something = "1234"
+		exports.default = function(data) {
+			if (__ENV.something != "1234") {
+				throw new Error("wrong value for __ENV.something "+ __ENV.something);
+			}
+		}
+	`
+
+	r, err := getSimpleRunner(t, "/script.js", script)
+	require.NoError(t, err)
+
+	initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+	err = vu.RunOnce()
+	assert.NoError(t, err)
+}
