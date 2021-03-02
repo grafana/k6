@@ -83,11 +83,8 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 		return false, ErrMetricsAddInInitContext
 	}
 
-	tags := state.CloneTags()
-	for _, ts := range addTags {
-		for k, v := range ts {
-			tags[k] = v
-		}
+	if goja.IsNull(v) {
+		return false, ErrMetricsAddNan
 	}
 
 	vfloat := v.ToFloat()
@@ -97,6 +94,13 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 
 	if math.IsNaN(vfloat) {
 		return false, ErrMetricsAddNan
+	}
+
+	tags := state.CloneTags()
+	for _, ts := range addTags {
+		for k, v := range ts {
+			tags[k] = v
+		}
 	}
 
 	sample := stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)}

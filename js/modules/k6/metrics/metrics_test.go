@@ -54,10 +54,11 @@ func TestMetrics(t *testing.T) {
 		"Int":       {JS: `5`, Float: 5.0},
 		"True":      {JS: `true`, Float: 1.0},
 		"False":     {JS: `false`, Float: 0.0},
-		"null":      {JS: `null`, Float: 0},
-		"undefined": {`undefined`, 0, true},
-		"NaN":       {`NaN`, 0, true},
-		"string":    {`"string"`, 0, true},
+		"null":      {JS: `null`, isError: true},
+		"undefined": {JS: `undefined`, isError: true},
+		"NaN":       {JS: `NaN`, isError: true},
+		"string":    {JS: `"string"`, isError: true},
+		"string 5":  {JS: `"5.3"`, Float: 5.3},
 	}
 	for fn, mtyp := range types {
 		fn, mtyp := fn, mtyp
