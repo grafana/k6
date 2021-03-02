@@ -25,3 +25,6 @@
 /vendor/**/*.y*ml
 /vendor/**/.*.y*ml
 /vendor/github.com/dlclark/regexp2/testoutput1
+
+/packaging/.env
+/packaging/*.gpg
