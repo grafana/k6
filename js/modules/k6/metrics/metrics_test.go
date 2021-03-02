@@ -50,15 +50,17 @@ func TestMetrics(t *testing.T) {
 		Float   float64
 		isError bool
 	}{
-		"Float":     {JS: `2.5`, Float: 2.5},
-		"Int":       {JS: `5`, Float: 5.0},
-		"True":      {JS: `true`, Float: 1.0},
-		"False":     {JS: `false`, Float: 0.0},
-		"null":      {JS: `null`, isError: true},
-		"undefined": {JS: `undefined`, isError: true},
-		"NaN":       {JS: `NaN`, isError: true},
-		"string":    {JS: `"string"`, isError: true},
-		"string 5":  {JS: `"5.3"`, Float: 5.3},
+		"Float":                 {JS: `2.5`, Float: 2.5},
+		"Int":                   {JS: `5`, Float: 5.0},
+		"True":                  {JS: `true`, Float: 1.0},
+		"False":                 {JS: `false`, Float: 0.0},
+		"null":                  {JS: `null`, isError: true},
+		"undefined":             {JS: `undefined`, isError: true},
+		"NaN":                   {JS: `NaN`, isError: true},
+		"string":                {JS: `"string"`, isError: true},
+		"string 5":              {JS: `"5.3"`, Float: 5.3},
+		"some object":           {JS: `{something: 3}`, isError: true},
+		"another metric object": {JS: `m`, isError: true},
 	}
 	for fn, mtyp := range types {
 		fn, mtyp := fn, mtyp
