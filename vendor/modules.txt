@@ -186,6 +186,11 @@ github.com/mitchellh/mapstructure
 github.com/nu7hatch/gouuid
 # github.com/onsi/ginkgo v1.14.0
 ## explicit
+# github.com/opentracing/opentracing-go v1.2.0
+## explicit
+github.com/opentracing/opentracing-go
+github.com/opentracing/opentracing-go/ext
+github.com/opentracing/opentracing-go/log
 # github.com/oxtoacart/bpool v0.0.0-20150712133111-4e1c5567d7c2
 ## explicit
 github.com/oxtoacart/bpool
@@ -221,7 +226,7 @@ github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.1
 ## explicit
 github.com/spf13/pflag
-# github.com/stretchr/testify v1.2.2 => github.com/stretchr/testify v1.2.1
+# github.com/stretchr/testify v1.3.0 => github.com/stretchr/testify v1.2.1
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
@@ -233,6 +238,29 @@ github.com/tidwall/match
 # github.com/tidwall/pretty v1.0.2
 ## explicit
 github.com/tidwall/pretty
+# github.com/uber/jaeger-client-go v2.25.0+incompatible
+## explicit
+github.com/uber/jaeger-client-go
+github.com/uber/jaeger-client-go/config
+github.com/uber/jaeger-client-go/internal/baggage
+github.com/uber/jaeger-client-go/internal/baggage/remote
+github.com/uber/jaeger-client-go/internal/reporterstats
+github.com/uber/jaeger-client-go/internal/spanlog
+github.com/uber/jaeger-client-go/internal/throttler
+github.com/uber/jaeger-client-go/internal/throttler/remote
+github.com/uber/jaeger-client-go/log
+github.com/uber/jaeger-client-go/rpcmetrics
+github.com/uber/jaeger-client-go/thrift
+github.com/uber/jaeger-client-go/thrift-gen/agent
+github.com/uber/jaeger-client-go/thrift-gen/baggage
+github.com/uber/jaeger-client-go/thrift-gen/jaeger
+github.com/uber/jaeger-client-go/thrift-gen/sampling
+github.com/uber/jaeger-client-go/thrift-gen/zipkincore
+github.com/uber/jaeger-client-go/transport
+github.com/uber/jaeger-client-go/utils
+# github.com/uber/jaeger-lib v2.4.0+incompatible
+## explicit
+github.com/uber/jaeger-lib/metrics
 # github.com/ugorji/go v1.1.7 => github.com/ugorji/go v0.0.0-20180112141927-9831f2c3ac10
 ## explicit
 github.com/ugorji/go/codec
@@ -248,6 +276,9 @@ github.com/valyala/fasttemplate
 # github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
 ## explicit
 github.com/zyedidia/highlight
+# go.uber.org/atomic v1.7.0
+## explicit
+go.uber.org/atomic
 # golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 ## explicit
 golang.org/x/crypto/acme

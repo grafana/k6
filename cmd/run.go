@@ -49,6 +49,13 @@ import (
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui/pb"
+
+	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/uber/jaeger-lib/metrics"
+
+	"github.com/uber/jaeger-client-go"
+	jaegercfg "github.com/uber/jaeger-client-go/config"
+	jaegerlog "github.com/uber/jaeger-client-go/log"
 )
 
 const (
@@ -147,6 +154,29 @@ a commandline interface for interacting with it.`,
 			if err = initRunner.SetOptions(conf.Options); err != nil {
 				return err
 			}
+
+			// Set up distributed tracing
+			cfg := jaegercfg.Configuration{
+				ServiceName: "k6",
+				Sampler: &jaegercfg.SamplerConfig{
+					Type:  jaeger.SamplerTypeConst,
+					Param: 1,
+				},
+				Reporter: &jaegercfg.ReporterConfig{
+					LogSpans: true,
+				},
+			}
+
+			jLogger := jaegerlog.StdLogger
+			jMetricsFactory := metrics.NullFactory
+
+			tracer, closer, err := cfg.NewTracer(
+				jaegercfg.Logger(jLogger),
+				jaegercfg.Metrics(jMetricsFactory),
+			)
+
+			opentracing.SetGlobalTracer(tracer)
+			defer closer.Close()
 
 			// We prepare a bunch of contexts:
 			//  - The runCtx is cancelled as soon as the Engine's run() lambda finishes,

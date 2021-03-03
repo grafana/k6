@@ -50,6 +50,7 @@ require (
 	github.com/mitchellh/mapstructure v0.0.0-20180220230111-00c29f56e238
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	github.com/onsi/ginkgo v1.14.0 // indirect
+	github.com/opentracing/opentracing-go v1.2.0
 	github.com/oxtoacart/bpool v0.0.0-20150712133111-4e1c5567d7c2
 	github.com/pierrec/lz4 v1.0.2-0.20171218195038-2fcda4cb7018 // indirect
 	github.com/pierrec/xxHash v0.1.1 // indirect
@@ -61,14 +62,17 @@ require (
 	github.com/spf13/afero v1.1.1
 	github.com/spf13/cobra v0.0.4-0.20180629152535-a114f312e075
 	github.com/spf13/pflag v1.0.1
-	github.com/stretchr/testify v1.2.2
+	github.com/stretchr/testify v1.3.0
 	github.com/tidwall/gjson v1.6.1
 	github.com/tidwall/pretty v1.0.2
+	github.com/uber/jaeger-client-go v2.25.0+incompatible
+	github.com/uber/jaeger-lib v2.4.0+incompatible
 	github.com/ugorji/go v1.1.7 // indirect
 	github.com/urfave/negroni v0.3.1-0.20180130044549-22c5532ea862
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v0.0.0-20170224212429-dcecefd839c4 // indirect
 	github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
+	go.uber.org/atomic v1.7.0 // indirect
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/net v0.0.0-20201008223702-a5fa9d4b7c91
 	golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f // indirect
