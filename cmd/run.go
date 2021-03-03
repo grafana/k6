@@ -177,7 +177,7 @@ a commandline interface for interacting with it.`,
 				}
 
 				opentracing.SetGlobalTracer(tracer)
-				defer closer.Close()
+				defer closer.Close() //nolint:errcheck
 			}
 
 			// We prepare a bunch of contexts:
