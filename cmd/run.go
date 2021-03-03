@@ -155,22 +155,30 @@ a commandline interface for interacting with it.`,
 			}
 
 			// Set up distributed tracing
-			cfg := jaegercfg.Configuration{
-				ServiceName: "k6",
-				Sampler: &jaegercfg.SamplerConfig{
-					Type:  jaeger.SamplerTypeConst,
-					Param: 1,
-				},
+			if runtimeOptions.DistributedTracing.Bool {
+				cfg := jaegercfg.Configuration{
+					ServiceName: "k6",
+					Sampler: &jaegercfg.SamplerConfig{
+						Type:  jaeger.SamplerTypeConst,
+						Param: 1,
+					},
+					Tags: []opentracing.Tag{
+						{
+							Key:   "k6.version",
+							Value: consts.Version,
+						},
+					},
+				}
+
+				jMetricsFactory := metrics.NullFactory
+				tracer, closer, err := cfg.NewTracer(jaegercfg.Metrics(jMetricsFactory))
+				if err != nil {
+					logger.WithError(err).Error("failed start the distributed tracing instrumentation")
+				}
+
+				opentracing.SetGlobalTracer(tracer)
+				defer closer.Close()
 			}
-
-			jMetricsFactory := metrics.NullFactory
-
-			tracer, closer, err := cfg.NewTracer(
-				jaegercfg.Metrics(jMetricsFactory),
-			)
-
-			opentracing.SetGlobalTracer(tracer)
-			defer closer.Close()
 
 			// We prepare a bunch of contexts:
 			//  - The runCtx is cancelled as soon as the Engine's run() lambda finishes,

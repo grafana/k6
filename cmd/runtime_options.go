@@ -68,6 +68,7 @@ extended: base + Babel with ES2015 preset + core.js v2,
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
 	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
+	flags.Bool("distributed-tracing", false, "(experimental) enable distributed tracing support")
 	flags.String(
 		"summary-export",
 		"",
@@ -101,6 +102,7 @@ func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib
 		NoThresholds:         getNullBool(flags, "no-thresholds"),
 		NoSummary:            getNullBool(flags, "no-summary"),
 		SummaryExport:        getNullString(flags, "summary-export"),
+		DistributedTracing:   getNullBool(flags, "distributed-tracing"),
 		Env:                  make(map[string]string),
 	}
 
