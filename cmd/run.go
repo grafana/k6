@@ -55,7 +55,6 @@ import (
 
 	"github.com/uber/jaeger-client-go"
 	jaegercfg "github.com/uber/jaeger-client-go/config"
-	jaegerlog "github.com/uber/jaeger-client-go/log"
 )
 
 const (
@@ -164,11 +163,9 @@ a commandline interface for interacting with it.`,
 				},
 			}
 
-			jLogger := jaegerlog.StdLogger
 			jMetricsFactory := metrics.NullFactory
 
 			tracer, closer, err := cfg.NewTracer(
-				jaegercfg.Logger(jLogger),
 				jaegercfg.Metrics(jMetricsFactory),
 			)
 
