@@ -36,6 +36,7 @@ import (
 
 	"github.com/Azure/go-ntlmssp"
 	"github.com/sirupsen/logrus"
+	"github.com/uber/jaeger-client-go"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
@@ -366,6 +367,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		resp.Status = res.StatusCode
 		resp.StatusText = res.Status
 		resp.Proto = res.Proto
+		resp.TraceID = extractTraceID(httpSpan)
 
 		if res.TLS != nil {
 			resp.setTLSInfo(res.TLS)
@@ -423,4 +425,17 @@ func SetRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[str
 			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
 		}
 	}
+}
+
+// Reference: https://github.com/grafana/grafana/pull/28952
+func extractTraceID(sp opentracing.Span) string {
+	if sp == nil {
+		return ""
+	}
+	sctx, ok := sp.Context().(jaeger.SpanContext)
+	if !ok {
+		return ""
+	}
+
+	return sctx.TraceID().String()
 }

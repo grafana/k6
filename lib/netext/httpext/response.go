@@ -108,6 +108,7 @@ type Response struct {
 	Error          string                   `json:"error"`
 	ErrorCode      int                      `json:"error_code"`
 	Request        Request                  `json:"request"`
+	TraceID        string                   `json:"trace_id"`
 
 	cachedJSON    interface{}
 	validatedJSON bool
