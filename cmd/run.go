@@ -171,9 +171,9 @@ a commandline interface for interacting with it.`,
 				}
 
 				jMetricsFactory := metrics.NullFactory
-				tracer, closer, err := cfg.NewTracer(jaegercfg.Metrics(jMetricsFactory))
-				if err != nil {
-					logger.WithError(err).Error("failed start the distributed tracing instrumentation")
+				tracer, closer, tracerErr := cfg.NewTracer(jaegercfg.Metrics(jMetricsFactory))
+				if tracerErr != nil {
+					logger.WithError(tracerErr).Error("failed start the distributed tracing instrumentation")
 				}
 
 				opentracing.SetGlobalTracer(tracer)

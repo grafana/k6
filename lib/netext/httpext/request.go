@@ -337,7 +337,10 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	reqCtx, cancelFunc := context.WithTimeout(ctx, preq.Timeout)
 	defer cancelFunc()
 	mreq := preq.Req.WithContext(reqCtx)
-	tracer.Inject(httpSpan.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(mreq.Header))
+	injectErr := tracer.Inject(httpSpan.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(mreq.Header))
+	if injectErr != nil {
+		state.Logger.Debug("Failed to inject distributed tracing span")
+	}
 	res, resErr := client.Do(mreq)
 	httpSpan.Finish()
 
