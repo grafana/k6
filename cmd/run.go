@@ -162,9 +162,6 @@ a commandline interface for interacting with it.`,
 					Type:  jaeger.SamplerTypeConst,
 					Param: 1,
 				},
-				Reporter: &jaegercfg.ReporterConfig{
-					LogSpans: true,
-				},
 			}
 
 			jLogger := jaegerlog.StdLogger
