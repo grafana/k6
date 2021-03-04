@@ -126,8 +126,8 @@ func getSampleChecker(t *testing.T, expSamples <-chan []Sample) http.HandlerFunc
 	}
 }
 
-func skewTrail(t httpext.Trail, minCoef, maxCoef float64) httpext.Trail {
-	coef := minCoef + rand.Float64()*(maxCoef-minCoef)
+func skewTrail(r *rand.Rand, t httpext.Trail, minCoef, maxCoef float64) httpext.Trail {
+	coef := minCoef + r.Float64()*(maxCoef-minCoef)
 	addJitter := func(d *time.Duration) {
 		*d = time.Duration(float64(*d) * coef)
 	}
@@ -158,6 +158,10 @@ func TestCloudOutput(t *testing.T) {
 }
 
 func runCloudOutputTestCase(t *testing.T, minSamples int) {
+	seed := time.Now().UnixNano()
+	r := rand.New(rand.NewSource(seed)) //nolint:gosec
+	t.Logf("Random source seeded with %d\n", seed)
+
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := fmt.Fprintf(w, `{
@@ -254,7 +258,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 	trails := []stats.SampleContainer{}
 	durations := make([]time.Duration, len(trails))
 	for i := int64(0); i < out.config.AggregationMinSamples.Int64; i++ {
-		similarTrail := skewTrail(simpleTrail, 1.0, 1.0+smallSkew)
+		similarTrail := skewTrail(r, simpleTrail, 1.0, 1.0+smallSkew)
 		trails = append(trails, &similarTrail)
 		durations = append(durations, similarTrail.Duration)
 	}
@@ -269,7 +273,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 		assert.InEpsilon(t, normal, stats.ToD(aggr.Max), smallSkew)
 	}
 
-	outlierTrail := skewTrail(simpleTrail, 2.0+smallSkew, 3.0+smallSkew)
+	outlierTrail := skewTrail(r, simpleTrail, 2.0+smallSkew, 3.0+smallSkew)
 	trails = append(trails, &outlierTrail)
 	out.AddMetricSamples(trails)
 	expSamples <- []Sample{
