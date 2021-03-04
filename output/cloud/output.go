@@ -201,6 +201,7 @@ func (out *Output) Start() error {
 	if out.config.PushRefID.Valid {
 		out.referenceID = out.config.PushRefID.String
 		out.logger.WithField("referenceId", out.referenceID).Debug("directly pushing metrics without init")
+		out.startBackgroundProcesses()
 		return nil
 	}
 
