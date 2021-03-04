@@ -155,7 +155,7 @@ a commandline interface for interacting with it.`,
 			}
 
 			// Set up distributed tracing
-			if runtimeOptions.DistributedTracing.Bool {
+			if conf.Options.DistributedTracing.Bool {
 				cfg := jaegercfg.Configuration{
 					ServiceName: "k6",
 					Sampler: &jaegercfg.SamplerConfig{

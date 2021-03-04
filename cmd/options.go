@@ -99,6 +99,7 @@ func optionFlagSet() *pflag.FlagSet {
 		"Milliseconds are assumed if no unit is provided.\n"+
 		"Possible select values to return a single IP are: 'first', 'random' or 'roundRobin'.\n"+
 		"Possible policy values are: 'preferIPv4', 'preferIPv6', 'onlyIPv4', 'onlyIPv6' or 'any'.\n")
+	flags.Bool("distributed-tracing", false, "(experimental) enable distributed tracing support")
 	return flags
 }
 
@@ -122,6 +123,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		MinIterationDuration:  getNullDuration(flags, "min-iteration-duration"),
 		Throw:                 getNullBool(flags, "throw"),
 		DiscardResponseBodies: getNullBool(flags, "discard-response-bodies"),
+		DistributedTracing:    getNullBool(flags, "distributed-tracing"),
 		// Default values for options without CLI flags:
 		// TODO: find a saner and more dev-friendly and error-proof way to handle options
 		SetupTimeout:    types.NullDuration{Duration: types.Duration(60 * time.Second), Valid: false},
