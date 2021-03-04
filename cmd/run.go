@@ -485,7 +485,6 @@ func initJaegerTracer(logger *logrus.Logger) func() {
 		}),
 		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
-
 	if err != nil {
 		logger.WithError(err).Error("Error while starting the Jaeger exporter pipeline")
 	}
