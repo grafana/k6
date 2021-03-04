@@ -157,7 +157,7 @@ a commandline interface for interacting with it.`,
 
 			// Set up distributed tracing
 			if conf.Options.DistributedTracing.Bool {
-				flush := initJaegerTracer()
+				flush := initJaegerTracer(logger)
 				otel.SetTextMapPropagator(propagation.TraceContext{})
 				defer flush()
 			}
@@ -472,9 +472,9 @@ func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[strin
 	return consolidateErrorMessage(errs, "Could not save some summary information:")
 }
 
-func initJaegerTracer() func() {
+func initJaegerTracer(logger *logrus.Logger) func() {
 	// Create a Jaeger exporter and install it as a global tracer.
-	flush, _ := jaeger.InstallNewPipeline(
+	flush, err := jaeger.InstallNewPipeline(
 		jaeger.WithCollectorEndpoint("http://localhost:14268/api/traces"),
 		jaeger.WithProcess(jaeger.Process{
 			ServiceName: "k6",
@@ -485,5 +485,9 @@ func initJaegerTracer() func() {
 		}),
 		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
+
+	if err != nil {
+		logger.WithError(err).Error("Error while starting the Jaeger exporter pipeline")
+	}
 	return flush
 }
