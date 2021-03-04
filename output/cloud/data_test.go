@@ -320,7 +320,6 @@ func TestQuickSelectAndBounds(t *testing.T) {
 				assert.Equal(t, dataForSort, dataForSelect)
 
 				t.Run(fmt.Sprintf("bounds-tc%d", tcNum), func(t *testing.T) {
-					t.Parallel()
 					sortMin, sortMax := dataForSort.SortGetNormalBounds(tc.r, tc.l, tc.u, false)
 					selectMin, selectMax := dataForSelect.SelectGetNormalBounds(tc.r, tc.l, tc.u)
 					assert.Equal(t, sortMin, selectMin)
