@@ -121,6 +121,9 @@ This will set the default server used when just "-o influxdb" is passed.`,
 				return err
 			}
 
+			if config.Collectors == nil {
+				config.Collectors = make(map[string]json.RawMessage)
+			}
 			config.Collectors["influxdb"], err = json.Marshal(conf)
 			if err != nil {
 				return err
