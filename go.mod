@@ -7,8 +7,7 @@ require (
 	github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
 	github.com/GeertJohan/go.rice v0.0.0-20170420135705-c02ca9a983da
 	github.com/PuerkitoBio/goquery v1.3.0
-	github.com/Shopify/sarama v1.16.0
-	github.com/Shopify/toxiproxy v2.1.4+incompatible // indirect
+	github.com/Shopify/sarama v1.19.0
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v0.0.0-20190704151324-71eb68cc467c
 	github.com/andybalholm/cascadia v1.0.0 // indirect
@@ -16,9 +15,6 @@ require (
 	github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91 // indirect
 	github.com/dop251/goja v0.0.0-20210216182323-60bc6ebb9fc1
 	github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4
-	github.com/eapache/go-resiliency v1.1.0 // indirect
-	github.com/eapache/go-xerial-snappy v0.0.0-20160609142408-bb955e01b934 // indirect
-	github.com/eapache/queue v1.1.0 // indirect
 	github.com/fatih/color v1.5.0
 	github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
@@ -26,9 +22,6 @@ require (
 	github.com/gin-gonic/gin v1.1.5-0.20170702092826-d459835d2b07 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/golang/protobuf v1.4.3
-	github.com/golang/snappy v0.0.0-20170215233205-553a64147049 // indirect
-	github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f // indirect
-	github.com/gorilla/mux v1.6.1 // indirect
 	github.com/gorilla/websocket v1.4.2
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
@@ -50,11 +43,8 @@ require (
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/oxtoacart/bpool v0.0.0-20150712133111-4e1c5567d7c2
-	github.com/pierrec/lz4 v1.0.2-0.20171218195038-2fcda4cb7018 // indirect
-	github.com/pierrec/xxHash v0.1.1 // indirect
 	github.com/pkg/errors v0.8.0
 	github.com/pmezard/go-difflib v1.0.0
-	github.com/rcrowley/go-metrics v0.0.0-20180503174638-e2704e165165 // indirect
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/afero v1.1.1
@@ -72,6 +62,7 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.17.0
 	go.opentelemetry.io/otel v0.17.0
 	go.opentelemetry.io/otel/exporters/trace/jaeger v0.17.0
+	go.opentelemetry.io/otel/exporters/trace/zipkin v0.17.0
 	go.opentelemetry.io/otel/sdk v0.17.0
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/net v0.0.0-20201209123823-ac852fbbde11

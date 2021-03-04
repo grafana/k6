@@ -145,8 +145,9 @@ type ProducerMessage struct {
 	// least version 0.10.0.
 	Timestamp time.Time
 
-	retries int
-	flags   flagSet
+	retries     int
+	flags       flagSet
+	expectation chan *ProducerError
 }
 
 const producerMessageOverhead = 26 // the metadata overhead of CRC, flags, etc.
@@ -270,6 +271,9 @@ func (p *asyncProducer) dispatcher() {
 		version := 1
 		if p.conf.Version.IsAtLeast(V0_11_0_0) {
 			version = 2
+		} else if msg.Headers != nil {
+			p.returnError(msg, ConfigurationError("Producing headers requires Kafka at least v0.11"))
+			continue
 		}
 		if msg.byteSize(version) > p.conf.Producer.MaxMessageBytes {
 			p.returnError(msg, ErrMessageSizeTooLarge)
@@ -343,7 +347,14 @@ func (tp *topicProducer) partitionMessage(msg *ProducerMessage) error {
 	var partitions []int32
 
 	err := tp.breaker.Run(func() (err error) {
-		if tp.partitioner.RequiresConsistency() {
+		var requiresConsistency = false
+		if ep, ok := tp.partitioner.(DynamicConsistencyPartitioner); ok {
+			requiresConsistency = ep.MessageRequiresConsistency(msg)
+		} else {
+			requiresConsistency = tp.partitioner.RequiresConsistency()
+		}
+
+		if requiresConsistency {
 			partitions, err = tp.parent.client.Partitions(msg.Topic)
 		} else {
 			partitions, err = tp.parent.client.WritablePartitions(msg.Topic)

@@ -24,3 +24,4 @@ _testmain.go
 *.exe
 
 coverage.txt
+profile.out

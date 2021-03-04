@@ -11,11 +11,9 @@ github.com/GeertJohan/go.rice/embedded
 # github.com/PuerkitoBio/goquery v1.3.0
 ## explicit
 github.com/PuerkitoBio/goquery
-# github.com/Shopify/sarama v1.16.0
+# github.com/Shopify/sarama v1.19.0
 ## explicit
 github.com/Shopify/sarama
-# github.com/Shopify/toxiproxy v2.1.4+incompatible
-## explicit
 # github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 ## explicit
 github.com/Soontao/goHttpDigestClient
@@ -50,13 +48,10 @@ github.com/dop251/goja/unistring
 ## explicit
 github.com/dustin/go-humanize
 # github.com/eapache/go-resiliency v1.1.0
-## explicit
 github.com/eapache/go-resiliency/breaker
-# github.com/eapache/go-xerial-snappy v0.0.0-20160609142408-bb955e01b934
-## explicit
+# github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21
 github.com/eapache/go-xerial-snappy
 # github.com/eapache/queue v1.1.0
-## explicit
 github.com/eapache/queue
 # github.com/fatih/color v1.5.0
 ## explicit
@@ -97,14 +92,11 @@ github.com/golang/protobuf/ptypes/empty
 github.com/golang/protobuf/ptypes/struct
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
-# github.com/golang/snappy v0.0.0-20170215233205-553a64147049
-## explicit
+# github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db
 github.com/golang/snappy
-# github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f
-## explicit
+# github.com/gorilla/context v1.1.1
 github.com/gorilla/context
-# github.com/gorilla/mux v1.6.1
-## explicit
+# github.com/gorilla/mux v1.6.2
 github.com/gorilla/mux
 # github.com/gorilla/websocket v1.4.2
 ## explicit
@@ -188,23 +180,21 @@ github.com/mitchellh/mapstructure
 github.com/nu7hatch/gouuid
 # github.com/onsi/ginkgo v1.14.0
 ## explicit
+# github.com/openzipkin/zipkin-go v0.2.5
+github.com/openzipkin/zipkin-go/model
 # github.com/oxtoacart/bpool v0.0.0-20150712133111-4e1c5567d7c2
 ## explicit
 github.com/oxtoacart/bpool
-# github.com/pierrec/lz4 v1.0.2-0.20171218195038-2fcda4cb7018
-## explicit
+# github.com/pierrec/lz4 v1.0.2-0.20190131084431-473cd7ce01a1
 github.com/pierrec/lz4
-# github.com/pierrec/xxHash v0.1.1
-## explicit
-github.com/pierrec/xxHash/xxHash32
+github.com/pierrec/lz4/internal/xxh32
 # github.com/pkg/errors v0.8.0
 ## explicit
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
-# github.com/rcrowley/go-metrics v0.0.0-20180503174638-e2704e165165
-## explicit
+# github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
 github.com/rcrowley/go-metrics
 # github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 ## explicit
@@ -274,6 +264,9 @@ go.opentelemetry.io/otel/unit
 ## explicit
 go.opentelemetry.io/otel/exporters/trace/jaeger
 go.opentelemetry.io/otel/exporters/trace/jaeger/internal/gen-go/jaeger
+# go.opentelemetry.io/otel/exporters/trace/zipkin v0.17.0
+## explicit
+go.opentelemetry.io/otel/exporters/trace/zipkin
 # go.opentelemetry.io/otel/metric v0.17.0
 go.opentelemetry.io/otel/metric
 go.opentelemetry.io/otel/metric/global

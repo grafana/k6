@@ -55,6 +55,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
+	"go.opentelemetry.io/otel/exporters/trace/zipkin"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -156,10 +157,18 @@ a commandline interface for interacting with it.`,
 			}
 
 			// Set up distributed tracing
-			if conf.Options.DistributedTracing.Bool {
-				flush := initJaegerTracer(logger)
-				otel.SetTextMapPropagator(propagation.TraceContext{})
-				defer flush()
+			if conf.Options.DistributedTracing.Valid {
+				if conf.Options.DistributedTracing.String == "jaeger" {
+					flush := initJaegerTracer(logger)
+					otel.SetTextMapPropagator(propagation.TraceContext{})
+					defer flush()
+				} else if conf.Options.DistributedTracing.String == "zipkin" {
+					initZipkinTracer(logger)
+					otel.SetTextMapPropagator(propagation.TraceContext{})
+				} else {
+					// TODO: This is temporal. Will change if we move the set up to another place.
+					logger.Error("unknow distributed-tracing exporter ", conf.Options.DistributedTracing.String)
+				}
 			}
 
 			// We prepare a bunch of contexts:
@@ -489,4 +498,16 @@ func initJaegerTracer(logger *logrus.Logger) func() {
 		logger.WithError(err).Error("Error while starting the Jaeger exporter pipeline")
 	}
 	return flush
+}
+
+func initZipkinTracer(logger *logrus.Logger) {
+	// Create a Zipkin exporter and install it as a global tracer.
+	err := zipkin.InstallNewPipeline(
+		"http://localhost:9412/api/v2/spans",
+		"k6",
+		zipkin.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
+	)
+	if err != nil {
+		logger.WithError(err).Error("Error while starting the Zipkin exporter pipeline")
+	}
 }
