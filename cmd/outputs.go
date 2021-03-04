@@ -29,14 +29,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
-	"github.com/loadimpact/k6/cloudapi"
 	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/output"
+	"github.com/loadimpact/k6/output/cloud"
 	"github.com/loadimpact/k6/output/json"
 	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/stats/cloud"
 	"github.com/loadimpact/k6/stats/csv"
 	"github.com/loadimpact/k6/stats/datadog"
 	"github.com/loadimpact/k6/stats/influxdb"
@@ -49,7 +47,8 @@ import (
 func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, error), error) {
 	// Start with the built-in outputs
 	result := map[string]func(output.Params) (output.Output, error){
-		"json": json.New,
+		"json":  json.New,
+		"cloud": cloud.New,
 
 		// TODO: remove all of these
 		"influxdb": func(params output.Params) (output.Output, error) {
@@ -61,20 +60,7 @@ func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, 
 			if err != nil {
 				return nil, err
 			}
-			return newCollectorAdapter(params, influxc)
-		},
-		"cloud": func(params output.Params) (output.Output, error) {
-			conf, err := cloudapi.GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument)
-			if err != nil {
-				return nil, err
-			}
-			cloudc, err := cloud.New(
-				params.Logger, conf, params.ScriptPath, params.ScriptOptions, params.ExecutionPlan, consts.Version,
-			)
-			if err != nil {
-				return nil, err
-			}
-			return newCollectorAdapter(params, cloudc)
+			return newCollectorAdapter(params, influxc), nil
 		},
 		"kafka": func(params output.Params) (output.Output, error) {
 			conf, err := kafka.GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument)
@@ -85,7 +71,7 @@ func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, 
 			if err != nil {
 				return nil, err
 			}
-			return newCollectorAdapter(params, kafkac)
+			return newCollectorAdapter(params, kafkac), nil
 		},
 		"statsd": func(params output.Params) (output.Output, error) {
 			conf, err := statsd.GetConsolidatedConfig(params.JSONConfig, params.Environment)
@@ -96,7 +82,7 @@ func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, 
 			if err != nil {
 				return nil, err
 			}
-			return newCollectorAdapter(params, statsdc)
+			return newCollectorAdapter(params, statsdc), nil
 		},
 		"datadog": func(params output.Params) (output.Output, error) {
 			conf, err := datadog.GetConsolidatedConfig(params.JSONConfig, params.Environment)
@@ -107,7 +93,7 @@ func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, 
 			if err != nil {
 				return nil, err
 			}
-			return newCollectorAdapter(params, datadogc)
+			return newCollectorAdapter(params, datadogc), nil
 		},
 		"csv": func(params output.Params) (output.Output, error) {
 			conf, err := csv.GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument)
@@ -118,7 +104,7 @@ func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, 
 			if err != nil {
 				return nil, err
 			}
-			return newCollectorAdapter(params, csvc)
+			return newCollectorAdapter(params, csvc), nil
 		},
 	}
 
@@ -202,27 +188,12 @@ func parseOutputArgument(s string) (t, arg string) {
 
 // TODO: remove this after we transition every collector to the output interface
 
-func newCollectorAdapter(params output.Params, collector lib.Collector) (output.Output, error) {
-	// Check if all required tags are present
-	missingRequiredTags := []string{}
-	requiredTags := collector.GetRequiredSystemTags()
-	for _, tag := range stats.SystemTagSetValues() {
-		if requiredTags.Has(tag) && !params.ScriptOptions.SystemTags.Has(tag) {
-			missingRequiredTags = append(missingRequiredTags, tag.String())
-		}
-	}
-	if len(missingRequiredTags) > 0 {
-		return nil, fmt.Errorf(
-			"the specified output '%s' needs the following system tags enabled: %s",
-			params.OutputType, strings.Join(missingRequiredTags, ", "),
-		)
-	}
-
+func newCollectorAdapter(params output.Params, collector lib.Collector) output.Output {
 	return &collectorAdapter{
 		outputType: params.OutputType,
 		collector:  collector,
 		stopCh:     make(chan struct{}),
-	}, nil
+	}
 }
 
 // collectorAdapter is a _temporary_ fix until we move all of the old
@@ -259,15 +230,9 @@ func (ca *collectorAdapter) AddMetricSamples(samples []stats.SampleContainer) {
 	ca.collector.Collect(samples)
 }
 
-func (ca *collectorAdapter) SetRunStatus(latestStatus lib.RunStatus) {
-	ca.collector.SetRunStatus(latestStatus)
-}
-
 // Stop implements the new output interface.
 func (ca *collectorAdapter) Stop() error {
 	ca.runCtxCancel()
 	<-ca.stopCh
 	return nil
 }
-
-var _ output.WithRunStatusUpdates = &collectorAdapter{}

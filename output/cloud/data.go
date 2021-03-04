@@ -245,7 +245,9 @@ func (d durations) Less(i, j int) bool { return d[i] < d[j] }
 // Used when there are fewer samples in the bucket (so we can interpolate)
 // and for benchmark comparisons and verification of the quickselect
 // algorithm (it should return exactly the same results if interpolation isn't used).
-func (d durations) SortGetNormalBounds(radius, iqrLowerCoef, iqrUpperCoef float64, interpolate bool) (min, max time.Duration) {
+func (d durations) SortGetNormalBounds(
+	radius, iqrLowerCoef, iqrUpperCoef float64, interpolate bool,
+) (min, max time.Duration) {
 	if len(d) == 0 {
 		return
 	}
@@ -276,7 +278,7 @@ func (d durations) SortGetNormalBounds(radius, iqrLowerCoef, iqrUpperCoef float6
 
 	min = q1 - time.Duration(iqrLowerCoef*iqr) // lower fence, anything below this is an outlier
 	max = q3 + time.Duration(iqrUpperCoef*iqr) // upper fence, anything above this is an outlier
-	return
+	return min, max
 }
 
 // Reworked and translated in Go from:
@@ -288,7 +290,7 @@ func (d durations) SortGetNormalBounds(radius, iqrLowerCoef, iqrUpperCoef float6
 // that only depends on the sort.Interface methods, but that would
 // probably introduce some performance overhead because of the
 // dynamic dispatch.
-func (d durations) quickSelect(k int) time.Duration {
+func (d durations) quickSelect(k int) time.Duration { //nolint:gocognit
 	n := len(d)
 	l := 0
 	ir := n - 1

@@ -20,12 +20,7 @@
 
 package cloudapi
 
-import "fmt"
-
+// URLForResults returns the cloud URL with the test run results.
 func URLForResults(refID string, config Config) string {
-	path := "runs"
-	if config.Token.String == "" {
-		path = "anonymous"
-	}
-	return fmt.Sprintf("%s/%s/%s", config.WebAppURL.String, path, refID)
+	return config.WebAppURL.String + "/runs/" + refID
 }

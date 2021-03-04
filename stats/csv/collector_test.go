@@ -462,18 +462,6 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestGetRequiredSystemTags(t *testing.T) {
-	collector, err := New(
-		testutils.NewLogger(t),
-		afero.NewMemMapFs(),
-		stats.TagSet{"tag1": true, "tag2": false, "tag3": true},
-		Config{FileName: null.StringFrom("name"), SaveInterval: types.NewNullDuration(time.Duration(1), true)},
-	)
-	assert.NoError(t, err)
-	assert.NotNil(t, collector)
-	assert.Equal(t, stats.SystemTagSet(0), collector.GetRequiredSystemTags())
-}
-
 func TestLink(t *testing.T) {
 	collector, err := New(
 		testutils.NewLogger(t),

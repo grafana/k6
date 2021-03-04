@@ -29,7 +29,6 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/lib"
 	jsono "github.com/loadimpact/k6/output/json"
 	"github.com/loadimpact/k6/stats"
 	"github.com/loadimpact/k6/stats/influxdb"
@@ -100,14 +99,6 @@ func (c *Collector) Collect(scs []stats.SampleContainer) {
 func (c *Collector) Link() string {
 	return ""
 }
-
-// GetRequiredSystemTags returns which sample tags are needed by this collector
-func (c *Collector) GetRequiredSystemTags() stats.SystemTagSet {
-	return stats.SystemTagSet(0) // There are no required tags for this collector
-}
-
-// SetRunStatus does nothing in the Kafka collector
-func (c *Collector) SetRunStatus(status lib.RunStatus) {}
 
 func (c *Collector) formatSamples(samples stats.Samples) ([]string, error) {
 	var metrics []string

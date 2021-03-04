@@ -110,14 +110,6 @@ func (c *Collector) Run(ctx context.Context) {
 	}
 }
 
-// GetRequiredSystemTags Return the required system sample tags for the specific collector
-func (c *Collector) GetRequiredSystemTags() stats.SystemTagSet {
-	return stats.SystemTagSet(0) // no tags are required
-}
-
-// SetRunStatus does nothing in statsd collector
-func (c *Collector) SetRunStatus(status lib.RunStatus) {}
-
 // Collect metrics
 func (c *Collector) Collect(containers []stats.SampleContainer) {
 	var pointSamples []*Sample

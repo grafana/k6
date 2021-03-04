@@ -23,6 +23,7 @@ package cloud
 import (
 	"bytes"
 	"compress/gzip"
+	json "encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -36,29 +37,28 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/cloudapi"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext/httpext"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/output"
 	"github.com/loadimpact/k6/stats"
 )
 
 func BenchmarkAggregateHTTP(b *testing.B) {
-	options := lib.Options{
-		Duration: types.NullDurationFrom(1 * time.Second),
-	}
-
-	config := cloudapi.NewConfig().Apply(cloudapi.Config{
-		NoCompress:              null.BoolFrom(true),
-		AggregationCalcInterval: types.NullDurationFrom(time.Millisecond * 200),
-		AggregationPeriod:       types.NullDurationFrom(time.Millisecond * 200),
+	out, err := newOutput(output.Params{
+		Logger:     testutils.NewLogger(b),
+		JSONConfig: json.RawMessage(`{"noCompress": true, "aggregationCalcInterval": "200ms","aggregationPeriod": "200ms"}`),
+		ScriptOptions: lib.Options{
+			Duration:   types.NullDurationFrom(1 * time.Second),
+			SystemTags: &stats.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
 	})
-	collector, err := New(testutils.NewLogger(b), config, &url.URL{Path: "/script.js"}, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(b, err)
 	now := time.Now()
-	collector.referenceID = "something"
+	out.referenceID = "something"
 	containersCount := 500000
 
 	for _, tagCount := range []int{1, 5, 35, 315, 3645} {
@@ -79,10 +79,10 @@ func BenchmarkAggregateHTTP(b *testing.B) {
 					tags := generateTags(i, tagCount, map[string]string{"status": status})
 					container[i-1] = generateHTTPExtTrail(now, time.Duration(i), tags)
 				}
-				collector.Collect(container)
+				out.AddMetricSamples(container)
 				b.StartTimer()
-				collector.aggregateHTTPTrails(time.Millisecond * 200)
-				collector.bufferSamples = nil
+				out.aggregateHTTPTrails(time.Millisecond * 200)
+				out.bufferSamples = nil
 			}
 		})
 	}
@@ -289,9 +289,6 @@ func generateHTTPExtTrail(now time.Time, i time.Duration, tags *stats.SampleTags
 }
 
 func BenchmarkHTTPPush(b *testing.B) {
-	options := lib.Options{
-		Duration: types.NullDurationFrom(1 * time.Second),
-	}
 	tb := httpmultibin.NewHTTPMultiBin(b)
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := fmt.Fprint(w, `{
@@ -307,14 +304,22 @@ func BenchmarkHTTPPush(b *testing.B) {
 		},
 	)
 
-	config := cloudapi.NewConfig().Apply(cloudapi.Config{
-		Host:                    null.StringFrom(tb.ServerHTTP.URL),
-		AggregationCalcInterval: types.NullDurationFrom(time.Millisecond * 200),
-		AggregationPeriod:       types.NullDurationFrom(time.Millisecond * 200),
+	out, err := newOutput(output.Params{
+		Logger: testutils.NewLogger(b),
+		JSONConfig: json.RawMessage(fmt.Sprintf(`{
+			"host": "%s",
+			"noCompress": true,
+			"aggregationCalcInterval": "200ms",
+			"aggregationPeriod": "200ms"
+		}`, tb.ServerHTTP.URL)),
+		ScriptOptions: lib.Options{
+			Duration:   types.NullDurationFrom(1 * time.Second),
+			SystemTags: &stats.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
 	})
-	collector, err := New(testutils.NewLogger(b), config, &url.URL{Path: "/script.js"}, options, []lib.ExecutionStep{}, "1.0")
 	require.NoError(b, err)
-	collector.referenceID = "fake"
+	out.referenceID = "fake"
 
 	for _, count := range []int{1000, 5000, 50000, 100000, 250000} {
 		count := count
@@ -325,7 +330,7 @@ func BenchmarkHTTPPush(b *testing.B) {
 				b.StopTimer()
 				toSend := append([]*Sample{}, samples...)
 				b.StartTimer()
-				require.NoError(b, collector.PushMetric("fake", false, toSend))
+				require.NoError(b, out.PushMetric("fake", false, toSend))
 			}
 		})
 	}

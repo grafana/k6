@@ -129,6 +129,9 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 				newCloudConf.Token = null.StringFrom(res.Token)
 			}
 
+			if currentDiskConf.Collectors == nil {
+				currentDiskConf.Collectors = make(map[string]json.RawMessage)
+			}
 			currentDiskConf.Collectors["cloud"], err = json.Marshal(newCloudConf)
 			if err != nil {
 				return err
