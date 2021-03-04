@@ -43,7 +43,7 @@ func GetCPUTime() int64 {
 	return ts.Nano()
 }
 
-// Rusage is an alias for syscall.Rusage under linux environment.
+// Rusage is an alias for syscall.Rusage under linux non-appengine environment.
 type Rusage syscall.Rusage
 
 // GetRusage returns the resource usage of current process.

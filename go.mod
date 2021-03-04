@@ -91,5 +91,6 @@ replace (
 	github.com/stretchr/testify => github.com/stretchr/testify v1.2.1
 	github.com/ugorji/go => github.com/ugorji/go v0.0.0-20180112141927-9831f2c3ac10
 	golang.org/x/text => golang.org/x/text v0.3.0
+	google.golang.org/grpc => google.golang.org/grpc v1.31.1
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.1.1
 )

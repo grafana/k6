@@ -19,10 +19,7 @@
 // Package attributes defines a generic key/value store used in various gRPC
 // components.
 //
-// Experimental
-//
-// Notice: This package is EXPERIMENTAL and may be changed or removed in a
-// later release.
+// All APIs in this package are EXPERIMENTAL.
 package attributes
 
 import "fmt"

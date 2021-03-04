@@ -58,9 +58,9 @@ type PerRPCCredentials interface {
 type SecurityLevel int
 
 const (
-	// InvalidSecurityLevel indicates an invalid security level.
+	// Invalid indicates an invalid security level.
 	// The zero SecurityLevel value is invalid for backward compatibility.
-	InvalidSecurityLevel SecurityLevel = iota
+	Invalid SecurityLevel = iota
 	// NoSecurity indicates a connection is insecure.
 	NoSecurity
 	// IntegrityOnly indicates a connection only provides integrity protection.
@@ -92,7 +92,7 @@ type CommonAuthInfo struct {
 }
 
 // GetCommonAuthInfo returns the pointer to CommonAuthInfo struct.
-func (c CommonAuthInfo) GetCommonAuthInfo() CommonAuthInfo {
+func (c *CommonAuthInfo) GetCommonAuthInfo() *CommonAuthInfo {
 	return c
 }
 
@@ -229,16 +229,17 @@ func ClientHandshakeInfoFromContext(ctx context.Context) ClientHandshakeInfo {
 // or 3) CommonAuthInfo.SecurityLevel has an invalid zero value. For 2) and 3), it is for the purpose of backward-compatibility.
 //
 // This API is experimental.
-func CheckSecurityLevel(ai AuthInfo, level SecurityLevel) error {
+func CheckSecurityLevel(ctx context.Context, level SecurityLevel) error {
 	type internalInfo interface {
-		GetCommonAuthInfo() CommonAuthInfo
+		GetCommonAuthInfo() *CommonAuthInfo
 	}
-	if ai == nil {
-		return errors.New("AuthInfo is nil")
+	ri, _ := RequestInfoFromContext(ctx)
+	if ri.AuthInfo == nil {
+		return errors.New("unable to obtain SecurityLevel from context")
 	}
-	if ci, ok := ai.(internalInfo); ok {
+	if ci, ok := ri.AuthInfo.(internalInfo); ok {
 		// CommonAuthInfo.SecurityLevel has an invalid value.
-		if ci.GetCommonAuthInfo().SecurityLevel == InvalidSecurityLevel {
+		if ci.GetCommonAuthInfo().SecurityLevel == Invalid {
 			return nil
 		}
 		if ci.GetCommonAuthInfo().SecurityLevel < level {

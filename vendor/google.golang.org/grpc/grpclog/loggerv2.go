@@ -204,10 +204,7 @@ func (g *loggerT) V(l int) bool {
 // DepthLoggerV2, the below functions will be called with the appropriate stack
 // depth set for trivial functions the logger may ignore.
 //
-// Experimental
-//
-// Notice: This type is EXPERIMENTAL and may be changed or removed in a
-// later release.
+// This API is EXPERIMENTAL.
 type DepthLoggerV2 interface {
 	LoggerV2
 	// InfoDepth logs to INFO log at the specified depth. Arguments are handled in the manner of fmt.Print.

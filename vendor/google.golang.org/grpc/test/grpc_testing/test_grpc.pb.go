@@ -11,7 +11,7 @@ import (
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion7
+const _ = grpc.SupportPackageIsVersion6
 
 // TestServiceClient is the client API for TestService service.
 //
@@ -194,7 +194,7 @@ func (x *testServiceHalfDuplexCallClient) Recv() (*StreamingOutputCallResponse, 
 }
 
 // TestServiceServer is the server API for TestService service.
-// All implementations must embed UnimplementedTestServiceServer
+// All implementations should embed UnimplementedTestServiceServer
 // for forward compatibility
 type TestServiceServer interface {
 	// One empty request followed by one empty response.
@@ -217,41 +217,32 @@ type TestServiceServer interface {
 	// stream of responses are returned to the client when the server starts with
 	// first request.
 	HalfDuplexCall(TestService_HalfDuplexCallServer) error
-	mustEmbedUnimplementedTestServiceServer()
 }
 
-// UnimplementedTestServiceServer must be embedded to have forward compatible implementations.
+// UnimplementedTestServiceServer should be embedded to have forward compatible implementations.
 type UnimplementedTestServiceServer struct {
 }
 
-func (UnimplementedTestServiceServer) EmptyCall(context.Context, *Empty) (*Empty, error) {
+func (*UnimplementedTestServiceServer) EmptyCall(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EmptyCall not implemented")
 }
-func (UnimplementedTestServiceServer) UnaryCall(context.Context, *SimpleRequest) (*SimpleResponse, error) {
+func (*UnimplementedTestServiceServer) UnaryCall(context.Context, *SimpleRequest) (*SimpleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UnaryCall not implemented")
 }
-func (UnimplementedTestServiceServer) StreamingOutputCall(*StreamingOutputCallRequest, TestService_StreamingOutputCallServer) error {
+func (*UnimplementedTestServiceServer) StreamingOutputCall(*StreamingOutputCallRequest, TestService_StreamingOutputCallServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamingOutputCall not implemented")
 }
-func (UnimplementedTestServiceServer) StreamingInputCall(TestService_StreamingInputCallServer) error {
+func (*UnimplementedTestServiceServer) StreamingInputCall(TestService_StreamingInputCallServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamingInputCall not implemented")
 }
-func (UnimplementedTestServiceServer) FullDuplexCall(TestService_FullDuplexCallServer) error {
+func (*UnimplementedTestServiceServer) FullDuplexCall(TestService_FullDuplexCallServer) error {
 	return status.Errorf(codes.Unimplemented, "method FullDuplexCall not implemented")
 }
-func (UnimplementedTestServiceServer) HalfDuplexCall(TestService_HalfDuplexCallServer) error {
+func (*UnimplementedTestServiceServer) HalfDuplexCall(TestService_HalfDuplexCallServer) error {
 	return status.Errorf(codes.Unimplemented, "method HalfDuplexCall not implemented")
 }
-func (UnimplementedTestServiceServer) mustEmbedUnimplementedTestServiceServer() {}
 
-// UnsafeTestServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to TestServiceServer will
-// result in compilation errors.
-type UnsafeTestServiceServer interface {
-	mustEmbedUnimplementedTestServiceServer()
-}
-
-func RegisterTestServiceServer(s grpc.ServiceRegistrar, srv TestServiceServer) {
+func RegisterTestServiceServer(s *grpc.Server, srv TestServiceServer) {
 	s.RegisterService(&_TestService_serviceDesc, srv)
 }
 

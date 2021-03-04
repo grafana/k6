@@ -33,7 +33,6 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 	"google.golang.org/grpc/internal/grpcutil"
-	"google.golang.org/grpc/internal/transport/networktype"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -138,18 +137,11 @@ type http2Client struct {
 	connectionID uint64
 }
 
-func dial(ctx context.Context, fn func(context.Context, string) (net.Conn, error), addr resolver.Address, useProxy bool, grpcUA string) (net.Conn, error) {
+func dial(ctx context.Context, fn func(context.Context, string) (net.Conn, error), addr string) (net.Conn, error) {
 	if fn != nil {
-		return fn(ctx, addr.Addr)
+		return fn(ctx, addr)
 	}
-	networkType := "tcp"
-	if n, ok := networktype.Get(addr); ok {
-		networkType = n
-	}
-	if networkType == "tcp" && useProxy {
-		return proxyDial(ctx, addr.Addr, grpcUA)
-	}
-	return (&net.Dialer{}).DialContext(ctx, networkType, addr.Addr)
+	return (&net.Dialer{}).DialContext(ctx, "tcp", addr)
 }
 
 func isTemporary(err error) bool {
@@ -180,7 +172,7 @@ func newHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 		}
 	}()
 
-	conn, err := dial(connectCtx, opts.Dialer, addr, opts.UseProxy, opts.UserAgent)
+	conn, err := dial(connectCtx, opts.Dialer, addr.Addr)
 	if err != nil {
 		if opts.FailOnNonTempDialError {
 			return nil, connectionErrorf(isTemporary(err), err, "transport: error while dialing: %v", err)
@@ -233,18 +225,6 @@ func newHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 		conn, authInfo, err = transportCreds.ClientHandshake(connectCtx, addr.ServerName, conn)
 		if err != nil {
 			return nil, connectionErrorf(isTemporary(err), err, "transport: authentication handshake failed: %v", err)
-		}
-		for _, cd := range perRPCCreds {
-			if cd.RequireTransportSecurity() {
-				if ci, ok := authInfo.(interface {
-					GetCommonAuthInfo() credentials.CommonAuthInfo
-				}); ok {
-					secLevel := ci.GetCommonAuthInfo().SecurityLevel
-					if secLevel != credentials.InvalidSecurityLevel && secLevel < credentials.PrivacyAndIntegrity {
-						return nil, connectionErrorf(true, nil, "transport: cannot send secure credentials on an insecure connection")
-					}
-				}
-			}
 		}
 		isSecure = true
 		if transportCreds.Info().SecurityProtocol == "tls" {
@@ -501,14 +481,14 @@ func (t *http2Client) createHeaderFields(ctx context.Context, callHdr *CallHdr) 
 		for _, vv := range added {
 			for i, v := range vv {
 				if i%2 == 0 {
-					k = strings.ToLower(v)
+					k = v
 					continue
 				}
 				// HTTP doesn't allow you to set pseudoheaders after non pseudoheaders were set.
 				if isReservedHeader(k) {
 					continue
 				}
-				headerFields = append(headerFields, hpack.HeaderField{Name: k, Value: encodeMetadataHeader(k, v)})
+				headerFields = append(headerFields, hpack.HeaderField{Name: strings.ToLower(k), Value: encodeMetadataHeader(k, v)})
 			}
 		}
 	}
@@ -569,11 +549,8 @@ func (t *http2Client) getCallAuthData(ctx context.Context, audience string, call
 	// Note: if these credentials are provided both via dial options and call
 	// options, then both sets of credentials will be applied.
 	if callCreds := callHdr.Creds; callCreds != nil {
-		if callCreds.RequireTransportSecurity() {
-			ri, _ := credentials.RequestInfoFromContext(ctx)
-			if !t.isSecure || credentials.CheckSecurityLevel(ri.AuthInfo, credentials.PrivacyAndIntegrity) != nil {
-				return nil, status.Error(codes.Unauthenticated, "transport: cannot send secure credentials on an insecure connection")
-			}
+		if !t.isSecure && callCreds.RequireTransportSecurity() {
+			return nil, status.Error(codes.Unauthenticated, "transport: cannot send secure credentials on an insecure connection")
 		}
 		data, err := callCreds.GetRequestMetadata(ctx, audience)
 		if err != nil {
@@ -1229,8 +1206,8 @@ func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
 	state := &decodeState{}
 	// Initialize isGRPC value to be !initialHeader, since if a gRPC Response-Headers has already been received, then it means that the peer is speaking gRPC and we are in gRPC mode.
 	state.data.isGRPC = !initialHeader
-	if h2code, err := state.decodeHeader(frame); err != nil {
-		t.closeStream(s, err, true, h2code, status.Convert(err), nil, endStream)
+	if err := state.decodeHeader(frame); err != nil {
+		t.closeStream(s, err, true, http2.ErrCodeProtocol, status.Convert(err), nil, endStream)
 		return
 	}
 
@@ -1329,13 +1306,7 @@ func (t *http2Client) reader() {
 				if s != nil {
 					// use error detail to provide better err message
 					code := http2ErrConvTab[se.Code]
-					errorDetail := t.framer.fr.ErrorDetail()
-					var msg string
-					if errorDetail != nil {
-						msg = errorDetail.Error()
-					} else {
-						msg = "received invalid frame"
-					}
+					msg := t.framer.fr.ErrorDetail().Error()
 					t.closeStream(s, status.Error(code, msg), true, http2.ErrCodeProtocol, status.New(code, msg), nil, false)
 				}
 				continue
