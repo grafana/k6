@@ -811,7 +811,7 @@ func shouldUseComplexStaticContextMap(input []byte, start_pos uint, length uint,
 	} else {
 		var end_pos uint = start_pos + length
 		var combined_histo = [32]uint32{0}
-		var context_histo = [13][32]uint32{{0}}
+		var context_histo = [13][32]uint32{[32]uint32{0}}
 		var total uint32 = 0
 		var entropy [3]float64
 		var dummy uint

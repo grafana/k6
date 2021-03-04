@@ -245,7 +245,7 @@ package codec
 //     - critical shared objects that are read many times
 //       TypeInfos
 //     - pooled objects:
-//       decNaked, decNakedContainers, codecFner, typeInfoLoadArray,
+//       decNaked, decNakedContainers, codecFner, typeInfoLoadArray, 
 //     - small objects allocated independently, that we read/use much across threads:
 //       codecFn, typeInfo
 //     - Objects allocated independently and used a lot
