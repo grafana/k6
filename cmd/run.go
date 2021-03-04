@@ -503,7 +503,7 @@ func initJaegerTracer(logger *logrus.Logger) func() {
 func initZipkinTracer(logger *logrus.Logger) {
 	// Create a Zipkin exporter and install it as a global tracer.
 	err := zipkin.InstallNewPipeline(
-		"http://localhost:9412/api/v2/spans",
+		"http://localhost:9411/api/v2/spans",
 		"k6",
 		zipkin.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
