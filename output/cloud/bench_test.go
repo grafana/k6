@@ -47,7 +47,7 @@ import (
 )
 
 func BenchmarkAggregateHTTP(b *testing.B) {
-	collector, err := newOutput(output.Params{
+	out, err := newOutput(output.Params{
 		Logger:     testutils.NewLogger(b),
 		JSONConfig: json.RawMessage(`{"noCompress": true, "aggregationCalcInterval": "200ms","aggregationPeriod": "200ms"}`),
 		ScriptOptions: lib.Options{
@@ -58,7 +58,7 @@ func BenchmarkAggregateHTTP(b *testing.B) {
 	})
 	require.NoError(b, err)
 	now := time.Now()
-	collector.referenceID = "something"
+	out.referenceID = "something"
 	containersCount := 500000
 
 	for _, tagCount := range []int{1, 5, 35, 315, 3645} {
@@ -79,10 +79,10 @@ func BenchmarkAggregateHTTP(b *testing.B) {
 					tags := generateTags(i, tagCount, map[string]string{"status": status})
 					container[i-1] = generateHTTPExtTrail(now, time.Duration(i), tags)
 				}
-				collector.AddMetricSamples(container)
+				out.AddMetricSamples(container)
 				b.StartTimer()
-				collector.aggregateHTTPTrails(time.Millisecond * 200)
-				collector.bufferSamples = nil
+				out.aggregateHTTPTrails(time.Millisecond * 200)
+				out.bufferSamples = nil
 			}
 		})
 	}
@@ -304,7 +304,7 @@ func BenchmarkHTTPPush(b *testing.B) {
 		},
 	)
 
-	collector, err := newOutput(output.Params{
+	out, err := newOutput(output.Params{
 		Logger: testutils.NewLogger(b),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{
 			"host": "%s",
@@ -319,7 +319,7 @@ func BenchmarkHTTPPush(b *testing.B) {
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
 	require.NoError(b, err)
-	collector.referenceID = "fake"
+	out.referenceID = "fake"
 
 	for _, count := range []int{1000, 5000, 50000, 100000, 250000} {
 		count := count
@@ -330,7 +330,7 @@ func BenchmarkHTTPPush(b *testing.B) {
 				b.StopTimer()
 				toSend := append([]*Sample{}, samples...)
 				b.StartTimer()
-				require.NoError(b, collector.PushMetric("fake", false, toSend))
+				require.NoError(b, out.PushMetric("fake", false, toSend))
 			}
 		})
 	}
