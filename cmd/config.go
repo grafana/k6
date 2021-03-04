@@ -80,6 +80,9 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.NoUsageReport.Valid {
 		c.NoUsageReport = cfg.NoUsageReport
 	}
+	if len(cfg.Collectors) > 0 {
+		c.Collectors = cfg.Collectors
+	}
 	return c
 }
 
