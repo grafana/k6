@@ -158,14 +158,15 @@ a commandline interface for interacting with it.`,
 
 			// Set up distributed tracing
 			if conf.Options.DistributedTracing.Valid {
-				if conf.Options.DistributedTracing.String == "jaeger" {
+				switch conf.Options.DistributedTracing.String {
+				case "jaeger":
 					flush := initJaegerTracer(logger)
 					otel.SetTextMapPropagator(propagation.TraceContext{})
 					defer flush()
-				} else if conf.Options.DistributedTracing.String == "zipkin" {
+				case "zipkin":
 					initZipkinTracer(logger)
 					otel.SetTextMapPropagator(propagation.TraceContext{})
-				} else {
+				default:
 					// TODO: This is temporal. Will change if we move the set up to another place.
 					logger.Error("unknow distributed-tracing exporter ", conf.Options.DistributedTracing.String)
 				}
