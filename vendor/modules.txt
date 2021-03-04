@@ -25,6 +25,8 @@ github.com/andybalholm/brotli
 # github.com/andybalholm/cascadia v1.0.0
 ## explicit
 github.com/andybalholm/cascadia
+# github.com/apache/thrift v0.13.0
+github.com/apache/thrift/lib/go/thrift
 # github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb
 ## explicit
 github.com/daaku/go.zipexe
@@ -80,7 +82,7 @@ github.com/go-sourcemap/sourcemap/internal/base64vlq
 # github.com/golang/gddo v0.0.0-20190419222130-af0f2af80721
 github.com/golang/gddo/httputil
 github.com/golang/gddo/httputil/header
-# github.com/golang/protobuf v1.4.2
+# github.com/golang/protobuf v1.4.3
 ## explicit
 github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
@@ -96,8 +98,6 @@ github.com/golang/protobuf/ptypes/wrappers
 # github.com/golang/snappy v0.0.0-20170215233205-553a64147049
 ## explicit
 github.com/golang/snappy
-# github.com/google/go-cmp v0.5.1
-## explicit
 # github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f
 ## explicit
 github.com/gorilla/context
@@ -186,11 +186,6 @@ github.com/mitchellh/mapstructure
 github.com/nu7hatch/gouuid
 # github.com/onsi/ginkgo v1.14.0
 ## explicit
-# github.com/opentracing/opentracing-go v1.2.0
-## explicit
-github.com/opentracing/opentracing-go
-github.com/opentracing/opentracing-go/ext
-github.com/opentracing/opentracing-go/log
 # github.com/oxtoacart/bpool v0.0.0-20150712133111-4e1c5567d7c2
 ## explicit
 github.com/oxtoacart/bpool
@@ -226,7 +221,9 @@ github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.1
 ## explicit
 github.com/spf13/pflag
-# github.com/stretchr/testify v1.3.0 => github.com/stretchr/testify v1.2.1
+# github.com/stretchr/objx v0.3.0
+## explicit
+# github.com/stretchr/testify v1.7.0 => github.com/stretchr/testify v1.2.1
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
@@ -238,29 +235,6 @@ github.com/tidwall/match
 # github.com/tidwall/pretty v1.0.2
 ## explicit
 github.com/tidwall/pretty
-# github.com/uber/jaeger-client-go v2.25.0+incompatible
-## explicit
-github.com/uber/jaeger-client-go
-github.com/uber/jaeger-client-go/config
-github.com/uber/jaeger-client-go/internal/baggage
-github.com/uber/jaeger-client-go/internal/baggage/remote
-github.com/uber/jaeger-client-go/internal/reporterstats
-github.com/uber/jaeger-client-go/internal/spanlog
-github.com/uber/jaeger-client-go/internal/throttler
-github.com/uber/jaeger-client-go/internal/throttler/remote
-github.com/uber/jaeger-client-go/log
-github.com/uber/jaeger-client-go/rpcmetrics
-github.com/uber/jaeger-client-go/thrift
-github.com/uber/jaeger-client-go/thrift-gen/agent
-github.com/uber/jaeger-client-go/thrift-gen/baggage
-github.com/uber/jaeger-client-go/thrift-gen/jaeger
-github.com/uber/jaeger-client-go/thrift-gen/sampling
-github.com/uber/jaeger-client-go/thrift-gen/zipkincore
-github.com/uber/jaeger-client-go/transport
-github.com/uber/jaeger-client-go/utils
-# github.com/uber/jaeger-lib v2.4.0+incompatible
-## explicit
-github.com/uber/jaeger-lib/metrics
 # github.com/ugorji/go v1.1.7 => github.com/ugorji/go v0.0.0-20180112141927-9831f2c3ac10
 ## explicit
 github.com/ugorji/go/codec
@@ -276,9 +250,42 @@ github.com/valyala/fasttemplate
 # github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
 ## explicit
 github.com/zyedidia/highlight
-# go.uber.org/atomic v1.7.0
+# go.opentelemetry.io/contrib v0.17.0
+go.opentelemetry.io/contrib
+# go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.17.0
 ## explicit
-go.uber.org/atomic
+go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace
+# go.opentelemetry.io/otel v0.17.0
+## explicit
+go.opentelemetry.io/otel
+go.opentelemetry.io/otel/baggage
+go.opentelemetry.io/otel/codes
+go.opentelemetry.io/otel/internal
+go.opentelemetry.io/otel/internal/baggage
+go.opentelemetry.io/otel/internal/global
+go.opentelemetry.io/otel/internal/trace/noop
+go.opentelemetry.io/otel/internal/trace/parent
+go.opentelemetry.io/otel/label
+go.opentelemetry.io/otel/propagation
+go.opentelemetry.io/otel/semconv
+go.opentelemetry.io/otel/unit
+# go.opentelemetry.io/otel/exporters/trace/jaeger v0.17.0
+## explicit
+go.opentelemetry.io/otel/exporters/trace/jaeger
+go.opentelemetry.io/otel/exporters/trace/jaeger/internal/gen-go/jaeger
+# go.opentelemetry.io/otel/metric v0.17.0
+go.opentelemetry.io/otel/metric
+go.opentelemetry.io/otel/metric/number
+go.opentelemetry.io/otel/metric/registry
+# go.opentelemetry.io/otel/sdk v0.17.0
+## explicit
+go.opentelemetry.io/otel/sdk/export/trace
+go.opentelemetry.io/otel/sdk/instrumentation
+go.opentelemetry.io/otel/sdk/internal
+go.opentelemetry.io/otel/sdk/resource
+go.opentelemetry.io/otel/sdk/trace
+# go.opentelemetry.io/otel/trace v0.17.0
+go.opentelemetry.io/otel/trace
 # golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 ## explicit
 golang.org/x/crypto/acme
@@ -287,9 +294,8 @@ golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20201008223702-a5fa9d4b7c91
+# golang.org/x/net v0.0.0-20201209123823-ac852fbbde11
 ## explicit
-golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/http/httpguts
@@ -298,12 +304,13 @@ golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f
-## explicit
+# golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
+golang.org/x/sync/semaphore
+# golang.org/x/sys v0.0.0-20210104204734-6f8348627aad
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/text v0.3.3 => golang.org/x/text v0.3.0
+# golang.org/x/text v0.3.4 => golang.org/x/text v0.3.0
 ## explicit
 golang.org/x/text/cases
 golang.org/x/text/collate
@@ -315,19 +322,18 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.0.0-20170927054726-6dc17368e09b
+# golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
-## explicit
-# google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336
-## explicit
+# google.golang.org/api v0.39.0
+google.golang.org/api/support/bundler
+# google.golang.org/genproto v0.0.0-20201214200347-8c77b98c765d
 google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/genproto/protobuf/api
 google.golang.org/genproto/protobuf/field_mask
 google.golang.org/genproto/protobuf/ptype
 google.golang.org/genproto/protobuf/source_context
-# google.golang.org/grpc v1.31.1
+# google.golang.org/grpc v1.34.0
 ## explicit
 google.golang.org/grpc
 google.golang.org/grpc/attributes
@@ -340,7 +346,6 @@ google.golang.org/grpc/binarylog/grpc_binarylog_v1
 google.golang.org/grpc/codes
 google.golang.org/grpc/connectivity
 google.golang.org/grpc/credentials
-google.golang.org/grpc/credentials/internal
 google.golang.org/grpc/encoding
 google.golang.org/grpc/encoding/proto
 google.golang.org/grpc/grpclog
@@ -356,12 +361,15 @@ google.golang.org/grpc/internal/grpclog
 google.golang.org/grpc/internal/grpcrand
 google.golang.org/grpc/internal/grpcsync
 google.golang.org/grpc/internal/grpcutil
+google.golang.org/grpc/internal/resolver
 google.golang.org/grpc/internal/resolver/dns
 google.golang.org/grpc/internal/resolver/passthrough
+google.golang.org/grpc/internal/resolver/unix
 google.golang.org/grpc/internal/serviceconfig
 google.golang.org/grpc/internal/status
 google.golang.org/grpc/internal/syscall
 google.golang.org/grpc/internal/transport
+google.golang.org/grpc/internal/transport/networktype
 google.golang.org/grpc/keepalive
 google.golang.org/grpc/metadata
 google.golang.org/grpc/peer
@@ -371,14 +379,13 @@ google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
 google.golang.org/grpc/test/grpc_testing
-# google.golang.org/protobuf v1.24.0
+# google.golang.org/protobuf v1.25.0
 ## explicit
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
 google.golang.org/protobuf/internal/descfmt
 google.golang.org/protobuf/internal/descopts
-google.golang.org/protobuf/internal/detectknown
 google.golang.org/protobuf/internal/detrand
 google.golang.org/protobuf/internal/encoding/defval
 google.golang.org/protobuf/internal/encoding/json
@@ -386,12 +393,11 @@ google.golang.org/protobuf/internal/encoding/messageset
 google.golang.org/protobuf/internal/encoding/tag
 google.golang.org/protobuf/internal/encoding/text
 google.golang.org/protobuf/internal/errors
-google.golang.org/protobuf/internal/fieldnum
 google.golang.org/protobuf/internal/fieldsort
 google.golang.org/protobuf/internal/filedesc
 google.golang.org/protobuf/internal/filetype
 google.golang.org/protobuf/internal/flags
-google.golang.org/protobuf/internal/genname
+google.golang.org/protobuf/internal/genid
 google.golang.org/protobuf/internal/impl
 google.golang.org/protobuf/internal/mapsort
 google.golang.org/protobuf/internal/pragma

@@ -50,11 +50,12 @@ import (
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui/pb"
 
-	opentracing "github.com/opentracing/opentracing-go"
-	"github.com/uber/jaeger-lib/metrics"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/propagation"
 
-	"github.com/uber/jaeger-client-go"
-	jaegercfg "github.com/uber/jaeger-client-go/config"
+	"go.opentelemetry.io/otel/exporters/trace/jaeger"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 const (
@@ -156,28 +157,9 @@ a commandline interface for interacting with it.`,
 
 			// Set up distributed tracing
 			if conf.Options.DistributedTracing.Bool {
-				cfg := jaegercfg.Configuration{
-					ServiceName: "k6",
-					Sampler: &jaegercfg.SamplerConfig{
-						Type:  jaeger.SamplerTypeConst,
-						Param: 1,
-					},
-					Tags: []opentracing.Tag{
-						{
-							Key:   "k6.version",
-							Value: consts.Version,
-						},
-					},
-				}
-
-				jMetricsFactory := metrics.NullFactory
-				tracer, closer, tracerErr := cfg.NewTracer(jaegercfg.Metrics(jMetricsFactory))
-				if tracerErr != nil {
-					logger.WithError(tracerErr).Error("failed start the distributed tracing instrumentation")
-				}
-
-				opentracing.SetGlobalTracer(tracer)
-				defer closer.Close() //nolint:errcheck
+				flush := initJaegerTracer()
+				otel.SetTextMapPropagator(propagation.TraceContext{})
+				defer flush()
 			}
 
 			// We prepare a bunch of contexts:
@@ -488,4 +470,20 @@ func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[strin
 	}
 
 	return consolidateErrorMessage(errs, "Could not save some summary information:")
+}
+
+func initJaegerTracer() func() {
+	// Create a Jaeger exporter and install it as a global tracer.
+	flush, _ := jaeger.InstallNewPipeline(
+		jaeger.WithCollectorEndpoint("http://localhost:14268/api/traces"),
+		jaeger.WithProcess(jaeger.Process{
+			ServiceName: "k6",
+			Tags: []label.KeyValue{
+				label.String("exporter", "jaeger"),
+				label.String("k6.version", consts.Version),
+			},
+		}),
+		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
+	)
+	return flush
 }

@@ -36,13 +36,12 @@ import (
 
 	"github.com/Azure/go-ntlmssp"
 	"github.com/sirupsen/logrus"
-	"github.com/uber/jaeger-client-go"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
+	"go.opentelemetry.io/otel"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
-	opentracing "github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
 )
 
 // HTTPRequestCookie is a representation of a cookie used for request objects
@@ -177,7 +176,7 @@ func updateK6Response(k6Response *Response, finishedReq *finishedRequest) {
 // MakeRequest makes http request for tor the provided ParsedHTTPRequest
 func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error) {
 	state := lib.GetState(ctx)
-	tracer := opentracing.GlobalTracer()
+	tr := otel.Tracer("http/makerequest")
 
 	respReq := &Request{
 		Method:  preq.Req.Method,
@@ -328,21 +327,16 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		},
 	}
 
-	httpSpan := tracer.StartSpan("HTTP")
-
-	ext.SpanKindRPCClient.Set(httpSpan)
-	ext.HTTPUrl.Set(httpSpan, preq.URL.URL)
-	ext.HTTPMethod.Set(httpSpan, "GET")
+	ctx, span := tr.Start(ctx, "http")
 
 	reqCtx, cancelFunc := context.WithTimeout(ctx, preq.Timeout)
 	defer cancelFunc()
 	mreq := preq.Req.WithContext(reqCtx)
-	injectErr := tracer.Inject(httpSpan.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(mreq.Header))
-	if injectErr != nil {
-		state.Logger.Debug("Failed to inject distributed tracing span")
-	}
+
+	ctx, mreq = otelhttptrace.W3C(ctx, mreq)
+	otelhttptrace.Inject(ctx, mreq)
 	res, resErr := client.Do(mreq)
-	httpSpan.Finish()
+	span.End()
 
 	// TODO(imiric): It would be safer to check for a writeable
 	// response body here instead of status code, but those are
@@ -370,7 +364,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		resp.Status = res.StatusCode
 		resp.StatusText = res.Status
 		resp.Proto = res.Proto
-		resp.TraceID = extractTraceID(httpSpan)
+		resp.TraceID = span.SpanContext().TraceID.String()
 
 		if res.TLS != nil {
 			resp.setTLSInfo(res.TLS)
@@ -428,17 +422,4 @@ func SetRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[str
 			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
 		}
 	}
-}
-
-// Reference: https://github.com/grafana/grafana/pull/28952
-func extractTraceID(sp opentracing.Span) string {
-	if sp == nil {
-		return ""
-	}
-	sctx, ok := sp.Context().(jaeger.SpanContext)
-	if !ok {
-		return ""
-	}
-
-	return sctx.TraceID().String()
 }
