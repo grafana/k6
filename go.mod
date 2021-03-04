@@ -70,6 +70,7 @@ require (
 	github.com/valyala/fasttemplate v0.0.0-20170224212429-dcecefd839c4 // indirect
 	github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.17.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.17.0
 	go.opentelemetry.io/otel v0.17.0
 	go.opentelemetry.io/otel/exporters/trace/jaeger v0.17.0
 	go.opentelemetry.io/otel/sdk v0.17.0

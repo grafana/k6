@@ -36,7 +36,7 @@ import (
 
 	"github.com/Azure/go-ntlmssp"
 	"github.com/sirupsen/logrus"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"gopkg.in/guregu/null.v3"
 
@@ -177,6 +177,8 @@ func updateK6Response(k6Response *Response, finishedReq *finishedRequest) {
 func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error) {
 	state := lib.GetState(ctx)
 	tr := otel.Tracer("http/makerequest")
+	ctx, span := tr.Start(ctx, "make-request")
+	defer span.End()
 
 	respReq := &Request{
 		Method:  preq.Req.Method,
@@ -298,7 +300,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 
 	resp := &Response{ctx: ctx, URL: preq.URL.URL, Request: *respReq}
 	client := http.Client{
-		Transport: transport,
+		Transport: otelhttp.NewTransport(transport),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			resp.URL = req.URL.String()
 
@@ -327,16 +329,11 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		},
 	}
 
-	ctx, span := tr.Start(ctx, "http")
-
 	reqCtx, cancelFunc := context.WithTimeout(ctx, preq.Timeout)
 	defer cancelFunc()
 	mreq := preq.Req.WithContext(reqCtx)
 
-	ctx, mreq = otelhttptrace.W3C(ctx, mreq)
-	otelhttptrace.Inject(ctx, mreq)
 	res, resErr := client.Do(mreq)
-	span.End()
 
 	// TODO(imiric): It would be safer to check for a writeable
 	// response body here instead of status code, but those are

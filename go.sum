@@ -79,6 +79,8 @@ github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1m
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/fatih/color v1.5.0 h1:vBh+kQp8lg9XPr56u1CPrWjFXtdphMoGWVHr9/1c+A0=
 github.com/fatih/color v1.5.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
+github.com/felixge/httpsnoop v1.0.1 h1:lvB5Jl89CsZtGIWuTcDM1E/vkVs49/Ml7JJe07l8SPQ=
+github.com/felixge/httpsnoop v1.0.1/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/fsnotify/fsnotify v1.4.9 h1:hsms1Qyu0jgnwNXIxa+/V/PDsU6CfLf6CNO8H7IWoS4=
 github.com/fsnotify/fsnotify v1.4.9/go.mod h1:znqG4EE+3YCdAaPaxE2ZRY/06pZUdp0tY4IgpuI1SZQ=
@@ -279,6 +281,8 @@ go.opentelemetry.io/contrib v0.17.0 h1:F9qs5F/A+BF7wvN9pXNHs67bsEyq0cCCwockpVJ1U
 go.opentelemetry.io/contrib v0.17.0/go.mod h1:G/EtFaa6qaN7+LxqfIAT3GiZa7Wv5DTBUzl5H4LY0Kc=
 go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.17.0 h1:FwwGUfB95A0SRLKD1OtCW8wWyxBGCoZtR9a6YqkzTbc=
 go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.17.0/go.mod h1:enhR45LXh2I5D3afc2Xdl9dm3vU23sKIZjkt0a4e+JE=
+go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.17.0 h1:nzs66fK36zaTO71SLzVj2EP89osxGiNzPRmL/0YDNOw=
+go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.17.0/go.mod h1:c4YsdmxKHUj2fAHJQDQNtjG/+fGa4DcUNe+hdFgDjcE=
 go.opentelemetry.io/otel v0.17.0 h1:6MKOu8WY4hmfpQ4oQn34u6rYhnf2sWf1LXYO/UFm71U=
 go.opentelemetry.io/otel v0.17.0/go.mod h1:Oqtdxmf7UtEvL037ohlgnaYa1h7GtMh0NcSd9eqkC9s=
 go.opentelemetry.io/otel/exporters/trace/jaeger v0.17.0 h1:9Nivnf6Oqkm6P8o7LGJfQNjqP45O2FgDAQgLncy1pPM=

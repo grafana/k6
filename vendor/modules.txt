@@ -61,6 +61,8 @@ github.com/eapache/queue
 # github.com/fatih/color v1.5.0
 ## explicit
 github.com/fatih/color
+# github.com/felixge/httpsnoop v1.0.1
+github.com/felixge/httpsnoop
 # github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813
 ## explicit
 github.com/gedex/inflector
@@ -255,6 +257,9 @@ go.opentelemetry.io/contrib
 # go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.17.0
 ## explicit
 go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace
+# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.17.0
+## explicit
+go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
 # go.opentelemetry.io/otel v0.17.0
 ## explicit
 go.opentelemetry.io/otel
@@ -275,6 +280,7 @@ go.opentelemetry.io/otel/exporters/trace/jaeger
 go.opentelemetry.io/otel/exporters/trace/jaeger/internal/gen-go/jaeger
 # go.opentelemetry.io/otel/metric v0.17.0
 go.opentelemetry.io/otel/metric
+go.opentelemetry.io/otel/metric/global
 go.opentelemetry.io/otel/metric/number
 go.opentelemetry.io/otel/metric/registry
 # go.opentelemetry.io/otel/sdk v0.17.0
