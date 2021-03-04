@@ -543,33 +543,33 @@ func (c *CharSet) addNamedASCII(name string, negate bool) bool {
 
 	switch name {
 	case "alnum":
-		rs = []singleRange{singleRange{'0', '9'}, singleRange{'A', 'Z'}, singleRange{'a', 'z'}}
+		rs = []singleRange{{'0', '9'}, {'A', 'Z'}, {'a', 'z'}}
 	case "alpha":
-		rs = []singleRange{singleRange{'A', 'Z'}, singleRange{'a', 'z'}}
+		rs = []singleRange{{'A', 'Z'}, {'a', 'z'}}
 	case "ascii":
-		rs = []singleRange{singleRange{0, 0x7f}}
+		rs = []singleRange{{0, 0x7f}}
 	case "blank":
-		rs = []singleRange{singleRange{'\t', '\t'}, singleRange{' ', ' '}}
+		rs = []singleRange{{'\t', '\t'}, {' ', ' '}}
 	case "cntrl":
-		rs = []singleRange{singleRange{0, 0x1f}, singleRange{0x7f, 0x7f}}
+		rs = []singleRange{{0, 0x1f}, {0x7f, 0x7f}}
 	case "digit":
 		c.addDigit(false, negate, "")
 	case "graph":
-		rs = []singleRange{singleRange{'!', '~'}}
+		rs = []singleRange{{'!', '~'}}
 	case "lower":
-		rs = []singleRange{singleRange{'a', 'z'}}
+		rs = []singleRange{{'a', 'z'}}
 	case "print":
-		rs = []singleRange{singleRange{' ', '~'}}
+		rs = []singleRange{{' ', '~'}}
 	case "punct": //[!-/:-@[-`{-~]
-		rs = []singleRange{singleRange{'!', '/'}, singleRange{':', '@'}, singleRange{'[', '`'}, singleRange{'{', '~'}}
+		rs = []singleRange{{'!', '/'}, {':', '@'}, {'[', '`'}, {'{', '~'}}
 	case "space":
 		c.addSpace(true, negate)
 	case "upper":
-		rs = []singleRange{singleRange{'A', 'Z'}}
+		rs = []singleRange{{'A', 'Z'}}
 	case "word":
 		c.addWord(true, negate)
 	case "xdigit":
-		rs = []singleRange{singleRange{'0', '9'}, singleRange{'A', 'F'}, singleRange{'a', 'f'}}
+		rs = []singleRange{{'0', '9'}, {'A', 'F'}, {'a', 'f'}}
 	default:
 		return false
 	}
@@ -703,100 +703,100 @@ type lcMap struct {
 }
 
 var lcTable = []lcMap{
-	lcMap{'\u0041', '\u005A', LowercaseAdd, 32},
-	lcMap{'\u00C0', '\u00DE', LowercaseAdd, 32},
-	lcMap{'\u0100', '\u012E', LowercaseBor, 0},
-	lcMap{'\u0130', '\u0130', LowercaseSet, 0x0069},
-	lcMap{'\u0132', '\u0136', LowercaseBor, 0},
-	lcMap{'\u0139', '\u0147', LowercaseBad, 0},
-	lcMap{'\u014A', '\u0176', LowercaseBor, 0},
-	lcMap{'\u0178', '\u0178', LowercaseSet, 0x00FF},
-	lcMap{'\u0179', '\u017D', LowercaseBad, 0},
-	lcMap{'\u0181', '\u0181', LowercaseSet, 0x0253},
-	lcMap{'\u0182', '\u0184', LowercaseBor, 0},
-	lcMap{'\u0186', '\u0186', LowercaseSet, 0x0254},
-	lcMap{'\u0187', '\u0187', LowercaseSet, 0x0188},
-	lcMap{'\u0189', '\u018A', LowercaseAdd, 205},
-	lcMap{'\u018B', '\u018B', LowercaseSet, 0x018C},
-	lcMap{'\u018E', '\u018E', LowercaseSet, 0x01DD},
-	lcMap{'\u018F', '\u018F', LowercaseSet, 0x0259},
-	lcMap{'\u0190', '\u0190', LowercaseSet, 0x025B},
-	lcMap{'\u0191', '\u0191', LowercaseSet, 0x0192},
-	lcMap{'\u0193', '\u0193', LowercaseSet, 0x0260},
-	lcMap{'\u0194', '\u0194', LowercaseSet, 0x0263},
-	lcMap{'\u0196', '\u0196', LowercaseSet, 0x0269},
-	lcMap{'\u0197', '\u0197', LowercaseSet, 0x0268},
-	lcMap{'\u0198', '\u0198', LowercaseSet, 0x0199},
-	lcMap{'\u019C', '\u019C', LowercaseSet, 0x026F},
-	lcMap{'\u019D', '\u019D', LowercaseSet, 0x0272},
-	lcMap{'\u019F', '\u019F', LowercaseSet, 0x0275},
-	lcMap{'\u01A0', '\u01A4', LowercaseBor, 0},
-	lcMap{'\u01A7', '\u01A7', LowercaseSet, 0x01A8},
-	lcMap{'\u01A9', '\u01A9', LowercaseSet, 0x0283},
-	lcMap{'\u01AC', '\u01AC', LowercaseSet, 0x01AD},
-	lcMap{'\u01AE', '\u01AE', LowercaseSet, 0x0288},
-	lcMap{'\u01AF', '\u01AF', LowercaseSet, 0x01B0},
-	lcMap{'\u01B1', '\u01B2', LowercaseAdd, 217},
-	lcMap{'\u01B3', '\u01B5', LowercaseBad, 0},
-	lcMap{'\u01B7', '\u01B7', LowercaseSet, 0x0292},
-	lcMap{'\u01B8', '\u01B8', LowercaseSet, 0x01B9},
-	lcMap{'\u01BC', '\u01BC', LowercaseSet, 0x01BD},
-	lcMap{'\u01C4', '\u01C5', LowercaseSet, 0x01C6},
-	lcMap{'\u01C7', '\u01C8', LowercaseSet, 0x01C9},
-	lcMap{'\u01CA', '\u01CB', LowercaseSet, 0x01CC},
-	lcMap{'\u01CD', '\u01DB', LowercaseBad, 0},
-	lcMap{'\u01DE', '\u01EE', LowercaseBor, 0},
-	lcMap{'\u01F1', '\u01F2', LowercaseSet, 0x01F3},
-	lcMap{'\u01F4', '\u01F4', LowercaseSet, 0x01F5},
-	lcMap{'\u01FA', '\u0216', LowercaseBor, 0},
-	lcMap{'\u0386', '\u0386', LowercaseSet, 0x03AC},
-	lcMap{'\u0388', '\u038A', LowercaseAdd, 37},
-	lcMap{'\u038C', '\u038C', LowercaseSet, 0x03CC},
-	lcMap{'\u038E', '\u038F', LowercaseAdd, 63},
-	lcMap{'\u0391', '\u03AB', LowercaseAdd, 32},
-	lcMap{'\u03E2', '\u03EE', LowercaseBor, 0},
-	lcMap{'\u0401', '\u040F', LowercaseAdd, 80},
-	lcMap{'\u0410', '\u042F', LowercaseAdd, 32},
-	lcMap{'\u0460', '\u0480', LowercaseBor, 0},
-	lcMap{'\u0490', '\u04BE', LowercaseBor, 0},
-	lcMap{'\u04C1', '\u04C3', LowercaseBad, 0},
-	lcMap{'\u04C7', '\u04C7', LowercaseSet, 0x04C8},
-	lcMap{'\u04CB', '\u04CB', LowercaseSet, 0x04CC},
-	lcMap{'\u04D0', '\u04EA', LowercaseBor, 0},
-	lcMap{'\u04EE', '\u04F4', LowercaseBor, 0},
-	lcMap{'\u04F8', '\u04F8', LowercaseSet, 0x04F9},
-	lcMap{'\u0531', '\u0556', LowercaseAdd, 48},
-	lcMap{'\u10A0', '\u10C5', LowercaseAdd, 48},
-	lcMap{'\u1E00', '\u1EF8', LowercaseBor, 0},
-	lcMap{'\u1F08', '\u1F0F', LowercaseAdd, -8},
-	lcMap{'\u1F18', '\u1F1F', LowercaseAdd, -8},
-	lcMap{'\u1F28', '\u1F2F', LowercaseAdd, -8},
-	lcMap{'\u1F38', '\u1F3F', LowercaseAdd, -8},
-	lcMap{'\u1F48', '\u1F4D', LowercaseAdd, -8},
-	lcMap{'\u1F59', '\u1F59', LowercaseSet, 0x1F51},
-	lcMap{'\u1F5B', '\u1F5B', LowercaseSet, 0x1F53},
-	lcMap{'\u1F5D', '\u1F5D', LowercaseSet, 0x1F55},
-	lcMap{'\u1F5F', '\u1F5F', LowercaseSet, 0x1F57},
-	lcMap{'\u1F68', '\u1F6F', LowercaseAdd, -8},
-	lcMap{'\u1F88', '\u1F8F', LowercaseAdd, -8},
-	lcMap{'\u1F98', '\u1F9F', LowercaseAdd, -8},
-	lcMap{'\u1FA8', '\u1FAF', LowercaseAdd, -8},
-	lcMap{'\u1FB8', '\u1FB9', LowercaseAdd, -8},
-	lcMap{'\u1FBA', '\u1FBB', LowercaseAdd, -74},
-	lcMap{'\u1FBC', '\u1FBC', LowercaseSet, 0x1FB3},
-	lcMap{'\u1FC8', '\u1FCB', LowercaseAdd, -86},
-	lcMap{'\u1FCC', '\u1FCC', LowercaseSet, 0x1FC3},
-	lcMap{'\u1FD8', '\u1FD9', LowercaseAdd, -8},
-	lcMap{'\u1FDA', '\u1FDB', LowercaseAdd, -100},
-	lcMap{'\u1FE8', '\u1FE9', LowercaseAdd, -8},
-	lcMap{'\u1FEA', '\u1FEB', LowercaseAdd, -112},
-	lcMap{'\u1FEC', '\u1FEC', LowercaseSet, 0x1FE5},
-	lcMap{'\u1FF8', '\u1FF9', LowercaseAdd, -128},
-	lcMap{'\u1FFA', '\u1FFB', LowercaseAdd, -126},
-	lcMap{'\u1FFC', '\u1FFC', LowercaseSet, 0x1FF3},
-	lcMap{'\u2160', '\u216F', LowercaseAdd, 16},
-	lcMap{'\u24B6', '\u24D0', LowercaseAdd, 26},
-	lcMap{'\uFF21', '\uFF3A', LowercaseAdd, 32},
+	{'\u0041', '\u005A', LowercaseAdd, 32},
+	{'\u00C0', '\u00DE', LowercaseAdd, 32},
+	{'\u0100', '\u012E', LowercaseBor, 0},
+	{'\u0130', '\u0130', LowercaseSet, 0x0069},
+	{'\u0132', '\u0136', LowercaseBor, 0},
+	{'\u0139', '\u0147', LowercaseBad, 0},
+	{'\u014A', '\u0176', LowercaseBor, 0},
+	{'\u0178', '\u0178', LowercaseSet, 0x00FF},
+	{'\u0179', '\u017D', LowercaseBad, 0},
+	{'\u0181', '\u0181', LowercaseSet, 0x0253},
+	{'\u0182', '\u0184', LowercaseBor, 0},
+	{'\u0186', '\u0186', LowercaseSet, 0x0254},
+	{'\u0187', '\u0187', LowercaseSet, 0x0188},
+	{'\u0189', '\u018A', LowercaseAdd, 205},
+	{'\u018B', '\u018B', LowercaseSet, 0x018C},
+	{'\u018E', '\u018E', LowercaseSet, 0x01DD},
+	{'\u018F', '\u018F', LowercaseSet, 0x0259},
+	{'\u0190', '\u0190', LowercaseSet, 0x025B},
+	{'\u0191', '\u0191', LowercaseSet, 0x0192},
+	{'\u0193', '\u0193', LowercaseSet, 0x0260},
+	{'\u0194', '\u0194', LowercaseSet, 0x0263},
+	{'\u0196', '\u0196', LowercaseSet, 0x0269},
+	{'\u0197', '\u0197', LowercaseSet, 0x0268},
+	{'\u0198', '\u0198', LowercaseSet, 0x0199},
+	{'\u019C', '\u019C', LowercaseSet, 0x026F},
+	{'\u019D', '\u019D', LowercaseSet, 0x0272},
+	{'\u019F', '\u019F', LowercaseSet, 0x0275},
+	{'\u01A0', '\u01A4', LowercaseBor, 0},
+	{'\u01A7', '\u01A7', LowercaseSet, 0x01A8},
+	{'\u01A9', '\u01A9', LowercaseSet, 0x0283},
+	{'\u01AC', '\u01AC', LowercaseSet, 0x01AD},
+	{'\u01AE', '\u01AE', LowercaseSet, 0x0288},
+	{'\u01AF', '\u01AF', LowercaseSet, 0x01B0},
+	{'\u01B1', '\u01B2', LowercaseAdd, 217},
+	{'\u01B3', '\u01B5', LowercaseBad, 0},
+	{'\u01B7', '\u01B7', LowercaseSet, 0x0292},
+	{'\u01B8', '\u01B8', LowercaseSet, 0x01B9},
+	{'\u01BC', '\u01BC', LowercaseSet, 0x01BD},
+	{'\u01C4', '\u01C5', LowercaseSet, 0x01C6},
+	{'\u01C7', '\u01C8', LowercaseSet, 0x01C9},
+	{'\u01CA', '\u01CB', LowercaseSet, 0x01CC},
+	{'\u01CD', '\u01DB', LowercaseBad, 0},
+	{'\u01DE', '\u01EE', LowercaseBor, 0},
+	{'\u01F1', '\u01F2', LowercaseSet, 0x01F3},
+	{'\u01F4', '\u01F4', LowercaseSet, 0x01F5},
+	{'\u01FA', '\u0216', LowercaseBor, 0},
+	{'\u0386', '\u0386', LowercaseSet, 0x03AC},
+	{'\u0388', '\u038A', LowercaseAdd, 37},
+	{'\u038C', '\u038C', LowercaseSet, 0x03CC},
+	{'\u038E', '\u038F', LowercaseAdd, 63},
+	{'\u0391', '\u03AB', LowercaseAdd, 32},
+	{'\u03E2', '\u03EE', LowercaseBor, 0},
+	{'\u0401', '\u040F', LowercaseAdd, 80},
+	{'\u0410', '\u042F', LowercaseAdd, 32},
+	{'\u0460', '\u0480', LowercaseBor, 0},
+	{'\u0490', '\u04BE', LowercaseBor, 0},
+	{'\u04C1', '\u04C3', LowercaseBad, 0},
+	{'\u04C7', '\u04C7', LowercaseSet, 0x04C8},
+	{'\u04CB', '\u04CB', LowercaseSet, 0x04CC},
+	{'\u04D0', '\u04EA', LowercaseBor, 0},
+	{'\u04EE', '\u04F4', LowercaseBor, 0},
+	{'\u04F8', '\u04F8', LowercaseSet, 0x04F9},
+	{'\u0531', '\u0556', LowercaseAdd, 48},
+	{'\u10A0', '\u10C5', LowercaseAdd, 48},
+	{'\u1E00', '\u1EF8', LowercaseBor, 0},
+	{'\u1F08', '\u1F0F', LowercaseAdd, -8},
+	{'\u1F18', '\u1F1F', LowercaseAdd, -8},
+	{'\u1F28', '\u1F2F', LowercaseAdd, -8},
+	{'\u1F38', '\u1F3F', LowercaseAdd, -8},
+	{'\u1F48', '\u1F4D', LowercaseAdd, -8},
+	{'\u1F59', '\u1F59', LowercaseSet, 0x1F51},
+	{'\u1F5B', '\u1F5B', LowercaseSet, 0x1F53},
+	{'\u1F5D', '\u1F5D', LowercaseSet, 0x1F55},
+	{'\u1F5F', '\u1F5F', LowercaseSet, 0x1F57},
+	{'\u1F68', '\u1F6F', LowercaseAdd, -8},
+	{'\u1F88', '\u1F8F', LowercaseAdd, -8},
+	{'\u1F98', '\u1F9F', LowercaseAdd, -8},
+	{'\u1FA8', '\u1FAF', LowercaseAdd, -8},
+	{'\u1FB8', '\u1FB9', LowercaseAdd, -8},
+	{'\u1FBA', '\u1FBB', LowercaseAdd, -74},
+	{'\u1FBC', '\u1FBC', LowercaseSet, 0x1FB3},
+	{'\u1FC8', '\u1FCB', LowercaseAdd, -86},
+	{'\u1FCC', '\u1FCC', LowercaseSet, 0x1FC3},
+	{'\u1FD8', '\u1FD9', LowercaseAdd, -8},
+	{'\u1FDA', '\u1FDB', LowercaseAdd, -100},
+	{'\u1FE8', '\u1FE9', LowercaseAdd, -8},
+	{'\u1FEA', '\u1FEB', LowercaseAdd, -112},
+	{'\u1FEC', '\u1FEC', LowercaseSet, 0x1FE5},
+	{'\u1FF8', '\u1FF9', LowercaseAdd, -128},
+	{'\u1FFA', '\u1FFB', LowercaseAdd, -126},
+	{'\u1FFC', '\u1FFC', LowercaseSet, 0x1FF3},
+	{'\u2160', '\u216F', LowercaseAdd, 16},
+	{'\u24B6', '\u24D0', LowercaseAdd, 26},
+	{'\uFF21', '\uFF3A', LowercaseAdd, 32},
 }
 
 func (c *CharSet) addLowercaseRange(chMin, chMax rune) {

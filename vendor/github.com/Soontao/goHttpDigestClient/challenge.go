@@ -71,7 +71,7 @@ func (info Challenge) ToAuthorizationStr() string {
 	auth_schema := KEY_DIGEST
 	authorization_content := ""
 	// how to specify the sequence
-	for k, _ := range info {
+	for k := range info {
 		if k != KEY_AUTH_SCHEMA {
 			authorization_content += fmt.Sprintf(", %s=%s", k, info.GetChallengeItemFormat(k))
 		}

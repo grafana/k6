@@ -10,7 +10,7 @@ import (
 // Write sorts writes each metric in the given registry periodically to the
 // given io.Writer.
 func Write(r Registry, d time.Duration, w io.Writer) {
-	for _ = range time.Tick(d) {
+	for range time.Tick(d) {
 		WriteOnce(r, w)
 	}
 }
