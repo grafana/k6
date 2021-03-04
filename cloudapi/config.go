@@ -188,6 +188,9 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.DeprecatedToken.Valid {
 		c.DeprecatedToken = cfg.DeprecatedToken
 	}
+	if cfg.ProjectID.Valid && cfg.ProjectID.Int64 > 0 {
+		c.ProjectID = cfg.ProjectID
+	}
 	if cfg.Name.Valid && cfg.Name.String != "" {
 		c.Name = cfg.Name
 	}
@@ -197,21 +200,25 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.LogsTailURL.Valid && cfg.LogsTailURL.String != "" {
 		c.LogsTailURL = cfg.LogsTailURL
 	}
+	if cfg.PushRefID.Valid {
+		c.PushRefID = cfg.PushRefID
+	}
 	if cfg.WebAppURL.Valid {
 		c.WebAppURL = cfg.WebAppURL
 	}
 	if cfg.NoCompress.Valid {
 		c.NoCompress = cfg.NoCompress
 	}
-	if cfg.ProjectID.Valid && cfg.ProjectID.Int64 > 0 {
-		c.ProjectID = cfg.ProjectID
+	if cfg.MaxMetricSamplesPerPackage.Valid {
+		c.MaxMetricSamplesPerPackage = cfg.MaxMetricSamplesPerPackage
 	}
 	if cfg.MetricPushInterval.Valid {
 		c.MetricPushInterval = cfg.MetricPushInterval
 	}
-	if cfg.MaxMetricSamplesPerPackage.Valid {
-		c.MaxMetricSamplesPerPackage = cfg.MaxMetricSamplesPerPackage
+	if cfg.MetricPushConcurrency.Valid {
+		c.MetricPushConcurrency = cfg.MetricPushConcurrency
 	}
+
 	if cfg.AggregationPeriod.Valid {
 		c.AggregationPeriod = cfg.AggregationPeriod
 	}
