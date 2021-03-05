@@ -1,0 +1,57 @@
+name: xk6
+on:
+  # Enable manually triggering this workflow via the API or web UI
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test-xk6:
+    strategy:
+      matrix:
+        go-version: [1.14.x, 1.15.x]
+        platform: [ubuntu-latest, windows-latest]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Run tests
+        run: |
+          set -x
+          COMMIT_ID="${{ github.event.pull_request.head.sha }}"
+          if [[ "$COMMIT_ID" == "" ]]; then
+            COMMIT_ID="$(git rev-parse HEAD)" # branch, not PR merge commit
+          fi
+          echo "COMMIT_ID=$COMMIT_ID"
+          cd .github/workflows/xk6-tests
+          go get github.com/k6io/xk6/cmd/xk6
+          GOPROXY="direct" xk6 build "$COMMIT_ID" \
+            --output ./k6ext \
+            --with github.com/k6io/xk6-js-test="$(pwd)/xk6-js-test" \
+            --with github.com/k6io/xk6-output-test="$(pwd)/xk6-output-test"
+          ./k6ext version
+          ./k6ext run --out outputtest=output-results.txt xk6-test.js
+
+          OUTPUT_RESULT="$(cat output-results.txt)"
+          if [[ "$OUTPUT_RESULT" != "10" ]]; then
+            echo "output result was not as expected: $OUTPUT_RESULT"
+            exit 11
+          fi
+
+          SUMMARY_RESULT="$(cat summary-results.txt)"
+          if [[ "$SUMMARY_RESULT" != "10" ]]; then
+            echo "summary result was not as expected: $SUMMARY_RESULT"
+            exit 12
+          fi
+
+
