@@ -580,6 +580,69 @@ func TestCloudOutputAggregationPeriodZeroNoBlock(t *testing.T) {
 	require.Equal(t, lib.RunStatusQueued, out.runStatus)
 }
 
+func TestCloudOutputPushRefID(t *testing.T) {
+	t.Parallel()
+	expSamples := make(chan []Sample)
+	defer close(expSamples)
+
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+	failHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("%s should not have been called at all", r.RequestURI)
+	})
+	tb.Mux.HandleFunc("/v1/tests", failHandler)
+	tb.Mux.HandleFunc("/v1/tests/333", failHandler)
+	tb.Mux.HandleFunc("/v1/metrics/333", getSampleChecker(t, expSamples))
+
+	out, err := newOutput(output.Params{
+		Logger: testutils.NewLogger(t),
+		JSONConfig: json.RawMessage(fmt.Sprintf(`{
+			"host": "%s", "noCompress": true,
+			"metricPushInterval": "10ms",
+			"aggregationPeriod": "0ms",
+			"pushRefID": "333"
+		}`, tb.ServerHTTP.URL)),
+		ScriptOptions: lib.Options{
+			Duration:   types.NullDurationFrom(1 * time.Second),
+			SystemTags: &stats.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "333", out.config.PushRefID.String)
+	require.NoError(t, out.Start())
+	assert.Equal(t, "333", out.referenceID)
+
+	now := time.Now()
+	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
+
+	out.AddMetricSamples([]stats.SampleContainer{stats.Sample{
+		Time:   now,
+		Metric: metrics.HTTPReqDuration,
+		Tags:   tags,
+		Value:  123.45,
+	}})
+	exp := []Sample{{
+		Type:   DataTypeSingle,
+		Metric: metrics.HTTPReqDuration.Name,
+		Data: &SampleDataSingle{
+			Type:  metrics.HTTPReqDuration.Type,
+			Time:  toMicroSecond(now),
+			Tags:  tags,
+			Value: 123.45,
+		},
+	}}
+
+	select {
+	case expSamples <- exp:
+	case <-time.After(5 * time.Second):
+		t.Error("test timeout")
+	}
+
+	require.NoError(t, out.Stop())
+}
+
 func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
