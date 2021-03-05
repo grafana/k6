@@ -70,8 +70,8 @@ func (o *Output) Description() string {
 	return fmt.Sprintf("json (%s)", o.filename)
 }
 
-// Start opens the tries to specified JSON file and starts the goroutine for
-// metric flushing.
+// Start tries to open the specified JSON file and starts the goroutine for
+// metric flushing. If gzip encoding is specified, it also handles that.
 func (o *Output) Start() error {
 	o.logger.Debug("Starting...")
 
