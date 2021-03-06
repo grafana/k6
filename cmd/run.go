@@ -610,11 +610,11 @@ func initOtlpTracer(logger *logrus.Logger) func() {
 	otel.SetTracerProvider(tracerProvider)
 
 	return func() {
-		tracerProvider.Shutdown(ctx)
+		err := tracerProvider.Shutdown(ctx)
 		if err != nil {
 			logger.WithError(err).Error("Failed to shutdown otlp provider")
 		}
-		exp.Shutdown(ctx)
+		err = exp.Shutdown(ctx)
 		if err != nil {
 			logger.WithError(err).Error("Failed to stop otlp exporter")
 		}
