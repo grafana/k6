@@ -50,10 +50,13 @@ import (
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui/pb"
 
+	propb3 "go.opentelemetry.io/contrib/propagators/b3"
+	propjaeger "go.opentelemetry.io/contrib/propagators/jaeger"
+	propot "go.opentelemetry.io/contrib/propagators/ot"
 	"go.opentelemetry.io/otel"
-	traceout "go.opentelemetry.io/otel/exporters/stdout"
-	"go.opentelemetry.io/otel/exporters/trace/jaeger"
-	"go.opentelemetry.io/otel/exporters/trace/zipkin"
+	exportout "go.opentelemetry.io/otel/exporters/stdout"
+	exportjaeger "go.opentelemetry.io/otel/exporters/trace/jaeger"
+	exportzipkin "go.opentelemetry.io/otel/exporters/trace/zipkin"
 	"go.opentelemetry.io/otel/label"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -162,6 +165,12 @@ a commandline interface for interacting with it.`,
 				switch conf.Options.TracingPropagator.String {
 				case "w3c":
 					propagator = propagation.TraceContext{}
+				case "b3":
+					propagator = propb3.B3{}
+				case "jaeger":
+					propagator = propjaeger.Jaeger{}
+				case "ot":
+					propagator = propot.OT{}
 				default:
 					// TODO: This is temporal. Will change if we move the set up to another place.
 					logger.Error("unknow tracing propagator ", conf.Options.TracingPropagator.String)
@@ -498,16 +507,16 @@ func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[strin
 
 func initJaegerTracer(logger *logrus.Logger) func() {
 	// Create a Jaeger exporter and install it as a global tracer.
-	flush, err := jaeger.InstallNewPipeline(
-		jaeger.WithCollectorEndpoint("http://localhost:14268/api/traces"),
-		jaeger.WithProcess(jaeger.Process{
+	flush, err := exportjaeger.InstallNewPipeline(
+		exportjaeger.WithCollectorEndpoint("http://localhost:14268/api/traces"),
+		exportjaeger.WithProcess(exportjaeger.Process{
 			ServiceName: "k6",
 			Tags: []label.KeyValue{
 				label.String("exporter", "jaeger"),
 				label.String("k6.version", consts.Version),
 			},
 		}),
-		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
+		exportjaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
 	if err != nil {
 		logger.WithError(err).Error("Error while starting the Jaeger exporter pipeline")
@@ -517,10 +526,10 @@ func initJaegerTracer(logger *logrus.Logger) func() {
 
 func initZipkinTracer(logger *logrus.Logger) {
 	// Create a Zipkin exporter and install it as a global tracer.
-	err := zipkin.InstallNewPipeline(
+	err := exportzipkin.InstallNewPipeline(
 		"http://localhost:9411/api/v2/spans",
 		"k6",
-		zipkin.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
+		exportzipkin.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
 	if err != nil {
 		logger.WithError(err).Error("Error while starting the Zipkin exporter pipeline")
@@ -529,10 +538,10 @@ func initZipkinTracer(logger *logrus.Logger) {
 
 func initNoopTracer(logger *logrus.Logger) {
 	// Create a noop exporter and install it as a global tracer.
-	exportOpts := []traceout.Option{
-		traceout.WithoutTraceExport(),
+	exportOpts := []exportout.Option{
+		exportout.WithoutTraceExport(),
 	}
-	_, err := traceout.InstallNewPipeline(exportOpts, nil)
+	_, err := exportout.InstallNewPipeline(exportOpts, nil)
 	if err != nil {
 		logger.WithError(err).Error("Error while starting the noop exporter pipeline")
 	}
@@ -540,10 +549,10 @@ func initNoopTracer(logger *logrus.Logger) {
 
 func initStdoutTracer(logger *logrus.Logger) {
 	// Create a stdout exporter and install it as a global tracer.
-	exportOpts := []traceout.Option{
-		traceout.WithPrettyPrint(),
+	exportOpts := []exportout.Option{
+		exportout.WithPrettyPrint(),
 	}
-	_, err := traceout.InstallNewPipeline(exportOpts, nil)
+	_, err := exportout.InstallNewPipeline(exportOpts, nil)
 	if err != nil {
 		logger.WithError(err).Error("Error while starting the stdout exporter pipeline")
 	}
