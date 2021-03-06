@@ -99,7 +99,9 @@ func optionFlagSet() *pflag.FlagSet {
 		"Milliseconds are assumed if no unit is provided.\n"+
 		"Possible select values to return a single IP are: 'first', 'random' or 'roundRobin'.\n"+
 		"Possible policy values are: 'preferIPv4', 'preferIPv6', 'onlyIPv4', 'onlyIPv6' or 'any'.\n")
-	flags.String("distributed-tracing", "", "(experimental) enable distributed tracing support")
+	flags.Bool("tracing", false, "Enable distributed tracing support.")
+	flags.String("tracing-exporter", "noop", "Set the tracing exporter. Possible values are: 'jaeger', 'zipkin', 'noop', 'stdout' (default: 'noop')")
+	flags.String("tracing-propagator", "w3c", "Set the propagation format. Possible values are: 'w3c', 'jaeger', 'b3', 'ot' (default: 'w3c')")
 	return flags
 }
 
@@ -123,7 +125,9 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		MinIterationDuration:  getNullDuration(flags, "min-iteration-duration"),
 		Throw:                 getNullBool(flags, "throw"),
 		DiscardResponseBodies: getNullBool(flags, "discard-response-bodies"),
-		DistributedTracing:    getNullString(flags, "distributed-tracing"),
+		Tracing:               getNullBool(flags, "tracing"),
+		TracingExporter:       getNullString(flags, "tracing-exporter"),
+		TracingPropagator:     getNullString(flags, "tracing-propagator"),
 		// Default values for options without CLI flags:
 		// TODO: find a saner and more dev-friendly and error-proof way to handle options
 		SetupTimeout:    types.NullDuration{Duration: types.Duration(60 * time.Second), Valid: false},

@@ -51,11 +51,11 @@ import (
 	"github.com/loadimpact/k6/ui/pb"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/label"
-	"go.opentelemetry.io/otel/propagation"
-
+	traceout "go.opentelemetry.io/otel/exporters/stdout"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
 	"go.opentelemetry.io/otel/exporters/trace/zipkin"
+	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -157,18 +157,32 @@ a commandline interface for interacting with it.`,
 			}
 
 			// Set up distributed tracing
-			if conf.Options.DistributedTracing.Valid {
-				switch conf.Options.DistributedTracing.String {
+			if conf.Options.Tracing.Bool {
+				var propagator propagation.TextMapPropagator
+				switch conf.Options.TracingPropagator.String {
+				case "w3c":
+					propagator = propagation.TraceContext{}
+				default:
+					// TODO: This is temporal. Will change if we move the set up to another place.
+					logger.Error("unknow tracing propagator ", conf.Options.TracingPropagator.String)
+				}
+				switch conf.Options.TracingExporter.String {
 				case "jaeger":
 					flush := initJaegerTracer(logger)
-					otel.SetTextMapPropagator(propagation.TraceContext{})
+					otel.SetTextMapPropagator(propagator)
 					defer flush()
 				case "zipkin":
 					initZipkinTracer(logger)
-					otel.SetTextMapPropagator(propagation.TraceContext{})
+					otel.SetTextMapPropagator(propagator)
+				case "noop":
+					initNoopTracer(logger)
+					otel.SetTextMapPropagator(propagator)
+				case "stdout":
+					initStdoutTracer(logger)
+					otel.SetTextMapPropagator(propagator)
 				default:
 					// TODO: This is temporal. Will change if we move the set up to another place.
-					logger.Error("unknow distributed-tracing exporter ", conf.Options.DistributedTracing.String)
+					logger.Error("unknow tracing exporter ", conf.Options.TracingExporter.String)
 				}
 			}
 
@@ -510,5 +524,27 @@ func initZipkinTracer(logger *logrus.Logger) {
 	)
 	if err != nil {
 		logger.WithError(err).Error("Error while starting the Zipkin exporter pipeline")
+	}
+}
+
+func initNoopTracer(logger *logrus.Logger) {
+	// Create a noop exporter and install it as a global tracer.
+	exportOpts := []traceout.Option{
+		traceout.WithoutTraceExport(),
+	}
+	_, err := traceout.InstallNewPipeline(exportOpts, nil)
+	if err != nil {
+		logger.WithError(err).Error("Error while starting the noop exporter pipeline")
+	}
+}
+
+func initStdoutTracer(logger *logrus.Logger) {
+	// Create a stdout exporter and install it as a global tracer.
+	exportOpts := []traceout.Option{
+		traceout.WithPrettyPrint(),
+	}
+	_, err := traceout.InstallNewPipeline(exportOpts, nil)
+	if err != nil {
+		logger.WithError(err).Error("Error while starting the stdout exporter pipeline")
 	}
 }

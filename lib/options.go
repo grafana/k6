@@ -393,7 +393,9 @@ type Options struct {
 	LocalIPs types.NullIPPool `json:"-" envconfig:"K6_LOCAL_IPS"`
 
 	// Enable distributed tracing support
-	DistributedTracing null.String `json:"distributedTracing"`
+	Tracing           null.Bool   `json:"tracing" envconfig:"K6_TRACING"`
+	TracingExporter   null.String `json:"tracingExporter" envconfig:"K6_TRACING_EXPORTER"`
+	TracingPropagator null.String `json:"tracingPropagator" envconfig:"K6_TRACING_PROPAGATOR"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.

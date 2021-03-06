@@ -54,6 +54,8 @@ github.com/andybalholm/cascadia v1.0.0 h1:hOCXnnZ5A+3eVDX8pvgl4kofXv2ELss0bKcqRy
 github.com/andybalholm/cascadia v1.0.0/go.mod h1:GsXiBklL0woXo1j/WYWtSYYC4ouU9PqHO0sqidkEA4Y=
 github.com/apache/thrift v0.13.0 h1:5hryIiq9gtn+MiLVn0wP37kb/uTeRZgN08WoCsAhIhI=
 github.com/apache/thrift v0.13.0/go.mod h1:cp2SuWMxlEZw2r+iP2GNCdIi4C1qmUzdZFSVb+bacwQ=
+github.com/benbjohnson/clock v1.0.3 h1:vkLuvpK4fmtSCuo60+yC63p7y0BmQ8gm5ZXGuBCJyXg=
+github.com/benbjohnson/clock v1.0.3/go.mod h1:bGMdMPoPVvcYyt1gHDf4J2KE153Yf9BuiUKYMaxlTDM=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/chzyer/logex v1.1.10/go.mod h1:+Ywpsq7O8HXn0nuIou7OrIPyXbp3wmkHB+jjWRnGsAI=
 github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5PlCu98SY8svDHJxuZscDgtXS6KTTbou5AhLI=
@@ -287,6 +289,8 @@ go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.17.0 h1:nzs66fK
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.17.0/go.mod h1:c4YsdmxKHUj2fAHJQDQNtjG/+fGa4DcUNe+hdFgDjcE=
 go.opentelemetry.io/otel v0.17.0 h1:6MKOu8WY4hmfpQ4oQn34u6rYhnf2sWf1LXYO/UFm71U=
 go.opentelemetry.io/otel v0.17.0/go.mod h1:Oqtdxmf7UtEvL037ohlgnaYa1h7GtMh0NcSd9eqkC9s=
+go.opentelemetry.io/otel/exporters/stdout v0.17.0 h1:QfS/okW9h99eT7m20E9un/TDz+Q1woZADvAgUWR8YQI=
+go.opentelemetry.io/otel/exporters/stdout v0.17.0/go.mod h1:NJ6kp8glOLKmXyjTM3I/ChQwUcE6rSdWd8AqGO/Av/w=
 go.opentelemetry.io/otel/exporters/trace/jaeger v0.17.0 h1:9Nivnf6Oqkm6P8o7LGJfQNjqP45O2FgDAQgLncy1pPM=
 go.opentelemetry.io/otel/exporters/trace/jaeger v0.17.0/go.mod h1:PCzsDDOeNfZNiKfWMgL8jK3qodD147xu6n/DYvFFNdw=
 go.opentelemetry.io/otel/exporters/trace/zipkin v0.17.0 h1:MZCDtOZyy0yYkYn7WvSb4sZhB+4S5wJPJbLJmI2Pqzk=
@@ -297,6 +301,10 @@ go.opentelemetry.io/otel/oteltest v0.17.0 h1:TyAihUowTDLqb4+m5ePAsR71xPJaTBJl4KD
 go.opentelemetry.io/otel/oteltest v0.17.0/go.mod h1:JT/LGFxPwpN+nlsTiinSYjdIx3hZIGqHCpChcIZmdoE=
 go.opentelemetry.io/otel/sdk v0.17.0 h1:eHXQwanmbtSHM/GcJYbJ8FyyH/sT9a0e+1Z9ZWkF7Ug=
 go.opentelemetry.io/otel/sdk v0.17.0/go.mod h1:INs1PePjjF2hf842AXsxGTe5lH023QfLTZRFPiV/RUk=
+go.opentelemetry.io/otel/sdk/export/metric v0.17.0 h1:RKOa26LDq4JBRwUnWwY64ccc27v1rA20z0q71aq4WFs=
+go.opentelemetry.io/otel/sdk/export/metric v0.17.0/go.mod h1:G9SxRFvGmGpdmJ8TEXnTEnnRuR5p3cg/tRvWkA/XHvo=
+go.opentelemetry.io/otel/sdk/metric v0.17.0 h1:l9W/OcHwyq3ZPqk4V6OS5ED50z9A6yI8N9gWeKS7zAY=
+go.opentelemetry.io/otel/sdk/metric v0.17.0/go.mod h1:zAX55SrmDMpZwfQrz1PKIPbCP5beU+JPQTfNko01deo=
 go.opentelemetry.io/otel/trace v0.17.0 h1:SBOj64/GAOyWzs5F680yW1ITIfJkm6cJWL2YAvuL9xY=
 go.opentelemetry.io/otel/trace v0.17.0/go.mod h1:bIujpqg6ZL6xUTubIUgziI1jSaUPthmabA/ygf/6Cfg=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
