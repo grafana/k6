@@ -76,6 +76,8 @@ github.com/gin-gonic/gin/render
 ## explicit
 github.com/go-sourcemap/sourcemap
 github.com/go-sourcemap/sourcemap/internal/base64vlq
+# github.com/gogo/protobuf v1.3.2
+github.com/gogo/protobuf/proto
 # github.com/golang/gddo v0.0.0-20190419222130-af0f2af80721
 github.com/golang/gddo/httputil
 github.com/golang/gddo/httputil/header
@@ -267,6 +269,17 @@ go.opentelemetry.io/otel/label
 go.opentelemetry.io/otel/propagation
 go.opentelemetry.io/otel/semconv
 go.opentelemetry.io/otel/unit
+# go.opentelemetry.io/otel/exporters/otlp v0.17.0
+## explicit
+go.opentelemetry.io/otel/exporters/otlp
+go.opentelemetry.io/otel/exporters/otlp/internal/opentelemetry-proto-gen/collector/metrics/v1
+go.opentelemetry.io/otel/exporters/otlp/internal/opentelemetry-proto-gen/collector/trace/v1
+go.opentelemetry.io/otel/exporters/otlp/internal/opentelemetry-proto-gen/common/v1
+go.opentelemetry.io/otel/exporters/otlp/internal/opentelemetry-proto-gen/metrics/v1
+go.opentelemetry.io/otel/exporters/otlp/internal/opentelemetry-proto-gen/resource/v1
+go.opentelemetry.io/otel/exporters/otlp/internal/opentelemetry-proto-gen/trace/v1
+go.opentelemetry.io/otel/exporters/otlp/internal/transform
+go.opentelemetry.io/otel/exporters/otlp/otlpgrpc
 # go.opentelemetry.io/otel/exporters/stdout v0.17.0
 ## explicit
 go.opentelemetry.io/otel/exporters/stdout
@@ -353,7 +366,7 @@ google.golang.org/genproto/protobuf/api
 google.golang.org/genproto/protobuf/field_mask
 google.golang.org/genproto/protobuf/ptype
 google.golang.org/genproto/protobuf/source_context
-# google.golang.org/grpc v1.34.0 => google.golang.org/grpc v1.31.1
+# google.golang.org/grpc v1.35.0 => google.golang.org/grpc v1.31.1
 ## explicit
 google.golang.org/grpc
 google.golang.org/grpc/attributes

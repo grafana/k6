@@ -54,12 +54,16 @@ import (
 	propjaeger "go.opentelemetry.io/contrib/propagators/jaeger"
 	propot "go.opentelemetry.io/contrib/propagators/ot"
 	"go.opentelemetry.io/otel"
+	exportotlp "go.opentelemetry.io/otel/exporters/otlp"
+	exportotlpgrpc "go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
 	exportout "go.opentelemetry.io/otel/exporters/stdout"
 	exportjaeger "go.opentelemetry.io/otel/exporters/trace/jaeger"
 	exportzipkin "go.opentelemetry.io/otel/exporters/trace/zipkin"
 	"go.opentelemetry.io/otel/label"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/semconv"
 )
 
 const (
@@ -188,6 +192,9 @@ a commandline interface for interacting with it.`,
 					otel.SetTextMapPropagator(propagator)
 				case "stdout":
 					initStdoutTracer(logger)
+					otel.SetTextMapPropagator(propagator)
+				case "otlp":
+					initOtlpTracer(logger)
 					otel.SetTextMapPropagator(propagator)
 				default:
 					// TODO: This is temporal. Will change if we move the set up to another place.
@@ -507,8 +514,12 @@ func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[strin
 
 func initJaegerTracer(logger *logrus.Logger) func() {
 	// Create a Jaeger exporter and install it as a global tracer.
+	jaegerEndpoint, ok := os.LookupEnv("JAEGER_ENDPOINT")
+	if !ok {
+		jaegerEndpoint = "http://localhost:14268/api/traces"
+	}
 	flush, err := exportjaeger.InstallNewPipeline(
-		exportjaeger.WithCollectorEndpoint("http://localhost:14268/api/traces"),
+		exportjaeger.WithCollectorEndpoint(jaegerEndpoint),
 		exportjaeger.WithProcess(exportjaeger.Process{
 			ServiceName: "k6",
 			Tags: []label.KeyValue{
@@ -526,8 +537,12 @@ func initJaegerTracer(logger *logrus.Logger) func() {
 
 func initZipkinTracer(logger *logrus.Logger) {
 	// Create a Zipkin exporter and install it as a global tracer.
+	zipkinEndpoint, ok := os.LookupEnv("ZIPKIN_ENDPOINT")
+	if !ok {
+		zipkinEndpoint = "http://localhost:9411/api/v2/spans"
+	}
 	err := exportzipkin.InstallNewPipeline(
-		"http://localhost:9411/api/v2/spans",
+		zipkinEndpoint,
 		"k6",
 		exportzipkin.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
@@ -555,5 +570,53 @@ func initStdoutTracer(logger *logrus.Logger) {
 	_, err := exportout.InstallNewPipeline(exportOpts, nil)
 	if err != nil {
 		logger.WithError(err).Error("Error while starting the stdout exporter pipeline")
+	}
+}
+
+func initOtlpTracer(logger *logrus.Logger) func() {
+	// Create an otlp exporter and install it as a global tracer.
+	// TODO: Replace this with otlp.InstallNewPipeline() https://github.com/open-telemetry/opentelemetry-go/pull/1373
+	ctx := context.Background()
+
+	otelAgentAddr, ok := os.LookupEnv("OTEL_AGENT_ENDPOINT")
+	if !ok {
+		otelAgentAddr = "0.0.0.0:55680"
+	}
+
+	exp, err := exportotlp.NewExporter(ctx, exportotlpgrpc.NewDriver(
+		exportotlpgrpc.WithInsecure(),
+		exportotlpgrpc.WithEndpoint(otelAgentAddr),
+	))
+	if err != nil {
+		logger.WithError(err).Error("Failed to create otlp exporter")
+	}
+
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceNameKey.String("k6"),
+		),
+	)
+	if err != nil {
+		logger.WithError(err).Error("Failed to create otlp resource")
+	}
+
+	bsp := sdktrace.NewBatchSpanProcessor(exp)
+	tracerProvider := sdktrace.NewTracerProvider(
+		sdktrace.WithConfig(sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
+		sdktrace.WithResource(res),
+		sdktrace.WithSpanProcessor(bsp),
+	)
+
+	otel.SetTracerProvider(tracerProvider)
+
+	return func() {
+		tracerProvider.Shutdown(ctx)
+		if err != nil {
+			logger.WithError(err).Error("Failed to shutdown otlp provider")
+		}
+		exp.Shutdown(ctx)
+		if err != nil {
+			logger.WithError(err).Error("Failed to stop otlp exporter")
+		}
 	}
 }

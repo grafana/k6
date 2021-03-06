@@ -62,6 +62,7 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.17.0
 	go.opentelemetry.io/contrib/propagators v0.17.0
 	go.opentelemetry.io/otel v0.17.0
+	go.opentelemetry.io/otel/exporters/otlp v0.17.0
 	go.opentelemetry.io/otel/exporters/stdout v0.17.0
 	go.opentelemetry.io/otel/exporters/trace/jaeger v0.17.0
 	go.opentelemetry.io/otel/exporters/trace/zipkin v0.17.0
@@ -70,7 +71,7 @@ require (
 	golang.org/x/net v0.0.0-20201209123823-ac852fbbde11
 	golang.org/x/text v0.3.4
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	google.golang.org/grpc v1.34.0
+	google.golang.org/grpc v1.35.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v8 v8.18.2 // indirect
