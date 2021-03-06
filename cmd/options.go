@@ -100,8 +100,10 @@ func optionFlagSet() *pflag.FlagSet {
 		"Possible select values to return a single IP are: 'first', 'random' or 'roundRobin'.\n"+
 		"Possible policy values are: 'preferIPv4', 'preferIPv6', 'onlyIPv4', 'onlyIPv6' or 'any'.\n")
 	flags.Bool("tracing", false, "Enable distributed tracing support.")
-	flags.String("tracing-exporter", "noop", "Set the tracing exporter. Possible values are: 'jaeger', 'zipkin', 'noop', 'stdout' (default: 'noop')")
-	flags.String("tracing-propagator", "w3c", "Set the propagation format. Possible values are: 'w3c', 'jaeger', 'b3', 'ot' (default: 'w3c')")
+	flags.String("tracing-exporter", "noop", "Set the tracing exporter."+
+		"Possible values are: 'jaeger', 'zipkin', 'noop', 'stdout' (default: 'noop')")
+	flags.String("tracing-propagator", "w3c", "Set the propagation format."+
+		"Possible values are: 'w3c', 'jaeger', 'b3', 'ot' (default: 'w3c')")
 	return flags
 }
 
