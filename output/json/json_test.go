@@ -71,9 +71,8 @@ func generateTestMetricSamples(t *testing.T) ([]stats.SampleContainer, func(io.R
 		}, Time: time2, Tags: connTags},
 		stats.Sample{Time: time3, Metric: metric2, Value: float64(5), Tags: stats.NewSampleTags(map[string]string{"tag3": "val3"})},
 	}
-	// TODO: fix JSON thresholds (https://github.com/loadimpact/k6/issues/1052)
 	expected := []string{
-		`{"type":"Metric","data":{"name":"my_metric1","type":"gauge","contains":"default","tainted":null,"thresholds":[],"submetrics":null,"sub":{"name":"","parent":"","suffix":"","tags":null}},"metric":"my_metric1"}`,
+		`{"type":"Metric","data":{"name":"my_metric1","type":"gauge","contains":"default","tainted":null,"thresholds":["rate<0.01", "p(99)<250"],"submetrics":null,"sub":{"name":"","parent":"","suffix":"","tags":null}},"metric":"my_metric1"}`,
 		`{"type":"Point","data":{"time":"2021-02-24T13:37:10Z","value":1,"tags":{"tag1":"val1"}},"metric":"my_metric1"}`,
 		`{"type":"Point","data":{"time":"2021-02-24T13:37:10Z","value":2,"tags":{"tag2":"val2"}},"metric":"my_metric1"}`,
 		`{"type":"Metric","data":{"name":"my_metric2","type":"counter","contains":"data","tainted":null,"thresholds":[],"submetrics":null,"sub":{"name":"","parent":"","suffix":"","tags":null}},"metric":"my_metric2"}`,
@@ -94,6 +93,8 @@ func TestJsonOutputStdout(t *testing.T) {
 		StdOut: stdout,
 	})
 	require.NoError(t, err)
+
+	setThresholds(t, out)
 	require.NoError(t, out.Start())
 
 	samples, validateResults := generateTestMetricSamples(t)
@@ -130,6 +131,8 @@ func TestJsonOutputFile(t *testing.T) {
 		ConfigArgument: "/json-output",
 	})
 	require.NoError(t, err)
+
+	setThresholds(t, out)
 	require.NoError(t, out.Start())
 
 	samples, validateResults := generateTestMetricSamples(t)
@@ -156,6 +159,8 @@ func TestJsonOutputFileGzipped(t *testing.T) {
 		ConfigArgument: "/json-output.gz",
 	})
 	require.NoError(t, err)
+
+	setThresholds(t, out)
 	require.NoError(t, out.Start())
 
 	samples, validateResults := generateTestMetricSamples(t)
@@ -184,4 +189,16 @@ func TestWrapMetricWithMetricPointer(t *testing.T) {
 	t.Parallel()
 	out := wrapMetric(&stats.Metric{})
 	assert.NotEqual(t, out, (*Envelope)(nil))
+}
+
+func setThresholds(t *testing.T, out output.Output) {
+	t.Helper()
+
+	jout, ok := out.(*Output)
+	require.True(t, ok)
+
+	ts, err := stats.NewThresholds([]string{"rate<0.01", "p(99)<250"})
+	require.NoError(t, err)
+
+	jout.SetThresholds(map[string]stats.Thresholds{"my_metric1": ts})
 }
