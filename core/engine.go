@@ -328,6 +328,15 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 		case <-ticker.C:
 			processSamples()
 		case <-processMetricsAfterRun:
+		getCachedMetrics:
+			for {
+				select {
+				case sc := <-e.Samples:
+					sampleContainers = append(sampleContainers, sc)
+				default:
+					break getCachedMetrics
+				}
+			}
 			e.logger.Debug("Processing metrics and thresholds after the test run has ended...")
 			processSamples()
 			if !e.runtimeOptions.NoThresholds.Bool {
