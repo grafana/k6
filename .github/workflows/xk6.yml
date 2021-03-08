@@ -15,7 +15,7 @@ jobs:
   test-xk6:
     strategy:
       matrix:
-        go-version: [1.15.x]
+        go-version: [1.15.x, 1.16.x]
         platform: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ubuntu-latest
     steps:
@@ -34,7 +34,7 @@ jobs:
           fi
           echo "COMMIT_ID=$COMMIT_ID"
           cd .github/workflows/xk6-tests
-          go get github.com/k6io/xk6/cmd/xk6
+          go get github.com/k6io/xk6/cmd/xk6@master
           GOPROXY="direct" xk6 build "$COMMIT_ID" \
             --output ./k6ext \
             --with github.com/k6io/xk6-js-test="$(pwd)/xk6-js-test" \
@@ -53,5 +53,3 @@ jobs:
             echo "summary result was not as expected: $SUMMARY_RESULT"
             exit 12
           fi
-
-
