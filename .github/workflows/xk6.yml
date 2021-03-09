@@ -13,6 +13,9 @@ defaults:
 
 jobs:
   test-xk6:
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == 'loadimpact/k6')
     strategy:
       matrix:
         go-version: [1.15.x]
@@ -53,5 +56,3 @@ jobs:
             echo "summary result was not as expected: $SUMMARY_RESULT"
             exit 12
           fi
-
-
