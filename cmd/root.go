@@ -205,6 +205,9 @@ func Execute() {
 			}
 		}
 
+		if stringer, ok := err.(fmt.Stringer); ok {
+			err = stringerError(stringer.String)
+		}
 		logger.WithFields(fields).Error(err)
 		if c.loggerIsRemote {
 			fallbackLogger.WithFields(fields).Error(err)
@@ -217,6 +220,12 @@ func Execute() {
 
 	cancel()
 	c.waitRemoteLogger()
+}
+
+type stringerError func() string
+
+func (s stringerError) Error() string {
+	return s()
 }
 
 func (c *rootCommand) waitRemoteLogger() {
