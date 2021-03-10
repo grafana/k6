@@ -44,7 +44,6 @@ const (
 	OCSP_REASON_REMOVE_FROM_CRL        = "remove_from_crl"
 	OCSP_REASON_PRIVILEGE_WITHDRAWN    = "privilege_withdrawn"
 	OCSP_REASON_AA_COMPROMISE          = "aa_compromise"
-	SSL_3_0                            = "ssl3.0"
 	TLS_1_0                            = "tls1.0"
 	TLS_1_1                            = "tls1.1"
 	TLS_1_2                            = "tls1.2"
@@ -67,8 +66,6 @@ type OCSP struct {
 func ParseTLSConnState(tlsState *tls.ConnectionState) (TLSInfo, OCSP) {
 	tlsInfo := TLSInfo{}
 	switch tlsState.Version {
-	case tls.VersionSSL30:
-		tlsInfo.Version = SSL_3_0
 	case tls.VersionTLS10:
 		tlsInfo.Version = TLS_1_0
 	case tls.VersionTLS11:
