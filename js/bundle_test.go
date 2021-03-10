@@ -380,27 +380,27 @@ func TestNewBundle(t *testing.T) {
 				b, err := getSimpleBundle(t, "/script.js", `
 					export let options = {
 						tlsVersion: {
-							min: "ssl3.0",
+							min: "tls1.0",
 							max: "tls1.2"
 						}
 					};
 					export default function() {};
 				`)
 				if assert.NoError(t, err) {
-					assert.Equal(t, b.Options.TLSVersion.Min, lib.TLSVersion(tls.VersionSSL30))
+					assert.Equal(t, b.Options.TLSVersion.Min, lib.TLSVersion(tls.VersionTLS10))
 					assert.Equal(t, b.Options.TLSVersion.Max, lib.TLSVersion(tls.VersionTLS12))
 				}
 			})
 			t.Run("String", func(t *testing.T) {
 				b, err := getSimpleBundle(t, "/script.js", `
 					export let options = {
-						tlsVersion: "ssl3.0"
+						tlsVersion: "tls1.0"
 					};
 					export default function() {};
 				`)
 				if assert.NoError(t, err) {
-					assert.Equal(t, b.Options.TLSVersion.Min, lib.TLSVersion(tls.VersionSSL30))
-					assert.Equal(t, b.Options.TLSVersion.Max, lib.TLSVersion(tls.VersionSSL30))
+					assert.Equal(t, b.Options.TLSVersion.Min, lib.TLSVersion(tls.VersionTLS10))
+					assert.Equal(t, b.Options.TLSVersion.Max, lib.TLSVersion(tls.VersionTLS10))
 				}
 			})
 		})

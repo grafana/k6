@@ -26,7 +26,6 @@ import "crypto/tls"
 // SupportedTLSVersions is string-to-constant map of available TLS versions.
 //nolint: gochecknoglobals
 var SupportedTLSVersions = map[string]TLSVersion{
-	"ssl3.0": tls.VersionSSL30,
 	"tls1.0": tls.VersionTLS10,
 	"tls1.1": tls.VersionTLS11,
 	"tls1.2": tls.VersionTLS12,
@@ -36,7 +35,6 @@ var SupportedTLSVersions = map[string]TLSVersion{
 // SupportedTLSVersionsToString is constant-to-string map of available TLS versions.
 //nolint: gochecknoglobals
 var SupportedTLSVersionsToString = map[TLSVersion]string{
-	tls.VersionSSL30: "ssl3.0",
 	tls.VersionTLS10: "tls1.0",
 	tls.VersionTLS11: "tls1.1",
 	tls.VersionTLS12: "tls1.2",

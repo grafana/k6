@@ -54,7 +54,6 @@ var _ modules.HasModuleInstancePerVU = new(GlobalHTTP)
 // NewModuleInstancePerVU returns an HTTP instance for each VU
 func (g *GlobalHTTP) NewModuleInstancePerVU() interface{} { // this here needs to return interface{}
 	return &HTTP{ // change the below fields to be not writable or not fields
-		SSL_3_0:                            netext.SSL_3_0,
 		TLS_1_0:                            netext.TLS_1_0,
 		TLS_1_1:                            netext.TLS_1_1,
 		TLS_1_2:                            netext.TLS_1_2,
@@ -80,7 +79,6 @@ func (g *GlobalHTTP) NewModuleInstancePerVU() interface{} { // this here needs t
 
 //nolint: golint
 type HTTP struct {
-	SSL_3_0                            string `js:"SSL_3_0"`
 	TLS_1_0                            string `js:"TLS_1_0"`
 	TLS_1_1                            string `js:"TLS_1_1"`
 	TLS_1_2                            string `js:"TLS_1_2"`
