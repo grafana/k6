@@ -63,6 +63,7 @@ const (
 	invalidConfigErrorCode       = 104
 	externalAbortErrorCode       = 105
 	cannotStartRESTAPIErrorCode  = 106
+	exceptionErrorCode           = 107
 )
 
 // TODO: fix this, global variables are not very testable...
@@ -345,6 +346,8 @@ func getExitCodeFromEngine(err error) ExitCode {
 		default:
 			return ExitCode{error: err, Code: genericTimeoutErrorCode}
 		}
+	case fmt.Stringer:
+		return ExitCode{error: stringerError(e.String), Code: exceptionErrorCode}
 	default:
 		//nolint:golint
 		return ExitCode{error: errors.New("Engine error"), Code: genericEngineErrorCode, Hint: err.Error()}
