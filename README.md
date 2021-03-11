@@ -72,7 +72,7 @@ You can manually download and install the [official `.msi` installation package]
 
 ### Linux
 
-**Notice: We are going to move away from bintray and start hosting our own packages soon, before k6 v0.32.0. This means you will have to re-install them, since the old .rpm and .deb repos will stop working.**
+**Notice: Because [Bintray is being shutdown](https://jfrog.com/blog/into-the-sunset-bintray-jcenter-gocenter-and-chartcenter/) we are going to start self-hosting our packages soon, before k6 v0.32.0. This means you will have to re-install them, since the old .rpm and .deb repos will stop working.**
 
 For Debian-based Linux distributions, you can install k6 from the private deb repo like this:
 
