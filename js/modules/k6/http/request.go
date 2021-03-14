@@ -148,97 +148,6 @@ func (h *HTTP) parseRequest(
 		result.ResponseType = httpext.ResponseTypeText
 	}
 
-	formatFormVal := func(v interface{}) string {
-		// TODO: handle/warn about unsupported/nested values
-		return fmt.Sprintf("%v", v)
-	}
-
-	handleObjectBody := func(data map[string]interface{}) error {
-		if !requestContainsFile(data) {
-			bodyQuery := make(url.Values, len(data))
-			for k, v := range data {
-				bodyQuery.Set(k, formatFormVal(v))
-			}
-			result.Body = bytes.NewBufferString(bodyQuery.Encode())
-			result.Req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			return nil
-		}
-
-		// handling multipart request
-		result.Body = &bytes.Buffer{}
-		mpw := multipart.NewWriter(result.Body)
-
-		// For parameters of type common.FileData, created with open(file, "b"),
-		// we write the file boundary to the body buffer.
-		// Otherwise parameters are treated as standard form field.
-		for k, v := range data {
-			switch ve := v.(type) {
-			case FileData:
-				// writing our own part to handle receiving
-				// different content-type than the default application/octet-stream
-				h := make(textproto.MIMEHeader)
-				escapedFilename := escapeQuotes(ve.Filename)
-				h.Set("Content-Disposition",
-					fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
-						k, escapedFilename))
-				h.Set("Content-Type", ve.ContentType)
-
-				// this writer will be closed either by the next part or
-				// the call to mpw.Close()
-				fw, err := mpw.CreatePart(h)
-				if err != nil {
-					return err
-				}
-
-				if _, err := fw.Write(ve.Data); err != nil {
-					return err
-				}
-			default:
-				fw, err := mpw.CreateFormField(k)
-				if err != nil {
-					return err
-				}
-
-				if _, err := fw.Write([]byte(formatFormVal(v))); err != nil {
-					return err
-				}
-			}
-		}
-
-		if err := mpw.Close(); err != nil {
-			return err
-		}
-
-		result.Req.Header.Set("Content-Type", mpw.FormDataContentType())
-		return nil
-	}
-
-	if body != nil {
-		switch data := body.(type) {
-		case map[string]goja.Value:
-			// TODO: fix forms submission and serialization in k6/html before fixing this..
-			newData := map[string]interface{}{}
-			for k, v := range data {
-				newData[k] = v.Export()
-			}
-			if err := handleObjectBody(newData); err != nil {
-				return nil, err
-			}
-		case goja.ArrayBuffer:
-			result.Body = bytes.NewBuffer(data.Bytes())
-		case map[string]interface{}:
-			if err := handleObjectBody(data); err != nil {
-				return nil, err
-			}
-		case string:
-			result.Body = bytes.NewBufferString(data)
-		case []byte:
-			result.Body = bytes.NewBuffer(data)
-		default:
-			return nil, fmt.Errorf("unknown request body type %T", body)
-		}
-	}
-
 	result.Req.Header.Set("User-Agent", state.Options.UserAgent.String)
 
 	if state.CookieJar != nil {
@@ -366,6 +275,97 @@ func (h *HTTP) parseRequest(
 
 	if result.ActiveJar != nil {
 		httpext.SetRequestCookies(result.Req, result.ActiveJar, result.Cookies)
+	}
+
+	formatFormVal := func(v interface{}) string {
+		// TODO: handle/warn about unsupported/nested values
+		return fmt.Sprintf("%v", v)
+	}
+
+	handleObjectBody := func(data map[string]interface{}) error {
+		if !requestContainsFile(data) {
+			bodyQuery := make(url.Values, len(data))
+			for k, v := range data {
+				bodyQuery.Set(k, formatFormVal(v))
+			}
+			result.Body = bytes.NewBufferString(bodyQuery.Encode())
+			result.Req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			return nil
+		}
+
+		// handling multipart request
+		result.Body = &bytes.Buffer{}
+		mpw := multipart.NewWriter(result.Body)
+
+		// For parameters of type common.FileData, created with open(file, "b"),
+		// we write the file boundary to the body buffer.
+		// Otherwise parameters are treated as standard form field.
+		for k, v := range data {
+			switch ve := v.(type) {
+			case FileData:
+				// writing our own part to handle receiving
+				// different content-type than the default application/octet-stream
+				h := make(textproto.MIMEHeader)
+				escapedFilename := escapeQuotes(ve.Filename)
+				h.Set("Content-Disposition",
+					fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+						k, escapedFilename))
+				h.Set("Content-Type", ve.ContentType)
+
+				// this writer will be closed either by the next part or
+				// the call to mpw.Close()
+				fw, err := mpw.CreatePart(h)
+				if err != nil {
+					return err
+				}
+
+				if _, err := fw.Write(ve.Data); err != nil {
+					return err
+				}
+			default:
+				fw, err := mpw.CreateFormField(k)
+				if err != nil {
+					return err
+				}
+
+				if _, err := fw.Write([]byte(formatFormVal(v))); err != nil {
+					return err
+				}
+			}
+		}
+
+		if err := mpw.Close(); err != nil {
+			return err
+		}
+
+		result.Req.Header.Set("Content-Type", mpw.FormDataContentType())
+		return nil
+	}
+
+	if body != nil {
+		switch data := body.(type) {
+		case map[string]goja.Value:
+			// TODO: fix forms submission and serialization in k6/html before fixing this..
+			newData := map[string]interface{}{}
+			for k, v := range data {
+				newData[k] = v.Export()
+			}
+			if err := handleObjectBody(newData); err != nil {
+				return nil, err
+			}
+		case goja.ArrayBuffer:
+			result.Body = bytes.NewBuffer(data.Bytes())
+		case map[string]interface{}:
+			if err := handleObjectBody(data); err != nil {
+				return nil, err
+			}
+		case string:
+			result.Body = bytes.NewBufferString(data)
+		case []byte:
+			result.Body = bytes.NewBuffer(data)
+		default:
+			return nil, fmt.Errorf("unknown request body type %T", body)
+		}
 	}
 
 	return result, nil
