@@ -278,77 +278,6 @@ func (h *HTTP) parseRequest(
 		httpext.SetRequestCookies(result.Req, result.ActiveJar, result.Cookies)
 	}
 
-	formatFormVal := func(v interface{}) string {
-		// TODO: handle/warn about unsupported/nested values
-		return fmt.Sprintf("%v", v)
-	}
-
-	handleObjectBody := func(data map[string]interface{}) error {
-		if !requestContainsFile(data) {
-			bodyQuery := make(url.Values, len(data))
-			for k, v := range data {
-				bodyQuery.Set(k, formatFormVal(v))
-			}
-			result.Body = bytes.NewBufferString(bodyQuery.Encode())
-			if result.Req.Header.Get("Content-Type") == "" {
-				result.Req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			}
-			return nil
-		}
-
-		// handling multipart request
-		result.Body = &bytes.Buffer{}
-		mpw := multipart.NewWriter(result.Body)
-
-		// For parameters of type common.FileData, created with open(file, "b"),
-		// we write the file boundary to the body buffer.
-		// Otherwise parameters are treated as standard form field.
-		for k, v := range data {
-			switch ve := v.(type) {
-			case FileData:
-				// writing our own part to handle receiving
-				// different content-type than the default application/octet-stream
-				h := make(textproto.MIMEHeader)
-				escapedFilename := escapeQuotes(ve.Filename)
-				h.Set("Content-Disposition",
-					fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
-						k, escapedFilename))
-				if h.Get("ContentType") == "" {
-					h.Set("Content-Type", ve.ContentType)
-				}
-
-				// this writer will be closed either by the next part or
-				// the call to mpw.Close()
-				fw, err := mpw.CreatePart(h)
-				if err != nil {
-					return err
-				}
-
-				if _, err := fw.Write(ve.Data); err != nil {
-					return err
-				}
-			default:
-				fw, err := mpw.CreateFormField(k)
-				if err != nil {
-					return err
-				}
-
-				if _, err := fw.Write([]byte(formatFormVal(v))); err != nil {
-					return err
-				}
-			}
-		}
-
-		if err := mpw.Close(); err != nil {
-			return err
-		}
-
-		if result.Req.Header.Get("Content-Type") == "" {
-			result.Req.Header.Set("Content-Type", mpw.FormDataContentType())
-		}
-		return nil
-	}
-
 	if body != nil {
 		switch data := body.(type) {
 		case map[string]goja.Value:
@@ -357,23 +286,17 @@ func (h *HTTP) parseRequest(
 			for k, v := range data {
 				newData[k] = v.Export()
 			}
-			if err := handleObjectBody(newData); err != nil {
+			err := h.handleRequestObjectBody(result, newData)
+			if err != nil {
 				return nil, err
 			}
 		case goja.ArrayBuffer:
 			result.Body = bytes.NewBuffer(data.Bytes())
 		case map[string]interface{}:
-			if result.Req.Header.Get("Content-Type") != "application/json" {
-				if err := handleObjectBody(data); err != nil {
-					return nil, err
-				}
-				break
-			}
-			jsBody, err := json.Marshal(data)
+			err := h.handleRequestObjectBody(result, data)
 			if err != nil {
 				return nil, err
 			}
-			result.Body = bytes.NewBuffer(jsBody)
 		case string:
 			result.Body = bytes.NewBufferString(data)
 		case []byte:
@@ -384,6 +307,83 @@ func (h *HTTP) parseRequest(
 	}
 
 	return result, nil
+}
+
+func (h *HTTP) handleRequestObjectBody(result *httpext.ParsedHTTPRequest, data map[string]interface{}) error {
+	formatFormVal := func(v interface{}) string {
+		// TODO: handle/warn about unsupported/nested values
+		return fmt.Sprintf("%v", v)
+	}
+	if !requestContainsFile(data) {
+		if result.Req.Header.Get("Content-Type") == "application/json" {
+			jsBody, err := json.Marshal(data)
+			if err != nil {
+				return err
+			}
+			result.Body = bytes.NewBuffer(jsBody)
+			return nil
+		}
+
+		if result.Req.Header.Get("Content-Type") == "" {
+			result.Req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		}
+
+		bodyQuery := make(url.Values, len(data))
+		for k, v := range data {
+			bodyQuery.Set(k, formatFormVal(v))
+		}
+		result.Body = bytes.NewBufferString(bodyQuery.Encode())
+		return nil
+	}
+
+	// handling multipart request
+	result.Body = &bytes.Buffer{}
+	mpw := multipart.NewWriter(result.Body)
+
+	// For parameters of type common.FileData, created with open(file, "b"),
+	// we write the file boundary to the body buffer.
+	// Otherwise parameters are treated as standard form field.
+	for k, v := range data {
+		switch ve := v.(type) {
+		case FileData:
+			// writing our own part to handle receiving
+			// different content-type than the default application/octet-stream
+			h := make(textproto.MIMEHeader)
+			escapedFilename := escapeQuotes(ve.Filename)
+			h.Set("Content-Disposition",
+				fmt.Sprintf(`form-data; name="%s"; filename="%s"`, k, escapedFilename))
+			h.Set("Content-Type", ve.ContentType)
+
+			// this writer will be closed either by the next part or
+			// the call to mpw.Close()
+			fw, err := mpw.CreatePart(h)
+			if err != nil {
+				return err
+			}
+
+			if _, err := fw.Write(ve.Data); err != nil {
+				return err
+			}
+		default:
+			fw, err := mpw.CreateFormField(k)
+			if err != nil {
+				return err
+			}
+
+			if _, err := fw.Write([]byte(formatFormVal(v))); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := mpw.Close(); err != nil {
+		return err
+	}
+
+	if result.Req.Header.Get("Content-Type") == "" {
+		result.Req.Header.Set("Content-Type", mpw.FormDataContentType())
+	}
+	return nil
 }
 
 func (h *HTTP) prepareBatchArray(
