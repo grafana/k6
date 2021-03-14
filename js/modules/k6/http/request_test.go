@@ -1142,6 +1142,8 @@ func TestRequestAndBatch(t *testing.T) {
 		"PATCH": "patch",
 	}
 	for method, fn := range postMethods {
+		method := method
+		fn := fn
 		t.Run(method, func(t *testing.T) {
 			_, err := rt.RunString(fmt.Sprintf(sr(`
 				var res = http.%s("HTTPBIN_URL/%s", "data");
@@ -1163,15 +1165,28 @@ func TestRequestAndBatch(t *testing.T) {
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), method, sr("HTTPBIN_URL/")+strings.ToLower(method), "", 200, "")
 				t.Run("Content-Type", func(t *testing.T) {
-					_, err := rt.RunString(fmt.Sprintf(sr(`
+					t.Run("Form", func(t *testing.T) {
+						_, err := rt.RunString(fmt.Sprintf(sr(`
 						var res = http.%s("HTTPBIN_URL/%s", {a: "a", b: 2}, {headers: {"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"}});
 						if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 						if (res.json().form.a != "a") { throw new Error("wrong a=: " + res.json().form.a); }
 						if (res.json().form.b != "2") { throw new Error("wrong b=: " + res.json().form.b); }
 						if (res.json().headers["Content-Type"] != "application/x-www-form-urlencoded; charset=utf-8") { throw new Error("wrong content type: " + res.json().headers["Content-Type"]); }
 						`), fn, strings.ToLower(method)))
-					assert.NoError(t, err)
-					assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), method, sr("HTTPBIN_URL/")+strings.ToLower(method), "", 200, "")
+						assert.NoError(t, err)
+						assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), method, sr("HTTPBIN_URL/")+strings.ToLower(method), "", 200, "")
+					})
+					t.Run("JSON", func(t *testing.T) {
+						_, err := rt.RunString(fmt.Sprintf(sr(`
+						var data = {a:"a",arr:["b","c"],nested:{d:"d"}}
+						var res = http.%s("HTTPBIN_URL/%s", data, {headers: {"Content-Type": "application/json"}});
+						if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+						if (res.json().data != JSON.stringify(data)) { throw new Error("wrong data: " + res.json().data); }
+						if (res.json().headers["Content-Type"] != "application/json") { throw new Error("wrong content type: " + res.json().headers["Content-Type"]); }
+						`), fn, strings.ToLower(method)))
+						assert.NoError(t, err)
+						assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), method, sr("HTTPBIN_URL/")+strings.ToLower(method), "", 200, "")
+					})
 				})
 			})
 		})
@@ -1341,6 +1356,17 @@ func TestRequestAndBatch(t *testing.T) {
 			}`))
 			assert.NoError(t, err)
 			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "POST", sr("HTTPBIN_URL/post"), "", 200, "")
+
+			t.Run("DataJSON", func(t *testing.T) {
+				_, err := rt.RunString(sr(`
+				var data = {a: "a", b: 2};
+				var res = http.batch([ {method: "POST", url: "HTTPBIN_URL/post", body: data, params: {headers: {"Content-Type": "application/json"}}} ]);
+				for (var key in res) {
+					if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
+					if (res[key].json().data != JSON.stringify(data)) { throw new Error("wrong json body: " + key + ": " + JSON.stringify(res[key].json().data)); }
+				}`))
+				assert.NoError(t, err)
+			})
 		})
 		t.Run("PUT", func(t *testing.T) {
 			_, err := rt.RunString(sr(`

@@ -23,6 +23,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"mime/multipart"
 	"net/http"
@@ -289,7 +290,9 @@ func (h *HTTP) parseRequest(
 				bodyQuery.Set(k, formatFormVal(v))
 			}
 			result.Body = bytes.NewBufferString(bodyQuery.Encode())
-			result.Req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			if result.Req.Header.Get("Content-Type") == "" {
+				result.Req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			}
 			return nil
 		}
 
@@ -310,7 +313,9 @@ func (h *HTTP) parseRequest(
 				h.Set("Content-Disposition",
 					fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
 						k, escapedFilename))
-				h.Set("Content-Type", ve.ContentType)
+				if h.Get("ContentType") == "" {
+					h.Set("Content-Type", ve.ContentType)
+				}
 
 				// this writer will be closed either by the next part or
 				// the call to mpw.Close()
@@ -338,7 +343,9 @@ func (h *HTTP) parseRequest(
 			return err
 		}
 
-		result.Req.Header.Set("Content-Type", mpw.FormDataContentType())
+		if result.Req.Header.Get("Content-Type") == "" {
+			result.Req.Header.Set("Content-Type", mpw.FormDataContentType())
+		}
 		return nil
 	}
 
@@ -356,9 +363,17 @@ func (h *HTTP) parseRequest(
 		case goja.ArrayBuffer:
 			result.Body = bytes.NewBuffer(data.Bytes())
 		case map[string]interface{}:
-			if err := handleObjectBody(data); err != nil {
+			if result.Req.Header.Get("Content-Type") != "application/json" {
+				if err := handleObjectBody(data); err != nil {
+					return nil, err
+				}
+				break
+			}
+			jsBody, err := json.Marshal(data)
+			if err != nil {
 				return nil, err
 			}
+			result.Body = bytes.NewBuffer(jsBody)
 		case string:
 			result.Body = bytes.NewBufferString(data)
 		case []byte:
