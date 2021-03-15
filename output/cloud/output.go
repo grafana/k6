@@ -21,20 +21,13 @@
 package cloud
 
 import (
-	"bytes"
-	"compress/gzip"
-	"context"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/mailru/easyjson"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
@@ -58,11 +51,10 @@ type Output struct {
 	config      cloudapi.Config
 	referenceID string
 
-	executionPlan  []lib.ExecutionStep
-	duration       int64 // in seconds
-	thresholds     map[string][]*stats.Threshold
-	client         *cloudapi.Client
-	pushBufferPool sync.Pool
+	executionPlan []lib.ExecutionStep
+	duration      int64 // in seconds
+	thresholds    map[string][]*stats.Threshold
+	client        *MetricsClient
 
 	runStatus lib.RunStatus
 
@@ -156,19 +148,17 @@ func newOutput(params output.Params) (*Output, error) {
 			conf.MaxMetricSamplesPerPackage.Int64)
 	}
 
+	apiClient := cloudapi.NewClient(logger, conf.Token.String, conf.Host.String, consts.Version)
+
 	return &Output{
 		config:        conf,
-		client:        cloudapi.NewClient(logger, conf.Token.String, conf.Host.String, consts.Version),
+		client:        NewMetricsClient(apiClient, logger, conf.Host.String, conf.NoCompress.Bool),
 		executionPlan: params.ExecutionPlan,
 		duration:      int64(duration / time.Second),
 		opts:          params.ScriptOptions,
 		aggrBuckets:   map[int64]map[[3]string]aggregationBucket{},
 		logger:        logger,
-		pushBufferPool: sync.Pool{
-			New: func() interface{} {
-				return &bytes.Buffer{}
-			},
-		},
+
 		stopSendingMetrics: make(chan struct{}),
 		stopAggregation:    make(chan struct{}),
 		aggregationDone:    &sync.WaitGroup{},
@@ -641,7 +631,7 @@ func (out *Output) pushMetrics() {
 	for i := 0; i < numberOfWorkers; i++ {
 		go func() {
 			for job := range ch {
-				err := out.PushMetric(out.referenceID, out.config.NoCompress.Bool, job.samples)
+				err := out.client.PushMetric(out.referenceID, job.samples)
 				job.done <- err
 				if out.shouldStopSendingMetrics(err) {
 					return
@@ -713,71 +703,3 @@ func (out *Output) testFinished() error {
 }
 
 const expectedGzipRatio = 6 // based on test it is around 6.8, but we don't need to be that accurate
-
-// PushMetric pushes the provided metric samples for the given referenceID
-func (out *Output) PushMetric(referenceID string, noCompress bool, s []*Sample) error {
-	start := time.Now()
-	url := fmt.Sprintf("%s/v1/metrics/%s", out.config.Host.String, referenceID)
-
-	jsonStart := time.Now()
-	b, err := easyjson.Marshal(samples(s))
-	if err != nil {
-		return err
-	}
-	jsonTime := time.Since(jsonStart)
-
-	// TODO: change the context, maybe to one with a timeout
-	req, err := http.NewRequestWithContext(context.Background(), "POST", url, nil)
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("X-Payload-Sample-Count", strconv.Itoa(len(s)))
-	var additionalFields logrus.Fields
-
-	if !noCompress {
-		buf := out.pushBufferPool.Get().(*bytes.Buffer)
-		buf.Reset()
-		defer out.pushBufferPool.Put(buf)
-		unzippedSize := len(b)
-		buf.Grow(unzippedSize / expectedGzipRatio)
-		gzipStart := time.Now()
-		{
-			g, _ := gzip.NewWriterLevel(buf, gzip.BestSpeed)
-			if _, err = g.Write(b); err != nil {
-				return err
-			}
-			if err = g.Close(); err != nil {
-				return err
-			}
-		}
-		gzipTime := time.Since(gzipStart)
-
-		req.Header.Set("Content-Encoding", "gzip")
-		req.Header.Set("X-Payload-Byte-Count", strconv.Itoa(unzippedSize))
-
-		additionalFields = logrus.Fields{
-			"unzipped_size":  unzippedSize,
-			"gzip_t":         gzipTime,
-			"content_length": buf.Len(),
-		}
-
-		b = buf.Bytes()
-	}
-
-	req.Header.Set("Content-Length", strconv.Itoa(len(b)))
-	req.Body = ioutil.NopCloser(bytes.NewReader(b))
-	req.GetBody = func() (io.ReadCloser, error) {
-		return ioutil.NopCloser(bytes.NewReader(b)), nil
-	}
-
-	err = out.client.Do(req, nil)
-
-	out.logger.WithFields(logrus.Fields{
-		"t":         time.Since(start),
-		"json_t":    jsonTime,
-		"part_size": len(s),
-	}).WithFields(additionalFields).Debug("Pushed part to cloud")
-
-	return err
-}

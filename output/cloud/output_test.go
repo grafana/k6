@@ -812,7 +812,7 @@ func TestPublishMetric(t *testing.T) {
 
 	out, err := newOutput(output.Params{
 		Logger:     testutils.NewLogger(t),
-		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s", "noCompress": true}`, server.URL)),
+		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s", "noCompress": false}`, server.URL)),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
 			SystemTags: &stats.DefaultSystemTagSet,
@@ -832,7 +832,7 @@ func TestPublishMetric(t *testing.T) {
 			},
 		},
 	}
-	err = out.PushMetric("1", false, samples)
+	err = out.client.PushMetric("1", samples)
 
 	assert.Nil(t, err)
 }
