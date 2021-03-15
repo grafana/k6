@@ -377,7 +377,7 @@ func (r *Runtime) stringproto_matchAll(call FunctionCall) Value {
 	if regexp != _undefined && regexp != _null {
 		if isRegexp(regexp) {
 			if o, ok := regexp.(*Object); ok {
-				flags := o.Get("flags")
+				flags := o.self.getStr("flags", nil)
 				r.checkObjectCoercible(flags)
 				if !strings.Contains(flags.toString().String(), "g") {
 					panic(r.NewTypeError("RegExp doesn't have global flag set"))

@@ -149,6 +149,7 @@ func isId(tkn token.Token) bool {
 		token.DO,
 
 		token.VAR,
+		token.LET,
 		token.FOR,
 		token.NEW,
 		token.TRY,
@@ -158,6 +159,7 @@ func isId(tkn token.Token) bool {
 		token.VOID,
 		token.WITH,
 
+		token.CONST,
 		token.WHILE,
 		token.BREAK,
 		token.CATCH,
@@ -180,6 +182,13 @@ func isId(tkn token.Token) bool {
 		return true
 	}
 	return false
+}
+
+func (self *_parser) peek() token.Token {
+	implicitSemicolon, insertSemicolon, chr, chrOffset, offset := self.implicitSemicolon, self.insertSemicolon, self.chr, self.chrOffset, self.offset
+	tok, _, _, _ := self.scan()
+	self.implicitSemicolon, self.insertSemicolon, self.chr, self.chrOffset, self.offset = implicitSemicolon, insertSemicolon, chr, chrOffset, offset
+	return tok
 }
 
 func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unistring.String, idx file.Idx) {
