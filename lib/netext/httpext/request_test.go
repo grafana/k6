@@ -31,12 +31,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mccutchen/go-httpbin/httpbin"
+	"github.com/oxtoacart/bpool"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 )
 
@@ -278,5 +282,70 @@ func BenchmarkWrapDecompressionError(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = wrapDecompressionError(err)
+	}
+}
+
+func TestTrailFailed(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewTLSServer(httpbin.New().Handler())
+	defer srv.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	samples := make(chan stats.SampleContainer, 10)
+	logger := logrus.New()
+	logger.Level = logrus.DebugLevel
+	state := &lib.State{
+		Options: lib.Options{
+			RunTags:    &stats.SampleTags{},
+			SystemTags: &stats.DefaultSystemTagSet,
+		},
+		Transport: srv.Client().Transport,
+		Samples:   samples,
+		Logger:    logger,
+		BPool:     bpool.NewBufferPool(2),
+	}
+	ctx = lib.WithState(ctx, state)
+
+	testCases := map[string]struct {
+		responseCallback func(int) bool
+		failed           null.Bool
+	}{
+		"null responsecallback": {responseCallback: nil, failed: null.NewBool(false, false)},
+		"unexpected response":   {responseCallback: func(int) bool { return false }, failed: null.NewBool(true, true)},
+		"expected response":     {responseCallback: func(int) bool { return true }, failed: null.NewBool(false, true)},
+	}
+	for name, testCase := range testCases {
+		responseCallback := testCase.responseCallback
+		failed := testCase.failed
+
+		t.Run(name, func(t *testing.T) {
+			req, _ := http.NewRequest("GET", srv.URL, nil)
+			preq := &ParsedHTTPRequest{
+				Req:              req,
+				URL:              &URL{u: req.URL, URL: srv.URL},
+				Body:             new(bytes.Buffer),
+				Timeout:          10 * time.Millisecond,
+				ResponseCallback: responseCallback,
+			}
+			res, err := MakeRequest(ctx, preq)
+
+			require.NoError(t, err)
+			assert.NotNil(t, res)
+			assert.Len(t, samples, 1)
+			sample := <-samples
+			trail := sample.(*Trail)
+			require.Equal(t, failed, trail.Failed)
+
+			var httpReqFailedSampleValue null.Bool
+			for _, s := range sample.GetSamples() {
+				if s.Metric.Name == metrics.HTTPReqFailed.Name {
+					httpReqFailedSampleValue.Valid = true
+					if s.Value == 1.0 {
+						httpReqFailedSampleValue.Bool = true
+					}
+				}
+			}
+			require.Equal(t, failed, httpReqFailedSampleValue)
+		})
 	}
 }
