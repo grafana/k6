@@ -1742,7 +1742,7 @@ func TestSystemTags(t *testing.T) {
 		t.Run(fmt.Sprintf("TC %d with only %s", num, tc.tag), func(t *testing.T) {
 			require.NoError(t, r.SetOptions(r.GetOptions().Apply(lib.Options{
 				Throw:                 null.BoolFrom(false),
-				TLSVersion:            &lib.TLSVersions{Max: lib.TLSVersion13},
+				TLSVersion:            &lib.TLSVersions{Max: tls.VersionTLS13},
 				SystemTags:            stats.ToSystemTagSet([]string{tc.tag}),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
 			})))
