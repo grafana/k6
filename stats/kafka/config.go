@@ -60,8 +60,9 @@ type config struct {
 // NewConfig creates a new Config instance with default values for some fields.
 func NewConfig() Config {
 	return Config{
-		Format:       null.StringFrom("json"),
-		PushInterval: types.NullDurationFrom(1 * time.Second),
+		Format:         null.StringFrom("json"),
+		PushInterval:   types.NullDurationFrom(1 * time.Second),
+		InfluxDBConfig: influxdb.NewConfig(),
 	}
 }
 
@@ -78,6 +79,7 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.PushInterval.Valid {
 		c.PushInterval = cfg.PushInterval
 	}
+	c.InfluxDBConfig = c.InfluxDBConfig.Apply(cfg.InfluxDBConfig)
 	return c
 }
 
