@@ -187,7 +187,7 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 	finalTags := stats.IntoSampleTags(&tags)
 	trail.SaveSamples(finalTags)
 	if t.responseCallback != nil {
-		trail.Failed.SetValid(true)
+		trail.Failed.Valid = true
 		if failed == 1 {
 			trail.Failed.Bool = true
 		}
