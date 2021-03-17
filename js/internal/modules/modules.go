@@ -23,6 +23,17 @@ package modules
 import (
 	"fmt"
 	"sync"
+
+	"github.com/loadimpact/k6/js/modules/k6"
+	"github.com/loadimpact/k6/js/modules/k6/crypto"
+	"github.com/loadimpact/k6/js/modules/k6/crypto/x509"
+	"github.com/loadimpact/k6/js/modules/k6/data"
+	"github.com/loadimpact/k6/js/modules/k6/encoding"
+	"github.com/loadimpact/k6/js/modules/k6/grpc"
+	"github.com/loadimpact/k6/js/modules/k6/html"
+	"github.com/loadimpact/k6/js/modules/k6/http"
+	"github.com/loadimpact/k6/js/modules/k6/metrics"
+	"github.com/loadimpact/k6/js/modules/k6/ws"
 )
 
 //nolint:gochecknoglobals
@@ -30,17 +41,6 @@ var (
 	modules = make(map[string]interface{})
 	mx      sync.RWMutex
 )
-
-// Get returns the module registered with name.
-func Get(name string) interface{} {
-	mx.RLock()
-	defer mx.RUnlock()
-	mod := modules[name]
-	if i, ok := mod.(HasModuleInstancePerVU); ok {
-		return i.NewModuleInstancePerVU()
-	}
-	return mod
-}
 
 // HasModuleInstancePerVU should be implemented by all native Golang modules that
 // would require per-VU state. k6 will call their NewModuleInstancePerVU() methods
@@ -60,4 +60,26 @@ func Register(name string, mod interface{}) {
 		panic(fmt.Sprintf("module already registered: %s", name))
 	}
 	modules[name] = mod
+}
+
+// GetJSModules returns a map of all js modules
+func GetJSModules() map[string]interface{} {
+	result := map[string]interface{}{
+		"k6":             k6.New(),
+		"k6/crypto":      crypto.New(),
+		"k6/crypto/x509": x509.New(),
+		"k6/data":        data.New(),
+		"k6/encoding":    encoding.New(),
+		"k6/net/grpc":    grpc.New(),
+		"k6/html":        html.New(),
+		"k6/http":        http.New(),
+		"k6/metrics":     metrics.New(),
+		"k6/ws":          ws.New(),
+	}
+
+	for name, module := range modules {
+		result[name] = module
+	}
+
+	return result
 }

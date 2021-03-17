@@ -30,14 +30,9 @@ import (
 	"github.com/dop251/goja"
 
 	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/internal/modules"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/stats"
 )
-
-func init() {
-	modules.Register("k6/metrics", New())
-}
 
 var nameRegexString = "^[\\p{L}\\p{N}\\._ !\\?/&#\\(\\)<>%-]{1,128}$"
 
@@ -59,7 +54,7 @@ func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime 
 		return nil, errors.New("metrics must be declared in the init context")
 	}
 
-	//TODO: move verification outside the JS
+	// TODO: move verification outside the JS
 	if !checkName(name) {
 		return nil, common.NewInitContextError(fmt.Sprintf("Invalid metric name: '%s'", name))
 	}

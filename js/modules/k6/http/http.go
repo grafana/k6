@@ -24,14 +24,9 @@ import (
 	"context"
 
 	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/internal/modules"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/netext"
 )
-
-func init() {
-	modules.Register("k6/http", new(GlobalHTTP))
-}
 
 const (
 	HTTP_METHOD_GET     = "GET"
@@ -46,10 +41,13 @@ const (
 // ErrJarForbiddenInInitContext is used when a cookie jar was made in the init context
 var ErrJarForbiddenInInitContext = common.NewInitContextError("Making cookie jars in the init context is not supported")
 
+// New returns a new global module instance
+func New() *GlobalHTTP {
+	return &GlobalHTTP{}
+}
+
 // GlobalHTTP is a global HTTP module for a k6 instance/test run
 type GlobalHTTP struct{}
-
-var _ modules.HasModuleInstancePerVU = new(GlobalHTTP)
 
 // NewModuleInstancePerVU returns an HTTP instance for each VU
 func (g *GlobalHTTP) NewModuleInstancePerVU() interface{} { // this here needs to return interface{}
