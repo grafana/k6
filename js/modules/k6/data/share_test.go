@@ -159,7 +159,7 @@ func TestSharedArrayAnotherRuntimeWorking(t *testing.T) {
 	// create another Runtime with new ctx but keep the initEnv
 	rt, err = newConfiguredRuntime(moduleInstance)
 	require.NoError(t, err)
-	_, err = rt.RunString(makeArrayScript)
+	_, err = rt.RunString(`var array = new data.SharedArray("shared", function() {throw "wat";});`)
 	require.NoError(t, err)
 
 	_, err = rt.RunString(`
