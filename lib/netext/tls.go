@@ -72,7 +72,7 @@ func ParseTLSConnState(tlsState *tls.ConnectionState) (TLSInfo, OCSP) {
 		tlsInfo.Version = TLS_1_1
 	case tls.VersionTLS12:
 		tlsInfo.Version = TLS_1_2
-	case lib.TLSVersion13:
+	case tls.VersionTLS13:
 		tlsInfo.Version = TLS_1_3
 	}
 
