@@ -135,7 +135,7 @@ jobs:
   configure:
     runs-on: ubuntu-latest
     outputs:
-        version: ${{ steps.get_version.outputs.version }}
+      version: ${{ steps.get_version.outputs.version }}
     steps:
       - name: Get version
         id: get_version
@@ -204,7 +204,7 @@ jobs:
           path: dist/
           retention-days: 7
 
-  publish-docker:
+  build-docker:
     runs-on: ubuntu-latest
     needs: [deps, lint, test, test-cov, configure]
     env:
@@ -226,19 +226,35 @@ jobs:
             docker run $DOCKER_IMAGE_ID scale --help
             docker run $DOCKER_IMAGE_ID pause --help
             docker run $DOCKER_IMAGE_ID resume --help
+
       - name: Publish
-        if: github.event_name != 'pull_request'
+        if: |
+          github.ref == 'refs/heads/master' ||
+          startsWith(github.ref, 'refs/tags/v')
         run: |
-          echo "REF=${{ github.ref }}"
-          echo "DOCKER_IMAGE_ID=$DOCKER_IMAGE_ID"
-          # Log into registry
-          echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
           VERSION="${VERSION#v}"
-          echo "VERSION=$VERSION"
+          echo "Publish GHCR ($DOCKER_IMAGE_ID:$VERSION)"
+
+          # Log into GitHub Container Registry
+          echo "${{ secrets.CR_PAT }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+          docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$DOCKER_IMAGE_ID:$VERSION"
+          docker push "ghcr.io/$DOCKER_IMAGE_ID:$VERSION"
+          # We also want to tag the latest stable version as latest
+          if [[ "$VERSION" != "master" ]] && [[ ! "$VERSION" =~ (RC|rc) ]]; then
+            echo 'Publish GHCR (latest)'
+            docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$DOCKER_IMAGE_ID:latest"
+            docker push "ghcr.io/$DOCKER_IMAGE_ID:latest"
+          fi
+
+          echo "Publish Docker ($DOCKER_IMAGE_ID:$VERSION)"
+
+          # Log into Docker Hub Registry
+          echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
           docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:$VERSION"
           docker push "$DOCKER_IMAGE_ID:$VERSION"
           # We also want to tag the latest stable version as latest
           if [[ "$VERSION" != "master" ]] && [[ ! "$VERSION" =~ (RC|rc) ]]; then
+            echo 'Publish Docker (latest)'
             docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:latest"
             docker push "$DOCKER_IMAGE_ID:latest"
           fi
