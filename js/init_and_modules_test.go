@@ -60,6 +60,7 @@ func (cm *CheckModule) VuCtx(ctx context.Context) {
 }
 
 func TestNewJSRunnerWithCustomModule(t *testing.T) {
+	t.Skip()
 	checkModule := &CheckModule{t: t}
 	modules.Register("k6/check", checkModule)
 

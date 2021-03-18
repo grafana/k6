@@ -70,8 +70,6 @@ type InitContext struct {
 
 	logger logrus.FieldLogger
 
-	sharedObjects *common.SharedObjects
-
 	modules map[string]interface{}
 }
 
@@ -89,7 +87,6 @@ func NewInitContext(
 		programs:          make(map[string]programWithSource),
 		compatibilityMode: compatMode,
 		logger:            logger,
-		sharedObjects:     common.NewSharedObjects(),
 		modules:           modules.GetJSModules(),
 	}
 }
@@ -116,7 +113,6 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 		programs:          programs,
 		compatibilityMode: base.compatibilityMode,
 		logger:            base.logger,
-		sharedObjects:     base.sharedObjects,
 		modules:           base.modules,
 	}
 }
