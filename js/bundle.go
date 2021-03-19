@@ -21,6 +21,7 @@
 package js
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/url"
@@ -99,7 +100,7 @@ func NewBundle(
 		return nil, err
 	}
 
-	err = bundle.getExports(rt, true)
+	err = bundle.getExports(logger, rt, true)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +160,7 @@ func NewBundleFromArchive(logger logrus.FieldLogger, arc *lib.Archive, rtOpts li
 
 	// Grab exported objects, but avoid overwriting options, which would
 	// be initialized from the metadata.json at this point.
-	err = bundle.getExports(rt, false)
+	err = bundle.getExports(logger, rt, false)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +190,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 }
 
 // getExports validates and extracts exported objects
-func (b *Bundle) getExports(rt *goja.Runtime, options bool) error {
+func (b *Bundle) getExports(logger logrus.FieldLogger, rt *goja.Runtime, options bool) error {
 	exportsV := rt.Get("exports")
 	if goja.IsNull(exportsV) || goja.IsUndefined(exportsV) {
 		return errors.New("exports must be an object")
@@ -211,8 +212,13 @@ func (b *Bundle) getExports(rt *goja.Runtime, options bool) error {
 			if err != nil {
 				return err
 			}
-			if err := json.Unmarshal(data, &b.Options); err != nil {
-				return err
+			dec := json.NewDecoder(bytes.NewReader(data))
+			dec.DisallowUnknownFields()
+			if err := dec.Decode(&b.Options); err != nil {
+				if uerr := json.Unmarshal(data, &b.Options); uerr != nil {
+					return uerr
+				}
+				logger.WithError(err).Warn("There were unknown fields in the options exported in the script")
 			}
 		case consts.SetupFn:
 			return errors.New("exported 'setup' must be a function")
