@@ -53,7 +53,7 @@ func (v TLSVersion) MarshalJSON() ([]byte, error) {
 
 func (v *TLSVersion) UnmarshalJSON(data []byte) error {
 	var str string
-	if err := json.Unmarshal(data, &str); err != nil {
+	if err := StrictJSONUnmarshal(data, &str); err != nil {
 		return err
 	}
 	if str == "" {
@@ -79,9 +79,9 @@ type TLSVersions TLSVersionsFields
 
 func (v *TLSVersions) UnmarshalJSON(data []byte) error {
 	var fields TLSVersionsFields
-	if err := json.Unmarshal(data, &fields); err != nil {
+	if err := StrictJSONUnmarshal(data, &fields); err != nil {
 		var ver TLSVersion
-		if err2 := json.Unmarshal(data, &ver); err2 != nil {
+		if err2 := StrictJSONUnmarshal(data, &ver); err2 != nil {
 			return err
 		}
 		fields.Min = ver
@@ -111,7 +111,7 @@ func (s *TLSCipherSuites) MarshalJSON() ([]byte, error) {
 
 func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
 	var suiteNames []string
-	if err := json.Unmarshal(data, &suiteNames); err != nil {
+	if err := StrictJSONUnmarshal(data, &suiteNames); err != nil {
 		return err
 	}
 
@@ -146,7 +146,7 @@ type TLSAuth struct {
 }
 
 func (c *TLSAuth) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, &c.TLSAuthFields); err != nil {
+	if err := StrictJSONUnmarshal(data, &c.TLSAuthFields); err != nil {
 		return err
 	}
 	if _, err := c.Certificate(); err != nil {
