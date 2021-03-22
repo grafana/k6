@@ -8,7 +8,7 @@ services:
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
       - PGP_SIGN_KEY_PASSPHRASE
-      - S3_BUCKET=test-dl-k6-io
+      - S3_BUCKET=dl.staging.k6.io
     volumes:
       - ../dist:/home/k6/dist
       - ./sign-key.gpg:/home/k6/sign-key.gpg

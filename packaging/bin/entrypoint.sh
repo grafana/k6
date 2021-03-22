@@ -6,6 +6,7 @@ log() {
 }
 
 signkeypath="$PWD/sign-key.gpg"
+s3bucket="${S3_BUCKET-dl-k6-io}"
 
 if ! [ -r "$signkeypath" ]; then
   log "ERROR: Signing key not found at '$signkeypath'"
@@ -33,6 +34,19 @@ log "Generating index.html ..."
 (cd dl.k6.io && generate_index.py -r)
 
 log "Syncing to S3 ..."
-s3cmd sync ./dl.k6.io/ "s3://${S3_BUCKET-dl-k6-io}/"
+s3cmd sync ./dl.k6.io/ "s3://${s3bucket}/"
+
+# Disable cache for repo metadata, so that new releases will be available
+# immediately.
+# TODO: Maybe do this inside each script?
+# TODO: How to handle k6-latest-amd64.msi? Could it be an S3 redirect that is never cached?
+s3cmd modify --add-header="Cache-Control:no-cache, max-age=0" \
+  "s3://${s3bucket}/deb/dists/stable/"{Release,Release.gpg,InRelease}
+s3cmd modify --add-header="Cache-Control:no-cache, max-age=0" \
+  "s3://${s3bucket}/deb/dists/stable/main/binary-amd64"/Packages{,.gz,.bz2}
+s3cmd --recursive modify --add-header="Cache-Control:no-cache, max-age=0" \
+  "s3://${s3bucket}/rpm/x86_64/repodata"
+s3cmd modify --recursive --exclude='*' --include='index.html' \
+  --add-header='Cache-Control:no-cache, max-age=0' "s3://${s3bucket}/"
 
 exec "$@"
