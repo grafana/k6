@@ -47,6 +47,7 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/js"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/metrics"
@@ -250,6 +251,9 @@ a commandline interface for interacting with it.`,
 			initBar.Modify(pb.WithConstProgress(0, "Init VUs..."))
 			engineRun, engineWait, err := engine.Init(globalCtx, runCtx)
 			if err != nil {
+				if common.IsInterruptError(err) {
+					return errext.WithExitCodeIfNone(err, exitcodes.ScriptException)
+				}
 				// Add a generic engine exit code if we don't have a more specific one
 				return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
 			}
@@ -273,8 +277,18 @@ a commandline interface for interacting with it.`,
 
 			// Start the test run
 			initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
-			if err := engineRun(); err != nil {
-				return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
+			var interrupt error
+			err = engineRun()
+			if err != nil {
+				if common.IsInterruptError(err) {
+					interrupt = err
+				}
+				if !conf.Linger.Bool {
+					if interrupt == nil {
+						return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
+					}
+					return errext.WithExitCodeIfNone(interrupt, exitcodes.ScriptException)
+				}
 			}
 			runCancel()
 			logger.Debug("Engine run terminated cleanly")
@@ -323,6 +337,9 @@ a commandline interface for interacting with it.`,
 			logger.Debug("Waiting for engine processes to finish...")
 			engineWait()
 			logger.Debug("Everything has finished, exiting k6!")
+			if interrupt != nil {
+				return errext.WithExitCodeIfNone(interrupt, exitcodes.ScriptException)
+			}
 			if engine.IsTainted() {
 				return errext.WithExitCodeIfNone(errors.New("some thresholds have failed"), exitcodes.ThresholdsHaveFailed)
 			}

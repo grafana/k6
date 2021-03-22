@@ -22,6 +22,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -30,11 +31,17 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/lib/testutils"
 )
 
 type mockWriter struct {
@@ -124,4 +131,49 @@ func TestHandleSummaryResultError(t *testing.T) {
 	files := getFiles(t, fs)
 	assertEqual(t, "file summary 1", files[filePath1])
 	assertEqual(t, "file summary 2", files[filePath2])
+}
+
+func TestAbortTest(t *testing.T) { //nolint: tparallel
+	t.Parallel()
+
+	t.Run("Check status code is 107", func(t *testing.T) { //nolint: paralleltest
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		logger := testutils.NewLogger(t)
+
+		cmd := getRunCmd(ctx, logger)
+		a, err := filepath.Abs("testdata/abort.js")
+		require.NoError(t, err)
+		cmd.SetArgs([]string{a})
+		err = cmd.Execute()
+		var e errext.HasExitCode
+		require.ErrorAs(t, err, &e)
+		require.Equal(t, exitcodes.ScriptException, e.ExitCode(), "Status code must be 107")
+		require.Contains(t, e.Error(), common.AbortTest)
+	})
+
+	t.Run("Check that teardown is called", func(t *testing.T) { //nolint: paralleltest
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		msg := "Calling teardown function after abortTest()"
+		var buf bytes.Buffer
+		logger := logrus.New()
+		logger.SetOutput(&buf)
+
+		cmd := getRunCmd(ctx, logger)
+		// Redefine the flag to avoid a nil pointer panic on lookup.
+		cmd.Flags().AddFlag(&pflag.Flag{
+			Name:   "address",
+			Hidden: true,
+		})
+		a, err := filepath.Abs("testdata/teardown.js")
+		require.NoError(t, err)
+		cmd.SetArgs([]string{a})
+		err = cmd.Execute()
+		var e errext.HasExitCode
+		require.ErrorAs(t, err, &e)
+		assert.Equal(t, exitcodes.ScriptException, e.ExitCode(), "Status code must be 107")
+		assert.Contains(t, e.Error(), common.AbortTest)
+		assert.Contains(t, buf.String(), msg)
+	})
 }

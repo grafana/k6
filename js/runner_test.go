@@ -1506,6 +1506,13 @@ func TestInitContextForbidden(t *testing.T) {
 			k6.ErrCheckInInitContext.Error(),
 		},
 		{
+			"abortTest",
+			`var abortTest = require("k6").abortTest;
+			 abortTest();
+			 exports.default = function() { console.log("p"); }`,
+			common.AbortTest,
+		},
+		{
 			"group",
 			`var group = require("k6").group;
 			 group("group1", function () { console.log("group1");})
