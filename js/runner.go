@@ -654,9 +654,16 @@ func (u *ActiveVU) RunOnce() error {
 		// Shouldn't happen; this is validated in cmd.validateScenarioConfig()
 		panic(fmt.Sprintf("function '%s' not found in exports", u.Exec))
 	}
-
 	// Call the exported function.
 	_, isFullIteration, totalTime, err := u.runFn(u.RunContext, true, fn, u.setupData)
+	if err != nil {
+		if x, ok := err.(*goja.InterruptedError); ok {
+			if v, ok := x.Value().(*common.InterruptError); ok {
+				v.Reason = x.Error()
+				err = v
+			}
+		}
+	}
 
 	// If MinIterationDuration is specified and the iteration wasn't canceled
 	// and was less than it, sleep for the remainder

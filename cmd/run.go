@@ -45,6 +45,7 @@ import (
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
+	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
 	"github.com/loadimpact/k6/loader"
@@ -63,6 +64,7 @@ const (
 	invalidConfigErrorCode       = 104
 	externalAbortErrorCode       = 105
 	cannotStartRESTAPIErrorCode  = 106
+	abortedByScriptErrorCode     = 107
 )
 
 // TODO: fix this, global variables are not very testable...
@@ -345,6 +347,8 @@ func getExitCodeFromEngine(err error) ExitCode {
 		default:
 			return ExitCode{error: err, Code: genericTimeoutErrorCode}
 		}
+	case *common.InterruptError:
+		return ExitCode{error: errors.New("Engine error"), Code: abortedByScriptErrorCode, Hint: e.Reason}
 	default:
 		//nolint:golint
 		return ExitCode{error: errors.New("Engine error"), Code: genericEngineErrorCode, Hint: err.Error()}

@@ -116,6 +116,24 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 	return ret, err
 }
 
+func (*K6) AbortTest(ctx context.Context, extra ...goja.Value) {
+	state := lib.GetState(ctx)
+	rt := common.GetRuntime(ctx)
+	if state == nil {
+		rt.Interrupt(common.AbortTestInitContext)
+		return
+	}
+	e := *common.AbortTest
+	if len(extra) > 0 {
+		var m string
+		for _, v := range extra {
+			m += v.String()
+		}
+		e.Reason = m
+	}
+	rt.Interrupt(&e)
+}
+
 func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
 	state := lib.GetState(ctx)
 	if state == nil {

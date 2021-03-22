@@ -28,6 +28,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/ui/pb"
@@ -74,6 +75,58 @@ func validateStages(stages []Stage) []error {
 	return errors
 }
 
+// cancelKey is the key used to store the cancel function for the context of an
+// executor. This is a work around to avoid excessive changes for the abolity of
+// nested functions to cancel the passed context
+type cancelKey struct{}
+
+type cancelExec struct {
+	cancel context.CancelFunc
+	reason error
+}
+
+// Context returns context.Context that can be cancelled by calling
+// CancelExecutorContext. Use this to initialize context that will be passed to
+// executors.
+//
+// This allows executors to globally halt any executions that uses this context.
+// Example use case is when a script calls abortTest()
+func Context(ctx context.Context) context.Context {
+	ctx, cancel := context.WithCancel(ctx)
+	return context.WithValue(ctx, cancelKey{}, &cancelExec{cancel: cancel})
+}
+
+// CancelExecutorContext cancels executor context found in ctx, ctx can be a
+// child of a context that was created with Context function.
+func CancelExecutorContext(ctx context.Context, err error) {
+	if x := ctx.Value(cancelKey{}); x != nil {
+		v := x.(*cancelExec)
+		v.reason = err
+		v.cancel()
+	}
+}
+
+// CancelReason returns a reason the executor context was cancelled. This will
+// return nil if ctx is not an executor context(ctx or any of its parents was
+// never created by Context function).
+func CancelReason(ctx context.Context) error {
+	if x := ctx.Value(cancelKey{}); x != nil {
+		v := x.(*cancelExec)
+		return v.reason
+	}
+	return nil
+}
+
+func handleInterupt(ctx context.Context, err error) bool {
+	if err != nil {
+		if common.IsInteruptError(err) {
+			CancelExecutorContext(ctx, err)
+			return false
+		}
+	}
+	return false
+}
+
 // getIterationRunner is a helper function that returns an iteration executor
 // closure. It takes care of updating the execution state statistics and
 // warning messages. And returns whether a full iteration was finished or not
@@ -96,6 +149,10 @@ func getIterationRunner(
 			return false
 		default:
 			if err != nil {
+				if handleInterupt(ctx, err) {
+					executionState.AddInterruptedIterations(1)
+					return false
+				}
 				if s, ok := err.(fmt.Stringer); ok {
 					// TODO better detection for stack traces
 					// TODO don't count this as a full iteration?
