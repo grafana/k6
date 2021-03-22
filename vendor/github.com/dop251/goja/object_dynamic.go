@@ -39,9 +39,8 @@ ones) is treated as an index and passed to the trap methods of the DynamicArray.
 the regular ECMAScript arrays which only support positive indexes up to 2^32-1.
 
 DynamicArray cannot be sparse, i.e. hasOwnProperty(num) will return true for num >= 0 && num < Len(). Deleting
-such a property will fail. Note that this creates a slight peculiarity because the properties are reported as
-configurable (and therefore should be deletable). Reporting them as non-configurable is not an option though
-as it breaks an ECMAScript invariant where non-configurable properties cannot disappear.
+such a property is equivalent to setting it to undefined. Note that this creates a slight peculiarity because
+hasOwnProperty() will still return true, even after deletion.
 
 Note that Runtime.ToValue() does not have any special treatment for DynamicArray. The only way to create
 a dynamic array is by using the Runtime.NewDynamicArray() method. This is done deliberately to avoid
@@ -657,11 +656,10 @@ func (a *dynamicArray) defineOwnPropertyIdx(name valueInt, desc PropertyDescript
 }
 
 func (a *dynamicArray) _delete(idx int, throw bool) bool {
-	if !a._has(idx) {
-		return true
+	if a._has(idx) {
+		a._setIdx(idx, _undefined, throw)
 	}
-	a.val.runtime.typeErrorResult(throw, "Cannot delete index property %d from a dynamic array", idx)
-	return false
+	return true
 }
 
 func (a *dynamicArray) deleteStr(name unistring.String, throw bool) bool {
