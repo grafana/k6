@@ -2,14 +2,14 @@
 # ---
 # Copyright 2020 glowinthedark
 #
-# Licensed under the Apache License, Version 2.0 (the "License"); 
-# you may not use this file except in compliance with the License. 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
 #
 # You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 #
-# Unless required by applicable law or agreed to in writing, 
-# software distributed under the License is distributed on an "AS IS" BASIS, 
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #
 # See the License for the specific language governing permissions and limitations under the License.
 # ---
@@ -58,46 +58,48 @@ def process_dir(top_dir, opts):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
     * { padding: 0; margin: 0; }
-    
+
     body {
         font-family: sans-serif;
         text-rendering: optimizespeed;
         background-color: #ffffff;
     }
-    
+
     a {
         color: #006ed3;
         text-decoration: none;
     }
-    
+
     a:hover,
     h1 a:hover {
         color: #319cff;
     }
-    
+
     header,
     #summary {
         padding-left: 5%;
         padding-right: 5%;
     }
-    
+
     th:first-child,
     td:first-child {
         width: 5%;
     }
-    
+
     th:last-child,
     td:last-child {
         width: 5%;
     }
-    
+
     header {
         padding-top: 25px;
         padding-bottom: 15px;
         background-color: #f2f2f2;
     }
-    
+
     h1 {
+        display: inline-block;
+        vertical-align: bottom;
         font-size: 20px;
         font-weight: normal;
         white-space: nowrap;
@@ -105,24 +107,31 @@ def process_dir(top_dir, opts):
         text-overflow: ellipsis;
         color: #999;
     }
-    
+
     h1 a {
         color: #000;
         margin: 0 4px;
     }
-    
+
     h1 a:hover {
         text-decoration: underline;
     }
-    
+
     h1 a:first-child {
         margin: 0;
     }
-    
+
+    svg.logo {
+        display: inline-block;
+        vertical-align: middle;
+        width: 2.5em;
+        height: 2.5em;
+    }
+
     main {
         display: block;
     }
-    
+
     .meta {
         font-size: 12px;
         font-family: Verdana, sans-serif;
@@ -130,79 +139,79 @@ def process_dir(top_dir, opts):
         padding-top: 10px;
         padding-bottom: 10px;
     }
-    
+
     .meta-item {
         margin-right: 1em;
     }
-    
+
     #filter {
         padding: 4px;
         border: 1px solid #CCC;
     }
-    
+
     table {
         width: 100%;
         border-collapse: collapse;
     }
-    
+
     tr {
         border-bottom: 1px dashed #dadada;
     }
-    
+
     tbody tr:hover {
         background-color: #ffffec;
     }
-    
+
     th,
     td {
         text-align: left;
         padding: 10px 0;
     }
-    
+
     th {
         padding-top: 15px;
         padding-bottom: 15px;
         font-size: 16px;
         white-space: nowrap;
     }
-    
+
     th a {
         color: black;
     }
-    
+
     th svg {
         vertical-align: middle;
     }
-    
+
     td {
         white-space: nowrap;
         font-size: 14px;
     }
-    
+
     td:nth-child(2) {
         width: 80%;
     }
-    
+
     td:nth-child(3) {
         padding: 0 20px 0 20px;
     }
-    
+
     th:nth-child(4),
     td:nth-child(4) {
         text-align: right;
     }
-    
+
     td:nth-child(2) svg {
         position: absolute;
     }
-    
+
     td .name {
         margin-left: 1.75em;
         word-break: break-all;
         overflow-wrap: break-word;
         white-space: pre-wrap;
     }
-    
+
     td .goup {
         margin-left: 1.75em;
         padding: 0;
@@ -210,45 +219,45 @@ def process_dir(top_dir, opts):
         overflow-wrap: break-word;
         white-space: pre-wrap;
     }
-    
+
     .icon {
         margin-right: 5px;
     }
-    
-    tr.clickable { 
-        cursor: pointer; 
-    } 
-    tr.clickable a { 
-        display: block; 
-    } 
-    
+
+    tr.clickable {
+        cursor: pointer;
+    }
+    tr.clickable a {
+        display: block;
+    }
+
     @media (max-width: 600px) {
-    
+
         * {
             font-size: 1.06rem;
         }
         .hideable {
             display: none;
         }
-    
+
         td:nth-child(2) {
             width: auto;
         }
-    
+
         th:nth-child(3),
         td:nth-child(3) {
             padding-right: 5%;
             text-align: right;
         }
-    
+
         h1 {
             color: #000;
         }
-    
+
         h1 a {
             margin: 0;
         }
-    
+
         #filter {
             max-width: 100px;
         }
@@ -292,9 +301,15 @@ def process_dir(top_dir, opts):
                 <path d="M47.803141,294.093878 C48.4999811,295.177551 48.9495553,296.095918 49.4216083,296.995918 C50.1184484,297.895918 50.5680227,298.630612 51.2873415,299.365306 C52.2089688,300.44898 53.3778619,301 54.7490634,301 C56.1427436,301 57.0643709,300.632653 57.761211,299.916327 C58.4580511,299.365306 58.9076254,298.465306 58.9076254,297.381633 C58.9076254,296.830612 58.9076254,295.930612 58.6828382,294.828571 C58.4355724,293.561224 58.2107852,292.844898 58.2107852,292.477551 C57.7387323,287.757143 57.5139451,283.753061 57.5139451,279.95102 C57.5139451,273.228571 58.4355724,267.057143 59.8292526,261.602041 C61.44772,256.165306 63.5382403,251.610204 66.0783349,247.62449 C68.8656954,243.620408 72.3274172,240.35102 76.4859792,237.44898 C80.6445412,234.546939 85.2751561,232.177551 90.1305582,230.359184 C94.9859603,228.540816 100.76299,227.089796 107.236859,226.006122 C113.710728,225.087755 120.409385,224.371429 127.13052,223.820408 C133.829177,223.453061 141.247152,223.269388 149.811542,223.269388 L167.704598,223.269388 L167.704598,249.057143 C167.704598,250.87551 168.401438,252.326531 170.019905,253.593878 C171.86316,254.861224 173.728893,255.595918 176.021722,255.595918 C178.112242,255.595918 180.180284,254.861224 181.82123,253.593878 L247.751296,201.834694 C249.369763,200.567347 250.291391,199.116327 250.291391,197.297959 C250.291391,195.479592 249.369763,194.028571 247.751296,192.761224 L181.82123,141.002041 C180.202763,139.734694 178.112242,139 176.044201,139 C173.728893,139 171.885639,139.734694 170.042384,141.002041 C168.423917,142.269388 167.727077,143.720408 167.727077,145.538776 L167.727077,171.326531 L149.811542,171.326531 C88.5120908,171.326531 50.8152886,184.955102 36.9234437,212.193878 C32.3153075,221.267347 30,232.526531 30,245.971429 C30,257.046939 35.5522422,272.291837 46.4094607,291.540816 C46.6567266,292.091837 47.1063009,292.826531 47.803141,294.093878 Z" id="Shape-Copy" fill="#000000" fill-rule="nonzero" transform="translate(140.145695, 220.000000) scale(-1, 1) translate(-140.145695, -220.000000) "></path>
             </g>
         </g>
+
+        <!-- k6 Logo -->
+        <g id="logo">
+          <path d="M220.727,213.731H.5L73.815,57.346l44.163,32.466L175.581,0Zm-80.746-33.778h.471a21.028,21.028,0,0,0,14.619-5.876,19.166,19.166,0,0,0,6.284-14.454,17.546,17.546,0,0,0-6.057-13.873,18.426,18.426,0,0,0-12.568-5.412h-.361a6.567,6.567,0,0,0-1.83.251l11.626-17.282-9.262-6.465-4.383,6.465-11.2,17.109c-1.925,2.836-3.535,5.334-4.533,7.07a40.655,40.655,0,0,0-2.663,5.726,17.816,17.816,0,0,0-1.272,6.6,19.145,19.145,0,0,0,6.206,14.3,20.709,20.709,0,0,0,14.485,5.876Zm-49.237-18.6,12.836,18.154H117.3l-15.1-21.06,13.41-18.617-8.9-6.159-3.927,5.184-12.058,17V121.674l-12.019-9.8V179.5H90.727V161.336ZM140,168.618a8.837,8.837,0,1,1,0-17.675h.079a8.639,8.639,0,0,1,6.229,2.663,8.228,8.228,0,0,1,2.663,6.127A8.978,8.978,0,0,1,140,168.6Z" transform="translate(-0.5 -0.001)" fill="#7d64ff"/>
+        </g>
     </defs>
     </svg>
 <header>
+    <svg class="logo" viewBox="0 0 220.227 213.73"><use xlink:href="#logo"></use></svg>
     <h1>"""
         f'{path_top_dir.name}'
     """</h1>
@@ -364,11 +379,11 @@ def process_dir(top_dir, opts):
             continue
 
         entry_path = str(entry.name)
-        
+
         if entry.is_dir() and not entry.is_symlink():
             entry_type = 'folder'
             entry_path = os.path.join(entry.name, '')
-            
+
         elif entry.is_dir() and entry.is_symlink():
             entry_type = 'folder-shortcut'
             print('dir-symlink', entry.absolute())
@@ -399,7 +414,7 @@ def process_dir(top_dir, opts):
             </tbody>
         </table>
     </div>
-</main>        
+</main>
 </body>
 </html>""")
     if index_file:
