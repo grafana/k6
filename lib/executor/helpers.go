@@ -117,11 +117,13 @@ func CancelReason(ctx context.Context) error {
 	return nil
 }
 
+// handleInterupt returns true if err is InteruptError and make sure that we
+// cancel the executor context passed with ctx.
 func handleInterupt(ctx context.Context, err error) bool {
 	if err != nil {
 		if common.IsInteruptError(err) {
 			CancelExecutorContext(ctx, err)
-			return false
+			return true
 		}
 	}
 	return false
