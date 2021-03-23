@@ -278,8 +278,16 @@ a commandline interface for interacting with it.`,
 
 			// Start the test run
 			initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
+			var interupt error
 			if err := engineRun(); err != nil {
-				return getExitCodeFromEngine(err)
+				if !conf.Linger.Bool {
+					return getExitCodeFromEngine(err)
+				}
+				if !common.IsInteruptError(err) {
+					return getExitCodeFromEngine(err)
+				}
+				// Engine was interrupted but we are in --linger mode
+				interupt = err
 			}
 			runCancel()
 			logger.Debug("Engine run terminated cleanly")
@@ -323,6 +331,10 @@ a commandline interface for interacting with it.`,
 			logger.Debug("Waiting for engine processes to finish...")
 			engineWait()
 			logger.Debug("Everything has finished, exiting k6!")
+			if interupt != nil {
+				e := interupt.(*common.InterruptError)
+				return ExitCode{error: errors.New("script execution  was aborted"), Code: abortedByScriptErrorCode, Hint: e.Reason}
+			}
 			if engine.IsTainted() {
 				return ExitCode{error: errors.New("some thresholds have failed"), Code: thresholdHaveFailedErrorCode}
 			}
@@ -348,7 +360,7 @@ func getExitCodeFromEngine(err error) ExitCode {
 			return ExitCode{error: err, Code: genericTimeoutErrorCode}
 		}
 	case *common.InterruptError:
-		return ExitCode{error: errors.New("Engine error"), Code: abortedByScriptErrorCode, Hint: e.Reason}
+		return ExitCode{error: errors.New("script execution  was aborted"), Code: abortedByScriptErrorCode, Hint: e.Reason}
 	default:
 		//nolint:golint
 		return ExitCode{error: errors.New("Engine error"), Code: genericEngineErrorCode, Hint: err.Error()}
