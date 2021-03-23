@@ -15,6 +15,7 @@ fi
 
 gpg2 --import --batch --passphrase="$PGP_SIGN_KEY_PASSPHRASE" "$signkeypath"
 export PGPKEYID="$(gpg2 --list-secret-keys --with-colons | grep '^sec' | cut -d: -f5)"
+# TODO: Publish the pub key to S3
 
 # Setup RPM signing
 cat > "$HOME/.rpmmacros" <<EOF
