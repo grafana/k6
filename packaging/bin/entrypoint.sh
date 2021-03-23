@@ -28,14 +28,14 @@ EOF
 
 for repo in deb rpm msi; do
   log "Creating ${repo} repository ..."
-  "create-${repo}-repo.sh" "$PWD/dist" "$PWD/dl.k6.io/${repo}"
+  "create-${repo}-repo.sh" "$PWD/dist" "$PWD/Packages/${repo}"
 done
 
 log "Generating index.html ..."
-(cd dl.k6.io && generate_index.py -r)
+(cd Packages && generate_index.py -r)
 
 log "Syncing to S3 ..."
-s3cmd sync ./dl.k6.io/ "s3://${s3bucket}/"
+s3cmd sync ./Packages/ "s3://${s3bucket}/"
 
 # Disable cache for repo metadata, so that new releases will be available
 # immediately.
