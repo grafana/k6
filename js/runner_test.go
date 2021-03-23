@@ -1475,7 +1475,7 @@ func TestInitContextForbidden(t *testing.T) {
 			`var abortTest = require("k6").abortTest;
 			 abortTest();
 			 exports.default = function() { console.log("p"); }`,
-			common.AbortTestInitContext.Error(),
+			common.AbortTestInitContext,
 		},
 		{
 			"group",

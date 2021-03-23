@@ -122,18 +122,18 @@ func (*K6) AbortTest(ctx context.Context, extra ...goja.Value) {
 	state := lib.GetState(ctx)
 	rt := common.GetRuntime(ctx)
 	if state == nil {
-		rt.Interrupt(common.AbortTestInitContext)
+		rt.Interrupt(&common.InterruptError{Reason: common.AbortTestInitContext})
 		return
 	}
-	e := *common.AbortTest
+	reason := common.AbortTest
 	if len(extra) > 0 {
 		var m string
 		for _, v := range extra {
 			m += v.String()
 		}
-		e.Reason = m
+		reason = m
 	}
-	rt.Interrupt(&e)
+	rt.Interrupt(&common.InterruptError{Reason: reason})
 }
 
 func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Value) (bool, error) {

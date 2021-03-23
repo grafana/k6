@@ -278,7 +278,7 @@ a commandline interface for interacting with it.`,
 
 			// Start the test run
 			initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
-			var interupt error
+			var interrupt error
 			if err := engineRun(); err != nil {
 				if !conf.Linger.Bool {
 					return getExitCodeFromEngine(err)
@@ -287,7 +287,7 @@ a commandline interface for interacting with it.`,
 					return getExitCodeFromEngine(err)
 				}
 				// Engine was interrupted but we are in --linger mode
-				interupt = err
+				interrupt = err
 			}
 			runCancel()
 			logger.Debug("Engine run terminated cleanly")
@@ -331,8 +331,8 @@ a commandline interface for interacting with it.`,
 			logger.Debug("Waiting for engine processes to finish...")
 			engineWait()
 			logger.Debug("Everything has finished, exiting k6!")
-			if interupt != nil {
-				e := interupt.(*common.InterruptError)
+			if interrupt != nil {
+				e := interrupt.(*common.InterruptError)
 				return ExitCode{error: errors.New("script execution  was aborted"), Code: abortedByScriptErrorCode, Hint: e.Reason}
 			}
 			if engine.IsTainted() {
