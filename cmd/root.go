@@ -23,6 +23,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/loadimpact/k6/log"
+	"github.com/mattn/go-colorable"
+	"github.com/mattn/go-isatty"
 	"io"
 	"io/ioutil"
 	stdlog "log"
@@ -33,14 +36,11 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/mattn/go-colorable"
-	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"github.com/loadimpact/k6/lib/consts"
-	"github.com/loadimpact/k6/log"
 )
 
 var BannerColor = color.New(color.FgCyan)
@@ -284,18 +284,27 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 	case "none":
 		c.logger.SetOutput(ioutil.Discard)
 	default:
-		if !strings.HasPrefix(c.logOutput, "loki") {
+		if strings.HasPrefix(c.logOutput, "loki") {
+			ch = make(chan struct{})
+			hook, err := log.LokiFromConfigLine(c.ctx, c.fallbackLogger, c.logOutput, ch)
+			if err != nil {
+				return nil, err
+			}
+			c.logger.AddHook(hook)
+			c.logger.SetOutput(ioutil.Discard) // don't output to anywhere else
+			c.logFmt = "raw"
+			noColor = true // disable color
+		} else if strings.HasPrefix(c.logOutput, "kafka") {
+			hook, err := log.KafkaFromConfigLine(c.ctx, c.fallbackLogger, c.logOutput)
+			if err != nil {
+				return nil, err
+			}
+			c.logger.AddHook(hook)
+			c.logger.SetOutput(ioutil.Discard) // don't output to anywhere else
+			noColor = true                     // disable color
+		} else {
 			return nil, fmt.Errorf("unsupported log output `%s`", c.logOutput)
 		}
-		ch = make(chan struct{})
-		hook, err := log.LokiFromConfigLine(c.ctx, c.fallbackLogger, c.logOutput, ch)
-		if err != nil {
-			return nil, err
-		}
-		c.logger.AddHook(hook)
-		c.logger.SetOutput(ioutil.Discard) // don't output to anywhere else
-		c.logFmt = "raw"
-		noColor = true // disable color
 	}
 
 	switch c.logFmt {
@@ -305,6 +314,8 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 	case "json":
 		c.logger.SetFormatter(&logrus.JSONFormatter{})
 		c.logger.Debug("Logger format: JSON")
+	case "gelf":
+		c.logger.SetFormatter(new(log.GelfFormatter))
 	default:
 		c.logger.SetFormatter(&logrus.TextFormatter{ForceColors: stderrTTY, DisableColors: noColor})
 		c.logger.Debug("Logger format: TEXT")
