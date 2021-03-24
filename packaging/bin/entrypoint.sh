@@ -31,23 +31,9 @@ for repo in deb rpm msi; do
   "create-${repo}-repo.sh" "$PWD/dist" "$PWD/Packages/${repo}"
 done
 
-log "Generating index.html ..."
-(cd Packages && generate_index.py -r)
-
-log "Syncing to S3 ..."
-s3cmd sync ./Packages/ "s3://${s3bucket}/"
-
-# Disable cache for repo metadata, so that new releases will be available
-# immediately.
-# TODO: Maybe do this inside each script?
-# TODO: How to handle k6-latest-amd64.msi? Could it be an S3 redirect that is never cached?
-s3cmd modify --add-header="Cache-Control:no-cache, max-age=0" \
-  "s3://${s3bucket}/deb/dists/stable/"{Release,Release.gpg,InRelease}
-s3cmd modify --add-header="Cache-Control:no-cache, max-age=0" \
-  "s3://${s3bucket}/deb/dists/stable/main/binary-amd64"/Packages{,.gz,.bz2}
-s3cmd --recursive modify --add-header="Cache-Control:no-cache, max-age=0" \
-  "s3://${s3bucket}/rpm/x86_64/repodata"
-s3cmd modify --recursive --exclude='*' --include='index.html' \
-  --add-header='Cache-Control:no-cache, max-age=0' "s3://${s3bucket}/"
+# Generate and sync the main index.html
+(cd Packages && generate_index.py)
+s3cmd put --add-header='Cache-Control:no-cache, max-age=0' \
+  Packages/index.html "s3://${s3bucket}/index.html"
 
 exec "$@"
