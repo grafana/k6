@@ -16,13 +16,22 @@ _usage="Usage: $0 <pkgdir> <repodir> [s3bucket=${_s3bucket}]"
 PKGDIR="${1?${_usage}}"  # The directory where .deb files are located
 REPODIR="${2?${_usage}}" # The package repository working directory
 S3PATH="${3-${_s3bucket}}/deb"
+# Number of packages to keep for each architecture, older packages will be deleted.
+RETAIN_PKG_COUNT=25
+
+delete_old_pkgs() {
+  find "$1" -name '*.deb' -type f | sort -r | tail -n "+$((RETAIN_PKG_COUNT+1))" | xargs -r rm -v
+  # Remove any dangling .asc files
+  find "$1" -name '*.asc' -type f -print0 | while read -r -d $'\0' f; do
+    if ! [ -r "${f%.*}" ]; then
+      rm -v "$f"
+    fi
+  done
+}
 
 # We don't publish i386 packages, but the repo structure is needed for
 # compatibility on some systems. See https://unix.stackexchange.com/a/272916 .
 architectures="amd64 i386"
-
-# TODO: Remove old package versions?
-# Something like: https://github.com/kopia/kopia/blob/master/tools/apt-publish.sh#L23-L25
 
 mkdir -p "$REPODIR" && cd "$_"
 
@@ -48,6 +57,8 @@ for arch in $architectures; do
   apt-ftparchive packages "$bindir" | tee "$bindir/Packages"
   gzip -fk "$bindir/Packages"
   bzip2 -fk "$bindir/Packages"
+
+  delete_old_pkgs "$bindir"
 done
 
 echo "Creating release file..."
