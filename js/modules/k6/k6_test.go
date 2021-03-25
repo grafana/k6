@@ -383,3 +383,32 @@ func TestCheck(t *testing.T) {
 		}
 	})
 }
+func TestAbortTest(t *testing.T) {
+	rt := goja.New()
+	baseCtx := common.WithRuntime(context.Background(), rt)
+
+	ctx := new(context.Context)
+	*ctx = baseCtx
+	rt.Set("k6", common.Bind(rt, New(), ctx))
+
+	prove := func(t *testing.T, script, reason string) {
+		_, err := rt.RunString(script)
+		require.NotNil(t, err)
+		x, ok := err.(*goja.InterruptedError)
+		require.True(t, ok)
+		v, ok := x.Value().(*common.InterruptError)
+		require.True(t, ok)
+		require.Equal(t, v.Reason, reason)
+	}
+	t.Run("Without state", func(t *testing.T) {
+		prove(t, "k6.abortTest()", common.AbortTestInitContext)
+	})
+	t.Run("With state and default reason", func(t *testing.T) {
+		*ctx = lib.WithState(baseCtx, &lib.State{})
+		prove(t, "k6.abortTest()", common.AbortTest)
+	})
+	t.Run("With state and custom reason", func(t *testing.T) {
+		*ctx = lib.WithState(baseCtx, &lib.State{})
+		prove(t, `k6.abortTest("mayday")`, "mayday")
+	})
+}
