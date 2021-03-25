@@ -808,7 +808,7 @@ func nlTitleSpan(c *context) bool {
 	return true
 }
 
-// Not part of CLDR, but see http://unicode.org/cldr/trac/ticket/7078.
+// Not part of CLDR, but see https://unicode.org/cldr/trac/ticket/7078.
 func afnlRewrite(c *context) {
 	if c.hasPrefix("'") || c.hasPrefix("’") {
 		c.isMidWord = true

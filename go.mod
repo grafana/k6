@@ -84,11 +84,3 @@ require (
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v2 v2.3.0
 )
-
-replace (
-	github.com/davecgh/go-spew => github.com/davecgh/go-spew v1.1.0
-	github.com/stretchr/testify => github.com/stretchr/testify v1.2.1
-	github.com/ugorji/go => github.com/ugorji/go v0.0.0-20180112141927-9831f2c3ac10
-	golang.org/x/text => golang.org/x/text v0.3.0
-	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.1.1
-)

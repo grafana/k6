@@ -32,7 +32,7 @@ func (c info) cccType() info {
 
 // For the purpose of title casing we use an approximation of the Unicode Word
 // Breaking algorithm defined in Annex #29:
-// http://www.unicode.org/reports/tr29/#Default_Grapheme_Cluster_Table.
+// https://www.unicode.org/reports/tr29/#Default_Grapheme_Cluster_Table.
 //
 // For our approximation, we group the Word Break types into the following
 // categories, with associated rules:

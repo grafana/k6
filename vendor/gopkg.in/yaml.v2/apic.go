@@ -86,6 +86,7 @@ func yaml_emitter_initialize(emitter *yaml_emitter_t) {
 		raw_buffer: make([]byte, 0, output_raw_buffer_size),
 		states:     make([]yaml_emitter_state_t, 0, initial_stack_size),
 		events:     make([]yaml_event_t, 0, initial_queue_size),
+		best_width: -1,
 	}
 }
 
@@ -468,7 +469,7 @@ func yaml_event_delete(event *yaml_event_t) {
 //    } context
 //    tag_directive *yaml_tag_directive_t
 //
-//    context.error = YAML_NO_ERROR // Eliminate a compliler warning.
+//    context.error = YAML_NO_ERROR // Eliminate a compiler warning.
 //
 //    assert(document) // Non-NULL document object is expected.
 //
