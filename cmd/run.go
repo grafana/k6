@@ -70,6 +70,7 @@ const (
 // TODO: fix this, global variables are not very testable...
 //nolint:gochecknoglobals
 var runType = os.Getenv("K6_TYPE")
+var errScriptInterupted = errors.New("script execution  was aborted")
 
 //nolint:funlen,gocognit,gocyclo
 func getRunCmd(ctx context.Context, logger *logrus.Logger) *cobra.Command {
@@ -333,7 +334,7 @@ a commandline interface for interacting with it.`,
 			logger.Debug("Everything has finished, exiting k6!")
 			if interrupt != nil {
 				e := interrupt.(*common.InterruptError)
-				return ExitCode{error: errors.New("script execution  was aborted"), Code: abortedByScriptErrorCode, Hint: e.Reason}
+				return ExitCode{error: errScriptInterupted, Code: abortedByScriptErrorCode, Hint: e.Reason}
 			}
 			if engine.IsTainted() {
 				return ExitCode{error: errors.New("some thresholds have failed"), Code: thresholdHaveFailedErrorCode}
@@ -360,7 +361,7 @@ func getExitCodeFromEngine(err error) ExitCode {
 			return ExitCode{error: err, Code: genericTimeoutErrorCode}
 		}
 	case *common.InterruptError:
-		return ExitCode{error: errors.New("script execution  was aborted"), Code: abortedByScriptErrorCode, Hint: e.Reason}
+		return ExitCode{error: errScriptInterupted, Code: abortedByScriptErrorCode, Hint: e.Reason}
 	default:
 		//nolint:golint
 		return ExitCode{error: errors.New("Engine error"), Code: genericEngineErrorCode, Hint: err.Error()}

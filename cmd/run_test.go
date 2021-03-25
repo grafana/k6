@@ -22,6 +22,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -31,6 +32,7 @@ import (
 	"testing"
 
 	"github.com/loadimpact/k6/lib/fsext"
+	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -123,4 +125,19 @@ func TestHandleSummaryResultError(t *testing.T) {
 	files := getFiles(t, fs)
 	assertEqual(t, "file summary 1", files[filePath1])
 	assertEqual(t, "file summary 2", files[filePath2])
+}
+
+func TestAbortTest(t *testing.T) {
+	t.Run("Check status code is 107", func(t *testing.T) {
+		logger := testutils.NewLogger(t)
+		cmd := getRunCmd(context.Background(), logger)
+		a, err := filepath.Abs("testdata/abort.js")
+		require.NoError(t, err)
+		cmd.SetArgs([]string{a})
+		err = cmd.Execute()
+		e, ok := err.(ExitCode)
+		require.True(t, ok)
+		require.Equal(t, abortedByScriptErrorCode, e.Code, "Status code must be 107")
+		require.EqualError(t, e.error, errScriptInterupted.Error())
+	})
 }
