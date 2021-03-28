@@ -401,7 +401,7 @@ func TestAbortTest(t *testing.T) {
 		require.Equal(t, v.Reason, reason)
 	}
 	t.Run("Without state", func(t *testing.T) {
-		prove(t, "k6.abortTest()", common.AbortTestInitContext)
+		prove(t, "k6.abortTest()", common.AbortTest)
 	})
 	t.Run("With state and default reason", func(t *testing.T) {
 		*ctx = lib.WithState(baseCtx, &lib.State{})

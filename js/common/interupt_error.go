@@ -32,10 +32,6 @@ func (i InterruptError) Error() string {
 // AbortTest is a reason emitted when a test script calls abortTest() without arguments
 const AbortTest = "abortTest() was called in a script"
 
-// AbortTestInitContext is a reason  emitted when a test script calls abortTest() without arguments
-// in the init context
-const AbortTestInitContext = "Using abortTest() in the init context is not supported"
-
 // IsInteruptError returns true if err is *InterruptError
 func IsInterruptError(err error) bool {
 	if err == nil {
