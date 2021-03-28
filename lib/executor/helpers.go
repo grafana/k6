@@ -117,9 +117,9 @@ func CancelReason(ctx context.Context) error {
 	return nil
 }
 
-// handleInterupt returns true if err is InteruptError and make sure that we
+// handleInterupt returns true if err is InterruptError and make sure that we
 // cancel the executor context passed with ctx.
-func handleInterupt(ctx context.Context, err error) bool {
+func handleInterrupt(ctx context.Context, err error) bool {
 	if err != nil {
 		if common.IsInterruptError(err) {
 			CancelExecutorContext(ctx, err)
