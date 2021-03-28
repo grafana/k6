@@ -76,8 +76,8 @@ func validateStages(stages []Stage) []error {
 }
 
 // cancelKey is the key used to store the cancel function for the context of an
-// executor. This is a work around to avoid excessive changes for the abolity of
-// nested functions to cancel the passed context
+// executor. This is a work around to avoid excessive changes for the ability of
+// nested functions to cancel the passed context.
 type cancelKey struct{}
 
 type cancelExec struct {
