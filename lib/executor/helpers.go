@@ -96,9 +96,9 @@ func Context(ctx context.Context) context.Context {
 	return context.WithValue(ctx, cancelKey{}, &cancelExec{cancel: cancel})
 }
 
-// CancelExecutorContext cancels executor context found in ctx, ctx can be a
+// cancelExecutorContext cancels executor context found in ctx, ctx can be a
 // child of a context that was created with Context function.
-func CancelExecutorContext(ctx context.Context, err error) {
+func cancelExecutorContext(ctx context.Context, err error) {
 	if x := ctx.Value(cancelKey{}); x != nil {
 		v := x.(*cancelExec)
 		v.reason = err
@@ -122,7 +122,7 @@ func CancelReason(ctx context.Context) error {
 func handleInterrupt(ctx context.Context, err error) bool {
 	if err != nil {
 		if common.IsInterruptError(err) {
-			CancelExecutorContext(ctx, err)
+			cancelExecutorContext(ctx, err)
 			return true
 		}
 	}
