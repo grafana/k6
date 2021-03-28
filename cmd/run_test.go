@@ -129,9 +129,16 @@ func TestHandleSummaryResultError(t *testing.T) {
 }
 
 func TestAbortTest(t *testing.T) {
+	// if this is not empty string this will result in spinning up REST server that
+	// triggers lookup for address flag resulting in a panic.
+	address = ""
+
 	t.Run("Check status code is 107", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		logger := testutils.NewLogger(t)
-		cmd := getRunCmd(context.Background(), logger)
+
+		cmd := getRunCmd(ctx, logger)
 		a, err := filepath.Abs("testdata/abort.js")
 		require.NoError(t, err)
 		cmd.SetArgs([]string{a})
@@ -141,13 +148,16 @@ func TestAbortTest(t *testing.T) {
 		require.Equal(t, abortedByScriptErrorCode, e.Code, "Status code must be 107")
 		require.EqualError(t, e.error, errScriptInterrupted.Error())
 	})
+
 	t.Run("Check that teardown is called", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		msg := "Calling teardown function after abortTest()"
 		var buf bytes.Buffer
 		logger := logrus.New()
 		logger.SetOutput(&buf)
 
-		cmd := getRunCmd(context.Background(), logger)
+		cmd := getRunCmd(ctx, logger)
 		a, err := filepath.Abs("testdata/teardown.js")
 		require.NoError(t, err)
 		cmd.SetArgs([]string{a})
@@ -158,4 +168,5 @@ func TestAbortTest(t *testing.T) {
 		require.EqualError(t, e.error, errScriptInterrupted.Error())
 		require.Contains(t, buf.String(), msg)
 	})
+
 }
