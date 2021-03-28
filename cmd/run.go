@@ -281,10 +281,7 @@ a commandline interface for interacting with it.`,
 			initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
 			var interrupt error
 			if err := engineRun(); err != nil {
-				if !conf.Linger.Bool {
-					return getExitCodeFromEngine(err)
-				}
-				if !common.IsInteruptError(err) {
+				if !conf.Linger.Bool || !common.IsInterruptError(err) {
 					return getExitCodeFromEngine(err)
 				}
 				// Engine was interrupted but we are in --linger mode
