@@ -28,8 +28,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	liberrors "github.com/loadimpact/k6/lib/errors"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/ui/pb"
 )
@@ -121,7 +121,7 @@ func CancelReason(ctx context.Context) error {
 // cancel the executor context passed with ctx.
 func handleInterrupt(ctx context.Context, err error) bool {
 	if err != nil {
-		if common.IsInterruptError(err) {
+		if liberrors.IsInterruptError(err) {
 			cancelExecutorContext(ctx, err)
 			return true
 		}

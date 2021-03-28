@@ -32,6 +32,7 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/internal/modules"
 	"github.com/loadimpact/k6/lib"
+	liberrors "github.com/loadimpact/k6/lib/errors"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 )
@@ -120,11 +121,11 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 // interrupt the active goja runtime passed with ctx.
 func (*K6) AbortTest(ctx context.Context, msg goja.Value) {
 	rt := common.GetRuntime(ctx)
-	reason := common.AbortTest
+	reason := liberrors.AbortTest
 	if !goja.IsUndefined(msg) {
 		reason = msg.String()
 	}
-	rt.Interrupt(&common.InterruptError{Reason: reason})
+	rt.Interrupt(&liberrors.InterruptError{Reason: reason})
 }
 
 func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Value) (bool, error) {

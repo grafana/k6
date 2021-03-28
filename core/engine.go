@@ -30,8 +30,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	liberrors "github.com/loadimpact/k6/lib/errors"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/output"
 	"github.com/loadimpact/k6/stats"
@@ -248,7 +248,7 @@ func (e *Engine) startBackgroundProcesses(
 			if err != nil {
 				e.logger.WithError(err).Debug("run: execution scheduler returned an error")
 				status := lib.RunStatusAbortedSystem
-				if common.IsInterruptError(err) {
+				if liberrors.IsInterruptError(err) {
 					status = lib.RunStatusAbortedScriptError
 				}
 				e.setRunStatus(status)

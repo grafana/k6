@@ -18,7 +18,7 @@
  *
  */
 
-package common
+package errors
 
 // InterruptError is an error that halts engine execution
 type InterruptError struct {

@@ -45,6 +45,7 @@ import (
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
+	liberrors "github.com/loadimpact/k6/lib/errors"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
@@ -658,7 +659,7 @@ func (u *ActiveVU) RunOnce() error {
 	_, isFullIteration, totalTime, err := u.runFn(u.RunContext, true, fn, u.setupData)
 	if err != nil {
 		if x, ok := err.(*goja.InterruptedError); ok {
-			if v, ok := x.Value().(*common.InterruptError); ok {
+			if v, ok := x.Value().(*liberrors.InterruptError); ok {
 				v.Reason = x.Error()
 				err = v
 			}

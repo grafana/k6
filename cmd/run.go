@@ -45,9 +45,9 @@ import (
 	"github.com/loadimpact/k6/core"
 	"github.com/loadimpact/k6/core/local"
 	"github.com/loadimpact/k6/js"
-	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
+	liberrors "github.com/loadimpact/k6/lib/errors"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui/pb"
 )
@@ -281,7 +281,7 @@ a commandline interface for interacting with it.`,
 			initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
 			var interrupt error
 			if err := engineRun(); err != nil {
-				if !conf.Linger.Bool || !common.IsInterruptError(err) {
+				if !conf.Linger.Bool || !liberrors.IsInterruptError(err) {
 					return getExitCodeFromEngine(err)
 				}
 				// Engine was interrupted but we are in --linger mode
@@ -330,7 +330,7 @@ a commandline interface for interacting with it.`,
 			engineWait()
 			logger.Debug("Everything has finished, exiting k6!")
 			if interrupt != nil {
-				e := interrupt.(*common.InterruptError)
+				e := interrupt.(*liberrors.InterruptError)
 				return ExitCode{error: errScriptInterrupted, Code: abortedByScriptErrorCode, Hint: e.Reason}
 			}
 			if engine.IsTainted() {
@@ -357,7 +357,7 @@ func getExitCodeFromEngine(err error) ExitCode {
 		default:
 			return ExitCode{error: err, Code: genericTimeoutErrorCode}
 		}
-	case *common.InterruptError:
+	case *liberrors.InterruptError:
 		return ExitCode{error: errScriptInterrupted, Code: abortedByScriptErrorCode, Hint: e.Reason}
 	default:
 		//nolint:golint
