@@ -168,5 +168,4 @@ func TestAbortTest(t *testing.T) {
 		require.EqualError(t, e.error, errScriptInterrupted.Error())
 		require.Contains(t, buf.String(), msg)
 	})
-
 }
