@@ -116,7 +116,7 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 	return ret, err
 }
 
-// AbortTest exposes abortTest function in the k6 module. When called ti will
+// AbortTest exposes abortTest function in the k6 module. When called it will
 // interrupt the active goja runtime passed with ctx.
 func (*K6) AbortTest(ctx context.Context, extra ...goja.Value) {
 	state := lib.GetState(ctx)
