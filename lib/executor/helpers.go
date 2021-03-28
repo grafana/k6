@@ -151,7 +151,7 @@ func getIterationRunner(
 			return false
 		default:
 			if err != nil {
-				if handleInterupt(ctx, err) {
+				if handleInterrupt(ctx, err) {
 					executionState.AddInterruptedIterations(1)
 					return false
 				}
