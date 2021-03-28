@@ -17,7 +17,7 @@ const AbortTest = "abortTest() was called in a script"
 const AbortTestInitContext = "Using abortTest() in the init context is not supported"
 
 // IsInteruptError returns true if err is *InterruptError
-func IsInteruptError(err error) bool {
+func IsInterruptError(err error) bool {
 	if err == nil {
 		return false
 	}
