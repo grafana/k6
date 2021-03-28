@@ -70,7 +70,7 @@ const (
 // TODO: fix this, global variables are not very testable...
 //nolint:gochecknoglobals
 var runType = os.Getenv("K6_TYPE")
-var errScriptInterupted = errors.New("script execution  was aborted")
+var errScriptInterrupted = errors.New("script execution was aborted")
 
 //nolint:funlen,gocognit,gocyclo
 func getRunCmd(ctx context.Context, logger *logrus.Logger) *cobra.Command {
