@@ -33,6 +33,7 @@ import (
 
 	"github.com/loadimpact/k6/lib/fsext"
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -139,5 +140,22 @@ func TestAbortTest(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, abortedByScriptErrorCode, e.Code, "Status code must be 107")
 		require.EqualError(t, e.error, errScriptInterrupted.Error())
+	})
+	t.Run("Check that teardown is called", func(t *testing.T) {
+		msg := "Calling teardown function after abortTest()"
+		var buf bytes.Buffer
+		logger := logrus.New()
+		logger.SetOutput(&buf)
+
+		cmd := getRunCmd(context.Background(), logger)
+		a, err := filepath.Abs("testdata/teardown.js")
+		require.NoError(t, err)
+		cmd.SetArgs([]string{a})
+		err = cmd.Execute()
+		e, ok := err.(ExitCode)
+		require.True(t, ok)
+		require.Equal(t, abortedByScriptErrorCode, e.Code, "Status code must be 107")
+		require.EqualError(t, e.error, errScriptInterrupted.Error())
+		require.Contains(t, buf.String(), msg)
 	})
 }
