@@ -138,6 +138,6 @@ func TestAbortTest(t *testing.T) {
 		e, ok := err.(ExitCode)
 		require.True(t, ok)
 		require.Equal(t, abortedByScriptErrorCode, e.Code, "Status code must be 107")
-		require.EqualError(t, e.error, errScriptInterupted.Error())
+		require.EqualError(t, e.error, errScriptInterrupted.Error())
 	})
 }
