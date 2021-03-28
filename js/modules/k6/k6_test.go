@@ -33,6 +33,7 @@ import (
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/lib"
+	liberrors "github.com/loadimpact/k6/lib/errors"
 	"github.com/loadimpact/k6/lib/metrics"
 	"github.com/loadimpact/k6/stats"
 )
@@ -396,16 +397,16 @@ func TestAbortTest(t *testing.T) {
 		require.NotNil(t, err)
 		x, ok := err.(*goja.InterruptedError)
 		require.True(t, ok)
-		v, ok := x.Value().(*common.InterruptError)
+		v, ok := x.Value().(*liberrors.InterruptError)
 		require.True(t, ok)
 		require.Equal(t, v.Reason, reason)
 	}
 	t.Run("Without state", func(t *testing.T) {
-		prove(t, "k6.abortTest()", common.AbortTest)
+		prove(t, "k6.abortTest()", liberrors.AbortTest)
 	})
 	t.Run("With state and default reason", func(t *testing.T) {
 		*ctx = lib.WithState(baseCtx, &lib.State{})
-		prove(t, "k6.abortTest()", common.AbortTest)
+		prove(t, "k6.abortTest()", liberrors.AbortTest)
 	})
 	t.Run("With state and custom reason", func(t *testing.T) {
 		*ctx = lib.WithState(baseCtx, &lib.State{})

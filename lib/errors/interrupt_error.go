@@ -32,7 +32,7 @@ func (i InterruptError) Error() string {
 // AbortTest is a reason emitted when a test script calls abortTest() without arguments
 const AbortTest = "abortTest() was called in a script"
 
-// IsInteruptError returns true if err is *InterruptError
+// IsInterruptError returns true if err is *InterruptError
 func IsInterruptError(err error) bool {
 	if err == nil {
 		return false
