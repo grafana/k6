@@ -248,7 +248,7 @@ func (e *Engine) startBackgroundProcesses(
 			if err != nil {
 				e.logger.WithError(err).Debug("run: execution scheduler returned an error")
 				status := lib.RunStatusAbortedSystem
-				if common.IsInteruptError(err) {
+				if common.IsInterruptError(err) {
 					status = lib.RunStatusAbortedScriptError
 				}
 				e.setRunStatus(status)
