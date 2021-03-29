@@ -6,7 +6,7 @@ log() {
 }
 
 signkeypath="$PWD/sign-key.gpg"
-s3bucket="${S3_BUCKET-dl-k6-io}"
+s3bucket="${S3_BUCKET-dl.k6.io}"
 
 if ! [ -r "$signkeypath" ]; then
   log "ERROR: Signing key not found at '$signkeypath'"
