@@ -22,7 +22,6 @@ package http
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -68,17 +67,12 @@ func (res *Response) JSON(selector ...string) goja.Value {
 
 // HTML returns the body as an html.Selection
 func (res *Response) HTML(selector ...string) html.Selection {
-	var body string
-	switch b := res.Body.(type) {
-	case []byte:
-		body = string(b)
-	case string:
-		body = b
-	default:
-		common.Throw(common.GetRuntime(res.GetCtx()), errors.New("invalid response type"))
+	body, err := common.ToBytes(res.Body)
+	if err != nil {
+		common.Throw(common.GetRuntime(res.GetCtx()), err)
 	}
 
-	sel, err := html.HTML{}.ParseHTML(res.GetCtx(), body)
+	sel, err := html.HTML{}.ParseHTML(res.GetCtx(), string(body))
 	if err != nil {
 		common.Throw(common.GetRuntime(res.GetCtx()), err)
 	}
