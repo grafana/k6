@@ -129,9 +129,6 @@ func TestHandleSummaryResultError(t *testing.T) {
 }
 
 func TestAbortTest(t *testing.T) {
-	// if this is not empty string this will result in spinning up REST server that
-	// triggers lookup for address flag resulting in a panic.
-	address = ""
 
 	t.Run("Check status code is 107", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -148,6 +145,10 @@ func TestAbortTest(t *testing.T) {
 		require.Equal(t, abortedByScriptErrorCode, e.Code, "Status code must be 107")
 		require.EqualError(t, e.error, errScriptInterrupted.Error())
 	})
+
+	// // if this is not empty string this will result in spinning up REST server that
+	// // triggers lookup for address flag resulting in a panic.
+	address = ""
 
 	t.Run("Check that teardown is called", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
