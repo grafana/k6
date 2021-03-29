@@ -55,6 +55,7 @@ def process_dir(top_dir, opts):
 <html>
 <head>
     <meta charset="utf-8">
+    <title>k6 Packages</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
     * { padding: 0; margin: 0; }
