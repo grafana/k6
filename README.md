@@ -4,10 +4,10 @@
 <p align="center">A modern load testing tool for developers and testers in the DevOps era.</p>
 
 <p align="center">
-  <a href="https://github.com/k6io/k6/releases"><img src="https://img.shields.io/github/release/loadimpact/k6.svg" alt="Github release"></a>
-  <a href="https://circleci.com/gh/loadimpact/k6/tree/master"><img src="https://img.shields.io/circleci/project/github/loadimpact/k6/master.svg" alt="Build status"></a>
+  <a href="https://github.com/k6io/k6/releases"><img src="https://img.shields.io/github/release/k6io/k6.svg" alt="Github release"></a>
+  <a href="https://circleci.com/gh/k6io/k6/tree/master"><img src="https://img.shields.io/circleci/project/github/k6io/k6/master.svg" alt="Build status"></a>
   <a href="https://goreportcard.com/report/github.com/k6io/k6"><img src="https://goreportcard.com/badge/github.com/k6io/k6" alt="Go Report Card"></a>
-  <a href="https://codecov.io/gh/loadimpact/k6"><img src="https://img.shields.io/codecov/c/github/loadimpact/k6/master.svg" alt="Codecov branch"></a>
+  <a href="https://codecov.io/gh/k6io/k6"><img src="https://img.shields.io/codecov/c/github/k6io/k6/master.svg" alt="Codecov branch"></a>
   <br>
   <a href="https://twitter.com/k6_io"><img src="https://img.shields.io/badge/twitter-@k6_io-55acee.svg" alt="@k6_io on Twitter"></a>
   <a href="https://k6.io/slack"><img src="https://img.shields.io/badge/Slack-k6-ff69b4.svg" alt="Slack channel"></a>
@@ -130,7 +130,7 @@ The script details and how we can extend and configure it will be explained belo
 
 If you decide to use the [k6 docker image](https://hub.docker.com/r/loadimpact/k6/), the command will be slightly different. Instead of passing the script filename to k6, a dash is used to instruct k6 to read the script contents directly via the standard input. This allows us to to avoid messing with docker volumes for such a simple single-file script, greatly simplifying the docker command: `docker run -i loadimpact/k6 run - <script.js`.
 
-In some situations it may also be useful to execute remote scripts. You can do that with HTTP**S** URLs in k6 by [importing them](https://k6.io/docs/using-k6/modules#section-remote-modules) in the script via their URL or simply specifying their URL in the CLI command: `k6 run github.com/k6io/k6/samples/http_2.js` (k6 "knows" a bit about github and cdnjs URLs, so this command is actually shorthand for `k6 run raw.githubusercontent.com/loadimpact/k6/master/samples/http_2.js`)
+In some situations it may also be useful to execute remote scripts. You can do that with HTTP**S** URLs in k6 by [importing them](https://k6.io/docs/using-k6/modules#section-remote-modules) in the script via their URL or simply specifying their URL in the CLI command: `k6 run github.com/k6io/k6/samples/http_2.js` (k6 "knows" a bit about github and cdnjs URLs, so this command is actually shorthand for `k6 run raw.githubusercontent.com/k6io/k6/master/samples/http_2.js`)
 
 For more information on how to get started running k6, please look at the [Running k6](https://k6.io/docs/getting-started/running-k6) documentation page. If you want to know more about making and measuring HTTP requests with k6, take a look [here](https://k6.io/docs/using-k6/http-requests) and [here](https://k6.io/docs/javascript-api/k6-http). And for information about the commercial k6 services like distributed cloud execution (the `k6 cloud` command) or Cloud Results (`k6 run -o cloud`), you can visit [k6.io](https://k6.io/cloud) or view the [cloud documentation](https://k6.io/docs/cloud).
 
