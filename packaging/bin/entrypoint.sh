@@ -7,6 +7,7 @@ log() {
 
 signkeypath="$PWD/sign-key.gpg"
 s3bucket="${S3_BUCKET-dl.k6.io}"
+pkgdir="$PWD/Packages"
 
 if ! [ -r "$signkeypath" ]; then
   log "ERROR: Signing key not found at '$signkeypath'"
@@ -15,7 +16,8 @@ fi
 
 gpg2 --import --batch --passphrase="$PGP_SIGN_KEY_PASSPHRASE" "$signkeypath"
 export PGPKEYID="$(gpg2 --list-secret-keys --with-colons | grep '^sec' | cut -d: -f5)"
-# TODO: Publish the pub key to S3
+mkdir -p "$pkgdir"
+gpg2 --export --armor --output "${pkgdir}/key.gpg" "$PGPKEYID"
 
 # Setup RPM signing
 cat > "$HOME/.rpmmacros" <<EOF
@@ -28,12 +30,12 @@ EOF
 
 for repo in deb rpm msi; do
   log "Creating ${repo} repository ..."
-  "create-${repo}-repo.sh" "$PWD/dist" "$PWD/Packages/${repo}"
+  "create-${repo}-repo.sh" "$PWD/dist" "${pkgdir}/${repo}"
 done
 
 # Generate and sync the main index.html
-(cd Packages && generate_index.py)
+(cd "$pkgdir" && generate_index.py)
 s3cmd put --add-header='Cache-Control:no-cache, max-age=0' \
-  Packages/index.html "s3://${s3bucket}/index.html"
+  "${pkgdir}/index.html" "s3://${s3bucket}/index.html"
 
 exec "$@"
