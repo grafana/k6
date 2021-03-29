@@ -25,8 +25,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/loadimpact/k6/api/v1/client"
-	"github.com/loadimpact/k6/ui"
+	"github.com/k6io/k6/api/v1/client"
+	"github.com/k6io/k6/ui"
 )
 
 func getStatusCmd(ctx context.Context) *cobra.Command {

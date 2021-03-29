@@ -42,12 +42,12 @@ import (
 	"google.golang.org/grpc/test/grpc_testing"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/fsext"
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/js/common"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/lib/fsext"
+	"github.com/k6io/k6/lib/metrics"
+	"github.com/k6io/k6/lib/testutils/httpmultibin"
+	"github.com/k6io/k6/stats"
 )
 
 const isWindows = runtime.GOOS == "windows"

@@ -29,9 +29,9 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/sirupsen/logrus"
 
-	jsono "github.com/loadimpact/k6/output/json"
-	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/stats/influxdb"
+	jsono "github.com/k6io/k6/output/json"
+	"github.com/k6io/k6/stats"
+	"github.com/k6io/k6/stats/influxdb"
 )
 
 // Collector implements the lib.Collector interface and should be used only for testing

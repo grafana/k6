@@ -24,7 +24,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/k6io/k6/lib/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"

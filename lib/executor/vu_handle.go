@@ -27,7 +27,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/lib"
+	"github.com/k6io/k6/lib"
 )
 
 type stateType int32

@@ -24,7 +24,7 @@ import (
 	"github.com/manyminds/api2go/jsonapi"
 	"github.com/pkg/errors"
 
-	"github.com/loadimpact/k6/lib"
+	"github.com/k6io/k6/lib"
 )
 
 type Check struct {

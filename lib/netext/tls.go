@@ -25,7 +25,7 @@ import (
 
 	"golang.org/x/crypto/ocsp"
 
-	"github.com/loadimpact/k6/lib"
+	"github.com/k6io/k6/lib"
 )
 
 //nolint: golint

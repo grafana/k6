@@ -28,9 +28,9 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/manyminds/api2go/jsonapi"
 
-	"github.com/loadimpact/k6/api/common"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/executor"
+	"github.com/k6io/k6/api/common"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/lib/executor"
 )
 
 func HandleGetStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {

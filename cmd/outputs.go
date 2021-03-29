@@ -29,17 +29,17 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/loader"
-	"github.com/loadimpact/k6/output"
-	"github.com/loadimpact/k6/output/cloud"
-	"github.com/loadimpact/k6/output/json"
-	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/stats/csv"
-	"github.com/loadimpact/k6/stats/datadog"
-	"github.com/loadimpact/k6/stats/influxdb"
-	"github.com/loadimpact/k6/stats/kafka"
-	"github.com/loadimpact/k6/stats/statsd"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/loader"
+	"github.com/k6io/k6/output"
+	"github.com/k6io/k6/output/cloud"
+	"github.com/k6io/k6/output/json"
+	"github.com/k6io/k6/stats"
+	"github.com/k6io/k6/stats/csv"
+	"github.com/k6io/k6/stats/datadog"
+	"github.com/k6io/k6/stats/influxdb"
+	"github.com/k6io/k6/stats/kafka"
+	"github.com/k6io/k6/stats/statsd"
 )
 
 // TODO: move this to an output sub-module after we get rid of the old collectors?

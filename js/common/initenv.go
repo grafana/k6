@@ -47,7 +47,7 @@ type InitEnvironment struct {
 // transform any relative paths into absolute ones, using the CWD.
 //
 // TODO: refactor? It was copied from
-// https://github.com/loadimpact/k6/blob/c51095ad7304bdd1e82cdb33c91abc331533b886/js/initcontext.go#L211-L222
+// https://github.com/k6io/k6/blob/c51095ad7304bdd1e82cdb33c91abc331533b886/js/initcontext.go#L211-L222
 func (ie *InitEnvironment) GetAbsFilePath(filename string) string {
 	// Here IsAbs should be enough but unfortunately it doesn't handle absolute paths starting from
 	// the current drive on windows like `\users\noname\...`. Also it makes it more easy to test and

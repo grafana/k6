@@ -25,7 +25,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/loadimpact/k6/lib/consts"
+	"github.com/k6io/k6/lib/consts"
 )
 
 func getVersionCmd() *cobra.Command {

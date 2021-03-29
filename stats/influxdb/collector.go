@@ -30,8 +30,8 @@ import (
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/stats"
 )
 
 // FieldKind defines Enum for tag-to-field type conversion

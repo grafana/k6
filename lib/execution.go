@@ -30,7 +30,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/stats"
 )
 
 // An ExecutionScheduler is in charge of initializing executors and using them

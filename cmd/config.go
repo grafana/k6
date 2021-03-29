@@ -33,10 +33,10 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/executor"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/lib/executor"
+	"github.com/k6io/k6/lib/types"
+	"github.com/k6io/k6/stats"
 )
 
 // configFlagSet returns a FlagSet with the default run configuration flags.

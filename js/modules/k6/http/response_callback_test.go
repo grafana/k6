@@ -27,10 +27,10 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/js/common"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/lib/metrics"
+	"github.com/k6io/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

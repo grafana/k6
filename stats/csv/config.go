@@ -28,8 +28,8 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/k6io/k6/lib/types"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/loadimpact/k6/lib/types"
 )
 
 // Config is the config for the csv collector

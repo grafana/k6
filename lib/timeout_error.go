@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/loadimpact/k6/lib/consts"
+	"github.com/k6io/k6/lib/consts"
 )
 
 // TimeoutError is used when somethings timeouts

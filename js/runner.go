@@ -42,13 +42,13 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/consts"
-	"github.com/loadimpact/k6/lib/netext"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/loader"
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/js/common"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/lib/consts"
+	"github.com/k6io/k6/lib/netext"
+	"github.com/k6io/k6/lib/types"
+	"github.com/k6io/k6/loader"
+	"github.com/k6io/k6/stats"
 )
 
 // Ensure Runner implements the lib.Runner interface

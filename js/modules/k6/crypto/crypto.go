@@ -36,8 +36,8 @@ import (
 	"golang.org/x/crypto/md4"
 	"golang.org/x/crypto/ripemd160"
 
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/internal/modules"
+	"github.com/k6io/k6/js/common"
+	"github.com/k6io/k6/js/internal/modules"
 )
 
 func init() {

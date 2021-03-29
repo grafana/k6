@@ -31,7 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/stats"
 )
 
 // DialContexter is an interface that can dial with a context

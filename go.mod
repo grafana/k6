@@ -1,4 +1,4 @@
-module github.com/loadimpact/k6
+module github.com/k6io/k6
 
 go 1.14
 

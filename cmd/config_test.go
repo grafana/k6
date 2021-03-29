@@ -29,10 +29,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/executor"
-	"github.com/loadimpact/k6/lib/testutils"
-	"github.com/loadimpact/k6/lib/types"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/lib/executor"
+	"github.com/k6io/k6/lib/testutils"
+	"github.com/k6io/k6/lib/types"
 )
 
 type testCmdData struct {

@@ -22,13 +22,13 @@ package js
 
 import (
 	// Initialize all internal JS modules.
-	_ "github.com/loadimpact/k6/js/modules/k6"
-	_ "github.com/loadimpact/k6/js/modules/k6/crypto"
-	_ "github.com/loadimpact/k6/js/modules/k6/crypto/x509"
-	_ "github.com/loadimpact/k6/js/modules/k6/data"
-	_ "github.com/loadimpact/k6/js/modules/k6/encoding"
-	_ "github.com/loadimpact/k6/js/modules/k6/grpc"
-	_ "github.com/loadimpact/k6/js/modules/k6/http"
-	_ "github.com/loadimpact/k6/js/modules/k6/metrics"
-	_ "github.com/loadimpact/k6/js/modules/k6/ws"
+	_ "github.com/k6io/k6/js/modules/k6"
+	_ "github.com/k6io/k6/js/modules/k6/crypto"
+	_ "github.com/k6io/k6/js/modules/k6/crypto/x509"
+	_ "github.com/k6io/k6/js/modules/k6/data"
+	_ "github.com/k6io/k6/js/modules/k6/encoding"
+	_ "github.com/k6io/k6/js/modules/k6/grpc"
+	_ "github.com/k6io/k6/js/modules/k6/http"
+	_ "github.com/k6io/k6/js/modules/k6/metrics"
+	_ "github.com/k6io/k6/js/modules/k6/ws"
 )

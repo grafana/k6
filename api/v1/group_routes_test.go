@@ -31,11 +31,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/loadimpact/k6/core"
-	"github.com/loadimpact/k6/core/local"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/testutils"
-	"github.com/loadimpact/k6/lib/testutils/minirunner"
+	"github.com/k6io/k6/core"
+	"github.com/k6io/k6/core/local"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/lib/testutils"
+	"github.com/k6io/k6/lib/testutils/minirunner"
 )
 
 func TestGetGroups(t *testing.T) {

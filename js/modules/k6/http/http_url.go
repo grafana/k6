@@ -25,7 +25,7 @@ import (
 
 	"github.com/dop251/goja"
 
-	"github.com/loadimpact/k6/lib/netext/httpext"
+	"github.com/k6io/k6/lib/netext/httpext"
 )
 
 // ToURL tries to convert anything passed to it to a k6 URL struct

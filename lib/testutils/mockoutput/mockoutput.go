@@ -21,9 +21,9 @@
 package mockoutput
 
 import (
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/output"
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/output"
+	"github.com/k6io/k6/stats"
 )
 
 // New exists so that the usage from tests avoids repetition, i.e. is

@@ -32,8 +32,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/loadimpact/k6/lib/testutils"
-	"github.com/loadimpact/k6/lib/types"
+	"github.com/k6io/k6/lib/testutils"
+	"github.com/k6io/k6/lib/types"
 )
 
 func init() {

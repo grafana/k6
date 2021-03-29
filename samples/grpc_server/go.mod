@@ -1,4 +1,4 @@
-module github.com/loadimpact/k6/samples/grpc_server
+module github.com/k6io/k6/samples/grpc_server
 
 go 1.15
 

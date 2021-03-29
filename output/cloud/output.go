@@ -32,15 +32,15 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/cloudapi"
-	"github.com/loadimpact/k6/output"
+	"github.com/k6io/k6/cloudapi"
+	"github.com/k6io/k6/output"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/consts"
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/lib/netext"
-	"github.com/loadimpact/k6/lib/netext/httpext"
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/lib/consts"
+	"github.com/k6io/k6/lib/metrics"
+	"github.com/k6io/k6/lib/netext"
+	"github.com/k6io/k6/lib/netext/httpext"
+	"github.com/k6io/k6/stats"
 )
 
 // TestName is the default Load Impact Cloud test name
@@ -67,7 +67,7 @@ type Output struct {
 
 	// TODO: optimize this
 	//
-	// Since the real-time metrics refactoring (https://github.com/loadimpact/k6/pull/678),
+	// Since the real-time metrics refactoring (https://github.com/k6io/k6/pull/678),
 	// we should no longer have to handle metrics that have times long in the past. So instead of a
 	// map, we can probably use a simple slice (or even an array!) as a ring buffer to store the
 	// aggregation buckets. This should save us a some time, since it would make the lookups and WaitPeriod

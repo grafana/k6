@@ -21,7 +21,7 @@
 package main
 
 import (
-	"github.com/loadimpact/k6/cmd"
+	"github.com/k6io/k6/cmd"
 )
 
 func main() {

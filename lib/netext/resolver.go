@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/loadimpact/k6/lib/types"
+	"github.com/k6io/k6/lib/types"
 )
 
 // MultiResolver returns all IP addresses for the given host.

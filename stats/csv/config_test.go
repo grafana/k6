@@ -26,7 +26,7 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib/types"
+	"github.com/k6io/k6/lib/types"
 	"github.com/stretchr/testify/assert"
 )
 

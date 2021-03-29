@@ -29,9 +29,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/loadimpact/k6/js"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/loader"
+	"github.com/k6io/k6/js"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/loader"
 )
 
 func getInspectCmd(logger logrus.FieldLogger) *cobra.Command {

@@ -23,7 +23,7 @@ package lib
 import (
 	"context"
 
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/stats"
 )
 
 // TODO: move to some other package - types? models?

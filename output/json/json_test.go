@@ -32,9 +32,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/loadimpact/k6/lib/testutils"
-	"github.com/loadimpact/k6/output"
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/lib/testutils"
+	"github.com/k6io/k6/output"
+	"github.com/k6io/k6/stats"
 )
 
 func getValidator(t *testing.T, expected []string) func(io.Reader) {

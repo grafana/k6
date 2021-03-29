@@ -41,10 +41,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/lib/netext"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/lib/metrics"
+	"github.com/k6io/k6/lib/netext"
+	"github.com/k6io/k6/lib/types"
+	"github.com/k6io/k6/stats"
 )
 
 const traceDelay = 100 * time.Millisecond

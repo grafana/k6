@@ -26,7 +26,7 @@ import (
 	"fmt"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
+	"github.com/k6io/k6/js/common"
 )
 
 //nolint:gochecknoglobals

@@ -31,9 +31,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/lib/netext/httpext"
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/lib/metrics"
+	"github.com/k6io/k6/lib/netext/httpext"
+	"github.com/k6io/k6/stats"
 )
 
 func TestSampleMarshaling(t *testing.T) {

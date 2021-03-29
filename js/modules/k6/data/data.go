@@ -25,9 +25,9 @@ import (
 	"strconv"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/internal/modules"
-	"github.com/loadimpact/k6/lib"
+	"github.com/k6io/k6/js/common"
+	"github.com/k6io/k6/js/internal/modules"
+	"github.com/k6io/k6/lib"
 	"github.com/pkg/errors"
 )
 

@@ -4,7 +4,7 @@ package cloud
 
 import (
 	json "encoding/json"
-	stats "github.com/loadimpact/k6/stats"
+	stats "github.com/k6io/k6/stats"
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"

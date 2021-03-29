@@ -29,7 +29,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/loadimpact/k6/lib"
+	"github.com/k6io/k6/lib"
 )
 
 type ResultStatus int

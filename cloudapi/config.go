@@ -26,8 +26,8 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/k6io/k6/lib/types"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/loadimpact/k6/lib/types"
 )
 
 // Config holds all the necessary data and options for sending metrics to the Load Impact cloud.

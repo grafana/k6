@@ -26,9 +26,9 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/guregu/null.v3"
 
-	v1 "github.com/loadimpact/k6/api/v1"
-	"github.com/loadimpact/k6/api/v1/client"
-	"github.com/loadimpact/k6/ui"
+	v1 "github.com/k6io/k6/api/v1"
+	"github.com/k6io/k6/api/v1/client"
+	"github.com/k6io/k6/ui"
 )
 
 func getResumeCmd(ctx context.Context) *cobra.Command {

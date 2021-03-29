@@ -38,7 +38,7 @@ type digestTransport struct {
 // should cache the nonces and behave more like a browser... or we should
 // ditch the hacky http.RoundTripper approach and write our own client...
 //
-// Github issue: https://github.com/loadimpact/k6/issues/800
+// Github issue: https://github.com/k6io/k6/issues/800
 func (t digestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Make the initial request authentication params to compute the
 	// authorization header

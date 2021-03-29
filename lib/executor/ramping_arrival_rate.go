@@ -31,11 +31,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/ui/pb"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/lib/metrics"
+	"github.com/k6io/k6/lib/types"
+	"github.com/k6io/k6/stats"
+	"github.com/k6io/k6/ui/pb"
 )
 
 const rampingArrivalRateType = "ramping-arrival-rate"
@@ -222,7 +222,7 @@ var _ lib.Executor = &RampingArrivalRate{}
 // up/down as a multiple constant functions, and you will get mostly okayish results. But here is
 // where calculus comes into play. Calculus gives us a way of exactly calculate the area for any
 // given function and linear ramp up/downs just happen to be pretty easy(actual math prove in
-// https://github.com/loadimpact/k6/issues/1299#issuecomment-575661084).
+// https://github.com/k6io/k6/issues/1299#issuecomment-575661084).
 //
 // One tricky last point is what happens if stage only completes 9.8 events? Let's say that the
 // first stage above was 4.9 seconds long 2 * 4.9 is 9.8, we have 9 events and .8 of an event, what
@@ -288,7 +288,7 @@ func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.
 // lambdas :D), while having both config frontends still be present for maximum
 // UX benefits. Basically, keep the progress bars and scheduling (i.e. at what
 // time should iteration X begin) different, but keep everyhing else the same.
-// This will allow us to implement https://github.com/loadimpact/k6/issues/1386
+// This will allow us to implement https://github.com/k6io/k6/issues/1386
 // and things like all of the TODOs below in one place only.
 //nolint:funlen,gocognit
 func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {

@@ -25,7 +25,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/stats"
 )
 
 // ActiveVU represents an actively running virtual user.

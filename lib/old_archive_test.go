@@ -32,7 +32,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 
-	"github.com/loadimpact/k6/lib/fsext"
+	"github.com/k6io/k6/lib/fsext"
 )
 
 func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
@@ -82,7 +82,7 @@ func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
 func TestOldArchive(t *testing.T) {
 	var testCases = map[string]string{
 		// map of filename to data for each main file tested
-		"github.com/loadimpact/k6/samples/example.js": `github file`,
+		"github.com/k6io/k6/samples/example.js": `github file`,
 		"cdnjs.com/packages/Faker":                    `faker file`,
 		"C:/something/path2":                          `windows script`,
 		"/absolulte/path2":                            `unix script`,
@@ -93,14 +93,14 @@ func TestOldArchive(t *testing.T) {
 			metadata := `{"filename": "` + filename + `", "options": {}}`
 			fs := makeMemMapFs(t, map[string][]byte{
 				// files
-				"/files/github.com/loadimpact/k6/samples/example.js": []byte(`github file`),
+				"/files/github.com/k6io/k6/samples/example.js": []byte(`github file`),
 				"/files/cdnjs.com/packages/Faker":                    []byte(`faker file`),
 				"/files/example.com/path/to.js":                      []byte(`example.com file`),
 				"/files/_/C/something/path":                          []byte(`windows file`),
 				"/files/_/absolulte/path":                            []byte(`unix file`),
 
 				// scripts
-				"/scripts/github.com/loadimpact/k6/samples/example.js2": []byte(`github script`),
+				"/scripts/github.com/k6io/k6/samples/example.js2": []byte(`github script`),
 				"/scripts/cdnjs.com/packages/Faker2":                    []byte(`faker script`),
 				"/scripts/example.com/path/too.js":                      []byte(`example.com script`),
 				"/scripts/_/C/something/path2":                          []byte(`windows script`),
@@ -123,9 +123,9 @@ func TestOldArchive(t *testing.T) {
 					"https": makeMemMapFs(t, map[string][]byte{
 						"/example.com/path/to.js":                       []byte(`example.com file`),
 						"/example.com/path/too.js":                      []byte(`example.com script`),
-						"/github.com/loadimpact/k6/samples/example.js":  []byte(`github file`),
+						"/github.com/k6io/k6/samples/example.js":  []byte(`github file`),
 						"/cdnjs.com/packages/Faker":                     []byte(`faker file`),
-						"/github.com/loadimpact/k6/samples/example.js2": []byte(`github script`),
+						"/github.com/k6io/k6/samples/example.js2": []byte(`github script`),
 						"/cdnjs.com/packages/Faker2":                    []byte(`faker script`),
 					}),
 				}
@@ -165,10 +165,10 @@ func TestFilenamePwdResolve(t *testing.T) {
 			expectedPwdURL:      &url.URL{Scheme: "file", Path: "/home/nobody"},
 		},
 		{
-			Filename:            "github.com/loadimpact/k6/samples/http2.js",
-			Pwd:                 "github.com/loadimpact/k6/samples",
-			expectedFilenameURL: &url.URL{Opaque: "github.com/loadimpact/k6/samples/http2.js"},
-			expectedPwdURL:      &url.URL{Opaque: "github.com/loadimpact/k6/samples"},
+			Filename:            "github.com/k6io/k6/samples/http2.js",
+			Pwd:                 "github.com/k6io/k6/samples",
+			expectedFilenameURL: &url.URL{Opaque: "github.com/k6io/k6/samples/http2.js"},
+			expectedPwdURL:      &url.URL{Opaque: "github.com/k6io/k6/samples"},
 		},
 		{
 			Filename:            "cdnjs.com/libraries/Faker",

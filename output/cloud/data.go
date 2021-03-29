@@ -27,9 +27,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/lib/netext/httpext"
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/lib/metrics"
+	"github.com/k6io/k6/lib/netext/httpext"
+	"github.com/k6io/k6/stats"
 )
 
 // DataType constants

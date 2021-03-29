@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loadimpact/k6/js/common"
+	"github.com/k6io/k6/js/common"
 )
 
 // FileData represents a binary file requiring multipart request encoding

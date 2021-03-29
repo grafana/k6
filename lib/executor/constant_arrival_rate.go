@@ -32,11 +32,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/ui/pb"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/lib/metrics"
+	"github.com/k6io/k6/lib/types"
+	"github.com/k6io/k6/stats"
+	"github.com/k6io/k6/ui/pb"
 )
 
 const constantArrivalRateType = "constant-arrival-rate"
@@ -207,7 +207,7 @@ func (car *ConstantArrivalRate) Init(ctx context.Context) error {
 // lambdas :D), while having both config frontends still be present for maximum
 // UX benefits. Basically, keep the progress bars and scheduling (i.e. at what
 // time should iteration X begin) different, but keep everything else the same.
-// This will allow us to implement https://github.com/loadimpact/k6/issues/1386
+// This will allow us to implement https://github.com/k6io/k6/issues/1386
 // and things like all of the TODOs below in one place only.
 //nolint:funlen
 func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {

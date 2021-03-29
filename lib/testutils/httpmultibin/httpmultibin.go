@@ -50,10 +50,10 @@ import (
 	"google.golang.org/grpc/status"
 	grpctest "google.golang.org/grpc/test/grpc_testing"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/netext"
-	"github.com/loadimpact/k6/lib/netext/httpext"
-	"github.com/loadimpact/k6/lib/types"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/lib/netext"
+	"github.com/k6io/k6/lib/netext/httpext"
+	"github.com/k6io/k6/lib/types"
 )
 
 // GetTLSClientConfig returns a TLS config that trusts the supplied

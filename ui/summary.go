@@ -30,8 +30,8 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/stats"
 )
 
 // TODO: delete everything here after we move it to a JS function

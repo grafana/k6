@@ -23,7 +23,7 @@ package grpc
 import (
 	"google.golang.org/grpc/codes"
 
-	"github.com/loadimpact/k6/js/internal/modules"
+	"github.com/k6io/k6/js/internal/modules"
 )
 
 func init() {

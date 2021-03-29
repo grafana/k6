@@ -32,11 +32,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/compiler"
-	"github.com/loadimpact/k6/js/internal/modules"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/loader"
+	"github.com/k6io/k6/js/common"
+	"github.com/k6io/k6/js/compiler"
+	"github.com/k6io/k6/js/internal/modules"
+	"github.com/k6io/k6/lib"
+	"github.com/k6io/k6/loader"
 )
 
 type programWithSource struct {

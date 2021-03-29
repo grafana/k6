@@ -35,7 +35,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
 
-	"github.com/loadimpact/k6/lib/netext"
+	"github.com/k6io/k6/lib/netext"
 )
 
 func TestDefaultError(t *testing.T) {

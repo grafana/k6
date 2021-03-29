@@ -31,8 +31,8 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
+	"github.com/k6io/k6/lib/types"
+	"github.com/k6io/k6/stats"
 )
 
 // DefaultScenarioName is used as the default key/ID of the scenario config entries

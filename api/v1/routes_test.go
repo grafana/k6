@@ -28,8 +28,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/loadimpact/k6/api/common"
-	"github.com/loadimpact/k6/core"
+	"github.com/k6io/k6/api/common"
+	"github.com/k6io/k6/core"
 )
 
 func newRequestWithEngine(engine *core.Engine, method, target string, body io.Reader) *http.Request {
