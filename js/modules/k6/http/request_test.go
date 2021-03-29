@@ -1184,15 +1184,17 @@ func TestRequestAndBatch(t *testing.T) {
 		})
 		t.Run("GET", func(t *testing.T) {
 			_, err := rt.RunString(sr(`
-			var reqs = [
+		{
+			let reqs = [
 				["GET", "HTTPBIN_URL/"],
 				["GET", "HTTPBIN_IP_URL/"],
 			];
-			var res = http.batch(reqs);
+			let res = http.batch(reqs);
 			for (var key in res) {
 				if (res[key].status != 200) { throw new Error("wrong status: " + res[key].status); }
 				if (res[key].url != reqs[key][1]) { throw new Error("wrong url: " + res[key].url); }
-			}`))
+			}
+		}`))
 			require.NoError(t, err)
 			bufSamples := stats.GetBufferedSamples(samples)
 			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/"), "", 200, "")
@@ -1200,6 +1202,7 @@ func TestRequestAndBatch(t *testing.T) {
 
 			t.Run("Tagged", func(t *testing.T) {
 				_, err := runES6String(t, rt, sr(`
+			{
 				let fragment = "get";
 				let reqs = [
 					["GET", http.url`+"`"+`HTTPBIN_URL/${fragment}`+"`"+`],
@@ -1209,7 +1212,8 @@ func TestRequestAndBatch(t *testing.T) {
 				for (var key in res) {
 					if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
 					if (res[key].url != reqs[key][1].url) { throw new Error("wrong url: " + key + ": " + res[key].url + " != " + reqs[key][1].url); }
-				}`))
+				}
+			}`))
 				assert.NoError(t, err)
 				bufSamples := stats.GetBufferedSamples(samples)
 				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get"), sr("HTTPBIN_URL/${}"), 200, "")
@@ -1218,15 +1222,17 @@ func TestRequestAndBatch(t *testing.T) {
 
 			t.Run("Shorthand", func(t *testing.T) {
 				_, err := rt.RunString(sr(`
-				var reqs = [
+			{
+				let reqs = [
 					"HTTPBIN_URL/",
 					"HTTPBIN_IP_URL/",
 				];
-				var res = http.batch(reqs);
+				let res = http.batch(reqs);
 				for (var key in res) {
 					if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
 					if (res[key].url != reqs[key]) { throw new Error("wrong url: " + key + ": " + res[key].url); }
-				}`))
+				}
+			}`))
 				assert.NoError(t, err)
 				bufSamples := stats.GetBufferedSamples(samples)
 				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/"), "", 200, "")
@@ -1234,6 +1240,7 @@ func TestRequestAndBatch(t *testing.T) {
 
 				t.Run("Tagged", func(t *testing.T) {
 					_, err := runES6String(t, rt, sr(`
+				{
 					let fragment = "get";
 					let reqs = [
 						http.url`+"`"+`HTTPBIN_URL/${fragment}`+"`"+`,
@@ -1243,7 +1250,8 @@ func TestRequestAndBatch(t *testing.T) {
 					for (var key in res) {
 						if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
 						if (res[key].url != reqs[key].url) { throw new Error("wrong url: " + key + ": " + res[key].url + " != " + reqs[key].url); }
-					}`))
+					}
+				}`))
 					assert.NoError(t, err)
 					bufSamples := stats.GetBufferedSamples(samples)
 					assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get"), sr("HTTPBIN_URL/${}"), 200, "")
@@ -1253,15 +1261,17 @@ func TestRequestAndBatch(t *testing.T) {
 
 			t.Run("ObjectForm", func(t *testing.T) {
 				_, err := rt.RunString(sr(`
-				var reqs = [
+			{
+				let reqs = [
 					{ method: "GET", url: "HTTPBIN_URL/" },
 					{ url: "HTTPBIN_IP_URL/", method: "GET"},
 				];
-				var res = http.batch(reqs);
+				let res = http.batch(reqs);
 				for (var key in res) {
 					if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
 					if (res[key].url != reqs[key].url) { throw new Error("wrong url: " + key + ": " + res[key].url + " != " + reqs[key].url); }
-				}`))
+				}
+			}`))
 				assert.NoError(t, err)
 				bufSamples := stats.GetBufferedSamples(samples)
 				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/"), "", 200, "")

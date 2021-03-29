@@ -1,4 +1,4 @@
-FROM golang:1.15-alpine as builder
+FROM golang:1.16-alpine as builder
 WORKDIR $GOPATH/src/github.com/loadimpact/k6
 ADD . .
 RUN apk --no-cache add git

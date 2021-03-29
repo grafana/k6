@@ -328,6 +328,7 @@ func (r *Runtime) builtin_unescape(call FunctionCall) Value {
 
 func (r *Runtime) initGlobalObject() {
 	o := r.globalObject.self
+	o._putProp("globalThis", r.globalObject, true, false, true)
 	o._putProp("NaN", _NaN, false, false, false)
 	o._putProp("undefined", _undefined, false, false, false)
 	o._putProp("Infinity", _positiveInf, false, false, false)

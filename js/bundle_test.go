@@ -160,7 +160,7 @@ func TestNewBundle(t *testing.T) {
 				{
 					"Promise", "base",
 					`module.exports.default = function() {}; new Promise(function(resolve, reject){});`,
-					"ReferenceError: Promise is not defined at file:///script.js:1:45(5)",
+					"ReferenceError: Promise is not defined at file:///script.js:1:45(4)",
 				},
 			}
 

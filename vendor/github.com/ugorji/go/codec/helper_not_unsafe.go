@@ -33,26 +33,47 @@ func bytesView(v string) []byte {
 	return []byte(v)
 }
 
-func definitelyNil(v interface{}) bool {
-	// this is a best-effort option.
-	// We just return false, so we don't unnecessarily incur the cost of reflection this early.
-	return false
+// isNil says whether the value v is nil.
+// This applies to references like map/ptr/unsafepointer/chan/func,
+// and non-reference values like interface/slice.
+func isNil(v interface{}) (rv reflect.Value, isnil bool) {
+	rv = rv4i(v)
+	if isnilBitset.isset(byte(rv.Kind())) {
+		isnil = rv.IsNil()
+	}
+	return
+}
+
+func rv4i(i interface{}) reflect.Value {
+	return reflect.ValueOf(i)
 }
 
 func rv2i(rv reflect.Value) interface{} {
 	return rv.Interface()
 }
 
-func rt2id(rt reflect.Type) uintptr {
-	return reflect.ValueOf(rt).Pointer()
+func rvIsNil(rv reflect.Value) bool {
+	return rv.IsNil()
 }
 
-func rv2rtid(rv reflect.Value) uintptr {
-	return reflect.ValueOf(rv.Type()).Pointer()
+func rvSetSliceLen(rv reflect.Value, length int) {
+	rv.SetLen(length)
+}
+
+func rvZeroAddrK(t reflect.Type, k reflect.Kind) reflect.Value {
+	return reflect.New(t).Elem()
+}
+
+func rvConvert(v reflect.Value, t reflect.Type) (rv reflect.Value) {
+	return v.Convert(t)
+}
+
+func rt2id(rt reflect.Type) uintptr {
+	return rv4i(rt).Pointer()
 }
 
 func i2rtid(i interface{}) uintptr {
-	return reflect.ValueOf(reflect.TypeOf(i)).Pointer()
+	return rv4i(reflect.TypeOf(i)).Pointer()
 }
 
 // --------------------------
@@ -86,24 +107,31 @@ func isEmptyValue(v reflect.Value, tinfos *TypeInfos, deref, checkStruct bool) b
 }
 
 // --------------------------
-// type ptrToRvMap struct{}
+type atomicClsErr struct {
+	v atomic.Value
+}
 
-// func (*ptrToRvMap) init() {}
-// func (*ptrToRvMap) get(i interface{}) reflect.Value {
-// 	return reflect.ValueOf(i).Elem()
-// }
+func (x *atomicClsErr) load() (e clsErr) {
+	if i := x.v.Load(); i != nil {
+		e = i.(clsErr)
+	}
+	return
+}
+
+func (x *atomicClsErr) store(p clsErr) {
+	x.v.Store(p)
+}
 
 // --------------------------
 type atomicTypeInfoSlice struct { // expected to be 2 words
 	v atomic.Value
 }
 
-func (x *atomicTypeInfoSlice) load() []rtid2ti {
-	i := x.v.Load()
-	if i == nil {
-		return nil
+func (x *atomicTypeInfoSlice) load() (e []rtid2ti) {
+	if i := x.v.Load(); i != nil {
+		e = i.([]rtid2ti)
 	}
-	return i.([]rtid2ti)
+	return
 }
 
 func (x *atomicTypeInfoSlice) store(p []rtid2ti) {
@@ -111,162 +139,271 @@ func (x *atomicTypeInfoSlice) store(p []rtid2ti) {
 }
 
 // --------------------------
-func (d *Decoder) raw(f *codecFnInfo, rv reflect.Value) {
-	rv.SetBytes(d.rawBytes())
+type atomicRtidFnSlice struct { // expected to be 2 words
+	v atomic.Value
 }
 
-func (d *Decoder) kString(f *codecFnInfo, rv reflect.Value) {
-	rv.SetString(d.d.DecodeString())
-}
-
-func (d *Decoder) kBool(f *codecFnInfo, rv reflect.Value) {
-	rv.SetBool(d.d.DecodeBool())
-}
-
-func (d *Decoder) kTime(f *codecFnInfo, rv reflect.Value) {
-	rv.Set(reflect.ValueOf(d.d.DecodeTime()))
-}
-
-func (d *Decoder) kFloat32(f *codecFnInfo, rv reflect.Value) {
-	fv := d.d.DecodeFloat64()
-	if chkOvf.Float32(fv) {
-		d.errorf("float32 overflow: %v", fv)
+func (x *atomicRtidFnSlice) load() (e []codecRtidFn) {
+	if i := x.v.Load(); i != nil {
+		e = i.([]codecRtidFn)
 	}
-	rv.SetFloat(fv)
+	return
 }
 
-func (d *Decoder) kFloat64(f *codecFnInfo, rv reflect.Value) {
-	rv.SetFloat(d.d.DecodeFloat64())
+func (x *atomicRtidFnSlice) store(p []codecRtidFn) {
+	x.v.Store(p)
 }
 
-func (d *Decoder) kInt(f *codecFnInfo, rv reflect.Value) {
-	rv.SetInt(chkOvf.IntV(d.d.DecodeInt64(), intBitsize))
+// --------------------------
+func (n *decNaked) ru() reflect.Value {
+	return rv4i(&n.u).Elem()
+}
+func (n *decNaked) ri() reflect.Value {
+	return rv4i(&n.i).Elem()
+}
+func (n *decNaked) rf() reflect.Value {
+	return rv4i(&n.f).Elem()
+}
+func (n *decNaked) rl() reflect.Value {
+	return rv4i(&n.l).Elem()
+}
+func (n *decNaked) rs() reflect.Value {
+	return rv4i(&n.s).Elem()
+}
+func (n *decNaked) rt() reflect.Value {
+	return rv4i(&n.t).Elem()
+}
+func (n *decNaked) rb() reflect.Value {
+	return rv4i(&n.b).Elem()
 }
 
-func (d *Decoder) kInt8(f *codecFnInfo, rv reflect.Value) {
-	rv.SetInt(chkOvf.IntV(d.d.DecodeInt64(), 8))
+// --------------------------
+func rvSetBytes(rv reflect.Value, v []byte) {
+	rv.SetBytes(v)
 }
 
-func (d *Decoder) kInt16(f *codecFnInfo, rv reflect.Value) {
-	rv.SetInt(chkOvf.IntV(d.d.DecodeInt64(), 16))
+func rvSetString(rv reflect.Value, v string) {
+	rv.SetString(v)
 }
 
-func (d *Decoder) kInt32(f *codecFnInfo, rv reflect.Value) {
-	rv.SetInt(chkOvf.IntV(d.d.DecodeInt64(), 32))
+func rvSetBool(rv reflect.Value, v bool) {
+	rv.SetBool(v)
 }
 
-func (d *Decoder) kInt64(f *codecFnInfo, rv reflect.Value) {
-	rv.SetInt(d.d.DecodeInt64())
+func rvSetTime(rv reflect.Value, v time.Time) {
+	rv.Set(rv4i(v))
 }
 
-func (d *Decoder) kUint(f *codecFnInfo, rv reflect.Value) {
-	rv.SetUint(chkOvf.UintV(d.d.DecodeUint64(), uintBitsize))
+func rvSetFloat32(rv reflect.Value, v float32) {
+	rv.SetFloat(float64(v))
 }
 
-func (d *Decoder) kUintptr(f *codecFnInfo, rv reflect.Value) {
-	rv.SetUint(chkOvf.UintV(d.d.DecodeUint64(), uintBitsize))
+func rvSetFloat64(rv reflect.Value, v float64) {
+	rv.SetFloat(v)
 }
 
-func (d *Decoder) kUint8(f *codecFnInfo, rv reflect.Value) {
-	rv.SetUint(chkOvf.UintV(d.d.DecodeUint64(), 8))
+func rvSetInt(rv reflect.Value, v int) {
+	rv.SetInt(int64(v))
 }
 
-func (d *Decoder) kUint16(f *codecFnInfo, rv reflect.Value) {
-	rv.SetUint(chkOvf.UintV(d.d.DecodeUint64(), 16))
+func rvSetInt8(rv reflect.Value, v int8) {
+	rv.SetInt(int64(v))
 }
 
-func (d *Decoder) kUint32(f *codecFnInfo, rv reflect.Value) {
-	rv.SetUint(chkOvf.UintV(d.d.DecodeUint64(), 32))
+func rvSetInt16(rv reflect.Value, v int16) {
+	rv.SetInt(int64(v))
 }
 
-func (d *Decoder) kUint64(f *codecFnInfo, rv reflect.Value) {
-	rv.SetUint(d.d.DecodeUint64())
+func rvSetInt32(rv reflect.Value, v int32) {
+	rv.SetInt(int64(v))
+}
+
+func rvSetInt64(rv reflect.Value, v int64) {
+	rv.SetInt(v)
+}
+
+func rvSetUint(rv reflect.Value, v uint) {
+	rv.SetUint(uint64(v))
+}
+
+func rvSetUintptr(rv reflect.Value, v uintptr) {
+	rv.SetUint(uint64(v))
+}
+
+func rvSetUint8(rv reflect.Value, v uint8) {
+	rv.SetUint(uint64(v))
+}
+
+func rvSetUint16(rv reflect.Value, v uint16) {
+	rv.SetUint(uint64(v))
+}
+
+func rvSetUint32(rv reflect.Value, v uint32) {
+	rv.SetUint(uint64(v))
+}
+
+func rvSetUint64(rv reflect.Value, v uint64) {
+	rv.SetUint(v)
 }
 
 // ----------------
 
-func (e *Encoder) kBool(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeBool(rv.Bool())
+// rvSetDirect is rv.Set for all kinds except reflect.Interface
+func rvSetDirect(rv reflect.Value, v reflect.Value) {
+	rv.Set(v)
 }
 
-func (e *Encoder) kTime(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeTime(rv2i(rv).(time.Time))
+// rvSlice returns a slice of the slice of lenth
+func rvSlice(rv reflect.Value, length int) reflect.Value {
+	return rv.Slice(0, length)
 }
 
-func (e *Encoder) kString(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeString(cUTF8, rv.String())
+// ----------------
+
+func rvSliceIndex(rv reflect.Value, i int, ti *typeInfo) reflect.Value {
+	return rv.Index(i)
 }
 
-func (e *Encoder) kFloat64(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeFloat64(rv.Float())
+func rvGetSliceLen(rv reflect.Value) int {
+	return rv.Len()
 }
 
-func (e *Encoder) kFloat32(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeFloat32(float32(rv.Float()))
+func rvGetSliceCap(rv reflect.Value) int {
+	return rv.Cap()
 }
 
-func (e *Encoder) kInt(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeInt(rv.Int())
+func rvGetArrayBytesRO(rv reflect.Value, scratch []byte) (bs []byte) {
+	l := rv.Len()
+	if rv.CanAddr() {
+		return rvGetBytes(rv.Slice(0, l))
+	}
+
+	if l <= cap(scratch) {
+		bs = scratch[:l]
+	} else {
+		bs = make([]byte, l)
+	}
+	reflect.Copy(rv4i(bs), rv)
+	return
 }
 
-func (e *Encoder) kInt8(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeInt(rv.Int())
+func rvGetArray4Slice(rv reflect.Value) (v reflect.Value) {
+	v = rvZeroAddrK(reflectArrayOf(rvGetSliceLen(rv), rv.Type().Elem()), reflect.Array)
+	reflect.Copy(v, rv)
+	return
 }
 
-func (e *Encoder) kInt16(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeInt(rv.Int())
+func rvGetSlice4Array(rv reflect.Value, tslice reflect.Type) (v reflect.Value) {
+	return rv.Slice(0, rv.Len())
 }
 
-func (e *Encoder) kInt32(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeInt(rv.Int())
+func rvCopySlice(dest, src reflect.Value) {
+	reflect.Copy(dest, src)
 }
 
-func (e *Encoder) kInt64(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeInt(rv.Int())
+// ------------
+
+func rvGetBool(rv reflect.Value) bool {
+	return rv.Bool()
 }
 
-func (e *Encoder) kUint(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeUint(rv.Uint())
+func rvGetBytes(rv reflect.Value) []byte {
+	return rv.Bytes()
 }
 
-func (e *Encoder) kUint8(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeUint(rv.Uint())
+func rvGetTime(rv reflect.Value) time.Time {
+	return rv2i(rv).(time.Time)
 }
 
-func (e *Encoder) kUint16(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeUint(rv.Uint())
+func rvGetString(rv reflect.Value) string {
+	return rv.String()
 }
 
-func (e *Encoder) kUint32(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeUint(rv.Uint())
+func rvGetFloat64(rv reflect.Value) float64 {
+	return rv.Float()
 }
 
-func (e *Encoder) kUint64(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeUint(rv.Uint())
+func rvGetFloat32(rv reflect.Value) float32 {
+	return float32(rv.Float())
 }
 
-func (e *Encoder) kUintptr(f *codecFnInfo, rv reflect.Value) {
-	e.e.EncodeUint(rv.Uint())
+func rvGetInt(rv reflect.Value) int {
+	return int(rv.Int())
 }
 
-// // keepAlive4BytesView maintains a reference to the input parameter for bytesView.
-// //
-// // Usage: call this at point where done with the bytes view.
-// func keepAlive4BytesView(v string) {}
+func rvGetInt8(rv reflect.Value) int8 {
+	return int8(rv.Int())
+}
 
-// // keepAlive4BytesView maintains a reference to the input parameter for stringView.
-// //
-// // Usage: call this at point where done with the string view.
-// func keepAlive4StringView(v []byte) {}
+func rvGetInt16(rv reflect.Value) int16 {
+	return int16(rv.Int())
+}
 
-// func definitelyNil(v interface{}) bool {
-// 	rv := reflect.ValueOf(v)
-// 	switch rv.Kind() {
-// 	case reflect.Invalid:
-// 		return true
-// 	case reflect.Ptr, reflect.Interface, reflect.Chan, reflect.Slice, reflect.Map, reflect.Func:
-// 		return rv.IsNil()
-// 	default:
-// 		return false
-// 	}
-// }
+func rvGetInt32(rv reflect.Value) int32 {
+	return int32(rv.Int())
+}
+
+func rvGetInt64(rv reflect.Value) int64 {
+	return rv.Int()
+}
+
+func rvGetUint(rv reflect.Value) uint {
+	return uint(rv.Uint())
+}
+
+func rvGetUint8(rv reflect.Value) uint8 {
+	return uint8(rv.Uint())
+}
+
+func rvGetUint16(rv reflect.Value) uint16 {
+	return uint16(rv.Uint())
+}
+
+func rvGetUint32(rv reflect.Value) uint32 {
+	return uint32(rv.Uint())
+}
+
+func rvGetUint64(rv reflect.Value) uint64 {
+	return rv.Uint()
+}
+
+func rvGetUintptr(rv reflect.Value) uintptr {
+	return uintptr(rv.Uint())
+}
+
+// ------------ map range and map indexing ----------
+
+func mapGet(m, k, v reflect.Value) (vv reflect.Value) {
+	return m.MapIndex(k)
+}
+
+func mapSet(m, k, v reflect.Value) {
+	m.SetMapIndex(k, v)
+}
+
+func mapDelete(m, k reflect.Value) {
+	m.SetMapIndex(k, reflect.Value{})
+}
+
+// return an addressable reflect value that can be used in mapRange and mapGet operations.
+//
+// all calls to mapGet or mapRange will call here to get an addressable reflect.Value.
+func mapAddressableRV(t reflect.Type, k reflect.Kind) (r reflect.Value) {
+	return // reflect.New(t).Elem()
+}
+
+// ---------- ENCODER optimized ---------------
+
+func (e *Encoder) jsondriver() *jsonEncDriver {
+	return e.e.(*jsonEncDriver)
+}
+
+// ---------- DECODER optimized ---------------
+
+func (d *Decoder) checkBreak() bool {
+	return d.d.CheckBreak()
+}
+
+func (d *Decoder) jsondriver() *jsonDecDriver {
+	return d.d.(*jsonDecDriver)
+}

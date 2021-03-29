@@ -14,12 +14,12 @@ import (
 
 // References:
 // - Unicode Reference Manual Chapter 3.13, 4.2, and 5.18.
-// - http://www.unicode.org/reports/tr29/
-// - http://www.unicode.org/Public/6.3.0/ucd/CaseFolding.txt
-// - http://www.unicode.org/Public/6.3.0/ucd/SpecialCasing.txt
-// - http://www.unicode.org/Public/6.3.0/ucd/DerivedCoreProperties.txt
-// - http://www.unicode.org/Public/6.3.0/ucd/auxiliary/WordBreakProperty.txt
-// - http://www.unicode.org/Public/6.3.0/ucd/auxiliary/WordBreakTest.txt
+// - https://www.unicode.org/reports/tr29/
+// - https://www.unicode.org/Public/6.3.0/ucd/CaseFolding.txt
+// - https://www.unicode.org/Public/6.3.0/ucd/SpecialCasing.txt
+// - https://www.unicode.org/Public/6.3.0/ucd/DerivedCoreProperties.txt
+// - https://www.unicode.org/Public/6.3.0/ucd/auxiliary/WordBreakProperty.txt
+// - https://www.unicode.org/Public/6.3.0/ucd/auxiliary/WordBreakTest.txt
 // - http://userguide.icu-project.org/transforms/casemappings
 
 // TODO:

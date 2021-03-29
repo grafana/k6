@@ -765,7 +765,7 @@ func (r *Runtime) regexpproto_stdMatcherAll(call FunctionCall) Value {
 	flags := nilSafe(thisObj.self.getStr("flags", nil)).toString()
 	c := r.speciesConstructorObj(call.This.(*Object), r.global.RegExp)
 	matcher := r.toConstructor(c)([]Value{call.This, flags}, nil)
-	matcher.self.setOwnStr("lastIndex", valueInt(toLength(thisObj.Get("lastIndex"))), true)
+	matcher.self.setOwnStr("lastIndex", valueInt(toLength(thisObj.self.getStr("lastIndex", nil))), true)
 	flagsStr := flags.String()
 	global := strings.Contains(flagsStr, "g")
 	fullUnicode := strings.Contains(flagsStr, "u")
@@ -800,7 +800,7 @@ type regExpStringIterObject struct {
 
 // RegExpExec as defined in 21.2.5.2.1
 func regExpExec(r *Object, s valueString) Value {
-	exec := r.Get("exec")
+	exec := r.self.getStr("exec", nil)
 	if execObject, ok := exec.(*Object); ok {
 		if execFn, ok := execObject.self.assertCallable(); ok {
 			return r.runtime.regExpExec(execFn, r, s)
