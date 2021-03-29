@@ -130,7 +130,6 @@ func TestHandleSummaryResultError(t *testing.T) {
 }
 
 func TestAbortTest(t *testing.T) {
-
 	t.Run("Check status code is 107", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
