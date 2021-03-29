@@ -1,8 +1,8 @@
-// +build !go1.10
+// +build appengine
 
 /*
  *
- * Copyright 2020 gRPC authors.
+ * Copyright 2018 gRPC authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,11 +21,10 @@
 package credentials
 
 import (
-	"crypto/tls"
-	"net/url"
+	"net"
 )
 
-//TODO(ZhenLian): delete this file when we remove Go 1.9 tests.
-func SPIFFEIDFromState(state tls.ConnectionState) *url.URL {
-	return nil
+// WrapSyscallConn returns newConn on appengine.
+func WrapSyscallConn(rawConn, newConn net.Conn) net.Conn {
+	return newConn
 }

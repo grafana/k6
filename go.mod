@@ -61,7 +61,7 @@ require (
 	github.com/spf13/afero v1.1.1
 	github.com/spf13/cobra v0.0.4-0.20180629152535-a114f312e075
 	github.com/spf13/pflag v1.0.1
-	github.com/stretchr/testify v1.2.2
+	github.com/stretchr/testify v1.5.1
 	github.com/tidwall/gjson v1.6.1
 	github.com/tidwall/pretty v1.0.2
 	github.com/ugorji/go v1.1.7 // indirect
@@ -76,8 +76,8 @@ require (
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336 // indirect
-	google.golang.org/grpc v1.31.1
-	google.golang.org/protobuf v1.24.0
+	google.golang.org/grpc v1.36.1
+	google.golang.org/protobuf v1.25.0
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v8 v8.18.2 // indirect
 	gopkg.in/guregu/null.v2 v2.1.2 // indirect

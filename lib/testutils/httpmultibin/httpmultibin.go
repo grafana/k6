@@ -210,6 +210,7 @@ func getZstdBrHandler(t testing.TB) http.Handler {
 
 // GRPCStub is an easily customisable TestServiceServer
 type GRPCStub struct {
+	grpctest.TestServiceServer
 	EmptyCallFunc func(context.Context, *grpctest.Empty) (*grpctest.Empty, error)
 	UnaryCallFunc func(context.Context, *grpctest.SimpleRequest) (*grpctest.SimpleResponse, error)
 }
