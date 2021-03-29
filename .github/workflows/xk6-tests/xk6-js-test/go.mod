@@ -2,7 +2,4 @@ module github.com/k6io/xk6-js-test
 
 go 1.15
 
-require (
-	github.com/dop251/goja v0.0.0-20210111190058-952c20e23c35
-	github.com/k6io/k6 v0.30.0
-)
+require github.com/k6io/k6 v0.31.2-0.20210329120007-d31df9ec5f06
