@@ -35,6 +35,7 @@ import (
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -129,12 +130,16 @@ func TestHandleSummaryResultError(t *testing.T) {
 }
 
 func TestAbortTest(t *testing.T) {
+
 	t.Run("Check status code is 107", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		logger := testutils.NewLogger(t)
 
 		cmd := getRunCmd(ctx, logger)
+		cmd.Flags().AddFlag(&pflag.Flag{
+			Name: "address",
+		})
 		a, err := filepath.Abs("testdata/abort.js")
 		require.NoError(t, err)
 		cmd.SetArgs([]string{a})
@@ -145,10 +150,6 @@ func TestAbortTest(t *testing.T) {
 		require.EqualError(t, e.error, errScriptInterrupted.Error())
 	})
 
-	// // if this is not empty string this will result in spinning up REST server that
-	// // triggers lookup for address flag resulting in a panic.
-	address = ""
-
 	t.Run("Check that teardown is called", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -158,6 +159,9 @@ func TestAbortTest(t *testing.T) {
 		logger.SetOutput(&buf)
 
 		cmd := getRunCmd(ctx, logger)
+		cmd.Flags().AddFlag(&pflag.Flag{
+			Name: "address",
+		})
 		a, err := filepath.Abs("testdata/teardown.js")
 		require.NoError(t, err)
 		cmd.SetArgs([]string{a})
