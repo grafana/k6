@@ -390,8 +390,8 @@ func TestAbortTest(t *testing.T) {
 
 	ctx := new(context.Context)
 	*ctx = baseCtx
-	rt.Set("k6", common.Bind(rt, New(), ctx))
-
+	err := rt.Set("k6", common.Bind(rt, New(), ctx))
+	require.Nil(t, err)
 	prove := func(t *testing.T, script, reason string) {
 		_, err := rt.RunString(script)
 		require.NotNil(t, err)
