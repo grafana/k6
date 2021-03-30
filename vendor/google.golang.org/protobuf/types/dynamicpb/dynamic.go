@@ -369,6 +369,18 @@ func NewMessageType(desc pref.MessageDescriptor) pref.MessageType {
 func (mt messageType) New() pref.Message                  { return NewMessage(mt.desc) }
 func (mt messageType) Zero() pref.Message                 { return &Message{typ: messageType{mt.desc}} }
 func (mt messageType) Descriptor() pref.MessageDescriptor { return mt.desc }
+func (mt messageType) Enum(i int) pref.EnumType {
+	if ed := mt.desc.Fields().Get(i).Enum(); ed != nil {
+		return NewEnumType(ed)
+	}
+	return nil
+}
+func (mt messageType) Message(i int) pref.MessageType {
+	if md := mt.desc.Fields().Get(i).Message(); md != nil {
+		return NewMessageType(md)
+	}
+	return nil
+}
 
 type emptyList struct {
 	desc pref.FieldDescriptor

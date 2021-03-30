@@ -2529,17 +2529,14 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 
 	// extension fields
 	rexts, _ := proto.ExtensionDescs(pm)
-	var unknownExtensions []byte
 	for _, ed := range rexts {
 		v, _ := proto.GetExtension(pm, ed)
 		if v == nil {
 			continue
 		}
 		if ed.ExtensionType == nil {
-			extBytes, _ := v.([]byte)
-			if len(extBytes) > 0 {
-				unknownExtensions = append(unknownExtensions, extBytes...)
-			}
+			// unrecognized extension: we'll handle that below when we
+			// handle other unrecognized fields
 			continue
 		}
 		fd := m.er.FindExtension(m.md.GetFullyQualifiedName(), ed.Field)
@@ -2569,13 +2566,6 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 		_ = m.UnmarshalMerge(data)
 	}
 
-	// lastly, also extract any unknown extensions the message may have (unknown extensions
-	// are stored with other extensions, not in the XXX_unrecognized field, so we have to do
-	// more than just the step above...)
-	if len(unknownExtensions) > 0 {
-		// pulling in unknown fields is best-effort, so we just ignore errors
-		_ = m.UnmarshalMerge(unknownExtensions)
-	}
 	return nil
 }
 
@@ -2627,11 +2617,14 @@ func (m *Message) validateRecursive(prefix string) error {
 			var dm *Message
 			if d, ok := pm.(*Message); ok {
 				dm = d
-			} else {
+			} else if pm != nil {
 				dm = m.mf.NewDynamicMessage(md)
 				if err := dm.ConvertFrom(pm); err != nil {
 					return nil
 				}
+			}
+			if dm == nil {
+				return nil
 			}
 			if err := dm.validateRecursive(chprefix); err != nil {
 				return err

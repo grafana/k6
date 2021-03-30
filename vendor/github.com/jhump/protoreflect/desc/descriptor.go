@@ -995,8 +995,9 @@ func (fd *FieldDescriptor) IsRepeated() bool {
 }
 
 // IsProto3Optional returns true if this field has an explicit "optional" label
-// and is in a "proto3" syntax file. Such fields will be nested in synthetic
-// oneofs that contain only the single field.
+// and is in a "proto3" syntax file. Such fields, if they are normal fields (not
+// extensions), will be nested in synthetic oneofs that contain only the single
+// field.
 func (fd *FieldDescriptor) IsProto3Optional() bool {
 	return internal.GetProto3Optional(fd.proto)
 }
