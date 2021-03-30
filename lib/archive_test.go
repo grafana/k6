@@ -155,7 +155,7 @@ func TestArchiveReadWrite(t *testing.T) {
 					"/path/to/file2.txt": []byte(`bye!`),
 				}),
 				"https": makeMemMapFs(t, map[string][]byte{
-					"/cdnjs.com/libraries/Faker":          []byte(`// faker contents`),
+					"/cdnjs.com/libraries/Faker":    []byte(`// faker contents`),
 					"/github.com/k6io/k6/README.md": []byte(`README`),
 				}),
 			},
@@ -206,7 +206,7 @@ func TestArchiveReadWrite(t *testing.T) {
 						fmt.Sprintf("%s/file2.txt", entry.Pwd): []byte(`bye!`),
 					}),
 					"https": makeMemMapFs(t, map[string][]byte{
-						"/cdnjs.com/libraries/Faker":          []byte(`// faker contents`),
+						"/cdnjs.com/libraries/Faker":    []byte(`// faker contents`),
 						"/github.com/k6io/k6/README.md": []byte(`README`),
 					}),
 				},
@@ -230,7 +230,7 @@ func TestArchiveReadWrite(t *testing.T) {
 						fmt.Sprintf("%s/file2.txt", entry.PwdNormAnon): []byte(`bye!`),
 					}),
 					"https": makeMemMapFs(t, map[string][]byte{
-						"/cdnjs.com/libraries/Faker":          []byte(`// faker contents`),
+						"/cdnjs.com/libraries/Faker":    []byte(`// faker contents`),
 						"/github.com/k6io/k6/README.md": []byte(`README`),
 					}),
 				},
