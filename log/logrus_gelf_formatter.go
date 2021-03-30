@@ -1,8 +1,6 @@
 package log
 
-
-// Portions of this files were taken from https://github.com/sirupsen/logrus
-// Copyrighted by Simon Eskildsen under the MIT license
+// Code based on the project: https://github.com/seatgeek/logrus-gelf-formatter
 
 import (
 	"encoding/json"

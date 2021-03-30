@@ -1,6 +1,6 @@
 package log
 
-// https://github.com/gfremex/logrus-kafka-hook
+// Code based on the project: https://github.com/gfremex/logrus-kafka-hook
 
 import (
 	"context"
