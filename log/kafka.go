@@ -19,6 +19,10 @@ type KafkaHook struct {
 	// Log levels allowed
 	levels []logrus.Level
 
+	labels [][2]string
+
+	fallbackLogger logrus.FieldLogger
+
 	// sarama.AsyncProducer
 	producer sarama.AsyncProducer
 
@@ -36,13 +40,17 @@ func KafkaFromConfigLine(ctx context.Context, fallbackLogger logrus.FieldLogger,
 	kafkaConfig.Producer.Compression = sarama.CompressionNone
 	kafkaConfig.Producer.Flush.Frequency = 500 * time.Millisecond // Flush batches every 500ms
 
-	hook := KafkaHook{}
+	hook := KafkaHook{
+		levels:         logrus.AllLevels,
+		formatter:      &logrus.JSONFormatter{},
+		fallbackLogger: fallbackLogger,
+	}
 	err := hook.parseArgs(line)
 	if err != nil {
 		return nil, err
 	}
 
-	producer, err := sarama.NewAsyncProducer(hook.brokers, kafkaConfig)
+	hook.producer, err = sarama.NewAsyncProducer(hook.brokers, kafkaConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +58,7 @@ func KafkaFromConfigLine(ctx context.Context, fallbackLogger logrus.FieldLogger,
 	// We will just log to STDOUT if we're not able to produce messages.
 	// Note: messages will only be returned here after all retry attempts are exhausted.
 	go func() {
-		for err := range producer.Errors() {
+		for err := range hook.producer.Errors() {
 			log.Printf("Failed to send log entry to kafka: %v\n", err)
 		}
 	}()
@@ -86,13 +94,12 @@ func (hook *KafkaHook) parseArgs(line string) error {
 			if err != nil {
 				return err
 			}
-			/*default:
+		default:
 			if strings.HasPrefix(key, "label.") {
 				labelKey := strings.TrimPrefix(key, "label.")
 				hook.labels = append(hook.labels, [2]string{labelKey, value})
-
-				continue
-			}*/
+			}
+			continue
 		}
 	}
 
@@ -108,9 +115,6 @@ func (hook *KafkaHook) Levels() []logrus.Level {
 }
 
 func (hook *KafkaHook) Fire(entry *logrus.Entry) error {
-	// Check time for partition key
-	var partitionKey sarama.ByteEncoder
-
 	// Get field time
 	t, _ := entry.Data["time"].(time.Time)
 
@@ -121,9 +125,10 @@ func (hook *KafkaHook) Fire(entry *logrus.Entry) error {
 		return err
 	}
 
-	partitionKey = sarama.ByteEncoder(b)
-
 	// Format before writing
+	for _, label := range hook.labels {
+		entry.Data[label[0]] = label[1]
+	}
 	b, err = hook.formatter.Format(entry)
 
 	if err != nil {
@@ -134,7 +139,7 @@ func (hook *KafkaHook) Fire(entry *logrus.Entry) error {
 
 	for _, topic := range hook.topics {
 		hook.producer.Input() <- &sarama.ProducerMessage{
-			Key:   partitionKey,
+			Key:   nil,
 			Topic: topic,
 			Value: value,
 		}
