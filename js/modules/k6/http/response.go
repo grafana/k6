@@ -71,12 +71,12 @@ func (h *HTTP) responseFromHttpext(resp *httpext.Response) *Response {
 
 // HTML returns the body as an html.Selection
 func (res *Response) HTML(selector ...string) html.Selection {
-	body, err := common.ToBytes(res.Body)
+	body, err := common.ToString(res.Body)
 	if err != nil {
 		common.Throw(common.GetRuntime(res.GetCtx()), err)
 	}
 
-	sel, err := html.HTML{}.ParseHTML(res.GetCtx(), string(body))
+	sel, err := html.HTML{}.ParseHTML(res.GetCtx(), body)
 	if err != nil {
 		common.Throw(common.GetRuntime(res.GetCtx()), err)
 	}

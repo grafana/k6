@@ -70,3 +70,29 @@ func TestToBytes(t *testing.T) {
 		})
 	}
 }
+
+func TestToString(t *testing.T) {
+	rt := goja.New()
+	s := "hello"
+	testCases := []struct {
+		in             interface{}
+		expOut, expErr string
+	}{
+		{s, s, ""},
+		{"hello", s, ""},
+		{rt.NewArrayBuffer([]byte(s)), s, ""},
+		{struct{}{}, "", "invalid type struct {}, expected string, []byte or ArrayBuffer"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("%T", tc.in), func(t *testing.T) {
+			out, err := ToString(tc.in)
+			if tc.expErr != "" {
+				assert.EqualError(t, err, tc.expErr)
+				return
+			}
+			assert.Equal(t, tc.expOut, out)
+		})
+	}
+}
