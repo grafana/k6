@@ -34,7 +34,7 @@ jobs:
           fi
           echo "COMMIT_ID=$COMMIT_ID"
           cd .github/workflows/xk6-tests
-          go get github.com/k6io/xk6/cmd/xk6@latest
+          GOPROXY=direct go get github.com/k6io/xk6/cmd/xk6@master
           if [ "${{ github.event_name }}" == "pull_request" -a \
                "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
             export XK6_K6_REPO="github.com/${{ github.event.pull_request.head.repo.full_name }}"
