@@ -138,7 +138,7 @@ export default function() {
 						},
 						"id": "${json.preview_payment_methods[0].id}",
 						"type": "${json.preview_payment_methods[0].type}"
-					}, 
+					},
 					{
 						"data": {
 							"allow_saved_card": "${json.preview_payment_methods[1].data.allow_saved_card}",
@@ -234,7 +234,7 @@ export default function() {
 						},
 						"id": "${json.preview_payment_methods[0].id}",
 						"type": "${json.preview_payment_methods[0].type}"
-					}, 
+					},
 					{
 						"data": {
 							"allow_saved_card": "${json.preview_payment_methods[1].data.allow_saved_card}",

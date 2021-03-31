@@ -3,12 +3,9 @@
     src="logo.png" 
     width="240" height="78" border="0" alt="GJSON">
 <br>
-<a href="https://travis-ci.org/tidwall/gjson"><img src="https://img.shields.io/travis/tidwall/gjson.svg?style=flat-square" alt="Build Status"></a>
 <a href="https://godoc.org/github.com/tidwall/gjson"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square" alt="GoDoc"></a>
 <a href="http://tidwall.com/gjson-play"><img src="https://img.shields.io/badge/%F0%9F%8F%90-playground-9900cc.svg?style=flat-square" alt="GJSON Playground"></a>
 </p>
-
-
 
 <p align="center">get json values quickly</a></p>
 
@@ -16,6 +13,8 @@ GJSON is a Go package that provides a [fast](#performance) and [simple](#get-a-v
 It has features such as [one line retrieval](#get-a-value), [dot notation paths](#path-syntax), [iteration](#iterate-through-an-object-or-array), and [parsing json lines](#json-lines).
 
 Also check out [SJSON](https://github.com/tidwall/sjson) for modifying json, and the [JJ](https://github.com/tidwall/jj) command line tool.
+
+For the Rust version go to [gjson.rs](https://github.com/tidwall/gjson.rs).
 
 Getting Started
 ===============
@@ -476,7 +475,7 @@ JSON document used:
 }    
 ```
 
-Each operation was rotated though one of the following search paths:
+Each operation was rotated through one of the following search paths:
 
 ```
 widget.window.name
@@ -484,12 +483,4 @@ widget.image.hOffset
 widget.text.onMouseUp
 ```
 
-*These benchmarks were run on a MacBook Pro 15" 2.8 GHz Intel Core i7 using Go 1.8 and can be be found [here](https://github.com/tidwall/gjson-benchmarks).*
-
-
-## Contact
-Josh Baker [@tidwall](http://twitter.com/tidwall)
-
-## License
-
-GJSON source code is available under the MIT [License](/LICENSE).
+*These benchmarks were run on a MacBook Pro 15" 2.8 GHz Intel Core i7 using Go 1.8 and can be found [here](https://github.com/tidwall/gjson-benchmarks).*
