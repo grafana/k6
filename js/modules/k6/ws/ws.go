@@ -287,7 +287,8 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 				Tags:   socket.sampleTags,
 				Value:  1,
 			})
-			socket.handleEvent("message", rt.ToValue(string(readData)))
+			ab := rt.NewArrayBuffer(readData)
+			socket.handleEvent("message", rt.ToValue(string(readData)), rt.ToValue(&ab))
 
 		case readErr := <-readErrChan:
 			socket.handleEvent("error", rt.ToValue(readErr))
@@ -329,13 +330,27 @@ func (s *Socket) handleEvent(event string, args ...goja.Value) {
 	}
 }
 
-func (s *Socket) Send(message string) {
-	// NOTE: No binary message support for the time being since goja doesn't
-	// support typed arrays.
+// Send writes the given string or ArrayBuffer message to the connection.
+func (s *Socket) Send(message interface{}) {
 	rt := common.GetRuntime(s.ctx)
 
-	writeData := []byte(message)
-	if err := s.conn.WriteMessage(websocket.TextMessage, writeData); err != nil {
+	var (
+		msgType int
+		msg     []byte
+	)
+	switch m := message.(type) {
+	case string:
+		msgType = websocket.TextMessage
+		msg = []byte(m)
+	case goja.ArrayBuffer:
+		msgType = websocket.BinaryMessage
+		msg = m.Bytes()
+	default:
+		err := fmt.Errorf("unsupported message type: %T, expected string or ArrayBuffer", message)
+		common.Throw(common.GetRuntime(s.ctx), err)
+	}
+
+	if err := s.conn.WriteMessage(msgType, msg); err != nil {
 		s.handleEvent("error", rt.ToValue(err))
 	}
 

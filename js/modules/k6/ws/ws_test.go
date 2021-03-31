@@ -175,6 +175,18 @@ func TestSession(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("send_err", func(t *testing.T) {
+		_, err := rt.RunString(sr(`
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+			socket.on("open", function() {
+				socket.send(1);
+			})
+		});
+		`))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unsupported message type: int64, expected string or ArrayBuffer")
+	})
+
 	samplesBuf := stats.GetBufferedSamples(samples)
 	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), 101, "")
 	assertMetricEmitted(t, metrics.WSMessagesSent, samplesBuf, sr("WSBIN_URL/ws-echo"))
@@ -345,6 +357,62 @@ func TestSession(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestSocketSendBinary(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+	sr := tb.Replacer.Replace
+
+	root, err := lib.NewGroup("", nil)
+	assert.NoError(t, err)
+
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	samples := make(chan stats.SampleContainer, 1000)
+	state := &lib.State{
+		Group:  root,
+		Dialer: tb.Dialer,
+		Options: lib.Options{
+			SystemTags: stats.NewSystemTagSet(
+				stats.TagURL,
+				stats.TagProto,
+				stats.TagStatus,
+				stats.TagSubproto,
+			),
+		},
+		Samples:   samples,
+		TLSConfig: tb.TLSClientConfig,
+	}
+
+	ctx := context.Background()
+	ctx = lib.WithState(ctx, state)
+	ctx = common.WithRuntime(ctx, rt)
+
+	err = rt.Set("ws", common.Bind(rt, New(), &ctx))
+	assert.NoError(t, err)
+
+	_, err = rt.RunString(sr(`
+		var res = ws.connect('WSBIN_URL/ws-echo', function(socket){
+			var data = new Uint8Array([104, 101, 108, 108, 111]); // 'hello'
+			socket.on('open', function() {
+				socket.send(data.buffer);
+			})
+			socket.on('message', function (msg, msgBin){
+				if (msg !== 'hello') {
+					throw new Error('received unexpected message: ' + msg);
+				}
+				let decText = String.fromCharCode.apply(null, new Uint8Array(msgBin));
+				decText = decodeURIComponent(escape(decText));
+				if (decText !== 'hello') {
+					throw new Error('received unexpected binary message: ' + decText);
+				}
+				socket.close()
+			});
+		});
+		`))
+	assert.NoError(t, err)
 }
 
 func TestErrors(t *testing.T) {
