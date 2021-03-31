@@ -157,7 +157,7 @@ github.com/labstack/echo
 ## explicit
 github.com/labstack/gommon/color
 github.com/labstack/gommon/log
-# github.com/mailru/easyjson v0.7.4-0.20200812114229-8ab5ff9cd8e4
+# github.com/mailru/easyjson v0.7.7
 ## explicit
 github.com/mailru/easyjson
 github.com/mailru/easyjson/buffer

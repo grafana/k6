@@ -42,7 +42,7 @@ require (
 	github.com/kubernetes/helm v2.9.0+incompatible
 	github.com/labstack/echo v3.2.6+incompatible // indirect
 	github.com/labstack/gommon v0.2.2-0.20170925052817-57409ada9da0 // indirect
-	github.com/mailru/easyjson v0.7.4-0.20200812114229-8ab5ff9cd8e4
+	github.com/mailru/easyjson v0.7.7
 	github.com/manyminds/api2go v0.0.0-20180125085803-95be7bd0455e
 	github.com/mattn/go-colorable v0.0.9
 	github.com/mattn/go-isatty v0.0.4
