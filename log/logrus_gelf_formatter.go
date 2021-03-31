@@ -5,7 +5,6 @@ package log
 import (
 	"encoding/json"
 	"fmt"
-	"log/syslog"
 	"math"
 	"os"
 
@@ -17,16 +16,16 @@ type GelfFormatter struct{}
 
 type fields map[string]interface{}
 
-const defaultLevel = syslog.LOG_INFO
-
-var levelMap = map[logrus.Level]syslog.Priority{ //nolint:gochecknoglobals
-	logrus.PanicLevel: syslog.LOG_EMERG,
-	logrus.FatalLevel: syslog.LOG_CRIT,
-	logrus.ErrorLevel: syslog.LOG_ERR,
-	logrus.WarnLevel:  syslog.LOG_WARNING,
-	logrus.InfoLevel:  syslog.LOG_INFO,
-	logrus.DebugLevel: syslog.LOG_DEBUG,
-}
+// Syslog severity levels
+const (
+	EmergencyLevel = int32(0)
+	CriticalLevel  = int32(2)
+	ErrorLevel     = int32(3)
+	WarningLevel   = int32(4)
+	NoticeLevel    = int32(5)
+	InfoLevel      = int32(6)
+	DebugLevel     = int32(7)
+)
 
 // Format formats the log entry to GELF JSON
 func (f *GelfFormatter) Format(entry *logrus.Entry) ([]byte, error) {
@@ -76,10 +75,24 @@ func round(val float64, places int) float64 {
 	return math.Floor((val*shift)+.5) / shift
 }
 
-func toSyslogLevel(level logrus.Level) syslog.Priority {
-	syslog, ok := levelMap[level]
-	if ok {
-		return syslog
+func toSyslogLevel(l logrus.Level) int32 {
+	var level int32
+	switch l {
+	case logrus.PanicLevel:
+		level = EmergencyLevel
+	case logrus.FatalLevel:
+		level = CriticalLevel
+	case logrus.ErrorLevel:
+		level = ErrorLevel
+	case logrus.WarnLevel:
+		level = WarningLevel
+	case logrus.InfoLevel:
+		level = InfoLevel
+	case logrus.DebugLevel:
+		level = DebugLevel
+	case logrus.TraceLevel:
+		level = NoticeLevel
 	}
-	return defaultLevel
+
+	return level
 }
