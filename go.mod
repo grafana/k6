@@ -10,7 +10,7 @@ require (
 	github.com/Shopify/sarama v1.16.0
 	github.com/Shopify/toxiproxy v2.1.4+incompatible // indirect
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
-	github.com/andybalholm/brotli v0.0.0-20190704151324-71eb68cc467c
+	github.com/andybalholm/brotli v1.0.1
 	github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb // indirect
 	github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91 // indirect
 	github.com/dop251/goja v0.0.0-20210317175251-bb14c2267b76

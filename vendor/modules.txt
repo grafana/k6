@@ -19,7 +19,7 @@ github.com/Shopify/sarama
 # github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 ## explicit
 github.com/Soontao/goHttpDigestClient
-# github.com/andybalholm/brotli v0.0.0-20190704151324-71eb68cc467c
+# github.com/andybalholm/brotli v1.0.1
 ## explicit
 github.com/andybalholm/brotli
 # github.com/andybalholm/cascadia v1.1.0
@@ -76,9 +76,6 @@ github.com/gin-gonic/gin/render
 ## explicit
 github.com/go-sourcemap/sourcemap
 github.com/go-sourcemap/sourcemap/internal/base64vlq
-# github.com/golang/gddo v0.0.0-20190419222130-af0f2af80721
-github.com/golang/gddo/httputil
-github.com/golang/gddo/httputil/header
 # github.com/golang/protobuf v1.4.2
 ## explicit
 github.com/golang/protobuf/jsonpb
