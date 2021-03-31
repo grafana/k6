@@ -3,7 +3,7 @@ module github.com/loadimpact/k6
 go 1.14
 
 require (
-	github.com/Azure/go-ntlmssp v0.0.0-20180810175552-4a21cbd618b4
+	github.com/Azure/go-ntlmssp v0.0.0-20200615164410-66371956d46c
 	github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
 	github.com/GeertJohan/go.rice v0.0.0-20170420135705-c02ca9a983da
 	github.com/PuerkitoBio/goquery v1.6.1
