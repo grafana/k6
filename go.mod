@@ -60,7 +60,7 @@ require (
 	github.com/spf13/afero v1.1.1
 	github.com/spf13/cobra v0.0.4-0.20180629152535-a114f312e075
 	github.com/spf13/pflag v1.0.1
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.7.0
 	github.com/tidwall/gjson v1.6.1
 	github.com/tidwall/pretty v1.0.2
 	github.com/ugorji/go v1.1.7 // indirect

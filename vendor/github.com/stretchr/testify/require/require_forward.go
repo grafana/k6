@@ -170,7 +170,7 @@ func (a *Assertions) EqualValues(expected interface{}, actual interface{}, msgAn
 // EqualValuesf asserts that two objects are equal or convertable to the same types
 // and equal.
 //
-//    a.EqualValuesf(uint32(123, "error message %s", "formatted"), int32(123))
+//    a.EqualValuesf(uint32(123), int32(123), "error message %s", "formatted")
 func (a *Assertions) EqualValuesf(expected interface{}, actual interface{}, msg string, args ...interface{}) {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -203,6 +203,42 @@ func (a *Assertions) Error(err error, msgAndArgs ...interface{}) {
 		h.Helper()
 	}
 	Error(a.t, err, msgAndArgs...)
+}
+
+// ErrorAs asserts that at least one of the errors in err's chain matches target, and if so, sets target to that error value.
+// This is a wrapper for errors.As.
+func (a *Assertions) ErrorAs(err error, target interface{}, msgAndArgs ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	ErrorAs(a.t, err, target, msgAndArgs...)
+}
+
+// ErrorAsf asserts that at least one of the errors in err's chain matches target, and if so, sets target to that error value.
+// This is a wrapper for errors.As.
+func (a *Assertions) ErrorAsf(err error, target interface{}, msg string, args ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	ErrorAsf(a.t, err, target, msg, args...)
+}
+
+// ErrorIs asserts that at least one of the errors in err's chain matches target.
+// This is a wrapper for errors.Is.
+func (a *Assertions) ErrorIs(err error, target error, msgAndArgs ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	ErrorIs(a.t, err, target, msgAndArgs...)
+}
+
+// ErrorIsf asserts that at least one of the errors in err's chain matches target.
+// This is a wrapper for errors.Is.
+func (a *Assertions) ErrorIsf(err error, target error, msg string, args ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	ErrorIsf(a.t, err, target, msg, args...)
 }
 
 // Errorf asserts that a function returned an error (i.e. not `nil`).
@@ -252,7 +288,7 @@ func (a *Assertions) Exactly(expected interface{}, actual interface{}, msgAndArg
 
 // Exactlyf asserts that two objects are equal in value and type.
 //
-//    a.Exactlyf(int32(123, "error message %s", "formatted"), int64(123))
+//    a.Exactlyf(int32(123), int64(123), "error message %s", "formatted")
 func (a *Assertions) Exactlyf(expected interface{}, actual interface{}, msg string, args ...interface{}) {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -371,7 +407,7 @@ func (a *Assertions) GreaterOrEqualf(e1 interface{}, e2 interface{}, msg string,
 // Greaterf asserts that the first element is greater than the second
 //
 //    a.Greaterf(2, 1, "error message %s", "formatted")
-//    a.Greaterf(float64(2, "error message %s", "formatted"), float64(1))
+//    a.Greaterf(float64(2), float64(1), "error message %s", "formatted")
 //    a.Greaterf("b", "a", "error message %s", "formatted")
 func (a *Assertions) Greaterf(e1 interface{}, e2 interface{}, msg string, args ...interface{}) {
 	if h, ok := a.t.(tHelper); ok {
@@ -448,7 +484,7 @@ func (a *Assertions) HTTPError(handler http.HandlerFunc, method string, url stri
 //
 //  a.HTTPErrorf(myHandler, "POST", "/a/b/c", url.Values{"a": []string{"b", "c"}}
 //
-// Returns whether the assertion was successful (true, "error message %s", "formatted") or not (false).
+// Returns whether the assertion was successful (true) or not (false).
 func (a *Assertions) HTTPErrorf(handler http.HandlerFunc, method string, url string, values url.Values, msg string, args ...interface{}) {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -472,12 +508,36 @@ func (a *Assertions) HTTPRedirect(handler http.HandlerFunc, method string, url s
 //
 //  a.HTTPRedirectf(myHandler, "GET", "/a/b/c", url.Values{"a": []string{"b", "c"}}
 //
-// Returns whether the assertion was successful (true, "error message %s", "formatted") or not (false).
+// Returns whether the assertion was successful (true) or not (false).
 func (a *Assertions) HTTPRedirectf(handler http.HandlerFunc, method string, url string, values url.Values, msg string, args ...interface{}) {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
 	}
 	HTTPRedirectf(a.t, handler, method, url, values, msg, args...)
+}
+
+// HTTPStatusCode asserts that a specified handler returns a specified status code.
+//
+//  a.HTTPStatusCode(myHandler, "GET", "/notImplemented", nil, 501)
+//
+// Returns whether the assertion was successful (true) or not (false).
+func (a *Assertions) HTTPStatusCode(handler http.HandlerFunc, method string, url string, values url.Values, statuscode int, msgAndArgs ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	HTTPStatusCode(a.t, handler, method, url, values, statuscode, msgAndArgs...)
+}
+
+// HTTPStatusCodef asserts that a specified handler returns a specified status code.
+//
+//  a.HTTPStatusCodef(myHandler, "GET", "/notImplemented", nil, 501, "error message %s", "formatted")
+//
+// Returns whether the assertion was successful (true) or not (false).
+func (a *Assertions) HTTPStatusCodef(handler http.HandlerFunc, method string, url string, values url.Values, statuscode int, msg string, args ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	HTTPStatusCodef(a.t, handler, method, url, values, statuscode, msg, args...)
 }
 
 // HTTPSuccess asserts that a specified handler returns a success status code.
@@ -516,7 +576,7 @@ func (a *Assertions) Implements(interfaceObject interface{}, object interface{},
 
 // Implementsf asserts that an object is implemented by the specified interface.
 //
-//    a.Implementsf((*MyInterface, "error message %s", "formatted")(nil), new(MyObject))
+//    a.Implementsf((*MyInterface)(nil), new(MyObject), "error message %s", "formatted")
 func (a *Assertions) Implementsf(interfaceObject interface{}, object interface{}, msg string, args ...interface{}) {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
@@ -606,6 +666,102 @@ func (a *Assertions) InEpsilonf(expected interface{}, actual interface{}, epsilo
 		h.Helper()
 	}
 	InEpsilonf(a.t, expected, actual, epsilon, msg, args...)
+}
+
+// IsDecreasing asserts that the collection is decreasing
+//
+//    a.IsDecreasing([]int{2, 1, 0})
+//    a.IsDecreasing([]float{2, 1})
+//    a.IsDecreasing([]string{"b", "a"})
+func (a *Assertions) IsDecreasing(object interface{}, msgAndArgs ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	IsDecreasing(a.t, object, msgAndArgs...)
+}
+
+// IsDecreasingf asserts that the collection is decreasing
+//
+//    a.IsDecreasingf([]int{2, 1, 0}, "error message %s", "formatted")
+//    a.IsDecreasingf([]float{2, 1}, "error message %s", "formatted")
+//    a.IsDecreasingf([]string{"b", "a"}, "error message %s", "formatted")
+func (a *Assertions) IsDecreasingf(object interface{}, msg string, args ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	IsDecreasingf(a.t, object, msg, args...)
+}
+
+// IsIncreasing asserts that the collection is increasing
+//
+//    a.IsIncreasing([]int{1, 2, 3})
+//    a.IsIncreasing([]float{1, 2})
+//    a.IsIncreasing([]string{"a", "b"})
+func (a *Assertions) IsIncreasing(object interface{}, msgAndArgs ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	IsIncreasing(a.t, object, msgAndArgs...)
+}
+
+// IsIncreasingf asserts that the collection is increasing
+//
+//    a.IsIncreasingf([]int{1, 2, 3}, "error message %s", "formatted")
+//    a.IsIncreasingf([]float{1, 2}, "error message %s", "formatted")
+//    a.IsIncreasingf([]string{"a", "b"}, "error message %s", "formatted")
+func (a *Assertions) IsIncreasingf(object interface{}, msg string, args ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	IsIncreasingf(a.t, object, msg, args...)
+}
+
+// IsNonDecreasing asserts that the collection is not decreasing
+//
+//    a.IsNonDecreasing([]int{1, 1, 2})
+//    a.IsNonDecreasing([]float{1, 2})
+//    a.IsNonDecreasing([]string{"a", "b"})
+func (a *Assertions) IsNonDecreasing(object interface{}, msgAndArgs ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	IsNonDecreasing(a.t, object, msgAndArgs...)
+}
+
+// IsNonDecreasingf asserts that the collection is not decreasing
+//
+//    a.IsNonDecreasingf([]int{1, 1, 2}, "error message %s", "formatted")
+//    a.IsNonDecreasingf([]float{1, 2}, "error message %s", "formatted")
+//    a.IsNonDecreasingf([]string{"a", "b"}, "error message %s", "formatted")
+func (a *Assertions) IsNonDecreasingf(object interface{}, msg string, args ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	IsNonDecreasingf(a.t, object, msg, args...)
+}
+
+// IsNonIncreasing asserts that the collection is not increasing
+//
+//    a.IsNonIncreasing([]int{2, 1, 1})
+//    a.IsNonIncreasing([]float{2, 1})
+//    a.IsNonIncreasing([]string{"b", "a"})
+func (a *Assertions) IsNonIncreasing(object interface{}, msgAndArgs ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	IsNonIncreasing(a.t, object, msgAndArgs...)
+}
+
+// IsNonIncreasingf asserts that the collection is not increasing
+//
+//    a.IsNonIncreasingf([]int{2, 1, 1}, "error message %s", "formatted")
+//    a.IsNonIncreasingf([]float{2, 1}, "error message %s", "formatted")
+//    a.IsNonIncreasingf([]string{"b", "a"}, "error message %s", "formatted")
+func (a *Assertions) IsNonIncreasingf(object interface{}, msg string, args ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	IsNonIncreasingf(a.t, object, msg, args...)
 }
 
 // IsType asserts that the specified objects are of the same type.
@@ -707,13 +863,35 @@ func (a *Assertions) LessOrEqualf(e1 interface{}, e2 interface{}, msg string, ar
 // Lessf asserts that the first element is less than the second
 //
 //    a.Lessf(1, 2, "error message %s", "formatted")
-//    a.Lessf(float64(1, "error message %s", "formatted"), float64(2))
+//    a.Lessf(float64(1), float64(2), "error message %s", "formatted")
 //    a.Lessf("a", "b", "error message %s", "formatted")
 func (a *Assertions) Lessf(e1 interface{}, e2 interface{}, msg string, args ...interface{}) {
 	if h, ok := a.t.(tHelper); ok {
 		h.Helper()
 	}
 	Lessf(a.t, e1, e2, msg, args...)
+}
+
+// Negative asserts that the specified element is negative
+//
+//    a.Negative(-1)
+//    a.Negative(-1.23)
+func (a *Assertions) Negative(e interface{}, msgAndArgs ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	Negative(a.t, e, msgAndArgs...)
+}
+
+// Negativef asserts that the specified element is negative
+//
+//    a.Negativef(-1, "error message %s", "formatted")
+//    a.Negativef(-1.23, "error message %s", "formatted")
+func (a *Assertions) Negativef(e interface{}, msg string, args ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	Negativef(a.t, e, msg, args...)
 }
 
 // Never asserts that the given condition doesn't satisfy in waitFor time,
@@ -885,6 +1063,26 @@ func (a *Assertions) NotEqual(expected interface{}, actual interface{}, msgAndAr
 	NotEqual(a.t, expected, actual, msgAndArgs...)
 }
 
+// NotEqualValues asserts that two objects are not equal even when converted to the same type
+//
+//    a.NotEqualValues(obj1, obj2)
+func (a *Assertions) NotEqualValues(expected interface{}, actual interface{}, msgAndArgs ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	NotEqualValues(a.t, expected, actual, msgAndArgs...)
+}
+
+// NotEqualValuesf asserts that two objects are not equal even when converted to the same type
+//
+//    a.NotEqualValuesf(obj1, obj2, "error message %s", "formatted")
+func (a *Assertions) NotEqualValuesf(expected interface{}, actual interface{}, msg string, args ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	NotEqualValuesf(a.t, expected, actual, msg, args...)
+}
+
 // NotEqualf asserts that the specified values are NOT equal.
 //
 //    a.NotEqualf(obj1, obj2, "error message %s", "formatted")
@@ -896,6 +1094,24 @@ func (a *Assertions) NotEqualf(expected interface{}, actual interface{}, msg str
 		h.Helper()
 	}
 	NotEqualf(a.t, expected, actual, msg, args...)
+}
+
+// NotErrorIs asserts that at none of the errors in err's chain matches target.
+// This is a wrapper for errors.Is.
+func (a *Assertions) NotErrorIs(err error, target error, msgAndArgs ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	NotErrorIs(a.t, err, target, msgAndArgs...)
+}
+
+// NotErrorIsf asserts that at none of the errors in err's chain matches target.
+// This is a wrapper for errors.Is.
+func (a *Assertions) NotErrorIsf(err error, target error, msg string, args ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	NotErrorIsf(a.t, err, target, msg, args...)
 }
 
 // NotNil asserts that the specified object is not nil.
@@ -951,7 +1167,7 @@ func (a *Assertions) NotRegexp(rx interface{}, str interface{}, msgAndArgs ...in
 
 // NotRegexpf asserts that a specified regexp does not match a string.
 //
-//  a.NotRegexpf(regexp.MustCompile("starts", "error message %s", "formatted"), "it's starting")
+//  a.NotRegexpf(regexp.MustCompile("starts"), "it's starting", "error message %s", "formatted")
 //  a.NotRegexpf("^start", "it's not starting", "error message %s", "formatted")
 func (a *Assertions) NotRegexpf(rx interface{}, str interface{}, msg string, args ...interface{}) {
 	if h, ok := a.t.(tHelper); ok {
@@ -1090,6 +1306,28 @@ func (a *Assertions) Panicsf(f assert.PanicTestFunc, msg string, args ...interfa
 	Panicsf(a.t, f, msg, args...)
 }
 
+// Positive asserts that the specified element is positive
+//
+//    a.Positive(1)
+//    a.Positive(1.23)
+func (a *Assertions) Positive(e interface{}, msgAndArgs ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	Positive(a.t, e, msgAndArgs...)
+}
+
+// Positivef asserts that the specified element is positive
+//
+//    a.Positivef(1, "error message %s", "formatted")
+//    a.Positivef(1.23, "error message %s", "formatted")
+func (a *Assertions) Positivef(e interface{}, msg string, args ...interface{}) {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	Positivef(a.t, e, msg, args...)
+}
+
 // Regexp asserts that a specified regexp matches a string.
 //
 //  a.Regexp(regexp.MustCompile("start"), "it's starting")
@@ -1103,7 +1341,7 @@ func (a *Assertions) Regexp(rx interface{}, str interface{}, msgAndArgs ...inter
 
 // Regexpf asserts that a specified regexp matches a string.
 //
-//  a.Regexpf(regexp.MustCompile("start", "error message %s", "formatted"), "it's starting")
+//  a.Regexpf(regexp.MustCompile("start"), "it's starting", "error message %s", "formatted")
 //  a.Regexpf("start...$", "it's not starting", "error message %s", "formatted")
 func (a *Assertions) Regexpf(rx interface{}, str interface{}, msg string, args ...interface{}) {
 	if h, ok := a.t.(tHelper); ok {
