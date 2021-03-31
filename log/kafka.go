@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// KafkaHook logrus Kafka Hook
 type KafkaHook struct {
 	// Id of the hook
 	id string
@@ -34,6 +35,8 @@ type KafkaHook struct {
 	brokers []string
 }
 
+// KafkaFromConfigLine returns a new logrus.Hook that pushes logrus. Entries to kafka and is configured
+// through the provided line
 func KafkaFromConfigLine(ctx context.Context, fallbackLogger logrus.FieldLogger, line string) (*KafkaHook, error) {
 	kafkaConfig := sarama.NewConfig()
 	kafkaConfig.Producer.RequiredAcks = sarama.WaitForLocal // Only wait for the leader to ack
@@ -106,14 +109,17 @@ func (hook *KafkaHook) parseArgs(line string) error {
 	return nil
 }
 
+// Id returns the logrus Hook id
 func (hook *KafkaHook) Id() string {
 	return hook.id
 }
 
+// Levels returns the logrus Hook levels
 func (hook *KafkaHook) Levels() []logrus.Level {
 	return hook.levels
 }
 
+// Fire logrus fire
 func (hook *KafkaHook) Fire(entry *logrus.Entry) error {
 	// Get field time
 	t, _ := entry.Data["time"].(time.Time)

@@ -12,16 +12,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Defines a log format type that wil output line separated JSON objects
-// in the GELF format.
+// Defines a log format type that wil output line separated JSON objects in the GELF format.
 type GelfFormatter struct {
 }
 
 type fields map[string]interface{}
 
 var (
-	DefaultLevel = syslog.LOG_INFO
-	levelMap     = map[logrus.Level]syslog.Priority{
+	defaultLevel = syslog.LOG_INFO
+	levelMap     = map[logrus.Level]syslog.Priority{ //nolint:gochecknoglobals
 		logrus.PanicLevel: syslog.LOG_EMERG,
 		logrus.FatalLevel: syslog.LOG_CRIT,
 		logrus.ErrorLevel: syslog.LOG_ERR,
@@ -60,7 +59,7 @@ func (f *GelfFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 	serialized, err := json.Marshal(data)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to marshal fields to JSON, %v", err)
+		return nil, fmt.Errorf("failed to marshal fields to JSON, %v", err)
 	}
 
 	return append(serialized, '\n'), nil
@@ -85,5 +84,5 @@ func toSyslogLevel(level logrus.Level) syslog.Priority {
 	if ok {
 		return syslog
 	}
-	return DefaultLevel
+	return defaultLevel
 }
