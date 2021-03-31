@@ -183,7 +183,7 @@ github.com/mitchellh/mapstructure
 github.com/nu7hatch/gouuid
 # github.com/onsi/ginkgo v1.14.0
 ## explicit
-# github.com/oxtoacart/bpool v0.0.0-20150712133111-4e1c5567d7c2
+# github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 ## explicit
 github.com/oxtoacart/bpool
 # github.com/pierrec/lz4 v1.0.2-0.20171218195038-2fcda4cb7018
