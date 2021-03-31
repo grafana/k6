@@ -10,69 +10,70 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc/internal"
+	"github.com/jhump/protoreflect/desc/protoparse/ast"
 )
 
-func (r *parseResult) createFileDescriptor(filename string, file *fileNode) {
+func (r *parseResult) createFileDescriptor(filename string, file *ast.FileNode) {
 	fd := &dpb.FileDescriptorProto{Name: proto.String(filename)}
 	r.fd = fd
 	r.putFileNode(fd, file)
 
 	isProto3 := false
-	if file.syntax != nil {
-		if file.syntax.syntax.val == "proto3" {
+	if file.Syntax != nil {
+		if file.Syntax.Syntax.AsString() == "proto3" {
 			isProto3 = true
-		} else if file.syntax.syntax.val != "proto2" {
-			if r.errs.handleErrorWithPos(file.syntax.syntax.start(), `syntax value must be "proto2" or "proto3"`) != nil {
+		} else if file.Syntax.Syntax.AsString() != "proto2" {
+			if r.errs.handleErrorWithPos(file.Syntax.Syntax.Start(), `syntax value must be "proto2" or "proto3"`) != nil {
 				return
 			}
 		}
 
 		// proto2 is the default, so no need to set unless proto3
 		if isProto3 {
-			fd.Syntax = proto.String(file.syntax.syntax.val)
+			fd.Syntax = proto.String(file.Syntax.Syntax.AsString())
 		}
 	} else {
-		r.errs.warn(file.start(), ErrNoSyntax)
+		r.errs.warn(file.Start(), ErrNoSyntax)
 	}
 
-	for _, decl := range file.decls {
+	for _, decl := range file.Decls {
 		if r.errs.err != nil {
 			return
 		}
-		if decl.enum != nil {
-			fd.EnumType = append(fd.EnumType, r.asEnumDescriptor(decl.enum))
-		} else if decl.extend != nil {
-			r.addExtensions(decl.extend, &fd.Extension, &fd.MessageType, isProto3)
-		} else if decl.imp != nil {
-			file.imports = append(file.imports, decl.imp)
+		switch decl := decl.(type) {
+		case *ast.EnumNode:
+			fd.EnumType = append(fd.EnumType, r.asEnumDescriptor(decl))
+		case *ast.ExtendNode:
+			r.addExtensions(decl, &fd.Extension, &fd.MessageType, isProto3)
+		case *ast.ImportNode:
 			index := len(fd.Dependency)
-			fd.Dependency = append(fd.Dependency, decl.imp.name.val)
-			if decl.imp.public {
+			fd.Dependency = append(fd.Dependency, decl.Name.AsString())
+			if decl.Public != nil {
 				fd.PublicDependency = append(fd.PublicDependency, int32(index))
-			} else if decl.imp.weak {
+			} else if decl.Weak != nil {
 				fd.WeakDependency = append(fd.WeakDependency, int32(index))
 			}
-		} else if decl.message != nil {
-			fd.MessageType = append(fd.MessageType, r.asMessageDescriptor(decl.message, isProto3))
-		} else if decl.option != nil {
+		case *ast.MessageNode:
+			fd.MessageType = append(fd.MessageType, r.asMessageDescriptor(decl, isProto3))
+		case *ast.OptionNode:
 			if fd.Options == nil {
 				fd.Options = &dpb.FileOptions{}
 			}
-			fd.Options.UninterpretedOption = append(fd.Options.UninterpretedOption, r.asUninterpretedOption(decl.option))
-		} else if decl.service != nil {
-			fd.Service = append(fd.Service, r.asServiceDescriptor(decl.service))
-		} else if decl.pkg != nil {
+			fd.Options.UninterpretedOption = append(fd.Options.UninterpretedOption, r.asUninterpretedOption(decl))
+		case *ast.ServiceNode:
+			fd.Service = append(fd.Service, r.asServiceDescriptor(decl))
+		case *ast.PackageNode:
 			if fd.Package != nil {
-				if r.errs.handleErrorWithPos(decl.pkg.start(), "files should have only one package declaration") != nil {
+				if r.errs.handleErrorWithPos(decl.Start(), "files should have only one package declaration") != nil {
 					return
 				}
 			}
-			fd.Package = proto.String(decl.pkg.name.val)
+			fd.Package = proto.String(string(decl.Name.AsIdentifier()))
 		}
 	}
 }
 
-func (r *parseResult) asUninterpretedOptions(nodes []*optionNode) []*dpb.UninterpretedOption {
+func (r *parseResult) asUninterpretedOptions(nodes []*ast.OptionNode) []*dpb.UninterpretedOption {
 	if len(nodes) == 0 {
 		return nil
 	}
@@ -83,11 +84,11 @@ func (r *parseResult) asUninterpretedOptions(nodes []*optionNode) []*dpb.Uninter
 	return opts
 }
 
-func (r *parseResult) asUninterpretedOption(node *optionNode) *dpb.UninterpretedOption {
-	opt := &dpb.UninterpretedOption{Name: r.asUninterpretedOptionName(node.name.parts)}
+func (r *parseResult) asUninterpretedOption(node *ast.OptionNode) *dpb.UninterpretedOption {
+	opt := &dpb.UninterpretedOption{Name: r.asUninterpretedOptionName(node.Name.Parts)}
 	r.putOptionNode(opt, node)
 
-	switch val := node.val.value().(type) {
+	switch val := node.Val.Value().(type) {
 	case bool:
 		if val {
 			opt.IdentifierValue = proto.String("true")
@@ -102,27 +103,24 @@ func (r *parseResult) asUninterpretedOption(node *optionNode) *dpb.Uninterpreted
 		opt.DoubleValue = proto.Float64(val)
 	case string:
 		opt.StringValue = []byte(val)
-	case identifier:
+	case ast.Identifier:
 		opt.IdentifierValue = proto.String(string(val))
-	case []*aggregateEntryNode:
+	case []*ast.MessageFieldNode:
 		var buf bytes.Buffer
 		aggToString(val, &buf)
 		aggStr := buf.String()
 		opt.AggregateValue = proto.String(aggStr)
+		//the grammar does not allow arrays here, so no case for []ast.ValueNode
 	}
 	return opt
 }
 
-func (r *parseResult) asUninterpretedOptionName(parts []*optionNamePartNode) []*dpb.UninterpretedOption_NamePart {
+func (r *parseResult) asUninterpretedOptionName(parts []*ast.FieldReferenceNode) []*dpb.UninterpretedOption_NamePart {
 	ret := make([]*dpb.UninterpretedOption_NamePart, len(parts))
 	for i, part := range parts {
-		txt := part.text.val
-		if !part.isExtension {
-			txt = part.text.val[part.offset : part.offset+part.length]
-		}
 		np := &dpb.UninterpretedOption_NamePart{
-			NamePart:    proto.String(txt),
-			IsExtension: proto.Bool(part.isExtension),
+			NamePart:    proto.String(string(part.Name.AsIdentifier())),
+			IsExtension: proto.Bool(part.IsExtension()),
 		}
 		r.putOptionNamePartNode(np, part)
 		ret[i] = np
@@ -130,54 +128,53 @@ func (r *parseResult) asUninterpretedOptionName(parts []*optionNamePartNode) []*
 	return ret
 }
 
-func (r *parseResult) addExtensions(ext *extendNode, flds *[]*dpb.FieldDescriptorProto, msgs *[]*dpb.DescriptorProto, isProto3 bool) {
-	extendee := ext.extendee.val
+func (r *parseResult) addExtensions(ext *ast.ExtendNode, flds *[]*dpb.FieldDescriptorProto, msgs *[]*dpb.DescriptorProto, isProto3 bool) {
+	extendee := string(ext.Extendee.AsIdentifier())
 	count := 0
-	for _, decl := range ext.decls {
-		if decl.field != nil {
+	for _, decl := range ext.Decls {
+		switch decl := decl.(type) {
+		case *ast.FieldNode:
 			count++
-			decl.field.extendee = ext
 			// use higher limit since we don't know yet whether extendee is messageset wire format
-			fd := r.asFieldDescriptor(decl.field, internal.MaxTag, isProto3)
+			fd := r.asFieldDescriptor(decl, internal.MaxTag, isProto3)
 			fd.Extendee = proto.String(extendee)
 			*flds = append(*flds, fd)
-		} else if decl.group != nil {
+		case *ast.GroupNode:
 			count++
-			decl.group.extendee = ext
 			// ditto: use higher limit right now
-			fd, md := r.asGroupDescriptors(decl.group, isProto3, internal.MaxTag)
+			fd, md := r.asGroupDescriptors(decl, isProto3, internal.MaxTag)
 			fd.Extendee = proto.String(extendee)
 			*flds = append(*flds, fd)
 			*msgs = append(*msgs, md)
 		}
 	}
 	if count == 0 {
-		_ = r.errs.handleErrorWithPos(ext.start(), "extend sections must define at least one extension")
+		_ = r.errs.handleErrorWithPos(ext.Start(), "extend sections must define at least one extension")
 	}
 }
 
-func asLabel(lbl *fieldLabel) *dpb.FieldDescriptorProto_Label {
-	if lbl.identNode == nil {
+func asLabel(lbl *ast.FieldLabel) *dpb.FieldDescriptorProto_Label {
+	if !lbl.IsPresent() {
 		return nil
 	}
 	switch {
-	case lbl.repeated:
+	case lbl.Repeated:
 		return dpb.FieldDescriptorProto_LABEL_REPEATED.Enum()
-	case lbl.required:
+	case lbl.Required:
 		return dpb.FieldDescriptorProto_LABEL_REQUIRED.Enum()
 	default:
 		return dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
 	}
 }
 
-func (r *parseResult) asFieldDescriptor(node *fieldNode, maxTag int32, isProto3 bool) *dpb.FieldDescriptorProto {
-	tag := node.tag.val
-	if err := checkTag(node.tag.start(), tag, maxTag); err != nil {
+func (r *parseResult) asFieldDescriptor(node *ast.FieldNode, maxTag int32, isProto3 bool) *dpb.FieldDescriptorProto {
+	tag := node.Tag.Val
+	if err := checkTag(node.Tag.Start(), tag, maxTag); err != nil {
 		_ = r.errs.handleError(err)
 	}
-	fd := newFieldDescriptor(node.name.val, node.fldType.val, int32(tag), asLabel(&node.label))
+	fd := newFieldDescriptor(node.Name.Val, string(node.FldType.AsIdentifier()), int32(tag), asLabel(&node.Label))
 	r.putFieldNode(fd, node)
-	if opts := node.options.Elements(); len(opts) > 0 {
+	if opts := node.Options.GetElements(); len(opts) > 0 {
 		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	if isProto3 && fd.Label != nil && fd.GetLabel() == dpb.FieldDescriptorProto_LABEL_OPTIONAL {
@@ -223,49 +220,49 @@ func newFieldDescriptor(name string, fieldType string, tag int32, lbl *dpb.Field
 	return fd
 }
 
-func (r *parseResult) asGroupDescriptors(group *groupNode, isProto3 bool, maxTag int32) (*dpb.FieldDescriptorProto, *dpb.DescriptorProto) {
-	tag := group.tag.val
-	if err := checkTag(group.tag.start(), tag, maxTag); err != nil {
+func (r *parseResult) asGroupDescriptors(group *ast.GroupNode, isProto3 bool, maxTag int32) (*dpb.FieldDescriptorProto, *dpb.DescriptorProto) {
+	tag := group.Tag.Val
+	if err := checkTag(group.Tag.Start(), tag, maxTag); err != nil {
 		_ = r.errs.handleError(err)
 	}
-	if !unicode.IsUpper(rune(group.name.val[0])) {
-		_ = r.errs.handleErrorWithPos(group.name.start(), "group %s should have a name that starts with a capital letter", group.name.val)
+	if !unicode.IsUpper(rune(group.Name.Val[0])) {
+		_ = r.errs.handleErrorWithPos(group.Name.Start(), "group %s should have a name that starts with a capital letter", group.Name.Val)
 	}
-	fieldName := strings.ToLower(group.name.val)
+	fieldName := strings.ToLower(group.Name.Val)
 	fd := &dpb.FieldDescriptorProto{
 		Name:     proto.String(fieldName),
 		JsonName: proto.String(internal.JsonName(fieldName)),
 		Number:   proto.Int32(int32(tag)),
-		Label:    asLabel(&group.label),
+		Label:    asLabel(&group.Label),
 		Type:     dpb.FieldDescriptorProto_TYPE_GROUP.Enum(),
-		TypeName: proto.String(group.name.val),
+		TypeName: proto.String(group.Name.Val),
 	}
 	r.putFieldNode(fd, group)
-	if opts := group.options.Elements(); len(opts) > 0 {
+	if opts := group.Options.GetElements(); len(opts) > 0 {
 		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
-	md := &dpb.DescriptorProto{Name: proto.String(group.name.val)}
+	md := &dpb.DescriptorProto{Name: proto.String(group.Name.Val)}
 	r.putMessageNode(md, group)
-	r.addMessageDecls(md, group.decls, isProto3)
+	r.addMessageBody(md, &group.MessageBody, isProto3)
 	return fd, md
 }
 
-func (r *parseResult) asMapDescriptors(mapField *mapFieldNode, isProto3 bool, maxTag int32) (*dpb.FieldDescriptorProto, *dpb.DescriptorProto) {
-	tag := mapField.tag.val
-	if err := checkTag(mapField.tag.start(), tag, maxTag); err != nil {
+func (r *parseResult) asMapDescriptors(mapField *ast.MapFieldNode, isProto3 bool, maxTag int32) (*dpb.FieldDescriptorProto, *dpb.DescriptorProto) {
+	tag := mapField.Tag.Val
+	if err := checkTag(mapField.Tag.Start(), tag, maxTag); err != nil {
 		_ = r.errs.handleError(err)
 	}
 	var lbl *dpb.FieldDescriptorProto_Label
 	if !isProto3 {
 		lbl = dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
 	}
-	keyFd := newFieldDescriptor("key", mapField.mapType.keyType.val, 1, lbl)
-	r.putFieldNode(keyFd, mapField.keyField())
-	valFd := newFieldDescriptor("value", mapField.mapType.valueType.val, 2, lbl)
-	r.putFieldNode(valFd, mapField.valueField())
-	entryName := internal.InitCap(internal.JsonName(mapField.name.val)) + "Entry"
-	fd := newFieldDescriptor(mapField.name.val, entryName, int32(tag), dpb.FieldDescriptorProto_LABEL_REPEATED.Enum())
-	if opts := mapField.options.Elements(); len(opts) > 0 {
+	keyFd := newFieldDescriptor("key", mapField.MapType.KeyType.Val, 1, lbl)
+	r.putFieldNode(keyFd, mapField.KeyField())
+	valFd := newFieldDescriptor("value", string(mapField.MapType.ValueType.AsIdentifier()), 2, lbl)
+	r.putFieldNode(valFd, mapField.ValueField())
+	entryName := internal.InitCap(internal.JsonName(mapField.Name.Val)) + "Entry"
+	fd := newFieldDescriptor(mapField.Name.Val, entryName, int32(tag), dpb.FieldDescriptorProto_LABEL_REPEATED.Enum())
+	if opts := mapField.Options.GetElements(); len(opts) > 0 {
 		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	r.putFieldNode(fd, mapField)
@@ -278,10 +275,10 @@ func (r *parseResult) asMapDescriptors(mapField *mapFieldNode, isProto3 bool, ma
 	return fd, md
 }
 
-func (r *parseResult) asExtensionRanges(node *extensionRangeNode, maxTag int32) []*dpb.DescriptorProto_ExtensionRange {
-	opts := r.asUninterpretedOptions(node.options.Elements())
-	ers := make([]*dpb.DescriptorProto_ExtensionRange, len(node.ranges))
-	for i, rng := range node.ranges {
+func (r *parseResult) asExtensionRanges(node *ast.ExtensionRangeNode, maxTag int32) []*dpb.DescriptorProto_ExtensionRange {
+	opts := r.asUninterpretedOptions(node.Options.GetElements())
+	ers := make([]*dpb.DescriptorProto_ExtensionRange, len(node.Ranges))
+	for i, rng := range node.Ranges {
 		start, end := getRangeBounds(r, rng, 0, maxTag)
 		er := &dpb.DescriptorProto_ExtensionRange{
 			Start: proto.Int32(start),
@@ -296,58 +293,64 @@ func (r *parseResult) asExtensionRanges(node *extensionRangeNode, maxTag int32) 
 	return ers
 }
 
-func (r *parseResult) asEnumValue(ev *enumValueNode) *dpb.EnumValueDescriptorProto {
-	num, ok := ev.number.asInt32(math.MinInt32, math.MaxInt32)
+func (r *parseResult) asEnumValue(ev *ast.EnumValueNode) *dpb.EnumValueDescriptorProto {
+	num, ok := ast.AsInt32(ev.Number, math.MinInt32, math.MaxInt32)
 	if !ok {
-		_ = r.errs.handleErrorWithPos(ev.number.start(), "value %d is out of range: should be between %d and %d", ev.number.value(), math.MinInt32, math.MaxInt32)
+		_ = r.errs.handleErrorWithPos(ev.Number.Start(), "value %d is out of range: should be between %d and %d", ev.Number.Value(), math.MinInt32, math.MaxInt32)
 	}
-	evd := &dpb.EnumValueDescriptorProto{Name: proto.String(ev.name.val), Number: proto.Int32(num)}
+	evd := &dpb.EnumValueDescriptorProto{Name: proto.String(ev.Name.Val), Number: proto.Int32(num)}
 	r.putEnumValueNode(evd, ev)
-	if opts := ev.options.Elements(); len(opts) > 0 {
+	if opts := ev.Options.GetElements(); len(opts) > 0 {
 		evd.Options = &dpb.EnumValueOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	return evd
 }
 
-func (r *parseResult) asMethodDescriptor(node *methodNode) *dpb.MethodDescriptorProto {
+func (r *parseResult) asMethodDescriptor(node *ast.RPCNode) *dpb.MethodDescriptorProto {
 	md := &dpb.MethodDescriptorProto{
-		Name:       proto.String(node.name.val),
-		InputType:  proto.String(node.input.msgType.val),
-		OutputType: proto.String(node.output.msgType.val),
+		Name:       proto.String(node.Name.Val),
+		InputType:  proto.String(string(node.Input.MessageType.AsIdentifier())),
+		OutputType: proto.String(string(node.Output.MessageType.AsIdentifier())),
 	}
 	r.putMethodNode(md, node)
-	if node.input.streamKeyword != nil {
+	if node.Input.Stream != nil {
 		md.ClientStreaming = proto.Bool(true)
 	}
-	if node.output.streamKeyword != nil {
+	if node.Output.Stream != nil {
 		md.ServerStreaming = proto.Bool(true)
 	}
 	// protoc always adds a MethodOptions if there are brackets
-	// We have a non-nil node.options if there are brackets
 	// We do the same to match protoc as closely as possible
 	// https://github.com/protocolbuffers/protobuf/blob/0c3f43a6190b77f1f68b7425d1b7e1a8257a8d0c/src/google/protobuf/compiler/parser.cc#L2152
-	if node.options != nil {
-		md.Options = &dpb.MethodOptions{UninterpretedOption: r.asUninterpretedOptions(node.options)}
+	if node.OpenBrace != nil {
+		md.Options = &dpb.MethodOptions{}
+		for _, decl := range node.Decls {
+			switch decl := decl.(type) {
+			case *ast.OptionNode:
+				md.Options.UninterpretedOption = append(md.Options.UninterpretedOption, r.asUninterpretedOption(decl))
+			}
+		}
 	}
 	return md
 }
 
-func (r *parseResult) asEnumDescriptor(en *enumNode) *dpb.EnumDescriptorProto {
-	ed := &dpb.EnumDescriptorProto{Name: proto.String(en.name.val)}
+func (r *parseResult) asEnumDescriptor(en *ast.EnumNode) *dpb.EnumDescriptorProto {
+	ed := &dpb.EnumDescriptorProto{Name: proto.String(en.Name.Val)}
 	r.putEnumNode(ed, en)
-	for _, decl := range en.decls {
-		if decl.option != nil {
+	for _, decl := range en.Decls {
+		switch decl := decl.(type) {
+		case *ast.OptionNode:
 			if ed.Options == nil {
 				ed.Options = &dpb.EnumOptions{}
 			}
-			ed.Options.UninterpretedOption = append(ed.Options.UninterpretedOption, r.asUninterpretedOption(decl.option))
-		} else if decl.value != nil {
-			ed.Value = append(ed.Value, r.asEnumValue(decl.value))
-		} else if decl.reserved != nil {
-			for _, n := range decl.reserved.names {
-				ed.ReservedName = append(ed.ReservedName, n.val)
+			ed.Options.UninterpretedOption = append(ed.Options.UninterpretedOption, r.asUninterpretedOption(decl))
+		case *ast.EnumValueNode:
+			ed.Value = append(ed.Value, r.asEnumValue(decl))
+		case *ast.ReservedNode:
+			for _, n := range decl.Names {
+				ed.ReservedName = append(ed.ReservedName, n.AsString())
 			}
-			for _, rng := range decl.reserved.ranges {
+			for _, rng := range decl.Ranges {
 				ed.ReservedRange = append(ed.ReservedRange, r.asEnumReservedRange(rng))
 			}
 		}
@@ -355,7 +358,7 @@ func (r *parseResult) asEnumDescriptor(en *enumNode) *dpb.EnumDescriptorProto {
 	return ed
 }
 
-func (r *parseResult) asEnumReservedRange(rng *rangeNode) *dpb.EnumDescriptorProto_EnumReservedRange {
+func (r *parseResult) asEnumReservedRange(rng *ast.RangeNode) *dpb.EnumDescriptorProto_EnumReservedRange {
 	start, end := getRangeBounds(r, rng, math.MinInt32, math.MaxInt32)
 	rr := &dpb.EnumDescriptorProto_EnumReservedRange{
 		Start: proto.Int32(start),
@@ -365,73 +368,76 @@ func (r *parseResult) asEnumReservedRange(rng *rangeNode) *dpb.EnumDescriptorPro
 	return rr
 }
 
-func (r *parseResult) asMessageDescriptor(node *messageNode, isProto3 bool) *dpb.DescriptorProto {
-	msgd := &dpb.DescriptorProto{Name: proto.String(node.name.val)}
+func (r *parseResult) asMessageDescriptor(node *ast.MessageNode, isProto3 bool) *dpb.DescriptorProto {
+	msgd := &dpb.DescriptorProto{Name: proto.String(node.Name.Val)}
 	r.putMessageNode(msgd, node)
-	r.addMessageDecls(msgd, node.decls, isProto3)
+	r.addMessageBody(msgd, &node.MessageBody, isProto3)
 	return msgd
 }
 
-func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, decls []*messageElement, isProto3 bool) {
+func (r *parseResult) addMessageBody(msgd *dpb.DescriptorProto, body *ast.MessageBody, isProto3 bool) {
 	// first process any options
-	for _, decl := range decls {
-		if decl.option != nil {
+	for _, decl := range body.Decls {
+		if opt, ok := decl.(*ast.OptionNode); ok {
 			if msgd.Options == nil {
 				msgd.Options = &dpb.MessageOptions{}
 			}
-			msgd.Options.UninterpretedOption = append(msgd.Options.UninterpretedOption, r.asUninterpretedOption(decl.option))
+			msgd.Options.UninterpretedOption = append(msgd.Options.UninterpretedOption, r.asUninterpretedOption(opt))
 		}
 	}
 
 	// now that we have options, we can see if this uses messageset wire format, which
 	// impacts how we validate tag numbers in any fields in the message
 	maxTag := int32(internal.MaxNormalTag)
-	if isMessageSet, err := isMessageSetWireFormat(r, "message "+msgd.GetName(), msgd); err != nil {
+	messageSetOpt, err := isMessageSetWireFormat(r, "message "+msgd.GetName(), msgd)
+	if err != nil {
 		return
-	} else if isMessageSet {
+	} else if messageSetOpt != nil {
 		maxTag = internal.MaxTag // higher limit for messageset wire format
 	}
 
 	rsvdNames := map[string]int{}
 
 	// now we can process the rest
-	for _, decl := range decls {
-		if decl.enum != nil {
-			msgd.EnumType = append(msgd.EnumType, r.asEnumDescriptor(decl.enum))
-		} else if decl.extend != nil {
-			r.addExtensions(decl.extend, &msgd.Extension, &msgd.NestedType, isProto3)
-		} else if decl.extensionRange != nil {
-			msgd.ExtensionRange = append(msgd.ExtensionRange, r.asExtensionRanges(decl.extensionRange, maxTag)...)
-		} else if decl.field != nil {
-			fd := r.asFieldDescriptor(decl.field, maxTag, isProto3)
+	for _, decl := range body.Decls {
+		switch decl := decl.(type) {
+		case *ast.EnumNode:
+			msgd.EnumType = append(msgd.EnumType, r.asEnumDescriptor(decl))
+		case *ast.ExtendNode:
+			r.addExtensions(decl, &msgd.Extension, &msgd.NestedType, isProto3)
+		case *ast.ExtensionRangeNode:
+			msgd.ExtensionRange = append(msgd.ExtensionRange, r.asExtensionRanges(decl, maxTag)...)
+		case *ast.FieldNode:
+			fd := r.asFieldDescriptor(decl, maxTag, isProto3)
 			msgd.Field = append(msgd.Field, fd)
-		} else if decl.mapField != nil {
-			fd, md := r.asMapDescriptors(decl.mapField, isProto3, maxTag)
-			msgd.Field = append(msgd.Field, fd)
-			msgd.NestedType = append(msgd.NestedType, md)
-		} else if decl.group != nil {
-			fd, md := r.asGroupDescriptors(decl.group, isProto3, maxTag)
+		case *ast.MapFieldNode:
+			fd, md := r.asMapDescriptors(decl, isProto3, maxTag)
 			msgd.Field = append(msgd.Field, fd)
 			msgd.NestedType = append(msgd.NestedType, md)
-		} else if decl.oneOf != nil {
+		case *ast.GroupNode:
+			fd, md := r.asGroupDescriptors(decl, isProto3, maxTag)
+			msgd.Field = append(msgd.Field, fd)
+			msgd.NestedType = append(msgd.NestedType, md)
+		case *ast.OneOfNode:
 			oodIndex := len(msgd.OneofDecl)
-			ood := &dpb.OneofDescriptorProto{Name: proto.String(decl.oneOf.name.val)}
-			r.putOneOfNode(ood, decl.oneOf)
+			ood := &dpb.OneofDescriptorProto{Name: proto.String(decl.Name.Val)}
+			r.putOneOfNode(ood, decl)
 			msgd.OneofDecl = append(msgd.OneofDecl, ood)
 			ooFields := 0
-			for _, oodecl := range decl.oneOf.decls {
-				if oodecl.option != nil {
+			for _, oodecl := range decl.Decls {
+				switch oodecl := oodecl.(type) {
+				case *ast.OptionNode:
 					if ood.Options == nil {
 						ood.Options = &dpb.OneofOptions{}
 					}
-					ood.Options.UninterpretedOption = append(ood.Options.UninterpretedOption, r.asUninterpretedOption(oodecl.option))
-				} else if oodecl.field != nil {
-					fd := r.asFieldDescriptor(oodecl.field, maxTag, isProto3)
+					ood.Options.UninterpretedOption = append(ood.Options.UninterpretedOption, r.asUninterpretedOption(oodecl))
+				case *ast.FieldNode:
+					fd := r.asFieldDescriptor(oodecl, maxTag, isProto3)
 					fd.OneofIndex = proto.Int32(int32(oodIndex))
 					msgd.Field = append(msgd.Field, fd)
 					ooFields++
-				} else if oodecl.group != nil {
-					fd, md := r.asGroupDescriptors(oodecl.group, isProto3, maxTag)
+				case *ast.GroupNode:
+					fd, md := r.asGroupDescriptors(oodecl, isProto3, maxTag)
 					fd.OneofIndex = proto.Int32(int32(oodIndex))
 					msgd.Field = append(msgd.Field, fd)
 					msgd.NestedType = append(msgd.NestedType, md)
@@ -439,22 +445,33 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, decls []*messag
 				}
 			}
 			if ooFields == 0 {
-				_ = r.errs.handleErrorWithPos(decl.oneOf.start(), "oneof must contain at least one field")
+				_ = r.errs.handleErrorWithPos(decl.Start(), "oneof must contain at least one field")
 			}
-		} else if decl.nested != nil {
-			msgd.NestedType = append(msgd.NestedType, r.asMessageDescriptor(decl.nested, isProto3))
-		} else if decl.reserved != nil {
-			for _, n := range decl.reserved.names {
-				count := rsvdNames[n.val]
+		case *ast.MessageNode:
+			msgd.NestedType = append(msgd.NestedType, r.asMessageDescriptor(decl, isProto3))
+		case *ast.ReservedNode:
+			for _, n := range decl.Names {
+				count := rsvdNames[n.AsString()]
 				if count == 1 { // already seen
-					_ = r.errs.handleErrorWithPos(n.start(), "name %q is reserved multiple times", n.val)
+					_ = r.errs.handleErrorWithPos(n.Start(), "name %q is reserved multiple times", n.AsString())
 				}
-				rsvdNames[n.val] = count + 1
-				msgd.ReservedName = append(msgd.ReservedName, n.val)
+				rsvdNames[n.AsString()] = count + 1
+				msgd.ReservedName = append(msgd.ReservedName, n.AsString())
 			}
-			for _, rng := range decl.reserved.ranges {
+			for _, rng := range decl.Ranges {
 				msgd.ReservedRange = append(msgd.ReservedRange, r.asMessageReservedRange(rng, maxTag))
 			}
+		}
+	}
+
+	if messageSetOpt != nil {
+		if len(msgd.Field) > 0 {
+			node := r.getFieldNode(msgd.Field[0])
+			_ = r.errs.handleErrorWithPos(node.Start(), "messages with message-set wire format cannot contain non-extension fields")
+		}
+		if len(msgd.ExtensionRange) == 0 {
+			node := r.getOptionNode(messageSetOpt)
+			_ = r.errs.handleErrorWithPos(node.Start(), "messages with message-set wire format must contain at least one extension range")
 		}
 	}
 
@@ -464,31 +481,31 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, decls []*messag
 	}
 }
 
-func isMessageSetWireFormat(res *parseResult, scope string, md *dpb.DescriptorProto) (bool, error) {
+func isMessageSetWireFormat(res *parseResult, scope string, md *dpb.DescriptorProto) (*dpb.UninterpretedOption, error) {
 	uo := md.GetOptions().GetUninterpretedOption()
 	index, err := findOption(res, scope, uo, "message_set_wire_format")
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if index == -1 {
-		// no such option, so default to false
-		return false, nil
+		// no such option
+		return nil, nil
 	}
 
 	opt := uo[index]
-	optNode := res.getOptionNode(opt)
 
 	switch opt.GetIdentifierValue() {
 	case "true":
-		return true, nil
+		return opt, nil
 	case "false":
-		return false, nil
+		return nil, nil
 	default:
-		return false, res.errs.handleErrorWithPos(optNode.getValue().start(), "%s: expecting bool value for message_set_wire_format option", scope)
+		optNode := res.getOptionNode(opt)
+		return nil, res.errs.handleErrorWithPos(optNode.GetValue().Start(), "%s: expecting bool value for message_set_wire_format option", scope)
 	}
 }
 
-func (r *parseResult) asMessageReservedRange(rng *rangeNode, maxTag int32) *dpb.DescriptorProto_ReservedRange {
+func (r *parseResult) asMessageReservedRange(rng *ast.RangeNode, maxTag int32) *dpb.DescriptorProto_ReservedRange {
 	start, end := getRangeBounds(r, rng, 0, maxTag)
 	rr := &dpb.DescriptorProto_ReservedRange{
 		Start: proto.Int32(start),
@@ -498,40 +515,41 @@ func (r *parseResult) asMessageReservedRange(rng *rangeNode, maxTag int32) *dpb.
 	return rr
 }
 
-func getRangeBounds(res *parseResult, rng *rangeNode, minVal, maxVal int32) (int32, int32) {
+func getRangeBounds(res *parseResult, rng *ast.RangeNode, minVal, maxVal int32) (int32, int32) {
 	checkOrder := true
-	start, ok := rng.startValueAsInt32(minVal, maxVal)
+	start, ok := rng.StartValueAsInt32(minVal, maxVal)
 	if !ok {
 		checkOrder = false
-		_ = res.errs.handleErrorWithPos(rng.startNode.start(), "range start %d is out of range: should be between %d and %d", rng.startValue(), minVal, maxVal)
+		_ = res.errs.handleErrorWithPos(rng.StartVal.Start(), "range start %d is out of range: should be between %d and %d", rng.StartValue(), minVal, maxVal)
 	}
 
-	end, ok := rng.endValueAsInt32(minVal, maxVal)
+	end, ok := rng.EndValueAsInt32(minVal, maxVal)
 	if !ok {
 		checkOrder = false
-		if rng.endNode != nil {
-			_ = res.errs.handleErrorWithPos(rng.endNode.start(), "range end %d is out of range: should be between %d and %d", rng.endValue(), minVal, maxVal)
+		if rng.EndVal != nil {
+			_ = res.errs.handleErrorWithPos(rng.EndVal.Start(), "range end %d is out of range: should be between %d and %d", rng.EndValue(), minVal, maxVal)
 		}
 	}
 
 	if checkOrder && start > end {
-		_ = res.errs.handleErrorWithPos(rng.rangeStart().start(), "range, %d to %d, is invalid: start must be <= end", start, end)
+		_ = res.errs.handleErrorWithPos(rng.RangeStart().Start(), "range, %d to %d, is invalid: start must be <= end", start, end)
 	}
 
 	return start, end
 }
 
-func (r *parseResult) asServiceDescriptor(svc *serviceNode) *dpb.ServiceDescriptorProto {
-	sd := &dpb.ServiceDescriptorProto{Name: proto.String(svc.name.val)}
+func (r *parseResult) asServiceDescriptor(svc *ast.ServiceNode) *dpb.ServiceDescriptorProto {
+	sd := &dpb.ServiceDescriptorProto{Name: proto.String(svc.Name.Val)}
 	r.putServiceNode(sd, svc)
-	for _, decl := range svc.decls {
-		if decl.option != nil {
+	for _, decl := range svc.Decls {
+		switch decl := decl.(type) {
+		case *ast.OptionNode:
 			if sd.Options == nil {
 				sd.Options = &dpb.ServiceOptions{}
 			}
-			sd.Options.UninterpretedOption = append(sd.Options.UninterpretedOption, r.asUninterpretedOption(decl.option))
-		} else if decl.rpc != nil {
-			sd.Method = append(sd.Method, r.asMethodDescriptor(decl.rpc))
+			sd.Options.UninterpretedOption = append(sd.Options.UninterpretedOption, r.asUninterpretedOption(decl))
+		case *ast.RPCNode:
+			sd.Method = append(sd.Method, r.asMethodDescriptor(decl))
 		}
 	}
 	return sd

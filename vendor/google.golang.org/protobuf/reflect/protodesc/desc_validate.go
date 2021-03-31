@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/internal/errors"
 	"google.golang.org/protobuf/internal/filedesc"
 	"google.golang.org/protobuf/internal/flags"
+	"google.golang.org/protobuf/internal/genid"
 	"google.golang.org/protobuf/internal/strs"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
@@ -238,6 +239,9 @@ func validateExtensionDeclarations(xs []filedesc.Extension, xds []*descriptorpb.
 			return errors.New("extension field %q has an invalid cardinality: %d", x.FullName(), x.Cardinality())
 		}
 		if xd.JsonName != nil {
+			// A bug in older versions of protoc would always populate the
+			// "json_name" option for extensions when it is meaningless.
+			// When it did so, it would always use the camel-cased field name.
 			if xd.GetJsonName() != strs.JSONCamelCase(string(x.Name())) {
 				return errors.New("extension field %q may not have an explicitly set JSON name: %q", x.FullName(), xd.GetJsonName())
 			}
@@ -348,9 +352,9 @@ func checkValidMap(fd protoreflect.FieldDescriptor) error {
 	kf := md.Fields().Get(0)
 	vf := md.Fields().Get(1)
 	switch {
-	case kf.Name() != "key" || kf.Number() != 1 || kf.Cardinality() != protoreflect.Optional || kf.ContainingOneof() != nil || kf.HasDefault():
+	case kf.Name() != genid.MapEntry_Key_field_name || kf.Number() != genid.MapEntry_Key_field_number || kf.Cardinality() != protoreflect.Optional || kf.ContainingOneof() != nil || kf.HasDefault():
 		return errors.New("invalid key field")
-	case vf.Name() != "value" || vf.Number() != 2 || vf.Cardinality() != protoreflect.Optional || vf.ContainingOneof() != nil || vf.HasDefault():
+	case vf.Name() != genid.MapEntry_Value_field_name || vf.Number() != genid.MapEntry_Value_field_number || vf.Cardinality() != protoreflect.Optional || vf.ContainingOneof() != nil || vf.HasDefault():
 		return errors.New("invalid value field")
 	}
 	switch kf.Kind() {

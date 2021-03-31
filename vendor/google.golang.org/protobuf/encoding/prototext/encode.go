@@ -6,7 +6,6 @@ package prototext
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"unicode/utf8"
 
@@ -14,12 +13,13 @@ import (
 	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/encoding/text"
 	"google.golang.org/protobuf/internal/errors"
-	"google.golang.org/protobuf/internal/fieldnum"
 	"google.golang.org/protobuf/internal/flags"
-	"google.golang.org/protobuf/internal/mapsort"
+	"google.golang.org/protobuf/internal/genid"
+	"google.golang.org/protobuf/internal/order"
 	"google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/internal/strs"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	pref "google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
@@ -162,42 +162,22 @@ func (e encoder) marshalMessage(m pref.Message, inclDelims bool) error {
 	}
 
 	// Handle Any expansion.
-	if messageDesc.FullName() == "google.protobuf.Any" {
+	if messageDesc.FullName() == genid.Any_message_fullname {
 		if e.marshalAny(m) {
 			return nil
 		}
 		// If unable to expand, continue on to marshal Any as a regular message.
 	}
 
-	// Marshal known fields.
-	fieldDescs := messageDesc.Fields()
-	size := fieldDescs.Len()
-	for i := 0; i < size; {
-		fd := fieldDescs.Get(i)
-		if od := fd.ContainingOneof(); od != nil {
-			fd = m.WhichOneof(od)
-			i += od.Fields().Len()
-		} else {
-			i++
+	// Marshal fields.
+	var err error
+	order.RangeFields(m, order.IndexNameFieldOrder, func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+		if err = e.marshalField(fd.TextName(), v, fd); err != nil {
+			return false
 		}
-
-		if fd == nil || !m.Has(fd) {
-			continue
-		}
-
-		name := fd.Name()
-		// Use type name for group field name.
-		if fd.Kind() == pref.GroupKind {
-			name = fd.Message().Name()
-		}
-		val := m.Get(fd)
-		if err := e.marshalField(string(name), val, fd); err != nil {
-			return err
-		}
-	}
-
-	// Marshal extensions.
-	if err := e.marshalExtensions(m); err != nil {
+		return true
+	})
+	if err != nil {
 		return err
 	}
 
@@ -290,18 +270,18 @@ func (e encoder) marshalList(name string, list pref.List, fd pref.FieldDescripto
 // marshalMap marshals the given protoreflect.Map as multiple name-value fields.
 func (e encoder) marshalMap(name string, mmap pref.Map, fd pref.FieldDescriptor) error {
 	var err error
-	mapsort.Range(mmap, fd.MapKey().Kind(), func(key pref.MapKey, val pref.Value) bool {
+	order.RangeEntries(mmap, order.GenericKeyOrder, func(key pref.MapKey, val pref.Value) bool {
 		e.WriteName(name)
 		e.StartMessage()
 		defer e.EndMessage()
 
-		e.WriteName("key")
+		e.WriteName(string(genid.MapEntry_Key_field_name))
 		err = e.marshalSingular(key.Value(), fd.MapKey())
 		if err != nil {
 			return false
 		}
 
-		e.WriteName("value")
+		e.WriteName(string(genid.MapEntry_Value_field_name))
 		err = e.marshalSingular(val, fd.MapValue())
 		if err != nil {
 			return false
@@ -309,48 +289,6 @@ func (e encoder) marshalMap(name string, mmap pref.Map, fd pref.FieldDescriptor)
 		return true
 	})
 	return err
-}
-
-// marshalExtensions marshals extension fields.
-func (e encoder) marshalExtensions(m pref.Message) error {
-	type entry struct {
-		key   string
-		value pref.Value
-		desc  pref.FieldDescriptor
-	}
-
-	// Get a sorted list based on field key first.
-	var entries []entry
-	m.Range(func(fd pref.FieldDescriptor, v pref.Value) bool {
-		if !fd.IsExtension() {
-			return true
-		}
-		// For MessageSet extensions, the name used is the parent message.
-		name := fd.FullName()
-		if messageset.IsMessageSetExtension(fd) {
-			name = name.Parent()
-		}
-		entries = append(entries, entry{
-			key:   string(name),
-			value: v,
-			desc:  fd,
-		})
-		return true
-	})
-	// Sort extensions lexicographically.
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].key < entries[j].key
-	})
-
-	// Write out sorted list.
-	for _, entry := range entries {
-		// Extension field name is the proto field name enclosed in [].
-		name := "[" + entry.key + "]"
-		if err := e.marshalField(name, entry.value, entry.desc); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // marshalUnknown parses the given []byte and marshals fields out.
@@ -399,7 +337,7 @@ func (e encoder) marshalUnknown(b []byte) {
 func (e encoder) marshalAny(any pref.Message) bool {
 	// Construct the embedded message.
 	fds := any.Descriptor().Fields()
-	fdType := fds.ByNumber(fieldnum.Any_TypeUrl)
+	fdType := fds.ByNumber(genid.Any_TypeUrl_field_number)
 	typeURL := any.Get(fdType).String()
 	mt, err := e.opts.Resolver.FindMessageByURL(typeURL)
 	if err != nil {
@@ -408,7 +346,7 @@ func (e encoder) marshalAny(any pref.Message) bool {
 	m := mt.New().Interface()
 
 	// Unmarshal bytes into embedded message.
-	fdValue := fds.ByNumber(fieldnum.Any_Value)
+	fdValue := fds.ByNumber(genid.Any_Value_field_number)
 	value := any.Get(fdValue)
 	err = proto.UnmarshalOptions{
 		AllowPartial: true,

@@ -33,7 +33,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
-	github.com/jhump/protoreflect v1.7.0
+	github.com/jhump/protoreflect v1.8.2
 	github.com/julienschmidt/httprouter v1.1.1-0.20180222160526-d18983907793
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -61,7 +61,7 @@ require (
 	github.com/spf13/afero v1.1.1
 	github.com/spf13/cobra v0.0.4-0.20180629152535-a114f312e075
 	github.com/spf13/pflag v1.0.1
-	github.com/stretchr/testify v1.2.2
+	github.com/stretchr/testify v1.5.1
 	github.com/tidwall/gjson v1.6.1
 	github.com/tidwall/pretty v1.0.2
 	github.com/ugorji/go v1.1.7 // indirect
@@ -76,8 +76,8 @@ require (
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336 // indirect
-	google.golang.org/grpc v1.31.1
-	google.golang.org/protobuf v1.24.0
+	google.golang.org/grpc v1.36.1
+	google.golang.org/protobuf v1.25.1-0.20200805231151-a709e31e5d12
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v8 v8.18.2 // indirect
 	gopkg.in/guregu/null.v2 v2.1.2 // indirect
