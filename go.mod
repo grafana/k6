@@ -36,8 +36,7 @@ require (
 	github.com/julienschmidt/httprouter v1.1.1-0.20180222160526-d18983907793
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/klauspost/compress v1.7.2
-	github.com/klauspost/cpuid v1.3.1 // indirect
+	github.com/klauspost/compress v1.11.13
 	github.com/kubernetes/helm v2.9.0+incompatible
 	github.com/labstack/echo v3.2.6+incompatible // indirect
 	github.com/labstack/gommon v0.2.2-0.20170925052817-57409ada9da0 // indirect

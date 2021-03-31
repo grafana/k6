@@ -30,7 +30,7 @@ type byteBuffer interface {
 type byteBuf []byte
 
 func (b *byteBuf) readSmall(n int) []byte {
-	if debug && n > 8 {
+	if debugAsserts && n > 8 {
 		panic(fmt.Errorf("small read > 8 (%d). use readBig", n))
 	}
 	bb := *b
@@ -82,7 +82,7 @@ type readerWrapper struct {
 }
 
 func (r *readerWrapper) readSmall(n int) []byte {
-	if debug && n > 8 {
+	if debugAsserts && n > 8 {
 		panic(fmt.Errorf("small read > 8 (%d). use readBig", n))
 	}
 	n2, err := io.ReadFull(r.r, r.tmp[:n])
@@ -101,6 +101,9 @@ func (r *readerWrapper) readBig(n int, dst []byte) ([]byte, error) {
 		dst = make([]byte, n)
 	}
 	n2, err := io.ReadFull(r.r, dst[:n])
+	if err == io.EOF && n > 0 {
+		err = io.ErrUnexpectedEOF
+	}
 	return dst[:n2], err
 }
 
@@ -116,6 +119,9 @@ func (r *readerWrapper) readByte() (byte, error) {
 }
 
 func (r *readerWrapper) skipN(n int) error {
-	_, err := io.CopyN(ioutil.Discard, r.r, int64(n))
+	n2, err := io.CopyN(ioutil.Discard, r.r, int64(n))
+	if n2 != int64(n) {
+		err = io.ErrUnexpectedEOF
+	}
 	return err
 }

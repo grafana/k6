@@ -132,15 +132,13 @@ github.com/kardianos/osext
 # github.com/kelseyhightower/envconfig v1.4.0
 ## explicit
 github.com/kelseyhightower/envconfig
-# github.com/klauspost/compress v1.7.2
+# github.com/klauspost/compress v1.11.13
 ## explicit
 github.com/klauspost/compress/fse
 github.com/klauspost/compress/huff0
 github.com/klauspost/compress/snappy
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-# github.com/klauspost/cpuid v1.3.1
-## explicit
 # github.com/kubernetes/helm v2.9.0+incompatible
 ## explicit
 github.com/kubernetes/helm/pkg/strvals

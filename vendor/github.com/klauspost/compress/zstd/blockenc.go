@@ -14,35 +14,52 @@ import (
 )
 
 type blockEnc struct {
-	size      int
-	literals  []byte
-	sequences []seq
-	coders    seqCoders
-	litEnc    *huff0.Scratch
-	wr        bitWriter
+	size       int
+	literals   []byte
+	sequences  []seq
+	coders     seqCoders
+	litEnc     *huff0.Scratch
+	dictLitEnc *huff0.Scratch
+	wr         bitWriter
 
-	extraLits int
-	last      bool
-
+	extraLits         int
 	output            []byte
 	recentOffsets     [3]uint32
 	prevRecentOffsets [3]uint32
+
+	last   bool
+	lowMem bool
 }
 
 // init should be used once the block has been created.
 // If called more than once, the effect is the same as calling reset.
 func (b *blockEnc) init() {
-	if cap(b.literals) < maxCompressedLiteralSize {
-		b.literals = make([]byte, 0, maxCompressedLiteralSize)
+	if b.lowMem {
+		// 1K literals
+		if cap(b.literals) < 1<<10 {
+			b.literals = make([]byte, 0, 1<<10)
+		}
+		const defSeqs = 20
+		if cap(b.sequences) < defSeqs {
+			b.sequences = make([]seq, 0, defSeqs)
+		}
+		// 1K
+		if cap(b.output) < 1<<10 {
+			b.output = make([]byte, 0, 1<<10)
+		}
+	} else {
+		if cap(b.literals) < maxCompressedBlockSize {
+			b.literals = make([]byte, 0, maxCompressedBlockSize)
+		}
+		const defSeqs = 200
+		if cap(b.sequences) < defSeqs {
+			b.sequences = make([]seq, 0, defSeqs)
+		}
+		if cap(b.output) < maxCompressedBlockSize {
+			b.output = make([]byte, 0, maxCompressedBlockSize)
+		}
 	}
-	const defSeqs = 200
-	b.literals = b.literals[:0]
-	if cap(b.sequences) < defSeqs {
-		b.sequences = make([]seq, 0, defSeqs)
-	}
-	if cap(b.output) < maxCompressedBlockSize {
-		b.output = make([]byte, 0, maxCompressedBlockSize)
-	}
+
 	if b.coders.mlEnc == nil {
 		b.coders.mlEnc = &fseEncoder{}
 		b.coders.mlPrev = &fseEncoder{}
@@ -51,7 +68,7 @@ func (b *blockEnc) init() {
 		b.coders.llEnc = &fseEncoder{}
 		b.coders.llPrev = &fseEncoder{}
 	}
-	b.litEnc = &huff0.Scratch{}
+	b.litEnc = &huff0.Scratch{WantLogLess: 4}
 	b.reset(nil)
 }
 
@@ -75,6 +92,7 @@ func (b *blockEnc) reset(prev *blockEnc) {
 	if prev != nil {
 		b.recentOffsets = prev.prevRecentOffsets
 	}
+	b.dictLitEnc = nil
 }
 
 // reset will reset the block for a new encode, but in the same stream,
@@ -155,14 +173,17 @@ func (h *literalsHeader) setSize(regenLen int) {
 }
 
 // setSizes will set the size of a compressed literals section and the input length.
-func (h *literalsHeader) setSizes(compLen, inLen int) {
+func (h *literalsHeader) setSizes(compLen, inLen int, single bool) {
 	compBits, inBits := bits.Len32(uint32(compLen)), bits.Len32(uint32(inLen))
 	// Only retain 2 bits
 	const mask = 3
 	lh := uint64(*h & mask)
 	switch {
 	case compBits <= 10 && inBits <= 10:
-		lh |= (1 << 2) | (uint64(inLen) << 4) | (uint64(compLen) << (10 + 4)) | (3 << 60)
+		if !single {
+			lh |= 1 << 2
+		}
+		lh |= (uint64(inLen) << 4) | (uint64(compLen) << (10 + 4)) | (3 << 60)
 		if debug {
 			const mmask = (1 << 24) - 1
 			n := (lh >> 4) & mmask
@@ -175,8 +196,14 @@ func (h *literalsHeader) setSizes(compLen, inLen int) {
 		}
 	case compBits <= 14 && inBits <= 14:
 		lh |= (2 << 2) | (uint64(inLen) << 4) | (uint64(compLen) << (14 + 4)) | (4 << 60)
+		if single {
+			panic("single stream used with more than 10 bits length.")
+		}
 	case compBits <= 18 && inBits <= 18:
 		lh |= (3 << 2) | (uint64(inLen) << 4) | (uint64(compLen) << (18 + 4)) | (5 << 60)
+		if single {
+			panic("single stream used with more than 10 bits length.")
+		}
 	default:
 		panic("internal error: block too big")
 	}
@@ -286,49 +313,78 @@ func (b *blockEnc) encodeRaw(a []byte) {
 	b.output = bh.appendTo(b.output[:0])
 	b.output = append(b.output, a...)
 	if debug {
-		println("Adding RAW block, length", len(a))
+		println("Adding RAW block, length", len(a), "last:", b.last)
 	}
 }
 
-// encodeLits can be used if the block is only litLen.
-func (b *blockEnc) encodeLits() error {
+// encodeRaw can be used to set the output to a raw representation of supplied bytes.
+func (b *blockEnc) encodeRawTo(dst, src []byte) []byte {
 	var bh blockHeader
 	bh.setLast(b.last)
-	bh.setSize(uint32(len(b.literals)))
+	bh.setSize(uint32(len(src)))
+	bh.setType(blockTypeRaw)
+	dst = bh.appendTo(dst)
+	dst = append(dst, src...)
+	if debug {
+		println("Adding RAW block, length", len(src), "last:", b.last)
+	}
+	return dst
+}
+
+// encodeLits can be used if the block is only litLen.
+func (b *blockEnc) encodeLits(lits []byte, raw bool) error {
+	var bh blockHeader
+	bh.setLast(b.last)
+	bh.setSize(uint32(len(lits)))
 
 	// Don't compress extremely small blocks
-	if len(b.literals) < 32 {
+	if len(lits) < 8 || (len(lits) < 32 && b.dictLitEnc == nil) || raw {
 		if debug {
-			println("Adding RAW block, length", len(b.literals))
+			println("Adding RAW block, length", len(lits), "last:", b.last)
 		}
 		bh.setType(blockTypeRaw)
 		b.output = bh.appendTo(b.output)
-		b.output = append(b.output, b.literals...)
+		b.output = append(b.output, lits...)
 		return nil
 	}
 
-	// TODO: Switch to 1X when less than x bytes.
-	out, reUsed, err := huff0.Compress4X(b.literals, b.litEnc)
-	// Bail out of compression is too little.
-	if len(out) > (len(b.literals) - len(b.literals)>>4) {
+	var (
+		out            []byte
+		reUsed, single bool
+		err            error
+	)
+	if b.dictLitEnc != nil {
+		b.litEnc.TransferCTable(b.dictLitEnc)
+		b.litEnc.Reuse = huff0.ReusePolicyAllow
+		b.dictLitEnc = nil
+	}
+	if len(lits) >= 1024 {
+		// Use 4 Streams.
+		out, reUsed, err = huff0.Compress4X(lits, b.litEnc)
+	} else if len(lits) > 32 {
+		// Use 1 stream
+		single = true
+		out, reUsed, err = huff0.Compress1X(lits, b.litEnc)
+	} else {
 		err = huff0.ErrIncompressible
 	}
+
 	switch err {
 	case huff0.ErrIncompressible:
 		if debug {
-			println("Adding RAW block, length", len(b.literals))
+			println("Adding RAW block, length", len(lits), "last:", b.last)
 		}
 		bh.setType(blockTypeRaw)
 		b.output = bh.appendTo(b.output)
-		b.output = append(b.output, b.literals...)
+		b.output = append(b.output, lits...)
 		return nil
 	case huff0.ErrUseRLE:
 		if debug {
-			println("Adding RLE block, length", len(b.literals))
+			println("Adding RLE block, length", len(lits))
 		}
 		bh.setType(blockTypeRLE)
 		b.output = bh.appendTo(b.output)
-		b.output = append(b.output, b.literals[0])
+		b.output = append(b.output, lits[0])
 		return nil
 	default:
 		return err
@@ -351,7 +407,7 @@ func (b *blockEnc) encodeLits() error {
 		lh.setType(literalsBlockCompressed)
 	}
 	// Set sizes
-	lh.setSizes(len(out), len(b.literals))
+	lh.setSizes(len(out), len(lits), single)
 	bh.setSize(uint32(len(out) + lh.size() + 1))
 
 	// Write block headers.
@@ -364,36 +420,97 @@ func (b *blockEnc) encodeLits() error {
 	return nil
 }
 
-// encode will encode the block and put the output in b.output.
-func (b *blockEnc) encode() error {
-	if len(b.sequences) == 0 {
-		return b.encodeLits()
+// fuzzFseEncoder can be used to fuzz the FSE encoder.
+func fuzzFseEncoder(data []byte) int {
+	if len(data) > maxSequences || len(data) < 2 {
+		return 0
 	}
-	// We want some difference
-	if len(b.literals) > (b.size - (b.size >> 5)) {
-		return errIncompressible
+	enc := fseEncoder{}
+	hist := enc.Histogram()[:256]
+	maxSym := uint8(0)
+	for i, v := range data {
+		v = v & 63
+		data[i] = v
+		hist[v]++
+		if v > maxSym {
+			maxSym = v
+		}
+	}
+	if maxSym == 0 {
+		// All 0
+		return 0
+	}
+	maxCount := func(a []uint32) int {
+		var max uint32
+		for _, v := range a {
+			if v > max {
+				max = v
+			}
+		}
+		return int(max)
+	}
+	cnt := maxCount(hist[:maxSym])
+	if cnt == len(data) {
+		// RLE
+		return 0
+	}
+	enc.HistogramFinished(maxSym, cnt)
+	err := enc.normalizeCount(len(data))
+	if err != nil {
+		return 0
+	}
+	_, err = enc.writeCount(nil)
+	if err != nil {
+		panic(err)
+	}
+	return 1
+}
+
+// encode will encode the block and append the output in b.output.
+// Previous offset codes must be pushed if more blocks are expected.
+func (b *blockEnc) encode(org []byte, raw, rawAllLits bool) error {
+	if len(b.sequences) == 0 {
+		return b.encodeLits(b.literals, rawAllLits)
+	}
+	// We want some difference to at least account for the headers.
+	saved := b.size - len(b.literals) - (b.size >> 5)
+	if saved < 16 {
+		if org == nil {
+			return errIncompressible
+		}
+		b.popOffsets()
+		return b.encodeLits(org, rawAllLits)
 	}
 
 	var bh blockHeader
 	var lh literalsHeader
 	bh.setLast(b.last)
 	bh.setType(blockTypeCompressed)
+	// Store offset of the block header. Needed when we know the size.
+	bhOffset := len(b.output)
 	b.output = bh.appendTo(b.output)
 
 	var (
-		out    []byte
-		reUsed bool
-		err    error
+		out            []byte
+		reUsed, single bool
+		err            error
 	)
-	if len(b.literals) > 32 {
-		// TODO: Switch to 1X on small blocks.
+	if b.dictLitEnc != nil {
+		b.litEnc.TransferCTable(b.dictLitEnc)
+		b.litEnc.Reuse = huff0.ReusePolicyAllow
+		b.dictLitEnc = nil
+	}
+	if len(b.literals) >= 1024 && !raw {
+		// Use 4 Streams.
 		out, reUsed, err = huff0.Compress4X(b.literals, b.litEnc)
-		if len(out) > len(b.literals)-len(b.literals)>>4 {
-			err = huff0.ErrIncompressible
-		}
+	} else if len(b.literals) > 32 && !raw {
+		// Use 1 stream
+		single = true
+		out, reUsed, err = huff0.Compress1X(b.literals, b.litEnc)
 	} else {
 		err = huff0.ErrIncompressible
 	}
+
 	switch err {
 	case huff0.ErrIncompressible:
 		lh.setType(literalsBlockRaw)
@@ -435,7 +552,7 @@ func (b *blockEnc) encode() error {
 				}
 			}
 		}
-		lh.setSizes(len(out), len(b.literals))
+		lh.setSizes(len(out), len(b.literals), single)
 		if debug {
 			printf("Compressed %d literals to %d bytes", len(b.literals), len(out))
 			println("Adding literal header:", lh)
@@ -661,23 +778,23 @@ func (b *blockEnc) encode() error {
 	}
 	b.output = wr.out
 
-	if len(b.output)-3 >= b.size {
+	if len(b.output)-3-bhOffset >= b.size {
 		// Maybe even add a bigger margin.
 		b.litEnc.Reuse = huff0.ReusePolicyNone
 		return errIncompressible
 	}
 
 	// Size is output minus block header.
-	bh.setSize(uint32(len(b.output)) - 3)
+	bh.setSize(uint32(len(b.output)-bhOffset) - 3)
 	if debug {
 		println("Rewriting block header", bh)
 	}
-	_ = bh.appendTo(b.output[:0])
+	_ = bh.appendTo(b.output[bhOffset:bhOffset])
 	b.coders.setPrev(llEnc, mlEnc, ofEnc)
 	return nil
 }
 
-var errIncompressible = errors.New("uncompressible")
+var errIncompressible = errors.New("incompressible")
 
 func (b *blockEnc) genCodes() {
 	if len(b.sequences) == 0 {
@@ -723,7 +840,7 @@ func (b *blockEnc) genCodes() {
 		mlH[v]++
 		if v > mlMax {
 			mlMax = v
-			if debug && mlMax > maxMatchLengthSymbol {
+			if debugAsserts && mlMax > maxMatchLengthSymbol {
 				panic(fmt.Errorf("mlMax > maxMatchLengthSymbol (%d), matchlen: %d", mlMax, seq.matchLen))
 			}
 		}
@@ -738,13 +855,13 @@ func (b *blockEnc) genCodes() {
 		}
 		return int(max)
 	}
-	if mlMax > maxMatchLengthSymbol {
+	if debugAsserts && mlMax > maxMatchLengthSymbol {
 		panic(fmt.Errorf("mlMax > maxMatchLengthSymbol (%d)", mlMax))
 	}
-	if ofMax > maxOffsetBits {
+	if debugAsserts && ofMax > maxOffsetBits {
 		panic(fmt.Errorf("ofMax > maxOffsetBits (%d)", ofMax))
 	}
-	if llMax > maxLiteralLengthSymbol {
+	if debugAsserts && llMax > maxLiteralLengthSymbol {
 		panic(fmt.Errorf("llMax > maxLiteralLengthSymbol (%d)", llMax))
 	}
 
