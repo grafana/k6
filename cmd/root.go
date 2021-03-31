@@ -23,9 +23,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/loadimpact/k6/log"
-	"github.com/mattn/go-colorable"
-	"github.com/mattn/go-isatty"
 	"io"
 	"io/ioutil"
 	stdlog "log"
@@ -34,6 +31,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/loadimpact/k6/log"
+	"github.com/mattn/go-colorable"
+	"github.com/mattn/go-isatty"
 
 	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
@@ -294,7 +295,10 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 			c.logger.SetOutput(ioutil.Discard) // don't output to anywhere else
 			c.logFmt = "raw"
 			noColor = true // disable color
-		} else if strings.HasPrefix(c.logOutput, "kafka") {
+			break
+		}
+
+		if strings.HasPrefix(c.logOutput, "kafka") {
 			hook, err := log.KafkaFromConfigLine(c.ctx, c.fallbackLogger, c.logOutput)
 			if err != nil {
 				return nil, err
@@ -302,9 +306,10 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 			c.logger.AddHook(hook)
 			c.logger.SetOutput(ioutil.Discard) // don't output to anywhere else
 			noColor = true                     // disable color
-		} else {
-			return nil, fmt.Errorf("unsupported log output `%s`", c.logOutput)
+			break
 		}
+
+		return nil, fmt.Errorf("unsupported log output `%s`", c.logOutput)
 	}
 
 	switch c.logFmt {

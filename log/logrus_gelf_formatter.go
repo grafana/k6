@@ -12,23 +12,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Defines a log format type that wil output line separated JSON objects in the GELF format.
-type GelfFormatter struct {
-}
+// GelfFormatter defines a log format type that wil output line separated JSON objects in the GELF format.
+type GelfFormatter struct{}
 
 type fields map[string]interface{}
 
-var (
-	defaultLevel = syslog.LOG_INFO
-	levelMap     = map[logrus.Level]syslog.Priority{ //nolint:gochecknoglobals
-		logrus.PanicLevel: syslog.LOG_EMERG,
-		logrus.FatalLevel: syslog.LOG_CRIT,
-		logrus.ErrorLevel: syslog.LOG_ERR,
-		logrus.WarnLevel:  syslog.LOG_WARNING,
-		logrus.InfoLevel:  syslog.LOG_INFO,
-		logrus.DebugLevel: syslog.LOG_DEBUG,
-	}
-)
+const defaultLevel = syslog.LOG_INFO
+
+var levelMap = map[logrus.Level]syslog.Priority{ //nolint:gochecknoglobals
+	logrus.PanicLevel: syslog.LOG_EMERG,
+	logrus.FatalLevel: syslog.LOG_CRIT,
+	logrus.ErrorLevel: syslog.LOG_ERR,
+	logrus.WarnLevel:  syslog.LOG_WARNING,
+	logrus.InfoLevel:  syslog.LOG_INFO,
+	logrus.DebugLevel: syslog.LOG_DEBUG,
+}
 
 // Format formats the log entry to GELF JSON
 func (f *GelfFormatter) Format(entry *logrus.Entry) ([]byte, error) {
@@ -36,7 +34,6 @@ func (f *GelfFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	blacklist := []string{"_id", "id", "timestamp", "version", "level"}
 
 	for k, v := range entry.Data {
-
 		if contains(k, blacklist) {
 			continue
 		}
@@ -59,7 +56,7 @@ func (f *GelfFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 	serialized, err := json.Marshal(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal fields to JSON, %v", err)
+		return nil, fmt.Errorf("failed to marshal fields to JSON, %w", err)
 	}
 
 	return append(serialized, '\n'), nil

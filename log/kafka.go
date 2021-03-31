@@ -5,11 +5,12 @@ package log
 import (
 	"context"
 	"fmt"
-	"github.com/Shopify/sarama"
-	"github.com/sirupsen/logrus"
 	"log"
 	"strings"
 	"time"
+
+	"github.com/Shopify/sarama"
+	"github.com/sirupsen/logrus"
 )
 
 // KafkaHook logrus Kafka Hook
@@ -44,10 +45,16 @@ func KafkaFromConfigLine(ctx context.Context, fallbackLogger logrus.FieldLogger,
 	kafkaConfig.Producer.Flush.Frequency = 500 * time.Millisecond // Flush batches every 500ms
 
 	hook := KafkaHook{
+		id:             "k6",
 		levels:         logrus.AllLevels,
-		formatter:      &logrus.JSONFormatter{},
+		formatter:      &logrus.JSONFormatter{}, //nolint:exhaustivestruct
 		fallbackLogger: fallbackLogger,
+		labels:         make([][2]string, 0),
+		topics:         make([]string, 0),
+		brokers:        make([]string, 0),
+		producer:       nil,
 	}
+
 	err := hook.parseArgs(line)
 	if err != nil {
 		return nil, err
@@ -69,7 +76,7 @@ func KafkaFromConfigLine(ctx context.Context, fallbackLogger logrus.FieldLogger,
 	return &hook, nil
 }
 
-func (hook *KafkaHook) parseArgs(line string) error {
+func (hook *KafkaHook) parseArgs(line string) error { //nolint:cyclop
 	tokens, err := tokenize(line)
 	if err != nil {
 		return fmt.Errorf("error while parsing loki configuration %w", err)
@@ -88,7 +95,7 @@ func (hook *KafkaHook) parseArgs(line string) error {
 		case "format":
 			switch value {
 			case "json":
-				hook.formatter = &logrus.JSONFormatter{}
+				hook.formatter = &logrus.JSONFormatter{} //nolint:exhaustivestruct
 			case "gelf":
 				hook.formatter = new(GelfFormatter)
 			}
@@ -109,8 +116,8 @@ func (hook *KafkaHook) parseArgs(line string) error {
 	return nil
 }
 
-// Id returns the logrus Hook id
-func (hook *KafkaHook) Id() string {
+// ID returns the logrus Hook id
+func (hook *KafkaHook) ID() string {
 	return hook.id
 }
 
@@ -125,9 +132,7 @@ func (hook *KafkaHook) Fire(entry *logrus.Entry) error {
 	t, _ := entry.Data["time"].(time.Time)
 
 	// Convert it to bytes
-	b, err := t.MarshalBinary()
-
-	if err != nil {
+	if _, err := t.MarshalBinary(); err != nil {
 		return err
 	}
 
@@ -135,8 +140,8 @@ func (hook *KafkaHook) Fire(entry *logrus.Entry) error {
 	for _, label := range hook.labels {
 		entry.Data[label[0]] = label[1]
 	}
-	b, err = hook.formatter.Format(entry)
 
+	b, err := hook.formatter.Format(entry)
 	if err != nil {
 		return err
 	}
@@ -144,7 +149,7 @@ func (hook *KafkaHook) Fire(entry *logrus.Entry) error {
 	value := sarama.ByteEncoder(b)
 
 	for _, topic := range hook.topics {
-		hook.producer.Input() <- &sarama.ProducerMessage{
+		hook.producer.Input() <- &sarama.ProducerMessage{ //nolint:exhaustivestruct
 			Key:   nil,
 			Topic: topic,
 			Value: value,
