@@ -8,7 +8,7 @@ github.com/DataDog/datadog-go/statsd
 ## explicit
 github.com/GeertJohan/go.rice
 github.com/GeertJohan/go.rice/embedded
-# github.com/PuerkitoBio/goquery v1.3.0
+# github.com/PuerkitoBio/goquery v1.6.1
 ## explicit
 github.com/PuerkitoBio/goquery
 # github.com/Shopify/sarama v1.16.0
@@ -22,8 +22,7 @@ github.com/Soontao/goHttpDigestClient
 # github.com/andybalholm/brotli v0.0.0-20190704151324-71eb68cc467c
 ## explicit
 github.com/andybalholm/brotli
-# github.com/andybalholm/cascadia v1.0.0
-## explicit
+# github.com/andybalholm/cascadia v1.1.0
 github.com/andybalholm/cascadia
 # github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb
 ## explicit
