@@ -330,28 +330,24 @@ func (s *Socket) handleEvent(event string, args ...goja.Value) {
 	}
 }
 
-// Send writes the given string or ArrayBuffer message to the connection.
-func (s *Socket) Send(message interface{}) {
-	rt := common.GetRuntime(s.ctx)
-
-	var (
-		msgType int
-		msg     []byte
-	)
-	switch m := message.(type) {
-	case string:
-		msgType = websocket.TextMessage
-		msg = []byte(m)
-	case goja.ArrayBuffer:
-		msgType = websocket.BinaryMessage
-		msg = m.Bytes()
-	default:
-		err := fmt.Errorf("unsupported message type: %T, expected string or ArrayBuffer", message)
-		common.Throw(common.GetRuntime(s.ctx), err)
+// Send writes the given string message to the connection.
+func (s *Socket) Send(message string) {
+	if err := s.conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
+		s.handleEvent("error", common.GetRuntime(s.ctx).ToValue(err))
 	}
 
-	if err := s.conn.WriteMessage(msgType, msg); err != nil {
-		s.handleEvent("error", rt.ToValue(err))
+	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
+		Metric: metrics.WSMessagesSent,
+		Time:   time.Now(),
+		Tags:   s.sampleTags,
+		Value:  1,
+	})
+}
+
+// SendBinary writes the given ArrayBuffer message to the connection.
+func (s *Socket) SendBinary(message *goja.ArrayBuffer) {
+	if err := s.conn.WriteMessage(websocket.BinaryMessage, message.Bytes()); err != nil {
+		s.handleEvent("error", common.GetRuntime(s.ctx).ToValue(err))
 	}
 
 	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
