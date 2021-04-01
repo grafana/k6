@@ -7,39 +7,20 @@ require (
 	github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
 	github.com/GeertJohan/go.rice v0.0.0-20170420135705-c02ca9a983da
 	github.com/PuerkitoBio/goquery v1.6.1
-	github.com/Shopify/sarama v1.16.0
-	github.com/Shopify/toxiproxy v2.1.4+incompatible // indirect
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.0.1
-	github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb // indirect
-	github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91 // indirect
 	github.com/dop251/goja v0.0.0-20210317175251-bb14c2267b76
 	github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4
-	github.com/eapache/go-resiliency v1.1.0 // indirect
-	github.com/eapache/go-xerial-snappy v0.0.0-20160609142408-bb955e01b934 // indirect
-	github.com/eapache/queue v1.1.0 // indirect
 	github.com/fatih/color v1.5.0
-	github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813 // indirect
-	github.com/ghodss/yaml v1.0.0 // indirect
-	github.com/gin-contrib/sse v0.0.0-20170109093832-22d885f9ecc7 // indirect
-	github.com/gin-gonic/gin v1.1.5-0.20170702092826-d459835d2b07 // indirect
-	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/golang/protobuf v1.4.2
-	github.com/golang/snappy v0.0.0-20170215233205-553a64147049 // indirect
-	github.com/google/go-cmp v0.5.1 // indirect
-	github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f // indirect
-	github.com/gorilla/mux v1.6.1 // indirect
 	github.com/gorilla/websocket v1.4.2
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.8.2
 	github.com/julienschmidt/httprouter v1.1.1-0.20180222160526-d18983907793
-	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1 // indirect
+	github.com/k6io/xk6-output-kafka v0.1.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/klauspost/compress v1.11.13
 	github.com/kubernetes/helm v2.9.0+incompatible
-	github.com/labstack/echo v3.2.6+incompatible // indirect
-	github.com/labstack/gommon v0.2.2-0.20170925052817-57409ada9da0 // indirect
 	github.com/mailru/easyjson v0.7.7
 	github.com/manyminds/api2go v0.0.0-20180125085803-95be7bd0455e
 	github.com/mattn/go-colorable v0.0.9
@@ -47,13 +28,9 @@ require (
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/mitchellh/mapstructure v0.0.0-20180220230111-00c29f56e238
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
-	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
-	github.com/pierrec/lz4 v1.0.2-0.20171218195038-2fcda4cb7018 // indirect
-	github.com/pierrec/xxHash v0.1.1 // indirect
 	github.com/pkg/errors v0.8.0
 	github.com/pmezard/go-difflib v1.0.0
-	github.com/rcrowley/go-metrics v0.0.0-20180503174638-e2704e165165 // indirect
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/afero v1.1.1
@@ -62,22 +39,14 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/tidwall/gjson v1.7.4
 	github.com/tidwall/pretty v1.1.0
-	github.com/ugorji/go v1.1.7 // indirect
-	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasttemplate v0.0.0-20170224212429-dcecefd839c4 // indirect
 	github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/net v0.0.0-20201209123823-ac852fbbde11
 	golang.org/x/sys v0.0.0-20201204225414-ed752295db88 // indirect
 	golang.org/x/text v0.3.4
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
-	google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336 // indirect
 	google.golang.org/grpc v1.36.1
 	google.golang.org/protobuf v1.25.1-0.20200805231151-a709e31e5d12
-	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
-	gopkg.in/go-playground/validator.v8 v8.18.2 // indirect
-	gopkg.in/guregu/null.v2 v2.1.2 // indirect
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v2 v2.3.0
 )
