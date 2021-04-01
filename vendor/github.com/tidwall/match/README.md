@@ -1,20 +1,17 @@
-Match
-=====
-<a href="https://travis-ci.org/tidwall/match"><img src="https://img.shields.io/travis/tidwall/match.svg?style=flat-square" alt="Build Status"></a>
-<a href="https://godoc.org/github.com/tidwall/match"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square" alt="GoDoc"></a>
+# Match
+
+[![GoDoc](https://godoc.org/github.com/tidwall/match?status.svg)](https://godoc.org/github.com/tidwall/match)
 
 Match is a very simple pattern matcher where '*' matches on any 
 number characters and '?' matches on any one character.
 
-Installing
-----------
+## Installing
 
 ```
 go get -u github.com/tidwall/match
 ```
 
-Example
--------
+## Example
 
 ```go
 match.Match("hello", "*llo") 
@@ -23,10 +20,10 @@ match.Match("hello", "h*o")
 ```
 
 
-Contact
--------
+## Contact
+
 Josh Baker [@tidwall](http://twitter.com/tidwall)
 
-License
--------
+## License
+
 Redcon source code is available under the MIT [License](/LICENSE).

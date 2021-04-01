@@ -35,6 +35,9 @@ var (
 
 	// ErrTooBig is return if input is too large for a single block.
 	ErrTooBig = errors.New("input too big")
+
+	// ErrMaxDecodedSizeExceeded is return if input is too large for a single block.
+	ErrMaxDecodedSizeExceeded = errors.New("maximum output size exceeded")
 )
 
 type ReusePolicy uint8
@@ -52,6 +55,9 @@ const (
 	// ReusePolicyNone will disable re-use of tables.
 	// This is slightly faster than ReusePolicyAllow but may produce larger output.
 	ReusePolicyNone
+
+	// ReusePolicyMust must allow reuse and produce smaller output.
+	ReusePolicyMust
 )
 
 type Scratch struct {
@@ -76,21 +82,34 @@ type Scratch struct {
 	// Slice of the returned data.
 	OutData []byte
 
+	// MaxDecodedSize will set the maximum allowed output size.
+	// This value will automatically be set to BlockSizeMax if not set.
+	// Decoders will return ErrMaxDecodedSizeExceeded is this limit is exceeded.
+	MaxDecodedSize int
+
+	br byteReader
+
 	// MaxSymbolValue will override the maximum symbol value of the next block.
 	MaxSymbolValue uint8
 
 	// TableLog will attempt to override the tablelog for the next block.
-	// Must be <= 11.
+	// Must be <= 11 and >= 5.
 	TableLog uint8
 
 	// Reuse will specify the reuse policy
 	Reuse ReusePolicy
 
-	br             byteReader
+	// WantLogLess allows to specify a log 2 reduction that should at least be achieved,
+	// otherwise the block will be returned as incompressible.
+	// The reduction should then at least be (input size >> WantLogLess)
+	// If WantLogLess == 0 any improvement will do.
+	WantLogLess uint8
+
 	symbolLen      uint16 // Length of active part of the symbol table.
 	maxCount       int    // count of the most probable symbol
 	clearCount     bool   // clear count
 	actualTableLog uint8  // Selected tablelog.
+	prevTableLog   uint8  // Tablelog for previous table
 	prevTable      cTable // Table used for previous compression.
 	cTable         cTable // compression table
 	dt             dTable // decompression table
@@ -98,6 +117,16 @@ type Scratch struct {
 	tmpOut         [4][]byte
 	fse            *fse.Scratch
 	huffWeight     [maxSymbolValue + 1]byte
+}
+
+// TransferCTable will transfer the previously used compression table.
+func (s *Scratch) TransferCTable(src *Scratch) {
+	if cap(s.prevTable) < len(src.prevTable) {
+		s.prevTable = make(cTable, 0, maxSymbolValue+1)
+	}
+	s.prevTable = s.prevTable[:len(src.prevTable)]
+	copy(s.prevTable, src.prevTable)
+	s.prevTableLog = src.prevTableLog
 }
 
 func (s *Scratch) prepare(in []byte) (*Scratch, error) {
@@ -113,8 +142,11 @@ func (s *Scratch) prepare(in []byte) (*Scratch, error) {
 	if s.TableLog == 0 {
 		s.TableLog = tableLogDefault
 	}
-	if s.TableLog > tableLogMax {
-		return nil, fmt.Errorf("tableLog (%d) > maxTableLog (%d)", s.TableLog, tableLogMax)
+	if s.TableLog > tableLogMax || s.TableLog < minTablelog {
+		return nil, fmt.Errorf(" invalid tableLog %d (%d -> %d)", s.TableLog, minTablelog, tableLogMax)
+	}
+	if s.MaxDecodedSize <= 0 || s.MaxDecodedSize > BlockSizeMax {
+		s.MaxDecodedSize = BlockSizeMax
 	}
 	if s.clearCount && s.maxCount == 0 {
 		for i := range s.count {

@@ -1,4 +1,4 @@
-# github.com/Azure/go-ntlmssp v0.0.0-20180810175552-4a21cbd618b4
+# github.com/Azure/go-ntlmssp v0.0.0-20200615164410-66371956d46c
 ## explicit
 github.com/Azure/go-ntlmssp
 # github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
@@ -8,7 +8,7 @@ github.com/DataDog/datadog-go/statsd
 ## explicit
 github.com/GeertJohan/go.rice
 github.com/GeertJohan/go.rice/embedded
-# github.com/PuerkitoBio/goquery v1.3.0
+# github.com/PuerkitoBio/goquery v1.6.1
 ## explicit
 github.com/PuerkitoBio/goquery
 # github.com/Shopify/sarama v1.16.0
@@ -19,11 +19,10 @@ github.com/Shopify/sarama
 # github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 ## explicit
 github.com/Soontao/goHttpDigestClient
-# github.com/andybalholm/brotli v0.0.0-20190704151324-71eb68cc467c
+# github.com/andybalholm/brotli v1.0.1
 ## explicit
 github.com/andybalholm/brotli
-# github.com/andybalholm/cascadia v1.0.0
-## explicit
+# github.com/andybalholm/cascadia v1.1.0
 github.com/andybalholm/cascadia
 # github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb
 ## explicit
@@ -77,9 +76,6 @@ github.com/gin-gonic/gin/render
 ## explicit
 github.com/go-sourcemap/sourcemap
 github.com/go-sourcemap/sourcemap/internal/base64vlq
-# github.com/golang/gddo v0.0.0-20190419222130-af0f2af80721
-github.com/golang/gddo/httputil
-github.com/golang/gddo/httputil/header
 # github.com/golang/protobuf v1.4.2
 ## explicit
 github.com/golang/protobuf/jsonpb
@@ -136,17 +132,13 @@ github.com/kardianos/osext
 # github.com/kelseyhightower/envconfig v1.4.0
 ## explicit
 github.com/kelseyhightower/envconfig
-# github.com/klauspost/compress v1.7.2
+# github.com/klauspost/compress v1.11.13
 ## explicit
 github.com/klauspost/compress/fse
 github.com/klauspost/compress/huff0
 github.com/klauspost/compress/snappy
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-# github.com/klauspost/cpuid v1.3.1
-## explicit
-# github.com/konsorten/go-windows-terminal-sequences v1.0.3
-github.com/konsorten/go-windows-terminal-sequences
 # github.com/kubernetes/helm v2.9.0+incompatible
 ## explicit
 github.com/kubernetes/helm/pkg/strvals
@@ -157,7 +149,7 @@ github.com/labstack/echo
 ## explicit
 github.com/labstack/gommon/color
 github.com/labstack/gommon/log
-# github.com/mailru/easyjson v0.7.4-0.20200812114229-8ab5ff9cd8e4
+# github.com/mailru/easyjson v0.7.7
 ## explicit
 github.com/mailru/easyjson
 github.com/mailru/easyjson/buffer
@@ -187,7 +179,7 @@ github.com/mitchellh/mapstructure
 github.com/nu7hatch/gouuid
 # github.com/onsi/ginkgo v1.14.0
 ## explicit
-# github.com/oxtoacart/bpool v0.0.0-20150712133111-4e1c5567d7c2
+# github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 ## explicit
 github.com/oxtoacart/bpool
 # github.com/pierrec/lz4 v1.0.2-0.20171218195038-2fcda4cb7018
@@ -205,10 +197,10 @@ github.com/pmezard/go-difflib/difflib
 # github.com/rcrowley/go-metrics v0.0.0-20180503174638-e2704e165165
 ## explicit
 github.com/rcrowley/go-metrics
-# github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
+# github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 ## explicit
 github.com/serenize/snaker
-# github.com/sirupsen/logrus v1.6.0
+# github.com/sirupsen/logrus v1.8.1
 ## explicit
 github.com/sirupsen/logrus
 github.com/sirupsen/logrus/hooks/test
@@ -222,16 +214,16 @@ github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.1
 ## explicit
 github.com/spf13/pflag
-# github.com/stretchr/testify v1.5.1
+# github.com/stretchr/testify v1.7.0
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# github.com/tidwall/gjson v1.6.1
+# github.com/tidwall/gjson v1.7.4
 ## explicit
 github.com/tidwall/gjson
-# github.com/tidwall/match v1.0.1
+# github.com/tidwall/match v1.0.3
 github.com/tidwall/match
-# github.com/tidwall/pretty v1.0.2
+# github.com/tidwall/pretty v1.1.0
 ## explicit
 github.com/tidwall/pretty
 # github.com/ugorji/go v1.1.7
@@ -402,3 +394,5 @@ gopkg.in/guregu/null.v3
 # gopkg.in/yaml.v2 v2.3.0
 ## explicit
 gopkg.in/yaml.v2
+# gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+gopkg.in/yaml.v3

@@ -1,4 +1,4 @@
-// Match provides a simple pattern matcher with unicode support.
+// Package match provides a simple pattern matcher with unicode support.
 package match
 
 import "unicode/utf8"
@@ -6,7 +6,7 @@ import "unicode/utf8"
 // Match returns true if str matches pattern. This is a very
 // simple wildcard match where '*' matches on any number characters
 // and '?' matches on any one character.
-
+//
 // pattern:
 // 	{ term }
 // term:
@@ -16,12 +16,16 @@ import "unicode/utf8"
 // 	'\\' c      matches character c
 //
 func Match(str, pattern string) bool {
+	return deepMatch(str, pattern)
+}
+
+func deepMatch(str, pattern string) bool {
 	if pattern == "*" {
 		return true
 	}
-	return deepMatch(str, pattern)
-}
-func deepMatch(str, pattern string) bool {
+	for len(pattern) > 1 && pattern[0] == '*' && pattern[1] == '*' {
+		pattern = pattern[1:]
+	}
 	for len(pattern) > 0 {
 		if pattern[0] > 0x7f {
 			return deepMatchRune(str, pattern)
@@ -52,6 +56,13 @@ func deepMatch(str, pattern string) bool {
 }
 
 func deepMatchRune(str, pattern string) bool {
+	if pattern == "*" {
+		return true
+	}
+	for len(pattern) > 1 && pattern[0] == '*' && pattern[1] == '*' {
+		pattern = pattern[1:]
+	}
+
 	var sr, pr rune
 	var srsz, prsz int
 
