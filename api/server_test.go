@@ -30,7 +30,6 @@ import (
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/negroni"
 
 	"github.com/loadimpact/k6/api/common"
 	"github.com/loadimpact/k6/core"
@@ -57,7 +56,7 @@ func TestLogger(t *testing.T) {
 
 					l, hook := logtest.NewNullLogger()
 					l.Level = logrus.DebugLevel
-					newLogger(l)(negroni.NewResponseWriter(rw), r, testHTTPHandler)
+					newLogger(l, http.HandlerFunc(testHTTPHandler))(rw, r)
 
 					res := rw.Result()
 					assert.Equal(t, http.StatusOK, res.StatusCode)
@@ -87,9 +86,9 @@ func TestWithEngine(t *testing.T) {
 
 	rw := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "http://example.com/", nil)
-	withEngine(engine)(rw, r, func(rw http.ResponseWriter, r *http.Request) {
+	withEngine(engine, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, engine, common.GetEngine(r.Context()))
-	})
+	}))(rw, r)
 }
 
 func TestPing(t *testing.T) {

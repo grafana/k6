@@ -63,7 +63,6 @@ require (
 	github.com/tidwall/gjson v1.7.4
 	github.com/tidwall/pretty v1.1.0
 	github.com/ugorji/go v1.1.7 // indirect
-	github.com/urfave/negroni v0.3.1-0.20180130044549-22c5532ea862
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v0.0.0-20170224212429-dcecefd839c4 // indirect
 	github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5

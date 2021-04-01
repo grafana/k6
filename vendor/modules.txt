@@ -230,9 +230,6 @@ github.com/tidwall/pretty
 ## explicit
 # github.com/ugorji/go/codec v1.1.7
 github.com/ugorji/go/codec
-# github.com/urfave/negroni v0.3.1-0.20180130044549-22c5532ea862
-## explicit
-github.com/urfave/negroni
 # github.com/valyala/bytebufferpool v1.0.0
 ## explicit
 github.com/valyala/bytebufferpool
