@@ -201,7 +201,7 @@ var configMapTestCases = []configMapTestCase{
 			assert.Equal(t, uint64(11), lib.GetMaxPossibleVUs(schedReqs))
 		}},
 	},
-	{`{"varloops": {"executor": "ramping-vus", "startVUs": 0, "stages": [{"duration": "60s", "target": 0}]}}`, exp{}},
+	{`{"varloops": {"executor": "ramping-vus", "startVUs": 0, "stages": [{"duration": "60s", "target": 0}]}}`, exp{validationError: true}},
 	{`{"varloops": {"executor": "ramping-vus", "startVUs": -1, "stages": [{"duration": "60s", "target": 30}]}}`, exp{validationError: true}},
 	{`{"varloops": {"executor": "ramping-vus", "startVUs": 2, "stages": [{"duration": "-60s", "target": 30}]}}`, exp{validationError: true}},
 	{`{"varloops": {"executor": "ramping-vus", "startVUs": 2, "stages": [{"duration": "60s", "target": -30}]}}`, exp{validationError: true}},
