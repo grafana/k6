@@ -287,8 +287,11 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 				Tags:   socket.sampleTags,
 				Value:  1,
 			})
-			ab := rt.NewArrayBuffer(readData)
-			socket.handleEvent("message", rt.ToValue(string(readData)), rt.ToValue(&ab))
+			socket.handleEvent("message", rt.ToValue(string(readData)))
+			if _, ok := socket.eventHandlers["binaryMessage"]; ok {
+				ab := rt.NewArrayBuffer(readData)
+				socket.handleEvent("binaryMessage", rt.ToValue(&ab))
+			}
 
 		case readErr := <-readErrChan:
 			socket.handleEvent("error", rt.ToValue(readErr))
