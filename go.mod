@@ -11,7 +11,7 @@ require (
 	github.com/andybalholm/brotli v1.0.1
 	github.com/dop251/goja v0.0.0-20210317175251-bb14c2267b76
 	github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4
-	github.com/fatih/color v1.5.0
+	github.com/fatih/color v1.10.0
 	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/websocket v1.4.2
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
@@ -23,8 +23,8 @@ require (
 	github.com/kubernetes/helm v2.9.0+incompatible
 	github.com/mailru/easyjson v0.7.7
 	github.com/manyminds/api2go v0.0.0-20180125085803-95be7bd0455e
-	github.com/mattn/go-colorable v0.0.9
-	github.com/mattn/go-isatty v0.0.4
+	github.com/mattn/go-colorable v0.1.8
+	github.com/mattn/go-isatty v0.0.12
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/mitchellh/mapstructure v0.0.0-20180220230111-00c29f56e238
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d

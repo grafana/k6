@@ -1,14 +1,18 @@
-// +build darwin freebsd openbsd netbsd dragonfly
-// +build !appengine
+// +build plan9
 
 package isatty
 
-import "golang.org/x/sys/unix"
+import (
+	"syscall"
+)
 
-// IsTerminal return true if the file descriptor is terminal.
+// IsTerminal returns true if the given file descriptor is a terminal.
 func IsTerminal(fd uintptr) bool {
-	_, err := unix.IoctlGetTermios(int(fd), unix.TIOCGETA)
-	return err == nil
+	path, err := syscall.Fd2path(int(fd))
+	if err != nil {
+		return false
+	}
+	return path == "/dev/cons" || path == "/mnt/term/dev/cons"
 }
 
 // IsCygwinTerminal return true if the file descriptor is a cygwin or msys2

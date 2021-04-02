@@ -47,7 +47,7 @@ github.com/eapache/go-resiliency/breaker
 github.com/eapache/go-xerial-snappy
 # github.com/eapache/queue v1.1.0
 github.com/eapache/queue
-# github.com/fatih/color v1.5.0
+# github.com/fatih/color v1.10.0
 ## explicit
 github.com/fatih/color
 # github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813
@@ -141,10 +141,10 @@ github.com/mailru/easyjson/jwriter
 github.com/manyminds/api2go
 github.com/manyminds/api2go/jsonapi
 github.com/manyminds/api2go/routing
-# github.com/mattn/go-colorable v0.0.9
+# github.com/mattn/go-colorable v0.1.8
 ## explicit
 github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.4
+# github.com/mattn/go-isatty v0.0.12
 ## explicit
 github.com/mattn/go-isatty
 # github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
