@@ -25,7 +25,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/julienschmidt/httprouter"
 	"github.com/manyminds/api2go/jsonapi"
 
 	"github.com/loadimpact/k6/api/common"
@@ -33,7 +32,7 @@ import (
 	"github.com/loadimpact/k6/lib/executor"
 )
 
-func HandleGetStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func handleGetStatus(rw http.ResponseWriter, r *http.Request) {
 	engine := common.GetEngine(r.Context())
 
 	status := NewStatus(engine)
@@ -57,7 +56,7 @@ func getFirstExternallyControlledExecutor(
 	return nil, errors.New("an externally-controlled executor needs to be configured for live configuration updates")
 }
 
-func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func handlePatchStatus(rw http.ResponseWriter, r *http.Request) {
 	engine := common.GetEngine(r.Context())
 
 	body, err := ioutil.ReadAll(r.Body)
@@ -83,9 +82,9 @@ func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Par
 		}
 
 		if status.VUsMax.Valid || status.VUs.Valid {
-			//TODO: add ability to specify the actual executor id? Though this should
-			//likely be in the v2 REST API, where we could implement it in a way that
-			//may allow us to eventually support other executor types.
+			// TODO: add ability to specify the actual executor id? Though this should
+			// likely be in the v2 REST API, where we could implement it in a way that
+			// may allow us to eventually support other executor types.
 			executor, updateErr := getFirstExternallyControlledExecutor(engine.ExecutionScheduler)
 			if updateErr != nil {
 				apiError(rw, "Execution config error", updateErr.Error(), http.StatusInternalServerError)
