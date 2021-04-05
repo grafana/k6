@@ -433,9 +433,30 @@ func (a *sparseArrayObject) export(ctx *objectExportCtx) interface{} {
 	}
 	arr := make([]interface{}, a.length)
 	ctx.put(a, arr)
+	var prevIdx uint32
 	for _, item := range a.items {
-		if item.value != nil {
-			arr[item.idx] = exportValue(item.value, ctx)
+		idx := item.idx
+		for i := prevIdx; i < idx; i++ {
+			if a.prototype != nil {
+				if v := a.prototype.self.getIdx(valueInt(i), nil); v != nil {
+					arr[i] = exportValue(v, ctx)
+				}
+			}
+		}
+		v := item.value
+		if v != nil {
+			if prop, ok := v.(*valueProperty); ok {
+				v = prop.get(a.val)
+			}
+			arr[idx] = exportValue(v, ctx)
+		}
+		prevIdx = idx + 1
+	}
+	for i := prevIdx; i < a.length; i++ {
+		if a.prototype != nil {
+			if v := a.prototype.self.getIdx(valueInt(i), nil); v != nil {
+				arr[i] = exportValue(v, ctx)
+			}
 		}
 	}
 	return arr

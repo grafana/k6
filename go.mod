@@ -9,7 +9,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.6.1
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.0.1
-	github.com/dop251/goja v0.0.0-20210317175251-bb14c2267b76
+	github.com/dop251/goja v0.0.0-20210402105715-96fa0aa6d91e
 	github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4
 	github.com/fatih/color v1.10.0
 	github.com/golang/protobuf v1.4.2
@@ -42,7 +42,7 @@ require (
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/net v0.0.0-20201209123823-ac852fbbde11
 	golang.org/x/sys v0.0.0-20201204225414-ed752295db88 // indirect
-	golang.org/x/text v0.3.4
+	golang.org/x/text v0.3.6
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	google.golang.org/grpc v1.36.1
 	google.golang.org/protobuf v1.25.1-0.20200805231151-a709e31e5d12
