@@ -54,12 +54,6 @@ github.com/fatih/color
 github.com/gedex/inflector
 # github.com/ghodss/yaml v1.0.0
 github.com/ghodss/yaml
-# github.com/gin-contrib/sse v0.0.0-20170109093832-22d885f9ecc7
-github.com/gin-contrib/sse
-# github.com/gin-gonic/gin v1.1.5-0.20170702092826-d459835d2b07
-github.com/gin-gonic/gin
-github.com/gin-gonic/gin/binding
-github.com/gin-gonic/gin/render
 # github.com/go-sourcemap/sourcemap v2.1.3+incompatible
 github.com/go-sourcemap/sourcemap
 github.com/go-sourcemap/sourcemap/internal/base64vlq
@@ -78,10 +72,6 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/golang/snappy v0.0.0-20170215233205-553a64147049
 github.com/golang/snappy
-# github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f
-github.com/gorilla/context
-# github.com/gorilla/mux v1.6.1
-github.com/gorilla/mux
 # github.com/gorilla/websocket v1.4.2
 ## explicit
 github.com/gorilla/websocket
@@ -125,11 +115,6 @@ github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/kubernetes/helm v2.9.0+incompatible
 ## explicit
 github.com/kubernetes/helm/pkg/strvals
-# github.com/labstack/echo v3.2.6+incompatible
-github.com/labstack/echo
-# github.com/labstack/gommon v0.2.2-0.20170925052817-57409ada9da0
-github.com/labstack/gommon/color
-github.com/labstack/gommon/log
 # github.com/mailru/easyjson v0.7.7
 ## explicit
 github.com/mailru/easyjson
@@ -138,9 +123,7 @@ github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
 # github.com/manyminds/api2go v0.0.0-20180125085803-95be7bd0455e
 ## explicit
-github.com/manyminds/api2go
 github.com/manyminds/api2go/jsonapi
-github.com/manyminds/api2go/routing
 # github.com/mattn/go-colorable v0.1.8
 ## explicit
 github.com/mattn/go-colorable
@@ -202,19 +185,11 @@ github.com/tidwall/match
 # github.com/tidwall/pretty v1.1.0
 ## explicit
 github.com/tidwall/pretty
-# github.com/ugorji/go/codec v1.1.7
-github.com/ugorji/go/codec
-# github.com/valyala/bytebufferpool v1.0.0
-github.com/valyala/bytebufferpool
-# github.com/valyala/fasttemplate v0.0.0-20170224212429-dcecefd839c4
-github.com/valyala/fasttemplate
 # github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
 ## explicit
 github.com/zyedidia/highlight
 # golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 ## explicit
-golang.org/x/crypto/acme
-golang.org/x/crypto/acme/autocert
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
@@ -347,8 +322,6 @@ google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/known/typepb
 google.golang.org/protobuf/types/known/wrapperspb
 google.golang.org/protobuf/types/pluginpb
-# gopkg.in/go-playground/validator.v8 v8.18.2
-gopkg.in/go-playground/validator.v8
 # gopkg.in/guregu/null.v3 v3.3.0
 ## explicit
 gopkg.in/guregu/null.v3
