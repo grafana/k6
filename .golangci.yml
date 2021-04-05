@@ -58,6 +58,7 @@ linters-settings:
 linters:
   enable-all: true
   disable:
+  - nlreturn
   - gci
   - gochecknoinits
   - godot
@@ -67,6 +68,10 @@ linters:
   - wsl
   - gomnd
   - goerr113 # most of the errors here are meant for humans
-  - nlreturn
   - goheader
+  - exhaustivestruct
+  - thelper
+  - maligned # replaced by govet 'fieldalignment'
+  - interfacer # deprecated
+  - scopelint # deprecated, replaced by exportloopref
   fast: false

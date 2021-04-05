@@ -37,7 +37,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     env:
-        GOLANGCI_VERSION: v1.31
+        GOLANG_CI_VERSION: "1.39.0"
         GO111MODULE: 'on'
     steps:
       - name: Checkout code
@@ -50,7 +50,7 @@ jobs:
           go-version: 1.16.x
       - name: Install golangci-lint
         working-directory: /tmp
-        run: go get github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANGCI_VERSION
+        run: go install "github.com/golangci/golangci-lint/cmd/golangci-lint@v$GOLANG_CI_VERSION"
       - name: Run linters
         run: |
           BASEREV=$(git merge-base HEAD origin/master)
