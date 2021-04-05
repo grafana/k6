@@ -22,8 +22,8 @@ package loader
 
 import (
 	"encoding/json"
+	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -53,7 +53,7 @@ func cdnjs(logger logrus.FieldLogger, path string, parts []string) (string, erro
 
 	// CDNJS doesn't actually send 404s, nonexistent libs' data is just *empty*.
 	if envelope.Name == "" {
-		return "", errors.Errorf("cdnjs: no such library: %s", name)
+		return "", fmt.Errorf("cdnjs: no such library: %s", name)
 	}
 
 	// If no version is specified, use the default/latest one.

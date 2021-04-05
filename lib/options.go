@@ -28,7 +28,6 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib/types"
@@ -62,7 +61,7 @@ func (v *TLSVersion) UnmarshalJSON(data []byte) error {
 	}
 	ver, ok := SupportedTLSVersions[str]
 	if !ok {
-		return errors.Errorf("unknown TLS version: %s", str)
+		return fmt.Errorf("unknown TLS version '%s'", str)
 	}
 	*v = ver
 	return nil
@@ -102,7 +101,7 @@ func (s *TLSCipherSuites) MarshalJSON() ([]byte, error) {
 		if suiteName, ok := SupportedTLSCipherSuitesToString[id]; ok {
 			suiteNames = append(suiteNames, suiteName)
 		} else {
-			return nil, errors.Errorf("Unknown cipher suite id: %d", id)
+			return nil, fmt.Errorf("unknown cipher suite id '%d'", id)
 		}
 	}
 
@@ -120,7 +119,7 @@ func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
 		if suiteID, ok := SupportedTLSCipherSuites[name]; ok {
 			suiteIDs = append(suiteIDs, suiteID)
 		} else {
-			return errors.New("Unknown cipher suite: " + name)
+			return fmt.Errorf("unknown cipher suite '%s'", name)
 		}
 	}
 
@@ -175,7 +174,7 @@ type IPNet struct {
 func (ipnet *IPNet) UnmarshalText(b []byte) error {
 	newIPNet, err := ParseCIDR(string(b))
 	if err != nil {
-		return errors.Wrap(err, "Failed to parse CIDR")
+		return fmt.Errorf("failed to parse CIDR '%s': %w", string(b), err)
 	}
 
 	*ipnet = *newIPNet

@@ -23,6 +23,7 @@ package httpext
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -31,7 +32,6 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
 
@@ -142,7 +142,7 @@ func testErrorCode(t *testing.T, code errCode, err error) {
 	result, _ := errorCodeForError(err)
 	require.Equalf(t, code, result, "Wrong error code for error `%s`", err)
 
-	result, _ = errorCodeForError(errors.WithStack(err))
+	result, _ = errorCodeForError(fmt.Errorf("foo: %w", err))
 	require.Equalf(t, code, result, "Wrong error code for error `%s`", err)
 
 	result, _ = errorCodeForError(&url.Error{Err: err})

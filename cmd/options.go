@@ -21,11 +21,11 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
@@ -140,7 +140,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		for i, s := range stageStrings {
 			var stage lib.Stage
 			if err := stage.UnmarshalText([]byte(s)); err != nil {
-				return opts, errors.Wrapf(err, "stage %d", i)
+				return opts, fmt.Errorf("error for stage %d: %w", i, err)
 			}
 			if !stage.Duration.Valid {
 				return opts, fmt.Errorf("stage %d doesn't have a specified duration", i)
@@ -190,7 +190,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	for _, s := range blacklistIPStrings {
 		net, parseErr := lib.ParseCIDR(s)
 		if parseErr != nil {
-			return opts, errors.Wrap(parseErr, "blacklist-ip")
+			return opts, fmt.Errorf("error parsing blacklist-ip '%s': %w", s, parseErr)
 		}
 		opts.BlacklistIPs = append(opts.BlacklistIPs, net)
 	}
@@ -234,7 +234,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	}
 	if summaryTimeUnit != "" {
 		if summaryTimeUnit != "s" && summaryTimeUnit != "ms" && summaryTimeUnit != "us" {
-			return opts, errors.New("invalid summary time unit. Use: 's', 'ms' or 'us'")
+			return opts, fmt.Errorf("invalid summary time unit '%s', use 's', 'ms' or 'us'", summaryTimeUnit)
 		}
 		opts.SummaryTimeUnit = null.StringFrom(summaryTimeUnit)
 	}
@@ -246,10 +246,10 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 
 	if len(runTags) > 0 {
 		parsedRunTags := make(map[string]string, len(runTags))
-		for i, s := range runTags {
+		for _, s := range runTags {
 			name, value, err := parseTagNameValue(s)
 			if err != nil {
-				return opts, errors.Wrapf(err, "tag %d", i)
+				return opts, fmt.Errorf("error parsing tag '%s': %w", s, err)
 			}
 			parsedRunTags[name] = value
 		}

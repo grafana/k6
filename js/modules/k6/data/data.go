@@ -22,13 +22,13 @@ package data
 
 import (
 	"context"
+	"errors"
 	"strconv"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/internal/modules"
 	"github.com/loadimpact/k6/lib"
-	"github.com/pkg/errors"
 )
 
 type data struct{}

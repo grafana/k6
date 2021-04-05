@@ -23,6 +23,7 @@ package httpext
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -30,7 +31,6 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/pkg/errors"
 	"golang.org/x/net/http2"
 
 	"github.com/loadimpact/k6/lib/netext"
@@ -109,7 +109,13 @@ func http2ErrCodeOffset(code http2.ErrCode) errCode {
 
 // errorCodeForError returns the errorCode and a specific error message for given error.
 func errorCodeForError(err error) (errCode, string) {
-	switch e := errors.Cause(err).(type) {
+	// We explicitly check for `Unwrap()` in the default switch branch, but
+	// checking for the concrete error types first gives us the opportunity to
+	// also directly detect high-level errors, if we need to, even if they wrap
+	// a low level error inside.
+
+	//nolint: errorlint
+	switch e := err.(type) {
 	case K6Error:
 		return e.Code, e.Message
 	case *net.DNSError:
@@ -184,6 +190,10 @@ func errorCodeForError(err error) (errCode, string) {
 	case *url.Error:
 		return errorCodeForError(e.Err)
 	default:
+		if wrappedErr := errors.Unwrap(err); wrappedErr != nil {
+			return errorCodeForError(wrappedErr)
+		}
+
 		return defaultErrorCode, err.Error()
 	}
 }

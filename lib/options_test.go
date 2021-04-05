@@ -553,7 +553,8 @@ func TestCIDRUnmarshal(t *testing.T) {
 			err := actualIPNet.UnmarshalText([]byte(data.input))
 
 			if data.expectFailure {
-				require.EqualError(t, err, "Failed to parse CIDR: invalid CIDR address: "+data.input)
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "invalid CIDR address: "+data.input)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, data.expectedOutput, actualIPNet)

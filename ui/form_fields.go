@@ -22,11 +22,12 @@ package ui
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -71,7 +72,7 @@ func (f StringField) GetContents(r io.Reader) (string, error) {
 			return string(result), err
 		} else if n != 1 {
 			// Shouldn't happen, but just in case
-			return string(result), errors.New("Unexpected input when reading string field")
+			return string(result), errors.New("unexpected input when reading string field")
 		} else if buf[0] == '\n' {
 			return string(result), nil
 		}
@@ -83,10 +84,10 @@ func (f StringField) GetContents(r io.Reader) (string, error) {
 func (f StringField) Clean(s string) (interface{}, error) {
 	s = strings.TrimSpace(s)
 	if f.Min != 0 && len(s) < f.Min {
-		return nil, errors.Errorf("invalid input, min length is %d", f.Min)
+		return nil, fmt.Errorf("invalid input, min length is %d", f.Min)
 	}
 	if f.Max != 0 && len(s) > f.Max {
-		return nil, errors.Errorf("invalid input, max length is %d", f.Max)
+		return nil, fmt.Errorf("invalid input, max length is %d", f.Max)
 	}
 	if s == "" {
 		s = f.Default
@@ -120,7 +121,7 @@ func (f PasswordField) GetLabelExtra() string {
 func (f PasswordField) GetContents(r io.Reader) (string, error) {
 	stdin, ok := r.(*os.File)
 	if !ok {
-		return "", errors.New("Cannot read password from the supplied terminal")
+		return "", errors.New("cannot read password from the supplied terminal")
 	}
 	password, err := terminal.ReadPassword(int(stdin.Fd()))
 	if err != nil {
@@ -139,7 +140,7 @@ func (f PasswordField) GetContents(r io.Reader) (string, error) {
 // Clean just checks if the minimum length is exceeded, it doesn't trim the string!
 func (f PasswordField) Clean(s string) (interface{}, error) {
 	if f.Min != 0 && len(s) < f.Min {
-		return nil, errors.Errorf("invalid input, min length is %d", f.Min)
+		return nil, fmt.Errorf("invalid input, min length is %d", f.Min)
 	}
 	return s, nil
 }

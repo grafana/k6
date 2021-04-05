@@ -24,12 +24,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/url"
 	"runtime"
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"gopkg.in/guregu/null.v3"
@@ -111,7 +112,7 @@ func NewBundle(
 // NewBundleFromArchive creates a new bundle from an lib.Archive.
 func NewBundleFromArchive(logger logrus.FieldLogger, arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle, error) {
 	if arc.Type != "js" {
-		return nil, errors.Errorf("expected bundle type 'js', got '%s'", arc.Type)
+		return nil, fmt.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
 
 	if !rtOpts.CompatibilityMode.Valid {

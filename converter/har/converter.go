@@ -24,13 +24,13 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"sort"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/tidwall/pretty"
 
 	"github.com/loadimpact/k6/lib"
@@ -64,15 +64,15 @@ func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks b
 	w := bufio.NewWriter(&b)
 
 	if returnOnFailedCheck && !enableChecks {
-		return "", errors.Errorf("return on failed check requires --enable-status-code-checks")
+		return "", fmt.Errorf("return on failed check requires --enable-status-code-checks")
 	}
 
 	if correlate && !nobatch {
-		return "", errors.Errorf("correlation requires --no-batch")
+		return "", fmt.Errorf("correlation requires --no-batch")
 	}
 
 	if h.Log == nil {
-		return "", errors.Errorf("invalid HAR file supplied, the 'log' property is missing")
+		return "", fmt.Errorf("invalid HAR file supplied, the 'log' property is missing")
 	}
 
 	if enableChecks {
@@ -192,7 +192,10 @@ func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks b
 
 				if correlate && recordedRedirectURL != "" {
 					if recordedRedirectURL != e.Request.URL {
-						return "", errors.Errorf("The har file contained a redirect but the next request did not match that redirect. Possibly a misbehaving client or concurrent requests?")
+						return "", errors.New( //nolint:stylecheck
+							"The har file contained a redirect but the next request did not match that redirect. " +
+								"Possibly a misbehaving client or concurrent requests?",
+						)
 					}
 					fprintf(w, "redirectUrl")
 					recordedRedirectURL = ""

@@ -22,10 +22,10 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"syscall"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"

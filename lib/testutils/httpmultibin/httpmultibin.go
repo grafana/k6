@@ -41,7 +41,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/klauspost/compress/zstd"
 	"github.com/mccutchen/go-httpbin/httpbin"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
@@ -151,7 +150,10 @@ func getWebsocketHandler(echo bool, closePrematurely bool) http.Handler {
 func writeJSON(w io.Writer, v interface{}) error {
 	e := json.NewEncoder(w)
 	e.SetIndent("", "  ")
-	return errors.Wrap(e.Encode(v), "failed to encode JSON")
+	if err := e.Encode(v); err != nil {
+		return fmt.Errorf("failed to encode JSON: %w", err)
+	}
+	return nil
 }
 
 func getEncodedHandler(t testing.TB, compressionType httpext.CompressionType) http.Handler {

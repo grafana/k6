@@ -21,11 +21,10 @@
 package cloudapi
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 var (

@@ -31,7 +31,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -205,8 +204,8 @@ func checkResponse(r *http.Response) error {
 		if r.StatusCode == http.StatusForbidden {
 			return ErrNotAuthorized
 		}
-		return errors.Errorf(
-			"Unexpected HTTP error from %s: %d %s",
+		return fmt.Errorf(
+			"unexpected HTTP error from %s: %d %s",
 			r.Request.URL,
 			r.StatusCode,
 			http.StatusText(r.StatusCode),

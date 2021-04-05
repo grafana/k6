@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
@@ -144,7 +143,7 @@ func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib
 		k, v := parseEnvKeyValue(kv)
 		// Allow only alphanumeric ASCII variable names for now
 		if !userEnvVarName.MatchString(k) {
-			return opts, errors.Errorf("Invalid environment variable name '%s'", k)
+			return opts, fmt.Errorf("invalid environment variable name '%s'", k)
 		}
 		opts.Env[k] = v
 	}

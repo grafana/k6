@@ -25,6 +25,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -36,7 +37,6 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/oxtoacart/bpool"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"golang.org/x/net/http2"
@@ -261,7 +261,7 @@ func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) er
 
 	r.setupData, err = json.Marshal(v.Export())
 	if err != nil {
-		return errors.Wrap(err, consts.SetupFn)
+		return fmt.Errorf("error marshaling setup() data to JSON: %w", err)
 	}
 	var tmp interface{}
 	return json.Unmarshal(r.setupData, &tmp)
@@ -284,7 +284,7 @@ func (r *Runner) Teardown(ctx context.Context, out chan<- stats.SampleContainer)
 	var data interface{}
 	if r.setupData != nil {
 		if err := json.Unmarshal(r.setupData, &data); err != nil {
-			return errors.Wrap(err, consts.TeardownFn)
+			return fmt.Errorf("error unmarshaling setup data for teardown() from JSON: %w", err)
 		}
 	} else {
 		data = goja.Undefined()
@@ -641,7 +641,7 @@ func (u *ActiveVU) RunOnce() error {
 		if u.Runner.setupData != nil {
 			var data interface{}
 			if err := json.Unmarshal(u.Runner.setupData, &data); err != nil {
-				return errors.Wrap(err, "RunOnce")
+				return fmt.Errorf("error unmarshaling setup data for the iteration from JSON: %w", err)
 			}
 			u.setupData = u.Runtime.ToValue(data)
 		} else {

@@ -21,10 +21,10 @@
 package influxdb
 
 import (
+	"fmt"
 	"strings"
 
 	client "github.com/influxdata/influxdb1-client/v2"
-	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -61,7 +61,7 @@ func MakeBatchConfig(conf Config) client.BatchPointsConfig {
 
 func checkDuplicatedTypeDefinitions(fieldKinds map[string]FieldKind, tag string) error {
 	if _, found := fieldKinds[tag]; found {
-		return errors.Errorf("A tag name (%s) shows up more than once in InfluxDB field type configurations.", tag)
+		return fmt.Errorf("a tag name (%s) shows up more than once in InfluxDB field type configurations", tag)
 	}
 	return nil
 }
@@ -94,7 +94,7 @@ func MakeFieldKinds(conf Config) (map[string]FieldKind, error) {
 		case "int":
 			fieldKinds[fieldName] = Int
 		default:
-			return nil, errors.Errorf("An invalid type (%s) is specified for an InfluxDB field (%s).",
+			return nil, fmt.Errorf("an invalid type (%s) is specified for an InfluxDB field (%s)",
 				fieldType, fieldName)
 		}
 	}

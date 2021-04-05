@@ -22,12 +22,12 @@ package k6
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"sync/atomic"
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/pkg/errors"
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/internal/modules"

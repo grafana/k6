@@ -28,7 +28,6 @@ require (
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
-	github.com/pkg/errors v0.8.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 	github.com/sirupsen/logrus v1.8.1
