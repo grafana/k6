@@ -25,16 +25,20 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-
-	"github.com/manyminds/api2go"
 )
 
-type Error api2go.Error
+// Error is an api error
+type Error struct {
+	Status string `json:"status,omitempty"`
+	Title  string `json:"title,omitempty"`
+	Detail string `json:"detail,omitempty"`
+}
 
 func (e Error) Error() string {
 	return fmt.Sprintf("%s: %s", e.Title, e.Detail)
 }
 
+// ErrorResponse is a struct wrapper around multiple errors
 type ErrorResponse struct {
 	Errors []Error `json:"errors"`
 }
