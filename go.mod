@@ -16,7 +16,6 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.8.2
-	github.com/julienschmidt/httprouter v1.2.0
 	github.com/k6io/xk6-output-kafka v0.1.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/klauspost/compress v1.11.13

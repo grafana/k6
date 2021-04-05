@@ -24,13 +24,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/julienschmidt/httprouter"
 	"github.com/manyminds/api2go/jsonapi"
 
 	"github.com/loadimpact/k6/api/common"
 )
 
-func HandleGetMetrics(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func handleGetMetrics(rw http.ResponseWriter, r *http.Request) {
 	engine := common.GetEngine(r.Context())
 
 	var t time.Duration
@@ -51,8 +50,7 @@ func HandleGetMetrics(rw http.ResponseWriter, r *http.Request, p httprouter.Para
 	_, _ = rw.Write(data)
 }
 
-func HandleGetMetric(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	id := p.ByName("id")
+func handleGetMetric(rw http.ResponseWriter, r *http.Request, id string) {
 	engine := common.GetEngine(r.Context())
 
 	var t time.Duration
