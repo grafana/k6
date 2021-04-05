@@ -33,11 +33,11 @@ import (
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/output"
 	"github.com/loadimpact/k6/output/cloud"
+	"github.com/loadimpact/k6/output/csv"
 	"github.com/loadimpact/k6/output/influxdb"
 	"github.com/loadimpact/k6/output/json"
 	"github.com/loadimpact/k6/output/statsd"
 	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/stats/csv"
 
 	"github.com/k6io/xk6-output-kafka/pkg/kafka"
 )
@@ -47,9 +47,8 @@ import (
 func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, error), error) {
 	// Start with the built-in outputs
 	result := map[string]func(output.Params) (output.Output, error){
-		"json":  json.New,
-		"cloud": cloud.New,
-
+		"json":     json.New,
+		"cloud":    cloud.New,
 		"influxdb": influxdb.New,
 		"kafka": func(params output.Params) (output.Output, error) {
 			params.Logger.Warn("The kafka output is deprecated, and will be removed in a future k6 version. " +
@@ -63,17 +62,7 @@ func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, 
 				"Please use the statsd output with env variable K6_STATSD_ENABLE_TAGS=true instead.")
 			return statsd.NewDatadog(params)
 		},
-		"csv": func(params output.Params) (output.Output, error) {
-			conf, err := csv.GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument)
-			if err != nil {
-				return nil, err
-			}
-			csvc, err := csv.New(params.Logger, params.FS, params.ScriptOptions.SystemTags.Map(), conf)
-			if err != nil {
-				return nil, err
-			}
-			return newCollectorAdapter(params, csvc), nil
-		},
+		"csv": csv.New,
 	}
 
 	exts := output.GetExtensions()

@@ -23,7 +23,6 @@ package csv
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"encoding/csv"
 	"fmt"
 	"os"
@@ -33,34 +32,39 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 
-	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/output"
 	"github.com/loadimpact/k6/stats"
 )
 
-// Collector saving output to csv implements the lib.Collector interface
-type Collector struct {
-	closeFn      func() error
-	fname        string
+// Output saving output to csv implements the lib.Output interface
+type Output struct {
+	output.SampleBuffer
+
+	params          output.Params
+	periodicFlusher *output.PeriodicFlusher
+
+	logger    logrus.FieldLogger
+	fname     string
+	csvWriter *csv.Writer
+	csvLock   sync.Mutex
+	closeFn   func() error
+
 	resTags      []string
 	ignoredTags  []string
-	csvWriter    *csv.Writer
-	csvLock      sync.Mutex
-	buffer       []stats.Sample
-	bufferLock   sync.Mutex
 	row          []string
 	saveInterval time.Duration
-	logger       logrus.FieldLogger
 }
 
-// Verify that Collector implements lib.Collector
-var _ lib.Collector = &Collector{}
-
 // New Creates new instance of CSV collector
-func New(logger logrus.FieldLogger, fs afero.Fs, tags stats.TagSet, config Config) (*Collector, error) {
+func New(params output.Params) (output.Output, error) {
+	return newOutput(params)
+}
+
+func newOutput(params output.Params) (*Output, error) {
 	resTags := []string{}
 	ignoredTags := []string{}
+	tags := params.ScriptOptions.SystemTags.Map()
 	for tag, flag := range tags {
 		if flag {
 			resTags = append(resTags, tag)
@@ -68,15 +72,25 @@ func New(logger logrus.FieldLogger, fs afero.Fs, tags stats.TagSet, config Confi
 			ignoredTags = append(ignoredTags, tag)
 		}
 	}
+
 	sort.Strings(resTags)
 	sort.Strings(ignoredTags)
+
+	config, err := GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument)
+	if err != nil {
+		return nil, err
+	}
 
 	saveInterval := time.Duration(config.SaveInterval.Duration)
 	fname := config.FileName.String
 
+	logger := params.Logger.WithFields(logrus.Fields{
+		"output":   "csv",
+		"filename": params.ConfigArgument,
+	})
 	if fname == "" || fname == "-" {
 		stdoutWriter := csv.NewWriter(os.Stdout)
-		return &Collector{
+		return &Output{
 			fname:        "-",
 			resTags:      resTags,
 			ignoredTags:  ignoredTags,
@@ -85,21 +99,23 @@ func New(logger logrus.FieldLogger, fs afero.Fs, tags stats.TagSet, config Confi
 			saveInterval: saveInterval,
 			closeFn:      func() error { return nil },
 			logger:       logger,
+			params:       params,
 		}, nil
 	}
 
-	logFile, err := fs.Create(fname)
+	logFile, err := params.FS.Create(fname)
 	if err != nil {
 		return nil, err
 	}
 
-	c := Collector{
+	c := Output{
 		fname:        fname,
 		resTags:      resTags,
 		ignoredTags:  ignoredTags,
 		row:          make([]string, 3+len(resTags)+1),
 		saveInterval: saveInterval,
 		logger:       logger,
+		params:       params,
 	}
 
 	if strings.HasSuffix(fname, ".gz") {
@@ -119,74 +135,63 @@ func New(logger logrus.FieldLogger, fs afero.Fs, tags stats.TagSet, config Confi
 	return &c, nil
 }
 
-// Init writes column names to csv file
-func (c *Collector) Init() error {
-	header := MakeHeader(c.resTags)
-	err := c.csvWriter.Write(header)
-	if err != nil {
-		c.logger.WithField("filename", c.fname).Error("CSV: Error writing column names to file")
+// Description returns a human-readable description of the output.
+func (o *Output) Description() string {
+	if o.fname == "" || o.fname == "-" { // TODO rename
+		return "csv(stdout)"
 	}
-	c.csvWriter.Flush()
+	return fmt.Sprintf("csv (%s)", o.fname)
+}
+
+// Start tries to open the specified JSON file and starts the goroutine for
+// metric flushing. If gzip encoding is specified, it also handles that.
+func (o *Output) Start() error {
+	o.logger.Debug("Starting...")
+
+	header := MakeHeader(o.resTags)
+	err := o.csvWriter.Write(header)
+	if err != nil {
+		o.logger.WithField("filename", o.fname).Error("CSV: Error writing column names to file")
+	}
+	o.csvWriter.Flush()
+
+	pf, err := output.NewPeriodicFlusher(o.saveInterval, o.flushMetrics)
+	if err != nil {
+		return err
+	}
+	o.logger.Debug("Started!")
+	o.periodicFlusher = pf
+
 	return nil
 }
 
-// Run just blocks until the context is done
-func (c *Collector) Run(ctx context.Context) {
-	ticker := time.NewTicker(c.saveInterval)
-	defer func() {
-		err := c.closeFn()
-		if err != nil {
-			c.logger.WithField("filename", c.fname).Errorf("CSV: Error closing the file: %v", err)
-		}
-	}()
-
-	for {
-		select {
-		case <-ticker.C:
-			c.writeToFile()
-		case <-ctx.Done():
-			c.writeToFile()
-			return
-		}
-	}
+// Stop flushes any remaining metrics and stops the goroutine.
+func (o *Output) Stop() error {
+	o.logger.Debug("Stopping...")
+	defer o.logger.Debug("Stopped!")
+	o.periodicFlusher.Stop()
+	return o.closeFn()
 }
 
-// Collect Saves samples to buffer
-func (c *Collector) Collect(scs []stats.SampleContainer) {
-	c.bufferLock.Lock()
-	defer c.bufferLock.Unlock()
-	for _, sc := range scs {
-		c.buffer = append(c.buffer, sc.GetSamples()...)
-	}
-}
-
-// writeToFile Writes samples to the csv file
-func (c *Collector) writeToFile() {
-	c.bufferLock.Lock()
-	samples := c.buffer
-	c.buffer = nil
-	c.bufferLock.Unlock()
+// flushMetrics Writes samples to the csv file
+func (o *Output) flushMetrics() {
+	samples := o.GetBufferedSamples()
 
 	if len(samples) > 0 {
-		c.csvLock.Lock()
-		defer c.csvLock.Unlock()
+		o.csvLock.Lock()
+		defer o.csvLock.Unlock()
 		for _, sc := range samples {
 			for _, sample := range sc.GetSamples() {
 				sample := sample
-				row := SampleToRow(&sample, c.resTags, c.ignoredTags, c.row)
-				err := c.csvWriter.Write(row)
+				row := SampleToRow(&sample, o.resTags, o.ignoredTags, o.row)
+				err := o.csvWriter.Write(row)
 				if err != nil {
-					c.logger.WithField("filename", c.fname).Error("CSV: Error writing to file")
+					o.logger.WithField("filename", o.fname).Error("CSV: Error writing to file")
 				}
 			}
 		}
-		c.csvWriter.Flush()
+		o.csvWriter.Flush()
 	}
-}
-
-// Link returns a dummy string, it's only included to satisfy the lib.Collector interface
-func (c *Collector) Link() string {
-	return c.fname
 }
 
 // MakeHeader creates list of column names for csv file
