@@ -48,6 +48,7 @@ func TestParseArg(t *testing.T) {
 }
 
 func TestParseURL(t *testing.T) {
+	t.Parallel()
 	testdata := map[string]Config{
 		"":                             {},
 		"dbname":                       {DB: null.StringFrom("dbname")},
@@ -68,6 +69,7 @@ func TestParseURL(t *testing.T) {
 	}
 	for str, data := range testdata {
 		t.Run(str, func(t *testing.T) {
+			t.Parallel()
 			config, err := ParseURL(str)
 			assert.NoError(t, err)
 			assert.Equal(t, data, config)

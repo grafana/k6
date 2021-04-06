@@ -26,42 +26,50 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib/testutils"
+	"github.com/loadimpact/k6/output"
 	"github.com/loadimpact/k6/stats"
 )
 
 func TestBadConcurrentWrites(t *testing.T) {
-	c := NewConfig()
+	t.Parallel()
 	logger := testutils.NewLogger(t)
 	t.Run("0", func(t *testing.T) {
-		c.ConcurrentWrites = null.IntFrom(0)
-		_, err := New(logger, c)
+		t.Parallel()
+		_, err := New(output.Params{
+			Logger:         logger,
+			ConfigArgument: "?concurrentWrites=0",
+		})
 		require.Error(t, err)
 		require.Equal(t, err.Error(), "influxdb's ConcurrentWrites must be a positive number")
 	})
 
 	t.Run("-2", func(t *testing.T) {
-		c.ConcurrentWrites = null.IntFrom(-2)
-		_, err := New(logger, c)
+		t.Parallel()
+		_, err := New(output.Params{
+			Logger:         logger,
+			ConfigArgument: "?concurrentWrites=-2",
+		})
 		require.Error(t, err)
 		require.Equal(t, err.Error(), "influxdb's ConcurrentWrites must be a positive number")
 	})
 
 	t.Run("2", func(t *testing.T) {
-		c.ConcurrentWrites = null.IntFrom(2)
-		_, err := New(logger, c)
+		t.Parallel()
+		_, err := New(output.Params{
+			Logger:         logger,
+			ConfigArgument: "?concurrentWrites=2",
+		})
 		require.NoError(t, err)
 	})
 }
 
-func testCollectorCycle(t testing.TB, handler http.HandlerFunc, body func(testing.TB, *Collector)) {
+func testOutputCycle(t testing.TB, handler http.HandlerFunc, body func(testing.TB, *Output)) {
 	s := &http.Server{
 		Addr:           ":",
 		Handler:        handler,
@@ -81,33 +89,25 @@ func testCollectorCycle(t testing.TB, handler http.HandlerFunc, body func(testin
 		require.Equal(t, http.ErrServerClosed, s.Serve(l))
 	}()
 
-	config := NewConfig()
-	config.Addr = null.StringFrom("http://" + l.Addr().String())
-	c, err := New(testutils.NewLogger(t), config)
+	c, err := newOutput(output.Params{
+		Logger:         testutils.NewLogger(t),
+		ConfigArgument: "http://" + l.Addr().String(),
+	})
 	require.NoError(t, err)
 
-	require.NoError(t, c.Init())
-	ctx, cancel := context.WithCancel(context.Background())
-	var wg sync.WaitGroup
-	defer cancel()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		c.Run(ctx)
-	}()
-
+	require.NoError(t, c.Start())
 	body(t, c)
 
-	cancel()
-	wg.Wait()
+	require.NoError(t, c.Stop())
 }
 
-func TestCollector(t *testing.T) {
+func TestOutput(t *testing.T) {
+	t.Parallel()
 	var samplesRead int
 	defer func() {
 		require.Equal(t, samplesRead, 20)
 	}()
-	testCollectorCycle(t, func(rw http.ResponseWriter, r *http.Request) {
+	testOutputCycle(t, func(rw http.ResponseWriter, r *http.Request) {
 		b := bytes.NewBuffer(nil)
 		_, _ = io.Copy(b, r.Body)
 		for {
@@ -121,7 +121,7 @@ func TestCollector(t *testing.T) {
 		}
 
 		rw.WriteHeader(204)
-	}, func(tb testing.TB, c *Collector) {
+	}, func(tb testing.TB, c *Output) {
 		samples := make(stats.Samples, 10)
 		for i := 0; i < len(samples); i++ {
 			samples[i] = stats.Sample{
@@ -135,21 +135,17 @@ func TestCollector(t *testing.T) {
 				Value: 2.0,
 			}
 		}
-		c.Collect([]stats.SampleContainer{samples})
-		c.Collect([]stats.SampleContainer{samples})
+		c.AddMetricSamples([]stats.SampleContainer{samples})
+		c.AddMetricSamples([]stats.SampleContainer{samples})
 	})
 }
 
 func TestExtractTagsToValues(t *testing.T) {
-	c := NewConfig()
-	c.TagsAsFields = []string{
-		"stringField",
-		"stringField2:string",
-		"boolField:bool",
-		"floatField:float",
-		"intField:int",
-	}
-	collector, err := New(testutils.NewLogger(t), c)
+	t.Parallel()
+	o, err := newOutput(output.Params{
+		Logger:         testutils.NewLogger(t),
+		ConfigArgument: "?tagsAsFields=stringField&tagsAsFields=stringField2:string&tagsAsFields=boolField:bool&tagsAsFields=floatField:float&tagsAsFields=intField:int",
+	})
 	require.NoError(t, err)
 	tags := map[string]string{
 		"stringField":  "string",
@@ -158,7 +154,7 @@ func TestExtractTagsToValues(t *testing.T) {
 		"floatField":   "3.14",
 		"intField":     "12345",
 	}
-	values := collector.extractTagsToValues(tags, map[string]interface{}{})
+	values := o.extractTagsToValues(tags, map[string]interface{}{})
 
 	require.Equal(t, "string", values["stringField"])
 	require.Equal(t, "string2", values["stringField2"])

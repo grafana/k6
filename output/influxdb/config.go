@@ -111,7 +111,6 @@ func (c Config) Apply(cfg Config) Config {
 func ParseArg(arg string) (Config, error) {
 	c := Config{}
 	params, err := strvals.Parse(arg)
-
 	if err != nil {
 		return c, err
 	}
