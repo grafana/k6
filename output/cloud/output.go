@@ -21,6 +21,7 @@
 package cloud
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -28,7 +29,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
@@ -139,12 +139,12 @@ func newOutput(params output.Params) (*Output, error) {
 	}
 
 	if !(conf.MetricPushConcurrency.Int64 > 0) {
-		return nil, errors.Errorf("metrics push concurrency must be a positive number but is %d",
+		return nil, fmt.Errorf("metrics push concurrency must be a positive number but is %d",
 			conf.MetricPushConcurrency.Int64)
 	}
 
 	if !(conf.MaxMetricSamplesPerPackage.Int64 > 0) {
-		return nil, errors.Errorf("metric samples per package must be a positive number but is %d",
+		return nil, fmt.Errorf("metric samples per package must be a positive number but is %d",
 			conf.MaxMetricSamplesPerPackage.Int64)
 	}
 

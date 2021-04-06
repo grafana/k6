@@ -27,8 +27,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/pkg/errors"
-
 	"github.com/loadimpact/k6/lib"
 )
 
@@ -80,7 +78,7 @@ func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error)
 	}
 
 	if ctrr.ReferenceID == "" {
-		return nil, errors.Errorf("Failed to get a reference ID")
+		return nil, fmt.Errorf("failed to get a reference ID")
 	}
 
 	return &ctrr, nil

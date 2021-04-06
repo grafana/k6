@@ -22,8 +22,8 @@ package cmd
 
 import (
 	"context"
+	"errors"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	v1 "github.com/loadimpact/k6/api/v1"

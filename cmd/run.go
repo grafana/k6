@@ -25,6 +25,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,7 +36,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -335,20 +335,19 @@ a commandline interface for interacting with it.`,
 }
 
 func getExitCodeFromEngine(err error) ExitCode {
-	switch e := errors.Cause(err).(type) {
-	case lib.TimeoutError:
-		switch e.Place() {
+	var terr lib.TimeoutError
+	if errors.As(err, &terr) {
+		switch terr.Place() {
 		case consts.SetupFn:
-			return ExitCode{error: err, Code: setupTimeoutErrorCode, Hint: e.Hint()}
+			return ExitCode{error: err, Code: setupTimeoutErrorCode, Hint: terr.Hint()}
 		case consts.TeardownFn:
-			return ExitCode{error: err, Code: teardownTimeoutErrorCode, Hint: e.Hint()}
+			return ExitCode{error: err, Code: teardownTimeoutErrorCode, Hint: terr.Hint()}
 		default:
 			return ExitCode{error: err, Code: genericTimeoutErrorCode}
 		}
-	default:
-		//nolint:golint
-		return ExitCode{error: errors.New("Engine error"), Code: genericEngineErrorCode, Hint: err.Error()}
 	}
+
+	return ExitCode{error: errors.New("engine error"), Code: genericEngineErrorCode, Hint: err.Error()}
 }
 
 func reportUsage(execScheduler *local.ExecutionScheduler) error {
@@ -419,10 +418,10 @@ func newRunner(
 		case typeJS:
 			return js.NewFromArchive(logger, arc, rtOpts)
 		default:
-			return nil, errors.Errorf("archive requests unsupported runner: %s", arc.Type)
+			return nil, fmt.Errorf("archive requests unsupported runner: %s", arc.Type)
 		}
 	default:
-		return nil, errors.Errorf("unknown -t/--type: %s", typ)
+		return nil, fmt.Errorf("unknown -t/--type: %s", typ)
 	}
 }
 

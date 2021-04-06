@@ -24,9 +24,9 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/tidwall/gjson"
 
 	"github.com/loadimpact/k6/lib/netext"

@@ -22,10 +22,10 @@ package stats
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/pkg/errors"
 
 	"github.com/loadimpact/k6/lib/types"
 )
@@ -137,14 +137,14 @@ func NewThresholds(sources []string) (Thresholds, error) {
 func newThresholdsWithConfig(configs []thresholdConfig) (Thresholds, error) {
 	rt := goja.New()
 	if _, err := rt.RunProgram(jsEnv); err != nil {
-		return Thresholds{}, errors.Wrap(err, "builtin")
+		return Thresholds{}, fmt.Errorf("threshold builtin error: %w", err)
 	}
 
 	ts := make([]*Threshold, len(configs))
 	for i, config := range configs {
 		t, err := newThreshold(config.Threshold, rt, config.AbortOnFail, config.AbortGracePeriod)
 		if err != nil {
-			return Thresholds{}, errors.Wrapf(err, "%d", i)
+			return Thresholds{}, fmt.Errorf("threshold %d error: %w", i, err)
 		}
 		ts[i] = t
 	}
@@ -166,7 +166,7 @@ func (ts *Thresholds) runAll(t time.Duration) (bool, error) {
 	for i, th := range ts.Thresholds {
 		b, err := th.run()
 		if err != nil {
-			return false, errors.Wrapf(err, "%d", i)
+			return false, fmt.Errorf("threshold %d run error: %w", i, err)
 		}
 		if !b {
 			succ = false

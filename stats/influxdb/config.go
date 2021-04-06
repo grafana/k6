@@ -22,6 +22,7 @@ package influxdb
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
@@ -30,7 +31,6 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/kubernetes/helm/pkg/strvals"
 	"github.com/mitchellh/mapstructure"
-	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib/types"
@@ -173,7 +173,7 @@ func ParseURL(text string) (Config, error) {
 			case "true":
 				c.Insecure = null.BoolFrom(true)
 			default:
-				return c, errors.Errorf("insecure must be true or false, not %s", vs[0])
+				return c, fmt.Errorf("insecure must be true or false, not %s", vs[0])
 			}
 		case "payload_size":
 			var size int
@@ -204,7 +204,7 @@ func ParseURL(text string) (Config, error) {
 		case "tagsAsFields":
 			c.TagsAsFields = vs
 		default:
-			return c, errors.Errorf("unknown query parameter: %s", k)
+			return c, fmt.Errorf("unknown query parameter: %s", k)
 		}
 	}
 	return c, err

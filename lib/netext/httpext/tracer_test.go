@@ -23,6 +23,7 @@ package httpext
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -37,7 +38,6 @@ import (
 	"time"
 
 	"github.com/mccutchen/go-httpbin/httpbin"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 

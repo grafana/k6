@@ -21,6 +21,7 @@
 package loader
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -32,7 +33,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 )
@@ -133,11 +133,11 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 		}
 		if u.Scheme != "file" && u.Scheme != "https" {
 			return nil,
-				errors.Errorf("only supported schemes for imports are file and https, %s has `%s`",
+				fmt.Errorf("only supported schemes for imports are file and https, %s has `%s`",
 					moduleSpecifier, u.Scheme)
 		}
 		if u.Scheme == "file" && pwd.Scheme == "https" {
-			return nil, errors.Errorf("origin (%s) not allowed to load local file: %s", pwd, moduleSpecifier)
+			return nil, fmt.Errorf("origin (%s) not allowed to load local file: %s", pwd, moduleSpecifier)
 		}
 		return u, err
 	}
@@ -235,10 +235,10 @@ func Load(
 			// let's write the coolest error message to try to help the lost soul who got to here
 			return nil, noSchemeRemoteModuleResolutionError{err: err, moduleSpecifier: originalModuleSpecifier}
 		}
-		return nil, errors.Errorf(httpsSchemeCouldntBeLoadedMsg, originalModuleSpecifier, finalModuleSpecifierURL, err)
+		return nil, fmt.Errorf(httpsSchemeCouldntBeLoadedMsg, originalModuleSpecifier, finalModuleSpecifierURL, err)
 	}
 
-	return nil, errors.Errorf(fileSchemeCouldntBeLoadedMsg, originalModuleSpecifier)
+	return nil, fmt.Errorf(fileSchemeCouldntBeLoadedMsg, originalModuleSpecifier)
 }
 
 func resolveUsingLoaders(logger logrus.FieldLogger, name string) (*url.URL, error) {
@@ -301,9 +301,9 @@ func fetch(logger logrus.FieldLogger, u string) ([]byte, error) {
 	if res.StatusCode != 200 {
 		switch res.StatusCode {
 		case 404:
-			return nil, errors.Errorf("not found: %s", u)
+			return nil, fmt.Errorf("not found: %s", u)
 		default:
-			return nil, errors.Errorf("wrong status code (%d) for: %s", res.StatusCode, u)
+			return nil, fmt.Errorf("wrong status code (%d) for: %s", res.StatusCode, u)
 		}
 	}
 

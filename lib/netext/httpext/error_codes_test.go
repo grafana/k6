@@ -23,15 +23,18 @@ package httpext
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"runtime"
 	"syscall"
 	"testing"
+	"time"
 
-	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
 
@@ -39,13 +42,15 @@ import (
 )
 
 func TestDefaultError(t *testing.T) {
+	t.Parallel()
 	testErrorCode(t, defaultErrorCode, fmt.Errorf("random error"))
 }
 
 func TestHTTP2Errors(t *testing.T) {
-	var unknownErrorCode = 220
-	var connectionError = http2.ConnectionError(unknownErrorCode)
-	var testTable = map[errCode]error{
+	t.Parallel()
+	unknownErrorCode := 220
+	connectionError := http2.ConnectionError(unknownErrorCode)
+	testTable := map[errCode]error{
 		unknownHTTP2ConnectionErrorCode + 1: new(http2.ConnectionError),
 		unknownHTTP2StreamErrorCode + 1:     new(http2.StreamError),
 		unknownHTTP2GoAwayErrorCode + 1:     new(http2.GoAwayError),
@@ -58,7 +63,8 @@ func TestHTTP2Errors(t *testing.T) {
 }
 
 func TestTLSErrors(t *testing.T) {
-	var testTable = map[errCode]error{
+	t.Parallel()
+	testTable := map[errCode]error{
 		x509UnknownAuthorityErrorCode: new(x509.UnknownAuthorityError),
 		x509HostnameErrorCode:         new(x509.HostnameError),
 		defaultTLSErrorCode:           new(tls.RecordHeaderError),
@@ -67,13 +73,14 @@ func TestTLSErrors(t *testing.T) {
 }
 
 func TestDNSErrors(t *testing.T) {
+	t.Parallel()
 	var (
 		defaultDNSError = new(net.DNSError)
 		noSuchHostError = new(net.DNSError)
 	)
 
 	noSuchHostError.Err = "no such host" // defined as private in go stdlib
-	var testTable = map[errCode]error{
+	testTable := map[errCode]error{
 		defaultDNSErrorCode:    defaultDNSError,
 		dnsNoSuchHostErrorCode: noSuchHostError,
 	}
@@ -81,9 +88,10 @@ func TestDNSErrors(t *testing.T) {
 }
 
 func TestBlackListedIPError(t *testing.T) {
-	var err = netext.BlackListedIPError{}
+	t.Parallel()
+	err := netext.BlackListedIPError{}
 	testErrorCode(t, blackListedIPErrorCode, err)
-	var errorCode, errorMsg = errorCodeForError(err)
+	errorCode, errorMsg := errorCodeForError(err)
 	require.NotEqual(t, err.Error(), errorMsg)
 	require.Equal(t, blackListedIPErrorCode, errorCode)
 }
@@ -99,19 +107,21 @@ func (t timeoutError) Error() string {
 }
 
 func TestUnknownNetErrno(t *testing.T) {
-	var err = new(net.OpError)
+	t.Parallel()
+	err := new(net.OpError)
 	err.Op = "write"
 	err.Net = "tcp"
 	err.Err = syscall.ENOTRECOVERABLE // Highly unlikely to actually need to do anything with this error
-	var expectedError = fmt.Sprintf(
+	expectedError := fmt.Sprintf(
 		"write: unknown errno `%d` on %s with message `%s`",
 		syscall.ENOTRECOVERABLE, runtime.GOOS, err.Err)
-	var errorCode, errorMsg = errorCodeForError(err)
+	errorCode, errorMsg := errorCodeForError(err)
 	require.Equal(t, expectedError, errorMsg)
 	require.Equal(t, netUnknownErrnoErrorCode, errorCode)
 }
 
 func TestTCPErrors(t *testing.T) {
+	t.Parallel()
 	var (
 		nonTCPError       = &net.OpError{Net: "something", Err: errors.New("non tcp error")}
 		econnreset        = &net.OpError{Net: "tcp", Op: "write", Err: &os.SyscallError{Err: syscall.ECONNRESET}}
@@ -123,7 +133,7 @@ func TestTCPErrors(t *testing.T) {
 		notTimeoutedError = &net.OpError{Net: "tcp", Op: "dial", Err: timeoutError(false)}
 	)
 
-	var testTable = map[errCode]error{
+	testTable := map[errCode]error{
 		defaultNetNonTCPErrorCode: nonTCPError,
 		tcpResetByPeerErrorCode:   econnreset,
 		tcpBrokenPipeErrorCode:    epipeerror,
@@ -142,7 +152,7 @@ func testErrorCode(t *testing.T, code errCode, err error) {
 	result, _ := errorCodeForError(err)
 	require.Equalf(t, code, result, "Wrong error code for error `%s`", err)
 
-	result, _ = errorCodeForError(errors.WithStack(err))
+	result, _ = errorCodeForError(fmt.Errorf("foo: %w", err))
 	require.Equalf(t, code, result, "Wrong error code for error `%s`", err)
 
 	result, _ = errorCodeForError(&url.Error{Err: err})
@@ -154,4 +164,57 @@ func testMapOfErrorCodes(t *testing.T, testTable map[errCode]error) {
 	for code, err := range testTable {
 		testErrorCode(t, code, err)
 	}
+}
+
+func TestConnReset(t *testing.T) {
+	t.Parallel()
+	// based on https://gist.github.com/jpittis/4357d817dc425ae99fbf719828ab1800
+	ln, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr()
+	ch := make(chan error, 10)
+
+	go func() {
+		defer close(ch)
+		// Accept one connection.
+		conn, innerErr := ln.Accept()
+		if innerErr != nil {
+			ch <- innerErr
+			return
+		}
+
+		// Force an RST
+		tcpConn, ok := conn.(*net.TCPConn)
+		require.True(t, ok)
+		innerErr = tcpConn.SetLinger(0)
+		if innerErr != nil {
+			ch <- innerErr
+		}
+		time.Sleep(time.Second) // Give time for the http request to start
+		_ = conn.Close()
+	}()
+
+	res, err := http.Get("http://" + addr.String()) //nolint:bodyclose,noctx
+	require.Nil(t, res)
+
+	code, msg := errorCodeForError(err)
+	assert.Equal(t, tcpResetByPeerErrorCode, code)
+	assert.Contains(t, msg, fmt.Sprintf(tcpResetByPeerErrorCodeMsg, ""))
+	for err := range ch {
+		assert.Nil(t, err)
+	}
+}
+
+func TestDnsResolve(t *testing.T) {
+	t.Parallel()
+	// this uses the Unwrap path
+	// this is not happening in our current codebase as the resolution in our code
+	// happens earlier so it doesn't get wrapped, but possibly happens in other cases as well
+	_, err := http.Get("http://s.com") //nolint:bodyclose,noctx
+	code, msg := errorCodeForError(err)
+
+	assert.Equal(t, dnsNoSuchHostErrorCode, code)
+	assert.Equal(t, dnsNoSuchHostErrorCodeMsg, msg)
 }

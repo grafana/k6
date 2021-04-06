@@ -23,10 +23,9 @@ package types
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // NullHostnameTrie is a nullable HostnameTrie, in the same vein as the nullable types provided by
@@ -125,7 +124,7 @@ var validHostnamePattern *regexp.Regexp = regexp.MustCompile(`^(\*\.?)?((([a-zA-
 
 func isValidHostnamePattern(s string) error {
 	if len(validHostnamePattern.FindString(s)) != len(s) {
-		return errors.Errorf("invalid hostname pattern %s", s)
+		return fmt.Errorf("invalid hostname pattern '%s'", s)
 	}
 	return nil
 }
