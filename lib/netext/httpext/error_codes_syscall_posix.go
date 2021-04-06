@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
  *
  * k6 - a next-generation load testing tool
@@ -17,8 +19,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
-// +build !windows
 
 package httpext
 
