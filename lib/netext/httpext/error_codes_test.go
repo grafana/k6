@@ -42,10 +42,12 @@ import (
 )
 
 func TestDefaultError(t *testing.T) {
+	t.Parallel()
 	testErrorCode(t, defaultErrorCode, fmt.Errorf("random error"))
 }
 
 func TestHTTP2Errors(t *testing.T) {
+	t.Parallel()
 	unknownErrorCode := 220
 	connectionError := http2.ConnectionError(unknownErrorCode)
 	testTable := map[errCode]error{
@@ -61,6 +63,7 @@ func TestHTTP2Errors(t *testing.T) {
 }
 
 func TestTLSErrors(t *testing.T) {
+	t.Parallel()
 	testTable := map[errCode]error{
 		x509UnknownAuthorityErrorCode: new(x509.UnknownAuthorityError),
 		x509HostnameErrorCode:         new(x509.HostnameError),
@@ -70,6 +73,7 @@ func TestTLSErrors(t *testing.T) {
 }
 
 func TestDNSErrors(t *testing.T) {
+	t.Parallel()
 	var (
 		defaultDNSError = new(net.DNSError)
 		noSuchHostError = new(net.DNSError)
@@ -84,6 +88,7 @@ func TestDNSErrors(t *testing.T) {
 }
 
 func TestBlackListedIPError(t *testing.T) {
+	t.Parallel()
 	err := netext.BlackListedIPError{}
 	testErrorCode(t, blackListedIPErrorCode, err)
 	errorCode, errorMsg := errorCodeForError(err)
@@ -102,6 +107,7 @@ func (t timeoutError) Error() string {
 }
 
 func TestUnknownNetErrno(t *testing.T) {
+	t.Parallel()
 	err := new(net.OpError)
 	err.Op = "write"
 	err.Net = "tcp"
@@ -115,6 +121,7 @@ func TestUnknownNetErrno(t *testing.T) {
 }
 
 func TestTCPErrors(t *testing.T) {
+	t.Parallel()
 	var (
 		nonTCPError       = &net.OpError{Net: "something", Err: errors.New("non tcp error")}
 		econnreset        = &net.OpError{Net: "tcp", Op: "write", Err: &os.SyscallError{Err: syscall.ECONNRESET}}
@@ -160,6 +167,7 @@ func testMapOfErrorCodes(t *testing.T, testTable map[errCode]error) {
 }
 
 func TestConnReset(t *testing.T) {
+	t.Parallel()
 	// based on https://gist.github.com/jpittis/4357d817dc425ae99fbf719828ab1800
 	ln, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
@@ -178,7 +186,8 @@ func TestConnReset(t *testing.T) {
 		}
 
 		// Force an RST
-		tcpConn := conn.(*net.TCPConn)
+		tcpConn, ok := conn.(*net.TCPConn)
+		require.True(t, ok)
 		innerErr = tcpConn.SetLinger(0)
 		if innerErr != nil {
 			ch <- innerErr
@@ -199,6 +208,7 @@ func TestConnReset(t *testing.T) {
 }
 
 func TestDnsResolve(t *testing.T) {
+	t.Parallel()
 	// this uses the Unwrap path
 	// this is not happening in our current codebase as the resolution in our code
 	// happens earlier so it doesn't get wrapped, but possibly happens in other cases as well
