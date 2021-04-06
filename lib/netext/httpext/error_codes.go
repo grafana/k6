@@ -107,14 +107,76 @@ func http2ErrCodeOffset(code http2.ErrCode) errCode {
 	return 1 + errCode(code)
 }
 
+//nolint: errorlint,cyclop
+func errorCodeForNetOpError(err *net.OpError) (errCode, string) {
+	// TODO: refactor this further - a big switch would be more readable, maybe
+	// we should even check for *os.SyscallError in the main switch body in the
+	// parent errorCodeForError() function?
+
+	if err.Net != "tcp" && err.Net != "tcp6" {
+		// TODO: figure out how this happens
+		return defaultNetNonTCPErrorCode, err.Error()
+	}
+	if sErr, ok := err.Err.(*os.SyscallError); ok {
+		switch sErr.Unwrap() {
+		case syscall.ECONNRESET:
+			return tcpResetByPeerErrorCode, fmt.Sprintf(tcpResetByPeerErrorCodeMsg, err.Op)
+		case syscall.EPIPE:
+			return tcpBrokenPipeErrorCode, fmt.Sprintf(tcpBrokenPipeErrorCodeMsg, err.Op)
+		}
+		code, msg := getOSSyscallErrorCode(err, sErr)
+		if code != 0 {
+			return code, msg
+		}
+	}
+	if err.Op != "dial" {
+		switch inErr := err.Err.(type) {
+		case syscall.Errno:
+			return netUnknownErrnoErrorCode,
+				fmt.Sprintf(netUnknownErrnoErrorCodeMsg,
+					err.Op, (int)(inErr), runtime.GOOS, inErr.Error())
+		default:
+			return defaultTCPErrorCode, err.Error()
+		}
+	}
+
+	// err.Op is "dial"
+	if err.Timeout() {
+		return tcpDialTimeoutErrorCode, tcpDialTimeoutErrorCodeMsg
+	}
+	if iErr, ok := err.Err.(*os.SyscallError); ok {
+		if errno, ok := iErr.Err.(syscall.Errno); ok {
+			if errno == syscall.ECONNREFUSED ||
+				// 10061 is some connection refused like thing on windows
+				// TODO: fix by moving to x/sys instead of syscall after
+				// https://github.com/golang/go/issues/31360 gets resolved
+				(errno == 10061 && runtime.GOOS == "windows") {
+				return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
+			}
+			return tcpDialUnknownErrnoCode,
+				fmt.Sprintf("dial: unknown errno %d error with msg `%s`", errno, iErr.Err)
+		}
+	}
+
+	// Check if the wrapped error isn't something we recognize, e.g. a DNS error
+	if wrappedErr := errors.Unwrap(err); wrappedErr != nil {
+		errCodeForWrapped, errForWrapped := errorCodeForError(wrappedErr)
+		if errCodeForWrapped != defaultErrorCode {
+			return errCodeForWrapped, errForWrapped
+		}
+	}
+
+	// If it's not, return a generic TCP dial error
+	return tcpDialErrorCode, err.Error()
+}
+
 // errorCodeForError returns the errorCode and a specific error message for given error.
+//nolint: errorlint, cyclop
 func errorCodeForError(err error) (errCode, string) {
 	// We explicitly check for `Unwrap()` in the default switch branch, but
 	// checking for the concrete error types first gives us the opportunity to
 	// also directly detect high-level errors, if we need to, even if they wrap
 	// a low level error inside.
-
-	//nolint: errorlint
 	switch e := err.(type) {
 	case K6Error:
 		return e.Code, e.Message
@@ -139,63 +201,7 @@ func errorCodeForError(err error) (errCode, string) {
 		return unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCode(*e)),
 			fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCode(*e))
 	case *net.OpError:
-		// TODO: refactor this branch and actually check for *os.SyscallError in
-		// the main switch body?
-
-		if e.Net != "tcp" && e.Net != "tcp6" {
-			// TODO: figure out how this happens
-			return defaultNetNonTCPErrorCode, err.Error()
-		}
-		if sErr, ok := e.Err.(*os.SyscallError); ok {
-			switch sErr.Unwrap() {
-			case syscall.ECONNRESET:
-				return tcpResetByPeerErrorCode, fmt.Sprintf(tcpResetByPeerErrorCodeMsg, e.Op)
-			case syscall.EPIPE:
-				return tcpBrokenPipeErrorCode, fmt.Sprintf(tcpBrokenPipeErrorCodeMsg, e.Op)
-			}
-			code, msg := getOSSyscallErrorCode(e, sErr)
-			if code != 0 {
-				return code, msg
-			}
-		}
-		if e.Op == "dial" {
-			if e.Timeout() {
-				return tcpDialTimeoutErrorCode, tcpDialTimeoutErrorCodeMsg
-			}
-			if iErr, ok := e.Err.(*os.SyscallError); ok {
-				if errno, ok := iErr.Err.(syscall.Errno); ok {
-					if errno == syscall.ECONNREFUSED ||
-						// 10061 is some connection refused like thing on windows
-						// TODO: fix by moving to x/sys instead of syscall after
-						// https://github.com/golang/go/issues/31360 gets resolved
-						(errno == 10061 && runtime.GOOS == "windows") {
-						return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
-					}
-					return tcpDialUnknownErrnoCode,
-						fmt.Sprintf("dial: unknown errno %d error with msg `%s`", errno, iErr.Err)
-				}
-			}
-
-			// Check if the wrapped error isn't something we recognize, e.g. a DNS error
-			if wrappedErr := errors.Unwrap(err); wrappedErr != nil {
-				errCodeForWrapped, errForWrapped := errorCodeForError(wrappedErr)
-				if errCodeForWrapped != defaultErrorCode {
-					return errCodeForWrapped, errForWrapped
-				}
-			}
-
-			// If it's not, return a generic TCP dial error
-			return tcpDialErrorCode, err.Error()
-		}
-		switch inErr := e.Err.(type) {
-		case syscall.Errno:
-			return netUnknownErrnoErrorCode,
-				fmt.Sprintf(netUnknownErrnoErrorCodeMsg,
-					e.Op, (int)(inErr), runtime.GOOS, inErr.Error())
-		default:
-			return defaultTCPErrorCode, err.Error()
-		}
-
+		return errorCodeForNetOpError(e)
 	case *x509.UnknownAuthorityError:
 		return x509UnknownAuthorityErrorCode, x509UnknownAuthority
 	case *x509.HostnameError:
