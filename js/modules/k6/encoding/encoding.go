@@ -74,7 +74,7 @@ func (e *Encoding) B64decode(ctx context.Context, input, encoding, format string
 		output, err = base64.StdEncoding.DecodeString(input)
 	}
 
-	rt := common.GetRuntime(ctx)
+	rt := common.GetRuntime(ctx) //nolint: ifshort
 	if err != nil {
 		common.Throw(rt, err)
 	}

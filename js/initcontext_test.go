@@ -240,6 +240,7 @@ func TestInitContextRequire(t *testing.T) {
 }
 
 func createAndReadFile(t *testing.T, file string, content []byte, expectedLength int, binary string) (*BundleInstance, error) {
+	t.Helper()
 	fs := afero.NewMemMapFs()
 	assert.NoError(t, fs.MkdirAll("/path/to", 0o755))
 	assert.NoError(t, afero.WriteFile(fs, "/path/to/"+file, content, 0o644))
