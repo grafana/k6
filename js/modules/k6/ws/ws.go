@@ -355,9 +355,15 @@ func (s *Socket) Send(message string) {
 }
 
 // SendBinary writes the given ArrayBuffer message to the connection.
-func (s *Socket) SendBinary(message *goja.ArrayBuffer) {
-	if err := s.conn.WriteMessage(websocket.BinaryMessage, message.Bytes()); err != nil {
-		s.handleEvent("error", common.GetRuntime(s.ctx).ToValue(err))
+func (s *Socket) SendBinary(message goja.Value) {
+	msg := message.Export()
+	if ab, ok := msg.(goja.ArrayBuffer); ok {
+		if err := s.conn.WriteMessage(websocket.BinaryMessage, ab.Bytes()); err != nil {
+			s.handleEvent("error", common.GetRuntime(s.ctx).ToValue(err))
+		}
+	} else {
+		common.Throw(common.GetRuntime(s.ctx),
+			fmt.Errorf("expected ArrayBuffer as argument, received: %T", msg))
 	}
 
 	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
