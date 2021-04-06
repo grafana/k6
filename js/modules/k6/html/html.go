@@ -143,7 +143,7 @@ func (s Selection) adjacentUntil(until func(string) *goquery.Selection,
 		}
 	}
 
-	err := fmt.Errorf("invalid argument, cannot use a %T as a selector", def[0].Export())
+	err := fmt.Errorf("invalid argument, cannot use a '%T' as a selector", def[0].Export())
 	panic(s.rt.NewGoError(err))
 }
 
