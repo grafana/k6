@@ -70,6 +70,11 @@ type WSHTTPResponse struct {
 	Error   string            `json:"error"`
 }
 
+type message struct {
+	mtype int // message type consts as defined in gorilla/websocket/conn.go
+	data  []byte
+}
+
 const writeWait = 10 * time.Second
 
 func New() *WS {
@@ -240,7 +245,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	conn.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
 	conn.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
 
-	readDataChan := make(chan []byte)
+	readDataChan := make(chan *message)
 	readCloseChan := make(chan int)
 	readErrChan := make(chan error)
 
@@ -280,17 +285,19 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			socket.trackPong(pingID)
 			socket.handleEvent("pong")
 
-		case readData := <-readDataChan:
+		case msg := <-readDataChan:
 			stats.PushIfNotDone(ctx, socket.samplesOutput, stats.Sample{
 				Metric: metrics.WSMessagesReceived,
 				Time:   time.Now(),
 				Tags:   socket.sampleTags,
 				Value:  1,
 			})
-			socket.handleEvent("message", rt.ToValue(string(readData)))
-			if _, ok := socket.eventHandlers["binaryMessage"]; ok {
-				ab := rt.NewArrayBuffer(readData)
+
+			if msg.mtype == websocket.BinaryMessage {
+				ab := rt.NewArrayBuffer(msg.data)
 				socket.handleEvent("binaryMessage", rt.ToValue(&ab))
+			} else {
+				socket.handleEvent("message", rt.ToValue(string(msg.data)))
 			}
 
 		case readErr := <-readErrChan:
@@ -500,9 +507,9 @@ func (s *Socket) closeConnection(code int) error {
 }
 
 // Wraps conn.ReadMessage in a channel
-func (s *Socket) readPump(readChan chan []byte, errorChan chan error, closeChan chan int) {
+func (s *Socket) readPump(readChan chan *message, errorChan chan error, closeChan chan int) {
 	for {
-		_, message, err := s.conn.ReadMessage()
+		messageType, data, err := s.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(
 				err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
@@ -525,7 +532,7 @@ func (s *Socket) readPump(readChan chan []byte, errorChan chan error, closeChan 
 		}
 
 		select {
-		case readChan <- message:
+		case readChan <- &message{messageType, data}:
 		case <-s.done:
 			return
 		}

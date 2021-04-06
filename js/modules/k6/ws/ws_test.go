@@ -382,22 +382,16 @@ func TestSocketSendBinary(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = rt.RunString(sr(`
-		var gotMsg = false, gotBinMsg = false;
+		var gotMsg = false;
 		var res = ws.connect('WSBIN_URL/ws-echo', function(socket){
 			var data = new Uint8Array([104, 101, 108, 108, 111]); // 'hello'
 
 			socket.on('open', function() {
 				socket.sendBinary(data.buffer);
 			})
-			socket.on('message', function(msg) {
+			socket.on('binaryMessage', function(msg) {
 				gotMsg = true;
-				if (msg !== 'hello') {
-					throw new Error('received unexpected message: ' + msg);
-				}
-			});
-			socket.on('binaryMessage', function(msgBin) {
-				gotBinMsg = true;
-				let decText = String.fromCharCode.apply(null, new Uint8Array(msgBin));
+				let decText = String.fromCharCode.apply(null, new Uint8Array(msg));
 				decText = decodeURIComponent(escape(decText));
 				if (decText !== 'hello') {
 					throw new Error('received unexpected binary message: ' + decText);
@@ -406,9 +400,6 @@ func TestSocketSendBinary(t *testing.T) {
 			});
 		});
 		if (!gotMsg) {
-			throw new Error("the 'message' handler wasn't called")
-		}
-		if (!gotBinMsg) {
 			throw new Error("the 'binaryMessage' handler wasn't called")
 		}
 		`))
@@ -675,7 +666,7 @@ func TestReadPump(t *testing.T) {
 				_ = conn.Close()
 			}()
 
-			msgChan := make(chan []byte)
+			msgChan := make(chan *message)
 			errChan := make(chan error)
 			closeChan := make(chan int)
 			s := &Socket{conn: conn}
