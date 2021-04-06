@@ -139,6 +139,9 @@ func errorCodeForError(err error) (errCode, string) {
 		return unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCode(*e)),
 			fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCode(*e))
 	case *net.OpError:
+		// TODO: refactor this branch and actually check for *os.SyscallError in
+		// the main switch body?
+
 		if e.Net != "tcp" && e.Net != "tcp6" {
 			// TODO: figure out how this happens
 			return defaultNetNonTCPErrorCode, err.Error()
@@ -172,6 +175,16 @@ func errorCodeForError(err error) (errCode, string) {
 						fmt.Sprintf("dial: unknown errno %d error with msg `%s`", errno, iErr.Err)
 				}
 			}
+
+			// Check if the wrapped error isn't something we recognize, e.g. a DNS error
+			if wrappedErr := errors.Unwrap(err); wrappedErr != nil {
+				errCodeForWrapped, errForWrapped := errorCodeForError(wrappedErr)
+				if errCodeForWrapped != defaultErrorCode {
+					return errCodeForWrapped, errForWrapped
+				}
+			}
+
+			// If it's not, return a generic TCP dial error
 			return tcpDialErrorCode, err.Error()
 		}
 		switch inErr := e.Err.(type) {
