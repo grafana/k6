@@ -86,7 +86,7 @@ func TestToString(t *testing.T) {
 		{struct{}{}, "", "invalid type struct {}, expected string, []byte or ArrayBuffer"},
 	}
 
-	for _, tc := range testCases { //nolint: paralleltest // false positive?
+	for _, tc := range testCases { //nolint: paralleltest // false positive: https://github.com/kunwardeep/paralleltest/issues/8
 		tc := tc
 		t.Run(fmt.Sprintf("%T", tc.in), func(t *testing.T) {
 			t.Parallel()

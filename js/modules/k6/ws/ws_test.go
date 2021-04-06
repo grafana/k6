@@ -381,7 +381,7 @@ func TestSocketSendBinary(t *testing.T) { //nolint: tparallel
 	err = rt.Set("ws", common.Bind(rt, New(), &ctx))
 	assert.NoError(t, err)
 
-	t.Run("ok", func(t *testing.T) { //nolint: paralleltest // can't be run in parallel
+	t.Run("ok", func(t *testing.T) {
 		_, err = rt.RunString(sr(`
 		var gotMsg = false;
 		var res = ws.connect('WSBIN_URL/ws-echo', function(socket){
@@ -407,17 +407,40 @@ func TestSocketSendBinary(t *testing.T) { //nolint: tparallel
 		assert.NoError(t, err)
 	})
 
-	t.Run("err", func(t *testing.T) { //nolint: paralleltest // can't be run in parallel
-		_, err = rt.RunString(sr(`
-		var res = ws.connect('WSBIN_URL/ws-echo', function(socket){
-			socket.on('open', function() {
-				socket.sendBinary([104, 101, 108, 108, 111]);
-			})
-		});
-		`))
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "expected ArrayBuffer as argument, received: []interface {}")
-	})
+	errTestCases := []struct {
+		in, expErrType string
+	}{
+		{"", ""},
+		{"undefined", "undefined"},
+		{"null", "null"},
+		{"true", "Boolean"},
+		{"1", "Number"},
+		{"3.14", "Number"},
+		{"'str'", "String"},
+		{"[1, 2, 3]", "Array"},
+		{"new Uint8Array([1, 2, 3])", "Object"},
+		{"Symbol('a')", "Symbol"},
+		{"function() {}", "Function"},
+	}
+
+	for _, tc := range errTestCases { //nolint: paralleltest
+		tc := tc
+		t.Run(fmt.Sprintf("err_%s", tc.expErrType), func(t *testing.T) {
+			_, err = rt.RunString(fmt.Sprintf(sr(`
+			var res = ws.connect('WSBIN_URL/ws-echo', function(socket){
+				socket.on('open', function() {
+					socket.sendBinary(%s);
+				})
+			});
+		`), tc.in))
+			require.Error(t, err)
+			if tc.in == "" {
+				assert.Contains(t, err.Error(), "missing argument, expected ArrayBuffer")
+			} else {
+				assert.Contains(t, err.Error(), fmt.Sprintf("expected ArrayBuffer as argument, received: %s", tc.expErrType))
+			}
+		})
+	}
 }
 
 func TestErrors(t *testing.T) {
