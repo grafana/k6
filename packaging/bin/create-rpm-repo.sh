@@ -3,8 +3,8 @@ set -eEuo pipefail
 
 # External dependencies:
 # - https://github.com/rpm-software-management/createrepo
-# - https://github.com/s3tools/s3cmd
-#   s3cmd expects AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to be set in the
+# - https://aws.amazon.com/cli/
+#   awscli expects AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to be set in the
 #   environment.
 # - https://gnupg.org/
 #   For signing the script expects the private signing key to already be
@@ -30,18 +30,6 @@ delete_old_pkgs() {
   find "$1" -name '*.rpm' -type f -daystart -mtime "+${REMOVE_PKG_DAYS}" -print0 | xargs -r0 rm -v
 }
 
-sync_to_s3() {
-  log "Syncing to S3 ..."
-  s3cmd sync --delete-removed "${REPODIR}/" "s3://${S3PATH}/"
-
-  # Disable cache for repo metadata and index files, so that new releases will be
-  # available immediately.
-  s3cmd --recursive modify --add-header="Cache-Control:no-cache, max-age=0" \
-    "s3://${S3PATH}/x86_64/repodata"
-  s3cmd modify --recursive --exclude='*' --include='index.html' \
-    --add-header='Cache-Control:no-cache, max-age=0' "s3://${S3PATH}/"
-}
-
 architectures="x86_64"
 
 pushd . > /dev/null
@@ -51,7 +39,7 @@ for arch in $architectures; do
   mkdir -p "$arch" && cd "$_"
 
   # Download existing packages
-  s3cmd sync --exclude='*' --include='*.rpm' "s3://${S3PATH}/${arch}/" ./
+  aws s3 sync --exclude='*' --include='*.rpm' "s3://${S3PATH}/${arch}/" ./
 
   # Copy the new packages in and generate signatures
   # FIXME: The architecture naming used by yum docs and in public RPM repos is
@@ -71,4 +59,6 @@ log "Generating index.html ..."
 generate_index.py -r
 
 popd > /dev/null
-sync_to_s3
+
+log "Syncing to S3 ..."
+aws s3 sync --delete "${REPODIR}/" "s3://${S3PATH}/"

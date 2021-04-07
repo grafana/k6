@@ -2,8 +2,8 @@
 set -eEuo pipefail
 
 # External dependencies:
-# - https://github.com/s3tools/s3cmd
-#   s3cmd expects AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to be set in the
+# - https://aws.amazon.com/cli/
+#   awscli expects AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to be set in the
 #   environment.
 # - generate_index.py
 #   For generating the index.html of each directory. It's available in the
@@ -27,11 +27,7 @@ delete_old_pkgs() {
 
 sync_to_s3() {
   log "Syncing to S3 ..."
-  s3cmd sync --delete-removed "${REPODIR}/" "s3://${S3PATH}/"
-
-  # Disable cache for index files.
-  s3cmd modify --recursive --exclude='*' --include='index.html' \
-    --add-header='Cache-Control:no-cache, max-age=0' "s3://${S3PATH}/"
+  aws s3 sync --delete "${REPODIR}/" "s3://${S3PATH}/"
 }
 
 mkdir -p "$REPODIR"
@@ -39,7 +35,7 @@ mkdir -p "$REPODIR"
 # Download existing packages
 # For MSI packages this is only done to be able to generate the index.html correctly.
 # Should we fake it and create empty files that have the same timestamp and size as the original ones?
-s3cmd sync --exclude='*' --include='*.msi' "s3://${S3PATH}/" "$REPODIR/"
+aws s3 sync --exclude='*' --include='*.msi' "s3://${S3PATH}/" "$REPODIR/"
 
 # Copy the new packages in
 find "$PKGDIR" -name "*.msi" -type f -print0 | xargs -r0 cp -t "$REPODIR"
