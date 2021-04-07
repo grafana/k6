@@ -19,15 +19,15 @@ _usage="Usage: $0 <pkgdir> <repodir> [s3bucket=${_s3bucket}]"
 PKGDIR="${1?${_usage}}"  # The directory where .rpm files are located
 REPODIR="${2?${_usage}}" # The package repository working directory
 S3PATH="${3-${_s3bucket}}/rpm"
-# Number of packages to keep for each architecture, older packages will be deleted.
-RETAIN_PKG_COUNT=25
+# Remove packages older than N number of days (730 is roughly ~2 years).
+REMOVE_PKG_DAYS=730
 
 log() {
     echo "$(date -Iseconds) $*"
 }
 
 delete_old_pkgs() {
-  find "$1" -name '*.rpm' -type f | sort -r | tail -n "+$((RETAIN_PKG_COUNT+1))" | xargs -r rm -v
+  find "$1" -name '*.rpm' -type f -daystart -mtime "+${REMOVE_PKG_DAYS}" -print0 | xargs -r0 rm -v
 }
 
 sync_to_s3() {
