@@ -56,7 +56,7 @@ type Output struct {
 	saveInterval time.Duration
 }
 
-// New Creates new instance of CSV collector
+// New Creates new instance of CSV output
 func New(params output.Params) (output.Output, error) {
 	return newOutput(params)
 }
