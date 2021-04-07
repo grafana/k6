@@ -32,6 +32,12 @@ sync_to_s3() {
   # Disable cache for index files.
   s3cmd modify --recursive --exclude='*' --include='index.html' \
     --add-header='Cache-Control:no-cache, max-age=0' "s3://${S3PATH}/"
+
+  # Update latest redirect
+  latest="$(find "$REPODIR" -name '*.msi' -printf '%P\n' | sort | tail -1)"
+  s3cmd --force --add-header="x-amz-website-redirect-location:/msi/${latest}" \
+     --add-header='Cache-Control:no-cache, max-age=0' \
+     put "$(mktemp)" "s3://${S3PATH}/k6-latest-amd64.msi"
 }
 
 mkdir -p "$REPODIR"
@@ -43,8 +49,6 @@ s3cmd sync --exclude='*' --include='*.msi' "s3://${S3PATH}/" "$REPODIR/"
 
 # Copy the new packages in
 find "$PKGDIR" -name "*.msi" -type f -print0 | xargs -r0 cp -t "$REPODIR"
-
-# TODO: Handle k6-latest-amd64.msi
 
 delete_old_pkgs "$REPODIR"
 
