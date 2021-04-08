@@ -326,14 +326,13 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	activeVUs := make(chan lib.ActiveVU, maxVUs)
 	activeVUsCount := uint64(0)
 
-	activationParams := getVUActivationParams(maxDurationCtx, varr.config.BaseConfig,
-		func(u lib.InitializedVU) {
-			varr.executionState.ReturnVU(u, true)
-			activeVUsWg.Done()
-		})
+	returnVU := func(u lib.InitializedVU) {
+		varr.executionState.ReturnVU(u, true)
+		activeVUsWg.Done()
+	}
 	activateVU := func(initVU lib.InitializedVU) lib.ActiveVU {
 		activeVUsWg.Add(1)
-		activeVU := initVU.Activate(activationParams)
+		activeVU := initVU.Activate(getVUActivationParams(maxDurationCtx, varr.config.BaseConfig, returnVU))
 		varr.executionState.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddUint64(&activeVUsCount, 1)
 		return activeVU

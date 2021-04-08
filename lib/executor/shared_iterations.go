@@ -232,19 +232,15 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 	regDurationDone := regDurationCtx.Done()
 	runIteration := getIterationRunner(si.executionState, si.logger)
 
-	activationParams := getVUActivationParams(maxDurationCtx, si.config.BaseConfig,
-		func(u lib.InitializedVU) {
-			si.executionState.ReturnVU(u, true)
-			activeVUs.Done()
-		})
+	returnVU := func(u lib.InitializedVU) {
+		si.executionState.ReturnVU(u, true)
+		activeVUs.Done()
+	}
 	handleVU := func(initVU lib.InitializedVU) {
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
 
-		newParams := *activationParams
-		newParams.RunContext = ctx
-
-		activeVU := initVU.Activate(&newParams)
+		activeVU := initVU.Activate(getVUActivationParams(ctx, si.config.BaseConfig, returnVU))
 
 		for {
 			select {
