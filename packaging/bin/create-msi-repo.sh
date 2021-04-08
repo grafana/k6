@@ -27,11 +27,11 @@ delete_old_pkgs() {
 
 sync_to_s3() {
   log "Syncing to S3 ..."
-  aws s3 sync --delete "${REPODIR}/" "s3://${S3PATH}/"
+  aws s3 sync --no-progress --delete "${REPODIR}/" "s3://${S3PATH}/"
 
   # Update redirect to the latest package.
   latest="$(find "$REPODIR" -name '*.msi' -printf '%P\n' | sort | tail -1)"
-  aws s3 cp --website-redirect="/msi/${latest}" \
+  aws s3 cp --no-progress --website-redirect="/msi/${latest}" \
     --content-type='application/x-msi' \
     "$REPODIR/k6-latest-amd64.msi" "s3://${S3PATH}/k6-latest-amd64.msi"
 }

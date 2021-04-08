@@ -39,7 +39,7 @@ for arch in $architectures; do
   mkdir -p "$arch" && cd "$_"
 
   # Download existing packages
-  aws s3 sync --exclude='*' --include='*.rpm' "s3://${S3PATH}/${arch}/" ./
+  aws s3 sync --no-progress --exclude='*' --include='*.rpm' "s3://${S3PATH}/${arch}/" ./
 
   # Copy the new packages in and generate signatures
   # FIXME: The architecture naming used by yum docs and in public RPM repos is
@@ -61,4 +61,4 @@ generate_index.py -r
 popd > /dev/null
 
 log "Syncing to S3 ..."
-aws s3 sync --delete "${REPODIR}/" "s3://${S3PATH}/"
+aws s3 sync --no-progress --delete "${REPODIR}/" "s3://${S3PATH}/"
