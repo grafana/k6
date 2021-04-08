@@ -33,7 +33,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats/influxdb"
+	"github.com/loadimpact/k6/output/influxdb"
 	"github.com/loadimpact/k6/ui"
 )
 
@@ -112,12 +112,11 @@ This will set the default server used when just "-o influxdb" is passed.`,
 			if err = dec.Decode(vals); err != nil {
 				return err
 			}
-
-			coll, err := influxdb.New(logger, conf)
+			client, err := influxdb.MakeClient(conf)
 			if err != nil {
 				return err
 			}
-			if _, _, err := coll.Client.Ping(10 * time.Second); err != nil {
+			if _, _, err = client.Ping(10 * time.Second); err != nil {
 				return err
 			}
 

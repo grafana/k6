@@ -99,8 +99,9 @@ func ParseArg(arg string) (Config, error) {
 		if err != nil {
 			return c, err
 		}
-		c.InfluxDBConfig = influxConfig
+		c.InfluxDBConfig = c.InfluxDBConfig.Apply(influxConfig)
 	}
+
 	delete(params, "influxdb")
 
 	if v, ok := params["push_interval"].(string); ok {
