@@ -28,6 +28,12 @@ delete_old_pkgs() {
 sync_to_s3() {
   log "Syncing to S3 ..."
   aws s3 sync --delete "${REPODIR}/" "s3://${S3PATH}/"
+
+  # Update redirect to the latest package.
+  latest="$(find "$REPODIR" -name '*.msi' -printf '%P\n' | sort | tail -1)"
+  aws s3 cp --website-redirect="/msi/${latest}" \
+    --content-type='application/x-msi' \
+    "$REPODIR/k6-latest-amd64.msi" "s3://${S3PATH}/k6-latest-amd64.msi"
 }
 
 mkdir -p "$REPODIR"
@@ -35,15 +41,12 @@ mkdir -p "$REPODIR"
 # Download existing packages
 # For MSI packages this is only done to be able to generate the index.html correctly.
 # Should we fake it and create empty files that have the same timestamp and size as the original ones?
-aws s3 sync --exclude='*' --include='*.msi' "s3://${S3PATH}/" "$REPODIR/"
+aws s3 sync --no-progress --exclude='*' --include='*.msi' "s3://${S3PATH}/" "$REPODIR/"
 
 # Copy the new packages in
 find "$PKGDIR" -name "*.msi" -type f -print0 | xargs -r0 cp -t "$REPODIR"
-
-# Update the latest package. This could be done with S3 redirects, but
-# CloudFront caches redirects aggressively and I wasn't able to invalidate it.
-latest="$(find "$REPODIR" -name '*.msi' -printf '%P\n' | sort | tail -1)"
-cp -p "${REPODIR}/${latest}" "${REPODIR}/k6-latest-amd64.msi"
+# Add placeholder for latest package redirect
+touch "$REPODIR/k6-latest-amd64.msi"
 
 delete_old_pkgs "$REPODIR"
 
