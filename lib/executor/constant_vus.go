@@ -176,19 +176,15 @@ func (clv ConstantVUs) Run(parentCtx context.Context, out chan<- stats.SampleCon
 	regDurationDone := regDurationCtx.Done()
 	runIteration := getIterationRunner(clv.executionState, clv.logger)
 
-	activationParams := getVUActivationParams(maxDurationCtx, clv.config.BaseConfig,
-		func(u lib.InitializedVU) {
-			clv.executionState.ReturnVU(u, true)
-			activeVUs.Done()
-		})
+	returnVU := func(u lib.InitializedVU) {
+		clv.executionState.ReturnVU(u, true)
+		activeVUs.Done()
+	}
 	handleVU := func(initVU lib.InitializedVU) {
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
 
-		newParams := *activationParams
-		newParams.RunContext = ctx
-
-		activeVU := initVU.Activate(&newParams)
+		activeVU := initVU.Activate(getVUActivationParams(ctx, clv.config.BaseConfig, returnVU))
 
 		for {
 			select {
