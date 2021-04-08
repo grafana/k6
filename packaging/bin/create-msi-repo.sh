@@ -29,18 +29,18 @@ sync_to_s3() {
   log "Syncing to S3 ..."
   aws s3 sync --no-progress --delete "${REPODIR}/" "s3://${S3PATH}/"
 
-  # Update redirect to the latest package.
-  latest="$(find "$REPODIR" -name '*.msi' -printf '%P\n' | sort | tail -1)"
-  aws s3 cp --no-progress --website-redirect="/msi/${latest}" \
-    --content-type='application/x-msi' --cache-control='max-age=60,must-revalidate' \
-    "$REPODIR/k6-latest-amd64.msi" "s3://${S3PATH}/k6-latest-amd64.msi"
-
-  # Set a short cache expiration for index files.
-  aws s3 cp --no-progress --recursive --exclude='*' --include='*.html' \
+  # Set a short cache expiration for index files and the latest MSI package.
+  aws s3 cp --no-progress --recursive --exclude='*' \
+    --include='*.html' \
     --cache-control='max-age=60,must-revalidate' \
     --content-type='text/html' \
     --metadata-directive=REPLACE \
     "s3://${S3PATH}" "s3://${S3PATH}"
+  aws s3 cp --no-progress \
+    --cache-control='max-age=60,must-revalidate' \
+    --content-type='application/x-msi' \
+    --metadata-directive=REPLACE \
+    "s3://${S3PATH}/k6-latest-amd64.msi" "s3://${S3PATH}/k6-latest-amd64.msi"
 }
 
 mkdir -p "$REPODIR"
@@ -52,10 +52,13 @@ aws s3 sync --no-progress --exclude='*' --include='*.msi' "s3://${S3PATH}/" "$RE
 
 # Copy the new packages in
 find "$PKGDIR" -name "*.msi" -type f -print0 | xargs -r0 cp -t "$REPODIR"
-# Add placeholder for latest package redirect
-touch "$REPODIR/k6-latest-amd64.msi"
 
 delete_old_pkgs "$REPODIR"
+
+# Update the latest package. This could be done with S3 redirects, but
+# CloudFront caches redirects aggressively and I wasn't able to invalidate it.
+latest="$(find "$REPODIR" -name '*.msi' -printf '%P\n' | sort | tail -1)"
+cp -p "${REPODIR}/${latest}" "${REPODIR}/k6-latest-amd64.msi"
 
 log "Generating index.html ..."
 (cd "$REPODIR" && generate_index.py -r)
