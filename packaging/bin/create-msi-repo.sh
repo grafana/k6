@@ -32,8 +32,15 @@ sync_to_s3() {
   # Update redirect to the latest package.
   latest="$(find "$REPODIR" -name '*.msi' -printf '%P\n' | sort | tail -1)"
   aws s3 cp --no-progress --website-redirect="/msi/${latest}" \
-    --content-type='application/x-msi' \
+    --content-type='application/x-msi' --cache-control='max-age=60,must-revalidate' \
     "$REPODIR/k6-latest-amd64.msi" "s3://${S3PATH}/k6-latest-amd64.msi"
+
+  # Set a short cache expiration for index files.
+  aws s3 cp --no-progress --recursive --exclude='*' --include='*.html' \
+    --cache-control='max-age=60,must-revalidate' \
+    --content-type='text/html' \
+    --metadata-directive=REPLACE \
+    "s3://${S3PATH}" "s3://${S3PATH}"
 }
 
 mkdir -p "$REPODIR"

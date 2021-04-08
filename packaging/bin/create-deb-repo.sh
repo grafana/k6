@@ -37,6 +37,25 @@ delete_old_pkgs() {
   done
 }
 
+sync_to_s3() {
+  log "Syncing to S3 ..."
+  aws s3 sync --no-progress --delete "${REPODIR}/" "s3://${S3PATH}/"
+
+  # Set a short cache expiration for index and repo metadata files.
+  aws s3 cp --no-progress --recursive \
+    --exclude='*.deb' --exclude='*.asc' --exclude='*.html' \
+    --cache-control='max-age=60,must-revalidate' \
+    --metadata-directive=REPLACE \
+    "s3://${S3PATH}" "s3://${S3PATH}"
+  # Set it separately for HTML files to set the correct Content-Type.
+  aws s3 cp --no-progress --recursive \
+    --exclude='*' --include='*.html' \
+    --content-type='text/html' \
+    --cache-control='max-age=60,must-revalidate' \
+    --metadata-directive=REPLACE \
+    "s3://${S3PATH}" "s3://${S3PATH}"
+}
+
 # We don't publish i386 packages, but the repo structure is needed for
 # compatibility on some systems. See https://unix.stackexchange.com/a/272916 .
 architectures="amd64 i386"
@@ -94,5 +113,4 @@ generate_index.py -r
 
 popd > /dev/null
 
-log "Syncing to S3 ..."
-aws s3 sync --no-progress --delete "${REPODIR}/" "s3://${S3PATH}/"
+sync_to_s3
