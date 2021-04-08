@@ -558,7 +558,8 @@ func (es *ExecutionState) SetInitVUFunc(initVUFunc InitVUFunc) {
 
 // GetUnplannedVU checks if any unplanned VUs remain to be initialized, and if
 // they do, it initializes one and returns it. If all unplanned VUs have already
-// been initialized, it returns one from the global vus buffer.
+// been initialized, it returns one from the global vus buffer, but doesn't
+// automatically increment the active VUs counter in either case.
 //
 // IMPORTANT: GetUnplannedVU() doesn't do any checking if the requesting
 // executor is actually allowed to have the VU at this particular time.
@@ -570,7 +571,7 @@ func (es *ExecutionState) GetUnplannedVU(ctx context.Context, logger *logrus.Ent
 	if remVUs < 0 {
 		logger.Debug("Reusing a previously initialized unplanned VU")
 		atomic.AddInt64(es.uninitializedUnplannedVUs, 1)
-		return es.GetPlannedVU(logger, true)
+		return es.GetPlannedVU(logger, false)
 	}
 
 	logger.Debug("Initializing an unplanned VU, this may affect test results")
