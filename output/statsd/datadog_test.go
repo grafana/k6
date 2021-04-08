@@ -1,7 +1,7 @@
 /*
  *
  * k6 - a next-generation load testing tool
- * Copyright (C) 2019 Load Impact
+ * Copyright (C) 2021 Load Impact
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,42 +18,48 @@
  *
  */
 
-package datadog
+package statsd
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/output"
+	"github.com/loadimpact/k6/stats"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
-
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/stats/statsd/common"
-	"github.com/loadimpact/k6/stats/statsd/common/testutil"
 )
 
-func TestCollector(t *testing.T) {
+// TODO delete this file as well when datadog output is dropped
+
+func TestCollectorDatadog(t *testing.T) {
+	t.Parallel()
 	tagMap := stats.TagSet{"tag1": true, "tag2": true}
-	handler := tagHandler(tagMap)
-	testutil.BaseTest(t, func(
+	baseTest(t, func(
 		logger logrus.FieldLogger, addr, namespace null.String, bufferSize null.Int,
-		pushInterval types.NullDuration) (*common.Collector, error) {
-		return New(logger, Config{
-			Addr:         addr,
-			Namespace:    namespace,
-			BufferSize:   bufferSize,
-			PushInterval: pushInterval,
-			TagBlacklist: tagMap,
-		})
+		pushInterval types.NullDuration) (*Output, error) {
+		return NewDatadog(
+			output.Params{
+				Logger: logger,
+				JSONConfig: json.RawMessage(fmt.Sprintf(`{
+			"addr": "%s",
+			"namespace": "%s",
+			"bufferSize": %d,
+			"pushInterval": "%s",
+			"tagBlacklist": ["tag1", "tag2"]
+		}`, addr.String, namespace.String, bufferSize.Int64, pushInterval.Duration.String())),
+			})
 	}, func(t *testing.T, containers []stats.SampleContainer, expectedOutput, output string) {
 		outputLines := strings.Split(output, "\n")
 		expectedOutputLines := strings.Split(expectedOutput, "\n")
 		for i, container := range containers {
 			for j, sample := range container.GetSamples() {
 				var (
-					expectedTagList    = handler.processTags(sample.GetTags().CloneTags())
+					expectedTagList    = processTags(tagMap, sample.GetTags().CloneTags())
 					expectedOutputLine = expectedOutputLines[i*j+i]
 					outputLine         = outputLines[i*j+i]
 					outputWithoutTags  = outputLine

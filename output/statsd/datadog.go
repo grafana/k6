@@ -18,35 +18,23 @@
  *
  */
 
-package datadog
+package statsd
 
 import (
 	"encoding/json"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/loadimpact/k6/lib/types"
+	"github.com/loadimpact/k6/output"
+	"github.com/loadimpact/k6/stats"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
-
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/stats/statsd/common"
 )
 
-type tagHandler stats.TagSet
+// TODO delete this whole file
 
-func (t tagHandler) processTags(tags map[string]string) []string {
-	var res []string
-	for key, value := range tags {
-		if value != "" && !t[key] {
-			res = append(res, key+":"+value)
-		}
-	}
-	return res
-}
-
-// Config defines the Datadog configuration.
-type Config struct {
+type datadogConfig struct {
 	Addr         null.String        `json:"addr,omitempty" envconfig:"K6_DATADOG_ADDR"`
 	BufferSize   null.Int           `json:"bufferSize,omitempty" envconfig:"K6_DATADOG_BUFFER_SIZE"`
 	Namespace    null.String        `json:"namespace,omitempty" envconfig:"K6_DATADOG_NAMESPACE"`
@@ -54,30 +42,8 @@ type Config struct {
 	TagBlacklist stats.TagSet       `json:"tagBlacklist,omitempty" envconfig:"K6_DATADOG_TAG_BLACKLIST"`
 }
 
-// GetAddr returns the address of the DogStatsD service.
-func (c Config) GetAddr() null.String {
-	return c.Addr
-}
-
-// GetBufferSize returns the size of the commands buffer.
-func (c Config) GetBufferSize() null.Int {
-	return c.BufferSize
-}
-
-// GetNamespace returns the namespace prepended to all statsd calls.
-func (c Config) GetNamespace() null.String {
-	return c.Namespace
-}
-
-// GetPushInterval returns the time interval between outgoing data batches.
-func (c Config) GetPushInterval() types.NullDuration {
-	return c.PushInterval
-}
-
-var _ common.Config = &Config{}
-
 // Apply saves config non-zero config values from the passed config in the receiver.
-func (c Config) Apply(cfg Config) Config {
+func (c datadogConfig) Apply(cfg datadogConfig) datadogConfig {
 	if cfg.Addr.Valid {
 		c.Addr = cfg.Addr
 	}
@@ -97,9 +63,9 @@ func (c Config) Apply(cfg Config) Config {
 	return c
 }
 
-// NewConfig creates a new Config instance with default values for some fields.
-func NewConfig() Config {
-	return Config{
+// NewdatadogConfig creates a new datadogConfig instance with default values for some fields.
+func newdatadogConfig() datadogConfig {
+	return datadogConfig{
 		Addr:         null.NewString("localhost:8125", false),
 		BufferSize:   null.NewInt(20, false),
 		Namespace:    null.NewString("k6.", false),
@@ -108,34 +74,47 @@ func NewConfig() Config {
 	}
 }
 
-// New creates a new Datadog connector client
-func New(logger logrus.FieldLogger, conf Config) (*common.Collector, error) {
-	return &common.Collector{
-		Config:      conf,
-		Type:        "datadog",
-		ProcessTags: tagHandler(conf.TagBlacklist).processTags,
-		Logger:      logger,
-	}, nil
-}
-
-// GetConsolidatedConfig combines {default config values + JSON config +
+// GetConsolidateddatadogConfig combines {default config values + JSON config +
 // environment vars}, and returns the final result.
-func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (Config, error) {
-	result := NewConfig()
+func getConsolidatedDatadogConfig(jsonRawConf json.RawMessage) (datadogConfig, error) {
+	result := newdatadogConfig()
 	if jsonRawConf != nil {
-		jsonConf := Config{}
+		jsonConf := datadogConfig{}
 		if err := json.Unmarshal(jsonRawConf, &jsonConf); err != nil {
 			return result, err
 		}
 		result = result.Apply(jsonConf)
 	}
 
-	envConfig := Config{}
-	if err := envconfig.Process("", &envConfig); err != nil {
+	envdatadogConfig := datadogConfig{}
+	if err := envconfig.Process("", &envdatadogConfig); err != nil {
 		// TODO: get rid of envconfig and actually use the env parameter...
 		return result, err
 	}
-	result = result.Apply(envConfig)
+	result = result.Apply(envdatadogConfig)
 
 	return result, nil
+}
+
+// NewDatadog creates a new statsd connector client with tags enabled
+// TODO delete this
+func NewDatadog(params output.Params) (*Output, error) {
+	conf, err := getConsolidatedDatadogConfig(params.JSONConfig)
+	if err != nil {
+		return nil, err
+	}
+	logger := params.Logger.WithFields(logrus.Fields{"output": "statsd"})
+	statsdConfig := config{
+		Addr:         conf.Addr,
+		BufferSize:   conf.BufferSize,
+		Namespace:    conf.Namespace,
+		PushInterval: conf.PushInterval,
+		TagBlocklist: conf.TagBlacklist,
+		EnableTags:   null.NewBool(true, false),
+	}
+
+	return &Output{
+		config: statsdConfig,
+		logger: logger,
+	}, nil
 }

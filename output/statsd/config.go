@@ -25,45 +25,34 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats/statsd/common"
+	"github.com/loadimpact/k6/stats"
 )
 
-// Config defines the StatsD configuration.
-type Config struct {
+// config defines the StatsD configuration.
+type config struct {
 	Addr         null.String        `json:"addr,omitempty" envconfig:"K6_STATSD_ADDR"`
 	BufferSize   null.Int           `json:"bufferSize,omitempty" envconfig:"K6_STATSD_BUFFER_SIZE"`
 	Namespace    null.String        `json:"namespace,omitempty" envconfig:"K6_STATSD_NAMESPACE"`
 	PushInterval types.NullDuration `json:"pushInterval,omitempty" envconfig:"K6_STATSD_PUSH_INTERVAL"`
+	TagBlocklist stats.TagSet       `json:"tagBlocklist,omitempty" envconfig:"K6_STATSD_TAG_BLOCKLIST"`
+	EnableTags   null.Bool          `json:"enableTags,omitempty" envconfig:"K6_STATSD_ENABLE_TAGS"`
 }
 
-// GetAddr returns the address of the StatsD service.
-func (c Config) GetAddr() null.String {
-	return c.Addr
+func processTags(t stats.TagSet, tags map[string]string) []string {
+	var res []string
+	for key, value := range tags {
+		if value != "" && !t[key] {
+			res = append(res, key+":"+value)
+		}
+	}
+	return res
 }
-
-// GetBufferSize returns the size of the commands buffer.
-func (c Config) GetBufferSize() null.Int {
-	return c.BufferSize
-}
-
-// GetNamespace returns the namespace prepended to all statsd calls.
-func (c Config) GetNamespace() null.String {
-	return c.Namespace
-}
-
-// GetPushInterval returns the time interval between outgoing data batches.
-func (c Config) GetPushInterval() types.NullDuration {
-	return c.PushInterval
-}
-
-var _ common.Config = &Config{}
 
 // Apply saves config non-zero config values from the passed config in the receiver.
-func (c Config) Apply(cfg Config) Config {
+func (c config) Apply(cfg config) config {
 	if cfg.Addr.Valid {
 		c.Addr = cfg.Addr
 	}
@@ -76,42 +65,41 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.PushInterval.Valid {
 		c.PushInterval = cfg.PushInterval
 	}
+	if cfg.TagBlocklist != nil {
+		c.TagBlocklist = cfg.TagBlocklist
+	}
+	if cfg.EnableTags.Valid {
+		c.EnableTags = cfg.EnableTags
+	}
 
 	return c
 }
 
-// NewConfig creates a new Config instance with default values for some fields.
-func NewConfig() Config {
-	return Config{
+// newConfig creates a new Config instance with default values for some fields.
+func newConfig() config {
+	return config{
 		Addr:         null.NewString("localhost:8125", false),
 		BufferSize:   null.NewInt(20, false),
 		Namespace:    null.NewString("k6.", false),
 		PushInterval: types.NewNullDuration(1*time.Second, false),
+		TagBlocklist: stats.TagSet{},
+		EnableTags:   null.NewBool(false, false),
 	}
 }
 
-// New creates a new statsd connector client
-func New(logger logrus.FieldLogger, conf common.Config) (*common.Collector, error) {
-	return &common.Collector{
-		Config: conf,
-		Type:   "statsd",
-		Logger: logger,
-	}, nil
-}
-
-// GetConsolidatedConfig combines {default config values + JSON config +
+// getConsolidatedConfig combines {default config values + JSON config +
 // environment vars}, and returns the final result.
-func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (Config, error) {
-	result := NewConfig()
+func getConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, _ string) (config, error) {
+	result := newConfig()
 	if jsonRawConf != nil {
-		jsonConf := Config{}
+		jsonConf := config{}
 		if err := json.Unmarshal(jsonRawConf, &jsonConf); err != nil {
 			return result, err
 		}
 		result = result.Apply(jsonConf)
 	}
 
-	envConfig := Config{}
+	envConfig := config{}
 	_ = env // TODO: get rid of envconfig and actually use the env parameter...
 	if err := envconfig.Process("", &envConfig); err != nil {
 		return result, err
