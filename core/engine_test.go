@@ -381,6 +381,17 @@ func getMetricCount(mo *mockoutput.MockOutput, name string) (result uint) {
 	return
 }
 
+func getMetricMax(mo *mockoutput.MockOutput, name string) (result float64) {
+	for _, sc := range mo.SampleContainers {
+		for _, s := range sc.GetSamples() {
+			if s.Metric.Name == name && s.Value > result {
+				result = s.Value
+			}
+		}
+	}
+	return
+}
+
 const expectedHeaderMaxLength = 500
 
 // FIXME: This test is too brittle, consider simplifying.
@@ -974,4 +985,100 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1.0, count)
+}
+
+func TestActiveVUsCount(t *testing.T) {
+	t.Parallel()
+
+	script := []byte(`
+		var sleep = require('k6').sleep;
+
+		exports.options = {
+			scenarios: {
+				carr1: {
+					executor: 'constant-arrival-rate',
+					rate: 10,
+					preAllocatedVUs: 1,
+					maxVUs: 10,
+					startTime: '0s',
+					duration: '3s',
+					gracefulStop: '0s',
+				},
+				carr2: {
+					executor: 'constant-arrival-rate',
+					rate: 10,
+					preAllocatedVUs: 1,
+					maxVUs: 10,
+					duration: '3s',
+					startTime: '3s',
+					gracefulStop: '0s',
+				},
+				rarr: {
+					executor: 'ramping-arrival-rate',
+					startRate: 5,
+					stages: [
+						{ target: 10, duration: '2s' },
+						{ target: 0, duration: '2s' },
+					],
+					preAllocatedVUs: 1,
+					maxVUs: 10,
+					startTime: '6s',
+					gracefulStop: '0s',
+				},
+			}
+		}
+
+		exports.default = function () {
+			sleep(5);
+		}
+	`)
+
+	logger := testutils.NewLogger(t)
+	logHook := testutils.SimpleLogrusHook{HookedLevels: logrus.AllLevels}
+	logger.AddHook(&logHook)
+
+	rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom("base")}
+
+	runner, err := js.New(logger, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil, rtOpts)
+	require.NoError(t, err)
+
+	mockOutput := mockoutput.New()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	opts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
+		MetricSamplesBufferSize: null.NewInt(200, false),
+	}.Apply(runner.GetOptions()))
+	require.NoError(t, err)
+	require.Empty(t, opts.Validate())
+	require.NoError(t, runner.SetOptions(opts))
+	execScheduler, err := local.NewExecutionScheduler(runner, logger)
+	require.NoError(t, err)
+	engine, err := NewEngine(execScheduler, opts, rtOpts, []output.Output{mockOutput}, logger)
+	require.NoError(t, err)
+	run, waitFn, err := engine.Init(ctx, ctx) // no need for 2 different contexts
+	require.NoError(t, err)
+
+	errC := make(chan error)
+	go func() { errC <- run() }()
+
+	select {
+	case <-time.After(15 * time.Second):
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		require.NoError(t, err)
+		cancel()
+		waitFn()
+		require.False(t, engine.IsTainted())
+	}
+
+	assert.Equal(t, 10.0, getMetricMax(mockOutput, metrics.VUs.Name))
+	assert.Equal(t, 10.0, getMetricMax(mockOutput, metrics.VUsMax.Name))
+
+	logEntries := logHook.Drain()
+	assert.Len(t, logEntries, 3)
+	for _, logEntry := range logEntries {
+		assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+		assert.Equal(t, "Insufficient VUs, reached 10 active VUs and cannot initialize more", logEntry.Message)
+	}
 }
