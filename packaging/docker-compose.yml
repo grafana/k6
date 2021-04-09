@@ -10,7 +10,7 @@ services:
       - AWS_DEFAULT_REGION
       - AWS_CF_DISTRIBUTION
       - PGP_SIGN_KEY_PASSPHRASE
-      - S3_BUCKET=dl.staging.k6.io
+      - S3_BUCKET=dl.k6.io
     volumes:
       - ../dist:/home/k6/dist
       - ./sign-key.gpg:/home/k6/sign-key.gpg
