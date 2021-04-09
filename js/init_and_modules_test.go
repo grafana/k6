@@ -30,7 +30,7 @@ import (
 
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/internal/modules"
+	"github.com/loadimpact/k6/js/modules"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/loader"
@@ -66,7 +66,7 @@ var uniqueModuleNumber int64 //nolint:gochecknoglobals
 func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	t.Parallel()
 	checkModule := &CheckModule{t: t}
-	moduleName := fmt.Sprintf("k6/check-%d", atomic.AddInt64(&uniqueModuleNumber, 1))
+	moduleName := fmt.Sprintf("k6/x/check-%d", atomic.AddInt64(&uniqueModuleNumber, 1))
 	modules.Register(moduleName, checkModule)
 
 	script := fmt.Sprintf(`

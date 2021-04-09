@@ -23,11 +23,27 @@ package modules
 import (
 	"fmt"
 	"strings"
+	"sync"
 
-	"github.com/loadimpact/k6/js/internal/modules"
+	"github.com/loadimpact/k6/js/modules/k6"
+	"github.com/loadimpact/k6/js/modules/k6/crypto"
+	"github.com/loadimpact/k6/js/modules/k6/crypto/x509"
+	"github.com/loadimpact/k6/js/modules/k6/data"
+	"github.com/loadimpact/k6/js/modules/k6/encoding"
+	"github.com/loadimpact/k6/js/modules/k6/grpc"
+	"github.com/loadimpact/k6/js/modules/k6/html"
+	"github.com/loadimpact/k6/js/modules/k6/http"
+	"github.com/loadimpact/k6/js/modules/k6/metrics"
+	"github.com/loadimpact/k6/js/modules/k6/ws"
 )
 
 const extPrefix string = "k6/x/"
+
+//nolint:gochecknoglobals
+var (
+	modules = make(map[string]interface{})
+	mx      sync.RWMutex
+)
 
 // Register the given mod as an external JavaScript module that can be imported
 // by name. The name must be unique across all registered modules and must be
@@ -37,5 +53,44 @@ func Register(name string, mod interface{}) {
 		panic(fmt.Errorf("external module names must be prefixed with '%s', tried to register: %s", extPrefix, name))
 	}
 
-	modules.Register(name, mod)
+	mx.Lock()
+	defer mx.Unlock()
+
+	if _, ok := modules[name]; ok {
+		panic(fmt.Sprintf("module already registered: %s", name))
+	}
+	modules[name] = mod
+}
+
+// HasModuleInstancePerVU should be implemented by all native Golang modules that
+// would require per-VU state. k6 will call their NewModuleInstancePerVU() methods
+// every time a VU imports the module and use its result as the returned object.
+type HasModuleInstancePerVU interface {
+	NewModuleInstancePerVU() interface{}
+}
+
+// checks that modules implement HasModuleInstancePerVU
+// this is done here as otherwise there will be a loop if the module imports this package
+var _ HasModuleInstancePerVU = http.New()
+
+// GetJSModules returns a map of all js modules
+func GetJSModules() map[string]interface{} {
+	result := map[string]interface{}{
+		"k6":             k6.New(),
+		"k6/crypto":      crypto.New(),
+		"k6/crypto/x509": x509.New(),
+		"k6/data":        data.New(),
+		"k6/encoding":    encoding.New(),
+		"k6/net/grpc":    grpc.New(),
+		"k6/html":        html.New(),
+		"k6/http":        http.New(),
+		"k6/metrics":     metrics.New(),
+		"k6/ws":          ws.New(),
+	}
+
+	for name, module := range modules {
+		result[name] = module
+	}
+
+	return result
 }
