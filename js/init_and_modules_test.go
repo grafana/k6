@@ -22,13 +22,15 @@ package js_test
 
 import (
 	"context"
+	"fmt"
 	"net/url"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/internal/modules"
+	"github.com/loadimpact/k6/js/modules"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/loadimpact/k6/loader"
@@ -59,19 +61,23 @@ func (cm *CheckModule) VuCtx(ctx context.Context) {
 	assert.NotNil(cm.t, lib.GetState(ctx))
 }
 
-func TestNewJSRunnerWithCustomModule(t *testing.T) {
-	checkModule := &CheckModule{t: t}
-	modules.Register("k6/check", checkModule)
+var uniqueModuleNumber int64 //nolint:gochecknoglobals
 
-	script := `
-		var check = require("k6/check");
+func TestNewJSRunnerWithCustomModule(t *testing.T) {
+	t.Parallel()
+	checkModule := &CheckModule{t: t}
+	moduleName := fmt.Sprintf("k6/x/check-%d", atomic.AddInt64(&uniqueModuleNumber, 1))
+	modules.Register(moduleName, checkModule)
+
+	script := fmt.Sprintf(`
+		var check = require("%s");
 		check.initCtx();
 
 		module.exports.options = { vus: 1, iterations: 1 };
 		module.exports.default = function() {
 			check.vuCtx();
 		};
-	`
+	`, moduleName)
 
 	logger := testutils.NewLogger(t)
 	rtOptions := lib.RuntimeOptions{CompatibilityMode: null.StringFrom("base")}

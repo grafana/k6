@@ -24,20 +24,49 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"sync"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/internal/modules"
 	"github.com/loadimpact/k6/lib"
 )
 
-type data struct{}
-
-func init() {
-	modules.Register("k6/data", new(data))
+type data struct {
+	shared sharedArrays
 }
 
-const sharedArrayNamePrefix = "k6/data/SharedArray."
+type sharedArrays struct {
+	data map[string]sharedArray
+	mu   sync.RWMutex
+}
+
+func (s *sharedArrays) get(rt *goja.Runtime, name string, call goja.Callable) sharedArray {
+	s.mu.RLock()
+	array, ok := s.data[name]
+	s.mu.RUnlock()
+	if !ok {
+		s.mu.Lock()
+		array, ok = s.data[name]
+		if !ok {
+			func() { // this is done for the defer below
+				defer s.mu.Unlock()
+				array = getShareArrayFromCall(rt, call)
+				s.data[name] = array
+			}()
+		}
+	}
+
+	return array
+}
+
+// New return a new Module instance
+func New() interface{} {
+	return &data{
+		shared: sharedArrays{
+			data: make(map[string]sharedArray),
+		},
+	}
+}
 
 // XSharedArray is a constructor returning a shareable read-only array
 // indentified by the name and having their contents be whatever the call returns
@@ -46,24 +75,14 @@ func (d *data) XSharedArray(ctx context.Context, name string, call goja.Callable
 		return nil, errors.New("new SharedArray must be called in the init context")
 	}
 
-	initEnv := common.GetInitEnv(ctx)
-	if initEnv == nil {
-		return nil, errors.New("missing init environment")
-	}
 	if len(name) == 0 {
 		return nil, errors.New("empty name provided to SharedArray's constructor")
 	}
 
-	name = sharedArrayNamePrefix + name
-	value := initEnv.SharedObjects.GetOrCreateShare(name, func() interface{} {
-		return getShareArrayFromCall(common.GetRuntime(ctx), call)
-	})
-	array, ok := value.(sharedArray)
-	if !ok { // TODO more info in the error?
-		return nil, errors.New("wrong type of shared object")
-	}
+	rt := common.GetRuntime(ctx)
+	array := d.shared.get(rt, name, call)
 
-	return array.wrap(common.GetRuntime(ctx)), nil
+	return array.wrap(rt), nil
 }
 
 func getShareArrayFromCall(rt *goja.Runtime, call goja.Callable) sharedArray {

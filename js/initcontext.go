@@ -34,7 +34,7 @@ import (
 
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/compiler"
-	"github.com/loadimpact/k6/js/internal/modules"
+	"github.com/loadimpact/k6/js/modules"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
 )
@@ -70,7 +70,7 @@ type InitContext struct {
 
 	logger logrus.FieldLogger
 
-	sharedObjects *common.SharedObjects
+	modules map[string]interface{}
 }
 
 // NewInitContext creates a new initcontext with the provided arguments
@@ -87,7 +87,7 @@ func NewInitContext(
 		programs:          make(map[string]programWithSource),
 		compatibilityMode: compatMode,
 		logger:            logger,
-		sharedObjects:     common.NewSharedObjects(),
+		modules:           modules.GetJSModules(),
 	}
 }
 
@@ -113,7 +113,7 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 		programs:          programs,
 		compatibilityMode: base.compatibilityMode,
 		logger:            base.logger,
-		sharedObjects:     base.sharedObjects,
+		modules:           base.modules,
 	}
 }
 
@@ -140,9 +140,12 @@ func (i *InitContext) Require(arg string) goja.Value {
 }
 
 func (i *InitContext) requireModule(name string) (goja.Value, error) {
-	mod := modules.Get(name)
-	if mod == nil {
+	mod, ok := i.modules[name]
+	if !ok {
 		return nil, fmt.Errorf("unknown module: %s", name)
+	}
+	if perInstance, ok := mod.(modules.HasModuleInstancePerVU); ok {
+		mod = perInstance.NewModuleInstancePerVU()
 	}
 	return i.runtime.ToValue(common.Bind(i.runtime, mod, i.ctxPtr)), nil
 }
