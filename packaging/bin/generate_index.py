@@ -310,7 +310,9 @@ def process_dir(top_dir, opts):
     </defs>
     </svg>
 <header>
-    <svg class="logo" viewBox="0 0 220.227 213.73"><use xlink:href="#logo"></use></svg>
+    <a href="/" title="Home">
+      <svg class="logo" viewBox="0 0 220.227 213.73"><use xlink:href="#logo"></use></svg>
+    </a>
     <h1>"""
         f'{path_top_dir.name}'
     """</h1>
