@@ -397,6 +397,7 @@ jobs:
           echo "${{ secrets.PGP_SIGN_KEY }}" > packaging/sign-key.gpg
       - name: Publish packages
         run: |
+          echo "${{ secrets.CR_PAT }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
           cd packaging
-          # TODO: Build and publish k6io/packager image to GH Container Registry
+          docker-compose pull packager
           docker-compose run --rm packager

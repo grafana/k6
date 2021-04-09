@@ -3,7 +3,7 @@ version: '3.4'
 services:
   packager:
     build: .
-    image: k6io/packager:latest
+    image: ghcr.io/k6io/k6packager:latest
     environment:
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
