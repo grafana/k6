@@ -2077,6 +2077,7 @@ func TestExecutionStats(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			r, err := getSimpleRunner(t, "/script.js", tc.script)
 			if tc.expErr != "" {
 				require.Error(t, err)
