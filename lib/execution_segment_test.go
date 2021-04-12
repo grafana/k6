@@ -926,8 +926,10 @@ func BenchmarkExecutionSegmentScale(b *testing.B) {
 // TODO: test with randomized things
 
 func TestSegmentedIndex(t *testing.T) {
+	t.Parallel()
 	// TODO ... more structure ?
 	t.Run("full", func(t *testing.T) {
+		t.Parallel()
 		s := SegmentedIndex{start: 0, lcd: 1, offsets: []int64{1}}
 
 		s.Next()
@@ -964,6 +966,7 @@ func TestSegmentedIndex(t *testing.T) {
 	})
 
 	t.Run("half", func(t *testing.T) {
+		t.Parallel()
 		s := SegmentedIndex{start: 0, lcd: 2, offsets: []int64{2}}
 
 		s.Next()
@@ -1004,6 +1007,7 @@ func TestSegmentedIndex(t *testing.T) {
 	})
 
 	t.Run("the other half", func(t *testing.T) {
+		t.Parallel()
 		s := SegmentedIndex{start: 1, lcd: 2, offsets: []int64{2}}
 
 		s.Next()
@@ -1044,6 +1048,7 @@ func TestSegmentedIndex(t *testing.T) {
 	})
 
 	t.Run("strange", func(t *testing.T) {
+		t.Parallel()
 		s := SegmentedIndex{start: 1, lcd: 7, offsets: []int64{4, 3}}
 
 		s.Next()
