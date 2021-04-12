@@ -193,7 +193,7 @@ func (varr *RampingArrivalRate) Init(ctx context.Context) error {
 	start, offsets, lcd := et.GetStripedOffsets()
 	varr.segIdx = lib.NewSegmentedIndex(start, lcd, offsets)
 
-	return err
+	return err //nolint: wrapcheck
 }
 
 // incrGlobalIter increments the global iteration count for this executor,

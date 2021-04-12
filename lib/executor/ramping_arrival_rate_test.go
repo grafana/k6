@@ -185,7 +185,7 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 		time.Sleep(time.Millisecond * 200)
 		cur = atomic.LoadInt64(&count)
 		require.NotEqual(t, cur, int64(2))
-		return runner.NewVU(es.GetUniqueVUIdentifier(), engineOut)
+		return runner.NewVU(es.GetUniqueVUIdentifier(), engineOut) //nolint: wrapcheck
 	})
 	err = executor.Run(ctx, engineOut)
 	assert.NoError(t, err)
@@ -235,7 +235,7 @@ func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 		cur = atomic.LoadInt64(&count)
 		require.NotEqual(t, cur, int64(1))
 
-		return runner.NewVU(es.GetUniqueVUIdentifier(), engineOut)
+		return runner.NewVU(es.GetUniqueVUIdentifier(), engineOut) //nolint: wrapcheck
 	})
 	err = executor.Run(ctx, engineOut)
 	assert.NoError(t, err)
@@ -718,9 +718,10 @@ func TestRampingArrivalRateGlobalIters(t *testing.T) {
 		{"0,1/4,3/4,1", "3/4:1", []uint64{0, 4, 9}},
 	}
 
-	for _, tc := range testCases {
+	for _, tc := range testCases { //nolint: paralleltest // false positive: https://github.com/kunwardeep/paralleltest/issues/8
 		tc := tc
 		t.Run(fmt.Sprintf("%s_%s", tc.seq, tc.seg), func(t *testing.T) {
+			t.Parallel()
 			ess, err := lib.NewExecutionSegmentSequenceFromString(tc.seq)
 			require.NoError(t, err)
 			seg, err := lib.NewExecutionSegmentFromString(tc.seg)
