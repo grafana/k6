@@ -2,7 +2,10 @@ version: '3.4'
 
 services:
   packager:
-    build: .
+    build:
+      context: .
+      args:
+        - AWSCLI_VERSION=${AWSCLI_VERSION:-2.1.36}
     image: ghcr.io/k6io/k6packager:latest
     environment:
       - AWS_ACCESS_KEY_ID

@@ -9,7 +9,7 @@ RUN apt-get update -y && \
 
 COPY ./awscli-key.gpg .
 
-ARG AWSCLI_VERSION=2.1.35
+ARG AWSCLI_VERSION
 
 # Download awscli, check GPG signature and install.
 RUN export GNUPGHOME="$(mktemp -d)" && \
@@ -17,7 +17,7 @@ RUN export GNUPGHOME="$(mktemp -d)" && \
     fpr="$(gpg2 --with-colons --fingerprint aws-cli | grep '^fpr' | cut -d: -f10)" && \
     gpg2 --export-ownertrust && echo "${fpr}:6:" | gpg2 --import-ownertrust && \
     curl -fsSL --remote-name-all \
-      "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${AWSCLI_VERSION}.zip"{,.sig} && \
+      "https://awscli.amazonaws.com/awscli-exe-linux-x86_64${AWSCLI_VERSION:+-$AWSCLI_VERSION}.zip"{,.sig} && \
     gpg2 --verify awscli*.sig awscli*.zip && \
     unzip -q awscli*.zip && \
     ./aws/install && \
