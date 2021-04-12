@@ -88,6 +88,9 @@ func GetJSModules() map[string]interface{} {
 		"k6/ws":          ws.New(),
 	}
 
+	mx.Lock()
+	defer mx.Unlock()
+
 	for name, module := range modules {
 		result[name] = module
 	}
