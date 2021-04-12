@@ -1,0 +1,19 @@
+version: '3.4'
+
+services:
+  packager:
+    build:
+      context: .
+      args:
+        - AWSCLI_VERSION=${AWSCLI_VERSION:-2.1.36}
+    image: ghcr.io/k6io/k6packager:latest
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_DEFAULT_REGION
+      - AWS_CF_DISTRIBUTION
+      - PGP_SIGN_KEY_PASSPHRASE
+      - S3_BUCKET=dl.k6.io
+    volumes:
+      - ../dist:/home/k6/dist
+      - ./sign-key.gpg:/home/k6/sign-key.gpg

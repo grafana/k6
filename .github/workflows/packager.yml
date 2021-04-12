@@ -1,0 +1,32 @@
+name: k6packager
+on:
+  # Enable manually triggering this workflow via the API or web UI
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0' # weekly (Sundays at 00:00)
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish-packager:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: 0.0.1
+      AWSCLI_VERSION: 2.1.36
+      DOCKER_IMAGE_ID: k6io/k6packager
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Build
+        run: |
+          cd packaging
+          docker-compose build packager
+      - name: Publish
+        run: |
+          echo "${{ secrets.CR_PAT }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+          docker tag "$DOCKER_IMAGE_ID" "ghcr.io/${DOCKER_IMAGE_ID}:${VERSION}"
+          docker push "ghcr.io/${DOCKER_IMAGE_ID}:${VERSION}"
+          docker tag "$DOCKER_IMAGE_ID" "ghcr.io/${DOCKER_IMAGE_ID}:latest"
+          docker push "ghcr.io/${DOCKER_IMAGE_ID}:latest"
