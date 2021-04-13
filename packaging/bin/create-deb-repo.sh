@@ -71,7 +71,7 @@ for arch in $architectures; do
     "s3://${S3PATH}/${bindir}/" "$bindir/"
 
   # Copy the new packages in
-  find "$PKGDIR" -name "*$arch*.deb" -type f -print0 | xargs -r0 cp -t "$bindir"
+  find "$PKGDIR" -name "*$arch*.deb" -type f -print0 | xargs -r0 cp -avt "$bindir"
   # Generate signatures for files that don't have it
   # TODO: Switch to debsign instead? This is currently done as Bintray did it,
   # but the signature is not validated by apt/dpkg.

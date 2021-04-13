@@ -51,7 +51,7 @@ mkdir -p "$REPODIR"
 aws s3 sync --no-progress --exclude='*' --include='*.msi' "s3://${S3PATH}/" "$REPODIR/"
 
 # Copy the new packages in
-find "$PKGDIR" -name "*.msi" -type f -print0 | xargs -r0 cp -t "$REPODIR"
+find "$PKGDIR" -name "*.msi" -type f -print0 | xargs -r0 cp -avt "$REPODIR"
 
 delete_old_pkgs "$REPODIR"
 
