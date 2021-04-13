@@ -112,8 +112,8 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (
 	}
 
 	envConfig := Config{}
+	_ = env // TODO: get rid of envconfig and actually use the env parameter...
 	if err := envconfig.Process("", &envConfig); err != nil {
-		// TODO: get rid of envconfig and actually use the env parameter...
 		return result, err
 	}
 	result = result.Apply(envConfig)
