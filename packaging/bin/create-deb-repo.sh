@@ -3,8 +3,8 @@ set -eEuo pipefail
 
 # External dependencies:
 # - https://salsa.debian.org/apt-team/apt (apt-ftparchive, packaged in apt-utils)
-# - https://aws.amazon.com/cli/
-#   awscli expects AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to be set in the
+# - https://github.com/s3tools/s3cmd
+#   s3cmd expects AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to be set in the
 #   environment.
 # - https://gnupg.org/
 #   For signing the script expects the private signing key to already be
@@ -39,21 +39,12 @@ delete_old_pkgs() {
 
 sync_to_s3() {
   log "Syncing to S3 ..."
-  aws s3 sync --no-progress --delete "${REPODIR}/" "s3://${S3PATH}/"
+  s3cmd sync --delete-removed "${REPODIR}/" "s3://${S3PATH}/"
 
   # Set a short cache expiration for index and repo metadata files.
-  aws s3 cp --no-progress --recursive \
-    --exclude='*.deb' --exclude='*.asc' --exclude='*.html' \
-    --cache-control='max-age=60,must-revalidate' \
-    --metadata-directive=REPLACE \
-    "s3://${S3PATH}" "s3://${S3PATH}"
-  # Set it separately for HTML files to set the correct Content-Type.
-  aws s3 cp --no-progress --recursive \
-    --exclude='*' --include='*.html' \
-    --content-type='text/html' \
-    --cache-control='max-age=60,must-revalidate' \
-    --metadata-directive=REPLACE \
-    "s3://${S3PATH}" "s3://${S3PATH}"
+  s3cmd modify --recursive --exclude='*' \
+    --include='index.html' --include='*Release*' --include='Packages*' \
+    --add-header='Cache-Control: max-age=60,must-revalidate' "s3://${S3PATH}/"
 }
 
 # We don't publish i386 packages, but the repo structure is needed for
@@ -67,7 +58,10 @@ for arch in $architectures; do
   bindir="dists/stable/main/binary-$arch"
   mkdir -p "$bindir"
   # Download existing files
-  aws s3 sync --no-progress --exclude='*' --include='*.deb' --include='*.asc' \
+  # TODO: Consider doing this over the CDN with curl to avoid S3 egress costs,
+  # but that would involve parsing the index.html, checking the checksum
+  # manually, etc.
+  s3cmd sync --exclude='*' --include='*.deb' --include='*.asc' \
     "s3://${S3PATH}/${bindir}/" "$bindir/"
 
   # Copy the new packages in
