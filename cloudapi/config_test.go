@@ -48,6 +48,7 @@ func TestConfigApply(t *testing.T) {
 		PushRefID:                       null.NewString("PushRefID", true),
 		WebAppURL:                       null.NewString("foo", true),
 		NoCompress:                      null.NewBool(true, true),
+		StopOnError:                     null.NewBool(true, true),
 		MaxMetricSamplesPerPackage:      null.NewInt(2, true),
 		MetricPushInterval:              types.NewNullDuration(1*time.Second, true),
 		MetricPushConcurrency:           null.NewInt(3, true),

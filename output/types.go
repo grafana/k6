@@ -80,8 +80,11 @@ type WithThresholds interface {
 	SetThresholds(map[string]stats.Thresholds)
 }
 
-// TODO: add some way for outputs to report mid-test errors and potentially
-// abort the whole test run
+// WithStopRunWithError TODO
+type WithStopRunWithError interface {
+	Output
+	SetStopRunWithErrorFunc(func(error))
+}
 
 // WithRunStatusUpdates means the output can receive test run status updates.
 type WithRunStatusUpdates interface {

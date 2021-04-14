@@ -138,6 +138,15 @@ func (e *Engine) StartOutputs() error {
 			thresholdOut.SetThresholds(e.thresholds)
 		}
 
+		if thresholdOut, ok := out.(output.WithStopRunWithError); ok {
+			thresholdOut.SetStopRunWithErrorFunc(
+				func(err error) {
+					e.logger.WithError(err).Error("Received error to stop from output")
+					// TODO don't stop if configured
+					e.Stop()
+				})
+		}
+
 		if err := out.Start(); err != nil {
 			e.stopOutputs(i)
 			return err

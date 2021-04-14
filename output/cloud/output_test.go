@@ -33,6 +33,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -387,6 +388,18 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 
 func TestCloudOutputStopSendingMetric(t *testing.T) {
 	t.Parallel()
+	t.Run("stop engine on error", func(t *testing.T) {
+		t.Parallel()
+		testCloudOutputStopSendingMetric(t, true)
+	})
+
+	t.Run("don't stop engine on error", func(t *testing.T) {
+		t.Parallel()
+		testCloudOutputStopSendingMetric(t, false)
+	})
+}
+
+func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		body, err := ioutil.ReadAll(req.Body)
@@ -416,8 +429,9 @@ func TestCloudOutputStopSendingMetric(t *testing.T) {
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{
 			"host": "%s", "noCompress": true,
 			"maxMetricSamplesPerPackage": 50,
-			"name": "something-that-should-be-overwritten"
-		}`, tb.ServerHTTP.URL)),
+			"name": "something-that-should-be-overwritten",
+			"stopOnError": %t
+		}`, tb.ServerHTTP.URL, stopOnError)),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
 			SystemTags: &stats.DefaultSystemTagSet,
@@ -427,6 +441,14 @@ func TestCloudOutputStopSendingMetric(t *testing.T) {
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
+	var expectedEngineStopFuncCalled int64
+	if stopOnError {
+		expectedEngineStopFuncCalled = 1
+	}
+	var engineStopFuncCalled int64
+	out.engineStopFunc = func(error) {
+		atomic.AddInt64(&engineStopFuncCalled, 1)
+	}
 	require.NoError(t, err)
 	now := time.Now()
 	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
@@ -495,6 +517,7 @@ func TestCloudOutputStopSendingMetric(t *testing.T) {
 		t.Fatal("sending metrics wasn't stopped")
 	}
 	require.Equal(t, max, count)
+	require.Equal(t, expectedEngineStopFuncCalled, engineStopFuncCalled)
 
 	nBufferSamples := len(out.bufferSamples)
 	nBufferHTTPTrails := len(out.bufferHTTPTrails)
