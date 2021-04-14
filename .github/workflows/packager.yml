@@ -15,6 +15,7 @@ jobs:
     env:
       VERSION: 0.0.1
       AWSCLI_VERSION: 2.1.36
+      S3CMD_VERSION: 2.1.0
       DOCKER_IMAGE_ID: ghcr.io/k6io/k6packager
     steps:
       - name: Checkout code
