@@ -197,6 +197,11 @@ func (r *Runner) newVU(id int64, samplesOut chan<- stats.SampleContainer) (*VU, 
 		MaxIdleConnsPerHost: int(r.Bundle.Options.BatchPerHost.Int64),
 	}
 	_ = http2.ConfigureTransport(transport)
+	http2Transport, err := http2.ConfigureTransports(transport)
+	http2Transport.AllowHTTP = true
+	http2Transport.DialTLS = func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+		return net.Dial(network, addr)
+	}
 
 	cookieJar, err := cookiejar.New(nil)
 	if err != nil {
