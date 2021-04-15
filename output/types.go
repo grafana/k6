@@ -80,10 +80,11 @@ type WithThresholds interface {
 	SetThresholds(map[string]stats.Thresholds)
 }
 
-// WithStopRunWithError TODO
-type WithStopRunWithError interface {
+// WithSetStopEngineRunWithError is an output that requires to have function which will be called with an error from
+// the output which should trigger the Engine to stop
+type WithSetStopEngineRunWithError interface {
 	Output
-	SetStopRunWithErrorFunc(func(error))
+	SetStopEngineRunWithError(func(error))
 }
 
 // WithRunStatusUpdates means the output can receive test run status updates.

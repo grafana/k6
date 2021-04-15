@@ -87,7 +87,7 @@ type Output struct {
 var _ interface {
 	output.WithRunStatusUpdates
 	output.WithThresholds
-	output.WithStopRunWithError
+	output.WithSetStopEngineRunWithError
 } = &Output{}
 
 // New creates a new cloud output.
@@ -324,8 +324,8 @@ func (out *Output) SetThresholds(scriptThresholds map[string]stats.Thresholds) {
 	out.thresholds = thresholds
 }
 
-// SetStopRunWithErrorFunc receives the function that stops the engine on error
-func (out *Output) SetStopRunWithErrorFunc(stopFunc func(error)) {
+// SetStopEngineRunWithError receives the function that stops the engine on error
+func (out *Output) SetStopEngineRunWithError(stopFunc func(error)) {
 	out.engineStopFunc = stopFunc
 }
 
