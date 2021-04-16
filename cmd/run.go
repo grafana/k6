@@ -47,6 +47,7 @@ import (
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui/pb"
 )
@@ -63,6 +64,7 @@ const (
 	invalidConfigErrorCode       = 104
 	externalAbortErrorCode       = 105
 	cannotStartRESTAPIErrorCode  = 106
+	scriptExceptionErrorCode     = 107
 )
 
 // TODO: fix this, global variables are not very testable...
@@ -124,6 +126,10 @@ a commandline interface for interacting with it.`,
 
 			initRunner, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
 			if err != nil {
+				var serr types.ScriptException
+				if errors.As(err, &serr) {
+					return ExitCode{error: serr, Code: scriptExceptionErrorCode, Hint: "script exception"}
+				}
 				return err
 			}
 
@@ -345,6 +351,11 @@ func getExitCodeFromEngine(err error) ExitCode {
 		default:
 			return ExitCode{error: err, Code: genericTimeoutErrorCode}
 		}
+	}
+
+	var serr types.ScriptException
+	if errors.As(err, &serr) {
+		return ExitCode{error: serr, Code: scriptExceptionErrorCode, Hint: "script exception"}
 	}
 
 	return ExitCode{error: errors.New("engine error"), Code: genericEngineErrorCode, Hint: err.Error()}
