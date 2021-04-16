@@ -121,3 +121,14 @@ func TestReadSourceHttpError(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), `only supported schemes for imports are file and https`)
 }
+
+func TestReadSourceMissingFileError(t *testing.T) {
+	t.Parallel()
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+	fs := afero.NewMemMapFs()
+	_, err := ReadSource(logger, "some file with spaces.js", "/c",
+		map[string]afero.Fs{"file": afero.NewMemMapFs(), "https": fs}, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `The moduleSpecifier "some file with spaces.js" couldn't be found on local disk.`)
+}
