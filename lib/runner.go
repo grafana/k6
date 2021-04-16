@@ -103,9 +103,18 @@ type Runner interface {
 	HandleSummary(context.Context, *Summary) (map[string]io.Reader, error)
 }
 
+// UIState describes the state of the UI, which might influence what
+// handleSummary() returns.
+type UIState struct {
+	IsStdOutTTY bool
+	IsStdErrTTY bool
+}
+
 // Summary contains all of the data the summary handler gets.
 type Summary struct {
 	Metrics         map[string]*stats.Metric
 	RootGroup       *Group
 	TestRunDuration time.Duration // TODO: use lib.ExecutionState-based interface instead?
+	NoColor         bool          // TODO: drop this when noColor is part of the (runtime) options
+	UIState         UIState
 }
