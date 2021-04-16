@@ -357,7 +357,6 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 		handleSummaryFn,
 		vu.Runtime.ToValue(r.Bundle.RuntimeOptions.SummaryExport.String),
 		vu.Runtime.ToValue(summaryDataForJS),
-		vu.Runtime.ToValue(getOldTextSummaryFunc(summary, r.Bundle.Options)), // TODO: remove
 	}
 	rawResult, _, _, err := vu.runFn(ctx, false, handleSummaryWrapper, wrapperArgs...)
 
