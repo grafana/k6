@@ -10,7 +10,6 @@ require (
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.0.2
 	github.com/dop251/goja v0.0.0-20210427212725-462d53687b0d
-	github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4
 	github.com/fatih/color v1.10.0
 	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/websocket v1.4.2
@@ -39,7 +38,6 @@ require (
 	github.com/tidwall/pretty v1.1.0
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/net v0.0.0-20201209123823-ac852fbbde11
-	golang.org/x/text v0.3.6
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	google.golang.org/grpc v1.36.1
 	google.golang.org/protobuf v1.25.1-0.20200805231151-a709e31e5d12
