@@ -5,7 +5,6 @@ go 1.16
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20200615164410-66371956d46c
 	github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
-	github.com/GeertJohan/go.rice v0.0.0-20170420135705-c02ca9a983da
 	github.com/PuerkitoBio/goquery v1.6.1
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.0.2
