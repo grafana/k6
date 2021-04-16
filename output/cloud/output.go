@@ -324,7 +324,7 @@ func (out *Output) SetThresholds(scriptThresholds map[string]stats.Thresholds) {
 	out.thresholds = thresholds
 }
 
-// SetStopRunStopCallback receives the function that stops the engine on error
+// SetTestRunStopCallback receives the function that stops the engine on error
 func (out *Output) SetTestRunStopCallback(stopFunc func(error)) {
 	out.engineStopFunc = stopFunc
 }
