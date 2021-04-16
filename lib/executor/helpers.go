@@ -22,6 +22,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -96,10 +97,10 @@ func getIterationRunner(
 			return false
 		default:
 			if err != nil {
-				if s, ok := err.(fmt.Stringer); ok {
-					// TODO better detection for stack traces
+				var exception types.ScriptException
+				if errors.As(err, &exception) {
 					// TODO don't count this as a full iteration?
-					logger.WithField("source", "stacktrace").Error(s.String())
+					logger.WithField("source", "stacktrace").Error(exception.StackTrace())
 				} else {
 					logger.Error(err.Error())
 				}
