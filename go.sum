@@ -342,7 +342,6 @@ github.com/valyala/fasttemplate v0.0.0-20170224212429-dcecefd839c4/go.mod h1:50w
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
-github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5 h1:Zs6mpwXvlqpF9zHl5XaN0p5V4J9XvP+WBuiuXyIgqvc=
 github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5/go.mod h1:c1r+Ob9tUTPB0FKWO1+x+Hsc/zNa45WdGq7Y38Ybip0=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.k6.io/k6 v0.31.2-0.20210510132435-c2958278a362/go.mod h1:WmqQqrJOnATU2o+vmmfPejQquY7DDsfUflLWUpu+LX0=

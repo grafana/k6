@@ -26,7 +26,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"go.k6.io/k6/api/v1/client"
-	"go.k6.io/k6/ui"
 )
 
 func getStatsCmd(ctx context.Context) *cobra.Command {
@@ -46,8 +45,8 @@ func getStatsCmd(ctx context.Context) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ui.Dump(stdout, metrics)
-			return nil
+
+			return yamlPrint(stdout, metrics)
 		},
 	}
 	return statsCmd

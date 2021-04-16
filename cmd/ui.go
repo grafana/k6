@@ -35,6 +35,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh/terminal"
+	"gopkg.in/yaml.v2"
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
@@ -390,4 +391,16 @@ func showProgress(
 		printProgressBars()
 		outMutex.Unlock()
 	}
+}
+
+func yamlPrint(w io.Writer, v interface{}) error {
+	data, err := yaml.Marshal(v)
+	if err != nil {
+		return fmt.Errorf("could not marshal YAML: %w", err)
+	}
+	_, err = fmt.Fprint(w, string(data))
+	if err != nil {
+		return fmt.Errorf("could flush the data to the output: %w", err)
+	}
+	return nil
 }

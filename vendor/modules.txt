@@ -179,9 +179,6 @@ github.com/tidwall/match
 # github.com/tidwall/pretty v1.1.0
 ## explicit
 github.com/tidwall/pretty
-# github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
-## explicit
-github.com/zyedidia/highlight
 # golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 ## explicit
 golang.org/x/crypto/md4
