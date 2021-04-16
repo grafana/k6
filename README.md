@@ -137,7 +137,7 @@ If there isn't an official package for your operating system or architecture, or
 
 ### Build from source
 
-k6 is written in Go, so it's just a single statically-linked executable and very easy to build and distribute. To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.12 or newer). Follow these instructions:
+k6 is written in Go, so it's just a single statically-linked executable and very easy to build and distribute. To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.16 or newer). Follow these instructions:
 
 - Run `go get go.k6.io/k6` which will:
   - git clone the repo and put the source in `$GOPATH/src/go.k6.io/k6`
