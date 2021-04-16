@@ -147,7 +147,7 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 	if loader == nil {
 		u, err := url.Parse("https://" + moduleSpecifier)
 		if err != nil {
-			return nil, err
+			return nil, noSchemeRemoteModuleResolutionError{err: err, moduleSpecifier: moduleSpecifier}
 		}
 		u.Scheme = ""
 		return u, nil
