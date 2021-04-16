@@ -11,9 +11,7 @@ ARG S3CMD_VERSION
 RUN pip3 install "s3cmd${S3CMD_VERSION:+==$S3CMD_VERSION}"
 
 COPY ./awscli-key.gpg .
-
 ARG AWSCLI_VERSION
-
 # Download awscli, check GPG signature and install.
 RUN export GNUPGHOME="$(mktemp -d)" && \
     gpg2 --import ./awscli-key.gpg && \
@@ -34,5 +32,8 @@ COPY bin/ /usr/local/bin/
 
 USER k6
 WORKDIR /home/k6
+
+COPY --chown=k6:k6 ./k6-rpm-repo.spec rpmbuild/SPECS/
+COPY --chown=k6:k6 ./k6-rpm.repo rpmbuild/SOURCES/k6-io.repo
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
