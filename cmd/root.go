@@ -48,11 +48,12 @@ var BannerColor = color.New(color.FgCyan)
 //TODO: remove these global variables
 //nolint:gochecknoglobals
 var (
-	outMutex  = &sync.Mutex{}
-	stdoutTTY = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
-	stderrTTY = isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd())
-	stdout    = &consoleWriter{colorable.NewColorableStdout(), stdoutTTY, outMutex, nil}
-	stderr    = &consoleWriter{colorable.NewColorableStderr(), stderrTTY, outMutex, nil}
+	outMutex   = &sync.Mutex{}
+	isDumbTerm = os.Getenv("TERM") == "dumb"
+	stdoutTTY  = !isDumbTerm && (isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()))
+	stderrTTY  = !isDumbTerm && (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()))
+	stdout     = &consoleWriter{colorable.NewColorableStdout(), stdoutTTY, outMutex, nil}
+	stderr     = &consoleWriter{colorable.NewColorableStderr(), stderrTTY, outMutex, nil}
 )
 
 const (
