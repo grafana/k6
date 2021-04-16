@@ -142,7 +142,6 @@ func (e *Engine) StartOutputs() error {
 			stopOut.SetTestRunStopCallback(
 				func(err error) {
 					e.logger.WithError(err).Error("Received error to stop from output")
-					// TODO don't stop if configured
 					e.Stop()
 				})
 		}
