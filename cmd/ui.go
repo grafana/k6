@@ -32,12 +32,13 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh/terminal"
 
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/output"
-	"go.k6.io/k6/ui"
 	"go.k6.io/k6/ui/pb"
 )
 
@@ -81,6 +82,26 @@ func (w *consoleWriter) Write(p []byte) (n int, err error) {
 	return origLen, err
 }
 
+// getColor returns the requested color, or an uncolored object, depending on
+// the value of noColor. The explicit EnableColor() and DisableColor() are
+// needed because the library checks os.Stdout itself otherwise...
+func getColor(noColor bool, attributes ...color.Attribute) *color.Color {
+	if noColor {
+		c := color.New()
+		c.DisableColor()
+		return c
+	}
+
+	c := color.New(attributes...)
+	c.EnableColor()
+	return c
+}
+
+func getBanner(noColor bool) string {
+	c := getColor(noColor, color.FgCyan)
+	return c.Sprint(consts.Banner())
+}
+
 func printBar(bar *pb.ProgressBar) {
 	if quiet {
 		return
@@ -113,10 +134,12 @@ func modifyAndPrintBar(bar *pb.ProgressBar, options ...pb.ProgressBarOption) {
 // TODO: Clean this up as part of #1499 or #1427
 func printExecutionDescription(
 	execution, filename, outputOverride string, conf Config, et *lib.ExecutionTuple,
-	execPlan []lib.ExecutionStep, outputs []output.Output,
+	execPlan []lib.ExecutionStep, outputs []output.Output, noColor bool,
 ) {
-	fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprint(execution))
-	fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
+	valueColor := getColor(noColor, color.FgCyan)
+
+	fprintf(stdout, "  execution: %s\n", valueColor.Sprint(execution))
+	fprintf(stdout, "     script: %s\n", valueColor.Sprint(filename))
 
 	var outputDescriptions []string
 	switch {
@@ -130,7 +153,7 @@ func printExecutionDescription(
 		}
 	}
 
-	fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(strings.Join(outputDescriptions, ", ")))
+	fprintf(stdout, "     output: %s\n", valueColor.Sprint(strings.Join(outputDescriptions, ", ")))
 	fprintf(stdout, "\n")
 
 	maxDuration, _ := lib.GetEndOffset(execPlan)
@@ -141,7 +164,7 @@ func printExecutionDescription(
 		scenarioDesc = fmt.Sprintf("%d scenarios", len(executorConfigs))
 	}
 
-	fprintf(stdout, "  scenarios: %s\n", ui.ValueColor.Sprintf(
+	fprintf(stdout, "  scenarios: %s\n", valueColor.Sprintf(
 		"(%.2f%%) %s, %d max VUs, %s max duration (incl. graceful stop):",
 		conf.ExecutionSegment.FloatLength()*100, scenarioDesc,
 		lib.GetMaxPossibleVUs(execPlan), maxDuration.Round(100*time.Millisecond)),

@@ -32,7 +32,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
@@ -42,8 +41,6 @@ import (
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/log"
 )
-
-var BannerColor = color.New(color.FgCyan)
 
 //TODO: remove these global variables
 //nolint:gochecknoglobals
@@ -98,7 +95,7 @@ func newRootCommand(ctx context.Context, logger *logrus.Logger, fallbackLogger l
 	c.cmd = &cobra.Command{
 		Use:               "k6",
 		Short:             "a next-generation load generator",
-		Long:              BannerColor.Sprintf("\n%s", consts.Banner()),
+		Long:              "\n" + getBanner(noColor || !stdoutTTY),
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
