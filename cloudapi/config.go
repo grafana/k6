@@ -44,6 +44,7 @@ type Config struct {
 	PushRefID   null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
 	WebAppURL   null.String `json:"webAppURL" envconfig:"K6_CLOUD_WEB_APP_URL"`
 	NoCompress  null.Bool   `json:"noCompress" envconfig:"K6_CLOUD_NO_COMPRESS"`
+	StopOnError null.Bool   `json:"stopOnError" envconfig:"K6_CLOUD_STOP_ON_ERROR"`
 
 	MaxMetricSamplesPerPackage null.Int `json:"maxMetricSamplesPerPackage" envconfig:"K6_CLOUD_MAX_METRIC_SAMPLES_PER_PACKAGE"`
 
@@ -208,6 +209,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.NoCompress.Valid {
 		c.NoCompress = cfg.NoCompress
+	}
+	if cfg.StopOnError.Valid {
+		c.StopOnError = cfg.StopOnError
 	}
 	if cfg.MaxMetricSamplesPerPackage.Valid {
 		c.MaxMetricSamplesPerPackage = cfg.MaxMetricSamplesPerPackage

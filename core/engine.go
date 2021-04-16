@@ -138,6 +138,14 @@ func (e *Engine) StartOutputs() error {
 			thresholdOut.SetThresholds(e.thresholds)
 		}
 
+		if stopOut, ok := out.(output.WithTestRunStop); ok {
+			stopOut.SetTestRunStopCallback(
+				func(err error) {
+					e.logger.WithError(err).Error("Received error to stop from output")
+					e.Stop()
+				})
+		}
+
 		if err := out.Start(); err != nil {
 			e.stopOutputs(i)
 			return err
