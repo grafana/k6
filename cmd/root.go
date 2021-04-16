@@ -277,10 +277,14 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 	if c.verbose {
 		c.logger.SetLevel(logrus.DebugLevel)
 	}
+
+	loggerForceColors := false // disable color by default
 	switch c.logOutput {
 	case "stderr":
+		loggerForceColors = !noColor && stderrTTY
 		c.logger.SetOutput(stderr)
 	case "stdout":
+		loggerForceColors = !noColor && stdoutTTY
 		c.logger.SetOutput(stdout)
 	case "none":
 		c.logger.SetOutput(ioutil.Discard)
@@ -296,7 +300,6 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 		c.logger.AddHook(hook)
 		c.logger.SetOutput(ioutil.Discard) // don't output to anywhere else
 		c.logFmt = "raw"
-		noColor = true // disable color
 	}
 
 	switch c.logFmt {
@@ -307,7 +310,7 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 		c.logger.SetFormatter(&logrus.JSONFormatter{})
 		c.logger.Debug("Logger format: JSON")
 	default:
-		c.logger.SetFormatter(&logrus.TextFormatter{ForceColors: stderrTTY, DisableColors: noColor})
+		c.logger.SetFormatter(&logrus.TextFormatter{ForceColors: loggerForceColors, DisableColors: noColor})
 		c.logger.Debug("Logger format: TEXT")
 	}
 	return ch, nil
