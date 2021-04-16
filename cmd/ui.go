@@ -333,9 +333,7 @@ func showProgress(
 
 	//TODO: make configurable?
 	updateFreq := 1 * time.Second
-	//TODO: remove !noColor after we fix how we handle colors (see the related
-	//description in the TODO message in cmd/root.go)
-	if stdoutTTY && !noColor {
+	if stdoutTTY {
 		updateFreq = 100 * time.Millisecond
 		outMutex.Lock()
 		stdout.PersistentText = printProgressBars

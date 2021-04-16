@@ -134,22 +134,6 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error
 		c.loggerIsRemote = true
 	}
 
-	if noColor {
-		// TODO: figure out something else... currently, with the wrappers
-		// below, we're stripping any colors from the output after we've
-		// added them. The problem is that, besides being very inefficient,
-		// this actually also strips other special characters from the
-		// intended output, like the progressbar formatting ones, which
-		// would otherwise be fine (in a TTY).
-		//
-		// It would be much better if we avoid messing with the output and
-		// instead have a parametrized instance of the color library. It
-		// will return colored output if colors are enabled and simply
-		// return the passed input as-is (i.e. be a noop) if colors are
-		// disabled...
-		stdout.Writer = colorable.NewNonColorable(os.Stdout)
-		stderr.Writer = colorable.NewNonColorable(os.Stderr)
-	}
 	stdlog.SetOutput(c.logger.Writer())
 	c.logger.Debugf("k6 version: v%s", consts.FullVersion())
 	return nil
