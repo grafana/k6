@@ -8,8 +8,7 @@ set -eEuo pipefail
 #   environment.
 # - https://gnupg.org/
 #   For signing the script expects the private signing key to already be
-#   imported and the `rpm` command configured for signing, e.g. ~/.rpmmacros
-#   should exist.
+#   imported.
 # - generate_index.py
 #   For generating the index.html of each directory. It's available in the
 #   packaging/bin directory of the k6 repo, and should be in $PATH.
@@ -40,6 +39,20 @@ sync_to_s3() {
     --add-header='Cache-Control: max-age=60,must-revalidate' "s3://${S3PATH}/"
 }
 
+# Setup RPM signing
+if ! [ -r "$HOME/.rpmmacros" ]; then
+  cat > "$HOME/.rpmmacros" <<EOF
+%_gpgbin        $(command -v gpg2)
+%_gpg_path      $HOME/.gnupg
+%_gpg_name      k6
+%_gpg_pass      -
+%__gpg_sign_cmd   %{__gpg} gpg2 --default-key="$PGPKEYID" --no-verbose \
+  --no-armor --pinentry-mode=loopback --yes --no-secmem-warning \
+  --passphrase="$PGP_SIGN_KEY_PASSPHRASE" --detach-sign \
+  -o %{__signature_filename} %{__plaintext_filename}
+EOF
+fi
+
 architectures="x86_64"
 
 pushd . > /dev/null
@@ -67,6 +80,17 @@ for arch in $architectures; do
 
   delete_old_pkgs "$arch"
 done
+
+# Create the RPM repository package if it doesn't exist already.
+# This is a bit hacky as it expects the GPG key to exist and the $HOME/rpmbuild
+# directory to have been pre-populated, but it's done here so that the index
+# generation script can pick up the file.
+s3cmd get "s3://${S3PATH}/repo.rpm" "${REPODIR}/repo.rpm" >/dev/null || {
+  mkdir -p "$HOME/rpmbuild/SOURCES"
+  cp -av "${REPODIR}/../key.gpg" "$HOME/rpmbuild/SOURCES/RPM-GPG-KEY-k6-io"
+  rpmbuild -ba "$HOME/rpmbuild/SPECS/k6-rpm-repo.spec"
+  cp -av "$(find "$HOME/rpmbuild/RPMS/" -type f -name '*.rpm')" "${REPODIR}/repo.rpm"
+}
 
 log "Generating index.html ..."
 generate_index.py -r
