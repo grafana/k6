@@ -340,6 +340,7 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut ch
 	executorsCount := len(e.executors)
 	logger := e.logger.WithField("phase", "local-execution-scheduler-run")
 	e.initProgress.Modify(pb.WithConstLeft("Run"))
+	defer e.state.MarkEnded()
 
 	if e.state.IsPaused() {
 		logger.Debug("Execution is paused, waiting for resume or interrupt...")
@@ -354,7 +355,6 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut ch
 	}
 
 	e.state.MarkStarted()
-	defer e.state.MarkEnded()
 	e.initProgress.Modify(pb.WithConstProgress(1, "running"))
 
 	logger.WithFields(logrus.Fields{"executorsCount": executorsCount}).Debugf("Start of test run")
