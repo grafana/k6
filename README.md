@@ -68,28 +68,41 @@ brew install k6
 
 ### Windows
 
-You can manually download and install the [official `.msi` installation package](https://dl.bintray.com/loadimpact/windows/k6-v0.31.1-amd64.msi) or, if you use the [chocolatey package manager](https://chocolatey.org/), follow [these instructions](https://bintray.com/repo/buildSettings?repoPath=%2Floadimpact%2Fchoco) to set up the k6 repository.
+If you use the [Chocolatey package manager](https://chocolatey.org/) you can install the unofficial k6 package with:
+
+```
+choco install k6
+```
+
+Otherwise you can manually download and install the [latest official `.msi` package](https://dl.k6.io/msi/k6-latest-amd64.msi).
 
 ### Linux
 
-**Notice: Because [Bintray is being shutdown](https://jfrog.com/blog/into-the-sunset-bintray-jcenter-gocenter-and-chartcenter/) we are going to start self-hosting our packages soon, before k6 v0.32.0. This means you will have to re-install them, since the old .rpm and .deb repos will stop working.**
-
-For Debian-based Linux distributions, you can install k6 from the private deb repo like this:
+For Debian-based Linux distributions like Ubuntu, you can install k6 from the private deb repo like this:
 
 ```bash
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61
-echo "deb https://dl.bintray.com/loadimpact/deb stable main" | sudo tee -a /etc/apt/sources.list
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
 sudo apt-get update
 sudo apt-get install k6
 ```
 
+If you have issues adding the key from the keyserver, you can instead run:
+```bash
+curl -s https://dl.k6.io/key.gpg | sudo apt-key add -
+```
+
+Then confirm that the key with the above ID is shown in the output of `sudo apt-key list`.
+
 And for rpm-based ones like Fedora and CentOS:
 
 ```bash
-wget https://bintray.com/loadimpact/rpm/rpm -O bintray-loadimpact-rpm.repo
-sudo mv bintray-loadimpact-rpm.repo /etc/yum.repos.d/
-sudo dnf install k6   # use yum instead of dnf for older distros
+sudo dnf install https://dl.k6.io/rpm/repo.rpm    # use yum instead of dnf for older distros
+sudo dnf install k6    # use yum install --nogpgcheck k6 for older distros (e.g. CentOS 7) without PGP V4 signature support
 ```
+
+Note that the `gnupg2` package is required for signature verification.
+
 
 ### Docker
 
