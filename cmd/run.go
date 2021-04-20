@@ -47,6 +47,7 @@ import (
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/consts"
+	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/loader"
 	"github.com/loadimpact/k6/ui/pb"
 )
@@ -63,6 +64,7 @@ const (
 	invalidConfigErrorCode       = 104
 	externalAbortErrorCode       = 105
 	cannotStartRESTAPIErrorCode  = 106
+	scriptExceptionErrorCode     = 107
 )
 
 // TODO: fix this, global variables are not very testable...
@@ -347,6 +349,11 @@ func getExitCodeFromEngine(err error) ExitCode {
 		}
 	}
 
+	var serr types.ScriptException
+	if errors.As(err, &serr) {
+		return ExitCode{error: serr, Code: scriptExceptionErrorCode, Hint: "script exception"}
+	}
+
 	return ExitCode{error: errors.New("engine error"), Code: genericEngineErrorCode, Hint: err.Error()}
 }
 
@@ -403,26 +410,36 @@ func runCmdFlagSet() *pflag.FlagSet {
 // Creates a new runner.
 func newRunner(
 	logger *logrus.Logger, src *loader.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
-) (lib.Runner, error) {
+) (runner lib.Runner, err error) {
 	switch typ {
 	case "":
-		return newRunner(logger, src, detectType(src.Data), filesystems, rtOpts)
+		runner, err = newRunner(logger, src, detectType(src.Data), filesystems, rtOpts)
 	case typeJS:
-		return js.New(logger, src, filesystems, rtOpts)
+		runner, err = js.New(logger, src, filesystems, rtOpts)
 	case typeArchive:
-		arc, err := lib.ReadArchive(bytes.NewReader(src.Data))
+		var arc *lib.Archive
+		arc, err = lib.ReadArchive(bytes.NewReader(src.Data))
 		if err != nil {
 			return nil, err
 		}
 		switch arc.Type {
 		case typeJS:
-			return js.NewFromArchive(logger, arc, rtOpts)
+			runner, err = js.NewFromArchive(logger, arc, rtOpts)
 		default:
 			return nil, fmt.Errorf("archive requests unsupported runner: %s", arc.Type)
 		}
 	default:
 		return nil, fmt.Errorf("unknown -t/--type: %s", typ)
 	}
+
+	if err != nil {
+		var serr types.ScriptException
+		if errors.As(err, &serr) {
+			err = ExitCode{error: serr, Code: scriptExceptionErrorCode, Hint: "script exception"}
+		}
+	}
+
+	return runner, err
 }
 
 func detectType(data []byte) string {

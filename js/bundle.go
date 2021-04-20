@@ -317,6 +317,10 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	*init.ctxPtr = common.WithRuntime(ctx, rt)
 	unbindInit := common.BindToGlobal(rt, common.Bind(rt, init, init.ctxPtr))
 	if _, err := rt.RunProgram(b.Program); err != nil {
+		var exception *goja.Exception
+		if errors.As(err, &exception) {
+			err = &scriptException{inner: exception}
+		}
 		return err
 	}
 	unbindInit()
