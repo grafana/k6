@@ -2,8 +2,8 @@
 set -eEuo pipefail
 
 # External dependencies:
-# - https://aws.amazon.com/cli/
-#   awscli expects AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to be set in the
+# - https://github.com/s3tools/s3cmd
+#   s3cmd expects AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to be set in the
 #   environment.
 # - generate_index.py
 #   For generating the index.html of each directory. It's available in the
@@ -27,20 +27,12 @@ delete_old_pkgs() {
 
 sync_to_s3() {
   log "Syncing to S3 ..."
-  aws s3 sync --no-progress --delete "${REPODIR}/" "s3://${S3PATH}/"
+  s3cmd sync --delete-removed "${REPODIR}/" "s3://${S3PATH}/"
 
   # Set a short cache expiration for index files and the latest MSI package.
-  aws s3 cp --no-progress --recursive --exclude='*' \
-    --include='*.html' \
-    --cache-control='max-age=60,must-revalidate' \
-    --content-type='text/html' \
-    --metadata-directive=REPLACE \
-    "s3://${S3PATH}" "s3://${S3PATH}"
-  aws s3 cp --no-progress \
-    --cache-control='max-age=60,must-revalidate' \
-    --content-type='application/x-msi' \
-    --metadata-directive=REPLACE \
-    "s3://${S3PATH}/k6-latest-amd64.msi" "s3://${S3PATH}/k6-latest-amd64.msi"
+  s3cmd modify --recursive --exclude='*' \
+    --include='index.html' --include='k6-latest-amd64.msi' \
+    --add-header='Cache-Control: max-age=60,must-revalidate' "s3://${S3PATH}/"
 }
 
 mkdir -p "$REPODIR"
@@ -48,10 +40,10 @@ mkdir -p "$REPODIR"
 # Download existing packages
 # For MSI packages this is only done to be able to generate the index.html correctly.
 # Should we fake it and create empty files that have the same timestamp and size as the original ones?
-aws s3 sync --no-progress --exclude='*' --include='*.msi' "s3://${S3PATH}/" "$REPODIR/"
+s3cmd sync --exclude='*' --include='*.msi' "s3://${S3PATH}/" "$REPODIR/"
 
 # Copy the new packages in
-find "$PKGDIR" -name "*.msi" -type f -print0 | xargs -r0 cp -t "$REPODIR"
+find "$PKGDIR" -name "*.msi" -type f -print0 | xargs -r0 cp -avt "$REPODIR"
 
 delete_old_pkgs "$REPODIR"
 

@@ -411,7 +411,7 @@ jobs:
           cat > packaging/.env <<EOF
           AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION=eu-west-1
+          AWS_DEFAULT_REGION=us-east-1
           AWS_CF_DISTRIBUTION="${{ secrets.AWS_CF_DISTRIBUTION }}"
           PGP_SIGN_KEY_PASSPHRASE=${{ secrets.PGP_SIGN_KEY_PASSPHRASE }}
           EOF
