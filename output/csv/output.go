@@ -37,7 +37,7 @@ import (
 	"github.com/loadimpact/k6/stats"
 )
 
-// Output saving output to csv implements the lib.Output interface
+// Output implements the lib.Output interface for saving to CSV files.
 type Output struct {
 	output.SampleBuffer
 
