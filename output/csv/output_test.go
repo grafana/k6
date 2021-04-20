@@ -21,9 +21,13 @@
 package csv
 
 import (
+	"bytes"
 	"compress/gzip"
+	"encoding/csv"
 	"fmt"
 	"io/ioutil"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -180,21 +184,6 @@ func TestSampleToRow(t *testing.T) {
 	}
 }
 
-func TestRun(t *testing.T) {
-	output, err := newOutput(output.Params{
-		Logger:         testutils.NewLogger(t),
-		FS:             afero.NewMemMapFs(),
-		ConfigArgument: "name",
-		ScriptOptions: lib.Options{
-			SystemTags: stats.NewSystemTagSet(stats.TagError),
-		},
-	})
-	require.NoError(t, err)
-	require.NotNil(t, output)
-	require.NoError(t, output.Start())
-	require.NoError(t, output.Stop())
-}
-
 func readUnCompressedFile(fileName string, fs afero.Fs) string {
 	csvbytes, err := afero.ReadFile(fs, fileName)
 	if err != nil {
@@ -223,7 +212,8 @@ func readCompressedFile(fileName string, fs afero.Fs) string {
 	return fmt.Sprintf("%s", csvbytes)
 }
 
-func TestRunCollect(t *testing.T) {
+func TestRun(t *testing.T) {
+	t.Parallel()
 	testData := []struct {
 		samples        []stats.SampleContainer
 		fileName       string
@@ -306,6 +296,24 @@ func TestRunCollect(t *testing.T) {
 		time.Sleep(1 * time.Second)
 		require.NoError(t, output.Stop())
 
-		assert.Equal(t, data.outputContent, data.fileReaderFunc(data.fileName, mem))
+		finalOutput := data.fileReaderFunc(data.fileName, mem)
+		assert.Equal(t, data.outputContent, sortExtraTagsForTest(t, finalOutput))
 	}
+}
+
+func sortExtraTagsForTest(t *testing.T, input string) string {
+	t.Helper()
+	r := csv.NewReader(strings.NewReader(input))
+	lines, err := r.ReadAll()
+	require.NoError(t, err)
+	for i, line := range lines[1:] {
+		extraTags := strings.Split(line[len(line)-1], "&")
+		sort.Strings(extraTags)
+		lines[i+1][len(line)-1] = strings.Join(extraTags, "&")
+	}
+	var b bytes.Buffer
+	w := csv.NewWriter(&b)
+	require.NoError(t, w.WriteAll(lines))
+	w.Flush()
+	return b.String()
 }
