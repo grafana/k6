@@ -143,8 +143,7 @@ func (o *Output) Description() string {
 	return fmt.Sprintf("csv (%s)", o.fname)
 }
 
-// Start tries to open the specified JSON file and starts the goroutine for
-// metric flushing. If gzip encoding is specified, it also handles that.
+// Start writes the csv header and starts a new output.PeriodicFlusher
 func (o *Output) Start() error {
 	o.logger.Debug("Starting...")
 
