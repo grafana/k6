@@ -104,6 +104,27 @@ sudo dnf install k6    # use yum install --nogpgcheck k6 for older distros (e.g.
 Note that the `gnupg2` package is required for signature verification.
 
 
+#### Migrating from Bintray
+
+The Bintray repositories will be [shutdown after May 1st, 2021](https://jfrog.com/blog/into-the-sunset-bintray-jcenter-gocenter-and-chartcenter/). If you previously added them you will have to add our repositories following the instructions above and should delete the Bintray ones.
+
+For Debian-based distributions, you can run:
+
+```bash
+sudo sed -i '/dl\.bintray\.com\/loadimpact\/deb/d' /etc/apt/sources.list
+sudo apt-key del 379CE192D401AB61
+sudo apt-get update
+```
+
+Or delete the repository file if you added it to `/etc/apt/sources.list.d/`.
+
+And for rpm-based ones, delete the repository file in `/etc/yum.repos.d/`. If you followed the [official installation instructions](https://k6.io/docs/getting-started/installation/#red-hat-centos), this should be:
+
+```bash
+sudo rm /etc/yum.repos.d/bintray-loadimpact-rpm.repo
+```
+
+
 ### Docker
 
 ```bash
