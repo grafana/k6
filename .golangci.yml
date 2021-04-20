@@ -74,4 +74,5 @@ linters:
   - maligned # replaced by govet 'fieldalignment'
   - interfacer # deprecated
   - scopelint # deprecated, replaced by exportloopref
+  - wrapcheck # a little bit too much for k6, maybe after https://github.com/tomarrell/wrapcheck/issues/2 is fixed
   fast: false
