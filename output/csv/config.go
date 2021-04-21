@@ -32,7 +32,7 @@ import (
 	"github.com/loadimpact/k6/lib/types"
 )
 
-// Config is the config for the csv collector
+// Config is the config for the csv output
 type Config struct {
 	// Samples.
 	FileName     null.String        `json:"file_name" envconfig:"K6_CSV_FILENAME"`
