@@ -138,7 +138,7 @@ func newOutput(params output.Params) (*Output, error) {
 // Description returns a human-readable description of the output.
 func (o *Output) Description() string {
 	if o.fname == "" || o.fname == "-" { // TODO rename
-		return "csv(stdout)"
+		return "csv (stdout)"
 	}
 	return fmt.Sprintf("csv (%s)", o.fname)
 }
