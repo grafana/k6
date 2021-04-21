@@ -20,12 +20,6 @@
 
 package lib
 
-import (
-	"context"
-
-	"github.com/loadimpact/k6/stats"
-)
-
 // TODO: move to some other package - types? models?
 
 // RunStatus values can be used by k6 to denote how a script run ends
@@ -47,24 +41,3 @@ const (
 	RunStatusAbortedScriptError RunStatus = 7
 	RunStatusAbortedThreshold   RunStatus = 8
 )
-
-// TODO: remove
-
-// A Collector abstracts the process of funneling samples to an external storage backend,
-// such as an InfluxDB instance.
-type Collector interface {
-	// Init is called between the collector's creation and the call to Run().
-	// You should do any lengthy setup here rather than in New.
-	Init() error
-
-	// Run is called in a goroutine and starts the collector. Should commit samples to the backend
-	// at regular intervals and when the context is terminated.
-	Run(ctx context.Context)
-
-	// Collect receives a set of samples. This method is never called concurrently, and only while
-	// the context for Run() is valid, but should defer as much work as possible to Run().
-	Collect(samples []stats.SampleContainer)
-
-	// Optionally return a link that is shown to the user.
-	Link() string
-}

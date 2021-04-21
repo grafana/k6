@@ -21,7 +21,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -37,13 +36,11 @@ import (
 	"github.com/loadimpact/k6/output/influxdb"
 	"github.com/loadimpact/k6/output/json"
 	"github.com/loadimpact/k6/output/statsd"
-	"github.com/loadimpact/k6/stats"
 
 	"github.com/k6io/xk6-output-kafka/pkg/kafka"
 )
 
 // TODO: move this to an output sub-module after we get rid of the old collectors?
-//nolint: funlen
 func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, error), error) {
 	// Start with the built-in outputs
 	result := map[string]func(output.Params) (output.Output, error){
@@ -141,55 +138,4 @@ func parseOutputArgument(s string) (t, arg string) {
 	default:
 		return parts[0], parts[1]
 	}
-}
-
-// TODO: remove this after we transition every collector to the output interface
-
-func newCollectorAdapter(params output.Params, collector lib.Collector) output.Output {
-	return &collectorAdapter{
-		outputType: params.OutputType,
-		collector:  collector,
-		stopCh:     make(chan struct{}),
-	}
-}
-
-// collectorAdapter is a _temporary_ fix until we move all of the old
-// "collectors" to the new output interface
-type collectorAdapter struct {
-	collector    lib.Collector
-	outputType   string
-	runCtx       context.Context
-	runCtxCancel func()
-	stopCh       chan struct{}
-}
-
-func (ca *collectorAdapter) Description() string {
-	link := ca.collector.Link()
-	if link != "" {
-		return fmt.Sprintf("%s (%s)", ca.outputType, link)
-	}
-	return ca.outputType
-}
-
-func (ca *collectorAdapter) Start() error {
-	if err := ca.collector.Init(); err != nil {
-		return err
-	}
-	ca.runCtx, ca.runCtxCancel = context.WithCancel(context.Background())
-	go func() {
-		ca.collector.Run(ca.runCtx)
-		close(ca.stopCh)
-	}()
-	return nil
-}
-
-func (ca *collectorAdapter) AddMetricSamples(samples []stats.SampleContainer) {
-	ca.collector.Collect(samples)
-}
-
-// Stop implements the new output interface.
-func (ca *collectorAdapter) Stop() error {
-	ca.runCtxCancel()
-	<-ca.stopCh
-	return nil
 }
