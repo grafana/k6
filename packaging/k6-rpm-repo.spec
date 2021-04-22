@@ -1,5 +1,5 @@
 Name:           k6-rpm
-Version:        0.0.1
+Version:        0.0.2
 Release:        1
 Summary:        k6 RPM Repository Configuration
 Group:          System Environment/Base
