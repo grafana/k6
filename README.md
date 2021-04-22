@@ -118,7 +118,7 @@ sudo apt-get update
 
 Or delete the repository file if you added it to `/etc/apt/sources.list.d/`.
 
-And for rpm-based ones, delete the repository file in `/etc/yum.repos.d/`. If you followed the [official installation instructions](https://k6.io/docs/getting-started/installation/#red-hat-centos), this should be:
+And for rpm-based ones, delete the repository file in `/etc/yum.repos.d/`. If you followed the [official installation instructions](https://k6.io/docs/getting-started/installation/#fedora-centos), this should be:
 
 ```bash
 sudo rm /etc/yum.repos.d/bintray-loadimpact-rpm.repo
