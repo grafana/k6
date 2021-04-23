@@ -1499,7 +1499,9 @@ func TestExecutionStatsScenarioIter(t *testing.T) {
 	t.Parallel()
 	script := []byte(`
 		import exec from 'k6/execution';
-		import { sleep } from 'k6';
+		import { randomSeed, sleep } from 'k6';
+
+		randomSeed(12345);
 
 		// The carr scenario should reuse the two VUs created for the pvu scenario.
 		export let options = {
@@ -1514,13 +1516,13 @@ func TestExecutionStatsScenarioIter(t *testing.T) {
 				carr: {
 					executor: 'constant-arrival-rate',
 					exec: 'carr',
-					rate: 10,
-					timeUnit: '1s',
+					rate: 9,
+					timeUnit: '0.95s',
 					duration: '1s',
 					preAllocatedVUs: 2,
 					maxVUs: 10,
 					startTime: '2s',
-					gracefulStop: '0s',
+					gracefulStop: '100ms',
 				},
 			},
 		};
