@@ -1408,13 +1408,13 @@ func TestExecutionStatsVUSharing(t *testing.T) {
 				carr: {
 					executor: 'constant-arrival-rate',
 					exec: 'carr',
-					rate: 10,
-					timeUnit: '1s',
+					rate: 9,
+					timeUnit: '0.95s',
 					duration: '1s',
 					preAllocatedVUs: 2,
 					maxVUs: 10,
 					startTime: '2s',
-					gracefulStop: '0s',
+					gracefulStop: '100ms',
 				},
 		    },
 		};
