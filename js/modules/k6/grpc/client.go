@@ -22,6 +22,7 @@ package grpc
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,6 +31,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	reflectpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 
 	"github.com/dop251/goja"
 	"github.com/jhump/protoreflect/desc"
@@ -114,6 +117,90 @@ func walkFileDescriptors(seen map[string]struct{}, fd *desc.FileDescriptor) []*d
 	return fds
 }
 
+func (c *Client) Reflect(ctxPtr *context.Context, addr string, params map[string]interface{}) ([]MethodInfo, error) {
+	ctx := context.Background()
+	opts := []grpc.DialOption{
+		grpc.WithBlock(),
+		grpc.WithInsecure(),
+	}
+	isPlaintext := false
+
+	for k, v := range params {
+		switch k {
+		case "plaintext":
+			isPlaintext, _ = v.(bool)
+		default:
+			return nil, fmt.Errorf("unknown connect param: %q", k)
+		}
+	}
+	if !isPlaintext {
+		cp, err := x509.SystemCertPool()
+		if err != nil {
+			return nil, err
+		}
+		opts = []grpc.DialOption{
+			grpc.WithBlock(),
+			grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(cp, "")),
+		}
+	}
+	conn, err := grpc.DialContext(ctx, addr, opts...)
+	if err != nil {
+		return nil, err
+	}
+	client := reflectpb.NewServerReflectionClient(conn)
+
+	req := &reflectpb.ServerReflectionRequest{
+		MessageRequest: &reflectpb.ServerReflectionRequest_ListServices{
+			ListServices: "*",
+		},
+	}
+
+	cl, err := client.ServerReflectionInfo(*ctxPtr)
+	if err != nil {
+		return nil, err
+	}
+	if err := cl.Send(req); err != nil {
+		return nil, err
+	}
+	resp, err := cl.Recv()
+	if err != nil {
+		return nil, err
+	}
+	listResp := resp.GetListServicesResponse()
+	if listResp == nil {
+		return nil, fmt.Errorf("Can't list services")
+	}
+	fdset := &descriptorpb.FileDescriptorSet{}
+	for _, service := range listResp.GetService() {
+		req := &reflectpb.ServerReflectionRequest{
+			MessageRequest: &reflectpb.ServerReflectionRequest_FileContainingSymbol{
+				FileContainingSymbol: service.GetName(),
+			},
+		}
+		if err := cl.Send(req); err != nil {
+			return nil, err
+		}
+		resp, err := cl.Recv()
+		if err != nil {
+			return nil, err
+		}
+		fdResp := resp.GetFileDescriptorResponse()
+		for _, f := range fdResp.GetFileDescriptorProto() {
+			a := &descriptorpb.FileDescriptorProto{}
+			if err := proto.Unmarshal(f, a); err != nil {
+				return nil, err
+			}
+			fdset.File = append(fdset.File, a)
+		}
+	}
+	rtn, err := c.convertToMethodInfo(err, fdset)
+	if err != nil {
+		return nil, err
+	}
+	return rtn, err
+
+}
+
 // Load will parse the given proto files and make the file descriptors available to request.
 func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames ...string) ([]MethodInfo, error) {
 	if lib.GetState(*ctxPtr) != nil {
@@ -150,7 +237,14 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 	for _, fd := range fds {
 		fdset.File = append(fdset.File, walkFileDescriptors(seen, fd)...)
 	}
+	rtn, err := c.convertToMethodInfo(err, fdset)
+	if err != nil {
+		return nil, err
+	}
+	return rtn, nil
+}
 
+func (c *Client) convertToMethodInfo(err error, fdset *descriptorpb.FileDescriptorSet) ([]MethodInfo, error) {
 	files, err := protodesc.NewFiles(fdset)
 	if err != nil {
 		return nil, err
@@ -186,7 +280,6 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 		}
 		return true
 	})
-
 	return rtn, nil
 }
 

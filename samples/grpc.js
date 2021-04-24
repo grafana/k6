@@ -2,7 +2,10 @@ import grpc from 'k6/net/grpc';
 import { check } from "k6";
 
 let client = new grpc.Client();
-client.load([], "./grpc_server/route_guide.proto")
+// client.load([], "./grpc_server/route_guide.proto")
+
+client.reflect("127.0.0.1:10000", { plaintext: true })
+
 
 
 export default () => {
