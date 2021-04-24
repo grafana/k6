@@ -22,10 +22,11 @@ package grpc
 
 import (
 	"context"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/loadimpact/k6/lib/netext"
+	"gopkg.in/guregu/null.v3"
 	"io"
 	"net"
 	"strconv"
@@ -117,45 +118,29 @@ func walkFileDescriptors(seen map[string]struct{}, fd *desc.FileDescriptor) []*d
 	return fds
 }
 
-func (c *Client) Reflect(ctxPtr *context.Context, addr string, params map[string]interface{}) ([]MethodInfo, error) {
-	ctx := context.Background()
-	opts := []grpc.DialOption{
-		grpc.WithBlock(),
-		grpc.WithInsecure(),
-	}
-	isPlaintext := false
+func (c *Client) Reflect(addr string, params map[string]interface{}) ([]MethodInfo, error) {
+	ctx := lib.WithState(
+		context.Background(),
+		&lib.State{
+			Options: lib.Options{UserAgent: null.String{}, HTTPDebug: null.String{}},
+			Dialer: netext.NewDialer(
+				net.Dialer{
+					Timeout:   2 * time.Second,
+					KeepAlive: 10 * time.Second,
+				}, netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4))})
 
-	for k, v := range params {
-		switch k {
-		case "plaintext":
-			isPlaintext, _ = v.(bool)
-		default:
-			return nil, fmt.Errorf("unknown connect param: %q", k)
-		}
+	ok, err := c.Connect(&ctx, addr, params)
+	if err != nil || !ok {
+		return nil, fmt.Errorf("error using reflection API on service: %s", addr)
 	}
-	if !isPlaintext {
-		cp, err := x509.SystemCertPool()
-		if err != nil {
-			return nil, err
-		}
-		opts = []grpc.DialOption{
-			grpc.WithBlock(),
-			grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(cp, "")),
-		}
-	}
-	conn, err := grpc.DialContext(ctx, addr, opts...)
-	if err != nil {
-		return nil, err
-	}
-	client := reflectpb.NewServerReflectionClient(conn)
-
+	client := reflectpb.NewServerReflectionClient(c.conn)
 	req := &reflectpb.ServerReflectionRequest{
 		MessageRequest: &reflectpb.ServerReflectionRequest_ListServices{
 			ListServices: "*",
 		},
 	}
 
-	cl, err := client.ServerReflectionInfo(*ctxPtr)
+	cl, err := client.ServerReflectionInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +183,6 @@ func (c *Client) Reflect(ctxPtr *context.Context, addr string, params map[string
 		return nil, err
 	}
 	return rtn, err
-
 }
 
 // Load will parse the given proto files and make the file descriptors available to request.
