@@ -140,20 +140,20 @@ func (c *Client) Reflect(addr string, params map[string]interface{}) ([]MethodIn
 		},
 	}
 
-	cl, err := client.ServerReflectionInfo(ctx)
+	methodClient, err := client.ServerReflectionInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := cl.Send(req); err != nil {
+	if err := methodClient.Send(req); err != nil {
 		return nil, err
 	}
-	resp, err := cl.Recv()
+	resp, err := methodClient.Recv()
 	if err != nil {
 		return nil, err
 	}
 	listResp := resp.GetListServicesResponse()
 	if listResp == nil {
-		return nil, fmt.Errorf("Can't list services")
+		return nil, fmt.Errorf("can't list services")
 	}
 	fdset := &descriptorpb.FileDescriptorSet{}
 	for _, service := range listResp.GetService() {
@@ -162,10 +162,10 @@ func (c *Client) Reflect(addr string, params map[string]interface{}) ([]MethodIn
 				FileContainingSymbol: service.GetName(),
 			},
 		}
-		if err := cl.Send(req); err != nil {
+		if err := methodClient.Send(req); err != nil {
 			return nil, err
 		}
-		resp, err := cl.Recv()
+		resp, err := methodClient.Recv()
 		if err != nil {
 			return nil, err
 		}
