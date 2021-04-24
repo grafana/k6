@@ -22,12 +22,9 @@ package grpc
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/loadimpact/k6/lib/netext"
-	"gopkg.in/guregu/null.v3"
 	"io"
 	"net"
 	"strconv"
@@ -119,41 +116,22 @@ func walkFileDescriptors(seen map[string]struct{}, fd *desc.FileDescriptor) []*d
 	return fds
 }
 
+// Reflect will use the grpc reflection api to make the file descriptors available to request.
 func (c *Client) Reflect(addr string, params map[string]interface{}) ([]MethodInfo, error) {
-	ctx := lib.WithState(
-		context.Background(),
-		&lib.State{
-			Options: lib.Options{UserAgent: null.String{sql.NullString{
-				String: "k6",
-				Valid:  true,
-			}}, HTTPDebug: null.String{}},
-			Dialer: netext.NewDialer(
-				net.Dialer{
-					Timeout:   2 * time.Second,
-					KeepAlive: 10 * time.Second,
-				}, netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4))})
-
+	ctx := lib.WithState(context.Background(), reflectState())
 	ok, err := c.Connect(&ctx, addr, params)
 	if err != nil || !ok {
-		return nil, fmt.Errorf("error using reflection API on service: %s", addr)
+		return nil, fmt.Errorf("error connecting with grpc server: %s", addr)
 	}
 	client := reflectpb.NewServerReflectionClient(c.conn)
-	req := &reflectpb.ServerReflectionRequest{
-		MessageRequest: &reflectpb.ServerReflectionRequest_ListServices{
-			ListServices: "*",
-		},
-	}
-
 	methodClient, err := client.ServerReflectionInfo(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error using reflection API on service: %s", addr)
+		return nil, fmt.Errorf("error using reflection API: %s", addr)
 	}
-	if err := methodClient.Send(req); err != nil {
-		return nil, err
-	}
-	resp, err := methodClient.Recv()
+	req := &reflectpb.ServerReflectionRequest{MessageRequest: &reflectpb.ServerReflectionRequest_ListServices{}}
+	resp, err := doReflect(methodClient, req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error using reflection API: %s", addr)
 	}
 	listResp := resp.GetListServicesResponse()
 	if listResp == nil {
@@ -161,32 +139,25 @@ func (c *Client) Reflect(addr string, params map[string]interface{}) ([]MethodIn
 	}
 	fdset := &descriptorpb.FileDescriptorSet{}
 	for _, service := range listResp.GetService() {
-		req := &reflectpb.ServerReflectionRequest{
+		req = &reflectpb.ServerReflectionRequest{
 			MessageRequest: &reflectpb.ServerReflectionRequest_FileContainingSymbol{
 				FileContainingSymbol: service.GetName(),
 			},
 		}
-		if err := methodClient.Send(req); err != nil {
-			return nil, err
-		}
-		resp, err := methodClient.Recv()
+		resp, err = doReflect(methodClient, req)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error listing methods on service: %s", service)
 		}
 		fdResp := resp.GetFileDescriptorResponse()
 		for _, f := range fdResp.GetFileDescriptorProto() {
 			a := &descriptorpb.FileDescriptorProto{}
-			if err := proto.Unmarshal(f, a); err != nil {
+			if err = proto.Unmarshal(f, a); err != nil {
 				return nil, err
 			}
 			fdset.File = append(fdset.File, a)
 		}
 	}
-	rtn, err := c.convertToMethodInfo(err, fdset)
-	if err != nil {
-		return nil, err
-	}
-	return rtn, err
+	return c.convertToMethodInfo(fdset)
 }
 
 // Load will parse the given proto files and make the file descriptors available to request.
@@ -225,14 +196,10 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 	for _, fd := range fds {
 		fdset.File = append(fdset.File, walkFileDescriptors(seen, fd)...)
 	}
-	rtn, err := c.convertToMethodInfo(err, fdset)
-	if err != nil {
-		return nil, err
-	}
-	return rtn, nil
+	return c.convertToMethodInfo(fdset)
 }
 
-func (c *Client) convertToMethodInfo(err error, fdset *descriptorpb.FileDescriptorSet) ([]MethodInfo, error) {
+func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]MethodInfo, error) {
 	files, err := protodesc.NewFiles(fdset)
 	if err != nil {
 		return nil, err
@@ -268,6 +235,7 @@ func (c *Client) convertToMethodInfo(err error, fdset *descriptorpb.FileDescript
 		}
 		return true
 	})
+
 	return rtn, nil
 }
 
