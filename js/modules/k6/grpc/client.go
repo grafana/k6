@@ -22,6 +22,7 @@ package grpc
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -122,7 +123,10 @@ func (c *Client) Reflect(addr string, params map[string]interface{}) ([]MethodIn
 	ctx := lib.WithState(
 		context.Background(),
 		&lib.State{
-			Options: lib.Options{UserAgent: null.String{}, HTTPDebug: null.String{}},
+			Options: lib.Options{UserAgent: null.String{sql.NullString{
+				String: "k6",
+				Valid:  true,
+			}}, HTTPDebug: null.String{}},
 			Dialer: netext.NewDialer(
 				net.Dialer{
 					Timeout:   2 * time.Second,
@@ -142,7 +146,7 @@ func (c *Client) Reflect(addr string, params map[string]interface{}) ([]MethodIn
 
 	methodClient, err := client.ServerReflectionInfo(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error using reflection API on service: %s", addr)
 	}
 	if err := methodClient.Send(req); err != nil {
 		return nil, err
