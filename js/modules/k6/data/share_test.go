@@ -22,7 +22,9 @@ package data
 
 import (
 	"context"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
@@ -189,4 +191,42 @@ func TestSharedArrayAnotherRuntimeWorking(t *testing.T) {
 
 	`)
 	require.NoError(t, err)
+}
+
+func TestSharedArrayRaceInInitialization(t *testing.T) {
+	t.Parallel()
+
+	const instances = 10
+	const repeats = 100
+	for i := 0; i < repeats; i++ {
+		runtimes := make([]*goja.Runtime, instances)
+		moduleInstance := New()
+		for j := 0; j < instances; j++ {
+			rt, err := newConfiguredRuntime(moduleInstance)
+			require.NoError(t, err)
+			runtimes[j] = rt
+		}
+		var wg sync.WaitGroup
+		for _, rt := range runtimes {
+			rt := rt
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_, err := rt.RunString(`var array = new data.SharedArray("shared", function() {return [1,2,3,4,5,6,7,8,9, 10]});`)
+				require.NoError(t, err)
+			}()
+		}
+		ch := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(ch)
+		}()
+
+		select {
+		case <-ch:
+			// everything is fine
+		case <-time.After(time.Second * 10):
+			t.Fatal("Took too long probably locked up")
+		}
+	}
 }
