@@ -39,7 +39,7 @@ func New() *Execution {
 func (e *Execution) GetVUStats(ctx context.Context) (map[string]interface{}, error) {
 	vuState := lib.GetState(ctx)
 	if vuState == nil {
-		return nil, errors.New("VU information can only be returned from an exported function")
+		return nil, errors.New("getting VU information in the init context is not supported")
 	}
 
 	scID, _ := vuState.GetScenarioVUID()
@@ -57,7 +57,7 @@ func (e *Execution) GetVUStats(ctx context.Context) (map[string]interface{}, err
 func (e *Execution) GetScenarioStats(ctx context.Context) (map[string]interface{}, error) {
 	ss := lib.GetScenarioState(ctx)
 	if ss == nil {
-		return nil, errors.New("scenario information can only be returned from an exported function")
+		return nil, errors.New("getting scenario information in the init context is not supported")
 	}
 
 	progress, _ := ss.ProgressFn()
@@ -79,7 +79,7 @@ func (e *Execution) GetScenarioStats(ctx context.Context) (map[string]interface{
 func (e *Execution) GetTestStats(ctx context.Context) (map[string]interface{}, error) {
 	es := lib.GetExecutionState(ctx)
 	if es == nil {
-		return nil, errors.New("test information can only be returned from an exported function")
+		return nil, errors.New("getting test information in the init context is not supported")
 	}
 
 	out := map[string]interface{}{
