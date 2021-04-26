@@ -123,7 +123,7 @@ func (c *Client) Reflect(addr string, params map[string]interface{}) ([]MethodIn
 	if err != nil || !ok {
 		return nil, fmt.Errorf("error connecting with grpc server: %s", addr)
 	}
-	defer c.conn.Close()
+	defer c.conn.Close() //nolint: errcheck
 	client := reflectpb.NewServerReflectionClient(c.conn)
 	methodClient, err := client.ServerReflectionInfo(ctx)
 	if err != nil {
