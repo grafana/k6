@@ -126,7 +126,6 @@ func invalidJSONHandler(w http.ResponseWriter, r *http.Request) {
 
 func TestResponse(t *testing.T) {
 	tb, state, samples, rt, _ := newRuntime(t)
-	defer tb.Cleanup()
 	root := state.Group
 	sr := tb.Replacer.Replace
 

@@ -101,7 +101,6 @@ type HTTPMultiBin struct {
 	Dialer          *netext.Dialer
 	HTTPTransport   *http.Transport
 	Context         context.Context
-	Cleanup         func()
 }
 
 type jsonBody struct {
@@ -335,7 +334,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 
 	ctx, ctxCancel := context.WithCancel(context.Background())
 
-	return &HTTPMultiBin{
+	result := &HTTPMultiBin{
 		Mux:         mux,
 		ServerHTTP:  httpSrv,
 		ServerHTTPS: httpsSrv,
@@ -368,12 +367,14 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 		Dialer:          dialer,
 		HTTPTransport:   transport,
 		Context:         ctx,
-		Cleanup: func() {
-			grpcSrv.Stop()
-			http2Srv.Close()
-			httpsSrv.Close()
-			httpSrv.Close()
-			ctxCancel()
-		},
 	}
+
+	t.Cleanup(func() {
+		grpcSrv.Stop()
+		http2Srv.Close()
+		httpsSrv.Close()
+		httpSrv.Close()
+		ctxCancel()
+	})
+	return result
 }

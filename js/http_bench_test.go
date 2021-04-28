@@ -36,7 +36,6 @@ import (
 func BenchmarkHTTPRequests(b *testing.B) {
 	b.StopTimer()
 	tb := httpmultibin.NewHTTPMultiBin(b)
-	defer tb.Cleanup()
 
 	r, err := getSimpleRunner(b, "/script.js", tb.Replacer.Replace(`
 			import http from "k6/http";
@@ -80,7 +79,6 @@ func BenchmarkHTTPRequests(b *testing.B) {
 func BenchmarkHTTPRequestsBase(b *testing.B) {
 	b.StopTimer()
 	tb := httpmultibin.NewHTTPMultiBin(b)
-	defer tb.Cleanup()
 
 	r, err := getSimpleRunner(b, "/script.js", tb.Replacer.Replace(`
 			var http = require("k6/http");

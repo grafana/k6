@@ -232,7 +232,6 @@ func TestOptionsPropagationToScript(t *testing.T) {
 
 func TestMetricName(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	script := tb.Replacer.Replace(`
 		var Counter = require("k6/metrics").Counter;
@@ -250,7 +249,6 @@ func TestMetricName(t *testing.T) {
 
 func TestSetupDataIsolation(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	script := tb.Replacer.Replace(`
 		var Counter = require("k6/metrics").Counter;
@@ -956,7 +954,6 @@ func TestVUIntegrationBlockHostnamesScript(t *testing.T) {
 
 func TestVUIntegrationHosts(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	r1, err := getSimpleRunner(t, "/script.js",
 		tb.Replacer.Replace(`
@@ -1122,7 +1119,6 @@ func TestVUIntegrationOpenFunctionErrorWhenSneaky(t *testing.T) {
 
 func TestVUIntegrationCookiesReset(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	r1, err := getSimpleRunner(t, "/script.js", tb.Replacer.Replace(`
 			var http = require("k6/http");;
@@ -1176,7 +1172,6 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 
 func TestVUIntegrationCookiesNoReset(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	r1, err := getSimpleRunner(t, "/script.js", tb.Replacer.Replace(`
 			var http = require("k6/http");;
@@ -1420,7 +1415,6 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 
 func TestHTTPRequestInInitContext(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	_, err := getSimpleRunner(t, "/script.js", tb.Replacer.Replace(`
 					var k6 = require("k6");
@@ -1501,7 +1495,6 @@ func TestInitContextForbidden(t *testing.T) {
 		},
 	}
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	for _, test := range table {
 		test := test
@@ -1519,7 +1512,6 @@ func TestInitContextForbidden(t *testing.T) {
 
 func TestArchiveRunningIntegrity(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	fs := afero.NewMemMapFs()
 	data := tb.Replacer.Replace(`
@@ -1567,7 +1559,6 @@ func TestArchiveRunningIntegrity(t *testing.T) {
 
 func TestArchiveNotPanicking(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/non/existent", []byte(`42`), os.ModePerm))
@@ -1588,7 +1579,6 @@ func TestArchiveNotPanicking(t *testing.T) {
 
 func TestStuffNotPanicking(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	r, err := getSimpleRunner(t, "/script.js", tb.Replacer.Replace(`
 			var http = require("k6/http");
@@ -1652,7 +1642,6 @@ func TestStuffNotPanicking(t *testing.T) {
 
 func TestPanicOnSimpleHTML(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	r, err := getSimpleRunner(t, "/script.js", tb.Replacer.Replace(`
 			var parseHTML = require("k6/html").parseHTML;
@@ -1688,7 +1677,6 @@ func TestPanicOnSimpleHTML(t *testing.T) {
 func TestSystemTags(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	// Handle paths with custom logic
 	tb.Mux.HandleFunc("/wrong-redirect", func(w http.ResponseWriter, r *http.Request) {
@@ -1904,7 +1892,6 @@ func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.H
 func TestComplicatedFileImportsForGRPC(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	tb.GRPCStub.UnaryCallFunc = func(ctx context.Context, sreq *grpc_testing.SimpleRequest) (
 		*grpc_testing.SimpleResponse, error,

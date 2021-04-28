@@ -178,7 +178,6 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 	// inside script that is imported
 
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/A.js", []byte(tb.Replacer.Replace(`
 		import http from "k6/http";

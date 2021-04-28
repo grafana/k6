@@ -72,7 +72,6 @@ func assertMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []
 func TestClient(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 	sr := tb.Replacer.Replace
 
 	root, err := lib.NewGroup("", nil)
