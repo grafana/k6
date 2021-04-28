@@ -24,6 +24,9 @@ issues:
        - gocognit
        - funlen
        - lll
+   - linters:
+     - paralleltest # false positive: https://github.com/kunwardeep/paralleltest/issues/8.
+     text: "does not use range value in test Run"
 
   exclude:
    #TODO: remove this exclusion after https://github.com/golang/lint/issues/381
