@@ -28,7 +28,7 @@ github.com/davecgh/go-spew/spew
 # github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
-# github.com/dop251/goja v0.0.0-20210402105715-96fa0aa6d91e
+# github.com/dop251/goja v0.0.0-20210427212725-462d53687b0d
 ## explicit
 github.com/dop251/goja
 github.com/dop251/goja/ast

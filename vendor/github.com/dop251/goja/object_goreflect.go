@@ -209,6 +209,10 @@ func (o *objectGoReflect) setForeignStr(name unistring.String, val, receiver Val
 	return o._setForeignStr(name, trueValIfPresent(o._has(name.String())), val, receiver, throw)
 }
 
+func (o *objectGoReflect) setForeignIdx(idx valueInt, val, receiver Value, throw bool) (bool, bool) {
+	return o._setForeignIdx(idx, nil, val, receiver, throw)
+}
+
 func (o *objectGoReflect) _put(name string, val Value, throw bool) (has, ok bool) {
 	if o.value.Kind() == reflect.Struct {
 		if v := o._getField(name); v.IsValid() {
