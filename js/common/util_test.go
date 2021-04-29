@@ -45,6 +45,7 @@ func TestThrow(t *testing.T) {
 }
 
 func TestToBytes(t *testing.T) {
+	t.Parallel()
 	rt := goja.New()
 	b := []byte("hello")
 	testCases := []struct {
@@ -62,6 +63,34 @@ func TestToBytes(t *testing.T) {
 		tc := tc
 		t.Run(fmt.Sprintf("%T", tc.in), func(t *testing.T) {
 			out, err := ToBytes(tc.in)
+			if tc.expErr != "" {
+				assert.EqualError(t, err, tc.expErr)
+				return
+			}
+			assert.Equal(t, tc.expOut, out)
+		})
+	}
+}
+
+func TestToString(t *testing.T) {
+	t.Parallel()
+	rt := goja.New()
+	s := "hello"
+	testCases := []struct {
+		in             interface{}
+		expOut, expErr string
+	}{
+		{s, s, ""},
+		{"hello", s, ""},
+		{rt.NewArrayBuffer([]byte(s)), s, ""},
+		{struct{}{}, "", "invalid type struct {}, expected string, []byte or ArrayBuffer"},
+	}
+
+	for _, tc := range testCases { //nolint: paralleltest // false positive: https://github.com/kunwardeep/paralleltest/issues/8
+		tc := tc
+		t.Run(fmt.Sprintf("%T", tc.in), func(t *testing.T) {
+			t.Parallel()
+			out, err := ToString(tc.in)
 			if tc.expErr != "" {
 				assert.EqualError(t, err, tc.expErr)
 				return

@@ -207,8 +207,9 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 	return pgm, err
 }
 
-// Open implements open() in the init context and will read and return the contents of a file.
-// If the second argument is "b" it returns the data as a binary array, otherwise as a string.
+// Open implements open() in the init context and will read and return the
+// contents of a file. If the second argument is "b" it returns an ArrayBuffer
+// instance, otherwise a string representation.
 func (i *InitContext) Open(ctx context.Context, filename string, args ...string) (goja.Value, error) {
 	if lib.GetState(ctx) != nil {
 		return nil, errors.New(openCantBeUsedOutsideInitContextMsg)
@@ -242,7 +243,8 @@ func (i *InitContext) Open(ctx context.Context, filename string, args ...string)
 	}
 
 	if len(args) > 0 && args[0] == "b" {
-		return i.runtime.ToValue(data), nil
+		ab := i.runtime.NewArrayBuffer(data)
+		return i.runtime.ToValue(&ab), nil
 	}
 	return i.runtime.ToValue(string(data)), nil
 }

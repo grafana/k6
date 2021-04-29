@@ -347,6 +347,102 @@ func TestSession(t *testing.T) {
 	}
 }
 
+func TestSocketSendBinary(t *testing.T) { //nolint: tparallel
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	t.Cleanup(tb.Cleanup)
+	sr := tb.Replacer.Replace
+
+	root, err := lib.NewGroup("", nil)
+	assert.NoError(t, err)
+
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	samples := make(chan stats.SampleContainer, 1000)
+	state := &lib.State{ //nolint: exhaustivestruct
+		Group:  root,
+		Dialer: tb.Dialer,
+		Options: lib.Options{ //nolint: exhaustivestruct
+			SystemTags: stats.NewSystemTagSet(
+				stats.TagURL,
+				stats.TagProto,
+				stats.TagStatus,
+				stats.TagSubproto,
+			),
+		},
+		Samples:   samples,
+		TLSConfig: tb.TLSClientConfig,
+	}
+
+	ctx := context.Background()
+	ctx = lib.WithState(ctx, state)
+	ctx = common.WithRuntime(ctx, rt)
+
+	err = rt.Set("ws", common.Bind(rt, New(), &ctx))
+	assert.NoError(t, err)
+
+	t.Run("ok", func(t *testing.T) {
+		_, err = rt.RunString(sr(`
+		var gotMsg = false;
+		var res = ws.connect('WSBIN_URL/ws-echo', function(socket){
+			var data = new Uint8Array([104, 101, 108, 108, 111]); // 'hello'
+
+			socket.on('open', function() {
+				socket.sendBinary(data.buffer);
+			})
+			socket.on('binaryMessage', function(msg) {
+				gotMsg = true;
+				let decText = String.fromCharCode.apply(null, new Uint8Array(msg));
+				decText = decodeURIComponent(escape(decText));
+				if (decText !== 'hello') {
+					throw new Error('received unexpected binary message: ' + decText);
+				}
+				socket.close()
+			});
+		});
+		if (!gotMsg) {
+			throw new Error("the 'binaryMessage' handler wasn't called")
+		}
+		`))
+		assert.NoError(t, err)
+	})
+
+	errTestCases := []struct {
+		in, expErrType string
+	}{
+		{"", ""},
+		{"undefined", "undefined"},
+		{"null", "null"},
+		{"true", "Boolean"},
+		{"1", "Number"},
+		{"3.14", "Number"},
+		{"'str'", "String"},
+		{"[1, 2, 3]", "Array"},
+		{"new Uint8Array([1, 2, 3])", "Object"},
+		{"Symbol('a')", "Symbol"},
+		{"function() {}", "Function"},
+	}
+
+	for _, tc := range errTestCases { //nolint: paralleltest
+		tc := tc
+		t.Run(fmt.Sprintf("err_%s", tc.expErrType), func(t *testing.T) {
+			_, err = rt.RunString(fmt.Sprintf(sr(`
+			var res = ws.connect('WSBIN_URL/ws-echo', function(socket){
+				socket.on('open', function() {
+					socket.sendBinary(%s);
+				})
+			});
+		`), tc.in))
+			require.Error(t, err)
+			if tc.in == "" {
+				assert.Contains(t, err.Error(), "missing argument, expected ArrayBuffer")
+			} else {
+				assert.Contains(t, err.Error(), fmt.Sprintf("expected ArrayBuffer as argument, received: %s", tc.expErrType))
+			}
+		})
+	}
+}
+
 func TestErrors(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
@@ -607,7 +703,7 @@ func TestReadPump(t *testing.T) {
 				_ = conn.Close()
 			}()
 
-			msgChan := make(chan []byte)
+			msgChan := make(chan *message)
 			errChan := make(chan error)
 			closeChan := make(chan int)
 			s := &Socket{conn: conn}

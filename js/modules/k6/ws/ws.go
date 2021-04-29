@@ -70,6 +70,11 @@ type WSHTTPResponse struct {
 	Error   string            `json:"error"`
 }
 
+type message struct {
+	mtype int // message type consts as defined in gorilla/websocket/conn.go
+	data  []byte
+}
+
 const writeWait = 10 * time.Second
 
 func New() *WS {
@@ -240,7 +245,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	conn.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
 	conn.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
 
-	readDataChan := make(chan []byte)
+	readDataChan := make(chan *message)
 	readCloseChan := make(chan int)
 	readErrChan := make(chan error)
 
@@ -280,14 +285,20 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			socket.trackPong(pingID)
 			socket.handleEvent("pong")
 
-		case readData := <-readDataChan:
+		case msg := <-readDataChan:
 			stats.PushIfNotDone(ctx, socket.samplesOutput, stats.Sample{
 				Metric: metrics.WSMessagesReceived,
 				Time:   time.Now(),
 				Tags:   socket.sampleTags,
 				Value:  1,
 			})
-			socket.handleEvent("message", rt.ToValue(string(readData)))
+
+			if msg.mtype == websocket.BinaryMessage {
+				ab := rt.NewArrayBuffer(msg.data)
+				socket.handleEvent("binaryMessage", rt.ToValue(&ab))
+			} else {
+				socket.handleEvent("message", rt.ToValue(string(msg.data)))
+			}
 
 		case readErr := <-readErrChan:
 			socket.handleEvent("error", rt.ToValue(readErr))
@@ -329,14 +340,41 @@ func (s *Socket) handleEvent(event string, args ...goja.Value) {
 	}
 }
 
+// Send writes the given string message to the connection.
 func (s *Socket) Send(message string) {
-	// NOTE: No binary message support for the time being since goja doesn't
-	// support typed arrays.
-	rt := common.GetRuntime(s.ctx)
+	if err := s.conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
+		s.handleEvent("error", common.GetRuntime(s.ctx).ToValue(err))
+	}
 
-	writeData := []byte(message)
-	if err := s.conn.WriteMessage(websocket.TextMessage, writeData); err != nil {
-		s.handleEvent("error", rt.ToValue(err))
+	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
+		Metric: metrics.WSMessagesSent,
+		Time:   time.Now(),
+		Tags:   s.sampleTags,
+		Value:  1,
+	})
+}
+
+// SendBinary writes the given ArrayBuffer message to the connection.
+func (s *Socket) SendBinary(message goja.Value) {
+	if message == nil {
+		common.Throw(common.GetRuntime(s.ctx), errors.New("missing argument, expected ArrayBuffer"))
+	}
+
+	msg := message.Export()
+	if ab, ok := msg.(goja.ArrayBuffer); ok {
+		if err := s.conn.WriteMessage(websocket.BinaryMessage, ab.Bytes()); err != nil {
+			s.handleEvent("error", common.GetRuntime(s.ctx).ToValue(err))
+		}
+	} else {
+		rt := common.GetRuntime(s.ctx)
+		var jsType string
+		switch {
+		case goja.IsNull(message), goja.IsUndefined(message):
+			jsType = message.String()
+		default:
+			jsType = message.ToObject(rt).ClassName()
+		}
+		common.Throw(rt, fmt.Errorf("expected ArrayBuffer as argument, received: %s", jsType))
 	}
 
 	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
@@ -486,9 +524,9 @@ func (s *Socket) closeConnection(code int) error {
 }
 
 // Wraps conn.ReadMessage in a channel
-func (s *Socket) readPump(readChan chan []byte, errorChan chan error, closeChan chan int) {
+func (s *Socket) readPump(readChan chan *message, errorChan chan error, closeChan chan int) { //nolint: cyclop
 	for {
-		_, message, err := s.conn.ReadMessage()
+		messageType, data, err := s.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(
 				err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
@@ -511,7 +549,7 @@ func (s *Socket) readPump(readChan chan []byte, errorChan chan error, closeChan 
 		}
 
 		select {
-		case readChan <- message:
+		case readChan <- &message{messageType, data}:
 		case <-s.done:
 			return
 		}
