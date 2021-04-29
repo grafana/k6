@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"net"
 	"time"
@@ -23,6 +24,7 @@ func doReflect(
 
 func reflectState() *lib.State {
 	return &lib.State{
+		TLSConfig: &tls.Config{},
 		Options: lib.Options{UserAgent: null.String{NullString: sql.NullString{
 			String: "k6",
 			Valid:  true,
