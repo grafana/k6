@@ -24,7 +24,10 @@ func doReflect(
 
 func reflectState() *lib.State {
 	return &lib.State{
-		TLSConfig: &tls.Config{},
+		TLSConfig: &tls.Config{
+			MinVersion: tls.VersionTLS10,
+			MaxVersion: tls.VersionTLS13,
+		},
 		Options: lib.Options{UserAgent: null.String{NullString: sql.NullString{
 			String: "k6",
 			Valid:  true,
