@@ -172,7 +172,7 @@ func (o *Output) flushMetrics() {
 
 	if count > 0 {
 		if errorCount != 0 {
-			o.logger.Warnf("Couldn't send %d out of %d metrics. Enable debug logging to see individual errors",
+			o.logger.Warnf("Couldn't send %d out of %d metrics. Enable verbose logging with --verbose to see individual errors",
 				errorCount, count)
 		}
 		if err := o.client.Flush(); err != nil {
