@@ -31,6 +31,8 @@ import (
 	"runtime"
 	"syscall"
 
+	"context"
+
 	"golang.org/x/net/http2"
 
 	"go.k6.io/k6/lib/netext"
@@ -82,6 +84,8 @@ const (
 	// Custom k6 content errors, i.e. when the magic fails
 	// defaultContentError errCode = 1700 // reserved for future use
 	responseDecompressionErrorCode errCode = 1701
+
+	requestTimeoutErrorCode errCode = 1800
 )
 
 const (
@@ -98,6 +102,7 @@ const (
 	http2ConnectionErrorCodeMsg = "http2: connection error with http2 ErrCode %s"
 	x509HostnameErrorCodeMsg    = "x509: certificate doesn't match hostname"
 	x509UnknownAuthority        = "x509: unknown authority"
+	requestTimeoutErrorCodeMsg  = "Request timeout"
 )
 
 func http2ErrCodeOffset(code http2.ErrCode) errCode {
@@ -213,6 +218,10 @@ func errorCodeForError(err error) (errCode, string) {
 	default:
 		if wrappedErr := errors.Unwrap(err); wrappedErr != nil {
 			return errorCodeForError(wrappedErr)
+		}
+
+		if errors.Is(e, context.DeadlineExceeded) {
+			return requestTimeoutErrorCode, requestTimeoutErrorCodeMsg
 		}
 
 		return defaultErrorCode, err.Error()
