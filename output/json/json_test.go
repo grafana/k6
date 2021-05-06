@@ -47,7 +47,7 @@ func getValidator(t *testing.T, expected []string) func(io.Reader) {
 				t.Errorf("Read unexpected line number %d, expected only %d entries", i, len(expected))
 				continue
 			}
-			assert.JSONEq(t, expected[i-1], string(s.Bytes()))
+			assert.Equal(t, expected[i-1], string(s.Bytes()))
 		}
 		assert.NoError(t, s.Err())
 		assert.Equal(t, len(expected), i)
@@ -72,7 +72,7 @@ func generateTestMetricSamples(t *testing.T) ([]stats.SampleContainer, func(io.R
 		stats.Sample{Time: time3, Metric: metric2, Value: float64(5), Tags: stats.NewSampleTags(map[string]string{"tag3": "val3"})},
 	}
 	expected := []string{
-		`{"type":"Metric","data":{"name":"my_metric1","type":"gauge","contains":"default","tainted":null,"thresholds":["rate<0.01", "p(99)<250"],"submetrics":null,"sub":{"name":"","parent":"","suffix":"","tags":null}},"metric":"my_metric1"}`,
+		`{"type":"Metric","data":{"name":"my_metric1","type":"gauge","contains":"default","tainted":null,"thresholds":["rate<0.01","p(99)<250"],"submetrics":null,"sub":{"name":"","parent":"","suffix":"","tags":null}},"metric":"my_metric1"}`,
 		`{"type":"Point","data":{"time":"2021-02-24T13:37:10Z","value":1,"tags":{"tag1":"val1"}},"metric":"my_metric1"}`,
 		`{"type":"Point","data":{"time":"2021-02-24T13:37:10Z","value":2,"tags":{"tag2":"val2"}},"metric":"my_metric1"}`,
 		`{"type":"Metric","data":{"name":"my_metric2","type":"counter","contains":"data","tainted":null,"thresholds":[],"submetrics":null,"sub":{"name":"","parent":"","suffix":"","tags":null}},"metric":"my_metric2"}`,

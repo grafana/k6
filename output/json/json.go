@@ -27,9 +27,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/loadimpact/k6/output"
 	"github.com/loadimpact/k6/stats"
-	"github.com/sirupsen/logrus"
 )
 
 // TODO: add option for emitting proper JSON files (https://github.com/loadimpact/k6/issues/737)
@@ -100,6 +101,8 @@ func (o *Output) Start() error {
 			o.encoder = stdlibjson.NewEncoder(logfile)
 		}
 	}
+
+	o.encoder.SetEscapeHTML(false)
 
 	pf, err := output.NewPeriodicFlusher(flushPeriod, o.flushMetrics)
 	if err != nil {

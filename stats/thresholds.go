@@ -21,6 +21,7 @@
 package stats
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -111,10 +112,12 @@ func (tc *thresholdConfig) UnmarshalJSON(data []byte) error {
 }
 
 func (tc thresholdConfig) MarshalJSON() ([]byte, error) {
+	var data interface{} = tc.Threshold
 	if tc.AbortOnFail {
-		return json.Marshal(rawThresholdConfig(tc))
+		data = rawThresholdConfig(tc)
 	}
-	return json.Marshal(tc.Threshold)
+
+	return MarshalJSONWithoutHTMLEscape(data)
 }
 
 // Thresholds is the combination of all Thresholds for a given metric
@@ -213,7 +216,21 @@ func (ts Thresholds) MarshalJSON() ([]byte, error) {
 		configs[i].AbortOnFail = t.AbortOnFail
 		configs[i].AbortGracePeriod = t.AbortGracePeriod
 	}
-	return json.Marshal(configs)
+
+	return MarshalJSONWithoutHTMLEscape(configs)
+}
+
+// MarshalJSONWithoutHTMLEscape marshals t to JSON without escaping characters
+// for safe use in HTML.
+func MarshalJSONWithoutHTMLEscape(t interface{}) ([]byte, error) {
+	buffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(buffer)
+	encoder.SetEscapeHTML(false)
+	err := encoder.Encode(t)
+	bytes := buffer.Bytes()
+	// Remove the newline appended by Encode() :-/
+	// See https://github.com/golang/go/issues/37083
+	return bytes[:len(bytes)-1], err
 }
 
 var _ json.Unmarshaler = &Thresholds{}
