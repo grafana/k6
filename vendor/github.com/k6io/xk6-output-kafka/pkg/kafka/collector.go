@@ -28,8 +28,8 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/output"
-	"github.com/loadimpact/k6/stats"
+	"go.k6.io/k6/output"
+	"go.k6.io/k6/stats"
 )
 
 // Collector implements the lib.Collector interface and should be used only for testing

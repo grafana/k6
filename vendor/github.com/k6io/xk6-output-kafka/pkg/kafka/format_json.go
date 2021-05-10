@@ -23,7 +23,7 @@ package kafka
 import (
 	"time"
 
-	"github.com/loadimpact/k6/stats"
+	"go.k6.io/k6/stats"
 )
 
 // wrapSample is used to package a metric sample in a way that's nice to export
