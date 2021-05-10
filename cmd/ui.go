@@ -35,10 +35,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh/terminal"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/output"
-	"github.com/loadimpact/k6/ui"
-	"github.com/loadimpact/k6/ui/pb"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/output"
+	"go.k6.io/k6/ui"
+	"go.k6.io/k6/ui/pb"
 )
 
 const (

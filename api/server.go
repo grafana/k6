@@ -26,9 +26,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/api/common"
-	v1 "github.com/loadimpact/k6/api/v1"
-	"github.com/loadimpact/k6/core"
+	"go.k6.io/k6/api/common"
+	v1 "go.k6.io/k6/api/v1"
+	"go.k6.io/k6/core"
 )
 
 func newHandler(logger logrus.FieldLogger) http.Handler {

@@ -35,11 +35,11 @@ import (
 	"github.com/spf13/afero"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/compiler"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/consts"
-	"github.com/loadimpact/k6/loader"
+	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/compiler"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/loader"
 )
 
 // A Bundle is a self-contained bundle of scripts and resources.

@@ -27,8 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/stats"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/stats"
 	"gopkg.in/guregu/null.v3"
 )
 

@@ -32,7 +32,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib/types"
+	"go.k6.io/k6/lib/types"
 )
 
 type Config struct {

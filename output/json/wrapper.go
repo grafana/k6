@@ -23,7 +23,7 @@ package json
 import (
 	"time"
 
-	"github.com/loadimpact/k6/stats"
+	"go.k6.io/k6/stats"
 )
 
 // Envelope is the data format we use to export both metrics and metric samples

@@ -32,7 +32,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/loadimpact/k6/cloudapi"
+	"go.k6.io/k6/cloudapi"
 	easyjson "github.com/mailru/easyjson"
 	"github.com/sirupsen/logrus"
 )

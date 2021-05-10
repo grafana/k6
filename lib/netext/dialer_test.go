@@ -26,9 +26,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/testutils/mockresolver"
-	"github.com/loadimpact/k6/lib/types"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/testutils/mockresolver"
+	"go.k6.io/k6/lib/types"
 )
 
 func TestDialerAddr(t *testing.T) {

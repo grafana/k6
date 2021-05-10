@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/loadimpact/k6/stats"
+	"go.k6.io/k6/stats"
 )
 
 // SampleBuffer is a simple thread-safe buffer for metric samples. It should be

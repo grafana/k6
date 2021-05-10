@@ -33,7 +33,7 @@ import (
 
 	"github.com/tidwall/pretty"
 
-	"github.com/loadimpact/k6/lib"
+	"go.k6.io/k6/lib"
 )
 
 // fprint panics when where's an error writing to the supplied io.Writer

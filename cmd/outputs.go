@@ -28,14 +28,14 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/loader"
-	"github.com/loadimpact/k6/output"
-	"github.com/loadimpact/k6/output/cloud"
-	"github.com/loadimpact/k6/output/csv"
-	"github.com/loadimpact/k6/output/influxdb"
-	"github.com/loadimpact/k6/output/json"
-	"github.com/loadimpact/k6/output/statsd"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/loader"
+	"go.k6.io/k6/output"
+	"go.k6.io/k6/output/cloud"
+	"go.k6.io/k6/output/csv"
+	"go.k6.io/k6/output/influxdb"
+	"go.k6.io/k6/output/json"
+	"go.k6.io/k6/output/statsd"
 
 	"github.com/k6io/xk6-output-kafka/pkg/kafka"
 )

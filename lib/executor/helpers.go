@@ -29,9 +29,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/ui/pb"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/ui/pb"
 )
 
 func sumStagesDuration(stages []Stage) (result time.Duration) {

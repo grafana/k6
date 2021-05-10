@@ -212,7 +212,7 @@ github.com/kubernetes/helm v2.9.0+incompatible h1:X6Tl40RMiqT0GD8hT3+jFPgkZV1EB6
 github.com/kubernetes/helm v2.9.0+incompatible/go.mod h1:3Nb8I82ptmDi7OvvBQK25X1bwxg+WMAkusUQXHxu8ag=
 github.com/labstack/echo v3.2.6+incompatible/go.mod h1:0INS7j/VjnFxD4E2wkz67b8cVwCLbBmJyDaka6Cmk1s=
 github.com/labstack/gommon v0.2.2-0.20170925052817-57409ada9da0/go.mod h1:/tj9csK2iPSBvn+3NLM9e52usepMtrd5ilFYA+wQNJ4=
-github.com/loadimpact/k6 v0.31.1/go.mod h1:wROIullWNNJKvNvRV/angbz+9lXn3OcCSVHmZVTO3Mc=
+go.k6.io/k6 v0.31.1/go.mod h1:wROIullWNNJKvNvRV/angbz+9lXn3OcCSVHmZVTO3Mc=
 github.com/magiconair/properties v1.8.1/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
 github.com/mailru/easyjson v0.7.4-0.20200812114229-8ab5ff9cd8e4/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
 github.com/mailru/easyjson v0.7.7 h1:UGYAvKxe3sBsEDzO8ZeWOSlIQfWFlxbzLZe7hwFURr0=

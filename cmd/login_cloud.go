@@ -32,9 +32,9 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/cloudapi"
-	"github.com/loadimpact/k6/lib/consts"
-	"github.com/loadimpact/k6/ui"
+	"go.k6.io/k6/cloudapi"
+	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/ui"
 )
 
 //nolint:funlen

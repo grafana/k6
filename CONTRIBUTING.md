@@ -43,15 +43,15 @@ To get a basic development environment for Go and k6 up and running, first make 
 
 Once that's done, you can get the k6 source into your Go workspace (`$GOPATH/src`) by running:
 ```bash
-go get github.com/loadimpact/k6
+go get go.k6.io/k6
 ```
 This will also build a `k6` binary and put it in `$GOPATH/bin`.
 
 **Building from source**:
 
-Standing in the repo root (`$GOPATH/src/github.com/loadimpact/k6`) you can build a k6 binary from source by running:
+Standing in the repo root (`$GOPATH/src/go.k6.io/k6`) you can build a k6 binary from source by running:
 ```bash
-cd $GOPATH/src/github.com/loadimpact/k6
+cd $GOPATH/src/go.k6.io/k6
 go build
 ```
 
@@ -81,7 +81,7 @@ go test -race ./...
 
 To run the tests of a specific package:
 ```bash
-go test -race github.com/loadimpact/k6/core
+go test -race go.k6.io/k6/core
 ```
 
 To run just a specific test case use `-run` and pass in a regex that matches the name of the test:
@@ -91,7 +91,7 @@ go test -race ./... -run ^TestEngineRun$
 
 Combining the two above we can run a specific test case in a specific package:
 ```bash
-go test -race github.com/loadimpact/k6/core -run ^TestEngineRun$
+go test -race go.k6.io/k6/core -run ^TestEngineRun$
 ```
 
 Style guide

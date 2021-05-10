@@ -24,7 +24,7 @@ import (
 	"context"
 	"net/url"
 
-	v1 "github.com/loadimpact/k6/api/v1"
+	v1 "go.k6.io/k6/api/v1"
 )
 
 // Metrics returns the current metrics summary.

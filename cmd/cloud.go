@@ -39,12 +39,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/loadimpact/k6/cloudapi"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/consts"
-	"github.com/loadimpact/k6/loader"
-	"github.com/loadimpact/k6/ui"
-	"github.com/loadimpact/k6/ui/pb"
+	"go.k6.io/k6/cloudapi"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/loader"
+	"go.k6.io/k6/ui"
+	"go.k6.io/k6/ui/pb"
 )
 
 const (
