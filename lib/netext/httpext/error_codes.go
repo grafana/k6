@@ -31,8 +31,6 @@ import (
 	"runtime"
 	"syscall"
 
-	"context"
-
 	"golang.org/x/net/http2"
 
 	"go.k6.io/k6/lib/netext"
@@ -48,6 +46,7 @@ const (
 	// non specific
 	defaultErrorCode          errCode = 1000
 	defaultNetNonTCPErrorCode errCode = 1010
+	requestTimeoutErrorCode   errCode = 1050
 	// DNS errors
 	defaultDNSErrorCode      errCode = 1100
 	dnsNoSuchHostErrorCode   errCode = 1101
@@ -84,8 +83,6 @@ const (
 	// Custom k6 content errors, i.e. when the magic fails
 	// defaultContentError errCode = 1700 // reserved for future use
 	responseDecompressionErrorCode errCode = 1701
-
-	requestTimeoutErrorCode errCode = 1800
 )
 
 const (
@@ -218,10 +215,6 @@ func errorCodeForError(err error) (errCode, string) {
 	default:
 		if wrappedErr := errors.Unwrap(err); wrappedErr != nil {
 			return errorCodeForError(wrappedErr)
-		}
-
-		if errors.Is(e, context.DeadlineExceeded) {
-			return requestTimeoutErrorCode, requestTimeoutErrorCodeMsg
 		}
 
 		return defaultErrorCode, err.Error()

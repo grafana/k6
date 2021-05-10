@@ -21,7 +21,6 @@
 package httpext
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -218,9 +217,4 @@ func TestDnsResolve(t *testing.T) {
 
 	assert.Equal(t, dnsNoSuchHostErrorCode, code)
 	assert.Equal(t, dnsNoSuchHostErrorCodeMsg, msg)
-}
-
-func TestContextDeadlineExceeded(t *testing.T) {
-	t.Parallel()
-	testErrorCode(t, requestTimeoutErrorCode, context.DeadlineExceeded)
 }

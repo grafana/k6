@@ -339,6 +339,9 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	}
 
 	resp.Body, resErr = readResponseBody(state, preq.ResponseType, res, resErr)
+	if resErr == context.DeadlineExceeded {
+		resErr = NewK6Error(requestTimeoutErrorCode, requestTimeoutErrorCodeMsg, resErr)
+	}
 	finishedReq := tracerTransport.processLastSavedRequest(wrapDecompressionError(resErr))
 	if finishedReq != nil {
 		updateK6Response(resp, finishedReq)
