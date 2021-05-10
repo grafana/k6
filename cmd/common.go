@@ -30,7 +30,7 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib/types"
+	"go.k6.io/k6/lib/types"
 )
 
 // Use these when interacting with fs and writing to terminal, makes a command testable

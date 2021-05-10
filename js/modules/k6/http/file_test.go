@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/loadimpact/k6/js/common"
+	"go.k6.io/k6/js/common"
 )
 
 func TestHTTPFile(t *testing.T) {

@@ -24,8 +24,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/types"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/types"
 )
 
 // ExecutionConflictError is a custom error type used for all of the errors in

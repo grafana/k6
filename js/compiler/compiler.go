@@ -32,7 +32,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/lib"
+	"go.k6.io/k6/lib"
 )
 
 var (

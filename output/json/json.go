@@ -29,8 +29,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/output"
-	"github.com/loadimpact/k6/stats"
+	"go.k6.io/k6/output"
+	"go.k6.io/k6/stats"
 )
 
 // TODO: add option for emitting proper JSON files (https://github.com/loadimpact/k6/issues/737)

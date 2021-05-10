@@ -28,7 +28,7 @@ import (
 
 	"github.com/dop251/goja"
 
-	"github.com/loadimpact/k6/lib/types"
+	"go.k6.io/k6/lib/types"
 )
 
 const jsEnvSrc = `

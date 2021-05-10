@@ -32,7 +32,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 
-	"github.com/loadimpact/k6/lib/fsext"
+	"go.k6.io/k6/lib/fsext"
 )
 
 func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
@@ -195,7 +195,6 @@ func TestFilenamePwdResolve(t *testing.T) {
 			expectedError: "only supported schemes for imports are file and https",
 			version:       "0.25.0",
 		},
-
 		{
 			Filename:      "https://example.com/something/dot.js",
 			Pwd:           "ftps://example.com/something",

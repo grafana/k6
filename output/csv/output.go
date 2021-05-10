@@ -33,8 +33,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/output"
-	"github.com/loadimpact/k6/stats"
+	"go.k6.io/k6/output"
+	"go.k6.io/k6/stats"
 )
 
 // Output implements the lib.Output interface for saving to CSV files.

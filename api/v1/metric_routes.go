@@ -26,7 +26,7 @@ import (
 
 	"github.com/manyminds/api2go/jsonapi"
 
-	"github.com/loadimpact/k6/api/common"
+	"go.k6.io/k6/api/common"
 )
 
 func handleGetMetrics(rw http.ResponseWriter, r *http.Request) {

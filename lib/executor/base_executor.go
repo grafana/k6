@@ -26,9 +26,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/ui/pb"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/stats"
+	"go.k6.io/k6/ui/pb"
 )
 
 // BaseExecutor is a helper struct that contains common properties and methods

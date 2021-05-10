@@ -33,7 +33,7 @@ import (
 	"github.com/andybalholm/brotli"
 	"github.com/klauspost/compress/zstd"
 
-	"github.com/loadimpact/k6/lib"
+	"go.k6.io/k6/lib"
 )
 
 // CompressionType is used to specify what compression is to be used to compress the body of a

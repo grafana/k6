@@ -26,9 +26,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	v1 "github.com/loadimpact/k6/api/v1"
-	"github.com/loadimpact/k6/api/v1/client"
-	"github.com/loadimpact/k6/ui"
+	v1 "go.k6.io/k6/api/v1"
+	"go.k6.io/k6/api/v1/client"
+	"go.k6.io/k6/ui"
 )
 
 func getScaleCmd(ctx context.Context) *cobra.Command {
