@@ -245,7 +245,7 @@ a commandline interface for interacting with it.`,
 				lingerCancel() // stop the test run, metric processing is cancelled below
 
 				// If we get a second signal, we immediately exit, so something like
-				// https://github.com/loadimpact/k6/issues/971 never happens again
+				// https://github.com/k6io/k6/issues/971 never happens again
 				sig = <-sigC
 				logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
 				globalCancel() // not that it matters, given the following command...

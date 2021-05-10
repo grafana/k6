@@ -184,7 +184,7 @@ func (vlvc RampingVUsConfig) Validate() []error {
 //       01234567890123456789012   (t%10)
 //       00000000001111111111222   (t/10)
 //
-// More information: https://github.com/loadimpact/k6/issues/997#issuecomment-484416866
+// More information: https://github.com/k6io/k6/issues/997#issuecomment-484416866
 func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEnd bool) []lib.ExecutionStep {
 	var (
 		timeTillEnd         time.Duration

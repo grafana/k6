@@ -31,7 +31,7 @@ import (
 // SetEnv is a helper funcion for setting arbitrary environment variables and
 // restoring the old ones at the end, usually by deferring the returned callback
 // TODO: remove these hacks when we improve the configuration (hopefully
-// completely, see https://github.com/loadimpact/k6/issues/883)... we shouldn't
+// completely, see https://github.com/k6io/k6/issues/883)... we shouldn't
 // have to mess with the global environment at all...
 func SetEnv(t *testing.T, newEnv []string) (restoreEnv func()) {
 	actuallSetEnv := func(env []string, abortOnSetErr bool) {

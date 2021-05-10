@@ -79,7 +79,7 @@ func validateStages(stages []Stage) []error {
 // closure. It takes care of updating the execution state statistics and
 // warning messages. And returns whether a full iteration was finished or not
 //
-// TODO: emit the end-of-test iteration metrics here (https://github.com/loadimpact/k6/issues/1250)
+// TODO: emit the end-of-test iteration metrics here (https://github.com/k6io/k6/issues/1250)
 func getIterationRunner(
 	executionState *lib.ExecutionState, logger *logrus.Entry,
 ) func(context.Context, lib.ActiveVU) bool {
