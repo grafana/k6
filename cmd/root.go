@@ -232,7 +232,7 @@ func (c *rootCommand) waitRemoteLogger() {
 func (c *rootCommand) rootCmdPersistentFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	// TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
-	flags.BoolVarP(&c.verbose, "verbose", "v", false, "enable debug logging")
+	flags.BoolVarP(&c.verbose, "verbose", "v", false, "enable verbose logging")
 	flags.BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
 	flags.BoolVar(&noColor, "no-color", false, "disable colored output")
 	flags.StringVar(&c.logOutput, "log-output", "stderr",
