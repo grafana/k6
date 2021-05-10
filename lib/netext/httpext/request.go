@@ -329,6 +329,9 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	mreq := preq.Req.WithContext(reqCtx)
 	res, resErr := client.Do(mreq)
 
+	if err, ok := resErr.(net.Error); ok && err.Timeout() {
+		resErr = NewK6Error(requestTimeoutErrorCode, requestTimeoutErrorCodeMsg, resErr)
+	}
 	// TODO(imiric): It would be safer to check for a writeable
 	// response body here instead of status code, but those are
 	// wrapped in a read-only body when using client timeouts and are
@@ -339,9 +342,6 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	}
 
 	resp.Body, resErr = readResponseBody(state, preq.ResponseType, res, resErr)
-	if resErr == context.DeadlineExceeded {
-		resErr = NewK6Error(requestTimeoutErrorCode, requestTimeoutErrorCodeMsg, resErr)
-	}
 	finishedReq := tracerTransport.processLastSavedRequest(wrapDecompressionError(resErr))
 	if finishedReq != nil {
 		updateK6Response(resp, finishedReq)
