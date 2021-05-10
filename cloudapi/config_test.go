@@ -23,9 +23,10 @@ import (
 	"testing"
 	"time"
 
-	"go.k6.io/k6/lib/types"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/lib/types"
 )
 
 func TestConfigApply(t *testing.T) {

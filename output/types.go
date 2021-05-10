@@ -25,10 +25,11 @@ import (
 	"io"
 	"net/url"
 
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/stats"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/stats"
 )
 
 // Params contains all possible constructor parameters an output may need.

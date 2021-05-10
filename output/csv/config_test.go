@@ -26,8 +26,9 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib/types"
 	"github.com/stretchr/testify/assert"
+
+	"go.k6.io/k6/lib/types"
 )
 
 func TestNewConfig(t *testing.T) {

@@ -26,9 +26,10 @@ import (
 	"testing"
 	"time"
 
-	"go.k6.io/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/stats"
 )
 
 func TestSampleBufferBasics(t *testing.T) {

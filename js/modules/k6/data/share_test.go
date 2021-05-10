@@ -27,8 +27,9 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/js/common"
 )
 
 const makeArrayScript = `
