@@ -429,7 +429,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 		// NOTE(imiric): This needs to keep testing against /ws-echo-invalid because
 		// this test is highly sensitive to metric data, and slightly differing
 		// WS server implementations might introduce flakiness.
-		// See https://github.com/loadimpact/k6/pull/1149
+		// See https://github.com/k6io/k6/pull/1149
 		{tr(`import ws from "k6/ws";
 			let data = "0123456789".repeat(100);
 			export default function() {

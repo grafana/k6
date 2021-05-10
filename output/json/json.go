@@ -33,7 +33,7 @@ import (
 	"go.k6.io/k6/stats"
 )
 
-// TODO: add option for emitting proper JSON files (https://github.com/loadimpact/k6/issues/737)
+// TODO: add option for emitting proper JSON files (https://github.com/k6io/k6/issues/737)
 const flushPeriod = 200 * time.Millisecond // TODO: make this configurable
 
 // Output funnels all passed metrics to an (optionally gzipped) JSON file.

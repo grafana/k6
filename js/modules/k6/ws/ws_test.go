@@ -564,7 +564,7 @@ func TestSystemTags(t *testing.T) {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	// TODO: test for actual tag values after removing the dependency on the
-	// external service demos.kaazing.com (https://github.com/loadimpact/k6/issues/537)
+	// external service demos.kaazing.com (https://github.com/k6io/k6/issues/537)
 	testedSystemTags := []string{"group", "status", "subproto", "url", "ip"}
 
 	samples := make(chan stats.SampleContainer, 1000)

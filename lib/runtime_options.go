@@ -46,7 +46,7 @@ type RuntimeOptions struct {
 
 	// JS compatibility mode: "extended" (Goja+Babel+core.js) or "base" (plain Goja)
 	//
-	// TODO: when we resolve https://github.com/loadimpact/k6/issues/883, we probably
+	// TODO: when we resolve https://github.com/k6io/k6/issues/883, we probably
 	// should use the CompatibilityMode type directly... but by then, we'd need to have
 	// some way of knowing if the value has been set by the user or if we're using the
 	// default one, so we can handle `k6 run --compatibility-mode=base es6_extended_archive.tar`

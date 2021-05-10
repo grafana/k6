@@ -946,7 +946,7 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 	assert.Equal(t, uint64(100), execScheduler.GetState().GetFullIterationCount())
 	assert.Equal(t, uint64(0), execScheduler.GetState().GetPartialIterationCount())
 	assert.Equal(t, int64(100), i)
-	require.Equal(t, 100, len(samples)) // TODO: change to 200 https://github.com/loadimpact/k6/issues/1250
+	require.Equal(t, 100, len(samples)) // TODO: change to 200 https://github.com/k6io/k6/issues/1250
 	for i := 0; i < 100; i++ {
 		mySample, ok := <-samples
 		require.True(t, ok)
