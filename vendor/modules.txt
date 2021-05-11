@@ -94,7 +94,7 @@ github.com/jhump/protoreflect/internal
 github.com/jhump/protoreflect/internal/codec
 # github.com/josharian/intern v1.0.0
 github.com/josharian/intern
-# github.com/k6io/xk6-output-kafka v0.1.2-0.20210510135110-a159d7c8c171
+# github.com/k6io/xk6-output-kafka v0.2.0
 ## explicit
 github.com/k6io/xk6-output-kafka/pkg/kafka
 # github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
