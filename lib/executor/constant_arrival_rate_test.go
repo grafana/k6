@@ -212,7 +212,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 					assert.WithinDuration(t,
 						startTime.Add(expectedTime),
 						time.Now(),
-						time.Millisecond*10,
+						time.Millisecond*12,
 						"%d expectedTime %s", current, expectedTime,
 					)
 
