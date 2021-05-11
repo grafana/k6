@@ -406,6 +406,11 @@ jobs:
         with:
           name: binaries-windows
           path: dist
+      - name: Rename binaries
+        run: |
+          mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
+          mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
+          mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
       - name: Setup docker-compose environment
         run: |
           cat > packaging/.env <<EOF
