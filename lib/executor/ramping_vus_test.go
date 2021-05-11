@@ -34,8 +34,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/types"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/types"
 )
 
 func TestRampingVUsConfigValidation(t *testing.T) {
@@ -281,7 +281,7 @@ func TestRampingVUsGracefulRampDown(t *testing.T) {
 }
 
 // Ensure there's no wobble of VUs during graceful ramp-down, without segments.
-// See https://github.com/loadimpact/k6/issues/1296
+// See https://github.com/k6io/k6/issues/1296
 func TestRampingVUsRampDownNoWobble(t *testing.T) {
 	t.Parallel()
 
@@ -1190,7 +1190,7 @@ func TestSegmentedIndex(t *testing.T) {
 }
 
 // TODO: delete in favor of lib.generateRandomSequence() after
-// https://github.com/loadimpact/k6/issues/1302 is done (can't import now due to
+// https://github.com/k6io/k6/issues/1302 is done (can't import now due to
 // import loops...)
 func generateRandomSequence(t testing.TB, n, m int64, r *rand.Rand) lib.ExecutionSegmentSequence {
 	var err error

@@ -22,8 +22,8 @@ package outputtest
 import (
 	"strconv"
 
-	"github.com/loadimpact/k6/output"
-	"github.com/loadimpact/k6/stats"
+	"go.k6.io/k6/output"
+	"go.k6.io/k6/stats"
 	"github.com/spf13/afero"
 )
 

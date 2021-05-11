@@ -30,10 +30,11 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/loadimpact/k6/lib/fsext"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/lib/fsext"
 )
 
 type mockWriter struct {

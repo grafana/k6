@@ -23,8 +23,8 @@ package v1
 import (
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/core"
-	"github.com/loadimpact/k6/lib"
+	"go.k6.io/k6/core"
+	"go.k6.io/k6/lib"
 )
 
 type Status struct {

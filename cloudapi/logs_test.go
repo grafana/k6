@@ -25,11 +25,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/lib/testutils"
 	"github.com/mailru/easyjson"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/lib/testutils"
 )
 
 func TestMsgParsing(t *testing.T) {

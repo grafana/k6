@@ -25,7 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/loadimpact/k6/lib"
+	"go.k6.io/k6/lib"
 )
 
 func TestNewCheck(t *testing.T) {

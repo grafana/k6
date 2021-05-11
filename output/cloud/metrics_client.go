@@ -32,9 +32,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/loadimpact/k6/cloudapi"
 	easyjson "github.com/mailru/easyjson"
 	"github.com/sirupsen/logrus"
+
+	"go.k6.io/k6/cloudapi"
 )
 
 // MetricsClient is a wrapper around the cloudapi.Client that is also capable of pushing

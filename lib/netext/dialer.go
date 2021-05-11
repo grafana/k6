@@ -28,10 +28,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/stats"
 )
 
 // Dialer wraps net.Dialer and provides k6 specific functionality -
@@ -93,7 +93,7 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 // GetTrail creates a new NetTrail instance with the Dialer
 // sent and received data metrics and the supplied times and tags.
 // TODO: Refactor this according to
-// https://github.com/loadimpact/k6/pull/1203#discussion_r337938370
+// https://github.com/k6io/k6/pull/1203#discussion_r337938370
 func (d *Dialer) GetTrail(
 	startTime, endTime time.Time, fullIteration bool, emitIterations bool, tags *stats.SampleTags,
 ) *NetTrail {

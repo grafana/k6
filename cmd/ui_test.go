@@ -27,7 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/loadimpact/k6/ui/pb"
+	"go.k6.io/k6/ui/pb"
 )
 
 // Return progressbars with different content lengths, to test for
