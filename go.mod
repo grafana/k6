@@ -8,7 +8,7 @@ require (
 	github.com/GeertJohan/go.rice v0.0.0-20170420135705-c02ca9a983da
 	github.com/PuerkitoBio/goquery v1.6.1
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
-	github.com/andybalholm/brotli v1.0.1
+	github.com/andybalholm/brotli v1.0.2
 	github.com/dop251/goja v0.0.0-20210427212725-462d53687b0d
 	github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4
 	github.com/fatih/color v1.10.0
