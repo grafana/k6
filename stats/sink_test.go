@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCounterSink(t *testing.T) {
@@ -162,6 +163,8 @@ func TestTrendSink(t *testing.T) {
 			assert.Equal(t, 54.0, sink.Avg)
 		})
 	})
+
+	tolerance := 0.000001
 	t.Run("percentile", func(t *testing.T) {
 		t.Run("no values", func(t *testing.T) {
 			sink := TrendSink{}
@@ -191,11 +194,11 @@ func TestTrendSink(t *testing.T) {
 			for _, s := range unsortedSamples10 {
 				sink.Add(Sample{Metric: &Metric{}, Value: s})
 			}
-			assert.Equal(t, 0.0, sink.P(0.0))
-			assert.Equal(t, 55.0, sink.P(0.5))
-			assert.Equal(t, 95.49999999999999, sink.P(0.95))
-			assert.Equal(t, 99.1, sink.P(0.99))
-			assert.Equal(t, 100.0, sink.P(1.0))
+			assert.InDelta(t, 0.0, sink.P(0.0), tolerance)
+			assert.InDelta(t, 55.0, sink.P(0.5), tolerance)
+			assert.InDelta(t, 95.5, sink.P(0.95), tolerance)
+			assert.InDelta(t, 99.1, sink.P(0.99), tolerance)
+			assert.InDelta(t, 100.0, sink.P(1.0), tolerance)
 		})
 	})
 	t.Run("format", func(t *testing.T) {
@@ -203,14 +206,20 @@ func TestTrendSink(t *testing.T) {
 		for _, s := range unsortedSamples10 {
 			sink.Add(Sample{Metric: &Metric{}, Value: s})
 		}
-		assert.Equal(t, map[string]float64{
+		expected := map[string]float64{
 			"min":   0.0,
 			"max":   100.0,
 			"avg":   54.0,
 			"med":   55.0,
 			"p(90)": 91.0,
-			"p(95)": 95.49999999999999,
-		}, sink.Format(0))
+			"p(95)": 95.5,
+		}
+		result := sink.Format(0)
+		require.Equal(t, len(expected), len(result))
+		for k, expV := range expected {
+			assert.Contains(t, result, k)
+			assert.InDelta(t, expV, result[k], tolerance)
+		}
 	})
 }
 
