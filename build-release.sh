@@ -68,16 +68,16 @@ echo "--- Building Release: ${VERSION}"
 
 mkdir -p "$OUT_DIR"
 
-build mac         ""   GOOS=darwin  GOARCH=amd64
-build mac-arm64   ""   GOOS=darwin  GOARCH=arm64
-build win64      .exe  GOOS=windows GOARCH=amd64
-build linux64     ""   GOOS=linux   GOARCH=amd64  CGO_ENABLED=0
-build linux-arm64 ""   GOOS=linux   GOARCH=arm64  CGO_ENABLED=0
+build osx-amd64     ""   GOOS=darwin  GOARCH=amd64
+build osx-arm64     ""   GOOS=darwin  GOARCH=arm64
+build windows-amd64 .exe GOOS=windows GOARCH=amd64
+build linux-amd64   ""   GOOS=linux   GOARCH=amd64  CGO_ENABLED=0
+build linux-arm64   ""   GOOS=linux   GOARCH=arm64  CGO_ENABLED=0
 
-package mac         zip
-package mac-arm64   zip
-package win64       zip
-package linux64     tgz
-package linux-arm64 tgz
-package linux64     rpm
-package linux64     deb
+package osx-amd64     zip
+package osx-arm64     zip
+package windows-amd64 zip
+package linux-amd64   tgz
+package linux-arm64   tgz
+package linux-amd64   rpm
+package linux-amd64   deb

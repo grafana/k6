@@ -292,9 +292,9 @@ jobs:
           path: dist
       - name: Unzip Windows binary
         run: |
-          Expand-Archive -Path ".\dist\k6-$env:VERSION-win64.zip" -DestinationPath .\packaging\
-          move .\packaging\k6-$env:VERSION-win64\k6.exe .\packaging\
-          rmdir .\packaging\k6-$env:VERSION-win64\
+          Expand-Archive -Path ".\dist\k6-$env:VERSION-windows-amd64.zip" -DestinationPath .\packaging\
+          move .\packaging\k6-$env:VERSION-windows-amd64\k6.exe .\packaging\
+          rmdir .\packaging\k6-$env:VERSION-windows-amd64\
       - name: Add signtool to PATH
         run: echo "${env:ProgramFiles(x86)}\Windows Kits\10\bin\x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Convert base64 certificate to PFX
@@ -325,7 +325,7 @@ jobs:
           args: pack --verbose --outputdirectory .\packaging .\packaging\k6.portable.nuspec
       - name: Rename MSI package
         # To keep it consistent with the other artifacts
-        run: move "packaging\k6.msi" "packaging\k6-$env:VERSION-win64.msi"
+        run: move "packaging\k6.msi" "packaging\k6-$env:VERSION-windows-amd64.msi"
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
