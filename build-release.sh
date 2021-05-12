@@ -43,7 +43,7 @@ package() {
         # The go-bin-* tools expect the binary in /tmp/
         [ ! -r /tmp/k6 ] && cp "${OUT_DIR}/${NAME}/k6" /tmp/k6
         "go-bin-${FMT}" generate --file "packaging/${FMT}.json" -a amd64 \
-            --version "${VERSION#v}" -o "${OUT_DIR}/k6-${VERSION}-amd64.${FMT}"
+            --version "${VERSION#v}" -o "${OUT_DIR}/k6-${VERSION}-linux-amd64.${FMT}"
         ;;
     tgz)
         tar -C "${OUT_DIR}" -zcf "${OUT_DIR}/${NAME}.tar.gz" "$NAME"

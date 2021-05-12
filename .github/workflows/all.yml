@@ -336,23 +336,24 @@ jobs:
             packaging/k6.*.nupkg
           retention-days: 7
 
-  publish-macos:
-    runs-on: macos-latest
-    needs: [deps, lint, test, test-cov, configure, build]
-    if: startsWith(github.ref, 'refs/tags/v')
-    env:
-      VERSION: ${{ needs.configure.outputs.version }}
-      HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
-    steps:
-      - name: Download source code archive
-        run: curl -fsSL "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/archive/${VERSION}.tar.gz" -o "${VERSION}.tar.gz"
-      - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@2eb78889a50ba021d744837934f1af2d8c4458ec
-      - name: Create version bump PR
-        run: |
-          brew bump-formula-pr k6 \
-            --url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/archive/${VERSION}.tar.gz" \
-            --sha256="$(shasum -a 256 ${VERSION}.tar.gz | cut -d' ' -f1)"
+  # Disabled until #1997 and #1998 are addressed.
+  # publish-macos:
+  #   runs-on: macos-latest
+  #   needs: [deps, lint, test, test-cov, configure, build]
+  #   if: startsWith(github.ref, 'refs/tags/v')
+  #   env:
+  #     VERSION: ${{ needs.configure.outputs.version }}
+  #     HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
+  #   steps:
+  #     - name: Download source code archive
+  #       run: curl -fsSL "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/archive/${VERSION}.tar.gz" -o "${VERSION}.tar.gz"
+  #     - name: Set up Homebrew
+  #       uses: Homebrew/actions/setup-homebrew@2eb78889a50ba021d744837934f1af2d8c4458ec
+  #     - name: Create version bump PR
+  #       run: |
+  #         brew bump-formula-pr k6 \
+  #           --url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/archive/${VERSION}.tar.gz" \
+  #           --sha256="$(shasum -a 256 ${VERSION}.tar.gz | cut -d' ' -f1)"
 
   publish-github:
     runs-on: ubuntu-latest
@@ -408,6 +409,7 @@ jobs:
           name: binaries-windows
           path: dist
       - name: Rename binaries
+        # To be consistent with the filenames used in dl.k6.io
         run: |
           mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
           mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
