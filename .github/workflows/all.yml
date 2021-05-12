@@ -185,6 +185,7 @@ jobs:
           # Need a blank versioninfo.json for the CLI overrides to work.
           echo '{}' > versioninfo.json
           goversioninfo -64 \
+            -platform-specific=true \
             -charset="1200" \
             -company="Load Impact AB" \
             -copyright="© Load Impact AB. Licensed under AGPL." \
