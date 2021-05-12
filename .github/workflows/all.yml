@@ -408,6 +408,7 @@ jobs:
           name: binaries-windows
           path: dist
       - name: Rename binaries
+        # To be consistent with the filenames used in dl.k6.io
         run: |
           mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
           mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
