@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - master
-      - ci-changes # TODO: remove
 
 jobs:
   test:
@@ -23,4 +22,3 @@ jobs:
           export GOMAXPROCS=2
           export CGO_ENABLED=1
           go test -p 2 -race -timeout 800s -count 1 ./...
-
