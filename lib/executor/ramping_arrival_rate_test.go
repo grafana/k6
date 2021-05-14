@@ -718,7 +718,7 @@ func TestRampingArrivalRateGlobalIters(t *testing.T) {
 		{"0,1/4,3/4,1", "3/4:1", []uint64{0, 4, 9}},
 	}
 
-	for _, tc := range testCases { //nolint: paralleltest // false positive: https://github.com/kunwardeep/paralleltest/issues/8
+	for _, tc := range testCases {
 		tc := tc
 		t.Run(fmt.Sprintf("%s_%s", tc.seq, tc.seg), func(t *testing.T) {
 			t.Parallel()
