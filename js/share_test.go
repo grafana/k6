@@ -35,6 +35,7 @@ import (
 )
 
 func TestNewSharedArrayIntegration(t *testing.T) {
+	t.Parallel()
 	data := `'use strict';
 var SharedArray = require("k6/data").SharedArray;
 function generateArray() {
