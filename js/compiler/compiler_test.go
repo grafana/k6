@@ -27,6 +27,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
@@ -77,9 +78,7 @@ func TestCompile(t *testing.T) {
 	t.Run("ES5", func(t *testing.T) {
 		src := `1+(function() { return 2; })()`
 		pgm, code, err := c.Compile(src, "script.js", "", "", true, lib.CompatibilityModeBase)
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		assert.Equal(t, src, code)
 		v, err := goja.New().RunProgram(pgm)
 		if assert.NoError(t, err) {
@@ -89,9 +88,7 @@ func TestCompile(t *testing.T) {
 		t.Run("Wrap", func(t *testing.T) {
 			pgm, code, err := c.Compile(src, "script.js",
 				"(function(){return ", "})", true, lib.CompatibilityModeBase)
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 			assert.Equal(t, `(function(){return 1+(function() { return 2; })()})`, code)
 			v, err := goja.New().RunProgram(pgm)
 			if assert.NoError(t, err) {
@@ -115,9 +112,7 @@ func TestCompile(t *testing.T) {
 	})
 	t.Run("ES6", func(t *testing.T) {
 		pgm, code, err := c.Compile(`1+(()=>2)()`, "script.js", "", "", true, lib.CompatibilityModeExtended)
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		assert.Equal(t, `"use strict";1 + function () {return 2;}();`, code)
 		v, err := goja.New().RunProgram(pgm)
 		if assert.NoError(t, err) {
@@ -126,9 +121,7 @@ func TestCompile(t *testing.T) {
 
 		t.Run("Wrap", func(t *testing.T) {
 			pgm, code, err := c.Compile(`fn(1+(()=>2)())`, "script.js", "(function(fn){", "})", true, lib.CompatibilityModeExtended)
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 			assert.Equal(t, `(function(fn){"use strict";fn(1 + function () {return 2;}());})`, code)
 			rt := goja.New()
 			v, err := rt.RunProgram(pgm)

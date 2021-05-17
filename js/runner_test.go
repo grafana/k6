@@ -117,14 +117,10 @@ func TestRunnerGetDefaultGroup(t *testing.T) {
 func TestRunnerOptions(t *testing.T) {
 	t.Parallel()
 	r1, err := getSimpleRunner(t, "/script.js", `exports.default = function() {};`)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
@@ -532,9 +528,7 @@ func TestVURunContext(t *testing.T) {
 	r1.SetOptions(r1.GetOptions().Apply(lib.Options{Throw: null.BoolFrom(true)}))
 
 	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
@@ -542,9 +536,7 @@ func TestVURunContext(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			vu, err := r.newVU(1, make(chan stats.SampleContainer, 100))
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 
 			fnCalled := false
 			vu.Runtime.Set("fn", func() {
@@ -682,9 +674,7 @@ func TestVUIntegrationGroups(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			vu, err := r.newVU(1, make(chan stats.SampleContainer, 100))
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 
 			fnOuterCalled := false
 			fnInnerCalled := false
@@ -739,9 +729,7 @@ func TestVUIntegrationMetrics(t *testing.T) {
 			samples := make(chan stats.SampleContainer, 100)
 			defer close(samples)
 			vu, err := r.newVU(1, samples)
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -816,9 +804,7 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 					r.Logger, _ = logtest.NewNullLogger()
 
 					initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
-					if !assert.NoError(t, err) {
-						return
-					}
+					require.NoError(t, err)
 
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
@@ -846,18 +832,14 @@ func TestVUIntegrationBlacklistOption(t *testing.T) {
 
 	cidr, err := lib.ParseCIDR("10.0.0.0/8")
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 	require.NoError(t, r1.SetOptions(lib.Options{
 		Throw:        null.BoolFrom(true),
 		BlacklistIPs: []*lib.IPNet{cidr},
 	}))
 
 	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
@@ -865,9 +847,7 @@ func TestVUIntegrationBlacklistOption(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
@@ -890,14 +870,10 @@ func TestVUIntegrationBlacklistScript(t *testing.T) {
 
 					exports.default = function() { http.get("http://10.1.2.3/"); }
 				`)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 
@@ -906,9 +882,7 @@ func TestVUIntegrationBlacklistScript(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
@@ -935,9 +909,7 @@ func TestVUIntegrationBlockHostnamesOption(t *testing.T) {
 	}))
 
 	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 
@@ -967,14 +939,10 @@ func TestVUIntegrationBlockHostnamesScript(t *testing.T) {
 
 					exports.default = function() { http.get("https://k6.io/"); }
 				`)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 
@@ -983,9 +951,7 @@ func TestVUIntegrationBlockHostnamesScript(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			initVu, err := r.NewVU(0, make(chan stats.SampleContainer, 100))
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 			vu := initVu.Activate(&lib.VUActivationParams{RunContext: context.Background()})
 			err = vu.RunOnce()
 			require.Error(t, err)
@@ -1011,9 +977,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 						}) || fail("failed to override dns");
 					}
 				`))
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	r1.SetOptions(lib.Options{
 		Throw: null.BoolFrom(true),
@@ -1023,9 +987,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 	})
 
 	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
@@ -1033,17 +995,13 @@ func TestVUIntegrationHosts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -1094,15 +1052,11 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 					var http = require("k6/http");;
 					exports.default = function() { http.get("https://sha256.badssl.com/"); }
 				`)
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 			require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)))
 
 			r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
 			for name, r := range runners {
@@ -1112,9 +1066,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 					r.Logger, _ = logtest.NewNullLogger()
 
 					initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
-					if !assert.NoError(t, err) {
-						return
-					}
+					require.NoError(t, err)
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
@@ -1187,9 +1139,7 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 				}
 			}
 		`))
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 	r1.SetOptions(lib.Options{
 		Throw:        null.BoolFrom(true),
 		MaxRedirects: null.IntFrom(10),
@@ -1197,9 +1147,7 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 	})
 
 	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
@@ -1207,9 +1155,7 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
@@ -1246,9 +1192,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 				}
 			}
 		`))
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 	r1.SetOptions(lib.Options{
 		Throw:          null.BoolFrom(true),
 		MaxRedirects:   null.IntFrom(10),
@@ -1257,9 +1201,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 	})
 
 	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
@@ -1267,9 +1209,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			initVU, err := r.NewVU(1, make(chan stats.SampleContainer, 100))
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -1290,15 +1230,11 @@ func TestVUIntegrationVUID(t *testing.T) {
 				if (__VU != 1234) { throw new Error("wrong __VU: " + __VU); }
 			}`,
 	)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 	r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)})
 
 	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
@@ -1306,9 +1242,7 @@ func TestVUIntegrationVUID(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			initVU, err := r.NewVU(1234, make(chan stats.SampleContainer, 100))
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -1363,18 +1297,14 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 			"wm689RyXiDzNSzjrqwLQBVQ2mTbVdsD9Bg==\n"+
 			"-----END EC PRIVATE KEY-----"),
 	)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{
 		Certificates: []tls.Certificate{serverCert},
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		ClientCAs:    clientCAPool,
 	})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { _ = listener.Close() })
 	srv := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -1391,17 +1321,13 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 			var http = require("k6/http");;
 			exports.default = function() { http.get("https://%s")}
 		`, listener.Addr().String()))
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		require.NoError(t, r1.SetOptions(lib.Options{
 			Throw:                 null.BoolFrom(true),
 			InsecureSkipTLSVerify: null.BoolFrom(true),
 		}))
 		r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		runners := map[string]*Runner{"Source": r1, "Archive": r2}
 		for name, r := range runners {
@@ -1428,9 +1354,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 			var http = require("k6/http");;
 			exports.default = function() { http.get("https://%s")}
 		`, listener.Addr().String()))
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		require.NoError(t, r1.SetOptions(lib.Options{
 			Throw:                 null.BoolFrom(true),
 			InsecureSkipTLSVerify: null.BoolFrom(true),
@@ -1462,9 +1386,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 			},
 		}))
 		r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		runners := map[string]*Runner{"Source": r1, "Archive": r2}
 		for name, r := range runners {
@@ -1848,9 +1770,7 @@ func TestVUPanic(t *testing.T) {
 	require.NoError(t, err)
 
 	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
@@ -1858,9 +1778,7 @@ func TestVUPanic(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			initVU, err := r.NewVU(1234, make(chan stats.SampleContainer, 100))
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 
 			logger := logrus.New()
 			logger.SetLevel(logrus.InfoLevel)

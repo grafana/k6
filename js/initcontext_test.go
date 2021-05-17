@@ -97,14 +97,10 @@ func TestInitContextRequire(t *testing.T) {
 						export let dummy = "abc123";
 						export default function() {}
 				`)
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 
 			bi, err := b.Instantiate(logger, 0)
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 
 			exports := bi.Runtime.Get("exports").ToObject(bi.Runtime)
 			if assert.NotNil(t, exports) {
@@ -208,17 +204,13 @@ func TestInitContextRequire(t *testing.T) {
 								export default function() {};`,
 							libName)
 						b, err := getSimpleBundle(t, "/path/to/script.js", data, fs)
-						if !assert.NoError(t, err) {
-							return
-						}
+						require.NoError(t, err)
 						if constPath != "" {
 							assert.Contains(t, b.BaseInitContext.programs, "file://"+constPath)
 						}
 
 						_, err = b.Instantiate(logger, 0)
-						if !assert.NoError(t, err) {
-							return
-						}
+						require.NoError(t, err)
 					})
 				}
 			})
@@ -239,14 +231,10 @@ func TestInitContextRequire(t *testing.T) {
 					}
 				};`
 			b, err := getSimpleBundle(t, "/script.js", data, fs)
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 
 			bi, err := b.Instantiate(logger, 0)
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 			_, err = bi.exports[consts.DefaultFn](goja.Undefined())
 			assert.NoError(t, err)
 		})
@@ -299,9 +287,7 @@ func TestInitContextOpen(t *testing.T) {
 		t.Run(tc.file, func(t *testing.T) {
 			t.Parallel()
 			bi, err := createAndReadFile(t, tc.file, tc.content, tc.length, "")
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 			assert.Equal(t, string(tc.content), bi.Runtime.Get("data").Export())
 		})
 	}
@@ -309,9 +295,7 @@ func TestInitContextOpen(t *testing.T) {
 	t.Run("Binary", func(t *testing.T) {
 		t.Parallel()
 		bi, err := createAndReadFile(t, "/path/to/file.bin", []byte("hi!\x0f\xff\x01"), 6, "b")
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		buf := bi.Runtime.NewArrayBuffer([]byte{104, 105, 33, 15, 255, 1})
 		assert.Equal(t, buf, bi.Runtime.Get("data").Export())
 	})
@@ -326,9 +310,7 @@ func TestInitContextOpen(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			_, err := createAndReadFile(t, loadPath, []byte("content"), 7, "")
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 		})
 	}
 

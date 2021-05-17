@@ -779,15 +779,11 @@ func TestBundleInstantiate(t *testing.T) {
 		let val = true;
 		export default function() { return val; }
 	`)
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		logger := testutils.NewLogger(t)
 
 		bi, err := b.Instantiate(logger, 0)
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 		if assert.NoError(t, err) {
 			assert.Equal(t, true, v.Export())
@@ -804,15 +800,11 @@ func TestBundleInstantiate(t *testing.T) {
 		let val = true;
 		export default function() { return val; }
 	`)
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		logger := testutils.NewLogger(t)
 
 		bi, err := b.Instantiate(logger, 0)
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		bi.Runtime.Set("val", false)
 		v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 		if assert.NoError(t, err) {
@@ -830,15 +822,11 @@ func TestBundleInstantiate(t *testing.T) {
 			let val = true;
 			export default function() { return val; }
 		`)
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		logger := testutils.NewLogger(t)
 
 		bi, err := b.Instantiate(logger, 0)
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		// Ensure `options` properties are correctly marshalled
 		jsOptions := bi.Runtime.Get("options").ToObject(bi.Runtime)
 		vus := jsOptions.Get("vus").Export()
@@ -871,15 +859,11 @@ func TestBundleEnv(t *testing.T) {
 		}
 	`
 	b1, err := getSimpleBundle(t, "/script.js", data, rtOpts)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	logger := testutils.NewLogger(t)
 	b2, err := NewBundleFromArchive(logger, b1.makeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
 	for name, b := range bundles {
@@ -913,15 +897,11 @@ func TestBundleNotSharable(t *testing.T) {
 		}
 	`
 	b1, err := getSimpleBundle(t, "/script.js", data)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 	logger := testutils.NewLogger(t)
 
 	b2, err := NewBundleFromArchive(logger, b1.makeArchive(), lib.RuntimeOptions{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
 	vus, iters := 10, 1000

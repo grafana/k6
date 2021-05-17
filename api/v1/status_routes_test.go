@@ -113,9 +113,7 @@ func TestPatchStatus(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 
 			body, err := jsonapi.Marshal(indata.Status)
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 
 			rw := httptest.NewRecorder()
 			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "PATCH", "/v1/status", bytes.NewReader(body)))

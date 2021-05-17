@@ -41,7 +41,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/klauspost/compress/zstd"
 	"github.com/mccutchen/go-httpbin/httpbin"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc"
@@ -182,9 +181,7 @@ func getEncodedHandler(t testing.TB, compressionType httpext.CompressionType) ht
 		if encw != nil {
 			_ = encw.Close()
 		}
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 	})
 }
 
