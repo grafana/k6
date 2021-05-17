@@ -187,22 +187,22 @@ func errorCodeForError(err error) (errCode, string) {
 		return blackListedIPErrorCode, blackListedIPErrorCodeMsg
 	case netext.BlockedHostError:
 		return blockedHostnameErrorCode, blockedHostnameErrorMsg
-	case *http2.GoAwayError:
+	case http2.GoAwayError:
 		return unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(e.ErrCode),
 			fmt.Sprintf(http2GoAwayErrorCodeMsg, e.ErrCode)
-	case *http2.StreamError:
+	case http2.StreamError:
 		return unknownHTTP2StreamErrorCode + http2ErrCodeOffset(e.Code),
 			fmt.Sprintf(http2StreamErrorCodeMsg, e.Code)
-	case *http2.ConnectionError:
-		return unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCode(*e)),
-			fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCode(*e))
+	case http2.ConnectionError:
+		return unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCode(e)),
+			fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCode(e))
 	case *net.OpError:
 		return errorCodeForNetOpError(e)
-	case *x509.UnknownAuthorityError:
+	case x509.UnknownAuthorityError:
 		return x509UnknownAuthorityErrorCode, x509UnknownAuthority
-	case *x509.HostnameError:
+	case x509.HostnameError:
 		return x509HostnameErrorCode, x509HostnameErrorCodeMsg
-	case *tls.RecordHeaderError:
+	case tls.RecordHeaderError:
 		return defaultTLSErrorCode, err.Error()
 	case *url.Error:
 		return errorCodeForError(e.Err)
