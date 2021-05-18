@@ -26,6 +26,7 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -141,7 +142,8 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			}
 
 			if newCloudConf.Token.Valid {
-				fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(newCloudConf.Token.String))
+				valueColor := getColor(noColor || !stdoutTTY, color.FgCyan)
+				fprintf(stdout, "  token: %s\n", valueColor.Sprint(newCloudConf.Token.String))
 			}
 			return nil
 		},

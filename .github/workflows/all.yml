@@ -59,10 +59,12 @@ jobs:
 
   test:
     strategy:
+      fail-fast: false
       matrix:
         go-version: [1.15.x]
         platform: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
+    if: github.ref == 'skipped' #TODO: re-enable this when Go 1.17 comes out?
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -84,8 +86,36 @@ jobs:
           fi
           go test "${args[@]}" -timeout 800s ./...
 
+  test-tip:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.x
+      - name: Install Go tip
+        run: |
+          go install golang.org/dl/gotip@latest
+          gotip download
+          echo "GOROOT=$HOME/sdk/gotip" >> "$GITHUB_ENV"
+          echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
+      - name: Run tests
+        run: |
+          set -x
+          which go
+          go version
+          export GOMAXPROCS=2
+          args=("-p" "2" "-race")
+          go test "${args[@]}" -timeout 800s ./...
+
   test-cov:
     strategy:
+      fail-fast: false
       matrix:
         go-version: [1.16.x]
         platform: [ubuntu-latest, windows-latest]

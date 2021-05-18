@@ -28,7 +28,6 @@ import (
 
 	v1 "go.k6.io/k6/api/v1"
 	"go.k6.io/k6/api/v1/client"
-	"go.k6.io/k6/ui"
 )
 
 func getScaleCmd(ctx context.Context) *cobra.Command {
@@ -54,8 +53,8 @@ func getScaleCmd(ctx context.Context) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ui.Dump(stdout, status)
-			return nil
+
+			return yamlPrint(stdout, status)
 		},
 	}
 

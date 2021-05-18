@@ -102,10 +102,11 @@ func createTestMetrics(t *testing.T) (map[string]*stats.Metric, *lib.Group) {
 
 	countMetric := stats.New("http_reqs", stats.Counter)
 	countMetric.Tainted = null.BoolFrom(true)
-	countMetric.Thresholds = stats.Thresholds{Thresholds: []*stats.Threshold{{Source: "rate<100"}}}
+	countMetric.Thresholds = stats.Thresholds{Thresholds: []*stats.Threshold{{Source: "rate<100", LastFailed: true}}}
 
 	checksMetric := stats.New("checks", stats.Rate)
 	checksMetric.Tainted = null.BoolFrom(false)
+	checksMetric.Thresholds = stats.Thresholds{Thresholds: []*stats.Threshold{{Source: "rate>70", LastFailed: false}}}
 	sink := &stats.TrendSink{}
 
 	samples := []float64{10.0, 15.0, 20.0}
@@ -212,13 +213,16 @@ const expectedOldJSONExportResult = `{
         "checks": {
             "value": 0.75,
             "passes": 45,
-            "fails": 15
+            "fails": 15,
+            "thresholds": {
+                "rate>70": false
+            }
         },
         "http_reqs": {
             "count": 3,
             "rate": 3,
             "thresholds": {
-                "rate<100": false
+                "rate<100": true
             }
         },
         "my_trend": {
@@ -324,8 +328,14 @@ const expectedHandleSummaryRawData = `
             "p(99)",
             "count"
         ],
-        "summaryTimeUnit": ""
+        "summaryTimeUnit": "",
+		"noColor": false
     },
+	"state": {
+		"isStdErrTTY": false,
+		"isStdOutTTY": false,
+		"testRunDurationMs": 1000
+	},
     "metrics": {
         "checks": {
             "contains": "default",
@@ -334,7 +344,12 @@ const expectedHandleSummaryRawData = `
                 "fails": 15,
                 "rate": 0.75
             },
-            "type": "rate"
+            "type": "rate",
+            "thresholds": {
+                "rate>70": {
+                    "ok": true
+                }
+            }
         },
         "my_trend": {
             "thresholds": {
@@ -373,7 +388,7 @@ const expectedHandleSummaryRawData = `
             },
             "thresholds": {
                 "rate<100": {
-                    "ok": true
+                    "ok": false
                 }
             }
         }

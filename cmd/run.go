@@ -102,7 +102,7 @@ a commandline interface for interacting with it.`,
 		Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// TODO: disable in quiet mode?
-			_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner())
+			_, _ = fmt.Fprintf(stdout, "\n%s\n\n", getBanner(noColor || !stdoutTTY))
 
 			logger.Debug("Initializing the runner...")
 
@@ -233,7 +233,7 @@ a commandline interface for interacting with it.`,
 
 			printExecutionDescription(
 				"local", filename, "", conf, execScheduler.GetState().ExecutionTuple,
-				executionPlan, outputs)
+				executionPlan, outputs, noColor || !stdoutTTY)
 
 			// Trap Interrupts, SIGINTs and SIGTERMs.
 			sigC := make(chan os.Signal, 1)
@@ -299,6 +299,11 @@ a commandline interface for interacting with it.`,
 					Metrics:         engine.Metrics,
 					RootGroup:       engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
 					TestRunDuration: executionState.GetCurrentTestRunDuration(),
+					NoColor:         noColor,
+					UIState: lib.UIState{
+						IsStdOutTTY: stdoutTTY,
+						IsStdErrTTY: stderrTTY,
+					},
 				})
 				if err == nil {
 					err = handleSummaryResult(afero.NewOsFs(), stdout, stderr, summaryResult)

@@ -4,10 +4,6 @@ github.com/Azure/go-ntlmssp
 # github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
 ## explicit
 github.com/DataDog/datadog-go/statsd
-# github.com/GeertJohan/go.rice v0.0.0-20170420135705-c02ca9a983da
-## explicit
-github.com/GeertJohan/go.rice
-github.com/GeertJohan/go.rice/embedded
 # github.com/PuerkitoBio/goquery v1.6.1
 ## explicit
 github.com/PuerkitoBio/goquery
@@ -21,8 +17,6 @@ github.com/Soontao/goHttpDigestClient
 github.com/andybalholm/brotli
 # github.com/andybalholm/cascadia v1.1.0
 github.com/andybalholm/cascadia
-# github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb
-github.com/daaku/go.zipexe
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91
@@ -38,9 +32,6 @@ github.com/dop251/goja/ftoa/internal/fast
 github.com/dop251/goja/parser
 github.com/dop251/goja/token
 github.com/dop251/goja/unistring
-# github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4
-## explicit
-github.com/dustin/go-humanize
 # github.com/eapache/go-resiliency v1.1.0
 github.com/eapache/go-resiliency/breaker
 # github.com/eapache/go-xerial-snappy v0.0.0-20160609142408-bb955e01b934
@@ -97,8 +88,6 @@ github.com/josharian/intern
 # github.com/k6io/xk6-output-kafka v0.2.0
 ## explicit
 github.com/k6io/xk6-output-kafka/pkg/kafka
-# github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
-github.com/kardianos/osext
 # github.com/kelseyhightower/envconfig v1.4.0
 ## explicit
 github.com/kelseyhightower/envconfig
@@ -179,9 +168,6 @@ github.com/tidwall/match
 # github.com/tidwall/pretty v1.1.0
 ## explicit
 github.com/tidwall/pretty
-# github.com/zyedidia/highlight v0.0.0-20170330143449-201131ce5cf5
-## explicit
-github.com/zyedidia/highlight
 # golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 ## explicit
 golang.org/x/crypto/md4
@@ -203,7 +189,6 @@ golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/text v0.3.6
-## explicit
 golang.org/x/text/cases
 golang.org/x/text/collate
 golang.org/x/text/internal

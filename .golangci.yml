@@ -1,7 +1,5 @@
 run:
   deadline: 5m
-  skip-files:
-  - "rice-box.go$"
 
 issues:
   # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
