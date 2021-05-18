@@ -33,6 +33,7 @@ import (
 	"net/http/cookiejar"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dop251/goja"
@@ -344,7 +345,8 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 	}()
 	*vu.Context = ctx
 
-	handleSummaryWrapperRaw, err := vu.Runtime.RunString(summaryWrapperLambdaCode)
+	wrapper := strings.Replace(summaryWrapperLambdaCode, "/*JSLIB_SUMMARY_CODE*/", jslibSummaryCode, 1)
+	handleSummaryWrapperRaw, err := vu.Runtime.RunString(wrapper)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error while getting the summary wrapper: %w", err)
 	}
