@@ -1395,16 +1395,9 @@ func TestExecutionStatsVUSharing(t *testing.T) {
 		import exec from 'k6/execution';
 		import { sleep } from 'k6';
 
-		// The carr scenario should reuse the two VUs created for the cvus scenario.
+		// The cvus scenario should reuse the two VUs created for the carr scenario.
 		export let options = {
 			scenarios: {
-			    cvus: {
-					executor: 'constant-vus',
-					exec: 'cvus',
-					vus: 2,
-					duration: '1s',
-					gracefulStop: '0s',
-			    },
 				carr: {
 					executor: 'constant-arrival-rate',
 					exec: 'carr',
@@ -1413,19 +1406,28 @@ func TestExecutionStatsVUSharing(t *testing.T) {
 					duration: '1s',
 					preAllocatedVUs: 2,
 					maxVUs: 10,
-					startTime: '2s',
 					gracefulStop: '100ms',
 				},
+			    cvus: {
+					executor: 'constant-vus',
+					exec: 'cvus',
+					vus: 2,
+					duration: '1s',
+					startTime: '2s',
+					gracefulStop: '0s',
+			    },
 		    },
 		};
 
 		export function cvus() {
-			console.log(JSON.stringify(Object.assign(exec.getVUStats(), {scenario: 'cvus'})));
+			const stats = Object.assign({scenario: 'cvus', globalVUID: __VU}, exec.getVUStats());
+			console.log(JSON.stringify(stats));
 			sleep(0.2);
 		};
 
 		export function carr() {
-			console.log(JSON.stringify(Object.assign(exec.getVUStats(), {scenario: 'carr'})));
+			const stats = Object.assign({scenario: 'carr', globalVUID: __VU}, exec.getVUStats());
+			console.log(JSON.stringify(stats));
 		};
 `)
 
@@ -1456,7 +1458,7 @@ func TestExecutionStatsVUSharing(t *testing.T) {
 	vuStats := map[uint64]vuStat{}
 
 	type logEntry struct {
-		ID, Iteration                 uint64
+		ID, Iteration, GlobalVUID     uint64
 		Scenario                      string
 		IDScenario, IterationScenario uint64
 	}
@@ -1473,6 +1475,7 @@ func TestExecutionStatsVUSharing(t *testing.T) {
 		for _, entry := range entries {
 			err = json.Unmarshal([]byte(entry.Message), le)
 			require.NoError(t, err)
+			assert.Contains(t, []uint64{1, 2}, le.GlobalVUID)
 			if _, ok := vuStats[le.ID]; !ok {
 				vuStats[le.ID] = vuStat{0, make(map[string]uint64), make(map[string]uint64)}
 			}
@@ -1503,16 +1506,9 @@ func TestExecutionStatsScenarioIter(t *testing.T) {
 
 		randomSeed(12345);
 
-		// The carr scenario should reuse the two VUs created for the pvu scenario.
+		// The pvu scenario should reuse the two VUs created for the carr scenario.
 		export let options = {
 			scenarios: {
-				pvu: {
-					executor: 'per-vu-iterations',
-					exec: 'pvu',
-					vus: 2,
-					iterations: 5,
-					gracefulStop: '0s',
-				},
 				carr: {
 					executor: 'constant-arrival-rate',
 					exec: 'carr',
@@ -1521,19 +1517,28 @@ func TestExecutionStatsScenarioIter(t *testing.T) {
 					duration: '1s',
 					preAllocatedVUs: 2,
 					maxVUs: 10,
-					startTime: '2s',
 					gracefulStop: '100ms',
+				},
+				pvu: {
+					executor: 'per-vu-iterations',
+					exec: 'pvu',
+					vus: 2,
+					iterations: 5,
+					startTime: '2s',
+					gracefulStop: '0s',
 				},
 			},
 		};
 
 		export function pvu() {
 			sleep(Math.random() * 0.5);
-			console.log(JSON.stringify(exec.getScenarioStats()));
+			const stats = Object.assign({VUID: __VU}, exec.getScenarioStats());
+			console.log(JSON.stringify(stats));
 		}
 
 		export function carr() {
-			console.log(JSON.stringify(exec.getScenarioStats()));
+			const stats = Object.assign({VUID: __VU}, exec.getScenarioStats());
+			console.log(JSON.stringify(stats));
 		};
 `)
 
@@ -1559,8 +1564,8 @@ func TestExecutionStatsScenarioIter(t *testing.T) {
 	scStats := map[string]uint64{}
 
 	type logEntry struct {
-		Name      string
-		Iteration uint64
+		Name            string
+		Iteration, VUID uint64
 	}
 
 	errCh := make(chan error, 1)
@@ -1575,6 +1580,7 @@ func TestExecutionStatsScenarioIter(t *testing.T) {
 		for _, entry := range entries {
 			err = json.Unmarshal([]byte(entry.Message), le)
 			require.NoError(t, err)
+			assert.Contains(t, []uint64{1, 2}, le.VUID)
 			scStats[le.Name] = le.Iteration
 		}
 		require.Len(t, scStats, 2)
