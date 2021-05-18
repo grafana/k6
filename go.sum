@@ -32,7 +32,6 @@ github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5/go.mod 
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/andybalholm/brotli v0.0.0-20190704151324-71eb68cc467c/go.mod h1:+lx6/Aqd1kLJ1GQfkvOnaZ1WGmLpMpbprPuIOOZX30U=
-github.com/andybalholm/brotli v1.0.1 h1:KqhlKozYbRtJvsPrrEeXcO+N2l6NYT5A2QAFmSULpEc=
 github.com/andybalholm/brotli v1.0.1/go.mod h1:loMXtMfwqflxFJPmdbJO0a3KNoPuLBgiu3qAvBg8x/Y=
 github.com/andybalholm/brotli v1.0.2 h1:JKnhI/XQ75uFBTiuzXpzFrUriDPiZjlOSzh6wXogP0E=
 github.com/andybalholm/brotli v1.0.2/go.mod h1:loMXtMfwqflxFJPmdbJO0a3KNoPuLBgiu3qAvBg8x/Y=
@@ -189,7 +188,6 @@ github.com/k6io/xk6-output-kafka v0.1.1/go.mod h1:FEnBddwavknsQ3/tGFW0CP9ABAVMyi
 github.com/k6io/xk6-output-kafka v0.1.2-0.20210510135110-a159d7c8c171/go.mod h1:fgsOfxm/erON/jKuOBL8/TceTnAZPQ1OS8A7cPhrso8=
 github.com/k6io/xk6-output-kafka v0.2.0 h1:BCWOFFDhjD2ETLMD1HdEO84xXkA6QgJ/LG9HxrsqqIo=
 github.com/k6io/xk6-output-kafka v0.2.0/go.mod h1:yoiecpPwfa3F/UVl8k2scJ0xkZqRYu6Ht1XqohXnlXA=
-github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1 h1:PJPDf8OUfOK1bb/NeTKd4f1QXZItOX389VN3B6qC8ro=
 github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1/go.mod h1:1NbS8ALrpOvjt0rHPNLyCIeMtbizbir8U//inJ+zuB8=
 github.com/kelseyhightower/envconfig v1.4.0 h1:Im6hONhd3pLkfDFsbRgu68RDNkGF1r3dvMUtDTo2cv8=
 github.com/kelseyhightower/envconfig v1.4.0/go.mod h1:cccZRl6mQpaq41TPp5QxidR+Sa3axMbJDNb//FQX6Gg=
