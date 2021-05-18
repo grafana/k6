@@ -57,7 +57,6 @@ const (
 	tcpBrokenPipeErrorCode   errCode = 1201
 	netUnknownErrnoErrorCode errCode = 1202
 	tcpDialErrorCode         errCode = 1210
-	tcpDialTimeoutErrorCode  errCode = 1211
 	tcpDialRefusedErrorCode  errCode = 1212
 	tcpDialUnknownErrnoCode  errCode = 1213
 	tcpResetByPeerErrorCode  errCode = 1220
@@ -87,7 +86,6 @@ const (
 
 const (
 	tcpResetByPeerErrorCodeMsg  = "%s: connection reset by peer"
-	tcpDialTimeoutErrorCodeMsg  = "dial: i/o timeout"
 	tcpDialRefusedErrorCodeMsg  = "dial: connection refused"
 	tcpBrokenPipeErrorCodeMsg   = "%s: broken pipe"
 	netUnknownErrnoErrorCodeMsg = "%s: unknown errno `%d` on %s with message `%s`"
@@ -142,10 +140,6 @@ func errorCodeForNetOpError(err *net.OpError) (errCode, string) {
 		}
 	}
 
-	// err.Op is "dial"
-	if err.Timeout() {
-		return tcpDialTimeoutErrorCode, tcpDialTimeoutErrorCodeMsg
-	}
 	if iErr, ok := err.Err.(*os.SyscallError); ok {
 		if errno, ok := iErr.Err.(syscall.Errno); ok {
 			if errno == syscall.ECONNREFUSED ||
