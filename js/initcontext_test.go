@@ -48,14 +48,17 @@ import (
 )
 
 func TestInitContextRequire(t *testing.T) {
-	logger := testutils.NewLogger(t)
+	t.Parallel()
 	t.Run("Modules", func(t *testing.T) {
 		t.Run("Nonexistent", func(t *testing.T) {
+			t.Parallel()
 			_, err := getSimpleBundle(t, "/script.js", `import "k6/NONEXISTENT";`)
 			assert.Contains(t, err.Error(), "GoError: unknown module: k6/NONEXISTENT")
 		})
 
 		t.Run("k6", func(t *testing.T) {
+			t.Parallel()
+			logger := testutils.NewLogger(t)
 			b, err := getSimpleBundle(t, "/script.js", `
 					import k6 from "k6";
 					export let _k6 = k6;
@@ -83,44 +86,45 @@ func TestInitContextRequire(t *testing.T) {
 				_, groupOk := goja.AssertFunction(k6.Get("group"))
 				assert.True(t, groupOk, "k6.group is not a function")
 			}
+		})
 
-			t.Run("group", func(t *testing.T) {
-				b, err := getSimpleBundle(t, "/script.js", `
+		t.Run("group", func(t *testing.T) {
+			logger := testutils.NewLogger(t)
+			t.Parallel()
+			b, err := getSimpleBundle(t, "/script.js", `
 						import { group } from "k6";
 						export let _group = group;
 						export let dummy = "abc123";
 						export default function() {}
 				`)
-				if !assert.NoError(t, err) {
-					return
-				}
+			require.NoError(t, err)
 
-				bi, err := b.Instantiate(logger, 0)
-				if !assert.NoError(t, err) {
-					return
-				}
+			bi, err := b.Instantiate(logger, 0)
+			require.NoError(t, err)
 
-				exports := bi.Runtime.Get("exports").ToObject(bi.Runtime)
-				if assert.NotNil(t, exports) {
-					_, defaultOk := goja.AssertFunction(exports.Get("default"))
-					assert.True(t, defaultOk, "default export is not a function")
-					assert.Equal(t, "abc123", exports.Get("dummy").String())
-				}
+			exports := bi.Runtime.Get("exports").ToObject(bi.Runtime)
+			if assert.NotNil(t, exports) {
+				_, defaultOk := goja.AssertFunction(exports.Get("default"))
+				assert.True(t, defaultOk, "default export is not a function")
+				assert.Equal(t, "abc123", exports.Get("dummy").String())
+			}
 
-				_, groupOk := goja.AssertFunction(exports.Get("_group"))
-				assert.True(t, groupOk, "{ group } is not a function")
-			})
+			_, groupOk := goja.AssertFunction(exports.Get("_group"))
+			assert.True(t, groupOk, "{ group } is not a function")
 		})
 	})
 
 	t.Run("Files", func(t *testing.T) {
+		t.Parallel()
 		t.Run("Nonexistent", func(t *testing.T) {
+			t.Parallel()
 			path := filepath.FromSlash("/nonexistent.js")
 			_, err := getSimpleBundle(t, "/script.js", `import "/nonexistent.js"; export default function() {}`)
 			assert.NotNil(t, err)
 			assert.Contains(t, err.Error(), fmt.Sprintf(`"%s" couldn't be found on local disk`, filepath.ToSlash(path)))
 		})
 		t.Run("Invalid", func(t *testing.T) {
+			t.Parallel()
 			fs := afero.NewMemMapFs()
 			assert.NoError(t, afero.WriteFile(fs, "/file.js", []byte{0x00}, 0o755))
 			_, err := getSimpleBundle(t, "/script.js", `import "/file.js"; export default function() {}`, fs)
@@ -128,6 +132,7 @@ func TestInitContextRequire(t *testing.T) {
 			assert.Contains(t, err.Error(), "SyntaxError: file:///file.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
 		})
 		t.Run("Error", func(t *testing.T) {
+			t.Parallel()
 			fs := afero.NewMemMapFs()
 			assert.NoError(t, afero.WriteFile(fs, "/file.js", []byte(`throw new Error("aaaa")`), 0o755))
 			_, err := getSimpleBundle(t, "/script.js", `import "/file.js"; export default function() {}`, fs)
@@ -166,6 +171,7 @@ func TestInitContextRequire(t *testing.T) {
 		for libName, data := range imports {
 			libName, data := libName, data
 			t.Run("lib=\""+libName+"\"", func(t *testing.T) {
+				t.Parallel()
 				for constName, constPath := range data.ConstPaths {
 					constName, constPath := constName, constPath
 					name := "inline"
@@ -173,7 +179,9 @@ func TestInitContextRequire(t *testing.T) {
 						name = "const=\"" + constName + "\""
 					}
 					t.Run(name, func(t *testing.T) {
+						t.Parallel()
 						fs := afero.NewMemMapFs()
+						logger := testutils.NewLogger(t)
 
 						jsLib := `export default function() { return 12345; }`
 						if constName != "" {
@@ -196,23 +204,21 @@ func TestInitContextRequire(t *testing.T) {
 								export default function() {};`,
 							libName)
 						b, err := getSimpleBundle(t, "/path/to/script.js", data, fs)
-						if !assert.NoError(t, err) {
-							return
-						}
+						require.NoError(t, err)
 						if constPath != "" {
 							assert.Contains(t, b.BaseInitContext.programs, "file://"+constPath)
 						}
 
 						_, err = b.Instantiate(logger, 0)
-						if !assert.NoError(t, err) {
-							return
-						}
+						require.NoError(t, err)
 					})
 				}
 			})
 		}
 
 		t.Run("Isolation", func(t *testing.T) {
+			t.Parallel()
+			logger := testutils.NewLogger(t)
 			fs := afero.NewMemMapFs()
 			assert.NoError(t, afero.WriteFile(fs, "/a.js", []byte(`const myvar = "a";`), 0o644))
 			assert.NoError(t, afero.WriteFile(fs, "/b.js", []byte(`const myvar = "b";`), 0o644))
@@ -225,14 +231,10 @@ func TestInitContextRequire(t *testing.T) {
 					}
 				};`
 			b, err := getSimpleBundle(t, "/script.js", data, fs)
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 
 			bi, err := b.Instantiate(logger, 0)
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 			_, err = bi.exports[consts.DefaultFn](goja.Undefined())
 			assert.NoError(t, err)
 		})
@@ -269,6 +271,7 @@ func createAndReadFile(t *testing.T, file string, content []byte, expectedLength
 }
 
 func TestInitContextOpen(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		content []byte
 		file    string
@@ -282,19 +285,17 @@ func TestInitContextOpen(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.file, func(t *testing.T) {
+			t.Parallel()
 			bi, err := createAndReadFile(t, tc.file, tc.content, tc.length, "")
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 			assert.Equal(t, string(tc.content), bi.Runtime.Get("data").Export())
 		})
 	}
 
 	t.Run("Binary", func(t *testing.T) {
+		t.Parallel()
 		bi, err := createAndReadFile(t, "/path/to/file.bin", []byte("hi!\x0f\xff\x01"), 6, "b")
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		buf := bi.Runtime.NewArrayBuffer([]byte{104, 105, 33, 15, 255, 1})
 		assert.Equal(t, buf, bi.Runtime.Get("data").Export())
 	})
@@ -307,20 +308,21 @@ func TestInitContextOpen(t *testing.T) {
 	for name, loadPath := range testdata {
 		loadPath := loadPath
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			_, err := createAndReadFile(t, loadPath, []byte("content"), 7, "")
-			if !assert.NoError(t, err) {
-				return
-			}
+			require.NoError(t, err)
 		})
 	}
 
 	t.Run("Nonexistent", func(t *testing.T) {
+		t.Parallel()
 		path := filepath.FromSlash("/nonexistent.txt")
 		_, err := getSimpleBundle(t, "/script.js", `open("/nonexistent.txt"); export default function() {}`)
 		assert.Contains(t, err.Error(), fmt.Sprintf("GoError: open %s: file does not exist", path))
 	})
 
 	t.Run("Directory", func(t *testing.T) {
+		t.Parallel()
 		path := filepath.FromSlash("/some/dir")
 		fs := afero.NewMemMapFs()
 		assert.NoError(t, fs.MkdirAll(path, 0o755))
@@ -560,6 +562,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 }
 
 func TestInitContextVU(t *testing.T) {
+	t.Parallel()
 	b, err := getSimpleBundle(t, "/script.js", `
 		let vu = __VU;
 		export default function() { return vu; }

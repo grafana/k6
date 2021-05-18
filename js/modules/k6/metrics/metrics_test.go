@@ -81,9 +81,7 @@ func TestMetrics(t *testing.T) {
 						isTimeString = `, true`
 					}
 					_, err := rt.RunString(fmt.Sprintf(`var m = new metrics.%s("my_metric"%s)`, fn, isTimeString))
-					if !assert.NoError(t, err) {
-						return
-					}
+					require.NoError(t, err)
 
 					t.Run("ExitInit", func(t *testing.T) {
 						*ctxPtr = lib.WithState(*ctxPtr, state)

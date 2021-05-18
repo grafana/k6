@@ -296,7 +296,6 @@ func BenchmarkHTTPPush(b *testing.B) {
 		}`)
 		require.NoError(b, err)
 	}))
-	defer tb.Cleanup()
 	tb.Mux.HandleFunc("/v1/metrics/fake",
 		func(w http.ResponseWriter, r *http.Request) {
 			_, err := io.Copy(ioutil.Discard, r.Body)

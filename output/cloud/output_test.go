@@ -177,7 +177,6 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 		}`, minSamples)
 		require.NoError(t, err)
 	}))
-	defer tb.Cleanup()
 
 	out, err := newOutput(output.Params{
 		Logger:     testutils.NewLogger(t),
@@ -322,7 +321,6 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 		require.NoError(t, err)
 	}))
 	tb.Mux.HandleFunc("/v1/tests/12", func(rw http.ResponseWriter, _ *http.Request) { rw.WriteHeader(http.StatusOK) })
-	defer tb.Cleanup()
 
 	out, err := newOutput(output.Params{
 		Logger:     testutils.NewLogger(t),
@@ -422,7 +420,6 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 		require.NoError(t, err)
 	}))
 	tb.Mux.HandleFunc("/v1/tests/12", func(rw http.ResponseWriter, _ *http.Request) { rw.WriteHeader(http.StatusOK) })
-	defer tb.Cleanup()
 
 	out, err := newOutput(output.Params{
 		Logger: testutils.NewLogger(t),
@@ -562,7 +559,6 @@ func TestCloudOutputAggregationPeriodZeroNoBlock(t *testing.T) {
 		require.NoError(t, err)
 	}))
 	tb.Mux.HandleFunc("/v1/tests/123", func(rw http.ResponseWriter, _ *http.Request) { rw.WriteHeader(http.StatusOK) })
-	defer tb.Cleanup()
 
 	out, err := newOutput(output.Params{
 		Logger: testutils.NewLogger(t),
@@ -609,7 +605,6 @@ func TestCloudOutputPushRefID(t *testing.T) {
 	defer close(expSamples)
 
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 	failHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Errorf("%s should not have been called at all", r.RequestURI)
 	})
@@ -681,7 +676,6 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 		require.NoError(t, err)
 	}))
 	tb.Mux.HandleFunc("/v1/tests/123", func(rw http.ResponseWriter, _ *http.Request) { rw.WriteHeader(http.StatusOK) })
-	defer tb.Cleanup()
 
 	out, err := newOutput(output.Params{
 		Logger: testutils.NewLogger(t),

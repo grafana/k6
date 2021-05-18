@@ -40,7 +40,6 @@ import (
 
 func TestSetupDataMarshalling(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 
 	script := []byte(tb.Replacer.Replace(`
 		import http from "k6/http";

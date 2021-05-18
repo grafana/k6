@@ -72,7 +72,6 @@ func assertMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []
 func TestClient(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	defer tb.Cleanup()
 	sr := tb.Replacer.Replace
 
 	root, err := lib.NewGroup("", nil)
@@ -142,9 +141,7 @@ func TestClient(t *testing.T) {
 		respV, err := rt.RunString(`
 			client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");
 		`)
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 		resp := respV.Export()
 		assert.IsType(t, []MethodInfo{}, resp)
 		assert.Len(t, resp, 6)

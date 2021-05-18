@@ -112,7 +112,6 @@ func TestLoad(t *testing.T) {
 	http.DefaultTransport = tb.HTTPTransport
 
 	defer func() {
-		tb.Cleanup()
 		http.DefaultTransport = oldHTTPTransport
 	}()
 
