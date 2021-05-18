@@ -35,7 +35,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh/terminal"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"

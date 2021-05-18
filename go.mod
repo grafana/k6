@@ -41,5 +41,5 @@ require (
 	google.golang.org/grpc v1.36.1
 	google.golang.org/protobuf v1.25.1-0.20200805231151-a709e31e5d12
 	gopkg.in/guregu/null.v3 v3.3.0
-	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 )
