@@ -22,6 +22,7 @@ package httpext
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptrace"
@@ -243,8 +244,9 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	reqWithTracer := req.WithContext(httptrace.WithClientTrace(ctx, tracer.Trace()))
 	resp, err := t.state.Transport.RoundTrip(reqWithTracer)
 
-	if typErr, ok := err.(net.Error); ok && typErr.Timeout() {
-		err = NewK6Error(requestTimeoutErrorCode, requestTimeoutErrorCodeMsg, err)
+	var netError net.Error
+	if errors.As(err, &netError) && netError.Timeout() {
+		err = NewK6Error(requestTimeoutErrorCode, requestTimeoutErrorCodeMsg, netError)
 	}
 	t.saveCurrentRequest(&unfinishedRequest{
 		ctx:      ctx,
