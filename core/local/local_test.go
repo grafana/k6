@@ -127,6 +127,7 @@ func TestExecutionSchedulerRunNonDefault(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			logger := logrus.New()
 			logger.SetOutput(testutils.NewTestOutput(t))
 			runner, err := js.New(logger, &loader.SourceData{
@@ -235,6 +236,7 @@ func TestExecutionSchedulerRunEnv(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			logger := logrus.New()
 			logger.SetOutput(testutils.NewTestOutput(t))
 			runner, err := js.New(logger, &loader.SourceData{
@@ -437,6 +439,7 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			logger := logrus.New()
 			logger.SetOutput(testutils.NewTestOutput(t))
 
@@ -680,6 +683,7 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 	t.Parallel()
 	t.Run("Normal", func(t *testing.T) {
+		t.Parallel()
 		setupC := make(chan struct{})
 		teardownC := make(chan struct{})
 		runner := &minirunner.MiniRunner{
@@ -702,6 +706,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 		assert.NoError(t, <-err)
 	})
 	t.Run("Setup Error", func(t *testing.T) {
+		t.Parallel()
 		runner := &minirunner.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, errors.New("setup error")
@@ -712,6 +717,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 		assert.EqualError(t, execScheduler.Run(ctx, ctx, samples), "setup error")
 	})
 	t.Run("Don't Run Setup", func(t *testing.T) {
+		t.Parallel()
 		runner := &minirunner.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, errors.New("setup error")
@@ -730,6 +736,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 	})
 
 	t.Run("Teardown Error", func(t *testing.T) {
+		t.Parallel()
 		runner := &minirunner.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, nil
@@ -747,6 +754,7 @@ func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
 		assert.EqualError(t, execScheduler.Run(ctx, ctx, samples), "teardown error")
 	})
 	t.Run("Don't Run Teardown", func(t *testing.T) {
+		t.Parallel()
 		runner := &minirunner.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, nil
@@ -976,6 +984,7 @@ func TestExecutionSchedulerIsRunning(t *testing.T) {
 
 // TestDNSResolver checks the DNS resolution behavior at the ExecutionScheduler level.
 func TestDNSResolver(t *testing.T) {
+	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	sr := tb.Replacer.Replace
 	script := sr(`
@@ -994,6 +1003,7 @@ func TestDNSResolver(t *testing.T) {
 		}`)
 
 	t.Run("cache", func(t *testing.T) {
+		t.Parallel()
 		testCases := map[string]struct {
 			opts          lib.Options
 			expLogEntries int
@@ -1031,6 +1041,7 @@ func TestDNSResolver(t *testing.T) {
 		for name, tc := range testCases {
 			tc := tc
 			t.Run(name, func(t *testing.T) {
+				t.Parallel()
 				logger := logrus.New()
 				logger.SetOutput(ioutil.Discard)
 				logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
@@ -1144,8 +1155,8 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 
 	expectIn := func(from, to time.Duration, expected stats.SampleContainer) {
 		start := time.Now()
-		from = from * time.Millisecond
-		to = to * time.Millisecond
+		from *= time.Millisecond
+		to *= time.Millisecond
 		for {
 			select {
 			case sampleContainer := <-sampleContainers:
@@ -1243,7 +1254,9 @@ func (p pausableExecutor) SetPaused(bool) error {
 }
 
 func TestSetPaused(t *testing.T) {
+	t.Parallel()
 	t.Run("second pause is an error", func(t *testing.T) {
+		t.Parallel()
 		runner := &minirunner.MiniRunner{}
 		logger := logrus.New()
 		logger.SetOutput(testutils.NewTestOutput(t))
@@ -1258,6 +1271,7 @@ func TestSetPaused(t *testing.T) {
 	})
 
 	t.Run("unpause at the start is an error", func(t *testing.T) {
+		t.Parallel()
 		runner := &minirunner.MiniRunner{}
 		logger := logrus.New()
 		logger.SetOutput(testutils.NewTestOutput(t))
@@ -1270,6 +1284,7 @@ func TestSetPaused(t *testing.T) {
 	})
 
 	t.Run("second unpause is an error", func(t *testing.T) {
+		t.Parallel()
 		runner := &minirunner.MiniRunner{}
 		logger := logrus.New()
 		logger.SetOutput(testutils.NewTestOutput(t))
@@ -1284,6 +1299,7 @@ func TestSetPaused(t *testing.T) {
 	})
 
 	t.Run("an error on pausing is propagated", func(t *testing.T) {
+		t.Parallel()
 		runner := &minirunner.MiniRunner{}
 		logger := logrus.New()
 		logger.SetOutput(testutils.NewTestOutput(t))
@@ -1297,6 +1313,7 @@ func TestSetPaused(t *testing.T) {
 	})
 
 	t.Run("can't pause unpausable executor", func(t *testing.T) {
+		t.Parallel()
 		runner := &minirunner.MiniRunner{}
 		options, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 			Iterations: null.IntFrom(2),
