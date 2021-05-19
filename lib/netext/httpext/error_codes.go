@@ -97,7 +97,7 @@ const (
 	http2ConnectionErrorCodeMsg = "http2: connection error with http2 ErrCode %s"
 	x509HostnameErrorCodeMsg    = "x509: certificate doesn't match hostname"
 	x509UnknownAuthority        = "x509: unknown authority"
-	requestTimeoutErrorCodeMsg  = "Request timeout"
+	requestTimeoutErrorCodeMsg  = "request timeout"
 )
 
 func http2ErrCodeOffset(code http2.ErrCode) errCode {
