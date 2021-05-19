@@ -46,6 +46,7 @@ const (
 	// non specific
 	defaultErrorCode          errCode = 1000
 	defaultNetNonTCPErrorCode errCode = 1010
+	requestTimeoutErrorCode   errCode = 1050
 	// DNS errors
 	defaultDNSErrorCode      errCode = 1100
 	dnsNoSuchHostErrorCode   errCode = 1101
@@ -56,7 +57,6 @@ const (
 	tcpBrokenPipeErrorCode   errCode = 1201
 	netUnknownErrnoErrorCode errCode = 1202
 	tcpDialErrorCode         errCode = 1210
-	tcpDialTimeoutErrorCode  errCode = 1211
 	tcpDialRefusedErrorCode  errCode = 1212
 	tcpDialUnknownErrnoCode  errCode = 1213
 	tcpResetByPeerErrorCode  errCode = 1220
@@ -86,7 +86,6 @@ const (
 
 const (
 	tcpResetByPeerErrorCodeMsg  = "%s: connection reset by peer"
-	tcpDialTimeoutErrorCodeMsg  = "dial: i/o timeout"
 	tcpDialRefusedErrorCodeMsg  = "dial: connection refused"
 	tcpBrokenPipeErrorCodeMsg   = "%s: broken pipe"
 	netUnknownErrnoErrorCodeMsg = "%s: unknown errno `%d` on %s with message `%s`"
@@ -98,6 +97,7 @@ const (
 	http2ConnectionErrorCodeMsg = "http2: connection error with http2 ErrCode %s"
 	x509HostnameErrorCodeMsg    = "x509: certificate doesn't match hostname"
 	x509UnknownAuthority        = "x509: unknown authority"
+	requestTimeoutErrorCodeMsg  = "Request timeout"
 )
 
 func http2ErrCodeOffset(code http2.ErrCode) errCode {
@@ -140,10 +140,6 @@ func errorCodeForNetOpError(err *net.OpError) (errCode, string) {
 		}
 	}
 
-	// err.Op is "dial"
-	if err.Timeout() {
-		return tcpDialTimeoutErrorCode, tcpDialTimeoutErrorCodeMsg
-	}
 	if iErr, ok := err.Err.(*os.SyscallError); ok {
 		if errno, ok := iErr.Err.(syscall.Errno); ok {
 			if errno == syscall.ECONNREFUSED ||

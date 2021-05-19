@@ -129,7 +129,6 @@ func TestTCPErrors(t *testing.T) {
 		econnrefused      = &net.OpError{Net: "tcp", Op: "dial", Err: &os.SyscallError{Err: syscall.ECONNREFUSED}}
 		errnounknown      = &net.OpError{Net: "tcp", Op: "dial", Err: &os.SyscallError{Err: syscall.E2BIG}}
 		tcperror          = &net.OpError{Net: "tcp", Err: errors.New("tcp error")}
-		timeoutedError    = &net.OpError{Net: "tcp", Op: "dial", Err: timeoutError(true)}
 		notTimeoutedError = &net.OpError{Net: "tcp", Op: "dial", Err: timeoutError(false)}
 	)
 
@@ -141,7 +140,6 @@ func TestTCPErrors(t *testing.T) {
 		tcpDialUnknownErrnoCode:   errnounknown,
 		defaultTCPErrorCode:       tcperror,
 		tcpDialErrorCode:          notTimeoutedError,
-		tcpDialTimeoutErrorCode:   timeoutedError,
 	}
 
 	testMapOfErrorCodes(t, testTable)

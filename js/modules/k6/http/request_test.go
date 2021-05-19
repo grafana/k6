@@ -326,7 +326,7 @@ func TestRequestAndBatch(t *testing.T) {
 			`))
 			endTime := time.Now()
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "context deadline exceeded")
+			assert.Contains(t, err.Error(), "Request timeout")
 			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 2*time.Second)
 
 			logEntry := hook.LastEntry()
@@ -344,7 +344,7 @@ func TestRequestAndBatch(t *testing.T) {
 			`))
 			endTime := time.Now()
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "context deadline exceeded")
+			assert.Contains(t, err.Error(), "Request timeout")
 			assert.WithinDuration(t, startTime.Add(1*time.Second), endTime, 2*time.Second)
 
 			logEntry := hook.LastEntry()
