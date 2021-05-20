@@ -297,7 +297,7 @@ func TestDefaultTLSError(t *testing.T) {
 	require.Error(t, err)
 
 	code, msg := errorCodeForError(err)
-	assert.Equal(t, defaultTLSErrorCode, code)
+	assert.Equal(t, tlsHeaderErrorCode, code)
 	urlError := new(url.Error)
 	require.ErrorAs(t, err, &urlError)
 	assert.Equal(t, urlError.Err.Error(), msg)

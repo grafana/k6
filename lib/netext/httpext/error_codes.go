@@ -62,7 +62,8 @@ const (
 	tcpDialUnknownErrnoCode  errCode = 1213
 	tcpResetByPeerErrorCode  errCode = 1220
 	// TLS errors
-	defaultTLSErrorCode           errCode = 1300
+	defaultTLSErrorCode           errCode = 1300 //nolint:deadcode,varcheck // this is here to save the number
+	tlsHeaderErrorCode            errCode = 1301
 	x509UnknownAuthorityErrorCode errCode = 1310
 	x509HostnameErrorCode         errCode = 1311
 
@@ -205,7 +206,7 @@ func errorCodeForError(err error) (errCode, string) {
 	case x509.HostnameError:
 		return x509HostnameErrorCode, x509HostnameErrorCodeMsg
 	case tls.RecordHeaderError:
-		return defaultTLSErrorCode, err.Error()
+		return tlsHeaderErrorCode, err.Error()
 	case *url.Error:
 		return errorCodeForError(e.Err)
 	default:
