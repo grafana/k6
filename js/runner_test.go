@@ -1990,3 +1990,34 @@ func TestComplicatedFileImportsForGRPC(t *testing.T) {
 		})
 	}
 }
+
+func TestMinIterationDurationIsCancellable(t *testing.T) {
+	t.Parallel()
+
+	r, err := getSimpleRunner(t, "/script.js", `
+			exports.options = { iterations: 1, vus: 1, minIterationDuration: '1m' };
+
+			exports.default = function() { /* do nothing */ };
+		`)
+	require.NoError(t, err)
+
+	ch := make(chan stats.SampleContainer, 1000)
+	initVU, err := r.NewVU(1, ch)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+	errC := make(chan error)
+	go func() { errC <- vu.RunOnce() }()
+
+	time.Sleep(200 * time.Millisecond) // give it some time to actually start
+
+	cancel() // simulate the end of gracefulStop or a Ctrl+C event
+
+	select {
+	case <-time.After(3 * time.Second):
+		t.Fatal("Test timed out or minIterationDuration prevailed")
+	case err := <-errC:
+		require.NoError(t, err)
+	}
+}
