@@ -273,7 +273,7 @@ func TestTracerError(t *testing.T) {
 func TestCancelledRequest(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewTLSServer(httpbin.New().Handler())
-	defer srv.Close()
+	t.Cleanup(srv.Close)
 
 	cancelTest := func(t *testing.T) {
 		t.Parallel()
@@ -297,6 +297,7 @@ func TestCancelledRequest(t *testing.T) {
 
 	// This Run will not return until the parallel subtests complete.
 	t.Run("group", func(t *testing.T) {
+		t.Parallel()
 		for i := 0; i < 200; i++ {
 			t.Run(fmt.Sprintf("TestCancelledRequest_%d", i), cancelTest)
 		}

@@ -84,14 +84,17 @@ func badCloseBody() io.ReadCloser {
 }
 
 func TestCompressionBodyError(t *testing.T) {
+	t.Parallel()
 	algos := []CompressionType{CompressionTypeGzip}
 	t.Run("bad read body", func(t *testing.T) {
+		t.Parallel()
 		_, _, err := compressBody(algos, ioutil.NopCloser(badReadBody()))
 		require.Error(t, err)
 		require.Equal(t, err.Error(), badReadMsg)
 	})
 
 	t.Run("bad close body", func(t *testing.T) {
+		t.Parallel()
 		_, _, err := compressBody(algos, badCloseBody())
 		require.Error(t, err)
 		require.Equal(t, err.Error(), badCloseMsg)
@@ -99,10 +102,12 @@ func TestCompressionBodyError(t *testing.T) {
 }
 
 func TestMakeRequestError(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	t.Cleanup(cancel)
 
 	t.Run("bad compression algorithm body", func(t *testing.T) {
+		t.Parallel()
 		req, err := http.NewRequest("GET", "https://wont.be.used", nil)
 
 		require.NoError(t, err)
@@ -119,6 +124,7 @@ func TestMakeRequestError(t *testing.T) {
 	})
 
 	t.Run("invalid upgrade response", func(t *testing.T) {
+		t.Parallel()
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("Connection", "Upgrade")
 			w.Header().Add("Upgrade", "h2c")
@@ -151,7 +157,9 @@ func TestMakeRequestError(t *testing.T) {
 }
 
 func TestResponseStatus(t *testing.T) {
+	t.Parallel()
 	t.Run("response status", func(t *testing.T) {
+		t.Parallel()
 		testCases := []struct {
 			name                     string
 			statusCode               int
@@ -169,6 +177,7 @@ func TestResponseStatus(t *testing.T) {
 		for _, tc := range testCases {
 			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(tc.statusCode)
 				}))
@@ -203,7 +212,9 @@ func TestResponseStatus(t *testing.T) {
 }
 
 func TestURL(t *testing.T) {
+	t.Parallel()
 	t.Run("Clean", func(t *testing.T) {
+		t.Parallel()
 		testCases := []struct {
 			url      string
 			expected string
@@ -221,6 +232,7 @@ func TestURL(t *testing.T) {
 		for _, tc := range testCases {
 			tc := tc
 			t.Run(tc.url, func(t *testing.T) {
+				t.Parallel()
 				u, err := url.Parse(tc.url)
 				require.NoError(t, err)
 				ut := URL{u: u, URL: tc.url}
@@ -299,23 +311,7 @@ func BenchmarkWrapDecompressionError(b *testing.B) {
 func TestTrailFailed(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewTLSServer(httpbin.New().Handler())
-	defer srv.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	samples := make(chan stats.SampleContainer, 10)
-	logger := logrus.New()
-	logger.Level = logrus.DebugLevel
-	state := &lib.State{
-		Options: lib.Options{
-			RunTags:    &stats.SampleTags{},
-			SystemTags: &stats.DefaultSystemTagSet,
-		},
-		Transport: srv.Client().Transport,
-		Samples:   samples,
-		Logger:    logger,
-		BPool:     bpool.NewBufferPool(2),
-	}
-	ctx = lib.WithState(ctx, state)
+	t.Cleanup(srv.Close)
 
 	testCases := map[string]struct {
 		responseCallback func(int) bool
@@ -330,6 +326,24 @@ func TestTrailFailed(t *testing.T) {
 		failed := testCase.failed
 
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			samples := make(chan stats.SampleContainer, 10)
+			logger := logrus.New()
+			logger.Level = logrus.DebugLevel
+			state := &lib.State{
+				Options: lib.Options{
+					RunTags:    &stats.SampleTags{},
+					SystemTags: &stats.DefaultSystemTagSet,
+				},
+				Transport: srv.Client().Transport,
+				Samples:   samples,
+				Logger:    logger,
+				BPool:     bpool.NewBufferPool(2),
+			}
+			ctx = lib.WithState(ctx, state)
 			req, _ := http.NewRequest("GET", srv.URL, nil)
 			preq := &ParsedHTTPRequest{
 				Req:              req,
@@ -341,8 +355,8 @@ func TestTrailFailed(t *testing.T) {
 			res, err := MakeRequest(ctx, preq)
 
 			require.NoError(t, err)
-			assert.NotNil(t, res)
-			assert.Len(t, samples, 1)
+			require.NotNil(t, res)
+			require.Len(t, samples, 1)
 			sample := <-samples
 			trail := sample.(*Trail)
 			require.Equal(t, failed, trail.Failed)
