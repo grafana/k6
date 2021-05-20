@@ -112,7 +112,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 	// Leave header to nil by default so we can pass it directly to the Dialer
 	var header http.Header
-	var jar http.CookieJar
 
 	tags := state.CloneTags()
 
@@ -203,6 +202,8 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		v := cookie
 		cookies = append(cookies, &v)
 	}
+
+	var jar http.CookieJar
 	if len(cookies) > 0 {
 		jar, err = cookiejar.New(nil)
 		if err != nil {
