@@ -286,8 +286,8 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 	allSamples := sampleCont.GetSamples()
 	require.Len(t, allSamples, 9)
 	expTags := map[string]string{
-		"error":             "context deadline exceeded",
-		"error_code":        "1000",
+		"error":             "request timeout",
+		"error_code":        "1050",
 		"status":            "0",
 		"expected_response": "true", // we wait for status code 0
 		"method":            "GET",
