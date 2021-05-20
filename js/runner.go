@@ -664,7 +664,10 @@ func (u *ActiveVU) RunOnce() error {
 	if isFullIteration && u.Runner.Bundle.Options.MinIterationDuration.Valid {
 		durationDiff := time.Duration(u.Runner.Bundle.Options.MinIterationDuration.Duration) - totalTime
 		if durationDiff > 0 {
-			time.Sleep(durationDiff)
+			select {
+			case <-time.After(durationDiff):
+			case <-u.RunContext.Done():
+			}
 		}
 	}
 
