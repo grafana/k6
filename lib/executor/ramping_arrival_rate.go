@@ -479,8 +479,8 @@ func newActiveVUPool() *activeVUPool {
 	}
 }
 
-// Run invokes a request to execute a new iteration.
-// When there aren'p *available VUs to process the request
+// TryRunIteration invokes a request to execute a new iteration.
+// When there are no available VUs to process the request
 // then false is returned.
 func (p *activeVUPool) TryRunIteration() bool {
 	select {
@@ -512,7 +512,7 @@ func (p *activeVUPool) AddVU(ctx context.Context, avu lib.ActiveVU, runfn func(c
 }
 
 // Close stops the pool from accepting requests
-// then it will wait thap *all the on-going iterations will be completed.
+// then it will wait for all on-going iterations to complete.
 func (p *activeVUPool) Close() {
 	close(p.iterations)
 	p.wg.Wait()
