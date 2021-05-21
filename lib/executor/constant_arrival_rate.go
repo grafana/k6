@@ -231,25 +231,29 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	returnedVUs := make(chan struct{})
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
 
+	vusPool := newActiveVUPool()
 	defer func() {
 		// Make sure all VUs aren't executing iterations anymore, for the cancel()
 		// below to deactivate them.
 		<-returnedVUs
+		// first close the vusPool so we wait for the gracefulShutdown
+		vusPool.Close()
 		cancel()
 		activeVUsWg.Wait()
 	}()
-	activeVUs := make(chan lib.ActiveVU, maxVUs)
 	activeVUsCount := uint64(0)
 
 	returnVU := func(u lib.InitializedVU) {
 		car.executionState.ReturnVU(u, true)
 		activeVUsWg.Done()
 	}
+	runIterationBasic := getIterationRunner(car.executionState, car.logger)
 	activateVU := func(initVU lib.InitializedVU) lib.ActiveVU {
 		activeVUsWg.Add(1)
 		activeVU := initVU.Activate(getVUActivationParams(maxDurationCtx, car.config.BaseConfig, returnVU))
 		car.executionState.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddUint64(&activeVUsCount, 1)
+		vusPool.AddVU(maxDurationCtx, activeVU, runIterationBasic)
 		return activeVU
 	}
 
@@ -258,13 +262,6 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	defer close(makeUnplannedVUCh)
 	go func() {
 		defer close(returnedVUs)
-		defer func() {
-			// this is done here as to not have an unplannedVU in the middle of initialization when
-			// starting to return activeVUs
-			for i := uint64(0); i < atomic.LoadUint64(&activeVUsCount); i++ {
-				<-activeVUs
-			}
-		}()
 		for range makeUnplannedVUCh {
 			car.logger.Debug("Starting initialization of an unplanned VU...")
 			initVU, err := car.executionState.GetUnplannedVU(maxDurationCtx, car.logger)
@@ -273,7 +270,7 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 				car.logger.WithError(err).Error("Error while allocating unplanned VU")
 			} else {
 				car.logger.Debug("The unplanned VU finished initializing successfully!")
-				activeVUs <- activateVU(initVU)
+				activateVU(initVU)
 			}
 		}
 	}()
@@ -284,7 +281,7 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 		if err != nil {
 			return err
 		}
-		activeVUs <- activateVU(initVU)
+		activateVU(initVU)
 	}
 
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
@@ -293,9 +290,8 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	progressFn := func() (float64, []string) {
 		spent := time.Since(startTime)
 		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
-		vusInBuffer := uint64(len(activeVUs))
 		progVUs := fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs",
-			currActiveVUs-vusInBuffer, currActiveVUs)
+			vusPool.Running(), currActiveVUs)
 
 		right := []string{progVUs, duration.String(), progIters}
 
@@ -311,12 +307,6 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	}
 	car.progress.Modify(pb.WithProgress(progressFn))
 	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, &car, progressFn)
-
-	runIterationBasic := getIterationRunner(car.executionState, car.logger)
-	runIteration := func(vu lib.ActiveVU) {
-		runIterationBasic(maxDurationCtx, vu)
-		activeVUs <- vu
-	}
 
 	start, offsets, _ := car.et.GetStripedOffsets()
 	timer := time.NewTimer(time.Hour * 24)
@@ -335,11 +325,8 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 		timer.Reset(t)
 		select {
 		case <-timer.C:
-			select {
-			case vu := <-activeVUs: // ideally, we get the VU from the buffer without any issues
-				go runIteration(vu) //TODO: refactor so we dont spin up a goroutine for each iteration
+			if vusPool.TryRunIteration() {
 				continue
-			default: // no free VUs currently available
 			}
 
 			// Since there aren't any free VUs available, consider this iteration
