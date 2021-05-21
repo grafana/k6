@@ -21,15 +21,18 @@
 package httpext
 
 import (
+	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"runtime"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -38,38 +41,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
 
+	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/netext"
+	"go.k6.io/k6/lib/testutils/httpmultibin"
+	"go.k6.io/k6/lib/types"
 )
 
 func TestDefaultError(t *testing.T) {
 	t.Parallel()
 	testErrorCode(t, defaultErrorCode, fmt.Errorf("random error"))
-}
-
-func TestHTTP2Errors(t *testing.T) {
-	t.Parallel()
-	unknownErrorCode := 220
-	connectionError := http2.ConnectionError(unknownErrorCode)
-	testTable := map[errCode]error{
-		unknownHTTP2ConnectionErrorCode + 1: new(http2.ConnectionError),
-		unknownHTTP2StreamErrorCode + 1:     new(http2.StreamError),
-		unknownHTTP2GoAwayErrorCode + 1:     new(http2.GoAwayError),
-
-		unknownHTTP2ConnectionErrorCode: &connectionError,
-		unknownHTTP2StreamErrorCode:     &http2.StreamError{Code: 220},
-		unknownHTTP2GoAwayErrorCode:     &http2.GoAwayError{ErrCode: 220},
-	}
-	testMapOfErrorCodes(t, testTable)
-}
-
-func TestTLSErrors(t *testing.T) {
-	t.Parallel()
-	testTable := map[errCode]error{
-		x509UnknownAuthorityErrorCode: new(x509.UnknownAuthorityError),
-		x509HostnameErrorCode:         new(x509.HostnameError),
-		defaultTLSErrorCode:           new(tls.RecordHeaderError),
-	}
-	testMapOfErrorCodes(t, testTable)
 }
 
 func TestDNSErrors(t *testing.T) {
@@ -215,4 +195,208 @@ func TestDnsResolve(t *testing.T) {
 
 	assert.Equal(t, dnsNoSuchHostErrorCode, code)
 	assert.Equal(t, dnsNoSuchHostErrorCodeMsg, msg)
+}
+
+func TestHTTP2StreamError(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+
+	tb.Mux.HandleFunc("/tsr", func(rw http.ResponseWriter, req *http.Request) {
+		rw.Header().Set("Content-Length", "100000")
+		rw.WriteHeader(200)
+
+		rw.(http.Flusher).Flush()
+		time.Sleep(time.Millisecond * 2)
+		panic("expected internal error")
+	})
+	client := http.Client{
+		Timeout:   time.Second * 3,
+		Transport: tb.HTTPTransport,
+	}
+
+	res, err := client.Get(tb.Replacer.Replace("HTTP2BIN_URL/tsr")) //nolint:noctx
+	require.NotNil(t, res)
+	require.NoError(t, err)
+	_, err = ioutil.ReadAll(res.Body)
+	_ = res.Body.Close()
+	require.Error(t, err)
+
+	code, msg := errorCodeForError(err)
+	assert.Equal(t, unknownHTTP2StreamErrorCode+errCode(http2.ErrCodeInternal)+1, code)
+	assert.Contains(t, msg, fmt.Sprintf(http2StreamErrorCodeMsg, http2.ErrCodeInternal))
+}
+
+func TestX509HostnameError(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+
+	client := http.Client{
+		Timeout:   time.Second * 3,
+		Transport: tb.HTTPTransport,
+	}
+	var err error
+	badHostname := "somewhere.else"
+	tb.Dialer.Hosts[badHostname], err = lib.NewHostAddress(net.ParseIP(tb.Replacer.Replace("HTTPSBIN_IP")), "")
+	require.NoError(t, err)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", tb.Replacer.Replace("https://"+badHostname+":HTTPSBIN_PORT/get"), nil)
+	require.NoError(t, err)
+	res, err := client.Do(req) //nolint:bodyclose
+	require.Nil(t, res)
+	require.Error(t, err)
+
+	code, msg := errorCodeForError(err)
+	assert.Equal(t, x509HostnameErrorCode, code)
+	assert.Contains(t, msg, x509HostnameErrorCodeMsg)
+}
+
+func TestX509UnknownAuthorityError(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+
+	client := http.Client{
+		Timeout: time.Second * 3,
+		Transport: &http.Transport{
+			DialContext: tb.HTTPTransport.DialContext,
+		},
+	}
+	req, err := http.NewRequestWithContext(context.Background(), "GET", tb.Replacer.Replace("HTTPSBIN_URL/get"), nil)
+	require.NoError(t, err)
+	res, err := client.Do(req) //nolint:bodyclose
+	require.Nil(t, res)
+	require.Error(t, err)
+
+	code, msg := errorCodeForError(err)
+	assert.Equal(t, x509UnknownAuthorityErrorCode, code)
+	assert.Contains(t, msg, x509UnknownAuthority)
+}
+
+func TestDefaultTLSError(t *testing.T) {
+	t.Parallel()
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	go func() {
+		conn, err := l.Accept() //nolint:govet // the shadowing is intentional
+		require.NoError(t, err)
+		_, err = conn.Write([]byte("not tls header")) // we just want to get an error
+		require.NoError(t, err)
+		// wait so it has time to get the tls header error and not the reset socket one
+		time.Sleep(time.Second)
+	}()
+
+	client := http.Client{
+		Timeout: time.Second * 3,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true, //nolint:gosec
+			},
+		},
+	}
+
+	_, err = client.Get("https://" + l.Addr().String()) //nolint:bodyclose,noctx
+	require.Error(t, err)
+
+	code, msg := errorCodeForError(err)
+	assert.Equal(t, tlsHeaderErrorCode, code)
+	urlError := new(url.Error)
+	require.ErrorAs(t, err, &urlError)
+	assert.Equal(t, urlError.Err.Error(), msg)
+}
+
+func TestHTTP2ConnectionError(t *testing.T) {
+	t.Parallel()
+	tb := getHTTP2ServerWithCustomConnContext(t)
+
+	// Pre-configure the HTTP client transport with the dialer and TLS config (incl. HTTP2 support)
+	tb.Mux.HandleFunc("/tsr", func(rw http.ResponseWriter, req *http.Request) {
+		conn := req.Context().Value(connKey).(*tls.Conn) //nolint:forcetypeassert
+		f := http2.NewFramer(conn, conn)
+		require.NoError(t, f.WriteData(3213, false, []byte("something")))
+	})
+	client := http.Client{
+		Timeout:   time.Second * 5,
+		Transport: tb.HTTPTransport,
+	}
+
+	_, err := client.Get(tb.Replacer.Replace("HTTP2BIN_URL/tsr")) //nolint:bodyclose,noctx
+	code, msg := errorCodeForError(err)
+	assert.Equal(t, unknownHTTP2ConnectionErrorCode+errCode(http2.ErrCodeProtocol)+1, code)
+	assert.Equal(t, fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCodeProtocol), msg)
+}
+
+func TestHTTP2GoAwayError(t *testing.T) {
+	t.Parallel()
+
+	tb := getHTTP2ServerWithCustomConnContext(t)
+	tb.Mux.HandleFunc("/tsr", func(rw http.ResponseWriter, req *http.Request) {
+		conn := req.Context().Value(connKey).(*tls.Conn) //nolint:forcetypeassert
+		f := http2.NewFramer(conn, conn)
+		require.NoError(t, f.WriteGoAway(4, http2.ErrCodeInadequateSecurity, []byte("whatever")))
+		require.NoError(t, conn.CloseWrite())
+	})
+	client := http.Client{
+		Timeout:   time.Second * 5,
+		Transport: tb.HTTPTransport,
+	}
+
+	_, err := client.Get(tb.Replacer.Replace("HTTP2BIN_URL/tsr")) //nolint:bodyclose,noctx
+
+	require.Error(t, err)
+	code, msg := errorCodeForError(err)
+	assert.Equal(t, unknownHTTP2GoAwayErrorCode+errCode(http2.ErrCodeInadequateSecurity)+1, code)
+	assert.Equal(t, fmt.Sprintf(http2GoAwayErrorCodeMsg, http2.ErrCodeInadequateSecurity), msg)
+}
+
+type connKeyT int32
+
+const connKey connKeyT = 2
+
+func getHTTP2ServerWithCustomConnContext(t *testing.T) *httpmultibin.HTTPMultiBin {
+	const http2Domain = "example.com"
+	mux := http.NewServeMux()
+	http2Srv := httptest.NewUnstartedServer(mux)
+	http2Srv.EnableHTTP2 = true
+	http2Srv.Config.ConnContext = func(ctx context.Context, c net.Conn) context.Context {
+		return context.WithValue(ctx, connKey, c)
+	}
+	http2Srv.StartTLS()
+	t.Cleanup(http2Srv.Close)
+	tlsConfig := httpmultibin.GetTLSClientConfig(t, http2Srv)
+
+	http2URL, err := url.Parse(http2Srv.URL)
+	require.NoError(t, err)
+	http2IP := net.ParseIP(http2URL.Hostname())
+	require.NotNil(t, http2IP)
+	http2DomainValue, err := lib.NewHostAddress(http2IP, "")
+	require.NoError(t, err)
+
+	// Set up the dialer with shorter timeouts and the custom domains
+	dialer := netext.NewDialer(net.Dialer{
+		Timeout:   2 * time.Second,
+		KeepAlive: 10 * time.Second,
+		DualStack: true,
+	}, netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4))
+	dialer.Hosts = map[string]*lib.HostAddress{
+		http2Domain: http2DomainValue,
+	}
+
+	transport := &http.Transport{
+		DialContext:     dialer.DialContext,
+		TLSClientConfig: tlsConfig,
+	}
+	require.NoError(t, http2.ConfigureTransport(transport))
+	return &httpmultibin.HTTPMultiBin{
+		Mux:         mux,
+		ServerHTTP2: http2Srv,
+		Replacer: strings.NewReplacer(
+			"HTTP2BIN_IP_URL", http2Srv.URL,
+			"HTTP2BIN_DOMAIN", http2Domain,
+			"HTTP2BIN_URL", fmt.Sprintf("https://%s:%s", http2Domain, http2URL.Port()),
+			"HTTP2BIN_IP", http2IP.String(),
+			"HTTP2BIN_PORT", http2URL.Port(),
+		),
+		TLSClientConfig: tlsConfig,
+		Dialer:          dialer,
+		HTTPTransport:   transport,
+	}
 }

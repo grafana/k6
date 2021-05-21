@@ -26,9 +26,11 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"runtime"
 	"testing"
 	"time"
 
@@ -82,14 +84,17 @@ func badCloseBody() io.ReadCloser {
 }
 
 func TestCompressionBodyError(t *testing.T) {
+	t.Parallel()
 	algos := []CompressionType{CompressionTypeGzip}
 	t.Run("bad read body", func(t *testing.T) {
+		t.Parallel()
 		_, _, err := compressBody(algos, ioutil.NopCloser(badReadBody()))
 		require.Error(t, err)
 		require.Equal(t, err.Error(), badReadMsg)
 	})
 
 	t.Run("bad close body", func(t *testing.T) {
+		t.Parallel()
 		_, _, err := compressBody(algos, badCloseBody())
 		require.Error(t, err)
 		require.Equal(t, err.Error(), badCloseMsg)
@@ -97,10 +102,12 @@ func TestCompressionBodyError(t *testing.T) {
 }
 
 func TestMakeRequestError(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	t.Cleanup(cancel)
 
 	t.Run("bad compression algorithm body", func(t *testing.T) {
+		t.Parallel()
 		req, err := http.NewRequest("GET", "https://wont.be.used", nil)
 
 		require.NoError(t, err)
@@ -117,6 +124,7 @@ func TestMakeRequestError(t *testing.T) {
 	})
 
 	t.Run("invalid upgrade response", func(t *testing.T) {
+		t.Parallel()
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("Connection", "Upgrade")
 			w.Header().Add("Upgrade", "h2c")
@@ -149,7 +157,9 @@ func TestMakeRequestError(t *testing.T) {
 }
 
 func TestResponseStatus(t *testing.T) {
+	t.Parallel()
 	t.Run("response status", func(t *testing.T) {
+		t.Parallel()
 		testCases := []struct {
 			name                     string
 			statusCode               int
@@ -167,6 +177,7 @@ func TestResponseStatus(t *testing.T) {
 		for _, tc := range testCases {
 			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(tc.statusCode)
 				}))
@@ -201,7 +212,9 @@ func TestResponseStatus(t *testing.T) {
 }
 
 func TestURL(t *testing.T) {
+	t.Parallel()
 	t.Run("Clean", func(t *testing.T) {
+		t.Parallel()
 		testCases := []struct {
 			url      string
 			expected string
@@ -219,6 +232,7 @@ func TestURL(t *testing.T) {
 		for _, tc := range testCases {
 			tc := tc
 			t.Run(tc.url, func(t *testing.T) {
+				t.Parallel()
 				u, err := url.Parse(tc.url)
 				require.NoError(t, err)
 				ut := URL{u: u, URL: tc.url}
@@ -228,7 +242,8 @@ func TestURL(t *testing.T) {
 	})
 }
 
-func TestMakeRequestTimeout(t *testing.T) {
+func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Length", "100000")
 		w.WriteHeader(200)
@@ -271,8 +286,8 @@ func TestMakeRequestTimeout(t *testing.T) {
 	allSamples := sampleCont.GetSamples()
 	require.Len(t, allSamples, 9)
 	expTags := map[string]string{
-		"error":             "context deadline exceeded",
-		"error_code":        "1000",
+		"error":             "request timeout",
+		"error_code":        "1050",
 		"status":            "0",
 		"expected_response": "true", // we wait for status code 0
 		"method":            "GET",
@@ -296,23 +311,7 @@ func BenchmarkWrapDecompressionError(b *testing.B) {
 func TestTrailFailed(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewTLSServer(httpbin.New().Handler())
-	defer srv.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	samples := make(chan stats.SampleContainer, 10)
-	logger := logrus.New()
-	logger.Level = logrus.DebugLevel
-	state := &lib.State{
-		Options: lib.Options{
-			RunTags:    &stats.SampleTags{},
-			SystemTags: &stats.DefaultSystemTagSet,
-		},
-		Transport: srv.Client().Transport,
-		Samples:   samples,
-		Logger:    logger,
-		BPool:     bpool.NewBufferPool(2),
-	}
-	ctx = lib.WithState(ctx, state)
+	t.Cleanup(srv.Close)
 
 	testCases := map[string]struct {
 		responseCallback func(int) bool
@@ -327,6 +326,24 @@ func TestTrailFailed(t *testing.T) {
 		failed := testCase.failed
 
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			samples := make(chan stats.SampleContainer, 10)
+			logger := logrus.New()
+			logger.Level = logrus.DebugLevel
+			state := &lib.State{
+				Options: lib.Options{
+					RunTags:    &stats.SampleTags{},
+					SystemTags: &stats.DefaultSystemTagSet,
+				},
+				Transport: srv.Client().Transport,
+				Samples:   samples,
+				Logger:    logger,
+				BPool:     bpool.NewBufferPool(2),
+			}
+			ctx = lib.WithState(ctx, state)
 			req, _ := http.NewRequest("GET", srv.URL, nil)
 			preq := &ParsedHTTPRequest{
 				Req:              req,
@@ -338,8 +355,8 @@ func TestTrailFailed(t *testing.T) {
 			res, err := MakeRequest(ctx, preq)
 
 			require.NoError(t, err)
-			assert.NotNil(t, res)
-			assert.Len(t, samples, 1)
+			require.NotNil(t, res)
+			require.Len(t, samples, 1)
 			sample := <-samples
 			trail := sample.(*Trail)
 			require.Equal(t, failed, trail.Failed)
@@ -355,5 +372,121 @@ func TestTrailFailed(t *testing.T) {
 			}
 			require.Equal(t, failed, httpReqFailedSampleValue)
 		})
+	}
+}
+
+func TestMakeRequestDialTimeout(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skipf("dial timeout doesn't get returned on windows") // or we don't match it correctly
+	}
+	t.Parallel()
+	ln, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr()
+	defer func() {
+		require.NoError(t, ln.Close())
+	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	samples := make(chan stats.SampleContainer, 10)
+	logger := logrus.New()
+	logger.Level = logrus.DebugLevel
+	state := &lib.State{
+		Options: lib.Options{
+			RunTags:    &stats.SampleTags{},
+			SystemTags: &stats.DefaultSystemTagSet,
+		},
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout: 1 * time.Microsecond,
+			}).DialContext,
+		},
+		Samples: samples,
+		Logger:  logger,
+		BPool:   bpool.NewBufferPool(100),
+	}
+
+	ctx = lib.WithState(ctx, state)
+	req, _ := http.NewRequest("GET", "http://"+addr.String(), nil)
+	preq := &ParsedHTTPRequest{
+		Req:              req,
+		URL:              &URL{u: req.URL, URL: req.URL.String()},
+		Body:             new(bytes.Buffer),
+		Timeout:          500 * time.Millisecond,
+		ResponseCallback: func(i int) bool { return i == 0 },
+	}
+
+	res, err := MakeRequest(ctx, preq)
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Len(t, samples, 1)
+	sampleCont := <-samples
+	allSamples := sampleCont.GetSamples()
+	require.Len(t, allSamples, 9)
+	expTags := map[string]string{
+		"error":             "dial: i/o timeout",
+		"error_code":        "1211",
+		"status":            "0",
+		"expected_response": "true", // we wait for status code 0
+		"method":            "GET",
+		"url":               req.URL.String(),
+		"name":              req.URL.String(),
+	}
+	for _, s := range allSamples {
+		assert.Equal(t, expTags, s.Tags.CloneTags())
+	}
+}
+
+func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+	}))
+	defer srv.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	samples := make(chan stats.SampleContainer, 10)
+	logger := logrus.New()
+	logger.Level = logrus.DebugLevel
+	state := &lib.State{
+		Options: lib.Options{
+			RunTags:    &stats.SampleTags{},
+			SystemTags: &stats.DefaultSystemTagSet,
+		},
+		Transport: srv.Client().Transport,
+		Samples:   samples,
+		Logger:    logger,
+		BPool:     bpool.NewBufferPool(100),
+	}
+	ctx = lib.WithState(ctx, state)
+	req, _ := http.NewRequest("GET", srv.URL, nil)
+	preq := &ParsedHTTPRequest{
+		Req:              req,
+		URL:              &URL{u: req.URL, URL: srv.URL},
+		Body:             new(bytes.Buffer),
+		Timeout:          50 * time.Millisecond,
+		ResponseCallback: func(i int) bool { return i == 0 },
+	}
+
+	res, err := MakeRequest(ctx, preq)
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Len(t, samples, 1)
+	sampleCont := <-samples
+	allSamples := sampleCont.GetSamples()
+	require.Len(t, allSamples, 9)
+	expTags := map[string]string{
+		"error":             "request timeout",
+		"error_code":        "1050",
+		"status":            "0",
+		"expected_response": "true", // we wait for status code 0
+		"method":            "GET",
+		"url":               srv.URL,
+		"name":              srv.URL,
+	}
+	for _, s := range allSamples {
+		assert.Equal(t, expTags, s.Tags.CloneTags())
 	}
 }

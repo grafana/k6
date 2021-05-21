@@ -57,11 +57,13 @@ const (
 	tcpBrokenPipeErrorCode   errCode = 1201
 	netUnknownErrnoErrorCode errCode = 1202
 	tcpDialErrorCode         errCode = 1210
+	tcpDialTimeoutErrorCode  errCode = 1211
 	tcpDialRefusedErrorCode  errCode = 1212
 	tcpDialUnknownErrnoCode  errCode = 1213
 	tcpResetByPeerErrorCode  errCode = 1220
 	// TLS errors
-	defaultTLSErrorCode           errCode = 1300
+	defaultTLSErrorCode           errCode = 1300 //nolint:deadcode,varcheck // this is here to save the number
+	tlsHeaderErrorCode            errCode = 1301
 	x509UnknownAuthorityErrorCode errCode = 1310
 	x509HostnameErrorCode         errCode = 1311
 
@@ -86,6 +88,7 @@ const (
 
 const (
 	tcpResetByPeerErrorCodeMsg  = "%s: connection reset by peer"
+	tcpDialTimeoutErrorCodeMsg  = "dial: i/o timeout"
 	tcpDialRefusedErrorCodeMsg  = "dial: connection refused"
 	tcpBrokenPipeErrorCodeMsg   = "%s: broken pipe"
 	netUnknownErrnoErrorCodeMsg = "%s: unknown errno `%d` on %s with message `%s`"
@@ -187,23 +190,23 @@ func errorCodeForError(err error) (errCode, string) {
 		return blackListedIPErrorCode, blackListedIPErrorCodeMsg
 	case netext.BlockedHostError:
 		return blockedHostnameErrorCode, blockedHostnameErrorMsg
-	case *http2.GoAwayError:
+	case http2.GoAwayError:
 		return unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(e.ErrCode),
 			fmt.Sprintf(http2GoAwayErrorCodeMsg, e.ErrCode)
-	case *http2.StreamError:
+	case http2.StreamError:
 		return unknownHTTP2StreamErrorCode + http2ErrCodeOffset(e.Code),
 			fmt.Sprintf(http2StreamErrorCodeMsg, e.Code)
-	case *http2.ConnectionError:
-		return unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCode(*e)),
-			fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCode(*e))
+	case http2.ConnectionError:
+		return unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCode(e)),
+			fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCode(e))
 	case *net.OpError:
 		return errorCodeForNetOpError(e)
-	case *x509.UnknownAuthorityError:
+	case x509.UnknownAuthorityError:
 		return x509UnknownAuthorityErrorCode, x509UnknownAuthority
-	case *x509.HostnameError:
+	case x509.HostnameError:
 		return x509HostnameErrorCode, x509HostnameErrorCodeMsg
-	case *tls.RecordHeaderError:
-		return defaultTLSErrorCode, err.Error()
+	case tls.RecordHeaderError:
+		return tlsHeaderErrorCode, err.Error()
 	case *url.Error:
 		return errorCodeForError(e.Err)
 	default:

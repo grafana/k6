@@ -50,7 +50,6 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/netext"
-	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/lib/types"
 )
 
@@ -154,7 +153,7 @@ func writeJSON(w io.Writer, v interface{}) error {
 	return nil
 }
 
-func getEncodedHandler(t testing.TB, compressionType httpext.CompressionType) http.Handler {
+func getEncodedHandler(t testing.TB, compressionType string) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		var (
 			encoding string
@@ -163,10 +162,10 @@ func getEncodedHandler(t testing.TB, compressionType httpext.CompressionType) ht
 		)
 
 		switch compressionType {
-		case httpext.CompressionTypeBr:
+		case "br":
 			encw = brotli.NewWriter(rw)
 			encoding = "br"
-		case httpext.CompressionTypeZstd:
+		case "zstd":
 			encw, _ = zstd.NewWriter(rw)
 			encoding = "zstd"
 		}
@@ -253,15 +252,16 @@ func (*GRPCStub) HalfDuplexCall(grpctest.TestService_HalfDuplexCallServer) error
 }
 
 // NewHTTPMultiBin returns a fully configured and running HTTPMultiBin
+//nolint:funlen
 func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	// Create a http.ServeMux and set the httpbin handler as the default
 	mux := http.NewServeMux()
-	mux.Handle("/brotli", getEncodedHandler(t, httpext.CompressionTypeBr))
+	mux.Handle("/brotli", getEncodedHandler(t, "br"))
 	mux.Handle("/ws-echo", getWebsocketHandler(true, false))
 	mux.Handle("/ws-echo-invalid", getWebsocketHandler(true, true))
 	mux.Handle("/ws-close", getWebsocketHandler(false, false))
 	mux.Handle("/ws-close-invalid", getWebsocketHandler(false, true))
-	mux.Handle("/zstd", getEncodedHandler(t, httpext.CompressionTypeZstd))
+	mux.Handle("/zstd", getEncodedHandler(t, "zstd"))
 	mux.Handle("/zstd-br", getZstdBrHandler(t))
 	mux.Handle("/", httpbin.New().Handler())
 

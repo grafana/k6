@@ -23,6 +23,7 @@ package httpext
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -338,7 +339,13 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		return nil, fmt.Errorf("unsupported response status: %s", res.Status)
 	}
 
-	resp.Body, resErr = readResponseBody(state, preq.ResponseType, res, resErr)
+	if resErr == nil {
+		resp.Body, resErr = readResponseBody(state, preq.ResponseType, res, resErr)
+		if resErr != nil && errors.Is(resErr, context.DeadlineExceeded) {
+			// TODO This can be more specific that the timeout happened in the middle of the reading of the body
+			resErr = NewK6Error(requestTimeoutErrorCode, requestTimeoutErrorCodeMsg, resErr)
+		}
+	}
 	finishedReq := tracerTransport.processLastSavedRequest(wrapDecompressionError(resErr))
 	if finishedReq != nil {
 		updateK6Response(resp, finishedReq)

@@ -246,8 +246,14 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	var netError net.Error
 	if errors.As(err, &netError) && netError.Timeout() {
-		err = NewK6Error(requestTimeoutErrorCode, requestTimeoutErrorCodeMsg, netError)
+		var netOpError *net.OpError
+		if errors.As(err, &netOpError) && netOpError.Op == "dial" {
+			err = NewK6Error(tcpDialTimeoutErrorCode, tcpDialTimeoutErrorCodeMsg, netError)
+		} else {
+			err = NewK6Error(requestTimeoutErrorCode, requestTimeoutErrorCodeMsg, netError)
+		}
 	}
+
 	t.saveCurrentRequest(&unfinishedRequest{
 		ctx:      ctx,
 		tracer:   tracer,
