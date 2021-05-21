@@ -42,7 +42,7 @@ func simpleRunner(vuFn func(context.Context) error) lib.Runner {
 	}
 }
 
-func setupExecutor(t *testing.T, config lib.ExecutorConfig, es *lib.ExecutionState, runner lib.Runner) (
+func setupExecutor(t testing.TB, config lib.ExecutorConfig, es *lib.ExecutionState, runner lib.Runner) (
 	context.Context, context.CancelFunc, lib.Executor, *testutils.SimpleLogrusHook,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
