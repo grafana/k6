@@ -336,10 +336,11 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	vusPool := newActiveVUPool()
 
 	defer func() {
-		vusPool.Close()
 		// Make sure all VUs aren't executing iterations anymore, for the cancel()
 		// below to deactivate them.
 		<-returnedVUs
+		// first close the vusPool so we wait for the gracefulShutdown
+		vusPool.Close()
 		cancel()
 		activeVUsWg.Wait()
 	}()
