@@ -126,7 +126,9 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	require.Empty(t, logHook.Drain())
 }
 
+//nolint:tparallel,paralleltest // this is flaky if ran with other tests
 func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
+	// t.Parallel()
 	tests := []struct {
 		segment  *lib.ExecutionSegment
 		sequence *lib.ExecutionSegmentSequence

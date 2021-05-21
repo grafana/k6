@@ -65,7 +65,8 @@ var configMapTestCases = []configMapTestCase{
 	{`{"someKey": {"executor": "constant-vus", "vus": 10, "duration": "60s", "env": 123}}`, exp{parseError: true}},
 
 	// Validation errors for constant-vus and the base config
-	{`{"someKey": {"executor": "constant-vus", "vus": 10, "duration": "60s",
+	{
+		`{"someKey": {"executor": "constant-vus", "vus": 10, "duration": "60s",
 		"gracefulStop": "10s", "startTime": "70s", "env": {"test": "mest"}, "exec": "someFunc"}}`,
 		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
 			sched := NewConstantVUsConfig("someKey")
@@ -105,7 +106,6 @@ var configMapTestCases = []configMapTestCase{
 			assert.Equal(t, true, isFinal)
 			assert.Equal(t, uint64(10), lib.GetMaxPlannedVUs(schedReqs))
 			assert.Equal(t, uint64(10), lib.GetMaxPossibleVUs(schedReqs))
-
 		}},
 	},
 	{`{"aname": {"executor": "constant-vus", "duration": "60s"}}`, exp{}},
@@ -120,7 +120,8 @@ var configMapTestCases = []configMapTestCase{
 	{`{"aname": {"executor": "constant-vus", "vus": 10, "duration": "10s", "exec": ""}}`, exp{validationError: true}},
 	{`{"aname": {"executor": "constant-vus", "vus": 10, "duration": "10s", "gracefulStop": "-2s"}}`, exp{validationError: true}},
 	// ramping-vus
-	{`{"varloops": {"executor": "ramping-vus", "startVUs": 20, "gracefulStop": "15s", "gracefulRampDown": "10s",
+	{
+		`{"varloops": {"executor": "ramping-vus", "startVUs": 20, "gracefulStop": "15s", "gracefulRampDown": "10s",
 		    "startTime": "23s", "stages": [{"duration": "60s", "target": 30}, {"duration": "130s", "target": 10}]}}`,
 		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
 			sched := NewRampingVUsConfig("varloops")
@@ -156,7 +157,8 @@ var configMapTestCases = []configMapTestCase{
 			assert.Equal(t, uint64(30), lib.GetMaxPossibleVUs(schedReqs))
 		}},
 	},
-	{`{"varloops": {"executor": "ramping-vus", "startVUs": 1, "gracefulStop": "0s", "gracefulRampDown": "10s",
+	{
+		`{"varloops": {"executor": "ramping-vus", "startVUs": 1, "gracefulStop": "0s", "gracefulRampDown": "10s",
 			"stages": [{"duration": "10s", "target": 10}]}}`,
 		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
 			assert.Empty(t, cm["varloops"].Validate())
@@ -171,7 +173,8 @@ var configMapTestCases = []configMapTestCase{
 			assert.Equal(t, uint64(10), lib.GetMaxPossibleVUs(schedReqs))
 		}},
 	},
-	{`{"varloops": {"executor": "ramping-vus", "startVUs": 1, "gracefulStop": "0s", "gracefulRampDown": "0s",
+	{
+		`{"varloops": {"executor": "ramping-vus", "startVUs": 1, "gracefulStop": "0s", "gracefulRampDown": "0s",
 			"stages": [{"duration": "10s", "target": 10}, {"duration": "0s", "target": 1}, {"duration": "10s", "target": 5}]}}`,
 		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
 			assert.Empty(t, cm["varloops"].Validate())
@@ -186,7 +189,8 @@ var configMapTestCases = []configMapTestCase{
 			assert.Equal(t, uint64(10), lib.GetMaxPossibleVUs(schedReqs))
 		}},
 	},
-	{`{"varloops": {"executor": "ramping-vus", "startVUs": 1, "gracefulStop": "0s", "gracefulRampDown": "0s",
+	{
+		`{"varloops": {"executor": "ramping-vus", "startVUs": 1, "gracefulStop": "0s", "gracefulRampDown": "0s",
 			"stages": [{"duration": "10s", "target": 10}, {"duration": "0s", "target": 11},{"duration": "0s", "target": 1}, {"duration": "10s", "target": 5}]}}`,
 		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
 			assert.Empty(t, cm["varloops"].Validate())
@@ -210,7 +214,8 @@ var configMapTestCases = []configMapTestCase{
 	{`{"varloops": {"executor": "ramping-vus", "stages": []}}`, exp{validationError: true}},
 	{`{"varloops": {"executor": "ramping-vus"}}`, exp{validationError: true}},
 	// shared-iterations
-	{`{"ishared": {"executor": "shared-iterations", "iterations": 22, "vus": 12, "maxDuration": "100s"}}`,
+	{
+		`{"ishared": {"executor": "shared-iterations", "iterations": 22, "vus": 12, "maxDuration": "100s"}}`,
 		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
 			sched := NewSharedIterationsConfig("ishared")
 			sched.Iterations = null.IntFrom(22)
@@ -285,7 +290,8 @@ var configMapTestCases = []configMapTestCase{
 	{`{"ishared": {"executor": "shared-iterations", "iterations": -1, "vus": 1}}`, exp{validationError: true}},
 	{`{"ishared": {"executor": "shared-iterations", "iterations": 20, "vus": 30}}`, exp{validationError: true}},
 	// per-vu-iterations
-	{`{"ipervu": {"executor": "per-vu-iterations", "iterations": 23, "vus": 13, "gracefulStop": 0}}`,
+	{
+		`{"ipervu": {"executor": "per-vu-iterations", "iterations": 23, "vus": 13, "gracefulStop": 0}}`,
 		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
 			sched := NewPerVUIterationsConfig("ipervu")
 			sched.Iterations = null.IntFrom(23)
@@ -320,7 +326,8 @@ var configMapTestCases = []configMapTestCase{
 	{`{"ipervu": {"executor": "per-vu-iterations", "iterations": -1, "vus": 1}}`, exp{validationError: true}},
 
 	// constant-arrival-rate
-	{`{"carrival": {"executor": "constant-arrival-rate", "rate": 30, "timeUnit": "1m", "duration": "10m", "preAllocatedVUs": 20, "maxVUs": 30}}`,
+	{
+		`{"carrival": {"executor": "constant-arrival-rate", "rate": 30, "timeUnit": "1m", "duration": "10m", "preAllocatedVUs": 20, "maxVUs": 30}}`,
 		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
 			et, err := lib.NewExecutionTuple(nil, nil)
 			require.NoError(t, err)
@@ -349,7 +356,8 @@ var configMapTestCases = []configMapTestCase{
 	},
 	{`{"carrival": {"executor": "constant-arrival-rate", "rate": 10, "duration": "10m", "preAllocatedVUs": 20, "maxVUs": 30}}`, exp{}},
 	{`{"carrival": {"executor": "constant-arrival-rate", "rate": 10, "duration": "10m", "preAllocatedVUs": 20, "maxVUs": 30, "timeUnit": "-1s"}}`, exp{validationError: true}},
-	{`{"carrival": {"executor": "constant-arrival-rate", "rate": 10, "duration": "10m", "preAllocatedVUs": 20}}`,
+	{
+		`{"carrival": {"executor": "constant-arrival-rate", "rate": 10, "duration": "10m", "preAllocatedVUs": 20}}`,
 		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
 			assert.Empty(t, cm["carrival"].Validate())
 			require.EqualValues(t, 20, cm["carrival"].(*ConstantArrivalRateConfig).MaxVUs.Int64)
@@ -364,7 +372,8 @@ var configMapTestCases = []configMapTestCase{
 	{`{"carrival": {"executor": "constant-arrival-rate", "rate": 10, "duration": "0s", "preAllocatedVUs": 20, "maxVUs": 25}}`, exp{validationError: true}},
 	{`{"carrival": {"executor": "constant-arrival-rate", "rate": 10, "duration": "10m", "preAllocatedVUs": -2, "maxVUs": 25}}`, exp{validationError: true}},
 	// ramping-arrival-rate
-	{`{"varrival": {"executor": "ramping-arrival-rate", "startRate": 10, "timeUnit": "30s", "preAllocatedVUs": 20,
+	{
+		`{"varrival": {"executor": "ramping-arrival-rate", "startRate": 10, "timeUnit": "30s", "preAllocatedVUs": 20,
 		"maxVUs": 50, "stages": [{"duration": "3m", "target": 30}, {"duration": "5m", "target": 10}]}}`,
 		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
 			sched := NewRampingArrivalRateConfig("varrival")
@@ -399,7 +408,8 @@ var configMapTestCases = []configMapTestCase{
 	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": 20, "maxVUs": 50, "stages": [{"duration": "5m", "target": 10}]}}`, exp{}},
 	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": -20, "maxVUs": 50, "stages": [{"duration": "5m", "target": 10}]}}`, exp{validationError: true}},
 	{`{"varrival": {"executor": "ramping-arrival-rate", "startRate": -1, "preAllocatedVUs": 20, "maxVUs": 50, "stages": [{"duration": "5m", "target": 10}]}}`, exp{validationError: true}},
-	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": 20, "stages": [{"duration": "5m", "target": 10}]}}`,
+	{
+		`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": 20, "stages": [{"duration": "5m", "target": 10}]}}`,
 		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
 			assert.Empty(t, cm["varrival"].Validate())
 			require.EqualValues(t, 20, cm["varrival"].(*RampingArrivalRateConfig).MaxVUs.Int64)
@@ -410,7 +420,7 @@ var configMapTestCases = []configMapTestCase{
 	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": 20, "maxVUs": 50, "stages": []}}`, exp{validationError: true}},
 	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": 20, "maxVUs": 50, "stages": [{"duration": "5m", "target": 10}], "timeUnit": "-1s"}}`, exp{validationError: true}},
 	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": 30, "maxVUs": 20, "stages": [{"duration": "5m", "target": 10}]}}`, exp{validationError: true}},
-	//TODO: more tests of mixed executors and execution plans
+	// TODO: more tests of mixed executors and execution plans
 }
 
 func TestConfigMapParsingAndValidation(t *testing.T) {
@@ -418,6 +428,7 @@ func TestConfigMapParsingAndValidation(t *testing.T) {
 	for i, tc := range configMapTestCases {
 		tc := tc
 		t.Run(fmt.Sprintf("TestCase#%d", i), func(t *testing.T) {
+			t.Parallel()
 			t.Logf(tc.rawJSON)
 			var result lib.ScenarioConfigs
 			err := json.Unmarshal([]byte(tc.rawJSON), &result)
