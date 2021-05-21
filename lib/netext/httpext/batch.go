@@ -46,7 +46,7 @@ type BatchParsedHTTPRequest struct {
 // to replace the body.
 func MakeBatchRequests(
 	ctx context.Context,
-	requests []BatchParsedHTTPRequest,
+	requests []*BatchParsedHTTPRequest,
 	reqCount, globalLimit, perHostLimit int,
 	processResponse func(context.Context, *Response, ResponseType),
 ) <-chan error {
@@ -57,7 +57,11 @@ func MakeBatchRequests(
 	result := make(chan error, reqCount)
 	perHostLimiter := lib.NewMultiSlotLimiter(perHostLimit)
 
-	makeRequest := func(req BatchParsedHTTPRequest) {
+	makeRequest := func(req *BatchParsedHTTPRequest) {
+		if req == nil {
+			result <- nil
+			return
+		}
 		if hl := perHostLimiter.Slot(req.URL.GetURL().Host); hl != nil {
 			hl.Begin()
 			defer hl.End()

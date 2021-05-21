@@ -30,7 +30,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -47,50 +46,6 @@ import (
 type HTTPRequestCookie struct {
 	Name, Value string
 	Replace     bool
-}
-
-// A URL wraps net.URL, and preserves the template (if any) the URL was constructed from.
-type URL struct {
-	u        *url.URL
-	Name     string // http://example.com/thing/${}/
-	URL      string // http://example.com/thing/1234/
-	CleanURL string // URL with masked user credentials, used for output
-}
-
-// NewURL returns a new URL for the provided url and name. The error is returned if the url provided
-// can't be parsed
-func NewURL(urlString, name string) (URL, error) {
-	u, err := url.Parse(urlString)
-	newURL := URL{u: u, Name: name, URL: urlString}
-	newURL.CleanURL = newURL.Clean()
-	if urlString == name {
-		newURL.Name = newURL.CleanURL
-	}
-	return newURL, err
-}
-
-// Clean returns an output-safe representation of URL
-func (u URL) Clean() string {
-	if u.CleanURL != "" {
-		return u.CleanURL
-	}
-
-	if u.u == nil || u.u.User == nil {
-		return u.URL
-	}
-
-	if password, passwordOk := u.u.User.Password(); passwordOk {
-		// here 3 is for the '://' and 4 is because of '://' and ':' between the credentials
-		return u.URL[:len(u.u.Scheme)+3] + "****:****" + u.URL[len(u.u.Scheme)+4+len(u.u.User.Username())+len(password):]
-	}
-
-	// here 3 in both places is for the '://'
-	return u.URL[:len(u.u.Scheme)+3] + "****" + u.URL[len(u.u.Scheme)+3+len(u.u.User.Username()):]
-}
-
-// GetURL returns the internal url.URL
-func (u URL) GetURL() *url.URL {
-	return u.u
 }
 
 // Request represent an http request

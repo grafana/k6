@@ -46,6 +46,7 @@ const (
 	// non specific
 	defaultErrorCode          errCode = 1000
 	defaultNetNonTCPErrorCode errCode = 1010
+	invalidURLErrorCode       errCode = 1020
 	requestTimeoutErrorCode   errCode = 1050
 	// DNS errors
 	defaultDNSErrorCode      errCode = 1100
@@ -101,6 +102,7 @@ const (
 	x509HostnameErrorCodeMsg    = "x509: certificate doesn't match hostname"
 	x509UnknownAuthority        = "x509: unknown authority"
 	requestTimeoutErrorCodeMsg  = "request timeout"
+	invalidURLErrorCodeMsg      = "invalid URL"
 )
 
 func http2ErrCodeOffset(code http2.ErrCode) errCode {
@@ -233,7 +235,10 @@ func NewK6Error(code errCode, msg string, originalErr error) K6Error {
 
 // Error implements the `error` interface, so K6Errors are normal Go errors.
 func (k6Err K6Error) Error() string {
-	return k6Err.Message
+	if k6Err.OriginalError == nil {
+		return k6Err.Message
+	}
+	return fmt.Sprintf("%s: %s", k6Err.Message, k6Err.OriginalError)
 }
 
 // Unwrap implements the `xerrors.Wrapper` interface, so K6Errors are a bit

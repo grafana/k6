@@ -572,13 +572,14 @@ func TestRequestAndBatch(t *testing.T) {
 			}
 		})
 	})
-	t.Run("MalformedURL", func(t *testing.T) {
-		js := `
-			http.request("GET", "https:// test.k6.io");
-		`
+	t.Run("InvalidURL", func(t *testing.T) {
+		t.Parallel()
+		js := `http.request("GET", "https:// test.k6.io");`
 		t.Run("throw=true", func(t *testing.T) {
 			_, err := rt.RunString(js)
 			require.Error(t, err)
+			assert.Contains(t, err.Error(),
+				`invalid URL: parse "https:// test.k6.io": invalid character " " in host name`)
 		})
 
 		t.Run("throw=false", func(t *testing.T) {
@@ -593,11 +594,11 @@ func TestRequestAndBatch(t *testing.T) {
 			require.NoError(t, err)
 
 			logEntry := hook.LastEntry()
-			if assert.NotNil(t, logEntry) {
-				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-				assert.Contains(t, logEntry.Data["error"].(error).Error(), `invalid character " "`)
-				assert.Equal(t, "Request Failed", logEntry.Message)
-			}
+			require.NotNil(t, logEntry)
+			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+			assert.Contains(t, logEntry.Data["error"].(error).Error(),
+				`invalid URL: parse "https:// test.k6.io": invalid character " " in host name`)
+			assert.Equal(t, "Request Failed", logEntry.Message)
 		})
 	})
 
@@ -1207,8 +1208,68 @@ func TestRequestAndBatch(t *testing.T) {
 
 	t.Run("Batch", func(t *testing.T) {
 		t.Run("error", func(t *testing.T) {
-			_, err := rt.RunString(`var res = http.batch("https://somevalidurl.com");`)
-			require.Error(t, err)
+			invalidURLerr := `invalid URL: parse "https:// invalidurl.com": invalid character " " in host name`
+			testCases := []struct {
+				name, code, expErr string
+				throw              bool
+			}{
+				{
+					name: "invalid arg", code: `"https://somevalidurl.com"`,
+					expErr: `invalid http.batch() argument type string`, throw: true,
+				},
+				{
+					name: "invalid URL short", code: `["https:// invalidurl.com"]`,
+					expErr: invalidURLerr, throw: true,
+				},
+				{
+					name: "invalid URL short no throw", code: `["https:// invalidurl.com"]`,
+					expErr: invalidURLerr, throw: false,
+				},
+				{
+					name: "invalid URL array", code: `[ ["GET", "https:// invalidurl.com"] ]`,
+					expErr: invalidURLerr, throw: true,
+				},
+				{
+					name: "invalid URL array no throw", code: `[ ["GET", "https:// invalidurl.com"] ]`,
+					expErr: invalidURLerr, throw: false,
+				},
+				{
+					name: "invalid URL object", code: `[ {method: "GET", url: "https:// invalidurl.com"} ]`,
+					expErr: invalidURLerr, throw: true,
+				},
+				{
+					name: "invalid object no throw", code: `[ {method: "GET", url: "https:// invalidurl.com"} ]`,
+					expErr: invalidURLerr, throw: false,
+				},
+				{
+					name: "object no url key", code: `[ {method: "GET"} ]`,
+					expErr: `batch request 0 doesn't have a url key`, throw: true,
+				},
+			}
+
+			for _, tc := range testCases {
+				tc := tc
+				t.Run(tc.name, func(t *testing.T) { //nolint:paralleltest
+					oldThrow := state.Options.Throw.Bool
+					state.Options.Throw.Bool = tc.throw
+					defer func() { state.Options.Throw.Bool = oldThrow }()
+
+					hook := logtest.NewLocal(state.Logger)
+					defer hook.Reset()
+
+					_, err := rt.RunString(fmt.Sprintf(`http.batch(%s);`, tc.code))
+					if tc.throw {
+						require.Error(t, err)
+						assert.Contains(t, err.Error(), tc.expErr)
+					} else {
+						logEntry := hook.LastEntry()
+						require.NotNil(t, logEntry)
+						assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+						assert.Contains(t, logEntry.Data["error"].(error).Error(), tc.expErr)
+						assert.Equal(t, "Request Failed", logEntry.Message)
+					}
+				})
+			}
 		})
 		t.Run("GET", func(t *testing.T) {
 			_, err := rt.RunString(sr(`
