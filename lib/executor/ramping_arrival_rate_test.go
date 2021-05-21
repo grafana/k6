@@ -359,22 +359,24 @@ func TestRampingArrivalRateCal(t *testing.T) {
 
 	var (
 		defaultTimeUnit = time.Second
-		config          = RampingArrivalRateConfig{
-			StartRate: null.IntFrom(0),
-			Stages: []Stage{ // TODO make this even bigger and longer .. will need more time
-				{
-					Duration: types.NullDurationFrom(time.Second * 5),
-					Target:   null.IntFrom(1),
+		getConfig       = func() RampingArrivalRateConfig {
+			return RampingArrivalRateConfig{
+				StartRate: null.IntFrom(0),
+				Stages: []Stage{ // TODO make this even bigger and longer .. will need more time
+					{
+						Duration: types.NullDurationFrom(time.Second * 5),
+						Target:   null.IntFrom(1),
+					},
+					{
+						Duration: types.NullDurationFrom(time.Second * 1),
+						Target:   null.IntFrom(1),
+					},
+					{
+						Duration: types.NullDurationFrom(time.Second * 5),
+						Target:   null.IntFrom(0),
+					},
 				},
-				{
-					Duration: types.NullDurationFrom(time.Second * 1),
-					Target:   null.IntFrom(1),
-				},
-				{
-					Duration: types.NullDurationFrom(time.Second * 5),
-					Target:   null.IntFrom(0),
-				},
-			},
+			}
 		}
 	)
 
@@ -427,15 +429,17 @@ func TestRampingArrivalRateCal(t *testing.T) {
 		// TODO: extend more
 	}
 
-	for testNum, testCase := range testCases { //nolint:paralleltest
+	for testNum, testCase := range testCases {
 		et := testCase.et
 		expectedTimes := testCase.expectedTimes
+		config := getConfig()
 		config.TimeUnit = types.NewNullDuration(testCase.timeUnit, true)
 		if testCase.timeUnit == 0 {
 			config.TimeUnit = types.NewNullDuration(defaultTimeUnit, true)
 		}
 
 		t.Run(fmt.Sprintf("testNum %d - %s timeunit %s", testNum, et, config.TimeUnit), func(t *testing.T) {
+			t.Parallel()
 			ch := make(chan time.Duration)
 			go config.cal(et, ch)
 			changes := make([]time.Duration, 0, len(expectedTimes))
