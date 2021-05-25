@@ -2212,3 +2212,15 @@ func TestDigestAuthWithBody(t *testing.T) {
 	assertRequestMetricsEmitted(t, sampleContainers[0:1], "POST", urlRaw, urlRaw, 401, "")
 	assertRequestMetricsEmitted(t, sampleContainers[1:2], "POST", urlRaw, urlRaw, 200, "")
 }
+
+func TestBinaryResponseWithStatus0(t *testing.T) {
+	t.Parallel()
+	_, state, _, rt, _ := newRuntime(t) //nolint:dogsled
+	state.Options.Throw = null.BoolFrom(false)
+	_, err := rt.RunString(`
+		var res = http.get("https://asdajkdahdqiuwhejkasdnakjdnadasdlkas.com", { responseType: "binary" });
+		if (res.status !== 0) { throw new Error("wrong status: " + res.status); }
+		if (res.body !== null) { throw new Error("wrong body: " + JSON.stringify(res.body)); }
+	`)
+	require.NoError(t, err)
+}
