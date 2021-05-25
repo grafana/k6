@@ -60,7 +60,7 @@ func (j jsonError) Error() string {
 // respType. This is done here instead of in httpext.readResponseBody to avoid
 // a reverse dependency on js/common or goja.
 func processResponse(ctx context.Context, resp *httpext.Response, respType httpext.ResponseType) {
-	if respType == httpext.ResponseTypeBinary {
+	if respType == httpext.ResponseTypeBinary && resp.Body != nil {
 		rt := common.GetRuntime(ctx)
 		resp.Body = rt.NewArrayBuffer(resp.Body.([]byte))
 	}
