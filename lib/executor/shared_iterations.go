@@ -163,6 +163,7 @@ type SharedIterations struct {
 	config     SharedIterationsConfig
 	et         *lib.ExecutionTuple
 	segIdx     *lib.SegmentedIndex
+	iterMx     sync.Mutex
 	globalIter *int64
 }
 
@@ -189,7 +190,8 @@ func (si *SharedIterations) Init(ctx context.Context) error {
 // incrGlobalIter increments the global iteration count for this executor,
 // taking into account the configured execution segment.
 func (si *SharedIterations) incrGlobalIter() int64 {
-	// TODO: Fix logic race
+	si.iterMx.Lock()
+	defer si.iterMx.Unlock()
 	si.segIdx.Next()
 	atomic.StoreInt64(si.globalIter, si.segIdx.GetUnscaled()-1)
 	return atomic.LoadInt64(si.globalIter)

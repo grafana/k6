@@ -179,6 +179,7 @@ type RampingArrivalRate struct {
 	config     RampingArrivalRateConfig
 	et         *lib.ExecutionTuple
 	segIdx     *lib.SegmentedIndex
+	iterMx     sync.Mutex
 	globalIter *int64
 }
 
@@ -200,7 +201,8 @@ func (varr *RampingArrivalRate) Init(ctx context.Context) error {
 // incrGlobalIter increments the global iteration count for this executor,
 // taking into account the configured execution segment.
 func (varr *RampingArrivalRate) incrGlobalIter() int64 {
-	// TODO: Fix logic race
+	varr.iterMx.Lock()
+	defer varr.iterMx.Unlock()
 	varr.segIdx.Next()
 	atomic.StoreInt64(varr.globalIter, varr.segIdx.GetUnscaled()-1)
 	return atomic.LoadInt64(varr.globalIter)
