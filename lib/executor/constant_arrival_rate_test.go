@@ -351,12 +351,11 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 
 	testCases := []struct {
 		seq, seg string
-		expIters []uint64
+		expIters []int64
 	}{
-		// 19 is missing?? o.O
-		{"0,1/4,3/4,1", "0:1/4", []uint64{0, 2, 7, 12, 17}},
-		{"0,1/4,3/4,1", "1/4:3/4", []uint64{0, 1, 3, 5, 6, 8, 10, 11, 13, 15, 16, 18, 20}},
-		{"0,1/4,3/4,1", "3/4:1", []uint64{0, 4, 9, 14}},
+		{"0,1/4,3/4,1", "0:1/4", []int64{1, 6, 11, 16, 21}},
+		{"0,1/4,3/4,1", "1/4:3/4", []int64{0, 2, 4, 5, 7, 9, 10, 12, 14, 15, 17, 19, 20}},
+		{"0,1/4,3/4,1", "3/4:1", []int64{3, 8, 13, 18}},
 	}
 
 	for _, tc := range testCases {
@@ -375,7 +374,7 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 			ctx, cancel, executor, _ := setupExecutor(t, config, es, runner)
 			defer cancel()
 
-			gotIters := []uint64{}
+			gotIters := []int64{}
 			var mx sync.Mutex
 			runner.Fn = func(ctx context.Context, _ chan<- stats.SampleContainer) error {
 				mx.Lock()

@@ -168,10 +168,11 @@ func (carc ConstantArrivalRateConfig) GetExecutionRequirements(et *lib.Execution
 func (carc ConstantArrivalRateConfig) NewExecutor(
 	es *lib.ExecutionState, logger *logrus.Entry,
 ) (lib.Executor, error) {
+	startGlobalIter := int64(-1)
 	return &ConstantArrivalRate{
 		BaseExecutor: NewBaseExecutor(&carc, es, logger),
 		config:       carc,
-		globalIter:   new(uint64),
+		globalIter:   &startGlobalIter,
 	}, nil
 }
 
@@ -187,7 +188,8 @@ type ConstantArrivalRate struct {
 	config     ConstantArrivalRateConfig
 	et         *lib.ExecutionTuple
 	segIdx     *lib.SegmentedIndex
-	globalIter *uint64
+	iterMx     sync.Mutex
+	globalIter *int64
 }
 
 // Make sure we implement the lib.Executor interface.
@@ -207,14 +209,17 @@ func (car *ConstantArrivalRate) Init(ctx context.Context) error {
 
 // incrGlobalIter increments the global iteration count for this executor,
 // taking into account the configured execution segment.
-func (car *ConstantArrivalRate) incrGlobalIter() {
+func (car *ConstantArrivalRate) incrGlobalIter() int64 {
+	car.iterMx.Lock()
+	defer car.iterMx.Unlock()
 	car.segIdx.Next()
-	atomic.StoreUint64(car.globalIter, uint64(car.segIdx.GetUnscaled()))
+	atomic.StoreInt64(car.globalIter, car.segIdx.GetUnscaled()-1)
+	return atomic.LoadInt64(car.globalIter)
 }
 
 // getGlobalIter returns the global iteration count for this executor.
-func (car *ConstantArrivalRate) getGlobalIter() uint64 {
-	return atomic.LoadUint64(car.globalIter)
+func (car *ConstantArrivalRate) getGlobalIter() int64 {
+	return atomic.LoadInt64(car.globalIter)
 }
 
 // Run executes a constant number of iterations per second.
@@ -286,12 +291,10 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, &car, progressFn)
 
 	maxDurationCtx = lib.WithScenarioState(maxDurationCtx, &lib.ScenarioState{
-		Name:          car.config.Name,
-		Executor:      car.config.Type,
-		StartTime:     startTime,
-		ProgressFn:    progressFn,
-		GetIter:       car.getScenarioIter,
-		GetGlobalIter: car.getGlobalIter,
+		Name:       car.config.Name,
+		Executor:   car.config.Type,
+		StartTime:  startTime,
+		ProgressFn: progressFn,
 	})
 
 	returnVU := func(u lib.InitializedVU) {
@@ -299,11 +302,12 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 		activeVUsWg.Done()
 	}
 
-	runIterationBasic := getIterationRunner(car.executionState, car.incrScenarioIter, car.logger)
+	runIterationBasic := getIterationRunner(car.executionState, car.logger)
 	activateVU := func(initVU lib.InitializedVU) lib.ActiveVU {
 		activeVUsWg.Add(1)
 		activeVU := initVU.Activate(getVUActivationParams(
-			maxDurationCtx, car.config.BaseConfig, returnVU, car.GetNextLocalVUID))
+			maxDurationCtx, car.config.BaseConfig, returnVU,
+			car.GetNextLocalVUID, car.incrScenarioIter, car.incrGlobalIter))
 		car.executionState.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddUint64(&activeVUsCount, 1)
 		vusPool.AddVU(maxDurationCtx, activeVU, runIterationBasic)

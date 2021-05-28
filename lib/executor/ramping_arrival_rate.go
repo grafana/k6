@@ -158,10 +158,11 @@ func (varc RampingArrivalRateConfig) GetExecutionRequirements(et *lib.ExecutionT
 func (varc RampingArrivalRateConfig) NewExecutor(
 	es *lib.ExecutionState, logger *logrus.Entry,
 ) (lib.Executor, error) {
+	startGlobalIter := int64(-1)
 	return &RampingArrivalRate{
 		BaseExecutor: NewBaseExecutor(&varc, es, logger),
 		config:       varc,
-		globalIter:   new(uint64),
+		globalIter:   &startGlobalIter,
 	}, nil
 }
 
@@ -178,7 +179,8 @@ type RampingArrivalRate struct {
 	config     RampingArrivalRateConfig
 	et         *lib.ExecutionTuple
 	segIdx     *lib.SegmentedIndex
-	globalIter *uint64
+	iterMx     sync.Mutex
+	globalIter *int64
 }
 
 // Make sure we implement the lib.Executor interface.
@@ -198,14 +200,17 @@ func (varr *RampingArrivalRate) Init(ctx context.Context) error {
 
 // incrGlobalIter increments the global iteration count for this executor,
 // taking into account the configured execution segment.
-func (varr *RampingArrivalRate) incrGlobalIter() {
+func (varr *RampingArrivalRate) incrGlobalIter() int64 {
+	varr.iterMx.Lock()
+	defer varr.iterMx.Unlock()
 	varr.segIdx.Next()
-	atomic.StoreUint64(varr.globalIter, uint64(varr.segIdx.GetUnscaled()))
+	atomic.StoreInt64(varr.globalIter, varr.segIdx.GetUnscaled()-1)
+	return atomic.LoadInt64(varr.globalIter)
 }
 
 // getGlobalIter returns the global iteration count for this executor.
-func (varr *RampingArrivalRate) getGlobalIter() uint64 {
-	return atomic.LoadUint64(varr.globalIter)
+func (varr *RampingArrivalRate) getGlobalIter() int64 {
+	return atomic.LoadInt64(varr.globalIter)
 }
 
 // cal calculates the  transtitions between stages and gives the next full value produced by the
@@ -408,12 +413,10 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, &varr, progressFn)
 
 	maxDurationCtx = lib.WithScenarioState(maxDurationCtx, &lib.ScenarioState{
-		Name:          varr.config.Name,
-		Executor:      varr.config.Type,
-		StartTime:     startTime,
-		ProgressFn:    progressFn,
-		GetIter:       varr.getScenarioIter,
-		GetGlobalIter: varr.getGlobalIter,
+		Name:       varr.config.Name,
+		Executor:   varr.config.Type,
+		StartTime:  startTime,
+		ProgressFn: progressFn,
 	})
 
 	returnVU := func(u lib.InitializedVU) {
@@ -421,15 +424,15 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 		activeVUsWg.Done()
 	}
 
-	runIterationBasic := getIterationRunner(varr.executionState, func() {
-		varr.incrScenarioIter()
-		varr.incrGlobalIter()
-	}, varr.logger)
+	runIterationBasic := getIterationRunner(varr.executionState, varr.logger)
 
 	activateVU := func(initVU lib.InitializedVU) lib.ActiveVU {
 		activeVUsWg.Add(1)
 		activeVU := initVU.Activate(
-			getVUActivationParams(maxDurationCtx, varr.config.BaseConfig, returnVU, varr.GetNextLocalVUID))
+			getVUActivationParams(
+				maxDurationCtx, varr.config.BaseConfig, returnVU,
+				varr.GetNextLocalVUID, varr.incrScenarioIter,
+				varr.incrGlobalIter))
 		varr.executionState.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddUint64(&activeVUsCount, 1)
 
