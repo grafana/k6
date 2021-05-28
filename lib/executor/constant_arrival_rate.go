@@ -188,6 +188,7 @@ type ConstantArrivalRate struct {
 	config     ConstantArrivalRateConfig
 	et         *lib.ExecutionTuple
 	segIdx     *lib.SegmentedIndex
+	iterMx     sync.Mutex
 	globalIter *int64
 }
 
@@ -209,7 +210,8 @@ func (car *ConstantArrivalRate) Init(ctx context.Context) error {
 // incrGlobalIter increments the global iteration count for this executor,
 // taking into account the configured execution segment.
 func (car *ConstantArrivalRate) incrGlobalIter() int64 {
-	// TODO: Fix logic race
+	car.iterMx.Lock()
+	defer car.iterMx.Unlock()
 	car.segIdx.Next()
 	atomic.StoreInt64(car.globalIter, car.segIdx.GetUnscaled()-1)
 	return atomic.LoadInt64(car.globalIter)
