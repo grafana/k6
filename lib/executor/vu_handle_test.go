@@ -30,18 +30,15 @@ func TestVUHandleRace(t *testing.T) {
 	// testLog.Level = logrus.DebugLevel
 	logEntry := logrus.NewEntry(testLog)
 
+	runner := &minirunner.MiniRunner{}
+	runner.Fn = func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		return nil
+	}
+
 	var getVUCount int64
 	var returnVUCount int64
 	getVU := func() (lib.InitializedVU, error) {
-		atomic.AddInt64(&getVUCount, 1)
-		return &minirunner.VU{
-			R: &minirunner.MiniRunner{
-				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-					// TODO: do something
-					return nil
-				},
-			},
-		}, nil
+		return runner.NewVU(uint64(atomic.AddInt64(&getVUCount, 1)), nil)
 	}
 
 	returnVU := func(_ lib.InitializedVU) {
@@ -122,21 +119,18 @@ func TestVUHandleStartStopRace(t *testing.T) {
 	// testLog.Level = logrus.DebugLevel
 	logEntry := logrus.NewEntry(testLog)
 
-	var vuID uint64
+	runner := &minirunner.MiniRunner{}
+	runner.Fn = func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		return nil
+	}
 
+	var vuID uint64
 	testIterations := 10000
 	returned := make(chan struct{})
+
 	getVU := func() (lib.InitializedVU, error) {
 		returned = make(chan struct{})
-		return &minirunner.VU{
-			ID: atomic.AddUint64(&vuID, 1),
-			R: &minirunner.MiniRunner{
-				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-					// TODO: do something
-					return nil
-				},
-			},
-		}, nil
+		return runner.NewVU(atomic.AddUint64(&vuID, 1), nil)
 	}
 
 	returnVU := func(v lib.InitializedVU) {
@@ -190,6 +184,7 @@ func TestVUHandleStartStopRace(t *testing.T) {
 }
 
 type handleVUTest struct {
+	runner          *minirunner.MiniRunner
 	getVUCount      uint32
 	returnVUCount   uint32
 	interruptedIter int64
@@ -197,16 +192,7 @@ type handleVUTest struct {
 }
 
 func (h *handleVUTest) getVU() (lib.InitializedVU, error) {
-	atomic.AddUint32(&h.getVUCount, 1)
-
-	return &minirunner.VU{
-		R: &minirunner.MiniRunner{
-			Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-				// TODO: do something
-				return nil
-			},
-		},
-	}, nil
+	return h.runner.NewVU(uint64(atomic.AddUint32(&h.getVUCount, 1)), nil)
 }
 
 func (h *handleVUTest) returnVU(_ lib.InitializedVU) {
@@ -241,7 +227,7 @@ func TestVUHandleSimple(t *testing.T) {
 		testLog.SetOutput(testutils.NewTestOutput(t))
 		// testLog.Level = logrus.DebugLevel
 		logEntry := logrus.NewEntry(testLog)
-		test := new(handleVUTest)
+		test := &handleVUTest{runner: &minirunner.MiniRunner{}}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, nil, &BaseConfig{}, logEntry)
@@ -280,7 +266,7 @@ func TestVUHandleSimple(t *testing.T) {
 		testLog.SetOutput(testutils.NewTestOutput(t))
 		// testLog.Level = logrus.DebugLevel
 		logEntry := logrus.NewEntry(testLog)
-		test := new(handleVUTest)
+		test := &handleVUTest{runner: &minirunner.MiniRunner{}}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -321,7 +307,7 @@ func TestVUHandleSimple(t *testing.T) {
 		testLog.SetOutput(testutils.NewTestOutput(t))
 		// testLog.Level = logrus.DebugLevel
 		logEntry := logrus.NewEntry(testLog)
-		test := new(handleVUTest)
+		test := &handleVUTest{runner: &minirunner.MiniRunner{}}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -375,17 +361,12 @@ func BenchmarkVUHandleIterations(b *testing.B) {
 		fullIterations = 0
 	}
 
+	runner := &minirunner.MiniRunner{}
+	runner.Fn = func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		return nil
+	}
 	getVU := func() (lib.InitializedVU, error) {
-		atomic.AddUint32(&getVUCount, 1)
-
-		return &minirunner.VU{
-			R: &minirunner.MiniRunner{
-				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-					// TODO: do something
-					return nil
-				},
-			},
-		}, nil
+		return runner.NewVU(uint64(atomic.AddUint32(&getVUCount, 1)), nil)
 	}
 
 	returnVU := func(_ lib.InitializedVU) {

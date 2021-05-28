@@ -54,7 +54,7 @@ func (e *Execution) GetVUStats(ctx context.Context) (goja.Value, error) {
 	stats := map[string]interface{}{
 		"id":         vuState.Vu,
 		"idScenario": scID,
-		"iteration":  vuState.Iteration,
+		"iteration":  vuState.GetIteration(),
 		"iterationScenario": func() goja.Value {
 			return rt.ToValue(vuState.GetScenarioVUIter())
 		},
@@ -71,13 +71,22 @@ func (e *Execution) GetVUStats(ctx context.Context) (goja.Value, error) {
 // GetScenarioStats returns information about the currently executing scenario.
 func (e *Execution) GetScenarioStats(ctx context.Context) (goja.Value, error) {
 	ss := lib.GetScenarioState(ctx)
-	if ss == nil {
+	vuState := lib.GetState(ctx)
+	if ss == nil || vuState == nil {
 		return nil, errors.New("getting scenario information in the init context is not supported")
 	}
 
 	rt := common.GetRuntime(ctx)
 	if rt == nil {
 		return nil, errors.New("goja runtime is nil in context")
+	}
+
+	var iterGlobal interface{}
+	// This stinks...
+	if ig := vuState.GetScenarioGlobalVUIter(); ig < 0 {
+		iterGlobal = goja.Null()
+	} else {
+		iterGlobal = ig
 	}
 
 	stats := map[string]interface{}{
@@ -88,15 +97,8 @@ func (e *Execution) GetScenarioStats(ctx context.Context) (goja.Value, error) {
 			p, _ := ss.ProgressFn()
 			return rt.ToValue(p)
 		},
-		"iteration": func() goja.Value {
-			return rt.ToValue(ss.GetIter())
-		},
-	}
-
-	if ss.GetGlobalIter != nil {
-		stats["iterationGlobal"] = func() goja.Value {
-			return rt.ToValue(ss.GetGlobalIter())
-		}
+		"iteration":       vuState.GetScenarioLocalVUIter(),
+		"iterationGlobal": iterGlobal,
 	}
 
 	obj, err := newLazyJSObject(rt, stats)

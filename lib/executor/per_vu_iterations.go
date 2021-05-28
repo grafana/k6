@@ -198,14 +198,13 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 	defer activeVUs.Wait()
 
 	regDurationDone := regDurationCtx.Done()
-	runIteration := getIterationRunner(pvi.executionState, pvi.incrScenarioIter, pvi.logger)
+	runIteration := getIterationRunner(pvi.executionState, pvi.logger)
 
 	maxDurationCtx = lib.WithScenarioState(maxDurationCtx, &lib.ScenarioState{
 		Name:       pvi.config.Name,
 		Executor:   pvi.config.Type,
 		StartTime:  startTime,
 		ProgressFn: progressFn,
-		GetIter:    pvi.getScenarioIter,
 	})
 
 	returnVU := func(u lib.InitializedVU) {
@@ -220,7 +219,8 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 
 		vuID := initVU.GetID()
 		activeVU := initVU.Activate(
-			getVUActivationParams(ctx, pvi.config.BaseConfig, returnVU, pvi.GetNextLocalVUID))
+			getVUActivationParams(ctx, pvi.config.BaseConfig, returnVU,
+				pvi.GetNextLocalVUID, pvi.incrScenarioIter, nil))
 
 		for i := int64(0); i < iterations; i++ {
 			select {

@@ -2028,19 +2028,19 @@ func TestExecutionStats(t *testing.T) {
 	testCases := []struct {
 		name, script, expErr string
 	}{
-		{"vu_ok", `
+		{name: "vu_ok", script: `
 		var exec = require('k6/execution');
 
 		exports.default = function() {
 			var vuStats = exec.getVUStats();
 			if (vuStats.id !== 1) throw new Error('unexpected VU ID: '+vuStats.id);
-			if (vuStats.iteration !== 1) throw new Error('unexpected VU iteration: '+vuStats.iteration);
-		}`, ""},
-		{"vu_err", `
+			if (vuStats.iteration !== 0) throw new Error('unexpected VU iteration: '+vuStats.iteration);
+		}`},
+		{name: "vu_err", script: `
 		var exec = require('k6/execution');
 		exec.getVUStats();
-		`, "getting VU information in the init context is not supported"},
-		{"scenario_ok", `
+		`, expErr: "getting VU information in the init context is not supported"},
+		{name: "scenario_ok", script: `
 		var exec = require('k6/execution');
 		var sleep = require('k6').sleep;
 
@@ -2053,12 +2053,12 @@ func TestExecutionStats(t *testing.T) {
 			if (ss.executor !== 'test-exec') throw new Error('unexpected executor: '+ss.name);
 			if (startTime > new Date()) throw new Error('unexpected startTime: '+startTime);
 			if (ss.progress !== 0.1) throw new Error('unexpected progress: '+ss.progress);
-		}`, ""},
-		{"scenario_err", `
+		}`},
+		{name: "scenario_err", script: `
 		var exec = require('k6/execution');
 		exec.getScenarioStats();
-		`, "getting scenario information in the init context is not supported"},
-		{"test_ok", `
+		`, expErr: "getting scenario information in the init context is not supported"},
+		{name: "test_ok", script: `
 		var exec = require('k6/execution');
 
 		exports.default = function() {
@@ -2067,11 +2067,11 @@ func TestExecutionStats(t *testing.T) {
 			if (ts.vusMax !== 0) throw new Error('unexpected vusMax: '+ts.vusMax);
 			if (ts.iterationsCompleted !== 0) throw new Error('unexpected iterationsCompleted: '+ts.iterationsCompleted);
 			if (ts.iterationsInterrupted !== 0) throw new Error('unexpected iterationsInterrupted: '+ts.iterationsInterrupted);
-		}`, ""},
-		{"test_err", `
+		}`},
+		{name: "test_err", script: `
 		var exec = require('k6/execution');
 		exec.getTestStats();
-		`, "getting test information in the init context is not supported"},
+		`, expErr: "getting test information in the init context is not supported"},
 	}
 
 	for _, tc := range testCases {
@@ -2104,7 +2104,6 @@ func TestExecutionStats(t *testing.T) {
 				ProgressFn: func() (float64, []string) {
 					return 0.1, nil
 				},
-				GetIter: func() uint64 { return 1 },
 			})
 			vu := initVU.Activate(&lib.VUActivationParams{
 				RunContext:      ctx,

@@ -155,11 +155,14 @@ func TestSharedIterationsGlobalIters(t *testing.T) {
 
 	testCases := []struct {
 		seq, seg string
-		expIters []uint64
+		expIters []int64
 	}{
-		{"0,1/4,3/4,1", "0:1/4", []uint64{0, 2, 7, 12, 17, 22, 27, 32, 37, 42}},
-		{"0,1/4,3/4,1", "1/4:3/4", []uint64{0, 1, 3, 5, 6, 8, 10, 11, 13, 15, 16, 18, 20, 21, 23, 25, 26, 28, 30, 31, 33, 35, 36, 38, 40, 41, 43, 45, 46, 48}},
-		{"0,1/4,3/4,1", "3/4:1", []uint64{0, 4, 9, 14, 19, 24, 29, 34, 39, 44}},
+		{"0,1/4,3/4,1", "0:1/4", []int64{1, 6, 11, 16, 21, 26, 31, 36, 41, 46}},
+		{"0,1/4,3/4,1", "1/4:3/4", []int64{0, 2, 4, 5, 7, 9, 10, 12, 14, 15, 17, 19, 20, 22, 24, 25, 27, 29, 30, 32, 34, 35, 37, 39, 40, 42, 44, 45, 47, 49}},
+		// FIXME: The skewed values are because of the time.Sleep() in the
+		// VU function below.
+		// {"0,1/4,3/4,1", "1/4:3/4", []int64{4, 5, 7, 9, 10, 12, 14, 15, 17, 19, 20, 22, 24, 25, 27, 29, 30, 32, 34, 35, 37, 39, 40, 42, 44, 45, 47, 49, 49, 49}},
+		{"0,1/4,3/4,1", "3/4:1", []int64{3, 8, 13, 18, 23, 28, 33, 38, 43, 48}},
 	}
 
 	for _, tc := range testCases {
@@ -178,14 +181,14 @@ func TestSharedIterationsGlobalIters(t *testing.T) {
 			ctx, cancel, executor, _ := setupExecutor(t, config, es, runner)
 			defer cancel()
 
-			gotIters := []uint64{}
+			gotIters := []int64{}
 			var mx sync.Mutex
 			runner.Fn = func(ctx context.Context, _ chan<- stats.SampleContainer) error {
 				mx.Lock()
-				// Slight delay to ensure the lock is held long enough to
-				// minimize any chances of flakiness... :-/
-				time.Sleep(10 * time.Millisecond)
 				gotIters = append(gotIters, executor.(*SharedIterations).getGlobalIter())
+				// FIXME: This delay minimizes chances of flakiness, but
+				// produces skewed values. :-/
+				// time.Sleep(10 * time.Millisecond)
 				mx.Unlock()
 				return nil
 			}

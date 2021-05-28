@@ -1487,11 +1487,11 @@ func TestExecutionStatsVUSharing(t *testing.T) {
 		}
 		require.Len(t, vuStats, 2)
 		// Both VUs should complete 10 iterations each globally, but 5
-		// iterations each per scenario.
+		// iterations each per scenario (iterations are 0-based)
 		for _, v := range vuStats {
-			assert.Equal(t, uint64(10), v.iteration)
-			assert.Equal(t, uint64(5), v.scIter["cvus"])
-			assert.Equal(t, uint64(5), v.scIter["carr"])
+			assert.Equal(t, uint64(9), v.iteration)
+			assert.Equal(t, uint64(4), v.scIter["cvus"])
+			assert.Equal(t, uint64(4), v.scIter["carr"])
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("timed out")
@@ -1590,6 +1590,77 @@ func TestExecutionStatsScenarioIter(t *testing.T) {
 			assert.Equal(t, uint64(9), v)
 		}
 	case <-time.After(10 * time.Second):
+		t.Fatal("timed out")
+	}
+}
+
+// Ensure that scenario iterations returned from k6/execution are
+// stable during the execution of an iteration.
+func TestSharedIterationsStable(t *testing.T) {
+	t.Parallel()
+	script := []byte(`
+		import { sleep } from 'k6';
+		import exec from 'k6/execution';
+
+		export let options = {
+			scenarios: {
+				test: {
+					executor: 'shared-iterations',
+					vus: 5,
+					iterations: 5,
+				},
+			},
+		};
+		export default function () {
+			const stats = exec.getScenarioStats();
+			sleep(1);
+			console.log(JSON.stringify(Object.assign({VUID: __VU}, stats)));
+		}
+`)
+
+	logger := logrus.New()
+	logger.SetOutput(ioutil.Discard)
+	logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel}}
+	logger.AddHook(&logHook)
+
+	runner, err := js.New(
+		logger,
+		&loader.SourceData{
+			URL:  &url.URL{Path: "/script.js"},
+			Data: script,
+		},
+		nil,
+		lib.RuntimeOptions{},
+	)
+	require.NoError(t, err)
+
+	ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, lib.Options{})
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
+
+	expIters := []uint64{0, 1, 2, 3, 4}
+	gotLocalIters, gotGlobalIters := []uint64{}, []uint64{}
+
+	type logEntry struct{ Iteration, IterationGlobal uint64 }
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+		entries := logHook.Drain()
+		require.Len(t, entries, 5)
+		le := &logEntry{}
+		for _, entry := range entries {
+			err = json.Unmarshal([]byte(entry.Message), le)
+			require.NoError(t, err)
+			gotLocalIters = append(gotLocalIters, le.Iteration)
+			gotGlobalIters = append(gotGlobalIters, le.IterationGlobal)
+		}
+
+		assert.ElementsMatch(t, expIters, gotLocalIters)
+		assert.ElementsMatch(t, expIters, gotGlobalIters)
+	case <-time.After(5 * time.Second):
 		t.Fatal("timed out")
 	}
 }
