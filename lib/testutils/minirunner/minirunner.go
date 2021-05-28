@@ -59,7 +59,9 @@ func (r MiniRunner) MakeArchive() *lib.Archive {
 
 // NewVU returns a new VU with an incremental ID.
 func (r *MiniRunner) NewVU(id uint64, out chan<- stats.SampleContainer) (lib.InitializedVU, error) {
-	return &VU{R: r, Out: out, ID: id}, nil
+	state := &lib.State{Vu: id}
+	state.Init()
+	return &VU{R: r, Out: out, ID: id, state: state}, nil
 }
 
 // Setup calls the supplied mock setup() function, if present.
@@ -127,6 +129,7 @@ type VU struct {
 	R             *MiniRunner
 	Out           chan<- stats.SampleContainer
 	ID, Iteration uint64
+	state         *lib.State
 }
 
 // ActiveVU holds a VU and its activation parameters
@@ -143,6 +146,11 @@ func (vu *VU) GetID() uint64 {
 
 // Activate the VU so it will be able to run code.
 func (vu *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
+	vu.state.IncrScIter = params.IncrScIter
+	vu.state.IncrScIterGlobal = params.IncrScIterGlobal
+
+	ctx := lib.WithState(params.RunContext, vu.state)
+
 	avu := &ActiveVU{
 		VU:                 vu,
 		VUActivationParams: params,
@@ -150,7 +158,7 @@ func (vu *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	}
 
 	go func() {
-		<-params.RunContext.Done()
+		<-ctx.Done()
 
 		// Wait for the VU to stop running, if it was, and prevent it from
 		// running again for this activation
@@ -180,13 +188,8 @@ func (vu *ActiveVU) RunOnce() error {
 		<-vu.busy // unlock deactivation again
 	}()
 
-	state := &lib.State{
-		Vu:        vu.ID,
-		Iteration: vu.Iteration,
-	}
-	newctx := lib.WithState(vu.RunContext, state)
+	ctx := lib.WithState(vu.RunContext, vu.state)
+	vu.state.IncrIteration()
 
-	vu.Iteration++
-
-	return vu.R.Fn(newctx, vu.Out)
+	return vu.R.Fn(ctx, vu.Out)
 }

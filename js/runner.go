@@ -228,7 +228,6 @@ func (r *Runner) newVU(id uint64, samplesOut chan<- stats.SampleContainer) (*VU,
 		BPool:     vu.BPool,
 		Vu:        vu.ID,
 		Samples:   vu.Samples,
-		Iteration: vu.Iteration,
 		Tags:      vu.Runner.Bundle.Options.RunTags.CloneTags(),
 		Group:     r.defaultGroup,
 	}
@@ -525,12 +524,12 @@ func (r *Runner) getTimeoutFor(stage string) time.Duration {
 type VU struct {
 	BundleInstance
 
-	Runner        *Runner
-	Transport     *http.Transport
-	Dialer        *netext.Dialer
-	CookieJar     *cookiejar.Jar
-	TLSConfig     *tls.Config
-	ID, Iteration uint64
+	Runner    *Runner
+	Transport *http.Transport
+	Dialer    *netext.Dialer
+	CookieJar *cookiejar.Jar
+	TLSConfig *tls.Config
+	ID        uint64
 
 	Console *console
 	BPool   *bpool.BufferPool
@@ -588,7 +587,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		u.state.Tags["vu"] = strconv.FormatUint(u.ID, 10)
 	}
 	if opts.SystemTags.Has(stats.TagIter) {
-		u.state.Tags["iter"] = strconv.FormatUint(u.Iteration, 10)
+		u.state.Tags["iter"] = strconv.FormatInt(u.state.GetIteration(), 10)
 	}
 	if opts.SystemTags.Has(stats.TagGroup) {
 		u.state.Tags["group"] = u.state.Group.Path
@@ -607,6 +606,9 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 			u.state.SetScenarioVUID(params.GetScenarioVUID())
 		}
 	}
+
+	u.state.IncrScIter = params.IncrScIter
+	u.state.IncrScIterGlobal = params.IncrScIterGlobal
 
 	avu := &ActiveVU{
 		VU:                 u,
@@ -663,6 +665,11 @@ func (u *ActiveVU) RunOnce() error {
 		panic(fmt.Sprintf("function '%s' not found in exports", u.Exec))
 	}
 
+	u.state.IncrIteration()
+	if err := u.Runtime.Set("__ITER", u.state.GetIteration()); err != nil {
+		panic(fmt.Errorf("error setting __ITER in goja runtime: %w", err))
+	}
+
 	// Call the exported function.
 	_, isFullIteration, totalTime, err := u.runFn(u.RunContext, true, fn, u.setupData)
 
@@ -693,16 +700,8 @@ func (u *VU) runFn(
 
 	opts := &u.Runner.Bundle.Options
 	if opts.SystemTags.Has(stats.TagIter) {
-		u.state.Tags["iter"] = strconv.FormatUint(u.Iteration, 10)
+		u.state.Tags["iter"] = strconv.FormatInt(u.state.GetIteration(), 10)
 	}
-
-	// TODO: this seems like the wrong place for the iteration incrementation
-	// also this means that teardown and setup have __ITER defined
-	// maybe move it to RunOnce ?
-	u.Runtime.Set("__ITER", u.Iteration)
-	u.Iteration++
-	u.state.Iteration = u.Iteration
-	u.state.IncrScenarioVUIter()
 
 	defer func() {
 		if r := recover(); r != nil {

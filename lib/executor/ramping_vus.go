@@ -543,7 +543,7 @@ func (vlv RampingVUs) Run(parentCtx context.Context, out chan<- stats.SampleCont
 
 	// Actually schedule the VUs and iterations, likely the most complicated
 	// executor among all of them...
-	runIteration := getIterationRunner(vlv.executionState, vlv.incrScenarioIter, vlv.logger)
+	runIteration := getIterationRunner(vlv.executionState, vlv.logger)
 	getVU := func() (lib.InitializedVU, error) {
 		initVU, err := vlv.executionState.GetPlannedVU(vlv.logger, false)
 		if err != nil {
@@ -568,7 +568,6 @@ func (vlv RampingVUs) Run(parentCtx context.Context, out chan<- stats.SampleCont
 		Executor:   vlv.config.Type,
 		StartTime:  startTime,
 		ProgressFn: progressFn,
-		GetIter:    vlv.getScenarioIter,
 	})
 	vuHandles := make([]*vuHandle, maxVUs)
 	for i := uint64(0); i < maxVUs; i++ {
