@@ -212,6 +212,8 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 		activeVUs.Done()
 	}
 
+	// Channel for synchronizing scenario-specific iteration increments
+	iterSync := make(chan struct{}, 1)
 	handleVU := func(initVU lib.InitializedVU) {
 		defer handleVUsWG.Done()
 		ctx, cancel := context.WithCancel(maxDurationCtx)
@@ -220,7 +222,7 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 		vuID := initVU.GetID()
 		activeVU := initVU.Activate(
 			getVUActivationParams(ctx, pvi.config.BaseConfig, returnVU,
-				pvi.GetNextLocalVUID, pvi.incrScenarioIter, nil))
+				pvi.getNextLocalVUID, pvi.getNextLocalIter, nil, iterSync))
 
 		for i := int64(0); i < iterations; i++ {
 			select {

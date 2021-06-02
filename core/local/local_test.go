@@ -1603,8 +1603,8 @@ func TestSharedIterationsStable(t *testing.T) {
 			scenarios: {
 				test: {
 					executor: 'shared-iterations',
-					vus: 5,
-					iterations: 5,
+					vus: 50,
+					iterations: 50,
 				},
 			},
 		};
@@ -1637,20 +1637,24 @@ func TestSharedIterationsStable(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
 
-	expIters := []uint64{0, 1, 2, 3, 4}
-	gotLocalIters, gotGlobalIters := []uint64{}, []uint64{}
+	expIters := [50]int64{}
+	for i := 0; i < 50; i++ {
+		expIters[i] = int64(i)
+	}
+	gotLocalIters, gotGlobalIters := []int64{}, []int64{}
 
-	type logEntry struct{ Iteration, IterationGlobal uint64 }
+	type logEntry struct{ Iteration, IterationGlobal int64 }
 
 	select {
 	case err := <-errCh:
 		require.NoError(t, err)
 		entries := logHook.Drain()
-		require.Len(t, entries, 5)
+		require.Len(t, entries, 50)
 		le := &logEntry{}
 		for _, entry := range entries {
 			err = json.Unmarshal([]byte(entry.Message), le)
 			require.NoError(t, err)
+			require.Equal(t, le.Iteration, le.IterationGlobal)
 			gotLocalIters = append(gotLocalIters, le.Iteration)
 			gotGlobalIters = append(gotGlobalIters, le.IterationGlobal)
 		}
