@@ -188,13 +188,15 @@ func (clv ConstantVUs) Run(parentCtx context.Context, out chan<- stats.SampleCon
 		activeVUs.Done()
 	}
 
+	// Channel for synchronizing scenario-specific iteration increments
+	iterSync := make(chan struct{}, 1)
 	handleVU := func(initVU lib.InitializedVU) {
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
 
 		activeVU := initVU.Activate(
 			getVUActivationParams(ctx, clv.config.BaseConfig, returnVU,
-				clv.GetNextLocalVUID, clv.incrScenarioIter, nil))
+				clv.getNextLocalVUID, clv.getNextLocalIter, nil, iterSync))
 
 		for {
 			select {

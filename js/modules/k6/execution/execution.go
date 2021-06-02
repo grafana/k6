@@ -50,11 +50,10 @@ func (e *Execution) GetVUStats(ctx context.Context) (goja.Value, error) {
 		return nil, errors.New("goja runtime is nil in context")
 	}
 
-	scID, _ := vuState.GetScenarioVUID()
 	stats := map[string]interface{}{
 		"id":         vuState.Vu,
-		"idScenario": scID,
-		"iteration":  vuState.GetIteration(),
+		"idScenario": vuState.VUIDScenario,
+		"iteration":  vuState.Iteration,
 		"iterationScenario": func() goja.Value {
 			return rt.ToValue(vuState.GetScenarioVUIter())
 		},

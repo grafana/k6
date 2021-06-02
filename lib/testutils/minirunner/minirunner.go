@@ -59,9 +59,15 @@ func (r MiniRunner) MakeArchive() *lib.Archive {
 
 // NewVU returns a new VU with an incremental ID.
 func (r *MiniRunner) NewVU(id uint64, out chan<- stats.SampleContainer) (lib.InitializedVU, error) {
-	state := &lib.State{Vu: id}
-	state.Init()
-	return &VU{R: r, Out: out, ID: id, state: state}, nil
+	state := &lib.State{Vu: id, Iteration: int64(-1)}
+	return &VU{
+		R:            r,
+		Out:          out,
+		ID:           id,
+		state:        state,
+		scenarioID:   make(map[string]uint64),
+		scenarioIter: make(map[string]int64),
+	}, nil
 }
 
 // Setup calls the supplied mock setup() function, if present.
@@ -126,10 +132,15 @@ func (r *MiniRunner) HandleSummary(ctx context.Context, s *lib.Summary) (map[str
 
 // VU is a mock VU, spawned by a MiniRunner.
 type VU struct {
-	R             *MiniRunner
-	Out           chan<- stats.SampleContainer
-	ID, Iteration uint64
-	state         *lib.State
+	R         *MiniRunner
+	Out       chan<- stats.SampleContainer
+	ID        uint64
+	Iteration int64
+	state     *lib.State
+	// ID of this VU in each scenario
+	scenarioID map[string]uint64
+	// count of iterations executed by this VU in each scenario
+	scenarioIter map[string]int64
 }
 
 // ActiveVU holds a VU and its activation parameters
@@ -137,6 +148,12 @@ type ActiveVU struct {
 	*VU
 	*lib.VUActivationParams
 	busy chan struct{}
+
+	scenarioName              string
+	iterSync                  chan struct{}
+	getNextScLocalIter        func() int64
+	getNextScGlobalIter       func() int64
+	scIterLocal, scIterGlobal int64
 }
 
 // GetID returns the unique VU ID.
@@ -146,15 +163,36 @@ func (vu *VU) GetID() uint64 {
 
 // Activate the VU so it will be able to run code.
 func (vu *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
-	vu.state.IncrScIter = params.IncrScIter
-	vu.state.IncrScIterGlobal = params.IncrScIterGlobal
-
 	ctx := lib.WithState(params.RunContext, vu.state)
 
+	if params.GetNextScVUID != nil {
+		if _, ok := vu.scenarioID[params.Scenario]; !ok {
+			vu.state.VUIDScenario = params.GetNextScVUID()
+			vu.scenarioID[params.Scenario] = vu.state.VUIDScenario
+		}
+	}
+
+	vu.state.GetScenarioVUIter = func() int64 {
+		return vu.scenarioIter[params.Scenario]
+	}
+
 	avu := &ActiveVU{
-		VU:                 vu,
-		VUActivationParams: params,
-		busy:               make(chan struct{}, 1),
+		VU:                  vu,
+		VUActivationParams:  params,
+		busy:                make(chan struct{}, 1),
+		scenarioName:        params.Scenario,
+		iterSync:            params.IterSync,
+		scIterLocal:         int64(-1),
+		scIterGlobal:        int64(-1),
+		getNextScLocalIter:  params.GetNextScLocalIter,
+		getNextScGlobalIter: params.GetNextScGlobalIter,
+	}
+
+	vu.state.GetScenarioLocalVUIter = func() int64 {
+		return avu.scIterLocal
+	}
+	vu.state.GetScenarioGlobalVUIter = func() int64 {
+		return avu.scIterGlobal
 	}
 
 	go func() {
@@ -170,6 +208,31 @@ func (vu *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	}()
 
 	return avu
+}
+
+func (vu *ActiveVU) incrIteration() {
+	vu.Iteration++
+	vu.state.Iteration = vu.Iteration
+
+	if vu.iterSync != nil {
+		// block other VUs from incrementing scenario iterations
+		vu.iterSync <- struct{}{}
+		defer func() {
+			<-vu.iterSync // unlock
+		}()
+	}
+
+	if _, ok := vu.scenarioIter[vu.scenarioName]; ok {
+		vu.scenarioIter[vu.scenarioName]++
+	} else {
+		vu.scenarioIter[vu.scenarioName] = 0
+	}
+	if vu.getNextScLocalIter != nil {
+		vu.scIterLocal = vu.getNextScLocalIter()
+	}
+	if vu.getNextScGlobalIter != nil {
+		vu.scIterGlobal = vu.getNextScGlobalIter()
+	}
 }
 
 // RunOnce runs the mock default function once, incrementing its iteration.
@@ -189,7 +252,7 @@ func (vu *ActiveVU) RunOnce() error {
 	}()
 
 	ctx := lib.WithState(vu.RunContext, vu.state)
-	vu.state.IncrIteration()
+	vu.incrIteration()
 
 	return vu.R.Fn(ctx, vu.Out)
 }

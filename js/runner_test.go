@@ -2034,7 +2034,9 @@ func TestExecutionStats(t *testing.T) {
 		exports.default = function() {
 			var vuStats = exec.getVUStats();
 			if (vuStats.id !== 1) throw new Error('unexpected VU ID: '+vuStats.id);
+			if (vuStats.idScenario !== 2) throw new Error('unexpected scenario VU ID: '+vuStats.idScenario);
 			if (vuStats.iteration !== 0) throw new Error('unexpected VU iteration: '+vuStats.iteration);
+			if (vuStats.iterationScenario !== 0) throw new Error('unexpected scenario iteration: '+vuStats.iterationScenario);
 		}`},
 		{name: "vu_err", script: `
 		var exec = require('k6/execution');
@@ -2050,9 +2052,11 @@ func TestExecutionStats(t *testing.T) {
 			// goja's Date handling is weird, see https://github.com/dop251/goja/issues/170
 			var startTime = new Date(JSON.parse(JSON.stringify(ss.startTime)));
 			if (ss.name !== 'default') throw new Error('unexpected scenario name: '+ss.name);
-			if (ss.executor !== 'test-exec') throw new Error('unexpected executor: '+ss.name);
+			if (ss.executor !== 'test-exec') throw new Error('unexpected executor: '+ss.executor);
 			if (startTime > new Date()) throw new Error('unexpected startTime: '+startTime);
 			if (ss.progress !== 0.1) throw new Error('unexpected progress: '+ss.progress);
+			if (ss.iteration !== 3) throw new Error('unexpected scenario local iteration: '+ss.iteration);
+			if (ss.iterationGlobal !== 4) throw new Error('unexpected scenario local iteration: '+ss.iterationGlobal);
 		}`},
 		{name: "scenario_err", script: `
 		var exec = require('k6/execution');
@@ -2063,6 +2067,7 @@ func TestExecutionStats(t *testing.T) {
 
 		exports.default = function() {
 			var ts = exec.getTestStats();
+			if (ts.duration !== '0s') throw new Error('unexpected test duration: '+ts.duration);
 			if (ts.vusActive !== 1) throw new Error('unexpected vusActive: '+ts.vusActive);
 			if (ts.vusMax !== 0) throw new Error('unexpected vusMax: '+ts.vusMax);
 			if (ts.iterationsCompleted !== 0) throw new Error('unexpected iterationsCompleted: '+ts.iterationsCompleted);
@@ -2105,10 +2110,14 @@ func TestExecutionStats(t *testing.T) {
 					return 0.1, nil
 				},
 			})
+			iterSync := make(chan struct{}, 1)
 			vu := initVU.Activate(&lib.VUActivationParams{
-				RunContext:      ctx,
-				Exec:            "default",
-				GetScenarioVUID: func() uint64 { return 1 },
+				RunContext:          ctx,
+				Exec:                "default",
+				IterSync:            iterSync,
+				GetNextScVUID:       func() uint64 { return 2 },
+				GetNextScLocalIter:  func() int64 { return 3 },
+				GetNextScGlobalIter: func() int64 { return 4 },
 			})
 
 			execState := execScheduler.GetState()
