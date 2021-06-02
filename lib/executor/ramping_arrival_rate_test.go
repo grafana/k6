@@ -737,8 +737,9 @@ func TestRampingArrivalRateGlobalIters(t *testing.T) {
 			gotIters := []int64{}
 			var mx sync.Mutex
 			runner.Fn = func(ctx context.Context, _ chan<- stats.SampleContainer) error {
+				state := lib.GetState(ctx)
 				mx.Lock()
-				gotIters = append(gotIters, executor.(*RampingArrivalRate).getGlobalIter())
+				gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
 				mx.Unlock()
 				return nil
 			}

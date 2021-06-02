@@ -225,17 +225,19 @@ func getArrivalRatePerSec(scaledArrivalRate *big.Rat) *big.Rat {
 // TODO: Refactor this, maybe move all scenario things to an embedded struct?
 func getVUActivationParams(
 	ctx context.Context, conf BaseConfig, deactivateCallback func(lib.InitializedVU),
-	getScenarioVUID func() uint64, incrScIter func() int64, incrScIterGlobal func() int64,
+	getNextScVUID func() uint64, getNextScLocalIter, getNextScGlobalIter func() int64,
+	iterSync chan struct{},
 ) *lib.VUActivationParams {
 	return &lib.VUActivationParams{
-		RunContext:         ctx,
-		Scenario:           conf.Name,
-		Exec:               conf.GetExec(),
-		Env:                conf.GetEnv(),
-		Tags:               conf.GetTags(),
-		DeactivateCallback: deactivateCallback,
-		GetScenarioVUID:    getScenarioVUID,
-		IncrScIter:         incrScIter,
-		IncrScIterGlobal:   incrScIterGlobal,
+		RunContext:          ctx,
+		Scenario:            conf.Name,
+		Exec:                conf.GetExec(),
+		Env:                 conf.GetEnv(),
+		Tags:                conf.GetTags(),
+		DeactivateCallback:  deactivateCallback,
+		GetNextScVUID:       getNextScVUID,
+		IterSync:            iterSync,
+		GetNextScLocalIter:  getNextScLocalIter,
+		GetNextScGlobalIter: getNextScGlobalIter,
 	}
 }

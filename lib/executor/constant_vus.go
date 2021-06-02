@@ -194,7 +194,7 @@ func (clv ConstantVUs) Run(parentCtx context.Context, out chan<- stats.SampleCon
 
 		activeVU := initVU.Activate(
 			getVUActivationParams(ctx, clv.config.BaseConfig, returnVU,
-				clv.GetNextLocalVUID, clv.incrScenarioIter, nil))
+				clv.getNextLocalVUID, clv.getNextLocalIter, nil, iterSync))
 
 		for {
 			select {

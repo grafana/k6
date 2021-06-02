@@ -168,11 +168,10 @@ func (carc ConstantArrivalRateConfig) GetExecutionRequirements(et *lib.Execution
 func (carc ConstantArrivalRateConfig) NewExecutor(
 	es *lib.ExecutionState, logger *logrus.Entry,
 ) (lib.Executor, error) {
-	startGlobalIter := int64(-1)
 	return &ConstantArrivalRate{
 		BaseExecutor: NewBaseExecutor(&carc, es, logger),
 		config:       carc,
-		globalIter:   &startGlobalIter,
+		iterMx:       &sync.Mutex{},
 	}, nil
 }
 
@@ -185,11 +184,10 @@ func (carc ConstantArrivalRateConfig) HasWork(et *lib.ExecutionTuple) bool {
 // specific period.
 type ConstantArrivalRate struct {
 	*BaseExecutor
-	config     ConstantArrivalRateConfig
-	et         *lib.ExecutionTuple
-	segIdx     *lib.SegmentedIndex
-	iterMx     sync.Mutex
-	globalIter *int64
+	config ConstantArrivalRateConfig
+	et     *lib.ExecutionTuple
+	iterMx *sync.Mutex
+	segIdx *lib.SegmentedIndex
 }
 
 // Make sure we implement the lib.Executor interface.
@@ -207,19 +205,16 @@ func (car *ConstantArrivalRate) Init(ctx context.Context) error {
 	return err
 }
 
-// incrGlobalIter increments the global iteration count for this executor,
-// taking into account the configured execution segment.
-func (car *ConstantArrivalRate) incrGlobalIter() int64 {
+// getNextGlobalIter advances and returns the next global iteration number for
+// this executor, taking into account the configured execution segment.
+// Unlike the local iteration number returned by getNextLocalIter(), this
+// iteration number will be unique across k6 instances.
+func (car *ConstantArrivalRate) getNextGlobalIter() int64 {
 	car.iterMx.Lock()
 	defer car.iterMx.Unlock()
 	car.segIdx.Next()
-	atomic.StoreInt64(car.globalIter, car.segIdx.GetUnscaled()-1)
-	return atomic.LoadInt64(car.globalIter)
-}
-
-// getGlobalIter returns the global iteration count for this executor.
-func (car *ConstantArrivalRate) getGlobalIter() int64 {
-	return atomic.LoadInt64(car.globalIter)
+	// iterations are 0-based
+	return car.segIdx.GetUnscaled() - 1
 }
 
 // Run executes a constant number of iterations per second.
@@ -302,12 +297,16 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 		activeVUsWg.Done()
 	}
 
+	// Channel for synchronizing scenario-specific iteration increments
+	iterSync := make(chan struct{}, 1)
 	runIterationBasic := getIterationRunner(car.executionState, car.logger)
 	activateVU := func(initVU lib.InitializedVU) lib.ActiveVU {
 		activeVUsWg.Add(1)
 		activeVU := initVU.Activate(getVUActivationParams(
 			maxDurationCtx, car.config.BaseConfig, returnVU,
-			car.GetNextLocalVUID, car.incrScenarioIter, car.incrGlobalIter))
+			car.getNextLocalVUID, car.getNextLocalIter, car.getNextGlobalIter,
+			iterSync,
+		))
 		car.executionState.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddUint64(&activeVUsCount, 1)
 		vusPool.AddVU(maxDurationCtx, activeVU, runIterationBasic)

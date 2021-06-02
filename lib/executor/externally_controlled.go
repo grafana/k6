@@ -362,7 +362,8 @@ func (rs *externallyControlledRunState) newManualVUHandle(
 	ctx, cancel := context.WithCancel(rs.ctx)
 	return &manualVUHandle{
 		vuHandle: newStoppedVUHandle(ctx, getVU, returnVU,
-			rs.executor.GetNextLocalVUID, &rs.executor.config.BaseConfig, logger),
+			rs.executor.getNextLocalVUID, rs.executor.getNextLocalIter,
+			rs.iterSync, &rs.executor.config.BaseConfig, logger),
 		initVU:   initVU,
 		wg:       &wg,
 		cancelVU: cancel,
@@ -383,6 +384,8 @@ type externallyControlledRunState struct {
 	currentlyPaused bool              // whether the executor is currently paused
 
 	runIteration func(context.Context, lib.ActiveVU) bool // a helper closure function that runs a single iteration
+	// channel for synchronizing scenario-specific iteration increments
+	iterSync chan struct{}
 }
 
 // retrieveStartMaxVUs gets and initializes the (scaled) number of MaxVUs
@@ -521,6 +524,8 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 	).Debug("Starting executor run...")
 
 	startMaxVUs := mex.executionState.Options.ExecutionSegment.Scale(mex.config.MaxVUs.Int64)
+	// Channel for synchronizing scenario-specific iteration increments
+	iterSync := make(chan struct{}, 1)
 	runState := &externallyControlledRunState{
 		ctx:             ctx,
 		executor:        mex,
@@ -531,6 +536,7 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 		activeVUsCount:  new(int64),
 		maxVUs:          new(int64),
 		runIteration:    getIterationRunner(mex.executionState, mex.logger),
+		iterSync:        iterSync,
 	}
 	*runState.maxVUs = startMaxVUs
 	if err = runState.retrieveStartMaxVUs(); err != nil {

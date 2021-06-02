@@ -39,21 +39,23 @@ import (
 type BaseExecutor struct {
 	config         lib.ExecutorConfig
 	executionState *lib.ExecutionState
-	localVUID      *uint64 // counter for assigning executor-specific VU IDs
-	localIter      *int64  // counter for keeping track of all VU iterations completed by this executor
-	logger         *logrus.Entry
-	progress       *pb.ProgressBar
+	VUIDLocal      *uint64 // counter for assigning executor-specific VU IDs
+	// Counter for keeping track of all VU iterations completed by this executor
+	// in the current (local) k6 instance.
+	iterLocal *int64
+	logger    *logrus.Entry
+	progress  *pb.ProgressBar
 }
 
 // NewBaseExecutor returns an initialized BaseExecutor
 func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *logrus.Entry) *BaseExecutor {
 	// Start at -1 so that the first iteration can be 0
-	startLocalIter := int64(-1)
+	startIterLocal := int64(-1)
 	return &BaseExecutor{
 		config:         config,
 		executionState: es,
-		localVUID:      new(uint64),
-		localIter:      &startLocalIter,
+		VUIDLocal:      new(uint64),
+		iterLocal:      &startIterLocal,
 		logger:         logger,
 		progress: pb.New(
 			pb.WithLeft(config.GetName),
@@ -73,10 +75,16 @@ func (bs BaseExecutor) GetConfig() lib.ExecutorConfig {
 	return bs.config
 }
 
-// GetNextLocalVUID increments and returns the next VU ID that's specific for
+// getNextLocalVUID increments and returns the next VU ID that's specific for
 // this executor (i.e. not global like __VU).
-func (bs BaseExecutor) GetNextLocalVUID() uint64 {
-	return atomic.AddUint64(bs.localVUID, 1)
+func (bs BaseExecutor) getNextLocalVUID() uint64 {
+	return atomic.AddUint64(bs.VUIDLocal, 1)
+}
+
+// getNextLocalIter increments and returns the next local iteration number, for
+// keeping track of total iterations executed by this scenario/executor.
+func (bs *BaseExecutor) getNextLocalIter() int64 {
+	return atomic.AddInt64(bs.iterLocal, 1)
 }
 
 // GetLogger returns the executor logger entry.
@@ -100,10 +108,4 @@ func (bs BaseExecutor) getMetricTags(vuID *uint64) *stats.SampleTags {
 		tags["vu"] = strconv.FormatUint(*vuID, 10)
 	}
 	return stats.IntoSampleTags(&tags)
-}
-
-// incrScenarioIter increments the counter of completed iterations by all VUs
-// for this executor.
-func (bs *BaseExecutor) incrScenarioIter() int64 {
-	return atomic.AddInt64(bs.localIter, 1)
 }

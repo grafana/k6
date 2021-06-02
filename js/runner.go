@@ -208,6 +208,7 @@ func (r *Runner) newVU(id uint64, samplesOut chan<- stats.SampleContainer) (*VU,
 
 	vu := &VU{
 		ID:             id,
+		iteration:      int64(-1),
 		BundleInstance: *bi,
 		Runner:         r,
 		Transport:      transport,
@@ -217,6 +218,8 @@ func (r *Runner) newVU(id uint64, samplesOut chan<- stats.SampleContainer) (*VU,
 		Console:        r.console,
 		BPool:          bpool.NewBufferPool(100),
 		Samples:        samplesOut,
+		scenarioID:     make(map[string]uint64),
+		scenarioIter:   make(map[string]int64),
 	}
 
 	vu.state = &lib.State{
@@ -233,7 +236,6 @@ func (r *Runner) newVU(id uint64, samplesOut chan<- stats.SampleContainer) (*VU,
 		Tags:      vu.Runner.Bundle.Options.RunTags.CloneTags(),
 		Group:     r.defaultGroup,
 	}
-	vu.state.Init()
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 
 	// This is here mostly so if someone tries they get a nice message
@@ -532,6 +534,7 @@ type VU struct {
 	CookieJar *cookiejar.Jar
 	TLSConfig *tls.Config
 	ID        uint64
+	iteration int64
 
 	Console *console
 	BPool   *bpool.BufferPool
@@ -541,6 +544,10 @@ type VU struct {
 	setupData goja.Value
 
 	state *lib.State
+	// ID of this VU in each scenario
+	scenarioID map[string]uint64
+	// count of iterations executed by this VU in each scenario
+	scenarioIter map[string]int64
 }
 
 // Verify that interfaces are implemented
@@ -554,6 +561,18 @@ type ActiveVU struct {
 	*VU
 	*lib.VUActivationParams
 	busy chan struct{}
+
+	scenarioName string
+	// Used to synchronize iteration increments for scenarios between VUs.
+	iterSync chan struct{}
+	// Returns the iteration number across all VUs in the current scenario
+	// unique to this single k6 instance.
+	getNextScLocalIter func() uint64
+	// Returns the iteration number across all VUs in the current scenario
+	// unique globally across k6 instances (taking into account execution
+	// segments).
+	getNextScGlobalIter       func() uint64
+	scIterLocal, scIterGlobal uint64
 }
 
 // GetID returns the unique VU ID.
@@ -589,7 +608,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		u.state.Tags["vu"] = strconv.FormatUint(u.ID, 10)
 	}
 	if opts.SystemTags.Has(stats.TagIter) {
-		u.state.Tags["iter"] = strconv.FormatInt(u.state.GetIteration(), 10)
+		u.state.Tags["iter"] = strconv.FormatInt(u.iteration, 10)
 	}
 	if opts.SystemTags.Has(stats.TagGroup) {
 		u.state.Tags["group"] = u.state.Group.Path
@@ -602,20 +621,34 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	ctx = lib.WithState(ctx, u.state)
 	params.RunContext = ctx
 	*u.Context = ctx
-	u.state.ScenarioName = params.Scenario
-	if params.GetScenarioVUID != nil {
-		if _, ok := u.state.GetScenarioVUID(); !ok {
-			u.state.SetScenarioVUID(params.GetScenarioVUID())
+	if params.GetNextScVUID != nil {
+		if _, ok := u.scenarioID[params.Scenario]; !ok {
+			u.state.VUIDScenario = params.GetNextScVUID()
+			u.scenarioID[params.Scenario] = u.state.VUIDScenario
 		}
 	}
 
-	u.state.IncrScIter = params.IncrScIter
-	u.state.IncrScIterGlobal = params.IncrScIterGlobal
+	u.state.GetScenarioVUIter = func() int64 {
+		return u.scenarioIter[params.Scenario]
+	}
 
 	avu := &ActiveVU{
-		VU:                 u,
-		VUActivationParams: params,
-		busy:               make(chan struct{}, 1),
+		VU:                  u,
+		VUActivationParams:  params,
+		busy:                make(chan struct{}, 1),
+		scenarioName:        params.Scenario,
+		iterSync:            params.IterSync,
+		scIterLocal:         int64(-1),
+		scIterGlobal:        int64(-1),
+		getNextScLocalIter:  params.GetNextScLocalIter,
+		getNextScGlobalIter: params.GetNextScGlobalIter,
+	}
+
+	u.state.GetScenarioLocalVUIter = func() int64 {
+		return avu.scIterLocal
+	}
+	u.state.GetScenarioGlobalVUIter = func() int64 {
+		return avu.scIterGlobal
 	}
 
 	go func() {
@@ -667,8 +700,8 @@ func (u *ActiveVU) RunOnce() error {
 		panic(fmt.Sprintf("function '%s' not found in exports", u.Exec))
 	}
 
-	u.state.IncrIteration()
-	if err := u.Runtime.Set("__ITER", u.state.GetIteration()); err != nil {
+	u.incrIteration()
+	if err := u.Runtime.Set("__ITER", u.iteration); err != nil {
 		panic(fmt.Errorf("error setting __ITER in goja runtime: %w", err))
 	}
 
@@ -702,7 +735,7 @@ func (u *VU) runFn(
 
 	opts := &u.Runner.Bundle.Options
 	if opts.SystemTags.Has(stats.TagIter) {
-		u.state.Tags["iter"] = strconv.FormatInt(u.state.GetIteration(), 10)
+		u.state.Tags["iter"] = strconv.FormatInt(u.state.Iteration, 10)
 	}
 
 	defer func() {
@@ -743,6 +776,31 @@ func (u *VU) runFn(
 	u.state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, isDefault, stats.NewSampleTags(u.state.Tags))
 
 	return v, isFullIteration, endTime.Sub(startTime), err
+}
+
+func (u *ActiveVU) incrIteration() {
+	u.iteration++
+	u.state.Iteration = u.iteration
+
+	if u.iterSync != nil {
+		// block other VUs from incrementing scenario iterations
+		u.iterSync <- struct{}{}
+		defer func() {
+			<-u.iterSync // unlock
+		}()
+	}
+
+	if _, ok := u.scenarioIter[u.scenarioName]; ok {
+		u.scenarioIter[u.scenarioName]++
+	} else {
+		u.scenarioIter[u.scenarioName] = 0
+	}
+	if u.getNextScLocalIter != nil {
+		u.scIterLocal = u.getNextScLocalIter()
+	}
+	if u.getNextScGlobalIter != nil {
+		u.scIterGlobal = u.getNextScGlobalIter()
+	}
 }
 
 type scriptException struct {
