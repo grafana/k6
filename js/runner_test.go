@@ -2116,8 +2116,8 @@ func TestExecutionStats(t *testing.T) {
 				Exec:                "default",
 				IterSync:            iterSync,
 				GetNextScVUID:       func() uint64 { return 2 },
-				GetNextScLocalIter:  func() int64 { return 3 },
-				GetNextScGlobalIter: func() int64 { return 4 },
+				GetNextScLocalIter:  func() uint64 { return 3 },
+				GetNextScGlobalIter: func() uint64 { return 4 },
 			})
 
 			execState := execScheduler.GetState()

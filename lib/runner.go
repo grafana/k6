@@ -57,8 +57,8 @@ type VUActivationParams struct {
 	Exec, Scenario      string
 	GetNextScVUID       func() uint64
 	IterSync            chan struct{}
-	GetNextScLocalIter  func() int64
-	GetNextScGlobalIter func() int64
+	GetNextScLocalIter  func() uint64
+	GetNextScGlobalIter func() uint64
 }
 
 // A Runner is a factory for VUs. It should precompute as much as possible upon

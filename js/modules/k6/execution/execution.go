@@ -81,11 +81,10 @@ func (e *Execution) GetScenarioStats(ctx context.Context) (goja.Value, error) {
 	}
 
 	var iterGlobal interface{}
-	// This stinks...
-	if ig := vuState.GetScenarioGlobalVUIter(); ig < 0 {
-		iterGlobal = goja.Null()
+	if vuState.GetScenarioGlobalVUIter != nil {
+		iterGlobal = vuState.GetScenarioGlobalVUIter()
 	} else {
-		iterGlobal = ig
+		iterGlobal = goja.Null()
 	}
 
 	stats := map[string]interface{}{

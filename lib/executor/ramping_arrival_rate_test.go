@@ -711,11 +711,11 @@ func TestRampingArrivalRateGlobalIters(t *testing.T) {
 
 	testCases := []struct {
 		seq, seg string
-		expIters []int64
+		expIters []uint64
 	}{
-		{"0,1/4,3/4,1", "0:1/4", []int64{1, 6, 11, 16}},
-		{"0,1/4,3/4,1", "1/4:3/4", []int64{0, 2, 4, 5, 7, 9, 10, 12, 14, 15, 17, 19, 20}},
-		{"0,1/4,3/4,1", "3/4:1", []int64{3, 8, 13}},
+		{"0,1/4,3/4,1", "0:1/4", []uint64{1, 6, 11, 16}},
+		{"0,1/4,3/4,1", "1/4:3/4", []uint64{0, 2, 4, 5, 7, 9, 10, 12, 14, 15, 17, 19, 20}},
+		{"0,1/4,3/4,1", "3/4:1", []uint64{3, 8, 13}},
 	}
 
 	for _, tc := range testCases {
@@ -734,7 +734,7 @@ func TestRampingArrivalRateGlobalIters(t *testing.T) {
 			ctx, cancel, executor, _ := setupExecutor(t, config, es, runner)
 			defer cancel()
 
-			gotIters := []int64{}
+			gotIters := []uint64{}
 			var mx sync.Mutex
 			runner.Fn = func(ctx context.Context, _ chan<- stats.SampleContainer) error {
 				state := lib.GetState(ctx)
