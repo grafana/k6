@@ -42,15 +42,15 @@ type BaseExecutor struct {
 	VUIDLocal      *uint64 // counter for assigning executor-specific VU IDs
 	// Counter for keeping track of all VU iterations completed by this executor
 	// in the current (local) k6 instance.
-	iterLocal *int64
+	iterLocal *uint64
 	logger    *logrus.Entry
 	progress  *pb.ProgressBar
 }
 
 // NewBaseExecutor returns an initialized BaseExecutor
 func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *logrus.Entry) *BaseExecutor {
-	// Start at -1 so that the first iteration can be 0
-	startIterLocal := int64(-1)
+	// Start at max uint64 so that the first iteration can be 0
+	startIterLocal := ^uint64(0)
 	return &BaseExecutor{
 		config:         config,
 		executionState: es,
@@ -83,8 +83,8 @@ func (bs BaseExecutor) getNextLocalVUID() uint64 {
 
 // getNextLocalIter increments and returns the next local iteration number, for
 // keeping track of total iterations executed by this scenario/executor.
-func (bs *BaseExecutor) getNextLocalIter() int64 {
-	return atomic.AddInt64(bs.iterLocal, 1)
+func (bs *BaseExecutor) getNextLocalIter() uint64 {
+	return atomic.AddUint64(bs.iterLocal, 1)
 }
 
 // GetLogger returns the executor logger entry.

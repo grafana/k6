@@ -66,7 +66,7 @@ func (r *MiniRunner) NewVU(id uint64, out chan<- stats.SampleContainer) (lib.Ini
 		ID:           id,
 		state:        state,
 		scenarioID:   make(map[string]uint64),
-		scenarioIter: make(map[string]int64),
+		scenarioIter: make(map[string]uint64),
 	}, nil
 }
 
@@ -140,7 +140,7 @@ type VU struct {
 	// ID of this VU in each scenario
 	scenarioID map[string]uint64
 	// count of iterations executed by this VU in each scenario
-	scenarioIter map[string]int64
+	scenarioIter map[string]uint64
 }
 
 // ActiveVU holds a VU and its activation parameters
@@ -151,9 +151,9 @@ type ActiveVU struct {
 
 	scenarioName              string
 	iterSync                  chan struct{}
-	getNextScLocalIter        func() int64
-	getNextScGlobalIter       func() int64
-	scIterLocal, scIterGlobal int64
+	getNextScLocalIter        func() uint64
+	getNextScGlobalIter       func() uint64
+	scIterLocal, scIterGlobal uint64
 }
 
 // GetID returns the unique VU ID.
@@ -172,7 +172,7 @@ func (vu *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		}
 	}
 
-	vu.state.GetScenarioVUIter = func() int64 {
+	vu.state.GetScenarioVUIter = func() uint64 {
 		return vu.scenarioIter[params.Scenario]
 	}
 
@@ -182,16 +182,16 @@ func (vu *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		busy:                make(chan struct{}, 1),
 		scenarioName:        params.Scenario,
 		iterSync:            params.IterSync,
-		scIterLocal:         int64(-1),
-		scIterGlobal:        int64(-1),
+		scIterLocal:         ^uint64(0),
+		scIterGlobal:        ^uint64(0),
 		getNextScLocalIter:  params.GetNextScLocalIter,
 		getNextScGlobalIter: params.GetNextScGlobalIter,
 	}
 
-	vu.state.GetScenarioLocalVUIter = func() int64 {
+	vu.state.GetScenarioLocalVUIter = func() uint64 {
 		return avu.scIterLocal
 	}
-	vu.state.GetScenarioGlobalVUIter = func() int64 {
+	vu.state.GetScenarioGlobalVUIter = func() uint64 {
 		return avu.scIterGlobal
 	}
 
