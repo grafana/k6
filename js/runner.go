@@ -561,9 +561,14 @@ type ActiveVU struct {
 	busy chan struct{}
 
 	scenarioName string
-	// TODO: Document these
-	iterSync                  chan struct{}
-	getNextScLocalIter        func() uint64
+	// Used to synchronize iteration increments for scenarios between VUs.
+	iterSync chan struct{}
+	// Returns the iteration number across all VUs in the current scenario
+	// unique to this single k6 instance.
+	getNextScLocalIter func() uint64
+	// Returns the iteration number across all VUs in the current scenario
+	// unique globally across k6 instances (taking into account execution
+	// segments).
 	getNextScGlobalIter       func() uint64
 	scIterLocal, scIterGlobal uint64
 }
