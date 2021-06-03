@@ -172,6 +172,7 @@ func (carc ConstantArrivalRateConfig) NewExecutor(
 	return &ConstantArrivalRate{
 		BaseExecutor: NewBaseExecutor(&carc, es, logger),
 		config:       carc,
+		iterMx:       &sync.Mutex{},
 		globalIter:   &startIterGlobal,
 	}, nil
 }
@@ -188,7 +189,7 @@ type ConstantArrivalRate struct {
 	config     ConstantArrivalRateConfig
 	et         *lib.ExecutionTuple
 	segIdx     *lib.SegmentedIndex
-	iterMx     sync.Mutex
+	iterMx     *sync.Mutex
 	globalIter *uint64
 }
 

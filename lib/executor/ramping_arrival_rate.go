@@ -162,6 +162,7 @@ func (varc RampingArrivalRateConfig) NewExecutor(
 	return &RampingArrivalRate{
 		BaseExecutor: NewBaseExecutor(&varc, es, logger),
 		config:       varc,
+		iterMx:       &sync.Mutex{},
 		globalIter:   &startGlobalIter,
 	}, nil
 }
@@ -179,7 +180,7 @@ type RampingArrivalRate struct {
 	config     RampingArrivalRateConfig
 	et         *lib.ExecutionTuple
 	segIdx     *lib.SegmentedIndex
-	iterMx     sync.Mutex
+	iterMx     *sync.Mutex
 	globalIter *int64
 }
 
