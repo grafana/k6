@@ -152,6 +152,7 @@ func (sic SharedIterationsConfig) NewExecutor(
 	return &SharedIterations{
 		BaseExecutor: NewBaseExecutor(sic, es, logger),
 		config:       sic,
+		iterMx:       &sync.Mutex{},
 		globalIter:   &startGlobalIter,
 	}, nil
 }
@@ -163,7 +164,7 @@ type SharedIterations struct {
 	config     SharedIterationsConfig
 	et         *lib.ExecutionTuple
 	segIdx     *lib.SegmentedIndex
-	iterMx     sync.Mutex
+	iterMx     *sync.Mutex
 	globalIter *int64
 }
 
