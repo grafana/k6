@@ -158,12 +158,10 @@ func (varc RampingArrivalRateConfig) GetExecutionRequirements(et *lib.ExecutionT
 func (varc RampingArrivalRateConfig) NewExecutor(
 	es *lib.ExecutionState, logger *logrus.Entry,
 ) (lib.Executor, error) {
-	startGlobalIter := int64(-1)
 	return &RampingArrivalRate{
 		BaseExecutor: NewBaseExecutor(&varc, es, logger),
 		config:       varc,
 		iterMx:       &sync.Mutex{},
-		globalIter:   &startGlobalIter,
 	}, nil
 }
 
@@ -177,11 +175,10 @@ func (varc RampingArrivalRateConfig) HasWork(et *lib.ExecutionTuple) bool {
 // TODO: combine with the ConstantArrivalRate?
 type RampingArrivalRate struct {
 	*BaseExecutor
-	config     RampingArrivalRateConfig
-	et         *lib.ExecutionTuple
-	segIdx     *lib.SegmentedIndex
-	iterMx     *sync.Mutex
-	globalIter *int64
+	config RampingArrivalRateConfig
+	et     *lib.ExecutionTuple
+	iterMx *sync.Mutex
+	segIdx *lib.SegmentedIndex
 }
 
 // Make sure we implement the lib.Executor interface.

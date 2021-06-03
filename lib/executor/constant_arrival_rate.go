@@ -168,12 +168,10 @@ func (carc ConstantArrivalRateConfig) GetExecutionRequirements(et *lib.Execution
 func (carc ConstantArrivalRateConfig) NewExecutor(
 	es *lib.ExecutionState, logger *logrus.Entry,
 ) (lib.Executor, error) {
-	startIterGlobal := ^uint64(0)
 	return &ConstantArrivalRate{
 		BaseExecutor: NewBaseExecutor(&carc, es, logger),
 		config:       carc,
 		iterMx:       &sync.Mutex{},
-		globalIter:   &startIterGlobal,
 	}, nil
 }
 
@@ -186,11 +184,10 @@ func (carc ConstantArrivalRateConfig) HasWork(et *lib.ExecutionTuple) bool {
 // specific period.
 type ConstantArrivalRate struct {
 	*BaseExecutor
-	config     ConstantArrivalRateConfig
-	et         *lib.ExecutionTuple
-	segIdx     *lib.SegmentedIndex
-	iterMx     *sync.Mutex
-	globalIter *uint64
+	config ConstantArrivalRateConfig
+	et     *lib.ExecutionTuple
+	iterMx *sync.Mutex
+	segIdx *lib.SegmentedIndex
 }
 
 // Make sure we implement the lib.Executor interface.
