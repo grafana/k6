@@ -93,7 +93,7 @@ type vuHandle struct {
 	getVU                func() (lib.InitializedVU, error)
 	returnVU             func(lib.InitializedVU)
 	getScenarioVUID      func() uint64
-	getScenarioLocalIter func() int64
+	getScenarioLocalIter func() uint64
 	iterSync             chan struct{}
 	config               *BaseConfig
 
@@ -112,7 +112,7 @@ type vuHandle struct {
 func newStoppedVUHandle(
 	parentCtx context.Context, getVU func() (lib.InitializedVU, error),
 	returnVU func(lib.InitializedVU), getScenarioVUID func() uint64,
-	getScenarioLocalIter func() int64, iterSync chan struct{},
+	getScenarioLocalIter func() uint64, iterSync chan struct{},
 	config *BaseConfig, logger *logrus.Entry,
 ) *vuHandle {
 	ctx, cancel := context.WithCancel(parentCtx)

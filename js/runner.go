@@ -217,7 +217,7 @@ func (r *Runner) newVU(id uint64, samplesOut chan<- stats.SampleContainer) (*VU,
 		BPool:          bpool.NewBufferPool(100),
 		Samples:        samplesOut,
 		scenarioID:     make(map[string]uint64),
-		scenarioIter:   make(map[string]int64),
+		scenarioIter:   make(map[string]uint64),
 	}
 
 	vu.state = &lib.State{
@@ -545,7 +545,7 @@ type VU struct {
 	// ID of this VU in each scenario
 	scenarioID map[string]uint64
 	// count of iterations executed by this VU in each scenario
-	scenarioIter map[string]int64
+	scenarioIter map[string]uint64
 }
 
 // Verify that interfaces are implemented
@@ -563,9 +563,9 @@ type ActiveVU struct {
 	scenarioName string
 	// TODO: Document these
 	iterSync                  chan struct{}
-	getNextScLocalIter        func() int64
-	getNextScGlobalIter       func() int64
-	scIterLocal, scIterGlobal int64
+	getNextScLocalIter        func() uint64
+	getNextScGlobalIter       func() uint64
+	scIterLocal, scIterGlobal uint64
 }
 
 // GetID returns the unique VU ID.
@@ -621,7 +621,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		}
 	}
 
-	u.state.GetScenarioVUIter = func() int64 {
+	u.state.GetScenarioVUIter = func() uint64 {
 		return u.scenarioIter[params.Scenario]
 	}
 
@@ -631,17 +631,19 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		busy:                make(chan struct{}, 1),
 		scenarioName:        params.Scenario,
 		iterSync:            params.IterSync,
-		scIterLocal:         int64(-1),
-		scIterGlobal:        int64(-1),
+		scIterLocal:         ^uint64(0),
+		scIterGlobal:        ^uint64(0),
 		getNextScLocalIter:  params.GetNextScLocalIter,
 		getNextScGlobalIter: params.GetNextScGlobalIter,
 	}
 
-	u.state.GetScenarioLocalVUIter = func() int64 {
+	u.state.GetScenarioLocalVUIter = func() uint64 {
 		return avu.scIterLocal
 	}
-	u.state.GetScenarioGlobalVUIter = func() int64 {
-		return avu.scIterGlobal
+	if params.GetNextScGlobalIter != nil {
+		u.state.GetScenarioGlobalVUIter = func() uint64 {
+			return avu.scIterGlobal
+		}
 	}
 
 	go func() {
