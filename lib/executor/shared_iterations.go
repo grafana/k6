@@ -148,12 +148,10 @@ func (sic SharedIterationsConfig) GetExecutionRequirements(et *lib.ExecutionTupl
 func (sic SharedIterationsConfig) NewExecutor(
 	es *lib.ExecutionState, logger *logrus.Entry,
 ) (lib.Executor, error) {
-	startGlobalIter := int64(-1)
 	return &SharedIterations{
 		BaseExecutor: NewBaseExecutor(sic, es, logger),
 		config:       sic,
 		iterMx:       &sync.Mutex{},
-		globalIter:   &startGlobalIter,
 	}, nil
 }
 
@@ -161,11 +159,10 @@ func (sic SharedIterationsConfig) NewExecutor(
 // all shared by the configured VUs.
 type SharedIterations struct {
 	*BaseExecutor
-	config     SharedIterationsConfig
-	et         *lib.ExecutionTuple
-	segIdx     *lib.SegmentedIndex
-	iterMx     *sync.Mutex
-	globalIter *int64
+	config SharedIterationsConfig
+	et     *lib.ExecutionTuple
+	iterMx *sync.Mutex
+	segIdx *lib.SegmentedIndex
 }
 
 // Make sure we implement the lib.Executor interface.
