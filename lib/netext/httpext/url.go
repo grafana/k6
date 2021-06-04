@@ -38,7 +38,8 @@ type URL struct {
 func NewURL(urlString, name string) (URL, error) {
 	u, err := url.Parse(urlString)
 	if err != nil {
-		return URL{}, NewK6Error(invalidURLErrorCode, invalidURLErrorCodeMsg, err)
+		return URL{}, NewK6Error(invalidURLErrorCode,
+			fmt.Sprintf("%s: %s", invalidURLErrorCodeMsg, err), err)
 	}
 	newURL := URL{u: u, Name: name, URL: urlString}
 	newURL.CleanURL = newURL.Clean()
