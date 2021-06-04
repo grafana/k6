@@ -1522,7 +1522,7 @@ func TestExecutionStatsScenarioIter(t *testing.T) {
 					vus: 2,
 					iterations: 5,
 					startTime: '2s',
-					gracefulStop: '0s',
+					gracefulStop: '100ms',
 				},
 			},
 		};
@@ -1577,14 +1577,15 @@ func TestExecutionStatsScenarioIter(t *testing.T) {
 			err = json.Unmarshal([]byte(entry.Message), le)
 			require.NoError(t, err)
 			assert.Contains(t, []uint64{1, 2}, le.VUID)
-			scStats[le.Name] = le.Iteration
+			if le.Iteration > scStats[le.Name] {
+				scStats[le.Name] = le.Iteration
+			}
 		}
 		require.Len(t, scStats, 2)
 		// The global per scenario iteration count should be 9 (iterations
 		// start at 0), despite VUs being shared or more than 1 being used.
-		// InDelta is used to silence occasional flaky failures :-/
 		for _, v := range scStats {
-			assert.InDelta(t, uint64(9), v, 1)
+			assert.Equal(t, uint64(9), v)
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("timed out")
