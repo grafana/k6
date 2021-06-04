@@ -89,6 +89,11 @@ func (h *HTTP) Options(ctx context.Context, url goja.Value, args ...goja.Value) 
 // Request makes an http request of the provided `method` and returns a corresponding response by
 // taking goja.Values as arguments
 func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args ...goja.Value) (*Response, error) {
+	state := lib.GetState(ctx)
+	if state == nil {
+		return nil, ErrHTTPForbiddenInInitContext
+	}
+
 	var body interface{}
 	var params goja.Value
 
@@ -100,8 +105,12 @@ func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args 
 	}
 
 	req, err := h.parseRequest(ctx, method, url, body, params)
-	if err != nil || req == nil {
-		return nil, err
+	if err != nil {
+		if state.Options.Throw.Bool {
+			return nil, err
+		}
+		state.Logger.WithField("error", err).Warn("Request Failed")
+		return &Response{Response: &httpext.Response{}}, nil
 	}
 
 	resp, err := httpext.MakeRequest(ctx, req)
@@ -125,11 +134,7 @@ func (h *HTTP) parseRequest(
 
 	u, err := httpext.ToURL(reqURL.Export())
 	if err != nil {
-		if state.Options.Throw.Bool {
-			return nil, err
-		}
-		state.Logger.WithField("error", err).Warn("Request Failed")
-		return nil, nil
+		return nil, err
 	}
 
 	result := &httpext.ParsedHTTPRequest{
@@ -378,9 +383,9 @@ func (h *HTTP) parseRequest(
 
 func (h *HTTP) prepareBatchArray(
 	ctx context.Context, requests []interface{},
-) ([]*httpext.BatchParsedHTTPRequest, []*Response, error) {
+) ([]httpext.BatchParsedHTTPRequest, []*Response, error) {
 	reqCount := len(requests)
-	batchReqs := make([]*httpext.BatchParsedHTTPRequest, reqCount)
+	batchReqs := make([]httpext.BatchParsedHTTPRequest, reqCount)
 	results := make([]*Response, reqCount)
 
 	for i, req := range requests {
@@ -388,14 +393,8 @@ func (h *HTTP) prepareBatchArray(
 		if err != nil {
 			return nil, nil, err
 		}
-		if parsedReq == nil {
-			// There was an error, but throw is disabled
-			batchReqs[i] = nil
-			results[i] = nil
-			continue
-		}
 		response := new(httpext.Response)
-		batchReqs[i] = &httpext.BatchParsedHTTPRequest{
+		batchReqs[i] = httpext.BatchParsedHTTPRequest{
 			ParsedHTTPRequest: parsedReq,
 			Response:          response,
 		}
@@ -407,9 +406,9 @@ func (h *HTTP) prepareBatchArray(
 
 func (h *HTTP) prepareBatchObject(
 	ctx context.Context, requests map[string]interface{},
-) ([]*httpext.BatchParsedHTTPRequest, map[string]*Response, error) {
+) ([]httpext.BatchParsedHTTPRequest, map[string]*Response, error) {
 	reqCount := len(requests)
-	batchReqs := make([]*httpext.BatchParsedHTTPRequest, reqCount)
+	batchReqs := make([]httpext.BatchParsedHTTPRequest, reqCount)
 	results := make(map[string]*Response, reqCount)
 
 	i := 0
@@ -418,15 +417,8 @@ func (h *HTTP) prepareBatchObject(
 		if err != nil {
 			return nil, nil, err
 		}
-		if parsedReq == nil {
-			// There was an error, but throw is disabled
-			batchReqs[i] = nil
-			results[key] = nil
-			i++
-			continue
-		}
 		response := new(httpext.Response)
-		batchReqs[i] = &httpext.BatchParsedHTTPRequest{
+		batchReqs[i] = httpext.BatchParsedHTTPRequest{
 			ParsedHTTPRequest: parsedReq,
 			Response:          response,
 		}
@@ -440,6 +432,7 @@ func (h *HTTP) prepareBatchObject(
 // Batch makes multiple simultaneous HTTP requests. The provideds reqsV should be an array of request
 // objects. Batch returns an array of responses and/or error
 func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) {
+	rt := common.GetRuntime(ctx)
 	state := lib.GetState(ctx)
 	if state == nil {
 		return nil, ErrBatchForbiddenInInitContext
@@ -447,7 +440,7 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 
 	var (
 		err       error
-		batchReqs []*httpext.BatchParsedHTTPRequest
+		batchReqs []httpext.BatchParsedHTTPRequest
 		results   interface{} // either []*Response or map[string]*Response
 	)
 
@@ -461,7 +454,11 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 	}
 
 	if err != nil {
-		return nil, err
+		if state.Options.Throw.Bool {
+			return nil, err
+		}
+		state.Logger.WithField("error", err).Warn("A batch request failed")
+		return rt.ToValue(results), nil
 	}
 
 	reqCount := len(batchReqs)
@@ -476,7 +473,7 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 			err = e
 		}
 	}
-	return common.GetRuntime(ctx).ToValue(results), err
+	return rt.ToValue(results), err
 }
 
 func (h *HTTP) parseBatchRequest(

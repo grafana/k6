@@ -574,8 +574,12 @@ func TestRequestAndBatch(t *testing.T) {
 	})
 	t.Run("InvalidURL", func(t *testing.T) {
 		t.Parallel()
-		js := `http.request("GET", "https:// test.k6.io");`
+
 		t.Run("throw=true", func(t *testing.T) {
+			js := `
+				http.request("GET", "https:// test.k6.io");
+				throw new Error("whoops!"); // shouldn't be reached
+			`
 			_, err := rt.RunString(js)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(),
@@ -590,8 +594,15 @@ func TestRequestAndBatch(t *testing.T) {
 			hook := logtest.NewLocal(state.Logger)
 			defer hook.Reset()
 
-			_, err := rt.RunString(js)
+			js := `
+				(function(){
+					var r = http.request("GET", "https:// test.k6.io");
+	                return r.error_code;
+				})()
+			`
+			v, err := rt.RunString(js)
 			require.NoError(t, err)
+			require.Equal(t, int64(0), v.Export())
 
 			logEntry := hook.LastEntry()
 			require.NotNil(t, logEntry)
@@ -1266,7 +1277,7 @@ func TestRequestAndBatch(t *testing.T) {
 						require.NotNil(t, logEntry)
 						assert.Equal(t, logrus.WarnLevel, logEntry.Level)
 						assert.Contains(t, logEntry.Data["error"].(error).Error(), tc.expErr)
-						assert.Equal(t, "Request Failed", logEntry.Message)
+						assert.Equal(t, "A batch request failed", logEntry.Message)
 					}
 				})
 			}
