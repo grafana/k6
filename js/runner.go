@@ -43,6 +43,8 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
@@ -371,7 +373,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 			return nil, err
 		}
 		// otherwise we have timeouted
-		return nil, lib.NewTimeoutError(consts.HandleSummaryFn, r.getTimeoutFor(consts.HandleSummaryFn))
+		return nil, newTimeoutError(consts.HandleSummaryFn, r.getTimeoutFor(consts.HandleSummaryFn))
 	}
 
 	if err != nil {
@@ -502,7 +504,7 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 			return v, err
 		}
 		// otherwise we have timeouted
-		return v, lib.NewTimeoutError(name, r.getTimeoutFor(name))
+		return v, newTimeoutError(name, r.getTimeoutFor(name))
 	}
 	return v, err
 }
@@ -739,7 +741,7 @@ type scriptException struct {
 	inner *goja.Exception
 }
 
-var _ types.ScriptException = &scriptException{}
+var _ errext.Exception = &scriptException{}
 
 func (s *scriptException) Error() string {
 	// this calls String instead of error so that by default if it's printed to print the stacktrace
@@ -752,4 +754,12 @@ func (s *scriptException) StackTrace() string {
 
 func (s *scriptException) Unwrap() error {
 	return s.inner
+}
+
+func (s *scriptException) Hint() string {
+	return "script exception"
+}
+
+func (s *scriptException) ExitCode() errext.ExitCode {
+	return exitcodes.ScriptException
 }

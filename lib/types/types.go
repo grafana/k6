@@ -280,10 +280,3 @@ func GetDurationValue(v interface{}) (time.Duration, error) {
 		return time.Duration(n) * time.Millisecond, nil
 	}
 }
-
-// ScriptException is an interface used to represent an error as a result of a script exception.
-type ScriptException interface {
-	error
-	// StackTrace is the string representation of the stacktrace of where the script exception happened
-	StackTrace() string
-}

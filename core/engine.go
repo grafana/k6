@@ -30,9 +30,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/errext"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
-	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/stats"
 )
@@ -255,7 +255,7 @@ func (e *Engine) startBackgroundProcesses(
 		case err := <-runResult:
 			if err != nil {
 				e.logger.WithError(err).Debug("run: execution scheduler returned an error")
-				var serr types.ScriptException
+				var serr errext.Exception
 				if errors.As(err, &serr) {
 					e.setRunStatus(lib.RunStatusAbortedScriptError)
 				} else {

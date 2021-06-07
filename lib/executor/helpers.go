@@ -29,6 +29,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"go.k6.io/k6/errext"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/ui/pb"
@@ -97,7 +98,7 @@ func getIterationRunner(
 			return false
 		default:
 			if err != nil {
-				var exception types.ScriptException
+				var exception errext.Exception
 				if errors.As(err, &exception) {
 					// TODO don't count this as a full iteration?
 					logger.WithField("source", "stacktrace").Error(exception.StackTrace())
