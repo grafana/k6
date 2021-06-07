@@ -771,6 +771,55 @@ func TestSetupException(t *testing.T) {
 	}
 }
 
+func TestVuInitException(t *testing.T) {
+	t.Parallel()
+
+	script := []byte(`
+		export let options = {
+			vus: 3,
+			iterations: 5,
+		};
+
+		export default function() {};
+
+		if (__VU == 2) {
+			throw new Error('oops in ' + __VU);
+		}
+	`)
+
+	logger := testutils.NewLogger(t)
+	runner, err := js.New(
+		logger,
+		&loader.SourceData{URL: &url.URL{Scheme: "file", Path: "/script.js"}, Data: script},
+		nil, lib.RuntimeOptions{},
+	)
+	require.NoError(t, err)
+
+	opts, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions())
+	require.NoError(t, err)
+	require.Empty(t, opts.Validate())
+	require.NoError(t, runner.SetOptions(opts))
+
+	execScheduler, err := local.NewExecutionScheduler(runner, logger)
+	require.NoError(t, err)
+	engine, err := NewEngine(execScheduler, opts, lib.RuntimeOptions{}, nil, logger)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_, _, err = engine.Init(ctx, ctx) // no need for 2 different contexts
+
+	require.Error(t, err)
+
+	var exception errext.Exception
+	require.ErrorAs(t, err, &exception)
+	assert.Equal(t, "Error: oops in 2\n\tat file:///script.js:10:8(32)\n", err.Error())
+
+	var errWithHint errext.HasHint
+	require.ErrorAs(t, err, &errWithHint)
+	assert.Equal(t, "error while initializing VU #2 (script exception)", errWithHint.Hint())
+}
+
 func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)

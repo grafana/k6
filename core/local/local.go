@@ -29,6 +29,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"go.k6.io/k6/errext"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/stats"
 	"go.k6.io/k6/ui/pb"
@@ -161,7 +162,7 @@ func (e *ExecutionScheduler) initVU(
 	vuID := e.state.GetUniqueVUIdentifier()
 	vu, err := e.runner.NewVU(int64(vuID), samplesOut)
 	if err != nil {
-		return nil, fmt.Errorf("error while initializing VU #%d: '%s'", vuID, err)
+		return nil, errext.WithHint(err, fmt.Sprintf("error while initializing VU #%d", vuID))
 	}
 
 	logger.Debugf("Initialized VU #%d", vuID)
@@ -273,7 +274,7 @@ func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- stats.S
 		executorConfig := exec.GetConfig()
 
 		if err := exec.Init(ctx); err != nil {
-			return fmt.Errorf("error while initializing executor %s: %s", executorConfig.GetName(), err)
+			return fmt.Errorf("error while initializing executor %s: %w", executorConfig.GetName(), err)
 		}
 		logger.Debugf("Initialized executor %s", executorConfig.GetName())
 	}
