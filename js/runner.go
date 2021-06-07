@@ -43,8 +43,6 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
@@ -735,31 +733,4 @@ func (u *VU) runFn(
 	u.state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, isDefault, stats.NewSampleTags(u.state.Tags))
 
 	return v, isFullIteration, endTime.Sub(startTime), err
-}
-
-type scriptException struct {
-	inner *goja.Exception
-}
-
-var _ errext.Exception = &scriptException{}
-
-func (s *scriptException) Error() string {
-	// this calls String instead of error so that by default if it's printed to print the stacktrace
-	return s.inner.String()
-}
-
-func (s *scriptException) StackTrace() string {
-	return s.inner.String()
-}
-
-func (s *scriptException) Unwrap() error {
-	return s.inner
-}
-
-func (s *scriptException) Hint() string {
-	return "script exception"
-}
-
-func (s *scriptException) ExitCode() errext.ExitCode {
-	return exitcodes.ScriptException
 }

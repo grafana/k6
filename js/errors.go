@@ -24,10 +24,41 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dop251/goja"
+
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/consts"
 )
+
+// scriptException is used for errors that resulted from a script exception and
+// contain a stack trace that lead to them.
+type scriptException struct {
+	inner *goja.Exception
+}
+
+var _ errext.Exception = &scriptException{}
+
+func (s *scriptException) Error() string {
+	// this calls String instead of error so that by default if it's printed to print the stacktrace
+	return s.inner.String()
+}
+
+func (s *scriptException) StackTrace() string {
+	return s.inner.String()
+}
+
+func (s *scriptException) Unwrap() error {
+	return s.inner
+}
+
+func (s *scriptException) Hint() string {
+	return "script exception"
+}
+
+func (s *scriptException) ExitCode() errext.ExitCode {
+	return exitcodes.ScriptException
+}
 
 // timeoutError is used when some operation times out.
 type timeoutError struct {
