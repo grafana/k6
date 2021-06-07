@@ -124,7 +124,7 @@ func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args 
 //TODO break this function up
 //nolint: gocyclo
 func (h *HTTP) parseRequest(
-	ctx context.Context, method string, reqURL goja.Value, body interface{}, params goja.Value,
+	ctx context.Context, method string, reqURL, body interface{}, params goja.Value,
 ) (*httpext.ParsedHTTPRequest, error) {
 	rt := common.GetRuntime(ctx)
 	state := lib.GetState(ctx)
@@ -132,7 +132,10 @@ func (h *HTTP) parseRequest(
 		return nil, ErrHTTPForbiddenInInitContext
 	}
 
-	u, err := httpext.ToURL(reqURL.Export())
+	if urlJSValue, ok := reqURL.(goja.Value); ok {
+		reqURL = urlJSValue.Export()
+	}
+	u, err := httpext.ToURL(reqURL)
 	if err != nil {
 		return nil, err
 	}
@@ -480,11 +483,11 @@ func (h *HTTP) parseBatchRequest(
 	ctx context.Context, key interface{}, val interface{},
 ) (*httpext.ParsedHTTPRequest, error) {
 	var (
-		method         = HTTP_METHOD_GET
-		ok             bool
-		body           interface{}
-		reqURL, params goja.Value
-		rt             = common.GetRuntime(ctx)
+		method       = HTTP_METHOD_GET
+		ok           bool
+		body, reqURL interface{}
+		params       goja.Value
+		rt           = common.GetRuntime(ctx)
 	)
 
 	switch data := val.(type) {
@@ -498,7 +501,7 @@ func (h *HTTP) parseBatchRequest(
 		if !ok {
 			return nil, fmt.Errorf("invalid method type '%#v'", data[0])
 		}
-		reqURL = rt.ToValue(data[1])
+		reqURL = data[1]
 		if dataLen > 2 {
 			body = data[2]
 		}
@@ -512,7 +515,7 @@ func (h *HTTP) parseBatchRequest(
 			return nil, fmt.Errorf("batch request %v doesn't have a url key", key)
 		}
 
-		reqURL = rt.ToValue(data["url"])
+		reqURL = data["url"]
 		body = data["body"] // It's fine if it's missing, the map lookup will return
 
 		if newMethod, ok := data["method"]; ok {
@@ -528,8 +531,8 @@ func (h *HTTP) parseBatchRequest(
 		if p, ok := data["params"]; ok {
 			params = rt.ToValue(p)
 		}
-	case string, httpext.URL:
-		reqURL = rt.ToValue(data)
+	default:
+		reqURL = val
 	}
 
 	return h.parseRequest(ctx, method, reqURL, body, params)
