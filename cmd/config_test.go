@@ -29,6 +29,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/testutils"
@@ -177,6 +179,9 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 			_, err := deriveAndValidateConfig(tc.conf,
 				func(_ string) bool { return tc.isExec })
 			if tc.err != "" {
+				var ecerr errext.HasExitCode
+				assert.ErrorAs(t, err, &ecerr)
+				assert.Equal(t, exitcodes.InvalidConfig, ecerr.ExitCode())
 				assert.Contains(t, err.Error(), tc.err)
 			} else {
 				assert.NoError(t, err)

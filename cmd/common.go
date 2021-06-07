@@ -44,14 +44,6 @@ func must(err error) {
 	}
 }
 
-// ExitCode wraps the error with an exit code.
-// Hint is used to show details information about underlying error.
-type ExitCode struct {
-	error
-	Code int
-	Hint string
-}
-
 //TODO: refactor the CLI config so these functions aren't needed - they
 // can mask errors by failing only at runtime, not at compile time
 func getNullBool(flags *pflag.FlagSet, key string) null.Bool {

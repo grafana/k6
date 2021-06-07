@@ -22,6 +22,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -38,6 +39,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"go.k6.io/k6/errext"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/log"
 )
@@ -178,23 +180,37 @@ func Execute() {
 	)
 
 	if err := c.cmd.Execute(); err != nil {
-		fields := logrus.Fields{}
-		code := -1
-		if e, ok := err.(ExitCode); ok {
-			code = e.Code
-			if e.Hint != "" {
-				fields["hint"] = e.Hint
-			}
+		exitCode := -1
+		var ecerr errext.HasExitCode
+		if errors.As(err, &ecerr) {
+			exitCode = int(ecerr.ExitCode())
 		}
 
-		logger.WithFields(fields).Error(err)
+		hint := ""
+		var herr errext.HasHint
+		if errors.As(err, &herr) {
+			hint = herr.Hint()
+		}
+
+		errText := err.Error()
+		var xerr errext.Exception
+		if errors.As(err, &xerr) {
+			errText = xerr.StackTrace()
+		}
+
+		fields := logrus.Fields{}
+		if hint != "" {
+			fields["hint"] = hint
+		}
+
+		logger.WithFields(fields).Error(errText)
 		if c.loggerIsRemote {
-			fallbackLogger.WithFields(fields).Error(err)
+			fallbackLogger.WithFields(fields).Error(errText)
 			cancel()
 			c.waitRemoteLogger()
 		}
 
-		os.Exit(code)
+		os.Exit(exitCode) //nolint:gocritic
 	}
 
 	cancel()

@@ -35,6 +35,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/core/local"
+	"go.k6.io/k6/errext"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
@@ -762,7 +763,7 @@ func TestSetupException(t *testing.T) {
 		t.Fatal("Test timed out")
 	case err := <-errC:
 		require.Error(t, err)
-		var exception types.ScriptException
+		var exception errext.Exception
 		require.ErrorAs(t, err, &exception)
 		require.Equal(t, "Error: baz\n\tat baz (file:///bar.js:7:8(4))\n"+
 			"\tat file:///bar.js:4:5(3)\n\tat setup (file:///script.js:7:204(4))\n",
