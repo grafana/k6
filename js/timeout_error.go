@@ -18,44 +18,41 @@
  *
  */
 
-package lib
+package js
 
 import (
 	"fmt"
 	"time"
 
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/consts"
 )
 
-// TimeoutError is used when somethings timeouts
-type TimeoutError struct {
+// timeoutError is used when some operation times out.
+type timeoutError struct {
 	place string
 	d     time.Duration
 }
 
-// NewTimeoutError returns a new TimeoutError reporting that timeout has happened
-// at the given place and given duration.
-func NewTimeoutError(place string, d time.Duration) TimeoutError {
-	return TimeoutError{place: place, d: d}
+var (
+	_ errext.HasExitCode = timeoutError{}
+	_ errext.HasHint     = timeoutError{}
+)
+
+// newTimeoutError returns a new timeout error, reporting that a timeout has
+// happened at the given place and given duration.
+func newTimeoutError(place string, d time.Duration) timeoutError {
+	return timeoutError{place: place, d: d}
 }
 
-// String returns timeout error in human readable format.
-func (t TimeoutError) String() string {
+// String returns the timeout error in human readable format.
+func (t timeoutError) Error() string {
 	return fmt.Sprintf("%s() execution timed out after %.f seconds", t.place, t.d.Seconds())
 }
 
-// Error implements error interface.
-func (t TimeoutError) Error() string {
-	return t.String()
-}
-
-// Place returns the place where timeout occurred.
-func (t TimeoutError) Place() string {
-	return t.place
-}
-
-// Hint returns a hint message for logging with given stage.
-func (t TimeoutError) Hint() string {
+// Hint potentially returns a hint message for fixing the error.
+func (t timeoutError) Hint() string {
 	hint := ""
 
 	switch t.place {
@@ -65,4 +62,17 @@ func (t TimeoutError) Hint() string {
 		hint = "You can increase the time limit via the teardownTimeout option"
 	}
 	return hint
+}
+
+// ExitCode returns the coresponding exit code value to the place.
+func (t timeoutError) ExitCode() errext.ExitCode {
+	// TODO: add handleSummary()
+	switch t.place {
+	case consts.SetupFn:
+		return exitcodes.SetupTimeout
+	case consts.TeardownFn:
+		return exitcodes.TeardownTimeout
+	default:
+		return exitcodes.GenericTimeout
+	}
 }

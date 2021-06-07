@@ -80,8 +80,9 @@ An archive is a fully self-contained test run, and can be executed identically e
 				return err
 			}
 
-			if _, cerr := deriveAndValidateConfig(conf, r.IsExecutable); cerr != nil {
-				return ExitCode{error: cerr, Code: invalidConfigErrorCode}
+			_, err = deriveAndValidateConfig(conf, r.IsExecutable)
+			if err != nil {
+				return err
 			}
 
 			err = r.SetOptions(conf.Options)

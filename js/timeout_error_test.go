@@ -18,7 +18,7 @@
  *
  */
 
-package lib
+package js
 
 import (
 	"strings"
@@ -29,6 +29,7 @@ import (
 )
 
 func TestTimeoutError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		stage, expectedStrContain string
 		d                         time.Duration
@@ -39,14 +40,15 @@ func TestTimeoutError(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		te := NewTimeoutError(tc.stage, tc.d)
-		if !strings.Contains(te.String(), tc.expectedStrContain) {
-			t.Errorf("Expected error contains %s, but got: %s", tc.expectedStrContain, te.String())
+		te := newTimeoutError(tc.stage, tc.d)
+		if !strings.Contains(te.Error(), tc.expectedStrContain) {
+			t.Errorf("Expected error contains %s, but got: %s", tc.expectedStrContain, te.Error())
 		}
 	}
 }
 
 func TestTimeoutErrorHint(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		stage string
 		empty bool
@@ -57,7 +59,7 @@ func TestTimeoutErrorHint(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		te := NewTimeoutError(tc.stage, time.Second)
+		te := newTimeoutError(tc.stage, time.Second)
 		if tc.empty && te.Hint() != "" {
 			t.Errorf("Expected empty hint, got: %s", te.Hint())
 		}

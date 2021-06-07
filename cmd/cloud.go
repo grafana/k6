@@ -41,15 +41,12 @@ import (
 	"github.com/spf13/pflag"
 
 	"go.k6.io/k6/cloudapi"
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/ui/pb"
-)
-
-const (
-	cloudFailedToGetProgressErrorCode = 98
-	cloudTestRunFailedErrorCode       = 99
 )
 
 //nolint:gochecknoglobals
@@ -126,9 +123,9 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				return err
 			}
 
-			derivedConf, cerr := deriveAndValidateConfig(conf, r.IsExecutable)
-			if cerr != nil {
-				return ExitCode{error: cerr, Code: invalidConfigErrorCode}
+			derivedConf, err := deriveAndValidateConfig(conf, r.IsExecutable)
+			if err != nil {
+				return err
 			}
 
 			// TODO: validate for usage of execution segment
@@ -233,7 +230,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 
 				sig = <-sigC
 				logger.WithField("sig", sig).Error("Aborting k6 in response to signal, we won't wait for the test to end.")
-				os.Exit(externalAbortErrorCode)
+				os.Exit(int(exitcodes.ExternalAbort))
 			}()
 
 			et, err := lib.NewExecutionTuple(derivedConf.ExecutionSegment, derivedConf.ExecutionSegmentSequence)
@@ -329,16 +326,17 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			}
 
 			if testProgress == nil {
-				//nolint:golint
-				return ExitCode{error: errors.New("Test progress error"), Code: cloudFailedToGetProgressErrorCode}
+				//nolint:stylecheck,golint
+				return errext.WithExitCode(errors.New("Test progress error"), exitcodes.CloudFailedToGetProgress)
 			}
 
 			valueColor := getColor(noColor || !stdoutTTY, color.FgCyan)
 			fprintf(stdout, "     test status: %s\n", valueColor.Sprint(testProgress.RunStatusText))
 
 			if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
-				//nolint:golint
-				return ExitCode{error: errors.New("The test has failed"), Code: cloudTestRunFailedErrorCode}
+				// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
+				//nolint:stylecheck,golint
+				return errext.WithExitCode(errors.New("The test has failed"), exitcodes.CloudTestRunFailed)
 			}
 
 			return nil
