@@ -741,7 +741,11 @@ type scriptException struct {
 	inner *goja.Exception
 }
 
-var _ errext.Exception = &scriptException{}
+var (
+	_ errext.Exception   = &scriptException{}
+	_ errext.HasExitCode = &scriptException{}
+	_ errext.HasHint     = &scriptException{}
+)
 
 func (s *scriptException) Error() string {
 	// this calls String instead of error so that by default if it's printed to print the stacktrace

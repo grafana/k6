@@ -327,7 +327,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 
 			if testProgress == nil {
 				//nolint:stylecheck,golint
-				return errext.WithExitCode(errors.New("Test progress error"), exitcodes.CloudFailedToGetProgress)
+				return errext.WithExitCodeIfNone(errors.New("Test progress error"), exitcodes.CloudFailedToGetProgress)
 			}
 
 			valueColor := getColor(noColor || !stdoutTTY, color.FgCyan)
@@ -336,7 +336,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
 				// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
 				//nolint:stylecheck,golint
-				return errext.WithExitCode(errors.New("The test has failed"), exitcodes.CloudTestRunFailed)
+				return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed)
 			}
 
 			return nil
