@@ -46,6 +46,7 @@ const (
 	// non specific
 	defaultErrorCode          errCode = 1000
 	defaultNetNonTCPErrorCode errCode = 1010
+	invalidURLErrorCode       errCode = 1020
 	requestTimeoutErrorCode   errCode = 1050
 	// DNS errors
 	defaultDNSErrorCode      errCode = 1100
@@ -101,6 +102,7 @@ const (
 	x509HostnameErrorCodeMsg    = "x509: certificate doesn't match hostname"
 	x509UnknownAuthority        = "x509: unknown authority"
 	requestTimeoutErrorCodeMsg  = "request timeout"
+	invalidURLErrorCodeMsg      = "invalid URL"
 )
 
 func http2ErrCodeOffset(code http2.ErrCode) errCode {
