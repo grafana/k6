@@ -575,6 +575,7 @@ func TestRequestAndBatch(t *testing.T) {
 	t.Run("InvalidURL", func(t *testing.T) {
 		t.Parallel()
 
+		expErr := `invalid URL: parse "https:// test.k6.io": invalid character " " in host name`
 		t.Run("throw=true", func(t *testing.T) {
 			js := `
 				http.request("GET", "https:// test.k6.io");
@@ -582,12 +583,10 @@ func TestRequestAndBatch(t *testing.T) {
 			`
 			_, err := rt.RunString(js)
 			require.Error(t, err)
-			assert.Contains(t, err.Error(),
-				`invalid URL: parse "https:// test.k6.io": invalid character " " in host name`)
+			assert.Contains(t, err.Error(), expErr)
 		})
 
 		t.Run("throw=false", func(t *testing.T) {
-			// Disable throw only on this sub-test
 			state.Options.Throw.Bool = false
 			defer func() { state.Options.Throw.Bool = true }()
 
@@ -597,18 +596,24 @@ func TestRequestAndBatch(t *testing.T) {
 			js := `
 				(function(){
 					var r = http.request("GET", "https:// test.k6.io");
-	                return r.error_code;
+	                return {error: r.error, error_code: r.error_code};
 				})()
 			`
-			v, err := rt.RunString(js)
+			ret, err := rt.RunString(js)
 			require.NoError(t, err)
-			require.Equal(t, int64(0), v.Export())
+			require.NotNil(t, ret)
+			var retobj map[string]interface{}
+			var ok bool
+			if retobj, ok = ret.Export().(map[string]interface{}); !ok {
+				require.Fail(t, "got wrong return object: %#+v", retobj)
+			}
+			require.Equal(t, int64(1020), retobj["error_code"])
+			require.Equal(t, expErr, retobj["error"])
 
 			logEntry := hook.LastEntry()
 			require.NotNil(t, logEntry)
 			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-			assert.Contains(t, logEntry.Data["error"].(error).Error(),
-				`invalid URL: parse "https:// test.k6.io": invalid character " " in host name`)
+			assert.Contains(t, logEntry.Data["error"].(error).Error(), expErr)
 			assert.Equal(t, "Request Failed", logEntry.Message)
 		})
 
@@ -622,21 +627,20 @@ func TestRequestAndBatch(t *testing.T) {
 			js := `
 				(function(){
 					var r = http.request("GET", "https:// test.k6.io");
-					r.html()
-					r.json()
-	                return r.error_code;
+					r.html();
+					r.json();
+	                return r.error_code; // not reached because of json()
 				})()
 			`
-			v, err := rt.RunString(js)
+			ret, err := rt.RunString(js)
 			require.Error(t, err)
-			assert.Nil(t, v)
+			assert.Nil(t, ret)
 			assert.Contains(t, err.Error(), "unexpected end of JSON input")
 
 			logEntry := hook.LastEntry()
 			require.NotNil(t, logEntry)
 			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-			assert.Contains(t, logEntry.Data["error"].(error).Error(),
-				`invalid URL: parse "https:// test.k6.io": invalid character " " in host name`)
+			assert.Contains(t, logEntry.Data["error"].(error).Error(), expErr)
 			assert.Equal(t, "Request Failed", logEntry.Message)
 		})
 	})
@@ -1296,17 +1300,81 @@ func TestRequestAndBatch(t *testing.T) {
 					hook := logtest.NewLocal(state.Logger)
 					defer hook.Reset()
 
-					_, err := rt.RunString(fmt.Sprintf(`http.batch(%s);`, tc.code))
+					ret, err := rt.RunString(fmt.Sprintf(`
+						(function(){
+							var r = http.batch(%s);
+							if (r.length !== 1) throw new Error('unexpected responses length: '+r.length);
+							return {error: r[0].error, error_code: r[0].error_code};
+						})()`, tc.code))
 					if tc.throw {
 						require.Error(t, err)
 						assert.Contains(t, err.Error(), tc.expErr)
+						require.Nil(t, ret)
 					} else {
+						require.NoError(t, err)
+						require.NotNil(t, ret)
+						var retobj map[string]interface{}
+						var ok bool
+						if retobj, ok = ret.Export().(map[string]interface{}); !ok {
+							require.Fail(t, "got wrong return object: %#+v", retobj)
+						}
+						require.Equal(t, int64(1020), retobj["error_code"])
+						require.Equal(t, invalidURLerr, retobj["error"])
+
 						logEntry := hook.LastEntry()
 						require.NotNil(t, logEntry)
 						assert.Equal(t, logrus.WarnLevel, logEntry.Level)
 						assert.Contains(t, logEntry.Data["error"].(error).Error(), tc.expErr)
 						assert.Equal(t, "A batch request failed", logEntry.Message)
 					}
+				})
+			}
+		})
+		t.Run("error,nopanic", func(t *testing.T) { //nolint:paralleltest
+			invalidURLerr := `invalid URL: parse "https:// invalidurl.com": invalid character " " in host name`
+			testCases := []struct{ name, code string }{
+				{
+					name: "array", code: `[
+						["GET", "https:// invalidurl.com"],
+						["GET", "https://somevalidurl.com"],
+					]`,
+				},
+				{
+					name: "object", code: `[
+						{method: "GET", url: "https:// invalidurl.com"},
+						{method: "GET", url: "https://somevalidurl.com"},
+					]`,
+				},
+			}
+
+			for _, tc := range testCases {
+				tc := tc
+				t.Run(tc.name, func(t *testing.T) { //nolint:paralleltest
+					oldThrow := state.Options.Throw.Bool
+					state.Options.Throw.Bool = false
+					defer func() { state.Options.Throw.Bool = oldThrow }()
+
+					hook := logtest.NewLocal(state.Logger)
+					defer hook.Reset()
+
+					ret, err := rt.RunString(fmt.Sprintf(`
+						(function(){
+							var r = http.batch(%s);
+							if (r.length !== 2) throw new Error('unexpected responses length: '+r.length);
+							if (r[1] !== null) throw new Error('expected response at index 1 to be null');
+							r[0].html();
+							r[0].json();
+	            		    return r[0].error_code; // not reached because of json()
+						})()
+					`, tc.code))
+					require.Error(t, err)
+					assert.Nil(t, ret)
+					assert.Contains(t, err.Error(), "unexpected end of JSON input")
+					logEntry := hook.LastEntry()
+					require.NotNil(t, logEntry)
+					assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+					assert.Contains(t, logEntry.Data["error"].(error).Error(), invalidURLerr)
+					assert.Equal(t, "A batch request failed", logEntry.Message)
 				})
 			}
 		})
