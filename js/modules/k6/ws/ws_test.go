@@ -316,6 +316,7 @@ func TestSession(t *testing.T) {
 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
 
 	t.Run("client_cookie", func(t *testing.T) {
+		t.Parallel()
 		_, err := rt.RunString(sr(`
 		var params = {
 			cookies: { "Session": "123" },

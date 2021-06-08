@@ -106,7 +106,9 @@ type jsonBody struct {
 	Compression string      `json:"compression"`
 }
 
-func getWebsocketHandler(echo bool, closePrematurely bool, echoCookies bool) http.Handler {
+// TODO: Refactor this
+//nolint:cyclop
+func getWebsocketHandler(echo, closePrematurely, echoCookies bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
 		if err != nil {
