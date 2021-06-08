@@ -611,6 +611,34 @@ func TestRequestAndBatch(t *testing.T) {
 				`invalid URL: parse "https:// test.k6.io": invalid character " " in host name`)
 			assert.Equal(t, "Request Failed", logEntry.Message)
 		})
+
+		t.Run("throw=false,nopanic", func(t *testing.T) {
+			state.Options.Throw.Bool = false
+			defer func() { state.Options.Throw.Bool = true }()
+
+			hook := logtest.NewLocal(state.Logger)
+			defer hook.Reset()
+
+			js := `
+				(function(){
+					var r = http.request("GET", "https:// test.k6.io");
+					r.html()
+					r.json()
+	                return r.error_code;
+				})()
+			`
+			v, err := rt.RunString(js)
+			require.Error(t, err)
+			assert.Nil(t, v)
+			assert.Contains(t, err.Error(), "unexpected end of JSON input")
+
+			logEntry := hook.LastEntry()
+			require.NotNil(t, logEntry)
+			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+			assert.Contains(t, logEntry.Data["error"].(error).Error(),
+				`invalid URL: parse "https:// test.k6.io": invalid character " " in host name`)
+			assert.Equal(t, "Request Failed", logEntry.Message)
+		})
 	})
 
 	t.Run("Unroutable", func(t *testing.T) {

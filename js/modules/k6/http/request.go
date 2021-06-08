@@ -110,7 +110,7 @@ func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args 
 			return nil, err
 		}
 		state.Logger.WithField("error", err).Warn("Request Failed")
-		return &Response{Response: &httpext.Response{}}, nil
+		return &Response{Response: httpext.NewResponse(ctx)}, nil
 	}
 
 	resp, err := httpext.MakeRequest(ctx, req)
