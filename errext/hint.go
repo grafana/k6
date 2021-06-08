@@ -36,13 +36,7 @@ type HasHint interface {
 // "new hint (old hint)".
 func WithHint(err error, hint string) error {
 	if err == nil {
-		// No error, do nothing
-		return nil
-	}
-	var oldhint HasHint
-	if errors.As(err, &oldhint) {
-		// The given error already had a hint, wrap it
-		hint = hint + " (" + oldhint.Hint() + ")"
+		return nil // No error, do nothing
 	}
 	return withHint{err, hint}
 }
@@ -57,7 +51,14 @@ func (wh withHint) Unwrap() error {
 }
 
 func (wh withHint) Hint() string {
-	return wh.hint
+	hint := wh.hint
+	var oldhint HasHint
+	if errors.As(wh.error, &oldhint) {
+		// The given error already had a hint, wrap it
+		hint = hint + " (" + oldhint.Hint() + ")"
+	}
+
+	return hint
 }
 
 var _ HasHint = withHint{}

@@ -171,7 +171,7 @@ func readEnvConfig() (Config, error) {
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
 func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf Config, err error) {
-	// TODO: use errext.WithExitCode(err, exitcodes.InvalidConfig) where it makes sense?
+	// TODO: use errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig) where it makes sense?
 
 	fileConf, _, err := readDiskConfig(fs)
 	if err != nil {
@@ -232,7 +232,7 @@ func deriveAndValidateConfig(conf Config, isExecutable func(string) bool) (resul
 	if err == nil {
 		err = validateConfig(result, isExecutable)
 	}
-	return result, errext.WithExitCode(err, exitcodes.InvalidConfig)
+	return result, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 }
 
 func validateConfig(conf Config, isExecutable func(string) bool) error {

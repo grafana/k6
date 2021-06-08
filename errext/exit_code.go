@@ -33,11 +33,11 @@ type HasExitCode interface {
 	ExitCode() ExitCode
 }
 
-// WithExitCode can attach an exit code to the given error, if it doesn't have
-// one already. It won't do anything if the error already had an exit code
+// WithExitCodeIfNone can attach an exit code to the given error, if it doesn't
+// have one already. It won't do anything if the error already had an exit code
 // attached. Similarly, if there is no error (i.e. the given error is nil), it
 // also won't do anything.
-func WithExitCode(err error, exitCode ExitCode) error {
+func WithExitCodeIfNone(err error, exitCode ExitCode) error {
 	if err == nil {
 		// No error, do nothing
 		return nil

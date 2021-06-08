@@ -48,7 +48,7 @@ func TestErrextHelpers(t *testing.T) {
 
 	const testExitCode ExitCode = 13
 	assert.Nil(t, WithHint(nil, "test hint"))
-	assert.Nil(t, WithExitCode(nil, testExitCode))
+	assert.Nil(t, WithExitCodeIfNone(nil, testExitCode))
 
 	errBase := errors.New("base error")
 	errBaseWithHint := WithHint(errBase, "test hint")
@@ -59,11 +59,11 @@ func TestErrextHelpers(t *testing.T) {
 	errWrapperWithHints := fmt.Errorf("wrapper error: %w", errBaseWithTwoHints)
 	assertHasHint(t, errWrapperWithHints, "better hint (test hint)")
 
-	errWithExitCode := WithExitCode(errWrapperWithHints, testExitCode)
+	errWithExitCode := WithExitCodeIfNone(errWrapperWithHints, testExitCode)
 	assertHasHint(t, errWithExitCode, "better hint (test hint)")
 	assertHasExitCode(t, errWithExitCode, testExitCode)
 
-	errWithExitCodeAgain := WithExitCode(errWithExitCode, ExitCode(27))
+	errWithExitCodeAgain := WithExitCodeIfNone(errWithExitCode, ExitCode(27))
 	assertHasHint(t, errWithExitCodeAgain, "better hint (test hint)")
 	assertHasExitCode(t, errWithExitCodeAgain, testExitCode)
 
