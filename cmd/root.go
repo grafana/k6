@@ -186,12 +186,6 @@ func Execute() {
 			exitCode = int(ecerr.ExitCode())
 		}
 
-		hint := ""
-		var herr errext.HasHint
-		if errors.As(err, &herr) {
-			hint = herr.Hint()
-		}
-
 		errText := err.Error()
 		var xerr errext.Exception
 		if errors.As(err, &xerr) {
@@ -199,8 +193,9 @@ func Execute() {
 		}
 
 		fields := logrus.Fields{}
-		if hint != "" {
-			fields["hint"] = hint
+		var herr errext.HasHint
+		if errors.As(err, &herr) {
+			fields["hint"] = herr.Hint()
 		}
 
 		logger.WithFields(fields).Error(errText)
