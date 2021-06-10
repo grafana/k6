@@ -736,8 +736,14 @@ func (et *ExecutionTuple) GetNewExecutionTupleFromValue(value int64) (*Execution
 type SegmentedIndex struct {
 	start, lcd       int64
 	offsets          []int64
-	mx               sync.RWMutex
+	mx               sync.Mutex
 	scaled, unscaled int64 // for both the first element(vu) is 1 not 0
+}
+
+// SegmentedIndexResult holds the new index values after being changed by
+// Next(), Prev() or GoTo().
+type SegmentedIndexResult struct {
+	Scaled, Unscaled int64
 }
 
 // NewSegmentedIndex returns a pointer to a new SegmentedIndex instance,
@@ -747,7 +753,7 @@ func NewSegmentedIndex(start, lcd int64, offsets []int64) *SegmentedIndex {
 }
 
 // Next goes to the next scaled index and moves the unscaled one accordingly.
-func (s *SegmentedIndex) Next() {
+func (s *SegmentedIndex) Next() SegmentedIndexResult {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 	if s.scaled == 0 { // the 1 element(VU) is at the start
@@ -756,11 +762,13 @@ func (s *SegmentedIndex) Next() {
 		s.unscaled += s.offsets[int(s.scaled-1)%len(s.offsets)] // slice's index start at 0 ours start at 1
 	}
 	s.scaled++
+
+	return SegmentedIndexResult{Scaled: s.scaled, Unscaled: s.unscaled}
 }
 
 // Prev goes to the previous scaled value and sets the unscaled one accordingly.
 // Calling Prev when s.scaled == 0 is undefined.
-func (s *SegmentedIndex) Prev() {
+func (s *SegmentedIndex) Prev() SegmentedIndexResult {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 	if s.scaled == 1 { // we are the first need to go to the 0th element which means we need to remove the start
@@ -769,11 +777,13 @@ func (s *SegmentedIndex) Prev() {
 		s.unscaled -= s.offsets[int(s.scaled-2)%len(s.offsets)] // slice's index start 0 our start at 1
 	}
 	s.scaled--
+
+	return SegmentedIndexResult{Scaled: s.scaled, Unscaled: s.unscaled}
 }
 
 // GoTo sets the scaled index to its biggest value for which the corresponding
 // unscaled index is smaller or equal to value.
-func (s *SegmentedIndex) GoTo(value int64) int64 { // TODO optimize
+func (s *SegmentedIndex) GoTo(value int64) SegmentedIndexResult { // TODO optimize
 	s.mx.Lock()
 	defer s.mx.Unlock()
 	var gi int64
@@ -808,19 +818,5 @@ func (s *SegmentedIndex) GoTo(value int64) int64 { // TODO optimize
 		s.unscaled = 0 // we would've added the start and 1
 	}
 
-	return s.scaled
-}
-
-// GetScaled returns the scaled value.
-func (s *SegmentedIndex) GetScaled() int64 {
-	s.mx.RLock()
-	defer s.mx.RUnlock()
-	return s.scaled
-}
-
-// GetUnscaled returns the unscaled value.
-func (s *SegmentedIndex) GetUnscaled() int64 {
-	s.mx.RLock()
-	defer s.mx.RUnlock()
-	return s.unscaled
+	return SegmentedIndexResult{Scaled: s.scaled, Unscaled: s.unscaled}
 }
