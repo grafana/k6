@@ -32,6 +32,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/pprof"
 	"sync"
 	"syscall"
 	"time"
@@ -241,6 +242,7 @@ a commandline interface for interacting with it.`,
 			defer signal.Stop(sigC)
 			go func() {
 				sig := <-sigC
+				pprof.Lookup("goroutine").WriteTo(os.Stdout, 2)
 				logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
 				lingerCancel() // stop the test run, metric processing is cancelled below
 
