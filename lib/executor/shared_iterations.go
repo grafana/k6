@@ -160,7 +160,6 @@ type SharedIterations struct {
 	*BaseExecutor
 	config SharedIterationsConfig
 	et     *lib.ExecutionTuple
-	segIdx *lib.SegmentedIndex
 }
 
 // Make sure we implement the lib.Executor interface.
@@ -178,19 +177,9 @@ func (si *SharedIterations) Init(ctx context.Context) error {
 	et, err := si.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(si.config.VUs.Int64)
 	si.et = et
 	start, offsets, lcd := et.GetStripedOffsets()
-	si.segIdx = lib.NewSegmentedIndex(start, lcd, offsets)
+	si.iterationSegIndex = lib.NewSegmentedIndex(start, lcd, offsets)
 
 	return err
-}
-
-// getNextGlobalIter advances and returns the next global iteration number for
-// this executor, taking into account the configured execution segment.
-// Unlike the local iteration number returned by getNextLocalIter(), this
-// iteration number will be unique across k6 instances.
-func (si *SharedIterations) getNextGlobalIter() uint64 {
-	res := si.segIdx.Next()
-	// iterations are 0-based
-	return uint64(res.Unscaled - 1)
 }
 
 // Run executes a specific total number of iterations, which are all shared by
@@ -258,15 +247,13 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 		activeVUs.Done()
 	}
 
-	// Channel for synchronizing scenario-specific iteration increments
-	iterSync := make(chan struct{}, 1)
 	handleVU := func(initVU lib.InitializedVU) {
 		ctx, cancel := context.WithCancel(maxDurationCtx)
 		defer cancel()
 
 		activeVU := initVU.Activate(getVUActivationParams(
 			ctx, si.config.BaseConfig, returnVU, si.getNextLocalVUID,
-			si.getNextLocalIter, si.getNextGlobalIter, iterSync,
+			si.NextIterationCounters,
 		))
 
 		for {

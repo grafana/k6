@@ -17,6 +17,10 @@ import (
 	"go.k6.io/k6/stats"
 )
 
+func mockNextIterations() (uint64, uint64) {
+	return 12, 15
+}
+
 // this test is mostly interesting when -race is enabled
 func TestVUHandleRace(t *testing.T) {
 	t.Parallel()
@@ -61,8 +65,7 @@ func TestVUHandleRace(t *testing.T) {
 		}
 	}
 
-	iterSync := make(chan struct{}, 1)
-	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, nil, nil, iterSync, &BaseConfig{}, logEntry)
+	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, nil, mockNextIterations, &BaseConfig{}, logEntry)
 	go vuHandle.runLoopsIfPossible(runIter)
 	var wg sync.WaitGroup
 	wg.Add(3)
@@ -154,8 +157,7 @@ func TestVUHandleStartStopRace(t *testing.T) {
 		}
 	}
 
-	iterSync := make(chan struct{}, 1)
-	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, nil, nil, iterSync, &BaseConfig{}, logEntry)
+	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, nil, mockNextIterations, &BaseConfig{}, logEntry)
 	go vuHandle.runLoopsIfPossible(runIter)
 	for i := 0; i < testIterations; i++ {
 		err := vuHandle.start()
@@ -232,8 +234,8 @@ func TestVUHandleSimple(t *testing.T) {
 		test := &handleVUTest{runner: &minirunner.MiniRunner{}}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		iterSync := make(chan struct{}, 1)
-		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, nil, nil, iterSync, &BaseConfig{}, logEntry)
+
+		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, nil, mockNextIterations, &BaseConfig{}, logEntry)
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
@@ -273,8 +275,7 @@ func TestVUHandleSimple(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		iterSync := make(chan struct{}, 1)
-		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, nil, nil, iterSync, &BaseConfig{}, logEntry)
+		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, nil, mockNextIterations, &BaseConfig{}, logEntry)
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
@@ -315,8 +316,7 @@ func TestVUHandleSimple(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		iterSync := make(chan struct{}, 1)
-		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, nil, nil, iterSync, &BaseConfig{}, logEntry)
+		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, nil, mockNextIterations, &BaseConfig{}, logEntry)
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
@@ -394,8 +394,8 @@ func BenchmarkVUHandleIterations(b *testing.B) {
 	reset()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	iterSync := make(chan struct{}, 1)
-	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, nil, nil, iterSync, &BaseConfig{}, logEntry)
+
+	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, nil, mockNextIterations, &BaseConfig{}, logEntry)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {

@@ -37,31 +37,35 @@ import (
 // inside of most of the executors, for the purpose of reducing boilerplate
 // code.
 type BaseExecutor struct {
-	config         lib.ExecutorConfig
-	executionState *lib.ExecutionState
-	VUIDLocal      *uint64 // counter for assigning executor-specific VU IDs
-	// Counter for keeping track of all VU iterations completed by this executor
-	// in the current (local) k6 instance.
-	iterLocal *uint64
-	logger    *logrus.Entry
-	progress  *pb.ProgressBar
+	config            lib.ExecutorConfig
+	executionState    *lib.ExecutionState
+	VUIDLocal         *uint64 // counter for assigning executor-specific VU IDs
+	iterationSegIndex *lib.SegmentedIndex
+	logger            *logrus.Entry
+	progress          *pb.ProgressBar
 }
 
 // NewBaseExecutor returns an initialized BaseExecutor
 func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *logrus.Entry) *BaseExecutor {
 	// Start at max uint64 so that the first iteration can be 0
-	startIterLocal := ^uint64(0)
+	start, offsets, lcd := es.ExecutionTuple.GetStripedOffsets()
+	segIdx := lib.NewSegmentedIndex(start, lcd, offsets)
 	return &BaseExecutor{
-		config:         config,
-		executionState: es,
-		VUIDLocal:      new(uint64),
-		iterLocal:      &startIterLocal,
-		logger:         logger,
+		config:            config,
+		executionState:    es,
+		VUIDLocal:         new(uint64),
+		logger:            logger,
+		iterationSegIndex: segIdx,
 		progress: pb.New(
 			pb.WithLeft(config.GetName),
 			pb.WithLogger(logger),
 		),
 	}
+}
+
+func (bs *BaseExecutor) NextIterationCounters() (uint64, uint64) {
+	res := bs.iterationSegIndex.Next()
+	return uint64(res.Scaled - 1), uint64(res.Unscaled - 1)
 }
 
 // Init doesn't do anything for most executors, since initialization of all
@@ -79,12 +83,6 @@ func (bs BaseExecutor) GetConfig() lib.ExecutorConfig {
 // this executor (i.e. not global like __VU).
 func (bs BaseExecutor) getNextLocalVUID() uint64 {
 	return atomic.AddUint64(bs.VUIDLocal, 1)
-}
-
-// getNextLocalIter increments and returns the next local iteration number, for
-// keeping track of total iterations executed by this scenario/executor.
-func (bs *BaseExecutor) getNextLocalIter() uint64 {
-	return atomic.AddUint64(bs.iterLocal, 1)
 }
 
 // GetLogger returns the executor logger entry.

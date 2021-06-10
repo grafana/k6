@@ -572,13 +572,11 @@ func (vlv RampingVUs) Run(parentCtx context.Context, out chan<- stats.SampleCont
 		ProgressFn: progressFn,
 	})
 
-	// Channel for synchronizing scenario-specific iteration increments
-	iterSync := make(chan struct{}, 1)
 	vuHandles := make([]*vuHandle, maxVUs)
 	for i := uint64(0); i < maxVUs; i++ {
 		vuHandle := newStoppedVUHandle(
 			maxDurationCtx, getVU, returnVU, vlv.getNextLocalVUID,
-			vlv.getNextLocalIter, iterSync, &vlv.config.BaseConfig,
+			vlv.NextIterationCounters, &vlv.config.BaseConfig,
 			vlv.logger.WithField("vuNum", i))
 		go vuHandle.runLoopsIfPossible(runIteration)
 		vuHandles[i] = vuHandle
