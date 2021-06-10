@@ -151,7 +151,6 @@ func (sic SharedIterationsConfig) NewExecutor(
 	return &SharedIterations{
 		BaseExecutor: NewBaseExecutor(sic, es, logger),
 		config:       sic,
-		iterMx:       &sync.Mutex{},
 	}, nil
 }
 
@@ -161,7 +160,6 @@ type SharedIterations struct {
 	*BaseExecutor
 	config SharedIterationsConfig
 	et     *lib.ExecutionTuple
-	iterMx *sync.Mutex
 	segIdx *lib.SegmentedIndex
 }
 
@@ -190,11 +188,9 @@ func (si *SharedIterations) Init(ctx context.Context) error {
 // Unlike the local iteration number returned by getNextLocalIter(), this
 // iteration number will be unique across k6 instances.
 func (si *SharedIterations) getNextGlobalIter() uint64 {
-	si.iterMx.Lock()
-	defer si.iterMx.Unlock()
-	si.segIdx.Next()
+	res := si.segIdx.Next()
 	// iterations are 0-based
-	return uint64(si.segIdx.GetUnscaled() - 1)
+	return uint64(res.Unscaled - 1)
 }
 
 // Run executes a specific total number of iterations, which are all shared by

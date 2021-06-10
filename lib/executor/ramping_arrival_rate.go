@@ -161,7 +161,6 @@ func (varc RampingArrivalRateConfig) NewExecutor(
 	return &RampingArrivalRate{
 		BaseExecutor: NewBaseExecutor(&varc, es, logger),
 		config:       varc,
-		iterMx:       &sync.Mutex{},
 	}, nil
 }
 
@@ -177,7 +176,6 @@ type RampingArrivalRate struct {
 	*BaseExecutor
 	config RampingArrivalRateConfig
 	et     *lib.ExecutionTuple
-	iterMx *sync.Mutex
 	segIdx *lib.SegmentedIndex
 }
 
@@ -201,11 +199,9 @@ func (varr *RampingArrivalRate) Init(ctx context.Context) error {
 // Unlike the local iteration number returned by getNextLocalIter(), this
 // iteration number will be unique across k6 instances.
 func (varr *RampingArrivalRate) getNextGlobalIter() uint64 {
-	varr.iterMx.Lock()
-	defer varr.iterMx.Unlock()
-	varr.segIdx.Next()
+	res := varr.segIdx.Next()
 	// iterations are 0-based
-	return uint64(varr.segIdx.GetUnscaled() - 1)
+	return uint64(res.Unscaled - 1)
 }
 
 // cal calculates the  transtitions between stages and gives the next full value produced by the
