@@ -195,7 +195,8 @@ func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEn
 	)
 
 	// Reserve the scaled StartVUs at the beginning
-	steps = append(steps, lib.ExecutionStep{TimeOffset: 0, PlannedVUs: uint64(index.GoTo(fromVUs))})
+	res := index.GoTo(fromVUs)
+	steps = append(steps, lib.ExecutionStep{TimeOffset: 0, PlannedVUs: uint64(res.Scaled)})
 	addStep := func(timeOffset time.Duration, plannedVUs uint64) {
 		if steps[len(steps)-1].PlannedVUs != plannedVUs {
 			steps = append(steps, lib.ExecutionStep{TimeOffset: timeOffset, PlannedVUs: plannedVUs})
@@ -212,30 +213,31 @@ func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEn
 			continue
 		}
 		if stageDuration == 0 {
-			addStep(timeTillEnd, uint64(index.GoTo(stageEndVUs)))
+			res = index.GoTo(stageEndVUs)
+			addStep(timeTillEnd, uint64(res.Scaled))
 			fromVUs = stageEndVUs
 			continue
 		}
 
 		// VU reservation for gracefully ramping down is handled as a
 		// separate method: reserveVUsForGracefulRampDowns()
-		if index.GetUnscaled() > stageEndVUs { // ramp down
+		if res.Unscaled > stageEndVUs { // ramp down
 			// here we don't want to emit for the equal to stageEndVUs as it doesn't go below it
 			// it will just go to it
-			for ; index.GetUnscaled() > stageEndVUs; index.Prev() {
+			for ; res.Unscaled > stageEndVUs; res = index.Prev() {
 				addStep(
 					// this is the time that we should go up 1 if we are ramping up
 					// but we are ramping down so we should go 1 down, but because we want to not
 					// stop VUs immediately we stop it on the next unscaled VU's time
-					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-index.GetUnscaled()+1)/stageVUDiff),
-					uint64(index.GetScaled()-1),
+					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-res.Unscaled+1)/stageVUDiff),
+					uint64(res.Scaled-1),
 				)
 			}
 		} else {
-			for ; index.GetUnscaled() <= stageEndVUs; index.Next() {
+			for ; res.Unscaled <= stageEndVUs; res = index.Next() {
 				addStep(
-					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-index.GetUnscaled())/stageVUDiff),
-					uint64(index.GetScaled()),
+					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-res.Unscaled)/stageVUDiff),
+					uint64(res.Scaled),
 				)
 			}
 		}
