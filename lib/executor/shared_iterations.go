@@ -176,8 +176,7 @@ func (si *SharedIterations) Init(ctx context.Context) error {
 	// with no work, as determined by their config's HasWork() method.
 	et, err := si.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(si.config.VUs.Int64)
 	si.et = et
-	start, offsets, lcd := et.GetStripedOffsets()
-	si.iterSegIndex = lib.NewSegmentedIndex(start, lcd, offsets)
+	si.iterSegIndex = lib.NewSegmentedIndex(et)
 
 	return err
 }

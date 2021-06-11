@@ -196,8 +196,7 @@ func (car *ConstantArrivalRate) Init(ctx context.Context) error {
 	// with no work, as determined by their config's HasWork() method.
 	et, err := car.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(car.config.MaxVUs.Int64)
 	car.et = et
-	start, offsets, lcd := et.GetStripedOffsets()
-	car.iterSegIndex = lib.NewSegmentedIndex(start, lcd, offsets)
+	car.iterSegIndex = lib.NewSegmentedIndex(et)
 
 	return err
 }
