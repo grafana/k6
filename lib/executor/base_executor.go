@@ -62,7 +62,8 @@ func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *
 	}
 }
 
-func (bs *BaseExecutor) NextIterationCounters() (uint64, uint64) {
+// nextIterationCounters next scaled(local) and unscaled(global) iteration counters
+func (bs *BaseExecutor) nextIterationCounters() (uint64, uint64) {
 	res := bs.iterationSegIndex.Next()
 	return uint64(res.Scaled - 1), uint64(res.Unscaled - 1)
 }

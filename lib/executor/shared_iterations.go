@@ -253,7 +253,7 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 
 		activeVU := initVU.Activate(getVUActivationParams(
 			ctx, si.config.BaseConfig, returnVU, si.getNextLocalVUID,
-			si.NextIterationCounters,
+			si.nextIterationCounters,
 		))
 
 		for {
