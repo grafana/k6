@@ -26,7 +26,6 @@ export default function () {
     let res = http.get("http://httpbin.org/");
     let passed = check(res, { "status is 200": (r) => r.status === 200 });
 
-
     // Add one for number of requests
     myCounter.add(1);
     console.log(myCounter.getName(), " is config ready")
@@ -37,7 +36,6 @@ export default function () {
 
     // Add check success or failure to keep track of rate
     myRate.add(passed);
-
 
     // Keep track of TCP-connecting and TLS handshaking part of the response time
     myTrend.add(res.timings.connecting + res.timings.tls_handshaking);
