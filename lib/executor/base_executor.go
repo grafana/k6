@@ -47,7 +47,6 @@ type BaseExecutor struct {
 
 // NewBaseExecutor returns an initialized BaseExecutor
 func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *logrus.Entry) *BaseExecutor {
-	// Start at max uint64 so that the first iteration can be 0
 	start, offsets, lcd := es.ExecutionTuple.GetStripedOffsets()
 	segIdx := lib.NewSegmentedIndex(start, lcd, offsets)
 	return &BaseExecutor{
