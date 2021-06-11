@@ -69,8 +69,8 @@ func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *
 func (bs *BaseExecutor) nextIterationCounters() (uint64, uint64) {
 	bs.iterationSegIndexMutex.Lock()
 	defer bs.iterationSegIndexMutex.Unlock()
-	res := bs.iterationSegIndex.Next()
-	return uint64(res.Scaled - 1), uint64(res.Unscaled - 1)
+	scaled, unscaled := bs.iterationSegIndex.Next()
+	return uint64(scaled - 1), uint64(unscaled - 1)
 }
 
 // Init doesn't do anything for most executors, since initialization of all

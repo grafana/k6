@@ -738,12 +738,6 @@ type SegmentedIndex struct {
 	scaled, unscaled int64 // for both the first element(vu) is 1 not 0
 }
 
-// SegmentedIndexResult holds the new index values after being changed by
-// Next(), Prev() or GoTo().
-type SegmentedIndexResult struct {
-	Scaled, Unscaled int64
-}
-
 // NewSegmentedIndex returns a pointer to a new SegmentedIndex instance,
 // given a starting index, LCD and offsets as returned by GetStripedOffsets().
 func NewSegmentedIndex(start, lcd int64, offsets []int64) *SegmentedIndex {
@@ -751,7 +745,7 @@ func NewSegmentedIndex(start, lcd int64, offsets []int64) *SegmentedIndex {
 }
 
 // Next goes to the next scaled index and moves the unscaled one accordingly.
-func (s *SegmentedIndex) Next() SegmentedIndexResult {
+func (s *SegmentedIndex) Next() (int64, int64) {
 	if s.scaled == 0 { // the 1 element(VU) is at the start
 		s.unscaled += s.start + 1 // the first element of the start 0, but the here we need it to be 1 so we add 1
 	} else { // if we are not at the first element we need to go through the offsets, looping over them
@@ -759,12 +753,12 @@ func (s *SegmentedIndex) Next() SegmentedIndexResult {
 	}
 	s.scaled++
 
-	return SegmentedIndexResult{Scaled: s.scaled, Unscaled: s.unscaled}
+	return s.scaled, s.unscaled
 }
 
 // Prev goes to the previous scaled value and sets the unscaled one accordingly.
 // Calling Prev when s.scaled == 0 is undefined.
-func (s *SegmentedIndex) Prev() SegmentedIndexResult {
+func (s *SegmentedIndex) Prev() (int64, int64) {
 	if s.scaled == 1 { // we are the first need to go to the 0th element which means we need to remove the start
 		s.unscaled -= s.start + 1 // this could've been just settign to 0
 	} else { // not at the first element - need to get the previously added offset so
@@ -772,12 +766,12 @@ func (s *SegmentedIndex) Prev() SegmentedIndexResult {
 	}
 	s.scaled--
 
-	return SegmentedIndexResult{Scaled: s.scaled, Unscaled: s.unscaled}
+	return s.scaled, s.unscaled
 }
 
 // GoTo sets the scaled index to its biggest value for which the corresponding
 // unscaled index is smaller or equal to value.
-func (s *SegmentedIndex) GoTo(value int64) SegmentedIndexResult { // TODO optimize
+func (s *SegmentedIndex) GoTo(value int64) (int64, int64) { // TODO optimize
 	var gi int64
 	// Because of the cyclical nature of the striping algorithm (with a cycle
 	// length of LCD, the least common denominator), when scaling large values
@@ -810,5 +804,5 @@ func (s *SegmentedIndex) GoTo(value int64) SegmentedIndexResult { // TODO optimi
 		s.unscaled = 0 // we would've added the start and 1
 	}
 
-	return SegmentedIndexResult{Scaled: s.scaled, Unscaled: s.unscaled}
+	return s.scaled, s.unscaled
 }
