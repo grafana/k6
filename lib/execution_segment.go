@@ -741,8 +741,9 @@ type SegmentedIndex struct {
 }
 
 // NewSegmentedIndex returns a pointer to a new SegmentedIndex instance,
-// given a starting index, LCD and offsets as returned by GetStripedOffsets().
-func NewSegmentedIndex(start, lcd int64, offsets []int64) *SegmentedIndex {
+// given an ExecutionTuple.
+func NewSegmentedIndex(et *ExecutionTuple) *SegmentedIndex {
+	start, offsets, lcd := et.GetStripedOffsets()
 	return &SegmentedIndex{start: start, lcd: lcd, offsets: offsets}
 }
 
