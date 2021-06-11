@@ -31,7 +31,7 @@ export default function () {
     myCounter.add(1);
     console.log(myCounter.getName(), " is config ready")
 
-	// Set max response time seen
+    // Set max response time seen
     maxResponseTime = Math.max(maxResponseTime, res.timings.duration);
     myGauge.add(maxResponseTime);
 
