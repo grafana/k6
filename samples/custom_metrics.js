@@ -29,21 +29,16 @@ export default function () {
 
     // Add one for number of requests
     myCounter.add(1);
-
-	console.log(myCounter.getName(), " is config ready")
+    console.log(myCounter.getName(), " is config ready")
 
 	// Set max response time seen
     maxResponseTime = Math.max(maxResponseTime, res.timings.duration);
     myGauge.add(maxResponseTime);
 
-	console.log(myGauge.getName(), " is config ready")
-
     // Add check success or failure to keep track of rate
     myRate.add(passed);
 
-	console.log(myRate.getName(), " is config ready")
 
     // Keep track of TCP-connecting and TLS handshaking part of the response time
     myTrend.add(res.timings.connecting + res.timings.tls_handshaking);
-	console.log(myTrend.getName(), " is config ready")
 }
