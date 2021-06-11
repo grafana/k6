@@ -187,11 +187,10 @@ func (vlvc RampingVUsConfig) Validate() []error {
 // More information: https://github.com/k6io/k6/issues/997#issuecomment-484416866
 func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEnd bool) []lib.ExecutionStep {
 	var (
-		timeTillEnd         time.Duration
-		fromVUs             = vlvc.StartVUs.Int64
-		start, offsets, lcd = et.GetStripedOffsets()
-		steps               = make([]lib.ExecutionStep, 0, vlvc.precalculateTheRequiredSteps(et, zeroEnd))
-		index               = lib.NewSegmentedIndex(start, lcd, offsets)
+		timeTillEnd time.Duration
+		fromVUs     = vlvc.StartVUs.Int64
+		steps       = make([]lib.ExecutionStep, 0, vlvc.precalculateTheRequiredSteps(et, zeroEnd))
+		index       = lib.NewSegmentedIndex(et)
 	)
 
 	// Reserve the scaled StartVUs at the beginning
