@@ -731,7 +731,9 @@ func (et *ExecutionTuple) GetNewExecutionTupleFromValue(value int64) (*Execution
 	}, nil
 }
 
-// SegmentedIndex ...
+// SegmentedIndex is an iterator that returns both the scaled and the unscaled
+// sequential values according to the given ExecutionTuple. It is not thread-safe,
+// concurrent access has to be externally synchronized.
 type SegmentedIndex struct {
 	start, lcd       int64
 	offsets          []int64
