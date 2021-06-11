@@ -176,7 +176,6 @@ type RampingArrivalRate struct {
 	*BaseExecutor
 	config RampingArrivalRateConfig
 	et     *lib.ExecutionTuple
-	segIdx *lib.SegmentedIndex
 }
 
 // Make sure we implement the lib.Executor interface.
@@ -189,19 +188,9 @@ func (varr *RampingArrivalRate) Init(ctx context.Context) error {
 	et, err := varr.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(varr.config.MaxVUs.Int64)
 	varr.et = et
 	start, offsets, lcd := et.GetStripedOffsets()
-	varr.segIdx = lib.NewSegmentedIndex(start, lcd, offsets)
+	varr.iterSegIndex = lib.NewSegmentedIndex(start, lcd, offsets)
 
 	return err //nolint: wrapcheck
-}
-
-// getNextGlobalIter advances and returns the next global iteration number for
-// this executor, taking into account the configured execution segment.
-// Unlike the local iteration number returned by getNextLocalIter(), this
-// iteration number will be unique across k6 instances.
-func (varr *RampingArrivalRate) getNextGlobalIter() uint64 {
-	res := varr.segIdx.Next()
-	// iterations are 0-based
-	return uint64(res.Unscaled - 1)
 }
 
 // cal calculates the  transtitions between stages and gives the next full value produced by the
@@ -417,15 +406,12 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 
 	runIterationBasic := getIterationRunner(varr.executionState, varr.logger)
 
-	// Channel for synchronizing scenario-specific iteration increments
-	iterSync := make(chan struct{}, 1)
 	activateVU := func(initVU lib.InitializedVU) lib.ActiveVU {
 		activeVUsWg.Add(1)
 		activeVU := initVU.Activate(
 			getVUActivationParams(
 				maxDurationCtx, varr.config.BaseConfig, returnVU,
-				varr.getNextLocalVUID, varr.getNextLocalIter,
-				varr.getNextGlobalIter, iterSync))
+				varr.getNextLocalVUID, varr.nextIterationCounters))
 		varr.executionState.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddUint64(&activeVUsCount, 1)
 

@@ -28,6 +28,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
@@ -35,9 +38,6 @@ import (
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/stats"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 )
 
