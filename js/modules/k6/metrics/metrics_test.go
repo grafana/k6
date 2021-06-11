@@ -169,3 +169,9 @@ func TestMetricNames(t *testing.T) {
 		})
 	}
 }
+
+func TestMetricGetName(t *testing.T) {
+	t.Parallel()
+	metric := Metric{metric: &stats.Metric{Name: "myMetricName"}}
+	assert.Equal(t, "myMetricName", metric.GetName())
+}
