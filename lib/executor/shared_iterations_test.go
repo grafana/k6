@@ -23,6 +23,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -54,7 +55,7 @@ func TestSharedIterationsRun(t *testing.T) {
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	var ctx, cancel, executor, _ = setupExecutor(
+	ctx, cancel, executor, _ := setupExecutor(
 		t, getTestSharedIterationsConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			atomic.AddUint64(&doneIters, 1)
@@ -191,6 +192,7 @@ func TestSharedIterationsGlobalIters(t *testing.T) {
 			engineOut := make(chan stats.SampleContainer, 100)
 			err = executor.Run(ctx, engineOut)
 			require.NoError(t, err)
+			sort.Slice(gotIters, func(i, j int) bool { return gotIters[i] < gotIters[j] })
 			assert.Equal(t, tc.expIters, gotIters)
 		})
 	}

@@ -150,9 +150,7 @@ type ActiveVU struct {
 	busy chan struct{}
 
 	scenarioName              string
-	iterSync                  chan struct{}
-	getNextScLocalIter        func() uint64
-	getNextScGlobalIter       func() uint64
+	getNexIterations          func() (uint64, uint64)
 	scIterLocal, scIterGlobal uint64
 }
 
@@ -177,15 +175,13 @@ func (vu *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	}
 
 	avu := &ActiveVU{
-		VU:                  vu,
-		VUActivationParams:  params,
-		busy:                make(chan struct{}, 1),
-		scenarioName:        params.Scenario,
-		iterSync:            params.IterSync,
-		scIterLocal:         ^uint64(0),
-		scIterGlobal:        ^uint64(0),
-		getNextScLocalIter:  params.GetNextScLocalIter,
-		getNextScGlobalIter: params.GetNextScGlobalIter,
+		VU:                 vu,
+		VUActivationParams: params,
+		busy:               make(chan struct{}, 1),
+		scenarioName:       params.Scenario,
+		scIterLocal:        ^uint64(0),
+		scIterGlobal:       ^uint64(0),
+		getNexIterations:   params.GetNextIterationCounters,
 	}
 
 	vu.state.GetScenarioLocalVUIter = func() uint64 {
@@ -214,25 +210,12 @@ func (vu *ActiveVU) incrIteration() {
 	vu.Iteration++
 	vu.state.Iteration = vu.Iteration
 
-	if vu.iterSync != nil {
-		// block other VUs from incrementing scenario iterations
-		vu.iterSync <- struct{}{}
-		defer func() {
-			<-vu.iterSync // unlock
-		}()
-	}
-
 	if _, ok := vu.scenarioIter[vu.scenarioName]; ok {
 		vu.scenarioIter[vu.scenarioName]++
 	} else {
 		vu.scenarioIter[vu.scenarioName] = 0
 	}
-	if vu.getNextScLocalIter != nil {
-		vu.scIterLocal = vu.getNextScLocalIter()
-	}
-	if vu.getNextScGlobalIter != nil {
-		vu.scIterGlobal = vu.getNextScGlobalIter()
-	}
+	vu.scIterLocal, vu.scIterGlobal = vu.getNexIterations()
 }
 
 // RunOnce runs the mock default function once, incrementing its iteration.

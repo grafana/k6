@@ -562,16 +562,8 @@ type ActiveVU struct {
 	*lib.VUActivationParams
 	busy chan struct{}
 
-	scenarioName string
-	// Used to synchronize iteration increments for scenarios between VUs.
-	iterSync chan struct{}
-	// Returns the iteration number across all VUs in the current scenario
-	// unique to this single k6 instance.
-	getNextScLocalIter func() uint64
-	// Returns the iteration number across all VUs in the current scenario
-	// unique globally across k6 instances (taking into account execution
-	// segments).
-	getNextScGlobalIter       func() uint64
+	scenarioName              string
+	getNextIterationCounters  func() (uint64, uint64)
 	scIterLocal, scIterGlobal uint64
 }
 
@@ -633,24 +625,20 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	}
 
 	avu := &ActiveVU{
-		VU:                  u,
-		VUActivationParams:  params,
-		busy:                make(chan struct{}, 1),
-		scenarioName:        params.Scenario,
-		iterSync:            params.IterSync,
-		scIterLocal:         ^uint64(0),
-		scIterGlobal:        ^uint64(0),
-		getNextScLocalIter:  params.GetNextScLocalIter,
-		getNextScGlobalIter: params.GetNextScGlobalIter,
+		VU:                       u,
+		VUActivationParams:       params,
+		busy:                     make(chan struct{}, 1),
+		scenarioName:             params.Scenario,
+		scIterLocal:              ^uint64(0),
+		scIterGlobal:             ^uint64(0),
+		getNextIterationCounters: params.GetNextIterationCounters,
 	}
 
 	u.state.GetScenarioLocalVUIter = func() uint64 {
 		return avu.scIterLocal
 	}
-	if params.GetNextScGlobalIter != nil {
-		u.state.GetScenarioGlobalVUIter = func() uint64 {
-			return avu.scIterGlobal
-		}
+	u.state.GetScenarioGlobalVUIter = func() uint64 {
+		return avu.scIterGlobal
 	}
 
 	go func() {
@@ -784,24 +772,14 @@ func (u *ActiveVU) incrIteration() {
 	u.iteration++
 	u.state.Iteration = u.iteration
 
-	if u.iterSync != nil {
-		// block other VUs from incrementing scenario iterations
-		u.iterSync <- struct{}{}
-		defer func() {
-			<-u.iterSync // unlock
-		}()
-	}
-
 	if _, ok := u.scenarioIter[u.scenarioName]; ok {
 		u.scenarioIter[u.scenarioName]++
 	} else {
 		u.scenarioIter[u.scenarioName] = 0
 	}
-	if u.getNextScLocalIter != nil {
-		u.scIterLocal = u.getNextScLocalIter()
-	}
-	if u.getNextScGlobalIter != nil {
-		u.scIterGlobal = u.getNextScGlobalIter()
+	// TODO remove this
+	if u.getNextIterationCounters != nil {
+		u.scIterLocal, u.scIterGlobal = u.getNextIterationCounters()
 	}
 }
 

@@ -195,8 +195,8 @@ func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEn
 	)
 
 	// Reserve the scaled StartVUs at the beginning
-	res := index.GoTo(fromVUs)
-	steps = append(steps, lib.ExecutionStep{TimeOffset: 0, PlannedVUs: uint64(res.Scaled)})
+	scaled, unscaled := index.GoTo(fromVUs)
+	steps = append(steps, lib.ExecutionStep{TimeOffset: 0, PlannedVUs: uint64(scaled)})
 	addStep := func(timeOffset time.Duration, plannedVUs uint64) {
 		if steps[len(steps)-1].PlannedVUs != plannedVUs {
 			steps = append(steps, lib.ExecutionStep{TimeOffset: timeOffset, PlannedVUs: plannedVUs})
@@ -213,31 +213,31 @@ func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEn
 			continue
 		}
 		if stageDuration == 0 {
-			res = index.GoTo(stageEndVUs)
-			addStep(timeTillEnd, uint64(res.Scaled))
+			scaled, unscaled = index.GoTo(stageEndVUs)
+			addStep(timeTillEnd, uint64(scaled))
 			fromVUs = stageEndVUs
 			continue
 		}
 
 		// VU reservation for gracefully ramping down is handled as a
 		// separate method: reserveVUsForGracefulRampDowns()
-		if res.Unscaled > stageEndVUs { // ramp down
+		if unscaled > stageEndVUs { // ramp down
 			// here we don't want to emit for the equal to stageEndVUs as it doesn't go below it
 			// it will just go to it
-			for ; res.Unscaled > stageEndVUs; res = index.Prev() {
+			for ; unscaled > stageEndVUs; scaled, unscaled = index.Prev() {
 				addStep(
 					// this is the time that we should go up 1 if we are ramping up
 					// but we are ramping down so we should go 1 down, but because we want to not
 					// stop VUs immediately we stop it on the next unscaled VU's time
-					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-res.Unscaled+1)/stageVUDiff),
-					uint64(res.Scaled-1),
+					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-unscaled+1)/stageVUDiff),
+					uint64(scaled-1),
 				)
 			}
 		} else {
-			for ; res.Unscaled <= stageEndVUs; res = index.Next() {
+			for ; unscaled <= stageEndVUs; scaled, unscaled = index.Next() {
 				addStep(
-					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-res.Unscaled)/stageVUDiff),
-					uint64(res.Scaled),
+					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-unscaled)/stageVUDiff),
+					uint64(scaled),
 				)
 			}
 		}
@@ -572,13 +572,11 @@ func (vlv RampingVUs) Run(parentCtx context.Context, out chan<- stats.SampleCont
 		ProgressFn: progressFn,
 	})
 
-	// Channel for synchronizing scenario-specific iteration increments
-	iterSync := make(chan struct{}, 1)
 	vuHandles := make([]*vuHandle, maxVUs)
 	for i := uint64(0); i < maxVUs; i++ {
 		vuHandle := newStoppedVUHandle(
 			maxDurationCtx, getVU, returnVU, vlv.getNextLocalVUID,
-			vlv.getNextLocalIter, iterSync, &vlv.config.BaseConfig,
+			vlv.nextIterationCounters, &vlv.config.BaseConfig,
 			vlv.logger.WithField("vuNum", i))
 		go vuHandle.runLoopsIfPossible(runIteration)
 		vuHandles[i] = vuHandle

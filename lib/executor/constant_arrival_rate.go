@@ -185,7 +185,6 @@ type ConstantArrivalRate struct {
 	*BaseExecutor
 	config ConstantArrivalRateConfig
 	et     *lib.ExecutionTuple
-	segIdx *lib.SegmentedIndex
 }
 
 // Make sure we implement the lib.Executor interface.
@@ -198,19 +197,9 @@ func (car *ConstantArrivalRate) Init(ctx context.Context) error {
 	et, err := car.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(car.config.MaxVUs.Int64)
 	car.et = et
 	start, offsets, lcd := et.GetStripedOffsets()
-	car.segIdx = lib.NewSegmentedIndex(start, lcd, offsets)
+	car.iterationSegIndex = lib.NewSegmentedIndex(start, lcd, offsets)
 
 	return err
-}
-
-// getNextGlobalIter advances and returns the next global iteration number for
-// this executor, taking into account the configured execution segment.
-// Unlike the local iteration number returned by getNextLocalIter(), this
-// iteration number will be unique across k6 instances.
-func (car *ConstantArrivalRate) getNextGlobalIter() uint64 {
-	res := car.segIdx.Next()
-	// iterations are 0-based
-	return uint64(res.Unscaled - 1)
 }
 
 // Run executes a constant number of iterations per second.
@@ -293,15 +282,12 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 		activeVUsWg.Done()
 	}
 
-	// Channel for synchronizing scenario-specific iteration increments
-	iterSync := make(chan struct{}, 1)
 	runIterationBasic := getIterationRunner(car.executionState, car.logger)
 	activateVU := func(initVU lib.InitializedVU) lib.ActiveVU {
 		activeVUsWg.Add(1)
 		activeVU := initVU.Activate(getVUActivationParams(
 			maxDurationCtx, car.config.BaseConfig, returnVU,
-			car.getNextLocalVUID, car.getNextLocalIter, car.getNextGlobalIter,
-			iterSync,
+			car.getNextLocalVUID, car.nextIterationCounters,
 		))
 		car.executionState.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddUint64(&activeVUsCount, 1)

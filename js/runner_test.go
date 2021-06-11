@@ -2110,14 +2110,11 @@ func TestExecutionStats(t *testing.T) {
 					return 0.1, nil
 				},
 			})
-			iterSync := make(chan struct{}, 1)
 			vu := initVU.Activate(&lib.VUActivationParams{
-				RunContext:          ctx,
-				Exec:                "default",
-				IterSync:            iterSync,
-				GetNextScVUID:       func() uint64 { return 2 },
-				GetNextScLocalIter:  func() uint64 { return 3 },
-				GetNextScGlobalIter: func() uint64 { return 4 },
+				RunContext:               ctx,
+				Exec:                     "default",
+				GetNextScVUID:            func() uint64 { return 2 },
+				GetNextIterationCounters: func() (uint64, uint64) { return 3, 4 },
 			})
 
 			execState := execScheduler.GetState()
