@@ -26,7 +26,6 @@ import (
 	"math/big"
 	"sort"
 	"strings"
-	"sync"
 )
 
 // ExecutionSegment represents a (start, end] partition of the total execution
@@ -736,7 +735,6 @@ func (et *ExecutionTuple) GetNewExecutionTupleFromValue(value int64) (*Execution
 type SegmentedIndex struct {
 	start, lcd       int64
 	offsets          []int64
-	mx               sync.Mutex
 	scaled, unscaled int64 // for both the first element(vu) is 1 not 0
 }
 
@@ -754,8 +752,6 @@ func NewSegmentedIndex(start, lcd int64, offsets []int64) *SegmentedIndex {
 
 // Next goes to the next scaled index and moves the unscaled one accordingly.
 func (s *SegmentedIndex) Next() SegmentedIndexResult {
-	s.mx.Lock()
-	defer s.mx.Unlock()
 	if s.scaled == 0 { // the 1 element(VU) is at the start
 		s.unscaled += s.start + 1 // the first element of the start 0, but the here we need it to be 1 so we add 1
 	} else { // if we are not at the first element we need to go through the offsets, looping over them
@@ -769,8 +765,6 @@ func (s *SegmentedIndex) Next() SegmentedIndexResult {
 // Prev goes to the previous scaled value and sets the unscaled one accordingly.
 // Calling Prev when s.scaled == 0 is undefined.
 func (s *SegmentedIndex) Prev() SegmentedIndexResult {
-	s.mx.Lock()
-	defer s.mx.Unlock()
 	if s.scaled == 1 { // we are the first need to go to the 0th element which means we need to remove the start
 		s.unscaled -= s.start + 1 // this could've been just settign to 0
 	} else { // not at the first element - need to get the previously added offset so
@@ -784,8 +778,6 @@ func (s *SegmentedIndex) Prev() SegmentedIndexResult {
 // GoTo sets the scaled index to its biggest value for which the corresponding
 // unscaled index is smaller or equal to value.
 func (s *SegmentedIndex) GoTo(value int64) SegmentedIndexResult { // TODO optimize
-	s.mx.Lock()
-	defer s.mx.Unlock()
 	var gi int64
 	// Because of the cyclical nature of the striping algorithm (with a cycle
 	// length of LCD, the least common denominator), when scaling large values

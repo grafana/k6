@@ -23,6 +23,7 @@ package executor
 import (
 	"context"
 	"strconv"
+	"sync"
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
@@ -37,12 +38,13 @@ import (
 // inside of most of the executors, for the purpose of reducing boilerplate
 // code.
 type BaseExecutor struct {
-	config            lib.ExecutorConfig
-	executionState    *lib.ExecutionState
-	VUIDLocal         *uint64 // counter for assigning executor-specific VU IDs
-	iterationSegIndex *lib.SegmentedIndex
-	logger            *logrus.Entry
-	progress          *pb.ProgressBar
+	config                 lib.ExecutorConfig
+	executionState         *lib.ExecutionState
+	VUIDLocal              *uint64 // counter for assigning executor-specific VU IDs
+	iterationSegIndexMutex *sync.Mutex
+	iterationSegIndex      *lib.SegmentedIndex
+	logger                 *logrus.Entry
+	progress               *pb.ProgressBar
 }
 
 // NewBaseExecutor returns an initialized BaseExecutor
@@ -50,11 +52,12 @@ func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *
 	start, offsets, lcd := es.ExecutionTuple.GetStripedOffsets()
 	segIdx := lib.NewSegmentedIndex(start, lcd, offsets)
 	return &BaseExecutor{
-		config:            config,
-		executionState:    es,
-		VUIDLocal:         new(uint64),
-		logger:            logger,
-		iterationSegIndex: segIdx,
+		config:                 config,
+		executionState:         es,
+		VUIDLocal:              new(uint64),
+		logger:                 logger,
+		iterationSegIndexMutex: new(sync.Mutex),
+		iterationSegIndex:      segIdx,
 		progress: pb.New(
 			pb.WithLeft(config.GetName),
 			pb.WithLogger(logger),
@@ -64,6 +67,8 @@ func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *
 
 // nextIterationCounters next scaled(local) and unscaled(global) iteration counters
 func (bs *BaseExecutor) nextIterationCounters() (uint64, uint64) {
+	bs.iterationSegIndexMutex.Lock()
+	defer bs.iterationSegIndexMutex.Unlock()
 	res := bs.iterationSegIndex.Next()
 	return uint64(res.Scaled - 1), uint64(res.Unscaled - 1)
 }
