@@ -268,7 +268,7 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	if strict {
 		src = "'use strict';\n" + src
 	}
-	early, err := ctx.runTC39Script(name, src, meta.Includes, vm)
+	early, origErr, err := ctx.runTC39Script(name, src, meta.Includes, vm)
 
 	if err == nil {
 		if meta.Negative.Type != "" {
@@ -295,37 +295,12 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 		failf("%s: error %v happened at the wrong phase (expected %s)", name, err, meta.Negative.Phase)
 		return
 	}
-	var errType string
+	errType := getErrType(name, err, failf)
 
-	switch err := err.(type) {
-	case *goja.Exception:
-		if o, ok := err.Value().(*goja.Object); ok { //nolint:nestif
-			if c := o.Get("constructor"); c != nil {
-				if c, ok := c.(*goja.Object); ok {
-					errType = c.Get("name").String()
-				} else {
-					failf("%s: error constructor is not an object (%v)", name, o)
-					return
-				}
-			} else {
-				failf("%s: error does not have a constructor (%v)", name, o)
-				return
-			}
-		} else {
-			failf("%s: error is not an object (%v)", name, err.Value())
+	if errType != "" && errType != meta.Negative.Type {
+		if meta.Negative.Type == "SyntaxError" && origErr != nil && getErrType(name, origErr, failf) == meta.Negative.Type {
 			return
 		}
-	case *goja.CompilerSyntaxError, *parser.Error, parser.ErrorList:
-		errType = "SyntaxError"
-	case *goja.CompilerReferenceError:
-		errType = "ReferenceError"
-	default:
-		failf("%s: error is not a JS error: %v", name, err)
-		return
-	}
-
-	_ = errType
-	if errType != meta.Negative.Type {
 		// vm.vm.prg.dumpCode(t.Logf)
 		failf("%s: unexpected error type (%s), expected (%s)", name, errType, meta.Negative.Type)
 		return
@@ -340,6 +315,35 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 			t.Fatalf("iter stack is not empty: %d", l)
 		}
 	*/
+}
+
+func getErrType(name string, err error, failf func(str string, args ...interface{})) string {
+	switch err := err.(type) {
+	case *goja.Exception:
+		if o, ok := err.Value().(*goja.Object); ok { //nolint:nestif
+			if c := o.Get("constructor"); c != nil {
+				if c, ok := c.(*goja.Object); ok {
+					return c.Get("name").String()
+				} else {
+					failf("%s: error constructor is not an object (%v)", name, o)
+					return ""
+				}
+			} else {
+				failf("%s: error does not have a constructor (%v)", name, o)
+				return ""
+			}
+		} else {
+			failf("%s: error is not an object (%v)", name, err.Value())
+			return ""
+		}
+	case *goja.CompilerSyntaxError, *parser.Error, parser.ErrorList:
+		return "SyntaxError"
+	case *goja.CompilerReferenceError:
+		return "ReferenceError"
+	default:
+		failf("%s: error is not a JS error: %v", name, err)
+		return ""
+	}
 }
 
 func shouldBeSkipped(t testing.TB, meta *tc39Meta) {
@@ -455,7 +459,7 @@ func (ctx *tc39TestCtx) runFile(base, name string, vm *goja.Runtime) error {
 	return err
 }
 
-func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *goja.Runtime) (early bool, err error) {
+func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *goja.Runtime) (early bool, origErr, err error) {
 	early = true
 	err = ctx.runFile(ctx.base, path.Join("harness", "assert.js"), vm)
 	if err != nil {
@@ -475,7 +479,15 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *g
 	}
 
 	var p *goja.Program
-	p, _, err = ctx.compiler.Compile(src, name, "", "", false, lib.CompatibilityModeExtended)
+	p, _, origErr = ctx.compiler.Compile(src, name, "", "", false, lib.CompatibilityModeBase)
+	if origErr != nil {
+		src, _, err = ctx.compiler.Transform(src, name)
+		if err == nil {
+			p, _, err = ctx.compiler.Compile(src, name, "", "", false, lib.CompatibilityModeBase)
+		}
+	} else {
+		err = origErr
+	}
 
 	if err != nil {
 		return
