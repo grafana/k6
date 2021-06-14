@@ -217,6 +217,9 @@ func (*tc39TestCtx) detachArrayBuffer(call goja.FunctionCall) goja.Value {
 func (ctx *tc39TestCtx) fail(t testing.TB, name string, strict bool, errStr string) {
 	nameKey := fmt.Sprintf("%s-strict:%v", name, strict)
 	expected, ok := ctx.expectedErrors[nameKey]
+	if index := strings.LastIndex(errStr, " at "); index != -1 {
+		errStr = errStr[:index] + " <at omitted>"
+	}
 	if ok {
 		if !assert.Equal(t, expected, errStr) {
 			ctx.errorsLock.Lock()
@@ -555,6 +558,7 @@ func TestTC39(t *testing.T) {
 	if len(ctx.errors) > 0 {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
+		enc.SetEscapeHTML(false)
 		_ = enc.Encode(ctx.errors)
 	}
 }
