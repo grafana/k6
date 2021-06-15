@@ -55,7 +55,8 @@ func setupExecutor(t testing.TB, config lib.ExecutorConfig, es *lib.ExecutionSta
 	logEntry := logrus.NewEntry(testLog)
 
 	initVUFunc := func(_ context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
-		return runner.NewVU(es.GetUniqueVUIdentifier(), engineOut) //nolint: wrapcheck
+		idl, idg := es.GetUniqueVUIdentifiers()
+		return runner.NewVU(idl, idg, engineOut)
 	}
 	es.SetInitVUFunc(initVUFunc)
 

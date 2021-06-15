@@ -26,7 +26,7 @@ func BenchmarkEmptyIteration(b *testing.B) {
 		for range ch {
 		}
 	}()
-	initVU, err := r.NewVU(1, ch)
+	initVU, err := r.NewVU(1, 1, ch)
 	if !assert.NoError(b, err) {
 		return
 	}

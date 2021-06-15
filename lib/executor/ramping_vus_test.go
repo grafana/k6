@@ -248,7 +248,7 @@ func TestRampingVUsGracefulRampDown(t *testing.T) {
 	ctx, cancel, executor, _ := setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context) error {
-			if lib.GetState(ctx).Vu == 1 { // the first VU will wait here to do stuff
+			if lib.GetState(ctx).VUID == 1 { // the first VU will wait here to do stuff
 				close(started)
 				defer close(stopped)
 				select {
