@@ -22,6 +22,7 @@ package executor
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"sync"
@@ -39,24 +40,62 @@ import (
 
 func TestExecutionStateVUIDs(t *testing.T) {
 	t.Parallel()
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 0, 0)
-	assert.Equal(t, uint64(1), es.GetUniqueVUIdentifier())
-	assert.Equal(t, uint64(2), es.GetUniqueVUIdentifier())
-	assert.Equal(t, uint64(3), es.GetUniqueVUIdentifier())
-	wg := sync.WaitGroup{}
-	rand.Seed(time.Now().UnixNano())
-	count := 100 + rand.Intn(50)
-	wg.Add(count)
-	for i := 0; i < count; i++ {
-		go func() {
-			es.GetUniqueVUIdentifier()
-			wg.Done()
-		}()
+
+	testCases := []struct {
+		seq, seg string
+	}{
+		{},
+		{seq: "0,1/4,3/4,1", seg: "0:1/4"},
+		{seq: "0,0.3,0.5,0.6,0.7,0.8,0.9,1", seg: "0.5:0.6"},
 	}
-	wg.Wait()
-	assert.Equal(t, uint64(4+count), es.GetUniqueVUIdentifier())
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("seq:%s;segment:%s", tc.seq, tc.seg), func(t *testing.T) {
+			t.Parallel()
+			ess, err := lib.NewExecutionSegmentSequenceFromString(tc.seq)
+			require.NoError(t, err)
+			segment, err := lib.NewExecutionSegmentFromString(tc.seg)
+			require.NoError(t, err)
+			et, err := lib.NewExecutionTuple(segment, &ess)
+			require.NoError(t, err)
+
+			start, offsets, _ := et.GetStripedOffsets()
+			es := lib.NewExecutionState(lib.Options{}, et, 0, 0)
+
+			idl, idg := es.GetUniqueVUIdentifiers()
+			assert.Equal(t, uint64(1), idl)
+			expGlobal := start + 1
+			assert.Equal(t, uint64(expGlobal), idg)
+
+			idl, idg = es.GetUniqueVUIdentifiers()
+			assert.Equal(t, uint64(2), idl)
+			expGlobal += offsets[0]
+			assert.Equal(t, uint64(expGlobal), idg)
+
+			idl, idg = es.GetUniqueVUIdentifiers()
+			assert.Equal(t, uint64(3), idl)
+			expGlobal += offsets[0]
+			assert.Equal(t, uint64(expGlobal), idg)
+
+			seed := time.Now().UnixNano()
+			r := rand.New(rand.NewSource(seed)) //nolint:gosec
+			t.Logf("Random source seeded with %d\n", seed)
+			count := 100 + r.Intn(50)
+			wg := sync.WaitGroup{}
+			wg.Add(count)
+			for i := 0; i < count; i++ {
+				go func() {
+					es.GetUniqueVUIdentifiers()
+					wg.Done()
+				}()
+			}
+			wg.Wait()
+			idl, idg = es.GetUniqueVUIdentifiers()
+			assert.Equal(t, uint64(4+count), idl)
+			assert.Equal(t, uint64((3+count)*int(offsets[0])+int(start+1)), idg)
+		})
+	}
 }
 
 func TestExecutionStateGettingVUsWhenNonAreAvailable(t *testing.T) {
