@@ -1226,10 +1226,14 @@ func TestRequestAndBatch(t *testing.T) {
 
 			t.Run("object", func(t *testing.T) {
 				_, err := rt.RunString(fmt.Sprintf(sr(`
-				var res = http.%s("HTTPBIN_URL/%s", {a: "a", b: 2});
+				var equalArray = function(a, b) {
+					return a.length === b.length && a.every(function(v, i) { return v === b[i]});
+				}
+				var res = http.%s("HTTPBIN_URL/%s", {a: "a", b: 2, c: ["one", "two"]});
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				if (res.json().form.a != "a") { throw new Error("wrong a=: " + res.json().form.a); }
 				if (res.json().form.b != "2") { throw new Error("wrong b=: " + res.json().form.b); }
+				if (!equalArray(res.json().form.c, ["one", "two"])) { throw new Error("wrong c: " + res.json().form.c); }
 				if (res.json().headers["Content-Type"] != "application/x-www-form-urlencoded") { throw new Error("wrong content type: " + res.json().headers["Content-Type"]); }
 				`), fn, strings.ToLower(method)))
 				assert.NoError(t, err)
