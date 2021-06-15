@@ -38,25 +38,25 @@ import (
 // inside of most of the executors, for the purpose of reducing boilerplate
 // code.
 type BaseExecutor struct {
-	config                 lib.ExecutorConfig
-	executionState         *lib.ExecutionState
-	VUIDLocal              *uint64 // counter for assigning executor-specific VU IDs
-	iterationSegIndexMutex *sync.Mutex
-	iterationSegIndex      *lib.SegmentedIndex
-	logger                 *logrus.Entry
-	progress               *pb.ProgressBar
+	config         lib.ExecutorConfig
+	executionState *lib.ExecutionState
+	VUIDLocal      *uint64 // counter for assigning executor-specific VU IDs
+	iterSegIndexMx *sync.Mutex
+	iterSegIndex   *lib.SegmentedIndex
+	logger         *logrus.Entry
+	progress       *pb.ProgressBar
 }
 
 // NewBaseExecutor returns an initialized BaseExecutor
 func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *logrus.Entry) *BaseExecutor {
 	segIdx := lib.NewSegmentedIndex(es.ExecutionTuple)
 	return &BaseExecutor{
-		config:                 config,
-		executionState:         es,
-		VUIDLocal:              new(uint64),
-		logger:                 logger,
-		iterationSegIndexMutex: new(sync.Mutex),
-		iterationSegIndex:      segIdx,
+		config:         config,
+		executionState: es,
+		VUIDLocal:      new(uint64),
+		logger:         logger,
+		iterSegIndexMx: new(sync.Mutex),
+		iterSegIndex:   segIdx,
 		progress: pb.New(
 			pb.WithLeft(config.GetName),
 			pb.WithLogger(logger),
@@ -66,9 +66,9 @@ func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *
 
 // nextIterationCounters next scaled(local) and unscaled(global) iteration counters
 func (bs *BaseExecutor) nextIterationCounters() (uint64, uint64) {
-	bs.iterationSegIndexMutex.Lock()
-	defer bs.iterationSegIndexMutex.Unlock()
-	scaled, unscaled := bs.iterationSegIndex.Next()
+	bs.iterSegIndexMx.Lock()
+	defer bs.iterSegIndexMx.Unlock()
+	scaled, unscaled := bs.iterSegIndex.Next()
 	return uint64(scaled - 1), uint64(unscaled - 1)
 }
 

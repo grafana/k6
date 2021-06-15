@@ -187,7 +187,7 @@ func (varr *RampingArrivalRate) Init(ctx context.Context) error {
 	// with no work, as determined by their config's HasWork() method.
 	et, err := varr.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(varr.config.MaxVUs.Int64)
 	varr.et = et
-	varr.iterationSegIndex = lib.NewSegmentedIndex(et)
+	varr.iterSegIndex = lib.NewSegmentedIndex(et)
 
 	return err //nolint: wrapcheck
 }
