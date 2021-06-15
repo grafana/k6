@@ -25,10 +25,10 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/stats"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -70,7 +70,7 @@ func newdatadogConfig() datadogConfig {
 		BufferSize:   null.NewInt(20, false),
 		Namespace:    null.NewString("k6.", false),
 		PushInterval: types.NewNullDuration(1*time.Second, false),
-		TagBlacklist: stats.TagSet{},
+		TagBlacklist: (stats.TagVU | stats.TagIter | stats.TagURL).Map(),
 	}
 }
 
