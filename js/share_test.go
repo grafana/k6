@@ -95,7 +95,7 @@ exports.default = function() {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			samples := make(chan stats.SampleContainer, 100)
-			initVU, err := r.NewVU(1, samples)
+			initVU, err := r.NewVU(1, 1, samples)
 			if assert.NoError(t, err) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()

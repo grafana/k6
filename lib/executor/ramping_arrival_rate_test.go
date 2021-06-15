@@ -185,7 +185,8 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 		time.Sleep(time.Millisecond * 200)
 		cur = atomic.LoadInt64(&count)
 		require.NotEqual(t, cur, int64(2))
-		return runner.NewVU(es.GetUniqueVUIdentifier(), engineOut) //nolint: wrapcheck
+		idl, idg := es.GetUniqueVUIdentifiers()
+		return runner.NewVU(idl, idg, engineOut)
 	})
 	err = executor.Run(ctx, engineOut)
 	assert.NoError(t, err)
@@ -235,7 +236,8 @@ func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 		cur = atomic.LoadInt64(&count)
 		require.NotEqual(t, cur, int64(1))
 
-		return runner.NewVU(es.GetUniqueVUIdentifier(), engineOut) //nolint: wrapcheck
+		idl, idg := es.GetUniqueVUIdentifiers()
+		return runner.NewVU(idl, idg, engineOut)
 	})
 	err = executor.Run(ctx, engineOut)
 	assert.NoError(t, err)

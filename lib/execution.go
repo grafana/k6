@@ -176,10 +176,11 @@ type ExecutionState struct {
 	// MaxTimeToWaitForPlannedVU.
 	vus chan InitializedVU
 
-	// The current VU ID, used for the __VU execution context variable. Use the
-	// GetUniqueVUIdentifier() to get unique values for each VU, starting from 1
-	// (for backwards compatibility...)
-	currentVUIdentifier *uint64
+	// The segmented index used to generate unique local (current k6 instance)
+	// and global (across k6 instances) VU IDs, starting from 1
+	// (for backwards compatibility...).
+	vuIDSegIndexMx *sync.Mutex
+	vuIDSegIndex   *SegmentedIndex
 
 	// TODO: add something similar, but for iterations? Currently, there isn't
 	// a straightforward way to get a unique sequential identifier per iteration
@@ -187,8 +188,8 @@ type ExecutionState struct {
 	// a unique identifier, but it's unwieldy and somewhat cumbersome.
 
 	// Total number of currently initialized VUs. Generally equal to
-	// currentVUIdentifier minus 1, since initializedVUs starts from 0 and is
-	// incremented only after a VU is initialized, while CurrentVUIdentifier is
+	// the VU ID minus 1, since initializedVUs starts from 0 and is
+	// incremented only after a VU is initialized, while the VU ID is
 	// incremented before a VU is initialized. It should always be greater than
 	// or equal to 0, but int64 is used for simplification of the used atomic
 	// arithmetic operations.
@@ -277,12 +278,14 @@ func NewExecutionState(options Options, et *ExecutionTuple, maxPlannedVUs, maxPo
 
 	maxUnplannedUninitializedVUs := int64(maxPossibleVUs - maxPlannedVUs)
 
+	segIdx := NewSegmentedIndex(et)
 	return &ExecutionState{
 		Options: options,
 		vus:     make(chan InitializedVU, maxPossibleVUs),
 
 		executionStatus:            new(uint32),
-		currentVUIdentifier:        new(uint64),
+		vuIDSegIndexMx:             new(sync.Mutex),
+		vuIDSegIndex:               segIdx,
 		initializedVUs:             new(int64),
 		uninitializedUnplannedVUs:  &maxUnplannedUninitializedVUs,
 		activeVUs:                  new(int64),
@@ -298,10 +301,14 @@ func NewExecutionState(options Options, et *ExecutionTuple, maxPlannedVUs, maxPo
 	}
 }
 
-// GetUniqueVUIdentifier returns an auto-incrementing unique VU ID, used for __VU.
-// It starts from 1 (for backwards compatibility...)
-func (es *ExecutionState) GetUniqueVUIdentifier() uint64 {
-	return atomic.AddUint64(es.currentVUIdentifier, 1)
+// GetUniqueVUIdentifiers returns the next unique VU IDs, both local (for the
+// current instance, exposed as __VU) and global (across k6 instances, exposed
+// in the k6/execution module). It starts from 1, for backwards compatibility.
+func (es *ExecutionState) GetUniqueVUIdentifiers() (uint64, uint64) {
+	es.vuIDSegIndexMx.Lock()
+	defer es.vuIDSegIndexMx.Unlock()
+	scaled, unscaled := es.vuIDSegIndex.Next()
+	return uint64(scaled), uint64(unscaled)
 }
 
 // GetInitializedVUsCount returns the total number of currently initialized VUs.

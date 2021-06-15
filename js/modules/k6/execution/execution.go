@@ -51,7 +51,8 @@ func (e *Execution) GetVUStats(ctx context.Context) (goja.Value, error) {
 	}
 
 	stats := map[string]interface{}{
-		"id":         vuState.Vu,
+		"id":         vuState.VUID,
+		"idGlobal":   vuState.VUIDGlobal,
 		"idScenario": vuState.VUIDScenario,
 		"iteration":  vuState.Iteration,
 		"iterationScenario": func() goja.Value {

@@ -46,9 +46,8 @@ type MiniRunner struct {
 
 	SetupData []byte
 
-	NextVUID uint64
-	Group    *lib.Group
-	Options  lib.Options
+	Group   *lib.Group
+	Options lib.Options
 }
 
 // MakeArchive isn't implemented, it always returns nil and is just here to
@@ -58,12 +57,13 @@ func (r MiniRunner) MakeArchive() *lib.Archive {
 }
 
 // NewVU returns a new VU with an incremental ID.
-func (r *MiniRunner) NewVU(id uint64, out chan<- stats.SampleContainer) (lib.InitializedVU, error) {
-	state := &lib.State{Vu: id, Iteration: int64(-1)}
+func (r *MiniRunner) NewVU(idLocal, idGlobal uint64, out chan<- stats.SampleContainer) (lib.InitializedVU, error) {
+	state := &lib.State{VUID: idLocal, VUIDGlobal: idGlobal, Iteration: int64(-1)}
 	return &VU{
 		R:            r,
 		Out:          out,
-		ID:           id,
+		ID:           idLocal,
+		IDGlobal:     idGlobal,
 		state:        state,
 		scenarioID:   make(map[string]uint64),
 		scenarioIter: make(map[string]uint64),
@@ -132,11 +132,11 @@ func (r *MiniRunner) HandleSummary(ctx context.Context, s *lib.Summary) (map[str
 
 // VU is a mock VU, spawned by a MiniRunner.
 type VU struct {
-	R         *MiniRunner
-	Out       chan<- stats.SampleContainer
-	ID        uint64
-	Iteration int64
-	state     *lib.State
+	R            *MiniRunner
+	Out          chan<- stats.SampleContainer
+	ID, IDGlobal uint64
+	Iteration    int64
+	state        *lib.State
 	// ID of this VU in each scenario
 	scenarioID map[string]uint64
 	// count of iterations executed by this VU in each scenario

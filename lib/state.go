@@ -67,9 +67,9 @@ type State struct {
 	// TODO: maybe use https://golang.org/pkg/sync/#Pool ?
 	BPool *bpool.BufferPool
 
-	Vu, VUIDScenario uint64
-	Iteration        int64
-	Tags             map[string]string
+	VUID, VUIDGlobal, VUIDScenario uint64
+	Iteration                      int64
+	Tags                           map[string]string
 	// These will be assigned on VU activation.
 	// Returns the iteration number of this VU in the current scenario.
 	GetScenarioVUIter func() uint64

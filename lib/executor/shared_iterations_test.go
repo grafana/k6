@@ -87,13 +87,13 @@ func TestSharedIterationsRunVariableVU(t *testing.T) {
 			// Pick one VU randomly and always slow it down.
 			sid := atomic.LoadUint64(&slowVUID)
 			if sid == uint64(0) {
-				atomic.StoreUint64(&slowVUID, state.Vu)
+				atomic.StoreUint64(&slowVUID, state.VUID)
 			}
-			if sid == state.Vu {
+			if sid == state.VUID {
 				time.Sleep(200 * time.Millisecond)
 			}
-			currIter, _ := result.LoadOrStore(state.Vu, uint64(0))
-			result.Store(state.Vu, currIter.(uint64)+1)
+			currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
+			result.Store(state.VUID, currIter.(uint64)+1)
 			return nil
 		}),
 	)
