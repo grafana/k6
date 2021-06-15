@@ -1420,13 +1420,13 @@ func TestExecutionStatsVUSharing(t *testing.T) {
 		};
 
 		export function cvus() {
-			const stats = Object.assign({scenario: 'cvus', globalVUID: __VU}, exec.getVUStats());
+			const stats = Object.assign({scenario: 'cvus'}, exec.getVUStats());
 			console.log(JSON.stringify(stats));
 			sleep(0.2);
 		};
 
 		export function carr() {
-			const stats = Object.assign({scenario: 'carr', globalVUID: __VU}, exec.getVUStats());
+			const stats = Object.assign({scenario: 'carr'}, exec.getVUStats());
 			console.log(JSON.stringify(stats));
 		};
 `)
@@ -1452,15 +1452,14 @@ func TestExecutionStatsVUSharing(t *testing.T) {
 
 	type vuStat struct {
 		iteration uint64
-		scVUID    map[string]uint64
 		scIter    map[string]uint64
 	}
-	vuStats := map[uint64]vuStat{}
+	vuStats := map[uint64]*vuStat{}
 
 	type logEntry struct {
-		ID, Iteration, GlobalVUID     uint64
-		Scenario                      string
-		IDScenario, IterationScenario uint64
+		ID, Iteration     uint64
+		Scenario          string
+		IterationScenario uint64
 	}
 
 	errCh := make(chan error, 1)
@@ -1475,15 +1474,16 @@ func TestExecutionStatsVUSharing(t *testing.T) {
 		for _, entry := range entries {
 			err = json.Unmarshal([]byte(entry.Message), le)
 			require.NoError(t, err)
-			assert.Contains(t, []uint64{1, 2}, le.GlobalVUID)
+			assert.Contains(t, []uint64{1, 2}, le.ID)
 			if _, ok := vuStats[le.ID]; !ok {
-				vuStats[le.ID] = vuStat{0, make(map[string]uint64), make(map[string]uint64)}
+				vuStats[le.ID] = &vuStat{0, make(map[string]uint64)}
 			}
-			e := vuStats[le.ID]
-			e.iteration = le.Iteration
-			e.scVUID[le.Scenario] = le.IDScenario
-			e.scIter[le.Scenario] = le.IterationScenario
-			vuStats[le.ID] = e
+			if le.Iteration > vuStats[le.ID].iteration {
+				vuStats[le.ID].iteration = le.Iteration
+			}
+			if le.IterationScenario > vuStats[le.ID].scIter[le.Scenario] {
+				vuStats[le.ID].scIter[le.Scenario] = le.IterationScenario
+			}
 		}
 		require.Len(t, vuStats, 2)
 		// Both VUs should complete 10 iterations each globally, but 5
