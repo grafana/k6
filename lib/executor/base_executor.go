@@ -79,29 +79,29 @@ func (bs *BaseExecutor) Init(_ context.Context) error {
 }
 
 // GetConfig returns the configuration with which this executor was launched.
-func (bs BaseExecutor) GetConfig() lib.ExecutorConfig {
+func (bs *BaseExecutor) GetConfig() lib.ExecutorConfig {
 	return bs.config
 }
 
 // getNextLocalVUID increments and returns the next VU ID that's specific for
 // this executor (i.e. not global like __VU).
-func (bs BaseExecutor) getNextLocalVUID() uint64 {
+func (bs *BaseExecutor) getNextLocalVUID() uint64 {
 	return atomic.AddUint64(bs.VUIDLocal, 1)
 }
 
 // GetLogger returns the executor logger entry.
-func (bs BaseExecutor) GetLogger() *logrus.Entry {
+func (bs *BaseExecutor) GetLogger() *logrus.Entry {
 	return bs.logger
 }
 
 // GetProgress just returns the progressbar pointer.
-func (bs BaseExecutor) GetProgress() *pb.ProgressBar {
+func (bs *BaseExecutor) GetProgress() *pb.ProgressBar {
 	return bs.progress
 }
 
 // getMetricTags returns a tag set that can be used to emit metrics by the
 // executor. The VU ID is optional.
-func (bs BaseExecutor) getMetricTags(vuID *uint64) *stats.SampleTags {
+func (bs *BaseExecutor) getMetricTags(vuID *uint64) *stats.SampleTags {
 	tags := bs.executionState.Options.RunTags.CloneTags()
 	if bs.executionState.Options.SystemTags.Has(stats.TagScenario) {
 		tags["scenario"] = bs.config.GetName()
