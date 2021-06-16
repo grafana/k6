@@ -52,8 +52,8 @@ var (
 		fn   loaderFunc
 		expr *regexp.Regexp
 	}{
-		{"cdnjs", cdnjs, regexp.MustCompile(`^cdnjs.com/libraries/([^/]+)(?:/([(\d\.)]+-?[^/]*))?(?:/(.*))?$`)},
-		{"github", github, regexp.MustCompile(`^github.com/([^/]+)/([^/]+)/(.*)$`)},
+		{"cdnjs", cdnjs, regexp.MustCompile(`^cdnjs\.com/libraries/([^/]+)(?:/([(\d\.)]+-?[^/]*))?(?:/(.*))?$`)},
+		{"github", github, regexp.MustCompile(`^github\.com/([^/]+)/([^/]+)/(.*)$`)},
 	}
 	httpsSchemeCouldntBeLoadedMsg = `The moduleSpecifier "%s" couldn't be retrieved from` +
 		` the resolved url "%s". Error : "%s"`
