@@ -65,7 +65,7 @@ func TestVUHandleRace(t *testing.T) {
 		}
 	}
 
-	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, nil, mockNextIterations, &BaseConfig{}, logEntry)
+	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, mockNextIterations, &BaseConfig{}, logEntry)
 	go vuHandle.runLoopsIfPossible(runIter)
 	var wg sync.WaitGroup
 	wg.Add(3)
@@ -157,7 +157,7 @@ func TestVUHandleStartStopRace(t *testing.T) {
 		}
 	}
 
-	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, nil, mockNextIterations, &BaseConfig{}, logEntry)
+	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, mockNextIterations, &BaseConfig{}, logEntry)
 	go vuHandle.runLoopsIfPossible(runIter)
 	for i := 0; i < testIterations; i++ {
 		err := vuHandle.start()
@@ -235,7 +235,7 @@ func TestVUHandleSimple(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, nil, mockNextIterations, &BaseConfig{}, logEntry)
+		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
@@ -275,7 +275,7 @@ func TestVUHandleSimple(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, nil, mockNextIterations, &BaseConfig{}, logEntry)
+		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
@@ -316,7 +316,7 @@ func TestVUHandleSimple(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, nil, mockNextIterations, &BaseConfig{}, logEntry)
+		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
@@ -395,7 +395,7 @@ func BenchmarkVUHandleIterations(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, nil, mockNextIterations, &BaseConfig{}, logEntry)
+	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, mockNextIterations, &BaseConfig{}, logEntry)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {

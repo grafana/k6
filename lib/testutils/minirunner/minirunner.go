@@ -65,7 +65,6 @@ func (r *MiniRunner) NewVU(idLocal, idGlobal uint64, out chan<- stats.SampleCont
 		ID:           idLocal,
 		IDGlobal:     idGlobal,
 		state:        state,
-		scenarioID:   make(map[string]uint64),
 		scenarioIter: make(map[string]uint64),
 	}, nil
 }
@@ -137,8 +136,6 @@ type VU struct {
 	ID, IDGlobal uint64
 	Iteration    int64
 	state        *lib.State
-	// ID of this VU in each scenario
-	scenarioID map[string]uint64
 	// count of iterations executed by this VU in each scenario
 	scenarioIter map[string]uint64
 }
@@ -162,13 +159,6 @@ func (vu *VU) GetID() uint64 {
 // Activate the VU so it will be able to run code.
 func (vu *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	ctx := lib.WithState(params.RunContext, vu.state)
-
-	if params.GetNextScVUID != nil {
-		if _, ok := vu.scenarioID[params.Scenario]; !ok {
-			vu.state.VUIDScenario = params.GetNextScVUID()
-			vu.scenarioID[params.Scenario] = vu.state.VUIDScenario
-		}
-	}
 
 	vu.state.GetScenarioVUIter = func() uint64 {
 		return vu.scenarioIter[params.Scenario]

@@ -574,9 +574,8 @@ func (vlv RampingVUs) Run(parentCtx context.Context, out chan<- stats.SampleCont
 	vuHandles := make([]*vuHandle, maxVUs)
 	for i := uint64(0); i < maxVUs; i++ {
 		vuHandle := newStoppedVUHandle(
-			maxDurationCtx, getVU, returnVU, vlv.getNextLocalVUID,
-			vlv.nextIterationCounters, &vlv.config.BaseConfig,
-			vlv.logger.WithField("vuNum", i))
+			maxDurationCtx, getVU, returnVU, vlv.nextIterationCounters,
+			&vlv.config.BaseConfig, vlv.logger.WithField("vuNum", i))
 		go vuHandle.runLoopsIfPossible(runIteration)
 		vuHandles[i] = vuHandle
 	}

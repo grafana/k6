@@ -55,7 +55,6 @@ type VUActivationParams struct {
 	DeactivateCallback       func(InitializedVU)
 	Env, Tags                map[string]string
 	Exec, Scenario           string
-	GetNextScVUID            func() uint64
 	GetNextIterationCounters func() (uint64, uint64)
 }
 

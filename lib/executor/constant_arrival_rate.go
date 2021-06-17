@@ -286,7 +286,7 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 		activeVUsWg.Add(1)
 		activeVU := initVU.Activate(getVUActivationParams(
 			maxDurationCtx, car.config.BaseConfig, returnVU,
-			car.getNextLocalVUID, car.nextIterationCounters,
+			car.nextIterationCounters,
 		))
 		car.executionState.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddUint64(&activeVUsCount, 1)

@@ -24,7 +24,6 @@ import (
 	"context"
 	"strconv"
 	"sync"
-	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
 
@@ -40,7 +39,6 @@ import (
 type BaseExecutor struct {
 	config         lib.ExecutorConfig
 	executionState *lib.ExecutionState
-	VUIDLocal      *uint64 // counter for assigning executor-specific VU IDs
 	iterSegIndexMx *sync.Mutex
 	iterSegIndex   *lib.SegmentedIndex
 	logger         *logrus.Entry
@@ -53,7 +51,6 @@ func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *
 	return &BaseExecutor{
 		config:         config,
 		executionState: es,
-		VUIDLocal:      new(uint64),
 		logger:         logger,
 		iterSegIndexMx: new(sync.Mutex),
 		iterSegIndex:   segIdx,
@@ -81,12 +78,6 @@ func (bs *BaseExecutor) Init(_ context.Context) error {
 // GetConfig returns the configuration with which this executor was launched.
 func (bs *BaseExecutor) GetConfig() lib.ExecutorConfig {
 	return bs.config
-}
-
-// getNextLocalVUID increments and returns the next VU ID that's specific for
-// this executor (i.e. not global like __VU).
-func (bs *BaseExecutor) getNextLocalVUID() uint64 {
-	return atomic.AddUint64(bs.VUIDLocal, 1)
 }
 
 // GetLogger returns the executor logger entry.
