@@ -40,6 +40,7 @@ type BaseExecutor struct {
 	config         lib.ExecutorConfig
 	executionState *lib.ExecutionState
 	localVUID      *uint64 // counter for assigning executor-specific VU IDs
+	localIters     *uint64 // counter for keeping track of all VU iterations completed by this executor
 	logger         *logrus.Entry
 	progress       *pb.ProgressBar
 }
@@ -50,6 +51,7 @@ func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *
 		config:         config,
 		executionState: es,
 		localVUID:      new(uint64),
+		localIters:     new(uint64),
 		logger:         logger,
 		progress: pb.New(
 			pb.WithLeft(config.GetName),
@@ -96,4 +98,15 @@ func (bs BaseExecutor) getMetricTags(vuID *uint64) *stats.SampleTags {
 		tags["vu"] = strconv.FormatUint(*vuID, 10)
 	}
 	return stats.IntoSampleTags(&tags)
+}
+
+// getScenarioIter returns the completed iterations by all VUs for this executor.
+func (bs *BaseExecutor) getScenarioIter() uint64 {
+	return atomic.LoadUint64(bs.localIters)
+}
+
+// incrScenarioIter increments the counter of completed iterations by all VUs
+// for this executor.
+func (bs *BaseExecutor) incrScenarioIter() {
+	atomic.AddUint64(bs.localIters, 1)
 }

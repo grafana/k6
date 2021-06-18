@@ -530,7 +530,7 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 		currentlyPaused: false,
 		activeVUsCount:  new(int64),
 		maxVUs:          new(int64),
-		runIteration:    getIterationRunner(mex.executionState, mex.logger),
+		runIteration:    getIterationRunner(mex.executionState, mex.incrScenarioIter, mex.logger),
 	}
 	*runState.maxVUs = startMaxVUs
 	if err = runState.retrieveStartMaxVUs(); err != nil {
@@ -542,6 +542,7 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 		Executor:   mex.config.Type,
 		StartTime:  time.Now(),
 		ProgressFn: runState.progressFn,
+		GetIter:    mex.getScenarioIter,
 	})
 
 	mex.progress.Modify(pb.WithProgress(runState.progressFn)) // Keep track of the progress

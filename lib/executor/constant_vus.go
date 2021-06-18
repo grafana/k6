@@ -174,13 +174,14 @@ func (clv ConstantVUs) Run(parentCtx context.Context, out chan<- stats.SampleCon
 	defer activeVUs.Wait()
 
 	regDurationDone := regDurationCtx.Done()
-	runIteration := getIterationRunner(clv.executionState, clv.logger)
+	runIteration := getIterationRunner(clv.executionState, clv.incrScenarioIter, clv.logger)
 
 	maxDurationCtx = lib.WithScenarioState(maxDurationCtx, &lib.ScenarioState{
 		Name:       clv.config.Name,
 		Executor:   clv.config.Type,
 		StartTime:  startTime,
 		ProgressFn: progressFn,
+		GetIter:    clv.getScenarioIter,
 	})
 
 	returnVU := func(u lib.InitializedVU) {
