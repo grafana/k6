@@ -362,6 +362,7 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut ch
 
 	runResults := make(chan error, executorsCount) // nil values are successful runs
 
+	runCtx = lib.WithExecutionState(runCtx, e.state)
 	runSubCtx, cancel := context.WithCancel(runCtx)
 	defer cancel() // just in case, and to shut up go vet...
 
