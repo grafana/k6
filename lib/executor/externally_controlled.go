@@ -536,6 +536,13 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 		return err
 	}
 
+	ctx = lib.WithScenarioState(ctx, &lib.ScenarioState{
+		Name:       mex.config.Name,
+		Executor:   mex.config.Type,
+		StartTime:  time.Now(),
+		ProgressFn: runState.progressFn,
+	})
+
 	mex.progress.Modify(pb.WithProgress(runState.progressFn)) // Keep track of the progress
 	go trackProgress(parentCtx, ctx, ctx, mex, runState.progressFn)
 
