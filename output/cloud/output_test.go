@@ -178,6 +178,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 		require.NoError(t, err)
 	}))
 
+	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
 	out, err := newOutput(output.Params{
 		Logger:     testutils.NewLogger(t),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s", "noCompress": true}`, tb.ServerHTTP.URL)),
@@ -222,15 +223,15 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 
 	out.AddMetricSamples([]stats.SampleContainer{stats.Sample{
 		Time:   now,
-		Metric: metrics.VUs,
+		Metric: builtinMetrics.VUs,
 		Tags:   tags,
 		Value:  1.0,
 	}})
 	expSamples <- []Sample{{
 		Type:   DataTypeSingle,
-		Metric: metrics.VUs.Name,
+		Metric: metrics.VUsName,
 		Data: &SampleDataSingle{
-			Type:  metrics.VUs.Type,
+			Type:  builtinMetrics.VUs.Type,
 			Time:  toMicroSecond(now),
 			Tags:  tags,
 			Value: 1.0,
@@ -305,6 +306,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 
 func TestCloudOutputMaxPerPacket(t *testing.T) {
 	t.Parallel()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	maxMetricSamplesPerPackage := 20
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -356,7 +358,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 
 	out.AddMetricSamples([]stats.SampleContainer{stats.Sample{
 		Time:   now,
-		Metric: metrics.VUs,
+		Metric: builtinMetrics.VUs,
 		Tags:   stats.NewSampleTags(tags.CloneTags()),
 		Value:  1.0,
 	}})
@@ -399,6 +401,7 @@ func TestCloudOutputStopSendingMetric(t *testing.T) {
 
 func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
+	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		body, err := ioutil.ReadAll(req.Body)
 		require.NoError(t, err)
@@ -480,7 +483,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 
 	out.AddMetricSamples([]stats.SampleContainer{stats.Sample{
 		Time:   now,
-		Metric: metrics.VUs,
+		Metric: builtinMetrics.VUs,
 		Tags:   stats.NewSampleTags(tags.CloneTags()),
 		Value:  1.0,
 	}})
@@ -520,7 +523,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	nBufferHTTPTrails := len(out.bufferHTTPTrails)
 	out.AddMetricSamples([]stats.SampleContainer{stats.Sample{
 		Time:   now,
-		Metric: metrics.VUs,
+		Metric: builtinMetrics.VUs,
 		Tags:   stats.NewSampleTags(tags.CloneTags()),
 		Value:  1.0,
 	}})
@@ -601,6 +604,7 @@ func TestCloudOutputAggregationPeriodZeroNoBlock(t *testing.T) {
 
 func TestCloudOutputPushRefID(t *testing.T) {
 	t.Parallel()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
 	expSamples := make(chan []Sample)
 	defer close(expSamples)
 
@@ -637,15 +641,15 @@ func TestCloudOutputPushRefID(t *testing.T) {
 
 	out.AddMetricSamples([]stats.SampleContainer{stats.Sample{
 		Time:   now,
-		Metric: metrics.HTTPReqDuration,
+		Metric: builtinMetrics.HTTPReqDuration,
 		Tags:   tags,
 		Value:  123.45,
 	}})
 	exp := []Sample{{
 		Type:   DataTypeSingle,
-		Metric: metrics.HTTPReqDuration.Name,
+		Metric: metrics.HTTPReqDurationName,
 		Data: &SampleDataSingle{
-			Type:  metrics.HTTPReqDuration.Type,
+			Type:  builtinMetrics.HTTPReqDuration.Type,
 			Time:  toMicroSecond(now),
 			Tags:  tags,
 			Value: 123.45,
@@ -663,6 +667,7 @@ func TestCloudOutputPushRefID(t *testing.T) {
 
 func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 	t.Parallel()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		body, err := ioutil.ReadAll(req.Body)
@@ -732,17 +737,17 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 		Samples: []stats.Sample{
 			{
 				Time:   now,
-				Metric: metrics.DataSent,
+				Metric: builtinMetrics.DataSent,
 				Value:  float64(200),
 			},
 			{
 				Time:   now,
-				Metric: metrics.DataReceived,
+				Metric: builtinMetrics.DataReceived,
 				Value:  float64(100),
 			},
 			{
 				Time:   now,
-				Metric: metrics.Iterations,
+				Metric: builtinMetrics.Iterations,
 				Value:  1,
 			},
 		},

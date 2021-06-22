@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/stats"
 )
@@ -82,7 +83,9 @@ exports.default = function() {
 	assert.Equal(t, logrus.InfoLevel, entries[0].Level)
 	assert.Equal(t, "once", entries[0].Message)
 
-	r2, err := NewFromArchive(logger, r1.MakeArchive(), lib.RuntimeOptions{})
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	r2, err := NewFromArchive(logger, r1.MakeArchive(), lib.RuntimeOptions{}, builtinMetrics, registry)
 	require.NoError(t, err)
 	entries = hook.Drain()
 	require.Len(t, entries, 1)

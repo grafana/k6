@@ -27,12 +27,12 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/stats"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestExpectedStatuses(t *testing.T) {
@@ -103,7 +103,7 @@ func TestExpectedStatuses(t *testing.T) {
 
 type expectedSample struct {
 	tags    map[string]string
-	metrics []*stats.Metric
+	metrics []string
 }
 
 func TestResponseCallbackInAction(t *testing.T) {
@@ -113,18 +113,18 @@ func TestResponseCallbackInAction(t *testing.T) {
 	httpModule := new(GlobalHTTP).NewModuleInstancePerVU().(*HTTP)
 	rt.Set("http", common.Bind(rt, httpModule, ctx))
 
-	HTTPMetricsWithoutFailed := []*stats.Metric{
-		metrics.HTTPReqs,
-		metrics.HTTPReqBlocked,
-		metrics.HTTPReqConnecting,
-		metrics.HTTPReqDuration,
-		metrics.HTTPReqReceiving,
-		metrics.HTTPReqWaiting,
-		metrics.HTTPReqSending,
-		metrics.HTTPReqTLSHandshaking,
+	HTTPMetricsWithoutFailed := []string{
+		metrics.HTTPReqsName,
+		metrics.HTTPReqBlockedName,
+		metrics.HTTPReqConnectingName,
+		metrics.HTTPReqDurationName,
+		metrics.HTTPReqReceivingName,
+		metrics.HTTPReqWaitingName,
+		metrics.HTTPReqSendingName,
+		metrics.HTTPReqTLSHandshakingName,
 	}
 
-	allHTTPMetrics := append(HTTPMetricsWithoutFailed, metrics.HTTPReqFailed)
+	allHTTPMetrics := append(HTTPMetricsWithoutFailed, metrics.HTTPReqFailedName)
 
 	testCases := map[string]struct {
 		code            string
@@ -313,18 +313,18 @@ func TestResponseCallbackBatch(t *testing.T) {
 	httpModule := new(GlobalHTTP).NewModuleInstancePerVU().(*HTTP)
 	rt.Set("http", common.Bind(rt, httpModule, ctx))
 
-	HTTPMetricsWithoutFailed := []*stats.Metric{
-		metrics.HTTPReqs,
-		metrics.HTTPReqBlocked,
-		metrics.HTTPReqConnecting,
-		metrics.HTTPReqDuration,
-		metrics.HTTPReqReceiving,
-		metrics.HTTPReqWaiting,
-		metrics.HTTPReqSending,
-		metrics.HTTPReqTLSHandshaking,
+	HTTPMetricsWithoutFailed := []string{
+		metrics.HTTPReqsName,
+		metrics.HTTPReqBlockedName,
+		metrics.HTTPReqConnectingName,
+		metrics.HTTPReqDurationName,
+		metrics.HTTPReqReceivingName,
+		metrics.HTTPReqWaitingName,
+		metrics.HTTPReqSendingName,
+		metrics.HTTPReqTLSHandshakingName,
 	}
 
-	allHTTPMetrics := append(HTTPMetricsWithoutFailed, metrics.HTTPReqFailed)
+	allHTTPMetrics := append(HTTPMetricsWithoutFailed, metrics.HTTPReqFailedName)
 	// IMPORTANT: the tests here depend on the fact that the url they hit can be ordered in the same
 	// order as the expectedSamples even if they are made concurrently
 	testCases := map[string]struct {
@@ -426,16 +426,16 @@ func TestResponseCallbackInActionWithoutPassedTag(t *testing.T) {
 	t.Parallel()
 	tb, state, samples, rt, ctx := newRuntime(t)
 	sr := tb.Replacer.Replace
-	allHTTPMetrics := []*stats.Metric{
-		metrics.HTTPReqs,
-		metrics.HTTPReqFailed,
-		metrics.HTTPReqBlocked,
-		metrics.HTTPReqConnecting,
-		metrics.HTTPReqDuration,
-		metrics.HTTPReqReceiving,
-		metrics.HTTPReqSending,
-		metrics.HTTPReqWaiting,
-		metrics.HTTPReqTLSHandshaking,
+	allHTTPMetrics := []string{
+		metrics.HTTPReqsName,
+		metrics.HTTPReqFailedName,
+		metrics.HTTPReqBlockedName,
+		metrics.HTTPReqConnectingName,
+		metrics.HTTPReqDurationName,
+		metrics.HTTPReqReceivingName,
+		metrics.HTTPReqSendingName,
+		metrics.HTTPReqWaitingName,
+		metrics.HTTPReqTLSHandshakingName,
 	}
 	deleteSystemTag(state, stats.TagExpectedResponse.String())
 	httpModule := new(GlobalHTTP).NewModuleInstancePerVU().(*HTTP)
@@ -465,7 +465,7 @@ func TestResponseCallbackInActionWithoutPassedTag(t *testing.T) {
 		"proto":  "HTTP/1.1",
 	}
 	assertRequestMetricsEmittedSingle(t, bufSamples[0], tags, allHTTPMetrics, func(sample stats.Sample) {
-		if sample.Metric.Name == metrics.HTTPReqFailed.Name {
+		if sample.Metric.Name == metrics.HTTPReqFailedName {
 			require.EqualValues(t, sample.Value, 1)
 		}
 	})
@@ -473,7 +473,7 @@ func TestResponseCallbackInActionWithoutPassedTag(t *testing.T) {
 	tags["name"] = tags["url"]
 	tags["status"] = "200"
 	assertRequestMetricsEmittedSingle(t, bufSamples[1], tags, allHTTPMetrics, func(sample stats.Sample) {
-		if sample.Metric.Name == metrics.HTTPReqFailed.Name {
+		if sample.Metric.Name == metrics.HTTPReqFailedName {
 			require.EqualValues(t, sample.Value, 0)
 		}
 	})
@@ -490,16 +490,16 @@ func TestDigestWithResponseCallback(t *testing.T) {
 		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/testuser/testpwd",
 	)
 
-	allHTTPMetrics := []*stats.Metric{
-		metrics.HTTPReqs,
-		metrics.HTTPReqFailed,
-		metrics.HTTPReqBlocked,
-		metrics.HTTPReqConnecting,
-		metrics.HTTPReqDuration,
-		metrics.HTTPReqReceiving,
-		metrics.HTTPReqSending,
-		metrics.HTTPReqWaiting,
-		metrics.HTTPReqTLSHandshaking,
+	allHTTPMetrics := []string{
+		metrics.HTTPReqsName,
+		metrics.HTTPReqFailedName,
+		metrics.HTTPReqBlockedName,
+		metrics.HTTPReqConnectingName,
+		metrics.HTTPReqDurationName,
+		metrics.HTTPReqReceivingName,
+		metrics.HTTPReqSendingName,
+		metrics.HTTPReqWaitingName,
+		metrics.HTTPReqTLSHandshakingName,
 	}
 	_, err := rt.RunString(fmt.Sprintf(`
 		var res = http.get(%q,  { auth: "digest" });
@@ -534,14 +534,14 @@ func TestDigestWithResponseCallback(t *testing.T) {
 		"error_code":        "1401",
 	}
 	assertRequestMetricsEmittedSingle(t, bufSamples[0], tags, allHTTPMetrics, func(sample stats.Sample) {
-		if sample.Metric.Name == metrics.HTTPReqFailed.Name {
+		if sample.Metric.Name == metrics.HTTPReqFailedName {
 			require.EqualValues(t, sample.Value, 0)
 		}
 	})
 	tags["status"] = "200"
 	delete(tags, "error_code")
 	assertRequestMetricsEmittedSingle(t, bufSamples[1], tags, allHTTPMetrics, func(sample stats.Sample) {
-		if sample.Metric.Name == metrics.HTTPReqFailed.Name {
+		if sample.Metric.Name == metrics.HTTPReqFailedName {
 			require.EqualValues(t, sample.Value, 0)
 		}
 	})

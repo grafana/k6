@@ -48,6 +48,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/netext"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
@@ -58,9 +59,11 @@ import (
 var _ lib.Runner = &Runner{}
 
 type Runner struct {
-	Bundle       *Bundle
-	Logger       *logrus.Logger
-	defaultGroup *lib.Group
+	Bundle         *Bundle
+	Logger         *logrus.Logger
+	defaultGroup   *lib.Group
+	builtinMetrics *metrics.BuiltinMetrics
+	registry       *metrics.Registry
 
 	BaseDialer net.Dialer
 	Resolver   netext.Resolver
@@ -75,26 +78,32 @@ type Runner struct {
 // New returns a new Runner for the provide source
 func New(
 	logger *logrus.Logger, src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
+	builtinMetrics *metrics.BuiltinMetrics, registry *metrics.Registry,
 ) (*Runner, error) {
-	bundle, err := NewBundle(logger, src, filesystems, rtOpts)
+	bundle, err := NewBundle(logger, src, filesystems, rtOpts, registry)
 	if err != nil {
 		return nil, err
 	}
 
-	return newFromBundle(logger, bundle)
+	return newFromBundle(logger, bundle, builtinMetrics, registry)
 }
 
 // NewFromArchive returns a new Runner from the source in the provided archive
-func NewFromArchive(logger *logrus.Logger, arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Runner, error) {
-	bundle, err := NewBundleFromArchive(logger, arc, rtOpts)
+func NewFromArchive(
+	logger *logrus.Logger, arc *lib.Archive, rtOpts lib.RuntimeOptions,
+	builtinMetrics *metrics.BuiltinMetrics, registry *metrics.Registry,
+) (*Runner, error) {
+	bundle, err := NewBundleFromArchive(logger, arc, rtOpts, registry)
 	if err != nil {
 		return nil, err
 	}
 
-	return newFromBundle(logger, bundle)
+	return newFromBundle(logger, bundle, builtinMetrics, registry)
 }
 
-func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
+func newFromBundle(
+	logger *logrus.Logger, b *Bundle, builtinMetrics *metrics.BuiltinMetrics, registry *metrics.Registry,
+) (*Runner, error) {
 	defaultGroup, err := lib.NewGroup("", nil)
 	if err != nil {
 		return nil, err
@@ -114,6 +123,8 @@ func newFromBundle(logger *logrus.Logger, b *Bundle) (*Runner, error) {
 		Resolver: netext.NewResolver(
 			net.LookupIP, 0, defDNS.Select.DNSSelect, defDNS.Policy.DNSPolicy),
 		ActualResolver: net.LookupIP,
+		builtinMetrics: builtinMetrics,
+		registry:       registry,
 	}
 
 	err = r.SetOptions(r.Bundle.Options)
@@ -223,19 +234,20 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 	}
 
 	vu.state = &lib.State{
-		Logger:     vu.Runner.Logger,
-		Options:    vu.Runner.Bundle.Options,
-		Transport:  vu.Transport,
-		Dialer:     vu.Dialer,
-		TLSConfig:  vu.TLSConfig,
-		CookieJar:  cookieJar,
-		RPSLimit:   vu.Runner.RPSLimit,
-		BPool:      vu.BPool,
-		VUID:       vu.ID,
-		VUIDGlobal: vu.IDGlobal,
-		Samples:    vu.Samples,
-		Tags:       vu.Runner.Bundle.Options.RunTags.CloneTags(),
-		Group:      r.defaultGroup,
+		Logger:         vu.Runner.Logger,
+		Options:        vu.Runner.Bundle.Options,
+		Transport:      vu.Transport,
+		Dialer:         vu.Dialer,
+		TLSConfig:      vu.TLSConfig,
+		CookieJar:      cookieJar,
+		RPSLimit:       vu.Runner.RPSLimit,
+		BPool:          vu.BPool,
+		VUID:           vu.ID,
+		VUIDGlobal:     vu.IDGlobal,
+		Samples:        vu.Samples,
+		Tags:           vu.Runner.Bundle.Options.RunTags.CloneTags(),
+		Group:          r.defaultGroup,
+		BuiltinMetrics: r.builtinMetrics,
 	}
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 
@@ -757,7 +769,8 @@ func (u *VU) runFn(
 		u.Transport.CloseIdleConnections()
 	}
 
-	u.state.Samples <- u.Dialer.GetTrail(startTime, endTime, isFullIteration, isDefault, stats.NewSampleTags(u.state.Tags))
+	u.state.Samples <- u.Dialer.GetTrail(
+		startTime, endTime, isFullIteration, isDefault, stats.NewSampleTags(u.state.Tags), u.Runner.builtinMetrics)
 
 	return v, isFullIteration, endTime.Sub(startTime), err
 }

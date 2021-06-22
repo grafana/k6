@@ -31,6 +31,7 @@ import (
 
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/loader"
 )
 
@@ -61,6 +62,8 @@ func getInspectCmd(logger logrus.FieldLogger) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			registry := metrics.NewRegistry()
+			_ = metrics.RegisterBuiltinMetrics(registry)
 
 			var (
 				opts lib.Options
@@ -73,13 +76,13 @@ func getInspectCmd(logger logrus.FieldLogger) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				b, err = js.NewBundleFromArchive(logger, arc, runtimeOptions)
+				b, err = js.NewBundleFromArchive(logger, arc, runtimeOptions, registry)
 				if err != nil {
 					return err
 				}
 				opts = b.Options
 			case typeJS:
-				b, err = js.NewBundle(logger, src, filesystems, runtimeOptions)
+				b, err = js.NewBundle(logger, src, filesystems, runtimeOptions, registry)
 				if err != nil {
 					return err
 				}

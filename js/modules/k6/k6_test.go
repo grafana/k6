@@ -124,10 +124,10 @@ func TestGroup(t *testing.T) {
 
 		rt := goja.New()
 		state := &lib.State{Group: root, Samples: make(chan stats.SampleContainer, 1000)}
-
 		ctx := context.Background()
 		ctx = lib.WithState(ctx, state)
 		ctx = common.WithRuntime(ctx, rt)
+		state.BuiltinMetrics = metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
 		require.NoError(t, rt.Set("k6", common.Bind(rt, New(), &ctx)))
 		return rt, state, root
 	}
@@ -154,7 +154,7 @@ func TestGroup(t *testing.T) {
 }
 
 func checkTestRuntime(t testing.TB, ctxs ...*context.Context) (
-	*goja.Runtime, chan stats.SampleContainer,
+	*goja.Runtime, chan stats.SampleContainer, *metrics.BuiltinMetrics,
 ) {
 	rt := goja.New()
 
@@ -175,16 +175,17 @@ func checkTestRuntime(t testing.TB, ctxs ...*context.Context) (
 	}
 	ctx = common.WithRuntime(ctx, rt)
 	ctx = lib.WithState(ctx, state)
+	state.BuiltinMetrics = metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
 	require.NoError(t, rt.Set("k6", common.Bind(rt, New(), &ctx)))
 	if len(ctxs) == 1 { // hacks
 		*ctxs[0] = ctx
 	}
-	return rt, samples
+	return rt, samples, state.BuiltinMetrics
 }
 
 func TestCheckObject(t *testing.T) {
 	t.Parallel()
-	rt, samples := checkTestRuntime(t)
+	rt, samples, builtinMetrics := checkTestRuntime(t)
 
 	_, err := rt.RunString(`k6.check(null, { "check": true })`)
 	assert.NoError(t, err)
@@ -195,7 +196,7 @@ func TestCheckObject(t *testing.T) {
 		require.True(t, ok)
 
 		assert.NotZero(t, sample.Time)
-		assert.Equal(t, metrics.Checks, sample.Metric)
+		assert.Equal(t, builtinMetrics.Checks, sample.Metric)
 		assert.Equal(t, float64(1), sample.Value)
 		assert.Equal(t, map[string]string{
 			"group": "",
@@ -205,7 +206,7 @@ func TestCheckObject(t *testing.T) {
 
 	t.Run("Multiple", func(t *testing.T) {
 		t.Parallel()
-		rt, samples := checkTestRuntime(t)
+		rt, samples, _ := checkTestRuntime(t)
 
 		_, err := rt.RunString(`k6.check(null, { "a": true, "b": false })`)
 		assert.NoError(t, err)
@@ -235,7 +236,7 @@ func TestCheckObject(t *testing.T) {
 
 	t.Run("Invalid", func(t *testing.T) {
 		t.Parallel()
-		rt, _ := checkTestRuntime(t)
+		rt, _, _ := checkTestRuntime(t)
 		_, err := rt.RunString(`k6.check(null, { "::": true })`)
 		assert.Contains(t, err.Error(), "group and check names may not contain '::'")
 	})
@@ -243,7 +244,7 @@ func TestCheckObject(t *testing.T) {
 
 func TestCheckArray(t *testing.T) {
 	t.Parallel()
-	rt, samples := checkTestRuntime(t)
+	rt, samples, builtinMetrics := checkTestRuntime(t)
 
 	_, err := rt.RunString(`k6.check(null, [ true ])`)
 	assert.NoError(t, err)
@@ -254,7 +255,7 @@ func TestCheckArray(t *testing.T) {
 		require.True(t, ok)
 
 		assert.NotZero(t, sample.Time)
-		assert.Equal(t, metrics.Checks, sample.Metric)
+		assert.Equal(t, builtinMetrics.Checks, sample.Metric)
 		assert.Equal(t, float64(1), sample.Value)
 		assert.Equal(t, map[string]string{
 			"group": "",
@@ -265,7 +266,7 @@ func TestCheckArray(t *testing.T) {
 
 func TestCheckLiteral(t *testing.T) {
 	t.Parallel()
-	rt, samples := checkTestRuntime(t)
+	rt, samples, _ := checkTestRuntime(t)
 
 	_, err := rt.RunString(`k6.check(null, 12345)`)
 	assert.NoError(t, err)
@@ -274,7 +275,7 @@ func TestCheckLiteral(t *testing.T) {
 
 func TestCheckThrows(t *testing.T) {
 	t.Parallel()
-	rt, samples := checkTestRuntime(t)
+	rt, samples, builtinMetrics := checkTestRuntime(t)
 	_, err := rt.RunString(`
 		k6.check(null, {
 			"a": function() { throw new Error("error A") },
@@ -289,7 +290,7 @@ func TestCheckThrows(t *testing.T) {
 		require.True(t, ok)
 
 		assert.NotZero(t, sample.Time)
-		assert.Equal(t, metrics.Checks, sample.Metric)
+		assert.Equal(t, builtinMetrics.Checks, sample.Metric)
 		assert.Equal(t, float64(0), sample.Value)
 		assert.Equal(t, map[string]string{
 			"group": "",
@@ -325,7 +326,7 @@ func TestCheckTypes(t *testing.T) {
 				value, succ := value, succ
 				t.Run(value, func(t *testing.T) {
 					t.Parallel()
-					rt, samples := checkTestRuntime(t)
+					rt, samples, builtinMetrics := checkTestRuntime(t)
 
 					v, err := rt.RunString(fmt.Sprintf(tpl, value))
 					if assert.NoError(t, err) {
@@ -338,7 +339,7 @@ func TestCheckTypes(t *testing.T) {
 						require.True(t, ok)
 
 						assert.NotZero(t, sample.Time)
-						assert.Equal(t, metrics.Checks, sample.Metric)
+						assert.Equal(t, builtinMetrics.Checks, sample.Metric)
 						if succ {
 							assert.Equal(t, float64(1), sample.Value)
 						} else {
@@ -358,7 +359,7 @@ func TestCheckTypes(t *testing.T) {
 func TestCheckContextExpiry(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
-	rt, _ := checkTestRuntime(t, &ctx)
+	rt, _, _ := checkTestRuntime(t, &ctx)
 	root := lib.GetState(ctx).Group
 
 	v, err := rt.RunString(`k6.check(null, { "check": true })`)
@@ -383,7 +384,7 @@ func TestCheckContextExpiry(t *testing.T) {
 
 func TestCheckTags(t *testing.T) {
 	t.Parallel()
-	rt, samples := checkTestRuntime(t)
+	rt, samples, builtinMetrics := checkTestRuntime(t)
 
 	v, err := rt.RunString(`k6.check(null, {"check": true}, {a: 1, b: "2"})`)
 	if assert.NoError(t, err) {
@@ -396,7 +397,7 @@ func TestCheckTags(t *testing.T) {
 		require.True(t, ok)
 
 		assert.NotZero(t, sample.Time)
-		assert.Equal(t, metrics.Checks, sample.Metric)
+		assert.Equal(t, builtinMetrics.Checks, sample.Metric)
 		assert.Equal(t, float64(1), sample.Value)
 		assert.Equal(t, map[string]string{
 			"group": "",

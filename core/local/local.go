@@ -31,6 +31,7 @@ import (
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/stats"
 	"go.k6.io/k6/ui/pb"
 )
@@ -290,6 +291,7 @@ func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- stats.S
 // method.
 func (e *ExecutionScheduler) runExecutor(
 	runCtx context.Context, runResults chan<- error, engineOut chan<- stats.SampleContainer, executor lib.Executor,
+	builtinMetrics *metrics.BuiltinMetrics,
 ) {
 	executorConfig := executor.GetConfig()
 	executorStartTime := executorConfig.GetStartTime()
@@ -326,7 +328,7 @@ func (e *ExecutionScheduler) runExecutor(
 		pb.WithConstProgress(0, "started"),
 	)
 	executorLogger.Debugf("Starting executor")
-	err := executor.Run(runCtx, engineOut) // executor should handle context cancel itself
+	err := executor.Run(runCtx, engineOut, builtinMetrics) // executor should handle context cancel itself
 	if err == nil {
 		executorLogger.Debugf("Executor finished successfully")
 	} else {
@@ -337,7 +339,10 @@ func (e *ExecutionScheduler) runExecutor(
 
 // Run the ExecutionScheduler, funneling all generated metric samples through the supplied
 // out channel.
-func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- stats.SampleContainer) error {
+//nolint:cyclop
+func (e *ExecutionScheduler) Run(
+	globalCtx, runCtx context.Context, engineOut chan<- stats.SampleContainer, builtinMetrics *metrics.BuiltinMetrics,
+) error {
 	executorsCount := len(e.executors)
 	logger := e.logger.WithField("phase", "local-execution-scheduler-run")
 	e.initProgress.Modify(pb.WithConstLeft("Run"))
@@ -382,7 +387,7 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut ch
 	logger.Debug("Start all executors...")
 	e.state.SetExecutionStatus(lib.ExecutionStatusRunning)
 	for _, exec := range e.executors {
-		go e.runExecutor(runSubCtx, runResults, engineOut, exec)
+		go e.runExecutor(runSubCtx, runResults, engineOut, exec, builtinMetrics)
 	}
 
 	// Wait for all executors to finish

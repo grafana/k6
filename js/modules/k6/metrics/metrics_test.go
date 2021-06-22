@@ -28,10 +28,12 @@ import (
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/stats"
 )
 
@@ -64,7 +66,7 @@ func TestMetrics(t *testing.T) {
 					rt.SetFieldNameMapper(common.FieldNameMapper{})
 					mii := &modulestest.InstanceCore{
 						Runtime: rt,
-						InitEnv: &common.InitEnvironment{},
+						InitEnv: &common.InitEnvironment{Registry: metrics.NewRegistry()},
 						Ctx:     context.Background(),
 					}
 					m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
@@ -74,7 +76,7 @@ func TestMetrics(t *testing.T) {
 					child, _ := root.Group("child")
 					samples := make(chan stats.SampleContainer, 1000)
 					state := &lib.State{
-						Options: lib.Options{SystemTags: stats.NewSystemTagSet(stats.TagGroup)},
+						Options: lib.Options{SystemTags: stats.NewSystemTagSet(stats.TagGroup), Throw: null.BoolFrom(true)},
 						Group:   root,
 						Samples: samples,
 						Tags:    map[string]string{"group": root.Path},
@@ -182,7 +184,7 @@ func TestMetricGetName(t *testing.T) {
 
 	mii := &modulestest.InstanceCore{
 		Runtime: rt,
-		InitEnv: &common.InitEnvironment{},
+		InitEnv: &common.InitEnvironment{Registry: metrics.NewRegistry()},
 		Ctx:     context.Background(),
 	}
 	m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
@@ -201,4 +203,45 @@ func TestMetricGetName(t *testing.T) {
 	`)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "TypeError: Cannot assign to read only property 'name'")
+}
+
+func TestMetricDuplicates(t *testing.T) {
+	t.Parallel()
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+
+	mii := &modulestest.InstanceCore{
+		Runtime: rt,
+		InitEnv: &common.InitEnvironment{Registry: metrics.NewRegistry()},
+		Ctx:     context.Background(),
+	}
+	m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("metrics", m.GetExports().Named))
+	_, err := rt.RunString(`
+		var m = new metrics.Counter("my_metric")
+	`)
+	require.NoError(t, err)
+
+	_, err = rt.RunString(`
+		var m2 = new metrics.Counter("my_metric")
+	`)
+	require.NoError(t, err)
+
+	_, err = rt.RunString(`
+		var m3 = new metrics.Gauge("my_metric")
+	`)
+	require.Error(t, err)
+
+	_, err = rt.RunString(`
+		var m4 = new metrics.Counter("my_metric", true)
+	`)
+	require.Error(t, err)
+
+	v, err := rt.RunString(`
+		m.name == m2.name && m.name == "my_metric" && m3 === undefined && m4 === undefined
+	`)
+	require.NoError(t, err)
+
+	require.True(t, v.ToBoolean())
 }

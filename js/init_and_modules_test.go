@@ -37,6 +37,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/stats"
@@ -82,6 +83,8 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 
 	logger := testutils.NewLogger(t)
 	rtOptions := lib.RuntimeOptions{CompatibilityMode: null.StringFrom("base")}
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
 		logger,
 		&loader.SourceData{
@@ -90,6 +93,8 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 		},
 		map[string]afero.Fs{"file": afero.NewMemMapFs(), "https": afero.NewMemMapFs()},
 		rtOptions,
+		builtinMetrics,
+		registry,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, checkModule.initCtxCalled, 1)
@@ -115,7 +120,7 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	assert.Equal(t, checkModule.initCtxCalled, 2) // shouldn't change, we're not executing the init context again
 	assert.Equal(t, checkModule.vuCtxCalled, 2)
 
-	runnerFromArc, err := js.NewFromArchive(logger, arc, rtOptions)
+	runnerFromArc, err := js.NewFromArchive(logger, arc, rtOptions, builtinMetrics, registry)
 	require.NoError(t, err)
 	assert.Equal(t, checkModule.initCtxCalled, 3) // changes because we need to get the exported functions
 	assert.Equal(t, checkModule.vuCtxCalled, 2)

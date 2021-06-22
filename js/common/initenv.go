@@ -26,6 +26,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"go.k6.io/k6/lib/metrics"
 )
 
 // InitEnvironment contains properties that can be accessed by Go code executed
@@ -34,6 +35,7 @@ type InitEnvironment struct {
 	Logger      logrus.FieldLogger
 	FileSystems map[string]afero.Fs
 	CWD         *url.URL
+	Registry    *metrics.Registry
 	// TODO: add RuntimeOptions and other properties, goja sources, etc.
 	// ideally, we should leave this as the only data structure necessary for
 	// executing the init context for all JS modules

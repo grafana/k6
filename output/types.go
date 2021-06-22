@@ -29,6 +29,7 @@ import (
 	"github.com/spf13/afero"
 
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/stats"
 )
 
@@ -94,4 +95,10 @@ type WithTestRunStop interface {
 type WithRunStatusUpdates interface {
 	Output
 	SetRunStatus(latestStatus lib.RunStatus)
+}
+
+// WithBuiltinMetrics means the output can receive the builtin metrics.
+type WithBuiltinMetrics interface {
+	Output
+	SetBuiltinMetrics(builtinMetrics *metrics.BuiltinMetrics)
 }
