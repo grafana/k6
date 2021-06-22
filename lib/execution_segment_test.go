@@ -924,3 +924,199 @@ func BenchmarkExecutionSegmentScale(b *testing.B) {
 }
 
 // TODO: test with randomized things
+
+func TestSegmentedIndex(t *testing.T) {
+	t.Parallel()
+	// TODO ... more structure ?
+	t.Run("full", func(t *testing.T) {
+		t.Parallel()
+		s := SegmentedIndex{start: 0, lcd: 1, offsets: []int64{1}}
+
+		s.Next()
+		assert.EqualValues(t, 1, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 0, s.unscaled)
+		assert.EqualValues(t, 0, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 1, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 2, s.unscaled)
+		assert.EqualValues(t, 2, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 3, s.unscaled)
+		assert.EqualValues(t, 3, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 2, s.unscaled)
+		assert.EqualValues(t, 2, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 1, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 2, s.unscaled)
+		assert.EqualValues(t, 2, s.scaled)
+	})
+
+	t.Run("half", func(t *testing.T) {
+		t.Parallel()
+		s := SegmentedIndex{start: 0, lcd: 2, offsets: []int64{2}}
+
+		s.Next()
+		assert.EqualValues(t, 1, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 0, s.unscaled)
+		assert.EqualValues(t, 0, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 1, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 3, s.unscaled)
+		assert.EqualValues(t, 2, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 5, s.unscaled)
+		assert.EqualValues(t, 3, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 3, s.unscaled)
+		assert.EqualValues(t, 2, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 1, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 0, s.unscaled)
+		assert.EqualValues(t, 0, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 1, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+	})
+
+	t.Run("the other half", func(t *testing.T) {
+		t.Parallel()
+		s := SegmentedIndex{start: 1, lcd: 2, offsets: []int64{2}}
+
+		s.Next()
+		assert.EqualValues(t, 2, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 0, s.unscaled)
+		assert.EqualValues(t, 0, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 2, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 4, s.unscaled)
+		assert.EqualValues(t, 2, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 6, s.unscaled)
+		assert.EqualValues(t, 3, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 4, s.unscaled)
+		assert.EqualValues(t, 2, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 2, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 0, s.unscaled)
+		assert.EqualValues(t, 0, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 2, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+	})
+
+	t.Run("strange", func(t *testing.T) {
+		t.Parallel()
+		s := SegmentedIndex{start: 1, lcd: 7, offsets: []int64{4, 3}}
+
+		s.Next()
+		assert.EqualValues(t, 2, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 0, s.unscaled)
+		assert.EqualValues(t, 0, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 2, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 6, s.unscaled)
+		assert.EqualValues(t, 2, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 9, s.unscaled)
+		assert.EqualValues(t, 3, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 6, s.unscaled)
+		assert.EqualValues(t, 2, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 2, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 0, s.unscaled)
+		assert.EqualValues(t, 0, s.scaled)
+
+		s.Next()
+		assert.EqualValues(t, 2, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.GoTo(6)
+		assert.EqualValues(t, 6, s.unscaled)
+		assert.EqualValues(t, 2, s.scaled)
+
+		s.GoTo(5)
+		assert.EqualValues(t, 2, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.GoTo(7)
+		assert.EqualValues(t, 6, s.unscaled)
+		assert.EqualValues(t, 2, s.scaled)
+
+		s.GoTo(8)
+		assert.EqualValues(t, 6, s.unscaled)
+		assert.EqualValues(t, 2, s.scaled)
+
+		s.GoTo(9)
+		assert.EqualValues(t, 9, s.unscaled)
+		assert.EqualValues(t, 3, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 6, s.unscaled)
+		assert.EqualValues(t, 2, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 2, s.unscaled)
+		assert.EqualValues(t, 1, s.scaled)
+
+		s.Prev()
+		assert.EqualValues(t, 0, s.unscaled)
+		assert.EqualValues(t, 0, s.scaled)
+	})
+}

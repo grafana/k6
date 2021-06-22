@@ -28,6 +28,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
+
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
@@ -35,10 +40,6 @@ import (
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/stats"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v3"
 )
 
 type CheckModule struct {
@@ -94,7 +95,7 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	assert.Equal(t, checkModule.initCtxCalled, 1)
 	assert.Equal(t, checkModule.vuCtxCalled, 0)
 
-	vu, err := runner.NewVU(1, make(chan stats.SampleContainer, 100))
+	vu, err := runner.NewVU(1, 1, make(chan stats.SampleContainer, 100))
 	require.NoError(t, err)
 	assert.Equal(t, checkModule.initCtxCalled, 2)
 	assert.Equal(t, checkModule.vuCtxCalled, 0)
@@ -118,7 +119,7 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, checkModule.initCtxCalled, 3) // changes because we need to get the exported functions
 	assert.Equal(t, checkModule.vuCtxCalled, 2)
-	vuFromArc, err := runnerFromArc.NewVU(2, make(chan stats.SampleContainer, 100))
+	vuFromArc, err := runnerFromArc.NewVU(2, 2, make(chan stats.SampleContainer, 100))
 	require.NoError(t, err)
 	assert.Equal(t, checkModule.initCtxCalled, 4)
 	assert.Equal(t, checkModule.vuCtxCalled, 2)

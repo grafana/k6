@@ -157,15 +157,15 @@ func (e *ExecutionScheduler) GetExecutionPlan() []lib.ExecutionStep {
 func (e *ExecutionScheduler) initVU(
 	samplesOut chan<- stats.SampleContainer, logger *logrus.Entry,
 ) (lib.InitializedVU, error) {
-	// Get the VU ID here, so that the VUs are (mostly) ordered by their
+	// Get the VU IDs here, so that the VUs are (mostly) ordered by their
 	// number in the channel buffer
-	vuID := e.state.GetUniqueVUIdentifier()
-	vu, err := e.runner.NewVU(int64(vuID), samplesOut)
+	vuIDLocal, vuIDGlobal := e.state.GetUniqueVUIdentifiers()
+	vu, err := e.runner.NewVU(vuIDLocal, vuIDGlobal, samplesOut)
 	if err != nil {
-		return nil, errext.WithHint(err, fmt.Sprintf("error while initializing VU #%d", vuID))
+		return nil, errext.WithHint(err, fmt.Sprintf("error while initializing VU #%d", vuIDGlobal))
 	}
 
-	logger.Debugf("Initialized VU #%d", vuID)
+	logger.Debugf("Initialized VU #%d", vuIDGlobal)
 	return vu, nil
 }
 
@@ -362,6 +362,7 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut ch
 
 	runResults := make(chan error, executorsCount) // nil values are successful runs
 
+	runCtx = lib.WithExecutionState(runCtx, e.state)
 	runSubCtx, cancel := context.WithCancel(runCtx)
 	defer cancel() // just in case, and to shut up go vet...
 

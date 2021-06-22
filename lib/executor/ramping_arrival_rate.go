@@ -158,7 +158,7 @@ func (varc RampingArrivalRateConfig) GetExecutionRequirements(et *lib.ExecutionT
 func (varc RampingArrivalRateConfig) NewExecutor(
 	es *lib.ExecutionState, logger *logrus.Entry,
 ) (lib.Executor, error) {
-	return RampingArrivalRate{
+	return &RampingArrivalRate{
 		BaseExecutor: NewBaseExecutor(&varc, es, logger),
 		config:       varc,
 	}, nil
@@ -175,10 +175,22 @@ func (varc RampingArrivalRateConfig) HasWork(et *lib.ExecutionTuple) bool {
 type RampingArrivalRate struct {
 	*BaseExecutor
 	config RampingArrivalRateConfig
+	et     *lib.ExecutionTuple
 }
 
 // Make sure we implement the lib.Executor interface.
 var _ lib.Executor = &RampingArrivalRate{}
+
+// Init values needed for the execution
+func (varr *RampingArrivalRate) Init(ctx context.Context) error {
+	// err should always be nil, because Init() won't be called for executors
+	// with no work, as determined by their config's HasWork() method.
+	et, err := varr.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(varr.config.MaxVUs.Int64)
+	varr.et = et
+	varr.iterSegIndex = lib.NewSegmentedIndex(et)
+
+	return err //nolint: wrapcheck
+}
 
 // cal calculates the  transtitions between stages and gives the next full value produced by the
 // stages. In this explanation we are talking about events and in practice those events are starting
@@ -346,6 +358,45 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	}()
 
 	activeVUsCount := uint64(0)
+	tickerPeriod := int64(startTickerPeriod.Duration)
+	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
+	itersFmt := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 0) + " iters/s"
+
+	progressFn := func() (float64, []string) {
+		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
+		currentTickerPeriod := atomic.LoadInt64(&tickerPeriod)
+		progVUs := fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs",
+			vusPool.Running(), currActiveVUs)
+
+		itersPerSec := 0.0
+		if currentTickerPeriod > 0 {
+			itersPerSec = float64(time.Second) / float64(currentTickerPeriod)
+		}
+		progIters := fmt.Sprintf(itersFmt, itersPerSec)
+
+		right := []string{progVUs, duration.String(), progIters}
+
+		spent := time.Since(startTime)
+		if spent > duration {
+			return 1, right
+		}
+
+		spentDuration := pb.GetFixedLengthDuration(spent, duration)
+		progDur := fmt.Sprintf("%s/%s", spentDuration, duration)
+		right[1] = progDur
+
+		return math.Min(1, float64(spent)/float64(duration)), right
+	}
+
+	varr.progress.Modify(pb.WithProgress(progressFn))
+	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, &varr, progressFn)
+
+	maxDurationCtx = lib.WithScenarioState(maxDurationCtx, &lib.ScenarioState{
+		Name:       varr.config.Name,
+		Executor:   varr.config.Type,
+		StartTime:  startTime,
+		ProgressFn: progressFn,
+	})
 
 	returnVU := func(u lib.InitializedVU) {
 		varr.executionState.ReturnVU(u, true)
@@ -353,9 +404,13 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	}
 
 	runIterationBasic := getIterationRunner(varr.executionState, varr.logger)
+
 	activateVU := func(initVU lib.InitializedVU) lib.ActiveVU {
 		activeVUsWg.Add(1)
-		activeVU := initVU.Activate(getVUActivationParams(maxDurationCtx, varr.config.BaseConfig, returnVU))
+		activeVU := initVU.Activate(
+			getVUActivationParams(
+				maxDurationCtx, varr.config.BaseConfig, returnVU,
+				varr.nextIterationCounters))
 		varr.executionState.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddUint64(&activeVUsCount, 1)
 
@@ -391,40 +446,6 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 		activateVU(initVU)
 	}
 
-	tickerPeriod := int64(startTickerPeriod.Duration)
-
-	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
-	itersFmt := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 0) + " iters/s"
-
-	progressFn := func() (float64, []string) {
-		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
-		currentTickerPeriod := atomic.LoadInt64(&tickerPeriod)
-		progVUs := fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs",
-			vusPool.Running(), currActiveVUs)
-
-		itersPerSec := 0.0
-		if currentTickerPeriod > 0 {
-			itersPerSec = float64(time.Second) / float64(currentTickerPeriod)
-		}
-		progIters := fmt.Sprintf(itersFmt, itersPerSec)
-
-		right := []string{progVUs, duration.String(), progIters}
-
-		spent := time.Since(startTime)
-		if spent > duration {
-			return 1, right
-		}
-
-		spentDuration := pb.GetFixedLengthDuration(spent, duration)
-		progDur := fmt.Sprintf("%s/%s", spentDuration, duration)
-		right[1] = progDur
-
-		return math.Min(1, float64(spent)/float64(duration)), right
-	}
-
-	varr.progress.Modify(pb.WithProgress(progressFn))
-	go trackProgress(parentCtx, maxDurationCtx, regDurationCtx, varr, progressFn)
-
 	regDurationDone := regDurationCtx.Done()
 	timer := time.NewTimer(time.Hour)
 	start := time.Now()
@@ -432,7 +453,7 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 	var prevTime time.Duration
 	shownWarning := false
 	metricTags := varr.getMetricTags(nil)
-	go varr.config.cal(varr.executionState.ExecutionTuple, ch)
+	go varr.config.cal(varr.et, ch)
 	for nextTime := range ch {
 		select {
 		case <-regDurationDone:

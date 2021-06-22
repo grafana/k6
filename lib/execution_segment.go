@@ -730,3 +730,82 @@ func (et *ExecutionTuple) GetNewExecutionTupleFromValue(value int64) (*Execution
 		SegmentIndex: newIndex,
 	}, nil
 }
+
+// SegmentedIndex is an iterator that returns both the scaled and the unscaled
+// sequential values according to the given ExecutionTuple. It is not thread-safe,
+// concurrent access has to be externally synchronized.
+type SegmentedIndex struct {
+	start, lcd       int64
+	offsets          []int64
+	scaled, unscaled int64 // for both the first element(vu) is 1 not 0
+}
+
+// NewSegmentedIndex returns a pointer to a new SegmentedIndex instance,
+// given an ExecutionTuple.
+func NewSegmentedIndex(et *ExecutionTuple) *SegmentedIndex {
+	start, offsets, lcd := et.GetStripedOffsets()
+	return &SegmentedIndex{start: start, lcd: lcd, offsets: offsets}
+}
+
+// Next goes to the next scaled index and moves the unscaled one accordingly.
+func (s *SegmentedIndex) Next() (int64, int64) {
+	if s.scaled == 0 { // the 1 element(VU) is at the start
+		s.unscaled += s.start + 1 // the first element of the start 0, but the here we need it to be 1 so we add 1
+	} else { // if we are not at the first element we need to go through the offsets, looping over them
+		s.unscaled += s.offsets[int(s.scaled-1)%len(s.offsets)] // slice's index start at 0 ours start at 1
+	}
+	s.scaled++
+
+	return s.scaled, s.unscaled
+}
+
+// Prev goes to the previous scaled value and sets the unscaled one accordingly.
+// Calling Prev when s.scaled == 0 is undefined.
+func (s *SegmentedIndex) Prev() (int64, int64) {
+	if s.scaled == 1 { // we are the first need to go to the 0th element which means we need to remove the start
+		s.unscaled -= s.start + 1 // this could've been just settign to 0
+	} else { // not at the first element - need to get the previously added offset so
+		s.unscaled -= s.offsets[int(s.scaled-2)%len(s.offsets)] // slice's index start 0 our start at 1
+	}
+	s.scaled--
+
+	return s.scaled, s.unscaled
+}
+
+// GoTo sets the scaled index to its biggest value for which the corresponding
+// unscaled index is smaller or equal to value.
+func (s *SegmentedIndex) GoTo(value int64) (int64, int64) { // TODO optimize
+	var gi int64
+	// Because of the cyclical nature of the striping algorithm (with a cycle
+	// length of LCD, the least common denominator), when scaling large values
+	// (i.e. many multiples of the LCD), we can quickly calculate how many times
+	// the cycle repeats.
+	wholeCycles := (value / s.lcd)
+	// So we can set some approximate initial values quickly, since we also know
+	// precisely how many scaled values there are per cycle length.
+	s.scaled = wholeCycles * int64(len(s.offsets))
+	s.unscaled = wholeCycles*s.lcd + s.start + 1 // our indexes are from 1 the start is from 0
+	// Approach the final value using the slow algorithm with the step by step loop
+	// TODO: this can be optimized by another array with size offsets that instead of the offsets
+	// from the previous is the offset from either 0 or start
+	i := s.start
+	for ; i < value%s.lcd; gi, i = gi+1, i+s.offsets[gi] {
+		s.scaled++
+		s.unscaled += s.offsets[gi]
+	}
+
+	if gi > 0 { // there were more values after the wholecycles
+		// the last offset actually shouldn't have been added
+		s.unscaled -= s.offsets[gi-1]
+	} else if s.scaled > 0 { // we didn't actually have more values after the wholecycles but we still had some
+		// in this case the unscaled value needs to move back by the last offset as it would've been
+		// the one to get it from the value it needs to be to it's current one
+		s.unscaled -= s.offsets[len(s.offsets)-1]
+	}
+
+	if s.scaled == 0 {
+		s.unscaled = 0 // we would've added the start and 1
+	}
+
+	return s.scaled, s.unscaled
+}

@@ -143,7 +143,7 @@ func TestConsole(t *testing.T) {
 					assert.NoError(t, err)
 
 					samples := make(chan stats.SampleContainer, 100)
-					initVU, err := r.newVU(1, samples)
+					initVU, err := r.newVU(1, 1, samples)
 					assert.NoError(t, err)
 
 					ctx, cancel := context.WithCancel(context.Background())
@@ -245,7 +245,7 @@ func TestFileConsole(t *testing.T) {
 							assert.NoError(t, err)
 
 							samples := make(chan stats.SampleContainer, 100)
-							initVU, err := r.newVU(1, samples)
+							initVU, err := r.newVU(1, 1, samples)
 							assert.NoError(t, err)
 
 							ctx, cancel := context.WithCancel(context.Background())

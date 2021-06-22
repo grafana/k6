@@ -23,6 +23,7 @@ package executor
 import (
 	"context"
 	"strconv"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 
@@ -38,21 +39,34 @@ import (
 type BaseExecutor struct {
 	config         lib.ExecutorConfig
 	executionState *lib.ExecutionState
+	iterSegIndexMx *sync.Mutex
+	iterSegIndex   *lib.SegmentedIndex
 	logger         *logrus.Entry
 	progress       *pb.ProgressBar
 }
 
 // NewBaseExecutor returns an initialized BaseExecutor
 func NewBaseExecutor(config lib.ExecutorConfig, es *lib.ExecutionState, logger *logrus.Entry) *BaseExecutor {
+	segIdx := lib.NewSegmentedIndex(es.ExecutionTuple)
 	return &BaseExecutor{
 		config:         config,
 		executionState: es,
 		logger:         logger,
+		iterSegIndexMx: new(sync.Mutex),
+		iterSegIndex:   segIdx,
 		progress: pb.New(
 			pb.WithLeft(config.GetName),
 			pb.WithLogger(logger),
 		),
 	}
+}
+
+// nextIterationCounters next scaled(local) and unscaled(global) iteration counters
+func (bs *BaseExecutor) nextIterationCounters() (uint64, uint64) {
+	bs.iterSegIndexMx.Lock()
+	defer bs.iterSegIndexMx.Unlock()
+	scaled, unscaled := bs.iterSegIndex.Next()
+	return uint64(scaled - 1), uint64(unscaled - 1)
 }
 
 // Init doesn't do anything for most executors, since initialization of all
@@ -62,29 +76,29 @@ func (bs *BaseExecutor) Init(_ context.Context) error {
 }
 
 // GetConfig returns the configuration with which this executor was launched.
-func (bs BaseExecutor) GetConfig() lib.ExecutorConfig {
+func (bs *BaseExecutor) GetConfig() lib.ExecutorConfig {
 	return bs.config
 }
 
 // GetLogger returns the executor logger entry.
-func (bs BaseExecutor) GetLogger() *logrus.Entry {
+func (bs *BaseExecutor) GetLogger() *logrus.Entry {
 	return bs.logger
 }
 
 // GetProgress just returns the progressbar pointer.
-func (bs BaseExecutor) GetProgress() *pb.ProgressBar {
+func (bs *BaseExecutor) GetProgress() *pb.ProgressBar {
 	return bs.progress
 }
 
 // getMetricTags returns a tag set that can be used to emit metrics by the
 // executor. The VU ID is optional.
-func (bs BaseExecutor) getMetricTags(vuID *int64) *stats.SampleTags {
+func (bs *BaseExecutor) getMetricTags(vuID *uint64) *stats.SampleTags {
 	tags := bs.executionState.Options.RunTags.CloneTags()
 	if bs.executionState.Options.SystemTags.Has(stats.TagScenario) {
 		tags["scenario"] = bs.config.GetName()
 	}
 	if vuID != nil && bs.executionState.Options.SystemTags.Has(stats.TagVU) {
-		tags["vu"] = strconv.FormatInt(*vuID, 10)
+		tags["vu"] = strconv.FormatUint(*vuID, 10)
 	}
 	return stats.IntoSampleTags(&tags)
 }

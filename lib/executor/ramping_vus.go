@@ -187,15 +187,15 @@ func (vlvc RampingVUsConfig) Validate() []error {
 // More information: https://github.com/k6io/k6/issues/997#issuecomment-484416866
 func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEnd bool) []lib.ExecutionStep {
 	var (
-		timeTillEnd         time.Duration
-		fromVUs             = vlvc.StartVUs.Int64
-		start, offsets, lcd = et.GetStripedOffsets()
-		steps               = make([]lib.ExecutionStep, 0, vlvc.precalculateTheRequiredSteps(et, zeroEnd))
-		index               = segmentedIndex{start: start, lcd: lcd, offsets: offsets}
+		timeTillEnd time.Duration
+		fromVUs     = vlvc.StartVUs.Int64
+		steps       = make([]lib.ExecutionStep, 0, vlvc.precalculateTheRequiredSteps(et, zeroEnd))
+		index       = lib.NewSegmentedIndex(et)
 	)
 
 	// Reserve the scaled StartVUs at the beginning
-	steps = append(steps, lib.ExecutionStep{TimeOffset: 0, PlannedVUs: uint64(index.goTo(fromVUs))})
+	scaled, unscaled := index.GoTo(fromVUs)
+	steps = append(steps, lib.ExecutionStep{TimeOffset: 0, PlannedVUs: uint64(scaled)})
 	addStep := func(timeOffset time.Duration, plannedVUs uint64) {
 		if steps[len(steps)-1].PlannedVUs != plannedVUs {
 			steps = append(steps, lib.ExecutionStep{TimeOffset: timeOffset, PlannedVUs: plannedVUs})
@@ -212,30 +212,31 @@ func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEn
 			continue
 		}
 		if stageDuration == 0 {
-			addStep(timeTillEnd, uint64(index.goTo(stageEndVUs)))
+			scaled, unscaled = index.GoTo(stageEndVUs)
+			addStep(timeTillEnd, uint64(scaled))
 			fromVUs = stageEndVUs
 			continue
 		}
 
 		// VU reservation for gracefully ramping down is handled as a
 		// separate method: reserveVUsForGracefulRampDowns()
-		if index.unscaled > stageEndVUs { // ramp down
+		if unscaled > stageEndVUs { // ramp down
 			// here we don't want to emit for the equal to stageEndVUs as it doesn't go below it
 			// it will just go to it
-			for ; index.unscaled > stageEndVUs; index.prev() {
+			for ; unscaled > stageEndVUs; scaled, unscaled = index.Prev() {
 				addStep(
 					// this is the time that we should go up 1 if we are ramping up
 					// but we are ramping down so we should go 1 down, but because we want to not
 					// stop VUs immediately we stop it on the next unscaled VU's time
-					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-index.unscaled+1)/stageVUDiff),
-					uint64(index.scaled-1),
+					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-unscaled+1)/stageVUDiff),
+					uint64(scaled-1),
 				)
 			}
 		} else {
-			for ; index.unscaled <= stageEndVUs; index.next() {
+			for ; unscaled <= stageEndVUs; scaled, unscaled = index.Next() {
 				addStep(
-					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-index.unscaled)/stageVUDiff),
-					uint64(index.scaled),
+					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-unscaled)/stageVUDiff),
+					uint64(scaled),
 				)
 			}
 		}
@@ -247,71 +248,6 @@ func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEn
 		steps = append(steps, lib.ExecutionStep{TimeOffset: timeTillEnd, PlannedVUs: 0})
 	}
 	return steps
-}
-
-type segmentedIndex struct { // TODO: rename ... although this is probably the best name so far :D
-	start, lcd       int64
-	offsets          []int64
-	scaled, unscaled int64 // for both the first element(vu) is 1 not 0
-}
-
-// goes to the next scaled index and move the unscaled one accordingly
-func (s *segmentedIndex) next() {
-	if s.scaled == 0 { // the 1 element(VU) is at the start
-		s.unscaled += s.start + 1 // the first element of the start 0, but the here we need it to be 1 so we add 1
-	} else { // if we are not at the first element we need to go through the offsets, looping over them
-		s.unscaled += s.offsets[int(s.scaled-1)%len(s.offsets)] // slice's index start at 0 ours start at 1
-	}
-	s.scaled++
-}
-
-// prev goest to the previous scaled value and sets the unscaled one accordingly
-// calling prev when s.scaled == 0 is undefined
-func (s *segmentedIndex) prev() {
-	if s.scaled == 1 { // we are the first need to go to the 0th element which means we need to remove the start
-		s.unscaled -= s.start + 1 // this could've been just settign to 0
-	} else { // not at the first element - need to get the previously added offset so
-		s.unscaled -= s.offsets[int(s.scaled-2)%len(s.offsets)] // slice's index start 0 our start at 1
-	}
-	s.scaled--
-}
-
-// goTo sets the scaled index to it's biggest value for which the corresponding unscaled index is
-// is smaller or equal to value
-func (s *segmentedIndex) goTo(value int64) int64 { // TODO optimize
-	var gi int64
-	// Because of the cyclical nature of the striping algorithm (with a cycle
-	// length of LCD, the least common denominator), when scaling large values
-	// (i.e. many multiples of the LCD), we can quickly calculate how many times
-	// the cycle repeats.
-	wholeCycles := (value / s.lcd)
-	// So we can set some approximate initial values quickly, since we also know
-	// precisely how many scaled values there are per cycle length.
-	s.scaled = wholeCycles * int64(len(s.offsets))
-	s.unscaled = wholeCycles*s.lcd + s.start + 1 // our indexes are from 1 the start is from 0
-	// Approach the final value using the slow algorithm with the step by step loop
-	// TODO: this can be optimized by another array with size offsets that instead of the offsets
-	// from the previous is the offset from either 0 or start
-	i := s.start
-	for ; i < value%s.lcd; gi, i = gi+1, i+s.offsets[gi] {
-		s.scaled++
-		s.unscaled += s.offsets[gi]
-	}
-
-	if gi > 0 { // there were more values after the wholecycles
-		// the last offset actually shouldn't have been added
-		s.unscaled -= s.offsets[gi-1]
-	} else if s.scaled > 0 { // we didn't actually have more values after the wholecycles but we still had some
-		// in this case the unscaled value needs to move back by the last offset as it would've been
-		// the one to get it from the value it needs to be to it's current one
-		s.unscaled -= s.offsets[len(s.offsets)-1]
-	}
-
-	if s.scaled == 0 {
-		s.unscaled = 0 // we would've added the start and 1
-	}
-
-	return s.scaled
 }
 
 func absInt64(a int64) int64 {
@@ -628,11 +564,18 @@ func (vlv RampingVUs) Run(parentCtx context.Context, out chan<- stats.SampleCont
 		vlv.executionState.ModCurrentlyActiveVUsCount(-1)
 	}
 
+	maxDurationCtx = lib.WithScenarioState(maxDurationCtx, &lib.ScenarioState{
+		Name:       vlv.config.Name,
+		Executor:   vlv.config.Type,
+		StartTime:  startTime,
+		ProgressFn: progressFn,
+	})
+
 	vuHandles := make([]*vuHandle, maxVUs)
 	for i := uint64(0); i < maxVUs; i++ {
 		vuHandle := newStoppedVUHandle(
-			maxDurationCtx, getVU, returnVU, &vlv.config.BaseConfig,
-			vlv.logger.WithField("vuNum", i))
+			maxDurationCtx, getVU, returnVU, vlv.nextIterationCounters,
+			&vlv.config.BaseConfig, vlv.logger.WithField("vuNum", i))
 		go vuHandle.runLoopsIfPossible(runIteration)
 		vuHandles[i] = vuHandle
 	}

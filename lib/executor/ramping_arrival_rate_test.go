@@ -36,6 +36,7 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/testutils/minirunner"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/stats"
 )
@@ -184,7 +185,8 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 		time.Sleep(time.Millisecond * 200)
 		cur = atomic.LoadInt64(&count)
 		require.NotEqual(t, cur, int64(2))
-		return runner.NewVU(int64(es.GetUniqueVUIdentifier()), engineOut)
+		idl, idg := es.GetUniqueVUIdentifiers()
+		return runner.NewVU(idl, idg, engineOut)
 	})
 	err = executor.Run(ctx, engineOut)
 	assert.NoError(t, err)
@@ -234,7 +236,8 @@ func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 		cur = atomic.LoadInt64(&count)
 		require.NotEqual(t, cur, int64(1))
 
-		return runner.NewVU(int64(es.GetUniqueVUIdentifier()), engineOut)
+		idl, idg := es.GetUniqueVUIdentifiers()
+		return runner.NewVU(idl, idg, engineOut)
 	})
 	err = executor.Run(ctx, engineOut)
 	assert.NoError(t, err)
@@ -684,5 +687,69 @@ func (varc RampingArrivalRateConfig) calRat(et *lib.ExecutionTuple, ch chan<- ti
 		doneSoFar.Set(endCount) // copy
 		curr = target
 		base += time.Duration(stage.Duration.Duration)
+	}
+}
+
+func TestRampingArrivalRateGlobalIters(t *testing.T) {
+	t.Parallel()
+
+	config := &RampingArrivalRateConfig{
+		BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(100 * time.Millisecond)},
+		TimeUnit:        types.NullDurationFrom(950 * time.Millisecond),
+		StartRate:       null.IntFrom(0),
+		PreAllocatedVUs: null.IntFrom(2),
+		MaxVUs:          null.IntFrom(5),
+		Stages: []Stage{
+			{
+				Duration: types.NullDurationFrom(1 * time.Second),
+				Target:   null.IntFrom(20),
+			},
+			{
+				Duration: types.NullDurationFrom(1 * time.Second),
+				Target:   null.IntFrom(0),
+			},
+		},
+	}
+
+	testCases := []struct {
+		seq, seg string
+		expIters []uint64
+	}{
+		{"0,1/4,3/4,1", "0:1/4", []uint64{1, 6, 11, 16}},
+		{"0,1/4,3/4,1", "1/4:3/4", []uint64{0, 2, 4, 5, 7, 9, 10, 12, 14, 15, 17, 19, 20}},
+		{"0,1/4,3/4,1", "3/4:1", []uint64{3, 8, 13}},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("%s_%s", tc.seq, tc.seg), func(t *testing.T) {
+			t.Parallel()
+			ess, err := lib.NewExecutionSegmentSequenceFromString(tc.seq)
+			require.NoError(t, err)
+			seg, err := lib.NewExecutionSegmentFromString(tc.seg)
+			require.NoError(t, err)
+			et, err := lib.NewExecutionTuple(seg, &ess)
+			require.NoError(t, err)
+			es := lib.NewExecutionState(lib.Options{}, et, 5, 5)
+
+			runner := &minirunner.MiniRunner{}
+			ctx, cancel, executor, _ := setupExecutor(t, config, es, runner)
+			defer cancel()
+
+			gotIters := []uint64{}
+			var mx sync.Mutex
+			runner.Fn = func(ctx context.Context, _ chan<- stats.SampleContainer) error {
+				state := lib.GetState(ctx)
+				mx.Lock()
+				gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
+				mx.Unlock()
+				return nil
+			}
+
+			engineOut := make(chan stats.SampleContainer, 100)
+			err = executor.Run(ctx, engineOut)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expIters, gotIters)
+		})
 	}
 }

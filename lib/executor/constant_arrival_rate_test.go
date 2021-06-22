@@ -35,6 +35,7 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/testutils/minirunner"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/stats"
 )
@@ -334,4 +335,59 @@ func TestConstantArrivalRateDroppedIterations(t *testing.T) {
 	assert.Contains(t, logs[0].Message, "cannot initialize more")
 	assert.Equal(t, int64(5), count)
 	assert.Equal(t, float64(5), sumMetricValues(engineOut, metrics.DroppedIterations.Name))
+}
+
+func TestConstantArrivalRateGlobalIters(t *testing.T) {
+	t.Parallel()
+
+	config := &ConstantArrivalRateConfig{
+		BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(100 * time.Millisecond)},
+		TimeUnit:        types.NullDurationFrom(950 * time.Millisecond),
+		Rate:            null.IntFrom(20),
+		Duration:        types.NullDurationFrom(1 * time.Second),
+		PreAllocatedVUs: null.IntFrom(5),
+		MaxVUs:          null.IntFrom(5),
+	}
+
+	testCases := []struct {
+		seq, seg string
+		expIters []uint64
+	}{
+		{"0,1/4,3/4,1", "0:1/4", []uint64{1, 6, 11, 16, 21}},
+		{"0,1/4,3/4,1", "1/4:3/4", []uint64{0, 2, 4, 5, 7, 9, 10, 12, 14, 15, 17, 19, 20}},
+		{"0,1/4,3/4,1", "3/4:1", []uint64{3, 8, 13, 18}},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("%s_%s", tc.seq, tc.seg), func(t *testing.T) {
+			t.Parallel()
+			ess, err := lib.NewExecutionSegmentSequenceFromString(tc.seq)
+			require.NoError(t, err)
+			seg, err := lib.NewExecutionSegmentFromString(tc.seg)
+			require.NoError(t, err)
+			et, err := lib.NewExecutionTuple(seg, &ess)
+			require.NoError(t, err)
+			es := lib.NewExecutionState(lib.Options{}, et, 5, 5)
+
+			runner := &minirunner.MiniRunner{}
+			ctx, cancel, executor, _ := setupExecutor(t, config, es, runner)
+			defer cancel()
+
+			gotIters := []uint64{}
+			var mx sync.Mutex
+			runner.Fn = func(ctx context.Context, _ chan<- stats.SampleContainer) error {
+				state := lib.GetState(ctx)
+				mx.Lock()
+				gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
+				mx.Unlock()
+				return nil
+			}
+
+			engineOut := make(chan stats.SampleContainer, 100)
+			err = executor.Run(ctx, engineOut)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expIters, gotIters)
+		})
+	}
 }
