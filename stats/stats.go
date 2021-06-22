@@ -402,11 +402,15 @@ func (s Sample) GetTime() time.Time {
 }
 
 // Ensure that interfaces are implemented correctly
-var _ SampleContainer = Sample{}
-var _ SampleContainer = Samples{}
+var (
+	_ SampleContainer = Sample{}
+	_ SampleContainer = Samples{}
+)
 
-var _ ConnectedSampleContainer = Sample{}
-var _ ConnectedSampleContainer = ConnectedSamples{}
+var (
+	_ ConnectedSampleContainer = Sample{}
+	_ ConnectedSampleContainer = ConnectedSamples{}
+)
 
 // GetBufferedSamples will read all present (i.e. buffered or currently being pushed)
 // values in the input channel and return them as a slice.

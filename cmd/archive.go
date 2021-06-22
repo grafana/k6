@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/loader"
 )
 
@@ -66,7 +67,9 @@ An archive is a fully self-contained test run, and can be executed identically e
 				return err
 			}
 
-			r, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			r, err := newRunner(logger, src, runType, filesystems, runtimeOptions, builtinMetrics, registry)
 			if err != nil {
 				return err
 			}

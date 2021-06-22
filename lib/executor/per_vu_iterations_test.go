@@ -53,7 +53,7 @@ func TestPerVUIterationsRun(t *testing.T) {
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	var ctx, cancel, executor, _ = setupExecutor(
+	ctx, cancel, executor, _ := setupExecutor(
 		t, getTestPerVUIterationsConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			state := lib.GetState(ctx)
@@ -64,7 +64,9 @@ func TestPerVUIterationsRun(t *testing.T) {
 	)
 	defer cancel()
 	engineOut := make(chan stats.SampleContainer, 1000)
-	err = executor.Run(ctx, engineOut)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	err = executor.Run(ctx, engineOut, builtinMetrics)
 	require.NoError(t, err)
 
 	var totalIters uint64
@@ -88,7 +90,7 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	var ctx, cancel, executor, _ = setupExecutor(
+	ctx, cancel, executor, _ := setupExecutor(
 		t, getTestPerVUIterationsConfig(), es,
 		simpleRunner(func(ctx context.Context) error {
 			state := lib.GetState(ctx)
@@ -102,7 +104,9 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 	)
 	defer cancel()
 	engineOut := make(chan stats.SampleContainer, 1000)
-	err = executor.Run(ctx, engineOut)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	err = executor.Run(ctx, engineOut, builtinMetrics)
 	require.NoError(t, err)
 
 	val, ok := result.Load(slowVUID)
@@ -147,9 +151,11 @@ func TestPerVuIterationsEmitDroppedIterations(t *testing.T) {
 	)
 	defer cancel()
 	engineOut := make(chan stats.SampleContainer, 1000)
-	err = executor.Run(ctx, engineOut)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	err = executor.Run(ctx, engineOut, builtinMetrics)
 	require.NoError(t, err)
 	assert.Empty(t, logHook.Drain())
 	assert.Equal(t, int64(5), count)
-	assert.Equal(t, float64(95), sumMetricValues(engineOut, metrics.DroppedIterations.Name))
+	assert.Equal(t, float64(95), sumMetricValues(engineOut, metrics.DroppedIterationsName))
 }

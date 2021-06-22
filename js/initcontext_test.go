@@ -41,6 +41,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/netext"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
@@ -386,6 +387,8 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	logger.Level = logrus.DebugLevel
 	logger.Out = ioutil.Discard
 
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	state := &lib.State{
 		Options: lib.Options{},
 		Logger:  logger,
@@ -400,8 +403,9 @@ func TestRequestWithBinaryFile(t *testing.T) {
 				netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
 			)).DialContext,
 		},
-		BPool:   bpool.NewBufferPool(1),
-		Samples: make(chan stats.SampleContainer, 500),
+		BPool:          bpool.NewBufferPool(1),
+		Samples:        make(chan stats.SampleContainer, 500),
+		BuiltinMetrics: builtinMetrics,
 	}
 
 	ctx := context.Background()
@@ -530,6 +534,8 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 	logger.Level = logrus.DebugLevel
 	logger.Out = ioutil.Discard
 
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	state := &lib.State{
 		Options: lib.Options{},
 		Logger:  logger,
@@ -544,8 +550,9 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 				netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
 			)).DialContext,
 		},
-		BPool:   bpool.NewBufferPool(1),
-		Samples: make(chan stats.SampleContainer, 500),
+		BPool:          bpool.NewBufferPool(1),
+		Samples:        make(chan stats.SampleContainer, 500),
+		BuiltinMetrics: builtinMetrics,
 	}
 
 	ctx := context.Background()

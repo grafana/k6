@@ -38,6 +38,7 @@ import (
 	"go.k6.io/k6/core"
 	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/minirunner"
 )
@@ -47,7 +48,9 @@ func TestGetStatus(t *testing.T) {
 	logger.SetOutput(testutils.NewTestOutput(t))
 	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, builtinMetrics)
 	require.NoError(t, err)
 
 	rw := httptest.NewRecorder()
@@ -96,12 +99,14 @@ func TestPatchStatus(t *testing.T) {
 			"vus": 0, "maxVUs": 10, "duration": "1s"}}`), &scenarios)
 	require.NoError(t, err)
 	options := lib.Options{Scenarios: scenarios}
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 
 	for name, indata := range testdata {
 		t.Run(name, func(t *testing.T) {
 			execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Options: options}, logger)
 			require.NoError(t, err)
-			engine, err := core.NewEngine(execScheduler, options, lib.RuntimeOptions{}, nil, logger)
+			engine, err := core.NewEngine(execScheduler, options, lib.RuntimeOptions{}, nil, logger, builtinMetrics)
 			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()

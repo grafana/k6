@@ -54,7 +54,6 @@ import (
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/stats"
 )
@@ -493,7 +492,7 @@ func (c *Client) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 		stats.PushIfNotDone(ctx, state.Samples, stats.ConnectedSamples{
 			Samples: []stats.Sample{
 				{
-					Metric: metrics.GRPCReqDuration,
+					Metric: state.BuiltinMetrics.GRPCReqDuration,
 					Tags:   sampleTags,
 					Value:  stats.D(s.EndTime.Sub(s.BeginTime)),
 					Time:   s.EndTime,

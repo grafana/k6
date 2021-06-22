@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/stats"
 )
@@ -90,55 +89,11 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	return conn, err
 }
 
-// GetTrail creates a new NetTrail instance with the Dialer
-// sent and received data metrics and the supplied times and tags.
-// TODO: Refactor this according to
-// https://github.com/k6io/k6/pull/1203#discussion_r337938370
-func (d *Dialer) GetTrail(
-	startTime, endTime time.Time, fullIteration bool, emitIterations bool, tags *stats.SampleTags,
-) *NetTrail {
-	bytesWritten := atomic.SwapInt64(&d.BytesWritten, 0)
-	bytesRead := atomic.SwapInt64(&d.BytesRead, 0)
-	samples := []stats.Sample{
-		{
-			Time:   endTime,
-			Metric: metrics.DataSent,
-			Value:  float64(bytesWritten),
-			Tags:   tags,
-		},
-		{
-			Time:   endTime,
-			Metric: metrics.DataReceived,
-			Value:  float64(bytesRead),
-			Tags:   tags,
-		},
-	}
-	if fullIteration {
-		samples = append(samples, stats.Sample{
-			Time:   endTime,
-			Metric: metrics.IterationDuration,
-			Value:  stats.D(endTime.Sub(startTime)),
-			Tags:   tags,
-		})
-		if emitIterations {
-			samples = append(samples, stats.Sample{
-				Time:   endTime,
-				Metric: metrics.Iterations,
-				Value:  1,
-				Tags:   tags,
-			})
-		}
-	}
-
-	return &NetTrail{
-		BytesRead:     bytesRead,
-		BytesWritten:  bytesWritten,
-		FullIteration: fullIteration,
-		StartTime:     startTime,
-		EndTime:       endTime,
-		Tags:          tags,
-		Samples:       samples,
-	}
+// GetBytes returns the written and read bytes through this dialer and zeros the fields.
+func (d *Dialer) GetBytes() (bytesWritten, bytesRead int64) {
+	bytesWritten = atomic.SwapInt64(&d.BytesWritten, 0)
+	bytesRead = atomic.SwapInt64(&d.BytesRead, 0)
+	return bytesWritten, bytesRead
 }
 
 func (d *Dialer) getDialAddr(addr string) (string, error) {

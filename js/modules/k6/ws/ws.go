@@ -58,8 +58,9 @@ type Socket struct {
 	pingSendTimestamps map[string]time.Time
 	pingSendCounter    int
 
-	sampleTags    *stats.SampleTags
-	samplesOutput chan<- stats.SampleContainer
+	sampleTags     *stats.SampleTags
+	samplesOutput  chan<- stats.SampleContainer
+	builtinMetrics *metrics.BuiltinMetrics
 }
 
 type WSHTTPResponse struct {
@@ -197,12 +198,13 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		done:               make(chan struct{}),
 		samplesOutput:      state.Samples,
 		sampleTags:         stats.IntoSampleTags(&tags),
+		builtinMetrics:     state.BuiltinMetrics,
 	}
 
 	stats.PushIfNotDone(ctx, state.Samples, stats.ConnectedSamples{
 		Samples: []stats.Sample{
-			{Metric: metrics.WSSessions, Time: start, Tags: socket.sampleTags, Value: 1},
-			{Metric: metrics.WSConnecting, Time: start, Tags: socket.sampleTags, Value: connectionDuration},
+			{Metric: state.BuiltinMetrics.WSSessions, Time: start, Tags: socket.sampleTags, Value: 1},
+			{Metric: state.BuiltinMetrics.WSConnecting, Time: start, Tags: socket.sampleTags, Value: connectionDuration},
 		},
 		Tags: socket.sampleTags,
 		Time: start,
@@ -259,7 +261,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		sessionDuration := stats.D(end.Sub(start))
 
 		stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
-			Metric: metrics.WSSessionDuration,
+			Metric: socket.builtinMetrics.WSSessionDuration,
 			Tags:   socket.sampleTags,
 			Time:   start,
 			Value:  sessionDuration,
@@ -287,7 +289,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 		case msg := <-readDataChan:
 			stats.PushIfNotDone(ctx, socket.samplesOutput, stats.Sample{
-				Metric: metrics.WSMessagesReceived,
+				Metric: socket.builtinMetrics.WSMessagesReceived,
 				Time:   time.Now(),
 				Tags:   socket.sampleTags,
 				Value:  1,
@@ -347,7 +349,7 @@ func (s *Socket) Send(message string) {
 	}
 
 	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
-		Metric: metrics.WSMessagesSent,
+		Metric: s.builtinMetrics.WSMessagesSent,
 		Time:   time.Now(),
 		Tags:   s.sampleTags,
 		Value:  1,
@@ -378,7 +380,7 @@ func (s *Socket) SendBinary(message goja.Value) {
 	}
 
 	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
-		Metric: metrics.WSMessagesSent,
+		Metric: s.builtinMetrics.WSMessagesSent,
 		Time:   time.Now(),
 		Tags:   s.sampleTags,
 		Value:  1,
@@ -412,7 +414,7 @@ func (s *Socket) trackPong(pingID string) {
 	pingTimestamp := s.pingSendTimestamps[pingID]
 
 	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
-		Metric: metrics.WSPing,
+		Metric: s.builtinMetrics.WSPing,
 		Time:   pongTimestamp,
 		Tags:   s.sampleTags,
 		Value:  stats.D(pongTimestamp.Sub(pingTimestamp)),

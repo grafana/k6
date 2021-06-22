@@ -50,12 +50,12 @@ func assertSessionMetricsEmitted(t *testing.T, sampleContainers []stats.SampleCo
 		for _, sample := range sampleContainer.GetSamples() {
 			tags := sample.Tags.CloneTags()
 			if tags["url"] == url {
-				switch sample.Metric {
-				case metrics.WSConnecting:
+				switch sample.Metric.Name {
+				case metrics.WSConnectingName:
 					seenConnecting = true
-				case metrics.WSSessionDuration:
+				case metrics.WSSessionDurationName:
 					seenSessionDuration = true
-				case metrics.WSSessions:
+				case metrics.WSSessionsName:
 					seenSessions = true
 				}
 
@@ -70,7 +70,7 @@ func assertSessionMetricsEmitted(t *testing.T, sampleContainers []stats.SampleCo
 	assert.True(t, seenSessionDuration, "url %s didn't emit SessionDuration", url)
 }
 
-func assertMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []stats.SampleContainer, url string) {
+func assertMetricEmitted(t *testing.T, metricName string, sampleContainers []stats.SampleContainer, url string) {
 	seenMetric := false
 
 	for _, sampleContainer := range sampleContainers {
@@ -78,13 +78,13 @@ func assertMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []
 			surl, ok := sample.Tags.Get("url")
 			assert.True(t, ok)
 			if surl == url {
-				if sample.Metric == metric {
+				if sample.Metric.Name == metricName {
 					seenMetric = true
 				}
 			}
 		}
 	}
-	assert.True(t, seenMetric, "url %s didn't emit %s", url, metric.Name)
+	assert.True(t, seenMetric, "url %s didn't emit %s", url, metricName)
 }
 
 func TestSession(t *testing.T) {
@@ -110,8 +110,9 @@ func TestSession(t *testing.T) {
 				stats.TagSubproto,
 			),
 		},
-		Samples:   samples,
-		TLSConfig: tb.TLSClientConfig,
+		Samples:        samples,
+		TLSConfig:      tb.TLSClientConfig,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
 	}
 
 	ctx := context.Background()
@@ -176,8 +177,8 @@ func TestSession(t *testing.T) {
 
 	samplesBuf := stats.GetBufferedSamples(samples)
 	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), 101, "")
-	assertMetricEmitted(t, metrics.WSMessagesSent, samplesBuf, sr("WSBIN_URL/ws-echo"))
-	assertMetricEmitted(t, metrics.WSMessagesReceived, samplesBuf, sr("WSBIN_URL/ws-echo"))
+	assertMetricEmitted(t, metrics.WSMessagesSentName, samplesBuf, sr("WSBIN_URL/ws-echo"))
+	assertMetricEmitted(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSBIN_URL/ws-echo"))
 
 	t.Run("interval", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
@@ -262,7 +263,7 @@ func TestSession(t *testing.T) {
 
 	samplesBuf = stats.GetBufferedSamples(samples)
 	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), 101, "")
-	assertMetricEmitted(t, metrics.WSPing, samplesBuf, sr("WSBIN_URL/ws-echo"))
+	assertMetricEmitted(t, metrics.WSPingName, samplesBuf, sr("WSBIN_URL/ws-echo"))
 
 	t.Run("multiple_handlers", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
@@ -296,7 +297,7 @@ func TestSession(t *testing.T) {
 
 	samplesBuf = stats.GetBufferedSamples(samples)
 	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), 101, "")
-	assertMetricEmitted(t, metrics.WSPing, samplesBuf, sr("WSBIN_URL/ws-echo"))
+	assertMetricEmitted(t, metrics.WSPingName, samplesBuf, sr("WSBIN_URL/ws-echo"))
 
 	t.Run("client_close", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
@@ -368,8 +369,9 @@ func TestSocketSendBinary(t *testing.T) { //nolint: tparallel
 				stats.TagSubproto,
 			),
 		},
-		Samples:   samples,
-		TLSConfig: tb.TLSClientConfig,
+		Samples:        samples,
+		TLSConfig:      tb.TLSClientConfig,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
 	}
 
 	ctx := context.Background()
@@ -458,7 +460,8 @@ func TestErrors(t *testing.T) {
 		Options: lib.Options{
 			SystemTags: &stats.DefaultSystemTagSet,
 		},
-		Samples: samples,
+		Samples:        samples,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
 	}
 
 	ctx := context.Background()
@@ -565,11 +568,12 @@ func TestSystemTags(t *testing.T) {
 
 	samples := make(chan stats.SampleContainer, 1000)
 	state := &lib.State{
-		Group:     root,
-		Dialer:    tb.Dialer,
-		Options:   lib.Options{SystemTags: stats.ToSystemTagSet(testedSystemTags)},
-		Samples:   samples,
-		TLSConfig: tb.TLSClientConfig,
+		Group:          root,
+		Dialer:         tb.Dialer,
+		Options:        lib.Options{SystemTags: stats.ToSystemTagSet(testedSystemTags)},
+		Samples:        samples,
+		TLSConfig:      tb.TLSClientConfig,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
 	}
 
 	ctx := context.Background()
@@ -631,7 +635,8 @@ func TestTLSConfig(t *testing.T) {
 				stats.TagIP,
 			),
 		},
-		Samples: samples,
+		Samples:        samples,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
 	}
 
 	ctx := context.Background()

@@ -98,20 +98,20 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleCo
 		for _, sample := range sampleContainer.GetSamples() {
 			tags := sample.Tags.CloneTags()
 			if tags["url"] == url {
-				switch sample.Metric {
-				case metrics.HTTPReqDuration:
+				switch sample.Metric.Name {
+				case metrics.HTTPReqDurationName:
 					seenDuration = true
-				case metrics.HTTPReqBlocked:
+				case metrics.HTTPReqBlockedName:
 					seenBlocked = true
-				case metrics.HTTPReqConnecting:
+				case metrics.HTTPReqConnectingName:
 					seenConnecting = true
-				case metrics.HTTPReqTLSHandshaking:
+				case metrics.HTTPReqTLSHandshakingName:
 					seenTLSHandshaking = true
-				case metrics.HTTPReqSending:
+				case metrics.HTTPReqSendingName:
 					seenSending = true
-				case metrics.HTTPReqWaiting:
+				case metrics.HTTPReqWaitingName:
 					seenWaiting = true
-				case metrics.HTTPReqReceiving:
+				case metrics.HTTPReqReceivingName:
 					seenReceiving = true
 				}
 
@@ -131,12 +131,12 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []stats.SampleCo
 	assert.True(t, seenReceiving, "url %s didn't emit Receiving", url)
 }
 
-func assertRequestMetricsEmittedSingle(t *testing.T, sampleContainer stats.SampleContainer, expectedTags map[string]string, metrics []*stats.Metric, callback func(sample stats.Sample)) {
+func assertRequestMetricsEmittedSingle(t *testing.T, sampleContainer stats.SampleContainer, expectedTags map[string]string, metrics []string, callback func(sample stats.Sample)) {
 	t.Helper()
 
 	metricMap := make(map[string]bool, len(metrics))
 	for _, m := range metrics {
-		metricMap[m.Name] = false
+		metricMap[m] = false
 	}
 	for _, sample := range sampleContainer.GetSamples() {
 		tags := sample.Tags.CloneTags()
@@ -161,6 +161,7 @@ func newRuntime(
 
 	root, err := lib.NewGroup("", nil)
 	require.NoError(t, err)
+	registry := metrics.NewRegistry()
 
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
@@ -180,14 +181,15 @@ func newRuntime(
 	samples := make(chan stats.SampleContainer, 1000)
 
 	state := &lib.State{
-		Options:   options,
-		Logger:    logger,
-		Group:     root,
-		TLSConfig: tb.TLSClientConfig,
-		Transport: tb.HTTPTransport,
-		BPool:     bpool.NewBufferPool(1),
-		Samples:   samples,
-		Tags:      map[string]string{"group": root.Path},
+		Options:        options,
+		Logger:         logger,
+		Group:          root,
+		TLSConfig:      tb.TLSClientConfig,
+		Transport:      tb.HTTPTransport,
+		BPool:          bpool.NewBufferPool(1),
+		Samples:        samples,
+		Tags:           map[string]string{"group": root.Path},
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 
 	ctx := new(context.Context)

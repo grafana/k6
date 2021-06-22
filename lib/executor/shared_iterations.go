@@ -184,7 +184,9 @@ func (si *SharedIterations) Init(ctx context.Context) error {
 // Run executes a specific total number of iterations, which are all shared by
 // the configured VUs.
 // nolint:funlen
-func (si SharedIterations) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (si SharedIterations) Run(
+	parentCtx context.Context, out chan<- stats.SampleContainer, builtinMetrics *metrics.BuiltinMetrics,
+) (err error) {
 	numVUs := si.config.GetVUs(si.executionState.ExecutionTuple)
 	iterations := si.et.ScaleInt64(si.config.Iterations.Int64)
 	duration := time.Duration(si.config.MaxDuration.Duration)
@@ -225,7 +227,7 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 		activeVUs.Wait()
 		if attemptedIters < totalIters {
 			stats.PushIfNotDone(parentCtx, out, stats.Sample{
-				Value: float64(totalIters - attemptedIters), Metric: metrics.DroppedIterations,
+				Value: float64(totalIters - attemptedIters), Metric: builtinMetrics.DroppedIterations,
 				Tags: si.getMetricTags(nil), Time: time.Now(),
 			})
 		}

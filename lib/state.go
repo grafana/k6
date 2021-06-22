@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/stats"
 )
 
@@ -81,6 +82,8 @@ type State struct {
 	// unique globally across k6 instances (taking into account execution
 	// segments).
 	GetScenarioGlobalVUIter func() uint64
+
+	BuiltinMetrics *metrics.BuiltinMetrics
 }
 
 // CloneTags makes a copy of the tags map and returns it.

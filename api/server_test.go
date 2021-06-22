@@ -35,6 +35,7 @@ import (
 	"go.k6.io/k6/core"
 	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/minirunner"
 )
@@ -81,7 +82,9 @@ func TestWithEngine(t *testing.T) {
 	logger.SetOutput(testutils.NewTestOutput(t))
 	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, builtinMetrics)
 	require.NoError(t, err)
 
 	rw := httptest.NewRecorder()
