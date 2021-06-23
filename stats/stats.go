@@ -450,6 +450,16 @@ type Metric struct {
 	Sink       Sink         `json:"-"`
 }
 
+// Emit a sample for the metric at the given time, with the provided tags and values
+func (m *Metric) Emit(t time.Time, tags *SampleTags, value float64) Sample {
+	return Sample{
+		Time:   t,
+		Tags:   tags,
+		Value:  value,
+		Metric: m,
+	}
+}
+
 func New(name string, typ MetricType, t ...ValueType) *Metric {
 	vt := Default
 	if len(t) > 0 {

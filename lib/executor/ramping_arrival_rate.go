@@ -482,10 +482,7 @@ func (varr RampingArrivalRate) Run(
 		// Since there aren't any free VUs available, consider this iteration
 		// dropped - we aren't going to try to recover it, but
 
-		stats.PushIfNotDone(parentCtx, out, stats.Sample{
-			Value: 1, Metric: droppedIterationMetric,
-			Tags: metricTags, Time: time.Now(),
-		})
+		stats.PushIfNotDone(parentCtx, out, droppedIterationMetric.Emit(time.Now(), metricTags, 1))
 
 		// We'll try to start allocating another VU in the background,
 		// non-blockingly, if we have remainingUnplannedVUs...
