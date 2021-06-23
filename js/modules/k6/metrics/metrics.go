@@ -49,36 +49,50 @@ type Metric struct {
 // ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
 var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
 
-func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime []bool) (interface{}, error) {
-	if lib.GetState(*ctxPtr) != nil {
+func newMetric(call goja.ConstructorCall, rt *goja.Runtime, t stats.MetricType) (*goja.Object, error) {
+	// TODO this can probably be done by a `common.GetContext(rt)`
+	ctx := rt.Get("context").Export().(context.Context) //nolint:forcetypeassert
+	if lib.GetState(ctx) != nil {
 		return nil, errors.New("metrics must be declared in the init context")
 	}
 
+	// TODO this kind of conversions can possibly be automated by the parts of common.Bind that are curently automating
+	// it and some wrapping
+	name := call.Argument(0).String()
+	isTime := call.Argument(1).ToBoolean()
 	// TODO: move verification outside the JS
 	if !checkName(name) {
 		return nil, common.NewInitContextError(fmt.Sprintf("Invalid metric name: '%s'", name))
 	}
 
 	valueType := stats.Default
-	if len(isTime) > 0 && isTime[0] {
+	if isTime {
 		valueType = stats.Time
 	}
 
-	rt := common.GetRuntime(*ctxPtr)
-	return common.Bind(rt, Metric{stats.New(name, t, valueType)}, ctxPtr), nil
+	return rt.ToValue(Metric{stats.New(name, t, valueType)}).ToObject(rt), nil
 }
 
-func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]string) (bool, error) {
+func (m Metric) Add(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
+	ctx := rt.Get("context").Export().(context.Context) //nolint:forcetypeassert
 	state := lib.GetState(ctx)
 	if state == nil {
-		return false, ErrMetricsAddInInitContext
+		common.Throw(rt, ErrMetricsAddInInitContext)
+	}
+	v := call.Argument(0)
+	var addTags map[string]string
+	if len(call.Arguments) > 1 {
+		// Technically the previous implementation support multiple maps but I don't think that is a good design and can
+		// be reproduced if desired
+		err := rt.ExportTo(call.Argument(1), &addTags)
+		if err != nil {
+			common.Throw(rt, err)
+		}
 	}
 
 	tags := state.CloneTags()
-	for _, ts := range addTags {
-		for k, v := range ts {
-			tags[k] = v
-		}
+	for k, v := range addTags {
+		tags[k] = v
 	}
 
 	vfloat := v.ToFloat()
@@ -88,7 +102,7 @@ func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]str
 
 	sample := stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)}
 	stats.PushIfNotDone(ctx, state.Samples, sample)
-	return true, nil
+	return rt.ToValue(true)
 }
 
 // GetName returns the metric name
@@ -96,24 +110,54 @@ func (m Metric) GetName() string {
 	return m.metric.Name
 }
 
-type Metrics struct{}
-
-func New() *Metrics {
-	return &Metrics{}
+func New() map[string]interface{} {
+	// This can definitely be automated more
+	// One thing that we can add is to differentiate between
+	// import something from "somewhere"; // where something is the *default* exports
+	// import * as something from "somewhere"; /// where something is an "object" with all the defined exports
+	// This likely will need a change once import/export syntax is part of goja as well :(
+	return map[string]interface{}{
+		"Counter":          Counter,
+		"Gauge":            Gauge,
+		"Trend":            Trend,
+		"Rate":             Rate,
+		"returnMetricType": ReturnMetricType,
+	}
 }
 
-func (*Metrics) XCounter(ctx *context.Context, name string, isTime ...bool) (interface{}, error) {
-	return newMetric(ctx, name, stats.Counter, isTime)
+// This is not possible after common.Bind as it wraps the object and doesn't return the original one.
+func ReturnMetricType(m Metric) string {
+	return m.metric.Type.String()
 }
 
-func (*Metrics) XGauge(ctx *context.Context, name string, isTime ...bool) (interface{}, error) {
-	return newMetric(ctx, name, stats.Gauge, isTime)
+func Counter(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := newMetric(call, rt, stats.Counter)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	return v
 }
 
-func (*Metrics) XTrend(ctx *context.Context, name string, isTime ...bool) (interface{}, error) {
-	return newMetric(ctx, name, stats.Trend, isTime)
+func Gauge(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := newMetric(call, rt, stats.Gauge)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	return v
 }
 
-func (*Metrics) XRate(ctx *context.Context, name string, isTime ...bool) (interface{}, error) {
-	return newMetric(ctx, name, stats.Rate, isTime)
+func Trend(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := newMetric(call, rt, stats.Trend)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	return v
+}
+
+func Rate(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := newMetric(call, rt, stats.Rate)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	return v
 }

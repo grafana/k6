@@ -287,6 +287,10 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	rt.SetParserOptions(parser.WithDisableSourceMaps)
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
+	// have a way to set get the current value of context
+	rt.GlobalObject().DefineAccessorProperty("context", rt.ToValue(func() context.Context {
+		return *init.ctxPtr
+	}), nil, goja.FLAG_FALSE, goja.FLAG_FALSE)
 
 	exports := rt.NewObject()
 	rt.Set("exports", exports)

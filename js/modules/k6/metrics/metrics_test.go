@@ -64,7 +64,10 @@ func TestMetrics(t *testing.T) {
 
 					ctxPtr := new(context.Context)
 					*ctxPtr = common.WithRuntime(context.Background(), rt)
-					rt.Set("metrics", common.Bind(rt, New(), ctxPtr))
+					rt.GlobalObject().DefineAccessorProperty("context", rt.ToValue(func() context.Context {
+						return *ctxPtr
+					}), nil, goja.FLAG_FALSE, goja.FLAG_FALSE)
+					rt.Set("metrics", New())
 
 					root, _ := lib.NewGroup("", nil)
 					child, _ := root.Group("child")
@@ -86,7 +89,7 @@ func TestMetrics(t *testing.T) {
 					t.Run("ExitInit", func(t *testing.T) {
 						*ctxPtr = lib.WithState(*ctxPtr, state)
 						_, err := rt.RunString(fmt.Sprintf(`new metrics.%s("my_metric")`, fn))
-						assert.EqualError(t, err, "metrics must be declared in the init context at apply (native)")
+						assert.Contains(t, err.Error(), "metrics must be declared in the init context")
 					})
 
 					groups := map[string]*lib.Group{

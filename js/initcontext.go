@@ -147,6 +147,9 @@ func (i *InitContext) requireModule(name string) (goja.Value, error) {
 	if perInstance, ok := mod.(modules.HasModuleInstancePerVU); ok {
 		mod = perInstance.NewModuleInstancePerVU()
 	}
+	if name == "k6/metrics" { // hacks to not wrap a particular module
+		return i.runtime.ToValue(mod), nil
+	}
 	return i.runtime.ToValue(common.Bind(i.runtime, mod, i.ctxPtr)), nil
 }
 
