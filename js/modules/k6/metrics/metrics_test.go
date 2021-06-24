@@ -34,6 +34,19 @@ import (
 	"go.k6.io/k6/stats"
 )
 
+// this probably should be done through some test package
+type moduleInstanceImpl struct {
+	ctxPtr *context.Context
+}
+
+func (m *moduleInstanceImpl) GetContext() context.Context {
+	return *m.ctxPtr
+}
+
+func (m *moduleInstanceImpl) GetExports() common.Exports {
+	panic("this needs to be implemented by the module")
+}
+
 func TestMetrics(t *testing.T) {
 	t.Parallel()
 	types := map[string]stats.MetricType{
@@ -64,8 +77,9 @@ func TestMetrics(t *testing.T) {
 
 					ctxPtr := new(context.Context)
 					*ctxPtr = common.WithRuntime(context.Background(), rt)
-					rt.Set("metrics", common.Bind(rt, New(), ctxPtr))
-
+					m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: ctxPtr}).(*MetricsModule)
+					require.True(t, ok)
+					rt.Set("metrics", m.GetExports().Others) // This also should probably be done by some test package
 					root, _ := lib.NewGroup("", nil)
 					child, _ := root.Group("child")
 					samples := make(chan stats.SampleContainer, 1000)
@@ -86,7 +100,7 @@ func TestMetrics(t *testing.T) {
 					t.Run("ExitInit", func(t *testing.T) {
 						*ctxPtr = lib.WithState(*ctxPtr, state)
 						_, err := rt.RunString(fmt.Sprintf(`new metrics.%s("my_metric")`, fn))
-						assert.EqualError(t, err, "metrics must be declared in the init context at apply (native)")
+						assert.Contains(t, err.Error(), "metrics must be declared in the init context")
 					})
 
 					groups := map[string]*lib.Group{

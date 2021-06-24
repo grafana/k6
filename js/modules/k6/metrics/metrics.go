@@ -43,32 +43,39 @@ func checkName(name string) bool {
 }
 
 type Metric struct {
-	metric *stats.Metric
+	metric     *stats.Metric
+	getContext func() context.Context
 }
 
 // ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
 var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
 
-func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime []bool) (interface{}, error) {
-	if lib.GetState(*ctxPtr) != nil {
+func (m *MetricsModule) newMetric(call goja.ConstructorCall, t stats.MetricType) (*goja.Object, error) {
+	ctx := m.GetContext()
+	if lib.GetState(ctx) != nil {
 		return nil, errors.New("metrics must be declared in the init context")
 	}
+	rt := common.GetRuntime(ctx) // NOTE we can get this differently as well
 
+	// TODO this kind of conversions can possibly be automated by the parts of common.Bind that are curently automating
+	// it and some wrapping
+	name := call.Argument(0).String()
+	isTime := call.Argument(1).ToBoolean()
 	// TODO: move verification outside the JS
 	if !checkName(name) {
 		return nil, common.NewInitContextError(fmt.Sprintf("Invalid metric name: '%s'", name))
 	}
 
 	valueType := stats.Default
-	if len(isTime) > 0 && isTime[0] {
+	if isTime {
 		valueType = stats.Time
 	}
 
-	rt := common.GetRuntime(*ctxPtr)
-	return common.Bind(rt, Metric{stats.New(name, t, valueType)}, ctxPtr), nil
+	return rt.ToValue(Metric{metric: stats.New(name, t, valueType), getContext: m.GetContext}).ToObject(rt), nil
 }
 
-func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]string) (bool, error) {
+func (m Metric) Add(v goja.Value, addTags ...map[string]string) (bool, error) {
+	ctx := m.getContext()
 	state := lib.GetState(ctx)
 	if state == nil {
 		return false, ErrMetricsAddInInitContext
@@ -96,24 +103,69 @@ func (m Metric) GetName() string {
 	return m.metric.Name
 }
 
-type Metrics struct{}
+type (
+	RootMetricsModule struct{}
+	MetricsModule     struct {
+		common.ModuleInstance
+	}
+)
 
-func New() *Metrics {
-	return &Metrics{}
+func (*RootMetricsModule) NewModuleInstance(m common.ModuleInstance) common.ModuleInstance {
+	return &MetricsModule{ModuleInstance: m}
 }
 
-func (*Metrics) XCounter(ctx *context.Context, name string, isTime ...bool) (interface{}, error) {
-	return newMetric(ctx, name, stats.Counter, isTime)
+func New() *RootMetricsModule {
+	return &RootMetricsModule{}
 }
 
-func (*Metrics) XGauge(ctx *context.Context, name string, isTime ...bool) (interface{}, error) {
-	return newMetric(ctx, name, stats.Gauge, isTime)
+func (m *MetricsModule) GetExports() common.Exports {
+	return common.Exports{
+		Default: "this will be our default export",
+		Others: map[string]interface{}{
+			"Counter": m.XCounter,
+			"Gauge":   m.XGauge,
+			"Trend":   m.XTrend,
+			"Rate":    m.XRate,
+
+			"returnMetricType": m.ReturnMetricType,
+		},
+	}
 }
 
-func (*Metrics) XTrend(ctx *context.Context, name string, isTime ...bool) (interface{}, error) {
-	return newMetric(ctx, name, stats.Trend, isTime)
+// This is not possible after common.Bind as it wraps the object and doesn't return the original one.
+func (m *MetricsModule) ReturnMetricType(metric Metric) string {
+	return metric.metric.Type.String()
 }
 
-func (*Metrics) XRate(ctx *context.Context, name string, isTime ...bool) (interface{}, error) {
-	return newMetric(ctx, name, stats.Rate, isTime)
+// Counter ... // NOTE we still need to use goja.ConstructorCall  somewhere to have access to the
+func (m *MetricsModule) XCounter(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := m.newMetric(call, stats.Counter)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	return v
+}
+
+func (m *MetricsModule) XGauge(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := m.newMetric(call, stats.Gauge)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	return v
+}
+
+func (m *MetricsModule) XTrend(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := m.newMetric(call, stats.Trend)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	return v
+}
+
+func (m *MetricsModule) XRate(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := m.newMetric(call, stats.Rate)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	return v
 }
