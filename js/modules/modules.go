@@ -21,6 +21,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -67,6 +68,12 @@ func Register(name string, mod interface{}) {
 // every time a VU imports the module and use its result as the returned object.
 type HasModuleInstancePerVU interface {
 	NewModuleInstancePerVU() interface{}
+}
+
+// HasWithContext should be implemented by modules that need access to the context, which should be all of them
+type HasWithContext interface { // TODO rename?
+	// This specifically is a function *returning* context as it can change between invocations
+	WithContext(func() context.Context) // this can be a different object that just has a context getter
 }
 
 // checks that modules implement HasModuleInstancePerVU

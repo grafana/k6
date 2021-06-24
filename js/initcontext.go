@@ -147,6 +147,14 @@ func (i *InitContext) requireModule(name string) (goja.Value, error) {
 	if perInstance, ok := mod.(modules.HasModuleInstancePerVU); ok {
 		mod = perInstance.NewModuleInstancePerVU()
 	}
+
+	if withContext, ok := mod.(modules.HasWithContext); ok {
+		withContext.WithContext(func() context.Context {
+			return *i.ctxPtr
+		})
+		return i.runtime.ToValue(mod), nil
+	}
+
 	return i.runtime.ToValue(common.Bind(i.runtime, mod, i.ctxPtr)), nil
 }
 
