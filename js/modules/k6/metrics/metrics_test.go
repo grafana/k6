@@ -64,7 +64,8 @@ func TestMetrics(t *testing.T) {
 
 					ctxPtr := new(context.Context)
 					*ctxPtr = common.WithRuntime(context.Background(), rt)
-					m := New()
+					m, ok := New().NewModuleInstancePerVU().(*MetricsModule)
+					require.True(t, ok)
 					m.WithContext(func() context.Context { return *ctxPtr })
 					rt.Set("metrics", m)
 					root, _ := lib.NewGroup("", nil)

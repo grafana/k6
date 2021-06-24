@@ -103,16 +103,23 @@ func (m Metric) GetName() string {
 	return m.metric.Name
 }
 
-type MetricsModule struct {
-	getContext func() context.Context
-}
+type (
+	RootMetricsModule struct{}
+	MetricsModule     struct {
+		getContext func() context.Context
+	}
+)
 
 func (m *MetricsModule) WithContext(getContext func() context.Context) {
 	m.getContext = getContext
 }
 
-func New() *MetricsModule {
+func (*RootMetricsModule) NewModuleInstancePerVU() interface{} {
 	return &MetricsModule{}
+}
+
+func New() *RootMetricsModule {
+	return &RootMetricsModule{}
 }
 
 // This is not possible after common.Bind as it wraps the object and doesn't return the original one.
