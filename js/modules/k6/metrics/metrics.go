@@ -119,17 +119,7 @@ func New() *RootMetricsModule {
 }
 
 func (m *MetricsModule) GetExports() common.Exports {
-	return common.Exports{
-		Default: "this will be our default export",
-		Others: map[string]interface{}{
-			"Counter": m.XCounter,
-			"Gauge":   m.XGauge,
-			"Trend":   m.XTrend,
-			"Rate":    m.XRate,
-
-			"returnMetricType": m.ReturnMetricType,
-		},
-	}
+	return common.GenerateExports(m)
 }
 
 // This is not possible after common.Bind as it wraps the object and doesn't return the original one.
