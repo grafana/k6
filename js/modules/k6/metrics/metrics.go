@@ -65,15 +65,13 @@ func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime 
 	}
 
 	rt := common.GetRuntime(*ctxPtr)
-	binded := common.Bind(rt, Metric{stats.New(name, t, valueType)}, ctxPtr)
+	bound := common.Bind(rt, Metric{stats.New(name, t, valueType)}, ctxPtr)
 	o := rt.NewObject()
-	err := o.DefineAccessorProperty("name", rt.ToValue(func() interface{} {
-		return name
-	}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE)
+	err := o.DefineDataProperty("name", rt.ToValue(name), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
 	if err != nil {
 		return nil, err
 	}
-	if err = o.Set("add", rt.ToValue(binded["add"])); err != nil {
+	if err = o.Set("add", rt.ToValue(bound["add"])); err != nil {
 		return nil, err
 	}
 	return o, nil
