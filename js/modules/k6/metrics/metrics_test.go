@@ -177,7 +177,7 @@ func TestMetricGetName(t *testing.T) {
 
 	ctxPtr := new(context.Context)
 	*ctxPtr = common.WithRuntime(context.Background(), rt)
-	rt.Set("metrics", common.Bind(rt, New(), ctxPtr))
+	require.NoError(t, rt.Set("metrics", common.Bind(rt, New(), ctxPtr)))
 	v, err := rt.RunString(`
 		var m = new metrics.Counter("my_metric")
 		m.name
