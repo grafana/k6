@@ -65,7 +65,13 @@ func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime 
 	}
 
 	rt := common.GetRuntime(*ctxPtr)
-	return common.Bind(rt, Metric{stats.New(name, t, valueType)}, ctxPtr), nil
+	binded := common.Bind(rt, Metric{stats.New(name, t, valueType)}, ctxPtr)
+	o := rt.NewObject()
+	o.DefineAccessorProperty("name", rt.ToValue(func() interface{} {
+		return name
+	}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE)
+	o.Set("add", rt.ToValue(binded["add"]))
+	return o, nil
 }
 
 func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]string) (bool, error) {
@@ -89,11 +95,6 @@ func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]str
 	sample := stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)}
 	stats.PushIfNotDone(ctx, state.Samples, sample)
 	return true, nil
-}
-
-// GetName returns the metric name
-func (m Metric) GetName() string {
-	return m.metric.Name
 }
 
 type Metrics struct{}
