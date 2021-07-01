@@ -7,8 +7,6 @@ github.com/DataDog/datadog-go/statsd
 # github.com/PuerkitoBio/goquery v1.6.1
 ## explicit
 github.com/PuerkitoBio/goquery
-# github.com/Shopify/sarama v1.16.0
-github.com/Shopify/sarama
 # github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 ## explicit
 github.com/Soontao/goHttpDigestClient
@@ -32,16 +30,11 @@ github.com/dop251/goja/ftoa/internal/fast
 github.com/dop251/goja/parser
 github.com/dop251/goja/token
 github.com/dop251/goja/unistring
-# github.com/eapache/go-resiliency v1.1.0
-github.com/eapache/go-resiliency/breaker
-# github.com/eapache/go-xerial-snappy v0.0.0-20160609142408-bb955e01b934
-github.com/eapache/go-xerial-snappy
-# github.com/eapache/queue v1.1.0
-github.com/eapache/queue
 # github.com/fatih/color v1.11.0
 ## explicit
 github.com/fatih/color
 # github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813
+## explicit
 github.com/gedex/inflector
 # github.com/ghodss/yaml v1.0.0
 github.com/ghodss/yaml
@@ -63,6 +56,8 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/golang/snappy v0.0.3
 github.com/golang/snappy
+# github.com/google/go-cmp v0.5.1
+## explicit
 # github.com/gorilla/websocket v1.4.2
 ## explicit
 github.com/gorilla/websocket
@@ -85,9 +80,6 @@ github.com/jhump/protoreflect/internal
 github.com/jhump/protoreflect/internal/codec
 # github.com/josharian/intern v1.0.0
 github.com/josharian/intern
-# github.com/k6io/xk6-output-kafka v0.2.0
-## explicit
-github.com/k6io/xk6-output-kafka/pkg/kafka
 # github.com/kelseyhightower/envconfig v1.4.0
 ## explicit
 github.com/kelseyhightower/envconfig
@@ -126,18 +118,14 @@ github.com/mitchellh/mapstructure
 # github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 ## explicit
 github.com/nu7hatch/gouuid
+# github.com/onsi/ginkgo v1.14.0
+## explicit
 # github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 ## explicit
 github.com/oxtoacart/bpool
-# github.com/pierrec/lz4 v1.0.2-0.20171218195038-2fcda4cb7018
-github.com/pierrec/lz4
-# github.com/pierrec/xxHash v0.1.1
-github.com/pierrec/xxHash/xxHash32
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
-# github.com/rcrowley/go-metrics v0.0.0-20180503174638-e2704e165165
-github.com/rcrowley/go-metrics
 # github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 ## explicit
 github.com/serenize/snaker
@@ -184,6 +172,7 @@ golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
 # golang.org/x/sys v0.0.0-20201204225414-ed752295db88
+## explicit
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -203,7 +192,10 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 ## explicit
 golang.org/x/time/rate
+# golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
+## explicit
 # google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336
+## explicit
 google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/genproto/protobuf/api
 google.golang.org/genproto/protobuf/field_mask
@@ -299,6 +291,8 @@ google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/known/typepb
 google.golang.org/protobuf/types/known/wrapperspb
 google.golang.org/protobuf/types/pluginpb
+# gopkg.in/guregu/null.v2 v2.1.2
+## explicit
 # gopkg.in/guregu/null.v3 v3.3.0
 ## explicit
 gopkg.in/guregu/null.v3
