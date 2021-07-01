@@ -47,14 +47,13 @@ func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, 
 		"cloud":    cloud.New,
 		"influxdb": influxdb.New,
 		"kafka": func(params output.Params) (output.Output, error) {
-			return nil, errors.New("The kafka output is removed. " +
-				"Please use the new xk6 kafka output extension instead. " +
-				"It can be found at https://github.com/k6io/xk6-output-kafka.")
+			return nil, errors.New("the kafka output was deprecated in k6 v0.32.0 and removed in k6 v0.34.0, " +
+				"please use the new xk6 kafka output extension instead - https://github.com/k6io/xk6-output-kafka")
 		},
 		"statsd": statsd.New,
 		"datadog": func(params output.Params) (output.Output, error) {
-			return nil, errors.New("the datadog output is removed. " +
-				"Please use the statsd output with env variable K6_STATSD_ENABLE_TAGS=true instead.")
+			return nil, errors.New("the datadog output was deprecated in k6 v0.32.0 and removed in k6 v0.34.0, " +
+				"please use the statsd output with env. variable K6_STATSD_ENABLE_TAGS=true instead")
 		},
 		"csv": csv.New,
 	}
