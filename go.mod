@@ -10,11 +10,12 @@ require (
 	github.com/andybalholm/brotli v1.0.2
 	github.com/dop251/goja v0.0.0-20210427212725-462d53687b0d
 	github.com/fatih/color v1.11.0
+	github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813 // indirect
 	github.com/golang/protobuf v1.4.2
+	github.com/google/go-cmp v0.5.1 // indirect
 	github.com/gorilla/websocket v1.4.2
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.8.2
-	github.com/k6io/xk6-output-kafka v0.2.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/klauspost/compress v1.12.2
 	github.com/kubernetes/helm v2.9.0+incompatible
@@ -25,6 +26,7 @@ require (
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
+	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
@@ -37,9 +39,13 @@ require (
 	github.com/tidwall/pretty v1.1.0
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/net v0.0.0-20210428185458-6f5299370f2b
+	golang.org/x/sys v0.0.0-20201204225414-ed752295db88 // indirect
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336 // indirect
 	google.golang.org/grpc v1.37.1
 	google.golang.org/protobuf v1.25.1-0.20200805231151-a709e31e5d12
+	gopkg.in/guregu/null.v2 v2.1.2 // indirect
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 )
