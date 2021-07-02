@@ -61,7 +61,7 @@ import (
 func runES6String(tb testing.TB, rt *goja.Runtime, src string) (goja.Value, error) {
 	var err error
 	c := compiler.New(testutils.NewLogger(tb)) // TODO drop it ? maybe we will drop babel and this will be less needed
-	src, _, err = c.Transform(src, "__string__")
+	src, _, err = c.Transform(src, "__string__", nil)
 	if err != nil {
 		return goja.Undefined(), err
 	}

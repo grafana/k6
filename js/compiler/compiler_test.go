@@ -36,7 +36,7 @@ import (
 func TestTransform(t *testing.T) {
 	c := New(testutils.NewLogger(t))
 	t.Run("blank", func(t *testing.T) {
-		src, _, err := c.Transform("", "test.js")
+		src, _, err := c.Transform("", "test.js", nil)
 		assert.NoError(t, err)
 		assert.Equal(t, `"use strict";`, src)
 		// assert.Equal(t, 3, srcmap.Version)
@@ -44,7 +44,7 @@ func TestTransform(t *testing.T) {
 		// assert.Equal(t, "", srcmap.Mappings)
 	})
 	t.Run("double-arrow", func(t *testing.T) {
-		src, _, err := c.Transform("()=> true", "test.js")
+		src, _, err := c.Transform("()=> true", "test.js", nil)
 		assert.NoError(t, err)
 		assert.Equal(t, `"use strict";(function () {return true;});`, src)
 		// assert.Equal(t, 3, srcmap.Version)
@@ -58,7 +58,7 @@ func TestTransform(t *testing.T) {
 			`};`,
 			``,
 			`let res = add(1, 2);`,
-		}, "\n"), "test.js")
+		}, "\n"), "test.js", nil)
 		assert.NoError(t, err)
 		assert.Equal(t, strings.Join([]string{
 			`"use strict";function add(a, b) {`,
@@ -74,7 +74,7 @@ func TestTransform(t *testing.T) {
 
 	t.Run("double-arrow with sourceMap", func(t *testing.T) {
 		c.COpts.SourceMapEnabled = true
-		src, _, err := c.Transform("()=> true", "test.js")
+		src, _, err := c.Transform("()=> true", "test.js", nil)
 		assert.NoError(t, err)
 		assert.Equal(t, `"use strict";(function () {return true;});
 //# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInRlc3QuanMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6ImFBQUEscUJBQUssSUFBTCIsImZpbGUiOiJ0ZXN0LmpzIiwic291cmNlc0NvbnRlbnQiOlsiKCk9PiB0cnVlIl19`, src)
