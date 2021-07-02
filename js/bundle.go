@@ -81,7 +81,12 @@ func NewBundle(
 	// Compile sources, both ES5 and ES6 are supported.
 	code := string(src.Data)
 	c := compiler.New(logger)
-	pgm, _, err := c.Compile(code, src.URL.String(), "", "", true, compatMode)
+	c.COpts = compiler.CompilerOptions{
+		CompatibilityMode: compatMode,
+		Strict:            true,
+		SourceMapEnabled:  rtOpts.SourceMapEnabled.Bool,
+	}
+	pgm, _, err := c.Compile(code, src.URL.String(), true, c.COpts)
 	if err != nil {
 		return nil, err
 	}
@@ -121,12 +126,23 @@ func NewBundleFromArchive(logger logrus.FieldLogger, arc *lib.Archive, rtOpts li
 		rtOpts.CompatibilityMode = null.StringFrom(arc.CompatibilityMode)
 	}
 	compatMode, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String)
-	if err != nil {
+	/* TODO
+	if !rtOpts.SourceMapEnabled.Valid {
+		// `k6 run --compatibility-mode=whatever archive.tar` should override
+		// whatever value is in the archive
+		rtOpts.SourceMapEnabled = null.BoolFrom(arc.SourceMapEnabled)
+	}
+	*/if err != nil {
 		return nil, err
 	}
 
 	c := compiler.New(logger)
-	pgm, _, err := c.Compile(string(arc.Data), arc.FilenameURL.String(), "", "", true, compatMode)
+	c.COpts = compiler.CompilerOptions{
+		Strict:            true,
+		CompatibilityMode: compatMode,
+		SourceMapEnabled:  rtOpts.SourceMapEnabled.Bool,
+	}
+	pgm, _, err := c.Compile(string(arc.Data), arc.FilenameURL.String(), true, c.COpts)
 	if err != nil {
 		return nil, err
 	}

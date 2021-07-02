@@ -52,6 +52,8 @@ type RuntimeOptions struct {
 	// default one, so we can handle `k6 run --compatibility-mode=base es6_extended_archive.tar`
 	CompatibilityMode null.String `json:"compatibilityMode"`
 
+	SourceMapEnabled null.Bool `json:"sourceMapEnabled"`
+
 	// Environment variables passed onto the runner
 	Env map[string]string `json:"env"`
 
