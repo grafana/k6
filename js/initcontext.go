@@ -270,8 +270,7 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 }
 
 func (i *InitContext) compileImport(src, filename string) (*goja.Program, error) {
-	pgm, _, err := i.compiler.Compile(src, filename,
-		"(function(module, exports){\n", "\n})\n", true, i.compatibilityMode)
+	pgm, _, err := i.compiler.Compile(src, filename, false)
 	return pgm, err
 }
 
