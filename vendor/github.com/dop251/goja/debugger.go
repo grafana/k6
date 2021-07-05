@@ -223,7 +223,7 @@ func (dbg *Debugger) Line() int {
 }
 
 func (dbg *Debugger) Filename() string {
-	return dbg.vm.prg.src.Position(dbg.vm.prg.sourceOffset(dbg.vm.pc)).Filename
+	return dbg.vm.prg.src.Name()
 }
 
 func (dbg *Debugger) updateCurrentLine() {

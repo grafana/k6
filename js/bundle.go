@@ -297,7 +297,17 @@ func (b *Bundle) Instantiate(logger logrus.FieldLogger, vuID uint64) (bi *Bundle
 				fmt.Printf("debug%s> ", getInfo(dbg))
 				userInput, _ := reader.ReadString('\n')
 				userInput = strings.Replace(userInput, "\n", "", -1)
-				if !repl(rt, dbg, userInput) {
+				if !repl(rt, dbg, userInput, func(path string) ([]byte, error) {
+					u, err := url.Parse(path)
+					if err != nil {
+						return nil, err
+					}
+					data, err := loader.Load(logger, b.BaseInitContext.filesystems, u, path)
+					if err != nil {
+						return nil, err
+					}
+					return data.Data, nil
+				}) {
 					reason = dbg.Continue()
 					printDebuggingReason(dbg, reason)
 				}

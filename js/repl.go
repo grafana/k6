@@ -37,7 +37,7 @@ func parseCmd(userInput string) (*Command, error) {
 	return &Command{Name: name, Args: args}, nil
 }
 
-func repl(runtime *goja.Runtime, dbg *goja.Debugger, userInput string) bool {
+func repl(runtime *goja.Runtime, dbg *goja.Debugger, userInput string, getsrc func(string) ([]byte, error)) bool {
 	cmd, err := parseCmd(userInput)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -115,11 +115,12 @@ func repl(runtime *goja.Runtime, dbg *goja.Debugger, userInput string) bool {
 		}
 		fmt.Printf("< %s\n", val)
 	case "list", "l":
-		lines, err := dbg.List()
+		b, err := getsrc(dbg.Filename())
 		if err != nil {
 			fmt.Printf("Error: %s\n", err.Error())
 			break
 		}
+		lines := strings.Split(string(b), "\n")
 		currentLine := dbg.Line()
 		lineIndex := currentLine - 1
 		var builder strings.Builder
