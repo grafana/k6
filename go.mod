@@ -49,3 +49,5 @@ require (
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 )
+
+replace github.com/dop251/goja => github.com/mostafa/goja v0.0.0-20210703115802-db8b4ffb74f5

@@ -74,6 +74,8 @@ type compiler struct {
 	enumGetExpr compiledEnumGetExpr
 
 	evalVM *vm
+
+	debug bool // enable debug mode, effectively disabling a lot of optimizations
 }
 
 type binding struct {
@@ -281,10 +283,12 @@ func (c *compiler) newScope() {
 		strict = c.scope.strict
 	}
 	c.scope = &scope{
-		c:      c,
-		prg:    c.p,
-		outer:  c.scope,
-		strict: strict,
+		c:         c,
+		prg:       c.p,
+		outer:     c.scope,
+		strict:    strict,
+		dynLookup: c.debug,
+		dynamic:   c.debug,
 	}
 }
 
@@ -300,9 +304,10 @@ func (c *compiler) popScope() {
 	c.scope = c.scope.outer
 }
 
-func newCompiler() *compiler {
+func newCompiler(debug bool) *compiler {
 	c := &compiler{
-		p: &Program{},
+		p:     &Program{},
+		debug: debug,
 	}
 
 	c.enumGetExpr.init(c, file.Idx(0))
@@ -475,6 +480,8 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 					case initStash:
 						*ap = initStash(idx)
 					case *loadMixed:
+						i.idx = idx
+					case *loadMixedLex:
 						i.idx = idx
 					case *resolveMixed:
 						i.idx = idx
@@ -878,6 +885,7 @@ func (c *compiler) checkIdentifierLName(name unistring.String, offset int) {
 // Such code should not be included in the final compilation result as it's never called, but it must
 // still produce compilation errors if there are any.
 // TODO: make sure variable lookups do not de-optimise parent scopes
+// TODO: the code needs to stay in debug mode
 func (c *compiler) enterDummyMode() (leaveFunc func()) {
 	savedBlock, savedProgram := c.block, c.p
 	if savedBlock != nil {

@@ -155,6 +155,9 @@ type vm struct {
 	interrupted   uint32
 	interruptVal  interface{}
 	interruptLock sync.Mutex
+
+	debugger  *Debugger
+	debugMode bool // TODO drop this as we can just check debugger is nil or not
 }
 
 type instruction interface {
@@ -415,6 +418,48 @@ func (vm *vm) run() {
 	}
 }
 
+func (vm *vm) debug() {
+	vm.halt = false
+	interrupted := false
+	ticks := 0
+	// vm.debugger.activate(ProgramStartActivation)
+
+	for !vm.halt {
+		if interrupted = atomic.LoadUint32(&vm.interrupted) != 0; interrupted {
+			break
+		}
+
+		if vm.debugger != nil && !vm.debugger.active && vm.debugger.breakpoint() {
+			vm.debugger.updateCurrentLine()
+			vm.debugger.activate(BreakpointActivation)
+
+			vm.prg.code[vm.pc].exec(vm)
+		} else {
+			vm.prg.code[vm.pc].exec(vm)
+		}
+
+		ticks++
+		if ticks > 10000 {
+			runtime.Gosched()
+			ticks = 0
+		}
+	}
+
+	if interrupted {
+		vm.interruptLock.Lock()
+		v := &InterruptedError{
+			iface: vm.interruptVal,
+		}
+		atomic.StoreUint32(&vm.interrupted, 0)
+		vm.interruptVal = nil
+		vm.interruptLock.Unlock()
+		panic(&uncatchableException{
+			stack: &v.stack,
+			err:   v,
+		})
+	}
+}
+
 func (vm *vm) Interrupt(v interface{}) {
 	vm.interruptLock.Lock()
 	vm.interruptVal = v
@@ -513,7 +558,11 @@ func (vm *vm) try(f func()) (ex *Exception) {
 }
 
 func (vm *vm) runTry() (ex *Exception) {
-	return vm.try(vm.run)
+	if vm.debugMode {
+		return vm.try(vm.debug)
+	} else {
+		return vm.try(vm.run)
+	}
 }
 
 func (vm *vm) push(v Value) {
@@ -1219,6 +1268,17 @@ var halt _halt
 func (_halt) exec(vm *vm) {
 	vm.halt = true
 	vm.pc++
+}
+
+type _debugger struct{}
+
+var debugger _debugger
+
+func (_debugger) exec(vm *vm) {
+	vm.pc++
+	if vm.debugMode && !vm.debugger.active { // this jumps over debugger statements
+		vm.debugger.activate(DebuggerStatementActivation)
+	}
 }
 
 type jump int32
@@ -2893,7 +2953,6 @@ end:
 		return valueTrue
 	}
 	return valueFalse
-
 }
 
 type _op_lt struct{}
@@ -3323,11 +3382,12 @@ var enumPopClose _enumPopClose
 
 func (_enumPopClose) exec(vm *vm) {
 	l := len(vm.iterStack) - 1
-	if iter := vm.iterStack[l].iter; iter != nil {
-		returnIter(iter)
-	}
+	item := vm.iterStack[l]
 	vm.iterStack[l] = iterStackItem{}
 	vm.iterStack = vm.iterStack[:l]
+	if iter := item.iter; iter != nil {
+		returnIter(iter)
+	}
 	vm.pc++
 }
 

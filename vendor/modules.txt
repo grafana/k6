@@ -20,7 +20,7 @@ github.com/davecgh/go-spew/spew
 # github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
-# github.com/dop251/goja v0.0.0-20210427212725-462d53687b0d
+# github.com/dop251/goja v0.0.0-20210427212725-462d53687b0d => github.com/mostafa/goja v0.0.0-20210703115802-db8b4ffb74f5
 ## explicit
 github.com/dop251/goja
 github.com/dop251/goja/ast
@@ -301,3 +301,4 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 ## explicit
 gopkg.in/yaml.v3
+# github.com/dop251/goja => github.com/mostafa/goja v0.0.0-20210703115802-db8b4ffb74f5

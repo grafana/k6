@@ -2,6 +2,7 @@ package goja
 
 import (
 	"fmt"
+
 	"github.com/dop251/goja/ast"
 	"github.com/dop251/goja/file"
 	"github.com/dop251/goja/token"
@@ -52,6 +53,7 @@ func (c *compiler) compileStatement(v ast.Statement, needResult bool) {
 	case *ast.WithStatement:
 		c.compileWithStatement(v, needResult)
 	case *ast.DebuggerStatement:
+		c.compileDebuggerStatement()
 	default:
 		panic(fmt.Errorf("Unknown statement type: %T", v))
 	}
@@ -1042,4 +1044,10 @@ func (c *compiler) compileSwitchStatement(v *ast.SwitchStatement, needResult boo
 		c.popScope()
 	}
 	c.leaveBlock()
+}
+
+func (c *compiler) compileDebuggerStatement() {
+	// The emitted debugger instruction will have no effect other than
+	// increasing vm.pc, if r.debugMode is not set
+	c.emit(debugger)
 }
