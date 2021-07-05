@@ -28,10 +28,9 @@ import (
 	"reflect"
 	"strconv"
 
-	"gopkg.in/guregu/null.v3"
-
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/stats"
+	"gopkg.in/guregu/null.v3"
 )
 
 // DefaultScenarioName is used as the default key/ID of the scenario config entries
@@ -178,8 +177,12 @@ func (ipnet *IPNet) UnmarshalText(b []byte) error {
 	}
 
 	*ipnet = *newIPNet
-
 	return nil
+}
+
+// MarshalText encodes the IPNet representation using CIDR notation.
+func (ipnet *IPNet) MarshalText() ([]byte, error) {
+	return []byte(ipnet.String()), nil
 }
 
 // HostAddress stores information about IP and port

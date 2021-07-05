@@ -307,15 +307,28 @@ func TestOptions(t *testing.T) {
 		opts := Options{}.Apply(Options{
 			BlacklistIPs: []*IPNet{{
 				IPNet: net.IPNet{
-					IP:   net.IPv4zero,
-					Mask: net.CIDRMask(1, 1),
+					IP:   net.IPv4bcast,
+					Mask: net.CIDRMask(31, 32),
 				},
 			}},
 		})
 		assert.NotNil(t, opts.BlacklistIPs)
 		assert.NotEmpty(t, opts.BlacklistIPs)
-		assert.Equal(t, net.IPv4zero, opts.BlacklistIPs[0].IP)
-		assert.Equal(t, net.CIDRMask(1, 1), opts.BlacklistIPs[0].Mask)
+		assert.Equal(t, net.IPv4bcast, opts.BlacklistIPs[0].IP)
+		assert.Equal(t, net.CIDRMask(31, 32), opts.BlacklistIPs[0].Mask)
+
+		t.Run("JSON", func(t *testing.T) {
+			t.Parallel()
+
+			b, err := json.Marshal(opts)
+			require.NoError(t, err)
+
+			var uopts Options
+			err = json.Unmarshal(b, &uopts)
+			require.NoError(t, err)
+			require.Len(t, uopts.BlacklistIPs, 1)
+			require.Equal(t, "255.255.255.254/31", uopts.BlacklistIPs[0].String())
+		})
 	})
 	t.Run("BlockedHostnames", func(t *testing.T) {
 		blockedHostnames, err := types.NewNullHostnameTrie([]string{"test.k6.io", "*valid.pattern"})
