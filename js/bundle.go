@@ -21,13 +21,16 @@
 package js
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"runtime"
+	"strings"
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
@@ -61,6 +64,8 @@ type Bundle struct {
 type BundleInstance struct {
 	Runtime *goja.Runtime
 	Context *context.Context
+
+	debugger *goja.Debugger
 
 	// TODO: maybe just have a reference to the Bundle? or save and pass rtOpts?
 	env map[string]string
@@ -281,6 +286,26 @@ func (b *Bundle) Instantiate(logger logrus.FieldLogger, vuID uint64) (bi *Bundle
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
 	rt := goja.New()
+	if vuID == 1 {
+		dbg := rt.EnableDebugMode()
+		go func() {
+			reader := bufio.NewReader(os.Stdin)
+
+			reason, resume := dbg.WaitToActivate()
+			printDebuggingReason(dbg, reason)
+			for {
+				fmt.Printf("debug%s> ", getInfo(dbg))
+				userInput, _ := reader.ReadString('\n')
+				userInput = strings.Replace(userInput, "\n", "", -1)
+				if !repl(rt, dbg, userInput) {
+					resume()
+					reason, resume = dbg.WaitToActivate()
+					printDebuggingReason(dbg, reason)
+				}
+			}
+		}()
+	}
+
 	init := newBoundInitContext(b.BaseInitContext, ctxPtr, rt)
 	if err := b.instantiate(logger, rt, init, vuID); err != nil {
 		return nil, err

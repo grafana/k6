@@ -153,7 +153,7 @@ func (c *Compiler) Compile(src, filename string, main bool, cOpts CompilerOption
 		}
 		return nil, code, err
 	}
-	pgm, err := goja.CompileAST(ast, cOpts.Strict)
+	pgm, err := goja.CompileASTDebug(ast, cOpts.Strict)
 	// Parsing only checks the syntax, not whether what the syntax expresses
 	// is actually supported (sometimes).
 	//
