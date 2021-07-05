@@ -287,19 +287,18 @@ func (b *Bundle) Instantiate(logger logrus.FieldLogger, vuID uint64) (bi *Bundle
 	// runtime, but no state, to allow module-provided types to function within the init context.
 	rt := goja.New()
 	if vuID == 1 {
-		dbg := rt.EnableDebugMode()
+		dbg := rt.AttachDebugger()
 		go func() {
 			reader := bufio.NewReader(os.Stdin)
 
-			reason, resume := dbg.WaitToActivate()
+			reason := dbg.Continue()
 			printDebuggingReason(dbg, reason)
 			for {
 				fmt.Printf("debug%s> ", getInfo(dbg))
 				userInput, _ := reader.ReadString('\n')
 				userInput = strings.Replace(userInput, "\n", "", -1)
 				if !repl(rt, dbg, userInput) {
-					resume()
-					reason, resume = dbg.WaitToActivate()
+					reason = dbg.Continue()
 					printDebuggingReason(dbg, reason)
 				}
 			}

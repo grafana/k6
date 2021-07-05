@@ -18,6 +18,7 @@ type Debugger struct {
 	lastLine     int
 	breakpoints  map[string][]int
 	activationCh chan chan ActivationReason
+	currentCh    chan ActivationReason
 	active       bool
 }
 
@@ -48,16 +49,32 @@ func (dbg *Debugger) activate(reason ActivationReason) {
 	dbg.active = false
 }
 
-// WaitToActivate returns what activated debugger and a function to deactivate it and resume normal execution/continue
-func (dbg *Debugger) WaitToActivate() (ActivationReason, func()) {
-	ch := make(chan ActivationReason)
-	dbg.activationCh <- ch
-	reason := <-ch
-	return reason, func() { close(ch) }
+// Continue unblocks the goja runtime to run code as is and will return the reason why it blocked again.
+func (dbg *Debugger) Continue() ActivationReason {
+	if dbg.currentCh != nil {
+		close(dbg.currentCh)
+	}
+	dbg.currentCh = make(chan ActivationReason)
+	dbg.activationCh <- dbg.currentCh
+	reason := <-dbg.currentCh
+	return reason
 }
 
 func (dbg *Debugger) PC() int {
 	return dbg.vm.pc
+}
+
+// Detach the debugger, after this call this instance of the debugger should *not* be used.
+// This also disables debug mode for the runtime
+func (dbg *Debugger) Detach() { // TODO return an error?
+	dbg.vm.debugger = nil
+	dbg.vm.debugMode = false
+	dbg.vm = nil
+	dbg.active = false
+	if dbg.currentCh != nil {
+		close(dbg.currentCh)
+		dbg.currentCh = nil
+	}
 }
 
 func (dbg *Debugger) SetBreakpoint(filename string, line int) (err error) {

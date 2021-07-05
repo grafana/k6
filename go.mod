@@ -50,4 +50,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 )
 
-replace github.com/dop251/goja => github.com/mostafa/goja v0.0.0-20210703115802-db8b4ffb74f5
+replace github.com/dop251/goja => github.com/mostafa/goja v0.0.0-20210705144130-6b30df779089

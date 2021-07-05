@@ -1088,8 +1088,15 @@ func New() *Runtime {
 	return r
 }
 
-func (r *Runtime) EnableDebugMode() *Debugger {
-	r.vm.debugMode = true
+// AttachDebugger will attach and return a Debugger instance to the runtime.
+// This will also compile all future scripts directly ran through it in a debug mode until it's detached
+// Another way to compile in debug mode is to use CompileASTDebug
+// Only 1 debugger can be attached at a time
+// This method needs to be called before running any script and to call Continue on the debugger before running a script
+// in order to get when it blocks on a debugger statement or breakpoint
+// There can only be 1 debugger attached at a time, attaching more is has undefined behaviour
+func (r *Runtime) AttachDebugger() *Debugger {
+	r.vm.debugMode = true // maybe don't do this?
 	r.vm.debugger = newDebugger(r.vm)
 	return r.vm.debugger
 }
