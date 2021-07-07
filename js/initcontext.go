@@ -163,10 +163,9 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 	pgm, ok := i.programs[fileURL.String()]
 	if !ok || pgm.module == nil {
 		if filepath.IsAbs(name) && runtime.GOOS == "windows" {
-			//nolint:lll
-			i.logger.Warnf("'%s' was imported with an absolute path - this won't be cross-platform and won't work if you move the script"+
-				" between machines or run it with `k6 cloud`; if absolute paths are required, import them with the `file://` schema"+
-				" for slightly better compatibility",
+			i.logger.Warnf("'%s' was imported with an absolute path - this won't be cross-platform and won't work if"+
+				" you move the script between machines or run it with `k6 cloud`; if absolute paths are required,"+
+				" import them with the `file://` schema for slightly better compatibility",
 				name)
 		}
 		i.pwd = loader.Dir(fileURL)
