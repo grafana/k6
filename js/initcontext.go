@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -161,6 +162,12 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 	// First, check if we have a cached program already.
 	pgm, ok := i.programs[fileURL.String()]
 	if !ok || pgm.module == nil {
+		if filepath.IsAbs(name) && runtime.GOOS == "windows" {
+			i.logger.Warnf("'%s' was imported with an absolute path - this won't be cross-platform and won't work if"+
+				" you move the script between machines or run it with `k6 cloud`; if absolute paths are required,"+
+				" import them with the `file://` schema for slightly better compatibility",
+				name)
+		}
 		i.pwd = loader.Dir(fileURL)
 		defer func() { i.pwd = pwd }()
 		exports := i.runtime.NewObject()
