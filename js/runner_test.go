@@ -1507,8 +1507,8 @@ func TestInitContextForbidden(t *testing.T) {
 		},
 		{
 			"abortTest",
-			`var abortTest = require("k6").abortTest;
-			 abortTest();
+			`var test = require("k6/execution").test;
+			 test.abort();
 			 exports.default = function() { console.log("p"); }`,
 			common.AbortTest,
 		},

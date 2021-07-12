@@ -155,7 +155,7 @@ func TestAbortTest(t *testing.T) { //nolint: tparallel
 	t.Run("Check that teardown is called", func(t *testing.T) { //nolint: paralleltest
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		msg := "Calling teardown function after abortTest()"
+		msg := "Calling teardown function after test.abort()"
 		var buf bytes.Buffer
 		logger := logrus.New()
 		logger.SetOutput(&buf)
