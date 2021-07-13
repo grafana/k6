@@ -68,7 +68,7 @@ github.com/inconshreveable/mousetrap
 github.com/influxdata/influxdb1-client/models
 github.com/influxdata/influxdb1-client/pkg/escape
 github.com/influxdata/influxdb1-client/v2
-# github.com/jhump/protoreflect v1.8.2
+# github.com/jhump/protoreflect v1.9.0
 ## explicit
 github.com/jhump/protoreflect/codec
 github.com/jhump/protoreflect/desc

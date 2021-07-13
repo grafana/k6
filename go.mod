@@ -15,7 +15,7 @@ require (
 	github.com/google/go-cmp v0.5.1 // indirect
 	github.com/gorilla/websocket v1.4.2
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
-	github.com/jhump/protoreflect v1.8.2
+	github.com/jhump/protoreflect v1.9.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/klauspost/compress v1.12.2
 	github.com/kubernetes/helm v2.9.0+incompatible

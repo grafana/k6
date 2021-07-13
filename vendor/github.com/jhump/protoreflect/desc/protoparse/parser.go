@@ -228,9 +228,14 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 		// TODO: if this re-writes one of the names in filenames, lookups below will break
 		protos = fixupFilenames(protos)
 	}
-	linkedProtos, err := newLinker(results, errs).linkFiles()
+	l := newLinker(results, errs)
+	linkedProtos, err := l.linkFiles()
 	if err != nil {
 		return nil, err
+	}
+	// Now we're done linking, so we can check to see if any imports were unused
+	for _, file := range filenames {
+		l.checkForUnusedImports(file)
 	}
 	if p.IncludeSourceCodeInfo {
 		for name, fd := range linkedProtos {
@@ -316,7 +321,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 			pr.errs.errReporter = func(err ErrorWithPos) error {
 				return err
 			}
-			_ = interpretFileOptions(pr, poorFileDescriptorish{FileDescriptorProto: fd})
+			_ = interpretFileOptions(nil, pr, poorFileDescriptorish{FileDescriptorProto: fd})
 		}
 		if p.IncludeSourceCodeInfo {
 			fd.SourceCodeInfo = pr.generateSourceCodeInfo()
