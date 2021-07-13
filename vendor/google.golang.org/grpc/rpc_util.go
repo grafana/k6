@@ -258,7 +258,8 @@ func (o PeerCallOption) after(c *callInfo, attempt *csAttempt) {
 }
 
 // WaitForReady configures the action to take when an RPC is attempted on broken
-// connections or unreachable servers. If waitForReady is false, the RPC will fail
+// connections or unreachable servers. If waitForReady is false and the
+// connection is in the TRANSIENT_FAILURE state, the RPC will fail
 // immediately. Otherwise, the RPC client will block the call until a
 // connection is available (or the call is canceled or times out) and will
 // retry the call if it fails due to a transient error.  gRPC will not retry if
@@ -429,9 +430,10 @@ func (o ContentSubtypeCallOption) before(c *callInfo) error {
 }
 func (o ContentSubtypeCallOption) after(c *callInfo, attempt *csAttempt) {}
 
-// ForceCodec returns a CallOption that will set the given Codec to be
-// used for all request and response messages for a call. The result of calling
-// String() will be used as the content-subtype in a case-insensitive manner.
+// ForceCodec returns a CallOption that will set codec to be used for all
+// request and response messages for a call. The result of calling Name() will
+// be used as the content-subtype after converting to lowercase, unless
+// CallContentSubtype is also used.
 //
 // See Content-Type on
 // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests for
@@ -853,7 +855,17 @@ func toRPCErr(err error) error {
 // setCallInfoCodec should only be called after CallOptions have been applied.
 func setCallInfoCodec(c *callInfo) error {
 	if c.codec != nil {
-		// codec was already set by a CallOption; use it.
+		// codec was already set by a CallOption; use it, but set the content
+		// subtype if it is not set.
+		if c.contentSubtype == "" {
+			// c.codec is a baseCodec to hide the difference between grpc.Codec and
+			// encoding.Codec (Name vs. String method name).  We only support
+			// setting content subtype from encoding.Codec to avoid a behavior
+			// change with the deprecated version.
+			if ec, ok := c.codec.(encoding.Codec); ok {
+				c.contentSubtype = strings.ToLower(ec.Name())
+			}
+		}
 		return nil
 	}
 
