@@ -7,7 +7,7 @@ require (
 	github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
 	github.com/PuerkitoBio/goquery v1.6.1
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
-	github.com/andybalholm/brotli v1.0.2
+	github.com/andybalholm/brotli v1.0.3
 	github.com/dop251/goja v0.0.0-20210712101704-705acef95ba3
 	github.com/fatih/color v1.12.0
 	github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813 // indirect
