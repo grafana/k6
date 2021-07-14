@@ -83,7 +83,7 @@ github.com/josharian/intern
 # github.com/kelseyhightower/envconfig v1.4.0
 ## explicit
 github.com/kelseyhightower/envconfig
-# github.com/klauspost/compress v1.12.2
+# github.com/klauspost/compress v1.13.1
 ## explicit
 github.com/klauspost/compress/fse
 github.com/klauspost/compress/huff0
