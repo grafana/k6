@@ -9,7 +9,7 @@ require (
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.0.2
 	github.com/dop251/goja v0.0.0-20210712101704-705acef95ba3
-	github.com/fatih/color v1.11.0
+	github.com/fatih/color v1.12.0
 	github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813 // indirect
 	github.com/golang/protobuf v1.4.3
 	github.com/google/go-cmp v0.5.1 // indirect
