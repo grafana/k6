@@ -55,7 +55,7 @@ func (*K6) Fail(msg string) (goja.Value, error) {
 	return goja.Undefined(), errors.New(msg)
 }
 
-// Sleep waits for the provides seconds before continuing the execution
+// Sleep waits the provided seconds before continuing the execution.
 func (*K6) Sleep(ctx context.Context, secs float64) {
 	timer := time.NewTimer(time.Duration(secs * float64(time.Second)))
 	select {
