@@ -10,7 +10,7 @@ github.com/PuerkitoBio/goquery
 # github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 ## explicit
 github.com/Soontao/goHttpDigestClient
-# github.com/andybalholm/brotli v1.0.2
+# github.com/andybalholm/brotli v1.0.3
 ## explicit
 github.com/andybalholm/brotli
 # github.com/andybalholm/cascadia v1.1.0
@@ -30,7 +30,7 @@ github.com/dop251/goja/ftoa/internal/fast
 github.com/dop251/goja/parser
 github.com/dop251/goja/token
 github.com/dop251/goja/unistring
-# github.com/fatih/color v1.11.0
+# github.com/fatih/color v1.12.0
 ## explicit
 github.com/fatih/color
 # github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813
@@ -41,7 +41,7 @@ github.com/ghodss/yaml
 # github.com/go-sourcemap/sourcemap v2.1.3+incompatible
 github.com/go-sourcemap/sourcemap
 github.com/go-sourcemap/sourcemap/internal/base64vlq
-# github.com/golang/protobuf v1.4.2
+# github.com/golang/protobuf v1.4.3
 ## explicit
 github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
@@ -68,7 +68,7 @@ github.com/inconshreveable/mousetrap
 github.com/influxdata/influxdb1-client/models
 github.com/influxdata/influxdb1-client/pkg/escape
 github.com/influxdata/influxdb1-client/v2
-# github.com/jhump/protoreflect v1.8.2
+# github.com/jhump/protoreflect v1.9.0
 ## explicit
 github.com/jhump/protoreflect/codec
 github.com/jhump/protoreflect/desc
@@ -83,7 +83,7 @@ github.com/josharian/intern
 # github.com/kelseyhightower/envconfig v1.4.0
 ## explicit
 github.com/kelseyhightower/envconfig
-# github.com/klauspost/compress v1.12.2
+# github.com/klauspost/compress v1.13.1
 ## explicit
 github.com/klauspost/compress/fse
 github.com/klauspost/compress/huff0
@@ -104,7 +104,7 @@ github.com/manyminds/api2go/jsonapi
 # github.com/mattn/go-colorable v0.1.8
 ## explicit
 github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.12
+# github.com/mattn/go-isatty v0.0.13
 ## explicit
 github.com/mattn/go-isatty
 # github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
@@ -147,12 +147,12 @@ github.com/spf13/pflag
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# github.com/tidwall/gjson v1.8.0
+# github.com/tidwall/gjson v1.8.1
 ## explicit
 github.com/tidwall/gjson
 # github.com/tidwall/match v1.0.3
 github.com/tidwall/match
-# github.com/tidwall/pretty v1.1.0
+# github.com/tidwall/pretty v1.2.0
 ## explicit
 github.com/tidwall/pretty
 # golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
@@ -189,11 +189,9 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
+# golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
-## explicit
 # google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336
 ## explicit
 google.golang.org/genproto/googleapis/rpc/status
@@ -201,7 +199,7 @@ google.golang.org/genproto/protobuf/api
 google.golang.org/genproto/protobuf/field_mask
 google.golang.org/genproto/protobuf/ptype
 google.golang.org/genproto/protobuf/source_context
-# google.golang.org/grpc v1.37.1
+# google.golang.org/grpc v1.39.0
 ## explicit
 google.golang.org/grpc
 google.golang.org/grpc/attributes

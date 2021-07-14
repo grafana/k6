@@ -52,14 +52,20 @@ import (
 // of the RPC.
 type StreamHandler func(srv interface{}, stream ServerStream) error
 
-// StreamDesc represents a streaming RPC service's method specification.
+// StreamDesc represents a streaming RPC service's method specification.  Used
+// on the server when registering services and on the client when initiating
+// new streams.
 type StreamDesc struct {
-	StreamName string
-	Handler    StreamHandler
+	// StreamName and Handler are only used when registering handlers on a
+	// server.
+	StreamName string        // the name of the method excluding the service
+	Handler    StreamHandler // the handler called for the method
 
-	// At least one of these is true.
-	ServerStreams bool
-	ClientStreams bool
+	// ServerStreams and ClientStreams are used for registering handlers on a
+	// server as well as defining RPC behavior when passed to NewClientStream
+	// and ClientConn.NewStream.  At least one must be true.
+	ServerStreams bool // indicates the server can perform streaming sends
+	ClientStreams bool // indicates the client can perform streaming sends
 }
 
 // Stream defines the common interface a client or server stream has to satisfy.

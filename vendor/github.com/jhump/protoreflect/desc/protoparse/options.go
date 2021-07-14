@@ -679,11 +679,11 @@ func (er extRangeDescriptorish) GetExtensionRangeOptions() *dpb.ExtensionRangeOp
 	return er.er.GetOptions()
 }
 
-func interpretFileOptions(r *parseResult, fd fileDescriptorish) error {
+func interpretFileOptions(l *linker, r *parseResult, fd fileDescriptorish) error {
 	opts := fd.GetFileOptions()
 	if opts != nil {
 		if len(opts.UninterpretedOption) > 0 {
-			if remain, err := interpretOptions(r, fd, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := interpretOptions(l, r, fd, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
@@ -691,24 +691,24 @@ func interpretFileOptions(r *parseResult, fd fileDescriptorish) error {
 		}
 	}
 	for _, md := range fd.GetMessageTypes() {
-		if err := interpretMessageOptions(r, md); err != nil {
+		if err := interpretMessageOptions(l, r, md); err != nil {
 			return err
 		}
 	}
 	for _, fld := range fd.GetExtensions() {
-		if err := interpretFieldOptions(r, fld); err != nil {
+		if err := interpretFieldOptions(l, r, fld); err != nil {
 			return err
 		}
 	}
 	for _, ed := range fd.GetEnumTypes() {
-		if err := interpretEnumOptions(r, ed); err != nil {
+		if err := interpretEnumOptions(l, r, ed); err != nil {
 			return err
 		}
 	}
 	for _, sd := range fd.GetServices() {
 		opts := sd.GetServiceOptions()
 		if len(opts.GetUninterpretedOption()) > 0 {
-			if remain, err := interpretOptions(r, sd, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := interpretOptions(l, r, sd, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
@@ -717,7 +717,7 @@ func interpretFileOptions(r *parseResult, fd fileDescriptorish) error {
 		for _, mtd := range sd.GetMethods() {
 			opts := mtd.GetMethodOptions()
 			if len(opts.GetUninterpretedOption()) > 0 {
-				if remain, err := interpretOptions(r, mtd, opts, opts.UninterpretedOption); err != nil {
+				if remain, err := interpretOptions(l, r, mtd, opts, opts.UninterpretedOption); err != nil {
 					return err
 				} else {
 					opts.UninterpretedOption = remain
@@ -728,11 +728,11 @@ func interpretFileOptions(r *parseResult, fd fileDescriptorish) error {
 	return nil
 }
 
-func interpretMessageOptions(r *parseResult, md msgDescriptorish) error {
+func interpretMessageOptions(l *linker, r *parseResult, md msgDescriptorish) error {
 	opts := md.GetMessageOptions()
 	if opts != nil {
 		if len(opts.UninterpretedOption) > 0 {
-			if remain, err := interpretOptions(r, md, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := interpretOptions(l, r, md, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
@@ -740,14 +740,14 @@ func interpretMessageOptions(r *parseResult, md msgDescriptorish) error {
 		}
 	}
 	for _, fld := range md.GetFields() {
-		if err := interpretFieldOptions(r, fld); err != nil {
+		if err := interpretFieldOptions(l, r, fld); err != nil {
 			return err
 		}
 	}
 	for _, ood := range md.GetOneOfs() {
 		opts := ood.GetOneOfOptions()
 		if len(opts.GetUninterpretedOption()) > 0 {
-			if remain, err := interpretOptions(r, ood, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := interpretOptions(l, r, ood, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
@@ -755,14 +755,14 @@ func interpretMessageOptions(r *parseResult, md msgDescriptorish) error {
 		}
 	}
 	for _, fld := range md.GetNestedExtensions() {
-		if err := interpretFieldOptions(r, fld); err != nil {
+		if err := interpretFieldOptions(l, r, fld); err != nil {
 			return err
 		}
 	}
 	for _, er := range md.GetExtensionRanges() {
 		opts := er.GetExtensionRangeOptions()
 		if len(opts.GetUninterpretedOption()) > 0 {
-			if remain, err := interpretOptions(r, er, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := interpretOptions(l, r, er, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
@@ -770,19 +770,19 @@ func interpretMessageOptions(r *parseResult, md msgDescriptorish) error {
 		}
 	}
 	for _, nmd := range md.GetNestedMessageTypes() {
-		if err := interpretMessageOptions(r, nmd); err != nil {
+		if err := interpretMessageOptions(l, r, nmd); err != nil {
 			return err
 		}
 	}
 	for _, ed := range md.GetNestedEnumTypes() {
-		if err := interpretEnumOptions(r, ed); err != nil {
+		if err := interpretEnumOptions(l, r, ed); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func interpretFieldOptions(r *parseResult, fld fldDescriptorish) error {
+func interpretFieldOptions(l *linker, r *parseResult, fld fldDescriptorish) error {
 	opts := fld.GetFieldOptions()
 	if len(opts.GetUninterpretedOption()) > 0 {
 		uo := opts.UninterpretedOption
@@ -824,7 +824,7 @@ func interpretFieldOptions(r *parseResult, fld fldDescriptorish) error {
 		if len(uo) == 0 {
 			// no real options, only pseudo-options above? clear out options
 			fld.AsFieldDescriptorProto().Options = nil
-		} else if remain, err := interpretOptions(r, fld, opts, uo); err != nil {
+		} else if remain, err := interpretOptions(l, r, fld, opts, uo); err != nil {
 			return err
 		} else {
 			opts.UninterpretedOption = remain
@@ -898,11 +898,11 @@ func encodeDefaultBytes(b []byte) string {
 	return buf.String()
 }
 
-func interpretEnumOptions(r *parseResult, ed enumDescriptorish) error {
+func interpretEnumOptions(l *linker, r *parseResult, ed enumDescriptorish) error {
 	opts := ed.GetEnumOptions()
 	if opts != nil {
 		if len(opts.UninterpretedOption) > 0 {
-			if remain, err := interpretOptions(r, ed, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := interpretOptions(l, r, ed, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
@@ -912,7 +912,7 @@ func interpretEnumOptions(r *parseResult, ed enumDescriptorish) error {
 	for _, evd := range ed.GetValues() {
 		opts := evd.GetEnumValueOptions()
 		if len(opts.GetUninterpretedOption()) > 0 {
-			if remain, err := interpretOptions(r, evd, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := interpretOptions(l, r, evd, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
@@ -922,8 +922,8 @@ func interpretEnumOptions(r *parseResult, ed enumDescriptorish) error {
 	return nil
 }
 
-func interpretOptions(res *parseResult, element descriptorish, opts proto.Message, uninterpreted []*dpb.UninterpretedOption) ([]*dpb.UninterpretedOption, error) {
-	optsd, err := desc.LoadMessageDescriptorForMessage(opts)
+func interpretOptions(l *linker, res *parseResult, element descriptorish, opts proto.Message, uninterpreted []*dpb.UninterpretedOption) ([]*dpb.UninterpretedOption, error) {
+	optsd, err := loadMessageDescriptorForOptions(l, element.GetFile(), opts)
 	if err != nil {
 		if res.lenient {
 			return uninterpreted, nil
@@ -993,13 +993,46 @@ func interpretOptions(res *parseResult, element descriptorish, opts proto.Messag
 		}
 	}
 
-	// nw try to convert into the passed in message and fail if not successful
+	// now try to convert into the passed in message and fail if not successful
 	if err := dm.ConvertToDeterministic(opts); err != nil {
 		node := res.nodes[element.AsProto()]
 		return nil, res.errs.handleError(ErrorWithSourcePos{Pos: node.Start(), Underlying: err})
 	}
 
 	return nil, nil
+}
+
+func loadMessageDescriptorForOptions(l *linker, fd fileDescriptorish, opts proto.Message) (*desc.MessageDescriptor, error) {
+	// see if the file imports a custom version of descriptor.proto
+	fqn := proto.MessageName(opts)
+	d := findMessageDescriptorForOptions(l, fd, fqn)
+	if d != nil {
+		return d, nil
+	}
+	// fall back to built-in options descriptors
+	return desc.LoadMessageDescriptorForMessage(opts)
+}
+
+func findMessageDescriptorForOptions(l *linker, fd fileDescriptorish, messageName string) *desc.MessageDescriptor {
+	d := fd.FindSymbol(messageName)
+	if d != nil {
+		md, _ := d.(*desc.MessageDescriptor)
+		return md
+	}
+
+	// TODO: should this support public imports and be recursive?
+	for _, dep := range fd.GetDependencies() {
+		d := dep.FindSymbol(messageName)
+		if d != nil {
+			if l != nil {
+				l.markUsed(fd.AsProto().(*dpb.FileDescriptorProto), d.GetFile().AsFileDescriptorProto())
+			}
+			md, _ := d.(*desc.MessageDescriptor)
+			return md
+		}
+	}
+
+	return nil
 }
 
 func interpretField(res *parseResult, mc *messageContext, element descriptorish, dm *dynamic.Message, opt *dpb.UninterpretedOption, nameIndex int, pathPrefix []int32) (path []int32, err error) {
