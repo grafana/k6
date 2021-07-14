@@ -18,6 +18,7 @@
  *
  */
 
+// Package k6 implements the module imported as 'k6' from inside k6.
 package k6
 
 import (
@@ -35,22 +36,26 @@ import (
 	"go.k6.io/k6/stats"
 )
 
+// K6 is just the module struct.
 type K6 struct{}
 
-// ErrGroupInInitContext is returned when group() are using in the init context
+// ErrGroupInInitContext is returned when group() are using in the init context.
 var ErrGroupInInitContext = common.NewInitContextError("Using group() in the init context is not supported")
 
-// ErrCheckInInitContext is returned when check() are using in the init context
+// ErrCheckInInitContext is returned when check() are using in the init context.
 var ErrCheckInInitContext = common.NewInitContextError("Using check() in the init context is not supported")
 
+// New returns a new module Struct.
 func New() *K6 {
 	return &K6{}
 }
 
+// Fail is a fancy way of saying `throw "something"`.
 func (*K6) Fail(msg string) (goja.Value, error) {
 	return goja.Undefined(), errors.New(msg)
 }
 
+// Sleep waits the provided seconds before continuing the execution.
 func (*K6) Sleep(ctx context.Context, secs float64) {
 	timer := time.NewTimer(time.Duration(secs * float64(time.Second)))
 	select {
@@ -60,13 +65,15 @@ func (*K6) Sleep(ctx context.Context, secs float64) {
 	}
 }
 
+// RandomSeed sets the seed to the random generator used for this VU.
 func (*K6) RandomSeed(ctx context.Context, seed int64) {
-	randSource := rand.New(rand.NewSource(seed)).Float64
+	randSource := rand.New(rand.NewSource(seed)).Float64 //nolint:gosec
 
 	rt := common.GetRuntime(ctx)
 	rt.SetRandSource(randSource)
 }
 
+// Group wraps a function call and executes it within the provided group name.
 func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value, error) {
 	state := lib.GetState(ctx)
 	if state == nil {
@@ -111,6 +118,8 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 	return ret, err
 }
 
+// Check will emit check metrics for the provided checks.
+//nolint:cyclop
 func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
 	state := lib.GetState(ctx)
 	if state == nil {
