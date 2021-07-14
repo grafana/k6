@@ -22,7 +22,7 @@ require (
 	github.com/mailru/easyjson v0.7.7
 	github.com/manyminds/api2go v0.0.0-20180125085803-95be7bd0455e
 	github.com/mattn/go-colorable v0.1.8
-	github.com/mattn/go-isatty v0.0.12
+	github.com/mattn/go-isatty v0.0.13
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d

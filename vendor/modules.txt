@@ -104,7 +104,7 @@ github.com/manyminds/api2go/jsonapi
 # github.com/mattn/go-colorable v0.1.8
 ## explicit
 github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.12
+# github.com/mattn/go-isatty v0.0.13
 ## explicit
 github.com/mattn/go-isatty
 # github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
