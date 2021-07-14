@@ -18,7 +18,7 @@
  *
  */
 
-// Package k6 implements the module imported as 'k6' from inside k6
+// Package k6 implements the module imported as 'k6' from inside k6.
 package k6
 
 import (
