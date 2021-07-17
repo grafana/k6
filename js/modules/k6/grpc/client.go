@@ -29,6 +29,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	reflectpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
@@ -71,6 +72,7 @@ var (
 type Client struct {
 	mds  map[string]protoreflect.MethodDescriptor
 	conn *grpc.ClientConn
+	sync sync.Once
 }
 
 // XClient represents the Client constructor (e.g. `new grpc.Client()`) and
@@ -116,8 +118,9 @@ func walkFileDescriptors(seen map[string]struct{}, fd *desc.FileDescriptor) []*d
 	return fds
 }
 
-// Reflect will use the grpc reflection api to make the file descriptors available to request.
-func (c *Client) Reflect(addr string, params map[string]interface{}) ([]MethodInfo, error) {
+// reflect will use the grpc reflection api to make the file descriptors available to request.
+// It is called in the connect function the first time the Client.Connect function is called.
+func (c *Client) reflect(addr string, params map[string]interface{}) ([]MethodInfo, error) {
 	ctx := lib.WithState(context.Background(), reflectState())
 	ok, err := c.Connect(&ctx, addr, params)
 	if err != nil || !ok {
@@ -262,7 +265,6 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 	if state == nil {
 		return false, errConnectInInitContext
 	}
-
 	isPlaintext, timeout := false, 60*time.Second
 
 	for k, v := range params {
@@ -274,6 +276,20 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 			timeout, err = types.GetDurationValue(v)
 			if err != nil {
 				return false, fmt.Errorf("invalid timeout value: %w", err)
+			}
+		case "reflect":
+			if reflect, ok := v.(bool); !ok || !reflect {
+				continue
+			}
+			params["reflect"] = false
+			var err error
+			c.sync.Do(
+				func() {
+					_, err = c.reflect(addr, params)
+				},
+			)
+			if err != nil {
+				return false, err
 			}
 		default:
 			return false, fmt.Errorf("unknown connect param: %q", k)

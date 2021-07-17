@@ -138,7 +138,7 @@ func (s *routeGuideServer) RouteChat(stream RouteGuide_RouteChatServer) error {
 			return nil
 		}
 		if err != nil {
-			return err
+ 			return err
 		}
 		key := serialize(in.Location)
 
