@@ -64,8 +64,6 @@ import (
 var (
 	errInvokeRPCInInitContext = common.NewInitContextError("invoking RPC methods in the init context is not supported")
 	errConnectInInitContext   = common.NewInitContextError("connecting to a gRPC server in the init context is not supported")
-	connectionErr             = errors.New("failed connecting to API server")
-	reflectionErr             = errors.New("error invoking reflect API")
 )
 
 // Client represents a gRPC client that can be used to make RPC requests
@@ -301,7 +299,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 			err = c.reflect(ctxPtr)
 		})
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("error invoking reflect API: %w", err)
 		}
 	}
 	return true, nil

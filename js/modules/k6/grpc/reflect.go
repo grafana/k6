@@ -15,19 +15,19 @@ func (c *Client) reflect(ctxPtr *context.Context) error {
 	client := reflectpb.NewServerReflectionClient(c.conn)
 	methodClient, err := client.ServerReflectionInfo(*ctxPtr)
 	if err != nil {
-		return fmt.Errorf("%w '%s': %w", reflectionErr, err)
+		return err
 	}
 	req := &reflectpb.ServerReflectionRequest{MessageRequest: &reflectpb.ServerReflectionRequest_ListServices{}}
 	if err := methodClient.Send(req); err != nil {
-		return fmt.Errorf("%w '%s': %w", reflectionErr, err)
+		return err
 	}
 	resp, err := methodClient.Recv()
 	if err != nil {
-		return fmt.Errorf("%w '%s': %w", reflectionErr, err)
+		return err
 	}
 	listResp := resp.GetListServicesResponse()
 	if listResp == nil {
-		return fmt.Errorf("%w  can't list services", reflectionErr)
+		return fmt.Errorf("can't list services")
 	}
 	fdset := &descriptorpb.FileDescriptorSet{}
 	for _, service := range listResp.GetService() {
@@ -36,11 +36,11 @@ func (c *Client) reflect(ctxPtr *context.Context) error {
 				FileContainingSymbol: service.GetName()},
 		}
 		if err := methodClient.Send(req); err != nil {
-			return fmt.Errorf("%w '%s': %w", reflectionErr, err)
+			return err
 		}
 		resp, err := methodClient.Recv()
 		if err != nil {
-			return fmt.Errorf("%w error listing methods on '%s': %w", reflectionErr, service, err)
+			return fmt.Errorf("error listing methods on '%s': %w", service, err)
 		}
 		fdResp := resp.GetFileDescriptorResponse()
 		for _, f := range fdResp.GetFileDescriptorProto() {
