@@ -37,6 +37,8 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc/reflection"
+
 	"github.com/andybalholm/brotli"
 	"github.com/gorilla/websocket"
 	"github.com/klauspost/compress/zstd"
@@ -284,6 +286,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	grpcSrv := grpc.NewServer()
 	stub := &GRPCStub{}
 	grpctest.RegisterTestServiceServer(grpcSrv, stub)
+	reflection.Register(grpcSrv)
 
 	cmux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
