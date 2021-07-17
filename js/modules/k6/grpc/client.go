@@ -32,8 +32,6 @@ import (
 	"sync"
 	"time"
 
-	reflectpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
-
 	"github.com/dop251/goja"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
@@ -66,6 +64,8 @@ import (
 var (
 	errInvokeRPCInInitContext = common.NewInitContextError("invoking RPC methods in the init context is not supported")
 	errConnectInInitContext   = common.NewInitContextError("connecting to a gRPC server in the init context is not supported")
+	connectionErr             = errors.New("failed connecting to API server")
+	reflectionErr             = errors.New("error invoking reflect API")
 )
 
 // Client represents a gRPC client that can be used to make RPC requests
@@ -219,7 +219,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 	if state == nil {
 		return false, errConnectInInitContext
 	}
-	isPlaintext, timeout := false, 60*time.Second
+	isPlaintext, reflect, timeout := false, false, 60*time.Second
 
 	for k, v := range params {
 		switch k {
@@ -232,19 +232,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 				return false, fmt.Errorf("invalid timeout value: %w", err)
 			}
 		case "reflect":
-			if reflect, ok := v.(bool); !ok || !reflect {
-				continue
-			}
-			params["reflect"] = false
-			var err error
-			c.sync.Do(
-				func() {
-					_, err = c.reflect(ctxPtr, addr, params)
-				},
-			)
-			if err != nil {
-				return false, err
-			}
+			reflect = true
 		default:
 			return false, fmt.Errorf("unknown connect param: %q", k)
 		}
@@ -307,7 +295,15 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 	if err := <-errc; err != nil {
 		return false, err
 	}
-
+	if reflect {
+		var err error
+		c.sync.Do(func() {
+			err = c.reflect(ctxPtr)
+		})
+		if err != nil {
+			return false, err
+		}
+	}
 	return true, nil
 }
 
@@ -495,7 +491,9 @@ func (*Client) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context.Cont
 func (c *Client) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	state := lib.GetState(ctx)
 	tags := getTags(ctx)
-
+	if tags == nil {
+		tags = make(map[string]string)
+	}
 	switch s := stat.(type) {
 	case *grpcstats.OutHeader:
 		if state.Options.SystemTags.Has(stats.TagIP) && s.RemoteAddr != nil {
