@@ -230,7 +230,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 				return false, fmt.Errorf("invalid timeout value: %w", err)
 			}
 		case "reflect":
-			reflect = true
+			reflect, _ = v.(bool)
 		default:
 			return false, fmt.Errorf("unknown connect param: %q", k)
 		}
