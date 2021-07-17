@@ -118,52 +118,6 @@ func walkFileDescriptors(seen map[string]struct{}, fd *desc.FileDescriptor) []*d
 	return fds
 }
 
-// reflect will use the grpc reflection api to make the file descriptors available to request.
-// It is called in the connect function the first time the Client.Connect function is called.
-func (c *Client) reflect(addr string, params map[string]interface{}) ([]MethodInfo, error) {
-	ctx := lib.WithState(context.Background(), reflectState())
-	ok, err := c.Connect(&ctx, addr, params)
-	if err != nil || !ok {
-		return nil, fmt.Errorf("error connecting with grpc server: %s", addr)
-	}
-	defer c.conn.Close() //nolint: errcheck
-	client := reflectpb.NewServerReflectionClient(c.conn)
-	methodClient, err := client.ServerReflectionInfo(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error using reflection API: %s", addr)
-	}
-	req := &reflectpb.ServerReflectionRequest{MessageRequest: &reflectpb.ServerReflectionRequest_ListServices{}}
-	resp, err := doReflect(methodClient, req)
-	if err != nil {
-		return nil, fmt.Errorf("error using reflection API: %s", addr)
-	}
-	listResp := resp.GetListServicesResponse()
-	if listResp == nil {
-		return nil, fmt.Errorf("can't list services")
-	}
-	fdset := &descriptorpb.FileDescriptorSet{}
-	for _, service := range listResp.GetService() {
-		req = &reflectpb.ServerReflectionRequest{
-			MessageRequest: &reflectpb.ServerReflectionRequest_FileContainingSymbol{
-				FileContainingSymbol: service.GetName(),
-			},
-		}
-		resp, err = doReflect(methodClient, req)
-		if err != nil {
-			return nil, fmt.Errorf("error listing methods on service: %s", service)
-		}
-		fdResp := resp.GetFileDescriptorResponse()
-		for _, f := range fdResp.GetFileDescriptorProto() {
-			a := &descriptorpb.FileDescriptorProto{}
-			if err = proto.Unmarshal(f, a); err != nil {
-				return nil, err
-			}
-			fdset.File = append(fdset.File, a)
-		}
-	}
-	return c.convertToMethodInfo(fdset)
-}
-
 // Load will parse the given proto files and make the file descriptors available to request.
 func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames ...string) ([]MethodInfo, error) {
 	if lib.GetState(*ctxPtr) != nil {
@@ -285,7 +239,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 			var err error
 			c.sync.Do(
 				func() {
-					_, err = c.reflect(addr, params)
+					_, err = c.reflect(ctxPtr, addr, params)
 				},
 			)
 			if err != nil {
