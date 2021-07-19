@@ -28,9 +28,11 @@ import (
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/stats"
 )
 
@@ -64,13 +66,14 @@ func TestMetrics(t *testing.T) {
 
 					ctxPtr := new(context.Context)
 					*ctxPtr = common.WithRuntime(context.Background(), rt)
+					*ctxPtr = common.WithInitEnv(*ctxPtr, &common.InitEnvironment{Registry: metrics.NewRegistry()})
 					rt.Set("metrics", common.Bind(rt, New(), ctxPtr))
 
 					root, _ := lib.NewGroup("", nil)
 					child, _ := root.Group("child")
 					samples := make(chan stats.SampleContainer, 1000)
 					state := &lib.State{
-						Options: lib.Options{SystemTags: stats.NewSystemTagSet(stats.TagGroup)},
+						Options: lib.Options{SystemTags: stats.NewSystemTagSet(stats.TagGroup), Throw: null.BoolFrom(true)},
 						Group:   root,
 						Samples: samples,
 						Tags:    map[string]string{"group": root.Path},
@@ -84,6 +87,7 @@ func TestMetrics(t *testing.T) {
 					require.NoError(t, err)
 
 					t.Run("ExitInit", func(t *testing.T) {
+						*ctxPtr = common.WithRuntime(context.Background(), rt)
 						*ctxPtr = lib.WithState(*ctxPtr, state)
 						_, err := rt.RunString(fmt.Sprintf(`new metrics.%s("my_metric")`, fn))
 						assert.EqualError(t, err, "metrics must be declared in the init context at apply (native)")
@@ -175,9 +179,9 @@ func TestMetricGetName(t *testing.T) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-	ctxPtr := new(context.Context)
-	*ctxPtr = common.WithRuntime(context.Background(), rt)
-	require.NoError(t, rt.Set("metrics", common.Bind(rt, New(), ctxPtr)))
+	ctx := common.WithRuntime(context.Background(), rt)
+	ctx = common.WithInitEnv(ctx, &common.InitEnvironment{Registry: metrics.NewRegistry()})
+	require.NoError(t, rt.Set("metrics", common.Bind(rt, New(), &ctx)))
 	v, err := rt.RunString(`
 		var m = new metrics.Counter("my_metric")
 		m.name
@@ -191,4 +195,40 @@ func TestMetricGetName(t *testing.T) {
 	`)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "TypeError: Cannot assign to read only property 'name'")
+}
+
+func TestMetricDuplicates(t *testing.T) {
+	t.Parallel()
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+
+	ctx := common.WithRuntime(context.Background(), rt)
+	ctx = common.WithInitEnv(ctx, &common.InitEnvironment{Registry: metrics.NewRegistry()})
+	require.NoError(t, rt.Set("metrics", common.Bind(rt, New(), &ctx)))
+	_, err := rt.RunString(`
+		var m = new metrics.Counter("my_metric")
+	`)
+	require.NoError(t, err)
+
+	_, err = rt.RunString(`
+		var m2 = new metrics.Counter("my_metric")
+	`)
+	require.NoError(t, err)
+
+	_, err = rt.RunString(`
+		var m3 = new metrics.Gauge("my_metric")
+	`)
+	require.Error(t, err)
+
+	_, err = rt.RunString(`
+		var m4 = new metrics.Counter("my_metric", true)
+	`)
+	require.Error(t, err)
+
+	v, err := rt.RunString(`
+		m.name == m2.name && m.name == "my_metric" && m3 === undefined && m4 === undefined
+	`)
+	require.NoError(t, err)
+
+	require.True(t, v.ToBoolean())
 }

@@ -50,7 +50,8 @@ type Metric struct {
 var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
 
 func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime []bool) (interface{}, error) {
-	if lib.GetState(*ctxPtr) != nil {
+	initEnv := common.GetInitEnv(*ctxPtr)
+	if initEnv == nil {
 		return nil, errors.New("metrics must be declared in the init context")
 	}
 
@@ -65,9 +66,14 @@ func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime 
 	}
 
 	rt := common.GetRuntime(*ctxPtr)
-	bound := common.Bind(rt, Metric{stats.New(name, t, valueType)}, ctxPtr)
+	m, err := initEnv.Registry.NewMetric(name, t, valueType)
+	if err != nil {
+		return nil, err
+	}
+
+	bound := common.Bind(rt, &Metric{metric: m}, ctxPtr)
 	o := rt.NewObject()
-	err := o.DefineDataProperty("name", rt.ToValue(name), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
+	err = o.DefineDataProperty("name", rt.ToValue(name), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
 	if err != nil {
 		return nil, err
 	}
