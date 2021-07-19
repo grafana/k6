@@ -3,6 +3,7 @@ package metrics
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/stats"
 )
@@ -25,4 +26,28 @@ func TestRegistryNewMetric(t *testing.T) {
 
 	_, err = r.NewMetric("something", stats.Counter, stats.Time)
 	require.Error(t, err)
+}
+
+func TestMetricNames(t *testing.T) {
+	t.Parallel()
+	testMap := map[string]bool{
+		"simple":       true,
+		"still_simple": true,
+		"":             false,
+		"@":            false,
+		"a":            true,
+		"special\n\t":  false,
+		// this has both hangul and japanese numerals .
+		"hello.World_in_한글一안녕一세상": true,
+		// too long
+		"tooolooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooog": false,
+	}
+
+	for key, value := range testMap {
+		key, value := key, value
+		t.Run(key, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, value, checkName(key), key)
+		})
+	}
 }
