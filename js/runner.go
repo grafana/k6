@@ -80,7 +80,7 @@ func New(
 	logger *logrus.Logger, src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
 	builtinMetrics *metrics.BuiltinMetrics, registry *metrics.Registry,
 ) (*Runner, error) {
-	bundle, err := NewBundle(logger, src, filesystems, rtOpts)
+	bundle, err := NewBundle(logger, src, filesystems, rtOpts, registry)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func NewFromArchive(
 	logger *logrus.Logger, arc *lib.Archive, rtOpts lib.RuntimeOptions,
 	builtinMetrics *metrics.BuiltinMetrics, registry *metrics.Registry,
 ) (*Runner, error) {
-	bundle, err := NewBundleFromArchive(logger, arc, rtOpts)
+	bundle, err := NewBundleFromArchive(logger, arc, rtOpts, registry)
 	if err != nil {
 		return nil, err
 	}
