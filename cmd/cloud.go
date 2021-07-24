@@ -137,15 +137,6 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				return err
 			}
 
-			// Cloud config
-			cloudConfig, err := cloudapi.GetConsolidatedConfig(derivedConf.Collectors["cloud"], osEnvironment, "")
-			if err != nil {
-				return err
-			}
-			if !cloudConfig.Token.Valid {
-				return errors.New("Not logged in, please use `k6 login cloud`.") //nolint:golint
-			}
-
 			modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Building the archive"))
 			arc := r.MakeArchive()
 			// TODO: Fix this
@@ -164,8 +155,14 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				}
 			}
 
-			if err = cloudapi.MergeFromExternal(arc.Options.External, &cloudConfig); err != nil {
+			// Cloud config
+			cloudConfig, err := cloudapi.GetConsolidatedConfig(
+				derivedConf.Collectors["cloud"], osEnvironment, "", arc.Options.External)
+			if err != nil {
 				return err
+			}
+			if !cloudConfig.Token.Valid {
+				return errors.New("Not logged in, please use `k6 login cloud`.") //nolint:golint,revive,stylecheck
 			}
 			if tmpCloudConfig == nil {
 				tmpCloudConfig = make(map[string]interface{}, 3)

@@ -20,10 +20,13 @@
 package cloudapi
 
 import (
+	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib/types"
@@ -69,4 +72,21 @@ func TestConfigApply(t *testing.T) {
 	assert.Equal(t, full, full.Apply(full))
 	assert.Equal(t, full, empty.Apply(full))
 	assert.Equal(t, full, defaults.Apply(full))
+}
+
+func TestConfigConsolidation(t *testing.T) { //nolint:paralleltest
+	config, err := GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "", nil)
+	require.NoError(t, err)
+	require.Equal(t, config.Token.String, "jsonraw")
+
+	config, err = GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "",
+		map[string]json.RawMessage{"loadimpact": json.RawMessage(`{"token":"ext"}`)})
+	require.NoError(t, err)
+	require.Equal(t, config.Token.String, "ext")
+
+	require.NoError(t, os.Setenv("K6_CLOUD_TOKEN", "envvalue")) // TODO drop when we don't use envconfig
+	config, err = GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "",
+		map[string]json.RawMessage{"loadimpact": json.RawMessage(`{"token":"ext"}`)})
+	require.NoError(t, err)
+	require.Equal(t, config.Token.String, "envvalue")
 }
