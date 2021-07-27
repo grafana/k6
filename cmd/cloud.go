@@ -168,13 +168,13 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				tmpCloudConfig = make(map[string]interface{}, 3)
 			}
 
-			if _, ok := tmpCloudConfig["token"]; !ok && cloudConfig.Token.Valid {
+			if cloudConfig.Token.Valid {
 				tmpCloudConfig["token"] = cloudConfig.Token
 			}
-			if _, ok := tmpCloudConfig["name"]; !ok && cloudConfig.Name.Valid {
+			if cloudConfig.Name.Valid {
 				tmpCloudConfig["name"] = cloudConfig.Name
 			}
-			if _, ok := tmpCloudConfig["projectID"]; !ok && cloudConfig.ProjectID.Valid {
+			if cloudConfig.ProjectID.Valid {
 				tmpCloudConfig["projectID"] = cloudConfig.ProjectID
 			}
 
