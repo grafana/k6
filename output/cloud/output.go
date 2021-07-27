@@ -132,11 +132,6 @@ func newOutput(params output.Params) (*Output, error) {
 		return nil, errors.New("tests with unspecified duration are not allowed when outputting data to k6 cloud")
 	}
 
-	if !conf.Token.Valid && conf.DeprecatedToken.Valid {
-		logger.Warn("K6CLOUD_TOKEN is deprecated and will be removed. Use K6_CLOUD_TOKEN instead.")
-		conf.Token = conf.DeprecatedToken
-	}
-
 	if !(conf.MetricPushConcurrency.Int64 > 0) {
 		return nil, fmt.Errorf("metrics push concurrency must be a positive number but is %d",
 			conf.MetricPushConcurrency.Int64)
