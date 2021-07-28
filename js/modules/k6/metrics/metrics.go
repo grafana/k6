@@ -56,21 +56,24 @@ func newMetric(call goja.ConstructorCall, rt *goja.Runtime, t stats.MetricType) 
 		return nil, errors.New("metrics must be declared in the init context")
 	}
 
-	// TODO this kind of conversions can possibly be automated by the parts of common.Bind that are curently automating
-	// it and some wrapping
-	name := call.Argument(0).String()
-	isTime := call.Argument(1).ToBoolean()
-	// TODO: move verification outside the JS
-	if !checkName(name) {
-		return nil, common.NewInitContextError(fmt.Sprintf("Invalid metric name: '%s'", name))
+	c, _ := goja.AssertFunction(rt.ToValue(func(name string, isTime ...bool) (*goja.Object, error) {
+		// TODO: move verification outside the JS
+		if !checkName(name) {
+			return nil, common.NewInitContextError(fmt.Sprintf("Invalid metric name: '%s'", name))
+		}
+
+		valueType := stats.Default
+		if len(isTime) > 0 && isTime[0] {
+			valueType = stats.Time
+		}
+		return rt.ToValue(&Metric{metric: stats.New(name, t, valueType)}).ToObject(rt), nil
+	}))
+	v, err := c(call.This, call.Arguments...)
+	if err != nil {
+		return nil, err
 	}
 
-	valueType := stats.Default
-	if isTime {
-		valueType = stats.Time
-	}
-
-	return rt.ToValue(Metric{stats.New(name, t, valueType)}).ToObject(rt), nil
+	return v.ToObject(rt), nil
 }
 
 func (m Metric) Add(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
@@ -79,29 +82,27 @@ func (m Metric) Add(call goja.FunctionCall, rt *goja.Runtime) goja.Value {
 	if state == nil {
 		common.Throw(rt, ErrMetricsAddInInitContext)
 	}
-	v := call.Argument(0)
-	var addTags map[string]string
-	if len(call.Arguments) > 1 {
-		// Technically the previous implementation support multiple maps but I don't think that is a good design and can
-		// be reproduced if desired
-		err := rt.ExportTo(call.Argument(1), &addTags)
-		if err != nil {
-			common.Throw(rt, err)
+
+	c, _ := goja.AssertFunction(rt.ToValue(func(v goja.Value, addTags ...map[string]string) {
+		tags := state.CloneTags()
+		for _, ts := range addTags {
+			for k, v := range ts {
+				tags[k] = v
+			}
 		}
-	}
 
-	tags := state.CloneTags()
-	for k, v := range addTags {
-		tags[k] = v
-	}
+		vfloat := v.ToFloat()
+		if vfloat == 0 && v.ToBoolean() {
+			vfloat = 1.0
+		}
 
-	vfloat := v.ToFloat()
-	if vfloat == 0 && v.ToBoolean() {
-		vfloat = 1.0
+		sample := stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)}
+		stats.PushIfNotDone(ctx, state.Samples, sample)
+	}))
+	_, err := c(call.This, call.Arguments...)
+	if err != nil {
+		common.Throw(rt, err)
 	}
-
-	sample := stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)}
-	stats.PushIfNotDone(ctx, state.Samples, sample)
 	return rt.ToValue(true)
 }
 
