@@ -366,7 +366,7 @@ func (h *lokiHook) createPushMessage(msgs []tmpMsg, cutOffIndex, dropped int) *l
 func (h *lokiHook) push(b bytes.Buffer) error {
 	body := b.Bytes()
 
-	req, err := http.NewRequestWithContext(context.Background(), "GET", h.addr, &b)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, h.addr, &b)
 	if err != nil {
 		return err
 	}
