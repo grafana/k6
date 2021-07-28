@@ -73,7 +73,7 @@ func TestConfigApply(t *testing.T) {
 	assert.Equal(t, full, defaults.Apply(full))
 }
 
-func TestConfigConsolidation(t *testing.T) { //nolint:paralleltest
+func TestGetConsolidatedConfig(t *testing.T) { //nolint:paralleltest
 	config, err := GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "", nil)
 	require.NoError(t, err)
 	require.Equal(t, config.Token.String, "jsonraw")
