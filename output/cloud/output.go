@@ -97,7 +97,8 @@ func New(params output.Params) (output.Output, error) {
 
 // New creates a new cloud output.
 func newOutput(params output.Params) (*Output, error) {
-	conf, err := cloudapi.GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument)
+	conf, err := cloudapi.GetConsolidatedConfig(
+		params.JSONConfig, params.Environment, params.ConfigArgument, params.ScriptOptions.External)
 	if err != nil {
 		return nil, err
 	}
@@ -107,10 +108,6 @@ func newOutput(params output.Params) (*Output, error) {
 	}
 
 	logger := params.Logger.WithFields(logrus.Fields{"output": "cloud"})
-
-	if err := cloudapi.MergeFromExternal(params.ScriptOptions.External, &conf); err != nil {
-		return nil, err
-	}
 
 	if conf.AggregationPeriod.Duration > 0 &&
 		(params.ScriptOptions.SystemTags.Has(stats.TagVU) || params.ScriptOptions.SystemTags.Has(stats.TagIter)) {
@@ -133,11 +130,6 @@ func newOutput(params output.Params) (*Output, error) {
 	duration, testEnds := lib.GetEndOffset(params.ExecutionPlan)
 	if !testEnds {
 		return nil, errors.New("tests with unspecified duration are not allowed when outputting data to k6 cloud")
-	}
-
-	if !conf.Token.Valid && conf.DeprecatedToken.Valid {
-		logger.Warn("K6CLOUD_TOKEN is deprecated and will be removed. Use K6_CLOUD_TOKEN instead.")
-		conf.Token = conf.DeprecatedToken
 	}
 
 	if !(conf.MetricPushConcurrency.Int64 > 0) {

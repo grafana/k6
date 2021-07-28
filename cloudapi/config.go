@@ -34,10 +34,9 @@ import (
 //nolint: lll
 type Config struct {
 	// TODO: refactor common stuff between cloud execution and output
-	Token           null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`
-	DeprecatedToken null.String `json:"-" envconfig:"K6CLOUD_TOKEN"`
-	ProjectID       null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
-	Name            null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
+	Token     null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`
+	ProjectID null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
+	Name      null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
 
 	Host        null.String `json:"host" envconfig:"K6_CLOUD_HOST"`
 	LogsTailURL null.String `json:"-" envconfig:"K6_CLOUD_LOGS_TAIL_URL"`
@@ -186,9 +185,6 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.Token.Valid {
 		c.Token = cfg.Token
 	}
-	if cfg.DeprecatedToken.Valid {
-		c.DeprecatedToken = cfg.DeprecatedToken
-	}
 	if cfg.ProjectID.Valid && cfg.ProjectID.Int64 > 0 {
 		c.ProjectID = cfg.ProjectID
 	}
@@ -278,7 +274,9 @@ func MergeFromExternal(external map[string]json.RawMessage, conf *Config) error 
 
 // GetConsolidatedConfig combines the default config values with the JSON config
 // values and environment variables and returns the final result.
-func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, configArg string) (Config, error) {
+func GetConsolidatedConfig(
+	jsonRawConf json.RawMessage, env map[string]string, configArg string, external map[string]json.RawMessage,
+) (Config, error) {
 	result := NewConfig()
 	if jsonRawConf != nil {
 		jsonConf := Config{}
@@ -286,6 +284,9 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, c
 			return result, err
 		}
 		result = result.Apply(jsonConf)
+	}
+	if err := MergeFromExternal(external, &result); err != nil {
+		return result, err
 	}
 
 	envConfig := Config{}
