@@ -282,12 +282,17 @@ func Bind(rt *goja.Runtime, v interface{}, ctxPtr *context.Context) map[string]i
 }
 
 // TODO move this
-// ModuleInstance is something that will be provided to modules and they need to embed it.
+// ModuleInstance is what a module needs to return
 type ModuleInstance interface {
-	GetContext() context.Context
+	ModuleInstanceCore
 	GetExports() Exports
+}
+
+// ModuleInstanceCore is something that will be provided to modules and they need to embed it in ModuleInstance
+type ModuleInstanceCore interface {
 	// we can add other methods here
 	// sealing field will help probably with pointing users that they just need to embed this in the
+	GetContext() context.Context
 }
 
 type Exports struct {

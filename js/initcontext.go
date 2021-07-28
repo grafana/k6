@@ -139,17 +139,13 @@ func (i *InitContext) Require(arg string) goja.Value {
 	}
 }
 
-type moduleInstanceImpl struct {
+type moduleInstanceCoreImpl struct {
 	ctxPtr *context.Context
-	// we can technically put lib.State here
+	// we can technically put lib.State here as well as anything else
 }
 
-func (m *moduleInstanceImpl) GetContext() context.Context {
+func (m *moduleInstanceCoreImpl) GetContext() context.Context {
 	return *m.ctxPtr
-}
-
-func (m *moduleInstanceImpl) GetExports() common.Exports {
-	panic("this needs to be implemented by the module") // maybe 2 interfaces ?
 }
 
 func toEsModuleexports(exp common.Exports) map[string]interface{} {
@@ -170,7 +166,7 @@ func (i *InitContext) requireModule(name string) (goja.Value, error) {
 		return nil, fmt.Errorf("unknown module: %s", name)
 	}
 	if modV2, ok := mod.(modules.IsModuleV2); ok {
-		instance := modV2.NewModuleInstance(&moduleInstanceImpl{ctxPtr: i.ctxPtr})
+		instance := modV2.NewModuleInstance(&moduleInstanceCoreImpl{ctxPtr: i.ctxPtr})
 		return i.runtime.ToValue(toEsModuleexports(instance.GetExports())), nil
 	}
 	if perInstance, ok := mod.(modules.HasModuleInstancePerVU); ok {

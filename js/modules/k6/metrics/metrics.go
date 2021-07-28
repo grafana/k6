@@ -106,12 +106,12 @@ func (m Metric) GetName() string {
 type (
 	RootMetricsModule struct{}
 	MetricsModule     struct {
-		common.ModuleInstance
+		common.ModuleInstanceCore
 	}
 )
 
-func (*RootMetricsModule) NewModuleInstance(m common.ModuleInstance) common.ModuleInstance {
-	return &MetricsModule{ModuleInstance: m}
+func (*RootMetricsModule) NewModuleInstance(m common.ModuleInstanceCore) common.ModuleInstance {
+	return &MetricsModule{ModuleInstanceCore: m}
 }
 
 func New() *RootMetricsModule {
@@ -127,7 +127,8 @@ func (m *MetricsModule) ReturnMetricType(metric Metric) string {
 	return metric.metric.Type.String()
 }
 
-// Counter ... // NOTE we still need to use goja.ConstructorCall  somewhere to have access to the
+// Counter ... // NOTE we still need to use goja.ConstructorCall  somewhere to have automatic constructor support by
+// goja
 func (m *MetricsModule) XCounter(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
 	v, err := m.newMetric(call, stats.Counter)
 	if err != nil {

@@ -72,7 +72,7 @@ type HasModuleInstancePerVU interface {
 
 // IsModuleV2 ... TODO better name
 type IsModuleV2 interface { // TODO rename?
-	NewModuleInstance(common.ModuleInstance) common.ModuleInstance
+	NewModuleInstance(common.ModuleInstanceCore) common.ModuleInstance
 }
 
 // checks that modules implement HasModuleInstancePerVU
