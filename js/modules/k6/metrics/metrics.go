@@ -21,7 +21,6 @@
 package metrics
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -43,8 +42,8 @@ func checkName(name string) bool {
 }
 
 type Metric struct {
-	metric     *stats.Metric
-	getContext func() context.Context
+	metric *stats.Metric
+	core   common.ModuleInstanceCore
 }
 
 // ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
@@ -56,26 +55,28 @@ func (m *MetricsModule) newMetric(call goja.ConstructorCall, t stats.MetricType)
 		return nil, errors.New("metrics must be declared in the init context")
 	}
 	rt := common.GetRuntime(ctx) // NOTE we can get this differently as well
+	c, _ := goja.AssertFunction(rt.ToValue(func(name string, isTime ...bool) (*goja.Object, error) {
+		// TODO: move verification outside the JS
+		if !checkName(name) {
+			return nil, common.NewInitContextError(fmt.Sprintf("Invalid metric name: '%s'", name))
+		}
 
-	// TODO this kind of conversions can possibly be automated by the parts of common.Bind that are curently automating
-	// it and some wrapping
-	name := call.Argument(0).String()
-	isTime := call.Argument(1).ToBoolean()
-	// TODO: move verification outside the JS
-	if !checkName(name) {
-		return nil, common.NewInitContextError(fmt.Sprintf("Invalid metric name: '%s'", name))
+		valueType := stats.Default
+		if len(isTime) > 0 && isTime[0] {
+			valueType = stats.Time
+		}
+		return rt.ToValue(&Metric{metric: stats.New(name, t, valueType), core: m.ModuleInstanceCore}).ToObject(rt), nil
+	}))
+	v, err := c(call.This, call.Arguments...)
+	if err != nil {
+		return nil, err
 	}
 
-	valueType := stats.Default
-	if isTime {
-		valueType = stats.Time
-	}
-
-	return rt.ToValue(Metric{metric: stats.New(name, t, valueType), getContext: m.GetContext}).ToObject(rt), nil
+	return v.ToObject(rt), nil
 }
 
 func (m Metric) Add(v goja.Value, addTags ...map[string]string) (bool, error) {
-	ctx := m.getContext()
+	ctx := m.core.GetContext()
 	state := lib.GetState(ctx)
 	if state == nil {
 		return false, ErrMetricsAddInInitContext
