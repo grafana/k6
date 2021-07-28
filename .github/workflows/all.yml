@@ -277,7 +277,7 @@ jobs:
           echo "Publish GHCR ($DOCKER_IMAGE_ID:$VERSION)"
 
           # Log into GitHub Container Registry
-          echo "${{ secrets.CR_PAT }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
           docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$GHCR_IMAGE_ID:$VERSION"
           docker push "ghcr.io/$GHCR_IMAGE_ID:$VERSION"
           # We also want to tag the latest stable version as latest
@@ -461,7 +461,7 @@ jobs:
           echo "${{ secrets.PGP_SIGN_KEY }}" > packaging/sign-key.gpg
       - name: Publish packages
         run: |
-          echo "${{ secrets.CR_PAT }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
           cd packaging
           docker-compose pull packager
           docker-compose run --rm packager
