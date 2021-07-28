@@ -140,14 +140,40 @@ func (i *InitContext) Require(arg string) goja.Value {
 	}
 }
 
+type moduleInstanceCoreImpl struct {
+	ctxPtr *context.Context
+	// we can technically put lib.State here as well as anything else
+}
+
+func (m *moduleInstanceCoreImpl) GetContext() context.Context {
+	return *m.ctxPtr
+}
+
+func toEsModuleexports(exp common.Exports) map[string]interface{} {
+	result := make(map[string]interface{}, len(exp.Others)+2)
+
+	for k, v := range exp.Others {
+		result[k] = v
+	}
+	// Maybe check that those weren't set
+	result["default"] = exp.Default
+	result["__esModule"] = true // this so babel works with
+	return result
+}
+
 func (i *InitContext) requireModule(name string) (goja.Value, error) {
 	mod, ok := i.modules[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown module: %s", name)
 	}
+	if modV2, ok := mod.(modules.IsModuleV2); ok {
+		instance := modV2.NewModuleInstance(&moduleInstanceCoreImpl{ctxPtr: i.ctxPtr})
+		return i.runtime.ToValue(toEsModuleexports(instance.GetExports())), nil
+	}
 	if perInstance, ok := mod.(modules.HasModuleInstancePerVU); ok {
 		mod = perInstance.NewModuleInstancePerVU()
 	}
+
 	return i.runtime.ToValue(common.Bind(i.runtime, mod, i.ctxPtr)), nil
 }
 
