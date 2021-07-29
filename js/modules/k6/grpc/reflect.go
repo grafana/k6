@@ -33,7 +33,8 @@ func (c *Client) reflect(ctxPtr *context.Context) error {
 	for _, service := range listResp.GetService() {
 		req = &reflectpb.ServerReflectionRequest{
 			MessageRequest: &reflectpb.ServerReflectionRequest_FileContainingSymbol{
-				FileContainingSymbol: service.GetName()},
+				FileContainingSymbol: service.GetName(),
+			},
 		}
 		if err := methodClient.Send(req); err != nil {
 			return err
