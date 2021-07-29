@@ -18,7 +18,7 @@ func (c *Client) reflect(ctxPtr *context.Context) error {
 		return err
 	}
 	req := &reflectpb.ServerReflectionRequest{MessageRequest: &reflectpb.ServerReflectionRequest_ListServices{}}
-	if err := methodClient.Send(req); err != nil {
+	if err = methodClient.Send(req); err != nil {
 		return err
 	}
 	resp, err := methodClient.Recv()
@@ -36,10 +36,10 @@ func (c *Client) reflect(ctxPtr *context.Context) error {
 				FileContainingSymbol: service.GetName(),
 			},
 		}
-		if err := methodClient.Send(req); err != nil {
+		if err = methodClient.Send(req); err != nil {
 			return err
 		}
-		resp, err := methodClient.Recv()
+		resp, err = methodClient.Recv()
 		if err != nil {
 			return fmt.Errorf("error listing methods on '%s': %w", service, err)
 		}
