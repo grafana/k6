@@ -288,6 +288,18 @@ type ModuleInstance interface {
 	GetExports() Exports
 }
 
+func getinterfaceMethods() []string {
+	var t ModuleInstance
+	T := reflect.TypeOf(&t).Elem()
+	result := make([]string, T.NumMethod())
+
+	for i := range result {
+		result[i] = T.Method(i).Name
+	}
+
+	return result
+}
+
 // ModuleInstanceCore is something that will be provided to modules and they need to embed it in ModuleInstance
 type ModuleInstanceCore interface {
 	// we can add other methods here
@@ -304,9 +316,17 @@ func GenerateExports(v interface{}) Exports {
 	exports := make(map[string]interface{})
 	val := reflect.ValueOf(v)
 	typ := val.Type()
+	badNames := getinterfaceMethods()
+outer:
 	for i := 0; i < typ.NumMethod(); i++ {
 		meth := typ.Method(i)
+		for _, badname := range badNames {
+			if meth.Name == badname {
+				continue outer
+			}
+		}
 		name := MethodName(typ, meth)
+
 		fn := val.Method(i)
 		exports[name] = fn.Interface()
 	}
@@ -316,8 +336,12 @@ func GenerateExports(v interface{}) Exports {
 		val = val.Elem()
 		typ = val.Type()
 	}
+	var mic ModuleInstanceCore // TODO move this out
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
+		if field.Type == reflect.TypeOf(&mic).Elem() {
+			continue
+		}
 		name := FieldName(typ, field)
 		if name != "" {
 			exports[name] = val.Field(i).Interface()
