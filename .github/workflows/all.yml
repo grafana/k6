@@ -86,8 +86,8 @@ jobs:
           # Run with less concurrency on Windows to minimize flakiness.
           if [[ "${{ matrix.platform }}" == windows* ]]; then
             unset args[2]
-            args[1]="1"
-            export GOMAXPROCS=1
+            #args[1]="1"
+            # export GOMAXPROCS=1
           fi
           go test "${args[@]}" -timeout 800s ./...
 
