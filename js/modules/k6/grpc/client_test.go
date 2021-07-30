@@ -139,6 +139,7 @@ func TestClient(t *testing.T) {
 
 	t.Run("Load", func(t *testing.T) {
 		respV, err := rt.RunString(`
+			var client = new grpc.Client();
 			client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");
 		`)
 		require.NoError(t, err)
@@ -309,7 +310,6 @@ func TestClient(t *testing.T) {
 			if req.Payload == nil || string(req.Payload.Body) != "负载测试" {
 				return nil, status.Error(codes.InvalidArgument, "")
 			}
-
 			return &grpc_testing.SimpleResponse{}, nil
 		}
 		_, err := rt.RunString(`
@@ -367,8 +367,7 @@ func TestClient(t *testing.T) {
 			}
 			if (!resp.error || resp.error.message !== "foobar" || resp.error.code !== 15) {
 				throw new Error("unexpected error object: " + JSON.stringify(resp.error.code))
-			}
-		`)
+			}`)
 		assert.NoError(t, err)
 		samplesBuf := stats.GetBufferedSamples(samples)
 		assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
