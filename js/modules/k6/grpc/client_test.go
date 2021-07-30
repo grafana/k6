@@ -579,15 +579,11 @@ func TestClient(t *testing.T) {
 			if test.setup != nil {
 				test.setup(tb)
 			}
-			if test.initString.code != "" {
-				val, err := rt.RunString(tb.Replacer.Replace(test.initString.code))
-				assertReponse(t, test.initString, err, val, tb, samples)
-			}
+			val, err := rt.RunString(tb.Replacer.Replace(test.initString.code))
+			assertReponse(t, test.initString, err, val, tb, samples)
 			ctx = lib.WithState(ctx, state)
-			if test.vuString.code != "" {
-				val, err := rt.RunString(tb.Replacer.Replace(test.vuString.code))
-				assertReponse(t, test.vuString, err, val, tb, samples)
-			}
+			val, err = rt.RunString(tb.Replacer.Replace(test.vuString.code))
+			assertReponse(t, test.vuString, err, val, tb, samples)
 		})
 	}
 }
@@ -596,7 +592,7 @@ func assertReponse(t *testing.T, r codeBlock, err error, val goja.Value, tb *htt
 	if r.err == "" {
 		assert.NoError(t, err)
 	} else {
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Regexp(t, regexp.MustCompile(r.err), err.Error())
 	}
 	if r.val != nil {
