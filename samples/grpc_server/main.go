@@ -67,7 +67,6 @@ type routeGuideServer struct {
 
 // GetFeature returns the feature at the given point.
 func (s *routeGuideServer) GetFeature(ctx context.Context, point *Point) (*Feature, error) {
-
 	n := rand.Intn(1000)
 	time.Sleep(time.Duration(n) * time.Millisecond)
 
@@ -138,7 +137,7 @@ func (s *routeGuideServer) RouteChat(stream RouteGuide_RouteChatServer) error {
 			return nil
 		}
 		if err != nil {
- 			return err
+			return err
 		}
 		key := serialize(in.Location)
 
