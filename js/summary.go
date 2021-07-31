@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"io"
 	"time"
-
+	"encoding/json"
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -79,7 +79,7 @@ func metricValueGetter(summaryTrendStats []string) func(stats.Sink, time.Duratio
 
 // summarizeMetricsToObject transforms the summary objects in a way that's
 // suitable to pass to the JS runtime or export to JSON.
-func summarizeMetricsToObject(data *lib.Summary, options lib.Options) map[string]interface{} {
+func summarizeMetricsToObject(data *lib.Summary, options lib.Options, setupData []byte) map[string]interface{} {
 	m := make(map[string]interface{})
 	m["root_group"] = exportGroup(data.RootGroup)
 	m["options"] = map[string]interface{}{
@@ -116,6 +116,17 @@ func summarizeMetricsToObject(data *lib.Summary, options lib.Options) map[string
 		metricsData[name] = metricData
 	}
 	m["metrics"] = metricsData
+
+	var setupDataI interface{}
+	if setupData != nil {
+		if err := json.Unmarshal(setupData, &setupDataI); err != nil {
+			return nil
+		}
+	} else {
+		setupDataI = goja.Undefined()
+	}
+
+	m["setup_data"] = setupDataI
 
 	return m
 }
