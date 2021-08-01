@@ -484,29 +484,11 @@ type Submetric struct {
 
 // Creates a submetric from a name.
 func NewSubmetric(name string) (parentName string, sm *Submetric) {
-	parts := strings.SplitN(strings.TrimSuffix(name, "}"), "{", 2)
-	if len(parts) == 1 {
-		return parts[0], &Submetric{Name: name}
+	metric, tagsAsStr, tags := ParseThresholdName(name)
+	if len(tags) == 0 {
+		return metric, &Submetric{Name: name}
 	}
-
-	kvs := strings.Split(parts[1], ",")
-	tags := make(map[string]string, len(kvs))
-	for _, kv := range kvs {
-		if kv == "" {
-			continue
-		}
-		parts := strings.SplitN(kv, ":", 2)
-
-		key := strings.TrimSpace(strings.Trim(parts[0], `"'`))
-		if len(parts) != 2 {
-			tags[key] = ""
-			continue
-		}
-
-		value := strings.TrimSpace(strings.Trim(parts[1], `"'`))
-		tags[key] = value
-	}
-	return parts[0], &Submetric{Name: name, Parent: parts[0], Suffix: parts[1], Tags: IntoSampleTags(&tags)}
+	return metric, &Submetric{Name: name, Parent: metric, Suffix: tagsAsStr, Tags: IntoSampleTags(&tags)}
 }
 
 // parsePercentile is a helper function to parse and validate percentile notations
