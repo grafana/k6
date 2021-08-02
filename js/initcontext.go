@@ -36,6 +36,16 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/js/modules/k6"
+	"go.k6.io/k6/js/modules/k6/crypto"
+	"go.k6.io/k6/js/modules/k6/crypto/x509"
+	"go.k6.io/k6/js/modules/k6/data"
+	"go.k6.io/k6/js/modules/k6/encoding"
+	"go.k6.io/k6/js/modules/k6/grpc"
+	"go.k6.io/k6/js/modules/k6/html"
+	"go.k6.io/k6/js/modules/k6/http"
+	"go.k6.io/k6/js/modules/k6/metrics"
+	"go.k6.io/k6/js/modules/k6/ws"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/loader"
 )
@@ -88,7 +98,7 @@ func NewInitContext(
 		programs:          make(map[string]programWithSource),
 		compatibilityMode: compatMode,
 		logger:            logger,
-		modules:           modules.GetJSModules(),
+		modules:           getJSModules(),
 	}
 }
 
@@ -149,10 +159,10 @@ func (m *moduleInstanceCoreImpl) GetContext() context.Context {
 	return *m.ctxPtr
 }
 
-func toESModuleExports(exp common.Exports) map[string]interface{} {
-	result := make(map[string]interface{}, len(exp.Others)+2)
+func toESModuleExports(exp modules.Exports) map[string]interface{} {
+	result := make(map[string]interface{}, len(exp.Named)+2)
 
-	for k, v := range exp.Others {
+	for k, v := range exp.Named {
 		result[k] = v
 	}
 	// Maybe check that those weren't set
@@ -280,4 +290,30 @@ func (i *InitContext) Open(ctx context.Context, filename string, args ...string)
 		return i.runtime.ToValue(&ab), nil
 	}
 	return i.runtime.ToValue(string(data)), nil
+}
+
+func getInternalJSModules() map[string]interface{} {
+	return map[string]interface{}{
+		"k6":             k6.New(),
+		"k6/crypto":      crypto.New(),
+		"k6/crypto/x509": x509.New(),
+		"k6/data":        data.New(),
+		"k6/encoding":    encoding.New(),
+		"k6/net/grpc":    grpc.New(),
+		"k6/html":        html.New(),
+		"k6/http":        http.New(),
+		"k6/metrics":     metrics.New(),
+		"k6/ws":          ws.New(),
+	}
+}
+
+func getJSModules() map[string]interface{} {
+	result := getInternalJSModules()
+	external := modules.GetJSModules()
+
+	for k, v := range external {
+		result[k] = v
+	}
+
+	return result
 }

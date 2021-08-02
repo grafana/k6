@@ -29,6 +29,7 @@ import (
 	"github.com/dop251/goja"
 
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/stats"
 )
@@ -43,7 +44,7 @@ func checkName(name string) bool {
 
 type Metric struct {
 	metric *stats.Metric
-	core   common.ModuleInstanceCore
+	core   modules.InstanceCore
 }
 
 // ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
@@ -68,7 +69,7 @@ func (mm *MetricsModule) newMetric(call goja.ConstructorCall, t stats.MetricType
 		}
 		m := stats.New(name, t, valueType)
 
-		metric := &Metric{metric: m, core: mm.ModuleInstanceCore}
+		metric := &Metric{metric: m, core: mm.InstanceCore}
 		o := rt.NewObject()
 		err := o.DefineDataProperty("name", rt.ToValue(name), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
 		if err != nil {
@@ -114,20 +115,20 @@ func (m Metric) Add(v goja.Value, addTags ...map[string]string) (bool, error) {
 type (
 	RootMetricsModule struct{}
 	MetricsModule     struct {
-		common.ModuleInstanceCore
+		modules.InstanceCore
 	}
 )
 
-func (*RootMetricsModule) NewModuleInstance(m common.ModuleInstanceCore) common.ModuleInstance {
-	return &MetricsModule{ModuleInstanceCore: m}
+func (*RootMetricsModule) NewModuleInstance(m modules.InstanceCore) modules.ModuleInstance {
+	return &MetricsModule{InstanceCore: m}
 }
 
 func New() *RootMetricsModule {
 	return &RootMetricsModule{}
 }
 
-func (m *MetricsModule) GetExports() common.Exports {
-	return common.GenerateExports(m)
+func (m *MetricsModule) GetExports() modules.Exports {
+	return modules.GenerateExports(m)
 }
 
 // This is not possible after common.Bind as it wraps the object and doesn't return the original one.
