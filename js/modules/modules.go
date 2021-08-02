@@ -65,7 +65,7 @@ type HasModuleInstancePerVU interface {
 
 // IsModuleV2 ... TODO better name
 type IsModuleV2 interface {
-	NewModuleInstance(InstanceCore) ModuleInstance
+	NewModuleInstance(InstanceCore) Instance
 }
 
 // checks that modules implement HasModuleInstancePerVU
@@ -85,14 +85,14 @@ func GetJSModules() map[string]interface{} {
 	return result
 }
 
-// ModuleInstance is what a module needs to return
-type ModuleInstance interface {
+// Instance is what a module needs to return
+type Instance interface {
 	InstanceCore
 	GetExports() Exports
 }
 
 func getInterfaceMethods() []string {
-	var t ModuleInstance
+	var t Instance
 	T := reflect.TypeOf(&t).Elem()
 	result := make([]string, T.NumMethod())
 
