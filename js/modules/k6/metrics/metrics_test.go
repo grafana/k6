@@ -79,9 +79,9 @@ func TestMetrics(t *testing.T) {
 					ctxPtr := new(context.Context)
 					*ctxPtr = common.WithRuntime(context.Background(), rt)
 					*ctxPtr = common.WithInitEnv(*ctxPtr, &common.InitEnvironment{})
-					m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: ctxPtr}).(*MetricsModule)
+					m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: ctxPtr}).(*ModuleInstance)
 					require.True(t, ok)
-					rt.Set("metrics", m.GetExports().Named) // This also should probably be done by some test package
+					require.NoError(t, rt.Set("metrics", m.GetExports().Named))
 					root, _ := lib.NewGroup("", nil)
 					child, _ := root.Group("child")
 					samples := make(chan stats.SampleContainer, 1000)
@@ -194,9 +194,9 @@ func TestMetricGetName(t *testing.T) {
 
 	ctx := common.WithRuntime(context.Background(), rt)
 	ctx = common.WithInitEnv(ctx, &common.InitEnvironment{})
-	m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: &ctx}).(*MetricsModule)
+	m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: &ctx}).(*ModuleInstance)
 	require.True(t, ok)
-	rt.Set("metrics", m.GetExports().Named) // This also should probably be done by some test package
+	require.NoError(t, rt.Set("metrics", m.GetExports().Named))
 	v, err := rt.RunString(`
 		var m = new metrics.Counter("my_metric")
 		m.name

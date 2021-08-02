@@ -50,8 +50,8 @@ type Metric struct {
 // ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
 var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
 
-func (mm *MetricsModule) newMetric(call goja.ConstructorCall, t stats.MetricType) (*goja.Object, error) {
-	ctx := mm.GetContext()
+func (mi *ModuleInstance) newMetric(call goja.ConstructorCall, t stats.MetricType) (*goja.Object, error) {
+	ctx := mi.GetContext()
 	initEnv := common.GetInitEnv(ctx)
 	if initEnv == nil {
 		return nil, errors.New("metrics must be declared in the init context")
@@ -69,13 +69,13 @@ func (mm *MetricsModule) newMetric(call goja.ConstructorCall, t stats.MetricType
 		}
 		m := stats.New(name, t, valueType)
 
-		metric := &Metric{metric: m, core: mm.InstanceCore}
+		metric := &Metric{metric: m, core: mi.InstanceCore}
 		o := rt.NewObject()
 		err := o.DefineDataProperty("name", rt.ToValue(name), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
 		if err != nil {
 			return nil, err
 		}
-		if err = o.Set("add", rt.ToValue(metric.Add)); err != nil {
+		if err = o.Set("add", rt.ToValue(metric.add)); err != nil {
 			return nil, err
 		}
 		return o, nil
@@ -88,7 +88,7 @@ func (mm *MetricsModule) newMetric(call goja.ConstructorCall, t stats.MetricType
 	return v.ToObject(rt), nil
 }
 
-func (m Metric) Add(v goja.Value, addTags ...map[string]string) (bool, error) {
+func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 	ctx := m.core.GetContext()
 	state := lib.GetState(ctx)
 	if state == nil {
@@ -113,57 +113,64 @@ func (m Metric) Add(v goja.Value, addTags ...map[string]string) (bool, error) {
 }
 
 type (
-	RootMetricsModule struct{}
-	MetricsModule     struct {
+	// RootModule is the root metrics module
+	RootModule struct{}
+	// ModuleInstance represents an instance of the metrics module
+	ModuleInstance struct {
 		modules.InstanceCore
 	}
 )
 
-func (*RootMetricsModule) NewModuleInstance(m modules.InstanceCore) modules.ModuleInstance {
-	return &MetricsModule{InstanceCore: m}
+var (
+	_ modules.IsModuleV2     = &RootModule{}
+	_ modules.ModuleInstance = &ModuleInstance{}
+)
+
+// NewModuleInstance implements modules.IsModuleV2 interface
+func (*RootModule) NewModuleInstance(m modules.InstanceCore) modules.ModuleInstance {
+	return &ModuleInstance{InstanceCore: m}
 }
 
-func New() *RootMetricsModule {
-	return &RootMetricsModule{}
+// New returns a new RootMetricsModule
+func New() *RootModule {
+	return &RootModule{}
 }
 
-func (m *MetricsModule) GetExports() modules.Exports {
-	return modules.GenerateExports(m)
+// GetExports returns the exports of the metrics module
+func (mi *ModuleInstance) GetExports() modules.Exports {
+	return modules.GenerateExports(mi)
 }
 
-// This is not possible after common.Bind as it wraps the object and doesn't return the original one.
-func (m *MetricsModule) ReturnMetricType(metric Metric) string {
-	return metric.metric.Type.String()
-}
-
-// Counter ... // NOTE we still need to use goja.ConstructorCall  somewhere to have automatic constructor support by
-// goja
-func (m *MetricsModule) XCounter(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
-	v, err := m.newMetric(call, stats.Counter)
+// XCounter is a counter constructor
+func (mi *ModuleInstance) XCounter(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := mi.newMetric(call, stats.Counter)
 	if err != nil {
 		common.Throw(rt, err)
 	}
 	return v
 }
 
-func (m *MetricsModule) XGauge(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
-	v, err := m.newMetric(call, stats.Gauge)
+// XGauge is a gauge constructor
+func (mi *ModuleInstance) XGauge(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := mi.newMetric(call, stats.Gauge)
 	if err != nil {
 		common.Throw(rt, err)
 	}
 	return v
 }
 
-func (m *MetricsModule) XTrend(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
-	v, err := m.newMetric(call, stats.Trend)
+// XTrend is a trend constructor
+func (mi *ModuleInstance) XTrend(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := mi.newMetric(call, stats.Trend)
 	if err != nil {
 		common.Throw(rt, err)
 	}
 	return v
 }
 
-func (m *MetricsModule) XRate(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
-	v, err := m.newMetric(call, stats.Rate)
+// XRate is a rate constructor
+func (mi *ModuleInstance) XRate(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := mi.newMetric(call, stats.Rate)
 	if err != nil {
 		common.Throw(rt, err)
 	}
