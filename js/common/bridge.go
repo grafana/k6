@@ -288,7 +288,7 @@ type ModuleInstance interface {
 	GetExports() Exports
 }
 
-func getinterfaceMethods() []string {
+func getInterfaceMethods() []string {
 	var t ModuleInstance
 	T := reflect.TypeOf(&t).Elem()
 	result := make([]string, T.NumMethod())
@@ -316,7 +316,7 @@ func GenerateExports(v interface{}) Exports {
 	exports := make(map[string]interface{})
 	val := reflect.ValueOf(v)
 	typ := val.Type()
-	badNames := getinterfaceMethods()
+	badNames := getInterfaceMethods()
 outer:
 	for i := 0; i < typ.NumMethod(); i++ {
 		meth := typ.Method(i)
