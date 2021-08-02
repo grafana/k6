@@ -83,7 +83,7 @@ func TestMetrics(t *testing.T) {
 					*ctxPtr = common.WithInitEnv(*ctxPtr, &common.InitEnvironment{Registry: metrics.NewRegistry()})
 					m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: ctxPtr}).(*MetricsModule)
 					require.True(t, ok)
-					rt.Set("metrics", m.GetExports().Named) // This also should probably be done by some test package
+					require.NoError(t, rt.Set("metrics", m.GetExports().Named))
 					root, _ := lib.NewGroup("", nil)
 					child, _ := root.Group("child")
 					samples := make(chan stats.SampleContainer, 1000)
@@ -176,7 +176,7 @@ func TestMetricGetName(t *testing.T) {
 	ctx = common.WithInitEnv(ctx, &common.InitEnvironment{Registry: metrics.NewRegistry()})
 	m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: &ctx}).(*MetricsModule)
 	require.True(t, ok)
-	rt.Set("metrics", m.GetExports().Named) // This also should probably be done by some test package
+	require.NoError(t, rt.Set("metrics", m.GetExports().Named))
 	v, err := rt.RunString(`
 		var m = new metrics.Counter("my_metric")
 		m.name
@@ -201,7 +201,7 @@ func TestMetricDuplicates(t *testing.T) {
 	ctx = common.WithInitEnv(ctx, &common.InitEnvironment{Registry: metrics.NewRegistry()})
 	m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: &ctx}).(*MetricsModule)
 	require.True(t, ok)
-	rt.Set("metrics", m.GetExports().Named) // This also should probably be done by some test package
+	require.NoError(t, rt.Set("metrics", m.GetExports().Named))
 	_, err := rt.RunString(`
 		var m = new metrics.Counter("my_metric")
 	`)
