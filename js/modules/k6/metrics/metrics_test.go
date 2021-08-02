@@ -81,7 +81,7 @@ func TestMetrics(t *testing.T) {
 					ctxPtr := new(context.Context)
 					*ctxPtr = common.WithRuntime(context.Background(), rt)
 					*ctxPtr = common.WithInitEnv(*ctxPtr, &common.InitEnvironment{Registry: metrics.NewRegistry()})
-					m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: ctxPtr}).(*MetricsModule)
+					m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: ctxPtr}).(*ModuleInstance)
 					require.True(t, ok)
 					require.NoError(t, rt.Set("metrics", m.GetExports().Named))
 					root, _ := lib.NewGroup("", nil)
@@ -174,7 +174,7 @@ func TestMetricGetName(t *testing.T) {
 
 	ctx := common.WithRuntime(context.Background(), rt)
 	ctx = common.WithInitEnv(ctx, &common.InitEnvironment{Registry: metrics.NewRegistry()})
-	m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: &ctx}).(*MetricsModule)
+	m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: &ctx}).(*ModuleInstance)
 	require.True(t, ok)
 	require.NoError(t, rt.Set("metrics", m.GetExports().Named))
 	v, err := rt.RunString(`
@@ -199,7 +199,7 @@ func TestMetricDuplicates(t *testing.T) {
 
 	ctx := common.WithRuntime(context.Background(), rt)
 	ctx = common.WithInitEnv(ctx, &common.InitEnvironment{Registry: metrics.NewRegistry()})
-	m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: &ctx}).(*MetricsModule)
+	m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: &ctx}).(*ModuleInstance)
 	require.True(t, ok)
 	require.NoError(t, rt.Set("metrics", m.GetExports().Named))
 	_, err := rt.RunString(`
