@@ -122,12 +122,12 @@ type (
 )
 
 var (
-	_ modules.IsModuleV2     = &RootModule{}
-	_ modules.ModuleInstance = &ModuleInstance{}
+	_ modules.IsModuleV2 = &RootModule{}
+	_ modules.Instance   = &ModuleInstance{}
 )
 
 // NewModuleInstance implements modules.IsModuleV2 interface
-func (*RootModule) NewModuleInstance(m modules.InstanceCore) modules.ModuleInstance {
+func (*RootModule) NewModuleInstance(m modules.InstanceCore) modules.Instance {
 	return &ModuleInstance{InstanceCore: m}
 }
 
