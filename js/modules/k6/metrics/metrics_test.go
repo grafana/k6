@@ -30,23 +30,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/stats"
 )
-
-// this probably should be done through some test package
-type moduleInstanceImpl struct {
-	ctxPtr *context.Context
-}
-
-func (m *moduleInstanceImpl) GetContext() context.Context {
-	return *m.ctxPtr
-}
-
-func (m *moduleInstanceImpl) GetExports() modules.Exports {
-	panic("this needs to be implemented by the module")
-}
 
 func TestMetrics(t *testing.T) {
 	t.Parallel()
@@ -75,11 +62,11 @@ func TestMetrics(t *testing.T) {
 					t.Parallel()
 					rt := goja.New()
 					rt.SetFieldNameMapper(common.FieldNameMapper{})
-
-					ctxPtr := new(context.Context)
-					*ctxPtr = common.WithRuntime(context.Background(), rt)
-					*ctxPtr = common.WithInitEnv(*ctxPtr, &common.InitEnvironment{})
-					m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: ctxPtr}).(*ModuleInstance)
+					ctx := common.WithRuntime(context.Background(), rt)
+					ctx = common.WithInitEnv(ctx, &common.InitEnvironment{})
+					mii := &modulestest.ModuleInstanceImpl{}
+					mii.Ctx = ctx
+					m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 					require.True(t, ok)
 					require.NoError(t, rt.Set("metrics", m.GetExports().Named))
 					root, _ := lib.NewGroup("", nil)
@@ -100,8 +87,9 @@ func TestMetrics(t *testing.T) {
 					require.NoError(t, err)
 
 					t.Run("ExitInit", func(t *testing.T) {
-						*ctxPtr = common.WithRuntime(context.Background(), rt)
-						*ctxPtr = lib.WithState(*ctxPtr, state)
+						ctx = common.WithRuntime(context.Background(), rt)
+						ctx = lib.WithState(ctx, state)
+						mii.Ctx = ctx
 						_, err := rt.RunString(fmt.Sprintf(`new metrics.%s("my_metric")`, fn))
 						assert.Contains(t, err.Error(), "metrics must be declared in the init context")
 					})
@@ -194,7 +182,9 @@ func TestMetricGetName(t *testing.T) {
 
 	ctx := common.WithRuntime(context.Background(), rt)
 	ctx = common.WithInitEnv(ctx, &common.InitEnvironment{})
-	m, ok := New().NewModuleInstance(&moduleInstanceImpl{ctxPtr: &ctx}).(*ModuleInstance)
+	mii := &modulestest.ModuleInstanceImpl{}
+	mii.Ctx = ctx
+	m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 	require.True(t, ok)
 	require.NoError(t, rt.Set("metrics", m.GetExports().Named))
 	v, err := rt.RunString(`
