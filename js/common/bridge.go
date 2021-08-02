@@ -331,7 +331,7 @@ outer:
 		exports[name] = fn.Interface()
 	}
 
-	// If v is a pointer, we need to indirect it to access fields.
+	// If v is a pointer, we need to indirect it to access its fields.
 	if typ.Kind() == reflect.Ptr {
 		val = val.Elem()
 		typ = val.Type()
