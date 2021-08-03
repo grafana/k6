@@ -1,8 +1,5 @@
-module github.com/k6io/xk6-js-test
+module github.com/grafana/xk6-js-test
 
 go 1.15
 
-require (
-	github.com/dop251/goja v0.0.0-20210427212725-462d53687b0d
-	go.k6.io/k6 v0.31.2-0.20210511090412-61f464b99a2d
-)
+require go.k6.io/k6 v0.33.1-0.20210729092242-a460e699c6e2
