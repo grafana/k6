@@ -159,6 +159,18 @@ func (m *moduleInstanceCoreImpl) GetContext() context.Context {
 	return *m.ctxPtr
 }
 
+func (m *moduleInstanceCoreImpl) GetInitEnv() *common.InitEnvironment {
+	return common.GetInitEnv(*m.ctxPtr) // TODO thread it correctly instead
+}
+
+func (m *moduleInstanceCoreImpl) GetState() *lib.State {
+	return lib.GetState(*m.ctxPtr) // TODO thread it correctly instead
+}
+
+func (m *moduleInstanceCoreImpl) GetRuntime() *goja.Runtime {
+	return common.GetRuntime(*m.ctxPtr) // TODO thread it correctly instead
+}
+
 func toESModuleExports(exp modules.Exports) map[string]interface{} {
 	result := make(map[string]interface{}, len(exp.Named)+2)
 
