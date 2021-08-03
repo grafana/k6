@@ -39,18 +39,22 @@ type InstanceCore struct {
 	Runtime *goja.Runtime
 }
 
+// GetContext returns internally set field to conform to modules.InstanceCore interface
 func (m *InstanceCore) GetContext() context.Context {
 	return m.Ctx
 }
 
+// GetInitEnv returns internally set field to conform to modules.InstanceCore interface
 func (m *InstanceCore) GetInitEnv() *common.InitEnvironment {
 	return m.InitEnv
 }
 
+// GetState returns internally set field to conform to modules.InstanceCore interface
 func (m *InstanceCore) GetState() *lib.State {
 	return m.State
 }
 
+// GetRuntime returns internally set field to conform to modules.InstanceCore interface
 func (m *InstanceCore) GetRuntime() *goja.Runtime {
 	return m.Runtime
 }
