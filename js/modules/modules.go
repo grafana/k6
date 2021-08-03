@@ -27,8 +27,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/dop251/goja"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules/k6/http"
+	"go.k6.io/k6/lib"
 )
 
 const extPrefix string = "k6/x/"
@@ -105,9 +107,19 @@ func getInterfaceMethods() []string {
 
 // InstanceCore is something that will be provided to modules and they need to embed it in ModuleInstance
 type InstanceCore interface {
-	// we can add other methods here
-	// sealing field will help probably with pointing users that they just need to embed this in the
 	GetContext() context.Context
+
+	// GetInitEnv returns common.InitEnvironment instance if present
+	GetInitEnv() *common.InitEnvironment
+
+	// GetState returns lib.State if any is present
+	GetState() *lib.State
+
+	// GetRuntime returns the goja.Runtime for the current VU
+	GetRuntime() *goja.Runtime
+
+	// sealing field will help probably with pointing users that they just need to embed this in their Instance
+	// implementations
 }
 
 // Exports is representation of ESM exports of a module

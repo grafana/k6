@@ -62,10 +62,10 @@ func TestMetrics(t *testing.T) {
 					t.Parallel()
 					rt := goja.New()
 					rt.SetFieldNameMapper(common.FieldNameMapper{})
-					ctx := common.WithRuntime(context.Background(), rt)
-					ctx = common.WithInitEnv(ctx, &common.InitEnvironment{})
-					mii := &modulestest.ModuleInstanceImpl{}
-					mii.Ctx = ctx
+					mii := &modulestest.InstanceCore{}
+					mii.Runtime = rt
+					mii.InitEnv = &common.InitEnvironment{}
+					mii.Ctx = context.Background()
 					m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 					require.True(t, ok)
 					require.NoError(t, rt.Set("metrics", m.GetExports().Named))
@@ -87,9 +87,8 @@ func TestMetrics(t *testing.T) {
 					require.NoError(t, err)
 
 					t.Run("ExitInit", func(t *testing.T) {
-						ctx = common.WithRuntime(context.Background(), rt)
-						ctx = lib.WithState(ctx, state)
-						mii.Ctx = ctx
+						mii.State = state
+						mii.InitEnv = nil
 						_, err := rt.RunString(fmt.Sprintf(`new metrics.%s("my_metric")`, fn))
 						assert.Contains(t, err.Error(), "metrics must be declared in the init context")
 					})
@@ -180,10 +179,10 @@ func TestMetricGetName(t *testing.T) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-	ctx := common.WithRuntime(context.Background(), rt)
-	ctx = common.WithInitEnv(ctx, &common.InitEnvironment{})
-	mii := &modulestest.ModuleInstanceImpl{}
-	mii.Ctx = ctx
+	mii := &modulestest.InstanceCore{}
+	mii.Runtime = rt
+	mii.InitEnv = &common.InitEnvironment{}
+	mii.Ctx = context.Background()
 	m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 	require.True(t, ok)
 	require.NoError(t, rt.Set("metrics", m.GetExports().Named))

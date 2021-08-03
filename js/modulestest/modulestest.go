@@ -23,16 +23,38 @@ package modulestest
 import (
 	"context"
 
+	"github.com/dop251/goja"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/lib"
 )
 
-var _ modules.InstanceCore = &ModuleInstanceImpl{}
+var _ modules.InstanceCore = &InstanceCore{}
 
-// this probably should be done through some test package
-type ModuleInstanceImpl struct {
-	Ctx context.Context
+// InstanceCore is a modules.InstanceCore implementation meant to be used within tests
+type InstanceCore struct {
+	Ctx     context.Context
+	InitEnv *common.InitEnvironment
+	State   *lib.State
+	Runtime *goja.Runtime
 }
 
-func (m *ModuleInstanceImpl) GetContext() context.Context {
+// GetContext returns internally set field to conform to modules.InstanceCore interface
+func (m *InstanceCore) GetContext() context.Context {
 	return m.Ctx
+}
+
+// GetInitEnv returns internally set field to conform to modules.InstanceCore interface
+func (m *InstanceCore) GetInitEnv() *common.InitEnvironment {
+	return m.InitEnv
+}
+
+// GetState returns internally set field to conform to modules.InstanceCore interface
+func (m *InstanceCore) GetState() *lib.State {
+	return m.State
+}
+
+// GetRuntime returns internally set field to conform to modules.InstanceCore interface
+func (m *InstanceCore) GetRuntime() *goja.Runtime {
+	return m.Runtime
 }

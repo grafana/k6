@@ -30,7 +30,6 @@ import (
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/lib"
 	"go.k6.io/k6/stats"
 )
 
@@ -51,12 +50,11 @@ type Metric struct {
 var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
 
 func (mi *ModuleInstance) newMetric(call goja.ConstructorCall, t stats.MetricType) (*goja.Object, error) {
-	ctx := mi.GetContext()
-	initEnv := common.GetInitEnv(ctx)
+	initEnv := mi.GetInitEnv()
 	if initEnv == nil {
 		return nil, errors.New("metrics must be declared in the init context")
 	}
-	rt := common.GetRuntime(ctx) // NOTE we can get this differently as well
+	rt := mi.GetRuntime()
 	c, _ := goja.AssertFunction(rt.ToValue(func(name string, isTime ...bool) (*goja.Object, error) {
 		// TODO: move verification outside the JS
 		if !checkName(name) {
@@ -89,8 +87,7 @@ func (mi *ModuleInstance) newMetric(call goja.ConstructorCall, t stats.MetricTyp
 }
 
 func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
-	ctx := m.core.GetContext()
-	state := lib.GetState(ctx)
+	state := m.core.GetState()
 	if state == nil {
 		return false, ErrMetricsAddInInitContext
 	}
@@ -108,7 +105,7 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 	}
 
 	sample := stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)}
-	stats.PushIfNotDone(ctx, state.Samples, sample)
+	stats.PushIfNotDone(m.core.GetContext(), state.Samples, sample)
 	return true, nil
 }
 
