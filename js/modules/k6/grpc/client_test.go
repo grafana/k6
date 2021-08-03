@@ -25,7 +25,6 @@ import (
 	"context"
 	"net/url"
 	"os"
-	"regexp"
 	"runtime"
 	"testing"
 
@@ -71,12 +70,13 @@ func assertMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []
 	assert.True(t, seenMetric, "url %s didn't emit %s", url, metric.Name)
 }
 
-// Run represents an execution of a k6 script.
+// codeBlock represents an execution of a k6 script.
 type codeBlock struct {
-	code    string
-	val     interface{}
-	err     string
-	asserts func(*testing.T, *httpmultibin.HTTPMultiBin, chan stats.SampleContainer)
+	code         string
+	val          interface{}
+	err          string
+	windowsError string
+	asserts      func(*testing.T, *httpmultibin.HTTPMultiBin, chan stats.SampleContainer, error)
 }
 
 type testcase struct {
@@ -103,8 +103,9 @@ func TestClient(t *testing.T) {
 				code: `
 			var client = new grpc.Client();
 			client.load([], "./does_not_exist.proto");`,
-				// (rogchap) this is a bit of a hack as windows reports a different system error than unix
-				err: "no such file or directory|The system cannot find the file specified",
+				err: "no such file or directory",
+				// (rogchap) this is a bit of a hack as windows reports a different system error than unix.
+				windowsError: "The system cannot find the file specified",
 			},
 		},
 		{
@@ -307,7 +308,7 @@ func TestClient(t *testing.T) {
 				if (resp.status !== grpc.StatusOK) {
 					throw new Error("unexpected error status: " + resp.status)
 				}`,
-				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer) {
+				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer, _ error) {
 					samplesBuf := stats.GetBufferedSamples(samples)
 					assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, rb.Replacer.Replace("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
 				},
@@ -381,7 +382,7 @@ func TestClient(t *testing.T) {
 				if (!resp.message || resp.message.username !== "" || resp.message.oauthScope !== "水") {
 					throw new Error("unexpected response message: " + JSON.stringify(resp.message))
 				}`,
-				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer) {
+				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer, _ error) {
 					samplesBuf := stats.GetBufferedSamples(samples)
 					assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, rb.Replacer.Replace("GRPCBIN_ADDR/grpc.testing.TestService/UnaryCall"))
 				},
@@ -409,7 +410,7 @@ func TestClient(t *testing.T) {
 				if (!resp.error || resp.error.message !== "foobar" || resp.error.code !== 15) {
 					throw new Error("unexpected error object: " + JSON.stringify(resp.error.code))
 				}`,
-				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer) {
+				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer, _ error) {
 					samplesBuf := stats.GetBufferedSamples(samples)
 					assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, rb.Replacer.Replace("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
 				},
@@ -439,7 +440,7 @@ func TestClient(t *testing.T) {
 				if (!resp.headers || !resp.headers["foo"] || resp.headers["foo"][0] !== "bar") {
 					throw new Error("unexpected headers object: " + JSON.stringify(resp.trailers))
 				}`,
-				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer) {
+				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer, _ error) {
 					samplesBuf := stats.GetBufferedSamples(samples)
 					assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, rb.Replacer.Replace("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
 				},
@@ -469,7 +470,7 @@ func TestClient(t *testing.T) {
 				if (!resp.trailers || !resp.trailers["foo"] || resp.trailers["foo"][0] !== "bar") {
 					throw new Error("unexpected trailers object: " + JSON.stringify(resp.trailers))
 				}`,
-				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer) {
+				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer, _ error) {
 					samplesBuf := stats.GetBufferedSamples(samples)
 					assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, rb.Replacer.Replace("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
 				},
@@ -593,27 +594,30 @@ func TestClient(t *testing.T) {
 				test.setup(tb)
 			}
 			val, err := rt.RunString(tb.Replacer.Replace(test.initString.code))
-			assertReponse(t, test.initString, err, val, tb, samples)
+			assertResponse(t, test.initString, err, val, tb, samples)
 			ctx = lib.WithState(ctx, state)
 			val, err = rt.RunString(tb.Replacer.Replace(test.vuString.code))
-			assertReponse(t, test.vuString, err, val, tb, samples)
+			assertResponse(t, test.vuString, err, val, tb, samples)
 		})
 	}
 }
 
-func assertReponse(t *testing.T, r codeBlock, err error, val goja.Value, tb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer) {
-	if r.err == "" {
+func assertResponse(t *testing.T, r codeBlock, err error, val goja.Value, tb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer) {
+	if r.err == "" && r.windowsError == "" {
 		assert.NoError(t, err)
-	} else {
+	} else if r.err != "" {
 		require.Error(t, err)
-		assert.Regexp(t, regexp.MustCompile(r.err), err.Error())
+		assert.Contains(t, err.Error(), r.err)
+	} else if r.windowsError != "" {
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), r.windowsError)
 	}
 	if r.val != nil {
 		require.NotNil(t, val)
 		assert.Equal(t, r.val, val.Export())
 	}
 	if r.asserts != nil {
-		r.asserts(t, tb, samples)
+		r.asserts(t, tb, samples, err)
 	}
 }
 
