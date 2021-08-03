@@ -55,8 +55,8 @@ jobs:
           fi
           GOPROXY="direct" xk6 build "$COMMIT_ID" \
             --output ./k6ext \
-            --with github.com/k6io/xk6-js-test="$(pwd)/xk6-js-test" \
-            --with github.com/k6io/xk6-output-test="$(pwd)/xk6-output-test"
+            --with github.com/grafana/xk6-js-test="$(pwd)/xk6-js-test" \
+            --with github.com/grafana/xk6-output-test="$(pwd)/xk6-output-test"
           ./k6ext version
           ./k6ext run --out outputtest=output-results.txt xk6-test.js
 
