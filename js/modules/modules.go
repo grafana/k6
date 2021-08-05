@@ -25,6 +25,7 @@ import (
 	"strings"
 	"sync"
 
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules/k6"
 	"go.k6.io/k6/js/modules/k6/crypto"
 	"go.k6.io/k6/js/modules/k6/crypto/x509"
@@ -67,6 +68,11 @@ func Register(name string, mod interface{}) {
 // every time a VU imports the module and use its result as the returned object.
 type HasModuleInstancePerVU interface {
 	NewModuleInstancePerVU() interface{}
+}
+
+// IsModuleV2 ... TODO better name
+type IsModuleV2 interface { // TODO rename?
+	NewModuleInstance(common.ModuleInstanceCore) common.ModuleInstance
 }
 
 // checks that modules implement HasModuleInstancePerVU

@@ -21,7 +21,6 @@
 package metrics
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -44,40 +43,52 @@ func checkName(name string) bool {
 
 type Metric struct {
 	metric *stats.Metric
+	core   common.ModuleInstanceCore
 }
 
 // ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
 var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
 
-func newMetric(ctxPtr *context.Context, name string, t stats.MetricType, isTime []bool) (interface{}, error) {
-	if lib.GetState(*ctxPtr) != nil {
+func (mm *MetricsModule) newMetric(call goja.ConstructorCall, t stats.MetricType) (*goja.Object, error) {
+	ctx := mm.GetContext()
+	initEnv := common.GetInitEnv(ctx)
+	if initEnv == nil {
 		return nil, errors.New("metrics must be declared in the init context")
 	}
+	rt := common.GetRuntime(ctx) // NOTE we can get this differently as well
+	c, _ := goja.AssertFunction(rt.ToValue(func(name string, isTime ...bool) (*goja.Object, error) {
+		// TODO: move verification outside the JS
+		if !checkName(name) {
+			return nil, common.NewInitContextError(fmt.Sprintf("Invalid metric name: '%s'", name))
+		}
 
-	// TODO: move verification outside the JS
-	if !checkName(name) {
-		return nil, common.NewInitContextError(fmt.Sprintf("Invalid metric name: '%s'", name))
-	}
+		valueType := stats.Default
+		if len(isTime) > 0 && isTime[0] {
+			valueType = stats.Time
+		}
+		m := stats.New(name, t, valueType)
 
-	valueType := stats.Default
-	if len(isTime) > 0 && isTime[0] {
-		valueType = stats.Time
-	}
-
-	rt := common.GetRuntime(*ctxPtr)
-	bound := common.Bind(rt, Metric{stats.New(name, t, valueType)}, ctxPtr)
-	o := rt.NewObject()
-	err := o.DefineDataProperty("name", rt.ToValue(name), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
+		metric := &Metric{metric: m, core: mm.ModuleInstanceCore}
+		o := rt.NewObject()
+		err := o.DefineDataProperty("name", rt.ToValue(name), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
+		if err != nil {
+			return nil, err
+		}
+		if err = o.Set("add", rt.ToValue(metric.Add)); err != nil {
+			return nil, err
+		}
+		return o, nil
+	}))
+	v, err := c(call.This, call.Arguments...)
 	if err != nil {
 		return nil, err
 	}
-	if err = o.Set("add", rt.ToValue(bound["add"])); err != nil {
-		return nil, err
-	}
-	return o, nil
+
+	return v.ToObject(rt), nil
 }
 
-func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]string) (bool, error) {
+func (m Metric) Add(v goja.Value, addTags ...map[string]string) (bool, error) {
+	ctx := m.core.GetContext()
 	state := lib.GetState(ctx)
 	if state == nil {
 		return false, ErrMetricsAddInInitContext
@@ -100,24 +111,60 @@ func (m Metric) Add(ctx context.Context, v goja.Value, addTags ...map[string]str
 	return true, nil
 }
 
-type Metrics struct{}
+type (
+	RootMetricsModule struct{}
+	MetricsModule     struct {
+		common.ModuleInstanceCore
+	}
+)
 
-func New() *Metrics {
-	return &Metrics{}
+func (*RootMetricsModule) NewModuleInstance(m common.ModuleInstanceCore) common.ModuleInstance {
+	return &MetricsModule{ModuleInstanceCore: m}
 }
 
-func (*Metrics) XCounter(ctx *context.Context, name string, isTime ...bool) (interface{}, error) {
-	return newMetric(ctx, name, stats.Counter, isTime)
+func New() *RootMetricsModule {
+	return &RootMetricsModule{}
 }
 
-func (*Metrics) XGauge(ctx *context.Context, name string, isTime ...bool) (interface{}, error) {
-	return newMetric(ctx, name, stats.Gauge, isTime)
+func (m *MetricsModule) GetExports() common.Exports {
+	return common.GenerateExports(m)
 }
 
-func (*Metrics) XTrend(ctx *context.Context, name string, isTime ...bool) (interface{}, error) {
-	return newMetric(ctx, name, stats.Trend, isTime)
+// This is not possible after common.Bind as it wraps the object and doesn't return the original one.
+func (m *MetricsModule) ReturnMetricType(metric Metric) string {
+	return metric.metric.Type.String()
 }
 
-func (*Metrics) XRate(ctx *context.Context, name string, isTime ...bool) (interface{}, error) {
-	return newMetric(ctx, name, stats.Rate, isTime)
+// Counter ... // NOTE we still need to use goja.ConstructorCall  somewhere to have automatic constructor support by
+// goja
+func (m *MetricsModule) XCounter(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := m.newMetric(call, stats.Counter)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	return v
+}
+
+func (m *MetricsModule) XGauge(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := m.newMetric(call, stats.Gauge)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	return v
+}
+
+func (m *MetricsModule) XTrend(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := m.newMetric(call, stats.Trend)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	return v
+}
+
+func (m *MetricsModule) XRate(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+	v, err := m.newMetric(call, stats.Rate)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	return v
 }
