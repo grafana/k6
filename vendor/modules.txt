@@ -17,6 +17,9 @@ github.com/andybalholm/brotli
 github.com/andybalholm/cascadia
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
+# github.com/deepmap/oapi-codegen v1.8.2
+github.com/deepmap/oapi-codegen/pkg/runtime
+github.com/deepmap/oapi-codegen/pkg/types
 # github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
@@ -61,11 +64,21 @@ github.com/golang/protobuf/ptypes/wrappers
 github.com/gorilla/websocket
 # github.com/inconshreveable/mousetrap v1.0.0
 github.com/inconshreveable/mousetrap
-# github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
+# github.com/influxdata/influxdb-client-go/v2 v2.5.1
 ## explicit
-github.com/influxdata/influxdb1-client/models
-github.com/influxdata/influxdb1-client/pkg/escape
-github.com/influxdata/influxdb1-client/v2
+github.com/influxdata/influxdb-client-go/v2
+github.com/influxdata/influxdb-client-go/v2/api
+github.com/influxdata/influxdb-client-go/v2/api/http
+github.com/influxdata/influxdb-client-go/v2/api/query
+github.com/influxdata/influxdb-client-go/v2/api/write
+github.com/influxdata/influxdb-client-go/v2/domain
+github.com/influxdata/influxdb-client-go/v2/internal/gzip
+github.com/influxdata/influxdb-client-go/v2/internal/http
+github.com/influxdata/influxdb-client-go/v2/internal/log
+github.com/influxdata/influxdb-client-go/v2/internal/write
+github.com/influxdata/influxdb-client-go/v2/log
+# github.com/influxdata/line-protocol v0.0.0-20200327222509-2487e7298839
+github.com/influxdata/line-protocol
 # github.com/jhump/protoreflect v1.10.0
 ## explicit
 github.com/jhump/protoreflect/codec
@@ -123,6 +136,8 @@ github.com/nu7hatch/gouuid
 # github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 ## explicit
 github.com/oxtoacart/bpool
+# github.com/pkg/errors v0.9.1
+github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
@@ -169,6 +184,7 @@ golang.org/x/net/http2
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
+golang.org/x/net/publicsuffix
 golang.org/x/net/trace
 # golang.org/x/sys v0.0.0-20210511113859-b0526f3d8744
 ## explicit
