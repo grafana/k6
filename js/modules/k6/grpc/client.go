@@ -69,9 +69,9 @@ var (
 
 // Client represents a gRPC client that can be used to make RPC requests
 type Client struct {
-	mds  map[string]protoreflect.MethodDescriptor
-	conn *grpc.ClientConn
-	sync sync.Once
+	mds         map[string]protoreflect.MethodDescriptor
+	conn        *grpc.ClientConn
+	reflectOnce sync.Once
 }
 
 // XClient represents the Client constructor (e.g. `new grpc.Client()`) and
@@ -234,7 +234,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 			var ok bool
 			reflect, ok = v.(bool)
 			if !ok {
-				return false, fmt.Errorf(`invalid reflect value %#v need bool`, v)
+				return false, fmt.Errorf(`invalid value for 'reflect': '%#v', it needs to be boolean`, v)
 			}
 
 		default:
@@ -301,7 +301,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 	}
 	if reflect {
 		var err error
-		c.sync.Do(func() {
+		c.reflectOnce.Do(func() {
 			err = c.reflect(ctxPtr)
 		})
 		if err != nil {
