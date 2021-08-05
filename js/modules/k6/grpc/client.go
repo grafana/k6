@@ -295,7 +295,6 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 		}
 		close(errc)
 	}()
-
 	if err := <-errc; err != nil {
 		return false, err
 	}
