@@ -542,9 +542,6 @@ func (*Client) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context.Cont
 func (c *Client) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	state := lib.GetState(ctx)
 	tags := getTags(ctx)
-	if tags == nil {
-		tags = make(map[string]string)
-	}
 	switch s := stat.(type) {
 	case *grpcstats.OutHeader:
 		if state.Options.SystemTags.Has(stats.TagIP) && s.RemoteAddr != nil {
