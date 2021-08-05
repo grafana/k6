@@ -21,6 +21,7 @@
 /vendor/**/*.png
 /vendor/**/*.tmpl
 /vendor/**/*.txt
+!/vendor/**/*LICENSE*
 !/vendor/modules.txt
 /vendor/**/*.y*ml
 /vendor/**/.*.y*ml
