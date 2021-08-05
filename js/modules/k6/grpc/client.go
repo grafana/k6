@@ -29,6 +29,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -56,6 +57,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/stats"
+	reflectpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 )
 
 //nolint: lll
@@ -66,8 +68,9 @@ var (
 
 // Client represents a gRPC client that can be used to make RPC requests
 type Client struct {
-	mds  map[string]protoreflect.MethodDescriptor
-	conn *grpc.ClientConn
+	mds         map[string]protoreflect.MethodDescriptor
+	conn        *grpc.ClientConn
+	reflectOnce sync.Once
 }
 
 // XClient represents the Client constructor (e.g. `new grpc.Client()`) and
@@ -149,7 +152,10 @@ func (c *Client) Load(ctxPtr *context.Context, importPaths []string, filenames .
 	for _, fd := range fds {
 		fdset.File = append(fdset.File, walkFileDescriptors(seen, fd)...)
 	}
+	return c.convertToMethodInfo(fdset)
+}
 
+func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]MethodInfo, error) {
 	files, err := protodesc.NewFiles(fdset)
 	if err != nil {
 		return nil, err
@@ -211,8 +217,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 	if state == nil {
 		return false, errConnectInInitContext
 	}
-
-	isPlaintext, timeout := false, 60*time.Second
+	isPlaintext, reflect, timeout := false, false, 60*time.Second
 
 	for k, v := range params {
 		switch k {
@@ -224,6 +229,13 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 			if err != nil {
 				return false, fmt.Errorf("invalid timeout value: %w", err)
 			}
+		case "reflect":
+			var ok bool
+			reflect, ok = v.(bool)
+			if !ok {
+				return false, fmt.Errorf(`invalid value for 'reflect': '%#v', it needs to be boolean`, v)
+			}
+
 		default:
 			return false, fmt.Errorf("unknown connect param: %q", k)
 		}
@@ -282,12 +294,66 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 		}
 		close(errc)
 	}()
-
 	if err := <-errc; err != nil {
 		return false, err
 	}
-
+	if reflect {
+		var err error
+		c.reflectOnce.Do(func() {
+			err = c.reflect(ctxPtr)
+		})
+		if err != nil {
+			return false, fmt.Errorf("error invoking reflect API: %w", err)
+		}
+	}
 	return true, nil
+}
+
+// reflect will use the grpc reflection api to make the file descriptors available to request.
+// It is called in the connect function the first time the Client.Connect function is called.
+func (c *Client) reflect(ctxPtr *context.Context) error {
+	client := reflectpb.NewServerReflectionClient(c.conn)
+	methodClient, err := client.ServerReflectionInfo(*ctxPtr)
+	if err != nil {
+		return err
+	}
+	req := &reflectpb.ServerReflectionRequest{MessageRequest: &reflectpb.ServerReflectionRequest_ListServices{}}
+	if err = methodClient.Send(req); err != nil {
+		return err
+	}
+	resp, err := methodClient.Recv()
+	if err != nil {
+		return err
+	}
+	listResp := resp.GetListServicesResponse()
+	if listResp == nil {
+		return fmt.Errorf("can't list services")
+	}
+	fdset := &descriptorpb.FileDescriptorSet{}
+	for _, service := range listResp.GetService() {
+		req = &reflectpb.ServerReflectionRequest{
+			MessageRequest: &reflectpb.ServerReflectionRequest_FileContainingSymbol{
+				FileContainingSymbol: service.GetName(),
+			},
+		}
+		if err = methodClient.Send(req); err != nil {
+			return err
+		}
+		resp, err = methodClient.Recv()
+		if err != nil {
+			return fmt.Errorf("error listing methods on '%s': %w", service, err)
+		}
+		fdResp := resp.GetFileDescriptorResponse()
+		for _, f := range fdResp.GetFileDescriptorProto() {
+			a := &descriptorpb.FileDescriptorProto{}
+			if err = proto.Unmarshal(f, a); err != nil {
+				return err
+			}
+			fdset.File = append(fdset.File, a)
+		}
+	}
+	_, err = c.convertToMethodInfo(fdset)
+	return err
 }
 
 // Invoke creates and calls a unary RPC by fully qualified method name
@@ -474,7 +540,6 @@ func (*Client) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context.Cont
 func (c *Client) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	state := lib.GetState(ctx)
 	tags := getTags(ctx)
-
 	switch s := stat.(type) {
 	case *grpcstats.OutHeader:
 		if state.Options.SystemTags.Has(stats.TagIP) && s.RemoteAddr != nil {
