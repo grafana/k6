@@ -127,7 +127,7 @@ func (*RootModule) NewModuleInstance(m modules.InstanceCore) modules.Instance {
 	return &ModuleInstance{InstanceCore: m}
 }
 
-// New returns a new RootMetricsModule
+// New returns a new RootModule.
 func New() *RootModule {
 	return &RootModule{}
 }
