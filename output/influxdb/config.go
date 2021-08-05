@@ -40,16 +40,15 @@ type Config struct {
 	Addr             null.String        `json:"addr" envconfig:"K6_INFLUXDB_ADDR"`
 	Username         null.String        `json:"username,omitempty" envconfig:"K6_INFLUXDB_USERNAME"`
 	Password         null.String        `json:"password,omitempty" envconfig:"K6_INFLUXDB_PASSWORD"`
+	Organization     null.String        `json:"organization" envconfig:"K6_INFLUXDB_ORGANIZATION"`
+	Bucket           null.String        `json:"bucket" envconfig:"K6_INFLUXDB_BUCKET"`
+	Token            null.String        `json:"token" envconfig:"K6_INFLUXDB_TOKEN"`
 	Insecure         null.Bool          `json:"insecure,omitempty" envconfig:"K6_INFLUXDB_INSECURE"`
-	PayloadSize      null.Int           `json:"payloadSize,omitempty" envconfig:"K6_INFLUXDB_PAYLOAD_SIZE"`
 	PushInterval     types.NullDuration `json:"pushInterval,omitempty" envconfig:"K6_INFLUXDB_PUSH_INTERVAL"`
 	ConcurrentWrites null.Int           `json:"concurrentWrites,omitempty" envconfig:"K6_INFLUXDB_CONCURRENT_WRITES"`
 
 	// Samples.
 	DB           null.String `json:"db" envconfig:"K6_INFLUXDB_DB"`
-	Precision    null.String `json:"precision,omitempty" envconfig:"K6_INFLUXDB_PRECISION"`
-	Retention    null.String `json:"retention,omitempty" envconfig:"K6_INFLUXDB_RETENTION"`
-	Consistency  null.String `json:"consistency,omitempty" envconfig:"K6_INFLUXDB_CONSISTENCY"`
 	TagsAsFields []string    `json:"tagsAsFields,omitempty" envconfig:"K6_INFLUXDB_TAGS_AS_FIELDS"`
 }
 
@@ -57,7 +56,6 @@ type Config struct {
 func NewConfig() Config {
 	c := Config{
 		Addr:             null.NewString("http://localhost:8086", false),
-		DB:               null.NewString("k6", false),
 		TagsAsFields:     []string{"vu", "iter", "url"},
 		ConcurrentWrites: null.NewInt(10, false),
 		PushInterval:     types.NewNullDuration(time.Second, false),
@@ -69,29 +67,17 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.Addr.Valid {
 		c.Addr = cfg.Addr
 	}
+	if cfg.DB.Valid {
+		c.DB = cfg.DB
+	}
+	if cfg.Insecure.Valid {
+		c.Insecure = cfg.Insecure
+	}
 	if cfg.Username.Valid {
 		c.Username = cfg.Username
 	}
 	if cfg.Password.Valid {
 		c.Password = cfg.Password
-	}
-	if cfg.Insecure.Valid {
-		c.Insecure = cfg.Insecure
-	}
-	if cfg.PayloadSize.Valid && cfg.PayloadSize.Int64 > 0 {
-		c.PayloadSize = cfg.PayloadSize
-	}
-	if cfg.DB.Valid {
-		c.DB = cfg.DB
-	}
-	if cfg.Precision.Valid {
-		c.Precision = cfg.Precision
-	}
-	if cfg.Retention.Valid {
-		c.Retention = cfg.Retention
-	}
-	if cfg.Consistency.Valid {
-		c.Consistency = cfg.Consistency
 	}
 	if len(cfg.TagsAsFields) > 0 {
 		c.TagsAsFields = cfg.TagsAsFields
@@ -99,9 +85,17 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.PushInterval.Valid {
 		c.PushInterval = cfg.PushInterval
 	}
-
 	if cfg.ConcurrentWrites.Valid {
 		c.ConcurrentWrites = cfg.ConcurrentWrites
+	}
+	if cfg.Organization.Valid {
+		c.Organization = cfg.Organization
+	}
+	if cfg.Bucket.Valid {
+		c.Bucket = cfg.Bucket
+	}
+	if cfg.Token.Valid {
+		c.Token = cfg.Token
 	}
 	return c
 }
@@ -141,13 +135,13 @@ func ParseURL(text string) (Config, error) {
 	if u.Host != "" {
 		c.Addr = null.StringFrom(u.Scheme + "://" + u.Host)
 	}
-	if db := strings.TrimPrefix(u.Path, "/"); db != "" {
-		c.DB = null.StringFrom(db)
-	}
 	if u.User != nil {
 		c.Username = null.StringFrom(u.User.Username())
 		pass, _ := u.User.Password()
 		c.Password = null.StringFrom(pass)
+	}
+	if bucket := strings.TrimPrefix(u.Path, "/"); bucket != "" {
+		c.Bucket = null.StringFrom(bucket)
 	}
 	for k, vs := range u.Query() {
 		switch k {
@@ -161,20 +155,6 @@ func ParseURL(text string) (Config, error) {
 			default:
 				return c, fmt.Errorf("insecure must be true or false, not %s", vs[0])
 			}
-		case "payload_size":
-			var size int
-			size, err = strconv.Atoi(vs[0])
-			if err != nil {
-				return c, err
-			}
-			c.PayloadSize = null.IntFrom(int64(size))
-		case "precision":
-			c.Precision = null.StringFrom(vs[0])
-		case "retention":
-			c.Retention = null.StringFrom(vs[0])
-		case "consistency":
-			c.Consistency = null.StringFrom(vs[0])
-
 		case "pushInterval":
 			err = c.PushInterval.UnmarshalText([]byte(vs[0]))
 			if err != nil {

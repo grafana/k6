@@ -22,30 +22,34 @@ package influxdb
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
 
 func TestParseURL(t *testing.T) {
 	t.Parallel()
 	testdata := map[string]Config{
-		"":                             {},
-		"dbname":                       {DB: null.StringFrom("dbname")},
-		"/dbname":                      {DB: null.StringFrom("dbname")},
-		"http://localhost:8086":        {Addr: null.StringFrom("http://localhost:8086")},
-		"http://localhost:8086/dbname": {Addr: null.StringFrom("http://localhost:8086"), DB: null.StringFrom("dbname")},
+		"":                                 {},
+		"bucketname":                       {Bucket: null.StringFrom("bucketname")},
+		"/bucketname":                      {Bucket: null.StringFrom("bucketname")},
+		"/dbname/retention":                {Bucket: null.StringFrom("dbname/retention")}, // 1.8+ API compatibility
+		"http://localhost:8086":            {Addr: null.StringFrom("http://localhost:8086")},
+		"http://localhost:8086/bucketname": {Addr: null.StringFrom("http://localhost:8086"), Bucket: null.StringFrom("bucketname")},
 	}
 	queries := map[string]struct {
 		Config Config
 		Err    string
 	}{
-		"?":                {Config{}, ""},
-		"?insecure=false":  {Config{Insecure: null.BoolFrom(false)}, ""},
-		"?insecure=true":   {Config{Insecure: null.BoolFrom(true)}, ""},
-		"?insecure=ture":   {Config{}, "insecure must be true or false, not ture"},
-		"?payload_size=69": {Config{PayloadSize: null.IntFrom(69)}, ""},
-		"?payload_size=a":  {Config{}, "strconv.Atoi: parsing \"a\": invalid syntax"},
+		"?":                                  {Config{}, ""},
+		"?insecure=false":                    {Config{Insecure: null.BoolFrom(false)}, ""},
+		"?insecure=true":                     {Config{Insecure: null.BoolFrom(true)}, ""},
+		"?insecure=ture":                     {Config{}, "insecure must be true or false, not ture"},
+		"?pushInterval=5s":                   {Config{PushInterval: types.NullDurationFrom(5 * time.Second)}, ""},
+		"?concurrentWrites=2":                {Config{ConcurrentWrites: null.IntFrom(2)}, ""},
+		"?tagsAsFields=foo&tagsAsFields=bar": {Config{TagsAsFields: []string{"foo", "bar"}}, ""},
 	}
 	for str, data := range testdata {
 		t.Run(str, func(t *testing.T) {
@@ -61,7 +65,7 @@ func TestParseURL(t *testing.T) {
 						assert.EqualError(t, err, qdata.Err)
 					} else {
 						expected2 := qdata.Config
-						expected2.DB = data.DB
+						expected2.Bucket = data.Bucket
 						expected2.Addr = data.Addr
 						assert.Equal(t, expected2, config)
 					}

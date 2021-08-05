@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib/testutils"
@@ -36,36 +37,66 @@ import (
 	"go.k6.io/k6/stats"
 )
 
-func TestBadConcurrentWrites(t *testing.T) {
+func TestNew(t *testing.T) {
 	t.Parallel()
-	logger := testutils.NewLogger(t)
-	t.Run("0", func(t *testing.T) {
+	t.Run("BucketRequired", func(t *testing.T) {
 		t.Parallel()
 		_, err := New(output.Params{
-			Logger:         logger,
-			ConfigArgument: "?concurrentWrites=0",
+			Logger:         testutils.NewLogger(t),
+			ConfigArgument: "/",
 		})
 		require.Error(t, err)
-		require.Equal(t, err.Error(), "influxdb's ConcurrentWrites must be a positive number")
+		require.Contains(t, err.Error(), "Bucket value is required")
 	})
-
-	t.Run("-2", func(t *testing.T) {
+	t.Run("ForceDatabaseAsBucket", func(t *testing.T) {
 		t.Parallel()
-		_, err := New(output.Params{
-			Logger:         logger,
-			ConfigArgument: "?concurrentWrites=-2",
-		})
-		require.Error(t, err)
-		require.Equal(t, err.Error(), "influxdb's ConcurrentWrites must be a positive number")
-	})
-
-	t.Run("2", func(t *testing.T) {
-		t.Parallel()
-		_, err := New(output.Params{
-			Logger:         logger,
-			ConfigArgument: "?concurrentWrites=2",
+		o, err := New(output.Params{
+			Logger:     testutils.NewLogger(t),
+			JSONConfig: []byte(`{"db":"dbtest"}`),
 		})
 		require.NoError(t, err)
+		assert.Equal(t, "dbtest", o.(*Output).Config.Bucket.String)
+	})
+	t.Run("ForceUserPasswordAsToken", func(t *testing.T) {
+		t.Parallel()
+		o, err := New(output.Params{
+			Logger:         testutils.NewLogger(t),
+			ConfigArgument: "http://myuser:mypassword@addr/bucketname",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "myuser:mypassword", o.(*Output).Config.Token.String)
+	})
+	t.Run("BadConcurrentWrites", func(t *testing.T) {
+		t.Parallel()
+		logger := testutils.NewLogger(t)
+		t.Run("0", func(t *testing.T) {
+			t.Parallel()
+			_, err := New(output.Params{
+				Logger:         logger,
+				ConfigArgument: "/bucketname?concurrentWrites=0",
+			})
+			require.Error(t, err)
+			require.Equal(t, err.Error(), "influxdb's ConcurrentWrites must be a positive number")
+		})
+
+		t.Run("-2", func(t *testing.T) {
+			t.Parallel()
+			_, err := New(output.Params{
+				Logger:         logger,
+				ConfigArgument: "/bucketname?concurrentWrites=-2",
+			})
+			require.Error(t, err)
+			require.Equal(t, "influxdb's ConcurrentWrites must be a positive number", err.Error())
+		})
+
+		t.Run("2", func(t *testing.T) {
+			t.Parallel()
+			_, err := New(output.Params{
+				Logger:         logger,
+				ConfigArgument: "/bucketname?concurrentWrites=2",
+			})
+			require.NoError(t, err)
+		})
 	})
 }
 
@@ -88,10 +119,10 @@ func testOutputCycle(t testing.TB, handler http.HandlerFunc, body func(testing.T
 	go func() {
 		require.Equal(t, http.ErrServerClosed, s.Serve(l))
 	}()
-
 	c, err := newOutput(output.Params{
 		Logger:         testutils.NewLogger(t),
 		ConfigArgument: "http://" + l.Addr().String(),
+		JSONConfig:     []byte(`{"bucket":"mybucket"}`),
 	})
 	require.NoError(t, err)
 
@@ -105,7 +136,7 @@ func TestOutput(t *testing.T) {
 	t.Parallel()
 	var samplesRead int
 	defer func() {
-		require.Equal(t, samplesRead, 20)
+		require.Equal(t, 20, samplesRead)
 	}()
 	testOutputCycle(t, func(rw http.ResponseWriter, r *http.Request) {
 		b := bytes.NewBuffer(nil)
@@ -144,6 +175,7 @@ func TestExtractTagsToValues(t *testing.T) {
 	t.Parallel()
 	o, err := newOutput(output.Params{
 		Logger:         testutils.NewLogger(t),
+		JSONConfig:     []byte(`{"bucket":"mybucket"}`),
 		ConfigArgument: "?tagsAsFields=stringField&tagsAsFields=stringField2:string&tagsAsFields=boolField:bool&tagsAsFields=floatField:float&tagsAsFields=intField:int",
 	})
 	require.NoError(t, err)

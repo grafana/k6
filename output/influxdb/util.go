@@ -21,42 +21,29 @@
 package influxdb
 
 import (
+	"crypto/tls"
 	"fmt"
 	"strings"
 
-	client "github.com/influxdata/influxdb1-client/v2"
+	client "github.com/influxdata/influxdb-client-go/v2"
+	influxdblog "github.com/influxdata/influxdb-client-go/v2/log"
 	"gopkg.in/guregu/null.v3"
 )
 
+func init() {
+	// disable the internal influxdb log
+	influxdblog.Log = nil
+}
+
 func MakeClient(conf Config) (client.Client, error) {
-	if strings.HasPrefix(conf.Addr.String, "udp://") {
-		return client.NewUDPClient(client.UDPConfig{
-			Addr:        strings.TrimPrefix(conf.Addr.String, "udp://"),
-			PayloadSize: int(conf.PayloadSize.Int64),
-		})
-	}
 	if conf.Addr.String == "" {
 		conf.Addr = null.StringFrom("http://localhost:8086")
 	}
-	return client.NewHTTPClient(client.HTTPConfig{
-		Addr:               conf.Addr.String,
-		Username:           conf.Username.String,
-		Password:           conf.Password.String,
-		UserAgent:          "k6",
-		InsecureSkipVerify: conf.Insecure.Bool,
-	})
-}
-
-func MakeBatchConfig(conf Config) client.BatchPointsConfig {
-	if !conf.DB.Valid || conf.DB.String == "" {
-		conf.DB = null.StringFrom("k6")
-	}
-	return client.BatchPointsConfig{
-		Precision:        conf.Precision.String,
-		Database:         conf.DB.String,
-		RetentionPolicy:  conf.Retention.String,
-		WriteConsistency: conf.Consistency.String,
-	}
+	opts := client.DefaultOptions().
+		SetTLSConfig(&tls.Config{
+			InsecureSkipVerify: conf.Insecure.Bool, //nolint:gosec
+		})
+	return client.NewClientWithOptions(conf.Addr.String, conf.Token.String, opts), nil
 }
 
 func checkDuplicatedTypeDefinitions(fieldKinds map[string]FieldKind, tag string) error {
