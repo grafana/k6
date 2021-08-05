@@ -33,10 +33,12 @@ repeat:
 	switch f := obj.self.(type) {
 	case *funcObject:
 		return newStringValue(f.src)
+	case *arrowFuncObject:
+		return newStringValue(f.src)
 	case *nativeFuncObject:
-		return newStringValue(fmt.Sprintf("function %s() { [native code] }", f.nameProp.get(call.This).toString()))
+		return newStringValue(fmt.Sprintf("function %s() { [native code] }", nilSafe(f.getStr("name", nil)).toString()))
 	case *boundFuncObject:
-		return newStringValue(fmt.Sprintf("function %s() { [native code] }", f.nameProp.get(call.This).toString()))
+		return newStringValue(fmt.Sprintf("function %s() { [native code] }", nilSafe(f.getStr("name", nil)).toString()))
 	case *lazyObject:
 		obj.self = f.create(obj)
 		goto repeat
@@ -46,10 +48,12 @@ repeat:
 		switch c := f.target.self.(type) {
 		case *funcObject:
 			name = c.src
+		case *arrowFuncObject:
+			name = c.src
 		case *nativeFuncObject:
-			name = nilSafe(c.nameProp.get(call.This)).toString().String()
+			name = nilSafe(f.getStr("name", nil)).toString().String()
 		case *boundFuncObject:
-			name = nilSafe(c.nameProp.get(call.This)).toString().String()
+			name = nilSafe(f.getStr("name", nil)).toString().String()
 		case *lazyObject:
 			f.target.self = c.create(obj)
 			goto repeat2
@@ -81,7 +85,7 @@ func (r *Runtime) createListFromArrayLike(a Value) []Value {
 	l := toLength(o.self.getStr("length", nil))
 	res := make([]Value, 0, l)
 	for k := int64(0); k < l; k++ {
-		res = append(res, o.self.getIdx(valueInt(k), nil))
+		res = append(res, nilSafe(o.self.getIdx(valueInt(k), nil)))
 	}
 	return res
 }
@@ -153,7 +157,7 @@ func (r *Runtime) functionproto_bind(call FunctionCall) Value {
 	fcall := r.toCallable(call.This)
 	construct := obj.self.assertConstructor()
 
-	l := int(toUint32(obj.self.getStr("length", nil)))
+	l := int(toUint32(nilSafe(obj.self.getStr("length", nil))))
 	l -= len(call.Arguments) - 1
 	if l < 0 {
 		l = 0
@@ -183,8 +187,7 @@ func (r *Runtime) functionproto_bind(call FunctionCall) Value {
 func (r *Runtime) initFunction() {
 	o := r.global.FunctionPrototype.self.(*nativeFuncObject)
 	o.prototype = r.global.ObjectPrototype
-	o.nameProp.value = stringEmpty
-
+	o._putProp("name", stringEmpty, false, false, true)
 	o._putProp("apply", r.newNativeFunc(r.functionproto_apply, nil, "apply", nil, 2), true, false, true)
 	o._putProp("bind", r.newNativeFunc(r.functionproto_bind, nil, "bind", nil, 1), true, false, true)
 	o._putProp("call", r.newNativeFunc(r.functionproto_call, nil, "call", nil, 1), true, false, true)

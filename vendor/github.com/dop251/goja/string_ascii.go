@@ -49,7 +49,7 @@ func (s asciiString) utf16Runes() []rune {
 }
 
 // ss must be trimmed
-func strToInt(ss string) (int64, error) {
+func stringToInt(ss string) (int64, error) {
 	if ss == "" {
 		return 0, nil
 	}
@@ -70,7 +70,7 @@ func strToInt(ss string) (int64, error) {
 }
 
 func (s asciiString) _toInt() (int64, error) {
-	return strToInt(strings.TrimSpace(string(s)))
+	return stringToInt(strings.TrimSpace(string(s)))
 }
 
 func isRangeErr(err error) bool {

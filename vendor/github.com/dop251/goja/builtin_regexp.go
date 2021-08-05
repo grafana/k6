@@ -900,7 +900,7 @@ func (r *Runtime) regexpproto_stdSplitterGeneric(splitter *Object, s valueString
 				}
 				numberOfCaptures := max(toLength(z.self.getStr("length", nil))-1, 0)
 				for i := int64(1); i <= numberOfCaptures; i++ {
-					a = append(a, z.self.getIdx(valueInt(i), nil))
+					a = append(a, nilSafe(z.self.getIdx(valueInt(i), nil)))
 					if int64(len(a)) == lim {
 						return r.newArrayValues(a)
 					}

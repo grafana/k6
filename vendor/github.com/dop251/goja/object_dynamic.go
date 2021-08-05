@@ -531,7 +531,7 @@ func (a *dynamicArray) getStr(p unistring.String, receiver Value) Value {
 	if p == "length" {
 		return intToValue(int64(a.a.Len()))
 	}
-	if idx, ok := strPropToInt(p); ok {
+	if idx, ok := strToInt(p); ok {
 		return a.a.Get(idx)
 	}
 	return a.getParentStr(p, receiver)
@@ -551,7 +551,7 @@ func (a *dynamicArray) getOwnPropStr(u unistring.String) Value {
 			writable: true,
 		}
 	}
-	if idx, ok := strPropToInt(u); ok {
+	if idx, ok := strToInt(u); ok {
 		return a.a.Get(idx)
 	}
 	return nil
@@ -573,7 +573,7 @@ func (a *dynamicArray) setOwnStr(p unistring.String, v Value, throw bool) bool {
 	if p == "length" {
 		return a._setLen(v, throw)
 	}
-	if idx, ok := strPropToInt(p); ok {
+	if idx, ok := strToInt(p); ok {
 		return a._setIdx(idx, v, throw)
 	}
 	a.val.runtime.typeErrorResult(throw, "Cannot set property %q on a dynamic array", p.String())
@@ -628,7 +628,7 @@ func (a *dynamicArray) hasOwnPropertyStr(u unistring.String) bool {
 	if u == "length" {
 		return true
 	}
-	if idx, ok := strPropToInt(u); ok {
+	if idx, ok := strToInt(u); ok {
 		return a._has(idx)
 	}
 	return false
@@ -640,7 +640,7 @@ func (a *dynamicArray) hasOwnPropertyIdx(v valueInt) bool {
 
 func (a *dynamicArray) defineOwnPropertyStr(name unistring.String, desc PropertyDescriptor, throw bool) bool {
 	if a.checkDynamicObjectPropertyDescr(name, desc, throw) {
-		if idx, ok := strPropToInt(name); ok {
+		if idx, ok := strToInt(name); ok {
 			return a._setIdx(idx, desc.Value, throw)
 		}
 		a.val.runtime.typeErrorResult(throw, "Cannot define property %q on a dynamic array", name.String())
@@ -663,7 +663,7 @@ func (a *dynamicArray) _delete(idx int, throw bool) bool {
 }
 
 func (a *dynamicArray) deleteStr(name unistring.String, throw bool) bool {
-	if idx, ok := strPropToInt(name); ok {
+	if idx, ok := strToInt(name); ok {
 		return a._delete(idx, throw)
 	}
 	if a.hasOwnPropertyStr(name) {
