@@ -170,12 +170,6 @@ func TestNewBundle(t *testing.T) {
 					"Modules", "base", `export default function() {};`,
 					"file:///script.js: Line 1:1 Unexpected reserved word",
 				},
-				// Arrow functions are not supported
-				{
-					"ArrowFuncs", "base",
-					`module.exports.default = function() {}; () => {};`,
-					"file:///script.js: Line 1:42 Unexpected token ) (and 1 more errors)",
-				},
 				// Promises are not supported
 				{
 					"Promise", "base",
