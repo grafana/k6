@@ -62,10 +62,11 @@ func TestMetrics(t *testing.T) {
 					t.Parallel()
 					rt := goja.New()
 					rt.SetFieldNameMapper(common.FieldNameMapper{})
-					mii := &modulestest.InstanceCore{}
-					mii.Runtime = rt
-					mii.InitEnv = &common.InitEnvironment{}
-					mii.Ctx = context.Background()
+					mii := &modulestest.InstanceCore{
+						Runtime: rt,
+						InitEnv: &common.InitEnvironment{},
+						Ctx:     context.Background(),
+					}
 					m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 					require.True(t, ok)
 					require.NoError(t, rt.Set("metrics", m.GetExports().Named))
@@ -179,10 +180,11 @@ func TestMetricGetName(t *testing.T) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-	mii := &modulestest.InstanceCore{}
-	mii.Runtime = rt
-	mii.InitEnv = &common.InitEnvironment{}
-	mii.Ctx = context.Background()
+	mii := &modulestest.InstanceCore{
+		Runtime: rt,
+		InitEnv: &common.InitEnvironment{},
+		Ctx:     context.Background(),
+	}
 	m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 	require.True(t, ok)
 	require.NoError(t, rt.Set("metrics", m.GetExports().Named))
