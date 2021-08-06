@@ -21,6 +21,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"syscall"
@@ -78,18 +79,18 @@ This will set the default server used when just "-o influxdb" is passed.`,
 						Default: conf.Addr.String,
 					},
 					ui.StringField{
-						Key:     "DB",
-						Label:   "Database",
-						Default: conf.DB.String,
+						Key:     "Bucket",
+						Label:   "Bucket",
+						Default: conf.Bucket.String,
 					},
 					ui.StringField{
-						Key:     "Username",
-						Label:   "Username",
-						Default: conf.Username.String,
+						Key:     "Organization",
+						Label:   "Organization",
+						Default: conf.Organization.String,
 					},
-					ui.PasswordField{
-						Key:   "Password",
-						Label: "Password",
+					ui.StringField{
+						Key:   "Token",
+						Label: "Token",
 					},
 				},
 			}
@@ -116,7 +117,9 @@ This will set the default server used when just "-o influxdb" is passed.`,
 			if err != nil {
 				return err
 			}
-			if _, _, err = client.Ping(10 * time.Second); err != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if _, err = client.Health(ctx); err != nil {
 				return err
 			}
 
@@ -127,6 +130,9 @@ This will set the default server used when just "-o influxdb" is passed.`,
 			if err != nil {
 				return err
 			}
+
+			// TODO: should we add a success log info?
+
 			return writeDiskConfig(fs, configPath, config)
 		},
 	}
