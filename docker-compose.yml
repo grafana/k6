@@ -6,14 +6,19 @@ networks:
 
 services:
   influxdb:
-    image: influxdb:1.8
+    image: influxdb:2.0-alpine
     networks:
       - k6
       - grafana
     ports:
       - "8086:8086"
     environment:
-      - INFLUXDB_DB=k6
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=croco
+      - DOCKER_INFLUXDB_INIT_PASSWORD=password1
+      - DOCKER_INFLUXDB_INIT_ORG=k6io
+      - DOCKER_INFLUXDB_INIT_BUCKET=demo
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=EEKpryGZk8pVDXmIuy484BKUxM5jOEDv7YNoeNZUbsNbpbPbP6kK_qY9Zsyw7zNnlZ7pHG16FYzNaqwLMBUz8g==
 
   grafana:
     image: grafana/grafana:latest
@@ -35,6 +40,9 @@ services:
     ports:
       - "6565:6565"
     environment:
-      - K6_OUT=influxdb=http://influxdb:8086/k6
+      - K6_INFLUXDB_ORGANIZATION=k6io
+      - K6_INFLUXDB_BUCKET=demo
+      - K6_INFLUXDB_TOKEN=EEKpryGZk8pVDXmIuy484BKUxM5jOEDv7YNoeNZUbsNbpbPbP6kK_qY9Zsyw7zNnlZ7pHG16FYzNaqwLMBUz8g==
+      - K6_INFLUXDB_INSECURE=true
     volumes:
       - ./samples:/scripts
