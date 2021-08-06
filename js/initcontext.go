@@ -171,7 +171,14 @@ func (m *moduleInstanceCoreImpl) GetRuntime() *goja.Runtime {
 	return common.GetRuntime(*m.ctxPtr) // TODO thread it correctly instead
 }
 
-func toESModuleExports(exp modules.Exports) map[string]interface{} {
+func toESModuleExports(exp modules.Exports) interface{} {
+	if exp.Named == nil {
+		return exp.Default
+	}
+	if exp.Default == nil {
+		return exp.Named
+	}
+
 	result := make(map[string]interface{}, len(exp.Named)+2)
 
 	for k, v := range exp.Named {
@@ -180,6 +187,7 @@ func toESModuleExports(exp modules.Exports) map[string]interface{} {
 	// Maybe check that those weren't set
 	result["default"] = exp.Default
 	result["__esModule"] = true // this so babel works with
+
 	return result
 }
 
