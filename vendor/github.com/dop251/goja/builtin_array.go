@@ -347,12 +347,36 @@ func (r *Runtime) arrayproto_sort(call FunctionCall) Value {
 		}
 	}
 
-	ctx := arraySortCtx{
-		obj:     o.self,
-		compare: compareFn,
-	}
+	if r.checkStdArrayObj(o) != nil {
+		ctx := arraySortCtx{
+			obj:     o.self,
+			compare: compareFn,
+		}
 
-	sort.Stable(&ctx)
+		sort.Stable(&ctx)
+	} else {
+		length := toLength(o.self.getStr("length", nil))
+		a := make([]Value, 0, length)
+		for i := int64(0); i < length; i++ {
+			idx := valueInt(i)
+			if o.self.hasPropertyIdx(idx) {
+				a = append(a, nilSafe(o.self.getIdx(idx, nil)))
+			}
+		}
+		ar := r.newArrayValues(a)
+		ctx := arraySortCtx{
+			obj:     ar.self,
+			compare: compareFn,
+		}
+
+		sort.Stable(&ctx)
+		for i := 0; i < len(a); i++ {
+			o.self.setOwnIdx(valueInt(i), a[i], true)
+		}
+		for i := int64(len(a)); i < length; i++ {
+			o.self.deleteIdx(valueInt(i), true)
+		}
+	}
 	return o
 }
 
@@ -380,6 +404,7 @@ func (r *Runtime) arrayproto_splice(call FunctionCall) Value {
 			for k := int64(0); k < actualDeleteCount; k++ {
 				createDataPropertyOrThrow(a, intToValue(k), src.values[k+actualStart])
 			}
+			a.self.setOwnStr("length", intToValue(actualDeleteCount), true)
 		}
 		var values []Value
 		if itemCount < actualDeleteCount {
@@ -411,7 +436,7 @@ func (r *Runtime) arrayproto_splice(call FunctionCall) Value {
 		for k := int64(0); k < actualDeleteCount; k++ {
 			from := valueInt(k + actualStart)
 			if o.self.hasPropertyIdx(from) {
-				createDataPropertyOrThrow(a, valueInt(k), o.self.getIdx(from, nil))
+				createDataPropertyOrThrow(a, valueInt(k), nilSafe(o.self.getIdx(from, nil)))
 			}
 		}
 
@@ -420,7 +445,7 @@ func (r *Runtime) arrayproto_splice(call FunctionCall) Value {
 				from := valueInt(k + actualDeleteCount)
 				to := valueInt(k + itemCount)
 				if o.self.hasPropertyIdx(from) {
-					o.self.setOwnIdx(to, o.self.getIdx(from, nil), true)
+					o.self.setOwnIdx(to, nilSafe(o.self.getIdx(from, nil)), true)
 				} else {
 					o.self.deleteIdx(to, true)
 				}
@@ -434,7 +459,7 @@ func (r *Runtime) arrayproto_splice(call FunctionCall) Value {
 				from := valueInt(k + actualDeleteCount - 1)
 				to := valueInt(k + itemCount - 1)
 				if o.self.hasPropertyIdx(from) {
-					o.self.setOwnIdx(to, o.self.getIdx(from, nil), true)
+					o.self.setOwnIdx(to, nilSafe(o.self.getIdx(from, nil)), true)
 				} else {
 					o.self.deleteIdx(to, true)
 				}
@@ -475,7 +500,7 @@ func (r *Runtime) arrayproto_unshift(call FunctionCall) Value {
 			from := valueInt(k)
 			to := valueInt(k + argCount)
 			if o.self.hasPropertyIdx(from) {
-				o.self.setOwnIdx(to, o.self.getIdx(from, nil), true)
+				o.self.setOwnIdx(to, nilSafe(o.self.getIdx(from, nil)), true)
 			} else {
 				o.self.deleteIdx(to, true)
 			}
@@ -962,7 +987,7 @@ func (r *Runtime) arrayproto_copyWithin(call FunctionCall) Value {
 	}
 	for count > 0 {
 		if o.self.hasPropertyIdx(valueInt(from)) {
-			o.self.setOwnIdx(valueInt(to), o.self.getIdx(valueInt(from), nil), true)
+			o.self.setOwnIdx(valueInt(to), nilSafe(o.self.getIdx(valueInt(from), nil)), true)
 		} else {
 			o.self.deleteIdx(valueInt(to), true)
 		}
@@ -1059,7 +1084,7 @@ func (r *Runtime) flattenIntoArray(target, source *Object, sourceLen, start, dep
 	for sourceIndex < sourceLen {
 		p := intToValue(sourceIndex)
 		if source.hasProperty(p.toString()) {
-			element := source.get(p, source)
+			element := nilSafe(source.get(p, source))
 			if mapperFunction != nil {
 				element = mapperFunction(FunctionCall{
 					This:      thisArg,

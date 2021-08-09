@@ -65,6 +65,18 @@ func (p *PropertyDescriptor) Empty() bool {
 	return *p == empty
 }
 
+func (p *PropertyDescriptor) IsAccessor() bool {
+	return p.Setter != nil || p.Getter != nil
+}
+
+func (p *PropertyDescriptor) IsData() bool {
+	return p.Value != nil || p.Writable != FLAG_NOT_SET
+}
+
+func (p *PropertyDescriptor) IsGeneric() bool {
+	return !p.IsAccessor() && !p.IsData()
+}
+
 func (p *PropertyDescriptor) toValue(r *Runtime) Value {
 	if p.jsDescriptor != nil {
 		return p.jsDescriptor
@@ -399,7 +411,7 @@ func (o *baseObject) deleteIdx(idx valueInt, throw bool) bool {
 func (o *baseObject) deleteSym(s *Symbol, throw bool) bool {
 	if o.symValues != nil {
 		if val := o.symValues.get(s); val != nil {
-			if !o.checkDelete(s.desc.string(), val, throw) {
+			if !o.checkDelete(s.descriptiveString().string(), val, throw) {
 				return false
 			}
 			o.symValues.remove(s)
@@ -744,7 +756,7 @@ func (o *baseObject) defineOwnPropertySym(s *Symbol, descr PropertyDescriptor, t
 	if o.symValues != nil {
 		existingVal = o.symValues.get(s)
 	}
-	if v, ok := o._defineOwnProperty(s.desc.string(), existingVal, descr, throw); ok {
+	if v, ok := o._defineOwnProperty(s.descriptiveString().string(), existingVal, descr, throw); ok {
 		if o.symValues == nil {
 			o.symValues = newOrderedMap(nil)
 		}
@@ -1121,9 +1133,9 @@ func (o *baseObject) fixPropOrder() {
 	names := o.propNames
 	for i := o.lastSortedPropLen; i < len(names); i++ {
 		name := names[i]
-		if idx := strToIdx(name); idx != math.MaxUint32 {
+		if idx := strToArrayIdx(name); idx != math.MaxUint32 {
 			k := sort.Search(o.idxPropCount, func(j int) bool {
-				return strToIdx(names[j]) >= idx
+				return strToArrayIdx(names[j]) >= idx
 			})
 			if k < i {
 				if namesMarkedForCopy(names) {

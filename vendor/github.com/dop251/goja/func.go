@@ -9,15 +9,26 @@ import (
 type baseFuncObject struct {
 	baseObject
 
-	nameProp, lenProp valueProperty
+	lenProp valueProperty
+}
+
+type baseJsFuncObject struct {
+	baseFuncObject
+
+	stash  *stash
+	prg    *Program
+	src    string
+	strict bool
 }
 
 type funcObject struct {
-	baseFuncObject
+	baseJsFuncObject
+}
 
-	stash *stash
-	prg   *Program
-	src   string
+type arrowFuncObject struct {
+	baseJsFuncObject
+	this      Value
+	newTarget Value
 }
 
 type nativeFuncObject struct {
@@ -129,18 +140,18 @@ func (f *funcObject) Call(call FunctionCall) Value {
 	return f.call(call, nil)
 }
 
-func (f *funcObject) call(call FunctionCall, newTarget Value) Value {
+func (f *arrowFuncObject) Call(call FunctionCall) Value {
+	return f._call(call, f.newTarget, f.this)
+}
+
+func (f *baseJsFuncObject) _call(call FunctionCall, newTarget, this Value) Value {
 	vm := f.val.runtime.vm
 	pc := vm.pc
 
 	vm.stack.expand(vm.sp + len(call.Arguments) + 1)
 	vm.stack[vm.sp] = f.val
 	vm.sp++
-	if call.This != nil {
-		vm.stack[vm.sp] = call.This
-	} else {
-		vm.stack[vm.sp] = _undefined
-	}
+	vm.stack[vm.sp] = this
 	vm.sp++
 	for _, arg := range call.Arguments {
 		if arg != nil {
@@ -162,6 +173,11 @@ func (f *funcObject) call(call FunctionCall, newTarget Value) Value {
 	vm.pc = pc
 	vm.halt = false
 	return vm.pop()
+
+}
+
+func (f *funcObject) call(call FunctionCall, newTarget Value) Value {
+	return f._call(call, newTarget, nilSafe(call.This))
 }
 
 func (f *funcObject) export(*objectExportCtx) interface{} {
@@ -180,14 +196,18 @@ func (f *funcObject) assertConstructor() func(args []Value, newTarget *Object) *
 	return f.construct
 }
 
+func (f *arrowFuncObject) exportType() reflect.Type {
+	return reflect.TypeOf(f.Call)
+}
+
+func (f *arrowFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
+	return f.Call, true
+}
+
 func (f *baseFuncObject) init(name unistring.String, length int) {
 	f.baseObject.init()
 
-	if name != "" {
-		f.nameProp.configurable = true
-		f.nameProp.value = stringValueFromRaw(name)
-		f._put("name", &f.nameProp)
-	}
+	f._putProp("name", stringValueFromRaw(name), false, false, true)
 
 	f.lenProp.configurable = true
 	f.lenProp.value = valueInt(length)

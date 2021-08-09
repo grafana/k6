@@ -92,17 +92,14 @@ and it includes an event loop.
 
 ### Can you implement (feature X from ES6 or higher)?
 
-Some ES6 functionality has been implemented. So far this is mostly built-ins, not syntax enhancements.
-See https://github.com/dop251/goja/milestone/1 for more details.
-
-The ongoing work is done in the es6 branch which is merged into master when appropriate. Every commit
-in this branch represents a relatively stable state (i.e. it compiles and passes all enabled tc39 tests),
-however because the version of tc39 tests I use is quite old, it may be not as well tested as the ES5.1
-functionality. Because ES6 is a superset of ES5.1 it should not break your existing code.
-
-I will be adding features in their dependency order and as quickly as my time allows. Please do not ask
+I will be adding features in their dependency order and as quickly as time permits. Please do not ask
 for ETAs. Features that are open in the [milestone](https://github.com/dop251/goja/milestone/1) are either in progress
 or will be worked on next.
+
+The ongoing work is done in separate feature branches which are merged into master when appropriate.
+Every commit in these branches represents a relatively stable state (i.e. it compiles and passes all enabled tc39 tests),
+however because the version of tc39 tests I use is quite old, it may be not as well tested as the ES5.1 functionality. Because there are (usually) no major breaking changes between ECMAScript revisions
+it should not break your existing code. You are encouraged to give it a try and report any bugs found. Please do not submit fixes though without discussing it first, as the code could be changed in the meantime.
 
 ### How do I contribute?
 

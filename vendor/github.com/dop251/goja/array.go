@@ -31,7 +31,7 @@ func (ai *arrayIterObject) next() Value {
 	if ai.kind == iterationKindKey {
 		return ai.val.runtime.createIterResultObject(idxVal, false)
 	}
-	elementValue := ai.obj.self.getIdx(idxVal, nil)
+	elementValue := nilSafe(ai.obj.self.getIdx(idxVal, nil))
 	var result Value
 	if ai.kind == iterationKindValue {
 		result = elementValue
@@ -162,7 +162,7 @@ func (a *arrayObject) getIdx(idx valueInt, receiver Value) Value {
 
 func (a *arrayObject) getOwnPropStr(name unistring.String) Value {
 	if len(a.values) > 0 {
-		if i := strToIdx(name); i != math.MaxUint32 {
+		if i := strToArrayIdx(name); i != math.MaxUint32 {
 			if i < uint32(len(a.values)) {
 				return a.values[i]
 			}
@@ -264,7 +264,7 @@ func (a *arrayObject) _setOwnIdx(idx uint32, val Value, throw bool) bool {
 }
 
 func (a *arrayObject) setOwnStr(name unistring.String, val Value, throw bool) bool {
-	if idx := strToIdx(name); idx != math.MaxUint32 {
+	if idx := strToArrayIdx(name); idx != math.MaxUint32 {
 		return a._setOwnIdx(idx, val, throw)
 	} else {
 		if name == "length" {
@@ -325,7 +325,7 @@ func (a *arrayObject) ownKeys(all bool, accum []Value) []Value {
 }
 
 func (a *arrayObject) hasOwnPropertyStr(name unistring.String) bool {
-	if idx := strToIdx(name); idx != math.MaxUint32 {
+	if idx := strToArrayIdx(name); idx != math.MaxUint32 {
 		return idx < uint32(len(a.values)) && a.values[idx] != nil
 	} else {
 		return a.baseObject.hasOwnPropertyStr(name)
@@ -426,14 +426,14 @@ func (a *arrayObject) _defineIdxProperty(idx uint32, desc PropertyDescriptor, th
 				a.propValueCount++
 			}
 		} else {
-			a.val.self.(*sparseArrayObject).add(uint32(idx), prop)
+			a.val.self.(*sparseArrayObject).add(idx, prop)
 		}
 	}
 	return ok
 }
 
 func (a *arrayObject) defineOwnPropertyStr(name unistring.String, descr PropertyDescriptor, throw bool) bool {
-	if idx := strToIdx(name); idx != math.MaxUint32 {
+	if idx := strToArrayIdx(name); idx != math.MaxUint32 {
 		return a._defineIdxProperty(idx, descr, throw)
 	}
 	if name == "length" {
@@ -467,7 +467,7 @@ func (a *arrayObject) _deleteIdxProp(idx uint32, throw bool) bool {
 }
 
 func (a *arrayObject) deleteStr(name unistring.String, throw bool) bool {
-	if idx := strToIdx(name); idx != math.MaxUint32 {
+	if idx := strToArrayIdx(name); idx != math.MaxUint32 {
 		return a._deleteIdxProp(idx, throw)
 	}
 	return a.baseObject.deleteStr(name, throw)
@@ -520,114 +520,4 @@ func toIdx(v valueInt) uint32 {
 		return uint32(v)
 	}
 	return math.MaxUint32
-}
-
-func strToIdx64(s unistring.String) int64 {
-	if s == "" {
-		return -1
-	}
-	l := len(s)
-	if s[0] == '0' {
-		if l == 1 {
-			return 0
-		}
-		return -1
-	}
-	var n int64
-	if l < 19 {
-		// guaranteed not to overflow
-		for i := 0; i < len(s); i++ {
-			c := s[i]
-			if c < '0' || c > '9' {
-				return -1
-			}
-			n = n*10 + int64(c-'0')
-		}
-		return n
-	}
-	if l > 19 {
-		// guaranteed to overflow
-		return -1
-	}
-	c18 := s[18]
-	if c18 < '0' || c18 > '9' {
-		return -1
-	}
-	for i := 0; i < 18; i++ {
-		c := s[i]
-		if c < '0' || c > '9' {
-			return -1
-		}
-		n = n*10 + int64(c-'0')
-	}
-	if n >= math.MaxInt64/10+1 {
-		return -1
-	}
-	n *= 10
-	n1 := n + int64(c18-'0')
-	if n1 < n {
-		return -1
-	}
-	return n1
-}
-
-func strToIdx(s unistring.String) uint32 {
-	if s == "" {
-		return math.MaxUint32
-	}
-	l := len(s)
-	if s[0] == '0' {
-		if l == 1 {
-			return 0
-		}
-		return math.MaxUint32
-	}
-	var n uint32
-	if l < 10 {
-		// guaranteed not to overflow
-		for i := 0; i < len(s); i++ {
-			c := s[i]
-			if c < '0' || c > '9' {
-				return math.MaxUint32
-			}
-			n = n*10 + uint32(c-'0')
-		}
-		return n
-	}
-	if l > 10 {
-		// guaranteed to overflow
-		return math.MaxUint32
-	}
-	c9 := s[9]
-	if c9 < '0' || c9 > '9' {
-		return math.MaxUint32
-	}
-	for i := 0; i < 9; i++ {
-		c := s[i]
-		if c < '0' || c > '9' {
-			return math.MaxUint32
-		}
-		n = n*10 + uint32(c-'0')
-	}
-	if n >= math.MaxUint32/10+1 {
-		return math.MaxUint32
-	}
-	n *= 10
-	n1 := n + uint32(c9-'0')
-	if n1 < n {
-		return math.MaxUint32
-	}
-
-	return n1
-}
-
-func strToGoIdx(s unistring.String) int {
-	if bits.UintSize == 64 {
-		return int(strToIdx64(s))
-	}
-	i := strToIdx(s)
-	if i >= math.MaxInt32 {
-		return -1
-	}
-	return int(i)
 }
