@@ -7,7 +7,7 @@ services:
       args:
         - AWSCLI_VERSION=${AWSCLI_VERSION:-2.1.36}
         - S3CMD_VERSION=${S3CMD_VERSION:-2.1.0}
-    image: ghcr.io/k6io/k6packager:latest
+    image: ghcr.io/grafana/k6packager:latest
     environment:
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY

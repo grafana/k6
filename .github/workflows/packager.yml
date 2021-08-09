@@ -16,7 +16,7 @@ jobs:
       VERSION: 0.0.3
       AWSCLI_VERSION: 2.1.36
       S3CMD_VERSION: 2.1.0
-      DOCKER_IMAGE_ID: ghcr.io/k6io/k6packager
+      DOCKER_IMAGE_ID: ghcr.io/grafana/k6packager
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
