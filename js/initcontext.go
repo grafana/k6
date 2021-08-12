@@ -186,7 +186,10 @@ func toESModuleExports(exp modules.Exports) interface{} {
 	}
 	// Maybe check that those weren't set
 	result["default"] = exp.Default
-	result["__esModule"] = true // this so babel works with
+	// this so babel works with the `default` when it transpiles from ESM to commonjs.
+	// This should probably be removed once we have support for ESM directly. So that require doesn't get support for
+	// that while ESM has.
+	result["__esModule"] = true
 
 	return result
 }
@@ -331,6 +334,7 @@ func getJSModules() map[string]interface{} {
 	result := getInternalJSModules()
 	external := modules.GetJSModules()
 
+	// external is always prefixed with `k6/x`
 	for k, v := range external {
 		result[k] = v
 	}
