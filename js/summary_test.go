@@ -566,8 +566,8 @@ func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
 		`,
 
 	)
-	runner.SetSetupData([]byte("5"))
 	require.NoError(t, err)
+	runner.SetSetupData([]byte("5"))
 
 	summary := createTestSummary(t)
 	result, err := runner.HandleSummary(context.Background(), summary)
