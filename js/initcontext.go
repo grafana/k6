@@ -36,6 +36,16 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/js/modules/k6"
+	"go.k6.io/k6/js/modules/k6/crypto"
+	"go.k6.io/k6/js/modules/k6/crypto/x509"
+	"go.k6.io/k6/js/modules/k6/data"
+	"go.k6.io/k6/js/modules/k6/encoding"
+	"go.k6.io/k6/js/modules/k6/grpc"
+	"go.k6.io/k6/js/modules/k6/html"
+	"go.k6.io/k6/js/modules/k6/http"
+	"go.k6.io/k6/js/modules/k6/metrics"
+	"go.k6.io/k6/js/modules/k6/ws"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/loader"
 )
@@ -88,7 +98,7 @@ func NewInitContext(
 		programs:          make(map[string]programWithSource),
 		compatibilityMode: compatMode,
 		logger:            logger,
-		modules:           modules.GetJSModules(),
+		modules:           getJSModules(),
 	}
 }
 
@@ -140,14 +150,63 @@ func (i *InitContext) Require(arg string) goja.Value {
 	}
 }
 
+type moduleInstanceCoreImpl struct {
+	ctxPtr *context.Context
+	// we can technically put lib.State here as well as anything else
+}
+
+func (m *moduleInstanceCoreImpl) GetContext() context.Context {
+	return *m.ctxPtr
+}
+
+func (m *moduleInstanceCoreImpl) GetInitEnv() *common.InitEnvironment {
+	return common.GetInitEnv(*m.ctxPtr) // TODO thread it correctly instead
+}
+
+func (m *moduleInstanceCoreImpl) GetState() *lib.State {
+	return lib.GetState(*m.ctxPtr) // TODO thread it correctly instead
+}
+
+func (m *moduleInstanceCoreImpl) GetRuntime() *goja.Runtime {
+	return common.GetRuntime(*m.ctxPtr) // TODO thread it correctly instead
+}
+
+func toESModuleExports(exp modules.Exports) interface{} {
+	if exp.Named == nil {
+		return exp.Default
+	}
+	if exp.Default == nil {
+		return exp.Named
+	}
+
+	result := make(map[string]interface{}, len(exp.Named)+2)
+
+	for k, v := range exp.Named {
+		result[k] = v
+	}
+	// Maybe check that those weren't set
+	result["default"] = exp.Default
+	// this so babel works with the `default` when it transpiles from ESM to commonjs.
+	// This should probably be removed once we have support for ESM directly. So that require doesn't get support for
+	// that while ESM has.
+	result["__esModule"] = true
+
+	return result
+}
+
 func (i *InitContext) requireModule(name string) (goja.Value, error) {
 	mod, ok := i.modules[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown module: %s", name)
 	}
+	if modV2, ok := mod.(modules.IsModuleV2); ok {
+		instance := modV2.NewModuleInstance(&moduleInstanceCoreImpl{ctxPtr: i.ctxPtr})
+		return i.runtime.ToValue(toESModuleExports(instance.GetExports())), nil
+	}
 	if perInstance, ok := mod.(modules.HasModuleInstancePerVU); ok {
 		mod = perInstance.NewModuleInstancePerVU()
 	}
+
 	return i.runtime.ToValue(common.Bind(i.runtime, mod, i.ctxPtr)), nil
 }
 
@@ -254,4 +313,31 @@ func (i *InitContext) Open(ctx context.Context, filename string, args ...string)
 		return i.runtime.ToValue(&ab), nil
 	}
 	return i.runtime.ToValue(string(data)), nil
+}
+
+func getInternalJSModules() map[string]interface{} {
+	return map[string]interface{}{
+		"k6":             k6.New(),
+		"k6/crypto":      crypto.New(),
+		"k6/crypto/x509": x509.New(),
+		"k6/data":        data.New(),
+		"k6/encoding":    encoding.New(),
+		"k6/net/grpc":    grpc.New(),
+		"k6/html":        html.New(),
+		"k6/http":        http.New(),
+		"k6/metrics":     metrics.New(),
+		"k6/ws":          ws.New(),
+	}
+}
+
+func getJSModules() map[string]interface{} {
+	result := getInternalJSModules()
+	external := modules.GetJSModules()
+
+	// external is always prefixed with `k6/x`
+	for k, v := range external {
+		result[k] = v
+	}
+
+	return result
 }

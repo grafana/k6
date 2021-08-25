@@ -21,20 +21,16 @@
 package modules
 
 import (
+	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 
-	"go.k6.io/k6/js/modules/k6"
-	"go.k6.io/k6/js/modules/k6/crypto"
-	"go.k6.io/k6/js/modules/k6/crypto/x509"
-	"go.k6.io/k6/js/modules/k6/data"
-	"go.k6.io/k6/js/modules/k6/encoding"
-	"go.k6.io/k6/js/modules/k6/grpc"
-	"go.k6.io/k6/js/modules/k6/html"
+	"github.com/dop251/goja"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules/k6/http"
-	"go.k6.io/k6/js/modules/k6/metrics"
-	"go.k6.io/k6/js/modules/k6/ws"
+	"go.k6.io/k6/lib"
 )
 
 const extPrefix string = "k6/x/"
@@ -69,31 +65,111 @@ type HasModuleInstancePerVU interface {
 	NewModuleInstancePerVU() interface{}
 }
 
+// IsModuleV2 is the interface js modules should implement to get the version 2 of the system
+type IsModuleV2 interface {
+	// NewModuleInstance will get InstanceCore that should provide the module with *everything* it needs and return an
+	// Instance implementation (embedding the InstanceCore).
+	// This method will be called for *each* require/import and return an object for VUs.
+	NewModuleInstance(InstanceCore) Instance
+}
+
 // checks that modules implement HasModuleInstancePerVU
 // this is done here as otherwise there will be a loop if the module imports this package
 var _ HasModuleInstancePerVU = http.New()
 
-// GetJSModules returns a map of all js modules
+// GetJSModules returns a map of all registered js modules
 func GetJSModules() map[string]interface{} {
-	result := map[string]interface{}{
-		"k6":             k6.New(),
-		"k6/crypto":      crypto.New(),
-		"k6/crypto/x509": x509.New(),
-		"k6/data":        data.New(),
-		"k6/encoding":    encoding.New(),
-		"k6/net/grpc":    grpc.New(),
-		"k6/html":        html.New(),
-		"k6/http":        http.New(),
-		"k6/metrics":     metrics.New(),
-		"k6/ws":          ws.New(),
-	}
-
 	mx.Lock()
 	defer mx.Unlock()
+	result := make(map[string]interface{}, len(modules))
 
 	for name, module := range modules {
 		result[name] = module
 	}
 
 	return result
+}
+
+// Instance is what a module needs to return
+type Instance interface {
+	InstanceCore
+	GetExports() Exports
+}
+
+func getInterfaceMethods() []string {
+	var t Instance
+	T := reflect.TypeOf(&t).Elem()
+	result := make([]string, T.NumMethod())
+
+	for i := range result {
+		result[i] = T.Method(i).Name
+	}
+
+	return result
+}
+
+// InstanceCore is something that will be provided to modules and they need to embed it in ModuleInstance
+type InstanceCore interface {
+	GetContext() context.Context
+
+	// GetInitEnv returns common.InitEnvironment instance if present
+	GetInitEnv() *common.InitEnvironment
+
+	// GetState returns lib.State if any is present
+	GetState() *lib.State
+
+	// GetRuntime returns the goja.Runtime for the current VU
+	GetRuntime() *goja.Runtime
+
+	// sealing field will help probably with pointing users that they just need to embed this in their Instance
+	// implementations
+}
+
+// Exports is representation of ESM exports of a module
+type Exports struct {
+	// Default is what will be the `default` export of a module
+	Default interface{}
+	// Named is the named exports of a module
+	Named map[string]interface{}
+}
+
+// GenerateExports generates an Exports from a module akin to how common.Bind does now.
+// it also skips anything that is expected will not want to be exported such as methods and fields coming from
+// interfaces defined in this package.
+func GenerateExports(v interface{}) Exports {
+	exports := make(map[string]interface{})
+	val := reflect.ValueOf(v)
+	typ := val.Type()
+	badNames := getInterfaceMethods()
+outer:
+	for i := 0; i < typ.NumMethod(); i++ {
+		meth := typ.Method(i)
+		for _, badname := range badNames {
+			if meth.Name == badname {
+				continue outer
+			}
+		}
+		name := common.MethodName(typ, meth)
+
+		fn := val.Method(i)
+		exports[name] = fn.Interface()
+	}
+
+	// If v is a pointer, we need to indirect it to access its fields.
+	if typ.Kind() == reflect.Ptr {
+		val = val.Elem()
+		typ = val.Type()
+	}
+	var mic InstanceCore // TODO move this out
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		if field.Type == reflect.TypeOf(&mic).Elem() {
+			continue
+		}
+		name := common.FieldName(typ, field)
+		if name != "" {
+			exports[name] = val.Field(i).Interface()
+		}
+	}
+	return Exports{Default: exports, Named: exports}
 }
