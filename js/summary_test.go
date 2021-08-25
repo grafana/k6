@@ -571,6 +571,7 @@ func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
 
 	summary := createTestSummary(t)
 	result, err := runner.HandleSummary(context.Background(), summary)
+	require.NoError(t, err)
 	dataWithSetup, err := ioutil.ReadAll(result["dataWithSetup.json"])
 	require.NoError(t, err)
 	t.Log(expectedHandleSummaryDataWithSetup)
