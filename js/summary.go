@@ -116,11 +116,12 @@ func summarizeMetricsToObject(data *lib.Summary, options lib.Options, setupData 
 		metricsData[name] = metricData
 	}
 	m["metrics"] = metricsData
-
+	
 	var setupDataI interface{}
 	if setupData != nil {
 		if err := json.Unmarshal(setupData, &setupDataI); err != nil {
-			return nil
+			//TODO: log the error
+			return m 
 		}
 	} else {
 		setupDataI = goja.Undefined()
