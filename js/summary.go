@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"time"
+	
 	"encoding/json"
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/common"
@@ -116,7 +117,7 @@ func summarizeMetricsToObject(data *lib.Summary, options lib.Options, setupData 
 		metricsData[name] = metricData
 	}
 	m["metrics"] = metricsData
-	
+
 	var setupDataI interface{}
 	if setupData != nil {
 		if err := json.Unmarshal(setupData, &setupDataI); err != nil {

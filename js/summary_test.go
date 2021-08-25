@@ -574,8 +574,6 @@ func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
 	require.NoError(t, err)
 	dataWithSetup, err := ioutil.ReadAll(result["dataWithSetup.json"])
 	require.NoError(t, err)
-	t.Log(expectedHandleSummaryDataWithSetup)
-	t.Log(string(dataWithSetup))
 	assert.JSONEq(t, expectedHandleSummaryDataWithSetup, string(dataWithSetup))
 }
 
