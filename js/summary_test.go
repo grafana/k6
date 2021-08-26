@@ -564,7 +564,6 @@ func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
 			return {'dataWithSetup.json': JSON.stringify(data)};
 		};
 		`,
-
 	)
 	require.NoError(t, err)
 	runner.SetSetupData([]byte("5"))
