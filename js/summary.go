@@ -22,11 +22,11 @@ package js
 
 import (
 	_ "embed" // this is used to embed the contents of summary.js
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"
 
-	"encoding/json"
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -121,7 +121,7 @@ func summarizeMetricsToObject(data *lib.Summary, options lib.Options, setupData 
 	var setupDataI interface{}
 	if setupData != nil {
 		if err := json.Unmarshal(setupData, &setupDataI); err != nil {
-			//TODO: log the error
+			// TODO: log the error
 			return m
 		}
 	} else {
