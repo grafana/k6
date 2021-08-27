@@ -395,6 +395,124 @@ const expectedHandleSummaryRawData = `
     }
 }`
 
+const expectedHandleSummaryDataWithSetup = `
+{
+    "root_group": {
+        "groups": [
+            {
+                "name": "child",
+                "path": "::child",
+                "id": "f41cbb53a398ec1c9fb3d33e20c9b040",
+                "groups": [],
+                "checks": [
+                        {
+                            "id": "6289a7a06253a1c3f6137dfb25695563",
+                            "passes": 30,
+                            "fails": 0,
+                            "name": "check1",
+                            "path": "::child::check1"
+                        },
+                        {
+                            "fails": 5,
+                            "name": "check3",
+                            "path": "::child::check3",
+                            "id": "c7553eca92d3e034b5808332296d304a",
+                            "passes": 10
+                        },
+                        {
+                            "name": "check2",
+                            "path": "::child::check2",
+                            "id": "06f5922794bef0d4584ba76a49893e1f",
+                            "passes": 5,
+                            "fails": 10
+                        }
+                    ]
+            }
+        ],
+        "checks": [],
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "options": {
+        "summaryTrendStats": [
+            "avg",
+            "min",
+            "med",
+            "max",
+            "p(90)",
+            "p(95)",
+            "p(99)",
+            "count"
+        ],
+        "summaryTimeUnit": "",
+		"noColor": false
+    },
+	"state": {
+		"isStdErrTTY": false,
+		"isStdOutTTY": false,
+		"testRunDurationMs": 1000
+	},
+	"setup_data": 5,
+    "metrics": {
+        "checks": {
+            "contains": "default",
+            "values": {
+                "passes": 45,
+                "fails": 15,
+                "rate": 0.75
+            },
+            "type": "rate",
+            "thresholds": {
+                "rate>70": {
+                    "ok": true
+                }
+            }
+        },
+        "my_trend": {
+            "thresholds": {
+                "my_trend<1000": {
+                    "ok": false
+                }
+            },
+            "type": "trend",
+            "contains": "time",
+            "values": {
+                "max": 20,
+                "p(90)": 19,
+                "p(95)": 19.5,
+                "p(99)": 19.9,
+                "count": 3,
+                "avg": 15,
+                "min": 10,
+                "med": 15
+            }
+        },
+        "vus": {
+            "contains": "default",
+            "values": {
+                "value": 1,
+                "min": 1,
+                "max": 1
+            },
+            "type": "gauge"
+        },
+        "http_reqs": {
+            "type": "counter",
+            "contains": "default",
+            "values": {
+                "count": 3,
+                "rate": 3
+            },
+            "thresholds": {
+                "rate<100": {
+                    "ok": false
+                }
+            }
+        }
+    }
+}`
+
 func TestRawHandleSummaryData(t *testing.T) {
 	t.Parallel()
 	runner, err := getSimpleRunner(
@@ -430,6 +548,32 @@ func TestRawHandleSummaryData(t *testing.T) {
 	newRawData, err := ioutil.ReadAll(result["rawdata.json"])
 	require.NoError(t, err)
 	assert.JSONEq(t, expectedHandleSummaryRawData, string(newRawData))
+}
+
+func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
+	t.Parallel()
+	runner, err := getSimpleRunner(
+		t, "/script.js",
+		`
+		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
+		exports.default = function() { /* we don't run this, metrics are mocked */ };
+		exports.handleSummary = function(data) {
+			if(data.setup_data != 5) {
+				throw new Error("handleSummary: wrong data: " + JSON.stringify(data))
+			}
+			return {'dataWithSetup.json': JSON.stringify(data)};
+		};
+		`,
+	)
+	require.NoError(t, err)
+	runner.SetSetupData([]byte("5"))
+
+	summary := createTestSummary(t)
+	result, err := runner.HandleSummary(context.Background(), summary)
+	require.NoError(t, err)
+	dataWithSetup, err := ioutil.ReadAll(result["dataWithSetup.json"])
+	require.NoError(t, err)
+	assert.JSONEq(t, expectedHandleSummaryDataWithSetup, string(dataWithSetup))
 }
 
 func TestWrongSummaryHandlerExportTypes(t *testing.T) {

@@ -22,6 +22,7 @@ package js
 
 import (
 	_ "embed" // this is used to embed the contents of summary.js
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -79,7 +80,7 @@ func metricValueGetter(summaryTrendStats []string) func(stats.Sink, time.Duratio
 
 // summarizeMetricsToObject transforms the summary objects in a way that's
 // suitable to pass to the JS runtime or export to JSON.
-func summarizeMetricsToObject(data *lib.Summary, options lib.Options) map[string]interface{} {
+func summarizeMetricsToObject(data *lib.Summary, options lib.Options, setupData []byte) map[string]interface{} {
 	m := make(map[string]interface{})
 	m["root_group"] = exportGroup(data.RootGroup)
 	m["options"] = map[string]interface{}{
@@ -116,6 +117,18 @@ func summarizeMetricsToObject(data *lib.Summary, options lib.Options) map[string
 		metricsData[name] = metricData
 	}
 	m["metrics"] = metricsData
+
+	var setupDataI interface{}
+	if setupData != nil {
+		if err := json.Unmarshal(setupData, &setupDataI); err != nil {
+			// TODO: log the error
+			return m
+		}
+	} else {
+		setupDataI = goja.Undefined()
+	}
+
+	m["setup_data"] = setupDataI
 
 	return m
 }
