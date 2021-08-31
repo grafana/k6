@@ -104,7 +104,7 @@ func TestExecutionInfoVUSharing(t *testing.T) {
 	vuStats := map[uint64]*vuStat{}
 
 	type logEntry struct {
-		IdInInstance        uint64
+		IDInInstance        uint64
 		Scenario            string
 		IterationInInstance uint64
 		IterationInScenario uint64
@@ -122,15 +122,15 @@ func TestExecutionInfoVUSharing(t *testing.T) {
 		for _, entry := range entries {
 			err = json.Unmarshal([]byte(entry.Message), le)
 			require.NoError(t, err)
-			assert.Contains(t, []uint64{1, 2}, le.IdInInstance)
-			if _, ok := vuStats[le.IdInInstance]; !ok {
-				vuStats[le.IdInInstance] = &vuStat{0, make(map[string]uint64)}
+			assert.Contains(t, []uint64{1, 2}, le.IDInInstance)
+			if _, ok := vuStats[le.IDInInstance]; !ok {
+				vuStats[le.IDInInstance] = &vuStat{0, make(map[string]uint64)}
 			}
-			if le.IterationInInstance > vuStats[le.IdInInstance].iteration {
-				vuStats[le.IdInInstance].iteration = le.IterationInInstance
+			if le.IterationInInstance > vuStats[le.IDInInstance].iteration {
+				vuStats[le.IDInInstance].iteration = le.IterationInInstance
 			}
-			if le.IterationInScenario > vuStats[le.IdInInstance].scIter[le.Scenario] {
-				vuStats[le.IdInInstance].scIter[le.Scenario] = le.IterationInScenario
+			if le.IterationInScenario > vuStats[le.IDInInstance].scIter[le.Scenario] {
+				vuStats[le.IDInInstance].scIter[le.Scenario] = le.IterationInScenario
 			}
 		}
 		require.Len(t, vuStats, 2)
