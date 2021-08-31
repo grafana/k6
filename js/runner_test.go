@@ -2021,3 +2021,102 @@ func TestMinIterationDurationIsCancellable(t *testing.T) {
 		require.NoError(t, err)
 	}
 }
+
+func TestExecutionInfo(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name, script, expErr string
+	}{
+		{name: "vu_ok", script: `
+		var exec = require('k6/execution');
+
+		exports.default = function() {
+			if (exec.vu.idInInstance !== 1) throw new Error('unexpected VU ID: '+exec.vu.idInInstance);
+			if (exec.vu.idInTest !== 10) throw new Error('unexpected global VU ID: '+exec.vu.idInTest);
+			if (exec.vu.iterationInInstance !== 0) throw new Error('unexpected VU iteration: '+exec.vu.iterationInInstance);
+			if (exec.vu.iterationInScenario !== 0) throw new Error('unexpected scenario iteration: '+exec.vu.iterationInScenario);
+		}`},
+		{name: "vu_err", script: `
+		var exec = require('k6/execution');
+		exec.vu;
+		`, expErr: "getting VU information in the init context is not supported"},
+		{name: "scenario_ok", script: `
+		var exec = require('k6/execution');
+		var sleep = require('k6').sleep;
+
+		exports.default = function() {
+			var si = exec.scenario;
+			sleep(0.1);
+			if (si.name !== 'default') throw new Error('unexpected scenario name: '+si.name);
+			if (si.executor !== 'test-exec') throw new Error('unexpected executor: '+si.executor);
+			if (si.startTime > new Date().getTime()) throw new Error('unexpected startTime: '+si.startTime);
+			if (si.progress !== 0.1) throw new Error('unexpected progress: '+si.progress);
+			if (si.iterationInInstance !== 3) throw new Error('unexpected scenario local iteration: '+si.iterationInInstance);
+			if (si.iterationInTest !== 4) throw new Error('unexpected scenario local iteration: '+si.iterationInTest);
+		}`},
+		{name: "scenario_err", script: `
+		var exec = require('k6/execution');
+		exec.scenario;
+		`, expErr: "getting scenario information in the init context is not supported"},
+		{name: "test_ok", script: `
+		var exec = require('k6/execution');
+
+		exports.default = function() {
+			var ti = exec.instance;
+			if (ti.currentTestRunDuration !== 0) throw new Error('unexpected test duration: '+ti.currentTestRunDuration);
+			if (ti.vusActive !== 1) throw new Error('unexpected vusActive: '+ti.vusActive);
+			if (ti.vusInitialized !== 0) throw new Error('unexpected vusInitialized: '+ti.vusInitialized);
+			if (ti.iterationsCompleted !== 0) throw new Error('unexpected iterationsCompleted: '+ti.iterationsCompleted);
+			if (ti.iterationsInterrupted !== 0) throw new Error('unexpected iterationsInterrupted: '+ti.iterationsInterrupted);
+		}`},
+		{name: "test_err", script: `
+		var exec = require('k6/execution');
+		exec.instance;
+		`, expErr: "getting instance information in the init context is not supported"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r, err := getSimpleRunner(t, "/script.js", tc.script)
+			if tc.expErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expErr)
+				return
+			}
+			require.NoError(t, err)
+
+			samples := make(chan stats.SampleContainer, 100)
+			initVU, err := r.NewVU(1, 10, samples)
+			require.NoError(t, err)
+
+			execScheduler, err := local.NewExecutionScheduler(r, testutils.NewLogger(t))
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ctx = lib.WithExecutionState(ctx, execScheduler.GetState())
+			ctx = lib.WithScenarioState(ctx, &lib.ScenarioState{
+				Name:      "default",
+				Executor:  "test-exec",
+				StartTime: time.Now(),
+				ProgressFn: func() (float64, []string) {
+					return 0.1, nil
+				},
+			})
+			vu := initVU.Activate(&lib.VUActivationParams{
+				RunContext:               ctx,
+				Exec:                     "default",
+				GetNextIterationCounters: func() (uint64, uint64) { return 3, 4 },
+			})
+
+			execState := execScheduler.GetState()
+			execState.ModCurrentlyActiveVUsCount(+1)
+			err = vu.RunOnce()
+			assert.NoError(t, err)
+		})
+	}
+}
