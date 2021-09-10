@@ -22,6 +22,7 @@ package local
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/url"
 	"testing"
@@ -311,5 +312,121 @@ func TestSharedIterationsStable(t *testing.T) {
 		assert.ElementsMatch(t, expIters, gotGlobalIters)
 	case <-time.After(5 * time.Second):
 		t.Fatal("timed out")
+	}
+}
+
+func TestExecutionInfoAll(t *testing.T) {
+	t.Parallel()
+
+	scriptTemplate := `
+	import { sleep } from 'k6';
+	import exec from "k6/execution";
+
+	export let options = {
+		scenarios: {
+			executor: {
+				executor: "%[1]s",
+				%[2]s
+			}
+		}
+	}
+
+	export default function () {
+		sleep(0.2);
+		console.log(JSON.stringify(exec));
+	}`
+
+	executorConfigs := map[string]string{
+		"constant-arrival-rate": `
+			rate: 1,
+			timeUnit: "1s",
+			duration: "1s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,
+			gracefulStop: "0s",`,
+		"constant-vus": `
+			vus: 1,
+			duration: "1s",
+			gracefulStop: "0s",`,
+		"externally-controlled": `
+			vus: 1,
+			duration: "1s",`,
+		"per-vu-iterations": `
+			vus: 1,
+			iterations: 1,
+			gracefulStop: "0s",`,
+		"shared-iterations": `
+			vus: 1,
+			iterations: 1,
+			gracefulStop: "0s",`,
+		"ramping-arrival-rate": `
+			startRate: 1,
+			timeUnit: "0.5s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,
+			stages: [ { target: 1, duration: "1s" } ],
+			gracefulStop: "0s",`,
+		"ramping-vus": `
+			startVUs: 1,
+			stages: [ { target: 1, duration: "1s" } ],
+			gracefulStop: "0s",`,
+	}
+
+	testCases := []struct{ name, script string }{}
+
+	for ename, econf := range executorConfigs {
+		testCases = append(testCases, struct{ name, script string }{
+			ename, fmt.Sprintf(scriptTemplate, ename, econf),
+		})
+	}
+
+	// We're only checking a small subset of all properties, to ensure
+	// there were no errors with accessing any of the top-level ones.
+	// Most of the others are time-based, and would be difficult/flaky to check.
+	type logEntry struct {
+		Scenario struct{ Executor string }
+		Instance struct{ VUsActive int }
+		VU       struct{ IDInTest int }
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			logger := logrus.New()
+			logger.SetOutput(ioutil.Discard)
+			logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel}}
+			logger.AddHook(&logHook)
+
+			runner, err := js.New(logger, &loader.SourceData{
+				URL:  &url.URL{Path: "/script.js"},
+				Data: []byte(tc.script),
+			}, nil, lib.RuntimeOptions{})
+			require.NoError(t, err)
+
+			ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, lib.Options{})
+			defer cancel()
+
+			errCh := make(chan error, 1)
+			go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
+
+			select {
+			case err := <-errCh:
+				require.NoError(t, err)
+				entries := logHook.Drain()
+				require.GreaterOrEqual(t, len(entries), 1)
+
+				le := &logEntry{}
+				err = json.Unmarshal([]byte(entries[0].Message), le)
+				require.NoError(t, err)
+
+				assert.Equal(t, tc.name, le.Scenario.Executor)
+				assert.Equal(t, 1, le.Instance.VUsActive)
+				assert.Equal(t, 1, le.VU.IDInTest)
+			case <-time.After(5 * time.Second):
+				t.Fatal("timed out")
+			}
+		})
 	}
 }

@@ -522,6 +522,14 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 	).Debug("Starting executor run...")
 
 	startMaxVUs := mex.executionState.Options.ExecutionSegment.Scale(mex.config.MaxVUs.Int64)
+
+	ss := &lib.ScenarioState{
+		Name:      mex.config.Name,
+		Executor:  mex.config.Type,
+		StartTime: time.Now(),
+	}
+	ctx = lib.WithScenarioState(ctx, ss)
+
 	runState := &externallyControlledRunState{
 		ctx:             ctx,
 		executor:        mex,
@@ -533,17 +541,12 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats
 		maxVUs:          new(int64),
 		runIteration:    getIterationRunner(mex.executionState, mex.logger),
 	}
+	ss.ProgressFn = runState.progressFn
+
 	*runState.maxVUs = startMaxVUs
 	if err = runState.retrieveStartMaxVUs(); err != nil {
 		return err
 	}
-
-	ctx = lib.WithScenarioState(ctx, &lib.ScenarioState{
-		Name:       mex.config.Name,
-		Executor:   mex.config.Type,
-		StartTime:  time.Now(),
-		ProgressFn: runState.progressFn,
-	})
 
 	mex.progress.Modify(pb.WithProgress(runState.progressFn)) // Keep track of the progress
 	go trackProgress(parentCtx, ctx, ctx, mex, runState.progressFn)
