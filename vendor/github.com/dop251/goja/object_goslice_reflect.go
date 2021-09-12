@@ -196,7 +196,7 @@ func (o *objectGoSliceReflect) setForeignIdx(idx valueInt, val, receiver Value, 
 }
 
 func (o *objectGoSliceReflect) setForeignStr(name unistring.String, val, receiver Value, throw bool) (bool, bool) {
-	return o._setForeignStr(name, trueValIfPresent(o._hasStr(name)), val, receiver, throw)
+	return o._setForeignStr(name, trueValIfPresent(o.hasOwnPropertyStr(name)), val, receiver, throw)
 }
 
 func (o *objectGoSliceReflect) hasOwnPropertyIdx(idx valueInt) bool {
@@ -204,7 +204,7 @@ func (o *objectGoSliceReflect) hasOwnPropertyIdx(idx valueInt) bool {
 }
 
 func (o *objectGoSliceReflect) hasOwnPropertyStr(name unistring.String) bool {
-	if o._hasStr(name) {
+	if o._hasStr(name) || name == "length" {
 		return true
 	}
 	return o.objectGoReflect._has(name.String())
