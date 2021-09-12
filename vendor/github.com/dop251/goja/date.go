@@ -24,51 +24,80 @@ type dateObject struct {
 	msec int64
 }
 
+type dateLayoutDesc struct {
+	layout   string
+	dateOnly bool
+}
+
 var (
-	dateLayoutList = []string{
-		"2006-01-02T15:04:05Z0700",
-		"2006-01-02T15:04:05",
-		"2006-01-02",
-		"2006-01-02 15:04:05",
-		time.RFC1123,
-		time.RFC1123Z,
-		dateTimeLayout,
-		time.UnixDate,
-		time.ANSIC,
-		time.RubyDate,
-		"Mon, 02 Jan 2006 15:04:05 GMT-0700 (MST)",
-		"Mon, 02 Jan 2006 15:04:05 -0700 (MST)",
+	dateLayoutsNumeric = []dateLayoutDesc{
+		{layout: "2006-01-02T15:04:05Z0700"},
+		{layout: "2006-01-02T15:04:05"},
+		{layout: "2006-01-02", dateOnly: true},
+		{layout: "2006-01-02 15:04:05"},
 
-		"2006",
-		"2006-01",
+		{layout: "2006", dateOnly: true},
+		{layout: "2006-01", dateOnly: true},
 
-		"2006T15:04",
-		"2006-01T15:04",
-		"2006-01-02T15:04",
+		{layout: "2006T15:04"},
+		{layout: "2006-01T15:04"},
+		{layout: "2006-01-02T15:04"},
 
-		"2006T15:04:05",
-		"2006-01T15:04:05",
+		{layout: "2006T15:04:05"},
+		{layout: "2006-01T15:04:05"},
 
-		"2006T15:04Z0700",
-		"2006-01T15:04Z0700",
-		"2006-01-02T15:04Z0700",
+		{layout: "2006T15:04Z0700"},
+		{layout: "2006-01T15:04Z0700"},
+		{layout: "2006-01-02T15:04Z0700"},
 
-		"2006T15:04:05Z0700",
-		"2006-01T15:04:05Z0700",
+		{layout: "2006T15:04:05Z0700"},
+		{layout: "2006-01T15:04:05Z0700"},
+	}
+
+	dateLayoutsAlpha = []dateLayoutDesc{
+		{layout: time.RFC1123},
+		{layout: time.RFC1123Z},
+		{layout: dateTimeLayout},
+		{layout: time.UnixDate},
+		{layout: time.ANSIC},
+		{layout: time.RubyDate},
+		{layout: "Mon, _2 Jan 2006 15:04:05 GMT-0700 (MST)"},
+		{layout: "Mon, _2 Jan 2006 15:04:05 -0700 (MST)"},
+		{layout: "Jan _2, 2006", dateOnly: true},
 	}
 )
 
 func dateParse(date string) (time.Time, bool) {
 	var t time.Time
 	var err error
-	for _, layout := range dateLayoutList {
-		t, err = parseDate(layout, date, time.UTC)
+	var layouts []dateLayoutDesc
+	if len(date) > 0 {
+		first := date[0]
+		if first <= '9' && (first >= '0' || first == '-' || first == '+') {
+			layouts = dateLayoutsNumeric
+		} else {
+			layouts = dateLayoutsAlpha
+		}
+	} else {
+		return time.Time{}, false
+	}
+	for _, desc := range layouts {
+		var defLoc *time.Location
+		if desc.dateOnly {
+			defLoc = time.UTC
+		} else {
+			defLoc = time.Local
+		}
+		t, err = parseDate(desc.layout, date, defLoc)
 		if err == nil {
 			break
 		}
 	}
+	if err != nil {
+		return time.Time{}, false
+	}
 	unix := timeToMsec(t)
-	return t, err == nil && unix >= -maxTime && unix <= maxTime
+	return t, unix >= -maxTime && unix <= maxTime
 }
 
 func (r *Runtime) newDateObject(t time.Time, isSet bool, proto *Object) *Object {
