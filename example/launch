@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+
+cd .. && xk6 build \
+  --with github.com/grafana/xk6-output-prometheus-remote=. \
+  && \
+./k6 run example/test.js -o output-prometheus-remote

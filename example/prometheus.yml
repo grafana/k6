@@ -1,0 +1,15 @@
+global:
+  scrape_interval:     10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+remote_write:
+  - url: "http://promscale:9201/write"
+
+remote_read:
+  - url: "http://promscale:9201/read"
+    read_recent: true

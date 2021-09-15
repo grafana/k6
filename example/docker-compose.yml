@@ -1,0 +1,36 @@
+version: '3.0'
+
+services:
+  db:
+    image: timescaledev/timescaledb-ha:pg12-latest
+    ports:
+      - 5432:5432/tcp
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+
+  prometheus:
+    image: prom/prometheus:latest
+    command: --enable-feature=remote-write-receiver --config.file=/etc/prometheus/prometheus.yml 
+    ports:
+      - 9090:9090/tcp
+    volumes:
+      - ${PWD}/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  promscale:
+    image: timescale/promscale:latest
+    ports:
+      - 9201:9201/tcp
+    restart: on-failure
+    depends_on:
+      - db
+      - prometheus
+    environment:
+      PROMSCALE_DB_CONNECT_RETRIES: 10
+      PROMSCALE_WEB_TELEMETRY_PATH: /metrics-text
+      PROMSCALE_DB_URI: postgres://postgres:password@db:5432/postgres?sslmode=allow
+
+#   node_exporter:
+#     image: quay.io/prometheus/node-exporter
+#     ports:
+#       - "9100:9100"
