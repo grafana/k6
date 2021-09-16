@@ -194,11 +194,11 @@ func (o *Output) Start() error {
 	}
 
 	if hres.Version != nil && strings.HasPrefix(*hres.Version, "1.") {
-		if err := o.createDatabase18(); err != nil {
+		if err = o.createDatabase18(ctx); err != nil {
 			return fmt.Errorf("not possible to create the specified Database %q: %w", o.Config.Bucket.String, err)
 		}
 	} else {
-		if err := o.createBucket(ctx); err != nil {
+		if err = o.createBucket(ctx); err != nil {
 			return fmt.Errorf("not possible to create or find the specified Bucket %q: %w", o.Config.Bucket.String, err)
 		}
 	}
@@ -260,7 +260,7 @@ func (o *Output) createBucket(ctx context.Context) error {
 }
 
 // createDatabase18 create a database using the v1 API for the old 1.8+ InfluxDB server versions.
-func (o *Output) createDatabase18() error {
+func (o *Output) createDatabase18(ctx context.Context) error {
 	// it uses the Bucket value following the compatibility mode
 	db := o.Config.Bucket.String
 
@@ -268,11 +268,11 @@ func (o *Output) createDatabase18() error {
 	q.Set("q", fmt.Sprintf("CREATE DATABASE %s", db))
 	b := strings.NewReader(q.Encode())
 
-	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/query", o.Config.Addr.String), b)
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/query", o.Config.Addr.String), b)
 	if err != nil {
 		return err
 	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	if o.Config.Username.Valid {
 		req.SetBasicAuth(o.Config.Username.String, o.Config.Password.String)
@@ -282,7 +282,7 @@ func (o *Output) createDatabase18() error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		rb, err := io.ReadAll(resp.Body)

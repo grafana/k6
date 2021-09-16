@@ -164,13 +164,15 @@ func ParseURL(text string) (Config, error) {
 				return c, fmt.Errorf("insecureSkipTLSVerify must be true or false, not %s", vs[0])
 			}
 		case "precision":
-			d, err := types.ParseExtendedDuration(vs[0])
+			var d time.Duration
+			d, err = types.ParseExtendedDuration(vs[0])
 			if err != nil {
 				return c, err
 			}
 			c.Precision = types.NullDurationFrom(d)
 		case "retention":
-			d, err := types.ParseExtendedDuration(vs[0])
+			var d time.Duration
+			d, err = types.ParseExtendedDuration(vs[0])
 			if err != nil {
 				return c, err
 			}
