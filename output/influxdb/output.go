@@ -245,7 +245,7 @@ func (o *Output) createBucket(ctx context.Context) error {
 		rr = []influxdomain.RetentionRule{
 			{
 				// duration in seconds for how long data will be kept in the database
-				EverySeconds: int(time.Duration(o.Config.Retention.Duration).Round(time.Second).Seconds()),
+				EverySeconds: int64(time.Duration(o.Config.Retention.Duration).Round(time.Second).Seconds()),
 				Type:         influxdomain.RetentionRuleTypeExpire,
 			},
 		}
