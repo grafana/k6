@@ -37,19 +37,21 @@ import (
 
 type Config struct {
 	// Connection.
-	Addr             null.String        `json:"addr" envconfig:"K6_INFLUXDB_ADDR"`
-	Username         null.String        `json:"username,omitempty" envconfig:"K6_INFLUXDB_USERNAME"`
-	Password         null.String        `json:"password,omitempty" envconfig:"K6_INFLUXDB_PASSWORD"`
-	Organization     null.String        `json:"organization" envconfig:"K6_INFLUXDB_ORGANIZATION"`
-	Bucket           null.String        `json:"bucket" envconfig:"K6_INFLUXDB_BUCKET"`
-	Token            null.String        `json:"token" envconfig:"K6_INFLUXDB_TOKEN"`
-	Insecure         null.Bool          `json:"insecure,omitempty" envconfig:"K6_INFLUXDB_INSECURE"`
-	PushInterval     types.NullDuration `json:"pushInterval,omitempty" envconfig:"K6_INFLUXDB_PUSH_INTERVAL"`
-	ConcurrentWrites null.Int           `json:"concurrentWrites,omitempty" envconfig:"K6_INFLUXDB_CONCURRENT_WRITES"`
+	Addr                  null.String        `json:"addr" envconfig:"K6_INFLUXDB_ADDR"`
+	Username              null.String        `json:"username,omitempty" envconfig:"K6_INFLUXDB_USERNAME"`
+	Password              null.String        `json:"password,omitempty" envconfig:"K6_INFLUXDB_PASSWORD"`
+	Organization          null.String        `json:"organization" envconfig:"K6_INFLUXDB_ORGANIZATION"`
+	Bucket                null.String        `json:"bucket" envconfig:"K6_INFLUXDB_BUCKET"`
+	Token                 null.String        `json:"token" envconfig:"K6_INFLUXDB_TOKEN"`
+	InsecureSkipTLSVerify null.Bool          `json:"insecureSkipTLSVerify,omitempty" envconfig:"K6_INFLUXDB_INSECURE"`
+	PushInterval          types.NullDuration `json:"pushInterval,omitempty" envconfig:"K6_INFLUXDB_PUSH_INTERVAL"`
+	ConcurrentWrites      null.Int           `json:"concurrentWrites,omitempty" envconfig:"K6_INFLUXDB_CONCURRENT_WRITES"`
 
 	// Samples.
-	DB           null.String `json:"db" envconfig:"K6_INFLUXDB_DB"`
-	TagsAsFields []string    `json:"tagsAsFields,omitempty" envconfig:"K6_INFLUXDB_TAGS_AS_FIELDS"`
+	DB           null.String        `json:"db" envconfig:"K6_INFLUXDB_DB"`
+	Precision    types.NullDuration `json:"precision,omitempty" envconfig:"K6_INFLUXDB_PRECISION"`
+	Retention    types.NullDuration `json:"retention,omitempty" envconfig:"K6_INFLUXDB_RETENTION"`
+	TagsAsFields []string           `json:"tagsAsFields,omitempty" envconfig:"K6_INFLUXDB_TAGS_AS_FIELDS"`
 }
 
 // NewConfig creates a new InfluxDB output config with some default values.
@@ -70,8 +72,8 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.DB.Valid {
 		c.DB = cfg.DB
 	}
-	if cfg.Insecure.Valid {
-		c.Insecure = cfg.Insecure
+	if cfg.InsecureSkipTLSVerify.Valid {
+		c.InsecureSkipTLSVerify = cfg.InsecureSkipTLSVerify
 	}
 	if cfg.Username.Valid {
 		c.Username = cfg.Username
@@ -87,6 +89,12 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.ConcurrentWrites.Valid {
 		c.ConcurrentWrites = cfg.ConcurrentWrites
+	}
+	if cfg.Precision.Valid {
+		c.Precision = cfg.Precision
+	}
+	if cfg.Retention.Valid {
+		c.Retention = cfg.Retention
 	}
 	if cfg.Organization.Valid {
 		c.Organization = cfg.Organization
@@ -145,16 +153,28 @@ func ParseURL(text string) (Config, error) {
 	}
 	for k, vs := range u.Query() {
 		switch k {
-		case "insecure":
+		case "insecureSkipTLSVerify":
 			switch vs[0] {
 			case "":
 			case "false":
-				c.Insecure = null.BoolFrom(false)
+				c.InsecureSkipTLSVerify = null.BoolFrom(false)
 			case "true":
-				c.Insecure = null.BoolFrom(true)
+				c.InsecureSkipTLSVerify = null.BoolFrom(true)
 			default:
-				return c, fmt.Errorf("insecure must be true or false, not %s", vs[0])
+				return c, fmt.Errorf("insecureSkipTLSVerify must be true or false, not %s", vs[0])
 			}
+		case "precision":
+			d, err := types.ParseExtendedDuration(vs[0])
+			if err != nil {
+				return c, err
+			}
+			c.Precision = types.NullDurationFrom(d)
+		case "retention":
+			d, err := types.ParseExtendedDuration(vs[0])
+			if err != nil {
+				return c, err
+			}
+			c.Retention = types.NullDurationFrom(d)
 		case "pushInterval":
 			err = c.PushInterval.UnmarshalText([]byte(vs[0]))
 			if err != nil {

@@ -24,6 +24,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"strings"
+	"time"
 
 	client "github.com/influxdata/influxdb-client-go/v2"
 	influxdblog "github.com/influxdata/influxdb-client-go/v2/log"
@@ -41,8 +42,11 @@ func MakeClient(conf Config) (client.Client, error) {
 	}
 	opts := client.DefaultOptions().
 		SetTLSConfig(&tls.Config{
-			InsecureSkipVerify: conf.Insecure.Bool, //nolint:gosec
+			InsecureSkipVerify: conf.InsecureSkipTLSVerify.Bool, //nolint:gosec
 		})
+	if conf.Precision.Valid {
+		opts.SetPrecision(time.Duration(conf.Precision.Duration))
+	}
 	return client.NewClientWithOptions(conf.Addr.String, conf.Token.String, opts), nil
 }
 

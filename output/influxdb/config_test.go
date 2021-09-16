@@ -44,11 +44,13 @@ func TestParseURL(t *testing.T) {
 		Err    string
 	}{
 		"?":                                  {Config{}, ""},
-		"?insecure=false":                    {Config{Insecure: null.BoolFrom(false)}, ""},
-		"?insecure=true":                     {Config{Insecure: null.BoolFrom(true)}, ""},
-		"?insecure=ture":                     {Config{}, "insecure must be true or false, not ture"},
+		"?insecureSkipTLSVerify=false":       {Config{InsecureSkipTLSVerify: null.BoolFrom(false)}, ""},
+		"?insecureSkipTLSVerify=true":        {Config{InsecureSkipTLSVerify: null.BoolFrom(true)}, ""},
+		"?insecureSkipTLSVerify=ture":        {Config{}, "insecureSkipTLSVerify must be true or false, not ture"},
 		"?pushInterval=5s":                   {Config{PushInterval: types.NullDurationFrom(5 * time.Second)}, ""},
 		"?concurrentWrites=2":                {Config{ConcurrentWrites: null.IntFrom(2)}, ""},
+		"?precision=5s":                      {Config{Precision: types.NullDurationFrom(5 * time.Second)}, ""},
+		"?retention=7d":                      {Config{Retention: types.NullDurationFrom(7 * 24 * time.Hour)}, ""},
 		"?tagsAsFields=foo&tagsAsFields=bar": {Config{TagsAsFields: []string{"foo", "bar"}}, ""},
 	}
 	for str, data := range testdata {

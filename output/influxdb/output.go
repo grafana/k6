@@ -23,12 +23,17 @@ package influxdb
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	client "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
+	influxdomain "github.com/influxdata/influxdb-client-go/v2/domain"
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/stats"
@@ -181,10 +186,20 @@ func (o *Output) Description() string {
 // metric flushing. If gzip encoding is specified, it also handles that.
 func (o *Output) Start() error {
 	o.logger.Debug("Starting...")
+	ctx := context.Background()
 
-	if o.Config.Organization.String != "" && o.Config.Bucket.String != "" {
-		if err := o.createBucket(); err != nil {
-			return fmt.Errorf("is not possible to create or find the specified Bucket: %w", err)
+	hres, err := o.Client.Health(ctx)
+	if err != nil || hres.Status != influxdomain.HealthCheckStatusPass {
+		return fmt.Errorf("the server healthcheck has failed")
+	}
+
+	if hres.Version != nil && strings.HasPrefix(*hres.Version, "1.") {
+		if err := o.createDatabase18(); err != nil {
+			return fmt.Errorf("not possible to create the specified Database %q: %w", o.Config.Bucket.String, err)
+		}
+	} else {
+		if err := o.createBucket(ctx); err != nil {
+			return fmt.Errorf("not possible to create or find the specified Bucket %q: %w", o.Config.Bucket.String, err)
 		}
 	}
 
@@ -208,16 +223,8 @@ func (o *Output) Stop() error {
 }
 
 // createBucket creates the configured bucket if it doesn't exist
-func (o *Output) createBucket() error {
-	ctx := context.Background()
-
-	org, err := o.Client.OrganizationsAPI().FindOrganizationByName(ctx, o.Config.Organization.String)
-	if err != nil {
-		return err
-	}
-
-	buckets := o.Client.BucketsAPI()
-	_, err = buckets.FindBucketByName(ctx, o.Config.Bucket.String)
+func (o *Output) createBucket(ctx context.Context) error {
+	_, err := o.Client.BucketsAPI().FindBucketByName(ctx, o.Config.Bucket.String)
 	if err == nil {
 		// the bucket already exists
 		return nil
@@ -228,10 +235,61 @@ func (o *Output) createBucket() error {
 		return err
 	}
 
-	// create a bucket with the default (infinite) retention policy
-	_, err = o.Client.BucketsAPI().CreateBucketWithName(ctx, org, o.Config.Bucket.String)
+	org, err := o.Client.OrganizationsAPI().FindOrganizationByName(ctx, o.Config.Organization.String)
 	if err != nil {
 		return err
+	}
+
+	var rr []influxdomain.RetentionRule
+	if o.Config.Retention.Valid {
+		rr = []influxdomain.RetentionRule{
+			{
+				// duration in seconds for how long data will be kept in the database
+				EverySeconds: int(time.Duration(o.Config.Retention.Duration).Round(time.Second).Seconds()),
+				Type:         influxdomain.RetentionRuleTypeExpire,
+			},
+		}
+	}
+	// create a bucket with the default retention policy
+	_, err = o.Client.BucketsAPI().CreateBucketWithName(ctx, org, o.Config.Bucket.String, rr...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// createDatabase18 create a database using the v1 API for the old 1.8+ InfluxDB server versions.
+func (o *Output) createDatabase18() error {
+	// it uses the Bucket value following the compatibility mode
+	db := o.Config.Bucket.String
+
+	q := url.Values{}
+	q.Set("q", fmt.Sprintf("CREATE DATABASE %s", db))
+	b := strings.NewReader(q.Encode())
+
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/query", o.Config.Addr.String), b)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	if err != nil {
+		return err
+	}
+
+	if o.Config.Username.Valid {
+		req.SetBasicAuth(o.Config.Username.String, o.Config.Password.String)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		rb, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("got unexpected %d response code with body %s", resp.StatusCode, string(rb))
 	}
 
 	return nil

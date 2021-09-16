@@ -139,6 +139,18 @@ func TestOutput(t *testing.T) {
 		require.Equal(t, 20, samplesRead)
 	}()
 	testOutputCycle(t, func(rw http.ResponseWriter, r *http.Request) {
+		// on startup the version returned from the server is checked
+		if r.URL.Path == "/health" {
+			rw.Header().Set("Content-Type", "applicaton/json")
+			rw.Write([]byte(`{"status":"pass","version":"2.0"}`))
+			return
+		}
+		// on startup if bucket exists is checked
+		if r.URL.Path == "/api/v2/buckets" {
+			rw.Header().Set("Content-Type", "applicaton/json")
+			rw.Write([]byte(`{"buckets":[{"name":"mybucket"}]}`))
+			return
+		}
 		b := bytes.NewBuffer(nil)
 		_, _ = io.Copy(b, r.Body)
 		for {
