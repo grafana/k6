@@ -283,11 +283,8 @@ a commandline interface for interacting with it.`,
 				if common.IsInterruptError(err) {
 					interrupt = err
 				}
-				if !conf.Linger.Bool {
-					if interrupt == nil {
-						return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
-					}
-					return errext.WithExitCodeIfNone(interrupt, exitcodes.ScriptException)
+				if !conf.Linger.Bool && interrupt == nil {
+					return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
 				}
 			}
 			runCancel()
