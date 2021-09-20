@@ -11,11 +11,15 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    command: --enable-feature=remote-write-receiver --config.file=/etc/prometheus/prometheus.yml 
+    command: --enable-feature=remote-write-receiver --config.file=/etc/prometheus/prometheus.yml --web.config.file=/etc/prometheus/web_config.yml
     ports:
       - 9090:9090/tcp
     volumes:
       - ${PWD}/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ${PWD}/web_config.yml:/etc/prometheus/web_config.yml
+      - ${PWD}/tls.crt:/etc/prometheus/tls.crt
+      - ${PWD}/tls.key:/etc/prometheus/tls.key
+    restart: always
 
   promscale:
     image: timescale/promscale:latest

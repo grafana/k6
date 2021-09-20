@@ -2,7 +2,6 @@ package prometheus
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -30,7 +29,7 @@ func New(params output.Params) (*Output, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("%+v\n", config)
+
 	remoteConfig, err := config.ConstructRemoteConfig()
 	if err != nil {
 		return nil, err

@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+
+cd .. && \
+  xk6 build --with github.com/grafana/xk6-output-prometheus-remote=. && \
+  K6_PROMETHEUS_REMOTE_URL=https://localhost:9090/api/v1/write K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY=false K6_CA_CERT_FILE=example/tls.crt K6_PROMETHEUS_USER=foo K6_PROMETHEUS_PASSWORD=bar ./k6 run example/test.js -o output-prometheus-remote

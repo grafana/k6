@@ -2,7 +2,6 @@ package prometheus
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/url"
 	"strconv"
 	"time"
@@ -16,10 +15,14 @@ import (
 )
 
 type Config struct {
-	Url                   null.String `json:"url" envconfig:"K6_PROMETHEUS_REMOTE_URL"` // here we assume that we won't need to distinguish from remote read URL
+	Url null.String `json:"url" envconfig:"K6_PROMETHEUS_REMOTE_URL"` // here we assume that we won't need to distinguish from remote read URL
+
 	InsecureSkipTLSVerify null.Bool   `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY"`
-	// User          null.String        `json:"user" envconfig:"K6_PROMETHEUS_USER"`
-	// Password      null.String        `json:"password" envconfig:"K6_PROMETHEUS_PASSWORD"`
+	CACert                null.String `json:"caCertFile" envconfig:"K6_CA_CERT_FILE"`
+
+	User     null.String `json:"user" envconfig:"K6_PROMETHEUS_USER"`
+	Password null.String `json:"password" envconfig:"K6_PROMETHEUS_PASSWORD"`
+
 	FlushPeriod types.NullDuration `json:"flushPeriod" envconfig:"K6_PROMETHEUS_FLUSH_PERIOD"`
 }
 
@@ -27,19 +30,29 @@ func NewConfig() Config {
 	return Config{
 		Url:                   null.StringFrom(""),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
+		CACert:                null.StringFrom(""),
+		User:                  null.StringFrom(""),
+		Password:              null.StringFrom(""),
 		FlushPeriod:           types.NullDurationFrom(1 * time.Second),
 	}
 }
 
 func (conf Config) ConstructRemoteConfig() (*remote.ClientConfig, error) {
 	httpConfig := promConfig.DefaultHTTPClientConfig
+
 	httpConfig.TLSConfig = promConfig.TLSConfig{
 		InsecureSkipVerify: conf.InsecureSkipTLSVerify.Bool,
 	}
-	// httpConfig.BasicAuth = &promConfig.BasicAuth{
-	// 	Username: "YOUR USERNAME",
-	// 	Password: "YOUR PASSWORD",
-	// }
+	if !conf.InsecureSkipTLSVerify.Bool {
+		httpConfig.TLSConfig.CAFile = conf.CACert.String
+	}
+
+	if conf.User.Valid {
+		httpConfig.BasicAuth = &promConfig.BasicAuth{
+			Username: conf.User.String,
+			Password: promConfig.Secret(conf.Password.String),
+		}
+	}
 
 	u, err := url.Parse(conf.Url.String)
 	if err != nil {
@@ -58,16 +71,27 @@ func (conf Config) ConstructRemoteConfig() (*remote.ClientConfig, error) {
 // From here till the end of the file partial duplicates waiting for config refactor (#883)
 
 func (base Config) Apply(applied Config) Config {
-	fmt.Printf("%+v\n%+v\n\n", base, applied)
-	if base.Url.Valid {
+	if applied.Url.Valid {
 		base.Url = applied.Url
 	}
 
-	if base.InsecureSkipTLSVerify.Valid {
+	if applied.InsecureSkipTLSVerify.Valid {
 		base.InsecureSkipTLSVerify = applied.InsecureSkipTLSVerify
 	}
 
-	if base.FlushPeriod.Valid {
+	if applied.CACert.Valid {
+		base.CACert = applied.CACert
+	}
+
+	if applied.User.Valid {
+		base.User = applied.User
+	}
+
+	if applied.Password.Valid {
+		base.Password = applied.Password
+	}
+
+	if applied.FlushPeriod.Valid {
 		base.FlushPeriod = applied.FlushPeriod
 	}
 
@@ -88,6 +112,18 @@ func ParseArg(arg string) (Config, error) {
 
 	if v, ok := params["insecureSkipTLSVerify"].(bool); ok {
 		c.InsecureSkipTLSVerify = null.BoolFrom(v)
+	}
+
+	if v, ok := params["caCertFile"].(string); ok {
+		c.CACert = null.StringFrom(v)
+	}
+
+	if v, ok := params["user"].(string); ok {
+		c.User = null.StringFrom(v)
+	}
+
+	if v, ok := params["password"].(string); ok {
+		c.Password = null.StringFrom(v)
 	}
 
 	if v, ok := params["flushPeriod"].(string); ok {
@@ -128,6 +164,18 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 		} else {
 			result.InsecureSkipTLSVerify = null.BoolFrom(b)
 		}
+	}
+
+	if ca, caDefined := env["K6_CA_CERT_FILE"]; caDefined {
+		result.CACert = null.StringFrom(ca)
+	}
+
+	if user, userDefined := env["K6_PROMETHEUS_USER"]; userDefined {
+		result.User = null.StringFrom(user)
+	}
+
+	if password, passwordDefined := env["K6_PROMETHEUS_PASSWORD"]; passwordDefined {
+		result.Password = null.StringFrom(password)
 	}
 
 	if arg != "" {

@@ -1,0 +1,6 @@
+tls_server_config:
+  cert_file: tls.crt
+  key_file: tls.key
+
+basic_auth_users:
+  foo: $2y$10$Psn5sRU9RzZRhLCLOAwS7eMSiNJFrPYR5RebjQHc0zS8lkW7Xg0z2
