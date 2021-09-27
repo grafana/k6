@@ -52,7 +52,7 @@ import (
 
 const isWindows = runtime.GOOS == "windows"
 
-func assertMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []stats.SampleContainer, url string) {
+func assertMetricEmitted(t *testing.T, metricName string, sampleContainers []stats.SampleContainer, url string) {
 	seenMetric := false
 
 	for _, sampleContainer := range sampleContainers {
@@ -60,13 +60,13 @@ func assertMetricEmitted(t *testing.T, metric *stats.Metric, sampleContainers []
 			surl, ok := sample.Tags.Get("url")
 			assert.True(t, ok)
 			if surl == url {
-				if sample.Metric == metric {
+				if sample.Metric.Name == metricName {
 					seenMetric = true
 				}
 			}
 		}
 	}
-	assert.True(t, seenMetric, "url %s didn't emit %s", url, metric.Name)
+	assert.True(t, seenMetric, "url %s didn't emit %s", url, metricName)
 }
 
 func TestClient(t *testing.T) {
@@ -92,6 +92,7 @@ func TestClient(t *testing.T) {
 			),
 			UserAgent: null.StringFrom("k6-test"),
 		},
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
 	}
 
 	cwd, err := os.Getwd()
@@ -301,7 +302,7 @@ func TestClient(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 		samplesBuf := stats.GetBufferedSamples(samples)
-		assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
+		assertMetricEmitted(t, metrics.GRPCReqDurationName, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
 	})
 
 	t.Run("RequestMessage", func(t *testing.T) {
@@ -353,7 +354,7 @@ func TestClient(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 		samplesBuf := stats.GetBufferedSamples(samples)
-		assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/UnaryCall"))
+		assertMetricEmitted(t, metrics.GRPCReqDurationName, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/UnaryCall"))
 	})
 
 	t.Run("ResponseError", func(t *testing.T) {
@@ -371,7 +372,7 @@ func TestClient(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 		samplesBuf := stats.GetBufferedSamples(samples)
-		assertMetricEmitted(t, metrics.GRPCReqDuration, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
+		assertMetricEmitted(t, metrics.GRPCReqDurationName, samplesBuf, sr("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
 	})
 
 	t.Run("ResponseHeaders", func(t *testing.T) {

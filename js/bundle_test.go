@@ -42,6 +42,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
@@ -73,6 +74,7 @@ func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) 
 		},
 		map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()},
 		rtOpts,
+		metrics.NewRegistry(),
 	)
 }
 
@@ -511,7 +513,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 	}
 
 	checkArchive := func(t *testing.T, arc *lib.Archive, rtOpts lib.RuntimeOptions, expError string) {
-		b, err := NewBundleFromArchive(logger, arc, rtOpts)
+		b, err := NewBundleFromArchive(logger, arc, rtOpts, metrics.NewRegistry())
 		if expError != "" {
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), expError)
@@ -594,7 +596,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 			PwdURL:      &url.URL{Scheme: "file", Path: "/"},
 			Filesystems: nil,
 		}
-		b, err := NewBundleFromArchive(logger, arc, lib.RuntimeOptions{})
+		b, err := NewBundleFromArchive(logger, arc, lib.RuntimeOptions{}, metrics.NewRegistry())
 		require.NoError(t, err)
 		bi, err := b.Instantiate(logger, 0)
 		require.NoError(t, err)
@@ -733,7 +735,7 @@ func TestOpen(t *testing.T) {
 					}
 					require.NoError(t, err)
 
-					arcBundle, err := NewBundleFromArchive(logger, sourceBundle.makeArchive(), lib.RuntimeOptions{})
+					arcBundle, err := NewBundleFromArchive(logger, sourceBundle.makeArchive(), lib.RuntimeOptions{}, metrics.NewRegistry())
 
 					require.NoError(t, err)
 
@@ -856,7 +858,7 @@ func TestBundleEnv(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := testutils.NewLogger(t)
-	b2, err := NewBundleFromArchive(logger, b1.makeArchive(), lib.RuntimeOptions{})
+	b2, err := NewBundleFromArchive(logger, b1.makeArchive(), lib.RuntimeOptions{}, metrics.NewRegistry())
 	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
@@ -894,7 +896,7 @@ func TestBundleNotSharable(t *testing.T) {
 	require.NoError(t, err)
 	logger := testutils.NewLogger(t)
 
-	b2, err := NewBundleFromArchive(logger, b1.makeArchive(), lib.RuntimeOptions{})
+	b2, err := NewBundleFromArchive(logger, b1.makeArchive(), lib.RuntimeOptions{}, metrics.NewRegistry())
 	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}

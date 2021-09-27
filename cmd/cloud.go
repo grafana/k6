@@ -45,6 +45,7 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/ui/pb"
 )
@@ -108,7 +109,9 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			}
 
 			modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Getting script options"))
-			r, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			r, err := newRunner(logger, src, runType, filesystems, runtimeOptions, builtinMetrics, registry)
 			if err != nil {
 				return err
 			}

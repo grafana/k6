@@ -184,11 +184,14 @@ func TestResponseStatus(t *testing.T) {
 				defer server.Close()
 				logger := logrus.New()
 				logger.Level = logrus.DebugLevel
+				samples := make(chan<- stats.SampleContainer, 1)
+				registry := metrics.NewRegistry()
 				state := &lib.State{
-					Options:   lib.Options{RunTags: &stats.SampleTags{}},
-					Transport: server.Client().Transport,
-					Logger:    logger,
-					Samples:   make(chan<- stats.SampleContainer, 1),
+					Options:        lib.Options{RunTags: &stats.SampleTags{}},
+					Transport:      server.Client().Transport,
+					Logger:         logger,
+					Samples:        samples,
+					BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 				}
 				ctx := lib.WithState(context.Background(), state)
 				req, err := http.NewRequest("GET", server.URL, nil)
@@ -258,15 +261,17 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 	samples := make(chan stats.SampleContainer, 10)
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
+	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
 			RunTags:    &stats.SampleTags{},
 			SystemTags: &stats.DefaultSystemTagSet,
 		},
-		Transport: srv.Client().Transport,
-		Samples:   samples,
-		Logger:    logger,
-		BPool:     bpool.NewBufferPool(100),
+		Transport:      srv.Client().Transport,
+		Samples:        samples,
+		Logger:         logger,
+		BPool:          bpool.NewBufferPool(100),
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 	ctx = lib.WithState(ctx, state)
 	req, _ := http.NewRequest("GET", srv.URL, nil)
@@ -333,15 +338,17 @@ func TestTrailFailed(t *testing.T) {
 			samples := make(chan stats.SampleContainer, 10)
 			logger := logrus.New()
 			logger.Level = logrus.DebugLevel
+			registry := metrics.NewRegistry()
 			state := &lib.State{
 				Options: lib.Options{
 					RunTags:    &stats.SampleTags{},
 					SystemTags: &stats.DefaultSystemTagSet,
 				},
-				Transport: srv.Client().Transport,
-				Samples:   samples,
-				Logger:    logger,
-				BPool:     bpool.NewBufferPool(2),
+				Transport:      srv.Client().Transport,
+				Samples:        samples,
+				Logger:         logger,
+				BPool:          bpool.NewBufferPool(2),
+				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 			}
 			ctx = lib.WithState(ctx, state)
 			req, _ := http.NewRequest("GET", srv.URL, nil)
@@ -363,7 +370,7 @@ func TestTrailFailed(t *testing.T) {
 
 			var httpReqFailedSampleValue null.Bool
 			for _, s := range sample.GetSamples() {
-				if s.Metric.Name == metrics.HTTPReqFailed.Name {
+				if s.Metric.Name == metrics.HTTPReqFailedName {
 					httpReqFailedSampleValue.Valid = true
 					if s.Value == 1.0 {
 						httpReqFailedSampleValue.Bool = true
@@ -393,6 +400,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 	samples := make(chan stats.SampleContainer, 10)
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
+	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
 			RunTags:    &stats.SampleTags{},
@@ -403,9 +411,10 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 				Timeout: 1 * time.Microsecond,
 			}).DialContext,
 		},
-		Samples: samples,
-		Logger:  logger,
-		BPool:   bpool.NewBufferPool(100),
+		Samples:        samples,
+		Logger:         logger,
+		BPool:          bpool.NewBufferPool(100),
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 
 	ctx = lib.WithState(ctx, state)
@@ -450,15 +459,17 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 	samples := make(chan stats.SampleContainer, 10)
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
+	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
 			RunTags:    &stats.SampleTags{},
 			SystemTags: &stats.DefaultSystemTagSet,
 		},
-		Transport: srv.Client().Transport,
-		Samples:   samples,
-		Logger:    logger,
-		BPool:     bpool.NewBufferPool(100),
+		Transport:      srv.Client().Transport,
+		Samples:        samples,
+		Logger:         logger,
+		BPool:          bpool.NewBufferPool(100),
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 	ctx = lib.WithState(ctx, state)
 	req, _ := http.NewRequest("GET", srv.URL, nil)

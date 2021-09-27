@@ -24,45 +24,113 @@ import (
 	"go.k6.io/k6/stats"
 )
 
-// TODO: refactor this, using non thread-safe global variables seems like a bad idea for various reasons...
+const (
+	VUsName               = "vus" //nolint:golint
+	VUsMaxName            = "vus_max"
+	IterationsName        = "iterations"
+	IterationDurationName = "iteration_duration"
+	DroppedIterationsName = "dropped_iterations"
+	ErrorsName            = "errors"
 
-//nolint:gochecknoglobals
-var (
-	// Engine-emitted.
-	VUs               = stats.New("vus", stats.Gauge)
-	VUsMax            = stats.New("vus_max", stats.Gauge)
-	Iterations        = stats.New("iterations", stats.Counter)
-	IterationDuration = stats.New("iteration_duration", stats.Trend, stats.Time)
-	DroppedIterations = stats.New("dropped_iterations", stats.Counter)
-	Errors            = stats.New("errors", stats.Counter)
+	ChecksName        = "checks"
+	GroupDurationName = "group_duration"
+
+	HTTPReqsName              = "http_reqs"
+	HTTPReqFailedName         = "http_req_failed"
+	HTTPReqDurationName       = "http_req_duration"
+	HTTPReqBlockedName        = "http_req_blocked"
+	HTTPReqConnectingName     = "http_req_connecting"
+	HTTPReqTLSHandshakingName = "http_req_tls_handshaking"
+	HTTPReqSendingName        = "http_req_sending"
+	HTTPReqWaitingName        = "http_req_waiting"
+	HTTPReqReceivingName      = "http_req_receiving"
+
+	WSSessionsName         = "ws_sessions"
+	WSMessagesSentName     = "ws_msgs_sent"
+	WSMessagesReceivedName = "ws_msgs_received"
+	WSPingName             = "ws_ping"
+	WSSessionDurationName  = "ws_session_duration"
+	WSConnectingName       = "ws_connecting"
+
+	GRPCReqDurationName = "grpc_req_duration"
+
+	DataSentName     = "data_sent"
+	DataReceivedName = "data_received"
+)
+
+// BuiltinMetrics represent all the builtin metrics of k6
+type BuiltinMetrics struct {
+	VUs               *stats.Metric
+	VUsMax            *stats.Metric
+	Iterations        *stats.Metric
+	IterationDuration *stats.Metric
+	DroppedIterations *stats.Metric
+	Errors            *stats.Metric
 
 	// Runner-emitted.
-	Checks        = stats.New("checks", stats.Rate)
-	GroupDuration = stats.New("group_duration", stats.Trend, stats.Time)
+	Checks        *stats.Metric
+	GroupDuration *stats.Metric
 
 	// HTTP-related.
-	HTTPReqs              = stats.New("http_reqs", stats.Counter)
-	HTTPReqFailed         = stats.New("http_req_failed", stats.Rate)
-	HTTPReqDuration       = stats.New("http_req_duration", stats.Trend, stats.Time)
-	HTTPReqBlocked        = stats.New("http_req_blocked", stats.Trend, stats.Time)
-	HTTPReqConnecting     = stats.New("http_req_connecting", stats.Trend, stats.Time)
-	HTTPReqTLSHandshaking = stats.New("http_req_tls_handshaking", stats.Trend, stats.Time)
-	HTTPReqSending        = stats.New("http_req_sending", stats.Trend, stats.Time)
-	HTTPReqWaiting        = stats.New("http_req_waiting", stats.Trend, stats.Time)
-	HTTPReqReceiving      = stats.New("http_req_receiving", stats.Trend, stats.Time)
+	HTTPReqs              *stats.Metric
+	HTTPReqFailed         *stats.Metric
+	HTTPReqDuration       *stats.Metric
+	HTTPReqBlocked        *stats.Metric
+	HTTPReqConnecting     *stats.Metric
+	HTTPReqTLSHandshaking *stats.Metric
+	HTTPReqSending        *stats.Metric
+	HTTPReqWaiting        *stats.Metric
+	HTTPReqReceiving      *stats.Metric
 
 	// Websocket-related
-	WSSessions         = stats.New("ws_sessions", stats.Counter)
-	WSMessagesSent     = stats.New("ws_msgs_sent", stats.Counter)
-	WSMessagesReceived = stats.New("ws_msgs_received", stats.Counter)
-	WSPing             = stats.New("ws_ping", stats.Trend, stats.Time)
-	WSSessionDuration  = stats.New("ws_session_duration", stats.Trend, stats.Time)
-	WSConnecting       = stats.New("ws_connecting", stats.Trend, stats.Time)
+	WSSessions         *stats.Metric
+	WSMessagesSent     *stats.Metric
+	WSMessagesReceived *stats.Metric
+	WSPing             *stats.Metric
+	WSSessionDuration  *stats.Metric
+	WSConnecting       *stats.Metric
 
 	// gRPC-related
-	GRPCReqDuration = stats.New("grpc_req_duration", stats.Trend, stats.Time)
+	GRPCReqDuration *stats.Metric
 
 	// Network-related; used for future protocols as well.
-	DataSent     = stats.New("data_sent", stats.Counter, stats.Data)
-	DataReceived = stats.New("data_received", stats.Counter, stats.Data)
-)
+	DataSent     *stats.Metric
+	DataReceived *stats.Metric
+}
+
+// RegisterBuiltinMetrics register and returns the builtin metrics in the provided registry
+func RegisterBuiltinMetrics(registry *Registry) *BuiltinMetrics {
+	return &BuiltinMetrics{
+		VUs:               registry.MustNewMetric(VUsName, stats.Gauge),
+		VUsMax:            registry.MustNewMetric(VUsMaxName, stats.Gauge),
+		Iterations:        registry.MustNewMetric(IterationsName, stats.Counter),
+		IterationDuration: registry.MustNewMetric(IterationDurationName, stats.Trend, stats.Time),
+		DroppedIterations: registry.MustNewMetric(DroppedIterationsName, stats.Counter),
+		Errors:            registry.MustNewMetric(ErrorsName, stats.Counter),
+
+		Checks:        registry.MustNewMetric(ChecksName, stats.Rate),
+		GroupDuration: registry.MustNewMetric(GroupDurationName, stats.Trend, stats.Time),
+
+		HTTPReqs:              registry.MustNewMetric(HTTPReqsName, stats.Counter),
+		HTTPReqFailed:         registry.MustNewMetric(HTTPReqFailedName, stats.Rate),
+		HTTPReqDuration:       registry.MustNewMetric(HTTPReqDurationName, stats.Trend, stats.Time),
+		HTTPReqBlocked:        registry.MustNewMetric(HTTPReqBlockedName, stats.Trend, stats.Time),
+		HTTPReqConnecting:     registry.MustNewMetric(HTTPReqConnectingName, stats.Trend, stats.Time),
+		HTTPReqTLSHandshaking: registry.MustNewMetric(HTTPReqTLSHandshakingName, stats.Trend, stats.Time),
+		HTTPReqSending:        registry.MustNewMetric(HTTPReqSendingName, stats.Trend, stats.Time),
+		HTTPReqWaiting:        registry.MustNewMetric(HTTPReqWaitingName, stats.Trend, stats.Time),
+		HTTPReqReceiving:      registry.MustNewMetric(HTTPReqReceivingName, stats.Trend, stats.Time),
+
+		WSSessions:         registry.MustNewMetric(WSSessionsName, stats.Counter),
+		WSMessagesSent:     registry.MustNewMetric(WSMessagesSentName, stats.Counter),
+		WSMessagesReceived: registry.MustNewMetric(WSMessagesReceivedName, stats.Counter),
+		WSPing:             registry.MustNewMetric(WSPingName, stats.Trend, stats.Time),
+		WSSessionDuration:  registry.MustNewMetric(WSSessionDurationName, stats.Trend, stats.Time),
+		WSConnecting:       registry.MustNewMetric(WSConnectingName, stats.Trend, stats.Time),
+
+		GRPCReqDuration: registry.MustNewMetric(GRPCReqDurationName, stats.Trend, stats.Time),
+
+		DataSent:     registry.MustNewMetric(DataSentName, stats.Counter, stats.Data),
+		DataReceived: registry.MustNewMetric(DataReceivedName, stats.Counter, stats.Data),
+	}
+}

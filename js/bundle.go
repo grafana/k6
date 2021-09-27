@@ -39,6 +39,7 @@ import (
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/loader"
 )
 
@@ -54,6 +55,7 @@ type Bundle struct {
 
 	RuntimeOptions    lib.RuntimeOptions
 	CompatibilityMode lib.CompatibilityMode // parsed value
+	registry          *metrics.Registry
 
 	exports map[string]goja.Callable
 }
@@ -72,6 +74,7 @@ type BundleInstance struct {
 // NewBundle creates a new bundle from a source file and a filesystem.
 func NewBundle(
 	logger logrus.FieldLogger, src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
+	registry *metrics.Registry,
 ) (*Bundle, error) {
 	compatMode, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String)
 	if err != nil {
@@ -96,6 +99,7 @@ func NewBundle(
 		RuntimeOptions:    rtOpts,
 		CompatibilityMode: compatMode,
 		exports:           make(map[string]goja.Callable),
+		registry:          registry,
 	}
 	if err = bundle.instantiate(logger, rt, bundle.BaseInitContext, 0); err != nil {
 		return nil, err
@@ -110,7 +114,9 @@ func NewBundle(
 }
 
 // NewBundleFromArchive creates a new bundle from an lib.Archive.
-func NewBundleFromArchive(logger logrus.FieldLogger, arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle, error) {
+func NewBundleFromArchive(
+	logger logrus.FieldLogger, arc *lib.Archive, rtOpts lib.RuntimeOptions, registry *metrics.Registry,
+) (*Bundle, error) {
 	if arc.Type != "js" {
 		return nil, fmt.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
@@ -153,6 +159,7 @@ func NewBundleFromArchive(logger logrus.FieldLogger, arc *lib.Archive, rtOpts li
 		RuntimeOptions:    rtOpts,
 		CompatibilityMode: compatMode,
 		exports:           make(map[string]goja.Callable),
+		registry:          registry,
 	}
 
 	if err = bundle.instantiate(logger, rt, bundle.BaseInitContext, 0); err != nil {
@@ -312,6 +319,7 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 		Logger:      logger,
 		FileSystems: init.filesystems,
 		CWD:         init.pwd,
+		Registry:    b.registry,
 	}
 	ctx := common.WithInitEnv(context.Background(), initenv)
 	*init.ctxPtr = common.WithRuntime(ctx, rt)

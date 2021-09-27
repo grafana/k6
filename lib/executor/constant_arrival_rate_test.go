@@ -81,7 +81,10 @@ func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	)
 	defer cancel()
 	engineOut := make(chan stats.SampleContainer, 1000)
-	err = executor.Run(ctx, engineOut)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+
+	err = executor.Run(ctx, engineOut, builtinMetrics)
 	require.NoError(t, err)
 	entries := logHook.Drain()
 	require.NotEmpty(t, entries)
@@ -121,7 +124,9 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 		}
 	}()
 	engineOut := make(chan stats.SampleContainer, 1000)
-	err = executor.Run(ctx, engineOut)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	err = executor.Run(ctx, engineOut, builtinMetrics)
 	wg.Wait()
 	require.NoError(t, err)
 	require.Empty(t, logHook.Drain())
@@ -182,6 +187,8 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 			steps:    []int64{60, 60, 60, 60, 60, 100},
 		},
 	}
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	for _, test := range tests {
 		test := test
 
@@ -239,7 +246,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 			}()
 			startTime = time.Now()
 			engineOut := make(chan stats.SampleContainer, 1000)
-			err = executor.Run(ctx, engineOut)
+			err = executor.Run(ctx, engineOut, builtinMetrics)
 			wg.Wait()
 			require.NoError(t, err)
 			require.Empty(t, logHook.Drain())
@@ -254,6 +261,8 @@ func TestArrivalRateCancel(t *testing.T) {
 		"constant": getTestConstantArrivalRateConfig(),
 		"ramping":  getTestRampingArrivalRateConfig(),
 	}
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	for name, config := range testCases {
 		config := config
 		t.Run(name, func(t *testing.T) {
@@ -280,7 +289,7 @@ func TestArrivalRateCancel(t *testing.T) {
 				defer wg.Done()
 
 				engineOut := make(chan stats.SampleContainer, 1000)
-				errCh <- executor.Run(ctx, engineOut)
+				errCh <- executor.Run(ctx, engineOut, builtinMetrics)
 				close(weAreDoneCh)
 			}()
 
@@ -328,13 +337,15 @@ func TestConstantArrivalRateDroppedIterations(t *testing.T) {
 	)
 	defer cancel()
 	engineOut := make(chan stats.SampleContainer, 1000)
-	err = executor.Run(ctx, engineOut)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	err = executor.Run(ctx, engineOut, builtinMetrics)
 	require.NoError(t, err)
 	logs := logHook.Drain()
 	require.Len(t, logs, 1)
 	assert.Contains(t, logs[0].Message, "cannot initialize more")
 	assert.Equal(t, int64(5), count)
-	assert.Equal(t, float64(5), sumMetricValues(engineOut, metrics.DroppedIterations.Name))
+	assert.Equal(t, float64(5), sumMetricValues(engineOut, metrics.DroppedIterationsName))
 }
 
 func TestConstantArrivalRateGlobalIters(t *testing.T) {
@@ -358,6 +369,8 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 		{"0,1/4,3/4,1", "3/4:1", []uint64{3, 8, 13, 18}},
 	}
 
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(fmt.Sprintf("%s_%s", tc.seq, tc.seg), func(t *testing.T) {
@@ -385,7 +398,7 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 			}
 
 			engineOut := make(chan stats.SampleContainer, 100)
-			err = executor.Run(ctx, engineOut)
+			err = executor.Run(ctx, engineOut, builtinMetrics)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expIters, gotIters)
 		})

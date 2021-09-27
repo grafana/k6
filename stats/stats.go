@@ -402,11 +402,15 @@ func (s Sample) GetTime() time.Time {
 }
 
 // Ensure that interfaces are implemented correctly
-var _ SampleContainer = Sample{}
-var _ SampleContainer = Samples{}
+var (
+	_ SampleContainer = Sample{}
+	_ SampleContainer = Samples{}
+)
 
-var _ ConnectedSampleContainer = Sample{}
-var _ ConnectedSampleContainer = ConnectedSamples{}
+var (
+	_ ConnectedSampleContainer = Sample{}
+	_ ConnectedSampleContainer = ConnectedSamples{}
+)
 
 // GetBufferedSamples will read all present (i.e. buffered or currently being pushed)
 // values in the input channel and return them as a slice.
@@ -444,6 +448,16 @@ type Metric struct {
 	Submetrics []*Submetric `json:"submetrics"`
 	Sub        Submetric    `json:"sub,omitempty"`
 	Sink       Sink         `json:"-"`
+}
+
+// Sample samples the metric at the given time, with the provided tags and value
+func (m *Metric) Sample(t time.Time, tags *SampleTags, value float64) Sample {
+	return Sample{
+		Time:   t,
+		Tags:   tags,
+		Value:  value,
+		Metric: m,
+	}
 }
 
 func New(name string, typ MetricType, t ...ValueType) *Metric {

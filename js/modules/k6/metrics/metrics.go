@@ -22,8 +22,6 @@ package metrics
 
 import (
 	"errors"
-	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/dop251/goja"
@@ -32,14 +30,6 @@ import (
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/stats"
 )
-
-var nameRegexString = "^[\\p{L}\\p{N}\\._ !\\?/&#\\(\\)<>%-]{1,128}$"
-
-var compileNameRegex = regexp.MustCompile(nameRegexString)
-
-func checkName(name string) bool {
-	return compileNameRegex.Match([]byte(name))
-}
 
 type Metric struct {
 	metric *stats.Metric
@@ -50,25 +40,23 @@ type Metric struct {
 var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
 
 func (mi *ModuleInstance) newMetric(call goja.ConstructorCall, t stats.MetricType) (*goja.Object, error) {
-	if mi.GetInitEnv() == nil {
+	initEnv := mi.GetInitEnv()
+	if initEnv == nil {
 		return nil, errors.New("metrics must be declared in the init context")
 	}
 	rt := mi.GetRuntime()
 	c, _ := goja.AssertFunction(rt.ToValue(func(name string, isTime ...bool) (*goja.Object, error) {
-		// TODO: move verification outside the JS
-		if !checkName(name) {
-			return nil, common.NewInitContextError(fmt.Sprintf("Invalid metric name: '%s'", name))
-		}
-
 		valueType := stats.Default
 		if len(isTime) > 0 && isTime[0] {
 			valueType = stats.Time
 		}
-		m := stats.New(name, t, valueType)
-
+		m, err := initEnv.Registry.NewMetric(name, t, valueType)
+		if err != nil {
+			return nil, err
+		}
 		metric := &Metric{metric: m, core: mi.InstanceCore}
 		o := rt.NewObject()
-		err := o.DefineDataProperty("name", rt.ToValue(name), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
+		err = o.DefineDataProperty("name", rt.ToValue(name), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
 		if err != nil {
 			return nil, err
 		}

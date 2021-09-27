@@ -49,6 +49,7 @@ import (
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/ui/pb"
 )
@@ -115,7 +116,9 @@ a commandline interface for interacting with it.`,
 				return err
 			}
 
-			initRunner, err := newRunner(logger, src, runType, filesystems, runtimeOptions)
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			initRunner, err := newRunner(logger, src, runType, filesystems, runtimeOptions, builtinMetrics, registry)
 			if err != nil {
 				return err
 			}
@@ -192,7 +195,7 @@ a commandline interface for interacting with it.`,
 
 			// Create the engine.
 			initBar.Modify(pb.WithConstProgress(0, "Init engine"))
-			engine, err := core.NewEngine(execScheduler, conf.Options, runtimeOptions, outputs, logger)
+			engine, err := core.NewEngine(execScheduler, conf.Options, runtimeOptions, outputs, logger, builtinMetrics)
 			if err != nil {
 				return err
 			}
@@ -386,12 +389,13 @@ func runCmdFlagSet() *pflag.FlagSet {
 // Creates a new runner.
 func newRunner(
 	logger *logrus.Logger, src *loader.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
+	builtinMetrics *metrics.BuiltinMetrics, registry *metrics.Registry,
 ) (runner lib.Runner, err error) {
 	switch typ {
 	case "":
-		runner, err = newRunner(logger, src, detectType(src.Data), filesystems, rtOpts)
+		runner, err = newRunner(logger, src, detectType(src.Data), filesystems, rtOpts, builtinMetrics, registry)
 	case typeJS:
-		runner, err = js.New(logger, src, filesystems, rtOpts)
+		runner, err = js.New(logger, src, filesystems, rtOpts, builtinMetrics, registry)
 	case typeArchive:
 		var arc *lib.Archive
 		arc, err = lib.ReadArchive(bytes.NewReader(src.Data))
@@ -400,7 +404,7 @@ func newRunner(
 		}
 		switch arc.Type {
 		case typeJS:
-			runner, err = js.NewFromArchive(logger, arc, rtOpts)
+			runner, err = js.NewFromArchive(logger, arc, rtOpts, builtinMetrics, registry)
 		default:
 			return nil, fmt.Errorf("archive requests unsupported runner: %s", arc.Type)
 		}

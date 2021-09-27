@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
 )
@@ -84,6 +85,8 @@ func TestExecutionInfoVUSharing(t *testing.T) {
 	logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel}}
 	logger.AddHook(&logHook)
 
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
 		logger,
 		&loader.SourceData{
@@ -92,6 +95,8 @@ func TestExecutionInfoVUSharing(t *testing.T) {
 		},
 		nil,
 		lib.RuntimeOptions{},
+		builtinMetrics,
+		registry,
 	)
 	require.NoError(t, err)
 
@@ -112,7 +117,7 @@ func TestExecutionInfoVUSharing(t *testing.T) {
 	}
 
 	errCh := make(chan error, 1)
-	go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
+	go func() { errCh <- execScheduler.Run(ctx, ctx, samples, builtinMetrics) }()
 
 	select {
 	case err := <-errCh:
@@ -192,6 +197,8 @@ func TestExecutionInfoScenarioIter(t *testing.T) {
 	logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel}}
 	logger.AddHook(&logHook)
 
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
 		logger,
 		&loader.SourceData{
@@ -200,6 +207,8 @@ func TestExecutionInfoScenarioIter(t *testing.T) {
 		},
 		nil,
 		lib.RuntimeOptions{},
+		builtinMetrics,
+		registry,
 	)
 	require.NoError(t, err)
 
@@ -207,7 +216,7 @@ func TestExecutionInfoScenarioIter(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error, 1)
-	go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
+	go func() { errCh <- execScheduler.Run(ctx, ctx, samples, builtinMetrics) }()
 
 	scStats := map[string]uint64{}
 
@@ -269,6 +278,8 @@ func TestSharedIterationsStable(t *testing.T) {
 	logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel}}
 	logger.AddHook(&logHook)
 
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
 		logger,
 		&loader.SourceData{
@@ -277,6 +288,8 @@ func TestSharedIterationsStable(t *testing.T) {
 		},
 		nil,
 		lib.RuntimeOptions{},
+		builtinMetrics,
+		registry,
 	)
 	require.NoError(t, err)
 
@@ -284,7 +297,7 @@ func TestSharedIterationsStable(t *testing.T) {
 	defer cancel()
 
 	errCh := make(chan error, 1)
-	go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
+	go func() { errCh <- execScheduler.Run(ctx, ctx, samples, builtinMetrics) }()
 
 	expIters := [50]int64{}
 	for i := 0; i < 50; i++ {

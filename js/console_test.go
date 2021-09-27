@@ -37,6 +37,7 @@ import (
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/stats"
@@ -89,6 +90,8 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 			logger = opt
 		}
 	}
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	return New(
 		logger,
 		&loader.SourceData{
@@ -97,6 +100,8 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 		},
 		map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()},
 		rtOpts,
+		builtinMetrics,
+		registry,
 	)
 }
 

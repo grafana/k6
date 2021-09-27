@@ -116,16 +116,16 @@ func NewSampleFromTrail(trail *httpext.Trail) *Sample {
 	}
 
 	values := make(map[string]float64, length)
-	values[metrics.HTTPReqs.Name] = 1
-	values[metrics.HTTPReqDuration.Name] = stats.D(trail.Duration)
-	values[metrics.HTTPReqBlocked.Name] = stats.D(trail.Blocked)
-	values[metrics.HTTPReqConnecting.Name] = stats.D(trail.Connecting)
-	values[metrics.HTTPReqTLSHandshaking.Name] = stats.D(trail.TLSHandshaking)
-	values[metrics.HTTPReqSending.Name] = stats.D(trail.Sending)
-	values[metrics.HTTPReqWaiting.Name] = stats.D(trail.Waiting)
-	values[metrics.HTTPReqReceiving.Name] = stats.D(trail.Receiving)
+	values[metrics.HTTPReqsName] = 1
+	values[metrics.HTTPReqDurationName] = stats.D(trail.Duration)
+	values[metrics.HTTPReqBlockedName] = stats.D(trail.Blocked)
+	values[metrics.HTTPReqConnectingName] = stats.D(trail.Connecting)
+	values[metrics.HTTPReqTLSHandshakingName] = stats.D(trail.TLSHandshaking)
+	values[metrics.HTTPReqSendingName] = stats.D(trail.Sending)
+	values[metrics.HTTPReqWaitingName] = stats.D(trail.Waiting)
+	values[metrics.HTTPReqReceivingName] = stats.D(trail.Receiving)
 	if trail.Failed.Valid { // this is done so the adding of 1 map element doesn't reexpand the map as this is a hotpath
-		values[metrics.HTTPReqFailed.Name] = stats.B(trail.Failed.Bool)
+		values[metrics.HTTPReqFailedName] = stats.B(trail.Failed.Bool)
 	}
 	return &Sample{
 		Type:   DataTypeMap,
