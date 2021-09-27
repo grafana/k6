@@ -412,17 +412,19 @@ func TestExecutionInfoAll(t *testing.T) {
 			logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel}}
 			logger.AddHook(&logHook)
 
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 			runner, err := js.New(logger, &loader.SourceData{
 				URL:  &url.URL{Path: "/script.js"},
 				Data: []byte(tc.script),
-			}, nil, lib.RuntimeOptions{})
+			}, nil, lib.RuntimeOptions{}, builtinMetrics, registry)
 			require.NoError(t, err)
 
 			ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, lib.Options{})
 			defer cancel()
 
 			errCh := make(chan error, 1)
-			go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
+			go func() { errCh <- execScheduler.Run(ctx, ctx, samples, builtinMetrics) }()
 
 			select {
 			case err := <-errCh:
