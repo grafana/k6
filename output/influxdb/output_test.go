@@ -252,6 +252,20 @@ func TestOutputStart(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, c.Start())
 	})
+	t.Run("SkipCreationOnHealthcheckFail", func(t *testing.T) {
+		dataset := influxMemory{Databases: []string{"db1"}}
+		ts := startTelegrafMock(nil)
+		defer ts.Close()
+
+		c, err := newOutput(output.Params{
+			Logger:         testutils.NewLogger(t),
+			ConfigArgument: ts.URL,
+			JSONConfig:     []byte(`{"bucket":"mybucket","organization":"org1"}`),
+		})
+		require.NoError(t, err)
+		require.NoError(t, c.Start())
+		assert.Len(t, dataset.Databases, 1)
+	})
 	t.Run("DatabaseAuthFailed", func(t *testing.T) {
 		dataset := influxMemory{Databases: []string{"db1"}}
 		ts := startInfluxv1Mock(&dataset, "joe", "passw")
@@ -427,5 +441,11 @@ func startInfluxv2Mock(db *influxMemory) *httptest.Server {
 		}
 
 		rw.WriteHeader(http.StatusInternalServerError)
+	}))
+}
+
+func startTelegrafMock(db *influxMemory) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.WriteHeader(http.StatusNotFound)
 	}))
 }
