@@ -191,16 +191,15 @@ func (o *Output) Start() error {
 	hres, err := o.Client.Health(ctx)
 	// Using Telegraf returns an error even if the system is well configured,
 	// because it doesn't support the health endpoint.
-	// For this reason, it doesn't return an error and just skip the auto-creation process.
+	// For this reason, it doesn't return an error and skips the auto-creation process.
 	if err == nil && hres.Status == influxdomain.HealthCheckStatusPass {
-		if hres.Version != nil && strings.HasPrefix(*hres.Version, "1.") {
-			if err = o.createDatabase18(ctx); err != nil {
-				return fmt.Errorf("not possible to create the specified Database %q: %w", o.Config.Bucket.String, err)
-			}
-		} else {
-			if err = o.createBucket(ctx); err != nil {
-				return fmt.Errorf("not possible to create or find the specified Bucket %q: %w", o.Config.Bucket.String, err)
-			}
+		version := "2.x"
+		if hres.Version != nil {
+			version = *hres.Version
+		}
+		err = o.autocreate(ctx, version)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -220,6 +219,19 @@ func (o *Output) Stop() error {
 	defer o.logger.Debug("Stopped!")
 	o.periodicFlusher.Stop()
 	o.Client.Close()
+	return nil
+}
+
+func (o *Output) autocreate(ctx context.Context, version string) error {
+	if strings.HasPrefix(version, "1.") {
+		if err := o.createDatabase18(ctx); err != nil {
+			return fmt.Errorf("not possible to create the specified Database %q: %w", o.Config.Bucket.String, err)
+		}
+		return nil
+	}
+	if err := o.createBucket(ctx); err != nil {
+		return fmt.Errorf("not possible to create or find the specified Bucket %q: %w", o.Config.Bucket.String, err)
+	}
 	return nil
 }
 

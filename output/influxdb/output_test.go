@@ -183,6 +183,8 @@ func TestOutputStart(t *testing.T) {
 	t.Parallel()
 
 	t.Run("SuccessWithBucketCreation", func(t *testing.T) {
+		t.Parallel()
+
 		dataset := influxMemory{Orgs: []string{"org1"}}
 		ts := startInfluxv2Mock(&dataset)
 		defer ts.Close()
@@ -197,6 +199,8 @@ func TestOutputStart(t *testing.T) {
 		assert.Contains(t, dataset.Buckets, "mybucket")
 	})
 	t.Run("SuccessWithAlreadyExistingBucket", func(t *testing.T) {
+		t.Parallel()
+
 		dataset := influxMemory{
 			Orgs:    []string{"org1"},
 			Buckets: []string{"bucket1"},
@@ -213,6 +217,8 @@ func TestOutputStart(t *testing.T) {
 		require.NoError(t, c.Start())
 	})
 	t.Run("SuccessWithDatabase18Creation", func(t *testing.T) {
+		t.Parallel()
+
 		dataset := influxMemory{}
 		ts := startInfluxv1Mock(&dataset, "", "")
 		defer ts.Close()
@@ -227,6 +233,8 @@ func TestOutputStart(t *testing.T) {
 		assert.Contains(t, dataset.Databases, "mydb")
 	})
 	t.Run("SuccessWithAlreadyExistingDatabase18", func(t *testing.T) {
+		t.Parallel()
+
 		dataset := influxMemory{Databases: []string{"db1"}}
 		ts := startInfluxv1Mock(&dataset, "", "")
 		defer ts.Close()
@@ -240,6 +248,8 @@ func TestOutputStart(t *testing.T) {
 		require.NoError(t, c.Start())
 	})
 	t.Run("SuccessWithDatabaseAuth", func(t *testing.T) {
+		t.Parallel()
+
 		dataset := influxMemory{Databases: []string{"db1"}}
 		ts := startInfluxv1Mock(&dataset, "joe", "passw")
 		defer ts.Close()
@@ -253,8 +263,10 @@ func TestOutputStart(t *testing.T) {
 		require.NoError(t, c.Start())
 	})
 	t.Run("SkipCreationOnHealthcheckFail", func(t *testing.T) {
+		t.Parallel()
+
 		dataset := influxMemory{Databases: []string{"db1"}}
-		ts := startTelegrafMock(nil)
+		ts := startTelegrafMock(&dataset)
 		defer ts.Close()
 
 		c, err := newOutput(output.Params{
@@ -267,6 +279,8 @@ func TestOutputStart(t *testing.T) {
 		assert.Len(t, dataset.Databases, 1)
 	})
 	t.Run("DatabaseAuthFailed", func(t *testing.T) {
+		t.Parallel()
+
 		dataset := influxMemory{Databases: []string{"db1"}}
 		ts := startInfluxv1Mock(&dataset, "joe", "passw")
 		defer ts.Close()
@@ -280,6 +294,8 @@ func TestOutputStart(t *testing.T) {
 		assert.NotNil(t, c.Start())
 	})
 	t.Run("OrganizationDoesNotExist", func(t *testing.T) {
+		t.Parallel()
+
 		dataset := influxMemory{
 			Orgs:    []string{"org1"},
 			Buckets: []string{"bucket1"},
@@ -305,6 +321,29 @@ type influxMemory struct {
 
 	// InfluxDB 1.x
 	Databases []string
+}
+
+func (db *influxMemory) FilterBuckets(name string) []string {
+	items := make([]string, 0, len(db.Buckets))
+	for _, bucket := range db.Buckets {
+		// apply the filter if required
+		if name != "" && name != bucket {
+			continue
+		}
+		items = append(items, fmt.Sprintf(`{"name":%q}`, bucket))
+	}
+	return items
+}
+
+func (db *influxMemory) FilterOrgs(name string) []string {
+	items := make([]string, 0, len(db.Orgs))
+	for i, org := range db.Orgs {
+		if name != "" && name != org {
+			continue
+		}
+		items = append(items, fmt.Sprintf(`{"id":"%d","name":%q}`, i, org))
+	}
+	return items
 }
 
 func testOutputCycle(t testing.TB, handler http.HandlerFunc, body func(testing.TB, *Output)) {
@@ -380,71 +419,51 @@ func startInfluxv1Mock(db *influxMemory, expuser, exppassword string) *httptest.
 }
 
 func startInfluxv2Mock(db *influxMemory) *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+	fn := func(rw http.ResponseWriter, r *http.Request) {
 		// on startup the version returned from the server is checked
 		if r.URL.Path == "/health" {
 			rw.Header().Set("Content-Type", "application/json")
 			_, _ = rw.Write([]byte(`{"status":"pass","version":"2.0"}`))
 			return
 		}
-		if r.URL.Path == "/api/v2/buckets" {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/v2/buckets" {
 			// list buckets
-			if r.Method == http.MethodGet {
-				filter := r.URL.Query().Get("name")
+			filter := r.URL.Query().Get("name")
+			buckets := strings.Join(db.FilterBuckets(filter), ",")
 
-				buckets := func() string {
-					items := make([]string, 0, len(db.Buckets))
-					for _, bucket := range db.Buckets {
-						// apply the filter if required
-						if filter != "" && filter != bucket {
-							continue
-						}
-						items = append(items, fmt.Sprintf(`{"name":%q}`, bucket))
-					}
-					return strings.Join(items, ",")
-				}()
-				rw.Header().Set("Content-Type", "application/json")
-				_, _ = rw.Write([]byte(fmt.Sprintf(`{"buckets":[%s]}`, buckets)))
+			rw.Header().Set("Content-Type", "application/json")
+			_, _ = rw.Write([]byte(fmt.Sprintf(`{"buckets":[%s]}`, buckets)))
+			return
+		}
+
+		// create a bucket
+		if r.Method == http.MethodPost && r.URL.Path == "/api/v2/buckets" {
+			var bucket influxdomain.Bucket
+			err := json.NewDecoder(r.Body).Decode(&bucket)
+			if err != nil {
+				rw.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-
-			// create a bucket
-			if r.Method == http.MethodPost {
-				var bucket influxdomain.Bucket
-				err := json.NewDecoder(r.Body).Decode(&bucket)
-				if err != nil {
-					rw.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				db.Buckets = append(db.Buckets, bucket.Name)
-				return
-			}
+			db.Buckets = append(db.Buckets, bucket.Name)
+			return
 		}
 
 		// list orgs
 		if r.Method == http.MethodGet && r.URL.Path == "/api/v2/orgs" {
 			filter := r.URL.Query().Get("org")
+			orgs := strings.Join(db.FilterOrgs(filter), filter)
 
-			orgs := func() string {
-				items := make([]string, 0, len(db.Orgs))
-				for i, org := range db.Orgs {
-					if filter != "" && filter != org {
-						continue
-					}
-					items = append(items, fmt.Sprintf(`{"id":"%d","name":%q}`, i, org))
-				}
-				return strings.Join(items, ",")
-			}()
 			rw.Header().Set("Content-Type", "application/json")
 			_, _ = rw.Write([]byte(fmt.Sprintf(`{"orgs":[%s]}`, orgs)))
 			return
 		}
 
 		rw.WriteHeader(http.StatusInternalServerError)
-	}))
+	}
+	return httptest.NewServer(http.HandlerFunc(fn))
 }
 
-func startTelegrafMock(db *influxMemory) *httptest.Server {
+func startTelegrafMock(_ *influxMemory) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusNotFound)
 	}))
