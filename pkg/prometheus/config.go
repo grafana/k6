@@ -14,8 +14,13 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
+const (
+	defaultPrometheusTimeout = time.Minute * 2
+	defaultFlushPeriod       = time.Second
+)
+
 type Config struct {
-	Url null.String `json:"url" envconfig:"K6_PROMETHEUS_REMOTE_URL"` // here we assume that we won't need to distinguish from remote read URL
+	Url null.String `json:"url" envconfig:"K6_PROMETHEUS_REMOTE_URL"` // here, in the name of env variable, we assume that we won't need to distinguish between remote write URL vs remote read URL
 
 	InsecureSkipTLSVerify null.Bool   `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY"`
 	CACert                null.String `json:"caCertFile" envconfig:"K6_CA_CERT_FILE"`
@@ -28,12 +33,12 @@ type Config struct {
 
 func NewConfig() Config {
 	return Config{
-		Url:                   null.StringFrom(""),
-		InsecureSkipTLSVerify: null.BoolFrom(false),
-		CACert:                null.StringFrom(""),
-		User:                  null.StringFrom(""),
-		Password:              null.StringFrom(""),
-		FlushPeriod:           types.NullDurationFrom(1 * time.Second),
+		Url:                   null.StringFrom("http://localhost:9090/api/v1/write"),
+		InsecureSkipTLSVerify: null.BoolFrom(true),
+		CACert:                null.NewString("", false),
+		User:                  null.NewString("", false),
+		Password:              null.NewString("", false),
+		FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
 	}
 }
 
@@ -43,16 +48,20 @@ func (conf Config) ConstructRemoteConfig() (*remote.ClientConfig, error) {
 	httpConfig.TLSConfig = promConfig.TLSConfig{
 		InsecureSkipVerify: conf.InsecureSkipTLSVerify.Bool,
 	}
+
+	// if insecureSkipTLSVerify is switched off, use the certificate file
 	if !conf.InsecureSkipTLSVerify.Bool {
 		httpConfig.TLSConfig.CAFile = conf.CACert.String
 	}
 
+	// if at least valid user was configured, use basic auth
 	if conf.User.Valid {
 		httpConfig.BasicAuth = &promConfig.BasicAuth{
 			Username: conf.User.String,
 			Password: promConfig.Secret(conf.Password.String),
 		}
 	}
+	// TODO: consider if the auth logic should be enforced here (e.g. if insecureSkipTLSVerify is switched off, then check for non-empty certificate file and auth, etc.)
 
 	u, err := url.Parse(conf.Url.String)
 	if err != nil {
@@ -61,14 +70,14 @@ func (conf Config) ConstructRemoteConfig() (*remote.ClientConfig, error) {
 
 	remoteConfig := remote.ClientConfig{
 		URL:              &promConfig.URL{u},
-		Timeout:          model.Duration(time.Minute * 2),
+		Timeout:          model.Duration(defaultPrometheusTimeout),
 		HTTPClientConfig: httpConfig,
 		RetryOnRateLimit: false, // disables retries on HTTP status 429
 	}
 	return &remoteConfig, nil
 }
 
-// From here till the end of the file partial duplicates waiting for config refactor (#883)
+// From here till the end of the file partial duplicates waiting for config refactor (k6 #883)
 
 func (base Config) Apply(applied Config) Config {
 	if applied.Url.Valid {
@@ -100,7 +109,7 @@ func (base Config) Apply(applied Config) Config {
 
 // ParseArg takes an arg string and converts it to a config
 func ParseArg(arg string) (Config, error) {
-	c := Config{}
+	var c Config
 	params, err := strvals.Parse(arg)
 	if err != nil {
 		return c, err
@@ -179,11 +188,12 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 	}
 
 	if arg != "" {
-		urlConf, err := ParseArg(arg)
+		argConf, err := ParseArg(arg)
 		if err != nil {
 			return result, err
 		}
-		result = result.Apply(urlConf)
+
+		result = result.Apply(argConf)
 	}
 
 	return result, nil
