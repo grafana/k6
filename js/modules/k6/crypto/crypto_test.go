@@ -24,12 +24,15 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/lib"
 )
 
 type MockReader struct{}
@@ -50,17 +53,17 @@ func TestCryptoAlgorithms(t *testing.T) {
 	rt.Set("crypto", common.Bind(rt, New(), &ctx))
 
 	t.Run("RandomBytesSuccess", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		let bytes = crypto.randomBytes(5);
-		if (bytes.length !== 5) {
-			throw new Error("Incorrect size: " + bytes.length);
+		_, err := rt.RunString(`
+		var buf = crypto.randomBytes(5);
+		if (buf.byteLength !== 5) {
+			throw new Error("Incorrect size: " + buf.byteLength);
 		}`)
 
 		assert.NoError(t, err)
 	})
 
 	t.Run("RandomBytesInvalidSize", func(t *testing.T) {
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 		crypto.randomBytes(-1);`)
 
 		assert.Error(t, err)
@@ -69,7 +72,7 @@ func TestCryptoAlgorithms(t *testing.T) {
 	t.Run("RandomBytesFailure", func(t *testing.T) {
 		SavedReader := rand.Reader
 		rand.Reader = MockReader{}
-		_, err := common.RunString(rt, `
+		_, err := rt.RunString(`
 		crypto.randomBytes(5);`)
 		rand.Reader = SavedReader
 
@@ -77,9 +80,9 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("MD4", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		const correct = "aa010fbc1d14c795d86ef98c95479d17";
-		let hash = crypto.md4("hello world", "hex");
+		_, err := rt.RunString(`
+		var correct = "aa010fbc1d14c795d86ef98c95479d17";
+		var hash = crypto.md4("hello world", "hex");
 		if (hash !== correct) {
 			throw new Error("Hash mismatch: " + hash);
 		}`)
@@ -87,9 +90,9 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("MD5", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		const correct = "5eb63bbbe01eeed093cb22bb8f5acdc3";
-		let hash = crypto.md5("hello world", "hex");
+		_, err := rt.RunString(`
+		var correct = "5eb63bbbe01eeed093cb22bb8f5acdc3";
+		var hash = crypto.md5("hello world", "hex");
 		if (hash !== correct) {
 			throw new Error("Hash mismatch: " + hash);
 		}`)
@@ -98,9 +101,9 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("SHA1", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		const correct = "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed";
-		let hash = crypto.sha1("hello world", "hex");
+		_, err := rt.RunString(`
+		var correct = "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed";
+		var hash = crypto.sha1("hello world", "hex");
 		if (hash !== correct) {
 			throw new Error("Hash mismatch: " + hash);
 		}`)
@@ -109,9 +112,9 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("SHA256", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		const correct = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
-		let hash = crypto.sha256("hello world", "hex");
+		_, err := rt.RunString(`
+		var correct = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
+		var hash = crypto.sha256("hello world", "hex");
 		if (hash !== correct) {
 			throw new Error("Hash mismatch: " + hash);
 		}`)
@@ -120,9 +123,9 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("SHA384", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		const correct = "fdbd8e75a67f29f701a4e040385e2e23986303ea10239211af907fcbb83578b3e417cb71ce646efd0819dd8c088de1bd";
-		let hash = crypto.sha384("hello world", "hex");
+		_, err := rt.RunString(`
+		var correct = "fdbd8e75a67f29f701a4e040385e2e23986303ea10239211af907fcbb83578b3e417cb71ce646efd0819dd8c088de1bd";
+		var hash = crypto.sha384("hello world", "hex");
 		if (hash !== correct) {
 			throw new Error("Hash mismatch: " + hash);
 		}`)
@@ -131,9 +134,9 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("SHA512", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		const correct = "309ecc489c12d6eb4cc40f50c902f2b4d0ed77ee511a7c7a9bcd3ca86d4cd86f989dd35bc5ff499670da34255b45b0cfd830e81f605dcf7dc5542e93ae9cd76f";
-		let hash = crypto.sha512("hello world", "hex");
+		_, err := rt.RunString(`
+		var correct = "309ecc489c12d6eb4cc40f50c902f2b4d0ed77ee511a7c7a9bcd3ca86d4cd86f989dd35bc5ff499670da34255b45b0cfd830e81f605dcf7dc5542e93ae9cd76f";
+		var hash = crypto.sha512("hello world", "hex");
 		if (hash !== correct) {
 			throw new Error("Hash mismatch: " + hash);
 		}`)
@@ -142,9 +145,9 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("SHA512_224", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		let hash = crypto.sha512_224("hello world", "hex");
-		const correct = "22e0d52336f64a998085078b05a6e37b26f8120f43bf4db4c43a64ee";
+		_, err := rt.RunString(`
+		var hash = crypto.sha512_224("hello world", "hex");
+		var correct = "22e0d52336f64a998085078b05a6e37b26f8120f43bf4db4c43a64ee";
 		if (hash !== correct) {
 			throw new Error("Hash mismatch: " + hash);
 		}`)
@@ -153,9 +156,9 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("SHA512_256", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		let hash = crypto.sha512_256("hello world", "hex");
-		const correct = "0ac561fac838104e3f2e4ad107b4bee3e938bf15f2b15f009ccccd61a913f017";
+		_, err := rt.RunString(`
+		var hash = crypto.sha512_256("hello world", "hex");
+		var correct = "0ac561fac838104e3f2e4ad107b4bee3e938bf15f2b15f009ccccd61a913f017";
 		if (hash !== correct) {
 			throw new Error("Hash mismatch: " + hash);
 		}`)
@@ -164,9 +167,9 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("RIPEMD160", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		let hash = crypto.ripemd160("hello world", "hex");
-		const correct = "98c615784ccb5fe5936fbc0cbe9dfdb408d92f0f";
+		_, err := rt.RunString(`
+		var hash = crypto.ripemd160("hello world", "hex");
+		var correct = "98c615784ccb5fe5936fbc0cbe9dfdb408d92f0f";
 		if (hash !== correct) {
 			throw new Error("Hash mismatch: " + hash);
 		}`)
@@ -194,12 +197,12 @@ func TestStreamingApi(t *testing.T) {
 
 	// Empty strings are still hashable
 	t.Run("Empty", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		const correctHex = "d41d8cd98f00b204e9800998ecf8427e";
+		_, err := rt.RunString(`
+		var correctHex = "d41d8cd98f00b204e9800998ecf8427e";
 
-		let hasher = crypto.createHash("md5");
+		var hasher = crypto.createHash("md5");
 
-		const resultHex = hasher.digest("hex");
+		var resultHex = hasher.digest("hex");
 		if (resultHex !== correctHex) {
 			throw new Error("Hex encoding mismatch: " + resultHex);
 		}`)
@@ -208,13 +211,13 @@ func TestStreamingApi(t *testing.T) {
 	})
 
 	t.Run("UpdateOnce", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		const correctHex = "5eb63bbbe01eeed093cb22bb8f5acdc3";
+		_, err := rt.RunString(`
+		var correctHex = "5eb63bbbe01eeed093cb22bb8f5acdc3";
 
-		let hasher = crypto.createHash("md5");
+		var hasher = crypto.createHash("md5");
 		hasher.update("hello world");
 
-		const resultHex = hasher.digest("hex");
+		var resultHex = hasher.digest("hex");
 		if (resultHex !== correctHex) {
 			throw new Error("Hex encoding mismatch: " + resultHex);
 		}`)
@@ -223,15 +226,15 @@ func TestStreamingApi(t *testing.T) {
 	})
 
 	t.Run("UpdateMultiple", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		const correctHex = "5eb63bbbe01eeed093cb22bb8f5acdc3";
+		_, err := rt.RunString(`
+		var correctHex = "5eb63bbbe01eeed093cb22bb8f5acdc3";
 
-		let hasher = crypto.createHash("md5");
+		var hasher = crypto.createHash("md5");
 		hasher.update("hello");
 		hasher.update(" ");
 		hasher.update("world");
 
-		const resultHex = hasher.digest("hex");
+		var resultHex = hasher.digest("hex");
 		if (resultHex !== correctHex) {
 			throw new Error("Hex encoding mismatch: " + resultHex);
 		}`)
@@ -258,32 +261,32 @@ func TestOutputEncoding(t *testing.T) {
 	rt.Set("crypto", common.Bind(rt, New(), &ctx))
 
 	t.Run("Valid", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		const correctHex = "5eb63bbbe01eeed093cb22bb8f5acdc3";
-		const correctBase64 = "XrY7u+Ae7tCTyyK7j1rNww==";
-		const correctBase64URL = "XrY7u-Ae7tCTyyK7j1rNww=="
-		const correctBase64RawURL = "XrY7u-Ae7tCTyyK7j1rNww";
-		const correctBinary = [94,182,59,187,224,30,238,208,147,203,34,187,143,90,205,195];
+		_, err := rt.RunString(`
+		var correctHex = "5eb63bbbe01eeed093cb22bb8f5acdc3";
+		var correctBase64 = "XrY7u+Ae7tCTyyK7j1rNww==";
+		var correctBase64URL = "XrY7u-Ae7tCTyyK7j1rNww=="
+		var correctBase64RawURL = "XrY7u-Ae7tCTyyK7j1rNww";
+		var correctBinary = [94,182,59,187,224,30,238,208,147,203,34,187,143,90,205,195];
 
-		let hasher = crypto.createHash("md5");
+		var hasher = crypto.createHash("md5");
 		hasher.update("hello world");
 
-		const resultHex = hasher.digest("hex");
+		var resultHex = hasher.digest("hex");
 		if (resultHex !== correctHex) {
 			throw new Error("Hex encoding mismatch: " + resultHex);
 		}
 
-		const resultBase64 = hasher.digest("base64");
+		var resultBase64 = hasher.digest("base64");
 		if (resultBase64 !== correctBase64) {
 			throw new Error("Base64 encoding mismatch: " + resultBase64);
 		}
 
-		const resultBase64URL = hasher.digest("base64url");
+		var resultBase64URL = hasher.digest("base64url");
 		if (resultBase64URL !== correctBase64URL) {
 			throw new Error("Base64 URL encoding mismatch: " + resultBase64URL);
 		}
 
-		const resultBase64RawURL = hasher.digest("base64rawurl");
+		var resultBase64RawURL = hasher.digest("base64rawurl");
 		if (resultBase64RawURL !== correctBase64RawURL) {
 			throw new Error("Base64 raw URL encoding mismatch: " + resultBase64RawURL);
 		}
@@ -300,7 +303,7 @@ func TestOutputEncoding(t *testing.T) {
 		  return true;
 		}
 
-		const resultBinary = hasher.digest("binary");
+		var resultBinary = new Uint8Array(hasher.digest("binary"));
 		if (!arraysEqual(resultBinary,  correctBinary)) {
 			throw new Error("Binary encoding mismatch: " + JSON.stringify(resultBinary));
 		}
@@ -310,12 +313,12 @@ func TestOutputEncoding(t *testing.T) {
 	})
 
 	t.Run("Invalid", func(t *testing.T) {
-		_, err := common.RunString(rt, `
-		let hasher = crypto.createHash("md5");
+		_, err := rt.RunString(`
+		var hasher = crypto.createHash("md5");
 		hasher.update("hello world");
 		hasher.digest("someInvalidEncoding");
 		`)
-		assert.EqualError(t, err, "GoError: Invalid output encoding: someInvalidEncoding")
+		assert.Contains(t, err.Error(), "Invalid output encoding: someInvalidEncoding")
 	})
 }
 
@@ -351,11 +354,11 @@ func TestHMac(t *testing.T) {
 		rt.Set("correctHex", rt.ToValue(value))
 		rt.Set("algorithm", rt.ToValue(algorithm))
 		t.Run(algorithm+" hasher: valid", func(t *testing.T) {
-			_, err := common.RunString(rt, `
-			let hasher = crypto.createHMAC(algorithm, "a secret");
+			_, err := rt.RunString(`
+			var hasher = crypto.createHMAC(algorithm, "a secret");
 			hasher.update("some data to hash");
 
-			const resultHex = hasher.digest("hex");
+			var resultHex = hasher.digest("hex");
 			if (resultHex !== correctHex) {
 				throw new Error("Hex encoding mismatch: " + resultHex);
 			}`)
@@ -364,8 +367,20 @@ func TestHMac(t *testing.T) {
 		})
 
 		t.Run(algorithm+" wrapper: valid", func(t *testing.T) {
-			_, err := common.RunString(rt, `
-			let resultHex = crypto.hmac(algorithm, "a secret", "some data to hash", "hex");
+			_, err := rt.RunString(`
+			var resultHex = crypto.hmac(algorithm, "a secret", "some data to hash", "hex");
+			if (resultHex !== correctHex) {
+				throw new Error("Hex encoding mismatch: " + resultHex);
+			}`)
+
+			assert.NoError(t, err)
+		})
+
+		t.Run(algorithm+" ArrayBuffer: valid", func(t *testing.T) {
+			_, err := rt.RunString(`
+			var data = new Uint8Array([115,111,109,101,32,100,97,116,97,32,116,
+										111,32,104,97,115,104]).buffer;
+			var resultHex = crypto.hmac(algorithm, "a secret", data, "hex");
 			if (resultHex !== correctHex) {
 				throw new Error("Hex encoding mismatch: " + resultHex);
 			}`)
@@ -381,31 +396,67 @@ func TestHMac(t *testing.T) {
 		"sha348": "d331e169e2dcfc742e80a3bf4dcc76d0e6425ab3777a3ac217ac6b2552aad5529ed4d40135b06e53a495ac7425d1e462",
 	}
 	for algorithm, value := range invalidData {
+		algorithm := algorithm
 		rt.Set("correctHex", rt.ToValue(value))
 		rt.Set("algorithm", rt.ToValue(algorithm))
 		t.Run(algorithm+" hasher: invalid", func(t *testing.T) {
-			_, err := common.RunString(rt, `
-			let hasher = crypto.createHMAC(algorithm, "a secret");
+			_, err := rt.RunString(`
+			var hasher = crypto.createHMAC(algorithm, "a secret");
 			hasher.update("some data to hash");
 
-			const resultHex = hasher.digest("hex");
+			var resultHex = hasher.digest("hex");
 			if (resultHex !== correctHex) {
 				throw new Error("Hex encoding mismatch: " + resultHex);
 			}`)
 
-			assert.EqualError(t, err, "GoError: Invalid algorithm: "+algorithm)
+			assert.Contains(t, err.Error(), "Invalid algorithm: "+algorithm)
 		})
 
 		t.Run(algorithm+" wrapper: invalid", func(t *testing.T) {
-			_, err := common.RunString(rt, `
-			let resultHex = crypto.hmac(algorithm, "a secret", "some data to hash", "hex");
+			_, err := rt.RunString(`
+			var resultHex = crypto.hmac(algorithm, "a secret", "some data to hash", "hex");
 			if (resultHex !== correctHex) {
 				throw new Error("Hex encoding mismatch: " + resultHex);
 			}`)
 
-			assert.EqualError(t, err, "GoError: Invalid algorithm: "+algorithm)
+			assert.Contains(t, err.Error(), "Invalid algorithm: "+algorithm)
 		})
 	}
+}
+
+func TestHexEncodeOK(t *testing.T) {
+	rt := goja.New()
+	input := []byte{104, 101, 108, 108, 111}
+	testCases := []interface{}{
+		input, string(input), rt.NewArrayBuffer(input),
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("%T", tc), func(t *testing.T) {
+			c := New()
+			ctx := common.WithRuntime(context.Background(), rt)
+			out := c.HexEncode(ctx, tc)
+			assert.Equal(t, "68656c6c6f", out)
+		})
+	}
+}
+
+func TestHexEncodeError(t *testing.T) {
+	rt := goja.New()
+
+	expErr := "invalid type struct {}, expected string, []byte or ArrayBuffer"
+	defer func() {
+		err := recover()
+		require.NotNil(t, err)
+		require.IsType(t, &goja.Object{}, err)
+		val := err.(*goja.Object).Export()
+		require.EqualError(t, val.(error), expErr)
+	}()
+
+	c := New()
+	ctx := common.WithRuntime(context.Background(), rt)
+	c.HexEncode(ctx, struct{}{})
 }
 
 func TestAWSv4(t *testing.T) {
@@ -416,41 +467,41 @@ func TestAWSv4(t *testing.T) {
 	ctx = common.WithRuntime(ctx, rt)
 	rt.Set("crypto", common.Bind(rt, New(), &ctx))
 
-	_, err := common.RunString(rt, `
-		let HexEncode = crypto.hexEncode;
-		let HmacSHA256 = function(data, key) {
-			return crypto.hmac("sha256",key, data, "binary");
+	_, err := rt.RunString(`
+		var HexEncode = crypto.hexEncode;
+		var HmacSHA256 = function(data, key) {
+			return crypto.hmac("sha256", key, data, "binary");
 		};
 
-		let expectedKDate    = '969fbb94feb542b71ede6f87fe4d5fa29c789342b0f407474670f0c2489e0a0d'
-		let expectedKRegion  = '69daa0209cd9c5ff5c8ced464a696fd4252e981430b10e3d3fd8e2f197d7a70c'
-		let expectedKService = 'f72cfd46f26bc4643f06a11eabb6c0ba18780c19a8da0c31ace671265e3c87fa'
-		let expectedKSigning = 'f4780e2d9f65fa895f9c67b32ce1baf0b0d8a43505a000a1a9e090d414db404d'
+		var expectedKDate    = '969fbb94feb542b71ede6f87fe4d5fa29c789342b0f407474670f0c2489e0a0d'
+		var expectedKRegion  = '69daa0209cd9c5ff5c8ced464a696fd4252e981430b10e3d3fd8e2f197d7a70c'
+		var expectedKService = 'f72cfd46f26bc4643f06a11eabb6c0ba18780c19a8da0c31ace671265e3c87fa'
+		var expectedKSigning = 'f4780e2d9f65fa895f9c67b32ce1baf0b0d8a43505a000a1a9e090d414db404d'
 
-		let key = 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY';
-		let dateStamp = '20120215';
-		let regionName = 'us-east-1';
-		let serviceName = 'iam';
+		var key = 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY';
+		var dateStamp = '20120215';
+		var regionName = 'us-east-1';
+		var serviceName = 'iam';
 
-		let kDate = HmacSHA256(dateStamp, "AWS4" + key);
-		let kRegion = HmacSHA256(regionName, kDate);
-		let kService = HmacSHA256(serviceName, kRegion);
-		let kSigning = HmacSHA256("aws4_request", kService);
+		var kDate = HmacSHA256(dateStamp, "AWS4" + key);
+		var kRegion = HmacSHA256(regionName, kDate);
+		var kService = HmacSHA256(serviceName, kRegion);
+		var kSigning = HmacSHA256("aws4_request", kService);
 
 
-		let hexKDate = HexEncode(kDate);
+		var hexKDate = HexEncode(kDate);
 		if (expectedKDate != hexKDate) {
 			throw new Error("Wrong kDate: expected '" + expectedKDate + "' got '" + hexKDate + "'");
 		}
-		let hexKRegion = HexEncode(kRegion);
+		var hexKRegion = HexEncode(kRegion);
 		if (expectedKRegion != hexKRegion) {
 			throw new Error("Wrong kRegion: expected '" + expectedKRegion + "' got '" + hexKRegion + "'");
 		}
-		let hexKService = HexEncode(kService);
+		var hexKService = HexEncode(kService);
 		if (expectedKService != hexKService) {
 			throw new Error("Wrong kService: expected '" + expectedKService + "' got '" + hexKService + "'");
 		}
-		let hexKSigning = HexEncode(kSigning);
+		var hexKSigning = HexEncode(kSigning);
 		if (expectedKSigning != hexKSigning) {
 			throw new Error("Wrong kSigning: expected '" + expectedKSigning + "' got '" + hexKSigning + "'");
 		}

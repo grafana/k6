@@ -1,0 +1,8 @@
+[k6]
+name=k6
+baseurl=https://dl.k6.io/rpm/$basearch
+enabled=1
+gpgcheck=1
+repo_gpgcheck=0
+metadata_expire=1d
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-k6-io

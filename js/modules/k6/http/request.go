@@ -23,6 +23,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"mime/multipart"
 	"net/http"
@@ -33,10 +34,12 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/netext/httpext"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/netext/httpext"
+	"go.k6.io/k6/lib/types"
 )
 
 // ErrHTTPForbiddenInInitContext is used when a http requests was made in the init context
@@ -87,9 +90,9 @@ func (h *HTTP) Options(ctx context.Context, url goja.Value, args ...goja.Value) 
 // Request makes an http request of the provided `method` and returns a corresponding response by
 // taking goja.Values as arguments
 func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args ...goja.Value) (*Response, error) {
-	u, err := ToURL(url)
-	if err != nil {
-		return nil, err
+	state := lib.GetState(ctx)
+	if state == nil {
+		return nil, ErrHTTPForbiddenInInitContext
 	}
 
 	var body interface{}
@@ -102,22 +105,33 @@ func (h *HTTP) Request(ctx context.Context, method string, url goja.Value, args 
 		params = args[1]
 	}
 
-	req, err := h.parseRequest(ctx, method, u, body, params)
+	req, err := h.parseRequest(ctx, method, url, body, params)
 	if err != nil {
-		return nil, err
+		if state.Options.Throw.Bool {
+			return nil, err
+		}
+		state.Logger.WithField("error", err).Warn("Request Failed")
+		r := httpext.NewResponse(ctx)
+		r.Error = err.Error()
+		var k6e httpext.K6Error
+		if errors.As(err, &k6e) {
+			r.ErrorCode = int(k6e.Code)
+		}
+		return &Response{Response: r}, nil
 	}
 
 	resp, err := httpext.MakeRequest(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	return responseFromHttpext(resp), nil
+	processResponse(ctx, resp, req.ResponseType)
+	return h.responseFromHttpext(resp), nil
 }
 
 //TODO break this function up
 //nolint: gocyclo
 func (h *HTTP) parseRequest(
-	ctx context.Context, method string, reqURL httpext.URL, body interface{}, params goja.Value,
+	ctx context.Context, method string, reqURL, body interface{}, params goja.Value,
 ) (*httpext.ParsedHTTPRequest, error) {
 	rt := common.GetRuntime(ctx)
 	state := lib.GetState(ctx)
@@ -125,19 +139,29 @@ func (h *HTTP) parseRequest(
 		return nil, ErrHTTPForbiddenInInitContext
 	}
 
+	if urlJSValue, ok := reqURL.(goja.Value); ok {
+		reqURL = urlJSValue.Export()
+	}
+	u, err := httpext.ToURL(reqURL)
+	if err != nil {
+		return nil, err
+	}
+
 	result := &httpext.ParsedHTTPRequest{
-		URL: &reqURL,
+		URL: &u,
 		Req: &http.Request{
 			Method: method,
-			URL:    reqURL.GetURL(),
+			URL:    u.GetURL(),
 			Header: make(http.Header),
 		},
-		Timeout:   60 * time.Second,
-		Throw:     state.Options.Throw.Bool,
-		Redirects: state.Options.MaxRedirects,
-		Cookies:   make(map[string]*httpext.HTTPRequestCookie),
-		Tags:      make(map[string]string),
+		Timeout:          60 * time.Second,
+		Throw:            state.Options.Throw.Bool,
+		Redirects:        state.Options.MaxRedirects,
+		Cookies:          make(map[string]*httpext.HTTPRequestCookie),
+		Tags:             make(map[string]string),
+		ResponseCallback: h.responseCallback,
 	}
+
 	if state.Options.DiscardResponseBodies.Bool {
 		result.ResponseType = httpext.ResponseTypeNone
 	} else {
@@ -145,7 +169,7 @@ func (h *HTTP) parseRequest(
 	}
 
 	formatFormVal := func(v interface{}) string {
-		//TODO: handle/warn about unsupported/nested values
+		// TODO: handle/warn about unsupported/nested values
 		return fmt.Sprintf("%v", v)
 	}
 
@@ -153,6 +177,12 @@ func (h *HTTP) parseRequest(
 		if !requestContainsFile(data) {
 			bodyQuery := make(url.Values, len(data))
 			for k, v := range data {
+				if arr, ok := v.([]interface{}); ok {
+					for _, el := range arr {
+						bodyQuery.Add(k, formatFormVal(el))
+					}
+					continue
+				}
 				bodyQuery.Set(k, formatFormVal(v))
 			}
 			result.Body = bytes.NewBufferString(bodyQuery.Encode())
@@ -212,7 +242,7 @@ func (h *HTTP) parseRequest(
 	if body != nil {
 		switch data := body.(type) {
 		case map[string]goja.Value:
-			//TODO: fix forms submission and serialization in k6/html before fixing this..
+			// TODO: fix forms submission and serialization in k6/html before fixing this..
 			newData := map[string]interface{}{}
 			for k, v := range data {
 				newData[k] = v.Export()
@@ -220,6 +250,8 @@ func (h *HTTP) parseRequest(
 			if err := handleObjectBody(newData); err != nil {
 				return nil, err
 			}
+		case goja.ArrayBuffer:
+			result.Body = bytes.NewBuffer(data.Bytes())
 		case map[string]interface{}:
 			if err := handleObjectBody(data); err != nil {
 				return nil, err
@@ -233,9 +265,7 @@ func (h *HTTP) parseRequest(
 		}
 	}
 
-	if userAgent := state.Options.UserAgent; userAgent.String != "" {
-		result.Req.Header.Set("User-Agent", userAgent.String)
-	}
+	result.Req.Header.Set("User-Agent", state.Options.UserAgent.String)
 
 	if state.CookieJar != nil {
 		result.ActiveJar = state.CookieJar
@@ -287,12 +317,10 @@ func (h *HTTP) parseRequest(
 				}
 				for _, key := range headers.Keys() {
 					str := headers.Get(key).String()
-					switch strings.ToLower(key) {
-					case "host":
+					if strings.ToLower(key) == "host" {
 						result.Req.Host = str
-					default:
-						result.Req.Header.Set(key, str)
 					}
+					result.Req.Header.Set(key, str)
 				}
 			case "jar":
 				jarV := params.Get(k)
@@ -304,11 +332,11 @@ func (h *HTTP) parseRequest(
 					result.ActiveJar = v.jar
 				}
 			case "compression":
-				var algosString = strings.TrimSpace(params.Get(k).ToString().String())
+				algosString := strings.TrimSpace(params.Get(k).ToString().String())
 				if algosString == "" {
 					continue
 				}
-				var algos = strings.Split(algosString, ",")
+				algos := strings.Split(algosString, ",")
 				var err error
 				result.Compressions = make([]httpext.CompressionType, len(algos))
 				for index, algo := range algos {
@@ -336,7 +364,11 @@ func (h *HTTP) parseRequest(
 			case "auth":
 				result.Auth = params.Get(k).String()
 			case "timeout":
-				result.Timeout = time.Duration(params.Get(k).ToFloat() * float64(time.Millisecond))
+				t, err := types.GetDurationValue(params.Get(k).Export())
+				if err != nil {
+					return nil, fmt.Errorf("invalid timeout value: %w", err)
+				}
+				result.Timeout = t
 			case "throw":
 				result.Throw = params.Get(k).ToBoolean()
 			case "responseType":
@@ -345,6 +377,15 @@ func (h *HTTP) parseRequest(
 					return nil, err
 				}
 				result.ResponseType = responseType
+			case "responseCallback":
+				v := params.Get(k).Export()
+				if v == nil {
+					result.ResponseCallback = nil
+				} else if c, ok := v.(*expectedStatuses); ok {
+					result.ResponseCallback = c.match
+				} else {
+					return nil, fmt.Errorf("unsupported responseCallback")
+				}
 			}
 		}
 	}
@@ -364,16 +405,22 @@ func (h *HTTP) prepareBatchArray(
 	results := make([]*Response, reqCount)
 
 	for i, req := range requests {
+		resp := httpext.NewResponse(ctx)
 		parsedReq, err := h.parseBatchRequest(ctx, i, req)
 		if err != nil {
-			return nil, nil, err
+			resp.Error = err.Error()
+			var k6e httpext.K6Error
+			if errors.As(err, &k6e) {
+				resp.ErrorCode = int(k6e.Code)
+			}
+			results[i] = h.responseFromHttpext(resp)
+			return batchReqs, results, err
 		}
-		response := new(httpext.Response)
 		batchReqs[i] = httpext.BatchParsedHTTPRequest{
 			ParsedHTTPRequest: parsedReq,
-			Response:          response,
+			Response:          resp,
 		}
-		results[i] = &Response{response}
+		results[i] = h.responseFromHttpext(resp)
 	}
 
 	return batchReqs, results, nil
@@ -388,16 +435,22 @@ func (h *HTTP) prepareBatchObject(
 
 	i := 0
 	for key, req := range requests {
+		resp := httpext.NewResponse(ctx)
 		parsedReq, err := h.parseBatchRequest(ctx, key, req)
 		if err != nil {
-			return nil, nil, err
+			resp.Error = err.Error()
+			var k6e httpext.K6Error
+			if errors.As(err, &k6e) {
+				resp.ErrorCode = int(k6e.Code)
+			}
+			results[key] = h.responseFromHttpext(resp)
+			return batchReqs, results, err
 		}
-		response := new(httpext.Response)
 		batchReqs[i] = httpext.BatchParsedHTTPRequest{
 			ParsedHTTPRequest: parsedReq,
-			Response:          response,
+			Response:          resp,
 		}
-		results[key] = &Response{response}
+		results[key] = h.responseFromHttpext(resp)
 		i++
 	}
 
@@ -406,7 +459,7 @@ func (h *HTTP) prepareBatchObject(
 
 // Batch makes multiple simultaneous HTTP requests. The provideds reqsV should be an array of request
 // objects. Batch returns an array of responses and/or error
-func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) {
+func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (interface{}, error) {
 	state := lib.GetState(ctx)
 	if state == nil {
 		return nil, ErrBatchForbiddenInInitContext
@@ -428,13 +481,18 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 	}
 
 	if err != nil {
-		return nil, err
+		if state.Options.Throw.Bool {
+			return nil, err
+		}
+		state.Logger.WithField("error", err).Warn("A batch request failed")
+		return results, nil
 	}
 
 	reqCount := len(batchReqs)
 	errs := httpext.MakeBatchRequests(
 		ctx, batchReqs, reqCount,
 		int(state.Options.Batch.Int64), int(state.Options.BatchPerHost.Int64),
+		processResponse,
 	)
 
 	for i := 0; i < reqCount; i++ {
@@ -442,20 +500,18 @@ func (h *HTTP) Batch(ctx context.Context, reqsV goja.Value) (goja.Value, error) 
 			err = e
 		}
 	}
-	return common.GetRuntime(ctx).ToValue(results), err
+	return results, err
 }
 
 func (h *HTTP) parseBatchRequest(
 	ctx context.Context, key interface{}, val interface{},
 ) (*httpext.ParsedHTTPRequest, error) {
 	var (
-		method = HTTP_METHOD_GET
-		ok     bool
-		err    error
-		reqURL httpext.URL
-		body   interface{}
-		params goja.Value
-		rt     = common.GetRuntime(ctx)
+		method       = HTTP_METHOD_GET
+		ok           bool
+		body, reqURL interface{}
+		params       goja.Value
+		rt           = common.GetRuntime(ctx)
 	)
 
 	switch data := val.(type) {
@@ -469,10 +525,7 @@ func (h *HTTP) parseBatchRequest(
 		if !ok {
 			return nil, fmt.Errorf("invalid method type '%#v'", data[0])
 		}
-		reqURL, err = ToURL(data[1])
-		if err != nil {
-			return nil, err
-		}
+		reqURL = data[1]
 		if dataLen > 2 {
 			body = data[2]
 		}
@@ -482,12 +535,11 @@ func (h *HTTP) parseBatchRequest(
 
 	case map[string]interface{}:
 		// Handling of {method: "GET", url: "https://test.k6.io"}
-		if murl, ok := data["url"]; !ok {
-			return nil, fmt.Errorf("batch request %q doesn't have an url key", key)
-		} else if reqURL, err = ToURL(murl); err != nil {
-			return nil, err
+		if _, ok := data["url"]; !ok {
+			return nil, fmt.Errorf("batch request %v doesn't have a url key", key)
 		}
 
+		reqURL = data["url"]
 		body = data["body"] // It's fine if it's missing, the map lookup will return
 
 		if newMethod, ok := data["method"]; ok {
@@ -503,13 +555,8 @@ func (h *HTTP) parseBatchRequest(
 		if p, ok := data["params"]; ok {
 			params = rt.ToValue(p)
 		}
-
 	default:
-		// Handling of "http://example.com/" or http.url`http://example.com/{$id}`
-		reqURL, err = ToURL(data)
-		if err != nil {
-			return nil, err
-		}
+		reqURL = val
 	}
 
 	return h.parseRequest(ctx, method, reqURL, body, params)

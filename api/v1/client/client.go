@@ -30,28 +30,79 @@ import (
 	"net/url"
 
 	"github.com/manyminds/api2go/jsonapi"
+	"github.com/sirupsen/logrus"
 
-	"github.com/loadimpact/k6/api/v1"
+	v1 "go.k6.io/k6/api/v1"
 )
 
+// Client is a simple HTTP client for the REST API.
 type Client struct {
-	BaseURL *url.URL
+	BaseURL    *url.URL
+	httpClient *http.Client
+	logger     *logrus.Entry
 }
 
-func New(base string) (*Client, error) {
+// Option function are helpers that enable the flexible configuration of the
+// REST API client.
+type Option func(*Client)
+
+// New returns a newly configured REST API Client.
+func New(base string, options ...Option) (*Client, error) {
 	baseURL, err := url.Parse("http://" + base)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{BaseURL: baseURL}, nil
+	c := &Client{
+		BaseURL:    baseURL,
+		httpClient: http.DefaultClient,
+	}
+
+	for _, option := range options {
+		option(c)
+	}
+
+	return c, nil
 }
 
-func (c *Client) call(ctx context.Context, method string, rel *url.URL, body, out interface{}) error {
+// WithHTTPClient configures the supplied HTTP client to be used when making
+// REST API requests.
+func WithHTTPClient(httpClient *http.Client) Option {
+	return Option(func(c *Client) {
+		c.httpClient = httpClient
+	})
+}
+
+// WithLogger sets the specifield logger to the client.
+func WithLogger(logger *logrus.Entry) Option {
+	return Option(func(c *Client) {
+		c.logger = logger
+	})
+}
+
+// Call executes the desired REST API request.
+func (c *Client) Call(ctx context.Context, method string, rel *url.URL, body, out interface{}) (err error) {
+	if c.logger != nil {
+		c.logger.Debugf("[REST API] Making a %s request to '%s'", method, rel.String())
+		defer func() {
+			if err != nil {
+				c.logger.WithError(err).Error("[REST API] Error")
+			}
+		}()
+	}
+
 	var bodyReader io.ReadCloser
 	if body != nil {
-		bodyData, err := jsonapi.Marshal(body)
-		if err != nil {
-			return err
+		var bodyData []byte
+		switch val := body.(type) {
+		case []byte:
+			bodyData = val
+		case string:
+			bodyData = []byte(val)
+		default:
+			bodyData, err = jsonapi.Marshal(body)
+			if err != nil {
+				return err
+			}
 		}
 		bodyReader = ioutil.NopCloser(bytes.NewBuffer(bodyData))
 	}
@@ -63,7 +114,7 @@ func (c *Client) call(ctx context.Context, method string, rel *url.URL, body, ou
 	}
 	req = req.WithContext(ctx)
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -82,5 +133,8 @@ func (c *Client) call(ctx context.Context, method string, rel *url.URL, body, ou
 		return errs.Errors[0]
 	}
 
-	return jsonapi.Unmarshal(data, out)
+	if out != nil {
+		return jsonapi.Unmarshal(data, out)
+	}
+	return nil
 }

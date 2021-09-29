@@ -25,14 +25,17 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/loadimpact/k6/js"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/loader"
 	"github.com/stretchr/testify/assert"
+
+	"go.k6.io/k6/js"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/loader"
 )
 
 func TestBuildK6Headers(t *testing.T) {
-	var headers = []struct {
+	headers := []struct {
 		values   []Header
 		expected []string
 	}{
@@ -56,15 +59,16 @@ func TestBuildK6RequestObject(t *testing.T) {
 	}
 	v, err := buildK6RequestObject(req)
 	assert.NoError(t, err)
-	_, err = js.New(&loader.SourceData{
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	_, err = js.New(testutils.NewLogger(t), &loader.SourceData{
 		URL:  &url.URL{Path: "/script.js"},
 		Data: []byte(fmt.Sprintf("export default function() { res = http.batch([%v]); }", v)),
-	}, nil, lib.RuntimeOptions{})
+	}, nil, lib.RuntimeOptions{}, builtinMetrics, registry)
 	assert.NoError(t, err)
 }
 
 func TestBuildK6Body(t *testing.T) {
-
 	bodyText := "ccustemail=ppcano%40gmail.com&size=medium&topping=cheese&delivery=12%3A00&comments="
 
 	req := &Request{

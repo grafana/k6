@@ -23,32 +23,31 @@ package cmd
 import (
 	"context"
 
-	"github.com/loadimpact/k6/api/v1/client"
-	"github.com/loadimpact/k6/ui"
 	"github.com/spf13/cobra"
+
+	"go.k6.io/k6/api/v1/client"
 )
 
-// statusCmd represents the status command
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show test status",
-	Long: `Show test status.
+func getStatusCmd(ctx context.Context) *cobra.Command {
+	// statusCmd represents the status command
+	statusCmd := &cobra.Command{
+		Use:   "status",
+		Short: "Show test status",
+		Long: `Show test status.
 
   Use the global --address flag to specify the URL to the API server.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := client.New(address)
-		if err != nil {
-			return err
-		}
-		status, err := c.Status(context.Background())
-		if err != nil {
-			return err
-		}
-		ui.Dump(stdout, status)
-		return nil
-	},
-}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := client.New(address)
+			if err != nil {
+				return err
+			}
+			status, err := c.Status(ctx)
+			if err != nil {
+				return err
+			}
 
-func init() {
-	RootCmd.AddCommand(statusCmd)
+			return yamlPrint(stdout, status)
+		},
+	}
+	return statusCmd
 }

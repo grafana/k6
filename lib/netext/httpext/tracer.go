@@ -24,19 +24,18 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http/httptrace"
-	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/stats"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/stats"
+	"gopkg.in/guregu/null.v3"
 )
 
 // A Trail represents detailed information about an HTTP request.
 // You'd typically get one from a Tracer.
 type Trail struct {
-	StartTime time.Time
-	EndTime   time.Time
+	EndTime time.Time
 
 	// Total connect time (Connecting + TLSHandshaking)
 	ConnDuration time.Duration
@@ -54,27 +53,27 @@ type Trail struct {
 	// Detailed connection information.
 	ConnReused     bool
 	ConnRemoteAddr net.Addr
-	Errors         []error
 
+	Failed null.Bool
 	// Populated by SaveSamples()
 	Tags    *stats.SampleTags
 	Samples []stats.Sample
 }
 
 // SaveSamples populates the Trail's sample slice so they're accesible via GetSamples()
-func (tr *Trail) SaveSamples(tags *stats.SampleTags) {
+func (tr *Trail) SaveSamples(builtinMetrics *metrics.BuiltinMetrics, tags *stats.SampleTags) {
 	tr.Tags = tags
-	tr.Samples = []stats.Sample{
-		{Metric: metrics.HTTPReqs, Time: tr.EndTime, Tags: tags, Value: 1},
-		{Metric: metrics.HTTPReqDuration, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Duration)},
-
-		{Metric: metrics.HTTPReqBlocked, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Blocked)},
-		{Metric: metrics.HTTPReqConnecting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Connecting)},
-		{Metric: metrics.HTTPReqTLSHandshaking, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.TLSHandshaking)},
-		{Metric: metrics.HTTPReqSending, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Sending)},
-		{Metric: metrics.HTTPReqWaiting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Waiting)},
-		{Metric: metrics.HTTPReqReceiving, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Receiving)},
-	}
+	tr.Samples = make([]stats.Sample, 0, 9) // this is with 1 more for a possible HTTPReqFailed
+	tr.Samples = append(tr.Samples, []stats.Sample{
+		{Metric: builtinMetrics.HTTPReqs, Time: tr.EndTime, Tags: tags, Value: 1},
+		{Metric: builtinMetrics.HTTPReqDuration, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Duration)},
+		{Metric: builtinMetrics.HTTPReqBlocked, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Blocked)},
+		{Metric: builtinMetrics.HTTPReqConnecting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Connecting)},
+		{Metric: builtinMetrics.HTTPReqTLSHandshaking, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.TLSHandshaking)},
+		{Metric: builtinMetrics.HTTPReqSending, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Sending)},
+		{Metric: builtinMetrics.HTTPReqWaiting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Waiting)},
+		{Metric: builtinMetrics.HTTPReqReceiving, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Receiving)},
+	}...)
 }
 
 // GetSamples implements the stats.SampleContainer interface.
@@ -112,9 +111,6 @@ type Tracer struct {
 
 	connReused     bool
 	connRemoteAddr net.Addr
-
-	protoErrorsMutex sync.Mutex
-	protoErrors      []error
 }
 
 // Trace returns a premade ClientTrace that calls all of the Tracer's hooks.
@@ -129,13 +125,6 @@ func (t *Tracer) Trace() *httptrace.ClientTrace {
 		WroteRequest:         t.WroteRequest,
 		GotFirstResponseByte: t.GotFirstResponseByte,
 	}
-}
-
-// Add an error in a thread-safe way
-func (t *Tracer) addError(err error) {
-	t.protoErrorsMutex.Lock()
-	defer t.protoErrorsMutex.Unlock()
-	t.protoErrors = append(t.protoErrors, err)
 }
 
 func now() int64 {
@@ -182,9 +171,9 @@ func (t *Tracer) ConnectDone(network, addr string, err error) {
 	// that only the first call's time is recorded
 	if err == nil {
 		atomic.CompareAndSwapInt64(&t.connectDone, 0, now())
-	} else {
-		t.addError(err)
 	}
+	// if there is an error it either is happy eyeballs related and doesn't matter or it will be
+	// returned by the http call
 }
 
 // TLSHandshakeStart is called when the TLS handshake is started. When
@@ -208,9 +197,8 @@ func (t *Tracer) TLSHandshakeStart() {
 func (t *Tracer) TLSHandshakeDone(state tls.ConnectionState, err error) {
 	if err == nil {
 		atomic.CompareAndSwapInt64(&t.tlsHandshakeDone, 0, now())
-	} else {
-		t.addError(err)
 	}
+	// if there is an error it will be returned by the http call
 }
 
 // GotConn is called after a successful connection is
@@ -266,9 +254,8 @@ func (t *Tracer) GotConn(info httptrace.GotConnInfo) {
 func (t *Tracer) WroteRequest(info httptrace.WroteRequestInfo) {
 	if info.Err == nil {
 		atomic.StoreInt64(&t.wroteRequest, now())
-	} else {
-		t.addError(info.Err)
 	}
+	// if there is an error it will be returned by the http call
 }
 
 // GotFirstResponseByte is called when the first byte of the response
@@ -346,13 +333,6 @@ func (t *Tracer) Done() *Trail {
 	trail.EndTime = done
 	trail.ConnDuration = trail.Connecting + trail.TLSHandshaking
 	trail.Duration = trail.Sending + trail.Waiting + trail.Receiving
-	trail.StartTime = trail.EndTime.Add(-trail.Duration)
-
-	t.protoErrorsMutex.Lock()
-	defer t.protoErrorsMutex.Unlock()
-	if len(t.protoErrors) > 0 {
-		trail.Errors = append([]error{}, t.protoErrors...)
-	}
 
 	return &trail
 }

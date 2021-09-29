@@ -26,7 +26,6 @@ const (
 	SHIFT_LEFT           // <<
 	SHIFT_RIGHT          // >>
 	UNSIGNED_SHIFT_RIGHT // >>>
-	AND_NOT              // &^
 
 	ADD_ASSIGN       // +=
 	SUBTRACT_ASSIGN  // -=
@@ -40,7 +39,6 @@ const (
 	SHIFT_LEFT_ASSIGN           // <<=
 	SHIFT_RIGHT_ASSIGN          // >>=
 	UNSIGNED_SHIFT_RIGHT_ASSIGN // >>>=
-	AND_NOT_ASSIGN              // &^=
 
 	LOGICAL_AND // &&
 	LOGICAL_OR  // ||
@@ -73,13 +71,17 @@ const (
 	SEMICOLON         // ;
 	COLON             // :
 	QUESTION_MARK     // ?
+	ARROW             // =>
+	ELLIPSIS          // ...
 
 	firstKeyword
 	IF
 	IN
+	OF
 	DO
 
 	VAR
+	LET
 	FOR
 	NEW
 	TRY
@@ -90,6 +92,7 @@ const (
 	VOID
 	WITH
 
+	CONST
 	WHILE
 	BREAK
 	CATCH
@@ -132,7 +135,6 @@ var token2string = [...]string{
 	SHIFT_LEFT:                  "<<",
 	SHIFT_RIGHT:                 ">>",
 	UNSIGNED_SHIFT_RIGHT:        ">>>",
-	AND_NOT:                     "&^",
 	ADD_ASSIGN:                  "+=",
 	SUBTRACT_ASSIGN:             "-=",
 	MULTIPLY_ASSIGN:             "*=",
@@ -144,7 +146,6 @@ var token2string = [...]string{
 	SHIFT_LEFT_ASSIGN:           "<<=",
 	SHIFT_RIGHT_ASSIGN:          ">>=",
 	UNSIGNED_SHIFT_RIGHT_ASSIGN: ">>>=",
-	AND_NOT_ASSIGN:              "&^=",
 	LOGICAL_AND:                 "&&",
 	LOGICAL_OR:                  "||",
 	INCREMENT:                   "++",
@@ -171,10 +172,14 @@ var token2string = [...]string{
 	SEMICOLON:                   ";",
 	COLON:                       ":",
 	QUESTION_MARK:               "?",
+	ARROW:                       "=>",
+	ELLIPSIS:                    "...",
 	IF:                          "if",
 	IN:                          "in",
+	OF:                          "of",
 	DO:                          "do",
 	VAR:                         "var",
+	LET:                         "let",
 	FOR:                         "for",
 	NEW:                         "new",
 	TRY:                         "try",
@@ -183,6 +188,7 @@ var token2string = [...]string{
 	CASE:                        "case",
 	VOID:                        "void",
 	WITH:                        "with",
+	CONST:                       "const",
 	WHILE:                       "while",
 	BREAK:                       "break",
 	CATCH:                       "catch",
@@ -200,148 +206,146 @@ var token2string = [...]string{
 }
 
 var keywordTable = map[string]_keyword{
-	"if": _keyword{
+	"if": {
 		token: IF,
 	},
-	"in": _keyword{
+	"in": {
 		token: IN,
 	},
-	"do": _keyword{
+	"do": {
 		token: DO,
 	},
-	"var": _keyword{
+	"var": {
 		token: VAR,
 	},
-	"for": _keyword{
+	"for": {
 		token: FOR,
 	},
-	"new": _keyword{
+	"new": {
 		token: NEW,
 	},
-	"try": _keyword{
+	"try": {
 		token: TRY,
 	},
-	"this": _keyword{
+	"this": {
 		token: THIS,
 	},
-	"else": _keyword{
+	"else": {
 		token: ELSE,
 	},
-	"case": _keyword{
+	"case": {
 		token: CASE,
 	},
-	"void": _keyword{
+	"void": {
 		token: VOID,
 	},
-	"with": _keyword{
+	"with": {
 		token: WITH,
 	},
-	"while": _keyword{
+	"while": {
 		token: WHILE,
 	},
-	"break": _keyword{
+	"break": {
 		token: BREAK,
 	},
-	"catch": _keyword{
+	"catch": {
 		token: CATCH,
 	},
-	"throw": _keyword{
+	"throw": {
 		token: THROW,
 	},
-	"return": _keyword{
+	"return": {
 		token: RETURN,
 	},
-	"typeof": _keyword{
+	"typeof": {
 		token: TYPEOF,
 	},
-	"delete": _keyword{
+	"delete": {
 		token: DELETE,
 	},
-	"switch": _keyword{
+	"switch": {
 		token: SWITCH,
 	},
-	"default": _keyword{
+	"default": {
 		token: DEFAULT,
 	},
-	"finally": _keyword{
+	"finally": {
 		token: FINALLY,
 	},
-	"function": _keyword{
+	"function": {
 		token: FUNCTION,
 	},
-	"continue": _keyword{
+	"continue": {
 		token: CONTINUE,
 	},
-	"debugger": _keyword{
+	"debugger": {
 		token: DEBUGGER,
 	},
-	"instanceof": _keyword{
+	"instanceof": {
 		token: INSTANCEOF,
 	},
-	"const": _keyword{
+	"const": {
+		token: CONST,
+	},
+	"class": {
 		token:         KEYWORD,
 		futureKeyword: true,
 	},
-	"class": _keyword{
+	"enum": {
 		token:         KEYWORD,
 		futureKeyword: true,
 	},
-	"enum": _keyword{
+	"export": {
 		token:         KEYWORD,
 		futureKeyword: true,
 	},
-	"export": _keyword{
+	"extends": {
 		token:         KEYWORD,
 		futureKeyword: true,
 	},
-	"extends": _keyword{
+	"import": {
 		token:         KEYWORD,
 		futureKeyword: true,
 	},
-	"import": _keyword{
+	"super": {
 		token:         KEYWORD,
 		futureKeyword: true,
 	},
-	"super": _keyword{
-		token:         KEYWORD,
-		futureKeyword: true,
-	},
-	"implements": _keyword{
-		token:         KEYWORD,
-		futureKeyword: true,
-		strict:        true,
-	},
-	"interface": _keyword{
+	"implements": {
 		token:         KEYWORD,
 		futureKeyword: true,
 		strict:        true,
 	},
-	"let": _keyword{
+	"interface": {
 		token:         KEYWORD,
 		futureKeyword: true,
 		strict:        true,
 	},
-	"package": _keyword{
+	"let": {
+		token:  LET,
+		strict: true,
+	},
+	"package": {
 		token:         KEYWORD,
 		futureKeyword: true,
 		strict:        true,
 	},
-	"private": _keyword{
+	"private": {
 		token:         KEYWORD,
 		futureKeyword: true,
 		strict:        true,
 	},
-	"protected": _keyword{
+	"protected": {
 		token:         KEYWORD,
 		futureKeyword: true,
 		strict:        true,
 	},
-	"public": _keyword{
+	"public": {
 		token:         KEYWORD,
 		futureKeyword: true,
 		strict:        true,
 	},
-	"static": _keyword{
+	"static": {
 		token:         KEYWORD,
 		futureKeyword: true,
 		strict:        true,

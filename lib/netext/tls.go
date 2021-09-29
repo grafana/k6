@@ -1,10 +1,31 @@
+/*
+ *
+ * k6 - a next-generation load testing tool
+ * Copyright (C) 2019 Load Impact
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 package netext
 
 import (
 	"crypto/tls"
 
-	"github.com/loadimpact/k6/lib"
 	"golang.org/x/crypto/ocsp"
+
+	"go.k6.io/k6/lib"
 )
 
 //nolint: golint
@@ -23,7 +44,6 @@ const (
 	OCSP_REASON_REMOVE_FROM_CRL        = "remove_from_crl"
 	OCSP_REASON_PRIVILEGE_WITHDRAWN    = "privilege_withdrawn"
 	OCSP_REASON_AA_COMPROMISE          = "aa_compromise"
-	SSL_3_0                            = "ssl3.0"
 	TLS_1_0                            = "tls1.0"
 	TLS_1_1                            = "tls1.1"
 	TLS_1_2                            = "tls1.2"
@@ -46,15 +66,13 @@ type OCSP struct {
 func ParseTLSConnState(tlsState *tls.ConnectionState) (TLSInfo, OCSP) {
 	tlsInfo := TLSInfo{}
 	switch tlsState.Version {
-	case tls.VersionSSL30:
-		tlsInfo.Version = SSL_3_0
 	case tls.VersionTLS10:
 		tlsInfo.Version = TLS_1_0
 	case tls.VersionTLS11:
 		tlsInfo.Version = TLS_1_1
 	case tls.VersionTLS12:
 		tlsInfo.Version = TLS_1_2
-	case lib.TLSVersion13:
+	case tls.VersionTLS13:
 		tlsInfo.Version = TLS_1_3
 	}
 

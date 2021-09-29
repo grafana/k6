@@ -26,8 +26,9 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/lib/types"
 	"github.com/stretchr/testify/assert"
+
+	"go.k6.io/k6/lib/types"
 )
 
 func TestNewThreshold(t *testing.T) {
@@ -240,6 +241,13 @@ func TestThresholdsJSON(t *testing.T) {
 			"",
 		},
 		{
+			`["rate<0.01"]`,
+			[]string{"rate<0.01"},
+			false,
+			types.NullDuration{},
+			`["rate<0.01"]`,
+		},
+		{
 			`["1+1==2","1+1==3"]`,
 			[]string{"1+1==2", "1+1==3"},
 			false,
@@ -295,7 +303,7 @@ func TestThresholdsJSON(t *testing.T) {
 			}
 
 			t.Run("marshal", func(t *testing.T) {
-				data2, err := json.Marshal(ts)
+				data2, err := MarshalJSONWithoutHTMLEscape(ts)
 				assert.NoError(t, err)
 				output := data.JSON
 				if data.outputJSON != "" {

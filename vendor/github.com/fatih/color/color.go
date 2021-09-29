@@ -15,20 +15,31 @@ import (
 var (
 	// NoColor defines if the output is colorized or not. It's dynamically set to
 	// false or true based on the stdout's file descriptor referring to a terminal
-	// or not. This is a global option and affects all colors. For more control
-	// over each color block use the methods DisableColor() individually.
-	NoColor = os.Getenv("TERM") == "dumb" ||
+	// or not. It's also set to true if the NO_COLOR environment variable is
+	// set (regardless of its value). This is a global option and affects all
+	// colors. For more control over each color block use the methods
+	// DisableColor() individually.
+	NoColor = noColorExists() || os.Getenv("TERM") == "dumb" ||
 		(!isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()))
 
 	// Output defines the standard output of the print functions. By default
 	// os.Stdout is used.
 	Output = colorable.NewColorableStdout()
 
+	// Error defines a color supporting writer for os.Stderr.
+	Error = colorable.NewColorableStderr()
+
 	// colorsCache is used to reduce the count of created Color objects and
 	// allows to reuse already created objects with required Attribute.
 	colorsCache   = make(map[Attribute]*Color)
 	colorsCacheMu sync.Mutex // protects colorsCache
 )
+
+// noColorExists returns true if the environment variable NO_COLOR exists.
+func noColorExists() bool {
+	_, exists := os.LookupEnv("NO_COLOR")
+	return exists
+}
 
 // Color defines a custom color object which is defined by SGR parameters.
 type Color struct {
@@ -105,7 +116,14 @@ const (
 
 // New returns a newly created color object.
 func New(value ...Attribute) *Color {
-	c := &Color{params: make([]Attribute, 0)}
+	c := &Color{
+		params: make([]Attribute, 0),
+	}
+
+	if noColorExists() {
+		c.noColor = boolPtr(true)
+	}
+
 	c.Add(value...)
 	return c
 }
@@ -341,7 +359,7 @@ func (c *Color) SprintlnFunc() func(a ...interface{}) string {
 	}
 }
 
-// sequence returns a formated SGR sequence to be plugged into a "\x1b[...m"
+// sequence returns a formatted SGR sequence to be plugged into a "\x1b[...m"
 // an example output might be: "1;36" -> bold cyan
 func (c *Color) sequence() string {
 	format := make([]string, len(c.params))
@@ -384,7 +402,7 @@ func (c *Color) EnableColor() {
 }
 
 func (c *Color) isNoColorSet() bool {
-	// check first if we have user setted action
+	// check first if we have user set action
 	if c.noColor != nil {
 		return *c.noColor
 	}

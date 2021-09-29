@@ -25,8 +25,9 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
 	"github.com/stretchr/testify/assert"
+
+	"go.k6.io/k6/js/common"
 )
 
 const testHTML = `
@@ -72,12 +73,12 @@ func TestParseHTML(t *testing.T) {
 	// TODO: I literally cannot think of a snippet that makes goquery error.
 	// I'm not sure if it's even possible without like, an invalid reader or something, which would
 	// be impossible to cause from the JS side.
-	_, err := common.RunString(rt, `let doc = html.parseHTML(src)`)
+	_, err := rt.RunString(`var doc = html.parseHTML(src)`)
 	assert.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 
 	t.Run("Find", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("h1")`)
+		v, err := rt.RunString(`doc.find("h1")`)
 		if assert.NoError(t, err) && assert.IsType(t, Selection{}, v.Export()) {
 			sel := v.Export().(Selection).sel
 			assert.Equal(t, 1, sel.Length())
@@ -86,7 +87,7 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Add", func(t *testing.T) {
 		t.Run("Selector", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").add("footer")`)
+			v, err := rt.RunString(`doc.find("h1").add("footer")`)
 			if assert.NoError(t, err) && assert.IsType(t, Selection{}, v.Export()) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 2, sel.Length())
@@ -94,7 +95,7 @@ func TestParseHTML(t *testing.T) {
 			}
 		})
 		t.Run("Selection", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").add(doc.find("footer"))`)
+			v, err := rt.RunString(`doc.find("h1").add(doc.find("footer"))`)
 			if assert.NoError(t, err) && assert.IsType(t, Selection{}, v.Export()) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 2, sel.Length())
@@ -103,30 +104,30 @@ func TestParseHTML(t *testing.T) {
 		})
 	})
 	t.Run("Text", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("h1").text()`)
+		v, err := rt.RunString(`doc.find("h1").text()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "Lorem ipsum", v.Export())
 		}
 	})
 	t.Run("Attr", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("h1").attr("id")`)
+		v, err := rt.RunString(`doc.find("h1").attr("id")`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "top", v.Export())
 		}
 		t.Run("Default", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").attr("id", "default")`)
+			v, err := rt.RunString(`doc.find("h1").attr("id", "default")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, "top", v.Export())
 			}
 		})
 		t.Run("Unset", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").attr("class")`)
+			v, err := rt.RunString(`doc.find("h1").attr("class")`)
 			if assert.NoError(t, err) {
 				assert.True(t, goja.IsUndefined(v), "v is not undefined: %v", v)
 			}
 
 			t.Run("Default", func(t *testing.T) {
-				v, err := common.RunString(rt, `doc.find("h1").attr("class", "default")`)
+				v, err := rt.RunString(`doc.find("h1").attr("class", "default")`)
 				if assert.NoError(t, err) {
 					assert.Equal(t, "default", v.Export())
 				}
@@ -134,38 +135,38 @@ func TestParseHTML(t *testing.T) {
 		})
 	})
 	t.Run("Html", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("h1").html()`)
+		v, err := rt.RunString(`doc.find("h1").html()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "Lorem ipsum", v.Export())
 		}
 	})
 	t.Run("Val", func(t *testing.T) {
 		t.Run("Input", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("#text_input").val()`)
+			v, err := rt.RunString(`doc.find("#text_input").val()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, "input-text-value", v.Export())
 			}
 		})
 		t.Run("Select option[selected]", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("#select_one option[selected]").val()`)
+			v, err := rt.RunString(`doc.find("#select_one option[selected]").val()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, "yes this option", v.Export())
 			}
 		})
 		t.Run("Select Option Attr", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("#select_one").val()`)
+			v, err := rt.RunString(`doc.find("#select_one").val()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, "yes this option", v.Export())
 			}
 		})
 		t.Run("Select Option Text", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("#select_text").val()`)
+			v, err := rt.RunString(`doc.find("#select_text").val()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, "yes text", v.Export())
 			}
 		})
 		t.Run("Select Option Multiple", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("#select_multi").val()`)
+			v, err := rt.RunString(`doc.find("#select_multi").val()`)
 			var opts []string
 			if assert.NoError(t, err) && rt.ExportTo(v, &opts) == nil {
 				assert.Equal(t, 2, len(opts))
@@ -174,7 +175,7 @@ func TestParseHTML(t *testing.T) {
 			}
 		})
 		t.Run("TextArea", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("#textarea").val()`)
+			v, err := rt.RunString(`doc.find("#textarea").val()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, "Lorem ipsum dolor sit amet", v.Export())
 			}
@@ -182,7 +183,7 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Children", func(t *testing.T) {
 		t.Run("All", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("head").children()`)
+			v, err := rt.RunString(`doc.find("head").children()`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 1, sel.Length())
@@ -190,7 +191,7 @@ func TestParseHTML(t *testing.T) {
 			}
 		})
 		t.Run("With selector", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children("p")`)
+			v, err := rt.RunString(`doc.find("body").children("p")`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 2, sel.Length())
@@ -199,13 +200,13 @@ func TestParseHTML(t *testing.T) {
 		})
 	})
 	t.Run("Closest", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("textarea").closest("form").attr("id")`)
+		v, err := rt.RunString(`doc.find("textarea").closest("form").attr("id")`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "form1", v.Export())
 		}
 	})
 	t.Run("Contents", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("head").contents()`)
+		v, err := rt.RunString(`doc.find("head").contents()`)
 		if assert.NoError(t, err) {
 			sel := v.Export().(Selection).sel
 			assert.Equal(t, 3, sel.Length())
@@ -214,7 +215,7 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Each", func(t *testing.T) {
 		t.Run("Func arg", func(t *testing.T) {
-			v, err := common.RunString(rt, `{ var elems = []; doc.find("#select_multi option").each(function(idx, elem) { elems[idx] = elem.innerHTML(); }); elems }`)
+			v, err := rt.RunString(`{ var elems = []; doc.find("#select_multi option").each(function(idx, elem) { elems[idx] = elem.innerHTML(); }); elems }`)
 			var elems []string
 			if assert.NoError(t, err) && rt.ExportTo(v, &elems) == nil {
 				assert.Equal(t, 3, len(elems))
@@ -223,7 +224,7 @@ func TestParseHTML(t *testing.T) {
 			}
 		})
 		t.Run("Invalid arg", func(t *testing.T) {
-			_, err := common.RunString(rt, `doc.find("#select_multi option").each("");`)
+			_, err := rt.RunString(`doc.find("#select_multi option").each("");`)
 			if assert.Error(t, err) {
 				assert.IsType(t, &goja.Exception{}, err)
 				assert.Contains(t, err.Error(), "must be a function")
@@ -232,19 +233,19 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Is", func(t *testing.T) {
 		t.Run("String selector", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").is("h1")`)
+			v, err := rt.RunString(`doc.find("h1").is("h1")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, true, v.Export())
 			}
 		})
 		t.Run("Function selector", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").is(function(idx, val){ return val.text() == "Lorem ipsum" })`)
+			v, err := rt.RunString(`doc.find("h1").is(function(idx, val){ return val.text() == "Lorem ipsum" })`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, true, v.Export())
 			}
 		})
 		t.Run("Selection selector", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().first().is(doc.find("h1"))`)
+			v, err := rt.RunString(`doc.find("body").children().first().is(doc.find("h1"))`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, true, v.Export())
 			}
@@ -252,21 +253,21 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Filter", func(t *testing.T) {
 		t.Run("String", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().filter("p")`)
+			v, err := rt.RunString(`doc.find("body").children().filter("p")`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 2, sel.Length())
 			}
 		})
 		t.Run("Function", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().filter(function(idx, val){ return val.is("p") })`)
+			v, err := rt.RunString(`doc.find("body").children().filter(function(idx, val){ return val.is("p") })`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 2, sel.Length())
 			}
 		})
 		t.Run("Selection", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().filter(doc.find("p"))`)
+			v, err := rt.RunString(`doc.find("body").children().filter(doc.find("p"))`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 2, sel.Length())
@@ -274,39 +275,39 @@ func TestParseHTML(t *testing.T) {
 		})
 	})
 	t.Run("End", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("body").children().filter("p").end()`)
+		v, err := rt.RunString(`doc.find("body").children().filter("p").end()`)
 		if assert.NoError(t, err) {
 			sel := v.Export().(Selection).sel
 			assert.Equal(t, 5, sel.Length())
 		}
 	})
 	t.Run("Eq", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("body").children().eq(3).attr("id")`)
+		v, err := rt.RunString(`doc.find("body").children().eq(3).attr("id")`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "form1", v.Export())
 		}
 	})
 	t.Run("First", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("body").children().first().attr("id")`)
+		v, err := rt.RunString(`doc.find("body").children().first().attr("id")`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "top", v.Export())
 		}
 	})
 	t.Run("Last", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("body").children().last().text()`)
+		v, err := rt.RunString(`doc.find("body").children().last().text()`)
 		if assert.NoError(t, err) {
 			assert.Equal(t, "This is the footer.", v.Export())
 		}
 	})
 	t.Run("Has", func(t *testing.T) {
 		t.Run("String selector", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().has("input").size()`)
+			v, err := rt.RunString(`doc.find("body").children().has("input").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(1), v.Export())
 			}
 		})
 		t.Run("Selection selector", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().has(doc.find("input")).size()`)
+			v, err := rt.RunString(`doc.find("body").children().has(doc.find("input")).size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(1), v.Export())
 			}
@@ -314,7 +315,7 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Map", func(t *testing.T) {
 		t.Run("Valid", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("#select_multi option").map(function(idx, val) { return val.text() })`)
+			v, err := rt.RunString(`doc.find("#select_multi option").map(function(idx, val) { return val.text() })`)
 			if assert.NoError(t, err) {
 				mapped := v.Export().([]string)
 				assert.Equal(t, 3, len(mapped))
@@ -322,14 +323,14 @@ func TestParseHTML(t *testing.T) {
 			}
 		})
 		t.Run("Invalid arg", func(t *testing.T) {
-			_, err := common.RunString(rt, `doc.find("#select_multi option").map("");`)
+			_, err := rt.RunString(`doc.find("#select_multi option").map("");`)
 			if assert.Error(t, err) {
 				assert.IsType(t, &goja.Exception{}, err)
 				assert.Contains(t, err.Error(), "must be a function")
 			}
 		})
 		t.Run("Map with attr must return string", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("#select_multi").map(function(idx, val) { return val.attr("name") })`)
+			v, err := rt.RunString(`doc.find("#select_multi").map(function(idx, val) { return val.attr("name") })`)
 			if assert.NoError(t, err) {
 				mapped := v.Export().([]string)
 				assert.Equal(t, 1, len(mapped))
@@ -339,7 +340,7 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Next", func(t *testing.T) {
 		t.Run("No arg", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").next()`)
+			v, err := rt.RunString(`doc.find("h1").next()`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 1, sel.Length())
@@ -347,7 +348,7 @@ func TestParseHTML(t *testing.T) {
 			}
 		})
 		t.Run("Filter arg", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("p").next("form")`)
+			v, err := rt.RunString(`doc.find("p").next("form")`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 1, sel.Length())
@@ -356,14 +357,14 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("NextAll", func(t *testing.T) {
 		t.Run("No arg", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").nextAll()`)
+			v, err := rt.RunString(`doc.find("h1").nextAll()`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 4, sel.Length())
 			}
 		})
 		t.Run("Filter arg", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").nextAll("p")`)
+			v, err := rt.RunString(`doc.find("h1").nextAll("p")`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 2, sel.Length())
@@ -372,14 +373,14 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Prev", func(t *testing.T) {
 		t.Run("No arg", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("footer").prev()`)
+			v, err := rt.RunString(`doc.find("footer").prev()`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.True(t, sel.Is("form"))
 			}
 		})
 		t.Run("Filter arg", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("footer").prev("form")`)
+			v, err := rt.RunString(`doc.find("footer").prev("form")`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 1, sel.Length())
@@ -388,14 +389,14 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("PrevAll", func(t *testing.T) {
 		t.Run("No arg", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("form").prevAll()`)
+			v, err := rt.RunString(`doc.find("form").prevAll()`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 3, sel.Length())
 			}
 		})
 		t.Run("Filter arg", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("form").prevAll("p")`)
+			v, err := rt.RunString(`doc.find("form").prevAll("p")`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 2, sel.Length())
@@ -404,37 +405,37 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("PrevUntil", func(t *testing.T) {
 		t.Run("String", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("footer").prevUntil("h1").size()`)
+			v, err := rt.RunString(`doc.find("footer").prevUntil("h1").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(3), v.Export())
 			}
 		})
 		t.Run("Query", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("footer").prevUntil(doc.find("h1")).size()`)
+			v, err := rt.RunString(`doc.find("footer").prevUntil(doc.find("h1")).size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(3), v.Export())
 			}
 		})
 		t.Run("String filtered", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("form").prevUntil("h1", "p").size()`)
+			v, err := rt.RunString(`doc.find("form").prevUntil("h1", "p").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(2), v.Export())
 			}
 		})
 		t.Run("Query filtered", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("form").prevUntil(doc.find("h1"), "p").size()`)
+			v, err := rt.RunString(`doc.find("form").prevUntil(doc.find("h1"), "p").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(2), v.Export())
 			}
 		})
 		t.Run("All", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("footer").prevUntil().size()`)
+			v, err := rt.RunString(`doc.find("footer").prevUntil().size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(4), v.Export())
 			}
 		})
 		t.Run("All filtered", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("footer").prevUntil(null, "p").size()`)
+			v, err := rt.RunString(`doc.find("footer").prevUntil(null, "p").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(2), v.Export())
 			}
@@ -442,37 +443,37 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("NextUntil", func(t *testing.T) {
 		t.Run("String", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").nextUntil("footer").size()`)
+			v, err := rt.RunString(`doc.find("h1").nextUntil("footer").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(3), v.Export())
 			}
 		})
 		t.Run("Query", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").nextUntil(doc.find("footer")).size()`)
+			v, err := rt.RunString(`doc.find("h1").nextUntil(doc.find("footer")).size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(3), v.Export())
 			}
 		})
 		t.Run("String filtered", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").nextUntil("footer", "p").size()`)
+			v, err := rt.RunString(`doc.find("h1").nextUntil("footer", "p").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(2), v.Export())
 			}
 		})
 		t.Run("Query filtered", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").nextUntil(doc.find("footer"), "p").size()`)
+			v, err := rt.RunString(`doc.find("h1").nextUntil(doc.find("footer"), "p").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(2), v.Export())
 			}
 		})
 		t.Run("All", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").nextUntil().size()`)
+			v, err := rt.RunString(`doc.find("h1").nextUntil().size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(4), v.Export())
 			}
 		})
 		t.Run("All filtered", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").nextUntil(null, "p").size()`)
+			v, err := rt.RunString(`doc.find("h1").nextUntil(null, "p").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(2), v.Export())
 			}
@@ -480,13 +481,13 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Parent", func(t *testing.T) {
 		t.Run("No filter", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("textarea").parent().attr("id")`)
+			v, err := rt.RunString(`doc.find("textarea").parent().attr("id")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, "form1", v.Export())
 			}
 		})
 		t.Run("Filtered", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("textarea").parent("form").attr("id")`)
+			v, err := rt.RunString(`doc.find("textarea").parent("form").attr("id")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, "form1", v.Export())
 			}
@@ -494,13 +495,13 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Parents", func(t *testing.T) {
 		t.Run("No filter", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("textarea").parents().size()`)
+			v, err := rt.RunString(`doc.find("textarea").parents().size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(3), v.Export())
 			}
 		})
 		t.Run("Filtered", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("textarea").parents("body").size()`)
+			v, err := rt.RunString(`doc.find("textarea").parents("body").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(1), v.Export())
 			}
@@ -508,37 +509,37 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("ParentsUntil", func(t *testing.T) {
 		t.Run("String", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("textarea").parentsUntil("html").size()`)
+			v, err := rt.RunString(`doc.find("textarea").parentsUntil("html").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(2), v.Export())
 			}
 		})
 		t.Run("Query", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("textarea").parentsUntil(doc.find("html")).size()`)
+			v, err := rt.RunString(`doc.find("textarea").parentsUntil(doc.find("html")).size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(2), v.Export())
 			}
 		})
 		t.Run("String filtered", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("textarea").parentsUntil("html", "body").size()`)
+			v, err := rt.RunString(`doc.find("textarea").parentsUntil("html", "body").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(1), v.Export())
 			}
 		})
 		t.Run("Query filtered", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("textarea").parentsUntil(doc.find("html"), "body").size()`)
+			v, err := rt.RunString(`doc.find("textarea").parentsUntil(doc.find("html"), "body").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(1), v.Export())
 			}
 		})
 		t.Run("All", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("textarea").parentsUntil().size()`)
+			v, err := rt.RunString(`doc.find("textarea").parentsUntil().size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(3), v.Export())
 			}
 		})
 		t.Run("All filtered", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("textarea").parentsUntil(null, "body").size()`)
+			v, err := rt.RunString(`doc.find("textarea").parentsUntil(null, "body").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(1), v.Export())
 			}
@@ -546,19 +547,19 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Not", func(t *testing.T) {
 		t.Run("String selector", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().not("p").size()`)
+			v, err := rt.RunString(`doc.find("body").children().not("p").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(3), v.Export())
 			}
 		})
 		t.Run("Selection selector", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().not(doc.find("p")).size()`)
+			v, err := rt.RunString(`doc.find("body").children().not(doc.find("p")).size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(3), v.Export())
 			}
 		})
 		t.Run("Function selector", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().not(function(idx, val){ return val.is("p") }).size()`)
+			v, err := rt.RunString(`doc.find("body").children().not(function(idx, val){ return val.is("p") }).size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(3), v.Export())
 			}
@@ -566,13 +567,13 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Siblings", func(t *testing.T) {
 		t.Run("No filter", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("form").siblings().size()`)
+			v, err := rt.RunString(`doc.find("form").siblings().size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(4), v.Export())
 			}
 		})
 		t.Run("Filtered", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("form").siblings("p").size()`)
+			v, err := rt.RunString(`doc.find("form").siblings("p").size()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(2), v.Export())
 			}
@@ -580,7 +581,7 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Slice", func(t *testing.T) {
 		t.Run("No filter", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().slice(1, 2)`)
+			v, err := rt.RunString(`doc.find("body").children().slice(1, 2)`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 1, sel.Length())
@@ -589,7 +590,7 @@ func TestParseHTML(t *testing.T) {
 			}
 		})
 		t.Run("Filtered", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().slice(3)`)
+			v, err := rt.RunString(`doc.find("body").children().slice(3)`)
 			if assert.NoError(t, err) {
 				sel := v.Export().(Selection).sel
 				assert.Equal(t, 2, sel.Length())
@@ -599,7 +600,7 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Get", func(t *testing.T) {
 		t.Run("No args", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().get()`)
+			v, err := rt.RunString(`doc.find("body").children().get()`)
 			if assert.NoError(t, err) {
 				elems := v.Export().([]goja.Value)
 
@@ -609,14 +610,14 @@ func TestParseHTML(t *testing.T) {
 			}
 		})
 		t.Run("+ve index", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().get(1)`)
+			v, err := rt.RunString(`doc.find("body").children().get(1)`)
 			if assert.NoError(t, err) {
 				elem, _ := v.Export().(Element)
 				assert.Contains(t, elem.InnerHTML(), "Lorem ipsum dolor sit amet")
 			}
 		})
 		t.Run("-ve index", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().get(-1)`)
+			v, err := rt.RunString(`doc.find("body").children().get(-1)`)
 			if assert.NoError(t, err) {
 				elem, _ := v.Export().(Element)
 				assert.Equal(t, "This is the footer.", elem.InnerHTML().String())
@@ -624,7 +625,7 @@ func TestParseHTML(t *testing.T) {
 		})
 	})
 	t.Run("ToArray", func(t *testing.T) {
-		v, err := common.RunString(rt, `doc.find("p").toArray()`)
+		v, err := rt.RunString(`doc.find("p").toArray()`)
 		if assert.NoError(t, err) {
 			arr := v.Export().([]Selection)
 			assert.Equal(t, 2, len(arr))
@@ -636,19 +637,19 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Index", func(t *testing.T) {
 		t.Run("No args", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("p").index()`)
+			v, err := rt.RunString(`doc.find("p").index()`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(1), v.Export())
 			}
 		})
 		t.Run("String selector", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("form").index("body > *")`)
+			v, err := rt.RunString(`doc.find("form").index("body > *")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(3), v.Export())
 			}
 		})
 		t.Run("Selection selector", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("body").children().index(doc.find("footer"))`)
+			v, err := rt.RunString(`doc.find("body").children().index(doc.find("footer"))`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(4), v.Export())
 			}
@@ -656,37 +657,37 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Data <h1>", func(t *testing.T) {
 		t.Run("string attr", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").data("test")`)
+			v, err := rt.RunString(`doc.find("h1").data("test")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, "dataval", v.Export())
 			}
 		})
 		t.Run("numeric attr 1", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").data("num-a")`)
+			v, err := rt.RunString(`doc.find("h1").data("num-a")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(123), v.Export())
 			}
 		})
 		t.Run("numeric attr 2", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").data("num-b")`)
+			v, err := rt.RunString(`doc.find("h1").data("num-b")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, float64(1.5), v.Export())
 			}
 		})
 		t.Run("not numeric attr 1", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").data("not-num-a")`)
+			v, err := rt.RunString(`doc.find("h1").data("not-num-a")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, "1.50", v.Export())
 			}
 		})
 		t.Run("not numeric attr 2", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").data("not-num-b")`)
+			v, err := rt.RunString(`doc.find("h1").data("not-num-b")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, "1.1e02", v.Export())
 			}
 		})
 		t.Run("dataset", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("h1").data()`)
+			v, err := rt.RunString(`doc.find("h1").data()`)
 			if assert.NoError(t, err) {
 				data := v.Export().(map[string]interface{})
 				assert.Equal(t, "dataval", data["test"])
@@ -696,37 +697,37 @@ func TestParseHTML(t *testing.T) {
 	})
 	t.Run("Data <p>", func(t *testing.T) {
 		t.Run("boolean attr", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("p").data("test-b")`)
+			v, err := rt.RunString(`doc.find("p").data("test-b")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, true, v.Export())
 			}
 		})
 		t.Run("snakeCase attr name", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("p").data("testB")`)
+			v, err := rt.RunString(`doc.find("p").data("testB")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, true, v.Export())
 			}
 		})
 		t.Run("empty string", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("p").data("test-empty")`)
+			v, err := rt.RunString(`doc.find("p").data("test-empty")`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, nil, v.Export())
 			}
 		})
 		t.Run("json attr", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("p").data("opts").id`)
+			v, err := rt.RunString(`doc.find("p").data("opts").id`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(101), v.Export())
 			}
 		})
 		t.Run("dataset property", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("p").data().testB`)
+			v, err := rt.RunString(`doc.find("p").data().testB`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, true, v.Export())
 			}
 		})
 		t.Run("dataset object", func(t *testing.T) {
-			v, err := common.RunString(rt, `doc.find("p").data().opts.id`)
+			v, err := rt.RunString(`doc.find("p").data().opts.id`)
 			if assert.NoError(t, err) {
 				assert.Equal(t, int64(101), v.Export())
 			}

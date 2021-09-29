@@ -21,11 +21,13 @@
 package ui
 
 import (
+	"bufio"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -70,7 +72,7 @@ func (f StringField) GetContents(r io.Reader) (string, error) {
 			return string(result), err
 		} else if n != 1 {
 			// Shouldn't happen, but just in case
-			return string(result), errors.New("Unexpected input when reading string field")
+			return string(result), errors.New("unexpected input when reading string field")
 		} else if buf[0] == '\n' {
 			return string(result), nil
 		}
@@ -82,10 +84,10 @@ func (f StringField) GetContents(r io.Reader) (string, error) {
 func (f StringField) Clean(s string) (interface{}, error) {
 	s = strings.TrimSpace(s)
 	if f.Min != 0 && len(s) < f.Min {
-		return nil, errors.Errorf("invalid input, min length is %d", f.Min)
+		return nil, fmt.Errorf("invalid input, min length is %d", f.Min)
 	}
 	if f.Max != 0 && len(s) > f.Max {
-		return nil, errors.Errorf("invalid input, max length is %d", f.Max)
+		return nil, fmt.Errorf("invalid input, max length is %d", f.Max)
 	}
 	if s == "" {
 		s = f.Default
@@ -119,16 +121,26 @@ func (f PasswordField) GetLabelExtra() string {
 func (f PasswordField) GetContents(r io.Reader) (string, error) {
 	stdin, ok := r.(*os.File)
 	if !ok {
-		return "", errors.New("Cannot read password from the supplied terminal")
+		return "", errors.New("cannot read password from the supplied terminal")
 	}
 	password, err := terminal.ReadPassword(int(stdin.Fd()))
+	if err != nil {
+		// Possibly running on Cygwin/mintty which doesn't emulate
+		// pseudo terminals properly, so fallback to plain text input.
+		// Note that passwords will be echoed if this is the case.
+		// See https://github.com/mintty/mintty/issues/56
+		// A workaround is to use winpty or mintty compiled with
+		// Cygwin >=3.1.0 which supports the new ConPTY Windows API.
+		bufR := bufio.NewReader(r)
+		password, err = bufR.ReadBytes('\n')
+	}
 	return string(password), err
 }
 
 // Clean just checks if the minimum length is exceeded, it doesn't trim the string!
 func (f PasswordField) Clean(s string) (interface{}, error) {
 	if f.Min != 0 && len(s) < f.Min {
-		return nil, errors.Errorf("invalid input, min length is %d", f.Min)
+		return nil, fmt.Errorf("invalid input, min length is %d", f.Min)
 	}
 	return s, nil
 }

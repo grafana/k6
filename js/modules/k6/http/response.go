@@ -21,49 +21,60 @@
 package http
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/modules/k6/html"
-	"github.com/loadimpact/k6/lib/netext/httpext"
+	"github.com/tidwall/gjson"
+
+	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modules/k6/html"
+	"go.k6.io/k6/lib/netext/httpext"
 )
 
 // Response is a representation of an HTTP response to be returned to the goja VM
 type Response struct {
 	*httpext.Response `js:"-"`
+	h                 *HTTP
+
+	cachedJSON    interface{}
+	validatedJSON bool
 }
 
-func responseFromHttpext(resp *httpext.Response) *Response {
-	res := Response{resp}
-	return &res
+type jsonError struct {
+	line      int
+	character int
+	err       error
 }
 
-// JSON parses the body of a response as json and returns it to the goja VM
-func (res *Response) JSON(selector ...string) goja.Value {
-	v, err := res.Response.JSON(selector...)
-	if err != nil {
-		common.Throw(common.GetRuntime(res.GetCtx()), err)
+func (j jsonError) Error() string {
+	errMessage := "cannot parse json due to an error at line"
+	return fmt.Sprintf("%s %d, character %d , error: %v", errMessage, j.line, j.character, j.err)
+}
+
+// processResponse stores the body as an ArrayBuffer if indicated by
+// respType. This is done here instead of in httpext.readResponseBody to avoid
+// a reverse dependency on js/common or goja.
+func processResponse(ctx context.Context, resp *httpext.Response, respType httpext.ResponseType) {
+	if respType == httpext.ResponseTypeBinary && resp.Body != nil {
+		rt := common.GetRuntime(ctx)
+		resp.Body = rt.NewArrayBuffer(resp.Body.([]byte))
 	}
-	if v == nil {
-		return goja.Undefined()
-	}
-	return common.GetRuntime(res.GetCtx()).ToValue(v)
+}
+
+func (h *HTTP) responseFromHttpext(resp *httpext.Response) *Response {
+	return &Response{Response: resp, h: h, cachedJSON: nil, validatedJSON: false}
 }
 
 // HTML returns the body as an html.Selection
 func (res *Response) HTML(selector ...string) html.Selection {
-	var body string
-	switch b := res.Body.(type) {
-	case []byte:
-		body = string(b)
-	case string:
-		body = b
-	default:
-		common.Throw(common.GetRuntime(res.GetCtx()), errors.New("invalid response type"))
+	body, err := common.ToString(res.Body)
+	if err != nil {
+		common.Throw(common.GetRuntime(res.GetCtx()), err)
 	}
 
 	sel, err := html.HTML{}.ParseHTML(res.GetCtx(), body)
@@ -75,6 +86,70 @@ func (res *Response) HTML(selector ...string) html.Selection {
 		sel = sel.Find(selector[0])
 	}
 	return sel
+}
+
+// JSON parses the body of a response as JSON and returns it to the goja VM.
+func (res *Response) JSON(selector ...string) goja.Value {
+	rt := common.GetRuntime(res.GetCtx())
+	hasSelector := len(selector) > 0
+	if res.cachedJSON == nil || hasSelector { //nolint:nestif
+		var v interface{}
+
+		body, err := common.ToBytes(res.Body)
+		if err != nil {
+			common.Throw(rt, err)
+		}
+
+		if hasSelector {
+			if !res.validatedJSON {
+				if !gjson.ValidBytes(body) {
+					return goja.Undefined()
+				}
+				res.validatedJSON = true
+			}
+
+			result := gjson.GetBytes(body, selector[0])
+
+			if !result.Exists() {
+				return goja.Undefined()
+			}
+			return rt.ToValue(result.Value())
+		}
+
+		if err := json.Unmarshal(body, &v); err != nil {
+			var syntaxError *json.SyntaxError
+			if errors.As(err, &syntaxError) {
+				err = checkErrorInJSON(body, int(syntaxError.Offset), err)
+			}
+			common.Throw(rt, err)
+		}
+		res.validatedJSON = true
+		res.cachedJSON = v
+	}
+
+	return rt.ToValue(res.cachedJSON)
+}
+
+func checkErrorInJSON(input []byte, offset int, err error) error {
+	lf := '\n'
+	str := string(input)
+
+	// Humans tend to count from 1.
+	line := 1
+	character := 0
+
+	for i, b := range str {
+		if b == lf {
+			line++
+			character = 0
+		}
+		character++
+		if i == offset {
+			break
+		}
+	}
+
+	return jsonError{line: line, character: character, err: err}
 }
 
 // SubmitForm parses the body as an html looking for a from and then submitting it
@@ -158,9 +233,9 @@ func (res *Response) SubmitForm(args ...goja.Value) (*Response, error) {
 			q.Add(k, v.String())
 		}
 		requestURL.RawQuery = q.Encode()
-		return New().Request(res.GetCtx(), requestMethod, rt.ToValue(requestURL.String()), goja.Null(), requestParams)
+		return res.h.Request(res.GetCtx(), requestMethod, rt.ToValue(requestURL.String()), goja.Null(), requestParams)
 	}
-	return New().Request(res.GetCtx(), requestMethod, rt.ToValue(requestURL.String()), rt.ToValue(values), requestParams)
+	return res.h.Request(res.GetCtx(), requestMethod, rt.ToValue(requestURL.String()), rt.ToValue(values), requestParams)
 }
 
 // ClickLink parses the body as an html, looks for a link and than makes a request as if the link was
@@ -201,5 +276,5 @@ func (res *Response) ClickLink(args ...goja.Value) (*Response, error) {
 	}
 	requestURL := responseURL.ResolveReference(hrefURL)
 
-	return New().Get(res.GetCtx(), rt.ToValue(requestURL.String()), requestParams)
+	return res.h.Get(res.GetCtx(), rt.ToValue(requestURL.String()), requestParams)
 }

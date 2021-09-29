@@ -1,7 +1,10 @@
 package pretty
 
 import (
+	"bytes"
+	"encoding/json"
 	"sort"
+	"strconv"
 )
 
 // Options is Pretty options
@@ -84,6 +87,14 @@ func ugly(dst, src []byte) []byte {
 	return dst
 }
 
+func isNaNOrInf(src []byte) bool {
+	return src[0] == 'i' || //Inf
+		src[0] == 'I' || // inf
+		src[0] == '+' || // +Inf
+		src[0] == 'N' || // Nan
+		(src[0] == 'n' && len(src) > 1 && src[1] != 'u') // nan
+}
+
 func appendPrettyAny(buf, json []byte, i int, pretty bool, width int, prefix, indent string, sortkeys bool, tabs, nl, max int) ([]byte, int, int, bool) {
 	for ; i < len(json); i++ {
 		if json[i] <= ' ' {
@@ -92,7 +103,8 @@ func appendPrettyAny(buf, json []byte, i int, pretty bool, width int, prefix, in
 		if json[i] == '"' {
 			return appendPrettyString(buf, json, i, nl)
 		}
-		if (json[i] >= '0' && json[i] <= '9') || json[i] == '-' {
+
+		if (json[i] >= '0' && json[i] <= '9') || json[i] == '-' || isNaNOrInf(json[i:]) {
 			return appendPrettyNumber(buf, json, i, nl)
 		}
 		if json[i] == '{' {
@@ -118,23 +130,119 @@ type pair struct {
 	vstart, vend int
 }
 
-type byKey struct {
+type byKeyVal struct {
 	sorted bool
 	json   []byte
+	buf    []byte
 	pairs  []pair
 }
 
-func (arr *byKey) Len() int {
+func (arr *byKeyVal) Len() int {
 	return len(arr.pairs)
 }
-func (arr *byKey) Less(i, j int) bool {
-	key1 := arr.json[arr.pairs[i].kstart+1 : arr.pairs[i].kend-1]
-	key2 := arr.json[arr.pairs[j].kstart+1 : arr.pairs[j].kend-1]
-	return string(key1) < string(key2)
+func (arr *byKeyVal) Less(i, j int) bool {
+	if arr.isLess(i, j, byKey) {
+		return true
+	}
+	if arr.isLess(j, i, byKey) {
+		return false
+	}
+	return arr.isLess(i, j, byVal)
 }
-func (arr *byKey) Swap(i, j int) {
+func (arr *byKeyVal) Swap(i, j int) {
 	arr.pairs[i], arr.pairs[j] = arr.pairs[j], arr.pairs[i]
 	arr.sorted = true
+}
+
+type byKind int
+
+const (
+	byKey byKind = 0
+	byVal byKind = 1
+)
+
+type jtype int
+
+const (
+	jnull jtype = iota
+	jfalse
+	jnumber
+	jstring
+	jtrue
+	jjson
+)
+
+func getjtype(v []byte) jtype {
+	if len(v) == 0 {
+		return jnull
+	}
+	switch v[0] {
+	case '"':
+		return jstring
+	case 'f':
+		return jfalse
+	case 't':
+		return jtrue
+	case 'n':
+		return jnull
+	case '[', '{':
+		return jjson
+	default:
+		return jnumber
+	}
+}
+
+func (arr *byKeyVal) isLess(i, j int, kind byKind) bool {
+	k1 := arr.json[arr.pairs[i].kstart:arr.pairs[i].kend]
+	k2 := arr.json[arr.pairs[j].kstart:arr.pairs[j].kend]
+	var v1, v2 []byte
+	if kind == byKey {
+		v1 = k1
+		v2 = k2
+	} else {
+		v1 = bytes.TrimSpace(arr.buf[arr.pairs[i].vstart:arr.pairs[i].vend])
+		v2 = bytes.TrimSpace(arr.buf[arr.pairs[j].vstart:arr.pairs[j].vend])
+		if len(v1) >= len(k1)+1 {
+			v1 = bytes.TrimSpace(v1[len(k1)+1:])
+		}
+		if len(v2) >= len(k2)+1 {
+			v2 = bytes.TrimSpace(v2[len(k2)+1:])
+		}
+	}
+	t1 := getjtype(v1)
+	t2 := getjtype(v2)
+	if t1 < t2 {
+		return true
+	}
+	if t1 > t2 {
+		return false
+	}
+	if t1 == jstring {
+		s1 := parsestr(v1)
+		s2 := parsestr(v2)
+		return string(s1) < string(s2)
+	}
+	if t1 == jnumber {
+		n1, _ := strconv.ParseFloat(string(v1), 64)
+		n2, _ := strconv.ParseFloat(string(v2), 64)
+		return n1 < n2
+	}
+	return string(v1) < string(v2)
+
+}
+
+func parsestr(s []byte) []byte {
+	for i := 1; i < len(s); i++ {
+		if s[i] == '\\' {
+			var str string
+			json.Unmarshal(s, &str)
+			return []byte(str)
+		}
+		if s[i] == '"' {
+			return s[1:i]
+		}
+	}
+	return nil
 }
 
 func appendPrettyObject(buf, json []byte, i int, open, close byte, pretty bool, width int, prefix, indent string, sortkeys bool, tabs, nl, max int) ([]byte, int, int, bool) {
@@ -174,7 +282,11 @@ func appendPrettyObject(buf, json []byte, i int, open, close byte, pretty bool, 
 				}
 				if n > 0 {
 					nl = len(buf)
-					buf = append(buf, '\n')
+					if buf[nl-1] == ' ' {
+						buf[nl-1] = '\n'
+					} else {
+						buf = append(buf, '\n')
+					}
 				}
 				if buf[len(buf)-1] != open {
 					buf = appendTabs(buf, prefix, indent, tabs)
@@ -186,14 +298,18 @@ func appendPrettyObject(buf, json []byte, i int, open, close byte, pretty bool, 
 		if open == '[' || json[i] == '"' {
 			if n > 0 {
 				buf = append(buf, ',')
-				if width != -1 {
+				if width != -1 && open == '[' {
 					buf = append(buf, ' ')
 				}
 			}
 			var p pair
 			if pretty {
 				nl = len(buf)
-				buf = append(buf, '\n')
+				if buf[nl-1] == ' ' {
+					buf[nl-1] = '\n'
+				} else {
+					buf = append(buf, '\n')
+				}
 				if open == '{' && sortkeys {
 					p.kstart = i
 					p.vstart = len(buf)
@@ -235,8 +351,8 @@ func sortPairs(json, buf []byte, pairs []pair) []byte {
 	}
 	vstart := pairs[0].vstart
 	vend := pairs[len(pairs)-1].vend
-	arr := byKey{false, json, pairs}
-	sort.Sort(&arr)
+	arr := byKeyVal{false, json, buf, pairs}
+	sort.Stable(&arr)
 	if !arr.sorted {
 		return buf
 	}
@@ -305,6 +421,7 @@ func appendTabs(buf []byte, prefix, indent string, tabs int) []byte {
 type Style struct {
 	Key, String, Number [2]string
 	True, False, Null   [2]string
+	Escape              [2]string
 	Append              func(dst []byte, c byte) []byte
 }
 
@@ -318,21 +435,26 @@ func hexp(p byte) byte {
 }
 
 // TerminalStyle is for terminals
-var TerminalStyle = &Style{
-	Key:    [2]string{"\x1B[94m", "\x1B[0m"},
-	String: [2]string{"\x1B[92m", "\x1B[0m"},
-	Number: [2]string{"\x1B[93m", "\x1B[0m"},
-	True:   [2]string{"\x1B[96m", "\x1B[0m"},
-	False:  [2]string{"\x1B[96m", "\x1B[0m"},
-	Null:   [2]string{"\x1B[91m", "\x1B[0m"},
-	Append: func(dst []byte, c byte) []byte {
-		if c < ' ' && (c != '\r' && c != '\n' && c != '\t' && c != '\v') {
-			dst = append(dst, "\\u00"...)
-			dst = append(dst, hexp((c>>4)&0xF))
-			return append(dst, hexp((c)&0xF))
-		}
-		return append(dst, c)
-	},
+var TerminalStyle *Style
+
+func init() {
+	TerminalStyle = &Style{
+		Key:    [2]string{"\x1B[94m", "\x1B[0m"},
+		String: [2]string{"\x1B[92m", "\x1B[0m"},
+		Number: [2]string{"\x1B[93m", "\x1B[0m"},
+		True:   [2]string{"\x1B[96m", "\x1B[0m"},
+		False:  [2]string{"\x1B[96m", "\x1B[0m"},
+		Null:   [2]string{"\x1B[91m", "\x1B[0m"},
+		Escape: [2]string{"\x1B[35m", "\x1B[0m"},
+		Append: func(dst []byte, c byte) []byte {
+			if c < ' ' && (c != '\r' && c != '\n' && c != '\t' && c != '\v') {
+				dst = append(dst, "\\u00"...)
+				dst = append(dst, hexp((c>>4)&0xF))
+				return append(dst, hexp((c)&0xF))
+			}
+			return append(dst, c)
+		},
+	}
 }
 
 // Color will colorize the json. The style parma is used for customizing
@@ -363,8 +485,39 @@ func Color(src []byte, style *Style) []byte {
 				dst = append(dst, style.String[0]...)
 			}
 			dst = apnd(dst, '"')
+			esc := false
+			uesc := 0
 			for i = i + 1; i < len(src); i++ {
-				dst = apnd(dst, src[i])
+				if src[i] == '\\' {
+					if key {
+						dst = append(dst, style.Key[1]...)
+					} else {
+						dst = append(dst, style.String[1]...)
+					}
+					dst = append(dst, style.Escape[0]...)
+					dst = apnd(dst, src[i])
+					esc = true
+					if i+1 < len(src) && src[i+1] == 'u' {
+						uesc = 5
+					} else {
+						uesc = 1
+					}
+				} else if esc {
+					dst = apnd(dst, src[i])
+					if uesc == 1 {
+						esc = false
+						dst = append(dst, style.Escape[1]...)
+						if key {
+							dst = append(dst, style.Key[0]...)
+						} else {
+							dst = append(dst, style.String[0]...)
+						}
+					} else {
+						uesc--
+					}
+				} else {
+					dst = apnd(dst, src[i])
+				}
 				if src[i] == '"' {
 					j := i - 1
 					for ; ; j-- {
@@ -377,7 +530,9 @@ func Color(src []byte, style *Style) []byte {
 					}
 				}
 			}
-			if key {
+			if esc {
+				dst = append(dst, style.Escape[1]...)
+			} else if key {
 				dst = append(dst, style.Key[1]...)
 			} else {
 				dst = append(dst, style.String[1]...)
@@ -393,7 +548,7 @@ func Color(src []byte, style *Style) []byte {
 			dst = apnd(dst, src[i])
 		} else {
 			var kind byte
-			if (src[i] >= '0' && src[i] <= '9') || src[i] == '-' {
+			if (src[i] >= '0' && src[i] <= '9') || src[i] == '-' || isNaNOrInf(src[i:]) {
 				kind = '0'
 				dst = append(dst, style.Number[0]...)
 			} else if src[i] == 't' {
@@ -425,6 +580,93 @@ func Color(src []byte, style *Style) []byte {
 				} else if kind == 'n' {
 					dst = append(dst, style.Null[1]...)
 				}
+			}
+		}
+	}
+	return dst
+}
+
+// Spec strips out comments and trailing commas and convert the input to a
+// valid JSON per the official spec: https://tools.ietf.org/html/rfc8259
+//
+// The resulting JSON will always be the same length as the input and it will
+// include all of the same line breaks at matching offsets. This is to ensure
+// the result can be later processed by a external parser and that that
+// parser will report messages or errors with the correct offsets.
+func Spec(src []byte) []byte {
+	return spec(src, nil)
+}
+
+// SpecInPlace is the same as Spec, but this method reuses the input json
+// buffer to avoid allocations. Do not use the original bytes slice upon return.
+func SpecInPlace(src []byte) []byte {
+	return spec(src, src)
+}
+
+func spec(src, dst []byte) []byte {
+	dst = dst[:0]
+	for i := 0; i < len(src); i++ {
+		if src[i] == '/' {
+			if i < len(src)-1 {
+				if src[i+1] == '/' {
+					dst = append(dst, ' ', ' ')
+					i += 2
+					for ; i < len(src); i++ {
+						if src[i] == '\n' {
+							dst = append(dst, '\n')
+							break
+						} else if src[i] == '\t' || src[i] == '\r' {
+							dst = append(dst, src[i])
+						} else {
+							dst = append(dst, ' ')
+						}
+					}
+					continue
+				}
+				if src[i+1] == '*' {
+					dst = append(dst, ' ', ' ')
+					i += 2
+					for ; i < len(src)-1; i++ {
+						if src[i] == '*' && src[i+1] == '/' {
+							dst = append(dst, ' ', ' ')
+							i++
+							break
+						} else if src[i] == '\n' || src[i] == '\t' ||
+							src[i] == '\r' {
+							dst = append(dst, src[i])
+						} else {
+							dst = append(dst, ' ')
+						}
+					}
+					continue
+				}
+			}
+		}
+		dst = append(dst, src[i])
+		if src[i] == '"' {
+			for i = i + 1; i < len(src); i++ {
+				dst = append(dst, src[i])
+				if src[i] == '"' {
+					j := i - 1
+					for ; ; j-- {
+						if src[j] != '\\' {
+							break
+						}
+					}
+					if (j-i)%2 != 0 {
+						break
+					}
+				}
+			}
+		} else if src[i] == '}' || src[i] == ']' {
+			for j := len(dst) - 2; j >= 0; j-- {
+				if dst[j] <= ' ' {
+					continue
+				}
+				if dst[j] == ',' {
+					dst[j] = ' '
+				}
+				break
 			}
 		}
 	}

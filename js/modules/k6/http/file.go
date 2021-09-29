@@ -21,9 +21,12 @@
 package http
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
+
+	"go.k6.io/k6/js/common"
 )
 
 // FileData represents a binary file requiring multipart request encoding
@@ -40,7 +43,7 @@ func escapeQuotes(s string) string {
 }
 
 // File returns a FileData parameter
-func (h *HTTP) File(data []byte, args ...string) FileData {
+func (h *HTTP) File(ctx context.Context, data interface{}, args ...string) FileData {
 	// supply valid default if filename and content-type are not specified
 	fname, ct := fmt.Sprintf("%d", time.Now().UnixNano()), "application/octet-stream"
 
@@ -52,8 +55,13 @@ func (h *HTTP) File(data []byte, args ...string) FileData {
 		}
 	}
 
+	dt, err := common.ToBytes(data)
+	if err != nil {
+		common.Throw(common.GetRuntime(ctx), err)
+	}
+
 	return FileData{
-		Data:        data,
+		Data:        dt,
 		Filename:    fname,
 		ContentType: ct,
 	}

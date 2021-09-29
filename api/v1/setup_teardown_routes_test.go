@@ -30,21 +30,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/core"
-	"github.com/loadimpact/k6/core/local"
-	"github.com/loadimpact/k6/js"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/loader"
 	"github.com/manyminds/api2go/jsonapi"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/core"
+	"go.k6.io/k6/core/local"
+	"go.k6.io/k6/js"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/loader"
 )
 
 func TestSetupData(t *testing.T) {
 	t.Parallel()
-	var testCases = []struct {
+	testCases := []struct {
 		name      string
 		script    []byte
 		setupRuns [][3]string
@@ -130,31 +134,46 @@ func TestSetupData(t *testing.T) {
 			},
 		},
 	}
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	for _, testCase := range testCases {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			runner, err := js.New(
+				logger,
 				&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: testCase.script},
 				nil,
 				lib.RuntimeOptions{},
+				builtinMetrics,
+				registry,
 			)
 			require.NoError(t, err)
 			runner.SetOptions(lib.Options{
 				Paused:          null.BoolFrom(true),
 				VUs:             null.IntFrom(2),
-				VUsMax:          null.IntFrom(2),
 				Iterations:      null.IntFrom(3),
-				SetupTimeout:    types.NullDurationFrom(1 * time.Second),
-				TeardownTimeout: types.NullDurationFrom(1 * time.Second),
+				NoSetup:         null.BoolFrom(true),
+				SetupTimeout:    types.NullDurationFrom(5 * time.Second),
+				TeardownTimeout: types.NullDurationFrom(5 * time.Second),
 			})
-			executor := local.New(runner)
-			executor.SetRunSetup(false)
-			engine, err := core.NewEngine(executor, runner.GetOptions())
+			execScheduler, err := local.NewExecutionScheduler(runner, logger)
+			require.NoError(t, err)
+			engine, err := core.NewEngine(execScheduler, runner.GetOptions(), lib.RuntimeOptions{}, nil, logger, builtinMetrics)
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			globalCtx, globalCancel := context.WithCancel(context.Background())
+			runCtx, runCancel := context.WithCancel(globalCtx)
+			run, wait, err := engine.Init(globalCtx, runCtx)
+			defer wait()
+			defer globalCancel()
+
+			require.NoError(t, err)
+
 			errC := make(chan error)
-			go func() { errC <- engine.Run(ctx) }()
+			go func() { errC <- run() }()
 
 			handler := NewHandler()
 
@@ -179,14 +198,14 @@ func TestSetupData(t *testing.T) {
 				checkSetup(setupRun[0], setupRun[1], setupRun[2])
 			}
 
-			engine.Executor.SetPaused(false)
+			require.NoError(t, engine.ExecutionScheduler.SetPaused(false))
 
 			select {
 			case <-time.After(10 * time.Second):
-				cancel()
+				runCancel()
 				t.Fatal("Test timed out")
 			case err := <-errC:
-				cancel()
+				runCancel()
 				require.NoError(t, err)
 			}
 		})

@@ -172,7 +172,7 @@ type decSymbol struct {
 // allocDtable will allocate decoding tables if they are not big enough.
 func (s *Scratch) allocDtable() {
 	tableSize := 1 << s.actualTableLog
-	if cap(s.decTable) < int(tableSize) {
+	if cap(s.decTable) < tableSize {
 		s.decTable = make([]decSymbol, tableSize)
 	}
 	s.decTable = s.decTable[:tableSize]
@@ -243,7 +243,7 @@ func (s *Scratch) buildDtable() error {
 			nBits := s.actualTableLog - byte(highBits(uint32(nextState)))
 			s.decTable[u].nbBits = nBits
 			newState := (nextState << nBits) - tableSize
-			if newState > tableSize {
+			if newState >= tableSize {
 				return fmt.Errorf("newState (%d) outside table size (%d)", newState, tableSize)
 			}
 			if newState == uint16(u) && nBits == 0 {
@@ -281,8 +281,12 @@ func (s *Scratch) decompress() error {
 			tmp[off+2] = s1.nextFast()
 			tmp[off+3] = s2.nextFast()
 			off += 4
+			// When off is 0, we have overflowed and should write.
 			if off == 0 {
 				s.Out = append(s.Out, tmp...)
+				if len(s.Out) >= s.DecompressLimit {
+					return fmt.Errorf("output size (%d) > DecompressLimit (%d)", len(s.Out), s.DecompressLimit)
+				}
 			}
 		}
 	} else {
@@ -296,7 +300,7 @@ func (s *Scratch) decompress() error {
 			off += 4
 			if off == 0 {
 				s.Out = append(s.Out, tmp...)
-				off = 0
+				// When off is 0, we have overflowed and should write.
 				if len(s.Out) >= s.DecompressLimit {
 					return fmt.Errorf("output size (%d) > DecompressLimit (%d)", len(s.Out), s.DecompressLimit)
 				}
@@ -336,7 +340,7 @@ type decoder struct {
 func (d *decoder) init(in *bitReader, dt []decSymbol, tableLog uint8) {
 	d.dt = dt
 	d.br = in
-	d.state = uint16(in.getBits(tableLog))
+	d.state = in.getBits(tableLog)
 }
 
 // next returns the next symbol and sets the next state.

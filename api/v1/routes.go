@@ -22,27 +22,80 @@ package v1
 
 import (
 	"net/http"
-
-	"github.com/julienschmidt/httprouter"
 )
 
 func NewHandler() http.Handler {
-	router := httprouter.New()
+	mux := http.NewServeMux()
 
-	router.GET("/v1/status", HandleGetStatus)
-	router.PATCH("/v1/status", HandlePatchStatus)
+	mux.HandleFunc("/v1/status", func(rw http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			handleGetStatus(rw, r)
+		case http.MethodPatch:
+			handlePatchStatus(rw, r)
+		default:
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
 
-	router.GET("/v1/metrics", HandleGetMetrics)
-	router.GET("/v1/metrics/:id", HandleGetMetric)
+	mux.HandleFunc("/v1/metrics", func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		handleGetMetrics(rw, r)
+	})
 
-	router.GET("/v1/groups", HandleGetGroups)
-	router.GET("/v1/groups/:id", HandleGetGroup)
+	mux.HandleFunc("/v1/metrics/", func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
 
-	router.POST("/v1/setup", HandleRunSetup)
-	router.PUT("/v1/setup", HandleSetSetupData)
-	router.GET("/v1/setup", HandleGetSetupData)
+		id := r.URL.Path[len("/v1/metrics/"):]
+		handleGetMetric(rw, r, id)
+	})
 
-	router.POST("/v1/teardown", HandleRunTeardown)
+	mux.HandleFunc("/v1/groups", func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
 
-	return router
+		handleGetGroups(rw, r)
+	})
+
+	mux.HandleFunc("/v1/groups/", func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		id := r.URL.Path[len("/v1/groups/"):]
+		handleGetGroup(rw, r, id)
+	})
+
+	mux.HandleFunc("/v1/setup", func(rw http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			handleRunSetup(rw, r)
+		case http.MethodPut:
+			handleSetSetupData(rw, r)
+		case http.MethodGet:
+			handleGetSetupData(rw, r)
+		default:
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc("/v1/teardown", func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		handleRunTeardown(rw, r)
+	})
+
+	return mux
 }

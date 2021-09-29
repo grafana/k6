@@ -24,45 +24,50 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/loadimpact/k6/js/compiler"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
+)
+
+// CompatibilityMode specifies the JS compatibility mode
+// nolint:lll
+//go:generate enumer -type=CompatibilityMode -transform=snake -trimprefix CompatibilityMode -output compatibility_mode_gen.go
+type CompatibilityMode uint8
+
+const (
+	// CompatibilityModeExtended achieves ES6+ compatibility with Babel and core.js
+	CompatibilityModeExtended CompatibilityMode = iota + 1
+	// CompatibilityModeBase is standard goja ES5.1+
+	CompatibilityModeBase
 )
 
 // RuntimeOptions are settings passed onto the goja JS runtime
 type RuntimeOptions struct {
 	// Whether to pass the actual system environment variables to the JS runtime
-	IncludeSystemEnvVars null.Bool `json:"includeSystemEnvVars" envconfig:"K6_INCLUDE_SYSTEM_ENV_VARS"`
+	IncludeSystemEnvVars null.Bool `json:"includeSystemEnvVars"`
 
 	// JS compatibility mode: "extended" (Goja+Babel+core.js) or "base" (plain Goja)
+	//
+	// TODO: when we resolve https://github.com/k6io/k6/issues/883, we probably
+	// should use the CompatibilityMode type directly... but by then, we'd need to have
+	// some way of knowing if the value has been set by the user or if we're using the
+	// default one, so we can handle `k6 run --compatibility-mode=base es6_extended_archive.tar`
 	CompatibilityMode null.String `json:"compatibilityMode"`
 
 	// Environment variables passed onto the runner
-	Env map[string]string `json:"env" envconfig:"K6_ENV"`
-}
+	Env map[string]string `json:"env"`
 
-// Apply overwrites the receiver RuntimeOptions' fields with any that are set
-// on the argument struct and returns the receiver
-func (o RuntimeOptions) Apply(opts RuntimeOptions) RuntimeOptions {
-	if opts.IncludeSystemEnvVars.Valid {
-		o.IncludeSystemEnvVars = opts.IncludeSystemEnvVars
-	}
-	if opts.CompatibilityMode.Valid {
-		o.CompatibilityMode = opts.CompatibilityMode
-	}
-	if opts.Env != nil {
-		o.Env = opts.Env
-	}
-	return o
+	NoThresholds  null.Bool   `json:"noThresholds"`
+	NoSummary     null.Bool   `json:"noSummary"`
+	SummaryExport null.String `json:"summaryExport"`
 }
 
 // ValidateCompatibilityMode checks if the provided val is a valid compatibility mode
-func ValidateCompatibilityMode(val string) (cm compiler.CompatibilityMode, err error) {
+func ValidateCompatibilityMode(val string) (cm CompatibilityMode, err error) {
 	if val == "" {
-		return compiler.CompatibilityModeExtended, nil
+		return CompatibilityModeExtended, nil
 	}
-	if cm, err = compiler.CompatibilityModeString(val); err != nil {
+	if cm, err = CompatibilityModeString(val); err != nil {
 		var compatValues []string
-		for _, v := range compiler.CompatibilityModeValues() {
+		for _, v := range CompatibilityModeValues() {
 			compatValues = append(compatValues, v.String())
 		}
 		err = fmt.Errorf(`invalid compatibility mode "%s". Use: "%s"`,

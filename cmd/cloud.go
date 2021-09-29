@@ -22,234 +22,329 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
-	"github.com/kelseyhightower/envconfig"
-	"github.com/pkg/errors"
+	"github.com/fatih/color"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/consts"
-	"github.com/loadimpact/k6/loader"
-	"github.com/loadimpact/k6/stats/cloud"
-	"github.com/loadimpact/k6/ui"
-
-	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/cloudapi"
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/loader"
+	"go.k6.io/k6/ui/pb"
 )
 
-const (
-	cloudFailedToGetProgressErrorCode = 98
-	cloudTestRunFailedErrorCode       = 99
-)
-
+//nolint:gochecknoglobals
 var (
 	exitOnRunning = os.Getenv("K6_EXIT_ON_RUNNING") != ""
+	showCloudLogs = true
 )
 
-var cloudCmd = &cobra.Command{
-	Use:   "cloud",
-	Short: "Run a test on the cloud",
-	Long: `Run a test on the cloud.
+//nolint:funlen,gocognit,gocyclo
+func getCloudCmd(ctx context.Context, logger *logrus.Logger) *cobra.Command {
+	cloudCmd := &cobra.Command{
+		Use:   "cloud",
+		Short: "Run a test on the cloud",
+		Long: `Run a test on the cloud.
 
-This will execute the test on the Load Impact cloud service. Use "k6 login cloud" to authenticate.`,
-	Example: `
+This will execute the test on the k6 cloud service. Use "k6 login cloud" to authenticate.`,
+		Example: `
         k6 cloud script.js`[1:],
-	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		//TODO: disable in quiet mode?
-		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
-		initBar := ui.ProgressBar{
-			Width: 60,
-			Left:  func() string { return "    uploading script" },
-		}
-		fprintf(stdout, "%s \r", initBar.String())
+		Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// we specifically first parse it and return an error if it has bad value and then check if
+			// we are going to set it  ... so we always parse it instead of it breaking the command if
+			// the cli flag is removed
+			if showCloudLogsEnv, ok := os.LookupEnv("K6_SHOW_CLOUD_LOGS"); ok {
+				showCloudLogsValue, err := strconv.ParseBool(showCloudLogsEnv)
+				if err != nil {
+					return fmt.Errorf("parsing K6_SHOW_CLOUD_LOGS returned an error: %w", err)
+				}
+				if !cmd.Flags().Changed("show-logs") {
+					showCloudLogs = showCloudLogsValue
+				}
+			}
+			// TODO: disable in quiet mode?
+			_, _ = fmt.Fprintf(stdout, "\n%s\n\n", getBanner(noColor || !stdoutTTY))
 
-		// Runner
-		pwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
+			progressBar := pb.New(
+				pb.WithConstLeft("Init"),
+				pb.WithConstProgress(0, "Parsing script"),
+			)
+			printBar(progressBar)
 
-		filename := args[0]
-		filesystems := loader.CreateFilesystems()
-		src, err := loader.ReadSource(filename, pwd, filesystems, os.Stdin)
-		if err != nil {
-			return err
-		}
-
-		runtimeOptions, err := getRuntimeOptions(cmd.Flags())
-		if err != nil {
-			return err
-		}
-
-		r, err := newRunner(src, runType, filesystems, runtimeOptions)
-		if err != nil {
-			return err
-		}
-
-		cliOpts, err := getOptions(cmd.Flags())
-		if err != nil {
-			return err
-		}
-		conf, err := getConsolidatedConfig(afero.NewOsFs(), Config{Options: cliOpts}, r)
-		if err != nil {
-			return err
-		}
-
-		derivedConf, cerr := deriveAndValidateConfig(conf)
-		if cerr != nil {
-			return ExitCode{error: cerr, Code: invalidConfigErrorCode}
-		}
-
-		err = r.SetOptions(conf.Options)
-		if err != nil {
-			return err
-		}
-
-		// Cloud config
-		cloudConfig := cloud.NewConfig().Apply(derivedConf.Collectors.Cloud)
-		if err = envconfig.Process("", &cloudConfig); err != nil {
-			return err
-		}
-		if !cloudConfig.Token.Valid {
-			return errors.New("Not logged in, please use `k6 login cloud`.")
-		}
-
-		arc := r.MakeArchive()
-		// TODO: Fix this
-		// We reuse cloud.Config for parsing options.ext.loadimpact, but this probably shouldn't be
-		// done as the idea of options.ext is that they are extensible without touching k6. But in
-		// order for this to happen we shouldn't actually marshall cloud.Config on top of it because
-		// it will be missing some fields that aren't actually mentioned in the struct.
-		// So in order for use to copy the fields that we need for loadimpact's api we unmarshal in
-		// map[string]interface{} and copy what we need if it isn't set already
-		var tmpCloudConfig map[string]interface{}
-		if val, ok := arc.Options.External["loadimpact"]; ok {
-			var dec = json.NewDecoder(bytes.NewReader(val))
-			dec.UseNumber() // otherwise float64 are used
-			if err := dec.Decode(&tmpCloudConfig); err != nil {
+			// Runner
+			pwd, err := os.Getwd()
+			if err != nil {
 				return err
 			}
-		}
 
-		if err := cloud.MergeFromExternal(arc.Options.External, &cloudConfig); err != nil {
-			return err
-		}
-		if tmpCloudConfig == nil {
-			tmpCloudConfig = make(map[string]interface{}, 3)
-		}
-
-		if _, ok := tmpCloudConfig["token"]; !ok && cloudConfig.Token.Valid {
-			tmpCloudConfig["token"] = cloudConfig.Token
-		}
-		if _, ok := tmpCloudConfig["name"]; !ok && cloudConfig.Name.Valid {
-			tmpCloudConfig["name"] = cloudConfig.Name
-		}
-		if _, ok := tmpCloudConfig["projectID"]; !ok && cloudConfig.ProjectID.Valid {
-			tmpCloudConfig["projectID"] = cloudConfig.ProjectID
-		}
-
-		if arc.Options.External == nil {
-			arc.Options.External = make(map[string]json.RawMessage)
-		}
-		arc.Options.External["loadimpact"], err = json.Marshal(tmpCloudConfig)
-		if err != nil {
-			return err
-		}
-
-		name := cloudConfig.Name.String
-		if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
-			name = filepath.Base(filename)
-		}
-
-		// Start cloud test run
-		client := cloud.NewClient(cloudConfig.Token.String, cloudConfig.Host.String, consts.Version)
-		if err := client.ValidateOptions(arc.Options); err != nil {
-			return err
-		}
-
-		refID, err := client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
-		if err != nil {
-			return err
-		}
-
-		testURL := cloud.URLForResults(refID, cloudConfig)
-		fprintf(stdout, "\n\n")
-		fprintf(stdout, "     execution: %s\n", ui.ValueColor.Sprint("cloud"))
-		fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
-		fprintf(stdout, "     output: %s\n", ui.ValueColor.Sprint(testURL))
-		fprintf(stdout, "\n")
-
-		// The quiet option hides the progress bar and disallow aborting the test
-		if quiet {
-			return nil
-		}
-
-		// Trap Interrupts, SIGINTs and SIGTERMs.
-		sigC := make(chan os.Signal, 1)
-		signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-		defer signal.Stop(sigC)
-
-		var progressErr error
-		testProgress := &cloud.TestProgressResponse{}
-		progress := ui.ProgressBar{
-			Width: 60,
-			Left: func() string {
-				return "  " + testProgress.RunStatusText
-			},
-		}
-
-		ticker := time.NewTicker(time.Millisecond * 2000)
-		shouldExitLoop := false
-
-	runningLoop:
-		for {
-			select {
-			case <-ticker.C:
-				testProgress, progressErr = client.GetTestProgress(refID)
-				if progressErr == nil {
-					if (testProgress.RunStatus > lib.RunStatusRunning) || (exitOnRunning && testProgress.RunStatus == lib.RunStatusRunning) {
-						shouldExitLoop = true
-					}
-					progress.Progress = testProgress.Progress
-					fprintf(stdout, "%s\x1b[0K\r", progress.String())
-				} else {
-					logrus.WithError(progressErr).Error("Test progress error")
-				}
-				if shouldExitLoop {
-					break runningLoop
-				}
-			case sig := <-sigC:
-				logrus.WithField("sig", sig).Print("Exiting in response to signal...")
-				err := client.StopCloudTestRun(refID)
-				if err != nil {
-					logrus.WithError(err).Error("Stop cloud test error")
-				}
-				shouldExitLoop = true // Exit after the next GetTestProgress call
+			filename := args[0]
+			filesystems := loader.CreateFilesystems()
+			src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
+			if err != nil {
+				return err
 			}
-		}
 
-		if testProgress == nil {
-			//nolint:golint
-			return ExitCode{error: errors.New("Test progress error"), Code: cloudFailedToGetProgressErrorCode}
-		}
+			osEnvironment := buildEnvMap(os.Environ())
+			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), osEnvironment)
+			if err != nil {
+				return err
+			}
 
-		fprintf(stdout, "     test status: %s\n", ui.ValueColor.Sprint(testProgress.RunStatusText))
+			modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Getting script options"))
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			r, err := newRunner(logger, src, runType, filesystems, runtimeOptions, builtinMetrics, registry)
+			if err != nil {
+				return err
+			}
 
-		if testProgress.ResultStatus == cloud.ResultStatusFailed {
-			//nolint:golint
-			return ExitCode{error: errors.New("The test has failed"), Code: cloudTestRunFailedErrorCode}
-		}
+			modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Consolidating options"))
+			cliOpts, err := getOptions(cmd.Flags())
+			if err != nil {
+				return err
+			}
+			conf, err := getConsolidatedConfig(afero.NewOsFs(), Config{Options: cliOpts}, r)
+			if err != nil {
+				return err
+			}
 
-		return nil
-	},
+			derivedConf, err := deriveAndValidateConfig(conf, r.IsExecutable)
+			if err != nil {
+				return err
+			}
+
+			// TODO: validate for usage of execution segment
+			// TODO: validate for externally controlled executor (i.e. executors that aren't distributable)
+			// TODO: move those validations to a separate function and reuse validateConfig()?
+
+			err = r.SetOptions(conf.Options)
+			if err != nil {
+				return err
+			}
+
+			modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Building the archive"))
+			arc := r.MakeArchive()
+			// TODO: Fix this
+			// We reuse cloud.Config for parsing options.ext.loadimpact, but this probably shouldn't be
+			// done, as the idea of options.ext is that they are extensible without touching k6. But in
+			// order for this to happen, we shouldn't actually marshall cloud.Config on top of it, because
+			// it will be missing some fields that aren't actually mentioned in the struct.
+			// So in order for use to copy the fields that we need for loadimpact's api we unmarshal in
+			// map[string]interface{} and copy what we need if it isn't set already
+			var tmpCloudConfig map[string]interface{}
+			if val, ok := arc.Options.External["loadimpact"]; ok {
+				dec := json.NewDecoder(bytes.NewReader(val))
+				dec.UseNumber() // otherwise float64 are used
+				if err = dec.Decode(&tmpCloudConfig); err != nil {
+					return err
+				}
+			}
+
+			// Cloud config
+			cloudConfig, err := cloudapi.GetConsolidatedConfig(
+				derivedConf.Collectors["cloud"], osEnvironment, "", arc.Options.External)
+			if err != nil {
+				return err
+			}
+			if !cloudConfig.Token.Valid {
+				return errors.New("Not logged in, please use `k6 login cloud`.") //nolint:golint,revive,stylecheck
+			}
+			if tmpCloudConfig == nil {
+				tmpCloudConfig = make(map[string]interface{}, 3)
+			}
+
+			if cloudConfig.Token.Valid {
+				tmpCloudConfig["token"] = cloudConfig.Token
+			}
+			if cloudConfig.Name.Valid {
+				tmpCloudConfig["name"] = cloudConfig.Name
+			}
+			if cloudConfig.ProjectID.Valid {
+				tmpCloudConfig["projectID"] = cloudConfig.ProjectID
+			}
+
+			if arc.Options.External == nil {
+				arc.Options.External = make(map[string]json.RawMessage)
+			}
+			arc.Options.External["loadimpact"], err = json.Marshal(tmpCloudConfig)
+			if err != nil {
+				return err
+			}
+
+			name := cloudConfig.Name.String
+			if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
+				name = filepath.Base(filename)
+			}
+
+			globalCtx, globalCancel := context.WithCancel(ctx)
+			defer globalCancel()
+
+			// Start cloud test run
+			modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Validating script options"))
+			client := cloudapi.NewClient(logger, cloudConfig.Token.String, cloudConfig.Host.String, consts.Version)
+			if err = client.ValidateOptions(arc.Options); err != nil {
+				return err
+			}
+
+			modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Uploading archive"))
+			refID, err := client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
+			if err != nil {
+				return err
+			}
+
+			// Trap Interrupts, SIGINTs and SIGTERMs.
+			sigC := make(chan os.Signal, 1)
+			signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+			defer signal.Stop(sigC)
+			go func() {
+				sig := <-sigC
+				logger.WithField("sig", sig).Print("Stopping cloud test run in response to signal...")
+				// Do this in a separate goroutine so that if it blocks the second signal can stop the execution
+				go func() {
+					stopErr := client.StopCloudTestRun(refID)
+					if stopErr != nil {
+						logger.WithError(stopErr).Error("Stop cloud test error")
+					} else {
+						logger.Info("Successfully sent signal to stop the cloud test, now waiting for it to actually stop...")
+					}
+					globalCancel()
+				}()
+
+				sig = <-sigC
+				logger.WithField("sig", sig).Error("Aborting k6 in response to signal, we won't wait for the test to end.")
+				os.Exit(int(exitcodes.ExternalAbort))
+			}()
+
+			et, err := lib.NewExecutionTuple(derivedConf.ExecutionSegment, derivedConf.ExecutionSegmentSequence)
+			if err != nil {
+				return err
+			}
+			testURL := cloudapi.URLForResults(refID, cloudConfig)
+			executionPlan := derivedConf.Scenarios.GetFullExecutionRequirements(et)
+			printExecutionDescription(
+				"cloud", filename, testURL, derivedConf, et,
+				executionPlan, nil, noColor || !stdoutTTY,
+			)
+
+			modifyAndPrintBar(
+				progressBar,
+				pb.WithConstLeft("Run "),
+				pb.WithConstProgress(0, "Initializing the cloud test"),
+			)
+
+			progressCtx, progressCancel := context.WithCancel(globalCtx)
+			progressBarWG := &sync.WaitGroup{}
+			progressBarWG.Add(1)
+			defer progressBarWG.Wait()
+			defer progressCancel()
+			go func() {
+				showProgress(progressCtx, conf, []*pb.ProgressBar{progressBar}, logger)
+				progressBarWG.Done()
+			}()
+
+			var (
+				startTime   time.Time
+				maxDuration time.Duration
+			)
+			maxDuration, _ = lib.GetEndOffset(executionPlan)
+
+			testProgressLock := &sync.Mutex{}
+			var testProgress *cloudapi.TestProgressResponse
+			progressBar.Modify(
+				pb.WithProgress(func() (float64, []string) {
+					testProgressLock.Lock()
+					defer testProgressLock.Unlock()
+
+					if testProgress == nil {
+						return 0, []string{"Waiting..."}
+					}
+
+					statusText := testProgress.RunStatusText
+
+					if testProgress.RunStatus == lib.RunStatusFinished {
+						testProgress.Progress = 1
+					} else if testProgress.RunStatus == lib.RunStatusRunning {
+						if startTime.IsZero() {
+							startTime = time.Now()
+						}
+						spent := time.Since(startTime)
+						if spent > maxDuration {
+							statusText = maxDuration.String()
+						} else {
+							statusText = fmt.Sprintf("%s/%s", pb.GetFixedLengthDuration(spent, maxDuration), maxDuration)
+						}
+					}
+
+					return testProgress.Progress, []string{statusText}
+				}),
+			)
+
+			ticker := time.NewTicker(time.Millisecond * 2000)
+			if showCloudLogs {
+				go func() {
+					logger.Debug("Connecting to cloud logs server...")
+					if err := cloudConfig.StreamLogsToLogger(globalCtx, logger, refID, 0); err != nil {
+						logger.WithError(err).Error("error while tailing cloud logs")
+					}
+				}()
+			}
+
+			for range ticker.C {
+				newTestProgress, progressErr := client.GetTestProgress(refID)
+				if progressErr != nil {
+					logger.WithError(progressErr).Error("Test progress error")
+					continue
+				}
+
+				testProgressLock.Lock()
+				testProgress = newTestProgress
+				testProgressLock.Unlock()
+
+				if (newTestProgress.RunStatus > lib.RunStatusRunning) ||
+					(exitOnRunning && newTestProgress.RunStatus == lib.RunStatusRunning) {
+					globalCancel()
+					break
+				}
+			}
+
+			if testProgress == nil {
+				//nolint:stylecheck,golint
+				return errext.WithExitCodeIfNone(errors.New("Test progress error"), exitcodes.CloudFailedToGetProgress)
+			}
+
+			valueColor := getColor(noColor || !stdoutTTY, color.FgCyan)
+			fprintf(stdout, "     test status: %s\n", valueColor.Sprint(testProgress.RunStatusText))
+
+			if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
+				// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
+				//nolint:stylecheck,golint
+				return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed)
+			}
+
+			return nil
+		},
+	}
+	cloudCmd.Flags().SortFlags = false
+	cloudCmd.Flags().AddFlagSet(cloudCmdFlagSet())
+	return cloudCmd
 }
 
 func cloudCmdFlagSet() *pflag.FlagSet {
@@ -258,7 +353,7 @@ func cloudCmdFlagSet() *pflag.FlagSet {
 	flags.AddFlagSet(optionFlagSet())
 	flags.AddFlagSet(runtimeOptionFlagSet(false))
 
-	//TODO: Figure out a better way to handle the CLI flags:
+	// TODO: Figure out a better way to handle the CLI flags:
 	// - the default value is specified in this way so we don't overwrire whatever
 	//   was specified via the environment variable
 	// - global variables are not very testable... :/
@@ -267,11 +362,9 @@ func cloudCmdFlagSet() *pflag.FlagSet {
 	// K6_EXIT_ON_RUNNING=true won't affect the usage message
 	flags.Lookup("exit-on-running").DefValue = "false"
 
-	return flags
-}
+	// read the comments above for explanation why this is done this way and what are the problems
+	flags.BoolVar(&showCloudLogs, "show-logs", showCloudLogs,
+		"enable showing of logs when a test is executed in the cloud")
 
-func init() {
-	RootCmd.AddCommand(cloudCmd)
-	cloudCmd.Flags().SortFlags = false
-	cloudCmd.Flags().AddFlagSet(cloudCmdFlagSet())
+	return flags
 }

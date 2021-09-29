@@ -26,11 +26,15 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modulestest"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/stats"
 )
 
 func TestMetrics(t *testing.T) {
@@ -60,35 +64,36 @@ func TestMetrics(t *testing.T) {
 					t.Parallel()
 					rt := goja.New()
 					rt.SetFieldNameMapper(common.FieldNameMapper{})
-
-					ctxPtr := new(context.Context)
-					*ctxPtr = common.WithRuntime(context.Background(), rt)
-					rt.Set("metrics", common.Bind(rt, New(), ctxPtr))
-
+					mii := &modulestest.InstanceCore{
+						Runtime: rt,
+						InitEnv: &common.InitEnvironment{Registry: metrics.NewRegistry()},
+						Ctx:     context.Background(),
+					}
+					m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
+					require.True(t, ok)
+					require.NoError(t, rt.Set("metrics", m.GetExports().Named))
 					root, _ := lib.NewGroup("", nil)
 					child, _ := root.Group("child")
 					samples := make(chan stats.SampleContainer, 1000)
 					state := &lib.State{
-						Options: lib.Options{SystemTags: stats.NewSystemTagSet(stats.TagGroup)},
+						Options: lib.Options{SystemTags: stats.NewSystemTagSet(stats.TagGroup), Throw: null.BoolFrom(true)},
 						Group:   root,
 						Samples: samples,
+						Tags:    map[string]string{"group": root.Path},
 					}
 
 					isTimeString := ""
 					if isTime {
 						isTimeString = `, true`
 					}
-					_, err := common.RunString(rt,
-						fmt.Sprintf(`let m = new metrics.%s("my_metric"%s)`, fn, isTimeString),
-					)
-					if !assert.NoError(t, err) {
-						return
-					}
+					_, err := rt.RunString(fmt.Sprintf(`var m = new metrics.%s("my_metric"%s)`, fn, isTimeString))
+					require.NoError(t, err)
 
 					t.Run("ExitInit", func(t *testing.T) {
-						*ctxPtr = lib.WithState(*ctxPtr, state)
-						_, err := common.RunString(rt, fmt.Sprintf(`new metrics.%s("my_metric")`, fn))
-						assert.EqualError(t, err, "GoError: metrics must be declared in the init context at apply (native)")
+						mii.State = state
+						mii.InitEnv = nil
+						_, err := rt.RunString(fmt.Sprintf(`new metrics.%s("my_metric")`, fn))
+						assert.Contains(t, err.Error(), "metrics must be declared in the init context")
 					})
 
 					groups := map[string]*lib.Group{
@@ -96,12 +101,15 @@ func TestMetrics(t *testing.T) {
 						"Child": child,
 					}
 					for name, g := range groups {
+						name, g := name, g
 						t.Run(name, func(t *testing.T) {
 							state.Group = g
+							state.Tags["group"] = g.Path
 							for name, val := range values {
+								name, val := name, val
 								t.Run(name, func(t *testing.T) {
 									t.Run("Simple", func(t *testing.T) {
-										_, err := common.RunString(rt, fmt.Sprintf(`m.add(%v)`, val.JS))
+										_, err := rt.RunString(fmt.Sprintf(`m.add(%v)`, val.JS))
 										assert.NoError(t, err)
 										bufSamples := stats.GetBufferedSamples(samples)
 										if assert.Len(t, bufSamples, 1) {
@@ -119,7 +127,7 @@ func TestMetrics(t *testing.T) {
 										}
 									})
 									t.Run("Tags", func(t *testing.T) {
-										_, err := common.RunString(rt, fmt.Sprintf(`m.add(%v, {a:1})`, val.JS))
+										_, err := rt.RunString(fmt.Sprintf(`m.add(%v, {a:1})`, val.JS))
 										assert.NoError(t, err)
 										bufSamples := stats.GetBufferedSamples(samples)
 										if assert.Len(t, bufSamples, 1) {
@@ -147,24 +155,71 @@ func TestMetrics(t *testing.T) {
 	}
 }
 
-func TestMetricNames(t *testing.T) {
+func TestMetricGetName(t *testing.T) {
 	t.Parallel()
-	var testMap = map[string]bool{
-		"simple":       true,
-		"still_simple": true,
-		"":             false,
-		"@":            false,
-		"a":            true,
-		"special\n\t":  false,
-		// this has both hangul and japanese numerals .
-		"hello.World_in_한글一안녕一세상": true,
-		// too long
-		"tooolooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooog": false,
-	}
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-	for key, value := range testMap {
-		t.Run(key, func(t *testing.T) {
-			assert.Equal(t, value, checkName(key), key)
-		})
+	mii := &modulestest.InstanceCore{
+		Runtime: rt,
+		InitEnv: &common.InitEnvironment{Registry: metrics.NewRegistry()},
+		Ctx:     context.Background(),
 	}
+	m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("metrics", m.GetExports().Named))
+	v, err := rt.RunString(`
+		var m = new metrics.Counter("my_metric")
+		m.name
+	`)
+	require.NoError(t, err)
+	require.Equal(t, "my_metric", v.String())
+
+	_, err = rt.RunString(`
+		"use strict";
+		m.name = "something"
+	`)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "TypeError: Cannot assign to read only property 'name'")
+}
+
+func TestMetricDuplicates(t *testing.T) {
+	t.Parallel()
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+
+	mii := &modulestest.InstanceCore{
+		Runtime: rt,
+		InitEnv: &common.InitEnvironment{Registry: metrics.NewRegistry()},
+		Ctx:     context.Background(),
+	}
+	m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("metrics", m.GetExports().Named))
+	_, err := rt.RunString(`
+		var m = new metrics.Counter("my_metric")
+	`)
+	require.NoError(t, err)
+
+	_, err = rt.RunString(`
+		var m2 = new metrics.Counter("my_metric")
+	`)
+	require.NoError(t, err)
+
+	_, err = rt.RunString(`
+		var m3 = new metrics.Gauge("my_metric")
+	`)
+	require.Error(t, err)
+
+	_, err = rt.RunString(`
+		var m4 = new metrics.Counter("my_metric", true)
+	`)
+	require.Error(t, err)
+
+	v, err := rt.RunString(`
+		m.name == m2.name && m.name == "my_metric" && m3 === undefined && m4 === undefined
+	`)
+	require.NoError(t, err)
+
+	require.True(t, v.ToBoolean())
 }

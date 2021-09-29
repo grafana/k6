@@ -1,0 +1,75 @@
+name: xk6
+on:
+  # Enable manually triggering this workflow via the API or web UI
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test-xk6:
+    strategy:
+      matrix:
+        go: [stable, tip]
+        platform: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.x
+      - name: Install Go tip
+        if: matrix.go == 'tip'
+        run: |
+          go install golang.org/dl/gotip@latest
+          gotip download
+          echo "GOROOT=$HOME/sdk/gotip" >> "$GITHUB_ENV"
+          echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
+      - name: Run tests
+        run: |
+          set -x
+          which go
+          go version
+
+          export CGO_ENABLED=0
+
+          COMMIT_ID="${{ github.event.pull_request.head.sha }}"
+          if [[ "$COMMIT_ID" == "" ]]; then
+            COMMIT_ID="$(git rev-parse HEAD)" # branch, not PR merge commit
+          fi
+          echo "COMMIT_ID=$COMMIT_ID"
+          cd .github/workflows/xk6-tests
+          # Temporary hack to ignore the v0.33.0 tag change
+          export GONOSUMDB="go.k6.io/k6"
+          go get go.k6.io/xk6/cmd/xk6@master
+          if [ "${{ github.event_name }}" == "pull_request" -a \
+               "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
+            export XK6_K6_REPO="github.com/${{ github.event.pull_request.head.repo.full_name }}"
+          fi
+          GOPROXY="direct" xk6 build "$COMMIT_ID" \
+            --output ./k6ext \
+            --with github.com/grafana/xk6-js-test="$(pwd)/xk6-js-test" \
+            --with github.com/grafana/xk6-output-test="$(pwd)/xk6-output-test"
+          ./k6ext version
+          ./k6ext run --out outputtest=output-results.txt xk6-test.js
+
+          OUTPUT_RESULT="$(cat output-results.txt)"
+          if [[ "$OUTPUT_RESULT" != "10" ]]; then
+            echo "output result was not as expected: $OUTPUT_RESULT"
+            exit 11
+          fi
+
+          SUMMARY_RESULT="$(cat summary-results.txt)"
+          if [[ "$SUMMARY_RESULT" != "10" ]]; then
+            echo "summary result was not as expected: $SUMMARY_RESULT"
+            exit 12
+          fi

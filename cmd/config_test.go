@@ -21,12 +21,20 @@
 package cmd
 
 import (
-	"os"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/executor"
+	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/lib/types"
 )
 
 type testCmdData struct {
@@ -41,7 +49,6 @@ type testCmdTest struct {
 }
 
 func TestConfigCmd(t *testing.T) {
-
 	testdata := []testCmdData{
 		{
 			Name: "Out",
@@ -101,11 +108,13 @@ func TestConfigEnv(t *testing.T) {
 		},
 	}
 	for field, data := range testdata {
-		os.Clearenv()
+		field, data := field, data
 		t.Run(field.Name, func(t *testing.T) {
 			for value, fn := range data {
+				value, fn := value, fn
 				t.Run(`"`+value+`"`, func(t *testing.T) {
-					assert.NoError(t, os.Setenv(field.Key, value))
+					restore := testutils.SetEnv(t, []string{fmt.Sprintf("%s=%s", field.Key, value)})
+					defer restore()
 					var config Config
 					assert.NoError(t, envconfig.Process("", &config))
 					fn(config)
@@ -131,4 +140,52 @@ func TestConfigApply(t *testing.T) {
 		conf = Config{}.Apply(Config{Out: []string{"influxdb", "json"}})
 		assert.Equal(t, []string{"influxdb", "json"}, conf.Out)
 	})
+}
+
+func TestDeriveAndValidateConfig(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		conf   Config
+		isExec bool
+		err    string
+	}{
+		{"defaultOK", Config{}, true, ""},
+		{"defaultErr", Config{}, false,
+			"executor default: function 'default' not found in exports"},
+		{"nonDefaultOK", Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+			"per_vu_iters": executor.PerVUIterationsConfig{BaseConfig: executor.BaseConfig{
+				Name: "per_vu_iters", Type: "per-vu-iterations", Exec: null.StringFrom("nonDefault")},
+				VUs:         null.IntFrom(1),
+				Iterations:  null.IntFrom(1),
+				MaxDuration: types.NullDurationFrom(time.Second),
+			}}}}, true, "",
+		},
+		{"nonDefaultErr", Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+			"per_vu_iters": executor.PerVUIterationsConfig{BaseConfig: executor.BaseConfig{
+				Name: "per_vu_iters", Type: "per-vu-iterations", Exec: null.StringFrom("nonDefaultErr")},
+				VUs:         null.IntFrom(1),
+				Iterations:  null.IntFrom(1),
+				MaxDuration: types.NullDurationFrom(time.Second),
+			}}}}, false,
+			"executor per_vu_iters: function 'nonDefaultErr' not found in exports",
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := deriveAndValidateConfig(tc.conf,
+				func(_ string) bool { return tc.isExec })
+			if tc.err != "" {
+				var ecerr errext.HasExitCode
+				assert.ErrorAs(t, err, &ecerr)
+				assert.Equal(t, exitcodes.InvalidConfig, ecerr.ExitCode())
+				assert.Contains(t, err.Error(), tc.err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

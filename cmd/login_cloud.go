@@ -21,26 +21,33 @@
 package cmd
 
 import (
+	"encoding/json"
+	"errors"
 	"os"
+	"syscall"
 
-	"gopkg.in/guregu/null.v3"
-
-	"github.com/loadimpact/k6/lib/consts"
-	"github.com/loadimpact/k6/stats/cloud"
-	"github.com/loadimpact/k6/ui"
-	"github.com/pkg/errors"
+	"github.com/fatih/color"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
+	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/cloudapi"
+	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/ui"
 )
 
-// loginCloudCommand represents the 'login cloud' command
-var loginCloudCommand = &cobra.Command{
-	Use:   "cloud",
-	Short: "Authenticate with Load Impact",
-	Long: `Authenticate with Load Impact.
+//nolint:funlen
+func getLoginCloudCommand(logger logrus.FieldLogger) *cobra.Command {
+	// loginCloudCommand represents the 'login cloud' command
+	loginCloudCommand := &cobra.Command{
+		Use:   "cloud",
+		Short: "Authenticate with Load Impact",
+		Long: `Authenticate with Load Impact.
 
 This will set the default token used when just "k6 run -o cloud" is passed.`,
-	Example: `
+		Example: `
   # Show the stored token.
   k6 login cloud -s
 
@@ -49,81 +56,103 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 
   # Log in with an email/password.
   k6 login cloud`[1:],
-	Args: cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fs := afero.NewOsFs()
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fs := afero.NewOsFs()
 
-		k6Conf, err := getConsolidatedConfig(fs, Config{}, nil)
-		if err != nil {
-			return err
-		}
-
-		currentDiskConf, configPath, err := readDiskConfig(fs)
-		if err != nil {
-			return err
-		}
-
-		show := getNullBool(cmd.Flags(), "show")
-		reset := getNullBool(cmd.Flags(), "reset")
-		token := getNullString(cmd.Flags(), "token")
-
-		newCloudConf := cloud.NewConfig().Apply(currentDiskConf.Collectors.Cloud)
-
-		switch {
-		case reset.Valid:
-			newCloudConf.Token = null.StringFromPtr(nil)
-			fprintf(stdout, "  token reset\n")
-		case show.Bool:
-		case token.Valid:
-			newCloudConf.Token = token
-		default:
-			form := ui.Form{
-				Fields: []ui.Field{
-					ui.StringField{
-						Key:   "Email",
-						Label: "Email",
-					},
-					ui.PasswordField{
-						Key:   "Password",
-						Label: "Password",
-					},
-				},
-			}
-			vals, err := form.Run(os.Stdin, stdout)
-			if err != nil {
-				return err
-			}
-			email := vals["Email"].(string)
-			password := vals["Password"].(string)
-
-			client := cloud.NewClient("", k6Conf.Collectors.Cloud.Host.String, consts.Version)
-			res, err := client.Login(email, password)
+			currentDiskConf, configPath, err := readDiskConfig(fs)
 			if err != nil {
 				return err
 			}
 
-			if res.Token == "" {
-				return errors.New(`your account has no API token, please generate one at https://app.k6.io/account/api-token`)
+			currentJSONConfig := cloudapi.Config{}
+			currentJSONConfigRaw := currentDiskConf.Collectors["cloud"]
+			if currentJSONConfigRaw != nil {
+				// We only want to modify this config, see comment below
+				if jsonerr := json.Unmarshal(currentJSONConfigRaw, &currentJSONConfig); jsonerr != nil {
+					return jsonerr
+				}
 			}
 
-			newCloudConf.Token = null.StringFrom(res.Token)
-		}
+			// We want to use this fully consolidated config for things like
+			// host addresses, so users can overwrite them with env vars.
+			consolidatedCurrentConfig, err := cloudapi.GetConsolidatedConfig(
+				currentJSONConfigRaw, buildEnvMap(os.Environ()), "", nil)
+			if err != nil {
+				return err
+			}
+			// But we don't want to save them back to the JSON file, we only
+			// want to save what already existed there and the login details.
+			newCloudConf := currentJSONConfig
 
-		currentDiskConf.Collectors.Cloud = newCloudConf
-		if err := writeDiskConfig(fs, configPath, currentDiskConf); err != nil {
-			return err
-		}
+			show := getNullBool(cmd.Flags(), "show")
+			reset := getNullBool(cmd.Flags(), "reset")
+			token := getNullString(cmd.Flags(), "token")
+			switch {
+			case reset.Valid:
+				newCloudConf.Token = null.StringFromPtr(nil)
+				fprintf(stdout, "  token reset\n")
+			case show.Bool:
+			case token.Valid:
+				newCloudConf.Token = token
+			default:
+				form := ui.Form{
+					Fields: []ui.Field{
+						ui.StringField{
+							Key:   "Email",
+							Label: "Email",
+						},
+						ui.PasswordField{
+							Key:   "Password",
+							Label: "Password",
+						},
+					},
+				}
+				if !terminal.IsTerminal(int(syscall.Stdin)) { // nolint: unconvert
+					logger.Warn("Stdin is not a terminal, falling back to plain text input")
+				}
+				vals, err := form.Run(os.Stdin, stdout)
+				if err != nil {
+					return err
+				}
+				email := vals["Email"].(string)
+				password := vals["Password"].(string)
 
-		if newCloudConf.Token.Valid {
-			fprintf(stdout, "  token: %s\n", ui.ValueColor.Sprint(newCloudConf.Token.String))
-		}
-		return nil
-	},
-}
+				client := cloudapi.NewClient(logger, "", consolidatedCurrentConfig.Host.String, consts.Version)
+				res, err := client.Login(email, password)
+				if err != nil {
+					return err
+				}
 
-func init() {
-	loginCmd.AddCommand(loginCloudCommand)
+				if res.Token == "" {
+					return errors.New(`your account has no API token, please generate one at https://app.k6.io/account/api-token`)
+				}
+
+				newCloudConf.Token = null.StringFrom(res.Token)
+			}
+
+			if currentDiskConf.Collectors == nil {
+				currentDiskConf.Collectors = make(map[string]json.RawMessage)
+			}
+			currentDiskConf.Collectors["cloud"], err = json.Marshal(newCloudConf)
+			if err != nil {
+				return err
+			}
+			if err := writeDiskConfig(fs, configPath, currentDiskConf); err != nil {
+				return err
+			}
+
+			if newCloudConf.Token.Valid {
+				valueColor := getColor(noColor || !stdoutTTY, color.FgCyan)
+				fprintf(stdout, "  token: %s\n", valueColor.Sprint(newCloudConf.Token.String))
+			}
+			return nil
+		},
+	}
+
 	loginCloudCommand.Flags().StringP("token", "t", "", "specify `token` to use")
 	loginCloudCommand.Flags().BoolP("show", "s", false, "display saved token and exit")
 	loginCloudCommand.Flags().BoolP("reset", "r", false, "reset token")
+
+	return loginCloudCommand
 }

@@ -21,18 +21,18 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/consts"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/ui"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/stats"
 )
 
 var (
@@ -45,11 +45,19 @@ func optionFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", 0)
 	flags.SortFlags = false
 	flags.Int64P("vus", "u", 1, "number of virtual users")
+
+	// TODO: delete in a few versions
 	flags.Int64P("max", "m", 0, "max available virtual users")
+	_ = flags.MarkDeprecated("max", "the global MaxVUs option is obsolete and doesn't affect the k6 script execution")
+
 	flags.DurationP("duration", "d", 0, "test duration limit")
 	flags.Int64P("iterations", "i", 0, "script total iteration limit (among all VUs)")
 	flags.StringSliceP("stage", "s", nil, "add a `stage`, as `[duration]:[target]`")
+	flags.String("execution-segment", "", "limit execution to the specified segment, e.g. 10%, 1/3, 0.2:2/3")
+	flags.String("execution-segment-sequence", "", "the execution segment sequence") // TODO better description
 	flags.BoolP("paused", "p", false, "start the test in a paused state")
+	flags.Bool("no-setup", false, "don't run setup()")
+	flags.Bool("no-teardown", false, "don't run teardown()")
 	flags.Int64("max-redirects", 10, "follow at most n redirects")
 	flags.Int64("batch", 20, "max parallel batch reqs")
 	flags.Int64("batch-per-host", 6, "max parallel batch reqs per host")
@@ -63,6 +71,8 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Duration("min-iteration-duration", 0, "minimum amount of time k6 will take executing a single iteration")
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
+	flags.StringSlice("block-hostnames", nil, "block a case-insensitive hostname `pattern`,"+
+		" with optional leading wildcard, from being called")
 
 	// The comment about system-tags also applies for summary-trend-stats. The default values
 	// are set in applyDefault().
@@ -82,16 +92,24 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	flags.String("console-output", "", "redirects the console logging to the provided output file")
 	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
+	flags.String("local-ips", "", "Client IP Ranges and/or CIDRs from which each VU will be making requests, "+
+		"e.g. '192.168.220.1,192.168.0.10-192.168.0.25', 'fd:1::0/120', etc.")
+	flags.String("dns", types.DefaultDNSConfig().String(), "DNS resolver configuration. Possible ttl values are: 'inf' "+
+		"for a persistent cache, '0' to disable the cache,\nor a positive duration, e.g. '1s', '1m', etc. "+
+		"Milliseconds are assumed if no unit is provided.\n"+
+		"Possible select values to return a single IP are: 'first', 'random' or 'roundRobin'.\n"+
+		"Possible policy values are: 'preferIPv4', 'preferIPv6', 'onlyIPv4', 'onlyIPv6' or 'any'.\n")
 	return flags
 }
 
 func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	opts := lib.Options{
 		VUs:                   getNullInt64(flags, "vus"),
-		VUsMax:                getNullInt64(flags, "max"),
 		Duration:              getNullDuration(flags, "duration"),
 		Iterations:            getNullInt64(flags, "iterations"),
 		Paused:                getNullBool(flags, "paused"),
+		NoSetup:               getNullBool(flags, "no-setup"),
+		NoTeardown:            getNullBool(flags, "no-teardown"),
 		MaxRedirects:          getNullInt64(flags, "max-redirects"),
 		Batch:                 getNullInt64(flags, "batch"),
 		BatchPerHost:          getNullInt64(flags, "batch-per-host"),
@@ -106,8 +124,8 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		DiscardResponseBodies: getNullBool(flags, "discard-response-bodies"),
 		// Default values for options without CLI flags:
 		// TODO: find a saner and more dev-friendly and error-proof way to handle options
-		SetupTimeout:    types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
-		TeardownTimeout: types.NullDuration{Duration: types.Duration(10 * time.Second), Valid: false},
+		SetupTimeout:    types.NullDuration{Duration: types.Duration(60 * time.Second), Valid: false},
+		TeardownTimeout: types.NullDuration{Duration: types.Duration(60 * time.Second), Valid: false},
 
 		MetricSamplesBufferSize: null.NewInt(1000, false),
 	}
@@ -122,13 +140,39 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		for i, s := range stageStrings {
 			var stage lib.Stage
 			if err := stage.UnmarshalText([]byte(s)); err != nil {
-				return opts, errors.Wrapf(err, "stage %d", i)
+				return opts, fmt.Errorf("error for stage %d: %w", i, err)
 			}
 			if !stage.Duration.Valid {
 				return opts, fmt.Errorf("stage %d doesn't have a specified duration", i)
 			}
 			opts.Stages = append(opts.Stages, stage)
 		}
+	}
+
+	if flags.Changed("execution-segment") {
+		executionSegmentStr, err := flags.GetString("execution-segment")
+		if err != nil {
+			return opts, err
+		}
+		segment := new(lib.ExecutionSegment)
+		err = segment.UnmarshalText([]byte(executionSegmentStr))
+		if err != nil {
+			return opts, err
+		}
+		opts.ExecutionSegment = segment
+	}
+
+	if flags.Changed("execution-segment-sequence") {
+		executionSegmentSequenceStr, err := flags.GetString("execution-segment-sequence")
+		if err != nil {
+			return opts, err
+		}
+		segmentSequence := new(lib.ExecutionSegmentSequence)
+		err = segmentSequence.UnmarshalText([]byte(executionSegmentSequenceStr))
+		if err != nil {
+			return opts, err
+		}
+		opts.ExecutionSegmentSequence = segmentSequence
 	}
 
 	if flags.Changed("system-tags") {
@@ -146,9 +190,31 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	for _, s := range blacklistIPStrings {
 		net, parseErr := lib.ParseCIDR(s)
 		if parseErr != nil {
-			return opts, errors.Wrap(parseErr, "blacklist-ip")
+			return opts, fmt.Errorf("error parsing blacklist-ip '%s': %w", s, parseErr)
 		}
 		opts.BlacklistIPs = append(opts.BlacklistIPs, net)
+	}
+
+	blockedHostnameStrings, err := flags.GetStringSlice("block-hostnames")
+	if err != nil {
+		return opts, err
+	}
+	if flags.Changed("block-hostnames") {
+		opts.BlockedHostnames, err = types.NewNullHostnameTrie(blockedHostnameStrings)
+		if err != nil {
+			return opts, err
+		}
+	}
+
+	localIpsString, err := flags.GetString("local-ips")
+	if err != nil {
+		return opts, err
+	}
+	if flags.Changed("local-ips") {
+		err = opts.LocalIPs.UnmarshalText([]byte(localIpsString))
+		if err != nil {
+			return opts, err
+		}
 	}
 
 	if flags.Changed("summary-trend-stats") {
@@ -156,7 +222,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		if errSts != nil {
 			return opts, errSts
 		}
-		if errSts = ui.ValidateSummary(trendStats); err != nil {
+		if _, errSts = stats.GetResolversForTrendColumns(trendStats); err != nil {
 			return opts, errSts
 		}
 		opts.SummaryTrendStats = trendStats
@@ -168,7 +234,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	}
 	if summaryTimeUnit != "" {
 		if summaryTimeUnit != "s" && summaryTimeUnit != "ms" && summaryTimeUnit != "us" {
-			return opts, errors.New("invalid summary time unit. Use: 's', 'ms' or 'us'")
+			return opts, fmt.Errorf("invalid summary time unit '%s', use 's', 'ms' or 'us'", summaryTimeUnit)
 		}
 		opts.SummaryTimeUnit = null.StringFrom(summaryTimeUnit)
 	}
@@ -180,10 +246,10 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 
 	if len(runTags) > 0 {
 		parsedRunTags := make(map[string]string, len(runTags))
-		for i, s := range runTags {
+		for _, s := range runTags {
 			name, value, err := parseTagNameValue(s)
 			if err != nil {
-				return opts, errors.Wrapf(err, "tag %d", i)
+				return opts, fmt.Errorf("error parsing tag '%s': %w", s, err)
 			}
 			parsedRunTags[name] = value
 		}
@@ -197,6 +263,14 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 
 	if redirectConFile != "" {
 		opts.ConsoleOutput = null.StringFrom(redirectConFile)
+	}
+
+	if dns, err := flags.GetString("dns"); err != nil {
+		return opts, err
+	} else if dns != "" {
+		if err := opts.DNS.UnmarshalText([]byte(dns)); err != nil {
+			return opts, err
+		}
 	}
 
 	return opts, nil

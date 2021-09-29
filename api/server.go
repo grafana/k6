@@ -26,58 +26,61 @@ import (
 	"os"
 
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/negroni"
 
-	"github.com/loadimpact/k6/api/common"
-	v1 "github.com/loadimpact/k6/api/v1"
-	"github.com/loadimpact/k6/core"
+	"go.k6.io/k6/api/common"
+	v1 "go.k6.io/k6/api/v1"
+	"go.k6.io/k6/core"
 	"github.com/loadimpact/k6/stats/prometheus"
 )
 
-func NewHandler() http.Handler {
+func newHandler(logger logrus.FieldLogger) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/v1/", v1.NewHandler())
-	mux.Handle("/ping", HandlePing())
-	mux.Handle("/", HandlePing())
+	mux.Handle("/ping", handlePing(logger))
+	mux.Handle("/", handlePing(logger))
 	mux.Handle("/metrics", prometheus.HandlePrometheusMetrics())
 	return mux
 }
 
-func ListenAndServe(addr string, engine *core.Engine) error {
-	mux := NewHandler()
+// ListenAndServe is analogous to the stdlib one but also takes a core.Engine and logrus.FieldLogger
+func ListenAndServe(addr string, engine *core.Engine, logger logrus.FieldLogger) error {
+	mux := newHandler(logger)
 
-	n := negroni.New()
-	n.Use(negroni.NewRecovery())
-	n.UseFunc(WithEngine(engine))
-	n.UseFunc(NewLogger(logrus.StandardLogger()))
-	n.UseHandler(mux)
-
-	return http.ListenAndServe(addr, n)
+	return http.ListenAndServe(addr, withEngine(engine, newLogger(logger, mux)))
 }
 
-// NewLogger returns the middleware which logs response status for request.
-func NewLogger(l *logrus.Logger) negroni.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-		next(rw, r)
+type wrappedResponseWriter struct {
+	http.ResponseWriter
+	status int
+}
 
-		res := rw.(negroni.ResponseWriter)
-		l.SetOutput(os.Stdout)
-		l.WithField("status", res.Status()).Debugf("%s %s", r.Method, r.URL.Path)
+func (w wrappedResponseWriter) WriteHeader(status int) {
+	w.status = status
+	w.ResponseWriter.WriteHeader(status)
+}
+
+// newLogger returns the middleware which logs response status for request.
+func newLogger(l logrus.FieldLogger, next http.Handler) http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		wrapped := wrappedResponseWriter{ResponseWriter: rw, status: 200} // The default status code is 200 if it's not set
+		next.ServeHTTP(wrapped, r)
+
+		l.WithField("status", wrapped.status).Debugf("%s %s", r.Method, r.URL.Path)
 	}
 }
 
-func WithEngine(engine *core.Engine) negroni.HandlerFunc {
-	return negroni.HandlerFunc(func(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+func withEngine(engine *core.Engine, next http.Handler) http.HandlerFunc {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(common.WithEngine(r.Context(), engine))
-		next(rw, r)
+		next.ServeHTTP(rw, r)
 	})
 }
 
-func HandlePing() http.Handler {
+func handlePing(logger logrus.FieldLogger) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
 		if _, err := fmt.Fprint(rw, "ok"); err != nil {
-			logrus.WithError(err).Error("Error while printing ok")
+			logger.WithError(err).Error("Error while printing ok")
 		}
 	})
 }

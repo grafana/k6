@@ -29,19 +29,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dustin/go-humanize"
+	"github.com/mailru/easyjson/jwriter"
 	"gopkg.in/guregu/null.v3"
 )
 
 const (
-	counterString = `"counter"`
-	gaugeString   = `"gauge"`
-	trendString   = `"trend"`
-	rateString    = `"rate"`
+	counterString = "counter"
+	gaugeString   = "gauge"
+	trendString   = "trend"
+	rateString    = "rate"
 
-	defaultString = `"default"`
-	timeString    = `"time"`
-	dataString    = `"data"`
+	defaultString = "default"
+	timeString    = "time"
+	dataString    = "data"
 )
 
 // Possible values for MetricType.
@@ -70,6 +70,15 @@ type MetricType int
 
 // MarshalJSON serializes a MetricType as a human readable string.
 func (t MetricType) MarshalJSON() ([]byte, error) {
+	txt, err := t.MarshalText()
+	if err != nil {
+		return nil, err
+	}
+	return []byte(`"` + string(txt) + `"`), nil
+}
+
+// MarshalText serializes a MetricType as a human readable string.
+func (t MetricType) MarshalText() ([]byte, error) {
 	switch t {
 	case Counter:
 		return []byte(counterString), nil
@@ -84,8 +93,8 @@ func (t MetricType) MarshalJSON() ([]byte, error) {
 	}
 }
 
-// UnmarshalJSON deserializes a MetricType from a string representation.
-func (t *MetricType) UnmarshalJSON(data []byte) error {
+// UnmarshalText deserializes a MetricType from a string representation.
+func (t *MetricType) UnmarshalText(data []byte) error {
 	switch string(data) {
 	case counterString:
 		*t = Counter
@@ -120,8 +129,17 @@ func (t MetricType) String() string {
 // The type of values a metric contains.
 type ValueType int
 
-// MarshalJSON serializes a ValueType as a human readable string.
+// MarshalJSON serializes a ValueType to a JSON string.
 func (t ValueType) MarshalJSON() ([]byte, error) {
+	txt, err := t.MarshalText()
+	if err != nil {
+		return nil, err
+	}
+	return []byte(`"` + string(txt) + `"`), nil
+}
+
+// MarshalText serializes a ValueType as a human readable string.
+func (t ValueType) MarshalText() ([]byte, error) {
 	switch t {
 	case Default:
 		return []byte(defaultString), nil
@@ -134,8 +152,8 @@ func (t ValueType) MarshalJSON() ([]byte, error) {
 	}
 }
 
-// UnmarshalJSON deserializes a ValueType from a string representation.
-func (t *ValueType) UnmarshalJSON(data []byte) error {
+// UnmarshalText deserializes a ValueType from a string representation.
+func (t *ValueType) UnmarshalText(data []byte) error {
 	switch string(data) {
 	case defaultString:
 		*t = Default
@@ -168,6 +186,7 @@ func (t ValueType) String() string {
 // copy-on-write semantics and uses pointers for faster comparison
 // between maps, since the same tag set is often used for multiple samples.
 // All methods should not panic, even if they are called on a nil pointer.
+//easyjson:skip
 type SampleTags struct {
 	tags map[string]string
 	json []byte
@@ -241,6 +260,23 @@ func (st *SampleTags) MarshalJSON() ([]byte, error) {
 	return res, nil
 }
 
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (st *SampleTags) MarshalEasyJSON(w *jwriter.Writer) {
+	w.RawByte('{')
+	first := true
+	for k, v := range st.tags {
+		if first {
+			first = false
+		} else {
+			w.RawByte(',')
+		}
+		w.String(k)
+		w.RawByte(':')
+		w.String(v)
+	}
+	w.RawByte('}')
+}
+
 // UnmarshalJSON deserializes SampleTags from a JSON string.
 func (st *SampleTags) UnmarshalJSON(data []byte) error {
 	if st == nil {
@@ -252,11 +288,12 @@ func (st *SampleTags) UnmarshalJSON(data []byte) error {
 // CloneTags copies the underlying set of a sample tags and
 // returns it. If the receiver is nil, it returns an empty non-nil map.
 func (st *SampleTags) CloneTags() map[string]string {
-	res := map[string]string{}
-	if st != nil {
-		for k, v := range st.tags {
-			res[k] = v
-		}
+	if st == nil {
+		return map[string]string{}
+	}
+	res := make(map[string]string, len(st.tags))
+	for k, v := range st.tags {
+		res[k] = v
 	}
 	return res
 }
@@ -365,11 +402,15 @@ func (s Sample) GetTime() time.Time {
 }
 
 // Ensure that interfaces are implemented correctly
-var _ SampleContainer = Sample{}
-var _ SampleContainer = Samples{}
+var (
+	_ SampleContainer = Sample{}
+	_ SampleContainer = Samples{}
+)
 
-var _ ConnectedSampleContainer = Sample{}
-var _ ConnectedSampleContainer = ConnectedSamples{}
+var (
+	_ ConnectedSampleContainer = Sample{}
+	_ ConnectedSampleContainer = ConnectedSamples{}
+)
 
 // GetBufferedSamples will read all present (i.e. buffered or currently being pushed)
 // values in the input channel and return them as a slice.
@@ -409,6 +450,16 @@ type Metric struct {
 	Sink       Sink         `json:"-"`
 }
 
+// Sample samples the metric at the given time, with the provided tags and value
+func (m *Metric) Sample(t time.Time, tags *SampleTags, value float64) Sample {
+	return Sample{
+		Time:   t,
+		Tags:   tags,
+		Value:  value,
+		Metric: m,
+	}
+}
+
 func New(name string, typ MetricType, t ...ValueType) *Metric {
 	vt := Default
 	if len(t) > 0 {
@@ -428,45 +479,6 @@ func New(name string, typ MetricType, t ...ValueType) *Metric {
 		return nil
 	}
 	return &Metric{Name: name, Type: typ, Contains: vt, Sink: sink}
-}
-
-var unitMap = map[string][]interface{}{
-	"s":  {"s", time.Second},
-	"ms": {"ms", time.Millisecond},
-	"us": {"µs", time.Microsecond},
-}
-
-func (m *Metric) HumanizeValue(v float64, timeUnit string) string {
-	switch m.Type {
-	case Rate:
-		// Truncate instead of round when decreasing precision to 2 decimal places
-		return strconv.FormatFloat(float64(int(v*100*100))/100, 'f', 2, 64) + "%"
-	default:
-		switch m.Contains {
-		case Time:
-			d := ToD(v)
-
-			if v, ok := unitMap[timeUnit]; ok {
-				return fmt.Sprintf("%.2f%s", float64(d.Nanoseconds())/float64(v[1].(time.Duration)), v[0])
-			}
-
-			switch {
-			case d > time.Minute:
-				d -= d % (1 * time.Second)
-			case d > time.Second:
-				d -= d % (10 * time.Millisecond)
-			case d > time.Millisecond:
-				d -= d % (10 * time.Microsecond)
-			case d > time.Microsecond:
-				d -= d % (10 * time.Nanosecond)
-			}
-			return d.String()
-		case Data:
-			return humanize.Bytes(uint64(v))
-		default:
-			return humanize.Ftoa(v)
-		}
-	}
 }
 
 // A Submetric represents a filtered dataset based on a parent metric.
@@ -505,14 +517,51 @@ func NewSubmetric(name string) (parentName string, sm *Submetric) {
 	return parts[0], &Submetric{Name: name, Parent: parts[0], Suffix: parts[1], Tags: IntoSampleTags(&tags)}
 }
 
-func (m *Metric) Summary(t time.Duration) *Summary {
-	return &Summary{
-		Metric:  m,
-		Summary: m.Sink.Format(t),
+// parsePercentile is a helper function to parse and validate percentile notations
+func parsePercentile(stat string) (float64, error) {
+	if !strings.HasPrefix(stat, "p(") || !strings.HasSuffix(stat, ")") {
+		return 0, fmt.Errorf("invalid trend stat '%s', unknown format", stat)
 	}
+
+	percentile, err := strconv.ParseFloat(stat[2:len(stat)-1], 64)
+
+	if err != nil || (percentile < 0) || (percentile > 100) {
+		return 0, fmt.Errorf("invalid percentile trend stat value '%s', provide a number between 0 and 100", stat)
+	}
+
+	return percentile, nil
 }
 
-type Summary struct {
-	Metric  *Metric            `json:"metric"`
-	Summary map[string]float64 `json:"summary"`
+// GetResolversForTrendColumns checks if passed trend columns are valid for use in
+// the summary output and then returns a map of the corresponding resolvers.
+func GetResolversForTrendColumns(trendColumns []string) (map[string]func(s *TrendSink) float64, error) {
+	staticResolvers := map[string]func(s *TrendSink) float64{
+		"avg":   func(s *TrendSink) float64 { return s.Avg },
+		"min":   func(s *TrendSink) float64 { return s.Min },
+		"med":   func(s *TrendSink) float64 { return s.Med },
+		"max":   func(s *TrendSink) float64 { return s.Max },
+		"count": func(s *TrendSink) float64 { return float64(s.Count) },
+	}
+	dynamicResolver := func(percentile float64) func(s *TrendSink) float64 {
+		return func(s *TrendSink) float64 {
+			return s.P(percentile / 100)
+		}
+	}
+
+	result := make(map[string]func(s *TrendSink) float64, len(trendColumns))
+
+	for _, stat := range trendColumns {
+		if staticStat, ok := staticResolvers[stat]; ok {
+			result[stat] = staticStat
+			continue
+		}
+
+		percentile, err := parsePercentile(stat)
+		if err != nil {
+			return nil, err
+		}
+		result[stat] = dynamicResolver(percentile)
+	}
+
+	return result, nil
 }

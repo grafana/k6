@@ -21,6 +21,7 @@ const (
 	RightToLeft                          = 0x0040 // "r"
 	Debug                                = 0x0080 // "d"
 	ECMAScript                           = 0x0100 // "e"
+	RE2                                  = 0x0200 // RE2 compat mode
 )
 
 func optionFromCode(ch rune) RegexOptions {
@@ -310,7 +311,7 @@ func (p *parser) countCaptures() error {
 		switch ch {
 		case '\\':
 			if p.charsRight() > 0 {
-				p.moveRight(1)
+				p.scanBackslash(true)
 			}
 
 		case '#':
@@ -354,6 +355,14 @@ func (p *parser) countCaptures() error {
 								p.noteCaptureName(p.scanCapname(), pos)
 							}
 						}
+					} else if p.useRE2() && p.charsRight() > 2 && (p.rightChar(0) == 'P' && p.rightChar(1) == '<') {
+						// RE2-compat (?P<)
+						p.moveRight(2)
+						ch = p.rightChar(0)
+						if IsWordChar(ch) {
+							p.noteCaptureName(p.scanCapname(), pos)
+						}
+
 					} else {
 						// (?...
 
@@ -520,7 +529,7 @@ func (p *parser) scanRegex() (*regexNode, error) {
 			}
 
 		case '\\':
-			n, err := p.scanBackslash()
+			n, err := p.scanBackslash(false)
 			if err != nil {
 				return nil, err
 			}
@@ -1022,6 +1031,50 @@ func (p *parser) scanGroupOpen() (*regexNode, error) {
 				}
 			}
 
+		case 'P':
+			if p.useRE2() {
+				// support for P<name> syntax
+				if p.charsRight() < 3 {
+					goto BreakRecognize
+				}
+
+				ch = p.moveRightGetChar()
+				if ch != '<' {
+					goto BreakRecognize
+				}
+
+				ch = p.moveRightGetChar()
+				p.moveLeft()
+
+				if IsWordChar(ch) {
+					capnum := -1
+					capname := p.scanCapname()
+
+					if p.isCaptureName(capname) {
+						capnum = p.captureSlotFromName(capname)
+					}
+
+					// check if we have bogus character after the name
+					if p.charsRight() > 0 && p.rightChar(0) != '>' {
+						return nil, p.getErr(ErrInvalidGroupName)
+					}
+
+					// actually make the node
+
+					if capnum != -1 && p.charsRight() > 0 && p.moveRightGetChar() == '>' {
+						return newRegexNodeMN(ntCapture, p.options, capnum, -1), nil
+					}
+					goto BreakRecognize
+
+				} else {
+					// bad group name - starts with something other than a word character and isn't a number
+					return nil, p.getErr(ErrInvalidGroupName)
+				}
+			}
+			// if we're not using RE2 compat mode then
+			// we just behave like normal
+			fallthrough
+
 		default:
 			p.moveLeft()
 
@@ -1055,7 +1108,7 @@ BreakRecognize:
 }
 
 // scans backslash specials and basics
-func (p *parser) scanBackslash() (*regexNode, error) {
+func (p *parser) scanBackslash(scanOnly bool) (*regexNode, error) {
 
 	if p.charsRight() == 0 {
 		return nil, p.getErr(ErrIllegalEndEscape)
@@ -1123,29 +1176,34 @@ func (p *parser) scanBackslash() (*regexNode, error) {
 		return newRegexNodeSet(ntSet, p.options, cc), nil
 
 	default:
-		return p.scanBasicBackslash()
+		return p.scanBasicBackslash(scanOnly)
 	}
 }
 
 // Scans \-style backreferences and character escapes
-func (p *parser) scanBasicBackslash() (*regexNode, error) {
+func (p *parser) scanBasicBackslash(scanOnly bool) (*regexNode, error) {
 	if p.charsRight() == 0 {
 		return nil, p.getErr(ErrIllegalEndEscape)
 	}
 	angled := false
+	k := false
 	close := '\x00'
 
 	backpos := p.textpos()
 	ch := p.rightChar(0)
 
-	// allow \k<foo> instead of \<foo>, which is now deprecated
+	// Allow \k<foo> instead of \<foo>, which is now deprecated.
 
-	if ch == 'k' {
+	// According to ECMAScript specification, \k<name> is only parsed as a named group reference if
+	// there is at least one group name in the regexp.
+	// See https://www.ecma-international.org/ecma-262/#sec-isvalidregularexpressionliteral, step 7.
+	// Note, during the first (scanOnly) run we may not have all group names scanned, but that's ok.
+	if ch == 'k' && (!p.useOptionE() || len(p.capnames) > 0) {
 		if p.charsRight() >= 2 {
 			p.moveRight(1)
 			ch = p.moveRightGetChar()
 
-			if ch == '<' || ch == '\'' {
+			if ch == '<' || (!p.useOptionE() && ch == '\'') { // No support for \k'name' in ECMAScript
 				angled = true
 				if ch == '\'' {
 					close = '\''
@@ -1160,8 +1218,9 @@ func (p *parser) scanBasicBackslash() (*regexNode, error) {
 		}
 
 		ch = p.rightChar(0)
+		k = true
 
-	} else if (ch == '<' || ch == '\'') && p.charsRight() > 1 { // Note angle without \g
+	} else if !p.useOptionE() && (ch == '<' || ch == '\'') && p.charsRight() > 1 { // Note angle without \g
 		angled = true
 		if ch == '\'' {
 			close = '\''
@@ -1184,30 +1243,43 @@ func (p *parser) scanBasicBackslash() (*regexNode, error) {
 		if p.charsRight() > 0 && p.moveRightGetChar() == close {
 			if p.isCaptureSlot(capnum) {
 				return newRegexNodeM(ntRef, p.options, capnum), nil
-			} else {
-				return nil, p.getErr(ErrUndefinedBackRef, capnum)
 			}
+			return nil, p.getErr(ErrUndefinedBackRef, capnum)
 		}
 	} else if !angled && ch >= '1' && ch <= '9' { // Try to parse backreference or octal: \1
 		capnum, err := p.scanDecimal()
 		if err != nil {
 			return nil, err
 		}
-		if p.useOptionE() || p.isCaptureSlot(capnum) {
+
+		if scanOnly {
+			return nil, nil
+		}
+
+		if p.isCaptureSlot(capnum) {
 			return newRegexNodeM(ntRef, p.options, capnum), nil
 		}
-		if capnum <= 9 {
+		if capnum <= 9 && !p.useOptionE() {
 			return nil, p.getErr(ErrUndefinedBackRef, capnum)
 		}
 
-	} else if angled && IsWordChar(ch) {
+	} else if angled {
 		capname := p.scanCapname()
 
-		if p.charsRight() > 0 && p.moveRightGetChar() == close {
+		if capname != "" && p.charsRight() > 0 && p.moveRightGetChar() == close {
+
+			if scanOnly {
+				return nil, nil
+			}
+
 			if p.isCaptureName(capname) {
 				return newRegexNodeM(ntRef, p.options, p.captureSlotFromName(capname)), nil
 			}
 			return nil, p.getErr(ErrUndefinedNameRef, capname)
+		} else {
+			if k {
+				return nil, p.getErr(ErrMalformedNameRef)
+			}
 		}
 	}
 
@@ -1217,6 +1289,10 @@ func (p *parser) scanBasicBackslash() (*regexNode, error) {
 	ch, err := p.scanCharEscape()
 	if err != nil {
 		return nil, err
+	}
+
+	if scanOnly {
+		return nil, nil
 	}
 
 	if p.useOptionI() {
@@ -1448,11 +1524,26 @@ func (p *parser) scanCharSet(caseInsensitive, scanOnly bool) (*CharSet, error) {
 				savePos := p.textpos()
 
 				p.moveRight(1)
-				p.scanCapname() // throwaway the name
+				negate := false
+				if p.charsRight() > 1 && p.rightChar(0) == '^' {
+					negate = true
+					p.moveRight(1)
+				}
+
+				nm := p.scanCapname() // snag the name
+				if !scanOnly && p.useRE2() {
+					// look up the name since these are valid for RE2
+					// add the group based on the name
+					if ok := cc.addNamedASCII(nm, negate); !ok {
+						return nil, p.getErr(ErrInvalidCharRange)
+					}
+				}
 				if p.charsRight() < 2 || p.moveRightGetChar() != ':' || p.moveRightGetChar() != ']' {
 					p.textto(savePos)
+				} else if p.useRE2() {
+					// move on
+					continue
 				}
-				// else lookup name (nyi)
 			}
 		}
 
@@ -1547,7 +1638,7 @@ func (p *parser) scanDecimal() (int, error) {
 
 // Returns true for options allowed only at the top level
 func isOnlyTopOption(option RegexOptions) bool {
-	return option == RightToLeft || option == ECMAScript
+	return option == RightToLeft || option == ECMAScript || option == RE2
 }
 
 // Scans cimsx-cimsx option string, stops at the first unrecognized char.
@@ -1576,7 +1667,7 @@ func (p *parser) scanOptions() {
 }
 
 // Scans \ code for escape codes that map to single unicode chars.
-func (p *parser) scanCharEscape() (rune, error) {
+func (p *parser) scanCharEscape() (r rune, err error) {
 
 	ch := p.moveRightGetChar()
 
@@ -1585,16 +1676,22 @@ func (p *parser) scanCharEscape() (rune, error) {
 		return p.scanOctal(), nil
 	}
 
+	pos := p.textpos()
+
 	switch ch {
 	case 'x':
 		// support for \x{HEX} syntax from Perl and PCRE
 		if p.charsRight() > 0 && p.rightChar(0) == '{' {
+			if p.useOptionE() {
+				return ch, nil
+			}
 			p.moveRight(1)
 			return p.scanHexUntilBrace()
+		} else {
+			r, err = p.scanHex(2)
 		}
-		return p.scanHex(2)
 	case 'u':
-		return p.scanHex(4)
+		r, err = p.scanHex(4)
 	case 'a':
 		return '\u0007', nil
 	case 'b':
@@ -1612,13 +1709,18 @@ func (p *parser) scanCharEscape() (rune, error) {
 	case 'v':
 		return '\u000B', nil
 	case 'c':
-		return p.scanControl()
+		r, err = p.scanControl()
 	default:
 		if !p.useOptionE() && IsWordChar(ch) {
 			return 0, p.getErr(ErrUnrecognizedEscape, string(ch))
 		}
 		return ch, nil
 	}
+	if err != nil && p.useOptionE() {
+		p.textto(pos)
+		return ch, nil
+	}
+	return
 }
 
 // Grabs and converts an ascii control character
@@ -1735,12 +1837,12 @@ func (p *parser) scanOctal() rune {
 	//we know the first char is good because the caller had to check
 	i := 0
 	d := int(p.rightChar(0) - '0')
-	for c > 0 && d <= 7 {
-		i *= 8
-		i += d
-		if p.useOptionE() && i >= 0x20 {
+	for c > 0 && d <= 7 && d >= 0 {
+		if i >= 0x20 && p.useOptionE() {
 			break
 		}
+		i *= 8
+		i += d
 		c--
 
 		p.moveRight(1)
@@ -1859,6 +1961,11 @@ func (p *parser) useOptionX() bool {
 // True if E option enabling ECMAScript behavior on.
 func (p *parser) useOptionE() bool {
 	return (p.options & ECMAScript) != 0
+}
+
+// true to use RE2 compatibility parsing behavior.
+func (p *parser) useRE2() bool {
+	return (p.options & RE2) != 0
 }
 
 // True if options stack is empty.

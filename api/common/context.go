@@ -23,7 +23,7 @@ package common
 import (
 	"context"
 
-	"github.com/loadimpact/k6/core"
+	"go.k6.io/k6/core"
 )
 
 type ContextKey int

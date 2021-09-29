@@ -24,12 +24,17 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/lib/testutils"
 )
 
 func TestCDNJS(t *testing.T) {
+	t.Skip("skipped to avoid inconsistent API responses")
+
 	paths := map[string]struct {
 		parts []string
 		src   string
@@ -65,6 +70,8 @@ func TestCDNJS(t *testing.T) {
 	}
 
 	var root = &url.URL{Scheme: "https", Host: "example.com", Path: "/something/"}
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
 	for path, expected := range paths {
 		path, expected := path, expected
 		t.Run(path, func(t *testing.T) {
@@ -72,7 +79,7 @@ func TestCDNJS(t *testing.T) {
 			assert.Equal(t, "cdnjs", name)
 			assert.Equal(t, expected.parts, parts)
 
-			src, err := loader(path, parts)
+			src, err := loader(logger, path, parts)
 			require.NoError(t, err)
 			assert.Regexp(t, expected.src, src)
 
@@ -81,7 +88,7 @@ func TestCDNJS(t *testing.T) {
 			require.Empty(t, resolvedURL.Scheme)
 			require.Equal(t, path, resolvedURL.Opaque)
 
-			data, err := Load(map[string]afero.Fs{"https": afero.NewMemMapFs()}, resolvedURL, path)
+			data, err := Load(logger, map[string]afero.Fs{"https": afero.NewMemMapFs()}, resolvedURL, path)
 			require.NoError(t, err)
 			assert.Equal(t, resolvedURL, data.URL)
 			assert.NotEmpty(t, data.Data)
@@ -93,7 +100,7 @@ func TestCDNJS(t *testing.T) {
 		name, loader, parts := pickLoader(path)
 		assert.Equal(t, "cdnjs", name)
 		assert.Equal(t, []string{"nonexistent", "", ""}, parts)
-		_, err := loader(path, parts)
+		_, err := loader(logger, path, parts)
 		assert.EqualError(t, err, "cdnjs: no such library: nonexistent")
 	})
 
@@ -102,14 +109,14 @@ func TestCDNJS(t *testing.T) {
 		name, loader, parts := pickLoader(path)
 		assert.Equal(t, "cdnjs", name)
 		assert.Equal(t, []string{"Faker", "3.1.0", "nonexistent.js"}, parts)
-		src, err := loader(path, parts)
+		src, err := loader(logger, path, parts)
 		require.NoError(t, err)
 		assert.Equal(t, "https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/nonexistent.js", src)
 
 		pathURL, err := url.Parse(src)
 		require.NoError(t, err)
 
-		_, err = Load(map[string]afero.Fs{"https": afero.NewMemMapFs()}, pathURL, path)
+		_, err = Load(logger, map[string]afero.Fs{"https": afero.NewMemMapFs()}, pathURL, path)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found: https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/nonexistent.js")
 	})

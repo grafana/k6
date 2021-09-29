@@ -1,4 +1,4 @@
-// Match provides a simple pattern matcher with unicode support.
+// Package match provides a simple pattern matcher with unicode support.
 package match
 
 import "unicode/utf8"
@@ -6,7 +6,7 @@ import "unicode/utf8"
 // Match returns true if str matches pattern. This is a very
 // simple wildcard match where '*' matches on any number characters
 // and '?' matches on any one character.
-
+//
 // pattern:
 // 	{ term }
 // term:
@@ -16,12 +16,16 @@ import "unicode/utf8"
 // 	'\\' c      matches character c
 //
 func Match(str, pattern string) bool {
+	return deepMatch(str, pattern)
+}
+
+func deepMatch(str, pattern string) bool {
 	if pattern == "*" {
 		return true
 	}
-	return deepMatch(str, pattern)
-}
-func deepMatch(str, pattern string) bool {
+	for len(pattern) > 1 && pattern[0] == '*' && pattern[1] == '*' {
+		pattern = pattern[1:]
+	}
 	for len(pattern) > 0 {
 		if pattern[0] > 0x7f {
 			return deepMatchRune(str, pattern)
@@ -52,6 +56,13 @@ func deepMatch(str, pattern string) bool {
 }
 
 func deepMatchRune(str, pattern string) bool {
+	if pattern == "*" {
+		return true
+	}
+	for len(pattern) > 1 && pattern[0] == '*' && pattern[1] == '*' {
+		pattern = pattern[1:]
+	}
+
 	var sr, pr rune
 	var srsz, prsz int
 
@@ -168,25 +179,14 @@ func Allowable(pattern string) (min, max string) {
 		}
 	}
 	return string(minb), string(maxb)
-	/*
-		return
-		if wild {
-			r, n := utf8.DecodeLastRune(maxb)
-			if r != utf8.RuneError {
-				if r < utf8.MaxRune {
-					infinite = true
-				} else {
-					r++
-					if r > 0x7f {
-						b := make([]byte, 4)
-						nn := utf8.EncodeRune(b, r)
-						maxb = append(maxb[:len(maxb)-n], b[:nn]...)
-					} else {
-						maxb = append(maxb[:len(maxb)-n], byte(r))
-					}
-				}
-			}
+}
+
+// IsPattern returns true if the string is a pattern.
+func IsPattern(str string) bool {
+	for i := 0; i < len(str); i++ {
+		if str[i] == '*' || str[i] == '?' {
+			return true
 		}
-		return string(minb), string(maxb), infinite
-	*/
+	}
+	return false
 }

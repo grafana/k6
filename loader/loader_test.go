@@ -27,11 +27,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
-	"github.com/loadimpact/k6/loader"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/lib/testutils/httpmultibin"
+	"go.k6.io/k6/loader"
 )
 
 func TestDir(t *testing.T) {
@@ -100,6 +103,8 @@ func TestResolve(t *testing.T) {
 
 }
 func TestLoad(t *testing.T) {
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	sr := tb.Replacer.Replace
 
@@ -107,7 +112,6 @@ func TestLoad(t *testing.T) {
 	http.DefaultTransport = tb.HTTPTransport
 
 	defer func() {
-		tb.Cleanup()
 		http.DefaultTransport = oldHTTPTransport
 	}()
 
@@ -131,7 +135,7 @@ func TestLoad(t *testing.T) {
 				moduleURL, err := loader.Resolve(pwdURL, data.path)
 				require.NoError(t, err)
 
-				src, err := loader.Load(filesystems, moduleURL, data.path)
+				src, err := loader.Load(logger, filesystems, moduleURL, data.path)
 				require.NoError(t, err)
 
 				assert.Equal(t, "file:///path/to/file.txt", src.URL.String())
@@ -147,13 +151,12 @@ func TestLoad(t *testing.T) {
 			pathURL, err := loader.Resolve(root, "/nonexistent")
 			require.NoError(t, err)
 
-			_, err = loader.Load(filesystems, pathURL, path)
+			_, err = loader.Load(logger, filesystems, pathURL, path)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(),
-				fmt.Sprintf(`The moduleSpecifier "file://%s" couldn't be found on local disk. `,
-					filepath.ToSlash(path)))
+				fmt.Sprintf(`The moduleSpecifier "%s" couldn't be found on local disk. `,
+					path))
 		})
-
 	})
 
 	t.Run("Remote", func(t *testing.T) {
@@ -166,7 +169,7 @@ func TestLoad(t *testing.T) {
 			moduleSpecifierURL, err := loader.Resolve(root, moduleSpecifier)
 			require.NoError(t, err)
 
-			src, err := loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+			src, err := loader.Load(logger, filesystems, moduleSpecifierURL, moduleSpecifier)
 			require.NoError(t, err)
 			assert.Equal(t, src.URL, moduleSpecifierURL)
 			assert.Contains(t, string(src.Data), "Herman Melville - Moby-Dick")
@@ -180,7 +183,7 @@ func TestLoad(t *testing.T) {
 			moduleSpecifierURL, err := loader.Resolve(pwdURL, moduleSpecifier)
 			require.NoError(t, err)
 
-			src, err := loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+			src, err := loader.Load(logger, filesystems, moduleSpecifierURL, moduleSpecifier)
 			require.NoError(t, err)
 			assert.Equal(t, src.URL.String(), sr("HTTPSBIN_URL/robots.txt"))
 			assert.Equal(t, string(src.Data), "User-agent: *\nDisallow: /deny\n")
@@ -194,7 +197,7 @@ func TestLoad(t *testing.T) {
 			moduleSpecifierURL, err := loader.Resolve(pwdURL, moduleSpecifier)
 			require.NoError(t, err)
 
-			src, err := loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+			src, err := loader.Load(logger, filesystems, moduleSpecifierURL, moduleSpecifier)
 			require.NoError(t, err)
 			assert.Equal(t, sr("HTTPSBIN_URL/robots.txt"), src.URL.String())
 			assert.Equal(t, "User-agent: *\nDisallow: /deny\n", string(src.Data))
@@ -220,7 +223,7 @@ func TestLoad(t *testing.T) {
 		require.NoError(t, err)
 
 		filesystems := map[string]afero.Fs{"https": afero.NewMemMapFs()}
-		src, err := loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+		src, err := loader.Load(logger, filesystems, moduleSpecifierURL, moduleSpecifier)
 
 		require.NoError(t, err)
 		assert.Equal(t, src.URL.String(), sr("HTTPSBIN_URL/raw/something"))
@@ -255,7 +258,7 @@ func TestLoad(t *testing.T) {
 				moduleSpecifierURL, err := loader.Resolve(root, moduleSpecifier)
 				require.NoError(t, err)
 
-				_, err = loader.Load(filesystems, moduleSpecifierURL, moduleSpecifier)
+				_, err = loader.Load(logger, filesystems, moduleSpecifierURL, moduleSpecifier)
 				require.Error(t, err)
 			})
 		}

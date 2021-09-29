@@ -24,16 +24,17 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib/netext/httpext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/lib/netext/httpext"
 )
 
 func TestTagURL(t *testing.T) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	rt.Set("http", common.Bind(rt, New(), nil))
+	rt.Set("http", common.Bind(rt, new(GlobalHTTP).NewModuleInstancePerVU(), nil))
 
 	testdata := map[string]struct{ u, n string }{
 		`http://localhost/anything/`:               {"http://localhost/anything/", "http://localhost/anything/"},
@@ -47,7 +48,7 @@ func TestTagURL(t *testing.T) {
 		t.Run("expr="+expr, func(t *testing.T) {
 			tag, err := httpext.NewURL(data.u, data.n)
 			require.NoError(t, err)
-			v, err := common.RunString(rt, "http.url`"+expr+"`")
+			v, err := runES6String(t, rt, "http.url`"+expr+"`")
 			if assert.NoError(t, err) {
 				assert.Equal(t, tag, v.Export())
 			}

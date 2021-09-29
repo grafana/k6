@@ -22,6 +22,7 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	neturl "net/url"
@@ -29,8 +30,8 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/pkg/errors"
+
+	"go.k6.io/k6/js/common"
 )
 
 // HTTPCookieJar is cookiejar.Jar wrapper to be used in js scripts
@@ -87,7 +88,7 @@ func (j HTTPCookieJar) Set(url, name, value string, opts goja.Value) (bool, erro
 				if expires != "" {
 					t, err = time.Parse(time.RFC1123, expires)
 					if err != nil {
-						return false, errors.Errorf("unable to parse \"expires\" date string \"%s\" with: %s", expires, err.Error())
+						return false, fmt.Errorf(`unable to parse "expires" date string "%s": %w`, expires, err)
 					}
 				}
 				c.Expires = t

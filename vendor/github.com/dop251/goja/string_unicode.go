@@ -3,16 +3,18 @@ package goja
 import (
 	"errors"
 	"fmt"
-	"github.com/dop251/goja/parser"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
+	"hash/maphash"
 	"io"
 	"math"
 	"reflect"
-	"regexp"
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	"github.com/dop251/goja/parser"
+	"github.com/dop251/goja/unistring"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 type unicodeString []uint16
@@ -22,65 +24,291 @@ type unicodeRuneReader struct {
 	pos int
 }
 
-type runeReaderReplace struct {
-	wrapped io.RuneReader
+type utf16RuneReader struct {
+	s   unicodeString
+	pos int
+}
+
+// passes through invalid surrogate pairs
+type lenientUtf16Decoder struct {
+	utf16Reader io.RuneReader
+	prev        rune
+	prevSet     bool
+}
+
+type valueStringBuilder struct {
+	asciiBuilder   strings.Builder
+	unicodeBuilder unicodeStringBuilder
+}
+
+type unicodeStringBuilder struct {
+	buf     []uint16
+	unicode bool
 }
 
 var (
-	InvalidRuneError = errors.New("Invalid rune")
+	InvalidRuneError = errors.New("invalid rune")
 )
 
-var (
-	unicodeTrimRegexp = regexp.MustCompile("^[" + parser.WhitespaceChars + "]*(.*?)[" + parser.WhitespaceChars + "]*$")
-)
-
-func (rr runeReaderReplace) ReadRune() (r rune, size int, err error) {
-	r, size, err = rr.wrapped.ReadRune()
-	if err == InvalidRuneError {
-		err = nil
-		r = utf8.RuneError
+func (rr *utf16RuneReader) ReadRune() (r rune, size int, err error) {
+	if rr.pos < len(rr.s) {
+		r = rune(rr.s[rr.pos])
+		size++
+		rr.pos++
+		return
 	}
+	err = io.EOF
+	return
+}
+
+func (rr *lenientUtf16Decoder) ReadRune() (r rune, size int, err error) {
+	if rr.prevSet {
+		r = rr.prev
+		size = 1
+		rr.prevSet = false
+	} else {
+		r, size, err = rr.utf16Reader.ReadRune()
+		if err != nil {
+			return
+		}
+	}
+	if isUTF16FirstSurrogate(r) {
+		second, _, err1 := rr.utf16Reader.ReadRune()
+		if err1 != nil {
+			if err1 != io.EOF {
+				err = err1
+			}
+			return
+		}
+		if isUTF16SecondSurrogate(second) {
+			r = utf16.DecodeRune(r, second)
+			size++
+		} else {
+			rr.prev = second
+			rr.prevSet = true
+		}
+	}
+
 	return
 }
 
 func (rr *unicodeRuneReader) ReadRune() (r rune, size int, err error) {
 	if rr.pos < len(rr.s) {
 		r = rune(rr.s[rr.pos])
-		if r != utf8.RuneError {
-			if utf16.IsSurrogate(r) {
-				if rr.pos+1 < len(rr.s) {
-					r1 := utf16.DecodeRune(r, rune(rr.s[rr.pos+1]))
+		size++
+		rr.pos++
+		if isUTF16FirstSurrogate(r) {
+			if rr.pos < len(rr.s) {
+				second := rune(rr.s[rr.pos])
+				if isUTF16SecondSurrogate(second) {
+					r = utf16.DecodeRune(r, second)
 					size++
 					rr.pos++
-					if r1 == utf8.RuneError {
-						err = InvalidRuneError
-					} else {
-						r = r1
-					}
 				} else {
 					err = InvalidRuneError
 				}
+			} else {
+				err = InvalidRuneError
 			}
+		} else if isUTF16SecondSurrogate(r) {
+			err = InvalidRuneError
 		}
-		size++
-		rr.pos++
 	} else {
 		err = io.EOF
 	}
 	return
 }
 
+func (b *unicodeStringBuilder) grow(n int) {
+	if cap(b.buf)-len(b.buf) < n {
+		buf := make([]uint16, len(b.buf), 2*cap(b.buf)+n)
+		copy(buf, b.buf)
+		b.buf = buf
+	}
+}
+
+func (b *unicodeStringBuilder) Grow(n int) {
+	b.grow(n + 1)
+}
+
+func (b *unicodeStringBuilder) ensureStarted(initialSize int) {
+	b.grow(len(b.buf) + initialSize + 1)
+	if len(b.buf) == 0 {
+		b.buf = append(b.buf, unistring.BOM)
+	}
+}
+
+func (b *unicodeStringBuilder) WriteString(s valueString) {
+	b.ensureStarted(s.length())
+	switch s := s.(type) {
+	case unicodeString:
+		b.buf = append(b.buf, s[1:]...)
+		b.unicode = true
+	case asciiString:
+		for i := 0; i < len(s); i++ {
+			b.buf = append(b.buf, uint16(s[i]))
+		}
+	default:
+		panic(fmt.Errorf("unsupported string type: %T", s))
+	}
+}
+
+func (b *unicodeStringBuilder) String() valueString {
+	if b.unicode {
+		return unicodeString(b.buf)
+	}
+	if len(b.buf) == 0 {
+		return stringEmpty
+	}
+	buf := make([]byte, 0, len(b.buf)-1)
+	for _, c := range b.buf[1:] {
+		buf = append(buf, byte(c))
+	}
+	return asciiString(buf)
+}
+
+func (b *unicodeStringBuilder) WriteRune(r rune) {
+	if r <= 0xFFFF {
+		b.ensureStarted(1)
+		b.buf = append(b.buf, uint16(r))
+		if !b.unicode && r >= utf8.RuneSelf {
+			b.unicode = true
+		}
+	} else {
+		b.ensureStarted(2)
+		first, second := utf16.EncodeRune(r)
+		b.buf = append(b.buf, uint16(first), uint16(second))
+		b.unicode = true
+	}
+}
+
+func (b *unicodeStringBuilder) writeASCIIString(bytes string) {
+	b.ensureStarted(len(bytes))
+	for _, c := range bytes {
+		b.buf = append(b.buf, uint16(c))
+	}
+}
+
+func (b *valueStringBuilder) ascii() bool {
+	return len(b.unicodeBuilder.buf) == 0
+}
+
+func (b *valueStringBuilder) WriteString(s valueString) {
+	if ascii, ok := s.(asciiString); ok {
+		if b.ascii() {
+			b.asciiBuilder.WriteString(string(ascii))
+		} else {
+			b.unicodeBuilder.writeASCIIString(string(ascii))
+		}
+	} else {
+		b.switchToUnicode(s.length())
+		b.unicodeBuilder.WriteString(s)
+	}
+}
+
+func (b *valueStringBuilder) WriteRune(r rune) {
+	if r < utf8.RuneSelf {
+		if b.ascii() {
+			b.asciiBuilder.WriteByte(byte(r))
+		} else {
+			b.unicodeBuilder.WriteRune(r)
+		}
+	} else {
+		var extraLen int
+		if r <= 0xFFFF {
+			extraLen = 1
+		} else {
+			extraLen = 2
+		}
+		b.switchToUnicode(extraLen)
+		b.unicodeBuilder.WriteRune(r)
+	}
+}
+
+func (b *valueStringBuilder) String() valueString {
+	if b.ascii() {
+		return asciiString(b.asciiBuilder.String())
+	}
+	return b.unicodeBuilder.String()
+}
+
+func (b *valueStringBuilder) Grow(n int) {
+	if b.ascii() {
+		b.asciiBuilder.Grow(n)
+	} else {
+		b.unicodeBuilder.Grow(n)
+	}
+}
+
+func (b *valueStringBuilder) switchToUnicode(extraLen int) {
+	if b.ascii() {
+		b.unicodeBuilder.ensureStarted(b.asciiBuilder.Len() + extraLen)
+		b.unicodeBuilder.writeASCIIString(b.asciiBuilder.String())
+		b.asciiBuilder.Reset()
+	}
+}
+
+func (b *valueStringBuilder) WriteSubstring(source valueString, start int, end int) {
+	if ascii, ok := source.(asciiString); ok {
+		if b.ascii() {
+			b.asciiBuilder.WriteString(string(ascii[start:end]))
+		} else {
+			b.unicodeBuilder.writeASCIIString(string(ascii[start:end]))
+		}
+		return
+	}
+	us := source.(unicodeString)
+	if b.ascii() {
+		uc := false
+		for i := start; i < end; i++ {
+			if us.charAt(i) >= utf8.RuneSelf {
+				uc = true
+				break
+			}
+		}
+		if uc {
+			b.switchToUnicode(end - start + 1)
+		} else {
+			b.asciiBuilder.Grow(end - start + 1)
+			for i := start; i < end; i++ {
+				b.asciiBuilder.WriteByte(byte(us.charAt(i)))
+			}
+			return
+		}
+	}
+	b.unicodeBuilder.buf = append(b.unicodeBuilder.buf, us[start+1:end+1]...)
+	b.unicodeBuilder.unicode = true
+}
+
 func (s unicodeString) reader(start int) io.RuneReader {
 	return &unicodeRuneReader{
-		s: s[start:],
+		s: s[start+1:],
 	}
+}
+
+func (s unicodeString) utf16Reader(start int) io.RuneReader {
+	return &utf16RuneReader{
+		s: s[start+1:],
+	}
+}
+
+func (s unicodeString) utf16Runes() []rune {
+	runes := make([]rune, len(s)-1)
+	for i, ch := range s[1:] {
+		runes[i] = rune(ch)
+	}
+	return runes
 }
 
 func (s unicodeString) ToInteger() int64 {
 	return 0
 }
 
-func (s unicodeString) ToString() valueString {
+func (s unicodeString) toString() valueString {
+	return s
+}
+
+func (s unicodeString) ToString() Value {
 	return s
 }
 
@@ -96,7 +324,7 @@ func (s unicodeString) toTrimmedUTF8() string {
 	if len(s) == 0 {
 		return ""
 	}
-	return unicodeTrimRegexp.FindStringSubmatch(s.String())[1]
+	return strings.Trim(s.String(), parser.WhitespaceChars)
 }
 
 func (s unicodeString) ToNumber() Value {
@@ -104,7 +332,7 @@ func (s unicodeString) ToNumber() Value {
 }
 
 func (s unicodeString) ToObject(r *Runtime) *Object {
-	return r._newString(s)
+	return r._newString(s, r.global.StringPrototype)
 }
 
 func (s unicodeString) equals(other unicodeString) bool {
@@ -132,38 +360,14 @@ func (s unicodeString) Equals(other Value) bool {
 		return true
 	}
 
-	if _, ok := other.assertInt(); ok {
-		return false
-	}
-
-	if _, ok := other.assertFloat(); ok {
-		return false
-	}
-
-	if _, ok := other.(valueBool); ok {
-		return false
-	}
-
 	if o, ok := other.(*Object); ok {
-		return s.Equals(o.self.toPrimitive())
+		return s.Equals(o.toPrimitive())
 	}
 	return false
 }
 
 func (s unicodeString) StrictEquals(other Value) bool {
 	return s.SameAs(other)
-}
-
-func (s unicodeString) assertInt() (int64, bool) {
-	return 0, false
-}
-
-func (s unicodeString) assertFloat() (float64, bool) {
-	return 0, false
-}
-
-func (s unicodeString) assertString() (valueString, bool) {
-	return s, true
 }
 
 func (s unicodeString) baseObject(r *Runtime) *Object {
@@ -173,18 +377,21 @@ func (s unicodeString) baseObject(r *Runtime) *Object {
 	return ss.val
 }
 
-func (s unicodeString) charAt(idx int64) rune {
-	return rune(s[idx])
+func (s unicodeString) charAt(idx int) rune {
+	return rune(s[idx+1])
 }
 
-func (s unicodeString) length() int64 {
-	return int64(len(s))
+func (s unicodeString) length() int {
+	return len(s) - 1
 }
 
 func (s unicodeString) concat(other valueString) valueString {
 	switch other := other.(type) {
 	case unicodeString:
-		return unicodeString(append(s, other...))
+		b := make(unicodeString, len(s)+len(other)-1)
+		copy(b, s)
+		copy(b[len(s):], other[1:])
+		return b
 	case asciiString:
 		b := make([]uint16, len(s)+len(other))
 		copy(b, s)
@@ -198,11 +405,14 @@ func (s unicodeString) concat(other valueString) valueString {
 	}
 }
 
-func (s unicodeString) substring(start, end int64) valueString {
-	ss := s[start:end]
+func (s unicodeString) substring(start, end int) valueString {
+	ss := s[start+1 : end+1]
 	for _, c := range ss {
 		if c >= utf8.RuneSelf {
-			return unicodeString(ss)
+			b := make(unicodeString, end-start+1)
+			b[0] = unistring.BOM
+			copy(b[1:], ss)
+			return b
 		}
 	}
 	as := make([]byte, end-start)
@@ -213,32 +423,33 @@ func (s unicodeString) substring(start, end int64) valueString {
 }
 
 func (s unicodeString) String() string {
-	return string(utf16.Decode(s))
+	return string(utf16.Decode(s[1:]))
 }
 
 func (s unicodeString) compareTo(other valueString) int {
+	// TODO handle invalid UTF-16
 	return strings.Compare(s.String(), other.String())
 }
 
-func (s unicodeString) index(substr valueString, start int64) int64 {
+func (s unicodeString) index(substr valueString, start int) int {
 	var ss []uint16
 	switch substr := substr.(type) {
 	case unicodeString:
-		ss = substr
+		ss = substr[1:]
 	case asciiString:
 		ss = make([]uint16, len(substr))
 		for i := 0; i < len(substr); i++ {
 			ss[i] = uint16(substr[i])
 		}
 	default:
-		panic(fmt.Errorf("Unknown string type: %T", substr))
+		panic(fmt.Errorf("unknown string type: %T", substr))
 	}
-
+	s1 := s[1:]
 	// TODO: optimise
-	end := int64(len(s) - len(ss))
+	end := len(s1) - len(ss)
 	for start <= end {
-		for i := int64(0); i < int64(len(ss)); i++ {
-			if s[start+i] != ss[i] {
+		for i := 0; i < len(ss); i++ {
+			if s1[start+i] != ss[i] {
 				goto nomatch
 			}
 		}
@@ -250,11 +461,11 @@ func (s unicodeString) index(substr valueString, start int64) int64 {
 	return -1
 }
 
-func (s unicodeString) lastIndex(substr valueString, start int64) int64 {
+func (s unicodeString) lastIndex(substr valueString, start int) int {
 	var ss []uint16
 	switch substr := substr.(type) {
 	case unicodeString:
-		ss = substr
+		ss = substr[1:]
 	case asciiString:
 		ss = make([]uint16, len(substr))
 		for i := 0; i < len(substr); i++ {
@@ -264,13 +475,14 @@ func (s unicodeString) lastIndex(substr valueString, start int64) int64 {
 		panic(fmt.Errorf("Unknown string type: %T", substr))
 	}
 
-	if maxStart := int64(len(s) - len(ss)); start > maxStart {
+	s1 := s[1:]
+	if maxStart := len(s1) - len(ss); start > maxStart {
 		start = maxStart
 	}
 	// TODO: optimise
 	for start >= 0 {
-		for i := int64(0); i < int64(len(ss)); i++ {
-			if s[start+i] != ss[i] {
+		for i := 0; i < len(ss); i++ {
+			if s1[start+i] != ss[i] {
 				goto nomatch
 			}
 		}
@@ -280,6 +492,10 @@ func (s unicodeString) lastIndex(substr valueString, start int64) int64 {
 		start--
 	}
 	return -1
+}
+
+func unicodeStringFromRunes(r []rune) unicodeString {
+	return unistring.NewFromRunes(r).AsUtf16()
 }
 
 func (s unicodeString) toLower() valueString {
@@ -302,7 +518,7 @@ func (s unicodeString) toLower() valueString {
 	if ascii {
 		return asciiString(r)
 	}
-	return unicodeString(utf16.Encode(r))
+	return unicodeStringFromRunes(r)
 }
 
 func (s unicodeString) toUpper() valueString {
@@ -316,4 +532,15 @@ func (s unicodeString) Export() interface{} {
 
 func (s unicodeString) ExportType() reflect.Type {
 	return reflectTypeString
+}
+
+func (s unicodeString) hash(hash *maphash.Hash) uint64 {
+	_, _ = hash.WriteString(string(unistring.FromUtf16(s)))
+	h := hash.Sum64()
+	hash.Reset()
+	return h
+}
+
+func (s unicodeString) string() unistring.String {
+	return unistring.FromUtf16(s)
 }

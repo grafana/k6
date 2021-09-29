@@ -21,15 +21,20 @@
 package cmd
 
 import (
-	"os"
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/lib"
 )
+
+// TODO: move this whole file out of the cmd package? maybe when fixing
+// https://github.com/k6io/k6/issues/883, since this code is fairly
+// self-contained and easily testable now, without any global dependencies...
 
 var userEnvVarName = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
@@ -40,9 +45,9 @@ func parseEnvKeyValue(kv string) (string, string) {
 	return kv, ""
 }
 
-func collectEnv() map[string]string {
-	env := make(map[string]string)
-	for _, kv := range os.Environ() {
+func buildEnvMap(environ []string) map[string]string {
+	env := make(map[string]string, len(environ))
+	for _, kv := range environ {
 		k, v := parseEnvKeyValue(kv)
 		env[k] = v
 	}
@@ -60,19 +65,73 @@ extended: base + Babel with ES2015 preset + core.js v2,
           slower and memory consuming but with greater JS support
 `)
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
+	flags.Bool("no-thresholds", false, "don't run thresholds")
+	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
+	flags.String(
+		"summary-export",
+		"",
+		"output the end-of-test summary report to JSON file",
+	)
 	return flags
 }
 
-func getRuntimeOptions(flags *pflag.FlagSet) (lib.RuntimeOptions, error) {
+func saveBoolFromEnv(env map[string]string, varName string, placeholder *null.Bool) error {
+	strValue, ok := env[varName]
+	if !ok {
+		return nil
+	}
+	val, err := strconv.ParseBool(strValue)
+	if err != nil {
+		return fmt.Errorf("env var '%s' is not a valid boolean value: %w", varName, err)
+	}
+	// Only override if not explicitly set via the CLI flag
+	if !placeholder.Valid {
+		*placeholder = null.BoolFrom(val)
+	}
+	return nil
+}
+
+func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib.RuntimeOptions, error) {
+	// TODO: refactor with composable helpers as a part of #883, to reduce copy-paste
+	// TODO: get these options out of the JSON config file as well?
 	opts := lib.RuntimeOptions{
 		IncludeSystemEnvVars: getNullBool(flags, "include-system-env-vars"),
 		CompatibilityMode:    getNullString(flags, "compatibility-mode"),
+		NoThresholds:         getNullBool(flags, "no-thresholds"),
+		NoSummary:            getNullBool(flags, "no-summary"),
+		SummaryExport:        getNullString(flags, "summary-export"),
 		Env:                  make(map[string]string),
 	}
 
-	// If enabled, gather the actual system environment variables
-	if opts.IncludeSystemEnvVars.Bool {
-		opts.Env = collectEnv()
+	if envVar, ok := environment["K6_COMPATIBILITY_MODE"]; ok {
+		// Only override if not explicitly set via the CLI flag
+		if !opts.CompatibilityMode.Valid {
+			opts.CompatibilityMode = null.StringFrom(envVar)
+		}
+	}
+	if _, err := lib.ValidateCompatibilityMode(opts.CompatibilityMode.String); err != nil {
+		// some early validation
+		return opts, err
+	}
+
+	if err := saveBoolFromEnv(environment, "K6_INCLUDE_SYSTEM_ENV_VARS", &opts.IncludeSystemEnvVars); err != nil {
+		return opts, err
+	}
+	if err := saveBoolFromEnv(environment, "K6_NO_THRESHOLDS", &opts.NoThresholds); err != nil {
+		return opts, err
+	}
+	if err := saveBoolFromEnv(environment, "K6_NO_SUMMARY", &opts.NoSummary); err != nil {
+		return opts, err
+	}
+
+	if envVar, ok := environment["K6_SUMMARY_EXPORT"]; ok {
+		if !opts.SummaryExport.Valid {
+			opts.SummaryExport = null.StringFrom(envVar)
+		}
+	}
+
+	if opts.IncludeSystemEnvVars.Bool { // If enabled, gather the actual system environment variables
+		opts.Env = environment
 	}
 
 	// Set/overwrite environment variables with custom user-supplied values
@@ -80,20 +139,13 @@ func getRuntimeOptions(flags *pflag.FlagSet) (lib.RuntimeOptions, error) {
 	if err != nil {
 		return opts, err
 	}
-
 	for _, kv := range envVars {
 		k, v := parseEnvKeyValue(kv)
 		// Allow only alphanumeric ASCII variable names for now
 		if !userEnvVarName.MatchString(k) {
-			return opts, errors.Errorf("Invalid environment variable name '%s'", k)
+			return opts, fmt.Errorf("invalid environment variable name '%s'", k)
 		}
 		opts.Env[k] = v
-	}
-
-	// Fallback to env
-	compatMode := opts.Env["K6_COMPATIBILITY_MODE"]
-	if !opts.CompatibilityMode.Valid && compatMode != "" {
-		opts.CompatibilityMode = null.StringFrom(compatMode)
 	}
 
 	return opts, nil
