@@ -1,34 +1,34 @@
-<p align="center"><a href="https://k6.io/"><img src="logo.svg" alt="k6" width="220" height="213" /></a></p>
+<p align="center"><a href="https://k6.io/"><img src="assets/logo.svg" alt="k6" width="220" height="213" /></a></p>
 
 <h3 align="center">Like unit testing, for performance</h3>
 <p align="center">A modern load testing tool for developers and testers in the DevOps era.</p>
 
 <p align="center">
-  <a href="https://github.com/loadimpact/k6/releases"><img src="https://img.shields.io/github/release/loadimpact/k6.svg" alt="Github release"></a>
-  <a href="https://circleci.com/gh/loadimpact/k6/tree/master"><img src="https://img.shields.io/circleci/project/github/loadimpact/k6/master.svg" alt="Build status"></a>
-  <a href="https://goreportcard.com/report/github.com/loadimpact/k6"><img src="https://goreportcard.com/badge/github.com/loadimpact/k6" alt="Go Report Card"></a>
-  <a href="https://codecov.io/gh/loadimpact/k6"><img src="https://img.shields.io/codecov/c/github/loadimpact/k6/master.svg" alt="Codecov branch"></a>
+  <a href="https://github.com/k6io/k6/releases"><img src="https://img.shields.io/github/release/k6io/k6.svg" alt="Github release"></a>
+  <a href="https://github.com/k6io/k6/actions/workflows/all.yml"><img src="https://github.com/k6io/k6/actions/workflows/all.yml/badge.svg" alt="Build status"></a>
+  <a href="https://goreportcard.com/report/github.com/k6io/k6"><img src="https://goreportcard.com/badge/github.com/k6io/k6" alt="Go Report Card"></a>
+  <a href="https://codecov.io/gh/k6io/k6"><img src="https://img.shields.io/codecov/c/github/k6io/k6/master.svg" alt="Codecov branch"></a>
   <br>
   <a href="https://twitter.com/k6_io"><img src="https://img.shields.io/badge/twitter-@k6_io-55acee.svg" alt="@k6_io on Twitter"></a>
   <a href="https://k6.io/slack"><img src="https://img.shields.io/badge/Slack-k6-ff69b4.svg" alt="Slack channel"></a>
 </p>
 <p align="center">
-    <a href="https://github.com/loadimpact/k6/releases">Download</a> ·
+    <a href="https://github.com/k6io/k6/releases">Download</a> ·
     <a href="#install">Install</a> ·
     <a href="https://k6.io/docs">Documentation</a> ·
     <a href="https://community.k6.io/">Community</a>
 </p>
 
 <br/>
-<img src="github-hr.png" alt="---" />
+<img src="assets/github-hr.png" alt="---" />
 <br/>
 
-**k6** is a modern load testing tool, building on [Load Impact](https://loadimpact.com/)'s years of experience in the load and performance testing industry. It provides a clean, approachable scripting API, [local](https://k6.io/docs/getting-started/running-k6) and [cloud execution](https://k6.io/docs/cloud), and flexible configuration.
+**k6** is a modern load testing tool, building on [our](https://k6.io/about) years of experience in the load and performance testing industry. It provides a clean, approachable scripting API, [local](https://k6.io/docs/getting-started/running-k6) and [cloud execution](https://k6.io/docs/cloud), and flexible configuration.
 
 This is how load testing should look in the 21st century.
 
 <p align="center">
-  <img width="600" src="https://cdn.rawgit.com/loadimpact/k6/master/demo.svg">
+  <img width="600" src="assets/k6-demo.gif">
 </p>
 
 Menu
@@ -38,7 +38,7 @@ Menu
 - [Install](#install)
 - [Running k6](#running-k6)
 - [Overview](#overview)
-- [Need help or want to contribute?](#need-help-or-want-to-contribute)
+- [Need help or want to contribute?](#contributing)
 
 Features
 --------
@@ -46,12 +46,12 @@ Features
 - **Scripting in ES6 JS**: support for [modules](https://k6.io/docs/using-k6/modules) to aid code reusability across an organization
 - **Everything as code**: test logic and [configuration options](https://k6.io/docs/using-k6/options) are both in JS for version control friendliness
 - **Automation-friendly**: [checks](https://k6.io/docs/using-k6/checks) (like asserts) and [thresholds](https://k6.io/docs/using-k6/thresholds) for easy and flexible CI configuration!
-- [**HTTP/1.1**](https://k6.io/docs/using-k6/http-requests), [**HTTP/2**](https://k6.io/docs/using-k6/protocols/http-2) and [**WebSocket**](https://k6.io/docs/using-k6/protocols/websockets) protocol support
-- **TLS features**: [client certificates](https://k6.io/docs/using-k6/ssl-tls/ssl-tls-client-certificates), [configurable SSL/TLS versions and ciphers](https://k6.io/docs/using-k6/ssl-tls/ssl-tls-version-and-ciphers)
+- [**HTTP/1.1**](https://k6.io/docs/using-k6/http-requests), [**HTTP/2**](https://k6.io/docs/using-k6/protocols/http-2), [**WebSocket**](https://k6.io/docs/using-k6/protocols/websockets) and [**gRPC**](https://k6.io/docs/using-k6/protocols/grpc) protocol support
+- **TLS features**: [client certificates](https://k6.io/docs/using-k6/protocols/ssl-tls/ssl-tls-client-certificates), [configurable SSL/TLS versions and ciphers](https://k6.io/docs/using-k6/protocols/ssl-tls/ssl-tls-version-and-ciphers)
 - **Batteries included**: [Cookies](https://k6.io/docs/using-k6/cookies), [Crypto](https://k6.io/docs/javascript-api/k6-crypto), [Custom metrics](https://k6.io/docs/using-k6/metrics#custom-metrics), [Encodings](https://k6.io/docs/javascript-api/k6-encoding), [Environment variables](https://k6.io/docs/using-k6/environment-variables), JSON, [HTML forms](https://k6.io/docs/using-k6/html/working-with-html-forms), [files](https://k6.io/docs/javascript-api/init-context/open-filepath-mode), [flexible execution control](https://k6.io/docs/getting-started/running-k6#section-stages-ramping-updown-vus), and more.
 - **Built-in HAR converter**: record browser sessions as [`.har` files](https://en.wikipedia.org/wiki/.har) and [directly convert them to k6 scripts](https://k6.io/docs/using-k6/session-recording-har-support)
 - **Flexible metrics storage and visualization**: [InfluxDB](https://k6.io/docs/results-visualization/influxdb-+-grafana) (+Grafana), [JSON](https://k6.io/docs/getting-started/results-output/json) or [k6 Cloud](https://k6.io/docs/cloud/analyzing-results/overview)
-- [**Cloud execution**](https://k6.io/docs/using-k6/cloud-execution) and distributed tests _(currently only on infrastructure managed by [Load Impact](https://loadimpact.com/), with native distributed execution in k6 [planned](https://github.com/loadimpact/k6/wiki/Roadmap) for the near future!)_
+- [**Cloud execution**](https://k6.io/docs/using-k6/cloud-execution) and distributed tests _(currently only on infrastructure managed by [us k6 cloud](https://k6.io/cloud), with native distributed execution in k6 [planned](https://github.com/k6io/k6/wiki/Roadmap) for the near future!)_
 
 There's even more! [See all features available in k6.](https://k6.io/docs/)
 
@@ -68,26 +68,62 @@ brew install k6
 
 ### Windows
 
-You can manually download and install the [official `.msi` installation package](https://dl.bintray.com/loadimpact/windows/k6-latest-amd64.msi) or, if you use the [chocolatey package manager](https://chocolatey.org/), follow [these instructions](https://bintray.com/repo/buildSettings?repoPath=%2Floadimpact%2Fchoco) to set up the k6 repository.
+If you use the [Chocolatey package manager](https://chocolatey.org/) you can install the unofficial k6 package with:
+
+```
+choco install k6
+```
+
+Otherwise you can manually download and install the [latest official `.msi` package](https://dl.k6.io/msi/k6-latest-amd64.msi).
 
 ### Linux
 
-For Debian-based Linux distributions, you can install k6 from the private deb repo like this:
+For Debian-based Linux distributions like Ubuntu, you can install k6 from the private deb repo like this:
 
 ```bash
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61
-echo "deb https://dl.bintray.com/loadimpact/deb stable main" | sudo tee -a /etc/apt/sources.list
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
 sudo apt-get update
 sudo apt-get install k6
 ```
 
+If you have issues adding the key from the keyserver, you can instead run:
+```bash
+curl -s https://dl.k6.io/key.gpg | sudo apt-key add -
+```
+
+Then confirm that the key with the above ID is shown in the output of `sudo apt-key list`.
+
 And for rpm-based ones like Fedora and CentOS:
 
 ```bash
-wget https://bintray.com/loadimpact/rpm/rpm -O bintray-loadimpact-rpm.repo
-sudo mv bintray-loadimpact-rpm.repo /etc/yum.repos.d/
-sudo dnf install k6   # use yum instead of dnf for older distros
+sudo dnf install https://dl.k6.io/rpm/repo.rpm    # use yum instead of dnf for older distros
+sudo dnf install k6    # use yum install --nogpgcheck k6 for older distros (e.g. CentOS 7) without PGP V4 signature support
 ```
+
+Note that the `gnupg2` package is required for signature verification.
+
+
+#### Migrating from Bintray
+
+The Bintray repositories will be [shutdown after May 1st, 2021](https://jfrog.com/blog/into-the-sunset-bintray-jcenter-gocenter-and-chartcenter/). If you previously added them you will have to add our repositories following the instructions above and should delete the Bintray ones.
+
+For Debian-based distributions, you can run:
+
+```bash
+sudo sed -i '/dl\.bintray\.com\/loadimpact\/deb/d' /etc/apt/sources.list
+sudo apt-key del 379CE192D401AB61
+sudo apt-get update
+```
+
+Or delete the repository file if you added it to `/etc/apt/sources.list.d/`.
+
+And for rpm-based ones, delete the repository file in `/etc/yum.repos.d/`. If you followed the [official installation instructions](https://k6.io/docs/getting-started/installation/#fedora-centos), this should be:
+
+```bash
+sudo rm /etc/yum.repos.d/bintray-loadimpact-rpm.repo
+```
+
 
 ### Docker
 
@@ -97,14 +133,14 @@ docker pull loadimpact/k6
 
 ### Pre-built binaries & other platforms
 
-If there isn't an official package for your operating system or architecture, or if you don't want to install a custom repository, you can easily grab a pre-built binary from [the GitHub Releases page](https://github.com/loadimpact/k6/releases). Once you download and unpack the release, you can optionally copy the `k6` binary it contains somewhere in your `PATH`, so you are able to run k6 from any location on your system.
+If there isn't an official package for your operating system or architecture, or if you don't want to install a custom repository, you can easily grab a pre-built binary from [the GitHub Releases page](https://github.com/k6io/k6/releases). Once you download and unpack the release, you can optionally copy the `k6` binary it contains somewhere in your `PATH`, so you are able to run k6 from any location on your system.
 
 ### Build from source
 
-k6 is written in Go, so it's just a single statically-linked executable and very easy to build and distribute. To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.12 or newer). Follow these instructions:
+k6 is written in Go, so it's just a single statically-linked executable and very easy to build and distribute. To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.16 or newer). Follow these instructions:
 
-- Run `go get github.com/loadimpact/k6` which will:
-  - git clone the repo and put the source in `$GOPATH/src/github.com/loadimpact/k6`
+- Run `go get go.k6.io/k6` which will:
+  - git clone the repo and put the source in `$GOPATH/src/go.k6.io/k6`
   - build a `k6` binary and put it in `$GOPATH/bin`
 - Make sure you have `$GOPATH/bin` in your `PATH` (or copy the `k6` binary somewhere in your `PATH`), so you are able to run k6 from any location.
 - Tada, you can now run k6 using `k6 run script.js`
@@ -128,7 +164,7 @@ The script details and how we can extend and configure it will be explained belo
 
 If you decide to use the [k6 docker image](https://hub.docker.com/r/loadimpact/k6/), the command will be slightly different. Instead of passing the script filename to k6, a dash is used to instruct k6 to read the script contents directly via the standard input. This allows us to to avoid messing with docker volumes for such a simple single-file script, greatly simplifying the docker command: `docker run -i loadimpact/k6 run - <script.js`.
 
-In some situations it may also be useful to execute remote scripts. You can do that with HTTP**S** URLs in k6 by [importing them](https://k6.io/docs/using-k6/modules#section-remote-modules) in the script via their URL or simply specifying their URL in the CLI command: `k6 run github.com/loadimpact/k6/samples/http_2.js` (k6 "knows" a bit about github and cdnjs URLs, so this command is actually shorthand for `k6 run raw.githubusercontent.com/loadimpact/k6/master/samples/http_2.js`)
+In some situations it may also be useful to execute remote scripts. You can do that with HTTP**S** URLs in k6 by [importing them](https://k6.io/docs/using-k6/modules#section-remote-modules) in the script via their URL or simply specifying their URL in the CLI command: `k6 run github.com/k6io/k6/samples/http_2.js` (k6 "knows" a bit about github and cdnjs URLs, so this command is actually shorthand for `k6 run raw.githubusercontent.com/k6io/k6/master/samples/http_2.js`)
 
 For more information on how to get started running k6, please look at the [Running k6](https://k6.io/docs/getting-started/running-k6) documentation page. If you want to know more about making and measuring HTTP requests with k6, take a look [here](https://k6.io/docs/using-k6/http-requests) and [here](https://k6.io/docs/javascript-api/k6-http). And for information about the commercial k6 services like distributed cloud execution (the `k6 cloud` command) or Cloud Results (`k6 run -o cloud`), you can visit [k6.io](https://k6.io/cloud) or view the [cloud documentation](https://k6.io/docs/cloud).
 
@@ -149,7 +185,7 @@ There are two reasons for this. The first is, of course: performance. If you rea
 
 But there's another, more interesting reason. By forcing all imports and file reads into the init context, we design for distributed execution. We know which files will be needed, so we distribute only those files to each node in the cluster. We know which modules will be imported, so we can bundle them up in an [archive](https://k6.io/docs/using-k6/archives-for-bundling-sharing-a-test) from the get-go. And, tying into the performance point above, the other nodes don't even need writable file systems - everything can be kept in-memory.
 
-This means that if your script works when it's executed with `k6 run` locally, it should also work without any modifications in a distributed execution environment like `k6 cloud` (that executes it in the commercial [k6 cloud infrastructure](https://k6.io/cloud)) or, in the future, with the [planned](https://github.com/loadimpact/k6/wiki/Roadmap) k6 native cluster execution mode.
+This means that if your script works when it's executed with `k6 run` locally, it should also work without any modifications in a distributed execution environment like `k6 cloud` (that executes it in the commercial [k6 cloud infrastructure](https://k6.io/cloud)) or, in the future, with the [planned](https://github.com/k6io/k6/wiki/Roadmap) k6 native cluster execution mode.
 
 ### Script execution
 
@@ -249,7 +285,7 @@ A copy of whatever data `setup()` returns will be passed as the first argument t
 
 ### Metrics, tags and groups
 
-By default k6 measures and collects a lot of metrics about the things your scripts do - the duration of different script iterations, how much data was sent and received, how many HTTP requests were made, the duration of those HTTP requests, and even how long did the TLS handshake of a particular HTTPS request take. To see a summary of these built-in metrics in the output, you can run a simple k6 test, e.g. `k6 run github.com/loadimpact/k6/samples/http_get.js`. More information about the different built-in metrics collected by k6 (and how some of them can be accessed from inside of the scripts) is available in the docs [here](https://k6.io/docs/using-k6/metrics).
+By default k6 measures and collects a lot of metrics about the things your scripts do - the duration of different script iterations, how much data was sent and received, how many HTTP requests were made, the duration of those HTTP requests, and even how long did the TLS handshake of a particular HTTPS request take. To see a summary of these built-in metrics in the output, you can run a simple k6 test, e.g. `k6 run github.com/k6io/k6/samples/http_get.js`. More information about the different built-in metrics collected by k6 (and how some of them can be accessed from inside of the scripts) is available in the docs [here](https://k6.io/docs/using-k6/metrics).
 
 k6 also allows the creation of user-defined `Counter`, `Gauge`, `Rate` and `Trend` metrics. They can be used to more precisely track and measure a custom subset of the things that k6 measures by default, or anything else the user wants, for example tracking non-timing information that is returned from the remote system. You can find more information about them [here](https://k6.io/docs/using-k6/metrics#custom-metrics) and a description of their APIs [here](https://k6.io/docs/javascript-api/k6-metrics).
 
@@ -301,13 +337,13 @@ export let options = {
 
 // Main function
 export default function () {
-    let response = http.get("https://test.loadimpact.com/");
+    let response = http.get("https://test.k6.io/");
 
     // check() returns false if any of the specified conditions fail
     let checkRes = check(response, {
         "http2 is used": (r) => r.proto === "HTTP/2.0",
         "status is 200": (r) => r.status === 200,
-        "content is present": (r) => r.body.indexOf("Welcome to the LoadImpact.com demo site!") !== -1,
+        "content is present": (r) => r.body.indexOf("Collection of simple web-pages suitable for load testing.") !== -1,
     });
 
     // We reverse the check() result since we want to count the failures
@@ -317,8 +353,9 @@ export default function () {
     group("Static Assets", function () {
         // Execute multiple requests in parallel like a browser, to fetch some static resources
         let resps = http.batch([
-            ["GET", "https://test.loadimpact.com/style.css", null, { tags: { staticAsset: "yes" } }],
-            ["GET", "https://test.loadimpact.com/images/logo.png", null, { tags: { staticAsset: "yes" } }]
+            ["GET", "https://test.k6.io/static/css/site.css", null, { tags: { staticAsset: "yes" } }],
+            ["GET", "https://test.k6.io/static/favicon.ico", null, { tags: { staticAsset: "yes" } }],
+            ["GET", "https://test.k6.io/static/js/prisms.js", null, { tags: { staticAsset: "yes" } }],
         ]);
         // Combine check() call with failure tracking
         failureRate.add(!check(resps, {
@@ -331,7 +368,7 @@ export default function () {
 }
 ```
 
-You can save the above example as a local file and run it, or you can also run it directly from the [github copy of the file](https://github.com/loadimpact/k6/blob/master/samples/thresholds_readme_example.js) with the `k6 run github.com/loadimpact/k6/samples/thresholds_readme_example.js` command. You can find (and contribute!) more k6 script examples here: [https://github.com/loadimpact/k6/tree/master/samples](https://github.com/loadimpact/k6/tree/master/samples)
+You can save the above example as a local file and run it, or you can also run it directly from the [github copy of the file](https://github.com/k6io/k6/blob/master/samples/thresholds_readme_example.js) with the `k6 run github.com/k6io/k6/samples/thresholds_readme_example.js` command. You can find (and contribute!) more k6 script examples here: [https://github.com/k6io/k6/tree/master/samples](https://github.com/k6io/k6/tree/master/samples)
 
 ### Outputs
 
@@ -355,4 +392,4 @@ To get help about usage, report bugs, suggest features, and discuss k6 with othe
 Contributing
 ------------
 
-If you want to contribute or help with the development of k6, start by reading [CONTRIBUTING.md](https://github.com/loadimpact/k6/blob/master/CONTRIBUTING.md). Before you start coding, especially when it comes to big changes and features, it might be a good idea to first discuss your plans and implementation details with the k6 maintainers. You can do this either in the [github issue](https://github.com/loadimpact/k6/issues) for the problem you're solving (create one if it doesn't exist) or in the `#developers` channel on [Slack](https://k6.io/slack).
+If you want to contribute or help with the development of k6, start by reading [CONTRIBUTING.md](https://github.com/k6io/k6/blob/master/CONTRIBUTING.md). Before you start coding, especially when it comes to big changes and features, it might be a good idea to first discuss your plans and implementation details with the k6 maintainers. You can do this either in the [github issue](https://github.com/k6io/k6/issues) for the problem you're solving (create one if it doesn't exist) or in the `#developers` channel on [Slack](https://k6.io/slack).

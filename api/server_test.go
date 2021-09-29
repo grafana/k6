@@ -29,11 +29,15 @@ import (
 	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
-	"github.com/urfave/negroni"
+	"github.com/stretchr/testify/require"
 
-	"github.com/loadimpact/k6/api/common"
-	"github.com/loadimpact/k6/core"
-	"github.com/loadimpact/k6/lib"
+	"go.k6.io/k6/api/common"
+	"go.k6.io/k6/core"
+	"go.k6.io/k6/core/local"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/lib/testutils/minirunner"
 )
 
 func testHTTPHandler(rw http.ResponseWriter, r *http.Request) {
@@ -53,7 +57,7 @@ func TestLogger(t *testing.T) {
 
 					l, hook := logtest.NewNullLogger()
 					l.Level = logrus.DebugLevel
-					NewLogger(l)(negroni.NewResponseWriter(rw), r, testHTTPHandler)
+					newLogger(l, http.HandlerFunc(testHTTPHandler))(rw, r)
 
 					res := rw.Result()
 					assert.Equal(t, http.StatusOK, res.StatusCode)
@@ -74,20 +78,26 @@ func TestLogger(t *testing.T) {
 }
 
 func TestWithEngine(t *testing.T) {
-	engine, err := core.NewEngine(nil, lib.Options{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
+	require.NoError(t, err)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, builtinMetrics)
+	require.NoError(t, err)
 
 	rw := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "http://example.com/", nil)
-	WithEngine(engine)(rw, r, func(rw http.ResponseWriter, r *http.Request) {
+	withEngine(engine, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, engine, common.GetEngine(r.Context()))
-	})
+	}))(rw, r)
 }
 
 func TestPing(t *testing.T) {
-	mux := NewHandler()
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+	mux := newHandler(logger)
 
 	rw := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/ping", nil)

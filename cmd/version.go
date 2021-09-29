@@ -23,20 +23,20 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/loadimpact/k6/lib/consts"
 	"github.com/spf13/cobra"
+
+	"go.k6.io/k6/lib/consts"
 )
 
-// versionCmd represents the version command.
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Show application version",
-	Long:  `Show the application version and exit.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("k6 v" + consts.FullVersion())
-	},
-}
-
-func init() {
-	RootCmd.AddCommand(versionCmd)
+func getVersionCmd() *cobra.Command {
+	// versionCmd represents the version command.
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Show application version",
+		Long:  `Show the application version and exit.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("k6 v" + consts.FullVersion())
+		},
+	}
+	return versionCmd
 }

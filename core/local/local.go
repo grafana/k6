@@ -23,518 +23,427 @@ package local
 import (
 	"context"
 	"fmt"
-	"sync"
+	"runtime"
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/stats"
+	"go.k6.io/k6/ui/pb"
 )
 
-// TODO: totally rewrite this!
-// This is an overcomplicated and probably buggy piece of code that is a major PITA to refactor...
-// It does a ton of stuff in a very convoluted way, has a and uses a very incomprehensible mix
-// of all possible Go synchronization mechanisms (channels, mutexes, rwmutexes, atomics,
-// and waitgroups) and has a bunch of contexts and tickers on top...
+// ExecutionScheduler is the local implementation of lib.ExecutionScheduler
+type ExecutionScheduler struct {
+	runner  lib.Runner
+	options lib.Options
+	logger  *logrus.Logger
 
-var _ lib.Executor = &Executor{}
-
-type vuHandle struct {
-	sync.RWMutex
-	vu     lib.VU
-	ctx    context.Context
-	cancel context.CancelFunc
+	initProgress    *pb.ProgressBar
+	executorConfigs []lib.ExecutorConfig // sorted by (startTime, ID)
+	executors       []lib.Executor       // sorted by (startTime, ID), excludes executors with no work
+	executionPlan   []lib.ExecutionStep
+	maxDuration     time.Duration // cached value derived from the execution plan
+	maxPossibleVUs  uint64        // cached value derived from the execution plan
+	state           *lib.ExecutionState
 }
 
-func (h *vuHandle) run(logger *logrus.Logger, flow <-chan int64, iterDone chan<- struct{}) {
-	h.RLock()
-	ctx := h.ctx
-	h.RUnlock()
+// Check to see if we implement the lib.ExecutionScheduler interface
+var _ lib.ExecutionScheduler = &ExecutionScheduler{}
 
-	for {
-		select {
-		case _, ok := <-flow:
-			if !ok {
-				return
-			}
-		case <-ctx.Done():
-			return
+// NewExecutionScheduler creates and returns a new local lib.ExecutionScheduler
+// instance, without initializing it beyond the bare minimum. Specifically, it
+// creates the needed executor instances and a lot of state placeholders, but it
+// doesn't initialize the executors and it doesn't initialize or run VUs.
+func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*ExecutionScheduler, error) {
+	options := runner.GetOptions()
+	et, err := lib.NewExecutionTuple(options.ExecutionSegment, options.ExecutionSegmentSequence)
+	if err != nil {
+		return nil, err
+	}
+	executionPlan := options.Scenarios.GetFullExecutionRequirements(et)
+	maxPlannedVUs := lib.GetMaxPlannedVUs(executionPlan)
+	maxPossibleVUs := lib.GetMaxPossibleVUs(executionPlan)
+
+	executionState := lib.NewExecutionState(options, et, maxPlannedVUs, maxPossibleVUs)
+	maxDuration, _ := lib.GetEndOffset(executionPlan) // we don't care if the end offset is final
+
+	executorConfigs := options.Scenarios.GetSortedConfigs()
+	executors := make([]lib.Executor, 0, len(executorConfigs))
+	// Only take executors which have work.
+	for _, sc := range executorConfigs {
+		if !sc.HasWork(et) {
+			logger.Warnf(
+				"Executor '%s' is disabled for segment %s due to lack of work!",
+				sc.GetName(), options.ExecutionSegment,
+			)
+			continue
 		}
-
-		if h.vu != nil {
-			err := h.vu.RunOnce(ctx)
-			select {
-			case <-ctx.Done():
-			// Don't log errors or emit iterations metrics from cancelled iterations
-			default:
-				if err != nil {
-					if s, ok := err.(fmt.Stringer); ok {
-						logger.Error(s.String())
-					} else {
-						logger.Error(err.Error())
-					}
-				}
-				iterDone <- struct{}{}
-			}
-		} else {
-			iterDone <- struct{}{}
+		s, err := sc.NewExecutor(executionState, logger.WithFields(logrus.Fields{
+			"scenario": sc.GetName(),
+			"executor": sc.GetType(),
+		}))
+		if err != nil {
+			return nil, err
 		}
-	}
-}
-
-type Executor struct {
-	Runner lib.Runner
-	Logger *logrus.Logger
-
-	runLock sync.Mutex
-	wg      sync.WaitGroup
-
-	runSetup    bool
-	runTeardown bool
-
-	vus       []*vuHandle
-	vusLock   sync.RWMutex
-	numVUs    int64
-	numVUsMax int64
-	nextVUID  int64
-
-	iters     int64 // Completed iterations
-	partIters int64 // Partial, incomplete iterations
-	endIters  int64 // End test at this many iterations
-
-	time    int64 // Current time
-	endTime int64 // End test at this timestamp
-
-	pauseLock sync.RWMutex
-	pause     chan interface{}
-
-	stages []lib.Stage
-
-	// Lock for: ctx, flow, out
-	lock sync.RWMutex
-
-	// Current context, nil if a test isn't running right now.
-	ctx context.Context
-
-	// Output channel to which VUs send samples.
-	vuOut chan stats.SampleContainer
-
-	// Channel on which VUs sigal that iterations are completed
-	iterDone chan struct{}
-
-	// Flow control for VUs; iterations are run only after reading from this channel.
-	flow chan int64
-}
-
-func New(r lib.Runner) *Executor {
-	var bufferSize int64
-	if r != nil {
-		bufferSize = r.GetOptions().MetricSamplesBufferSize.Int64
+		executors = append(executors, s)
 	}
 
-	return &Executor{
-		Runner:      r,
-		Logger:      logrus.StandardLogger(),
-		runSetup:    true,
-		runTeardown: true,
-		endIters:    -1,
-		endTime:     -1,
-		vuOut:       make(chan stats.SampleContainer, bufferSize),
-		iterDone:    make(chan struct{}),
-	}
-}
-
-func (e *Executor) Run(parent context.Context, engineOut chan<- stats.SampleContainer) (reterr error) {
-	e.runLock.Lock()
-	defer e.runLock.Unlock()
-
-	if e.Runner != nil && e.runSetup {
-		if err := e.Runner.Setup(parent, engineOut); err != nil {
-			return err
+	if options.Paused.Bool {
+		if err := executionState.Pause(); err != nil {
+			return nil, err
 		}
 	}
 
-	ctx, cancel := context.WithCancel(parent)
-	vuFlow := make(chan int64)
-	e.lock.Lock()
-	vuOut := e.vuOut
-	iterDone := e.iterDone
-	e.ctx = ctx
-	e.flow = vuFlow
-	e.lock.Unlock()
+	return &ExecutionScheduler{
+		runner:  runner,
+		logger:  logger,
+		options: options,
 
-	var cutoff time.Time
-	defer func() {
-		if e.Runner != nil && e.runTeardown {
-			err := e.Runner.Teardown(parent, engineOut)
-			if reterr == nil {
-				reterr = err
-			} else if err != nil {
-				reterr = fmt.Errorf("teardown error %#v\nPrevious error: %#v", err, reterr)
-			}
-		}
+		initProgress:    pb.New(pb.WithConstLeft("Init")),
+		executors:       executors,
+		executorConfigs: executorConfigs,
+		executionPlan:   executionPlan,
+		maxDuration:     maxDuration,
+		maxPossibleVUs:  maxPossibleVUs,
+		state:           executionState,
+	}, nil
+}
 
-		close(vuFlow)
-		cancel()
+// GetRunner returns the wrapped lib.Runner instance.
+func (e *ExecutionScheduler) GetRunner() lib.Runner {
+	return e.runner
+}
 
-		e.lock.Lock()
-		e.ctx = nil
-		e.vuOut = nil
-		e.flow = nil
-		e.lock.Unlock()
+// GetState returns a pointer to the execution state struct for the local
+// execution scheduler. It's guaranteed to be initialized and present, though
+// see the documentation in lib/execution.go for caveats about its usage. The
+// most important one is that none of the methods beyond the pause-related ones
+// should be used for synchronization.
+func (e *ExecutionScheduler) GetState() *lib.ExecutionState {
+	return e.state
+}
 
-		wait := make(chan interface{})
+// GetExecutors returns the slice of configured executor instances which
+// have work, sorted by their (startTime, name) in an ascending order.
+func (e *ExecutionScheduler) GetExecutors() []lib.Executor {
+	return e.executors
+}
+
+// GetExecutorConfigs returns the slice of all executor configs, sorted by
+// their (startTime, name) in an ascending order.
+func (e *ExecutionScheduler) GetExecutorConfigs() []lib.ExecutorConfig {
+	return e.executorConfigs
+}
+
+// GetInitProgressBar returns the progress bar associated with the Init
+// function. After the Init is done, it is "hijacked" to display real-time
+// execution statistics as a text bar.
+func (e *ExecutionScheduler) GetInitProgressBar() *pb.ProgressBar {
+	return e.initProgress
+}
+
+// GetExecutionPlan is a helper method so users of the local execution scheduler
+// don't have to calculate the execution plan again.
+func (e *ExecutionScheduler) GetExecutionPlan() []lib.ExecutionStep {
+	return e.executionPlan
+}
+
+// initVU is a helper method that's used to both initialize the planned VUs
+// in the Init() method, and also passed to executors so they can initialize
+// any unplanned VUs themselves.
+func (e *ExecutionScheduler) initVU(
+	samplesOut chan<- stats.SampleContainer, logger *logrus.Entry,
+) (lib.InitializedVU, error) {
+	// Get the VU IDs here, so that the VUs are (mostly) ordered by their
+	// number in the channel buffer
+	vuIDLocal, vuIDGlobal := e.state.GetUniqueVUIdentifiers()
+	vu, err := e.runner.NewVU(vuIDLocal, vuIDGlobal, samplesOut)
+	if err != nil {
+		return nil, errext.WithHint(err, fmt.Sprintf("error while initializing VU #%d", vuIDGlobal))
+	}
+
+	logger.Debugf("Initialized VU #%d", vuIDGlobal)
+	return vu, nil
+}
+
+// getRunStats is a helper function that can be used as the execution
+// scheduler's progressbar substitute (i.e. hijack).
+func (e *ExecutionScheduler) getRunStats() string {
+	status := "running"
+	if e.state.IsPaused() {
+		status = "paused"
+	}
+	if e.state.HasStarted() {
+		dur := e.state.GetCurrentTestRunDuration()
+		status = fmt.Sprintf("%s (%s)", status, pb.GetFixedLengthDuration(dur, e.maxDuration))
+	}
+
+	vusFmt := pb.GetFixedLengthIntFormat(int64(e.maxPossibleVUs))
+	return fmt.Sprintf(
+		"%s, "+vusFmt+"/"+vusFmt+" VUs, %d complete and %d interrupted iterations",
+		status, e.state.GetCurrentlyActiveVUsCount(), e.state.GetInitializedVUsCount(),
+		e.state.GetFullIterationCount(), e.state.GetPartialIterationCount(),
+	)
+}
+
+func (e *ExecutionScheduler) initVUsConcurrently(
+	ctx context.Context, samplesOut chan<- stats.SampleContainer, count uint64,
+	concurrency int, logger *logrus.Entry,
+) chan error {
+	doneInits := make(chan error, count) // poor man's early-return waitgroup
+	limiter := make(chan struct{})
+
+	for i := 0; i < concurrency; i++ {
 		go func() {
-			e.wg.Wait()
-			close(wait)
-		}()
-
-		for {
-			select {
-			case <-iterDone:
-				// Spool through all remaining iterations, do not emit stats since the Run() is over
-			case newSampleContainer := <-vuOut:
-				if cutoff.IsZero() {
-					engineOut <- newSampleContainer
-				} else if csc, ok := newSampleContainer.(stats.ConnectedSampleContainer); ok && csc.GetTime().Before(cutoff) {
-					engineOut <- newSampleContainer
-				} else {
-					for _, s := range newSampleContainer.GetSamples() {
-						if s.Time.Before(cutoff) {
-							engineOut <- s
-						}
-					}
+			for range limiter {
+				newVU, err := e.initVU(samplesOut, logger)
+				if err == nil {
+					e.state.AddInitializedVU(newVU)
 				}
-			case <-wait:
+				doneInits <- err
 			}
+		}()
+	}
+
+	go func() {
+		defer close(limiter)
+		for vuNum := uint64(0); vuNum < count; vuNum++ {
 			select {
-			case <-wait:
-				close(vuOut)
+			case limiter <- struct{}{}:
+			case <-ctx.Done():
 				return
-			default:
 			}
 		}
 	}()
 
-	startVUs := atomic.LoadInt64(&e.numVUs)
-	if err := e.scale(ctx, lib.Max(0, startVUs)); err != nil {
-		return err
+	return doneInits
+}
+
+// Init concurrently initializes all of the planned VUs and then sequentially
+// initializes all of the configured executors.
+func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- stats.SampleContainer) error {
+	logger := e.logger.WithField("phase", "local-execution-scheduler-init")
+
+	vusToInitialize := lib.GetMaxPlannedVUs(e.executionPlan)
+	logger.WithFields(logrus.Fields{
+		"neededVUs":      vusToInitialize,
+		"executorsCount": len(e.executors),
+	}).Debugf("Start of initialization")
+
+	subctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	e.state.SetExecutionStatus(lib.ExecutionStatusInitVUs)
+	doneInits := e.initVUsConcurrently(subctx, samplesOut, vusToInitialize, runtime.GOMAXPROCS(0), logger)
+
+	initializedVUs := new(uint64)
+	vusFmt := pb.GetFixedLengthIntFormat(int64(vusToInitialize))
+	e.initProgress.Modify(
+		pb.WithProgress(func() (float64, []string) {
+			doneVUs := atomic.LoadUint64(initializedVUs)
+			right := fmt.Sprintf(vusFmt+"/%d VUs initialized", doneVUs, vusToInitialize)
+			return float64(doneVUs) / float64(vusToInitialize), []string{right}
+		}),
+	)
+
+	for vuNum := uint64(0); vuNum < vusToInitialize; vuNum++ {
+		select {
+		case err := <-doneInits:
+			if err != nil {
+				logger.WithError(err).Debug("VU initialization returned with an error, aborting...")
+				// the context's cancel() is called in a defer above and will
+				// abort any in-flight VU initializations
+				return err
+			}
+			atomic.AddUint64(initializedVUs, 1)
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 
-	ticker := time.NewTicker(1 * time.Millisecond)
-	defer ticker.Stop()
+	e.state.SetInitVUFunc(func(ctx context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
+		return e.initVU(samplesOut, logger)
+	})
 
-	lastTick := time.Now()
-	for {
-		// If the test is paused, sleep until either the pause or the test ends.
-		// Also shift the last tick to omit time spent paused, but not partial ticks.
-		e.pauseLock.RLock()
-		pause := e.pause
-		e.pauseLock.RUnlock()
-		if pause != nil {
-			e.Logger.Debug("Local: Pausing!")
-			leftovers := time.Since(lastTick)
-			select {
-			case <-pause:
-				e.Logger.Debug("Local: No longer paused")
-				lastTick = time.Now().Add(-leftovers)
-			case <-ctx.Done():
-				e.Logger.Debug("Local: Terminated while in paused state")
-				return nil
-			}
+	e.state.SetExecutionStatus(lib.ExecutionStatusInitExecutors)
+	logger.Debugf("Finished initializing needed VUs, start initializing executors...")
+	for _, exec := range e.executors {
+		executorConfig := exec.GetConfig()
+
+		if err := exec.Init(ctx); err != nil {
+			return fmt.Errorf("error while initializing executor %s: %w", executorConfig.GetName(), err)
 		}
+		logger.Debugf("Initialized executor %s", executorConfig.GetName())
+	}
 
-		// Dumb hack: we don't wanna start any more iterations than the max, but we can't
-		// conditionally select on a channel either...so, we cheat: swap out the flow channel for a
-		// nil channel (writing to nil always blocks) if we don't wanna write an iteration.
-		flow := vuFlow
-		end := atomic.LoadInt64(&e.endIters)
-		partials := atomic.LoadInt64(&e.partIters)
-		if end >= 0 && partials >= end {
-			flow = nil
-		}
+	e.state.SetExecutionStatus(lib.ExecutionStatusInitDone)
+	logger.Debugf("Initialization completed")
+	return nil
+}
 
+// runExecutor gets called by the public Run() method once per configured
+// executor, each time in a new goroutine. It is responsible for waiting out the
+// configured startTime for the specific executor and then running its Run()
+// method.
+func (e *ExecutionScheduler) runExecutor(
+	runCtx context.Context, runResults chan<- error, engineOut chan<- stats.SampleContainer, executor lib.Executor,
+	builtinMetrics *metrics.BuiltinMetrics,
+) {
+	executorConfig := executor.GetConfig()
+	executorStartTime := executorConfig.GetStartTime()
+	executorLogger := e.logger.WithFields(logrus.Fields{
+		"executor":  executorConfig.GetName(),
+		"type":      executorConfig.GetType(),
+		"startTime": executorStartTime,
+	})
+	executorProgress := executor.GetProgress()
+
+	// Check if we have to wait before starting the actual executor execution
+	if executorStartTime > 0 {
+		startTime := time.Now()
+		executorProgress.Modify(
+			pb.WithStatus(pb.Waiting),
+			pb.WithProgress(func() (float64, []string) {
+				remWait := (executorStartTime - time.Since(startTime))
+				return 0, []string{"waiting", pb.GetFixedLengthDuration(remWait, executorStartTime)}
+			}),
+		)
+
+		executorLogger.Debugf("Waiting for executor start time...")
 		select {
-		case flow <- partials:
-			// Start an iteration if there's a VU waiting. See also: the big comment block above.
-			atomic.AddInt64(&e.partIters, 1)
-		case t := <-ticker.C:
-			// Every tick, increment the clock, see if we passed the end point, and process stages.
-			// If the test ends this way, set a cutoff point; any samples collected past the cutoff
-			// point are excluded.
-			d := t.Sub(lastTick)
-			lastTick = t
+		case <-runCtx.Done():
+			runResults <- nil // no error since executor hasn't started yet
+			return
+		case <-time.After(executorStartTime):
+			// continue
+		}
+	}
 
-			end := time.Duration(atomic.LoadInt64(&e.endTime))
-			at := time.Duration(atomic.AddInt64(&e.time, int64(d)))
-			if end >= 0 && at >= end {
-				e.Logger.WithFields(logrus.Fields{"at": at, "end": end}).Debug("Local: Hit time limit")
-				cutoff = time.Now()
-				return nil
-			}
+	executorProgress.Modify(
+		pb.WithStatus(pb.Running),
+		pb.WithConstProgress(0, "started"),
+	)
+	executorLogger.Debugf("Starting executor")
+	err := executor.Run(runCtx, engineOut, builtinMetrics) // executor should handle context cancel itself
+	if err == nil {
+		executorLogger.Debugf("Executor finished successfully")
+	} else {
+		executorLogger.WithField("error", err).Errorf("Executor error")
+	}
+	runResults <- err
+}
 
-			stages := e.stages
-			if len(stages) > 0 {
-				vus, keepRunning := ProcessStages(startVUs, stages, at)
-				if !keepRunning {
-					e.Logger.WithField("at", at).Debug("Local: Ran out of stages")
-					cutoff = time.Now()
-					return nil
-				}
-				if vus.Valid {
-					if err := e.SetVUs(vus.Int64); err != nil {
-						return err
-					}
-				}
-			}
-		case sampleContainer := <-vuOut:
-			engineOut <- sampleContainer
-		case <-iterDone:
-			// Every iteration ends with a write to iterDone. Check if we've hit the end point.
-			// If not, make sure to include an Iterations bump in the list!
-			end := atomic.LoadInt64(&e.endIters)
-			at := atomic.AddInt64(&e.iters, 1)
-			if end >= 0 && at >= end {
-				e.Logger.WithFields(logrus.Fields{"at": at, "end": end}).Debug("Local: Hit iteration limit")
-				return nil
-			}
-		case <-ctx.Done():
-			// If the test is cancelled, just set the cutoff point to now and proceed down the same
-			// logic as if the time limit was hit.
-			e.Logger.Debug("Local: Exiting with context")
-			cutoff = time.Now()
+// Run the ExecutionScheduler, funneling all generated metric samples through the supplied
+// out channel.
+//nolint:cyclop
+func (e *ExecutionScheduler) Run(
+	globalCtx, runCtx context.Context, engineOut chan<- stats.SampleContainer, builtinMetrics *metrics.BuiltinMetrics,
+) error {
+	executorsCount := len(e.executors)
+	logger := e.logger.WithField("phase", "local-execution-scheduler-run")
+	e.initProgress.Modify(pb.WithConstLeft("Run"))
+	defer e.state.MarkEnded()
+
+	if e.state.IsPaused() {
+		logger.Debug("Execution is paused, waiting for resume or interrupt...")
+		e.state.SetExecutionStatus(lib.ExecutionStatusPausedBeforeRun)
+		e.initProgress.Modify(pb.WithConstProgress(1, "paused"))
+		select {
+		case <-e.state.ResumeNotify():
+			// continue
+		case <-runCtx.Done():
 			return nil
 		}
 	}
-}
 
-func (e *Executor) scale(ctx context.Context, num int64) error {
-	e.Logger.WithField("num", num).Debug("Local: Scaling...")
+	e.state.MarkStarted()
+	e.initProgress.Modify(pb.WithConstProgress(1, "running"))
 
-	e.vusLock.Lock()
-	defer e.vusLock.Unlock()
+	logger.WithFields(logrus.Fields{"executorsCount": executorsCount}).Debugf("Start of test run")
 
-	e.lock.RLock()
-	flow := e.flow
-	iterDone := e.iterDone
-	e.lock.RUnlock()
+	runResults := make(chan error, executorsCount) // nil values are successful runs
 
-	for i, handle := range e.vus {
-		handle := handle
-		handle.RLock()
-		cancel := handle.cancel
-		handle.RUnlock()
+	runCtx = lib.WithExecutionState(runCtx, e.state)
+	runSubCtx, cancel := context.WithCancel(runCtx)
+	defer cancel() // just in case, and to shut up go vet...
 
-		if i < int(num) {
-			if cancel == nil {
-				vuctx, cancel := context.WithCancel(ctx)
-				handle.Lock()
-				handle.ctx = vuctx
-				handle.cancel = cancel
-				handle.Unlock()
-
-				if handle.vu != nil {
-					if err := handle.vu.Reconfigure(atomic.AddInt64(&e.nextVUID, 1)); err != nil {
-						return err
-					}
-				}
-
-				e.wg.Add(1)
-				go func() {
-					handle.run(e.Logger, flow, iterDone)
-					e.wg.Done()
-				}()
-			}
-		} else if cancel != nil {
-			handle.Lock()
-			handle.cancel()
-			handle.cancel = nil
-			handle.Unlock()
-		}
-	}
-
-	atomic.StoreInt64(&e.numVUs, num)
-	return nil
-}
-
-func (e *Executor) IsRunning() bool {
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.ctx != nil
-}
-
-func (e *Executor) GetRunner() lib.Runner {
-	return e.Runner
-}
-
-// SetLogger sets Executor's logger.
-func (e *Executor) SetLogger(l *logrus.Logger) {
-	e.Logger = l
-}
-
-// GetLogger returns current Executor's logger.
-func (e *Executor) GetLogger() *logrus.Logger {
-	return e.Logger
-}
-
-func (e *Executor) GetStages() []lib.Stage {
-	return e.stages
-}
-
-func (e *Executor) SetStages(s []lib.Stage) {
-	e.stages = s
-}
-
-func (e *Executor) GetIterations() int64 {
-	return atomic.LoadInt64(&e.iters)
-}
-
-func (e *Executor) GetEndIterations() null.Int {
-	v := atomic.LoadInt64(&e.endIters)
-	if v < 0 {
-		return null.Int{}
-	}
-	return null.IntFrom(v)
-}
-
-func (e *Executor) SetEndIterations(i null.Int) {
-	if !i.Valid {
-		i.Int64 = -1
-	}
-	e.Logger.WithField("i", i.Int64).Debug("Local: Setting end iterations")
-	atomic.StoreInt64(&e.endIters, i.Int64)
-}
-
-func (e *Executor) GetTime() time.Duration {
-	return time.Duration(atomic.LoadInt64(&e.time))
-}
-
-func (e *Executor) GetEndTime() types.NullDuration {
-	v := atomic.LoadInt64(&e.endTime)
-	if v < 0 {
-		return types.NullDuration{}
-	}
-	return types.NullDurationFrom(time.Duration(v))
-}
-
-func (e *Executor) SetEndTime(t types.NullDuration) {
-	if !t.Valid {
-		t.Duration = -1
-	}
-	e.Logger.WithField("d", t.Duration).Debug("Local: Setting end time")
-	atomic.StoreInt64(&e.endTime, int64(t.Duration))
-}
-
-func (e *Executor) IsPaused() bool {
-	e.pauseLock.RLock()
-	defer e.pauseLock.RUnlock()
-	return e.pause != nil
-}
-
-func (e *Executor) SetPaused(paused bool) {
-	e.Logger.WithField("paused", paused).Debug("Local: Setting paused")
-	e.pauseLock.Lock()
-	defer e.pauseLock.Unlock()
-
-	if paused && e.pause == nil {
-		e.pause = make(chan interface{})
-	} else if !paused && e.pause != nil {
-		close(e.pause)
-		e.pause = nil
-	}
-}
-
-func (e *Executor) GetVUs() int64 {
-	return atomic.LoadInt64(&e.numVUs)
-}
-
-func (e *Executor) SetVUs(num int64) error {
-	if num < 0 {
-		return errors.New("vu count can't be negative")
-	}
-
-	if atomic.LoadInt64(&e.numVUs) == num {
-		return nil
-	}
-
-	e.Logger.WithField("vus", num).Debug("Local: Setting VUs")
-
-	if numVUsMax := atomic.LoadInt64(&e.numVUsMax); num > numVUsMax {
-		return errors.Errorf("can't raise vu count (to %d) above vu cap (%d)", num, numVUsMax)
-	}
-
-	if ctx := e.ctx; ctx != nil {
-		if err := e.scale(ctx, num); err != nil {
+	// Run setup() before any executors, if it's not disabled
+	if !e.options.NoSetup.Bool {
+		logger.Debug("Running setup()")
+		e.state.SetExecutionStatus(lib.ExecutionStatusSetup)
+		e.initProgress.Modify(pb.WithConstProgress(1, "setup()"))
+		if err := e.runner.Setup(runSubCtx, engineOut); err != nil {
+			logger.WithField("error", err).Debug("setup() aborted by error")
 			return err
 		}
-	} else {
-		atomic.StoreInt64(&e.numVUs, num)
+	}
+	e.initProgress.Modify(pb.WithHijack(e.getRunStats))
+
+	// Start all executors at their particular startTime in a separate goroutine...
+	logger.Debug("Start all executors...")
+	e.state.SetExecutionStatus(lib.ExecutionStatusRunning)
+	for _, exec := range e.executors {
+		go e.runExecutor(runSubCtx, runResults, engineOut, exec, builtinMetrics)
 	}
 
-	return nil
-}
-
-func (e *Executor) GetVUsMax() int64 {
-	return atomic.LoadInt64(&e.numVUsMax)
-}
-
-func (e *Executor) SetVUsMax(max int64) error {
-	e.Logger.WithField("max", max).Debug("Local: Setting max VUs")
-	if max < 0 {
-		return errors.New("vu cap can't be negative")
-	}
-
-	numVUsMax := atomic.LoadInt64(&e.numVUsMax)
-
-	if numVUsMax == max {
-		return nil
-	}
-
-	if numVUs := atomic.LoadInt64(&e.numVUs); max < numVUs {
-		return errors.Errorf("can't lower vu cap (to %d) below vu count (%d)", max, numVUs)
-	}
-
-	if max < numVUsMax {
-		e.vus = e.vus[:max]
-		atomic.StoreInt64(&e.numVUsMax, max)
-		return nil
-	}
-
-	e.lock.RLock()
-	vuOut := e.vuOut
-	e.lock.RUnlock()
-
-	e.vusLock.Lock()
-	defer e.vusLock.Unlock()
-
-	vus := e.vus
-	for i := numVUsMax; i < max; i++ {
-		var handle vuHandle
-		if e.Runner != nil {
-			vu, err := e.Runner.NewVU(vuOut)
-			if err != nil {
-				return err
-			}
-			handle.vu = vu
+	// Wait for all executors to finish
+	var firstErr error
+	for range e.executors {
+		err := <-runResults
+		if err != nil && firstErr == nil {
+			logger.WithError(err).Debug("Executor returned with an error, cancelling test run...")
+			firstErr = err
+			cancel()
 		}
-		vus = append(vus, &handle)
 	}
-	e.vus = vus
 
-	atomic.StoreInt64(&e.numVUsMax, max)
+	// Run teardown() after all executors are done, if it's not disabled
+	if !e.options.NoTeardown.Bool {
+		logger.Debug("Running teardown()")
+		e.state.SetExecutionStatus(lib.ExecutionStatusTeardown)
+		e.initProgress.Modify(pb.WithConstProgress(1, "teardown()"))
 
-	return nil
+		// We run teardown() with the global context, so it isn't interrupted by
+		// aborts caused by thresholds or even Ctrl+C (unless used twice).
+		if err := e.runner.Teardown(globalCtx, engineOut); err != nil {
+			logger.WithField("error", err).Debug("teardown() aborted by error")
+			return err
+		}
+	}
+
+	return firstErr
 }
 
-func (e *Executor) SetRunSetup(r bool) {
-	e.runSetup = r
-}
+// SetPaused pauses a test, if called with true. And if called with false, tries
+// to start/resume it. See the lib.ExecutionScheduler interface documentation of
+// the methods for the various caveats about its usage.
+func (e *ExecutionScheduler) SetPaused(pause bool) error {
+	if !e.state.HasStarted() && e.state.IsPaused() {
+		if pause {
+			return fmt.Errorf("execution is already paused")
+		}
+		e.logger.Debug("Starting execution")
+		return e.state.Resume()
+	}
 
-func (e *Executor) SetRunTeardown(r bool) {
-	e.runTeardown = r
+	for _, exec := range e.executors {
+		pausableExecutor, ok := exec.(lib.PausableExecutor)
+		if !ok {
+			return fmt.Errorf(
+				"%s executor '%s' doesn't support pause and resume operations after its start",
+				exec.GetConfig().GetType(), exec.GetConfig().GetName(),
+			)
+		}
+		if err := pausableExecutor.SetPaused(pause); err != nil {
+			return err
+		}
+	}
+	if pause {
+		return e.state.Pause()
+	}
+	return e.state.Resume()
 }

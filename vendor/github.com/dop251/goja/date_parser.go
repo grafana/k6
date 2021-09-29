@@ -5,6 +5,8 @@ package goja
 // - 6-digit extended years are supported in place of long year (2006) in the form of +123456
 // - Timezone formats tolerate colons, e.g. -0700 will parse -07:00
 // - Short week day will also parse long week day
+// - Short month ("Jan") will also parse long month ("January")
+// - Long day ("02") will also parse short day ("2").
 // - Timezone in brackets, "(MST)", will match any string in brackets (e.g. "(GMT Standard Time)")
 // - If offset is not set and timezone name is unknown, an error is returned
 // - If offset and timezone name are both set the offset takes precedence and the resulting Location will be FixedZone("", offset)
@@ -133,7 +135,10 @@ func parseDate(layout, value string, defaultLocation *time.Location) (time.Time,
 			}
 
 		case stdMonth:
-			month, value, err = lookup(shortMonthNames, value)
+			month, value, err = lookup(longMonthNames, value)
+			if err != nil {
+				month, value, err = lookup(shortMonthNames, value)
+			}
 			month++
 		case stdLongMonth:
 			month, value, err = lookup(longMonthNames, value)
@@ -155,7 +160,7 @@ func parseDate(layout, value string, defaultLocation *time.Location) (time.Time,
 			if std == stdUnderDay && len(value) > 0 && value[0] == ' ' {
 				value = value[1:]
 			}
-			day, value, err = getnum(value, std == stdZeroDay)
+			day, value, err = getnum(value, false)
 			if day < 0 {
 				// Note that we allow any one- or two-digit day here.
 				rangeErrString = "day"

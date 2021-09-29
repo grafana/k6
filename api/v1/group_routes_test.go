@@ -26,11 +26,17 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/loadimpact/k6/core"
-	"github.com/loadimpact/k6/core/local"
-	"github.com/loadimpact/k6/lib"
 	"github.com/manyminds/api2go/jsonapi"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/core"
+	"go.k6.io/k6/core/local"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/lib/testutils/minirunner"
 )
 
 func TestGetGroups(t *testing.T) {
@@ -41,8 +47,15 @@ func TestGetGroups(t *testing.T) {
 	g2, err := g1.Group("group 2")
 	assert.NoError(t, err)
 
-	engine, err := core.NewEngine(local.New(&lib.MiniRunner{Group: g0}), lib.Options{})
-	assert.NoError(t, err)
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Group: g0}, logger)
+	require.NoError(t, err)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, builtinMetrics)
+	require.NoError(t, err)
 
 	t.Run("list", func(t *testing.T) {
 		rw := httptest.NewRecorder()
@@ -61,34 +74,33 @@ func TestGetGroups(t *testing.T) {
 			}
 		})
 
-		// t.Run("groups", func(t *testing.T) {
-		// 	var groups []Group
-		// 	assert.NoError(t, jsonapi.Unmarshal(body, &groups))
-		// 	if assert.Len(t, groups, 3) {
-		// 		for _, g := range groups {
-		// 			switch g.ID {
-		// 			case g0.ID:
-		// 				assert.Equal(t, "", g.Name)
-		// 				assert.Nil(t, g.Parent)
-		// 				assert.Equal(t, "", g.ParentID)
-		// 				assert.Len(t, g.GroupIDs, 1)
-		// 				assert.EqualValues(t, []string{g1.ID}, g.GroupIDs)
-		// 			case g1.ID:
-		// 				assert.Equal(t, "group 1", g.Name)
-		// 				assert.Nil(t, g.Parent)
-		// 				assert.Equal(t, g0.ID, g.ParentID)
-		// 				assert.EqualValues(t, []string{g2.ID}, g.GroupIDs)
-		// 			case g2.ID:
-		// 				assert.Equal(t, "group 2", g.Name)
-		// 				assert.Nil(t, g.Parent)
-		// 				assert.Equal(t, g1.ID, g.ParentID)
-		// 				assert.EqualValues(t, []string{}, g.GroupIDs)
-		// 			default:
-		// 				assert.Fail(t, "Unknown ID: "+g.ID)
-		// 			}
-		// 		}
-		// 	}
-		// })
+		t.Run("groups", func(t *testing.T) {
+			var groups []Group
+			require.NoError(t, jsonapi.Unmarshal(body, &groups))
+			require.Len(t, groups, 3)
+			for _, g := range groups {
+				switch g.ID {
+				case g0.ID:
+					assert.Equal(t, "", g.Name)
+					assert.Nil(t, g.Parent)
+					assert.Equal(t, "", g.ParentID)
+					assert.Len(t, g.GroupIDs, 1)
+					assert.EqualValues(t, []string{g1.ID}, g.GroupIDs)
+				case g1.ID:
+					assert.Equal(t, "group 1", g.Name)
+					assert.Nil(t, g.Parent)
+					assert.Equal(t, g0.ID, g.ParentID)
+					assert.EqualValues(t, []string{g2.ID}, g.GroupIDs)
+				case g2.ID:
+					assert.Equal(t, "group 2", g.Name)
+					assert.Nil(t, g.Parent)
+					assert.Equal(t, g1.ID, g.ParentID)
+					assert.EqualValues(t, []string{}, g.GroupIDs)
+				default:
+					assert.Fail(t, "Unknown ID: "+g.ID)
+				}
+			}
+		})
 	})
 	for _, gp := range []*lib.Group{g0, g1, g2} {
 		t.Run(gp.Name, func(t *testing.T) {

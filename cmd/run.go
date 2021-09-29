@@ -25,61 +25,55 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
-	"strings"
+	"sync"
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	null "gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/api"
-	"github.com/loadimpact/k6/core"
-	"github.com/loadimpact/k6/core/local"
-	"github.com/loadimpact/k6/js"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/consts"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/loader"
-	"github.com/loadimpact/k6/ui"
+	"go.k6.io/k6/api"
+	"go.k6.io/k6/core"
+	"go.k6.io/k6/core/local"
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/js"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/loader"
+	"go.k6.io/k6/ui/pb"
 )
 
 const (
 	typeJS      = "js"
 	typeArchive = "archive"
-
-	thresholdHaveFailedErrorCode = 99
-	setupTimeoutErrorCode        = 100
-	teardownTimeoutErrorCode     = 101
-	genericTimeoutErrorCode      = 102
-	genericEngineErrorCode       = 103
-	invalidConfigErrorCode       = 104
 )
 
-var (
-	//TODO: fix this, global variables are not very testable...
-	runType       = os.Getenv("K6_TYPE")
-	runNoSetup    = os.Getenv("K6_NO_SETUP") != ""
-	runNoTeardown = os.Getenv("K6_NO_TEARDOWN") != ""
-)
+// TODO: fix this, global variables are not very testable...
+//nolint:gochecknoglobals
+var runType = os.Getenv("K6_TYPE")
 
-// runCmd represents the run command.
-var runCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Start a load test",
-	Long: `Start a load test.
+//nolint:funlen,gocognit,gocyclo
+func getRunCmd(ctx context.Context, logger *logrus.Logger) *cobra.Command {
+	// runCmd represents the run command.
+	runCmd := &cobra.Command{
+		Use:   "run",
+		Short: "Start a load test",
+		Long: `Start a load test.
 
 This also exposes a REST API to interact with it. Various k6 subcommands offer
 a commandline interface for interacting with it.`,
-	Example: `
+		Example: `
   # Run a single VU, once.
   k6 run script.js
 
@@ -97,392 +91,280 @@ a commandline interface for interacting with it.`,
 
   # Send metrics to an influxdb server
   k6 run -o influxdb=http://1.2.3.4:8086/k6`[1:],
-	Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		//TODO: disable in quiet mode?
-		_, _ = BannerColor.Fprintf(stdout, "\n%s\n\n", consts.Banner)
+		Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// TODO: disable in quiet mode?
+			_, _ = fmt.Fprintf(stdout, "\n%s\n\n", getBanner(noColor || !stdoutTTY))
 
-		initBar := ui.ProgressBar{
-			Width: 60,
-			Left:  func() string { return "    init" },
-		}
+			logger.Debug("Initializing the runner...")
 
-		// Create the Runner.
-		fprintf(stdout, "%s runner\r", initBar.String())
-		pwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		filename := args[0]
-		filesystems := loader.CreateFilesystems()
-		src, err := loader.ReadSource(filename, pwd, filesystems, os.Stdin)
-		if err != nil {
-			return err
-		}
-
-		runtimeOptions, err := getRuntimeOptions(cmd.Flags())
-		if err != nil {
-			return err
-		}
-
-		r, err := newRunner(src, runType, filesystems, runtimeOptions)
-		if err != nil {
-			return err
-		}
-
-		fprintf(stdout, "%s options\r", initBar.String())
-
-		cliConf, err := getConfig(cmd.Flags())
-		if err != nil {
-			return err
-		}
-		conf, err := getConsolidatedConfig(afero.NewOsFs(), cliConf, r)
-		if err != nil {
-			return err
-		}
-
-		// If -m/--max isn't specified, figure out the max that should be needed.
-		if !conf.VUsMax.Valid {
-			conf.VUsMax = null.NewInt(conf.VUs.Int64, conf.VUs.Valid)
-			for _, stage := range conf.Stages {
-				if stage.Target.Valid && stage.Target.Int64 > conf.VUsMax.Int64 {
-					conf.VUsMax = stage.Target
-				}
-			}
-		}
-
-		// If -d/--duration, -i/--iterations and -s/--stage are all unset, run to one iteration.
-		if !conf.Duration.Valid && !conf.Iterations.Valid && len(conf.Stages) == 0 {
-			conf.Iterations = null.IntFrom(1)
-		}
-
-		if conf.Iterations.Valid && conf.Iterations.Int64 < conf.VUsMax.Int64 {
-			logrus.Warnf(
-				"All iterations (%d in this test run) are shared between all VUs, so some of the %d VUs will not execute even a single iteration!",
-				conf.Iterations.Int64, conf.VUsMax.Int64,
-			)
-		}
-
-		//TODO: move a bunch of the logic above to a config "constructor" and to the Validate() method
-
-		// If duration is explicitly set to 0, it means run forever.
-		//TODO: just... handle this differently, e.g. as a part of the manual executor
-		if conf.Duration.Valid && conf.Duration.Duration == 0 {
-			conf.Duration = types.NullDuration{}
-		}
-
-		conf, cerr := deriveAndValidateConfig(conf)
-		if cerr != nil {
-			return ExitCode{error: cerr, Code: invalidConfigErrorCode}
-		}
-
-		// Write options back to the runner too.
-		if err = r.SetOptions(conf.Options); err != nil {
-			return err
-		}
-
-		// Create a local executor wrapping the runner.
-		fprintf(stdout, "%s executor\r", initBar.String())
-		ex := local.New(r)
-		if runNoSetup {
-			ex.SetRunSetup(false)
-		}
-		if runNoTeardown {
-			ex.SetRunTeardown(false)
-		}
-
-		// Create an engine.
-		fprintf(stdout, "%s   engine\r", initBar.String())
-		engine, err := core.NewEngine(ex, conf.Options)
-		if err != nil {
-			return err
-		}
-
-		// Configure the engine.
-		if conf.NoThresholds.Valid {
-			engine.NoThresholds = conf.NoThresholds.Bool
-		}
-		if conf.NoSummary.Valid {
-			engine.NoSummary = conf.NoSummary.Bool
-		}
-		if conf.SummaryExport.Valid {
-			engine.SummaryExport = conf.SummaryExport.String != ""
-		}
-
-		// Create a collector and assign it to the engine if requested.
-		fprintf(stdout, "%s   collector\r", initBar.String())
-		for _, out := range conf.Out {
-			t, arg := parseCollector(out)
-			collector, err := newCollector(t, arg, src, conf)
+			// Create the Runner.
+			pwd, err := os.Getwd()
 			if err != nil {
 				return err
 			}
-			if err := collector.Init(); err != nil {
+			filename := args[0]
+			filesystems := loader.CreateFilesystems()
+			src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
+			if err != nil {
 				return err
 			}
-			engine.Collectors = append(engine.Collectors, collector)
-		}
 
-		// Create an API server.
-		fprintf(stdout, "%s   server\r", initBar.String())
-		go func() {
-			if err := api.ListenAndServe(address, engine); err != nil {
-				logrus.WithError(err).Warn("Error from API server")
-			}
-		}()
-
-		// Write the big banner.
-		{
-			out := "-"
-			link := ""
-
-			for idx, collector := range engine.Collectors {
-				if out != "-" {
-					out = out + "; " + conf.Out[idx]
-				} else {
-					out = conf.Out[idx]
-				}
-
-				if l := collector.Link(); l != "" {
-					link = link + " (" + l + ")"
-				}
+			osEnvironment := buildEnvMap(os.Environ())
+			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), osEnvironment)
+			if err != nil {
+				return err
 			}
 
-			fprintf(stdout, "  execution: %s\n", ui.ValueColor.Sprint("local"))
-			fprintf(stdout, "     output: %s%s\n", ui.ValueColor.Sprint(out), ui.ExtraColor.Sprint(link))
-			fprintf(stdout, "     script: %s\n", ui.ValueColor.Sprint(filename))
-			fprintf(stdout, "\n")
-
-			duration := ui.GrayColor.Sprint("-")
-			iterations := ui.GrayColor.Sprint("-")
-			if conf.Duration.Valid {
-				duration = ui.ValueColor.Sprint(conf.Duration.Duration)
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			initRunner, err := newRunner(logger, src, runType, filesystems, runtimeOptions, builtinMetrics, registry)
+			if err != nil {
+				return err
 			}
-			if conf.Iterations.Valid {
-				iterations = ui.ValueColor.Sprint(conf.Iterations.Int64)
+
+			logger.Debug("Getting the script options...")
+
+			cliConf, err := getConfig(cmd.Flags())
+			if err != nil {
+				return err
 			}
-			vus := ui.ValueColor.Sprint(conf.VUs.Int64)
-			max := ui.ValueColor.Sprint(conf.VUsMax.Int64)
-
-			leftWidth := ui.StrWidth(duration)
-			if l := ui.StrWidth(vus); l > leftWidth {
-				leftWidth = l
+			conf, err := getConsolidatedConfig(afero.NewOsFs(), cliConf, initRunner)
+			if err != nil {
+				return err
 			}
-			durationPad := strings.Repeat(" ", leftWidth-ui.StrWidth(duration))
-			vusPad := strings.Repeat(" ", leftWidth-ui.StrWidth(vus))
 
-			fprintf(stdout, "    duration: %s,%s iterations: %s\n", duration, durationPad, iterations)
-			fprintf(stdout, "         vus: %s,%s max: %s\n", vus, vusPad, max)
-			fprintf(stdout, "\n")
-		}
+			conf, err = deriveAndValidateConfig(conf, initRunner.IsExecutable)
+			if err != nil {
+				return err
+			}
 
-		// Run the engine with a cancellable context.
-		fprintf(stdout, "%s starting\r", initBar.String())
-		ctx, cancel := context.WithCancel(context.Background())
-		errC := make(chan error)
-		go func() { errC <- engine.Run(ctx) }()
+			// Write options back to the runner too.
+			if err = initRunner.SetOptions(conf.Options); err != nil {
+				return err
+			}
 
-		// Trap Interrupts, SIGINTs and SIGTERMs.
-		sigC := make(chan os.Signal, 1)
-		signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-		defer signal.Stop(sigC)
+			// We prepare a bunch of contexts:
+			//  - The runCtx is cancelled as soon as the Engine's run() lambda finishes,
+			//    and can trigger things like the usage report and end of test summary.
+			//    Crucially, metrics processing by the Engine will still work after this
+			//    context is cancelled!
+			//  - The lingerCtx is cancelled by Ctrl+C, and is used to wait for that
+			//    event when k6 was ran with the --linger option.
+			//  - The globalCtx is cancelled only after we're completely done with the
+			//    test execution and any --linger has been cleared, so that the Engine
+			//    can start winding down its metrics processing.
+			globalCtx, globalCancel := context.WithCancel(ctx)
+			defer globalCancel()
+			lingerCtx, lingerCancel := context.WithCancel(globalCtx)
+			defer lingerCancel()
+			runCtx, runCancel := context.WithCancel(lingerCtx)
+			defer runCancel()
 
-		// If the user hasn't opted out: report usage.
-		if !conf.NoUsageReport.Bool {
+			// Create a local execution scheduler wrapping the runner.
+			logger.Debug("Initializing the execution scheduler...")
+			execScheduler, err := local.NewExecutionScheduler(initRunner, logger)
+			if err != nil {
+				return err
+			}
+
+			// This is manually triggered after the Engine's Run() has completed,
+			// and things like a single Ctrl+C don't affect it. We use it to make
+			// sure that the progressbars finish updating with the latest execution
+			// state one last time, after the test run has finished.
+			progressCtx, progressCancel := context.WithCancel(globalCtx)
+			defer progressCancel()
+			initBar := execScheduler.GetInitProgressBar()
+			progressBarWG := &sync.WaitGroup{}
+			progressBarWG.Add(1)
 			go func() {
-				u := "https://reports.k6.io/"
-				mime := "application/json"
-				var endTSeconds float64
-				if endT := engine.Executor.GetEndTime(); endT.Valid {
-					endTSeconds = time.Duration(endT.Duration).Seconds()
+				pbs := []*pb.ProgressBar{execScheduler.GetInitProgressBar()}
+				for _, s := range execScheduler.GetExecutors() {
+					pbs = append(pbs, s.GetProgress())
 				}
-				var stagesEndTSeconds float64
-				if stagesEndT := lib.SumStages(engine.Executor.GetStages()); stagesEndT.Valid {
-					stagesEndTSeconds = time.Duration(stagesEndT.Duration).Seconds()
-				}
-				body, err := json.Marshal(map[string]interface{}{
-					"k6_version":  consts.Version,
-					"vus_max":     engine.Executor.GetVUsMax(),
-					"iterations":  engine.Executor.GetEndIterations(),
-					"duration":    endTSeconds,
-					"st_duration": stagesEndTSeconds,
-					"goos":        runtime.GOOS,
-					"goarch":      runtime.GOARCH,
-				})
-				if err != nil {
-					panic(err) // This should never happen!!
-				}
-				_, _ = http.Post(u, mime, bytes.NewBuffer(body))
+				showProgress(progressCtx, conf, pbs, logger)
+				progressBarWG.Done()
 			}()
-		}
 
-		// Prepare a progress bar.
-		progress := ui.ProgressBar{
-			Width: 60,
-			Left: func() string {
-				if engine.Executor.IsPaused() {
-					return "  paused"
-				} else if engine.Executor.IsRunning() {
-					return " running"
-				} else {
-					return "    done"
-				}
-			},
-			Right: func() string {
-				if endIt := engine.Executor.GetEndIterations(); endIt.Valid {
-					return fmt.Sprintf("%d / %d", engine.Executor.GetIterations(), endIt.Int64)
-				}
-				precision := 100 * time.Millisecond
-				atT := engine.Executor.GetTime()
-				stagesEndT := lib.SumStages(engine.Executor.GetStages())
-				endT := engine.Executor.GetEndTime()
-				if !endT.Valid || (stagesEndT.Valid && endT.Duration > stagesEndT.Duration) {
-					endT = stagesEndT
-				}
-				if endT.Valid {
-					return fmt.Sprintf("%s / %s",
-						(atT/precision)*precision,
-						(time.Duration(endT.Duration)/precision)*precision,
-					)
-				}
-				return ((atT / precision) * precision).String()
-			},
-		}
-
-		// Ticker for progress bar updates. Less frequent updates for non-TTYs, none if quiet.
-		updateFreq := 50 * time.Millisecond
-		if !stdoutTTY {
-			updateFreq = 1 * time.Second
-		}
-		ticker := time.NewTicker(updateFreq)
-		if quiet || conf.HTTPDebug.Valid && conf.HTTPDebug.String != "" {
-			ticker.Stop()
-		}
-	mainLoop:
-		for {
-			select {
-			case <-ticker.C:
-				if quiet || !stdoutTTY {
-					l := logrus.WithFields(logrus.Fields{
-						"t": engine.Executor.GetTime(),
-						"i": engine.Executor.GetIterations(),
-					})
-					fn := l.Info
-					if quiet {
-						fn = l.Debug
-					}
-					if engine.Executor.IsPaused() {
-						fn("Paused")
-					} else {
-						fn("Running")
-					}
-					break
-				}
-
-				var prog float64
-				if endIt := engine.Executor.GetEndIterations(); endIt.Valid {
-					prog = float64(engine.Executor.GetIterations()) / float64(endIt.Int64)
-				} else {
-					stagesEndT := lib.SumStages(engine.Executor.GetStages())
-					endT := engine.Executor.GetEndTime()
-					if !endT.Valid || (stagesEndT.Valid && endT.Duration > stagesEndT.Duration) {
-						endT = stagesEndT
-					}
-					if endT.Valid {
-						prog = float64(engine.Executor.GetTime()) / float64(endT.Duration)
-					}
-				}
-				progress.Progress = prog
-				fprintf(stdout, "%s\x1b[0K\r", progress.String())
-			case err := <-errC:
-				cancel()
-				if err == nil {
-					logrus.Debug("Engine terminated cleanly")
-					break mainLoop
-				}
-
-				switch e := errors.Cause(err).(type) {
-				case lib.TimeoutError:
-					switch e.Place() {
-					case "setup":
-						return ExitCode{error: err, Code: setupTimeoutErrorCode, Hint: e.Hint()}
-					case "teardown":
-						return ExitCode{error: err, Code: teardownTimeoutErrorCode, Hint: e.Hint()}
-					default:
-						return ExitCode{error: err, Code: genericTimeoutErrorCode}
-					}
-				default:
-					//nolint:golint
-					return ExitCode{error: errors.New("Engine error"), Code: genericEngineErrorCode, Hint: err.Error()}
-				}
-			case sig := <-sigC:
-				logrus.WithField("sig", sig).Debug("Exiting in response to signal")
-				cancel()
-			}
-		}
-		if quiet || !stdoutTTY {
-			e := logrus.WithFields(logrus.Fields{
-				"t": engine.Executor.GetTime(),
-				"i": engine.Executor.GetIterations(),
-			})
-			fn := e.Info
-			if quiet {
-				fn = e.Debug
-			}
-			fn("Test finished")
-		} else {
-			progress.Progress = 1
-			fprintf(stdout, "%s\x1b[0K\n", progress.String())
-		}
-
-		// Warn if no iterations could be completed.
-		if engine.Executor.GetIterations() == 0 {
-			logrus.Warn("No data generated, because no script iterations finished, consider making the test duration longer")
-		}
-
-		data := ui.SummaryData{
-			Metrics:   engine.Metrics,
-			RootGroup: engine.Executor.GetRunner().GetDefaultGroup(),
-			Time:      engine.Executor.GetTime(),
-			TimeUnit:  conf.Options.SummaryTimeUnit.String,
-		}
-		// Print the end-of-test summary.
-		if !conf.NoSummary.Bool {
-			fprintf(stdout, "\n")
-
-			s := ui.NewSummary(conf.SummaryTrendStats)
-			s.SummarizeMetrics(stdout, "", data)
-
-			fprintf(stdout, "\n")
-		}
-
-		if conf.SummaryExport.ValueOrZero() != "" {
-			f, err := os.Create(conf.SummaryExport.String)
+			// Create all outputs.
+			executionPlan := execScheduler.GetExecutionPlan()
+			outputs, err := createOutputs(conf.Out, src, conf, runtimeOptions, executionPlan, osEnvironment, logger)
 			if err != nil {
-				logrus.WithError(err).Error("failed to create summary export file")
-			} else {
-				defer func() {
-					if err := f.Close(); err != nil {
-						logrus.WithError(err).Error("failed to close summary export file")
+				return err
+			}
+
+			// Create the engine.
+			initBar.Modify(pb.WithConstProgress(0, "Init engine"))
+			engine, err := core.NewEngine(execScheduler, conf.Options, runtimeOptions, outputs, logger, builtinMetrics)
+			if err != nil {
+				return err
+			}
+
+			// Spin up the REST API server, if not disabled.
+			if address != "" {
+				initBar.Modify(pb.WithConstProgress(0, "Init API server"))
+				go func() {
+					logger.Debugf("Starting the REST API server on %s", address)
+					if aerr := api.ListenAndServe(address, engine, logger); aerr != nil {
+						// Only exit k6 if the user has explicitly set the REST API address
+						if cmd.Flags().Lookup("address").Changed {
+							logger.WithError(aerr).Error("Error from API server")
+							os.Exit(int(exitcodes.CannotStartRESTAPI))
+						} else {
+							logger.WithError(aerr).Warn("Error from API server")
+						}
 					}
 				}()
-				s := ui.NewSummary(conf.SummaryTrendStats)
-				if err := s.SummarizeMetricsJSON(f, data); err != nil {
-					logrus.WithError(err).Error("failed to make summary export file")
+			}
+
+			// We do this here so we can get any output URLs below.
+			initBar.Modify(pb.WithConstProgress(0, "Starting outputs"))
+			err = engine.StartOutputs()
+			if err != nil {
+				return err
+			}
+			defer engine.StopOutputs()
+
+			printExecutionDescription(
+				"local", filename, "", conf, execScheduler.GetState().ExecutionTuple,
+				executionPlan, outputs, noColor || !stdoutTTY)
+
+			// Trap Interrupts, SIGINTs and SIGTERMs.
+			sigC := make(chan os.Signal, 1)
+			signal.Notify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+			defer signal.Stop(sigC)
+			go func() {
+				sig := <-sigC
+				logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
+				lingerCancel() // stop the test run, metric processing is cancelled below
+
+				// If we get a second signal, we immediately exit, so something like
+				// https://github.com/k6io/k6/issues/971 never happens again
+				sig = <-sigC
+				logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
+				globalCancel() // not that it matters, given the following command...
+				os.Exit(int(exitcodes.ExternalAbort))
+			}()
+
+			// Initialize the engine
+			initBar.Modify(pb.WithConstProgress(0, "Init VUs..."))
+			engineRun, engineWait, err := engine.Init(globalCtx, runCtx)
+			if err != nil {
+				// Add a generic engine exit code if we don't have a more specific one
+				return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
+			}
+
+			// Init has passed successfully, so unless disabled, make sure we send a
+			// usage report after the context is done.
+			if !conf.NoUsageReport.Bool {
+				reportDone := make(chan struct{})
+				go func() {
+					<-runCtx.Done()
+					_ = reportUsage(execScheduler)
+					close(reportDone)
+				}()
+				defer func() {
+					select {
+					case <-reportDone:
+					case <-time.After(3 * time.Second):
+					}
+				}()
+			}
+
+			// Start the test run
+			initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
+			if err := engineRun(); err != nil {
+				return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
+			}
+			runCancel()
+			logger.Debug("Engine run terminated cleanly")
+
+			progressCancel()
+			progressBarWG.Wait()
+
+			executionState := execScheduler.GetState()
+			// Warn if no iterations could be completed.
+			if executionState.GetFullIterationCount() == 0 {
+				logger.Warn("No script iterations finished, consider making the test duration longer")
+			}
+
+			// Handle the end-of-test summary.
+			if !runtimeOptions.NoSummary.Bool {
+				summaryResult, err := initRunner.HandleSummary(globalCtx, &lib.Summary{
+					Metrics:         engine.Metrics,
+					RootGroup:       engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
+					TestRunDuration: executionState.GetCurrentTestRunDuration(),
+					NoColor:         noColor,
+					UIState: lib.UIState{
+						IsStdOutTTY: stdoutTTY,
+						IsStdErrTTY: stderrTTY,
+					},
+				})
+				if err == nil {
+					err = handleSummaryResult(afero.NewOsFs(), stdout, stderr, summaryResult)
+				}
+				if err != nil {
+					logger.WithError(err).Error("failed to handle the end-of-test summary")
 				}
 			}
-		}
 
-		if conf.Linger.Bool {
-			logrus.Info("Linger set; waiting for Ctrl+C...")
-			<-sigC
-		}
+			if conf.Linger.Bool {
+				select {
+				case <-lingerCtx.Done():
+					// do nothing, we were interrupted by Ctrl+C already
+				default:
+					logger.Debug("Linger set; waiting for Ctrl+C...")
+					fprintf(stdout, "Linger set; waiting for Ctrl+C...")
+					<-lingerCtx.Done()
+					logger.Debug("Ctrl+C received, exiting...")
+				}
+			}
+			globalCancel() // signal the Engine that it should wind down
+			logger.Debug("Waiting for engine processes to finish...")
+			engineWait()
+			logger.Debug("Everything has finished, exiting k6!")
+			if engine.IsTainted() {
+				return errext.WithExitCodeIfNone(errors.New("some thresholds have failed"), exitcodes.ThresholdsHaveFailed)
+			}
+			return nil
+		},
+	}
 
-		if engine.IsTainted() {
-			return ExitCode{error: errors.New("some thresholds have failed"), Code: thresholdHaveFailedErrorCode}
+	runCmd.Flags().SortFlags = false
+	runCmd.Flags().AddFlagSet(runCmdFlagSet())
+
+	return runCmd
+}
+
+func reportUsage(execScheduler *local.ExecutionScheduler) error {
+	execState := execScheduler.GetState()
+	executorConfigs := execScheduler.GetExecutorConfigs()
+
+	executors := make(map[string]int)
+	for _, ec := range executorConfigs {
+		executors[ec.GetType()]++
+	}
+
+	body, err := json.Marshal(map[string]interface{}{
+		"k6_version": consts.Version,
+		"executors":  executors,
+		"vus_max":    execState.GetInitializedVUsCount(),
+		"iterations": execState.GetFullIterationCount(),
+		"duration":   execState.GetCurrentTestRunDuration().String(),
+		"goos":       runtime.GOOS,
+		"goarch":     runtime.GOARCH,
+	})
+	if err != nil {
+		return err
+	}
+	res, err := http.Post("https://reports.k6.io/", "application/json", bytes.NewBuffer(body))
+	defer func() {
+		if err == nil {
+			_ = res.Body.Close()
 		}
-		return nil
-	},
+	}()
+
+	return err
 }
 
 func runCmdFlagSet() *pflag.FlagSet {
@@ -492,7 +374,7 @@ func runCmdFlagSet() *pflag.FlagSet {
 	flags.AddFlagSet(runtimeOptionFlagSet(true))
 	flags.AddFlagSet(configFlagSet())
 
-	//TODO: Figure out a better way to handle the CLI flags:
+	// TODO: Figure out a better way to handle the CLI flags:
 	// - the default values are specified in this way so we don't overwrire whatever
 	//   was specified via the environment variables
 	// - but we need to manually specify the DefValue, since that's the default value
@@ -501,44 +383,36 @@ func runCmdFlagSet() *pflag.FlagSet {
 	// - and finally, global variables are not very testable... :/
 	flags.StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
 	flags.Lookup("type").DefValue = ""
-	flags.BoolVar(&runNoSetup, "no-setup", runNoSetup, "don't run setup()")
-	falseStr := "false" // avoiding goconst warnings...
-	flags.Lookup("no-setup").DefValue = falseStr
-	flags.BoolVar(&runNoTeardown, "no-teardown", runNoTeardown, "don't run teardown()")
-	flags.Lookup("no-teardown").DefValue = falseStr
 	return flags
-}
-
-func init() {
-	RootCmd.AddCommand(runCmd)
-
-	runCmd.Flags().SortFlags = false
-	runCmd.Flags().AddFlagSet(runCmdFlagSet())
 }
 
 // Creates a new runner.
 func newRunner(
-	src *loader.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
-) (lib.Runner, error) {
+	logger *logrus.Logger, src *loader.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
+	builtinMetrics *metrics.BuiltinMetrics, registry *metrics.Registry,
+) (runner lib.Runner, err error) {
 	switch typ {
 	case "":
-		return newRunner(src, detectType(src.Data), filesystems, rtOpts)
+		runner, err = newRunner(logger, src, detectType(src.Data), filesystems, rtOpts, builtinMetrics, registry)
 	case typeJS:
-		return js.New(src, filesystems, rtOpts)
+		runner, err = js.New(logger, src, filesystems, rtOpts, builtinMetrics, registry)
 	case typeArchive:
-		arc, err := lib.ReadArchive(bytes.NewReader(src.Data))
+		var arc *lib.Archive
+		arc, err = lib.ReadArchive(bytes.NewReader(src.Data))
 		if err != nil {
 			return nil, err
 		}
 		switch arc.Type {
 		case typeJS:
-			return js.NewFromArchive(arc, rtOpts)
+			runner, err = js.NewFromArchive(logger, arc, rtOpts, builtinMetrics, registry)
 		default:
-			return nil, errors.Errorf("archive requests unsupported runner: %s", arc.Type)
+			return nil, fmt.Errorf("archive requests unsupported runner: %s", arc.Type)
 		}
 	default:
-		return nil, errors.Errorf("unknown -t/--type: %s", typ)
+		return nil, fmt.Errorf("unknown -t/--type: %s", typ)
 	}
+
+	return runner, err
 }
 
 func detectType(data []byte) string {
@@ -546,4 +420,29 @@ func detectType(data []byte) string {
 		return typeArchive
 	}
 	return typeJS
+}
+
+func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[string]io.Reader) error {
+	var errs []error
+
+	getWriter := func(path string) (io.Writer, error) {
+		switch path {
+		case "stdout":
+			return stdOut, nil
+		case "stderr":
+			return stdErr, nil
+		default:
+			return fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		}
+	}
+
+	for path, value := range result {
+		if writer, err := getWriter(path); err != nil {
+			errs = append(errs, fmt.Errorf("could not open '%s': %w", path, err))
+		} else if n, err := io.Copy(writer, value); err != nil {
+			errs = append(errs, fmt.Errorf("error saving summary to '%s' after %d bytes: %w", path, n, err))
+		}
+	}
+
+	return consolidateErrorMessage(errs, "Could not save some summary information:")
 }

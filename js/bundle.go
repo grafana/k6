@@ -21,21 +21,26 @@
 package js
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/url"
 	"runtime"
 
-	"github.com/loadimpact/k6/lib/consts"
-
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/compiler"
-	jslib "github.com/loadimpact/k6/js/lib"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/loader"
-	"github.com/pkg/errors"
+	"github.com/dop251/goja/parser"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/compiler"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/loader"
 )
 
 // A Bundle is a self-contained bundle of scripts and resources.
@@ -48,19 +53,29 @@ type Bundle struct {
 
 	BaseInitContext *InitContext
 
-	Env               map[string]string
-	CompatibilityMode compiler.CompatibilityMode
+	RuntimeOptions    lib.RuntimeOptions
+	CompatibilityMode lib.CompatibilityMode // parsed value
+	registry          *metrics.Registry
+
+	exports map[string]goja.Callable
 }
 
 // A BundleInstance is a self-contained instance of a Bundle.
 type BundleInstance struct {
 	Runtime *goja.Runtime
 	Context *context.Context
-	Default goja.Callable
+
+	// TODO: maybe just have a reference to the Bundle? or save and pass rtOpts?
+	env map[string]string
+
+	exports map[string]goja.Callable
 }
 
 // NewBundle creates a new bundle from a source file and a filesystem.
-func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
+func NewBundle(
+	logger logrus.FieldLogger, src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
+	registry *metrics.Registry,
+) (*Bundle, error) {
 	compatMode, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String)
 	if err != nil {
 		return nil, err
@@ -68,7 +83,7 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 
 	// Compile sources, both ES5 and ES6 are supported.
 	code := string(src.Data)
-	c := compiler.New()
+	c := compiler.New(logger)
 	pgm, _, err := c.Compile(code, src.URL.String(), "", "", true, compatMode)
 	if err != nil {
 		return nil, err
@@ -79,76 +94,50 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 		Filename: src.URL,
 		Source:   code,
 		Program:  pgm,
-		BaseInitContext: NewInitContext(rt, c, compatMode, new(context.Context),
+		BaseInitContext: NewInitContext(logger, rt, c, compatMode, new(context.Context),
 			filesystems, loader.Dir(src.URL)),
-		Env:               rtOpts.Env,
+		RuntimeOptions:    rtOpts,
 		CompatibilityMode: compatMode,
+		exports:           make(map[string]goja.Callable),
+		registry:          registry,
 	}
-	if err := bundle.instantiate(rt, bundle.BaseInitContext); err != nil {
+	if err = bundle.instantiate(logger, rt, bundle.BaseInitContext, 0); err != nil {
 		return nil, err
 	}
 
-	// Grab exports.
-	exportsV := rt.Get("exports")
-	if goja.IsNull(exportsV) || goja.IsUndefined(exportsV) {
-		return nil, errors.New("exports must be an object")
-	}
-	exports := exportsV.ToObject(rt)
-
-	// Validate the default function.
-	def := exports.Get("default")
-	if def == nil || goja.IsNull(def) || goja.IsUndefined(def) {
-		return nil, errors.New("script must export a default function")
-	}
-	if _, ok := goja.AssertFunction(def); !ok {
-		return nil, errors.New("default export must be a function")
-	}
-
-	// Extract/validate other exports.
-	for _, k := range exports.Keys() {
-		v := exports.Get(k)
-		switch k {
-		case "default": // Already checked above.
-		case "options":
-			data, err := json.Marshal(v.Export())
-			if err != nil {
-				return nil, err
-			}
-			if err := json.Unmarshal(data, &bundle.Options); err != nil {
-				return nil, err
-			}
-		case "setup":
-			if _, ok := goja.AssertFunction(v); !ok {
-				return nil, errors.New("exported 'setup' must be a function")
-			}
-		case "teardown":
-			if _, ok := goja.AssertFunction(v); !ok {
-				return nil, errors.New("exported 'teardown' must be a function")
-			}
-		}
+	err = bundle.getExports(logger, rt, true)
+	if err != nil {
+		return nil, err
 	}
 
 	return &bundle, nil
 }
 
 // NewBundleFromArchive creates a new bundle from an lib.Archive.
-func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle, error) {
+func NewBundleFromArchive(
+	logger logrus.FieldLogger, arc *lib.Archive, rtOpts lib.RuntimeOptions, registry *metrics.Registry,
+) (*Bundle, error) {
 	if arc.Type != "js" {
-		return nil, errors.Errorf("expected bundle type 'js', got '%s'", arc.Type)
+		return nil, fmt.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
 
-	compatMode, err := lib.ValidateCompatibilityMode(arc.CompatibilityMode)
+	if !rtOpts.CompatibilityMode.Valid {
+		// `k6 run --compatibility-mode=whatever archive.tar` should override
+		// whatever value is in the archive
+		rtOpts.CompatibilityMode = null.StringFrom(arc.CompatibilityMode)
+	}
+	compatMode, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String)
 	if err != nil {
 		return nil, err
 	}
 
-	c := compiler.New()
+	c := compiler.New(logger)
 	pgm, _, err := c.Compile(string(arc.Data), arc.FilenameURL.String(), "", "", true, compatMode)
 	if err != nil {
 		return nil, err
 	}
-
-	initctx := NewInitContext(goja.New(), c, compatMode,
+	rt := goja.New()
+	initctx := NewInitContext(logger, rt, c, compatMode,
 		new(context.Context), arc.Filesystems, arc.PwdURL)
 
 	env := arc.Env
@@ -159,6 +148,7 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 	for k, v := range rtOpts.Env {
 		env[k] = v
 	}
+	rtOpts.Env = env
 
 	bundle := &Bundle{
 		Filename:          arc.FilenameURL,
@@ -166,12 +156,23 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		Program:           pgm,
 		Options:           arc.Options,
 		BaseInitContext:   initctx,
-		Env:               env,
+		RuntimeOptions:    rtOpts,
 		CompatibilityMode: compatMode,
+		exports:           make(map[string]goja.Callable),
+		registry:          registry,
 	}
-	if err := bundle.instantiate(bundle.BaseInitContext.runtime, bundle.BaseInitContext); err != nil {
+
+	if err = bundle.instantiate(logger, rt, bundle.BaseInitContext, 0); err != nil {
 		return nil, err
 	}
+
+	// Grab exported objects, but avoid overwriting options, which would
+	// be initialized from the metadata.json at this point.
+	err = bundle.getExports(logger, rt, false)
+	if err != nil {
+		return nil, err
+	}
+
 	return bundle, nil
 }
 
@@ -183,21 +184,67 @@ func (b *Bundle) makeArchive() *lib.Archive {
 		FilenameURL:       b.Filename,
 		Data:              []byte(b.Source),
 		PwdURL:            b.BaseInitContext.pwd,
-		Env:               make(map[string]string, len(b.Env)),
+		Env:               make(map[string]string, len(b.RuntimeOptions.Env)),
 		CompatibilityMode: b.CompatibilityMode.String(),
 		K6Version:         consts.Version,
 		Goos:              runtime.GOOS,
 	}
 	// Copy env so changes in the archive are not reflected in the source Bundle
-	for k, v := range b.Env {
+	for k, v := range b.RuntimeOptions.Env {
 		arc.Env[k] = v
 	}
 
 	return arc
 }
 
+// getExports validates and extracts exported objects
+func (b *Bundle) getExports(logger logrus.FieldLogger, rt *goja.Runtime, options bool) error {
+	exportsV := rt.Get("exports")
+	if goja.IsNull(exportsV) || goja.IsUndefined(exportsV) {
+		return errors.New("exports must be an object")
+	}
+	exports := exportsV.ToObject(rt)
+
+	for _, k := range exports.Keys() {
+		v := exports.Get(k)
+		if fn, ok := goja.AssertFunction(v); ok && k != consts.Options {
+			b.exports[k] = fn
+			continue
+		}
+		switch k {
+		case consts.Options:
+			if !options {
+				continue
+			}
+			data, err := json.Marshal(v.Export())
+			if err != nil {
+				return err
+			}
+			dec := json.NewDecoder(bytes.NewReader(data))
+			dec.DisallowUnknownFields()
+			if err := dec.Decode(&b.Options); err != nil {
+				if uerr := json.Unmarshal(data, &b.Options); uerr != nil {
+					return uerr
+				}
+				logger.WithError(err).Warn("There were unknown fields in the options exported in the script")
+			}
+		case consts.SetupFn:
+			return errors.New("exported 'setup' must be a function")
+		case consts.TeardownFn:
+			return errors.New("exported 'teardown' must be a function")
+		}
+	}
+
+	if len(b.exports) == 0 {
+		return errors.New("no exported functions in script")
+	}
+
+	return nil
+}
+
 // Instantiate creates a new runtime from this bundle.
-func (b *Bundle) Instantiate() (bi *BundleInstance, instErr error) {
+func (b *Bundle) Instantiate(logger logrus.FieldLogger, vuID uint64) (bi *BundleInstance, instErr error) {
+	// TODO: actually use a real context here, so that the instantiation can be killed
 	// Placeholder for a real context.
 	ctxPtr := new(context.Context)
 
@@ -205,15 +252,23 @@ func (b *Bundle) Instantiate() (bi *BundleInstance, instErr error) {
 	// runtime, but no state, to allow module-provided types to function within the init context.
 	rt := goja.New()
 	init := newBoundInitContext(b.BaseInitContext, ctxPtr, rt)
-	if err := b.instantiate(rt, init); err != nil {
+	if err := b.instantiate(logger, rt, init, vuID); err != nil {
 		return nil, err
 	}
 
-	// Grab the default function; type is already checked in NewBundle().
+	bi = &BundleInstance{
+		Runtime: rt,
+		Context: ctxPtr,
+		exports: make(map[string]goja.Callable),
+		env:     b.RuntimeOptions.Env,
+	}
+
+	// Grab any exported functions that could be executed. These were
+	// already pre-validated in cmd.validateScenarioConfig(), just get them here.
 	exports := rt.Get("exports").ToObject(rt)
-	def, ok := goja.AssertFunction(exports.Get("default"))
-	if !ok || def == nil {
-		panic("exported default is not a function")
+	for k := range b.exports {
+		fn, _ := goja.AssertFunction(exports.Get(k))
+		bi.exports[k] = fn
 	}
 
 	jsOptions := rt.Get("options")
@@ -230,24 +285,15 @@ func (b *Bundle) Instantiate() (bi *BundleInstance, instErr error) {
 		}
 	})
 
-	return &BundleInstance{
-		Runtime: rt,
-		Context: ctxPtr,
-		Default: def,
-	}, instErr
+	return bi, instErr
 }
 
 // Instantiates the bundle into an existing runtime. Not public because it also messes with a bunch
 // of other things, will potentially thrash data and makes a mess in it if the operation fails.
-func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
+func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *InitContext, vuID uint64) error {
+	rt.SetParserOptions(parser.WithDisableSourceMaps)
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
-
-	if init.compatibilityMode == compiler.CompatibilityModeExtended {
-		if _, err := rt.RunProgram(jslib.GetCoreJS()); err != nil {
-			return err
-		}
-	}
 
 	exports := rt.NewObject()
 	rt.Set("exports", exports)
@@ -255,16 +301,34 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	_ = module.Set("exports", exports)
 	rt.Set("module", module)
 
-	env := make(map[string]string, len(b.Env))
-	for key, value := range b.Env {
+	env := make(map[string]string, len(b.RuntimeOptions.Env))
+	for key, value := range b.RuntimeOptions.Env {
 		env[key] = value
 	}
 	rt.Set("__ENV", env)
-	rt.Set("console", common.Bind(rt, newConsole(), init.ctxPtr))
+	rt.Set("__VU", vuID)
+	rt.Set("console", common.Bind(rt, newConsole(logger), init.ctxPtr))
 
-	*init.ctxPtr = common.WithRuntime(context.Background(), rt)
+	if init.compatibilityMode == lib.CompatibilityModeExtended {
+		rt.Set("global", rt.GlobalObject())
+	}
+
+	// TODO: get rid of the unused ctxPtr, use a real external context (so we
+	// can interrupt), build the common.InitEnvironment earlier and reuse it
+	initenv := &common.InitEnvironment{
+		Logger:      logger,
+		FileSystems: init.filesystems,
+		CWD:         init.pwd,
+		Registry:    b.registry,
+	}
+	ctx := common.WithInitEnv(context.Background(), initenv)
+	*init.ctxPtr = common.WithRuntime(ctx, rt)
 	unbindInit := common.BindToGlobal(rt, common.Bind(rt, init, init.ctxPtr))
 	if _, err := rt.RunProgram(b.Program); err != nil {
+		var exception *goja.Exception
+		if errors.As(err, &exception) {
+			err = &scriptException{inner: exception}
+		}
 		return err
 	}
 	unbindInit()

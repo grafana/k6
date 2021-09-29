@@ -20,7 +20,9 @@
 
 package loader
 
-func github(path string, parts []string) (string, error) {
+import "github.com/sirupsen/logrus"
+
+func github(_ logrus.FieldLogger, path string, parts []string) (string, error) {
 	username := parts[0]
 	repo := parts[1]
 	filepath := parts[2]

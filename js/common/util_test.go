@@ -22,35 +22,80 @@ package common
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRunString(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		_, err := RunString(goja.New(), `let a = 1;`)
-		assert.NoError(t, err)
-	})
-	t.Run("Invalid", func(t *testing.T) {
-		_, err := RunString(goja.New(), `let a = #;`)
-		assert.NotNil(t, err)
-		assert.Contains(t, err.Error(), "SyntaxError: __string__: Unexpected character '#' (1:8)\n> 1 | let a = #;\n")
-	})
-}
-
 func TestThrow(t *testing.T) {
 	rt := goja.New()
 	fn1, ok := goja.AssertFunction(rt.ToValue(func() { Throw(rt, errors.New("aaaa")) }))
 	if assert.True(t, ok, "fn1 is invalid") {
 		_, err := fn1(goja.Undefined())
-		assert.EqualError(t, err, "GoError: aaaa")
+		assert.EqualError(t, err, "aaaa")
 
 		fn2, ok := goja.AssertFunction(rt.ToValue(func() { Throw(rt, err) }))
 		if assert.True(t, ok, "fn1 is invalid") {
 			_, err := fn2(goja.Undefined())
-			assert.EqualError(t, err, "GoError: aaaa")
+			assert.EqualError(t, err, "aaaa")
 		}
+	}
+}
+
+func TestToBytes(t *testing.T) {
+	t.Parallel()
+	rt := goja.New()
+	b := []byte("hello")
+	testCases := []struct {
+		in     interface{}
+		expOut []byte
+		expErr string
+	}{
+		{b, b, ""},
+		{"hello", b, ""},
+		{rt.NewArrayBuffer(b), b, ""},
+		{struct{}{}, nil, "invalid type struct {}, expected string, []byte or ArrayBuffer"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("%T", tc.in), func(t *testing.T) {
+			out, err := ToBytes(tc.in)
+			if tc.expErr != "" {
+				assert.EqualError(t, err, tc.expErr)
+				return
+			}
+			assert.Equal(t, tc.expOut, out)
+		})
+	}
+}
+
+func TestToString(t *testing.T) {
+	t.Parallel()
+	rt := goja.New()
+	s := "hello"
+	testCases := []struct {
+		in             interface{}
+		expOut, expErr string
+	}{
+		{s, s, ""},
+		{"hello", s, ""},
+		{rt.NewArrayBuffer([]byte(s)), s, ""},
+		{struct{}{}, "", "invalid type struct {}, expected string, []byte or ArrayBuffer"},
+	}
+
+	for _, tc := range testCases { //nolint: paralleltest // false positive: https://github.com/kunwardeep/paralleltest/issues/8
+		tc := tc
+		t.Run(fmt.Sprintf("%T", tc.in), func(t *testing.T) {
+			t.Parallel()
+			out, err := ToString(tc.in)
+			if tc.expErr != "" {
+				assert.EqualError(t, err, tc.expErr)
+				return
+			}
+			assert.Equal(t, tc.expOut, out)
+		})
 	}
 }

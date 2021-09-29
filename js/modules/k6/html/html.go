@@ -22,14 +22,15 @@ package html
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/pkg/errors"
 	gohtml "golang.org/x/net/html"
+
+	"go.k6.io/k6/js/common"
 )
 
 type HTML struct{}
@@ -72,7 +73,6 @@ func (s Selection) varargFnCall(arg interface{},
 	strFilter func(string) *goquery.Selection,
 	selFilter func(*goquery.Selection) *goquery.Selection,
 	nodeFilter func(...*gohtml.Node) *goquery.Selection) Selection {
-
 	switch v := arg.(type) {
 	case Selection:
 		return Selection{s.rt, selFilter(v.sel), s.URL}
@@ -87,8 +87,8 @@ func (s Selection) varargFnCall(arg interface{},
 		return s.varargFnCall(v.Export(), strFilter, selFilter, nodeFilter)
 
 	default:
-		errmsg := fmt.Sprintf("Invalid argument: Cannot use a %T as a selector", arg)
-		panic(s.rt.NewGoError(errors.New(errmsg)))
+		err := fmt.Errorf("invalid argument, cannot use a '%T' as a selector", arg)
+		panic(s.rt.NewGoError(err))
 	}
 }
 
@@ -107,7 +107,6 @@ func (s Selection) adjacentUntil(until func(string) *goquery.Selection,
 	filteredUntil func(string, string) *goquery.Selection,
 	filteredUntilSelection func(string, *goquery.Selection) *goquery.Selection,
 	def ...goja.Value) Selection {
-
 	switch len(def) {
 	case 0:
 		return Selection{s.rt, until(""), s.URL}
@@ -137,8 +136,8 @@ func (s Selection) adjacentUntil(until func(string) *goquery.Selection,
 		}
 	}
 
-	errmsg := fmt.Sprintf("Invalid argument: Cannot use a %T as a selector", def[0].Export())
-	panic(s.rt.NewGoError(errors.New(errmsg)))
+	err := fmt.Errorf("invalid argument, cannot use a '%T' as a selector", def[0].Export())
+	panic(s.rt.NewGoError(err))
 }
 
 func (s Selection) Add(arg interface{}) Selection {
@@ -326,12 +325,12 @@ func (s Selection) Children(def ...string) Selection {
 func (s Selection) Each(v goja.Value) Selection {
 	gojaFn, isFn := goja.AssertFunction(v)
 	if !isFn {
-		common.Throw(s.rt, errors.New("Argument to each() must be a function."))
+		common.Throw(s.rt, errors.New("the argument to each() must be a function"))
 	}
 
 	fn := func(idx int, sel *goquery.Selection) {
 		if _, err := gojaFn(v, s.rt.ToValue(idx), selToElement(Selection{s.rt, s.sel.Eq(idx), s.URL})); err != nil {
-			common.Throw(s.rt, errors.Wrap(err, "Function passed to each() failed."))
+			common.Throw(s.rt, fmt.Errorf("the function passed to each() failed: %w", err))
 		}
 	}
 
@@ -349,7 +348,7 @@ func (s Selection) Filter(v goja.Value) Selection {
 
 	gojaFn, isFn := goja.AssertFunction(v)
 	if !isFn {
-		common.Throw(s.rt, errors.New("Argument to filter() must be a function, a selector or a selection"))
+		common.Throw(s.rt, errors.New("the argument to filter() must be a function, a selector or a selection"))
 	}
 
 	return Selection{s.rt, s.sel.FilterFunction(s.buildMatcher(v, gojaFn)), s.URL}
@@ -366,7 +365,7 @@ func (s Selection) Is(v goja.Value) bool {
 	default:
 		gojaFn, isFn := goja.AssertFunction(v)
 		if !isFn {
-			common.Throw(s.rt, errors.New("Argument to is() must be a function, a selector or a selection"))
+			common.Throw(s.rt, errors.New("the argument to is() must be a function, a selector or a selection"))
 		}
 
 		return s.sel.IsFunction(s.buildMatcher(v, gojaFn))
@@ -377,7 +376,7 @@ func (s Selection) Is(v goja.Value) bool {
 func (s Selection) Map(v goja.Value) []string {
 	gojaFn, isFn := goja.AssertFunction(v)
 	if !isFn {
-		common.Throw(s.rt, errors.New("Argument to map() must be a function"))
+		common.Throw(s.rt, errors.New("the argument to map() must be a function"))
 	}
 
 	fn := func(idx int, sel *goquery.Selection) string {
@@ -392,7 +391,10 @@ func (s Selection) Map(v goja.Value) []string {
 }
 
 func (s Selection) Slice(start int, def ...int) Selection {
-	if len(def) > 0 {
+	// We are forced to check that def[0] is inferior to the length of the array
+	// otherwise the s.sel.Slice panics. Besides returning the whole array when
+	// the end value for slicing is superior to the array length is standard in js.
+	if len(def) > 0 && def[0] < len(s.sel.Nodes) {
 		return Selection{s.rt, s.sel.Slice(start, def[0]), s.URL}
 	}
 

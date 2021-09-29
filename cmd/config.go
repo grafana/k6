@@ -29,22 +29,16 @@ import (
 	"strings"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/scheduler"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
-	"github.com/loadimpact/k6/stats/cloud"
-	"github.com/loadimpact/k6/stats/csv"
-	"github.com/loadimpact/k6/stats/datadog"
-	"github.com/loadimpact/k6/stats/influxdb"
-	"github.com/loadimpact/k6/stats/kafka"
-	"github.com/loadimpact/k6/stats/statsd/common"
-	"github.com/loadimpact/k6/ui"
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/executor"
+	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/stats"
 )
 
 // configFlagSet returns a FlagSet with the default run configuration flags.
@@ -54,34 +48,27 @@ func configFlagSet() *pflag.FlagSet {
 	flags.StringArrayP("out", "o", []string{}, "`uri` for an external metrics database")
 	flags.BoolP("linger", "l", false, "keep the API server alive past test end")
 	flags.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
-	flags.Bool("no-thresholds", false, "don't run thresholds")
-	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
-	flags.String(
-		"summary-export",
-		"",
-		"output the end-of-test summary report to JSON file",
-	)
 	return flags
 }
 
 type Config struct {
 	lib.Options
 
-	Out           []string    `json:"out" envconfig:"K6_OUT"`
-	Linger        null.Bool   `json:"linger" envconfig:"K6_LINGER"`
-	NoUsageReport null.Bool   `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
-	NoThresholds  null.Bool   `json:"noThresholds" envconfig:"K6_NO_THRESHOLDS"`
-	NoSummary     null.Bool   `json:"noSummary" envconfig:"K6_NO_SUMMARY"`
-	SummaryExport null.String `json:"summaryExport" envconfig:"K6_SUMMARY_EXPORT"`
+	Out           []string  `json:"out" envconfig:"K6_OUT"`
+	Linger        null.Bool `json:"linger" envconfig:"K6_LINGER"`
+	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
 
-	Collectors struct {
-		InfluxDB influxdb.Config `json:"influxdb"`
-		Kafka    kafka.Config    `json:"kafka"`
-		Cloud    cloud.Config    `json:"cloud"`
-		StatsD   common.Config   `json:"statsd"`
-		Datadog  datadog.Config  `json:"datadog"`
-		CSV      csv.Config      `json:"csv"`
-	} `json:"collectors"`
+	// TODO: deprecate
+	Collectors map[string]json.RawMessage `json:"collectors"`
+}
+
+// Validate checks if all of the specified options make sense
+func (c Config) Validate() []error {
+	errors := c.Options.Validate()
+	//TODO: validate all of the other options... that we should have already been validating...
+	//TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
+
+	return errors
 }
 
 func (c Config) Apply(cfg Config) Config {
@@ -95,21 +82,9 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.NoUsageReport.Valid {
 		c.NoUsageReport = cfg.NoUsageReport
 	}
-	if cfg.NoThresholds.Valid {
-		c.NoThresholds = cfg.NoThresholds
+	if len(cfg.Collectors) > 0 {
+		c.Collectors = cfg.Collectors
 	}
-	if cfg.NoSummary.Valid {
-		c.NoSummary = cfg.NoSummary
-	}
-	if cfg.SummaryExport.Valid {
-		c.SummaryExport = cfg.SummaryExport
-	}
-	c.Collectors.InfluxDB = c.Collectors.InfluxDB.Apply(cfg.Collectors.InfluxDB)
-	c.Collectors.Cloud = c.Collectors.Cloud.Apply(cfg.Collectors.Cloud)
-	c.Collectors.Kafka = c.Collectors.Kafka.Apply(cfg.Collectors.Kafka)
-	c.Collectors.StatsD = c.Collectors.StatsD.Apply(cfg.Collectors.StatsD)
-	c.Collectors.Datadog = c.Collectors.Datadog.Apply(cfg.Collectors.Datadog)
-	c.Collectors.CSV = c.Collectors.CSV.Apply(cfg.Collectors.CSV)
 	return c
 }
 
@@ -128,9 +103,6 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 		Out:           out,
 		Linger:        getNullBool(flags, "linger"),
 		NoUsageReport: getNullBool(flags, "no-usage-report"),
-		NoThresholds:  getNullBool(flags, "no-thresholds"),
-		NoSummary:     getNullBool(flags, "no-summary"),
-		SummaryExport: getNullString(flags, "summary-export"),
 	}, nil
 }
 
@@ -182,110 +154,11 @@ func writeDiskConfig(fs afero.Fs, configPath string, conf Config) error {
 }
 
 // Reads configuration variables from the environment.
-func readEnvConfig() (conf Config, err error) {
-	// TODO: replace envconfig and refactor the whole configuration from the groun up :/
-	for _, err := range []error{
-		envconfig.Process("", &conf),
-		envconfig.Process("", &conf.Collectors.Cloud),
-		envconfig.Process("", &conf.Collectors.InfluxDB),
-		envconfig.Process("", &conf.Collectors.Kafka),
-		envconfig.Process("k6_statsd", &conf.Collectors.StatsD),
-		envconfig.Process("k6_datadog", &conf.Collectors.Datadog),
-	} {
-		return conf, err
-	}
-	return conf, nil
-}
-
-type executionConflictConfigError string
-
-func (e executionConflictConfigError) Error() string {
-	return string(e)
-}
-
-var _ error = executionConflictConfigError("")
-
-func getConstantLoopingVUsExecution(duration types.NullDuration, vus null.Int) scheduler.ConfigMap {
-	ds := scheduler.NewConstantLoopingVUsConfig(lib.DefaultSchedulerName)
-	ds.VUs = vus
-	ds.Duration = duration
-	return scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
-}
-
-func getVariableLoopingVUsExecution(stages []lib.Stage, startVUs null.Int) scheduler.ConfigMap {
-	ds := scheduler.NewVariableLoopingVUsConfig(lib.DefaultSchedulerName)
-	ds.StartVUs = startVUs
-	for _, s := range stages {
-		if s.Duration.Valid {
-			ds.Stages = append(ds.Stages, scheduler.Stage{Duration: s.Duration, Target: s.Target})
-		}
-	}
-	return scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
-}
-
-func getSharedIterationsExecution(iterations null.Int, duration types.NullDuration, vus null.Int) scheduler.ConfigMap {
-	ds := scheduler.NewSharedIterationsConfig(lib.DefaultSchedulerName)
-	ds.VUs = vus
-	ds.Iterations = iterations
-	if duration.Valid {
-		ds.MaxDuration = duration
-	}
-	return scheduler.ConfigMap{lib.DefaultSchedulerName: ds}
-}
-
-// This checks for conflicting options and turns any shortcut options (i.e. duration, iterations,
-// stages) into the proper scheduler configuration
-func deriveExecutionConfig(conf Config) (Config, error) {
-	result := conf
-	switch {
-	case conf.Iterations.Valid:
-		if len(conf.Stages) > 0 { // stages isn't nil (not set) and isn't explicitly set to empty
-			//TODO: make this an executionConflictConfigError in the next version
-			logrus.Warn("Specifying both iterations and stages is deprecated and won't be supported in the future k6 versions")
-		}
-
-		result.Execution = getSharedIterationsExecution(conf.Iterations, conf.Duration, conf.VUs)
-		// TODO: maybe add a new flag that will be used as a shortcut to per-VU iterations?
-
-	case conf.Duration.Valid:
-		if len(conf.Stages) > 0 { // stages isn't nil (not set) and isn't explicitly set to empty
-			//TODO: make this an executionConflictConfigError in the next version
-			logrus.Warn("Specifying both duration and stages is deprecated and won't be supported in the future k6 versions")
-		}
-
-		if conf.Duration.Duration <= 0 {
-			//TODO: make this an executionConflictConfigError in the next version
-			msg := "Specifying infinite duration in this way is deprecated and won't be supported in the future k6 versions"
-			logrus.Warn(msg)
-		} else {
-			result.Execution = getConstantLoopingVUsExecution(conf.Duration, conf.VUs)
-		}
-
-	case len(conf.Stages) > 0: // stages isn't nil (not set) and isn't explicitly set to empty
-		result.Execution = getVariableLoopingVUsExecution(conf.Stages, conf.VUs)
-
-	default:
-		if conf.Execution != nil { // If someone set this, regardless if its empty
-			//TODO: remove this warning in the next version
-			logrus.Warn("The execution settings are not functional in this k6 release, they will be ignored")
-		}
-
-		if len(conf.Execution) == 0 { // If unset or set to empty
-			// No execution parameters whatsoever were specified, so we'll create a per-VU iterations config
-			// with 1 VU and 1 iteration. We're choosing the per-VU config, since that one could also
-			// be executed both locally, and in the cloud.
-			result.Execution = scheduler.ConfigMap{
-				lib.DefaultSchedulerName: scheduler.NewPerVUIterationsConfig(lib.DefaultSchedulerName),
-			}
-		}
-	}
-
-	//TODO: validate the config; questions:
-	// - separately validate the duration, iterations and stages for better error messages?
-	// - or reuse the execution validation somehow, at the end? or something mixed?
-	// - here or in getConsolidatedConfig() or somewhere else?
-
-	return result, nil
+func readEnvConfig() (Config, error) {
+	// TODO: replace envconfig and refactor the whole configuration from the ground up :/
+	conf := Config{}
+	err := envconfig.Process("", &conf)
+	return conf, err
 }
 
 // Assemble the final consolidated configuration from all of the different sources:
@@ -298,11 +171,7 @@ func deriveExecutionConfig(conf Config) (Config, error) {
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
 func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf Config, err error) {
-	cliConf.Collectors.InfluxDB = influxdb.NewConfig().Apply(cliConf.Collectors.InfluxDB)
-	cliConf.Collectors.Cloud = cloud.NewConfig().Apply(cliConf.Collectors.Cloud)
-	cliConf.Collectors.Kafka = kafka.NewConfig().Apply(cliConf.Collectors.Kafka)
-	cliConf.Collectors.StatsD = common.NewConfig().Apply(cliConf.Collectors.StatsD)
-	cliConf.Collectors.Datadog = datadog.NewConfig().Apply(cliConf.Collectors.Datadog)
+	// TODO: use errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig) where it makes sense?
 
 	fileConf, _, err := readDiskConfig(fs)
 	if err != nil {
@@ -325,7 +194,7 @@ func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf
 	// for CLI flags in cmd.getOptions, in case other configuration sources
 	// (e.g. env vars) overrode our default value. This is not done in
 	// lib.Options.Validate to avoid circular imports.
-	if err = ui.ValidateSummary(conf.SummaryTrendStats); err != nil {
+	if _, err = stats.GetResolversForTrendColumns(conf.SummaryTrendStats); err != nil {
 		return conf, err
 	}
 
@@ -343,32 +212,58 @@ func applyDefault(conf Config) Config {
 	if conf.Options.SummaryTrendStats == nil {
 		conf.Options.SummaryTrendStats = lib.DefaultSummaryTrendStats
 	}
+	defDNS := types.DefaultDNSConfig()
+	if !conf.DNS.TTL.Valid {
+		conf.DNS.TTL = defDNS.TTL
+	}
+	if !conf.DNS.Select.Valid {
+		conf.DNS.Select = defDNS.Select
+	}
+	if !conf.DNS.Policy.Valid {
+		conf.DNS.Policy = defDNS.Policy
+	}
+
 	return conf
 }
 
-func deriveAndValidateConfig(conf Config) (Config, error) {
-	result, err := deriveExecutionConfig(conf)
-	if err != nil {
-		return result, err
+func deriveAndValidateConfig(conf Config, isExecutable func(string) bool) (result Config, err error) {
+	result = conf
+	result.Options, err = executor.DeriveScenariosFromShortcuts(conf.Options)
+	if err == nil {
+		err = validateConfig(result, isExecutable)
 	}
-	return result, validateConfig(conf)
+	return result, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 }
 
-//TODO: remove ↓
-//nolint:unparam
-func validateConfig(conf Config) error {
+func validateConfig(conf Config, isExecutable func(string) bool) error {
 	errList := conf.Validate()
+
+	for _, ec := range conf.Scenarios {
+		if err := validateScenarioConfig(ec, isExecutable); err != nil {
+			errList = append(errList, err)
+		}
+	}
+
+	return consolidateErrorMessage(errList, "There were problems with the specified script configuration:")
+}
+
+func consolidateErrorMessage(errList []error, title string) error {
 	if len(errList) == 0 {
 		return nil
 	}
 
-	errMsgParts := []string{"There were problems with the specified script configuration:"}
+	errMsgParts := []string{title}
 	for _, err := range errList {
 		errMsgParts = append(errMsgParts, fmt.Sprintf("\t- %s", err.Error()))
 	}
-	errMsg := errors.New(strings.Join(errMsgParts, "\n"))
 
-	//TODO: actually return the error here instead of warning, so k6 aborts on config validation errors
-	logrus.Warn(errMsg)
+	return errors.New(strings.Join(errMsgParts, "\n"))
+}
+
+func validateScenarioConfig(conf lib.ExecutorConfig, isExecutable func(string) bool) error {
+	execFn := conf.GetExec()
+	if !isExecutable(execFn) {
+		return fmt.Errorf("executor %s: function '%s' not found in exports", conf.GetName(), execFn)
+	}
 	return nil
 }

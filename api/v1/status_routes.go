@@ -21,15 +21,18 @@
 package v1
 
 import (
+	"errors"
 	"io/ioutil"
 	"net/http"
 
-	"github.com/julienschmidt/httprouter"
-	"github.com/loadimpact/k6/api/common"
 	"github.com/manyminds/api2go/jsonapi"
+
+	"go.k6.io/k6/api/common"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/executor"
 )
 
-func HandleGetStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func handleGetStatus(rw http.ResponseWriter, r *http.Request) {
 	engine := common.GetEngine(r.Context())
 
 	status := NewStatus(engine)
@@ -41,7 +44,19 @@ func HandleGetStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Param
 	_, _ = rw.Write(data)
 }
 
-func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func getFirstExternallyControlledExecutor(
+	execScheduler lib.ExecutionScheduler,
+) (*executor.ExternallyControlled, error) {
+	executors := execScheduler.GetExecutors()
+	for _, s := range executors {
+		if mex, ok := s.(*executor.ExternallyControlled); ok {
+			return mex, nil
+		}
+	}
+	return nil, errors.New("an externally-controlled executor needs to be configured for live configuration updates")
+}
+
+func handlePatchStatus(rw http.ResponseWriter, r *http.Request) {
 	engine := common.GetEngine(r.Context())
 
 	body, err := ioutil.ReadAll(r.Body)
@@ -56,20 +71,37 @@ func HandlePatchStatus(rw http.ResponseWriter, r *http.Request, p httprouter.Par
 		return
 	}
 
-	if status.VUsMax.Valid {
-		if err := engine.Executor.SetVUsMax(status.VUsMax.Int64); err != nil {
-			apiError(rw, "Couldn't change cap", err.Error(), http.StatusBadRequest)
-			return
+	if status.Stopped { //nolint:nestif
+		engine.Stop()
+	} else {
+		if status.Paused.Valid {
+			if err = engine.ExecutionScheduler.SetPaused(status.Paused.Bool); err != nil {
+				apiError(rw, "Pause error", err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
-	}
-	if status.VUs.Valid {
-		if err := engine.Executor.SetVUs(status.VUs.Int64); err != nil {
-			apiError(rw, "Couldn't scale", err.Error(), http.StatusBadRequest)
-			return
+
+		if status.VUsMax.Valid || status.VUs.Valid {
+			// TODO: add ability to specify the actual executor id? Though this should
+			// likely be in the v2 REST API, where we could implement it in a way that
+			// may allow us to eventually support other executor types.
+			executor, updateErr := getFirstExternallyControlledExecutor(engine.ExecutionScheduler)
+			if updateErr != nil {
+				apiError(rw, "Execution config error", updateErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			newConfig := executor.GetCurrentConfig().ExternallyControlledConfigParams
+			if status.VUsMax.Valid {
+				newConfig.MaxVUs = status.VUsMax
+			}
+			if status.VUs.Valid {
+				newConfig.VUs = status.VUs
+			}
+			if updateErr := executor.UpdateConfig(r.Context(), newConfig); updateErr != nil {
+				apiError(rw, "Config update error", updateErr.Error(), http.StatusBadRequest)
+				return
+			}
 		}
-	}
-	if status.Paused.Valid {
-		engine.Executor.SetPaused(status.Paused.Bool)
 	}
 
 	data, err := jsonapi.Marshal(NewStatus(engine))

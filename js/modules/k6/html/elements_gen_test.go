@@ -1,3 +1,23 @@
+/*
+ *
+ * k6 - a next-generation load testing tool
+ * Copyright (C) 2019 Load Impact
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 package html
 
 import (
@@ -5,8 +25,9 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
 	"github.com/stretchr/testify/assert"
+
+	"go.k6.io/k6/js/common"
 )
 
 var textTests = []struct {
@@ -298,7 +319,7 @@ var urlTests = []struct {
 }
 
 const testGenElems = `<html><body>
-	<a id="a1" download="file:///path/name" referrerpolicy="no-referrer" rel="open" href="http://test.url" target="__blank" type="text/html" accesskey="w" hreflang="es"></a> 
+	<a id="a1" download="file:///path/name" referrerpolicy="no-referrer" rel="open" href="http://test.url" target="__blank" type="text/html" accesskey="w" hreflang="es"></a>
 	<a id="a2"></a>
 	<a id="a3" href="relpath"></a>
 	<a id="a4" href="/abspath"></a>
@@ -390,14 +411,14 @@ func TestGenElements(t *testing.T) {
 	rt.Set("src", testGenElems)
 	rt.Set("html", common.Bind(rt, &HTML{}, &ctx))
 
-	_, err := common.RunString(rt, "let doc = html.parseHTML(src)")
+	_, err := rt.RunString("var doc = html.parseHTML(src)")
 
 	assert.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 
 	t.Run("Test text properties", func(t *testing.T) {
 		for _, test := range textTests {
-			v, err := common.RunString(rt, `doc.find("#`+test.id+`").get(0).`+test.property+`()`)
+			v, err := rt.RunString(`doc.find("#` + test.id + `").get(0).` + test.property + `()`)
 			if err != nil {
 				t.Errorf("Error for property name '%s' on element id '#%s':\n%+v ", test.id, test.property, err)
 			} else if v.Export() != test.data {
@@ -408,14 +429,14 @@ func TestGenElements(t *testing.T) {
 
 	t.Run("Test bool properties", func(t *testing.T) {
 		for _, test := range boolTests {
-			vT, errT := common.RunString(rt, `doc.find("#`+test.idTrue+`").get(0).`+test.property+`()`)
+			vT, errT := rt.RunString(`doc.find("#` + test.idTrue + `").get(0).` + test.property + `()`)
 			if errT != nil {
 				t.Errorf("Error for property name '%s' on element id '#%s':\n%+v", test.property, test.idTrue, errT)
 			} else if vT.Export() != true { // nolint: gosimple
 				t.Errorf("Expected true for property name '%s' on element id '#%s'", test.property, test.idTrue)
 			}
 
-			vF, errF := common.RunString(rt, `doc.find("#`+test.idFalse+`").get(0).`+test.property+`()`)
+			vF, errF := rt.RunString(`doc.find("#` + test.idFalse + `").get(0).` + test.property + `()`)
 			if errF != nil {
 				t.Errorf("Error for property name '%s' on element id '#%s':\n%+v", test.property, test.idFalse, errF)
 			} else if vF.Export() != false { // nolint: gosimple
@@ -426,7 +447,7 @@ func TestGenElements(t *testing.T) {
 
 	t.Run("Test int64 properties", func(t *testing.T) {
 		for _, test := range intTests {
-			v, err := common.RunString(rt, `doc.find("#`+test.id+`").get(0).`+test.property+`()`)
+			v, err := rt.RunString(`doc.find("#` + test.id + `").get(0).` + test.property + `()`)
 			if err != nil {
 				t.Errorf("Error for property name '%s' on element id '#%s':\n%+v", test.property, test.id, err)
 			} else if v.Export() != int64(test.data) {
@@ -437,7 +458,7 @@ func TestGenElements(t *testing.T) {
 
 	t.Run("Test nullable properties", func(t *testing.T) {
 		for _, test := range nullTests {
-			v, err := common.RunString(rt, `doc.find("#`+test.id+`").get(0).`+test.property+`()`)
+			v, err := rt.RunString(`doc.find("#` + test.id + `").get(0).` + test.property + `()`)
 			if err != nil {
 				t.Errorf("Error for property name '%s' on element id '#%s':\n%+v", test.property, test.id, err)
 			} else if v.Export() != nil {
@@ -457,7 +478,7 @@ func TestGenElements(t *testing.T) {
 			sel.URL = test.baseUrl
 			rt.Set("urldoc", sel)
 
-			v, err := common.RunString(rt, `urldoc.find("#`+test.id+`").get(0).`+test.property+`()`)
+			v, err := rt.RunString(`urldoc.find("#` + test.id + `").get(0).` + test.property + `()`)
 			if err != nil {
 				t.Errorf("Error for url property '%s' on element id '#%s':\n%+v", test.property, test.id, err)
 			} else if v.Export() != test.data {

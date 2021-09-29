@@ -1,3 +1,23 @@
+/*
+ *
+ * k6 - a next-generation load testing tool
+ * Copyright (C) 2019 Load Impact
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 package lib
 
 import (
@@ -9,10 +29,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/loadimpact/k6/lib/fsext"
-	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/lib/fsext"
 )
 
 func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
@@ -62,10 +82,10 @@ func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
 func TestOldArchive(t *testing.T) {
 	var testCases = map[string]string{
 		// map of filename to data for each main file tested
-		"github.com/loadimpact/k6/samples/example.js": `github file`,
-		"cdnjs.com/packages/Faker":                    `faker file`,
-		"C:/something/path2":                          `windows script`,
-		"/absolulte/path2":                            `unix script`,
+		"github.com/k6io/k6/samples/example.js": `github file`,
+		"cdnjs.com/packages/Faker":              `faker file`,
+		"C:/something/path2":                    `windows script`,
+		"/absolulte/path2":                      `unix script`,
 	}
 	for filename, data := range testCases {
 		filename, data := filename, data
@@ -73,20 +93,20 @@ func TestOldArchive(t *testing.T) {
 			metadata := `{"filename": "` + filename + `", "options": {}}`
 			fs := makeMemMapFs(t, map[string][]byte{
 				// files
-				"/files/github.com/loadimpact/k6/samples/example.js": []byte(`github file`),
-				"/files/cdnjs.com/packages/Faker":                    []byte(`faker file`),
-				"/files/example.com/path/to.js":                      []byte(`example.com file`),
-				"/files/_/C/something/path":                          []byte(`windows file`),
-				"/files/_/absolulte/path":                            []byte(`unix file`),
+				"/files/github.com/k6io/k6/samples/example.js": []byte(`github file`),
+				"/files/cdnjs.com/packages/Faker":              []byte(`faker file`),
+				"/files/example.com/path/to.js":                []byte(`example.com file`),
+				"/files/_/C/something/path":                    []byte(`windows file`),
+				"/files/_/absolulte/path":                      []byte(`unix file`),
 
 				// scripts
-				"/scripts/github.com/loadimpact/k6/samples/example.js2": []byte(`github script`),
-				"/scripts/cdnjs.com/packages/Faker2":                    []byte(`faker script`),
-				"/scripts/example.com/path/too.js":                      []byte(`example.com script`),
-				"/scripts/_/C/something/path2":                          []byte(`windows script`),
-				"/scripts/_/absolulte/path2":                            []byte(`unix script`),
-				"/data":                                                 []byte(data),
-				"/metadata.json":                                        []byte(metadata),
+				"/scripts/github.com/k6io/k6/samples/example.js2": []byte(`github script`),
+				"/scripts/cdnjs.com/packages/Faker2":              []byte(`faker script`),
+				"/scripts/example.com/path/too.js":                []byte(`example.com script`),
+				"/scripts/_/C/something/path2":                    []byte(`windows script`),
+				"/scripts/_/absolulte/path2":                      []byte(`unix script`),
+				"/data":                                           []byte(data),
+				"/metadata.json":                                  []byte(metadata),
 			})
 
 			buf, err := dumpMemMapFsToBuf(fs)
@@ -101,12 +121,12 @@ func TestOldArchive(t *testing.T) {
 						"/absolulte/path2":    []byte(`unix script`),
 					}),
 					"https": makeMemMapFs(t, map[string][]byte{
-						"/example.com/path/to.js":                       []byte(`example.com file`),
-						"/example.com/path/too.js":                      []byte(`example.com script`),
-						"/github.com/loadimpact/k6/samples/example.js":  []byte(`github file`),
-						"/cdnjs.com/packages/Faker":                     []byte(`faker file`),
-						"/github.com/loadimpact/k6/samples/example.js2": []byte(`github script`),
-						"/cdnjs.com/packages/Faker2":                    []byte(`faker script`),
+						"/example.com/path/to.js":                 []byte(`example.com file`),
+						"/example.com/path/too.js":                []byte(`example.com script`),
+						"/github.com/k6io/k6/samples/example.js":  []byte(`github file`),
+						"/cdnjs.com/packages/Faker":               []byte(`faker file`),
+						"/github.com/k6io/k6/samples/example.js2": []byte(`github script`),
+						"/cdnjs.com/packages/Faker2":              []byte(`faker script`),
 					}),
 				}
 			)
@@ -145,10 +165,10 @@ func TestFilenamePwdResolve(t *testing.T) {
 			expectedPwdURL:      &url.URL{Scheme: "file", Path: "/home/nobody"},
 		},
 		{
-			Filename:            "github.com/loadimpact/k6/samples/http2.js",
-			Pwd:                 "github.com/loadimpact/k6/samples",
-			expectedFilenameURL: &url.URL{Opaque: "github.com/loadimpact/k6/samples/http2.js"},
-			expectedPwdURL:      &url.URL{Opaque: "github.com/loadimpact/k6/samples"},
+			Filename:            "github.com/k6io/k6/samples/http2.js",
+			Pwd:                 "github.com/k6io/k6/samples",
+			expectedFilenameURL: &url.URL{Opaque: "github.com/k6io/k6/samples/http2.js"},
+			expectedPwdURL:      &url.URL{Opaque: "github.com/k6io/k6/samples"},
 		},
 		{
 			Filename:            "cdnjs.com/libraries/Faker",
@@ -175,7 +195,6 @@ func TestFilenamePwdResolve(t *testing.T) {
 			expectedError: "only supported schemes for imports are file and https",
 			version:       "0.25.0",
 		},
-
 		{
 			Filename:      "https://example.com/something/dot.js",
 			Pwd:           "ftps://example.com/something",
@@ -210,18 +229,20 @@ func TestFilenamePwdResolve(t *testing.T) {
 }
 
 func TestDerivedExecutionDiscarding(t *testing.T) {
-	var emptyConfigMap scheduler.ConfigMap
+	var emptyConfigMap ScenarioConfigs
 	var tests = []struct {
 		metadata     string
-		expExecution interface{}
+		expScenarios interface{}
 		expError     string
 	}{
+		// Tests to make sure that "execution" in the options, the old name for
+		// "scenarios" before #1007 was merged, doesn't mess up the options...
 		{
 			metadata: `{
 				"filename": "/test.js", "pwd": "/",
 				"options": { "execution": { "something": "invalid" } }
 			}`,
-			expExecution: emptyConfigMap,
+			expScenarios: emptyConfigMap,
 		},
 		{
 			metadata: `{
@@ -229,7 +250,7 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 				"k6version": "0.24.0",
 				"options": { "execution": { "something": "invalid" } }
 			}`,
-			expExecution: emptyConfigMap,
+			expScenarios: emptyConfigMap,
 		},
 		{
 			metadata: `blah`,
@@ -238,36 +259,21 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 		{
 			metadata: `{
 				"filename": "/test.js", "pwd": "/",
-				"k6version": "0.24.0"
-			}`,
-			expError: "missing options key",
-		},
-		{
-			metadata: `{
-				"filename": "/test.js", "pwd": "/",
 				"k6version": "0.24.0",
 				"options": "something invalid"
 			}`,
-			expError: "wrong options type in metadata.json",
+			expError: "cannot unmarshal string into Go struct field",
 		},
 		{
 			metadata: `{
 				"filename": "/test.js", "pwd": "/",
 				"k6version": "0.25.0",
-				"options": { "execution": { "something": "invalid" } }
+				"options": { "scenarios": { "something": "invalid" } }
 			}`,
 			expError: "cannot unmarshal string",
 		},
-		{
-			metadata: `{
-				"filename": "/test.js", "pwd": "/",
-				"k6version": "0.25.0",
-				"options": { "execution": { "default": { "type": "per-vu-iterations" } } }
-			}`,
-			expExecution: scheduler.ConfigMap{
-				DefaultSchedulerName: scheduler.NewPerVUIterationsConfig(DefaultSchedulerName),
-			},
-		},
+		// TODO: test an actual scenarios unmarshalling, which is currently
+		// impossible due to import cycles...
 	}
 
 	for _, test := range tests {
@@ -278,11 +284,11 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 
 		arc, err := ReadArchive(buf)
 		if test.expError != "" {
-			require.Error(t, err)
+			require.Errorf(t, err, "expected error '%s' but got nil", test.expError)
 			require.Contains(t, err.Error(), test.expError)
 		} else {
 			require.NoError(t, err)
-			require.Equal(t, test.expExecution, arc.Options.Execution)
+			require.Equal(t, test.expScenarios, arc.Options.Scenarios)
 		}
 	}
 }

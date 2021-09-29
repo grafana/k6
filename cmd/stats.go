@@ -23,32 +23,31 @@ package cmd
 import (
 	"context"
 
-	"github.com/loadimpact/k6/api/v1/client"
-	"github.com/loadimpact/k6/ui"
 	"github.com/spf13/cobra"
+
+	"go.k6.io/k6/api/v1/client"
 )
 
-// statsCmd represents the stats command
-var statsCmd = &cobra.Command{
-	Use:   "stats",
-	Short: "Show test metrics",
-	Long: `Show test metrics.
+func getStatsCmd(ctx context.Context) *cobra.Command {
+	// statsCmd represents the stats command
+	statsCmd := &cobra.Command{
+		Use:   "stats",
+		Short: "Show test metrics",
+		Long: `Show test metrics.
 
   Use the global --address flag to specify the URL to the API server.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := client.New(address)
-		if err != nil {
-			return err
-		}
-		metrics, err := c.Metrics(context.Background())
-		if err != nil {
-			return err
-		}
-		ui.Dump(stdout, metrics)
-		return nil
-	},
-}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := client.New(address)
+			if err != nil {
+				return err
+			}
+			metrics, err := c.Metrics(ctx)
+			if err != nil {
+				return err
+			}
 
-func init() {
-	RootCmd.AddCommand(statsCmd)
+			return yamlPrint(stdout, metrics)
+		},
+	}
+	return statsCmd
 }

@@ -1,12 +1,20 @@
-version: '3'
+version: '3.4'
+
 services:
-  build-linux-packages:
+  packager:
     build:
       context: .
-      dockerfile: Dockerfile.linux
-    command: |
-      bash -c "
-      CGO_ENABLED=0 GOARCH=amd64 go build -a -ldflags '-s -w' -o /tmp/k6
-      /go/src/github.com/loadimpact/k6/packaging/gen-packages.sh"
+      args:
+        - AWSCLI_VERSION=${AWSCLI_VERSION:-2.1.36}
+        - S3CMD_VERSION=${S3CMD_VERSION:-2.1.0}
+    image: ghcr.io/grafana/k6packager:latest
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_DEFAULT_REGION
+      - AWS_CF_DISTRIBUTION
+      - PGP_SIGN_KEY_PASSPHRASE
+      - S3_BUCKET=dl.k6.io
     volumes:
-      - ..:/go/src/github.com/loadimpact/k6
+      - ../dist:/home/k6/dist
+      - ./sign-key.gpg:/home/k6/sign-key.gpg

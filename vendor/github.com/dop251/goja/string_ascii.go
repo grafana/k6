@@ -2,11 +2,14 @@ package goja
 
 import (
 	"fmt"
+	"hash/maphash"
 	"io"
 	"math"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/dop251/goja/unistring"
 )
 
 type asciiString string
@@ -33,8 +36,20 @@ func (s asciiString) reader(start int) io.RuneReader {
 	}
 }
 
+func (s asciiString) utf16Reader(start int) io.RuneReader {
+	return s.reader(start)
+}
+
+func (s asciiString) utf16Runes() []rune {
+	runes := make([]rune, len(s))
+	for i := 0; i < len(s); i++ {
+		runes[i] = rune(s[i])
+	}
+	return runes
+}
+
 // ss must be trimmed
-func strToInt(ss string) (int64, error) {
+func stringToInt(ss string) (int64, error) {
 	if ss == "" {
 		return 0, nil
 	}
@@ -44,21 +59,18 @@ func strToInt(ss string) (int64, error) {
 	if len(ss) > 2 {
 		switch ss[:2] {
 		case "0x", "0X":
-			i, _ := strconv.ParseInt(ss[2:], 16, 64)
-			return i, nil
+			return strconv.ParseInt(ss[2:], 16, 64)
 		case "0b", "0B":
-			i, _ := strconv.ParseInt(ss[2:], 2, 64)
-			return i, nil
+			return strconv.ParseInt(ss[2:], 2, 64)
 		case "0o", "0O":
-			i, _ := strconv.ParseInt(ss[2:], 8, 64)
-			return i, nil
+			return strconv.ParseInt(ss[2:], 8, 64)
 		}
 	}
 	return strconv.ParseInt(ss, 10, 64)
 }
 
 func (s asciiString) _toInt() (int64, error) {
-	return strToInt(strings.TrimSpace(string(s)))
+	return stringToInt(strings.TrimSpace(string(s)))
 }
 
 func isRangeErr(err error) bool {
@@ -104,7 +116,11 @@ func (s asciiString) ToInteger() int64 {
 	return i
 }
 
-func (s asciiString) ToString() valueString {
+func (s asciiString) toString() valueString {
+	return s
+}
+
+func (s asciiString) ToString() Value {
 	return s
 }
 
@@ -160,7 +176,7 @@ func (s asciiString) ToNumber() Value {
 }
 
 func (s asciiString) ToObject(r *Runtime) *Object {
-	return r._newString(s)
+	return r._newString(s, r.global.StringPrototype)
 }
 
 func (s asciiString) SameAs(other Value) bool {
@@ -175,15 +191,15 @@ func (s asciiString) Equals(other Value) bool {
 		return s == o
 	}
 
-	if o, ok := other.assertInt(); ok {
+	if o, ok := other.(valueInt); ok {
 		if o1, e := s._toInt(); e == nil {
-			return o1 == o
+			return o1 == int64(o)
 		}
 		return false
 	}
 
-	if o, ok := other.assertFloat(); ok {
-		return s.ToFloat() == o
+	if o, ok := other.(valueFloat); ok {
+		return s.ToFloat() == float64(o)
 	}
 
 	if o, ok := other.(valueBool); ok {
@@ -194,7 +210,7 @@ func (s asciiString) Equals(other Value) bool {
 	}
 
 	if o, ok := other.(*Object); ok {
-		return s.Equals(o.self.toPrimitive())
+		return s.Equals(o.toPrimitive())
 	}
 	return false
 }
@@ -206,18 +222,6 @@ func (s asciiString) StrictEquals(other Value) bool {
 	return false
 }
 
-func (s asciiString) assertInt() (int64, bool) {
-	return 0, false
-}
-
-func (s asciiString) assertFloat() (float64, bool) {
-	return 0, false
-}
-
-func (s asciiString) assertString() (valueString, bool) {
-	return s, true
-}
-
 func (s asciiString) baseObject(r *Runtime) *Object {
 	ss := r.stringSingleton
 	ss.value = s
@@ -225,12 +229,19 @@ func (s asciiString) baseObject(r *Runtime) *Object {
 	return ss.val
 }
 
-func (s asciiString) charAt(idx int64) rune {
+func (s asciiString) hash(hash *maphash.Hash) uint64 {
+	_, _ = hash.WriteString(string(s))
+	h := hash.Sum64()
+	hash.Reset()
+	return h
+}
+
+func (s asciiString) charAt(idx int) rune {
 	return rune(s[idx])
 }
 
-func (s asciiString) length() int64 {
-	return int64(len(s))
+func (s asciiString) length() int {
+	return len(s)
 }
 
 func (s asciiString) concat(other valueString) valueString {
@@ -240,21 +251,21 @@ func (s asciiString) concat(other valueString) valueString {
 		copy(b, s)
 		copy(b[len(s):], other)
 		return asciiString(b)
-		//return asciiString(string(s) + string(other))
 	case unicodeString:
 		b := make([]uint16, len(s)+len(other))
+		b[0] = unistring.BOM
 		for i := 0; i < len(s); i++ {
-			b[i] = uint16(s[i])
+			b[i+1] = uint16(s[i])
 		}
-		copy(b[len(s):], other)
+		copy(b[len(s)+1:], other[1:])
 		return unicodeString(b)
 	default:
-		panic(fmt.Errorf("Unknown string type: %T", other))
+		panic(fmt.Errorf("unknown string type: %T", other))
 	}
 }
 
-func (s asciiString) substring(start, end int64) valueString {
-	return asciiString(s[start:end])
+func (s asciiString) substring(start, end int) valueString {
+	return s[start:end]
 }
 
 func (s asciiString) compareTo(other valueString) int {
@@ -264,13 +275,13 @@ func (s asciiString) compareTo(other valueString) int {
 	case unicodeString:
 		return strings.Compare(string(s), other.String())
 	default:
-		panic(fmt.Errorf("Unknown string type: %T", other))
+		panic(fmt.Errorf("unknown string type: %T", other))
 	}
 }
 
-func (s asciiString) index(substr valueString, start int64) int64 {
+func (s asciiString) index(substr valueString, start int) int {
 	if substr, ok := substr.(asciiString); ok {
-		p := int64(strings.Index(string(s[start:]), string(substr)))
+		p := strings.Index(string(s[start:]), string(substr))
 		if p >= 0 {
 			return p + start
 		}
@@ -278,16 +289,16 @@ func (s asciiString) index(substr valueString, start int64) int64 {
 	return -1
 }
 
-func (s asciiString) lastIndex(substr valueString, pos int64) int64 {
+func (s asciiString) lastIndex(substr valueString, pos int) int {
 	if substr, ok := substr.(asciiString); ok {
-		end := pos + int64(len(substr))
+		end := pos + len(substr)
 		var ss string
-		if end > int64(len(s)) {
+		if end > len(s) {
 			ss = string(s)
 		} else {
 			ss = string(s[:end])
 		}
-		return int64(strings.LastIndex(ss, string(substr)))
+		return strings.LastIndex(ss, string(substr))
 	}
 	return -1
 }
@@ -302,6 +313,10 @@ func (s asciiString) toUpper() valueString {
 
 func (s asciiString) toTrimmedUTF8() string {
 	return strings.TrimSpace(string(s))
+}
+
+func (s asciiString) string() unistring.String {
+	return unistring.String(s)
 }
 
 func (s asciiString) Export() interface{} {

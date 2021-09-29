@@ -22,52 +22,685 @@ package local
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io/ioutil"
 	"net"
 	"net/url"
+	"reflect"
 	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/lib/netext"
-	"github.com/loadimpact/k6/loader"
-
-	"github.com/loadimpact/k6/js"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
-	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/js"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/executor"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/netext"
+	"go.k6.io/k6/lib/netext/httpext"
+	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/lib/testutils/httpmultibin"
+	"go.k6.io/k6/lib/testutils/minirunner"
+	"go.k6.io/k6/lib/testutils/mockresolver"
+	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/loader"
+	"go.k6.io/k6/stats"
 )
 
-func TestExecutorRun(t *testing.T) {
-	e := New(nil)
-	assert.NoError(t, e.SetVUsMax(10))
-	assert.NoError(t, e.SetVUs(10))
+func newTestExecutionScheduler(
+	t *testing.T, runner lib.Runner, logger *logrus.Logger, opts lib.Options,
+) (ctx context.Context, cancel func(), execScheduler *ExecutionScheduler, samples chan stats.SampleContainer) {
+	if runner == nil {
+		runner = &minirunner.MiniRunner{}
+	}
+	ctx, cancel = context.WithCancel(context.Background())
+	newOpts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
+		MetricSamplesBufferSize: null.NewInt(200, false),
+	}.Apply(runner.GetOptions()).Apply(opts))
+	require.NoError(t, err)
+	require.Empty(t, newOpts.Validate())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	err := make(chan error, 1)
-	samples := make(chan stats.SampleContainer, 100)
-	defer close(samples)
+	require.NoError(t, runner.SetOptions(newOpts))
+
+	if logger == nil {
+		logger = logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+	}
+
+	execScheduler, err = NewExecutionScheduler(runner, logger)
+	require.NoError(t, err)
+
+	samples = make(chan stats.SampleContainer, newOpts.MetricSamplesBufferSize.Int64)
 	go func() {
-		for range samples {
+		for {
+			select {
+			case <-samples:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
-	go func() { err <- e.Run(ctx, samples) }()
-	cancel()
+	require.NoError(t, execScheduler.Init(ctx, samples))
+
+	return ctx, cancel, execScheduler, samples
+}
+
+func TestExecutionSchedulerRun(t *testing.T) {
+	t.Parallel()
+	ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, nil, nil, lib.Options{})
+	defer cancel()
+
+	err := make(chan error, 1)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	go func() { err <- execScheduler.Run(ctx, ctx, samples, builtinMetrics) }()
 	assert.NoError(t, <-err)
 }
 
-func TestExecutorSetupTeardownRun(t *testing.T) {
+func TestExecutionSchedulerRunNonDefault(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name, script, expErr string
+	}{
+		{"defaultOK", `export default function () {}`, ""},
+		{"nonDefaultOK", `
+	export let options = {
+		scenarios: {
+			per_vu_iters: {
+				executor: "per-vu-iterations",
+				vus: 1,
+				iterations: 1,
+				exec: "nonDefault",
+			},
+		}
+	}
+	export function nonDefault() {}`, ""},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			runner, err := js.New(logger, &loader.SourceData{
+				URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script),
+			},
+				nil, lib.RuntimeOptions{}, builtinMetrics, registry)
+			require.NoError(t, err)
+
+			execScheduler, err := NewExecutionScheduler(runner, logger)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			done := make(chan struct{})
+			samples := make(chan stats.SampleContainer)
+			go func() {
+				err := execScheduler.Init(ctx, samples)
+				if tc.expErr != "" {
+					assert.EqualError(t, err, tc.expErr)
+				} else {
+					assert.NoError(t, err)
+					assert.NoError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics))
+				}
+				close(done)
+			}()
+			for {
+				select {
+				case <-samples:
+				case <-done:
+					return
+				}
+			}
+		})
+	}
+}
+
+func TestExecutionSchedulerRunEnv(t *testing.T) {
+	t.Parallel()
+
+	scriptTemplate := `
+	import { Counter } from "k6/metrics";
+
+	let errors = new Counter("errors");
+
+	export let options = {
+		scenarios: {
+			executor: {
+				executor: "%[1]s",
+				gracefulStop: "0.5s",
+				%[2]s
+			}
+		}
+	}
+
+	export default function () {
+		if (__ENV.TESTVAR !== "%[3]s") {
+		    console.error('Wrong env var value. Expected: %[3]s, actual: ', __ENV.TESTVAR);
+			errors.add(1);
+		}
+	}`
+
+	executorConfigs := map[string]string{
+		"constant-arrival-rate": `
+			rate: 1,
+			timeUnit: "0.5s",
+			duration: "0.5s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,`,
+		"constant-vus": `
+			vus: 1,
+			duration: "0.5s",`,
+		"externally-controlled": `
+			vus: 1,
+			duration: "0.5s",`,
+		"per-vu-iterations": `
+			vus: 1,
+			iterations: 1,`,
+		"shared-iterations": `
+			vus: 1,
+			iterations: 1,`,
+		"ramping-arrival-rate": `
+			startRate: 1,
+			timeUnit: "0.5s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,
+			stages: [ { target: 1, duration: "0.5s" } ],`,
+		"ramping-vus": `
+			startVUs: 1,
+			stages: [ { target: 1, duration: "0.5s" } ],`,
+	}
+
+	testCases := []struct{ name, script string }{}
+
+	// Generate tests using global env and with env override
+	for ename, econf := range executorConfigs {
+		testCases = append(testCases, struct{ name, script string }{
+			"global/" + ename, fmt.Sprintf(scriptTemplate, ename, econf, "global"),
+		})
+		configWithEnvOverride := econf + "env: { TESTVAR: 'overridden' }"
+		testCases = append(testCases, struct{ name, script string }{
+			"override/" + ename, fmt.Sprintf(scriptTemplate, ename, configWithEnvOverride, "overridden"),
+		})
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			runner, err := js.New(logger, &loader.SourceData{
+				URL:  &url.URL{Path: "/script.js"},
+				Data: []byte(tc.script),
+			},
+				nil, lib.RuntimeOptions{Env: map[string]string{"TESTVAR": "global"}}, builtinMetrics, registry)
+			require.NoError(t, err)
+
+			execScheduler, err := NewExecutionScheduler(runner, logger)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			done := make(chan struct{})
+			samples := make(chan stats.SampleContainer)
+			go func() {
+				assert.NoError(t, execScheduler.Init(ctx, samples))
+				assert.NoError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics))
+				close(done)
+			}()
+			for {
+				select {
+				case sample := <-samples:
+					if s, ok := sample.(stats.Sample); ok && s.Metric.Name == "errors" {
+						assert.FailNow(t, "received error sample from test")
+					}
+				case <-done:
+					return
+				}
+			}
+		})
+	}
+}
+
+func TestExecutionSchedulerSystemTags(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	script := sr(`
+	import http from "k6/http";
+
+	export let options = {
+		scenarios: {
+			per_vu_test: {
+				executor: "per-vu-iterations",
+				gracefulStop: "0s",
+				vus: 1,
+				iterations: 1,
+			},
+			shared_test: {
+				executor: "shared-iterations",
+				gracefulStop: "0s",
+				vus: 1,
+				iterations: 1,
+			}
+		}
+	}
+
+	export default function () {
+		http.get("HTTPBIN_IP_URL/");
+	}`)
+
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	runner, err := js.New(logger, &loader.SourceData{
+		URL:  &url.URL{Path: "/script.js"},
+		Data: []byte(script),
+	},
+		nil, lib.RuntimeOptions{}, builtinMetrics, registry)
+	require.NoError(t, err)
+
+	require.NoError(t, runner.SetOptions(runner.GetOptions().Apply(lib.Options{
+		SystemTags: &stats.DefaultSystemTagSet,
+	})))
+
+	execScheduler, err := NewExecutionScheduler(runner, logger)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	samples := make(chan stats.SampleContainer)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		require.NoError(t, execScheduler.Init(ctx, samples))
+		require.NoError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics))
+	}()
+
+	expCommonTrailTags := stats.IntoSampleTags(&map[string]string{
+		"group":             "",
+		"method":            "GET",
+		"name":              sr("HTTPBIN_IP_URL/"),
+		"url":               sr("HTTPBIN_IP_URL/"),
+		"proto":             "HTTP/1.1",
+		"status":            "200",
+		"expected_response": "true",
+	})
+	expTrailPVUTagsRaw := expCommonTrailTags.CloneTags()
+	expTrailPVUTagsRaw["scenario"] = "per_vu_test"
+	expTrailPVUTags := stats.IntoSampleTags(&expTrailPVUTagsRaw)
+	expTrailSITagsRaw := expCommonTrailTags.CloneTags()
+	expTrailSITagsRaw["scenario"] = "shared_test"
+	expTrailSITags := stats.IntoSampleTags(&expTrailSITagsRaw)
+	expNetTrailPVUTags := stats.IntoSampleTags(&map[string]string{
+		"group":    "",
+		"scenario": "per_vu_test",
+	})
+	expNetTrailSITags := stats.IntoSampleTags(&map[string]string{
+		"group":    "",
+		"scenario": "shared_test",
+	})
+
+	var gotCorrectTags int
+	for {
+		select {
+		case sample := <-samples:
+			switch s := sample.(type) {
+			case *httpext.Trail:
+				if s.Tags.IsEqual(expTrailPVUTags) || s.Tags.IsEqual(expTrailSITags) {
+					gotCorrectTags++
+				}
+			case *netext.NetTrail:
+				if s.Tags.IsEqual(expNetTrailPVUTags) || s.Tags.IsEqual(expNetTrailSITags) {
+					gotCorrectTags++
+				}
+			}
+		case <-done:
+			require.Equal(t, 4, gotCorrectTags, "received wrong amount of samples with expected tags")
+			return
+		}
+	}
+}
+
+func TestExecutionSchedulerRunCustomTags(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	scriptTemplate := sr(`
+	import http from "k6/http";
+
+	export let options = {
+		scenarios: {
+			executor: {
+				executor: "%s",
+				gracefulStop: "0.5s",
+				%s
+			}
+		}
+	}
+
+	export default function () {
+		http.get("HTTPBIN_IP_URL/");
+	}`)
+
+	executorConfigs := map[string]string{
+		"constant-arrival-rate": `
+			rate: 1,
+			timeUnit: "0.5s",
+			duration: "0.5s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,`,
+		"constant-vus": `
+			vus: 1,
+			duration: "0.5s",`,
+		"externally-controlled": `
+			vus: 1,
+			duration: "0.5s",`,
+		"per-vu-iterations": `
+			vus: 1,
+			iterations: 1,`,
+		"shared-iterations": `
+			vus: 1,
+			iterations: 1,`,
+		"ramping-arrival-rate": `
+			startRate: 5,
+			timeUnit: "0.5s",
+			preAllocatedVUs: 1,
+			maxVUs: 2,
+			stages: [ { target: 10, duration: "1s" } ],`,
+		"ramping-vus": `
+			startVUs: 1,
+			stages: [ { target: 1, duration: "0.5s" } ],`,
+	}
+
+	testCases := []struct{ name, script string }{}
+
+	// Generate tests using custom tags
+	for ename, econf := range executorConfigs {
+		configWithCustomTag := econf + "tags: { customTag: 'value' }"
+		testCases = append(testCases, struct{ name, script string }{
+			ename, fmt.Sprintf(scriptTemplate, ename, configWithCustomTag),
+		})
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
+
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			runner, err := js.New(logger, &loader.SourceData{
+				URL:  &url.URL{Path: "/script.js"},
+				Data: []byte(tc.script),
+			},
+				nil, lib.RuntimeOptions{}, builtinMetrics, registry)
+			require.NoError(t, err)
+
+			execScheduler, err := NewExecutionScheduler(runner, logger)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+
+			done := make(chan struct{})
+			samples := make(chan stats.SampleContainer)
+			go func() {
+				defer close(done)
+				require.NoError(t, execScheduler.Init(ctx, samples))
+				require.NoError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics))
+			}()
+			var gotTrailTag, gotNetTrailTag bool
+			for {
+				select {
+				case sample := <-samples:
+					if trail, ok := sample.(*httpext.Trail); ok && !gotTrailTag {
+						tags := trail.Tags.CloneTags()
+						if v, ok := tags["customTag"]; ok && v == "value" {
+							gotTrailTag = true
+						}
+					}
+					if netTrail, ok := sample.(*netext.NetTrail); ok && !gotNetTrailTag {
+						tags := netTrail.Tags.CloneTags()
+						if v, ok := tags["customTag"]; ok && v == "value" {
+							gotNetTrailTag = true
+						}
+					}
+				case <-done:
+					if !gotTrailTag || !gotNetTrailTag {
+						assert.FailNow(t, "a sample with expected tag wasn't received")
+					}
+					return
+				}
+			}
+		})
+	}
+}
+
+// Ensure that custom executor settings are unique per executor and
+// that there's no "crossover"/"pollution" between executors.
+// Also test that custom tags are properly set on checks and groups metrics.
+func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+
+	script := tb.Replacer.Replace(`
+	import http from "k6/http";
+	import ws from 'k6/ws';
+	import { Counter } from 'k6/metrics';
+	import { check, group } from 'k6';
+
+	let errors = new Counter('errors');
+
+	export let options = {
+		// Required for WS tests
+		hosts: { 'httpbin.local': '127.0.0.1' },
+		scenarios: {
+			scenario1: {
+				executor: 'per-vu-iterations',
+				vus: 1,
+				iterations: 1,
+				gracefulStop: '0s',
+				maxDuration: '1s',
+				exec: 's1func',
+				env: { TESTVAR1: 'scenario1' },
+				tags: { testtag1: 'scenario1' },
+			},
+			scenario2: {
+				executor: 'shared-iterations',
+				vus: 1,
+				iterations: 1,
+				gracefulStop: '1s',
+				startTime: '0.5s',
+				maxDuration: '2s',
+				exec: 's2func',
+				env: { TESTVAR2: 'scenario2' },
+				tags: { testtag2: 'scenario2' },
+			},
+			scenario3: {
+				executor: 'per-vu-iterations',
+				vus: 1,
+				iterations: 1,
+				gracefulStop: '1s',
+				exec: 's3funcWS',
+				env: { TESTVAR3: 'scenario3' },
+				tags: { testtag3: 'scenario3' },
+			},
+		}
+	}
+
+	function checkVar(name, expected) {
+		if (__ENV[name] !== expected) {
+		    console.error('Wrong ' + name + " env var value. Expected: '"
+						+ expected + "', actual: '" + __ENV[name] + "'");
+			errors.add(1);
+		}
+	}
+
+	export function s1func() {
+		checkVar('TESTVAR1', 'scenario1');
+		checkVar('TESTVAR2', undefined);
+		checkVar('TESTVAR3', undefined);
+		checkVar('TESTGLOBALVAR', 'global');
+
+		// Intentionally try to pollute the env
+		__ENV.TESTVAR2 = 'overridden';
+
+		http.get('HTTPBIN_IP_URL/', { tags: { reqtag: 'scenario1' }});
+	}
+
+	export function s2func() {
+		checkVar('TESTVAR1', undefined);
+		checkVar('TESTVAR2', 'scenario2');
+		checkVar('TESTVAR3', undefined);
+		checkVar('TESTGLOBALVAR', 'global');
+
+		http.get('HTTPBIN_IP_URL/', { tags: { reqtag: 'scenario2' }});
+	}
+
+	export function s3funcWS() {
+		checkVar('TESTVAR1', undefined);
+		checkVar('TESTVAR2', undefined);
+		checkVar('TESTVAR3', 'scenario3');
+		checkVar('TESTGLOBALVAR', 'global');
+
+		const customTags = { wstag: 'scenario3' };
+		group('wsgroup', function() {
+			const response = ws.connect('WSBIN_URL/ws-echo', { tags: customTags },
+				function (socket) {
+					socket.on('open', function() {
+						socket.send('hello');
+					});
+					socket.on('message', function(msg) {
+						if (msg != 'hello') {
+						    console.error("Expected to receive 'hello' but got '" + msg + "' instead!");
+							errors.add(1);
+						}
+						socket.close()
+					});
+					socket.on('error', function (e) {
+						console.log('ws error: ' + e.error());
+						errors.add(1);
+					});
+				}
+			);
+			check(response, { 'status is 101': (r) => r && r.status === 101 }, customTags);
+		});
+	}
+`)
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	runner, err := js.New(logger, &loader.SourceData{
+		URL:  &url.URL{Path: "/script.js"},
+		Data: []byte(script),
+	},
+		nil, lib.RuntimeOptions{Env: map[string]string{"TESTGLOBALVAR": "global"}}, builtinMetrics, registry)
+	require.NoError(t, err)
+
+	execScheduler, err := NewExecutionScheduler(runner, logger)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	samples := make(chan stats.SampleContainer)
+	go func() {
+		assert.NoError(t, execScheduler.Init(ctx, samples))
+		assert.NoError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics))
+		close(samples)
+	}()
+
+	expectedTrailTags := []map[string]string{
+		{"testtag1": "scenario1", "reqtag": "scenario1"},
+		{"testtag2": "scenario2", "reqtag": "scenario2"},
+	}
+	expectedNetTrailTags := []map[string]string{
+		{"testtag1": "scenario1"},
+		{"testtag2": "scenario2"},
+	}
+	expectedConnSampleTags := map[string]string{
+		"testtag3": "scenario3", "wstag": "scenario3",
+	}
+	expectedPlainSampleTags := []map[string]string{
+		{"testtag3": "scenario3"},
+		{"testtag3": "scenario3", "wstag": "scenario3"},
+	}
+	var gotSampleTags int
+	for sample := range samples {
+		switch s := sample.(type) {
+		case stats.Sample:
+			if s.Metric.Name == "errors" {
+				assert.FailNow(t, "received error sample from test")
+			}
+			if s.Metric.Name == "checks" || s.Metric.Name == "group_duration" {
+				tags := s.Tags.CloneTags()
+				for _, expTags := range expectedPlainSampleTags {
+					if reflect.DeepEqual(expTags, tags) {
+						gotSampleTags++
+					}
+				}
+			}
+		case *httpext.Trail:
+			tags := s.Tags.CloneTags()
+			for _, expTags := range expectedTrailTags {
+				if reflect.DeepEqual(expTags, tags) {
+					gotSampleTags++
+				}
+			}
+		case *netext.NetTrail:
+			tags := s.Tags.CloneTags()
+			for _, expTags := range expectedNetTrailTags {
+				if reflect.DeepEqual(expTags, tags) {
+					gotSampleTags++
+				}
+			}
+		case stats.ConnectedSamples:
+			for _, sm := range s.Samples {
+				tags := sm.Tags.CloneTags()
+				if reflect.DeepEqual(expectedConnSampleTags, tags) {
+					gotSampleTags++
+				}
+			}
+		}
+	}
+	require.Equal(t, 8, gotSampleTags, "received wrong amount of samples with expected tags")
+}
+
+func TestExecutionSchedulerSetupTeardownRun(t *testing.T) {
+	t.Parallel()
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	t.Run("Normal", func(t *testing.T) {
+		t.Parallel()
 		setupC := make(chan struct{})
 		teardownC := make(chan struct{})
-		e := New(&lib.MiniRunner{
+		runner := &minirunner.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				close(setupC)
 				return nil, nil
@@ -76,214 +709,274 @@ func TestExecutorSetupTeardownRun(t *testing.T) {
 				close(teardownC)
 				return nil
 			},
-		})
+		}
+		ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, nil, lib.Options{})
 
-		ctx, cancel := context.WithCancel(context.Background())
 		err := make(chan error, 1)
-		go func() { err <- e.Run(ctx, make(chan stats.SampleContainer, 100)) }()
-		cancel()
+		go func() { err <- execScheduler.Run(ctx, ctx, samples, builtinMetrics) }()
+		defer cancel()
 		<-setupC
 		<-teardownC
 		assert.NoError(t, <-err)
 	})
 	t.Run("Setup Error", func(t *testing.T) {
-		e := New(&lib.MiniRunner{
+		t.Parallel()
+		runner := &minirunner.MiniRunner{
+			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
+				return nil, errors.New("setup error")
+			},
+		}
+		ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, nil, lib.Options{})
+		defer cancel()
+		assert.EqualError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics), "setup error")
+	})
+	t.Run("Don't Run Setup", func(t *testing.T) {
+		t.Parallel()
+		runner := &minirunner.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, errors.New("setup error")
 			},
 			TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 				return errors.New("teardown error")
 			},
+		}
+		ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, nil, lib.Options{
+			NoSetup:    null.BoolFrom(true),
+			VUs:        null.IntFrom(1),
+			Iterations: null.IntFrom(1),
 		})
-		assert.EqualError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 100)), "setup error")
-
-		t.Run("Don't Run Setup", func(t *testing.T) {
-			e := New(&lib.MiniRunner{
-				SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
-					return nil, errors.New("setup error")
-				},
-				TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-					return errors.New("teardown error")
-				},
-			})
-			e.SetRunSetup(false)
-			e.SetEndIterations(null.IntFrom(1))
-			assert.NoError(t, e.SetVUsMax(1))
-			assert.NoError(t, e.SetVUs(1))
-			assert.EqualError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 100)), "teardown error")
-		})
+		defer cancel()
+		assert.EqualError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics), "teardown error")
 	})
+
 	t.Run("Teardown Error", func(t *testing.T) {
-		e := New(&lib.MiniRunner{
+		t.Parallel()
+		runner := &minirunner.MiniRunner{
 			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
 				return nil, nil
 			},
 			TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 				return errors.New("teardown error")
 			},
+		}
+		ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, nil, lib.Options{
+			VUs:        null.IntFrom(1),
+			Iterations: null.IntFrom(1),
 		})
-		e.SetEndIterations(null.IntFrom(1))
-		assert.NoError(t, e.SetVUsMax(1))
-		assert.NoError(t, e.SetVUs(1))
-		assert.EqualError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 100)), "teardown error")
+		defer cancel()
 
-		t.Run("Don't Run Teardown", func(t *testing.T) {
-			e := New(&lib.MiniRunner{
-				SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
-					return nil, nil
-				},
-				TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-					return errors.New("teardown error")
-				},
-			})
-			e.SetRunTeardown(false)
-			e.SetEndIterations(null.IntFrom(1))
-			assert.NoError(t, e.SetVUsMax(1))
-			assert.NoError(t, e.SetVUs(1))
-			assert.NoError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 100)))
+		assert.EqualError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics), "teardown error")
+	})
+	t.Run("Don't Run Teardown", func(t *testing.T) {
+		t.Parallel()
+		runner := &minirunner.MiniRunner{
+			SetupFn: func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error) {
+				return nil, nil
+			},
+			TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+				return errors.New("teardown error")
+			},
+		}
+		ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, nil, lib.Options{
+			NoTeardown: null.BoolFrom(true),
+			VUs:        null.IntFrom(1),
+			Iterations: null.IntFrom(1),
 		})
+		defer cancel()
+		assert.NoError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics))
 	})
 }
 
-func TestExecutorSetLogger(t *testing.T) {
-	logger, _ := logtest.NewNullLogger()
-	e := New(nil)
-	e.SetLogger(logger)
-	assert.Equal(t, logger, e.GetLogger())
-}
-
-func TestExecutorStages(t *testing.T) {
+func TestExecutionSchedulerStages(t *testing.T) {
+	t.Parallel()
 	testdata := map[string]struct {
 		Duration time.Duration
 		Stages   []lib.Stage
 	}{
 		"one": {
 			1 * time.Second,
-			[]lib.Stage{{Duration: types.NullDurationFrom(1 * time.Second)}},
+			[]lib.Stage{{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(1)}},
 		},
 		"two": {
 			2 * time.Second,
 			[]lib.Stage{
-				{Duration: types.NullDurationFrom(1 * time.Second)},
-				{Duration: types.NullDurationFrom(1 * time.Second)},
+				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(1)},
+				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(2)},
 			},
 		},
-		"two/targeted": {
-			2 * time.Second,
+		"four": {
+			4 * time.Second,
 			[]lib.Stage{
 				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(5)},
-				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(10)},
+				{Duration: types.NullDurationFrom(3 * time.Second), Target: null.IntFrom(10)},
 			},
 		},
 	}
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+
 	for name, data := range testdata {
+		data := data
 		t.Run(name, func(t *testing.T) {
-			e := New(&lib.MiniRunner{
+			t.Parallel()
+			runner := &minirunner.MiniRunner{
 				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 					time.Sleep(100 * time.Millisecond)
 					return nil
 				},
-				Options: lib.Options{
-					MetricSamplesBufferSize: null.IntFrom(500),
-				},
+			}
+			ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, nil, lib.Options{
+				VUs:    null.IntFrom(1),
+				Stages: data.Stages,
 			})
-			assert.NoError(t, e.SetVUsMax(10))
-			e.SetStages(data.Stages)
-			assert.NoError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 500)))
-			assert.True(t, e.GetTime() >= data.Duration)
+			defer cancel()
+			assert.NoError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics))
+			assert.True(t, execScheduler.GetState().GetCurrentTestRunDuration() >= data.Duration)
 		})
 	}
 }
 
-func TestExecutorEndTime(t *testing.T) {
-	e := New(&lib.MiniRunner{
+func TestExecutionSchedulerEndTime(t *testing.T) {
+	t.Parallel()
+	runner := &minirunner.MiniRunner{
 		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 			time.Sleep(100 * time.Millisecond)
 			return nil
 		},
-		Options: lib.Options{MetricSamplesBufferSize: null.IntFrom(200)},
+	}
+	ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, nil, lib.Options{
+		VUs:      null.IntFrom(10),
+		Duration: types.NullDurationFrom(1 * time.Second),
 	})
-	assert.NoError(t, e.SetVUsMax(10))
-	assert.NoError(t, e.SetVUs(10))
-	e.SetEndTime(types.NullDurationFrom(1 * time.Second))
-	assert.Equal(t, types.NullDurationFrom(1*time.Second), e.GetEndTime())
+	defer cancel()
+
+	endTime, isFinal := lib.GetEndOffset(execScheduler.GetExecutionPlan())
+	assert.Equal(t, 31*time.Second, endTime) // because of the default 30s gracefulStop
+	assert.True(t, isFinal)
 
 	startTime := time.Now()
-	assert.NoError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 200)))
-	assert.True(t, time.Now().After(startTime.Add(1*time.Second)), "test did not take 1s")
-
-	t.Run("Runtime Errors", func(t *testing.T) {
-		e := New(&lib.MiniRunner{
-			Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-				time.Sleep(10 * time.Millisecond)
-				return errors.New("hi")
-			},
-			Options: lib.Options{MetricSamplesBufferSize: null.IntFrom(200)},
-		})
-		assert.NoError(t, e.SetVUsMax(10))
-		assert.NoError(t, e.SetVUs(10))
-		e.SetEndTime(types.NullDurationFrom(100 * time.Millisecond))
-		assert.Equal(t, types.NullDurationFrom(100*time.Millisecond), e.GetEndTime())
-
-		l, hook := logtest.NewNullLogger()
-		e.SetLogger(l)
-
-		startTime := time.Now()
-		assert.NoError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 200)))
-		assert.True(t, time.Now().After(startTime.Add(100*time.Millisecond)), "test did not take 100ms")
-
-		assert.NotEmpty(t, hook.Entries)
-		for _, e := range hook.Entries {
-			assert.Equal(t, "hi", e.Message)
-		}
-	})
-
-	t.Run("End Errors", func(t *testing.T) {
-		e := New(&lib.MiniRunner{
-			Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-				<-ctx.Done()
-				return errors.New("hi")
-			},
-			Options: lib.Options{MetricSamplesBufferSize: null.IntFrom(200)},
-		})
-		assert.NoError(t, e.SetVUsMax(10))
-		assert.NoError(t, e.SetVUs(10))
-		e.SetEndTime(types.NullDurationFrom(100 * time.Millisecond))
-		assert.Equal(t, types.NullDurationFrom(100*time.Millisecond), e.GetEndTime())
-
-		l, hook := logtest.NewNullLogger()
-		e.SetLogger(l)
-
-		startTime := time.Now()
-		assert.NoError(t, e.Run(context.Background(), make(chan stats.SampleContainer, 200)))
-		assert.True(t, time.Now().After(startTime.Add(100*time.Millisecond)), "test did not take 100ms")
-
-		assert.Empty(t, hook.Entries)
-	})
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	assert.NoError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics))
+	runTime := time.Since(startTime)
+	assert.True(t, runTime > 1*time.Second, "test did not take 1s")
+	assert.True(t, runTime < 10*time.Second, "took more than 10 seconds")
 }
 
-func TestExecutorEndIterations(t *testing.T) {
+func TestExecutionSchedulerRuntimeErrors(t *testing.T) {
+	t.Parallel()
+	runner := &minirunner.MiniRunner{
+		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+			time.Sleep(10 * time.Millisecond)
+			return errors.New("hi")
+		},
+		Options: lib.Options{
+			VUs:      null.IntFrom(10),
+			Duration: types.NullDurationFrom(1 * time.Second),
+		},
+	}
+	logger, hook := logtest.NewNullLogger()
+	ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, lib.Options{})
+	defer cancel()
+
+	endTime, isFinal := lib.GetEndOffset(execScheduler.GetExecutionPlan())
+	assert.Equal(t, 31*time.Second, endTime) // because of the default 30s gracefulStop
+	assert.True(t, isFinal)
+
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	startTime := time.Now()
+	assert.NoError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics))
+	runTime := time.Since(startTime)
+	assert.True(t, runTime > 1*time.Second, "test did not take 1s")
+	assert.True(t, runTime < 10*time.Second, "took more than 10 seconds")
+
+	assert.NotEmpty(t, hook.Entries)
+	for _, e := range hook.Entries {
+		assert.Equal(t, "hi", e.Message)
+	}
+}
+
+func TestExecutionSchedulerEndErrors(t *testing.T) {
+	t.Parallel()
+
+	exec := executor.NewConstantVUsConfig("we_need_hard_stop")
+	exec.VUs = null.IntFrom(10)
+	exec.Duration = types.NullDurationFrom(1 * time.Second)
+	exec.GracefulStop = types.NullDurationFrom(0 * time.Second)
+
+	runner := &minirunner.MiniRunner{
+		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+			<-ctx.Done()
+			return errors.New("hi")
+		},
+		Options: lib.Options{
+			Scenarios: lib.ScenarioConfigs{exec.GetName(): exec},
+		},
+	}
+	logger, hook := logtest.NewNullLogger()
+	ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, lib.Options{})
+	defer cancel()
+
+	endTime, isFinal := lib.GetEndOffset(execScheduler.GetExecutionPlan())
+	assert.Equal(t, 1*time.Second, endTime) // because of the 0s gracefulStop
+	assert.True(t, isFinal)
+
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	startTime := time.Now()
+	assert.NoError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics))
+	runTime := time.Since(startTime)
+	assert.True(t, runTime > 1*time.Second, "test did not take 1s")
+	assert.True(t, runTime < 10*time.Second, "took more than 10 seconds")
+
+	assert.Empty(t, hook.Entries)
+}
+
+func TestExecutionSchedulerEndIterations(t *testing.T) {
+	t.Parallel()
 	metric := &stats.Metric{Name: "test_metric"}
 
-	var i int64
-	e := New(&lib.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-		select {
-		case <-ctx.Done():
-		default:
-			atomic.AddInt64(&i, 1)
-		}
-		out <- stats.Sample{Metric: metric, Value: 1.0}
-		return nil
-	}})
-	assert.NoError(t, e.SetVUsMax(1))
-	assert.NoError(t, e.SetVUs(1))
-	e.SetEndIterations(null.IntFrom(100))
-	assert.Equal(t, null.IntFrom(100), e.GetEndIterations())
+	options, err := executor.DeriveScenariosFromShortcuts(lib.Options{
+		VUs:        null.IntFrom(1),
+		Iterations: null.IntFrom(100),
+	})
+	require.NoError(t, err)
+	require.Empty(t, options.Validate())
 
-	samples := make(chan stats.SampleContainer, 201)
-	assert.NoError(t, e.Run(context.Background(), samples))
-	assert.Equal(t, int64(100), e.GetIterations())
+	var i int64
+	runner := &minirunner.MiniRunner{
+		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+			select {
+			case <-ctx.Done():
+			default:
+				atomic.AddInt64(&i, 1)
+			}
+			out <- stats.Sample{Metric: metric, Value: 1.0}
+			return nil
+		},
+		Options: options,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+
+	execScheduler, err := NewExecutionScheduler(runner, logger)
+	require.NoError(t, err)
+
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	samples := make(chan stats.SampleContainer, 300)
+	require.NoError(t, execScheduler.Init(ctx, samples))
+	require.NoError(t, execScheduler.Run(ctx, ctx, samples, builtinMetrics))
+
+	assert.Equal(t, uint64(100), execScheduler.GetState().GetFullIterationCount())
+	assert.Equal(t, uint64(0), execScheduler.GetState().GetPartialIterationCount())
 	assert.Equal(t, int64(100), i)
+	require.Equal(t, 100, len(samples)) // TODO: change to 200 https://github.com/k6io/k6/issues/1250
 	for i := 0; i < 100; i++ {
 		mySample, ok := <-samples
 		require.True(t, ok)
@@ -291,152 +984,136 @@ func TestExecutorEndIterations(t *testing.T) {
 	}
 }
 
-func TestExecutorIsRunning(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	e := New(nil)
+func TestExecutionSchedulerIsRunning(t *testing.T) {
+	t.Parallel()
+	runner := &minirunner.MiniRunner{
+		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+			<-ctx.Done()
+			return nil
+		},
+	}
+	ctx, cancel, execScheduler, _ := newTestExecutionScheduler(t, runner, nil, lib.Options{})
+	state := execScheduler.GetState()
 
 	err := make(chan error)
-	go func() { err <- e.Run(ctx, nil) }()
-	for !e.IsRunning() {
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	go func() { err <- execScheduler.Run(ctx, ctx, nil, builtinMetrics) }()
+	for !state.HasStarted() {
+		time.Sleep(10 * time.Microsecond)
 	}
 	cancel()
-	for e.IsRunning() {
+	for !state.HasEnded() {
+		time.Sleep(10 * time.Microsecond)
 	}
 	assert.NoError(t, <-err)
 }
 
-func TestExecutorSetVUsMax(t *testing.T) {
-	t.Run("Negative", func(t *testing.T) {
-		assert.EqualError(t, New(nil).SetVUsMax(-1), "vu cap can't be negative")
-	})
+// TestDNSResolver checks the DNS resolution behavior at the ExecutionScheduler level.
+func TestDNSResolver(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+	script := sr(`
+		import http from "k6/http";
+		import { sleep } from "k6";
 
-	t.Run("Raise", func(t *testing.T) {
-		e := New(nil)
-
-		assert.NoError(t, e.SetVUsMax(50))
-		assert.Equal(t, int64(50), e.GetVUsMax())
-
-		assert.NoError(t, e.SetVUsMax(100))
-		assert.Equal(t, int64(100), e.GetVUsMax())
-
-		t.Run("Lower", func(t *testing.T) {
-			assert.NoError(t, e.SetVUsMax(50))
-			assert.Equal(t, int64(50), e.GetVUsMax())
-		})
-	})
-
-	t.Run("TooLow", func(t *testing.T) {
-		e := New(nil)
-		e.ctx = context.Background()
-
-		assert.NoError(t, e.SetVUsMax(100))
-		assert.Equal(t, int64(100), e.GetVUsMax())
-
-		assert.NoError(t, e.SetVUs(100))
-		assert.Equal(t, int64(100), e.GetVUs())
-
-		assert.EqualError(t, e.SetVUsMax(50), "can't lower vu cap (to 50) below vu count (100)")
-	})
-}
-
-func TestExecutorSetVUs(t *testing.T) {
-	t.Run("Negative", func(t *testing.T) {
-		assert.EqualError(t, New(nil).SetVUs(-1), "vu count can't be negative")
-	})
-
-	t.Run("Too High", func(t *testing.T) {
-		assert.EqualError(t, New(nil).SetVUs(100), "can't raise vu count (to 100) above vu cap (0)")
-	})
-
-	t.Run("Raise", func(t *testing.T) {
-		e := New(&lib.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-			return nil
-		}})
-		e.ctx = context.Background()
-
-		assert.NoError(t, e.SetVUsMax(100))
-		assert.Equal(t, int64(100), e.GetVUsMax())
-		if assert.Len(t, e.vus, 100) {
-			num := 0
-			for i, handle := range e.vus {
-				num++
-				if assert.NotNil(t, handle.vu, "vu %d lacks impl", i) {
-					assert.Equal(t, int64(0), handle.vu.(*lib.MiniRunnerVU).ID)
-				}
-				assert.Nil(t, handle.ctx, "vu %d has ctx", i)
-				assert.Nil(t, handle.cancel, "vu %d has cancel", i)
-			}
-			assert.Equal(t, 100, num)
+		export let options = {
+			vus: 1,
+			iterations: 8,
+			noConnectionReuse: true,
 		}
 
-		assert.NoError(t, e.SetVUs(50))
-		assert.Equal(t, int64(50), e.GetVUs())
-		if assert.Len(t, e.vus, 100) {
-			num := 0
-			for i, handle := range e.vus {
-				if i < 50 {
-					assert.NotNil(t, handle.cancel, "vu %d lacks cancel", i)
-					assert.Equal(t, int64(i+1), handle.vu.(*lib.MiniRunnerVU).ID)
-					num++
-				} else {
-					assert.Nil(t, handle.cancel, "vu %d has cancel", i)
-					assert.Equal(t, int64(0), handle.vu.(*lib.MiniRunnerVU).ID)
-				}
-			}
-			assert.Equal(t, 50, num)
+		export default function () {
+			const res = http.get("http://myhost:HTTPBIN_PORT/", { timeout: 50 });
+			sleep(0.7);  // somewhat uneven multiple of 0.5 to minimize races with asserts
+		}`)
+
+	t.Run("cache", func(t *testing.T) {
+		t.Parallel()
+		testCases := map[string]struct {
+			opts          lib.Options
+			expLogEntries int
+		}{
+			"default": { // IPs are cached for 5m
+				lib.Options{DNS: types.DefaultDNSConfig()}, 0,
+			},
+			"0": { // cache is disabled, every request does a DNS lookup
+				lib.Options{DNS: types.DNSConfig{
+					TTL:    null.StringFrom("0"),
+					Select: types.NullDNSSelect{DNSSelect: types.DNSfirst, Valid: true},
+					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
+				}}, 5,
+			},
+			"1000": { // cache IPs for 1s, check that unitless values are interpreted as ms
+				lib.Options{DNS: types.DNSConfig{
+					TTL:    null.StringFrom("1000"),
+					Select: types.NullDNSSelect{DNSSelect: types.DNSfirst, Valid: true},
+					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
+				}}, 4,
+			},
+			"3s": {
+				lib.Options{DNS: types.DNSConfig{
+					TTL:    null.StringFrom("3s"),
+					Select: types.NullDNSSelect{DNSSelect: types.DNSfirst, Valid: true},
+					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
+				}}, 3,
+			},
 		}
 
-		assert.NoError(t, e.SetVUs(100))
-		assert.Equal(t, int64(100), e.GetVUs())
-		if assert.Len(t, e.vus, 100) {
-			num := 0
-			for i, handle := range e.vus {
-				assert.NotNil(t, handle.cancel, "vu %d lacks cancel", i)
-				assert.Equal(t, int64(i+1), handle.vu.(*lib.MiniRunnerVU).ID)
-				num++
-			}
-			assert.Equal(t, 100, num)
+		expErr := sr(`dial tcp 127.0.0.254:HTTPBIN_PORT: connect: connection refused`)
+		if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+			expErr = "request timeout"
 		}
+		for name, tc := range testCases {
+			tc := tc
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+				logger := logrus.New()
+				logger.SetOutput(ioutil.Discard)
+				logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+				logger.AddHook(&logHook)
 
-		t.Run("Lower", func(t *testing.T) {
-			assert.NoError(t, e.SetVUs(50))
-			assert.Equal(t, int64(50), e.GetVUs())
-			if assert.Len(t, e.vus, 100) {
-				num := 0
-				for i, handle := range e.vus {
-					if i < 50 {
-						assert.NotNil(t, handle.cancel, "vu %d lacks cancel", i)
-						num++
-					} else {
-						assert.Nil(t, handle.cancel, "vu %d has cancel", i)
+				registry := metrics.NewRegistry()
+				builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+				runner, err := js.New(logger, &loader.SourceData{
+					URL: &url.URL{Path: "/script.js"}, Data: []byte(script),
+				}, nil, lib.RuntimeOptions{}, builtinMetrics, registry)
+				require.NoError(t, err)
+
+				mr := mockresolver.New(nil, net.LookupIP)
+				runner.ActualResolver = mr.LookupIPAll
+
+				ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, tc.opts)
+				defer cancel()
+
+				mr.Set("myhost", sr("HTTPBIN_IP"))
+				time.AfterFunc(1700*time.Millisecond, func() {
+					mr.Set("myhost", "127.0.0.254")
+				})
+				defer mr.Unset("myhost")
+
+				errCh := make(chan error, 1)
+				go func() { errCh <- execScheduler.Run(ctx, ctx, samples, builtinMetrics) }()
+
+				select {
+				case err := <-errCh:
+					require.NoError(t, err)
+					entries := logHook.Drain()
+					require.Len(t, entries, tc.expLogEntries)
+					for _, entry := range entries {
+						require.IsType(t, &url.Error{}, entry.Data["error"])
+						assert.EqualError(t, entry.Data["error"].(*url.Error).Err, expErr)
 					}
-					assert.Equal(t, int64(i+1), handle.vu.(*lib.MiniRunnerVU).ID)
-				}
-				assert.Equal(t, 50, num)
-			}
-
-			t.Run("Raise", func(t *testing.T) {
-				assert.NoError(t, e.SetVUs(100))
-				assert.Equal(t, int64(100), e.GetVUs())
-				if assert.Len(t, e.vus, 100) {
-					for i, handle := range e.vus {
-						assert.NotNil(t, handle.cancel, "vu %d lacks cancel", i)
-						if i < 50 {
-							assert.Equal(t, int64(i+1), handle.vu.(*lib.MiniRunnerVU).ID)
-						} else {
-							assert.Equal(t, int64(50+i+1), handle.vu.(*lib.MiniRunnerVU).ID)
-						}
-					}
+				case <-time.After(10 * time.Second):
+					t.Fatal("timed out")
 				}
 			})
-		})
+		}
 	})
 }
 
 func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip()
-	}
 	t.Parallel()
 	script := []byte(`
 	import { Counter } from "k6/metrics";
@@ -475,38 +1152,44 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		counter.add(6, { place: "defaultAfterSleep" });
 	}`)
 
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
-		nil,
-		lib.RuntimeOptions{},
-	)
+		logger, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil,
+		lib.RuntimeOptions{}, builtinMetrics, registry)
 	require.NoError(t, err)
 
-	options := lib.Options{
+	options, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions().Apply(lib.Options{
+		Iterations:      null.IntFrom(2),
+		VUs:             null.IntFrom(1),
 		SystemTags:      &stats.DefaultSystemTagSet,
 		SetupTimeout:    types.NullDurationFrom(4 * time.Second),
 		TeardownTimeout: types.NullDurationFrom(4 * time.Second),
-	}
-	runner.SetOptions(options)
+	}))
+	require.NoError(t, err)
+	require.NoError(t, runner.SetOptions(options))
 
-	executor := New(runner)
-	executor.SetEndIterations(null.IntFrom(2))
-	require.NoError(t, executor.SetVUsMax(1))
-	require.NoError(t, executor.SetVUs(1))
+	execScheduler, err := NewExecutionScheduler(runner, logger)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	done := make(chan struct{})
 	sampleContainers := make(chan stats.SampleContainer)
 	go func() {
-		assert.NoError(t, executor.Run(ctx, sampleContainers))
+		require.NoError(t, execScheduler.Init(ctx, sampleContainers))
+		assert.NoError(t, execScheduler.Run(ctx, ctx, sampleContainers, builtinMetrics))
 		close(done)
 	}()
 
 	expectIn := func(from, to time.Duration, expected stats.SampleContainer) {
 		start := time.Now()
-		from = from * time.Millisecond
-		to = to * time.Millisecond
+		from *= time.Millisecond
+		to *= time.Millisecond
 		for {
 			select {
 			case sampleContainer := <-sampleContainers:
@@ -522,7 +1205,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 				if assert.Len(t, gotSamples, len(expSamples)) {
 					for i, s := range gotSamples {
 						expS := expSamples[i]
-						if s.Metric != metrics.IterationDuration {
+						if s.Metric.Name != metrics.IterationDurationName {
 							assert.Equal(t, expS.Value, s.Value)
 						}
 						assert.Equal(t, expS.Metric.Name, s.Metric.Name)
@@ -554,23 +1237,28 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 			Value:  expValue,
 		}
 	}
-	getDummyTrail := func(group string, emitIterations bool) stats.SampleContainer {
-		return netext.NewDialer(net.Dialer{}).GetTrail(time.Now(), time.Now(),
-			true, emitIterations, getTags("group", group))
+	getDummyTrail := func(group string, emitIterations bool, addExpTags ...string) stats.SampleContainer {
+		expTags := []string{"group", group}
+		expTags = append(expTags, addExpTags...)
+		return netext.NewDialer(
+			net.Dialer{},
+			netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
+		).GetTrail(time.Now(), time.Now(),
+			true, emitIterations, getTags(expTags...), builtinMetrics)
 	}
 
-	// Initially give a long time (5s) for the executor to start
+	// Initially give a long time (5s) for the execScheduler to start
 	expectIn(0, 5000, getSample(1, testCounter, "group", "::setup", "place", "setupBeforeSleep"))
 	expectIn(900, 1100, getSample(2, testCounter, "group", "::setup", "place", "setupAfterSleep"))
 	expectIn(0, 100, getDummyTrail("::setup", false))
 
-	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep"))
-	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep"))
-	expectIn(0, 100, getDummyTrail("", true))
+	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep", "scenario", "default"))
+	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep", "scenario", "default"))
+	expectIn(0, 100, getDummyTrail("", true, "scenario", "default"))
 
-	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep"))
-	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep"))
-	expectIn(0, 100, getDummyTrail("", true))
+	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep", "scenario", "default"))
+	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep", "scenario", "default"))
+	expectIn(0, 100, getDummyTrail("", true, "scenario", "default"))
 
 	expectIn(0, 1000, getSample(3, testCounter, "group", "::teardown", "place", "teardownBeforeSleep"))
 	expectIn(900, 1100, getSample(4, testCounter, "group", "::teardown", "place", "teardownAfterSleep"))
@@ -581,9 +1269,158 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		case s := <-sampleContainers:
 			t.Fatalf("Did not expect anything in the sample channel bug got %#v", s)
 		case <-time.After(3 * time.Second):
-			t.Fatalf("Local executor took way to long to finish")
+			t.Fatalf("Local execScheduler took way to long to finish")
 		case <-done:
 			return // Exit normally
 		}
 	}
+}
+
+// Just a lib.PausableExecutor implementation that can return an error
+type pausableExecutor struct {
+	lib.Executor
+	err error
+}
+
+func (p pausableExecutor) SetPaused(bool) error {
+	return p.err
+}
+
+func TestSetPaused(t *testing.T) {
+	t.Parallel()
+	t.Run("second pause is an error", func(t *testing.T) {
+		t.Parallel()
+		runner := &minirunner.MiniRunner{}
+		logger := logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+		sched, err := NewExecutionScheduler(runner, logger)
+		require.NoError(t, err)
+		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
+
+		require.NoError(t, sched.SetPaused(true))
+		err = sched.SetPaused(true)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "execution is already paused")
+	})
+
+	t.Run("unpause at the start is an error", func(t *testing.T) {
+		t.Parallel()
+		runner := &minirunner.MiniRunner{}
+		logger := logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+		sched, err := NewExecutionScheduler(runner, logger)
+		require.NoError(t, err)
+		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
+		err = sched.SetPaused(false)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "execution wasn't paused")
+	})
+
+	t.Run("second unpause is an error", func(t *testing.T) {
+		t.Parallel()
+		runner := &minirunner.MiniRunner{}
+		logger := logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+		sched, err := NewExecutionScheduler(runner, logger)
+		require.NoError(t, err)
+		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
+		require.NoError(t, sched.SetPaused(true))
+		require.NoError(t, sched.SetPaused(false))
+		err = sched.SetPaused(false)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "execution wasn't paused")
+	})
+
+	t.Run("an error on pausing is propagated", func(t *testing.T) {
+		t.Parallel()
+		runner := &minirunner.MiniRunner{}
+		logger := logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+		sched, err := NewExecutionScheduler(runner, logger)
+		require.NoError(t, err)
+		expectedErr := errors.New("testing pausable executor error")
+		sched.executors = []lib.Executor{pausableExecutor{err: expectedErr}}
+		err = sched.SetPaused(true)
+		require.Error(t, err)
+		require.Equal(t, err, expectedErr)
+	})
+
+	t.Run("can't pause unpausable executor", func(t *testing.T) {
+		t.Parallel()
+		runner := &minirunner.MiniRunner{}
+		options, err := executor.DeriveScenariosFromShortcuts(lib.Options{
+			Iterations: null.IntFrom(2),
+			VUs:        null.IntFrom(1),
+		}.Apply(runner.GetOptions()))
+		require.NoError(t, err)
+		require.NoError(t, runner.SetOptions(options))
+
+		logger := logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+		sched, err := NewExecutionScheduler(runner, logger)
+		require.NoError(t, err)
+		err = sched.SetPaused(true)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "doesn't support pause and resume operations after its start")
+	})
+}
+
+func TestNewExecutionSchedulerHasWork(t *testing.T) {
+	t.Parallel()
+	script := []byte(`
+		import http from 'k6/http';
+
+		export let options = {
+			executionSegment: "3/4:1",
+			executionSegmentSequence: "0,1/4,2/4,3/4,1",
+			scenarios: {
+				shared_iters1: {
+					executor: "shared-iterations",
+					vus: 3,
+					iterations: 3,
+				},
+				shared_iters2: {
+					executor: "shared-iterations",
+					vus: 4,
+					iterations: 4,
+				},
+				constant_arr_rate: {
+					executor: "constant-arrival-rate",
+					rate: 3,
+					timeUnit: "1s",
+					duration: "20s",
+					preAllocatedVUs: 4,
+					maxVUs: 4,
+				},
+		    },
+		};
+
+		export default function() {
+			const response = http.get("http://test.loadimpact.com");
+		};
+`)
+
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	runner, err := js.New(
+		logger,
+		&loader.SourceData{
+			URL:  &url.URL{Path: "/script.js"},
+			Data: script,
+		},
+		nil,
+		lib.RuntimeOptions{},
+		builtinMetrics,
+		registry,
+	)
+	require.NoError(t, err)
+
+	execScheduler, err := NewExecutionScheduler(runner, logger)
+	require.NoError(t, err)
+
+	assert.Len(t, execScheduler.executors, 2)
+	assert.Len(t, execScheduler.executorConfigs, 3)
 }

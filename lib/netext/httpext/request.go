@@ -23,75 +23,29 @@ package httpext
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Azure/go-ntlmssp"
 	"github.com/sirupsen/logrus"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/stats"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/stats"
 )
 
 // HTTPRequestCookie is a representation of a cookie used for request objects
 type HTTPRequestCookie struct {
 	Name, Value string
 	Replace     bool
-}
-
-// A URL wraps net.URL, and preserves the template (if any) the URL was constructed from.
-type URL struct {
-	u        *url.URL
-	Name     string // http://example.com/thing/${}/
-	URL      string // http://example.com/thing/1234/
-	CleanURL string // URL with masked user credentials, used for output
-}
-
-// NewURL returns a new URL for the provided url and name. The error is returned if the url provided
-// can't be parsed
-func NewURL(urlString, name string) (URL, error) {
-	u, err := url.Parse(urlString)
-	newURL := URL{u: u, Name: name, URL: urlString}
-	newURL.CleanURL = newURL.Clean()
-	if urlString == name {
-		newURL.Name = newURL.CleanURL
-	}
-	return newURL, err
-}
-
-// Clean returns an output-safe representation of URL
-func (u URL) Clean() string {
-	if u.CleanURL != "" {
-		return u.CleanURL
-	}
-
-	out := u.URL
-
-	if u.u != nil && u.u.User != nil {
-		schemeIndex := strings.Index(out, "://")
-		atIndex := strings.Index(out, "@")
-		if _, passwordOk := u.u.User.Password(); passwordOk {
-			out = out[:schemeIndex+3] + "****:****" + out[atIndex:]
-		} else {
-			out = out[:schemeIndex+3] + "****" + out[atIndex:]
-		}
-	}
-
-	return out
-}
-
-// GetURL returns the internal url.URL
-func (u URL) GetURL() *url.URL {
-	return u.u
 }
 
 // Request represent an http request
@@ -105,18 +59,19 @@ type Request struct {
 
 // ParsedHTTPRequest a represantion of a request after it has been parsed from a user script
 type ParsedHTTPRequest struct {
-	URL          *URL
-	Body         *bytes.Buffer
-	Req          *http.Request
-	Timeout      time.Duration
-	Auth         string
-	Throw        bool
-	ResponseType ResponseType
-	Compressions []CompressionType
-	Redirects    null.Int
-	ActiveJar    *cookiejar.Jar
-	Cookies      map[string]*HTTPRequestCookie
-	Tags         map[string]string
+	URL              *URL
+	Body             *bytes.Buffer
+	Req              *http.Request
+	Timeout          time.Duration
+	Auth             string
+	Throw            bool
+	ResponseType     ResponseType
+	ResponseCallback func(int) bool
+	Compressions     []CompressionType
+	Redirects        null.Int
+	ActiveJar        *cookiejar.Jar
+	Cookies          map[string]*HTTPRequestCookie
+	Tags             map[string]string
 }
 
 // Matches non-compliant io.Closer implementations (e.g. zstd.Decoder)
@@ -141,7 +96,7 @@ func (r readCloser) Close() error {
 }
 
 func stdCookiesToHTTPRequestCookies(cookies []*http.Cookie) map[string][]*HTTPRequestCookie {
-	var result = make(map[string][]*HTTPRequestCookie, len(cookies))
+	result := make(map[string][]*HTTPRequestCookie, len(cookies))
 	for _, cookie := range cookies {
 		result[cookie.Name] = append(result[cookie.Name],
 			&HTTPRequestCookie{Name: cookie.Name, Value: cookie.Value})
@@ -231,30 +186,17 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		}
 	}
 
-	tags := state.Options.RunTags.CloneTags()
+	tags := state.CloneTags()
+	// Override any global tags with request-specific ones.
 	for k, v := range preq.Tags {
 		tags[k] = v
 	}
 
-	if state.Options.SystemTags.Has(stats.TagMethod) {
-		tags["method"] = preq.Req.Method
-	}
-	if state.Options.SystemTags.Has(stats.TagURL) {
-		tags["url"] = preq.URL.Clean()
-	}
-
-	// Only set the name system tag if the user didn't explicitly set it beforehand
-	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) {
+	// Only set the name system tag if the user didn't explicitly set it beforehand,
+	// and the Name was generated from a tagged template string (via http.url).
+	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) &&
+		preq.URL.Name != "" && preq.URL.Name != preq.URL.Clean() {
 		tags["name"] = preq.URL.Name
-	}
-	if state.Options.SystemTags.Has(stats.TagGroup) {
-		tags["group"] = state.Group.Path
-	}
-	if state.Options.SystemTags.Has(stats.TagVU) {
-		tags["vu"] = strconv.FormatInt(state.Vu, 10)
-	}
-	if state.Options.SystemTags.Has(stats.TagIter) {
-		tags["iter"] = strconv.FormatInt(state.Iteration, 10)
 	}
 
 	// Check rate limit *after* we've prepared a request; no need to wait with that part.
@@ -264,19 +206,46 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		}
 	}
 
-	tracerTransport := newTransport(ctx, state, tags)
+	tracerTransport := newTransport(ctx, state, tags, preq.ResponseCallback)
 	var transport http.RoundTripper = tracerTransport
+
+	// Combine tags with common log fields
+	combinedLogFields := map[string]interface{}{"source": "http-debug", "vu": state.VUID, "iter": state.Iteration}
+	for k, v := range tags {
+		if _, present := combinedLogFields[k]; !present {
+			combinedLogFields[k] = v
+		}
+	}
 
 	if state.Options.HTTPDebug.String != "" {
 		transport = httpDebugTransport{
 			originalTransport: transport,
 			httpDebugOption:   state.Options.HTTPDebug.String,
+			logger:            state.Logger.WithFields(combinedLogFields),
 		}
 	}
 
 	if preq.Auth == "digest" {
+		// Until digest authentication is refactored, the first response will always
+		// be a 401 error, so we expect that.
+		if tracerTransport.responseCallback != nil {
+			originalResponseCallback := tracerTransport.responseCallback
+			tracerTransport.responseCallback = func(status int) bool {
+				tracerTransport.responseCallback = originalResponseCallback
+				return status == 401
+			}
+		}
 		transport = digestTransport{originalTransport: transport}
 	} else if preq.Auth == "ntlm" {
+		// The first response of NTLM auth may be a 401 error.
+		if tracerTransport.responseCallback != nil {
+			originalResponseCallback := tracerTransport.responseCallback
+			tracerTransport.responseCallback = func(status int) bool {
+				tracerTransport.responseCallback = originalResponseCallback
+				// ntlm is connection-level based so we could've already authorized the connection and to now reuse it
+				return status == 401 || originalResponseCallback(status)
+			}
+		}
 		transport = ntlmssp.Negotiator{RoundTripper: transport}
 	}
 
@@ -325,7 +294,13 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		return nil, fmt.Errorf("unsupported response status: %s", res.Status)
 	}
 
-	resp.Body, resErr = readResponseBody(state, preq.ResponseType, res, resErr)
+	if resErr == nil {
+		resp.Body, resErr = readResponseBody(state, preq.ResponseType, res, resErr)
+		if resErr != nil && errors.Is(resErr, context.DeadlineExceeded) {
+			// TODO This can be more specific that the timeout happened in the middle of the reading of the body
+			resErr = NewK6Error(requestTimeoutErrorCode, requestTimeoutErrorCodeMsg, resErr)
+		}
+	}
 	finishedReq := tracerTransport.processLastSavedRequest(wrapDecompressionError(resErr))
 	if finishedReq != nil {
 		updateK6Response(resp, finishedReq)
@@ -340,6 +315,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 
 		resp.URL = res.Request.URL.String()
 		resp.Status = res.StatusCode
+		resp.StatusText = res.Status
 		resp.Proto = res.Proto
 
 		if res.TLS != nil {
@@ -368,15 +344,15 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 	}
 
 	if resErr != nil {
+		if preq.Throw { // if we are going to throw, we shouldn't log it
+			return nil, resErr
+		}
+
 		// Do *not* log errors about the context being cancelled.
 		select {
 		case <-ctx.Done():
 		default:
 			state.Logger.WithField("error", resErr).Warn("Request Failed")
-		}
-
-		if preq.Throw {
-			return nil, resErr
 		}
 	}
 
@@ -386,7 +362,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 // SetRequestCookies sets the cookies of the requests getting those cookies both from the jar and
 // from the reqCookies map. The Replace field of the HTTPRequestCookie will be taken into account
 func SetRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) {
-	var replacedCookies = make(map[string]struct{})
+	replacedCookies := make(map[string]struct{})
 	for key, reqCookie := range reqCookies {
 		req.AddCookie(&http.Cookie{Name: key, Value: reqCookie.Value})
 		if reqCookie.Replace {

@@ -24,6 +24,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -34,10 +35,11 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/stats"
+
+	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/stats"
 )
 
 // ErrWSInInitContext is returned when websockets are using in the init context
@@ -56,8 +58,9 @@ type Socket struct {
 	pingSendTimestamps map[string]time.Time
 	pingSendCounter    int
 
-	sampleTags    *stats.SampleTags
-	samplesOutput chan<- stats.SampleContainer
+	sampleTags     *stats.SampleTags
+	samplesOutput  chan<- stats.SampleContainer
+	builtinMetrics *metrics.BuiltinMetrics
 }
 
 type WSHTTPResponse struct {
@@ -66,6 +69,11 @@ type WSHTTPResponse struct {
 	Headers map[string]string `json:"headers"`
 	Body    string            `json:"body"`
 	Error   string            `json:"error"`
+}
+
+type message struct {
+	mtype int // message type consts as defined in gorilla/websocket/conn.go
+	data  []byte
 }
 
 const writeWait = 10 * time.Second
@@ -103,7 +111,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	// Leave header to nil by default so we can pass it directly to the Dialer
 	var header http.Header
 
-	tags := state.Options.RunTags.CloneTags()
+	tags := state.CloneTags()
 
 	// Parse the optional second argument (params)
 	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
@@ -143,15 +151,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	if state.Options.SystemTags.Has(stats.TagURL) {
 		tags["url"] = url
 	}
-	if state.Options.SystemTags.Has(stats.TagGroup) {
-		tags["group"] = state.Group.Path
-	}
-
-	// Pass a custom net.Dial function to websocket.Dialer that will substitute
-	// the underlying net.Conn with our own tracked netext.Conn
-	netDial := func(network, address string) (net.Conn, error) {
-		return state.Dialer.DialContext(ctx, network, address)
-	}
 
 	// Overriding the NextProtos to avoid talking http2
 	var tlsConfig *tls.Config
@@ -161,13 +160,16 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	}
 
 	wsd := websocket.Dialer{
-		NetDial:         netDial,
+		HandshakeTimeout: time.Second * 60, // TODO configurable
+		// Pass a custom net.DialContext function to websocket.Dialer that will substitute
+		// the underlying net.Conn with our own tracked netext.Conn
+		NetDialContext:  state.Dialer.DialContext,
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
 	}
 
 	start := time.Now()
-	conn, httpResponse, connErr := wsd.Dial(url, header)
+	conn, httpResponse, connErr := wsd.DialContext(ctx, url, header)
 	connectionEnd := time.Now()
 	connectionDuration := stats.D(connectionEnd.Sub(start))
 
@@ -196,12 +198,13 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		done:               make(chan struct{}),
 		samplesOutput:      state.Samples,
 		sampleTags:         stats.IntoSampleTags(&tags),
+		builtinMetrics:     state.BuiltinMetrics,
 	}
 
 	stats.PushIfNotDone(ctx, state.Samples, stats.ConnectedSamples{
 		Samples: []stats.Sample{
-			{Metric: metrics.WSSessions, Time: start, Tags: socket.sampleTags, Value: 1},
-			{Metric: metrics.WSConnecting, Time: start, Tags: socket.sampleTags, Value: connectionDuration},
+			{Metric: state.BuiltinMetrics.WSSessions, Time: start, Tags: socket.sampleTags, Value: 1},
+			{Metric: state.BuiltinMetrics.WSConnecting, Time: start, Tags: socket.sampleTags, Value: connectionDuration},
 		},
 		Tags: socket.sampleTags,
 		Time: start,
@@ -244,12 +247,26 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	conn.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
 	conn.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
 
-	readDataChan := make(chan []byte)
+	readDataChan := make(chan *message)
 	readCloseChan := make(chan int)
 	readErrChan := make(chan error)
 
 	// Wraps a couple of channels around conn.ReadMessage
-	go readPump(conn, readDataChan, readErrChan, readCloseChan)
+	go socket.readPump(readDataChan, readErrChan, readCloseChan)
+
+	// we do it here as below we can panic, which translates to an exception in js code
+	defer func() {
+		socket.Close() // just in case
+		end := time.Now()
+		sessionDuration := stats.D(end.Sub(start))
+
+		stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
+			Metric: socket.builtinMetrics.WSSessionDuration,
+			Tags:   socket.sampleTags,
+			Time:   start,
+			Value:  sessionDuration,
+		})
+	}()
 
 	// This is the main control loop. All JS code (including error handlers)
 	// should only be executed by this thread to avoid race conditions
@@ -270,14 +287,20 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			socket.trackPong(pingID)
 			socket.handleEvent("pong")
 
-		case readData := <-readDataChan:
+		case msg := <-readDataChan:
 			stats.PushIfNotDone(ctx, socket.samplesOutput, stats.Sample{
-				Metric: metrics.WSMessagesReceived,
+				Metric: socket.builtinMetrics.WSMessagesReceived,
 				Time:   time.Now(),
 				Tags:   socket.sampleTags,
 				Value:  1,
 			})
-			socket.handleEvent("message", rt.ToValue(string(readData)))
+
+			if msg.mtype == websocket.BinaryMessage {
+				ab := rt.NewArrayBuffer(msg.data)
+				socket.handleEvent("binaryMessage", rt.ToValue(&ab))
+			} else {
+				socket.handleEvent("message", rt.ToValue(string(msg.data)))
+			}
 
 		case readErr := <-readErrChan:
 			socket.handleEvent("error", rt.ToValue(readErr))
@@ -287,6 +310,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 		case scheduledFn := <-socket.scheduled:
 			if _, err := scheduledFn(goja.Undefined()); err != nil {
+				_ = socket.closeConnection(websocket.CloseGoingAway)
 				return nil, err
 			}
 
@@ -297,16 +321,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 
 		case <-socket.done:
 			// This is the final exit point normally triggered by closeConnection
-			end := time.Now()
-			sessionDuration := stats.D(end.Sub(start))
-
-			stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
-				Metric: metrics.WSSessionDuration,
-				Tags:   socket.sampleTags,
-				Time:   start,
-				Value:  sessionDuration,
-			})
-
 			return wsResponse, nil
 		}
 	}
@@ -328,18 +342,45 @@ func (s *Socket) handleEvent(event string, args ...goja.Value) {
 	}
 }
 
+// Send writes the given string message to the connection.
 func (s *Socket) Send(message string) {
-	// NOTE: No binary message support for the time being since goja doesn't
-	// support typed arrays.
-	rt := common.GetRuntime(s.ctx)
-
-	writeData := []byte(message)
-	if err := s.conn.WriteMessage(websocket.TextMessage, writeData); err != nil {
-		s.handleEvent("error", rt.ToValue(err))
+	if err := s.conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
+		s.handleEvent("error", common.GetRuntime(s.ctx).ToValue(err))
 	}
 
 	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
-		Metric: metrics.WSMessagesSent,
+		Metric: s.builtinMetrics.WSMessagesSent,
+		Time:   time.Now(),
+		Tags:   s.sampleTags,
+		Value:  1,
+	})
+}
+
+// SendBinary writes the given ArrayBuffer message to the connection.
+func (s *Socket) SendBinary(message goja.Value) {
+	if message == nil {
+		common.Throw(common.GetRuntime(s.ctx), errors.New("missing argument, expected ArrayBuffer"))
+	}
+
+	msg := message.Export()
+	if ab, ok := msg.(goja.ArrayBuffer); ok {
+		if err := s.conn.WriteMessage(websocket.BinaryMessage, ab.Bytes()); err != nil {
+			s.handleEvent("error", common.GetRuntime(s.ctx).ToValue(err))
+		}
+	} else {
+		rt := common.GetRuntime(s.ctx)
+		var jsType string
+		switch {
+		case goja.IsNull(message), goja.IsUndefined(message):
+			jsType = message.String()
+		default:
+			jsType = message.ToObject(rt).ClassName()
+		}
+		common.Throw(rt, fmt.Errorf("expected ArrayBuffer as argument, received: %s", jsType))
+	}
+
+	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
+		Metric: s.builtinMetrics.WSMessagesSent,
 		Time:   time.Now(),
 		Tags:   s.sampleTags,
 		Value:  1,
@@ -373,30 +414,54 @@ func (s *Socket) trackPong(pingID string) {
 	pingTimestamp := s.pingSendTimestamps[pingID]
 
 	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
-		Metric: metrics.WSPing,
+		Metric: s.builtinMetrics.WSPing,
 		Time:   pongTimestamp,
 		Tags:   s.sampleTags,
 		Value:  stats.D(pongTimestamp.Sub(pingTimestamp)),
 	})
 }
 
-func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs int) {
+// SetTimeout executes the provided function inside the socket's event loop after at least the provided
+// timeout, which is in ms, has elapsed
+func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs float64) error {
 	// Starts a goroutine, blocks once on the timeout and pushes the callable
-	// back to the main loop through the scheduled channel
+	// back to the main loop through the scheduled channel.
+	//
+	// Intentionally not using the generic GetDurationValue() helper, since this
+	// API is meant to use ms, similar to the original SetTimeout() JS API.
+	d := time.Duration(timeoutMs * float64(time.Millisecond))
+	if d <= 0 {
+		return fmt.Errorf("setTimeout requires a >0 timeout parameter, received %.2f", timeoutMs)
+	}
 	go func() {
 		select {
-		case <-time.After(time.Duration(timeoutMs) * time.Millisecond):
-			s.scheduled <- fn
+		case <-time.After(d):
+			select {
+			case s.scheduled <- fn:
+			case <-s.done:
+				return
+			}
 
 		case <-s.done:
 			return
 		}
 	}()
+
+	return nil
 }
 
-func (s *Socket) SetInterval(fn goja.Callable, intervalMs int) {
+// SetInterval executes the provided function inside the socket's event loop each interval time, which is
+// in ms
+func (s *Socket) SetInterval(fn goja.Callable, intervalMs float64) error {
 	// Starts a goroutine, blocks forever on the ticker and pushes the callable
-	// back to the main loop through the scheduled channel
+	// back to the main loop through the scheduled channel.
+	//
+	// Intentionally not using the generic GetDurationValue() helper, since this
+	// API is meant to use ms, similar to the original SetInterval() JS API.
+	d := time.Duration(intervalMs * float64(time.Millisecond))
+	if d <= 0 {
+		return fmt.Errorf("setInterval requires a >0 timeout parameter, received %.2f", intervalMs)
+	}
 	go func() {
 		ticker := time.NewTicker(time.Duration(intervalMs) * time.Millisecond)
 		defer ticker.Stop()
@@ -404,13 +469,19 @@ func (s *Socket) SetInterval(fn goja.Callable, intervalMs int) {
 		for {
 			select {
 			case <-ticker.C:
-				s.scheduled <- fn
+				select {
+				case s.scheduled <- fn:
+				case <-s.done:
+					return
+				}
 
 			case <-s.done:
 				return
 			}
 		}
 	}()
+
+	return nil
 }
 
 func (s *Socket) Close(args ...goja.Value) {
@@ -428,6 +499,14 @@ func (s *Socket) closeConnection(code int) error {
 	var err error
 
 	s.shutdownOnce.Do(func() {
+		// this is because handleEvent can panic ... on purpose so we just make sure we
+		// close the connection and the channel
+		defer func() {
+			_ = s.conn.Close()
+
+			// Stop the main control loop
+			close(s.done)
+		}()
 		rt := common.GetRuntime(s.ctx)
 
 		err = s.conn.WriteControl(websocket.CloseMessage,
@@ -441,35 +520,41 @@ func (s *Socket) closeConnection(code int) error {
 
 		// Call the user-defined close handler
 		s.handleEvent("close", rt.ToValue(code))
-
-		_ = s.conn.Close()
-
-		// Stop the main control loop
-		close(s.done)
 	})
 
 	return err
 }
 
 // Wraps conn.ReadMessage in a channel
-func readPump(conn *websocket.Conn, readChan chan []byte, errorChan chan error, closeChan chan int) {
+func (s *Socket) readPump(readChan chan *message, errorChan chan error, closeChan chan int) { //nolint: cyclop
 	for {
-		_, message, err := conn.ReadMessage()
+		messageType, data, err := s.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(
 				err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 				// Report an unexpected closure
-				errorChan <- err
+				select {
+				case errorChan <- err:
+				case <-s.done:
+					return
+				}
 			}
 			code := websocket.CloseGoingAway
 			if e, ok := err.(*websocket.CloseError); ok {
 				code = e.Code
 			}
-			closeChan <- code
+			select {
+			case closeChan <- code:
+			case <-s.done:
+			}
 			return
 		}
 
-		readChan <- message
+		select {
+		case readChan <- &message{messageType, data}:
+		case <-s.done:
+			return
+		}
 	}
 }
 

@@ -22,13 +22,19 @@ package compiler
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
+	"github.com/dop251/goja/parser"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/testutils"
 )
 
 func TestTransform(t *testing.T) {
-	c := New()
+	c := New(testutils.NewLogger(t))
 	t.Run("blank", func(t *testing.T) {
 		src, _, err := c.Transform("", "test.js")
 		assert.NoError(t, err)
@@ -40,7 +46,7 @@ func TestTransform(t *testing.T) {
 	t.Run("double-arrow", func(t *testing.T) {
 		src, _, err := c.Transform("()=> true", "test.js")
 		assert.NoError(t, err)
-		assert.Equal(t, `"use strict";(function () {return true;});`, src)
+		assert.Equal(t, `"use strict";() => true;`, src)
 		// assert.Equal(t, 3, srcmap.Version)
 		// assert.Equal(t, "test.js", srcmap.File)
 		// assert.Equal(t, "aAAA,qBAAK,IAAL", srcmap.Mappings)
@@ -59,7 +65,7 @@ func TestTransform(t *testing.T) {
 			`    return a + b;`,
 			`};`,
 			``,
-			`var res = add(1, 2);`,
+			`let res = add(1, 2);`,
 		}, "\n"), src)
 		// assert.Equal(t, 3, srcmap.Version)
 		// assert.Equal(t, "test.js", srcmap.File)
@@ -68,13 +74,11 @@ func TestTransform(t *testing.T) {
 }
 
 func TestCompile(t *testing.T) {
-	c := New()
+	c := New(testutils.NewLogger(t))
 	t.Run("ES5", func(t *testing.T) {
 		src := `1+(function() { return 2; })()`
-		pgm, code, err := c.Compile(src, "script.js", "", "", true, CompatibilityModeBase)
-		if !assert.NoError(t, err) {
-			return
-		}
+		pgm, code, err := c.Compile(src, "script.js", "", "", true, lib.CompatibilityModeBase)
+		require.NoError(t, err)
 		assert.Equal(t, src, code)
 		v, err := goja.New().RunProgram(pgm)
 		if assert.NoError(t, err) {
@@ -83,10 +87,8 @@ func TestCompile(t *testing.T) {
 
 		t.Run("Wrap", func(t *testing.T) {
 			pgm, code, err := c.Compile(src, "script.js",
-				"(function(){return ", "})", true, CompatibilityModeBase)
-			if !assert.NoError(t, err) {
-				return
-			}
+				"(function(){return ", "})", true, lib.CompatibilityModeBase)
+			require.NoError(t, err)
 			assert.Equal(t, `(function(){return 1+(function() { return 2; })()})`, code)
 			v, err := goja.New().RunProgram(pgm)
 			if assert.NoError(t, err) {
@@ -102,29 +104,25 @@ func TestCompile(t *testing.T) {
 
 		t.Run("Invalid", func(t *testing.T) {
 			src := `1+(function() { return 2; )()`
-			_, _, err := c.Compile(src, "script.js", "", "", true, CompatibilityModeExtended)
+			_, _, err := c.Compile(src, "script.js", "", "", true, lib.CompatibilityModeExtended)
 			assert.IsType(t, &goja.Exception{}, err)
 			assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:26)
 > 1 | 1+(function() { return 2; )()`)
 		})
 	})
 	t.Run("ES6", func(t *testing.T) {
-		pgm, code, err := c.Compile(`1+(()=>2)()`, "script.js", "", "", true, CompatibilityModeExtended)
-		if !assert.NoError(t, err) {
-			return
-		}
-		assert.Equal(t, `"use strict";1 + function () {return 2;}();`, code)
+		pgm, code, err := c.Compile(`3**2`, "script.js", "", "", true, lib.CompatibilityModeExtended)
+		require.NoError(t, err)
+		assert.Equal(t, `"use strict";Math.pow(3, 2);`, code)
 		v, err := goja.New().RunProgram(pgm)
 		if assert.NoError(t, err) {
-			assert.Equal(t, int64(3), v.Export())
+			assert.Equal(t, int64(9), v.Export())
 		}
 
 		t.Run("Wrap", func(t *testing.T) {
-			pgm, code, err := c.Compile(`fn(1+(()=>2)())`, "script.js", "(function(fn){", "})", true, CompatibilityModeExtended)
-			if !assert.NoError(t, err) {
-				return
-			}
-			assert.Equal(t, `(function(fn){"use strict";fn(1 + function () {return 2;}());})`, code)
+			pgm, code, err := c.Compile(`fn(3**2)`, "script.js", "(function(fn){", "})", true, lib.CompatibilityModeExtended)
+			require.NoError(t, err)
+			assert.Equal(t, `(function(fn){"use strict";fn(Math.pow(3, 2));})`, code)
 			rt := goja.New()
 			v, err := rt.RunProgram(pgm)
 			if assert.NoError(t, err) {
@@ -135,16 +133,38 @@ func TestCompile(t *testing.T) {
 						out = v.Export()
 					}))
 					assert.NoError(t, err)
-					assert.Equal(t, int64(3), out)
+					assert.Equal(t, int64(9), out)
 				}
 			}
 		})
 
 		t.Run("Invalid", func(t *testing.T) {
-			_, _, err := c.Compile(`1+(=>2)()`, "script.js", "", "", true, CompatibilityModeExtended)
+			_, _, err := c.Compile(`1+(=>2)()`, "script.js", "", "", true, lib.CompatibilityModeExtended)
 			assert.IsType(t, &goja.Exception{}, err)
 			assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:3)
 > 1 | 1+(=>2)()`)
+		})
+
+		t.Run("Invalid for goja but not babel", func(t *testing.T) {
+			t.Skip("Find something else that breaks this as this was fixed in goja :(")
+			ch := make(chan struct{})
+			go func() {
+				defer close(ch)
+				// This is a string with U+2029 Paragraph separator in it
+				// the important part is that goja won't parse it but babel will transform it but still
+				// goja won't be able to parse the result it is actually "\<U+2029>"
+				_, _, err := c.Compile(string([]byte{0x22, 0x5c, 0xe2, 0x80, 0xa9, 0x22}), "script.js", "", "", true, lib.CompatibilityModeExtended)
+				assert.IsType(t, parser.ErrorList{}, err)
+				assert.Contains(t, err.Error(), ` Unexpected token ILLEGAL`)
+			}()
+
+			select {
+			case <-ch:
+				// everything is fine
+			case <-time.After(time.Second):
+				// it took too long
+				t.Fatal("takes too long")
+			}
 		})
 	})
 }

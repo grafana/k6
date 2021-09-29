@@ -23,19 +23,20 @@ package lib
 import (
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"net"
-	"os"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/loadimpact/k6/lib/scheduler"
-	"github.com/loadimpact/k6/lib/types"
-	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	null "gopkg.in/guregu/null.v3"
+	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/stats"
 )
 
 func TestOptions(t *testing.T) {
@@ -48,11 +49,6 @@ func TestOptions(t *testing.T) {
 		opts := Options{}.Apply(Options{VUs: null.IntFrom(12345)})
 		assert.True(t, opts.VUs.Valid)
 		assert.Equal(t, int64(12345), opts.VUs.Int64)
-	})
-	t.Run("VUsMax", func(t *testing.T) {
-		opts := Options{}.Apply(Options{VUsMax: null.IntFrom(12345)})
-		assert.True(t, opts.VUsMax.Valid)
-		assert.Equal(t, int64(12345), opts.VUsMax.Int64)
 	})
 	t.Run("Duration", func(t *testing.T) {
 		opts := Options{}.Apply(Options{Duration: types.NullDurationFrom(2 * time.Minute)})
@@ -88,17 +84,7 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, oneStage, opts.Apply(Options{Stages: oneStage}).Stages)
 		assert.Equal(t, oneStage, Options{}.Apply(opts).Apply(Options{Stages: oneStage}).Apply(Options{Stages: oneStage}).Stages)
 	})
-	t.Run("Execution", func(t *testing.T) {
-		sched := scheduler.NewConstantLoopingVUsConfig("test")
-		sched.VUs = null.IntFrom(123)
-		sched.Duration = types.NullDurationFrom(3 * time.Minute)
-		opts := Options{}.Apply(Options{Execution: scheduler.ConfigMap{"test": sched}})
-		cs, ok := opts.Execution["test"].(scheduler.ConstantLoopingVUsConfig)
-		assert.True(t, ok)
-		assert.Equal(t, int64(123), cs.VUs.Int64)
-		assert.Equal(t, "3m0s", cs.Duration.String())
-	})
-	//TODO: test that any execution option overwrites any other lower-level options
+	// Execution overwriting is tested by the config consolidation test in cmd
 	t.Run("RPS", func(t *testing.T) {
 		opts := Options{}.Apply(Options{RPS: null.IntFrom(12345)})
 		assert.True(t, opts.RPS.Valid)
@@ -146,12 +132,20 @@ func TestOptions(t *testing.T) {
 		}
 
 		t.Run("JSON", func(t *testing.T) {
-
 			t.Run("String", func(t *testing.T) {
 				var opts Options
 				jsonStr := `{"tlsCipherSuites":["TLS_ECDHE_RSA_WITH_RC4_128_SHA"]}`
 				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
 				assert.Equal(t, &TLSCipherSuites{tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA}, opts.TLSCipherSuites)
+
+				t.Run("Roundtrip", func(t *testing.T) {
+					data, err := json.Marshal(opts.TLSCipherSuites)
+					assert.NoError(t, err)
+					assert.Equal(t, `["TLS_ECDHE_RSA_WITH_RC4_128_SHA"]`, string(data))
+					var vers2 TLSCipherSuites
+					assert.NoError(t, json.Unmarshal(data, &vers2))
+					assert.Equal(t, &vers2, opts.TLSCipherSuites)
+				})
 			})
 			t.Run("Not a string", func(t *testing.T) {
 				var opts Options
@@ -176,17 +170,17 @@ func TestOptions(t *testing.T) {
 		t.Run("JSON", func(t *testing.T) {
 			t.Run("Object", func(t *testing.T) {
 				var opts Options
-				jsonStr := `{"tlsVersion":{"min":"ssl3.0","max":"tls1.2"}}`
+				jsonStr := `{"tlsVersion":{"min":"tls1.0","max":"tls1.2"}}`
 				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
 				assert.Equal(t, &TLSVersions{
-					Min: TLSVersion(tls.VersionSSL30),
+					Min: TLSVersion(tls.VersionTLS10),
 					Max: TLSVersion(tls.VersionTLS12),
 				}, opts.TLSVersion)
 
 				t.Run("Roundtrip", func(t *testing.T) {
 					data, err := json.Marshal(opts.TLSVersion)
 					assert.NoError(t, err)
-					assert.Equal(t, `{"min":"ssl3.0","max":"tls1.2"}`, string(data))
+					assert.Equal(t, `{"min":"tls1.0","max":"tls1.2"}`, string(data))
 					var vers2 TLSVersions
 					assert.NoError(t, json.Unmarshal(data, &vers2))
 					assert.Equal(t, &vers2, opts.TLSVersion)
@@ -215,6 +209,9 @@ func TestOptions(t *testing.T) {
 			t.Run("Unsupported version", func(t *testing.T) {
 				var opts Options
 				jsonStr := `{"tlsVersion":"-1"}`
+				assert.Error(t, json.Unmarshal([]byte(jsonStr), &opts))
+
+				jsonStr = `{"tlsVersion":"ssl3.0"}`
 				assert.Error(t, json.Unmarshal([]byte(jsonStr), &opts))
 			})
 		})
@@ -309,23 +306,48 @@ func TestOptions(t *testing.T) {
 	t.Run("BlacklistIPs", func(t *testing.T) {
 		opts := Options{}.Apply(Options{
 			BlacklistIPs: []*IPNet{{
-				IP:   net.IPv4zero,
-				Mask: net.CIDRMask(1, 1),
+				IPNet: net.IPNet{
+					IP:   net.IPv4bcast,
+					Mask: net.CIDRMask(31, 32),
+				},
 			}},
 		})
 		assert.NotNil(t, opts.BlacklistIPs)
 		assert.NotEmpty(t, opts.BlacklistIPs)
-		assert.Equal(t, net.IPv4zero, opts.BlacklistIPs[0].IP)
-		assert.Equal(t, net.CIDRMask(1, 1), opts.BlacklistIPs[0].Mask)
+		assert.Equal(t, net.IPv4bcast, opts.BlacklistIPs[0].IP)
+		assert.Equal(t, net.CIDRMask(31, 32), opts.BlacklistIPs[0].Mask)
+
+		t.Run("JSON", func(t *testing.T) {
+			t.Parallel()
+
+			b, err := json.Marshal(opts)
+			require.NoError(t, err)
+
+			var uopts Options
+			err = json.Unmarshal(b, &uopts)
+			require.NoError(t, err)
+			require.Len(t, uopts.BlacklistIPs, 1)
+			require.Equal(t, "255.255.255.254/31", uopts.BlacklistIPs[0].String())
+		})
+	})
+	t.Run("BlockedHostnames", func(t *testing.T) {
+		blockedHostnames, err := types.NewNullHostnameTrie([]string{"test.k6.io", "*valid.pattern"})
+		require.NoError(t, err)
+		opts := Options{}.Apply(Options{BlockedHostnames: blockedHostnames})
+		assert.NotNil(t, opts.BlockedHostnames)
+		assert.Equal(t, blockedHostnames, opts.BlockedHostnames)
 	})
 
 	t.Run("Hosts", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Hosts: map[string]net.IP{
-			"test.loadimpact.com": net.ParseIP("192.0.2.1"),
+		host, err := NewHostAddress(net.ParseIP("192.0.2.1"), "80")
+		assert.NoError(t, err)
+
+		opts := Options{}.Apply(Options{Hosts: map[string]*HostAddress{
+			"test.loadimpact.com": host,
 		}})
 		assert.NotNil(t, opts.Hosts)
 		assert.NotEmpty(t, opts.Hosts)
-		assert.Equal(t, "192.0.2.1", opts.Hosts["test.loadimpact.com"].String())
+		assert.Equal(t, "192.0.2.1:80", opts.Hosts["test.loadimpact.com"].String())
 	})
 
 	t.Run("Throws", func(t *testing.T) {
@@ -401,10 +423,21 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.DiscardResponseBodies.Valid)
 		assert.True(t, opts.DiscardResponseBodies.Bool)
 	})
-
+	t.Run("ClientIPRanges", func(t *testing.T) {
+		clientIPRanges, err := types.NewIPPool("129.112.232.12,123.12.0.0/32")
+		require.NoError(t, err)
+		opts := Options{}.Apply(Options{LocalIPs: types.NullIPPool{Pool: clientIPRanges, Valid: true}})
+		assert.NotNil(t, opts.LocalIPs)
+	})
 }
 
 func TestOptionsEnv(t *testing.T) {
+	mustIPPool := func(s string) *types.IPPool {
+		p, err := types.NewIPPool(s)
+		require.NoError(t, err)
+		return p
+	}
+
 	testdata := map[struct{ Name, Key string }]map[string]interface{}{
 		{"Paused", "K6_PAUSED"}: {
 			"":      null.Bool{},
@@ -412,10 +445,6 @@ func TestOptionsEnv(t *testing.T) {
 			"false": null.BoolFrom(false),
 		},
 		{"VUs", "K6_VUS"}: {
-			"":    null.Int{},
-			"123": null.IntFrom(123),
-		},
-		{"VUsMax", "K6_VUS_MAX"}: {
 			"":    null.Int{},
 			"123": null.IntFrom(123),
 		},
@@ -429,8 +458,10 @@ func TestOptionsEnv(t *testing.T) {
 		},
 		{"Stages", "K6_STAGES"}: {
 			// "": []Stage{},
-			"1s": []Stage{{
-				Duration: types.NullDurationFrom(1 * time.Second)},
+			"1s": []Stage{
+				{
+					Duration: types.NullDurationFrom(1 * time.Second),
+				},
 			},
 			"1s:100": []Stage{
 				{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(100)},
@@ -466,6 +497,11 @@ func TestOptionsEnv(t *testing.T) {
 			"":    null.String{},
 			"Hi!": null.StringFrom("Hi!"),
 		},
+		{"LocalIPs", "K6_LOCAL_IPS"}: {
+			"":                 types.NullIPPool{},
+			"192.168.220.2":    types.NullIPPool{Pool: mustIPPool("192.168.220.2"), Valid: true},
+			"192.168.220.2/24": types.NullIPPool{Pool: mustIPPool("192.168.220.0/24"), Valid: true},
+		},
 		{"Throw", "K6_THROW"}: {
 			"":      null.Bool{},
 			"true":  null.BoolFrom(true),
@@ -480,11 +516,13 @@ func TestOptionsEnv(t *testing.T) {
 		// External
 	}
 	for field, data := range testdata {
-		os.Clearenv()
+		field, data := field, data
 		t.Run(field.Name, func(t *testing.T) {
 			for str, val := range data {
+				str, val := str, val
 				t.Run(`"`+str+`"`, func(t *testing.T) {
-					assert.NoError(t, os.Setenv(field.Key, str))
+					restore := testutils.SetEnv(t, []string{fmt.Sprintf("%s=%s", field.Key, str)})
+					defer restore()
 					var opts Options
 					assert.NoError(t, envconfig.Process("k6", &opts))
 					assert.Equal(t, val, reflect.ValueOf(opts).FieldByName(field.Name).Interface())
@@ -495,26 +533,25 @@ func TestOptionsEnv(t *testing.T) {
 }
 
 func TestCIDRUnmarshal(t *testing.T) {
-
-	var testData = []struct {
+	testData := []struct {
 		input          string
 		expectedOutput *IPNet
-		expactFailure  bool
+		expectFailure  bool
 	}{
 		{
 			"10.0.0.0/8",
-			&IPNet{
+			&IPNet{IPNet: net.IPNet{
 				IP:   net.IP{10, 0, 0, 0},
 				Mask: net.IPv4Mask(255, 0, 0, 0),
-			},
+			}},
 			false,
 		},
 		{
 			"fc00:1234:5678::/48",
-			&IPNet{
+			&IPNet{IPNet: net.IPNet{
 				IP:   net.ParseIP("fc00:1234:5678::"),
 				Mask: net.CIDRMask(48, 128),
-			},
+			}},
 			false,
 		},
 		{"10.0.0.0", nil, true},
@@ -528,11 +565,71 @@ func TestCIDRUnmarshal(t *testing.T) {
 			actualIPNet := &IPNet{}
 			err := actualIPNet.UnmarshalText([]byte(data.input))
 
-			if data.expactFailure {
-				require.EqualError(t, err, "Failed to parse CIDR: invalid CIDR address: "+data.input)
+			if data.expectFailure {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "invalid CIDR address: "+data.input)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, data.expectedOutput, actualIPNet)
+			}
+		})
+	}
+}
+
+func TestHostAddressUnmarshal(t *testing.T) {
+	testData := []struct {
+		input          string
+		expectedOutput *HostAddress
+		expectFailure  string
+	}{
+		{
+			"1.2.3.4",
+			&HostAddress{IP: net.ParseIP("1.2.3.4")},
+			"",
+		},
+		{
+			"1.2.3.4:80",
+			&HostAddress{IP: net.ParseIP("1.2.3.4"), Port: 80},
+			"",
+		},
+		{
+			"1.2.3.4:asdf",
+			nil,
+			"strconv.Atoi: parsing \"asdf\": invalid syntax",
+		},
+		{
+			"2001:0db8:0000:0000:0000:ff00:0042:8329",
+			&HostAddress{IP: net.ParseIP("2001:0db8:0000:0000:0000:ff00:0042:8329")},
+			"",
+		},
+		{
+			"2001:db8::68",
+			&HostAddress{IP: net.ParseIP("2001:db8::68")},
+			"",
+		},
+		{
+			"[2001:db8::68]:80",
+			&HostAddress{IP: net.ParseIP("2001:db8::68"), Port: 80},
+			"",
+		},
+		{
+			"[2001:db8::68]:asdf",
+			nil,
+			"strconv.Atoi: parsing \"asdf\": invalid syntax",
+		},
+	}
+
+	for _, data := range testData {
+		data := data
+		t.Run(data.input, func(t *testing.T) {
+			actualHost := &HostAddress{}
+			err := actualHost.UnmarshalText([]byte(data.input))
+
+			if data.expectFailure != "" {
+				require.EqualError(t, err, data.expectFailure)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, data.expectedOutput, actualHost)
 			}
 		})
 	}

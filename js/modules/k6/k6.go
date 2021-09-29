@@ -18,39 +18,43 @@
  *
  */
 
+// Package k6 implements the module imported as 'k6' from inside k6.
 package k6
 
 import (
 	"context"
+	"errors"
 	"math/rand"
-	"strconv"
 	"sync/atomic"
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/stats"
-	"github.com/pkg/errors"
+
+	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/stats"
 )
 
+// K6 is just the module struct.
 type K6 struct{}
 
-// ErrGroupInInitContext is returned when group() are using in the init context
+// ErrGroupInInitContext is returned when group() are using in the init context.
 var ErrGroupInInitContext = common.NewInitContextError("Using group() in the init context is not supported")
 
-// ErrCheckInInitContext is returned when check() are using in the init context
+// ErrCheckInInitContext is returned when check() are using in the init context.
 var ErrCheckInInitContext = common.NewInitContextError("Using check() in the init context is not supported")
 
+// New returns a new module Struct.
 func New() *K6 {
 	return &K6{}
 }
 
+// Fail is a fancy way of saying `throw "something"`.
 func (*K6) Fail(msg string) (goja.Value, error) {
 	return goja.Undefined(), errors.New(msg)
 }
 
+// Sleep waits the provided seconds before continuing the execution.
 func (*K6) Sleep(ctx context.Context, secs float64) {
 	timer := time.NewTimer(time.Duration(secs * float64(time.Second)))
 	select {
@@ -60,13 +64,15 @@ func (*K6) Sleep(ctx context.Context, secs float64) {
 	}
 }
 
+// RandomSeed sets the seed to the random generator used for this VU.
 func (*K6) RandomSeed(ctx context.Context, seed int64) {
-	randSource := rand.New(rand.NewSource(seed)).Float64
+	randSource := rand.New(rand.NewSource(seed)).Float64 //nolint:gosec
 
 	rt := common.GetRuntime(ctx)
 	rt.SetRandSource(randSource)
 }
 
+// Group wraps a function call and executes it within the provided group name.
 func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value, error) {
 	state := lib.GetState(ctx)
 	if state == nil {
@@ -84,26 +90,27 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 
 	old := state.Group
 	state.Group = g
-	defer func() { state.Group = old }()
+
+	shouldUpdateTag := state.Options.SystemTags.Has(stats.TagGroup)
+	if shouldUpdateTag {
+		state.Tags["group"] = g.Path
+	}
+	defer func() {
+		state.Group = old
+		if shouldUpdateTag {
+			state.Tags["group"] = old.Path
+		}
+	}()
 
 	startTime := time.Now()
 	ret, err := fn(goja.Undefined())
 	t := time.Now()
 
-	tags := state.Options.RunTags.CloneTags()
-	if state.Options.SystemTags.Has(stats.TagGroup) {
-		tags["group"] = g.Path
-	}
-	if state.Options.SystemTags.Has(stats.TagVU) {
-		tags["vu"] = strconv.FormatInt(state.Vu, 10)
-	}
-	if state.Options.SystemTags.Has(stats.TagIter) {
-		tags["iter"] = strconv.FormatInt(state.Iteration, 10)
-	}
+	tags := state.CloneTags()
 
 	stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
 		Time:   t,
-		Metric: metrics.GroupDuration,
+		Metric: state.BuiltinMetrics.GroupDuration,
 		Tags:   stats.IntoSampleTags(&tags),
 		Value:  stats.D(t.Sub(startTime)),
 	})
@@ -111,6 +118,8 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 	return ret, err
 }
 
+// Check will emit check metrics for the provided checks.
+//nolint:cyclop
 func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
 	state := lib.GetState(ctx)
 	if state == nil {
@@ -119,22 +128,13 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 	rt := common.GetRuntime(ctx)
 	t := time.Now()
 
-	// Prepare tags, make sure the `group` tag can't be overwritten.
-	commonTags := state.Options.RunTags.CloneTags()
-	if state.Options.SystemTags.Has(stats.TagGroup) {
-		commonTags["group"] = state.Group.Path
-	}
+	// Prepare the metric tags
+	commonTags := state.CloneTags()
 	if len(extras) > 0 {
 		obj := extras[0].ToObject(rt)
 		for _, k := range obj.Keys() {
 			commonTags[k] = obj.Get(k).String()
 		}
-	}
-	if state.Options.SystemTags.Has(stats.TagVU) {
-		commonTags["vu"] = strconv.FormatInt(state.Vu, 10)
-	}
-	if state.Options.SystemTags.Has(stats.TagIter) {
-		commonTags["iter"] = strconv.FormatInt(state.Iteration, 10)
 	}
 
 	succ := true
@@ -176,10 +176,12 @@ func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Va
 		default:
 			if val.ToBoolean() {
 				atomic.AddInt64(&check.Passes, 1)
-				stats.PushIfNotDone(ctx, state.Samples, stats.Sample{Time: t, Metric: metrics.Checks, Tags: sampleTags, Value: 1})
+				stats.PushIfNotDone(ctx, state.Samples,
+					stats.Sample{Time: t, Metric: state.BuiltinMetrics.Checks, Tags: sampleTags, Value: 1})
 			} else {
 				atomic.AddInt64(&check.Fails, 1)
-				stats.PushIfNotDone(ctx, state.Samples, stats.Sample{Time: t, Metric: metrics.Checks, Tags: sampleTags, Value: 0})
+				stats.PushIfNotDone(ctx, state.Samples,
+					stats.Sample{Time: t, Metric: state.BuiltinMetrics.Checks, Tags: sampleTags, Value: 0})
 				// A single failure makes the return value false.
 				succ = false
 			}

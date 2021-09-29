@@ -2,12 +2,12 @@ package goja
 
 import (
 	"errors"
+	"github.com/dop251/goja/unistring"
 	"io"
 	"math"
 	"regexp"
 	"strconv"
 	"strings"
-	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -26,14 +26,14 @@ func (r *Runtime) builtin_isNaN(call FunctionCall) Value {
 }
 
 func (r *Runtime) builtin_parseInt(call FunctionCall) Value {
-	str := call.Argument(0).ToString().toTrimmedUTF8()
+	str := call.Argument(0).toString().toTrimmedUTF8()
 	radix := int(toInt32(call.Argument(1)))
 	v, _ := parseInt(str, radix)
 	return v
 }
 
 func (r *Runtime) builtin_parseFloat(call FunctionCall) Value {
-	m := parseFloatRegexp.FindStringSubmatch(call.Argument(0).ToString().toTrimmedUTF8())
+	m := parseFloatRegexp.FindStringSubmatch(call.Argument(0).toString().toTrimmedUTF8())
 	if len(m) == 2 {
 		if s := m[1]; s != "" && s != "+" && s != "-" {
 			switch s {
@@ -95,7 +95,7 @@ func (r *Runtime) _encode(uriString valueString, unescaped *[256]bool) valueStri
 	reader = uriString.reader(0)
 	for {
 		rn, _, err := reader.ReadRune()
-		if err != nil {
+		if err == io.EOF {
 			break
 		}
 
@@ -117,7 +117,7 @@ func (r *Runtime) _encode(uriString valueString, unescaped *[256]bool) valueStri
 			i++
 		}
 	}
-	return asciiString(string(buf))
+	return asciiString(buf)
 }
 
 func (r *Runtime) _decode(sv valueString, reservedSet *[256]bool) valueString {
@@ -189,7 +189,7 @@ func (r *Runtime) _decode(sv valueString, reservedSet *[256]bool) valueString {
 		us = append(us, rn)
 		t = t[size:]
 	}
-	return unicodeString(utf16.Encode(us))
+	return unicodeStringFromRunes(us)
 }
 
 func ishex(c byte) bool {
@@ -217,30 +217,30 @@ func unhex(c byte) byte {
 }
 
 func (r *Runtime) builtin_decodeURI(call FunctionCall) Value {
-	uriString := call.Argument(0).ToString()
+	uriString := call.Argument(0).toString()
 	return r._decode(uriString, &uriReservedHash)
 }
 
 func (r *Runtime) builtin_decodeURIComponent(call FunctionCall) Value {
-	uriString := call.Argument(0).ToString()
+	uriString := call.Argument(0).toString()
 	return r._decode(uriString, &emptyEscapeSet)
 }
 
 func (r *Runtime) builtin_encodeURI(call FunctionCall) Value {
-	uriString := call.Argument(0).ToString()
+	uriString := call.Argument(0).toString()
 	return r._encode(uriString, &uriReservedUnescapedHash)
 }
 
 func (r *Runtime) builtin_encodeURIComponent(call FunctionCall) Value {
-	uriString := call.Argument(0).ToString()
+	uriString := call.Argument(0).toString()
 	return r._encode(uriString, &uriUnescaped)
 }
 
 func (r *Runtime) builtin_escape(call FunctionCall) Value {
-	s := call.Argument(0).ToString()
+	s := call.Argument(0).toString()
 	var sb strings.Builder
 	l := s.length()
-	for i := int64(0); i < l; i++ {
+	for i := 0; i < l; i++ {
 		r := uint16(s.charAt(i))
 		if r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' ||
 			r == '@' || r == '*' || r == '_' || r == '+' || r == '-' || r == '.' || r == '/' {
@@ -261,17 +261,18 @@ func (r *Runtime) builtin_escape(call FunctionCall) Value {
 }
 
 func (r *Runtime) builtin_unescape(call FunctionCall) Value {
-	s := call.Argument(0).ToString()
+	s := call.Argument(0).toString()
 	l := s.length()
 	_, unicode := s.(unicodeString)
 	var asciiBuf []byte
 	var unicodeBuf []uint16
 	if unicode {
-		unicodeBuf = make([]uint16, 0, l)
+		unicodeBuf = make([]uint16, 1, l+1)
+		unicodeBuf[0] = unistring.BOM
 	} else {
 		asciiBuf = make([]byte, 0, l)
 	}
-	for i := int64(0); i < l; {
+	for i := 0; i < l; {
 		r := s.charAt(i)
 		if r == '%' {
 			if i <= l-6 && s.charAt(i+1) == 'u' {
@@ -303,7 +304,8 @@ func (r *Runtime) builtin_unescape(call FunctionCall) Value {
 		}
 	out:
 		if r >= utf8.RuneSelf && !unicode {
-			unicodeBuf = make([]uint16, 0, l)
+			unicodeBuf = make([]uint16, 1, l+1)
+			unicodeBuf[0] = unistring.BOM
 			for _, b := range asciiBuf {
 				unicodeBuf = append(unicodeBuf, uint16(b))
 			}
@@ -326,6 +328,7 @@ func (r *Runtime) builtin_unescape(call FunctionCall) Value {
 
 func (r *Runtime) initGlobalObject() {
 	o := r.globalObject.self
+	o._putProp("globalThis", r.globalObject, true, false, true)
 	o._putProp("NaN", _NaN, false, false, false)
 	o._putProp("undefined", _undefined, false, false, false)
 	o._putProp("Infinity", _positiveInf, false, false, false)
@@ -341,9 +344,7 @@ func (r *Runtime) initGlobalObject() {
 	o._putProp("escape", r.newNativeFunc(r.builtin_escape, nil, "escape", nil, 1), true, false, true)
 	o._putProp("unescape", r.newNativeFunc(r.builtin_unescape, nil, "unescape", nil, 1), true, false, true)
 
-	o._putProp("toString", r.newNativeFunc(func(FunctionCall) Value {
-		return stringGlobalObject
-	}, nil, "toString", nil, 0), false, false, false)
+	o._putSym(SymToStringTag, valueProp(asciiString(classGlobal), false, false, true))
 
 	// TODO: Annex B
 

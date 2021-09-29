@@ -24,15 +24,14 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"strings"
+	"strconv"
 	"sync/atomic"
 	"time"
 
-	"github.com/loadimpact/k6/lib"
-	"github.com/loadimpact/k6/lib/metrics"
-	"github.com/loadimpact/k6/stats"
-
-	"github.com/viki-org/dnscache"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/stats"
 )
 
 // Dialer wraps net.Dialer and provides k6 specific functionality -
@@ -40,19 +39,20 @@ import (
 type Dialer struct {
 	net.Dialer
 
-	Resolver  *dnscache.Resolver
-	Blacklist []*lib.IPNet
-	Hosts     map[string]net.IP
+	Resolver         Resolver
+	Blacklist        []*lib.IPNet
+	BlockedHostnames *types.HostnameTrie
+	Hosts            map[string]*lib.HostAddress
 
 	BytesRead    int64
 	BytesWritten int64
 }
 
-// NewDialer constructs a new Dialer and initializes its cache.
-func NewDialer(dialer net.Dialer) *Dialer {
+// NewDialer constructs a new Dialer with the given DNS resolver.
+func NewDialer(dialer net.Dialer, resolver Resolver) *Dialer {
 	return &Dialer{
 		Dialer:   dialer,
-		Resolver: dnscache.New(0),
+		Resolver: resolver,
 	}
 }
 
@@ -66,31 +66,23 @@ func (b BlackListedIPError) Error() string {
 	return fmt.Sprintf("IP (%s) is in a blacklisted range (%s)", b.ip, b.net)
 }
 
+// BlockedHostError is returned when a given hostname is blocked
+type BlockedHostError struct {
+	hostname string
+	match    string
+}
+
+func (b BlockedHostError) Error() string {
+	return fmt.Sprintf("hostname (%s) is in a blocked pattern (%s)", b.hostname, b.match)
+}
+
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
 func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
-	delimiter := strings.LastIndex(addr, ":")
-	host := addr[:delimiter]
-
-	// lookup for domain defined in Hosts option before trying to resolve DNS.
-	ip, ok := d.Hosts[host]
-	if !ok {
-		var err error
-		ip, err = d.Resolver.FetchOne(host)
-		if err != nil {
-			return nil, err
-		}
+	dialAddr, err := d.getDialAddr(addr)
+	if err != nil {
+		return nil, err
 	}
-
-	for _, ipnet := range d.Blacklist {
-		if (*net.IPNet)(ipnet).Contains(ip) {
-			return nil, BlackListedIPError{ip: ip, net: ipnet}
-		}
-	}
-	ipStr := ip.String()
-	if strings.ContainsRune(ipStr, ':') {
-		ipStr = "[" + ipStr + "]"
-	}
-	conn, err := d.Dialer.DialContext(ctx, proto, ipStr+":"+addr[delimiter+1:])
+	conn, err := d.Dialer.DialContext(ctx, proto, dialAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -101,22 +93,23 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 // GetTrail creates a new NetTrail instance with the Dialer
 // sent and received data metrics and the supplied times and tags.
 // TODO: Refactor this according to
-// https://github.com/loadimpact/k6/pull/1203#discussion_r337938370
+// https://github.com/k6io/k6/pull/1203#discussion_r337938370
 func (d *Dialer) GetTrail(
 	startTime, endTime time.Time, fullIteration bool, emitIterations bool, tags *stats.SampleTags,
+	builtinMetrics *metrics.BuiltinMetrics,
 ) *NetTrail {
 	bytesWritten := atomic.SwapInt64(&d.BytesWritten, 0)
 	bytesRead := atomic.SwapInt64(&d.BytesRead, 0)
 	samples := []stats.Sample{
 		{
 			Time:   endTime,
-			Metric: metrics.DataSent,
+			Metric: builtinMetrics.DataSent,
 			Value:  float64(bytesWritten),
 			Tags:   tags,
 		},
 		{
 			Time:   endTime,
-			Metric: metrics.DataReceived,
+			Metric: builtinMetrics.DataReceived,
 			Value:  float64(bytesRead),
 			Tags:   tags,
 		},
@@ -124,14 +117,14 @@ func (d *Dialer) GetTrail(
 	if fullIteration {
 		samples = append(samples, stats.Sample{
 			Time:   endTime,
-			Metric: metrics.IterationDuration,
+			Metric: builtinMetrics.IterationDuration,
 			Value:  stats.D(endTime.Sub(startTime)),
 			Tags:   tags,
 		})
 		if emitIterations {
 			samples = append(samples, stats.Sample{
 				Time:   endTime,
-				Metric: metrics.Iterations,
+				Metric: builtinMetrics.Iterations,
 				Value:  1,
 				Tags:   tags,
 			})
@@ -147,6 +140,79 @@ func (d *Dialer) GetTrail(
 		Tags:          tags,
 		Samples:       samples,
 	}
+}
+
+func (d *Dialer) getDialAddr(addr string) (string, error) {
+	remote, err := d.findRemote(addr)
+	if err != nil {
+		return "", err
+	}
+
+	for _, ipnet := range d.Blacklist {
+		if ipnet.Contains(remote.IP) {
+			return "", BlackListedIPError{ip: remote.IP, net: ipnet}
+		}
+	}
+
+	return remote.String(), nil
+}
+
+func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	ip := net.ParseIP(host)
+	if d.BlockedHostnames != nil && ip == nil {
+		if match, blocked := d.BlockedHostnames.Contains(host); blocked {
+			return nil, BlockedHostError{hostname: host, match: match}
+		}
+	}
+
+	remote, err := d.getConfiguredHost(addr, host, port)
+	if err != nil || remote != nil {
+		return remote, err
+	}
+
+	if ip != nil {
+		return lib.NewHostAddress(ip, port)
+	}
+
+	ip, err = d.Resolver.LookupIP(host)
+	if err != nil {
+		return nil, err
+	}
+
+	if ip == nil {
+		return nil, fmt.Errorf("lookup %s: no such host", host)
+	}
+
+	return lib.NewHostAddress(ip, port)
+}
+
+func (d *Dialer) getConfiguredHost(addr, host, port string) (*lib.HostAddress, error) {
+	if remote, ok := d.Hosts[addr]; ok {
+		return remote, nil
+	}
+
+	if remote, ok := d.Hosts[host]; ok {
+		if remote.Port != 0 || port == "" {
+			return remote, nil
+		}
+
+		newPort, err := strconv.Atoi(port)
+		if err != nil {
+			return nil, err
+		}
+
+		newRemote := *remote
+		newRemote.Port = newPort
+
+		return &newRemote, nil
+	}
+
+	return nil, nil
 }
 
 // NetTrail contains information about the exchanged data size and length of a

@@ -22,18 +22,33 @@ package js
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/dop251/goja"
-	"github.com/loadimpact/k6/js/common"
-	"github.com/loadimpact/k6/js/compiler"
-	"github.com/loadimpact/k6/js/modules"
-	"github.com/loadimpact/k6/loader"
-	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+
+	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/compiler"
+	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/js/modules/k6"
+	"go.k6.io/k6/js/modules/k6/crypto"
+	"go.k6.io/k6/js/modules/k6/crypto/x509"
+	"go.k6.io/k6/js/modules/k6/data"
+	"go.k6.io/k6/js/modules/k6/encoding"
+	"go.k6.io/k6/js/modules/k6/execution"
+	"go.k6.io/k6/js/modules/k6/grpc"
+	"go.k6.io/k6/js/modules/k6/html"
+	"go.k6.io/k6/js/modules/k6/http"
+	"go.k6.io/k6/js/modules/k6/metrics"
+	"go.k6.io/k6/js/modules/k6/ws"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/loader"
 )
 
 type programWithSource struct {
@@ -42,7 +57,12 @@ type programWithSource struct {
 	module *goja.Object
 }
 
+const openCantBeUsedOutsideInitContextMsg = `The "open()" function is only available in the init stage ` +
+	`(i.e. the global scope), see https://k6.io/docs/using-k6/test-life-cycle for more information`
+
 // InitContext provides APIs for use in the init context.
+//
+// TODO: refactor most/all of this state away, use common.InitEnvironment instead
 type InitContext struct {
 	// Bound runtime; used to instantiate objects.
 	runtime  *goja.Runtime
@@ -58,12 +78,16 @@ type InitContext struct {
 	// Cache of loaded programs and files.
 	programs map[string]programWithSource
 
-	compatibilityMode compiler.CompatibilityMode
+	compatibilityMode lib.CompatibilityMode
+
+	logger logrus.FieldLogger
+
+	modules map[string]interface{}
 }
 
 // NewInitContext creates a new initcontext with the provided arguments
 func NewInitContext(
-	rt *goja.Runtime, c *compiler.Compiler, compatMode compiler.CompatibilityMode,
+	logger logrus.FieldLogger, rt *goja.Runtime, c *compiler.Compiler, compatMode lib.CompatibilityMode,
 	ctxPtr *context.Context, filesystems map[string]afero.Fs, pwd *url.URL,
 ) *InitContext {
 	return &InitContext{
@@ -74,6 +98,8 @@ func NewInitContext(
 		pwd:               pwd,
 		programs:          make(map[string]programWithSource),
 		compatibilityMode: compatMode,
+		logger:            logger,
+		modules:           getJSModules(),
 	}
 }
 
@@ -81,7 +107,7 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 	// we don't copy the exports as otherwise they will be shared and we don't want this.
 	// this means that all the files will be executed again but once again only once per compilation
 	// of the main file.
-	var programs = make(map[string]programWithSource, len(base.programs))
+	programs := make(map[string]programWithSource, len(base.programs))
 	for key, program := range base.programs {
 		programs[key] = programWithSource{
 			src: program.src,
@@ -98,6 +124,8 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 
 		programs:          programs,
 		compatibilityMode: base.compatibilityMode,
+		logger:            base.logger,
+		modules:           base.modules,
 	}
 }
 
@@ -105,8 +133,9 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 func (i *InitContext) Require(arg string) goja.Value {
 	switch {
 	case arg == "k6", strings.HasPrefix(arg, "k6/"):
-		// Builtin modules ("k6" or "k6/...") are handled specially, as they don't exist on the
-		// filesystem. This intentionally shadows attempts to name your own modules this.
+		// Builtin or external modules ("k6", "k6/*", or "k6/x/*") are handled
+		// specially, as they don't exist on the filesystem. This intentionally
+		// shadows attempts to name your own modules this.
 		v, err := i.requireModule(arg)
 		if err != nil {
 			common.Throw(i.runtime, err)
@@ -122,11 +151,63 @@ func (i *InitContext) Require(arg string) goja.Value {
 	}
 }
 
-func (i *InitContext) requireModule(name string) (goja.Value, error) {
-	mod, ok := modules.Index[name]
-	if !ok {
-		return nil, errors.Errorf("unknown builtin module: %s", name)
+type moduleInstanceCoreImpl struct {
+	ctxPtr *context.Context
+	// we can technically put lib.State here as well as anything else
+}
+
+func (m *moduleInstanceCoreImpl) GetContext() context.Context {
+	return *m.ctxPtr
+}
+
+func (m *moduleInstanceCoreImpl) GetInitEnv() *common.InitEnvironment {
+	return common.GetInitEnv(*m.ctxPtr) // TODO thread it correctly instead
+}
+
+func (m *moduleInstanceCoreImpl) GetState() *lib.State {
+	return lib.GetState(*m.ctxPtr) // TODO thread it correctly instead
+}
+
+func (m *moduleInstanceCoreImpl) GetRuntime() *goja.Runtime {
+	return common.GetRuntime(*m.ctxPtr) // TODO thread it correctly instead
+}
+
+func toESModuleExports(exp modules.Exports) interface{} {
+	if exp.Named == nil {
+		return exp.Default
 	}
+	if exp.Default == nil {
+		return exp.Named
+	}
+
+	result := make(map[string]interface{}, len(exp.Named)+2)
+
+	for k, v := range exp.Named {
+		result[k] = v
+	}
+	// Maybe check that those weren't set
+	result["default"] = exp.Default
+	// this so babel works with the `default` when it transpiles from ESM to commonjs.
+	// This should probably be removed once we have support for ESM directly. So that require doesn't get support for
+	// that while ESM has.
+	result["__esModule"] = true
+
+	return result
+}
+
+func (i *InitContext) requireModule(name string) (goja.Value, error) {
+	mod, ok := i.modules[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown module: %s", name)
+	}
+	if modV2, ok := mod.(modules.IsModuleV2); ok {
+		instance := modV2.NewModuleInstance(&moduleInstanceCoreImpl{ctxPtr: i.ctxPtr})
+		return i.runtime.ToValue(toESModuleExports(instance.GetExports())), nil
+	}
+	if perInstance, ok := mod.(modules.HasModuleInstancePerVU); ok {
+		mod = perInstance.NewModuleInstancePerVU()
+	}
+
 	return i.runtime.ToValue(common.Bind(i.runtime, mod, i.ctxPtr)), nil
 }
 
@@ -141,6 +222,12 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 	// First, check if we have a cached program already.
 	pgm, ok := i.programs[fileURL.String()]
 	if !ok || pgm.module == nil {
+		if filepath.IsAbs(name) && runtime.GOOS == "windows" {
+			i.logger.Warnf("'%s' was imported with an absolute path - this won't be cross-platform and won't work if"+
+				" you move the script between machines or run it with `k6 cloud`; if absolute paths are required,"+
+				" import them with the `file://` schema for slightly better compatibility",
+				name)
+		}
 		i.pwd = loader.Dir(fileURL)
 		defer func() { i.pwd = pwd }()
 		exports := i.runtime.NewObject()
@@ -149,7 +236,7 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 
 		if pgm.pgm == nil {
 			// Load the sources; the loader takes care of remote loading, etc.
-			data, err := loader.Load(i.filesystems, fileURL, name)
+			data, err := loader.Load(i.logger, i.filesystems, fileURL, name)
 			if err != nil {
 				return goja.Undefined(), err
 			}
@@ -187,8 +274,14 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 	return pgm, err
 }
 
-// Open implements open() in the init context and will read and return the contents of a file
-func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) {
+// Open implements open() in the init context and will read and return the
+// contents of a file. If the second argument is "b" it returns an ArrayBuffer
+// instance, otherwise a string representation.
+func (i *InitContext) Open(ctx context.Context, filename string, args ...string) (goja.Value, error) {
+	if lib.GetState(ctx) != nil {
+		return nil, errors.New(openCantBeUsedOutsideInitContextMsg)
+	}
+
 	if filename == "" {
 		return nil, errors.New("open() can't be used with an empty filename")
 	}
@@ -217,7 +310,36 @@ func (i *InitContext) Open(filename string, args ...string) (goja.Value, error) 
 	}
 
 	if len(args) > 0 && args[0] == "b" {
-		return i.runtime.ToValue(data), nil
+		ab := i.runtime.NewArrayBuffer(data)
+		return i.runtime.ToValue(&ab), nil
 	}
 	return i.runtime.ToValue(string(data)), nil
+}
+
+func getInternalJSModules() map[string]interface{} {
+	return map[string]interface{}{
+		"k6":             k6.New(),
+		"k6/crypto":      crypto.New(),
+		"k6/crypto/x509": x509.New(),
+		"k6/data":        data.New(),
+		"k6/encoding":    encoding.New(),
+		"k6/execution":   execution.New(),
+		"k6/net/grpc":    grpc.New(),
+		"k6/html":        html.New(),
+		"k6/http":        http.New(),
+		"k6/metrics":     metrics.New(),
+		"k6/ws":          ws.New(),
+	}
+}
+
+func getJSModules() map[string]interface{} {
+	result := getInternalJSModules()
+	external := modules.GetJSModules()
+
+	// external is always prefixed with `k6/x`
+	for k, v := range external {
+		result[k] = v
+	}
+
+	return result
 }

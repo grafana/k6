@@ -21,11 +21,12 @@ That said, "how do I..."-type questions are often more suited for Slack.
 Contributing code
 -----------------
 
-If you'd like to contribute code to k6, this is the basic procedure. Make sure to follow the [style guide](#style-guide) described below!
+If you'd like to contribute code to k6, this is the basic procedure. Make sure to follow the [style guide](#style-guide) described below.
 
-1. Find an issue you'd like to fix. If there is none already, or you'd like to add a feature, please open one and we can talk about how to do it.
-
-   Remember, there's more to software development than code; if it's not properly planned, stuff gets messy real fast.
+1. Find an issue you'd like to fix. If there is none already, or you'd like to add a feature, please open one and we can talk about how to do it.  Out of respect for your time, please start a discussion regarding any bigger contributions either in a GitHub Issue, in the community forums or in the `#contributors` channel of the k6 slack **before** you get started on the implementation.
+  
+   
+   Remember, there's more to software development than code; if it's not properly planned, stuff gets messy real fast. 
 
 2. Create a fork and open a feature branch - `feature/my-cool-feature` is the classic way to name these, but it really doesn't matter.
 
@@ -42,15 +43,15 @@ To get a basic development environment for Go and k6 up and running, first make 
 
 Once that's done, you can get the k6 source into your Go workspace (`$GOPATH/src`) by running:
 ```bash
-go get github.com/loadimpact/k6
+go get go.k6.io/k6
 ```
 This will also build a `k6` binary and put it in `$GOPATH/bin`.
 
 **Building from source**:
 
-Standing in the repo root (`$GOPATH/src/github.com/loadimpact/k6`) you can build a k6 binary from source by running:
+Standing in the repo root (`$GOPATH/src/go.k6.io/k6`) you can build a k6 binary from source by running:
 ```bash
-cd $GOPATH/src/github.com/loadimpact/k6
+cd $GOPATH/src/go.k6.io/k6
 go build
 ```
 
@@ -80,7 +81,7 @@ go test -race ./...
 
 To run the tests of a specific package:
 ```bash
-go test -race github.com/loadimpact/k6/core
+go test -race go.k6.io/k6/core
 ```
 
 To run just a specific test case use `-run` and pass in a regex that matches the name of the test:
@@ -90,7 +91,7 @@ go test -race ./... -run ^TestEngineRun$
 
 Combining the two above we can run a specific test case in a specific package:
 ```bash
-go test -race github.com/loadimpact/k6/core -run ^TestEngineRun$
+go test -race go.k6.io/k6/core -run ^TestEngineRun$
 ```
 
 Style guide

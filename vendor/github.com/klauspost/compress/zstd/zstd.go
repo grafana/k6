@@ -4,19 +4,40 @@
 package zstd
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"log"
+	"math"
 	"math/bits"
 )
 
+// enable debug printing
 const debug = false
+
+// enable encoding debug printing
+const debugEncoder = debug
+
+// enable decoding debug printing
+const debugDecoder = debug
+
+// Enable extra assertions.
+const debugAsserts = debug || false
+
+// print sequence details
 const debugSequences = false
+
+// print detailed matching information
+const debugMatches = false
 
 // force encoder to use predefined tables.
 const forcePreDef = false
 
 // zstdMinMatch is the minimum zstd match length.
 const zstdMinMatch = 3
+
+// Reset the buffer offset when reaching this.
+const bufferReset = math.MaxInt32 - MaxWindowSize
 
 var (
 	// ErrReservedBlockType is returned when a reserved block type is found.
@@ -60,18 +81,33 @@ var (
 	// ErrDecoderClosed will be returned if the Decoder was used after
 	// Close has been called.
 	ErrDecoderClosed = errors.New("decoder used after Close")
+
+	// ErrDecoderNilInput is returned when a nil Reader was provided
+	// and an operation other than Reset/DecodeAll/Close was attempted.
+	ErrDecoderNilInput = errors.New("nil input provided as reader")
 )
 
 func println(a ...interface{}) {
-	if debug {
+	if debug || debugDecoder || debugEncoder {
 		log.Println(a...)
 	}
 }
 
 func printf(format string, a ...interface{}) {
-	if debug {
+	if debug || debugDecoder || debugEncoder {
 		log.Printf(format, a...)
 	}
+}
+
+// matchLenFast does matching, but will not match the last up to 7 bytes.
+func matchLenFast(a, b []byte) int {
+	endI := len(a) & (math.MaxInt32 - 7)
+	for i := 0; i < endI; i += 8 {
+		if diff := load64(a, i) ^ load64(b, i); diff != 0 {
+			return i + bits.TrailingZeros64(diff)>>3
+		}
+	}
+	return endI
 }
 
 // matchLen returns the maximum length.
@@ -84,52 +120,33 @@ func matchLen(a, b []byte) int {
 			return i + (bits.TrailingZeros64(diff) >> 3)
 		}
 	}
+
 	checked := (len(a) >> 3) << 3
 	a = a[checked:]
 	b = b[checked:]
-	// TODO: We could do a 4 check.
 	for i := range a {
 		if a[i] != b[i] {
-			return int(i) + checked
+			return i + checked
 		}
 	}
 	return len(a) + checked
 }
 
-// matchLen returns a match length in src between index s and t
-func matchLenIn(src []byte, s, t int32) int32 {
-	s1 := len(src)
-	b := src[t:]
-	a := src[s:s1]
-	b = b[:len(a)]
-	// Extend the match to be as long as possible.
-	for i := range a {
-		if a[i] != b[i] {
-			return int32(i)
-		}
-	}
-	return int32(len(a))
-}
-
 func load3232(b []byte, i int32) uint32 {
-	// Help the compiler eliminate bounds checks on the read so it can be done in a single read.
-	b = b[i:]
-	b = b[:4]
-	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
+	return binary.LittleEndian.Uint32(b[i:])
 }
 
 func load6432(b []byte, i int32) uint64 {
-	// Help the compiler eliminate bounds checks on the read so it can be done in a single read.
-	b = b[i:]
-	b = b[:8]
-	return uint64(b[0]) | uint64(b[1])<<8 | uint64(b[2])<<16 | uint64(b[3])<<24 |
-		uint64(b[4])<<32 | uint64(b[5])<<40 | uint64(b[6])<<48 | uint64(b[7])<<56
+	return binary.LittleEndian.Uint64(b[i:])
 }
 
 func load64(b []byte, i int) uint64 {
-	// Help the compiler eliminate bounds checks on the read so it can be done in a single read.
-	b = b[i:]
-	b = b[:8]
-	return uint64(b[0]) | uint64(b[1])<<8 | uint64(b[2])<<16 | uint64(b[3])<<24 |
-		uint64(b[4])<<32 | uint64(b[5])<<40 | uint64(b[6])<<48 | uint64(b[7])<<56
+	return binary.LittleEndian.Uint64(b[i:])
 }
+
+type byter interface {
+	Bytes() []byte
+	Len() int
+}
+
+var _ byter = &bytes.Buffer{}

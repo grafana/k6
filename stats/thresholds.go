@@ -21,13 +21,14 @@
 package stats
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/pkg/errors"
 
-	"github.com/loadimpact/k6/lib/types"
+	"go.k6.io/k6/lib/types"
 )
 
 const jsEnvSrc = `
@@ -111,10 +112,12 @@ func (tc *thresholdConfig) UnmarshalJSON(data []byte) error {
 }
 
 func (tc thresholdConfig) MarshalJSON() ([]byte, error) {
+	var data interface{} = tc.Threshold
 	if tc.AbortOnFail {
-		return json.Marshal(rawThresholdConfig(tc))
+		data = rawThresholdConfig(tc)
 	}
-	return json.Marshal(tc.Threshold)
+
+	return MarshalJSONWithoutHTMLEscape(data)
 }
 
 // Thresholds is the combination of all Thresholds for a given metric
@@ -137,14 +140,14 @@ func NewThresholds(sources []string) (Thresholds, error) {
 func newThresholdsWithConfig(configs []thresholdConfig) (Thresholds, error) {
 	rt := goja.New()
 	if _, err := rt.RunProgram(jsEnv); err != nil {
-		return Thresholds{}, errors.Wrap(err, "builtin")
+		return Thresholds{}, fmt.Errorf("threshold builtin error: %w", err)
 	}
 
 	ts := make([]*Threshold, len(configs))
 	for i, config := range configs {
 		t, err := newThreshold(config.Threshold, rt, config.AbortOnFail, config.AbortGracePeriod)
 		if err != nil {
-			return Thresholds{}, errors.Wrapf(err, "%d", i)
+			return Thresholds{}, fmt.Errorf("threshold %d error: %w", i, err)
 		}
 		ts[i] = t
 	}
@@ -166,7 +169,7 @@ func (ts *Thresholds) runAll(t time.Duration) (bool, error) {
 	for i, th := range ts.Thresholds {
 		b, err := th.run()
 		if err != nil {
-			return false, errors.Wrapf(err, "%d", i)
+			return false, fmt.Errorf("threshold %d run error: %w", i, err)
 		}
 		if !b {
 			succ = false
@@ -213,7 +216,24 @@ func (ts Thresholds) MarshalJSON() ([]byte, error) {
 		configs[i].AbortOnFail = t.AbortOnFail
 		configs[i].AbortGracePeriod = t.AbortGracePeriod
 	}
-	return json.Marshal(configs)
+
+	return MarshalJSONWithoutHTMLEscape(configs)
+}
+
+// MarshalJSONWithoutHTMLEscape marshals t to JSON without escaping characters
+// for safe use in HTML.
+func MarshalJSONWithoutHTMLEscape(t interface{}) ([]byte, error) {
+	buffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(buffer)
+	encoder.SetEscapeHTML(false)
+	err := encoder.Encode(t)
+	bytes := buffer.Bytes()
+	if err == nil && len(bytes) > 0 {
+		// Remove the newline appended by Encode() :-/
+		// See https://github.com/golang/go/issues/37083
+		bytes = bytes[:len(bytes)-1]
+	}
+	return bytes, err
 }
 
 var _ json.Unmarshaler = &Thresholds{}
