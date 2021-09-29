@@ -17,35 +17,35 @@ Currently only Chromium is supported, and the [Playwright API](https://playwrigh
 
 |          | Support | Missing APIs |
 |   :---   | :--- | :--- |
-| [Accessibility](https://playwright.dev/docs/api/class-accessibility) | :white_cross: | [`snapshot()`](https://playwright.dev/docs/api/class-accessibility#accessibilitysnapshotoptions) | 
+| [Accessibility](https://playwright.dev/docs/api/class-accessibility) | :warning: | [`snapshot()`](https://playwright.dev/docs/api/class-accessibility#accessibilitysnapshotoptions) | 
 | [Browser](https://playwright.dev/docs/api/class-browser) | :white_check_mark: | - |
 | [BrowserContext](https://playwright.dev/docs/api/class-browsercontext) | :white_check_mark: Partial | [`addCookies()`](https://playwright.dev/docs/api/class-browsercontext#browsercontextaddcookiescookies) |
-| [BrowserServer](https://playwright.dev/docs/api/class-browserserver) | :white_cross: | All |
+| [BrowserServer](https://playwright.dev/docs/api/class-browserserver) | :warning: | All |
 | [BrowserType](https://playwright.dev/docs/api/class-browsertype) | :white_check_mark: | [`launchPersistentContext()`](https://playwright.dev/docs/api/class-browsertype#browsertypelaunchpersistentcontextuserdatadir-options), [`launchServer()`](https://playwright.dev/docs/api/class-browsertype#browsertypelaunchserveroptions) |
-| [CDPSession](https://playwright.dev/docs/api/class-cdpsession) | :white_cross: | All |
-| [ChromiumBrowser](https://playwright.dev/docs/api/class-chromiumbrowser) | :white_cross: | TODO |
-| [ConsoleMessage](https://playwright.dev/docs/api/class-consolemessage) | :white_cross: | All |
-| [Dialog](https://playwright.dev/docs/api/class-dialog) | :white_cross: | All |
-| [Download](https://playwright.dev/docs/api/class-download) | :white_cross: | All |
+| [CDPSession](https://playwright.dev/docs/api/class-cdpsession) | :warning: | All |
+| [ChromiumBrowser](https://playwright.dev/docs/api/class-chromiumbrowser) | :warning: | TODO |
+| [ConsoleMessage](https://playwright.dev/docs/api/class-consolemessage) | :warning: | All |
+| [Dialog](https://playwright.dev/docs/api/class-dialog) | :warning: | All |
+| [Download](https://playwright.dev/docs/api/class-download) | :warning: | All |
 | [ElementHandle](https://playwright.dev/docs/api/class-elementhandle) | :white_check_mark: | - |
-| [FileChooser](https://playwright.dev/docs/api/class-filechooser) | :white_cross: | All |
-| [FirefoxBrowser](https://playwright.dev/docs/api/class-firefoxbrowser) | :white_cross: | All |
+| [FileChooser](https://playwright.dev/docs/api/class-filechooser) | :warning: | All |
+| [FirefoxBrowser](https://playwright.dev/docs/api/class-firefoxbrowser) | :warning: | All |
 | [Frame](https://playwright.dev/docs/api/class-frame) | :white_check_mark: | TODO |
 | [JSHandle](https://playwright.dev/docs/api/class-jshandle) | :white_check_mark: | - |
 | [Keyboard](https://playwright.dev/docs/api/class-keyboard) | :white_check_mark: | - |
-| [Logger](https://playwright.dev/docs/api/class-logger) | :white_cross: | All |
+| [Logger](https://playwright.dev/docs/api/class-logger) | :warning: | All |
 | [Mouse](https://playwright.dev/docs/api/class-mouse) | :white_check_mark: | - |
 | [Page](https://playwright.dev/docs/api/class-page) | :white_check_mark: Partial | TODO |
 | [Request](https://playwright.dev/docs/api/class-request) | :white_check_mark: Partial | TODO |
 | [Response](https://playwright.dev/docs/api/class-response) | :white_check_mark: Partial | TODO |
-| [Route](https://playwright.dev/docs/api/class-route) | :white_cross: | All |
-| [Selectors](https://playwright.dev/docs/api/class-selectors) | :white_cross: | All |
-| [TimeoutError](https://playwright.dev/docs/api/class-timeouterror) | :white_cross: | All |
+| [Route](https://playwright.dev/docs/api/class-route) | :warning: | All |
+| [Selectors](https://playwright.dev/docs/api/class-selectors) | :warning: | All |
+| [TimeoutError](https://playwright.dev/docs/api/class-timeouterror) | :warning: | All |
 | [Touchscreen](https://playwright.dev/docs/api/class-touchscreen) | :white_check_mark: | - |
-| [Video](https://playwright.dev/docs/api/class-video) | :white_cross: | All |
-| [WebKitBrowser](https://playwright.dev/docs/api/class-webkitbrowser) | :white_cross: | All |
-| [WebSocket](https://playwright.dev/docs/api/class-websocket) | :white_cross: | All |
-| [Worker](https://playwright.dev/docs/api/class-worker) | :white_cross: | All |
+| [Video](https://playwright.dev/docs/api/class-video) | :warning: | All |
+| [WebKitBrowser](https://playwright.dev/docs/api/class-webkitbrowser) | :warning: | All |
+| [WebSocket](https://playwright.dev/docs/api/class-websocket) | :warning: | All |
+| [Worker](https://playwright.dev/docs/api/class-worker) | :warning: | All |
 
 ## Usage
 
