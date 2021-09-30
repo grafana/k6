@@ -80,6 +80,28 @@ Then:
 
 ## Examples
 
+#### Launch options
+
+```js
+import launcher from "k6/x/browser";
+
+export default function() {
+    const browser = launcher.launch('chromium', {
+        args: [],                   // Extra commandline arguments to include when launching browser process
+        debug: true,                // Log all CDP messages to k6 logging subsystem
+        devtools: true,             // Open up developer tools in the browser by default
+        env: {},                    // Environment variables to set before launching browser process
+        executablePath: null,       // Override search for browser executable in favor of specified absolute path
+        headless: false,            // Show browser UI or not
+        ignoreDefaultArgs: [],      // Ignore any of the default arguments included when launching browser process
+        proxy: {},                  // Specify to set browser's proxy config
+        slowMo: '500ms',            // Slow down input actions and navigations by specified time
+        timeout: '30s',             // Default timeout to use for various actions and navigations
+    });
+    browser.close();
+}
+```
+
 #### Page screenshot
 
 ```js
@@ -91,7 +113,7 @@ export default function() {
     const page = context.newPage();
     page.goto('http://whatsmyuseragent.org/');
     page.screenshot({ path: `example-chromium.png` });
-	page.close();
+    page.close();
     browser.close();
 }
 ```
@@ -119,7 +141,7 @@ export default function() {
     //ip = page.$("My IP Address").textContent();
     //console.log("Text search: ", ip);
 
-	page.close();
+    page.close();
     browser.close();
 }
 ```
@@ -135,14 +157,14 @@ export default function() {
     const page = context.newPage();
     page.goto('http://whatsmyuseragent.org/', { waitUntil: 'networkidle' });
     const dimensions = page.evaluate(() => {
-		return {
+        return {
             width: document.documentElement.clientWidth,
             height: document.documentElement.clientHeight,
             deviceScaleFactor: window.devicePixelRatio
         };
     });
     console.log(JSON.stringify(dimensions));
-	page.close();
+    page.close();
     browser.close();
 }
 ```
@@ -164,7 +186,7 @@ export default function() {
 
     sleep(5);
 
-	page.close();
+    page.close();
     browser.close();
 }
 ```
@@ -177,7 +199,7 @@ import launcher from "k6/x/browser";
 export default function() {
     const browser = launcher.launch('chromium', {
         headless: false,
-		slowMo: '500ms' // slow down by 500ms
+        slowMo: '500ms' // slow down by 500ms
     });
     const context = browser.newContext();
     const page = context.newPage();
@@ -195,7 +217,7 @@ export default function() {
     // Wait for next page to load
     page.waitForLoadState('networkdidle');
 
-	page.close();
+    page.close();
     browser.close();
 }
 ```
@@ -214,7 +236,7 @@ export default function() {
     const page = context.newPage();
 
     // Inject page content
-	page.setContent(`
+    page.setContent(`
         <div class="visible">Hello world</div>
         <div style="display:none" class="hidden"></div>
         <div class="editable" editable>Edit me</div>
@@ -235,7 +257,7 @@ export default function() {
         'unchecked': p => p.$('.unchecked').isChecked() === false,
     });
 
-	page.close();
+    page.close();
     browser.close();
 }
 ```
