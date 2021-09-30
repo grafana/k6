@@ -665,7 +665,7 @@ func (rs rampingVUsRunState) scheduledVUsHandlerStrategy() func(lib.ExecutionSte
 	return func(raw lib.ExecutionStep) {
 		pv := raw.PlannedVUs
 		for ; cur < pv; cur++ {
-			rs.vuHandles[cur].start()
+			_ = rs.vuHandles[cur].start() // TODO: handle the error
 		}
 		for ; pv < cur; cur-- {
 			rs.vuHandles[cur-1].gracefulStop()
