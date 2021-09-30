@@ -261,14 +261,26 @@ func (b *BrowserContext) SetGeolocation(geolocation goja.Value) {
 	}
 }
 
+// SetHTTPCredentials sets username/password credentials to use for HTTP authentication.
 func (b *BrowserContext) SetHTTPCredentials(httpCredentials goja.Value) {
 	rt := common.GetRuntime(b.ctx)
-	common.Throw(rt, errors.Errorf("BrowserContext.setHTTPCredentials(httpCredentials) has not been implemented yet!"))
+	c := NewCredentials()
+	if err := c.Parse(b.ctx, httpCredentials); err != nil {
+		common.Throw(rt, err)
+	}
+
+	b.opts.HttpCredentials = c
+	for _, p := range b.browser.getPages() {
+		p.updateHttpCredentials()
+	}
 }
 
+// SetOffline toggles the browser's connectivity on/off.
 func (b *BrowserContext) SetOffline(offline bool) {
-	rt := common.GetRuntime(b.ctx)
-	common.Throw(rt, errors.Errorf("BrowserContext.setHTTPCredentials(offline) has not been implemented yet!"))
+	b.opts.Offline = offline
+	for _, p := range b.browser.getPages() {
+		p.updateOffline()
+	}
 }
 
 func (b *BrowserContext) StorageState(opts goja.Value) {
