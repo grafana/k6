@@ -494,17 +494,17 @@ var _ lib.Executor = &RampingVUs{}
 // Run constantly loops through as many iterations as possible on a variable
 // number of VUs for the specified stages.
 func (vlv RampingVUs) Run(ctx context.Context, _ chan<- stats.SampleContainer, _ *metrics.BuiltinMetrics) error {
-	stepsRaw := vlv.config.getRawExecutionSteps(vlv.executionState.ExecutionTuple, true)
-	regDur, finalRaw := lib.GetEndOffset(stepsRaw)
+	rawSteps := vlv.config.getRawExecutionSteps(vlv.executionState.ExecutionTuple, true)
+	regDur, finalRaw := lib.GetEndOffset(rawSteps)
 	if !finalRaw {
 		return fmt.Errorf("%s expected raw end offset at %s to be final", vlv.config.GetName(), regDur)
 	}
-	stepsGraceful := vlv.config.GetExecutionRequirements(vlv.executionState.ExecutionTuple)
-	maxDur, finalGraceful := lib.GetEndOffset(stepsGraceful)
+	gracefulSteps := vlv.config.GetExecutionRequirements(vlv.executionState.ExecutionTuple)
+	maxDur, finalGraceful := lib.GetEndOffset(gracefulSteps)
 	if !finalGraceful {
 		return fmt.Errorf("%s expected graceful end offset at %s to be final", vlv.config.GetName(), maxDur)
 	}
-	startMaxVUs := lib.GetMaxPlannedVUs(stepsGraceful)
+	startMaxVUs := lib.GetMaxPlannedVUs(gracefulSteps)
 	startTime, maxDurCtx, regDurCtx, cancel := getDurationContexts(ctx, regDur, maxDur-regDur)
 	defer cancel()
 
@@ -523,8 +523,8 @@ func (vlv RampingVUs) Run(ctx context.Context, _ chan<- stats.SampleContainer, _
 		maxVUs:         startMaxVUs,
 		activeVUsCount: new(int64),
 		started:        startTime,
-		stepsRaw:       stepsRaw,
-		stepsGraceful:  stepsGraceful,
+		rawSteps:       rawSteps,
+		gracefulSteps:  gracefulSteps,
 		runIteration:   getIterationRunner(vlv.executionState, vlv.logger),
 	}
 
@@ -558,7 +558,7 @@ type rampingVUsRunState struct {
 	maxVUs                  uint64      // the scaled number of initially configured MaxVUs
 	activeVUsCount          *int64      // the current number of active VUs, used only for the progress display
 	started                 time.Time
-	stepsRaw, stepsGraceful []lib.ExecutionStep
+	rawSteps, gracefulSteps []lib.ExecutionStep
 	wg                      *sync.WaitGroup
 
 	runIteration func(context.Context, lib.ActiveVU) bool // a helper closure function that runs a single iteration
@@ -607,18 +607,18 @@ func (rs rampingVUsRunState) initializeVUs(ctx context.Context, cancel func()) {
 }
 
 func (rs rampingVUsRunState) handleVUs(ctx context.Context) {
-	// iterate over stepsRaw and stepsGraceful in order by TimeOffset
-	// giving stepsRaw precedence.
-	// we stop iterating once stepsRaw are over as we need to run the remaining
-	// stepsGraceful concurrently while waiting for VUs to stop in order to not wait until
+	// iterate over rawSteps and gracefulSteps in order by TimeOffset
+	// giving rawSteps precedence.
+	// we stop iterating once rawSteps are over as we need to run the remaining
+	// gracefulSteps concurrently while waiting for VUs to stop in order to not wait until
 	// the end of gracefulStop (= maxDur-regDur) timeouts
 	var (
 		handleNewMaxAllowedVUs = rs.maxAllowedVUsHandlerStrategy()
 		handleNewScheduledVUs  = rs.scheduledVUsHandlerStrategy()
 		wait                   = waiter(ctx, rs.started)
 	)
-	for i, j := 0, 0; i != len(rs.stepsRaw); {
-		r, g := rs.stepsRaw[i], rs.stepsGraceful[j]
+	for i, j := 0, 0; i != len(rs.rawSteps); {
+		r, g := rs.rawSteps[i], rs.gracefulSteps[j]
 		if g.TimeOffset < r.TimeOffset {
 			j++
 			if wait(g.TimeOffset) {
@@ -641,7 +641,7 @@ func (rs rampingVUsRunState) handleRemainingVUs(ctx context.Context) {
 		handleNewMaxAllowedVUs = rs.maxAllowedVUsHandlerStrategy()
 		wait                   = waiter(ctx, rs.started)
 	)
-	for _, s := range rs.stepsGraceful {
+	for _, s := range rs.gracefulSteps {
 		if wait(s.TimeOffset) {
 			return
 		}
