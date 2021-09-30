@@ -28,8 +28,8 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
 	"github.com/dop251/goja"
-	"github.com/k6io/xk6-browser/api"
-	"github.com/k6io/xk6-browser/keyboardlayout"
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/keyboardlayout"
 	"go.k6.io/k6/js/common"
 )
 

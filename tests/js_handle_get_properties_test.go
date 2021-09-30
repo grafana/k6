@@ -24,7 +24,7 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/k6io/xk6-browser/testutils/browsertest"
+	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 

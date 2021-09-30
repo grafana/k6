@@ -21,7 +21,7 @@
 package allocation
 
 import (
-	"github.com/k6io/xk6-browser/common"
+	"github.com/grafana/xk6-browser/common"
 	"golang.org/x/net/context"
 )
 

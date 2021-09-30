@@ -34,8 +34,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/k6io/xk6-browser/allocation"
-	"github.com/k6io/xk6-browser/common"
+	"github.com/grafana/xk6-browser/allocation"
+	"github.com/grafana/xk6-browser/common"
 )
 
 // Ensure Allocator implements the browser.Allocator interface.

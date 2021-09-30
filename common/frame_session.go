@@ -37,7 +37,7 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/cdproto/target"
-	"github.com/k6io/xk6-browser/api"
+	"github.com/grafana/xk6-browser/api"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/stats"

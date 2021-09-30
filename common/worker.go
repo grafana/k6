@@ -29,7 +29,7 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
-	"github.com/k6io/xk6-browser/api"
+	"github.com/grafana/xk6-browser/api"
 	"go.k6.io/k6/js/common"
 
 	"golang.org/x/net/context"
