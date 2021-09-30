@@ -70,12 +70,12 @@ Then:
 
 1. Install `xk6`:
   ```shell
-  go install github.com/k6io/xk6/cmd/xk6@latest
+  go install github.com/grafana/xk6/cmd/xk6@latest
   ```
 
 2. Build the binary:
   ```shell
-  xk6 build --with github.com/k6io/xk6-browser
+  xk6 build --with github.com/grafana/xk6-browser
   ```
 
 ## Examples
