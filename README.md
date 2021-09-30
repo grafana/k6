@@ -1,6 +1,6 @@
 # xk6-browser
 
-A k6 extension adding support for automation of browsers via the Chrome Devtools Protocol (CDP).
+A k6 extension adding support for automation of browsers via the [Chrome Devtools Protocol](https://chromedevtools.github.io/devtools-protocol/) (CDP).
 
 Major acknowledgement to the authors of [Playwright](https://playwright.dev/) and [Puppeteer](https://github.com/puppeteer/puppeteer) for their trailblazing work in this area. This project is heavily influenced and in some regards based on the code from those projects.
 
