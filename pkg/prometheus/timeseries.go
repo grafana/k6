@@ -1,7 +1,8 @@
 package prometheus
 
 import (
-	"github.com/prometheus/prometheus/pkg/timestamp"
+	"fmt"
+
 	"github.com/prometheus/prometheus/prompb"
 	"go.k6.io/k6/stats"
 )
@@ -19,42 +20,50 @@ func newTimeSeries() timeSeries {
 	return make([]prompb.TimeSeries, 0)
 }
 
-func (ts *timeSeries) addSamples(samples []stats.Sample) {
-	// Prometheus remote write treats each label array in TimeSeries as the same
-	// for all Samples in those TimeSeries (https://github.com/prometheus/prometheus/blob/03d084f8629477907cab39fc3d314b375eeac010/storage/remote/write_handler.go#L75).
-	// But K6 metrics can have different tags per each Sample so in order not to
-	// lose info in tags or assign tags wrongly, let's store each Sample in a different TimeSeries, for now.
-	// This approach also allows to avoid hard to replicate issues with duplicate timestamps.
+func (ts *timeSeries) addSample(sample *stats.Sample, labelPairs []prompb.Label) error {
+	var newts []prompb.TimeSeries
 
-	for _, sample := range samples {
-		labelPairs := tagsToLabels(sample.Tags)
-		labelPairs = append(labelPairs, prompb.Label{
-			Name: "__name__",
-			// we cannot use name tag as it can be absent or equal to URL in HTTP testing
-			Value: sample.Metric.Name,
-		})
+	switch sample.Metric.Type {
+	case stats.Counter:
+		newts = getCounter(sample, labelPairs)
 
-		*ts = append(*ts, prompb.TimeSeries{
-			Labels: labelPairs,
-			Samples: []prompb.Sample{
-				{
-					Value:     sample.Value,
-					Timestamp: timestamp.FromTime(sample.Time),
-				},
-			},
-		})
+	case stats.Gauge:
+		newts = getGauge(sample, labelPairs)
+
+	case stats.Rate:
+		newts = getHistogram(sample, labelPairs)
+
+	case stats.Trend:
+		// TODO temporary skipping
+		return nil
+
+	default:
+		return fmt.Errorf("Something is really off as I cannot recognize the type of metric %s: `%s`", sample.Metric.Name, sample.Metric.Type)
 	}
+
+	*ts = append(*ts, newts...)
+
+	return nil
 }
 
-func tagsToLabels(tags *stats.SampleTags) []prompb.Label {
+func tagsToPrometheusLabels(tags *stats.SampleTags) ([]prompb.Label, error) {
 	tagsMap := tags.CloneTags()
-	labelPairs := make([]prompb.Label, len(tagsMap))
-	i := 0
+	labelPairs := make([]prompb.Label, 0, len(tagsMap))
+
 	for name, value := range tagsMap {
-		labelPairs[i].Name = name
-		labelPairs[i].Value = value
-		i++
+		if len(name) < 1 || len(value) < 1 {
+			continue
+		}
+		// TODO add checks:
+		// - reserved underscore
+		// - sorting
+		// - duplicates?
+
+		labelPairs = append(labelPairs, prompb.Label{
+			Name:  name,
+			Value: value,
+		})
 	}
 
-	return labelPairs
+	return labelPairs, nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/prometheus/storage/remote"
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/output"
+	"go.k6.io/k6/stats"
 )
 
 type Output struct {
@@ -70,11 +71,7 @@ func (o *Output) Stop() error {
 
 func (o *Output) flush() {
 	samplesContainers := o.GetBufferedSamples()
-	promTimeSeries := newTimeSeries()
-
-	for _, samplesContainer := range samplesContainers {
-		promTimeSeries.addSamples(samplesContainer.GetSamples())
-	}
+	promTimeSeries := o.convertToTimeSeries(samplesContainers)
 
 	o.logger.Info("Number of time series: ", len(promTimeSeries))
 
@@ -91,4 +88,31 @@ func (o *Output) flush() {
 			o.logger.WithError(err).Fatal("Failed to store timeseries")
 		}
 	}
+}
+
+func (o *Output) convertToTimeSeries(samplesContainers []stats.SampleContainer) []prompb.TimeSeries {
+	promTimeSeries := newTimeSeries()
+
+	for _, samplesContainer := range samplesContainers {
+		samples := samplesContainer.GetSamples()
+
+		for _, sample := range samples {
+			// Prometheus remote write treats each label array in TimeSeries as the same
+			// for all Samples in those TimeSeries (https://github.com/prometheus/prometheus/blob/03d084f8629477907cab39fc3d314b375eeac010/storage/remote/write_handler.go#L75).
+			// But K6 metrics can have different tags per each Sample so in order not to
+			// lose info in tags or assign tags wrongly, let's store each Sample in a different TimeSeries, for now.
+			// This approach also allows to avoid hard to replicate issues with duplicate timestamps.
+
+			labelPairs, err := tagsToPrometheusLabels(sample.Tags)
+			if err != nil {
+				o.logger.Error(err)
+			}
+
+			if err := promTimeSeries.addSample(&sample, labelPairs); err != nil {
+				o.logger.Error(err)
+			}
+		}
+	}
+
+	return promTimeSeries
 }
