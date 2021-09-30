@@ -1,4 +1,4 @@
-module github.com/k6io/xk6-browser
+module github.com/grafana/xk6-browser
 
 go 1.16
 

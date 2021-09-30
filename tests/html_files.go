@@ -24,7 +24,7 @@ import (
 	_ "embed"
 	"net/http"
 
-	"github.com/k6io/xk6-browser/testutils/browsertest"
+	"github.com/grafana/xk6-browser/testutils/browsertest"
 )
 
 //go:embed html/empty.html

@@ -31,7 +31,7 @@ import (
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/target"
 	"github.com/gorilla/websocket"
-	"github.com/k6io/xk6-browser/testutils"
+	"github.com/grafana/xk6-browser/testutils"
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

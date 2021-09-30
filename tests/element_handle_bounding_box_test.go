@@ -24,8 +24,8 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/k6io/xk6-browser/api"
-	"github.com/k6io/xk6-browser/testutils/browsertest"
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/require"
 )
 
