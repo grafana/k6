@@ -8,42 +8,54 @@ Major acknowledgement to the authors of [Playwright](https://playwright.dev/) an
 
 - Bring browser automation to the k6 testing platform while supporting core k6 features like VU executors, scenarios, metrics, checks, thresholds, logging, DNS remapping, IP block lists etc.
 - Test stability as top priority by supporting non-flaky [selectors](https://playwright.dev/docs/selectors) combined with [auto-wait](https://playwright.dev/docs/actionability/) for actions just like Playwright
-- Aim for rough compatibility with [Playwright](https://github.com/microsoft/playwright). The reason for this is two-fold; for one we don't want users to have to learn a completley new API just to use xk6-browser, and secondly it opens up for using the [Playwright RPC server](https://github.com/mxschmitt/playwright-go) as an optional backend for xk6-browser should we decided to support that.
-- Support for Chromium, and eventually Firefox and WebKit based browsers.
+- Aim for rough compatibility with [Playwright](https://github.com/microsoft/playwright). The reason for this is two-fold; for one we don't want users to have to learn a completley new API just to use xk6-browser, and secondly it opens up for using the [Playwright RPC server](https://github.com/mxschmitt/playwright-go) as an optional backend for xk6-browser should we decide to support that.
+- Support for Chromium compatible browsers first, and eventually Firefox and WebKit based browsers.
+
+## FAQ
+
+- **It doesn't work with my Chromium/Chrome version, why?**
+    CDP evolves and there are differences between different versions of Chromium, some times quite subtle. The codebase has been tested with v92.0.4474.0 (for Mac that means [this build](https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Mac/857950/)).
+
+- **Are Firefox or WebKit based browsers supported?**
+    Not yet. There are differences in CDP coverage between Chromium, Firefox and WebKit. xk6-browser is initially only targetting Chromium based browsers.
+
+- **Are all features of Playwright supported?**
+    No. Playwright's API is pretty big and some of the functionality only makes sense if they're implemented as async operations: event listening, request interception, waiting for events etc. As [k6 doesn't have a VU event-loop](https://github.com/grafana/k6/issues/882) yet, the xk6-browser API is synchronous and thus lacking some of the functionality that requires asynchronicity.
 
 ## Status
 
 Currently only Chromium is supported, and the [Playwright API](https://playwright.dev/docs/api/class-playwright) coverage is as follows:
 
-|          | Support | Missing APIs |
+| Class | Support | Missing APIs |
 |   :---   | :--- | :--- |
 | [Accessibility](https://playwright.dev/docs/api/class-accessibility) | :warning: | [`snapshot()`](https://playwright.dev/docs/api/class-accessibility#accessibilitysnapshotoptions) | 
-| [Browser](https://playwright.dev/docs/api/class-browser) | :white_check_mark: | - |
-| [BrowserContext](https://playwright.dev/docs/api/class-browsercontext) | :white_check_mark: Partial | [`addCookies()`](https://playwright.dev/docs/api/class-browsercontext#browsercontextaddcookiescookies) |
+| [Browser](https://playwright.dev/docs/api/class-browser) | :white_check_mark: | [`on()`](https://playwright.dev/docs/api/class-browser#browser-event-disconnected), [`startTracing()`](https://playwright.dev/docs/api/class-browser#browser-start-tracing), [`stopTracing()`](https://playwright.dev/docs/api/class-browser#browser-stop-tracing) |
+| [BrowserContext](https://playwright.dev/docs/api/class-browsercontext) | :white_check_mark: Partial | [`addCookies()`](https://playwright.dev/docs/api/class-browsercontext#browsercontextaddcookiescookies), [`backgroundPages()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-background-pages), [`cookies()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-cookies), [`exposeBinding()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-expose-binding), [`exposeFunction()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-expose-function), [`newCDPSession()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-new-cdp-session), [`on()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-event-background-page), [`route()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-route) (dependent on event-loop support in k6), [`serviceWorkers()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-service-workers), [`storageState()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-storage-state), [`unroute()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-unroute) (dependent on event-loop support in k6), [`waitForEvent()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-wait-for-event) (dependent on event-loop support in k6), [`tracing`](https://playwright.dev/docs/api/class-browsercontext#browser-context-tracing) |
 | [BrowserServer](https://playwright.dev/docs/api/class-browserserver) | :warning: | All |
-| [BrowserType](https://playwright.dev/docs/api/class-browsertype) | :white_check_mark: | [`launchPersistentContext()`](https://playwright.dev/docs/api/class-browsertype#browsertypelaunchpersistentcontextuserdatadir-options), [`launchServer()`](https://playwright.dev/docs/api/class-browsertype#browsertypelaunchserveroptions) |
+| [BrowserType](https://playwright.dev/docs/api/class-browsertype) | :white_check_mark: | [`connect()`](https://playwright.dev/docs/api/class-browsertype#browser-type-connect), [`connectOverCDP()`](https://playwright.dev/docs/api/class-browsertype#browser-type-connect-over-cdp), [`launchPersistentContext()`](https://playwright.dev/docs/api/class-browsertype#browsertypelaunchpersistentcontextuserdatadir-options), [`launchServer()`](https://playwright.dev/docs/api/class-browsertype#browsertypelaunchserveroptions) |
 | [CDPSession](https://playwright.dev/docs/api/class-cdpsession) | :warning: | All |
-| [ChromiumBrowser](https://playwright.dev/docs/api/class-chromiumbrowser) | :warning: | TODO |
 | [ConsoleMessage](https://playwright.dev/docs/api/class-consolemessage) | :warning: | All |
+| [Coverage](https://playwright.dev/docs/api/class-coverage) | :warning: | All |
 | [Dialog](https://playwright.dev/docs/api/class-dialog) | :warning: | All |
 | [Download](https://playwright.dev/docs/api/class-download) | :warning: | All |
-| [ElementHandle](https://playwright.dev/docs/api/class-elementhandle) | :white_check_mark: | - |
+| [ElementHandle](https://playwright.dev/docs/api/class-elementhandle) | :white_check_mark: | [`$eval()`](https://playwright.dev/docs/api/class-elementhandle#element-handle-eval-on-selector), [`$$eval()`](https://playwright.dev/docs/api/class-elementhandle#element-handle-eval-on-selector-all), [`screenshot()`](https://playwright.dev/docs/api/class-elementhandle#element-handle-screenshot), [`setInputFiles()`](https://playwright.dev/docs/api/class-elementhandle#element-handle-set-input-files) |
+| [FetchRequest](https://playwright.dev/docs/api/class-fetchrequest) | :warning: | All |
+| [FetchResponse](https://playwright.dev/docs/api/class-fetchresponse) | :warning: | All |
 | [FileChooser](https://playwright.dev/docs/api/class-filechooser) | :warning: | All |
-| [FirefoxBrowser](https://playwright.dev/docs/api/class-firefoxbrowser) | :warning: | All |
-| [Frame](https://playwright.dev/docs/api/class-frame) | :white_check_mark: | TODO |
+| [Frame](https://playwright.dev/docs/api/class-frame) | :white_check_mark: | [`$eval()`](https://playwright.dev/docs/api/class-frame#frame-eval-on-selector), [`$$eval()`](https://playwright.dev/docs/api/class-frame#frame-eval-on-selector-all), [`addScriptTag()`](https://playwright.dev/docs/api/class-frame#frame-add-script-tag), [`addStyleTag()`](https://playwright.dev/docs/api/class-frame#frame-add-style-tag), [`dragAndDrop()`](https://playwright.dev/docs/api/class-frame#frame-drag-and-drop), [`locator()`](https://playwright.dev/docs/api/class-frame#frame-locator), [`setInputFiles()`](https://playwright.dev/docs/api/class-frame#frame-set-input-files) |
 | [JSHandle](https://playwright.dev/docs/api/class-jshandle) | :white_check_mark: | - |
 | [Keyboard](https://playwright.dev/docs/api/class-keyboard) | :white_check_mark: | - |
+| [Locator](https://playwright.dev/docs/api/class-locator) | :warning: | All |
 | [Logger](https://playwright.dev/docs/api/class-logger) | :warning: | All |
 | [Mouse](https://playwright.dev/docs/api/class-mouse) | :white_check_mark: | - |
-| [Page](https://playwright.dev/docs/api/class-page) | :white_check_mark: Partial | TODO |
-| [Request](https://playwright.dev/docs/api/class-request) | :white_check_mark: Partial | TODO |
-| [Response](https://playwright.dev/docs/api/class-response) | :white_check_mark: Partial | TODO |
+| [Page](https://playwright.dev/docs/api/class-page) | :white_check_mark: | [`$eval()`](https://playwright.dev/docs/api/class-page#page-eval-on-selector), [`$$eval()`](https://playwright.dev/docs/api/class-page#page-eval-on-selector-all), [`addInitScript()`](https://playwright.dev/docs/api/class-page#page-add-init-script), [`addScriptTag()`](https://playwright.dev/docs/api/class-page#page-add-script-tag), [`addStyleTag()`](https://playwright.dev/docs/api/class-page#page-add-style-tag), [`dragAndDrop()`](https://playwright.dev/docs/api/class-page#page-drag-and-drop), [`exposeBinding()](https://playwright.dev/docs/api/class-page#page-expose-binding), [`exposeFunction()`](https://playwright.dev/docs/api/class-page#page-expose-function), [`frame()`](https://playwright.dev/docs/api/class-page#page-frame), [`goBack()`](https://playwright.dev/docs/api/class-page#page-go-back), [`goForward()`](https://playwright.dev/docs/api/class-page#page-go-forward), [`locator()`](https://playwright.dev/docs/api/class-page#page-locator), [`on()`](https://playwright.dev/docs/api/class-page#page-event-close), [`pause()`](https://playwright.dev/docs/api/class-page#page-pause), [`pdf()`](https://playwright.dev/docs/api/class-page#page-pdf), [`route()`](https://playwright.dev/docs/api/class-page#page-route) (dependent on event-loop support in k6), [`unroute()`](https://playwright.dev/docs/api/class-page#page-unroute) (dependent on event-loop support in k6), [`video()`](https://playwright.dev/docs/api/class-page#page-video), [`waitForEvent()`](https://playwright.dev/docs/api/class-page#page-wait-for-event) (dependent on event-loop support in k6), [`waitForResponse()`](https://playwright.dev/docs/api/class-page#page-wait-for-response) (dependent on event-loop support in k6), [`waitForURL()`](https://playwright.dev/docs/api/class-page#page-wait-for-url) (dependent on event-loop support in k6), [`workers()`](https://playwright.dev/docs/api/class-page#page-workers) |
+| [Request](https://playwright.dev/docs/api/class-request) | :white_check_mark: | [`failure()`](https://playwright.dev/docs/api/class-request#request-failure) (dependent on event-loop support in k6), [`postDataJSON()`](https://playwright.dev/docs/api/class-request#request-post-data-json), [`redirectFrom()`](https://playwright.dev/docs/api/class-request#request-redirected-from), [`redirectTo()`](https://playwright.dev/docs/api/class-request#request-redirected-to) |
+| [Response](https://playwright.dev/docs/api/class-response) | :white_check_mark: | [`finished()`](https://playwright.dev/docs/api/class-response#response-finished) (dependent on event-loop support in k6) |
 | [Route](https://playwright.dev/docs/api/class-route) | :warning: | All |
 | [Selectors](https://playwright.dev/docs/api/class-selectors) | :warning: | All |
-| [TimeoutError](https://playwright.dev/docs/api/class-timeouterror) | :warning: | All |
 | [Touchscreen](https://playwright.dev/docs/api/class-touchscreen) | :white_check_mark: | - |
+| [Tracing](https://playwright.dev/docs/api/class-tracing) | :warning: | All |
 | [Video](https://playwright.dev/docs/api/class-video) | :warning: | All |
-| [WebKitBrowser](https://playwright.dev/docs/api/class-webkitbrowser) | :warning: | All |
 | [WebSocket](https://playwright.dev/docs/api/class-websocket) | :warning: | All |
 | [Worker](https://playwright.dev/docs/api/class-worker) | :warning: | All |
 
