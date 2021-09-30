@@ -35,7 +35,8 @@ func New(params output.Params) (*Output, error) {
 		return nil, err
 	}
 
-	client, err := remote.NewWriteClient("prw", remoteConfig)
+	// name is used to differentiate clients in metrics
+	client, err := remote.NewWriteClient("xk6-prwo", remoteConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +49,7 @@ func New(params output.Params) (*Output, error) {
 }
 
 func (*Output) Description() string {
-	return "Send k6 metrics to prometheus remote-write endpoints"
+	return "Output k6 metrics to prometheus remote-write endpoint"
 }
 
 func (o *Output) Start() error {
@@ -75,16 +76,16 @@ func (o *Output) flush() {
 		promTimeSeries.addSamples(samplesContainer.GetSamples())
 	}
 
-	o.logger.Info("number of time series:", len(promTimeSeries.ts))
+	o.logger.Info("Number of time series: ", len(promTimeSeries))
 
 	req := prompb.WriteRequest{
-		Timeseries: promTimeSeries.ts,
+		Timeseries: promTimeSeries,
 	}
 
 	if buf, err := proto.Marshal(&req); err != nil {
 		o.logger.WithError(err).Fatal("Failed to marshal timeseries")
 	} else {
-		encoded := snappy.Encode(nil, buf)
+		encoded := snappy.Encode(nil, buf) // this call can panic
 
 		if err = o.client.Store(context.Background(), encoded); err != nil {
 			o.logger.WithError(err).Fatal("Failed to store timeseries")
