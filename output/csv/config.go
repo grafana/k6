@@ -29,6 +29,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib/types"
 )
 
@@ -59,7 +60,7 @@ func (c Config) Apply(cfg Config) Config {
 }
 
 // ParseArg takes an arg string and converts it to a config
-func ParseArg(arg string) (Config, error) {
+func ParseArg(arg string, logger *logrus.Logger) (Config, error) {
 	c := Config{}
 
 	if !strings.Contains(arg, "=") {
@@ -76,11 +77,17 @@ func ParseArg(arg string) (Config, error) {
 		}
 		switch r[0] {
 		case "save_interval":
+			logger.Warnf("CSV output argument '%s' will soon be deprecated, please use 'saveInterval' instead.", r[0])
+			fallthrough
+		case "saveInterval":
 			err := c.SaveInterval.UnmarshalText([]byte(r[1]))
 			if err != nil {
 				return c, err
 			}
 		case "file_name":
+			logger.Warnf("CSV output argument '%s' will soon be deprecated, please use 'fileName' instead.", r[0])
+			fallthrough
+		case "fileName":
 			c.FileName = null.StringFrom(r[1])
 		default:
 			return c, fmt.Errorf("unknown key %q as argument for csv output", r[0])
@@ -92,7 +99,7 @@ func ParseArg(arg string) (Config, error) {
 
 // GetConsolidatedConfig combines {default config values + JSON config +
 // environment vars + arg config values}, and returns the final result.
-func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, arg string) (Config, error) {
+func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, arg string, logger *logrus.Logger) (Config, error) {
 	result := NewConfig()
 	if jsonRawConf != nil {
 		jsonConf := Config{}
@@ -110,7 +117,7 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 	result = result.Apply(envConfig)
 
 	if arg != "" {
-		urlConf, err := ParseArg(arg)
+		urlConf, err := ParseArg(arg, logger)
 		if err != nil {
 			return result, err
 		}

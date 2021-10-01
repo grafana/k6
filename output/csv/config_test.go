@@ -24,8 +24,11 @@ import (
 	"testing"
 	"time"
 
+	"go.k6.io/k6/lib/testutils"
+
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"go.k6.io/k6/lib/types"
@@ -91,7 +94,18 @@ func TestParseArg(t *testing.T) {
 				SaveInterval: types.NullDurationFrom(5 * time.Second),
 			},
 		},
+		"saveInterval=5s": {
+			config: Config{
+				SaveInterval: types.NullDurationFrom(5 * time.Second),
+			},
+		},
 		"file_name=test.csv,save_interval=5s": {
+			config: Config{
+				FileName:     null.StringFrom("test.csv"),
+				SaveInterval: types.NullDurationFrom(5 * time.Second),
+			},
+		},
+		"fileName=test.csv,save_interval=5s": {
 			config: Config{
 				FileName:     null.StringFrom("test.csv"),
 				SaveInterval: types.NullDurationFrom(5 * time.Second),
@@ -102,12 +116,15 @@ func TestParseArg(t *testing.T) {
 		},
 	}
 
+	testLog := logrus.New()
+	testLog.SetOutput(testutils.NewTestOutput(t))
+
 	for arg, testCase := range cases {
 		arg := arg
 		testCase := testCase
 
 		t.Run(arg, func(t *testing.T) {
-			config, err := ParseArg(arg)
+			config, err := ParseArg(arg, testLog)
 
 			if testCase.expectedErr {
 				assert.Error(t, err)
