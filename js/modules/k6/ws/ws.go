@@ -109,9 +109,9 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	}
 
 	header := make(http.Header)
-	tags := state.CloneTags()
-
 	header.Set("User-Agent", state.Options.UserAgent.String)
+
+	tags := state.CloneTags()
 
 	// Parse the optional second argument (params)
 	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
