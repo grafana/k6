@@ -106,7 +106,7 @@ Note that the `gnupg2` package is required for signature verification.
 
 #### Migrating from Bintray
 
-The Bintray repositories will be [shutdown after May 1st, 2021](https://jfrog.com/blog/into-the-sunset-bintray-jcenter-gocenter-and-chartcenter/). If you previously added them you will have to add our repositories following the instructions above and should delete the Bintray ones.
+The Bintray repositories will be [shutdown after May 1st, 2021](https://jfrog.com/blog/into-the-sunset-bintray-jcenter-gocenter-and-chartcenter/). If you previously added them, you will have to add our repositories following the instructions above and should delete the Bintray ones.
 
 For Debian-based distributions, you can run:
 
@@ -148,7 +148,7 @@ k6 is written in Go, so it's just a single statically-linked executable and very
 Running k6
 ----------
 
-k6 works with the concept of **virtual users** (VUs) that execute scripts - they're essentially glorified, parallel `while(true)` loops. Scripts are written using JavaScript, as ES6 modules, which allows you to break larger tests into smaller and more reusable pieces, making it easy to scale tests across an organization.
+k6 works with the concept of **virtual users** (VUs) that execute scripts - they're essentially glorified, parallel `while(true)` loops. Scripts are written using JavaScript as ES6 modules, which allows you to break larger tests into smaller and more reusable pieces, making it easy to scale tests across an organization.
 
 Scripts must contain, at the very least, an exported `default` function - this defines the entry point for your VUs, similar to the `main()` function in many languages. Let's create a very simple script that makes an HTTP GET request to a test website:
 
@@ -160,26 +160,26 @@ export default function() {
 };
 ```
 
-The script details and how we can extend and configure it will be explained below, but for now simply save the above snippet as a `script.js` file somewhere on your system. Assuming that you've [installed k6](#install) correctly, on Linux and Mac you can run the saved script by executing `k6 run script.js` from the same folder. For Windows the command is almost the same - `k6.exe run script.js`.
+The script details and how we can extend and configure it will be explained below, but for now, simply save the above snippet as a `script.js` file somewhere on your system. Assuming that you've [installed k6](#install) correctly, on Linux and Mac, you can run the saved script by executing `k6 run script.js` from the same folder. For Windows, the command is almost the same - `k6.exe run script.js`.
 
 If you decide to use the [k6 docker image](https://hub.docker.com/r/loadimpact/k6/), the command will be slightly different. Instead of passing the script filename to k6, a dash is used to instruct k6 to read the script contents directly via the standard input. This allows us to to avoid messing with docker volumes for such a simple single-file script, greatly simplifying the docker command: `docker run -i loadimpact/k6 run - <script.js`.
 
-In some situations it may also be useful to execute remote scripts. You can do that with HTTP**S** URLs in k6 by [importing them](https://k6.io/docs/using-k6/modules#section-remote-modules) in the script via their URL or simply specifying their URL in the CLI command: `k6 run github.com/k6io/k6/samples/http_2.js` (k6 "knows" a bit about github and cdnjs URLs, so this command is actually shorthand for `k6 run raw.githubusercontent.com/k6io/k6/master/samples/http_2.js`)
+In some situations, it may also be useful to execute remote scripts. You can do that with HTTP**S** URLs in k6 by [importing them](https://k6.io/docs/using-k6/modules#section-remote-modules) in the script via their URL or simply specifying their URL in the CLI command: `k6 run github.com/k6io/k6/samples/http_2.js` (k6 "knows" a bit about github and cdnjs URLs, so this command is actually shorthand for `k6 run raw.githubusercontent.com/k6io/k6/master/samples/http_2.js`)
 
 For more information on how to get started running k6, please look at the [Running k6](https://k6.io/docs/getting-started/running-k6) documentation page. If you want to know more about making and measuring HTTP requests with k6, take a look [here](https://k6.io/docs/using-k6/http-requests) and [here](https://k6.io/docs/javascript-api/k6-http). And for information about the commercial k6 services like distributed cloud execution (the `k6 cloud` command) or Cloud Results (`k6 run -o cloud`), you can visit [k6.io](https://k6.io/cloud) or view the [cloud documentation](https://k6.io/docs/cloud).
 
 Overview
 --------
 
-In this section we'll briefly explore some of the basic concepts and principles of how k6 works. If you want to learn more in-depth about the k6 scripting API, results output, and features, you can visit the full k6 documentation website at [k6.io/docs](https://k6.io/docs/).
+In this section, we'll briefly explore some of the basic concepts and principles of how k6 works. If you want to learn more in-depth about the k6 scripting API, results output, and features, you can visit the complete k6 documentation website at [k6.io/docs](https://k6.io/docs/).
 
 ### Init and VU stages
 
 Earlier, in the [Running k6](#running-k6) section, we mentioned that scripts must contain a `default` function. *"Why not just run my script normally, from top to bottom"*, you might ask - the answer is: we do, but code **inside** and **outside** your `default` function can do different things.
 
-Each virtual user (VU) executes your script in a completely separate JavaScript runtime, parallel to all of the other running VUs. Code inside the `default` function is called _VU code_, and is run over and over, for as long as the test is running. Code outside of the `default` function is called _init code_, and is run only once per VU, when that VU is initialized.
+Each virtual user (VU) executes your script in a completely separate JavaScript runtime, parallel to all of the other running VUs. Code inside the `default` function is called _VU code_ and is run over and over for as long as the test is running. Code outside of the `default` function is called _init code_ and is run only once per VU when that VU is initialized.
 
-VU code can make HTTP and websocket requests, emit metrics, and generally do everything you'd expect a load test to do, with a few important exceptions - you can't load anything from your local filesystem, or import any other modules. This all has to be done from the [init code](https://k6.io/docs/javascript-api/init-context).
+VU code can make HTTP and websocket requests, emit metrics, and generally do everything you'd expect a load test to do. With a few important exceptions - you can't load anything from your local filesystem or import any other modules. This all has to be done from the [init code](https://k6.io/docs/javascript-api/init-context).
 
 There are two reasons for this. The first is, of course: performance. If you read a file from disk on every single script iteration, it'd be needlessly slow. Even if you cache the contents of the file and any imported modules, it'd mean the *first run* of the script would be much slower than all the others. Worse yet, if you have a script that imports or loads things based on things that can only be known at runtime, you'd get slow iterations thrown in every time you load something new. That's also the reason why we initialize *all* needed VUs before any of them starts the actual load test by executing the `default` function.
 
@@ -191,7 +191,7 @@ This means that if your script works when it's executed with `k6 run` locally, i
 
 For simplicity, unlike many other JavaScript runtimes, a lot of the operations in k6 are synchronous. That means that, for example, the `let response = http.get("https://test-api.k6.io/")` call from the [Running k6](#running-k6) example script will block the VU execution until the HTTP request is completed, save the [response information](https://k6.io/docs/javascript-api/k6-http/response-k6-http) in the `response` variable and only then continue executing the rest of the script - no callbacks and promises needed.
 
-This simplification works because k6 isn't just a single JavaScript runtime. Instead each VU independently executes the supplied script in its own separate and semi-isolated JavaScript runtime, in parallel to all of the other running VUs. This allows us to fully utilize modern multi-core hardware, while at the same time lowering the script complexity by having mostly synchronous functions. Where it makes sense, we also have in-VU parallelization as well, for example the [`http.batch()`](https://k6.io/docs/javascript-api/k6-http/batch-requests) function (which allows a single VU to make multiple simultaneous HTTP requests like a browser/real user would) or the [websocket](https://k6.io/docs/javascript-api/k6-ws) support.
+This simplification works because k6 isn't just a single JavaScript runtime. Instead, each VU independently executes the supplied script in its own separate and semi-isolated JavaScript runtime, in parallel to all of the other running VUs. This allows us to fully utilize modern multi-core hardware while at the same time lowering the script complexity by having mostly synchronous functions. Where it makes sense, we also have in-VU parallelization as well, for example, the [`http.batch()`](https://k6.io/docs/javascript-api/k6-http/batch-requests) function (which allows a single VU to make multiple simultaneous HTTP requests like a browser/real user would) or the [websocket](https://k6.io/docs/javascript-api/k6-ws) support.
 
 As an added bonus, there's an actual [`sleep()` function](https://k6.io/docs/javascript-api/k6/sleep-t)! And you can also use the VU separation to reuse data between iterations (i.e. executions of the `default` function) in the same VU:
 ```js
