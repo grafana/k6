@@ -580,7 +580,7 @@ func (rs rampingVUsRunState) makeProgressFn(total time.Duration) (progressFn fun
 	}
 }
 
-func (rs rampingVUsRunState) populateVUs(ctx context.Context, cancel func()) {
+func (rs rampingVUsRunState) populateVUHandles(ctx context.Context, cancel func()) {
 	getVU := func() (lib.InitializedVU, error) {
 		pvu, err := rs.executor.executionState.GetPlannedVU(rs.executor.logger, false)
 		if err != nil {
