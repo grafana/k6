@@ -475,6 +475,16 @@ func TestOptionsEnv(t *testing.T) {
 			"":    null.Int{},
 			"123": null.IntFrom(123),
 		},
+		{"NoSetup", "K6_NO_SETUP"}: {
+			"":      null.Bool{},
+			"true":  null.BoolFrom(true),
+			"false": null.BoolFrom(false),
+		},
+		{"NoTeardown", "K6_NO_TEARDOWN"}: {
+			"":      null.Bool{},
+			"true":  null.BoolFrom(true),
+			"false": null.BoolFrom(false),
+		},
 		{"InsecureSkipTLSVerify", "K6_INSECURE_SKIP_TLS_VERIFY"}: {
 			"":      null.Bool{},
 			"true":  null.BoolFrom(true),
