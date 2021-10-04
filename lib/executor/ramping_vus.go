@@ -539,7 +539,7 @@ func (vlv RampingVUs) Run(ctx context.Context, _ chan<- stats.SampleContainer, _
 	go trackProgress(ctx, maxDurCtx, regDurCtx, vlv, progressFn)
 
 	defer runState.wg.Wait()
-	runState.initializeVUs(maxDurCtx, cancel)
+	runState.populateVUs(maxDurCtx, cancel)
 	for i := uint64(0); i < runState.maxVUs; i++ {
 		go runState.vuHandles[i].runLoopsIfPossible(runState.runIteration)
 	}
@@ -580,7 +580,7 @@ func (rs rampingVUsRunState) makeProgressFn(total time.Duration) (progressFn fun
 	}
 }
 
-func (rs rampingVUsRunState) initializeVUs(ctx context.Context, cancel func()) {
+func (rs rampingVUsRunState) populateVUs(ctx context.Context, cancel func()) {
 	getVU := func() (lib.InitializedVU, error) {
 		pvu, err := rs.executor.executionState.GetPlannedVU(rs.executor.logger, false)
 		if err != nil {
