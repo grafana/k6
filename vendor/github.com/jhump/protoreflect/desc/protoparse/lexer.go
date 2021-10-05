@@ -61,11 +61,6 @@ func (rr *runeReader) endMark() string {
 	return m
 }
 
-func lexError(l protoLexer, pos *SourcePos, err string) {
-	pl := l.(*protoLex)
-	_ = pl.errs.handleErrorWithPos(pos, err)
-}
-
 type protoLex struct {
 	filename string
 	input    *runeReader
@@ -226,7 +221,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 
 		l.offset += n
 		l.adjustPos(c)
-		if strings.ContainsRune("\n\r\t ", c) {
+		if strings.ContainsRune("\n\r\t\f\v ", c) {
 			l.ws = append(l.ws, c)
 			continue
 		}
@@ -241,11 +236,10 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			}
 			if cn >= '0' && cn <= '9' {
 				l.adjustPos(cn)
-				token := []rune{c, cn}
-				token = l.readNumber(token, false, true)
-				f, err := strconv.ParseFloat(string(token), 64)
+				token := l.readNumber(c, cn)
+				f, err := strconv.ParseFloat(token, 64)
 				if err != nil {
-					l.setError(lval, err)
+					l.setError(lval, numError(err, "float", token))
 					return _ERROR
 				}
 				l.setFloat(lval, f)
@@ -271,66 +265,42 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 
 		if c >= '0' && c <= '9' {
 			// integer or float literal
-			if c == '0' {
-				cn, _, err := l.input.readRune()
+			token := l.readNumber(c)
+			if strings.HasPrefix(token, "0x") || strings.HasPrefix(token, "0X") {
+				// hexadecimal
+				ui, err := strconv.ParseUint(token[2:], 16, 64)
 				if err != nil {
-					l.setInt(lval, 0)
-					return _INT_LIT
+					l.setError(lval, numError(err, "hexadecimal integer", token[2:]))
+					return _ERROR
 				}
-				if cn == 'x' || cn == 'X' {
-					cnn, _, err := l.input.readRune()
-					if err != nil {
-						l.input.unreadRune(cn)
-						l.setInt(lval, 0)
-						return _INT_LIT
-					}
-					if (cnn >= '0' && cnn <= '9') || (cnn >= 'a' && cnn <= 'f') || (cnn >= 'A' && cnn <= 'F') {
-						// hexadecimal!
-						l.adjustPos(cn, cnn)
-						token := []rune{cnn}
-						token = l.readHexNumber(token)
-						ui, err := strconv.ParseUint(string(token), 16, 64)
-						if err != nil {
-							l.setError(lval, err)
-							return _ERROR
-						}
-						l.setInt(lval, ui)
-						return _INT_LIT
-					}
-					l.input.unreadRune(cnn)
-					l.input.unreadRune(cn)
-					l.setInt(lval, 0)
-					return _INT_LIT
-				} else {
-					l.input.unreadRune(cn)
-				}
+				l.setInt(lval, ui)
+				return _INT_LIT
 			}
-			token := []rune{c}
-			token = l.readNumber(token, true, true)
-			numstr := string(token)
-			if strings.Contains(numstr, ".") || strings.Contains(numstr, "e") || strings.Contains(numstr, "E") {
+			if strings.Contains(token, ".") || strings.Contains(token, "e") || strings.Contains(token, "E") {
 				// floating point!
-				f, err := strconv.ParseFloat(numstr, 64)
+				f, err := strconv.ParseFloat(token, 64)
 				if err != nil {
-					l.setError(lval, err)
+					l.setError(lval, numError(err, "float", token))
 					return _ERROR
 				}
 				l.setFloat(lval, f)
 				return _FLOAT_LIT
 			}
 			// integer! (decimal or octal)
-			ui, err := strconv.ParseUint(numstr, 0, 64)
+			ui, err := strconv.ParseUint(token, 0, 64)
 			if err != nil {
+				kind := "integer"
 				if numErr, ok := err.(*strconv.NumError); ok && numErr.Err == strconv.ErrRange {
 					// if it's too big to be an int, parse it as a float
 					var f float64
-					f, err = strconv.ParseFloat(numstr, 64)
+					kind = "float"
+					f, err = strconv.ParseFloat(token, 64)
 					if err == nil {
 						l.setFloat(lval, f)
 						return _FLOAT_LIT
 					}
 				}
-				l.setError(lval, err)
+				l.setError(lval, numError(err, kind, token))
 				return _ERROR
 			}
 			l.setInt(lval, ui)
@@ -382,6 +352,10 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			l.input.unreadRune(cn)
 		}
 
+		if c > 255 {
+			l.setError(lval, errors.New("invalid character"))
+			return _ERROR
+		}
 		l.setRune(lval, c)
 		return int(c)
 	}
@@ -526,79 +500,47 @@ func (l *protoLex) setError(lval *protoSymType, err error) {
 	lval.err = l.addSourceError(err)
 }
 
-func (l *protoLex) readNumber(sofar []rune, allowDot bool, allowExp bool) []rune {
+func (l *protoLex) readNumber(sofar ...rune) string {
 	token := sofar
+	allowExpSign := false
 	for {
 		c, _, err := l.input.readRune()
 		if err != nil {
 			break
 		}
-		if c == '.' {
-			if !allowDot {
-				l.input.unreadRune(c)
-				break
-			}
-			allowDot = false
-		} else if c == 'e' || c == 'E' {
-			if !allowExp {
-				l.input.unreadRune(c)
-				break
-			}
-			allowExp = false
-			cn, _, err := l.input.readRune()
-			if err != nil {
-				l.input.unreadRune(c)
-				break
-			}
-			if cn == '-' || cn == '+' {
-				cnn, _, err := l.input.readRune()
-				if err != nil {
-					l.input.unreadRune(cn)
-					l.input.unreadRune(c)
-					break
-				}
-				if cnn < '0' || cnn > '9' {
-					l.input.unreadRune(cnn)
-					l.input.unreadRune(cn)
-					l.input.unreadRune(c)
-					break
-				}
-				l.adjustPos(c)
-				token = append(token, c)
-				c, cn = cn, cnn
-			} else if cn < '0' || cn > '9' {
-				l.input.unreadRune(cn)
-				l.input.unreadRune(c)
-				break
-			}
-			l.adjustPos(c)
-			token = append(token, c)
-			c = cn
-		} else if c < '0' || c > '9' {
+		if (c == '-' || c == '+') && !allowExpSign {
 			l.input.unreadRune(c)
 			break
+		}
+		allowExpSign = false
+		if c != '.' && c != '_' && (c < '0' || c > '9') &&
+			(c < 'a' || c > 'z') && (c < 'A' || c > 'Z') &&
+			c != '-' && c != '+' {
+			// no more chars in the number token
+			l.input.unreadRune(c)
+			break
+		}
+		if c == 'e' || c == 'E' {
+			// scientific notation char can be followed by
+			// an exponent sign
+			allowExpSign = true
 		}
 		l.adjustPos(c)
 		token = append(token, c)
 	}
-	return token
+	return string(token)
 }
 
-func (l *protoLex) readHexNumber(sofar []rune) []rune {
-	token := sofar
-	for {
-		c, _, err := l.input.readRune()
-		if err != nil {
-			break
-		}
-		if (c < 'a' || c > 'f') && (c < 'A' || c > 'F') && (c < '0' || c > '9') {
-			l.input.unreadRune(c)
-			break
-		}
-		l.adjustPos(c)
-		token = append(token, c)
+func numError(err error, kind, s string) error {
+	ne, ok := err.(*strconv.NumError)
+	if !ok {
+		return err
 	}
-	return token
+	if ne.Err == strconv.ErrRange {
+		return fmt.Errorf("value out of range for %s: %s", kind, s)
+	}
+	// syntax error
+	return fmt.Errorf("invalid syntax in %s value: %s", kind, s)
 }
 
 func (l *protoLex) readIdentifier(sofar []rune) []rune {
