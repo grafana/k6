@@ -58,3 +58,10 @@ func Float64() float64 {
 	defer mu.Unlock()
 	return r.Float64()
 }
+
+// Uint64 implements rand.Uint64 on the grpcrand global source.
+func Uint64() uint64 {
+	mu.Lock()
+	defer mu.Unlock()
+	return r.Uint64()
+}

@@ -54,8 +54,6 @@ github.com/golang/protobuf/ptypes/empty
 github.com/golang/protobuf/ptypes/struct
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
-# github.com/golang/snappy v0.0.3
-github.com/golang/snappy
 # github.com/google/go-cmp v0.5.1
 ## explicit
 # github.com/gorilla/websocket v1.4.2
@@ -68,7 +66,7 @@ github.com/inconshreveable/mousetrap
 github.com/influxdata/influxdb1-client/models
 github.com/influxdata/influxdb1-client/pkg/escape
 github.com/influxdata/influxdb1-client/v2
-# github.com/jhump/protoreflect v1.9.0
+# github.com/jhump/protoreflect v1.10.0
 ## explicit
 github.com/jhump/protoreflect/codec
 github.com/jhump/protoreflect/desc
@@ -83,10 +81,12 @@ github.com/josharian/intern
 # github.com/kelseyhightower/envconfig v1.4.0
 ## explicit
 github.com/kelseyhightower/envconfig
-# github.com/klauspost/compress v1.13.1
+# github.com/klauspost/compress v1.13.6
 ## explicit
+github.com/klauspost/compress
 github.com/klauspost/compress/fse
 github.com/klauspost/compress/huff0
+github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/kubernetes/helm v2.9.0+incompatible
@@ -147,21 +147,20 @@ github.com/spf13/pflag
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# github.com/tidwall/gjson v1.8.1
+# github.com/tidwall/gjson v1.9.2
 ## explicit
 github.com/tidwall/gjson
-# github.com/tidwall/match v1.0.3
+# github.com/tidwall/match v1.1.0
 github.com/tidwall/match
 # github.com/tidwall/pretty v1.2.0
 ## explicit
 github.com/tidwall/pretty
-# golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
+# golang.org/x/crypto v0.0.0-20210503195802-e9a32991a82e
 ## explicit
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
-golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20210428185458-6f5299370f2b
+# golang.org/x/net v0.0.0-20210901185426-6d2eada6345e
 ## explicit
 golang.org/x/net/html
 golang.org/x/net/html/atom
@@ -171,11 +170,15 @@ golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/sys v0.0.0-20201204225414-ed752295db88
+# golang.org/x/sys v0.0.0-20210511113859-b0526f3d8744
 ## explicit
 golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+# golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
+## explicit
+golang.org/x/term
 # golang.org/x/text v0.3.6
 golang.org/x/text/cases
 golang.org/x/text/collate
@@ -189,7 +192,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6
+# golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 ## explicit
 golang.org/x/time/rate
 # google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336
@@ -199,7 +202,7 @@ google.golang.org/genproto/protobuf/api
 google.golang.org/genproto/protobuf/field_mask
 google.golang.org/genproto/protobuf/ptype
 google.golang.org/genproto/protobuf/source_context
-# google.golang.org/grpc v1.39.0
+# google.golang.org/grpc v1.41.0
 ## explicit
 google.golang.org/grpc
 google.golang.org/grpc/attributes
@@ -237,6 +240,7 @@ google.golang.org/grpc/internal/status
 google.golang.org/grpc/internal/syscall
 google.golang.org/grpc/internal/transport
 google.golang.org/grpc/internal/transport/networktype
+google.golang.org/grpc/internal/xds/env
 google.golang.org/grpc/keepalive
 google.golang.org/grpc/metadata
 google.golang.org/grpc/peer

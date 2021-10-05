@@ -30,7 +30,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/cloudapi"
@@ -108,7 +108,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 						},
 					},
 				}
-				if !terminal.IsTerminal(int(syscall.Stdin)) { // nolint: unconvert
+				if !term.IsTerminal(int(syscall.Stdin)) { // nolint: unconvert
 					logger.Warn("Stdin is not a terminal, falling back to plain text input")
 				}
 				vals, err := form.Run(os.Stdin, stdout)
