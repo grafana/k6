@@ -85,7 +85,7 @@ func ParseArg(arg string, logger *logrus.Logger) (Config, error) {
 				return c, err
 			}
 		case "file_name":
-			logger.Warnf("CSV output argument '%s' will soon be deprecated, please use 'fileName' instead.", r[0])
+			logger.Warnf("CSV output argument '%s' is deprecated, please use 'fileName' instead.", r[0])
 			fallthrough
 		case "fileName":
 			c.FileName = null.StringFrom(r[1])
