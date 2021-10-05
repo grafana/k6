@@ -160,7 +160,6 @@ github.com/tidwall/pretty
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
-golang.org/x/crypto/ssh/terminal
 # golang.org/x/net v0.0.0-20210901185426-6d2eada6345e
 ## explicit
 golang.org/x/net/html
@@ -178,6 +177,7 @@ golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
+## explicit
 golang.org/x/term
 # golang.org/x/text v0.3.6
 golang.org/x/text/cases
