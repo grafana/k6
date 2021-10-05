@@ -38,7 +38,7 @@ require (
 	github.com/tidwall/gjson v1.9.2
 	github.com/tidwall/pretty v1.2.0
 	golang.org/x/crypto v0.0.0-20210503195802-e9a32991a82e
-	golang.org/x/net v0.0.0-20210428185458-6f5299370f2b
+	golang.org/x/net v0.0.0-20210901185426-6d2eada6345e
 	golang.org/x/sys v0.0.0-20210511113859-b0526f3d8744 // indirect
 	golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6
 	google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336 // indirect
