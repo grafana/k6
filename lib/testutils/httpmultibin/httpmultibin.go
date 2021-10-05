@@ -108,7 +108,14 @@ type jsonBody struct {
 
 func getWebsocketHandler(echo bool, closePrematurely bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+
+		// Echo back User-Agent header if it exists
+		responseHeaders := w.Header().Clone()
+		if ua := req.Header.Get("User-Agent"); ua != "" {
+			responseHeaders.Add("Echo-User-Agent", req.Header.Get("User-Agent"))
+		}
+
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, responseHeaders)
 		if err != nil {
 			return
 		}

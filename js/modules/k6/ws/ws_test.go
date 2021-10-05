@@ -33,6 +33,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -109,6 +110,7 @@ func TestSession(t *testing.T) {
 				stats.TagStatus,
 				stats.TagSubproto,
 			),
+			UserAgent: null.StringFrom("TestUserAgent"),
 		},
 		Samples:        samples,
 		TLSConfig:      tb.TLSClientConfig,
@@ -311,6 +313,25 @@ func TestSession(t *testing.T) {
 			})
 		});
 		if (!closed) { throw new Error ("close event not fired"); }
+		`))
+		assert.NoError(t, err)
+	})
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
+
+	// websocket handler should send back User-Agent as Echo-User-Agent for this test to work
+	t.Run("useragent", func(t *testing.T) {
+		_, err := rt.RunString(sr(`
+		
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+			socket.close()
+		})
+		var userAgent = res.headers["Echo-User-Agent"];
+		if (userAgent == undefined) {
+			throw new Error("user agent is not echoed back by test server");
+		}
+		if (userAgent != "TestUserAgent") {
+			throw new Error("incorrect user agent: " + userAgent);
+		}
 		`))
 		assert.NoError(t, err)
 	})
