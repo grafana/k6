@@ -77,7 +77,7 @@ func ParseArg(arg string, logger *logrus.Logger) (Config, error) {
 		}
 		switch r[0] {
 		case "save_interval":
-			logger.Warnf("CSV output argument '%s' will soon be deprecated, please use 'saveInterval' instead.", r[0])
+			logger.Warnf("CSV output argument '%s' is deprecated, please use 'saveInterval' instead.", r[0])
 			fallthrough
 		case "saveInterval":
 			err := c.SaveInterval.UnmarshalText([]byte(r[1]))
