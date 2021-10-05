@@ -7,9 +7,9 @@ import (
 	"fmt"
 )
 
-const _ExecutionStatusName = "CreatedInitVUsInitExecutorsInitDonePausedBeforeRunStartedSetupRunningTeardownEnded"
+const _ExecutionStatusName = "CreatedInitVUsInitExecutorsInitDonePausedBeforeRunStartedSetupRunningTeardownEndedInterrupted"
 
-var _ExecutionStatusIndex = [...]uint8{0, 7, 14, 27, 35, 50, 57, 62, 69, 77, 82}
+var _ExecutionStatusIndex = [...]uint8{0, 7, 14, 27, 35, 50, 57, 62, 69, 77, 82, 93}
 
 func (i ExecutionStatus) String() string {
 	if i >= ExecutionStatus(len(_ExecutionStatusIndex)-1) {
@@ -18,7 +18,7 @@ func (i ExecutionStatus) String() string {
 	return _ExecutionStatusName[_ExecutionStatusIndex[i]:_ExecutionStatusIndex[i+1]]
 }
 
-var _ExecutionStatusValues = []ExecutionStatus{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+var _ExecutionStatusValues = []ExecutionStatus{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 
 var _ExecutionStatusNameToValueMap = map[string]ExecutionStatus{
 	_ExecutionStatusName[0:7]:   0,
@@ -31,6 +31,7 @@ var _ExecutionStatusNameToValueMap = map[string]ExecutionStatus{
 	_ExecutionStatusName[62:69]: 7,
 	_ExecutionStatusName[69:77]: 8,
 	_ExecutionStatusName[77:82]: 9,
+	_ExecutionStatusName[82:93]: 10,
 }
 
 // ExecutionStatusString retrieves an enum value from the enum constants string name.
