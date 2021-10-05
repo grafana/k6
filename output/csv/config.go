@@ -99,8 +99,9 @@ func ParseArg(arg string, logger *logrus.Logger) (Config, error) {
 
 // GetConsolidatedConfig combines {default config values + JSON config +
 // environment vars + arg config values}, and returns the final result.
-//nolint: lll
-func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, arg string, logger *logrus.Logger) (Config, error) {
+func GetConsolidatedConfig(
+	jsonRawConf json.RawMessage, env map[string]string, arg string, logger *logrus.Logger,
+) (Config, error) {
 	result := NewConfig()
 	if jsonRawConf != nil {
 		jsonConf := Config{}
