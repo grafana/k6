@@ -24,13 +24,12 @@ import (
 	"testing"
 	"time"
 
-	"go.k6.io/k6/lib/testutils"
-
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
+	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
 )
 
@@ -80,8 +79,9 @@ func TestApply(t *testing.T) {
 
 func TestParseArg(t *testing.T) {
 	cases := map[string]struct {
-		config      Config
-		expectedErr bool
+		config             Config
+		expectedLogEntries []string
+		expectedErr        bool
 	}{
 		"test_file.csv": {
 			config: Config{
@@ -92,6 +92,9 @@ func TestParseArg(t *testing.T) {
 		"save_interval=5s": {
 			config: Config{
 				SaveInterval: types.NullDurationFrom(5 * time.Second),
+			},
+			expectedLogEntries: []string{
+				"CSV output argument 'save_interval' is deprecated, please use 'saveInterval' instead.",
 			},
 		},
 		"saveInterval=5s": {
@@ -104,11 +107,18 @@ func TestParseArg(t *testing.T) {
 				FileName:     null.StringFrom("test.csv"),
 				SaveInterval: types.NullDurationFrom(5 * time.Second),
 			},
+			expectedLogEntries: []string{
+				"CSV output argument 'file_name' is deprecated, please use 'fileName' instead.",
+				"CSV output argument 'save_interval' is deprecated, please use 'saveInterval' instead.",
+			},
 		},
 		"fileName=test.csv,save_interval=5s": {
 			config: Config{
 				FileName:     null.StringFrom("test.csv"),
 				SaveInterval: types.NullDurationFrom(5 * time.Second),
+			},
+			expectedLogEntries: []string{
+				"CSV output argument 'save_interval' is deprecated, please use 'saveInterval' instead.",
 			},
 		},
 		"filename=test.csv,save_interval=5s": {
@@ -116,15 +126,15 @@ func TestParseArg(t *testing.T) {
 		},
 	}
 
-	testLog := logrus.New()
-	testLog.SetOutput(testutils.NewTestOutput(t))
-
 	for arg, testCase := range cases {
 		arg := arg
 		testCase := testCase
 
+		testLogger, hook := test.NewNullLogger()
+		testLogger.SetOutput(testutils.NewTestOutput(t))
+
 		t.Run(arg, func(t *testing.T) {
-			config, err := ParseArg(arg, testLog)
+			config, err := ParseArg(arg, testLogger)
 
 			if testCase.expectedErr {
 				assert.Error(t, err)
@@ -133,6 +143,12 @@ func TestParseArg(t *testing.T) {
 			}
 			assert.Equal(t, testCase.config.FileName.String, config.FileName.String)
 			assert.Equal(t, testCase.config.SaveInterval.String(), config.SaveInterval.String())
+
+			var entries []string
+			for _, v := range hook.AllEntries() {
+				entries = append(entries, v.Message)
+			}
+			assert.ElementsMatch(t, entries, testCase.expectedLogEntries)
 		})
 	}
 }
