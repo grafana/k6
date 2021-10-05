@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/sirupsen/logrus/hooks/test"
@@ -146,6 +148,7 @@ func TestParseArg(t *testing.T) {
 
 			var entries []string
 			for _, v := range hook.AllEntries() {
+				assert.Equal(t, v.Level, logrus.WarnLevel)
 				entries = append(entries, v.Message)
 			}
 			assert.ElementsMatch(t, entries, testCase.expectedLogEntries)
