@@ -321,7 +321,6 @@ func TestSession(t *testing.T) {
 	// websocket handler should send back User-Agent as Echo-User-Agent for this test to work
 	t.Run("useragent", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
-		
 		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.close()
 		})
