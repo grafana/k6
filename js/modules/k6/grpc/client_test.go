@@ -185,6 +185,13 @@ func TestClient(t *testing.T) {
 			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { timeout: 3000 });`},
 		},
 		{
+			name: "ConnectFloatTimeout",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { timeout: 3456.3 });`},
+		},
+		{
 			name: "Connect",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
