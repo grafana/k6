@@ -163,9 +163,10 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		HandshakeTimeout: time.Second * 60, // TODO configurable
 		// Pass a custom net.DialContext function to websocket.Dialer that will substitute
 		// the underlying net.Conn with our own tracked netext.Conn
-		NetDialContext:  state.Dialer.DialContext,
-		Proxy:           http.ProxyFromEnvironment,
-		TLSClientConfig: tlsConfig,
+		NetDialContext:    state.Dialer.DialContext,
+		Proxy:             http.ProxyFromEnvironment,
+		TLSClientConfig:   tlsConfig,
+		EnableCompression: true,
 	}
 
 	start := time.Now()
