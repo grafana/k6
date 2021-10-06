@@ -1,4 +1,4 @@
-package prometheus
+package remotewrite
 
 import (
 	"encoding/json"
@@ -17,6 +17,7 @@ import (
 const (
 	defaultPrometheusTimeout = time.Minute * 2
 	defaultFlushPeriod       = time.Second
+	defaultMetricPrefix      = "k6_"
 )
 
 type Config struct {
@@ -61,7 +62,8 @@ func (conf Config) ConstructRemoteConfig() (*remote.ClientConfig, error) {
 			Password: promConfig.Secret(conf.Password.String),
 		}
 	}
-	// TODO: consider if the auth logic should be enforced here (e.g. if insecureSkipTLSVerify is switched off, then check for non-empty certificate file and auth, etc.)
+	// TODO: consider if the auth logic should be enforced here
+	// (e.g. if insecureSkipTLSVerify is switched off, then check for non-empty certificate file and auth, etc.)
 
 	u, err := url.Parse(conf.Url.String)
 	if err != nil {

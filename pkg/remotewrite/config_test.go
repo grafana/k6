@@ -1,4 +1,4 @@
-package prometheus
+package remotewrite
 
 import (
 	"encoding/json"

@@ -1,4 +1,4 @@
-package prometheus
+package remotewrite
 
 import (
 	"context"
@@ -14,9 +14,11 @@ import (
 )
 
 type Output struct {
-	client remote.WriteClient
 	config Config
 
+	client          remote.WriteClient
+	metrics         *metricsStorage
+	mapping         Mapping
 	periodicFlusher *output.PeriodicFlusher
 	output.SampleBuffer
 
@@ -43,9 +45,11 @@ func New(params output.Params) (*Output, error) {
 	}
 
 	return &Output{
-		client: client,
-		config: config,
-		logger: params.Logger,
+		client:  client,
+		config:  config,
+		metrics: newMetricsStorage(),
+		mapping: NewPrometheusMapping(),
+		logger:  params.Logger,
 	}, nil
 }
 
@@ -60,6 +64,7 @@ func (o *Output) Start() error {
 		o.periodicFlusher = periodicFlusher
 	}
 	o.logger.Debug("Prometheus: starting remote-write")
+
 	return nil
 }
 
@@ -71,6 +76,13 @@ func (o *Output) Stop() error {
 
 func (o *Output) flush() {
 	samplesContainers := o.GetBufferedSamples()
+
+	// Remote write endpoint accepts TimeSeries structure defined in gRPC. It must:
+	// a) contain Labels array
+	// b) have a __name__ label: without it, metric might be unquerable or even rejected
+	// as a metric without a name. This behaviour depends on underlying storage used.
+	// c) not have duplicate timestamps within 1 timeseries, see https://github.com/prometheus/prometheus/issues/9210
+	// Prometheus write handler processes only some fields as of now, so here we'll add only them.
 	promTimeSeries := o.convertToTimeSeries(samplesContainers)
 
 	o.logger.Info("Number of time series: ", len(promTimeSeries))
@@ -91,7 +103,7 @@ func (o *Output) flush() {
 }
 
 func (o *Output) convertToTimeSeries(samplesContainers []stats.SampleContainer) []prompb.TimeSeries {
-	promTimeSeries := newTimeSeries()
+	promTimeSeries := make([]prompb.TimeSeries, 0)
 
 	for _, samplesContainer := range samplesContainers {
 		samples := samplesContainer.GetSamples()
@@ -103,13 +115,15 @@ func (o *Output) convertToTimeSeries(samplesContainers []stats.SampleContainer) 
 			// lose info in tags or assign tags wrongly, let's store each Sample in a different TimeSeries, for now.
 			// This approach also allows to avoid hard to replicate issues with duplicate timestamps.
 
-			labelPairs, err := tagsToPrometheusLabels(sample.Tags)
+			labels, err := tagsToPrometheusLabels(sample.Tags)
 			if err != nil {
 				o.logger.Error(err)
 			}
 
-			if err := promTimeSeries.addSample(&sample, labelPairs); err != nil {
+			if newts, err := o.metrics.transform(o.mapping, sample, labels); err != nil {
 				o.logger.Error(err)
+			} else {
+				promTimeSeries = append(promTimeSeries, newts...)
 			}
 		}
 	}
