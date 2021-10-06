@@ -110,7 +110,6 @@ func TestSession(t *testing.T) {
 				stats.TagStatus,
 				stats.TagSubproto,
 			),
-			UserAgent: null.StringFrom("TestUserAgent"),
 		},
 		Samples:        samples,
 		TLSConfig:      tb.TLSClientConfig,
@@ -313,24 +312,6 @@ func TestSession(t *testing.T) {
 			})
 		});
 		if (!closed) { throw new Error ("close event not fired"); }
-		`))
-		assert.NoError(t, err)
-	})
-	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
-
-	// websocket handler should send back User-Agent as Echo-User-Agent for this test to work
-	t.Run("useragent", func(t *testing.T) {
-		_, err := rt.RunString(sr(`
-		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
-			socket.close()
-		})
-		var userAgent = res.headers["Echo-User-Agent"];
-		if (userAgent == undefined) {
-			throw new Error("user agent is not echoed back by test server");
-		}
-		if (userAgent != "TestUserAgent") {
-			throw new Error("incorrect user agent: " + userAgent);
-		}
 		`))
 		assert.NoError(t, err)
 	})
@@ -748,4 +729,58 @@ func TestReadPump(t *testing.T) {
 
 	// Ensure all close code asserts passed
 	assert.Equal(t, numAsserts, len(closeCodes))
+}
+
+func TestUserAgent(t *testing.T) {
+	t.Parallel()
+
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	root, err := lib.NewGroup("", nil)
+	assert.NoError(t, err)
+
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	samples := make(chan stats.SampleContainer, 1000)
+	state := &lib.State{
+		Group:  root,
+		Dialer: tb.Dialer,
+		Options: lib.Options{
+			SystemTags: stats.NewSystemTagSet(
+				stats.TagURL,
+				stats.TagProto,
+				stats.TagStatus,
+				stats.TagSubproto,
+			),
+			UserAgent: null.StringFrom("TestUserAgent"),
+		},
+		Samples:        samples,
+		TLSConfig:      tb.TLSClientConfig,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
+	}
+
+	ctx := context.Background()
+	ctx = lib.WithState(ctx, state)
+	ctx = common.WithRuntime(ctx, rt)
+
+	err = rt.Set("ws", common.Bind(rt, New(), &ctx))
+	assert.NoError(t, err)
+
+	// websocket handler should echo back User-Agent as Echo-User-Agent for this test to work
+	_, err = rt.RunString(sr(`
+		var res = ws.connect("WSBIN_URL/ws-echo-useragent", function(socket){
+			socket.close()
+		})
+		var userAgent = res.headers["Echo-User-Agent"];
+		if (userAgent == undefined) {
+			throw new Error("user agent is not echoed back by test server");
+		}
+		if (userAgent != "TestUserAgent") {
+			throw new Error("incorrect user agent: " + userAgent);
+		}
+		`))
+	assert.NoError(t, err)
+
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo-useragent"), 101, "")
 }
