@@ -108,14 +108,58 @@ func (c Config) Apply(cfg Config) Config {
 	return c
 }
 
-// parseJSON parses the supplied JSON into a Config.
+// SetFromKeyVals sets fields passed from a key and the associated values.
+// e.g An URL Query field.
+//nolint:cyclop
+func (c *Config) SetFromKeyVals(k string, vs []string) (err error) {
+	switch k {
+	case "insecureSkipTLSVerify":
+		err = c.InsecureSkipTLSVerify.UnmarshalText([]byte(vs[0]))
+		if err != nil {
+			return fmt.Errorf("insecureSkipTLSVerify must be true or false, not %s", vs[0])
+		}
+	case "precision":
+		var d time.Duration
+		d, err = types.ParseExtendedDuration(vs[0])
+		if err != nil {
+			return err
+		}
+		c.Precision = types.NullDurationFrom(d)
+	case "retention":
+		var d time.Duration
+		d, err = types.ParseExtendedDuration(vs[0])
+		if err != nil {
+			return err
+		}
+		c.Retention = types.NullDurationFrom(d)
+	case "pushInterval":
+		err = c.PushInterval.UnmarshalText([]byte(vs[0]))
+		if err != nil {
+			return err
+		}
+	case "concurrentWrites":
+		var writes int
+		writes, err = strconv.Atoi(vs[0])
+		if err != nil {
+			return err
+		}
+		c.ConcurrentWrites = null.IntFrom(int64(writes))
+	case "tagsAsFields":
+		c.TagsAsFields = vs
+	default:
+		return fmt.Errorf("unknown query parameter: %s", k)
+	}
+	return nil
+}
+
+// ParseJSON parses the supplied JSON into a Config.
 func ParseJSON(data json.RawMessage) (Config, error) {
 	conf := Config{}
 	err := json.Unmarshal(data, &conf)
 	return conf, err
 }
 
-// parseURL parses the supplied URL into a Config.
+// ParseURL parses the supplied URL into a Config.
 func ParseURL(text string, logger logrus.FieldLogger) (Config, error) {
 	c := Config{}
 	u, err := url.Parse(text)
@@ -134,50 +178,17 @@ func ParseURL(text string, logger logrus.FieldLogger) (Config, error) {
 		c.Bucket = null.StringFrom(bucket)
 	}
 	for k, vs := range u.Query() {
-		switch k {
-		case "insecure":
-			logger.Warnf("'insecure' option is deprecated and it will be removed in the next releases, please use 'insecureSkipTLSVerify' instead.")
-			fallthrough
-		case "insecureSkipTLSVerify":
-			switch vs[0] {
-			case "":
-			case "false":
-				c.InsecureSkipTLSVerify = null.BoolFrom(false)
-			case "true":
-				c.InsecureSkipTLSVerify = null.BoolFrom(true)
-			default:
-				return c, fmt.Errorf("insecureSkipTLSVerify must be true or false, not %s", vs[0])
-			}
-		case "precision":
-			var d time.Duration
-			d, err = types.ParseExtendedDuration(vs[0])
-			if err != nil {
-				return c, err
-			}
-			c.Precision = types.NullDurationFrom(d)
-		case "retention":
-			var d time.Duration
-			d, err = types.ParseExtendedDuration(vs[0])
-			if err != nil {
-				return c, err
-			}
-			c.Retention = types.NullDurationFrom(d)
-		case "pushInterval":
-			err = c.PushInterval.UnmarshalText([]byte(vs[0]))
-			if err != nil {
-				return c, err
-			}
-		case "concurrentWrites":
-			var writes int
-			writes, err = strconv.Atoi(vs[0])
-			if err != nil {
-				return c, err
-			}
-			c.ConcurrentWrites = null.IntFrom(int64(writes))
-		case "tagsAsFields":
-			c.TagsAsFields = vs
-		default:
-			return c, fmt.Errorf("unknown query parameter: %s", k)
+		if k == "insecure" {
+			logger.Warnf(
+				"%q option is deprecated and it will be removed in the next releases, please use %q instead.",
+				"insecure",
+				"insecureSkipTLSVerify",
+			)
+			k = "insecureSkipTLSVerify"
+		}
+		err = c.SetFromKeyVals(k, vs)
+		if err != nil {
+			return c, err
 		}
 	}
 	return c, err
@@ -185,7 +196,9 @@ func ParseURL(text string, logger logrus.FieldLogger) (Config, error) {
 
 // GetConsolidatedConfig combines {default config values + JSON config +
 // environment vars + URL config values}, and returns the final result.
-func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, url string, logger logrus.FieldLogger) (Config, error) {
+func GetConsolidatedConfig(
+	jsonRawConf json.RawMessage, env map[string]string, url string, logger logrus.FieldLogger,
+) (Config, error) {
 	result := NewConfig()
 	if jsonRawConf != nil {
 		jsonConf, err := ParseJSON(jsonRawConf)
