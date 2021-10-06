@@ -64,7 +64,8 @@ This will set the default server used when just "-o influxdb" is passed.`,
 				conf = conf.Apply(jsonConfParsed)
 			}
 			if len(args) > 0 {
-				urlConf, err := influxdb.ParseURL(args[0]) //nolint:govet
+				var urlConf influxdb.Config
+				urlConf, err = influxdb.ParseURL(args[0], logger)
 				if err != nil {
 					return err
 				}
