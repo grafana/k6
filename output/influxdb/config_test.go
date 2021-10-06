@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
@@ -47,6 +48,7 @@ func TestParseURL(t *testing.T) {
 		"?insecureSkipTLSVerify=false":       {Config{InsecureSkipTLSVerify: null.BoolFrom(false)}, ""},
 		"?insecureSkipTLSVerify=true":        {Config{InsecureSkipTLSVerify: null.BoolFrom(true)}, ""},
 		"?insecureSkipTLSVerify=ture":        {Config{}, "insecureSkipTLSVerify must be true or false, not ture"},
+		"?insecure=true":                     {Config{InsecureSkipTLSVerify: null.BoolFrom(true)}, ""},
 		"?pushInterval=5s":                   {Config{PushInterval: types.NullDurationFrom(5 * time.Second)}, ""},
 		"?concurrentWrites=2":                {Config{ConcurrentWrites: null.IntFrom(2)}, ""},
 		"?precision=5s":                      {Config{Precision: types.NullDurationFrom(5 * time.Second)}, ""},
@@ -56,13 +58,13 @@ func TestParseURL(t *testing.T) {
 	for str, data := range testdata {
 		t.Run(str, func(t *testing.T) {
 			t.Parallel()
-			config, err := ParseURL(str)
+			config, err := ParseURL(str, testutils.NewLogger(t))
 			assert.NoError(t, err)
 			assert.Equal(t, data, config)
 
 			for q, qdata := range queries {
 				t.Run(q, func(t *testing.T) {
-					config, err := ParseURL(str + q)
+					config, err := ParseURL(str+q, testutils.NewLogger(t))
 					if qdata.Err != "" {
 						assert.EqualError(t, err, qdata.Err)
 					} else {

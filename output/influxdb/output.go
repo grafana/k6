@@ -77,7 +77,7 @@ func New(params output.Params) (output.Output, error) {
 func newOutput(params output.Params) (*Output, error) {
 	logger := params.Logger.WithFields(logrus.Fields{"output": "InfluxDBv2"})
 
-	conf, err := GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument)
+	conf, err := GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument, logger)
 	if err != nil {
 		return nil, err
 	}

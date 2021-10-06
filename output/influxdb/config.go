@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib/types"
@@ -108,33 +108,15 @@ func (c Config) Apply(cfg Config) Config {
 	return c
 }
 
-// ParseMap parses a map[string]interface{} into a Config
-func ParseMap(m map[string]interface{}) (Config, error) {
-	c := Config{}
-	if v, ok := m["tagsAsFields"].(string); ok {
-		m["tagsAsFields"] = []string{v}
-	}
-	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		DecodeHook: types.NullDecoder,
-		Result:     &c,
-	})
-	if err != nil {
-		return c, err
-	}
-
-	err = dec.Decode(m)
-	return c, err
-}
-
-// ParseJSON parses the supplied JSON into a Config.
+// parseJSON parses the supplied JSON into a Config.
 func ParseJSON(data json.RawMessage) (Config, error) {
 	conf := Config{}
 	err := json.Unmarshal(data, &conf)
 	return conf, err
 }
 
-// ParseURL parses the supplied URL into a Config.
-func ParseURL(text string) (Config, error) {
+// parseURL parses the supplied URL into a Config.
+func ParseURL(text string, logger logrus.FieldLogger) (Config, error) {
 	c := Config{}
 	u, err := url.Parse(text)
 	if err != nil {
@@ -153,6 +135,9 @@ func ParseURL(text string) (Config, error) {
 	}
 	for k, vs := range u.Query() {
 		switch k {
+		case "insecure":
+			logger.Warnf("'insecure' option is deprecated and it will be removed in the next releases, please use 'insecureSkipTLSVerify' instead.")
+			fallthrough
 		case "insecureSkipTLSVerify":
 			switch vs[0] {
 			case "":
@@ -200,7 +185,7 @@ func ParseURL(text string) (Config, error) {
 
 // GetConsolidatedConfig combines {default config values + JSON config +
 // environment vars + URL config values}, and returns the final result.
-func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, url string) (Config, error) {
+func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, url string, logger logrus.FieldLogger) (Config, error) {
 	result := NewConfig()
 	if jsonRawConf != nil {
 		jsonConf, err := ParseJSON(jsonRawConf)
@@ -218,7 +203,7 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, u
 	result = result.Apply(envConfig)
 
 	if url != "" {
-		urlConf, err := ParseURL(url)
+		urlConf, err := ParseURL(url, logger)
 		if err != nil {
 			return result, err
 		}
