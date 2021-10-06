@@ -23,9 +23,11 @@ package grpc
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/url"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 
 	"google.golang.org/grpc/reflection"
@@ -53,30 +55,13 @@ import (
 
 const isWindows = runtime.GOOS == "windows"
 
-func assertMetricEmitted(t *testing.T, metricName string, sampleContainers []stats.SampleContainer, url string) {
-	seenMetric := false
-
-	for _, sampleContainer := range sampleContainers {
-		for _, sample := range sampleContainer.GetSamples() {
-			surl, ok := sample.Tags.Get("url")
-			assert.True(t, ok)
-			if surl == url {
-				if sample.Metric.Name == metricName {
-					seenMetric = true
-				}
-			}
-		}
-	}
-	assert.True(t, seenMetric, "url %s didn't emit %s", url, metricName)
-}
-
 // codeBlock represents an execution of a k6 script.
 type codeBlock struct {
-	code         string
-	val          interface{}
-	err          string
-	windowsError string
-	asserts      func(*testing.T, *httpmultibin.HTTPMultiBin, chan stats.SampleContainer, error)
+	code       string
+	val        interface{}
+	err        string
+	windowsErr string
+	asserts    func(*testing.T, *httpmultibin.HTTPMultiBin, chan stats.SampleContainer, error)
 }
 
 type testcase struct {
@@ -88,6 +73,86 @@ type testcase struct {
 
 func TestClient(t *testing.T) {
 	t.Parallel()
+
+	type testState struct {
+		rt      *goja.Runtime
+		vuState *lib.State
+		env     *common.InitEnvironment
+		httpBin *httpmultibin.HTTPMultiBin
+		samples chan stats.SampleContainer
+	}
+	setup := func(t *testing.T) testState {
+		t.Helper()
+
+		root, err := lib.NewGroup("", nil)
+		require.NoError(t, err)
+		tb := httpmultibin.NewHTTPMultiBin(t)
+		samples := make(chan stats.SampleContainer, 1000)
+		state := &lib.State{
+			Group:     root,
+			Dialer:    tb.Dialer,
+			TLSConfig: tb.TLSClientConfig,
+			Samples:   samples,
+			Options: lib.Options{
+				SystemTags: stats.NewSystemTagSet(
+					stats.TagName,
+					stats.TagURL,
+				),
+				UserAgent: null.StringFrom("k6-test"),
+			},
+			BuiltinMetrics: metrics.RegisterBuiltinMetrics(
+				metrics.NewRegistry(),
+			),
+		}
+
+		cwd, err := os.Getwd()
+		require.NoError(t, err)
+		fs := afero.NewOsFs()
+		if isWindows {
+			fs = fsext.NewTrimFilePathSeparatorFs(fs)
+		}
+		initEnv := &common.InitEnvironment{
+			Logger: logrus.New(),
+			CWD:    &url.URL{Path: cwd},
+			FileSystems: map[string]afero.Fs{
+				"file": fs,
+			},
+		}
+
+		rt := goja.New()
+		rt.SetFieldNameMapper(common.FieldNameMapper{})
+
+		return testState{
+			rt:      rt,
+			httpBin: tb,
+			vuState: state,
+			env:     initEnv,
+			samples: samples,
+		}
+	}
+
+	assertMetricEmitted := func(
+		t *testing.T,
+		metricName string,
+		sampleContainers []stats.SampleContainer,
+		url string,
+	) {
+		seenMetric := false
+
+		for _, sampleContainer := range sampleContainers {
+			for _, sample := range sampleContainer.GetSamples() {
+				surl, ok := sample.Tags.Get("url")
+				assert.True(t, ok)
+				if surl == url {
+					if sample.Metric.Name == metricName {
+						seenMetric = true
+					}
+				}
+			}
+		}
+		assert.True(t, seenMetric, "url %s didn't emit %s", url, metricName)
+	}
+
 	tests := []testcase{
 		{
 			name: "New",
@@ -105,7 +170,7 @@ func TestClient(t *testing.T) {
 			client.load([], "./does_not_exist.proto");`,
 				err: "no such file or directory",
 				// (rogchap) this is a bit of a hack as windows reports a different system error than unix.
-				windowsError: "The system cannot find the file specified",
+				windowsErr: "The system cannot find the file specified",
 			},
 		},
 		{
@@ -509,7 +574,7 @@ func TestClient(t *testing.T) {
 			},
 			vuString: codeBlock{
 				code: `client.connect("GRPCBIN_ADDR", {reflect: true})`,
-				err:  "error invoking reflect API: rpc error: code = Unimplemented desc = unknown service grpc.reflection.v1alpha.ServerReflection",
+				err:  "rpc error: code = Unimplemented desc = unknown service grpc.reflection.v1alpha.ServerReflection",
 			},
 		},
 		{
@@ -534,7 +599,7 @@ func TestClient(t *testing.T) {
 			},
 			vuString: codeBlock{
 				code: `client.connect("GRPCBIN_ADDR", {reflect: "true"})`,
-				err:  `invalid value for 'reflect': '"true"', it needs to be boolean`,
+				err:  `invalid reflect value`,
 			},
 		},
 		{
@@ -589,80 +654,70 @@ func TestClient(t *testing.T) {
 			},
 		},
 	}
-	for _, test := range tests {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
+
+	assertResponse := func(t *testing.T, cb codeBlock, err error, val goja.Value, ts testState) {
+		if isWindows && cb.windowsErr != "" && err != nil {
+			err = errors.New(strings.ReplaceAll(err.Error(), cb.windowsErr, cb.err))
+		}
+		if cb.err == "" {
+			assert.NoError(t, err)
+		} else {
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), cb.err)
+		}
+		if cb.val != nil {
+			require.NotNil(t, val)
+			assert.Equal(t, cb.val, val.Export())
+		}
+		if cb.asserts != nil {
+			cb.asserts(t, ts.httpBin, ts.samples, err)
+		}
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			rt, state, initEnv, tb, samples, err := setup(t)
+
+			ts := setup(t)
+
+			// create and attach the GRPC module to goja
+			ctx := common.WithRuntime(context.Background(), ts.rt)
+			ctx = common.WithInitEnv(ctx, ts.env)
+			err := ts.rt.Set("grpc", common.Bind(ts.rt, New(), &ctx))
 			require.NoError(t, err)
-			ctx := common.WithInitEnv(common.WithRuntime(context.Background(), rt), initEnv)
-			require.NoError(t, rt.Set("grpc", common.Bind(rt, New(), &ctx)))
-			if test.setup != nil {
-				test.setup(tb)
+
+			// setup necessary environment if needed by a test
+			if tt.setup != nil {
+				tt.setup(ts.httpBin)
 			}
-			val, err := rt.RunString(tb.Replacer.Replace(test.initString.code))
-			assertResponse(t, test.initString, err, val, tb, samples)
-			ctx = lib.WithState(ctx, state)
-			val, err = rt.RunString(tb.Replacer.Replace(test.vuString.code))
-			assertResponse(t, test.vuString, err, val, tb, samples)
+
+			replace := func(code string) (goja.Value, error) {
+				return ts.rt.RunString(ts.httpBin.Replacer.Replace(code))
+			}
+
+			val, err := replace(tt.initString.code)
+			assertResponse(t, tt.initString, err, val, ts)
+
+			ctx = lib.WithState(ctx, ts.vuState)
+			val, err = replace(tt.vuString.code)
+			assertResponse(t, tt.vuString, err, val, ts)
 		})
 	}
 }
 
-func assertResponse(t *testing.T, r codeBlock, err error, val goja.Value, tb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer) {
-	if r.err == "" && r.windowsError == "" {
-		assert.NoError(t, err)
-	} else if r.err != "" {
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), r.err)
-	} else if r.windowsError != "" {
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), r.windowsError)
-	}
-	if r.val != nil {
-		require.NotNil(t, val)
-		assert.Equal(t, r.val, val.Export())
-	}
-	if r.asserts != nil {
-		r.asserts(t, tb, samples, err)
-	}
-}
+func TestGoja(t *testing.T) {
+	// ctx := common.WithInitEnv(common.WithRuntime(context.Background(), rt), initEnv)
+	// require.NoError(t, rt.Set("grpc", common.Bind(rt, New(), &ctx)))
 
-func setup(t *testing.T) (*goja.Runtime, *lib.State, *common.InitEnvironment, *httpmultibin.HTTPMultiBin, chan stats.SampleContainer, error) {
-	tb := httpmultibin.NewHTTPMultiBin(t)
-	root, err := lib.NewGroup("", nil)
-	assert.NoError(t, err)
-	runtime := goja.New()
-	runtime.SetFieldNameMapper(common.FieldNameMapper{})
-	samples := make(chan stats.SampleContainer, 1000)
-	state := &lib.State{
-		Group:     root,
-		Dialer:    tb.Dialer,
-		TLSConfig: tb.TLSClientConfig,
-		Samples:   samples,
-		Options: lib.Options{
-			SystemTags: stats.NewSystemTagSet(
-				stats.TagName,
-				stats.TagURL,
-			),
-			UserAgent: null.StringFrom("k6-test"),
-		},
-		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
-	}
-	cwd, err := os.Getwd()
-	require.NoError(t, err)
-	fs := afero.NewOsFs()
-	if isWindows {
-		fs = fsext.NewTrimFilePathSeparatorFs(fs)
-	}
-	initEnv := &common.InitEnvironment{
-		Logger: logrus.New(),
-		CWD:    &url.URL{Path: cwd},
-		FileSystems: map[string]afero.Fs{
-			"file": fs,
-		},
-	}
-	return runtime, state, initEnv, tb, samples, err
+	// if tt.setup != nil {
+	// 	tt.setup(tb)
+	// }
+	// val, err := rt.RunString(tb.Replacer.Replace(tt.initString.code))
+	// assertResponse(t, tt.initString, err, val, tb, samples)
+
+	// ctx = lib.WithState(ctx, state)
+	// val, err = rt.RunString(tb.Replacer.Replace(tt.vuString.code))
+	// assertResponse(t, tt.vuString, err, val, tb, samples)
 }
 
 func TestDebugStat(t *testing.T) {

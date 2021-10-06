@@ -160,14 +160,30 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 	if err != nil {
 		return nil, err
 	}
-
 	var rtn []MethodInfo
 	if c.mds == nil {
 		// This allows us to call load() multiple times, without overwriting the
 		// previously loaded definitions.
 		c.mds = make(map[string]protoreflect.MethodDescriptor)
 	}
-
+	appendMethodInfo := func(
+		fd protoreflect.FileDescriptor,
+		sd protoreflect.ServiceDescriptor,
+		md protoreflect.MethodDescriptor,
+	) {
+		name := fmt.Sprintf("/%s/%s", sd.FullName(), md.Name())
+		c.mds[name] = md
+		rtn = append(rtn, MethodInfo{
+			MethodInfo: grpc.MethodInfo{
+				Name:           string(md.Name()),
+				IsClientStream: md.IsStreamingClient(),
+				IsServerStream: md.IsStreamingServer(),
+			},
+			Package:    string(fd.Package()),
+			Service:    string(sd.Name()),
+			FullMethod: name,
+		})
+	}
 	files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
 		sds := fd.Services()
 		for i := 0; i < sds.Len(); i++ {
@@ -175,23 +191,11 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 			mds := sd.Methods()
 			for j := 0; j < mds.Len(); j++ {
 				md := mds.Get(j)
-				name := fmt.Sprintf("/%s/%s", sd.FullName(), md.Name())
-				c.mds[name] = md
-				rtn = append(rtn, MethodInfo{
-					MethodInfo: grpc.MethodInfo{
-						Name:           string(md.Name()),
-						IsClientStream: md.IsStreamingClient(),
-						IsServerStream: md.IsStreamingServer(),
-					},
-					Package:    string(fd.Package()),
-					Service:    string(sd.Name()),
-					FullMethod: name,
-				})
+				appendMethodInfo(fd, sd, md)
 			}
 		}
 		return true
 	})
-
 	return rtn, nil
 }
 
@@ -233,7 +237,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 			var ok bool
 			reflect, ok = v.(bool)
 			if !ok {
-				return false, fmt.Errorf(`invalid value for 'reflect': '%#v', it needs to be boolean`, v)
+				return false, fmt.Errorf("invalid reflect value: '%#v', it needs to be boolean", v)
 			}
 
 		default:
@@ -303,7 +307,7 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 			err = c.reflect(ctxPtr)
 		})
 		if err != nil {
-			return false, fmt.Errorf("error invoking reflect API: %w", err)
+			return false, fmt.Errorf("reflect: %w", err)
 		}
 	}
 	return true, nil
@@ -315,19 +319,21 @@ func (c *Client) reflect(ctxPtr *context.Context) error {
 	client := reflectpb.NewServerReflectionClient(c.conn)
 	methodClient, err := client.ServerReflectionInfo(*ctxPtr)
 	if err != nil {
-		return err
+		return fmt.Errorf("can't get server info: %w", err)
 	}
-	req := &reflectpb.ServerReflectionRequest{MessageRequest: &reflectpb.ServerReflectionRequest_ListServices{}}
+	req := &reflectpb.ServerReflectionRequest{
+		MessageRequest: &reflectpb.ServerReflectionRequest_ListServices{},
+	}
 	if err = methodClient.Send(req); err != nil {
-		return err
+		return fmt.Errorf("can't send list services request: %w", err)
 	}
 	resp, err := methodClient.Recv()
 	if err != nil {
-		return err
+		return fmt.Errorf("please enable server reflection on your grpc server: %w", err)
 	}
 	listResp := resp.GetListServicesResponse()
 	if listResp == nil {
-		return fmt.Errorf("can't list services")
+		return fmt.Errorf("can't list services, nil response")
 	}
 	fdset := &descriptorpb.FileDescriptorSet{}
 	for _, service := range listResp.GetService() {
@@ -337,22 +343,25 @@ func (c *Client) reflect(ctxPtr *context.Context) error {
 			},
 		}
 		if err = methodClient.Send(req); err != nil {
-			return err
+			return fmt.Errorf("can't send file descriptors request on service %q: %w", service, err)
 		}
 		resp, err = methodClient.Recv()
 		if err != nil {
-			return fmt.Errorf("error listing methods on '%s': %w", service, err)
+			return fmt.Errorf("can't receive file descriptors request on service %q: %w", service, err)
 		}
 		fdResp := resp.GetFileDescriptorResponse()
-		for _, f := range fdResp.GetFileDescriptorProto() {
-			a := &descriptorpb.FileDescriptorProto{}
-			if err = proto.Unmarshal(f, a); err != nil {
-				return err
+		for _, raw := range fdResp.GetFileDescriptorProto() {
+			var fdp descriptorpb.FileDescriptorProto
+			if err = proto.Unmarshal(raw, &fdp); err != nil {
+				return fmt.Errorf("can't unmarshal proto on service %q: %w", service, err)
 			}
-			fdset.File = append(fdset.File, a)
+			fdset.File = append(fdset.File, &fdp)
 		}
 	}
 	_, err = c.convertToMethodInfo(fdset)
+	if err != nil {
+		err = fmt.Errorf("can't convert method info: %w", err)
+	}
 	return err
 }
 
@@ -366,20 +375,16 @@ func (c *Client) Invoke(ctxPtr *context.Context,
 	if state == nil {
 		return nil, errInvokeRPCInInitContext
 	}
-
 	if c.conn == nil {
 		return nil, errors.New("no gRPC connection, you must call connect first")
 	}
-
 	if method == "" {
 		return nil, errors.New("method to invoke cannot be empty")
 	}
-
 	if method[0] != '/' {
 		method = "/" + method
 	}
 	md := c.mds[method]
-
 	if md == nil {
 		return nil, fmt.Errorf("method %q not found in file descriptors", method)
 	}
@@ -428,7 +433,6 @@ func (c *Client) Invoke(ctxPtr *context.Context,
 	if state.Options.SystemTags.Has(stats.TagURL) {
 		tags["url"] = fmt.Sprintf("%s%s", c.conn.Target(), method)
 	}
-
 	parts := strings.Split(method[1:], "/")
 	if state.Options.SystemTags.Has(stats.TagService) {
 		tags["service"] = parts[0]
@@ -504,7 +508,6 @@ func (c *Client) Invoke(ctxPtr *context.Context,
 		_ = json.Unmarshal(raw, &msg)
 		response.Message = msg
 	}
-
 	return &response, nil
 }
 
@@ -635,6 +638,5 @@ func formatPayload(payload interface{}) string {
 	if err != nil {
 		return ""
 	}
-
 	return string(b)
 }
