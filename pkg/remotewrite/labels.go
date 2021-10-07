@@ -6,7 +6,6 @@ import (
 )
 
 func tagsToPrometheusLabels(tags *stats.SampleTags) ([]prompb.Label, error) {
-	return []prompb.Label{}, nil
 	tagsMap := tags.CloneTags()
 	labelPairs := make([]prompb.Label, 0, len(tagsMap))
 

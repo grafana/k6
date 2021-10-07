@@ -47,11 +47,15 @@ To enable remote write in Prometheus 2.x use `--enable-feature=remote-write-rece
 
 <!-- #### Metric types conversion -->
 
-#### Next steps
+### Next steps
 
 *Note:* this list is meant to keep up to date with current roadmap and status of the extension and is very dynamic.
 
 - [X] support of raw format of Prometheus remote write specification
 - [ ] support of Prometheus as remote-write agent
    - [ ] mapping of k6 metrics to Prometheus metrics
+      - [X] Counter
+      - [X] Gauge
+      - [X] Rate
+      - [ ] Trend (draft)
    - [ ] ability to switch Prometheus as remote agent on as a configurable option
