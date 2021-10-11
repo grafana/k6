@@ -21,6 +21,8 @@ const (
 )
 
 type Config struct {
+	Mapping null.String `json:"mapping" envconfig:"K6_PROMETHEUS_MAPPING"`
+
 	Url null.String `json:"url" envconfig:"K6_PROMETHEUS_REMOTE_URL"` // here, in the name of env variable, we assume that we won't need to distinguish between remote write URL vs remote read URL
 
 	InsecureSkipTLSVerify null.Bool   `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY"`
@@ -37,6 +39,7 @@ type Config struct {
 
 func NewConfig() Config {
 	return Config{
+		Mapping:               null.StringFrom("prometheus"),
 		Url:                   null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 		CACert:                null.NewString("", false),
@@ -87,6 +90,10 @@ func (conf Config) ConstructRemoteConfig() (*remote.ClientConfig, error) {
 // From here till the end of the file partial duplicates waiting for config refactor (k6 #883)
 
 func (base Config) Apply(applied Config) Config {
+	if applied.Mapping.Valid {
+		base.Mapping = applied.Mapping
+	}
+
 	if applied.Url.Valid {
 		base.Url = applied.Url
 	}
@@ -128,6 +135,10 @@ func ParseArg(arg string) (Config, error) {
 	params, err := strvals.Parse(arg)
 	if err != nil {
 		return c, err
+	}
+
+	if v, ok := params["mapping"].(string); ok {
+		c.Mapping = null.StringFrom(v)
 	}
 
 	if v, ok := params["url"].(string); ok {
@@ -195,6 +206,10 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 		if err := result.FlushPeriod.UnmarshalText([]byte(flushPeriod)); err != nil {
 			return result, err
 		}
+	}
+
+	if mapping, mappingDefined := env["K6_PROMETHEUS_MAPPING"]; mappingDefined {
+		result.Mapping = null.StringFrom(mapping)
 	}
 
 	if url, urlDefined := env["K6_PROMETHEUS_REMOTE_URL"]; urlDefined {

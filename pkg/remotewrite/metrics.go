@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/prometheus/prometheus/pkg/timestamp"
 	"github.com/prometheus/prometheus/prompb"
 	"go.k6.io/k6/stats"
 )
@@ -76,4 +77,46 @@ type Mapping interface {
 	// AdjustLabels(labels []prompb.Label) []prompb.Label
 }
 
-// TODO: add dummy RawMapping
+func NewMapping(mapping string) Mapping {
+	switch mapping {
+	case "prometheus":
+		return &PrometheusMapping{}
+	default:
+		return &RawMapping{}
+	}
+}
+
+type RawMapping struct{}
+
+func (rm *RawMapping) MapCounter(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+	return rm.processSample(sample, labels)
+}
+
+func (rm *RawMapping) MapGauge(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+	return rm.processSample(sample, labels)
+}
+
+func (rm *RawMapping) MapRate(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+	return rm.processSample(sample, labels)
+}
+
+func (rm *RawMapping) MapTrend(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+	return rm.processSample(sample, labels)
+}
+
+func (rm *RawMapping) processSample(sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+	return []prompb.TimeSeries{
+		{
+			Labels: append(labels, prompb.Label{
+				Name:  "__name__",
+				Value: fmt.Sprintf("%s%s", defaultMetricPrefix, sample.Metric.Name),
+			}),
+			Samples: []prompb.Sample{
+				{
+					Value:     sample.Value,
+					Timestamp: timestamp.FromTime(sample.Time),
+				},
+			},
+		},
+	}
+}

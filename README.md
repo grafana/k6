@@ -57,5 +57,5 @@ To enable remote write in Prometheus 2.x use `--enable-feature=remote-write-rece
       - [X] Counter
       - [X] Gauge
       - [X] Rate
-      - [ ] Trend (draft)
+      - [X] Trend (draft)
    - [ ] ability to switch Prometheus as remote agent on as a configurable option

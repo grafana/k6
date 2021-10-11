@@ -10,10 +10,6 @@ import (
 
 type PrometheusMapping struct{}
 
-func NewPrometheusMapping() *PrometheusMapping {
-	return &PrometheusMapping{}
-}
-
 func (pm *PrometheusMapping) MapCounter(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
 	sample = ms.update(sample)
 	aggr := sample.Metric.Sink.Format(0)

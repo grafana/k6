@@ -2,6 +2,7 @@ package remotewrite
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -44,11 +45,13 @@ func New(params output.Params) (*Output, error) {
 		return nil, err
 	}
 
+	params.Logger.Info(fmt.Sprintf("Prometheus: configuring remote-write with %s mapping", config.Mapping.String))
+
 	return &Output{
 		client:  client,
 		config:  config,
 		metrics: newMetricsStorage(),
-		mapping: NewPrometheusMapping(),
+		mapping: NewMapping(config.Mapping.String),
 		logger:  params.Logger,
 	}, nil
 }
@@ -85,7 +88,7 @@ func (o *Output) flush() {
 	// Prometheus write handler processes only some fields as of now, so here we'll add only them.
 	promTimeSeries := o.convertToTimeSeries(samplesContainers)
 
-	o.logger.Info("Number of time series: ", len(promTimeSeries))
+	o.logger.Debug("Number of time series: ", len(promTimeSeries))
 
 	req := prompb.WriteRequest{
 		Timeseries: promTimeSeries,
