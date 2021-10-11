@@ -1,0 +1,56 @@
+name: Bug report
+description: Use this template for reporting bugs. Please search existing issues first.
+title: '[Bug]: '
+body:
+  - type: markdown
+    attributes:
+      value: '## Environment'
+  - type: dropdown
+    attributes:
+      label: k6 version
+      options:
+        - '0.34'
+        - '0.33'
+        - '0.32'
+        - '0.31'
+        - '0.30'
+        - <0.30
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: OS
+      options:
+        - Windows
+        - Linux
+        - Mac
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: 'Docker version and image, if applicable:'
+      options:
+        - '4.10'
+        - '4.0'
+        - '3.6'
+        - 3.5.2
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected Behaviour
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Actual Behaviour
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Steps to Reproduce the Problem
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: >-
