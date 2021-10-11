@@ -172,14 +172,14 @@ func (vlvc RampingVUsConfig) Validate() []error {
 //
 // VUs  ^
 //    10|          Y
-//     9|         YYY
+//     9|         XXX
 //     8|        YYYYY
-//     7|       YYYYYYY
+//     7|       XXXXXXX
 //     6|      YYYYYYYYY
-//     5|     YYYYXXXYYYY
-//     4|    YYYXXXXXXXYYY
-//     3|   YYXXXXXXXXXXXYY
-//     2|  YXXXXXXXXXXXXXXXY
+//     5|     XXXXXXXXXXX
+//     4|    YYYYYYYYYYYYY
+//     3|   XXXXXXXXXXXXXXX
+//     2|  YYYYYYYYYYYYYYYYY
 //     1| XXXXXXXXXXXXXXXXXXX
 //     0------------------------> time(s)
 //       01234567890123456789012   (t%10)
