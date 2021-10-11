@@ -80,6 +80,19 @@ func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing
 	}
 }
 
+func verifyExternallyExecuted(scenarioName string, vus null.Int, duration time.Duration) func(t *testing.T, c Config) {
+	return func(t *testing.T, c Config) {
+		exec := c.Scenarios[scenarioName]
+		require.NotEmpty(t, exec)
+		require.IsType(t, executor.ExternallyControlledConfig{}, exec)
+		ecc, ok := exec.(executor.ExternallyControlledConfig)
+		require.True(t, ok)
+		assert.Equal(t, vus, ecc.VUs)
+		assert.Equal(t, types.NullDurationFrom(duration), ecc.Duration)
+		assert.Equal(t, vus, ecc.MaxVUs) // MaxVUs defaults to VUs unless specified
+	}
+}
+
 func verifyRampingVUs(startVus null.Int, stages []executor.Stage) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
 		exec := c.Scenarios[lib.DefaultScenarioName]
@@ -181,7 +194,7 @@ func resetStickyGlobalVars() {
 type exp struct {
 	cliParseError      bool
 	cliReadError       bool
-	consolidationError bool
+	consolidationError bool // Note: consolidationError includes validation errors from envconfig.Process()
 	derivationError    bool
 	validationErrors   bool
 	logWarning         bool
@@ -234,7 +247,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{"--vus", "10", "-i", "6"}}, exp{validationErrors: true}, verifySharedIters(I(10), I(6))},
 		{opts{cli: []string{"-s", "10s:5", "-s", "10s:"}}, exp{validationErrors: true}, nil},
 		{opts{fs: defaultConfig(`{"stages": [{"duration": "20s"}], "vus": 10}`)}, exp{validationErrors: true}, nil},
-		// These should emit a consolidation error
+		// These should emit a derivation error
 		{opts{cli: []string{"-u", "2", "-d", "10s", "-s", "10s:20"}}, exp{derivationError: true}, nil},
 		{opts{cli: []string{"-u", "3", "-i", "5", "-s", "10s:20"}}, exp{derivationError: true}, nil},
 		{opts{cli: []string{"-u", "3", "-d", "0"}}, exp{derivationError: true}, nil},
@@ -360,7 +373,15 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				assert.Equal(t, types.NullDurationFrom(10*time.Second), clvc.GracefulStop)
 			},
 		},
-		// TODO: test the externally controlled executor
+		{
+			opts{
+				fs: defaultConfig(`{"scenarios": { "def": {
+					"executor": "externally-controlled", "vus": 15, "duration": "2h"
+				}}}`),
+			},
+			exp{},
+			verifyExternallyExecuted("def", I(15), 2*time.Hour),
+		},
 		// TODO: test execution-segment
 
 		// Just in case, verify that no options will result in the same 1 vu 1 iter config
@@ -488,7 +509,21 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				}, c.Options.DNS)
 			},
 		},
-
+		{
+			opts{env: []string{"K6_NO_SETUP=true", "K6_NO_TEARDOWN=false"}},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, null.BoolFrom(true), c.Options.NoSetup)
+				assert.Equal(t, null.BoolFrom(false), c.Options.NoTeardown)
+			},
+		},
+		{
+			opts{env: []string{"K6_NO_SETUP=false", "K6_NO_TEARDOWN=bool"}},
+			exp{
+				consolidationError: true,
+			},
+			nil,
+		},
 		// TODO: test for differences between flagsets
 		// TODO: more tests in general, especially ones not related to execution parameters...
 	}

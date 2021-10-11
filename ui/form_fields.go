@@ -28,7 +28,7 @@ import (
 	"os"
 	"strings"
 
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 // Verify that the fields implement the interface
@@ -123,7 +123,7 @@ func (f PasswordField) GetContents(r io.Reader) (string, error) {
 	if !ok {
 		return "", errors.New("cannot read password from the supplied terminal")
 	}
-	password, err := terminal.ReadPassword(int(stdin.Fd()))
+	password, err := term.ReadPassword(int(stdin.Fd()))
 	if err != nil {
 		// Possibly running on Cygwin/mintty which doesn't emulate
 		// pseudo terminals properly, so fallback to plain text input.

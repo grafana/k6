@@ -291,8 +291,8 @@ gjson.AddModifier("case", func(json, arg string) string {
 ### Multipaths
 
 Starting with v1.3.0, GJSON added the ability to join multiple paths together
-to form new documents. Wrapping comma-separated paths between `{...}` or 
-`[...]` will result in a new array or object, respectively.
+to form new documents. Wrapping comma-separated paths between `[...]` or
+`{...}` will result in a new array or object, respectively.
 
 For example, using the given multipath 
 

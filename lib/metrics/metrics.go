@@ -30,7 +30,6 @@ const (
 	IterationsName        = "iterations"
 	IterationDurationName = "iteration_duration"
 	DroppedIterationsName = "dropped_iterations"
-	ErrorsName            = "errors"
 
 	ChecksName        = "checks"
 	GroupDurationName = "group_duration"
@@ -65,7 +64,6 @@ type BuiltinMetrics struct {
 	Iterations        *stats.Metric
 	IterationDuration *stats.Metric
 	DroppedIterations *stats.Metric
-	Errors            *stats.Metric
 
 	// Runner-emitted.
 	Checks        *stats.Metric
@@ -106,7 +104,6 @@ func RegisterBuiltinMetrics(registry *Registry) *BuiltinMetrics {
 		Iterations:        registry.MustNewMetric(IterationsName, stats.Counter),
 		IterationDuration: registry.MustNewMetric(IterationDurationName, stats.Trend, stats.Time),
 		DroppedIterations: registry.MustNewMetric(DroppedIterationsName, stats.Counter),
-		Errors:            registry.MustNewMetric(ErrorsName, stats.Counter),
 
 		Checks:        registry.MustNewMetric(ChecksName, stats.Rate),
 		GroupDuration: registry.MustNewMetric(GroupDurationName, stats.Trend, stats.Time),
