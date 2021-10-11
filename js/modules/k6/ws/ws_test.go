@@ -733,7 +733,6 @@ func TestReadPump(t *testing.T) {
 
 func TestUserAgent(t *testing.T) {
 	t.Parallel()
-
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	sr := tb.Replacer.Replace
 
@@ -759,6 +758,22 @@ func TestUserAgent(t *testing.T) {
 		TLSConfig:      tb.TLSClientConfig,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
 	}
+
+	tb.Mux.HandleFunc("/ws-echo-useragent", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// Echo back User-Agent header if it exists
+		responseHeaders := w.Header().Clone()
+		if ua := req.Header.Get("User-Agent"); ua != "" {
+			responseHeaders.Add("Echo-User-Agent", req.Header.Get("User-Agent"))
+		}
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, responseHeaders)
+		if err != nil {
+			return
+		}
+		err = conn.Close()
+		if err != nil {
+			return
+		}
+	}))
 
 	ctx := context.Background()
 	ctx = lib.WithState(ctx, state)

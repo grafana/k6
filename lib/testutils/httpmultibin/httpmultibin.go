@@ -259,21 +259,6 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	mux.Handle("/brotli", getEncodedHandler(t, "br"))
 	mux.Handle("/ws-echo", getWebsocketHandler(true, false))
 	mux.Handle("/ws-echo-invalid", getWebsocketHandler(true, true))
-	mux.HandleFunc("/ws-echo-useragent", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// Echo back User-Agent header if it exists
-		responseHeaders := w.Header().Clone()
-		if ua := req.Header.Get("User-Agent"); ua != "" {
-			responseHeaders.Add("Echo-User-Agent", req.Header.Get("User-Agent"))
-		}
-		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, responseHeaders)
-		if err != nil {
-			return
-		}
-		err = conn.Close()
-		if err != nil {
-			return
-		}
-	}))
 	mux.Handle("/ws-close", getWebsocketHandler(false, false))
 	mux.Handle("/ws-close-invalid", getWebsocketHandler(false, true))
 	mux.Handle("/zstd", getEncodedHandler(t, "zstd"))
