@@ -30,6 +30,9 @@ type Config struct {
 	Password null.String `json:"password" envconfig:"K6_PROMETHEUS_PASSWORD"`
 
 	FlushPeriod types.NullDuration `json:"flushPeriod" envconfig:"K6_PROMETHEUS_FLUSH_PERIOD"`
+
+	KeepTags    null.Bool `json:"keepTags" envconfig:"K6_KEEP_TAGS"`
+	KeepNameTag null.Bool `json:"keepNameTag" envconfig:"K6_KEEP_NAME_TAG"`
 }
 
 func NewConfig() Config {
@@ -40,6 +43,8 @@ func NewConfig() Config {
 		User:                  null.NewString("", false),
 		Password:              null.NewString("", false),
 		FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
+		KeepTags:              null.BoolFrom(true),
+		KeepNameTag:           null.BoolFrom(false),
 	}
 }
 
@@ -106,6 +111,14 @@ func (base Config) Apply(applied Config) Config {
 		base.FlushPeriod = applied.FlushPeriod
 	}
 
+	if applied.KeepTags.Valid {
+		base.KeepTags = applied.KeepTags
+	}
+
+	if applied.KeepNameTag.Valid {
+		base.KeepNameTag = applied.KeepNameTag
+	}
+
 	return base
 }
 
@@ -143,6 +156,14 @@ func ParseArg(arg string) (Config, error) {
 		}
 	}
 
+	if v, ok := params["keepTags"].(bool); ok {
+		c.KeepTags = null.BoolFrom(v)
+	}
+
+	if v, ok := params["keepNameTag"].(bool); ok {
+		c.KeepNameTag = null.BoolFrom(v)
+	}
+
 	return c, nil
 }
 
@@ -158,6 +179,17 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 		result = result.Apply(jsonConf)
 	}
 
+	getEnvBool := func(env map[string]string, name string) (null.Bool, error) {
+		if v, vDefined := env[name]; vDefined {
+			if b, err := strconv.ParseBool(v); err != nil {
+				return null.NewBool(false, false), err
+			} else {
+				return null.BoolFrom(b), nil
+			}
+		}
+		return null.NewBool(false, false), nil
+	}
+
 	// envconfig is not processing some undefined vars (at least duration) so apply them manually
 	if flushPeriod, flushPeriodDefined := env["K6_PROMETHEUS_FLUSH_PERIOD"]; flushPeriodDefined {
 		if err := result.FlushPeriod.UnmarshalText([]byte(flushPeriod)); err != nil {
@@ -169,11 +201,12 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 		result.Url = null.StringFrom(url)
 	}
 
-	if insecureSkipTLSVerify, insecureSkipTLSVerifyDefined := env["K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY"]; insecureSkipTLSVerifyDefined {
-		if b, err := strconv.ParseBool(insecureSkipTLSVerify); err != nil {
-			return result, err
-		} else {
-			result.InsecureSkipTLSVerify = null.BoolFrom(b)
+	if b, err := getEnvBool(env, "K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY"); err != nil {
+		return result, err
+	} else {
+		if b.Valid {
+			// apply only if valid, to keep default option otherwise
+			result.InsecureSkipTLSVerify = b
 		}
 	}
 
@@ -187,6 +220,22 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 
 	if password, passwordDefined := env["K6_PROMETHEUS_PASSWORD"]; passwordDefined {
 		result.Password = null.StringFrom(password)
+	}
+
+	if b, err := getEnvBool(env, "K6_KEEP_TAGS"); err != nil {
+		return result, err
+	} else {
+		if b.Valid {
+			result.KeepTags = b
+		}
+	}
+
+	if b, err := getEnvBool(env, "K6_KEEP_NAME_TAG"); err != nil {
+		return result, err
+	} else {
+		if b.Valid {
+			result.KeepNameTag = b
+		}
 	}
 
 	if arg != "" {

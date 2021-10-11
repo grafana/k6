@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/storage/remote"
@@ -115,7 +115,7 @@ func (o *Output) convertToTimeSeries(samplesContainers []stats.SampleContainer) 
 			// lose info in tags or assign tags wrongly, let's store each Sample in a different TimeSeries, for now.
 			// This approach also allows to avoid hard to replicate issues with duplicate timestamps.
 
-			labels, err := tagsToPrometheusLabels(sample.Tags)
+			labels, err := tagsToPrometheusLabels(sample.Tags, o.config)
 			if err != nil {
 				o.logger.Error(err)
 			}

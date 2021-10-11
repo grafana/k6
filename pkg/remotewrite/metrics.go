@@ -55,7 +55,7 @@ func (ms *metricsStorage) transform(mapping Mapping, sample stats.Sample, labels
 		newts = mapping.MapRate(ms, sample, labels)
 
 	case stats.Trend:
-		// newts = mapping.MapTrend(ms, sample, labels)
+		newts = mapping.MapTrend(ms, sample, labels)
 
 	default:
 		return nil, fmt.Errorf("Something is really off as I cannot recognize the type of metric %s: `%s`", sample.Metric.Name, sample.Metric.Type)

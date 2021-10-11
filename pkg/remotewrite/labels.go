@@ -5,7 +5,11 @@ import (
 	"go.k6.io/k6/stats"
 )
 
-func tagsToPrometheusLabels(tags *stats.SampleTags) ([]prompb.Label, error) {
+func tagsToPrometheusLabels(tags *stats.SampleTags, config Config) ([]prompb.Label, error) {
+	if !config.KeepTags.Bool {
+		return []prompb.Label{}, nil
+	}
+
 	tagsMap := tags.CloneTags()
 	labelPairs := make([]prompb.Label, 0, len(tagsMap))
 
@@ -13,6 +17,11 @@ func tagsToPrometheusLabels(tags *stats.SampleTags) ([]prompb.Label, error) {
 		if len(name) < 1 || len(value) < 1 {
 			continue
 		}
+
+		if !config.KeepNameTag.Bool && name == "name" {
+			continue
+		}
+
 		// TODO add checks:
 		// - reserved underscore
 		// - sorting
