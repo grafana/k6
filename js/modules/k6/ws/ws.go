@@ -111,6 +111,8 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	// Leave header to nil by default so we can pass it directly to the Dialer
 	var header http.Header
 
+	enableCompression := false
+
 	tags := state.CloneTags()
 
 	// Parse the optional second argument (params)
@@ -143,6 +145,22 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 				for _, key := range tagObj.Keys() {
 					tags[key] = tagObj.Get(key).String()
 				}
+			case "compression":
+				// deflate compression algorithm is supported - as defined in RFC7692
+				// compression here relies on the implementation in gorilla/websocket package, usage is
+				// experimental and may result in decreased performance. package supports
+				// only "no context takeover" scenario
+
+				algoString := strings.TrimSpace(params.Get(k).ToString().String())
+				if algoString == "" {
+					continue
+				}
+
+				if algoString != "deflate" {
+					return nil, fmt.Errorf("unsupported compression algorithm '%s', supported algorithm is 'deflate'", algoString)
+				}
+
+				enableCompression = true
 			}
 		}
 
@@ -166,7 +184,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		NetDialContext:    state.Dialer.DialContext,
 		Proxy:             http.ProxyFromEnvironment,
 		TLSClientConfig:   tlsConfig,
-		EnableCompression: true,
+		EnableCompression: enableCompression,
 	}
 
 	start := time.Now()
