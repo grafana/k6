@@ -1,0 +1,15 @@
+name: Feature Request
+description: Use this template for suggesting new features.
+title: '[Feature Request]: '
+labels: feature
+body:
+  - type: textarea
+    attributes:
+      label: Feature Description
+      description: A clear and concise description of the problem or missing capability
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Suggested Solution (optional)
+      description: If you have a solution in mind, please describe it.
