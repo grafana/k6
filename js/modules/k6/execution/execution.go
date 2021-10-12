@@ -130,6 +130,21 @@ func (mi *ModuleInstance) newScenarioInfo() (*goja.Object, error) {
 		"iterationInTest": func() interface{} {
 			return vuState.GetScenarioGlobalVUIter()
 		},
+		"stage": func() interface{} {
+			stage, err := getScenarioState().CurrentStage()
+			if err != nil {
+				common.Throw(rt, err)
+			}
+			si := map[string]func() interface{}{
+				"number": func() interface{} { return stage.Index },
+				"name":   func() interface{} { return stage.Name },
+			}
+			obj, err := newInfoObj(rt, si)
+			if err != nil {
+				common.Throw(rt, err)
+			}
+			return obj
+		},
 	}
 
 	return newInfoObj(rt, si)
