@@ -29,7 +29,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -68,9 +67,8 @@ var (
 
 // Client represents a gRPC client that can be used to make RPC requests
 type Client struct {
-	mds         map[string]protoreflect.MethodDescriptor
-	conn        *grpc.ClientConn
-	reflectOnce sync.Once
+	mds  map[string]protoreflect.MethodDescriptor
+	conn *grpc.ClientConn
 }
 
 // XClient represents the Client constructor (e.g. `new grpc.Client()`) and
@@ -215,7 +213,7 @@ func (t transportCreds) ClientHandshake(ctx context.Context,
 }
 
 // Connect is a block dial to the gRPC server at the given address (host:port)
-// nolint: funlen
+// nolint:funlen,cyclop
 func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string]interface{}) (bool, error) {
 	state := lib.GetState(*ctxPtr)
 	if state == nil {
@@ -293,24 +291,19 @@ func (c *Client) Connect(ctxPtr *context.Context, addr string, params map[string
 		c.conn, err = grpc.DialContext(ctx, addr, opts...)
 		if err != nil {
 			errc <- err
-
 			return
+		}
+		if reflect {
+			err := c.reflect(ctxPtr)
+			if err != nil {
+				errc <- err
+				return
+			}
 		}
 		close(errc)
 	}()
-	if err := <-errc; err != nil {
-		return false, err
-	}
-	if reflect {
-		var err error
-		c.reflectOnce.Do(func() {
-			err = c.reflect(ctxPtr)
-		})
-		if err != nil {
-			return false, fmt.Errorf("reflect: %w", err)
-		}
-	}
-	return true, nil
+	err := <-errc
+	return err == nil, err
 }
 
 // reflect will use the grpc reflection api to make the file descriptors available to request.
@@ -324,39 +317,17 @@ func (c *Client) reflect(ctxPtr *context.Context) error {
 	req := &reflectpb.ServerReflectionRequest{
 		MessageRequest: &reflectpb.ServerReflectionRequest_ListServices{},
 	}
-	if err = methodClient.Send(req); err != nil {
-		return fmt.Errorf("can't send list services request: %w", err)
-	}
-	resp, err := methodClient.Recv()
+	resp, err := sendReceive(methodClient, req)
 	if err != nil {
-		return fmt.Errorf("please enable server reflection on your grpc server: %w", err)
+		return fmt.Errorf("can't list services: %w", err)
 	}
 	listResp := resp.GetListServicesResponse()
 	if listResp == nil {
 		return fmt.Errorf("can't list services, nil response")
 	}
-	fdset := &descriptorpb.FileDescriptorSet{}
-	for _, service := range listResp.GetService() {
-		req = &reflectpb.ServerReflectionRequest{
-			MessageRequest: &reflectpb.ServerReflectionRequest_FileContainingSymbol{
-				FileContainingSymbol: service.GetName(),
-			},
-		}
-		if err = methodClient.Send(req); err != nil {
-			return fmt.Errorf("can't send file descriptors request on service %q: %w", service, err)
-		}
-		resp, err = methodClient.Recv()
-		if err != nil {
-			return fmt.Errorf("can't receive file descriptors request on service %q: %w", service, err)
-		}
-		fdResp := resp.GetFileDescriptorResponse()
-		for _, raw := range fdResp.GetFileDescriptorProto() {
-			var fdp descriptorpb.FileDescriptorProto
-			if err = proto.Unmarshal(raw, &fdp); err != nil {
-				return fmt.Errorf("can't unmarshal proto on service %q: %w", service, err)
-			}
-			fdset.File = append(fdset.File, &fdp)
-		}
+	fdset, err := resolveFileDescriptors(methodClient, listResp)
+	if err != nil {
+		return fmt.Errorf("resolveFileDescriptors: %w", err)
 	}
 	_, err = c.convertToMethodInfo(fdset)
 	if err != nil {
@@ -365,10 +336,57 @@ func (c *Client) reflect(ctxPtr *context.Context) error {
 	return err
 }
 
+func resolveFileDescriptors(
+	mc reflectpb.ServerReflection_ServerReflectionInfoClient,
+	res *reflectpb.ListServiceResponse,
+) (*descriptorpb.FileDescriptorSet, error) {
+	fdset := &descriptorpb.FileDescriptorSet{}
+	for _, service := range res.GetService() {
+		req := &reflectpb.ServerReflectionRequest{
+			MessageRequest: &reflectpb.ServerReflectionRequest_FileContainingSymbol{
+				FileContainingSymbol: service.GetName(),
+			},
+		}
+		resp, err := sendReceive(mc, req)
+		if err != nil {
+			return nil, fmt.Errorf("can't get method on service %q: %w", service, err)
+		}
+		fdResp := resp.GetFileDescriptorResponse()
+		for _, raw := range fdResp.GetFileDescriptorProto() {
+			var fdp descriptorpb.FileDescriptorProto
+			if err = proto.Unmarshal(raw, &fdp); err != nil {
+				return nil, fmt.Errorf("can't unmarshal proto on service %q: %w", service, err)
+			}
+			fdset.File = append(fdset.File, &fdp)
+		}
+	}
+	return fdset, nil
+}
+
+// sendReceive sends a request to a reflection client and,
+// receives a response.
+func sendReceive(
+	client reflectpb.ServerReflection_ServerReflectionInfoClient,
+	req *reflectpb.ServerReflectionRequest,
+) (*reflectpb.ServerReflectionResponse, error) {
+	if err := client.Send(req); err != nil {
+		return nil, fmt.Errorf("can't send request: %w", err)
+	}
+	resp, err := client.Recv()
+	if err != nil {
+		return nil, fmt.Errorf("can't receive response: %w", err)
+	}
+	return resp, nil
+}
+
 // Invoke creates and calls a unary RPC by fully qualified method name
-//nolint: funlen,gocognit,gocyclo
-func (c *Client) Invoke(ctxPtr *context.Context,
-	method string, req goja.Value, params map[string]interface{}) (*Response, error) {
+//nolint: funlen,gocognit,gocyclo,cyclop
+func (c *Client) Invoke(
+	ctxPtr *context.Context,
+	method string,
+	req goja.Value,
+	params map[string]interface{},
+) (*Response, error) {
 	ctx := *ctxPtr
 	rt := common.GetRuntime(ctx)
 	state := lib.GetState(ctx)
@@ -452,10 +470,10 @@ func (c *Client) Invoke(ctxPtr *context.Context,
 	{
 		b, err := req.ToObject(rt).MarshalJSON()
 		if err != nil {
-			return nil, fmt.Errorf("unable to serialise request object: %v", err)
+			return nil, fmt.Errorf("unable to serialise request object: %w", err)
 		}
 		if err := protojson.Unmarshal(b, reqdm); err != nil {
-			return nil, fmt.Errorf("unable to serialise request object to protocol buffer: %v", err)
+			return nil, fmt.Errorf("unable to serialise request object to protocol buffer: %w", err)
 		}
 	}
 

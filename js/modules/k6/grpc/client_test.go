@@ -706,6 +706,8 @@ func TestClient(t *testing.T) {
 }
 
 func TestGoja(t *testing.T) {
+	t.Parallel()
+	t.Skip()
 	// ctx := common.WithInitEnv(common.WithRuntime(context.Background(), rt), initEnv)
 	// require.NoError(t, rt.Set("grpc", common.Bind(rt, New(), &ctx)))
 
