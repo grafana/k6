@@ -1,0 +1,16 @@
+addReviewers: true
+addAssignees: false
+useReviewGroups: true
+useAssigneeGroups: false
+numberOfReviewers: 1
+reviewGroups:
+  old:
+    - na--
+    - MStoykov
+    - imiric
+  new: # TODO: remove a few months from now
+    - codebien
+    - yorugac
+    - inancgumus
+skipKeywords:
+  - wip
