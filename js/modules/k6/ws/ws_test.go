@@ -745,13 +745,13 @@ func TestUserAgent(t *testing.T) {
 
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, responseHeaders)
 		if err != nil {
-			t.Fatalf("error in %s %s handler : %s", "TestUserAgent", "/ws-echo-useragent", err)
+			t.Fatalf("/ws-echo-useragent cannot upgrade request: %v", err)
 			return
 		}
 
 		err = conn.Close()
 		if err != nil {
-			t.Logf("error in %s %s handler : %s", "TestUserAgent", "/ws-echo-useragent", err)
+			t.Logf("error while closing connection in /ws-echo-useragent: %v", err)
 			return
 		}
 	}))
