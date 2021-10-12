@@ -108,8 +108,8 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		return nil, errors.New("last argument to ws.connect must be a function")
 	}
 
-	// Leave header to nil by default so we can pass it directly to the Dialer
-	var header http.Header
+	header := make(http.Header)
+	header.Set("User-Agent", state.Options.UserAgent.String)
 
 	tags := state.CloneTags()
 
@@ -119,7 +119,6 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		for _, k := range params.Keys() {
 			switch k {
 			case "headers":
-				header = http.Header{}
 				headersV := params.Get(k)
 				if goja.IsUndefined(headersV) || goja.IsNull(headersV) {
 					continue
