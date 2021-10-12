@@ -742,12 +742,16 @@ func TestUserAgent(t *testing.T) {
 		if ua := req.Header.Get("User-Agent"); ua != "" {
 			responseHeaders.Add("Echo-User-Agent", req.Header.Get("User-Agent"))
 		}
+
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, responseHeaders)
 		if err != nil {
+			t.Fatalf("error in %s %s handler : %s", "TestUserAgent", "/ws-echo-useragent", err)
 			return
 		}
+
 		err = conn.Close()
 		if err != nil {
+			t.Logf("error in %s %s handler : %s", "TestUserAgent", "/ws-echo-useragent", err)
 			return
 		}
 	}))
@@ -775,8 +779,7 @@ func TestUserAgent(t *testing.T) {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
 	}
 
-	ctx := context.Background()
-	ctx = lib.WithState(ctx, state)
+	ctx := lib.WithState(context.Background(), state)
 	ctx = common.WithRuntime(ctx, rt)
 
 	err = rt.Set("ws", common.Bind(rt, New(), &ctx))
