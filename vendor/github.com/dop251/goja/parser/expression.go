@@ -85,11 +85,9 @@ func (self *_parser) parsePrimaryExpression() ast.Expression {
 	case token.LEFT_BRACKET:
 		return self.parseArrayLiteral()
 	case token.LEFT_PARENTHESIS:
-		/*self.expect(token.LEFT_PARENTHESIS)
-		expression := self.parseExpression()
-		self.expect(token.RIGHT_PARENTHESIS)
-		return expression*/
 		return self.parseParenthesisedExpression()
+	case token.BACKTICK:
+		return self.parseTemplateLiteral(false)
 	case token.THIS:
 		self.next()
 		return &ast.ThisExpression{
@@ -465,6 +463,46 @@ func (self *_parser) parseArrayLiteral() *ast.ArrayLiteral {
 	}
 }
 
+func (self *_parser) parseTemplateLiteral(tagged bool) *ast.TemplateLiteral {
+	res := &ast.TemplateLiteral{
+		OpenQuote: self.idx,
+	}
+	for self.chr != -1 {
+		start := self.idx + 1
+		literal, parsed, finished, parseErr, err := self.parseTemplateCharacters()
+		if err != nil {
+			self.error(self.idx, err.Error())
+		}
+		res.Elements = append(res.Elements, &ast.TemplateElement{
+			Idx:     start,
+			Literal: literal,
+			Parsed:  parsed,
+			Valid:   parseErr == nil,
+		})
+		if !tagged && parseErr != nil {
+			self.error(self.idx, parseErr.Error())
+		}
+		end := self.idx + 1
+		self.next()
+		if finished {
+			res.CloseQuote = end
+			break
+		}
+		expr := self.parseExpression()
+		res.Expressions = append(res.Expressions, expr)
+		if self.token != token.RIGHT_BRACE {
+			self.errorUnexpectedToken(self.token)
+		}
+	}
+	return res
+}
+
+func (self *_parser) parseTaggedTemplateLiteral(tag ast.Expression) *ast.TemplateLiteral {
+	l := self.parseTemplateLiteral(true)
+	l.Tag = tag
+	return l
+}
+
 func (self *_parser) parseArgumentList() (argumentList []ast.Expression, idx0, idx1 file.Idx) {
 	idx0 = self.expect(token.LEFT_PARENTHESIS)
 	if self.token != token.RIGHT_PARENTHESIS {
@@ -575,14 +613,17 @@ func (self *_parser) parseLeftHandSideExpression() ast.Expression {
 	} else {
 		left = self.parsePrimaryExpression()
 	}
-
+L:
 	for {
-		if self.token == token.PERIOD {
+		switch self.token {
+		case token.PERIOD:
 			left = self.parseDotMember(left)
-		} else if self.token == token.LEFT_BRACKET {
+		case token.LEFT_BRACKET:
 			left = self.parseBracketMember(left)
-		} else {
-			break
+		case token.BACKTICK:
+			left = self.parseTaggedTemplateLiteral(left)
+		default:
+			break L
 		}
 	}
 
@@ -603,16 +644,19 @@ func (self *_parser) parseLeftHandSideExpressionAllowCall() ast.Expression {
 	} else {
 		left = self.parsePrimaryExpression()
 	}
-
+L:
 	for {
-		if self.token == token.PERIOD {
+		switch self.token {
+		case token.PERIOD:
 			left = self.parseDotMember(left)
-		} else if self.token == token.LEFT_BRACKET {
+		case token.LEFT_BRACKET:
 			left = self.parseBracketMember(left)
-		} else if self.token == token.LEFT_PARENTHESIS {
+		case token.LEFT_PARENTHESIS:
 			left = self.parseCallExpression(left)
-		} else {
-			break
+		case token.BACKTICK:
+			left = self.parseTaggedTemplateLiteral(left)
+		default:
+			break L
 		}
 	}
 

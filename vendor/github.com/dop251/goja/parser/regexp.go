@@ -284,7 +284,12 @@ func (self *_RegExp_parser) scanEscape(inClass bool) {
 
 	case 'u':
 		self.read()
-		length, base = 4, 16
+		if self.chr == '{' {
+			self.read()
+			length, base = 0, 16
+		} else {
+			length, base = 4, 16
+		}
 
 	case 'b':
 		if inClass {
@@ -365,31 +370,36 @@ func (self *_RegExp_parser) scanEscape(inClass bool) {
 	// Otherwise, we're a \u.... or \x...
 	valueOffset := self.chrOffset
 
-	var value uint32
-	{
-		length := length
-		for ; length > 0; length-- {
+	if length > 0 {
+		for length := length; length > 0; length-- {
 			digit := uint32(digitValue(self.chr))
 			if digit >= base {
 				// Not a valid digit
 				goto skip
 			}
-			value = value*base + digit
+			self.read()
+		}
+	} else {
+		for self.chr != '}' && self.chr != -1 {
+			digit := uint32(digitValue(self.chr))
+			if digit >= base {
+				// Not a valid digit
+				goto skip
+			}
 			self.read()
 		}
 	}
 
-	if length == 4 {
+	if length == 4 || length == 0 {
 		self.write([]byte{
 			'\\',
 			'x',
 			'{',
-			self.str[valueOffset+0],
-			self.str[valueOffset+1],
-			self.str[valueOffset+2],
-			self.str[valueOffset+3],
-			'}',
 		})
+		self.passString(valueOffset, self.chrOffset)
+		if length != 0 {
+			self.writeByte('}')
+		}
 	} else if length == 2 {
 		self.passString(offset-1, valueOffset+2)
 	} else {
