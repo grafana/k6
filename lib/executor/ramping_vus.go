@@ -52,6 +52,7 @@ func init() {
 
 // Stage contains
 type Stage struct {
+	Name     null.String        `json:"name"`
 	Duration types.NullDuration `json:"duration"`
 	Target   null.Int           `json:"target"` // TODO: maybe rename this to endVUs? something else?
 	// TODO: add a progression function?
@@ -572,6 +573,17 @@ func (vlv RampingVUs) Run(
 		Executor:   vlv.config.Type,
 		StartTime:  startTime,
 		ProgressFn: progressFn,
+		Stages: func() []lib.ScenarioStage {
+			stages := make([]lib.ScenarioStage, 0, len(vlv.config.Stages))
+			for i, s := range vlv.config.Stages {
+				stages = append(stages, lib.ScenarioStage{
+					Index:    uint(i),
+					Name:     s.Name.String,
+					Duration: time.Duration(s.Duration.Duration),
+				})
+			}
+			return stages
+		}(),
 	})
 
 	vuHandles := make([]*vuHandle, maxVUs)

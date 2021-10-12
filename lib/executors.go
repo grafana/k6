@@ -113,9 +113,45 @@ type ExecutorConfig interface {
 // ScenarioState holds runtime scenario information returned by the k6/execution
 // JS module.
 type ScenarioState struct {
-	Name, Executor string
-	StartTime      time.Time
-	ProgressFn     func() (float64, []string)
+	Name       string
+	Executor   string
+	StartTime  time.Time
+	ProgressFn func() (float64, []string)
+	Stages     []ScenarioStage
+}
+
+// ScenarioStage represents a Scenario's Stage.
+// where Index tracks the original slice's position of the Stage.
+type ScenarioStage struct {
+	Index    uint
+	Name     string
+	Duration time.Duration
+}
+
+// CurrentStage returns the detected Stage that is currently running
+// based on the StartTime of the Scenario.
+func (s *ScenarioState) CurrentStage() (*ScenarioStage, error) {
+	if len(s.Stages) < 1 {
+		// TODO: improve this error message
+		return nil, fmt.Errorf("can't get the current Stage because any Stage has been defined")
+	}
+
+	// sum represents the stages passed
+	sum := int64(0)
+	elapsed := time.Since(s.StartTime)
+	for _, stage := range s.Stages {
+		sum += int64(stage.Duration)
+		// when elapsed is smaller than sum
+		// then the current stage has been found
+		if int64(elapsed) < sum {
+			return &stage, nil
+		}
+	}
+
+	// it happen when:
+	// * the total duration is equal to the latest stage's upper limit
+	// * the latest stage is taking more than the expected defined duration
+	return &s.Stages[len(s.Stages)-1], nil
 }
 
 // InitVUFunc is just a shorthand so we don't have to type the function

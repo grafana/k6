@@ -398,6 +398,17 @@ func (varr RampingArrivalRate) Run(
 		Executor:   varr.config.Type,
 		StartTime:  startTime,
 		ProgressFn: progressFn,
+		Stages: func() []lib.ScenarioStage {
+			stages := make([]lib.ScenarioStage, 0, len(varr.config.Stages))
+			for i, s := range varr.config.Stages {
+				stages = append(stages, lib.ScenarioStage{
+					Index:    uint(i),
+					Name:     s.Name.String,
+					Duration: time.Duration(s.Duration.Duration),
+				})
+			}
+			return stages
+		}(),
 	})
 
 	returnVU := func(u lib.InitializedVU) {
