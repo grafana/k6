@@ -42,7 +42,7 @@ var (
 		"plugins": []interface{}{
 			// es2015 https://github.com/babel/babel/blob/v6.26.0/packages/babel-preset-es2015/src/index.js
 			[]interface{}{"transform-es2015-template-literals", map[string]interface{}{"loose": false, "spec": false}},
-			"transform-es2015-literals",
+			// "transform-es2015-literals", // in goja
 			// "transform-es2015-function-name", // in goja
 			// []interface{}{"transform-es2015-arrow-functions", map[string]interface{}{"spec": false}}, // in goja
 			// "transform-es2015-block-scoped-functions", // in goja
