@@ -5,6 +5,7 @@ import (
 	"math"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -1239,6 +1240,14 @@ type _toPropertyKey struct{}
 func (_toPropertyKey) exec(vm *vm) {
 	p := vm.sp - 1
 	vm.stack[p] = toPropertyKey(vm.stack[p])
+	vm.pc++
+}
+
+type _toString struct{}
+
+func (_toString) exec(vm *vm) {
+	p := vm.sp - 1
+	vm.stack[p] = vm.stack[p].toString()
 	vm.pc++
 }
 
@@ -3820,6 +3829,7 @@ func (copyStash) exec(vm *vm) {
 	}
 	vm.stashAllocs++
 	newStash.values = append([]Value(nil), oldStash.values...)
+	newStash.names = oldStash.names
 	vm.stash = newStash
 	vm.pc++
 }
@@ -3904,5 +3914,83 @@ var createArgsRestStash _createArgsRestStash
 func (_createArgsRestStash) exec(vm *vm) {
 	vm.push(vm.r.newArrayValues(vm.stash.extraArgs))
 	vm.stash.extraArgs = nil
+	vm.pc++
+}
+
+type concatStrings int
+
+func (n concatStrings) exec(vm *vm) {
+	strs := vm.stack[vm.sp-int(n) : vm.sp]
+	length := 0
+	allAscii := true
+	for _, s := range strs {
+		if allAscii {
+			if _, ok := s.(unicodeString); ok {
+				allAscii = false
+			}
+		}
+		length += s.(valueString).length()
+	}
+
+	vm.sp -= int(n) - 1
+	if allAscii {
+		var buf strings.Builder
+		buf.Grow(length)
+		for _, s := range strs {
+			buf.WriteString(string(s.(asciiString)))
+		}
+		vm.stack[vm.sp-1] = asciiString(buf.String())
+	} else {
+		var buf unicodeStringBuilder
+		buf.Grow(length)
+		for _, s := range strs {
+			buf.WriteString(s.(valueString))
+		}
+		vm.stack[vm.sp-1] = buf.String()
+	}
+	vm.pc++
+}
+
+type getTaggedTmplObject struct {
+	raw, cooked []Value
+}
+
+// As tagged template objects are not cached (because it's hard to ensure the cache is cleaned without using
+// finalizers) this wrapper is needed to override the equality method so that two objects for the same template
+// literal appeared be equal from the code's point of view.
+type taggedTemplateArray struct {
+	*arrayObject
+	idPtr *[]Value
+}
+
+func (a *taggedTemplateArray) equal(other objectImpl) bool {
+	if o, ok := other.(*taggedTemplateArray); ok {
+		return a.idPtr == o.idPtr
+	}
+	return false
+}
+
+func (c *getTaggedTmplObject) exec(vm *vm) {
+	cooked := vm.r.newArrayObject()
+	setArrayValues(cooked, c.cooked)
+	cooked.lengthProp.writable = false
+
+	raw := vm.r.newArrayObject()
+	setArrayValues(raw, c.raw)
+	raw.lengthProp.writable = false
+	raw.preventExtensions(true)
+	raw.val.self = &taggedTemplateArray{
+		arrayObject: raw,
+		idPtr:       &c.raw,
+	}
+
+	cooked._putProp("raw", raw.val, false, false, false)
+	cooked.preventExtensions(true)
+	cooked.val.self = &taggedTemplateArray{
+		arrayObject: cooked,
+		idPtr:       &c.cooked,
+	}
+
+	vm.push(cooked.val)
 	vm.pc++
 }
