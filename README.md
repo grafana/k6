@@ -33,11 +33,17 @@ Add TLS and HTTP basic authentication:
 K6_PROMETHEUS_REMOTE_URL=https://localhost:9090/api/v1/write K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY=false K6_CA_CERT_FILE=example/tls.crt K6_PROMETHEUS_USER=foo K6_PROMETHEUS_PASSWORD=bar ./k6 run script.js -o output-prometheus-remote
 ```
 
+Different remote storage agents are supported with mapping option. The default is Prometheus itself but there is a simpler raw mapping that can be used as a starting point for other storages:
+
+```
+K6_PROMETHEUS_MAPPING=raw K6_PROMETHEUS_REMOTE_URL=http://localhost:9090/api/v1/write ./k6 run script.js -o output-prometheus-remote
+```
+
 Note: Prometheus remote client relies on a snappy library for serialization which can panic on [encode operation](https://github.com/golang/snappy/blob/544b4180ac705b7605231d4a4550a1acb22a19fe/encode.go#L22).
 
 ### On sample rate
 
-K6 processes its outputs once per second and that is also a default flush period in this extension. The number of K6 builtin metrics is 26 as of now and they are collected at the rate of 50ms. In practice it means that there will be around 1000-1500 samples on average per each flush period. If custom metrics are configured, that estimate will have to be adjusted.
+K6 processes its outputs once per second and that is also a default flush period in this extension. The number of K6 builtin metrics is 26 as of now and they are collected at the rate of 50ms. In practice it means that there will be around 1000-1500 samples on average per each flush period in case of raw mapping. If custom metrics are configured, that estimate will have to be adjusted.
 
 Depending on exact Prometheus setup, it may be necessary to configure Prometheus and / or remote-write agent to handle the load. For example, see [`queue_config` parameter](https://prometheus.io/docs/practices/remote_write/) of Prometheus.
 
@@ -45,17 +51,17 @@ Depending on exact Prometheus setup, it may be necessary to configure Prometheus
 
 To enable remote write in Prometheus 2.x use `--enable-feature=remote-write-receiver` option. See docker-compose samples in `example/`. Options for remote write storage can be found [here](https://prometheus.io/docs/operating/integrations/). 
 
-<!-- #### Metric types conversion -->
-
 ### Next steps
 
 *Note:* this list is meant to keep up to date with current roadmap and status of the extension and is very dynamic.
 
 - [X] support of raw format of Prometheus remote write specification
-- [ ] support of Prometheus as remote-write agent
-   - [ ] mapping of k6 metrics to Prometheus metrics
+- [X] support of Prometheus as remote-write agent
+   - [X] mapping of k6 metrics to Prometheus metrics
       - [X] Counter
       - [X] Gauge
       - [X] Rate
       - [X] Trend (draft)
-   - [ ] ability to switch Prometheus as remote agent on as a configurable option
+   - [X] ability to switch Prometheus as remote agent on as a configurable option
+   - [ ] decide on submetrics processing
+   - [ ] investigate: the processing loop may need an overhaul with long running tests and cloud setups and / or look into more complex aggregations

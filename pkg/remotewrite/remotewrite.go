@@ -78,6 +78,16 @@ func (o *Output) Stop() error {
 }
 
 func (o *Output) flush() {
+	start := time.Now()
+	defer func() {
+		flushDuration := time.Since(start)
+		if flushDuration > time.Duration(o.config.FlushPeriod.Duration) {
+			// There is no intermediary storage so warn if remote write endpoint becomes too slow
+			o.logger.Warn(fmt.Sprintf("Remote write took %s while flush period is %s. Some samples may be dropped.",
+				flushDuration.String(), o.config.FlushPeriod.String()))
+		}
+	}()
+
 	samplesContainers := o.GetBufferedSamples()
 
 	// Remote write endpoint accepts TimeSeries structure defined in gRPC. It must:
@@ -100,7 +110,7 @@ func (o *Output) flush() {
 		encoded := snappy.Encode(nil, buf) // this call can panic
 
 		if err = o.client.Store(context.Background(), encoded); err != nil {
-			o.logger.WithError(err).Fatal("Failed to store timeseries")
+			o.logger.Error("Failed to store timeseries")
 		}
 	}
 }
@@ -128,6 +138,12 @@ func (o *Output) convertToTimeSeries(samplesContainers []stats.SampleContainer) 
 			} else {
 				promTimeSeries = append(promTimeSeries, newts...)
 			}
+		}
+
+		// Do not blow up if remote endpoint is overloaded and responds too slowly.
+		// TODO: consider other approaches
+		if len(promTimeSeries) > 15000 {
+			break
 		}
 	}
 

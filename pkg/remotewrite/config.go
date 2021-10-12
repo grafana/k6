@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	defaultPrometheusTimeout = time.Minute * 2
-	defaultFlushPeriod       = time.Second
+	defaultPrometheusTimeout = time.Minute
+	defaultFlushPeriod       = time.Second * 2
 	defaultMetricPrefix      = "k6_"
 )
 
@@ -82,7 +82,7 @@ func (conf Config) ConstructRemoteConfig() (*remote.ClientConfig, error) {
 		URL:              &promConfig.URL{u},
 		Timeout:          model.Duration(defaultPrometheusTimeout),
 		HTTPClientConfig: httpConfig,
-		RetryOnRateLimit: false, // disables retries on HTTP status 429
+		RetryOnRateLimit: true,
 	}
 	return &remoteConfig, nil
 }

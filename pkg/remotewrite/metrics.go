@@ -32,6 +32,11 @@ func (ms *metricsStorage) update(sample stats.Sample) stats.Sample {
 	if current, ok := ms.m[sample.Metric.Name]; ok {
 		current.Metric.Sink.Add(sample)
 		current.Time = sample.Time // to avoid duplicates in timestamps
+		// Sometimes remote write endpoint throws an error about duplicates even if the values
+		// sent were different. By current observations, this is a hard to repeat case and
+		// potentially a bug.
+		// Related: https://github.com/prometheus/prometheus/issues/9210
+
 		ms.m[current.Metric.Name] = current
 		return current
 	} else {
