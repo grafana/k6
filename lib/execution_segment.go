@@ -677,7 +677,50 @@ func (essw *ExecutionSegmentSequenceWrapper) GetNewExecutionSegmentSequenceFromV
 // ExecutionTuple is the combination of an ExecutionSegmentSequence(Wrapper) and
 // a specific ExecutionSegment from it. It gives easy access to the efficient
 // scaling and striping algorithms for that specific segment, since the results
-// are cached in the sequence wrapper.
+// are cached in the sequence wrapper. It is also the basis for the
+// SegmentedIndex type below, which is the actual implementation of a segmented
+// (striped) iterator, usable both for segmenting actual iterations and for
+// partitioning data between multiple instances.
+//
+// For example, let's try to segment a load test in 3 unequal parts: 50%, 25%
+// and 25% (so the ExecutionSegmentSequence will contain these segments: 0:1/2,
+// 1/2:3/4, 3/4:1). The building blocks that k6 needs for distributed execution
+// are segmented (non-overlapping) iterators and proportionally dividing integer
+// numbers as fairly as possible between multiple segments in a stable manner.
+//
+// The segmented iterators (i.e. SegmentedIndex values below) will be like this:
+//
+//  Normal iterator:              0   1   2   3   4   5   6   7   8   9   10  11 ...
+//  Instance 1 (0:1/2) iterator:  0       2       4       6       8       10     ...
+//  Instance 2 (1/2:3/4) iterator:    1               5               9          ...
+//  Instance 2 (3/4:1) iterator:              3               7               11 ...
+//
+// See how every instance has its own uniqe non-overlapping iterator, but when
+// we combine all of them, we cover every possible value in the original one.
+//
+// We also can use this property to scale integer numbers proportionally, as
+// fairly as possible, between the instances, like this:
+//
+//  Global int value to scale:    1   2   3   4   5   6   7   8   9   10  11  12 ...
+//  Calling ScaleInt64():
+//  - Instance 1 (0:1/2) value:   1   1   2   2   3   3   4   4   5   5   6   6  ...
+//  - Instance 2 (1/2:3/4) value: 0   1   1   1   1   2   2   2   2   3   3   3  ...
+//  - Instance 2 (3/4:1) value:   0   0   0   1   1   1   1   2   2   2   2   3  ...
+//
+// Notice how the sum of the per-instance values is always equal to the global
+// value - this is what ExecutionTuple.ScaleInt64() does. Also compare both
+// tables (their positions match), see how we only increment the value for a
+// particular instance when we would have cycled the iterator on that step.
+//
+// This also makes the scaling stable, in contrast to ExecutionSegment.Scale().
+// Scaled values will only ever increase, since we just increment them in a
+// specific order between instances. There will never be a situation where
+// `ScaleInt64(i)` is less than `ScaleInt64(i+n)` for any positive n!
+//
+// The algorithm that calculates the offsets and everything that's necessary to
+// have these segmented iterators is in NewExecutionSegmentSequenceWrapper().
+// The ExecutionTuple simply exposes them efficiently for a single segment of
+// the sequence, so it's the thing that most users will probably need.
 type ExecutionTuple struct { // TODO rename? make fields private and have getter methods?
 	Sequence     *ExecutionSegmentSequenceWrapper
 	Segment      *ExecutionSegment
@@ -732,8 +775,11 @@ func (et *ExecutionTuple) GetNewExecutionTupleFromValue(value int64) (*Execution
 }
 
 // SegmentedIndex is an iterator that returns both the scaled and the unscaled
-// sequential values according to the given ExecutionTuple. It is not thread-safe,
-// concurrent access has to be externally synchronized.
+// sequential values according to the given ExecutionTuple. It is not
+// thread-safe, concurrent access has to be externally synchronized.
+//
+// See the documentation for ExecutionTuple above for a visual explanation of
+// how this iterator actually works.
 type SegmentedIndex struct {
 	start, lcd       int64
 	offsets          []int64
