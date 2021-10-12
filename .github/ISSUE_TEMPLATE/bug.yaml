@@ -5,16 +5,9 @@ body:
   - type: markdown
     attributes:
       value: '## Environment'
-  - type: dropdown
+  - type: input
     attributes:
       label: k6 version
-      options:
-        - '0.34'
-        - '0.33'
-        - '0.32'
-        - '0.31'
-        - '0.30'
-        - <0.30
     validations:
       required: true
   - type: dropdown
