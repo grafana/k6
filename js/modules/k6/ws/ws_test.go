@@ -787,19 +787,19 @@ func TestCompression(t *testing.T) {
 
 			conn, e := upgrader.Upgrade(w, req, w.Header())
 			if e != nil {
-				t.Fatalf("error in %s %s handler : %s", "TestCompression", "/ws-compression", e)
+				t.Fatalf("/ws-compression cannot upgrade request: %v", e)
 				return
 			}
 
 			// send a message and exit
 			if e = conn.WriteMessage(websocket.TextMessage, []byte(text)); e != nil {
-				t.Logf("error in %s %s handler : %s", "TestCompression", "/ws-compression", e)
+				t.Logf("error while sending message in /ws-compression: %v", e)
 				return
 			}
 
 			e = conn.Close()
 			if e != nil {
-				t.Logf("error in %s %s handler : %s", "TestCompression", "/ws-compression", e)
+				t.Logf("error while closing connection in /ws-compression: %v", e)
 				return
 			}
 		}))
@@ -875,13 +875,13 @@ func TestCompression(t *testing.T) {
 
 					conn, e := upgrader.Upgrade(w, req, w.Header())
 					if e != nil {
-						t.Fatalf("error in %s %s handler : %s", "TestCompression", "/ws-compression-param", e)
+						t.Fatalf("/ws-compression-param cannot upgrade request: %v", e)
 						return
 					}
 
 					e = conn.Close()
 					if e != nil {
-						t.Logf("error in %s %s handler : %s", "TestCompression", "/ws-compression-param", e)
+						t.Logf("error while closing connection in /ws-compression-param: %v", e)
 						return
 					}
 				}))
