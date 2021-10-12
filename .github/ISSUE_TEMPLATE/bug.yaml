@@ -1,7 +1,6 @@
 name: Bug report
 description: Use this template for reporting bugs. Please search existing issues first.
 title: '[Bug]: '
-labels: bug
 body:
   - type: markdown
     attributes:
@@ -13,16 +12,13 @@ body:
       required: true
   - type: input
     attributes:
-      label: 'Docker version and image'
-  - type: dropdown
-    attributes:
       label: OS
-      options:
-        - Windows
-        - Linux
-        - Mac
+      description: e.g. Windows 10, Arch Linux, macOS 11, etc.
     validations:
       required: true
+  - type: input
+    attributes:
+      label: Docker version and image
   - type: textarea
     attributes:
       label: Expected Behaviour
