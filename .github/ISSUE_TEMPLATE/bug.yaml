@@ -13,7 +13,7 @@ body:
       required: true
   - type: input
     attributes:
-      label: 'Docker version and image, if applicable:'
+      label: 'Docker version and image'
   - type: dropdown
     attributes:
       label: OS
