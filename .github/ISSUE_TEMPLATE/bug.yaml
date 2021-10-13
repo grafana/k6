@@ -13,16 +13,13 @@ body:
       required: true
   - type: input
     attributes:
-      label: 'Docker version and image'
-  - type: dropdown
-    attributes:
       label: OS
-      options:
-        - Windows
-        - Linux
-        - Mac
+      description: e.g. Windows 10, Arch Linux, macOS 11, etc.
     validations:
       required: true
+  - type: input
+    attributes:
+      label: Docker version and image
   - type: textarea
     attributes:
       label: Expected Behaviour

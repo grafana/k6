@@ -74,7 +74,7 @@ If you use the [Chocolatey package manager](https://chocolatey.org/) you can ins
 choco install k6
 ```
 
-Otherwise you can manually download and install the [latest official `.msi` package](https://dl.k6.io/msi/k6-latest-amd64.msi).
+Otherwise, you can manually download and install the [latest official `.msi` package](https://dl.k6.io/msi/k6-latest-amd64.msi).
 
 ### Linux
 
@@ -106,7 +106,7 @@ Note that the `gnupg2` package is required for signature verification.
 
 #### Migrating from Bintray
 
-The Bintray repositories will be [shutdown after May 1st, 2021](https://jfrog.com/blog/into-the-sunset-bintray-jcenter-gocenter-and-chartcenter/). If you previously added them, you will have to add our repositories following the instructions above and should delete the Bintray ones.
+The Bintray repositories were [shut down after May 1st, 2021](https://jfrog.com/blog/into-the-sunset-bintray-jcenter-gocenter-and-chartcenter/). If you previously added them, you will have to add our repositories following the instructions above and should delete the Bintray ones.
 
 For Debian-based distributions, you can run:
 
@@ -133,7 +133,7 @@ docker pull loadimpact/k6
 
 ### Pre-built binaries & other platforms
 
-If there isn't an official package for your operating system or architecture, or if you don't want to install a custom repository, you can easily grab a pre-built binary from [the GitHub Releases page](https://github.com/k6io/k6/releases). Once you download and unpack the release, you can optionally copy the `k6` binary it contains somewhere in your `PATH`, so you are able to run k6 from any location on your system.
+In case there isn't an official package for your operating system or architecture, or if you don't want to install a custom repository, you can easily grab a pre-built binary from [the GitHub Releases page](https://github.com/k6io/k6/releases). Once you download and unpack the release, you can optionally copy the `k6` binary it contains somewhere in your `PATH`, so you are able to run k6 from any location on your system.
 
 ### Build from source
 
@@ -181,7 +181,7 @@ Each virtual user (VU) executes your script in a completely separate JavaScript 
 
 VU code can make HTTP and WebSocket requests, emit metrics, and generally do everything you'd expect a load test to do. With a few important exceptions - you can't load anything from your local filesystem or import any other modules. This all has to be done from the [init code](https://k6.io/docs/javascript-api/init-context).
 
-There are two reasons for this. The first is, of course: performance. If you read a file from disk on every single script iteration, it'd be needlessly slow. Even if you cache the contents of the file and any imported modules, it'd mean the *first run* of the script would be much slower than all the others. Worse yet, if you have a script that imports or loads things based on things that can only be known at runtime, you'd get slow iterations thrown in every time you load something new. That's also the reason why we initialize *all* needed VUs before any of them starts the actual load test by executing the `default` function.
+There are two reasons for this. The first is, of course, performance. If you read a file from disk on every single script iteration, it'd be needlessly slow. Even if you cache the contents of the file and any imported modules, it'd mean the *first run* of the script would be much slower than all the others. Worse yet, if you have a script that imports or loads things based on things that can only be known at runtime, you'd get slow iterations thrown in every time you load something new. That's also the reason why we initialize *all* needed VUs before any of them starts the actual load test by executing the `default` function.
 
 But there's another, more interesting reason. By forcing all imports and file reads into the init context, we design for distributed execution. We know which files will be needed, so we distribute only those files to each node in the cluster. We know which modules will be imported, so we can bundle them up in an [archive](https://k6.io/docs/using-k6/archives-for-bundling-sharing-a-test) from the get-go. And, tying into the performance point above, the other nodes don't even need writable file systems - everything can be kept in memory.
 
@@ -227,13 +227,13 @@ Let's say that you want to specify the number of VUs in your script. In order of
     ```
     Or any variation of the above, like importing different config files, etc. Also, having most of the script configuration right next to the script code makes k6 scripts very easily version-controllable.
 
-4. A global JSON config. By default k6 looks for it in the config home folder of the current user (OS-dependent, for Linux/BSDs k6 will look for `config.json` inside of `${HOME}/.config/loadimpact/k6`), though that can be modified with the `--config`/`-c` CLI flag.
+4. A global JSON config. By default, k6 looks for it in the config home folder of the current user (OS-dependent, for Linux/BSDs k6 will look for `config.json` inside of `${HOME}/.config/loadimpact/k6`), though that can be modified with the `--config`/`-c` CLI flag.
 It uses the same option keys as the exported `options` from the script file, so we can set the VUs by having `config.json` contain `{ "vus": 1 }`. Although it rarely makes sense to set the number of VUs there, the global config file is much more useful for storing things like login credentials for the different [outputs](#outputs), as used by the `k6 login` subcommand...
 
 Configuration mechanisms do have an order of precedence. As presented, options at the top of the list can override configuration mechanisms that are specified lower in the list. If we used all of the above examples for setting the number of VUs, we would end up with 10 VUs, since the CLI flags have the highest priority. Also please note that not all of the available options are configurable via all different mechanisms - some options may be impractical to specify via simple strings (so no CLI/environment variables), while other rarely-used ones may be intentionally excluded from the CLI flags to avoid clutter - refer to [options docs](https://k6.io/docs/using-k6/options) for more information.
 
 As shown above, there are several ways to configure the number of simultaneous virtual users k6 will launch. There are also different ways to specify how long those virtual users will be running. For simple tests you can:
-- Set the test duration by the `--duration`/`-d` CLI flag (or the `K6_DURATION` environment variable and the `duration` script/JSON option). For ease of use, `duration` is specified with human readable values like `1h30m10s` - `k6 run --duration 30s script.js`, `k6 cloud -d 15m10s script.js`, `export K6_DURATION=1h`, etc. If set to `0`, k6 wouldn't stop executing the script unless the user manually stops it.
+- Set the test duration by the `--duration`/`-d` CLI flag (or the `K6_DURATION` environment variable and the `duration` script/JSON option). For ease of use, `duration` is specified with human-readable values like `1h30m10s` - `k6 run --duration 30s script.js`, `k6 cloud -d 15m10s script.js`, `export K6_DURATION=1h`, etc. If set to `0`, k6 wouldn't stop executing the script unless the user manually stops it.
 - Set the total number of script iterations with the `--iterations`/`-i` CLI flag (or the `K6_ITERATIONS` environment variable and the `iterations` script/JSON option). k6 will stop executing the script whenever the **total** number of iterations (i.e. the number of iterations across all VUs) reaches the specified number. So if you have `k6 run --iterations 10 --vus 10 script.js`, then each VU would make only a single iteration.
 
 For more complex cases, you can specify execution stages. They are a combination of `duration,target-VUs` pairs. These pairs instruct k6 to linearly ramp up, ramp down, or stay at the number of VUs specified for the period specified. Execution stages can be set via the `stages` script/JSON option as an array of `{ duration: ..., target: ... }` pairs, or with the `--stage`/`-s` CLI flags and the `K6_STAGES` environment variable via the `duration:target,duration:target...` syntax.
@@ -262,7 +262,7 @@ For even more complex scenarios, you can use the k6 [REST API](https://k6.io/doc
 
 ### Setup and teardown
 
-Beyond the init code and the required VU stage (i.e. the `default` function), which is code run for each VU, k6 also supports test wide setup and teardown stages, like many other testing frameworks and tools. The `setup` and `teardown` functions, like the `default` function, need to be `export`ed. But unlike the `default` function, `setup` and `teardown` are only called once for a test - `setup()` is called at the beginning of the test, after the init stage but before the VU stage (`default` function), and `teardown()` is called at the end of a test, after the last VU iteration (`default` function) has finished executing. This is also supported in the distributed [cloud execution](https://k6.io/docs/using-k6/cloud-execution) mode via `k6 cloud`.
+Beyond the init code and the required VU stage (i.e. the `default` function), which is code run for each VU, k6 also supports test-wide setup and teardown stages, like many other testing frameworks and tools. The `setup` and `teardown` functions, like the `default` function, need to be `export`ed. But unlike the `default` function, `setup` and `teardown` are only called once for a test - `setup()` is called at the beginning of the test, after the init stage but before the VU stage (`default` function), and `teardown()` is called at the end of a test, after the last VU iteration (`default` function) has finished executing. This is also supported in the distributed [cloud execution](https://k6.io/docs/using-k6/cloud-execution) mode via `k6 cloud`.
 
 ```js
 export function setup() {
@@ -283,13 +283,13 @@ export function teardown(data) {
 A copy of whatever data `setup()` returns will be passed as the first argument to each iteration of the `default` function and to `teardown()` at the end of the test. For more information and examples, refer to the k6 docs [here](https://k6.io/docs/using-k6/test-life-cycle#setup-and-teardown-stages).
 
 
-### Metrics, tags and groups
+### Metrics, tags, and groups
 
 By default k6 measures and collects a lot of metrics about the things your scripts do - the duration of different script iterations, how much data was sent and received, how many HTTP requests were made, the duration of those HTTP requests, and even how long did the TLS handshake of a particular HTTPS request take. To see a summary of these built-in metrics in the output, you can run a simple k6 test, e.g. `k6 run github.com/k6io/k6/samples/http_get.js`. More information about the different built-in metrics collected by k6 (and how some of them can be accessed from inside of the scripts) is available in the docs [here](https://k6.io/docs/using-k6/metrics).
 
-k6 also allows the creation of user-defined `Counter`, `Gauge`, `Rate` and `Trend` metrics. They can be used to more precisely track and measure a custom subset of the things that k6 measures by default, or anything else the user wants, for example tracking non-timing information that is returned from the remote system. You can find more information about them [here](https://k6.io/docs/using-k6/metrics#custom-metrics) and a description of their APIs [here](https://k6.io/docs/javascript-api/k6-metrics).
+k6 also allows the creation of user-defined `Counter`, `Gauge`, `Rate`, and `Trend` metrics. They can be used to more precisely track and measure a custom subset of the things that k6 measures by default, or anything else the user wants, for example tracking non-timing information that is returned from the remote system. You can find more information about them [here](https://k6.io/docs/using-k6/metrics#custom-metrics) and a description of their APIs [here](https://k6.io/docs/javascript-api/k6-metrics).
 
-Every measurement metric in k6 comes with a set of key-value tags attached. Some of them are automatically added by k6 - for example a particular `http_req_duration` metric may have the `method=GET`, `status=200`, `url=https://loadimpact.com`, etc. system tags attached to it. Others can be added by users - globally for a test run via the `tags` [option](https://k6.io/docs/using-k6/options#tags), or individually as a [parameter](https://k6.io/docs/javascript-api/k6-http/params-k6-http) in a specific HTTP request, websocket connection, `userMetric.Add()` call, etc.
+Every measurement metric in k6 comes with a set of key-value tags attached. Some of them are automatically added by k6 - for example, a particular `http_req_duration` metric may have the `method=GET`, `status=200`, `url=https://loadimpact.com`, etc. system tags attached to it. Others can be added by users - globally for a test run via the `tags` [option](https://k6.io/docs/using-k6/options#tags), or individually as a [parameter](https://k6.io/docs/javascript-api/k6-http/params-k6-http) in a specific HTTP request, WebSocket connection, `userMetric.Add()` call, etc.
 
 These tags don't show in the simple summary at the end of a k6 test (unless you reference them in a [threshold](#checks-and-thresholds)), but they are invaluable for filtering and investigating k6 test results if you use any of the [outputs](#outputs) mentioned below. k6 also supports simple hierarchical groups for easier code and result organization. You can find more information about groups and system and user-defined tags [here](https://k6.io/docs/using-k6/tags-and-groups).
 
@@ -374,7 +374,7 @@ You can save the above example as a local file and run it, or you can also run i
 
 To make full use of your test results and to be able to fully explore and understand them, k6 can output the raw metrics to an external repository of your choice.
 
-The simplest output option, meant primarily for debugging, is to send the JSON-encoded metrics to a file or to `stdout`. Other output options are sending the metrics to an InfluxDB instance, an Apache Kafka queue, or even to the k6 cloud. This allows you to run your load tests locally or behind a company firewall, early in the development process or as a part of a CI suite, while at the same time being able to store their results in the k6 cloud, where you can compare and analyse them. You can find more information about the available outputs [here](https://k6.io/docs/getting-started/results-output) and about k6 Cloud Results [here](https://k6.io/docs/getting-started/results-output/cloud) and [here](https://k6.io/docs/cloud/analyzing-results/overview).
+The simplest output option, meant primarily for debugging, is to send the JSON-encoded metrics to a file or to `stdout`. Other output options are sending the metrics to an InfluxDB instance, an Apache Kafka queue, or even to the k6 cloud. This allows you to run your load tests locally or behind a company firewall, early in the development process or as part of a CI suite, while at the same time being able to store their results in the k6 cloud, where you can compare and analyze them. You can find more information about the available outputs [here](https://k6.io/docs/getting-started/results-output) and about k6 Cloud Results [here](https://k6.io/docs/getting-started/results-output/cloud) and [here](https://k6.io/docs/cloud/analyzing-results/overview).
 
 ### Modules and JavaScript compatibility
 
@@ -386,7 +386,7 @@ You can, of course, also write your own ES6 modules and `import` them in your sc
 Support
 -------
 
-To get help about usage, report bugs, suggest features, and discuss k6 with other users see [SUPPORT.md](SUPPORT.md).
+To get help about usage, report bugs, suggest features and discuss k6 with other users see [SUPPORT.md](SUPPORT.md).
 
 
 Contributing

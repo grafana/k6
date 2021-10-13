@@ -42,7 +42,7 @@ export default function () {
 
         socket.on('error', function (e) {
             if (e.error() != "websocket: close sent") {
-                console.log('An unexpected error occured: ', e.error());
+                console.log('An unexpected error occurred: ', e.error());
             }
         });
 
