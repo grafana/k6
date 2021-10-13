@@ -89,6 +89,23 @@ func assertMetricEmitted(t *testing.T, metricName string, sampleContainers []sta
 	assert.True(t, seenMetric, "url %s didn't emit %s", url, metricName)
 }
 
+func assertMetricEmittedCount(t *testing.T, metricName string, sampleContainers []stats.SampleContainer, url string, count int) {
+	actualCount := 0
+
+	for _, sampleContainer := range sampleContainers {
+		for _, sample := range sampleContainer.GetSamples() {
+			surl, ok := sample.Tags.Get("url")
+			assert.True(t, ok)
+			if surl == url {
+				if sample.Metric.Name == metricName {
+					actualCount++
+				}
+			}
+		}
+	}
+	assert.Equal(t, count, actualCount, "url %s emitted %s %d times, expected was %d times", url, metricName, actualCount, count)
+}
+
 func TestSession(t *testing.T) {
 	// TODO: split and paralelize tests
 	t.Parallel()
@@ -380,7 +397,8 @@ func TestSession(t *testing.T) {
 			_, err := rt.RunString(sr(`
 			var msg1 = "test1"
 			var msg2 = "test2"
-			var secondMsgReceived = false
+			var msg3 = "test3"
+			var thirdMsgRecd = false
 			var res = ws.connect("WSBIN_URL/ws-echo-multi", function(socket){
 				socket.on("open", function() {
 					socket.send(msg1)
@@ -389,19 +407,27 @@ func TestSession(t *testing.T) {
 					if (data == msg1){
 						socket.send(msg2)
 					}
-					if (data == msg2){
-						secondMsgReceived = true
+					if (data == msg1){
+						socket.send(msg3)
+					}
+					if (data == msg3){
+						thirdMsgRecd = true
 						socket.close()
 					}
 				});
 			});
 
-			if (!secondMsgReceived) {
-				throw new Error ("second test message was not received!");
+			if (!thirdMsgRecd) {
+				throw new Error ("third test message was not received!");
 			}
 			`))
 			assert.NoError(t, err)
 		})
+
+		samplesBuf = stats.GetBufferedSamples(samples)
+		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo-multi"), 101, "")
+		assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 3)
+		assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 3)
 
 		t.Run("send_receive_multiple_wss", func(t *testing.T) {
 			_, err := rt.RunString(sr(`
@@ -429,6 +455,11 @@ func TestSession(t *testing.T) {
 			`))
 			assert.NoError(t, err)
 		})
+
+		samplesBuf = stats.GetBufferedSamples(samples)
+		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSSBIN_URL/ws-echo-multi"), 101, "")
+		assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSSBIN_URL/ws-echo-multi"), 2)
+		assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSSBIN_URL/ws-echo-multi"), 2)
 
 		t.Run("send_receive_text_binary", func(t *testing.T) {
 			_, err := rt.RunString(sr(`
@@ -459,6 +490,11 @@ func TestSession(t *testing.T) {
 			`))
 			assert.NoError(t, err)
 		})
+
+		samplesBuf = stats.GetBufferedSamples(samples)
+		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo-multi"), 101, "")
+		assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 2)
+		assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 2)
 	})
 }
 
