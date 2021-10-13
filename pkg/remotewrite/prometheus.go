@@ -2,6 +2,8 @@ package remotewrite
 
 import (
 	"fmt"
+	"math"
+	"sort"
 
 	"github.com/prometheus/prometheus/pkg/timestamp"
 	"github.com/prometheus/prometheus/prompb"
@@ -11,7 +13,7 @@ import (
 type PrometheusMapping struct{}
 
 func (pm *PrometheusMapping) MapCounter(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
-	sample = ms.update(sample)
+	sample = ms.update(sample, nil)
 	aggr := sample.Metric.Sink.Format(0)
 
 	return []prompb.TimeSeries{
@@ -31,7 +33,7 @@ func (pm *PrometheusMapping) MapCounter(ms *metricsStorage, sample stats.Sample,
 }
 
 func (pm *PrometheusMapping) MapGauge(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
-	sample = ms.update(sample)
+	sample = ms.update(sample, nil)
 	aggr := sample.Metric.Sink.Format(0)
 
 	return []prompb.TimeSeries{
@@ -51,7 +53,7 @@ func (pm *PrometheusMapping) MapGauge(ms *metricsStorage, sample stats.Sample, l
 }
 
 func (pm *PrometheusMapping) MapRate(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
-	sample = ms.update(sample)
+	sample = ms.update(sample, nil)
 	aggr := sample.Metric.Sink.Format(0)
 
 	return []prompb.TimeSeries{
@@ -71,8 +73,42 @@ func (pm *PrometheusMapping) MapRate(ms *metricsStorage, sample stats.Sample, la
 }
 
 func (pm *PrometheusMapping) MapTrend(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
-	sample = ms.update(sample)
-	aggr := sample.Metric.Sink.Format(0)
+	sample = ms.update(sample, func(current, s stats.Sample) stats.Sample {
+		// this is an attempt to optimize what happens in TrendSink;
+		// partial copy-paste from k6/stats
+		t := current.Metric.Sink.(*stats.TrendSink)
+
+		index := sort.Search(len(t.Values), func(i int) bool {
+			return t.Values[i] > s.Value
+		})
+		t.Values = append(t.Values, 0)
+		copy(t.Values[index+1:], t.Values[index:])
+		t.Values[index] = s.Value
+
+		t.Count += 1
+		t.Sum += s.Value
+		t.Avg = t.Sum / float64(t.Count)
+
+		if s.Value > t.Max {
+			t.Max = s.Value
+		}
+		if s.Value < t.Min || t.Count == 1 {
+			t.Min = s.Value
+		}
+
+		current.Metric.Sink = t
+		return current
+	})
+
+	s := sample.Metric.Sink.(*stats.TrendSink)
+	aggr := map[string]float64{
+		"min":   s.Min,
+		"max":   s.Max,
+		"avg":   s.Avg,
+		"med":   s.Med,
+		"p(90)": p(s, 0.90),
+		"p(95)": p(s, 0.95),
+	}
 
 	// Prometheus metric system does not support Trend so this mapping will store gauges
 	// to keep track of key values.
@@ -151,5 +187,24 @@ func (pm *PrometheusMapping) MapTrend(ms *metricsStorage, sample stats.Sample, l
 				},
 			},
 		},
+	}
+}
+
+// Note: this is a copy-paste from k6/stats/sink.go but without additional call to Calc
+func p(t *stats.TrendSink, pct float64) float64 {
+	switch t.Count {
+	case 0:
+		return 0
+	case 1:
+		return t.Values[0]
+	default:
+		// If percentile falls on a value in Values slice, we return that value.
+		// If percentile does not fall on a value in Values slice, we calculate (linear interpolation)
+		// the value that would fall at percentile, given the values above and below that percentile.
+		i := pct * (float64(t.Count) - 1.0)
+		j := t.Values[int(math.Floor(i))]
+		k := t.Values[int(math.Ceil(i))]
+		f := i - math.Floor(i)
+		return j + (k-j)*f
 	}
 }

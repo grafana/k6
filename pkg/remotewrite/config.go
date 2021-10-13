@@ -16,7 +16,7 @@ import (
 
 const (
 	defaultPrometheusTimeout = time.Minute
-	defaultFlushPeriod       = time.Second * 2
+	defaultFlushPeriod       = time.Second
 	defaultMetricPrefix      = "k6_"
 )
 

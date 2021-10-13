@@ -2,7 +2,6 @@ package remotewrite
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/prometheus/prometheus/pkg/timestamp"
 	"github.com/prometheus/prometheus/prompb"
@@ -12,25 +11,24 @@ import (
 // Note: k6 Registry is not used here since Output is getting
 // samples only from k6 engine, hence we assume they are already vetted.
 type metricsStorage struct {
-	m    map[string]stats.Sample
-	lock sync.RWMutex
+	m map[string]stats.Sample
 }
 
 func newMetricsStorage() *metricsStorage {
 	return &metricsStorage{
-		m:    make(map[string]stats.Sample),
-		lock: sync.RWMutex{},
+		m: make(map[string]stats.Sample),
 	}
 }
 
 // update modifies metricsStorage and returns updated sample
 // so that they hold the same value for the given metric
-func (ms *metricsStorage) update(sample stats.Sample) stats.Sample {
-	ms.lock.Lock()
-	defer ms.lock.Unlock()
-
+func (ms *metricsStorage) update(sample stats.Sample, add func(current, s stats.Sample) stats.Sample) stats.Sample {
 	if current, ok := ms.m[sample.Metric.Name]; ok {
-		current.Metric.Sink.Add(sample)
+		if add == nil {
+			current.Metric.Sink.Add(sample)
+		} else {
+			current = add(current, sample)
+		}
 		current.Time = sample.Time // to avoid duplicates in timestamps
 		// Sometimes remote write endpoint throws an error about duplicates even if the values
 		// sent were different. By current observations, this is a hard to repeat case and

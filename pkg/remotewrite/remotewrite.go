@@ -78,13 +78,20 @@ func (o *Output) Stop() error {
 }
 
 func (o *Output) flush() {
-	start := time.Now()
+	var (
+		start = time.Now()
+		nts   int
+	)
+
 	defer func() {
-		flushDuration := time.Since(start)
-		if flushDuration > time.Duration(o.config.FlushPeriod.Duration) {
-			// There is no intermediary storage so warn if remote write endpoint becomes too slow
-			o.logger.Warn(fmt.Sprintf("Remote write took %s while flush period is %s. Some samples may be dropped.",
-				flushDuration.String(), o.config.FlushPeriod.String()))
+		d := time.Since(start)
+		if d > time.Duration(o.config.FlushPeriod.Duration) {
+			// There is no intermediary storage so warn if writing to remote write endpoint becomes too slow
+			o.logger.WithField("nts", nts).
+				Warn(fmt.Sprintf("Remote write took %s while flush period is %s. Some samples may be dropped.",
+					d.String(), o.config.FlushPeriod.String()))
+		} else {
+			o.logger.WithField("nts", nts).Debug(fmt.Sprintf("Remote write took %s.", d.String()))
 		}
 	}()
 
@@ -97,20 +104,20 @@ func (o *Output) flush() {
 	// c) not have duplicate timestamps within 1 timeseries, see https://github.com/prometheus/prometheus/issues/9210
 	// Prometheus write handler processes only some fields as of now, so here we'll add only them.
 	promTimeSeries := o.convertToTimeSeries(samplesContainers)
+	nts = len(promTimeSeries)
 
-	o.logger.Debug("Number of time series: ", len(promTimeSeries))
+	o.logger.WithField("nts", nts).Debug("Converted samples to time series in preparation for sending.")
 
 	req := prompb.WriteRequest{
 		Timeseries: promTimeSeries,
 	}
 
 	if buf, err := proto.Marshal(&req); err != nil {
-		o.logger.WithError(err).Fatal("Failed to marshal timeseries")
+		o.logger.WithError(err).Fatal("Failed to marshal timeseries.")
 	} else {
 		encoded := snappy.Encode(nil, buf) // this call can panic
-
 		if err = o.client.Store(context.Background(), encoded); err != nil {
-			o.logger.Error("Failed to store timeseries")
+			o.logger.WithError(err).Error("Failed to store timeseries.")
 		}
 	}
 }
