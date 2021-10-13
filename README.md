@@ -106,7 +106,7 @@ Note that the `gnupg2` package is required for signature verification.
 
 #### Migrating from Bintray
 
-The Bintray repositories will be [shut down after May 1st, 2021](https://jfrog.com/blog/into-the-sunset-bintray-jcenter-gocenter-and-chartcenter/). If you previously added them, you will have to add our repositories following the instructions above and should delete the Bintray ones.
+The Bintray repositories were [shut down after May 1st, 2021](https://jfrog.com/blog/into-the-sunset-bintray-jcenter-gocenter-and-chartcenter/). If you previously added them, you will have to add our repositories following the instructions above and should delete the Bintray ones.
 
 For Debian-based distributions, you can run:
 
