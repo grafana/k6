@@ -33,6 +33,7 @@ var (
 	typeValue    = reflect.TypeOf((*Value)(nil)).Elem()
 	typeObject   = reflect.TypeOf((*Object)(nil))
 	typeTime     = reflect.TypeOf(time.Time{})
+	typeBytes    = reflect.TypeOf(([]byte)(nil))
 )
 
 type iterationKind int
@@ -1788,7 +1789,76 @@ func (r *Runtime) wrapReflectFunc(value reflect.Value) func(FunctionCall) Value 
 
 func (r *Runtime) toReflectValue(v Value, dst reflect.Value, ctx *objectExportCtx) error {
 	typ := dst.Type()
-	switch typ.Kind() {
+
+	if typ == typeValue {
+		dst.Set(reflect.ValueOf(v))
+		return nil
+	}
+
+	if typ == typeObject {
+		if obj, ok := v.(*Object); ok {
+			dst.Set(reflect.ValueOf(obj))
+			return nil
+		}
+	}
+
+	if typ == typeCallable {
+		if fn, ok := AssertFunction(v); ok {
+			dst.Set(reflect.ValueOf(fn))
+			return nil
+		}
+	}
+
+	et := v.ExportType()
+	if et == nil || et == reflectTypeNil {
+		dst.Set(reflect.Zero(typ))
+		return nil
+	}
+
+	kind := typ.Kind()
+	for i := 0; ; i++ {
+		if et.AssignableTo(typ) {
+			ev := reflect.ValueOf(exportValue(v, ctx))
+			for ; i > 0; i-- {
+				ev = ev.Elem()
+			}
+			dst.Set(ev)
+			return nil
+		}
+		expKind := et.Kind()
+		if expKind == kind && et.ConvertibleTo(typ) || expKind == reflect.String && typ == typeBytes {
+			ev := reflect.ValueOf(exportValue(v, ctx))
+			for ; i > 0; i-- {
+				ev = ev.Elem()
+			}
+			dst.Set(ev.Convert(typ))
+			return nil
+		}
+		if expKind == reflect.Ptr {
+			et = et.Elem()
+		} else {
+			break
+		}
+	}
+
+	if typ == typeTime {
+		if obj, ok := v.(*Object); ok {
+			if d, ok := obj.self.(*dateObject); ok {
+				dst.Set(reflect.ValueOf(d.time()))
+				return nil
+			}
+		}
+		if et.Kind() == reflect.String {
+			tme, ok := dateParse(v.String())
+			if !ok {
+				return fmt.Errorf("could not convert string %v to %v", v, typ)
+			}
+			dst.Set(reflect.ValueOf(tme))
+			return nil
+		}
+	}
+
+	switch kind {
 	case reflect.String:
 		dst.Set(reflect.ValueOf(v.String()).Convert(typ))
 		return nil
@@ -1831,69 +1901,6 @@ func (r *Runtime) toReflectValue(v Value, dst reflect.Value, ctx *objectExportCt
 	case reflect.Float32:
 		dst.Set(reflect.ValueOf(toFloat32(v)).Convert(typ))
 		return nil
-	}
-
-	if typ == typeCallable {
-		if fn, ok := AssertFunction(v); ok {
-			dst.Set(reflect.ValueOf(fn))
-			return nil
-		}
-	}
-
-	if typ == typeValue {
-		dst.Set(reflect.ValueOf(v))
-		return nil
-	}
-
-	if typ == typeObject {
-		if obj, ok := v.(*Object); ok {
-			dst.Set(reflect.ValueOf(obj))
-			return nil
-		}
-	}
-
-	{
-		et := v.ExportType()
-		if et == nil || et == reflectTypeNil {
-			dst.Set(reflect.Zero(typ))
-			return nil
-		}
-
-		for i := 0; ; i++ {
-			if et.ConvertibleTo(typ) {
-				ev := reflect.ValueOf(exportValue(v, ctx))
-				for ; i > 0; i-- {
-					ev = ev.Elem()
-				}
-				dst.Set(ev.Convert(typ))
-				return nil
-			}
-			if et.Kind() == reflect.Ptr {
-				et = et.Elem()
-			} else {
-				break
-			}
-		}
-
-		if typ == typeTime {
-			if obj, ok := v.(*Object); ok {
-				if d, ok := obj.self.(*dateObject); ok {
-					dst.Set(reflect.ValueOf(d.time()))
-					return nil
-				}
-			}
-			if et.Kind() == reflect.String {
-				tme, ok := dateParse(v.String())
-				if !ok {
-					return fmt.Errorf("could not convert string %v to %v", v, typ)
-				}
-				dst.Set(reflect.ValueOf(tme))
-				return nil
-			}
-		}
-	}
-
-	switch typ.Kind() {
 	case reflect.Slice:
 		if o, ok := v.(*Object); ok {
 			if o.self.className() == classArray {

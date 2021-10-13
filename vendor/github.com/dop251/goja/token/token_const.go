@@ -73,6 +73,7 @@ const (
 	QUESTION_MARK     // ?
 	ARROW             // =>
 	ELLIPSIS          // ...
+	BACKTICK          // `
 
 	firstKeyword
 	IF
@@ -174,6 +175,7 @@ var token2string = [...]string{
 	QUESTION_MARK:               "?",
 	ARROW:                       "=>",
 	ELLIPSIS:                    "...",
+	BACKTICK:                    "`",
 	IF:                          "if",
 	IN:                          "in",
 	OF:                          "of",

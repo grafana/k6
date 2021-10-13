@@ -768,6 +768,78 @@ func TestReadPump(t *testing.T) {
 	assert.Equal(t, numAsserts, len(closeCodes))
 }
 
+func TestUserAgent(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	tb.Mux.HandleFunc("/ws-echo-useragent", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// Echo back User-Agent header if it exists
+		responseHeaders := w.Header().Clone()
+		if ua := req.Header.Get("User-Agent"); ua != "" {
+			responseHeaders.Add("Echo-User-Agent", req.Header.Get("User-Agent"))
+		}
+
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, responseHeaders)
+		if err != nil {
+			t.Fatalf("/ws-echo-useragent cannot upgrade request: %v", err)
+			return
+		}
+
+		err = conn.Close()
+		if err != nil {
+			t.Logf("error while closing connection in /ws-echo-useragent: %v", err)
+			return
+		}
+	}))
+
+	root, err := lib.NewGroup("", nil)
+	assert.NoError(t, err)
+
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	samples := make(chan stats.SampleContainer, 1000)
+	state := &lib.State{
+		Group:  root,
+		Dialer: tb.Dialer,
+		Options: lib.Options{
+			SystemTags: stats.NewSystemTagSet(
+				stats.TagURL,
+				stats.TagProto,
+				stats.TagStatus,
+				stats.TagSubproto,
+			),
+			UserAgent: null.StringFrom("TestUserAgent"),
+		},
+		Samples:        samples,
+		TLSConfig:      tb.TLSClientConfig,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
+	}
+
+	ctx := lib.WithState(context.Background(), state)
+	ctx = common.WithRuntime(ctx, rt)
+
+	err = rt.Set("ws", common.Bind(rt, New(), &ctx))
+	assert.NoError(t, err)
+
+	// websocket handler should echo back User-Agent as Echo-User-Agent for this test to work
+	_, err = rt.RunString(sr(`
+		var res = ws.connect("WSBIN_URL/ws-echo-useragent", function(socket){
+			socket.close()
+		})
+		var userAgent = res.headers["Echo-User-Agent"];
+		if (userAgent == undefined) {
+			throw new Error("user agent is not echoed back by test server");
+		}
+		if (userAgent != "TestUserAgent") {
+			throw new Error("incorrect user agent: " + userAgent);
+		}
+		`))
+	assert.NoError(t, err)
+
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo-useragent"), 101, "")
+}
+
 // TODO: Benchmark with compression and not
 func TestCompression(t *testing.T) {
 	t.Parallel()

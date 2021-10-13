@@ -1,0 +1,13 @@
+name: 'Auto Assign'
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+
+jobs:
+  add-reviews:
+    if: ${{ join(github.event.pull_request.requested_reviewers.*.login, ',') == '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: kentaro-m/auto-assign-action@19c336bfad4fcb61cab8dcb6b6a5fe3e62ac5cd8 #v1.2.0
+        with:
+          configuration-path: ".github/pr-auto-assign-config.yml"
