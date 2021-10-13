@@ -23,6 +23,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -346,6 +347,119 @@ func TestSession(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+
+	t.Run("multi_message", func(t *testing.T) {
+		t.Parallel()
+
+		tb.Mux.HandleFunc("/ws-echo-multi", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+			if err != nil {
+				return
+			}
+
+			for {
+				messageType, r, e := conn.NextReader()
+				if e != nil {
+					return
+				}
+				var wc io.WriteCloser
+				wc, err = conn.NextWriter(messageType)
+				if err != nil {
+					return
+				}
+				if _, err = io.Copy(wc, r); err != nil {
+					return
+				}
+				if err = wc.Close(); err != nil {
+					return
+				}
+			}
+		}))
+
+		t.Run("send_receive_multiple_ws", func(t *testing.T) {
+			_, err := rt.RunString(sr(`
+			var msg1 = "test1"
+			var msg2 = "test2"
+			var secondMsgReceived = false
+			var res = ws.connect("WSBIN_URL/ws-echo-multi", function(socket){
+				socket.on("open", function() {
+					socket.send(msg1)
+				})
+				socket.on("message", function (data){
+					if (data == msg1){
+						socket.send(msg2)
+					}
+					if (data == msg2){
+						secondMsgReceived = true
+						socket.close()
+					}
+				});
+			});
+
+			if (!secondMsgReceived) {
+				throw new Error ("second test message was not received!");
+			}
+			`))
+			assert.NoError(t, err)
+		})
+
+		t.Run("send_receive_multiple_wss", func(t *testing.T) {
+			_, err := rt.RunString(sr(`
+			var msg1 = "test1"
+			var msg2 = "test2"
+			var secondMsgReceived = false
+			var res = ws.connect("WSSBIN_URL/ws-echo-multi", function(socket){
+				socket.on("open", function() {
+					socket.send(msg1)
+				})
+				socket.on("message", function (data){
+					if (data == msg1){
+						socket.send(msg2)
+					}
+					if (data == msg2){
+						secondMsgReceived = true
+						socket.close()
+					}
+				});
+			});
+
+			if (!secondMsgReceived) {
+				throw new Error ("second test message was not received!");
+			}
+			`))
+			assert.NoError(t, err)
+		})
+
+		t.Run("send_receive_text_binary", func(t *testing.T) {
+			_, err := rt.RunString(sr(`
+			var msg1 = "test1"
+			var msg2 = new Uint8Array([116, 101, 115, 116, 50]); // 'test2'
+			var secondMsgReceived = false
+			var res = ws.connect("WSBIN_URL/ws-echo-multi", function(socket){
+				socket.on("open", function() {
+					socket.send(msg1)
+				})
+				socket.on("message", (data) => {
+					if (data == msg1){
+						socket.sendBinary(msg2.buffer)
+					}
+				});
+				socket.on("binaryMessage", (data) => {
+					let data2 = new Uint8Array(data)
+					if(JSON.stringify(msg2) == JSON.stringify(data2)){
+						secondMsgReceived = true
+					}
+					socket.close()
+				})
+			});
+
+			if (!secondMsgReceived) {
+				throw new Error ("second test message was not received!");
+			}
+			`))
+			assert.NoError(t, err)
+		})
+	})
 }
 
 func TestSocketSendBinary(t *testing.T) { //nolint: tparallel
