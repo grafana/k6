@@ -407,7 +407,7 @@ func TestSession(t *testing.T) {
 					if (data == msg1){
 						socket.send(msg2)
 					}
-					if (data == msg1){
+					if (data == msg2){
 						socket.send(msg3)
 					}
 					if (data == msg3){
