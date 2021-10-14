@@ -705,23 +705,6 @@ func TestClient(t *testing.T) {
 	}
 }
 
-func TestGoja(t *testing.T) {
-	t.Parallel()
-	t.Skip()
-	// ctx := common.WithInitEnv(common.WithRuntime(context.Background(), rt), initEnv)
-	// require.NoError(t, rt.Set("grpc", common.Bind(rt, New(), &ctx)))
-
-	// if tt.setup != nil {
-	// 	tt.setup(tb)
-	// }
-	// val, err := rt.RunString(tb.Replacer.Replace(tt.initString.code))
-	// assertResponse(t, tt.initString, err, val, tb, samples)
-
-	// ctx = lib.WithState(ctx, state)
-	// val, err = rt.RunString(tb.Replacer.Replace(tt.vuString.code))
-	// assertResponse(t, tt.vuString, err, val, tb, samples)
-}
-
 func TestDebugStat(t *testing.T) {
 	t.Parallel()
 
