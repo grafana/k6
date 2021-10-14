@@ -356,23 +356,6 @@ func TestClient(t *testing.T) {
 					return &grpc_testing.Empty{}, nil
 				}
 			},
-			vuString: codeBlock{code: `
-				client.connect("GRPCBIN_ADDR");
-				var resp = client.invoke("grpc.testing.TestService/EmptyCall", {})
-				if (resp.status !== grpc.StatusOK) {
-					throw new Error("unexpected error status: " + resp.status)
-				}`},
-		},
-		{
-			name: "Invoke",
-			initString: codeBlock{code: `
-				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
-			setup: func(tb *httpmultibin.HTTPMultiBin) {
-				tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
-					return &grpc_testing.Empty{}, nil
-				}
-			},
 			vuString: codeBlock{
 				code: `
 				client.connect("GRPCBIN_ADDR");
