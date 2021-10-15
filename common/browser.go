@@ -240,14 +240,13 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) api.Page {
 // Close shuts down the browser
 func (b *Browser) Close() {
 	b.browserProc.GracefulClose()
+	defer b.browserProc.Terminate()
 
 	action := cdpbrowser.Close()
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
 		rt := common.GetRuntime(b.ctx)
 		common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
 	}
-
-	b.browserProc.Terminate()
 }
 
 // Contexts returns list of browser contexts
