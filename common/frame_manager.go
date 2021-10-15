@@ -444,6 +444,9 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 	} else {
 		select {
 		case <-timeoutCtx.Done():
+			if timeoutCtx.Err() == context.DeadlineExceeded {
+				common.Throw(rt, ErrTimedOut)
+			}
 		case data := <-chSameDoc:
 			event = data.(*NavigationEvent)
 		}
@@ -452,6 +455,9 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 	if !frame.hasSubtreeLifecycleEventFired(parsedOpts.WaitUntil) {
 		select {
 		case <-timeoutCtx.Done():
+			if timeoutCtx.Err() == context.DeadlineExceeded {
+				common.Throw(rt, ErrTimedOut)
+			}
 		case <-chWaitUntilCh:
 		}
 	}
