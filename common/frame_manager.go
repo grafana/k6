@@ -125,6 +125,7 @@ func (m *FrameManager) frameAttached(frameID cdp.FrameID, parentFrameID cdp.Fram
 	if parentFrame, ok := m.frames[parentFrameID]; ok {
 		frame := NewFrame(m.ctx, m, parentFrame, frameID)
 		m.frames[frameID] = frame
+		parentFrame.childFrames[frame] = true
 		m.page.emit(EventPageFrameAttached, frame)
 	}
 }
@@ -394,10 +395,18 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 		common.Throw(rt, fmt.Errorf("failed parsing options: %v", err))
 	}
 
-	chSameDoc, evCancelFn := createWaitForEventHandler(m.ctx, frame, []string{EventFrameNavigation}, func(data interface{}) bool {
+	timeoutCtx, timeoutCancelFn := context.WithTimeout(m.ctx, parsedOpts.Timeout)
+	defer timeoutCancelFn()
+
+	chSameDoc, evCancelFn := createWaitForEventHandler(timeoutCtx, frame, []string{EventFrameNavigation}, func(data interface{}) bool {
 		return data.(*NavigationEvent).newDocument == nil
 	})
 	defer evCancelFn() // Remove event handler
+
+	chWaitUntilCh, evCancelFn2 := createWaitForEventHandler(timeoutCtx, frame, []string{EventFrameAddLifecycle}, func(data interface{}) bool {
+		return data.(LifecycleEvent) == parsedOpts.WaitUntil
+	})
+	defer evCancelFn2() // Remove event handler
 
 	fs := frame.page.getFrameSession(frame.id)
 	if fs == nil {
@@ -434,25 +443,26 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 		}
 	} else {
 		select {
-		case <-m.ctx.Done():
-		case <-time.After(parsedOpts.Timeout):
-			common.Throw(rt, ErrTimedOut)
+		case <-timeoutCtx.Done():
 		case data := <-chSameDoc:
 			event = data.(*NavigationEvent)
 		}
 	}
 
-	if frame.hasSubtreeLifecycleEventFired(parsedOpts.WaitUntil) {
-		waitForEvent(m.ctx, frame, []string{EventFrameAddLifecycle}, func(data interface{}) bool {
-			return data.(LifecycleEvent) == parsedOpts.WaitUntil
-		}, parsedOpts.Timeout)
+	if !frame.hasSubtreeLifecycleEventFired(parsedOpts.WaitUntil) {
+		select {
+		case <-timeoutCtx.Done():
+		case <-chWaitUntilCh:
+		}
 	}
 
 	var resp *Response
-	req := event.newDocument.request
-	if req != nil {
-		if req.response != nil {
-			resp = req.response
+	if event.newDocument != nil {
+		req := event.newDocument.request
+		if req != nil {
+			if req.response != nil {
+				resp = req.response
+			}
 		}
 	}
 	return resp

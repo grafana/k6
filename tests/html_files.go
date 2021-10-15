@@ -30,9 +30,20 @@ import (
 //go:embed html/empty.html
 var HTMLEmptyPage string
 
+//go:embed html/wait_until.html
+var HTMLWaitUntilPage string
+
 func setupHandlersForHTMLFiles(bt *browsertest.BrowserTest) {
+	bt.HTTPMultiBin.Mux.Handle("/favicon.ico", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", "image/png")
+		w.Write([]byte{})
+	}))
 	bt.HTTPMultiBin.Mux.Handle("/empty.html", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "text/html")
 		w.Write([]byte(HTMLEmptyPage))
+	}))
+	bt.HTTPMultiBin.Mux.Handle("/wait_until.html", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", "text/html")
+		w.Write([]byte(HTMLWaitUntilPage))
 	}))
 }

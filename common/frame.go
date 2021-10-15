@@ -326,6 +326,7 @@ func (f *Frame) recalculateLifecycle() {
 
 	// Only consider a life cycle event as fired if it has triggered for all of subtree.
 	for child := range f.childFrames {
+		child.(*Frame).recalculateLifecycle()
 		for k := range events {
 			if !child.(*Frame).hasSubtreeLifecycleEventFired(k) {
 				delete(events, k)
@@ -348,13 +349,16 @@ func (f *Frame) recalculateLifecycle() {
 
 	// Emit removal events
 	for k := range f.subtreeLifecycleEvents {
-		if ok := events[k]; ok {
+		if ok := events[k]; !ok {
 			f.emit(EventFrameRemoveLifecycle, k)
 		}
 	}
 
 	f.lifecycleEventsMu.Lock()
-	f.subtreeLifecycleEvents = events
+	f.subtreeLifecycleEvents = make(map[LifecycleEvent]bool)
+	for k, v := range events {
+		f.subtreeLifecycleEvents[k] = v
+	}
 	f.lifecycleEventsMu.Unlock()
 }
 
