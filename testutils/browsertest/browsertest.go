@@ -22,6 +22,8 @@ package browsertest
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -48,29 +50,7 @@ type BrowserTest struct {
 	Browser      api.Browser
 }
 
-func NewBrowserTest(t testing.TB, debug bool) *BrowserTest {
-	/*ctx := context.Background()
-	rt := goja.New()
-	ctx = k6common.WithRuntime(ctx, rt)
-	samples := make(chan stats.SampleContainer, 1)
-	group, _ := k6lib.NewGroup("browserTestGroup", nil)
-	state := &k6lib.State{
-		Group:   group,
-		Logger:  logrus.StandardLogger(),
-		Samples: samples,
-	}
-	ctx = k6lib.WithState(ctx, state)
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-samples: // Consume samples
-			}
-		}
-	}()*/
-
+func NewBrowserTest(t testing.TB) *BrowserTest {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	root, err := lib.NewGroup("", nil)
@@ -109,6 +89,14 @@ func NewBrowserTest(t testing.TB, debug bool) *BrowserTest {
 	rt.Set("http", common.Bind(rt, new(http.GlobalHTTP).NewModuleInstancePerVU(), ctx))
 
 	bt := chromium.NewBrowserType(*ctx).(*chromium.BrowserType)
+	debug := false
+	headless := true
+	if v, found := os.LookupEnv("XK6_BROWSER_TEST_DEBUG"); found {
+		debug, _ = strconv.ParseBool(v)
+	}
+	if v, found := os.LookupEnv("XK6_BROWSER_TEST_HEADLESS"); found {
+		headless, _ = strconv.ParseBool(v)
+	}
 	launchOpts := rt.ToValue(struct {
 		Debug    bool   `js:"debug"`
 		Headless bool   `js:"headless"`
@@ -116,7 +104,7 @@ func NewBrowserTest(t testing.TB, debug bool) *BrowserTest {
 		Timeout  string `js:"timeout"`
 	}{
 		Debug:    debug,
-		Headless: false,
+		Headless: headless,
 		SlowMo:   "0s",
 		Timeout:  "30s",
 	})

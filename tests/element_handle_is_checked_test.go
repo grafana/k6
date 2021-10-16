@@ -29,7 +29,7 @@ import (
 )
 
 func TestElementHandleIsChecked(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t, false)
+	bt := browsertest.NewBrowserTest(t)
 	defer bt.Browser.Close()
 
 	t.Run("ElementHandle.isChecked", func(t *testing.T) {

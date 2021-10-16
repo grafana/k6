@@ -30,7 +30,7 @@ import (
 )
 
 func TestElementHandleBoundingBox(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t, false)
+	bt := browsertest.NewBrowserTest(t)
 	defer bt.Browser.Close()
 
 	t.Run("ElementHandle.boundingBox", func(t *testing.T) {

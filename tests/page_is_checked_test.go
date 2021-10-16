@@ -29,7 +29,7 @@ import (
 )
 
 func TestPageIsChecked(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t, false)
+	bt := browsertest.NewBrowserTest(t)
 	defer bt.Browser.Close()
 
 	t.Run("Page.isChecked", func(t *testing.T) {

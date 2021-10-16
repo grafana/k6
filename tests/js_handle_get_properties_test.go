@@ -29,7 +29,7 @@ import (
 )
 
 func TestJSHandleGetProperties(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t, false)
+	bt := browsertest.NewBrowserTest(t)
 	defer bt.Browser.Close()
 
 	t.Run("JSHandle.getProperties", func(t *testing.T) {

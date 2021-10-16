@@ -30,7 +30,7 @@ import (
 )
 
 func TestBrowserModule(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t, false)
+	bt := browsertest.NewBrowserTest(t)
 	defer bt.Browser.Close()
 
 	t.Run("Browser", func(t *testing.T) {

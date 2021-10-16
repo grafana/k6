@@ -69,7 +69,7 @@ var htmlInputButton = fmt.Sprintf(`
 `, mouseHelperScriptSource)
 
 func TestElementHandleClick(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t, false)
+	bt := browsertest.NewBrowserTest(t)
 	defer bt.Browser.Close()
 
 	t.Run("ElementHandle.click", func(t *testing.T) {
