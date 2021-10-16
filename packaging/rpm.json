@@ -1,0 +1,17 @@
+{
+    "name": "xk6-browser",
+    "Summary": "Load testing for the 21st century",
+    "description": "k6 is a developer centric open source load testing tool for testing the performance of your backend infrastructure. It’s built with Go and JavaScript to integrate well into your development workflow, so you can stay on top of performance without fuzz.",
+    "changelog-cmd": "echo \"* $(date \"+%a %b %d %Y\") Load Impact \n - Go to the release page for more details on the changelog.\n\n https://github.com/grafana/xk6-browser/releases/tag/v!version!\"",
+    "license": "LICENSE",
+    "version": "!version!",
+    "arch": "!arch!",
+    "url": "https://k6.io/",
+    "files": [
+      {
+        "from": "/tmp/!name!",
+        "to": "%{_bindir}/",
+        "base": "/tmp"
+      }
+    ]
+  }

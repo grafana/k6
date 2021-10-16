@@ -1,0 +1,26 @@
+{
+    "name": "xk6-browser",
+    "maintainer": "Load Impact AB",
+    "description": "Load testing for the 21st century",
+    "changelog-cmd": "echo \"* $(date \"+%a %b %d %Y\") Load Impact \n - Go to the release page for more details on the changelog.\n\n https://github.com/grafana/xk6-browser/releases/tag/v!version!\"",
+    "homepage": "https://k6.io/",
+    "files": [
+      {
+        "from": "/tmp/!name!",
+        "to": "/usr/bin/",
+        "base" : "/tmp",
+        "fperm": "0755"
+      }
+    ],
+    "copyrights": [
+      {
+        "files": "*",
+        "copyright": "2021 Load Impact AB",
+        "license": "AGPL-3.0",
+        "file": "LICENSE"
+      }
+    ],
+	"depends": [
+      "ca-certificates"
+    ]
+  }
