@@ -57,8 +57,7 @@ func (b *Barrier) AddFrameNavigation(frame *Frame) {
 }
 
 func (b *Barrier) Wait(ctx context.Context) error {
-	atomic.AddInt64(&b.count, -1)
-	if b.count == 0 {
+	if atomic.AddInt64(&b.count, -1) == 0 {
 		return nil
 	}
 
