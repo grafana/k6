@@ -78,6 +78,7 @@ jobs:
         uses: browser-actions/setup-chrome@latest
         with:
           chrome-version: stable
+      - name: Chrome version
         run: chrome --version
       - name: Run tests
         run: |
@@ -107,6 +108,7 @@ jobs:
         uses: browser-actions/setup-chrome@latest
         with:
           chrome-version: stable
+      - name: Chrome version
         run: chrome --version
       - name: Run tests
         run: |
