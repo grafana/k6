@@ -84,7 +84,8 @@ jobs:
         run: |
           set -x
           go version
-          go test -race -timeout 800s ./...
+          export GOMAXPROCS=1
+          go test -race -v -timeout 800s ./...
 
   test-tip:
     runs-on: ubuntu-latest
@@ -115,7 +116,8 @@ jobs:
           set -x
           which go
           go version
-          go test -race -timeout 800s ./...
+          export GOMAXPROCS=1
+          go test -race -v -timeout 800s ./...
 
   test-current-cov:
     strategy:
@@ -131,17 +133,17 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go-version }}
+      - name: Setup chrome
+        uses: browser-actions/setup-chrome@latest
+        with:
+          chrome-version: stable
+      - name: Chrome version
+        run: chrome --version
       - name: Run tests with code coverage
         run: |
           go version
-          export GOMAXPROCS=2
-          args=("-p" "2" "-race")
-          # Run with less concurrency on Windows to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == windows* ]]; then
-            unset args[2]
-            args[1]="1"
-            export GOMAXPROCS=1
-          fi
+          export GOMAXPROCS=1
+          args=("-race")
           echo "mode: set" > coverage.txt
           for pkg in $(go list ./... | grep -v vendor); do
               list=$(go list -test -f  '{{ join .Deps  "\n"}}' $pkg | grep github.com/grafana/xk6-browser | grep -v vendor || true)
