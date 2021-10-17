@@ -23,6 +23,7 @@ package common
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -115,9 +116,12 @@ type Frame struct {
 
 	documentHandle *ElementHandle
 
-	mainExecutionContext    *ExecutionContext
-	utilityExecutionContext *ExecutionContext
-	executionContextCh      chan bool
+	mainExecutionContext             *ExecutionContext
+	utilityExecutionContext          *ExecutionContext
+	mainExecutionContextCh           chan bool
+	utilityExecutionContextCh        chan bool
+	mainExecutionContextHasWaited    int32
+	utilityExecutionContextHasWaited int32
 
 	loadingStartedTime time.Time
 
@@ -131,30 +135,31 @@ type Frame struct {
 // NewFrame creates a new HTML document frame
 func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID cdp.FrameID) *Frame {
 	f := Frame{
-		BaseEventEmitter:        NewBaseEventEmitter(),
-		ctx:                     ctx,
-		page:                    m.page,
-		manager:                 m,
-		parentFrame:             parentFrame,
-		childFrames:             make(map[api.Frame]bool),
-		id:                      frameID,
-		loaderID:                "",
-		name:                    "",
-		url:                     "",
-		detached:                false,
-		lifecycleEvents:         make(map[LifecycleEvent]bool),
-		subtreeLifecycleEvents:  make(map[LifecycleEvent]bool),
-		lifecycleEventsMu:       sync.RWMutex{},
-		documentHandle:          nil,
-		mainExecutionContext:    nil,
-		utilityExecutionContext: nil,
-		executionContextCh:      make(chan bool, 1),
-		loadingStartedTime:      time.Time{},
-		networkIdleCtx:          nil,
-		networkIdleCancelFn:     nil,
-		inflightRequests:        make(map[network.RequestID]bool),
-		currentDocument:         &DocumentInfo{},
-		pendingDocument:         nil,
+		BaseEventEmitter:          NewBaseEventEmitter(),
+		ctx:                       ctx,
+		page:                      m.page,
+		manager:                   m,
+		parentFrame:               parentFrame,
+		childFrames:               make(map[api.Frame]bool),
+		id:                        frameID,
+		loaderID:                  "",
+		name:                      "",
+		url:                       "",
+		detached:                  false,
+		lifecycleEvents:           make(map[LifecycleEvent]bool),
+		subtreeLifecycleEvents:    make(map[LifecycleEvent]bool),
+		lifecycleEventsMu:         sync.RWMutex{},
+		documentHandle:            nil,
+		mainExecutionContext:      nil,
+		utilityExecutionContext:   nil,
+		mainExecutionContextCh:    make(chan bool, 1),
+		utilityExecutionContextCh: make(chan bool, 1),
+		loadingStartedTime:        time.Time{},
+		networkIdleCtx:            nil,
+		networkIdleCancelFn:       nil,
+		inflightRequests:          make(map[network.RequestID]bool),
+		currentDocument:           &DocumentInfo{},
+		pendingDocument:           nil,
 	}
 	return &f
 }
@@ -207,12 +212,7 @@ func (f *Frame) document() (*ElementHandle, error) {
 	if f.documentHandle != nil {
 		return f.documentHandle, nil
 	}
-	if f.mainExecutionContext == nil {
-		select {
-		case <-f.ctx.Done():
-		case <-f.executionContextCh:
-		}
-	}
+	f.waitForExecutionContext("main")
 	result, err := f.mainExecutionContext.evaluate(f.ctx, false, false, rt.ToValue("document"), nil)
 	if err != nil {
 		return nil, err
@@ -369,11 +369,14 @@ func (f *Frame) requestByID(reqID network.RequestID) *Request {
 func (f *Frame) setContext(world string, execCtx *ExecutionContext) {
 	if world == "main" {
 		f.mainExecutionContext = execCtx
-		if len(f.executionContextCh) == 0 {
-			f.executionContextCh <- true
+		if len(f.mainExecutionContextCh) == 0 {
+			f.mainExecutionContextCh <- true
 		}
 	} else if world == "utility" {
 		f.utilityExecutionContext = execCtx
+		if len(f.utilityExecutionContextCh) == 0 {
+			f.utilityExecutionContextCh <- true
+		}
 	}
 }
 
@@ -406,8 +409,23 @@ func (f *Frame) stopNetworkIdleTimer() {
 	}
 }
 
+func (f *Frame) waitForExecutionContext(world string) {
+	if world == "main" && atomic.CompareAndSwapInt32(&f.mainExecutionContextHasWaited, 0, 1) {
+		select {
+		case <-f.ctx.Done():
+		case <-f.mainExecutionContextCh:
+		}
+	} else if world == "utility" && atomic.CompareAndSwapInt32(&f.utilityExecutionContextHasWaited, 0, 1) {
+		select {
+		case <-f.ctx.Done():
+		case <-f.utilityExecutionContextCh:
+		}
+	}
+}
+
 func (f *Frame) waitForFunction(apiCtx context.Context, world string, predicateFn goja.Value, polling PollingType, interval int64, timeout time.Duration, args ...goja.Value) (interface{}, error) {
 	rt := common.GetRuntime(f.ctx)
+	f.waitForExecutionContext(world)
 	execCtx := f.mainExecutionContext
 	if world == "utility" {
 		execCtx = f.utilityExecutionContext
@@ -586,6 +604,7 @@ func (f *Frame) DispatchEvent(selector string, typ string, eventInit goja.Value,
 // Evaluate will evaluate provided page function within an execution context
 func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 	rt := common.GetRuntime(f.ctx)
+	f.waitForExecutionContext("main")
 	i, err := f.mainExecutionContext.Evaluate(f.ctx, pageFunc, args...)
 	if err != nil {
 		common.Throw(rt, err)
@@ -597,6 +616,7 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 // EvaluateHandle will evaluate provided page function within an execution context
 func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHandle {
 	rt := common.GetRuntime(f.ctx)
+	f.waitForExecutionContext("main")
 	handle, err := f.mainExecutionContext.EvaluateHandle(f.ctx, pageFunc, args...)
 	if err != nil {
 		common.Throw(rt, err)
@@ -1025,6 +1045,7 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 		document.write(html);
 		document.close();
 	}`
+	f.waitForExecutionContext("utility")
 	_, err := f.utilityExecutionContext.evaluate(f.ctx, true, true, rt.ToValue(js), rt.ToValue(html))
 	if err != nil {
 		common.Throw(rt, err)
