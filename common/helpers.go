@@ -252,7 +252,13 @@ func valueFromRemoteObject(ctx context.Context, remoteObject *cdpruntime.RemoteO
 	return rt.ToValue(i), err
 }
 
-func createWaitForEventHandler(ctx context.Context, emitter EventEmitter, events []string, predicateFn func(data interface{}) bool) (chan interface{}, context.CancelFunc) {
+func createWaitForEventHandler(
+	ctx context.Context,
+	emitter EventEmitter, events []string,
+	predicateFn func(data interface{}) bool,
+) (
+	chan interface{}, context.CancelFunc,
+) {
 	evCancelCtx, evCancelFn := context.WithCancel(ctx)
 	chEvHandler := make(chan Event)
 	ch := make(chan interface{})
