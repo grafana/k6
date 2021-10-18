@@ -229,17 +229,14 @@ func testSlowMoImpl(t *testing.T, bt *browsertest.BrowserTest, fn func(bt *brows
 	hooks := common.GetHooks(bt.Ctx)
 	currentHook := hooks.Get(common.HookApplySlowMo)
 	chCalled := make(chan bool, 1)
+	defer hooks.Register(common.HookApplySlowMo, currentHook)
 	hooks.Register(common.HookApplySlowMo, func(ctx context.Context) {
 		currentHook(ctx)
 		chCalled <- true
-		hooks.Register(common.HookApplySlowMo, currentHook)
 	})
 
-	go func() {
-		fn(bt)
-	}()
-
 	didSlowMo := false
+	go fn(bt)
 	select {
 	case <-bt.Ctx.Done():
 	case <-chCalled:
