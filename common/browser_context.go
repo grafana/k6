@@ -211,11 +211,7 @@ func (b *BrowserContext) NewCDPSession() api.CDPSession {
 
 // NewPage creates a new page inside this browser context.
 func (b *BrowserContext) NewPage() api.Page {
-	p := b.browser.newPageInContext(b.id)
-	if p != nil {
-		return p
-	}
-	return nil
+	return b.browser.newPageInContext(b.id)
 }
 
 // Pages returns a list of pages inside this browser context.

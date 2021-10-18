@@ -110,9 +110,9 @@ type Frame struct {
 
 	// A life cycle event is only considered triggered for a frame if the entire
 	// frame subtree has also had the life cycle event triggered.
+	lifecycleEventsMu      sync.RWMutex
 	lifecycleEvents        map[LifecycleEvent]bool
 	subtreeLifecycleEvents map[LifecycleEvent]bool
-	lifecycleEventsMu      sync.RWMutex
 
 	documentHandle *ElementHandle
 
@@ -127,14 +127,17 @@ type Frame struct {
 
 	networkIdleCtx      context.Context
 	networkIdleCancelFn context.CancelFunc
-	inflightRequests    map[network.RequestID]bool
-	currentDocument     *DocumentInfo
-	pendingDocument     *DocumentInfo
+
+	muInflightRequests sync.RWMutex
+	inflightRequests   map[network.RequestID]bool
+
+	currentDocument *DocumentInfo
+	pendingDocument *DocumentInfo
 }
 
 // NewFrame creates a new HTML document frame
 func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID cdp.FrameID) *Frame {
-	f := Frame{
+	return &Frame{
 		BaseEventEmitter:          NewBaseEventEmitter(),
 		ctx:                       ctx,
 		page:                      m.page,
@@ -142,41 +145,54 @@ func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID 
 		parentFrame:               parentFrame,
 		childFrames:               make(map[api.Frame]bool),
 		id:                        frameID,
-		loaderID:                  "",
-		name:                      "",
-		url:                       "",
-		detached:                  false,
 		lifecycleEvents:           make(map[LifecycleEvent]bool),
 		subtreeLifecycleEvents:    make(map[LifecycleEvent]bool),
-		lifecycleEventsMu:         sync.RWMutex{},
-		documentHandle:            nil,
-		mainExecutionContext:      nil,
-		utilityExecutionContext:   nil,
 		mainExecutionContextCh:    make(chan bool, 1),
 		utilityExecutionContextCh: make(chan bool, 1),
-		loadingStartedTime:        time.Time{},
-		networkIdleCtx:            nil,
-		networkIdleCancelFn:       nil,
 		inflightRequests:          make(map[network.RequestID]bool),
 		currentDocument:           &DocumentInfo{},
-		pendingDocument:           nil,
 	}
-	return &f
 }
 
 func (f *Frame) addRequest(requestID network.RequestID) {
+	f.muInflightRequests.Lock()
+	defer f.muInflightRequests.Unlock()
+
 	f.inflightRequests[requestID] = true
+}
+
+func (f *Frame) deleteRequest(requestID network.RequestID) {
+	f.muInflightRequests.Lock()
+	defer f.muInflightRequests.Unlock()
+
+	delete(f.inflightRequests, requestID)
+}
+
+func (f *Frame) getInflightRequestCount() int {
+	f.muInflightRequests.RLock()
+	defer f.muInflightRequests.RUnlock()
+	return len(f.inflightRequests)
+}
+
+func (f *Frame) hasInflightRequest(requestID network.RequestID) bool {
+	f.muInflightRequests.RLock()
+	defer f.muInflightRequests.RUnlock()
+
+	return f.inflightRequests[requestID]
 }
 
 func (f *Frame) clearLifecycle() {
 	f.lifecycleEventsMu.RLock()
-	for k, _ := range f.lifecycleEvents {
+	for k := range f.lifecycleEvents {
 		f.lifecycleEvents[k] = false
 	}
 	f.lifecycleEventsMu.RUnlock()
 	f.page.frameManager.mainFrame.recalculateLifecycle()
+
+	f.muInflightRequests.Lock()
+	defer f.muInflightRequests.Unlock()
 	inflightRequests := make(map[network.RequestID]bool)
-	for req, _ := range f.inflightRequests {
+	for req := range f.inflightRequests {
 		if req == f.currentDocument.request.requestID {
 			inflightRequests[req] = true
 		}
@@ -189,10 +205,6 @@ func (f *Frame) clearLifecycle() {
 
 func (f *Frame) defaultTimeout() time.Duration {
 	return time.Duration(f.manager.timeoutSettings.timeout()) * time.Second
-}
-
-func (f *Frame) deleteRequest(requestID network.RequestID) {
-	delete(f.inflightRequests, requestID)
 }
 
 func (f *Frame) detach() {
@@ -221,10 +233,6 @@ func (f *Frame) document() (*ElementHandle, error) {
 	return f.documentHandle, err
 }
 
-func (f *Frame) getInflightRequestCount() int {
-	return len(f.inflightRequests)
-}
-
 func (f *Frame) getLoadingStartedTime() time.Time {
 	return f.loadingStartedTime
 }
@@ -237,10 +245,6 @@ func (f *Frame) hasContext(world string) bool {
 		return f.utilityExecutionContext != nil
 	}
 	return false // Should never reach here!
-}
-
-func (f *Frame) hasInflightRequest(requestID network.RequestID) bool {
-	return f.inflightRequests[requestID]
 }
 
 func (f *Frame) hasLifecycleEventFired(event LifecycleEvent) bool {
@@ -1031,7 +1035,7 @@ func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value
 	return strArr
 }
 
-// SetContent relaces the entire HTML document content
+// SetContent replaces the entire HTML document content
 func (f *Frame) SetContent(html string, opts goja.Value) {
 	rt := common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameSetContentOptions(f.defaultTimeout())

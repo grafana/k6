@@ -209,31 +209,39 @@ func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
 func (b *Browser) newPageInContext(id cdp.BrowserContextID) api.Page {
 	rt := common.GetRuntime(b.ctx)
 
-	var targetID target.ID
-	var err error
-
 	browserCtx, ok := b.contexts[id]
 	if !ok {
 		common.Throw(rt, fmt.Errorf("no browser context with ID %s exists", id))
 	}
 
+	var (
+		mu       sync.RWMutex // protects targetID
+		targetID target.ID
+
+		err error
+	)
 	ch, evCancelFn := createWaitForEventHandler(
-		b.ctx, browserCtx, []string{EventBrowserContextPage}, func(data interface{}) bool {
+		b.ctx, browserCtx, []string{EventBrowserContextPage},
+		func(data interface{}) bool {
+			mu.RLock()
+			defer mu.RUnlock()
 			return data.(*Page).targetID == targetID
-		})
+		},
+	)
 	defer evCancelFn() // Remove event handler
-
-	action := target.CreateTarget("about:blank").WithBrowserContextID(id)
-	if targetID, err = action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
-	}
-
+	func() {
+		action := target.CreateTarget("about:blank").WithBrowserContextID(id)
+		mu.Lock()
+		defer mu.Unlock()
+		if targetID, err = action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
+			common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
+		}
+	}()
 	select {
 	case <-b.ctx.Done():
 	case <-time.After(b.launchOpts.Timeout):
 	case <-ch:
 	}
-
 	return b.pages[targetID]
 }
 
