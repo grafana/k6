@@ -1031,7 +1031,7 @@ func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value
 	return strArr
 }
 
-// SetContent relaces the entire HTML document content
+// SetContent replaces the entire HTML document content
 func (f *Frame) SetContent(html string, opts goja.Value) {
 	rt := common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameSetContentOptions(f.defaultTimeout())

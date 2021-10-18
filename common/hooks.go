@@ -22,6 +22,7 @@ package common
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -34,26 +35,28 @@ const (
 type Hook func(context.Context)
 
 type Hooks struct {
+	mu    sync.RWMutex
 	hooks map[HookID]Hook
 }
 
 func applySlowMo(ctx context.Context) {
 	hooks := GetHooks(ctx)
-	if hooks != nil {
-		hook := hooks.GetHook(HookApplySlowMo)
-		if hook != nil {
-			hook(ctx)
-		}
+	if hooks == nil {
+		return
+	}
+	if hook := hooks.GetHook(HookApplySlowMo); hook != nil {
+		hook(ctx)
 	}
 }
 
 func defaultSlowMo(ctx context.Context) {
-	l := GetLaunchOptions(ctx)
-	if l.SlowMo > 0 {
-		select {
-		case <-ctx.Done():
-		case <-time.After(l.SlowMo):
-		}
+	sm := GetLaunchOptions(ctx).SlowMo
+	if sm <= 0 {
+		return
+	}
+	select {
+	case <-ctx.Done():
+	case <-time.After(sm):
 	}
 }
 
@@ -66,13 +69,17 @@ func NewHooks() *Hooks {
 }
 
 func (h *Hooks) registerDefaultHooks() {
-	h.hooks[HookApplySlowMo] = defaultSlowMo
+	h.RegisterHook(HookApplySlowMo, defaultSlowMo)
 }
 
 func (h *Hooks) GetHook(id HookID) Hook {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	return h.hooks[id]
 }
 
 func (h *Hooks) RegisterHook(id HookID, hook Hook) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.hooks[id] = hook
 }
