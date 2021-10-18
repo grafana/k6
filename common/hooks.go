@@ -44,7 +44,7 @@ func applySlowMo(ctx context.Context) {
 	if hooks == nil {
 		return
 	}
-	if hook := hooks.GetHook(HookApplySlowMo); hook != nil {
+	if hook := hooks.Get(HookApplySlowMo); hook != nil {
 		hook(ctx)
 	}
 }
@@ -69,16 +69,16 @@ func NewHooks() *Hooks {
 }
 
 func (h *Hooks) registerDefaultHooks() {
-	h.RegisterHook(HookApplySlowMo, defaultSlowMo)
+	h.Register(HookApplySlowMo, defaultSlowMo)
 }
 
-func (h *Hooks) GetHook(id HookID) Hook {
+func (h *Hooks) Get(id HookID) Hook {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return h.hooks[id]
 }
 
-func (h *Hooks) RegisterHook(id HookID, hook Hook) {
+func (h *Hooks) Register(id HookID, hook Hook) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.hooks[id] = hook
