@@ -215,25 +215,30 @@ func (m *NetworkManager) initEvents() {
 	}, chHandler)
 
 	go func() {
-		for {
-			select {
-			case <-m.ctx.Done():
-				return
-			case event := <-chHandler:
-				if ev, ok := event.data.(*network.EventLoadingFailed); ok {
-					m.onLoadingFailed(ev)
-				} else if ev, ok := event.data.(*network.EventLoadingFinished); ok {
-					m.onLoadingFinished(ev)
-				} else if ev, ok := event.data.(*network.EventRequestWillBeSent); ok {
-					m.onRequest(ev, "")
-				} else if ev, ok := event.data.(*network.EventRequestServedFromCache); ok {
-					m.onRequestServedFromCache(ev)
-				} else if ev, ok := event.data.(*network.EventResponseReceived); ok {
-					m.onResponseReceived(ev)
-				}
-			}
+		for m.handleEvents(chHandler) {
 		}
 	}()
+}
+
+func (m *NetworkManager) handleEvents(in <-chan Event) bool {
+	select {
+	case <-m.ctx.Done():
+		return false
+	case event := <-in:
+		switch ev := event.data.(type) {
+		case *network.EventLoadingFailed:
+			m.onLoadingFailed(ev)
+		case *network.EventLoadingFinished:
+			m.onLoadingFinished(ev)
+		case *network.EventRequestWillBeSent:
+			m.onRequest(ev, "")
+		case *network.EventRequestServedFromCache:
+			m.onRequestServedFromCache(ev)
+		case *network.EventResponseReceived:
+			m.onResponseReceived(ev)
+		}
+	}
+	return true
 }
 
 func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {

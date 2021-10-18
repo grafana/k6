@@ -226,10 +226,10 @@ func (m *FrameManager) frameNavigated(frameID cdp.FrameID, parentFrameID cdp.Fra
 	frame.clearLifecycle()
 	frame.emit(EventFrameNavigation, &NavigationEvent{url: url, name: name, newDocument: frame.currentDocument})
 
-	if !initial {
-		// TODO: when we add API support for storage we need to track origins
-		//f.page.frameNavigatedToNewDocument(f)
-	}
+	// TODO: when we add API support for storage we need to track origins
+	// if !initial {
+	// 	//f.page.frameNavigatedToNewDocument(f)
+	// }
 
 	// Restore pending if any (see comments above about keepPending).
 	frame.pendingDocument = keepPending
@@ -313,7 +313,7 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 		if frame.getInflightRequestCount() == 0 {
 			frame.startNetworkIdleTimer()
 		} else if frame.getInflightRequestCount() <= 10 {
-			for reqID, _ := range frame.inflightRequests {
+			for reqID := range frame.inflightRequests {
 				req := frame.requestByID(reqID)
 				debugLog("<framemanager:requestFailed> reqID=%s inflightURL=%s, frameID=%s", reqID, req.url, frame.id)
 			}
@@ -331,18 +331,23 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 
 func (m *FrameManager) requestFinished(req *Request) {
 	delete(m.inflightRequests, req.getID())
+
+	defer m.page.emit(EventPageRequestFinished, req)
 	frame := req.getFrame()
-	if frame != nil {
-		frame.deleteRequest(req.getID())
-		if frame.getInflightRequestCount() == 0 {
-			frame.startNetworkIdleTimer()
-		} else if frame.getInflightRequestCount() <= 10 {
-			/*for reqID, _ := range frame.inflightRequests {
-				req := frame.requestByID(reqID)
-			}*/
-		}
+	if frame == nil {
+		return
 	}
-	m.page.emit(EventPageRequestFinished, req)
+	frame.deleteRequest(req.getID())
+	if frame.getInflightRequestCount() == 0 {
+		frame.startNetworkIdleTimer()
+	}
+	/*
+		else if frame.getInflightRequestCount() <= 10 {
+			for reqID, _ := range frame.inflightRequests {
+				req := frame.requestByID(reqID)
+			}
+		}
+	*/
 }
 
 func (m *FrameManager) requestReceivedResponse(res *Response) {
