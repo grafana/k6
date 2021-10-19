@@ -1022,7 +1022,7 @@ func TestCompression(t *testing.T) {
 		var res = ws.connect("WSBIN_URL/ws-compression", params, function(socket){
 			socket.on('message', (data) => {
 				if(data != "` + text + `"){
-					throw new Error("wrong message received from server")
+					throw new Error("wrong message received from server: ", data)
 				}
 				socket.close()
 			})
@@ -1035,7 +1035,7 @@ func TestCompression(t *testing.T) {
 		`))
 
 		assert.NoError(t, err)
-		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-compression"), 101, "")
+		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-compression"), statusProtocolSwitch, "")
 	})
 
 	t.Run("params", func(t *testing.T) {
@@ -1112,7 +1112,7 @@ func TestCompression(t *testing.T) {
 func BenchmarkCompressionEnabled(b *testing.B) {
 	tb, samples, rt := newRuntime(b)
 	sr := tb.Replacer.Replace
-	handler := "/ws-compression-enabled-echo"
+	const handler = "/ws-compression-enabled-echo"
 
 	go func() {
 		ctxDone := tb.Context.Done()
@@ -1126,8 +1126,8 @@ func BenchmarkCompressionEnabled(b *testing.B) {
 	}()
 
 	tb.Mux.HandleFunc(handler, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		compressionEnabled := true
-		textMessage := 1
+		const compressionEnabled = true
+		const textMessage = 1
 		kbData := bytes.Repeat([]byte("0123456789"), 100)
 
 		// upgrade connection, send the first (long) message, disconnect
@@ -1156,7 +1156,7 @@ func BenchmarkCompressionEnabled(b *testing.B) {
 	}))
 
 	testCodeCompressionEnabled := sr(`
-		var res = ws.connect("WSBIN_URL/ws-compression-enabled-echo", {"compression":"deflate"}, function(socket){
+		var res = ws.connect("WSBIN_URL/ws-compression-enabled-echo", {"compression":"deflate"}, (socket) => {
 			socket.on('message', (data) => {
 				socket.close()
 			})
@@ -1176,7 +1176,7 @@ func BenchmarkCompressionEnabled(b *testing.B) {
 func BenchmarkCompressionDisabled(b *testing.B) {
 	tb, samples, rt := newRuntime(b)
 	sr := tb.Replacer.Replace
-	handler := "/ws-compression-disabled-echo"
+	const handler = "/ws-compression-disabled-echo"
 
 	go func() {
 		ctxDone := tb.Context.Done()
@@ -1190,8 +1190,8 @@ func BenchmarkCompressionDisabled(b *testing.B) {
 	}()
 
 	tb.Mux.HandleFunc(handler, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		compressionEnabled := false
-		textMessage := 1
+		const compressionEnabled = false
+		const textMessage = 1
 		kbData := bytes.Repeat([]byte("0123456789"), 100)
 
 		// upgrade connection, send the first (long) message, disconnect
@@ -1220,7 +1220,7 @@ func BenchmarkCompressionDisabled(b *testing.B) {
 	}))
 
 	testCode := sr(`
-		var res = ws.connect("WSBIN_URL/ws-compression-disabled-echo", {}, function(socket){
+		var res = ws.connect("WSBIN_URL/ws-compression-disabled-echo", {}, (socket) => {
 			socket.on('message', (data) => {
 				socket.close()
 			})
