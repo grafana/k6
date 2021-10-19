@@ -56,11 +56,20 @@ type Config struct {
 // NewConfig creates a new InfluxDB output config with some default values.
 func NewConfig() Config {
 	c := Config{
-		Addr:             null.NewString("http://localhost:8086", false),
-		DB:               null.NewString("k6", false),
-		TagsAsFields:     []string{"vu", "iter", "url"},
-		ConcurrentWrites: null.NewInt(10, false),
-		PushInterval:     types.NewNullDuration(time.Second, false),
+		Addr:         null.NewString("http://localhost:8086", false),
+		DB:           null.NewString("k6", false),
+		TagsAsFields: []string{"vu", "iter", "url"},
+		PushInterval: types.NewNullDuration(time.Second, false),
+
+		// The minimum value of pow(2, N) for handling a stressful situation
+		// with the default push interval set to 1s.
+		// Concurrency is not expected for the normal use-case,
+		// the response time should be lower than the push interval set value.
+		// In case of spikes, the response time could go around 2s,
+		// higher values will highlight a not sustainable situation
+		// and the user should adjust the executed script
+		// or the configuration based on the environment and rate expected.
+		ConcurrentWrites: null.NewInt(4, false),
 	}
 	return c
 }
