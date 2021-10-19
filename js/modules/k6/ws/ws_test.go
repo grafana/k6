@@ -383,7 +383,7 @@ func TestSession(t *testing.T) {
 			var msg2 = "test2"
 			var msg3 = "test3"
 			var allMsgsRecvd = false
-			var res = ws.connect("WSBIN_URL/ws-echo-multi", function(socket){
+			var res = ws.connect("WSBIN_URL/ws-echo-multi", (socket) => {
 				socket.on("open", () => {
 					socket.send(msg1)
 				})
@@ -418,7 +418,7 @@ func TestSession(t *testing.T) {
 			var msg1 = "test1"
 			var msg2 = "test2"
 			var secondMsgReceived = false
-			var res = ws.connect("WSSBIN_URL/ws-echo-multi", function(socket){
+			var res = ws.connect("WSSBIN_URL/ws-echo-multi", (socket) => {
 				socket.on("open", () => {
 					socket.send(msg1)
 				})
@@ -450,7 +450,7 @@ func TestSession(t *testing.T) {
 			var msg1 = "test1"
 			var msg2 = new Uint8Array([116, 101, 115, 116, 50]); // 'test2'
 			var secondMsgReceived = false
-			var res = ws.connect("WSBIN_URL/ws-echo-multi", function(socket){
+			var res = ws.connect("WSBIN_URL/ws-echo-multi", (socket) => {
 				socket.on("open", () => {
 					socket.send(msg1)
 				})
