@@ -43,6 +43,8 @@ import (
 	"go.k6.io/k6/stats"
 )
 
+const statusProtocolSwitch = 101
+
 func assertSessionMetricsEmitted(t *testing.T, sampleContainers []stats.SampleContainer, subprotocol, url string, status int, group string) {
 	seenSessions := false
 	seenSessionDuration := false
@@ -72,34 +74,16 @@ func assertSessionMetricsEmitted(t *testing.T, sampleContainers []stats.SampleCo
 	assert.True(t, seenSessionDuration, "url %s didn't emit SessionDuration", url)
 }
 
-func assertMetricEmitted(t *testing.T, metricName string, sampleContainers []stats.SampleContainer, url string) {
-	seenMetric := false
-
-	for _, sampleContainer := range sampleContainers {
-		for _, sample := range sampleContainer.GetSamples() {
-			surl, ok := sample.Tags.Get("url")
-			assert.True(t, ok)
-			if surl == url {
-				if sample.Metric.Name == metricName {
-					seenMetric = true
-				}
-			}
-		}
-	}
-	assert.True(t, seenMetric, "url %s didn't emit %s", url, metricName)
-}
-
 func assertMetricEmittedCount(t *testing.T, metricName string, sampleContainers []stats.SampleContainer, url string, count int) {
+	t.Helper()
 	actualCount := 0
 
 	for _, sampleContainer := range sampleContainers {
 		for _, sample := range sampleContainer.GetSamples() {
 			surl, ok := sample.Tags.Get("url")
 			assert.True(t, ok)
-			if surl == url {
-				if sample.Metric.Name == metricName {
-					actualCount++
-				}
+			if surl == url && sample.Metric.Name == metricName {
+				actualCount++
 			}
 		}
 	}
@@ -149,7 +133,7 @@ func TestSession(t *testing.T) {
 		`))
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
 
 	t.Run("connect_wss", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
@@ -160,7 +144,7 @@ func TestSession(t *testing.T) {
 		`))
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/ws-echo"), 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/ws-echo"), statusProtocolSwitch, "")
 
 	t.Run("open", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
@@ -175,7 +159,7 @@ func TestSession(t *testing.T) {
 		`))
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
 
 	t.Run("send_receive", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
@@ -183,7 +167,7 @@ func TestSession(t *testing.T) {
 			socket.on("open", function() {
 				socket.send("test")
 			})
-			socket.on("message", function (data){
+			socket.on("message", function (data) {
 				if (!data=="test") {
 					throw new Error ("echo'd data doesn't match our message!");
 				}
@@ -195,9 +179,9 @@ func TestSession(t *testing.T) {
 	})
 
 	samplesBuf := stats.GetBufferedSamples(samples)
-	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), 101, "")
-	assertMetricEmitted(t, metrics.WSMessagesSentName, samplesBuf, sr("WSBIN_URL/ws-echo"))
-	assertMetricEmitted(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSBIN_URL/ws-echo"))
+	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+	assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
+	assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
 
 	t.Run("interval", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
@@ -212,7 +196,7 @@ func TestSession(t *testing.T) {
 		`))
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
 	t.Run("bad interval", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
 		var counter = 0;
@@ -258,7 +242,7 @@ func TestSession(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "setTimeout requires a >0 timeout parameter, received 0.00 ")
 	})
-	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
 
 	t.Run("ping", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
@@ -281,8 +265,8 @@ func TestSession(t *testing.T) {
 	})
 
 	samplesBuf = stats.GetBufferedSamples(samples)
-	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), 101, "")
-	assertMetricEmitted(t, metrics.WSPingName, samplesBuf, sr("WSBIN_URL/ws-echo"))
+	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+	assertMetricEmittedCount(t, metrics.WSPingName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
 
 	t.Run("multiple_handlers", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
@@ -315,8 +299,8 @@ func TestSession(t *testing.T) {
 	})
 
 	samplesBuf = stats.GetBufferedSamples(samples)
-	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), 101, "")
-	assertMetricEmitted(t, metrics.WSPingName, samplesBuf, sr("WSBIN_URL/ws-echo"))
+	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+	assertMetricEmittedCount(t, metrics.WSPingName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
 
 	t.Run("client_close", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
@@ -333,7 +317,7 @@ func TestSession(t *testing.T) {
 		`))
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
 
 	serverCloseTests := []struct {
 		name     string
@@ -398,12 +382,12 @@ func TestSession(t *testing.T) {
 			var msg1 = "test1"
 			var msg2 = "test2"
 			var msg3 = "test3"
-			var thirdMsgRecd = false
+			var allMsgsRecvd = false
 			var res = ws.connect("WSBIN_URL/ws-echo-multi", function(socket){
-				socket.on("open", function() {
+				socket.on("open", () => {
 					socket.send(msg1)
 				})
-				socket.on("message", function (data){
+				socket.on("message", (data) => {
 					if (data == msg1){
 						socket.send(msg2)
 					}
@@ -411,21 +395,21 @@ func TestSession(t *testing.T) {
 						socket.send(msg3)
 					}
 					if (data == msg3){
-						thirdMsgRecd = true
+						allMsgsRecvd = true
 						socket.close()
 					}
 				});
 			});
 
-			if (!thirdMsgRecd) {
-				throw new Error ("third test message was not received!");
+			if (!allMsgsRecvd) {
+				throw new Error ("messages 1,2,3 in sequence, was not received from server");
 			}
 			`))
 			assert.NoError(t, err)
 		})
 
 		samplesBuf = stats.GetBufferedSamples(samples)
-		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo-multi"), 101, "")
+		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo-multi"), statusProtocolSwitch, "")
 		assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 3)
 		assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 3)
 
@@ -435,10 +419,10 @@ func TestSession(t *testing.T) {
 			var msg2 = "test2"
 			var secondMsgReceived = false
 			var res = ws.connect("WSSBIN_URL/ws-echo-multi", function(socket){
-				socket.on("open", function() {
+				socket.on("open", () => {
 					socket.send(msg1)
 				})
-				socket.on("message", function (data){
+				socket.on("message", (data) => {
 					if (data == msg1){
 						socket.send(msg2)
 					}
@@ -450,14 +434,14 @@ func TestSession(t *testing.T) {
 			});
 
 			if (!secondMsgReceived) {
-				throw new Error ("second test message was not received!");
+				throw new Error ("second test message was not received from server!");
 			}
 			`))
 			assert.NoError(t, err)
 		})
 
 		samplesBuf = stats.GetBufferedSamples(samples)
-		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSSBIN_URL/ws-echo-multi"), 101, "")
+		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSSBIN_URL/ws-echo-multi"), statusProtocolSwitch, "")
 		assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSSBIN_URL/ws-echo-multi"), 2)
 		assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSSBIN_URL/ws-echo-multi"), 2)
 
@@ -467,7 +451,7 @@ func TestSession(t *testing.T) {
 			var msg2 = new Uint8Array([116, 101, 115, 116, 50]); // 'test2'
 			var secondMsgReceived = false
 			var res = ws.connect("WSBIN_URL/ws-echo-multi", function(socket){
-				socket.on("open", function() {
+				socket.on("open", () => {
 					socket.send(msg1)
 				})
 				socket.on("message", (data) => {
@@ -485,14 +469,14 @@ func TestSession(t *testing.T) {
 			});
 
 			if (!secondMsgReceived) {
-				throw new Error ("second test message was not received!");
+				throw new Error ("second test message was not received from server!");
 			}
 			`))
 			assert.NoError(t, err)
 		})
 
 		samplesBuf = stats.GetBufferedSamples(samples)
-		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo-multi"), 101, "")
+		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo-multi"), statusProtocolSwitch, "")
 		assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 2)
 		assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 2)
 	})
@@ -669,7 +653,7 @@ func TestErrors(t *testing.T) {
 		}
 		`))
 		assert.NoError(t, err)
-		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo-invalid"), 101, "")
+		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo-invalid"), statusProtocolSwitch, "")
 	})
 
 	t.Run("error on close", func(t *testing.T) {
@@ -698,7 +682,7 @@ func TestErrors(t *testing.T) {
 		});
 		`))
 		assert.NoError(t, err)
-		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-close"), 101, "")
+		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-close"), statusProtocolSwitch, "")
 	})
 }
 
@@ -809,7 +793,7 @@ func TestTLSConfig(t *testing.T) {
 		`))
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/ws-close"), 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/ws-close"), statusProtocolSwitch, "")
 
 	t.Run("custom certificates", func(t *testing.T) {
 		state.TLSConfig = tb.TLSClientConfig
@@ -824,7 +808,7 @@ func TestTLSConfig(t *testing.T) {
 		`))
 		assert.NoError(t, err)
 	})
-	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/ws-close"), 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSSBIN_URL/ws-close"), statusProtocolSwitch, "")
 }
 
 func TestReadPump(t *testing.T) {
@@ -950,5 +934,5 @@ func TestUserAgent(t *testing.T) {
 		`))
 	assert.NoError(t, err)
 
-	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo-useragent"), 101, "")
+	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo-useragent"), statusProtocolSwitch, "")
 }
