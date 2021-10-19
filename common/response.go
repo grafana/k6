@@ -92,7 +92,7 @@ func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, 
 		fromServiceWorker: resp.FromServiceWorker,
 		fromPrefetchCache: resp.FromPrefetchCache,
 		timestamp:         timestamp.Time(),
-		responseTime:      resp.ResponseTime.Time(),
+		responseTime:      time.Time{},
 		timing:            resp.Timing,
 	}
 
@@ -105,6 +105,10 @@ func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, 
 				r.headers[n] = append(r.headers[n], v)
 			}
 		}
+	}
+
+	if resp.ResponseTime != nil {
+		r.responseTime = resp.ResponseTime.Time()
 	}
 
 	if resp.SecurityDetails != nil {
