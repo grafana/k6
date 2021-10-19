@@ -20,6 +20,7 @@
 package ws
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -840,7 +841,6 @@ func TestUserAgent(t *testing.T) {
 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-echo-useragent"), 101, "")
 }
 
-// TODO: Benchmark with compression and not
 func TestCompression(t *testing.T) {
 	t.Parallel()
 
@@ -971,6 +971,135 @@ func TestCompression(t *testing.T) {
 					require.Contains(t, err.Error(), testCase.expectedError)
 				}
 			})
+		}
+	})
+}
+
+func BenchmarkCompressionEnabled(b *testing.B) {
+	tb, samples, rt := newRuntime(b)
+	sr := tb.Replacer.Replace
+	handler := "/ws-compression-enabled-echo"
+
+	go func() {
+		ctxDone := tb.Context.Done()
+		for {
+			select {
+			case <-samples:
+			case <-ctxDone:
+				return
+			}
+		}
+	}()
+
+	tb.Mux.HandleFunc(handler, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		compressionEnabled := true
+		textMessage := 1
+		kbData := bytes.Repeat([]byte("0123456789"), 100)
+
+		// upgrade connection, send the first (long) message, disconnect
+		upgrader := websocket.Upgrader{
+			EnableCompression: compressionEnabled,
+			ReadBufferSize:    1024,
+			WriteBufferSize:   1024,
+		}
+
+		conn, e := upgrader.Upgrade(w, req, w.Header())
+		if e != nil {
+			b.Fatalf(handler+" cannot upgrade request: %v", e)
+			return
+		}
+
+		if err := conn.WriteMessage(textMessage, kbData); err != nil {
+			b.Fatalf(handler+" cannot write message: %v", err)
+			return
+		}
+
+		e = conn.Close()
+		if e != nil {
+			b.Logf("error while closing connection in "+handler+": %v", e)
+			return
+		}
+	}))
+
+	testCodeCompressionEnabled := sr(`
+		var res = ws.connect("WSBIN_URL/ws-compression-enabled-echo", {"compression":"deflate"}, function(socket){
+			socket.on('message', (data) => {
+				socket.close()
+			})
+		});
+	`)
+
+	b.ResetTimer()
+	b.Run("compression-enabled", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			if _, err := rt.RunString(testCodeCompressionEnabled); err != nil {
+				b.Error(err)
+			}
+		}
+	})
+}
+
+func BenchmarkCompressionDisabled(b *testing.B) {
+	tb, samples, rt := newRuntime(b)
+	sr := tb.Replacer.Replace
+	handler := "/ws-compression-disabled-echo"
+
+	go func() {
+		ctxDone := tb.Context.Done()
+		for {
+			select {
+			case <-samples:
+			case <-ctxDone:
+				return
+			}
+		}
+	}()
+
+	tb.Mux.HandleFunc(handler, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		compressionEnabled := false
+		textMessage := 1
+		kbData := bytes.Repeat([]byte("0123456789"), 100)
+
+		// upgrade connection, send the first (long) message, disconnect
+		upgrader := websocket.Upgrader{
+			EnableCompression: compressionEnabled,
+			ReadBufferSize:    1024,
+			WriteBufferSize:   1024,
+		}
+
+		conn, e := upgrader.Upgrade(w, req, w.Header())
+		if e != nil {
+			b.Fatalf(handler+" cannot upgrade request: %v", e)
+			return
+		}
+
+		if err := conn.WriteMessage(textMessage, kbData); err != nil {
+			b.Fatalf(handler+" cannot write message: %v", err)
+			return
+		}
+
+		e = conn.Close()
+		if e != nil {
+			b.Logf("error while closing connection in "+handler+": %v", e)
+			return
+		}
+	}))
+
+	testCode := sr(`
+		var res = ws.connect("WSBIN_URL/ws-compression-disabled-echo", {}, function(socket){
+			socket.on('message', (data) => {
+				socket.close()
+			})
+		});
+	`)
+
+	b.ResetTimer()
+
+	b.Run("compression-disabled", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			if _, err := rt.RunString(testCode); err != nil {
+				b.Error(err)
+			}
 		}
 	})
 }
