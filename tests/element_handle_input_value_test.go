@@ -29,7 +29,7 @@ import (
 )
 
 func TestElementHandleInputValue(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t, false)
+	bt := browsertest.NewBrowserTest(t)
 	defer bt.Browser.Close()
 
 	t.Run("ElementHandle.inputValue", func(t *testing.T) {
