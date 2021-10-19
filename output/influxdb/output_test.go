@@ -26,9 +26,13 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib/testutils"
@@ -103,6 +107,7 @@ func testOutputCycle(t testing.TB, handler http.HandlerFunc, body func(testing.T
 
 func TestOutput(t *testing.T) {
 	t.Parallel()
+
 	var samplesRead int
 	defer func() {
 		require.Equal(t, samplesRead, 20)
@@ -138,6 +143,58 @@ func TestOutput(t *testing.T) {
 		c.AddMetricSamples([]stats.SampleContainer{samples})
 		c.AddMetricSamples([]stats.SampleContainer{samples})
 	})
+}
+
+func TestOutputFlushMetricsConcurrency(t *testing.T) {
+	t.Parallel()
+
+	var (
+		requests = int32(0)
+		block    = make(chan struct{})
+	)
+	wg := sync.WaitGroup{}
+	ts := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		// block all the received requests
+		// so concurrency will be needed
+		// to not block the flush
+		atomic.AddInt32(&requests, 1)
+		wg.Done()
+		block <- struct{}{}
+	}))
+	defer func() {
+		// unlock the server
+		for i := 0; i < 4; i++ {
+			<-block
+		}
+		close(block)
+		ts.Close()
+	}()
+
+	o, err := newOutput(output.Params{
+		Logger:         testutils.NewLogger(t),
+		ConfigArgument: ts.URL,
+	})
+	require.NoError(t, err)
+
+	for i := 0; i < 5; i++ {
+		select {
+		case o.semaphoreCh <- struct{}{}:
+			<-o.semaphoreCh
+			wg.Add(1)
+			o.AddMetricSamples([]stats.SampleContainer{stats.Samples{
+				stats.Sample{
+					Metric: stats.New("gauge", stats.Gauge),
+					Value:  2.0,
+				},
+			}})
+			o.flushMetrics()
+		default:
+			// the 5th request should be rate limited
+			assert.Equal(t, 5, i+1)
+		}
+	}
+	wg.Wait()
+	assert.Equal(t, 4, int(atomic.LoadInt32(&requests)))
 }
 
 func TestExtractTagsToValues(t *testing.T) {

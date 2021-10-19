@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	client "github.com/influxdata/influxdb1-client/v2"
@@ -51,16 +52,16 @@ const (
 type Output struct {
 	output.SampleBuffer
 
-	params          output.Params
-	periodicFlusher *output.PeriodicFlusher
-
 	Client    client.Client
 	Config    Config
 	BatchConf client.BatchPointsConfig
 
-	logger      logrus.FieldLogger
-	semaphoreCh chan struct{}
-	fieldKinds  map[string]FieldKind
+	logger          logrus.FieldLogger
+	params          output.Params
+	fieldKinds      map[string]FieldKind
+	periodicFlusher *output.PeriodicFlusher
+	semaphoreCh     chan struct{}
+	wg              sync.WaitGroup
 }
 
 // New returns new influxdb output
@@ -90,8 +91,9 @@ func newOutput(params output.Params) (*Output, error) {
 		Client:      cl,
 		Config:      conf,
 		BatchConf:   batchConf,
-		semaphoreCh: make(chan struct{}, conf.ConcurrentWrites.Int64),
 		fieldKinds:  fldKinds,
+		semaphoreCh: make(chan struct{}, conf.ConcurrentWrites.Int64),
+		wg:          sync.WaitGroup{},
 	}, err
 }
 
@@ -178,12 +180,12 @@ func (o *Output) Start() error {
 	// usually means we're either a non-admin user to an existing DB or connecting over UDP.
 	_, err := o.Client.Query(client.NewQuery("CREATE DATABASE "+o.BatchConf.Database, "", ""))
 	if err != nil {
-		o.logger.WithError(err).Debug("InfluxDB: Couldn't create database; most likely harmless")
+		o.logger.WithError(err).Debug("Couldn't create database; most likely harmless")
 	}
 
 	pf, err := output.NewPeriodicFlusher(time.Duration(o.Config.PushInterval.Duration), o.flushMetrics)
 	if err != nil {
-		return err //nolint:wrapcheck
+		return err
 	}
 	o.logger.Debug("Started!")
 	o.periodicFlusher = pf
@@ -196,30 +198,45 @@ func (o *Output) Stop() error {
 	o.logger.Debug("Stopping...")
 	defer o.logger.Debug("Stopped!")
 	o.periodicFlusher.Stop()
+	o.wg.Wait()
 	return nil
 }
 
 func (o *Output) flushMetrics() {
 	samples := o.GetBufferedSamples()
-
-	o.semaphoreCh <- struct{}{}
-	defer func() {
-		<-o.semaphoreCh
-	}()
-	o.logger.Debug("Committing...")
-	o.logger.WithField("samples", len(samples)).Debug("Writing...")
-
-	batch, err := o.batchFromSamples(samples)
-	if err != nil {
-		o.logger.WithError(err).Error("Couldn't create batch from samples")
+	if len(samples) < 1 {
 		return
 	}
 
-	o.logger.WithField("points", len(batch.Points())).Debug("Writing...")
-	startTime := time.Now()
-	if err := o.Client.Write(batch); err != nil {
-		o.logger.WithError(err).Error("Couldn't write stats")
-	}
-	t := time.Since(startTime)
-	o.logger.WithField("t", t).Debug("Batch written!")
+	o.logger.Debug("Committing...")
+	o.wg.Add(1)
+	o.semaphoreCh <- struct{}{}
+	go func() {
+		defer func() {
+			<-o.semaphoreCh
+			o.wg.Done()
+		}()
+
+		o.logger.WithField("samples", len(samples)).Debug("Writing...")
+
+		batch, err := o.batchFromSamples(samples)
+		if err != nil {
+			o.logger.WithError(err).Error("Couldn't create batch from samples")
+			return
+		}
+
+		o.logger.WithField("points", len(batch.Points())).Debug("Writing...")
+		startTime := time.Now()
+		if err := o.Client.Write(batch); err != nil {
+			o.logger.WithError(err).Error("Couldn't write stats")
+			return
+		}
+		t := time.Since(startTime)
+		o.logger.WithField("t", t).Debug("Batch written!")
+
+		if t > time.Duration(o.Config.PushInterval.Duration) {
+			o.logger.WithField("t", t).
+				Warn("The flush operation took higher than the expected set push interval. If you see this message multiple times then the setup or configuration need to be adjusted to achieve a sustainable rate.") //nolint:lll
+		}
+	}()
 }
