@@ -84,7 +84,13 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 	}
 
 	if goja.IsNull(v) {
-		return false, ErrMetricsAddNan
+		if state.Options.Throw.Bool {
+			// only return/throw the error if throw is enabled
+			return false, ErrMetricsAddNan
+		}
+		// log otherwise
+		state.Logger.Warn(ErrMetricsAddNan)
+		return false, nil
 	}
 
 	vfloat := v.ToFloat()
@@ -93,7 +99,13 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 	}
 
 	if math.IsNaN(vfloat) {
-		return false, ErrMetricsAddNan
+		if state.Options.Throw.Bool {
+			// only return/throw the error if throw is enabled
+			return false, ErrMetricsAddNan
+		}
+		// log otherwise
+		state.Logger.Warn(ErrMetricsAddNan)
+		return false, nil
 	}
 
 	tags := state.CloneTags()
