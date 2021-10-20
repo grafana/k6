@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"sync"
 
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
@@ -70,7 +71,7 @@ type State struct {
 
 	VUID, VUIDGlobal uint64
 	Iteration        int64
-	Tags             map[string]string
+	Tags             *TagMap
 	// These will be assigned on VU activation.
 	// Returns the iteration number of this VU in the current scenario.
 	GetScenarioVUIter func() uint64
@@ -88,8 +89,65 @@ type State struct {
 
 // CloneTags makes a copy of the tags map and returns it.
 func (s *State) CloneTags() map[string]string {
-	tags := make(map[string]string, len(s.Tags))
-	for k, v := range s.Tags {
+	return s.Tags.Clone()
+}
+
+// TagMap is a safe-concurrent Tags lookup.
+type TagMap struct {
+	m     map[string]string
+	mutex sync.RWMutex
+}
+
+// NewTagMap creates a TagMap,
+// if a not-nil map is passed then it will be used as the internal map
+// otherwise a new one will be created.
+func NewTagMap(m map[string]string) *TagMap {
+	if m == nil {
+		m = make(map[string]string)
+	}
+	return &TagMap{
+		m:     m,
+		mutex: sync.RWMutex{},
+	}
+}
+
+// Set sets a Tag.
+func (tg *TagMap) Set(k, v string) {
+	tg.mutex.Lock()
+	defer tg.mutex.Unlock()
+	tg.m[k] = v
+}
+
+// Get returns the Tag value and true
+// if the provided key has been found.
+func (tg *TagMap) Get(k string) (string, bool) {
+	tg.mutex.RLock()
+	defer tg.mutex.RUnlock()
+	v, ok := tg.m[k]
+	return v, ok
+}
+
+// Len returns the number of the set keys.
+func (tg *TagMap) Len() int {
+	tg.mutex.RLock()
+	defer tg.mutex.RUnlock()
+	return len(tg.m)
+}
+
+// Delete deletes a map's item based on the provided key.
+func (tg *TagMap) Delete(k string) {
+	tg.mutex.Lock()
+	defer tg.mutex.Unlock()
+	delete(tg.m, k)
+}
+
+// Clone returns a map with the entire set of items.
+func (tg *TagMap) Clone() map[string]string {
+	tg.mutex.RLock()
+	defer tg.mutex.RUnlock()
+
+	tags := make(map[string]string, len(tg.m))
+	for k, v := range tg.m {
 		tags[k] = v
 	}
 	return tags
