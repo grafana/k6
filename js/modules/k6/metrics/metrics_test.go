@@ -23,17 +23,19 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/stats"
 )
 
@@ -82,7 +84,7 @@ func TestMetrics(t *testing.T) {
 					require.NoError(t, rt.Set("metrics", m.GetExports().Named))
 					samples := make(chan stats.SampleContainer, 1000)
 					state := &lib.State{
-						Options: lib.Options{SystemTags: stats.NewSystemTagSet(stats.TagGroup), Throw: null.BoolFrom(true)},
+						Options: lib.Options{},
 						Samples: samples,
 						Tags:    map[string]string{"key": "value"},
 					}
@@ -100,59 +102,81 @@ func TestMetrics(t *testing.T) {
 						_, err := rt.RunString(fmt.Sprintf(`new metrics.%s("my_metric")`, fn))
 						assert.Contains(t, err.Error(), "metrics must be declared in the init context")
 					})
-
+					mii.State = state
+					logger := logrus.New()
+					logger.Out = ioutil.Discard
+					hook := &testutils.SimpleLogrusHook{HookedLevels: logrus.AllLevels}
+					logger.AddHook(hook)
+					state.Logger = logger
 					for name, val := range values {
 						name, val := name, val
 						t.Run(name, func(t *testing.T) {
-							t.Run("Simple", func(t *testing.T) {
-								_, err := rt.RunString(fmt.Sprintf(`m.add(%v)`, val.JS))
-								if val.isError {
-									if assert.Error(t, err) {
-										return
-									}
-								} else {
-									assert.NoError(t, err)
-								}
-								bufSamples := stats.GetBufferedSamples(samples)
-								if assert.Len(t, bufSamples, 1) {
-									sample, ok := bufSamples[0].(stats.Sample)
-									require.True(t, ok)
+							for _, isThrow := range []bool{false, true} {
+								state.Options.Throw.Bool = isThrow
+								t.Run(fmt.Sprintf("isThrow=%v", isThrow), func(t *testing.T) {
+									t.Run("Simple", func(t *testing.T) {
+										_, err := rt.RunString(fmt.Sprintf(`m.add(%v)`, val.JS))
+										if val.isError && isThrow {
+											if assert.Error(t, err) {
+												return
+											}
+										} else {
+											assert.NoError(t, err)
+											if val.isError && !isThrow {
+												lines := hook.Drain()
+												require.Len(t, lines, 1)
+												assert.Equal(t, lines[0].Message, ErrMetricsAddNan.Error())
+												return
+											}
+										}
+										bufSamples := stats.GetBufferedSamples(samples)
+										if assert.Len(t, bufSamples, 1) {
+											sample, ok := bufSamples[0].(stats.Sample)
+											require.True(t, ok)
 
-									assert.NotZero(t, sample.Time)
-									assert.Equal(t, val.Float, sample.Value)
-									assert.Equal(t, map[string]string{
-										"key": "value",
-									}, sample.Tags.CloneTags())
-									assert.Equal(t, "my_metric", sample.Metric.Name)
-									assert.Equal(t, mtyp, sample.Metric.Type)
-									assert.Equal(t, valueType, sample.Metric.Contains)
-								}
-							})
-							t.Run("Tags", func(t *testing.T) {
-								_, err := rt.RunString(fmt.Sprintf(`m.add(%v, {a:1})`, val.JS))
-								if val.isError {
-									if assert.Error(t, err) {
-										return
-									}
-								} else {
-									assert.NoError(t, err)
-								}
-								bufSamples := stats.GetBufferedSamples(samples)
-								if assert.Len(t, bufSamples, 1) {
-									sample, ok := bufSamples[0].(stats.Sample)
-									require.True(t, ok)
+											assert.NotZero(t, sample.Time)
+											assert.Equal(t, val.Float, sample.Value)
+											assert.Equal(t, map[string]string{
+												"key": "value",
+											}, sample.Tags.CloneTags())
+											assert.Equal(t, "my_metric", sample.Metric.Name)
+											assert.Equal(t, mtyp, sample.Metric.Type)
+											assert.Equal(t, valueType, sample.Metric.Contains)
+										}
+									})
+									t.Run("Tags", func(t *testing.T) {
+										_, err := rt.RunString(fmt.Sprintf(`m.add(%v, {a:1})`, val.JS))
+										if val.isError && isThrow {
+											if assert.Error(t, err) {
+												return
+											}
+										} else {
+											assert.NoError(t, err)
+											if val.isError && !isThrow {
+												lines := hook.Drain()
+												require.Len(t, lines, 1)
+												assert.Equal(t, lines[0].Message, ErrMetricsAddNan.Error())
+												return
+											}
+										}
+										bufSamples := stats.GetBufferedSamples(samples)
+										if assert.Len(t, bufSamples, 1) {
+											sample, ok := bufSamples[0].(stats.Sample)
+											require.True(t, ok)
 
-									assert.NotZero(t, sample.Time)
-									assert.Equal(t, val.Float, sample.Value)
-									assert.Equal(t, map[string]string{
-										"key": "value",
-										"a":   "1",
-									}, sample.Tags.CloneTags())
-									assert.Equal(t, "my_metric", sample.Metric.Name)
-									assert.Equal(t, mtyp, sample.Metric.Type)
-									assert.Equal(t, valueType, sample.Metric.Contains)
-								}
-							})
+											assert.NotZero(t, sample.Time)
+											assert.Equal(t, val.Float, sample.Value)
+											assert.Equal(t, map[string]string{
+												"key": "value",
+												"a":   "1",
+											}, sample.Tags.CloneTags())
+											assert.Equal(t, "my_metric", sample.Metric.Name)
+											assert.Equal(t, mtyp, sample.Metric.Type)
+											assert.Equal(t, valueType, sample.Metric.Contains)
+										}
+									})
+								})
+							}
 						})
 					}
 				})
