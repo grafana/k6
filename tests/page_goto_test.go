@@ -30,7 +30,7 @@ import (
 )
 
 func TestPageGoto(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t, false)
+	bt := browsertest.NewBrowserTest(t)
 	setupHandlersForHTMLFiles(bt)
 	defer bt.Browser.Close()
 
