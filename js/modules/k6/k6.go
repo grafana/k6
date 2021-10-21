@@ -93,12 +93,12 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 
 	shouldUpdateTag := state.Options.SystemTags.Has(stats.TagGroup)
 	if shouldUpdateTag {
-		state.Tags["group"] = g.Path
+		state.Tags.Set("group", g.Path)
 	}
 	defer func() {
 		state.Group = old
 		if shouldUpdateTag {
-			state.Tags["group"] = old.Path
+			state.Tags.Set("group", g.Path)
 		}
 	}()
 
