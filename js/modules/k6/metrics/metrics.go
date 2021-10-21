@@ -39,10 +39,7 @@ type Metric struct {
 }
 
 // ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
-var (
-	ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
-	errMetricsAddNanTemplate   = "'%s' is an invalid value for metric '%s', a number or a boolean value is expected"
-)
+var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
 
 func (mi *ModuleInstance) newMetric(call goja.ConstructorCall, t stats.MetricType) (*goja.Object, error) {
 	initEnv := mi.GetInitEnv()
@@ -86,7 +83,8 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 
 	// return/throw exception if throw enabled, otherwise just log
 	raiseNan := func() (bool, error) {
-		err := fmt.Errorf(errMetricsAddNanTemplate, v, m.metric.Name)
+		err := fmt.Errorf("'%s' is an invalid value for metric '%s', a number or a boolean value is expected",
+			v, m.metric.Name)
 		if state.Options.Throw.Bool {
 			return false, err
 		}
