@@ -125,7 +125,7 @@ func TestMetrics(t *testing.T) {
 											if val.isError && !isThrow {
 												lines := hook.Drain()
 												require.Len(t, lines, 1)
-												assert.Equal(t, lines[0].Message, ErrMetricsAddNan.Error())
+												assert.Contains(t, lines[0].Message, "is an invalid value for metric")
 												return
 											}
 										}
@@ -155,7 +155,7 @@ func TestMetrics(t *testing.T) {
 											if val.isError && !isThrow {
 												lines := hook.Drain()
 												require.Len(t, lines, 1)
-												assert.Equal(t, lines[0].Message, ErrMetricsAddNan.Error())
+												assert.Contains(t, lines[0].Message, "is an invalid value for metric")
 												return
 											}
 										}

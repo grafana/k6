@@ -22,6 +22,7 @@ package metrics
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"time"
 
@@ -40,7 +41,7 @@ type Metric struct {
 // ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
 var (
 	ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
-	ErrMetricsAddNan           = errors.New("adding a non number, non boolean to a metric")
+	errMetricsAddNanTemplate   = "'%s' is an invalid value for metric '%s', a number or a boolean value is expected"
 )
 
 func (mi *ModuleInstance) newMetric(call goja.ConstructorCall, t stats.MetricType) (*goja.Object, error) {
@@ -84,12 +85,13 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 	}
 
 	if goja.IsNull(v) {
+		err := fmt.Errorf(errMetricsAddNanTemplate, v, m.metric.Name)
 		if state.Options.Throw.Bool {
 			// only return/throw the error if throw is enabled
-			return false, ErrMetricsAddNan
+			return false, err
 		}
 		// log otherwise
-		state.Logger.Warn(ErrMetricsAddNan)
+		state.Logger.Warn(err)
 		return false, nil
 	}
 
@@ -99,12 +101,13 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 	}
 
 	if math.IsNaN(vfloat) {
+		err := fmt.Errorf(errMetricsAddNanTemplate, v, m.metric.Name)
 		if state.Options.Throw.Bool {
 			// only return/throw the error if throw is enabled
-			return false, ErrMetricsAddNan
+			return false, err
 		}
 		// log otherwise
-		state.Logger.Warn(ErrMetricsAddNan)
+		state.Logger.Warn(err)
 		return false, nil
 	}
 
