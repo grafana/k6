@@ -23,17 +23,19 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/stats"
 )
 
@@ -46,13 +48,21 @@ func TestMetrics(t *testing.T) {
 		"Rate":    stats.Rate,
 	}
 	values := map[string]struct {
-		JS    string
-		Float float64
+		JS      string
+		Float   float64
+		isError bool
 	}{
-		"Float": {`2.5`, 2.5},
-		"Int":   {`5`, 5.0},
-		"True":  {`true`, 1.0},
-		"False": {`false`, 0.0},
+		"Float":                 {JS: `2.5`, Float: 2.5},
+		"Int":                   {JS: `5`, Float: 5.0},
+		"True":                  {JS: `true`, Float: 1.0},
+		"False":                 {JS: `false`, Float: 0.0},
+		"null":                  {JS: `null`, isError: true},
+		"undefined":             {JS: `undefined`, isError: true},
+		"NaN":                   {JS: `NaN`, isError: true},
+		"string":                {JS: `"string"`, isError: true},
+		"string 5":              {JS: `"5.3"`, Float: 5.3},
+		"some object":           {JS: `{something: 3}`, isError: true},
+		"another metric object": {JS: `m`, isError: true},
 	}
 	for fn, mtyp := range types {
 		fn, mtyp := fn, mtyp
@@ -72,14 +82,11 @@ func TestMetrics(t *testing.T) {
 					m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 					require.True(t, ok)
 					require.NoError(t, rt.Set("metrics", m.GetExports().Named))
-					root, _ := lib.NewGroup("", nil)
-					child, _ := root.Group("child")
 					samples := make(chan stats.SampleContainer, 1000)
 					state := &lib.State{
-						Options: lib.Options{SystemTags: stats.NewSystemTagSet(stats.TagGroup), Throw: null.BoolFrom(true)},
-						Group:   root,
+						Options: lib.Options{},
 						Samples: samples,
-						Tags:    map[string]string{"group": root.Path},
+						Tags:    map[string]string{"key": "value"},
 					}
 
 					isTimeString := ""
@@ -95,31 +102,42 @@ func TestMetrics(t *testing.T) {
 						_, err := rt.RunString(fmt.Sprintf(`new metrics.%s("my_metric")`, fn))
 						assert.Contains(t, err.Error(), "metrics must be declared in the init context")
 					})
-
-					groups := map[string]*lib.Group{
-						"Root":  root,
-						"Child": child,
-					}
-					for name, g := range groups {
-						name, g := name, g
+					mii.State = state
+					logger := logrus.New()
+					logger.Out = ioutil.Discard
+					hook := &testutils.SimpleLogrusHook{HookedLevels: logrus.AllLevels}
+					logger.AddHook(hook)
+					state.Logger = logger
+					for name, val := range values {
+						name, val := name, val
 						t.Run(name, func(t *testing.T) {
-							state.Group = g
-							state.Tags["group"] = g.Path
-							for name, val := range values {
-								name, val := name, val
-								t.Run(name, func(t *testing.T) {
+							for _, isThrow := range []bool{false, true} {
+								state.Options.Throw.Bool = isThrow
+								t.Run(fmt.Sprintf("isThrow=%v", isThrow), func(t *testing.T) {
 									t.Run("Simple", func(t *testing.T) {
 										_, err := rt.RunString(fmt.Sprintf(`m.add(%v)`, val.JS))
-										assert.NoError(t, err)
+										if val.isError && isThrow {
+											if assert.Error(t, err) {
+												return
+											}
+										} else {
+											assert.NoError(t, err)
+											if val.isError && !isThrow {
+												lines := hook.Drain()
+												require.Len(t, lines, 1)
+												assert.Contains(t, lines[0].Message, "is an invalid value for metric")
+												return
+											}
+										}
 										bufSamples := stats.GetBufferedSamples(samples)
 										if assert.Len(t, bufSamples, 1) {
 											sample, ok := bufSamples[0].(stats.Sample)
 											require.True(t, ok)
 
 											assert.NotZero(t, sample.Time)
-											assert.Equal(t, sample.Value, val.Float)
+											assert.Equal(t, val.Float, sample.Value)
 											assert.Equal(t, map[string]string{
-												"group": g.Path,
+												"key": "value",
 											}, sample.Tags.CloneTags())
 											assert.Equal(t, "my_metric", sample.Metric.Name)
 											assert.Equal(t, mtyp, sample.Metric.Type)
@@ -128,17 +146,29 @@ func TestMetrics(t *testing.T) {
 									})
 									t.Run("Tags", func(t *testing.T) {
 										_, err := rt.RunString(fmt.Sprintf(`m.add(%v, {a:1})`, val.JS))
-										assert.NoError(t, err)
+										if val.isError && isThrow {
+											if assert.Error(t, err) {
+												return
+											}
+										} else {
+											assert.NoError(t, err)
+											if val.isError && !isThrow {
+												lines := hook.Drain()
+												require.Len(t, lines, 1)
+												assert.Contains(t, lines[0].Message, "is an invalid value for metric")
+												return
+											}
+										}
 										bufSamples := stats.GetBufferedSamples(samples)
 										if assert.Len(t, bufSamples, 1) {
 											sample, ok := bufSamples[0].(stats.Sample)
 											require.True(t, ok)
 
 											assert.NotZero(t, sample.Time)
-											assert.Equal(t, sample.Value, val.Float)
+											assert.Equal(t, val.Float, sample.Value)
 											assert.Equal(t, map[string]string{
-												"group": g.Path,
-												"a":     "1",
+												"key": "value",
+												"a":   "1",
 											}, sample.Tags.CloneTags())
 											assert.Equal(t, "my_metric", sample.Metric.Name)
 											assert.Equal(t, mtyp, sample.Metric.Type)
