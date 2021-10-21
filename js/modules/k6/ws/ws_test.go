@@ -1109,129 +1109,80 @@ func TestCompression(t *testing.T) {
 	})
 }
 
-func BenchmarkCompressionEnabled(b *testing.B) {
+func clearSamples(tb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContainer) {
+	ctxDone := tb.Context.Done()
+	for {
+		select {
+		case <-samples:
+		case <-ctxDone:
+			return
+		}
+	}
+}
+
+func BenchmarkCompression(b *testing.B) {
+	const textMessage = 1
 	tb, samples, rt := newRuntime(b)
 	sr := tb.Replacer.Replace
-	const handler = "/ws-compression-enabled-echo"
+	go clearSamples(tb, samples)
 
-	go func() {
-		ctxDone := tb.Context.Done()
-		for {
-			select {
-			case <-samples:
-			case <-ctxDone:
-				return
-			}
-		}
-	}()
+	testCodes := []string{
+		sr(`
+		var res = ws.connect("WSBIN_URL/ws-compression", {"compression":"deflate"}, (socket) => {
+			socket.on('message', (data) => {
+				socket.close()
+			})
+		});
+		`),
+		sr(`
+		var res = ws.connect("WSBIN_URL/ws-compression", {}, (socket) => {
+			socket.on('message', (data) => {
+				socket.close()
+			})
+		});
+		`),
+	}
 
-	tb.Mux.HandleFunc(handler, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		const compressionEnabled = true
-		const textMessage = 1
+	tb.Mux.HandleFunc("/ws-compression", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		kbData := bytes.Repeat([]byte("0123456789"), 100)
 
 		// upgrade connection, send the first (long) message, disconnect
 		upgrader := websocket.Upgrader{
-			EnableCompression: compressionEnabled,
+			EnableCompression: true,
 			ReadBufferSize:    1024,
 			WriteBufferSize:   1024,
 		}
 
 		conn, e := upgrader.Upgrade(w, req, w.Header())
+
 		if e != nil {
-			b.Fatalf(handler+" cannot upgrade request: %v", e)
+			b.Fatalf("/ws-compression cannot upgrade request: %v", e)
 			return
 		}
 
-		if err := conn.WriteMessage(textMessage, kbData); err != nil {
-			b.Fatalf(handler+" cannot write message: %v", err)
+		if e = conn.WriteMessage(textMessage, kbData); e != nil {
+			b.Fatalf("/ws-compression cannot write message: %v", e)
 			return
 		}
 
 		e = conn.Close()
 		if e != nil {
-			b.Logf("error while closing connection in "+handler+": %v", e)
+			b.Logf("error while closing connection in /ws-compression: %v", e)
 			return
 		}
 	}))
-
-	testCodeCompressionEnabled := sr(`
-		var res = ws.connect("WSBIN_URL/ws-compression-enabled-echo", {"compression":"deflate"}, (socket) => {
-			socket.on('message', (data) => {
-				socket.close()
-			})
-		});
-	`)
 
 	b.ResetTimer()
 	b.Run("compression-enabled", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if _, err := rt.RunString(testCodeCompressionEnabled); err != nil {
+			if _, err := rt.RunString(testCodes[0]); err != nil {
 				b.Error(err)
 			}
 		}
 	})
-}
-
-func BenchmarkCompressionDisabled(b *testing.B) {
-	tb, samples, rt := newRuntime(b)
-	sr := tb.Replacer.Replace
-	const handler = "/ws-compression-disabled-echo"
-
-	go func() {
-		ctxDone := tb.Context.Done()
-		for {
-			select {
-			case <-samples:
-			case <-ctxDone:
-				return
-			}
-		}
-	}()
-
-	tb.Mux.HandleFunc(handler, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		const compressionEnabled = false
-		const textMessage = 1
-		kbData := bytes.Repeat([]byte("0123456789"), 100)
-
-		// upgrade connection, send the first (long) message, disconnect
-		upgrader := websocket.Upgrader{
-			EnableCompression: compressionEnabled,
-			ReadBufferSize:    1024,
-			WriteBufferSize:   1024,
-		}
-
-		conn, e := upgrader.Upgrade(w, req, w.Header())
-		if e != nil {
-			b.Fatalf(handler+" cannot upgrade request: %v", e)
-			return
-		}
-
-		if err := conn.WriteMessage(textMessage, kbData); err != nil {
-			b.Fatalf(handler+" cannot write message: %v", err)
-			return
-		}
-
-		e = conn.Close()
-		if e != nil {
-			b.Logf("error while closing connection in "+handler+": %v", e)
-			return
-		}
-	}))
-
-	testCode := sr(`
-		var res = ws.connect("WSBIN_URL/ws-compression-disabled-echo", {}, (socket) => {
-			socket.on('message', (data) => {
-				socket.close()
-			})
-		});
-	`)
-
-	b.ResetTimer()
-
 	b.Run("compression-disabled", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if _, err := rt.RunString(testCode); err != nil {
+			if _, err := rt.RunString(testCodes[1]); err != nil {
 				b.Error(err)
 			}
 		}
