@@ -33,7 +33,7 @@ func withTags(ctx context.Context, tags reqtags) context.Context {
 func getTags(ctx context.Context) reqtags {
 	v := ctx.Value(ctxKeyTags{})
 	if v == nil {
-		return nil
+		return make(map[string]string)
 	}
 	return v.(reqtags)
 }
