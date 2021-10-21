@@ -133,7 +133,9 @@ func TestMetrics(t *testing.T) {
 					state := &lib.State{
 						Options: lib.Options{},
 						Samples: test.samples,
-						Tags:    map[string]string{"key": "value"},
+						Tags: lib.NewTagMap(map[string]string{
+							"key": "value",
+						}),
 					}
 
 					isTimeString := ""

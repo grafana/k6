@@ -103,6 +103,7 @@ func TestClient(t *testing.T) {
 			BuiltinMetrics: metrics.RegisterBuiltinMetrics(
 				metrics.NewRegistry(),
 			),
+			Tags: lib.NewTagMap(nil),
 		}
 
 		cwd, err := os.Getwd()

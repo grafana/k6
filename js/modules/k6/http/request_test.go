@@ -156,14 +156,16 @@ func newRuntime(
 	samples := make(chan stats.SampleContainer, 1000)
 
 	state := &lib.State{
-		Options:        options,
-		Logger:         logger,
-		Group:          root,
-		TLSConfig:      tb.TLSClientConfig,
-		Transport:      tb.HTTPTransport,
-		BPool:          bpool.NewBufferPool(1),
-		Samples:        samples,
-		Tags:           map[string]string{"group": root.Path},
+		Options:   options,
+		Logger:    logger,
+		Group:     root,
+		TLSConfig: tb.TLSClientConfig,
+		Transport: tb.HTTPTransport,
+		BPool:     bpool.NewBufferPool(1),
+		Samples:   samples,
+		Tags: lib.NewTagMap(map[string]string{
+			"group": root.Path,
+		}),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 
@@ -1094,7 +1096,10 @@ func TestRequestAndBatch(t *testing.T) {
 			t.Run("tags-precedence", func(t *testing.T) {
 				oldTags := state.Tags
 				defer func() { state.Tags = oldTags }()
-				state.Tags = map[string]string{"runtag1": "val1", "runtag2": "val2"}
+				state.Tags = lib.NewTagMap(map[string]string{
+					"runtag1": "val1",
+					"runtag2": "val2",
+				})
 
 				_, err := rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL/headers", null, { tags: { method: "test", name: "myName", runtag1: "fromreq" } });
