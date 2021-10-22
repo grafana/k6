@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -228,7 +229,11 @@ func (o *Output) flushMetrics() {
 		o.logger.WithField("points", len(batch.Points())).Debug("Writing...")
 		startTime := time.Now()
 		if err := o.Client.Write(batch); err != nil {
-			o.logger.WithError(err).Error("Couldn't write stats")
+			msg := "Couldn't write stats"
+			if strings.Contains(err.Error(), "unauthorized access") {
+				msg += ", InfluxDB v2.x isn't supported by this output, if you are using it you may consider to use the extension https://github.com/grafana/xk6-output-influxdb" //nolint:lll
+			}
+			o.logger.WithError(err).Error(msg)
 			return
 		}
 		t := time.Since(startTime)
