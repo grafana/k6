@@ -124,6 +124,7 @@ func invalidJSONHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
+//nolint:paralleltest
 func TestResponse(t *testing.T) {
 	tb, state, samples, rt, _ := newRuntime(t)
 	root := state.Group
@@ -183,6 +184,12 @@ func TestResponse(t *testing.T) {
 			assert.NoError(t, err)
 			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/html"), "", 200, "::my group")
 		})
+
+		t.Run("NoResponseBody", func(t *testing.T) {
+			_, err := rt.RunString(sr(`http.get("HTTPBIN_URL/html", {responseType: 'none'}).html();`))
+			assert.Contains(t, err.Error(), "the body is null so we can't transform it to HTML"+
+				" - this likely was because of a request error getting the response")
+		})
 	})
 	t.Run("Json", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
@@ -204,6 +211,12 @@ func TestResponse(t *testing.T) {
 			_, err := rt.RunString(sr(`http.request("GET", "HTTPBIN_URL/invalidjson").json();`))
 			//nolint:lll
 			assert.Contains(t, err.Error(), "cannot parse json due to an error at line 3, character 9 , error: invalid character 'e' in literal true (expecting 'r')")
+		})
+
+		t.Run("NoResponseBody", func(t *testing.T) {
+			_, err := rt.RunString(sr(`http.get("HTTPBIN_URL/json", {responseType: 'none'}).json();`))
+			assert.Contains(t, err.Error(), "the body is null so we can't transform it to JSON"+
+				" - this likely was because of a request error getting the response")
 		})
 	})
 	t.Run("JsonSelector", func(t *testing.T) {

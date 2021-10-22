@@ -72,6 +72,12 @@ func (h *HTTP) responseFromHttpext(resp *httpext.Response) *Response {
 
 // HTML returns the body as an html.Selection
 func (res *Response) HTML(selector ...string) html.Selection {
+	if res.Body == nil {
+		err := fmt.Errorf("the body is null so we can't transform it to HTML" +
+			" - this likely was because of a request error getting the response")
+		common.Throw(common.GetRuntime(res.GetCtx()), err)
+	}
+
 	body, err := common.ToString(res.Body)
 	if err != nil {
 		common.Throw(common.GetRuntime(res.GetCtx()), err)
@@ -91,6 +97,13 @@ func (res *Response) HTML(selector ...string) html.Selection {
 // JSON parses the body of a response as JSON and returns it to the goja VM.
 func (res *Response) JSON(selector ...string) goja.Value {
 	rt := common.GetRuntime(res.GetCtx())
+
+	if res.Body == nil {
+		err := fmt.Errorf("the body is null so we can't transform it to JSON" +
+			" - this likely was because of a request error getting the response")
+		common.Throw(rt, err)
+	}
+
 	hasSelector := len(selector) > 0
 	if res.cachedJSON == nil || hasSelector { //nolint:nestif
 		var v interface{}
