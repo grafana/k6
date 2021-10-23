@@ -543,9 +543,21 @@ func (vlv RampingVUs) Run(ctx context.Context, _ chan<- stats.SampleContainer, _
 	for i := uint64(0); i < runState.maxVUs; i++ {
 		go runState.vuHandles[i].runLoopsIfPossible(runState.runIteration)
 	}
-	runState.handleVUs(ctx)
-	go runState.handleRemainingVUs(ctx)
 
+	var (
+		handleNewMaxAllowedVUs = runState.maxAllowedVUsHandlerStrategy()
+		handleNewScheduledVUs  = runState.scheduledVUsHandlerStrategy()
+	)
+	handledGracefulSteps := runState.handleVUs(
+		ctx,
+		handleNewMaxAllowedVUs,
+		handleNewScheduledVUs,
+	)
+	go runState.handleRemainingVUs(
+		ctx,
+		handleNewMaxAllowedVUs,
+		handledGracefulSteps,
+	)
 	return nil
 }
 
@@ -606,41 +618,48 @@ func (rs rampingVUsRunState) populateVUHandles(ctx context.Context, cancel func(
 	}
 }
 
-func (rs rampingVUsRunState) handleVUs(ctx context.Context) {
-	// iterate over rawSteps and gracefulSteps in order by TimeOffset
-	// giving rawSteps precedence.
-	// we stop iterating once rawSteps are over as we need to run the remaining
-	// gracefulSteps concurrently while waiting for VUs to stop in order to not wait until
-	// the end of gracefulStop (= maxDuration-regularDuration) timeouts
-	var (
-		handleNewMaxAllowedVUs = rs.maxAllowedVUsHandlerStrategy()
-		handleNewScheduledVUs  = rs.scheduledVUsHandlerStrategy()
-		wait                   = waiter(ctx, rs.started)
-	)
-	for i, j := 0, 0; i != len(rs.rawSteps); {
+// handleVUs iterates over rawSteps and gracefulSteps in order according to
+// their TimeOffsets, prioritizing rawSteps. It stops iterating once rawSteps
+// are over. And it returns the number of handled gracefulSteps.
+func (rs rampingVUsRunState) handleVUs(
+	ctx context.Context,
+	handleNewMaxAllowedVUs, handleNewScheduledVUs func(lib.ExecutionStep),
+) (handledGracefulSteps int) {
+	wait := waiter(ctx, rs.started)
+	i, j := 0, 0
+	for i != len(rs.rawSteps) {
 		r, g := rs.rawSteps[i], rs.gracefulSteps[j]
 		if g.TimeOffset < r.TimeOffset {
-			j++
 			if wait(g.TimeOffset) {
-				return
+				break
 			}
 			handleNewMaxAllowedVUs(g)
+			j++
 		} else {
-			i++
 			if wait(r.TimeOffset) {
-				return
+				break
 			}
 			handleNewScheduledVUs(r)
+			i++
 		}
 	}
+	return j
 }
 
-func (rs rampingVUsRunState) handleRemainingVUs(ctx context.Context) {
-	var (
-		handleNewMaxAllowedVUs = rs.maxAllowedVUsHandlerStrategy()
-		wait                   = waiter(ctx, rs.started)
-	)
-	for _, s := range rs.gracefulSteps {
+// handleRemainingVUs runs the remaining gracefulSteps concurrently
+// before the gracefulStop timeout period stops VUs.
+//
+// This way we will have run the gracefulSteps at the same time while
+// waiting for the VUs to finish.
+//
+// (gracefulStop = maxDuration-regularDuration)
+func (rs rampingVUsRunState) handleRemainingVUs(
+	ctx context.Context,
+	handleNewMaxAllowedVUs func(lib.ExecutionStep),
+	handledGracefulSteps int,
+) {
+	wait := waiter(ctx, rs.started)
+	for _, s := range rs.gracefulSteps[handledGracefulSteps:] {
 		if wait(s.TimeOffset) {
 			return
 		}
