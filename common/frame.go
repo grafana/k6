@@ -1047,7 +1047,10 @@ func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value
 		common.Throw(rt, err)
 	}
 
-	arrayHandle := value.(api.JSHandle)
+	arrayHandle, ok := value.(api.JSHandle)
+	if !ok {
+		common.Throw(rt, err)
+	}
 	properties := arrayHandle.GetProperties()
 	strArr := make([]string, len(properties))
 	for _, property := range properties {
