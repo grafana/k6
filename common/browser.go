@@ -74,9 +74,11 @@ type Browser struct {
 
 	// Needed as the targets map will be accessed from multiple Go routines,
 	// the main VU/JS go routine and the Go routine listening for CDP messages.
-	targetsMu           sync.RWMutex
-	pages               map[target.ID]*Page
-	sessionIDtoTargetID map[target.SessionID]target.ID
+	pagesMu sync.RWMutex
+	pages   map[target.ID]*Page
+
+	sessionIDtoTargetIDMu sync.RWMutex
+	sessionIDtoTargetID   map[target.SessionID]target.ID
 
 	logger *Logger
 }
@@ -86,19 +88,21 @@ func NewBrowser(ctx context.Context, cancelFn context.CancelFunc, browserProc *B
 	state := lib.GetState(ctx)
 	reCategoryFilter, _ := regexp.Compile(launchOpts.LogCategoryFilter)
 	b := Browser{
-		BaseEventEmitter:    NewBaseEventEmitter(),
-		ctx:                 ctx,
-		cancelFn:            cancelFn,
-		state:               int64(BrowserStateOpen),
-		browserProc:         browserProc,
-		conn:                nil,
-		connected:           false,
-		launchOpts:          launchOpts,
-		contexts:            make(map[cdp.BrowserContextID]*BrowserContext),
-		defaultContext:      nil,
-		pages:               make(map[target.ID]*Page),
-		sessionIDtoTargetID: make(map[target.SessionID]target.ID),
-		logger:              NewLogger(ctx, state.Logger, launchOpts.Debug, reCategoryFilter),
+		BaseEventEmitter:      NewBaseEventEmitter(),
+		ctx:                   ctx,
+		cancelFn:              cancelFn,
+		state:                 int64(BrowserStateOpen),
+		browserProc:           browserProc,
+		conn:                  nil,
+		connected:             false,
+		launchOpts:            launchOpts,
+		contexts:              make(map[cdp.BrowserContextID]*BrowserContext),
+		defaultContext:        nil,
+		pagesMu:               sync.RWMutex{},
+		pages:                 make(map[target.ID]*Page),
+		sessionIDtoTargetIDMu: sync.RWMutex{},
+		sessionIDtoTargetID:   make(map[target.SessionID]target.ID),
+		logger:                NewLogger(ctx, state.Logger, launchOpts.Debug, reCategoryFilter),
 	}
 	if err := b.connect(); err != nil {
 		return nil, err
@@ -128,8 +132,8 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 }
 
 func (b *Browser) getPages() []*Page {
-	b.targetsMu.RLock()
-	defer b.targetsMu.RUnlock()
+	b.pagesMu.RLock()
+	defer b.pagesMu.RUnlock()
 	pages := make([]*Page, len(b.pages))
 	for _, p := range b.pages {
 		pages = append(pages, p)
@@ -206,10 +210,12 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 			rt := common.GetRuntime(b.ctx)
 			common.Throw(rt, err)
 		}
-		b.targetsMu.Lock()
+		b.pagesMu.Lock()
 		b.pages[ev.TargetInfo.TargetID] = p
-		b.targetsMu.Unlock()
+		b.pagesMu.Unlock()
+		b.sessionIDtoTargetIDMu.Lock()
 		b.sessionIDtoTargetID[ev.SessionID] = ev.TargetInfo.TargetID
+		b.sessionIDtoTargetIDMu.Unlock()
 	} else if ev.TargetInfo.Type == "page" {
 		var opener *Page = nil
 		if t, ok := b.pages[ev.TargetInfo.OpenerID]; ok {
@@ -225,25 +231,29 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 			rt := common.GetRuntime(b.ctx)
 			common.Throw(rt, err)
 		}
-		b.targetsMu.Lock()
+		b.pagesMu.Lock()
 		b.pages[ev.TargetInfo.TargetID] = p
-		b.targetsMu.Unlock()
+		b.pagesMu.Unlock()
+		b.sessionIDtoTargetIDMu.Lock()
 		b.sessionIDtoTargetID[ev.SessionID] = ev.TargetInfo.TargetID
+		b.sessionIDtoTargetIDMu.Unlock()
 		browserCtx.emit(EventBrowserContextPage, p)
 	}
 }
 
 func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
+	b.sessionIDtoTargetIDMu.RLock()
 	targetID, ok := b.sessionIDtoTargetID[ev.SessionID]
+	b.sessionIDtoTargetIDMu.RUnlock()
 	if !ok {
 		// We don't track targets of type "browser", "other" and "devtools", so ignore if we don't recognize target.
 		return
 	}
 
 	if t, ok := b.pages[targetID]; ok {
-		b.targetsMu.Lock()
+		b.pagesMu.Lock()
 		delete(b.pages, targetID)
-		b.targetsMu.Unlock()
+		b.pagesMu.Unlock()
 		t.didClose()
 	}
 }
@@ -285,6 +295,8 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 	case err := <-errCh:
 		return nil, err
 	}
+	b.pagesMu.RLock()
+	defer b.pagesMu.RUnlock()
 	return b.pages[targetID], nil
 }
 
