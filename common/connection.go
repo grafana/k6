@@ -119,7 +119,7 @@ func NewConnection(ctx context.Context, wsURL string, logger *Logger) (*Connecti
 	var tlsConfig *tls.Config
 	wsd := websocket.Dialer{
 		HandshakeTimeout: time.Second * 60,
-		Proxy:            http.ProxyFromEnvironment,
+		Proxy:            http.ProxyFromEnvironment, // TODO(fix): use proxy settings from launch options
 		TLSClientConfig:  tlsConfig,
 		WriteBufferSize:  wsWriteBufferSize,
 	}
@@ -312,7 +312,7 @@ func (c *Connection) send(msg *cdproto.Message, recvCh chan *cdproto.Message, re
 		return err
 	case code := <-c.closeCh:
 		_ = c.closeConnection(code)
-		return ErrWebsocketClosed
+		return &websocket.CloseError{Code: code}
 	case <-c.done:
 	}
 
@@ -332,7 +332,7 @@ func (c *Connection) send(msg *cdproto.Message, recvCh chan *cdproto.Message, re
 			return err
 		case code := <-c.closeCh:
 			_ = c.closeConnection(code)
-			return ErrWebsocketClosed
+			return &websocket.CloseError{Code: code}
 		case <-c.done:
 		}
 	}
