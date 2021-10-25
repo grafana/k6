@@ -78,7 +78,7 @@ type Page struct {
 }
 
 // NewPage creates a new browser page context
-func NewPage(ctx context.Context, session *Session, browserCtx *BrowserContext, targetID target.ID, opener *Page, backgroundPage bool) *Page {
+func NewPage(ctx context.Context, session *Session, browserCtx *BrowserContext, targetID target.ID, opener *Page, backgroundPage bool) (*Page, error) {
 	p := Page{
 		BaseEventEmitter: NewBaseEventEmitter(),
 		ctx:              ctx,
@@ -106,8 +106,12 @@ func NewPage(ctx context.Context, session *Session, browserCtx *BrowserContext, 
 		routes:           make([]api.Route, 0),
 	}
 
+	var err error
 	p.frameManager = NewFrameManager(p.ctx, session, &p, browserCtx.timeoutSettings)
-	p.mainFrameSession = NewFrameSession(ctx, session, &p, nil, targetID)
+	p.mainFrameSession, err = NewFrameSession(ctx, session, &p, nil, targetID)
+	if err != nil {
+		return nil, err
+	}
 	p.frameSessions[cdp.FrameID(targetID)] = p.mainFrameSession
 	p.Mouse = NewMouse(p.ctx, session, p.frameManager.MainFrame(), browserCtx.timeoutSettings, p.Keyboard)
 	p.Touchscreen = NewTouchscreen(p.ctx, session, p.Keyboard)
@@ -116,17 +120,19 @@ func NewPage(ctx context.Context, session *Session, browserCtx *BrowserContext, 
 		p.emulatedSize = NewEmulatedSize(browserCtx.opts.Viewport, browserCtx.opts.Screen)
 	}
 
-	p.initEvents()
+	if err := p.initEvents(); err != nil {
+		return nil, err
+	}
 
-	return &p
+	return &p, nil
 }
 
-func (p *Page) initEvents() {
-	rt := common.GetRuntime(p.ctx)
+func (p *Page) initEvents() error {
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
+		return fmt.Errorf("unable to execute %T: %v", action, err)
 	}
+	return nil
 }
 
 func (p *Page) closeWorker(sessionID target.SessionID) {
@@ -228,10 +234,13 @@ func (p *Page) updateExtraHTTPHeaders() {
 	}
 }
 
-func (p *Page) updateGeolocation() {
+func (p *Page) updateGeolocation() error {
 	for _, fs := range p.frameSessions {
-		fs.updateGeolocation(false)
+		if err := fs.updateGeolocation(false); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (p *Page) updateOffline() {
@@ -246,8 +255,8 @@ func (p *Page) updateHttpCredentials() {
 	}
 }
 
-func (p *Page) setEmulatedSize(emulatedSize *EmulatedSize) {
-	p.mainFrameSession.updateViewport()
+func (p *Page) setEmulatedSize(emulatedSize *EmulatedSize) error {
+	return p.mainFrameSession.updateViewport()
 }
 
 // AddInitScript adds script to run in all new frames
@@ -326,7 +335,9 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 	p.reducedMotion = parsedOpts.ReducedMotion
 
 	for _, fs := range p.frameSessions {
-		fs.updateEmulateMedia(false)
+		if err := fs.updateEmulateMedia(false); err != nil {
+			common.Throw(rt, err)
+		}
 	}
 
 	applySlowMo(p.ctx)
@@ -681,7 +692,9 @@ func (p *Page) SetViewportSize(viewportSize goja.Value) {
 	if err := viewport.Parse(p.ctx, viewportSize); err != nil {
 		common.Throw(rt, fmt.Errorf("failed parsing screen: %w", err))
 	}
-	p.setEmulatedSize(NewEmulatedSize(viewport, screen))
+	if err := p.setEmulatedSize(NewEmulatedSize(viewport, screen)); err != nil {
+		common.Throw(rt, err)
+	}
 	applySlowMo(p.ctx)
 }
 

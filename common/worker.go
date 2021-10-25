@@ -30,7 +30,6 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
-	"go.k6.io/k6/js/common"
 
 	"golang.org/x/net/context"
 )
@@ -51,7 +50,7 @@ type Worker struct {
 }
 
 // NewWorker creates a new page viewport
-func NewWorker(ctx context.Context, session *Session, id target.ID, url string) *Worker {
+func NewWorker(ctx context.Context, session *Session, id target.ID, url string) (*Worker, error) {
 	w := Worker{
 		BaseEventEmitter: NewBaseEventEmitter(),
 		ctx:              ctx,
@@ -59,16 +58,17 @@ func NewWorker(ctx context.Context, session *Session, id target.ID, url string) 
 		targetID:         id,
 		url:              url,
 	}
-	w.initEvents()
-	return &w
+	if err := w.initEvents(); err != nil {
+		return nil, err
+	}
+	return &w, nil
 }
 
 func (w *Worker) didClose() {
 	w.emit(EventWorkerClose, w)
 }
 
-func (w *Worker) initEvents() {
-	rt := common.GetRuntime(w.ctx)
+func (w *Worker) initEvents() error {
 	actions := []Action{
 		log.Enable(),
 		network.Enable(),
@@ -76,9 +76,10 @@ func (w *Worker) initEvents() {
 	}
 	for _, action := range actions {
 		if err := action.Do(cdp.WithExecutor(w.ctx, w.session)); err != nil {
-			common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
+			return fmt.Errorf("unable to execute %T: %v", action, err)
 		}
 	}
+	return nil
 }
 
 // Evaluate evaluates a page function in the context of the web worker
