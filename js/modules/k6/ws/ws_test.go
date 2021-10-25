@@ -91,7 +91,15 @@ func assertMetricEmittedCount(t *testing.T, metricName string, sampleContainers 
 	assert.Equal(t, count, actualCount, "url %s emitted %s %d times, expected was %d times", url, metricName, actualCount, count)
 }
 
-func newRuntime(t testing.TB) (*httpmultibin.HTTPMultiBin, chan stats.SampleContainer, *goja.Runtime) {
+type testState struct {
+	ctxPtr  *context.Context
+	rt      *goja.Runtime
+	tb      *httpmultibin.HTTPMultiBin
+	state   *lib.State
+	samples chan stats.SampleContainer
+}
+
+func newTestState(t testing.TB) testState {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	root, err := lib.NewGroup("", nil)
@@ -125,7 +133,13 @@ func newRuntime(t testing.TB) (*httpmultibin.HTTPMultiBin, chan stats.SampleCont
 	err = rt.Set("ws", common.Bind(rt, New(), ctx))
 	assert.NoError(t, err)
 
-	return tb, samples, rt
+	return testState{
+		ctxPtr:  ctx,
+		rt:      rt,
+		tb:      tb,
+		state:   state,
+		samples: samples,
+	}
 }
 
 func TestSession(t *testing.T) {
@@ -982,9 +996,9 @@ func TestCompression(t *testing.T) {
 		t.Parallel()
 		const text string = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas sed pharetra sapien. Nunc laoreet molestie ante ac gravida. Etiam interdum dui viverra posuere egestas. Pellentesque at dolor tristique, mattis turpis eget, commodo purus. Nunc orci aliquam.`
 
-		tb, samples, rt := newRuntime(t)
-		sr := tb.Replacer.Replace
-		tb.Mux.HandleFunc("/ws-compression", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ts := newTestState(t)
+		sr := ts.tb.Replacer.Replace
+		ts.tb.Mux.HandleFunc("/ws-compression", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			upgrader := websocket.Upgrader{
 				EnableCompression: true,
 				ReadBufferSize:    1024,
@@ -1010,7 +1024,7 @@ func TestCompression(t *testing.T) {
 			}
 		}))
 
-		_, err := rt.RunString(sr(`
+		_, err := ts.rt.RunString(sr(`
 		// if client supports compression, it has to send the header 
 		// 'Sec-Websocket-Extensions:permessage-deflate; server_no_context_takeover; client_no_context_takeover' to server.
 		// if compression is negotiated successfully, server will reply with header 
@@ -1035,7 +1049,7 @@ func TestCompression(t *testing.T) {
 		`))
 
 		assert.NoError(t, err)
-		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(samples), "", sr("WSBIN_URL/ws-compression"), statusProtocolSwitch, "")
+		assertSessionMetricsEmitted(t, stats.GetBufferedSamples(ts.samples), "", sr("WSBIN_URL/ws-compression"), statusProtocolSwitch, "")
 	})
 
 	t.Run("params", func(t *testing.T) {
@@ -1070,9 +1084,9 @@ func TestCompression(t *testing.T) {
 			testCase := testCase
 			t.Run(testCase.compression, func(t *testing.T) {
 				t.Parallel()
-				tb, _, rt := newRuntime(t)
-				sr := tb.Replacer.Replace
-				tb.Mux.HandleFunc("/ws-compression-param", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				ts := newTestState(t)
+				sr := ts.tb.Replacer.Replace
+				ts.tb.Mux.HandleFunc("/ws-compression-param", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 					upgrader := websocket.Upgrader{
 						EnableCompression: true,
 						ReadBufferSize:    1024,
@@ -1092,7 +1106,7 @@ func TestCompression(t *testing.T) {
 					}
 				}))
 
-				_, err := rt.RunString(sr(`
+				_, err := ts.rt.RunString(sr(`
 					var res = ws.connect("WSBIN_URL/ws-compression-param", {"compression":"` + testCase.compression + `"}, function(socket){
 						socket.close()
 					});
@@ -1122,9 +1136,9 @@ func clearSamples(tb *httpmultibin.HTTPMultiBin, samples chan stats.SampleContai
 
 func BenchmarkCompression(b *testing.B) {
 	const textMessage = 1
-	tb, samples, rt := newRuntime(b)
-	sr := tb.Replacer.Replace
-	go clearSamples(tb, samples)
+	ts := newTestState(b)
+	sr := ts.tb.Replacer.Replace
+	go clearSamples(ts.tb, ts.samples)
 
 	testCodes := []string{
 		sr(`
@@ -1143,7 +1157,7 @@ func BenchmarkCompression(b *testing.B) {
 		`),
 	}
 
-	tb.Mux.HandleFunc("/ws-compression", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	ts.tb.Mux.HandleFunc("/ws-compression", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		kbData := bytes.Repeat([]byte("0123456789"), 100)
 
 		// upgrade connection, send the first (long) message, disconnect
@@ -1175,14 +1189,14 @@ func BenchmarkCompression(b *testing.B) {
 	b.ResetTimer()
 	b.Run("compression-enabled", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if _, err := rt.RunString(testCodes[0]); err != nil {
+			if _, err := ts.rt.RunString(testCodes[0]); err != nil {
 				b.Error(err)
 			}
 		}
 	})
 	b.Run("compression-disabled", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if _, err := rt.RunString(testCodes[1]); err != nil {
+			if _, err := ts.rt.RunString(testCodes[1]); err != nil {
 				b.Error(err)
 			}
 		}
