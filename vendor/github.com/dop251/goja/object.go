@@ -22,10 +22,12 @@ const (
 	classString   = "String"
 	classBoolean  = "Boolean"
 	classError    = "Error"
+	classAggError = "AggregateError"
 	classRegExp   = "RegExp"
 	classDate     = "Date"
 	classJSON     = "JSON"
 	classGlobal   = "global"
+	classPromise  = "Promise"
 
 	classArrayIterator        = "Array Iterator"
 	classMapIterator          = "Map Iterator"

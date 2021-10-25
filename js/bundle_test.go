@@ -172,11 +172,11 @@ func TestNewBundle(t *testing.T) {
 					"Modules", "base", `export default function() {};`,
 					"file:///script.js: Line 1:1 Unexpected reserved word",
 				},
-				// Promises are not supported
+				// BigInt is not supported
 				{
-					"Promise", "base",
-					`module.exports.default = function() {}; new Promise(function(resolve, reject){});`,
-					"ReferenceError: Promise is not defined\n\tat file:///script.js:1:45(4)\n",
+					"BigInt", "base",
+					`module.exports.default = function() {}; BigInt(1231412444)`,
+					"ReferenceError: BigInt is not defined\n\tat file:///script.js:1:47(6)\n",
 				},
 			}
 

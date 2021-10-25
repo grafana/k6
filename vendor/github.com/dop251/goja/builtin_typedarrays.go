@@ -1094,11 +1094,7 @@ func (r *Runtime) typedArrayFrom(ctor, items *Object, mapFn, thisValue Value) *O
 	}
 	usingIter := toMethod(items.self.getSym(SymIterator, nil))
 	if usingIter != nil {
-		iter := r.getIterator(items, usingIter)
-		var values []Value
-		r.iterate(iter, func(item Value) {
-			values = append(values, item)
-		})
+		values := r.iterableToList(items, usingIter)
 		ta := r.typedArrayCreate(ctor, []Value{intToValue(int64(len(values)))})
 		if mapFc == nil {
 			for idx, val := range values {
@@ -1260,11 +1256,8 @@ func (r *Runtime) createArrayBufferProto(val *Object) objectImpl {
 func (r *Runtime) createArrayBuffer(val *Object) objectImpl {
 	o := r.newNativeConstructOnly(val, r.builtin_newArrayBuffer, r.global.ArrayBufferPrototype, "ArrayBuffer", 1)
 	o._putProp("isView", r.newNativeFunc(r.arrayBuffer_isView, nil, "isView", nil, 1), true, false, true)
-	o._putSym(SymSpecies, &valueProperty{
-		getterFunc:   r.newNativeFunc(r.returnThis, nil, "get [Symbol.species]", nil, 0),
-		accessor:     true,
-		configurable: true,
-	})
+	r.putSpeciesReturnThis(o)
+
 	return o
 }
 
@@ -1375,11 +1368,7 @@ func (r *Runtime) createTypedArray(val *Object) objectImpl {
 	o := r.newNativeConstructOnly(val, r.newTypedArray, r.global.TypedArrayPrototype, "TypedArray", 0)
 	o._putProp("from", r.newNativeFunc(r.typedArray_from, nil, "from", nil, 1), true, false, true)
 	o._putProp("of", r.newNativeFunc(r.typedArray_of, nil, "of", nil, 0), true, false, true)
-	o._putSym(SymSpecies, &valueProperty{
-		getterFunc:   r.newNativeFunc(r.returnThis, nil, "get [Symbol.species]", nil, 0),
-		accessor:     true,
-		configurable: true,
-	})
+	r.putSpeciesReturnThis(o)
 
 	return o
 }

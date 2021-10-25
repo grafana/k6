@@ -243,11 +243,7 @@ func (r *Runtime) createMapProto(val *Object) objectImpl {
 
 func (r *Runtime) createMap(val *Object) objectImpl {
 	o := r.newNativeConstructOnly(val, r.builtin_newMap, r.global.MapPrototype, "Map", 0)
-	o._putSym(SymSpecies, &valueProperty{
-		getterFunc:   r.newNativeFunc(r.returnThis, nil, "get [Symbol.species]", nil, 0),
-		accessor:     true,
-		configurable: true,
-	})
+	r.putSpeciesReturnThis(o)
 
 	return o
 }
