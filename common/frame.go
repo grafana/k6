@@ -101,12 +101,13 @@ type Frame struct {
 	manager     *FrameManager
 	parentFrame *Frame
 
-	childFrames map[api.Frame]bool
-	id          cdp.FrameID
-	loaderID    string
-	name        string
-	url         string
-	detached    bool
+	childFramesMu sync.RWMutex
+	childFrames   map[api.Frame]bool
+	id            cdp.FrameID
+	loaderID      string
+	name          string
+	url           string
+	detached      bool
 
 	// A life cycle event is only considered triggered for a frame if the entire
 	// frame subtree has also had the life cycle event triggered.
@@ -125,10 +126,11 @@ type Frame struct {
 
 	loadingStartedTime time.Time
 
+	networkIdleMu       sync.Mutex
 	networkIdleCtx      context.Context
 	networkIdleCancelFn context.CancelFunc
 
-	muInflightRequests sync.RWMutex
+	inflightRequestsMu sync.RWMutex
 	inflightRequests   map[network.RequestID]bool
 
 	currentDocument *DocumentInfo
@@ -154,29 +156,35 @@ func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID 
 	}
 }
 
+func (f *Frame) addChildFrame(childFrame *Frame) {
+	f.childFramesMu.Lock()
+	f.childFrames[childFrame] = true
+	f.childFramesMu.Unlock()
+}
+
 func (f *Frame) addRequest(requestID network.RequestID) {
-	f.muInflightRequests.Lock()
-	defer f.muInflightRequests.Unlock()
+	f.inflightRequestsMu.Lock()
+	defer f.inflightRequestsMu.Unlock()
 
 	f.inflightRequests[requestID] = true
 }
 
 func (f *Frame) deleteRequest(requestID network.RequestID) {
-	f.muInflightRequests.Lock()
-	defer f.muInflightRequests.Unlock()
+	f.inflightRequestsMu.Lock()
+	defer f.inflightRequestsMu.Unlock()
 
 	delete(f.inflightRequests, requestID)
 }
 
 func (f *Frame) getInflightRequestCount() int {
-	f.muInflightRequests.RLock()
-	defer f.muInflightRequests.RUnlock()
+	f.inflightRequestsMu.RLock()
+	defer f.inflightRequestsMu.RUnlock()
 	return len(f.inflightRequests)
 }
 
 func (f *Frame) hasInflightRequest(requestID network.RequestID) bool {
-	f.muInflightRequests.RLock()
-	defer f.muInflightRequests.RUnlock()
+	f.inflightRequestsMu.RLock()
+	defer f.inflightRequestsMu.RUnlock()
 
 	return f.inflightRequests[requestID]
 }
@@ -189,8 +197,8 @@ func (f *Frame) clearLifecycle() {
 	f.lifecycleEventsMu.RUnlock()
 	f.page.frameManager.mainFrame.recalculateLifecycle()
 
-	f.muInflightRequests.Lock()
-	defer f.muInflightRequests.Unlock()
+	f.inflightRequestsMu.Lock()
+	defer f.inflightRequestsMu.Unlock()
 	inflightRequests := make(map[network.RequestID]bool)
 	for req := range f.inflightRequests {
 		if req == f.currentDocument.request.requestID {
@@ -325,6 +333,7 @@ func (f *Frame) recalculateLifecycle() {
 	f.lifecycleEventsMu.Unlock()
 
 	// Only consider a life cycle event as fired if it has triggered for all of subtree.
+	f.childFramesMu.RLock()
 	for child := range f.childFrames {
 		child.(*Frame).recalculateLifecycle()
 		for k := range events {
@@ -333,6 +342,7 @@ func (f *Frame) recalculateLifecycle() {
 			}
 		}
 	}
+	f.childFramesMu.RUnlock()
 
 	// Check if any of the fired events should be considered fired when looking at the entire subtree.
 	mainFrame := f.manager.mainFrame
@@ -363,7 +373,9 @@ func (f *Frame) recalculateLifecycle() {
 }
 
 func (f *Frame) removeChildFrame(childFrame *Frame) {
+	f.childFramesMu.Lock()
 	delete(f.childFrames, childFrame)
+	f.childFramesMu.Unlock()
 }
 
 func (f *Frame) requestByID(reqID network.RequestID) *Request {
@@ -399,10 +411,15 @@ func (f *Frame) startNetworkIdleTimer() {
 	if f.networkIdleCancelFn != nil {
 		f.networkIdleCancelFn()
 	}
+	f.networkIdleMu.Lock()
 	f.networkIdleCtx, f.networkIdleCancelFn = context.WithCancel(f.ctx)
+	f.networkIdleMu.Unlock()
 	go func() {
+		f.networkIdleMu.Lock()
+		doneCh := f.networkIdleCtx.Done()
+		f.networkIdleMu.Unlock()
 		select {
-		case <-f.networkIdleCtx.Done():
+		case <-doneCh:
 		case <-time.After(LifeCycleNetworkIdleTimeout):
 			f.manager.frameLifecycleEvent(f.id, LifecycleEventNetworkIdle)
 		}
@@ -412,8 +429,10 @@ func (f *Frame) startNetworkIdleTimer() {
 func (f *Frame) stopNetworkIdleTimer() {
 	if f.networkIdleCancelFn != nil {
 		f.networkIdleCancelFn()
+		f.networkIdleMu.Lock()
 		f.networkIdleCtx = nil
 		f.networkIdleCancelFn = nil
+		f.networkIdleMu.Unlock()
 	}
 }
 
@@ -527,6 +546,8 @@ func (f *Frame) Check(selector string, opts goja.Value) {
 
 // ChildFrames returns a list of child frames
 func (f *Frame) ChildFrames() []api.Frame {
+	f.childFramesMu.RLock()
+	defer f.childFramesMu.RUnlock()
 	l := make([]api.Frame, len(f.childFrames))
 	for child := range f.childFrames {
 		l = append(l, child)
@@ -1026,7 +1047,10 @@ func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value
 		common.Throw(rt, err)
 	}
 
-	arrayHandle := value.(api.JSHandle)
+	arrayHandle, ok := value.(api.JSHandle)
+	if !ok {
+		common.Throw(rt, err)
+	}
 	properties := arrayHandle.GetProperties()
 	strArr := make([]string, len(properties))
 	for _, property := range properties {

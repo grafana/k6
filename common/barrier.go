@@ -45,13 +45,17 @@ func (b *Barrier) AddFrameNavigation(frame *Frame) {
 	if frame.parentFrame != nil {
 		return // We only care about top-frame navigation
 	}
+	ch, evCancelFn := createWaitForEventHandler(frame.ctx, frame, []string{EventFrameNavigation}, func(data interface{}) bool { return true })
 	go func() {
+		defer evCancelFn() // Remove event handler
 		atomic.AddInt64(&b.count, 1)
-		_, err := waitForEvent(frame.ctx, frame, []string{EventFrameNavigation}, func(data interface{}) bool { return true }, time.Duration(frame.manager.timeoutSettings.navigationTimeout())*time.Second)
-		if err != nil {
-			b.errCh <- err
+		select {
+		case <-frame.ctx.Done():
+		case <-time.After(time.Duration(frame.manager.timeoutSettings.navigationTimeout()) * time.Second):
+			b.errCh <- ErrTimedOut
+		case <-ch:
+			b.ch <- true
 		}
-		b.ch <- true
 		atomic.AddInt64(&b.count, -1)
 	}()
 }

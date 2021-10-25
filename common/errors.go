@@ -42,7 +42,6 @@ const (
 	ErrJSHandleDisposed             Error = "JS handle is disposed"
 	ErrTargetCrashed                Error = "Target has crashed"
 	ErrTimedOut                     Error = "timed out"
-	ErrWebsocketClosed              Error = "websocket closed"
 	ErrWrongExecutionContext        Error = "JS handles can be evaluated only in the context they were created"
 )
 

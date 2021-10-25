@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chromedp/cdproto"
@@ -66,70 +67,86 @@ type FrameSession struct {
 	// To understand the concepts of Isolated Worlds, Contexts and Frames and
 	// the relationship betwween them have a look at the following doc:
 	// https://chromium.googlesource.com/chromium/src/+/master/third_party/blink/renderer/bindings/core/v8/V8BindingDesign.md
-	contextIDToContext map[runtime.ExecutionContextID]*ExecutionContext
-	isolatedWorlds     map[string]bool
+	contextIDToContextMu sync.Mutex
+	contextIDToContext   map[runtime.ExecutionContextID]*ExecutionContext
+	isolatedWorlds       map[string]bool
 
 	eventCh chan Event
 
 	childSessions map[cdp.FrameID]*FrameSession
 }
 
-func NewFrameSession(ctx context.Context, session *Session, page *Page, parent *FrameSession, targetID target.ID) *FrameSession {
+func NewFrameSession(ctx context.Context, session *Session, page *Page, parent *FrameSession, targetID target.ID) (*FrameSession, error) {
 	fs := FrameSession{
-		ctx:                ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
-		session:            session,
-		page:               page,
-		parent:             parent,
-		manager:            page.frameManager,
-		networkManager:     nil,
-		targetID:           targetID,
-		initTime:           &cdp.MonotonicTime{},
-		contextIDToContext: make(map[runtime.ExecutionContextID]*ExecutionContext),
-		isolatedWorlds:     make(map[string]bool),
-		eventCh:            make(chan Event),
-		childSessions:      make(map[cdp.FrameID]*FrameSession),
+		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
+		session:              session,
+		page:                 page,
+		parent:               parent,
+		manager:              page.frameManager,
+		networkManager:       nil,
+		targetID:             targetID,
+		initTime:             &cdp.MonotonicTime{},
+		contextIDToContextMu: sync.Mutex{},
+		contextIDToContext:   make(map[runtime.ExecutionContextID]*ExecutionContext),
+		isolatedWorlds:       make(map[string]bool),
+		eventCh:              make(chan Event),
+		childSessions:        make(map[cdp.FrameID]*FrameSession),
 	}
+	var err error
 	if fs.parent != nil {
-		fs.networkManager = NewNetworkManager(ctx, session, fs.manager, fs.parent.networkManager)
+		fs.networkManager, err = NewNetworkManager(ctx, session, fs.manager, fs.parent.networkManager)
+		if err != nil {
+			return nil, err
+		}
 	} else {
-		fs.networkManager = NewNetworkManager(ctx, session, fs.manager, nil)
+		fs.networkManager, err = NewNetworkManager(ctx, session, fs.manager, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 	fs.initEvents()
-	fs.initFrameTree()
-	fs.initIsolatedWorld(utilityWorldName)
-	fs.initDomains()
-	fs.initOptions()
-	return &fs
+	if err = fs.initFrameTree(); err != nil {
+		return nil, err
+	}
+	if err = fs.initIsolatedWorld(utilityWorldName); err != nil {
+		return nil, err
+	}
+	if err = fs.initDomains(); err != nil {
+		return nil, err
+	}
+	if err = fs.initOptions(); err != nil {
+		return nil, err
+	}
+	return &fs, nil
 }
 
-func (fs *FrameSession) emulateLocale() {
-	rt := common.GetRuntime(fs.ctx)
+func (fs *FrameSession) emulateLocale() error {
 	action := emulation.SetLocaleOverride().WithLocale(fs.page.browserCtx.opts.Locale)
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		if strings.Contains(err.Error(), "Another locale override is already in effect") {
-			return
+			return nil
 		}
-		common.Throw(rt, fmt.Errorf(`unable to set locale: %w`, err))
+		return fmt.Errorf(`unable to set locale: %w`, err)
 	}
+	return nil
 }
 
-func (fs *FrameSession) emulateTimezone() {
-	rt := common.GetRuntime(fs.ctx)
+func (fs *FrameSession) emulateTimezone() error {
 	action := emulation.SetTimezoneOverride(fs.page.browserCtx.opts.TimezoneID)
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		if strings.Contains(err.Error(), "Timezone override is already in effect") {
-			return
+			return nil
 		}
-		common.Throw(rt, fmt.Errorf(`unable to set timezone ID: %w`, err))
+		return fmt.Errorf(`unable to set timezone ID: %w`, err)
 	}
+	return nil
 }
 
 func (fs *FrameSession) getNetworkManager() *NetworkManager {
 	return fs.networkManager
 }
 
-func (fs *FrameSession) initDomains() {
-	rt := common.GetRuntime(fs.ctx)
+func (fs *FrameSession) initDomains() error {
 	actions := []Action{
 		dom.Enable(), // TODO: can we get rid of this by doing DOM related stuff in JS instead?
 		log.Enable(),
@@ -138,9 +155,10 @@ func (fs *FrameSession) initDomains() {
 	}
 	for _, action := range actions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-			common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
+			return fmt.Errorf("unable to execute %T: %v", action, err)
 		}
 	}
+	return nil
 }
 
 func (fs *FrameSession) initEvents() {
@@ -198,12 +216,10 @@ func (fs *FrameSession) initEvents() {
 	}()
 }
 
-func (fs *FrameSession) initFrameTree() {
-	rt := common.GetRuntime(fs.ctx)
-
+func (fs *FrameSession) initFrameTree() error {
 	action := cdppage.Enable()
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to enable page domain: %w", err))
+		return fmt.Errorf("unable to enable page domain: %w", err)
 	}
 
 	var frameTree *cdppage.FrameTree
@@ -213,25 +229,24 @@ func (fs *FrameSession) initFrameTree() {
 	// used for access and manipulation from JS.
 	action2 := cdppage.GetFrameTree()
 	if frameTree, err = action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to get page frame tree: %w", err))
+		return fmt.Errorf("unable to get page frame tree: %w", err)
 	}
 
 	if fs.isMainFrame() {
 		fs.handleFrameTree(frameTree)
 		fs.initRendererEvents()
 	}
+	return nil
 }
 
-func (fs *FrameSession) initIsolatedWorld(name string) {
-	rt := common.GetRuntime(fs.ctx)
-
+func (fs *FrameSession) initIsolatedWorld(name string) error {
 	action := cdppage.SetLifecycleEventsEnabled(true)
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		common.Throw(rt, fmt.Errorf(`unable to enable page lifecycle events: %w`, err))
+		return fmt.Errorf(`unable to enable page lifecycle events: %w`, err)
 	}
 
 	if _, ok := fs.isolatedWorlds[name]; ok {
-		return
+		return nil
 	}
 	fs.isolatedWorlds[name] = true
 
@@ -253,18 +268,20 @@ func (fs *FrameSession) initIsolatedWorld(name string) {
 	action2 := cdppage.AddScriptToEvaluateOnNewDocument(`//# sourceURL=` + evaluationScriptURL).
 		WithWorldName(name)
 	if _, err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to add script to evaluate for isolated world: %w", err))
+		return fmt.Errorf("unable to add script to evaluate for isolated world: %w", err)
 	}
+	return nil
 }
 
-func (fs *FrameSession) initOptions() {
-	rt := common.GetRuntime(fs.ctx)
+func (fs *FrameSession) initOptions() error {
 	opts := fs.manager.page.browserCtx.opts
 	optActions := []Action{}
 
 	if fs.isMainFrame() {
 		optActions = append(optActions, emulation.SetFocusEmulationEnabled(true))
-		fs.updateViewport()
+		if err := fs.updateViewport(); err != nil {
+			return err
+		}
 	}
 	if opts.BypassCSP {
 		optActions = append(optActions, cdppage.SetBypassCSP(true))
@@ -282,17 +299,27 @@ func (fs *FrameSession) initOptions() {
 		optActions = append(optActions, emulation.SetUserAgentOverride(opts.UserAgent).WithAcceptLanguage(opts.Locale))
 	}
 	if opts.Locale != "" {
-		fs.emulateLocale()
+		if err := fs.emulateLocale(); err != nil {
+			return err
+		}
 	}
 	if opts.TimezoneID != "" {
-		fs.emulateTimezone()
+		if err := fs.emulateTimezone(); err != nil {
+			return err
+		}
 	}
-	fs.updateGeolocation(true)
+	if err := fs.updateGeolocation(true); err != nil {
+		return err
+	}
 	fs.updateExtraHTTPHeaders(true)
-	fs.updateRequestInterception(true)
+	if err := fs.updateRequestInterception(true); err != nil {
+		return err
+	}
 	fs.updateOffline(true)
 	fs.updateHttpCredentials(true)
-	fs.updateEmulateMedia(true)
+	if err := fs.updateEmulateMedia(true); err != nil {
+		return err
+	}
 
 	// if (screencastOptions)
 	//   promises.push(this._startVideoRecording(screencastOptions));
@@ -306,9 +333,11 @@ func (fs *FrameSession) initOptions() {
 
 	for _, action := range optActions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-			common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
+			return fmt.Errorf("unable to execute %T: %v", action, err)
 		}
 	}
+
+	return nil
 }
 
 func (fs *FrameSession) initRendererEvents() {
@@ -375,6 +404,7 @@ func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled)
 	for _, arg := range event.Args {
 		i, err := interfaceFromRemoteObject(arg)
 		if err != nil {
+			// TODO(fix): this should not throw!
 			common.Throw(rt, fmt.Errorf("unable to parse remote object value: %w", err))
 		}
 		convertedArgs = append(convertedArgs, i)
@@ -427,10 +457,14 @@ func (fs FrameSession) onExecutionContextCreated(event *runtime.EventExecutionCo
 	if world != "" {
 		frame.setContext(world, context)
 	}
+	fs.contextIDToContextMu.Lock()
 	fs.contextIDToContext[event.Context.ID] = context
+	fs.contextIDToContextMu.Unlock()
 }
 
 func (fs *FrameSession) onExecutionContextDestroyed(execCtxID runtime.ExecutionContextID) {
+	fs.contextIDToContextMu.Lock()
+	defer fs.contextIDToContextMu.Unlock()
 	context, ok := fs.contextIDToContext[execCtxID]
 	if !ok {
 		return
@@ -442,6 +476,8 @@ func (fs *FrameSession) onExecutionContextDestroyed(execCtxID runtime.ExecutionC
 }
 
 func (fs *FrameSession) onExecutionContextsCleared() {
+	fs.contextIDToContextMu.Lock()
+	defer fs.contextIDToContextMu.Unlock()
 	for _, context := range fs.contextIDToContext {
 		if context.Frame() != nil {
 			context.Frame().nullContexts()
@@ -602,7 +638,15 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 			return
 		}
 		fs.manager.removeChildFramesRecursively(frame)
-		frameSession := NewFrameSession(fs.ctx, session, fs.page, fs, targetID)
+		frameSession, err := NewFrameSession(fs.ctx, session, fs.page, fs, targetID)
+		if err != nil {
+			if !fs.page.browserCtx.browser.connected && strings.Contains(err.Error(), "websocket: close 1006 (abnormal closure)") {
+				// If we're no longer connected to browser, then ignore WebSocket errors
+				return
+			}
+			rt := common.GetRuntime(fs.ctx)
+			common.Throw(rt, err)
+		}
 		fs.page.frameSessions[cdp.FrameID(targetID)] = frameSession
 		return
 	}
@@ -615,7 +659,16 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	}
 
 	// Handle new worker
-	fs.page.workers[session.id] = NewWorker(fs.ctx, session, targetID, event.TargetInfo.URL)
+	w, err := NewWorker(fs.ctx, session, targetID, event.TargetInfo.URL)
+	if err != nil {
+		if !fs.page.browserCtx.browser.connected && strings.Contains(err.Error(), "websocket: close 1006 (abnormal closure)") {
+			// If we're no longer connected to browser, then ignore WebSocket errors
+			return
+		}
+		rt := common.GetRuntime(fs.ctx)
+		common.Throw(rt, err)
+	}
+	fs.page.workers[session.id] = w
 }
 
 func (fs *FrameSession) onDetachedFromTarget(event *target.EventDetachedFromTarget) {
@@ -627,8 +680,7 @@ func (fs *FrameSession) onTargetCrashed(event *inspector.EventTargetCrashed) {
 	fs.page.didCrash()
 }
 
-func (fs *FrameSession) updateEmulateMedia(initial bool) {
-	rt := common.GetRuntime(fs.ctx)
+func (fs *FrameSession) updateEmulateMedia(initial bool) error {
 	features := make([]*emulation.MediaFeature, 0)
 
 	switch fs.page.colorScheme {
@@ -651,8 +703,9 @@ func (fs *FrameSession) updateEmulateMedia(initial bool) {
 		WithMedia(string(fs.page.mediaType)).
 		WithFeatures(features)
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
+		return fmt.Errorf("unable to execute %T: %v", action, err)
 	}
+	return nil
 }
 
 func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) {
@@ -669,18 +722,18 @@ func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) {
 	}
 }
 
-func (fs *FrameSession) updateGeolocation(initial bool) {
+func (fs *FrameSession) updateGeolocation(initial bool) error {
 	geolocation := fs.page.browserCtx.opts.Geolocation
 	if !initial || geolocation != nil {
-		rt := common.GetRuntime(fs.ctx)
 		action := emulation.SetGeolocationOverride().
 			WithLatitude(geolocation.Latitude).
 			WithLongitude(geolocation.Longitude).
 			WithAccuracy(geolocation.Accurracy)
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-			common.Throw(rt, fmt.Errorf("unable to set geolocation override: %w", err))
+			return fmt.Errorf("unable to set geolocation override: %w", err)
 		}
 	}
+	return nil
 }
 
 func (fs *FrameSession) updateHttpCredentials(initial bool) {
@@ -697,12 +750,11 @@ func (fs *FrameSession) updateOffline(initial bool) {
 	}
 }
 
-func (fs *FrameSession) updateRequestInterception(initial bool) {
-	fs.networkManager.setRequestInterception(fs.page.hasRoutes())
+func (fs *FrameSession) updateRequestInterception(initial bool) error {
+	return fs.networkManager.setRequestInterception(fs.page.hasRoutes())
 }
 
-func (fs *FrameSession) updateViewport() {
-	rt := common.GetRuntime(fs.ctx)
+func (fs *FrameSession) updateViewport() error {
 	opts := fs.page.browserCtx.opts
 	emulatedSize := fs.page.emulatedSize
 	viewport := opts.Viewport
@@ -721,6 +773,7 @@ func (fs *FrameSession) updateViewport() {
 			WithScreenHeight(emulatedSize.Screen.Height)
 	}
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to emulate viewport: %w", err))
+		return fmt.Errorf("unable to emulate viewport: %w", err)
 	}
+	return nil
 }

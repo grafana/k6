@@ -25,6 +25,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/chromedp/cdproto"
@@ -32,6 +33,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
+	"github.com/gorilla/websocket"
 	"github.com/grafana/xk6-browser/api"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -42,11 +44,20 @@ import (
 var _ EventEmitter = &Browser{}
 var _ api.Browser = &Browser{}
 
+const (
+	BrowserStateOpen int64 = iota
+	BrowserStateClosing
+	BrowserStateClosed
+)
+
 // Browser stores a Browser context
 type Browser struct {
 	BaseEventEmitter
 
-	ctx context.Context
+	ctx      context.Context
+	cancelFn context.CancelFunc
+
+	state int64
 
 	browserProc *BrowserProcess
 	launchOpts  *LaunchOptions
@@ -55,6 +66,7 @@ type Browser struct {
 	conn      *Connection
 	connected bool
 
+	contextsMu     sync.RWMutex
 	contexts       map[cdp.BrowserContextID]*BrowserContext
 	defaultContext *BrowserContext
 
@@ -63,59 +75,68 @@ type Browser struct {
 
 	// Needed as the targets map will be accessed from multiple Go routines,
 	// the main VU/JS go routine and the Go routine listening for CDP messages.
-	targetsMu           sync.RWMutex
-	pages               map[target.ID]*Page
-	sessionIDtoTargetID map[target.SessionID]target.ID
+	pagesMu sync.RWMutex
+	pages   map[target.ID]*Page
+
+	sessionIDtoTargetIDMu sync.RWMutex
+	sessionIDtoTargetID   map[target.SessionID]target.ID
 
 	logger *Logger
 }
 
 // NewBrowser creates a new browser
-func NewBrowser(ctx context.Context, browserProc *BrowserProcess, launchOpts *LaunchOptions) *Browser {
+func NewBrowser(ctx context.Context, cancelFn context.CancelFunc, browserProc *BrowserProcess, launchOpts *LaunchOptions) (*Browser, error) {
 	state := lib.GetState(ctx)
 	reCategoryFilter, _ := regexp.Compile(launchOpts.LogCategoryFilter)
 	b := Browser{
-		BaseEventEmitter:    NewBaseEventEmitter(),
-		ctx:                 ctx,
-		browserProc:         browserProc,
-		conn:                nil,
-		connected:           false,
-		launchOpts:          launchOpts,
-		contexts:            make(map[cdp.BrowserContextID]*BrowserContext),
-		defaultContext:      nil,
-		pages:               make(map[target.ID]*Page),
-		sessionIDtoTargetID: make(map[target.SessionID]target.ID),
-		logger:              NewLogger(ctx, state.Logger, launchOpts.Debug, reCategoryFilter),
+		BaseEventEmitter:      NewBaseEventEmitter(),
+		ctx:                   ctx,
+		cancelFn:              cancelFn,
+		state:                 int64(BrowserStateOpen),
+		browserProc:           browserProc,
+		conn:                  nil,
+		connected:             false,
+		launchOpts:            launchOpts,
+		contexts:              make(map[cdp.BrowserContextID]*BrowserContext),
+		defaultContext:        nil,
+		pagesMu:               sync.RWMutex{},
+		pages:                 make(map[target.ID]*Page),
+		sessionIDtoTargetIDMu: sync.RWMutex{},
+		sessionIDtoTargetID:   make(map[target.SessionID]target.ID),
+		logger:                NewLogger(ctx, state.Logger, launchOpts.Debug, reCategoryFilter),
 	}
-	b.connect()
-	return &b
+	if err := b.connect(); err != nil {
+		return nil, err
+	}
+	return &b, nil
 }
 
-func (b *Browser) connect() {
-	rt := common.GetRuntime(b.ctx)
+func (b *Browser) connect() error {
 	var err error
 	b.conn, err = NewConnection(b.ctx, b.browserProc.WsURL(), b.logger)
 	if err != nil {
-		common.Throw(rt, fmt.Errorf("unable to connect to browser WS URL: %w", err))
+		return fmt.Errorf("unable to connect to browser WS URL: %w", err)
 	}
 
 	b.connected = true
 	b.defaultContext = NewBrowserContext(b.ctx, b.conn, b, "", NewBrowserContextOptions(), b.logger)
-	b.initEvents()
+	return b.initEvents()
 }
 
-func (b *Browser) disposeContext(id cdp.BrowserContextID) {
-	rt := common.GetRuntime(b.ctx)
+func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 	action := target.DisposeBrowserContext(id)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to dispose browser context %T: %v", action, err))
+		return fmt.Errorf("unable to dispose browser context %T: %v", action, err)
 	}
+	b.contextsMu.Lock()
+	defer b.contextsMu.Unlock()
 	delete(b.contexts, id)
+	return nil
 }
 
 func (b *Browser) getPages() []*Page {
-	b.targetsMu.RLock()
-	defer b.targetsMu.RUnlock()
+	b.pagesMu.RLock()
+	defer b.pagesMu.RUnlock()
 	pages := make([]*Page, len(b.pages))
 	for _, p := range b.pages {
 		pages = append(pages, p)
@@ -123,7 +144,7 @@ func (b *Browser) getPages() []*Page {
 	return pages
 }
 
-func (b *Browser) initEvents() {
+func (b *Browser) initEvents() error {
 	var cancelCtx context.Context
 	cancelCtx, b.evCancelFn = context.WithCancel(b.ctx)
 	chHandler := make(chan Event)
@@ -141,29 +162,41 @@ func (b *Browser) initEvents() {
 				return
 			case event := <-chHandler:
 				if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
-					b.onAttachedToTarget(ev)
+					go b.onAttachedToTarget(ev)
 				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
-					b.onDetachedFromTarget(ev)
+					go b.onDetachedFromTarget(ev)
 				} else if event.typ == EventConnectionClose {
 					b.connected = false
 					b.browserProc.didLooseConnection()
+					b.cancelFn()
 				}
 			}
 		}
 	}()
 
-	rt := common.GetRuntime(b.ctx)
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
+		return fmt.Errorf("unable to execute %T: %v", action, err)
 	}
+
+	// Target.setAutoAttach has a bug where it does not wait for new Targets being attached.
+	// However making a dummy call afterwards fixes this.
+	// This can be removed after https://chromium-review.googlesource.com/c/chromium/src/+/2885888 lands in stable.
+	action2 := target.GetTargetInfo()
+	if _, err := action2.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
+		return fmt.Errorf("unable to execute %T: %v", action, err)
+	}
+
+	return nil
 }
 
 func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
+	b.contextsMu.RLock()
 	var browserCtx *BrowserContext = b.defaultContext
 	if b, ok := b.contexts[ev.TargetInfo.BrowserContextID]; ok {
 		browserCtx = b
 	}
+	b.contextsMu.RUnlock()
 
 	// We're not interested in the top-level browser target, other targets or DevTools targets right now.
 	isDevTools := strings.HasPrefix(ev.TargetInfo.URL, "devtools://devtools")
@@ -172,46 +205,72 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	}
 
 	if ev.TargetInfo.Type == "background_page" {
-		p := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, nil, false)
-		b.targetsMu.Lock()
+		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, nil, false)
+		if err != nil {
+			isRunning := b.state == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
+			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
+				// If we're no longer connected to browser, then ignore WebSocket errors
+				return
+			}
+			rt := common.GetRuntime(b.ctx)
+			common.Throw(rt, err)
+		}
+		b.pagesMu.Lock()
 		b.pages[ev.TargetInfo.TargetID] = p
-		b.targetsMu.Unlock()
+		b.pagesMu.Unlock()
+		b.sessionIDtoTargetIDMu.Lock()
 		b.sessionIDtoTargetID[ev.SessionID] = ev.TargetInfo.TargetID
+		b.sessionIDtoTargetIDMu.Unlock()
 	} else if ev.TargetInfo.Type == "page" {
 		var opener *Page = nil
+		b.pagesMu.RLock()
 		if t, ok := b.pages[ev.TargetInfo.OpenerID]; ok {
 			opener = t
 		}
-		p := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, opener, true)
-		b.targetsMu.Lock()
+		b.pagesMu.RUnlock()
+		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, opener, true)
+		if err != nil {
+			isRunning := b.state == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
+			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
+				// If we're no longer connected to browser, then ignore WebSocket errors
+				return
+			}
+			rt := common.GetRuntime(b.ctx)
+			common.Throw(rt, err)
+		}
+		b.pagesMu.Lock()
 		b.pages[ev.TargetInfo.TargetID] = p
-		b.targetsMu.Unlock()
+		b.pagesMu.Unlock()
+		b.sessionIDtoTargetIDMu.Lock()
 		b.sessionIDtoTargetID[ev.SessionID] = ev.TargetInfo.TargetID
+		b.sessionIDtoTargetIDMu.Unlock()
 		browserCtx.emit(EventBrowserContextPage, p)
 	}
 }
 
 func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
+	b.sessionIDtoTargetIDMu.RLock()
 	targetID, ok := b.sessionIDtoTargetID[ev.SessionID]
+	b.sessionIDtoTargetIDMu.RUnlock()
 	if !ok {
 		// We don't track targets of type "browser", "other" and "devtools", so ignore if we don't recognize target.
 		return
 	}
 
+	b.pagesMu.Lock()
+	defer b.pagesMu.Unlock()
 	if t, ok := b.pages[targetID]; ok {
-		b.targetsMu.Lock()
 		delete(b.pages, targetID)
-		b.targetsMu.Unlock()
 		t.didClose()
 	}
 }
 
-func (b *Browser) newPageInContext(id cdp.BrowserContextID) api.Page {
-	rt := common.GetRuntime(b.ctx)
-
+func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
+	b.contextsMu.RLock()
 	browserCtx, ok := b.contexts[id]
+	b.contextsMu.RUnlock()
 	if !ok {
-		common.Throw(rt, fmt.Errorf("no browser context with ID %s exists", id))
+		return nil, fmt.Errorf("no browser context with ID %s exists", id)
 	}
 
 	var (
@@ -229,36 +288,51 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) api.Page {
 		},
 	)
 	defer evCancelFn() // Remove event handler
+	errCh := make(chan error)
 	func() {
 		action := target.CreateTarget("about:blank").WithBrowserContextID(id)
 		mu.Lock()
 		defer mu.Unlock()
 		if targetID, err = action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-			common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
+			errCh <- fmt.Errorf("unable to execute %T: %v", action, err)
 		}
 	}()
 	select {
 	case <-b.ctx.Done():
 	case <-time.After(b.launchOpts.Timeout):
 	case <-ch:
+	case err := <-errCh:
+		return nil, err
 	}
-	return b.pages[targetID]
+	b.pagesMu.RLock()
+	defer b.pagesMu.RUnlock()
+	return b.pages[targetID], nil
 }
 
 // Close shuts down the browser
 func (b *Browser) Close() {
+	if !atomic.CompareAndSwapInt64(&b.state, b.state, BrowserStateClosing) {
+		// If we're already in a closing state then no need to continue.
+		return
+	}
 	b.browserProc.GracefulClose()
 	defer b.browserProc.Terminate()
 
 	action := cdpbrowser.Close()
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		rt := common.GetRuntime(b.ctx)
-		common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
+		if _, ok := err.(*websocket.CloseError); !ok {
+			rt := common.GetRuntime(b.ctx)
+			common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
+		}
 	}
+
+	atomic.CompareAndSwapInt64(&b.state, b.state, BrowserStateClosed)
 }
 
 // Contexts returns list of browser contexts
 func (b *Browser) Contexts() []api.BrowserContext {
+	b.contextsMu.RLock()
+	defer b.contextsMu.RUnlock()
 	contexts := make([]api.BrowserContext, 0, len(b.contexts))
 	for _, b := range b.contexts {
 		contexts = append(contexts, b)
@@ -286,6 +360,8 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 		common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
+	b.contextsMu.Lock()
+	defer b.contextsMu.Unlock()
 	browserCtx := NewBrowserContext(b.ctx, b.conn, b, browserContextID, browserCtxOpts, b.logger)
 	b.contexts[browserContextID] = browserCtx
 

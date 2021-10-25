@@ -125,7 +125,7 @@ func (m *FrameManager) frameAttached(frameID cdp.FrameID, parentFrameID cdp.Fram
 	if parentFrame, ok := m.frames[parentFrameID]; ok {
 		frame := NewFrame(m.ctx, m, parentFrame, frameID)
 		m.frames[frameID] = frame
-		parentFrame.childFrames[frame] = true
+		parentFrame.addChildFrame(frame)
 		m.page.emit(EventPageFrameAttached, frame)
 	}
 }

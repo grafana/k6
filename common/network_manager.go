@@ -70,7 +70,7 @@ type NetworkManager struct {
 }
 
 // NewNetworkManager creates a new network manager
-func NewNetworkManager(ctx context.Context, session *Session, manager *FrameManager, parent *NetworkManager) *NetworkManager {
+func NewNetworkManager(ctx context.Context, session *Session, manager *FrameManager, parent *NetworkManager) (*NetworkManager, error) {
 	m := NetworkManager{
 		BaseEventEmitter:               NewBaseEventEmitter(),
 		ctx:                            ctx,
@@ -88,8 +88,10 @@ func NewNetworkManager(ctx context.Context, session *Session, manager *FrameMana
 		protocolReqInterceptionEnabled: false,
 	}
 	m.initEvents()
-	m.initDomains()
-	return &m
+	if err := m.initDomains(); err != nil {
+		return nil, err
+	}
+	return &m, nil
 }
 
 func (m *NetworkManager) deleteRequestByID(reqID network.RequestID) {
@@ -196,12 +198,12 @@ func (m *NetworkManager) handleRequestRedirect(req *Request, redirectResponse *n
 	m.emit(cdproto.EventNetworkLoadingFinished, req)
 }
 
-func (m *NetworkManager) initDomains() {
-	rt := common.GetRuntime(m.ctx)
+func (m *NetworkManager) initDomains() error {
 	action := network.Enable()
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
+		return fmt.Errorf("unable to execute %T: %v", action, err)
 	}
+	return nil
 }
 
 func (m *NetworkManager) initEvents() {
@@ -358,24 +360,23 @@ func (m *NetworkManager) requestFromID(reqID network.RequestID) *Request {
 	return m.reqIDToRequest[reqID]
 }
 
-func (m *NetworkManager) setRequestInterception(value bool) {
+func (m *NetworkManager) setRequestInterception(value bool) error {
 	m.userReqInterceptionEnabled = value
-	m.updateProtocolRequestInterception()
+	return m.updateProtocolRequestInterception()
 }
 
-func (m *NetworkManager) updateProtocolCacheDisabled() {
-	rt := common.GetRuntime(m.ctx)
+func (m *NetworkManager) updateProtocolCacheDisabled() error {
 	action := network.SetCacheDisabled(m.userCacheDisabled)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to toggle cache on/off: %w", err))
+		return fmt.Errorf("unable to toggle cache on/off: %w", err)
 	}
+	return nil
 }
 
-func (m *NetworkManager) updateProtocolRequestInterception() {
-	rt := common.GetRuntime(m.ctx)
+func (m *NetworkManager) updateProtocolRequestInterception() error {
 	enabled := m.userReqInterceptionEnabled
 	if enabled == m.protocolReqInterceptionEnabled {
-		return
+		return nil
 	}
 	m.protocolReqInterceptionEnabled = enabled
 	if enabled {
@@ -389,7 +390,7 @@ func (m *NetworkManager) updateProtocolRequestInterception() {
 		}
 		for _, action := range actions {
 			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-				common.Throw(rt, fmt.Errorf("unable to execute %T: %w", action, err))
+				return fmt.Errorf("unable to execute %T: %w", action, err)
 			}
 		}
 	} else {
@@ -399,16 +400,20 @@ func (m *NetworkManager) updateProtocolRequestInterception() {
 		}
 		for _, action := range actions {
 			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-				common.Throw(rt, fmt.Errorf("unable to execute %T: %w", action, err))
+				return fmt.Errorf("unable to execute %T: %w", action, err)
 			}
 		}
 	}
+	return nil
 }
 
 // Authenticate sets HTTP authentication credentials to use
 func (m *NetworkManager) Authenticate(credentials *Credentials) {
 	m.credentials = credentials
-	m.updateProtocolRequestInterception()
+	if err := m.updateProtocolRequestInterception(); err != nil {
+		rt := common.GetRuntime(m.ctx)
+		common.Throw(rt, err)
+	}
 }
 
 // ExtraHTTPHeaders returns the currently set extra HTTP request headers
@@ -452,5 +457,8 @@ func (m *NetworkManager) SetUserAgent(userAgent string) {
 // SetCacheEnabled toggles cache on/off
 func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 	m.userCacheDisabled = !enabled
-	m.updateProtocolCacheDisabled()
+	if err := m.updateProtocolCacheDisabled(); err != nil {
+		rt := common.GetRuntime(m.ctx)
+		common.Throw(rt, err)
+	}
 }

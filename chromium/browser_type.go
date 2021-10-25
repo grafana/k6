@@ -29,6 +29,7 @@ import (
 	"github.com/grafana/xk6-browser/common"
 	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
+	"go.k6.io/k6/lib"
 )
 
 // Ensure BrowserType implements the api.BrowserType interface.
@@ -36,19 +37,30 @@ var _ api.BrowserType = &BrowserType{}
 
 type BrowserType struct {
 	Ctx             context.Context
+	CancelFn        context.CancelFunc
 	hooks           *common.Hooks
 	fieldNameMapper *common.FieldNameMapper
 }
 
 func NewBrowserType(ctx context.Context) api.BrowserType {
+	rt := k6common.GetRuntime(ctx)
+	state := lib.GetState(ctx)
 	hooks := common.NewHooks()
-	ctx = common.WithHooks(ctx, hooks)
+
+	// Create extension master context. If this context is cancelled we'll
+	// initiate an extension wide cancellation and shutdown.
+	extensionCtx := context.Background()
+	extensionCtx, extensionCancelFn := context.WithCancel(extensionCtx)
+	extensionCtx = k6common.WithRuntime(extensionCtx, rt)
+	extensionCtx = lib.WithState(extensionCtx, state)
+	extensionCtx = common.WithHooks(extensionCtx, hooks)
+
 	b := BrowserType{
-		Ctx:             ctx,
+		Ctx:             extensionCtx,
+		CancelFn:        extensionCancelFn,
 		hooks:           hooks,
 		fieldNameMapper: common.NewFieldNameMapper(),
 	}
-	rt := k6common.GetRuntime(b.Ctx)
 	rt.SetFieldNameMapper(b.fieldNameMapper)
 	return &b
 }
@@ -122,12 +134,16 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		k6common.Throw(rt, fmt.Errorf("unable to allocate browser: %w", err))
 	}
 
-	browser := common.NewBrowser(b.Ctx, browserProc, launchOpts)
+	browser, err := common.NewBrowser(b.Ctx, b.CancelFn, browserProc, launchOpts)
+	if err != nil {
+		k6common.Throw(rt, err)
+	}
 	return browser
 }
 
 func (b *BrowserType) LaunchPersistentContext(userDataDir string, opts goja.Value) api.Browser {
-	// TODO: implement
+	rt := k6common.GetRuntime(b.Ctx)
+	k6common.Throw(rt, errors.Errorf("BrowserType.LaunchPersistentContext(userDataDir, opts) has not been implemented yet!"))
 	return nil
 }
 

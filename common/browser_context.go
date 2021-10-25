@@ -140,7 +140,9 @@ func (b *BrowserContext) Close() {
 	if b.id == "" {
 		common.Throw(rt, fmt.Errorf("default browser context can't be closed"))
 	}
-	b.browser.disposeContext(b.id)
+	if err := b.browser.disposeContext(b.id); err != nil {
+		common.Throw(rt, err)
+	}
 }
 
 func (b *BrowserContext) Cookies() []goja.Object {
@@ -211,7 +213,12 @@ func (b *BrowserContext) NewCDPSession() api.CDPSession {
 
 // NewPage creates a new page inside this browser context.
 func (b *BrowserContext) NewPage() api.Page {
-	return b.browser.newPageInContext(b.id)
+	p, err := b.browser.newPageInContext(b.id)
+	if err != nil {
+		rt := common.GetRuntime(b.ctx)
+		common.Throw(rt, err)
+	}
+	return p
 }
 
 // Pages returns a list of pages inside this browser context.
@@ -253,7 +260,9 @@ func (b *BrowserContext) SetGeolocation(geolocation goja.Value) {
 
 	b.opts.Geolocation = g
 	for _, p := range b.browser.getPages() {
-		p.updateGeolocation()
+		if err := p.updateGeolocation(); err != nil {
+			common.Throw(rt, err)
+		}
 	}
 }
 
