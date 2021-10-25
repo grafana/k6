@@ -126,10 +126,11 @@ type Frame struct {
 
 	loadingStartedTime time.Time
 
+	networkIdleMu       sync.Mutex
 	networkIdleCtx      context.Context
 	networkIdleCancelFn context.CancelFunc
 
-	muInflightRequests sync.RWMutex
+	inflightRequestsMu sync.RWMutex
 	inflightRequests   map[network.RequestID]bool
 
 	currentDocument *DocumentInfo
@@ -144,7 +145,6 @@ func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID 
 		page:                      m.page,
 		manager:                   m,
 		parentFrame:               parentFrame,
-		childFramesMu:             sync.RWMutex{},
 		childFrames:               make(map[api.Frame]bool),
 		id:                        frameID,
 		lifecycleEvents:           make(map[LifecycleEvent]bool),
@@ -163,28 +163,28 @@ func (f *Frame) addChildFrame(childFrame *Frame) {
 }
 
 func (f *Frame) addRequest(requestID network.RequestID) {
-	f.muInflightRequests.Lock()
-	defer f.muInflightRequests.Unlock()
+	f.inflightRequestsMu.Lock()
+	defer f.inflightRequestsMu.Unlock()
 
 	f.inflightRequests[requestID] = true
 }
 
 func (f *Frame) deleteRequest(requestID network.RequestID) {
-	f.muInflightRequests.Lock()
-	defer f.muInflightRequests.Unlock()
+	f.inflightRequestsMu.Lock()
+	defer f.inflightRequestsMu.Unlock()
 
 	delete(f.inflightRequests, requestID)
 }
 
 func (f *Frame) getInflightRequestCount() int {
-	f.muInflightRequests.RLock()
-	defer f.muInflightRequests.RUnlock()
+	f.inflightRequestsMu.RLock()
+	defer f.inflightRequestsMu.RUnlock()
 	return len(f.inflightRequests)
 }
 
 func (f *Frame) hasInflightRequest(requestID network.RequestID) bool {
-	f.muInflightRequests.RLock()
-	defer f.muInflightRequests.RUnlock()
+	f.inflightRequestsMu.RLock()
+	defer f.inflightRequestsMu.RUnlock()
 
 	return f.inflightRequests[requestID]
 }
@@ -197,8 +197,8 @@ func (f *Frame) clearLifecycle() {
 	f.lifecycleEventsMu.RUnlock()
 	f.page.frameManager.mainFrame.recalculateLifecycle()
 
-	f.muInflightRequests.Lock()
-	defer f.muInflightRequests.Unlock()
+	f.inflightRequestsMu.Lock()
+	defer f.inflightRequestsMu.Unlock()
 	inflightRequests := make(map[network.RequestID]bool)
 	for req := range f.inflightRequests {
 		if req == f.currentDocument.request.requestID {
@@ -411,10 +411,15 @@ func (f *Frame) startNetworkIdleTimer() {
 	if f.networkIdleCancelFn != nil {
 		f.networkIdleCancelFn()
 	}
+	f.networkIdleMu.Lock()
 	f.networkIdleCtx, f.networkIdleCancelFn = context.WithCancel(f.ctx)
+	f.networkIdleMu.Unlock()
 	go func() {
+		f.networkIdleMu.Lock()
+		doneCh := f.networkIdleCtx.Done()
+		f.networkIdleMu.Unlock()
 		select {
-		case <-f.networkIdleCtx.Done():
+		case <-doneCh:
 		case <-time.After(LifeCycleNetworkIdleTimeout):
 			f.manager.frameLifecycleEvent(f.id, LifecycleEventNetworkIdle)
 		}
@@ -424,8 +429,10 @@ func (f *Frame) startNetworkIdleTimer() {
 func (f *Frame) stopNetworkIdleTimer() {
 	if f.networkIdleCancelFn != nil {
 		f.networkIdleCancelFn()
+		f.networkIdleMu.Lock()
 		f.networkIdleCtx = nil
 		f.networkIdleCancelFn = nil
+		f.networkIdleMu.Unlock()
 	}
 }
 
