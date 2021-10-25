@@ -66,6 +66,7 @@ type Browser struct {
 	conn      *Connection
 	connected bool
 
+	contextsMu     sync.RWMutex
 	contexts       map[cdp.BrowserContextID]*BrowserContext
 	defaultContext *BrowserContext
 
@@ -127,6 +128,8 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
 		return fmt.Errorf("unable to dispose browser context %T: %v", action, err)
 	}
+	b.contextsMu.Lock()
+	defer b.contextsMu.Unlock()
 	delete(b.contexts, id)
 	return nil
 }
@@ -188,10 +191,12 @@ func (b *Browser) initEvents() error {
 }
 
 func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
+	b.contextsMu.RLock()
 	var browserCtx *BrowserContext = b.defaultContext
 	if b, ok := b.contexts[ev.TargetInfo.BrowserContextID]; ok {
 		browserCtx = b
 	}
+	b.contextsMu.RUnlock()
 
 	// We're not interested in the top-level browser target, other targets or DevTools targets right now.
 	isDevTools := strings.HasPrefix(ev.TargetInfo.URL, "devtools://devtools")
@@ -261,7 +266,9 @@ func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
 }
 
 func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
+	b.contextsMu.RLock()
 	browserCtx, ok := b.contexts[id]
+	b.contextsMu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("no browser context with ID %s exists", id)
 	}
@@ -324,6 +331,8 @@ func (b *Browser) Close() {
 
 // Contexts returns list of browser contexts
 func (b *Browser) Contexts() []api.BrowserContext {
+	b.contextsMu.RLock()
+	defer b.contextsMu.RUnlock()
 	contexts := make([]api.BrowserContext, 0, len(b.contexts))
 	for _, b := range b.contexts {
 		contexts = append(contexts, b)
@@ -351,6 +360,8 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 		common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
+	b.contextsMu.Lock()
+	defer b.contextsMu.Unlock()
 	browserCtx := NewBrowserContext(b.ctx, b.conn, b, browserContextID, browserCtxOpts, b.logger)
 	b.contexts[browserContextID] = browserCtx
 
