@@ -218,9 +218,11 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		b.sessionIDtoTargetIDMu.Unlock()
 	} else if ev.TargetInfo.Type == "page" {
 		var opener *Page = nil
+		b.pagesMu.RLock()
 		if t, ok := b.pages[ev.TargetInfo.OpenerID]; ok {
 			opener = t
 		}
+		b.pagesMu.RUnlock()
 		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, opener, true)
 		if err != nil {
 			isRunning := b.state == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
