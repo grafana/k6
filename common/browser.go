@@ -250,10 +250,10 @@ func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
 		return
 	}
 
+	b.pagesMu.Lock()
+	defer b.pagesMu.Unlock()
 	if t, ok := b.pages[targetID]; ok {
-		b.pagesMu.Lock()
 		delete(b.pages, targetID)
-		b.pagesMu.Unlock()
 		t.didClose()
 	}
 }

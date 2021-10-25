@@ -101,12 +101,13 @@ type Frame struct {
 	manager     *FrameManager
 	parentFrame *Frame
 
-	childFrames map[api.Frame]bool
-	id          cdp.FrameID
-	loaderID    string
-	name        string
-	url         string
-	detached    bool
+	childFramesMu sync.RWMutex
+	childFrames   map[api.Frame]bool
+	id            cdp.FrameID
+	loaderID      string
+	name          string
+	url           string
+	detached      bool
 
 	// A life cycle event is only considered triggered for a frame if the entire
 	// frame subtree has also had the life cycle event triggered.
@@ -143,6 +144,7 @@ func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID 
 		page:                      m.page,
 		manager:                   m,
 		parentFrame:               parentFrame,
+		childFramesMu:             sync.RWMutex{},
 		childFrames:               make(map[api.Frame]bool),
 		id:                        frameID,
 		lifecycleEvents:           make(map[LifecycleEvent]bool),
@@ -152,6 +154,12 @@ func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID 
 		inflightRequests:          make(map[network.RequestID]bool),
 		currentDocument:           &DocumentInfo{},
 	}
+}
+
+func (f *Frame) addChildFrame(childFrame *Frame) {
+	f.childFramesMu.Lock()
+	f.childFrames[childFrame] = true
+	f.childFramesMu.Unlock()
 }
 
 func (f *Frame) addRequest(requestID network.RequestID) {
@@ -325,6 +333,7 @@ func (f *Frame) recalculateLifecycle() {
 	f.lifecycleEventsMu.Unlock()
 
 	// Only consider a life cycle event as fired if it has triggered for all of subtree.
+	f.childFramesMu.RLock()
 	for child := range f.childFrames {
 		child.(*Frame).recalculateLifecycle()
 		for k := range events {
@@ -333,6 +342,7 @@ func (f *Frame) recalculateLifecycle() {
 			}
 		}
 	}
+	f.childFramesMu.RUnlock()
 
 	// Check if any of the fired events should be considered fired when looking at the entire subtree.
 	mainFrame := f.manager.mainFrame
@@ -363,7 +373,9 @@ func (f *Frame) recalculateLifecycle() {
 }
 
 func (f *Frame) removeChildFrame(childFrame *Frame) {
+	f.childFramesMu.Lock()
 	delete(f.childFrames, childFrame)
+	f.childFramesMu.Unlock()
 }
 
 func (f *Frame) requestByID(reqID network.RequestID) *Request {
@@ -527,6 +539,8 @@ func (f *Frame) Check(selector string, opts goja.Value) {
 
 // ChildFrames returns a list of child frames
 func (f *Frame) ChildFrames() []api.Frame {
+	f.childFramesMu.RLock()
+	defer f.childFramesMu.RUnlock()
 	l := make([]api.Frame, len(f.childFrames))
 	for child := range f.childFrames {
 		l = append(l, child)
