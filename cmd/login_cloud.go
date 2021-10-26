@@ -118,7 +118,13 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 				email := vals["Email"].(string)
 				password := vals["Password"].(string)
 
-				client := cloudapi.NewClient(logger, "", consolidatedCurrentConfig.Host.String, consts.Version)
+				client := cloudapi.NewClient(
+					logger,
+					"",
+					consolidatedCurrentConfig.Host.String,
+					consts.Version,
+					consolidatedCurrentConfig.Timeout.TimeDuration())
+
 				res, err := client.Login(email, password)
 				if err != nil {
 					return err
