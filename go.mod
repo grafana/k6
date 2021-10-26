@@ -5,14 +5,13 @@ go 1.17
 require (
 	github.com/golang/protobuf v1.5.2
 	github.com/golang/snappy v0.0.4
-	github.com/kubernetes/helm v2.9.0+incompatible
-	github.com/prometheus/common v0.30.0
-	github.com/prometheus/prometheus v1.8.2-0.20210909123707-05a816bfb739
+	github.com/kubernetes/helm v2.17.0+incompatible
+	github.com/prometheus/common v0.32.1
+	github.com/prometheus/prometheus v1.8.2-0.20211005150130-f29caccc4255
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
-	go.k6.io/k6 v0.33.0
-	google.golang.org/genproto v0.0.0-20210909211513-a8c4777a87af // indirect
-	gopkg.in/guregu/null.v3 v3.3.0
+	go.k6.io/k6 v0.34.1
+	gopkg.in/guregu/null.v3 v3.5.0
 )
 
 require (
@@ -23,8 +22,8 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dennwc/varint v1.0.0 // indirect
 	github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91 // indirect
-	github.com/dop251/goja v0.0.0-20210427212725-462d53687b0d // indirect
-	github.com/fatih/color v1.11.0 // indirect
+	github.com/dop251/goja v0.0.0-20210912140721-ac5354e9a820 // indirect
+	github.com/fatih/color v1.12.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-kit/log v0.1.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
@@ -34,7 +33,7 @@ require (
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
-	github.com/mattn/go-isatty v0.0.12 // indirect
+	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/opentracing-contrib/go-stdlib v1.0.0 // indirect
