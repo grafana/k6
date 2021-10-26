@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	//nolint:staticcheck
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"

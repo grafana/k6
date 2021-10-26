@@ -96,6 +96,13 @@ func (pm *PrometheusMapping) MapTrend(ms *metricsStorage, sample stats.Sample, l
 			t.Min = s.Value
 		}
 
+		// The median of an even number of values is the average of the middle two.
+		if (t.Count & 0x01) == 0 {
+			t.Med = (t.Values[(t.Count/2)-1] + t.Values[(t.Count/2)]) / 2
+		} else {
+			t.Med = t.Values[t.Count/2]
+		}
+
 		current.Metric.Sink = t
 		return current
 	})

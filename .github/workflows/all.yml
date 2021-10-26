@@ -1,0 +1,108 @@
+name: CI
+on:
+  # Enable manually triggering this workflow via the API or web UI
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  deps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17.x
+      - name: Check dependencies
+        run: |
+            go version
+            test -z "$(go mod vendor && git status --porcelain)"
+            go mod verify
+
+  lint:
+    runs-on: ubuntu-latest
+    env:
+        GOLANG_CI_VERSION: "1.39.0"
+        GO111MODULE: 'on'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17.x
+      - name: Install golangci-lint
+        working-directory: /tmp
+        run: go install "github.com/golangci/golangci-lint/cmd/golangci-lint@v$GOLANG_CI_VERSION"
+      - name: Run linters
+        run: |
+          BASEREV=$(git merge-base HEAD origin/main)
+          echo "Base revision: $BASEREV"
+          golangci-lint run --timeout=10m --out-format=tab --new-from-rev "$BASEREV" ./...
+
+  test-prev:
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [1.16.x]
+        platform: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Run tests
+        run: |
+          set -x
+          go version
+          export GOMAXPROCS=2
+          args=("-p" "2" "-race")
+          # Run with less concurrency on Windows to minimize flakiness.
+          if [[ "${{ matrix.platform }}" == windows* ]]; then
+            unset args[2]
+            #args[1]="1"
+            # export GOMAXPROCS=1
+          fi
+          go test "${args[@]}" -timeout 800s ./...
+
+  test-tip:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.x
+      - name: Install Go tip
+        run: |
+          go install golang.org/dl/gotip@latest
+          gotip download
+          echo "GOROOT=$HOME/sdk/gotip" >> "$GITHUB_ENV"
+          echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
+      - name: Run tests
+        run: |
+          set -x
+          which go
+          go version
+          export GOMAXPROCS=2
+          args=("-p" "2" "-race")
+          go test "${args[@]}" -timeout 800s ./...

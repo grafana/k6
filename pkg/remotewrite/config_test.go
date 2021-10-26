@@ -107,7 +107,7 @@ func TestConstructRemoteConfig(t *testing.T) {
 			},
 			errString: "",
 			remoteConfig: &remote.ClientConfig{
-				URL:     &promConfig.URL{u},
+				URL:     &promConfig.URL{URL: u},
 				Timeout: model.Duration(defaultPrometheusTimeout),
 				HTTPClientConfig: promConfig.HTTPClientConfig{
 					FollowRedirects: true,
@@ -135,7 +135,7 @@ func TestConstructRemoteConfig(t *testing.T) {
 			},
 			errString: "",
 			remoteConfig: &remote.ClientConfig{
-				URL:     &promConfig.URL{u},
+				URL:     &promConfig.URL{URL: u},
 				Timeout: model.Duration(defaultPrometheusTimeout),
 				HTTPClientConfig: promConfig.HTTPClientConfig{
 					FollowRedirects: true,

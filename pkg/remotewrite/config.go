@@ -79,7 +79,7 @@ func (conf Config) ConstructRemoteConfig() (*remote.ClientConfig, error) {
 	}
 
 	remoteConfig := remote.ClientConfig{
-		URL:              &promConfig.URL{u},
+		URL:              &promConfig.URL{URL: u},
 		Timeout:          model.Duration(defaultPrometheusTimeout),
 		HTTPClientConfig: httpConfig,
 		RetryOnRateLimit: true,
