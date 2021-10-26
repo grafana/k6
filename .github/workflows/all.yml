@@ -14,7 +14,7 @@ defaults:
     shell: bash
 
 jobs:
-  deps:
+  test-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -23,11 +23,21 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.17.x
-      - name: Check dependencies
+      - name: Check build
         run: |
             go version
-            test -z "$(go mod vendor && git status --porcelain)"
-            go mod verify
+            pwd && ls -l
+
+            export CGO_ENABLED=0
+            
+            # Temporary hack to ignore the v0.33.0 tag change
+            export GONOSUMDB="go.k6.io/k6"
+            go install go.k6.io/xk6/cmd/xk6@master
+
+            GOPROXY="direct" xk6 build \
+              --output ./k6ext \
+              --with github.com/grafana/xk6-output-prometheus-remote="." \
+            ./k6ext version
 
   lint:
     runs-on: ubuntu-latest
