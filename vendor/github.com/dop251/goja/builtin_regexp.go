@@ -1267,10 +1267,6 @@ func (r *Runtime) initRegExp() {
 
 	r.global.RegExp = r.newNativeFunc(r.builtin_RegExp, r.builtin_newRegExp, "RegExp", r.global.RegExpPrototype, 2)
 	rx := r.global.RegExp.self
-	rx._putSym(SymSpecies, &valueProperty{
-		getterFunc:   r.newNativeFunc(r.returnThis, nil, "get [Symbol.species]", nil, 0),
-		accessor:     true,
-		configurable: true,
-	})
+	r.putSpeciesReturnThis(rx)
 	r.addToGlobal("RegExp", r.global.RegExp)
 }

@@ -33,6 +33,7 @@ var (
 	stringEmpty        valueString = asciiString("")
 
 	stringError          valueString = asciiString("Error")
+	stringAggregateError valueString = asciiString("AggregateError")
 	stringTypeError      valueString = asciiString("TypeError")
 	stringReferenceError valueString = asciiString("ReferenceError")
 	stringSyntaxError    valueString = asciiString("SyntaxError")

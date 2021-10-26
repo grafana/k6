@@ -1354,11 +1354,7 @@ func (r *Runtime) createArray(val *Object) objectImpl {
 	o._putProp("from", r.newNativeFunc(r.array_from, nil, "from", nil, 1), true, false, true)
 	o._putProp("isArray", r.newNativeFunc(r.array_isArray, nil, "isArray", nil, 1), true, false, true)
 	o._putProp("of", r.newNativeFunc(r.array_of, nil, "of", nil, 0), true, false, true)
-	o._putSym(SymSpecies, &valueProperty{
-		getterFunc:   r.newNativeFunc(r.returnThis, nil, "get [Symbol.species]", nil, 0),
-		accessor:     true,
-		configurable: true,
-	})
+	r.putSpeciesReturnThis(o)
 
 	return o
 }
