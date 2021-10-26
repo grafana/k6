@@ -199,7 +199,8 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 
 			// Start cloud test run
 			modifyAndPrintBar(progressBar, pb.WithConstProgress(0, "Validating script options"))
-			client := cloudapi.NewClient(logger, cloudConfig.Token.String, cloudConfig.Host.String, consts.Version)
+			client := cloudapi.NewClient(
+				logger, cloudConfig.Token.String, cloudConfig.Host.String, consts.Version, cloudConfig.Timeout.TimeDuration())
 			if err = client.ValidateOptions(arc.Options); err != nil {
 				return err
 			}
