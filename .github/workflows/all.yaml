@@ -72,10 +72,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Install chrome dependencies
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y libpangocairo-1.0-0 libx11-xcb1 libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 libxrandr2 libgconf-2-4 libasound2 libatk1.0-0 libgtk-3-0
-          sudo apt-get install -y libgbm-dev libxshmfence1
+        run: "${GITHUB_WORKSPACE}/.github/bin/install_chrome_deps_linux.sh"
       - name: Setup chrome
         uses: browser-actions/setup-chrome@latest
         with:
@@ -109,10 +106,7 @@ jobs:
           echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
       - name: Install chrome dependencies
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y libpangocairo-1.0-0 libx11-xcb1 libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 libxrandr2 libgconf-2-4 libasound2 libatk1.0-0 libgtk-3-0
-          sudo apt-get install -y libgbm-dev libxshmfence1
+        run: "${GITHUB_WORKSPACE}/.github/bin/install_chrome_deps_linux.sh"
       - name: Setup chrome
         uses: browser-actions/setup-chrome@latest
         with:
@@ -144,10 +138,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Install chrome dependencies
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y libpangocairo-1.0-0 libx11-xcb1 libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 libxrandr2 libgconf-2-4 libasound2 libatk1.0-0 libgtk-3-0
-          sudo apt-get install -y libgbm-dev libxshmfence1
+        run: "${GITHUB_WORKSPACE}/.github/bin/install_chrome_deps_linux.sh"
       - name: Setup chrome
         uses: browser-actions/setup-chrome@latest
         with:
