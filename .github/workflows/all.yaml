@@ -53,14 +53,15 @@ jobs:
         run: |
           BASEREV=$(git merge-base HEAD origin/main)
           echo "Base revision: $BASEREV"
-          golangci-lint run --timeout=10m --out-format=tab --new-from-rev "$BASEREV" ./...
+          golangci-lint run --timeout=3m --out-format=tab --new-from-rev "$BASEREV" ./...
 
   test-prev:
     strategy:
       fail-fast: false
       matrix:
         go-version: [1.16.x]
-        platform: [ubuntu-latest, macos-latest, windows-latest]
+        #platform: [ubuntu-latest, macos-latest, windows-latest]
+        platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -70,12 +71,8 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Install chrome dependencies
-        run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get update -y
-            sudo apt-get install -y libpangocairo-1.0-0 libx11-xcb1 libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 libxrandr2 libgconf-2-4 libasound2 libatk1.0-0 libgtk-3-0
-            sudo apt-get install -y libgbm-dev libxshmfence1
-          fi
+        if: runner.os == 'Linux'
+        run: "${GITHUB_WORKSPACE}/.github/bin/install_chrome_deps_linux.sh"
       - name: Setup chrome
         uses: browser-actions/setup-chrome@latest
         with:
@@ -87,7 +84,7 @@ jobs:
           set -x
           go version
           export GOMAXPROCS=1
-          go test -race -v -timeout 800s ./...
+          go test -v -timeout 60s ./...
 
   test-tip:
     runs-on: ubuntu-latest
@@ -108,12 +105,8 @@ jobs:
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
           echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
       - name: Install chrome dependencies
-        run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get update -y
-            sudo apt-get install -y libpangocairo-1.0-0 libx11-xcb1 libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 libxrandr2 libgconf-2-4 libasound2 libatk1.0-0 libgtk-3-0
-            sudo apt-get install -y libgbm-dev libxshmfence1
-          fi
+        if: runner.os == 'Linux'
+        run: "${GITHUB_WORKSPACE}/.github/bin/install_chrome_deps_linux.sh"
       - name: Setup chrome
         uses: browser-actions/setup-chrome@latest
         with:
@@ -126,14 +119,15 @@ jobs:
           which go
           go version
           export GOMAXPROCS=1
-          go test -race -v -timeout 800s ./...
+          go test -v -timeout 60s ./...
 
   test-current-cov:
     strategy:
       fail-fast: false
       matrix:
         go-version: [1.17.x]
-        platform: [ubuntu-latest, macos-latest, windows-latest]
+        #platform: [ubuntu-latest, macos-latest, windows-latest]
+        platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -143,12 +137,8 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Install chrome dependencies
-        run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get update -y
-            sudo apt-get install -y libpangocairo-1.0-0 libx11-xcb1 libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 libxrandr2 libgconf-2-4 libasound2 libatk1.0-0 libgtk-3-0
-            sudo apt-get install -y libgbm-dev libxshmfence1
-          fi
+        if: runner.os == 'Linux'
+        run: "${GITHUB_WORKSPACE}/.github/bin/install_chrome_deps_linux.sh"
       - name: Setup chrome
         uses: browser-actions/setup-chrome@latest
         with:
@@ -159,7 +149,6 @@ jobs:
         run: |
           go version
           export GOMAXPROCS=1
-          args=("-race")
           echo "mode: set" > coverage.txt
           for pkg in $(go list ./... | grep -v vendor); do
               list=$(go list -test -f  '{{ join .Deps  "\n"}}' $pkg | grep github.com/grafana/xk6-browser | grep -v vendor || true)
@@ -167,7 +156,7 @@ jobs:
                   list=$(echo "$list" | cut -f1 -d ' ' | sort -u | paste -sd, -)
               fi
 
-              go test "${args[@]}" -timeout 800s --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
+              go test -timeout 60s --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
           done
           grep -h -v "^mode:" *.coverage >> coverage.txt
           rm -f *.coverage
