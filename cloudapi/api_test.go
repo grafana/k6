@@ -53,7 +53,7 @@ func TestCreateTestRun(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0", 1*time.Second)
 
 	tr := &TestRun{
 		Name: "test",
@@ -74,7 +74,7 @@ func TestFinished(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0", 1*time.Second)
 
 	thresholds := map[string]map[string]bool{
 		"threshold": {
@@ -95,7 +95,7 @@ func TestAuthorizedError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0", 1*time.Second)
 
 	resp, err := client.CreateTestRun(&TestRun{Name: "test"})
 
@@ -113,7 +113,7 @@ func TestDetailsError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0", 1*time.Second)
 
 	resp, err := client.CreateTestRun(&TestRun{Name: "test"})
 
@@ -139,7 +139,7 @@ func TestClientRetry(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0", 1*time.Second)
 	client.retryInterval = 1 * time.Millisecond
 	resp, err := client.CreateTestRun(&TestRun{Name: "test"})
 
@@ -169,7 +169,7 @@ func TestClientRetrySuccessOnSecond(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0", 1*time.Second)
 	client.retryInterval = 1 * time.Millisecond
 	resp, err := client.CreateTestRun(&TestRun{Name: "test"})
 
@@ -193,7 +193,7 @@ func TestIdempotencyKey(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0")
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0", 1*time.Second)
 	client.retryInterval = 1 * time.Millisecond
 	req, err := client.NewRequest(http.MethodPost, server.URL, nil)
 	assert.NoError(t, err)
@@ -203,4 +203,16 @@ func TestIdempotencyKey(t *testing.T) {
 	req, err = client.NewRequest(http.MethodGet, server.URL, nil)
 	assert.NoError(t, err)
 	assert.NoError(t, client.Do(req, nil))
+}
+
+func TestNewClient(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Timeout", func(t *testing.T) {
+		t.Parallel()
+
+		timeout := 5 * time.Second
+		c := NewClient(testutils.NewLogger(t), "token", "server-url", "1.0", 5*time.Second)
+		assert.Equal(t, timeout, c.client.Timeout)
+	})
 }

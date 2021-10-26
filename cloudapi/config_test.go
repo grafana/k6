@@ -52,6 +52,7 @@ func TestConfigApply(t *testing.T) {
 		WebAppURL:                       null.NewString("foo", true),
 		NoCompress:                      null.NewBool(true, true),
 		StopOnError:                     null.NewBool(true, true),
+		Timeout:                         types.NewNullDuration(5*time.Second, true),
 		MaxMetricSamplesPerPackage:      null.NewInt(2, true),
 		MetricPushInterval:              types.NewNullDuration(1*time.Second, true),
 		MetricPushConcurrency:           null.NewInt(3, true),
