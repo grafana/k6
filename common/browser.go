@@ -89,7 +89,7 @@ func NewBrowser(ctx context.Context, cancelFn context.CancelFunc, browserProc *B
 	state := lib.GetState(ctx)
 	reCategoryFilter, _ := regexp.Compile(launchOpts.LogCategoryFilter)
 	b := Browser{
-		BaseEventEmitter:      NewBaseEventEmitter(),
+		BaseEventEmitter:      NewBaseEventEmitter(ctx),
 		ctx:                   ctx,
 		cancelFn:              cancelFn,
 		state:                 int64(BrowserStateOpen),

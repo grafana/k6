@@ -60,7 +60,7 @@ type BrowserContext struct {
 // NewBrowserContext creates a new browser context.
 func NewBrowserContext(ctx context.Context, conn *Connection, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *Logger) *BrowserContext {
 	b := BrowserContext{
-		BaseEventEmitter: NewBaseEventEmitter(),
+		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
 		conn:             conn,
 		browser:          browser,

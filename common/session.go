@@ -53,7 +53,7 @@ type Session struct {
 // NewSession creates a new session
 func NewSession(ctx context.Context, conn *Connection, id target.SessionID) *Session {
 	s := Session{
-		BaseEventEmitter: NewBaseEventEmitter(),
+		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
 		conn:             conn,
 		id:               id,

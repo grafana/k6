@@ -22,7 +22,6 @@ package common
 
 import (
 	"context"
-	"sync"
 )
 
 // Ensure BaseEventEmitter implements the EventEmitter interface
@@ -99,80 +98,111 @@ type EventEmitter interface {
 
 // BaseEventEmitter emits events to registered handlers
 type BaseEventEmitter struct {
-	handlersMu  sync.RWMutex
 	handlers    map[string][]eventHandler
 	handlersAll []eventHandler
+
+	handlersCh chan func() chan struct{}
+	ctx        context.Context
 }
 
 // NewBaseEventEmitter creates a new instance of a base event emitter
-func NewBaseEventEmitter() BaseEventEmitter {
-	return BaseEventEmitter{
+func NewBaseEventEmitter(ctx context.Context) BaseEventEmitter {
+	bem := BaseEventEmitter{
 		handlers:    make(map[string][]eventHandler),
 		handlersAll: make([]eventHandler, 0),
+		handlersCh:  make(chan func() chan struct{}),
+		ctx:         ctx,
+	}
+	go bem.handleHandlers(ctx)
+	return bem
+}
+
+// handleHandlers handles handlers in a single Goroutine.
+// It basically process one request at a time for synchronization.
+func (e *BaseEventEmitter) handleHandlers(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case fn := <-e.handlersCh:
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			done := fn()
+			done <- struct{}{}
+		}
 	}
 }
 
+// sync is a helper for sychronized access to the BaseEventEmitter.
+func (e *BaseEventEmitter) sync(fn func()) {
+	done := make(chan struct{})
+	select {
+	case <-e.ctx.Done():
+		return
+	case e.handlersCh <- func() chan struct{} {
+		fn()
+		return done
+	}:
+	}
+	<-done
+}
+
 func (e *BaseEventEmitter) emit(event string, data interface{}) {
-	e.handlersMu.Lock()
-	defer e.handlersMu.Unlock()
-
-	handlers := e.handlers[event]
-	for i := 0; i < len(handlers); {
-		handler := handlers[i]
-		e.handlersMu.Unlock()
-		select {
-		case <-handler.ctx.Done():
-			e.handlersMu.Lock()
-			handlers = append(handlers[:i], handlers[i+1:]...)
-			continue
-		default:
-			go func() {
-				handler.ch <- Event{event, data}
-			}()
-			i++
+	e.sync(func() {
+		handlers := e.handlers[event]
+		for i := 0; i < len(handlers); {
+			handler := handlers[i]
+			select {
+			case <-handler.ctx.Done():
+				handlers = append(handlers[:i], handlers[i+1:]...)
+				continue
+			default:
+				go func() {
+					handler.ch <- Event{event, data}
+				}()
+				i++
+			}
 		}
-		e.handlersMu.Lock()
-	}
-	e.handlers[event] = handlers
+		e.handlers[event] = handlers
 
-	handlers = e.handlersAll
-	for i := 0; i < len(handlers); {
-		handler := handlers[i]
-		e.handlersMu.Unlock()
-		select {
-		case <-handler.ctx.Done():
-			e.handlersMu.Lock()
-			handlers = append(handlers[:i], handlers[i+1:]...)
-			continue
-		default:
-			go func() {
-				handler.ch <- Event{event, data}
-			}()
-			i++
+		handlers = e.handlersAll
+		for i := 0; i < len(handlers); {
+			handler := handlers[i]
+			select {
+			case <-handler.ctx.Done():
+				handlers = append(handlers[:i], handlers[i+1:]...)
+				continue
+			default:
+				go func() {
+					handler.ch <- Event{event, data}
+				}()
+				i++
+			}
 		}
-		e.handlersMu.Lock()
-	}
-	e.handlersAll = handlers
+		e.handlersAll = handlers
+	})
 }
 
 // On registers a handler for a specific event
 func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Event) {
-	e.handlersMu.Lock()
-	defer e.handlersMu.Unlock()
-
-	for _, event := range events {
-		_, ok := e.handlers[event]
-		if !ok {
-			e.handlers[event] = make([]eventHandler, 0)
+	e.sync(func() {
+		for _, event := range events {
+			_, ok := e.handlers[event]
+			if !ok {
+				e.handlers[event] = make([]eventHandler, 0)
+			}
+			eh := eventHandler{ctx, ch}
+			e.handlers[event] = append(e.handlers[event], eh)
 		}
-		eh := eventHandler{ctx, ch}
-		e.handlers[event] = append(e.handlers[event], eh)
-	}
+	})
 }
 
 // OnAll registers a handler for all events
 func (e *BaseEventEmitter) onAll(ctx context.Context, ch chan Event) {
-	e.handlersMu.Lock()
-	defer e.handlersMu.Unlock()
-	e.handlersAll = append(e.handlersAll, eventHandler{ctx, ch})
+	e.sync(func() {
+		e.handlersAll = append(e.handlersAll, eventHandler{ctx, ch})
+	})
 }

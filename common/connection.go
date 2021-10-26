@@ -130,7 +130,7 @@ func NewConnection(ctx context.Context, wsURL string, logger *Logger) (*Connecti
 	}
 
 	c := Connection{
-		BaseEventEmitter: NewBaseEventEmitter(),
+		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
 		wsURL:            wsURL,
 		logger:           logger,
@@ -334,6 +334,12 @@ func (c *Connection) send(msg *cdproto.Message, recvCh chan *cdproto.Message, re
 			_ = c.closeConnection(code)
 			return &websocket.CloseError{Code: code}
 		case <-c.done:
+		case <-c.ctx.Done():
+			c.logger.Debugf("connection:sendLoop", "returning")
+			return c.ctx.Err()
+			// TODO: add a timeout?
+			// case <-timeout:
+			// 	return
 		}
 	}
 
@@ -372,6 +378,12 @@ func (c *Connection) sendLoop() {
 		case code := <-c.closeCh:
 			_ = c.closeConnection(code)
 		case <-c.done:
+		case <-c.ctx.Done():
+			c.logger.Debugf("connection:sendLoop", "returning, ctx.Err: %q", c.ctx.Err())
+			return
+			// TODO: add a timeout?
+			// case <-timeout:
+			// 	return
 		}
 	}
 }

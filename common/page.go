@@ -80,7 +80,7 @@ type Page struct {
 // NewPage creates a new browser page context
 func NewPage(ctx context.Context, session *Session, browserCtx *BrowserContext, targetID target.ID, opener *Page, backgroundPage bool) (*Page, error) {
 	p := Page{
-		BaseEventEmitter: NewBaseEventEmitter(),
+		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
 		session:          session,
 		browserCtx:       browserCtx,
