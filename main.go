@@ -29,7 +29,7 @@ import (
 	"github.com/grafana/xk6-browser/common"
 	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
+	k6modules "go.k6.io/k6/js/modules"
 )
 
 const version = "v0.1.0"
@@ -73,5 +73,5 @@ func (m *JSModule) Launch(ctx context.Context, browserName string, opts goja.Val
 }
 
 func init() {
-	modules.Register("k6/x/browser", NewJSModule(version))
+	k6modules.Register("k6/x/browser", NewJSModule(version))
 }

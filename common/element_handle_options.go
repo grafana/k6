@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 )
 
 type ElementHandleBaseOptions struct {
@@ -107,7 +107,7 @@ func NewElementHandleBaseOptions(defaultTimeout time.Duration) *ElementHandleBas
 }
 
 func (o *ElementHandleBaseOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -133,7 +133,7 @@ func NewElementHandleBasePointerOptions(defaultTimeout time.Duration) *ElementHa
 }
 
 func (o *ElementHandleBasePointerOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func NewElementHandleClickOptions(defaultTimeout time.Duration) *ElementHandleCl
 }
 
 func (o *ElementHandleClickOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -221,7 +221,7 @@ func NewElementHandleDblclickOptions(defaultTimeout time.Duration) *ElementHandl
 }
 
 func (o *ElementHandleDblclickOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -261,7 +261,7 @@ func NewElementHandleHoverOptions(defaultTimeout time.Duration) *ElementHandleHo
 }
 
 func (o *ElementHandleHoverOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -290,7 +290,7 @@ func NewElementHandlePressOptions(defaultTimeout time.Duration) *ElementHandlePr
 }
 
 func (o *ElementHandlePressOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -326,7 +326,7 @@ func NewElementHandleScreenshotOptions(defaultTimeout time.Duration) *ElementHan
 }
 
 func (o *ElementHandleScreenshotOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -355,7 +355,7 @@ func NewElementHandleSetCheckedOptions(defaultTimeout time.Duration) *ElementHan
 }
 
 func (o *ElementHandleSetCheckedOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
@@ -381,7 +381,7 @@ func NewElementHandleTapOptions(defaultTimeout time.Duration) *ElementHandleTapO
 }
 
 func (o *ElementHandleTapOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -410,7 +410,7 @@ func NewElementHandleTypeOptions(defaultTimeout time.Duration) *ElementHandleTyp
 }
 
 func (o *ElementHandleTypeOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -442,7 +442,7 @@ func NewElementHandleWaitForElementStateOptions(defaultTimeout time.Duration) *E
 }
 
 func (o *ElementHandleWaitForElementStateOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {

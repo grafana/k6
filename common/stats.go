@@ -20,12 +20,12 @@
 
 package common
 
-import "go.k6.io/k6/stats"
+import k6stats "go.k6.io/k6/stats"
 
 var (
-	BrowserDOMContentLoaded     = stats.New("browser_dom_content_loaded", stats.Trend, stats.Time)
-	BrowserFirstPaint           = stats.New("browser_first_paint", stats.Trend, stats.Time)
-	BrowserFirstContentfulPaint = stats.New("browser_first_contentful_paint", stats.Trend, stats.Time)
-	BrowserFirstMeaningfulPaint = stats.New("browser_first_meaningful_paint", stats.Trend, stats.Time)
-	BrowserLoaded               = stats.New("browser_loaded", stats.Trend, stats.Time)
+	BrowserDOMContentLoaded     = k6stats.New("browser_dom_content_loaded", k6stats.Trend, k6stats.Time)
+	BrowserFirstPaint           = k6stats.New("browser_first_paint", k6stats.Trend, k6stats.Time)
+	BrowserFirstContentfulPaint = k6stats.New("browser_first_contentful_paint", k6stats.Trend, k6stats.Time)
+	BrowserFirstMeaningfulPaint = k6stats.New("browser_first_meaningful_paint", k6stats.Trend, k6stats.Time)
+	BrowserLoaded               = k6stats.New("browser_loaded", k6stats.Trend, k6stats.Time)
 )

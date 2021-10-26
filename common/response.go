@@ -30,7 +30,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	"github.com/pkg/errors"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 	"golang.org/x/net/context"
 )
 
@@ -146,13 +146,13 @@ func (r *Response) AllHeaders() map[string]string {
 
 // Body returns the response body as a binary buffer
 func (r *Response) Body() goja.ArrayBuffer {
-	rt := common.GetRuntime(r.ctx)
+	rt := k6common.GetRuntime(r.ctx)
 	if r.status >= 300 && r.status <= 399 {
-		common.Throw(rt, errors.Errorf("Response body is unavailable for redirect responses"))
+		k6common.Throw(rt, errors.Errorf("Response body is unavailable for redirect responses"))
 	}
 	if r.body == nil {
 		if err := r.fetchBody(); err != nil {
-			common.Throw(rt, err)
+			k6common.Throw(rt, err)
 		}
 	}
 	return rt.NewArrayBuffer(r.body)
@@ -161,8 +161,8 @@ func (r *Response) Body() goja.ArrayBuffer {
 // Finished waits for response to finish, return error if request failed
 func (r *Response) Finished() bool {
 	// TODO: should return nil|Error
-	rt := common.GetRuntime(r.ctx)
-	common.Throw(rt, errors.Errorf("Response.finished() has not been implemented yet!"))
+	rt := k6common.GetRuntime(r.ctx)
+	k6common.Throw(rt, errors.Errorf("Response.finished() has not been implemented yet!"))
 	return false
 }
 
@@ -172,7 +172,7 @@ func (r *Response) Frame() api.Frame {
 }
 
 func (r *Response) HeaderValue(name string) goja.Value {
-	rt := common.GetRuntime(r.ctx)
+	rt := k6common.GetRuntime(r.ctx)
 	headers := r.AllHeaders()
 	val, ok := headers[name]
 	if !ok {
@@ -211,7 +211,7 @@ func (r *Response) Headers() map[string]string {
 }
 
 func (r *Response) HeadersArray() []goja.Value {
-	rt := common.GetRuntime(r.ctx)
+	rt := k6common.GetRuntime(r.ctx)
 	type Header struct {
 		Name  string `json:"name"`
 		Value string `json:"value"`
@@ -227,17 +227,17 @@ func (r *Response) HeadersArray() []goja.Value {
 
 // JSON returns the response body as JSON data
 func (r *Response) JSON() goja.Value {
-	rt := common.GetRuntime(r.ctx)
+	rt := k6common.GetRuntime(r.ctx)
 	if r.cachedJSON == nil {
 		if r.body == nil {
 			if err := r.fetchBody(); err != nil {
-				common.Throw(rt, err)
+				k6common.Throw(rt, err)
 			}
 		}
 
 		var v interface{}
 		if err := json.Unmarshal(r.body, &v); err != nil {
-			common.Throw(rt, err)
+			k6common.Throw(rt, err)
 		}
 		r.cachedJSON = v
 	}
@@ -258,13 +258,13 @@ func (r *Response) Request() api.Request {
 }
 
 func (r *Response) SecurityDetails() goja.Value {
-	rt := common.GetRuntime(r.ctx)
+	rt := k6common.GetRuntime(r.ctx)
 	return rt.ToValue(r.securityDetails)
 }
 
 // ServerAdd returns the remote address of the server
 func (r *Response) ServerAddr() goja.Value {
-	rt := common.GetRuntime(r.ctx)
+	rt := k6common.GetRuntime(r.ctx)
 	return rt.ToValue(r.remoteAddress)
 }
 
@@ -280,10 +280,10 @@ func (r *Response) StatusText() string {
 
 // Text returns the response body as a string
 func (r *Response) Text() string {
-	rt := common.GetRuntime(r.ctx)
+	rt := k6common.GetRuntime(r.ctx)
 	if r.body == nil {
 		if err := r.fetchBody(); err != nil {
-			common.Throw(rt, err)
+			k6common.Throw(rt, err)
 		}
 	}
 	return string(r.body)

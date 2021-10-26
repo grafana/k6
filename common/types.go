@@ -27,7 +27,7 @@ import (
 	"fmt"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 )
 
 // ColorScheme represents a browser color scheme
@@ -257,7 +257,7 @@ func NewCredentials() *Credentials {
 }
 
 func (c *Credentials) Parse(ctx context.Context, credentials goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if credentials != nil && !goja.IsUndefined(credentials) && !goja.IsNull(credentials) {
 		credentials := credentials.ToObject(rt)
 		for _, k := range credentials.Keys() {
@@ -284,7 +284,7 @@ func NewGeolocation() *Geolocation {
 }
 
 func (g *Geolocation) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	longitude := 0.0
 	latitude := 0.0
 	accuracy := 0.0
@@ -324,7 +324,7 @@ func NewScreen() *Screen {
 }
 
 func (s *Screen) Parse(ctx context.Context, screen goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if screen != nil && !goja.IsUndefined(screen) && !goja.IsNull(screen) {
 		screen := screen.ToObject(rt)
 		for _, k := range screen.Keys() {
@@ -344,7 +344,7 @@ func NewViewport() *Viewport {
 }
 
 func (v *Viewport) Parse(ctx context.Context, viewport goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if viewport != nil && !goja.IsUndefined(viewport) && !goja.IsNull(viewport) {
 		viewport := viewport.ToObject(rt)
 		for _, k := range viewport.Keys() {

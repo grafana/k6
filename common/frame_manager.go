@@ -30,7 +30,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	"github.com/pkg/errors"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 	"golang.org/x/net/context"
 )
 
@@ -388,11 +388,11 @@ func (m *FrameManager) MainFrame() *Frame {
 
 // NavigateFrame will navigate specified frame to specifed URL
 func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) api.Response {
-	rt := common.GetRuntime(m.ctx)
+	rt := k6common.GetRuntime(m.ctx)
 	defaultReferer := m.page.mainFrameSession.getNetworkManager().extraHTTPHeaders["referer"]
 	parsedOpts := NewFrameGotoOptions(defaultReferer, time.Duration(m.timeoutSettings.navigationTimeout())*time.Second)
 	if err := parsedOpts.Parse(m.ctx, opts); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing options: %v", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %v", err))
 	}
 
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(m.ctx, parsedOpts.Timeout)
@@ -417,7 +417,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 	}
 	newDocumentID, err := fs.navigateFrame(frame, url, parsedOpts.Referer)
 	if err != nil {
-		common.Throw(rt, err)
+		k6common.Throw(rt, err)
 	}
 
 	var event *NavigationEvent
@@ -433,19 +433,19 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 			return false
 		}, parsedOpts.Timeout)
 		if err != nil {
-			common.Throw(rt, err)
+			k6common.Throw(rt, err)
 		}
 		event = data.(*NavigationEvent)
 		if event.newDocument.documentID != newDocumentID {
-			common.Throw(rt, errors.New("navigation interrupted by another one"))
+			k6common.Throw(rt, errors.New("navigation interrupted by another one"))
 		} else if event.err != nil {
-			common.Throw(rt, event.err)
+			k6common.Throw(rt, event.err)
 		}
 	} else {
 		select {
 		case <-timeoutCtx.Done():
 			if timeoutCtx.Err() == context.DeadlineExceeded {
-				common.Throw(rt, ErrTimedOut)
+				k6common.Throw(rt, ErrTimedOut)
 			}
 		case data := <-chSameDoc:
 			event = data.(*NavigationEvent)
@@ -456,7 +456,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 		select {
 		case <-timeoutCtx.Done():
 			if timeoutCtx.Err() == context.DeadlineExceeded {
-				common.Throw(rt, ErrTimedOut)
+				k6common.Throw(rt, ErrTimedOut)
 			}
 		case <-chWaitUntilCh:
 		}
@@ -484,10 +484,10 @@ func (m *FrameManager) Page() api.Page {
 
 // WaitForFrameNavigation waits for the given navigation lifecycle event to happen
 func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api.Response {
-	rt := common.GetRuntime(m.ctx)
+	rt := k6common.GetRuntime(m.ctx)
 	parsedOpts := NewFrameWaitForNavigationOptions(time.Duration(m.timeoutSettings.timeout()) * time.Second)
 	if err := parsedOpts.Parse(m.ctx, opts); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing options: %v", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %v", err))
 	}
 
 	ch, evCancelFn := createWaitForEventHandler(m.ctx, frame, []string{EventFrameNavigation}, func(data interface{}) bool {
@@ -499,7 +499,7 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 	select {
 	case <-m.ctx.Done():
 	case <-time.After(parsedOpts.Timeout):
-		common.Throw(rt, ErrTimedOut)
+		k6common.Throw(rt, ErrTimedOut)
 	case data := <-ch:
 		event = data.(*NavigationEvent)
 	}

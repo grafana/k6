@@ -30,7 +30,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/keyboardlayout"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 )
 
 // Ensure Keyboard implements the api.Keyboard interface
@@ -253,55 +253,55 @@ func (k *Keyboard) up(key string) error {
 
 // Down
 func (k *Keyboard) Down(key string) {
-	rt := common.GetRuntime(k.ctx)
+	rt := k6common.GetRuntime(k.ctx)
 	err := k.down(key)
 	if err != nil {
-		common.Throw(rt, err)
+		k6common.Throw(rt, err)
 	}
 }
 
 // Press
 func (k *Keyboard) Press(key string, opts goja.Value) {
-	rt := common.GetRuntime(k.ctx)
+	rt := k6common.GetRuntime(k.ctx)
 	kbdOpts := NewKeyboardOptions()
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
 	err := k.press(key, kbdOpts)
 	if err != nil {
-		common.Throw(rt, err)
+		k6common.Throw(rt, err)
 	}
 }
 
 // InsertText
 func (k *Keyboard) InsertText(text string) {
-	rt := common.GetRuntime(k.ctx)
+	rt := k6common.GetRuntime(k.ctx)
 	err := k.insertText(text)
 	if err != nil {
-		common.Throw(rt, err)
+		k6common.Throw(rt, err)
 	}
 }
 
 // Type
 func (k *Keyboard) Type(text string, opts goja.Value) {
-	rt := common.GetRuntime(k.ctx)
+	rt := k6common.GetRuntime(k.ctx)
 	kbdOpts := NewKeyboardOptions()
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
 	err := k.typ(text, kbdOpts)
 	if err != nil {
-		common.Throw(rt, err)
+		k6common.Throw(rt, err)
 	}
 }
 
 // Up
 func (k *Keyboard) Up(key string) {
-	rt := common.GetRuntime(k.ctx)
+	rt := k6common.GetRuntime(k.ctx)
 	err := k.up(key)
 	if err != nil {
-		common.Throw(rt, err)
+		k6common.Throw(rt, err)
 	}
 }

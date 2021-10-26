@@ -28,7 +28,7 @@ import (
 	"github.com/chromedp/cdproto/input"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 	"golang.org/x/net/context"
 )
 
@@ -154,60 +154,60 @@ func (m *Mouse) up(x float64, y float64, opts *MouseDownUpOptions) error {
 
 // Click will trigger a series of MouseMove, MouseDown and MouseUp events in the browser
 func (m *Mouse) Click(x float64, y float64, opts goja.Value) {
-	rt := common.GetRuntime(m.ctx)
+	rt := k6common.GetRuntime(m.ctx)
 	mouseOpts := NewMouseClickOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 	if err := m.click(x, y, mouseOpts); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to mouse click: %w", err))
+		k6common.Throw(rt, fmt.Errorf("unable to mouse click: %w", err))
 	}
 }
 
 func (m *Mouse) DblClick(x float64, y float64, opts goja.Value) {
-	rt := common.GetRuntime(m.ctx)
+	rt := k6common.GetRuntime(m.ctx)
 	mouseOpts := NewMouseDblClickOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 	if err := m.dblClick(x, y, mouseOpts); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to mouse double click: %w", err))
+		k6common.Throw(rt, fmt.Errorf("unable to mouse double click: %w", err))
 	}
 }
 
 // Down will trigger a MouseDown event in the browser
 func (m *Mouse) Down(x float64, y float64, opts goja.Value) {
-	rt := common.GetRuntime(m.ctx)
+	rt := k6common.GetRuntime(m.ctx)
 	mouseOpts := NewMouseDownUpOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 	if err := m.down(x, y, mouseOpts); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to mouse down: %w", err))
+		k6common.Throw(rt, fmt.Errorf("unable to mouse down: %w", err))
 	}
 }
 
 // Move will trigger a MouseMoved event in the browser
 func (m *Mouse) Move(x float64, y float64, opts goja.Value) {
-	rt := common.GetRuntime(m.ctx)
+	rt := k6common.GetRuntime(m.ctx)
 	mouseOpts := NewMouseDownUpOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 	if err := m.down(x, y, mouseOpts); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to move mouse: %w", err))
+		k6common.Throw(rt, fmt.Errorf("unable to move mouse: %w", err))
 	}
 }
 
 // Up will trigger a MouseUp event in the browser
 func (m *Mouse) Up(x float64, y float64, opts goja.Value) {
-	rt := common.GetRuntime(m.ctx)
+	rt := k6common.GetRuntime(m.ctx)
 	mouseOpts := NewMouseDownUpOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 	if err := m.up(x, y, mouseOpts); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to mouse up: %w", err))
+		k6common.Throw(rt, fmt.Errorf("unable to mouse up: %w", err))
 	}
 }
 

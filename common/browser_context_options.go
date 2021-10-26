@@ -22,7 +22,7 @@ package common
 
 import (
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 	"golang.org/x/net/context"
 )
 
@@ -76,7 +76,7 @@ func NewBrowserContextOptions() *BrowserContextOptions {
 }
 
 func (b *BrowserContextOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
