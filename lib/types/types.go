@@ -86,7 +86,7 @@ func NullDecoder(f reflect.Type, t reflect.Type, data interface{}) (interface{},
 	return data, nil
 }
 
-//TODO: something better that won't require so much boilerplate and casts for NullDuration values...
+// TODO: something better that won't require so much boilerplate and casts for NullDuration values...
 
 // Duration is an alias for time.Duration that de/serialises to JSON as human-readable strings.
 type Duration time.Duration
@@ -226,6 +226,11 @@ func (d NullDuration) ValueOrZero() Duration {
 	}
 
 	return d.Duration
+}
+
+// TimeDuration returns a NullDuration's value as a stdlib Duration.
+func (d NullDuration) TimeDuration() time.Duration {
+	return time.Duration(d.Duration)
 }
 
 func getInt64(v interface{}) (int64, error) {
