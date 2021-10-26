@@ -38,7 +38,9 @@ type Config struct {
 	ProjectID null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
 	Name      null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
 
-	Host        null.String `json:"host" envconfig:"K6_CLOUD_HOST"`
+	Host    null.String        `json:"host" envconfig:"K6_CLOUD_HOST"`
+	Timeout types.NullDuration `json:"timeout" envconfig:"K6_CLOUD_TIMEOUT"`
+
 	LogsTailURL null.String `json:"-" envconfig:"K6_CLOUD_LOGS_TAIL_URL"`
 	PushRefID   null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
 	WebAppURL   null.String `json:"webAppURL" envconfig:"K6_CLOUD_WEB_APP_URL"`
@@ -164,6 +166,7 @@ func NewConfig() Config {
 		MetricPushInterval:         types.NewNullDuration(1*time.Second, false),
 		MetricPushConcurrency:      null.NewInt(1, false),
 		MaxMetricSamplesPerPackage: null.NewInt(100000, false),
+		Timeout:                    types.NewNullDuration(20*time.Second, false),
 		// Aggregation is disabled by default, since AggregationPeriod has no default value
 		// but if it's enabled manually or from the cloud service, those are the default values it will use:
 		AggregationCalcInterval:         types.NewNullDuration(3*time.Second, false),
@@ -208,6 +211,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.StopOnError.Valid {
 		c.StopOnError = cfg.StopOnError
+	}
+	if cfg.Timeout.Valid {
+		c.Timeout = cfg.Timeout
 	}
 	if cfg.MaxMetricSamplesPerPackage.Valid {
 		c.MaxMetricSamplesPerPackage = cfg.MaxMetricSamplesPerPackage

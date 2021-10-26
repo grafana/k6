@@ -35,8 +35,6 @@ import (
 )
 
 const (
-	// RequestTimeout is the default cloud request timeout
-	RequestTimeout = 20 * time.Second
 	// RetryInterval is the default cloud request retry interval
 	RetryInterval = 500 * time.Millisecond
 	// MaxRetries specifies max retry attempts
@@ -59,9 +57,9 @@ type Client struct {
 }
 
 // NewClient return a new client for the cloud API
-func NewClient(logger logrus.FieldLogger, token, host, version string) *Client {
+func NewClient(logger logrus.FieldLogger, token, host, version string, timeout time.Duration) *Client {
 	c := &Client{
-		client:        &http.Client{Timeout: RequestTimeout},
+		client:        &http.Client{Timeout: timeout},
 		token:         token,
 		baseURL:       fmt.Sprintf("%s/v1", host),
 		version:       version,
