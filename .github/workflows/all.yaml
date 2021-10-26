@@ -53,7 +53,7 @@ jobs:
         run: |
           BASEREV=$(git merge-base HEAD origin/main)
           echo "Base revision: $BASEREV"
-          golangci-lint run --timeout=10m --out-format=tab --new-from-rev "$BASEREV" ./...
+          golangci-lint run --timeout=3m --out-format=tab --new-from-rev "$BASEREV" ./...
 
   test-prev:
     strategy:
@@ -87,7 +87,7 @@ jobs:
           set -x
           go version
           export GOMAXPROCS=1
-          go test -race -v -timeout 800s ./...
+          go test -race -v -timeout 60s ./...
 
   test-tip:
     runs-on: ubuntu-latest
@@ -125,7 +125,7 @@ jobs:
           which go
           go version
           export GOMAXPROCS=1
-          go test -race -v -timeout 800s ./...
+          go test -race -v -timeout 60s ./...
 
   test-current-cov:
     strategy:
@@ -166,7 +166,7 @@ jobs:
                   list=$(echo "$list" | cut -f1 -d ' ' | sort -u | paste -sd, -)
               fi
 
-              go test "${args[@]}" -timeout 800s --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
+              go test "${args[@]}" -timeout 60s --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
           done
           grep -h -v "^mode:" *.coverage >> coverage.txt
           rm -f *.coverage
