@@ -94,7 +94,6 @@ var (
 		"test/built-ins/Atomics",
 		"test/built-ins/BigInt",
 		"test/built-ins/SharedArrayBuffer",
-		"test/built-ins/NativeErrors/AggregateError",
 		"test/language/eval-code/direct/async",
 		"test/language/expressions/async",
 		"test/language/expressions/dynamic-import",
