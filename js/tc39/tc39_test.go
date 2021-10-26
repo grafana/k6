@@ -93,7 +93,6 @@ var (
 		"test/built-ins/AsyncIteratorPrototype",
 		"test/built-ins/Atomics",
 		"test/built-ins/BigInt",
-		"test/built-ins/Promise",
 		"test/built-ins/SharedArrayBuffer",
 		"test/built-ins/NativeErrors/AggregateError",
 		"test/language/eval-code/direct/async",
