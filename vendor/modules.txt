@@ -147,10 +147,10 @@ github.com/spf13/pflag
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# github.com/tidwall/gjson v1.9.2
+# github.com/tidwall/gjson v1.10.2
 ## explicit
 github.com/tidwall/gjson
-# github.com/tidwall/match v1.1.0
+# github.com/tidwall/match v1.1.1
 github.com/tidwall/match
 # github.com/tidwall/pretty v1.2.0
 ## explicit

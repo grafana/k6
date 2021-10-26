@@ -189,14 +189,15 @@ func (t Result) Time() time.Time {
 }
 
 // Array returns back an array of values.
-// If the result represents a non-existent value, then an empty array will be
-// returned. If the result is not a JSON array, the return value will be an
+// If the result represents a null value or is non-existent, then an empty
+// array will be returned.
+// If the result is not a JSON array, the return value will be an
 // array containing one result.
 func (t Result) Array() []Result {
 	if t.Type == Null {
 		return []Result{}
 	}
-	if t.Type != JSON {
+	if !t.IsArray() {
 		return []Result{t}
 	}
 	r := t.arrayOrMap('[', false)
@@ -760,7 +761,7 @@ func parseArrayPath(path string) (r arrayPathResult) {
 						// bad query, end now
 						break
 					}
-					if len(value) > 2 && value[0] == '"' &&
+					if len(value) >= 2 && value[0] == '"' &&
 						value[len(value)-1] == '"' {
 						value = value[1 : len(value)-1]
 						if vesc {
@@ -1089,9 +1090,9 @@ func parseObject(c *parseContext, i int, path string) (int, bool) {
 		}
 		if rp.wild {
 			if kesc {
-				pmatch = match.Match(unescape(key), rp.part)
+				pmatch = matchLimit(unescape(key), rp.part)
 			} else {
-				pmatch = match.Match(key, rp.part)
+				pmatch = matchLimit(key, rp.part)
 			}
 		} else {
 			if kesc {
@@ -1102,6 +1103,7 @@ func parseObject(c *parseContext, i int, path string) (int, bool) {
 		}
 		hit = pmatch && !rp.more
 		for ; i < len(c.json); i++ {
+			var num bool
 			switch c.json[i] {
 			default:
 				continue
@@ -1149,15 +1151,13 @@ func parseObject(c *parseContext, i int, path string) (int, bool) {
 						return i, true
 					}
 				}
-			case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-				i, val = parseNumber(c.json, i)
-				if hit {
-					c.value.Raw = val
-					c.value.Type = Number
-					c.value.Num, _ = strconv.ParseFloat(val, 64)
-					return i, true
+			case 'n':
+				if i+1 < len(c.json) && c.json[i+1] != 'u' {
+					num = true
+					break
 				}
-			case 't', 'f', 'n':
+				fallthrough
+			case 't', 'f':
 				vc := c.json[i]
 				i, val = parseLiteral(c.json, i)
 				if hit {
@@ -1170,12 +1170,33 @@ func parseObject(c *parseContext, i int, path string) (int, bool) {
 					}
 					return i, true
 				}
+			case '+', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+				'i', 'I', 'N':
+				num = true
+			}
+			if num {
+				i, val = parseNumber(c.json, i)
+				if hit {
+					c.value.Raw = val
+					c.value.Type = Number
+					c.value.Num, _ = strconv.ParseFloat(val, 64)
+					return i, true
+				}
 			}
 			break
 		}
 	}
 	return i, false
 }
+
+// matchLimit will limit the complexity of the match operation to avoid ReDos
+// attacks from arbritary inputs.
+// See the github.com/tidwall/match.MatchLimit function for more information.
+func matchLimit(str, pattern string) bool {
+	matched, _ := match.MatchLimit(str, pattern, 10000)
+	return matched
+}
+
 func queryMatches(rp *arrayPathResult, value Result) bool {
 	rpv := rp.query.value
 	if len(rpv) > 0 && rpv[0] == '~' {
@@ -1213,9 +1234,9 @@ func queryMatches(rp *arrayPathResult, value Result) bool {
 		case ">=":
 			return value.Str >= rpv
 		case "%":
-			return match.Match(value.Str, rpv)
+			return matchLimit(value.Str, rpv)
 		case "!%":
-			return !match.Match(value.Str, rpv)
+			return !matchLimit(value.Str, rpv)
 		}
 	case Number:
 		rpvn, _ := strconv.ParseFloat(rpv, 64)
@@ -1348,6 +1369,7 @@ func parseArray(c *parseContext, i int, path string) (int, bool) {
 			} else {
 				ch = c.json[i]
 			}
+			var num bool
 			switch ch {
 			default:
 				continue
@@ -1430,26 +1452,13 @@ func parseArray(c *parseContext, i int, path string) (int, bool) {
 						return i, true
 					}
 				}
-			case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-				i, val = parseNumber(c.json, i)
-				if rp.query.on {
-					var qval Result
-					qval.Raw = val
-					qval.Type = Number
-					qval.Num, _ = strconv.ParseFloat(val, 64)
-					if procQuery(qval) {
-						return i, true
-					}
-				} else if hit {
-					if rp.alogok {
-						break
-					}
-					c.value.Raw = val
-					c.value.Type = Number
-					c.value.Num, _ = strconv.ParseFloat(val, 64)
-					return i, true
+			case 'n':
+				if i+1 < len(c.json) && c.json[i+1] != 'u' {
+					num = true
+					break
 				}
-			case 't', 'f', 'n':
+				fallthrough
+			case 't', 'f':
 				vc := c.json[i]
 				i, val = parseLiteral(c.json, i)
 				if rp.query.on {
@@ -1477,6 +1486,9 @@ func parseArray(c *parseContext, i int, path string) (int, bool) {
 					}
 					return i, true
 				}
+			case '+', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+				'i', 'I', 'N':
+				num = true
 			case ']':
 				if rp.arrch && rp.part == "#" {
 					if rp.alogok {
@@ -1551,6 +1563,26 @@ func parseArray(c *parseContext, i int, path string) (int, bool) {
 					}
 				}
 				return i + 1, false
+			}
+			if num {
+				i, val = parseNumber(c.json, i)
+				if rp.query.on {
+					var qval Result
+					qval.Raw = val
+					qval.Type = Number
+					qval.Num, _ = strconv.ParseFloat(val, 64)
+					if procQuery(qval) {
+						return i, true
+					}
+				} else if hit {
+					if rp.alogok {
+						break
+					}
+					c.value.Raw = val
+					c.value.Type = Number
+					c.value.Num, _ = strconv.ParseFloat(val, 64)
+					return i, true
+				}
 			}
 			break
 		}
@@ -2071,6 +2103,7 @@ func parseAny(json string, i int, hit bool) (int, Result, bool) {
 		if json[i] <= ' ' {
 			continue
 		}
+		var num bool
 		switch json[i] {
 		case '"':
 			i++
@@ -2090,15 +2123,13 @@ func parseAny(json string, i int, hit bool) (int, Result, bool) {
 				}
 			}
 			return i, res, true
-		case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-			i, val = parseNumber(json, i)
-			if hit {
-				res.Raw = val
-				res.Type = Number
-				res.Num, _ = strconv.ParseFloat(val, 64)
+		case 'n':
+			if i+1 < len(json) && json[i+1] != 'u' {
+				num = true
+				break
 			}
-			return i, res, true
-		case 't', 'f', 'n':
+			fallthrough
+		case 't', 'f':
 			vc := json[i]
 			i, val = parseLiteral(json, i)
 			if hit {
@@ -2111,7 +2142,20 @@ func parseAny(json string, i int, hit bool) (int, Result, bool) {
 				}
 				return i, res, true
 			}
+		case '+', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+			'i', 'I', 'N':
+			num = true
 		}
+		if num {
+			i, val = parseNumber(json, i)
+			if hit {
+				res.Raw = val
+				res.Type = Number
+				res.Num, _ = strconv.ParseFloat(val, 64)
+			}
+			return i, res, true
+		}
+
 	}
 	return i, res, false
 }
@@ -2555,6 +2599,8 @@ var modifiers = map[string]func(json, arg string) string{
 	"flatten": modFlatten,
 	"join":    modJoin,
 	"valid":   modValid,
+	"keys":    modKeys,
+	"values":  modValues,
 }
 
 // AddModifier binds a custom modifier command to the GJSON syntax.
@@ -2709,6 +2755,58 @@ func modFlatten(json, arg string) string {
 	})
 	out = append(out, ']')
 	return bytesString(out)
+}
+
+// @keys extracts the keys from an object.
+//  {"first":"Tom","last":"Smith"} -> ["first","last"]
+func modKeys(json, arg string) string {
+	v := Parse(json)
+	if !v.Exists() {
+		return "[]"
+	}
+	obj := v.IsObject()
+	var out strings.Builder
+	out.WriteByte('[')
+	var i int
+	v.ForEach(func(key, _ Result) bool {
+		if i > 0 {
+			out.WriteByte(',')
+		}
+		if obj {
+			out.WriteString(key.Raw)
+		} else {
+			out.WriteString("null")
+		}
+		i++
+		return true
+	})
+	out.WriteByte(']')
+	return out.String()
+}
+
+// @values extracts the values from an object.
+//   {"first":"Tom","last":"Smith"} -> ["Tom","Smith"]
+func modValues(json, arg string) string {
+	v := Parse(json)
+	if !v.Exists() {
+		return "[]"
+	}
+	if v.IsArray() {
+		return json
+	}
+	var out strings.Builder
+	out.WriteByte('[')
+	var i int
+	v.ForEach(func(_, value Result) bool {
+		if i > 0 {
+			out.WriteByte(',')
+		}
+		out.WriteString(value.Raw)
+		i++
+		return true
+	})
+	out.WriteByte(']')
+	return out.String()
 }
 
 // @join multiple objects into a single object.
