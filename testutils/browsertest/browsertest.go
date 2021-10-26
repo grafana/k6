@@ -34,7 +34,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules/k6/http"
-	"go.k6.io/k6/lib"
 	k6lib "go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	"go.k6.io/k6/stats"
@@ -53,7 +52,7 @@ type BrowserTest struct {
 func NewBrowserTest(t testing.TB) *BrowserTest {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
-	root, err := lib.NewGroup("", nil)
+	root, err := k6lib.NewGroup("", nil)
 	require.NoError(t, err)
 
 	logger := logrus.StandardLogger()
@@ -61,7 +60,7 @@ func NewBrowserTest(t testing.TB) *BrowserTest {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-	options := lib.Options{
+	options := k6lib.Options{
 		MaxRedirects: null.IntFrom(10),
 		UserAgent:    null.StringFrom("TestUserAgent"),
 		Throw:        null.BoolFrom(true),
@@ -72,7 +71,7 @@ func NewBrowserTest(t testing.TB) *BrowserTest {
 	}
 	samples := make(chan stats.SampleContainer, 1000)
 
-	state := &lib.State{
+	state := &k6lib.State{
 		Options:   options,
 		Logger:    logger,
 		Group:     root,
@@ -84,7 +83,7 @@ func NewBrowserTest(t testing.TB) *BrowserTest {
 	}
 
 	ctx := new(context.Context)
-	*ctx = lib.WithState(tb.Context, state)
+	*ctx = k6lib.WithState(tb.Context, state)
 	*ctx = common.WithRuntime(*ctx, rt)
 	rt.Set("http", common.Bind(rt, new(http.GlobalHTTP).NewModuleInstancePerVU(), ctx))
 
