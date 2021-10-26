@@ -329,7 +329,7 @@ func (h *HTTP) parseRequest(
 				}
 				switch v := jarV.Export().(type) {
 				case *HTTPCookieJar:
-					result.ActiveJar = v.jar
+					result.ActiveJar = v.Jar
 				}
 			case "compression":
 				algosString := strings.TrimSpace(params.Get(k).ToString().String())
