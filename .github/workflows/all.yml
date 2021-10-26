@@ -36,7 +36,7 @@ jobs:
 
             GOPROXY="direct" xk6 build \
               --output ./k6ext \
-              --with github.com/grafana/xk6-output-prometheus-remote="." \
+              --with github.com/grafana/xk6-output-prometheus-remote="."
             ./k6ext version
 
   lint:
