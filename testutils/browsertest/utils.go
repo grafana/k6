@@ -98,7 +98,8 @@ func NewRuntime(
 	ctx := new(context.Context)
 	*ctx = k6lib.WithState(tb.Context, state)
 	*ctx = k6common.WithRuntime(*ctx, rt)
-	rt.Set("http", k6common.Bind(rt, new(k6http.GlobalHTTP).NewModuleInstancePerVU(), ctx))
+	err = rt.Set("http", k6common.Bind(rt, new(k6http.GlobalHTTP).NewModuleInstancePerVU(), ctx))
+	require.NoError(t, err)
 
 	return tb, state, samples, rt, ctx
 }
