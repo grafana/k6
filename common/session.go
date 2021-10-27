@@ -28,7 +28,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
 	"github.com/mailru/easyjson"
-	"go.k6.io/k6/lib"
+	k6lib "go.k6.io/k6/lib"
 	"golang.org/x/net/context"
 )
 
@@ -83,7 +83,7 @@ func (s *Session) markAsCrashed() {
 
 // Wraps conn.ReadMessage in a channel
 func (s *Session) readLoop() {
-	state := lib.GetState(s.ctx)
+	state := k6lib.GetState(s.ctx)
 
 	for {
 		select {

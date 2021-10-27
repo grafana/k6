@@ -34,7 +34,7 @@ import (
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 	"github.com/fatih/color"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 	"golang.org/x/net/context"
 )
 
@@ -244,7 +244,7 @@ func stringSliceContains(s []string, e string) bool {
 }
 
 func valueFromRemoteObject(ctx context.Context, remoteObject *cdpruntime.RemoteObject) (goja.Value, error) {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	i, err := interfaceFromRemoteObject(remoteObject)
 	if i == "undefined" {
 		return goja.Undefined(), err

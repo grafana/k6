@@ -32,12 +32,11 @@ import (
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules/k6/http"
-	"go.k6.io/k6/lib"
+	k6common "go.k6.io/k6/js/common"
+	k6http "go.k6.io/k6/js/modules/k6/http"
 	k6lib "go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils/httpmultibin"
-	"go.k6.io/k6/stats"
+	k6test "go.k6.io/k6/lib/testutils/httpmultibin"
+	k6stats "go.k6.io/k6/stats"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -45,34 +44,34 @@ type BrowserTest struct {
 	Ctx          context.Context
 	Runtime      *goja.Runtime
 	State        *k6lib.State
-	HTTPMultiBin *httpmultibin.HTTPMultiBin
-	Samples      chan stats.SampleContainer
+	HTTPMultiBin *k6test.HTTPMultiBin
+	Samples      chan k6stats.SampleContainer
 	Browser      api.Browser
 }
 
 func NewBrowserTest(t testing.TB) *BrowserTest {
-	tb := httpmultibin.NewHTTPMultiBin(t)
+	tb := k6test.NewHTTPMultiBin(t)
 
-	root, err := lib.NewGroup("", nil)
+	root, err := k6lib.NewGroup("", nil)
 	require.NoError(t, err)
 
 	logger := logrus.StandardLogger()
 
 	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
 
-	options := lib.Options{
+	options := k6lib.Options{
 		MaxRedirects: null.IntFrom(10),
 		UserAgent:    null.StringFrom("TestUserAgent"),
 		Throw:        null.BoolFrom(true),
-		SystemTags:   &stats.DefaultSystemTagSet,
+		SystemTags:   &k6stats.DefaultSystemTagSet,
 		Batch:        null.IntFrom(20),
 		BatchPerHost: null.IntFrom(20),
 		// HTTPDebug:    null.StringFrom("full"),
 	}
-	samples := make(chan stats.SampleContainer, 1000)
+	samples := make(chan k6stats.SampleContainer, 1000)
 
-	state := &lib.State{
+	state := &k6lib.State{
 		Options:   options,
 		Logger:    logger,
 		Group:     root,
@@ -84,9 +83,10 @@ func NewBrowserTest(t testing.TB) *BrowserTest {
 	}
 
 	ctx := new(context.Context)
-	*ctx = lib.WithState(tb.Context, state)
-	*ctx = common.WithRuntime(*ctx, rt)
-	rt.Set("http", common.Bind(rt, new(http.GlobalHTTP).NewModuleInstancePerVU(), ctx))
+	*ctx = k6lib.WithState(tb.Context, state)
+	*ctx = k6common.WithRuntime(*ctx, rt)
+	err = rt.Set("http", k6common.Bind(rt, new(k6http.GlobalHTTP).NewModuleInstancePerVU(), ctx))
+	require.NoError(t, err)
 
 	bt := chromium.NewBrowserType(*ctx).(*chromium.BrowserType)
 	debug := false

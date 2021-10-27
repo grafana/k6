@@ -32,7 +32,7 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 )
 
 func TestHelpersConvertArgument(t *testing.T) {
@@ -244,7 +244,7 @@ func TestHelpersValueFromRemoteObject(t *testing.T) {
 
 	t.Run("remote object with ID", func(t *testing.T) {
 		rt := goja.New()
-		ctx := common.WithRuntime(context.Background(), rt)
+		ctx := k6common.WithRuntime(context.Background(), rt)
 		remoteObjectID := runtime.RemoteObjectID("object_id_0123456789")
 		remoteObject := &runtime.RemoteObject{
 			Type:     "object",
@@ -259,7 +259,7 @@ func TestHelpersValueFromRemoteObject(t *testing.T) {
 
 	t.Run("unserializable value error", func(t *testing.T) {
 		rt := goja.New()
-		ctx := common.WithRuntime(context.Background(), rt)
+		ctx := k6common.WithRuntime(context.Background(), rt)
 		unserializableValue := runtime.UnserializableValue("a string instead")
 		remoteObject := &runtime.RemoteObject{
 			Type:                "number",
@@ -273,7 +273,7 @@ func TestHelpersValueFromRemoteObject(t *testing.T) {
 
 	t.Run("bigint parsing error", func(t *testing.T) {
 		rt := goja.New()
-		ctx := common.WithRuntime(context.Background(), rt)
+		ctx := k6common.WithRuntime(context.Background(), rt)
 		unserializableValue := runtime.UnserializableValue("a string instead")
 		remoteObject := &runtime.RemoteObject{
 			Type:                "bigint",
@@ -292,7 +292,7 @@ func TestHelpersValueFromRemoteObject(t *testing.T) {
 
 	t.Run("float64 unserializable values", func(t *testing.T) {
 		rt := goja.New()
-		ctx := common.WithRuntime(context.Background(), rt)
+		ctx := k6common.WithRuntime(context.Background(), rt)
 		unserializableValues := []struct {
 			value    string
 			expected float64
@@ -332,7 +332,7 @@ func TestHelpersValueFromRemoteObject(t *testing.T) {
 
 	t.Run("primitive types", func(t *testing.T) {
 		rt := goja.New()
-		ctx := common.WithRuntime(context.Background(), rt)
+		ctx := k6common.WithRuntime(context.Background(), rt)
 
 		primitiveTypes := []struct {
 			typ   runtime.Type

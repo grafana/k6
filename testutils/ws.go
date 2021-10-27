@@ -36,9 +36,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
 
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/netext"
-	"go.k6.io/k6/lib/types"
+	k6lib "go.k6.io/k6/lib"
+	k6netext "go.k6.io/k6/lib/netext"
+	k6types "go.k6.io/k6/lib/types"
 )
 
 const httpDomain = "wsbin.local"
@@ -47,7 +47,7 @@ const httpDomain = "wsbin.local"
 type WSTestServer struct {
 	Mux           *http.ServeMux
 	ServerHTTP    *httptest.Server
-	Dialer        *netext.Dialer
+	Dialer        *k6netext.Dialer
 	HTTPTransport *http.Transport
 	Context       context.Context
 	Cleanup       func()
@@ -121,16 +121,16 @@ func NewWSTestServer(t testing.TB, path string, handler http.Handler) *WSTestSer
 	httpIP := net.ParseIP(httpURL.Hostname())
 	require.NotNil(t, httpIP)
 
-	httpDomainValue, err := lib.NewHostAddress(httpIP, "")
+	httpDomainValue, err := k6lib.NewHostAddress(httpIP, "")
 	require.NoError(t, err)
 
 	// Set up the dialer with shorter timeouts and the custom domains
-	dialer := netext.NewDialer(net.Dialer{
+	dialer := k6netext.NewDialer(net.Dialer{
 		Timeout:   2 * time.Second,
 		KeepAlive: 10 * time.Second,
 		DualStack: true,
-	}, netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4))
-	dialer.Hosts = map[string]*lib.HostAddress{
+	}, k6netext.NewResolver(net.LookupIP, 0, k6types.DNSfirst, k6types.DNSpreferIPv4))
+	dialer.Hosts = map[string]*k6lib.HostAddress{
 		httpDomain: httpDomainValue,
 	}
 

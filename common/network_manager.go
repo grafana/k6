@@ -36,10 +36,10 @@ import (
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
 	"github.com/pkg/errors"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/metrics"
-	"go.k6.io/k6/stats"
+	k6metrics "go.k6.io/k6/lib/metrics"
+	k6stats "go.k6.io/k6/stats"
 	"golang.org/x/net/context"
 )
 
@@ -104,22 +104,22 @@ func (m *NetworkManager) emitResponseReceived(resp *Response) {
 	state := k6lib.GetState(m.ctx)
 
 	tags := state.CloneTags()
-	if state.Options.SystemTags.Has(stats.TagGroup) {
+	if state.Options.SystemTags.Has(k6stats.TagGroup) {
 		tags["group"] = state.Group.Path
 	}
-	if state.Options.SystemTags.Has(stats.TagMethod) {
+	if state.Options.SystemTags.Has(k6stats.TagMethod) {
 		tags["method"] = resp.request.method
 	}
-	if state.Options.SystemTags.Has(stats.TagURL) {
+	if state.Options.SystemTags.Has(k6stats.TagURL) {
 		tags["url"] = resp.url
 	}
-	if state.Options.SystemTags.Has(stats.TagIP) {
+	if state.Options.SystemTags.Has(k6stats.TagIP) {
 		tags["ip"] = resp.remoteAddress.IPAddress
 	}
-	if state.Options.SystemTags.Has(stats.TagStatus) {
+	if state.Options.SystemTags.Has(k6stats.TagStatus) {
 		tags["status"] = strconv.Itoa(int(resp.status))
 	}
-	if state.Options.SystemTags.Has(stats.TagProto) {
+	if state.Options.SystemTags.Has(k6stats.TagProto) {
 		tags["proto"] = resp.protocol
 	}
 
@@ -127,17 +127,17 @@ func (m *NetworkManager) emitResponseReceived(resp *Response) {
 	tags["from_prefetch_cache"] = strconv.FormatBool(resp.fromPrefetchCache)
 	tags["from_service_worker"] = strconv.FormatBool(resp.fromServiceWorker)
 
-	sampleTags := stats.IntoSampleTags(&tags)
-	stats.PushIfNotDone(m.ctx, state.Samples, stats.ConnectedSamples{
-		Samples: []stats.Sample{
+	sampleTags := k6stats.IntoSampleTags(&tags)
+	k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
+		Samples: []k6stats.Sample{
 			{
-				Metric: metrics.HTTPReqs,
+				Metric: k6metrics.HTTPReqs,
 				Tags:   sampleTags,
 				Value:  1,
 				Time:   resp.timestamp,
 			},
 			{
-				Metric: metrics.HTTPReqDuration,
+				Metric: k6metrics.HTTPReqDuration,
 				Tags:   sampleTags,
 
 				// We're using diff between CDP protocol message timestamps here because the `Network.responseReceived.responseTime`
@@ -145,36 +145,36 @@ func (m *NetworkManager) emitResponseReceived(resp *Response) {
 				// issues with the parsing and conversion to `time.Time`.
 				// Have not spent time looking for the root cause of this in the Chromium source to file a bug report, and neither
 				// Puppeteer nor Playwright seems to care about the `responseTime` value and don't use/expose it.
-				Value: stats.D(resp.timestamp.Sub(resp.request.timestamp)),
+				Value: k6stats.D(resp.timestamp.Sub(resp.request.timestamp)),
 				Time:  resp.timestamp,
 			},
 		},
 	})
 	if resp.timing != nil {
-		stats.PushIfNotDone(m.ctx, state.Samples, stats.ConnectedSamples{
-			Samples: []stats.Sample{
+		k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
+			Samples: []k6stats.Sample{
 				{
-					Metric: metrics.HTTPReqConnecting,
+					Metric: k6metrics.HTTPReqConnecting,
 					Tags:   sampleTags,
-					Value:  stats.D(time.Duration(resp.timing.ConnectEnd-resp.timing.ConnectStart) * time.Millisecond),
+					Value:  k6stats.D(time.Duration(resp.timing.ConnectEnd-resp.timing.ConnectStart) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 				{
-					Metric: metrics.HTTPReqTLSHandshaking,
+					Metric: k6metrics.HTTPReqTLSHandshaking,
 					Tags:   sampleTags,
-					Value:  stats.D(time.Duration(resp.timing.SslEnd-resp.timing.SslStart) * time.Millisecond),
+					Value:  k6stats.D(time.Duration(resp.timing.SslEnd-resp.timing.SslStart) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 				{
-					Metric: metrics.HTTPReqSending,
+					Metric: k6metrics.HTTPReqSending,
 					Tags:   sampleTags,
-					Value:  stats.D(time.Duration(resp.timing.SendEnd-resp.timing.SendStart) * time.Millisecond),
+					Value:  k6stats.D(time.Duration(resp.timing.SendEnd-resp.timing.SendStart) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 				{
-					Metric: metrics.HTTPReqReceiving,
+					Metric: k6metrics.HTTPReqReceiving,
 					Tags:   sampleTags,
-					Value:  stats.D(time.Duration(resp.timing.ReceiveHeadersEnd-resp.timing.SendEnd) * time.Millisecond),
+					Value:  k6stats.D(time.Duration(resp.timing.ReceiveHeadersEnd-resp.timing.SendEnd) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 			},
@@ -323,9 +323,9 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 				fetch.FailRequest(fetch.RequestID(req.getID()), network.ErrorReasonBlockedByClient)
 
 				// Throw exception into JS runtime
-				rt := common.GetRuntime(m.ctx)
+				rt := k6common.GetRuntime(m.ctx)
 				// TODO: create PR to make netext.BlockedHostError a public struct in k6 perhaps?
-				common.Throw(rt, errors.Errorf("hostname (%s) is in a blocked pattern (%s)", url.Host, match))
+				k6common.Throw(rt, errors.Errorf("hostname (%s) is in a blocked pattern (%s)", url.Host, match))
 			}
 		}
 
@@ -416,29 +416,29 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 func (m *NetworkManager) Authenticate(credentials *Credentials) {
 	m.credentials = credentials
 	if err := m.updateProtocolRequestInterception(); err != nil {
-		rt := common.GetRuntime(m.ctx)
-		common.Throw(rt, err)
+		rt := k6common.GetRuntime(m.ctx)
+		k6common.Throw(rt, err)
 	}
 }
 
 // ExtraHTTPHeaders returns the currently set extra HTTP request headers
 func (m *NetworkManager) ExtraHTTPHeaders() goja.Value {
-	rt := common.GetRuntime(m.ctx)
+	rt := k6common.GetRuntime(m.ctx)
 	return rt.ToValue(m.extraHTTPHeaders)
 }
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request
 func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) {
-	rt := common.GetRuntime(m.ctx)
+	rt := k6common.GetRuntime(m.ctx)
 	action := network.SetExtraHTTPHeaders(headers)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to set extra HTTP headers: %w", err))
+		k6common.Throw(rt, fmt.Errorf("unable to set extra HTTP headers: %w", err))
 	}
 }
 
 // SetOfflineMode toggles offline mode on/off
 func (m *NetworkManager) SetOfflineMode(offline bool) {
-	rt := common.GetRuntime(m.ctx)
+	rt := k6common.GetRuntime(m.ctx)
 	if m.offline == offline {
 		return
 	}
@@ -446,16 +446,16 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 
 	action := network.EmulateNetworkConditions(m.offline, 0, -1, -1)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to set offline mode: %w", err))
+		k6common.Throw(rt, fmt.Errorf("unable to set offline mode: %w", err))
 	}
 }
 
 // SetUserAgent overrides the browser user agent string
 func (m *NetworkManager) SetUserAgent(userAgent string) {
-	rt := common.GetRuntime(m.ctx)
+	rt := k6common.GetRuntime(m.ctx)
 	action := emulation.SetUserAgentOverride(userAgent)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to set user agent override: %w", err))
+		k6common.Throw(rt, fmt.Errorf("unable to set user agent override: %w", err))
 	}
 }
 
@@ -463,7 +463,7 @@ func (m *NetworkManager) SetUserAgent(userAgent string) {
 func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 	m.userCacheDisabled = !enabled
 	if err := m.updateProtocolCacheDisabled(); err != nil {
-		rt := common.GetRuntime(m.ctx)
-		common.Throw(rt, err)
+		rt := k6common.GetRuntime(m.ctx)
+		k6common.Throw(rt, err)
 	}
 }

@@ -39,9 +39,9 @@ import (
 	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/cdproto/target"
 	"github.com/grafana/xk6-browser/api"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/stats"
+	k6common "go.k6.io/k6/js/common"
+	k6lib "go.k6.io/k6/lib"
+	k6stats "go.k6.io/k6/stats"
 	"golang.org/x/net/context"
 )
 
@@ -392,8 +392,8 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 
 func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
 	// TODO: switch to using browser logger instead of directly outputting to k6 logging system
-	rt := common.GetRuntime(fs.ctx)
-	state := lib.GetState(fs.ctx)
+	rt := k6common.GetRuntime(fs.ctx)
+	state := k6lib.GetState(fs.ctx)
 	l := state.Logger.
 		WithTime(event.Timestamp.Time()).
 		WithField("source", "browser-console-api")
@@ -405,7 +405,7 @@ func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled)
 		i, err := interfaceFromRemoteObject(arg)
 		if err != nil {
 			// TODO(fix): this should not throw!
-			common.Throw(rt, fmt.Errorf("unable to parse remote object value: %w", err))
+			k6common.Throw(rt, fmt.Errorf("unable to parse remote object value: %w", err))
 		}
 		convertedArgs = append(convertedArgs, i)
 	}
@@ -428,7 +428,7 @@ func (fs *FrameSession) onExceptionThrown(event *runtime.EventExceptionThrown) {
 }
 
 func (fs FrameSession) onExecutionContextCreated(event *runtime.EventExecutionContextCreated) {
-	rt := common.GetRuntime(fs.ctx)
+	rt := k6common.GetRuntime(fs.ctx)
 	auxData := event.Context.AuxData
 	var i struct {
 		FrameID   cdp.FrameID `json:"frameId"`
@@ -436,7 +436,7 @@ func (fs FrameSession) onExecutionContextCreated(event *runtime.EventExecutionCo
 		Type      string      `json:"type"`
 	}
 	if err := json.Unmarshal(auxData, &i); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to unmarshal JSON: %w", err))
+		k6common.Throw(rt, fmt.Errorf("unable to unmarshal JSON: %w", err))
 	}
 	var world string = ""
 	frame := fs.manager.getFrameByID(i.FrameID)
@@ -498,19 +498,19 @@ func (fs *FrameSession) onFrameDetached(frameID cdp.FrameID) {
 }
 
 func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
-	rt := common.GetRuntime(fs.ctx)
+	rt := k6common.GetRuntime(fs.ctx)
 	err := fs.manager.frameNavigated(frame.ID, frame.ParentID, frame.LoaderID.String(), frame.Name, frame.URL+frame.URLFragment, initial)
 	if err != nil {
-		common.Throw(rt, err)
+		k6common.Throw(rt, err)
 	}
 }
 
 func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequestedNavigation) {
-	rt := common.GetRuntime(fs.ctx)
+	rt := k6common.GetRuntime(fs.ctx)
 	if event.Disposition == "currentTab" {
 		err := fs.manager.frameRequestedNavigation(event.FrameID, event.URL, "")
 		if err != nil {
-			common.Throw(rt, err)
+			k6common.Throw(rt, err)
 		}
 	}
 }
@@ -525,7 +525,7 @@ func (fs *FrameSession) onFrameStoppedLoading(frameID cdp.FrameID) {
 
 func (fs *FrameSession) onLogEntryAdded(event *log.EventEntryAdded) {
 	// TODO: switch to using Browser logger instead of directly outputting to k6 logging system
-	state := lib.GetState(fs.ctx)
+	state := k6lib.GetState(fs.ctx)
 	l := state.Logger.
 		WithTime(event.Entry.Timestamp.Time()).
 		WithField("source", "browser").
@@ -548,7 +548,7 @@ func (fs *FrameSession) onLogEntryAdded(event *log.EventEntryAdded) {
 }
 
 func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
-	state := lib.GetState(fs.ctx)
+	state := k6lib.GetState(fs.ctx)
 	if event.Name == "init" || event.Name == "commit" {
 		fs.initTime = event.Timestamp
 	}
@@ -558,16 +558,16 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 		if frame != nil {
 			endTime := event.Timestamp.Time()
 			tags := state.CloneTags()
-			if state.Options.SystemTags.Has(stats.TagURL) {
+			if state.Options.SystemTags.Has(k6stats.TagURL) {
 				tags["url"] = frame.URL()
 			}
-			sampleTags := stats.IntoSampleTags(&tags)
-			stats.PushIfNotDone(fs.ctx, state.Samples, stats.ConnectedSamples{
-				Samples: []stats.Sample{
+			sampleTags := k6stats.IntoSampleTags(&tags)
+			k6stats.PushIfNotDone(fs.ctx, state.Samples, k6stats.ConnectedSamples{
+				Samples: []k6stats.Sample{
 					{
 						Metric: BrowserLoaded,
 						Tags:   sampleTags,
-						Value:  stats.D(endTime.Sub(fs.initTime.Time())),
+						Value:  k6stats.D(endTime.Sub(fs.initTime.Time())),
 						Time:   time.Now(),
 					},
 				},
@@ -579,23 +579,23 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 		if frame != nil {
 			endTime := event.Timestamp.Time()
 			tags := state.CloneTags()
-			if state.Options.SystemTags.Has(stats.TagURL) {
+			if state.Options.SystemTags.Has(k6stats.TagURL) {
 				tags["url"] = frame.URL()
 			}
-			sampleTags := stats.IntoSampleTags(&tags)
-			stats.PushIfNotDone(fs.ctx, state.Samples, stats.ConnectedSamples{
-				Samples: []stats.Sample{
+			sampleTags := k6stats.IntoSampleTags(&tags)
+			k6stats.PushIfNotDone(fs.ctx, state.Samples, k6stats.ConnectedSamples{
+				Samples: []k6stats.Sample{
 					{
 						Metric: BrowserDOMContentLoaded,
 						Tags:   sampleTags,
-						Value:  stats.D(endTime.Sub(fs.initTime.Time())),
+						Value:  k6stats.D(endTime.Sub(fs.initTime.Time())),
 						Time:   time.Now(),
 					},
 				},
 			})
 		}
 	} else {
-		eventToMetric := map[string]*stats.Metric{
+		eventToMetric := map[string]*k6stats.Metric{
 			"firstPaint":           BrowserFirstPaint,
 			"firstContentfulPaint": BrowserFirstContentfulPaint,
 			"firstMeaningfulPaint": BrowserFirstMeaningfulPaint,
@@ -605,16 +605,16 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 			if metric, ok := eventToMetric[event.Name]; ok {
 				endTime := event.Timestamp.Time()
 				tags := state.CloneTags()
-				if state.Options.SystemTags.Has(stats.TagURL) {
+				if state.Options.SystemTags.Has(k6stats.TagURL) {
 					tags["url"] = frame.URL()
 				}
-				sampleTags := stats.IntoSampleTags(&tags)
-				stats.PushIfNotDone(fs.ctx, state.Samples, stats.ConnectedSamples{
-					Samples: []stats.Sample{
+				sampleTags := k6stats.IntoSampleTags(&tags)
+				k6stats.PushIfNotDone(fs.ctx, state.Samples, k6stats.ConnectedSamples{
+					Samples: []k6stats.Sample{
 						{
 							Metric: metric,
 							Tags:   sampleTags,
-							Value:  stats.D(endTime.Sub(fs.initTime.Time())),
+							Value:  k6stats.D(endTime.Sub(fs.initTime.Time())),
 							Time:   time.Now(),
 						},
 					},
@@ -644,8 +644,8 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 				// If we're no longer connected to browser, then ignore WebSocket errors
 				return
 			}
-			rt := common.GetRuntime(fs.ctx)
-			common.Throw(rt, err)
+			rt := k6common.GetRuntime(fs.ctx)
+			k6common.Throw(rt, err)
 		}
 		fs.page.frameSessions[cdp.FrameID(targetID)] = frameSession
 		return
@@ -665,8 +665,8 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 			// If we're no longer connected to browser, then ignore WebSocket errors
 			return
 		}
-		rt := common.GetRuntime(fs.ctx)
-		common.Throw(rt, err)
+		rt := k6common.GetRuntime(fs.ctx)
+		k6common.Throw(rt, err)
 	}
 	fs.page.workers[session.id] = w
 }

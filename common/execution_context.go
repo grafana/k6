@@ -29,7 +29,7 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 	"golang.org/x/net/context"
 )
 
@@ -176,7 +176,7 @@ func (e *ExecutionContext) evaluate(apiCtx context.Context, forceCallable bool, 
 // getInjectedScript returns a JS handle to the injected script of helper functions
 func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHandle, error) {
 	if e.injectedScript == nil {
-		rt := common.GetRuntime(e.ctx)
+		rt := k6common.GetRuntime(e.ctx)
 		suffix := `//# sourceURL=` + evaluationScriptURL
 		source := fmt.Sprintf(`(() => {%s; return new InjectedScript();})()`, injectedScriptSource)
 		expression := source

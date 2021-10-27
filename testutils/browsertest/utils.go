@@ -29,13 +29,13 @@ import (
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/compiler"
-	"go.k6.io/k6/js/modules/k6/http"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/lib/testutils/httpmultibin"
-	"go.k6.io/k6/stats"
+	k6common "go.k6.io/k6/js/common"
+	k6compiler "go.k6.io/k6/js/compiler"
+	k6http "go.k6.io/k6/js/modules/k6/http"
+	k6lib "go.k6.io/k6/lib"
+	k6testutils "go.k6.io/k6/lib/testutils"
+	k6test "go.k6.io/k6/lib/testutils/httpmultibin"
+	k6stats "go.k6.io/k6/stats"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -61,30 +61,30 @@ func DetachFrame(bt *BrowserTest, page api.Page, frameID string) {
 
 func NewRuntime(
 	t testing.TB,
-) (*httpmultibin.HTTPMultiBin, *lib.State, chan stats.SampleContainer, *goja.Runtime, *context.Context) {
-	tb := httpmultibin.NewHTTPMultiBin(t)
+) (*k6test.HTTPMultiBin, *k6lib.State, chan k6stats.SampleContainer, *goja.Runtime, *context.Context) {
+	tb := k6test.NewHTTPMultiBin(t)
 
-	root, err := lib.NewGroup("", nil)
+	root, err := k6lib.NewGroup("", nil)
 	require.NoError(t, err)
 
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
 
 	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
 
-	options := lib.Options{
+	options := k6lib.Options{
 		MaxRedirects: null.IntFrom(10),
 		UserAgent:    null.StringFrom("TestUserAgent"),
 		Throw:        null.BoolFrom(true),
-		SystemTags:   &stats.DefaultSystemTagSet,
+		SystemTags:   &k6stats.DefaultSystemTagSet,
 		Batch:        null.IntFrom(20),
 		BatchPerHost: null.IntFrom(20),
 		// HTTPDebug:    null.StringFrom("full"),
 	}
-	samples := make(chan stats.SampleContainer, 1000)
+	samples := make(chan k6stats.SampleContainer, 1000)
 
-	state := &lib.State{
+	state := &k6lib.State{
 		Options:   options,
 		Logger:    logger,
 		Group:     root,
@@ -96,9 +96,10 @@ func NewRuntime(
 	}
 
 	ctx := new(context.Context)
-	*ctx = lib.WithState(tb.Context, state)
-	*ctx = common.WithRuntime(*ctx, rt)
-	rt.Set("http", common.Bind(rt, new(http.GlobalHTTP).NewModuleInstancePerVU(), ctx))
+	*ctx = k6lib.WithState(tb.Context, state)
+	*ctx = k6common.WithRuntime(*ctx, rt)
+	err = rt.Set("http", k6common.Bind(rt, new(k6http.GlobalHTTP).NewModuleInstancePerVU(), ctx))
+	require.NoError(t, err)
 
 	return tb, state, samples, rt, ctx
 }
@@ -106,7 +107,7 @@ func NewRuntime(
 // runES6String Runs an ES6 string in the given runtime. Use this rather than writing ES5 in tests.
 func RunES6String(tb testing.TB, rt *goja.Runtime, src string) (goja.Value, error) {
 	var err error
-	c := compiler.New(testutils.NewLogger(tb)) // TODO drop it ? maybe we will drop babel and this will be less needed
+	c := k6compiler.New(k6testutils.NewLogger(tb)) // TODO drop it ? maybe we will drop babel and this will be less needed
 	src, _, err = c.Transform(src, "__string__")
 	if err != nil {
 		return goja.Undefined(), err

@@ -37,7 +37,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	"github.com/pkg/errors"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 	"golang.org/x/net/context"
 )
 
@@ -186,7 +186,7 @@ func (p *Page) getFrameElement(f *Frame) (*ElementHandle, error) {
 
 func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.FrameID {
 	// document.documentElement has frameId of the owner frame
-	rt := common.GetRuntime(p.ctx)
+	rt := k6common.GetRuntime(p.ctx)
 	pageFn := rt.ToValue(`
 		node => {
 			const doc = node;
@@ -261,26 +261,26 @@ func (p *Page) setEmulatedSize(emulatedSize *EmulatedSize) error {
 
 // AddInitScript adds script to run in all new frames
 func (p *Page) AddInitScript(script goja.Value, arg goja.Value) {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.addInitScript(script, arg) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.addInitScript(script, arg) has not been implemented yet!"))
 }
 
 func (p *Page) AddScriptTag(opts goja.Value) {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.addScriptTag(opts) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.addScriptTag(opts) has not been implemented yet!"))
 }
 
 func (p *Page) AddStyleTag(opts goja.Value) {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.addStyleTag(opts) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.addStyleTag(opts) has not been implemented yet!"))
 }
 
 // BrintToFront activates the browser tab for this page
 func (p *Page) BrintToFront() {
-	rt := common.GetRuntime(p.ctx)
+	rt := k6common.GetRuntime(p.ctx)
 	action := cdppage.BringToFront()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to bring page to front: %w", err))
+		k6common.Throw(rt, fmt.Errorf("unable to bring page to front: %w", err))
 	}
 }
 
@@ -319,15 +319,15 @@ func (p *Page) DispatchEvent(selector string, typ string, eventInit goja.Value, 
 }
 
 func (p *Page) DragAndDrop(source string, target string, opts goja.Value) {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.DragAndDrop(source, target, opts) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.DragAndDrop(source, target, opts) has not been implemented yet!"))
 }
 
 func (p *Page) EmulateMedia(opts goja.Value) {
-	rt := common.GetRuntime(p.ctx)
+	rt := k6common.GetRuntime(p.ctx)
 	parsedOpts := NewPageEmulateMediaOptions(p.mediaType, p.colorScheme, p.reducedMotion)
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing options: %v", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %v", err))
 	}
 
 	p.mediaType = parsedOpts.Media
@@ -336,7 +336,7 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 
 	for _, fs := range p.frameSessions {
 		if err := fs.updateEmulateMedia(false); err != nil {
-			common.Throw(rt, err)
+			k6common.Throw(rt, err)
 		}
 	}
 
@@ -345,7 +345,7 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 
 // EmulateVisionDeficiency activates/deactivates emulation of a vision deficiency
 func (p *Page) EmulateVisionDeficiency(typ string) {
-	rt := common.GetRuntime(p.ctx)
+	rt := k6common.GetRuntime(p.ctx)
 	validTypes := map[string]emulation.SetEmulatedVisionDeficiencyType{
 		"achromatopsia": emulation.SetEmulatedVisionDeficiencyTypeAchromatopsia,
 		"blurredVision": emulation.SetEmulatedVisionDeficiencyTypeBlurredVision,
@@ -356,12 +356,12 @@ func (p *Page) EmulateVisionDeficiency(typ string) {
 	}
 	t, ok := validTypes[typ]
 	if !ok {
-		common.Throw(rt, fmt.Errorf("unsupported vision deficiency: '%s'", typ))
+		k6common.Throw(rt, fmt.Errorf("unsupported vision deficiency: '%s'", typ))
 	}
 
 	action := emulation.SetEmulatedVisionDeficiency(t)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to set emulated vision deficiency '%s': %w", typ, err))
+		k6common.Throw(rt, fmt.Errorf("unable to set emulated vision deficiency '%s': %w", typ, err))
 	}
 
 	applySlowMo(p.ctx)
@@ -377,13 +377,13 @@ func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHan
 }
 
 func (p *Page) ExposeBinding(name string, callback goja.Callable, opts goja.Value) {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.exposeBinding(name, callback) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.exposeBinding(name, callback) has not been implemented yet!"))
 }
 
 func (p *Page) ExposeFunction(name string, callback goja.Callable) {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.exposeFunction(name, callback) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.exposeFunction(name, callback) has not been implemented yet!"))
 }
 
 func (p *Page) Fill(selector string, value string, opts goja.Value) {
@@ -395,8 +395,8 @@ func (p *Page) Focus(selector string, opts goja.Value) {
 }
 
 func (p *Page) Frame(frameSelector goja.Value) api.Frame {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.frame(frameSelector) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.frame(frameSelector) has not been implemented yet!"))
 	return nil
 }
 
@@ -410,14 +410,14 @@ func (p *Page) GetAttribute(selector string, name string, opts goja.Value) goja.
 }
 
 func (p *Page) GoBack(opts goja.Value) api.Response {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.goBack(opts) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.goBack(opts) has not been implemented yet!"))
 	return nil
 }
 
 func (p *Page) GoForward(opts goja.Value) api.Response {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.goForward(opts) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.goForward(opts) has not been implemented yet!"))
 	return nil
 }
 
@@ -481,13 +481,13 @@ func (p *Page) Opener() api.Page {
 }
 
 func (p *Page) Pause() {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.pause() has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.pause() has not been implemented yet!"))
 }
 
 func (p *Page) Pdf(opts goja.Value) goja.ArrayBuffer {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.pdf(opts) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.pdf(opts) has not been implemented yet!"))
 	return rt.NewArrayBuffer([]byte{})
 }
 
@@ -505,10 +505,10 @@ func (p *Page) QueryAll(selector string) []api.ElementHandle {
 
 // Reload will reload the current page
 func (p *Page) Reload(opts goja.Value) api.Response {
-	rt := common.GetRuntime(p.ctx)
+	rt := k6common.GetRuntime(p.ctx)
 	parsedOpts := NewPageReloadOptions(LifecycleEventLoad, p.defaultTimeout())
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
 	ch, evCancelFn := createWaitForEventHandler(p.ctx, p.frameManager.mainFrame, []string{EventFrameNavigation}, func(data interface{}) bool {
@@ -518,14 +518,14 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 
 	action := cdppage.Reload()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to reload page: %w", err))
+		k6common.Throw(rt, fmt.Errorf("unable to reload page: %w", err))
 	}
 
 	var event *NavigationEvent
 	select {
 	case <-p.ctx.Done():
 	case <-time.After(parsedOpts.Timeout):
-		common.Throw(rt, ErrTimedOut)
+		k6common.Throw(rt, ErrTimedOut)
 	case data := <-ch:
 		event = data.(*NavigationEvent)
 	}
@@ -548,16 +548,16 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 }
 
 func (p *Page) Route(url goja.Value, handler goja.Callable) {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.route(url, handler) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.route(url, handler) has not been implemented yet!"))
 }
 
 // Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file
 func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
-	rt := common.GetRuntime(p.ctx)
+	rt := k6common.GetRuntime(p.ctx)
 	parsedOpts := NewPageScreenshotOptions()
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
 	var buf []byte
@@ -578,7 +578,7 @@ func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	if parsedOpts.Clip.Width > 0 && parsedOpts.Clip.Height > 0 {
 		_, _, contentSize, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(p.ctx, p.session))
 		if err != nil {
-			common.Throw(rt, fmt.Errorf("unable to get layout metrics: %w", err))
+			k6common.Throw(rt, fmt.Errorf("unable to get layout metrics: %w", err))
 		}
 		width, height := int64(math.Ceil(contentSize.Width)), int64(math.Ceil(contentSize.Height))
 		action := emulation.SetDeviceMetricsOverride(width, height, 1, false).
@@ -587,7 +587,7 @@ func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
 				Angle: 0,
 			})
 		if err = action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-			common.Throw(rt, fmt.Errorf("unable to set screen width and height: %w", err))
+			k6common.Throw(rt, fmt.Errorf("unable to set screen width and height: %w", err))
 		}
 		clip = cdppage.Viewport{
 			X:      contentSize.X,
@@ -616,21 +616,21 @@ func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
 		action := emulation.SetDefaultBackgroundColorOverride().
 			WithColor(&cdp.RGBA{R: 0, G: 0, B: 0, A: 0})
 		if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-			common.Throw(rt, fmt.Errorf("unable to set screenshot background transparency: %w", err))
+			k6common.Throw(rt, fmt.Errorf("unable to set screenshot background transparency: %w", err))
 		}
 	}
 
 	// Capture screenshot
 	buf, err := capture.Do(cdp.WithExecutor(p.ctx, p.session))
 	if err != nil {
-		common.Throw(rt, fmt.Errorf("unable to capture screenshot of page '%s': %w", p.frameManager.MainFrame().URL(), err))
+		k6common.Throw(rt, fmt.Errorf("unable to capture screenshot of page '%s': %w", p.frameManager.MainFrame().URL(), err))
 	}
 
 	// Reset background
 	if parsedOpts.OmitBackground && format == "png" {
 		action := emulation.SetDefaultBackgroundColorOverride()
 		if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-			common.Throw(rt, fmt.Errorf("unable to reset screenshot background color: %w", err))
+			k6common.Throw(rt, fmt.Errorf("unable to reset screenshot background color: %w", err))
 		}
 	}
 
@@ -641,10 +641,10 @@ func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	if parsedOpts.Path != "" {
 		dir := filepath.Dir(parsedOpts.Path)
 		if err := os.MkdirAll(dir, 0775); err != nil {
-			common.Throw(rt, fmt.Errorf("unable to create directory for screenshot of page '%s': %w", p.frameManager.MainFrame().URL(), err))
+			k6common.Throw(rt, fmt.Errorf("unable to create directory for screenshot of page '%s': %w", p.frameManager.MainFrame().URL(), err))
 		}
 		if err := ioutil.WriteFile(parsedOpts.Path, buf, 0664); err != nil {
-			common.Throw(rt, fmt.Errorf("unable to save screenshot of page '%s' to file: %w", p.frameManager.MainFrame().URL(), err))
+			k6common.Throw(rt, fmt.Errorf("unable to save screenshot of page '%s' to file: %w", p.frameManager.MainFrame().URL(), err))
 		}
 	}
 
@@ -676,24 +676,24 @@ func (p *Page) SetExtraHTTPHeaders(headers map[string]string) {
 }
 
 func (p *Page) SetInputFiles(selector string, files goja.Value, opts goja.Value) {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.textContent(selector, opts) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.textContent(selector, opts) has not been implemented yet!"))
 	// TODO: needs slowMo
 }
 
 // SetViewportSize will update the viewport width and height
 func (p *Page) SetViewportSize(viewportSize goja.Value) {
-	rt := common.GetRuntime(p.ctx)
+	rt := k6common.GetRuntime(p.ctx)
 	viewport := NewViewport()
 	if err := viewport.Parse(p.ctx, viewportSize); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing viewport: %w", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing viewport: %w", err))
 	}
 	screen := NewScreen()
 	if err := viewport.Parse(p.ctx, viewportSize); err != nil {
-		common.Throw(rt, fmt.Errorf("failed parsing screen: %w", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing screen: %w", err))
 	}
 	if err := p.setEmulatedSize(NewEmulatedSize(viewport, screen)); err != nil {
-		common.Throw(rt, err)
+		k6common.Throw(rt, err)
 	}
 	applySlowMo(p.ctx)
 }
@@ -707,7 +707,7 @@ func (p *Page) TextContent(selector string, opts goja.Value) string {
 }
 
 func (p *Page) Title() string {
-	rt := common.GetRuntime(p.ctx)
+	rt := k6common.GetRuntime(p.ctx)
 	js := `() => document.title`
 	return p.Evaluate(rt.ToValue(js)).(goja.Value).String()
 }
@@ -721,20 +721,20 @@ func (p *Page) Uncheck(selector string, opts goja.Value) {
 }
 
 func (p *Page) Unroute(url goja.Value, handler goja.Callable) {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.unroute(url, handler) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.unroute(url, handler) has not been implemented yet!"))
 }
 
 // URL returns the location of the page
 func (p *Page) URL() string {
-	rt := common.GetRuntime(p.ctx)
+	rt := k6common.GetRuntime(p.ctx)
 	return p.Evaluate(rt.ToValue("document.location.toString()")).(string)
 }
 
 // Video returns information of recorded video
 func (p *Page) Video() api.Video {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.video() has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.video() has not been implemented yet!"))
 	return nil
 }
 
@@ -748,8 +748,8 @@ func (p *Page) ViewportSize() map[string]float64 {
 
 // WaitForEvent waits for the specified event to trigger
 func (p *Page) WaitForEvent(event string, optsOrPredicate goja.Value) interface{} {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.waitForEvent(event, optsOrPredicate) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.waitForEvent(event, optsOrPredicate) has not been implemented yet!"))
 	return nil
 }
 
@@ -769,14 +769,14 @@ func (p *Page) WaitForNavigation(opts goja.Value) api.Response {
 }
 
 func (p *Page) WaitForRequest(urlOrPredicate, opts goja.Value) api.Request {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.waitForRequest(urlOrPredicate, opts) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.waitForRequest(urlOrPredicate, opts) has not been implemented yet!"))
 	return nil
 }
 
 func (p *Page) WaitForResponse(urlOrPredicate, opts goja.Value) api.Response {
-	rt := common.GetRuntime(p.ctx)
-	common.Throw(rt, errors.Errorf("Page.waitForResponse(urlOrPredicate, opts) has not been implemented yet!"))
+	rt := k6common.GetRuntime(p.ctx)
+	k6common.Throw(rt, errors.Errorf("Page.waitForResponse(urlOrPredicate, opts) has not been implemented yet!"))
 	return nil
 }
 

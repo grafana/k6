@@ -22,7 +22,7 @@ package common
 
 import (
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 	"golang.org/x/net/context"
 )
 
@@ -55,7 +55,7 @@ func NewMouseClickOptions() *MouseClickOptions {
 }
 
 func (o *MouseClickOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -87,7 +87,7 @@ func NewMouseDblClickOptions() *MouseDblClickOptions {
 }
 
 func (o *MouseDblClickOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -116,7 +116,7 @@ func NewMouseDownUpOptions() *MouseDownUpOptions {
 }
 
 func (o *MouseDownUpOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -138,7 +138,7 @@ func NewMouseMoveOptions() *MouseMoveOptions {
 }
 
 func (o *MouseMoveOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := common.GetRuntime(ctx)
+	rt := k6common.GetRuntime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
