@@ -96,13 +96,17 @@ type EventEmitter interface {
 	onAll(ctx context.Context, ch chan Event)
 }
 
+// syncFunc functions are passed through the syncCh for synchronously handling
+// eventHandler requests.
+type syncFunc func() (done chan struct{})
+
 // BaseEventEmitter emits events to registered handlers
 type BaseEventEmitter struct {
 	handlers    map[string][]eventHandler
 	handlersAll []eventHandler
 
-	handlersCh chan func() chan struct{}
-	ctx        context.Context
+	syncCh chan syncFunc
+	ctx    context.Context
 }
 
 // NewBaseEventEmitter creates a new instance of a base event emitter
@@ -110,26 +114,24 @@ func NewBaseEventEmitter(ctx context.Context) BaseEventEmitter {
 	bem := BaseEventEmitter{
 		handlers:    make(map[string][]eventHandler),
 		handlersAll: make([]eventHandler, 0),
-		handlersCh:  make(chan func() chan struct{}),
+		syncCh:      make(chan syncFunc),
 		ctx:         ctx,
 	}
-	go bem.handleHandlers(ctx)
+	go bem.syncAll(ctx)
 	return bem
 }
 
-// handleHandlers handles handlers in a single Goroutine.
-// It basically process one request at a time for synchronization.
-func (e *BaseEventEmitter) handleHandlers(ctx context.Context) {
+// syncAll receives work requests from BaseEventEmitter methods
+// and processes them one at a time for synchronization.
+//
+// It returns when the BaseEventEmitter context is done.
+func (e *BaseEventEmitter) syncAll(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case fn := <-e.handlersCh:
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
+		case fn := <-e.syncCh:
+			// run the function and signal when it's done
 			done := fn()
 			done <- struct{}{}
 		}
@@ -142,47 +144,40 @@ func (e *BaseEventEmitter) sync(fn func()) {
 	select {
 	case <-e.ctx.Done():
 		return
-	case e.handlersCh <- func() chan struct{} {
+	case e.syncCh <- func() chan struct{} {
 		fn()
 		return done
 	}:
 	}
+	// wait for the function to return
 	<-done
 }
 
 func (e *BaseEventEmitter) emit(event string, data interface{}) {
+	emitEvent := func(eh eventHandler) {
+		select {
+		case eh.ch <- Event{event, data}:
+		case <-eh.ctx.Done():
+			// TODO: handle the error
+		}
+	}
+	emitTo := func(handlers []eventHandler) (updated []eventHandler) {
+		for i := 0; i < len(handlers); {
+			handler := handlers[i]
+			select {
+			case <-handler.ctx.Done():
+				handlers = append(handlers[:i], handlers[i+1:]...)
+				continue
+			default:
+				go emitEvent(handler)
+				i++
+			}
+		}
+		return handlers
+	}
 	e.sync(func() {
-		handlers := e.handlers[event]
-		for i := 0; i < len(handlers); {
-			handler := handlers[i]
-			select {
-			case <-handler.ctx.Done():
-				handlers = append(handlers[:i], handlers[i+1:]...)
-				continue
-			default:
-				go func() {
-					handler.ch <- Event{event, data}
-				}()
-				i++
-			}
-		}
-		e.handlers[event] = handlers
-
-		handlers = e.handlersAll
-		for i := 0; i < len(handlers); {
-			handler := handlers[i]
-			select {
-			case <-handler.ctx.Done():
-				handlers = append(handlers[:i], handlers[i+1:]...)
-				continue
-			default:
-				go func() {
-					handler.ch <- Event{event, data}
-				}()
-				i++
-			}
-		}
-		e.handlersAll = handlers
+		e.handlers[event] = emitTo(e.handlers[event])
+		e.handlersAll = emitTo(e.handlersAll)
 	})
 }
 
