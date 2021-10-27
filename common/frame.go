@@ -190,11 +190,11 @@ func (f *Frame) hasInflightRequest(requestID network.RequestID) bool {
 }
 
 func (f *Frame) clearLifecycle() {
-	f.lifecycleEventsMu.RLock()
+	f.lifecycleEventsMu.Lock()
 	for k := range f.lifecycleEvents {
 		f.lifecycleEvents[k] = false
 	}
-	f.lifecycleEventsMu.RUnlock()
+	f.lifecycleEventsMu.Unlock()
 	f.page.frameManager.mainFrame.recalculateLifecycle()
 
 	f.inflightRequestsMu.Lock()
@@ -427,12 +427,12 @@ func (f *Frame) startNetworkIdleTimer() {
 }
 
 func (f *Frame) stopNetworkIdleTimer() {
+	f.networkIdleMu.Lock()
+	defer f.networkIdleMu.Unlock()
 	if f.networkIdleCancelFn != nil {
 		f.networkIdleCancelFn()
-		f.networkIdleMu.Lock()
 		f.networkIdleCtx = nil
 		f.networkIdleCancelFn = nil
-		f.networkIdleMu.Unlock()
 	}
 }
 
