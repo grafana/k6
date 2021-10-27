@@ -22,7 +22,6 @@ package common
 
 import (
 	"context"
-	"sync"
 )
 
 // Ensure BaseEventEmitter implements the EventEmitter interface
@@ -97,82 +96,108 @@ type EventEmitter interface {
 	onAll(ctx context.Context, ch chan Event)
 }
 
+// syncFunc functions are passed through the syncCh for synchronously handling
+// eventHandler requests.
+type syncFunc func() (done chan struct{})
+
 // BaseEventEmitter emits events to registered handlers
 type BaseEventEmitter struct {
-	handlersMu  sync.RWMutex
 	handlers    map[string][]eventHandler
 	handlersAll []eventHandler
+
+	syncCh chan syncFunc
+	ctx    context.Context
 }
 
 // NewBaseEventEmitter creates a new instance of a base event emitter
-func NewBaseEventEmitter() BaseEventEmitter {
-	return BaseEventEmitter{
+func NewBaseEventEmitter(ctx context.Context) BaseEventEmitter {
+	bem := BaseEventEmitter{
 		handlers:    make(map[string][]eventHandler),
 		handlersAll: make([]eventHandler, 0),
+		syncCh:      make(chan syncFunc),
+		ctx:         ctx,
+	}
+	go bem.syncAll(ctx)
+	return bem
+}
+
+// syncAll receives work requests from BaseEventEmitter methods
+// and processes them one at a time for synchronization.
+//
+// It returns when the BaseEventEmitter context is done.
+func (e *BaseEventEmitter) syncAll(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case fn := <-e.syncCh:
+			// run the function and signal when it's done
+			done := fn()
+			done <- struct{}{}
+		}
 	}
 }
 
+// sync is a helper for sychronized access to the BaseEventEmitter.
+func (e *BaseEventEmitter) sync(fn func()) {
+	done := make(chan struct{})
+	select {
+	case <-e.ctx.Done():
+		return
+	case e.syncCh <- func() chan struct{} {
+		fn()
+		return done
+	}:
+	}
+	// wait for the function to return
+	<-done
+}
+
 func (e *BaseEventEmitter) emit(event string, data interface{}) {
-	e.handlersMu.Lock()
-	defer e.handlersMu.Unlock()
-
-	handlers := e.handlers[event]
-	for i := 0; i < len(handlers); {
-		handler := handlers[i]
-		e.handlersMu.Unlock()
+	emitEvent := func(eh eventHandler) {
 		select {
-		case <-handler.ctx.Done():
-			e.handlersMu.Lock()
-			handlers = append(handlers[:i], handlers[i+1:]...)
-			continue
-		default:
-			go func() {
-				handler.ch <- Event{event, data}
-			}()
-			i++
+		case eh.ch <- Event{event, data}:
+		case <-eh.ctx.Done():
+			// TODO: handle the error
 		}
-		e.handlersMu.Lock()
 	}
-	e.handlers[event] = handlers
-
-	handlers = e.handlersAll
-	for i := 0; i < len(handlers); {
-		handler := handlers[i]
-		e.handlersMu.Unlock()
-		select {
-		case <-handler.ctx.Done():
-			e.handlersMu.Lock()
-			handlers = append(handlers[:i], handlers[i+1:]...)
-			continue
-		default:
-			go func() {
-				handler.ch <- Event{event, data}
-			}()
-			i++
+	emitTo := func(handlers []eventHandler) (updated []eventHandler) {
+		for i := 0; i < len(handlers); {
+			handler := handlers[i]
+			select {
+			case <-handler.ctx.Done():
+				handlers = append(handlers[:i], handlers[i+1:]...)
+				continue
+			default:
+				go emitEvent(handler)
+				i++
+			}
 		}
-		e.handlersMu.Lock()
+		return handlers
 	}
-	e.handlersAll = handlers
+	e.sync(func() {
+		e.handlers[event] = emitTo(e.handlers[event])
+		e.handlersAll = emitTo(e.handlersAll)
+	})
 }
 
 // On registers a handler for a specific event
 func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Event) {
-	e.handlersMu.Lock()
-	defer e.handlersMu.Unlock()
-
-	for _, event := range events {
-		_, ok := e.handlers[event]
-		if !ok {
-			e.handlers[event] = make([]eventHandler, 0)
+	e.sync(func() {
+		for _, event := range events {
+			_, ok := e.handlers[event]
+			if !ok {
+				e.handlers[event] = make([]eventHandler, 0)
+			}
+			eh := eventHandler{ctx, ch}
+			e.handlers[event] = append(e.handlers[event], eh)
 		}
-		eh := eventHandler{ctx, ch}
-		e.handlers[event] = append(e.handlers[event], eh)
-	}
+	})
 }
 
 // OnAll registers a handler for all events
 func (e *BaseEventEmitter) onAll(ctx context.Context, ch chan Event) {
-	e.handlersMu.Lock()
-	defer e.handlersMu.Unlock()
-	e.handlersAll = append(e.handlersAll, eventHandler{ctx, ch})
+	e.sync(func() {
+		e.handlersAll = append(e.handlersAll, eventHandler{ctx, ch})
+	})
 }

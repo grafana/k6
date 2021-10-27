@@ -52,7 +52,7 @@ type Worker struct {
 // NewWorker creates a new page viewport
 func NewWorker(ctx context.Context, session *Session, id target.ID, url string) (*Worker, error) {
 	w := Worker{
-		BaseEventEmitter: NewBaseEventEmitter(),
+		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
 		session:          session,
 		targetID:         id,

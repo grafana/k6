@@ -26,7 +26,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
 	"github.com/grafana/xk6-browser/api"
-	"go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 	"golang.org/x/net/context"
 )
 
@@ -68,8 +68,8 @@ func (t *Touchscreen) tap(x float64, y float64) error {
 
 // Tap dispatches a tap start and tap end event.
 func (t *Touchscreen) Tap(x float64, y float64) {
-	rt := common.GetRuntime(t.ctx)
+	rt := k6common.GetRuntime(t.ctx)
 	if err := t.tap(x, y); err != nil {
-		common.Throw(rt, fmt.Errorf("unable to tap: %w", err))
+		k6common.Throw(rt, fmt.Errorf("unable to tap: %w", err))
 	}
 }

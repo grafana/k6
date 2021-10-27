@@ -37,7 +37,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/pkg/errors"
 	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/lib"
+	k6lib "go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/stats"
 	"golang.org/x/net/context"
@@ -72,7 +72,7 @@ type NetworkManager struct {
 // NewNetworkManager creates a new network manager
 func NewNetworkManager(ctx context.Context, session *Session, manager *FrameManager, parent *NetworkManager) (*NetworkManager, error) {
 	m := NetworkManager{
-		BaseEventEmitter:               NewBaseEventEmitter(),
+		BaseEventEmitter:               NewBaseEventEmitter(ctx),
 		ctx:                            ctx,
 		session:                        session,
 		parent:                         parent,
@@ -101,7 +101,7 @@ func (m *NetworkManager) deleteRequestByID(reqID network.RequestID) {
 }
 
 func (m *NetworkManager) emitResponseReceived(resp *Response) {
-	state := lib.GetState(m.ctx)
+	state := k6lib.GetState(m.ctx)
 
 	tags := state.CloneTags()
 	if state.Options.SystemTags.Has(stats.TagGroup) {
@@ -227,6 +227,11 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 	case <-m.ctx.Done():
 		return false
 	case event := <-in:
+		select {
+		case <-m.ctx.Done():
+			return false
+		default:
+		}
 		switch ev := event.data.(type) {
 		case *network.EventLoadingFailed:
 			m.onLoadingFailed(ev)
@@ -305,7 +310,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	m.frameManager.requestStarted(req)
 
 	if m.userReqInterceptionEnabled && !strings.HasPrefix(event.Request.URL, "data:") {
-		state := lib.GetState(m.ctx)
+		state := k6lib.GetState(m.ctx)
 		url, err := url.Parse(event.Request.URL)
 		if err != nil {
 			return

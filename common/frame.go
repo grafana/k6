@@ -140,7 +140,7 @@ type Frame struct {
 // NewFrame creates a new HTML document frame
 func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID cdp.FrameID) *Frame {
 	return &Frame{
-		BaseEventEmitter:          NewBaseEventEmitter(),
+		BaseEventEmitter:          NewBaseEventEmitter(ctx),
 		ctx:                       ctx,
 		page:                      m.page,
 		manager:                   m,
