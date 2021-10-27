@@ -166,7 +166,7 @@ func NewConfig() Config {
 		MetricPushInterval:         types.NewNullDuration(1*time.Second, false),
 		MetricPushConcurrency:      null.NewInt(1, false),
 		MaxMetricSamplesPerPackage: null.NewInt(100000, false),
-		Timeout:                    types.NewNullDuration(20*time.Second, false),
+		Timeout:                    types.NewNullDuration(1*time.Minute, false),
 		// Aggregation is disabled by default, since AggregationPeriod has no default value
 		// but if it's enabled manually or from the cloud service, those are the default values it will use:
 		AggregationCalcInterval:         types.NewNullDuration(3*time.Second, false),
