@@ -207,7 +207,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	if ev.TargetInfo.Type == "background_page" {
 		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, nil, false)
 		if err != nil {
-			isRunning := b.state == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
+			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
 				// If we're no longer connected to browser, then ignore WebSocket errors
 				return
@@ -230,7 +230,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		b.pagesMu.RUnlock()
 		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, opener, true)
 		if err != nil {
-			isRunning := b.state == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
+			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
 				// If we're no longer connected to browser, then ignore WebSocket errors
 				return
