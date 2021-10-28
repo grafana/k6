@@ -95,6 +95,57 @@ func TestTextSummary(t *testing.T) {
 	}
 }
 
+func TestTextSummaryWithSubMetrics(t *testing.T) {
+	t.Parallel()
+
+	parentMetric := stats.New("my_parent", stats.Counter)
+	parentMetric.Sink.Add(stats.Sample{Value: 11})
+	parentMetricPost := stats.New("my_parent_post", stats.Counter)
+	parentMetricPost.Sink.Add(stats.Sample{Value: 22})
+
+	subMetric := stats.New("my_parent{sub:1}", stats.Counter)
+	subMetric.Sink.Add(stats.Sample{Value: 1})
+	subMetricPost := stats.New("my_parent_post{sub:2}", stats.Counter)
+	subMetricPost.Sink.Add(stats.Sample{Value: 2})
+
+	metrics := map[string]*stats.Metric{
+		parentMetric.Name:     parentMetric,
+		parentMetricPost.Name: parentMetricPost,
+		subMetric.Name:        subMetric,
+		subMetricPost.Name:    subMetricPost,
+	}
+
+	summary := &lib.Summary{
+		Metrics:         metrics,
+		RootGroup:       &lib.Group{},
+		TestRunDuration: time.Second,
+	}
+
+	runner, err := getSimpleRunner(
+		t,
+		"/script.js",
+		"exports.default = function() {/* we don't run this, metrics are mocked */};",
+		lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)},
+	)
+	require.NoError(t, err)
+
+	result, err := runner.HandleSummary(context.Background(), summary)
+	require.NoError(t, err)
+
+	require.Len(t, result, 1)
+	stdout := result["stdout"]
+	require.NotNil(t, stdout)
+
+	summaryOut, err := ioutil.ReadAll(stdout)
+	require.NoError(t, err)
+
+	expected := "     my_parent........: 11 11/s\n" +
+		"       { sub:1 }......: 1  1/s\n" +
+		"     my_parent_post...: 22 22/s\n" +
+		"       { sub:2 }......: 2  2/s\n"
+	assert.Equal(t, "\n"+expected+"\n", string(summaryOut))
+}
+
 func createTestMetrics(t *testing.T) (map[string]*stats.Metric, *lib.Group) {
 	metrics := make(map[string]*stats.Metric)
 	gaugeMetric := stats.New("vus", stats.Gauge)
@@ -233,7 +284,7 @@ const expectedOldJSONExportResult = `{
             "p(90)": 19,
             "p(95)": 19.5,
             "p(99)": 19.9,
-			"count": 3,
+            "count": 3,
             "thresholds": {
                 "my_trend<1000": true
             }
@@ -329,13 +380,13 @@ const expectedHandleSummaryRawData = `
             "count"
         ],
         "summaryTimeUnit": "",
-		"noColor": false
+        "noColor": false
     },
-	"state": {
-		"isStdErrTTY": false,
-		"isStdOutTTY": false,
-		"testRunDurationMs": 1000
-	},
+    "state": {
+        "isStdErrTTY": false,
+        "isStdOutTTY": false,
+        "testRunDurationMs": 1000
+    },
     "metrics": {
         "checks": {
             "contains": "default",
@@ -444,17 +495,17 @@ const expectedHandleSummaryDataWithSetup = `
             "p(95)",
             "p(99)",
             "count"
-        ],
-        "summaryTimeUnit": "",
-		"noColor": false
-    },
-	"state": {
-		"isStdErrTTY": false,
-		"isStdOutTTY": false,
-		"testRunDurationMs": 1000
-	},
-	"setup_data": 5,
-    "metrics": {
+            ],
+            "summaryTimeUnit": "",
+            "noColor": false
+        },
+        "state": {
+            "isStdErrTTY": false,
+            "isStdOutTTY": false,
+            "testRunDurationMs": 1000
+        },
+        "setup_data": 5,
+        "metrics": {
         "checks": {
             "contains": "default",
             "values": {
