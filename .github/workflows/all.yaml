@@ -78,7 +78,14 @@ jobs:
         with:
           chrome-version: stable
       - name: Chrome version
+        if: runner.os != 'Windows'
         run: chrome --version
+      - name: Chrome version
+        if: runner.os == 'Windows'
+        shell: powershell
+        # chrome --version doesn't work on Windows :-/
+        # See https://bugs.chromium.org/p/chromium/issues/detail?id=158372
+        run: (get-command chrome.exe).Version
       - name: Run tests
         run: |
           set -x
@@ -112,7 +119,14 @@ jobs:
         with:
           chrome-version: stable
       - name: Chrome version
+        if: runner.os != 'Windows'
         run: chrome --version
+      - name: Chrome version
+        if: runner.os == 'Windows'
+        shell: powershell
+        # chrome --version doesn't work on Windows :-/
+        # See https://bugs.chromium.org/p/chromium/issues/detail?id=158372
+        run: (get-command chrome.exe).Version
       - name: Run tests
         run: |
           set -x
@@ -144,7 +158,14 @@ jobs:
         with:
           chrome-version: stable
       - name: Chrome version
+        if: runner.os != 'Windows'
         run: chrome --version
+      - name: Chrome version
+        if: runner.os == 'Windows'
+        shell: powershell
+        # chrome --version doesn't work on Windows :-/
+        # See https://bugs.chromium.org/p/chromium/issues/detail?id=158372
+        run: (get-command chrome.exe).Version
       - name: Run tests with code coverage
         run: |
           go version
