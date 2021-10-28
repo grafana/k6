@@ -403,7 +403,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 		vu.Runtime.ToValue(r.Bundle.RuntimeOptions.SummaryExport.String),
 		vu.Runtime.ToValue(summaryDataForJS),
 	}
-	rawResult, _, _, err := vu.runFn(ctx, false, handleSummaryWrapper, wrapperArgs...)
+	rawResult, _, _, err := vu.runFn(ctx, false, handleSummaryWrapper, nil, wrapperArgs...)
 
 	// TODO: refactor the whole JS runner to avoid copy-pasting these complicated bits...
 	// deadline is reached so we have timeouted but this might've not been registered correctly
@@ -535,7 +535,7 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 	}
 	vu.state.Group = group
 
-	v, _, _, err := vu.runFn(ctx, false, fn, vu.Runtime.ToValue(arg))
+	v, _, _, err := vu.runFn(ctx, false, fn, nil, vu.Runtime.ToValue(arg))
 
 	// deadline is reached so we have timeouted but this might've not been registered correctly
 	if deadline, ok := ctx.Deadline(); ok && time.Now().After(deadline) {
@@ -729,8 +729,11 @@ func (u *ActiveVU) RunOnce() error {
 		panic(fmt.Errorf("error setting __ITER in goja runtime: %w", err))
 	}
 
+	ctx, cancel := context.WithCancel(u.RunContext)
+	defer cancel()
+	*u.moduleVUImpl.ctxPtr = ctx
 	// Call the exported function.
-	_, isFullIteration, totalTime, err := u.runFn(u.RunContext, true, fn, u.setupData)
+	_, isFullIteration, totalTime, err := u.runFn(ctx, true, fn, cancel, u.setupData)
 	if err != nil {
 		var x *goja.InterruptedError
 		if errors.As(err, &x) {
@@ -756,8 +759,10 @@ func (u *ActiveVU) RunOnce() error {
 	return err
 }
 
+// if isDefault is true, cancel also needs to be provided and it should cancel the provided context
+// TODO remove the need for the above through refactoring of this function and its callees
 func (u *VU) runFn(
-	ctx context.Context, isDefault bool, fn goja.Callable, args ...goja.Value,
+	ctx context.Context, isDefault bool, fn goja.Callable, cancel func(), args ...goja.Value,
 ) (v goja.Value, isFullIteration bool, t time.Duration, err error) {
 	if !u.Runner.Bundle.Options.NoCookiesReset.ValueOrZero() {
 		u.state.CookieJar, err = cookiejar.New(nil)
@@ -771,24 +776,35 @@ func (u *VU) runFn(
 		u.state.Tags.Set("iter", strconv.FormatInt(u.state.Iteration, 10))
 	}
 
-	defer func() {
-		if r := recover(); r != nil {
-			gojaStack := u.Runtime.CaptureCallStack(20, nil)
-			err = fmt.Errorf("a panic occurred in VU code but was caught: %s", r)
-			// TODO figure out how to use PanicLevel without panicing .. this might require changing
-			// the logger we use see
-			// https://github.com/sirupsen/logrus/issues/1028
-			// https://github.com/sirupsen/logrus/issues/993
-			b := new(bytes.Buffer)
-			for _, s := range gojaStack {
-				s.Write(b)
-			}
-			u.state.Logger.Log(logrus.ErrorLevel, "panic: ", r, "\n", string(debug.Stack()), "\nGoja stack:\n", b.String())
-		}
-	}()
-
 	startTime := time.Now()
-	v, err = fn(goja.Undefined(), args...) // Actually run the JS script
+
+	if u.moduleVUImpl.eventLoop == nil {
+		u.moduleVUImpl.eventLoop = newEventLoop(u.moduleVUImpl)
+	}
+	err = u.moduleVUImpl.eventLoop.start(func() (err error) {
+		// here the returned value purposefully shadows the external one as they can be different
+		defer func() {
+			if r := recover(); r != nil {
+				gojaStack := u.Runtime.CaptureCallStack(20, nil)
+				err = fmt.Errorf("a panic occurred in VU code but was caught: %s", r)
+				// TODO figure out how to use PanicLevel without panicing .. this might require changing
+				// the logger we use see
+				// https://github.com/sirupsen/logrus/issues/1028
+				// https://github.com/sirupsen/logrus/issues/993
+				b := new(bytes.Buffer)
+				for _, s := range gojaStack {
+					s.Write(b)
+				}
+				u.state.Logger.Log(logrus.ErrorLevel, "panic: ", r, "\n", string(debug.Stack()), "\nGoja stack:\n", b.String())
+			}
+		}()
+		v, err = fn(goja.Undefined(), args...) // Actually run the JS script
+		return err
+	})
+	if err != nil && isDefault {
+		cancel()
+		u.moduleVUImpl.eventLoop.waitOnRegistered()
+	}
 	endTime := time.Now()
 	var exception *goja.Exception
 	if errors.As(err, &exception) {

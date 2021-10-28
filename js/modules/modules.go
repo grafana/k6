@@ -107,6 +107,20 @@ type VU interface {
 
 	// Runtime returns the goja.Runtime for the current VU
 	Runtime() *goja.Runtime
+
+	// RegisterCallback lets a module declare that it wants to run a function on the event loop *at a later point in time*.
+	// It needs to be called from within the event loop, so not in a goroutine spawned by a module.
+	// Its result can be called with a function that will be executed *on the event loop* -
+	// possibly letting you call RegisterCallback again.
+	// Calling the result can be done at any time. The event loop will block until that happens, (if it doesn't
+	// have something else to run) so in the event of an iteration end or abort (for example due to an exception),
+	// It is the module responsibility to monitor the context and abort on it being done.
+	// This still means that the returned function here *needs* to be called to signal that the module
+	// has aborted the operation and will not do anything more, not doing so will block k6.
+	RegisterCallback() func(func() error)
+
+	// sealing field will help probably with pointing users that they just need to embed this in their Instance
+	// implementations
 }
 
 // Exports is representation of ESM exports of a module

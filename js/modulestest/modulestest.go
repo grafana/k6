@@ -58,3 +58,9 @@ func (m *VU) State() *lib.State {
 func (m *VU) Runtime() *goja.Runtime {
 	return m.RuntimeField
 }
+
+// RegisterCallback is not really implemented
+func (m *VU) RegisterCallback() func(f func() error) {
+	// TODO Implement
+	return nil
+}
