@@ -232,6 +232,9 @@ func (fs *FrameSession) initFrameTree() error {
 		return fmt.Errorf("unable to get page frame tree: %w", err)
 	}
 
+	// FIXME: frameTree is sometimes nil on Windows
+	// https://github.com/grafana/xk6-browser/runs/4036384507
+
 	if fs.isMainFrame() {
 		fs.handleFrameTree(frameTree)
 		fs.initRendererEvents()
