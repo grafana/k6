@@ -363,9 +363,9 @@ func (m *FrameManager) requestStarted(req *Request) {
 		if frame.getInflightRequestCount() == 1 {
 			frame.stopNetworkIdleTimer()
 		}
-	}
-	if req.documentID != "" {
-		frame.pendingDocument = &DocumentInfo{documentID: req.documentID, request: req}
+		if req.documentID != "" {
+			frame.pendingDocument = &DocumentInfo{documentID: req.documentID, request: req}
+		}
 	}
 	m.page.emit(EventPageRequest, req)
 }
