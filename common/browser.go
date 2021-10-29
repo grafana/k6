@@ -167,7 +167,7 @@ func (b *Browser) initEvents() error {
 					go b.onDetachedFromTarget(ev)
 				} else if event.typ == EventConnectionClose {
 					b.connected = false
-					b.browserProc.didLooseConnection()
+					b.browserProc.didLoseConnection()
 					b.cancelFn()
 				}
 			}

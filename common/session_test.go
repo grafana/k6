@@ -82,9 +82,9 @@ func TestSessionCreateSession(t *testing.T) {
 
 		if assert.NoError(t, err) {
 			session, err := conn.createSession(&target.Info{
-				TargetID:         testutils.DEAFULT_CDP_TARGET_ID,
+				TargetID:         testutils.DEFAULT_CDP_TARGET_ID,
 				Type:             "page",
-				BrowserContextID: testutils.DEAFULT_CDP_BROWSER_CONTEXT_ID,
+				BrowserContextID: testutils.DEFAULT_CDP_BROWSER_CONTEXT_ID,
 			})
 
 			if assert.NoError(t, err) {

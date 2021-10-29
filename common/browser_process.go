@@ -55,7 +55,7 @@ func NewBrowserProcess(ctx context.Context, cancel context.CancelFunc, process *
 		userDataDir:                userDataDir,
 	}
 	go func() {
-		// If we loose connection to the browser and we're not in-progress with clean
+		// If we lose connection to the browser and we're not in-progress with clean
 		// browser-initiated termination then cancel the context to clean up.
 		<-p.lostConnection
 		select {
@@ -67,7 +67,7 @@ func NewBrowserProcess(ctx context.Context, cancel context.CancelFunc, process *
 	return &p
 }
 
-func (p *BrowserProcess) didLooseConnection() {
+func (p *BrowserProcess) didLoseConnection() {
 	close(p.lostConnection)
 }
 

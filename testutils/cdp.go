@@ -34,9 +34,9 @@ import (
 )
 
 const (
-	DEAFULT_CDP_SESSION_ID         = "session_id_0123456789"
-	DEAFULT_CDP_TARGET_ID          = "target_id_0123456789"
-	DEAFULT_CDP_BROWSER_CONTEXT_ID = "browser_context_id_0123456789"
+	DEFAULT_CDP_SESSION_ID         = "session_id_0123456789"
+	DEFAULT_CDP_TARGET_ID          = "target_id_0123456789"
+	DEFAULT_CDP_BROWSER_CONTEXT_ID = "browser_context_id_0123456789"
 )
 
 var DEFAULT_CDP_TARGET_ATTACHED_TO_TARGET_MSG = fmt.Sprintf(`
@@ -52,8 +52,8 @@ var DEFAULT_CDP_TARGET_ATTACHED_TO_TARGET_MSG = fmt.Sprintf(`
 		},
 		"waitingForDebugger": false
 	}
-	`, DEAFULT_CDP_SESSION_ID, DEAFULT_CDP_TARGET_ID, DEAFULT_CDP_BROWSER_CONTEXT_ID)
-var DEFAULT_CDP_TARGET_ATTACH_TO_TARGET_RESPONSE = fmt.Sprintf(`{"sessionId":"%s"}`, DEAFULT_CDP_SESSION_ID)
+	`, DEFAULT_CDP_SESSION_ID, DEFAULT_CDP_TARGET_ID, DEFAULT_CDP_BROWSER_CONTEXT_ID)
+var DEFAULT_CDP_TARGET_ATTACH_TO_TARGET_RESPONSE = fmt.Sprintf(`{"sessionId":"%s"}`, DEFAULT_CDP_SESSION_ID)
 
 func getWebsocketHandlerCDP(
 	fn func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}),
