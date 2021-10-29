@@ -31,6 +31,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"os"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -200,6 +201,15 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 		Certificates:       certs,
 		NameToCertificate:  nameToCert,
 		Renegotiation:      tls.RenegotiateFreelyAsClient,
+	}
+	if keyWriter := r.Bundle.RuntimeOptions.KeyWriter; keyWriter.Valid {
+		f, err := os.OpenFile(keyWriter.String, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		tlsConfig.KeyLogWriter = f
+
 	}
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
