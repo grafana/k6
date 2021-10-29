@@ -317,14 +317,12 @@ func TestStreamLogsToLogger(t *testing.T) {
 				require.NoError(t, err)
 
 				// wait the flush of the message on the network
-				time.Sleep(5 * time.Millisecond)
+				time.Sleep(20 * time.Millisecond)
 
 				// it generates a failure closing the connection
 				// in a rude way
 				err = conn.Close()
 				require.NoError(t, err)
-
-				time.Sleep(time.Millisecond)
 				return
 			}
 
@@ -338,7 +336,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 			require.NoError(t, err)
 
 			// wait the flush of the message on the network
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(20 * time.Millisecond)
 			cancel()
 		})
 
@@ -406,7 +404,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 			require.NoError(t, err)
 
 			// wait the flush of the message on the network
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(20 * time.Millisecond)
 			cancel()
 		})
 
