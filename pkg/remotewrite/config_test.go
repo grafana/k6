@@ -16,6 +16,8 @@ import (
 )
 
 func TestApply(t *testing.T) {
+	t.Parallel()
+
 	fullConfig := Config{
 		Url:                   null.StringFrom("some-url"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
@@ -48,6 +50,8 @@ func TestApply(t *testing.T) {
 }
 
 func TestConfigParseArg(t *testing.T) {
+	t.Parallel()
+
 	c, err := ParseArg("url=http://prometheus.remote:3412/write")
 	assert.Nil(t, err)
 	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.Url)

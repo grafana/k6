@@ -10,6 +10,8 @@ import (
 
 // Note: k6 Registry is not used here since Output is getting
 // samples only from k6 engine, hence we assume they are already vetted.
+
+// metricsStorage is an in-memory gather point for metrics
 type metricsStorage struct {
 	m map[string]stats.Sample
 }
@@ -21,7 +23,7 @@ func newMetricsStorage() *metricsStorage {
 }
 
 // update modifies metricsStorage and returns updated sample
-// so that they hold the same value for the given metric
+// so that the stored metric and the returned metric hold the same value
 func (ms *metricsStorage) update(sample stats.Sample, add func(current, s stats.Sample) stats.Sample) stats.Sample {
 	if current, ok := ms.m[sample.Metric.Name]; ok {
 		if add == nil {

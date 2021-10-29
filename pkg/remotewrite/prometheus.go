@@ -73,39 +73,7 @@ func (pm *PrometheusMapping) MapRate(ms *metricsStorage, sample stats.Sample, la
 }
 
 func (pm *PrometheusMapping) MapTrend(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
-	sample = ms.update(sample, func(current, s stats.Sample) stats.Sample {
-		// this is an attempt to optimize what happens in TrendSink;
-		// partial copy-paste from k6/stats
-		t := current.Metric.Sink.(*stats.TrendSink)
-
-		index := sort.Search(len(t.Values), func(i int) bool {
-			return t.Values[i] > s.Value
-		})
-		t.Values = append(t.Values, 0)
-		copy(t.Values[index+1:], t.Values[index:])
-		t.Values[index] = s.Value
-
-		t.Count += 1
-		t.Sum += s.Value
-		t.Avg = t.Sum / float64(t.Count)
-
-		if s.Value > t.Max {
-			t.Max = s.Value
-		}
-		if s.Value < t.Min || t.Count == 1 {
-			t.Min = s.Value
-		}
-
-		// The median of an even number of values is the average of the middle two.
-		if (t.Count & 0x01) == 0 {
-			t.Med = (t.Values[(t.Count/2)-1] + t.Values[(t.Count/2)]) / 2
-		} else {
-			t.Med = t.Values[t.Count/2]
-		}
-
-		current.Metric.Sink = t
-		return current
-	})
+	sample = ms.update(sample, trendAdd)
 
 	s := sample.Metric.Sink.(*stats.TrendSink)
 	aggr := map[string]float64{
@@ -197,7 +165,42 @@ func (pm *PrometheusMapping) MapTrend(ms *metricsStorage, sample stats.Sample, l
 	}
 }
 
-// Note: this is a copy-paste from k6/stats/sink.go but without additional call to Calc
+// The following functions are an attempt to add ad-hoc optimization to TrendSink,
+// and are a partial copy-paste from k6/stats.
+// TODO: re-write & refactor this once metrics refactoring progresses in k6.
+
+func trendAdd(current, s stats.Sample) stats.Sample {
+	t := current.Metric.Sink.(*stats.TrendSink)
+
+	// insert into sorted array instead of sorting anew on each addition
+	index := sort.Search(len(t.Values), func(i int) bool {
+		return t.Values[i] > s.Value
+	})
+	t.Values = append(t.Values, 0)
+	copy(t.Values[index+1:], t.Values[index:])
+	t.Values[index] = s.Value
+
+	t.Count += 1
+	t.Sum += s.Value
+	t.Avg = t.Sum / float64(t.Count)
+
+	if s.Value > t.Max {
+		t.Max = s.Value
+	}
+	if s.Value < t.Min || t.Count == 1 {
+		t.Min = s.Value
+	}
+
+	if (t.Count & 0x01) == 0 {
+		t.Med = (t.Values[(t.Count/2)-1] + t.Values[(t.Count/2)]) / 2
+	} else {
+		t.Med = t.Values[t.Count/2]
+	}
+
+	current.Metric.Sink = t
+	return current
+}
+
 func p(t *stats.TrendSink, pct float64) float64 {
 	switch t.Count {
 	case 0:

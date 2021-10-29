@@ -29,6 +29,9 @@ type Output struct {
 
 var _ output.Output = new(Output)
 
+// toggle to indicate whether we should stop dropping samples
+var flushTooLong bool
+
 func New(params output.Params) (*Output, error) {
 	config, err := GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument)
 	if err != nil {
@@ -91,8 +94,10 @@ func (o *Output) flush() {
 			o.logger.WithField("nts", nts).
 				Warn(fmt.Sprintf("Remote write took %s while flush period is %s. Some samples may be dropped.",
 					d.String(), o.config.FlushPeriod.String()))
+			flushTooLong = true
 		} else {
 			o.logger.WithField("nts", nts).Debug(fmt.Sprintf("Remote write took %s.", d.String()))
+			flushTooLong = false
 		}
 	}()
 
@@ -136,7 +141,7 @@ func (o *Output) convertToTimeSeries(samplesContainers []stats.SampleContainer) 
 			// lose info in tags or assign tags wrongly, let's store each Sample in a different TimeSeries, for now.
 			// This approach also allows to avoid hard to replicate issues with duplicate timestamps.
 
-			labels, err := tagsToPrometheusLabels(sample.Tags, o.config)
+			labels, err := tagsToLabels(sample.Tags, o.config)
 			if err != nil {
 				o.logger.Error(err)
 			}
@@ -150,7 +155,7 @@ func (o *Output) convertToTimeSeries(samplesContainers []stats.SampleContainer) 
 
 		// Do not blow up if remote endpoint is overloaded and responds too slowly.
 		// TODO: consider other approaches
-		if len(promTimeSeries) > 15000 {
+		if flushTooLong && len(promTimeSeries) > 150000 {
 			break
 		}
 	}
