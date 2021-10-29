@@ -170,16 +170,11 @@ func (r *Request) Headers() map[string]string {
 	return headers
 }
 
-func (r *Request) HeadersArray() []goja.Value {
-	rt := k6common.GetRuntime(r.ctx)
-	type Header struct {
-		Name  string `json:"name"`
-		Value string `json:"value"`
-	}
-	headers := make([]goja.Value, 0)
+func (r *Request) HeadersArray() []api.HTTPHeader {
+	headers := make([]api.HTTPHeader, 0)
 	for n, vals := range r.headers {
 		for _, v := range vals {
-			headers = append(headers, rt.ToValue(Header{Name: n, Value: v}))
+			headers = append(headers, api.HTTPHeader{Name: n, Value: v})
 		}
 	}
 	return headers

@@ -29,7 +29,7 @@ type Request interface {
 	Frame() Frame
 	HeaderValue(string) goja.Value
 	Headers() map[string]string
-	HeadersArray() []goja.Value
+	HeadersArray() []HTTPHeader
 	IsNavigationRequest() bool
 	Method() string
 	PostData() string

@@ -20,6 +20,11 @@
 
 package api
 
+type HTTPHeader struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 type HTTPMessageSize struct {
 	Headers int64 `json:"headers"`
 	Body    int64 `json:"body"`
