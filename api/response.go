@@ -37,6 +37,7 @@ type Response interface {
 	Request() Request
 	SecurityDetails() goja.Value
 	ServerAddr() goja.Value
+	Size() HTTPMessageSize
 	Status() int64
 	StatusText() string
 	URL() string

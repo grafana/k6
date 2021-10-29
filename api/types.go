@@ -20,6 +20,11 @@
 
 package api
 
+type HTTPMessageSize struct {
+	Headers int64 `json:"headers"`
+	Body    int64 `json:"body"`
+}
+
 type Rect struct {
 	X      float64 `js:"x"`
 	Y      float64 `js:"y"`

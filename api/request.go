@@ -39,7 +39,7 @@ type Request interface {
 	RedirectedTo() Request
 	ResourceType() string
 	Response() Response
-	Sizes() goja.Value
+	Size() HTTPMessageSize
 	Timing() goja.Value
 	URL() string
 }
