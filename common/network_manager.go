@@ -302,6 +302,9 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	if event.FrameID != "" {
 		frame = m.frameManager.getFrameByID(event.FrameID)
 	}
+	if frame == nil {
+		debugLog("<networkmanager:onRequest> frame is nil")
+	}
 
 	req := NewRequest(m.ctx, event, frame, redirectChain, interceptionID, m.userReqInterceptionEnabled)
 	m.reqsMu.Lock()
@@ -349,14 +352,15 @@ func (m *NetworkManager) onRequestServedFromCache(event *network.EventRequestSer
 
 func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived) {
 	req := m.requestFromID(event.RequestID)
-	if req != nil {
-		resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
-		req.response = resp
-		if !strings.HasPrefix(req.url, "data:") {
-			m.emitResponseReceived(resp)
-		}
-		m.frameManager.requestReceivedResponse(resp)
+	if req == nil {
+		return
 	}
+	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
+	req.response = resp
+	if !strings.HasPrefix(req.url, "data:") {
+		m.emitResponseReceived(resp)
+	}
+	m.frameManager.requestReceivedResponse(resp)
 }
 
 func (m *NetworkManager) requestFromID(reqID network.RequestID) *Request {

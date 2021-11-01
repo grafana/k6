@@ -176,43 +176,125 @@ func (f *Frame) deleteRequest(requestID network.RequestID) {
 	delete(f.inflightRequests, requestID)
 }
 
-func (f *Frame) getInflightRequestCount() int {
+func (f *Frame) inflightRequestsLen() int {
 	f.inflightRequestsMu.RLock()
 	defer f.inflightRequestsMu.RUnlock()
 	return len(f.inflightRequests)
 }
 
-func (f *Frame) hasInflightRequest(requestID network.RequestID) bool {
-	f.inflightRequestsMu.RLock()
-	defer f.inflightRequestsMu.RUnlock()
-
-	return f.inflightRequests[requestID]
-}
-
 func (f *Frame) clearLifecycle() {
+	// clear lifecycle events
 	f.lifecycleEventsMu.Lock()
-	for k := range f.lifecycleEvents {
-		f.lifecycleEvents[k] = false
+	{
+		for e := range f.lifecycleEvents {
+			f.lifecycleEvents[e] = false
+		}
 	}
 	f.lifecycleEventsMu.Unlock()
 	f.page.frameManager.mainFrame.recalculateLifecycle()
 
+	// keep the request related to the document if present
+	// in f.inflightRequests
 	f.inflightRequestsMu.Lock()
-	defer f.inflightRequestsMu.Unlock()
-	inflightRequests := make(map[network.RequestID]bool)
-	for req := range f.inflightRequests {
-		if req == f.currentDocument.request.requestID {
+	{
+		inflightRequests := make(map[network.RequestID]bool)
+		for req := range f.inflightRequests {
+			if req != f.currentDocument.request.requestID {
+				continue
+			}
 			inflightRequests[req] = true
 		}
+		f.inflightRequests = inflightRequests
 	}
+	f.inflightRequestsMu.Unlock()
+
 	f.stopNetworkIdleTimer()
-	if len(f.inflightRequests) == 0 {
+	if f.inflightRequestsLen() == 0 {
 		f.startNetworkIdleTimer()
 	}
 }
 
-func (f *Frame) defaultTimeout() time.Duration {
-	return time.Duration(f.manager.timeoutSettings.timeout()) * time.Second
+func (f *Frame) recalculateLifecycle() {
+	// Start with triggered events.
+	var events map[LifecycleEvent]bool = make(map[LifecycleEvent]bool)
+	f.lifecycleEventsMu.Lock()
+	for k, v := range f.lifecycleEvents {
+		events[k] = v
+	}
+	f.lifecycleEventsMu.Unlock()
+
+	// Only consider a life cycle event as fired if it has triggered for all of subtree.
+	f.childFramesMu.RLock()
+	for child := range f.childFrames {
+		child.(*Frame).recalculateLifecycle()
+		for k := range events {
+			if !child.(*Frame).hasSubtreeLifecycleEventFired(k) {
+				delete(events, k)
+			}
+		}
+	}
+	f.childFramesMu.RUnlock()
+
+	// Check if any of the fired events should be considered fired when looking at the entire subtree.
+	mainFrame := f.manager.mainFrame
+	for k := range events {
+		if !f.hasSubtreeLifecycleEventFired(k) {
+			f.emit(EventFrameAddLifecycle, k)
+			if f == mainFrame && k == LifecycleEventLoad {
+				f.page.emit(EventPageLoad, nil)
+			} else if f == mainFrame && k == LifecycleEventDOMContentLoad {
+				f.page.emit(EventPageDOMContentLoaded, nil)
+			}
+		}
+	}
+
+	// Emit removal events
+	f.lifecycleEventsMu.RLock()
+	for k := range f.subtreeLifecycleEvents {
+		if ok := events[k]; !ok {
+			f.emit(EventFrameRemoveLifecycle, k)
+		}
+	}
+	f.lifecycleEventsMu.RUnlock()
+
+	f.lifecycleEventsMu.Lock()
+	f.subtreeLifecycleEvents = make(map[LifecycleEvent]bool)
+	for k, v := range events {
+		f.subtreeLifecycleEvents[k] = v
+	}
+	f.lifecycleEventsMu.Unlock()
+}
+
+func (f *Frame) stopNetworkIdleTimer() {
+	f.networkIdleMu.Lock()
+	defer f.networkIdleMu.Unlock()
+	if f.networkIdleCancelFn != nil {
+		f.networkIdleCancelFn()
+		f.networkIdleCtx = nil
+		f.networkIdleCancelFn = nil
+	}
+}
+
+func (f *Frame) startNetworkIdleTimer() {
+	if f.hasLifecycleEventFired(LifecycleEventNetworkIdle) || f.detached {
+		return
+	}
+	if f.networkIdleCancelFn != nil {
+		f.networkIdleCancelFn()
+	}
+	f.networkIdleMu.Lock()
+	f.networkIdleCtx, f.networkIdleCancelFn = context.WithCancel(f.ctx)
+	f.networkIdleMu.Unlock()
+	go func() {
+		f.networkIdleMu.Lock()
+		doneCh := f.networkIdleCtx.Done()
+		f.networkIdleMu.Unlock()
+		select {
+		case <-doneCh:
+		case <-time.After(LifeCycleNetworkIdleTimeout):
+			f.manager.frameLifecycleEvent(f.id, LifecycleEventNetworkIdle)
+		}
+	}()
 }
 
 func (f *Frame) detach() {
@@ -227,6 +309,10 @@ func (f *Frame) detach() {
 	}
 }
 
+func (f *Frame) defaultTimeout() time.Duration {
+	return time.Duration(f.manager.timeoutSettings.timeout()) * time.Second
+}
+
 func (f *Frame) document() (*ElementHandle, error) {
 	rt := k6common.GetRuntime(f.ctx)
 	if f.documentHandle != nil {
@@ -239,10 +325,6 @@ func (f *Frame) document() (*ElementHandle, error) {
 	}
 	f.documentHandle = result.(*ElementHandle)
 	return f.documentHandle, err
-}
-
-func (f *Frame) getLoadingStartedTime() time.Time {
-	return f.loadingStartedTime
 }
 
 func (f *Frame) hasContext(world string) bool {
@@ -323,57 +405,6 @@ func (f *Frame) position() *Position {
 	return &Position{X: box.X, Y: box.Y}
 }
 
-func (f *Frame) recalculateLifecycle() {
-	// Start with triggered events.
-	var events map[LifecycleEvent]bool = make(map[LifecycleEvent]bool)
-	f.lifecycleEventsMu.Lock()
-	for k, v := range f.lifecycleEvents {
-		events[k] = v
-	}
-	f.lifecycleEventsMu.Unlock()
-
-	// Only consider a life cycle event as fired if it has triggered for all of subtree.
-	f.childFramesMu.RLock()
-	for child := range f.childFrames {
-		child.(*Frame).recalculateLifecycle()
-		for k := range events {
-			if !child.(*Frame).hasSubtreeLifecycleEventFired(k) {
-				delete(events, k)
-			}
-		}
-	}
-	f.childFramesMu.RUnlock()
-
-	// Check if any of the fired events should be considered fired when looking at the entire subtree.
-	mainFrame := f.manager.mainFrame
-	for k := range events {
-		if !f.hasSubtreeLifecycleEventFired(k) {
-			f.emit(EventFrameAddLifecycle, k)
-			if f == mainFrame && k == LifecycleEventLoad {
-				f.page.emit(EventPageLoad, nil)
-			} else if f == mainFrame && k == LifecycleEventDOMContentLoad {
-				f.page.emit(EventPageDOMContentLoaded, nil)
-			}
-		}
-	}
-
-	// Emit removal events
-	f.lifecycleEventsMu.RLock()
-	for k := range f.subtreeLifecycleEvents {
-		if ok := events[k]; !ok {
-			f.emit(EventFrameRemoveLifecycle, k)
-		}
-	}
-	f.lifecycleEventsMu.RUnlock()
-
-	f.lifecycleEventsMu.Lock()
-	f.subtreeLifecycleEvents = make(map[LifecycleEvent]bool)
-	for k, v := range events {
-		f.subtreeLifecycleEvents[k] = v
-	}
-	f.lifecycleEventsMu.Unlock()
-}
-
 func (f *Frame) removeChildFrame(childFrame *Frame) {
 	f.childFramesMu.Lock()
 	delete(f.childFrames, childFrame)
@@ -404,38 +435,6 @@ func (f *Frame) setContext(world string, execCtx *ExecutionContext) {
 
 func (f *Frame) setID(id cdp.FrameID) {
 	f.id = id
-}
-
-func (f *Frame) startNetworkIdleTimer() {
-	if f.hasLifecycleEventFired(LifecycleEventNetworkIdle) || f.detached {
-		return
-	}
-	if f.networkIdleCancelFn != nil {
-		f.networkIdleCancelFn()
-	}
-	f.networkIdleMu.Lock()
-	f.networkIdleCtx, f.networkIdleCancelFn = context.WithCancel(f.ctx)
-	f.networkIdleMu.Unlock()
-	go func() {
-		f.networkIdleMu.Lock()
-		doneCh := f.networkIdleCtx.Done()
-		f.networkIdleMu.Unlock()
-		select {
-		case <-doneCh:
-		case <-time.After(LifeCycleNetworkIdleTimeout):
-			f.manager.frameLifecycleEvent(f.id, LifecycleEventNetworkIdle)
-		}
-	}()
-}
-
-func (f *Frame) stopNetworkIdleTimer() {
-	f.networkIdleMu.Lock()
-	defer f.networkIdleMu.Unlock()
-	if f.networkIdleCancelFn != nil {
-		f.networkIdleCancelFn()
-		f.networkIdleCtx = nil
-		f.networkIdleCancelFn = nil
-	}
 }
 
 func (f *Frame) waitForExecutionContext(world string) {
