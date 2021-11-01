@@ -3,3 +3,6 @@ contact_links:
   - name: k6 Community Forum
     url: https://community.k6.io/
     about: Please ask and answer questions here.
+  - name: k6 Documentation
+    url: https://github.com/grafana/k6-docs
+    about: Please add any documentation related issues here.
