@@ -387,8 +387,8 @@ func TestNewBundle(t *testing.T) {
 				assert.Equal(t, null.BoolFrom(true), b.Options.InsecureSkipTLSVerify)
 			}
 		})
-		t.Run("ForceHTTP1", func(t *testing.T){
-			t.Parallel();
+		t.Run("ForceHTTP1", func(t *testing.T) {
+			t.Parallel()
 			b, err := getSimpleBundle(t, "/script.js", `
 			    export let options = {
 					forceHttp1: true,
