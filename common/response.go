@@ -135,6 +135,18 @@ func (r *Response) fetchBody() error {
 	return nil
 }
 
+func (r *Response) headersSize() int64 {
+	size := 4 // 4 = 2 spaces + 2 line breaks (HTTP/1.1 200 OK\r\n)
+	size += 8 // httpVersion
+	size += 3 // statusCode
+	size += len(r.statusText)
+	for n, v := range r.headers {
+		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
+	}
+	size += 2 // '\r\n'
+	return int64(size)
+}
+
 func (r *Response) AllHeaders() map[string]string {
 	// TODO: fix this data to include "ExtraInfo" header data
 	headers := make(map[string]string)
@@ -210,16 +222,11 @@ func (r *Response) Headers() map[string]string {
 	return headers
 }
 
-func (r *Response) HeadersArray() []goja.Value {
-	rt := k6common.GetRuntime(r.ctx)
-	type Header struct {
-		Name  string `json:"name"`
-		Value string `json:"value"`
-	}
-	headers := make([]goja.Value, 0)
+func (r *Response) HeadersArray() []api.HTTPHeader {
+	headers := make([]api.HTTPHeader, 0)
 	for n, vals := range r.headers {
 		for _, v := range vals {
-			headers = append(headers, rt.ToValue(Header{Name: n, Value: v}))
+			headers = append(headers, api.HTTPHeader{Name: n, Value: v})
 		}
 	}
 	return headers
@@ -266,6 +273,13 @@ func (r *Response) SecurityDetails() goja.Value {
 func (r *Response) ServerAddr() goja.Value {
 	rt := k6common.GetRuntime(r.ctx)
 	return rt.ToValue(r.remoteAddress)
+}
+
+func (r *Response) Size() api.HTTPMessageSize {
+	return api.HTTPMessageSize{
+		Body:    int64(len(r.body)),
+		Headers: r.headersSize(),
+	}
 }
 
 // Status returns the response status code

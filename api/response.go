@@ -31,12 +31,13 @@ type Response interface {
 	HeaderValue(string) goja.Value
 	HeaderValues(string) []string
 	Headers() map[string]string
-	HeadersArray() []goja.Value
+	HeadersArray() []HTTPHeader
 	JSON() goja.Value
 	Ok() bool
 	Request() Request
 	SecurityDetails() goja.Value
 	ServerAddr() goja.Value
+	Size() HTTPMessageSize
 	Status() int64
 	StatusText() string
 	URL() string

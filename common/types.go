@@ -227,13 +227,6 @@ type ResourceTiming struct {
 	ResponseEnd           float64 `json:"responseEnd"`
 }
 
-type RequestSizes struct {
-	RequestBodySize     int64 `json:"requestBodySize"`
-	RequestHeadersSize  int64 `json:"requestHeadersSize"`
-	ResponseBodySize    int64 `json:"responseBodySize"`
-	ResponseHeadersSize int64 `json:"responseHeadersSize"`
-}
-
 // Viewport represents a device screen
 type Screen struct {
 	Width  int64 `json:"width"`
