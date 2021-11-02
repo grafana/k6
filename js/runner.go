@@ -210,8 +210,13 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 		MaxIdleConns:        int(r.Bundle.Options.Batch.Int64),
 		MaxIdleConnsPerHost: int(r.Bundle.Options.BatchPerHost.Int64),
 	}
-	_ = http2.ConfigureTransport(transport)
 
+    if r.Bundle.Options.ForceHTTP1.Bool {
+	    transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{} //send req over h1 protocol
+	} else {
+	    _ = http2.ConfigureTransport(transport) //send over h2 protocol
+	}
+	
 	cookieJar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
