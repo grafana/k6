@@ -24,6 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dop251/goja"
@@ -75,6 +77,21 @@ func (mi *ModuleInstance) newMetric(call goja.ConstructorCall, t stats.MetricTyp
 	return v.ToObject(rt), nil
 }
 
+const warnMessageValueMaxSize = 100
+
+func limitValue(v string) string {
+	vRunes := []rune(v)
+	if len(vRunes) < warnMessageValueMaxSize {
+		return v
+	}
+	difference := int64(len(vRunes) - warnMessageValueMaxSize)
+	omitMsg := append(strconv.AppendInt([]byte("... omitting "), difference, 10), " characters ..."...)
+	return strings.Join([]string{
+		string(vRunes[:warnMessageValueMaxSize/2]),
+		string(vRunes[len(vRunes)-warnMessageValueMaxSize/2:]),
+	}, string(omitMsg))
+}
+
 func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 	state := m.core.GetState()
 	if state == nil {
@@ -84,7 +101,7 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 	// return/throw exception if throw enabled, otherwise just log
 	raiseNan := func() (bool, error) {
 		err := fmt.Errorf("'%s' is an invalid value for metric '%s', a number or a boolean value is expected",
-			v, m.metric.Name)
+			limitValue(v.String()), m.metric.Name)
 		if state.Options.Throw.Bool {
 			return false, err
 		}
