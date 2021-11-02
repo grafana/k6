@@ -120,6 +120,11 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.InsecureSkipTLSVerify.Valid)
 		assert.True(t, opts.InsecureSkipTLSVerify.Bool)
 	})
+	t.Run("ForceHTTP1", func(t *testing.T) {
+		opts := Options{}.Apply(Options{ForceHTTP1: null.BoolFrom(true)})
+		assert.True(t, opts.ForceHTTP1.Valid)
+		assert.True(t, opts.ForceHTTP1.Bool)
+	})
 	t.Run("TLSCipherSuites", func(t *testing.T) {
 		for suiteName, suiteID := range SupportedTLSCipherSuites {
 			t.Run(suiteName, func(t *testing.T) {
@@ -486,6 +491,11 @@ func TestOptionsEnv(t *testing.T) {
 			"false": null.BoolFrom(false),
 		},
 		{"InsecureSkipTLSVerify", "K6_INSECURE_SKIP_TLS_VERIFY"}: {
+			"":      null.Bool{},
+			"true":  null.BoolFrom(true),
+			"false": null.BoolFrom(false),
+		},
+		{"ForceHTTP1", "K6_FORCE_HTTP1"}: {
 			"":      null.Bool{},
 			"true":  null.BoolFrom(true),
 			"false": null.BoolFrom(false),
