@@ -1,23 +1,22 @@
-import launcher from "k6/x/browser";
+import launcher from 'k6/x/browser';
+import { check } from 'k6';
 
 export default function() {
-    const browser = launcher.launch('chromium', { headless: false });
-    const context = browser.newContext();
-    const page = context.newPage();
-    page.goto('http://whatsmyuseragent.org/');
+  const browser = launcher.launch('chromium', {
+    headless: __ENV.XK6_HEADLESS ? true : false,
+  });
+  const context = browser.newContext();
+  const page = context.newPage();
 
-    // Find element using CSS selector
-    let ip = page.$('.ip-address p').textContent();
-    console.log("CSS selector: ", ip);
+  page.goto('https://test.k6.io/');
 
-    // Find element using XPath expression
-    ip = page.$("//div[@class='ip-address']/p").textContent();
-    console.log("Xpath expression: ", ip);
+  check(page, {
+    'Title with CSS selector':
+      p => p.$('header h1.title').textContent() == 'test.k6.io',
+    'Title with XPath selector':
+      p => p.$(`//header//h1[@class="title"]`).textContent() == 'test.k6.io',
+  });
 
-    // Find element using Text search
-    //ip = page.$("My IP Address").textContent();
-    //console.log("Text search: ", ip);
-
-	page.close();
-    browser.close();
+  page.close();
+  browser.close();
 }
