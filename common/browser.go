@@ -35,7 +35,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
 	"github.com/grafana/xk6-browser/api"
-	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
 	"golang.org/x/net/context"
 )
@@ -217,8 +216,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 				// If we're no longer connected to browser, then ignore WebSocket errors
 				return
 			}
-			rt := k6common.GetRuntime(b.ctx)
-			k6common.Throw(rt, err)
+			k6Throw(b.ctx, "cannot create NewPage for background_page event: %w", err)
 		}
 		b.pagesMu.Lock()
 		b.pages[ev.TargetInfo.TargetID] = p
@@ -240,8 +238,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 				// If we're no longer connected to browser, then ignore WebSocket errors
 				return
 			}
-			rt := k6common.GetRuntime(b.ctx)
-			k6common.Throw(rt, err)
+			k6Throw(b.ctx, "cannot create NewPage for page event: %w", err)
 		}
 		b.pagesMu.Lock()
 		b.pages[ev.TargetInfo.TargetID] = p
@@ -324,13 +321,12 @@ func (b *Browser) Close() {
 	defer b.browserProc.Terminate()
 
 	action := cdpbrowser.Close()
-	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
+	err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
+	if err != nil {
 		if _, ok := err.(*websocket.CloseError); !ok {
-			rt := k6common.GetRuntime(b.ctx)
-			k6common.Throw(rt, fmt.Errorf("unable to execute %T: %v", action, err))
+			k6Throw(b.ctx, "unable to execute %T: %v", action, err)
 		}
 	}
-
 	atomic.CompareAndSwapInt64(&b.state, b.state, BrowserStateClosed)
 }
 
@@ -353,18 +349,16 @@ func (b *Browser) IsConnected() bool {
 
 // NewContext creates a new incognito-like browser context
 func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
-	rt := k6common.GetRuntime(b.ctx)
-
 	action := target.CreateBrowserContext().WithDisposeOnDetach(true)
 	browserContextID, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	if err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to execute %T: %w", action, err))
+		k6Throw(b.ctx, "unable to execute %T: %w", action, err)
 	}
 
 	browserCtxOpts := NewBrowserContextOptions()
 	err = browserCtxOpts.Parse(b.ctx, opts)
 	if err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(b.ctx, "failed parsing options: %w", err)
 	}
 
 	b.contextsMu.Lock()
@@ -383,29 +377,21 @@ func (b *Browser) NewPage(opts goja.Value) api.Page {
 
 // UserAgent returns the controlled browser's user agent string
 func (b *Browser) UserAgent() string {
-	rt := k6common.GetRuntime(b.ctx)
-	var userAgent string
-	var err error
-
 	action := cdpbrowser.GetVersion()
-	if _, _, _, userAgent, _, err = action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to get browser user agent: %w", err))
+	_, _, _, ua, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
+	if err != nil {
+		k6Throw(b.ctx, "unable to get browser user agent: %w", err)
 	}
-
-	return userAgent
+	return ua
 }
 
 // Version returns the controlled browser's version
 func (b *Browser) Version() string {
-	rt := k6common.GetRuntime(b.ctx)
-	var product string
-	var err error
-
 	action := cdpbrowser.GetVersion()
-	if _, product, _, _, _, err = action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to get browser version: %w", err))
+	_, product, _, _, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
+	if err != nil {
+		k6Throw(b.ctx, "unable to get browser version: %w", err)
 	}
-
 	i := strings.Index(product, "/")
 	if i == -1 {
 		return product

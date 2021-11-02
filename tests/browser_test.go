@@ -29,14 +29,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var browserModuleTests = map[string]func(*testing.T, api.Browser){
+	"NewPage":   testBrowserNewPage,
+	"Version":   testBrowserVersion,
+	"UserAgent": testBrowserUserAgent,
+}
+
 func TestBrowserModule(t *testing.T) {
 	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
+	t.Cleanup(bt.Browser.Close)
 
-	t.Run("Browser", func(t *testing.T) {
-		t.Run("newPage", func(t *testing.T) { testBrowserNewPage(t, bt.Browser) })
-		t.Run("version", func(t *testing.T) { testBrowserVersion(t, bt.Browser) })
-	})
+	for name, test := range browserModuleTests {
+		t.Run(name, func(t *testing.T) {
+			test(t, bt.Browser)
+		})
+	}
 }
 
 func testBrowserNewPage(t *testing.T, b api.Browser) {
@@ -56,8 +63,17 @@ func testBrowserNewPage(t *testing.T, b api.Browser) {
 	assert.Equal(t, 0, l, "expected there to be 0 browser context after second page close, but found %d", l)
 }
 
+// This only works for Chrome!
 func testBrowserVersion(t *testing.T, b api.Browser) {
-	version := b.Version()
-	r, _ := regexp.Compile(`^\d+\.\d+\.\d+\.\d+$`) // This only works for Chrome!
-	assert.Regexp(t, r, version, "expected browser version to match regex '^\\d+\\.\\d+\\.\\d+\\.\\d+', but found %q", version)
+	const re = `^\d+\.\d+\.\d+\.\d+$`
+	r, _ := regexp.Compile(re)
+	ver := b.Version()
+	assert.Regexp(t, r, ver, "expected browser version to match regex %q, but found %q", re, ver)
+}
+
+// This only works for Chrome!
+func testBrowserUserAgent(t *testing.T, b api.Browser) {
+	// testBrowserVersion() tests the version already
+	// just look for "Headless" in UserAgent
+	assert.Contains(t, b.UserAgent(), "Headless")
 }

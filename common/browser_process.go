@@ -44,7 +44,12 @@ type BrowserProcess struct {
 	userDataDir string
 }
 
-func NewBrowserProcess(ctx context.Context, cancel context.CancelFunc, process *os.Process, wsURL string, userDataDir string) *BrowserProcess {
+func NewBrowserProcess(
+	ctx context.Context,
+	cancel context.CancelFunc,
+	process *os.Process,
+	wsURL, userDataDir string,
+) *BrowserProcess {
 	p := BrowserProcess{
 		ctx:                        ctx,
 		cancel:                     cancel,
