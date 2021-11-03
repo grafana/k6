@@ -111,28 +111,16 @@ func (r *Request) getDocumentID() string {
 	return r.documentID
 }
 
-func (r *Request) requestHeadersSize() int {
-	headersSize := 4 // 4 = 2 spaces + 2 line breaks (GET /path \r\n)
-	headersSize += len(r.method)
+func (r *Request) headersSize() int64 {
+	size := 4 // 4 = 2 spaces + 2 line breaks (GET /path \r\n)
+	size += len(r.method)
 	u, _ := url.Parse(r.url)
-	headersSize += len(u.Path)
-	headersSize += 8 // httpVersion
+	size += len(u.Path)
+	size += 8 // httpVersion
 	for n, v := range r.headers {
-		headersSize += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
+		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
 	}
-	return headersSize
-}
-
-func (r *Request) responseHeadersSize() int {
-	headersSize := 4 // 4 = 2 spaces + 2 line breaks (HTTP/1.1 200 Ok\r\n)
-	headersSize += 8 // httpVersion
-	headersSize += 3 // statusCode
-	headersSize += len(r.response.statusText)
-	for n, v := range r.headers {
-		headersSize += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
-	}
-	headersSize += 2 // '\r\n'
-	return headersSize
+	return int64(size)
 }
 
 func (r *Request) setErrorText(errorText string) {
@@ -182,16 +170,11 @@ func (r *Request) Headers() map[string]string {
 	return headers
 }
 
-func (r *Request) HeadersArray() []goja.Value {
-	rt := k6common.GetRuntime(r.ctx)
-	type Header struct {
-		Name  string `json:"name"`
-		Value string `json:"value"`
-	}
-	headers := make([]goja.Value, 0)
+func (r *Request) HeadersArray() []api.HTTPHeader {
+	headers := make([]api.HTTPHeader, 0)
 	for n, vals := range r.headers {
 		for _, v := range vals {
-			headers = append(headers, rt.ToValue(Header{Name: n, Value: v}))
+			headers = append(headers, api.HTTPHeader{Name: n, Value: v})
 		}
 	}
 	return headers
@@ -247,20 +230,11 @@ func (r *Request) Response() api.Response {
 	return r.response
 }
 
-func (r *Request) Sizes() goja.Value {
-	type Size struct {
-		RequestBodySize     int `json:"requestBodySize"`
-		RequestHeadersSize  int `json:"requestHeadersSize"`
-		ResponseBodySize    int `json:"responseBodySize"`
-		ResponseHeadersSize int `json:"responseHeadersSize"`
+func (r *Request) Size() api.HTTPMessageSize {
+	return api.HTTPMessageSize{
+		Body:    int64(len(r.postData)),
+		Headers: r.headersSize(),
 	}
-	rt := k6common.GetRuntime(r.ctx)
-	return rt.ToValue(Size{
-		RequestBodySize:     len(r.postData),
-		RequestHeadersSize:  r.requestHeadersSize(),
-		ResponseBodySize:    len(r.response.body),
-		ResponseHeadersSize: r.responseHeadersSize(),
-	})
 }
 
 func (r *Request) Timing() goja.Value {

@@ -64,6 +64,7 @@ type Browser struct {
 
 	// Connection to browser to talk CDP protocol
 	conn      *Connection
+	connMu    sync.RWMutex
 	connected bool
 
 	contextsMu     sync.RWMutex
@@ -118,6 +119,8 @@ func (b *Browser) connect() error {
 		return fmt.Errorf("unable to connect to browser WS URL: %w", err)
 	}
 
+	b.connMu.Lock()
+	defer b.connMu.Unlock()
 	b.connected = true
 	b.defaultContext = NewBrowserContext(b.ctx, b.conn, b, "", NewBrowserContextOptions(), b.logger)
 	return b.initEvents()
@@ -166,8 +169,10 @@ func (b *Browser) initEvents() error {
 				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
 					go b.onDetachedFromTarget(ev)
 				} else if event.typ == EventConnectionClose {
+					b.connMu.Lock()
 					b.connected = false
-					b.browserProc.didLooseConnection()
+					b.connMu.Unlock()
+					b.browserProc.didLoseConnection()
 					b.cancelFn()
 				}
 			}
@@ -207,7 +212,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	if ev.TargetInfo.Type == "background_page" {
 		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, nil, false)
 		if err != nil {
-			isRunning := b.state == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
+			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
 				// If we're no longer connected to browser, then ignore WebSocket errors
 				return
@@ -230,7 +235,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		b.pagesMu.RUnlock()
 		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, opener, true)
 		if err != nil {
-			isRunning := b.state == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
+			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
 				// If we're no longer connected to browser, then ignore WebSocket errors
 				return
@@ -341,6 +346,8 @@ func (b *Browser) Contexts() []api.BrowserContext {
 }
 
 func (b *Browser) IsConnected() bool {
+	b.connMu.RLock()
+	defer b.connMu.RUnlock()
 	return b.connected
 }
 
