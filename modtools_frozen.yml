@@ -40,9 +40,6 @@
 - path: github.com/manyminds/api2go
   minVersion: v0.0.0-20180125085803-95be7bd0455e
   validUntil: 2029-08-04T16:33:07+03:00
-- path: github.com/mitchellh/mapstructure
-  minVersion: v1.1.2
-  validUntil: 2029-08-04T16:51:38+03:00
 - path: golang.org/x/sys
   minVersion: v0.0.0-20201204225414-ed752295db88
   validUntil: 2029-08-04T17:00:51+03:00

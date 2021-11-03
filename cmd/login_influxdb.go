@@ -26,13 +26,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/output/influxdb"
 	"go.k6.io/k6/ui"
 )
@@ -101,17 +100,11 @@ This will set the default server used when just "-o influxdb" is passed.`,
 				return err
 			}
 
-			dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-				DecodeHook: types.NullDecoder,
-				Result:     &conf,
-			})
-			if err != nil {
-				return err
-			}
+			conf.Addr = null.StringFrom(vals["Addr"].(string))
+			conf.DB = null.StringFrom(vals["DB"].(string))
+			conf.Username = null.StringFrom(vals["Username"].(string))
+			conf.Password = null.StringFrom(vals["Password"].(string))
 
-			if err = dec.Decode(vals); err != nil {
-				return err
-			}
 			client, err := influxdb.MakeClient(conf)
 			if err != nil {
 				return err

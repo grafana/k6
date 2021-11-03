@@ -27,78 +27,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v3"
 )
-
-func TestNullDecoder(t *testing.T) {
-	type foo struct {
-		Strs      []string
-		Str       null.String
-		Boolean   null.Bool
-		Integer   null.Int
-		Integer32 null.Int
-		Integer64 null.Int
-		Float32   null.Float
-		Float64   null.Float
-		Dur       NullDuration
-	}
-	f := foo{}
-	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		DecodeHook: NullDecoder,
-		Result:     &f,
-	})
-	require.NoError(t, err)
-
-	conf := map[string]interface{}{
-		"strs":      []string{"fake"},
-		"str":       "bar",
-		"boolean":   true,
-		"integer":   42,
-		"integer32": int32(42),
-		"integer64": int64(42),
-		"float32":   float32(3.14),
-		"float64":   float64(3.14),
-		"dur":       "1m",
-	}
-
-	err = dec.Decode(conf)
-	require.NoError(t, err)
-
-	require.Equal(t, foo{
-		Strs:      []string{"fake"},
-		Str:       null.StringFrom("bar"),
-		Boolean:   null.BoolFrom(true),
-		Integer:   null.IntFrom(42),
-		Integer32: null.IntFrom(42),
-		Integer64: null.IntFrom(42),
-		Float32:   null.FloatFrom(3.140000104904175),
-		Float64:   null.FloatFrom(3.14),
-		Dur:       NewNullDuration(1*time.Minute, true),
-	}, f)
-
-	input := map[string][]interface{}{
-		"Str":       {true, "string", "bool"},
-		"Boolean":   {"invalid", "bool", "string"},
-		"Integer":   {"invalid", "int", "string"},
-		"Integer32": {true, "int", "bool"},
-		"Integer64": {"invalid", "int", "string"},
-		"Float32":   {true, "float32 or float64", "bool"},
-		"Float64":   {"invalid", "float32 or float64", "string"},
-		"Dur":       {10, "string", "int"},
-	}
-
-	for k, v := range input {
-		t.Run("Error Message/"+k, func(t *testing.T) {
-			err = dec.Decode(map[string]interface{}{
-				k: v[0],
-			})
-			assert.EqualError(t, err, fmt.Sprintf("1 error(s) decoding:\n\n* error decoding '%s': expected '%s', got '%s'", k, v[1], v[2]))
-		})
-	}
-}
 
 func TestParseExtendedDuration(t *testing.T) {
 	testCases := []struct {
