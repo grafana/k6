@@ -22,6 +22,7 @@ package tests
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/grafana/xk6-browser/api"
@@ -77,5 +78,9 @@ func testBrowserVersion(t *testing.T, b api.Browser) {
 func testBrowserUserAgent(t *testing.T, b api.Browser) {
 	// testBrowserVersion() tests the version already
 	// just look for "Headless" in UserAgent
-	assert.Contains(t, b.UserAgent(), "Headless")
+	ua := b.UserAgent()
+	if prefix := "Mozilla/5.0"; !strings.HasPrefix(ua, prefix) {
+		t.Errorf("UserAgent should start with %q, but got: %q", prefix, ua)
+	}
+	assert.Contains(t, ua, "Headless")
 }
