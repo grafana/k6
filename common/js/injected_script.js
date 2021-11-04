@@ -489,7 +489,7 @@ class InjectedScript {
             throw 'error:strictmodeviolation';
         }
         if (result.length == 0) {
-            return nil
+            return null
         }
         return result[0].capture || result[0].element;
     }

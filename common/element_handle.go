@@ -883,13 +883,17 @@ func (h *ElementHandle) waitForSelector(apiCtx context.Context, selector string,
 			rt.ToValue(h),
 			rt.ToValue(opts.Strict),
 			rt.ToValue(opts.State.String()),
-			rt.ToValue(opts.Timeout),
+			rt.ToValue(opts.Timeout.Milliseconds()),
 		}...)
 	if err != nil {
 		return nil, err
 	}
-
-	return result.(*ElementHandle), nil
+	switch r := result.(type) {
+	case *ElementHandle:
+		return r, nil
+	default:
+		return nil, nil
+	}
 }
 
 // AsElement returns this element handle
