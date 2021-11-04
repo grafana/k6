@@ -279,12 +279,6 @@ func (m *FrameManager) getFrameByID(id cdp.FrameID) *Frame {
 	return m.frames[id]
 }
 
-func (m *FrameManager) getFrames() map[cdp.FrameID]*Frame {
-	m.framesMu.RLock()
-	defer m.framesMu.RUnlock()
-	return m.frames
-}
-
 func (m *FrameManager) removeChildFramesRecursively(frame *Frame) {
 	for _, child := range frame.ChildFrames() {
 		m.removeFramesRecursively(child.(*Frame))
@@ -308,42 +302,49 @@ func (m *FrameManager) removeFramesRecursively(frame *Frame) {
 
 func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	delete(m.inflightRequests, req.getID())
+	defer m.page.emit(EventPageRequestFailed, req)
+
 	frame := req.getFrame()
-	if frame != nil {
-		frame.deleteRequest(req.getID())
-		if frame.getInflightRequestCount() == 0 {
-			frame.startNetworkIdleTimer()
-		} else if frame.getInflightRequestCount() <= 10 {
-			for reqID := range frame.inflightRequests {
-				req := frame.requestByID(reqID)
-				debugLog("<framemanager:requestFailed> reqID=%s inflightURL=%s, frameID=%s", reqID, req.url, frame.id)
-			}
+	if frame == nil {
+		debugLog("<framemanager:requestFailed> frame is nil")
+		return
+	}
+	frame.deleteRequest(req.getID())
+
+	switch rc := frame.inflightRequestsLen(); {
+	case rc == 0:
+		frame.startNetworkIdleTimer()
+	case rc <= 10:
+		for reqID := range frame.inflightRequests {
+			req := frame.requestByID(reqID)
+			debugLog("<framemanager:requestFailed> reqID=%s inflightURL=%s, frameID=%s", reqID, req.url, frame.id)
 		}
 	}
-	if frame.pendingDocument != nil && frame.pendingDocument.request == req {
-		errorText := req.errorText
-		if canceled {
-			errorText += "; maybe frame was detached?"
-		}
-		m.frameAbortedNavigation(frame.id, errorText, frame.pendingDocument.documentID)
+
+	if frame.pendingDocument == nil || frame.pendingDocument.request != req {
+		return
 	}
-	m.page.emit(EventPageRequestFailed, req)
+	errorText := req.errorText
+	if canceled {
+		errorText += "; maybe frame was detached?"
+	}
+	m.frameAbortedNavigation(frame.id, errorText, frame.pendingDocument.documentID)
 }
 
 func (m *FrameManager) requestFinished(req *Request) {
 	delete(m.inflightRequests, req.getID())
-
 	defer m.page.emit(EventPageRequestFinished, req)
+
 	frame := req.getFrame()
 	if frame == nil {
 		return
 	}
 	frame.deleteRequest(req.getID())
-	if frame.getInflightRequestCount() == 0 {
+	if frame.inflightRequestsLen() == 0 {
 		frame.startNetworkIdleTimer()
 	}
 	/*
-		else if frame.getInflightRequestCount() <= 10 {
+		else if frame.inflightRequestsLen() <= 10 {
 			for reqID, _ := range frame.inflightRequests {
 				req := frame.requestByID(reqID)
 			}
@@ -356,18 +357,20 @@ func (m *FrameManager) requestReceivedResponse(res *Response) {
 }
 
 func (m *FrameManager) requestStarted(req *Request) {
+	defer m.page.emit(EventPageRequest, req)
+
 	m.inflightRequests[req.getID()] = true
 	frame := req.getFrame()
-	if frame != nil {
-		frame.addRequest(req.getID())
-		if frame.getInflightRequestCount() == 1 {
-			frame.stopNetworkIdleTimer()
-		}
-		if req.documentID != "" {
-			frame.pendingDocument = &DocumentInfo{documentID: req.documentID, request: req}
-		}
+	if frame == nil {
+		return
 	}
-	m.page.emit(EventPageRequest, req)
+	frame.addRequest(req.getID())
+	if frame.inflightRequestsLen() == 1 {
+		frame.stopNetworkIdleTimer()
+	}
+	if req.documentID != "" {
+		frame.pendingDocument = &DocumentInfo{documentID: req.documentID, request: req}
+	}
 }
 
 // Frames returns a list of frames on the page
