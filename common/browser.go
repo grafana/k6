@@ -321,8 +321,7 @@ func (b *Browser) Close() {
 	defer b.browserProc.Terminate()
 
 	action := cdpbrowser.Close()
-	err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
-	if err != nil {
+	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
 		if _, ok := err.(*websocket.CloseError); !ok {
 			k6Throw(b.ctx, "unable to execute %T: %v", action, err)
 		}
@@ -356,8 +355,7 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 	}
 
 	browserCtxOpts := NewBrowserContextOptions()
-	err = browserCtxOpts.Parse(b.ctx, opts)
-	if err != nil {
+	if err := browserCtxOpts.Parse(b.ctx, opts); err != nil {
 		k6Throw(b.ctx, "failed parsing options: %w", err)
 	}
 

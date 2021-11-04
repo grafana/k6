@@ -306,3 +306,13 @@ func waitForEvent(ctx context.Context, emitter EventEmitter, events []string, pr
 
 	return nil, nil
 }
+
+// k6Throw throws a k6 error
+func k6Throw(ctx context.Context, format string, a ...interface{}) {
+	rt := k6common.GetRuntime(ctx)
+	if rt == nil {
+		// this should never happen unless a programmer error
+		panic("cannot get k6 runtime")
+	}
+	k6common.Throw(rt, fmt.Errorf(format, a...))
+}

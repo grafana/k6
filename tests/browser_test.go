@@ -72,6 +72,8 @@ func testBrowserVersion(t *testing.T, b api.Browser) {
 }
 
 // This only works for Chrome!
+// TODO: Improve this test, see:
+// https://github.com/grafana/xk6-browser/pull/51#discussion_r742696736
 func testBrowserUserAgent(t *testing.T, b api.Browser) {
 	// testBrowserVersion() tests the version already
 	// just look for "Headless" in UserAgent
