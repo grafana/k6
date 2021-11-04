@@ -21,8 +21,6 @@
 package browser
 
 import (
-	"context"
-
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
@@ -34,24 +32,55 @@ import (
 
 const version = "v0.1.0"
 
-// JSModule is the entrypoint into the browser JS module
-type JSModule struct {
-	// For when https://github.com/k6io/k6/issues/1802 is fixed
-	//Chromium api.BrowserType
-	Devices map[string]common.Device
-	Version string
+type (
+	// RootModule is the global module instance that will create module
+	// instances for each VU.
+	RootModule struct{}
+
+	// JSModule is the entrypoint into the browser JS module
+	JSModule struct {
+		k6modules.InstanceCore
+		Devices map[string]common.Device
+		Version string
+	}
+
+	// ModuleInstance represents an instance of the JS module.
+	ModuleInstance struct {
+		k6modules.InstanceCore
+		mod *JSModule
+	}
+)
+
+var (
+	_ k6modules.IsModuleV2 = &RootModule{}
+	_ k6modules.Instance   = &ModuleInstance{}
+)
+
+// New returns a pointer to a new RootModule instance.
+func New() *RootModule {
+	return &RootModule{}
 }
 
-// NewJSModule creates a new browser module
-func NewJSModule(version string) *JSModule {
-	return &JSModule{
-		//Chromium: chromium.NewBrowserType(),
-		Devices: common.GetDevices(),
-		Version: version,
+// NewModuleInstance implements the modules.IsModuleV2 interface to return
+// a new instance for each VU.
+func (*RootModule) NewModuleInstance(m k6modules.InstanceCore) k6modules.Instance {
+	return &ModuleInstance{
+		InstanceCore: m,
+		mod: &JSModule{
+			InstanceCore: m,
+			Devices:      common.GetDevices(),
+			Version:      version,
+		},
 	}
 }
 
-func (m *JSModule) Launch(ctx context.Context, browserName string, opts goja.Value) api.Browser {
+// GetExports returns the exports of the JS module so that it can be used in
+// test scripts.
+func (mi *ModuleInstance) GetExports() k6modules.Exports {
+	return k6modules.Exports{Default: mi.mod}
+}
+
+func (m *JSModule) Launch(browserName string, opts goja.Value) api.Browser {
 	/*go func() {
 		f, err := os.Create("./cpu.profile")
 		if err != nil {
@@ -63,15 +92,15 @@ func (m *JSModule) Launch(ctx context.Context, browserName string, opts goja.Val
 	}()*/
 
 	if browserName == "chromium" {
-		bt := chromium.NewBrowserType(ctx)
+		bt := chromium.NewBrowserType(m.GetContext())
 		return bt.Launch(opts)
 	}
 
-	rt := k6common.GetRuntime(ctx)
-	k6common.Throw(rt, errors.Errorf("Currently 'chromium' is the only supported browser"))
+	k6common.Throw(m.GetRuntime(),
+		errors.Errorf("Currently 'chromium' is the only supported browser"))
 	return nil
 }
 
 func init() {
-	k6modules.Register("k6/x/browser", NewJSModule(version))
+	k6modules.Register("k6/x/browser", New())
 }
