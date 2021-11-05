@@ -25,10 +25,10 @@ import (
 	"testing"
 
 	"github.com/grafana/xk6-browser/testutils/browsertest"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestElementHandleWaitForSelector(t *testing.T) {
+func TestElementHandleGetAttribute(t *testing.T) {
 	bt := browsertest.NewBrowserTest(t)
 	p := bt.Browser.NewPage(nil)
 	t.Cleanup(func() {
@@ -36,22 +36,13 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 		bt.Browser.Close()
 	})
 
-	p.SetContent(`<div class="root"></div>`, nil)
-	root := p.Query(".root")
-	p.Evaluate(bt.Runtime.ToValue(`
-        () => {
-		setTimeout(() => {
-			const div = document.createElement('div');
-			div.className = 'element-to-appear';
-			div.appendChild(document.createTextNode("Hello World"));
-			root = document.querySelector('.root');
-			root.appendChild(div);
-			}, 100);
-		}
-		`))
-	element := root.WaitForSelector(".element-to-appear", bt.Runtime.ToValue(struct {
-		Timeout int64 `js:"timeout"`
-	}{Timeout: 1000}))
-	require.NotNil(t, element, "expected element to have been found after wait")
-	element.Dispose()
+	const want = "https://somewhere"
+
+	p.SetContent(`
+		<a id="dark-mode-toggle-X" href="https://somewhere">Dark</a>
+	`, nil)
+
+	el := p.Query("#dark-mode-toggle-X")
+	got := el.GetAttribute("href").String()
+	assert.Equal(t, want, got)
 }
