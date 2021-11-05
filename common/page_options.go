@@ -91,7 +91,7 @@ func (o *PageReloadOptions) Parse(ctx context.Context, opts goja.Value) error {
 			switch k {
 			case "waitUntil":
 				lifeCycle := opts.Get(k).String()
-				if l, ok := LifecycleEventToID[lifeCycle]; ok {
+				if l, ok := lifecycleEventToID[lifeCycle]; ok {
 					o.WaitUntil = l
 				} else {
 					return fmt.Errorf("%q is not a valid lifecycle", lifeCycle)

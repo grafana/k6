@@ -298,7 +298,7 @@ func (o *FrameGotoOptions) Parse(ctx context.Context, opts goja.Value) error {
 				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
 			case "waitUntil":
 				lifeCycle := opts.Get(k).String()
-				if l, ok := LifecycleEventToID[lifeCycle]; ok {
+				if l, ok := lifecycleEventToID[lifeCycle]; ok {
 					o.WaitUntil = l
 				} else {
 					return fmt.Errorf("%q is not a valid lifecycle", lifeCycle)
@@ -505,7 +505,7 @@ func (o *FrameSetContentOptions) Parse(ctx context.Context, opts goja.Value) err
 				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
 			case "waitUntil":
 				lifeCycle := opts.Get(k).String()
-				if l, ok := LifecycleEventToID[lifeCycle]; ok {
+				if l, ok := lifecycleEventToID[lifeCycle]; ok {
 					o.WaitUntil = l
 				} else {
 					return fmt.Errorf("%q is not a valid lifecycle", lifeCycle)
@@ -670,7 +670,7 @@ func (o *FrameWaitForNavigationOptions) Parse(ctx context.Context, opts goja.Val
 				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
 			case "waitUntil":
 				lifeCycle := opts.Get(k).String()
-				if l, ok := LifecycleEventToID[lifeCycle]; ok {
+				if l, ok := lifecycleEventToID[lifeCycle]; ok {
 					o.WaitUntil = l
 				} else {
 					return fmt.Errorf("%q is not a valid lifecycle", lifeCycle)
@@ -698,7 +698,7 @@ func (o *FrameWaitForSelectorOptions) Parse(ctx context.Context, opts goja.Value
 			switch k {
 			case "state":
 				state := opts.Get(k).String()
-				if s, ok := DOMElementStateToID[state]; ok {
+				if s, ok := domElementStateToID[state]; ok {
 					o.State = s
 				} else {
 					return fmt.Errorf("%q is not a valid DOM state", state)

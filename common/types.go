@@ -41,16 +41,16 @@ const (
 )
 
 func (c ColorScheme) String() string {
-	return ColorSchemeToString[c]
+	return colorSchemeToString[c]
 }
 
-var ColorSchemeToString = map[ColorScheme]string{
+var colorSchemeToString = map[ColorScheme]string{
 	ColorSchemeLight:        "light",
 	ColorSchemeDark:         "dark",
 	ColorSchemeNoPreference: "no-preference",
 }
 
-var ColorSchemeToID = map[string]ColorScheme{
+var colorSchemeToID = map[string]ColorScheme{
 	"light":         ColorSchemeLight,
 	"dark":          ColorSchemeDark,
 	"no-preference": ColorSchemeNoPreference,
@@ -59,12 +59,12 @@ var ColorSchemeToID = map[string]ColorScheme{
 // MarshalJSON marshals the enum as a quoted JSON string
 func (c ColorScheme) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
-	buffer.WriteString(ColorSchemeToString[c])
+	buffer.WriteString(colorSchemeToString[c])
 	buffer.WriteString(`"`)
 	return buffer.Bytes(), nil
 }
 
-// UnmarshalJSON unmashals a quoted JSON string to the enum value
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value
 func (c *ColorScheme) UnmarshalJSON(b []byte) error {
 	var j string
 	err := json.Unmarshal(b, &j)
@@ -72,7 +72,7 @@ func (c *ColorScheme) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	// Note that if the string cannot be found then it will be set to the zero value.
-	*c = ColorSchemeToID[j]
+	*c = colorSchemeToID[j]
 	return nil
 }
 
@@ -94,17 +94,17 @@ const (
 )
 
 func (s DOMElementState) String() string {
-	return DOMElementStateToString[s]
+	return domElementStateToString[s]
 }
 
-var DOMElementStateToString = map[DOMElementState]string{
+var domElementStateToString = map[DOMElementState]string{
 	DOMElementStateAttached: "attached",
 	DOMElementStateDetached: "detached",
 	DOMElementStateVisible:  "visible",
 	DOMElementStateHidden:   "hidden",
 }
 
-var DOMElementStateToID = map[string]DOMElementState{
+var domElementStateToID = map[string]DOMElementState{
 	"attached": DOMElementStateAttached,
 	"detached": DOMElementStateDetached,
 	"visible":  DOMElementStateVisible,
@@ -114,12 +114,12 @@ var DOMElementStateToID = map[string]DOMElementState{
 // MarshalJSON marshals the enum as a quoted JSON string
 func (s DOMElementState) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
-	buffer.WriteString(DOMElementStateToString[s])
+	buffer.WriteString(domElementStateToString[s])
 	buffer.WriteString(`"`)
 	return buffer.Bytes(), nil
 }
 
-// UnmarshalJSON unmashals a quoted JSON string to the enum value
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value
 func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	var j string
 	err := json.Unmarshal(b, &j)
@@ -127,7 +127,7 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	// Note that if the string cannot be found then it will be set to the zero value.
-	*s = DOMElementStateToID[j]
+	*s = domElementStateToID[j]
 	return nil
 }
 
@@ -151,16 +151,16 @@ const (
 )
 
 func (l LifecycleEvent) String() string {
-	return LifecycleEventToString[l]
+	return lifecycleEventToString[l]
 }
 
-var LifecycleEventToString = map[LifecycleEvent]string{
+var lifecycleEventToString = map[LifecycleEvent]string{
 	LifecycleEventLoad:           "load",
 	LifecycleEventDOMContentLoad: "domcontentloaded",
 	LifecycleEventNetworkIdle:    "networkidle",
 }
 
-var LifecycleEventToID = map[string]LifecycleEvent{
+var lifecycleEventToID = map[string]LifecycleEvent{
 	"load":             LifecycleEventLoad,
 	"domcontentloaded": LifecycleEventDOMContentLoad,
 	"networkidle":      LifecycleEventNetworkIdle,
@@ -169,7 +169,7 @@ var LifecycleEventToID = map[string]LifecycleEvent{
 // MarshalJSON marshals the enum as a quoted JSON string
 func (l LifecycleEvent) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
-	buffer.WriteString(LifecycleEventToString[l])
+	buffer.WriteString(lifecycleEventToString[l])
 	buffer.WriteString(`"`)
 	return buffer.Bytes(), nil
 }
@@ -182,7 +182,7 @@ func (l *LifecycleEvent) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	// Note that if the string cannot be found then it will be set to the zero value.
-	*l = LifecycleEventToID[j]
+	*l = lifecycleEventToID[j]
 	return nil
 }
 
@@ -202,16 +202,16 @@ const (
 )
 
 func (p PollingType) String() string {
-	return PollingTypeToString[p]
+	return pollingTypeToString[p]
 }
 
-var PollingTypeToString = map[PollingType]string{
+var pollingTypeToString = map[PollingType]string{
 	PollingRaf:      "raf",
 	PollingMutation: "mutation",
 	PollingInterval: "interval",
 }
 
-var PollingTypeToID = map[string]PollingType{
+var pollingTypeToID = map[string]PollingType{
 	"raf":      PollingRaf,
 	"mutation": PollingMutation,
 	"interval": PollingInterval,
@@ -220,12 +220,12 @@ var PollingTypeToID = map[string]PollingType{
 // MarshalJSON marshals the enum as a quoted JSON string
 func (p PollingType) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
-	buffer.WriteString(PollingTypeToString[p])
+	buffer.WriteString(pollingTypeToString[p])
 	buffer.WriteString(`"`)
 	return buffer.Bytes(), nil
 }
 
-// UnmarshalJSON unmashals a quoted JSON string to the enum value
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value
 func (p *PollingType) UnmarshalJSON(b []byte) error {
 	var j string
 	err := json.Unmarshal(b, &j)
@@ -233,7 +233,7 @@ func (p *PollingType) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	// Note that if the string cannot be found then it will be set to the zero value.
-	*p = PollingTypeToID[j]
+	*p = pollingTypeToID[j]
 	return nil
 }
 
@@ -252,15 +252,15 @@ const (
 )
 
 func (r ReducedMotion) String() string {
-	return ReducedMotionToString[r]
+	return reducedMotionToString[r]
 }
 
-var ReducedMotionToString = map[ReducedMotion]string{
+var reducedMotionToString = map[ReducedMotion]string{
 	ReducedMotionReduce:       "reduce",
 	ReducedMotionNoPreference: "no-preference",
 }
 
-var ReducedMotionToID = map[string]ReducedMotion{
+var reducedMotionToID = map[string]ReducedMotion{
 	"reduce":        ReducedMotionReduce,
 	"no-preference": ReducedMotionNoPreference,
 }
@@ -268,12 +268,12 @@ var ReducedMotionToID = map[string]ReducedMotion{
 // MarshalJSON marshals the enum as a quoted JSON string
 func (r ReducedMotion) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
-	buffer.WriteString(ReducedMotionToString[r])
+	buffer.WriteString(reducedMotionToString[r])
 	buffer.WriteString(`"`)
 	return buffer.Bytes(), nil
 }
 
-// UnmarshalJSON unmashals a quoted JSON string to the enum value
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value
 func (r *ReducedMotion) UnmarshalJSON(b []byte) error {
 	var j string
 	err := json.Unmarshal(b, &j)
@@ -281,7 +281,7 @@ func (r *ReducedMotion) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	// Note that if the string cannot be found then it will be set to the zero value.
-	*r = ReducedMotionToID[j]
+	*r = reducedMotionToID[j]
 	return nil
 }
 
