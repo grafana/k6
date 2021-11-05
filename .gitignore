@@ -10,6 +10,11 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+/*.html
+
+# Text and log files
+*.txt
+*.log
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
