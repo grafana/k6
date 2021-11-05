@@ -475,15 +475,15 @@ func (h *ElementHandle) focus(apiCtx context.Context, resetSelectionIfNotFocused
 func (h *ElementHandle) getAttribute(apiCtx context.Context, name string) (interface{}, error) {
 	rt := k6common.GetRuntime(apiCtx)
 	action := dom.RequestNode(h.remoteObject.ObjectID)
-	nodeID, err := action.Do(h.ctx)
+	nodeID, err := action.Do(cdp.WithExecutor(h.ctx, h.session))
 	if err != nil {
 		return nil, fmt.Errorf("unable to get node ID of element handle %T: %w", action, err)
 	}
 
 	action2 := dom.GetAttributes(nodeID)
-	attributes, err := action2.Do(h.ctx)
+	attributes, err := action2.Do(cdp.WithExecutor(h.ctx, h.session))
 	if err != nil {
-		return nil, fmt.Errorf("unable to get attrbutes of element handle %T: %w", action2, err)
+		return nil, fmt.Errorf("unable to get attributes of element handle %T: %w", action2, err)
 	}
 
 	// Attributes are interleaved names and values
@@ -1016,7 +1016,6 @@ func (h *ElementHandle) Focus() {
 
 // GetAttribute retrieves the value of specified element attribute
 func (h *ElementHandle) GetAttribute(name string) goja.Value {
-	rt := k6common.GetRuntime(h.ctx)
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.getAttribute(apiCtx, name)
 	}
@@ -1024,7 +1023,7 @@ func (h *ElementHandle) GetAttribute(name string) goja.Value {
 	actFn := elementHandleActionFn(h, []string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
 	value, err := callApiWithTimeout(h.ctx, actFn, opts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "GetAttribute(%q): %q", name, err)
 	}
 	applySlowMo(h.ctx)
 	return value.(goja.Value)
