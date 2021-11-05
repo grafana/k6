@@ -157,7 +157,7 @@ github.com/tidwall/pretty
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
-# golang.org/x/net v0.0.0-20210901185426-6d2eada6345e
+# golang.org/x/net v0.0.0-20211101194204-95aca89e93de
 ## explicit
 golang.org/x/net/html
 golang.org/x/net/html/atom

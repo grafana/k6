@@ -1018,7 +1018,7 @@ func parseHeadersFrame(_ *frameCache, fh FrameHeader, p []byte) (_ Frame, err er
 			return nil, err
 		}
 	}
-	if len(p)-int(padLength) <= 0 {
+	if len(p)-int(padLength) < 0 {
 		return nil, streamError(fh.StreamID, ErrCodeProtocol)
 	}
 	hf.headerFragBuf = p[:len(p)-int(padLength)]
