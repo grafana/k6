@@ -126,6 +126,9 @@ func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, 
 }
 
 func (r *Response) fetchBody() error {
+	if r.body != nil {
+		return nil
+	}
 	action := network.GetResponseBody(r.request.requestID)
 	body, err := action.Do(cdp.WithExecutor(r.ctx, r.request.frame.manager.session))
 	if err != nil {
@@ -162,10 +165,8 @@ func (r *Response) Body() goja.ArrayBuffer {
 	if r.status >= 300 && r.status <= 399 {
 		k6common.Throw(rt, errors.Errorf("Response body is unavailable for redirect responses"))
 	}
-	if r.body == nil {
-		if err := r.fetchBody(); err != nil {
-			k6common.Throw(rt, err)
-		}
+	if err := r.fetchBody(); err != nil {
+		k6common.Throw(rt, err)
 	}
 	return rt.NewArrayBuffer(r.body)
 }
@@ -236,10 +237,8 @@ func (r *Response) HeadersArray() []api.HTTPHeader {
 func (r *Response) JSON() goja.Value {
 	rt := k6common.GetRuntime(r.ctx)
 	if r.cachedJSON == nil {
-		if r.body == nil {
-			if err := r.fetchBody(); err != nil {
-				k6common.Throw(rt, err)
-			}
+		if err := r.fetchBody(); err != nil {
+			k6common.Throw(rt, err)
 		}
 
 		var v interface{}
@@ -295,10 +294,8 @@ func (r *Response) StatusText() string {
 // Text returns the response body as a string
 func (r *Response) Text() string {
 	rt := k6common.GetRuntime(r.ctx)
-	if r.body == nil {
-		if err := r.fetchBody(); err != nil {
-			k6common.Throw(rt, err)
-		}
+	if err := r.fetchBody(); err != nil {
+		k6common.Throw(rt, err)
 	}
 	return string(r.body)
 }
