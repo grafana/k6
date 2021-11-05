@@ -473,27 +473,11 @@ func (h *ElementHandle) focus(apiCtx context.Context, resetSelectionIfNotFocused
 }
 
 func (h *ElementHandle) getAttribute(apiCtx context.Context, name string) (interface{}, error) {
+	js := `(element) => {
+		return element.getAttribute('` + name + `');
+	}`
 	rt := k6common.GetRuntime(apiCtx)
-	action := dom.RequestNode(h.remoteObject.ObjectID)
-	nodeID, err := action.Do(cdp.WithExecutor(h.ctx, h.session))
-	if err != nil {
-		return nil, fmt.Errorf("unable to get node ID of element handle %T: %w", action, err)
-	}
-
-	action2 := dom.GetAttributes(nodeID)
-	attributes, err := action2.Do(cdp.WithExecutor(h.ctx, h.session))
-	if err != nil {
-		return nil, fmt.Errorf("unable to get attributes of element handle %T: %w", action2, err)
-	}
-
-	// Attributes are interleaved names and values
-	for i := 0; i < len(attributes); i += 2 {
-		if attributes[i] == name {
-			return rt.ToValue(attributes[i+1]), nil
-		}
-	}
-
-	return nil, nil
+	return h.execCtx.evaluate(apiCtx, true, true, rt.ToValue(js), rt.ToValue(h))
 }
 
 func (h *ElementHandle) hover(apiCtx context.Context, p *Position) error {
