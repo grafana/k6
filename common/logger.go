@@ -71,6 +71,10 @@ func (l *Logger) Infof(category string, msg string, args ...interface{}) {
 	l.Logf(logrus.InfoLevel, category, msg, args...)
 }
 
+func (l *Logger) Warnf(category string, msg string, args ...interface{}) {
+	l.Logf(logrus.WarnLevel, category, msg, args...)
+}
+
 func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
