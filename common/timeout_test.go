@@ -28,22 +28,22 @@ import (
 
 func TestTimeoutSettings(t *testing.T) {
 	t.Run("TimeoutSettings.NewTimeoutSettings", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testTimeoutSettingsNewTimeoutSettings(t) })
-		t.Run("should work with parent", func(t *testing.T) { testTimeoutSettingsNewTimeoutSettingsWithParent(t) })
+		t.Run("should work", testTimeoutSettingsNewTimeoutSettings)
+		t.Run("should work with parent", testTimeoutSettingsNewTimeoutSettingsWithParent)
 	})
 	t.Run("TimeoutSettings.setDefaultTimeout", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testTimeoutSettingsSetDefaultTimeout(t) })
+		t.Run("should work", testTimeoutSettingsSetDefaultTimeout)
 	})
 	t.Run("TimeoutSettings.setDefaultNavigationTimeout", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testTimeoutSettingsSetDefaultNavigationTimeout(t) })
+		t.Run("should work", testTimeoutSettingsSetDefaultNavigationTimeout)
 	})
 	t.Run("TimeoutSettings.navigationTimeout", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testTimeoutSettingsNavigationTimeout(t) })
-		t.Run("should work with parent", func(t *testing.T) { testTimeoutSettingsNavigationTimeoutWithParent(t) })
+		t.Run("should work", testTimeoutSettingsNavigationTimeout)
+		t.Run("should work with parent", testTimeoutSettingsNavigationTimeoutWithParent)
 	})
 	t.Run("TimeoutSettings.timeout", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testTimeoutSettingsTimeout(t) })
-		t.Run("should work with parent", func(t *testing.T) { testTimeoutSettingsTimeoutWithParent(t) })
+		t.Run("should work", testTimeoutSettingsTimeout)
+		t.Run("should work with parent", testTimeoutSettingsTimeoutWithParent)
 	})
 }
 
