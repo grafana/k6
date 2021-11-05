@@ -430,7 +430,7 @@ func (fs *FrameSession) onExceptionThrown(event *runtime.EventExceptionThrown) {
 	fs.page.emit(EventPageError, event.ExceptionDetails)
 }
 
-func (fs FrameSession) onExecutionContextCreated(event *runtime.EventExecutionContextCreated) {
+func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionContextCreated) {
 	rt := k6common.GetRuntime(fs.ctx)
 	auxData := event.Context.AuxData
 	var i struct {
