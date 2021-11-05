@@ -100,7 +100,34 @@ func (m *NetworkManager) deleteRequestByID(reqID network.RequestID) {
 	delete(m.reqIDToRequest, reqID)
 }
 
-func (m *NetworkManager) emitResponseReceived(resp *Response) {
+func (m *NetworkManager) emitRequestMetrics(req *Request) {
+	state := k6lib.GetState(m.ctx)
+
+	tags := state.CloneTags()
+	if state.Options.SystemTags.Has(k6stats.TagGroup) {
+		tags["group"] = state.Group.Path
+	}
+	if state.Options.SystemTags.Has(k6stats.TagMethod) {
+		tags["method"] = req.method
+	}
+	if state.Options.SystemTags.Has(k6stats.TagURL) {
+		tags["url"] = req.url
+	}
+
+	sampleTags := k6stats.IntoSampleTags(&tags)
+	k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
+		Samples: []k6stats.Sample{
+			{
+				Metric: k6metrics.DataSent,
+				Tags:   sampleTags,
+				Value:  float64(req.Size().Total()),
+				Time:   req.timestamp,
+			},
+		},
+	})
+}
+
+func (m *NetworkManager) emitResponseMetrics(resp *Response) {
 	state := k6lib.GetState(m.ctx)
 
 	tags := state.CloneTags()
@@ -194,7 +221,7 @@ func (m *NetworkManager) handleRequestRedirect(req *Request, redirectResponse *n
 	req.redirectChain = append(req.redirectChain, req)
 
 	m.deleteRequestByID(req.requestID)
-	m.emitResponseReceived(resp)
+	m.emitResponseMetrics(resp)
 
 	/*
 		delete(m.attemptedAuth, req.interceptionID);
@@ -304,6 +331,10 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 		redirectChain = make([]*Request, 0)
 	}
 
+	for _, r := range redirectChain {
+		m.emitRequestMetrics(r)
+	}
+
 	var frame *Frame = nil
 	if event.FrameID != "" {
 		frame = m.frameManager.getFrameByID(event.FrameID)
@@ -316,6 +347,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	m.reqsMu.Lock()
 	m.reqIDToRequest[event.RequestID] = req
 	m.reqsMu.Unlock()
+	m.emitRequestMetrics(req)
 	m.frameManager.requestStarted(req)
 
 	if m.userReqInterceptionEnabled && !strings.HasPrefix(event.Request.URL, "data:") {
@@ -364,7 +396,7 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
 	req.response = resp
 	if !strings.HasPrefix(req.url, "data:") {
-		m.emitResponseReceived(resp)
+		m.emitResponseMetrics(resp)
 	}
 	m.frameManager.requestReceivedResponse(resp)
 }
