@@ -28,26 +28,26 @@ import (
 
 // BrowserContextOptions stores browser context options
 type BrowserContextOptions struct {
-	AcceptDownloads   bool
-	BypassCSP         bool
-	ColorScheme       ColorScheme
-	DeviceScaleFactor float64
-	ExtraHTTPHeaders  map[string]string
-	Geolocation       *Geolocation
-	HasTouch          bool
-	HttpCredentials   *Credentials
-	IgnoreHTTPSErrors bool
-	IsMobile          bool
-	JavaScriptEnabled bool
-	Locale            string
-	Offline           bool
-	Permissions       []string
-	ReducedMotion     ReducedMotion
-	Screen            *Screen
-	TimezoneID        string
-	UserAgent         string
-	VideosPath        string
-	Viewport          *Viewport
+	AcceptDownloads   bool              `js:"acceptDownloads"`
+	BypassCSP         bool              `js:"bypassCSP"`
+	ColorScheme       ColorScheme       `js:"colorScheme"`
+	DeviceScaleFactor float64           `js:"deviceScaleFactor"`
+	ExtraHTTPHeaders  map[string]string `js:"extraHTTPHeaders"`
+	Geolocation       *Geolocation      `js:"geolocation"`
+	HasTouch          bool              `js:"hasTouch"`
+	HttpCredentials   *Credentials      `js:"httpCredentials"`
+	IgnoreHTTPSErrors bool              `js:"ignoreHTTPSErrors"`
+	IsMobile          bool              `js:"isMobile"`
+	JavaScriptEnabled bool              `js:"javaScriptEnabled"`
+	Locale            string            `js:"locale"`
+	Offline           bool              `js:"offline"`
+	Permissions       []string          `js:"permissions"`
+	ReducedMotion     ReducedMotion     `js:"reducedMotion"`
+	Screen            *Screen           `js:"screen"`
+	TimezoneID        string            `js:"timezoneID"`
+	UserAgent         string            `js:"userAgent"`
+	VideosPath        string            `js:"videosPath"`
+	Viewport          *Viewport         `js:"viewport"`
 }
 
 // NewBrowserContextOptions creates a default set of browser context options

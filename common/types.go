@@ -40,10 +40,46 @@ const (
 	ColorSchemeNoPreference ColorScheme = "no-preference"
 )
 
+func (c ColorScheme) String() string {
+	return ColorSchemeToString[c]
+}
+
+var ColorSchemeToString = map[ColorScheme]string{
+	ColorSchemeLight:        "light",
+	ColorSchemeDark:         "dark",
+	ColorSchemeNoPreference: "no-preference",
+}
+
+var ColorSchemeToID = map[string]ColorScheme{
+	"light":         ColorSchemeLight,
+	"dark":          ColorSchemeDark,
+	"no-preference": ColorSchemeNoPreference,
+}
+
+// MarshalJSON marshals the enum as a quoted JSON string
+func (c ColorScheme) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString(`"`)
+	buffer.WriteString(ColorSchemeToString[c])
+	buffer.WriteString(`"`)
+	return buffer.Bytes(), nil
+}
+
+// UnmarshalJSON unmashals a quoted JSON string to the enum value
+func (c *ColorScheme) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return err
+	}
+	// Note that if the string cannot be found then it will be set to the zero value.
+	*c = ColorSchemeToID[j]
+	return nil
+}
+
 // Credentials holds HTTP authentication credentials
 type Credentials struct {
-	Username string
-	Password string
+	Username string `js:"username"`
+	Password string `js:"password"`
 }
 
 // DOMElementState represents a DOM element state
@@ -101,9 +137,9 @@ type EmulatedSize struct {
 }
 
 type Geolocation struct {
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
-	Accurracy float64 `json:"accurracy"`
+	Latitude  float64 `js:"latitude"`
+	Longitude float64 `js:"longitude"`
+	Accurracy float64 `js:"accurracy"`
 }
 
 type LifecycleEvent int
@@ -202,8 +238,8 @@ func (p *PollingType) UnmarshalJSON(b []byte) error {
 }
 
 type Position struct {
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
+	X float64 `js:"x"`
+	Y float64 `js:"y"`
 }
 
 // ReducedMotion represents a browser reduce-motion setting
@@ -215,34 +251,68 @@ const (
 	ReducedMotionNoPreference ReducedMotion = "no-preference"
 )
 
+func (r ReducedMotion) String() string {
+	return ReducedMotionToString[r]
+}
+
+var ReducedMotionToString = map[ReducedMotion]string{
+	ReducedMotionReduce:       "reduce",
+	ReducedMotionNoPreference: "no-preference",
+}
+
+var ReducedMotionToID = map[string]ReducedMotion{
+	"reduce":        ReducedMotionReduce,
+	"no-preference": ReducedMotionNoPreference,
+}
+
+// MarshalJSON marshals the enum as a quoted JSON string
+func (r ReducedMotion) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString(`"`)
+	buffer.WriteString(ReducedMotionToString[r])
+	buffer.WriteString(`"`)
+	return buffer.Bytes(), nil
+}
+
+// UnmarshalJSON unmashals a quoted JSON string to the enum value
+func (r *ReducedMotion) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return err
+	}
+	// Note that if the string cannot be found then it will be set to the zero value.
+	*r = ReducedMotionToID[j]
+	return nil
+}
+
 type ResourceTiming struct {
-	StartTime             float64 `json:"startTime"`
-	DomainLookupStart     float64 `json:"domainLookupStart"`
-	DomainLookupEnd       float64 `json:"domainLookupEnd"`
-	ConnectStart          float64 `json:"connectStart"`
-	SecureConnectionStart float64 `json:"secureConnectionStart"`
-	ConnectEnd            float64 `json:"connectEnd"`
-	RequestStart          float64 `json:"requestStart"`
-	ResponseStart         float64 `json:"responseStart"`
-	ResponseEnd           float64 `json:"responseEnd"`
+	StartTime             float64 `js:"startTime"`
+	DomainLookupStart     float64 `js:"domainLookupStart"`
+	DomainLookupEnd       float64 `js:"domainLookupEnd"`
+	ConnectStart          float64 `js:"connectStart"`
+	SecureConnectionStart float64 `js:"secureConnectionStart"`
+	ConnectEnd            float64 `js:"connectEnd"`
+	RequestStart          float64 `js:"requestStart"`
+	ResponseStart         float64 `js:"responseStart"`
+	ResponseEnd           float64 `js:"responseEnd"`
 }
 
 // Viewport represents a device screen
 type Screen struct {
-	Width  int64 `json:"width"`
-	Height int64 `json:"height"`
+	Width  int64 `js:"width"`
+	Height int64 `js:"height"`
 }
 
 type SelectOption struct {
-	Value *string `json:"value"`
-	Label *string `json:"label"`
-	Index *int64  `json:"index"`
+	Value *string `js:"value"`
+	Label *string `js:"label"`
+	Index *int64  `js:"index"`
 }
 
 // Viewport represents a page viewport
 type Viewport struct {
-	Width  int64 `json:"width"`
-	Height int64 `json:"height"`
+	Width  int64 `js:"width"`
+	Height int64 `js:"height"`
 }
 
 func NewCredentials() *Credentials {
