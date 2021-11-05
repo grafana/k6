@@ -3,9 +3,9 @@ module github.com/grafana/xk6-browser
 go 1.17
 
 require (
-	github.com/chromedp/cdproto v0.0.0-20210305224431-50b9f457e822
-	github.com/dop251/goja v0.0.0-20210912140721-ac5354e9a820
-	github.com/fatih/color v1.12.0
+	github.com/chromedp/cdproto v0.0.0-20211025030258-2570df970243
+	github.com/dop251/goja v0.0.0-20211022113120-dc8c55024d06
+	github.com/fatih/color v1.13.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/mailru/easyjson v0.7.7
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
@@ -14,8 +14,8 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	go.k6.io/k6 v0.34.1
-	golang.org/x/net v0.0.0-20210428185458-6f5299370f2b
-	gopkg.in/guregu/null.v3 v3.3.0
+	golang.org/x/net v0.0.0-20211104170005-ce137452f963
+	gopkg.in/guregu/null.v3 v3.5.0
 )
 
 require (
@@ -34,8 +34,8 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.13.1 // indirect
 	github.com/kubernetes/helm v2.9.0+incompatible // indirect
-	github.com/mattn/go-colorable v0.1.8 // indirect
-	github.com/mattn/go-isatty v0.0.13 // indirect
+	github.com/mattn/go-colorable v0.1.9 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -45,7 +45,7 @@ require (
 	github.com/tidwall/match v1.0.3 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897 // indirect
-	golang.org/x/sys v0.0.0-20210521203332-0cec03c779c1 // indirect
+	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	golang.org/x/text v0.3.6 // indirect
 	golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6 // indirect
 	google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336 // indirect
