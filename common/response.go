@@ -22,6 +22,7 @@ package common
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
@@ -177,6 +178,27 @@ func (r *Response) Body() goja.ArrayBuffer {
 	return rt.NewArrayBuffer(r.body)
 }
 
+// bodySize returns the size in bytes of the response body.
+// It first attempts to get the size specified in the content-length
+// header, and if unavailable falls back to the size as returned by CDP in
+// r.fetchBody(). This is because the CDP Network.getResponseBody call
+// is unreliable, see https://github.com/ChromeDevTools/devtools-protocol/issues/12#issuecomment-306947275 .
+func (r *Response) bodySize() int64 {
+	if v, ok := r.headers["content-length"]; ok && len(v) > 0 {
+		cl, err := strconv.ParseInt(v[0], 10, 64)
+		if err == nil {
+			return cl
+		}
+		r.logger.Warnf("cdp", "error parsing content-length header: %s", err)
+	}
+
+	if err := r.fetchBody(); err != nil {
+		r.logger.Warnf("cdp", "error fetching response body: %s", err)
+	}
+
+	return int64(len(r.body))
+}
+
 // Finished waits for response to finish, return error if request failed
 func (r *Response) Finished() bool {
 	// TODO: should return nil|Error
@@ -282,7 +304,7 @@ func (r *Response) ServerAddr() goja.Value {
 
 func (r *Response) Size() api.HTTPMessageSize {
 	return api.HTTPMessageSize{
-		Body:    int64(len(r.body)),
+		Body:    r.bodySize(),
 		Headers: r.headersSize(),
 	}
 }
