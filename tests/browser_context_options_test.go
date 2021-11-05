@@ -73,9 +73,6 @@ func testBrowserContextOptionsDefaultViewport(t *testing.T, bt *browsertest.Brow
 }
 
 func testBrowserContextOptionsSetViewport(t *testing.T, bt *browsertest.BrowserTest) {
-	opts := common.NewBrowserContextOptions()
-	opts.Viewport.Width = 800
-	opts.Viewport.Width = 600
 	bctx := bt.Browser.NewContext(bt.Runtime.ToValue(struct {
 		Viewport common.Viewport `js:"viewport"`
 	}{
