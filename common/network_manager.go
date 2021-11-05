@@ -148,6 +148,12 @@ func (m *NetworkManager) emitResponseReceived(resp *Response) {
 				Value: k6stats.D(resp.timestamp.Sub(resp.request.timestamp)),
 				Time:  resp.timestamp,
 			},
+			{
+				Metric: k6metrics.DataReceived,
+				Tags:   sampleTags,
+				Value:  float64(resp.Size().Total()),
+				Time:   resp.timestamp,
+			},
 		},
 	})
 	if resp.timing != nil {
