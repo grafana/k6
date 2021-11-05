@@ -184,7 +184,21 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 		}
 	}
 	msg := &cdproto.Message{
-		ID:        id,
+		ID: id,
+		// We use different sessions to send messages to "targets"
+		// (browser, page, frame etc.) in CDP.
+		//
+		// If we don't specify a session (a session ID in the JSON message),
+		// it will be a message for the browser target.
+		//
+		// With a session specified (set using cdp.WithExecutor(ctx, session)),
+		// it will properly route the CDP message to the correct target
+		// (page, frame etc.).
+		//
+		// The difference between using Connection and Session to send
+		// and receive CDP messages basically, they both implement
+		// the cdp.Executor interface but one adds a sessionID to
+		// the CPD messages:
 		SessionID: s.id,
 		Method:    cdproto.MethodType(method),
 		Params:    buf,
