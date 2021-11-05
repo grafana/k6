@@ -238,8 +238,8 @@ func (p *PollingType) UnmarshalJSON(b []byte) error {
 }
 
 type Position struct {
-	X float64 `js:"x"`
-	Y float64 `js:"y"`
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
 }
 
 // ReducedMotion represents a browser reduce-motion setting
@@ -304,9 +304,9 @@ type Screen struct {
 }
 
 type SelectOption struct {
-	Value *string `js:"value"`
-	Label *string `js:"label"`
-	Index *int64  `js:"index"`
+	Value *string `json:"value"`
+	Label *string `json:"label"`
+	Index *int64  `json:"index"`
 }
 
 // Viewport represents a page viewport
