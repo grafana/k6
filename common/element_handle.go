@@ -483,7 +483,7 @@ func (h *ElementHandle) getAttribute(apiCtx context.Context, name string) (inter
 	action2 := dom.GetAttributes(nodeID)
 	attributes, err := action2.Do(cdp.WithExecutor(h.ctx, h.session))
 	if err != nil {
-		return nil, fmt.Errorf("unable to get attrbutes of element handle %T: %w", action2, err)
+		return nil, fmt.Errorf("unable to get attributes of element handle %T: %w", action2, err)
 	}
 
 	// Attributes are interleaved names and values
