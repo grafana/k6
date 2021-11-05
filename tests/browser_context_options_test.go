@@ -65,7 +65,7 @@ func testBrowserContextOptionsDefaultValues(t *testing.T, bt *browsertest.Browse
 
 func testBrowserContextOptionsDefaultViewport(t *testing.T, bt *browsertest.BrowserTest) {
 	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
+	t.Cleanup(func() { p.Close(nil) })
 
 	viewportSize := p.ViewportSize()
 	assert.Equal(t, float64(common.DefaultScreenWidth), viewportSize["width"])
@@ -81,7 +81,7 @@ func testBrowserContextOptionsSetViewport(t *testing.T, bt *browsertest.BrowserT
 			Height: 600,
 		},
 	}))
-	defer bctx.Close()
+	t.Cleanup(func() { bctx.Close() })
 	p := bctx.NewPage()
 
 	viewportSize := p.ViewportSize()
