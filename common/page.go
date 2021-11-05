@@ -107,14 +107,14 @@ func NewPage(ctx context.Context, session *Session, browserCtx *BrowserContext, 
 	}
 
 	var err error
-	p.frameManager = NewFrameManager(p.ctx, session, &p, browserCtx.timeoutSettings)
+	p.frameManager = NewFrameManager(ctx, session, &p, browserCtx.timeoutSettings)
 	p.mainFrameSession, err = NewFrameSession(ctx, session, &p, nil, targetID)
 	if err != nil {
 		return nil, err
 	}
 	p.frameSessions[cdp.FrameID(targetID)] = p.mainFrameSession
-	p.Mouse = NewMouse(p.ctx, session, p.frameManager.MainFrame(), browserCtx.timeoutSettings, p.Keyboard)
-	p.Touchscreen = NewTouchscreen(p.ctx, session, p.Keyboard)
+	p.Mouse = NewMouse(ctx, session, p.frameManager.MainFrame(), browserCtx.timeoutSettings, p.Keyboard)
+	p.Touchscreen = NewTouchscreen(ctx, session, p.Keyboard)
 
 	if browserCtx.opts.Viewport != nil {
 		p.emulatedSize = NewEmulatedSize(browserCtx.opts.Viewport, browserCtx.opts.Screen)
