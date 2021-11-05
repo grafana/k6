@@ -30,30 +30,23 @@ import (
 
 func TestElementHandleWaitForSelector(t *testing.T) {
 	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
-
-	t.Run("ElementHandle.waitForSelector", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testElementHandleWaitForSelector(t, bt) })
-	})
-}
-
-func testElementHandleWaitForSelector(t *testing.T, bt *browsertest.BrowserTest) {
 	p := bt.Browser.NewPage(nil)
+	defer bt.Browser.Close()
 	defer p.Close(nil)
 
 	p.SetContent(`<div class="root"></div>`, nil)
 	root := p.Query(".root")
 	p.Evaluate(bt.Runtime.ToValue(`
         () => {
-            setTimeout(() => {
-                const div = document.createElement('div');
-                div.className = 'element-to-appear';
-                div.appendChild(document.createTextNode("Hello World"));
-                root = document.querySelector('.root');
-                root.appendChild(div);
-            }, 100);
-        }
-    `))
+		setTimeout(() => {
+			const div = document.createElement('div');
+			div.className = 'element-to-appear';
+			div.appendChild(document.createTextNode("Hello World"));
+			root = document.querySelector('.root');
+			root.appendChild(div);
+			}, 100);
+		}
+		`))
 	element := root.WaitForSelector(".element-to-appear", bt.Runtime.ToValue(struct {
 		Timeout int64 `js:"timeout"`
 	}{Timeout: 1000}))
