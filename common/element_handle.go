@@ -315,7 +315,7 @@ func (h *ElementHandle) clickablePoint() (*Position, error) {
 	}
 
 	action2 := cdppage.GetLayoutMetrics()
-	if layoutViewport, _, _, err = action2.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+	if layoutViewport, _, _, _, _, _, err = action2.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
 		return nil, fmt.Errorf("unable to get page layout metrics %T: %v", action, err)
 	}
 
@@ -1333,7 +1333,7 @@ func (h *ElementHandle) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	var capture *cdppage.CaptureScreenshotParams
 
 	// Setup viewport or full page screenshot capture based on options
-	_, _, contentSize, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(h.ctx, h.session))
+	_, _, contentSize, _, _, _, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(h.ctx, h.session))
 	if err != nil {
 		k6common.Throw(rt, fmt.Errorf("unable to get layout metrics: %w", err))
 	}
