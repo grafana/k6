@@ -42,5 +42,5 @@ func TestElementHandleGetAttribute(t *testing.T) {
 
 	el := p.Query("#dark-mode-toggle-X")
 	got := el.GetAttribute("href").String()
-	assert.Equal(t, got, want)
+	assert.Equal(t, want, got)
 }
