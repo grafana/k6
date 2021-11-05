@@ -112,9 +112,6 @@ github.com/mattn/go-isatty
 github.com/mccutchen/go-httpbin/httpbin
 github.com/mccutchen/go-httpbin/httpbin/assets
 github.com/mccutchen/go-httpbin/httpbin/digest
-# github.com/mitchellh/mapstructure v1.1.2
-## explicit
-github.com/mitchellh/mapstructure
 # github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 ## explicit
 github.com/nu7hatch/gouuid
