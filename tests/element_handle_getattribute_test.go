@@ -31,8 +31,10 @@ import (
 func TestElementHandleGetAttribute(t *testing.T) {
 	bt := browsertest.NewBrowserTest(t)
 	p := bt.Browser.NewPage(nil)
-	defer bt.Browser.Close()
-	defer p.Close(nil)
+	t.Cleanup(func() {
+		p.Close(nil)
+		bt.Browser.Close()
+	})
 
 	const want = "https://somewhere"
 
