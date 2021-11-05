@@ -31,6 +31,7 @@ import (
 	"github.com/grafana/xk6-browser/api"
 	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
+	k6lib "go.k6.io/k6/lib"
 	"golang.org/x/net/context"
 )
 
@@ -56,6 +57,7 @@ type SecurityDetails struct {
 // Response represents a browser HTTP response
 type Response struct {
 	ctx               context.Context
+	logger            *Logger
 	request           *Request
 	remoteAddress     *RemoteAddress
 	securityDetails   *SecurityDetails
@@ -77,8 +79,12 @@ type Response struct {
 
 // NewHTTPResponse creates a new HTTP response
 func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, timestamp *cdp.MonotonicTime) *Response {
+	state := k6lib.GetState(ctx)
 	r := Response{
-		ctx:               ctx,
+		ctx: ctx,
+		// TODO: Pass an internal logger instead of basing it on k6's logger?
+		// See https://github.com/grafana/xk6-browser/issues/54
+		logger:            NewLogger(ctx, state.Logger, false, nil),
 		request:           req,
 		remoteAddress:     &RemoteAddress{IPAddress: resp.RemoteIPAddress, Port: resp.RemotePort},
 		securityDetails:   nil,
