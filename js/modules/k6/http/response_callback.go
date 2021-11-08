@@ -21,7 +21,6 @@
 package http
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -57,11 +56,11 @@ func (e expectedStatuses) match(status int) bool {
 	return false
 }
 
-// ExpectedStatuses returns expectedStatuses object based on the provided arguments.
+// expectedStatuses returns expectedStatuses object based on the provided arguments.
 // The arguments must be either integers or object of `{min: <integer>, max: <integer>}`
 // kind. The "integer"ness is checked by the Number.isInteger.
-func (*HTTP) ExpectedStatuses(ctx context.Context, args ...goja.Value) *expectedStatuses { //nolint: golint
-	rt := common.GetRuntime(ctx)
+func (mi *ModuleInstance) expectedStatuses(args ...goja.Value) *expectedStatuses {
+	rt := mi.vu.Runtime()
 
 	if len(args) == 0 {
 		common.Throw(rt, errors.New("no arguments"))
@@ -102,16 +101,18 @@ func (*HTTP) ExpectedStatuses(ctx context.Context, args ...goja.Value) *expected
 // SetResponseCallback sets the responseCallback to the value provided. Supported values are
 // expectedStatuses object or a `null` which means that metrics shouldn't be tagged as failed and
 // `http_req_failed` should not be emitted - the behaviour previous to this
-func (h *HTTP) SetResponseCallback(ctx context.Context, val goja.Value) {
+func (c *Client) SetResponseCallback(val goja.Value) {
 	if val != nil && !goja.IsNull(val) {
 		// This is done this way as ExportTo exports functions to empty structs without an error
 		if es, ok := val.Export().(*expectedStatuses); ok {
-			h.responseCallback = es.match
+			c.responseCallback = es.match
 		} else {
-			//nolint:golint
-			common.Throw(common.GetRuntime(ctx), fmt.Errorf("unsupported argument, expected http.expectedStatuses"))
+			common.Throw(
+				c.moduleInstance.vu.Runtime(),
+				fmt.Errorf("unsupported argument, expected http.expectedStatuses"),
+			)
 		}
 	} else {
-		h.responseCallback = nil
+		c.responseCallback = nil
 	}
 }

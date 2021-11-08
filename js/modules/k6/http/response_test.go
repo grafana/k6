@@ -28,8 +28,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/stats"
 )
 
@@ -187,6 +187,7 @@ func TestResponse(t *testing.T) {
 
 		t.Run("NoResponseBody", func(t *testing.T) {
 			_, err := rt.RunString(sr(`http.get("HTTPBIN_URL/html", {responseType: 'none'}).html();`))
+			require.NotNil(t, err)
 			assert.Contains(t, err.Error(), "the body is null so we can't transform it to HTML"+
 				" - this likely was because of a request error getting the response")
 		})
@@ -356,7 +357,7 @@ func TestResponse(t *testing.T) {
 					data.textarea[0] !== "Lorem ipsum dolor sit amet"
 				) { throw new Error("incorrect body: " + JSON.stringify(data, null, 4) ); }
 			`))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/myforms/get"), "", 200, "")
 		})
 	})
@@ -405,37 +406,5 @@ func TestResponse(t *testing.T) {
 			assert.NoError(t, err)
 			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get"), "", 200, "")
 		})
-	})
-}
-
-func BenchmarkResponseJson(b *testing.B) {
-	b.Skipf("We need to have context in the response")
-	testCases := []struct {
-		selector string
-	}{
-		{"glossary.GlossDiv.GlossList.GlossEntry.title"},
-		{"glossary.GlossDiv.GlossList.GlossEntry.int"},
-		{"glossary.GlossDiv.GlossList.GlossEntry.intArray"},
-		{"glossary.GlossDiv.GlossList.GlossEntry.mixedArray"},
-		{"glossary.friends"},
-		{"glossary.friends.#.first"},
-		{"glossary.GlossDiv.GlossList.GlossEntry.GlossDef"},
-		{"glossary"},
-	}
-	for _, tc := range testCases {
-		tc := tc
-		b.Run(fmt.Sprintf("Selector %s ", tc.selector), func(b *testing.B) {
-			for n := 0; n < b.N; n++ {
-				resp := new(HTTP).responseFromHttpext(&httpext.Response{Body: jsonData})
-				resp.JSON(tc.selector)
-			}
-		})
-	}
-
-	b.Run("Without selector", func(b *testing.B) {
-		for n := 0; n < b.N; n++ {
-			resp := new(HTTP).responseFromHttpext(&httpext.Response{Body: jsonData})
-			resp.JSON()
-		}
 	})
 }

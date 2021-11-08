@@ -21,7 +21,6 @@
 package http
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
@@ -30,27 +29,23 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-
 	"go.k6.io/k6/js/common"
 )
 
-// HTTPCookieJar is cookiejar.Jar wrapper to be used in js scripts
-type HTTPCookieJar struct {
-	// js is to make it not be accessible from inside goja/js, the json is because it's used if we return it from setup
-	Jar *cookiejar.Jar `js:"-" json:"-"`
-	ctx *context.Context
-}
+// ErrJarForbiddenInInitContext is used when a cookie jar was made in the init context
+// TODO: unexport this? there's no reason for this to be exported
+var ErrJarForbiddenInInitContext = common.NewInitContextError("Making cookie jars in the init context is not supported")
 
-func newCookieJar(ctxPtr *context.Context) *HTTPCookieJar {
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		common.Throw(common.GetRuntime(*ctxPtr), err)
-	}
-	return &HTTPCookieJar{jar, ctxPtr}
+// CookieJar is cookiejar.Jar wrapper to be used in js scripts
+type CookieJar struct {
+	moduleInstance *ModuleInstance
+	// js is to make it not be accessible from inside goja/js, the json is
+	// for when it is returned from setup().
+	Jar *cookiejar.Jar `js:"-" json:"-"`
 }
 
 // CookiesForURL return the cookies for a given url as a map of key and values
-func (j HTTPCookieJar) CookiesForURL(url string) map[string][]string {
+func (j CookieJar) CookiesForURL(url string) map[string][]string {
 	u, err := neturl.Parse(url)
 	if err != nil {
 		panic(err)
@@ -65,8 +60,8 @@ func (j HTTPCookieJar) CookiesForURL(url string) map[string][]string {
 }
 
 // Set sets a cookie for a particular url with the given name value and additional opts
-func (j HTTPCookieJar) Set(url, name, value string, opts goja.Value) (bool, error) {
-	rt := common.GetRuntime(*j.ctx)
+func (j CookieJar) Set(url, name, value string, opts goja.Value) (bool, error) {
+	rt := j.moduleInstance.vu.Runtime()
 
 	u, err := neturl.Parse(url)
 	if err != nil {

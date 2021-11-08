@@ -118,7 +118,13 @@ func TestMakeRequestError(t *testing.T) {
 			Body:         new(bytes.Buffer),
 			Compressions: []CompressionType{badCompressionType},
 		}
-		_, err = MakeRequest(ctx, preq)
+		state := &lib.State{
+			Options:   lib.Options{RunTags: &stats.SampleTags{}},
+			Transport: http.DefaultTransport,
+			Logger:    logrus.New(),
+			Tags:      lib.NewTagMap(nil),
+		}
+		_, err = MakeRequest(ctx, state, preq)
 		require.Error(t, err)
 		require.Equal(t, err.Error(), "unknown compressionType CompressionType(13)")
 	})
@@ -141,7 +147,6 @@ func TestMakeRequestError(t *testing.T) {
 			Logger:    logger,
 			Tags:      lib.NewTagMap(nil),
 		}
-		ctx = lib.WithState(ctx, state)
 		req, _ := http.NewRequest("GET", srv.URL, nil)
 		preq := &ParsedHTTPRequest{
 			Req:     req,
@@ -150,7 +155,7 @@ func TestMakeRequestError(t *testing.T) {
 			Timeout: 10 * time.Second,
 		}
 
-		res, err := MakeRequest(ctx, preq)
+		res, err := MakeRequest(ctx, state, preq)
 
 		assert.Nil(t, res)
 		assert.EqualError(t, err, "unsupported response status: 101 Switching Protocols")
@@ -195,7 +200,6 @@ func TestResponseStatus(t *testing.T) {
 					BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 					Tags:           lib.NewTagMap(nil),
 				}
-				ctx := lib.WithState(context.Background(), state)
 				req, err := http.NewRequest("GET", server.URL, nil)
 				require.NoError(t, err)
 
@@ -207,7 +211,9 @@ func TestResponseStatus(t *testing.T) {
 					ResponseType: ResponseTypeNone,
 				}
 
-				res, err := MakeRequest(ctx, preq)
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				res, err := MakeRequest(ctx, state, preq)
 				require.NoError(t, err)
 				assert.Equal(t, tc.statusCodeExpected, res.Status)
 				assert.Equal(t, tc.statusCodeStringExpected, res.StatusText)
@@ -276,7 +282,6 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewTagMap(nil),
 	}
-	ctx = lib.WithState(ctx, state)
 	req, _ := http.NewRequest("GET", srv.URL, nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
@@ -286,7 +291,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		ResponseCallback: func(i int) bool { return i == 0 },
 	}
 
-	res, err := MakeRequest(ctx, preq)
+	res, err := MakeRequest(ctx, state, preq)
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Len(t, samples, 1)
@@ -354,7 +359,6 @@ func TestTrailFailed(t *testing.T) {
 				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 				Tags:           lib.NewTagMap(nil),
 			}
-			ctx = lib.WithState(ctx, state)
 			req, _ := http.NewRequest("GET", srv.URL, nil)
 			preq := &ParsedHTTPRequest{
 				Req:              req,
@@ -363,7 +367,7 @@ func TestTrailFailed(t *testing.T) {
 				Timeout:          10 * time.Millisecond,
 				ResponseCallback: responseCallback,
 			}
-			res, err := MakeRequest(ctx, preq)
+			res, err := MakeRequest(ctx, state, preq)
 
 			require.NoError(t, err)
 			require.NotNil(t, res)
@@ -422,7 +426,6 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		Tags:           lib.NewTagMap(nil),
 	}
 
-	ctx = lib.WithState(ctx, state)
 	req, _ := http.NewRequest("GET", "http://"+addr.String(), nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
@@ -432,7 +435,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		ResponseCallback: func(i int) bool { return i == 0 },
 	}
 
-	res, err := MakeRequest(ctx, preq)
+	res, err := MakeRequest(ctx, state, preq)
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Len(t, samples, 1)
@@ -477,7 +480,6 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewTagMap(nil),
 	}
-	ctx = lib.WithState(ctx, state)
 	req, _ := http.NewRequest("GET", srv.URL, nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
@@ -487,7 +489,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		ResponseCallback: func(i int) bool { return i == 0 },
 	}
 
-	res, err := MakeRequest(ctx, preq)
+	res, err := MakeRequest(ctx, state, preq)
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Len(t, samples, 1)

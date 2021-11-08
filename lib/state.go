@@ -54,8 +54,11 @@ type State struct {
 	Group *Group
 
 	// Networking equipment.
+	Dialer DialContexter
+
+	// TODO: move a lot of the things below to the k6/http ModuleInstance, see
+	// https://github.com/grafana/k6/issues/2293.
 	Transport http.RoundTripper
-	Dialer    DialContexter
 	CookieJar *cookiejar.Jar
 	TLSConfig *tls.Config
 
