@@ -306,7 +306,7 @@ jobs:
       - name: Create MSI package
         run: |
           $env:VERSION = $env:VERSION -replace 'v(\d+\.\d+\.\d+).*','$1'
-          pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
+          pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE
           cd .\packaging
           candle.exe -arch x64 "-dVERSION=$env:VERSION" xk6-browser.wxs
           light.exe -ext WixUIExtension xk6-browser.wixobj

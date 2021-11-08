@@ -7,19 +7,20 @@
         <Icon Id="k6Icon" SourceFile="xk6-browser.ico"/>
         <Property Id="ARPPRODUCTICON" Value="k6Icon"/>
 
-        <Media Id="1" Cabinet="xk6-browser.cab" EmbedCab="yes" />
+        <Media Id="1" Cabinet="xk6browser.cab" EmbedCab="yes" />
 
         <!-- Step 1: Define the directory structure -->
         <Directory Id="TARGETDIR" Name="SourceDir">
             <Directory Id="ProgramFiles64Folder">
-                <Directory Id="INSTALLDIR" Name="k6"/>
+                <Directory Id="INSTALLDIR" Name="xk6-browser"/>
             </Directory>
         </Directory>
 
         <!-- Step 2: Add files to your installer package -->
         <DirectoryRef Id="INSTALLDIR">
-            <Component Id="xk6-browser.exe" Guid="*">
-                <File Id="xk6-browser.exe" Source="xk6-browser.exe" KeyPath="yes" />
+            <!-- Ids can't contain dashes; only A-Z, a-z, digits, underscore or period. -->
+            <Component Id="xk6browser.exe" Guid="*">
+                <File Id="xk6browser.exe" Source="xk6-browser.exe" KeyPath="yes" />
             </Component>
             <Component Id="PathEnv" Guid="2DFDBB7D-292E-462c-A3E3-2FA14FFCD05D" >
               <Environment Id="Path" Name="PATH" Value="[INSTALLDIR]" Permanent="no" Part="last" Action="set" System="yes" Separator=";" />
@@ -29,7 +30,7 @@
 
         <!-- Step 3: Tell WiX to install the files -->
         <Feature Id="MainApplication" Title="Main Application" Level="1">
-            <ComponentRef Id="xk6-browser.exe" />
+            <ComponentRef Id="xk6browser.exe" />
             <ComponentRef Id="PathEnv" />
         </Feature>
 
