@@ -21,13 +21,10 @@
 package html
 
 import (
-	"context"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
-
-	"go.k6.io/k6/js/common"
+	"github.com/stretchr/testify/require"
 )
 
 var textTests = []struct {
@@ -404,16 +401,13 @@ const testGenElems = `<html><body>
 	`
 
 func TestGenElements(t *testing.T) {
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-
-	ctx := common.WithRuntime(context.Background(), rt)
-	rt.Set("src", testGenElems)
-	rt.Set("html", common.Bind(rt, &HTML{}, &ctx))
+	t.Parallel()
+	rt, mi := getTestModuleInstance(t)
+	require.NoError(t, rt.Set("src", testGenElems))
 
 	_, err := rt.RunString("var doc = html.parseHTML(src)")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 
 	t.Run("Test text properties", func(t *testing.T) {
@@ -468,8 +462,7 @@ func TestGenElements(t *testing.T) {
 	})
 
 	t.Run("Test url properties", func(t *testing.T) {
-		html := HTML{}
-		sel, parseError := html.ParseHTML(ctx, testGenElems)
+		sel, parseError := mi.parseHTML(testGenElems)
 		if parseError != nil {
 			t.Errorf("Unable to parse html")
 		}

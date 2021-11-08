@@ -21,13 +21,11 @@
 package html
 
 import (
-	"context"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
-
-	"go.k6.io/k6/js/common"
+	"github.com/stretchr/testify/require"
 )
 
 const testHTMLElems = `
@@ -86,16 +84,13 @@ const testHTMLElems = `
 `
 
 func TestElements(t *testing.T) {
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-
-	ctx := common.WithRuntime(context.Background(), rt)
-	rt.Set("src", testHTMLElems)
-	rt.Set("html", common.Bind(rt, &HTML{}, &ctx))
+	t.Parallel()
+	rt, _ := getTestModuleInstance(t)
+	require.NoError(t, rt.Set("src", testHTMLElems))
 
 	_, err := rt.RunString(`var doc = html.parseHTML(src)`)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 
 	t.Run("AnchorElement", func(t *testing.T) {

@@ -21,7 +21,6 @@
 package html
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -31,20 +30,62 @@ import (
 	gohtml "golang.org/x/net/html"
 
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modules"
 )
 
-type HTML struct{}
+// RootModule is the global module object type. It is instantiated once per test
+// run and will be used to create k6/html module instances for each VU.
+type RootModule struct{}
 
-func New() *HTML {
-	return &HTML{}
+// ModuleInstance represents an instance of the HTML module for every VU.
+type ModuleInstance struct {
+	vu         modules.VU
+	rootModule *RootModule
+	exports    *goja.Object
 }
 
-func (HTML) ParseHTML(ctx context.Context, src string) (Selection, error) {
+var (
+	_ modules.Module   = &RootModule{}
+	_ modules.Instance = &ModuleInstance{}
+)
+
+// New returns a pointer to a new HTML RootModule.
+func New() *RootModule {
+	return &RootModule{}
+}
+
+// Exports returns the JS values this module exports.
+func (mi *ModuleInstance) Exports() modules.Exports {
+	return modules.Exports{
+		Default: mi.exports,
+	}
+}
+
+// NewModuleInstance returns an HTML module instance for each VU.
+func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+	rt := vu.Runtime()
+	mi := &ModuleInstance{
+		vu:         vu,
+		rootModule: r,
+		exports:    rt.NewObject(),
+	}
+	if err := mi.exports.Set("parseHTML", mi.parseHTML); err != nil {
+		common.Throw(rt, err)
+	}
+	return mi
+}
+
+func (mi *ModuleInstance) parseHTML(src string) (Selection, error) {
+	return ParseHTML(mi.vu.Runtime(), src)
+}
+
+// ParseHTML parses the provided HTML source into a Selection object.
+func ParseHTML(rt *goja.Runtime, src string) (Selection, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(src))
 	if err != nil {
 		return Selection{}, err
 	}
-	return Selection{rt: common.GetRuntime(ctx), sel: doc.Selection}, nil
+	return Selection{rt: rt, sel: doc.Selection}, nil
 }
 
 type Selection struct {

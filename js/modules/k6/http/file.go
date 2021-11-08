@@ -21,7 +21,6 @@
 package http
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -42,8 +41,8 @@ func escapeQuotes(s string) string {
 	return quoteEscaper.Replace(s)
 }
 
-// File returns a FileData parameter
-func (h *HTTP) File(ctx context.Context, data interface{}, args ...string) FileData {
+// File returns a FileData object.
+func (mi *ModuleInstance) file(data interface{}, args ...string) FileData {
 	// supply valid default if filename and content-type are not specified
 	fname, ct := fmt.Sprintf("%d", time.Now().UnixNano()), "application/octet-stream"
 
@@ -57,7 +56,7 @@ func (h *HTTP) File(ctx context.Context, data interface{}, args ...string) FileD
 
 	dt, err := common.ToBytes(data)
 	if err != nil {
-		common.Throw(common.GetRuntime(ctx), err)
+		common.Throw(mi.vu.Runtime(), err)
 	}
 
 	return FileData{

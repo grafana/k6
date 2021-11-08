@@ -26,8 +26,11 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modulestest"
+	"go.k6.io/k6/lib/metrics"
 )
 
 const testHTML = `
@@ -63,18 +66,42 @@ const testHTML = `
 </body>
 `
 
-func TestParseHTML(t *testing.T) {
+func getTestModuleInstance(t testing.TB) (*goja.Runtime, *ModuleInstance) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	ctx := common.WithRuntime(context.Background(), rt)
-	rt.Set("src", testHTML)
-	rt.Set("html", common.Bind(rt, New(), &ctx))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	root := New()
+	mockVU := &modulestest.VU{
+		RuntimeField: rt,
+		InitEnvField: &common.InitEnvironment{
+			Registry: metrics.NewRegistry(),
+		},
+		CtxField:   ctx,
+		StateField: nil,
+	}
+	mi, ok := root.NewModuleInstance(mockVU).(*ModuleInstance)
+	require.True(t, ok)
+
+	require.NoError(t, rt.Set("html", mi.Exports().Default))
+
+	return rt, mi
+}
+
+// TODO: split apart?
+// nolint: cyclop, tparallel
+func TestParseHTML(t *testing.T) {
+	t.Parallel()
+	rt, _ := getTestModuleInstance(t)
+	require.NoError(t, rt.Set("src", testHTML))
 
 	// TODO: I literally cannot think of a snippet that makes goquery error.
 	// I'm not sure if it's even possible without like, an invalid reader or something, which would
 	// be impossible to cause from the JS side.
 	_, err := rt.RunString(`var doc = html.parseHTML(src)`)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 
 	t.Run("Find", func(t *testing.T) {

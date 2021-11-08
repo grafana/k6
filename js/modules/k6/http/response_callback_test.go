@@ -21,7 +21,6 @@
 package http
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -29,7 +28,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/stats"
@@ -37,12 +35,8 @@ import (
 
 func TestExpectedStatuses(t *testing.T) {
 	t.Parallel()
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	ctx := context.Background()
+	rt, _ := getTestModuleInstance(t, nil, nil)
 
-	ctx = common.WithRuntime(ctx, rt)
-	rt.Set("http", common.Bind(rt, new(GlobalHTTP).NewModuleInstancePerVU(), &ctx))
 	cases := map[string]struct {
 		code, err string
 		expected  expectedStatuses
@@ -108,10 +102,8 @@ type expectedSample struct {
 
 func TestResponseCallbackInAction(t *testing.T) {
 	t.Parallel()
-	tb, _, samples, rt, ctx := newRuntime(t)
+	tb, _, samples, rt, mii := newRuntime(t)
 	sr := tb.Replacer.Replace
-	httpModule := new(GlobalHTTP).NewModuleInstancePerVU().(*HTTP)
-	rt.Set("http", common.Bind(rt, httpModule, ctx))
 
 	HTTPMetricsWithoutFailed := []string{
 		metrics.HTTPReqsName,
@@ -282,7 +274,7 @@ func TestResponseCallbackInAction(t *testing.T) {
 	for name, testCase := range testCases {
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			httpModule.responseCallback = defaultExpectedStatuses.match
+			mii.defaultClient.responseCallback = defaultExpectedStatuses.match
 
 			_, err := rt.RunString(sr(testCase.code))
 			assert.NoError(t, err)
@@ -308,10 +300,8 @@ func TestResponseCallbackInAction(t *testing.T) {
 
 func TestResponseCallbackBatch(t *testing.T) {
 	t.Parallel()
-	tb, _, samples, rt, ctx := newRuntime(t)
+	tb, _, samples, rt, mii := newRuntime(t)
 	sr := tb.Replacer.Replace
-	httpModule := new(GlobalHTTP).NewModuleInstancePerVU().(*HTTP)
-	rt.Set("http", common.Bind(rt, httpModule, ctx))
 
 	HTTPMetricsWithoutFailed := []string{
 		metrics.HTTPReqsName,
@@ -393,7 +383,7 @@ func TestResponseCallbackBatch(t *testing.T) {
 	for name, testCase := range testCases {
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			httpModule.responseCallback = defaultExpectedStatuses.match
+			mii.defaultClient.responseCallback = defaultExpectedStatuses.match
 
 			_, err := rt.RunString(sr(testCase.code))
 			assert.NoError(t, err)
@@ -424,7 +414,7 @@ func TestResponseCallbackBatch(t *testing.T) {
 
 func TestResponseCallbackInActionWithoutPassedTag(t *testing.T) {
 	t.Parallel()
-	tb, state, samples, rt, ctx := newRuntime(t)
+	tb, state, samples, rt, _ := newRuntime(t)
 	sr := tb.Replacer.Replace
 	allHTTPMetrics := []string{
 		metrics.HTTPReqsName,
@@ -438,8 +428,6 @@ func TestResponseCallbackInActionWithoutPassedTag(t *testing.T) {
 		metrics.HTTPReqTLSHandshakingName,
 	}
 	deleteSystemTag(state, stats.TagExpectedResponse.String())
-	httpModule := new(GlobalHTTP).NewModuleInstancePerVU().(*HTTP)
-	rt.Set("http", common.Bind(rt, httpModule, ctx))
 
 	_, err := rt.RunString(sr(`http.request("GET", "HTTPBIN_URL/redirect/1", null, {responseCallback: http.expectedStatuses(200)});`))
 	assert.NoError(t, err)
@@ -481,10 +469,7 @@ func TestResponseCallbackInActionWithoutPassedTag(t *testing.T) {
 
 func TestDigestWithResponseCallback(t *testing.T) {
 	t.Parallel()
-	tb, _, samples, rt, ctx := newRuntime(t)
-
-	httpModule := new(GlobalHTTP).NewModuleInstancePerVU().(*HTTP)
-	rt.Set("http", common.Bind(rt, httpModule, ctx))
+	tb, _, samples, rt, _ := newRuntime(t)
 
 	urlWithCreds := tb.Replacer.Replace(
 		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/testuser/testpwd",

@@ -38,6 +38,8 @@ linters-settings:
     min-confidence: 0
   gocyclo:
     min-complexity: 25
+  cyclop: #TODO: see https://github.com/grafana/k6/issues/2294, leave only one of these?
+    max-complexity: 25
   maligned:
     suggest-new: true
   dupl:

@@ -48,7 +48,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
@@ -129,9 +129,9 @@ func assertRequestMetricsEmittedSingle(t *testing.T, sampleContainer stats.Sampl
 	}
 }
 
-func newRuntime(
-	t testing.TB,
-) (*httpmultibin.HTTPMultiBin, *lib.State, chan stats.SampleContainer, *goja.Runtime, *context.Context) {
+func newRuntime(t testing.TB) (
+	*httpmultibin.HTTPMultiBin, *lib.State, chan stats.SampleContainer, *goja.Runtime, *ModuleInstance,
+) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	root, err := lib.NewGroup("", nil)
@@ -140,9 +140,6 @@ func newRuntime(
 
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
-
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	options := lib.Options{
 		MaxRedirects: null.IntFrom(10),
@@ -169,17 +166,13 @@ func newRuntime(
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 
-	ctx := new(context.Context)
-	*ctx = lib.WithState(tb.Context, state)
-	*ctx = common.WithRuntime(*ctx, rt)
-	rt.Set("http", common.Bind(rt, new(GlobalHTTP).NewModuleInstancePerVU(), ctx))
-
-	return tb, state, samples, rt, ctx
+	rt, mi := getTestModuleInstance(t, tb.Context, state)
+	return tb, state, samples, rt, mi
 }
 
 func TestRequestAndBatch(t *testing.T) {
 	t.Parallel()
-	tb, state, samples, rt, ctx := newRuntime(t)
+	tb, state, samples, rt, _ := newRuntime(t)
 	sr := tb.Replacer.Replace
 
 	// Handle paths with custom logic
@@ -484,20 +477,6 @@ func TestRequestAndBatch(t *testing.T) {
 			`))
 			assert.NoError(t, err)
 		})
-	})
-	t.Run("Cancelled", func(t *testing.T) {
-		hook := logtest.NewLocal(state.Logger)
-		defer hook.Reset()
-
-		oldctx := *ctx
-		newctx, cancel := context.WithCancel(oldctx)
-		cancel()
-		*ctx = newctx
-		defer func() { *ctx = oldctx }()
-
-		_, err := rt.RunString(sr(`http.get("HTTPBIN_URL/get/");`))
-		assert.Error(t, err)
-		assert.Nil(t, hook.LastEntry())
 	})
 	t.Run("HTTP/2", func(t *testing.T) {
 		stats.GetBufferedSamples(samples) // Clean up buffered samples from previous tests
@@ -1578,6 +1557,26 @@ func TestRequestAndBatch(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	})
+}
+
+func TestRequestCancellation(t *testing.T) {
+	t.Parallel()
+	tb, state, _, rt, mi := newRuntime(t)
+	sr := tb.Replacer.Replace
+
+	hook := logtest.NewLocal(state.Logger)
+	defer hook.Reset()
+
+	testVU, ok := mi.vu.(*modulestest.VU)
+	require.True(t, ok)
+
+	newctx, cancel := context.WithCancel(mi.vu.Context())
+	testVU.CtxField = newctx
+	cancel()
+
+	_, err := rt.RunString(sr(`http.get("HTTPBIN_URL/get/");`))
+	assert.Error(t, err)
+	assert.Nil(t, hook.LastEntry())
 }
 
 func TestRequestArrayBufferBody(t *testing.T) {

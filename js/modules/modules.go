@@ -29,7 +29,6 @@ import (
 
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules/k6/http"
 	"go.k6.io/k6/lib"
 )
 
@@ -71,10 +70,6 @@ type Module interface {
 	// This method will be called for *each* require/import and should return an unique instance for each call
 	NewModuleInstance(VU) Instance
 }
-
-// checks that modules implement HasModuleInstancePerVU
-// this is done here as otherwise there will be a loop if the module imports this package
-var _ HasModuleInstancePerVU = http.New()
 
 // GetJSModules returns a map of all registered js modules
 func GetJSModules() map[string]interface{} {

@@ -21,13 +21,11 @@
 package html
 
 import (
-	"context"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
-
-	"go.k6.io/k6/js/common"
+	"github.com/stretchr/testify/require"
 )
 
 const testSerializeHTML = `
@@ -69,14 +67,12 @@ const testSerializeHTML = `
 `
 
 func TestSerialize(t *testing.T) {
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	ctx := common.WithRuntime(context.Background(), rt)
-	rt.Set("src", testSerializeHTML)
-	rt.Set("html", common.Bind(rt, New(), &ctx))
+	t.Parallel()
+	rt, _ := getTestModuleInstance(t)
+	require.NoError(t, rt.Set("src", testSerializeHTML))
 
 	_, err := rt.RunString(`var doc = html.parseHTML(src)`)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 
 	t.Run("SerializeArray", func(t *testing.T) {
