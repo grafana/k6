@@ -29,7 +29,6 @@ import (
 	"github.com/grafana/xk6-browser/common"
 	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
-	k6lib "go.k6.io/k6/lib"
 )
 
 // Ensure BrowserType implements the api.BrowserType interface.
@@ -44,15 +43,11 @@ type BrowserType struct {
 
 func NewBrowserType(ctx context.Context) api.BrowserType {
 	rt := k6common.GetRuntime(ctx)
-	state := k6lib.GetState(ctx)
 	hooks := common.NewHooks()
 
 	// Create extension master context. If this context is cancelled we'll
 	// initiate an extension wide cancellation and shutdown.
-	extensionCtx := context.Background()
-	extensionCtx, extensionCancelFn := context.WithCancel(extensionCtx)
-	extensionCtx = k6common.WithRuntime(extensionCtx, rt)
-	extensionCtx = k6lib.WithState(extensionCtx, state)
+	extensionCtx, extensionCancelFn := context.WithCancel(ctx)
 	extensionCtx = common.WithHooks(extensionCtx, hooks)
 
 	b := BrowserType{
