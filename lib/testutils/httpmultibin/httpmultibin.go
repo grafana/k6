@@ -76,6 +76,7 @@ func GetTLSClientConfig(t testing.TB, srv *httptest.Server) *tls.Config {
 		RootCAs:            certs,
 		InsecureSkipVerify: false,
 		Renegotiation:      tls.RenegotiateFreelyAsClient,
+		MinVersion:         tls.VersionTLS10,
 	}
 }
 
