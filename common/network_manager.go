@@ -38,7 +38,6 @@ import (
 	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
-	k6metrics "go.k6.io/k6/lib/metrics"
 	k6stats "go.k6.io/k6/stats"
 	"golang.org/x/net/context"
 )
@@ -118,7 +117,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
 		Samples: []k6stats.Sample{
 			{
-				Metric: k6metrics.DataSent,
+				Metric: state.BuiltinMetrics.DataSent,
 				Tags:   sampleTags,
 				Value:  float64(req.Size().Total()),
 				Time:   req.timestamp,
@@ -158,13 +157,13 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response) {
 	k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
 		Samples: []k6stats.Sample{
 			{
-				Metric: k6metrics.HTTPReqs,
+				Metric: state.BuiltinMetrics.HTTPReqs,
 				Tags:   sampleTags,
 				Value:  1,
 				Time:   resp.timestamp,
 			},
 			{
-				Metric: k6metrics.HTTPReqDuration,
+				Metric: state.BuiltinMetrics.HTTPReqDuration,
 				Tags:   sampleTags,
 
 				// We're using diff between CDP protocol message timestamps here because the `Network.responseReceived.responseTime`
@@ -176,7 +175,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response) {
 				Time:  resp.timestamp,
 			},
 			{
-				Metric: k6metrics.DataReceived,
+				Metric: state.BuiltinMetrics.DataReceived,
 				Tags:   sampleTags,
 				Value:  float64(resp.Size().Total()),
 				Time:   resp.timestamp,
@@ -187,25 +186,25 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response) {
 		k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
 			Samples: []k6stats.Sample{
 				{
-					Metric: k6metrics.HTTPReqConnecting,
+					Metric: state.BuiltinMetrics.HTTPReqConnecting,
 					Tags:   sampleTags,
 					Value:  k6stats.D(time.Duration(resp.timing.ConnectEnd-resp.timing.ConnectStart) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 				{
-					Metric: k6metrics.HTTPReqTLSHandshaking,
+					Metric: state.BuiltinMetrics.HTTPReqTLSHandshaking,
 					Tags:   sampleTags,
 					Value:  k6stats.D(time.Duration(resp.timing.SslEnd-resp.timing.SslStart) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 				{
-					Metric: k6metrics.HTTPReqSending,
+					Metric: state.BuiltinMetrics.HTTPReqSending,
 					Tags:   sampleTags,
 					Value:  k6stats.D(time.Duration(resp.timing.SendEnd-resp.timing.SendStart) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 				{
-					Metric: k6metrics.HTTPReqReceiving,
+					Metric: state.BuiltinMetrics.HTTPReqReceiving,
 					Tags:   sampleTags,
 					Value:  k6stats.D(time.Duration(resp.timing.ReceiveHeadersEnd-resp.timing.SendEnd) * time.Millisecond),
 					Time:   resp.timestamp,
