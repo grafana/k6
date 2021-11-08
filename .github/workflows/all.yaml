@@ -321,7 +321,6 @@ jobs:
           name: binaries-windows
           path: |
             packaging/xk6-browser-*.msi
-            packaging/xk6-browser.*.nupkg
           retention-days: 7
 
   publish-github:
