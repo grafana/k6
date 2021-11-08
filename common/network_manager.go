@@ -38,7 +38,6 @@ import (
 	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
-	k6metrics "go.k6.io/k6/lib/metrics"
 	k6stats "go.k6.io/k6/stats"
 	"golang.org/x/net/context"
 )
@@ -100,7 +99,34 @@ func (m *NetworkManager) deleteRequestByID(reqID network.RequestID) {
 	delete(m.reqIDToRequest, reqID)
 }
 
-func (m *NetworkManager) emitResponseReceived(resp *Response) {
+func (m *NetworkManager) emitRequestMetrics(req *Request) {
+	state := k6lib.GetState(m.ctx)
+
+	tags := state.CloneTags()
+	if state.Options.SystemTags.Has(k6stats.TagGroup) {
+		tags["group"] = state.Group.Path
+	}
+	if state.Options.SystemTags.Has(k6stats.TagMethod) {
+		tags["method"] = req.method
+	}
+	if state.Options.SystemTags.Has(k6stats.TagURL) {
+		tags["url"] = req.url
+	}
+
+	sampleTags := k6stats.IntoSampleTags(&tags)
+	k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
+		Samples: []k6stats.Sample{
+			{
+				Metric: state.BuiltinMetrics.DataSent,
+				Tags:   sampleTags,
+				Value:  float64(req.Size().Total()),
+				Time:   req.timestamp,
+			},
+		},
+	})
+}
+
+func (m *NetworkManager) emitResponseMetrics(resp *Response) {
 	state := k6lib.GetState(m.ctx)
 
 	tags := state.CloneTags()
@@ -131,13 +157,13 @@ func (m *NetworkManager) emitResponseReceived(resp *Response) {
 	k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
 		Samples: []k6stats.Sample{
 			{
-				Metric: k6metrics.HTTPReqs,
+				Metric: state.BuiltinMetrics.HTTPReqs,
 				Tags:   sampleTags,
 				Value:  1,
 				Time:   resp.timestamp,
 			},
 			{
-				Metric: k6metrics.HTTPReqDuration,
+				Metric: state.BuiltinMetrics.HTTPReqDuration,
 				Tags:   sampleTags,
 
 				// We're using diff between CDP protocol message timestamps here because the `Network.responseReceived.responseTime`
@@ -148,31 +174,37 @@ func (m *NetworkManager) emitResponseReceived(resp *Response) {
 				Value: k6stats.D(resp.timestamp.Sub(resp.request.timestamp)),
 				Time:  resp.timestamp,
 			},
+			{
+				Metric: state.BuiltinMetrics.DataReceived,
+				Tags:   sampleTags,
+				Value:  float64(resp.Size().Total()),
+				Time:   resp.timestamp,
+			},
 		},
 	})
 	if resp.timing != nil {
 		k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
 			Samples: []k6stats.Sample{
 				{
-					Metric: k6metrics.HTTPReqConnecting,
+					Metric: state.BuiltinMetrics.HTTPReqConnecting,
 					Tags:   sampleTags,
 					Value:  k6stats.D(time.Duration(resp.timing.ConnectEnd-resp.timing.ConnectStart) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 				{
-					Metric: k6metrics.HTTPReqTLSHandshaking,
+					Metric: state.BuiltinMetrics.HTTPReqTLSHandshaking,
 					Tags:   sampleTags,
 					Value:  k6stats.D(time.Duration(resp.timing.SslEnd-resp.timing.SslStart) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 				{
-					Metric: k6metrics.HTTPReqSending,
+					Metric: state.BuiltinMetrics.HTTPReqSending,
 					Tags:   sampleTags,
 					Value:  k6stats.D(time.Duration(resp.timing.SendEnd-resp.timing.SendStart) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 				{
-					Metric: k6metrics.HTTPReqReceiving,
+					Metric: state.BuiltinMetrics.HTTPReqReceiving,
 					Tags:   sampleTags,
 					Value:  k6stats.D(time.Duration(resp.timing.ReceiveHeadersEnd-resp.timing.SendEnd) * time.Millisecond),
 					Time:   resp.timestamp,
@@ -188,7 +220,7 @@ func (m *NetworkManager) handleRequestRedirect(req *Request, redirectResponse *n
 	req.redirectChain = append(req.redirectChain, req)
 
 	m.deleteRequestByID(req.requestID)
-	m.emitResponseReceived(resp)
+	m.emitResponseMetrics(resp)
 
 	/*
 		delete(m.attemptedAuth, req.interceptionID);
@@ -298,6 +330,10 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 		redirectChain = make([]*Request, 0)
 	}
 
+	for _, r := range redirectChain {
+		m.emitRequestMetrics(r)
+	}
+
 	var frame *Frame = nil
 	if event.FrameID != "" {
 		frame = m.frameManager.getFrameByID(event.FrameID)
@@ -310,6 +346,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	m.reqsMu.Lock()
 	m.reqIDToRequest[event.RequestID] = req
 	m.reqsMu.Unlock()
+	m.emitRequestMetrics(req)
 	m.frameManager.requestStarted(req)
 
 	if m.userReqInterceptionEnabled && !strings.HasPrefix(event.Request.URL, "data:") {
@@ -358,7 +395,7 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
 	req.response = resp
 	if !strings.HasPrefix(req.url, "data:") {
-		m.emitResponseReceived(resp)
+		m.emitResponseMetrics(resp)
 	}
 	m.frameManager.requestReceivedResponse(resp)
 }

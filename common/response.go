@@ -22,6 +22,7 @@ package common
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	"github.com/grafana/xk6-browser/api"
 	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
+	k6lib "go.k6.io/k6/lib"
 	"golang.org/x/net/context"
 )
 
@@ -56,6 +58,7 @@ type SecurityDetails struct {
 // Response represents a browser HTTP response
 type Response struct {
 	ctx               context.Context
+	logger            *Logger
 	request           *Request
 	remoteAddress     *RemoteAddress
 	securityDetails   *SecurityDetails
@@ -77,8 +80,12 @@ type Response struct {
 
 // NewHTTPResponse creates a new HTTP response
 func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, timestamp *cdp.MonotonicTime) *Response {
+	state := k6lib.GetState(ctx)
 	r := Response{
-		ctx:               ctx,
+		ctx: ctx,
+		// TODO: Pass an internal logger instead of basing it on k6's logger?
+		// See https://github.com/grafana/xk6-browser/issues/54
+		logger:            NewLogger(ctx, state.Logger, false, nil),
 		request:           req,
 		remoteAddress:     &RemoteAddress{IPAddress: resp.RemoteIPAddress, Port: resp.RemotePort},
 		securityDetails:   nil,
@@ -126,6 +133,9 @@ func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, 
 }
 
 func (r *Response) fetchBody() error {
+	if r.body != nil {
+		return nil
+	}
 	action := network.GetResponseBody(r.request.requestID)
 	body, err := action.Do(cdp.WithExecutor(r.ctx, r.request.frame.manager.session))
 	if err != nil {
@@ -162,12 +172,31 @@ func (r *Response) Body() goja.ArrayBuffer {
 	if r.status >= 300 && r.status <= 399 {
 		k6common.Throw(rt, errors.Errorf("Response body is unavailable for redirect responses"))
 	}
-	if r.body == nil {
-		if err := r.fetchBody(); err != nil {
-			k6common.Throw(rt, err)
-		}
+	if err := r.fetchBody(); err != nil {
+		k6common.Throw(rt, err)
 	}
 	return rt.NewArrayBuffer(r.body)
+}
+
+// bodySize returns the size in bytes of the response body.
+// It first attempts to get the size specified in the content-length
+// header, and if unavailable falls back to the size as returned by CDP in
+// r.fetchBody(). This is because the CDP Network.getResponseBody call
+// is unreliable, see https://github.com/ChromeDevTools/devtools-protocol/issues/12#issuecomment-306947275 .
+func (r *Response) bodySize() int64 {
+	if v, ok := r.headers["content-length"]; ok && len(v) > 0 {
+		cl, err := strconv.ParseInt(v[0], 10, 64)
+		if err == nil {
+			return cl
+		}
+		r.logger.Warnf("cdp", "error parsing content-length header: %s", err)
+	}
+
+	if err := r.fetchBody(); err != nil {
+		r.logger.Warnf("cdp", "error fetching response body: %s", err)
+	}
+
+	return int64(len(r.body))
 }
 
 // Finished waits for response to finish, return error if request failed
@@ -236,10 +265,8 @@ func (r *Response) HeadersArray() []api.HTTPHeader {
 func (r *Response) JSON() goja.Value {
 	rt := k6common.GetRuntime(r.ctx)
 	if r.cachedJSON == nil {
-		if r.body == nil {
-			if err := r.fetchBody(); err != nil {
-				k6common.Throw(rt, err)
-			}
+		if err := r.fetchBody(); err != nil {
+			k6common.Throw(rt, err)
 		}
 
 		var v interface{}
@@ -277,7 +304,7 @@ func (r *Response) ServerAddr() goja.Value {
 
 func (r *Response) Size() api.HTTPMessageSize {
 	return api.HTTPMessageSize{
-		Body:    int64(len(r.body)),
+		Body:    r.bodySize(),
 		Headers: r.headersSize(),
 	}
 }
@@ -295,10 +322,8 @@ func (r *Response) StatusText() string {
 // Text returns the response body as a string
 func (r *Response) Text() string {
 	rt := k6common.GetRuntime(r.ctx)
-	if r.body == nil {
-		if err := r.fetchBody(); err != nil {
-			k6common.Throw(rt, err)
-		}
+	if err := r.fetchBody(); err != nil {
+		k6common.Throw(rt, err)
 	}
 	return string(r.body)
 }

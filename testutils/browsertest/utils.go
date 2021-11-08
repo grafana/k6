@@ -21,22 +21,12 @@
 package browsertest
 
 import (
-	"context"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
-	"github.com/oxtoacart/bpool"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
-	k6common "go.k6.io/k6/js/common"
 	k6compiler "go.k6.io/k6/js/compiler"
-	k6http "go.k6.io/k6/js/modules/k6/http"
-	k6lib "go.k6.io/k6/lib"
 	k6testutils "go.k6.io/k6/lib/testutils"
-	k6test "go.k6.io/k6/lib/testutils/httpmultibin"
-	k6stats "go.k6.io/k6/stats"
-	"gopkg.in/guregu/null.v3"
 )
 
 func AttachFrame(bt *BrowserTest, page api.Page, frameID string, url string) api.Frame {
@@ -57,51 +47,6 @@ func DetachFrame(bt *BrowserTest, page api.Page, frameID string) {
         document.getElementById(frameId).remove();
     }`
 	page.Evaluate(bt.Runtime.ToValue(pageFn), bt.Runtime.ToValue(frameID))
-}
-
-func NewRuntime(
-	t testing.TB,
-) (*k6test.HTTPMultiBin, *k6lib.State, chan k6stats.SampleContainer, *goja.Runtime, *context.Context) {
-	tb := k6test.NewHTTPMultiBin(t)
-
-	root, err := k6lib.NewGroup("", nil)
-	require.NoError(t, err)
-
-	logger := logrus.New()
-	logger.Level = logrus.DebugLevel
-
-	rt := goja.New()
-	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
-
-	options := k6lib.Options{
-		MaxRedirects: null.IntFrom(10),
-		UserAgent:    null.StringFrom("TestUserAgent"),
-		Throw:        null.BoolFrom(true),
-		SystemTags:   &k6stats.DefaultSystemTagSet,
-		Batch:        null.IntFrom(20),
-		BatchPerHost: null.IntFrom(20),
-		// HTTPDebug:    null.StringFrom("full"),
-	}
-	samples := make(chan k6stats.SampleContainer, 1000)
-
-	state := &k6lib.State{
-		Options:   options,
-		Logger:    logger,
-		Group:     root,
-		TLSConfig: tb.TLSClientConfig,
-		Transport: tb.HTTPTransport,
-		BPool:     bpool.NewBufferPool(1),
-		Samples:   samples,
-		Tags:      map[string]string{"group": root.Path},
-	}
-
-	ctx := new(context.Context)
-	*ctx = k6lib.WithState(tb.Context, state)
-	*ctx = k6common.WithRuntime(*ctx, rt)
-	err = rt.Set("http", k6common.Bind(rt, new(k6http.GlobalHTTP).NewModuleInstancePerVU(), ctx))
-	require.NoError(t, err)
-
-	return tb, state, samples, rt, ctx
 }
 
 // runES6String Runs an ES6 string in the given runtime. Use this rather than writing ES5 in tests.

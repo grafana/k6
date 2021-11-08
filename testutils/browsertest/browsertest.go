@@ -35,6 +35,7 @@ import (
 	k6common "go.k6.io/k6/js/common"
 	k6http "go.k6.io/k6/js/modules/k6/http"
 	k6lib "go.k6.io/k6/lib"
+	k6metrics "go.k6.io/k6/lib/metrics"
 	k6test "go.k6.io/k6/lib/testutils/httpmultibin"
 	k6stats "go.k6.io/k6/stats"
 	"gopkg.in/guregu/null.v3"
@@ -71,15 +72,17 @@ func NewBrowserTest(t testing.TB) *BrowserTest {
 	}
 	samples := make(chan k6stats.SampleContainer, 1000)
 
+	registry := k6metrics.NewRegistry()
 	state := &k6lib.State{
-		Options:   options,
-		Logger:    logger,
-		Group:     root,
-		TLSConfig: tb.TLSClientConfig,
-		Transport: tb.HTTPTransport,
-		BPool:     bpool.NewBufferPool(1),
-		Samples:   samples,
-		Tags:      map[string]string{"group": root.Path},
+		Options:        options,
+		Logger:         logger,
+		Group:          root,
+		TLSConfig:      tb.TLSClientConfig,
+		Transport:      tb.HTTPTransport,
+		BPool:          bpool.NewBufferPool(1),
+		Samples:        samples,
+		Tags:           k6lib.NewTagMap(map[string]string{"group": root.Path}),
+		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(registry),
 	}
 
 	ctx := new(context.Context)
