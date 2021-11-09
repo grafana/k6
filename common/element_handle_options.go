@@ -22,6 +22,7 @@ package common
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/dop251/goja"
@@ -72,7 +73,7 @@ type ElementHandlePressOptions struct {
 
 type ElementHandleScreenshotOptions struct {
 	Path           string        `json:"path"`
-	Format         string        `json:"format"`
+	Format         ImageFormat   `json:"format"`
 	OmitBackground bool          `json:"omitBackground"`
 	Quality        int64         `json:"quality"`
 	Timeout        time.Duration `json:"timeout"`
@@ -318,7 +319,7 @@ func (o *ElementHandlePressOptions) ToBaseOptions() *ElementHandleBaseOptions {
 func NewElementHandleScreenshotOptions(defaultTimeout time.Duration) *ElementHandleScreenshotOptions {
 	return &ElementHandleScreenshotOptions{
 		Path:           "",
-		Format:         "png",
+		Format:         ImageFormatPNG,
 		OmitBackground: false,
 		Quality:        100,
 		Timeout:        defaultTimeout,
@@ -328,6 +329,7 @@ func NewElementHandleScreenshotOptions(defaultTimeout time.Duration) *ElementHan
 func (o *ElementHandleScreenshotOptions) Parse(ctx context.Context, opts goja.Value) error {
 	rt := k6common.GetRuntime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+		formatSpecified := false
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -338,9 +340,19 @@ func (o *ElementHandleScreenshotOptions) Parse(ctx context.Context, opts goja.Va
 			case "quality":
 				o.Quality = opts.Get(k).ToInteger()
 			case "type":
-				o.Format = opts.Get(k).String()
+				if f, ok := imageFormatToID[opts.Get(k).String()]; ok {
+					o.Format = f
+					formatSpecified = true
+				}
 			case "timeout":
 				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
+			}
+		}
+
+		// Infer file format by path if format not explicitly specified (default is PNG)
+		if o.Path != "" && !formatSpecified {
+			if strings.HasSuffix(o.Path, ".jpg") || strings.HasSuffix(o.Path, ".jpeg") {
+				o.Format = ImageFormatJPEG
 			}
 		}
 	}

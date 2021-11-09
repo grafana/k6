@@ -25,8 +25,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 
 	"github.com/dop251/goja"
+	"github.com/grafana/xk6-browser/api"
 	k6common "go.k6.io/k6/js/common"
 )
 
@@ -142,6 +144,49 @@ type Geolocation struct {
 	Accurracy float64 `js:"accurracy"`
 }
 
+// ImageFormat represents an image file format
+type ImageFormat string
+
+// Valid image format options
+const (
+	ImageFormatJPEG ImageFormat = "jpeg"
+	ImageFormatPNG  ImageFormat = "png"
+)
+
+func (f ImageFormat) String() string {
+	return imageFormatToString[f]
+}
+
+var imageFormatToString = map[ImageFormat]string{
+	ImageFormatJPEG: "jpeg",
+	ImageFormatPNG:  "png",
+}
+
+var imageFormatToID = map[string]ImageFormat{
+	"jpeg": ImageFormatJPEG,
+	"png":  ImageFormatPNG,
+}
+
+// MarshalJSON marshals the enum as a quoted JSON string
+func (f ImageFormat) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString(`"`)
+	buffer.WriteString(imageFormatToString[f])
+	buffer.WriteString(`"`)
+	return buffer.Bytes(), nil
+}
+
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value
+func (f *ImageFormat) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return err
+	}
+	// Note that if the string cannot be found then it will be set to the zero value.
+	*f = imageFormatToID[j]
+	return nil
+}
+
 type LifecycleEvent int
 
 const (
@@ -242,6 +287,13 @@ type Position struct {
 	Y float64 `json:"y"`
 }
 
+type Rect struct {
+	X      float64 `js:"x"`
+	Y      float64 `js:"y"`
+	Width  float64 `js:"width"`
+	Height float64 `js:"height"`
+}
+
 // ReducedMotion represents a browser reduce-motion setting
 type ReducedMotion string
 
@@ -307,6 +359,11 @@ type SelectOption struct {
 	Value *string `json:"value"`
 	Label *string `json:"label"`
 	Index *int64  `json:"index"`
+}
+
+type Size struct {
+	Width  float64 `js:"width"`
+	Height float64 `js:"height"`
 }
 
 // Viewport represents a page viewport
@@ -382,8 +439,16 @@ func (g *Geolocation) Parse(ctx context.Context, opts goja.Value) error {
 	return nil
 }
 
-func NewScreen() *Screen {
-	return &Screen{}
+func (r *Rect) enclosingIntRect() *Rect {
+	x := math.Floor(r.X + 1e-3)
+	y := math.Floor(r.Y + 1e-3)
+	x2 := math.Ceil(r.X + r.Width - 1e-3)
+	y2 := math.Ceil(r.Y + r.Height - 1e-3)
+	return &Rect{X: x, Y: y, Width: x2 - x, Height: y2 - y}
+}
+
+func (r *Rect) toApiRect() *api.Rect {
+	return &api.Rect{X: r.X, Y: r.Y, Width: r.Width, Height: r.Height}
 }
 
 func (s *Screen) Parse(ctx context.Context, screen goja.Value) error {
@@ -402,8 +467,27 @@ func (s *Screen) Parse(ctx context.Context, screen goja.Value) error {
 	return nil
 }
 
-func NewViewport() *Viewport {
-	return &Viewport{}
+func (s Size) enclosingIntSize() *Size {
+	return &Size{
+		Width:  math.Floor(s.Width + 1e-3),
+		Height: math.Floor(s.Height + 1e-3),
+	}
+}
+
+func (s *Size) Parse(ctx context.Context, viewport goja.Value) error {
+	rt := k6common.GetRuntime(ctx)
+	if viewport != nil && !goja.IsUndefined(viewport) && !goja.IsNull(viewport) {
+		viewport := viewport.ToObject(rt)
+		for _, k := range viewport.Keys() {
+			switch k {
+			case "width":
+				s.Width = viewport.Get(k).ToFloat()
+			case "height":
+				s.Height = viewport.Get(k).ToFloat()
+			}
+		}
+	}
+	return nil
 }
 
 func (v *Viewport) Parse(ctx context.Context, viewport goja.Value) error {

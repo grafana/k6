@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/chromedp/cdproto"
+	"github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/emulation"
@@ -61,6 +62,7 @@ type FrameSession struct {
 	networkManager *NetworkManager
 
 	targetID target.ID
+	windowID browser.WindowID
 
 	initTime *cdp.MonotonicTime
 
@@ -104,6 +106,12 @@ func NewFrameSession(ctx context.Context, session *Session, page *Page, parent *
 			return nil, err
 		}
 	}
+
+	action := browser.GetWindowForTarget().WithTargetID(fs.targetID)
+	if fs.windowID, _, err = action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		return nil, fmt.Errorf(`unable to get window ID: %w`, err)
+	}
+
 	fs.initEvents()
 	if err = fs.initFrameTree(); err != nil {
 		return nil, err
@@ -760,23 +768,32 @@ func (fs *FrameSession) updateRequestInterception(initial bool) error {
 func (fs *FrameSession) updateViewport() error {
 	opts := fs.page.browserCtx.opts
 	emulatedSize := fs.page.emulatedSize
-	viewport := opts.Viewport
+	if emulatedSize == nil {
+		return nil
+	}
+	viewport := emulatedSize.Viewport
+	screen := emulatedSize.Screen
 	orientation := emulation.ScreenOrientation{
 		Angle: 0.0,
-		Type:  emulation.OrientationTypeLandscapePrimary,
+		Type:  emulation.OrientationTypePortraitPrimary,
 	}
 	if viewport.Width > viewport.Height {
 		orientation.Angle = 90.0
-		orientation.Type = emulation.OrientationTypePortraitPrimary
+		orientation.Type = emulation.OrientationTypeLandscapePrimary
 	}
 	action := emulation.SetDeviceMetricsOverride(viewport.Width, viewport.Height, opts.DeviceScaleFactor, opts.IsMobile).
-		WithScreenOrientation(&orientation)
-	if emulatedSize != nil {
-		action.WithScreenWidth(emulatedSize.Screen.Width).
-			WithScreenHeight(emulatedSize.Screen.Height)
-	}
+		WithScreenOrientation(&orientation).
+		WithScreenWidth(screen.Width).
+		WithScreenHeight(screen.Height)
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		return fmt.Errorf("unable to emulate viewport: %w", err)
+	}
+	action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{
+		Width:  viewport.Width,
+		Height: viewport.Height,
+	})
+	if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		return fmt.Errorf("unable to set window bounds: %w", err)
 	}
 	return nil
 }

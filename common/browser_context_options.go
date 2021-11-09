@@ -137,7 +137,7 @@ func (b *BrowserContextOptions) Parse(ctx context.Context, opts goja.Value) erro
 					b.ReducedMotion = ReducedMotionNoPreference
 				}
 			case "screen":
-				screen := NewScreen()
+				screen := &Screen{}
 				if err := screen.Parse(ctx, opts.Get(k).ToObject(rt)); err != nil {
 					return err
 				}
@@ -147,7 +147,7 @@ func (b *BrowserContextOptions) Parse(ctx context.Context, opts goja.Value) erro
 			case "userAgent":
 				b.UserAgent = opts.Get(k).String()
 			case "viewport":
-				viewport := NewViewport()
+				viewport := &Viewport{}
 				if err := viewport.Parse(ctx, opts.Get(k).ToObject(rt)); err != nil {
 					return err
 				}
