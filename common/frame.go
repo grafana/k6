@@ -26,14 +26,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"context"
+
+	"errors"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
-	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
-	"golang.org/x/net/context"
 )
 
 // Ensure frame implements the Frame interface
@@ -497,7 +499,7 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 		return nil, err
 	}
 	if handle == nil {
-		return nil, fmt.Errorf("wait for selector didn't resulted in any nodes")
+		return nil, errors.New("wait for selector didn't resulted in any nodes")
 	}
 
 	// We always return ElementHandles in the main execution context (aka "DOM world")
@@ -514,13 +516,13 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 
 func (f *Frame) AddScriptTag(opts goja.Value) {
 	rt := k6common.GetRuntime(f.ctx)
-	k6common.Throw(rt, errors.Errorf("Frame.AddScriptTag() has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Frame.AddScriptTag() has not been implemented yet!"))
 	applySlowMo(f.ctx)
 }
 
 func (f *Frame) AddStyleTag(opts goja.Value) {
 	rt := k6common.GetRuntime(f.ctx)
-	k6common.Throw(rt, errors.Errorf("Frame.AddStyleTag() has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Frame.AddStyleTag() has not been implemented yet!"))
 	applySlowMo(f.ctx)
 }
 
@@ -1069,7 +1071,7 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameSetContentOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %v", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
 	js := `(html) => {
@@ -1089,7 +1091,7 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 
 func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value) {
 	rt := k6common.GetRuntime(f.ctx)
-	k6common.Throw(rt, errors.Errorf("Frame.setInputFiles(selector, files, opts) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Frame.setInputFiles(selector, files, opts) has not been implemented yet!"))
 	// TODO: needs slowMo
 }
 
@@ -1188,7 +1190,7 @@ func (f *Frame) WaitForFunction(pageFunc goja.Value, opts goja.Value, args ...go
 	parsedOpts := NewFrameWaitForFunctionOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6common.Throw(rt, errors.Errorf("failed parsing options: %v", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
 	handle, err := f.waitForFunction(f.ctx, "utility", pageFunc, parsedOpts.Polling, parsedOpts.Interval, parsedOpts.Timeout, args...)
@@ -1204,7 +1206,7 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 	parsedOpts := NewFrameWaitForLoadStateOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6common.Throw(rt, errors.Errorf("failed parsing options: %v", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
 	waitUntil := LifecycleEventLoad
@@ -1234,7 +1236,7 @@ func (f *Frame) WaitForSelector(selector string, opts goja.Value) api.ElementHan
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %v", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 	handle, err := f.waitForSelector(selector, parsedOpts)
 	if err != nil {

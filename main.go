@@ -21,11 +21,12 @@
 package browser
 
 import (
+	"errors"
+
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
-	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
 )
@@ -97,7 +98,7 @@ func (m *JSModule) Launch(browserName string, opts goja.Value) api.Browser {
 	}
 
 	k6common.Throw(m.GetRuntime(),
-		errors.Errorf("Currently 'chromium' is the only supported browser"))
+		errors.New("Currently 'chromium' is the only supported browser"))
 	return nil
 }
 

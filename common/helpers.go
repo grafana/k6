@@ -22,6 +22,7 @@ package common
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -31,11 +32,12 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 	"github.com/fatih/color"
 	k6common "go.k6.io/k6/js/common"
-	"golang.org/x/net/context"
 )
 
 var debugMu = sync.Mutex{}
@@ -147,35 +149,35 @@ func callApiWithTimeout(ctx context.Context, fn func(context.Context, chan inter
 func errorFromDOMError(domErr string) error {
 	switch domErr {
 	case "error:notconnected":
-		return fmt.Errorf("element is not attached to the DOM")
+		return errors.New("element is not attached to the DOM")
 	case "error:notelement":
-		return fmt.Errorf("node is not an element")
+		return errors.New("node is not an element")
 	case "error:nothtmlelement":
-		return fmt.Errorf("not an HTMLElement")
+		return errors.New("not an HTMLElement")
 	case "error:notfillableelement":
-		return fmt.Errorf("element is not an <input>, <textarea> or [contenteditable] element")
+		return errors.New("element is not an <input>, <textarea> or [contenteditable] element")
 	case "error:notfillableinputtype":
-		return fmt.Errorf("input of this type cannot be filled")
+		return errors.New("input of this type cannot be filled")
 	case "error:notfillablenumberinput":
-		return fmt.Errorf("cannot type text into input[type=number]")
+		return errors.New("cannot type text into input[type=number]")
 	case "error:notvaliddate":
-		return fmt.Errorf("malformed value")
+		return errors.New("malformed value")
 	case "error:notinput":
-		return fmt.Errorf("node is not an HTMLInputElement")
+		return errors.New("node is not an HTMLInputElement")
 	case "error:hasnovalue":
-		return fmt.Errorf("node is not an HTMLInputElement or HTMLTextAreaElement or HTMLSelectElement")
+		return errors.New("node is not an HTMLInputElement or HTMLTextAreaElement or HTMLSelectElement")
 	case "error:notselect":
-		return fmt.Errorf("element is not a <select> element")
+		return errors.New("element is not a <select> element")
 	case "error:notcheckbox":
-		return fmt.Errorf("not a checkbox or radio button")
+		return errors.New("not a checkbox or radio button")
 	case "error:notmultiplefileinput":
-		return fmt.Errorf("non-multiple file input can only accept single file")
+		return errors.New("non-multiple file input can only accept single file")
 	case "error:strictmodeviolation":
-		return fmt.Errorf("strict mode violation, multiple elements were returned for selector query")
+		return errors.New("strict mode violation, multiple elements were returned for selector query")
 	case "error:notqueryablenode":
-		return fmt.Errorf("node is not queryable")
+		return errors.New("node is not queryable")
 	case "error:nthnocapture":
-		return fmt.Errorf("can't query n-th element in a chained selector with capture")
+		return errors.New("can't query n-th element in a chained selector with capture")
 	case "error:timeout":
 		return ErrTimedOut
 	default:

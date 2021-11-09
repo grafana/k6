@@ -24,12 +24,13 @@ import (
 	"fmt"
 	"time"
 
+	"context"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	k6common "go.k6.io/k6/js/common"
-	"golang.org/x/net/context"
 )
 
 // Ensure Mouse implements the api.Mouse interface

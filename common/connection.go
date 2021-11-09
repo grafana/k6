@@ -27,6 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"context"
+
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
@@ -35,7 +37,6 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/mailru/easyjson/jlexer"
 	"github.com/mailru/easyjson/jwriter"
-	"golang.org/x/net/context"
 )
 
 const wsWriteBufferSize = 1 << 20

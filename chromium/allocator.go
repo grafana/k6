@@ -75,7 +75,7 @@ func (a *Allocator) buildCmdArgs(userDataDir *string, removeDir *bool) ([]string
 				args = append(args, fmt.Sprintf("--%s", name))
 			}
 		default:
-			return nil, fmt.Errorf("invalid browser command line flag")
+			return nil, errors.New("invalid browser command line flag")
 		}
 	}
 	*removeDir = false

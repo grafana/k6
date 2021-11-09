@@ -24,12 +24,13 @@ import (
 	"errors"
 	"sync/atomic"
 
+	"context"
+
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
 	"github.com/mailru/easyjson"
 	k6lib "go.k6.io/k6/lib"
-	"golang.org/x/net/context"
 )
 
 // Ensure Session implements the EventEmitter and Executor interfaces

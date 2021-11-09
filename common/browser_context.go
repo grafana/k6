@@ -25,14 +25,16 @@ import (
 	"reflect"
 	"time"
 
+	"context"
+
+	"errors"
+
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/storage"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
-	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
-	"golang.org/x/net/context"
 )
 
 // Ensure BrowserContext implements the EventEmitter and api.BrowserContext interfaces
@@ -74,7 +76,7 @@ func NewBrowserContext(ctx context.Context, conn *Connection, browser *Browser, 
 
 func (b *BrowserContext) AddCookies(cookies goja.Value) {
 	rt := k6common.GetRuntime(b.ctx)
-	k6common.Throw(rt, errors.Errorf("BrowserContext.addCookies(cookies) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("BrowserContext.addCookies(cookies) has not been implemented yet!"))
 }
 
 // AddInitScript adds a script that will be initialized on all new pages.
@@ -138,7 +140,7 @@ func (b *BrowserContext) ClearPermissions() {
 func (b *BrowserContext) Close() {
 	rt := k6common.GetRuntime(b.ctx)
 	if b.id == "" {
-		k6common.Throw(rt, fmt.Errorf("default browser context can't be closed"))
+		k6common.Throw(rt, errors.New("default browser context can't be closed"))
 	}
 	if err := b.browser.disposeContext(b.id); err != nil {
 		k6common.Throw(rt, err)
@@ -147,18 +149,18 @@ func (b *BrowserContext) Close() {
 
 func (b *BrowserContext) Cookies() []goja.Object {
 	rt := k6common.GetRuntime(b.ctx)
-	k6common.Throw(rt, errors.Errorf("BrowserContext.cookies() has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("BrowserContext.cookies() has not been implemented yet!"))
 	return nil
 }
 
 func (b *BrowserContext) ExposeBinding(name string, callback goja.Callable, opts goja.Value) {
 	rt := k6common.GetRuntime(b.ctx)
-	k6common.Throw(rt, errors.Errorf("BrowserContext.exposeBinding(name, callback, opts) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("BrowserContext.exposeBinding(name, callback, opts) has not been implemented yet!"))
 }
 
 func (b *BrowserContext) ExposeFunction(name string, callback goja.Callable) {
 	rt := k6common.GetRuntime(b.ctx)
-	k6common.Throw(rt, errors.Errorf("BrowserContext.newCDPSession(name, callback) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("BrowserContext.newCDPSession(name, callback) has not been implemented yet!"))
 }
 
 // GrantPermissions enables the specified permissions, all others will be disabled.
@@ -207,7 +209,7 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value)
 // NewCDPSession returns a new CDP session attached to this target
 func (b *BrowserContext) NewCDPSession() api.CDPSession {
 	rt := k6common.GetRuntime(b.ctx)
-	k6common.Throw(rt, errors.Errorf("BrowserContext.newCDPSession() has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("BrowserContext.newCDPSession() has not been implemented yet!"))
 	return nil
 }
 
@@ -232,7 +234,7 @@ func (b *BrowserContext) Pages() []api.Page {
 
 func (b *BrowserContext) Route(url goja.Value, handler goja.Callable) {
 	rt := k6common.GetRuntime(b.ctx)
-	k6common.Throw(rt, errors.Errorf("BrowserContext.setHTTPCredentials(httpCredentials) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("BrowserContext.setHTTPCredentials(httpCredentials) has not been implemented yet!"))
 }
 
 // SetDefaultNavigationTimeout sets the default navigation timeout in milliseconds.
@@ -247,7 +249,7 @@ func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 
 func (b *BrowserContext) SetExtraHTTPHeaders(headers map[string]string) {
 	rt := k6common.GetRuntime(b.ctx)
-	k6common.Throw(rt, errors.Errorf("BrowserContext.setHTTPCredentials(httpCredentials) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("BrowserContext.setHTTPCredentials(httpCredentials) has not been implemented yet!"))
 }
 
 // SetGeolocation overrides the geo location of the user.
@@ -290,12 +292,12 @@ func (b *BrowserContext) SetOffline(offline bool) {
 
 func (b *BrowserContext) StorageState(opts goja.Value) {
 	rt := k6common.GetRuntime(b.ctx)
-	k6common.Throw(rt, errors.Errorf("BrowserContext.storageState(opts) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("BrowserContext.storageState(opts) has not been implemented yet!"))
 }
 
 func (b *BrowserContext) Unroute(url goja.Value, handler goja.Callable) {
 	rt := k6common.GetRuntime(b.ctx)
-	k6common.Throw(rt, errors.Errorf("BrowserContext.unroute(url, handler) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("BrowserContext.unroute(url, handler) has not been implemented yet!"))
 }
 
 func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) interface{} {
@@ -316,7 +318,7 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 				case "predicate":
 					predicateFn, isCallable = goja.AssertFunction(opts.Get(k))
 					if !isCallable {
-						k6common.Throw(rt, fmt.Errorf("expected callable predicate"))
+						k6common.Throw(rt, errors.New("expected callable predicate"))
 					}
 				case "timeout":
 					timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
@@ -325,7 +327,7 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 		default:
 			predicateFn, isCallable = goja.AssertFunction(optsOrPredicate)
 			if !isCallable {
-				k6common.Throw(rt, fmt.Errorf("expected callable predicate"))
+				k6common.Throw(rt, errors.New("expected callable predicate"))
 			}
 		}
 	}

@@ -21,8 +21,9 @@
 package allocation
 
 import (
+	"context"
+
 	"github.com/grafana/xk6-browser/common"
-	"golang.org/x/net/context"
 )
 
 type Allocator interface {

@@ -29,17 +29,17 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
-	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
 	k6stats "go.k6.io/k6/stats"
-	"golang.org/x/net/context"
 )
 
 // Ensure NetworkManager implements the EventEmitter interface
@@ -233,7 +233,7 @@ func (m *NetworkManager) handleRequestRedirect(req *Request, redirectResponse *n
 func (m *NetworkManager) initDomains() error {
 	action := network.Enable()
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		return fmt.Errorf("unable to execute %T: %v", action, err)
+		return fmt.Errorf("unable to execute %T: %w", action, err)
 	}
 	return nil
 }
@@ -365,7 +365,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 				// Throw exception into JS runtime
 				rt := k6common.GetRuntime(m.ctx)
 				// TODO: create PR to make netext.BlockedHostError a public struct in k6 perhaps?
-				k6common.Throw(rt, errors.Errorf("hostname (%s) is in a blocked pattern (%s)", url.Host, match))
+				k6common.Throw(rt, fmt.Errorf("hostname (%s) is in a blocked pattern (%s)", url.Host, match))
 			}
 		}
 

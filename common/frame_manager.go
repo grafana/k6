@@ -25,13 +25,15 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
+	"errors"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
-	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
-	"golang.org/x/net/context"
 )
 
 // FrameManager manages all frames in a page and their life-cycles, it's a purely internal component.
@@ -170,7 +172,7 @@ func (m *FrameManager) frameNavigated(frameID cdp.FrameID, parentFrameID cdp.Fra
 	frame := m.frames[frameID]
 
 	if !(isMainFrame || frame != nil) {
-		return errors.Errorf("we either navigate top level or have old version of the navigated frame")
+		return errors.New("we either navigate top level or have old version of the navigated frame")
 	}
 
 	if frame != nil {
@@ -395,7 +397,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 	defaultReferer := m.page.mainFrameSession.getNetworkManager().extraHTTPHeaders["referer"]
 	parsedOpts := NewFrameGotoOptions(defaultReferer, time.Duration(m.timeoutSettings.navigationTimeout())*time.Second)
 	if err := parsedOpts.Parse(m.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %v", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(m.ctx, parsedOpts.Timeout)
@@ -490,7 +492,7 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 	rt := k6common.GetRuntime(m.ctx)
 	parsedOpts := NewFrameWaitForNavigationOptions(time.Duration(m.timeoutSettings.timeout()) * time.Second)
 	if err := parsedOpts.Parse(m.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %v", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
 	ch, evCancelFn := createWaitForEventHandler(m.ctx, frame, []string{EventFrameNavigation}, func(data interface{}) bool {

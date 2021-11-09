@@ -31,7 +31,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 // Ensure Worker implements the EventEmitter, Target and api.Worker interfaces
@@ -76,7 +76,7 @@ func (w *Worker) initEvents() error {
 	}
 	for _, action := range actions {
 		if err := action.Do(cdp.WithExecutor(w.ctx, w.session)); err != nil {
-			return fmt.Errorf("unable to execute %T: %v", action, err)
+			return fmt.Errorf("unable to execute %T: %w", action, err)
 		}
 	}
 	return nil
