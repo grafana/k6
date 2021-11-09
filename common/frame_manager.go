@@ -27,11 +27,12 @@ import (
 
 	"context"
 
+	"errors"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
-	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
 )
 
@@ -171,7 +172,7 @@ func (m *FrameManager) frameNavigated(frameID cdp.FrameID, parentFrameID cdp.Fra
 	frame := m.frames[frameID]
 
 	if !(isMainFrame || frame != nil) {
-		return errors.Errorf("we either navigate top level or have old version of the navigated frame")
+		return errors.New("we either navigate top level or have old version of the navigated frame")
 	}
 
 	if frame != nil {

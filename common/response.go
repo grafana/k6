@@ -28,11 +28,12 @@ import (
 
 	"context"
 
+	"errors"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
-	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
 )
@@ -171,7 +172,7 @@ func (r *Response) AllHeaders() map[string]string {
 func (r *Response) Body() goja.ArrayBuffer {
 	rt := k6common.GetRuntime(r.ctx)
 	if r.status >= 300 && r.status <= 399 {
-		k6common.Throw(rt, errors.Errorf("Response body is unavailable for redirect responses"))
+		k6common.Throw(rt, errors.New("Response body is unavailable for redirect responses"))
 	}
 	if err := r.fetchBody(); err != nil {
 		k6common.Throw(rt, err)
@@ -204,7 +205,7 @@ func (r *Response) bodySize() int64 {
 func (r *Response) Finished() bool {
 	// TODO: should return nil|Error
 	rt := k6common.GetRuntime(r.ctx)
-	k6common.Throw(rt, errors.Errorf("Response.finished() has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Response.finished() has not been implemented yet!"))
 	return false
 }
 

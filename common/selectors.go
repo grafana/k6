@@ -37,7 +37,7 @@
 package common
 
 import (
-	"fmt"
+	"errors"
 	"regexp"
 	"strings"
 )
@@ -77,7 +77,7 @@ func (s *Selector) appendPart(p *SelectorPart, capture bool) error {
 	s.Parts = append(s.Parts, p)
 	if capture {
 		if s.Capture != nil {
-			return fmt.Errorf("only one of the selectors can capture using * modifier")
+			return errors.New("only one of the selectors can capture using * modifier")
 		}
 		s.Capture = new(int)
 		*s.Capture = (len(s.Parts) - 1)

@@ -24,10 +24,11 @@ import (
 	"context"
 	"fmt"
 
+	"errors"
+
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
-	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
 )
 
@@ -62,7 +63,7 @@ func NewBrowserType(ctx context.Context) api.BrowserType {
 
 func (b *BrowserType) Connect(opts goja.Value) {
 	rt := k6common.GetRuntime(b.Ctx)
-	k6common.Throw(rt, errors.Errorf("BrowserType.connect() has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("BrowserType.connect() has not been implemented yet!"))
 }
 
 func (b *BrowserType) ExecutablePath() string {
@@ -138,7 +139,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 
 func (b *BrowserType) LaunchPersistentContext(userDataDir string, opts goja.Value) api.Browser {
 	rt := k6common.GetRuntime(b.Ctx)
-	k6common.Throw(rt, errors.Errorf("BrowserType.LaunchPersistentContext(userDataDir, opts) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("BrowserType.LaunchPersistentContext(userDataDir, opts) has not been implemented yet!"))
 	return nil
 }
 
