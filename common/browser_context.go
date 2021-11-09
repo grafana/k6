@@ -25,6 +25,8 @@ import (
 	"reflect"
 	"time"
 
+	"context"
+
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/storage"
@@ -32,7 +34,6 @@ import (
 	"github.com/grafana/xk6-browser/api"
 	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
-	"golang.org/x/net/context"
 )
 
 // Ensure BrowserContext implements the EventEmitter and api.BrowserContext interfaces

@@ -21,9 +21,10 @@
 package common
 
 import (
+	"context"
+
 	"github.com/dop251/goja"
 	k6common "go.k6.io/k6/js/common"
-	"golang.org/x/net/context"
 )
 
 // BrowserContextOptions stores browser context options

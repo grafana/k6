@@ -23,7 +23,7 @@ package common
 import (
 	"os"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 type BrowserProcess struct {

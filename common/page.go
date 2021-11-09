@@ -29,6 +29,8 @@ import (
 	"strings"
 	"time"
 
+	"context"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/emulation"
@@ -38,7 +40,6 @@ import (
 	"github.com/grafana/xk6-browser/api"
 	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
-	"golang.org/x/net/context"
 )
 
 // Ensure page implements the EventEmitter, Target and Page interfaces.

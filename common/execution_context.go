@@ -24,13 +24,14 @@ import (
 	"fmt"
 	"regexp"
 
+	"context"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	k6common "go.k6.io/k6/js/common"
-	"golang.org/x/net/context"
 )
 
 const evaluationScriptURL = "__xk6_browser_evaluation_script__"

@@ -31,7 +31,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 // Ensure Worker implements the EventEmitter, Target and api.Worker interfaces

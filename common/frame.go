@@ -26,6 +26,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"context"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/runtime"
@@ -33,7 +35,6 @@ import (
 	"github.com/grafana/xk6-browser/api"
 	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
-	"golang.org/x/net/context"
 )
 
 // Ensure frame implements the Frame interface

@@ -25,13 +25,14 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
-	"golang.org/x/net/context"
 )
 
 // FrameManager manages all frames in a page and their life-cycles, it's a purely internal component.

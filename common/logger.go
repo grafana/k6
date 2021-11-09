@@ -27,9 +27,10 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
 	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 type Logger struct {

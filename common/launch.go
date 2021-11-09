@@ -24,9 +24,10 @@ import (
 	"reflect"
 	"time"
 
+	"context"
+
 	"github.com/dop251/goja"
 	k6common "go.k6.io/k6/js/common"
-	"golang.org/x/net/context"
 )
 
 type ProxyOptions struct {

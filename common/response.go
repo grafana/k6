@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"context"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
@@ -33,7 +35,6 @@ import (
 	"github.com/pkg/errors"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
-	"golang.org/x/net/context"
 )
 
 // Ensure Response implements the api.Response interface

@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
@@ -42,7 +44,6 @@ import (
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
 	k6stats "go.k6.io/k6/stats"
-	"golang.org/x/net/context"
 )
 
 const utilityWorldName = "__k6_browser_utility_world__"

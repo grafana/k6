@@ -28,6 +28,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"context"
+
 	"github.com/chromedp/cdproto"
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
@@ -36,7 +38,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/grafana/xk6-browser/api"
 	k6lib "go.k6.io/k6/lib"
-	"golang.org/x/net/context"
 )
 
 // Ensure Browser implements the EventEmitter and Browser interfaces

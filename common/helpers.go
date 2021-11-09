@@ -31,11 +31,12 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 	"github.com/fatih/color"
 	k6common "go.k6.io/k6/js/common"
-	"golang.org/x/net/context"
 )
 
 var debugMu = sync.Mutex{}

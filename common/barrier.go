@@ -24,7 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 type Barrier struct {
