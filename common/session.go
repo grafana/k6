@@ -21,10 +21,9 @@
 package common
 
 import (
+	"context"
 	"errors"
 	"sync/atomic"
-
-	"context"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"

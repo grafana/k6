@@ -37,6 +37,8 @@
 package common
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -45,10 +47,6 @@ import (
 	"reflect"
 	"strings"
 	"time"
-
-	"context"
-
-	"errors"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"

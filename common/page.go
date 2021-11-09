@@ -21,6 +21,8 @@
 package common
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -28,10 +30,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"context"
-
-	"errors"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"

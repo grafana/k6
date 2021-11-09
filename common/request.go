@@ -21,13 +21,11 @@
 package common
 
 import (
+	"context"
+	"errors"
 	"net/url"
 	"strings"
 	"time"
-
-	"context"
-
-	"errors"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"

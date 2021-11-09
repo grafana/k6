@@ -21,13 +21,12 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"regexp"
 	"sync"
 	"time"
-
-	"context"
 
 	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"

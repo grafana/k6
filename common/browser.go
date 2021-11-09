@@ -21,14 +21,13 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"context"
 
 	"github.com/chromedp/cdproto"
 	cdpbrowser "github.com/chromedp/cdproto/browser"

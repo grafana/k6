@@ -21,6 +21,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -28,8 +29,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"context"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"

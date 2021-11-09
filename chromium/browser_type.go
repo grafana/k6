@@ -22,9 +22,8 @@ package chromium
 
 import (
 	"context"
-	"fmt"
-
 	"errors"
+	"fmt"
 
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"

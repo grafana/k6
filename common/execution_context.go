@@ -21,10 +21,9 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"regexp"
-
-	"context"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"

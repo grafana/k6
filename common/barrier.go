@@ -21,10 +21,9 @@
 package common
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
-
-	"context"
 )
 
 type Barrier struct {

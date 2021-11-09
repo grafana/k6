@@ -21,6 +21,7 @@
 package common
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,8 +32,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"context"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"

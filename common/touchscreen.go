@@ -21,9 +21,8 @@
 package common
 
 import (
-	"fmt"
-
 	"context"
+	"fmt"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"

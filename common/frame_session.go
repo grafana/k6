@@ -21,13 +21,12 @@
 package common
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
-
-	"context"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"

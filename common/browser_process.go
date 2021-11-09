@@ -21,9 +21,8 @@
 package common
 
 import (
-	"os"
-
 	"context"
+	"os"
 )
 
 type BrowserProcess struct {

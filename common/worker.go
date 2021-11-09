@@ -21,6 +21,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -30,8 +31,6 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
-
-	"context"
 )
 
 // Ensure Worker implements the EventEmitter, Target and api.Worker interfaces

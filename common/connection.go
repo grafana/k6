@@ -21,13 +21,12 @@
 package common
 
 import (
+	"context"
 	"crypto/tls"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"context"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
