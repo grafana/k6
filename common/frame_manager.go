@@ -357,6 +357,8 @@ func (m *FrameManager) requestReceivedResponse(res *Response) {
 }
 
 func (m *FrameManager) requestStarted(req *Request) {
+	m.framesMu.Lock()
+	defer m.framesMu.Unlock()
 	defer m.page.emit(EventPageRequest, req)
 
 	m.inflightRequests[req.getID()] = true
