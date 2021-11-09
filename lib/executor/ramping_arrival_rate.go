@@ -96,7 +96,7 @@ func (varc RampingArrivalRateConfig) GetDescription(et *lib.ExecutionTuple) stri
 	}
 	maxUnscaledRate := getStagesUnscaledMaxTarget(varc.StartRate.Int64, varc.Stages)
 	maxArrRatePerSec, _ := getArrivalRatePerSec(
-		getScaledArrivalRate(et.Segment, maxUnscaledRate, time.Duration(varc.TimeUnit.Duration)),
+		getScaledArrivalRate(et.Segment, maxUnscaledRate, varc.TimeUnit.TimeDuration()),
 	).Float64()
 
 	return fmt.Sprintf("Up to %.2f iterations/s for %s over %d stages%s",
@@ -112,7 +112,7 @@ func (varc *RampingArrivalRateConfig) Validate() []error {
 		errors = append(errors, fmt.Errorf("the startRate value shouldn't be negative"))
 	}
 
-	if time.Duration(varc.TimeUnit.Duration) < 0 {
+	if varc.TimeUnit.TimeDuration() < 0 {
 		errors = append(errors, fmt.Errorf("the timeUnit should be more than 0"))
 	}
 
@@ -147,7 +147,7 @@ func (varc RampingArrivalRateConfig) GetExecutionRequirements(et *lib.ExecutionT
 			MaxUnplannedVUs: uint64(et.Segment.Scale(varc.MaxVUs.Int64 - varc.PreAllocatedVUs.Int64)),
 		},
 		{
-			TimeOffset:      sumStagesDuration(varc.Stages) + time.Duration(varc.GracefulStop.Duration),
+			TimeOffset:      sumStagesDuration(varc.Stages) + varc.GracefulStop.TimeDuration(),
 			PlannedVUs:      0,
 			MaxUnplannedVUs: 0,
 		},
@@ -288,7 +288,7 @@ func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.
 		}
 		doneSoFar = endCount
 		from = to
-		stageStart += time.Duration(stage.Duration.Duration)
+		stageStart += stage.Duration.TimeDuration()
 	}
 }
 
@@ -330,7 +330,7 @@ func (varr RampingArrivalRate) Run(
 	maxVUs := varr.config.GetMaxVUs(varr.executionState.ExecutionTuple)
 
 	// TODO: refactor and simplify
-	timeUnit := time.Duration(varr.config.TimeUnit.Duration)
+	timeUnit := varr.config.TimeUnit.TimeDuration()
 	startArrivalRate := getScaledArrivalRate(segment, varr.config.StartRate.Int64, timeUnit)
 	maxUnscaledRate := getStagesUnscaledMaxTarget(varr.config.StartRate.Int64, varr.config.Stages)
 	maxArrivalRatePerSec, _ := getArrivalRatePerSec(getScaledArrivalRate(segment, maxUnscaledRate, timeUnit)).Float64()

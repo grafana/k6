@@ -37,7 +37,7 @@ import (
 
 func sumStagesDuration(stages []Stage) (result time.Duration) {
 	for _, s := range stages {
-		result += time.Duration(s.Duration.Duration)
+		result += s.Duration.TimeDuration()
 	}
 	return
 }

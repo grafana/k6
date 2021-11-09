@@ -91,7 +91,7 @@ func (clvc ConstantVUsConfig) Validate() []error {
 
 	if !clvc.Duration.Valid {
 		errors = append(errors, fmt.Errorf("the duration is unspecified"))
-	} else if time.Duration(clvc.Duration.Duration) < minDuration {
+	} else if clvc.Duration.TimeDuration() < minDuration {
 		errors = append(errors, fmt.Errorf(
 			"the duration should be at least %s, but is %s", minDuration, clvc.Duration,
 		))
@@ -112,7 +112,7 @@ func (clvc ConstantVUsConfig) GetExecutionRequirements(et *lib.ExecutionTuple) [
 			PlannedVUs: uint64(clvc.GetVUs(et)),
 		},
 		{
-			TimeOffset: time.Duration(clvc.Duration.Duration + clvc.GracefulStop.Duration),
+			TimeOffset: clvc.Duration.TimeDuration() + clvc.GracefulStop.TimeDuration(),
 			PlannedVUs: 0,
 		},
 	}
@@ -147,7 +147,7 @@ func (clv ConstantVUs) Run(
 	parentCtx context.Context, out chan<- stats.SampleContainer, _ *metrics.BuiltinMetrics,
 ) (err error) {
 	numVUs := clv.config.GetVUs(clv.executionState.ExecutionTuple)
-	duration := time.Duration(clv.config.Duration.Duration)
+	duration := clv.config.Duration.TimeDuration()
 	gracefulStop := clv.config.GetGracefulStop()
 
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)

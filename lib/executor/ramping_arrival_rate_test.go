@@ -656,7 +656,7 @@ func (varc RampingArrivalRateConfig) calRat(et *lib.ExecutionTuple, ch chan<- ti
 			var (
 				from = big.NewRat(curr, int64(time.Second))
 				to   = big.NewRat(target, int64(time.Second))
-				dur  = big.NewRat(time.Duration(stage.Duration.Duration).Nanoseconds(), 1)
+				dur  = big.NewRat(stage.Duration.TimeDuration().Nanoseconds(), 1)
 			)
 			// precalcualations :)
 			toMinusFrom := new(big.Rat).Sub(to, from)
@@ -687,7 +687,7 @@ func (varc RampingArrivalRateConfig) calRat(et *lib.ExecutionTuple, ch chan<- ti
 			step := big.NewRat(int64(time.Second), target)
 			first := big.NewRat(0, 1)
 			first.Sub(first, carry)
-			endCount.Add(endCount, new(big.Rat).Mul(big.NewRat(target, 1), big.NewRat(time.Duration(stage.Duration.Duration).Nanoseconds(), time.Duration(varc.TimeUnit.Duration).Nanoseconds())))
+			endCount.Add(endCount, new(big.Rat).Mul(big.NewRat(target, 1), big.NewRat(stage.Duration.TimeDuration().Nanoseconds(), varc.TimeUnit.TimeDuration().Nanoseconds())))
 
 			for ; endCount.Cmp(iRat) >= 0; iRat.Add(iRat, big.NewRat(next(), 1)) {
 				res := new(big.Rat).Sub(iRat, doneSoFar) // this can get next added to it but will need to change the above for .. so
@@ -698,7 +698,7 @@ func (varc RampingArrivalRateConfig) calRat(et *lib.ExecutionTuple, ch chan<- ti
 		}
 		doneSoFar.Set(endCount) // copy
 		curr = target
-		base += time.Duration(stage.Duration.Duration)
+		base += stage.Duration.TimeDuration()
 	}
 }
 

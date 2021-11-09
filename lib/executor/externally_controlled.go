@@ -81,7 +81,7 @@ func (mecc ExternallyControlledConfigParams) Validate() (errors []error) {
 
 	if !mecc.Duration.Valid {
 		errors = append(errors, fmt.Errorf("the duration should be specified, for infinite duration use 0"))
-	} else if time.Duration(mecc.Duration.Duration) < 0 {
+	} else if mecc.Duration.TimeDuration() < 0 {
 		errors = append(errors, fmt.Errorf(
 			"the duration shouldn't be negative, for infinite duration use 0",
 		))
@@ -148,7 +148,7 @@ func (mec ExternallyControlledConfig) GetExecutionRequirements(et *lib.Execution
 		MaxUnplannedVUs: 0,                                          // intentional, see function comment
 	}
 
-	maxDuration := time.Duration(mec.Duration.Duration)
+	maxDuration := mec.Duration.TimeDuration()
 	if maxDuration == 0 {
 		// Infinite duration, don't emit 0 VUs at the end since there's no planned end
 		return []lib.ExecutionStep{startVUs}
@@ -319,7 +319,7 @@ func (mex *ExternallyControlled) stopWhenDurationIsReached(ctx context.Context, 
 		// TODO: something saner and more optimized that sleeps for pauses and
 		// doesn't depend on the global execution state?
 		case <-checkInterval.C:
-			elapsed := mex.executionState.GetCurrentTestRunDuration() - time.Duration(mex.config.StartTime.Duration)
+			elapsed := mex.executionState.GetCurrentTestRunDuration() - mex.config.StartTime.TimeDuration()
 			if elapsed >= duration {
 				cancel()
 				return
@@ -415,8 +415,7 @@ func (rs *externallyControlledRunState) progressFn() (float64, []string) {
 
 	// TODO: use a saner way to calculate the elapsed time, without relying on
 	// the global execution state...
-	elapsed := rs.executor.executionState.GetCurrentTestRunDuration() - time.Duration(
-		rs.executor.config.StartTime.Duration)
+	elapsed := rs.executor.executionState.GetCurrentTestRunDuration() - rs.executor.config.StartTime.TimeDuration()
 	if elapsed > rs.duration {
 		return 1, right
 	}
@@ -515,7 +514,7 @@ func (mex *ExternallyControlled) Run(
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 
-	duration := time.Duration(currentControlConfig.Duration.Duration)
+	duration := currentControlConfig.Duration.TimeDuration()
 	if duration > 0 { // Only keep track of duration if it's not infinite
 		go mex.stopWhenDurationIsReached(ctx, duration, cancel)
 	}

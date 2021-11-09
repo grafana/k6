@@ -99,7 +99,7 @@ func (pvic PerVUIterationsConfig) Validate() []error {
 		errors = append(errors, fmt.Errorf("the number of iterations should be more than 0"))
 	}
 
-	if time.Duration(pvic.MaxDuration.Duration) < minDuration {
+	if pvic.MaxDuration.TimeDuration() < minDuration {
 		errors = append(errors, fmt.Errorf(
 			"the maxDuration should be at least %s, but is %s", minDuration, pvic.MaxDuration,
 		))
@@ -120,7 +120,7 @@ func (pvic PerVUIterationsConfig) GetExecutionRequirements(et *lib.ExecutionTupl
 			PlannedVUs: uint64(pvic.GetVUs(et)),
 		},
 		{
-			TimeOffset: time.Duration(pvic.MaxDuration.Duration + pvic.GracefulStop.Duration),
+			TimeOffset: pvic.MaxDuration.TimeDuration() + pvic.GracefulStop.TimeDuration(),
 			PlannedVUs: 0,
 		},
 	}
@@ -157,7 +157,7 @@ func (pvi PerVUIterations) Run(
 ) (err error) {
 	numVUs := pvi.config.GetVUs(pvi.executionState.ExecutionTuple)
 	iterations := pvi.config.GetIterations()
-	duration := time.Duration(pvi.config.MaxDuration.Duration)
+	duration := pvi.config.MaxDuration.TimeDuration()
 	gracefulStop := pvi.config.GetGracefulStop()
 
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)

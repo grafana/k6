@@ -184,7 +184,7 @@ func (o *Output) Start() error {
 		o.logger.WithError(err).Debug("Couldn't create database; most likely harmless")
 	}
 
-	pf, err := output.NewPeriodicFlusher(time.Duration(o.Config.PushInterval.Duration), o.flushMetrics)
+	pf, err := output.NewPeriodicFlusher(o.Config.PushInterval.TimeDuration(), o.flushMetrics)
 	if err != nil {
 		return err
 	}
@@ -239,7 +239,7 @@ func (o *Output) flushMetrics() {
 		t := time.Since(startTime)
 		o.logger.WithField("t", t).Debug("Batch written!")
 
-		if t > time.Duration(o.Config.PushInterval.Duration) {
+		if t > o.Config.PushInterval.TimeDuration() {
 			o.logger.WithField("t", t).
 				Warn("The flush operation took higher than the expected set push interval. If you see this message multiple times then the setup or configuration need to be adjusted to achieve a sustainable rate.") //nolint:lll
 		}
