@@ -129,7 +129,7 @@ func (b *Browser) connect() error {
 func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 	action := target.DisposeBrowserContext(id)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		return fmt.Errorf("unable to dispose browser context %T: %v", action, err)
+		return fmt.Errorf("unable to dispose browser context %T: %w", action, err)
 	}
 	b.contextsMu.Lock()
 	defer b.contextsMu.Unlock()
@@ -181,7 +181,7 @@ func (b *Browser) initEvents() error {
 
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		return fmt.Errorf("unable to execute %T: %v", action, err)
+		return fmt.Errorf("unable to execute %T: %w", action, err)
 	}
 
 	// Target.setAutoAttach has a bug where it does not wait for new Targets being attached.
@@ -189,7 +189,7 @@ func (b *Browser) initEvents() error {
 	// This can be removed after https://chromium-review.googlesource.com/c/chromium/src/+/2885888 lands in stable.
 	action2 := target.GetTargetInfo()
 	if _, err := action2.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		return fmt.Errorf("unable to execute %T: %v", action, err)
+		return fmt.Errorf("unable to execute %T: %w", action, err)
 	}
 
 	return nil
@@ -297,7 +297,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		if targetID, err = action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-			errCh <- fmt.Errorf("unable to execute %T: %v", action, err)
+			errCh <- fmt.Errorf("unable to execute %T: %w", action, err)
 		}
 	}()
 	select {

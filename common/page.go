@@ -132,7 +132,7 @@ func NewPage(ctx context.Context, session *Session, browserCtx *BrowserContext, 
 func (p *Page) initEvents() error {
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return fmt.Errorf("unable to execute %T: %v", action, err)
+		return fmt.Errorf("unable to execute %T: %w", action, err)
 	}
 	return nil
 }
@@ -329,7 +329,7 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 	rt := k6common.GetRuntime(p.ctx)
 	parsedOpts := NewPageEmulateMediaOptions(p.mediaType, p.colorScheme, p.reducedMotion)
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %v", err))
+		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
 	p.mediaType = parsedOpts.Media

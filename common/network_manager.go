@@ -233,7 +233,7 @@ func (m *NetworkManager) handleRequestRedirect(req *Request, redirectResponse *n
 func (m *NetworkManager) initDomains() error {
 	action := network.Enable()
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		return fmt.Errorf("unable to execute %T: %v", action, err)
+		return fmt.Errorf("unable to execute %T: %w", action, err)
 	}
 	return nil
 }

@@ -86,7 +86,7 @@ func (h *BaseJSHandle) Dispose() {
 
 	action := runtime.ReleaseObject(h.remoteObject.ObjectID)
 	if err := action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to dispose element %T: %v", action, err))
+		k6common.Throw(rt, fmt.Errorf("unable to dispose element %T: %w", action, err))
 	}
 }
 
@@ -122,7 +122,7 @@ func (h *BaseJSHandle) GetProperties() map[string]api.JSHandle {
 	action := runtime.GetProperties(h.remoteObject.ObjectID).
 		WithOwnProperties(true)
 	if result, _, _, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to get properties for JS handle %T: %v", action, err))
+		k6common.Throw(rt, fmt.Errorf("unable to get properties for JS handle %T: %w", action, err))
 	}
 
 	props := make(map[string]api.JSHandle, len(result))
@@ -150,7 +150,7 @@ func (h *BaseJSHandle) JSONValue() goja.Value {
 			WithAwaitPromise(true).
 			WithObjectID(h.remoteObject.ObjectID)
 		if result, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-			k6common.Throw(rt, fmt.Errorf("unable to get properties for JS handle %T: %v", action, err))
+			k6common.Throw(rt, fmt.Errorf("unable to get properties for JS handle %T: %w", action, err))
 		}
 		res, err := valueFromRemoteObject(h.ctx, result)
 		if err != nil {

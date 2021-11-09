@@ -156,7 +156,7 @@ func (fs *FrameSession) initDomains() error {
 	}
 	for _, action := range actions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-			return fmt.Errorf("unable to execute %T: %v", action, err)
+			return fmt.Errorf("unable to execute %T: %w", action, err)
 		}
 	}
 	return nil
@@ -337,7 +337,7 @@ func (fs *FrameSession) initOptions() error {
 
 	for _, action := range optActions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-			return fmt.Errorf("unable to execute %T: %v", action, err)
+			return fmt.Errorf("unable to execute %T: %w", action, err)
 		}
 	}
 
@@ -707,7 +707,7 @@ func (fs *FrameSession) updateEmulateMedia(initial bool) error {
 		WithMedia(string(fs.page.mediaType)).
 		WithFeatures(features)
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return fmt.Errorf("unable to execute %T: %v", action, err)
+		return fmt.Errorf("unable to execute %T: %w", action, err)
 	}
 	return nil
 }
