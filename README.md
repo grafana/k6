@@ -1,28 +1,62 @@
-# xk6-browser
+<p align="center"><a href="https://k6.io/"><img src="assets/logo.svg" alt="xk6-browser" width="220" height="220" /></a></p>
 
-A k6 extension adding support for automation of browsers via the [Chrome Devtools Protocol](https://chromedevtools.github.io/devtools-protocol/) (CDP).
+<h3 align="center">Browser automation and end-to-end web testing for k6</h3>
+<p align="center">An extension for k6 adding browser-level APIs with rough Playwright compatibility.</p>
 
-Major acknowledgement to the authors of [Playwright](https://playwright.dev/) and [Puppeteer](https://github.com/puppeteer/puppeteer) for their trailblazing work in this area. This project is heavily influenced and in some regards based on the code from those projects.
+<p align="center">
+  <a href="https://github.com/grafana/xk6-browser/releases"><img src="https://img.shields.io/github/release/grafana/xk6-browser.svg" alt="Github release"></a>
+  <a href="https://github.com/grafana/xk6-browser/actions/workflows/all.yaml"><img src="https://github.com/grafana/xk6-browser/actions/workflows/all.yaml/badge.svg" alt="Build status"></a>
+  <a href="https://goreportcard.com/report/github.com/grafana/xk6-browser"><img src="https://goreportcard.com/badge/github.com/grafana/xk6-browser" alt="Go Report Card"></a>
+  <br>
+  <a href="https://twitter.com/k6_io"><img src="https://img.shields.io/badge/twitter-@k6_io-55acee.svg" alt="@k6_io on Twitter"></a>
+  <a href="https://k6.io/slack"><img src="https://img.shields.io/badge/Slack-k6-ff69b4.svg" alt="Slack channel"></a>
+</p>
+<p align="center">
+    <a href="https://github.com/grafana/xk6-browser/releases">Download</a> ·
+    <a href="#install">Install</a> ·
+    <a href="https://k6.io/docs/javascript-api/k6-x-browser/">Documentation</a> ·
+    <a href="https://community.k6.io/">Community</a>
+</p>
+
+<br/>
+<img src="assets/github-hr.svg" height="32" alt="---" />
+<br/>
+
+**xk6-browser** is a k6 extension adding support for automation of browsers via the [Chrome Devtools Protocol](https://chromedevtools.github.io/devtools-protocol/) (CDP).
+
+Special acknowledgment to the authors of [Playwright](https://playwright.dev/) and [Puppeteer](https://github.com/puppeteer/puppeteer) for their trailblazing work in this area. This project is heavily influenced and in some regards based on the code of those projects.
 
 ## Goals
 
-- Bring browser automation to the k6 testing platform while supporting core k6 features like VU executors, scenarios, metrics, checks, thresholds, logging, DNS remapping, IP block lists etc.
-- Test stability as top priority by supporting non-flaky [selectors](https://playwright.dev/docs/selectors) combined with [auto-wait](https://playwright.dev/docs/actionability/) for actions just like Playwright
-- Aim for rough compatibility with [Playwright](https://github.com/microsoft/playwright). The reason for this is two-fold; for one we don't want users to have to learn a completley new API just to use xk6-browser, and secondly it opens up for using the [Playwright RPC server](https://github.com/mxschmitt/playwright-go) as an optional backend for xk6-browser should we decide to support that.
-- Support for Chromium compatible browsers first, and eventually Firefox and WebKit based browsers.
+- Bring browser automation to the k6 testing platform while supporting core k6 features like VU executors, scenarios, metrics, checks, thresholds, logging, DNS remapping, IP blocklists, etc.
+- Test stability as the top priority by supporting non-flaky [selectors](https://playwright.dev/docs/selectors) combined with [auto-waiting](https://playwright.dev/docs/actionability/) for actions just like Playwright.
+- Aim for rough API compatibility with [Playwright](https://github.com/microsoft/playwright). The reason for this is two-fold; for one we don't want users to have to learn a completely new API just to use xk6-browser, and secondly, it opens up for using the [Playwright RPC server](https://github.com/mxschmitt/playwright-go) as an optional backend for xk6-browser should we decide to support that in the future.
+- Support for Chromium compatible browsers first, and eventually Firefox and WebKit-based browsers.
 
 ## FAQ
 
-- **It doesn't work with my Chromium/Chrome version, why?**
-    CDP evolves and there are differences between different versions of Chromium, some times quite subtle. The codebase has been tested with v92.0.4474.0 (for Mac that means [this build](https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Mac/857950/)).
+- **Is this production ready?**
+    No, not yet. We're focused on making the extension stable and reliable, as that's our top priority, before adding more features.
 
-- **Are Firefox or WebKit based browsers supported?**
-    Not yet. There are differences in CDP coverage between Chromium, Firefox and WebKit. xk6-browser is initially only targetting Chromium based browsers.
+- **Is this extension supported in k6 Cloud?**
+    No, not yet. Once the codebase is deemed production ready we'll add support for browser-based testing in k6 Cloud.
+
+- **It doesn't work with my Chromium/Chrome version, why?**
+    CDP evolves and there are differences between different versions of Chromium, sometimes quite subtle. The codebase is continuously tested with the two latest major releases of Google Chrome.
+
+- **Are Firefox or WebKit-based browsers supported?**
+    Not yet. There are differences in CDP coverage between Chromium, Firefox, and WebKit-based browsers. xk6-browser is initially only targetting Chromium-based browsers.
 
 - **Are all features of Playwright supported?**
-    No. Playwright's API is pretty big and some of the functionality only makes sense if they're implemented as async operations: event listening, request interception, waiting for events etc. As [k6 doesn't have a VU event-loop](https://github.com/grafana/k6/issues/882) yet, the xk6-browser API is synchronous and thus lacking some of the functionality that requires asynchronicity.
+    No. Playwright's API is pretty big and some of the functionality only makes sense if they're implemented as async operations: event listening, request interception, waiting for events, etc. As [k6 doesn't have a VU event-loop](https://github.com/grafana/k6/issues/882) yet, the xk6-browser API is synchronous right now and thus lacks some of the functionality that requires asynchronicity.
 
-## Usage
+## Install
+
+### Pre-built binaries
+
+The easiest way to install xk6-browser is to grab a pre-built binary from the [GitHub Releases](https://github.com/grafana/xk6-browser/releases) page. Once you download and unpack the release, you can optionally copy the k6 binary (it's compiled with the xk6-browser extension) it contains somewhere in your PATH, so you are able to run k6 from any location on your system.
+
+### Build from source
 
 To build a `k6` binary with this extension, first ensure you have the prerequisites:
 
@@ -73,7 +107,7 @@ import launcher from "k6/x/browser";
 export default function() {
     const browser = launcher.launch('chromium');
     const context = browser.newContext({
-        acceptDownloads: false,             // Whether to accepts downloading of files by defaul
+        acceptDownloads: false,             // Whether to accept downloading of files by default
         bypassCSP: false,                   // Whether to bypass content-security-policy rules
         colorScheme: 'light',               // Preferred color scheme of browser ('light', 'dark' or 'no-preference')
         deviceScaleFactor: 1.0,             // Device scaling factor
@@ -85,7 +119,7 @@ export default function() {
         isMobile: false,                    // Simulate mobile device or not
         javaScriptEnabled: true,            // Should JavaScript be enabled or not
         locale: 'en-US',                    // The locale to set
-        offline: false,                     // Whether to put browser in offline or not
+        offline: false,                     // Whether to put browser in offline mode or not
         permissions: ['midi'],              // Permisions to grant by default
         reducedMotion: 'no-preference',     // Indicate to browser whether it should try to reduce motion/animations
         screen: {width: 800, height: 600},  // Set default screen size
@@ -172,10 +206,11 @@ import { sleep } from "k6";
 
 export default function() {
     const browser = launcher.launch('chromium', {
-        colorScheme: 'dark', // Valid values are "light", "dark" or "no-preference"
         headless: false
     });
-    const context = browser.newContext();
+    const context = browser.newContext({
+        colorScheme: 'dark', // Valid values are "light", "dark" or "no-preference"
+    });
     const page = context.newPage();
     page.goto('http://whatsmyuseragent.org/');
 
@@ -263,9 +298,9 @@ Currently only Chromium is supported, and the [Playwright API](https://playwrigh
 
 | Class | Support | Missing APIs |
 |   :---   | :--- | :--- |
-| [Accessibility](https://playwright.dev/docs/api/class-accessibility) | :warning: | [`snapshot()`](https://playwright.dev/docs/api/class-accessibility#accessibilitysnapshotoptions) | 
+| [Accessibility](https://playwright.dev/docs/api/class-accessibility) | :warning: | [`snapshot()`](https://playwright.dev/docs/api/class-accessibility#accessibilitysnapshotoptions) |
 | [Browser](https://playwright.dev/docs/api/class-browser) | :white_check_mark: | [`on()`](https://playwright.dev/docs/api/class-browser#browser-event-disconnected) (dependent on event-loop support in k6), [`startTracing()`](https://playwright.dev/docs/api/class-browser#browser-start-tracing), [`stopTracing()`](https://playwright.dev/docs/api/class-browser#browser-stop-tracing) |
-| [BrowserContext](https://playwright.dev/docs/api/class-browsercontext) | :white_check_mark: Partial | [`addCookies()`](https://playwright.dev/docs/api/class-browsercontext#browsercontextaddcookiescookies), [`backgroundPages()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-background-pages), [`cookies()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-cookies), [`exposeBinding()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-expose-binding), [`exposeFunction()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-expose-function), [`newCDPSession()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-new-cdp-session), [`on()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-event-background-page) (dependent on event-loop support in k6), [`route()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-route) (dependent on event-loop support in k6), [`serviceWorkers()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-service-workers), [`storageState()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-storage-state), [`unroute()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-unroute) (dependent on event-loop support in k6), [`waitForEvent()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-wait-for-event) (dependent on event-loop support in k6), [`tracing`](https://playwright.dev/docs/api/class-browsercontext#browser-context-tracing) |
+| [BrowserContext](https://playwright.dev/docs/api/class-browsercontext) | :white_check_mark: | [`addCookies()`](https://playwright.dev/docs/api/class-browsercontext#browsercontextaddcookiescookies), [`backgroundPages()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-background-pages), [`cookies()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-cookies), [`exposeBinding()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-expose-binding), [`exposeFunction()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-expose-function), [`newCDPSession()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-new-cdp-session), [`on()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-event-background-page) (dependent on event-loop support in k6), [`route()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-route) (dependent on event-loop support in k6), [`serviceWorkers()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-service-workers), [`storageState()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-storage-state), [`unroute()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-unroute) (dependent on event-loop support in k6), [`waitForEvent()`](https://playwright.dev/docs/api/class-browsercontext#browser-context-wait-for-event) (dependent on event-loop support in k6), [`tracing`](https://playwright.dev/docs/api/class-browsercontext#browser-context-tracing) |
 | [BrowserServer](https://playwright.dev/docs/api/class-browserserver) | :warning: | All |
 | [BrowserType](https://playwright.dev/docs/api/class-browsertype) | :white_check_mark: | [`connect()`](https://playwright.dev/docs/api/class-browsertype#browser-type-connect), [`connectOverCDP()`](https://playwright.dev/docs/api/class-browsertype#browser-type-connect-over-cdp), [`launchPersistentContext()`](https://playwright.dev/docs/api/class-browsertype#browsertypelaunchpersistentcontextuserdatadir-options), [`launchServer()`](https://playwright.dev/docs/api/class-browsertype#browsertypelaunchserveroptions) |
 | [CDPSession](https://playwright.dev/docs/api/class-cdpsession) | :warning: | All |
@@ -273,7 +308,7 @@ Currently only Chromium is supported, and the [Playwright API](https://playwrigh
 | [Coverage](https://playwright.dev/docs/api/class-coverage) | :warning: | All |
 | [Dialog](https://playwright.dev/docs/api/class-dialog) | :warning: | All |
 | [Download](https://playwright.dev/docs/api/class-download) | :warning: | All |
-| [ElementHandle](https://playwright.dev/docs/api/class-elementhandle) | :white_check_mark: | [`$eval()`](https://playwright.dev/docs/api/class-elementhandle#element-handle-eval-on-selector), [`$$eval()`](https://playwright.dev/docs/api/class-elementhandle#element-handle-eval-on-selector-all), [`screenshot()`](https://playwright.dev/docs/api/class-elementhandle#element-handle-screenshot), [`setInputFiles()`](https://playwright.dev/docs/api/class-elementhandle#element-handle-set-input-files) |
+| [ElementHandle](https://playwright.dev/docs/api/class-elementhandle) | :white_check_mark: | [`$eval()`](https://playwright.dev/docs/api/class-elementhandle#element-handle-eval-on-selector), [`$$eval()`](https://playwright.dev/docs/api/class-elementhandle#element-handle-eval-on-selector-all), [`setInputFiles()`](https://playwright.dev/docs/api/class-elementhandle#element-handle-set-input-files) |
 | [FetchRequest](https://playwright.dev/docs/api/class-fetchrequest) | :warning: | All |
 | [FetchResponse](https://playwright.dev/docs/api/class-fetchresponse) | :warning: | All |
 | [FileChooser](https://playwright.dev/docs/api/class-filechooser) | :warning: | All |
