@@ -16,7 +16,7 @@ build() {
     local NAME="xk6-browser-${VERSION}-${ALIAS}"
 
     local BUILD_ENV=("${@:3}")
-    local BUILD_ARGS=(--output "${OUT_DIR}/${NAME}/k6${SUFFIX}")
+    local BUILD_ARGS=(--output "${OUT_DIR}/${NAME}/xk6-browser${SUFFIX}")
 
     #if [ -n "$VERSION_DETAILS" ]; then
     #    BUILD_ARGS+=(-ldflags "-X go.k6.io/k6/lib/consts.VersionDetails=$VERSION_DETAILS")
@@ -30,7 +30,7 @@ build() {
     (
         export "${BUILD_ENV[@]}"
         # Build a binary
-        xk6 build --with github.com/grafana/xk6-browser "${BUILD_ARGS[@]}"
+        xk6 build --with github.com/grafana/xk6-browser=. "${BUILD_ARGS[@]}"
     )
 }
 
@@ -41,9 +41,9 @@ package() {
     case $FMT in
     deb|rpm)
         # The go-bin-* tools expect the binary in /tmp/
-        [ ! -r /tmp/k6 ] && cp "${OUT_DIR}/${NAME}/k6" /tmp/k6
+        [ ! -r /tmp/xk6-browser ] && cp "${OUT_DIR}/${NAME}/xk6-browser" /tmp/xk6-browser
         "go-bin-${FMT}" generate --file "packaging/${FMT}.json" -a amd64 \
-            --version "${VERSION#v}" -o "${OUT_DIR}/k6-${VERSION}-linux-amd64.${FMT}"
+            --version "${VERSION#v}" -o "${OUT_DIR}/${NAME}.${FMT}"
         ;;
     tgz)
         tar -C "${OUT_DIR}" -zcf "${OUT_DIR}/${NAME}.tar.gz" "$NAME"
@@ -79,5 +79,5 @@ package macos-arm64   zip
 package windows-amd64 zip
 package linux-amd64   tgz
 package linux-arm64   tgz
-#package linux-amd64   rpm
-#package linux-amd64   deb
+package linux-amd64   rpm
+package linux-amd64   deb

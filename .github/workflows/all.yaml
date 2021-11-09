@@ -251,6 +251,8 @@ jobs:
             -ver-minor="${version[1]}" \
             -ver-patch="${version[2]}" \
             -product-version="${VERSION#v}"
+      - name: Install xk6
+        run: go install go.k6.io/xk6/cmd/xk6@master
       - name: Build
         run: |
           go version
@@ -304,7 +306,7 @@ jobs:
       - name: Create MSI package
         run: |
           $env:VERSION = $env:VERSION -replace 'v(\d+\.\d+\.\d+).*','$1'
-          pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
+          pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE
           cd .\packaging
           candle.exe -arch x64 "-dVERSION=$env:VERSION" xk6-browser.wxs
           light.exe -ext WixUIExtension xk6-browser.wixobj
@@ -321,7 +323,6 @@ jobs:
           name: binaries-windows
           path: |
             packaging/xk6-browser-*.msi
-            packaging/xk6-browser.*.nupkg
           retention-days: 7
 
   publish-github:
