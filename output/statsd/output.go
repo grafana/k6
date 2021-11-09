@@ -131,7 +131,7 @@ func (o *Output) Start() error {
 		o.client.Namespace = namespace
 	}
 
-	pf, err := output.NewPeriodicFlusher(time.Duration(o.config.PushInterval.Duration), o.flushMetrics)
+	pf, err := output.NewPeriodicFlusher(o.config.PushInterval.TimeDuration(), o.flushMetrics)
 	if err != nil {
 		return err
 	}

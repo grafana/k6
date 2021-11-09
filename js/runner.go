@@ -529,9 +529,9 @@ func (r *Runner) getTimeoutFor(stage string) time.Duration {
 	d := time.Duration(0)
 	switch stage {
 	case consts.SetupFn:
-		return time.Duration(r.Bundle.Options.SetupTimeout.Duration)
+		return r.Bundle.Options.SetupTimeout.TimeDuration()
 	case consts.TeardownFn:
-		return time.Duration(r.Bundle.Options.TeardownTimeout.Duration)
+		return r.Bundle.Options.TeardownTimeout.TimeDuration()
 	case consts.HandleSummaryFn:
 		return 2 * time.Minute // TODO: make configurable
 	}
@@ -707,7 +707,7 @@ func (u *ActiveVU) RunOnce() error {
 	// If MinIterationDuration is specified and the iteration wasn't canceled
 	// and was less than it, sleep for the remainder
 	if isFullIteration && u.Runner.Bundle.Options.MinIterationDuration.Valid {
-		durationDiff := time.Duration(u.Runner.Bundle.Options.MinIterationDuration.Duration) - totalTime
+		durationDiff := u.Runner.Bundle.Options.MinIterationDuration.TimeDuration() - totalTime
 		if durationDiff > 0 {
 			select {
 			case <-time.After(durationDiff):

@@ -67,9 +67,9 @@ func TestOptions(t *testing.T) {
 		}})
 		assert.NotNil(t, opts.Stages)
 		assert.Len(t, opts.Stages, 2)
-		assert.Equal(t, 1*time.Second, time.Duration(opts.Stages[0].Duration.Duration))
+		assert.Equal(t, 1*time.Second, opts.Stages[0].Duration.TimeDuration())
 		assert.Equal(t, int64(10), opts.Stages[0].Target.Int64)
-		assert.Equal(t, 2*time.Second, time.Duration(opts.Stages[1].Duration.Duration))
+		assert.Equal(t, 2*time.Second, opts.Stages[1].Duration.TimeDuration())
 		assert.Equal(t, int64(20), opts.Stages[1].Target.Int64)
 
 		emptyStages := []Stage{}

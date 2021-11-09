@@ -232,13 +232,13 @@ func (out *Output) Start() error {
 }
 
 func (out *Output) startBackgroundProcesses() {
-	aggregationPeriod := time.Duration(out.config.AggregationPeriod.Duration)
+	aggregationPeriod := out.config.AggregationPeriod.TimeDuration()
 	// If enabled, start periodically aggregating the collected HTTP trails
 	if aggregationPeriod > 0 {
 		out.aggregationDone.Add(1)
 		go func() {
 			defer out.aggregationDone.Done()
-			aggregationWaitPeriod := time.Duration(out.config.AggregationWaitPeriod.Duration)
+			aggregationWaitPeriod := out.config.AggregationWaitPeriod.TimeDuration()
 			aggregationTicker := time.NewTicker(aggregationPeriod)
 			defer aggregationTicker.Stop()
 
@@ -260,7 +260,7 @@ func (out *Output) startBackgroundProcesses() {
 	out.outputDone.Add(1)
 	go func() {
 		defer out.outputDone.Done()
-		pushTicker := time.NewTicker(time.Duration(out.config.MetricPushInterval.Duration))
+		pushTicker := time.NewTicker(out.config.MetricPushInterval.TimeDuration())
 		defer pushTicker.Stop()
 		for {
 			select {

@@ -85,7 +85,7 @@ func newOutput(params output.Params) (*Output, error) {
 		return nil, err
 	}
 
-	saveInterval := time.Duration(config.SaveInterval.Duration)
+	saveInterval := config.SaveInterval.TimeDuration()
 	fname := config.FileName.String
 
 	if fname == "" || fname == "-" {
