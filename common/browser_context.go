@@ -21,13 +21,11 @@
 package common
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
-
-	"context"
-
-	"errors"
 
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
