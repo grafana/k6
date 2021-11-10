@@ -193,7 +193,7 @@ func (r *Response) bodySize() int64 {
 	}
 
 	if err := r.fetchBody(); err != nil {
-		r.logger.Warnf("cdp", "error fetching response body: %s", err)
+		r.logger.Warnf("cdp", "error fetching response body for '%s': %s", r.url, err)
 	}
 
 	return int64(len(r.body))
