@@ -67,7 +67,7 @@ Then:
 
 1. Install `xk6`:
   ```shell
-  go install github.com/grafana/xk6/cmd/xk6@latest
+  go install go.k6.io/xk6/cmd/xk6@latest
   ```
 
 2. Build the binary:
