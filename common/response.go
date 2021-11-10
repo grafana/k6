@@ -133,7 +133,7 @@ func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, 
 }
 
 func (r *Response) fetchBody() error {
-	if r.body != nil {
+	if r.body != nil || r.request.frame == nil {
 		return nil
 	}
 	action := network.GetResponseBody(r.request.requestID)
