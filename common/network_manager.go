@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -352,13 +351,17 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 		m.logger.Errorf("NetworkManager", "cannot create Request: %s", err)
 		return
 	}
+	if req.url.Scheme == "data" {
+		m.logger.Debugf("NetworkManager", "skipped request handling of data URL")
+		return
+	}
 	m.reqsMu.Lock()
 	m.reqIDToRequest[event.RequestID] = req
 	m.reqsMu.Unlock()
 	m.emitRequestMetrics(req)
 	m.frameManager.requestStarted(req)
 
-	if m.userReqInterceptionEnabled && !strings.HasPrefix(event.Request.URL, "data:") {
+	if m.userReqInterceptionEnabled {
 		state := k6lib.GetState(m.ctx)
 		ip := net.ParseIP(req.url.Host)
 		blockedHosts := state.Options.BlockedHostnames.Trie
