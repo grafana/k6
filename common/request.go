@@ -23,6 +23,7 @@ package common
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -45,7 +46,7 @@ type Request struct {
 	redirectChain       []*Request
 	requestID           network.RequestID
 	documentID          string
-	url                 string
+	url                 *url.URL
 	method              string
 	headers             map[string][]string
 	postData            string
@@ -61,11 +62,20 @@ type Request struct {
 }
 
 // NewRequest creates a new HTTP request
-func NewRequest(ctx context.Context, event *network.EventRequestWillBeSent, f *Frame, redirectChain []*Request, interceptionID string, allowInterception bool) *Request {
+func NewRequest(
+	ctx context.Context, event *network.EventRequestWillBeSent, f *Frame,
+	redirectChain []*Request, interceptionID string, allowInterception bool,
+) (*Request, error) {
 	documentID := cdp.LoaderID("")
 	if event.RequestID == network.RequestID(event.LoaderID) && event.Type == "Document" {
 		documentID = event.LoaderID
 	}
+
+	u, err := url.Parse(event.Request.URL)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse URL: %w", err)
+	}
+
 	r := Request{
 		ctx:                 ctx,
 		frame:               f,
@@ -73,7 +83,7 @@ func NewRequest(ctx context.Context, event *network.EventRequestWillBeSent, f *F
 		redirectChain:       redirectChain,
 		requestID:           event.RequestID,
 		documentID:          documentID.String(),
-		url:                 event.Request.URL,
+		url:                 u,
 		method:              event.Request.Method,
 		headers:             make(map[string][]string),
 		postData:            event.Request.PostData,
@@ -96,7 +106,7 @@ func NewRequest(ctx context.Context, event *network.EventRequestWillBeSent, f *F
 			}
 		}
 	}
-	return &r
+	return &r, nil
 }
 
 func (r *Request) getFrame() *Frame {
@@ -114,8 +124,7 @@ func (r *Request) getDocumentID() string {
 func (r *Request) headersSize() int64 {
 	size := 4 // 4 = 2 spaces + 2 line breaks (GET /path \r\n)
 	size += len(r.method)
-	u, _ := url.Parse(r.url)
-	size += len(u.Path)
+	size += len(r.url.Path)
 	size += 8 // httpVersion
 	for n, v := range r.headers {
 		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
@@ -255,5 +264,5 @@ func (r *Request) Timing() goja.Value {
 
 // URL returns the request URL
 func (r *Request) URL() string {
-	return r.url
+	return r.url.String()
 }

@@ -30,6 +30,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	k6common "go.k6.io/k6/js/common"
 )
 
@@ -51,7 +52,26 @@ func TestRequest(t *testing.T) {
 		Timestamp: &ts,
 		WallTime:  &wt,
 	}
-	req := NewRequest(ctx, evt, nil, nil, "intercept", false)
+	req, err := NewRequest(ctx, evt, nil, nil, "intercept", false)
+	require.NoError(t, err)
+
+	t.Run("error_parse_url", func(t *testing.T) {
+		t.Parallel()
+		evt := &network.EventRequestWillBeSent{
+			RequestID: network.RequestID("1234"),
+			Request: &network.Request{
+				URL:      ":",
+				Method:   "POST",
+				Headers:  network.Headers(headers),
+				PostData: "hello",
+			},
+			Timestamp: &ts,
+			WallTime:  &wt,
+		}
+		req, err := NewRequest(ctx, evt, nil, nil, "intercept", false)
+		require.EqualError(t, err, `cannot parse URL: parse ":": missing protocol scheme`)
+		require.Nil(t, req)
+	})
 
 	t.Run("Headers()", func(t *testing.T) {
 		t.Parallel()

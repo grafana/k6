@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -49,6 +48,7 @@ type NetworkManager struct {
 	BaseEventEmitter
 
 	ctx          context.Context
+	logger       *Logger
 	session      *Session
 	parent       *NetworkManager
 	frameManager *FrameManager
@@ -68,10 +68,16 @@ type NetworkManager struct {
 }
 
 // NewNetworkManager creates a new network manager
-func NewNetworkManager(ctx context.Context, session *Session, manager *FrameManager, parent *NetworkManager) (*NetworkManager, error) {
+func NewNetworkManager(
+	ctx context.Context, session *Session, manager *FrameManager, parent *NetworkManager,
+) (*NetworkManager, error) {
+	state := k6lib.GetState(ctx)
 	m := NetworkManager{
-		BaseEventEmitter:               NewBaseEventEmitter(ctx),
-		ctx:                            ctx,
+		BaseEventEmitter: NewBaseEventEmitter(ctx),
+		ctx:              ctx,
+		// TODO: Pass an internal logger instead of basing it on k6's logger?
+		// See https://github.com/grafana/xk6-browser/issues/54
+		logger:                         NewLogger(ctx, state.Logger, false, nil),
 		session:                        session,
 		parent:                         parent,
 		frameManager:                   manager,
@@ -109,7 +115,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 		tags["method"] = req.method
 	}
 	if state.Options.SystemTags.Has(k6stats.TagURL) {
-		tags["url"] = req.url
+		tags["url"] = req.URL()
 	}
 
 	sampleTags := k6stats.IntoSampleTags(&tags)
@@ -338,10 +344,14 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 		frame = m.frameManager.getFrameByID(event.FrameID)
 	}
 	if frame == nil {
-		debugLog("<networkmanager:onRequest> frame is nil")
+		m.logger.Debugf("NetworkManager", "frame is nil")
 	}
 
-	req := NewRequest(m.ctx, event, frame, redirectChain, interceptionID, m.userReqInterceptionEnabled)
+	req, err := NewRequest(m.ctx, event, frame, redirectChain, interceptionID, m.userReqInterceptionEnabled)
+	if err != nil {
+		m.logger.Errorf("NetworkManager", "cannot create Request: %s", err)
+		return
+	}
 	m.reqsMu.Lock()
 	m.reqIDToRequest[event.RequestID] = req
 	m.reqsMu.Unlock()
@@ -350,21 +360,17 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 
 	if m.userReqInterceptionEnabled && !strings.HasPrefix(event.Request.URL, "data:") {
 		state := k6lib.GetState(m.ctx)
-		url, err := url.Parse(event.Request.URL)
-		if err != nil {
-			return
-		}
-		ip := net.ParseIP(url.Host)
+		ip := net.ParseIP(req.url.Host)
 		blockedHosts := state.Options.BlockedHostnames.Trie
 		if blockedHosts != nil && ip == nil {
-			if match, blocked := blockedHosts.Contains(url.Host); blocked {
+			if match, blocked := blockedHosts.Contains(req.url.Host); blocked {
 				// Tell browser we've blocked this request.
 				fetch.FailRequest(fetch.RequestID(req.getID()), network.ErrorReasonBlockedByClient)
 
 				// Throw exception into JS runtime
 				rt := k6common.GetRuntime(m.ctx)
 				// TODO: create PR to make netext.BlockedHostError a public struct in k6 perhaps?
-				k6common.Throw(rt, fmt.Errorf("hostname (%s) is in a blocked pattern (%s)", url.Host, match))
+				k6common.Throw(rt, fmt.Errorf("hostname (%s) is in a blocked pattern (%s)", req.url.Host, match))
 			}
 		}
 
@@ -393,7 +399,7 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 	}
 	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
 	req.response = resp
-	if !strings.HasPrefix(req.url, "data:") {
+	if req.url.Scheme != "data" {
 		m.emitResponseMetrics(resp)
 	}
 	m.frameManager.requestReceivedResponse(resp)
