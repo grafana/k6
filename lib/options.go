@@ -324,9 +324,6 @@ type Options struct {
 	// Accept invalid or untrusted TLS certificates.
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_INSECURE_SKIP_TLS_VERIFY"`
 
-	// Force requests to be send over HTTP/1.1
-	ForceHTTP1 null.Bool `json:"forceHttp1" envconfig:"K6_FORCE_HTTP1"`
-
 	// Specify TLS versions and cipher suites, and present client certificates.
 	TLSCipherSuites *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"K6_TLS_CIPHER_SUITES"`
 	TLSVersion      *TLSVersions     `json:"tlsVersion" ignored:"true"`
@@ -482,9 +479,6 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
-	}
-	if opts.ForceHTTP1.Valid {
-		o.ForceHTTP1 = opts.ForceHTTP1
 	}
 	if opts.TLSCipherSuites != nil {
 		o.TLSCipherSuites = opts.TLSCipherSuites
