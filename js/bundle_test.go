@@ -387,18 +387,6 @@ func TestNewBundle(t *testing.T) {
 				assert.Equal(t, null.BoolFrom(true), b.Options.InsecureSkipTLSVerify)
 			}
 		})
-		t.Run("ForceHTTP1", func(t *testing.T) {
-			t.Parallel()
-			b, err := getSimpleBundle(t, "/script.js", `
-			    export let options = {
-					forceHttp1: true,
-				};
-				export default function() {};
-			`)
-			if assert.NoError(t, err) {
-				assert.Equal(t, null.BoolFrom(true), b.Options.ForceHTTP1)
-			}
-		})
 		t.Run("TLSCipherSuites", func(t *testing.T) {
 			t.Parallel()
 			for suiteName, suiteID := range lib.SupportedTLSCipherSuites {

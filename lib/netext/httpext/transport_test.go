@@ -26,9 +26,9 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/stats"
-	"github.com/sirupsen/logrus"
 )
 
 func BenchmarkMeasureAndEmitMetrics(b *testing.B) {

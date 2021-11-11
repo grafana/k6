@@ -66,7 +66,6 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full'")
 	flags.Lookup("http-debug").NoOptDefVal = "headers"
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
-	flags.Bool("force-http1", false, "force requests to be sent over http1 protocol")
 	flags.Bool("no-connection-reuse", false, "disable keep-alive connections")
 	flags.Bool("no-vu-connection-reuse", false, "don't reuse connections between iterations")
 	flags.Duration("min-iteration-duration", 0, "minimum amount of time k6 will take executing a single iteration")
@@ -118,7 +117,6 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		UserAgent:             getNullString(flags, "user-agent"),
 		HTTPDebug:             getNullString(flags, "http-debug"),
 		InsecureSkipTLSVerify: getNullBool(flags, "insecure-skip-tls-verify"),
-		ForceHTTP1: 		   getNullBool(flags, "force-http1"),
 		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
 		NoVUConnectionReuse:   getNullBool(flags, "no-vu-connection-reuse"),
 		MinIterationDuration:  getNullDuration(flags, "min-iteration-duration"),
