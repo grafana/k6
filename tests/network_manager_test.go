@@ -21,12 +21,9 @@
 package tests
 
 import (
-	"io/ioutil"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils"
 	"github.com/grafana/xk6-browser/testutils/browsertest"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,10 +36,7 @@ func TestDataURLSkipRequest(t *testing.T) {
 		bt.Browser.Close()
 	})
 
-	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
-	bt.State.Logger.SetLevel(logrus.DebugLevel)
-	bt.State.Logger.AddHook(logHook)
-	bt.State.Logger.SetOutput(ioutil.Discard)
+	logHook := bt.LogHook()
 
 	p.Goto("data:text/html,hello", nil)
 
