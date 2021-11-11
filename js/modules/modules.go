@@ -93,7 +93,7 @@ func GetJSModules() map[string]interface{} {
 // Instance is what a module needs to return
 type Instance interface {
 	InstanceCore
-	GetExports() Exports
+	Exports() Exports
 }
 
 func getInterfaceMethods() []string {

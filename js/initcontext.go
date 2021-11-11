@@ -202,7 +202,7 @@ func (i *InitContext) requireModule(name string) (goja.Value, error) {
 	}
 	if modV2, ok := mod.(modules.IsModuleV2); ok {
 		instance := modV2.NewModuleInstance(&moduleInstanceCoreImpl{ctxPtr: i.ctxPtr})
-		return i.runtime.ToValue(toESModuleExports(instance.GetExports())), nil
+		return i.runtime.ToValue(toESModuleExports(instance.Exports())), nil
 	}
 	if perInstance, ok := mod.(modules.HasModuleInstancePerVU); ok {
 		mod = perInstance.NewModuleInstancePerVU()

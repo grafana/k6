@@ -158,8 +158,8 @@ func New() *RootModule {
 	return &RootModule{}
 }
 
-// GetExports returns the exports of the metrics module
-func (mi *ModuleInstance) GetExports() modules.Exports {
+// Exports returns the exports of the metrics module
+func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.GenerateExports(mi)
 }
 

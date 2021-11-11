@@ -82,8 +82,8 @@ func (*RootModule) NewModuleInstance(m modules.InstanceCore) modules.Instance {
 	return mi
 }
 
-// GetExports returns the exports of the execution module.
-func (mi *ModuleInstance) GetExports() modules.Exports {
+// Exports returns the exports of the execution module.
+func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{Default: mi.obj}
 }
 
