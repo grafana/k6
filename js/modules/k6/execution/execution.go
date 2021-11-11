@@ -40,7 +40,7 @@ type (
 
 	// ModuleInstance represents an instance of the execution module.
 	ModuleInstance struct {
-		modules.InstanceCore
+		vu  modules.VU
 		obj *goja.Object
 	}
 )
@@ -57,9 +57,9 @@ func New() *RootModule {
 
 // NewModuleInstance implements the modules.Module interface to return
 // a new instance for each VU.
-func (*RootModule) NewModuleInstance(m modules.InstanceCore) modules.Instance {
-	mi := &ModuleInstance{InstanceCore: m}
-	rt := m.GetRuntime()
+func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+	mi := &ModuleInstance{vu: vu}
+	rt := vu.Runtime()
 	o := rt.NewObject()
 	defProp := func(name string, newInfo func() (*goja.Object, error)) {
 		err := o.DefineAccessorProperty(name, rt.ToValue(func() goja.Value {
@@ -90,9 +90,9 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 // newScenarioInfo returns a goja.Object with property accessors to retrieve
 // information about the scenario the current VU is running in.
 func (mi *ModuleInstance) newScenarioInfo() (*goja.Object, error) {
-	ctx := mi.GetContext()
+	ctx := mi.vu.Context()
 	rt := common.GetRuntime(ctx)
-	vuState := mi.GetState()
+	vuState := mi.vu.State()
 	if vuState == nil {
 		return nil, errors.New("getting scenario information in the init context is not supported")
 	}
@@ -100,7 +100,7 @@ func (mi *ModuleInstance) newScenarioInfo() (*goja.Object, error) {
 		return nil, errors.New("goja runtime is nil in context")
 	}
 	getScenarioState := func() *lib.ScenarioState {
-		ss := lib.GetScenarioState(mi.GetContext())
+		ss := lib.GetScenarioState(mi.vu.Context())
 		if ss == nil {
 			common.Throw(rt, errors.New("getting scenario information in the init context is not supported"))
 		}
@@ -140,7 +140,7 @@ func (mi *ModuleInstance) newScenarioInfo() (*goja.Object, error) {
 // newInstanceInfo returns a goja.Object with property accessors to retrieve
 // information about the local instance stats.
 func (mi *ModuleInstance) newInstanceInfo() (*goja.Object, error) {
-	ctx := mi.GetContext()
+	ctx := mi.vu.Context()
 	es := lib.GetExecutionState(ctx)
 	if es == nil {
 		return nil, errors.New("getting instance information in the init context is not supported")
@@ -175,7 +175,7 @@ func (mi *ModuleInstance) newInstanceInfo() (*goja.Object, error) {
 // newVUInfo returns a goja.Object with property accessors to retrieve
 // information about the currently executing VU.
 func (mi *ModuleInstance) newVUInfo() (*goja.Object, error) {
-	ctx := mi.GetContext()
+	ctx := mi.vu.Context()
 	vuState := lib.GetState(ctx)
 	if vuState == nil {
 		return nil, errors.New("getting VU information in the init context is not supported")

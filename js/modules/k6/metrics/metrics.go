@@ -37,18 +37,18 @@ import (
 
 type Metric struct {
 	metric *stats.Metric
-	core   modules.InstanceCore
+	vu     modules.VU
 }
 
 // ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
 var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
 
 func (mi *ModuleInstance) newMetric(call goja.ConstructorCall, t stats.MetricType) (*goja.Object, error) {
-	initEnv := mi.GetInitEnv()
+	initEnv := mi.vu.InitEnv()
 	if initEnv == nil {
 		return nil, errors.New("metrics must be declared in the init context")
 	}
-	rt := mi.GetRuntime()
+	rt := mi.vu.Runtime()
 	c, _ := goja.AssertFunction(rt.ToValue(func(name string, isTime ...bool) (*goja.Object, error) {
 		valueType := stats.Default
 		if len(isTime) > 0 && isTime[0] {
@@ -58,7 +58,7 @@ func (mi *ModuleInstance) newMetric(call goja.ConstructorCall, t stats.MetricTyp
 		if err != nil {
 			return nil, err
 		}
-		metric := &Metric{metric: m, core: mi.InstanceCore}
+		metric := &Metric{metric: m, vu: mi.vu}
 		o := rt.NewObject()
 		err = o.DefineDataProperty("name", rt.ToValue(name), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
 		if err != nil {
@@ -93,7 +93,7 @@ func limitValue(v string) string {
 }
 
 func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
-	state := m.core.GetState()
+	state := m.vu.State()
 	if state == nil {
 		return false, ErrMetricsAddInInitContext
 	}
@@ -130,7 +130,7 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 	}
 
 	sample := stats.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: stats.IntoSampleTags(&tags)}
-	stats.PushIfNotDone(m.core.GetContext(), state.Samples, sample)
+	stats.PushIfNotDone(m.vu.Context(), state.Samples, sample)
 	return true, nil
 }
 
@@ -139,7 +139,7 @@ type (
 	RootModule struct{}
 	// ModuleInstance represents an instance of the metrics module
 	ModuleInstance struct {
-		modules.InstanceCore
+		vu modules.VU
 	}
 )
 
@@ -149,8 +149,8 @@ var (
 )
 
 // NewModuleInstance implements modules.Module interface
-func (*RootModule) NewModuleInstance(m modules.InstanceCore) modules.Instance {
-	return &ModuleInstance{InstanceCore: m}
+func (*RootModule) NewModuleInstance(m modules.VU) modules.Instance {
+	return &ModuleInstance{vu: m}
 }
 
 // New returns a new RootModule.
@@ -160,7 +160,14 @@ func New() *RootModule {
 
 // Exports returns the exports of the metrics module
 func (mi *ModuleInstance) Exports() modules.Exports {
-	return modules.GenerateExports(mi)
+	return modules.Exports{
+		Named: map[string]interface{}{
+			"Counter": mi.XCounter,
+			"Gauge":   mi.XGauge,
+			"Trend":   mi.XTrend,
+			"Rate":    mi.XRate,
+		},
+	}
 }
 
 // XCounter is a counter constructor
