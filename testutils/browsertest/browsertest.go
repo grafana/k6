@@ -125,8 +125,8 @@ func NewBrowserTest(t testing.TB) *BrowserTest {
 	}
 }
 
-func (bt *BrowserTest) LogHook() *testutils.SimpleLogrusHook {
-	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
+func (bt *BrowserTest) LogHook() *testutils.CacheLogrusHook {
+	logHook := &testutils.CacheLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
 	bt.State.Logger.SetLevel(logrus.DebugLevel)
 	bt.State.Logger.AddHook(logHook)
 	bt.State.Logger.SetOutput(ioutil.Discard)
