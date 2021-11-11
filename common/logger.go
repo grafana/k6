@@ -93,7 +93,7 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...i
 				"elapsed":   fmt.Sprintf("%d ms", elapsed),
 				"goroutine": goRoutineID(),
 			})
-			if l.logger.Level < level && l.debugOverride {
+			if l.logger.GetLevel() < level && l.debugOverride {
 				entry.Printf(msg, args...)
 			} else {
 				entry.Logf(level, msg, args...)
