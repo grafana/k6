@@ -65,8 +65,8 @@ type HasModuleInstancePerVU interface {
 	NewModuleInstancePerVU() interface{}
 }
 
-// IsModuleV2 is the interface js modules should implement to get the version 2 of the system
-type IsModuleV2 interface {
+// Module is the interface js modules should implement in order to get access to the InstanceCore
+type Module interface {
 	// NewModuleInstance will get InstanceCore that should provide the module with *everything* it needs and return an
 	// Instance implementation (embedding the InstanceCore).
 	// This method will be called for *each* require/import and return an object for VUs.

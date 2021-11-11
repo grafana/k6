@@ -46,8 +46,8 @@ type (
 )
 
 var (
-	_ modules.IsModuleV2 = &RootModule{}
-	_ modules.Instance   = &ModuleInstance{}
+	_ modules.Module   = &RootModule{}
+	_ modules.Instance = &ModuleInstance{}
 )
 
 // New returns a pointer to a new RootModule instance.
@@ -55,7 +55,7 @@ func New() *RootModule {
 	return &RootModule{}
 }
 
-// NewModuleInstance implements the modules.IsModuleV2 interface to return
+// NewModuleInstance implements the modules.Module interface to return
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(m modules.InstanceCore) modules.Instance {
 	mi := &ModuleInstance{InstanceCore: m}

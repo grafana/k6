@@ -144,11 +144,11 @@ type (
 )
 
 var (
-	_ modules.IsModuleV2 = &RootModule{}
-	_ modules.Instance   = &ModuleInstance{}
+	_ modules.Module   = &RootModule{}
+	_ modules.Instance = &ModuleInstance{}
 )
 
-// NewModuleInstance implements modules.IsModuleV2 interface
+// NewModuleInstance implements modules.Module interface
 func (*RootModule) NewModuleInstance(m modules.InstanceCore) modules.Instance {
 	return &ModuleInstance{InstanceCore: m}
 }
