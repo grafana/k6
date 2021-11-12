@@ -129,6 +129,10 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		k6common.Throw(rt, fmt.Errorf("unable to allocate browser: %w", err))
 	}
 
+	// attach the browser process ID to the context
+	// so that we can kill it afterward if it lingers
+	// see: k6Throw function
+	b.Ctx = common.WithProcessID(b.Ctx, browserProc.Pid())
 	browser, err := common.NewBrowser(b.Ctx, b.CancelFn, browserProc, launchOpts)
 	if err != nil {
 		k6common.Throw(rt, err)

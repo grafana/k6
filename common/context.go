@@ -26,6 +26,7 @@ type ctxKey int
 
 const (
 	ctxKeyLaunchOptions ctxKey = iota
+	ctxKeyPid
 	ctxKeyHooks
 )
 
@@ -51,4 +52,15 @@ func GetLaunchOptions(ctx context.Context) *LaunchOptions {
 		return nil
 	}
 	return v.(*LaunchOptions)
+}
+
+// TODO: Test is missing
+func WithProcessID(ctx context.Context, pid int) context.Context {
+	return context.WithValue(ctx, ctxKeyPid, pid)
+}
+
+// TODO: Test is missing
+func GetProcessID(ctx context.Context) int {
+	v, _ := ctx.Value(ctxKeyPid).(int)
+	return v // it will return zero on error
 }
