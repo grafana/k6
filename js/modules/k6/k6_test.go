@@ -127,6 +127,9 @@ func TestGroup(t *testing.T) {
 			Group:   root,
 			Samples: make(chan stats.SampleContainer, 1000),
 			Tags:    lib.NewTagMap(nil),
+			Options: lib.Options{
+				SystemTags: stats.NewSystemTagSet(stats.TagGroup),
+			},
 		}
 		ctx := context.Background()
 		ctx = lib.WithState(ctx, state)
@@ -141,12 +144,18 @@ func TestGroup(t *testing.T) {
 		rt, state, root := setupGroupTest()
 		assert.Equal(t, state.Group, root)
 		require.NoError(t, rt.Set("fn", func() {
+			groupTag, ok := state.Tags.Get("group")
+			require.True(t, ok)
+			assert.Equal(t, groupTag, "::my group")
 			assert.Equal(t, state.Group.Name, "my group")
 			assert.Equal(t, state.Group.Parent, root)
 		}))
 		_, err := rt.RunString(`k6.group("my group", fn)`)
 		assert.NoError(t, err)
 		assert.Equal(t, state.Group, root)
+		groupTag, ok := state.Tags.Get("group")
+		require.True(t, ok)
+		assert.Equal(t, groupTag, root.Name)
 	})
 
 	t.Run("Invalid", func(t *testing.T) {
