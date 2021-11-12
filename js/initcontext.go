@@ -151,24 +151,25 @@ func (i *InitContext) Require(arg string) goja.Value {
 	}
 }
 
-type moduleInstanceCoreImpl struct {
+// TODO this likely should just be part of the initialized VU or at least to take stuff directly from it.
+type moduleVUImpl struct {
 	ctxPtr *context.Context
 	// we can technically put lib.State here as well as anything else
 }
 
-func (m *moduleInstanceCoreImpl) GetContext() context.Context {
+func (m *moduleVUImpl) Context() context.Context {
 	return *m.ctxPtr
 }
 
-func (m *moduleInstanceCoreImpl) GetInitEnv() *common.InitEnvironment {
+func (m *moduleVUImpl) InitEnv() *common.InitEnvironment {
 	return common.GetInitEnv(*m.ctxPtr) // TODO thread it correctly instead
 }
 
-func (m *moduleInstanceCoreImpl) GetState() *lib.State {
+func (m *moduleVUImpl) State() *lib.State {
 	return lib.GetState(*m.ctxPtr) // TODO thread it correctly instead
 }
 
-func (m *moduleInstanceCoreImpl) GetRuntime() *goja.Runtime {
+func (m *moduleVUImpl) Runtime() *goja.Runtime {
 	return common.GetRuntime(*m.ctxPtr) // TODO thread it correctly instead
 }
 
@@ -200,9 +201,9 @@ func (i *InitContext) requireModule(name string) (goja.Value, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown module: %s", name)
 	}
-	if modV2, ok := mod.(modules.IsModuleV2); ok {
-		instance := modV2.NewModuleInstance(&moduleInstanceCoreImpl{ctxPtr: i.ctxPtr})
-		return i.runtime.ToValue(toESModuleExports(instance.GetExports())), nil
+	if m, ok := mod.(modules.Module); ok {
+		instance := m.NewModuleInstance(&moduleVUImpl{ctxPtr: i.ctxPtr})
+		return i.runtime.ToValue(toESModuleExports(instance.Exports())), nil
 	}
 	if perInstance, ok := mod.(modules.HasModuleInstancePerVU); ok {
 		mod = perInstance.NewModuleInstancePerVU()

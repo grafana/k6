@@ -65,12 +65,11 @@ type HasModuleInstancePerVU interface {
 	NewModuleInstancePerVU() interface{}
 }
 
-// IsModuleV2 is the interface js modules should implement to get the version 2 of the system
-type IsModuleV2 interface {
-	// NewModuleInstance will get InstanceCore that should provide the module with *everything* it needs and return an
-	// Instance implementation (embedding the InstanceCore).
-	// This method will be called for *each* require/import and return an object for VUs.
-	NewModuleInstance(InstanceCore) Instance
+// Module is the interface js modules should implement in order to get access to the VU
+type Module interface {
+	// NewModuleInstance will get modules.VU that should provide the module with a way to interact with the VU
+	// This method will be called for *each* require/import and should return an unique instance for each call
+	NewModuleInstance(VU) Instance
 }
 
 // checks that modules implement HasModuleInstancePerVU
@@ -92,8 +91,7 @@ func GetJSModules() map[string]interface{} {
 
 // Instance is what a module needs to return
 type Instance interface {
-	InstanceCore
-	GetExports() Exports
+	Exports() Exports
 }
 
 func getInterfaceMethods() []string {
@@ -108,21 +106,19 @@ func getInterfaceMethods() []string {
 	return result
 }
 
-// InstanceCore is something that will be provided to modules and they need to embed it in ModuleInstance
-type InstanceCore interface {
-	GetContext() context.Context
+// VU gives access to the currently executing VU to a module Instance
+type VU interface {
+	// Context return the context.Context about the current VU
+	Context() context.Context
 
-	// GetInitEnv returns common.InitEnvironment instance if present
-	GetInitEnv() *common.InitEnvironment
+	// InitEnv returns common.InitEnvironment instance if present
+	InitEnv() *common.InitEnvironment
 
-	// GetState returns lib.State if any is present
-	GetState() *lib.State
+	// State returns lib.State if any is present
+	State() *lib.State
 
-	// GetRuntime returns the goja.Runtime for the current VU
-	GetRuntime() *goja.Runtime
-
-	// sealing field will help probably with pointing users that they just need to embed this in their Instance
-	// implementations
+	// Runtime returns the goja.Runtime for the current VU
+	Runtime() *goja.Runtime
 }
 
 // Exports is representation of ESM exports of a module
@@ -131,45 +127,4 @@ type Exports struct {
 	Default interface{}
 	// Named is the named exports of a module
 	Named map[string]interface{}
-}
-
-// GenerateExports generates an Exports from a module akin to how common.Bind does now.
-// it also skips anything that is expected will not want to be exported such as methods and fields coming from
-// interfaces defined in this package.
-func GenerateExports(v interface{}) Exports {
-	exports := make(map[string]interface{})
-	val := reflect.ValueOf(v)
-	typ := val.Type()
-	badNames := getInterfaceMethods()
-outer:
-	for i := 0; i < typ.NumMethod(); i++ {
-		meth := typ.Method(i)
-		for _, badname := range badNames {
-			if meth.Name == badname {
-				continue outer
-			}
-		}
-		name := common.MethodName(typ, meth)
-
-		fn := val.Method(i)
-		exports[name] = fn.Interface()
-	}
-
-	// If v is a pointer, we need to indirect it to access its fields.
-	if typ.Kind() == reflect.Ptr {
-		val = val.Elem()
-		typ = val.Type()
-	}
-	var mic InstanceCore // TODO move this out
-	for i := 0; i < typ.NumField(); i++ {
-		field := typ.Field(i)
-		if field.Type == reflect.TypeOf(&mic).Elem() {
-			continue
-		}
-		name := common.FieldName(typ, field)
-		if name != "" {
-			exports[name] = val.Field(i).Interface()
-		}
-	}
-	return Exports{Default: exports, Named: exports}
 }

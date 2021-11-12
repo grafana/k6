@@ -64,15 +64,15 @@ func setupTagsExecEnv(t *testing.T) execEnv {
 	ctx := common.WithRuntime(context.Background(), rt)
 	ctx = lib.WithState(ctx, state)
 	m, ok := New().NewModuleInstance(
-		&modulestest.InstanceCore{
-			Runtime: rt,
-			InitEnv: &common.InitEnvironment{},
-			Ctx:     ctx,
-			State:   state,
+		&modulestest.VU{
+			RuntimeField: rt,
+			InitEnvField: &common.InitEnvironment{},
+			CtxField:     ctx,
+			StateField:   state,
 		},
 	).(*ModuleInstance)
 	require.True(t, ok)
-	require.NoError(t, rt.Set("exec", m.GetExports().Default))
+	require.NoError(t, rt.Set("exec", m.Exports().Default))
 
 	return execEnv{
 		Module:  m,
@@ -102,7 +102,7 @@ func TestVUTags(t *testing.T) {
 		t.Parallel()
 
 		tenv := setupTagsExecEnv(t)
-		state := tenv.Module.GetState()
+		state := tenv.Module.vu.State()
 		state.Tags.Set("custom-tag", "mytag1")
 
 		encoded, err := tenv.Runtime.RunString(`JSON.stringify(exec.vu.tags)`)
@@ -157,7 +157,7 @@ func TestVUTags(t *testing.T) {
 			t.Parallel()
 
 			tenv := setupTagsExecEnv(t)
-			state := tenv.Module.GetState()
+			state := tenv.Module.vu.State()
 			state.Options.Throw = null.BoolFrom(true)
 			require.NotNil(t, state)
 

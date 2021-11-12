@@ -121,14 +121,14 @@ func TestMetrics(t *testing.T) {
 					}
 					test.rt = goja.New()
 					test.rt.SetFieldNameMapper(common.FieldNameMapper{})
-					mii := &modulestest.InstanceCore{
-						Runtime: test.rt,
-						InitEnv: &common.InitEnvironment{Registry: metrics.NewRegistry()},
-						Ctx:     context.Background(),
+					mii := &modulestest.VU{
+						RuntimeField: test.rt,
+						InitEnvField: &common.InitEnvironment{Registry: metrics.NewRegistry()},
+						CtxField:     context.Background(),
 					}
 					m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 					require.True(t, ok)
-					require.NoError(t, test.rt.Set("metrics", m.GetExports().Named))
+					require.NoError(t, test.rt.Set("metrics", m.Exports().Named))
 					test.samples = make(chan stats.SampleContainer, 1000)
 					state := &lib.State{
 						Options: lib.Options{},
@@ -146,12 +146,12 @@ func TestMetrics(t *testing.T) {
 					require.NoError(t, err)
 
 					t.Run("ExitInit", func(t *testing.T) {
-						mii.State = state
-						mii.InitEnv = nil
+						mii.StateField = state
+						mii.InitEnvField = nil
 						_, err := test.rt.RunString(fmt.Sprintf(`new metrics.%s("my_metric")`, fn))
 						assert.Contains(t, err.Error(), "metrics must be declared in the init context")
 					})
-					mii.State = state
+					mii.StateField = state
 					logger := logrus.New()
 					logger.Out = ioutil.Discard
 					test.hook = &testutils.SimpleLogrusHook{HookedLevels: logrus.AllLevels}
@@ -186,14 +186,14 @@ func TestMetricGetName(t *testing.T) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-	mii := &modulestest.InstanceCore{
-		Runtime: rt,
-		InitEnv: &common.InitEnvironment{Registry: metrics.NewRegistry()},
-		Ctx:     context.Background(),
+	mii := &modulestest.VU{
+		RuntimeField: rt,
+		InitEnvField: &common.InitEnvironment{Registry: metrics.NewRegistry()},
+		CtxField:     context.Background(),
 	}
 	m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 	require.True(t, ok)
-	require.NoError(t, rt.Set("metrics", m.GetExports().Named))
+	require.NoError(t, rt.Set("metrics", m.Exports().Named))
 	v, err := rt.RunString(`
 		var m = new metrics.Counter("my_metric")
 		m.name
@@ -214,14 +214,14 @@ func TestMetricDuplicates(t *testing.T) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-	mii := &modulestest.InstanceCore{
-		Runtime: rt,
-		InitEnv: &common.InitEnvironment{Registry: metrics.NewRegistry()},
-		Ctx:     context.Background(),
+	mii := &modulestest.VU{
+		RuntimeField: rt,
+		InitEnvField: &common.InitEnvironment{Registry: metrics.NewRegistry()},
+		CtxField:     context.Background(),
 	}
 	m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 	require.True(t, ok)
-	require.NoError(t, rt.Set("metrics", m.GetExports().Named))
+	require.NoError(t, rt.Set("metrics", m.Exports().Named))
 	_, err := rt.RunString(`
 		var m = new metrics.Counter("my_metric")
 	`)
