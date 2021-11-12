@@ -54,12 +54,12 @@ func GetLaunchOptions(ctx context.Context) *LaunchOptions {
 	return v.(*LaunchOptions)
 }
 
-// TODO: Test is missing
+// WithProcessID saves the browser process ID to the context.
 func WithProcessID(ctx context.Context, pid int) context.Context {
 	return context.WithValue(ctx, ctxKeyPid, pid)
 }
 
-// TODO: Test is missing
+// GetProcessID returns the browser process ID from the context.
 func GetProcessID(ctx context.Context) int {
 	v, _ := ctx.Value(ctxKeyPid).(int)
 	return v // it will return zero on error

@@ -401,7 +401,7 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 }
 
 func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
-	// TODO: switch to using browser logger instead of directly outputting to k6 logging system	rt := k6common.GetRuntime(fs.ctx)
+	// TODO: switch to using browser logger instead of directly outputting to k6 logging system
 	state := k6lib.GetState(fs.ctx)
 	l := state.Logger.
 		WithTime(event.Timestamp.Time()).

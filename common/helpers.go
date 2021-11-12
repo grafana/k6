@@ -330,13 +330,6 @@ func k6Throw(ctx context.Context, format string, a ...interface{}) {
 		// optimistically return and don't kill the process
 		return
 	}
-	ps, _ := p.Wait()
-	if err != nil {
-		return
-	}
-	if ps.Exited() {
-		return
-	}
 	// no need to check the error for waiting the process to release
 	// its resources or whether we could kill it as we're already
 	// dying.
