@@ -715,7 +715,7 @@ func (fs *FrameSession) updateEmulateMedia(initial bool) error {
 func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) {
 	// Merge extra headers from browser context and page, where page specific headers ake precedence.
 	mergedHeaders := make(network.Headers)
-	for v, k := range fs.page.browserCtx.opts.ExtraHTTPHeaders {
+	for k, v := range fs.page.browserCtx.opts.ExtraHTTPHeaders {
 		mergedHeaders[k] = v
 	}
 	for v, k := range fs.page.extraHTTPHeaders {

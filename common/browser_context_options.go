@@ -100,7 +100,7 @@ func (b *BrowserContextOptions) Parse(ctx context.Context, opts goja.Value) erro
 			case "extraHTTPHeaders":
 				headers := opts.Get(k).ToObject(rt)
 				for _, k := range headers.Keys() {
-					b.ExtraHTTPHeaders[k] = opts.Get(k).String()
+					b.ExtraHTTPHeaders[k] = headers.Get(k).String()
 				}
 			case "geolocation":
 				geolocation := NewGeolocation()
