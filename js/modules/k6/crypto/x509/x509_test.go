@@ -28,16 +28,26 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modulestest"
 )
 
-func makeRuntime() *goja.Runtime {
+func makeRuntime(t *testing.T) *goja.Runtime {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	ctx := context.Background()
-	ctx = common.WithRuntime(ctx, rt)
-	rt.Set("x509", common.Bind(rt, New(), &ctx))
+	ctx := common.WithRuntime(context.Background(), rt)
+	m, ok := New().NewModuleInstance(
+		&modulestest.VU{
+			RuntimeField: rt,
+			InitEnvField: &common.InitEnvironment{},
+			CtxField:     ctx,
+			StateField:   nil,
+		},
+	).(*X509)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("x509", m.Exports().Named))
 	return rt
 }
 
@@ -144,7 +154,7 @@ func TestParse(t *testing.T) {
 	if testing.Short() {
 		return
 	}
-	rt := makeRuntime()
+	rt := makeRuntime(t)
 
 	t.Run("DecodeFailure", func(t *testing.T) {
 		_, err := rt.RunString(`
@@ -572,7 +582,7 @@ func TestGetAltNames(t *testing.T) {
 	if testing.Short() {
 		return
 	}
-	rt := makeRuntime()
+	rt := makeRuntime(t)
 
 	t.Run("Failure", func(t *testing.T) {
 		_, err := rt.RunString(`
@@ -606,7 +616,7 @@ func TestGetIssuer(t *testing.T) {
 	if testing.Short() {
 		return
 	}
-	rt := makeRuntime()
+	rt := makeRuntime(t)
 
 	t.Run("Failure", func(t *testing.T) {
 		_, err := rt.RunString(`
@@ -638,7 +648,7 @@ func TestGetSubject(t *testing.T) {
 	if testing.Short() {
 		return
 	}
-	rt := makeRuntime()
+	rt := makeRuntime(t)
 
 	t.Run("Failure", func(t *testing.T) {
 		_, err := rt.RunString(`
