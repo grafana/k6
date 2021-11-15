@@ -718,7 +718,7 @@ func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) {
 	for k, v := range fs.page.browserCtx.opts.ExtraHTTPHeaders {
 		mergedHeaders[k] = v
 	}
-	for v, k := range fs.page.extraHTTPHeaders {
+	for k, v := range fs.page.extraHTTPHeaders {
 		mergedHeaders[k] = v
 	}
 	if !initial || len(mergedHeaders) > 0 {

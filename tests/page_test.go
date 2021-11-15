@@ -22,11 +22,13 @@ package tests
 
 import (
 	_ "embed"
+	"encoding/json"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPageGoto(t *testing.T) {
@@ -87,4 +89,27 @@ func testPageGotoWaitUntilDOMContentLoaded(t *testing.T, bt *browsertest.Browser
 	bt.Runtime.ExportTo(results.(goja.Value), &actual)
 
 	assert.EqualValues(t, "DOMContentLoaded", actual[0], `expected "DOMContentLoaded" event to have fired`)
+}
+
+func TestPageSetExtraHTTPHeaders(t *testing.T) {
+	bt := browsertest.NewBrowserTest(t)
+	p := bt.Browser.NewPage(nil)
+	t.Cleanup(func() {
+		p.Close(nil)
+		bt.Browser.Close()
+	})
+
+	headers := map[string]string{
+		"Some-Header": "Some-Value",
+	}
+	p.SetExtraHTTPHeaders(headers)
+	resp := p.Goto(bt.HTTPMultiBin.ServerHTTP.URL+"/get", nil)
+
+	require.NotNil(t, resp)
+	var body struct{ Headers map[string][]string }
+	err := json.Unmarshal(resp.Body().Bytes(), &body)
+	require.NoError(t, err)
+	h := body.Headers["Some-Header"]
+	require.NotEmpty(t, h)
+	assert.Equal(t, "Some-Value", h[0])
 }
