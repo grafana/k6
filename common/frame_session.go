@@ -41,7 +41,6 @@ import (
 	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/cdproto/target"
 	"github.com/grafana/xk6-browser/api"
-	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
 	k6stats "go.k6.io/k6/stats"
 )
@@ -403,7 +402,6 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 
 func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
 	// TODO: switch to using browser logger instead of directly outputting to k6 logging system
-	rt := k6common.GetRuntime(fs.ctx)
 	state := k6lib.GetState(fs.ctx)
 	l := state.Logger.
 		WithTime(event.Timestamp.Time()).
@@ -416,7 +414,7 @@ func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled)
 		i, err := interfaceFromRemoteObject(arg)
 		if err != nil {
 			// TODO(fix): this should not throw!
-			k6common.Throw(rt, fmt.Errorf("unable to parse remote object value: %w", err))
+			k6Throw(fs.ctx, "unable to parse remote object value: %w", err)
 		}
 		convertedArgs = append(convertedArgs, i)
 	}
@@ -439,7 +437,6 @@ func (fs *FrameSession) onExceptionThrown(event *runtime.EventExceptionThrown) {
 }
 
 func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionContextCreated) {
-	rt := k6common.GetRuntime(fs.ctx)
 	auxData := event.Context.AuxData
 	var i struct {
 		FrameID   cdp.FrameID `json:"frameId"`
@@ -447,7 +444,7 @@ func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionC
 		Type      string      `json:"type"`
 	}
 	if err := json.Unmarshal(auxData, &i); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to unmarshal JSON: %w", err))
+		k6Throw(fs.ctx, "unable to unmarshal JSON: %w", err)
 	}
 	var world string = ""
 	frame := fs.manager.getFrameByID(i.FrameID)
@@ -509,19 +506,17 @@ func (fs *FrameSession) onFrameDetached(frameID cdp.FrameID) {
 }
 
 func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
-	rt := k6common.GetRuntime(fs.ctx)
 	err := fs.manager.frameNavigated(frame.ID, frame.ParentID, frame.LoaderID.String(), frame.Name, frame.URL+frame.URLFragment, initial)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(fs.ctx, "cannot handle frame navigation: %w", err)
 	}
 }
 
 func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequestedNavigation) {
-	rt := k6common.GetRuntime(fs.ctx)
 	if event.Disposition == "currentTab" {
 		err := fs.manager.frameRequestedNavigation(event.FrameID, event.URL, "")
 		if err != nil {
-			k6common.Throw(rt, err)
+			k6Throw(fs.ctx, "cannot handle frame requested navigation: %w", err)
 		}
 	}
 }
@@ -655,8 +650,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 				// If we're no longer connected to browser, then ignore WebSocket errors
 				return
 			}
-			rt := k6common.GetRuntime(fs.ctx)
-			k6common.Throw(rt, err)
+			k6Throw(fs.ctx, "cannot create frame session: %w", err)
 		}
 		fs.page.frameSessions[cdp.FrameID(targetID)] = frameSession
 		return
@@ -676,8 +670,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 			// If we're no longer connected to browser, then ignore WebSocket errors
 			return
 		}
-		rt := k6common.GetRuntime(fs.ctx)
-		k6common.Throw(rt, err)
+		k6Throw(fs.ctx, "cannot create new worker: %w", err)
 	}
 	fs.page.workers[session.id] = w
 }

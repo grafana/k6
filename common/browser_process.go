@@ -89,3 +89,8 @@ func (p *BrowserProcess) Terminate() {
 func (p *BrowserProcess) WsURL() string {
 	return p.wsURL
 }
+
+// Pid returns the browser process ID
+func (p *BrowserProcess) Pid() int {
+	return p.process.Pid
+}

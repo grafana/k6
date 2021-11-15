@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -308,12 +309,30 @@ func waitForEvent(ctx context.Context, emitter EventEmitter, events []string, pr
 	return nil, nil
 }
 
-// k6Throw throws a k6 error
+// k6Throw throws a k6 error, and before throwing the error, it finds the
+// browser process from the context and kills it if it still exists.
+// TODO: test
 func k6Throw(ctx context.Context, format string, a ...interface{}) {
 	rt := k6common.GetRuntime(ctx)
 	if rt == nil {
 		// this should never happen unless a programmer error
 		panic("cannot get k6 runtime")
 	}
-	k6common.Throw(rt, fmt.Errorf(format, a...))
+	defer k6common.Throw(rt, fmt.Errorf(format, a...))
+
+	pid := GetProcessID(ctx)
+	if pid == 0 {
+		// this should never happen unless a programmer error
+		panic("cannot find process id")
+	}
+	p, err := os.FindProcess(pid)
+	if err != nil {
+		// optimistically return and don't kill the process
+		return
+	}
+	// no need to check the error for waiting the process to release
+	// its resources or whether we could kill it as we're already
+	// dying.
+	_ = p.Release()
+	_ = p.Kill()
 }
