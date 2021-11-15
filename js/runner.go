@@ -212,8 +212,8 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 		MaxIdleConnsPerHost: int(r.Bundle.Options.BatchPerHost.Int64),
 	}
 
-	if ForceHTTP1() {
-		transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{} //send over h1 protocol
+	if forceHTTP1() {
+		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper) //send over h1 protocol
 	} else {
 		_ = http2.ConfigureTransport(transport) //send over h2 protocol
 	}
@@ -268,9 +268,9 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 	return vu, nil
 }
 
-// Will check if force http1 env variable has been set in order to force requests to be sent over h1
-// This feature is temporary until #936 is resolved
-func ForceHTTP1() bool {
+// forceHTTP1 checks if force http1 env variable has been set in order to force requests to be sent over h1
+// TODO: This feature is temporary until #936 is resolved
+func forceHTTP1() bool {
 	godebug := os.Getenv("GODEBUG")
 	if godebug == "" {
 		return false
