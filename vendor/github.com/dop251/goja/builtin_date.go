@@ -997,7 +997,7 @@ func (r *Runtime) createDateProto(val *Object) objectImpl {
 }
 
 func (r *Runtime) createDate(val *Object) objectImpl {
-	o := r.newNativeFuncObj(val, r.builtin_date, r.builtin_newDate, "Date", r.global.DatePrototype, 7)
+	o := r.newNativeFuncObj(val, r.builtin_date, r.builtin_newDate, "Date", r.global.DatePrototype, intToValue(7))
 
 	o._putProp("parse", r.newNativeFunc(r.date_parse, nil, "parse", nil, 1), true, false, true)
 	o._putProp("UTC", r.newNativeFunc(r.date_UTC, nil, "UTC", nil, 7), true, false, true)

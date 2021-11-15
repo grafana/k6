@@ -79,7 +79,7 @@ func (r *Runtime) builtin_reflect_isExtensible(call FunctionCall) Value {
 
 func (r *Runtime) builtin_reflect_ownKeys(call FunctionCall) Value {
 	target := r.toObject(call.Argument(0))
-	return r.newArrayValues(target.self.ownPropertyKeys(true, nil))
+	return r.newArrayValues(target.self.keys(true, nil))
 }
 
 func (r *Runtime) builtin_reflect_preventExtensions(call FunctionCall) Value {

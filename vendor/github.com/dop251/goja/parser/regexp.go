@@ -9,6 +9,7 @@ import (
 
 const (
 	WhitespaceChars = " \f\n\r\t\v\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
+	Re2Dot          = "[^\r\n\u2028\u2029]"
 )
 
 type regexpParseError struct {
@@ -146,7 +147,7 @@ func (self *_RegExp_parser) scan() {
 			self.error(true, "Unmatched ')'")
 			return
 		case '.':
-			self.writeString("[^\\r\\n]")
+			self.writeString(Re2Dot)
 			self.read()
 		default:
 			self.pass()
@@ -184,7 +185,7 @@ func (self *_RegExp_parser) scanGroup() {
 		case '[':
 			self.scanBracket()
 		case '.':
-			self.writeString("[^\\r\\n]")
+			self.writeString(Re2Dot)
 			self.read()
 		default:
 			self.pass()

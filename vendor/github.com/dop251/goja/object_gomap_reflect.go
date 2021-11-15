@@ -242,21 +242,21 @@ func (i *gomapReflectPropIter) next() (propIterItem, iterNextFunc) {
 		v := i.o.value.MapIndex(key)
 		i.idx++
 		if v.IsValid() {
-			return propIterItem{name: unistring.NewFromString(key.String()), enumerable: _ENUM_TRUE}, i.next
+			return propIterItem{name: newStringValue(key.String()), enumerable: _ENUM_TRUE}, i.next
 		}
 	}
 
 	return propIterItem{}, nil
 }
 
-func (o *objectGoMapReflect) enumerateOwnKeys() iterNextFunc {
+func (o *objectGoMapReflect) iterateStringKeys() iterNextFunc {
 	return (&gomapReflectPropIter{
 		o:    o,
 		keys: o.value.MapKeys(),
 	}).next
 }
 
-func (o *objectGoMapReflect) ownKeys(_ bool, accum []Value) []Value {
+func (o *objectGoMapReflect) stringKeys(_ bool, accum []Value) []Value {
 	// all own keys are enumerable
 	for _, key := range o.value.MapKeys() {
 		accum = append(accum, newStringValue(key.String()))

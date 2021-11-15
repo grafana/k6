@@ -52,7 +52,7 @@ func (r *Runtime) populateWeakSetGeneric(s *Object, adderValue Value, iterable V
 		panic(r.NewTypeError("WeakSet.add is not set"))
 	}
 	iter := r.getIterator(iterable, nil)
-	r.iterate(iter, func(val Value) {
+	iter.iterate(func(val Value) {
 		adder(FunctionCall{This: s, Arguments: []Value{val}})
 	})
 }

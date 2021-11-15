@@ -189,6 +189,9 @@ func (c *compiler) compileTryStatement(v *ast.TryStatement, needResult bool) {
 		lbl1 := len(c.p.code)
 		c.emit(nil)
 		finallyOffset = len(c.p.code) - lbl
+		if bodyNeedResult && finallyBreaking != nil && lp == -1 {
+			c.emit(clearResult)
+		}
 		c.compileBlockStatement(v.Finally, false)
 		c.emit(halt, retFinally)
 
@@ -749,7 +752,7 @@ func (c *compiler) emitVarAssign(name unistring.String, offset int, init compile
 	if init != nil {
 		c.emitVarRef(name, offset)
 		c.emitNamed(init, name)
-		c.emit(putValueP)
+		c.emit(initValueP)
 	}
 }
 
@@ -802,7 +805,7 @@ func (c *compiler) emitPatternAssign(target, init compiledExpr) {
 	} else {
 		init.emitGetter(true)
 	}
-	c.emit(putValueP)
+	c.emit(initValueP)
 }
 
 func (c *compiler) compileLexicalBinding(expr *ast.Binding, isConst bool) {

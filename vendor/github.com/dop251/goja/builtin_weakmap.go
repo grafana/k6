@@ -122,7 +122,7 @@ func (r *Runtime) builtin_newWeakMap(args []Value, newTarget *Object) *Object {
 			i0 := valueInt(0)
 			i1 := valueInt(1)
 			if adder == r.global.weakMapAdder {
-				r.iterate(iter, func(item Value) {
+				iter.iterate(func(item Value) {
 					itemObj := r.toObject(item)
 					k := itemObj.self.getIdx(i0, nil)
 					v := nilSafe(itemObj.self.getIdx(i1, nil))
@@ -133,7 +133,7 @@ func (r *Runtime) builtin_newWeakMap(args []Value, newTarget *Object) *Object {
 				if adderFn == nil {
 					panic(r.NewTypeError("WeakMap.set in missing"))
 				}
-				r.iterate(iter, func(item Value) {
+				iter.iterate(func(item Value) {
 					itemObj := r.toObject(item)
 					k := itemObj.self.getIdx(i0, nil)
 					v := itemObj.self.getIdx(i1, nil)
