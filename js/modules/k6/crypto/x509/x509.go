@@ -21,7 +21,6 @@
 package x509
 
 import (
-	"context"
 	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/rsa"
@@ -34,10 +33,47 @@ import (
 	"time"
 
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modules"
 )
 
-// X509 certificate functionality
-type X509 struct{}
+type (
+	// RootModule is the global module instance that will create module
+	// instances for each VU.
+	RootModule struct{}
+
+	// X509 represents an instance of the X509 certificate module.
+	X509 struct {
+		vu modules.VU
+	}
+)
+
+var (
+	_ modules.Module   = &RootModule{}
+	_ modules.Instance = &X509{}
+)
+
+// New returns a pointer to a new RootModule instance.
+func New() *RootModule {
+	return &RootModule{}
+}
+
+// NewModuleInstance implements the modules.Module interface to return
+// a new instance for each VU.
+func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+	return &X509{vu: vu}
+}
+
+// Exports returns the exports of the execution module.
+func (mi *X509) Exports() modules.Exports {
+	return modules.Exports{
+		Named: map[string]interface{}{
+			"parse":       mi.parse,
+			"getAltNames": mi.altNames,
+			"getIssuer":   mi.issuer,
+			"getSubject":  mi.subject,
+		},
+	}
+}
 
 // Certificate is an X.509 certificate
 type Certificate struct {
@@ -86,47 +122,42 @@ type PublicKey struct {
 	Key       interface{}
 }
 
-// New constructs the X509 interface
-func New() *X509 {
-	return &X509{}
-}
-
-// Parse produces an entire X.509 certificate
-func (X509) Parse(ctx context.Context, encoded []byte) Certificate {
+// parse produces an entire X.509 certificate
+func (mi X509) parse(encoded []byte) (Certificate, error) {
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
-		throw(ctx, err)
+		return Certificate{}, err
 	}
 	certificate, err := makeCertificate(parsed)
 	if err != nil {
-		throw(ctx, err)
+		return Certificate{}, err
 	}
-	return certificate
+	return certificate, nil
 }
 
-// GetAltNames extracts alt names
-func (X509) GetAltNames(ctx context.Context, encoded []byte) []string {
+// altNames extracts alt names
+func (mi X509) altNames(encoded []byte) ([]string, error) {
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
-		throw(ctx, err)
+		return nil, err
 	}
-	return altNames(parsed)
+	return altNames(parsed), nil
 }
 
-// GetIssuer extracts certificate issuer
-func (X509) GetIssuer(ctx context.Context, encoded []byte) Issuer {
+// issuer extracts certificate issuer
+func (mi X509) issuer(encoded []byte) (Issuer, error) {
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
-		throw(ctx, err)
+		return Issuer{}, err
 	}
-	return makeIssuer(parsed.Issuer)
+	return makeIssuer(parsed.Issuer), nil
 }
 
-// GetSubject extracts certificate subject
-func (X509) GetSubject(ctx context.Context, encoded []byte) Subject {
+// subject extracts certificate subject
+func (mi X509) subject(encoded []byte) Subject {
 	parsed, err := parseCertificate(encoded)
 	if err != nil {
-		throw(ctx, err)
+		common.Throw(mi.vu.Runtime(), err)
 	}
 	return makeSubject(parsed.Subject)
 }
@@ -134,13 +165,11 @@ func (X509) GetSubject(ctx context.Context, encoded []byte) Subject {
 func parseCertificate(encoded []byte) (*x509.Certificate, error) {
 	decoded, _ := pem.Decode(encoded)
 	if decoded == nil {
-		err := errors.New("failed to decode certificate PEM file")
-		return nil, err
+		return nil, fmt.Errorf("failed to decode certificate PEM file")
 	}
 	parsed, err := x509.ParseCertificate(decoded.Bytes)
 	if err != nil {
-		err = fmt.Errorf("failed to parse certificate: %w", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to parse certificate: %w", err)
 	}
 	return parsed, nil
 }
@@ -267,8 +296,4 @@ func signatureAlgorithm(value x509.SignatureAlgorithm) string {
 func fingerPrint(parsed *x509.Certificate) []byte {
 	bytes := sha1.Sum(parsed.Raw) // #nosec G401
 	return bytes[:]
-}
-
-func throw(ctx context.Context, err error) {
-	common.Throw(common.GetRuntime(ctx), err)
 }
