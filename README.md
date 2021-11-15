@@ -22,7 +22,7 @@
 <img src="assets/github-hr.svg" height="32" alt="---" />
 <br/>
 
-**xk6-browser** is a k6 extension adding support for automation of browsers via the [Chrome Devtools Protocol](https://chromedevtools.github.io/devtools-protocol/) (CDP).
+**xk6-browser** is a [k6](https://k6.io/) extension adding support for automation of browsers via the [Chrome Devtools Protocol](https://chromedevtools.github.io/devtools-protocol/) (CDP).
 
 Special acknowledgment to the authors of [Playwright](https://playwright.dev/) and [Puppeteer](https://github.com/puppeteer/puppeteer) for their trailblazing work in this area. This project is heavily influenced and in some regards based on the code of those projects.
 
@@ -54,7 +54,9 @@ Special acknowledgment to the authors of [Playwright](https://playwright.dev/) a
 
 ### Pre-built binaries
 
-The easiest way to install xk6-browser is to grab a pre-built binary from the [GitHub Releases](https://github.com/grafana/xk6-browser/releases) page. Once you download and unpack the release, you can optionally copy the k6 binary (it's compiled with the xk6-browser extension) it contains somewhere in your PATH, so you are able to run k6 from any location on your system.
+The easiest way to install xk6-browser is to grab a pre-built binary from the [GitHub Releases](https://github.com/grafana/xk6-browser/releases) page. Once you download and unpack the release, you can optionally copy the xk6-browser binary it contains somewhere in your `PATH`, so you are able to run xk6-browser from any location on your system.
+
+Note that you **cannot** use the plain k6 binary released by the k6 project and must run any scripts that import `k6/x/browser` with this separate binary.
 
 ### Build from source
 
@@ -72,8 +74,12 @@ Then:
 
 2. Build the binary:
   ```shell
-  xk6 build --with github.com/grafana/xk6-browser
+  xk6 build --output xk6-browser --with github.com/grafana/xk6-browser
   ```
+
+  This will create a `xk6-browser` binary file in the current working directory. This file can be used exactly the same as the main `k6` binary, with the addition of being able to run xk6-browser scripts.
+
+3. Run scripts that import `k6/x/browser` with the new `xk6-browser` binary. On Linux and macOS make sure this is done by referencing the file in the current directory, e.g. `./xk6-browser run <script>`, or you can place it somewhere in your `PATH` so that it can be run from anywhere on your system.
 
 ## Examples
 
