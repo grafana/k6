@@ -206,16 +206,30 @@ func (i *destructKeyedSourceIter) next() (propIterItem, iterNextFunc) {
 			return item, nil
 		}
 		i.wrapped = next
-		if _, exists := i.d.usedKeys[stringValueFromRaw(item.name)]; !exists {
+		if _, exists := i.d.usedKeys[item.name]; !exists {
 			return item, i.next
 		}
 	}
 }
 
-func (d *destructKeyedSource) enumerateOwnKeys() iterNextFunc {
+func (d *destructKeyedSource) iterateStringKeys() iterNextFunc {
 	return (&destructKeyedSourceIter{
 		d:       d,
-		wrapped: d.w().enumerateOwnKeys(),
+		wrapped: d.w().iterateStringKeys(),
+	}).next
+}
+
+func (d *destructKeyedSource) iterateSymbols() iterNextFunc {
+	return (&destructKeyedSourceIter{
+		d:       d,
+		wrapped: d.w().iterateSymbols(),
+	}).next
+}
+
+func (d *destructKeyedSource) iterateKeys() iterNextFunc {
+	return (&destructKeyedSourceIter{
+		d:       d,
+		wrapped: d.w().iterateKeys(),
 	}).next
 }
 
@@ -231,17 +245,18 @@ func (d *destructKeyedSource) equal(impl objectImpl) bool {
 	return d.w().equal(impl)
 }
 
-func (d *destructKeyedSource) ownKeys(all bool, accum []Value) []Value {
+func (d *destructKeyedSource) stringKeys(all bool, accum []Value) []Value {
 	var next iterNextFunc
 	if all {
-		next = d.enumerateOwnKeys()
+		next = d.iterateStringKeys()
 	} else {
 		next = (&enumerableIter{
-			wrapped: d.enumerateOwnKeys(),
+			o:       d.wrapped.ToObject(d.r),
+			wrapped: d.iterateStringKeys(),
 		}).next
 	}
 	for item, next := next(); next != nil; item, next = next() {
-		accum = append(accum, stringValueFromRaw(item.name))
+		accum = append(accum, item.name)
 	}
 	return accum
 }
@@ -260,12 +275,12 @@ func (d *destructKeyedSource) filterUsedKeys(keys []Value) []Value {
 	return keys[:k]
 }
 
-func (d *destructKeyedSource) ownSymbols(all bool, accum []Value) []Value {
-	return d.filterUsedKeys(d.w().ownSymbols(all, accum))
+func (d *destructKeyedSource) symbols(all bool, accum []Value) []Value {
+	return d.filterUsedKeys(d.w().symbols(all, accum))
 }
 
-func (d *destructKeyedSource) ownPropertyKeys(all bool, accum []Value) []Value {
-	return d.filterUsedKeys(d.w().ownPropertyKeys(all, accum))
+func (d *destructKeyedSource) keys(all bool, accum []Value) []Value {
+	return d.filterUsedKeys(d.w().keys(all, accum))
 }
 
 func (d *destructKeyedSource) _putProp(name unistring.String, value Value, writable, enumerable, configurable bool) Value {

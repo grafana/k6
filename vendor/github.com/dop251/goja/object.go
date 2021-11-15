@@ -190,13 +190,18 @@ type objectImpl interface {
 	hasInstance(v Value) bool
 	isExtensible() bool
 	preventExtensions(throw bool) bool
-	enumerateOwnKeys() iterNextFunc
+
 	export(ctx *objectExportCtx) interface{}
 	exportType() reflect.Type
 	equal(objectImpl) bool
-	ownKeys(all bool, accum []Value) []Value
-	ownSymbols(all bool, accum []Value) []Value
-	ownPropertyKeys(all bool, accum []Value) []Value
+
+	iterateStringKeys() iterNextFunc
+	iterateSymbols() iterNextFunc
+	iterateKeys() iterNextFunc
+
+	stringKeys(all bool, accum []Value) []Value
+	symbols(all bool, accum []Value) []Value
+	keys(all bool, accum []Value) []Value
 
 	_putProp(name unistring.String, value Value, writable, enumerable, configurable bool) Value
 	_putSym(s *Symbol, prop Value)
@@ -938,7 +943,7 @@ func (o *baseObject) export(ctx *objectExportCtx) interface{} {
 	if v, exists := ctx.get(o); exists {
 		return v
 	}
-	keys := o.ownKeys(false, nil)
+	keys := o.stringKeys(false, nil)
 	m := make(map[string]interface{}, len(keys))
 	ctx.put(o, m)
 	for _, itemName := range keys {
@@ -967,8 +972,8 @@ const (
 )
 
 type propIterItem struct {
-	name       unistring.String
-	value      Value // set only when enumerable == _ENUM_UNKNOWN
+	name       Value
+	value      Value
 	enumerable enumerableFlag
 }
 
@@ -985,6 +990,7 @@ type recursivePropIter struct {
 }
 
 type enumerableIter struct {
+	o       *Object
 	wrapped iterNextFunc
 }
 
@@ -999,7 +1005,16 @@ func (i *enumerableIter) next() (propIterItem, iterNextFunc) {
 			continue
 		}
 		if item.enumerable == _ENUM_UNKNOWN {
-			if prop, ok := item.value.(*valueProperty); ok {
+			var prop Value
+			if item.value == nil {
+				prop = i.o.getOwnProp(item.name)
+			} else {
+				prop = item.value
+			}
+			if prop == nil {
+				continue
+			}
+			if prop, ok := prop.(*valueProperty); ok {
 				if !prop.enumerable {
 					continue
 				}
@@ -1015,14 +1030,15 @@ func (i *recursivePropIter) next() (propIterItem, iterNextFunc) {
 		item, i.cur = i.cur()
 		if i.cur == nil {
 			if proto := i.o.proto(); proto != nil {
-				i.cur = proto.self.enumerateOwnKeys()
+				i.cur = proto.self.iterateStringKeys()
 				i.o = proto.self
 				continue
 			}
 			return propIterItem{}, nil
 		}
-		if _, exists := i.seen[item.name]; !exists {
-			i.seen[item.name] = struct{}{}
+		name := item.name.string()
+		if _, exists := i.seen[name]; !exists {
+			i.seen[name] = struct{}{}
 			return item, i.next
 		}
 	}
@@ -1030,9 +1046,10 @@ func (i *recursivePropIter) next() (propIterItem, iterNextFunc) {
 
 func enumerateRecursive(o *Object) iterNextFunc {
 	return (&enumerableIter{
+		o: o,
 		wrapped: (&recursivePropIter{
 			o:    o.self,
-			cur:  o.self.enumerateOwnKeys(),
+			cur:  o.self.iterateStringKeys(),
 			seen: make(map[unistring.String]struct{}),
 		}).next,
 	}).next
@@ -1044,7 +1061,7 @@ func (i *objectPropIter) next() (propIterItem, iterNextFunc) {
 		i.idx++
 		prop := i.o.values[name]
 		if prop != nil {
-			return propIterItem{name: name, value: prop}, i.next
+			return propIterItem{name: stringValueFromRaw(name), value: prop}, i.next
 		}
 	}
 	clearNamesCopyMarker(i.propNames)
@@ -1107,7 +1124,7 @@ func copyNamesIfNeeded(names []unistring.String, extraCap int) []unistring.Strin
 	return names
 }
 
-func (o *baseObject) enumerateOwnKeys() iterNextFunc {
+func (o *baseObject) iterateStringKeys() iterNextFunc {
 	if len(o.propNames) > o.lastSortedPropLen {
 		o.fixPropOrder()
 	}
@@ -1116,6 +1133,53 @@ func (o *baseObject) enumerateOwnKeys() iterNextFunc {
 	return (&objectPropIter{
 		o:         o,
 		propNames: propNames,
+	}).next
+}
+
+type objectSymbolIter struct {
+	iter *orderedMapIter
+}
+
+func (i *objectSymbolIter) next() (propIterItem, iterNextFunc) {
+	entry := i.iter.next()
+	if entry != nil {
+		return propIterItem{
+			name:  entry.key,
+			value: entry.value,
+		}, i.next
+	}
+	return propIterItem{}, nil
+}
+
+func (o *baseObject) iterateSymbols() iterNextFunc {
+	if o.symValues != nil {
+		return (&objectSymbolIter{
+			iter: o.symValues.newIter(),
+		}).next
+	}
+	return func() (propIterItem, iterNextFunc) {
+		return propIterItem{}, nil
+	}
+}
+
+type objectAllPropIter struct {
+	o      *Object
+	curStr iterNextFunc
+}
+
+func (i *objectAllPropIter) next() (propIterItem, iterNextFunc) {
+	item, next := i.curStr()
+	if next != nil {
+		i.curStr = next
+		return item, i.next
+	}
+	return i.o.self.iterateSymbols()()
+}
+
+func (o *baseObject) iterateKeys() iterNextFunc {
+	return (&objectAllPropIter{
+		o:      o.val,
+		curStr: o.val.self.iterateStringKeys(),
 	}).next
 }
 
@@ -1158,7 +1222,7 @@ func (o *baseObject) fixPropOrder() {
 	o.lastSortedPropLen = len(names)
 }
 
-func (o *baseObject) ownKeys(all bool, keys []Value) []Value {
+func (o *baseObject) stringKeys(all bool, keys []Value) []Value {
 	if len(o.propNames) > o.lastSortedPropLen {
 		o.fixPropOrder()
 	}
@@ -1178,7 +1242,7 @@ func (o *baseObject) ownKeys(all bool, keys []Value) []Value {
 	return keys
 }
 
-func (o *baseObject) ownSymbols(all bool, accum []Value) []Value {
+func (o *baseObject) symbols(all bool, accum []Value) []Value {
 	if o.symValues != nil {
 		iter := o.symValues.newIter()
 		if all {
@@ -1208,8 +1272,8 @@ func (o *baseObject) ownSymbols(all bool, accum []Value) []Value {
 	return accum
 }
 
-func (o *baseObject) ownPropertyKeys(all bool, accum []Value) []Value {
-	return o.ownSymbols(all, o.val.self.ownKeys(all, accum))
+func (o *baseObject) keys(all bool, accum []Value) []Value {
+	return o.symbols(all, o.val.self.stringKeys(all, accum))
 }
 
 func (o *baseObject) hasInstance(Value) bool {
@@ -1300,9 +1364,9 @@ func (o *Object) setStr(name unistring.String, val, receiver Value, throw bool) 
 							return false
 						}
 					}
-					robj.self.defineOwnPropertyStr(name, PropertyDescriptor{Value: val}, throw)
+					return robj.self.defineOwnPropertyStr(name, PropertyDescriptor{Value: val}, throw)
 				} else {
-					robj.self.defineOwnPropertyStr(name, PropertyDescriptor{
+					return robj.self.defineOwnPropertyStr(name, PropertyDescriptor{
 						Value:        val,
 						Writable:     FLAG_TRUE,
 						Configurable: FLAG_TRUE,
@@ -1317,7 +1381,6 @@ func (o *Object) setStr(name unistring.String, val, receiver Value, throw bool) 
 			return res
 		}
 	}
-	return true
 }
 
 func (o *Object) set(name Value, val, receiver Value, throw bool) bool {
@@ -1551,4 +1614,51 @@ func (ctx *objectExportCtx) putTyped(key objectImpl, typ reflect.Type, value int
 		m[typ] = value
 		ctx.cache[key] = m
 	}
+}
+
+type enumPropertiesIter struct {
+	o       *Object
+	wrapped iterNextFunc
+}
+
+func (i *enumPropertiesIter) next() (propIterItem, iterNextFunc) {
+	for i.wrapped != nil {
+		item, next := i.wrapped()
+		i.wrapped = next
+		if next == nil {
+			break
+		}
+		if item.value == nil {
+			item.value = i.o.get(item.name, nil)
+			if item.value == nil {
+				continue
+			}
+		} else {
+			if prop, ok := item.value.(*valueProperty); ok {
+				item.value = prop.get(i.o)
+			}
+		}
+		return item, i.next
+	}
+	return propIterItem{}, nil
+}
+
+func iterateEnumerableProperties(o *Object) iterNextFunc {
+	return (&enumPropertiesIter{
+		o: o,
+		wrapped: (&enumerableIter{
+			o:       o,
+			wrapped: o.self.iterateKeys(),
+		}).next,
+	}).next
+}
+
+func iterateEnumerableStringProperties(o *Object) iterNextFunc {
+	return (&enumPropertiesIter{
+		o: o,
+		wrapped: (&enumerableIter{
+			o:       o,
+			wrapped: o.self.iterateStringKeys(),
+		}).next,
+	}).next
 }

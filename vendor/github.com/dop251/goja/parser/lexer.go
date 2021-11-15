@@ -3,26 +3,43 @@ package parser
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
 
+	"golang.org/x/text/unicode/rangetable"
+
 	"github.com/dop251/goja/file"
 	"github.com/dop251/goja/token"
 	"github.com/dop251/goja/unistring"
 )
 
-var matchIdentifier = regexp.MustCompile(`^[$_\p{L}][$_\p{L}\d}]*$`)
+var (
+	unicodeRangeIdNeg      = rangetable.Merge(unicode.Pattern_Syntax, unicode.Pattern_White_Space)
+	unicodeRangeIdStartPos = rangetable.Merge(unicode.Letter, unicode.Nl, unicode.Other_ID_Start)
+	unicodeRangeIdContPos  = rangetable.Merge(unicodeRangeIdStartPos, unicode.Mn, unicode.Mc, unicode.Nd, unicode.Pc, unicode.Other_ID_Continue)
+)
 
 func isDecimalDigit(chr rune) bool {
 	return '0' <= chr && chr <= '9'
 }
 
 func IsIdentifier(s string) bool {
-	return matchIdentifier.MatchString(s)
+	if s == "" {
+		return false
+	}
+	r, size := utf8.DecodeRuneInString(s)
+	if !isIdentifierStart(r) {
+		return false
+	}
+	for _, r := range s[size:] {
+		if !isIdentifierPart(r) {
+			return false
+		}
+	}
+	return true
 }
 
 func digitValue(chr rune) int {
@@ -41,20 +58,28 @@ func isDigit(chr rune, base int) bool {
 	return digitValue(chr) < base
 }
 
+func isIdStartUnicode(r rune) bool {
+	return unicode.Is(unicodeRangeIdStartPos, r) && !unicode.Is(unicodeRangeIdNeg, r)
+}
+
+func isIdPartUnicode(r rune) bool {
+	return unicode.Is(unicodeRangeIdContPos, r) && !unicode.Is(unicodeRangeIdNeg, r) || r == '\u200C' || r == '\u200D'
+}
+
 func isIdentifierStart(chr rune) bool {
 	return chr == '$' || chr == '_' || chr == '\\' ||
 		'a' <= chr && chr <= 'z' || 'A' <= chr && chr <= 'Z' ||
-		chr >= utf8.RuneSelf && unicode.IsLetter(chr)
+		chr >= utf8.RuneSelf && isIdStartUnicode(chr)
 }
 
 func isIdentifierPart(chr rune) bool {
 	return chr == '$' || chr == '_' || chr == '\\' ||
 		'a' <= chr && chr <= 'z' || 'A' <= chr && chr <= 'Z' ||
 		'0' <= chr && chr <= '9' ||
-		chr >= utf8.RuneSelf && (unicode.IsLetter(chr) || unicode.IsDigit(chr))
+		chr >= utf8.RuneSelf && isIdPartUnicode(chr)
 }
 
-func (self *_parser) scanIdentifier() (string, unistring.String, bool, error) {
+func (self *_parser) scanIdentifier() (string, unistring.String, bool, string) {
 	offset := self.chrOffset
 	hasEscape := false
 	isUnicode := false
@@ -67,26 +92,49 @@ func (self *_parser) scanIdentifier() (string, unistring.String, bool, error) {
 			distance := self.chrOffset - offset
 			self.read()
 			if self.chr != 'u' {
-				return "", "", false, fmt.Errorf("Invalid identifier escape character: %c (%s)", self.chr, string(self.chr))
+				return "", "", false, fmt.Sprintf("Invalid identifier escape character: %c (%s)", self.chr, string(self.chr))
 			}
 			var value rune
-			for j := 0; j < 4; j++ {
+			if self._peek() == '{' {
 				self.read()
-				decimal, ok := hex2decimal(byte(self.chr))
-				if !ok {
-					return "", "", false, fmt.Errorf("Invalid identifier escape character: %c (%s)", self.chr, string(self.chr))
+				value = -1
+				for value <= utf8.MaxRune {
+					self.read()
+					if self.chr == '}' {
+						break
+					}
+					decimal, ok := hex2decimal(byte(self.chr))
+					if !ok {
+						return "", "", false, "Invalid Unicode escape sequence"
+					}
+					if value == -1 {
+						value = decimal
+					} else {
+						value = value<<4 | decimal
+					}
 				}
-				value = value<<4 | decimal
+				if value == -1 {
+					return "", "", false, "Invalid Unicode escape sequence"
+				}
+			} else {
+				for j := 0; j < 4; j++ {
+					self.read()
+					decimal, ok := hex2decimal(byte(self.chr))
+					if !ok {
+						return "", "", false, fmt.Sprintf("Invalid identifier escape character: %c (%s)", self.chr, string(self.chr))
+					}
+					value = value<<4 | decimal
+				}
 			}
 			if value == '\\' {
-				return "", "", false, fmt.Errorf("Invalid identifier escape value: %c (%s)", value, string(value))
+				return "", "", false, fmt.Sprintf("Invalid identifier escape value: %c (%s)", value, string(value))
 			} else if distance == 0 {
 				if !isIdentifierStart(value) {
-					return "", "", false, fmt.Errorf("Invalid identifier escape value: %c (%s)", value, string(value))
+					return "", "", false, fmt.Sprintf("Invalid identifier escape value: %c (%s)", value, string(value))
 				}
 			} else if distance > 0 {
 				if !isIdentifierPart(value) {
-					return "", "", false, fmt.Errorf("Invalid identifier escape value: %c (%s)", value, string(value))
+					return "", "", false, fmt.Sprintf("Invalid identifier escape value: %c (%s)", value, string(value))
 				}
 			}
 			r = value
@@ -103,17 +151,17 @@ func (self *_parser) scanIdentifier() (string, unistring.String, bool, error) {
 	literal := self.str[offset:self.chrOffset]
 	var parsed unistring.String
 	if hasEscape || isUnicode {
-		var err error
+		var err string
 		// TODO strict
 		parsed, err = parseStringLiteral(literal, length, isUnicode, false)
-		if err != nil {
+		if err != "" {
 			return "", "", false, err
 		}
 	} else {
 		parsed = unistring.String(literal)
 	}
 
-	return literal, parsed, hasEscape, nil
+	return literal, parsed, hasEscape, ""
 }
 
 // 7.2
@@ -231,10 +279,10 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 
 		switch chr := self.chr; {
 		case isIdentifierStart(chr):
-			var err error
+			var err string
 			var hasEscape bool
 			literal, parsedLiteral, hasEscape, err = self.scanIdentifier()
-			if err != nil {
+			if err != "" {
 				tkn = token.ILLEGAL
 				break
 			}
@@ -242,34 +290,29 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 				// Keywords are longer than 1 character, avoid lookup otherwise
 				var strict bool
 				tkn, strict = token.IsKeyword(string(parsedLiteral))
-
+				if hasEscape {
+					self.insertSemicolon = true
+					if tkn != 0 && tkn != token.LET || parsedLiteral == "true" || parsedLiteral == "false" || parsedLiteral == "null" {
+						tkn = token.KEYWORD
+					} else {
+						tkn = token.IDENTIFIER
+					}
+					return
+				}
 				switch tkn {
 
 				case 0: // Not a keyword
 					if parsedLiteral == "true" || parsedLiteral == "false" {
-						if hasEscape {
-							tkn = token.STRING
-							return
-						}
 						self.insertSemicolon = true
 						tkn = token.BOOLEAN
 						return
 					} else if parsedLiteral == "null" {
-						if hasEscape {
-							tkn = token.STRING
-							return
-						}
 						self.insertSemicolon = true
 						tkn = token.NULL
 						return
 					}
 
 				case token.KEYWORD:
-					if hasEscape {
-						tkn = token.STRING
-						return
-					}
-					tkn = token.KEYWORD
 					if strict {
 						// TODO If strict and in strict mode, then this is not a break
 						break
@@ -283,17 +326,10 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 					token.RETURN,
 					token.CONTINUE,
 					token.DEBUGGER:
-					if hasEscape {
-						tkn = token.STRING
-						return
-					}
 					self.insertSemicolon = true
 					return
 
 				default:
-					if hasEscape {
-						tkn = token.STRING
-					}
 					return
 
 				}
@@ -420,9 +456,9 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 			case '"', '\'':
 				insertSemicolon = true
 				tkn = token.STRING
-				var err error
+				var err string
 				literal, parsedLiteral, err = self.scanString(self.chrOffset-1, true)
-				if err != nil {
+				if err != "" {
 					tkn = token.ILLEGAL
 				}
 			case '`':
@@ -660,7 +696,7 @@ func (self *_parser) scanEscape(quote rune) (int, bool) {
 	return 1, false
 }
 
-func (self *_parser) scanString(offset int, parse bool) (literal string, parsed unistring.String, err error) {
+func (self *_parser) scanString(offset int, parse bool) (literal string, parsed unistring.String, err string) {
 	// " ' /
 	quote := rune(self.str[offset])
 	length := 0
@@ -717,7 +753,7 @@ newline:
 		errStr = "Invalid regular expression: missing /"
 		self.error(self.idxOf(offset), errStr)
 	}
-	return "", "", errors.New(errStr)
+	return "", "", errStr
 }
 
 func (self *_parser) scanNewline() {
@@ -730,7 +766,7 @@ func (self *_parser) scanNewline() {
 	self.read()
 }
 
-func (self *_parser) parseTemplateCharacters() (literal string, parsed unistring.String, finished bool, parseErr, err error) {
+func (self *_parser) parseTemplateCharacters() (literal string, parsed unistring.String, finished bool, parseErr, err string) {
 	offset := self.chrOffset
 	var end int
 	length := 0
@@ -754,6 +790,11 @@ func (self *_parser) parseTemplateCharacters() (literal string, parsed unistring
 				}
 				self.scanNewline()
 			} else {
+				if self.chr == '8' || self.chr == '9' {
+					if parseErr == "" {
+						parseErr = "\\8 and \\9 are not allowed in template strings."
+					}
+				}
 				l, u := self.scanEscape('`')
 				length += l
 				if u {
@@ -784,11 +825,13 @@ func (self *_parser) parseTemplateCharacters() (literal string, parsed unistring
 	if hasCR {
 		literal = normaliseCRLF(literal)
 	}
-	parsed, parseErr = parseStringLiteral(literal, length, isUnicode, true)
+	if parseErr == "" {
+		parsed, parseErr = parseStringLiteral(literal, length, isUnicode, true)
+	}
 	self.insertSemicolon = true
 	return
 unterminated:
-	err = errors.New(err_UnexpectedEndOfInput)
+	err = err_UnexpectedEndOfInput
 	return
 }
 
@@ -862,7 +905,7 @@ error:
 	return nil, errors.New("Illegal numeric literal")
 }
 
-func parseStringLiteral(literal string, length int, unicode, strict bool) (unistring.String, error) {
+func parseStringLiteral(literal string, length int, unicode, strict bool) (unistring.String, string) {
 	var sb strings.Builder
 	var chars []uint16
 	if unicode {
@@ -937,12 +980,12 @@ func parseStringLiteral(literal string, length int, unicode, strict bool) (unist
 				}
 				if size > 0 {
 					if len(str) < size {
-						return "", fmt.Errorf("invalid escape: \\%s: len(%q) != %d", string(chr), str, size)
+						return "", fmt.Sprintf("invalid escape: \\%s: len(%q) != %d", string(chr), str, size)
 					}
 					for j := 0; j < size; j++ {
 						decimal, ok := hex2decimal(str[j])
 						if !ok {
-							return "", fmt.Errorf("invalid escape: \\%s: %q", string(chr), str[:size])
+							return "", fmt.Sprintf("invalid escape: \\%s: %q", string(chr), str[:size])
 						}
 						value = value<<4 | decimal
 					}
@@ -953,7 +996,7 @@ func parseStringLiteral(literal string, length int, unicode, strict bool) (unist
 					for ; size < len(str); size++ {
 						if str[size] == '}' {
 							if size == 0 {
-								return "", fmt.Errorf("invalid escape: \\%s", string(chr))
+								return "", fmt.Sprintf("invalid escape: \\%s", string(chr))
 							}
 							size++
 							value = val
@@ -961,15 +1004,15 @@ func parseStringLiteral(literal string, length int, unicode, strict bool) (unist
 						}
 						decimal, ok := hex2decimal(str[size])
 						if !ok {
-							return "", fmt.Errorf("invalid escape: \\%s: %q", string(chr), str[:size+1])
+							return "", fmt.Sprintf("invalid escape: \\%s: %q", string(chr), str[:size+1])
 						}
 						val = val<<4 | decimal
 						if val > utf8.MaxRune {
-							return "", fmt.Errorf("undefined Unicode code-point: %q", str[:size+1])
+							return "", fmt.Sprintf("undefined Unicode code-point: %q", str[:size+1])
 						}
 					}
 					if value == -1 {
-						return "", fmt.Errorf("unterminated \\u{: %q", str)
+						return "", fmt.Sprintf("unterminated \\u{: %q", str)
 					}
 				}
 				str = str[size:]
@@ -987,7 +1030,7 @@ func parseStringLiteral(literal string, length int, unicode, strict bool) (unist
 				fallthrough
 			case '1', '2', '3', '4', '5', '6', '7':
 				if strict {
-					return "", errors.New("Octal escape sequences are not allowed in this context")
+					return "", "Octal escape sequences are not allowed in this context"
 				}
 				value = rune(chr) - '0'
 				j := 0
@@ -1029,7 +1072,7 @@ func parseStringLiteral(literal string, length int, unicode, strict bool) (unist
 			}
 		} else {
 			if value >= utf8.RuneSelf {
-				return "", fmt.Errorf("Unexpected unicode character")
+				return "", "Unexpected unicode character"
 			}
 			sb.WriteByte(byte(value))
 		}
@@ -1039,12 +1082,12 @@ func parseStringLiteral(literal string, length int, unicode, strict bool) (unist
 		if len(chars) != length+1 {
 			panic(fmt.Errorf("unexpected unicode length while parsing '%s'", literal))
 		}
-		return unistring.FromUtf16(chars), nil
+		return unistring.FromUtf16(chars), ""
 	}
 	if sb.Len() != length {
 		panic(fmt.Errorf("unexpected length while parsing '%s'", literal))
 	}
-	return unistring.String(sb.String()), nil
+	return unistring.String(sb.String()), ""
 }
 
 func (self *_parser) scanNumericLiteral(decimalPoint bool) (token.Token, string) {

@@ -362,7 +362,7 @@ func (i *goreflectPropIter) nextField() (propIterItem, iterNextFunc) {
 	if i.idx < len(names) {
 		name := names[i.idx]
 		i.idx++
-		return propIterItem{name: unistring.NewFromString(name), enumerable: _ENUM_TRUE}, i.nextField
+		return propIterItem{name: newStringValue(name), enumerable: _ENUM_TRUE}, i.nextField
 	}
 
 	i.idx = 0
@@ -374,13 +374,13 @@ func (i *goreflectPropIter) nextMethod() (propIterItem, iterNextFunc) {
 	if i.idx < len(names) {
 		name := names[i.idx]
 		i.idx++
-		return propIterItem{name: unistring.NewFromString(name), enumerable: _ENUM_TRUE}, i.nextMethod
+		return propIterItem{name: newStringValue(name), enumerable: _ENUM_TRUE}, i.nextMethod
 	}
 
 	return propIterItem{}, nil
 }
 
-func (o *objectGoReflect) enumerateOwnKeys() iterNextFunc {
+func (o *objectGoReflect) iterateStringKeys() iterNextFunc {
 	r := &goreflectPropIter{
 		o: o,
 	}
@@ -391,7 +391,7 @@ func (o *objectGoReflect) enumerateOwnKeys() iterNextFunc {
 	return r.nextMethod
 }
 
-func (o *objectGoReflect) ownKeys(_ bool, accum []Value) []Value {
+func (o *objectGoReflect) stringKeys(_ bool, accum []Value) []Value {
 	// all own keys are enumerable
 	for _, name := range o.valueTypeInfo.FieldNames {
 		accum = append(accum, newStringValue(name))

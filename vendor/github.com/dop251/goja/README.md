@@ -16,12 +16,11 @@ Features
 --------
 
  * Full ECMAScript 5.1 support (including regex and strict mode).
- * Passes nearly all [tc39 tests](https://github.com/tc39/test262) tagged with es5id. The goal is to pass all of them.
-   Note, the current working commit is https://github.com/tc39/test262/commit/ddfe24afe3043388827aa220ef623b8540958bbd.
-   The next commit removed most of the es5id tags which made it impossible to distinguish which tests to run.
+ * Passes nearly all [tc39 tests](https://github.com/tc39/test262) for the features implemented so far. The goal is to
+   pass all of them. Note, the current working commit is https://github.com/tc39/test262/commit/26f1f4567ee7e33163d961c867d689173cbb9065.
  * Capable of running Babel, Typescript compiler and pretty much anything written in ES5.
  * Sourcemaps.
- * Some ES6 functionality, still work in progress, see https://github.com/dop251/goja/milestone/1?closed=1
+ * Most of ES6 functionality, still work in progress, see https://github.com/dop251/goja/milestone/1?closed=1
  
 Known incompatibilities and caveats
 -----------------------------------
@@ -52,6 +51,26 @@ above is the only reasonable way I can think of without involving finalizers. Th
 (see https://github.com/dop251/goja/issues/250 and https://github.com/dop251/goja/issues/199 for more details).
 
 Note, this does not have any effect on the application logic, but may cause a higher-than-expected memory usage.
+
+### WeakRef and FinalizationRegistry
+For the reason mentioned above implementing WeakRef and FinalizationRegistry does not seem to be possible at this stage.
+
+### JSON
+`JSON.parse()` uses the standard Go library which operates in UTF-8. Therefore, it cannot correctly parse broken UTF-16
+surrogate pairs, for example:
+
+```javascript
+JSON.parse(`"\\uD800"`).charCodeAt(0).toString(16) // returns "fffd" instead of "d800"
+```
+
+### Date
+Conversion from calendar date to epoch timestamp uses the standard Go library which uses `int`, rather than `float` as per
+ECMAScript specification. This means if you pass arguments that overflow int to the `Date()` constructor or  if there is
+an integer overflow, the result will be incorrect, for example:
+
+```javascript
+Date.UTC(1970, 0, 1, 80063993375, 29, 1, -288230376151711740) // returns 29256 instead of 29312
+```
 
 FAQ
 ---

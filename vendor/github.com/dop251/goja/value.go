@@ -767,7 +767,8 @@ func (o *Object) GetSymbol(sym *Symbol) Value {
 // This method will panic with an *Exception if a JavaScript exception is thrown in the process.
 func (o *Object) Keys() (keys []string) {
 	iter := &enumerableIter{
-		wrapped: o.self.enumerateOwnKeys(),
+		o:       o,
+		wrapped: o.self.iterateStringKeys(),
 	}
 	for item, next := iter.next(); next != nil; item, next = next() {
 		keys = append(keys, item.name.String())
@@ -779,7 +780,7 @@ func (o *Object) Keys() (keys []string) {
 // Symbols returns a list of Object's enumerable symbol properties.
 // This method will panic with an *Exception if a JavaScript exception is thrown in the process.
 func (o *Object) Symbols() []*Symbol {
-	symbols := o.self.ownSymbols(false, nil)
+	symbols := o.self.symbols(false, nil)
 	ret := make([]*Symbol, len(symbols))
 	for i, sym := range symbols {
 		ret[i], _ = sym.(*Symbol)

@@ -20,7 +20,7 @@ github.com/davecgh/go-spew/spew
 # github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
-# github.com/dop251/goja v0.0.0-20211022113120-dc8c55024d06
+# github.com/dop251/goja v0.0.0-20211115154819-26ebff68a7d5
 ## explicit
 github.com/dop251/goja
 github.com/dop251/goja/ast
@@ -190,6 +190,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
+golang.org/x/text/unicode/rangetable
 # golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 ## explicit
 golang.org/x/time/rate

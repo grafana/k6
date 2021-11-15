@@ -451,18 +451,28 @@ func (i *dynamicObjectPropIter) next() (propIterItem, iterNextFunc) {
 		name := i.propNames[i.idx]
 		i.idx++
 		if i.o.d.Has(name) {
-			return propIterItem{name: unistring.NewFromString(name), enumerable: _ENUM_TRUE}, i.next
+			return propIterItem{name: newStringValue(name), enumerable: _ENUM_TRUE}, i.next
 		}
 	}
 	return propIterItem{}, nil
 }
 
-func (o *dynamicObject) enumerateOwnKeys() iterNextFunc {
+func (o *dynamicObject) iterateStringKeys() iterNextFunc {
 	keys := o.d.Keys()
 	return (&dynamicObjectPropIter{
 		o:         o,
 		propNames: keys,
 	}).next
+}
+
+func (o *baseDynamicObject) iterateSymbols() iterNextFunc {
+	return func() (propIterItem, iterNextFunc) {
+		return propIterItem{}, nil
+	}
+}
+
+func (o *dynamicObject) iterateKeys() iterNextFunc {
+	return o.iterateStringKeys()
 }
 
 func (o *dynamicObject) export(ctx *objectExportCtx) interface{} {
@@ -480,7 +490,7 @@ func (o *dynamicObject) equal(impl objectImpl) bool {
 	return false
 }
 
-func (o *dynamicObject) ownKeys(all bool, accum []Value) []Value {
+func (o *dynamicObject) stringKeys(all bool, accum []Value) []Value {
 	keys := o.d.Keys()
 	if l := len(accum) + len(keys); l > cap(accum) {
 		oldAccum := accum
@@ -493,12 +503,12 @@ func (o *dynamicObject) ownKeys(all bool, accum []Value) []Value {
 	return accum
 }
 
-func (*baseDynamicObject) ownSymbols(all bool, accum []Value) []Value {
+func (*baseDynamicObject) symbols(all bool, accum []Value) []Value {
 	return accum
 }
 
-func (o *dynamicObject) ownPropertyKeys(all bool, accum []Value) []Value {
-	return o.ownKeys(all, accum)
+func (o *dynamicObject) keys(all bool, accum []Value) []Value {
+	return o.stringKeys(all, accum)
 }
 
 func (*baseDynamicObject) _putProp(name unistring.String, value Value, writable, enumerable, configurable bool) Value {
@@ -686,17 +696,21 @@ func (i *dynArrayPropIter) next() (propIterItem, iterNextFunc) {
 	if i.idx < i.limit && i.idx < i.a.Len() {
 		name := strconv.Itoa(i.idx)
 		i.idx++
-		return propIterItem{name: unistring.String(name), enumerable: _ENUM_TRUE}, i.next
+		return propIterItem{name: asciiString(name), enumerable: _ENUM_TRUE}, i.next
 	}
 
 	return propIterItem{}, nil
 }
 
-func (a *dynamicArray) enumerateOwnKeys() iterNextFunc {
+func (a *dynamicArray) iterateStringKeys() iterNextFunc {
 	return (&dynArrayPropIter{
 		a:     a.a,
 		limit: a.a.Len(),
 	}).next
+}
+
+func (a *dynamicArray) iterateKeys() iterNextFunc {
+	return a.iterateStringKeys()
 }
 
 func (a *dynamicArray) export(ctx *objectExportCtx) interface{} {
@@ -714,7 +728,7 @@ func (a *dynamicArray) equal(impl objectImpl) bool {
 	return false
 }
 
-func (a *dynamicArray) ownKeys(all bool, accum []Value) []Value {
+func (a *dynamicArray) stringKeys(all bool, accum []Value) []Value {
 	al := a.a.Len()
 	l := len(accum) + al
 	if all {
@@ -734,6 +748,6 @@ func (a *dynamicArray) ownKeys(all bool, accum []Value) []Value {
 	return accum
 }
 
-func (a *dynamicArray) ownPropertyKeys(all bool, accum []Value) []Value {
-	return a.ownKeys(all, accum)
+func (a *dynamicArray) keys(all bool, accum []Value) []Value {
+	return a.stringKeys(all, accum)
 }

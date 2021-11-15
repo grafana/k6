@@ -200,9 +200,10 @@ type (
 	}
 
 	PropertyKeyed struct {
-		Key   Expression
-		Kind  PropertyKind
-		Value Expression
+		Key      Expression
+		Kind     PropertyKind
+		Value    Expression
+		Computed bool
 	}
 
 	SpreadElement struct {
@@ -624,16 +625,22 @@ func (self *DotExpression) Idx1() file.Idx         { return self.Identifier.Idx1
 func (self *FunctionLiteral) Idx1() file.Idx       { return self.Body.Idx1() }
 func (self *ArrowFunctionLiteral) Idx1() file.Idx  { return self.Body.Idx1() }
 func (self *Identifier) Idx1() file.Idx            { return file.Idx(int(self.Idx) + len(self.Name)) }
-func (self *NewExpression) Idx1() file.Idx         { return self.RightParenthesis + 1 }
-func (self *NullLiteral) Idx1() file.Idx           { return file.Idx(int(self.Idx) + 4) } // "null"
-func (self *NumberLiteral) Idx1() file.Idx         { return file.Idx(int(self.Idx) + len(self.Literal)) }
-func (self *ObjectLiteral) Idx1() file.Idx         { return self.RightBrace + 1 }
-func (self *ObjectPattern) Idx1() file.Idx         { return self.RightBrace + 1 }
-func (self *RegExpLiteral) Idx1() file.Idx         { return file.Idx(int(self.Idx) + len(self.Literal)) }
-func (self *SequenceExpression) Idx1() file.Idx    { return self.Sequence[len(self.Sequence)-1].Idx1() }
-func (self *StringLiteral) Idx1() file.Idx         { return file.Idx(int(self.Idx) + len(self.Literal)) }
-func (self *TemplateLiteral) Idx1() file.Idx       { return self.CloseQuote + 1 }
-func (self *ThisExpression) Idx1() file.Idx        { return self.Idx + 4 }
+func (self *NewExpression) Idx1() file.Idx {
+	if self.ArgumentList != nil {
+		return self.RightParenthesis + 1
+	} else {
+		return self.Callee.Idx1()
+	}
+}
+func (self *NullLiteral) Idx1() file.Idx        { return file.Idx(int(self.Idx) + 4) } // "null"
+func (self *NumberLiteral) Idx1() file.Idx      { return file.Idx(int(self.Idx) + len(self.Literal)) }
+func (self *ObjectLiteral) Idx1() file.Idx      { return self.RightBrace + 1 }
+func (self *ObjectPattern) Idx1() file.Idx      { return self.RightBrace + 1 }
+func (self *RegExpLiteral) Idx1() file.Idx      { return file.Idx(int(self.Idx) + len(self.Literal)) }
+func (self *SequenceExpression) Idx1() file.Idx { return self.Sequence[len(self.Sequence)-1].Idx1() }
+func (self *StringLiteral) Idx1() file.Idx      { return file.Idx(int(self.Idx) + len(self.Literal)) }
+func (self *TemplateLiteral) Idx1() file.Idx    { return self.CloseQuote + 1 }
+func (self *ThisExpression) Idx1() file.Idx     { return self.Idx + 4 }
 func (self *UnaryExpression) Idx1() file.Idx {
 	if self.Postfix {
 		return self.Operand.Idx1() + 2 // ++ --

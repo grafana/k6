@@ -138,41 +138,47 @@ func (r *Runtime) math_log2(call FunctionCall) Value {
 }
 
 func (r *Runtime) math_max(call FunctionCall) Value {
-	if len(call.Arguments) == 0 {
-		return _negativeInf
+	result := math.Inf(-1)
+	args := call.Arguments
+	for i, arg := range args {
+		n := nilSafe(arg).ToFloat()
+		if math.IsNaN(n) {
+			args = args[i+1:]
+			goto NaNLoop
+		}
+		result = math.Max(result, n)
 	}
 
-	result := call.Arguments[0].ToFloat()
-	if math.IsNaN(result) {
-		return _NaN
-	}
-	for _, arg := range call.Arguments[1:] {
-		f := arg.ToFloat()
-		if math.IsNaN(f) {
-			return _NaN
-		}
-		result = math.Max(result, f)
-	}
 	return floatToValue(result)
+
+NaNLoop:
+	// All arguments still need to be coerced to number according to the specs.
+	for _, arg := range args {
+		nilSafe(arg).ToFloat()
+	}
+	return _NaN
 }
 
 func (r *Runtime) math_min(call FunctionCall) Value {
-	if len(call.Arguments) == 0 {
-		return _positiveInf
+	result := math.Inf(1)
+	args := call.Arguments
+	for i, arg := range args {
+		n := nilSafe(arg).ToFloat()
+		if math.IsNaN(n) {
+			args = args[i+1:]
+			goto NaNLoop
+		}
+		result = math.Min(result, n)
 	}
 
-	result := call.Arguments[0].ToFloat()
-	if math.IsNaN(result) {
-		return _NaN
-	}
-	for _, arg := range call.Arguments[1:] {
-		f := arg.ToFloat()
-		if math.IsNaN(f) {
-			return _NaN
-		}
-		result = math.Min(result, f)
-	}
 	return floatToValue(result)
+
+NaNLoop:
+	// All arguments still need to be coerced to number according to the specs.
+	for _, arg := range args {
+		nilSafe(arg).ToFloat()
+	}
+	return _NaN
 }
 
 func (r *Runtime) math_pow(call FunctionCall) Value {
@@ -192,8 +198,15 @@ func (r *Runtime) math_pow(call FunctionCall) Value {
 			}
 		}
 	}
-
-	return floatToValue(math.Pow(x.ToFloat(), y.ToFloat()))
+	xf := x.ToFloat()
+	yf := y.ToFloat()
+	if math.Abs(xf) == 1 && math.IsInf(yf, 0) {
+		return _NaN
+	}
+	if xf == 1 && math.IsNaN(yf) {
+		return _NaN
+	}
+	return floatToValue(math.Pow(xf, yf))
 }
 
 func (r *Runtime) math_random(call FunctionCall) Value {
