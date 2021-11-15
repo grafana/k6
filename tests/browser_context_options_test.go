@@ -33,7 +33,7 @@ import (
 
 func TestBrowserContextOptions(t *testing.T) {
 	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
+	t.Cleanup(bt.Browser.Close)
 
 	t.Run("BrowserContextOptions", func(t *testing.T) {
 		t.Run("should have correct default values", func(t *testing.T) { testBrowserContextOptionsDefaultValues(t, bt) })
@@ -84,7 +84,7 @@ func testBrowserContextOptionsSetViewport(t *testing.T, bt *browsertest.BrowserT
 			Height: 600,
 		},
 	}))
-	t.Cleanup(func() { bctx.Close() })
+	t.Cleanup(bctx.Close)
 	p := bctx.NewPage()
 
 	viewportSize := p.ViewportSize()
