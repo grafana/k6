@@ -22,6 +22,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modulestest"
 )
 
 const makeArrayScript = `
@@ -43,22 +45,33 @@ var array = new data.SharedArray("shared",function() {
 });
 `
 
-func newConfiguredRuntime(moduleInstance interface{}) (*goja.Runtime, error) {
+func newConfiguredRuntime() (*goja.Runtime, error) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	ctx := common.WithRuntime(context.Background(), rt)
-	err := rt.Set("data", common.Bind(rt, moduleInstance, &ctx))
+
+	m, ok := New().NewModuleInstance(
+		&modulestest.VU{
+			RuntimeField: rt,
+			InitEnvField: &common.InitEnvironment{},
+			CtxField:     common.WithRuntime(context.Background(), rt),
+			StateField:   nil,
+		},
+	).(*Data)
+	if !ok {
+		return rt, fmt.Errorf("not a Data module instance")
+	}
+
+	err := rt.Set("data", m.Exports().Named)
 	if err != nil {
 		return rt, err //nolint:wrapcheck
 	}
 	_, err = rt.RunString("var SharedArray = data.SharedArray;")
-
 	return rt, err //nolint:wrapcheck
 }
 
 func TestSharedArrayConstructorExceptions(t *testing.T) {
 	t.Parallel()
-	rt, err := newConfiguredRuntime(New())
+	rt, err := newConfiguredRuntime()
 	require.NoError(t, err)
 	cases := map[string]struct {
 		code, err string
@@ -79,6 +92,10 @@ func TestSharedArrayConstructorExceptions(t *testing.T) {
 			}
 		`,
 			err: "",
+		},
+		"not a function": {
+			code: `var s = new SharedArray("wat3", "astring");`,
+			err:  "a function is expected",
 		},
 	}
 
@@ -101,13 +118,12 @@ func TestSharedArrayConstructorExceptions(t *testing.T) {
 func TestSharedArrayAnotherRuntimeExceptions(t *testing.T) {
 	t.Parallel()
 
-	moduleInstance := New()
-	rt, err := newConfiguredRuntime(moduleInstance)
+	rt, err := newConfiguredRuntime()
 	require.NoError(t, err)
 	_, err = rt.RunString(makeArrayScript)
 	require.NoError(t, err)
 
-	rt, err = newConfiguredRuntime(moduleInstance)
+	rt, err = newConfiguredRuntime()
 	require.NoError(t, err)
 	_, err = rt.RunString(makeArrayScript)
 	require.NoError(t, err)
@@ -153,15 +169,26 @@ func TestSharedArrayAnotherRuntimeExceptions(t *testing.T) {
 func TestSharedArrayAnotherRuntimeWorking(t *testing.T) {
 	t.Parallel()
 
-	moduleInstance := New()
-	rt, err := newConfiguredRuntime(moduleInstance)
-	require.NoError(t, err)
-	_, err = rt.RunString(makeArrayScript)
+	rt := goja.New()
+	vu := &modulestest.VU{
+		RuntimeField: rt,
+		InitEnvField: &common.InitEnvironment{},
+		CtxField:     common.WithRuntime(context.Background(), rt),
+		StateField:   nil,
+	}
+	m, ok := New().NewModuleInstance(vu).(*Data)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("data", m.Exports().Named))
+
+	_, err := rt.RunString(makeArrayScript)
 	require.NoError(t, err)
 
 	// create another Runtime with new ctx but keep the initEnv
-	rt, err = newConfiguredRuntime(moduleInstance)
-	require.NoError(t, err)
+	rt = goja.New()
+	vu.RuntimeField = rt
+	vu.CtxField = common.WithRuntime(context.Background(), rt)
+	require.NoError(t, rt.Set("data", m.Exports().Named))
+
 	_, err = rt.RunString(`var array = new data.SharedArray("shared", function() {throw "wat";});`)
 	require.NoError(t, err)
 
@@ -201,9 +228,8 @@ func TestSharedArrayRaceInInitialization(t *testing.T) {
 	const repeats = 100
 	for i := 0; i < repeats; i++ {
 		runtimes := make([]*goja.Runtime, instances)
-		moduleInstance := New()
 		for j := 0; j < instances; j++ {
-			rt, err := newConfiguredRuntime(moduleInstance)
+			rt, err := newConfiguredRuntime()
 			require.NoError(t, err)
 			runtimes[j] = rt
 		}
