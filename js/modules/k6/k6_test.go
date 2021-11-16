@@ -32,6 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/stats"
@@ -40,7 +41,17 @@ import (
 func TestFail(t *testing.T) {
 	t.Parallel()
 	rt := goja.New()
-	require.NoError(t, rt.Set("k6", common.Bind(rt, New(), nil)))
+	m, ok := New().NewModuleInstance(
+		&modulestest.VU{
+			RuntimeField: rt,
+			InitEnvField: &common.InitEnvironment{},
+			CtxField:     common.WithRuntime(context.Background(), rt),
+			StateField:   nil,
+		},
+	).(*K6)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("k6", m.Exports().Named))
+
 	_, err := rt.RunString(`k6.fail("blah")`)
 	assert.Contains(t, err.Error(), "blah")
 }
@@ -58,8 +69,17 @@ func TestSleep(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			rt := goja.New()
-			ctx := context.Background()
-			require.NoError(t, rt.Set("k6", common.Bind(rt, New(), &ctx)))
+			m, ok := New().NewModuleInstance(
+				&modulestest.VU{
+					RuntimeField: rt,
+					InitEnvField: &common.InitEnvironment{},
+					CtxField:     common.WithRuntime(context.Background(), rt),
+					StateField:   nil,
+				},
+			).(*K6)
+			require.True(t, ok)
+			require.NoError(t, rt.Set("k6", m.Exports().Named))
+
 			startTime := time.Now()
 			_, err := rt.RunString(`k6.sleep(1)`)
 			endTime := time.Now()
@@ -72,7 +92,17 @@ func TestSleep(t *testing.T) {
 		t.Parallel()
 		rt := goja.New()
 		ctx, cancel := context.WithCancel(context.Background())
-		require.NoError(t, rt.Set("k6", common.Bind(rt, New(), &ctx)))
+		m, ok := New().NewModuleInstance(
+			&modulestest.VU{
+				RuntimeField: rt,
+				InitEnvField: &common.InitEnvironment{},
+				CtxField:     common.WithRuntime(ctx, rt),
+				StateField:   nil,
+			},
+		).(*K6)
+		require.True(t, ok)
+		require.NoError(t, rt.Set("k6", m.Exports().Named))
+
 		dch := make(chan time.Duration)
 		go func() {
 			startTime := time.Now()
@@ -96,10 +126,16 @@ func TestRandSeed(t *testing.T) {
 	t.Parallel()
 	rt := goja.New()
 
-	ctx := context.Background()
-	ctx = common.WithRuntime(ctx, rt)
-
-	require.NoError(t, rt.Set("k6", common.Bind(rt, New(), &ctx)))
+	m, ok := New().NewModuleInstance(
+		&modulestest.VU{
+			RuntimeField: rt,
+			InitEnvField: &common.InitEnvironment{},
+			CtxField:     common.WithRuntime(context.Background(), rt),
+			StateField:   nil,
+		},
+	).(*K6)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("k6", m.Exports().Named))
 
 	rand := 0.8487305991992138
 	_, err := rt.RunString(fmt.Sprintf(`
@@ -131,11 +167,18 @@ func TestGroup(t *testing.T) {
 				SystemTags: stats.NewSystemTagSet(stats.TagGroup),
 			},
 		}
-		ctx := context.Background()
-		ctx = lib.WithState(ctx, state)
-		ctx = common.WithRuntime(ctx, rt)
+		ctx := lib.WithState(context.Background(), state)
 		state.BuiltinMetrics = metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
-		require.NoError(t, rt.Set("k6", common.Bind(rt, New(), &ctx)))
+		m, ok := New().NewModuleInstance(
+			&modulestest.VU{
+				RuntimeField: rt,
+				InitEnvField: &common.InitEnvironment{},
+				CtxField:     common.WithRuntime(ctx, rt),
+				StateField:   state,
+			},
+		).(*K6)
+		require.True(t, ok)
+		require.NoError(t, rt.Set("k6", m.Exports().Named))
 		return rt, state, root
 	}
 
@@ -191,7 +234,16 @@ func checkTestRuntime(t testing.TB, ctxs ...*context.Context) (
 	ctx = common.WithRuntime(ctx, rt)
 	ctx = lib.WithState(ctx, state)
 	state.BuiltinMetrics = metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
-	require.NoError(t, rt.Set("k6", common.Bind(rt, New(), &ctx)))
+	m, ok := New().NewModuleInstance(
+		&modulestest.VU{
+			RuntimeField: rt,
+			InitEnvField: &common.InitEnvironment{},
+			CtxField:     ctx,
+			StateField:   state,
+		},
+	).(*K6)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("k6", m.Exports().Named))
 	if len(ctxs) == 1 { // hacks
 		*ctxs[0] = ctx
 	}
