@@ -52,6 +52,7 @@ var (
 		"TypedArray.prototype.item",   // not even standard yet
 		"String.prototype.replaceAll", // not supported at all, Stage 4 since 2020
 
+		// from goja
 		"Symbol.asyncIterator",
 		"async-functions",
 		"class-static-block",
@@ -83,6 +84,12 @@ var (
 		"ShadowRealm",
 		"SharedArrayBuffer",
 		"error-cause",
+		"resizable-arraybuffer", // stage 3 as of 2021 https://github.com/tc39/proposal-resizablearraybuffer
+
+		"array-find-from-last",    // stage 3 as of 2021 https://github.com/tc39/proposal-array-find-from-last
+		"Array.prototype.at",      // stage 3 as of 2021 https://github.com/tc39/proposal-relative-indexing-method
+		"String.prototype.at",     // stage 3 as of 2021 https://github.com/tc39/proposal-relative-indexing-method
+		"TypedArray.prototype.at", // stage 3 as of 2021 https://github.com/tc39/proposal-relative-indexing-method
 	}
 	skipWords = []string{"async", "yield", "generator", "Generator"}
 	skipList  = map[string]bool{
