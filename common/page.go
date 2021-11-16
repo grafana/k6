@@ -604,7 +604,7 @@ func (p *Page) SetDefaultTimeout(timeout int64) {
 // SetExtraHTTPHeaders sets default HTTP headers for page and whole frame hierarchy
 func (p *Page) SetExtraHTTPHeaders(headers map[string]string) {
 	p.extraHTTPHeaders = headers
-	p.updateHttpCredentials()
+	p.updateExtraHTTPHeaders()
 }
 
 func (p *Page) SetInputFiles(selector string, files goja.Value, opts goja.Value) {

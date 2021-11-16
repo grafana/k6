@@ -22,21 +22,24 @@ package tests
 
 import (
 	_ "embed"
+	"encoding/json"
 	"testing"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBrowserContextOptions(t *testing.T) {
 	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
+	t.Cleanup(bt.Browser.Close)
 
 	t.Run("BrowserContextOptions", func(t *testing.T) {
 		t.Run("should have correct default values", func(t *testing.T) { testBrowserContextOptionsDefaultValues(t, bt) })
 		t.Run("should correctly set default viewport", func(t *testing.T) { testBrowserContextOptionsDefaultViewport(t, bt) })
 		t.Run("should correctly set custom viewport", func(t *testing.T) { testBrowserContextOptionsSetViewport(t, bt) })
+		t.Run("should correctly set extra headers", func(t *testing.T) { testBrowserContextOptionsExtraHTTPHeaders(t, bt) })
 	})
 }
 
@@ -81,10 +84,32 @@ func testBrowserContextOptionsSetViewport(t *testing.T, bt *browsertest.BrowserT
 			Height: 600,
 		},
 	}))
-	t.Cleanup(func() { bctx.Close() })
+	t.Cleanup(bctx.Close)
 	p := bctx.NewPage()
 
 	viewportSize := p.ViewportSize()
 	assert.Equal(t, float64(800), viewportSize["width"])
 	assert.Equal(t, float64(600), viewportSize["height"])
+}
+
+func testBrowserContextOptionsExtraHTTPHeaders(t *testing.T, bt *browsertest.BrowserTest) {
+	bctx := bt.Browser.NewContext(bt.Runtime.ToValue(struct {
+		ExtraHTTPHeaders map[string]string `js:"extraHTTPHeaders"`
+	}{
+		ExtraHTTPHeaders: map[string]string{
+			"Some-Header": "Some-Value",
+		},
+	}))
+	t.Cleanup(bctx.Close)
+
+	p := bctx.NewPage()
+	resp := p.Goto(bt.HTTPMultiBin.ServerHTTP.URL+"/get", nil)
+
+	require.NotNil(t, resp)
+	var body struct{ Headers map[string][]string }
+	err := json.Unmarshal(resp.Body().Bytes(), &body)
+	require.NoError(t, err)
+	h := body.Headers["Some-Header"]
+	require.NotEmpty(t, h)
+	assert.Equal(t, "Some-Value", h[0])
 }
