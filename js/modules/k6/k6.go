@@ -22,7 +22,6 @@
 package k6
 
 import (
-	"context"
 	"errors"
 	"math/rand"
 	"sync/atomic"
@@ -31,22 +30,56 @@ import (
 	"github.com/dop251/goja"
 
 	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/lib"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/stats"
 )
 
-// K6 is just the module struct.
-type K6 struct{}
+var (
+	// ErrGroupInInitContext is returned when group() are using in the init context.
+	ErrGroupInInitContext = common.NewInitContextError("Using group() in the init context is not supported")
 
-// ErrGroupInInitContext is returned when group() are using in the init context.
-var ErrGroupInInitContext = common.NewInitContextError("Using group() in the init context is not supported")
+	// ErrCheckInInitContext is returned when check() are using in the init context.
+	ErrCheckInInitContext = common.NewInitContextError("Using check() in the init context is not supported")
+)
 
-// ErrCheckInInitContext is returned when check() are using in the init context.
-var ErrCheckInInitContext = common.NewInitContextError("Using check() in the init context is not supported")
+type (
+	// RootModule is the global module instance that will create module
+	// instances for each VU.
+	RootModule struct{}
 
-// New returns a new module Struct.
-func New() *K6 {
-	return &K6{}
+	// K6 represents an instance of the k6 module.
+	K6 struct {
+		vu modules.VU
+	}
+)
+
+var (
+	_ modules.Module   = &RootModule{}
+	_ modules.Instance = &K6{}
+)
+
+// New returns a pointer to a new RootModule instance.
+func New() *RootModule {
+	return &RootModule{}
+}
+
+// NewModuleInstance implements the modules.Module interface to return
+// a new instance for each VU.
+func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+	return &K6{vu: vu}
+}
+
+// Exports returns the exports of the k6 module.
+func (mi *K6) Exports() modules.Exports {
+	return modules.Exports{
+		Named: map[string]interface{}{
+			"check":      mi.Check,
+			"fail":       mi.Fail,
+			"group":      mi.Group,
+			"randomSeed": mi.RandomSeed,
+			"sleep":      mi.Sleep,
+		},
+	}
 }
 
 // Fail is a fancy way of saying `throw "something"`.
@@ -55,7 +88,8 @@ func (*K6) Fail(msg string) (goja.Value, error) {
 }
 
 // Sleep waits the provided seconds before continuing the execution.
-func (*K6) Sleep(ctx context.Context, secs float64) {
+func (mi *K6) Sleep(secs float64) {
+	ctx := mi.vu.Context()
 	timer := time.NewTimer(time.Duration(secs * float64(time.Second)))
 	select {
 	case <-timer.C:
@@ -65,16 +99,14 @@ func (*K6) Sleep(ctx context.Context, secs float64) {
 }
 
 // RandomSeed sets the seed to the random generator used for this VU.
-func (*K6) RandomSeed(ctx context.Context, seed int64) {
+func (mi *K6) RandomSeed(seed int64) {
 	randSource := rand.New(rand.NewSource(seed)).Float64 //nolint:gosec
-
-	rt := common.GetRuntime(ctx)
-	rt.SetRandSource(randSource)
+	mi.vu.Runtime().SetRandSource(randSource)
 }
 
 // Group wraps a function call and executes it within the provided group name.
-func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value, error) {
-	state := lib.GetState(ctx)
+func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
+	state := mi.vu.State()
 	if state == nil {
 		return nil, ErrGroupInInitContext
 	}
@@ -108,6 +140,7 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 
 	tags := state.CloneTags()
 
+	ctx := mi.vu.Context()
 	stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
 		Time:   t,
 		Metric: state.BuiltinMetrics.GroupDuration,
@@ -120,12 +153,13 @@ func (*K6) Group(ctx context.Context, name string, fn goja.Callable) (goja.Value
 
 // Check will emit check metrics for the provided checks.
 //nolint:cyclop
-func (*K6) Check(ctx context.Context, arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
-	state := lib.GetState(ctx)
+func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
+	state := mi.vu.State()
 	if state == nil {
 		return false, ErrCheckInInitContext
 	}
-	rt := common.GetRuntime(ctx)
+	ctx := mi.vu.Context()
+	rt := mi.vu.Runtime()
 	t := time.Now()
 
 	// Prepare the metric tags
