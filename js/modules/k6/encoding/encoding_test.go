@@ -26,8 +26,10 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modulestest"
 )
 
 func TestEncodingAlgorithms(t *testing.T) {
@@ -38,9 +40,16 @@ func TestEncodingAlgorithms(t *testing.T) {
 
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	ctx := context.Background()
-	ctx = common.WithRuntime(ctx, rt)
-	rt.Set("encoding", common.Bind(rt, New(), &ctx))
+	m, ok := New().NewModuleInstance(
+		&modulestest.VU{
+			CtxField:     common.WithRuntime(context.Background(), rt),
+			RuntimeField: rt,
+			InitEnvField: &common.InitEnvironment{},
+			StateField:   nil,
+		},
+	).(*Encoding)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("encoding", m.Exports().Named))
 
 	t.Run("Base64", func(t *testing.T) {
 		t.Run("DefaultEnc", func(t *testing.T) {

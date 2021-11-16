@@ -21,24 +21,55 @@
 package encoding
 
 import (
-	"context"
 	"encoding/base64"
 
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modules"
 )
 
-type Encoding struct{}
+type (
+	// RootModule is the global module instance that will create module
+	// instances for each VU.
+	RootModule struct{}
 
-func New() *Encoding {
-	return &Encoding{}
+	// Encoding represents an instance of the encoding module.
+	Encoding struct {
+		vu modules.VU
+	}
+)
+
+var (
+	_ modules.Module   = &RootModule{}
+	_ modules.Instance = &Encoding{}
+)
+
+// New returns a pointer to a new RootModule instance.
+func New() *RootModule {
+	return &RootModule{}
 }
 
-// B64encode returns the base64 encoding of input as a string.
+// NewModuleInstance implements the modules.Module interface to return
+// a new instance for each VU.
+func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+	return &Encoding{vu: vu}
+}
+
+// Exports returns the exports of the encoding module.
+func (e *Encoding) Exports() modules.Exports {
+	return modules.Exports{
+		Named: map[string]interface{}{
+			"b64encode": e.b64Encode,
+			"b64decode": e.b64Decode,
+		},
+	}
+}
+
+// b64encode returns the base64 encoding of input as a string.
 // The data type of input can be a string, []byte or ArrayBuffer.
-func (e *Encoding) B64encode(ctx context.Context, input interface{}, encoding string) string {
+func (e *Encoding) b64Encode(input interface{}, encoding string) string {
 	data, err := common.ToBytes(input)
 	if err != nil {
-		common.Throw(common.GetRuntime(ctx), err)
+		common.Throw(e.vu.Runtime(), err)
 	}
 	switch encoding {
 	case "rawstd":
@@ -54,12 +85,14 @@ func (e *Encoding) B64encode(ctx context.Context, input interface{}, encoding st
 	}
 }
 
-// B64decode returns the decoded data of the base64 encoded input string using
+// b64decode returns the decoded data of the base64 encoded input string using
 // the given encoding. If format is "s" it returns the data as a string,
 // otherwise as an ArrayBuffer.
-func (e *Encoding) B64decode(ctx context.Context, input, encoding, format string) interface{} {
-	var output []byte
-	var err error
+func (e *Encoding) b64Decode(input, encoding, format string) interface{} {
+	var (
+		output []byte
+		err    error
+	)
 
 	switch encoding {
 	case "rawstd":
@@ -74,16 +107,15 @@ func (e *Encoding) B64decode(ctx context.Context, input, encoding, format string
 		output, err = base64.StdEncoding.DecodeString(input)
 	}
 
-	rt := common.GetRuntime(ctx) //nolint: ifshort
 	if err != nil {
-		common.Throw(rt, err)
+		common.Throw(e.vu.Runtime(), err)
 	}
 
 	var out interface{}
 	if format == "s" {
 		out = string(output)
 	} else {
-		ab := rt.NewArrayBuffer(output)
+		ab := e.vu.Runtime().NewArrayBuffer(output)
 		out = &ab
 	}
 
