@@ -26,6 +26,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -66,6 +67,7 @@ type Response struct {
 	url               string
 	status            int64
 	statusText        string
+	bodyMu            sync.RWMutex
 	body              []byte
 	headers           map[string][]string
 	fromDiskCache     bool
@@ -133,7 +135,13 @@ func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, 
 }
 
 func (r *Response) fetchBody() error {
-	if r.body != nil || r.request.frame == nil {
+	cached := func() bool {
+		r.bodyMu.RLock()
+		defer r.bodyMu.RUnlock()
+
+		return r.body != nil || r.request.frame == nil
+	}
+	if cached() {
 		return nil
 	}
 	action := network.GetResponseBody(r.request.requestID)
@@ -141,7 +149,9 @@ func (r *Response) fetchBody() error {
 	if err != nil {
 		return err
 	}
+	r.bodyMu.Lock()
 	r.body = body
+	r.bodyMu.Unlock()
 	return nil
 }
 
@@ -175,6 +185,8 @@ func (r *Response) Body() goja.ArrayBuffer {
 	if err := r.fetchBody(); err != nil {
 		k6common.Throw(rt, err)
 	}
+	r.bodyMu.RLock()
+	defer r.bodyMu.RUnlock()
 	return rt.NewArrayBuffer(r.body)
 }
 
@@ -196,6 +208,8 @@ func (r *Response) bodySize() int64 {
 		r.logger.Warnf("cdp", "error fetching response body for '%s': %s", r.url, err)
 	}
 
+	r.bodyMu.RLock()
+	defer r.bodyMu.RUnlock()
 	return int64(len(r.body))
 }
 
@@ -270,6 +284,8 @@ func (r *Response) JSON() goja.Value {
 		}
 
 		var v interface{}
+		r.bodyMu.RLock()
+		defer r.bodyMu.RUnlock()
 		if err := json.Unmarshal(r.body, &v); err != nil {
 			k6common.Throw(rt, err)
 		}
@@ -325,6 +341,8 @@ func (r *Response) Text() string {
 	if err := r.fetchBody(); err != nil {
 		k6common.Throw(rt, err)
 	}
+	r.bodyMu.RLock()
+	defer r.bodyMu.RUnlock()
 	return string(r.body)
 }
 
