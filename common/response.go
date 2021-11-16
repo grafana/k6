@@ -191,6 +191,11 @@ func (r *Response) Body() goja.ArrayBuffer {
 
 // bodySize returns the size in bytes of the response body.
 func (r *Response) bodySize() int64 {
+	// Skip redirect responses
+	if r.status >= 300 && r.status <= 399 {
+		return 0
+	}
+
 	if err := r.fetchBody(); err != nil {
 		r.logger.Warnf("cdp", "error fetching response body for '%s': %s", r.url, err)
 	}
