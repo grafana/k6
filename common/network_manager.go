@@ -419,7 +419,8 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 		frame = m.frameManager.getFrameByID(event.FrameID)
 	}
 	if frame == nil {
-		m.logger.Debugf("NetworkManager", "frame is nil")
+		m.logger.Debugf("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s frame is nil",
+			event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
 	}
 
 	req, err := NewRequest(m.ctx, event, frame, redirectChain, interceptionID, m.userReqInterceptionEnabled)

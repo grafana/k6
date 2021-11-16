@@ -24,6 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -146,7 +147,7 @@ func (r *Response) fetchBody() error {
 	action := network.GetResponseBody(r.request.requestID)
 	body, err := action.Do(cdp.WithExecutor(r.ctx, r.request.frame.manager.session))
 	if err != nil {
-		return err
+		return fmt.Errorf("error fetching response body: %w", err)
 	}
 	r.bodyMu.Lock()
 	r.body = body
@@ -197,7 +198,8 @@ func (r *Response) bodySize() int64 {
 	}
 
 	if err := r.fetchBody(); err != nil {
-		r.logger.Warnf("cdp", "error fetching response body for '%s': %s", r.url, err)
+		r.logger.Warnf("Response:bodySize:fetchBody",
+			"url:%s method:%s err:%s", r.url, r.request.method, err)
 	}
 
 	r.bodyMu.RLock()
