@@ -282,15 +282,13 @@ func (f *Frame) startNetworkIdleTimer() {
 	if f.networkIdleCancelFn != nil {
 		f.networkIdleCancelFn()
 	}
+	networkIdleCtx, networkIdleCancelFn := context.WithCancel(f.ctx)
 	f.networkIdleMu.Lock()
-	f.networkIdleCtx, f.networkIdleCancelFn = context.WithCancel(f.ctx)
+	f.networkIdleCtx, f.networkIdleCancelFn = networkIdleCtx, networkIdleCancelFn
 	f.networkIdleMu.Unlock()
 	go func() {
-		f.networkIdleMu.Lock()
-		doneCh := f.networkIdleCtx.Done()
-		f.networkIdleMu.Unlock()
 		select {
-		case <-doneCh:
+		case <-networkIdleCtx.Done():
 		case <-time.After(LifeCycleNetworkIdleTimeout):
 			f.manager.frameLifecycleEvent(f.id, LifecycleEventNetworkIdle)
 		}
