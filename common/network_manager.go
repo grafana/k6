@@ -391,6 +391,9 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 		}
 	}
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
+	if req.url.Scheme != "data" {
+		m.emitResponseMetrics(req.response)
+	}
 	m.deleteRequestByID(event.RequestID)
 	m.frameManager.requestFinished(req)
 }
@@ -528,9 +531,6 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 	}
 	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
 	req.response = resp
-	if req.url.Scheme != "data" {
-		m.emitResponseMetrics(resp)
-	}
 	m.frameManager.requestReceivedResponse(resp)
 }
 
