@@ -51,6 +51,38 @@ var (
 		"Array.prototype.item",        // not even standard yet
 		"TypedArray.prototype.item",   // not even standard yet
 		"String.prototype.replaceAll", // not supported at all, Stage 4 since 2020
+
+		"Symbol.asyncIterator",
+		"async-functions",
+		"class-static-block",
+		"class-fields-private",
+		"class-fields-private-in",
+		"regexp-named-groups",
+		"regexp-dotall",
+		"regexp-unicode-property-escapes",
+		"regexp-unicode-property-escapes",
+		"regexp-match-indices",
+		"legacy-regexp",
+		"tail-call-optimization",
+		"Temporal",
+		"import-assertions",
+		"dynamic-import",
+		"logical-assignment-operators",
+		"coalesce-expression",
+		"import.meta",
+		"optional-chaining",
+		"Atomics",
+		"Atomics.waitAsync",
+		"FinalizationRegistry",
+		"WeakRef",
+		"numeric-separator-literal",
+		"Object.fromEntries",
+		"Object.hasOwn",
+		"__getter__",
+		"__setter__",
+		"ShadowRealm",
+		"SharedArrayBuffer",
+		"error-cause",
 	}
 	skipWords = []string{"async", "yield", "generator", "Generator"}
 	skipList  = map[string]bool{
