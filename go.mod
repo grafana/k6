@@ -10,10 +10,9 @@ require (
 	github.com/mailru/easyjson v0.7.7
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
-	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
-	go.k6.io/k6 v0.34.2-0.20211105090803-dae70006ca77
+	go.k6.io/k6 v0.35.0
 	golang.org/x/net v0.0.0-20211104170005-ce137452f963
 	gopkg.in/guregu/null.v3 v3.5.0
 )
