@@ -2074,15 +2074,15 @@ func TestMinIterationDurationIsCancellable(t *testing.T) {
 	}
 }
 
-func TestCheckingForceHTTP1EnvironmentVariable(t *testing.T){
-	os.Setenv("GODEBUG","http2client=0,gctrace=1")
+func TestCheckingForceHTTP1EnvironmentVariable(t *testing.T) {
+	os.Setenv("GODEBUG", "http2client=0,gctrace=1")
 	defer os.Unsetenv("GODEBUG")
 
 	assert.True(t, forceHTTP1())
 }
 
-func TestCheckingForceHTTP1EnvironmentVariableWhenNotSet(t *testing.T){
-	os.Setenv("GODEBUG","test=0")
+func TestCheckingForceHTTP1EnvironmentVariableWhenNotSet(t *testing.T) {
+	os.Setenv("GODEBUG", "test=0")
 	defer os.Unsetenv("GODEBUG")
 
 	assert.False(t, forceHTTP1())
