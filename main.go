@@ -40,21 +40,20 @@ type (
 
 	// JSModule is the entrypoint into the browser JS module
 	JSModule struct {
-		k6modules.InstanceCore
+		vu      k6modules.VU
 		Devices map[string]common.Device
 		Version string
 	}
 
 	// ModuleInstance represents an instance of the JS module.
 	ModuleInstance struct {
-		k6modules.InstanceCore
 		mod *JSModule
 	}
 )
 
 var (
-	_ k6modules.IsModuleV2 = &RootModule{}
-	_ k6modules.Instance   = &ModuleInstance{}
+	_ k6modules.Module   = &RootModule{}
+	_ k6modules.Instance = &ModuleInstance{}
 )
 
 // New returns a pointer to a new RootModule instance.
@@ -62,22 +61,21 @@ func New() *RootModule {
 	return &RootModule{}
 }
 
-// NewModuleInstance implements the modules.IsModuleV2 interface to return
+// NewModuleInstance implements the k6modules.Module interface to return
 // a new instance for each VU.
-func (*RootModule) NewModuleInstance(m k6modules.InstanceCore) k6modules.Instance {
+func (*RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 	return &ModuleInstance{
-		InstanceCore: m,
 		mod: &JSModule{
-			InstanceCore: m,
-			Devices:      common.GetDevices(),
-			Version:      version,
+			vu:      vu,
+			Devices: common.GetDevices(),
+			Version: version,
 		},
 	}
 }
 
-// GetExports returns the exports of the JS module so that it can be used in
-// test scripts.
-func (mi *ModuleInstance) GetExports() k6modules.Exports {
+// Exports returns the exports of the JS module so that it can be used in test
+// scripts.
+func (mi *ModuleInstance) Exports() k6modules.Exports {
 	return k6modules.Exports{Default: mi.mod}
 }
 
@@ -93,11 +91,11 @@ func (m *JSModule) Launch(browserName string, opts goja.Value) api.Browser {
 	}()*/
 
 	if browserName == "chromium" {
-		bt := chromium.NewBrowserType(m.GetContext())
+		bt := chromium.NewBrowserType(m.vu.Context())
 		return bt.Launch(opts)
 	}
 
-	k6common.Throw(m.GetRuntime(),
+	k6common.Throw(m.vu.Runtime(),
 		errors.New("Currently 'chromium' is the only supported browser"))
 	return nil
 }
