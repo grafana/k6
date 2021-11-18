@@ -77,6 +77,13 @@ type message struct {
 	data  []byte
 }
 
+type wsErr struct {
+	Error   string
+	Headers map[string][]string
+	Code    int
+	Body    []byte
+}
+
 const writeWait = 10 * time.Second
 
 func New() *WS {
@@ -91,8 +98,12 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	}
 
 	// The params argument is optional
-	var callableV, paramsV goja.Value
+	var callableV, paramsV, secondCallableV goja.Value
 	switch len(args) {
+	case 3:
+		paramsV = args[0]
+		callableV = args[1]
+		secondCallableV = args[2]
 	case 2:
 		paramsV = args[0]
 		callableV = args[1]
@@ -107,6 +118,14 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 	setupFn, isFunc := goja.AssertFunction(callableV)
 	if !isFunc {
 		return nil, errors.New("last argument to ws.connect must be a function")
+	}
+
+	var errHandlerFn goja.Callable = nil
+	if secondCallableV != nil {
+		errHandlerFn, isFunc = goja.AssertFunction(secondCallableV)
+		if !isFunc {
+			return nil, errors.New("last argument to ws.connect must be a function")
+		}
 	}
 
 	header := make(http.Header)
@@ -246,6 +265,13 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		// Pass the error to the user script before exiting immediately
 		socket.handleEvent("error", rt.ToValue(connErr))
 
+		if errHandlerFn != nil {
+			errVal := newWsErr(httpResponse, connErr)
+
+			if _, err := errHandlerFn(goja.Undefined(), rt.ToValue(errVal)); err != nil {
+				return nil, err
+			}
+		}
 		return nil, connErr
 	}
 
@@ -355,6 +381,19 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 			// This is the final exit point normally triggered by closeConnection
 			return wsResponse, nil
 		}
+	}
+}
+
+func newWsErr(httpResponse *http.Response, connErr error) wsErr {
+	body, _ := ioutil.ReadAll(ioutil.NopCloser(httpResponse.Body))
+	// ignore the returned error. It's supposed to always be nil,
+	// Even it's not-nil, we still prefer returning a semi-valid result over aborting
+
+	return wsErr{
+		Error:   connErr.Error(),
+		Headers: httpResponse.Header,
+		Code:    httpResponse.StatusCode,
+		Body:    body,
 	}
 }
 
