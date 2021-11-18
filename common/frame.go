@@ -126,9 +126,7 @@ type Frame struct {
 
 	loadingStartedTime time.Time
 
-	networkIdleMu       sync.Mutex
-	networkIdleCtx      context.Context
-	networkIdleCancelFn context.CancelFunc
+	networkIdleCh chan struct{}
 
 	inflightRequestsMu sync.RWMutex
 	inflightRequests   map[network.RequestID]bool
@@ -153,6 +151,7 @@ func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID 
 		utilityExecutionContextCh: make(chan bool, 1),
 		inflightRequests:          make(map[network.RequestID]bool),
 		currentDocument:           &DocumentInfo{},
+		networkIdleCh:             make(chan struct{}),
 	}
 }
 
@@ -266,12 +265,9 @@ func (f *Frame) recalculateLifecycle() {
 }
 
 func (f *Frame) stopNetworkIdleTimer() {
-	f.networkIdleMu.Lock()
-	defer f.networkIdleMu.Unlock()
-	if f.networkIdleCancelFn != nil {
-		f.networkIdleCancelFn()
-		f.networkIdleCtx = nil
-		f.networkIdleCancelFn = nil
+	select {
+	case f.networkIdleCh <- struct{}{}:
+	default:
 	}
 }
 
@@ -279,16 +275,11 @@ func (f *Frame) startNetworkIdleTimer() {
 	if f.hasLifecycleEventFired(LifecycleEventNetworkIdle) || f.detached {
 		return
 	}
-	if f.networkIdleCancelFn != nil {
-		f.networkIdleCancelFn()
-	}
-	networkIdleCtx, networkIdleCancelFn := context.WithCancel(f.ctx)
-	f.networkIdleMu.Lock()
-	f.networkIdleCtx, f.networkIdleCancelFn = networkIdleCtx, networkIdleCancelFn
-	f.networkIdleMu.Unlock()
+	f.stopNetworkIdleTimer()
 	go func() {
 		select {
-		case <-networkIdleCtx.Done():
+		case <-f.ctx.Done():
+		case <-f.networkIdleCh:
 		case <-time.After(LifeCycleNetworkIdleTimeout):
 			f.manager.frameLifecycleEvent(f.id, LifecycleEventNetworkIdle)
 		}
