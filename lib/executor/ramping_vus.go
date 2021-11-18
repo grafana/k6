@@ -551,10 +551,9 @@ func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- stats.SampleContainer, 
 	go trackProgress(ctx, maxDurationCtx, regularDurationCtx, vlv, progressFn)
 
 	defer runState.wg.Wait()
-	runState.populateVUHandles(maxDurationCtx, cancel)
-	for i := uint64(0); i < runState.maxVUs; i++ {
-		go runState.vuHandles[i].runLoopsIfPossible(runState.runIteration)
-	}
+	// this will populate stopped VUs and run runLoopsIfPossible on each VU
+	// handle in a new goroutine
+	runState.runLoopsIfPossible(maxDurationCtx, cancel)
 
 	var (
 		handleNewMaxAllowedVUs = runState.maxAllowedVUsHandlerStrategy()
@@ -603,7 +602,7 @@ func (rs *rampingVUsRunState) makeProgressFn(regular time.Duration) (progressFn 
 	}
 }
 
-func (rs *rampingVUsRunState) populateVUHandles(ctx context.Context, cancel func()) {
+func (rs *rampingVUsRunState) runLoopsIfPossible(ctx context.Context, cancel func()) {
 	getVU := func() (lib.InitializedVU, error) {
 		pvu, err := rs.executor.executionState.GetPlannedVU(rs.executor.logger, false)
 		if err != nil {
@@ -626,6 +625,7 @@ func (rs *rampingVUsRunState) populateVUHandles(ctx context.Context, cancel func
 		rs.vuHandles[i] = newStoppedVUHandle(
 			ctx, getVU, returnVU, rs.executor.nextIterationCounters,
 			&rs.executor.config.BaseConfig, rs.executor.logger.WithField("vuNum", i))
+		go rs.vuHandles[i].runLoopsIfPossible(rs.runIteration)
 	}
 }
 
