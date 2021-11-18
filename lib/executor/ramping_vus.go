@@ -680,7 +680,7 @@ func (rs rampingVUsRunState) handleRemainingVUs(
 }
 
 func (rs rampingVUsRunState) maxAllowedVUsHandlerStrategy() func(lib.ExecutionStep) {
-	var cur uint64
+	var cur uint64 // current number of planned graceful VUs
 	return func(graceful lib.ExecutionStep) {
 		pv := graceful.PlannedVUs
 		for ; pv < cur; cur-- {
@@ -691,7 +691,7 @@ func (rs rampingVUsRunState) maxAllowedVUsHandlerStrategy() func(lib.ExecutionSt
 }
 
 func (rs rampingVUsRunState) scheduledVUsHandlerStrategy() func(lib.ExecutionStep) {
-	var cur uint64
+	var cur uint64 // current number of planned raw VUs
 	return func(raw lib.ExecutionStep) {
 		pv := raw.PlannedVUs
 		for ; cur < pv; cur++ {
