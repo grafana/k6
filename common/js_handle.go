@@ -37,6 +37,7 @@ var _ api.JSHandle = &BaseJSHandle{}
 // BaseJSHandle represents a JS object in an execution context
 type BaseJSHandle struct {
 	ctx          context.Context
+	logger       *Logger
 	session      *Session
 	execCtx      *ExecutionContext
 	remoteObject *runtime.RemoteObject
@@ -44,7 +45,10 @@ type BaseJSHandle struct {
 }
 
 // NewJSHandle creates a new JS handle referencing a remote object
-func NewJSHandle(ctx context.Context, session *Session, execCtx *ExecutionContext, frame *Frame, remoteObject *runtime.RemoteObject) api.JSHandle {
+func NewJSHandle(
+	ctx context.Context, session *Session, execCtx *ExecutionContext,
+	frame *Frame, remoteObject *runtime.RemoteObject, logger *Logger,
+) api.JSHandle {
 	if remoteObject.Subtype == "node" && execCtx.Frame() != nil {
 		return &ElementHandle{
 			BaseJSHandle: BaseJSHandle{
@@ -53,6 +57,7 @@ func NewJSHandle(ctx context.Context, session *Session, execCtx *ExecutionContex
 				execCtx:      execCtx,
 				remoteObject: remoteObject,
 				disposed:     false,
+				logger:       logger,
 			},
 			frame: frame,
 		}
@@ -63,6 +68,7 @@ func NewJSHandle(ctx context.Context, session *Session, execCtx *ExecutionContex
 		execCtx:      execCtx,
 		remoteObject: remoteObject,
 		disposed:     false,
+		logger:       logger,
 	}
 }
 
@@ -127,7 +133,8 @@ func (h *BaseJSHandle) GetProperties() map[string]api.JSHandle {
 	props := make(map[string]api.JSHandle, len(result))
 	for i := 0; i < len(result); i++ {
 		if result[i].Enumerable {
-			props[result[i].Name] = NewJSHandle(h.ctx, h.session, h.execCtx, h.execCtx.Frame(), result[i].Value)
+			props[result[i].Name] = NewJSHandle(
+				h.ctx, h.session, h.execCtx, h.execCtx.Frame(), result[i].Value, h.logger)
 		}
 	}
 	return props
@@ -151,13 +158,13 @@ func (h *BaseJSHandle) JSONValue() goja.Value {
 		if result, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
 			k6common.Throw(rt, fmt.Errorf("unable to get properties for JS handle %T: %w", action, err))
 		}
-		res, err := valueFromRemoteObject(h.ctx, result)
+		res, err := valueFromRemoteObject(h.ctx, result, h.logger.log.WithContext(h.ctx))
 		if err != nil {
 			k6common.Throw(rt, fmt.Errorf("unable to extract value from remote object: %w", err))
 		}
 		return res
 	}
-	res, err := valueFromRemoteObject(h.ctx, h.remoteObject)
+	res, err := valueFromRemoteObject(h.ctx, h.remoteObject, h.logger.log.WithContext(h.ctx))
 	if err != nil {
 		k6common.Throw(rt, fmt.Errorf("unable to extract value from remote object: %w", err))
 	}

@@ -41,6 +41,7 @@ import (
 	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/cdproto/target"
 	"github.com/grafana/xk6-browser/api"
+	"github.com/sirupsen/logrus"
 	k6lib "go.k6.io/k6/lib"
 	k6stats "go.k6.io/k6/stats"
 )
@@ -77,10 +78,21 @@ type FrameSession struct {
 	childSessions map[cdp.FrameID]*FrameSession
 
 	logger *Logger
+	// logger that will properly serialize RemoteObject instances
+	loggerObj *logrus.Logger
 }
 
-func NewFrameSession(ctx context.Context, session *Session, page *Page, parent *FrameSession, targetID target.ID, logger *Logger) (*FrameSession, error) {
+func NewFrameSession(
+	ctx context.Context, session *Session, page *Page, parent *FrameSession,
+	targetID target.ID, logger *Logger,
+) (*FrameSession, error) {
 	logger.Debugf("NewFrameSession", "sid:%v tid:%v", session.id, targetID)
+	state := k6lib.GetState(ctx)
+	loggerObj := &logrus.Logger{
+		Out:       state.Logger.Out,
+		Level:     state.Logger.Level,
+		Formatter: &mapAsObjectFormatter{state.Logger.Formatter},
+	}
 	fs := FrameSession{
 		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
 		session:              session,
@@ -96,6 +108,7 @@ func NewFrameSession(ctx context.Context, session *Session, page *Page, parent *
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
 		logger:               logger,
+		loggerObj:            loggerObj,
 	}
 	var err error
 	if fs.parent != nil {
@@ -454,34 +467,39 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 }
 
 func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
-	// TODO: switch to using browser logger instead of directly outputting to k6 logging system
 	state := k6lib.GetState(fs.ctx)
-	l := state.Logger.
+	// TODO: switch to using browser logger instead of directly outputting to k6 logging system
+	l := fs.loggerObj.
 		WithTime(event.Timestamp.Time()).
 		WithField("source", "browser-console-api")
+
 	if state.Group.Path != "" {
 		l = l.WithField("group", state.Group.Path)
 	}
-	var convertedArgs []interface{}
-	for _, arg := range event.Args {
-		i, err := interfaceFromRemoteObject(arg)
+
+	var parsedObjects []interface{}
+	for _, robj := range event.Args {
+		i, err := parseRemoteObject(robj, l)
 		if err != nil {
-			// TODO(fix): this should not throw!
+			// If this throws it's a bug :)
 			k6Throw(fs.ctx, "unable to parse remote object value: %w", err)
 		}
-		convertedArgs = append(convertedArgs, i)
+		parsedObjects = append(parsedObjects, i)
 	}
+
+	l = l.WithField("objects", parsedObjects)
+
 	switch event.Type {
 	case "log":
-		l.Info(convertedArgs...)
+		l.Info()
 	case "info":
-		l.Info(convertedArgs...)
+		l.Info()
 	case "warning":
-		l.Warn(convertedArgs...)
+		l.Warn()
 	case "error":
-		l.Error(convertedArgs...)
+		l.Error()
 	default:
-		l.Debug(convertedArgs...)
+		l.Debug()
 	}
 }
 
@@ -517,7 +535,7 @@ func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionC
 	if i.Type == "isolated" {
 		fs.isolatedWorlds[event.Context.Name] = true
 	}
-	context := NewExecutionContext(fs.ctx, fs.session, frame, event.Context.ID)
+	context := NewExecutionContext(fs.ctx, fs.session, frame, event.Context.ID, fs.logger)
 	if world != "" {
 		frame.setContext(world, context)
 	}

@@ -21,6 +21,7 @@
 package testutils
 
 import (
+	"io/ioutil"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -57,3 +58,12 @@ func (smh *CacheLogrusHook) Drain() []logrus.Entry {
 }
 
 var _ logrus.Hook = &CacheLogrusHook{}
+
+// LogHook sets logger to DebugLevel, attaches a CacheLogrusHook and returns it.
+func LogHook(logger *logrus.Logger) *CacheLogrusHook {
+	logHook := &CacheLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel, logrus.WarnLevel}}
+	logger.SetLevel(logrus.DebugLevel)
+	logger.AddHook(logHook)
+	logger.SetOutput(ioutil.Discard)
+	return logHook
+}

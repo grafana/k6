@@ -22,6 +22,7 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"regexp"
@@ -157,4 +158,23 @@ func goRoutineID() int {
 		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
 	}
 	return id
+}
+
+type mapAsObjectFormatter struct {
+	logrus.Formatter
+}
+
+func (f *mapAsObjectFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	if objects, ok := entry.Data["objects"].([]interface{}); ok {
+		var msg []string
+		for _, obj := range objects {
+			// TODO: Log error?
+			if o, err := json.Marshal(obj); err == nil {
+				msg = append(msg, string(o))
+			}
+		}
+		entry.Message = strings.Join(msg, " ")
+		delete(entry.Data, "objects")
+	}
+	return f.Formatter.Format(entry)
 }

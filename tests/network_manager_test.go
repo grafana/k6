@@ -23,6 +23,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/grafana/xk6-browser/testutils"
 	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,7 +37,7 @@ func TestDataURLSkipRequest(t *testing.T) {
 		bt.Browser.Close()
 	})
 
-	logHook := bt.LogHook()
+	logHook := testutils.LogHook(bt.State.Logger)
 
 	p.Goto("data:text/html,hello", nil)
 

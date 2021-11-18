@@ -10,11 +10,13 @@ export default function() {
 
   page.goto('https://test.k6.io/', { waitUntil: 'load' });
   const dimensions = page.evaluate(() => {
-    return {
+    const obj = {
       width: document.documentElement.clientWidth,
       height: document.documentElement.clientHeight,
       deviceScaleFactor: window.devicePixelRatio
     };
+    console.log(obj); // tests #120
+    return obj;
   });
 
   check(dimensions, {
