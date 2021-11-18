@@ -533,7 +533,7 @@ func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- stats.SampleContainer, 
 
 	runState := &rampingVUsRunState{
 		executor:       vlv,
-		wg:             new(sync.WaitGroup),
+		wg:             sync.WaitGroup{},
 		vuHandles:      make([]*vuHandle, maxVUs),
 		maxVUs:         maxVUs,
 		activeVUsCount: new(int64),
@@ -561,12 +561,12 @@ func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- stats.SampleContainer, 
 		handleNewMaxAllowedVUs = runState.maxAllowedVUsHandlerStrategy()
 		handleNewScheduledVUs  = runState.scheduledVUsHandlerStrategy()
 	)
-	handledGracefulSteps := runState.handleVUs(
+	handledGracefulSteps := runState.iterateSteps(
 		ctx,
 		handleNewMaxAllowedVUs,
 		handleNewScheduledVUs,
 	)
-	go runState.handleRemainingVUs(
+	go runState.runRemainingGracefulSteps(
 		ctx,
 		handleNewMaxAllowedVUs,
 		handledGracefulSteps,
@@ -583,12 +583,12 @@ type rampingVUsRunState struct {
 	maxVUs         uint64      // the scaled number of initially configured MaxVUs
 	activeVUsCount *int64      // the current number of active VUs, used only for the progress display
 	started        time.Time
-	wg             *sync.WaitGroup
+	wg             sync.WaitGroup
 
 	runIteration func(context.Context, lib.ActiveVU) bool // a helper closure function that runs a single iteration
 }
 
-func (rs rampingVUsRunState) makeProgressFn(regular time.Duration) (progressFn func() (float64, []string)) {
+func (rs *rampingVUsRunState) makeProgressFn(regular time.Duration) (progressFn func() (float64, []string)) {
 	vusFmt := pb.GetFixedLengthIntFormat(int64(rs.maxVUs))
 	regularDuration := pb.GetFixedLengthDuration(regular, regular)
 
@@ -604,7 +604,7 @@ func (rs rampingVUsRunState) makeProgressFn(regular time.Duration) (progressFn f
 	}
 }
 
-func (rs rampingVUsRunState) populateVUHandles(ctx context.Context, cancel func()) {
+func (rs *rampingVUsRunState) populateVUHandles(ctx context.Context, cancel func()) {
 	getVU := func() (lib.InitializedVU, error) {
 		pvu, err := rs.executor.executionState.GetPlannedVU(rs.executor.logger, false)
 		if err != nil {
@@ -630,10 +630,10 @@ func (rs rampingVUsRunState) populateVUHandles(ctx context.Context, cancel func(
 	}
 }
 
-// handleVUs iterates over rawSteps and gracefulSteps in order according to
+// iterateSteps iterates over rawSteps and gracefulSteps in order according to
 // their TimeOffsets, prioritizing rawSteps. It stops iterating once rawSteps
 // are over. And it returns the number of handled gracefulSteps.
-func (rs rampingVUsRunState) handleVUs(
+func (rs *rampingVUsRunState) iterateSteps(
 	ctx context.Context,
 	handleNewMaxAllowedVUs, handleNewScheduledVUs func(lib.ExecutionStep),
 ) (handledGracefulSteps int) {
@@ -658,14 +658,14 @@ func (rs rampingVUsRunState) handleVUs(
 	return j
 }
 
-// handleRemainingVUs runs the remaining gracefulSteps concurrently
+// runRemainingGracefulSteps runs the remaining gracefulSteps concurrently
 // before the gracefulStop timeout period stops VUs.
 //
 // This way we will have run the gracefulSteps at the same time while
 // waiting for the VUs to finish.
 //
 // (gracefulStop = maxDuration-regularDuration)
-func (rs rampingVUsRunState) handleRemainingVUs(
+func (rs *rampingVUsRunState) runRemainingGracefulSteps(
 	ctx context.Context,
 	handleNewMaxAllowedVUs func(lib.ExecutionStep),
 	handledGracefulSteps int,
@@ -679,7 +679,7 @@ func (rs rampingVUsRunState) handleRemainingVUs(
 	}
 }
 
-func (rs rampingVUsRunState) maxAllowedVUsHandlerStrategy() func(lib.ExecutionStep) {
+func (rs *rampingVUsRunState) maxAllowedVUsHandlerStrategy() func(lib.ExecutionStep) {
 	var cur uint64 // current number of planned graceful VUs
 	return func(graceful lib.ExecutionStep) {
 		pv := graceful.PlannedVUs
@@ -690,7 +690,7 @@ func (rs rampingVUsRunState) maxAllowedVUsHandlerStrategy() func(lib.ExecutionSt
 	}
 }
 
-func (rs rampingVUsRunState) scheduledVUsHandlerStrategy() func(lib.ExecutionStep) {
+func (rs *rampingVUsRunState) scheduledVUsHandlerStrategy() func(lib.ExecutionStep) {
 	var cur uint64 // current number of planned raw VUs
 	return func(raw lib.ExecutionStep) {
 		pv := raw.PlannedVUs
