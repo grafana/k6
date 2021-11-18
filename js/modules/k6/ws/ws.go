@@ -259,13 +259,15 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		_ = socket.closeConnection(websocket.CloseGoingAway)
 		return nil, wsRespErr
 	}
-	wsResponse.URL = url
+	if wsResponse != nil {
+		wsResponse.URL = url
+	}
 
 	if connErr != nil {
 		// Pass the error to the user script before exiting immediately
 		socket.handleEvent("error", rt.ToValue(connErr))
 
-		if errHandlerFn != nil {
+		if errHandlerFn != nil && wsResponse != nil {
 			if _, err := errHandlerFn(goja.Undefined(), rt.ToValue(wsResponse)); err != nil {
 				return nil, err
 			}
@@ -610,6 +612,9 @@ func (s *Socket) readPump(readChan chan *message, errorChan chan error, closeCha
 
 // Wrap the raw HTTPResponse we received to a WSHTTPResponse we can pass to the user
 func wrapHTTPResponse(httpResponse *http.Response) (*WSHTTPResponse, error) {
+	if httpResponse == nil {
+		return nil, nil
+	}
 	wsResponse := WSHTTPResponse{
 		Status: httpResponse.StatusCode,
 	}
