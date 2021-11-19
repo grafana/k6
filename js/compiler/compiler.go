@@ -283,6 +283,10 @@ func (b *babel) transformImpl(
 		opts[k] = v
 	}
 	if sourceMapsEnabled {
+		// given that the source map should provide accurate lines(and columns), this option isn't needed
+		// it also happens to make very long and awkward lines, especially around import/exports and definitely a lot
+		// less readable overall. Hopefully it also has some performance improvement not trying to keep the same lines
+		opts["retainLines"] = false
 		opts["sourceMaps"] = true
 		if inputSrcMap != nil {
 			srcMap := new(map[string]interface{})
