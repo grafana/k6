@@ -2074,18 +2074,105 @@ func TestMinIterationDurationIsCancellable(t *testing.T) {
 	}
 }
 
-func TestCheckingForceHTTP1EnvironmentVariable(t *testing.T) {
+func TestForceHTTP1FeatureEnabledCheckForH1(t *testing.T) {
 	os.Setenv("GODEBUG", "http2client=0,gctrace=1")
+
 	defer os.Unsetenv("GODEBUG")
 
 	assert.True(t, forceHTTP1())
+
+	r1, err := getSimpleRunner(t, "/script.js", `
+					var k6 = require("k6");
+					var check = k6.check;
+					var fail = k6.fail;
+					var http = require("k6/http");;
+					exports.default = function() {
+						var res = http.get("https://k6.io/");
+						if (
+							!check(res, {
+							'checking to see if status was 200': (res) => res.status === 200,
+							'checking to see if protocol was H1': (res) => res.proto === 'HTTP/1.1'
+							})
+						) {
+							fail('test failed')
+						}
+					}
+				`)
+	require.NoError(t, err)
+
+	r1.SetOptions(lib.Options{
+		InsecureSkipTLSVerify: null.BoolFrom(true),
+	})
+
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{}, builtinMetrics, registry)
+	require.NoError(t, err)
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			initVU, err := r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
+			require.NoError(t, err)
+		})
+	}
 }
 
-func TestCheckingForceHTTP1EnvironmentVariableWhenNotSet(t *testing.T) {
+func TestForceHTTP1FeatureDisabledCheckForH2(t *testing.T) {
 	os.Setenv("GODEBUG", "test=0")
 	defer os.Unsetenv("GODEBUG")
 
 	assert.False(t, forceHTTP1())
+
+	r1, err := getSimpleRunner(t, "/script.js", `
+					var k6 = require("k6");
+					var check = k6.check;
+					var fail = k6.fail;
+					var http = require("k6/http");;
+					exports.default = function() {
+						var res = http.get("https://k6.io/");
+						if (
+							!check(res, {
+							'checking to see if status was 200': (res) => res.status === 200,
+							'checking to see if protocol was H2': (res) => res.proto === 'HTTP/2.0'
+							})
+						) {
+							fail('test failed')
+						}
+					}
+				`)
+	require.NoError(t, err)
+
+	r1.SetOptions(lib.Options{
+		InsecureSkipTLSVerify: null.BoolFrom(true),
+	})
+
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{}, builtinMetrics, registry)
+	require.NoError(t, err)
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			initVU, err := r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
+			require.NoError(t, err)
+		})
+	}
 }
 
 func TestExecutionInfo(t *testing.T) {
