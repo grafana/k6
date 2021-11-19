@@ -39,7 +39,7 @@ github.com/fatih/color
 # github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813
 ## explicit
 github.com/gedex/inflector
-# github.com/go-sourcemap/sourcemap v2.1.3+incompatible
+# github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible
 ## explicit
 github.com/go-sourcemap/sourcemap
 github.com/go-sourcemap/sourcemap/internal/base64vlq
