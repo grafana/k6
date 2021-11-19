@@ -2075,20 +2075,18 @@ func TestMinIterationDurationIsCancellable(t *testing.T) {
 }
 
 func TestForceHTTP1FeatureEnabledCheckForH1(t *testing.T) {
-	os.Setenv("GODEBUG", "http2client=0,gctrace=1")
-	defer os.Unsetenv("GODEBUG")
-
-	assert.True(t, forceHTTP1())
+	// os.Setenv("GODEBUG", "http2client=0,gctrace=1")
+	// defer os.Unsetenv("GODEBUG")
 
 	//t.Parallel()
 
-	r1, err := getSimpleRunner(t, "/script.js", `
+	data := `
 					var k6 = require("k6");
 					var check = k6.check;
 					var fail = k6.fail;
 					var http = require("k6/http");;
 					exports.default = function() {
-						var res = http.get("https://127.0.0.1:3002/tenkb");
+						var res = http.get("https://k6.io/");
 						if (
 							!check(res, {
 							'checking to see if status was 200': (res) => res.status === 200,
@@ -2098,7 +2096,12 @@ func TestForceHTTP1FeatureEnabledCheckForH1(t *testing.T) {
 							fail('test failed')
 						}
 					}
-				`)
+				`
+	r1, err := getSimpleRunner(t, "/script.js", data, 
+		lib.RuntimeOptions{Env: map[string]string{"GODEBUG": "http2client=0,gctrace=1"}})
+		
+	assert.True(t, forceHTTP1())
+
 	require.NoError(t, err)
 
 	r1.SetOptions(lib.Options{
@@ -2141,7 +2144,7 @@ func TestForceHTTP1FeatureDisabledCheckForH2(t *testing.T) {
 					var fail = k6.fail;
 					var http = require("k6/http");;
 					exports.default = function() {
-						var res = http.get("https://127.0.0.1:3002/tenkb");
+						var res = http.get("https://k6.io/");
 						if (
 							!check(res, {
 							'checking to see if status was 200': (res) => res.status === 200,
