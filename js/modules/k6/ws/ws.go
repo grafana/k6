@@ -113,7 +113,7 @@ func (*WS) Connect(ctx context.Context, url string, args ...goja.Value) (*WSHTTP
 		return nil, errors.New("last argument to ws.connect must be a function")
 	}
 
-	var errHandlerFn goja.Callable = nil
+	var errHandlerFn goja.Callable
 	if secondCallableV != nil {
 		errHandlerFn, isFunc = goja.AssertFunction(secondCallableV)
 		if !isFunc {
