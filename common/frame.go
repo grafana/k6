@@ -196,9 +196,13 @@ func (f *Frame) clearLifecycle() {
 	// in f.inflightRequests
 	f.inflightRequestsMu.Lock()
 	{
+		// currentDocument may not always have a request
+		// associated with it. see: frame_manager.go
+		cdr := f.currentDocument.request
+
 		inflightRequests := make(map[network.RequestID]bool)
 		for req := range f.inflightRequests {
-			if req != f.currentDocument.request.requestID {
+			if cdr != nil && req != cdr.requestID {
 				continue
 			}
 			inflightRequests[req] = true
