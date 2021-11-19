@@ -2075,12 +2075,13 @@ func TestMinIterationDurationIsCancellable(t *testing.T) {
 }
 
 func TestForceHTTP1FeatureEnabledCheckForH1(t *testing.T) {
-	// os.Setenv("GODEBUG", "http2client=0,gctrace=1")
-	// defer os.Unsetenv("GODEBUG")
+	os.Setenv("GODEBUG", "http2client=0,gctrace=1")
 
-	//t.Parallel()
+	defer os.Unsetenv("GODEBUG")
 
-	data := `
+	assert.True(t, forceHTTP1())
+
+	r1, err := getSimpleRunner(t, "/script.js", `
 					var k6 = require("k6");
 					var check = k6.check;
 					var fail = k6.fail;
@@ -2096,12 +2097,7 @@ func TestForceHTTP1FeatureEnabledCheckForH1(t *testing.T) {
 							fail('test failed')
 						}
 					}
-				`
-	r1, err := getSimpleRunner(t, "/script.js", data, 
-		lib.RuntimeOptions{Env: map[string]string{"GODEBUG": "http2client=0,gctrace=1"}})
-		
-	assert.True(t, forceHTTP1())
-
+				`)
 	require.NoError(t, err)
 
 	r1.SetOptions(lib.Options{
@@ -2117,7 +2113,6 @@ func TestForceHTTP1FeatureEnabledCheckForH1(t *testing.T) {
 	for name, r := range runners {
 		r := r
 		t.Run(name, func(t *testing.T) {
-			//t.Parallel()
 			initVU, err := r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
 			require.NoError(t, err)
 
@@ -2135,8 +2130,6 @@ func TestForceHTTP1FeatureDisabledCheckForH2(t *testing.T) {
 	defer os.Unsetenv("GODEBUG")
 
 	assert.False(t, forceHTTP1())
-
-	//t.Parallel()
 
 	r1, err := getSimpleRunner(t, "/script.js", `
 					var k6 = require("k6");
@@ -2170,7 +2163,6 @@ func TestForceHTTP1FeatureDisabledCheckForH2(t *testing.T) {
 	for name, r := range runners {
 		r := r
 		t.Run(name, func(t *testing.T) {
-			//t.Parallel()
 			initVU, err := r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
 			require.NoError(t, err)
 
