@@ -56,8 +56,14 @@ func getTestRampingArrivalRateConfig() *RampingArrivalRateConfig {
 				Target:   null.IntFrom(50),
 			},
 			{
-				Duration: types.NullDurationFrom(time.Second * 1),
-				Target:   null.IntFrom(50),
+				Duration:    types.NullDurationFrom(time.Second * 1),
+				Target:      null.IntFrom(50),
+				Progression: null.StringFrom("linear"),
+			},
+			{
+				Duration:    types.NullDurationFrom(time.Second * 1),
+				Target:      null.IntFrom(50),
+				Progression: null.StringFrom("constant"),
 			},
 		},
 		PreAllocatedVUs: null.IntFrom(10),

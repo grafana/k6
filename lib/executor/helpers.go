@@ -72,6 +72,16 @@ func validateStages(stages []Stage) []error {
 		} else if s.Target.Int64 < 0 {
 			errors = append(errors, fmt.Errorf("the target for stage %d shouldn't be negative", stageNum))
 		}
+
+		switch s.Progression.String {
+		case "linear",
+			"constant",
+			"":
+			continue
+		default:
+			errors = append(errors, fmt.Errorf(
+				"stage %d  doesn't have proper progression parameter, one of (linear, constant)", stageNum))
+		}
 	}
 	return errors
 }

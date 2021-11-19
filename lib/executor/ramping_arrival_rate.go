@@ -271,24 +271,34 @@ func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.
 	for _, stage := range varc.Stages {
 		to = float64(stage.Target.ValueOrZero()) / timeUnit
 		dur = float64(stage.Duration.Duration)
-		if from != to { // ramp up/down
-			endCount += dur * ((to-from)/2 + from)
-			for ; i <= endCount; i += float64(next()) {
-				// TODO: try to twist this in a way to be able to get i (the only changing part)
-				// somewhere where it is less in the middle of the equation
-				x := (from*dur - noNegativeSqrt(dur*(from*from*dur+2*(i-doneSoFar)*(to-from)))) / (from - to)
-
-				ch <- time.Duration(x) + stageStart
-			}
-		} else {
+		switch progression := stage.Progression.String; progression {
+		case "constant":
 			endCount += dur * to
 			for ; i <= endCount; i += float64(next()) {
 				ch <- time.Duration((i-doneSoFar)/to) + stageStart
 			}
+		// linear is default one, since we have progression type = null.String, empty string is equal to the ""
+		case "linear", "":
+			if from != to { // ramp up/down
+				endCount += dur * ((to-from)/2 + from)
+				for ; i <= endCount; i += float64(next()) {
+					// TODO: try to twist this in a way to be able to get i (the only changing part)
+					// somewhere where it is less in the middle of the equation
+					x := (from*dur - noNegativeSqrt(dur*(from*from*dur+2*(i-doneSoFar)*(to-from)))) / (from - to)
+
+					ch <- time.Duration(x) + stageStart
+				}
+			} else {
+				endCount += dur * to
+				for ; i <= endCount; i += float64(next()) {
+					ch <- time.Duration((i-doneSoFar)/to) + stageStart
+				}
+			}
+
+			doneSoFar = endCount
+			from = to
+			stageStart += stage.Duration.TimeDuration()
 		}
-		doneSoFar = endCount
-		from = to
-		stageStart += stage.Duration.TimeDuration()
 	}
 }
 
