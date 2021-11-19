@@ -38,22 +38,22 @@ import (
 	"go.k6.io/k6/ui/pb"
 )
 
-const rampingArrivalRateType = "ramping-arrival-rate"
+const steppedArrivalRateType = "stepped-arrival-rate"
 
 func init() {
 	lib.RegisterExecutorConfigType(
-		rampingArrivalRateType,
+		steppedArrivalRateType,
 		func(name string, rawJSON []byte) (lib.ExecutorConfig, error) {
-			config := NewRampingArrivalRateConfig(name)
+			config := NewSteppedArrivalRateConfig(name)
 			err := lib.StrictJSONUnmarshal(rawJSON, &config)
 			return config, err
 		},
 	)
 }
 
-// RampingArrivalRateConfig stores config for the ramping (i.e. variable)
+// SteppedArrivalRateConfig stores config for the ramping (i.e. variable)
 // arrival-rate executor.
-type RampingArrivalRateConfig struct {
+type SteppedArrivalRateConfig struct {
 	BaseConfig
 	StartRate null.Int           `json:"startRate"`
 	TimeUnit  types.NullDuration `json:"timeUnit"`
@@ -66,29 +66,29 @@ type RampingArrivalRateConfig struct {
 	MaxVUs          null.Int `json:"maxVUs"`
 }
 
-// NewRampingArrivalRateConfig returns a RampingArrivalRateConfig with default values
-func NewRampingArrivalRateConfig(name string) *RampingArrivalRateConfig {
-	return &RampingArrivalRateConfig{
-		BaseConfig: NewBaseConfig(name, rampingArrivalRateType),
+// NewSteppedArrivalRateConfig returns a SteppedArrivalRateConfig with default values
+func NewSteppedArrivalRateConfig(name string) *SteppedArrivalRateConfig {
+	return &SteppedArrivalRateConfig{
+		BaseConfig: NewBaseConfig(name, steppedArrivalRateType),
 		TimeUnit:   types.NewNullDuration(1*time.Second, false),
 	}
 }
 
 // Make sure we implement the lib.ExecutorConfig interface
-var _ lib.ExecutorConfig = &RampingArrivalRateConfig{}
+var _ lib.ExecutorConfig = &SteppedArrivalRateConfig{}
 
 // GetPreAllocatedVUs is just a helper method that returns the scaled pre-allocated VUs.
-func (varc RampingArrivalRateConfig) GetPreAllocatedVUs(et *lib.ExecutionTuple) int64 {
+func (varc SteppedArrivalRateConfig) GetPreAllocatedVUs(et *lib.ExecutionTuple) int64 {
 	return et.Segment.Scale(varc.PreAllocatedVUs.Int64)
 }
 
 // GetMaxVUs is just a helper method that returns the scaled max VUs.
-func (varc RampingArrivalRateConfig) GetMaxVUs(et *lib.ExecutionTuple) int64 {
+func (varc SteppedArrivalRateConfig) GetMaxVUs(et *lib.ExecutionTuple) int64 {
 	return et.Segment.Scale(varc.MaxVUs.Int64)
 }
 
 // GetDescription returns a human-readable description of the executor options
-func (varc RampingArrivalRateConfig) GetDescription(et *lib.ExecutionTuple) string {
+func (varc SteppedArrivalRateConfig) GetDescription(et *lib.ExecutionTuple) string {
 	// TODO: something better? always show iterations per second?
 	maxVUsRange := fmt.Sprintf("maxVUs: %d", et.Segment.Scale(varc.PreAllocatedVUs.Int64))
 	if varc.MaxVUs.Int64 > varc.PreAllocatedVUs.Int64 {
@@ -105,7 +105,7 @@ func (varc RampingArrivalRateConfig) GetDescription(et *lib.ExecutionTuple) stri
 }
 
 // Validate makes sure all options are configured and valid
-func (varc *RampingArrivalRateConfig) Validate() []error {
+func (varc *SteppedArrivalRateConfig) Validate() []error {
 	errors := varc.BaseConfig.Validate()
 
 	if varc.StartRate.Int64 < 0 {
@@ -139,7 +139,7 @@ func (varc *RampingArrivalRateConfig) Validate() []error {
 // maximum waiting time for any iterations to gracefully stop. This is used by
 // the execution scheduler in its VU reservation calculations, so it knows how
 // many VUs to pre-initialize.
-func (varc RampingArrivalRateConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
+func (varc SteppedArrivalRateConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
 	return []lib.ExecutionStep{
 		{
 			TimeOffset:      0,
@@ -154,35 +154,35 @@ func (varc RampingArrivalRateConfig) GetExecutionRequirements(et *lib.ExecutionT
 	}
 }
 
-// NewExecutor creates a new RampingArrivalRate executor
-func (varc RampingArrivalRateConfig) NewExecutor(
+// NewExecutor creates a new SteppedArrivalRate executor
+func (varc SteppedArrivalRateConfig) NewExecutor(
 	es *lib.ExecutionState, logger *logrus.Entry,
 ) (lib.Executor, error) {
-	return &RampingArrivalRate{
+	return &SteppedArrivalRate{
 		BaseExecutor: NewBaseExecutor(&varc, es, logger),
 		config:       varc,
 	}, nil
 }
 
 // HasWork reports whether there is any work to be done for the given execution segment.
-func (varc RampingArrivalRateConfig) HasWork(et *lib.ExecutionTuple) bool {
+func (varc SteppedArrivalRateConfig) HasWork(et *lib.ExecutionTuple) bool {
 	return varc.GetMaxVUs(et) > 0
 }
 
-// RampingArrivalRate tries to execute a specific number of iterations for a
+// SteppedArrivalRate tries to execute a specific number of iterations for a
 // specific period.
 // TODO: combine with the ConstantArrivalRate?
-type RampingArrivalRate struct {
+type SteppedArrivalRate struct {
 	*BaseExecutor
-	config RampingArrivalRateConfig
+	config SteppedArrivalRateConfig
 	et     *lib.ExecutionTuple
 }
 
 // Make sure we implement the lib.Executor interface.
-var _ lib.Executor = &RampingArrivalRate{}
+var _ lib.Executor = &SteppedArrivalRate{}
 
 // Init values needed for the execution
-func (varr *RampingArrivalRate) Init(ctx context.Context) error {
+func (varr *SteppedArrivalRate) Init(ctx context.Context) error {
 	// err should always be nil, because Init() won't be called for executors
 	// with no work, as determined by their config's HasWork() method.
 	et, err := varr.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(varr.config.MaxVUs.Int64)
@@ -250,7 +250,7 @@ func (varr *RampingArrivalRate) Init(ctx context.Context) error {
 // The specific implementation here can only go forward and does incorporate
 // the striping algorithm from the lib.ExecutionTuple for additional speed up but this could
 // possibly be refactored if need for this arises.
-func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.Duration) {
+func (varc SteppedArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.Duration) {
 	start, offsets, _ := et.GetStripedOffsets()
 	li := -1
 	// TODO: move this to a utility function, or directly what GetStripedOffsets uses once we see everywhere we will use it
@@ -263,7 +263,7 @@ func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.
 		stageStart                   time.Duration
 		timeUnit                     = float64(varc.TimeUnit.Duration)
 		doneSoFar, endCount, to, dur float64
-		from                         = float64(varc.StartRate.ValueOrZero()) / timeUnit
+		//from                         = float64(varc.StartRate.ValueOrZero()) / timeUnit
 		// start .. starts at 0 but the algorithm works with area so we need to start from 1 not 0
 		i = float64(start + 1)
 	)
@@ -271,51 +271,16 @@ func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.
 	for _, stage := range varc.Stages {
 		to = float64(stage.Target.ValueOrZero()) / timeUnit
 		dur = float64(stage.Duration.Duration)
-		switch progression := stage.Progression.String; progression {
 
-		case "linear":
-			if from != to { // ramp up/down
-				endCount, i, ch = linearRampUp(endCount, dur, to, from, i, next, doneSoFar, ch, stageStart)
-			} else {
-				endCount += dur * to
-				i, ch = instantRampUp(i, endCount, next, ch, doneSoFar, to, stageStart)
-			}
-		case "instant":
-			endCount += dur * to
-			i, ch = instantRampUp(i, endCount, next, ch, doneSoFar, to, stageStart)
-
-		default:
-			if from != to { // ramp up/down
-				endCount, i, ch = linearRampUp(endCount, dur, to, from, i, next, doneSoFar, ch, stageStart)
-			} else {
-				endCount += dur * to
-				i, ch = instantRampUp(i, endCount, next, ch, doneSoFar, to, stageStart)
-			}
+		endCount += dur * to
+		for ; i <= endCount; i += float64(next()) {
+			ch <- time.Duration((i-doneSoFar)/to) + stageStart
 		}
 
 		doneSoFar = endCount
-		from = to
+		//from = to
 		stageStart += stage.Duration.TimeDuration()
 	}
-}
-
-func instantRampUp(i float64, endCount float64, next func() int64, ch chan<- time.Duration, doneSoFar float64, to float64, stageStart time.Duration) (float64, chan<- time.Duration) {
-	for ; i <= endCount; i += float64(next()) {
-		ch <- time.Duration((i-doneSoFar)/to) + stageStart
-	}
-	return i, ch
-}
-
-func linearRampUp(endCount float64, dur float64, to float64, from float64, i float64, next func() int64, doneSoFar float64, ch chan<- time.Duration, stageStart time.Duration) (float64, float64, chan<- time.Duration) {
-	endCount += dur * ((to-from)/2 + from)
-	for ; i <= endCount; i += float64(next()) {
-		// TODO: try to twist this in a way to be able to get i (the only changing part)
-		// somewhere where it is less in the middle of the equation
-		x := (from*dur - noNegativeSqrt(dur*(from*from*dur+2*(i-doneSoFar)*(to-from)))) / (from - to)
-
-		ch <- time.Duration(x) + stageStart
-	}
-	return endCount, i, ch
 }
 
 // Run executes a variable number of iterations per second.
@@ -329,7 +294,7 @@ func linearRampUp(endCount float64, dur float64, to float64, from float64, i flo
 // This will allow us to implement https://github.com/k6io/k6/issues/1386
 // and things like all of the TODOs below in one place only.
 //nolint:funlen,cyclop
-func (varr RampingArrivalRate) Run(
+func (varr SteppedArrivalRate) Run(
 	parentCtx context.Context, out chan<- stats.SampleContainer, builtinMetrics *metrics.BuiltinMetrics,
 ) (err error) {
 	segment := varr.executionState.ExecutionTuple.Segment

@@ -24,7 +24,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -236,4 +239,78 @@ func getVUActivationParams(
 		DeactivateCallback:       deactivateCallback,
 		GetNextIterationCounters: nextIterationCounters,
 	}
+}
+
+// This is needed because, on some platforms (arm64), sometimes, even though we
+// in *reality* don't get negative results due to the nature of how float64 is
+// implemented, we get negative values (very close to the 0). This would get an
+// sqrt which is *even* smaller and likely will have negligible effects on the
+// final result.
+//
+// TODO: this is probably going to be less necessary if we do some kind of of
+// optimization above and the operations with the float64 are more "accurate"
+// even on arm platforms.
+func noNegativeSqrt(f float64) float64 {
+	if !math.Signbit(f) {
+		return math.Sqrt(f)
+	}
+
+	return 0
+}
+
+// activeVUPool controls the activeVUs
+// executing the received requests for iterations.
+type activeVUPool struct {
+	iterations chan struct{}
+	running    uint64
+	wg         sync.WaitGroup
+}
+
+// newActiveVUPool returns an activeVUPool.
+func newActiveVUPool() *activeVUPool {
+	return &activeVUPool{
+		iterations: make(chan struct{}),
+	}
+}
+
+// TryRunIteration invokes a request to execute a new iteration.
+// When there are no available VUs to process the request
+// then false is returned.
+func (p *activeVUPool) TryRunIteration() bool {
+	select {
+	case p.iterations <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+// Running returns the number of the currently running VUs.
+func (p *activeVUPool) Running() uint64 {
+	return atomic.LoadUint64(&p.running)
+}
+
+// AddVU adds the active VU to the pool of VUs for handling the incoming requests.
+// When a new request is accepted the runfn function is executed.
+func (p *activeVUPool) AddVU(ctx context.Context, avu lib.ActiveVU, runfn func(context.Context, lib.ActiveVU) bool) {
+	p.wg.Add(1)
+	ch := make(chan struct{})
+	go func() {
+		defer p.wg.Done()
+
+		close(ch)
+		for range p.iterations {
+			atomic.AddUint64(&p.running, uint64(1))
+			runfn(ctx, avu)
+			atomic.AddUint64(&p.running, ^uint64(0))
+		}
+	}()
+	<-ch
+}
+
+// Close stops the pool from accepting requests
+// then it will wait for all on-going iterations to complete.
+func (p *activeVUPool) Close() {
+	close(p.iterations)
+	p.wg.Wait()
 }

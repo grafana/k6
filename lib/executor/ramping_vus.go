@@ -54,6 +54,7 @@ func init() {
 type Stage struct {
 	Duration types.NullDuration `json:"duration"`
 	Target   null.Int           `json:"target"` // TODO: maybe rename this to endVUs? something else?
+	Progression null.String 	`json:"progression"`
 	// TODO: add a progression function?
 }
 
