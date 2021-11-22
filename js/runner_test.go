@@ -2078,7 +2078,7 @@ func TestForceHTTP1FeatureEnabledCheckForH1(t *testing.T) {
 	err := os.Setenv("GODEBUG", "http2client=0,gctrace=1")
 	require.NoError(t, err)
 	defer func() {
-		err := os.Unsetenv("GODEBUG")
+		err = os.Unsetenv("GODEBUG")
 		require.NoError(t, err)
 	}()
 
@@ -2108,7 +2108,6 @@ func TestForceHTTP1FeatureEnabledCheckForH1(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{}, builtinMetrics, registry)
@@ -2134,7 +2133,7 @@ func TestForceHTTP1FeatureDisabledCheckForH2(t *testing.T) {
 	err := os.Setenv("GODEBUG", "test=0")
 	require.NoError(t, err)
 	defer func() {
-		err := os.Unsetenv("GODEBUG")
+		err = os.Unsetenv("GODEBUG")
 		require.NoError(t, err)
 	}()
 
