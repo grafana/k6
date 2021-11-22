@@ -207,6 +207,7 @@ func (c *Connection) createSession(info *target.Info) (*Session, error) {
 
 func (c *Connection) handleIOError(err error) {
 	c.logger.Errorf("Connection:handleIOError", "err:%v", err)
+
 	if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 		// Report an unexpected closure
 		select {
@@ -269,7 +270,7 @@ func (c *Connection) recvLoop() {
 			sessionID := ev.(*target.EventAttachedToTarget).SessionID
 			c.sessionsMu.Lock()
 			session := NewSession(c.ctx, c, sessionID)
-			c.logger.Infof("Connection:recvLoop", "sid:%v wsURL:%q, NewSession", sessionID, c.wsURL)
+			c.logger.Infof("Connection:recvLoop:EventAttachedToTarget", "sid:%v wsURL:%q, NewSession", sessionID, c.wsURL)
 			c.sessions[sessionID] = session
 			c.sessionsMu.Unlock()
 		} else if msg.Method == cdproto.EventTargetDetachedFromTarget {
@@ -279,7 +280,7 @@ func (c *Connection) recvLoop() {
 				continue
 			}
 			sessionID := ev.(*target.EventDetachedFromTarget).SessionID
-			c.logger.Errorf("Connection:recvLoop", "sid:%v wsURL:%q, closeSession", sessionID, c.wsURL)
+			c.logger.Errorf("Connection:recvLoop:EventDetachedFromTarget", "sid:%v wsURL:%q, closeSession", sessionID, c.wsURL)
 			c.closeSession(sessionID)
 		}
 
