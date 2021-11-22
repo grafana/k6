@@ -1,6 +1,6 @@
 name: Feature Request
 description: Use this template for suggesting new features.
-title: '[Feature Request]: '
+title: ''
 labels: feature
 body:
   - type: textarea
@@ -13,3 +13,7 @@ body:
     attributes:
       label: Suggested Solution (optional)
       description: If you have a solution in mind, please describe it.
+  - type: textarea
+    attributes:
+      label: Already existing or connected issues / PRs (optional)
+      description: If you have found some issues or pull requests that are related to your new issue, please link them here.

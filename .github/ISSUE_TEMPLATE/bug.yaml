@@ -1,8 +1,13 @@
 name: Bug report
 description: Use this template for reporting bugs. Please search existing issues first.
-title: '[Bug]: '
+title: ''
 labels: bug
 body:
+  - type: textarea
+    attributes:
+      label: Brief summary
+    validations:
+      required: true
   - type: markdown
     attributes:
       value: '## Environment'
@@ -19,19 +24,22 @@ body:
       required: true
   - type: input
     attributes:
-      label: Docker version and image
+      label: Docker version and image (if applicable)
+  - type: markdown
+    attributes:
+      value: '## Detailed issue description'
   - type: textarea
     attributes:
-      label: Expected Behaviour
+      label: Steps to reproduce the problem
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Actual Behaviour
+      label: Expected behaviour
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Steps to Reproduce the Problem
+      label: Actual behaviour
     validations:
       required: true
