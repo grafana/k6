@@ -221,7 +221,9 @@ func (c *Connection) handleIOError(err error) {
 	}
 	select {
 	case c.closeCh <- code:
+		c.logger.Errorf("Connection:handleIOError:c.closeCh <-", "code:%d", code)
 	case <-c.done:
+		c.logger.Errorf("Connection:handleIOError:<-c.done", "")
 	}
 }
 
@@ -249,7 +251,7 @@ func (c *Connection) recvLoop() {
 		if err := c.decoder.Error(); err != nil {
 			select {
 			case c.errorCh <- err:
-				c.logger.Infof("Connection:recvLoop:<-err", "wsURL:%q, err:%v", c.wsURL, err)
+				c.logger.Infof("Connection:recvLoop:<-err", "wsURL:%q err:%v", c.wsURL, err)
 			case <-c.done:
 				c.logger.Infof("Connection:recvLoop:<-c.done", "wsURL:%q", c.wsURL)
 				return
@@ -268,7 +270,7 @@ func (c *Connection) recvLoop() {
 				sessionID := ev.(*target.EventAttachedToTarget).SessionID
 				c.sessionsMu.Lock()
 				session := NewSession(c.ctx, c, sessionID)
-				c.logger.Infof("Connection:recvLoop", "wsURL:%q, NewSession(%v)", c.wsURL, sessionID)
+				c.logger.Infof("Connection:recvLoop", "sid:%v wsURL:%q, NewSession(%v)", sessionID, c.wsURL)
 				c.sessions[sessionID] = session
 				c.sessionsMu.Unlock()
 			} else if msg.Method == cdproto.EventTargetDetachedFromTarget {
@@ -278,7 +280,7 @@ func (c *Connection) recvLoop() {
 					continue
 				}
 				sessionID := ev.(*target.EventDetachedFromTarget).SessionID
-				c.logger.Errorf("Connection:recvLoop", "wsURL:%q, closeSession(%v)", c.wsURL, sessionID)
+				c.logger.Errorf("Connection:recvLoop", "sid:%v wsURL:%q, closeSession", sessionID, c.wsURL)
 				c.closeSession(sessionID)
 			}
 		}
@@ -287,7 +289,7 @@ func (c *Connection) recvLoop() {
 		case msg.SessionID != "" && (msg.Method != "" || msg.ID != 0):
 			if session, ok := c.sessions[msg.SessionID]; ok {
 				if msg.Error != nil && msg.Error.Message == "No session with given id" {
-					c.logger.Errorf("Connection:recvLoop", "wsURL:%q, closeSession(%v) #2", c.wsURL, msg.SessionID)
+					c.logger.Errorf("Connection:recvLoop", "sid:%v wsURL:%q, closeSession #2", msg.SessionID, c.wsURL)
 					c.closeSession(session.id)
 					continue
 				}

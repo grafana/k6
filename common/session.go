@@ -96,7 +96,6 @@ func (s *Session) readLoop() {
 			if err != nil {
 				s.conn.logger.Infof("Session:readLoop:<-s.readCh", "sid=%v cannot unmarshal: %v", s.id, err)
 				if _, ok := err.(cdp.ErrUnknownCommandOrEvent); ok {
-					s.conn.logger.Infof("Session:readLoop:<-s.readCh", "sid=%v unknown command", s.id)
 					// This is most likely an event received from an older
 					// Chrome which a newer cdproto doesn't have, as it is
 					// deprecated. Ignore that error, and emit raw cdproto.Message.
@@ -220,6 +219,5 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 		Method:    cdproto.MethodType(method),
 		Params:    buf,
 	}
-	s.conn.logger.Infof("Session:ExecuteWithoutExpectationOnReply:s.conn.send", "sid=%v method=%q err=%v", s.id, method)
 	return s.conn.send(msg, nil, res)
 }
