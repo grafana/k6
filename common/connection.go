@@ -337,38 +337,39 @@ func (c *Connection) send(msg *cdproto.Message, recvCh chan *cdproto.Message, re
 		return nil
 	}
 
-	if recvCh != nil {
-		// Block waiting for response.
-		select {
-		case msg := <-recvCh:
-			switch {
-			case msg == nil:
-				c.logger.Errorf("Connection:send", "wsURL:%q sid:%v, err:ErrChannelClosed", c.wsURL, msg.SessionID)
-				return ErrChannelClosed
-			case msg.Error != nil:
-				c.logger.Errorf("Connection:send", "wsURL:%q sid:%v, msg err:%v", c.wsURL, msg.SessionID, msg.Error)
-				return msg.Error
-			case res != nil:
-				return easyjson.Unmarshal(msg.Result, res)
-			}
-		case err := <-c.errorCh:
-			c.logger.Errorf("Connection:send:<-c.errorCh #2", "wsURL:%q sid:%v, err:%v", c.wsURL, msg.SessionID, err)
-			return err
-		case code := <-c.closeCh:
-			c.logger.Errorf("Connection:send:<-c.closeCh #2", "wsURL:%q sid:%v, websocket code:%v", c.wsURL, msg.SessionID, code)
-			_ = c.closeConnection(code)
-			return &websocket.CloseError{Code: code}
-		case <-c.done:
-			c.logger.Errorf("Connection:send:<-c.done #2", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
-		case <-c.ctx.Done():
-			c.logger.Errorf("Connection:send:<-c.ctx.Done()", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
-			return c.ctx.Err()
-			// TODO: add a timeout?
-			// case <-timeout:
-			// 	return
-		}
+	// Block waiting for response.
+	if recvCh == nil {
+		return nil
 	}
-
+	select {
+	case msg := <-recvCh:
+		switch {
+		case msg == nil:
+			c.logger.Errorf("Connection:send", "wsURL:%q sid:%v, err:ErrChannelClosed", c.wsURL, msg.SessionID)
+			return ErrChannelClosed
+		case msg.Error != nil:
+			c.logger.Errorf("Connection:send", "wsURL:%q sid:%v, msg err:%v", c.wsURL, msg.SessionID, msg.Error)
+			return msg.Error
+		case res != nil:
+			return easyjson.Unmarshal(msg.Result, res)
+		}
+	case err := <-c.errorCh:
+		c.logger.Errorf("Connection:send:<-c.errorCh #2", "wsURL:%q sid:%v, err:%v", c.wsURL, msg.SessionID, err)
+		return err
+	case code := <-c.closeCh:
+		c.logger.Errorf("Connection:send:<-c.closeCh #2", "wsURL:%q sid:%v, websocket code:%v", c.wsURL, msg.SessionID, code)
+		_ = c.closeConnection(code)
+		return &websocket.CloseError{Code: code}
+	case <-c.done:
+		c.logger.Errorf("Connection:send:<-c.done #2", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
+	case <-c.ctx.Done():
+		c.logger.Errorf("Connection:send:<-c.ctx.Done()", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
+		// TODO: this brings many bugs to the surface
+		return c.ctx.Err()
+		// TODO: add a timeout?
+		// case <-timeout:
+		// 	return
+	}
 	return nil
 }
 
