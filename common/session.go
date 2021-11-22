@@ -61,12 +61,15 @@ func NewSession(ctx context.Context, conn *Connection, id target.SessionID) *Ses
 		readCh:           make(chan *cdproto.Message),
 		done:             make(chan struct{}),
 	}
+	s.conn.logger.Infof("Session:NewSession", "sid=%v", id)
 	go s.readLoop()
 	return &s
 }
 
 func (s *Session) close() {
+	s.conn.logger.Infof("Session:close", "sid=%v", s.id)
 	if s.closed {
+		s.conn.logger.Infof("Session:close", "already closed, sid=%v", s.id)
 		return
 	}
 
@@ -78,6 +81,7 @@ func (s *Session) close() {
 }
 
 func (s *Session) markAsCrashed() {
+	s.conn.logger.Infof("Session:markAsCrashed", "sid=%v", s.id)
 	s.crashed = true
 }
 
@@ -90,7 +94,9 @@ func (s *Session) readLoop() {
 		case msg := <-s.readCh:
 			ev, err := cdproto.UnmarshalMessage(msg)
 			if err != nil {
+				s.conn.logger.Infof("Session:readLoop:<-s.readCh", "sid=%v cannot unmarshal: %v", s.id, err)
 				if _, ok := err.(cdp.ErrUnknownCommandOrEvent); ok {
+					s.conn.logger.Infof("Session:readLoop:<-s.readCh", "sid=%v unknown command", s.id)
 					// This is most likely an event received from an older
 					// Chrome which a newer cdproto doesn't have, as it is
 					// deprecated. Ignore that error, and emit raw cdproto.Message.
@@ -102,6 +108,7 @@ func (s *Session) readLoop() {
 			}
 			s.emit(string(msg.Method), ev)
 		case <-s.done:
+			s.conn.logger.Errorf("Session:readLoop:<-s.done", "sid=%v", s.id)
 			return
 		}
 	}
@@ -109,11 +116,13 @@ func (s *Session) readLoop() {
 
 // Execute implements the cdp.Executor interface
 func (s *Session) Execute(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
+	s.conn.logger.Infof("Session:Execute", "sid=%v method=%q", s.id, method)
 	// Certain methods aren't available to the user directly.
 	if method == target.CommandCloseTarget {
 		return errors.New("to close the target, cancel its context")
 	}
 	if s.crashed {
+		s.conn.logger.Infof("Session:Execute", "sid=%v method=%q, returns: crashed", s.id, method)
 		return ErrTargetCrashed
 	}
 
@@ -127,12 +136,16 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 		for {
 			select {
 			case <-evCancelCtx.Done():
+				s.conn.logger.Errorf("Session:Execute:<-evCancelCtx.Done()", "sid=%v method=%q, returns", s.id, method)
 				return
 			case ev := <-chEvHandler:
+				// s.conn.logger.Infof("Session:Execute:<-chEvHandler", "sid=%v method=%q", s.id, method)
 				if msg, ok := ev.data.(*cdproto.Message); ok && msg.ID == id {
 					select {
 					case <-evCancelCtx.Done():
+						s.conn.logger.Errorf("Session:Execute:<-evCancelCtx.Done():2", "sid=%v method=%q, returns", s.id, method)
 					case ch <- msg:
+						// s.conn.logger.Infof("Session:Execute:<-chEvHandler:ch <- msg", "sid=%v method=%q", s.id, method)
 						// We expect only one response with the matching message ID,
 						// then remove event handler by cancelling context and stopping goroutine.
 						evCancelFn()
@@ -160,15 +173,18 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 		Method:    cdproto.MethodType(method),
 		Params:    buf,
 	}
+	s.conn.logger.Infof("Session:Execute:s.conn.send", "sid=%v method=%q", s.id, method)
 	return s.conn.send(msg, ch, res)
 }
 
 func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
+	s.conn.logger.Infof("Session:ExecuteWithoutExpectationOnReply", "sid=%v method=%q", s.id, method)
 	// Certain methods aren't available to the user directly.
 	if method == target.CommandCloseTarget {
 		return errors.New("to close the target, cancel its context")
 	}
 	if s.crashed {
+		s.conn.logger.Infof("Session:ExecuteWithoutExpectationOnReply", "sid=%v method=%q, ErrTargetCrashed", s.id, method)
 		return ErrTargetCrashed
 	}
 
@@ -180,6 +196,7 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 		var err error
 		buf, err = easyjson.Marshal(params)
 		if err != nil {
+			s.conn.logger.Infof("Session:ExecuteWithoutExpectationOnReply:Marshal", "sid=%v method=%q err=%v", s.id, method, err)
 			return err
 		}
 	}
@@ -203,5 +220,6 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 		Method:    cdproto.MethodType(method),
 		Params:    buf,
 	}
+	s.conn.logger.Infof("Session:ExecuteWithoutExpectationOnReply:s.conn.send", "sid=%v method=%q err=%v", s.id, method)
 	return s.conn.send(msg, nil, res)
 }

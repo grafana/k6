@@ -127,6 +127,7 @@ func (p *Page) initEvents() error {
 }
 
 func (p *Page) closeWorker(sessionID target.SessionID) {
+	p.browserCtx.logger.Infof("Page:closeWorker", "sid=%v", sessionID)
 	if worker, ok := p.workers[sessionID]; ok {
 		worker.didClose()
 		delete(p.workers, sessionID)
@@ -138,11 +139,13 @@ func (p *Page) defaultTimeout() time.Duration {
 }
 
 func (p *Page) didClose() {
+	p.browserCtx.logger.Infof("Page:didClose", "sid=%v", p.session.id)
 	p.closed = true
 	p.emit(EventPageClose, p)
 }
 
 func (p *Page) didCrash() {
+	p.browserCtx.logger.Infof("Page:didCrash", "sid=%v", p.session.id)
 	p.frameManager.dispose()
 	p.emit(EventPageCrash, p)
 }
@@ -152,6 +155,7 @@ func (p *Page) evaluateOnNewDocument(source string) {
 }
 
 func (p *Page) getFrameElement(f *Frame) (*ElementHandle, error) {
+	p.browserCtx.logger.Infof("Page:getFrameElement", "sid=%v", p.session.id)
 	parent := f.parentFrame
 	if parent == nil {
 		return nil, errors.New("frame has been detached 1")
@@ -176,6 +180,7 @@ func (p *Page) getFrameElement(f *Frame) (*ElementHandle, error) {
 }
 
 func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.FrameID {
+	p.browserCtx.logger.Infof("Page:getOwnerFrame", "sid=%v", p.session.id)
 	// document.documentElement has frameId of the owner frame
 	rt := k6common.GetRuntime(p.ctx)
 	pageFn := rt.ToValue(`
@@ -212,6 +217,7 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.Frame
 }
 
 func (p *Page) getFrameSession(frameID cdp.FrameID) *FrameSession {
+	p.browserCtx.logger.Infof("Page:getFrameSession", "sid=%v fid=%v", p.session.id, frameID)
 	return p.frameSessions[frameID]
 }
 
@@ -293,6 +299,7 @@ func (p *Page) AddStyleTag(opts goja.Value) {
 
 // BrintToFront activates the browser tab for this page
 func (p *Page) BrintToFront() {
+	p.browserCtx.logger.Infof("Page:BrintToFront", "sid=%v", p.session.id)
 	rt := k6common.GetRuntime(p.ctx)
 	action := cdppage.BringToFront()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
@@ -331,6 +338,7 @@ func (p *Page) Dblclick(selector string, opts goja.Value) {
 }
 
 func (p *Page) DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value) {
+	p.browserCtx.logger.Infof("Page:DispatchEvent", "sid=%v selector=%q", p.session.id, selector)
 	p.MainFrame().DispatchEvent(selector, typ, eventInit, opts)
 }
 
@@ -439,6 +447,7 @@ func (p *Page) GoForward(opts goja.Value) api.Response {
 
 // Goto will navigate the page to the specified URL and return a HTTP response object
 func (p *Page) Goto(url string, opts goja.Value) api.Response {
+	p.browserCtx.logger.Infof("Page:Goto", "sid=%v url=%q", p.session.id, url)
 	return p.MainFrame().Goto(url, opts)
 }
 
@@ -512,15 +521,18 @@ func (p *Page) Press(selector string, key string, opts goja.Value) {
 }
 
 func (p *Page) Query(selector string) api.ElementHandle {
+	p.browserCtx.logger.Infof("Page:Query", "sid=%v selector=%q", p.session.id, selector)
 	return p.frameManager.MainFrame().Query(selector)
 }
 
 func (p *Page) QueryAll(selector string) []api.ElementHandle {
+	p.browserCtx.logger.Infof("Page:QueryAll", "sid=%v selector=%q", p.session.id, selector)
 	return p.frameManager.MainFrame().QueryAll(selector)
 }
 
 // Reload will reload the current page
 func (p *Page) Reload(opts goja.Value) api.Response {
+	p.browserCtx.logger.Infof("Page:Reload", "sid=%v", p.session.id)
 	rt := k6common.GetRuntime(p.ctx)
 	parsedOpts := NewPageReloadOptions(LifecycleEventLoad, p.defaultTimeout())
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
@@ -593,11 +605,13 @@ func (p *Page) SetContent(html string, opts goja.Value) {
 
 // SetDefaultNavigationTimeout sets the default navigation timeout in milliseconds
 func (p *Page) SetDefaultNavigationTimeout(timeout int64) {
+	p.browserCtx.logger.Infof("Page:SetDefaultNavigationTimeout", "sid=%v timeout=%d", p.session.id, timeout)
 	p.timeoutSettings.setDefaultNavigationTimeout(timeout)
 }
 
 // SetDefaultTimeout sets the default maximum timeout in milliseconds
 func (p *Page) SetDefaultTimeout(timeout int64) {
+	p.browserCtx.logger.Infof("Page:SetDefaultTimeout", "sid=%v timeout=%d", p.session.id, timeout)
 	p.timeoutSettings.setDefaultTimeout(timeout)
 }
 
@@ -615,6 +629,7 @@ func (p *Page) SetInputFiles(selector string, files goja.Value, opts goja.Value)
 
 // SetViewportSize will update the viewport width and height
 func (p *Page) SetViewportSize(viewportSize goja.Value) {
+	p.browserCtx.logger.Infof("Page:SetViewportSize", "sid=%v", p.session.id)
 	rt := k6common.GetRuntime(p.ctx)
 	s := &Size{}
 	if err := s.Parse(p.ctx, viewportSize); err != nil {
@@ -684,16 +699,19 @@ func (p *Page) WaitForEvent(event string, optsOrPredicate goja.Value) interface{
 
 // WaitForFunction waits for the given predicate to return a truthy value
 func (p *Page) WaitForFunction(pageFunc goja.Value, arg goja.Value, opts goja.Value) api.JSHandle {
+	p.browserCtx.logger.Infof("Page:WaitForFunction", "sid=%v", p.session.id)
 	return p.frameManager.MainFrame().WaitForFunction(pageFunc, opts, arg)
 }
 
 // WaitForLoadState waits for the specified page life cycle event
 func (p *Page) WaitForLoadState(state string, opts goja.Value) {
+	p.browserCtx.logger.Infof("Page:WaitForLoadState", "sid=%v state=%q", p.session.id, state)
 	p.frameManager.MainFrame().WaitForLoadState(state, opts)
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen
 func (p *Page) WaitForNavigation(opts goja.Value) api.Response {
+	p.browserCtx.logger.Infof("Page:WaitForNavigation", "sid=%v", p.session.id)
 	return p.frameManager.MainFrame().WaitForNavigation(opts)
 }
 
@@ -711,11 +729,13 @@ func (p *Page) WaitForResponse(urlOrPredicate, opts goja.Value) api.Response {
 
 // WaitForSelector waits for the given selector to match the waiting criteria
 func (p *Page) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
+	p.browserCtx.logger.Infof("Page:WaitForSelector", "sid=%v selector=%q", p.session.id, selector)
 	return p.frameManager.MainFrame().WaitForSelector(selector, opts)
 }
 
 // WaitForTimeout waits the specified number of milliseconds
 func (p *Page) WaitForTimeout(timeout int64) {
+	p.browserCtx.logger.Infof("Page:WaitForTimeout", "sid=%v timeout=%d", p.session.id, timeout)
 	p.frameManager.MainFrame().WaitForTimeout(timeout)
 }
 
