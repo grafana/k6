@@ -166,7 +166,7 @@ func (b *Browser) initEvents() error {
 				return
 			case event := <-chHandler:
 				if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
-					b.logger.Infof("Browser:initEvents:onAttachedToTarget", "sid=%v, tid=%v", ev.SessionID, ev.TargetInfo.TargetID)
+					b.logger.Infof("Browser:initEvents:onAttachedToTarget", "sid=%v tid=%v", ev.SessionID, ev.TargetInfo.TargetID)
 					go b.onAttachedToTarget(ev)
 				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
 					b.logger.Infof("Browser:initEvents:onDetachedFromTarget", "sid=%v", ev.SessionID)
