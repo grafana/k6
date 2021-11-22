@@ -258,31 +258,29 @@ func (c *Connection) recvLoop() {
 			}
 		}
 
-		if msg.Method != "" {
-			// Handle attachment and detachment from targets,
-			// creating and deleting sessions as necessary.
-			if msg.Method == cdproto.EventTargetAttachedToTarget {
-				ev, err := cdproto.UnmarshalMessage(&msg)
-				if err != nil {
-					c.logger.Errorf("cdp", "%s", err)
-					continue
-				}
-				sessionID := ev.(*target.EventAttachedToTarget).SessionID
-				c.sessionsMu.Lock()
-				session := NewSession(c.ctx, c, sessionID)
-				c.logger.Infof("Connection:recvLoop", "sid:%v wsURL:%q, NewSession", sessionID, c.wsURL)
-				c.sessions[sessionID] = session
-				c.sessionsMu.Unlock()
-			} else if msg.Method == cdproto.EventTargetDetachedFromTarget {
-				ev, err := cdproto.UnmarshalMessage(&msg)
-				if err != nil {
-					c.logger.Errorf("cdp", "%s", err)
-					continue
-				}
-				sessionID := ev.(*target.EventDetachedFromTarget).SessionID
-				c.logger.Errorf("Connection:recvLoop", "sid:%v wsURL:%q, closeSession", sessionID, c.wsURL)
-				c.closeSession(sessionID)
+		// Handle attachment and detachment from targets,
+		// creating and deleting sessions as necessary.
+		if msg.Method == cdproto.EventTargetAttachedToTarget {
+			ev, err := cdproto.UnmarshalMessage(&msg)
+			if err != nil {
+				c.logger.Errorf("cdp", "%s", err)
+				continue
 			}
+			sessionID := ev.(*target.EventAttachedToTarget).SessionID
+			c.sessionsMu.Lock()
+			session := NewSession(c.ctx, c, sessionID)
+			c.logger.Infof("Connection:recvLoop", "sid:%v wsURL:%q, NewSession", sessionID, c.wsURL)
+			c.sessions[sessionID] = session
+			c.sessionsMu.Unlock()
+		} else if msg.Method == cdproto.EventTargetDetachedFromTarget {
+			ev, err := cdproto.UnmarshalMessage(&msg)
+			if err != nil {
+				c.logger.Errorf("cdp", "%s", err)
+				continue
+			}
+			sessionID := ev.(*target.EventDetachedFromTarget).SessionID
+			c.logger.Errorf("Connection:recvLoop", "sid:%v wsURL:%q, closeSession", sessionID, c.wsURL)
+			c.closeSession(sessionID)
 		}
 
 		switch {
@@ -296,6 +294,7 @@ func (c *Connection) recvLoop() {
 
 				select {
 				case session.readCh <- &msg:
+					// c.logger.Errorf("Connection:recvLoop:session.readCh<-", "sid=%v wsURL=%v crashed:%t", session.id, c.wsURL, session.crashed)
 				case code := <-c.closeCh:
 					c.logger.Errorf("Connection:recvLoop:<-c.closeCh", "sid=%v wsURL=%v crashed:%t", session.id, c.wsURL, session.crashed)
 					_ = c.closeConnection(code)
@@ -306,6 +305,7 @@ func (c *Connection) recvLoop() {
 			}
 
 		case msg.Method != "":
+			c.logger.Errorf("Connection:recvLoop:msg.Method:emit", "method=%q", msg.Method)
 			ev, err := cdproto.UnmarshalMessage(&msg)
 			if err != nil {
 				c.logger.Errorf("cdp", "%s", err)
@@ -314,6 +314,7 @@ func (c *Connection) recvLoop() {
 			c.emit(string(msg.Method), ev)
 
 		case msg.ID != 0:
+			c.logger.Errorf("Connection:recvLoop:msg.ID:emit", "method=%q", msg.ID)
 			c.emit("", &msg)
 
 		default:
@@ -413,8 +414,9 @@ func (c *Connection) sendLoop() {
 		case <-c.ctx.Done():
 			c.logger.Errorf("connection:sendLoop", "returning, ctx.Err: %q", c.ctx.Err())
 			return
-			// TODO: add a timeout?
-			// case <-timeout:
+			// case <-time.After(time.Second * 10):
+			// 	c.logger.Errorf("connection:sendLoop", "returning, timeout")
+			// 	c.Close()
 			// 	return
 		}
 	}
