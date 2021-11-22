@@ -78,6 +78,7 @@ type FrameSession struct {
 }
 
 func NewFrameSession(ctx context.Context, session *Session, page *Page, parent *FrameSession, targetID target.ID) (*FrameSession, error) {
+	session.conn.logger.Infof("NewFrameSession", "sid:%v tid:%v", session.id, targetID)
 	fs := FrameSession{
 		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
 		session:              session,
@@ -97,33 +98,41 @@ func NewFrameSession(ctx context.Context, session *Session, page *Page, parent *
 	if fs.parent != nil {
 		fs.networkManager, err = NewNetworkManager(ctx, session, fs.manager, fs.parent.networkManager)
 		if err != nil {
+			session.conn.logger.Infof("NewFrameSession:NewNetworkManager", "sid:%v tid:%v err:%v", session.id, targetID, err)
 			return nil, err
 		}
 	} else {
 		fs.networkManager, err = NewNetworkManager(ctx, session, fs.manager, nil)
 		if err != nil {
+			session.conn.logger.Infof("NewFrameSession:NewNetworkManager#2", "sid:%v tid:%v err:%v", session.id, targetID, err)
 			return nil, err
 		}
 	}
 
 	action := browser.GetWindowForTarget().WithTargetID(fs.targetID)
 	if fs.windowID, _, err = action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		session.conn.logger.Infof("NewFrameSession:GetWindowForTarget", "sid:%v tid:%v err:%v", session.id, targetID, err)
 		return nil, fmt.Errorf(`unable to get window ID: %w`, err)
 	}
 
 	fs.initEvents()
 	if err = fs.initFrameTree(); err != nil {
+		session.conn.logger.Infof("NewFrameSession:initFrameTree", "sid:%v tid:%v err:%v", session.id, targetID, err)
 		return nil, err
 	}
 	if err = fs.initIsolatedWorld(utilityWorldName); err != nil {
+		session.conn.logger.Infof("NewFrameSession:initIsolatedWorld", "sid:%v tid:%v err:%v", session.id, targetID, err)
 		return nil, err
 	}
 	if err = fs.initDomains(); err != nil {
+		session.conn.logger.Infof("NewFrameSession:initDomains", "sid:%v tid:%v err:%v", session.id, targetID, err)
 		return nil, err
 	}
 	if err = fs.initOptions(); err != nil {
+		session.conn.logger.Infof("NewFrameSession:initOptions", "sid:%v tid:%v err:%v", session.id, targetID, err)
 		return nil, err
 	}
+	session.conn.logger.Infof("NewFrameSession", "sid:%v tid:%v wid:%v err:%v", session.id, targetID, fs.windowID, err)
 	return &fs, nil
 }
 
@@ -169,6 +178,9 @@ func (fs *FrameSession) initDomains() error {
 }
 
 func (fs *FrameSession) initEvents() {
+	fs.session.conn.logger.Infof("NewFrameSession:initEvents",
+		"sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	events := []string{
 		cdproto.EventInspectorTargetCrashed,
 	}
@@ -178,9 +190,18 @@ func (fs *FrameSession) initEvents() {
 	}
 
 	go func() {
+		fs.session.conn.logger.Infof("NewFrameSession:initEvents:go",
+			"sid:%v tid:%v", fs.session.id, fs.targetID)
+		defer fs.session.conn.logger.Infof("NewFrameSession:initEvents:go",
+			"sid:%v tid:%v, returns", fs.session.id, fs.targetID)
+
 		for {
 			select {
 			case <-fs.ctx.Done():
+				fs.session.conn.logger.Infof(
+					"NewFrameSession:initEvents:go:ctx.Done",
+					"sid:%v tid:%v",
+					fs.session.id, fs.targetID)
 				return
 			case event := <-fs.eventCh:
 				if ev, ok := event.data.(*inspector.EventTargetCrashed); ok {
@@ -224,6 +245,9 @@ func (fs *FrameSession) initEvents() {
 }
 
 func (fs *FrameSession) initFrameTree() error {
+	fs.session.conn.logger.Infof("NewFrameSession:initFrameTree",
+		"sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	action := cdppage.Enable()
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		return fmt.Errorf("unable to enable page domain: %w", err)
@@ -250,12 +274,17 @@ func (fs *FrameSession) initFrameTree() error {
 }
 
 func (fs *FrameSession) initIsolatedWorld(name string) error {
+	fs.session.conn.logger.Infof("NewFrameSession:initIsolatedWorld",
+		"sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	action := cdppage.SetLifecycleEventsEnabled(true)
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		return fmt.Errorf(`unable to enable page lifecycle events: %w`, err)
 	}
 
 	if _, ok := fs.isolatedWorlds[name]; ok {
+		fs.session.conn.logger.Infof("NewFrameSession:initIsolatedWorld",
+			"sid:%v tid:%v, not found: %q", fs.session.id, fs.targetID, name)
 		return nil
 	}
 	fs.isolatedWorlds[name] = true
@@ -275,6 +304,10 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 		}, nil)
 	}
 
+	fs.session.conn.logger.Infof(
+		"NewFrameSession:initIsolatedWorld:AddScriptToEvaluateOnNewDocument",
+		"sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	action2 := cdppage.AddScriptToEvaluateOnNewDocument(`//# sourceURL=` + evaluationScriptURL).
 		WithWorldName(name)
 	if _, err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
@@ -284,12 +317,19 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 }
 
 func (fs *FrameSession) initOptions() error {
+	fs.session.conn.logger.Infof("NewFrameSession:initOptions",
+		"sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	opts := fs.manager.page.browserCtx.opts
 	optActions := []Action{}
 
 	if fs.isMainFrame() {
 		optActions = append(optActions, emulation.SetFocusEmulationEnabled(true))
 		if err := fs.updateViewport(); err != nil {
+			fs.session.conn.logger.Infof(
+				"NewFrameSession:initOptions:updateViewport",
+				"sid:%v tid:%v, err:%v",
+				fs.session.id, fs.targetID, err)
 			return err
 		}
 	}
@@ -351,6 +391,9 @@ func (fs *FrameSession) initOptions() error {
 }
 
 func (fs *FrameSession) initRendererEvents() {
+	fs.session.conn.logger.Infof("NewFrameSession:initEvents:initRendererEvents",
+		"sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	events := []string{
 		cdproto.EventLogEntryAdded,
 		cdproto.EventPageFileChooserOpened,
@@ -379,6 +422,9 @@ func (fs *FrameSession) isMainFrame() bool {
 }
 
 func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree) {
+	fs.session.conn.logger.Infof("NewFrameSession:handleFrameTree",
+		"sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	if frameTree.Frame.ParentID != "" {
 		fs.onFrameAttached(frameTree.Frame.ID, frameTree.Frame.ParentID)
 	}
@@ -392,6 +438,10 @@ func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree) {
 }
 
 func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (string, error) {
+	fs.session.conn.logger.Infof("NewFrameSession:navigateFrame",
+		"sid:%v tid:%v url:%q referrer:%q",
+		fs.session.id, fs.targetID, url, referrer)
+
 	action := cdppage.Navigate(url).WithReferrer(referrer).WithFrameID(cdp.FrameID(frame.ID()))
 	_, documentID, errorText, err := action.Do(cdp.WithExecutor(fs.ctx, fs.session))
 	if err != nil {
@@ -437,6 +487,9 @@ func (fs *FrameSession) onExceptionThrown(event *runtime.EventExceptionThrown) {
 }
 
 func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionContextCreated) {
+	fs.session.conn.logger.Infof("NewFrameSession:onExecutionContextCreated",
+		"sid:%v tid:%v ectxid:%v", fs.session.id, fs.targetID, event.Context.ID)
+
 	auxData := event.Context.AuxData
 	var i struct {
 		FrameID   cdp.FrameID `json:"frameId"`
@@ -471,6 +524,9 @@ func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionC
 }
 
 func (fs *FrameSession) onExecutionContextDestroyed(execCtxID runtime.ExecutionContextID) {
+	fs.session.conn.logger.Infof("NewFrameSession:onExecutionContextDestroyed",
+		"sid:%v tid:%v ectxid:%v", fs.session.id, fs.targetID, execCtxID)
+
 	fs.contextIDToContextMu.Lock()
 	defer fs.contextIDToContextMu.Unlock()
 	context, ok := fs.contextIDToContext[execCtxID]
@@ -484,6 +540,9 @@ func (fs *FrameSession) onExecutionContextDestroyed(execCtxID runtime.ExecutionC
 }
 
 func (fs *FrameSession) onExecutionContextsCleared() {
+	fs.session.conn.logger.Infof("NewFrameSession:onExecutionContextsCleared",
+		"sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	fs.contextIDToContextMu.Lock()
 	defer fs.contextIDToContextMu.Unlock()
 	for _, context := range fs.contextIDToContext {
@@ -497,15 +556,25 @@ func (fs *FrameSession) onExecutionContextsCleared() {
 }
 
 func (fs *FrameSession) onFrameAttached(frameID cdp.FrameID, parentFrameID cdp.FrameID) {
+	fs.session.conn.logger.Infof("NewFrameSession:onFrameAttached",
+		"sid:%v tid:%v fid:%v pfid:%v",
+		fs.session.id, fs.targetID, frameID, parentFrameID)
+
 	// TODO: add handling for cross-process frame transitioning
 	fs.manager.frameAttached(frameID, parentFrameID)
 }
 
 func (fs *FrameSession) onFrameDetached(frameID cdp.FrameID) {
+	fs.session.conn.logger.Infof("NewFrameSession:onFrameDetached",
+		"sid:%v tid:%v fid:%v", fs.session.id, fs.targetID, frameID)
+
 	fs.manager.frameDetached(frameID)
 }
 
 func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
+	fs.session.conn.logger.Infof("NewFrameSession:onFrameNavigated",
+		"sid:%v tid:%v fid:%v", fs.session.id, fs.targetID, frame.ID)
+
 	err := fs.manager.frameNavigated(frame.ID, frame.ParentID, frame.LoaderID.String(), frame.Name, frame.URL+frame.URLFragment, initial)
 	if err != nil {
 		k6Throw(fs.ctx, "cannot handle frame navigation: %w", err)
@@ -513,6 +582,10 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 }
 
 func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequestedNavigation) {
+	fs.session.conn.logger.Infof("NewFrameSession:onFrameRequestedNavigation",
+		"sid:%v tid:%v fid:%v url:%q",
+		fs.session.id, fs.targetID, event.FrameID, event.URL)
+
 	if event.Disposition == "currentTab" {
 		err := fs.manager.frameRequestedNavigation(event.FrameID, event.URL, "")
 		if err != nil {
@@ -522,10 +595,16 @@ func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequ
 }
 
 func (fs *FrameSession) onFrameStartedLoading(frameID cdp.FrameID) {
+	fs.session.conn.logger.Infof("NewFrameSession:onFrameStartedLoading",
+		"sid:%v tid:%v fid:%v", fs.session.id, fs.targetID, frameID)
+
 	fs.manager.frameLoadingStarted(frameID)
 }
 
 func (fs *FrameSession) onFrameStoppedLoading(frameID cdp.FrameID) {
+	fs.session.conn.logger.Infof("NewFrameSession:onFrameStoppedLoading",
+		"sid:%v tid:%v fid:%v", fs.session.id, fs.targetID, frameID)
+
 	fs.manager.frameLoadingStopped(frameID)
 }
 
@@ -554,6 +633,10 @@ func (fs *FrameSession) onLogEntryAdded(event *log.EventEntryAdded) {
 }
 
 func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
+	fs.session.conn.logger.Infof("NewFrameSession:onPageLifecycle",
+		"sid:%v tid:%v fid:%v event:%q",
+		fs.session.id, fs.targetID, event.FrameID, event.Name)
+
 	state := k6lib.GetState(fs.ctx)
 	if event.Name == "init" || event.Name == "commit" {
 		fs.initTime = event.Timestamp
@@ -631,10 +714,19 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 }
 
 func (fs *FrameSession) onPageNavigatedWithinDocument(event *cdppage.EventNavigatedWithinDocument) {
+	fs.session.conn.logger.Infof("NewFrameSession:onPageNavigatedWithinDocument",
+		"sid:%v tid:%v fid:%v", fs.session.id, fs.targetID, event.FrameID)
+
 	fs.manager.frameNavigatedWithinDocument(event.FrameID, event.URL)
 }
 
 func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) {
+	fs.session.conn.logger.Infof("NewFrameSession:onAttachedToTarget",
+		"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q",
+		fs.session.id, fs.targetID, event.SessionID,
+		event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
+		event.TargetInfo.Type)
+
 	session := fs.page.browserCtx.conn.getSession(event.SessionID)
 	targetID := event.TargetInfo.TargetID
 
@@ -676,15 +768,19 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 }
 
 func (fs *FrameSession) onDetachedFromTarget(event *target.EventDetachedFromTarget) {
+	fs.session.conn.logger.Infof("NewFrameSession:onDetachedFromTarget", "sid:%v tid:%v esid:%v", fs.session.id, fs.targetID, event.SessionID)
+
 	fs.page.closeWorker(event.SessionID)
 }
 
 func (fs *FrameSession) onTargetCrashed(event *inspector.EventTargetCrashed) {
+	fs.session.conn.logger.Infof("NewFrameSession:onTargetCrashed", "sid:%v tid:%v", fs.session.id, fs.targetID)
 	fs.session.markAsCrashed()
 	fs.page.didCrash()
 }
 
 func (fs *FrameSession) updateEmulateMedia(initial bool) error {
+	fs.session.conn.logger.Infof("NewFrameSession:updateEmulateMedia", "sid:%v tid:%v", fs.session.id, fs.targetID)
 	features := make([]*emulation.MediaFeature, 0)
 
 	switch fs.page.colorScheme {
@@ -713,6 +809,8 @@ func (fs *FrameSession) updateEmulateMedia(initial bool) error {
 }
 
 func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) {
+	fs.session.conn.logger.Infof("NewFrameSession:updateExtraHTTPHeaders", "sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	// Merge extra headers from browser context and page, where page specific headers ake precedence.
 	mergedHeaders := make(network.Headers)
 	for k, v := range fs.page.browserCtx.opts.ExtraHTTPHeaders {
@@ -727,6 +825,8 @@ func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) {
 }
 
 func (fs *FrameSession) updateGeolocation(initial bool) error {
+	fs.session.conn.logger.Infof("NewFrameSession:updateGeolocation", "sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	geolocation := fs.page.browserCtx.opts.Geolocation
 	if !initial || geolocation != nil {
 		action := emulation.SetGeolocationOverride().
@@ -741,6 +841,8 @@ func (fs *FrameSession) updateGeolocation(initial bool) error {
 }
 
 func (fs *FrameSession) updateHttpCredentials(initial bool) {
+	fs.session.conn.logger.Infof("NewFrameSession:updateHttpCredentials", "sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	credentials := fs.page.browserCtx.opts.HttpCredentials
 	if !initial || credentials != nil {
 		fs.networkManager.Authenticate(credentials)
@@ -748,6 +850,8 @@ func (fs *FrameSession) updateHttpCredentials(initial bool) {
 }
 
 func (fs *FrameSession) updateOffline(initial bool) {
+	fs.session.conn.logger.Infof("NewFrameSession:updateOffline", "sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	offline := fs.page.browserCtx.opts.Offline
 	if !initial || offline {
 		fs.networkManager.SetOfflineMode(offline)
@@ -755,10 +859,14 @@ func (fs *FrameSession) updateOffline(initial bool) {
 }
 
 func (fs *FrameSession) updateRequestInterception(initial bool) error {
+	fs.session.conn.logger.Infof("NewFrameSession:updateRequestInterception", "sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	return fs.networkManager.setRequestInterception(fs.page.hasRoutes())
 }
 
 func (fs *FrameSession) updateViewport() error {
+	fs.session.conn.logger.Infof("NewFrameSession:updateViewport", "sid:%v tid:%v", fs.session.id, fs.targetID)
+
 	opts := fs.page.browserCtx.opts
 	emulatedSize := fs.page.emulatedSize
 	if emulatedSize == nil {
