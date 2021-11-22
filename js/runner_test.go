@@ -2075,9 +2075,12 @@ func TestMinIterationDurationIsCancellable(t *testing.T) {
 }
 
 func TestForceHTTP1FeatureEnabledCheckForH1(t *testing.T) {
-	os.Setenv("GODEBUG", "http2client=0,gctrace=1")
-
-	defer os.Unsetenv("GODEBUG")
+	err := os.Setenv("GODEBUG", "http2client=0,gctrace=1")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Unsetenv("GODEBUG")
+		require.NoError(t, err)
+	}()
 
 	assert.True(t, forceHTTP1())
 
@@ -2100,9 +2103,11 @@ func TestForceHTTP1FeatureEnabledCheckForH1(t *testing.T) {
 				`)
 	require.NoError(t, err)
 
-	r1.SetOptions(lib.Options{
+	err = r1.SetOptions(lib.Options{
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 	})
+	require.NoError(t, err)
+
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -2126,8 +2131,12 @@ func TestForceHTTP1FeatureEnabledCheckForH1(t *testing.T) {
 }
 
 func TestForceHTTP1FeatureDisabledCheckForH2(t *testing.T) {
-	os.Setenv("GODEBUG", "test=0")
-	defer os.Unsetenv("GODEBUG")
+	err := os.Setenv("GODEBUG", "test=0")
+	require.NoError(t, err)
+	defer func() {
+		err := os.Unsetenv("GODEBUG")
+		require.NoError(t, err)
+	}()
 
 	assert.False(t, forceHTTP1())
 
@@ -2150,9 +2159,11 @@ func TestForceHTTP1FeatureDisabledCheckForH2(t *testing.T) {
 				`)
 	require.NoError(t, err)
 
-	r1.SetOptions(lib.Options{
+	err = r1.SetOptions(lib.Options{
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 	})
+
+	require.NoError(t, err)
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)

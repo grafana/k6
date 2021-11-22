@@ -213,9 +213,9 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 	}
 
 	if forceHTTP1() {
-		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper) //send over h1 protocol
+		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper) // send over h1 protocol
 	} else {
-		_ = http2.ConfigureTransport(transport) //send over h2 protocol
+		_ = http2.ConfigureTransport(transport) // send over h2 protocol
 	}
 
 	cookieJar, err := cookiejar.New(nil)
