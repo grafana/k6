@@ -358,6 +358,9 @@ func (c *Connection) send(msg *cdproto.Message, recvCh chan *cdproto.Message, re
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
 		return nil
+	case <-c.ctx.Done():
+		c.logger.Errorf("Connection:send:<-c.ctx.Done()", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
+		return nil
 	}
 
 	// Block waiting for response.
