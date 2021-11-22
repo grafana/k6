@@ -7,11 +7,9 @@ reviewGroups:
   old:
     - na--
     - MStoykov
-    - imiric
-  new: # TODO: remove a few months from now
+  new: # TODO: combine a few months from now
     - codebien
     - yorugac
-    - inancgumus
     - oleiade
 skipKeywords:
   - wip
