@@ -84,23 +84,26 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...i
 	if now == elapsed {
 		elapsed = 0
 	}
-
-	if l.categoryFilter == nil || l.categoryFilter.Match([]byte(category)) {
-		magenta := color.New(color.FgMagenta).SprintFunc()
-		if l.logger != nil {
-			entry := l.logger.WithFields(logrus.Fields{
-				"category":  magenta(category),
-				"elapsed":   fmt.Sprintf("%d ms", elapsed),
-				"goroutine": goRoutineID(),
-			})
-			if l.logger.GetLevel() < level && l.debugOverride {
-				entry.Printf(msg, args...)
-			} else {
-				entry.Logf(level, msg, args...)
-			}
-		} else {
-			fmt.Printf("%s [%d]: %s - %s ms\n", magenta(category), goRoutineID(), string(msg), magenta(elapsed))
-		}
+	defer func() {
 		l.lastLogCall = now
+	}()
+
+	if l.categoryFilter != nil && !l.categoryFilter.Match([]byte(category)) {
+		return
 	}
+	if l.logger == nil {
+		magenta := color.New(color.FgMagenta).SprintFunc()
+		fmt.Printf("%s [%d]: %s - %s ms\n", magenta(category), goRoutineID(), string(msg), magenta(elapsed))
+		return
+	}
+	entry := l.logger.WithFields(logrus.Fields{
+		"category":  category,
+		"elapsed":   fmt.Sprintf("%d ms", elapsed),
+		"goroutine": goRoutineID(),
+	})
+	if l.logger.GetLevel() < level && l.debugOverride {
+		entry.Printf(msg, args...)
+		return
+	}
+	entry.Logf(level, msg, args...)
 }
