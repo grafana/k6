@@ -79,7 +79,7 @@ func (b *BrowserContext) AddCookies(cookies goja.Value) {
 
 // AddInitScript adds a script that will be initialized on all new pages.
 func (b *BrowserContext) AddInitScript(script goja.Value, arg goja.Value) {
-	b.logger.Infof("BrowserContext:AddInitScript", "")
+	b.logger.Debugf("BrowserContext:AddInitScript", "")
 
 	rt := k6common.GetRuntime(b.ctx)
 
@@ -165,7 +165,7 @@ func (b *BrowserContext) ExposeFunction(name string, callback goja.Callable) {
 
 // GrantPermissions enables the specified permissions, all others will be disabled.
 func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value) {
-	b.logger.Infof("BrowserContext:GrantPermissions", "")
+	b.logger.Debugf("BrowserContext:GrantPermissions", "")
 	rt := k6common.GetRuntime(b.ctx)
 	permsToProtocol := map[string]cdpbrowser.PermissionType{
 		"geolocation":          cdpbrowser.PermissionTypeGeolocation,
@@ -216,7 +216,7 @@ func (b *BrowserContext) NewCDPSession() api.CDPSession {
 
 // NewPage creates a new page inside this browser context.
 func (b *BrowserContext) NewPage() api.Page {
-	b.logger.Infof("BrowserContext:NewPage", "b.id:%v", b.id)
+	b.logger.Debugf("BrowserContext:NewPage", "b.id:%v", b.id)
 	p, err := b.browser.newPageInContext(b.id)
 	if err != nil {
 		rt := k6common.GetRuntime(b.ctx)
@@ -303,7 +303,7 @@ func (b *BrowserContext) Unroute(url goja.Value, handler goja.Callable) {
 }
 
 func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) interface{} {
-	b.logger.Infof("BrowserContext:WaitForEvent", "event:%q", event)
+	b.logger.Debugf("BrowserContext:WaitForEvent", "event:%q", event)
 	// TODO: This public API needs Promise support (as return value) to be useful in JS!
 
 	rt := k6common.GetRuntime(b.ctx)
@@ -340,16 +340,16 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 	ch := make(chan interface{})
 
 	go func() {
-		b.logger.Infof("BrowserContext:WaitForEvent:go()", "starts")
-		defer b.logger.Infof("BrowserContext:WaitForEvent:go()", "returns")
+		b.logger.Debugf("BrowserContext:WaitForEvent:go()", "starts")
+		defer b.logger.Debugf("BrowserContext:WaitForEvent:go()", "returns")
 		for {
 			select {
 			case <-evCancelCtx.Done():
-				b.logger.Infof("BrowserContext:WaitForEvent:go()", "evCancelCtx done")
+				b.logger.Debugf("BrowserContext:WaitForEvent:go()", "evCancelCtx done")
 				return
 			case ev := <-chEvHandler:
 				if ev.typ == EventBrowserContextClose {
-					b.logger.Infof("BrowserContext:WaitForEvent:go()", "EventBrowserContextClose returns")
+					b.logger.Debugf("BrowserContext:WaitForEvent:go()", "EventBrowserContextClose returns")
 					ch <- nil
 					close(ch)
 
@@ -359,11 +359,11 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 					return
 				}
 				if ev.typ == EventBrowserContextPage {
-					b.logger.Infof("BrowserContext:WaitForEvent:go()", "EventBrowserContextPage")
+					b.logger.Debugf("BrowserContext:WaitForEvent:go()", "EventBrowserContextPage")
 					p := ev.data.(*Page)
 					exported := k6common.Bind(rt, p, &b.ctx)
 					if retVal, err := predicateFn(rt.ToValue(exported)); err == nil && retVal.ToBoolean() {
-						b.logger.Infof("BrowserContext:WaitForEvent:go()", "EventBrowserContextPage returns")
+						b.logger.Debugf("BrowserContext:WaitForEvent:go()", "EventBrowserContextPage returns")
 						ch <- p
 						close(ch)
 
@@ -382,13 +382,13 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 
 	select {
 	case <-b.ctx.Done():
-		b.logger.Infof("BrowserContext:WaitForEvent", "b.ctx Done")
+		b.logger.Debugf("BrowserContext:WaitForEvent", "b.ctx Done")
 	case <-time.After(timeout):
-		b.logger.Infof("BrowserContext:WaitForEvent", "timeout")
+		b.logger.Debugf("BrowserContext:WaitForEvent", "timeout")
 	case evData := <-ch:
-		b.logger.Infof("BrowserContext:WaitForEvent", "evData")
+		b.logger.Debugf("BrowserContext:WaitForEvent", "evData")
 		return evData
 	}
-	b.logger.Infof("BrowserContext:WaitForEvent", "nil return")
+	b.logger.Debugf("BrowserContext:WaitForEvent", "nil return")
 	return nil
 }

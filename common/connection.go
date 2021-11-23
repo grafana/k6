@@ -245,12 +245,12 @@ func (c *Connection) findSessionTargetID(id target.SessionID) target.ID {
 }
 
 func (c *Connection) recvLoop() {
-	c.logger.Infof("Connection:recvLoop", "wsURL:%q", c.wsURL)
+	c.logger.Debugf("Connection:recvLoop", "wsURL:%q", c.wsURL)
 	for {
 		_, buf, err := c.conn.ReadMessage()
 		if err != nil {
 			c.handleIOError(err)
-			c.logger.Infof("Connection:recvLoop", "wsURL:%q ioErr:%v", c.wsURL, err)
+			c.logger.Debugf("Connection:recvLoop", "wsURL:%q ioErr:%v", c.wsURL, err)
 			return
 		}
 
@@ -262,9 +262,9 @@ func (c *Connection) recvLoop() {
 		if err := c.decoder.Error(); err != nil {
 			select {
 			case c.errorCh <- err:
-				c.logger.Infof("Connection:recvLoop:<-err", "wsURL:%q err:%v", c.wsURL, err)
+				c.logger.Debugf("Connection:recvLoop:<-err", "wsURL:%q err:%v", c.wsURL, err)
 			case <-c.done:
-				c.logger.Infof("Connection:recvLoop:<-c.done", "wsURL:%q", c.wsURL)
+				c.logger.Debugf("Connection:recvLoop:<-c.done", "wsURL:%q", c.wsURL)
 				return
 			}
 		}
@@ -281,7 +281,7 @@ func (c *Connection) recvLoop() {
 			sid, tid := eva.SessionID, eva.TargetInfo.TargetID
 			c.sessionsMu.Lock()
 			session := NewSession(c.ctx, c, sid, tid)
-			c.logger.Infof("Connection:recvLoop:EventAttachedToTarget", "sid:%v tid:%v wsURL:%q, NewSession", sid, tid, c.wsURL)
+			c.logger.Debugf("Connection:recvLoop:EventAttachedToTarget", "sid:%v tid:%v wsURL:%q, NewSession", sid, tid, c.wsURL)
 			c.sessions[sid] = session
 			c.sessionsMu.Unlock()
 		} else if msg.Method == cdproto.EventTargetDetachedFromTarget {
@@ -312,7 +312,7 @@ func (c *Connection) recvLoop() {
 
 			select {
 			case session.readCh <- &msg:
-				// c.logger.Errorf("Connection:recvLoop:session.readCh<-", "sid=%v wsURL=%v crashed:%t", session.id, c.wsURL, session.crashed)
+				// c.logger.Errorf("Connection:recvLoop:session.readCh<-", "sid:%v wsURL:%v crashed:%t", session.id, c.wsURL, session.crashed)
 			case code := <-c.closeCh:
 				c.logger.Errorf("Connection:recvLoop:<-c.closeCh", "sid:%v tid:%v wsURL:%v crashed:%t", session.id, session.targetID, c.wsURL, session.crashed)
 				_ = c.closeConnection(code)
@@ -322,7 +322,7 @@ func (c *Connection) recvLoop() {
 			}
 
 		case msg.Method != "":
-			c.logger.Errorf("Connection:recvLoop:msg.Method:emit", "method=%q", msg.Method)
+			c.logger.Errorf("Connection:recvLoop:msg.Method:emit", "method:%q", msg.Method)
 			ev, err := cdproto.UnmarshalMessage(&msg)
 			if err != nil {
 				c.logger.Errorf("cdp", "%s", err)
@@ -331,7 +331,7 @@ func (c *Connection) recvLoop() {
 			c.emit(string(msg.Method), ev)
 
 		case msg.ID != 0:
-			c.logger.Errorf("Connection:recvLoop:msg.ID:emit", "method=%q", msg.ID)
+			c.logger.Errorf("Connection:recvLoop:msg.ID:emit", "method:%q", msg.ID)
 			c.emit("", &msg)
 
 		default:
