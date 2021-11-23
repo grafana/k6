@@ -112,7 +112,7 @@ func (s *Session) readLoop() {
 			}
 			s.emit(string(msg.Method), ev)
 		case <-s.done:
-			s.conn.logger.Errorf("Session:readLoop:<-s.done", "sid:%v tid:%v", s.id, s.targetID)
+			s.logger.Debugf("Session:readLoop:<-s.done", "sid:%v tid:%v", s.id, s.targetID)
 			return
 		}
 	}
@@ -140,14 +140,14 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 		for {
 			select {
 			case <-evCancelCtx.Done():
-				s.conn.logger.Errorf("Session:Execute:<-evCancelCtx.Done()", "sid:%v tid:%v method:%q, returns", s.id, s.targetID, method)
+				s.logger.Debugf("Session:Execute:<-evCancelCtx.Done()", "sid:%v tid:%v method:%q, returns", s.id, s.targetID, method)
 				return
 			case ev := <-chEvHandler:
 				// s.logger.Debugf("Session:Execute:<-chEvHandler", "sid:%v method:%q", s.id, method)
 				if msg, ok := ev.data.(*cdproto.Message); ok && msg.ID == id {
 					select {
 					case <-evCancelCtx.Done():
-						s.conn.logger.Errorf("Session:Execute:<-evCancelCtx.Done():2", "sid:%v tid:%v method:%q, returns", s.id, s.targetID, method)
+						s.logger.Debugf("Session:Execute:<-evCancelCtx.Done():2", "sid:%v tid:%v method:%q, returns", s.id, s.targetID, method)
 					case ch <- msg:
 						// s.logger.Debugf("Session:Execute:<-chEvHandler:ch <- msg", "sid:%v method:%q", s.id, method)
 						// We expect only one response with the matching message ID,
