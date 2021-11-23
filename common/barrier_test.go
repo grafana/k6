@@ -32,7 +32,7 @@ func TestBarrier(t *testing.T) {
 	t.Run("should work", func(t *testing.T) {
 		ctx := context.Background()
 		timeoutSetings := NewTimeoutSettings(nil)
-		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings)
+		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
 		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
 
 		barrier := NewBarrier()

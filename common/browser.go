@@ -218,7 +218,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	}
 
 	if ev.TargetInfo.Type == "background_page" {
-		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, nil, false)
+		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, nil, false, b.logger)
 		if err != nil {
 			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
@@ -244,7 +244,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		}
 		b.logger.Debugf("Browser:onAttachedToTarget:page", "sid:%v tid:%v opener nil:%t", ev.SessionID, ev.TargetInfo.TargetID, opener == nil)
 		b.pagesMu.RUnlock()
-		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, opener, true)
+		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, opener, true, b.logger)
 		if err != nil {
 			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {

@@ -49,10 +49,12 @@ type Session struct {
 	done     chan struct{}
 	closed   bool
 	crashed  bool
+
+	logger *Logger
 }
 
 // NewSession creates a new session
-func NewSession(ctx context.Context, conn *Connection, id target.SessionID, tid target.ID) *Session {
+func NewSession(ctx context.Context, conn *Connection, id target.SessionID, tid target.ID, logger *Logger) *Session {
 	s := Session{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
@@ -61,16 +63,18 @@ func NewSession(ctx context.Context, conn *Connection, id target.SessionID, tid 
 		targetID:         tid,
 		readCh:           make(chan *cdproto.Message),
 		done:             make(chan struct{}),
+
+		logger: logger,
 	}
-	s.conn.logger.Debugf("Session:NewSession", "sid:%v tid:%v", id, tid)
+	s.logger.Debugf("Session:NewSession", "sid:%v tid:%v", id, tid)
 	go s.readLoop()
 	return &s
 }
 
 func (s *Session) close() {
-	s.conn.logger.Debugf("Session:close", "sid:%v tid:%v", s.id, s.targetID)
+	s.logger.Debugf("Session:close", "sid:%v tid:%v", s.id, s.targetID)
 	if s.closed {
-		s.conn.logger.Debugf("Session:close", "already closed, sid:%v tid:%v", s.id, s.targetID)
+		s.logger.Debugf("Session:close", "already closed, sid:%v tid:%v", s.id, s.targetID)
 		return
 	}
 
@@ -82,7 +86,7 @@ func (s *Session) close() {
 }
 
 func (s *Session) markAsCrashed() {
-	s.conn.logger.Debugf("Session:markAsCrashed", "sid:%v tid:%v", s.id, s.targetID)
+	s.logger.Debugf("Session:markAsCrashed", "sid:%v tid:%v", s.id, s.targetID)
 	s.crashed = true
 }
 
@@ -95,7 +99,7 @@ func (s *Session) readLoop() {
 		case msg := <-s.readCh:
 			ev, err := cdproto.UnmarshalMessage(msg)
 			if err != nil {
-				s.conn.logger.Debugf("Session:readLoop:<-s.readCh", "sid:%v tid:%v cannot unmarshal: %v", s.id, s.targetID, err)
+				s.logger.Debugf("Session:readLoop:<-s.readCh", "sid:%v tid:%v cannot unmarshal: %v", s.id, s.targetID, err)
 				if _, ok := err.(cdp.ErrUnknownCommandOrEvent); ok {
 					// This is most likely an event received from an older
 					// Chrome which a newer cdproto doesn't have, as it is
@@ -116,13 +120,13 @@ func (s *Session) readLoop() {
 
 // Execute implements the cdp.Executor interface
 func (s *Session) Execute(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
-	s.conn.logger.Debugf("Session:Execute", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
+	s.logger.Debugf("Session:Execute", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
 	// Certain methods aren't available to the user directly.
 	if method == target.CommandCloseTarget {
 		return errors.New("to close the target, cancel its context")
 	}
 	if s.crashed {
-		s.conn.logger.Debugf("Session:Execute", "sid:%v tid:%v method:%q, returns: crashed", s.id, s.targetID, method)
+		s.logger.Debugf("Session:Execute", "sid:%v tid:%v method:%q, returns: crashed", s.id, s.targetID, method)
 		return ErrTargetCrashed
 	}
 
@@ -139,13 +143,13 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 				s.conn.logger.Errorf("Session:Execute:<-evCancelCtx.Done()", "sid:%v tid:%v method:%q, returns", s.id, s.targetID, method)
 				return
 			case ev := <-chEvHandler:
-				// s.conn.logger.Debugf("Session:Execute:<-chEvHandler", "sid:%v method:%q", s.id, method)
+				// s.logger.Debugf("Session:Execute:<-chEvHandler", "sid:%v method:%q", s.id, method)
 				if msg, ok := ev.data.(*cdproto.Message); ok && msg.ID == id {
 					select {
 					case <-evCancelCtx.Done():
 						s.conn.logger.Errorf("Session:Execute:<-evCancelCtx.Done():2", "sid:%v tid:%v method:%q, returns", s.id, s.targetID, method)
 					case ch <- msg:
-						// s.conn.logger.Debugf("Session:Execute:<-chEvHandler:ch <- msg", "sid:%v method:%q", s.id, method)
+						// s.logger.Debugf("Session:Execute:<-chEvHandler:ch <- msg", "sid:%v method:%q", s.id, method)
 						// We expect only one response with the matching message ID,
 						// then remove event handler by cancelling context and stopping goroutine.
 						evCancelFn()
@@ -173,18 +177,18 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 		Method:    cdproto.MethodType(method),
 		Params:    buf,
 	}
-	s.conn.logger.Debugf("Session:Execute:s.conn.send", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
+	s.logger.Debugf("Session:Execute:s.conn.send", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
 	return s.conn.send(msg, ch, res)
 }
 
 func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
-	s.conn.logger.Debugf("Session:ExecuteWithoutExpectationOnReply", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
+	s.logger.Debugf("Session:ExecuteWithoutExpectationOnReply", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
 	// Certain methods aren't available to the user directly.
 	if method == target.CommandCloseTarget {
 		return errors.New("to close the target, cancel its context")
 	}
 	if s.crashed {
-		s.conn.logger.Debugf("Session:ExecuteWithoutExpectationOnReply", "sid:%v tid:%v method:%q, ErrTargetCrashed", s.id, s.targetID, method)
+		s.logger.Debugf("Session:ExecuteWithoutExpectationOnReply", "sid:%v tid:%v method:%q, ErrTargetCrashed", s.id, s.targetID, method)
 		return ErrTargetCrashed
 	}
 
@@ -196,7 +200,7 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 		var err error
 		buf, err = easyjson.Marshal(params)
 		if err != nil {
-			s.conn.logger.Debugf("Session:ExecuteWithoutExpectationOnReply:Marshal", "sid:%v tid:%v method:%q err=%v", s.id, s.targetID, method, err)
+			s.logger.Debugf("Session:ExecuteWithoutExpectationOnReply:Marshal", "sid:%v tid:%v method:%q err=%v", s.id, s.targetID, method, err)
 			return err
 		}
 	}

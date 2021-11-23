@@ -153,7 +153,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
 		rt := goja.New()
 		timeoutSetings := NewTimeoutSettings(nil)
-		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings)
+		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
 		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
 		remoteObjValue := "hellow world"
 		result, _ := json.Marshal(remoteObjValue)
@@ -176,7 +176,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
 		rt := goja.New()
 		timeoutSetings := NewTimeoutSettings(nil)
-		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings)
+		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
 		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
 		remoteObjectID := runtime.RemoteObjectID("object_id_0123456789")
 		remoteObject := &runtime.RemoteObject{
@@ -198,7 +198,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
 		rt := goja.New()
 		timeoutSetings := NewTimeoutSettings(nil)
-		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings)
+		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
 		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
 		remoteObjectID := runtime.RemoteObjectID("object_id_0123456789")
 		remoteObject := &runtime.RemoteObject{
@@ -220,7 +220,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
 		rt := goja.New()
 		timeoutSetings := NewTimeoutSettings(nil)
-		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings)
+		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
 		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
 		remoteObjectID := runtime.RemoteObjectID("object_id_0123456789")
 		remoteObject := &runtime.RemoteObject{
