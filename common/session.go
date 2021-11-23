@@ -40,36 +40,37 @@ var _ cdp.Executor = &Session{}
 type Session struct {
 	BaseEventEmitter
 
-	ctx     context.Context
-	conn    *Connection
-	id      target.SessionID
-	msgID   int64
-	readCh  chan *cdproto.Message
-	done    chan struct{}
-	closed  bool
-	crashed bool
+	ctx      context.Context
+	conn     *Connection
+	id       target.SessionID
+	targetID target.ID
+	msgID    int64
+	readCh   chan *cdproto.Message
+	done     chan struct{}
+	closed   bool
+	crashed  bool
 }
 
 // NewSession creates a new session
-func NewSession(ctx context.Context, conn *Connection, id target.SessionID) *Session {
+func NewSession(ctx context.Context, conn *Connection, id target.SessionID, tid target.ID) *Session {
 	s := Session{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
 		conn:             conn,
 		id:               id,
-		msgID:            0,
+		targetID:         tid,
 		readCh:           make(chan *cdproto.Message),
 		done:             make(chan struct{}),
 	}
-	s.conn.logger.Infof("Session:NewSession", "sid=%v", id)
+	s.conn.logger.Infof("Session:NewSession", "sid=%v tid=%v", id, tid)
 	go s.readLoop()
 	return &s
 }
 
 func (s *Session) close() {
-	s.conn.logger.Infof("Session:close", "sid=%v", s.id)
+	s.conn.logger.Infof("Session:close", "sid=%v tid=%v", s.id, s.targetID)
 	if s.closed {
-		s.conn.logger.Infof("Session:close", "already closed, sid=%v", s.id)
+		s.conn.logger.Infof("Session:close", "already closed, sid=%v tid=%v", s.id, s.targetID)
 		return
 	}
 
@@ -81,7 +82,7 @@ func (s *Session) close() {
 }
 
 func (s *Session) markAsCrashed() {
-	s.conn.logger.Infof("Session:markAsCrashed", "sid=%v", s.id)
+	s.conn.logger.Infof("Session:markAsCrashed", "sid=%v tid=%v", s.id, s.targetID)
 	s.crashed = true
 }
 
@@ -94,7 +95,7 @@ func (s *Session) readLoop() {
 		case msg := <-s.readCh:
 			ev, err := cdproto.UnmarshalMessage(msg)
 			if err != nil {
-				s.conn.logger.Infof("Session:readLoop:<-s.readCh", "sid=%v cannot unmarshal: %v", s.id, err)
+				s.conn.logger.Infof("Session:readLoop:<-s.readCh", "sid=%v tid=%v cannot unmarshal: %v", s.id, s.targetID, err)
 				if _, ok := err.(cdp.ErrUnknownCommandOrEvent); ok {
 					// This is most likely an event received from an older
 					// Chrome which a newer cdproto doesn't have, as it is
@@ -107,7 +108,7 @@ func (s *Session) readLoop() {
 			}
 			s.emit(string(msg.Method), ev)
 		case <-s.done:
-			s.conn.logger.Errorf("Session:readLoop:<-s.done", "sid=%v", s.id)
+			s.conn.logger.Errorf("Session:readLoop:<-s.done", "sid=%v tid=%v", s.id, s.targetID)
 			return
 		}
 	}
@@ -115,13 +116,13 @@ func (s *Session) readLoop() {
 
 // Execute implements the cdp.Executor interface
 func (s *Session) Execute(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
-	s.conn.logger.Infof("Session:Execute", "sid=%v method=%q", s.id, method)
+	s.conn.logger.Infof("Session:Execute", "sid=%v tid=%v method=%q", s.id, s.targetID, method)
 	// Certain methods aren't available to the user directly.
 	if method == target.CommandCloseTarget {
 		return errors.New("to close the target, cancel its context")
 	}
 	if s.crashed {
-		s.conn.logger.Infof("Session:Execute", "sid=%v method=%q, returns: crashed", s.id, method)
+		s.conn.logger.Infof("Session:Execute", "sid=%v tid=%v method=%q, returns: crashed", s.id, s.targetID, method)
 		return ErrTargetCrashed
 	}
 
@@ -135,14 +136,14 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 		for {
 			select {
 			case <-evCancelCtx.Done():
-				s.conn.logger.Errorf("Session:Execute:<-evCancelCtx.Done()", "sid=%v method=%q, returns", s.id, method)
+				s.conn.logger.Errorf("Session:Execute:<-evCancelCtx.Done()", "sid=%v tid=%v method=%q, returns", s.id, s.targetID, method)
 				return
 			case ev := <-chEvHandler:
 				// s.conn.logger.Infof("Session:Execute:<-chEvHandler", "sid=%v method=%q", s.id, method)
 				if msg, ok := ev.data.(*cdproto.Message); ok && msg.ID == id {
 					select {
 					case <-evCancelCtx.Done():
-						s.conn.logger.Errorf("Session:Execute:<-evCancelCtx.Done():2", "sid=%v method=%q, returns", s.id, method)
+						s.conn.logger.Errorf("Session:Execute:<-evCancelCtx.Done():2", "sid=%v tid=%v method=%q, returns", s.id, s.targetID, method)
 					case ch <- msg:
 						// s.conn.logger.Infof("Session:Execute:<-chEvHandler:ch <- msg", "sid=%v method=%q", s.id, method)
 						// We expect only one response with the matching message ID,
@@ -177,13 +178,13 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 }
 
 func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
-	s.conn.logger.Infof("Session:ExecuteWithoutExpectationOnReply", "sid=%v method=%q", s.id, method)
+	s.conn.logger.Infof("Session:ExecuteWithoutExpectationOnReply", "sid=%v tid=%v method=%q", s.id, s.targetID, method)
 	// Certain methods aren't available to the user directly.
 	if method == target.CommandCloseTarget {
 		return errors.New("to close the target, cancel its context")
 	}
 	if s.crashed {
-		s.conn.logger.Infof("Session:ExecuteWithoutExpectationOnReply", "sid=%v method=%q, ErrTargetCrashed", s.id, method)
+		s.conn.logger.Infof("Session:ExecuteWithoutExpectationOnReply", "sid=%v tid=%v method=%q, ErrTargetCrashed", s.id, s.targetID, method)
 		return ErrTargetCrashed
 	}
 
@@ -195,7 +196,7 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 		var err error
 		buf, err = easyjson.Marshal(params)
 		if err != nil {
-			s.conn.logger.Infof("Session:ExecuteWithoutExpectationOnReply:Marshal", "sid=%v method=%q err=%v", s.id, method, err)
+			s.conn.logger.Infof("Session:ExecuteWithoutExpectationOnReply:Marshal", "sid=%v tid=%v method=%q err=%v", s.id, s.targetID, method, err)
 			return err
 		}
 	}
