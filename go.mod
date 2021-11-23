@@ -36,6 +36,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/tidwall/gjson v1.10.2
 	github.com/tidwall/pretty v1.2.0
+	github.com/twitchtv/twirp v8.1.0+incompatible
 	golang.org/x/crypto v0.0.0-20210503195802-e9a32991a82e
 	golang.org/x/net v0.0.0-20211101194204-95aca89e93de
 	golang.org/x/sys v0.0.0-20210511113859-b0526f3d8744 // indirect

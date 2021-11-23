@@ -49,6 +49,8 @@ import (
 	"go.k6.io/k6/js/modules/k6/ws"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/loader"
+
+	"go.k6.io/k6/js/modules/k6/twirp"
 )
 
 type programWithSource struct {
@@ -330,6 +332,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/http":        http.New(),
 		"k6/metrics":     metrics.New(),
 		"k6/ws":          ws.New(),
+		"k6/net/twirp":   twirp.New(),
 	}
 }
 

@@ -152,6 +152,11 @@ github.com/tidwall/match
 # github.com/tidwall/pretty v1.2.0
 ## explicit
 github.com/tidwall/pretty
+# github.com/twitchtv/twirp v8.1.0+incompatible
+## explicit
+github.com/twitchtv/twirp
+github.com/twitchtv/twirp/ctxsetters
+github.com/twitchtv/twirp/internal/contextkeys
 # golang.org/x/crypto v0.0.0-20210503195802-e9a32991a82e
 ## explicit
 golang.org/x/crypto/md4
