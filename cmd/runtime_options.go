@@ -62,7 +62,7 @@ func runtimeOptionFlagSet(includeSysEnv bool) *pflag.FlagSet {
 		`JavaScript compiler compatibility mode, "extended" or "base"
 base: pure goja - Golang JS VM supporting ES5.1+
 extended: base + Babel with parts of ES2015 preset
-		  slower to compile in case the script uses unsupported by base syntax
+		  slower to compile in case the script uses syntax unsupported by base
 `)
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
