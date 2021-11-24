@@ -99,6 +99,30 @@ func (k *Keyboard) down(key string) error {
 	return nil
 }
 
+func (k *Keyboard) up(key string) error {
+	keyInput := keyboardlayout.KeyInput(key)
+	layout := keyboardlayout.GetKeyboardLayout(k.layoutName)
+	if _, ok := layout.ValidKeys[keyInput]; !ok {
+		return fmt.Errorf("'%s' is not a valid key for layout '%s'", key, k.layoutName)
+	}
+
+	keyDef := k.keyDefinitionFromKey(keyInput)
+	k.modifiers &= ^k.modifierBitFromKeyName(keyDef.Key)
+	delete(k.pressedKeys, keyDef.KeyCode)
+
+	action := input.DispatchKeyEvent(input.KeyUp).
+		WithModifiers(input.Modifier(k.modifiers)).
+		WithKey(keyDef.Key).
+		WithWindowsVirtualKeyCode(keyDef.KeyCode).
+		WithCode(keyDef.Code).
+		WithLocation(keyDef.Location)
+	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
+		return fmt.Errorf("unable to mouse down: %w", err)
+	}
+
+	return nil
+}
+
 func (k *Keyboard) insertText(text string) error {
 	action := input.InsertText(text)
 	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
@@ -224,30 +248,6 @@ func (k *Keyboard) typ(text string, opts *KeyboardOptions) error {
 			}
 		}
 	}
-	return nil
-}
-
-func (k *Keyboard) up(key string) error {
-	keyInput := keyboardlayout.KeyInput(key)
-	layout := keyboardlayout.GetKeyboardLayout(k.layoutName)
-	if _, ok := layout.ValidKeys[keyInput]; !ok {
-		return fmt.Errorf("'%s' is not a valid key for layout '%s'", key, k.layoutName)
-	}
-
-	keyDef := k.keyDefinitionFromKey(keyInput)
-	k.modifiers &= ^k.modifierBitFromKeyName(keyDef.Key)
-	delete(k.pressedKeys, keyDef.KeyCode)
-
-	action := input.DispatchKeyEvent(input.KeyUp).
-		WithModifiers(input.Modifier(k.modifiers)).
-		WithKey(keyDef.Key).
-		WithWindowsVirtualKeyCode(keyDef.KeyCode).
-		WithCode(keyDef.Code).
-		WithLocation(keyDef.Location)
-	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
-		return fmt.Errorf("unable to mouse down: %w", err)
-	}
-
 	return nil
 }
 
