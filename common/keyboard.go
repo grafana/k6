@@ -93,7 +93,7 @@ func (k *Keyboard) down(key string) error {
 		WithUnmodifiedText(text).
 		WithAutoRepeat(autoRepeat)
 	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
-		return fmt.Errorf("unable to mouse down: %w", err)
+		return fmt.Errorf("unable to key down: %w", err)
 	}
 
 	return nil
@@ -117,7 +117,7 @@ func (k *Keyboard) up(key string) error {
 		WithCode(keyDef.Code).
 		WithLocation(keyDef.Location)
 	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
-		return fmt.Errorf("unable to mouse down: %w", err)
+		return fmt.Errorf("unable to key up: %w", err)
 	}
 
 	return nil
