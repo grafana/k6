@@ -46,6 +46,7 @@ import (
 	"go.k6.io/k6/js/modules/k6/html"
 	"go.k6.io/k6/js/modules/k6/http"
 	"go.k6.io/k6/js/modules/k6/metrics"
+	"go.k6.io/k6/js/modules/k6/segment"
 	"go.k6.io/k6/js/modules/k6/ws"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/loader"
@@ -323,6 +324,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/crypto":      crypto.New(),
 		"k6/crypto/x509": x509.New(),
 		"k6/data":        data.New(),
+		"k6/segment":     segment.New(),
 		"k6/encoding":    encoding.New(),
 		"k6/execution":   execution.New(),
 		"k6/net/grpc":    grpc.New(),
