@@ -30,6 +30,8 @@ issues:
    #TODO: remove this exclusion after https://github.com/golang/lint/issues/381
    # is fixed by https://github.com/golang/lint/pull/380 or something else
    - "should have a package comment, unless it's in another file for this package"
+   # most k6 errors are actually used as exceptions for users
+   - "error strings should not be capitalized or end with punctuation or a newline"
 
 linters-settings:
   govet:
