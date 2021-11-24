@@ -15,6 +15,9 @@ github.com/Soontao/goHttpDigestClient
 github.com/andybalholm/brotli
 # github.com/andybalholm/cascadia v1.1.0
 github.com/andybalholm/cascadia
+# github.com/benbjohnson/clock v1.3.0
+## explicit
+github.com/benbjohnson/clock
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91
