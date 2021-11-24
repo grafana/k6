@@ -37,10 +37,10 @@ import (
 var _ api.Keyboard = &Keyboard{}
 
 const (
-	ModifierKeyAlt     int64 = 1
-	ModifierKeyControl       = 2
-	ModifierKeyMeta          = 4
-	ModifierKeyShift         = 8
+	ModifierKeyAlt int64 = 1 << iota
+	ModifierKeyControl
+	ModifierKeyMeta
+	ModifierKeyShift
 )
 
 // Keyboard represents a keyboard input device
