@@ -36,4 +36,5 @@ const (
 	ExternalAbort            errext.ExitCode = 105
 	CannotStartRESTAPI       errext.ExitCode = 106
 	ScriptException          errext.ExitCode = 107
+	ScriptAborted            errext.ExitCode = 108
 )

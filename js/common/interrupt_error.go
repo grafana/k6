@@ -20,15 +20,28 @@
 
 package common
 
-import "errors"
+import (
+	"errors"
+
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
+)
 
 // InterruptError is an error that halts engine execution
 type InterruptError struct {
 	Reason string
 }
 
+var _ errext.HasExitCode = &InterruptError{}
+
+// Error returns the reason of the interruption.
 func (i *InterruptError) Error() string {
 	return i.Reason
+}
+
+// ExitCode returns the status code used when the k6 process exits.
+func (i *InterruptError) ExitCode() errext.ExitCode {
+	return exitcodes.ScriptAborted
 }
 
 // AbortTest is the reason emitted when a test script calls test.abort()

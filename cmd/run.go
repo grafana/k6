@@ -251,9 +251,6 @@ a commandline interface for interacting with it.`,
 			initBar.Modify(pb.WithConstProgress(0, "Init VUs..."))
 			engineRun, engineWait, err := engine.Init(globalCtx, runCtx)
 			if err != nil {
-				if common.IsInterruptError(err) {
-					return errext.WithExitCodeIfNone(err, exitcodes.ScriptException)
-				}
 				// Add a generic engine exit code if we don't have a more specific one
 				return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
 			}
@@ -281,6 +278,8 @@ a commandline interface for interacting with it.`,
 			err = engineRun()
 			if err != nil {
 				if common.IsInterruptError(err) {
+					// Don't return here since we need to work with --linger,
+					// show the end-of-test summary and exit cleanly.
 					interrupt = err
 				}
 				if !conf.Linger.Bool && interrupt == nil {
@@ -335,7 +334,7 @@ a commandline interface for interacting with it.`,
 			engineWait()
 			logger.Debug("Everything has finished, exiting k6!")
 			if interrupt != nil {
-				return errext.WithExitCodeIfNone(interrupt, exitcodes.ScriptException)
+				return interrupt
 			}
 			if engine.IsTainted() {
 				return errext.WithExitCodeIfNone(errors.New("some thresholds have failed"), exitcodes.ThresholdsHaveFailed)

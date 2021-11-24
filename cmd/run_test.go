@@ -136,7 +136,7 @@ func TestHandleSummaryResultError(t *testing.T) {
 func TestAbortTest(t *testing.T) { //nolint: tparallel
 	t.Parallel()
 
-	t.Run("Check status code is 107", func(t *testing.T) { //nolint: paralleltest
+	t.Run("Check correct status code", func(t *testing.T) { //nolint: paralleltest
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		logger := testutils.NewLogger(t)
@@ -148,7 +148,8 @@ func TestAbortTest(t *testing.T) { //nolint: tparallel
 		err = cmd.Execute()
 		var e errext.HasExitCode
 		require.ErrorAs(t, err, &e)
-		require.Equal(t, exitcodes.ScriptException, e.ExitCode(), "Status code must be 107")
+		assert.Equalf(t, exitcodes.ScriptAborted, e.ExitCode(),
+			"Status code must be %d", exitcodes.ScriptAborted)
 		require.Contains(t, e.Error(), common.AbortTest)
 	})
 
@@ -172,7 +173,8 @@ func TestAbortTest(t *testing.T) { //nolint: tparallel
 		err = cmd.Execute()
 		var e errext.HasExitCode
 		require.ErrorAs(t, err, &e)
-		assert.Equal(t, exitcodes.ScriptException, e.ExitCode(), "Status code must be 107")
+		assert.Equalf(t, exitcodes.ScriptAborted, e.ExitCode(),
+			"Status code must be %d", exitcodes.ScriptAborted)
 		assert.Contains(t, e.Error(), common.AbortTest)
 		assert.Contains(t, buf.String(), msg)
 	})
