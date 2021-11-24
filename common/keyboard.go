@@ -132,23 +132,31 @@ func (k *Keyboard) insertText(text string) error {
 }
 
 func (k *Keyboard) keyDefinitionFromKey(keyString keyboardlayout.KeyInput) keyboardlayout.KeyDefinition {
-	shift := k.modifiers & ModifierKeyShift
-	keyDef := keyboardlayout.KeyDefinition{}
 	layout := keyboardlayout.GetKeyboardLayout(k.layoutName)
-	code := keyString
 	srcKeyDef, ok := layout.Keys[keyString]
-
+	// Find based on key value instead of code
 	if !ok {
-		// Find based on key value instead of code
 		for k, v := range layout.Keys {
-			if v.Key == string(keyString) {
-				code = k
-				srcKeyDef = v
-				break
+			if v.Key != string(keyString) {
+				continue
 			}
+			keyString, srcKeyDef = k, v
+			ok = true // don't look for a shift key below
 		}
 	}
+	// try to find with the shift key value
+	shift := k.modifiers & ModifierKeyShift
+	if !ok {
+		for k, v := range layout.Keys {
+			if v.ShiftKey != string(keyString) {
+				continue
+			}
+			keyString, srcKeyDef = k, v
+		}
+		shift = k.modifiers | ModifierKeyShift
+	}
 
+	var keyDef keyboardlayout.KeyDefinition
 	if srcKeyDef.Key != "" {
 		keyDef.Key = srcKeyDef.Key
 	}
@@ -164,8 +172,8 @@ func (k *Keyboard) keyDefinitionFromKey(keyString keyboardlayout.KeyInput) keybo
 	if srcKeyDef.KeyCode != 0 {
 		keyDef.KeyCode = srcKeyDef.KeyCode
 	}
-	if code != "" {
-		keyDef.Code = string(code)
+	if keyString != "" {
+		keyDef.Code = string(keyString)
 	}
 	if srcKeyDef.Location != 0 {
 		keyDef.Location = srcKeyDef.Location
@@ -176,15 +184,13 @@ func (k *Keyboard) keyDefinitionFromKey(keyString keyboardlayout.KeyInput) keybo
 	if srcKeyDef.Text != "" {
 		keyDef.Text = srcKeyDef.Text
 	}
-	if shift != 0 && keyDef.ShiftKey != "" {
-		keyDef.Text = keyDef.ShiftKey
+	if shift != 0 && srcKeyDef.ShiftKey != "" {
+		keyDef.Text = srcKeyDef.ShiftKey
 	}
-
 	// If any modifiers besides shift are pressed, no text should be sent
 	if k.modifiers & ^ModifierKeyShift != 0 {
 		keyDef.Text = ""
 	}
-
 	return keyDef
 }
 

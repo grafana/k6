@@ -55,27 +55,36 @@ func testPageInputValue(t *testing.T, b api.Browser) {
 		<textarea>hello3</textarea>
      	`, nil)
 
-	value := p.InputValue("input", nil)
-	assert.Equal(t, value, "hello1")
+	got, want := p.InputValue("input", nil), "hello1"
+	assert.Equal(t, got, want)
 
-	value = p.InputValue("select", nil)
-	assert.Equal(t, value, "hello2")
+	got, want = p.InputValue("select", nil), "hello2"
+	assert.Equal(t, got, want)
 
-	value = p.InputValue("textarea", nil)
-	assert.Equal(t, value, "hello3")
+	got, want = p.InputValue("textarea", nil), "hello3"
+	assert.Equal(t, got, want)
 }
 
 // test for: https://github.com/grafana/xk6-browser/issues/132
 func testPageInputSpecialCharacters(t *testing.T, b api.Browser) {
-	const want = "test@k6.io"
-
 	p := b.NewPage(nil)
 	defer p.Close(nil)
 
-	p.SetContent(`<input id="username">`, nil)
-	el := p.Query("#username")
-	el.Type(want, nil)
+	p.SetContent(`<input id="special">`, nil)
+	el := p.Query("#special")
 
-	got := el.InputValue(nil)
-	assert.Equal(t, want, got)
+	wants := []string{
+		"test@k6.io",
+		"<hello WoRlD \\/>",
+		"{(hello world!)}",
+		"!#$%^&*()+_|~±",
+		`¯\_(ツ)_/¯`,
+	}
+	for _, want := range wants {
+		el.Fill("", nil)
+		el.Type(want, nil)
+
+		got := el.InputValue(nil)
+		assert.Equal(t, want, got)
+	}
 }
