@@ -124,7 +124,7 @@ func (k *Keyboard) up(key string) error {
 func (k *Keyboard) insertText(text string) error {
 	action := input.InsertText(text)
 	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
-		return fmt.Errorf("unable to send character: %w", err)
+		return fmt.Errorf("cannot send character: %w", err)
 	}
 	return nil
 }
@@ -216,7 +216,7 @@ func (k *Keyboard) press(key string, opts *KeyboardOptions) error {
 		}
 	}
 	if err := k.down(key); err != nil {
-		return err
+		return fmt.Errorf("cannot down: %w", err)
 	}
 	return k.up(key)
 }
@@ -235,12 +235,12 @@ func (k *Keyboard) typ(text string, opts *KeyboardOptions) error {
 		keyInput := keyboardlayout.KeyInput(c)
 		if _, ok := layout.ValidKeys[keyInput]; ok {
 			if err := k.press(string(c), opts); err != nil {
-				return err
+				return fmt.Errorf("cannot press: %w", err)
 			}
 			continue
 		}
 		if err := k.insertText(string(c)); err != nil {
-			return err
+			return fmt.Errorf("cannot insert text: %w", err)
 		}
 	}
 	return nil
