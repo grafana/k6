@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
@@ -67,6 +68,9 @@ type Engine struct {
 	Metrics     map[string]*stats.Metric
 	MetricsLock sync.Mutex
 
+	// clock are an interface to the functions in the standard library time package.
+	clock clock.Clock
+
 	builtinMetrics *metrics.BuiltinMetrics
 	Samples        chan stats.SampleContainer
 
@@ -95,6 +99,7 @@ func NewEngine(
 		runtimeOptions: rtOpts,
 		outputs:        outputs,
 		Metrics:        make(map[string]*stats.Metric),
+		clock:          clock.New(),
 		Samples:        make(chan stats.SampleContainer, opts.MetricSamplesBufferSize.Int64),
 		stopChan:       make(chan struct{}),
 		logger:         logger.WithField("component", "engine"),
@@ -292,7 +297,7 @@ func (e *Engine) startBackgroundProcesses(
 		go func() {
 			defer processes.Done()
 			defer e.logger.Debug("Engine: Thresholds terminated")
-			ticker := time.NewTicker(thresholdsRate)
+			ticker := e.clock.Ticker(thresholdsRate)
 			defer ticker.Stop()
 
 			for {
@@ -331,7 +336,7 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 		}
 	}()
 
-	ticker := time.NewTicker(collectRate)
+	ticker := e.clock.Ticker(collectRate)
 	defer ticker.Stop()
 
 	e.logger.Debug("Metrics processing started...")
@@ -403,7 +408,7 @@ func (e *Engine) IsStopped() bool {
 }
 
 func (e *Engine) runMetricsEmission(ctx context.Context) {
-	ticker := time.NewTicker(metricsRate)
+	ticker := e.clock.Ticker(metricsRate)
 	for {
 		select {
 		case <-ticker.C:
@@ -415,26 +420,26 @@ func (e *Engine) runMetricsEmission(ctx context.Context) {
 }
 
 func (e *Engine) emitMetrics() {
-	t := time.Now()
+	now := e.clock.Now()
 
 	executionState := e.ExecutionScheduler.GetState()
 	// TODO: optimize and move this, it shouldn't call processSamples() directly
 	e.processSamples([]stats.SampleContainer{stats.ConnectedSamples{
 		Samples: []stats.Sample{
 			{
-				Time:   t,
+				Time:   now,
 				Metric: e.builtinMetrics.VUs,
 				Value:  float64(executionState.GetCurrentlyActiveVUsCount()),
 				Tags:   e.Options.RunTags,
 			}, {
-				Time:   t,
+				Time:   now,
 				Metric: e.builtinMetrics.VUsMax,
 				Value:  float64(executionState.GetInitializedVUsCount()),
 				Tags:   e.Options.RunTags,
 			},
 		},
 		Tags: e.Options.RunTags,
-		Time: t,
+		Time: now,
 	}})
 }
 

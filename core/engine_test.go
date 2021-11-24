@@ -101,84 +101,99 @@ func TestNewEngine(t *testing.T) {
 	newTestEngine(t, nil, nil, nil, lib.Options{})
 }
 
-func TestEngineRun(t *testing.T) {
+func TestEngineRunExitsWithContextTimeout(t *testing.T) {
 	t.Parallel()
 	logrus.SetLevel(logrus.DebugLevel)
-	t.Run("exits with context", func(t *testing.T) {
-		t.Parallel()
-		done := make(chan struct{})
-		runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-			<-ctx.Done()
-			close(done)
-			return nil
-		}}
 
-		duration := 100 * time.Millisecond
-		ctx, cancel := context.WithTimeout(context.Background(), duration)
-		defer cancel()
+	// Arrange
+	done := make(chan struct{})
+	runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		<-ctx.Done()
+		close(done)
+		return nil
+	}}
+	contextDuration := 100 * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), contextDuration)
+	defer cancel()
 
-		_, run, wait := newTestEngine(t, ctx, runner, nil, lib.Options{})
-		defer wait()
+	engine, run, wait := newTestEngine(t, ctx, runner, nil, lib.Options{})
+	defer wait()
 
-		startTime := time.Now()
-		assert.NoError(t, run())
-		assert.WithinDuration(t, startTime.Add(duration), time.Now(), 100*time.Millisecond)
-		<-done
+	// Act
+	runStartTime := engine.clock.Now()
+	runErr := run()
+
+	// Assert
+	assert.NoError(t, runErr)
+	assert.WithinDuration(t, runStartTime.Add(contextDuration), engine.clock.Now(), 100*time.Millisecond)
+	<-done
+}
+
+func TestEngineRunExitsWithExecutor(t *testing.T) {
+	t.Parallel()
+	logrus.SetLevel(logrus.DebugLevel)
+
+	// Arrange
+	engine, run, wait := newTestEngine(t, nil, nil, nil, lib.Options{
+		VUs:        null.IntFrom(10),
+		Iterations: null.IntFrom(100),
 	})
-	t.Run("exits with executor", func(t *testing.T) {
-		t.Parallel()
-		e, run, wait := newTestEngine(t, nil, nil, nil, lib.Options{
-			VUs:        null.IntFrom(10),
-			Iterations: null.IntFrom(100),
-		})
-		defer wait()
-		assert.NoError(t, run())
-		assert.Equal(t, uint64(100), e.ExecutionScheduler.GetState().GetFullIterationCount())
+	defer wait()
+
+	// Act
+	err := run()
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(100), engine.ExecutionScheduler.GetState().GetFullIterationCount())
+}
+
+func TestEngineRunCollectsSamples(t *testing.T) {
+	t.Parallel()
+	logrus.SetLevel(logrus.DebugLevel)
+
+	// Arrange
+	testMetric := stats.New("test_metric", stats.Trend)
+	signalChan := make(chan interface{})
+	runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
+		close(signalChan)
+		<-ctx.Done()
+		stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
+		return nil
+	}}
+
+	mockOutput := mockoutput.New()
+	ctx, cancel := context.WithCancel(context.Background())
+	_, run, wait := newTestEngine(t, ctx, runner, []output.Output{mockOutput}, lib.Options{
+		VUs:        null.IntFrom(1),
+		Iterations: null.IntFrom(1),
 	})
-	// Make sure samples are discarded after context close (using "cutoff" timestamp in local.go)
-	t.Run("collects samples", func(t *testing.T) {
-		t.Parallel()
-		testMetric := stats.New("test_metric", stats.Trend)
+	errChannel := make(chan error)
 
-		signalChan := make(chan interface{})
+	// Act
+	go func() { errChannel <- run() }()
+	<-signalChan
+	cancel()
+	assert.NoError(t, <-errChannel)
+	wait()
 
-		runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-			stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
-			close(signalChan)
-			<-ctx.Done()
-			stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
-			return nil
-		}}
-
-		mockOutput := mockoutput.New()
-		ctx, cancel := context.WithCancel(context.Background())
-		_, run, wait := newTestEngine(t, ctx, runner, []output.Output{mockOutput}, lib.Options{
-			VUs:        null.IntFrom(1),
-			Iterations: null.IntFrom(1),
-		})
-
-		errC := make(chan error)
-		go func() { errC <- run() }()
-		<-signalChan
-		cancel()
-		assert.NoError(t, <-errC)
-		wait()
-
-		found := 0
-		for _, s := range mockOutput.Samples {
-			if s.Metric != testMetric {
-				continue
-			}
-			found++
-			assert.Equal(t, 1.0, s.Value, "wrong value")
+	// Assert
+	found := 0
+	for _, s := range mockOutput.Samples {
+		if s.Metric != testMetric {
+			continue
 		}
-		assert.Equal(t, 1, found, "wrong number of samples")
-	})
+		found++
+		assert.Equal(t, 1.0, s.Value, "wrong value")
+	}
+	assert.Equal(t, 1, found, "wrong number of samples")
 }
 
 func TestEngineAtTime(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+
 	defer cancel()
 	_, run, wait := newTestEngine(t, ctx, nil, nil, lib.Options{
 		VUs:      null.IntFrom(2),
@@ -191,19 +206,26 @@ func TestEngineAtTime(t *testing.T) {
 
 func TestEngineStopped(t *testing.T) {
 	t.Parallel()
+
+	// Arrange
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	e, run, wait := newTestEngine(t, ctx, nil, nil, lib.Options{
+	engine, run, wait := newTestEngine(t, ctx, nil, nil, lib.Options{
 		VUs:      null.IntFrom(1),
 		Duration: types.NullDurationFrom(20 * time.Second),
 	})
 	defer wait()
 
-	assert.NoError(t, run())
-	assert.Equal(t, false, e.IsStopped(), "engine should be running")
-	e.Stop()
-	assert.Equal(t, true, e.IsStopped(), "engine should be stopped")
-	e.Stop() // test that a second stop doesn't panic
+	// Act
+	runErr := run()
+	initiallyStopped := engine.IsStopped()
+	engine.Stop()
+	engine.Stop() // Ensure that a second stop doesn't panic
+
+	// Assert
+	assert.NoError(t, runErr)
+	assert.False(t, initiallyStopped, "engine should be running")
+	assert.True(t, engine.IsStopped(), "engine should be stopped")
 }
 
 func TestEngineOutput(t *testing.T) {
