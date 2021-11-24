@@ -30,7 +30,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/keyboardlayout"
-	k6common "go.k6.io/k6/js/common"
 )
 
 // Ensure Keyboard implements the api.Keyboard interface
@@ -54,14 +53,13 @@ type Keyboard struct {
 
 // NewKeyboard creates a new keyboard
 func NewKeyboard(ctx context.Context, session *Session) *Keyboard {
-	k := &Keyboard{
+	return &Keyboard{
 		ctx:         ctx,
 		session:     session,
 		modifiers:   0,
 		pressedKeys: make(map[int64]bool),
 		layoutName:  "us",
 	}
-	return k
 }
 
 func (k *Keyboard) down(key string) error {
@@ -136,22 +134,22 @@ func (k *Keyboard) keyDefinitionFromKey(keyString keyboardlayout.KeyInput) keybo
 	srcKeyDef, ok := layout.Keys[keyString]
 	// Find based on key value instead of code
 	if !ok {
-		for k, v := range layout.Keys {
-			if v.Key != string(keyString) {
+		for key, def := range layout.Keys {
+			if def.Key != string(keyString) {
 				continue
 			}
-			keyString, srcKeyDef = k, v
+			keyString, srcKeyDef = key, def
 			ok = true // don't look for a shift key below
 		}
 	}
 	// try to find with the shift key value
 	shift := k.modifiers & ModifierKeyShift
 	if !ok {
-		for k, v := range layout.Keys {
-			if v.ShiftKey != string(keyString) {
+		for key, def := range layout.Keys {
+			if def.ShiftKey != string(keyString) {
 				continue
 			}
-			keyString, srcKeyDef = k, v
+			keyString, srcKeyDef = key, def
 		}
 		shift = k.modifiers | ModifierKeyShift
 	}
@@ -195,26 +193,20 @@ func (k *Keyboard) keyDefinitionFromKey(keyString keyboardlayout.KeyInput) keybo
 }
 
 func (k *Keyboard) modifierBitFromKeyName(key string) int64 {
-	if key == "Alt" {
+	switch key {
+	case "Alt":
 		return ModifierKeyAlt
-	}
-	if key == "Control" {
+	case "Control":
 		return ModifierKeyControl
-	}
-	if key == "Meta" {
+	case "Meta":
 		return ModifierKeyMeta
-	}
-	if key == "Shift" {
+	case "Shift":
 		return ModifierKeyShift
 	}
 	return 0
 }
 
 func (k *Keyboard) press(key string, opts *KeyboardOptions) error {
-	err := k.down(key)
-	if err != nil {
-		return err
-	}
 	if opts.Delay != 0 {
 		t := time.NewTimer(time.Duration(opts.Delay * time.Hour.Milliseconds()))
 		select {
@@ -223,35 +215,32 @@ func (k *Keyboard) press(key string, opts *KeyboardOptions) error {
 		case <-t.C:
 		}
 	}
-	err = k.up(key)
-	if err != nil {
+	if err := k.down(key); err != nil {
 		return err
 	}
-	return nil
+	return k.up(key)
 }
 
 func (k *Keyboard) typ(text string, opts *KeyboardOptions) error {
 	layout := keyboardlayout.GetKeyboardLayout(k.layoutName)
 	for _, c := range text {
+		if opts.Delay != 0 {
+			t := time.NewTimer(time.Duration(opts.Delay * time.Hour.Milliseconds()))
+			select {
+			case <-k.ctx.Done():
+				t.Stop()
+			case <-t.C:
+			}
+		}
 		keyInput := keyboardlayout.KeyInput(c)
 		if _, ok := layout.ValidKeys[keyInput]; ok {
-			err := k.press(string(c), opts)
-			if err != nil {
-				return nil
+			if err := k.press(string(c), opts); err != nil {
+				return err
 			}
-		} else {
-			if opts.Delay != 0 {
-				t := time.NewTimer(time.Duration(opts.Delay * time.Hour.Milliseconds()))
-				select {
-				case <-k.ctx.Done():
-					t.Stop()
-				case <-t.C:
-				}
-			}
-			err := k.insertText(string(c))
-			if err != nil {
-				return nil
-			}
+			continue
+		}
+		if err := k.insertText(string(c)); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -259,55 +248,43 @@ func (k *Keyboard) typ(text string, opts *KeyboardOptions) error {
 
 // Down
 func (k *Keyboard) Down(key string) {
-	rt := k6common.GetRuntime(k.ctx)
-	err := k.down(key)
-	if err != nil {
-		k6common.Throw(rt, err)
+	if err := k.down(key); err != nil {
+		k6Throw(k.ctx, "cannot press down key: %w", err)
 	}
 }
 
 // Press
 func (k *Keyboard) Press(key string, opts goja.Value) {
-	rt := k6common.GetRuntime(k.ctx)
 	kbdOpts := NewKeyboardOptions()
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(k.ctx, "cannot parse options: %w", err)
 	}
-
-	err := k.press(key, kbdOpts)
-	if err != nil {
-		k6common.Throw(rt, err)
+	if err := k.press(key, kbdOpts); err != nil {
+		k6Throw(k.ctx, "cannot press key: %w", err)
 	}
 }
 
 // InsertText
 func (k *Keyboard) InsertText(text string) {
-	rt := k6common.GetRuntime(k.ctx)
-	err := k.insertText(text)
-	if err != nil {
-		k6common.Throw(rt, err)
+	if err := k.insertText(text); err != nil {
+		k6Throw(k.ctx, "cannot insert text: %w", err)
 	}
 }
 
 // Type
 func (k *Keyboard) Type(text string, opts goja.Value) {
-	rt := k6common.GetRuntime(k.ctx)
 	kbdOpts := NewKeyboardOptions()
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(k.ctx, "cannot parse options: %w", err)
 	}
-
-	err := k.typ(text, kbdOpts)
-	if err != nil {
-		k6common.Throw(rt, err)
+	if err := k.typ(text, kbdOpts); err != nil {
+		k6Throw(k.ctx, "cannot type text: %w", err)
 	}
 }
 
 // Up
 func (k *Keyboard) Up(key string) {
-	rt := k6common.GetRuntime(k.ctx)
-	err := k.up(key)
-	if err != nil {
-		k6common.Throw(rt, err)
+	if err := k.up(key); err != nil {
+		k6Throw(k.ctx, "cannot press up key: %w", err)
 	}
 }
