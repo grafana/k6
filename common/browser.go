@@ -23,7 +23,6 @@ package common
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -36,7 +35,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
 	"github.com/grafana/xk6-browser/api"
-	k6lib "go.k6.io/k6/lib"
 )
 
 // Ensure Browser implements the EventEmitter and Browser interfaces
@@ -85,9 +83,7 @@ type Browser struct {
 }
 
 // NewBrowser creates a new browser
-func NewBrowser(ctx context.Context, cancelFn context.CancelFunc, browserProc *BrowserProcess, launchOpts *LaunchOptions) (*Browser, error) {
-	state := k6lib.GetState(ctx)
-	reCategoryFilter, _ := regexp.Compile(launchOpts.LogCategoryFilter)
+func NewBrowser(ctx context.Context, cancelFn context.CancelFunc, browserProc *BrowserProcess, launchOpts *LaunchOptions, logger *Logger) (*Browser, error) {
 	b := Browser{
 		BaseEventEmitter:      NewBaseEventEmitter(ctx),
 		ctx:                   ctx,
@@ -103,7 +99,7 @@ func NewBrowser(ctx context.Context, cancelFn context.CancelFunc, browserProc *B
 		pages:                 make(map[target.ID]*Page),
 		sessionIDtoTargetIDMu: sync.RWMutex{},
 		sessionIDtoTargetID:   make(map[target.SessionID]target.ID),
-		logger:                NewLogger(ctx, state.Logger, launchOpts.Debug, reCategoryFilter),
+		logger:                logger,
 	}
 	if err := b.connect(); err != nil {
 		return nil, err
@@ -223,7 +219,8 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
 				// If we're no longer connected to browser, then ignore WebSocket errors
-				b.logger.Debugf("Browser:onAttachedToTarget:background_page", "sid:%v tid:%v, returns: websocket error", ev.SessionID, ev.TargetInfo.TargetID)
+				b.logger.Debugf("Browser:onAttachedToTarget:background_page", "sid:%v tid:%v, returns: websocket err: %v",
+					ev.SessionID, ev.TargetInfo.TargetID, err)
 				return
 			}
 			k6Throw(b.ctx, "cannot create NewPage for background_page event: %w", err)
@@ -326,11 +323,11 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 	case <-b.ctx.Done():
 		b.logger.Debugf("Browser:newPageInContext:<-b.ctx.Done", "tid:%v bcid:%v", localTargetID, id)
 	case <-time.After(b.launchOpts.Timeout):
-		b.logger.Debugf("Browser:newPageInContext:timeout", "tid:%v bcid:%v", localTargetID, id)
+		b.logger.Debugf("Browser:newPageInContext:timeout", "tid:%v bcid:%v timeout:%s", localTargetID, id, b.launchOpts.Timeout)
 	case c := <-ch:
-		b.logger.Debugf("Browser:newPageInContext:<-ch", "tid:%v bcid:%v, ch:%v", localTargetID, id, c)
+		b.logger.Debugf("Browser:newPageInContext:<-ch", "tid:%v bcid:%v, c:%v", localTargetID, id, c)
 	case err := <-errCh:
-		b.logger.Debugf("Browser:newPageInContext:<-errCh", "tid:%v bcid:%v, ch:%v", localTargetID, id, err)
+		b.logger.Debugf("Browser:newPageInContext:<-errCh", "tid:%v bcid:%v, err:%v", localTargetID, id, err)
 		return nil, err
 	}
 	b.pagesMu.RLock()
@@ -346,12 +343,8 @@ func (b *Browser) Close() {
 		b.logger.Debugf("Browser:Close", "already in a closing state")
 		return
 	}
-	b.logger.Debugf("Browser:Close", "graceful terminate")
 	b.browserProc.GracefulClose()
-	defer func() {
-		b.logger.Debugf("Browser:Close", "browserProc terminate")
-		b.browserProc.Terminate()
-	}()
+	defer b.browserProc.Terminate()
 
 	action := cdpbrowser.Close()
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
@@ -405,7 +398,6 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 // NewPage creates a new tab in the browser window
 func (b *Browser) NewPage(opts goja.Value) api.Page {
 	browserCtx := b.NewContext(opts)
-	b.logger.Debugf("Browser:NewContext", "NewPage")
 	return browserCtx.NewPage()
 }
 
