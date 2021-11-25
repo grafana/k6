@@ -39,6 +39,9 @@ type Logger struct {
 	lastLogCall    int64
 	debugOverride  bool
 	categoryFilter *regexp.Regexp
+
+	// debug is true if debug mode is enabled in the browser launch options.
+	debug bool
 }
 
 func NullLogger() *logrus.Logger {
@@ -106,4 +109,12 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...i
 		return
 	}
 	entry.Logf(level, msg, args...)
+}
+
+func (l *Logger) EnableDebugMode() {
+	l.debug = true
+}
+
+func (l *Logger) DebugMode() bool {
+	return l.debug
 }
