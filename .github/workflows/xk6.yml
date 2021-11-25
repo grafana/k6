@@ -55,7 +55,7 @@ jobs:
                "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
             export XK6_K6_REPO="github.com/${{ github.event.pull_request.head.repo.full_name }}"
           fi
-          GOPROXY="direct" xk6 build "$COMMIT_ID" \
+          GOPRIVATE="go.k6.io/k6" xk6 build "$COMMIT_ID" \
             --output ./k6ext \
             --with github.com/grafana/xk6-js-test="$(pwd)/xk6-js-test" \
             --with github.com/grafana/xk6-output-test="$(pwd)/xk6-output-test"
