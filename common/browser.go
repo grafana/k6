@@ -207,7 +207,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	if ok {
 		browserCtx = bctx
 	}
-	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bcid:%v btx nil=%t", ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID, bctx == nil)
+	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bcid:%v bctx nil=%t", ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID, bctx == nil)
 	b.contextsMu.RUnlock()
 
 	// We're not interested in the top-level browser target, other targets or DevTools targets right now.
