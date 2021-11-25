@@ -44,26 +44,35 @@ func getTestConstantVUsConfig() ConstantVUsConfig {
 
 func TestConstantVUsRun(t *testing.T) {
 	t.Parallel()
+
+	// Arrange
 	var result sync.Map
-	et, err := lib.NewExecutionTuple(nil, nil)
+	executionTuple, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	ctx, cancel, executor, _ := setupExecutor(
-		t, getTestConstantVUsConfig(), es,
-		simpleRunner(func(ctx context.Context) error {
-			select {
-			case <-ctx.Done():
-				return nil
-			default:
-			}
-			state := lib.GetState(ctx)
-			currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
-			result.Store(state.VUID, currIter.(uint64)+1)
-			time.Sleep(210 * time.Millisecond)
+	executionState := lib.NewExecutionState(lib.Options{}, executionTuple, 10, 50)
+	vuFn := func(ctx context.Context) error {
+		select {
+		case <-ctx.Done():
 			return nil
-		}),
+		default:
+		}
+		state := lib.GetState(ctx)
+		currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
+		result.Store(state.VUID, currIter.(uint64)+1)
+		time.Sleep(210 * time.Millisecond)
+		return nil
+	}
+
+	config := getTestConstantVUsConfig()
+	ctx, cancel, executor, _ := setupExecutor(
+		t,
+		config,
+		executionState,
+		simpleRunner(vuFn),
 	)
 	defer cancel()
+
+	// Act
 	err = executor.Run(ctx, nil, nil)
 
 	// Assert
