@@ -192,17 +192,20 @@ func (c *Connection) closeSession(sid target.SessionID, tid target.ID) {
 }
 
 func (c *Connection) createSession(info *target.Info) (*Session, error) {
-	c.logger.Debugf("Connection:createSession", "")
+	c.logger.Debugf("Connection:createSession", "tid:%v bctxid:%v type:%s", info.TargetID, info.BrowserContextID, info.Type)
 
 	var sessionID target.SessionID
 	var err error
 	action := target.AttachToTarget(info.TargetID).WithFlatten(true)
 	if sessionID, err = action.Do(cdp.WithExecutor(c.ctx, c)); err != nil {
-		c.logger.Debugf("Connection:createSession", "err:%v", err)
+		c.logger.Debugf("Connection:createSession", "tid:%v bctxid:%v type:%s err:%v", info.TargetID, info.BrowserContextID, info.Type, err)
 		return nil, err
 	}
-	c.logger.Debugf("Connection:createSession", "sid:%v", sessionID)
-	return c.getSession(sessionID), nil
+	sess := c.getSession(sessionID)
+	if sess == nil {
+		c.logger.Warnf("Connection:createSession", "tid:%v bctxid:%v type:%s sid:%v, session is nil", info.TargetID, info.BrowserContextID, info.Type, sessionID)
+	}
+	return sess, nil
 }
 
 func (c *Connection) handleIOError(err error) {
@@ -234,11 +237,14 @@ func (c *Connection) getSession(id target.SessionID) *Session {
 	return c.sessions[id]
 }
 
-func (c *Connection) findSessionTargetID(id target.SessionID) target.ID {
-	c.sessionsMu.RLock()
-	defer c.sessionsMu.RUnlock()
-	s, ok := c.sessions[id]
-	if !ok {
+// findTragetIDForLog should only be used for logging purposes.
+// It will return an empty string if logger.DebugMode is false.
+func (c *Connection) findTargetIDForLog(id target.SessionID) target.ID {
+	if !c.logger.DebugMode() {
+		return ""
+	}
+	s := c.getSession(id)
+	if s == nil {
 		return ""
 	}
 	return s.targetID
@@ -292,7 +298,7 @@ func (c *Connection) recvLoop() {
 			}
 			evt := ev.(*target.EventDetachedFromTarget)
 			sid := evt.SessionID
-			tid := c.findSessionTargetID(sid)
+			tid := c.findTargetIDForLog(sid)
 			c.logger.Debugf("Connection:recvLoop:EventDetachedFromTarget", "sid:%v tid:%v wsURL:%q, closeSession", sid, tid, c.wsURL)
 			c.closeSession(sid, tid)
 		}
@@ -334,7 +340,7 @@ func (c *Connection) recvLoop() {
 			c.emit("", &msg)
 
 		default:
-			c.logger.Debugf("cdp", "ignoring malformed incoming message (missing id or method): %#v (message: %s)", msg, msg.Error.Message)
+			c.logger.Errorf("cdp", "ignoring malformed incoming message (missing id or method): %#v (message: %s)", msg, msg.Error.Message)
 		}
 	}
 }
@@ -358,15 +364,14 @@ func (c *Connection) send(msg *cdproto.Message, recvCh chan *cdproto.Message, re
 	if recvCh == nil {
 		return nil
 	}
+	tid := c.findTargetIDForLog(msg.SessionID)
 	select {
 	case msg := <-recvCh:
-		var (
-			sid target.SessionID
-			tid target.ID
-		)
+		var sid target.SessionID
+		tid = ""
 		if msg != nil {
 			sid = msg.SessionID
-			tid = c.findSessionTargetID(sid)
+			tid = c.findTargetIDForLog(sid)
 		}
 		switch {
 		case msg == nil:
@@ -379,19 +384,15 @@ func (c *Connection) send(msg *cdproto.Message, recvCh chan *cdproto.Message, re
 			return easyjson.Unmarshal(msg.Result, res)
 		}
 	case err := <-c.errorCh:
-		tid := c.findSessionTargetID(msg.SessionID)
 		c.logger.Debugf("Connection:send:<-c.errorCh #2", "sid:%v tid:%v wsURL:%q, err:%v", msg.SessionID, tid, c.wsURL, err)
 		return err
 	case code := <-c.closeCh:
-		tid := c.findSessionTargetID(msg.SessionID)
 		c.logger.Debugf("Connection:send:<-c.closeCh #2", "sid:%v tid:%v wsURL:%q, websocket code:%v", msg.SessionID, tid, c.wsURL, code)
 		_ = c.closeConnection(code)
 		return &websocket.CloseError{Code: code}
 	case <-c.done:
-		tid := c.findSessionTargetID(msg.SessionID)
 		c.logger.Debugf("Connection:send:<-c.done #2", "sid:%v tid:%v wsURL:%q", msg.SessionID, tid, c.wsURL)
 	case <-c.ctx.Done():
-		tid := c.findSessionTargetID(msg.SessionID)
 		c.logger.Debugf("Connection:send:<-c.ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v", msg.SessionID, tid, c.wsURL, c.ctx.Err())
 		// TODO: this brings many bugs to the surface
 		return c.ctx.Err()
@@ -411,7 +412,7 @@ func (c *Connection) sendLoop() {
 			msg.MarshalEasyJSON(&c.encoder)
 			if err := c.encoder.Error; err != nil {
 				sid := msg.SessionID
-				tid := c.findSessionTargetID(sid)
+				tid := c.findTargetIDForLog(sid)
 				select {
 				case c.errorCh <- err:
 					c.logger.Debugf("Connection:sendLoop:c.errorCh <- err", "sid:%v tid:%v wsURL:%q err:%v", sid, tid, c.wsURL, err)
