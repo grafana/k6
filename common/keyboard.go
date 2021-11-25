@@ -206,12 +206,7 @@ func (k *Keyboard) keyDefinitionFromKey(keyString keyboardlayout.KeyInput) keybo
 	var keyDef keyboardlayout.KeyDefinition
 	if srcKeyDef.Key != "" {
 		keyDef.Key = srcKeyDef.Key
-	}
-	if shift != 0 && srcKeyDef.ShiftKey != "" {
-		keyDef.Key = srcKeyDef.ShiftKey
-	}
-	if srcKeyDef.KeyCode != 0 {
-		keyDef.KeyCode = srcKeyDef.KeyCode
+		keyDef.Text = srcKeyDef.Key
 	}
 	if shift != 0 && srcKeyDef.ShiftKeyCode != 0 {
 		keyDef.KeyCode = srcKeyDef.ShiftKeyCode
@@ -225,13 +220,11 @@ func (k *Keyboard) keyDefinitionFromKey(keyString keyboardlayout.KeyInput) keybo
 	if srcKeyDef.Location != 0 {
 		keyDef.Location = srcKeyDef.Location
 	}
-	if len(srcKeyDef.Key) == 1 {
-		keyDef.Text = srcKeyDef.Key
-	}
 	if srcKeyDef.Text != "" {
 		keyDef.Text = srcKeyDef.Text
 	}
 	if shift != 0 && srcKeyDef.ShiftKey != "" {
+		keyDef.Key = srcKeyDef.ShiftKey
 		keyDef.Text = srcKeyDef.ShiftKey
 	}
 	// If any modifiers besides shift are pressed, no text should be sent
