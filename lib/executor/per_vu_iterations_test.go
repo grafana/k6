@@ -49,24 +49,36 @@ func getTestPerVUIterationsConfig() PerVUIterationsConfig {
 // Baseline test
 func TestPerVUIterationsRun(t *testing.T) {
 	t.Parallel()
+
+	// Arrange
 	var result sync.Map
-	et, err := lib.NewExecutionTuple(nil, nil)
+
+	executionTuple, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+
+	executionState := lib.NewExecutionState(lib.Options{}, executionTuple, 10, 50)
+	vuFn := func(ctx context.Context) error {
+		state := lib.GetState(ctx)
+		currentIteration, _ := result.LoadOrStore(state.VUID, uint64(0))
+		result.Store(state.VUID, currentIteration.(uint64)+1)
+		return nil
+	}
+
 	ctx, cancel, executor, _ := setupExecutor(
-		t, getTestPerVUIterationsConfig(), es,
-		simpleRunner(func(ctx context.Context) error {
-			state := lib.GetState(ctx)
-			currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
-			result.Store(state.VUID, currIter.(uint64)+1)
-			return nil
-		}),
+		t,
+		getTestPerVUIterationsConfig(),
+		executionState,
+		simpleRunner(vuFn),
 	)
 	defer cancel()
+
 	engineOut := make(chan stats.SampleContainer, 1000)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
+
+	// Act
 	err = executor.Run(ctx, engineOut, builtinMetrics)
+
+	// Assert
 	require.NoError(t, err)
 
 	var totalIters uint64
@@ -83,54 +95,60 @@ func TestPerVUIterationsRun(t *testing.T) {
 // This is the reverse behavior of the SharedIterations executor.
 func TestPerVUIterationsRunVariableVU(t *testing.T) {
 	t.Parallel()
-	var (
-		result   sync.Map
-		slowVUID = uint64(1)
-	)
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	ctx, cancel, executor, _ := setupExecutor(
-		t, getTestPerVUIterationsConfig(), es,
-		simpleRunner(func(ctx context.Context) error {
-			state := lib.GetState(ctx)
-			if state.VUID == slowVUID {
-				time.Sleep(200 * time.Millisecond)
-			}
-			currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
-			result.Store(state.VUID, currIter.(uint64)+1)
-			return nil
-		}),
-	)
-	defer cancel()
-	engineOut := make(chan stats.SampleContainer, 1000)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	err = executor.Run(ctx, engineOut, builtinMetrics)
-	require.NoError(t, err)
 
+	// Arrange
+	var result sync.Map
+	var slowVUID uint64 = 1
+
+	executionTuple, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	executionState := lib.NewExecutionState(lib.Options{}, executionTuple, 10, 50)
+	vuFn := func(ctx context.Context) error {
+		state := lib.GetState(ctx)
+		if state.VUID == slowVUID {
+			time.Sleep(200 * time.Millisecond)
+		}
+		currentIteration, _ := result.LoadOrStore(state.VUID, uint64(0))
+		result.Store(state.VUID, currentIteration.(uint64)+1)
+		return nil
+	}
+
+	ctx, cancel, executor, _ := setupExecutor(t, getTestPerVUIterationsConfig(), executionState, simpleRunner(vuFn))
+	defer cancel()
+
+	engineOut := make(chan stats.SampleContainer, 1000)
+	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
+
+	// Act
+	err = executor.Run(ctx, engineOut, builtinMetrics)
 	val, ok := result.Load(slowVUID)
+
+	// Assert
+	require.NoError(t, err)
 	assert.True(t, ok)
 
-	var totalIters uint64
+	var totalIterations uint64
 	result.Range(func(key, value interface{}) bool {
 		vuIters := value.(uint64)
 		if key != slowVUID {
 			assert.Equal(t, uint64(100), vuIters)
 		}
-		totalIters += vuIters
+		totalIterations += vuIters
 		return true
 	})
 
 	// The slow VU should complete 15 iterations given these timings,
 	// while the rest should equally complete their assigned 100 iterations.
 	assert.Equal(t, uint64(15), val)
-	assert.Equal(t, uint64(915), totalIters)
+	assert.Equal(t, uint64(915), totalIterations)
 }
 
 func TestPerVuIterationsEmitDroppedIterations(t *testing.T) {
 	t.Parallel()
+
+	// Arrange
 	var count int64
+
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 
@@ -141,19 +159,21 @@ func TestPerVuIterationsEmitDroppedIterations(t *testing.T) {
 	}
 
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
-	ctx, cancel, executor, logHook := setupExecutor(
-		t, config, es,
-		simpleRunner(func(ctx context.Context) error {
-			atomic.AddInt64(&count, 1)
-			<-ctx.Done()
-			return nil
-		}),
-	)
+	vuFn := func(ctx context.Context) error {
+		atomic.AddInt64(&count, 1)
+		<-ctx.Done()
+		return nil
+	}
+	ctx, cancel, executor, logHook := setupExecutor(t, config, es, simpleRunner(vuFn))
 	defer cancel()
+
 	engineOut := make(chan stats.SampleContainer, 1000)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
+
+	// Act
 	err = executor.Run(ctx, engineOut, builtinMetrics)
+
+	// Assert
 	require.NoError(t, err)
 	assert.Empty(t, logHook.Drain())
 	assert.Equal(t, int64(5), count)

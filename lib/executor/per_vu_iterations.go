@@ -158,9 +158,11 @@ func (pvi PerVUIterations) Run(
 	numVUs := pvi.config.GetVUs(pvi.executionState.ExecutionTuple)
 	iterations := pvi.config.GetIterations()
 	duration := pvi.config.MaxDuration.TimeDuration()
-	gracefulStop := pvi.config.GetGracefulStop()
-
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(
+		parentCtx,
+		duration,
+		pvi.config.GetGracefulStop(),
+	)
 	defer cancel()
 
 	// Make sure the log and the progress bar have accurate information
@@ -172,12 +174,12 @@ func (pvi PerVUIterations) Run(
 	doneIters := new(uint64)
 
 	vusFmt := pb.GetFixedLengthIntFormat(numVUs)
-	itersFmt := pb.GetFixedLengthIntFormat(int64(totalIters))
 	progressFn := func() (float64, []string) {
 		spent := time.Since(startTime)
 		progVUs := fmt.Sprintf(vusFmt+" VUs", numVUs)
 		currentDoneIters := atomic.LoadUint64(doneIters)
-		progIters := fmt.Sprintf(itersFmt+"/"+itersFmt+" iters, %d per VU",
+		iterationsFmt := pb.GetFixedLengthIntFormat(int64(totalIters))
+		progIters := fmt.Sprintf(iterationsFmt+"/"+iterationsFmt+" iters, %d per VU",
 			currentDoneIters, totalIters, iterations)
 		right := []string{progVUs, duration.String(), progIters}
 		if spent > duration {
