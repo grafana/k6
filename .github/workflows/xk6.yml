@@ -48,8 +48,6 @@ jobs:
           fi
           echo "COMMIT_ID=$COMMIT_ID"
           cd .github/workflows/xk6-tests
-          # Temporary hack to ignore the v0.33.0 tag change
-          export GONOSUMDB="go.k6.io/k6"
           go install go.k6.io/xk6/cmd/xk6@master
           if [ "${{ github.event_name }}" == "pull_request" -a \
                "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
