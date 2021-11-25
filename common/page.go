@@ -308,9 +308,9 @@ func (p *Page) AddStyleTag(opts goja.Value) {
 	k6common.Throw(rt, errors.New("Page.addStyleTag(opts) has not been implemented yet!"))
 }
 
-// BrintToFront activates the browser tab for this page
-func (p *Page) BrintToFront() {
-	p.logger.Debugf("Page:BrintToFront", "sid:%v", p.session.id)
+// BringToFront activates the browser tab for this page
+func (p *Page) BringToFront() {
+	p.logger.Debugf("Page:BringToFront", "sid:%v", p.session.id)
 	rt := k6common.GetRuntime(p.ctx)
 	action := cdppage.BringToFront()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
