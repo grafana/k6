@@ -41,6 +41,8 @@ type BrowserProcess struct {
 
 	// The directory where user data for the browser is stored.
 	userDataDir string
+
+	logger *Logger
 }
 
 func NewBrowserProcess(
@@ -77,11 +79,13 @@ func (p *BrowserProcess) didLoseConnection() {
 
 // GracefulClose triggers a graceful closing of the browser process
 func (p *BrowserProcess) GracefulClose() {
+	p.logger.Debugf("Browser:GracefulClose", "")
 	close(p.processIsGracefullyClosing)
 }
 
 // Terminate triggers the termination of the browser process
 func (p *BrowserProcess) Terminate() {
+	p.logger.Debugf("Browser:Close", "browserProc terminate")
 	p.cancel()
 }
 
@@ -93,4 +97,9 @@ func (p *BrowserProcess) WsURL() string {
 // Pid returns the browser process ID
 func (p *BrowserProcess) Pid() int {
 	return p.process.Pid
+}
+
+// WithLogger attaches a logger to the browser process
+func (p *BrowserProcess) AttachLogger(logger *Logger) {
+	p.logger = logger
 }
