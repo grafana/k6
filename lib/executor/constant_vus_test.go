@@ -65,6 +65,8 @@ func TestConstantVUsRun(t *testing.T) {
 	)
 	defer cancel()
 	err = executor.Run(ctx, nil, nil)
+
+	// Assert
 	require.NoError(t, err)
 
 	var totalIters uint64
