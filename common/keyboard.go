@@ -140,7 +140,7 @@ func (k *Keyboard) down(key string) error {
 		WithUnmodifiedText(text).
 		WithAutoRepeat(autoRepeat)
 	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
-		return fmt.Errorf("cannot execute dispatch key event down %w", err)
+		return fmt.Errorf("cannot execute dispatch key event down: %w", err)
 	}
 
 	return nil
