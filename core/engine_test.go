@@ -208,6 +208,7 @@ func TestEngineStopped(t *testing.T) {
 
 func TestEngineOutput(t *testing.T) {
 	t.Parallel()
+
 	testMetric := stats.New("test_metric", stats.Trend)
 
 	runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
@@ -221,7 +222,8 @@ func TestEngineOutput(t *testing.T) {
 		Iterations: null.IntFrom(1),
 	})
 
-	assert.NoError(t, run())
+	err := run()
+	require.NoError(t, err)
 	wait()
 
 	cSamples := []stats.Sample{}
@@ -241,76 +243,82 @@ func TestEngineOutput(t *testing.T) {
 	}
 }
 
-func TestEngine_processSamples(t *testing.T) {
+func TestEngineProcessSamplesOfMetric(t *testing.T) {
 	t.Parallel()
+
+	// Arrange
 	metric := stats.New("my_metric", stats.Gauge)
+	e, _, wait := newTestEngine(t, nil, nil, nil, lib.Options{})
+	defer wait()
 
-	t.Run("metric", func(t *testing.T) {
-		t.Parallel()
-		e, _, wait := newTestEngine(t, nil, nil, nil, lib.Options{})
-		defer wait()
+	// Act
+	e.processSamples(
+		[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
+	)
 
-		e.processSamples(
-			[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
-		)
+	// Assert
+	assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric"].Sink)
+}
 
-		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric"].Sink)
+func TestEngineProcessSamplesOfSubmetric(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	metric := stats.New("my_metric", stats.Gauge)
+	thresholds, err := stats.NewThresholds([]string{`1+1==2`})
+	require.NoError(t, err)
+
+	engine, _, wait := newTestEngine(t, nil, nil, nil, lib.Options{
+		Thresholds: map[string]stats.Thresholds{
+			"my_metric{a:1}": thresholds,
+		},
 	})
-	t.Run("submetric", func(t *testing.T) {
-		t.Parallel()
-		ths, err := stats.NewThresholds([]string{`1+1==2`})
-		assert.NoError(t, err)
+	defer wait()
 
-		e, _, wait := newTestEngine(t, nil, nil, nil, lib.Options{
-			Thresholds: map[string]stats.Thresholds{
-				"my_metric{a:1}": ths,
-			},
-		})
-		defer wait()
+	// Act
+	submetrics := engine.submetrics["my_metric"]
+	engine.processSamples(
+		[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1", "b": "2"})}},
+	)
 
-		sms := e.submetrics["my_metric"]
-		assert.Len(t, sms, 1)
-		assert.Equal(t, "my_metric{a:1}", sms[0].Name)
-		assert.EqualValues(t, map[string]string{"a": "1"}, sms[0].Tags.CloneTags())
+	// Assert
+	assert.Len(t, submetrics, 1)
+	assert.Equal(t, "my_metric{a:1}", submetrics[0].Name)
+	assert.EqualValues(t, map[string]string{"a": "1"}, submetrics[0].Tags.CloneTags())
+	assert.IsType(t, &stats.GaugeSink{}, engine.Metrics["my_metric"].Sink)
+	assert.IsType(t, &stats.GaugeSink{}, engine.Metrics["my_metric{a:1}"].Sink)
 
-		e.processSamples(
-			[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1", "b": "2"})}},
-		)
-
-		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric"].Sink)
-		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric{a:1}"].Sink)
-	})
 }
 
 func TestEngineThresholdsWillAbort(t *testing.T) {
 	t.Parallel()
+
+	// Arrange
 	metric := stats.New("my_metric", stats.Gauge)
-
-	ths, err := stats.NewThresholds([]string{"1+1==3"})
-	assert.NoError(t, err)
-	ths.Thresholds[0].AbortOnFail = true
-
-	thresholds := map[string]stats.Thresholds{metric.Name: ths}
-
-	e, _, wait := newTestEngine(t, nil, nil, nil, lib.Options{Thresholds: thresholds})
+	thresholds, err := stats.NewThresholds([]string{"1+1==3"})
+	require.NoError(t, err)
+	thresholds.Thresholds[0].AbortOnFail = true
+	engine, _, wait := newTestEngine(t, nil, nil, nil, lib.Options{Thresholds: map[string]stats.Thresholds{metric.Name: thresholds}})
 	defer wait()
 
-	e.processSamples(
+	// Act
+	engine.processSamples(
 		[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
 	)
-	assert.True(t, e.processThresholds())
+	shouldAbort := engine.processThresholds()
+
+	// Assert
+	assert.True(t, shouldAbort)
 }
 
 func TestEngineAbortedByThresholds(t *testing.T) {
 	t.Parallel()
+
+	// Arrange
 	metric := stats.New("my_metric", stats.Gauge)
-
-	ths, err := stats.NewThresholds([]string{"1+1==3"})
-	assert.NoError(t, err)
-	ths.Thresholds[0].AbortOnFail = true
-
-	thresholds := map[string]stats.Thresholds{metric.Name: ths}
-
+	thresholds, err := stats.NewThresholds([]string{"1+1==3"})
+	require.NoError(t, err)
+	thresholds.Thresholds[0].AbortOnFail = true
 	done := make(chan struct{})
 	runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
 		out <- stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}
@@ -319,13 +327,15 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 		return nil
 	}}
 
-	_, run, wait := newTestEngine(t, nil, runner, nil, lib.Options{Thresholds: thresholds})
+	_, run, wait := newTestEngine(t, nil, runner, nil, lib.Options{Thresholds: map[string]stats.Thresholds{metric.Name: thresholds}})
 	defer wait()
 
+	// Act
 	go func() {
 		assert.NoError(t, run())
 	}()
 
+	// Assert
 	select {
 	case <-done:
 		return
@@ -549,6 +559,8 @@ func TestSentReceivedMetrics(t *testing.T) {
 
 func TestRunTags(t *testing.T) {
 	t.Parallel()
+
+	// Arrange
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	runTagsMap := map[string]string{"foo": "bar", "test": "mest", "over": "written"}
@@ -627,17 +639,6 @@ func TestRunTags(t *testing.T) {
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 	})
 
-	errC := make(chan error)
-	go func() { errC <- run() }()
-
-	select {
-	case <-time.After(10 * time.Second):
-		t.Fatal("Test timed out")
-	case err := <-errC:
-		require.NoError(t, err)
-	}
-	wait()
-
 	systemMetrics := []string{
 		metrics.VUsName, metrics.VUsMaxName, metrics.IterationsName, metrics.IterationDurationName,
 		metrics.GroupDurationName, metrics.DataSentName, metrics.DataReceivedName,
@@ -651,6 +652,19 @@ func TestRunTags(t *testing.T) {
 		}
 		return "the rainbow"
 	}
+
+	// Act
+	errC := make(chan error)
+	go func() { errC <- run() }()
+
+	// Assert
+	select {
+	case <-time.After(10 * time.Second):
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		require.NoError(t, err)
+	}
+	wait()
 
 	for _, s := range mockOutput.Samples {
 		for key, expVal := range runTagsMap {
@@ -668,6 +682,8 @@ func TestRunTags(t *testing.T) {
 
 func TestSetupTeardownThresholds(t *testing.T) {
 	t.Parallel()
+
+	// Arrange
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	script := []byte(tb.Replacer.Replace(`
@@ -720,9 +736,11 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	})
 	defer wait()
 
+	// Act
 	errC := make(chan error)
 	go func() { errC <- run() }()
 
+	// Assert
 	select {
 	case <-time.After(10 * time.Second):
 		t.Fatal("Test timed out")
@@ -735,7 +753,8 @@ func TestSetupTeardownThresholds(t *testing.T) {
 func TestSetupException(t *testing.T) {
 	t.Parallel()
 
-	script := []byte(`
+	// Arrange
+	srcScript := []byte(`
 	import bar from "./bar.js";
 	export function setup() {
 		bar();
@@ -744,20 +763,22 @@ func TestSetupException(t *testing.T) {
 	};
 	`)
 
-	memfs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(memfs, "/bar.js", []byte(`
+	fsScript := []byte(`
 	export default function () {
         baz();
 	}
 	function baz() {
 		        throw new Error("baz");
 			}
-	`), 0x666))
+	`)
+	memfs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(memfs, "/bar.js", fsScript, 0x666))
+
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
 		testutils.NewLogger(t),
-		&loader.SourceData{URL: &url.URL{Scheme: "file", Path: "/script.js"}, Data: script},
+		&loader.SourceData{URL: &url.URL{Scheme: "file", Path: "/script.js"}, Data: srcScript},
 		map[string]afero.Fs{"file": memfs},
 		lib.RuntimeOptions{},
 		builtinMetrics,
@@ -773,9 +794,11 @@ func TestSetupException(t *testing.T) {
 	})
 	defer wait()
 
+	// Act
 	errC := make(chan error)
 	go func() { errC <- run() }()
 
+	// Assert
 	select {
 	case <-time.After(10 * time.Second):
 		t.Fatal("Test timed out")
@@ -792,6 +815,7 @@ func TestSetupException(t *testing.T) {
 func TestVuInitException(t *testing.T) {
 	t.Parallel()
 
+	// Arrange
 	script := []byte(`
 		export let options = {
 			vus: 3,
@@ -829,8 +853,11 @@ func TestVuInitException(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Act
 	_, _, err = engine.Init(ctx, ctx) // no need for 2 different contexts
 
+	// Assert
 	require.Error(t, err)
 
 	var exception errext.Exception
@@ -844,6 +871,8 @@ func TestVuInitException(t *testing.T) {
 
 func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	t.Parallel()
+
+	// Arrange
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	script := []byte(tb.Replacer.Replace(`
@@ -892,9 +921,11 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	mockOutput := mockoutput.New()
 	engine, run, wait := newTestEngine(t, nil, runner, []output.Output{mockOutput}, lib.Options{})
 
+	// Act
 	errC := make(chan error)
 	go func() { errC <- run() }()
 
+	// Assert
 	select {
 	case <-time.After(12 * time.Second):
 		t.Fatal("Test timed out")
@@ -1107,8 +1138,9 @@ func TestMinIterationDurationInSetupTeardownStage(t *testing.T) {
 
 func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 	t.Parallel()
-	testMetric := stats.New("teardown_metric", stats.Counter)
 
+	// Arrange
+	testMetric := stats.New("teardown_metric", stats.Counter)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	runner := &minirunner.MiniRunner{
@@ -1127,7 +1159,9 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 		VUs: null.IntFrom(1), Iterations: null.IntFrom(1),
 	})
 
-	assert.NoError(t, run())
+	// Act
+	err := run()
+	require.NoError(t, err)
 	wait()
 
 	var count float64
@@ -1136,12 +1170,15 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 			count += sample.Value
 		}
 	}
+
+	// Assert
 	assert.Equal(t, 1.0, count)
 }
 
 func TestActiveVUsCount(t *testing.T) {
 	t.Parallel()
 
+	// Arrange
 	script := []byte(`
 		var sleep = require('k6').sleep;
 
@@ -1214,9 +1251,11 @@ func TestActiveVUsCount(t *testing.T) {
 	run, waitFn, err := engine.Init(ctx, ctx) // no need for 2 different contexts
 	require.NoError(t, err)
 
+	// Act
 	errC := make(chan error)
 	go func() { errC <- run() }()
 
+	// Assert
 	select {
 	case <-time.After(15 * time.Second):
 		t.Fatal("Test timed out")
