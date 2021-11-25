@@ -325,9 +325,9 @@ func (c *Client) reflect(ctx context.Context) error {
 	if listResp == nil {
 		return fmt.Errorf("can't list services, nil response")
 	}
-	fdset, err := resolveFileDescriptors(methodClient, listResp)
+	fdset, err := resolveServiceFileDescriptors(methodClient, listResp)
 	if err != nil {
-		return fmt.Errorf("resolveFileDescriptors: %w", err)
+		return fmt.Errorf("can't resolve services' file descriptors: %w", err)
 	}
 	_, err = c.convertToMethodInfo(fdset)
 	if err != nil {
@@ -336,12 +336,22 @@ func (c *Client) reflect(ctx context.Context) error {
 	return err
 }
 
-func resolveFileDescriptors(
+type fileDescriptorLookupKey struct {
+	Package string
+	Name    string
+}
+
+func resolveServiceFileDescriptors(
 	mc reflectpb.ServerReflection_ServerReflectionInfoClient,
 	res *reflectpb.ListServiceResponse,
 ) (*descriptorpb.FileDescriptorSet, error) {
-	fdset := &descriptorpb.FileDescriptorSet{}
-	for _, service := range res.GetService() {
+	services := res.GetService()
+	seen := make(map[fileDescriptorLookupKey]bool, len(services))
+	fdset := &descriptorpb.FileDescriptorSet{
+		File: make([]*descriptorpb.FileDescriptorProto, 0, len(services)),
+	}
+
+	for _, service := range services {
 		req := &reflectpb.ServerReflectionRequest{
 			MessageRequest: &reflectpb.ServerReflectionRequest_FileContainingSymbol{
 				FileContainingSymbol: service.GetName(),
@@ -357,6 +367,17 @@ func resolveFileDescriptors(
 			if err = proto.Unmarshal(raw, &fdp); err != nil {
 				return nil, fmt.Errorf("can't unmarshal proto on service %q: %w", service, err)
 			}
+			fdkey := fileDescriptorLookupKey{
+				Package: *fdp.Package,
+				Name:    *fdp.Name,
+			}
+			if seen[fdkey] {
+				// When a proto file contains declarations for multiple services
+				// then the same proto file is returned multiple times,
+				// this prevents adding the returned proto file as a duplicate.
+				continue
+			}
+			seen[fdkey] = true
 			fdset.File = append(fdset.File, &fdp)
 		}
 	}
