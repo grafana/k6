@@ -32,7 +32,6 @@ import (
 	"github.com/grafana/xk6-browser/keyboardlayout"
 )
 
-// Ensure Keyboard implements the api.Keyboard interface
 var _ api.Keyboard = &Keyboard{}
 
 const (
@@ -42,23 +41,73 @@ const (
 	ModifierKeyShift
 )
 
-// Keyboard represents a keyboard input device
+// Keyboard represents a keyboard input device.
+// Each Page has a publicly accessible Keyboard.
 type Keyboard struct {
-	ctx         context.Context
-	session     *Session
-	modifiers   int64
-	pressedKeys map[int64]bool
-	layoutName  string
+	ctx     context.Context
+	session *Session
+
+	modifiers   int64          // like shift, alt, ctrl, ...
+	pressedKeys map[int64]bool // tracks keys through down() and up()
+	layoutName  string         // us by default
 }
 
-// NewKeyboard creates a new keyboard
+// NewKeyboard return a new keyboard with a "us" layout.
 func NewKeyboard(ctx context.Context, session *Session) *Keyboard {
 	return &Keyboard{
 		ctx:         ctx,
 		session:     session,
-		modifiers:   0,
 		pressedKeys: make(map[int64]bool),
 		layoutName:  "us",
+	}
+}
+
+// Down sends a key down message to a session target.
+func (k *Keyboard) Down(key string) {
+	if err := k.down(key); err != nil {
+		k6Throw(k.ctx, "cannot send key down: %w", err)
+	}
+}
+
+// Up sends a key up message to a session target.
+func (k *Keyboard) Up(key string) {
+	if err := k.up(key); err != nil {
+		k6Throw(k.ctx, "cannot send key up: %w", err)
+	}
+}
+
+// Press sends a key press message to a session target.
+// It delays the action if `Delay` option is specified.
+// A press message is consisting of successive key down and up messages.
+func (k *Keyboard) Press(key string, opts goja.Value) {
+	kbdOpts := NewKeyboardOptions()
+	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
+		k6Throw(k.ctx, "cannot parse keyboard options: %w", err)
+	}
+	if err := k.press(key, kbdOpts); err != nil {
+		k6Throw(k.ctx, "cannot press key: %w", err)
+	}
+}
+
+// InsertText inserts a text without dispatching key events.
+func (k *Keyboard) InsertText(text string) {
+	if err := k.insertText(text); err != nil {
+		k6Throw(k.ctx, "cannot insert text: %w", err)
+	}
+}
+
+// Type sends a press message to a session target for each character in text.
+// It delays the action if `Delay` option is specified.
+//
+// It sends an insertText message if a character is not among
+// valid characters in the keyboard's layout.
+func (k *Keyboard) Type(text string, opts goja.Value) {
+	kbdOpts := NewKeyboardOptions()
+	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
+		k6Throw(k.ctx, "cannot parse keyboard options: %w", err)
+	}
+	if err := k.typ(text, kbdOpts); err != nil {
+		k6Throw(k.ctx, "cannot type text: %w", err)
 	}
 }
 
@@ -91,7 +140,7 @@ func (k *Keyboard) down(key string) error {
 		WithUnmodifiedText(text).
 		WithAutoRepeat(autoRepeat)
 	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
-		return fmt.Errorf("unable to key down: %w", err)
+		return fmt.Errorf("cannot execute dispatch key event down %w", err)
 	}
 
 	return nil
@@ -115,7 +164,7 @@ func (k *Keyboard) up(key string) error {
 		WithCode(keyDef.Code).
 		WithLocation(keyDef.Location)
 	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
-		return fmt.Errorf("unable to key up: %w", err)
+		return fmt.Errorf("cannot execute dispatch key event up: %w", err)
 	}
 
 	return nil
@@ -124,7 +173,7 @@ func (k *Keyboard) up(key string) error {
 func (k *Keyboard) insertText(text string) error {
 	action := input.InsertText(text)
 	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
-		return fmt.Errorf("cannot send character: %w", err)
+		return fmt.Errorf("cannot execute insert text: %w", err)
 	}
 	return nil
 }
@@ -216,7 +265,7 @@ func (k *Keyboard) press(key string, opts *KeyboardOptions) error {
 		}
 	}
 	if err := k.down(key); err != nil {
-		return fmt.Errorf("cannot down: %w", err)
+		return fmt.Errorf("cannot do key down: %w", err)
 	}
 	return k.up(key)
 }
@@ -235,7 +284,7 @@ func (k *Keyboard) typ(text string, opts *KeyboardOptions) error {
 		keyInput := keyboardlayout.KeyInput(c)
 		if _, ok := layout.ValidKeys[keyInput]; ok {
 			if err := k.press(string(c), opts); err != nil {
-				return fmt.Errorf("cannot press: %w", err)
+				return fmt.Errorf("cannot press key: %w", err)
 			}
 			continue
 		}
@@ -244,47 +293,4 @@ func (k *Keyboard) typ(text string, opts *KeyboardOptions) error {
 		}
 	}
 	return nil
-}
-
-// Down
-func (k *Keyboard) Down(key string) {
-	if err := k.down(key); err != nil {
-		k6Throw(k.ctx, "cannot press down key: %w", err)
-	}
-}
-
-// Press
-func (k *Keyboard) Press(key string, opts goja.Value) {
-	kbdOpts := NewKeyboardOptions()
-	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		k6Throw(k.ctx, "cannot parse options: %w", err)
-	}
-	if err := k.press(key, kbdOpts); err != nil {
-		k6Throw(k.ctx, "cannot press key: %w", err)
-	}
-}
-
-// InsertText
-func (k *Keyboard) InsertText(text string) {
-	if err := k.insertText(text); err != nil {
-		k6Throw(k.ctx, "cannot insert text: %w", err)
-	}
-}
-
-// Type
-func (k *Keyboard) Type(text string, opts goja.Value) {
-	kbdOpts := NewKeyboardOptions()
-	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		k6Throw(k.ctx, "cannot parse options: %w", err)
-	}
-	if err := k.typ(text, kbdOpts); err != nil {
-		k6Throw(k.ctx, "cannot type text: %w", err)
-	}
-}
-
-// Up
-func (k *Keyboard) Up(key string) {
-	if err := k.up(key); err != nil {
-		k6Throw(k.ctx, "cannot press up key: %w", err)
-	}
 }
