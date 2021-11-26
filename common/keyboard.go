@@ -50,6 +50,7 @@ type Keyboard struct {
 	modifiers   int64          // like shift, alt, ctrl, ...
 	pressedKeys map[int64]bool // tracks keys through down() and up()
 	layoutName  string         // us by default
+	layout      keyboardlayout.KeyboardLayout
 }
 
 // NewKeyboard returns a new keyboard with a "us" layout.
@@ -59,6 +60,7 @@ func NewKeyboard(ctx context.Context, session *Session) *Keyboard {
 		session:     session,
 		pressedKeys: make(map[int64]bool),
 		layoutName:  "us",
+		layout:      keyboardlayout.GetKeyboardLayout("us"),
 	}
 }
 
@@ -113,8 +115,7 @@ func (k *Keyboard) Type(text string, opts goja.Value) {
 
 func (k *Keyboard) down(key string) error {
 	keyInput := keyboardlayout.KeyInput(key)
-	layout := keyboardlayout.GetKeyboardLayout(k.layoutName)
-	if _, ok := layout.ValidKeys[keyInput]; !ok {
+	if _, ok := k.layout.ValidKeys[keyInput]; !ok {
 		return fmt.Errorf("%q is not a valid key for layout %q", key, k.layoutName)
 	}
 
@@ -148,8 +149,7 @@ func (k *Keyboard) down(key string) error {
 
 func (k *Keyboard) up(key string) error {
 	keyInput := keyboardlayout.KeyInput(key)
-	layout := keyboardlayout.GetKeyboardLayout(k.layoutName)
-	if _, ok := layout.ValidKeys[keyInput]; !ok {
+	if _, ok := k.layout.ValidKeys[keyInput]; !ok {
 		return fmt.Errorf("'%s' is not a valid key for layout '%s'", key, k.layoutName)
 	}
 
@@ -178,28 +178,18 @@ func (k *Keyboard) insertText(text string) error {
 	return nil
 }
 
-func (k *Keyboard) keyDefinitionFromKey(keyString keyboardlayout.KeyInput) keyboardlayout.KeyDefinition {
-	layout := keyboardlayout.GetKeyboardLayout(k.layoutName)
-	srcKeyDef, ok := layout.Keys[keyString]
-	// Find based on key value instead of code
-	if !ok {
-		for key, def := range layout.Keys {
-			if def.Key == string(keyString) {
-				keyString, srcKeyDef = key, def
-				ok = true // don't look for a shift key below
-				break
-			}
-		}
-	}
-	// try to find with the shift key value
+func (k *Keyboard) keyDefinitionFromKey(key keyboardlayout.KeyInput) keyboardlayout.KeyDefinition {
 	shift := k.modifiers & ModifierKeyShift
+
+	// Find directly from the keyboard layout
+	srcKeyDef, ok := k.layout.Keys[key]
+	// Try to find based on key value instead of code
 	if !ok {
-		for key, def := range layout.Keys {
-			if def.ShiftKey == string(keyString) {
-				keyString, srcKeyDef = key, def
-				break
-			}
-		}
+		srcKeyDef, ok = k.layout.KeyDefinition(key)
+	}
+	// Try to find with the shift key value
+	if !ok {
+		key, srcKeyDef = k.layout.ShiftKeyDefinition(key)
 		shift = k.modifiers | ModifierKeyShift
 	}
 
@@ -214,8 +204,8 @@ func (k *Keyboard) keyDefinitionFromKey(keyString keyboardlayout.KeyInput) keybo
 	if srcKeyDef.KeyCode != 0 {
 		keyDef.KeyCode = srcKeyDef.KeyCode
 	}
-	if keyString != "" {
-		keyDef.Code = string(keyString)
+	if key != "" {
+		keyDef.Code = string(key)
 	}
 	if srcKeyDef.Location != 0 {
 		keyDef.Location = srcKeyDef.Location

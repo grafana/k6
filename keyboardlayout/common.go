@@ -43,6 +43,28 @@ type KeyboardLayout struct {
 	Keys      map[KeyInput]KeyDefinition
 }
 
+// KeyDefinition returns true with the key definition of a given key input.
+// It returns false and an empty key definition if it cannot find the key.
+func (kl KeyboardLayout) KeyDefinition(key KeyInput) (KeyDefinition, bool) {
+	for _, d := range kl.Keys {
+		if d.Key == string(key) {
+			return d, true
+		}
+	}
+	return KeyDefinition{}, false
+}
+
+// ShiftKeyDefinition returns shift key definition of a given key input.
+// It an empty key definition if it cannot find the key.
+func (kl KeyboardLayout) ShiftKeyDefinition(key KeyInput) (KeyInput, KeyDefinition) {
+	for k, d := range kl.Keys {
+		if d.ShiftKey == string(key) {
+			return k, d
+		}
+	}
+	return key, KeyDefinition{}
+}
+
 //nolint:gochecknoglobals
 var (
 	kbdLayouts = make(map[string]KeyboardLayout)
