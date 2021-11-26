@@ -52,7 +52,7 @@ type Keyboard struct {
 	layoutName  string         // us by default
 }
 
-// NewKeyboard return a new keyboard with a "us" layout.
+// NewKeyboard returns a new keyboard with a "us" layout.
 func NewKeyboard(ctx context.Context, session *Session) *Keyboard {
 	return &Keyboard{
 		ctx:         ctx,
