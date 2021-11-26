@@ -28,13 +28,11 @@ import (
 	"math"
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-	"github.com/sirupsen/logrus"
 	k6common "go.k6.io/k6/js/common"
 )
 
@@ -169,85 +167,6 @@ func errorFromDOMError(domErr string) error {
 	return fmt.Errorf(domErr)
 }
 
-func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview, logger *logrus.Entry) (map[string]interface{}, error) {
-	obj := make(map[string]interface{})
-	if op.Overflow {
-		logger.Warn("object will be parsed partially")
-	}
-
-	for _, p := range op.Properties {
-		val, err := parseRemoteObjectValue(p.Type, p.Value, p.ValuePreview, logger)
-		if err != nil {
-			logger.WithError(err).Errorf("failed parsing object property '%s'", p.Name)
-			continue
-		}
-		obj[p.Name] = val
-	}
-
-	return obj, nil
-}
-
-func parseRemoteObjectValue(
-	t cdpruntime.Type, val string, op *cdpruntime.ObjectPreview, logger *logrus.Entry,
-) (interface{}, error) {
-	switch t {
-	case cdpruntime.TypeAccessor:
-		return "accessor", nil
-	case cdpruntime.TypeBigint:
-		n, err := strconv.ParseInt(strings.Replace(val, "n", "", -1), 10, 64)
-		if err != nil {
-			return nil, BigIntParseError{err}
-		}
-		return n, nil
-	case cdpruntime.TypeFunction:
-		return "function()", nil
-	case cdpruntime.TypeString:
-		if !strings.HasPrefix(val, `"`) {
-			return val, nil
-		}
-	case cdpruntime.TypeSymbol:
-		return val, nil
-	case cdpruntime.TypeObject:
-		if op != nil {
-			return parseRemoteObjectPreview(op, logger)
-		}
-		if val == "Object" {
-			return val, nil
-		}
-	case cdpruntime.TypeUndefined:
-		return "undefined", nil
-	}
-
-	var v interface{}
-	err := json.Unmarshal([]byte(val), &v)
-	if err != nil {
-		return nil, err
-	}
-
-	return v, nil
-}
-
-func parseRemoteObject(obj *cdpruntime.RemoteObject, logger *logrus.Entry) (val interface{}, err error) {
-	if obj.UnserializableValue == "" {
-		val, err = parseRemoteObjectValue(obj.Type, string(obj.Value), obj.Preview, logger)
-	} else {
-		switch obj.UnserializableValue.String() {
-		case "-0": // To handle +0 divided by negative number
-			return math.Float64frombits(0 | (1 << 63)), nil
-		case "NaN":
-			return math.NaN(), nil
-		case "Infinity":
-			return math.Inf(0), nil
-		case "-Infinity":
-			return math.Inf(-1), nil
-		default:
-			return nil, UnserializableValueError{obj.UnserializableValue}
-		}
-	}
-
-	return
-}
-
 func stringSliceContains(s []string, e string) bool {
 	for _, a := range s {
 		if a == e {
@@ -255,17 +174,6 @@ func stringSliceContains(s []string, e string) bool {
 		}
 	}
 	return false
-}
-
-func valueFromRemoteObject(
-	ctx context.Context, remoteObject *cdpruntime.RemoteObject, logger *logrus.Entry,
-) (goja.Value, error) {
-	rt := k6common.GetRuntime(ctx)
-	val, err := parseRemoteObject(remoteObject, logger)
-	if val == "undefined" {
-		return goja.Undefined(), err
-	}
-	return rt.ToValue(val), err
 }
 
 func createWaitForEventHandler(
