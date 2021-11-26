@@ -160,11 +160,13 @@ func goRoutineID() int {
 	return id
 }
 
-type mapAsObjectFormatter struct {
+type consoleLogFormatter struct {
 	logrus.Formatter
 }
 
-func (f *mapAsObjectFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+// Format assembles a message from marshalling elements in the "objects" field
+// to JSON separated by space, and deletes the field when done.
+func (f *consoleLogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	if objects, ok := entry.Data["objects"].([]interface{}); ok {
 		var msg []string
 		for _, obj := range objects {

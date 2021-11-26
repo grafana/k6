@@ -79,7 +79,7 @@ type FrameSession struct {
 
 	logger *Logger
 	// logger that will properly serialize RemoteObject instances
-	loggerObj *logrus.Logger
+	serializer *logrus.Logger
 }
 
 func NewFrameSession(
@@ -88,11 +88,6 @@ func NewFrameSession(
 ) (*FrameSession, error) {
 	logger.Debugf("NewFrameSession", "sid:%v tid:%v", session.id, targetID)
 	state := k6lib.GetState(ctx)
-	loggerObj := &logrus.Logger{
-		Out:       state.Logger.Out,
-		Level:     state.Logger.Level,
-		Formatter: &mapAsObjectFormatter{state.Logger.Formatter},
-	}
 	fs := FrameSession{
 		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
 		session:              session,
@@ -108,7 +103,11 @@ func NewFrameSession(
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
 		logger:               logger,
-		loggerObj:            loggerObj,
+		serializer: &logrus.Logger{
+			Out:       state.Logger.Out,
+			Level:     state.Logger.Level,
+			Formatter: &consoleLogFormatter{state.Logger.Formatter},
+		},
 	}
 	var err error
 	if fs.parent != nil {
@@ -467,14 +466,13 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 }
 
 func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
-	state := k6lib.GetState(fs.ctx)
 	// TODO: switch to using browser logger instead of directly outputting to k6 logging system
-	l := fs.loggerObj.
+	l := fs.serializer.
 		WithTime(event.Timestamp.Time()).
 		WithField("source", "browser-console-api")
 
-	if state.Group.Path != "" {
-		l = l.WithField("group", state.Group.Path)
+	if s := k6lib.GetState(fs.ctx); s.Group.Path != "" {
+		l = l.WithField("group", s.Group.Path)
 	}
 
 	var parsedObjects []interface{}
@@ -490,9 +488,7 @@ func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled)
 	l = l.WithField("objects", parsedObjects)
 
 	switch event.Type {
-	case "log":
-		l.Info()
-	case "info":
+	case "log", "info":
 		l.Info()
 	case "warning":
 		l.Warn()

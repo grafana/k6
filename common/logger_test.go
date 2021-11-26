@@ -34,7 +34,7 @@ func (f *testLogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	return []byte(entry.Message), nil
 }
 
-func TestMapAsObjectFormatter(t *testing.T) {
+func TestConsoleLogFormatter(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -42,23 +42,25 @@ func TestMapAsObjectFormatter(t *testing.T) {
 		expected string
 	}{
 		{objects: nil, expected: ""},
-		{objects: []interface{}{
-			map[string]interface{}{"one": 1, "two": "two"},
-			map[string]interface{}{"nested": map[string]interface{}{
-				"sub": float64(7.777),
-			}},
-		},
+		{
+			objects: []interface{}{
+				map[string]interface{}{"one": 1, "two": "two"},
+				map[string]interface{}{"nested": map[string]interface{}{
+					"sub": float64(7.777),
+				}},
+			},
 			expected: `{"one":1,"two":"two"} {"nested":{"sub":7.777}}`,
 		},
-		{objects: []interface{}{
-			map[string]interface{}{"one": 1, "fail": make(chan int)},
-			map[string]interface{}{"two": 2},
-		},
+		{
+			objects: []interface{}{
+				map[string]interface{}{"one": 1, "fail": make(chan int)},
+				map[string]interface{}{"two": 2},
+			},
 			expected: `{"two":2}`,
 		},
 	}
 
-	fmtr := &mapAsObjectFormatter{&testLogFormatter{}}
+	fmtr := &consoleLogFormatter{&testLogFormatter{}}
 
 	for _, tc := range testCases {
 		var data logrus.Fields

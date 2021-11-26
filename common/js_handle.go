@@ -49,20 +49,7 @@ func NewJSHandle(
 	ctx context.Context, session *Session, execCtx *ExecutionContext,
 	frame *Frame, remoteObject *runtime.RemoteObject, logger *Logger,
 ) api.JSHandle {
-	if remoteObject.Subtype == "node" && execCtx.Frame() != nil {
-		return &ElementHandle{
-			BaseJSHandle: BaseJSHandle{
-				ctx:          ctx,
-				session:      session,
-				execCtx:      execCtx,
-				remoteObject: remoteObject,
-				disposed:     false,
-				logger:       logger,
-			},
-			frame: frame,
-		}
-	}
-	return &BaseJSHandle{
+	eh := &BaseJSHandle{
 		ctx:          ctx,
 		session:      session,
 		execCtx:      execCtx,
@@ -70,6 +57,15 @@ func NewJSHandle(
 		disposed:     false,
 		logger:       logger,
 	}
+
+	if remoteObject.Subtype == "node" && execCtx.Frame() != nil {
+		return &ElementHandle{
+			BaseJSHandle: *eh,
+			frame:        frame,
+		}
+	}
+
+	return eh
 }
 
 // AsElement returns an element handle if this JSHandle is a reference to a JS HTML element
@@ -132,10 +128,11 @@ func (h *BaseJSHandle) GetProperties() map[string]api.JSHandle {
 
 	props := make(map[string]api.JSHandle, len(result))
 	for i := 0; i < len(result); i++ {
-		if result[i].Enumerable {
-			props[result[i].Name] = NewJSHandle(
-				h.ctx, h.session, h.execCtx, h.execCtx.Frame(), result[i].Value, h.logger)
+		if !result[i].Enumerable {
+			continue
 		}
+		props[result[i].Name] = NewJSHandle(
+			h.ctx, h.session, h.execCtx, h.execCtx.Frame(), result[i].Value, h.logger)
 	}
 	return props
 }

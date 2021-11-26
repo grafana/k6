@@ -38,20 +38,19 @@ import (
 	k6common "go.k6.io/k6/js/common"
 )
 
-func newExecCtx() (context.Context, *ExecutionContext, *goja.Runtime) {
+func newExecCtx() (*ExecutionContext, context.Context, *goja.Runtime) {
 	ctx := context.Background()
 	logger := NewLogger(ctx, logrus.New(), false, nil)
 	execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789), logger)
-	rt := goja.New()
 
-	return ctx, execCtx, rt
+	return execCtx, ctx, goja.New()
 }
 
 func TestHelpersConvertArgument(t *testing.T) {
 	t.Parallel()
 
 	t.Run("int64", func(t *testing.T) {
-		ctx, execCtx, rt := newExecCtx()
+		execCtx, ctx, rt := newExecCtx()
 		var value int64 = 777
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
 
@@ -63,7 +62,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("int64 maxint", func(t *testing.T) {
-		ctx, execCtx, rt := newExecCtx()
+		execCtx, ctx, rt := newExecCtx()
 
 		var value int64 = math.MaxInt32 + 1
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
@@ -75,7 +74,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("float64", func(t *testing.T) {
-		ctx, execCtx, rt := newExecCtx()
+		execCtx, ctx, rt := newExecCtx()
 
 		var value float64 = 777.0
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
@@ -88,7 +87,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("float64 unserializable values", func(t *testing.T) {
-		ctx, execCtx, rt := newExecCtx()
+		execCtx, ctx, rt := newExecCtx()
 
 		unserializableValues := []struct {
 			value    float64
@@ -122,7 +121,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("bool", func(t *testing.T) {
-		ctx, execCtx, rt := newExecCtx()
+		execCtx, ctx, rt := newExecCtx()
 
 		var value bool = true
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
@@ -135,7 +134,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("string", func(t *testing.T) {
-		ctx, execCtx, rt := newExecCtx()
+		execCtx, ctx, rt := newExecCtx()
 		var value string = "hello world"
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
 
@@ -147,7 +146,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("*BaseJSHandle", func(t *testing.T) {
-		ctx, execCtx, rt := newExecCtx()
+		execCtx, ctx, rt := newExecCtx()
 		timeoutSetings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
 		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
@@ -168,7 +167,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("*BaseJSHandle wrong context", func(t *testing.T) {
-		ctx, execCtx, rt := newExecCtx()
+		execCtx, ctx, rt := newExecCtx()
 		timeoutSetings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
 		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
@@ -188,7 +187,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("*BaseJSHandle is disposed", func(t *testing.T) {
-		ctx, execCtx, rt := newExecCtx()
+		execCtx, ctx, rt := newExecCtx()
 		timeoutSetings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
 		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
@@ -208,7 +207,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("*BaseJSHandle as *ElementHandle", func(t *testing.T) {
-		ctx, execCtx, rt := newExecCtx()
+		execCtx, ctx, rt := newExecCtx()
 		timeoutSetings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
 		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
