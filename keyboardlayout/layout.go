@@ -55,7 +55,7 @@ func (kl KeyboardLayout) KeyDefinition(key KeyInput) (KeyDefinition, bool) {
 }
 
 // ShiftKeyDefinition returns shift key definition of a given key input.
-// It an empty key definition if it cannot find the key.
+// It returns an empty key definition if it cannot find the key.
 func (kl KeyboardLayout) ShiftKeyDefinition(key KeyInput) KeyDefinition {
 	for _, d := range kl.Keys {
 		if d.ShiftKey == string(key) {
