@@ -22,6 +22,7 @@ package testutils
 
 import (
 	"io/ioutil"
+	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -31,30 +32,43 @@ import (
 // if log messages were outputted
 type CacheLogrusHook struct {
 	HookedLevels []logrus.Level
-	mutex        sync.Mutex
+	mutex        sync.RWMutex
 	messageCache []logrus.Entry
 }
 
 // Levels just returns whatever was stored in the HookedLevels slice
-func (smh *CacheLogrusHook) Levels() []logrus.Level {
-	return smh.HookedLevels
+func (clh *CacheLogrusHook) Levels() []logrus.Level {
+	return clh.HookedLevels
 }
 
 // Fire saves whatever message the logrus library passed in the cache
-func (smh *CacheLogrusHook) Fire(e *logrus.Entry) error {
-	smh.mutex.Lock()
-	defer smh.mutex.Unlock()
-	smh.messageCache = append(smh.messageCache, *e)
+func (clh *CacheLogrusHook) Fire(e *logrus.Entry) error {
+	clh.mutex.Lock()
+	defer clh.mutex.Unlock()
+	clh.messageCache = append(clh.messageCache, *e)
 	return nil
 }
 
 // Drain returns the currently stored messages and deletes them from the cache
-func (smh *CacheLogrusHook) Drain() []logrus.Entry {
-	smh.mutex.Lock()
-	defer smh.mutex.Unlock()
-	res := smh.messageCache
-	smh.messageCache = []logrus.Entry{}
+func (clh *CacheLogrusHook) Drain() []logrus.Entry {
+	clh.mutex.Lock()
+	defer clh.mutex.Unlock()
+	res := clh.messageCache
+	clh.messageCache = []logrus.Entry{}
 	return res
+}
+
+// Contains returns true if msg is contained in any of the cached logged events
+// or false otherwise.
+func (clh *CacheLogrusHook) Contains(msg string) bool {
+	clh.mutex.RLock()
+	defer clh.mutex.RUnlock()
+	for _, evt := range clh.messageCache {
+		if strings.Contains(evt.Message, msg) {
+			return true
+		}
+	}
+	return false
 }
 
 var _ logrus.Hook = &CacheLogrusHook{}

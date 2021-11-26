@@ -41,11 +41,5 @@ func TestDataURLSkipRequest(t *testing.T) {
 
 	p.Goto("data:text/html,hello", nil)
 
-	var gotMsg bool
-	for _, evt := range logHook.Drain() {
-		if evt.Message == "skipped request handling of data URL" {
-			gotMsg = true
-		}
-	}
-	assert.True(t, gotMsg)
+	assert.True(t, logHook.Contains("skipped request handling of data URL"))
 }

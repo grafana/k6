@@ -256,13 +256,7 @@ func TestParseRemoteObject(t *testing.T) {
 			assert.Equal(t, tc.expected, val)
 
 			if tc.name == "overflow" {
-				var gotMsg bool
-				for _, evt := range logHook.Drain() {
-					if evt.Message == "object will be parsed partially" {
-						gotMsg = true
-					}
-				}
-				assert.True(t, gotMsg)
+				assert.True(t, logHook.Contains("object will be parsed partially"))
 			}
 		})
 	}
