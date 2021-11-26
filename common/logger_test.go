@@ -52,11 +52,22 @@ func TestConsoleLogFormatter(t *testing.T) {
 			expected: `{"one":1,"two":"two"} {"nested":{"sub":7.777}}`,
 		},
 		{
+			// The first object can't be serialized to JSON, so it will be
+			// skipped in the output.
 			objects: []interface{}{
 				map[string]interface{}{"one": 1, "fail": make(chan int)},
 				map[string]interface{}{"two": 2},
 			},
 			expected: `{"two":2}`,
+		},
+		{
+			// Mixed objects and primitive values
+			objects: []interface{}{
+				map[string]interface{}{"one": 1},
+				"someString",
+				42,
+			},
+			expected: `{"one":1} "someString" 42`,
 		},
 	}
 
