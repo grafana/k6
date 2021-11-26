@@ -240,7 +240,7 @@ func (k *Keyboard) modifierBitFromKeyName(key string) int64 {
 
 func (k *Keyboard) press(key string, opts *KeyboardOptions) error {
 	if opts.Delay != 0 {
-		t := time.NewTimer(time.Duration(opts.Delay * time.Hour.Milliseconds()))
+		t := time.NewTimer(time.Duration(opts.Delay) * time.Millisecond)
 		select {
 		case <-k.ctx.Done():
 			t.Stop()
@@ -257,7 +257,7 @@ func (k *Keyboard) typ(text string, opts *KeyboardOptions) error {
 	layout := keyboardlayout.GetKeyboardLayout(k.layoutName)
 	for _, c := range text {
 		if opts.Delay != 0 {
-			t := time.NewTimer(time.Duration(opts.Delay * time.Hour.Milliseconds()))
+			t := time.NewTimer(time.Duration(opts.Delay) * time.Millisecond)
 			select {
 			case <-k.ctx.Done():
 				t.Stop()
