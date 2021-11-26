@@ -80,7 +80,7 @@ func (k *Keyboard) Up(key string) {
 
 // Press sends a key press message to a session target.
 // It delays the action if `Delay` option is specified.
-// A press message is consisting of successive key down and up messages.
+// A press message consists of successive key down and up messages.
 func (k *Keyboard) Press(key string, opts goja.Value) {
 	kbdOpts := NewKeyboardOptions()
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
