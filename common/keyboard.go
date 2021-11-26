@@ -189,7 +189,7 @@ func (k *Keyboard) keyDefinitionFromKey(key keyboardlayout.KeyInput) keyboardlay
 	}
 	// Try to find with the shift key value
 	if !ok {
-		key, srcKeyDef = k.layout.ShiftKeyDefinition(key)
+		srcKeyDef = k.layout.ShiftKeyDefinition(key)
 		shift = k.modifiers | ModifierKeyShift
 	}
 
