@@ -184,21 +184,21 @@ func (k *Keyboard) keyDefinitionFromKey(keyString keyboardlayout.KeyInput) keybo
 	// Find based on key value instead of code
 	if !ok {
 		for key, def := range layout.Keys {
-			if def.Key != string(keyString) {
-				continue
+			if def.Key == string(keyString) {
+				keyString, srcKeyDef = key, def
+				ok = true // don't look for a shift key below
+				break
 			}
-			keyString, srcKeyDef = key, def
-			ok = true // don't look for a shift key below
 		}
 	}
 	// try to find with the shift key value
 	shift := k.modifiers & ModifierKeyShift
 	if !ok {
 		for key, def := range layout.Keys {
-			if def.ShiftKey != string(keyString) {
-				continue
+			if def.ShiftKey == string(keyString) {
+				keyString, srcKeyDef = key, def
+				break
 			}
-			keyString, srcKeyDef = key, def
 		}
 		shift = k.modifiers | ModifierKeyShift
 	}
