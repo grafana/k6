@@ -159,7 +159,7 @@ func (clv ConstantVUs) Run(
 	).Debug("Starting executor run...")
 
 	progressFn := func() (float64, []string) {
-		spent := time.Since(startTime)
+		spent := clv.config.clock.Since(startTime)
 		right := []string{fmt.Sprintf("%d VUs", numVUs)}
 		if spent > duration {
 			right = append(right, duration.String())

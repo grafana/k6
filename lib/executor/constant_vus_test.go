@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -36,9 +37,12 @@ import (
 
 func getTestConstantVUsConfig() ConstantVUsConfig {
 	return ConstantVUsConfig{
-		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(100 * time.Millisecond)},
-		VUs:        null.IntFrom(10),
-		Duration:   types.NullDurationFrom(1 * time.Second),
+		BaseConfig: BaseConfig{
+			GracefulStop: types.NullDurationFrom(100 * time.Millisecond),
+			clock:        clock.NewMock(),
+		},
+		VUs:      null.IntFrom(10),
+		Duration: types.NullDurationFrom(1 * time.Second),
 	}
 }
 
