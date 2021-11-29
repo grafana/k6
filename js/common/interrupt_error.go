@@ -23,6 +23,7 @@ package common
 import (
 	"errors"
 
+	"github.com/dop251/goja"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 )
@@ -54,4 +55,15 @@ func IsInterruptError(err error) bool {
 	}
 	var intErr *InterruptError
 	return errors.As(err, &intErr)
+}
+
+// UnwrapGojaInterruptedError returns the internal error handled by goja.
+func UnwrapGojaInterruptedError(err error) error {
+	var gojaErr *goja.InterruptedError
+	if errors.As(err, &gojaErr) {
+		if e, ok := gojaErr.Value().(error); ok {
+			return e
+		}
+	}
+	return err
 }
