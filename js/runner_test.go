@@ -2077,48 +2077,20 @@ func TestMinIterationDurationIsCancellable(t *testing.T) {
 // nolint:paralleltest
 func TestForceHTTP1Feature(t *testing.T) {
 
-	var cases = map[string]struct {
+	cases := map[string]struct {
 		godebug               string
 		expectedForceH1Result bool
-		script                string
+		protocol              string
 	}{
 		"Force H1 Enabled. Checking for H1": {
 			godebug:               "http2client=0,gctrace=1",
 			expectedForceH1Result: true,
-			script: `var k6 = require("k6");
-			var check = k6.check;
-			var fail = k6.fail;
-			var http = require("k6/http");;
-			exports.default = function() {
-				var res = http.get("https://k6.io/");
-				if (
-					!check(res, {
-					'checking to see if status was 200': (res) => res.status === 200,
-					'checking to see if protocol was H1': (res) => res.proto === 'HTTP/1.1'
-					})
-				) {
-					fail('test failed')
-				}
-			}`,
+			protocol:              "HTTP/1.1",
 		},
 		"Force H1 Disabled. Checking for H2": {
 			godebug:               "test=0",
 			expectedForceH1Result: false,
-			script: `var k6 = require("k6");
-			var check = k6.check;
-			var fail = k6.fail;
-			var http = require("k6/http");;
-			exports.default = function() {
-				var res = http.get("https://k6.io/");
-				if (
-					!check(res, {
-					'checking to see if status was 200': (res) => res.status === 200,
-					'checking to see if protocol was H2': (res) => res.proto === 'HTTP/2.0'
-					})
-				) {
-					fail('test failed')
-				}
-			}`,
+			protocol:              "HTTP/2.0",
 		},
 	}
 
@@ -2132,7 +2104,21 @@ func TestForceHTTP1Feature(t *testing.T) {
 			}()
 			assert.Equal(t, tc.expectedForceH1Result, forceHTTP1())
 
-			r1, err := getSimpleRunner(t, "/script.js", tc.script)
+			r1, err := getSimpleRunner(t, "/script.js", fmt.Sprintf(`var k6 = require("k6");
+			var check = k6.check;
+			var fail = k6.fail;
+			var http = require("k6/http");;
+			exports.default = function() {
+				var res = http.get("https://k6.io/");
+				if (
+					!check(res, {
+					'checking to see if status was 200': (res) => res.status === 200,
+					'checking to see if protocol was H2': (res) => res.proto === '%s'
+					})
+				) {
+					fail('test failed')
+				}
+			}`, tc.protocol))
 			require.NoError(t, err)
 
 			err = r1.SetOptions(lib.Options{
