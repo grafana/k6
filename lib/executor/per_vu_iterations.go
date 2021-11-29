@@ -175,7 +175,6 @@ func (pvi PerVUIterations) Run(
 
 	vusFmt := pb.GetFixedLengthIntFormat(numVUs)
 	progressFn := func() (float64, []string) {
-		spent := time.Since(startTime)
 		progVUs := fmt.Sprintf(vusFmt+" VUs", numVUs)
 		currentDoneIters := atomic.LoadUint64(doneIters)
 		iterationsFmt := pb.GetFixedLengthIntFormat(int64(totalIters))
@@ -232,7 +231,7 @@ func (pvi PerVUIterations) Run(
 			case <-regDurationDone:
 				stats.PushIfNotDone(parentCtx, out, stats.Sample{
 					Value: float64(iterations - i), Metric: droppedIterationMetric,
-					Tags: pvi.getMetricTags(&vuID), Time: time.Now(),
+					Tags: pvi.getMetricTags(&vuID), Time: pvi.config.clock.Now(),
 				})
 				return // don't make more iterations
 			default:
