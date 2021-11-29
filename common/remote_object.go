@@ -33,10 +33,18 @@ import (
 	k6common "go.k6.io/k6/js/common"
 )
 
+type objectOverflowError struct{}
+
+// Error returns the description of the overflow error.
+func (*objectOverflowError) Error() string {
+	return "object is too large and will be parsed partially"
+}
+
 func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview, logger *logrus.Entry) (map[string]interface{}, error) {
 	obj := make(map[string]interface{})
+	var err error
 	if op.Overflow {
-		logger.Warn("object will be parsed partially")
+		err = &objectOverflowError{}
 	}
 
 	for _, p := range op.Properties {
@@ -48,7 +56,7 @@ func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview, logger *logrus.Entry
 		obj[p.Name] = val
 	}
 
-	return obj, nil
+	return obj, err
 }
 
 func parseRemoteObjectValue(

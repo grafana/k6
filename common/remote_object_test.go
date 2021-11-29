@@ -28,7 +28,6 @@ import (
 
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/testutils"
 	"github.com/mailru/easyjson"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -192,6 +191,7 @@ func TestParseRemoteObject(t *testing.T) {
 		preview  *runtime.ObjectPreview
 		value    string
 		expected map[string]interface{}
+		expErr   error
 	}{
 		{
 			name: "most_types",
@@ -236,6 +236,7 @@ func TestParseRemoteObject(t *testing.T) {
 			name:     "overflow",
 			preview:  &runtime.ObjectPreview{Overflow: true},
 			expected: map[string]interface{}{},
+			expErr:   &objectOverflowError{},
 		},
 	}
 
@@ -249,14 +250,13 @@ func TestParseRemoteObject(t *testing.T) {
 				Value:    easyjson.RawMessage(tc.value),
 			}
 			lg := logrus.New()
-			logHook := testutils.LogHook(lg)
 			logger := NewLogger(ctx, lg, false, nil)
 			val, err := parseRemoteObject(remoteObject, logger.log.WithContext(ctx))
-			require.NoError(t, err)
 			assert.Equal(t, tc.expected, val)
-
-			if tc.name == "overflow" {
-				assert.True(t, logHook.Contains("object will be parsed partially"))
+			if tc.expErr != nil {
+				assert.ErrorAs(t, err, &tc.expErr)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
