@@ -342,7 +342,10 @@ func TestConstantArrivalRateDroppedIterations(t *testing.T) {
 	require.NoError(t, err)
 
 	config := &ConstantArrivalRateConfig{
-		BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
+		BaseConfig: BaseConfig{
+			GracefulStop: types.NullDurationFrom(0 * time.Second),
+			clock:        clock.NewMock(),
+		},
 		TimeUnit:        types.NullDurationFrom(time.Second),
 		Rate:            null.IntFrom(10),
 		Duration:        types.NullDurationFrom(950 * time.Millisecond),
