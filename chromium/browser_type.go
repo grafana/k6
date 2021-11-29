@@ -24,12 +24,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
-	"github.com/sirupsen/logrus"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
 )
@@ -167,8 +167,15 @@ func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*common.
 	)
 	// set the log level from the launch options (usually from a script's options).
 	if launchOpts.Debug {
-		logger.SetLevel(logrus.DebugLevel)
+		logger.SetLevel("debug")
 	}
-	err := logger.SetLevelEnv("XK6_BROWSER_LOG")
-	return logger, err
+	if el, ok := os.LookupEnv("XK6_BROWSER_LOG"); ok {
+		if err := logger.SetLevel(el); err != nil {
+			return nil, err
+		}
+	}
+	if _, ok := os.LookupEnv("XK6_BROWSER_CALLER"); ok {
+		logger.ReportCaller()
+	}
+	return logger, nil
 }

@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -117,20 +116,10 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...i
 	entry.Logf(level, msg, args...)
 }
 
-// SetLogLevel sets the logger level.
-func (l *Logger) SetLevel(level logrus.Level) {
-	l.log.SetLevel(level)
-}
-
-// SetLevelEnv sets the logger level from an environment variable if the
-// variable exists.
-func (l *Logger) SetLevelEnv(level string) error {
-	el, ok := os.LookupEnv(level)
-	if !ok {
-		// don't change the level if the env var doesn't exist
-		return nil
-	}
-	pl, err := logrus.ParseLevel(el)
+// SetLevel sets the logger level from a level string.
+// Accepted values:
+func (l *Logger) SetLevel(level string) error {
+	pl, err := logrus.ParseLevel(level)
 	if err != nil {
 		return err
 	}
@@ -141,6 +130,22 @@ func (l *Logger) SetLevelEnv(level string) error {
 // DebugMode returns true if the logger level is set to Debug or higher.
 func (l *Logger) DebugMode() bool {
 	return l.log.GetLevel() >= logrus.DebugLevel
+}
+
+// ReportCaller adds source file and function names to the log entries.
+func (l *Logger) ReportCaller() {
+	caller := func() func(*runtime.Frame) (string, string) {
+		return func(f *runtime.Frame) (function string, file string) {
+			return f.Func.Name(), fmt.Sprintf("%s:%d", f.File, f.Line)
+		}
+	}
+	l.log.SetFormatter(&logrus.TextFormatter{
+		CallerPrettyfier: caller(),
+		FieldMap: logrus.FieldMap{
+			logrus.FieldKeyFile: "caller",
+		},
+	})
+	l.log.SetReportCaller(true)
 }
 
 func goRoutineID() int {
