@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib/consts"
@@ -50,6 +51,13 @@ type BaseConfig struct {
 	Exec         null.String        `json:"exec"` // function name, externally validated
 	Tags         map[string]string  `json:"tags"`
 
+	// clock implements the Clock interface, and is a proxy for every
+	// request relative to time. The Clock interface exposes the standard
+	// time.Time methods, and allows us, for instance, to control the flow
+	// of time in tests by injecting a `clock.Mock`` implementation instance
+	// instead of the standard one.
+	clock clock.Clock
+
 	// TODO: future extensions like distribution, others?
 }
 
@@ -59,6 +67,7 @@ func NewBaseConfig(name, configType string) BaseConfig {
 		Name:         name,
 		Type:         configType,
 		GracefulStop: types.NewNullDuration(DefaultGracefulStopValue, false),
+		clock:        clock.New(),
 	}
 }
 
