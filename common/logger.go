@@ -26,6 +26,9 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -138,4 +141,15 @@ func (l *Logger) SetLevelEnv(level string) error {
 // DebugMode returns true if the logger level is set to Debug or higher.
 func (l *Logger) DebugMode() bool {
 	return l.log.GetLevel() >= logrus.DebugLevel
+}
+
+func goRoutineID() int {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
+	id, err := strconv.Atoi(idField)
+	if err != nil {
+		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
+	}
+	return id
 }
