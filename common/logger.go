@@ -57,6 +57,10 @@ func NewLogger(ctx context.Context, logger *logrus.Logger, debugOverride bool, c
 	}
 }
 
+func (l *Logger) Tracef(category string, msg string, args ...interface{}) {
+	l.Logf(logrus.TraceLevel, category, msg, args...)
+}
+
 func (l *Logger) Debugf(category string, msg string, args ...interface{}) {
 	l.Logf(logrus.DebugLevel, category, msg, args...)
 }

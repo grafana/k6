@@ -260,7 +260,7 @@ func (c *Connection) recvLoop() {
 			return
 		}
 
-		c.logger.Debugf("cdp:recv", "<- %s", buf)
+		c.logger.Tracef("cdp:recv", "<- %s", buf)
 
 		var msg cdproto.Message
 		c.decoder = jlexer.Lexer{Data: buf}
@@ -423,7 +423,7 @@ func (c *Connection) sendLoop() {
 			}
 
 			buf, _ := c.encoder.BuildBytes()
-			c.logger.Debugf("cdp:send", "-> %s", buf)
+			c.logger.Tracef("cdp:send", "-> %s", buf)
 			writer, err := c.conn.NextWriter(websocket.TextMessage)
 			if err != nil {
 				c.handleIOError(err)
