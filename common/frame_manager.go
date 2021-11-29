@@ -51,10 +51,12 @@ type FrameManager struct {
 
 	barriersMu sync.RWMutex
 	barriers   []*Barrier
+
+	logger *Logger
 }
 
 // NewFrameManager creates a new HTML document frame manager.
-func NewFrameManager(ctx context.Context, session *Session, page *Page, timeoutSettings *TimeoutSettings) *FrameManager {
+func NewFrameManager(ctx context.Context, session *Session, page *Page, timeoutSettings *TimeoutSettings, logger *Logger) *FrameManager {
 	m := FrameManager{
 		ctx:              ctx,
 		session:          session,
@@ -66,6 +68,7 @@ func NewFrameManager(ctx context.Context, session *Session, page *Page, timeoutS
 		inflightRequests: make(map[network.RequestID]bool),
 		barriers:         make([]*Barrier, 0),
 		barriersMu:       sync.RWMutex{},
+		logger:           logger,
 	}
 	return &m
 }
@@ -306,7 +309,7 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 
 	frame := req.getFrame()
 	if frame == nil {
-		debugLog("<framemanager:requestFailed> frame is nil")
+		m.logger.Debugf("FrameManager:requestFailed", "frame is nil")
 		return
 	}
 	frame.deleteRequest(req.getID())
@@ -317,7 +320,7 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	case rc <= 10:
 		for reqID := range frame.inflightRequests {
 			req := frame.requestByID(reqID)
-			debugLog("<framemanager:requestFailed> reqID=%s inflightURL=%s, frameID=%s", reqID, req.url, frame.id)
+			m.logger.Debugf("FrameManager:requestFailed", "reqID:%s inflightURL:%s frameID:%s", reqID, req.url, frame.id)
 		}
 	}
 

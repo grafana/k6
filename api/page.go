@@ -27,7 +27,7 @@ type Page interface {
 	AddInitScript(script goja.Value, arg goja.Value)
 	AddScriptTag(opts goja.Value)
 	AddStyleTag(opts goja.Value)
-	BrintToFront()
+	BringToFront()
 	Check(selector string, opts goja.Value)
 	Click(selector string, opts goja.Value)
 	Close(opts goja.Value)

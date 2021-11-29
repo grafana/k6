@@ -217,7 +217,7 @@ func (r *Response) bodySize() int64 {
 func (r *Response) Finished() bool {
 	// TODO: should return nil|Error
 	rt := k6common.GetRuntime(r.ctx)
-	k6common.Throw(rt, errors.New("Response.finished() has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Response.finished() has not been implemented yet"))
 	return false
 }
 

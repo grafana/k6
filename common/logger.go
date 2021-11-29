@@ -25,6 +25,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"regexp"
+	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,7 +37,7 @@ import (
 
 type Logger struct {
 	ctx            context.Context
-	logger         *logrus.Logger
+	log            *logrus.Logger
 	mu             sync.Mutex
 	lastLogCall    int64
 	debugOverride  bool
@@ -48,15 +51,16 @@ func NullLogger() *logrus.Logger {
 }
 
 func NewLogger(ctx context.Context, logger *logrus.Logger, debugOverride bool, categoryFilter *regexp.Regexp) *Logger {
-	l := Logger{
+	return &Logger{
 		ctx:            ctx,
-		logger:         logger,
-		mu:             sync.Mutex{},
+		log:            logger,
 		debugOverride:  debugOverride,
 		categoryFilter: categoryFilter,
-		lastLogCall:    0,
 	}
-	return &l
+}
+
+func (l *Logger) Tracef(category string, msg string, args ...interface{}) {
+	l.Logf(logrus.TraceLevel, category, msg, args...)
 }
 
 func (l *Logger) Debugf(category string, msg string, args ...interface{}) {
@@ -76,6 +80,10 @@ func (l *Logger) Warnf(category string, msg string, args ...interface{}) {
 }
 
 func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...interface{}) {
+	// don't log if the current log level isn't in the required level.
+	if l.log.GetLevel() < level {
+		return
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -84,23 +92,69 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...i
 	if now == elapsed {
 		elapsed = 0
 	}
-
-	if l.categoryFilter == nil || l.categoryFilter.Match([]byte(category)) {
-		magenta := color.New(color.FgMagenta).SprintFunc()
-		if l.logger != nil {
-			entry := l.logger.WithFields(logrus.Fields{
-				"category":  magenta(category),
-				"elapsed":   fmt.Sprintf("%d ms", elapsed),
-				"goroutine": goRoutineID(),
-			})
-			if l.logger.GetLevel() < level && l.debugOverride {
-				entry.Printf(msg, args...)
-			} else {
-				entry.Logf(level, msg, args...)
-			}
-		} else {
-			fmt.Printf("%s [%d]: %s - %s ms\n", magenta(category), goRoutineID(), string(msg), magenta(elapsed))
-		}
+	defer func() {
 		l.lastLogCall = now
+	}()
+
+	if l.categoryFilter != nil && !l.categoryFilter.Match([]byte(category)) {
+		return
 	}
+	if l.log == nil {
+		magenta := color.New(color.FgMagenta).SprintFunc()
+		fmt.Printf("%s [%d]: %s - %s ms\n", magenta(category), goRoutineID(), string(msg), magenta(elapsed))
+		return
+	}
+	entry := l.log.WithFields(logrus.Fields{
+		"category":  category,
+		"elapsed":   fmt.Sprintf("%d ms", elapsed),
+		"goroutine": goRoutineID(),
+	})
+	if l.log.GetLevel() < level && l.debugOverride {
+		entry.Printf(msg, args...)
+		return
+	}
+	entry.Logf(level, msg, args...)
+}
+
+// SetLevel sets the logger level from a level string.
+// Accepted values:
+func (l *Logger) SetLevel(level string) error {
+	pl, err := logrus.ParseLevel(level)
+	if err != nil {
+		return err
+	}
+	l.log.SetLevel(pl)
+	return nil
+}
+
+// DebugMode returns true if the logger level is set to Debug or higher.
+func (l *Logger) DebugMode() bool {
+	return l.log.GetLevel() >= logrus.DebugLevel
+}
+
+// ReportCaller adds source file and function names to the log entries.
+func (l *Logger) ReportCaller() {
+	caller := func() func(*runtime.Frame) (string, string) {
+		return func(f *runtime.Frame) (function string, file string) {
+			return f.Func.Name(), fmt.Sprintf("%s:%d", f.File, f.Line)
+		}
+	}
+	l.log.SetFormatter(&logrus.TextFormatter{
+		CallerPrettyfier: caller(),
+		FieldMap: logrus.FieldMap{
+			logrus.FieldKeyFile: "caller",
+		},
+	})
+	l.log.SetReportCaller(true)
+}
+
+func goRoutineID() int {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
+	id, err := strconv.Atoi(idField)
+	if err != nil {
+		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
+	}
+	return id
 }

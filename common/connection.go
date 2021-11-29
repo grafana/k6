@@ -181,26 +181,36 @@ func (c *Connection) closeConnection(code int) error {
 	return err
 }
 
-func (c *Connection) closeSession(sessionID target.SessionID) {
+func (c *Connection) closeSession(sid target.SessionID, tid target.ID) {
+	c.logger.Debugf("Connection:closeSession", "sid:%v tid:%v wsURL:%v", sid, tid, c.wsURL)
 	c.sessionsMu.Lock()
-	if session, ok := c.sessions[sessionID]; ok {
+	if session, ok := c.sessions[sid]; ok {
 		session.close()
 	}
-	delete(c.sessions, sessionID)
+	delete(c.sessions, sid)
 	c.sessionsMu.Unlock()
 }
 
 func (c *Connection) createSession(info *target.Info) (*Session, error) {
+	c.logger.Debugf("Connection:createSession", "tid:%v bctxid:%v type:%s", info.TargetID, info.BrowserContextID, info.Type)
+
 	var sessionID target.SessionID
 	var err error
 	action := target.AttachToTarget(info.TargetID).WithFlatten(true)
 	if sessionID, err = action.Do(cdp.WithExecutor(c.ctx, c)); err != nil {
+		c.logger.Debugf("Connection:createSession", "tid:%v bctxid:%v type:%s err:%v", info.TargetID, info.BrowserContextID, info.Type, err)
 		return nil, err
 	}
-	return c.getSession(sessionID), nil
+	sess := c.getSession(sessionID)
+	if sess == nil {
+		c.logger.Warnf("Connection:createSession", "tid:%v bctxid:%v type:%s sid:%v, session is nil", info.TargetID, info.BrowserContextID, info.Type, sessionID)
+	}
+	return sess, nil
 }
 
 func (c *Connection) handleIOError(err error) {
+	c.logger.Errorf("Connection:handleIOError", "err:%v", err)
+
 	if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 		// Report an unexpected closure
 		select {
@@ -215,7 +225,9 @@ func (c *Connection) handleIOError(err error) {
 	}
 	select {
 	case c.closeCh <- code:
+		c.logger.Debugf("Connection:handleIOError:c.closeCh <-", "code:%d", code)
 	case <-c.done:
+		c.logger.Debugf("Connection:handleIOError:<-c.done", "")
 	}
 }
 
@@ -225,15 +237,30 @@ func (c *Connection) getSession(id target.SessionID) *Session {
 	return c.sessions[id]
 }
 
+// findTragetIDForLog should only be used for logging purposes.
+// It will return an empty string if logger.DebugMode is false.
+func (c *Connection) findTargetIDForLog(id target.SessionID) target.ID {
+	if !c.logger.DebugMode() {
+		return ""
+	}
+	s := c.getSession(id)
+	if s == nil {
+		return ""
+	}
+	return s.targetID
+}
+
 func (c *Connection) recvLoop() {
+	c.logger.Debugf("Connection:recvLoop", "wsURL:%q", c.wsURL)
 	for {
 		_, buf, err := c.conn.ReadMessage()
 		if err != nil {
 			c.handleIOError(err)
+			c.logger.Debugf("Connection:recvLoop", "wsURL:%q ioErr:%v", c.wsURL, err)
 			return
 		}
 
-		c.logger.Debugf("cdp:recv", "<- %s", buf)
+		c.logger.Tracef("cdp:recv", "<- %s", buf)
 
 		var msg cdproto.Message
 		c.decoder = jlexer.Lexer{Data: buf}
@@ -241,54 +268,66 @@ func (c *Connection) recvLoop() {
 		if err := c.decoder.Error(); err != nil {
 			select {
 			case c.errorCh <- err:
+				c.logger.Debugf("Connection:recvLoop:<-err", "wsURL:%q err:%v", c.wsURL, err)
 			case <-c.done:
+				c.logger.Debugf("Connection:recvLoop:<-c.done", "wsURL:%q", c.wsURL)
 				return
 			}
 		}
 
-		if msg.Method != "" {
-			// Handle attachment and detachment from targets,
-			// creating and deleting sessions as necessary.
-			if msg.Method == cdproto.EventTargetAttachedToTarget {
-				ev, err := cdproto.UnmarshalMessage(&msg)
-				if err != nil {
-					c.logger.Errorf("cdp", "%s", err)
-					continue
-				}
-				sessionID := ev.(*target.EventAttachedToTarget).SessionID
-				c.sessionsMu.Lock()
-				session := NewSession(c.ctx, c, sessionID)
-				c.sessions[sessionID] = session
-				c.sessionsMu.Unlock()
-			} else if msg.Method == cdproto.EventTargetDetachedFromTarget {
-				ev, err := cdproto.UnmarshalMessage(&msg)
-				if err != nil {
-					c.logger.Errorf("cdp", "%s", err)
-					continue
-				}
-				sessionID := ev.(*target.EventDetachedFromTarget).SessionID
-				c.closeSession(sessionID)
+		// Handle attachment and detachment from targets,
+		// creating and deleting sessions as necessary.
+		if msg.Method == cdproto.EventTargetAttachedToTarget {
+			ev, err := cdproto.UnmarshalMessage(&msg)
+			if err != nil {
+				c.logger.Errorf("cdp", "%s", err)
+				continue
 			}
+			eva := ev.(*target.EventAttachedToTarget)
+			sid, tid := eva.SessionID, eva.TargetInfo.TargetID
+			c.sessionsMu.Lock()
+			session := NewSession(c.ctx, c, sid, tid, c.logger)
+			c.logger.Debugf("Connection:recvLoop:EventAttachedToTarget", "sid:%v tid:%v wsURL:%q, NewSession", sid, tid, c.wsURL)
+			c.sessions[sid] = session
+			c.sessionsMu.Unlock()
+		} else if msg.Method == cdproto.EventTargetDetachedFromTarget {
+			ev, err := cdproto.UnmarshalMessage(&msg)
+			if err != nil {
+				c.logger.Errorf("cdp", "%s", err)
+				continue
+			}
+			evt := ev.(*target.EventDetachedFromTarget)
+			sid := evt.SessionID
+			tid := c.findTargetIDForLog(sid)
+			c.logger.Debugf("Connection:recvLoop:EventDetachedFromTarget", "sid:%v tid:%v wsURL:%q, closeSession", sid, tid, c.wsURL)
+			c.closeSession(sid, tid)
 		}
 
 		switch {
 		case msg.SessionID != "" && (msg.Method != "" || msg.ID != 0):
-			if session, ok := c.sessions[msg.SessionID]; ok {
-				if msg.Error != nil && msg.Error.Message == "No session with given id" {
-					c.closeSession(session.id)
-					continue
-				}
+			// TODO: possible data race - session can get removed after getting it here
+			session := c.getSession(msg.SessionID)
+			if session == nil {
+				continue
+			}
+			if msg.Error != nil && msg.Error.Message == "No session with given id" {
+				c.logger.Debugf("Connection:recvLoop", "sid:%v tid:%v wsURL:%q, closeSession #2", session.id, session.targetID, c.wsURL)
+				c.closeSession(session.id, session.targetID)
+				continue
+			}
 
-				select {
-				case session.readCh <- &msg:
-				case code := <-c.closeCh:
-					_ = c.closeConnection(code)
-				case <-c.done:
-					return
-				}
+			select {
+			case session.readCh <- &msg:
+			case code := <-c.closeCh:
+				c.logger.Debugf("Connection:recvLoop:<-c.closeCh", "sid:%v tid:%v wsURL:%v crashed:%t", session.id, session.targetID, c.wsURL, session.crashed)
+				_ = c.closeConnection(code)
+			case <-c.done:
+				c.logger.Debugf("Connection:recvLoop:<-c.done", "sid:%v tid:%v wsURL:%v crashed:%t", session.id, session.targetID, c.wsURL, session.crashed)
+				return
 			}
 
 		case msg.Method != "":
+			c.logger.Debugf("Connection:recvLoop:msg.Method:emit", "method:%q", msg.Method)
 			ev, err := cdproto.UnmarshalMessage(&msg)
 			if err != nil {
 				c.logger.Errorf("cdp", "%s", err)
@@ -297,6 +336,7 @@ func (c *Connection) recvLoop() {
 			c.emit(string(msg.Method), ev)
 
 		case msg.ID != 0:
+			c.logger.Debugf("Connection:recvLoop:msg.ID:emit", "method:%q", msg.ID)
 			c.emit("", &msg)
 
 		default:
@@ -309,59 +349,81 @@ func (c *Connection) send(msg *cdproto.Message, recvCh chan *cdproto.Message, re
 	select {
 	case c.sendCh <- msg:
 	case err := <-c.errorCh:
+		c.logger.Debugf("Connection:send:<-c.errorCh", "wsURL:%q sid:%v, err:%v", c.wsURL, msg.SessionID, err)
 		return err
 	case code := <-c.closeCh:
+		c.logger.Debugf("Connection:send:<-c.closeCh", "wsURL:%q sid:%v, websocket code:%v", c.wsURL, msg.SessionID, code)
 		_ = c.closeConnection(code)
 		return &websocket.CloseError{Code: code}
 	case <-c.done:
+		c.logger.Debugf("Connection:send:<-c.done", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
+		return nil
 	}
 
-	if recvCh != nil {
-		// Block waiting for response.
-		select {
-		case msg := <-recvCh:
-			switch {
-			case msg == nil:
-				return ErrChannelClosed
-			case msg.Error != nil:
-				return msg.Error
-			case res != nil:
-				return easyjson.Unmarshal(msg.Result, res)
-			}
-		case err := <-c.errorCh:
-			return err
-		case code := <-c.closeCh:
-			_ = c.closeConnection(code)
-			return &websocket.CloseError{Code: code}
-		case <-c.done:
-		case <-c.ctx.Done():
-			c.logger.Debugf("connection:sendLoop", "returning")
-			return c.ctx.Err()
-			// TODO: add a timeout?
-			// case <-timeout:
-			// 	return
+	// Block waiting for response.
+	if recvCh == nil {
+		return nil
+	}
+	tid := c.findTargetIDForLog(msg.SessionID)
+	select {
+	case msg := <-recvCh:
+		var sid target.SessionID
+		tid = ""
+		if msg != nil {
+			sid = msg.SessionID
+			tid = c.findTargetIDForLog(sid)
 		}
+		switch {
+		case msg == nil:
+			c.logger.Debugf("Connection:send", "wsURL:%q, err:ErrChannelClosed", c.wsURL)
+			return ErrChannelClosed
+		case msg.Error != nil:
+			c.logger.Debugf("Connection:send", "sid:%v tid:%v wsURL:%q, msg err:%v", sid, tid, c.wsURL, msg.Error)
+			return msg.Error
+		case res != nil:
+			return easyjson.Unmarshal(msg.Result, res)
+		}
+	case err := <-c.errorCh:
+		c.logger.Debugf("Connection:send:<-c.errorCh #2", "sid:%v tid:%v wsURL:%q, err:%v", msg.SessionID, tid, c.wsURL, err)
+		return err
+	case code := <-c.closeCh:
+		c.logger.Debugf("Connection:send:<-c.closeCh #2", "sid:%v tid:%v wsURL:%q, websocket code:%v", msg.SessionID, tid, c.wsURL, code)
+		_ = c.closeConnection(code)
+		return &websocket.CloseError{Code: code}
+	case <-c.done:
+		c.logger.Debugf("Connection:send:<-c.done #2", "sid:%v tid:%v wsURL:%q", msg.SessionID, tid, c.wsURL)
+	case <-c.ctx.Done():
+		c.logger.Debugf("Connection:send:<-c.ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v", msg.SessionID, tid, c.wsURL, c.ctx.Err())
+		// TODO: this brings many bugs to the surface
+		return c.ctx.Err()
+		// TODO: add a timeout?
+		// case <-timeout:
+		// 	return
 	}
-
 	return nil
 }
 
 func (c *Connection) sendLoop() {
+	c.logger.Debugf("Connection:sendLoop", "wsURL:%q, starts", c.wsURL)
 	for {
 		select {
 		case msg := <-c.sendCh:
 			c.encoder = jwriter.Writer{}
 			msg.MarshalEasyJSON(&c.encoder)
 			if err := c.encoder.Error; err != nil {
+				sid := msg.SessionID
+				tid := c.findTargetIDForLog(sid)
 				select {
 				case c.errorCh <- err:
+					c.logger.Debugf("Connection:sendLoop:c.errorCh <- err", "sid:%v tid:%v wsURL:%q err:%v", sid, tid, c.wsURL, err)
 				case <-c.done:
+					c.logger.Debugf("Connection:sendLoop:<-c.done", "sid:%v tid:%v wsURL:%q", sid, tid, c.wsURL)
 					return
 				}
 			}
 
 			buf, _ := c.encoder.BuildBytes()
-			c.logger.Debugf("cdp:send", "-> %s", buf)
+			c.logger.Tracef("cdp:send", "-> %s", buf)
 			writer, err := c.conn.NextWriter(websocket.TextMessage)
 			if err != nil {
 				c.handleIOError(err)
@@ -376,13 +438,16 @@ func (c *Connection) sendLoop() {
 				return
 			}
 		case code := <-c.closeCh:
+			c.logger.Debugf("Connection:sendLoop:<-c.closeCh", "wsURL:%q code:%d", c.wsURL, code)
 			_ = c.closeConnection(code)
 		case <-c.done:
+			c.logger.Debugf("Connection:sendLoop:<-c.done#2", "wsURL:%q", c.wsURL)
 		case <-c.ctx.Done():
 			c.logger.Debugf("connection:sendLoop", "returning, ctx.Err: %q", c.ctx.Err())
 			return
-			// TODO: add a timeout?
-			// case <-timeout:
+			// case <-time.After(time.Second * 10):
+			// 	c.logger.Errorf("connection:sendLoop", "returning, timeout")
+			// 	c.Close()
 			// 	return
 		}
 	}
@@ -393,11 +458,13 @@ func (c *Connection) Close(args ...goja.Value) {
 	if len(args) > 0 {
 		code = int(args[0].ToInteger())
 	}
+	c.logger.Debugf("connection:Close", "wsURL:%q code:%d", c.wsURL, code)
 	_ = c.closeConnection(code)
 }
 
 // Execute implements cdproto.Executor and performs a synchronous send and receive
 func (c *Connection) Execute(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
+	c.logger.Debugf("connection:Execute", "wsURL:%q method:%q", c.wsURL, method)
 	id := atomic.AddInt64(&c.msgID, 1)
 
 	// Setup event handler used to block for response to message being sent.
@@ -408,12 +475,14 @@ func (c *Connection) Execute(ctx context.Context, method string, params easyjson
 		for {
 			select {
 			case <-evCancelCtx.Done():
+				c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()", "wsURL:%q err:%v", c.wsURL, evCancelCtx.Err())
 				return
 			case ev := <-chEvHandler:
 				msg, ok := ev.data.(*cdproto.Message)
 				if ok && msg.ID == id {
 					select {
 					case <-evCancelCtx.Done():
+						c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()#2", "wsURL:%q err:%v", c.wsURL, evCancelCtx.Err())
 					case ch <- msg:
 						// We expect only one response with the matching message ID,
 						// then remove event handler by cancelling context and stopping goroutine.

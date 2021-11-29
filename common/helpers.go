@@ -28,35 +28,14 @@ import (
 	"math"
 	"os"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-	"github.com/fatih/color"
 	k6common "go.k6.io/k6/js/common"
 )
-
-var debugMu = sync.Mutex{}
-var debugLastCall int64 = 0
-
-func debugLog(msg string, args ...interface{}) {
-	debugMu.Lock()
-	defer debugMu.Unlock()
-	now := time.Now().UnixNano() / 1000000
-	elapsed := now - debugLastCall
-	if now == elapsed {
-		elapsed = 0
-	}
-	magenta := color.New(color.FgMagenta).SprintFunc()
-	args = []interface{}{fmt.Sprintf("[%d] %s", goRoutineID(), fmt.Sprintf(msg, args...))}
-	args = append(args, fmt.Sprintf("%s ms", magenta(elapsed)))
-	fmt.Println(args...)
-	debugLastCall = now
-}
 
 func convertBaseJSHandleTypes(ctx context.Context, execCtx *ExecutionContext, objHandle *BaseJSHandle) (*cdpruntime.CallArgument, error) {
 	if objHandle.execCtx != execCtx {
@@ -187,17 +166,6 @@ func errorFromDOMError(domErr string) error {
 		}
 	}
 	return fmt.Errorf(domErr)
-}
-
-func goRoutineID() int {
-	var buf [64]byte
-	n := runtime.Stack(buf[:], false)
-	idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
-	id, err := strconv.Atoi(idField)
-	if err != nil {
-		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
-	}
-	return id
 }
 
 func interfaceFromRemoteObject(remoteObject *cdpruntime.RemoteObject) (interface{}, error) {
