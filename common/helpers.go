@@ -31,32 +31,12 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-	"github.com/fatih/color"
 	k6common "go.k6.io/k6/js/common"
 )
-
-var debugMu = sync.Mutex{}
-var debugLastCall int64 = 0
-
-func debugLog(msg string, args ...interface{}) {
-	debugMu.Lock()
-	defer debugMu.Unlock()
-	now := time.Now().UnixNano() / 1000000
-	elapsed := now - debugLastCall
-	if now == elapsed {
-		elapsed = 0
-	}
-	magenta := color.New(color.FgMagenta).SprintFunc()
-	args = []interface{}{fmt.Sprintf("[%d] %s", goRoutineID(), fmt.Sprintf(msg, args...))}
-	args = append(args, fmt.Sprintf("%s ms", magenta(elapsed)))
-	fmt.Println(args...)
-	debugLastCall = now
-}
 
 func convertBaseJSHandleTypes(ctx context.Context, execCtx *ExecutionContext, objHandle *BaseJSHandle) (*cdpruntime.CallArgument, error) {
 	if objHandle.execCtx != execCtx {
