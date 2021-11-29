@@ -167,7 +167,7 @@ func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*common.
 	)
 	// set the log level from the launch options (usually from a script's options).
 	if launchOpts.Debug {
-		logger.SetLevel("debug")
+		_ = logger.SetLevel("debug")
 	}
 	if el, ok := os.LookupEnv("XK6_BROWSER_LOG"); ok {
 		if err := logger.SetLevel(el); err != nil {
