@@ -27,6 +27,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/errext"
@@ -140,17 +141,17 @@ func getIterationRunner(
 //  - If the whole test is aborted, the parent context will be cancelled, so
 //    that will also cancel these contexts, thus the "general abort" case is
 //    handled transparently.
-func getDurationContexts(parentCtx context.Context, regularDuration, gracefulStop time.Duration) (
+func getDurationContexts(parentCtx context.Context, clock clock.Clock, regularDuration, gracefulStop time.Duration) (
 	startTime time.Time, maxDurationCtx, regDurationCtx context.Context, maxDurationCancel func(),
 ) {
-	startTime = time.Now()
+	startTime = clock.Now()
 	maxEndTime := startTime.Add(regularDuration + gracefulStop)
 
-	maxDurationCtx, maxDurationCancel = context.WithDeadline(parentCtx, maxEndTime)
+	maxDurationCtx, maxDurationCancel = clock.WithDeadline(parentCtx, maxEndTime)
 	if gracefulStop == 0 {
 		return startTime, maxDurationCtx, maxDurationCtx, maxDurationCancel
 	}
-	regDurationCtx, _ = context.WithDeadline(maxDurationCtx, startTime.Add(regularDuration)) //nolint:govet
+	regDurationCtx, _ = clock.WithDeadline(maxDurationCtx, startTime.Add(regularDuration)) //nolint:govet
 	return startTime, maxDurationCtx, regDurationCtx, maxDurationCancel
 }
 
