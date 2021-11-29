@@ -37,9 +37,9 @@ func TestDataURLSkipRequest(t *testing.T) {
 		bt.Browser.Close()
 	})
 
-	logHook := testutils.LogHook(bt.State.Logger)
+	lc := testutils.AttachLogCache(bt.State.Logger)
 
 	p.Goto("data:text/html,hello", nil)
 
-	assert.True(t, logHook.Contains("skipped request handling of data URL"))
+	assert.True(t, lc.Contains("skipped request handling of data URL"))
 }
