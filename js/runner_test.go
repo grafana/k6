@@ -2074,113 +2074,91 @@ func TestMinIterationDurationIsCancellable(t *testing.T) {
 	}
 }
 
-func TestForceHTTP1FeatureEnabledCheckForH1(t *testing.T) {
-	err := os.Setenv("GODEBUG", "http2client=0,gctrace=1")
-	require.NoError(t, err)
-	defer func() {
-		err = os.Unsetenv("GODEBUG")
-		require.NoError(t, err)
-	}()
+// nolint:paralleltest
+func TestForceHTTP1Feature(t *testing.T) {
 
-	assert.True(t, forceHTTP1())
-
-	r1, err := getSimpleRunner(t, "/script.js", `
-					var k6 = require("k6");
-					var check = k6.check;
-					var fail = k6.fail;
-					var http = require("k6/http");;
-					exports.default = function() {
-						var res = http.get("https://k6.io/");
-						if (
-							!check(res, {
-							'checking to see if status was 200': (res) => res.status === 200,
-							'checking to see if protocol was H1': (res) => res.proto === 'HTTP/1.1'
-							})
-						) {
-							fail('test failed')
-						}
-					}
-				`)
-	require.NoError(t, err)
-
-	err = r1.SetOptions(lib.Options{
-		InsecureSkipTLSVerify: null.BoolFrom(true),
-	})
-	require.NoError(t, err)
-
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{}, builtinMetrics, registry)
-	require.NoError(t, err)
-
-	runners := map[string]*Runner{"Source": r1, "Archive": r2}
-	for name, r := range runners {
-		r := r
-		t.Run(name, func(t *testing.T) {
-			initVU, err := r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
-			require.NoError(t, err)
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
-			err = vu.RunOnce()
-			require.NoError(t, err)
-		})
+	var cases = map[string]struct {
+		godebug               string
+		expectedForceH1Result bool
+		script                string
+	}{
+		"Force H1 Enabled. Checking for H1": {
+			godebug:               "http2client=0,gctrace=1",
+			expectedForceH1Result: true,
+			script: `var k6 = require("k6");
+			var check = k6.check;
+			var fail = k6.fail;
+			var http = require("k6/http");;
+			exports.default = function() {
+				var res = http.get("https://k6.io/");
+				if (
+					!check(res, {
+					'checking to see if status was 200': (res) => res.status === 200,
+					'checking to see if protocol was H1': (res) => res.proto === 'HTTP/1.1'
+					})
+				) {
+					fail('test failed')
+				}
+			}`,
+		},
+		"Force H1 Disabled. Checking for H2": {
+			godebug:               "test=0",
+			expectedForceH1Result: false,
+			script: `var k6 = require("k6");
+			var check = k6.check;
+			var fail = k6.fail;
+			var http = require("k6/http");;
+			exports.default = function() {
+				var res = http.get("https://k6.io/");
+				if (
+					!check(res, {
+					'checking to see if status was 200': (res) => res.status === 200,
+					'checking to see if protocol was H2': (res) => res.proto === 'HTTP/2.0'
+					})
+				) {
+					fail('test failed')
+				}
+			}`,
+		},
 	}
-}
 
-func TestForceHTTP1FeatureDisabledCheckForH2(t *testing.T) {
-	err := os.Setenv("GODEBUG", "test=0")
-	require.NoError(t, err)
-	defer func() {
-		err = os.Unsetenv("GODEBUG")
-		require.NoError(t, err)
-	}()
-
-	assert.False(t, forceHTTP1())
-
-	r1, err := getSimpleRunner(t, "/script.js", `
-					var k6 = require("k6");
-					var check = k6.check;
-					var fail = k6.fail;
-					var http = require("k6/http");;
-					exports.default = function() {
-						var res = http.get("https://k6.io/");
-						if (
-							!check(res, {
-							'checking to see if status was 200': (res) => res.status === 200,
-							'checking to see if protocol was H2': (res) => res.proto === 'HTTP/2.0'
-							})
-						) {
-							fail('test failed')
-						}
-					}
-				`)
-	require.NoError(t, err)
-
-	err = r1.SetOptions(lib.Options{
-		InsecureSkipTLSVerify: null.BoolFrom(true),
-	})
-
-	require.NoError(t, err)
-
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{}, builtinMetrics, registry)
-	require.NoError(t, err)
-
-	runners := map[string]*Runner{"Source": r1, "Archive": r2}
-	for name, r := range runners {
-		r := r
+	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			initVU, err := r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
+			err := os.Setenv("GODEBUG", tc.godebug)
+			require.NoError(t, err)
+			defer func() {
+				err = os.Unsetenv("GODEBUG")
+				require.NoError(t, err)
+			}()
+			assert.Equal(t, tc.expectedForceH1Result, forceHTTP1())
+
+			r1, err := getSimpleRunner(t, "/script.js", tc.script)
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
-			err = vu.RunOnce()
+			err = r1.SetOptions(lib.Options{
+				InsecureSkipTLSVerify: null.BoolFrom(true),
+			})
 			require.NoError(t, err)
+
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{}, builtinMetrics, registry)
+			require.NoError(t, err)
+
+			runners := map[string]*Runner{"Source": r1, "Archive": r2}
+			for name, r := range runners {
+				r := r
+				t.Run(name, func(t *testing.T) {
+					initVU, err := r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
+					require.NoError(t, err)
+
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+					err = vu.RunOnce()
+					require.NoError(t, err)
+				})
+			}
 		})
 	}
 }
