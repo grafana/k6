@@ -24,35 +24,67 @@ import (
 	_ "embed"
 	"testing"
 
+	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPageInputValue(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
-
-	t.Run("Page.inputValue", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testPageInputValue(t, bt) })
-	})
+var pageInputTests = map[string]func(*testing.T, api.Browser){
+	"value":              testPageInputValue,
+	"special_characters": testPageInputSpecialCharacters,
 }
 
-func testPageInputValue(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
+func TestPageInput(t *testing.T) {
+	bt := browsertest.NewBrowserTest(t)
+	t.Cleanup(bt.Browser.Close)
+
+	for name, test := range pageInputTests {
+		t.Run(name, func(t *testing.T) {
+			test(t, bt.Browser)
+		})
+	}
+}
+
+func testPageInputValue(t *testing.T, b api.Browser) {
+	p := b.NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`
-         <input value="hello1">
-         <select><option value="hello2" selected></option></select>
-         <textarea>hello3</textarea>
-     `, nil)
+		<input value="hello1">
+		<select><option value="hello2" selected></option></select>
+		<textarea>hello3</textarea>
+     	`, nil)
 
-	value := p.InputValue("input", nil)
-	assert.Equal(t, value, "hello1", `expected input value "hello1", got %q`, value)
+	got, want := p.InputValue("input", nil), "hello1"
+	assert.Equal(t, got, want)
 
-	value = p.InputValue("select", nil)
-	assert.Equal(t, value, "hello2", `expected input value "hello2", got %q`, value)
+	got, want = p.InputValue("select", nil), "hello2"
+	assert.Equal(t, got, want)
 
-	value = p.InputValue("textarea", nil)
-	assert.Equal(t, value, "hello3", `expected input value "hello3", got %q`, value)
+	got, want = p.InputValue("textarea", nil), "hello3"
+	assert.Equal(t, got, want)
+}
+
+// test for: https://github.com/grafana/xk6-browser/issues/132
+func testPageInputSpecialCharacters(t *testing.T, b api.Browser) {
+	p := b.NewPage(nil)
+	defer p.Close(nil)
+
+	p.SetContent(`<input id="special">`, nil)
+	el := p.Query("#special")
+
+	wants := []string{
+		"test@k6.io",
+		"<hello WoRlD \\/>",
+		"{(hello world!)}",
+		"!#$%^&*()+_|~±",
+		`¯\_(ツ)_/¯`,
+	}
+	for _, want := range wants {
+		el.Fill("", nil)
+		el.Type(want, nil)
+
+		got := el.InputValue(nil)
+		assert.Equal(t, want, got)
+	}
 }
