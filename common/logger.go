@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"regexp"
 	"sync"
 	"time"
@@ -34,14 +35,11 @@ import (
 
 type Logger struct {
 	ctx            context.Context
-	logger         *logrus.Logger
+	log            *logrus.Logger
 	mu             sync.Mutex
 	lastLogCall    int64
 	debugOverride  bool
 	categoryFilter *regexp.Regexp
-
-	// debug is true if debug mode is enabled in the browser launch options.
-	debug bool
 }
 
 func NullLogger() *logrus.Logger {
@@ -51,15 +49,12 @@ func NullLogger() *logrus.Logger {
 }
 
 func NewLogger(ctx context.Context, logger *logrus.Logger, debugOverride bool, categoryFilter *regexp.Regexp) *Logger {
-	l := Logger{
+	return &Logger{
 		ctx:            ctx,
-		logger:         logger,
-		mu:             sync.Mutex{},
+		log:            logger,
 		debugOverride:  debugOverride,
 		categoryFilter: categoryFilter,
-		lastLogCall:    0,
 	}
-	return &l
 }
 
 func (l *Logger) Debugf(category string, msg string, args ...interface{}) {
@@ -79,6 +74,10 @@ func (l *Logger) Warnf(category string, msg string, args ...interface{}) {
 }
 
 func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...interface{}) {
+	// don't log if the current log level isn't in the required level.
+	if l.log.GetLevel() < level {
+		return
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -94,27 +93,45 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...i
 	if l.categoryFilter != nil && !l.categoryFilter.Match([]byte(category)) {
 		return
 	}
-	if l.logger == nil {
+	if l.log == nil {
 		magenta := color.New(color.FgMagenta).SprintFunc()
 		fmt.Printf("%s [%d]: %s - %s ms\n", magenta(category), goRoutineID(), string(msg), magenta(elapsed))
 		return
 	}
-	entry := l.logger.WithFields(logrus.Fields{
+	entry := l.log.WithFields(logrus.Fields{
 		"category":  category,
 		"elapsed":   fmt.Sprintf("%d ms", elapsed),
 		"goroutine": goRoutineID(),
 	})
-	if l.logger.GetLevel() < level && l.debugOverride {
+	if l.log.GetLevel() < level && l.debugOverride {
 		entry.Printf(msg, args...)
 		return
 	}
 	entry.Logf(level, msg, args...)
 }
 
-func (l *Logger) EnableDebugMode() {
-	l.debug = true
+// SetLogLevel sets the logger level.
+func (l *Logger) SetLevel(level logrus.Level) {
+	l.log.SetLevel(level)
 }
 
+// SetLevelEnv sets the logger level from an environment variable if the
+// variable exists.
+func (l *Logger) SetLevelEnv(level string) error {
+	el, ok := os.LookupEnv(level)
+	if !ok {
+		// don't change the level if the env var doesn't exist
+		return nil
+	}
+	pl, err := logrus.ParseLevel(el)
+	if err != nil {
+		return err
+	}
+	l.log.SetLevel(pl)
+	return nil
+}
+
+// DebugMode returns true if the logger level is set to Debug or higher.
 func (l *Logger) DebugMode() bool {
-	return l.debug
+	return l.log.GetLevel() >= logrus.DebugLevel
 }

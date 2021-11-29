@@ -29,6 +29,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/sirupsen/logrus"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
 )
@@ -79,13 +80,6 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 	launchOpts.Parse(b.Ctx, opts)
 	b.Ctx = common.WithLaunchOptions(b.Ctx, launchOpts)
 
-	// create an extension wide logger
-	reCategoryFilter, _ := regexp.Compile(launchOpts.LogCategoryFilter)
-	logger := common.NewLogger(b.Ctx, k6lib.GetState(b.Ctx).Logger, launchOpts.Debug, reCategoryFilter)
-	if launchOpts.Debug {
-		logger.EnableDebugMode()
-	}
-
 	envs := make([]string, len(launchOpts.Env))
 	for k, v := range launchOpts.Env {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
@@ -130,12 +124,17 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		"use-mock-keychain":                                  true,
 		"no-startup-window":                                  true,
 	}
+
 	allocator := NewAllocator(flags, envs)
 	browserProc, err := allocator.Allocate(b.Ctx, launchOpts)
 	if browserProc == nil {
-		k6common.Throw(rt, fmt.Errorf("unable to allocate browser: %w", err))
+		k6common.Throw(rt, fmt.Errorf("cannot allocate browser: %w", err))
 	}
 
+	logger, err := makeLogger(b.Ctx, launchOpts)
+	if err != nil {
+		k6common.Throw(rt, fmt.Errorf("cannot make logger: %w", err))
+	}
 	browserProc.AttachLogger(logger)
 
 	// attach the browser process ID to the context
@@ -157,4 +156,19 @@ func (b *BrowserType) LaunchPersistentContext(userDataDir string, opts goja.Valu
 
 func (b *BrowserType) Name() string {
 	return "chromium"
+}
+
+// makes an extension wide logger
+func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*common.Logger, error) {
+	var (
+		k6Logger            = k6lib.GetState(ctx).Logger
+		reCategoryFilter, _ = regexp.Compile(launchOpts.LogCategoryFilter)
+		logger              = common.NewLogger(ctx, k6Logger, launchOpts.Debug, reCategoryFilter)
+	)
+	// set the log level from the launch options (usually from a script's options).
+	if launchOpts.Debug {
+		logger.SetLevel(logrus.DebugLevel)
+	}
+	err := logger.SetLevelEnv("XK6_BROWSER_LOG")
+	return logger, err
 }
