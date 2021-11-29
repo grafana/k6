@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,7 +59,10 @@ func newExecutionSegmentSequenceFromString(str string) *lib.ExecutionSegmentSequ
 
 func getTestConstantArrivalRateConfig() *ConstantArrivalRateConfig {
 	return &ConstantArrivalRateConfig{
-		BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(1 * time.Second)},
+		BaseConfig: BaseConfig{
+			GracefulStop: types.NullDurationFrom(1 * time.Second),
+			clock:        clock.NewMock(),
+		},
 		TimeUnit:        types.NullDurationFrom(time.Second),
 		Rate:            null.IntFrom(50),
 		Duration:        types.NullDurationFrom(5 * time.Second),
@@ -385,7 +389,10 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 	t.Parallel()
 
 	config := &ConstantArrivalRateConfig{
-		BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(100 * time.Millisecond)},
+		BaseConfig: BaseConfig{
+			GracefulStop: types.NullDurationFrom(100 * time.Millisecond),
+			clock:        clock.NewMock(),
+		},
 		TimeUnit:        types.NullDurationFrom(950 * time.Millisecond),
 		Rate:            null.IntFrom(20),
 		Duration:        types.NullDurationFrom(1 * time.Second),

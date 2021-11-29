@@ -233,7 +233,12 @@ func (car ConstantArrivalRate) Run(
 	activeVUsWg := &sync.WaitGroup{}
 
 	returnedVUs := make(chan struct{})
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(
+		parentCtx,
+		car.config.clock,
+		duration,
+		gracefulStop,
+	)
 
 	vusPool := newActiveVUPool()
 	defer func() {
@@ -251,7 +256,7 @@ func (car ConstantArrivalRate) Run(
 	progIters := fmt.Sprintf(
 		pb.GetFixedLengthFloatFormat(arrivalRatePerSec, 0)+" iters/s", arrivalRatePerSec)
 	progressFn := func() (float64, []string) {
-		spent := time.Since(startTime)
+		spent := car.config.clock.Since(startTime)
 		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
 		progVUs := fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs",
 			vusPool.Running(), currActiveVUs)
@@ -324,7 +329,7 @@ func (car ConstantArrivalRate) Run(
 	}
 
 	start, offsets, _ := car.et.GetStripedOffsets()
-	timer := time.NewTimer(time.Hour * 24)
+	timer := car.config.clock.Timer(time.Hour * 24)
 	// here the we need the not scaled one
 	notScaledTickerPeriod := getTickerPeriod(
 		big.NewRat(
@@ -336,7 +341,7 @@ func (car ConstantArrivalRate) Run(
 	shownWarning := false
 	metricTags := car.getMetricTags(nil)
 	for li, gi := 0, start; ; li, gi = li+1, gi+offsets[li%len(offsets)] {
-		t := notScaledTickerPeriod*time.Duration(gi) - time.Since(startTime)
+		t := notScaledTickerPeriod*time.Duration(gi) - car.config.clock.Since(startTime)
 		timer.Reset(t)
 		select {
 		case <-timer.C:
@@ -349,7 +354,7 @@ func (car ConstantArrivalRate) Run(
 
 			stats.PushIfNotDone(parentCtx, out, stats.Sample{
 				Value: 1, Metric: droppedIterationMetric,
-				Tags: metricTags, Time: time.Now(),
+				Tags: metricTags, Time: car.config.clock.Now(),
 			})
 
 			// We'll try to start allocating another VU in the background,
