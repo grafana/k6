@@ -160,6 +160,7 @@ func (pvi PerVUIterations) Run(
 	duration := pvi.config.MaxDuration.TimeDuration()
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(
 		parentCtx,
+		pvi.config.clock,
 		duration,
 		pvi.config.GetGracefulStop(),
 	)
@@ -175,6 +176,7 @@ func (pvi PerVUIterations) Run(
 
 	vusFmt := pb.GetFixedLengthIntFormat(numVUs)
 	progressFn := func() (float64, []string) {
+		spent := pvi.config.clock.Since(startTime)
 		progVUs := fmt.Sprintf(vusFmt+" VUs", numVUs)
 		currentDoneIters := atomic.LoadUint64(doneIters)
 		iterationsFmt := pb.GetFixedLengthIntFormat(int64(totalIters))

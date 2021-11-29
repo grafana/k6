@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -39,7 +40,10 @@ import (
 
 func getTestPerVUIterationsConfig() PerVUIterationsConfig {
 	return PerVUIterationsConfig{
-		BaseConfig:  BaseConfig{GracefulStop: types.NullDurationFrom(1 * time.Second)},
+		BaseConfig: BaseConfig{
+			GracefulStop: types.NullDurationFrom(1 * time.Second),
+			clock:        clock.NewMock(),
+		},
 		VUs:         null.IntFrom(10),
 		Iterations:  null.IntFrom(100),
 		MaxDuration: types.NullDurationFrom(3 * time.Second),
@@ -153,6 +157,7 @@ func TestPerVuIterationsEmitDroppedIterations(t *testing.T) {
 	require.NoError(t, err)
 
 	config := PerVUIterationsConfig{
+		BaseConfig:  BaseConfig{clock: clock.NewMock()},
 		VUs:         null.IntFrom(5),
 		Iterations:  null.IntFrom(20),
 		MaxDuration: types.NullDurationFrom(1 * time.Second),
