@@ -7,6 +7,7 @@ require (
 	github.com/dop251/goja v0.0.0-20211022113120-dc8c55024d06
 	github.com/fatih/color v1.13.0
 	github.com/gorilla/websocket v1.4.2
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/mailru/easyjson v0.7.7
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
@@ -29,6 +30,7 @@ require (
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/golang/protobuf v1.4.3 // indirect
+	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/kubernetes/helm v2.9.0+incompatible // indirect

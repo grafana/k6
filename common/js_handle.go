@@ -155,13 +155,13 @@ func (h *BaseJSHandle) JSONValue() goja.Value {
 		if result, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
 			k6common.Throw(rt, fmt.Errorf("unable to get properties for JS handle %T: %w", action, err))
 		}
-		res, err := valueFromRemoteObject(h.ctx, result, h.logger.log.WithContext(h.ctx))
+		res, err := valueFromRemoteObject(h.ctx, result)
 		if err != nil {
 			k6common.Throw(rt, fmt.Errorf("unable to extract value from remote object: %w", err))
 		}
 		return res
 	}
-	res, err := valueFromRemoteObject(h.ctx, h.remoteObject, h.logger.log.WithContext(h.ctx))
+	res, err := valueFromRemoteObject(h.ctx, h.remoteObject)
 	if err != nil {
 		k6common.Throw(rt, fmt.Errorf("unable to extract value from remote object: %w", err))
 	}

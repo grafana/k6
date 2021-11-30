@@ -29,7 +29,6 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 	"github.com/mailru/easyjson"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	k6common "go.k6.io/k6/js/common"
@@ -47,8 +46,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 			UnserializableValue: unserializableValue,
 		}
 
-		logger := NewLogger(ctx, logrus.New(), false, nil)
-		arg, err := valueFromRemoteObject(ctx, remoteObject, logger.log.WithContext(ctx))
+		arg, err := valueFromRemoteObject(ctx, remoteObject)
 		require.True(t, goja.IsNull(arg))
 		require.ErrorIs(t, UnserializableValueError{unserializableValue}, err)
 	})
@@ -62,8 +60,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 			UnserializableValue: unserializableValue,
 		}
 
-		logger := NewLogger(ctx, logrus.New(), false, nil)
-		arg, err := valueFromRemoteObject(ctx, remoteObject, logger.log.WithContext(ctx))
+		arg, err := valueFromRemoteObject(ctx, remoteObject)
 
 		require.True(t, goja.IsNull(arg))
 		assert.ErrorIs(t, UnserializableValueError{unserializableValue}, err)
@@ -99,8 +96,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 				Type:                "number",
 				UnserializableValue: runtime.UnserializableValue(v.value),
 			}
-			logger := NewLogger(ctx, logrus.New(), false, nil)
-			arg, err := valueFromRemoteObject(ctx, remoteObject, logger.log.WithContext(ctx))
+			arg, err := valueFromRemoteObject(ctx, remoteObject)
 			require.NoError(t, err)
 			require.NotNil(t, arg)
 			if v.value == "NaN" {
@@ -149,8 +145,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 				Value: marshalled,
 			}
 
-			logger := NewLogger(ctx, logrus.New(), false, nil)
-			arg, err := valueFromRemoteObject(ctx, remoteObject, logger.log.WithContext(ctx))
+			arg, err := valueFromRemoteObject(ctx, remoteObject)
 
 			require.Nil(t, err)
 			require.Equal(t, p.value, p.toFn(arg))
@@ -172,8 +167,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 			},
 		}
 
-		logger := NewLogger(ctx, logrus.New(), false, nil)
-		val, err := valueFromRemoteObject(ctx, remoteObject, logger.log.WithContext(ctx))
+		val, err := valueFromRemoteObject(ctx, remoteObject)
 		require.NoError(t, err)
 		assert.Equal(t, rt.ToValue(map[string]interface{}{"num": float64(1)}), val)
 	})
@@ -183,15 +177,12 @@ func TestValueFromRemoteObject(t *testing.T) {
 func TestParseRemoteObject(t *testing.T) {
 	t.Parallel()
 
-	rt := goja.New()
-	ctx := k6common.WithRuntime(context.Background(), rt)
-
 	testCases := []struct {
 		name     string
 		preview  *runtime.ObjectPreview
 		value    string
 		expected map[string]interface{}
-		expErr   error
+		expErr   string
 	}{
 		{
 			name: "most_types",
@@ -233,28 +224,37 @@ func TestParseRemoteObject(t *testing.T) {
 			},
 		},
 		{
-			name:     "overflow",
+			name:     "err_overflow",
 			preview:  &runtime.ObjectPreview{Overflow: true},
 			expected: map[string]interface{}{},
-			expErr:   &objectOverflowError{},
+			expErr:   "object is too large and will be parsed partially",
+		},
+		{
+			name: "err_parsing_property",
+			preview: &runtime.ObjectPreview{
+				Properties: []*runtime.PropertyPreview{
+					{Name: "failprop", Type: runtime.TypeObject, Value: "some"},
+				},
+			},
+			expected: map[string]interface{}{},
+			expErr:   "failed parsing object property",
 		},
 	}
 
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			remoteObject := &runtime.RemoteObject{
 				Type:     "object",
 				ObjectID: runtime.RemoteObjectID("object_id_0123456789"),
 				Preview:  tc.preview,
 				Value:    easyjson.RawMessage(tc.value),
 			}
-			lg := logrus.New()
-			logger := NewLogger(ctx, lg, false, nil)
-			val, err := parseRemoteObject(remoteObject, logger.log.WithContext(ctx))
+			val, err := parseRemoteObject(remoteObject)
 			assert.Equal(t, tc.expected, val)
-			if tc.expErr != nil {
-				assert.ErrorAs(t, err, &tc.expErr)
+			if tc.expErr != "" {
+				assert.Contains(t, err.Error(), tc.expErr)
 			} else {
 				assert.NoError(t, err)
 			}

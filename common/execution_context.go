@@ -128,7 +128,7 @@ func (e *ExecutionContext) evaluate(apiCtx context.Context, forceCallable bool, 
 		}
 		if remoteObject != nil {
 			if returnByValue {
-				res, err = valueFromRemoteObject(apiCtx, remoteObject, e.logger.log.WithContext(e.ctx))
+				res, err = valueFromRemoteObject(apiCtx, remoteObject)
 				if err != nil {
 					return nil, fmt.Errorf("unable to extract value from remote object: %w", err)
 				}
@@ -164,7 +164,7 @@ func (e *ExecutionContext) evaluate(apiCtx context.Context, forceCallable bool, 
 		}
 		if remoteObject != nil {
 			if returnByValue {
-				res, err = valueFromRemoteObject(apiCtx, remoteObject, e.logger.log.WithContext(apiCtx))
+				res, err = valueFromRemoteObject(apiCtx, remoteObject)
 				if err != nil {
 					return nil, fmt.Errorf("unable to extract value from remote object: %w", err)
 				}

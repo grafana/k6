@@ -23,7 +23,6 @@ package common
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -478,15 +477,9 @@ func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled)
 
 	var parsedObjects []interface{}
 	for _, robj := range event.Args {
-		i, err := parseRemoteObject(robj, l)
+		i, err := parseRemoteObject(robj)
 		if err != nil {
-			var oe *objectOverflowError
-			if errors.As(err, &oe) {
-				l.Warn(err)
-			} else {
-				// If this throws it's a bug :)
-				k6Throw(fs.ctx, "unable to parse remote object value: %w", err)
-			}
+			handleParseRemoteObjectErr(fs.ctx, err, l)
 		}
 		parsedObjects = append(parsedObjects, i)
 	}

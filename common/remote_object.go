@@ -23,12 +23,15 @@ package common
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
+	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 	k6common "go.k6.io/k6/js/common"
 )
@@ -40,28 +43,42 @@ func (*objectOverflowError) Error() string {
 	return "object is too large and will be parsed partially"
 }
 
-func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview, logger *logrus.Entry) (map[string]interface{}, error) {
+type objectPropertyParseError struct {
+	error
+	property string
+}
+
+// Error returns the reason of the failure, including the wrapper parsing error
+// message.
+func (pe *objectPropertyParseError) Error() string {
+	return fmt.Sprintf("failed parsing object property %q: %s", pe.property, pe.error)
+}
+
+// Unwrap returns the wrapped parsing error.
+func (pe *objectPropertyParseError) Unwrap() error {
+	return pe.error
+}
+
+func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview) (map[string]interface{}, error) {
 	obj := make(map[string]interface{})
-	var err error
+	var result error
 	if op.Overflow {
-		err = &objectOverflowError{}
+		result = multierror.Append(result, &objectOverflowError{})
 	}
 
 	for _, p := range op.Properties {
-		val, err := parseRemoteObjectValue(p.Type, p.Value, p.ValuePreview, logger)
+		val, err := parseRemoteObjectValue(p.Type, p.Value, p.ValuePreview)
 		if err != nil {
-			logger.WithError(err).Errorf("failed parsing object property %q", p.Name)
+			result = multierror.Append(result, &objectPropertyParseError{err, p.Name})
 			continue
 		}
 		obj[p.Name] = val
 	}
 
-	return obj, err
+	return obj, result
 }
 
-func parseRemoteObjectValue(
-	t cdpruntime.Type, val string, op *cdpruntime.ObjectPreview, logger *logrus.Entry,
-) (interface{}, error) {
+func parseRemoteObjectValue(t cdpruntime.Type, val string, op *cdpruntime.ObjectPreview) (interface{}, error) {
 	switch t {
 	case cdpruntime.TypeAccessor:
 		return "accessor", nil
@@ -81,7 +98,7 @@ func parseRemoteObjectValue(
 		return val, nil
 	case cdpruntime.TypeObject:
 		if op != nil {
-			return parseRemoteObjectPreview(op, logger)
+			return parseRemoteObjectPreview(op)
 		}
 		if val == "Object" {
 			return val, nil
@@ -98,9 +115,9 @@ func parseRemoteObjectValue(
 	return v, nil
 }
 
-func parseRemoteObject(obj *cdpruntime.RemoteObject, logger *logrus.Entry) (interface{}, error) {
+func parseRemoteObject(obj *cdpruntime.RemoteObject) (interface{}, error) {
 	if obj.UnserializableValue == "" {
-		return parseRemoteObjectValue(obj.Type, string(obj.Value), obj.Preview, logger)
+		return parseRemoteObjectValue(obj.Type, string(obj.Value), obj.Preview)
 	}
 
 	switch obj.UnserializableValue.String() {
@@ -117,12 +134,33 @@ func parseRemoteObject(obj *cdpruntime.RemoteObject, logger *logrus.Entry) (inte
 	return nil, UnserializableValueError{obj.UnserializableValue}
 }
 
-func valueFromRemoteObject(
-	ctx context.Context, remoteObject *cdpruntime.RemoteObject, logger *logrus.Entry,
-) (goja.Value, error) {
-	val, err := parseRemoteObject(remoteObject, logger)
+func valueFromRemoteObject(ctx context.Context, robj *cdpruntime.RemoteObject) (goja.Value, error) {
+	val, err := parseRemoteObject(robj)
 	if val == "undefined" {
 		return goja.Undefined(), err
 	}
 	return k6common.GetRuntime(ctx).ToValue(val), err
+}
+
+func handleParseRemoteObjectErr(ctx context.Context, err error, logger *logrus.Entry) {
+	var (
+		ooe *objectOverflowError
+		ope *objectPropertyParseError
+	)
+	merr, ok := err.(*multierror.Error)
+	if !ok {
+		// If this throws it's a bug :)
+		k6Throw(ctx, "unable to parse remote object value: %w", err)
+	}
+	for _, e := range merr.Errors {
+		switch {
+		case errors.As(e, &ooe):
+			logger.Warn(ooe)
+		case errors.As(e, &ope):
+			logger.WithError(ope).Error()
+		default:
+			// If this throws it's a bug :)
+			k6Throw(ctx, "unable to parse remote object value: %w", e)
+		}
+	}
 }
