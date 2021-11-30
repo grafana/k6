@@ -24,8 +24,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 
-	"github.com/kubernetes/helm/pkg/strvals"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -213,33 +213,37 @@ func (c *DNSConfig) UnmarshalText(text []byte) error {
 		*c = DefaultDNSConfig()
 		return nil
 	}
-	params, err := strvals.Parse(string(text))
-	if err != nil {
-		return err
+	values := strings.Split(string(text), ",")
+	params := make(map[string]string, len(values))
+	for _, value := range values {
+		args := strings.SplitN(value, "=", 2)
+		if len(args) != 2 {
+			return fmt.Errorf("no value for key %s", value)
+		}
+		params[args[0]] = args[1]
 	}
 	return c.unmarshal(params)
 }
 
-func (c *DNSConfig) unmarshal(params map[string]interface{}) error {
+func (c *DNSConfig) unmarshal(params map[string]string) error {
 	for k, v := range params {
 		switch k {
 		case "policy":
-			p, err := DNSPolicyString(v.(string))
+			p, err := DNSPolicyString(v)
 			if err != nil {
 				return err
 			}
 			c.Policy.DNSPolicy = p
 			c.Policy.Valid = true
 		case "select":
-			s, err := DNSSelectString(v.(string))
+			s, err := DNSSelectString(v)
 			if err != nil {
 				return err
 			}
 			c.Select.DNSSelect = s
 			c.Select.Valid = true
 		case "ttl":
-			ttlv := fmt.Sprintf("%v", v)
-			c.TTL = null.StringFrom(ttlv)
+			c.TTL = null.StringFrom(v)
 		default:
 			return fmt.Errorf("unknown DNS configuration field: %s", k)
 		}
