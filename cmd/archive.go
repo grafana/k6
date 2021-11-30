@@ -78,7 +78,7 @@ An archive is a fully self-contained test run, and can be executed identically e
 			if err != nil {
 				return err
 			}
-			conf, err := getConsolidatedConfig(afero.NewOsFs(), Config{Options: cliOpts}, r)
+			conf, err := getConsolidatedConfig(afero.NewOsFs(), Config{Options: cliOpts}, r.GetOptions())
 			if err != nil {
 				return err
 			}

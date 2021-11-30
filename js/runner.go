@@ -86,7 +86,7 @@ func New(
 		return nil, err
 	}
 
-	return newFromBundle(logger, bundle, builtinMetrics, registry)
+	return NewFromBundle(logger, bundle, builtinMetrics, registry)
 }
 
 // NewFromArchive returns a new Runner from the source in the provided archive
@@ -99,10 +99,11 @@ func NewFromArchive(
 		return nil, err
 	}
 
-	return newFromBundle(logger, bundle, builtinMetrics, registry)
+	return NewFromBundle(logger, bundle, builtinMetrics, registry)
 }
 
-func newFromBundle(
+// NewFromBundle returns a new Runner from the provided Bundle
+func NewFromBundle(
 	logger *logrus.Logger, b *Bundle, builtinMetrics *metrics.BuiltinMetrics, registry *metrics.Registry,
 ) (*Runner, error) {
 	defaultGroup, err := lib.NewGroup("", nil)

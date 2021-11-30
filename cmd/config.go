@@ -164,13 +164,13 @@ func readEnvConfig() (Config, error) {
 // Assemble the final consolidated configuration from all of the different sources:
 // - start with the CLI-provided options to get shadowed (non-Valid) defaults in there
 // - add the global file config options
-// - if supplied, add the Runner-provided options
+// - add the Runner-provided options (they may come from Bundle too if applicable)
 // - add the environment variables
 // - merge the user-supplied CLI flags back in on top, to give them the greatest priority
 // - set some defaults if they weren't previously specified
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
-func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf Config, err error) {
+func getConsolidatedConfig(fs afero.Fs, cliConf Config, runnerOpts lib.Options) (conf Config, err error) {
 	// TODO: use errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig) where it makes sense?
 
 	fileConf, _, err := readDiskConfig(fs)
@@ -183,9 +183,9 @@ func getConsolidatedConfig(fs afero.Fs, cliConf Config, runner lib.Runner) (conf
 	}
 
 	conf = cliConf.Apply(fileConf)
-	if runner != nil {
-		conf = conf.Apply(Config{Options: runner.GetOptions()})
-	}
+
+	conf = conf.Apply(Config{Options: runnerOpts})
+
 	conf = conf.Apply(envConf).Apply(cliConf)
 	conf = applyDefault(conf)
 

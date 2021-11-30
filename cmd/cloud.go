@@ -121,7 +121,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			if err != nil {
 				return err
 			}
-			conf, err := getConsolidatedConfig(afero.NewOsFs(), Config{Options: cliOpts}, r)
+			conf, err := getConsolidatedConfig(afero.NewOsFs(), Config{Options: cliOpts}, r.GetOptions())
 			if err != nil {
 				return err
 			}
