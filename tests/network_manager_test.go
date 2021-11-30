@@ -23,6 +23,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/grafana/xk6-browser/testutils"
 	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,15 +37,9 @@ func TestDataURLSkipRequest(t *testing.T) {
 		bt.Browser.Close()
 	})
 
-	logHook := bt.LogHook()
+	lc := testutils.AttachLogCache(bt.State.Logger)
 
 	p.Goto("data:text/html,hello", nil)
 
-	var gotMsg bool
-	for _, evt := range logHook.Drain() {
-		if evt.Message == "skipped request handling of data URL" {
-			gotMsg = true
-		}
-	}
-	assert.True(t, gotMsg)
+	assert.True(t, lc.Contains("skipped request handling of data URL"))
 }

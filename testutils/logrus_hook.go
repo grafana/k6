@@ -21,39 +21,64 @@
 package testutils
 
 import (
+	"io/ioutil"
+	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
 )
 
-// CacheLogrusHook implements the logrus.Hook interface and could be used to check
+// LogCache implements the logrus.Hook interface and could be used to check
 // if log messages were outputted
-type CacheLogrusHook struct {
+type LogCache struct {
 	HookedLevels []logrus.Level
-	mutex        sync.Mutex
+	mutex        sync.RWMutex
 	messageCache []logrus.Entry
 }
 
 // Levels just returns whatever was stored in the HookedLevels slice
-func (smh *CacheLogrusHook) Levels() []logrus.Level {
-	return smh.HookedLevels
+func (lc *LogCache) Levels() []logrus.Level {
+	return lc.HookedLevels
 }
 
 // Fire saves whatever message the logrus library passed in the cache
-func (smh *CacheLogrusHook) Fire(e *logrus.Entry) error {
-	smh.mutex.Lock()
-	defer smh.mutex.Unlock()
-	smh.messageCache = append(smh.messageCache, *e)
+func (lc *LogCache) Fire(e *logrus.Entry) error {
+	lc.mutex.Lock()
+	defer lc.mutex.Unlock()
+	lc.messageCache = append(lc.messageCache, *e)
 	return nil
 }
 
 // Drain returns the currently stored messages and deletes them from the cache
-func (smh *CacheLogrusHook) Drain() []logrus.Entry {
-	smh.mutex.Lock()
-	defer smh.mutex.Unlock()
-	res := smh.messageCache
-	smh.messageCache = []logrus.Entry{}
+func (lc *LogCache) Drain() []logrus.Entry {
+	lc.mutex.Lock()
+	defer lc.mutex.Unlock()
+	res := lc.messageCache
+	lc.messageCache = []logrus.Entry{}
 	return res
 }
 
-var _ logrus.Hook = &CacheLogrusHook{}
+// Contains returns true if msg is contained in any of the cached logged events
+// or false otherwise.
+func (lc *LogCache) Contains(msg string) bool {
+	lc.mutex.RLock()
+	defer lc.mutex.RUnlock()
+	for _, evt := range lc.messageCache {
+		if strings.Contains(evt.Message, msg) {
+			return true
+		}
+	}
+	return false
+}
+
+var _ logrus.Hook = &LogCache{}
+
+// AttachLogCache sets logger to DebugLevel, attaches a LogCache hook and
+// returns it.
+func AttachLogCache(logger *logrus.Logger) *LogCache {
+	lc := &LogCache{HookedLevels: []logrus.Level{logrus.DebugLevel, logrus.WarnLevel}}
+	logger.SetLevel(logrus.DebugLevel)
+	logger.AddHook(lc)
+	logger.SetOutput(ioutil.Discard)
+	return lc
+}

@@ -22,7 +22,6 @@ package browsertest
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"testing"
@@ -30,7 +29,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
-	"github.com/grafana/xk6-browser/testutils"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -123,12 +121,4 @@ func NewBrowserTest(t testing.TB) *BrowserTest {
 		HTTPMultiBin: tb,
 		Samples:      samples,
 	}
-}
-
-func (bt *BrowserTest) LogHook() *testutils.CacheLogrusHook {
-	logHook := &testutils.CacheLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
-	bt.State.Logger.SetLevel(logrus.DebugLevel)
-	bt.State.Logger.AddHook(logHook)
-	bt.State.Logger.SetOutput(ioutil.Discard)
-	return logHook
 }

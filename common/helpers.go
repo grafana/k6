@@ -28,7 +28,6 @@ import (
 	"math"
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
@@ -168,42 +167,6 @@ func errorFromDOMError(domErr string) error {
 	return fmt.Errorf(domErr)
 }
 
-func interfaceFromRemoteObject(remoteObject *cdpruntime.RemoteObject) (interface{}, error) {
-	if remoteObject.ObjectID != "" {
-		return nil, ErrUnexpectedRemoteObjectWithID
-	}
-	if remoteObject.UnserializableValue != "" {
-		if remoteObject.Type == "bigint" {
-			n, err := strconv.ParseInt(strings.Replace(remoteObject.UnserializableValue.String(), "n", "", -1), 10, 64)
-			if err != nil {
-				return nil, BigIntParseError{err}
-			}
-			return n, nil
-		}
-		switch remoteObject.UnserializableValue.String() {
-		case "-0": // To handle +0 divided by negative number
-			return math.Float64frombits(0 | (1 << 63)), nil
-		case "NaN":
-			return math.NaN(), nil
-		case "Infinity":
-			return math.Inf(0), nil
-		case "-Infinity":
-			return math.Inf(-1), nil
-		default:
-			return nil, UnserializableValueError{remoteObject.UnserializableValue}
-		}
-	}
-	if remoteObject.Type == "undefined" {
-		return "undefined", nil
-	}
-	var i interface{}
-	err := json.Unmarshal(remoteObject.Value, &i)
-	if err != nil {
-		return nil, err
-	}
-	return i, nil
-}
-
 func stringSliceContains(s []string, e string) bool {
 	for _, a := range s {
 		if a == e {
@@ -211,15 +174,6 @@ func stringSliceContains(s []string, e string) bool {
 		}
 	}
 	return false
-}
-
-func valueFromRemoteObject(ctx context.Context, remoteObject *cdpruntime.RemoteObject) (goja.Value, error) {
-	rt := k6common.GetRuntime(ctx)
-	i, err := interfaceFromRemoteObject(remoteObject)
-	if i == "undefined" {
-		return goja.Undefined(), err
-	}
-	return rt.ToValue(i), err
 }
 
 func createWaitForEventHandler(

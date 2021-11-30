@@ -40,6 +40,7 @@ var /* const */ sourceURLRegex = regexp.MustCompile(`^(?s)[\040\t]*//[@#] source
 // ExecutionContext represents a JS execution context
 type ExecutionContext struct {
 	ctx            context.Context
+	logger         *Logger
 	session        *Session
 	frame          *Frame
 	id             runtime.ExecutionContextID
@@ -47,13 +48,17 @@ type ExecutionContext struct {
 }
 
 // NewExecutionContext creates a new JS execution context
-func NewExecutionContext(ctx context.Context, session *Session, frame *Frame, id runtime.ExecutionContextID) *ExecutionContext {
+func NewExecutionContext(
+	ctx context.Context, session *Session, frame *Frame,
+	id runtime.ExecutionContextID, logger *Logger,
+) *ExecutionContext {
 	return &ExecutionContext{
 		ctx:            ctx,
 		session:        session,
 		frame:          frame,
 		id:             id,
 		injectedScript: nil,
+		logger:         logger,
 	}
 }
 
@@ -69,7 +74,7 @@ func (e *ExecutionContext) adoptBackendNodeId(backendNodeID cdp.BackendNodeID) (
 		return nil, fmt.Errorf("unable to get DOM node: %w", err)
 	}
 
-	return NewJSHandle(e.ctx, e.session, e, e.frame, remoteObj).AsElement().(*ElementHandle), nil
+	return NewJSHandle(e.ctx, e.session, e, e.frame, remoteObj, e.logger).AsElement().(*ElementHandle), nil
 }
 
 // Adopts the specified element handle into this execution context from another execution context
@@ -129,7 +134,7 @@ func (e *ExecutionContext) evaluate(apiCtx context.Context, forceCallable bool, 
 				}
 			} else if remoteObject.ObjectID != "" {
 				// Note: we don't use the passed in apiCtx here as it could be tied to a timeout
-				res = NewJSHandle(e.ctx, e.session, e, e.frame, remoteObject)
+				res = NewJSHandle(e.ctx, e.session, e, e.frame, remoteObject, e.logger)
 			}
 		}
 	} else {
@@ -165,7 +170,7 @@ func (e *ExecutionContext) evaluate(apiCtx context.Context, forceCallable bool, 
 				}
 			} else if remoteObject.ObjectID != "" {
 				// Note: we don't use the passed in apiCtx here as it could be tied to a timeout
-				res = NewJSHandle(e.ctx, e.session, e, e.frame, remoteObject)
+				res = NewJSHandle(e.ctx, e.session, e, e.frame, remoteObject, e.logger)
 			}
 		}
 	}

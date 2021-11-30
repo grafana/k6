@@ -25,24 +25,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"strconv"
 	"testing"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	k6common "go.k6.io/k6/js/common"
 )
 
-func TestHelpersConvertArgument(t *testing.T) {
+func newExecCtx() (*ExecutionContext, context.Context, *goja.Runtime) {
+	ctx := context.Background()
+	logger := NewLogger(ctx, logrus.New(), false, nil)
+	execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789), logger)
+
+	return execCtx, ctx, goja.New()
+}
+
+func TestConvertArgument(t *testing.T) {
 	t.Parallel()
 
 	t.Run("int64", func(t *testing.T) {
-		ctx := context.Background()
-		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
-		rt := goja.New()
-
+		execCtx, ctx, rt := newExecCtx()
 		var value int64 = 777
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
 
@@ -54,9 +58,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("int64 maxint", func(t *testing.T) {
-		ctx := context.Background()
-		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
-		rt := goja.New()
+		execCtx, ctx, rt := newExecCtx()
 
 		var value int64 = math.MaxInt32 + 1
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
@@ -68,9 +70,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("float64", func(t *testing.T) {
-		ctx := context.Background()
-		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
-		rt := goja.New()
+		execCtx, ctx, rt := newExecCtx()
 
 		var value float64 = 777.0
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
@@ -83,9 +83,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("float64 unserializable values", func(t *testing.T) {
-		ctx := context.Background()
-		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
-		rt := goja.New()
+		execCtx, ctx, rt := newExecCtx()
 
 		unserializableValues := []struct {
 			value    float64
@@ -119,9 +117,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("bool", func(t *testing.T) {
-		ctx := context.Background()
-		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
-		rt := goja.New()
+		execCtx, ctx, rt := newExecCtx()
 
 		var value bool = true
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
@@ -134,10 +130,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("string", func(t *testing.T) {
-		ctx := context.Background()
-		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
-		rt := goja.New()
-
+		execCtx, ctx, rt := newExecCtx()
 		var value string = "hello world"
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
 
@@ -149,9 +142,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("*BaseJSHandle", func(t *testing.T) {
-		ctx := context.Background()
-		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
-		rt := goja.New()
+		execCtx, ctx, rt := newExecCtx()
 		timeoutSetings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
 		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
@@ -162,7 +153,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 			Value: result,
 		}
 
-		value := NewJSHandle(ctx, nil, execCtx, frame, remoteObject)
+		value := NewJSHandle(ctx, nil, execCtx, frame, remoteObject, execCtx.logger)
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
 
 		require.NotNil(t, arg)
@@ -172,9 +163,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("*BaseJSHandle wrong context", func(t *testing.T) {
-		ctx := context.Background()
-		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
-		rt := goja.New()
+		execCtx, ctx, rt := newExecCtx()
 		timeoutSetings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
 		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
@@ -184,9 +173,9 @@ func TestHelpersConvertArgument(t *testing.T) {
 			Subtype:  "node",
 			ObjectID: remoteObjectID,
 		}
-		execCtx2 := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
+		execCtx2 := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789), execCtx.logger)
 
-		value := NewJSHandle(ctx, nil, execCtx2, frame, remoteObject)
+		value := NewJSHandle(ctx, nil, execCtx2, frame, remoteObject, execCtx.logger)
 		arg, err := convertArgument(ctx, execCtx, rt.ToValue(value))
 
 		require.Nil(t, arg)
@@ -194,9 +183,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("*BaseJSHandle is disposed", func(t *testing.T) {
-		ctx := context.Background()
-		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
-		rt := goja.New()
+		execCtx, ctx, rt := newExecCtx()
 		timeoutSetings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
 		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
@@ -207,7 +194,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 			ObjectID: remoteObjectID,
 		}
 
-		value := NewJSHandle(ctx, nil, execCtx, frame, remoteObject)
+		value := NewJSHandle(ctx, nil, execCtx, frame, remoteObject, execCtx.logger)
 		value.(*BaseJSHandle).disposed = true
 		arg, err := convertArgument(ctx, execCtx, rt.ToValue(value))
 
@@ -216,9 +203,7 @@ func TestHelpersConvertArgument(t *testing.T) {
 	})
 
 	t.Run("*BaseJSHandle as *ElementHandle", func(t *testing.T) {
-		ctx := context.Background()
-		execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789))
-		rt := goja.New()
+		execCtx, ctx, rt := newExecCtx()
 		timeoutSetings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
 		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
@@ -229,149 +214,12 @@ func TestHelpersConvertArgument(t *testing.T) {
 			ObjectID: remoteObjectID,
 		}
 
-		value := NewJSHandle(ctx, nil, execCtx, frame, remoteObject)
+		value := NewJSHandle(ctx, nil, execCtx, frame, remoteObject, execCtx.logger)
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
 
 		require.NotNil(t, arg)
 		require.Equal(t, remoteObjectID, arg.ObjectID)
 		require.Empty(t, arg.Value)
 		require.Empty(t, arg.UnserializableValue)
-	})
-}
-
-func TestHelpersValueFromRemoteObject(t *testing.T) {
-	t.Parallel()
-
-	t.Run("remote object with ID", func(t *testing.T) {
-		rt := goja.New()
-		ctx := k6common.WithRuntime(context.Background(), rt)
-		remoteObjectID := runtime.RemoteObjectID("object_id_0123456789")
-		remoteObject := &runtime.RemoteObject{
-			Type:     "object",
-			Subtype:  "node",
-			ObjectID: remoteObjectID,
-		}
-
-		arg, err := valueFromRemoteObject(ctx, remoteObject)
-		require.True(t, goja.IsNull(arg))
-		require.ErrorIs(t, ErrUnexpectedRemoteObjectWithID, err)
-	})
-
-	t.Run("unserializable value error", func(t *testing.T) {
-		rt := goja.New()
-		ctx := k6common.WithRuntime(context.Background(), rt)
-		unserializableValue := runtime.UnserializableValue("a string instead")
-		remoteObject := &runtime.RemoteObject{
-			Type:                "number",
-			UnserializableValue: unserializableValue,
-		}
-
-		arg, err := valueFromRemoteObject(ctx, remoteObject)
-		require.True(t, goja.IsNull(arg))
-		require.ErrorIs(t, UnserializableValueError{unserializableValue}, err)
-	})
-
-	t.Run("bigint parsing error", func(t *testing.T) {
-		rt := goja.New()
-		ctx := k6common.WithRuntime(context.Background(), rt)
-		unserializableValue := runtime.UnserializableValue("a string instead")
-		remoteObject := &runtime.RemoteObject{
-			Type:                "bigint",
-			UnserializableValue: unserializableValue,
-		}
-
-		arg, err := valueFromRemoteObject(ctx, remoteObject)
-
-		require.True(t, goja.IsNull(arg))
-		require.ErrorIs(t, BigIntParseError{&strconv.NumError{
-			Func: "ParseInt",
-			Num:  "a strig istead",
-			Err:  strconv.ErrSyntax,
-		}}, err)
-	})
-
-	t.Run("float64 unserializable values", func(t *testing.T) {
-		rt := goja.New()
-		ctx := k6common.WithRuntime(context.Background(), rt)
-		unserializableValues := []struct {
-			value    string
-			expected float64
-		}{
-			{
-				value:    "-0",
-				expected: math.Float64frombits(0 | (1 << 63)),
-			},
-			{
-				value:    "Infinity",
-				expected: math.Inf(0),
-			},
-			{
-				value:    "-Infinity",
-				expected: math.Inf(-1),
-			},
-			{
-				value:    "NaN",
-				expected: math.NaN(),
-			},
-		}
-
-		for _, v := range unserializableValues {
-			remoteObject := &runtime.RemoteObject{
-				Type:                "number",
-				UnserializableValue: runtime.UnserializableValue(v.value),
-			}
-			arg, _ := valueFromRemoteObject(ctx, remoteObject)
-			require.NotNil(t, arg)
-			if v.value == "NaN" {
-				require.True(t, math.IsNaN(arg.ToFloat()))
-			} else {
-				require.Equal(t, v.expected, arg.ToFloat())
-			}
-		}
-	})
-
-	t.Run("primitive types", func(t *testing.T) {
-		rt := goja.New()
-		ctx := k6common.WithRuntime(context.Background(), rt)
-
-		primitiveTypes := []struct {
-			typ   runtime.Type
-			value interface{}
-			toFn  func(goja.Value) interface{}
-		}{
-			{
-				typ:   "number",
-				value: int64(777),
-				toFn:  func(v goja.Value) interface{} { return v.ToInteger() },
-			},
-			{
-				typ:   "number",
-				value: float64(777.0),
-				toFn:  func(v goja.Value) interface{} { return v.ToFloat() },
-			},
-			{
-				typ:   "string",
-				value: "hello world",
-				toFn:  func(v goja.Value) interface{} { return v.String() },
-			},
-			{
-				typ:   "boolean",
-				value: true,
-				toFn:  func(v goja.Value) interface{} { return v.ToBoolean() },
-			},
-		}
-
-		for _, p := range primitiveTypes {
-			marshalled, _ := json.Marshal(p.value)
-			remoteObject := &runtime.RemoteObject{
-				Type:  p.typ,
-				Value: marshalled,
-			}
-
-			arg, err := valueFromRemoteObject(ctx, remoteObject)
-
-			require.Nil(t, err)
-			require.Equal(t, p.value, p.toFn(arg))
-		}
 	})
 }
