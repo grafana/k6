@@ -569,16 +569,18 @@ func runTestCase(
 	}
 	require.NoError(t, cliErr)
 
-	var runner lib.Runner
+	var runnerOpts lib.Options
 	if testCase.options.runner != nil {
-		runner = &minirunner.MiniRunner{Options: *testCase.options.runner}
+		runnerOpts = minirunner.MiniRunner{Options: *testCase.options.runner}.GetOptions()
 	}
+	// without runner creation, values in runnerOpts will simply be invalid
+
 	if testCase.options.fs == nil {
 		t.Logf("Creating an empty FS for this test")
 		testCase.options.fs = afero.NewMemMapFs() // create an empty FS if it wasn't supplied
 	}
 
-	consolidatedConfig, err := getConsolidatedConfig(testCase.options.fs, cliConf, runner)
+	consolidatedConfig, err := getConsolidatedConfig(testCase.options.fs, cliConf, runnerOpts)
 	if testCase.expected.consolidationError {
 		require.Error(t, err)
 		return

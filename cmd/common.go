@@ -21,16 +21,20 @@
 package cmd
 
 import (
+	"archive/tar"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/loader"
 )
 
 // Use these when interacting with fs and writing to terminal, makes a command testable
@@ -87,4 +91,40 @@ func exactArgsWithMsg(n int, msg string) cobra.PositionalArgs {
 		}
 		return nil
 	}
+}
+
+func readSource(filename string, logger *logrus.Logger) (*loader.SourceData, map[string]afero.Fs, error) {
+	pwd, err := os.Getwd()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	filesystems := loader.CreateFilesystems()
+	src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
+	return src, filesystems, err
+}
+
+// TODO: consider moving this out as a method of SourceData ?
+func getRunType(src *loader.SourceData) string {
+	typ := runType
+	if typ == "" {
+		typ = detectType(src.Data)
+	}
+	return typ
+}
+
+func detectType(data []byte) string {
+	if _, err := tar.NewReader(bytes.NewReader(data)).Next(); err == nil {
+		return typeArchive
+	}
+	return typeJS
+}
+
+// fprintf panics when where's an error writing to the supplied io.Writer
+func fprintf(w io.Writer, format string, a ...interface{}) (n int) {
+	n, err := fmt.Fprintf(w, format, a...)
+	if err != nil {
+		panic(err.Error())
+	}
+	return n
 }
