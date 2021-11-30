@@ -87,7 +87,6 @@ func NewFrameSession(
 	targetID target.ID, logger *Logger,
 ) (*FrameSession, error) {
 	logger.Debugf("NewFrameSession", "sid:%v tid:%v", session.id, targetID)
-	state := k6lib.GetState(ctx)
 	fs := FrameSession{
 		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
 		session:              session,
@@ -104,9 +103,9 @@ func NewFrameSession(
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
 		logger:               logger,
 		serializer: &logrus.Logger{
-			Out:       state.Logger.Out,
-			Level:     state.Logger.Level,
-			Formatter: &consoleLogFormatter{state.Logger.Formatter},
+			Out:       logger.log.Out,
+			Level:     logger.log.Level,
+			Formatter: &consoleLogFormatter{logger.log.Formatter},
 		},
 	}
 	var err error
