@@ -2103,26 +2103,34 @@ func TestForceHTTP1Feature(t *testing.T) {
 			}()
 			assert.Equal(t, tc.expectedForceH1Result, forceHTTP1())
 
-			r1, err := getSimpleRunner(t, "/script.js", fmt.Sprintf(`var k6 = require("k6");
+			tb := httpmultibin.NewHTTPMultiBin(t)
+
+			data := fmt.Sprintf(`var k6 = require("k6");
 			var check = k6.check;
 			var fail = k6.fail;
 			var http = require("k6/http");;
 			exports.default = function() {
-				var res = http.get("https://k6.io/");
+				var res = http.get("HTTP2BIN_URL");
 				if (
 					!check(res, {
 					'checking to see if status was 200': (res) => res.status === 200,
-					'checking to see if protocol was H2': (res) => res.proto === '%s'
+					'checking to see protocol': (res) => res.proto === '%s'
 					})
 				) {
 					fail('test failed')
 				}
-			}`, tc.protocol))
+			}`, tc.protocol)
+
+			r1, err := getSimpleRunner(t, "/script.js", tb.Replacer.Replace(data))
 			require.NoError(t, err)
 
 			err = r1.SetOptions(lib.Options{
+				Hosts: tb.Dialer.Hosts,
+				// We disable TLS verify so that we don't get a TLS handshake error since
+				// the certificates on the endpoint are not certified by a certificate authority
 				InsecureSkipTLSVerify: null.BoolFrom(true),
 			})
+
 			require.NoError(t, err)
 
 			registry := metrics.NewRegistry()
