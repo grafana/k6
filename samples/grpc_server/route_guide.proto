@@ -16,10 +16,11 @@ syntax = "proto3";
 
 package main;
 
-option go_package = ".;main";
+option go_package = "./;main";
 
+// FeatureExplorer is the service for exploring Features.
 // Interface exported by the server.
-service RouteGuide {
+service FeatureExplorer {
   // A simple RPC.
   //
   // Obtains the feature at a given position.
@@ -35,6 +36,10 @@ service RouteGuide {
   // repeated field), as the rectangle may cover a large area and contain a
   // huge number of features.
   rpc ListFeatures(Rectangle) returns (stream Feature) {}
+}
+
+// Interface exported by the server.
+service RouteGuide {
 
   // A client-to-server streaming RPC.
   //
