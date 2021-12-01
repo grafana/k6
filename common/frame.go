@@ -130,8 +130,9 @@ func (f *Frame) addChildFrame(child *Frame) {
 		f.ID(), child.ID(), f.URL(), child.URL())
 
 	f.childFramesMu.Lock()
+	defer f.childFramesMu.Unlock()
+
 	f.childFrames[child] = true
-	f.childFramesMu.Unlock()
 }
 
 func (f *Frame) addRequest(id network.RequestID) {
@@ -155,6 +156,7 @@ func (f *Frame) deleteRequest(id network.RequestID) {
 func (f *Frame) inflightRequestsLen() int {
 	f.inflightRequestsMu.RLock()
 	defer f.inflightRequestsMu.RUnlock()
+
 	return len(f.inflightRequests)
 }
 
@@ -202,19 +204,23 @@ func (f *Frame) recalculateLifecycle() {
 
 	// Start with triggered events.
 	var events map[LifecycleEvent]bool = make(map[LifecycleEvent]bool)
-	f.lifecycleEventsMu.Lock()
-	for k, v := range f.lifecycleEvents {
-		events[k] = v
+	f.lifecycleEventsMu.RLock()
+	{
+		for k, v := range f.lifecycleEvents {
+			events[k] = v
+		}
 	}
-	f.lifecycleEventsMu.Unlock()
+	f.lifecycleEventsMu.RUnlock()
 
 	// Only consider a life cycle event as fired if it has triggered for all of subtree.
 	f.childFramesMu.RLock()
-	for child := range f.childFrames {
-		child.(*Frame).recalculateLifecycle()
-		for k := range events {
-			if !child.(*Frame).hasSubtreeLifecycleEventFired(k) {
-				delete(events, k)
+	{
+		for child := range f.childFrames {
+			child.(*Frame).recalculateLifecycle()
+			for k := range events {
+				if !child.(*Frame).hasSubtreeLifecycleEventFired(k) {
+					delete(events, k)
+				}
 			}
 		}
 	}
@@ -235,17 +241,21 @@ func (f *Frame) recalculateLifecycle() {
 
 	// Emit removal events
 	f.lifecycleEventsMu.RLock()
-	for k := range f.subtreeLifecycleEvents {
-		if ok := events[k]; !ok {
-			f.emit(EventFrameRemoveLifecycle, k)
+	{
+		for k := range f.subtreeLifecycleEvents {
+			if ok := events[k]; !ok {
+				f.emit(EventFrameRemoveLifecycle, k)
+			}
 		}
 	}
 	f.lifecycleEventsMu.RUnlock()
 
 	f.lifecycleEventsMu.Lock()
-	f.subtreeLifecycleEvents = make(map[LifecycleEvent]bool)
-	for k, v := range events {
-		f.subtreeLifecycleEvents[k] = v
+	{
+		f.subtreeLifecycleEvents = make(map[LifecycleEvent]bool)
+		for k, v := range events {
+			f.subtreeLifecycleEvents[k] = v
+		}
 	}
 	f.lifecycleEventsMu.Unlock()
 }
@@ -375,6 +385,7 @@ func (f *Frame) onLifecycleEvent(event LifecycleEvent) {
 
 	f.lifecycleEventsMu.Lock()
 	defer f.lifecycleEventsMu.Unlock()
+
 	if ok := f.lifecycleEvents[event]; ok {
 		return
 	}
@@ -392,6 +403,7 @@ func (f *Frame) onLoadingStopped() {
 
 	f.lifecycleEventsMu.Lock()
 	defer f.lifecycleEventsMu.Unlock()
+
 	f.lifecycleEvents[LifecycleEventDOMContentLoad] = true
 	f.lifecycleEvents[LifecycleEventLoad] = true
 	f.lifecycleEvents[LifecycleEventNetworkIdle] = true
@@ -415,8 +427,9 @@ func (f *Frame) removeChildFrame(child *Frame) {
 		f.ID(), f.URL(), child.ID(), child.URL())
 
 	f.childFramesMu.Lock()
+	defer f.childFramesMu.Unlock()
+
 	delete(f.childFrames, child)
-	f.childFramesMu.Unlock()
 }
 
 func (f *Frame) requestByID(reqID network.RequestID) *Request {
