@@ -29,13 +29,12 @@ import (
 	"github.com/spf13/pflag"
 
 	"go.k6.io/k6/lib/metrics"
-	"go.k6.io/k6/loader"
 )
 
 var archiveOut = "archive.tar"
 
 func getArchiveCmd(logger *logrus.Logger) *cobra.Command {
-	// archiveCmd represents the pause command
+	// archiveCmd represents the archive command
 	archiveCmd := &cobra.Command{
 		Use:   "archive",
 		Short: "Create an archive",
@@ -50,14 +49,7 @@ An archive is a fully self-contained test run, and can be executed identically e
   k6 run myarchive.tar`[1:],
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Runner.
-			pwd, err := os.Getwd()
-			if err != nil {
-				return err
-			}
-			filename := args[0]
-			filesystems := loader.CreateFilesystems()
-			src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
+			src, filesystems, err := readSource(args[0], logger)
 			if err != nil {
 				return err
 			}
