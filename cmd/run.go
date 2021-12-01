@@ -21,7 +21,6 @@
 package cmd
 
 import (
-	"archive/tar"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -100,13 +99,7 @@ a commandline interface for interacting with it.`,
 			logger.Debug("Initializing the runner...")
 
 			// Create the Runner.
-			pwd, err := os.Getwd()
-			if err != nil {
-				return err
-			}
-			filename := args[0]
-			filesystems := loader.CreateFilesystems()
-			src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
+			src, filesystems, err := readSource(args[0], logger)
 			if err != nil {
 				return err
 			}
@@ -227,7 +220,7 @@ a commandline interface for interacting with it.`,
 			defer engine.StopOutputs()
 
 			printExecutionDescription(
-				"local", filename, "", conf, execScheduler.GetState().ExecutionTuple,
+				"local", args[0], "", conf, execScheduler.GetState().ExecutionTuple,
 				executionPlan, outputs, noColor || !stdoutTTY)
 
 			// Trap Interrupts, SIGINTs and SIGTERMs.
@@ -428,13 +421,6 @@ func newRunner(
 	}
 
 	return runner, err
-}
-
-func detectType(data []byte) string {
-	if _, err := tar.NewReader(bytes.NewReader(data)).Next(); err == nil {
-		return typeArchive
-	}
-	return typeJS
 }
 
 func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[string]io.Reader) error {

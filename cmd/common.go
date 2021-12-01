@@ -93,6 +93,8 @@ func exactArgsWithMsg(n int, msg string) cobra.PositionalArgs {
 	}
 }
 
+// readSource is a small wrapper around loader.ReadSource returning
+// result of the load and filesystems map
 func readSource(filename string, logger *logrus.Logger) (*loader.SourceData, map[string]afero.Fs, error) {
 	pwd, err := os.Getwd()
 	if err != nil {
