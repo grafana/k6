@@ -85,8 +85,8 @@ func (clvc ConstantVUsConfig) GetDescription(et *lib.ExecutionTuple) string {
 // Validate makes sure all options are configured and valid
 func (clvc ConstantVUsConfig) Validate() []error {
 	errors := clvc.BaseConfig.Validate()
-	if clvc.VUs.Int64 <= 0 {
-		errors = append(errors, fmt.Errorf("the number of VUs should be more than 0"))
+	if clvc.VUs.Int64 < 0 {
+		clvc.VUs.Int64 = 0
 	}
 
 	if !clvc.Duration.Valid {

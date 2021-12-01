@@ -113,8 +113,8 @@ var configMapTestCases = []configMapTestCase{
 	{`{"aname": {"executor": "constant-vus"}}`, exp{validationError: true}},
 	{`{"aname": {"executor": "constant-vus", "vus": 0.5}}`, exp{parseError: true}},
 	{`{"aname": {"executor": "constant-vus", "vus": 10}}`, exp{validationError: true}},
-	{`{"aname": {"executor": "constant-vus", "vus": 0, "duration": "60s"}}`, exp{validationError: true}},
-	{`{"aname": {"executor": "constant-vus", "vus": -1, "duration": "60s"}}`, exp{validationError: true}},
+	{`{"aname": {"executor": "constant-vus", "vus": 0, "duration": "60s"}}`, exp{validationError: false}},
+	{`{"aname": {"executor": "constant-vus", "vus": -1, "duration": "60s"}}`, exp{validationError: false}},
 	{`{"aname": {"executor": "constant-vus", "vus": 10, "duration": "0s"}}`, exp{validationError: true}},
 	{`{"aname": {"executor": "constant-vus", "vus": 10, "duration": "10s", "startTime": "-10s"}}`, exp{validationError: true}},
 	{`{"aname": {"executor": "constant-vus", "vus": 10, "duration": "10s", "exec": ""}}`, exp{validationError: true}},
@@ -286,7 +286,7 @@ var configMapTestCases = []configMapTestCase{
 	{`{"ishared": {"executor": "shared-iterations", "iterations": 20, "vus": 10, "maxDuration": "30m"}}`, exp{}},
 	{`{"ishared": {"executor": "shared-iterations", "iterations": 20, "vus": 10, "maxDuration": "-3m"}}`, exp{validationError: true}},
 	{`{"ishared": {"executor": "shared-iterations", "iterations": 20, "vus": 10, "maxDuration": "0s"}}`, exp{validationError: true}},
-	{`{"ishared": {"executor": "shared-iterations", "iterations": 20, "vus": -10}}`, exp{validationError: true}},
+	{`{"ishared": {"executor": "shared-iterations", "iterations": 20, "vus": -10}}`, exp{validationError: false}},
 	{`{"ishared": {"executor": "shared-iterations", "iterations": -1, "vus": 1}}`, exp{validationError: true}},
 	{`{"ishared": {"executor": "shared-iterations", "iterations": 20, "vus": 30}}`, exp{validationError: true}},
 	// per-vu-iterations
@@ -322,7 +322,7 @@ var configMapTestCases = []configMapTestCase{
 	{`{"ipervu": {"executor": "per-vu-iterations", "iterations": 20, "vus": 10}}`, exp{}},
 	{`{"ipervu": {"executor": "per-vu-iterations", "iterations": 20, "vus": 10, "maxDuration": "-3m"}}`, exp{validationError: true}},
 	{`{"ipervu": {"executor": "per-vu-iterations", "iterations": 20, "vus": 10, "maxDuration": "0s"}}`, exp{validationError: true}},
-	{`{"ipervu": {"executor": "per-vu-iterations", "iterations": 20, "vus": -10}}`, exp{validationError: true}},
+	{`{"ipervu": {"executor": "per-vu-iterations", "iterations": 20, "vus": -10}}`, exp{validationError: false}},
 	{`{"ipervu": {"executor": "per-vu-iterations", "iterations": -1, "vus": 1}}`, exp{validationError: true}},
 
 	// constant-arrival-rate

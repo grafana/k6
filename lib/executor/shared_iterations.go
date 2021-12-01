@@ -97,7 +97,7 @@ func (sic SharedIterationsConfig) GetDescription(et *lib.ExecutionTuple) string 
 func (sic SharedIterationsConfig) Validate() []error {
 	errors := sic.BaseConfig.Validate()
 	if sic.VUs.Int64 <= 0 {
-		errors = append(errors, fmt.Errorf("the number of VUs should be more than 0"))
+		sic.VUs.Int64 = 0
 	}
 
 	if sic.Iterations.Int64 < sic.VUs.Int64 {

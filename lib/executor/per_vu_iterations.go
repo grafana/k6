@@ -92,7 +92,7 @@ func (pvic PerVUIterationsConfig) GetDescription(et *lib.ExecutionTuple) string 
 func (pvic PerVUIterationsConfig) Validate() []error {
 	errors := pvic.BaseConfig.Validate()
 	if pvic.VUs.Int64 <= 0 {
-		errors = append(errors, fmt.Errorf("the number of VUs should be more than 0"))
+		pvic.VUs.Int64 = 0
 	}
 
 	if pvic.Iterations.Int64 <= 0 {
