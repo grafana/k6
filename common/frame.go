@@ -39,54 +39,6 @@ import (
 // Ensure frame implements the Frame interface
 var _ api.Frame = &Frame{}
 
-func frameActionFn(f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandleActionFn, states []string, force, noWaitAfter bool, timeout time.Duration) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
-	// We execute a frame action in the following steps:
-	// 1. Find element matching specified selector
-	// 2. Wait for it to reach specified DOM state
-	// 3. Run element handle action (incl. actionability checks)
-
-	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
-		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
-		waitOpts.State = state
-		waitOpts.Strict = strict
-		handle, err := f.waitForSelector(selector, waitOpts)
-		if err != nil {
-			errCh <- err
-			return
-		}
-		if handle == nil {
-			resultCh <- nil
-			return
-		}
-		actFn := elementHandleActionFn(handle, states, fn, false, false, timeout)
-		actFn(apiCtx, resultCh, errCh)
-	}
-}
-
-func framePointerActionFn(f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandlePointerActionFn, opts *ElementHandleBasePointerOptions) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
-	// We execute a frame pointer action in the following steps:
-	// 1. Find element matching specified selector
-	// 2. Wait for it to reach specified DOM state
-	// 3. Run element handle action (incl. actionability checks)
-
-	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
-		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
-		waitOpts.State = state
-		waitOpts.Strict = strict
-		handle, err := f.waitForSelector(selector, waitOpts)
-		if err != nil {
-			errCh <- err
-			return
-		}
-		if handle == nil {
-			resultCh <- nil
-			return
-		}
-		pointerActFn := elementHandlePointerActionFn(handle, true, fn, opts)
-		pointerActFn(apiCtx, resultCh, errCh)
-	}
-}
-
 type DocumentInfo struct {
 	documentID string
 	request    *Request
@@ -1468,4 +1420,52 @@ type frameExecutionContext interface {
 
 	// id returns the CDP runtime ID of this execution context.
 	ID() runtime.ExecutionContextID
+}
+
+func frameActionFn(f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandleActionFn, states []string, force, noWaitAfter bool, timeout time.Duration) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+	// We execute a frame action in the following steps:
+	// 1. Find element matching specified selector
+	// 2. Wait for it to reach specified DOM state
+	// 3. Run element handle action (incl. actionability checks)
+
+	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
+		waitOpts.State = state
+		waitOpts.Strict = strict
+		handle, err := f.waitForSelector(selector, waitOpts)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		if handle == nil {
+			resultCh <- nil
+			return
+		}
+		actFn := elementHandleActionFn(handle, states, fn, false, false, timeout)
+		actFn(apiCtx, resultCh, errCh)
+	}
+}
+
+func framePointerActionFn(f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandlePointerActionFn, opts *ElementHandleBasePointerOptions) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+	// We execute a frame pointer action in the following steps:
+	// 1. Find element matching specified selector
+	// 2. Wait for it to reach specified DOM state
+	// 3. Run element handle action (incl. actionability checks)
+
+	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
+		waitOpts.State = state
+		waitOpts.Strict = strict
+		handle, err := f.waitForSelector(selector, waitOpts)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		if handle == nil {
+			resultCh <- nil
+			return
+		}
+		pointerActFn := elementHandlePointerActionFn(handle, true, fn, opts)
+		pointerActFn(apiCtx, resultCh, errCh)
+	}
 }
