@@ -41,7 +41,12 @@ type FrameManager struct {
 	session         *Session
 	page            *Page
 	timeoutSettings *TimeoutSettings
-	mainFrame       *Frame
+
+	// protects from the data race between:
+	// - Frame.startNetworkIdleTimer.frameLifecycleEvent.recalculateLifecycle
+	// - *FrameSession.initEvents.onFrameNavigated->FrameManager.frameNavigated
+	mainFrameMu sync.RWMutex
+	mainFrame   *Frame
 
 	// Needed as the frames map will be accessed from multiple Go routines,
 	// the main VU/JS go routine and the Go routine listening for CDP messages.
@@ -266,7 +271,7 @@ func (m *FrameManager) frameNavigated(frameID cdp.FrameID, parentFrameID cdp.Fra
 			frame = NewFrame(m.ctx, m, nil, frameID, m.logger)
 		}
 		m.frames[frameID] = frame
-		m.mainFrame = frame
+		m.setMainFrame(frame)
 	}
 
 	frame.navigated(name, url, documentID)
@@ -535,7 +540,17 @@ func (m *FrameManager) Frames() []api.Frame {
 
 // MainFrame returns the main frame of the page
 func (m *FrameManager) MainFrame() *Frame {
+	m.mainFrameMu.RLock()
+	defer m.mainFrameMu.RUnlock()
+
 	return m.mainFrame
+}
+
+// setMainFrame sets the main frame of the page
+func (m *FrameManager) setMainFrame(f *Frame) {
+	m.mainFrameMu.Lock()
+	defer m.mainFrameMu.Unlock()
+	m.mainFrame = f
 }
 
 // NavigateFrame will navigate specified frame to specifed URL
