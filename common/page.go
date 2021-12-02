@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -57,19 +58,28 @@ type Page struct {
 	frameManager    *FrameManager
 	timeoutSettings *TimeoutSettings
 
-	jsEnabled        bool
-	closed           bool
-	backgroundPage   bool
+	jsEnabled bool
+
+	// protects from race between:
+	// - Browser.initEvents.onDetachedFromTarget->Page.didClose
+	// - FrameSession.initEvents.onFrameDetached->FrameManager.frameDetached.removeFramesRecursively->Page.IsClosed
+	closedMu sync.RWMutex
+	closed   bool
+
+	// TODO: setter change these fields (mutex?)
+	emulatedSize     *EmulatedSize
 	mediaType        MediaType
 	colorScheme      ColorScheme
 	reducedMotion    ReducedMotion
 	extraHTTPHeaders map[string]string
-	emulatedSize     *EmulatedSize
+
+	backgroundPage bool
 
 	mainFrameSession *FrameSession
-	frameSessions    map[cdp.FrameID]*FrameSession
-	workers          map[target.SessionID]*Worker
-	routes           []api.Route
+	// TODO: FrameSession changes by attachFrameSession (mutex?)
+	frameSessions map[cdp.FrameID]*FrameSession
+	workers       map[target.SessionID]*Worker
+	routes        []api.Route
 
 	logger *Logger
 }
@@ -163,7 +173,12 @@ func (p *Page) defaultTimeout() time.Duration {
 func (p *Page) didClose() {
 	p.logger.Debugf("Page:didClose", "sid:%v", p.sessionID())
 
-	p.closed = true
+	p.closedMu.Lock()
+	{
+		p.closed = true
+	}
+	p.closedMu.Unlock()
+
 	p.emit(EventPageClose, p)
 }
 
@@ -253,6 +268,11 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.Frame
 	frameID := node.FrameID
 	documentElement.Dispose()
 	return frameID
+}
+
+func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) {
+	p.logger.Debugf("Page:attachFrameSession", "sid:%v fid=%v", p.session.id, fid)
+	fs.page.frameSessions[fid] = fs
 }
 
 func (p *Page) getFrameSession(frameID cdp.FrameID) *FrameSession {
@@ -573,6 +593,9 @@ func (p *Page) IsChecked(selector string, opts goja.Value) bool {
 }
 
 func (p *Page) IsClosed() bool {
+	p.closedMu.RLock()
+	defer p.closedMu.RUnlock()
+
 	return p.closed
 }
 

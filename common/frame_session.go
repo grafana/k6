@@ -796,7 +796,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 		// Successful case
 		frameSession, err := NewFrameSession(fs.ctx, session, fs.page, fs, targetID, fs.logger)
 		if err == nil {
-			fs.page.frameSessions[cdp.FrameID(targetID)] = frameSession
+			fs.page.attachFrameSession(cdp.FrameID(targetID), frameSession)
 			return
 		}
 		// Erroneous cases
