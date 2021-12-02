@@ -1,6 +1,6 @@
 module go.k6.io/k6
 
-go 1.16
+go 1.17
 
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20200615164410-66371956d46c
@@ -10,9 +10,7 @@ require (
 	github.com/andybalholm/brotli v1.0.3
 	github.com/dop251/goja v0.0.0-20211115154819-26ebff68a7d5
 	github.com/fatih/color v1.12.0
-	github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813 // indirect
 	github.com/golang/protobuf v1.4.3
-	github.com/google/go-cmp v0.5.1 // indirect
 	github.com/gorilla/websocket v1.4.2
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.10.0
@@ -24,7 +22,6 @@ require (
 	github.com/mattn/go-isatty v0.0.13
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
-	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
@@ -37,14 +34,27 @@ require (
 	github.com/tidwall/pretty v1.2.0
 	golang.org/x/crypto v0.0.0-20210503195802-e9a32991a82e
 	golang.org/x/net v0.0.0-20211101194204-95aca89e93de
-	golang.org/x/sys v0.0.0-20210511113859-b0526f3d8744 // indirect
 	golang.org/x/term v0.0.0-20210503060354-a79de5458b56
-	golang.org/x/text v0.3.7-0.20210503195748-5c7c50ebbd4f // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
-	google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336 // indirect
 	google.golang.org/grpc v1.41.0
 	google.golang.org/protobuf v1.25.1-0.20200805231151-a709e31e5d12
-	gopkg.in/guregu/null.v2 v2.1.2 // indirect
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+)
+
+require (
+	github.com/andybalholm/cascadia v1.1.0 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91 // indirect
+	github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813 // indirect
+	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
+	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/josharian/intern v1.0.0 // indirect
+	github.com/onsi/ginkgo v1.14.0 // indirect
+	github.com/onsi/gomega v1.10.1 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	golang.org/x/sys v0.0.0-20210511113859-b0526f3d8744 // indirect
+	golang.org/x/text v0.3.7-0.20210503195748-5c7c50ebbd4f // indirect
+	google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336 // indirect
+	gopkg.in/guregu/null.v2 v2.1.2 // indirect
 )
