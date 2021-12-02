@@ -542,7 +542,8 @@ func (f *Frame) Check(selector string, opts goja.Value) {
 func (f *Frame) ChildFrames() []api.Frame {
 	f.childFramesMu.RLock()
 	defer f.childFramesMu.RUnlock()
-	l := make([]api.Frame, len(f.childFrames))
+
+	l := make([]api.Frame, 0, len(f.childFrames))
 	for child := range f.childFrames {
 		l = append(l, child)
 	}
@@ -1046,7 +1047,7 @@ func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value
 		k6common.Throw(rt, err)
 	}
 	properties := arrayHandle.GetProperties()
-	strArr := make([]string, len(properties))
+	strArr := make([]string, 0, len(properties))
 	for _, property := range properties {
 		strArr = append(strArr, property.JSONValue().String())
 		property.Dispose()

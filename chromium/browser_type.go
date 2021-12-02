@@ -80,7 +80,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 	launchOpts.Parse(b.Ctx, opts)
 	b.Ctx = common.WithLaunchOptions(b.Ctx, launchOpts)
 
-	envs := make([]string, len(launchOpts.Env))
+	envs := make([]string, 0, len(launchOpts.Env))
 	for k, v := range launchOpts.Env {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}

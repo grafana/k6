@@ -137,7 +137,7 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 func (b *Browser) getPages() []*Page {
 	b.pagesMu.RLock()
 	defer b.pagesMu.RUnlock()
-	pages := make([]*Page, len(b.pages))
+	pages := make([]*Page, 0, len(b.pages))
 	for _, p := range b.pages {
 		pages = append(pages, p)
 	}
@@ -359,10 +359,12 @@ func (b *Browser) Close() {
 func (b *Browser) Contexts() []api.BrowserContext {
 	b.contextsMu.RLock()
 	defer b.contextsMu.RUnlock()
+
 	contexts := make([]api.BrowserContext, 0, len(b.contexts))
 	for _, b := range b.contexts {
 		contexts = append(contexts, b)
 	}
+
 	return contexts
 }
 
