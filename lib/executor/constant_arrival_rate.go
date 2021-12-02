@@ -249,7 +249,7 @@ func (car ConstantArrivalRate) Run(
 
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
 	progIters := fmt.Sprintf(
-		pb.GetFixedLengthFloatFormat(arrivalRatePerSec, 0)+" iters/s", arrivalRatePerSec)
+		pb.GetFixedLengthFloatFormat(arrivalRatePerSec, 2)+" iters/s", arrivalRatePerSec)
 	progressFn := func() (float64, []string) {
 		spent := time.Since(startTime)
 		currActiveVUs := atomic.LoadUint64(&activeVUsCount)

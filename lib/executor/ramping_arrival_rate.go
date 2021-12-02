@@ -362,7 +362,7 @@ func (varr RampingArrivalRate) Run(
 	activeVUsCount := uint64(0)
 	tickerPeriod := int64(startTickerPeriod.Duration)
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
-	itersFmt := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 0) + " iters/s"
+	itersFmt := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 2) + " iters/s"
 
 	progressFn := func() (float64, []string) {
 		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
