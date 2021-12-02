@@ -107,6 +107,43 @@ func TestStatsdEnabledTags(t *testing.T) {
 	})
 }
 
+func TestStatsdAppendTags(t *testing.T) {
+	t.Parallel()
+	appended := ".value1.value3"
+
+	appendTest(t, appended, func(
+		logger logrus.FieldLogger, addr, namespace null.String, bufferSize null.Int, pushInterval types.NullDuration,
+	) (*Output, error) {
+		return newOutput(
+			output.Params{
+				Logger: logger,
+				JSONConfig: json.RawMessage(fmt.Sprintf(`{
+			"addr": "%s",
+			"namespace": "%s",
+			"bufferSize": %d,
+			"pushInterval": "%s",
+			"tagAppend": ["tag1", "tag2", "tag3"],
+			"enableTags": false
+		}`, addr.String, namespace.String, bufferSize.Int64, pushInterval.Duration.String())),
+			})
+	}, func(t *testing.T, containers []stats.SampleContainer, expectedOutput, output string) {
+		outputLines := strings.Split(output, "\n")
+		expectedOutputLines := strings.Split(expectedOutput, "\n")
+		var lines int
+
+		for i, container := range containers {
+			for j := range container.GetSamples() {
+				lines++
+				expectedOutputLine := expectedOutputLines[i*j+i]
+				outputLine := outputLines[i*j+i]
+
+				require.Equal(t, expectedOutputLine, outputLine)
+			}
+		}
+		require.Equal(t, lines, len(outputLines))
+	})
+}
+
 func TestInitWithoutAddressErrors(t *testing.T) {
 	t.Parallel()
 	c := &Output{

@@ -38,6 +38,7 @@ type config struct {
 	Namespace    null.String        `json:"namespace,omitempty" envconfig:"K6_STATSD_NAMESPACE"`
 	PushInterval types.NullDuration `json:"pushInterval,omitempty" envconfig:"K6_STATSD_PUSH_INTERVAL"`
 	TagBlocklist stats.TagSet       `json:"tagBlocklist,omitempty" envconfig:"K6_STATSD_TAG_BLOCKLIST"`
+	TagAppend    []string           `json:"tagAppend,omitempty" envconfig:"K6_STATSD_TAG_APPEND"`
 	EnableTags   null.Bool          `json:"enableTags,omitempty" envconfig:"K6_STATSD_ENABLE_TAGS"`
 }
 
@@ -67,6 +68,9 @@ func (c config) Apply(cfg config) config {
 	}
 	if cfg.TagBlocklist != nil {
 		c.TagBlocklist = cfg.TagBlocklist
+	}
+	if cfg.TagAppend != nil {
+		c.TagAppend = cfg.TagAppend
 	}
 	if cfg.EnableTags.Valid {
 		c.EnableTags = cfg.EnableTags

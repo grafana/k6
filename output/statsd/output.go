@@ -22,6 +22,7 @@ package statsd
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/DataDog/datadog-go/statsd"
@@ -65,17 +66,29 @@ type Output struct {
 
 func (o *Output) dispatch(entry stats.Sample) error {
 	var tagList []string
+	metricName := entry.Metric.Name
 	if o.config.EnableTags.Bool {
 		tagList = processTags(o.config.TagBlocklist, entry.Tags.CloneTags())
+	} else if len(o.config.TagAppend) > 0 && !entry.Tags.IsEmpty() {
+		var sb strings.Builder
+		sb.Grow(len(metricName) + 10*len(o.config.TagAppend))
+		sb.WriteString(metricName)
+		for _, t := range o.config.TagAppend {
+			if v, ok := entry.Tags.Get(t); ok {
+				sb.WriteByte('.')
+				sb.WriteString(v)
+			}
+		}
+		metricName = sb.String()
 	}
 
 	switch entry.Metric.Type {
 	case stats.Counter:
-		return o.client.Count(entry.Metric.Name, int64(entry.Value), tagList, 1)
+		return o.client.Count(metricName, int64(entry.Value), tagList, 1)
 	case stats.Trend:
-		return o.client.TimeInMilliseconds(entry.Metric.Name, entry.Value, tagList, 1)
+		return o.client.TimeInMilliseconds(metricName, entry.Value, tagList, 1)
 	case stats.Gauge:
-		return o.client.Gauge(entry.Metric.Name, entry.Value, tagList, 1)
+		return o.client.Gauge(metricName, entry.Value, tagList, 1)
 	case stats.Rate:
 		if check, ok := entry.Tags.Get("check"); ok {
 			return o.client.Count(
@@ -85,7 +98,7 @@ func (o *Output) dispatch(entry stats.Sample) error {
 				1,
 			)
 		}
-		return o.client.Count(entry.Metric.Name, int64(entry.Value), tagList, 1)
+		return o.client.Count(metricName, int64(entry.Value), tagList, 1)
 	default:
 		return fmt.Errorf("unsupported metric type %s", entry.Metric.Type)
 	}
