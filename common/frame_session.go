@@ -785,7 +785,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	session := fs.page.browserCtx.conn.getSession(event.SessionID)
 	targetID := event.TargetInfo.TargetID
 
-	if event.TargetInfo.Type == "iframe" {
+	if eti := event.TargetInfo; eti.Type == "iframe" && eti.URL != "" {
 		frame := fs.manager.getFrameByID(cdp.FrameID(targetID))
 		if frame == nil {
 			return
