@@ -500,7 +500,6 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 }
 
 func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
-	// TODO: switch to using browser logger instead of directly outputting to k6 logging system
 	l := fs.serializer.
 		WithTime(event.Timestamp.Time()).
 		WithField("source", "browser-console-api")
@@ -541,10 +540,6 @@ func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionC
 		"sid:%v tid:%v ectxid:%d",
 		fs.session.id, fs.targetID, event.Context.ID)
 
-	// TODO: find out is it necessary to do so function-wide
-	fs.contextIDToContextMu.Lock()
-	defer fs.contextIDToContextMu.Unlock()
-
 	auxData := event.Context.AuxData
 	var i struct {
 		FrameID   cdp.FrameID `json:"frameId"`
@@ -573,7 +568,9 @@ func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionC
 	if world != "" {
 		frame.setContext(world, context)
 	}
+	fs.contextIDToContextMu.Lock()
 	fs.contextIDToContext[event.Context.ID] = context
+	fs.contextIDToContextMu.Unlock()
 }
 
 func (fs *FrameSession) onExecutionContextDestroyed(execCtxID runtime.ExecutionContextID) {
