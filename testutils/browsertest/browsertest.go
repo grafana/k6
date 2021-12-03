@@ -48,7 +48,7 @@ type BrowserTest struct {
 	State        *k6lib.State
 	HTTPMultiBin *k6test.HTTPMultiBin
 	Samples      chan k6stats.SampleContainer
-	Browser      api.Browser
+	api.Browser
 }
 
 // New configures and launches a chrome browser.

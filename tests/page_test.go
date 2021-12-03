@@ -33,21 +33,19 @@ import (
 
 // setupHandlersForHTMLFiles(bt)
 func TestPageGoto(t *testing.T) {
-	bt := browsertest.New(t).WithStaticFiles()
+	b := browsertest.New(t).WithStaticFiles()
 
-	p := bt.Browser.NewPage(nil)
+	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
-	url := bt.URL("/static/empty.html")
+	url := b.URL("/static/empty.html")
 	r := p.Goto(url, nil)
 
 	assert.Equal(t, url, r.URL(), `expected URL to be %q, result of navigation was %q`, url, r.URL())
 }
 
 func TestPageGotoDataURI(t *testing.T) {
-	bt := browsertest.New(t)
-
-	p := bt.Browser.NewPage(nil)
+	p := browsertest.New(t).NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
 	r := p.Goto("data:text/html,hello", nil)
@@ -56,43 +54,43 @@ func TestPageGotoDataURI(t *testing.T) {
 }
 
 func TestPageGotoWaitUntilLoad(t *testing.T) {
-	bt := browsertest.New(t).WithStaticFiles()
+	b := browsertest.New(t).WithStaticFiles()
 
-	p := bt.Browser.NewPage(nil)
+	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
-	p.Goto(bt.URL("/static/wait_until.html"), bt.Runtime.ToValue(struct {
+	p.Goto(b.URL("/static/wait_until.html"), b.Runtime.ToValue(struct {
 		WaitUntil string `js:"waitUntil"`
 	}{WaitUntil: "load"}))
 
-	results := p.Evaluate(bt.Runtime.ToValue("() => window.results"))
+	results := p.Evaluate(b.Runtime.ToValue("() => window.results"))
 	var actual []string
-	bt.Runtime.ExportTo(results.(goja.Value), &actual)
+	b.Runtime.ExportTo(results.(goja.Value), &actual)
 
 	assert.EqualValues(t, []string{"DOMContentLoaded", "load"}, actual, `expected "load" event to have fired`)
 }
 
 func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
-	bt := browsertest.New(t).WithStaticFiles()
+	b := browsertest.New(t).WithStaticFiles()
 
-	p := bt.Browser.NewPage(nil)
+	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
-	p.Goto(bt.URL("/static/wait_until.html"), bt.Runtime.ToValue(struct {
+	p.Goto(b.URL("/static/wait_until.html"), b.Runtime.ToValue(struct {
 		WaitUntil string `js:"waitUntil"`
 	}{WaitUntil: "domcontentloaded"}))
 
-	results := p.Evaluate(bt.Runtime.ToValue("() => window.results"))
+	results := p.Evaluate(b.Runtime.ToValue("() => window.results"))
 	var actual []string
-	bt.Runtime.ExportTo(results.(goja.Value), &actual)
+	b.Runtime.ExportTo(results.(goja.Value), &actual)
 
 	assert.EqualValues(t, "DOMContentLoaded", actual[0], `expected "DOMContentLoaded" event to have fired`)
 }
 
 func TestPageSetExtraHTTPHeaders(t *testing.T) {
-	bt := browsertest.New(t)
+	b := browsertest.New(t)
 
-	p := bt.Browser.NewPage(nil)
+	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
 	headers := map[string]string{
@@ -100,7 +98,7 @@ func TestPageSetExtraHTTPHeaders(t *testing.T) {
 	}
 	p.SetExtraHTTPHeaders(headers)
 
-	resp := p.Goto(bt.URL("/get"), nil)
+	resp := p.Goto(b.URL("/get"), nil)
 
 	require.NotNil(t, resp)
 	var body struct{ Headers map[string][]string }
