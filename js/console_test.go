@@ -48,7 +48,10 @@ func TestConsoleContext(t *testing.T) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-	ctxPtr := new(context.Context)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctxPtr := &ctx
+
 	logger, hook := logtest.NewNullLogger()
 	rt.Set("console", common.Bind(rt, &console{logger}, ctxPtr))
 
@@ -58,7 +61,7 @@ func TestConsoleContext(t *testing.T) {
 		assert.Equal(t, "a", entry.Message)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel = context.WithCancel(context.Background())
 	*ctxPtr = ctx
 	_, err = rt.RunString(`console.log("b")`)
 	assert.NoError(t, err)

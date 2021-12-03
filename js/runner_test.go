@@ -359,15 +359,15 @@ func testSetupDataHelper(t *testing.T, data string) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			samples := make(chan stats.SampleContainer, 100)
 
-			if !assert.NoError(t, r.Setup(context.Background(), samples)) {
+			if !assert.NoError(t, r.Setup(ctx, samples)) {
 				return
 			}
 			initVU, err := r.NewVU(1, 1, samples)
 			if assert.NoError(t, err) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
 				vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 				err := vu.RunOnce()
 				assert.NoError(t, err)
@@ -947,7 +947,10 @@ func TestVUIntegrationBlockHostnamesOption(t *testing.T) {
 			t.Parallel()
 			initVu, err := r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
 			require.NoError(t, err)
-			vu := initVu.Activate(&lib.VUActivationParams{RunContext: context.Background()})
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVu.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "hostname (k6.io) is in a blocked pattern (*.io)")
@@ -982,7 +985,9 @@ func TestVUIntegrationBlockHostnamesScript(t *testing.T) {
 			t.Parallel()
 			initVu, err := r.NewVU(0, 0, make(chan stats.SampleContainer, 100))
 			require.NoError(t, err)
-			vu := initVu.Activate(&lib.VUActivationParams{RunContext: context.Background()})
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVu.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "hostname (k6.io) is in a blocked pattern (*.io)")
@@ -1585,11 +1590,14 @@ func TestArchiveRunningIntegrity(t *testing.T) {
 			t.Parallel()
 			var err error
 			ch := make(chan stats.SampleContainer, 100)
-			err = r.Setup(context.Background(), ch)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			err = r.Setup(ctx, ch)
+			cancel()
 			require.NoError(t, err)
 			initVU, err := r.NewVU(1, 1, ch)
 			require.NoError(t, err)
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel = context.WithCancel(context.Background())
 			defer cancel()
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
@@ -1755,6 +1763,8 @@ func TestSystemTags(t *testing.T) {
 		num, tc := num, tc
 		t.Run(fmt.Sprintf("TC %d with only %s", num, tc.tag), func(t *testing.T) {
 			t.Parallel()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			samples := make(chan stats.SampleContainer, 100)
 			r, err := getSimpleRunner(t, "/script.js", tb.Replacer.Replace(`
 				var http = require("k6/http");
@@ -1781,7 +1791,7 @@ func TestSystemTags(t *testing.T) {
 			vu, err := r.NewVU(uint64(num), 0, samples)
 			require.NoError(t, err)
 			activeVU := vu.Activate(&lib.VUActivationParams{
-				RunContext: context.Background(),
+				RunContext: ctx,
 				Exec:       tc.exec,
 				Scenario:   "default",
 			})
@@ -1972,9 +1982,13 @@ func TestComplicatedFileImportsForGRPC(t *testing.T) {
 
 			exports.default = function() {
 				client.connect('GRPCBIN_ADDR', {timeout: '3s'});
-				var resp = client.invoke('grpc.testing.TestService/UnaryCall', {})
-				if (!resp.message || resp.error || resp.message.username !== 'foo') {
-					throw new Error('unexpected response message: ' + JSON.stringify(resp.message))
+				try {
+					var resp = client.invoke('grpc.testing.TestService/UnaryCall', {})
+					if (!resp.message || resp.error || resp.message.username !== 'foo') {
+						throw new Error('unexpected response message: ' + JSON.stringify(resp.message))
+					}
+				} finally {
+					client.close();
 				}
 			}
 		`, loadCode))
