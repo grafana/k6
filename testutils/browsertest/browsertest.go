@@ -54,55 +54,53 @@ type BrowserTest struct {
 // New configures and launches a chrome browser.
 // It automatically closes the browser when `t` returns.
 func New(t testing.TB) *BrowserTest {
-	tb := k6test.NewHTTPMultiBin(t)
+	var (
+		tb      = k6test.NewHTTPMultiBin(t)
+		samples = make(chan k6stats.SampleContainer, 1000)
+	)
 
 	root, err := k6lib.NewGroup("", nil)
 	require.NoError(t, err)
 
-	logger := logrus.StandardLogger()
-
-	rt := goja.New()
-	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
-
-	options := k6lib.Options{
-		MaxRedirects: null.IntFrom(10),
-		UserAgent:    null.StringFrom("TestUserAgent"),
-		Throw:        null.BoolFrom(true),
-		SystemTags:   &k6stats.DefaultSystemTagSet,
-		Batch:        null.IntFrom(20),
-		BatchPerHost: null.IntFrom(20),
-		// HTTPDebug:    null.StringFrom("full"),
-	}
-	samples := make(chan k6stats.SampleContainer, 1000)
-
-	registry := k6metrics.NewRegistry()
 	state := &k6lib.State{
-		Options:        options,
-		Logger:         logger,
+		Options: k6lib.Options{
+			MaxRedirects: null.IntFrom(10),
+			UserAgent:    null.StringFrom("TestUserAgent"),
+			Throw:        null.BoolFrom(true),
+			SystemTags:   &k6stats.DefaultSystemTagSet,
+			Batch:        null.IntFrom(20),
+			BatchPerHost: null.IntFrom(20),
+			// HTTPDebug:    null.StringFrom("full"),
+		},
+		Logger:         logrus.StandardLogger(),
 		Group:          root,
 		TLSConfig:      tb.TLSClientConfig,
 		Transport:      tb.HTTPTransport,
 		BPool:          bpool.NewBufferPool(1),
 		Samples:        samples,
 		Tags:           k6lib.NewTagMap(map[string]string{"group": root.Path}),
-		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(registry),
+		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
 	}
+	ctx := k6lib.WithState(tb.Context, state)
 
-	ctx := new(context.Context)
-	*ctx = k6lib.WithState(tb.Context, state)
-	*ctx = k6common.WithRuntime(*ctx, rt)
-	err = rt.Set("http", k6common.Bind(rt, new(k6http.GlobalHTTP).NewModuleInstancePerVU(), ctx))
+	rt := goja.New()
+	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
+	ctx = k6common.WithRuntime(ctx, rt)
+
+	err = rt.Set("http", k6common.Bind(rt, new(k6http.GlobalHTTP).NewModuleInstancePerVU(), &ctx))
 	require.NoError(t, err)
 
-	bt := chromium.NewBrowserType(*ctx).(*chromium.BrowserType)
-	debug := false
-	headless := true
+	var (
+		debug    = false
+		headless = true
+	)
 	if v, found := os.LookupEnv("XK6_BROWSER_TEST_DEBUG"); found {
 		debug, _ = strconv.ParseBool(v)
 	}
 	if v, found := os.LookupEnv("XK6_BROWSER_TEST_HEADLESS"); found {
 		headless, _ = strconv.ParseBool(v)
 	}
+
 	launchOpts := rt.ToValue(struct {
 		Debug    bool   `js:"debug"`
 		Headless bool   `js:"headless"`
@@ -115,6 +113,7 @@ func New(t testing.TB) *BrowserTest {
 		Timeout:  "30s",
 	})
 
+	bt := chromium.NewBrowserType(ctx).(*chromium.BrowserType)
 	browser := bt.Launch(launchOpts)
 	t.Cleanup(browser.Close)
 
