@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,9 +44,12 @@ import (
 
 func getTestRampingArrivalRateConfig() *RampingArrivalRateConfig {
 	return &RampingArrivalRateConfig{
-		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(1 * time.Second)},
-		TimeUnit:   types.NullDurationFrom(time.Second),
-		StartRate:  null.IntFrom(10),
+		BaseConfig: BaseConfig{
+			GracefulStop: types.NullDurationFrom(1 * time.Second),
+			clock:        clock.NewMock(),
+		},
+		TimeUnit:  types.NullDurationFrom(time.Second),
+		StartRate: null.IntFrom(10),
 		Stages: []Stage{
 			{
 				Duration: types.NullDurationFrom(time.Second * 1),

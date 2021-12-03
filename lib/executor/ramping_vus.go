@@ -517,7 +517,10 @@ func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- stats.SampleContainer, 
 		return fmt.Errorf("%s expected graceful end offset at %s to be final", vlv.config.GetName(), maxDuration)
 	}
 	startTime, maxDurationCtx, regularDurationCtx, cancel := getDurationContexts(
-		ctx, regularDuration, maxDuration-regularDuration,
+		ctx,
+		vlv.config.clock,
+		regularDuration,
+		maxDuration-regularDuration,
 	)
 	defer cancel()
 

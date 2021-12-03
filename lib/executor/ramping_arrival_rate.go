@@ -345,7 +345,12 @@ func (varr RampingArrivalRate) Run(
 	activeVUsWg := &sync.WaitGroup{}
 
 	returnedVUs := make(chan struct{})
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(
+		parentCtx,
+		varr.config.clock,
+		duration,
+		gracefulStop,
+	)
 
 	vusPool := newActiveVUPool()
 

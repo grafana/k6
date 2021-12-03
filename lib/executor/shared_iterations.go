@@ -192,7 +192,12 @@ func (si SharedIterations) Run(
 	duration := si.config.MaxDuration.TimeDuration()
 	gracefulStop := si.config.GetGracefulStop()
 
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(
+		parentCtx,
+		si.config.clock,
+		duration,
+		gracefulStop,
+	)
 	defer cancel()
 
 	// Make sure the log and the progress bar have accurate information

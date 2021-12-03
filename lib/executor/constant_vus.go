@@ -150,7 +150,12 @@ func (clv ConstantVUs) Run(
 	duration := clv.config.Duration.TimeDuration()
 	gracefulStop := clv.config.GetGracefulStop()
 
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(
+		parentCtx,
+		clv.config.clock,
+		duration,
+		gracefulStop,
+	)
 	defer cancel()
 
 	// Make sure the log and the progress bar have accurate information
