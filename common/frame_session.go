@@ -553,12 +553,12 @@ func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionC
 	frame := fs.manager.getFrameByID(i.FrameID)
 	if frame != nil {
 		if i.IsDefault {
-			world = "main"
-		} else if event.Context.Name == utilityWorldName && !frame.hasContext("utility") {
+			world = mainExecutionContext
+		} else if event.Context.Name == utilityWorldName && !frame.hasContext(utilityExecutionContext) {
 			// In case of multiple sessions to the same target, there's a race between
 			// connections so we might end up creating multiple isolated worlds.
 			// We can use either.
-			world = "utility"
+			world = utilityExecutionContext
 		}
 	}
 	if i.Type == "isolated" {

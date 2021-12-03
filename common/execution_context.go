@@ -36,7 +36,12 @@ import (
 
 const evaluationScriptURL = "__xk6_browser_evaluation_script__"
 
-var /* const */ sourceURLRegex = regexp.MustCompile(`^(?s)[\040\t]*//[@#] sourceURL=\s*(\S*?)\s*$`)
+var sourceURLRegex = regexp.MustCompile(`^(?s)[\040\t]*//[@#] sourceURL=\s*(\S*?)\s*$`)
+
+const (
+	mainExecutionContext    = "main"
+	utilityExecutionContext = "utility"
+)
 
 // ExecutionContext represents a JS execution context
 type ExecutionContext struct {
