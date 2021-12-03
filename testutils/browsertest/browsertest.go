@@ -138,8 +138,7 @@ func (bt *BrowserTest) WithHandle(pattern string, handler http.HandlerFunc) *Bro
 // WithStaticFiles adds a file server to the HTTP test server that is accessible
 // via /static/ prefix.
 func (bt *BrowserTest) WithStaticFiles() *BrowserTest {
-	// TODO: /html -> /static?
-	fs := http.FileServer(http.Dir("html"))
+	fs := http.FileServer(http.Dir("static"))
 	return bt.WithHandle("/static/", http.StripPrefix("/static/", fs).ServeHTTP)
 }
 

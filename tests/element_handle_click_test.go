@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//go:embed js/mouse_helper.js
+//go:embed static/mouse_helper.js
 var mouseHelperScriptSource string
 var htmlInputButton = fmt.Sprintf(`
 <!DOCTYPE html>
