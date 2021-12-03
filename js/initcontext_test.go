@@ -409,7 +409,8 @@ func TestRequestWithBinaryFile(t *testing.T) {
 		Tags:           lib.NewTagMap(nil),
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	ctx = lib.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, bi.Runtime)
 	*bi.Context = ctx
@@ -557,7 +558,8 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 		Tags:           lib.NewTagMap(nil),
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	ctx = lib.WithState(ctx, state)
 	ctx = common.WithRuntime(ctx, bi.Runtime)
 	*bi.Context = ctx
