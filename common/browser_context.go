@@ -207,12 +207,12 @@ func (b *BrowserContext) NewCDPSession() api.CDPSession {
 
 // NewPage creates a new page inside this browser context.
 func (b *BrowserContext) NewPage() api.Page {
-	b.logger.Debugf("BrowserContext:NewPage", "bid:%v", b.id)
+	b.logger.Debugf("BrowserContext:NewPage", "bcid:%v", b.id)
 	p, err := b.browser.newPageInContext(b.id)
 	if err != nil {
 		k6Throw(b.ctx, "cannot create a new page: %w", err)
 	}
-	b.logger.Debugf("BrowserContext:NewPage:returns", "bid:%v ptid:%s", b.id, p.targetID)
+	b.logger.Debugf("BrowserContext:NewPage:returns", "bcid:%v ptid:%s", b.id, p.targetID)
 	return p
 }
 

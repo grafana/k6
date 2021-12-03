@@ -126,7 +126,7 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 		return errors.New("to close the target, cancel its context")
 	}
 	if s.crashed {
-		s.logger.Debugf("Session:Execute", "sid:%v tid:%v method:%q, returns: crashed", s.id, s.targetID, method)
+		s.logger.Debugf("Session:Execute:return", "sid:%v tid:%v method:%q crashed", s.id, s.targetID, method)
 		return ErrTargetCrashed
 	}
 
@@ -140,13 +140,13 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 		for {
 			select {
 			case <-evCancelCtx.Done():
-				s.logger.Debugf("Session:Execute:<-evCancelCtx.Done()", "sid:%v tid:%v method:%q, returns", s.id, s.targetID, method)
+				s.logger.Debugf("Session:Execute:<-evCancelCtx.Done():return", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
 				return
 			case ev := <-chEvHandler:
 				if msg, ok := ev.data.(*cdproto.Message); ok && msg.ID == id {
 					select {
 					case <-evCancelCtx.Done():
-						s.logger.Debugf("Session:Execute:<-evCancelCtx.Done():2", "sid:%v tid:%v method:%q, returns", s.id, s.targetID, method)
+						s.logger.Debugf("Session:Execute:<-evCancelCtx.Done()-2:return", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
 					case ch <- msg:
 						// We expect only one response with the matching message ID,
 						// then remove event handler by cancelling context and stopping goroutine.

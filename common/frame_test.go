@@ -37,7 +37,7 @@ func TestFrameNilDocument(t *testing.T) {
 
 	ctx := context.Background()
 	fm := NewFrameManager(ctx, nil, nil, nil, nil)
-	frame := NewFrame(ctx, fm, nil, cdp.FrameID("42"))
+	frame := NewFrame(ctx, fm, nil, cdp.FrameID("42"), NewLogger(ctx, NullLogger(), false, nil))
 
 	// frame should not panic with a nil document
 	stub := &executionContextTestStub{

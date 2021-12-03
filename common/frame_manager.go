@@ -126,7 +126,7 @@ func (m *FrameManager) frameAttached(frameID cdp.FrameID, parentFrameID cdp.Fram
 		return
 	}
 	if parentFrame, ok := m.frames[parentFrameID]; ok {
-		frame := NewFrame(m.ctx, m, parentFrame, frameID)
+		frame := NewFrame(m.ctx, m, parentFrame, frameID, m.logger)
 		m.frames[frameID] = frame
 		parentFrame.addChildFrame(frame)
 		m.page.emit(EventPageFrameAttached, frame)
@@ -189,7 +189,7 @@ func (m *FrameManager) frameNavigated(frameID cdp.FrameID, parentFrameID cdp.Fra
 			frame.setID(frameID)
 		} else {
 			// Initial main frame navigation.
-			frame = NewFrame(m.ctx, m, nil, frameID)
+			frame = NewFrame(m.ctx, m, nil, frameID, m.logger)
 		}
 		m.frames[frameID] = frame
 		m.mainFrame = frame
@@ -320,7 +320,7 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	case rc <= 10:
 		for reqID := range frame.inflightRequests {
 			req := frame.requestByID(reqID)
-			m.logger.Debugf("FrameManager:requestFailed", "reqID:%s inflightURL:%s frameID:%s", reqID, req.url, frame.id)
+			m.logger.Debugf("FrameManager:requestFailed", "reqID:%s inflightURL:%q frameID:%s", reqID, req.url, frame.id)
 		}
 	}
 
@@ -396,6 +396,9 @@ func (m *FrameManager) MainFrame() *Frame {
 
 // NavigateFrame will navigate specified frame to specifed URL
 func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) api.Response {
+	m.logger.Debugf("FrameManager:NavigateFrame", "tid:%s url:%q", frame.id, url)
+	defer m.logger.Debugf("FrameManager:NavigateFrame:returns", "tid:%s url:%q", frame.id, url)
+
 	rt := k6common.GetRuntime(m.ctx)
 	defaultReferer := m.page.mainFrameSession.getNetworkManager().extraHTTPHeaders["referer"]
 	parsedOpts := NewFrameGotoOptions(defaultReferer, time.Duration(m.timeoutSettings.navigationTimeout())*time.Second)
@@ -492,6 +495,9 @@ func (m *FrameManager) Page() api.Page {
 
 // WaitForFrameNavigation waits for the given navigation lifecycle event to happen
 func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api.Response {
+	m.logger.Debugf("FrameManager:WaitForNavigation", "tid:%s furl:%q", frame.id, frame.url)
+	defer m.logger.Debugf("FrameManager:WaitForNavigation:return", "tid:%s furl:%q", frame.id, frame.url)
+
 	rt := k6common.GetRuntime(m.ctx)
 	parsedOpts := NewFrameWaitForNavigationOptions(time.Duration(m.timeoutSettings.timeout()) * time.Second)
 	if err := parsedOpts.Parse(m.ctx, opts); err != nil {

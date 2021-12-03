@@ -87,6 +87,7 @@ func NewFrameSession(
 	targetID target.ID, logger *Logger,
 ) (*FrameSession, error) {
 	logger.Debugf("NewFrameSession", "sid:%v tid:%v", session.id, targetID)
+
 	fs := FrameSession{
 		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
 		session:              session,
@@ -204,10 +205,8 @@ func (fs *FrameSession) initEvents() {
 	}
 
 	go func() {
-		fs.logger.Debugf("NewFrameSession:initEvents:go",
-			"sid:%v tid:%v", fs.session.id, fs.targetID)
-		defer fs.logger.Debugf("NewFrameSession:initEvents:go",
-			"sid:%v tid:%v, returns", fs.session.id, fs.targetID)
+		fs.logger.Debugf("NewFrameSession:initEvents:go", "sid:%v tid:%v", fs.session.id, fs.targetID)
+		defer fs.logger.Debugf("NewFrameSession:initEvents:go:return", "sid:%v tid:%v", fs.session.id, fs.targetID)
 
 		for {
 			select {
@@ -503,7 +502,7 @@ func (fs *FrameSession) onExceptionThrown(event *runtime.EventExceptionThrown) {
 
 func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionContextCreated) {
 	fs.logger.Debugf("NewFrameSession:onExecutionContextCreated",
-		"sid:%v tid:%v ectxid:%v", fs.session.id, fs.targetID, event.Context.ID)
+		"sid:%v tid:%v ecid:%d", fs.session.id, fs.targetID, event.Context.ID)
 
 	auxData := event.Context.AuxData
 	var i struct {
@@ -540,7 +539,7 @@ func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionC
 
 func (fs *FrameSession) onExecutionContextDestroyed(execCtxID runtime.ExecutionContextID) {
 	fs.logger.Debugf("NewFrameSession:onExecutionContextDestroyed",
-		"sid:%v tid:%v ectxid:%v", fs.session.id, fs.targetID, execCtxID)
+		"sid:%v tid:%v ecid:%d", fs.session.id, fs.targetID, execCtxID)
 
 	fs.contextIDToContextMu.Lock()
 	defer fs.contextIDToContextMu.Unlock()
@@ -572,7 +571,7 @@ func (fs *FrameSession) onExecutionContextsCleared() {
 
 func (fs *FrameSession) onFrameAttached(frameID cdp.FrameID, parentFrameID cdp.FrameID) {
 	fs.logger.Debugf("NewFrameSession:onFrameAttached",
-		"sid:%v tid:%v fid:%v pfid:%v",
+		"sid:%v tid:%v fid:%v ptid:%v",
 		fs.session.id, fs.targetID, frameID, parentFrameID)
 
 	// TODO: add handling for cross-process frame transitioning
@@ -624,16 +623,14 @@ func (fs *FrameSession) onFrameStoppedLoading(frameID cdp.FrameID) {
 }
 
 func (fs *FrameSession) onLogEntryAdded(event *log.EventEntryAdded) {
-	// TODO: switch to using Browser logger instead of directly outputting to k6 logging system
-	state := k6lib.GetState(fs.ctx)
-	l := state.Logger.
+	l := fs.logger.log.
 		WithTime(event.Entry.Timestamp.Time()).
 		WithField("source", "browser").
 		WithField("url", event.Entry.URL).
 		WithField("browser_source", event.Entry.Source.String()).
 		WithField("line_number", event.Entry.LineNumber)
-	if state.Group.Path != "" {
-		l = l.WithField("group", state.Group.Path)
+	if s := k6lib.GetState(fs.ctx); s.Group.Path != "" {
+		l = l.WithField("group", s.Group.Path)
 	}
 	switch event.Entry.Level {
 	case "info":
@@ -737,7 +734,7 @@ func (fs *FrameSession) onPageNavigatedWithinDocument(event *cdppage.EventNaviga
 
 func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) {
 	fs.logger.Debugf("NewFrameSession:onAttachedToTarget",
-		"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q",
+		"sid:%v tid:%v esid:%v etid:%v ebid:%v type:%q",
 		fs.session.id, fs.targetID, event.SessionID,
 		event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
 		event.TargetInfo.Type)
@@ -757,13 +754,29 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 				// If we're no longer connected to browser, then ignore WebSocket errors
 				return
 			}
-			k6Throw(fs.ctx, "cannot create frame session: %w", err)
+			select {
+			case <-fs.ctx.Done():
+				fs.logger.Debugf("FrameSession:onAttachedToTarget:NewFrameSession:<-ctx.Done",
+					"sid:%v tid:%v esid:%v etid:%v ebid:%v type:%q",
+					fs.session.id, fs.targetID, event.SessionID,
+					event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
+					event.TargetInfo.Type)
+				return
+			default:
+				k6Throw(fs.ctx, "cannot create frame session (iframe): %w", err)
+			}
 		}
 		fs.page.frameSessions[cdp.FrameID(targetID)] = frameSession
 		return
 	}
 
 	if event.TargetInfo.Type != "worker" {
+		fs.logger.Debugf("FrameSession:onAttachedToTarget returns: target is not a worker",
+			"sid:%v tid:%v esid:%v etid:%v ebid:%v type:%q",
+			fs.session.id, fs.targetID, event.SessionID,
+			event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
+			event.TargetInfo.Type)
+
 		// Just unblock (debugger continue) these targets and detach from them.
 		session.ExecuteWithoutExpectationOnReply(fs.ctx, runtime.CommandRunIfWaitingForDebugger, nil, nil)
 		session.ExecuteWithoutExpectationOnReply(fs.ctx, target.CommandDetachFromTarget, &target.DetachFromTargetParams{SessionID: session.id}, nil)
@@ -776,6 +789,17 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 		if !fs.page.browserCtx.browser.connected && strings.Contains(err.Error(), "websocket: close 1006 (abnormal closure)") {
 			// If we're no longer connected to browser, then ignore WebSocket errors
 			return
+		}
+		select {
+		case <-fs.ctx.Done():
+			fs.logger.Debugf("FrameSession:onAttachedToTarget:NewWorker:<-ctx.Done",
+				"sid:%v tid:%v esid:%v etid:%v ebid:%v type:%q",
+				fs.session.id, fs.targetID, event.SessionID,
+				event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
+				event.TargetInfo.Type)
+			return
+		default:
+			k6Throw(fs.ctx, "cannot create frame session (worker): %w", err)
 		}
 		k6Throw(fs.ctx, "cannot create new worker: %w", err)
 	}

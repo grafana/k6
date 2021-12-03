@@ -143,9 +143,11 @@ func TestConvertArgument(t *testing.T) {
 
 	t.Run("*BaseJSHandle", func(t *testing.T) {
 		execCtx, ctx, rt := newExecCtx()
+		log := NewLogger(ctx, NullLogger(), false, nil)
+
 		timeoutSetings := NewTimeoutSettings(nil)
-		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
-		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
+		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, log)
+		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"), log)
 		remoteObjValue := "hellow world"
 		result, _ := json.Marshal(remoteObjValue)
 		remoteObject := &runtime.RemoteObject{
@@ -164,9 +166,11 @@ func TestConvertArgument(t *testing.T) {
 
 	t.Run("*BaseJSHandle wrong context", func(t *testing.T) {
 		execCtx, ctx, rt := newExecCtx()
+		log := NewLogger(ctx, NullLogger(), false, nil)
+
 		timeoutSetings := NewTimeoutSettings(nil)
-		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
-		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
+		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, log)
+		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"), log)
 		remoteObjectID := runtime.RemoteObjectID("object_id_0123456789")
 		remoteObject := &runtime.RemoteObject{
 			Type:     "object",
@@ -184,9 +188,11 @@ func TestConvertArgument(t *testing.T) {
 
 	t.Run("*BaseJSHandle is disposed", func(t *testing.T) {
 		execCtx, ctx, rt := newExecCtx()
+		log := NewLogger(ctx, NullLogger(), false, nil)
+
 		timeoutSetings := NewTimeoutSettings(nil)
-		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
-		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
+		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, log)
+		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"), log)
 		remoteObjectID := runtime.RemoteObjectID("object_id_0123456789")
 		remoteObject := &runtime.RemoteObject{
 			Type:     "object",
@@ -204,9 +210,11 @@ func TestConvertArgument(t *testing.T) {
 
 	t.Run("*BaseJSHandle as *ElementHandle", func(t *testing.T) {
 		execCtx, ctx, rt := newExecCtx()
+		log := NewLogger(ctx, NullLogger(), false, nil)
+
 		timeoutSetings := NewTimeoutSettings(nil)
-		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, NewLogger(ctx, NullLogger(), false, nil))
-		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"))
+		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, log)
+		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"), log)
 		remoteObjectID := runtime.RemoteObjectID("object_id_0123456789")
 		remoteObject := &runtime.RemoteObject{
 			Type:     "object",

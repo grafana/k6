@@ -65,7 +65,7 @@ func NewExecutionContext(
 		fid = frame.id
 		furl = frame.url
 	}
-	logger.Debugf("NewExecutionContext", "sid:%s fid:%s ecid:%d furl:%q",
+	logger.Debugf("NewExecutionContext", "sid:%s tid:%s ecid:%d furl:%q",
 		sid, fid, id, furl)
 
 	return &ExecutionContext{
@@ -80,7 +80,7 @@ func NewExecutionContext(
 
 // Adopts specified backend node into this execution context from another execution context
 func (e *ExecutionContext) adoptBackendNodeId(backendNodeID cdp.BackendNodeID) (*ElementHandle, error) {
-	e.logger.Debugf("ExecutionContext:adoptBackendNodeId", "sid:%s tid:%s fid:%s ecid:%d furl:%q bnid:%d",
+	e.logger.Debugf("ExecutionContext:adoptBackendNodeId", "sid:%s tid:%s tid:%s ecid:%d furl:%q bnid:%d",
 		e.session.id, e.session.targetID, e.frame.id, e.id, e.frame.url, backendNodeID)
 
 	var (
@@ -101,7 +101,7 @@ func (e *ExecutionContext) adoptBackendNodeId(backendNodeID cdp.BackendNodeID) (
 
 // Adopts the specified element handle into this execution context from another execution context
 func (e *ExecutionContext) adoptElementHandle(elementHandle *ElementHandle) (*ElementHandle, error) {
-	e.logger.Debugf("ExecutionContext:adoptElementHandle", "sid:%s tid:%s fid:%s ecid:%d furl:%q ehfid:%s ehsid:%s",
+	e.logger.Debugf("ExecutionContext:adoptElementHandle", "sid:%s tid:%s tid:%s ecid:%d furl:%q ehtid:%s ehsid:%s",
 		e.session.id, e.session.targetID, e.frame.id, e.id, e.frame.url,
 		elementHandle.frame.id, elementHandle.session.id)
 
@@ -125,7 +125,7 @@ func (e *ExecutionContext) adoptElementHandle(elementHandle *ElementHandle) (*El
 
 // evaluate will evaluate provided callable within this execution context and return by value or handle
 func (e *ExecutionContext) evaluate(apiCtx context.Context, forceCallable bool, returnByValue bool, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
-	e.logger.Debugf("ExecutionContext:evaluate", "sid:%s tid:%s fid:%s ecid:%d furl:%q",
+	e.logger.Debugf("ExecutionContext:evaluate", "sid:%s tid:%s tid:%s ecid:%d furl:%q",
 		e.session.id, e.session.targetID, e.frame.id, e.id, e.frame.url)
 
 	suffix := `//# sourceURL=` + evaluationScriptURL
@@ -216,7 +216,7 @@ func (e *ExecutionContext) evaluate(apiCtx context.Context, forceCallable bool, 
 
 // getInjectedScript returns a JS handle to the injected script of helper functions
 func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHandle, error) {
-	e.logger.Debugf("ExecutionContext:getInjectedScript", "sid:%s tid:%s fid:%s ecid:%d furl:%q",
+	e.logger.Debugf("ExecutionContext:getInjectedScript", "sid:%s tid:%s tid:%s ecid:%d furl:%q",
 		e.session.id, e.session.targetID, e.frame.id, e.id, e.frame.url)
 
 	if e.injectedScript == nil {
