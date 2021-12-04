@@ -246,7 +246,7 @@ func (c *rootCommand) rootCmdPersistentFlagSet() *pflag.FlagSet {
 	flags.BoolVarP(&c.commandFlags.quiet, "quiet", "q", false, "disable progress updates")
 	flags.BoolVar(&c.commandFlags.noColor, "no-color", false, "disable colored output")
 	flags.StringVar(&c.logOutput, "log-output", "stderr",
-		"change the output for k6 logs, possible values are stderr,stdout,none,loki[=host:port]")
+		"change the output for k6 logs, possible values are stderr,stdout,none,loki[=host:port],file[=./path.fileformat]")
 	flags.StringVar(&c.logFmt, "logformat", "", "log output format") // TODO rename to log-format and warn on old usage
 	flags.StringVarP(&c.commandFlags.address, "address", "a", "localhost:6565", "address for the api server")
 
@@ -279,27 +279,37 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 	}
 
 	loggerForceColors := false // disable color by default
-	switch c.logOutput {
-	case "stderr":
+	switch line := c.logOutput; {
+	case line == "stderr":
 		loggerForceColors = !c.commandFlags.noColor && c.commandFlags.stderrTTY
 		c.logger.SetOutput(c.commandFlags.stderr)
-	case "stdout":
+	case line == "stdout":
 		loggerForceColors = !c.commandFlags.noColor && c.commandFlags.stdoutTTY
 		c.logger.SetOutput(c.commandFlags.stdout)
-	case "none":
+	case line == "none":
 		c.logger.SetOutput(ioutil.Discard)
-	default:
-		if !strings.HasPrefix(c.logOutput, "loki") {
-			return nil, fmt.Errorf("unsupported log output `%s`", c.logOutput)
-		}
+
+	case strings.HasPrefix(line, "loki"):
 		ch = make(chan struct{})
-		hook, err := log.LokiFromConfigLine(c.ctx, c.fallbackLogger, c.logOutput, ch)
+		hook, err := log.LokiFromConfigLine(c.ctx, c.fallbackLogger, line, ch)
 		if err != nil {
 			return nil, err
 		}
 		c.logger.AddHook(hook)
 		c.logger.SetOutput(ioutil.Discard) // don't output to anywhere else
 		c.logFmt = "raw"
+
+	case strings.HasPrefix(line, "file"):
+		hook, err := log.FileHookFromConfigLine(c.ctx, c.fallbackLogger, line)
+		if err != nil {
+			return nil, err
+		}
+
+		c.logger.AddHook(hook)
+		c.logger.SetOutput(ioutil.Discard)
+
+	default:
+		return nil, fmt.Errorf("unsupported log output `%s`", line)
 	}
 
 	switch c.logFmt {
