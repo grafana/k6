@@ -1,7 +1,7 @@
 /*
  *
  * k6 - a next-generation load testing tool
- * Copyright (C) 2021 Load Impact
+ * Copyright (C) 2020 Load Impact
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,47 +21,20 @@
 package log
 
 import (
-	"testing"
+	"fmt"
+	"sort"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/sirupsen/logrus"
 )
 
-func TestTokenizer(t *testing.T) {
-	tokens, err := tokenize("loki=something,s.e=2231,s=12,12=3,a=[1,2,3],b=[1],s=c")
-	assert.Equal(t, []token{
-		{
-			key:   "loki",
-			value: "something",
-		},
-		{
-			key:   "s.e",
-			value: "2231",
-		},
-		{
-			key:   "s",
-			value: "12",
-		},
-		{
-			key:   "12",
-			value: "3",
-		},
-		{
-			key:    "a",
-			value:  "1,2,3",
-			inside: '[',
-		},
-		{
-			key:    "b",
-			value:  "1",
-			inside: '[',
-		},
-		{
-			key:   "s",
-			value: "c",
-		},
-	}, tokens)
-	assert.NoError(t, err)
+func parseLevels(level string) ([]logrus.Level, error) {
+	lvl, err := logrus.ParseLevel(level)
+	if err != nil {
+		return nil, fmt.Errorf("unknown log level %s", level) // specifically use a custom error
+	}
+	index := sort.Search(len(logrus.AllLevels), func(i int) bool {
+		return logrus.AllLevels[i] > lvl
+	})
 
-	_, err = tokenize("empty=")
-	assert.EqualError(t, err, "key `empty=` with no value")
+	return logrus.AllLevels[:index], nil
 }

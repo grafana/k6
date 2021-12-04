@@ -36,7 +36,7 @@ type tokenizer struct {
 func (t *tokenizer) readKey() (string, error) {
 	start := t.i
 	for ; t.i < len(t.s); t.i++ {
-		if t.s[t.i] == '=' {
+		if t.s[t.i] == '=' && t.i != len(t.s)-1 {
 			t.i++
 
 			return t.s[start : t.i-1], nil
