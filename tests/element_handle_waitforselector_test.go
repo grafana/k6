@@ -28,15 +28,15 @@ import (
 )
 
 func TestElementHandleWaitForSelector(t *testing.T) {
-	bt := TestBrowser(t)
-	p := bt.Browser.NewPage(nil)
+	tb := TestBrowser(t)
+	p := tb.NewPage(nil)
 	t.Cleanup(func() {
 		p.Close(nil)
 	})
 
 	p.SetContent(`<div class="root"></div>`, nil)
 	root := p.Query(".root")
-	p.Evaluate(bt.Runtime.ToValue(`
+	p.Evaluate(tb.Runtime.ToValue(`
         () => {
 		setTimeout(() => {
 			const div = document.createElement('div');
@@ -47,7 +47,7 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 			}, 100);
 		}
 		`))
-	element := root.WaitForSelector(".element-to-appear", bt.Runtime.ToValue(struct {
+	element := root.WaitForSelector(".element-to-appear", tb.Runtime.ToValue(struct {
 		Timeout int64 `js:"timeout"`
 	}{Timeout: 1000}))
 	require.NotNil(t, element, "expected element to have been found after wait")

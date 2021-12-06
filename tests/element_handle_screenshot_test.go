@@ -30,22 +30,22 @@ import (
 )
 
 func TestElementHandleScreenshot(t *testing.T) {
-	bt := TestBrowser(t)
+	tb := TestBrowser(t)
 
 	t.Run("ElementHandle.screenshot", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testElementHandleScreenshot(t, bt) })
+		t.Run("should work", func(t *testing.T) { testElementHandleScreenshot(t, tb) })
 	})
 }
 
-func testElementHandleScreenshot(t *testing.T, bt *Browser) {
-	p := bt.Browser.NewPage(nil)
+func testElementHandleScreenshot(t *testing.T, tb *Browser) {
+	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
-	p.SetViewportSize(bt.Runtime.ToValue(struct {
+	p.SetViewportSize(tb.Runtime.ToValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{Width: 800, Height: 600}))
-	p.Evaluate(bt.Runtime.ToValue(`
+	p.Evaluate(tb.Runtime.ToValue(`
          () => {
              document.body.style.margin = '0';
              document.body.style.padding = '0';

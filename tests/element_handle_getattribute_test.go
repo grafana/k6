@@ -28,8 +28,7 @@ import (
 )
 
 func TestElementHandleGetAttribute(t *testing.T) {
-	bt := TestBrowser(t)
-	p := bt.Browser.NewPage(nil)
+	p := TestBrowser(t).NewPage(nil)
 	t.Cleanup(func() {
 		p.Close(nil)
 	})

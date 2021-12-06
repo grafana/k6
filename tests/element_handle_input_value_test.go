@@ -28,15 +28,15 @@ import (
 )
 
 func TestElementHandleInputValue(t *testing.T) {
-	bt := TestBrowser(t)
+	tb := TestBrowser(t)
 
 	t.Run("ElementHandle.inputValue", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testElementHandleInputValue(t, bt) })
+		t.Run("should work", func(t *testing.T) { testElementHandleInputValue(t, tb) })
 	})
 }
 
-func testElementHandleInputValue(t *testing.T, bt *Browser) {
-	p := bt.Browser.NewPage(nil)
+func testElementHandleInputValue(t *testing.T, tb *Browser) {
+	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`

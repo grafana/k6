@@ -36,11 +36,11 @@ var browserModuleTests = map[string]func(*testing.T, api.Browser){
 }
 
 func TestBrowserModule(t *testing.T) {
-	bt := TestBrowser(t)
+	tb := TestBrowser(t)
 
 	for name, test := range browserModuleTests {
 		t.Run(name, func(t *testing.T) {
-			test(t, bt.Browser)
+			test(t, tb.Browser)
 		})
 	}
 }

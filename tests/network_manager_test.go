@@ -28,13 +28,13 @@ import (
 
 func TestDataURLSkipRequest(t *testing.T) {
 	t.Parallel()
-	bt := TestBrowser(t)
-	p := bt.Browser.NewPage(nil)
+	tb := TestBrowser(t)
+	p := tb.NewPage(nil)
 	t.Cleanup(func() {
 		p.Close(nil)
 	})
 
-	lc := AttachLogCache(bt.State.Logger)
+	lc := AttachLogCache(tb.State.Logger)
 
 	p.Goto("data:text/html,hello", nil)
 

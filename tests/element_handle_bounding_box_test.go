@@ -29,16 +29,16 @@ import (
 )
 
 func TestElementHandleBoundingBox(t *testing.T) {
-	bt := TestBrowser(t)
+	tb := TestBrowser(t)
 
 	t.Run("ElementHandle.boundingBox", func(t *testing.T) {
-		t.Run("should return null for invisible elements", func(t *testing.T) { testElementHandleBoundingBoxInvisibleElement(t, bt) })
-		t.Run("should work with SVG nodes", func(t *testing.T) { testElementHandleBoundingBoxSVG(t, bt) })
+		t.Run("should return null for invisible elements", func(t *testing.T) { testElementHandleBoundingBoxInvisibleElement(t, tb) })
+		t.Run("should work with SVG nodes", func(t *testing.T) { testElementHandleBoundingBoxSVG(t, tb) })
 	})
 }
 
-func testElementHandleBoundingBoxInvisibleElement(t *testing.T, bt *Browser) {
-	p := bt.Browser.NewPage(nil)
+func testElementHandleBoundingBoxInvisibleElement(t *testing.T, tb *Browser) {
+	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`<div style="display:none">hello</div>`, nil)
@@ -47,8 +47,8 @@ func testElementHandleBoundingBoxInvisibleElement(t *testing.T, bt *Browser) {
 	require.Nil(t, element.BoundingBox())
 }
 
-func testElementHandleBoundingBoxSVG(t *testing.T, bt *Browser) {
-	p := bt.Browser.NewPage(nil)
+func testElementHandleBoundingBoxSVG(t *testing.T, tb *Browser) {
+	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`
@@ -62,8 +62,8 @@ func testElementHandleBoundingBoxSVG(t *testing.T, bt *Browser) {
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     }`
 	var r api.Rect
-	webBbox := p.Evaluate(bt.Runtime.ToValue(pageFn), bt.Runtime.ToValue(element))
-	bt.Runtime.ExportTo(webBbox.(goja.Value), &r)
+	webBbox := p.Evaluate(tb.Runtime.ToValue(pageFn), tb.Runtime.ToValue(element))
+	tb.Runtime.ExportTo(webBbox.(goja.Value), &r)
 
 	require.EqualValues(t, bbox, &r)
 }

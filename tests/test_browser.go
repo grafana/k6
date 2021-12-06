@@ -114,12 +114,12 @@ func TestBrowser(t testing.TB) *Browser {
 		Timeout:  "30s",
 	})
 
-	bt := chromium.NewBrowserType(ctx).(*chromium.BrowserType)
-	browser := bt.Launch(launchOpts)
+	b := chromium.NewBrowserType(ctx).(*chromium.BrowserType)
+	browser := b.Launch(launchOpts)
 	t.Cleanup(browser.Close)
 
 	return &Browser{
-		Ctx:          bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
+		Ctx:          b.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
 		Runtime:      rt,
 		State:        state,
 		Browser:      browser,
@@ -130,25 +130,25 @@ func TestBrowser(t testing.TB) *Browser {
 
 // WithHandle adds the given handler to the HTTP test server and makes it
 // accessible with the given pattern.
-func (bt *Browser) WithHandle(pattern string, handler http.HandlerFunc) *Browser {
-	bt.HTTPMultiBin.Mux.Handle(pattern, handler)
-	return bt
+func (b *Browser) WithHandle(pattern string, handler http.HandlerFunc) *Browser {
+	b.HTTPMultiBin.Mux.Handle(pattern, handler)
+	return b
 }
 
 // WithStaticFiles adds a file server to the HTTP test server that is accessible
 // via /static/ prefix.
-func (bt *Browser) WithStaticFiles() *Browser {
+func (b *Browser) WithStaticFiles() *Browser {
 	fs := http.FileServer(http.Dir("static"))
-	return bt.WithHandle("/static/", http.StripPrefix("/static/", fs).ServeHTTP)
+	return b.WithHandle("/static/", http.StripPrefix("/static/", fs).ServeHTTP)
 }
 
 // URL the listening HTTP test server's URL combined with the given path.
-func (bt *Browser) URL(path string) string {
-	return bt.HTTPMultiBin.ServerHTTP.URL + path
+func (b *Browser) URL(path string) string {
+	return b.HTTPMultiBin.ServerHTTP.URL + path
 }
 
 // AttachFrame attaches the frame to the page and returns it.
-func (bt *Browser) AttachFrame(page api.Page, frameID string, url string) api.Frame {
+func (b *Browser) AttachFrame(page api.Page, frameID string, url string) api.Frame {
 	pageFn := `
 	async (frameId, url) => {
 		const frame = document.createElement('iframe');
@@ -160,21 +160,21 @@ func (bt *Browser) AttachFrame(page api.Page, frameID string, url string) api.Fr
 	}
 	`
 	return page.EvaluateHandle(
-		bt.Runtime.ToValue(pageFn),
-		bt.Runtime.ToValue(frameID),
-		bt.Runtime.ToValue(url)).
+		b.Runtime.ToValue(pageFn),
+		b.Runtime.ToValue(frameID),
+		b.Runtime.ToValue(url)).
 		AsElement().
 		ContentFrame()
 }
 
 // DetachFrame detaches the frame from the page.
-func (bt *Browser) DetachFrame(page api.Page, frameID string) {
+func (b *Browser) DetachFrame(page api.Page, frameID string) {
 	pageFn := `
 	frameId => {
         	document.getElementById(frameId).remove();
     	}
 	`
 	page.Evaluate(
-		bt.Runtime.ToValue(pageFn),
-		bt.Runtime.ToValue(frameID))
+		b.Runtime.ToValue(pageFn),
+		b.Runtime.ToValue(frameID))
 }

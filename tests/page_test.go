@@ -30,7 +30,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setupHandlersForHTMLFiles(bt)
 func TestPageGoto(t *testing.T) {
 	b := TestBrowser(t).WithStaticFiles()
 

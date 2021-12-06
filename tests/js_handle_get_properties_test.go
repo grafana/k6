@@ -28,18 +28,18 @@ import (
 )
 
 func TestJSHandleGetProperties(t *testing.T) {
-	bt := TestBrowser(t)
+	tb := TestBrowser(t)
 
 	t.Run("JSHandle.getProperties", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testJSHandleGetProperties(t, bt) })
+		t.Run("should work", func(t *testing.T) { testJSHandleGetProperties(t, tb) })
 	})
 }
 
-func testJSHandleGetProperties(t *testing.T, bt *Browser) {
-	p := bt.Browser.NewPage(nil)
+func testJSHandleGetProperties(t *testing.T, tb *Browser) {
+	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
-	handle := p.EvaluateHandle(bt.Runtime.ToValue(`() => {
+	handle := p.EvaluateHandle(tb.Runtime.ToValue(`() => {
         return {
             prop1: "one",
             prop2: "two",

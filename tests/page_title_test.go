@@ -28,15 +28,15 @@ import (
 )
 
 func TestPageTitle(t *testing.T) {
-	bt := TestBrowser(t)
+	tb := TestBrowser(t)
 
 	t.Run("Page.title", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testPageTitle(t, bt) })
+		t.Run("should work", func(t *testing.T) { testPageTitle(t, tb) })
 	})
 }
 
-func testPageTitle(t *testing.T, bt *Browser) {
-	p := bt.Browser.NewPage(nil)
+func testPageTitle(t *testing.T, tb *Browser) {
+	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)

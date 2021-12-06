@@ -34,11 +34,11 @@ var pageInputTests = map[string]func(*testing.T, api.Browser){
 }
 
 func TestPageInput(t *testing.T) {
-	bt := TestBrowser(t)
+	tb := TestBrowser(t)
 
 	for name, test := range pageInputTests {
 		t.Run(name, func(t *testing.T) {
-			test(t, bt.Browser)
+			test(t, tb.Browser)
 		})
 	}
 }

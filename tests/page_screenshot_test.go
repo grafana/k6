@@ -30,22 +30,22 @@ import (
 )
 
 func TestPageScreenshot(t *testing.T) {
-	bt := TestBrowser(t)
+	tb := TestBrowser(t)
 
 	t.Run("Page.screenshot", func(t *testing.T) {
-		t.Run("should work with full page", func(t *testing.T) { testPageScreenshotFullpage(t, bt) })
+		t.Run("should work with full page", func(t *testing.T) { testPageScreenshotFullpage(t, tb) })
 	})
 }
 
-func testPageScreenshotFullpage(t *testing.T, bt *Browser) {
-	p := bt.Browser.NewPage(nil)
+func testPageScreenshotFullpage(t *testing.T, tb *Browser) {
+	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
-	p.SetViewportSize(bt.Runtime.ToValue(struct {
+	p.SetViewportSize(tb.Runtime.ToValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{Width: 1280, Height: 800}))
-	p.Evaluate(bt.Runtime.ToValue(`
+	p.Evaluate(tb.Runtime.ToValue(`
         () => {
             document.body.style.margin = '0';
             document.body.style.padding = '0';
@@ -59,7 +59,7 @@ func testPageScreenshotFullpage(t *testing.T, bt *Browser) {
         }
     `))
 
-	buf := p.Screenshot(bt.Runtime.ToValue(struct {
+	buf := p.Screenshot(tb.Runtime.ToValue(struct {
 		FullPage bool `js:"fullPage"`
 	}{FullPage: true}))
 
