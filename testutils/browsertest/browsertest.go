@@ -145,3 +145,35 @@ func (bt *BrowserTest) WithStaticFiles() *BrowserTest {
 func (bt *BrowserTest) URL(path string) string {
 	return bt.HTTPMultiBin.ServerHTTP.URL + path
 }
+
+// AttachFrame attaches the frame to the page and returns it.
+func (bt *BrowserTest) AttachFrame(page api.Page, frameID string, url string) api.Frame {
+	pageFn := `
+	async (frameId, url) => {
+		const frame = document.createElement('iframe');
+		frame.src = url;
+		frame.id = frameId;
+		document.body.appendChild(frame);
+		await new Promise(x => frame.onload = x);
+		return frame;
+	}
+	`
+	return page.EvaluateHandle(
+		bt.Runtime.ToValue(pageFn),
+		bt.Runtime.ToValue(frameID),
+		bt.Runtime.ToValue(url)).
+		AsElement().
+		ContentFrame()
+}
+
+// DetachFrame detaches the frame from the page.
+func (bt *BrowserTest) DetachFrame(page api.Page, frameID string) {
+	pageFn := `
+	frameId => {
+        	document.getElementById(frameId).remove();
+    	}
+	`
+	page.Evaluate(
+		bt.Runtime.ToValue(pageFn),
+		bt.Runtime.ToValue(frameID))
+}

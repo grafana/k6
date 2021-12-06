@@ -65,7 +65,7 @@ func TestPageGotoWaitUntilLoad(t *testing.T) {
 
 	results := p.Evaluate(b.Runtime.ToValue("() => window.results"))
 	var actual []string
-	b.Runtime.ExportTo(results.(goja.Value), &actual)
+	_ = b.Runtime.ExportTo(results.(goja.Value), &actual)
 
 	assert.EqualValues(t, []string{"DOMContentLoaded", "load"}, actual, `expected "load" event to have fired`)
 }
@@ -82,7 +82,7 @@ func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 
 	results := p.Evaluate(b.Runtime.ToValue("() => window.results"))
 	var actual []string
-	b.Runtime.ExportTo(results.(goja.Value), &actual)
+	_ = b.Runtime.ExportTo(results.(goja.Value), &actual)
 
 	assert.EqualValues(t, "DOMContentLoaded", actual[0], `expected "DOMContentLoaded" event to have fired`)
 }

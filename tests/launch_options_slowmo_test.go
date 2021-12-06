@@ -249,15 +249,15 @@ func testPageSlowMoImpl(t *testing.T, bt *browsertest.BrowserTest, fn func(bt *b
 	defer p.Close(nil)
 
 	p.SetContent(`
-      <button>a</button>
-      <input type="checkbox" class="check">
-      <input type="checkbox" checked=true class="uncheck">
-      <input class="fill">
-      <select>
-        <option>foo</option>
-      </select>
-      <input type="file" class="file">
-    `, nil)
+		<button>a</button>
+		<input type="checkbox" class="check">
+		<input type="checkbox" checked=true class="uncheck">
+		<input class="fill">
+		<select>
+		<option>foo</option>
+		</select>
+		<input type="file" class="file">
+    	`, nil)
 	testSlowMoImpl(t, bt, func(bt *browsertest.BrowserTest) { fn(bt, p) })
 }
 
@@ -265,16 +265,16 @@ func testFrameSlowMoImpl(t *testing.T, bt *browsertest.BrowserTest, fn func(bt *
 	p := bt.Browser.NewPage(nil)
 	defer p.Close(nil)
 
-	f := browsertest.AttachFrame(bt, p, "frame1", bt.HTTPMultiBin.ServerHTTP.URL+"/static/empty.html")
+	f := bt.AttachFrame(p, "frame1", bt.URL("/static/empty.html"))
 	f.SetContent(`
-      <button>a</button>
-      <input type="checkbox" class="check">
-      <input type="checkbox" checked=true class="uncheck">
-      <input class="fill">
-      <select>
-        <option>foo</option>
-      </select>
-      <input type="file" class="file">
-    `, nil)
+		<button>a</button>
+		<input type="checkbox" class="check">
+		<input type="checkbox" checked=true class="uncheck">
+		<input class="fill">
+		<select>
+		  <option>foo</option>
+		</select>
+		<input type="file" class="file">
+    	`, nil)
 	testSlowMoImpl(t, bt, func(bt *browsertest.BrowserTest) { fn(bt, f) })
 }

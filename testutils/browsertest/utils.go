@@ -24,30 +24,9 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/api"
 	k6compiler "go.k6.io/k6/js/compiler"
 	k6testutils "go.k6.io/k6/lib/testutils"
 )
-
-func AttachFrame(bt *BrowserTest, page api.Page, frameID string, url string) api.Frame {
-	pageFn := `async (frameId, url) => {
-	    const frame = document.createElement('iframe');
-	    frame.src = url;
-	    frame.id = frameId;
-	    document.body.appendChild(frame);
-	    await new Promise(x => frame.onload = x);
-	    return frame;
-	}`
-	handle := page.EvaluateHandle(bt.Runtime.ToValue(pageFn), bt.Runtime.ToValue(frameID), bt.Runtime.ToValue(url))
-	return handle.AsElement().ContentFrame()
-}
-
-func DetachFrame(bt *BrowserTest, page api.Page, frameID string) {
-	pageFn := `frameId => {
-        document.getElementById(frameId).remove();
-    }`
-	page.Evaluate(bt.Runtime.ToValue(pageFn), bt.Runtime.ToValue(frameID))
-}
 
 // runES6String Runs an ES6 string in the given runtime. Use this rather than writing ES5 in tests.
 func RunES6String(tb testing.TB, rt *goja.Runtime, src string) (goja.Value, error) {
