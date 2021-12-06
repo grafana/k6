@@ -157,7 +157,7 @@ func (b *Browser) URL(path string) string {
 
 // StaticURL is a helper for URL("/`testBrowserStaticDir`/"+ path).
 func (b *Browser) StaticURL(path string) string {
-	return b.HTTPMultiBin.ServerHTTP.URL + "/" + testBrowserStaticDir + "/" + path
+	return b.URL("/" + testBrowserStaticDir + "/" + path)
 }
 
 // AttachFrame attaches the frame to the page and returns it.
