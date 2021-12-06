@@ -31,8 +31,7 @@ import (
 )
 
 func TestPageScreenshot(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
+	bt := browsertest.New(t)
 
 	t.Run("Page.screenshot", func(t *testing.T) {
 		t.Run("should work with full page", func(t *testing.T) { testPageScreenshotFullpage(t, bt) })

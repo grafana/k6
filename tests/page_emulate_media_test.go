@@ -37,8 +37,7 @@ type emulateMediaOpts struct {
 }
 
 func TestPageEmulateMedia(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
+	bt := browsertest.New(t)
 
 	t.Run("Page.emulateMedia", func(t *testing.T) {
 		t.Run("should work", func(t *testing.T) { testPageEmulateMedia(t, bt) })

@@ -31,41 +31,37 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// setupHandlersForHTMLFiles(bt)
 func TestPageGoto(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	setupHandlersForHTMLFiles(bt)
-	defer bt.Browser.Close()
+	bt := browsertest.New(t).WithStaticFiles()
 
-	t.Run("Page.goto", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testPageGoto(t, bt) })
-		//t.Run("should work when navigating to data URI", func(t *testing.T) { testPageGotoDataURI(t, bt) })
-		t.Run("should wait for load event", func(t *testing.T) { testPageGotoWaitUntilLoad(t, bt) })
-		t.Run("should wait for domcontentloaded event", func(t *testing.T) { testPageGotoWaitUntilDOMContentLoaded(t, bt) })
-	})
-}
-
-func testPageGoto(t *testing.T, bt *browsertest.BrowserTest) {
 	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
+	t.Cleanup(func() { p.Close(nil) })
 
-	url := bt.HTTPMultiBin.ServerHTTP.URL + "/empty.html"
+	url := bt.URL("/static/empty.html")
 	r := p.Goto(url, nil)
 
 	assert.Equal(t, url, r.URL(), `expected URL to be %q, result of navigation was %q`, url, r.URL())
 }
 
-func testPageGotoDataURI(t *testing.T, bt *browsertest.BrowserTest) {
+func TestPageGotoDataURI(t *testing.T) {
+	bt := browsertest.New(t)
+
 	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
+	t.Cleanup(func() { p.Close(nil) })
+
 	r := p.Goto("data:text/html,hello", nil)
+
 	assert.Nil(t, r, `expected response to be nil`)
 }
 
-func testPageGotoWaitUntilLoad(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
+func TestPageGotoWaitUntilLoad(t *testing.T) {
+	bt := browsertest.New(t).WithStaticFiles()
 
-	p.Goto(bt.HTTPMultiBin.ServerHTTP.URL+"/wait_until.html", bt.Runtime.ToValue(struct {
+	p := bt.Browser.NewPage(nil)
+	t.Cleanup(func() { p.Close(nil) })
+
+	p.Goto(bt.URL("/static/wait_until.html"), bt.Runtime.ToValue(struct {
 		WaitUntil string `js:"waitUntil"`
 	}{WaitUntil: "load"}))
 
@@ -76,11 +72,13 @@ func testPageGotoWaitUntilLoad(t *testing.T, bt *browsertest.BrowserTest) {
 	assert.EqualValues(t, []string{"DOMContentLoaded", "load"}, actual, `expected "load" event to have fired`)
 }
 
-func testPageGotoWaitUntilDOMContentLoaded(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
+func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
+	bt := browsertest.New(t).WithStaticFiles()
 
-	p.Goto(bt.HTTPMultiBin.ServerHTTP.URL+"/wait_until.html", bt.Runtime.ToValue(struct {
+	p := bt.Browser.NewPage(nil)
+	t.Cleanup(func() { p.Close(nil) })
+
+	p.Goto(bt.URL("/static/wait_until.html"), bt.Runtime.ToValue(struct {
 		WaitUntil string `js:"waitUntil"`
 	}{WaitUntil: "domcontentloaded"}))
 
@@ -92,18 +90,17 @@ func testPageGotoWaitUntilDOMContentLoaded(t *testing.T, bt *browsertest.Browser
 }
 
 func TestPageSetExtraHTTPHeaders(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
+	bt := browsertest.New(t)
+
 	p := bt.Browser.NewPage(nil)
-	t.Cleanup(func() {
-		p.Close(nil)
-		bt.Browser.Close()
-	})
+	t.Cleanup(func() { p.Close(nil) })
 
 	headers := map[string]string{
 		"Some-Header": "Some-Value",
 	}
 	p.SetExtraHTTPHeaders(headers)
-	resp := p.Goto(bt.HTTPMultiBin.ServerHTTP.URL+"/get", nil)
+
+	resp := p.Goto(bt.URL("/get"), nil)
 
 	require.NotNil(t, resp)
 	var body struct{ Headers map[string][]string }

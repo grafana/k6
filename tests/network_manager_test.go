@@ -30,11 +30,10 @@ import (
 
 func TestDataURLSkipRequest(t *testing.T) {
 	t.Parallel()
-	bt := browsertest.NewBrowserTest(t)
+	bt := browsertest.New(t)
 	p := bt.Browser.NewPage(nil)
 	t.Cleanup(func() {
 		p.Close(nil)
-		bt.Browser.Close()
 	})
 
 	lc := testutils.AttachLogCache(bt.State.Logger)

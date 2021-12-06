@@ -31,8 +31,7 @@ import (
 )
 
 func TestElementHandleScreenshot(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
+	bt := browsertest.New(t)
 
 	t.Run("ElementHandle.screenshot", func(t *testing.T) {
 		t.Run("should work", func(t *testing.T) { testElementHandleScreenshot(t, bt) })

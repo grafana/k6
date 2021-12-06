@@ -29,11 +29,10 @@ import (
 )
 
 func TestElementHandleWaitForSelector(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
+	bt := browsertest.New(t)
 	p := bt.Browser.NewPage(nil)
 	t.Cleanup(func() {
 		p.Close(nil)
-		bt.Browser.Close()
 	})
 
 	p.SetContent(`<div class="root"></div>`, nil)

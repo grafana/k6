@@ -32,9 +32,7 @@ import (
 )
 
 func TestLaunchOptionsSlowMo(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	setupHandlersForHTMLFiles(bt)
-	defer bt.Browser.Close()
+	bt := browsertest.New(t).WithStaticFiles()
 
 	t.Run("Page", func(t *testing.T) {
 		t.Run("check", func(t *testing.T) {
@@ -267,7 +265,7 @@ func testFrameSlowMoImpl(t *testing.T, bt *browsertest.BrowserTest, fn func(bt *
 	p := bt.Browser.NewPage(nil)
 	defer p.Close(nil)
 
-	f := browsertest.AttachFrame(bt, p, "frame1", bt.HTTPMultiBin.ServerHTTP.URL+"/empty.html")
+	f := browsertest.AttachFrame(bt, p, "frame1", bt.HTTPMultiBin.ServerHTTP.URL+"/static/empty.html")
 	f.SetContent(`
       <button>a</button>
       <input type="checkbox" class="check">

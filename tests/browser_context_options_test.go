@@ -32,8 +32,7 @@ import (
 )
 
 func TestBrowserContextOptions(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	t.Cleanup(bt.Browser.Close)
+	bt := browsertest.New(t)
 
 	t.Run("BrowserContextOptions", func(t *testing.T) {
 		t.Run("should have correct default values", func(t *testing.T) { testBrowserContextOptionsDefaultValues(t, bt) })

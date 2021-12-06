@@ -30,8 +30,7 @@ import (
 )
 
 func TestElementHandleBoundingBox(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
+	bt := browsertest.New(t)
 
 	t.Run("ElementHandle.boundingBox", func(t *testing.T) {
 		t.Run("should return null for invisible elements", func(t *testing.T) { testElementHandleBoundingBoxInvisibleElement(t, bt) })

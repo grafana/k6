@@ -37,8 +37,7 @@ var browserModuleTests = map[string]func(*testing.T, api.Browser){
 }
 
 func TestBrowserModule(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	t.Cleanup(bt.Browser.Close)
+	bt := browsertest.New(t)
 
 	for name, test := range browserModuleTests {
 		t.Run(name, func(t *testing.T) {

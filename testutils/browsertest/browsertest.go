@@ -22,6 +22,7 @@ package browsertest
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"strconv"
 	"testing"
@@ -50,7 +51,9 @@ type BrowserTest struct {
 	Browser      api.Browser
 }
 
-func NewBrowserTest(t testing.TB) *BrowserTest {
+// New configures and launches a chrome browser.
+// It automatically closes the browser when `t` returns.
+func New(t testing.TB) *BrowserTest {
 	tb := k6test.NewHTTPMultiBin(t)
 
 	root, err := k6lib.NewGroup("", nil)
@@ -111,7 +114,9 @@ func NewBrowserTest(t testing.TB) *BrowserTest {
 		SlowMo:   "0s",
 		Timeout:  "30s",
 	})
+
 	browser := bt.Launch(launchOpts)
+	t.Cleanup(browser.Close)
 
 	return &BrowserTest{
 		Ctx:          bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
@@ -121,4 +126,24 @@ func NewBrowserTest(t testing.TB) *BrowserTest {
 		HTTPMultiBin: tb,
 		Samples:      samples,
 	}
+}
+
+// WithHandle adds the given handler to the HTTP test server and makes it
+// accessible with the given pattern.
+func (bt *BrowserTest) WithHandle(pattern string, handler http.HandlerFunc) *BrowserTest {
+	bt.HTTPMultiBin.Mux.Handle(pattern, handler)
+	return bt
+}
+
+// WithStaticFiles adds a file server to the HTTP test server that is accessible
+// via /static/ prefix.
+func (bt *BrowserTest) WithStaticFiles() *BrowserTest {
+	// TODO: /html -> /static?
+	fs := http.FileServer(http.Dir("html"))
+	return bt.WithHandle("/static/", http.StripPrefix("/static/", fs).ServeHTTP)
+}
+
+// URL the listening HTTP test server's URL combined with the given path.
+func (bt *BrowserTest) URL(path string) string {
+	return bt.HTTPMultiBin.ServerHTTP.URL + path
 }
