@@ -150,7 +150,7 @@ func (b *Browser) WithStaticFiles() *Browser {
 	return b.WithHandle(path, http.StripPrefix(path, fs).ServeHTTP)
 }
 
-// URL the listening HTTP test server's URL combined with the given path.
+// URL returns the listening HTTP test server's URL combined with the given path.
 func (b *Browser) URL(path string) string {
 	return b.HTTPMultiBin.ServerHTTP.URL + path
 }
