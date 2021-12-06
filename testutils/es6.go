@@ -29,7 +29,7 @@ import (
 	k6testutils "go.k6.io/k6/lib/testutils"
 )
 
-// runES6String Runs an ES6 string in the given runtime. Use this rather than writing ES5 in tests.
+// RunES6String Runs an ES6 string in the given runtime. Use this rather than writing ES5 in tests.
 func RunES6String(tb testing.TB, rt *goja.Runtime, src string) (goja.Value, error) {
 	var err error
 	c := k6compiler.New(k6testutils.NewLogger(tb)) // TODO drop it ? maybe we will drop babel and this will be less needed

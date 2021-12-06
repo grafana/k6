@@ -42,6 +42,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
+// Browser is a test browser for integration testing.
 type Browser struct {
 	Ctx          context.Context
 	Runtime      *goja.Runtime
@@ -51,7 +52,7 @@ type Browser struct {
 	api.Browser
 }
 
-// Test configures and launches a chrome browser.
+// TestBrowser configures and launches a chrome browser.
 // It automatically closes the browser when `t` returns.
 func TestBrowser(t testing.TB) *Browser {
 	var (
