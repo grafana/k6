@@ -28,17 +28,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestElementHandleBoundingBox(t *testing.T) {
-	tb := TestBrowser(t)
+func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {
+	t.Parallel()
 
-	t.Run("ElementHandle.boundingBox", func(t *testing.T) {
-		t.Run("should return null for invisible elements", func(t *testing.T) { testElementHandleBoundingBoxInvisibleElement(t, tb) })
-		t.Run("should work with SVG nodes", func(t *testing.T) { testElementHandleBoundingBoxSVG(t, tb) })
-	})
-}
-
-func testElementHandleBoundingBoxInvisibleElement(t *testing.T, tb *Browser) {
-	p := tb.NewPage(nil)
+	p := TestBrowser(t).NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`<div style="display:none">hello</div>`, nil)
@@ -47,7 +40,10 @@ func testElementHandleBoundingBoxInvisibleElement(t *testing.T, tb *Browser) {
 	require.Nil(t, element.BoundingBox())
 }
 
-func testElementHandleBoundingBoxSVG(t *testing.T, tb *Browser) {
+func TestElementHandleBoundingBoxSVG(t *testing.T) {
+	t.Parallel()
+
+	tb := TestBrowser(t)
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
@@ -63,7 +59,7 @@ func testElementHandleBoundingBoxSVG(t *testing.T, tb *Browser) {
     }`
 	var r api.Rect
 	webBbox := p.Evaluate(tb.Runtime.ToValue(pageFn), tb.Runtime.ToValue(element))
-	tb.Runtime.ExportTo(webBbox.(goja.Value), &r)
+	_ = tb.Runtime.ExportTo(webBbox.(goja.Value), &r)
 
 	require.EqualValues(t, bbox, &r)
 }

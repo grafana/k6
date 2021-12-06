@@ -30,18 +30,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBrowserContextOptions(t *testing.T) {
-	tb := TestBrowser(t)
+func TestBrowserContextOptionsDefaultValues(t *testing.T) {
+	t.Parallel()
 
-	t.Run("BrowserContextOptions", func(t *testing.T) {
-		t.Run("should have correct default values", func(t *testing.T) { testBrowserContextOptionsDefaultValues(t, tb) })
-		t.Run("should correctly set default viewport", func(t *testing.T) { testBrowserContextOptionsDefaultViewport(t, tb) })
-		t.Run("should correctly set custom viewport", func(t *testing.T) { testBrowserContextOptionsSetViewport(t, tb) })
-		t.Run("should correctly set extra headers", func(t *testing.T) { testBrowserContextOptionsExtraHTTPHeaders(t, tb) })
-	})
-}
-
-func testBrowserContextOptionsDefaultValues(t *testing.T, tb *Browser) {
 	opts := common.NewBrowserContextOptions()
 	assert.False(t, opts.AcceptDownloads)
 	assert.False(t, opts.BypassCSP)
@@ -64,8 +55,10 @@ func testBrowserContextOptionsDefaultValues(t *testing.T, tb *Browser) {
 	assert.Equal(t, &common.Viewport{Width: common.DefaultScreenWidth, Height: common.DefaultScreenHeight}, opts.Viewport)
 }
 
-func testBrowserContextOptionsDefaultViewport(t *testing.T, tb *Browser) {
-	p := tb.NewPage(nil)
+func TestBrowserContextOptionsDefaultViewport(t *testing.T) {
+	t.Parallel()
+
+	p := TestBrowser(t).NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
 	viewportSize := p.ViewportSize()
@@ -73,7 +66,10 @@ func testBrowserContextOptionsDefaultViewport(t *testing.T, tb *Browser) {
 	assert.Equal(t, float64(common.DefaultScreenHeight), viewportSize["height"])
 }
 
-func testBrowserContextOptionsSetViewport(t *testing.T, tb *Browser) {
+func TestBrowserContextOptionsSetViewport(t *testing.T) {
+	t.Parallel()
+
+	tb := TestBrowser(t)
 	bctx := tb.NewContext(tb.Runtime.ToValue(struct {
 		Viewport common.Viewport `js:"viewport"`
 	}{
@@ -90,7 +86,10 @@ func testBrowserContextOptionsSetViewport(t *testing.T, tb *Browser) {
 	assert.Equal(t, float64(600), viewportSize["height"])
 }
 
-func testBrowserContextOptionsExtraHTTPHeaders(t *testing.T, tb *Browser) {
+func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
+	t.Parallel()
+
+	tb := TestBrowser(t)
 	bctx := tb.NewContext(tb.Runtime.ToValue(struct {
 		ExtraHTTPHeaders map[string]string `js:"extraHTTPHeaders"`
 	}{

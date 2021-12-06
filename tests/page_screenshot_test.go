@@ -29,15 +29,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPageScreenshot(t *testing.T) {
+func TestPageScreenshotFullpage(t *testing.T) {
+	t.Parallel()
+
 	tb := TestBrowser(t)
-
-	t.Run("Page.screenshot", func(t *testing.T) {
-		t.Run("should work with full page", func(t *testing.T) { testPageScreenshotFullpage(t, tb) })
-	})
-}
-
-func testPageScreenshotFullpage(t *testing.T, tb *Browser) {
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 

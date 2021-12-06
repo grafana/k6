@@ -24,27 +24,13 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/stretchr/testify/assert"
 )
 
-var pageInputTests = map[string]func(*testing.T, api.Browser){
-	"value":              testPageInputValue,
-	"special_characters": testPageInputSpecialCharacters,
-}
+func TestPageInputValue(t *testing.T) {
+	t.Parallel()
 
-func TestPageInput(t *testing.T) {
-	tb := TestBrowser(t)
-
-	for name, test := range pageInputTests {
-		t.Run(name, func(t *testing.T) {
-			test(t, tb.Browser)
-		})
-	}
-}
-
-func testPageInputValue(t *testing.T, b api.Browser) {
-	p := b.NewPage(nil)
+	p := TestBrowser(t).NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`
@@ -64,8 +50,10 @@ func testPageInputValue(t *testing.T, b api.Browser) {
 }
 
 // test for: https://github.com/grafana/xk6-browser/issues/132
-func testPageInputSpecialCharacters(t *testing.T, b api.Browser) {
-	p := b.NewPage(nil)
+func TestPageInputSpecialCharacters(t *testing.T) {
+	t.Parallel()
+
+	p := TestBrowser(t).NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`<input id="special">`, nil)

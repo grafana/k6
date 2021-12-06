@@ -28,15 +28,9 @@ import (
 )
 
 func TestElementHandleIsChecked(t *testing.T) {
-	tb := TestBrowser(t)
+	t.Parallel()
 
-	t.Run("ElementHandle.isChecked", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testElementHandleIsChecked(t, tb) })
-	})
-}
-
-func testElementHandleIsChecked(t *testing.T, tb *Browser) {
-	p := tb.NewPage(nil)
+	p := TestBrowser(t).NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`<input type="checkbox" checked>`, nil)

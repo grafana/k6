@@ -28,15 +28,9 @@ import (
 )
 
 func TestPageTitle(t *testing.T) {
-	tb := TestBrowser(t)
+	t.Parallel()
 
-	t.Run("Page.title", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testPageTitle(t, tb) })
-	})
-}
-
-func testPageTitle(t *testing.T, tb *Browser) {
-	p := tb.NewPage(nil)
+	p := TestBrowser(t).NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)

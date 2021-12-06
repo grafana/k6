@@ -28,6 +28,7 @@ import (
 
 func TestDataURLSkipRequest(t *testing.T) {
 	t.Parallel()
+
 	tb := TestBrowser(t)
 	p := tb.NewPage(nil)
 	t.Cleanup(func() {

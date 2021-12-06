@@ -68,16 +68,9 @@ var htmlInputButton = fmt.Sprintf(`
 `, mouseHelperScriptSource)
 
 func TestElementHandleClick(t *testing.T) {
+	t.Parallel()
+
 	tb := TestBrowser(t)
-
-	t.Run("ElementHandle.click", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testElementHandleClick(t, tb) })
-		t.Run("should work with node removed", func(t *testing.T) { testElementHandleClickWithNodeRemoved(t, tb) })
-		t.Run("should throw with detached node", func(t *testing.T) { testElementHandleClickWithDetachedNode(t, tb) })
-	})
-}
-
-func testElementHandleClick(t *testing.T, tb *Browser) {
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
@@ -99,7 +92,10 @@ func testElementHandleClick(t *testing.T, tb *Browser) {
 	}
 }
 
-func testElementHandleClickWithNodeRemoved(t *testing.T, tb *Browser) {
+func TestElementHandleClickWithNodeRemoved(t *testing.T) {
+	t.Parallel()
+
+	tb := TestBrowser(t)
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
@@ -124,7 +120,10 @@ func testElementHandleClickWithNodeRemoved(t *testing.T, tb *Browser) {
 	}
 }
 
-func testElementHandleClickWithDetachedNode(t *testing.T, tb *Browser) {
+func TestElementHandleClickWithDetachedNode(t *testing.T) {
+	t.Parallel()
+
+	tb := TestBrowser(t)
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 

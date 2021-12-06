@@ -28,22 +28,16 @@ import (
 )
 
 func TestElementHandleInputValue(t *testing.T) {
-	tb := TestBrowser(t)
+	t.Parallel()
 
-	t.Run("ElementHandle.inputValue", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testElementHandleInputValue(t, tb) })
-	})
-}
-
-func testElementHandleInputValue(t *testing.T, tb *Browser) {
-	p := tb.NewPage(nil)
+	p := TestBrowser(t).NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`
-        <input value="hello1">
-        <select><option value="hello2" selected></option></select>
-        <textarea>hello3</textarea>
-    `, nil)
+		<input value="hello1">
+		<select><option value="hello2" selected></option></select>
+		<textarea>hello3</textarea>
+    	`, nil)
 
 	element := p.Query("input")
 	value := element.InputValue(nil)

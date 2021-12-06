@@ -30,14 +30,9 @@ import (
 )
 
 func TestElementHandleScreenshot(t *testing.T) {
+	t.Parallel()
+
 	tb := TestBrowser(t)
-
-	t.Run("ElementHandle.screenshot", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testElementHandleScreenshot(t, tb) })
-	})
-}
-
-func testElementHandleScreenshot(t *testing.T, tb *Browser) {
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 

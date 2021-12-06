@@ -36,14 +36,9 @@ type emulateMediaOpts struct {
 }
 
 func TestPageEmulateMedia(t *testing.T) {
+	t.Parallel()
+
 	tb := TestBrowser(t)
-
-	t.Run("Page.emulateMedia", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testPageEmulateMedia(t, tb) })
-	})
-}
-
-func testPageEmulateMedia(t *testing.T, tb *Browser) {
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
