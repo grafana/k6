@@ -135,16 +135,29 @@ func (b *Browser) WithHandle(pattern string, handler http.HandlerFunc) *Browser 
 	return b
 }
 
+const testBrowserStaticDir = "static"
+
 // WithStaticFiles adds a file server to the HTTP test server that is accessible
-// via /static/ prefix.
+// via `testBrowserStaticDir` prefix.
 func (b *Browser) WithStaticFiles() *Browser {
-	fs := http.FileServer(http.Dir("static"))
-	return b.WithHandle("/static/", http.StripPrefix("/static/", fs).ServeHTTP)
+	const (
+		slash = string(os.PathSeparator)
+		path  = slash + testBrowserStaticDir + slash
+	)
+
+	fs := http.FileServer(http.Dir(testBrowserStaticDir))
+
+	return b.WithHandle(path, http.StripPrefix(path, fs).ServeHTTP)
 }
 
 // URL the listening HTTP test server's URL combined with the given path.
 func (b *Browser) URL(path string) string {
 	return b.HTTPMultiBin.ServerHTTP.URL + path
+}
+
+// StaticURL is a helper for URL("/`testBrowserStaticDir`/"+ path).
+func (b *Browser) StaticURL(path string) string {
+	return b.HTTPMultiBin.ServerHTTP.URL + "/" + testBrowserStaticDir + "/" + path
 }
 
 // AttachFrame attaches the frame to the page and returns it.

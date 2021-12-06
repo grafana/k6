@@ -264,7 +264,7 @@ func testFrameSlowMoImpl(t *testing.T, tb *Browser, fn func(bt *Browser, f api.F
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
-	f := tb.AttachFrame(p, "frame1", tb.URL("/static/empty.html"))
+	f := tb.AttachFrame(p, "frame1", tb.StaticURL("empty.html"))
 	f.SetContent(`
 		<button>a</button>
 		<input type="checkbox" class="check">

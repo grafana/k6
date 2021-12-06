@@ -38,7 +38,7 @@ func TestPageGoto(t *testing.T) {
 	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
-	url := b.URL("/static/empty.html")
+	url := b.StaticURL("empty.html")
 	r := p.Goto(url, nil)
 
 	assert.Equal(t, url, r.URL(), `expected URL to be %q, result of navigation was %q`, url, r.URL())
@@ -63,7 +63,7 @@ func TestPageGotoWaitUntilLoad(t *testing.T) {
 	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
-	p.Goto(b.URL("/static/wait_until.html"), b.Runtime.ToValue(struct {
+	p.Goto(b.StaticURL("wait_until.html"), b.Runtime.ToValue(struct {
 		WaitUntil string `js:"waitUntil"`
 	}{WaitUntil: "load"}))
 
@@ -82,7 +82,7 @@ func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
-	p.Goto(b.URL("/static/wait_until.html"), b.Runtime.ToValue(struct {
+	p.Goto(b.StaticURL("wait_until.html"), b.Runtime.ToValue(struct {
 		WaitUntil string `js:"waitUntil"`
 	}{WaitUntil: "domcontentloaded"}))
 
