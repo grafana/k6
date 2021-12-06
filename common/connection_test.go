@@ -37,7 +37,7 @@ import (
 )
 
 func TestConnection(t *testing.T) {
-	server := test.NewWSTestServerWithEcho(t)
+	server := test.WSServerWithEcho(t)
 	defer server.Cleanup()
 
 	t.Run("connect", func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestConnection(t *testing.T) {
 }
 
 func TestConnectionClosureAbnormal(t *testing.T) {
-	server := test.NewWSTestServerWithClosureAbnormal(t)
+	server := test.WSServerWithClosureAbnormal(t)
 	defer server.Cleanup()
 
 	t.Run("closure abnormal", func(t *testing.T) {
@@ -70,7 +70,7 @@ func TestConnectionClosureAbnormal(t *testing.T) {
 }
 
 func TestConnectionSendRecv(t *testing.T) {
-	server := test.NewWSTestServerWithCDPHandler(t, test.CDPDefaultHandler, nil)
+	server := test.WSServerWithCDPHandler(t, test.CDPDefaultHandler, nil)
 	defer server.Cleanup()
 
 	t.Run("send command with empty reply", func(t *testing.T) {
@@ -134,7 +134,7 @@ func TestConnectionCreateSession(t *testing.T) {
 		}
 	}
 
-	server := test.NewWSTestServerWithCDPHandler(t, handler, &cmdsReceived)
+	server := test.WSServerWithCDPHandler(t, handler, &cmdsReceived)
 	defer server.Cleanup()
 
 	t.Run("create session for target", func(t *testing.T) {

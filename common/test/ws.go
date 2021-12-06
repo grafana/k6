@@ -98,17 +98,17 @@ func getWebsocketHandlerEcho() http.Handler {
 }
 
 // NewWSTestServerWithCustomHandler creates a WS test server with abnormal closure behavior
-func NewWSTestServerWithClosureAbnormal(t testing.TB) *WSTestServer {
-	return NewWSTestServer(t, "/closure-abnormal", getWebsocketHandlerAbnormalClosure())
+func WSServerWithClosureAbnormal(t testing.TB) *WSTestServer {
+	return WSServer(t, "/closure-abnormal", getWebsocketHandlerAbnormalClosure())
 }
 
 // NewWSTestServerWithCustomHandler creates a WS test server with an echo handler
-func NewWSTestServerWithEcho(t testing.TB) *WSTestServer {
-	return NewWSTestServer(t, "/echo", getWebsocketHandlerEcho())
+func WSServerWithEcho(t testing.TB) *WSTestServer {
+	return WSServer(t, "/echo", getWebsocketHandlerEcho())
 }
 
-// NewWSTestServer returns a fully configured and running WS test server
-func NewWSTestServer(t testing.TB, path string, handler http.Handler) *WSTestServer {
+// WSServer returns a fully configured and running WS test server
+func WSServer(t testing.TB, path string, handler http.Handler) *WSTestServer {
 	// Create a http.ServeMux and set the httpbin handler as the default
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)

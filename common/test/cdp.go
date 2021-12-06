@@ -106,12 +106,12 @@ func getWebsocketHandlerCDP(
 	})
 }
 
-// NewWSTestServerWithCDPHandler creates a WS test server with a custom CDP handler function
-func NewWSTestServerWithCDPHandler(
+// WSServerWithCDPHandler creates a WS test server with a custom CDP handler function
+func WSServerWithCDPHandler(
 	t testing.TB,
 	fn func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}),
 	cmdsReceived *[]cdproto.MethodType) *WSTestServer {
-	return NewWSTestServer(t, "/cdp", getWebsocketHandlerCDP(fn, cmdsReceived))
+	return WSServer(t, "/cdp", getWebsocketHandlerCDP(fn, cmdsReceived))
 }
 
 // CDPDefaultCDPHandler is a default handler for the CDP WS server
