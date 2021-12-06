@@ -1,6 +1,5 @@
 name: Feature Request
 description: Use this template for suggesting new features.
-title: ''
 labels: feature
 body:
   - type: textarea
