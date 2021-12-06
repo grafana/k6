@@ -26,14 +26,13 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // setupHandlersForHTMLFiles(bt)
 func TestPageGoto(t *testing.T) {
-	b := browsertest.New(t).WithStaticFiles()
+	b := TestBrowser(t).WithStaticFiles()
 
 	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
@@ -45,7 +44,7 @@ func TestPageGoto(t *testing.T) {
 }
 
 func TestPageGotoDataURI(t *testing.T) {
-	p := browsertest.New(t).NewPage(nil)
+	p := TestBrowser(t).NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
 	r := p.Goto("data:text/html,hello", nil)
@@ -54,7 +53,7 @@ func TestPageGotoDataURI(t *testing.T) {
 }
 
 func TestPageGotoWaitUntilLoad(t *testing.T) {
-	b := browsertest.New(t).WithStaticFiles()
+	b := TestBrowser(t).WithStaticFiles()
 
 	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
@@ -71,7 +70,7 @@ func TestPageGotoWaitUntilLoad(t *testing.T) {
 }
 
 func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
-	b := browsertest.New(t).WithStaticFiles()
+	b := TestBrowser(t).WithStaticFiles()
 
 	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
@@ -88,7 +87,7 @@ func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 }
 
 func TestPageSetExtraHTTPHeaders(t *testing.T) {
-	b := browsertest.New(t)
+	b := TestBrowser(t)
 
 	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })

@@ -27,7 +27,6 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -69,7 +68,7 @@ var htmlInputButton = fmt.Sprintf(`
 `, mouseHelperScriptSource)
 
 func TestElementHandleClick(t *testing.T) {
-	bt := browsertest.New(t)
+	bt := TestBrowser(t)
 
 	t.Run("ElementHandle.click", func(t *testing.T) {
 		t.Run("should work", func(t *testing.T) { testElementHandleClick(t, bt) })
@@ -78,7 +77,7 @@ func TestElementHandleClick(t *testing.T) {
 	})
 }
 
-func testElementHandleClick(t *testing.T, bt *browsertest.BrowserTest) {
+func testElementHandleClick(t *testing.T, bt *Browser) {
 	p := bt.Browser.NewPage(nil)
 	defer p.Close(nil)
 
@@ -100,7 +99,7 @@ func testElementHandleClick(t *testing.T, bt *browsertest.BrowserTest) {
 	}
 }
 
-func testElementHandleClickWithNodeRemoved(t *testing.T, bt *browsertest.BrowserTest) {
+func testElementHandleClickWithNodeRemoved(t *testing.T, bt *Browser) {
 	p := bt.Browser.NewPage(nil)
 	defer p.Close(nil)
 
@@ -125,7 +124,7 @@ func testElementHandleClickWithNodeRemoved(t *testing.T, bt *browsertest.Browser
 	}
 }
 
-func testElementHandleClickWithDetachedNode(t *testing.T, bt *browsertest.BrowserTest) {
+func testElementHandleClickWithDetachedNode(t *testing.T, bt *Browser) {
 	p := bt.Browser.NewPage(nil)
 	defer p.Close(nil)
 

@@ -26,7 +26,6 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,14 +36,14 @@ type emulateMediaOpts struct {
 }
 
 func TestPageEmulateMedia(t *testing.T) {
-	bt := browsertest.New(t)
+	bt := TestBrowser(t)
 
 	t.Run("Page.emulateMedia", func(t *testing.T) {
 		t.Run("should work", func(t *testing.T) { testPageEmulateMedia(t, bt) })
 	})
 }
 
-func testPageEmulateMedia(t *testing.T, bt *browsertest.BrowserTest) {
+func testPageEmulateMedia(t *testing.T, bt *Browser) {
 	p := bt.Browser.NewPage(nil)
 	defer p.Close(nil)
 

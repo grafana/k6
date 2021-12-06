@@ -24,12 +24,11 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/require"
 )
 
 func TestElementHandleWaitForSelector(t *testing.T) {
-	bt := browsertest.New(t)
+	bt := TestBrowser(t)
 	p := bt.Browser.NewPage(nil)
 	t.Cleanup(func() {
 		p.Close(nil)

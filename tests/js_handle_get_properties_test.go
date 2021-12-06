@@ -24,19 +24,18 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestJSHandleGetProperties(t *testing.T) {
-	bt := browsertest.New(t)
+	bt := TestBrowser(t)
 
 	t.Run("JSHandle.getProperties", func(t *testing.T) {
 		t.Run("should work", func(t *testing.T) { testJSHandleGetProperties(t, bt) })
 	})
 }
 
-func testJSHandleGetProperties(t *testing.T, bt *browsertest.BrowserTest) {
+func testJSHandleGetProperties(t *testing.T, bt *Browser) {
 	p := bt.Browser.NewPage(nil)
 	defer p.Close(nil)
 

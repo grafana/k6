@@ -24,13 +24,12 @@ import (
 	"testing"
 
 	"github.com/grafana/xk6-browser/testutils"
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDataURLSkipRequest(t *testing.T) {
 	t.Parallel()
-	bt := browsertest.New(t)
+	bt := TestBrowser(t)
 	p := bt.Browser.NewPage(nil)
 	t.Cleanup(func() {
 		p.Close(nil)

@@ -25,12 +25,11 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/require"
 )
 
 func TestElementHandleBoundingBox(t *testing.T) {
-	bt := browsertest.New(t)
+	bt := TestBrowser(t)
 
 	t.Run("ElementHandle.boundingBox", func(t *testing.T) {
 		t.Run("should return null for invisible elements", func(t *testing.T) { testElementHandleBoundingBoxInvisibleElement(t, bt) })
@@ -38,7 +37,7 @@ func TestElementHandleBoundingBox(t *testing.T) {
 	})
 }
 
-func testElementHandleBoundingBoxInvisibleElement(t *testing.T, bt *browsertest.BrowserTest) {
+func testElementHandleBoundingBoxInvisibleElement(t *testing.T, bt *Browser) {
 	p := bt.Browser.NewPage(nil)
 	defer p.Close(nil)
 
@@ -48,7 +47,7 @@ func testElementHandleBoundingBoxInvisibleElement(t *testing.T, bt *browsertest.
 	require.Nil(t, element.BoundingBox())
 }
 
-func testElementHandleBoundingBoxSVG(t *testing.T, bt *browsertest.BrowserTest) {
+func testElementHandleBoundingBoxSVG(t *testing.T, bt *Browser) {
 	p := bt.Browser.NewPage(nil)
 	defer p.Close(nil)
 

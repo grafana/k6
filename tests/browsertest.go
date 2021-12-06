@@ -18,7 +18,7 @@
  *
  */
 
-package browsertest
+package tests
 
 import (
 	"context"
@@ -42,7 +42,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-type BrowserTest struct {
+type Browser struct {
 	Ctx          context.Context
 	Runtime      *goja.Runtime
 	State        *k6lib.State
@@ -51,9 +51,9 @@ type BrowserTest struct {
 	api.Browser
 }
 
-// New configures and launches a chrome browser.
+// Test configures and launches a chrome browser.
 // It automatically closes the browser when `t` returns.
-func New(t testing.TB) *BrowserTest {
+func TestBrowser(t testing.TB) *Browser {
 	var (
 		tb      = k6test.NewHTTPMultiBin(t)
 		samples = make(chan k6stats.SampleContainer, 1000)
@@ -117,7 +117,7 @@ func New(t testing.TB) *BrowserTest {
 	browser := bt.Launch(launchOpts)
 	t.Cleanup(browser.Close)
 
-	return &BrowserTest{
+	return &Browser{
 		Ctx:          bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
 		Runtime:      rt,
 		State:        state,
@@ -129,25 +129,25 @@ func New(t testing.TB) *BrowserTest {
 
 // WithHandle adds the given handler to the HTTP test server and makes it
 // accessible with the given pattern.
-func (bt *BrowserTest) WithHandle(pattern string, handler http.HandlerFunc) *BrowserTest {
+func (bt *Browser) WithHandle(pattern string, handler http.HandlerFunc) *Browser {
 	bt.HTTPMultiBin.Mux.Handle(pattern, handler)
 	return bt
 }
 
 // WithStaticFiles adds a file server to the HTTP test server that is accessible
 // via /static/ prefix.
-func (bt *BrowserTest) WithStaticFiles() *BrowserTest {
+func (bt *Browser) WithStaticFiles() *Browser {
 	fs := http.FileServer(http.Dir("static"))
 	return bt.WithHandle("/static/", http.StripPrefix("/static/", fs).ServeHTTP)
 }
 
 // URL the listening HTTP test server's URL combined with the given path.
-func (bt *BrowserTest) URL(path string) string {
+func (bt *Browser) URL(path string) string {
 	return bt.HTTPMultiBin.ServerHTTP.URL + path
 }
 
 // AttachFrame attaches the frame to the page and returns it.
-func (bt *BrowserTest) AttachFrame(page api.Page, frameID string, url string) api.Frame {
+func (bt *Browser) AttachFrame(page api.Page, frameID string, url string) api.Frame {
 	pageFn := `
 	async (frameId, url) => {
 		const frame = document.createElement('iframe');
@@ -167,7 +167,7 @@ func (bt *BrowserTest) AttachFrame(page api.Page, frameID string, url string) ap
 }
 
 // DetachFrame detaches the frame from the page.
-func (bt *BrowserTest) DetachFrame(page api.Page, frameID string) {
+func (bt *Browser) DetachFrame(page api.Page, frameID string) {
 	pageFn := `
 	frameId => {
         	document.getElementById(frameId).remove();

@@ -26,13 +26,12 @@ import (
 	"testing"
 
 	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBrowserContextOptions(t *testing.T) {
-	bt := browsertest.New(t)
+	bt := TestBrowser(t)
 
 	t.Run("BrowserContextOptions", func(t *testing.T) {
 		t.Run("should have correct default values", func(t *testing.T) { testBrowserContextOptionsDefaultValues(t, bt) })
@@ -42,7 +41,7 @@ func TestBrowserContextOptions(t *testing.T) {
 	})
 }
 
-func testBrowserContextOptionsDefaultValues(t *testing.T, bt *browsertest.BrowserTest) {
+func testBrowserContextOptionsDefaultValues(t *testing.T, bt *Browser) {
 	opts := common.NewBrowserContextOptions()
 	assert.False(t, opts.AcceptDownloads)
 	assert.False(t, opts.BypassCSP)
@@ -65,7 +64,7 @@ func testBrowserContextOptionsDefaultValues(t *testing.T, bt *browsertest.Browse
 	assert.Equal(t, &common.Viewport{Width: common.DefaultScreenWidth, Height: common.DefaultScreenHeight}, opts.Viewport)
 }
 
-func testBrowserContextOptionsDefaultViewport(t *testing.T, bt *browsertest.BrowserTest) {
+func testBrowserContextOptionsDefaultViewport(t *testing.T, bt *Browser) {
 	p := bt.Browser.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
@@ -74,7 +73,7 @@ func testBrowserContextOptionsDefaultViewport(t *testing.T, bt *browsertest.Brow
 	assert.Equal(t, float64(common.DefaultScreenHeight), viewportSize["height"])
 }
 
-func testBrowserContextOptionsSetViewport(t *testing.T, bt *browsertest.BrowserTest) {
+func testBrowserContextOptionsSetViewport(t *testing.T, bt *Browser) {
 	bctx := bt.Browser.NewContext(bt.Runtime.ToValue(struct {
 		Viewport common.Viewport `js:"viewport"`
 	}{
@@ -91,7 +90,7 @@ func testBrowserContextOptionsSetViewport(t *testing.T, bt *browsertest.BrowserT
 	assert.Equal(t, float64(600), viewportSize["height"])
 }
 
-func testBrowserContextOptionsExtraHTTPHeaders(t *testing.T, bt *browsertest.BrowserTest) {
+func testBrowserContextOptionsExtraHTTPHeaders(t *testing.T, bt *Browser) {
 	bctx := bt.Browser.NewContext(bt.Runtime.ToValue(struct {
 		ExtraHTTPHeaders map[string]string `js:"extraHTTPHeaders"`
 	}{

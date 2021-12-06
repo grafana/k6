@@ -18,7 +18,8 @@
  *
  */
 
-package browsertest
+// Package testutils is indended only for use in tests, do not import in production code!
+package testutils
 
 import (
 	"testing"

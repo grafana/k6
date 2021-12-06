@@ -26,19 +26,18 @@ import (
 	"image/png"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestElementHandleScreenshot(t *testing.T) {
-	bt := browsertest.New(t)
+	bt := TestBrowser(t)
 
 	t.Run("ElementHandle.screenshot", func(t *testing.T) {
 		t.Run("should work", func(t *testing.T) { testElementHandleScreenshot(t, bt) })
 	})
 }
 
-func testElementHandleScreenshot(t *testing.T, bt *browsertest.BrowserTest) {
+func testElementHandleScreenshot(t *testing.T, bt *Browser) {
 	p := bt.Browser.NewPage(nil)
 	defer p.Close(nil)
 

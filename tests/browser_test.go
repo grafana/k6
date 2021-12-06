@@ -26,7 +26,6 @@ import (
 	"testing"
 
 	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,7 +36,7 @@ var browserModuleTests = map[string]func(*testing.T, api.Browser){
 }
 
 func TestBrowserModule(t *testing.T) {
-	bt := browsertest.New(t)
+	bt := TestBrowser(t)
 
 	for name, test := range browserModuleTests {
 		t.Run(name, func(t *testing.T) {

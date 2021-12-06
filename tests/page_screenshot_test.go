@@ -26,19 +26,18 @@ import (
 	"image/png"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPageScreenshot(t *testing.T) {
-	bt := browsertest.New(t)
+	bt := TestBrowser(t)
 
 	t.Run("Page.screenshot", func(t *testing.T) {
 		t.Run("should work with full page", func(t *testing.T) { testPageScreenshotFullpage(t, bt) })
 	})
 }
 
-func testPageScreenshotFullpage(t *testing.T, bt *browsertest.BrowserTest) {
+func testPageScreenshotFullpage(t *testing.T, bt *Browser) {
 	p := bt.Browser.NewPage(nil)
 	defer p.Close(nil)
 

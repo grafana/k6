@@ -24,19 +24,18 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestElementHandleIsChecked(t *testing.T) {
-	bt := browsertest.New(t)
+	bt := TestBrowser(t)
 
 	t.Run("ElementHandle.isChecked", func(t *testing.T) {
 		t.Run("should work", func(t *testing.T) { testElementHandleIsChecked(t, bt) })
 	})
 }
 
-func testElementHandleIsChecked(t *testing.T, bt *browsertest.BrowserTest) {
+func testElementHandleIsChecked(t *testing.T, bt *Browser) {
 	p := bt.Browser.NewPage(nil)
 	defer p.Close(nil)
 

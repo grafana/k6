@@ -24,19 +24,18 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestElementHandleInputValue(t *testing.T) {
-	bt := browsertest.New(t)
+	bt := TestBrowser(t)
 
 	t.Run("ElementHandle.inputValue", func(t *testing.T) {
 		t.Run("should work", func(t *testing.T) { testElementHandleInputValue(t, bt) })
 	})
 }
 
-func testElementHandleInputValue(t *testing.T, bt *browsertest.BrowserTest) {
+func testElementHandleInputValue(t *testing.T, bt *Browser) {
 	p := bt.Browser.NewPage(nil)
 	defer p.Close(nil)
 
