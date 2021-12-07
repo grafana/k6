@@ -72,7 +72,6 @@ func TestElementHandleClick(t *testing.T) {
 
 	tb := testBrowser(t)
 	p := tb.NewPage(nil)
-	defer p.Close(nil)
 
 	p.SetContent(htmlInputButton, nil)
 
@@ -97,7 +96,6 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 
 	tb := testBrowser(t)
 	p := tb.NewPage(nil)
-	defer p.Close(nil)
 
 	p.SetContent(htmlInputButton, nil)
 
@@ -125,7 +123,6 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 
 	tb := testBrowser(t)
 	p := tb.NewPage(nil)
-	defer p.Close(nil)
 
 	p.SetContent(htmlInputButton, nil)
 

@@ -31,7 +31,6 @@ func TestElementHandleInputValue(t *testing.T) {
 	t.Parallel()
 
 	p := testBrowser(t).NewPage(nil)
-	defer p.Close(nil)
 
 	p.SetContent(`
 		<input value="hello1">

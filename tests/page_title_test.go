@@ -31,9 +31,9 @@ func TestPageTitle(t *testing.T) {
 	t.Parallel()
 
 	p := testBrowser(t).NewPage(nil)
-	defer p.Close(nil)
 
 	p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)
+
 	title := p.Title()
 	assert.Equal(t, "Some title", title, `expected title to be "Some title", got %q`, title)
 }

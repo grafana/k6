@@ -31,7 +31,6 @@ func TestElementHandleIsChecked(t *testing.T) {
 	t.Parallel()
 
 	p := testBrowser(t).NewPage(nil)
-	defer p.Close(nil)
 
 	p.SetContent(`<input type="checkbox" checked>`, nil)
 	element := p.Query("input")

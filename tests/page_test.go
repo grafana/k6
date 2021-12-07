@@ -36,7 +36,6 @@ func TestPageGoto(t *testing.T) {
 	b := testBrowser(t, withFileServer())
 
 	p := b.NewPage(nil)
-	t.Cleanup(func() { p.Close(nil) })
 
 	url := b.staticURL("empty.html")
 	r := p.Goto(url, nil)
@@ -48,7 +47,6 @@ func TestPageGotoDataURI(t *testing.T) {
 	t.Parallel()
 
 	p := testBrowser(t).NewPage(nil)
-	t.Cleanup(func() { p.Close(nil) })
 
 	r := p.Goto("data:text/html,hello", nil)
 
@@ -61,7 +59,6 @@ func TestPageGotoWaitUntilLoad(t *testing.T) {
 	b := testBrowser(t, withFileServer())
 
 	p := b.NewPage(nil)
-	t.Cleanup(func() { p.Close(nil) })
 
 	p.Goto(b.staticURL("wait_until.html"), b.rt.ToValue(struct {
 		WaitUntil string `js:"waitUntil"`
@@ -80,7 +77,6 @@ func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 	b := testBrowser(t, withFileServer())
 
 	p := b.NewPage(nil)
-	t.Cleanup(func() { p.Close(nil) })
 
 	p.Goto(b.staticURL("wait_until.html"), b.rt.ToValue(struct {
 		WaitUntil string `js:"waitUntil"`
@@ -99,7 +95,6 @@ func TestPageSetExtraHTTPHeaders(t *testing.T) {
 	b := testBrowser(t, withHTTPServer())
 
 	p := b.NewPage(nil)
-	t.Cleanup(func() { p.Close(nil) })
 
 	headers := map[string]string{
 		"Some-Header": "Some-Value",

@@ -40,7 +40,6 @@ func TestPageEmulateMedia(t *testing.T) {
 
 	tb := testBrowser(t)
 	p := tb.NewPage(nil)
-	defer p.Close(nil)
 
 	p.EmulateMedia(tb.rt.ToValue(emulateMediaOpts{
 		Media:         "print",

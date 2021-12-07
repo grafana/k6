@@ -32,15 +32,16 @@ func TestJSHandleGetProperties(t *testing.T) {
 
 	tb := testBrowser(t)
 	p := tb.NewPage(nil)
-	defer p.Close(nil)
 
-	handle := p.EvaluateHandle(tb.rt.ToValue(`() => {
-        return {
-            prop1: "one",
-            prop2: "two",
-            prop3: "three"
-        };
-    }`))
+	handle := p.EvaluateHandle(tb.rt.ToValue(`
+	() => {
+		return {
+			prop1: "one",
+			prop2: "two",
+			prop3: "three"
+		};
+	}
+	`))
 
 	props := handle.GetProperties()
 	value := props["prop1"].JSONValue().String()

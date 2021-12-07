@@ -34,7 +34,6 @@ func TestElementHandleScreenshot(t *testing.T) {
 
 	tb := testBrowser(t)
 	p := tb.NewPage(nil)
-	defer p.Close(nil)
 
 	p.SetViewportSize(tb.rt.ToValue(struct {
 		Width  float64 `js:"width"`

@@ -32,7 +32,6 @@ func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {
 	t.Parallel()
 
 	p := testBrowser(t).NewPage(nil)
-	defer p.Close(nil)
 
 	p.SetContent(`<div style="display:none">hello</div>`, nil)
 	element := p.Query("div")
@@ -45,7 +44,6 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
 
 	tb := testBrowser(t)
 	p := tb.NewPage(nil)
-	defer p.Close(nil)
 
 	p.SetContent(`
         <svg xmlns="http://www.w3.org/2000/svg" width="500" height="500">

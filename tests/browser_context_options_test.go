@@ -59,7 +59,6 @@ func TestBrowserContextOptionsDefaultViewport(t *testing.T) {
 	t.Parallel()
 
 	p := testBrowser(t).NewPage(nil)
-	t.Cleanup(func() { p.Close(nil) })
 
 	viewportSize := p.ViewportSize()
 	assert.Equal(t, float64(common.DefaultScreenWidth), viewportSize["width"])
