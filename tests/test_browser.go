@@ -58,6 +58,8 @@ type browser struct {
 // opts provides a way to customize the testBrowser.
 // see: withLaunchOptions for an example.
 func testBrowser(t testing.TB, opts ...interface{}) *browser {
+	ctx := context.Background()
+
 	// set default options and then customize them
 	var (
 		launchOpts         = defaultLaunchOpts()
@@ -73,6 +75,8 @@ func testBrowser(t testing.TB, opts ...interface{}) *browser {
 		case fileServerOption:
 			enableFileServer = true
 			enableHTTPMultiBin = true
+		case withContext:
+			ctx = opt
 		}
 	}
 
@@ -101,7 +105,6 @@ func testBrowser(t testing.TB, opts ...interface{}) *browser {
 	}
 
 	// configure the goja VM (1)
-	ctx := context.Background()
 	rt := goja.New()
 
 	// enable the HTTP test server only when necessary
@@ -110,8 +113,6 @@ func testBrowser(t testing.TB, opts ...interface{}) *browser {
 		testServer = k6test.NewHTTPMultiBin(t)
 		state.TLSConfig = testServer.TLSClientConfig
 		state.Transport = testServer.HTTPTransport
-
-		ctx = testServer.Context
 
 		err = rt.Set("http", k6common.Bind(rt, new(k6http.GlobalHTTP).NewModuleInstancePerVU(), &ctx))
 		require.NoError(t, err)
@@ -125,7 +126,13 @@ func testBrowser(t testing.TB, opts ...interface{}) *browser {
 	// launch the browser
 	bt := chromium.NewBrowserType(ctx).(*chromium.BrowserType)
 	b := bt.Launch(rt.ToValue(launchOpts))
-	t.Cleanup(b.Close)
+	t.Cleanup(func() {
+		select {
+		case <-ctx.Done():
+		default:
+			b.Close()
+		}
+	})
 
 	tb := &browser{
 		ctx:     bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
@@ -284,3 +291,7 @@ type fileServerOption struct{}
 func withFileServer() fileServerOption {
 	return struct{}{}
 }
+
+// withContext is used to detect whether to use a custom context in the test
+// browser.
+type withContext = context.Context
