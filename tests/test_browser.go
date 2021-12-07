@@ -54,7 +54,18 @@ type Browser struct {
 
 // TestBrowser configures and launches a chrome browser.
 // It automatically closes the browser when `t` returns.
-func TestBrowser(t testing.TB) *Browser {
+//
+// opts provides a way to customize the TestBrowser.
+// see: withLaunchOptions for an example.
+func TestBrowser(t testing.TB, opts ...interface{}) *Browser {
+	launchOpts := defaultLaunchOpts()
+	if len(opts) == 1 {
+		switch opt := opts[0].(type) {
+		case withLaunchOptions:
+			launchOpts = opt
+		}
+	}
+
 	var (
 		tb      = k6test.NewHTTPMultiBin(t)
 		samples = make(chan k6stats.SampleContainer, 1000)
@@ -91,31 +102,8 @@ func TestBrowser(t testing.TB) *Browser {
 	err = rt.Set("http", k6common.Bind(rt, new(k6http.GlobalHTTP).NewModuleInstancePerVU(), &ctx))
 	require.NoError(t, err)
 
-	var (
-		debug    = false
-		headless = true
-	)
-	if v, found := os.LookupEnv("XK6_BROWSER_TEST_DEBUG"); found {
-		debug, _ = strconv.ParseBool(v)
-	}
-	if v, found := os.LookupEnv("XK6_BROWSER_TEST_HEADLESS"); found {
-		headless, _ = strconv.ParseBool(v)
-	}
-
-	launchOpts := rt.ToValue(struct {
-		Debug    bool   `js:"debug"`
-		Headless bool   `js:"headless"`
-		SlowMo   string `js:"slowMo"`
-		Timeout  string `js:"timeout"`
-	}{
-		Debug:    debug,
-		Headless: headless,
-		SlowMo:   "0s",
-		Timeout:  "30s",
-	})
-
 	b := chromium.NewBrowserType(ctx).(*chromium.BrowserType)
-	browser := b.Launch(launchOpts)
+	browser := b.Launch(rt.ToValue(launchOpts))
 	t.Cleanup(browser.Close)
 
 	return &Browser{
@@ -190,4 +178,47 @@ func (b *Browser) DetachFrame(page api.Page, frameID string) {
 	page.Evaluate(
 		b.Runtime.ToValue(pageFn),
 		b.Runtime.ToValue(frameID))
+}
+
+// launchOptions provides a way to customize browser type
+// launch options in tests.
+type launchOptions struct {
+	Debug    bool   `js:"debug"`
+	Headless bool   `js:"headless"`
+	SlowMo   string `js:"slowMo"`
+	Timeout  string `js:"timeout"`
+}
+
+// withLaunchOptions is a helper for increasing readability
+// in tests while customizing the browser type launch options.
+//
+// example:
+//
+//    b := TestBrowser(t, withLaunchOptions{
+//        SlowMo:  "100s",
+//        Timeout: "30s",
+//    })
+//
+type withLaunchOptions = launchOptions
+
+// defaultLaunchOptions returns defaults for browser type launch options.
+// TestBrowser uses this for launching a browser type by default.
+func defaultLaunchOpts() launchOptions {
+	var (
+		debug    = false
+		headless = true
+	)
+	if v, found := os.LookupEnv("XK6_BROWSER_TEST_DEBUG"); found {
+		debug, _ = strconv.ParseBool(v)
+	}
+	if v, found := os.LookupEnv("XK6_BROWSER_TEST_HEADLESS"); found {
+		headless, _ = strconv.ParseBool(v)
+	}
+
+	return launchOptions{
+		Debug:    debug,
+		Headless: headless,
+		SlowMo:   "0s",
+		Timeout:  "30s",
+	}
 }
