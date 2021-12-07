@@ -89,7 +89,7 @@ func TestBrowserContextOptionsSetViewport(t *testing.T) {
 func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
 	t.Parallel()
 
-	tb := TestBrowser(t)
+	tb := TestBrowser(t, withHTTPServer())
 	bctx := tb.NewContext(tb.Runtime.ToValue(struct {
 		ExtraHTTPHeaders map[string]string `js:"extraHTTPHeaders"`
 	}{
@@ -100,7 +100,7 @@ func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
 	t.Cleanup(bctx.Close)
 
 	p := bctx.NewPage()
-	resp := p.Goto(tb.HTTPMultiBin.ServerHTTP.URL+"/get", nil)
+	resp := p.Goto(tb.URL("/get"), nil)
 
 	require.NotNil(t, resp)
 	var body struct{ Headers map[string][]string }

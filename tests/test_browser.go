@@ -58,21 +58,29 @@ type Browser struct {
 // opts provides a way to customize the TestBrowser.
 // see: withLaunchOptions for an example.
 func TestBrowser(t testing.TB, opts ...interface{}) *Browser {
-	launchOpts := defaultLaunchOpts()
-	if len(opts) == 1 {
-		switch opt := opts[0].(type) {
+	// set default options and then customize them
+	var (
+		launchOpts         = defaultLaunchOpts()
+		enableHTTPMultiBin = false
+		enableFileServer   = false
+	)
+	for _, opt := range opts {
+		switch opt := opt.(type) {
 		case withLaunchOptions:
 			launchOpts = opt
+		case httpServerOption:
+			enableHTTPMultiBin = true
+		case fileServerOption:
+			enableFileServer = true
+			enableHTTPMultiBin = true
 		}
 	}
 
-	var (
-		tb      = k6test.NewHTTPMultiBin(t)
-		samples = make(chan k6stats.SampleContainer, 1000)
-	)
-
+	// create a k6 state
 	root, err := k6lib.NewGroup("", nil)
 	require.NoError(t, err)
+
+	samples := make(chan k6stats.SampleContainer, 1000)
 
 	state := &k6lib.State{
 		Options: k6lib.Options{
@@ -86,48 +94,71 @@ func TestBrowser(t testing.TB, opts ...interface{}) *Browser {
 		},
 		Logger:         logrus.StandardLogger(),
 		Group:          root,
-		TLSConfig:      tb.TLSClientConfig,
-		Transport:      tb.HTTPTransport,
 		BPool:          bpool.NewBufferPool(1),
 		Samples:        samples,
 		Tags:           k6lib.NewTagMap(map[string]string{"group": root.Path}),
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
 	}
-	ctx := k6lib.WithState(tb.Context, state)
 
+	// configure the goja VM (1)
+	ctx := context.Background()
 	rt := goja.New()
-	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
+
+	// enable the HTTP test server only when necessary
+	var testServer *k6test.HTTPMultiBin
+	if enableHTTPMultiBin {
+		testServer = k6test.NewHTTPMultiBin(t)
+		state.TLSConfig = testServer.TLSClientConfig
+		state.Transport = testServer.HTTPTransport
+
+		ctx = testServer.Context
+
+		err = rt.Set("http", k6common.Bind(rt, new(k6http.GlobalHTTP).NewModuleInstancePerVU(), &ctx))
+		require.NoError(t, err)
+	}
+
+	// configure the goja VM (2)
+	ctx = k6lib.WithState(ctx, state)
 	ctx = k6common.WithRuntime(ctx, rt)
+	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
 
-	err = rt.Set("http", k6common.Bind(rt, new(k6http.GlobalHTTP).NewModuleInstancePerVU(), &ctx))
-	require.NoError(t, err)
-
+	// launch the browser
 	b := chromium.NewBrowserType(ctx).(*chromium.BrowserType)
 	browser := b.Launch(rt.ToValue(launchOpts))
 	t.Cleanup(browser.Close)
 
-	return &Browser{
+	tb := &Browser{
 		Ctx:          b.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
 		Runtime:      rt,
 		State:        state,
 		Browser:      browser,
-		HTTPMultiBin: tb,
+		HTTPMultiBin: testServer,
 		Samples:      samples,
 	}
+	if enableFileServer {
+		tb = tb.WithFileServer()
+	}
+	return tb
 }
 
 // WithHandle adds the given handler to the HTTP test server and makes it
 // accessible with the given pattern.
 func (b *Browser) WithHandle(pattern string, handler http.HandlerFunc) *Browser {
+	if b.HTTPMultiBin == nil {
+		panic("You should enable HTTP test server, see: withHTTPServer option")
+	}
 	b.HTTPMultiBin.Mux.Handle(pattern, handler)
 	return b
 }
 
 const testBrowserStaticDir = "static"
 
-// WithStaticFiles adds a file server to the HTTP test server that is accessible
-// via `testBrowserStaticDir` prefix.
-func (b *Browser) WithStaticFiles() *Browser {
+// WithFileServer serves a file server using the HTTP test server that is
+// accessible via `testBrowserStaticDir` prefix.
+//
+// This method is for enabling the static file server after starting a test
+// browser. For early starting the file server see withFileServer function.
+func (b *Browser) WithFileServer() *Browser {
 	const (
 		slash = string(os.PathSeparator)
 		path  = slash + testBrowserStaticDir + slash
@@ -140,6 +171,9 @@ func (b *Browser) WithStaticFiles() *Browser {
 
 // URL returns the listening HTTP test server's URL combined with the given path.
 func (b *Browser) URL(path string) string {
+	if b.HTTPMultiBin == nil {
+		panic("You should enable HTTP test server, see: withHTTPServer option")
+	}
 	return b.HTTPMultiBin.ServerHTTP.URL + path
 }
 
@@ -198,7 +232,6 @@ type launchOptions struct {
 //        SlowMo:  "100s",
 //        Timeout: "30s",
 //    })
-//
 type withLaunchOptions = launchOptions
 
 // defaultLaunchOptions returns defaults for browser type launch options.
@@ -221,4 +254,33 @@ func defaultLaunchOpts() launchOptions {
 		SlowMo:   "0s",
 		Timeout:  "30s",
 	}
+}
+
+// httpServerOption is used to detect whether to enable the HTTP test
+// server.
+type httpServerOption struct{}
+
+// withHTTPServer enables the HTTP test server.
+//
+// example:
+//
+//    b := TestBrowser(t, withHTTPServer())
+func withHTTPServer() httpServerOption {
+	return struct{}{}
+}
+
+// fileServerOption is used to detect whether enable the static file
+// server.
+type fileServerOption struct{}
+
+// withFileServer enables the HTTP test server and serves a file server
+// for static files.
+//
+// see: WithFileServer
+//
+// example:
+//
+//    b := TestBrowser(t, withFileServer())
+func withFileServer() fileServerOption {
+	return struct{}{}
 }

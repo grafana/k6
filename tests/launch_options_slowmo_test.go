@@ -31,7 +31,7 @@ import (
 )
 
 func TestLaunchOptionsSlowMo(t *testing.T) {
-	tb := TestBrowser(t).WithStaticFiles()
+	tb := TestBrowser(t, withFileServer())
 
 	t.Run("Page", func(t *testing.T) {
 		t.Run("check", func(t *testing.T) {
