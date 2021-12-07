@@ -33,12 +33,12 @@ import (
 func TestPageGoto(t *testing.T) {
 	t.Parallel()
 
-	b := TestBrowser(t, withFileServer())
+	b := testBrowser(t, withFileServer())
 
 	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
-	url := b.StaticURL("empty.html")
+	url := b.staticURL("empty.html")
 	r := p.Goto(url, nil)
 
 	assert.Equal(t, url, r.URL(), `expected URL to be %q, result of navigation was %q`, url, r.URL())
@@ -47,7 +47,7 @@ func TestPageGoto(t *testing.T) {
 func TestPageGotoDataURI(t *testing.T) {
 	t.Parallel()
 
-	p := TestBrowser(t).NewPage(nil)
+	p := testBrowser(t).NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
 	r := p.Goto("data:text/html,hello", nil)
@@ -58,18 +58,18 @@ func TestPageGotoDataURI(t *testing.T) {
 func TestPageGotoWaitUntilLoad(t *testing.T) {
 	t.Parallel()
 
-	b := TestBrowser(t, withFileServer())
+	b := testBrowser(t, withFileServer())
 
 	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
-	p.Goto(b.StaticURL("wait_until.html"), b.Runtime.ToValue(struct {
+	p.Goto(b.staticURL("wait_until.html"), b.rt.ToValue(struct {
 		WaitUntil string `js:"waitUntil"`
 	}{WaitUntil: "load"}))
 
-	results := p.Evaluate(b.Runtime.ToValue("() => window.results"))
+	results := p.Evaluate(b.rt.ToValue("() => window.results"))
 	var actual []string
-	_ = b.Runtime.ExportTo(results.(goja.Value), &actual)
+	_ = b.rt.ExportTo(results.(goja.Value), &actual)
 
 	assert.EqualValues(t, []string{"DOMContentLoaded", "load"}, actual, `expected "load" event to have fired`)
 }
@@ -77,18 +77,18 @@ func TestPageGotoWaitUntilLoad(t *testing.T) {
 func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 	t.Parallel()
 
-	b := TestBrowser(t, withFileServer())
+	b := testBrowser(t, withFileServer())
 
 	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })
 
-	p.Goto(b.StaticURL("wait_until.html"), b.Runtime.ToValue(struct {
+	p.Goto(b.staticURL("wait_until.html"), b.rt.ToValue(struct {
 		WaitUntil string `js:"waitUntil"`
 	}{WaitUntil: "domcontentloaded"}))
 
-	results := p.Evaluate(b.Runtime.ToValue("() => window.results"))
+	results := p.Evaluate(b.rt.ToValue("() => window.results"))
 	var actual []string
-	_ = b.Runtime.ExportTo(results.(goja.Value), &actual)
+	_ = b.rt.ExportTo(results.(goja.Value), &actual)
 
 	assert.EqualValues(t, "DOMContentLoaded", actual[0], `expected "DOMContentLoaded" event to have fired`)
 }
@@ -96,7 +96,7 @@ func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 func TestPageSetExtraHTTPHeaders(t *testing.T) {
 	t.Parallel()
 
-	b := TestBrowser(t, withHTTPServer())
+	b := testBrowser(t, withHTTPServer())
 
 	p := b.NewPage(nil)
 	t.Cleanup(func() { p.Close(nil) })

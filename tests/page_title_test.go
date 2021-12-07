@@ -30,7 +30,7 @@ import (
 func TestPageTitle(t *testing.T) {
 	t.Parallel()
 
-	p := TestBrowser(t).NewPage(nil)
+	p := testBrowser(t).NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)

@@ -38,17 +38,17 @@ type emulateMediaOpts struct {
 func TestPageEmulateMedia(t *testing.T) {
 	t.Parallel()
 
-	tb := TestBrowser(t)
+	tb := testBrowser(t)
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
-	p.EmulateMedia(tb.Runtime.ToValue(emulateMediaOpts{
+	p.EmulateMedia(tb.rt.ToValue(emulateMediaOpts{
 		Media:         "print",
 		ColorScheme:   "dark",
 		ReducedMotion: "reduce",
 	}))
 
-	result := p.Evaluate(tb.Runtime.ToValue("() => matchMedia('print').matches")).(goja.Value)
+	result := p.Evaluate(tb.rt.ToValue("() => matchMedia('print').matches")).(goja.Value)
 	switch result.ExportType().Kind() {
 	case reflect.Bool:
 		assert.True(t, result.ToBoolean(), "expected media 'print'")
@@ -56,7 +56,7 @@ func TestPageEmulateMedia(t *testing.T) {
 		t.Fail()
 	}
 
-	result = p.Evaluate(tb.Runtime.ToValue("() => matchMedia('(prefers-color-scheme: dark)').matches")).(goja.Value)
+	result = p.Evaluate(tb.rt.ToValue("() => matchMedia('(prefers-color-scheme: dark)').matches")).(goja.Value)
 	switch result.ExportType().Kind() {
 	case reflect.Bool:
 		assert.True(t, result.ToBoolean(), "expected color scheme 'dark'")
@@ -64,7 +64,7 @@ func TestPageEmulateMedia(t *testing.T) {
 		t.Fail()
 	}
 
-	result = p.Evaluate(tb.Runtime.ToValue("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).(goja.Value)
+	result = p.Evaluate(tb.rt.ToValue("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).(goja.Value)
 	switch result.ExportType().Kind() {
 	case reflect.Bool:
 		assert.True(t, result.ToBoolean(), "expected reduced motion setting to be 'reduce'")

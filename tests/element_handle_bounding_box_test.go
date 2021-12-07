@@ -31,7 +31,7 @@ import (
 func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {
 	t.Parallel()
 
-	p := TestBrowser(t).NewPage(nil)
+	p := testBrowser(t).NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`<div style="display:none">hello</div>`, nil)
@@ -43,7 +43,7 @@ func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {
 func TestElementHandleBoundingBoxSVG(t *testing.T) {
 	t.Parallel()
 
-	tb := TestBrowser(t)
+	tb := testBrowser(t)
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
@@ -58,8 +58,8 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     }`
 	var r api.Rect
-	webBbox := p.Evaluate(tb.Runtime.ToValue(pageFn), tb.Runtime.ToValue(element))
-	_ = tb.Runtime.ExportTo(webBbox.(goja.Value), &r)
+	webBbox := p.Evaluate(tb.rt.ToValue(pageFn), tb.rt.ToValue(element))
+	_ = tb.rt.ExportTo(webBbox.(goja.Value), &r)
 
 	require.EqualValues(t, bbox, &r)
 }

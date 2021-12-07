@@ -42,22 +42,22 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-// Browser is a test browser for integration testing.
-type Browser struct {
-	Ctx          context.Context
-	Runtime      *goja.Runtime
-	State        *k6lib.State
-	HTTPMultiBin *k6test.HTTPMultiBin
-	Samples      chan k6stats.SampleContainer
+// browser is a test browser for integration testing.
+type browser struct {
+	ctx     context.Context
+	rt      *goja.Runtime
+	state   *k6lib.State
+	http    *k6test.HTTPMultiBin
+	samples chan k6stats.SampleContainer
 	api.Browser
 }
 
-// TestBrowser configures and launches a chrome browser.
+// testBrowser configures and launches a chrome browser.
 // It automatically closes the browser when `t` returns.
 //
-// opts provides a way to customize the TestBrowser.
+// opts provides a way to customize the testBrowser.
 // see: withLaunchOptions for an example.
-func TestBrowser(t testing.TB, opts ...interface{}) *Browser {
+func testBrowser(t testing.TB, opts ...interface{}) *browser {
 	// set default options and then customize them
 	var (
 		launchOpts         = defaultLaunchOpts()
@@ -123,42 +123,42 @@ func TestBrowser(t testing.TB, opts ...interface{}) *Browser {
 	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
 
 	// launch the browser
-	b := chromium.NewBrowserType(ctx).(*chromium.BrowserType)
-	browser := b.Launch(rt.ToValue(launchOpts))
-	t.Cleanup(browser.Close)
+	bt := chromium.NewBrowserType(ctx).(*chromium.BrowserType)
+	b := bt.Launch(rt.ToValue(launchOpts))
+	t.Cleanup(b.Close)
 
-	tb := &Browser{
-		Ctx:          b.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
-		Runtime:      rt,
-		State:        state,
-		Browser:      browser,
-		HTTPMultiBin: testServer,
-		Samples:      samples,
+	tb := &browser{
+		ctx:     bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
+		rt:      rt,
+		state:   state,
+		http:    testServer,
+		samples: samples,
+		Browser: b,
 	}
 	if enableFileServer {
-		tb = tb.WithFileServer()
+		tb = tb.withFileServer()
 	}
 	return tb
 }
 
-// WithHandle adds the given handler to the HTTP test server and makes it
+// withHandle adds the given handler to the HTTP test server and makes it
 // accessible with the given pattern.
-func (b *Browser) WithHandle(pattern string, handler http.HandlerFunc) *Browser {
-	if b.HTTPMultiBin == nil {
+func (b *browser) withHandle(pattern string, handler http.HandlerFunc) *browser {
+	if b.http == nil {
 		panic("You should enable HTTP test server, see: withHTTPServer option")
 	}
-	b.HTTPMultiBin.Mux.Handle(pattern, handler)
+	b.http.Mux.Handle(pattern, handler)
 	return b
 }
 
 const testBrowserStaticDir = "static"
 
-// WithFileServer serves a file server using the HTTP test server that is
+// withFileServer serves a file server using the HTTP test server that is
 // accessible via `testBrowserStaticDir` prefix.
 //
 // This method is for enabling the static file server after starting a test
 // browser. For early starting the file server see withFileServer function.
-func (b *Browser) WithFileServer() *Browser {
+func (b *browser) withFileServer() *browser {
 	const (
 		slash = string(os.PathSeparator)
 		path  = slash + testBrowserStaticDir + slash
@@ -166,24 +166,24 @@ func (b *Browser) WithFileServer() *Browser {
 
 	fs := http.FileServer(http.Dir(testBrowserStaticDir))
 
-	return b.WithHandle(path, http.StripPrefix(path, fs).ServeHTTP)
+	return b.withHandle(path, http.StripPrefix(path, fs).ServeHTTP)
 }
 
 // URL returns the listening HTTP test server's URL combined with the given path.
-func (b *Browser) URL(path string) string {
-	if b.HTTPMultiBin == nil {
+func (b *browser) URL(path string) string {
+	if b.http == nil {
 		panic("You should enable HTTP test server, see: withHTTPServer option")
 	}
-	return b.HTTPMultiBin.ServerHTTP.URL + path
+	return b.http.ServerHTTP.URL + path
 }
 
-// StaticURL is a helper for URL("/`testBrowserStaticDir`/"+ path).
-func (b *Browser) StaticURL(path string) string {
+// staticURL is a helper for URL("/`testBrowserStaticDir`/"+ path).
+func (b *browser) staticURL(path string) string {
 	return b.URL("/" + testBrowserStaticDir + "/" + path)
 }
 
-// AttachFrame attaches the frame to the page and returns it.
-func (b *Browser) AttachFrame(page api.Page, frameID string, url string) api.Frame {
+// attachFrame attaches the frame to the page and returns it.
+func (b *browser) attachFrame(page api.Page, frameID string, url string) api.Frame {
 	pageFn := `
 	async (frameId, url) => {
 		const frame = document.createElement('iframe');
@@ -195,23 +195,23 @@ func (b *Browser) AttachFrame(page api.Page, frameID string, url string) api.Fra
 	}
 	`
 	return page.EvaluateHandle(
-		b.Runtime.ToValue(pageFn),
-		b.Runtime.ToValue(frameID),
-		b.Runtime.ToValue(url)).
+		b.rt.ToValue(pageFn),
+		b.rt.ToValue(frameID),
+		b.rt.ToValue(url)).
 		AsElement().
 		ContentFrame()
 }
 
-// DetachFrame detaches the frame from the page.
-func (b *Browser) DetachFrame(page api.Page, frameID string) {
+// detachFrame detaches the frame from the page.
+func (b *browser) detachFrame(page api.Page, frameID string) {
 	pageFn := `
 	frameId => {
         	document.getElementById(frameId).remove();
     	}
 	`
 	page.Evaluate(
-		b.Runtime.ToValue(pageFn),
-		b.Runtime.ToValue(frameID))
+		b.rt.ToValue(pageFn),
+		b.rt.ToValue(frameID))
 }
 
 // launchOptions provides a way to customize browser type

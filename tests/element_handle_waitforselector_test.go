@@ -30,7 +30,7 @@ import (
 func TestElementHandleWaitForSelector(t *testing.T) {
 	t.Parallel()
 
-	tb := TestBrowser(t)
+	tb := testBrowser(t)
 	p := tb.NewPage(nil)
 	t.Cleanup(func() {
 		p.Close(nil)
@@ -39,7 +39,7 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 	p.SetContent(`<div class="root"></div>`, nil)
 
 	root := p.Query(".root")
-	p.Evaluate(tb.Runtime.ToValue(`
+	p.Evaluate(tb.rt.ToValue(`
         () => {
 		setTimeout(() => {
 			const div = document.createElement('div');
@@ -50,7 +50,7 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 			}, 100);
 		}
 	`))
-	element := root.WaitForSelector(".element-to-appear", tb.Runtime.ToValue(struct {
+	element := root.WaitForSelector(".element-to-appear", tb.rt.ToValue(struct {
 		Timeout int64 `js:"timeout"`
 	}{Timeout: 1000}))
 

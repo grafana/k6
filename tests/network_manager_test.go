@@ -29,15 +29,15 @@ import (
 func TestDataURLSkipRequest(t *testing.T) {
 	t.Parallel()
 
-	tb := TestBrowser(t)
+	tb := testBrowser(t)
 	p := tb.NewPage(nil)
 	t.Cleanup(func() {
 		p.Close(nil)
 	})
 
-	lc := AttachLogCache(tb.State.Logger)
+	lc := attachLogCache(tb.state.Logger)
 
 	p.Goto("data:text/html,hello", nil)
 
-	assert.True(t, lc.Contains("skipped request handling of data URL"))
+	assert.True(t, lc.contains("skipped request handling of data URL"))
 }

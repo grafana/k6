@@ -70,20 +70,20 @@ var htmlInputButton = fmt.Sprintf(`
 func TestElementHandleClick(t *testing.T) {
 	t.Parallel()
 
-	tb := TestBrowser(t)
+	tb := testBrowser(t)
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(htmlInputButton, nil)
 
 	button := p.Query("button")
-	button.Click(tb.Runtime.ToValue(struct {
+	button.Click(tb.rt.ToValue(struct {
 		NoWaitAfter bool `js:"noWaitAfter"`
 	}{
 		NoWaitAfter: true, // FIX: this is just a workaround because navigation is never triggered and we'd be waiting for it to happen otherwise!
 	}))
 
-	result := p.Evaluate(tb.Runtime.ToValue("() => window['result']")).(goja.Value)
+	result := p.Evaluate(tb.rt.ToValue("() => window['result']")).(goja.Value)
 	switch result.ExportType().Kind() {
 	case reflect.String:
 		assert.Equal(t, result.String(), "Clicked", "expected button to be clicked, but got %q", result.String())
@@ -95,23 +95,23 @@ func TestElementHandleClick(t *testing.T) {
 func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 	t.Parallel()
 
-	tb := TestBrowser(t)
+	tb := testBrowser(t)
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(htmlInputButton, nil)
 
 	// Remove all nodes
-	p.Evaluate(tb.Runtime.ToValue("() => delete window['Node']"))
+	p.Evaluate(tb.rt.ToValue("() => delete window['Node']"))
 
 	button := p.Query("button")
-	button.Click(tb.Runtime.ToValue(struct {
+	button.Click(tb.rt.ToValue(struct {
 		NoWaitAfter bool `js:"noWaitAfter"`
 	}{
 		NoWaitAfter: true, // FIX: this is just a workaround because navigation is never triggered and we'd be waiting for it to happen otherwise!
 	}))
 
-	result := p.Evaluate(tb.Runtime.ToValue("() => window['result']")).(goja.Value)
+	result := p.Evaluate(tb.rt.ToValue("() => window['result']")).(goja.Value)
 	switch result.ExportType().Kind() {
 	case reflect.String:
 		assert.Equal(t, result.String(), "Clicked", "expected button to be clicked, but got %q", result.String())
@@ -123,7 +123,7 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	t.Parallel()
 
-	tb := TestBrowser(t)
+	tb := testBrowser(t)
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
@@ -132,7 +132,7 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	button := p.Query("button")
 
 	// Detach node
-	p.Evaluate(tb.Runtime.ToValue("button => button.remove()"), tb.Runtime.ToValue(button))
+	p.Evaluate(tb.rt.ToValue("button => button.remove()"), tb.rt.ToValue(button))
 
 	// We expect the click to fail with the correct error raised
 	errorMsg := ""
@@ -142,7 +142,7 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 				errorMsg = err.(*goja.Object).String()
 			}
 		}()
-		button.Click(tb.Runtime.ToValue(struct {
+		button.Click(tb.rt.ToValue(struct {
 			NoWaitAfter bool `js:"noWaitAfter"`
 		}{
 			NoWaitAfter: true, // FIX: this is just a workaround because navigation is never triggered and we'd be waiting for it to happen otherwise!

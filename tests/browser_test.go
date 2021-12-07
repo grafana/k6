@@ -31,7 +31,7 @@ import (
 func TestBrowserNewPage(t *testing.T) {
 	t.Parallel()
 
-	b := TestBrowser(t)
+	b := testBrowser(t)
 	p := b.NewPage(nil)
 	l := len(b.Contexts())
 	assert.Equal(t, 1, l, "expected there to be 1 browser context, but found %d", l)
@@ -54,7 +54,7 @@ func TestBrowserVersion(t *testing.T) {
 
 	const re = `^\d+\.\d+\.\d+\.\d+$`
 	r, _ := regexp.Compile(re)
-	ver := TestBrowser(t).Version()
+	ver := testBrowser(t).Version()
 	assert.Regexp(t, r, ver, "expected browser version to match regex %q, but found %q", re, ver)
 }
 
@@ -64,7 +64,7 @@ func TestBrowserVersion(t *testing.T) {
 func TestBrowserUserAgent(t *testing.T) {
 	t.Parallel()
 
-	b := TestBrowser(t)
+	b := testBrowser(t)
 
 	// testBrowserVersion() tests the version already
 	// just look for "Headless" in UserAgent

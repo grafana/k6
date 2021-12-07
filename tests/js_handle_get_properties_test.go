@@ -30,11 +30,11 @@ import (
 func TestJSHandleGetProperties(t *testing.T) {
 	t.Parallel()
 
-	tb := TestBrowser(t)
+	tb := testBrowser(t)
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
-	handle := p.EvaluateHandle(tb.Runtime.ToValue(`() => {
+	handle := p.EvaluateHandle(tb.rt.ToValue(`() => {
         return {
             prop1: "one",
             prop2: "two",

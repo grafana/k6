@@ -30,7 +30,7 @@ import (
 func TestElementHandleGetAttribute(t *testing.T) {
 	t.Parallel()
 
-	p := TestBrowser(t).NewPage(nil)
+	p := testBrowser(t).NewPage(nil)
 	t.Cleanup(func() {
 		p.Close(nil)
 	})

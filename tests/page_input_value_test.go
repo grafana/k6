@@ -30,7 +30,7 @@ import (
 func TestPageInputValue(t *testing.T) {
 	t.Parallel()
 
-	p := TestBrowser(t).NewPage(nil)
+	p := testBrowser(t).NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`
@@ -53,7 +53,7 @@ func TestPageInputValue(t *testing.T) {
 func TestPageInputSpecialCharacters(t *testing.T) {
 	t.Parallel()
 
-	p := TestBrowser(t).NewPage(nil)
+	p := testBrowser(t).NewPage(nil)
 	defer p.Close(nil)
 
 	p.SetContent(`<input id="special">`, nil)

@@ -32,15 +32,15 @@ import (
 func TestPageScreenshotFullpage(t *testing.T) {
 	t.Parallel()
 
-	tb := TestBrowser(t)
+	tb := testBrowser(t)
 	p := tb.NewPage(nil)
 	defer p.Close(nil)
 
-	p.SetViewportSize(tb.Runtime.ToValue(struct {
+	p.SetViewportSize(tb.rt.ToValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{Width: 1280, Height: 800}))
-	p.Evaluate(tb.Runtime.ToValue(`
+	p.Evaluate(tb.rt.ToValue(`
         () => {
             document.body.style.margin = '0';
             document.body.style.padding = '0';
@@ -54,7 +54,7 @@ func TestPageScreenshotFullpage(t *testing.T) {
         }
     `))
 
-	buf := p.Screenshot(tb.Runtime.ToValue(struct {
+	buf := p.Screenshot(tb.rt.ToValue(struct {
 		FullPage bool `js:"fullPage"`
 	}{FullPage: true}))
 
