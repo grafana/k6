@@ -31,9 +31,6 @@ func TestDataURLSkipRequest(t *testing.T) {
 
 	tb := testBrowser(t)
 	p := tb.NewPage(nil)
-	t.Cleanup(func() {
-		p.Close(nil)
-	})
 
 	lc := attachLogCache(tb.state.Logger)
 

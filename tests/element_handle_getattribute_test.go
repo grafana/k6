@@ -30,13 +30,9 @@ import (
 func TestElementHandleGetAttribute(t *testing.T) {
 	t.Parallel()
 
-	p := testBrowser(t).NewPage(nil)
-	t.Cleanup(func() {
-		p.Close(nil)
-	})
-
 	const want = "https://somewhere"
 
+	p := testBrowser(t).NewPage(nil)
 	p.SetContent(`
 		<a id="dark-mode-toggle-X" href="https://somewhere">Dark</a>
 	`, nil)

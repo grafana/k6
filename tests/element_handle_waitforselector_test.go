@@ -32,10 +32,6 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 
 	tb := testBrowser(t)
 	p := tb.NewPage(nil)
-	t.Cleanup(func() {
-		p.Close(nil)
-	})
-
 	p.SetContent(`<div class="root"></div>`, nil)
 
 	root := p.Query(".root")
