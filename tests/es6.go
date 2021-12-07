@@ -21,22 +21,14 @@
 // Package testutils is indended only for use in tests, do not import in production code!
 package tests
 
-import (
-	"testing"
-
-	"github.com/dop251/goja"
-	k6compiler "go.k6.io/k6/js/compiler"
-	k6testutils "go.k6.io/k6/lib/testutils"
-)
-
 // runES6String runs an ES6 string in the given runtime. Use this rather than writing ES5 in tests.
-func runES6String(tb testing.TB, rt *goja.Runtime, src string) (goja.Value, error) {
-	var err error
-	c := k6compiler.New(k6testutils.NewLogger(tb)) // TODO drop it ? maybe we will drop babel and this will be less needed
-	src, _, err = c.Transform(src, "__string__")
-	if err != nil {
-		return goja.Undefined(), err
-	}
+// func runES6String(tb testing.TB, rt *goja.Runtime, src string) (goja.Value, error) {
+// 	var err error
+// 	c := k6compiler.New(k6testutils.NewLogger(tb)) // TODO drop it ? maybe we will drop babel and this will be less needed
+// 	src, _, err = c.Transform(src, "__string__")
+// 	if err != nil {
+// 		return goja.Undefined(), err
+// 	}
 
-	return rt.RunString(src)
-}
+// 	return rt.RunString(src)
+// }
