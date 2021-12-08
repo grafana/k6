@@ -70,7 +70,7 @@ func TestSessionCreateSession(t *testing.T) {
 		}
 	}
 
-	server := WSServerWithCDPHandler(t, handler, &cmdsReceived)
+	server := NewWSServerWithCDPHandler(t, handler, &cmdsReceived)
 	defer server.Cleanup()
 
 	t.Run("send and recv session commands", func(t *testing.T) {

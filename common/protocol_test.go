@@ -118,12 +118,12 @@ func getWebsocketHandlerCDP(
 	})
 }
 
-// WSServerWithCDPHandler creates a WS test server with a custom CDP handler function
-func WSServerWithCDPHandler(
+// NewWSServerWithCDPHandler creates a WS test server with a custom CDP handler function
+func NewWSServerWithCDPHandler(
 	t testing.TB,
 	fn func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}),
 	cmdsReceived *[]cdproto.MethodType) *WSTestServer {
-	return WSServer(t, "/cdp", getWebsocketHandlerCDP(fn, cmdsReceived))
+	return NewWSServer(t, "/cdp", getWebsocketHandlerCDP(fn, cmdsReceived))
 }
 
 // CDPDefaultCDPHandler is a default handler for the CDP WS server
@@ -251,18 +251,20 @@ func getWebsocketHandlerEcho() http.Handler {
 	})
 }
 
-// NewWSTestServerWithCustomHandler creates a WS test server with abnormal closure behavior
-func WSServerWithClosureAbnormal(t testing.TB) *WSTestServer {
-	return WSServer(t, "/closure-abnormal", getWebsocketHandlerAbnormalClosure())
+// NewWSServerWithClosureAbnormal creates a WS test server with abnormal closure behavior
+func NewWSServerWithClosureAbnormal(t testing.TB) *WSTestServer {
+	return NewWSServer(t, "/closure-abnormal", getWebsocketHandlerAbnormalClosure())
 }
 
-// NewWSTestServerWithCustomHandler creates a WS test server with an echo handler
-func WSServerWithEcho(t testing.TB) *WSTestServer {
-	return WSServer(t, "/echo", getWebsocketHandlerEcho())
+// NewWSServerWithEcho creates a WS test server with an echo handler
+func NewWSServerWithEcho(t testing.TB) *WSTestServer {
+	return NewWSServer(t, "/echo", getWebsocketHandlerEcho())
 }
 
-// WSServer returns a fully configured and running WS test server
-func WSServer(t testing.TB, path string, handler http.Handler) *WSTestServer {
+// NewWSServer returns a fully configured and running WS test server
+func NewWSServer(t testing.TB, path string, handler http.Handler) *WSTestServer {
+	t.Helper()
+
 	// Create a http.ServeMux and set the httpbin handler as the default
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)
