@@ -209,18 +209,6 @@ func (b *testBrowser) attachFrame(page api.Page, frameID string, url string) api
 		ContentFrame()
 }
 
-// detachFrame detaches the frame from the page.
-// func (b *browser) detachFrame(page api.Page, frameID string) {
-// 	pageFn := `
-// 	frameId => {
-//         	document.getElementById(frameId).remove();
-//     	}
-// 	`
-// 	page.Evaluate(
-// 		b.rt.ToValue(pageFn),
-// 		b.rt.ToValue(frameID))
-// }
-
 // launchOptions provides a way to customize browser type
 // launch options in tests.
 type launchOptions struct {
