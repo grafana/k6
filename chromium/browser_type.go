@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"runtime"
 
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
@@ -85,47 +86,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	flags := map[string]interface{}{
-		//chromedp.ProxyServer(""),
-		//chromedp.UserAgent(""),
-		//chromedp.UserDataDir(""),
-		//chromedp.DisableGPU,
-
-		"no-first-run":                true,
-		"no-default-browser-check":    true,
-		"no-sandbox":                  true,
-		"headless":                    launchOpts.Headless,
-		"auto-open-devtools-for-tabs": launchOpts.Devtools,
-		"window-size":                 fmt.Sprintf("%d,%d", 800, 600),
-
-		// After Puppeteer's and Playwright's default behavior.
-		"disable-background-networking":                      true,
-		"enable-features":                                    "NetworkService,NetworkServiceInProcess",
-		"disable-background-timer-throttling":                true,
-		"disable-backgrounding-occluded-windows":             true,
-		"disable-breakpad":                                   true,
-		"disable-client-side-phishing-detection":             true,
-		"disable-component-extensions-with-background-pages": true,
-		"disable-default-apps":                               true,
-		"disable-dev-shm-usage":                              true,
-		"disable-extensions":                                 true,
-		"disable-features":                                   "TranslateUI,BlinkGenPropertyTrees,ImprovedCookieControls,SameSiteByDefaultCookies,LazyFrameLoading",
-		"disable-hang-monitor":                               true,
-		"disable-ipc-flooding-protection":                    true,
-		"disable-popup-blocking":                             true,
-		"disable-prompt-on-repost":                           true,
-		"disable-renderer-backgrounding":                     true,
-		"disable-sync":                                       true,
-		"force-color-profile":                                "srgb",
-		"metrics-recording-only":                             true,
-		"safebrowsing-disable-auto-update":                   true,
-		"enable-automation":                                  true,
-		"password-store":                                     "basic",
-		"use-mock-keychain":                                  true,
-		"no-startup-window":                                  true,
-	}
-
-	allocator := NewAllocator(flags, envs)
+	allocator := NewAllocator(b.flags(launchOpts), envs)
 	browserProc, err := allocator.Allocate(b.Ctx, launchOpts)
 	if browserProc == nil {
 		k6common.Throw(rt, fmt.Errorf("cannot allocate browser: %w", err))
@@ -156,6 +117,53 @@ func (b *BrowserType) LaunchPersistentContext(userDataDir string, opts goja.Valu
 
 func (b *BrowserType) Name() string {
 	return "chromium"
+}
+
+func (b *BrowserType) flags(lopts *common.LaunchOptions) map[string]interface{} {
+	// After Puppeteer's and Playwright's default behavior.
+	f := map[string]interface{}{
+		"disable-background-networking":                      true,
+		"enable-features":                                    "NetworkService,NetworkServiceInProcess",
+		"disable-background-timer-throttling":                true,
+		"disable-backgrounding-occluded-windows":             true,
+		"disable-breakpad":                                   true,
+		"disable-client-side-phishing-detection":             true,
+		"disable-component-extensions-with-background-pages": true,
+		"disable-default-apps":                               true,
+		"disable-dev-shm-usage":                              true,
+		"disable-extensions":                                 true,
+		"disable-features":                                   "ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,AcceptCHFrame",
+		"disable-hang-monitor":                               true,
+		"disable-ipc-flooding-protection":                    true,
+		"disable-popup-blocking":                             true,
+		"disable-prompt-on-repost":                           true,
+		"disable-renderer-backgrounding":                     true,
+		"disable-sync":                                       true,
+		"force-color-profile":                                "srgb",
+		"metrics-recording-only":                             true,
+		"no-first-run":                                       true,
+		"safebrowsing-disable-auto-update":                   true,
+		"enable-automation":                                  true,
+		"password-store":                                     "basic",
+		"use-mock-keychain":                                  true,
+		"no-service-autorun":                                 true,
+
+		"no-startup-window":           true,
+		"no-default-browser-check":    true,
+		"no-sandbox":                  true,
+		"headless":                    lopts.Headless,
+		"auto-open-devtools-for-tabs": lopts.Devtools,
+		"window-size":                 fmt.Sprintf("%d,%d", 800, 600),
+	}
+	if runtime.GOOS == "darwin" {
+		f["enable-use-zoom-for-dsf"] = false
+	}
+	if lopts.Headless {
+		f["hide-scrollbars"] = true
+		f["mute-audio"] = true
+		f["blink-settings"] = "primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4"
+	}
+	return f
 }
 
 // makes an extension wide logger
