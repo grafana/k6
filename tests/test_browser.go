@@ -148,9 +148,9 @@ func testBrowser(t testing.TB, opts ...interface{}) *browser {
 	return tb
 }
 
-// withHandle adds the given handler to the HTTP test server and makes it
+// withHandler adds the given handler to the HTTP test server and makes it
 // accessible with the given pattern.
-func (b *browser) withHandle(pattern string, handler http.HandlerFunc) *browser {
+func (b *browser) withHandler(pattern string, handler http.HandlerFunc) *browser {
 	if b.http == nil {
 		panic("You should enable HTTP test server, see: withHTTPServer option")
 	}
@@ -173,7 +173,7 @@ func (b *browser) withFileServer() *browser {
 
 	fs := http.FileServer(http.Dir(testBrowserStaticDir))
 
-	return b.withHandle(path, http.StripPrefix(path, fs).ServeHTTP)
+	return b.withHandler(path, http.StripPrefix(path, fs).ServeHTTP)
 }
 
 // URL returns the listening HTTP test server's URL combined with the given path.
