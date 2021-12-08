@@ -29,8 +29,8 @@ import (
 	"github.com/grafana/xk6-browser/api"
 )
 
-// FrameExecutionContext represents a JS execution context that belongs to Frame.
-type FrameExecutionContext interface {
+// frameExecutionContext represents a JS execution context that belongs to Frame.
+type frameExecutionContext interface {
 	// adoptBackendNodeId adopts specified backend node into this execution
 	// context from another execution context.
 	adoptBackendNodeId(backendNodeID cdp.BackendNodeID) (*ElementHandle, error)

@@ -117,8 +117,8 @@ type Frame struct {
 
 	documentHandle *ElementHandle
 
-	mainExecutionContext             FrameExecutionContext
-	utilityExecutionContext          FrameExecutionContext
+	mainExecutionContext             frameExecutionContext
+	utilityExecutionContext          frameExecutionContext
 	mainExecutionContextCh           chan bool
 	utilityExecutionContextCh        chan bool
 	mainExecutionContextHasWaited    int32
@@ -418,7 +418,7 @@ func (f *Frame) requestByID(reqID network.RequestID) *Request {
 	return frameSession.networkManager.requestFromID(reqID)
 }
 
-func (f *Frame) setContext(world string, execCtx FrameExecutionContext) {
+func (f *Frame) setContext(world string, execCtx frameExecutionContext) {
 	if world == "main" {
 		f.mainExecutionContext = execCtx
 		if len(f.mainExecutionContextCh) == 0 {
