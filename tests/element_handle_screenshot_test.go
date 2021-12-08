@@ -32,7 +32,7 @@ import (
 func TestElementHandleScreenshot(t *testing.T) {
 	t.Parallel()
 
-	tb := testBrowser(t)
+	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
 	p.SetViewportSize(tb.rt.ToValue(struct {

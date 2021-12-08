@@ -32,7 +32,7 @@ func TestElementHandleGetAttribute(t *testing.T) {
 
 	const want = "https://somewhere"
 
-	p := testBrowser(t).NewPage(nil)
+	p := newTestBrowser(t).NewPage(nil)
 	p.SetContent(`
 		<a id="dark-mode-toggle-X" href="https://somewhere">Dark</a>
 	`, nil)

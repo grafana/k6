@@ -58,7 +58,7 @@ func TestBrowserContextOptionsDefaultValues(t *testing.T) {
 func TestBrowserContextOptionsDefaultViewport(t *testing.T) {
 	t.Parallel()
 
-	p := testBrowser(t).NewPage(nil)
+	p := newTestBrowser(t).NewPage(nil)
 
 	viewportSize := p.ViewportSize()
 	assert.Equal(t, float64(common.DefaultScreenWidth), viewportSize["width"])
@@ -68,7 +68,7 @@ func TestBrowserContextOptionsDefaultViewport(t *testing.T) {
 func TestBrowserContextOptionsSetViewport(t *testing.T) {
 	t.Parallel()
 
-	tb := testBrowser(t)
+	tb := newTestBrowser(t)
 	bctx := tb.NewContext(tb.rt.ToValue(struct {
 		Viewport common.Viewport `js:"viewport"`
 	}{
@@ -88,7 +88,7 @@ func TestBrowserContextOptionsSetViewport(t *testing.T) {
 func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
 	t.Parallel()
 
-	tb := testBrowser(t, withHTTPServer())
+	tb := newTestBrowser(t, withHTTPServer())
 	bctx := tb.NewContext(tb.rt.ToValue(struct {
 		ExtraHTTPHeaders map[string]string `js:"extraHTTPHeaders"`
 	}{

@@ -31,31 +31,31 @@ import (
 )
 
 func TestLaunchOptionsSlowMo(t *testing.T) {
-	tb := testBrowser(t, withFileServer())
+	tb := newTestBrowser(t, withFileServer())
 
 	t.Run("Page", func(t *testing.T) {
 		t.Run("check", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Check(".check", nil)
 			})
 		})
 		t.Run("click", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Click("button", nil)
 			})
 		})
 		t.Run("dblClick", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Dblclick("button", nil)
 			})
 		})
 		t.Run("dispatchEvent", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.DispatchEvent("button", "click", goja.Null(), nil)
 			})
 		})
 		t.Run("emulateMedia", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.EmulateMedia(tb.rt.ToValue(struct {
 					Media string `js:"media"`
 				}{
@@ -64,47 +64,47 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 			})
 		})
 		t.Run("evaluate", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Evaluate(tb.rt.ToValue("() => void 0"))
 			})
 		})
 		t.Run("evaluateHandle", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.EvaluateHandle(tb.rt.ToValue("() => window"))
 			})
 		})
 		t.Run("fill", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Fill(".fill", "foo", nil)
 			})
 		})
 		t.Run("focus", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Focus("button", nil)
 			})
 		})
 		t.Run("goto", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Goto("about:blank", nil)
 			})
 		})
 		t.Run("hover", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Hover("button", nil)
 			})
 		})
 		t.Run("press", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Press("button", "Enter", nil)
 			})
 		})
 		t.Run("reload", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Reload(nil)
 			})
 		})
 		t.Run("setContent", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.SetContent("hello world", nil)
 			})
 		})
@@ -114,22 +114,22 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 			})
 		})*/
 		t.Run("selectOption", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.SelectOption("select", tb.rt.ToValue("foo"), nil)
 			})
 		})
 		t.Run("setViewportSize", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.SetViewportSize(nil)
 			})
 		})
 		t.Run("type", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Type(".fill", "a", nil)
 			})
 		})
 		t.Run("uncheck", func(t *testing.T) {
-			testPageSlowMoImpl(t, tb, func(_ *browser, p api.Page) {
+			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Uncheck(".uncheck", nil)
 			})
 		})
@@ -137,62 +137,62 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 
 	t.Run("Frame", func(t *testing.T) {
 		t.Run("check", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Check(".check", nil)
 			})
 		})
 		t.Run("click", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Click("button", nil)
 			})
 		})
 		t.Run("dblClick", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Dblclick("button", nil)
 			})
 		})
 		t.Run("dispatchEvent", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.DispatchEvent("button", "click", goja.Null(), nil)
 			})
 		})
 		t.Run("evaluate", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Evaluate(tb.rt.ToValue("() => void 0"))
 			})
 		})
 		t.Run("evaluateHandle", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.EvaluateHandle(tb.rt.ToValue("() => window"))
 			})
 		})
 		t.Run("fill", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Fill(".fill", "foo", nil)
 			})
 		})
 		t.Run("focus", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Focus("button", nil)
 			})
 		})
 		t.Run("goto", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Goto("about:blank", nil)
 			})
 		})
 		t.Run("hover", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Hover("button", nil)
 			})
 		})
 		t.Run("press", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Press("button", "Enter", nil)
 			})
 		})
 		t.Run("setContent", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.SetContent("hello world", nil)
 			})
 		})
@@ -202,17 +202,17 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 			})
 		})*/
 		t.Run("selectOption", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.SelectOption("select", tb.rt.ToValue("foo"), nil)
 			})
 		})
 		t.Run("type", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Type(".fill", "a", nil)
 			})
 		})
 		t.Run("uncheck", func(t *testing.T) {
-			testFrameSlowMoImpl(t, tb, func(_ *browser, f api.Frame) {
+			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Uncheck(".uncheck", nil)
 			})
 		})
@@ -222,7 +222,7 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 	})
 }
 
-func testSlowMoImpl(t *testing.T, tb *browser, fn func(*browser)) {
+func testSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser)) {
 	hooks := common.GetHooks(tb.ctx)
 	currentHook := hooks.Get(common.HookApplySlowMo)
 	chCalled := make(chan bool, 1)
@@ -243,7 +243,7 @@ func testSlowMoImpl(t *testing.T, tb *browser, fn func(*browser)) {
 	require.True(t, didSlowMo, "expected action to have been slowed down")
 }
 
-func testPageSlowMoImpl(t *testing.T, tb *browser, fn func(*browser, api.Page)) {
+func testPageSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser, api.Page)) {
 	p := tb.NewPage(nil)
 
 	p.SetContent(`
@@ -256,10 +256,10 @@ func testPageSlowMoImpl(t *testing.T, tb *browser, fn func(*browser, api.Page)) 
 		</select>
 		<input type="file" class="file">
     	`, nil)
-	testSlowMoImpl(t, tb, func(tb *browser) { fn(tb, p) })
+	testSlowMoImpl(t, tb, func(tb *testBrowser) { fn(tb, p) })
 }
 
-func testFrameSlowMoImpl(t *testing.T, tb *browser, fn func(bt *browser, f api.Frame)) {
+func testFrameSlowMoImpl(t *testing.T, tb *testBrowser, fn func(bt *testBrowser, f api.Frame)) {
 	p := tb.NewPage(nil)
 
 	f := tb.attachFrame(p, "frame1", tb.staticURL("empty.html"))
@@ -273,5 +273,5 @@ func testFrameSlowMoImpl(t *testing.T, tb *browser, fn func(bt *browser, f api.F
 		</select>
 		<input type="file" class="file">
     	`, nil)
-	testSlowMoImpl(t, tb, func(tb *browser) { fn(tb, f) })
+	testSlowMoImpl(t, tb, func(tb *testBrowser) { fn(tb, f) })
 }

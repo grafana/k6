@@ -70,7 +70,7 @@ var htmlInputButton = fmt.Sprintf(`
 func TestElementHandleClick(t *testing.T) {
 	t.Parallel()
 
-	tb := testBrowser(t)
+	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
 	p.SetContent(htmlInputButton, nil)
@@ -94,7 +94,7 @@ func TestElementHandleClick(t *testing.T) {
 func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 	t.Parallel()
 
-	tb := testBrowser(t)
+	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
 	p.SetContent(htmlInputButton, nil)
@@ -121,7 +121,7 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	t.Parallel()
 
-	tb := testBrowser(t)
+	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
 	p.SetContent(htmlInputButton, nil)

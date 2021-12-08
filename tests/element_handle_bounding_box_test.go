@@ -31,7 +31,7 @@ import (
 func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {
 	t.Parallel()
 
-	p := testBrowser(t).NewPage(nil)
+	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<div style="display:none">hello</div>`, nil)
 	element := p.Query("div")
@@ -42,7 +42,7 @@ func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {
 func TestElementHandleBoundingBoxSVG(t *testing.T) {
 	t.Parallel()
 
-	tb := testBrowser(t)
+	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
 	p.SetContent(`

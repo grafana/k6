@@ -29,7 +29,7 @@ import (
 func TestDataURLSkipRequest(t *testing.T) {
 	t.Parallel()
 
-	tb := testBrowser(t)
+	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
 	lc := attachLogCache(tb.state.Logger)

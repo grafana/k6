@@ -42,8 +42,8 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-// browser is a test browser for integration testing.
-type browser struct {
+// testBrowser is a test testBrowser for integration testing.
+type testBrowser struct {
 	ctx     context.Context
 	rt      *goja.Runtime
 	state   *k6lib.State
@@ -52,12 +52,12 @@ type browser struct {
 	api.Browser
 }
 
-// testBrowser configures and launches a chrome browser.
-// It automatically closes the browser when `t` returns.
+// newTestBrowser configures and launches a new chrome browser.
+// It automatically closes it when `t` returns.
 //
-// opts provides a way to customize the testBrowser.
+// opts provides a way to customize the newTestBrowser.
 // see: withLaunchOptions for an example.
-func testBrowser(t testing.TB, opts ...interface{}) *browser {
+func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 	ctx := context.Background()
 
 	// set default options and then customize them
@@ -134,7 +134,7 @@ func testBrowser(t testing.TB, opts ...interface{}) *browser {
 		}
 	})
 
-	tb := &browser{
+	tb := &testBrowser{
 		ctx:     bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
 		rt:      rt,
 		state:   state,
@@ -150,7 +150,7 @@ func testBrowser(t testing.TB, opts ...interface{}) *browser {
 
 // withHandler adds the given handler to the HTTP test server and makes it
 // accessible with the given pattern.
-func (b *browser) withHandler(pattern string, handler http.HandlerFunc) *browser {
+func (b *testBrowser) withHandler(pattern string, handler http.HandlerFunc) *testBrowser {
 	if b.http == nil {
 		panic("You should enable HTTP test server, see: withHTTPServer option")
 	}
@@ -165,7 +165,7 @@ const testBrowserStaticDir = "static"
 //
 // This method is for enabling the static file server after starting a test
 // browser. For early starting the file server see withFileServer function.
-func (b *browser) withFileServer() *browser {
+func (b *testBrowser) withFileServer() *testBrowser {
 	const (
 		slash = string(os.PathSeparator)
 		path  = slash + testBrowserStaticDir + slash
@@ -177,7 +177,7 @@ func (b *browser) withFileServer() *browser {
 }
 
 // URL returns the listening HTTP test server's URL combined with the given path.
-func (b *browser) URL(path string) string {
+func (b *testBrowser) URL(path string) string {
 	if b.http == nil {
 		panic("You should enable HTTP test server, see: withHTTPServer option")
 	}
@@ -185,12 +185,12 @@ func (b *browser) URL(path string) string {
 }
 
 // staticURL is a helper for URL("/`testBrowserStaticDir`/"+ path).
-func (b *browser) staticURL(path string) string {
+func (b *testBrowser) staticURL(path string) string {
 	return b.URL("/" + testBrowserStaticDir + "/" + path)
 }
 
 // attachFrame attaches the frame to the page and returns it.
-func (b *browser) attachFrame(page api.Page, frameID string, url string) api.Frame {
+func (b *testBrowser) attachFrame(page api.Page, frameID string, url string) api.Frame {
 	pageFn := `
 	async (frameId, url) => {
 		const frame = document.createElement('iframe');
