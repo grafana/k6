@@ -25,6 +25,8 @@ import (
 	"testing"
 
 	"github.com/grafana/xk6-browser/common"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBrowserTypeFlags(t *testing.T) {
@@ -35,34 +37,64 @@ func TestBrowserTypeFlags(t *testing.T) {
 
 		const devToolsFlag = "auto-open-devtools-for-tabs"
 
-		var bt BrowserType
+		var (
+			bt    BrowserType
+			lopts = &common.LaunchOptions{}
+		)
 
-		flags := bt.flags(&common.LaunchOptions{
-			Devtools: false,
-		})
-		flagi, ok := flags[devToolsFlag]
+		flags := bt.flags(lopts)
+		require.Contains(t, flags, devToolsFlag)
 
-		if !ok {
-			t.Fatalf("%q is missing", devToolsFlag)
-		}
-		flag, ok := flagi.(bool)
-		if !ok {
-			t.Fatalf("%q should be a bool", devToolsFlag)
-		}
-		if flag {
-			t.Fatalf("%q should be false when launch options Devtools is false, got %t", devToolsFlag, flag)
-		}
+		_, ok := flags[devToolsFlag].(bool)
+		require.Truef(t, ok, "%q should be a bool", devToolsFlag)
+
+		lopts.Devtools = false
+		assert.Falsef(t,
+			flags[devToolsFlag].(bool),
+			"%q should also be false if launch options Devtools is false", devToolsFlag,
+		)
 
 		flags = bt.flags(&common.LaunchOptions{
 			Devtools: true,
 		})
-		flag = flags[devToolsFlag].(bool)
-		if !flag {
-			t.Fatalf("%q should be true when launch options Devtools is true, got %t", devToolsFlag, flag)
-		}
+		assert.Truef(t,
+			flags[devToolsFlag].(bool),
+			"%q should be true when launch options Devtools is true", devToolsFlag,
+		)
 	})
 
 	t.Run("headless", func(t *testing.T) {
+		t.Parallel()
+
+		const headlessFlag = "headless"
+
+		var (
+			bt    BrowserType
+			lopts = &common.LaunchOptions{}
+		)
+
+		flags := bt.flags(lopts)
+		require.Contains(t, flags, headlessFlag)
+
+		_, ok := flags[headlessFlag].(bool)
+		require.Truef(t, ok, "%q should be a bool", headlessFlag)
+
+		lopts.Headless = false
+		assert.Falsef(t,
+			flags[headlessFlag].(bool),
+			"%q should also be false if launch options Headless is false", headlessFlag,
+		)
+
+		flags = bt.flags(&common.LaunchOptions{
+			Headless: true,
+		})
+		assert.Truef(t,
+			flags[headlessFlag].(bool),
+			"%q should be true when launch options Headless is true", headlessFlag,
+		)
+	})
+
+	t.Run("headless/enabled", func(t *testing.T) {
 		t.Parallel()
 
 		var (
@@ -77,9 +109,7 @@ func TestBrowserTypeFlags(t *testing.T) {
 		lopts.Headless = true
 		after = len(bt.flags(lopts))
 
-		if before == after {
-			t.Errorf("enabling headless mode did not add flags")
-		}
+		assert.NotEqual(t, before, after, "enabling headless mode did not add flags")
 	})
 
 	t.Run("darwin", func(t *testing.T) {
@@ -88,11 +118,15 @@ func TestBrowserTypeFlags(t *testing.T) {
 			t.Skip()
 		}
 
+		const zoomFlag = "enable-use-zoom-for-dsf"
+
 		var bt BrowserType
 		f := bt.flags(&common.LaunchOptions{})
 
-		if _, ok := f["enable-use-zoom-for-dsf"]; !ok {
-			t.Errorf("darwin should enable 'enable-use-zoom-for-dsf'")
-		}
+		assert.Containsf(t, f, zoomFlag, "darwin should disable %q", zoomFlag)
+
+		flag, ok := f[zoomFlag].(bool)
+		require.Truef(t, ok, "%q should be a bool", zoomFlag)
+		assert.False(t, flag, zoomFlag)
 	})
 }
