@@ -146,7 +146,7 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 				if msg, ok := ev.data.(*cdproto.Message); ok && msg.ID == id {
 					select {
 					case <-evCancelCtx.Done():
-						s.logger.Debugf("Session:Execute:<-evCancelCtx.Done()-2:return", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
+						s.logger.Debugf("Session:Execute:<-evCancelCtx.Done():2:return", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
 					case ch <- msg:
 						// We expect only one response with the matching message ID,
 						// then remove event handler by cancelling context and stopping goroutine.

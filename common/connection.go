@@ -192,18 +192,18 @@ func (c *Connection) closeSession(sid target.SessionID, tid target.ID) {
 }
 
 func (c *Connection) createSession(info *target.Info) (*Session, error) {
-	c.logger.Debugf("Connection:createSession", "tid:%v bid::%v type:%s", info.TargetID, info.BrowserContextID, info.Type)
+	c.logger.Debugf("Connection:createSession", "tid:%v bctxid:%v type:%s", info.TargetID, info.BrowserContextID, info.Type)
 
 	var sessionID target.SessionID
 	var err error
 	action := target.AttachToTarget(info.TargetID).WithFlatten(true)
 	if sessionID, err = action.Do(cdp.WithExecutor(c.ctx, c)); err != nil {
-		c.logger.Debugf("Connection:createSession", "tid:%v bid::%v type:%s err:%v", info.TargetID, info.BrowserContextID, info.Type, err)
+		c.logger.Debugf("Connection:createSession", "tid:%v bctxid:%v type:%s err:%v", info.TargetID, info.BrowserContextID, info.Type, err)
 		return nil, err
 	}
 	sess := c.getSession(sessionID)
 	if sess == nil {
-		c.logger.Warnf("Connection:createSession", "tid:%v bid::%v type:%s sid:%v, session is nil", info.TargetID, info.BrowserContextID, info.Type, sessionID)
+		c.logger.Warnf("Connection:createSession", "tid:%v bctxid:%v type:%s sid:%v, session is nil", info.TargetID, info.BrowserContextID, info.Type, sessionID)
 	}
 	return sess, nil
 }

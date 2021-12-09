@@ -397,7 +397,7 @@ func (m *FrameManager) MainFrame() *Frame {
 // NavigateFrame will navigate specified frame to specifed URL
 func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) api.Response {
 	m.logger.Debugf("FrameManager:NavigateFrame", "tid:%s url:%q", frame.id, url)
-	defer m.logger.Debugf("FrameManager:NavigateFrame:returns", "tid:%s url:%q", frame.id, url)
+	defer m.logger.Debugf("FrameManager:NavigateFrame:return", "tid:%s url:%q", frame.id, url)
 
 	rt := k6common.GetRuntime(m.ctx)
 	defaultReferer := m.page.mainFrameSession.getNetworkManager().extraHTTPHeaders["referer"]

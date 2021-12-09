@@ -123,7 +123,7 @@ func (b *Browser) connect() error {
 }
 
 func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
-	b.logger.Debugf("Browser:disposeContext", "bid::%v", id)
+	b.logger.Debugf("Browser:disposeContext", "bctxid:%v", id)
 	action := target.DisposeBrowserContext(id)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
 		return fmt.Errorf("unable to dispose browser context %T: %w", action, err)
@@ -203,13 +203,13 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	if ok {
 		browserCtx = bctx
 	}
-	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bcid:%v bctx nil=%t", ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID, bctx == nil)
+	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v bctx nil=%t", ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID, bctx == nil)
 	b.contextsMu.RUnlock()
 
 	// We're not interested in the top-level browser target, other targets or DevTools targets right now.
 	isDevTools := strings.HasPrefix(ev.TargetInfo.URL, "devtools://devtools")
 	if ev.TargetInfo.Type == "browser" || ev.TargetInfo.Type == "other" || isDevTools {
-		b.logger.Debugf("Browser:onAttachedToTarget:returns", "sid:%v tid:%v (devtools)", ev.SessionID, ev.TargetInfo.TargetID)
+		b.logger.Debugf("Browser:onAttachedToTarget:return", "sid:%v tid:%v (devtools)", ev.SessionID, ev.TargetInfo.TargetID)
 		return
 	}
 
@@ -219,7 +219,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
 				// If we're no longer connected to browser, then ignore WebSocket errors
-				b.logger.Debugf("Browser:onAttachedToTarget:background_page:returns", "sid:%v tid:%v websocket err:%v",
+				b.logger.Debugf("Browser:onAttachedToTarget:background_page:return", "sid:%v tid:%v websocket err:%v",
 					ev.SessionID, ev.TargetInfo.TargetID, err)
 				return
 			}
@@ -306,7 +306,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		func(data interface{}) bool {
 			mu.RLock()
 			defer mu.RUnlock()
-			b.logger.Debugf("Browser:newPageInContext:createWaitForEventHandler", "tid:%v bcid:%v", targetID, id)
+			b.logger.Debugf("Browser:newPageInContext:createWaitForEventHandler", "tid:%v bctxid:%v", targetID, id)
 			return data.(*Page).targetID == targetID
 		},
 	)
@@ -317,20 +317,20 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		localTargetID = targetID
-		b.logger.Debugf("Browser:newPageInContext:CreateTargetBlank", "tid:%v bcid:%v", localTargetID, id)
+		b.logger.Debugf("Browser:newPageInContext:CreateTargetBlank", "tid:%v bctxid:%v", localTargetID, id)
 		if targetID, err = action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
 			errCh <- fmt.Errorf("unable to execute %T: %w", action, err)
 		}
 	}()
 	select {
 	case <-b.ctx.Done():
-		b.logger.Debugf("Browser:newPageInContext:<-b.ctx.Done", "tid:%v bcid:%v", localTargetID, id)
+		b.logger.Debugf("Browser:newPageInContext:<-b.ctx.Done", "tid:%v bctxid:%v", localTargetID, id)
 	case <-time.After(b.launchOpts.Timeout):
-		b.logger.Debugf("Browser:newPageInContext:timeout", "tid:%v bcid:%v timeout:%s", localTargetID, id, b.launchOpts.Timeout)
+		b.logger.Debugf("Browser:newPageInContext:timeout", "tid:%v bctxid:%v timeout:%s", localTargetID, id, b.launchOpts.Timeout)
 	case c := <-ch:
-		b.logger.Debugf("Browser:newPageInContext:<-ch", "tid:%v bcid:%v, c:%v", localTargetID, id, c)
+		b.logger.Debugf("Browser:newPageInContext:<-ch", "tid:%v bctxid:%v, c:%v", localTargetID, id, c)
 	case err := <-errCh:
-		b.logger.Debugf("Browser:newPageInContext:<-errCh", "tid:%v bcid:%v, err:%v", localTargetID, id, err)
+		b.logger.Debugf("Browser:newPageInContext:<-errCh", "tid:%v bctxid:%v, err:%v", localTargetID, id, err)
 		return nil, err
 	}
 	b.pagesMu.RLock()
@@ -381,7 +381,7 @@ func (b *Browser) IsConnected() bool {
 func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 	action := target.CreateBrowserContext().WithDisposeOnDetach(true)
 	browserContextID, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
-	b.logger.Debugf("Browser:NewContext", "bcid:%v", browserContextID)
+	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
 	if err != nil {
 		k6Throw(b.ctx, "cannot create browser context (%s): %w", browserContextID, err)
 	}

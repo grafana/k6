@@ -46,6 +46,12 @@ type ExecutionContext struct {
 	frame          *Frame
 	id             runtime.ExecutionContextID
 	injectedScript api.JSHandle
+
+	// Used for logging
+	sid  target.SessionID // Session ID
+	stid cdp.FrameID      // Session TargetID
+	fid  cdp.FrameID      // Frame ID
+	furl string           // Frame URL
 }
 
 // NewExecutionContext creates a new JS execution context
@@ -53,22 +59,7 @@ func NewExecutionContext(
 	ctx context.Context, session *Session, frame *Frame,
 	id runtime.ExecutionContextID, logger *Logger,
 ) *ExecutionContext {
-	var (
-		sid  target.SessionID
-		fid  cdp.FrameID
-		furl string
-	)
-	if session != nil {
-		sid = session.id
-	}
-	if frame != nil {
-		fid = frame.id
-		furl = frame.url
-	}
-	logger.Debugf("NewExecutionContext", "sid:%s tid:%s ecid:%d furl:%q",
-		sid, fid, id, furl)
-
-	return &ExecutionContext{
+	e := &ExecutionContext{
 		ctx:            ctx,
 		session:        session,
 		frame:          frame,
@@ -76,12 +67,29 @@ func NewExecutionContext(
 		injectedScript: nil,
 		logger:         logger,
 	}
+
+	if session != nil {
+		e.sid = session.id
+		e.stid = cdp.FrameID(session.targetID)
+	}
+	if frame != nil {
+		e.fid = frame.id
+		e.furl = frame.url
+	}
+	logger.Debugf(
+		"NewExecutionContext",
+		"sid:%s stid:%s fid:%s ectxid:%d furl:%q",
+		e.sid, e.stid, e.fid, id, e.furl)
+
+	return e
 }
 
 // Adopts specified backend node into this execution context from another execution context
-func (e *ExecutionContext) adoptBackendNodeId(backendNodeID cdp.BackendNodeID) (*ElementHandle, error) {
-	e.logger.Debugf("ExecutionContext:adoptBackendNodeId", "sid:%s tid:%s tid:%s ecid:%d furl:%q bnid:%d",
-		e.session.id, e.session.targetID, e.frame.id, e.id, e.frame.url, backendNodeID)
+func (e *ExecutionContext) adoptBackendNodeID(backendNodeID cdp.BackendNodeID) (*ElementHandle, error) {
+	e.logger.Debugf(
+		"ExecutionContext:adoptBackendNodeID",
+		"sid:%s stid:%s fid:%s ectxid:%d furl:%q bnid:%d",
+		e.sid, e.stid, e.fid, e.id, e.furl, backendNodeID)
 
 	var (
 		remoteObj *runtime.RemoteObject
@@ -93,19 +101,31 @@ func (e *ExecutionContext) adoptBackendNodeId(backendNodeID cdp.BackendNodeID) (
 		WithExecutionContextID(e.id)
 
 	if remoteObj, err = action.Do(cdp.WithExecutor(e.ctx, e.session)); err != nil {
-		return nil, fmt.Errorf("cannot resolve dom node: %w", err)
+		return nil, fmt.Errorf("cannot resolve DOM node: %w", err)
 	}
 
 	return NewJSHandle(e.ctx, e.session, e, e.frame, remoteObj, e.logger).AsElement().(*ElementHandle), nil
 }
 
 // Adopts the specified element handle into this execution context from another execution context
-func (e *ExecutionContext) adoptElementHandle(elementHandle *ElementHandle) (*ElementHandle, error) {
-	e.logger.Debugf("ExecutionContext:adoptElementHandle", "sid:%s tid:%s tid:%s ecid:%d furl:%q ehtid:%s ehsid:%s",
-		e.session.id, e.session.targetID, e.frame.id, e.id, e.frame.url,
-		elementHandle.frame.id, elementHandle.session.id)
+func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle, error) {
+	var (
+		efid cdp.FrameID
+		esid target.SessionID
+	)
+	if eh.frame != nil {
+		efid = eh.frame.id
+	}
+	if eh.session != nil {
+		esid = eh.session.id
+	}
+	e.logger.Debugf(
+		"ExecutionContext:adoptElementHandle",
+		"sid:%s stid:%s fid:%s ectxid:%d furl:%q ehtid:%s ehsid:%s",
+		e.sid, e.stid, e.fid, e.id, e.furl,
+		efid, esid)
 
-	if elementHandle.execCtx == e {
+	if eh.execCtx == e {
 		panic("Cannot adopt handle that already belongs to this execution context")
 	}
 	if e.frame == nil {
@@ -115,18 +135,25 @@ func (e *ExecutionContext) adoptElementHandle(elementHandle *ElementHandle) (*El
 	var node *cdp.Node
 	var err error
 
-	action := dom.DescribeNode().WithObjectID(elementHandle.remoteObject.ObjectID)
+	action := dom.DescribeNode().WithObjectID(eh.remoteObject.ObjectID)
 	if node, err = action.Do(cdp.WithExecutor(e.ctx, e.session)); err != nil {
-		return nil, fmt.Errorf("cannot describe dom node: %w", err)
+		return nil, fmt.Errorf("cannot describe DOM node: %w", err)
 	}
 
-	return e.adoptBackendNodeId(node.BackendNodeID)
+	return e.adoptBackendNodeID(node.BackendNodeID)
 }
 
-// evaluate will evaluate provided callable within this execution context and return by value or handle
-func (e *ExecutionContext) evaluate(apiCtx context.Context, forceCallable bool, returnByValue bool, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
-	e.logger.Debugf("ExecutionContext:evaluate", "sid:%s tid:%s tid:%s ecid:%d furl:%q",
-		e.session.id, e.session.targetID, e.frame.id, e.id, e.frame.url)
+// evaluate will evaluate provided callable within this execution context
+// and return by value or handle
+func (e *ExecutionContext) evaluate(
+	apiCtx context.Context,
+	forceCallable bool, returnByValue bool,
+	pageFunc goja.Value, args ...goja.Value,
+) (res interface{}, err error) {
+	e.logger.Debugf(
+		"ExecutionContext:evaluate",
+		"sid:%s stid:%s fid:%s ectxid:%d furl:%q forceCallable:%t returnByvalue:%t",
+		e.sid, e.stid, e.fid, e.id, e.furl, forceCallable, returnByValue)
 
 	suffix := `//# sourceURL=` + evaluationScriptURL
 
@@ -181,21 +208,21 @@ func (e *ExecutionContext) evaluate(apiCtx context.Context, forceCallable bool, 
 		}
 
 		var (
-			remoteObject     *runtime.RemoteObject
-			exceptionDetails *runtime.ExceptionDetails
-			functionOn       = expression + "\n" + suffix + "\n"
+			remoteObject            *runtime.RemoteObject
+			exceptionDetails        *runtime.ExceptionDetails
+			expressionWithSourceURL = expression + "\n" + suffix + "\n"
 		)
-		action := runtime.CallFunctionOn(functionOn).
+		action := runtime.CallFunctionOn(expressionWithSourceURL).
 			WithArguments(arguments).
 			WithExecutionContextID(e.id).
 			WithReturnByValue(returnByValue).
 			WithAwaitPromise(true).
 			WithUserGesture(true)
 		if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
-			return nil, fmt.Errorf("cannot call function on expression (%q) in execution context (%d): %w", functionOn, e.id, err)
+			return nil, fmt.Errorf("cannot call function on expression (%q) in execution context (%d): %w", expressionWithSourceURL, e.id, err)
 		}
 		if exceptionDetails != nil {
-			return nil, fmt.Errorf("cannot call function on expression (%q) in execution context (%d): %w", functionOn, e.id, err)
+			return nil, fmt.Errorf("cannot call function on expression (%q) in execution context (%d): %w", expressionWithSourceURL, e.id, err)
 		}
 		if remoteObject == nil {
 			return
@@ -216,8 +243,10 @@ func (e *ExecutionContext) evaluate(apiCtx context.Context, forceCallable bool, 
 
 // getInjectedScript returns a JS handle to the injected script of helper functions
 func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHandle, error) {
-	e.logger.Debugf("ExecutionContext:getInjectedScript", "sid:%s tid:%s tid:%s ecid:%d furl:%q",
-		e.session.id, e.session.targetID, e.frame.id, e.id, e.frame.url)
+	e.logger.Debugf(
+		"ExecutionContext:getInjectedScript",
+		"sid:%s stid:%s fid:%s ectxid:%d efurl:%s",
+		e.sid, e.stid, e.fid, e.id, e.furl)
 
 	if e.injectedScript == nil {
 		rt := k6common.GetRuntime(e.ctx)
@@ -239,12 +268,18 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 }
 
 // Evaluate will evaluate provided page function within this execution context
-func (e *ExecutionContext) Evaluate(apiCtx context.Context, pageFunc goja.Value, args ...goja.Value) (interface{}, error) {
+func (e *ExecutionContext) Evaluate(
+	apiCtx context.Context,
+	pageFunc goja.Value, args ...goja.Value,
+) (interface{}, error) {
 	return e.evaluate(apiCtx, true, true, pageFunc, args...)
 }
 
 // EvaluateHandle will evaluate provided page function within this execution context
-func (e *ExecutionContext) EvaluateHandle(apiCtx context.Context, pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
+func (e *ExecutionContext) EvaluateHandle(
+	apiCtx context.Context,
+	pageFunc goja.Value, args ...goja.Value,
+) (api.JSHandle, error) {
 	res, err := e.evaluate(apiCtx, true, false, pageFunc, args...)
 	if err != nil {
 		return nil, err

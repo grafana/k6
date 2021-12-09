@@ -55,7 +55,6 @@ type Page struct {
 	targetID        target.ID
 	opener          *Page
 	frameManager    *FrameManager
-	viewport        *Viewport
 	timeoutSettings *TimeoutSettings
 
 	jsEnabled        bool
@@ -151,12 +150,14 @@ func (p *Page) defaultTimeout() time.Duration {
 
 func (p *Page) didClose() {
 	p.logger.Debugf("Page:didClose", "sid:%v", p.session.id)
+
 	p.closed = true
 	p.emit(EventPageClose, p)
 }
 
 func (p *Page) didCrash() {
 	p.logger.Debugf("Page:didCrash", "sid:%v", p.session.id)
+
 	p.frameManager.dispose()
 	p.emit(EventPageCrash, p)
 }
@@ -167,6 +168,7 @@ func (p *Page) evaluateOnNewDocument(source string) {
 
 func (p *Page) getFrameElement(f *Frame) (*ElementHandle, error) {
 	p.logger.Debugf("Page:getFrameElement", "sid:%v", p.session.id)
+
 	parent := f.parentFrame
 	if parent == nil {
 		return nil, errors.New("frame has been detached 1")
@@ -186,12 +188,13 @@ func (p *Page) getFrameElement(f *Frame) (*ElementHandle, error) {
 	if parent == nil {
 		return nil, errors.New("frame has been detached 2")
 	}
-	handle, err := parent.mainExecutionContext.adoptBackendNodeId(backendNodeId)
+	handle, err := parent.mainExecutionContext.adoptBackendNodeID(backendNodeId)
 	return handle, err
 }
 
 func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.FrameID {
 	p.logger.Debugf("Page:getOwnerFrame", "sid:%v", p.session.id)
+
 	// document.documentElement has frameId of the owner frame
 	rt := k6common.GetRuntime(p.ctx)
 	pageFn := rt.ToValue(`
@@ -229,6 +232,7 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.Frame
 
 func (p *Page) getFrameSession(frameID cdp.FrameID) *FrameSession {
 	p.logger.Debugf("Page:getFrameSession", "sid:%v fid=%v", p.session.id, frameID)
+
 	return p.frameSessions[frameID]
 }
 
@@ -295,22 +299,23 @@ func (p *Page) viewportSize() Size {
 // AddInitScript adds script to run in all new frames
 func (p *Page) AddInitScript(script goja.Value, arg goja.Value) {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.addInitScript(script, arg) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.addInitScript(script, arg) has not been implemented yet"))
 }
 
 func (p *Page) AddScriptTag(opts goja.Value) {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.addScriptTag(opts) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.addScriptTag(opts) has not been implemented yet"))
 }
 
 func (p *Page) AddStyleTag(opts goja.Value) {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.addStyleTag(opts) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.addStyleTag(opts) has not been implemented yet"))
 }
 
 // BringToFront activates the browser tab for this page
 func (p *Page) BringToFront() {
 	p.logger.Debugf("Page:BringToFront", "sid:%v", p.session.id)
+
 	rt := k6common.GetRuntime(p.ctx)
 	action := cdppage.BringToFront()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
@@ -350,12 +355,13 @@ func (p *Page) Dblclick(selector string, opts goja.Value) {
 
 func (p *Page) DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value) {
 	p.logger.Debugf("Page:DispatchEvent", "sid:%v selector:%q", p.session.id, selector)
+
 	p.MainFrame().DispatchEvent(selector, typ, eventInit, opts)
 }
 
 func (p *Page) DragAndDrop(source string, target string, opts goja.Value) {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.DragAndDrop(source, target, opts) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.DragAndDrop(source, target, opts) has not been implemented yet"))
 }
 
 func (p *Page) EmulateMedia(opts goja.Value) {
@@ -413,12 +419,12 @@ func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHan
 
 func (p *Page) ExposeBinding(name string, callback goja.Callable, opts goja.Value) {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.exposeBinding(name, callback) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.exposeBinding(name, callback) has not been implemented yet"))
 }
 
 func (p *Page) ExposeFunction(name string, callback goja.Callable) {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.exposeFunction(name, callback) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.exposeFunction(name, callback) has not been implemented yet"))
 }
 
 func (p *Page) Fill(selector string, value string, opts goja.Value) {
@@ -431,7 +437,7 @@ func (p *Page) Focus(selector string, opts goja.Value) {
 
 func (p *Page) Frame(frameSelector goja.Value) api.Frame {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.frame(frameSelector) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.frame(frameSelector) has not been implemented yet"))
 	return nil
 }
 
@@ -446,13 +452,13 @@ func (p *Page) GetAttribute(selector string, name string, opts goja.Value) goja.
 
 func (p *Page) GoBack(opts goja.Value) api.Response {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.goBack(opts) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.goBack(opts) has not been implemented yet"))
 	return nil
 }
 
 func (p *Page) GoForward(opts goja.Value) api.Response {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.goForward(opts) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.goForward(opts) has not been implemented yet"))
 	return nil
 }
 
@@ -518,12 +524,12 @@ func (p *Page) Opener() api.Page {
 
 func (p *Page) Pause() {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.pause() has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.pause() has not been implemented yet"))
 }
 
 func (p *Page) Pdf(opts goja.Value) goja.ArrayBuffer {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.pdf(opts) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.pdf(opts) has not been implemented yet"))
 	return rt.NewArrayBuffer([]byte{})
 }
 
@@ -533,17 +539,20 @@ func (p *Page) Press(selector string, key string, opts goja.Value) {
 
 func (p *Page) Query(selector string) api.ElementHandle {
 	p.logger.Debugf("Page:Query", "sid:%v selector:%q", p.session.id, selector)
+
 	return p.frameManager.MainFrame().Query(selector)
 }
 
 func (p *Page) QueryAll(selector string) []api.ElementHandle {
 	p.logger.Debugf("Page:QueryAll", "sid:%v selector:%q", p.session.id, selector)
+
 	return p.frameManager.MainFrame().QueryAll(selector)
 }
 
 // Reload will reload the current page
 func (p *Page) Reload(opts goja.Value) api.Response {
 	p.logger.Debugf("Page:Reload", "sid:%v", p.session.id)
+
 	rt := k6common.GetRuntime(p.ctx)
 	parsedOpts := NewPageReloadOptions(LifecycleEventLoad, p.defaultTimeout())
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
@@ -588,7 +597,7 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 
 func (p *Page) Route(url goja.Value, handler goja.Callable) {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.route(url, handler) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.route(url, handler) has not been implemented yet"))
 }
 
 // Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file
@@ -617,12 +626,14 @@ func (p *Page) SetContent(html string, opts goja.Value) {
 // SetDefaultNavigationTimeout sets the default navigation timeout in milliseconds
 func (p *Page) SetDefaultNavigationTimeout(timeout int64) {
 	p.logger.Debugf("Page:SetDefaultNavigationTimeout", "sid:%v timeout=%d", p.session.id, timeout)
+
 	p.timeoutSettings.setDefaultNavigationTimeout(timeout)
 }
 
 // SetDefaultTimeout sets the default maximum timeout in milliseconds
 func (p *Page) SetDefaultTimeout(timeout int64) {
 	p.logger.Debugf("Page:SetDefaultTimeout", "sid:%v timeout=%d", p.session.id, timeout)
+
 	p.timeoutSettings.setDefaultTimeout(timeout)
 }
 
@@ -634,13 +645,14 @@ func (p *Page) SetExtraHTTPHeaders(headers map[string]string) {
 
 func (p *Page) SetInputFiles(selector string, files goja.Value, opts goja.Value) {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.textContent(selector, opts) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.textContent(selector, opts) has not been implemented yet"))
 	// TODO: needs slowMo
 }
 
 // SetViewportSize will update the viewport width and height
 func (p *Page) SetViewportSize(viewportSize goja.Value) {
 	p.logger.Debugf("Page:SetViewportSize", "sid:%v", p.session.id)
+
 	rt := k6common.GetRuntime(p.ctx)
 	s := &Size{}
 	if err := s.Parse(p.ctx, viewportSize); err != nil {
@@ -676,7 +688,7 @@ func (p *Page) Uncheck(selector string, opts goja.Value) {
 
 func (p *Page) Unroute(url goja.Value, handler goja.Callable) {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.unroute(url, handler) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.unroute(url, handler) has not been implemented yet"))
 }
 
 // URL returns the location of the page
@@ -688,7 +700,7 @@ func (p *Page) URL() string {
 // Video returns information of recorded video
 func (p *Page) Video() api.Video {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.video() has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.video() has not been implemented yet"))
 	return nil
 }
 
@@ -704,49 +716,57 @@ func (p *Page) ViewportSize() map[string]float64 {
 // WaitForEvent waits for the specified event to trigger
 func (p *Page) WaitForEvent(event string, optsOrPredicate goja.Value) interface{} {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.waitForEvent(event, optsOrPredicate) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.waitForEvent(event, optsOrPredicate) has not been implemented yet"))
 	return nil
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value
 func (p *Page) WaitForFunction(pageFunc goja.Value, arg goja.Value, opts goja.Value) api.JSHandle {
 	p.logger.Debugf("Page:WaitForFunction", "sid:%v", p.session.id)
+
 	return p.frameManager.MainFrame().WaitForFunction(pageFunc, opts, arg)
 }
 
 // WaitForLoadState waits for the specified page life cycle event
 func (p *Page) WaitForLoadState(state string, opts goja.Value) {
 	p.logger.Debugf("Page:WaitForLoadState", "sid:%v state=%q", p.session.id, state)
+
 	p.frameManager.MainFrame().WaitForLoadState(state, opts)
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen
 func (p *Page) WaitForNavigation(opts goja.Value) api.Response {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.session.id)
+
 	return p.frameManager.MainFrame().WaitForNavigation(opts)
 }
 
 func (p *Page) WaitForRequest(urlOrPredicate, opts goja.Value) api.Request {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.waitForRequest(urlOrPredicate, opts) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.waitForRequest(urlOrPredicate, opts) has not been implemented yet"))
 	return nil
 }
 
 func (p *Page) WaitForResponse(urlOrPredicate, opts goja.Value) api.Response {
 	rt := k6common.GetRuntime(p.ctx)
-	k6common.Throw(rt, errors.New("Page.waitForResponse(urlOrPredicate, opts) has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Page.waitForResponse(urlOrPredicate, opts) has not been implemented yet"))
 	return nil
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria
 func (p *Page) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
-	p.logger.Debugf("Page:WaitForSelector", "sid:%v stid:%v ptid:%v selector:%q", p.session.id, p.session.targetID, p.targetID, selector)
+	p.logger.Debugf(
+		"Page:WaitForSelector",
+		"sid:%v stid:%v ptid:%v selector:%q",
+		p.session.id, p.session.targetID, p.targetID, selector)
+
 	return p.frameManager.MainFrame().WaitForSelector(selector, opts)
 }
 
 // WaitForTimeout waits the specified number of milliseconds
 func (p *Page) WaitForTimeout(timeout int64) {
 	p.logger.Debugf("Page:WaitForTimeout", "sid:%v timeout=%d", p.session.id, timeout)
+
 	p.frameManager.MainFrame().WaitForTimeout(timeout)
 }
 
