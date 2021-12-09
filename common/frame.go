@@ -117,8 +117,8 @@ type Frame struct {
 
 	documentHandle *ElementHandle
 
-	mainExecutionContext             *ExecutionContext
-	utilityExecutionContext          *ExecutionContext
+	mainExecutionContext             frameExecutionContext
+	utilityExecutionContext          frameExecutionContext
 	mainExecutionContextCh           chan bool
 	utilityExecutionContextCh        chan bool
 	mainExecutionContextHasWaited    int32
@@ -311,11 +311,17 @@ func (f *Frame) document() (*ElementHandle, error) {
 	if f.documentHandle != nil {
 		return f.documentHandle, nil
 	}
+
 	f.waitForExecutionContext("main")
+
 	result, err := f.mainExecutionContext.evaluate(f.ctx, false, false, rt.ToValue("document"), nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("frame document: cannot evaluate in main execution context: %w", err)
 	}
+	if result == nil {
+		return nil, errors.New("frame document: evaluate result is nil in main execution context")
+	}
+
 	f.documentHandle = result.(*ElementHandle)
 	return f.documentHandle, err
 }
@@ -350,10 +356,10 @@ func (f *Frame) navigated(name string, url string, loaderID string) {
 }
 
 func (f *Frame) nullContext(execCtxID runtime.ExecutionContextID) {
-	if f.mainExecutionContext != nil && f.mainExecutionContext.id == execCtxID {
+	if f.mainExecutionContext != nil && f.mainExecutionContext.ID() == execCtxID {
 		f.mainExecutionContext = nil
 		f.documentHandle = nil
-	} else if f.utilityExecutionContext != nil && f.utilityExecutionContext.id == execCtxID {
+	} else if f.utilityExecutionContext != nil && f.utilityExecutionContext.ID() == execCtxID {
 		f.utilityExecutionContext = nil
 	}
 }
@@ -412,7 +418,7 @@ func (f *Frame) requestByID(reqID network.RequestID) *Request {
 	return frameSession.networkManager.requestFromID(reqID)
 }
 
-func (f *Frame) setContext(world string, execCtx *ExecutionContext) {
+func (f *Frame) setContext(world string, execCtx frameExecutionContext) {
 	if world == "main" {
 		f.mainExecutionContext = execCtx
 		if len(f.mainExecutionContextCh) == 0 {
@@ -507,13 +513,13 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 
 func (f *Frame) AddScriptTag(opts goja.Value) {
 	rt := k6common.GetRuntime(f.ctx)
-	k6common.Throw(rt, errors.New("Frame.AddScriptTag() has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Frame.AddScriptTag() has not been implemented yet"))
 	applySlowMo(f.ctx)
 }
 
 func (f *Frame) AddStyleTag(opts goja.Value) {
 	rt := k6common.GetRuntime(f.ctx)
-	k6common.Throw(rt, errors.New("Frame.AddStyleTag() has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("Frame.AddStyleTag() has not been implemented yet"))
 	applySlowMo(f.ctx)
 }
 
@@ -1243,4 +1249,47 @@ func (f *Frame) WaitForTimeout(timeout int64) {
 	case <-f.ctx.Done():
 	case <-time.After(time.Duration(timeout) * time.Millisecond):
 	}
+}
+
+// frameExecutionContext represents a JS execution context that belongs to Frame.
+type frameExecutionContext interface {
+	// adoptBackendNodeId adopts specified backend node into this execution
+	// context from another execution context.
+	adoptBackendNodeId(backendNodeID cdp.BackendNodeID) (*ElementHandle, error)
+
+	// adoptElementHandle adopts the specified element handle into this
+	// execution context from another execution context.
+	adoptElementHandle(elementHandle *ElementHandle) (*ElementHandle, error)
+
+	// evaluate will evaluate provided callable within this execution
+	// context and return by value or handle.
+	evaluate(
+		apiCtx context.Context,
+		forceCallable bool, returnByValue bool,
+		pageFunc goja.Value, args ...goja.Value,
+	) (res interface{}, err error)
+
+	// getInjectedScript returns a JS handle to the injected script of helper
+	// functions.
+	getInjectedScript(apiCtx context.Context) (api.JSHandle, error)
+
+	// Evaluate will evaluate provided page function within this execution
+	// context.
+	Evaluate(
+		apiCtx context.Context,
+		pageFunc goja.Value, args ...goja.Value,
+	) (interface{}, error)
+
+	// EvaluateHandle will evaluate provided page function within this
+	// execution context.
+	EvaluateHandle(
+		apiCtx context.Context,
+		pageFunc goja.Value, args ...goja.Value,
+	) (api.JSHandle, error)
+
+	// Frame returns the frame that this execution context belongs to.
+	Frame() *Frame
+
+	// id returns the CDP runtime ID of this execution context.
+	ID() runtime.ExecutionContextID
 }

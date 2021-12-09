@@ -217,3 +217,8 @@ func (e *ExecutionContext) EvaluateHandle(apiCtx context.Context, pageFunc goja.
 func (e *ExecutionContext) Frame() *Frame {
 	return e.frame
 }
+
+// ID returns the CDP runtime ID of this execution context.
+func (e *ExecutionContext) ID() runtime.ExecutionContextID {
+	return e.id
+}
