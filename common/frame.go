@@ -319,7 +319,7 @@ func (f *Frame) document() (*ElementHandle, error) {
 		return f.documentHandle, nil
 	}
 
-	f.waitForExecutionContext(mainExecutionContext)
+	f.waitForExecutionContext(mainWorld)
 
 	var (
 		result interface{}
@@ -346,9 +346,9 @@ func (f *Frame) hasContext(world string) bool {
 	defer f.executionContextMu.RUnlock()
 
 	switch world {
-	case mainExecutionContext:
+	case mainWorld:
 		return f.mainExecutionContext != nil
-	case utilityExecutionContext:
+	case utilityWorld:
 		return f.utilityExecutionContext != nil
 	}
 	return false // Should never reach here!
@@ -461,11 +461,11 @@ func (f *Frame) setContext(world string, execCtx frameExecutionContext) {
 		f.ID(), f.URL(), execCtx.ID(), world)
 
 	switch world {
-	case mainExecutionContext:
+	case mainWorld:
 		if f.mainExecutionContext == nil {
 			f.mainExecutionContext = execCtx
 		}
-	case utilityExecutionContext:
+	case utilityWorld:
 		if f.utilityExecutionContext == nil {
 			f.utilityExecutionContext = execCtx
 		}
@@ -524,7 +524,7 @@ func (f *Frame) waitForFunction(apiCtx context.Context, world string, predicateF
 	defer f.executionContextMu.RUnlock()
 
 	execCtx := f.mainExecutionContext
-	if world == utilityExecutionContext {
+	if world == utilityWorld {
 		execCtx = f.utilityExecutionContext
 	}
 	injected, err := execCtx.getInjectedScript(apiCtx)
@@ -722,7 +722,7 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) (result interf
 
 	rt := k6common.GetRuntime(f.ctx)
 
-	f.waitForExecutionContext(mainExecutionContext)
+	f.waitForExecutionContext(mainWorld)
 
 	var err error
 	f.executionContextMu.RLock()
@@ -744,7 +744,7 @@ func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle 
 
 	rt := k6common.GetRuntime(f.ctx)
 
-	f.waitForExecutionContext(mainExecutionContext)
+	f.waitForExecutionContext(mainWorld)
 
 	var err error
 	f.executionContextMu.RLock()
@@ -1377,7 +1377,7 @@ func (f *Frame) WaitForFunction(pageFunc goja.Value, opts goja.Value, args ...go
 		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
-	handle, err := f.waitForFunction(f.ctx, utilityExecutionContext, pageFunc, parsedOpts.Polling, parsedOpts.Interval, parsedOpts.Timeout, args...)
+	handle, err := f.waitForFunction(f.ctx, utilityWorld, pageFunc, parsedOpts.Polling, parsedOpts.Interval, parsedOpts.Timeout, args...)
 	if err != nil {
 		k6common.Throw(rt, err)
 	}

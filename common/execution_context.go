@@ -39,8 +39,8 @@ const evaluationScriptURL = "__xk6_browser_evaluation_script__"
 var sourceURLRegex = regexp.MustCompile(`^(?s)[\040\t]*//[@#] sourceURL=\s*(\S*?)\s*$`)
 
 const (
-	mainExecutionContext    = "main"
-	utilityExecutionContext = "utility"
+	mainWorld    = "main"
+	utilityWorld = "utility"
 )
 
 // ExecutionContext represents a JS execution context
