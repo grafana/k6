@@ -51,6 +51,10 @@ func NullLogger() *logrus.Logger {
 	return log
 }
 
+func NewNullLogger() *Logger {
+	return NewLogger(context.TODO(), NullLogger(), false, nil)
+}
+
 func NewLogger(ctx context.Context, logger *logrus.Logger, debugOverride bool, categoryFilter *regexp.Regexp) *Logger {
 	return &Logger{
 		ctx:            ctx,

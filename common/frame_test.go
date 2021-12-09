@@ -36,10 +36,10 @@ func TestFrameNilDocument(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	logger := NewLogger(ctx, NullLogger(), false, nil)
+	log := NewNullLogger()
 
-	fm := NewFrameManager(ctx, nil, nil, nil, logger)
-	frame := NewFrame(ctx, fm, nil, cdp.FrameID("42"), logger)
+	fm := NewFrameManager(ctx, nil, nil, nil, log)
+	frame := NewFrame(ctx, fm, nil, cdp.FrameID("42"), log)
 
 	// frame should not panic with a nil document
 	stub := &executionContextTestStub{
