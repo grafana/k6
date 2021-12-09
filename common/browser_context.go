@@ -247,7 +247,7 @@ func (b *BrowserContext) SetExtraHTTPHeaders(headers map[string]string) {
 func (b *BrowserContext) SetGeolocation(geolocation goja.Value) {
 	g := NewGeolocation()
 	if err := g.Parse(b.ctx, geolocation); err != nil {
-		k6Throw(b.ctx, "cannot set geo location: %w", err)
+		k6Throw(b.ctx, "cannot parse geo location: %w", err)
 	}
 
 	b.opts.Geolocation = g
@@ -262,7 +262,7 @@ func (b *BrowserContext) SetGeolocation(geolocation goja.Value) {
 func (b *BrowserContext) SetHTTPCredentials(httpCredentials goja.Value) {
 	c := NewCredentials()
 	if err := c.Parse(b.ctx, httpCredentials); err != nil {
-		k6Throw(b.ctx, "cannot set http credentials: %w", err)
+		k6Throw(b.ctx, "cannot set HTTP credentials: %w", err)
 	}
 
 	b.opts.HttpCredentials = c
