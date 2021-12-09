@@ -1283,7 +1283,7 @@ func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 	arrayHandle := result.(api.JSHandle)
 	defer arrayHandle.Dispose()
 	properties := arrayHandle.GetProperties()
-	elements := make([]api.ElementHandle, len(properties))
+	elements := make([]api.ElementHandle, 0, len(properties))
 	for _, property := range properties {
 		elementHandle := property.AsElement()
 		if elementHandle != nil {
