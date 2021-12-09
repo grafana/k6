@@ -23,13 +23,16 @@ package common
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
 )
 
-func TestFrameDocument_Issue53(t *testing.T) {
+// Test calling Frame.document does not panic with a nil document.
+// See: issue #53 for details.
+func TestFrameNilDocument(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -45,7 +48,16 @@ func TestFrameDocument_Issue53(t *testing.T) {
 	}
 
 	// document() waits for the main execution context
-	go frame.setContext("main", stub)
+	ok := make(chan struct{}, 1)
+	go func() {
+		frame.setContext("main", stub)
+		ok <- struct{}{}
+	}()
+	select {
+	case <-ok:
+	case <-time.After(time.Second):
+		require.FailNow(t, "cannot set the main execution context, frame.setContext timed out")
+	}
 
 	require.NotPanics(t, func() {
 		_, err := frame.document()

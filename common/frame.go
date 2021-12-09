@@ -319,7 +319,7 @@ func (f *Frame) document() (*ElementHandle, error) {
 		return nil, fmt.Errorf("frame document: cannot evaluate in main execution context: %w", err)
 	}
 	if result == nil {
-		return nil, fmt.Errorf("frame document: evaluate result is nil in main execution context: %w", err)
+		return nil, errors.New("frame document: evaluate result is nil in main execution context")
 	}
 
 	f.documentHandle = result.(*ElementHandle)
@@ -1248,4 +1248,47 @@ func (f *Frame) WaitForTimeout(timeout int64) {
 	case <-f.ctx.Done():
 	case <-time.After(time.Duration(timeout) * time.Millisecond):
 	}
+}
+
+// frameExecutionContext represents a JS execution context that belongs to Frame.
+type frameExecutionContext interface {
+	// adoptBackendNodeId adopts specified backend node into this execution
+	// context from another execution context.
+	adoptBackendNodeId(backendNodeID cdp.BackendNodeID) (*ElementHandle, error)
+
+	// adoptElementHandle adopts the specified element handle into this
+	// execution context from another execution context.
+	adoptElementHandle(elementHandle *ElementHandle) (*ElementHandle, error)
+
+	// evaluate will evaluate provided callable within this execution
+	// context and return by value or handle.
+	evaluate(
+		apiCtx context.Context,
+		forceCallable bool, returnByValue bool,
+		pageFunc goja.Value, args ...goja.Value,
+	) (res interface{}, err error)
+
+	// getInjectedScript returns a JS handle to the injected script of helper
+	// functions.
+	getInjectedScript(apiCtx context.Context) (api.JSHandle, error)
+
+	// Evaluate will evaluate provided page function within this execution
+	// context.
+	Evaluate(
+		apiCtx context.Context,
+		pageFunc goja.Value, args ...goja.Value,
+	) (interface{}, error)
+
+	// EvaluateHandle will evaluate provided page function within this
+	// execution context.
+	EvaluateHandle(
+		apiCtx context.Context,
+		pageFunc goja.Value, args ...goja.Value,
+	) (api.JSHandle, error)
+
+	// Frame returns the frame that this execution context belongs to.
+	Frame() *Frame
+
+	// id returns the CDP runtime ID of this execution context.
+	ID() runtime.ExecutionContextID
 }
