@@ -123,7 +123,7 @@ func TestBrowserTypeFlags(t *testing.T) {
 		var bt BrowserType
 		f := bt.flags(&common.LaunchOptions{})
 
-		assert.Containsf(t, f, zoomFlag, "darwin should disable %q", zoomFlag)
+		assert.Containsf(t, f, zoomFlag, "%q should exist for OSX (darwin)", zoomFlag)
 
 		flag, ok := f[zoomFlag].(bool)
 		require.Truef(t, ok, "%q should be a bool", zoomFlag)
