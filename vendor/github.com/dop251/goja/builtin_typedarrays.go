@@ -197,7 +197,7 @@ func (r *Runtime) dataViewProto_getBuffer(call FunctionCall) Value {
 	if dv, ok := r.toObject(call.This).self.(*dataViewObject); ok {
 		return dv.viewedArrayBuf.val
 	}
-	panic(r.NewTypeError("Method get DataView.prototype.buffer called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method get DataView.prototype.buffer called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_getByteLen(call FunctionCall) Value {
@@ -205,7 +205,7 @@ func (r *Runtime) dataViewProto_getByteLen(call FunctionCall) Value {
 		dv.viewedArrayBuf.ensureNotDetached(true)
 		return intToValue(int64(dv.byteLen))
 	}
-	panic(r.NewTypeError("Method get DataView.prototype.byteLength called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method get DataView.prototype.byteLength called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_getByteOffset(call FunctionCall) Value {
@@ -213,21 +213,21 @@ func (r *Runtime) dataViewProto_getByteOffset(call FunctionCall) Value {
 		dv.viewedArrayBuf.ensureNotDetached(true)
 		return intToValue(int64(dv.byteOffset))
 	}
-	panic(r.NewTypeError("Method get DataView.prototype.byteOffset called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method get DataView.prototype.byteOffset called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_getFloat32(call FunctionCall) Value {
 	if dv, ok := r.toObject(call.This).self.(*dataViewObject); ok {
 		return floatToValue(float64(dv.viewedArrayBuf.getFloat32(dv.getIdxAndByteOrder(r.toIndex(call.Argument(0)), call.Argument(1), 4))))
 	}
-	panic(r.NewTypeError("Method DataView.prototype.getFloat32 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.getFloat32 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_getFloat64(call FunctionCall) Value {
 	if dv, ok := r.toObject(call.This).self.(*dataViewObject); ok {
 		return floatToValue(dv.viewedArrayBuf.getFloat64(dv.getIdxAndByteOrder(r.toIndex(call.Argument(0)), call.Argument(1), 8)))
 	}
-	panic(r.NewTypeError("Method DataView.prototype.getFloat64 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.getFloat64 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_getInt8(call FunctionCall) Value {
@@ -235,21 +235,21 @@ func (r *Runtime) dataViewProto_getInt8(call FunctionCall) Value {
 		idx, _ := dv.getIdxAndByteOrder(r.toIndex(call.Argument(0)), call.Argument(1), 1)
 		return intToValue(int64(dv.viewedArrayBuf.getInt8(idx)))
 	}
-	panic(r.NewTypeError("Method DataView.prototype.getInt8 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.getInt8 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_getInt16(call FunctionCall) Value {
 	if dv, ok := r.toObject(call.This).self.(*dataViewObject); ok {
 		return intToValue(int64(dv.viewedArrayBuf.getInt16(dv.getIdxAndByteOrder(r.toIndex(call.Argument(0)), call.Argument(1), 2))))
 	}
-	panic(r.NewTypeError("Method DataView.prototype.getInt16 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.getInt16 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_getInt32(call FunctionCall) Value {
 	if dv, ok := r.toObject(call.This).self.(*dataViewObject); ok {
 		return intToValue(int64(dv.viewedArrayBuf.getInt32(dv.getIdxAndByteOrder(r.toIndex(call.Argument(0)), call.Argument(1), 4))))
 	}
-	panic(r.NewTypeError("Method DataView.prototype.getInt32 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.getInt32 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_getUint8(call FunctionCall) Value {
@@ -257,21 +257,21 @@ func (r *Runtime) dataViewProto_getUint8(call FunctionCall) Value {
 		idx, _ := dv.getIdxAndByteOrder(r.toIndex(call.Argument(0)), call.Argument(1), 1)
 		return intToValue(int64(dv.viewedArrayBuf.getUint8(idx)))
 	}
-	panic(r.NewTypeError("Method DataView.prototype.getUint8 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.getUint8 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_getUint16(call FunctionCall) Value {
 	if dv, ok := r.toObject(call.This).self.(*dataViewObject); ok {
 		return intToValue(int64(dv.viewedArrayBuf.getUint16(dv.getIdxAndByteOrder(r.toIndex(call.Argument(0)), call.Argument(1), 2))))
 	}
-	panic(r.NewTypeError("Method DataView.prototype.getUint16 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.getUint16 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_getUint32(call FunctionCall) Value {
 	if dv, ok := r.toObject(call.This).self.(*dataViewObject); ok {
 		return intToValue(int64(dv.viewedArrayBuf.getUint32(dv.getIdxAndByteOrder(r.toIndex(call.Argument(0)), call.Argument(1), 4))))
 	}
-	panic(r.NewTypeError("Method DataView.prototype.getUint32 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.getUint32 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_setFloat32(call FunctionCall) Value {
@@ -282,7 +282,7 @@ func (r *Runtime) dataViewProto_setFloat32(call FunctionCall) Value {
 		dv.viewedArrayBuf.setFloat32(idx, val, bo)
 		return _undefined
 	}
-	panic(r.NewTypeError("Method DataView.prototype.setFloat32 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.setFloat32 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_setFloat64(call FunctionCall) Value {
@@ -293,7 +293,7 @@ func (r *Runtime) dataViewProto_setFloat64(call FunctionCall) Value {
 		dv.viewedArrayBuf.setFloat64(idx, val, bo)
 		return _undefined
 	}
-	panic(r.NewTypeError("Method DataView.prototype.setFloat64 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.setFloat64 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_setInt8(call FunctionCall) Value {
@@ -304,7 +304,7 @@ func (r *Runtime) dataViewProto_setInt8(call FunctionCall) Value {
 		dv.viewedArrayBuf.setInt8(idx, val)
 		return _undefined
 	}
-	panic(r.NewTypeError("Method DataView.prototype.setInt8 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.setInt8 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_setInt16(call FunctionCall) Value {
@@ -315,7 +315,7 @@ func (r *Runtime) dataViewProto_setInt16(call FunctionCall) Value {
 		dv.viewedArrayBuf.setInt16(idx, val, bo)
 		return _undefined
 	}
-	panic(r.NewTypeError("Method DataView.prototype.setInt16 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.setInt16 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_setInt32(call FunctionCall) Value {
@@ -326,7 +326,7 @@ func (r *Runtime) dataViewProto_setInt32(call FunctionCall) Value {
 		dv.viewedArrayBuf.setInt32(idx, val, bo)
 		return _undefined
 	}
-	panic(r.NewTypeError("Method DataView.prototype.setInt32 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.setInt32 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_setUint8(call FunctionCall) Value {
@@ -337,7 +337,7 @@ func (r *Runtime) dataViewProto_setUint8(call FunctionCall) Value {
 		dv.viewedArrayBuf.setUint8(idx, val)
 		return _undefined
 	}
-	panic(r.NewTypeError("Method DataView.prototype.setUint8 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.setUint8 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_setUint16(call FunctionCall) Value {
@@ -348,7 +348,7 @@ func (r *Runtime) dataViewProto_setUint16(call FunctionCall) Value {
 		dv.viewedArrayBuf.setUint16(idx, val, bo)
 		return _undefined
 	}
-	panic(r.NewTypeError("Method DataView.prototype.setUint16 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.setUint16 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_setUint32(call FunctionCall) Value {
@@ -359,14 +359,14 @@ func (r *Runtime) dataViewProto_setUint32(call FunctionCall) Value {
 		dv.viewedArrayBuf.setUint32(idx, val, bo)
 		return _undefined
 	}
-	panic(r.NewTypeError("Method DataView.prototype.setUint32 called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method DataView.prototype.setUint32 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_getBuffer(call FunctionCall) Value {
 	if ta, ok := r.toObject(call.This).self.(*typedArrayObject); ok {
 		return ta.viewedArrayBuf.val
 	}
-	panic(r.NewTypeError("Method get TypedArray.prototype.buffer called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method get TypedArray.prototype.buffer called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_getByteLen(call FunctionCall) Value {
@@ -376,7 +376,7 @@ func (r *Runtime) typedArrayProto_getByteLen(call FunctionCall) Value {
 		}
 		return intToValue(int64(ta.length) * int64(ta.elemSize))
 	}
-	panic(r.NewTypeError("Method get TypedArray.prototype.byteLength called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method get TypedArray.prototype.byteLength called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_getLength(call FunctionCall) Value {
@@ -386,7 +386,7 @@ func (r *Runtime) typedArrayProto_getLength(call FunctionCall) Value {
 		}
 		return intToValue(int64(ta.length))
 	}
-	panic(r.NewTypeError("Method get TypedArray.prototype.length called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method get TypedArray.prototype.length called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_getByteOffset(call FunctionCall) Value {
@@ -396,7 +396,7 @@ func (r *Runtime) typedArrayProto_getByteOffset(call FunctionCall) Value {
 		}
 		return intToValue(int64(ta.offset) * int64(ta.elemSize))
 	}
-	panic(r.NewTypeError("Method get TypedArray.prototype.byteOffset called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method get TypedArray.prototype.byteOffset called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_copyWithin(call FunctionCall) Value {
@@ -421,7 +421,7 @@ func (r *Runtime) typedArrayProto_copyWithin(call FunctionCall) Value {
 		}
 		return call.This
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.copyWithin called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.copyWithin called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_entries(call FunctionCall) Value {
@@ -429,7 +429,7 @@ func (r *Runtime) typedArrayProto_entries(call FunctionCall) Value {
 		ta.viewedArrayBuf.ensureNotDetached(true)
 		return r.createArrayIterator(ta.val, iterationKindKeyValue)
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.entries called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.entries called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_every(call FunctionCall) Value {
@@ -454,7 +454,7 @@ func (r *Runtime) typedArrayProto_every(call FunctionCall) Value {
 		return valueTrue
 
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.every called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.every called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_fill(call FunctionCall) Value {
@@ -476,7 +476,7 @@ func (r *Runtime) typedArrayProto_fill(call FunctionCall) Value {
 		}
 		return call.This
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.fill called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.fill called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_filter(call FunctionCall) Value {
@@ -523,7 +523,7 @@ func (r *Runtime) typedArrayProto_filter(call FunctionCall) Value {
 			return ret.val
 		}
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.filter called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.filter called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_find(call FunctionCall) Value {
@@ -547,7 +547,7 @@ func (r *Runtime) typedArrayProto_find(call FunctionCall) Value {
 		}
 		return _undefined
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.find called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.find called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_findIndex(call FunctionCall) Value {
@@ -571,7 +571,7 @@ func (r *Runtime) typedArrayProto_findIndex(call FunctionCall) Value {
 		}
 		return intToValue(-1)
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.findIndex called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.findIndex called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_forEach(call FunctionCall) Value {
@@ -593,7 +593,7 @@ func (r *Runtime) typedArrayProto_forEach(call FunctionCall) Value {
 		}
 		return _undefined
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.forEach called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.forEach called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_includes(call FunctionCall) Value {
@@ -634,7 +634,7 @@ func (r *Runtime) typedArrayProto_includes(call FunctionCall) Value {
 		}
 		return valueFalse
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.includes called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.includes called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_indexOf(call FunctionCall) Value {
@@ -670,7 +670,7 @@ func (r *Runtime) typedArrayProto_indexOf(call FunctionCall) Value {
 		}
 		return intToValue(-1)
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.indexOf called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.indexOf called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_join(call FunctionCall) Value {
@@ -718,7 +718,7 @@ func (r *Runtime) typedArrayProto_keys(call FunctionCall) Value {
 		ta.viewedArrayBuf.ensureNotDetached(true)
 		return r.createArrayIterator(ta.val, iterationKindKey)
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.keys called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.keys called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_lastIndexOf(call FunctionCall) Value {
@@ -762,7 +762,7 @@ func (r *Runtime) typedArrayProto_lastIndexOf(call FunctionCall) Value {
 
 		return intToValue(-1)
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.lastIndexOf called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.lastIndexOf called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_map(call FunctionCall) Value {
@@ -785,7 +785,7 @@ func (r *Runtime) typedArrayProto_map(call FunctionCall) Value {
 		}
 		return dst.val
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.map called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.map called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_reduce(call FunctionCall) Value {
@@ -820,7 +820,7 @@ func (r *Runtime) typedArrayProto_reduce(call FunctionCall) Value {
 		}
 		return fc.Arguments[0]
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.reduce called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.reduce called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_reduceRight(call FunctionCall) Value {
@@ -855,7 +855,7 @@ func (r *Runtime) typedArrayProto_reduceRight(call FunctionCall) Value {
 		}
 		return fc.Arguments[0]
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.reduceRight called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.reduceRight called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_reverse(call FunctionCall) Value {
@@ -870,7 +870,7 @@ func (r *Runtime) typedArrayProto_reverse(call FunctionCall) Value {
 
 		return call.This
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.reverse called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.reverse called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_set(call FunctionCall) Value {
@@ -947,7 +947,7 @@ func (r *Runtime) typedArrayProto_set(call FunctionCall) Value {
 		}
 		return _undefined
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.set called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.set called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_slice(call FunctionCall) Value {
@@ -983,7 +983,7 @@ func (r *Runtime) typedArrayProto_slice(call FunctionCall) Value {
 		}
 		return dst.val
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.slice called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.slice called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_some(call FunctionCall) Value {
@@ -1007,7 +1007,7 @@ func (r *Runtime) typedArrayProto_some(call FunctionCall) Value {
 		}
 		return valueFalse
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.some called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.some called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_sort(call FunctionCall) Value {
@@ -1027,7 +1027,7 @@ func (r *Runtime) typedArrayProto_sort(call FunctionCall) Value {
 		sort.Stable(&ctx)
 		return call.This
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.sort called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.sort called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_subarray(call FunctionCall) Value {
@@ -1047,7 +1047,7 @@ func (r *Runtime) typedArrayProto_subarray(call FunctionCall) Value {
 			intToValue(newLen),
 		}).val
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.subarray called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.subarray called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_toLocaleString(call FunctionCall) Value {
@@ -1064,7 +1064,7 @@ func (r *Runtime) typedArrayProto_toLocaleString(call FunctionCall) Value {
 		}
 		return buf.String()
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.toLocaleString called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.toLocaleString called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_values(call FunctionCall) Value {
@@ -1072,7 +1072,7 @@ func (r *Runtime) typedArrayProto_values(call FunctionCall) Value {
 		ta.viewedArrayBuf.ensureNotDetached(true)
 		return r.createArrayIterator(ta.val, iterationKindValue)
 	}
-	panic(r.NewTypeError("Method TypedArray.prototype.values called on incompatible receiver %s", call.This.String()))
+	panic(r.NewTypeError("Method TypedArray.prototype.values called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) typedArrayProto_toStringTag(call FunctionCall) Value {

@@ -823,9 +823,13 @@ func (c *compiler) compileFunctionsGlobal(list []*ast.FunctionDeclaration) {
 			m[name] = i
 		}
 	}
+	idx := 0
 	for i, decl := range list {
-		if m[decl.Function.Name.Name] == i {
+		name := decl.Function.Name.Name
+		if m[name] == i {
 			c.compileFunctionLiteral(decl.Function, false).emitGetter(true)
+			c.scope.bindings[idx] = c.scope.boundNames[name]
+			idx++
 		} else {
 			leave := c.enterDummyMode()
 			c.compileFunctionLiteral(decl.Function, false).emitGetter(false)

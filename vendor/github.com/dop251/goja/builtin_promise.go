@@ -244,7 +244,7 @@ func (r *Runtime) promiseProto_then(call FunctionCall) Value {
 		resultCapability := r.newPromiseCapability(c)
 		return r.performPromiseThen(p, call.Argument(0), call.Argument(1), resultCapability)
 	}
-	panic(r.NewTypeError("Method Promise.prototype.then called on incompatible receiver %s", thisObj))
+	panic(r.NewTypeError("Method Promise.prototype.then called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 }
 
 func (r *Runtime) newPromiseCapability(c *Object) *promiseCapability {

@@ -102,7 +102,7 @@ func (f *funcObject) addPrototype() Value {
 }
 
 func (f *funcObject) hasOwnPropertyStr(name unistring.String) bool {
-	if r := f.baseObject.hasOwnPropertyStr(name); r {
+	if f.baseObject.hasOwnPropertyStr(name) {
 		return true
 	}
 
@@ -162,7 +162,6 @@ func (f *arrowFuncObject) Call(call FunctionCall) Value {
 
 func (f *baseJsFuncObject) _call(call FunctionCall, newTarget, this Value) Value {
 	vm := f.val.runtime.vm
-	pc := vm.pc
 
 	vm.stack.expand(vm.sp + len(call.Arguments) + 1)
 	vm.stack[vm.sp] = f.val
@@ -178,18 +177,26 @@ func (f *baseJsFuncObject) _call(call FunctionCall, newTarget, this Value) Value
 		vm.sp++
 	}
 
-	vm.pc = -1
-	vm.pushCtx()
+	pc := vm.pc
+	if pc != -1 {
+		vm.pc++ // fake "return address" so that captureStack() records the correct call location
+		vm.pushCtx()
+		vm.callStack = append(vm.callStack, context{pc: -1}) // extra frame so that run() halts after ret
+	} else {
+		vm.pushCtx()
+	}
 	vm.args = len(call.Arguments)
 	vm.prg = f.prg
 	vm.stash = f.stash
 	vm.newTarget = newTarget
 	vm.pc = 0
 	vm.run()
+	if pc != -1 {
+		vm.popCtx()
+	}
 	vm.pc = pc
 	vm.halt = false
 	return vm.pop()
-
 }
 
 func (f *baseJsFuncObject) call(call FunctionCall, newTarget Value) Value {

@@ -6,13 +6,9 @@ const (
 	ILLEGAL
 	EOF
 	COMMENT
-	KEYWORD
 
 	STRING
-	BOOLEAN
-	NULL
 	NUMBER
-	IDENTIFIER
 
 	PLUS      // +
 	MINUS     // -
@@ -75,7 +71,13 @@ const (
 	ELLIPSIS          // ...
 	BACKTICK          // `
 
-	firstKeyword
+	// tokens below (and only them) are syntactically valid identifiers
+
+	IDENTIFIER
+	KEYWORD
+	BOOLEAN
+	NULL
+
 	IF
 	IN
 	OF
@@ -112,7 +114,6 @@ const (
 	DEBUGGER
 
 	INSTANCEOF
-	lastKeyword
 )
 
 var token2string = [...]string{

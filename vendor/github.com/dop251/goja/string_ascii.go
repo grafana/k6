@@ -247,10 +247,7 @@ func (s asciiString) length() int {
 func (s asciiString) concat(other valueString) valueString {
 	switch other := other.(type) {
 	case asciiString:
-		b := make([]byte, len(s)+len(other))
-		copy(b, s)
-		copy(b[len(s):], other)
-		return asciiString(b)
+		return asciiString(s + other)
 	case unicodeString:
 		b := make([]uint16, len(s)+len(other))
 		b[0] = unistring.BOM

@@ -299,7 +299,7 @@ func (e *baseCompiledExpr) emitUnary(func(), func(), bool, bool) {
 }
 
 func (e *baseCompiledExpr) addSrcMap() {
-	if e.offset > 0 {
+	if e.offset >= 0 {
 		e.c.p.srcMap = append(e.c.p.srcMap, srcMapItem{pc: len(e.c.p.code), srcPos: e.offset})
 	}
 }
@@ -370,12 +370,14 @@ func (e *compiledIdentifierExpr) emitGetterAndCallee() {
 	}
 }
 
-func (c *compiler) emitVarSetter1(name unistring.String, offset int, putOnStack bool, emitRight func(isRef bool)) {
+func (e *compiledIdentifierExpr) emitVarSetter1(putOnStack bool, emitRight func(isRef bool)) {
+	e.addSrcMap()
+	c := e.c
 	if c.scope.strict {
-		c.checkIdentifierLName(name, offset)
+		c.checkIdentifierLName(e.name, e.offset)
 	}
 
-	if b, noDynamics := c.scope.lookupName(name); noDynamics {
+	if b, noDynamics := c.scope.lookupName(e.name); noDynamics {
 		emitRight(false)
 		if b != nil {
 			if putOnStack {
@@ -385,9 +387,9 @@ func (c *compiler) emitVarSetter1(name unistring.String, offset int, putOnStack 
 			}
 		} else {
 			if c.scope.strict {
-				c.emit(setGlobalStrict(name))
+				c.emit(setGlobalStrict(e.name))
 			} else {
-				c.emit(setGlobal(name))
+				c.emit(setGlobal(e.name))
 			}
 			if !putOnStack {
 				c.emit(pop)
@@ -398,9 +400,9 @@ func (c *compiler) emitVarSetter1(name unistring.String, offset int, putOnStack 
 			b.emitResolveVar(c.scope.strict)
 		} else {
 			if c.scope.strict {
-				c.emit(resolveVar1Strict(name))
+				c.emit(resolveVar1Strict(e.name))
 			} else {
-				c.emit(resolveVar1(name))
+				c.emit(resolveVar1(e.name))
 			}
 		}
 		emitRight(true)
@@ -412,9 +414,9 @@ func (c *compiler) emitVarSetter1(name unistring.String, offset int, putOnStack 
 	}
 }
 
-func (c *compiler) emitVarSetter(name unistring.String, offset int, valueExpr compiledExpr, putOnStack bool) {
-	c.emitVarSetter1(name, offset, putOnStack, func(bool) {
-		c.emitExpr(valueExpr, true)
+func (e *compiledIdentifierExpr) emitVarSetter(valueExpr compiledExpr, putOnStack bool) {
+	e.emitVarSetter1(putOnStack, func(bool) {
+		e.c.emitExpr(valueExpr, true)
 	})
 }
 
@@ -440,12 +442,12 @@ func (e *compiledIdentifierExpr) emitRef() {
 }
 
 func (e *compiledIdentifierExpr) emitSetter(valueExpr compiledExpr, putOnStack bool) {
-	e.c.emitVarSetter(e.name, e.offset, valueExpr, putOnStack)
+	e.emitVarSetter(valueExpr, putOnStack)
 }
 
 func (e *compiledIdentifierExpr) emitUnary(prepare, body func(), postfix, putOnStack bool) {
 	if putOnStack {
-		e.c.emitVarSetter1(e.name, e.offset, true, func(isRef bool) {
+		e.emitVarSetter1(true, func(isRef bool) {
 			e.c.emit(loadUndef)
 			if isRef {
 				e.c.emit(getValue)
@@ -465,7 +467,7 @@ func (e *compiledIdentifierExpr) emitUnary(prepare, body func(), postfix, putOnS
 		})
 		e.c.emit(pop)
 	} else {
-		e.c.emitVarSetter1(e.name, e.offset, false, func(isRef bool) {
+		e.emitVarSetter1(false, func(isRef bool) {
 			if isRef {
 				e.c.emit(getValue)
 			} else {
@@ -747,7 +749,6 @@ func (e *deleteGlobalExpr) emitGetter(putOnStack bool) {
 }
 
 func (e *compiledAssignExpr) emitGetter(putOnStack bool) {
-	e.addSrcMap()
 	switch e.operator {
 	case token.ASSIGN:
 		if fn, ok := e.right.(*compiledFunctionLiteral); ok {
@@ -820,7 +821,6 @@ func (e *compiledAssignExpr) emitGetter(putOnStack bool) {
 
 func (e *compiledLiteral) emitGetter(putOnStack bool) {
 	if putOnStack {
-		e.addSrcMap()
 		e.c.emit(loadVal(e.c.p.defineLiteralValue(e.val)))
 	}
 }
@@ -1499,6 +1499,7 @@ func (e *compiledUnaryExpr) emitGetter(putOnStack bool) {
 	var prepare, body func()
 
 	toNumber := func() {
+		e.addSrcMap()
 		e.c.emit(toNumber)
 	}
 

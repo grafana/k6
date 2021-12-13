@@ -96,7 +96,7 @@ func TestNewBundle(t *testing.T) {
 		_, err := getSimpleBundle(t, "/script.js", `throw new Error("aaaa");`)
 		exception := new(scriptException)
 		assert.ErrorAs(t, err, &exception)
-		assert.EqualError(t, err, "Error: aaaa\n\tat file:///script.js:1:7(3)\n")
+		assert.EqualError(t, err, "Error: aaaa\n\tat file:///script.js:1:7(2)\n")
 	})
 	t.Run("InvalidExports", func(t *testing.T) {
 		t.Parallel()
