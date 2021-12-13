@@ -249,7 +249,7 @@ func MakeRequest(ctx context.Context, preq *ParsedHTTPRequest) (*Response, error
 		transport = ntlmssp.Negotiator{RoundTripper: transport}
 	}
 
-	resp := &Response{ctx: ctx, URL: preq.URL.URL, Request: *respReq}
+	resp := &Response{ctx: ctx, URL: preq.URL.URL, Request: respReq}
 	client := http.Client{
 		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
