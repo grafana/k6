@@ -44,7 +44,7 @@ func (r *Runtime) mapProto_clear(call FunctionCall) Value {
 	thisObj := r.toObject(call.This)
 	mo, ok := thisObj.self.(*mapObject)
 	if !ok {
-		panic(r.NewTypeError("Method Map.prototype.clear called on incompatible receiver %s", thisObj.String()))
+		panic(r.NewTypeError("Method Map.prototype.clear called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
 
 	mo.m.clear()
@@ -56,7 +56,7 @@ func (r *Runtime) mapProto_delete(call FunctionCall) Value {
 	thisObj := r.toObject(call.This)
 	mo, ok := thisObj.self.(*mapObject)
 	if !ok {
-		panic(r.NewTypeError("Method Map.prototype.delete called on incompatible receiver %s", thisObj.String()))
+		panic(r.NewTypeError("Method Map.prototype.delete called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
 
 	return r.toBoolean(mo.m.remove(call.Argument(0)))
@@ -66,7 +66,7 @@ func (r *Runtime) mapProto_get(call FunctionCall) Value {
 	thisObj := r.toObject(call.This)
 	mo, ok := thisObj.self.(*mapObject)
 	if !ok {
-		panic(r.NewTypeError("Method Map.prototype.get called on incompatible receiver %s", thisObj.String()))
+		panic(r.NewTypeError("Method Map.prototype.get called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
 
 	return nilSafe(mo.m.get(call.Argument(0)))
@@ -76,7 +76,7 @@ func (r *Runtime) mapProto_has(call FunctionCall) Value {
 	thisObj := r.toObject(call.This)
 	mo, ok := thisObj.self.(*mapObject)
 	if !ok {
-		panic(r.NewTypeError("Method Map.prototype.has called on incompatible receiver %s", thisObj.String()))
+		panic(r.NewTypeError("Method Map.prototype.has called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
 	if mo.m.has(call.Argument(0)) {
 		return valueTrue
@@ -88,7 +88,7 @@ func (r *Runtime) mapProto_set(call FunctionCall) Value {
 	thisObj := r.toObject(call.This)
 	mo, ok := thisObj.self.(*mapObject)
 	if !ok {
-		panic(r.NewTypeError("Method Map.prototype.set called on incompatible receiver %s", thisObj.String()))
+		panic(r.NewTypeError("Method Map.prototype.set called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
 	mo.m.set(call.Argument(0), call.Argument(1))
 	return call.This
@@ -102,7 +102,7 @@ func (r *Runtime) mapProto_forEach(call FunctionCall) Value {
 	thisObj := r.toObject(call.This)
 	mo, ok := thisObj.self.(*mapObject)
 	if !ok {
-		panic(r.NewTypeError("Method Map.prototype.forEach called on incompatible receiver %s", thisObj.String()))
+		panic(r.NewTypeError("Method Map.prototype.forEach called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
 	callbackFn, ok := r.toObject(call.Argument(0)).self.assertCallable()
 	if !ok {
@@ -133,7 +133,7 @@ func (r *Runtime) mapProto_getSize(call FunctionCall) Value {
 	thisObj := r.toObject(call.This)
 	mo, ok := thisObj.self.(*mapObject)
 	if !ok {
-		panic(r.NewTypeError("Method get Map.prototype.size called on incompatible receiver %s", thisObj.String()))
+		panic(r.NewTypeError("Method get Map.prototype.size called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
 	return intToValue(int64(mo.m.size))
 }
@@ -210,7 +210,7 @@ func (r *Runtime) mapIterProto_next(call FunctionCall) Value {
 	if iter, ok := thisObj.self.(*mapIterObject); ok {
 		return iter.next()
 	}
-	panic(r.NewTypeError("Method Map Iterator.prototype.next called on incompatible receiver %s", thisObj.String()))
+	panic(r.NewTypeError("Method Map Iterator.prototype.next called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 }
 
 func (r *Runtime) createMapProto(val *Object) objectImpl {

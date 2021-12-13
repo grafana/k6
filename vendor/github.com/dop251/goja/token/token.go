@@ -114,3 +114,7 @@ func IsKeyword(literal string) (Token, bool) {
 	}
 	return 0, false
 }
+
+func IsId(tkn Token) bool {
+	return tkn >= IDENTIFIER
+}

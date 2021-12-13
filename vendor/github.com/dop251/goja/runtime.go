@@ -217,6 +217,40 @@ func (f *StackFrame) Position() file.Position {
 	return f.prg.src.Position(f.prg.sourceOffset(f.pc))
 }
 
+func (f *StackFrame) WriteToValueBuilder(b *valueStringBuilder) {
+	if f.prg != nil {
+		if n := f.prg.funcName; n != "" {
+			b.WriteString(stringValueFromRaw(n))
+			b.WriteASCII(" (")
+		}
+		p := f.Position()
+		if p.Filename != "" {
+			b.WriteASCII(p.Filename)
+		} else {
+			b.WriteASCII("<eval>")
+		}
+		b.WriteRune(':')
+		b.WriteASCII(strconv.Itoa(p.Line))
+		b.WriteRune(':')
+		b.WriteASCII(strconv.Itoa(p.Column))
+		b.WriteRune('(')
+		b.WriteASCII(strconv.Itoa(f.pc))
+		b.WriteRune(')')
+		if f.prg.funcName != "" {
+			b.WriteRune(')')
+		}
+	} else {
+		if f.funcName != "" {
+			b.WriteString(stringValueFromRaw(f.funcName))
+			b.WriteASCII(" (")
+		}
+		b.WriteASCII("native")
+		if f.funcName != "" {
+			b.WriteRune(')')
+		}
+	}
+}
+
 func (f *StackFrame) Write(b *bytes.Buffer) {
 	if f.prg != nil {
 		if n := f.prg.funcName; n != "" {
@@ -257,8 +291,7 @@ type Exception struct {
 }
 
 type uncatchableException struct {
-	stack *[]StackFrame
-	err   error
+	err error
 }
 
 type InterruptedError struct {
@@ -812,10 +845,6 @@ func (r *Runtime) error_toString(call FunctionCall) Value {
 
 func (r *Runtime) builtin_new(construct *Object, args []Value) *Object {
 	return r.toConstructor(construct)(args, nil)
-}
-
-func (r *Runtime) throw(e Value) {
-	panic(e)
 }
 
 func (r *Runtime) builtin_thrower(call FunctionCall) Value {
@@ -1462,7 +1491,12 @@ operator:
     // If return value is a non-nil *Object, it will be used instead of call.This
     // This way it is possible to return a Go struct or a map converted
     // into goja.Value using ToValue(), however in this case
-    // instanceof will not work as expected.
+    // instanceof will not work as expected, unless you set the prototype:
+    //
+    // instance := &myCustomStruct{}
+    // instanceValue := vm.ToValue(instance).(*Object)
+    // instanceValue.SetPrototype(call.This.Prototype())
+    // return instanceValue
     return nil
  }
 

@@ -1,7 +1,127 @@
 package goja
 
+import "github.com/dop251/goja/unistring"
+
+const propNameStack = "stack"
+
+type errorObject struct {
+	baseObject
+	stack          []StackFrame
+	stackPropAdded bool
+}
+
+func (e *errorObject) formatStack() valueString {
+	var b valueStringBuilder
+	if name := e.getStr("name", nil); name != nil {
+		b.WriteString(name.toString())
+		b.WriteRune('\n')
+	} else {
+		b.WriteASCII("Error\n")
+	}
+
+	for _, frame := range e.stack {
+		b.WriteASCII("\tat ")
+		frame.WriteToValueBuilder(&b)
+		b.WriteRune('\n')
+	}
+	return b.String()
+}
+
+func (e *errorObject) addStackProp() Value {
+	if !e.stackPropAdded {
+		res := e._putProp(propNameStack, e.formatStack(), true, false, true)
+		if len(e.propNames) > 1 {
+			// reorder property names to ensure 'stack' is the first one
+			copy(e.propNames[1:], e.propNames)
+			e.propNames[0] = propNameStack
+		}
+		e.stackPropAdded = true
+		return res
+	}
+	return nil
+}
+
+func (e *errorObject) getStr(p unistring.String, receiver Value) Value {
+	return e.getStrWithOwnProp(e.getOwnPropStr(p), p, receiver)
+}
+
+func (e *errorObject) getOwnPropStr(name unistring.String) Value {
+	res := e.baseObject.getOwnPropStr(name)
+	if res == nil && name == propNameStack {
+		return e.addStackProp()
+	}
+
+	return res
+}
+
+func (e *errorObject) setOwnStr(name unistring.String, val Value, throw bool) bool {
+	if name == propNameStack {
+		e.addStackProp()
+	}
+	return e.baseObject.setOwnStr(name, val, throw)
+}
+
+func (e *errorObject) setForeignStr(name unistring.String, val, receiver Value, throw bool) (bool, bool) {
+	return e._setForeignStr(name, e.getOwnPropStr(name), val, receiver, throw)
+}
+
+func (e *errorObject) deleteStr(name unistring.String, throw bool) bool {
+	if name == propNameStack {
+		e.addStackProp()
+	}
+	return e.baseObject.deleteStr(name, throw)
+}
+
+func (e *errorObject) defineOwnPropertyStr(name unistring.String, desc PropertyDescriptor, throw bool) bool {
+	if name == propNameStack {
+		e.addStackProp()
+	}
+	return e.baseObject.defineOwnPropertyStr(name, desc, throw)
+}
+
+func (e *errorObject) hasOwnPropertyStr(name unistring.String) bool {
+	if e.baseObject.hasOwnPropertyStr(name) {
+		return true
+	}
+
+	return name == propNameStack && !e.stackPropAdded
+}
+
+func (e *errorObject) stringKeys(all bool, accum []Value) []Value {
+	if all && !e.stackPropAdded {
+		accum = append(accum, asciiString(propNameStack))
+	}
+	return e.baseObject.stringKeys(all, accum)
+}
+
+func (e *errorObject) iterateStringKeys() iterNextFunc {
+	e.addStackProp()
+	return e.baseObject.iterateStringKeys()
+}
+
+func (e *errorObject) init() {
+	e.baseObject.init()
+	vm := e.val.runtime.vm
+	e.stack = vm.captureStack(make([]StackFrame, 0, len(vm.callStack)+1), 0)
+}
+
+func (r *Runtime) newErrorObject(proto *Object, class string) *errorObject {
+	obj := &Object{runtime: r}
+	o := &errorObject{
+		baseObject: baseObject{
+			class:      class,
+			val:        obj,
+			extensible: true,
+			prototype:  proto,
+		},
+	}
+	obj.self = o
+	o.init()
+	return o
+}
+
 func (r *Runtime) builtin_Error(args []Value, proto *Object) *Object {
-	obj := r.newBaseObject(proto, classError)
+	obj := r.newErrorObject(proto, classError)
 	if len(args) > 0 && args[0] != _undefined {
 		obj._putProp("message", args[0], true, false, true)
 	}
@@ -9,7 +129,7 @@ func (r *Runtime) builtin_Error(args []Value, proto *Object) *Object {
 }
 
 func (r *Runtime) builtin_AggregateError(args []Value, proto *Object) *Object {
-	obj := r.newBaseObject(proto, classAggError)
+	obj := r.newErrorObject(proto, classAggError)
 	if len(args) > 1 && args[1] != nil && args[1] != _undefined {
 		obj._putProp("message", args[1].toString(), true, false, true)
 	}
