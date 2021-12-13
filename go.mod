@@ -33,7 +33,7 @@ require (
 	github.com/tidwall/gjson v1.10.2
 	github.com/tidwall/pretty v1.2.0
 	golang.org/x/crypto v0.0.0-20210503195802-e9a32991a82e
-	golang.org/x/net v0.0.0-20211101194204-95aca89e93de
+	golang.org/x/net v0.0.0-20211209100829-84cba5454caf
 	golang.org/x/term v0.0.0-20210503060354-a79de5458b56
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/grpc v1.41.0
