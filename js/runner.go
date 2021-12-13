@@ -31,6 +31,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"os"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -210,7 +211,12 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 		MaxIdleConns:        int(r.Bundle.Options.Batch.Int64),
 		MaxIdleConnsPerHost: int(r.Bundle.Options.BatchPerHost.Int64),
 	}
-	_ = http2.ConfigureTransport(transport)
+
+	if forceHTTP1() {
+		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper) // send over h1 protocol
+	} else {
+		_ = http2.ConfigureTransport(transport) // send over h2 protocol
+	}
 
 	cookieJar, err := cookiejar.New(nil)
 	if err != nil {
@@ -260,6 +266,23 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 	})
 
 	return vu, nil
+}
+
+// forceHTTP1 checks if force http1 env variable has been set in order to force requests to be sent over h1
+// TODO: This feature is temporary until #936 is resolved
+func forceHTTP1() bool {
+	godebug := os.Getenv("GODEBUG")
+	if godebug == "" {
+		return false
+	}
+	variables := strings.SplitAfter(godebug, ",")
+
+	for _, v := range variables {
+		if strings.Trim(v, ",") == "http2client=0" {
+			return true
+		}
+	}
+	return false
 }
 
 // Setup runs the setup function if there is one and sets the setupData to the returned value

@@ -2088,6 +2088,88 @@ func TestMinIterationDurationIsCancellable(t *testing.T) {
 	}
 }
 
+// nolint:paralleltest
+func TestForceHTTP1Feature(t *testing.T) {
+	cases := map[string]struct {
+		godebug               string
+		expectedForceH1Result bool
+		protocol              string
+	}{
+		"Force H1 Enabled. Checking for H1": {
+			godebug:               "http2client=0,gctrace=1",
+			expectedForceH1Result: true,
+			protocol:              "HTTP/1.1",
+		},
+		"Force H1 Disabled. Checking for H2": {
+			godebug:               "test=0",
+			expectedForceH1Result: false,
+			protocol:              "HTTP/2.0",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := os.Setenv("GODEBUG", tc.godebug)
+			require.NoError(t, err)
+			defer func() {
+				err = os.Unsetenv("GODEBUG")
+				require.NoError(t, err)
+			}()
+			assert.Equal(t, tc.expectedForceH1Result, forceHTTP1())
+
+			tb := httpmultibin.NewHTTPMultiBin(t)
+
+			data := fmt.Sprintf(`var k6 = require("k6");
+			var check = k6.check;
+			var fail = k6.fail;
+			var http = require("k6/http");;
+			exports.default = function() {
+				var res = http.get("HTTP2BIN_URL");
+				if (
+					!check(res, {
+					'checking to see if status was 200': (res) => res.status === 200,
+					'checking to see protocol': (res) => res.proto === '%s'
+					})
+				) {
+					fail('test failed')
+				}
+			}`, tc.protocol)
+
+			r1, err := getSimpleRunner(t, "/script.js", tb.Replacer.Replace(data))
+			require.NoError(t, err)
+
+			err = r1.SetOptions(lib.Options{
+				Hosts: tb.Dialer.Hosts,
+				// We disable TLS verify so that we don't get a TLS handshake error since
+				// the certificates on the endpoint are not certified by a certificate authority
+				InsecureSkipTLSVerify: null.BoolFrom(true),
+			})
+
+			require.NoError(t, err)
+
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			r2, err := NewFromArchive(testutils.NewLogger(t), r1.MakeArchive(), lib.RuntimeOptions{}, builtinMetrics, registry)
+			require.NoError(t, err)
+
+			runners := map[string]*Runner{"Source": r1, "Archive": r2}
+			for name, r := range runners {
+				r := r
+				t.Run(name, func(t *testing.T) {
+					initVU, err := r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
+					require.NoError(t, err)
+
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+					err = vu.RunOnce()
+					require.NoError(t, err)
+				})
+			}
+		})
+	}
+}
+
 func TestExecutionInfo(t *testing.T) {
 	t.Parallel()
 
