@@ -231,19 +231,12 @@ type withLaunchOptions = launchOptions
 // defaultLaunchOptions returns defaults for browser type launch options.
 // TestBrowser uses this for launching a browser type by default.
 func defaultLaunchOpts() launchOptions {
-	var (
-		debug    = false
-		headless = true
-	)
-	if v, found := os.LookupEnv("XK6_BROWSER_TEST_DEBUG"); found {
-		debug, _ = strconv.ParseBool(v)
-	}
+	headless := true
 	if v, found := os.LookupEnv("XK6_BROWSER_TEST_HEADLESS"); found {
 		headless, _ = strconv.ParseBool(v)
 	}
 
 	return launchOptions{
-		Debug:    debug,
 		Headless: headless,
 		SlowMo:   "0s",
 		Timeout:  "30s",
