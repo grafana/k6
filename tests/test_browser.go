@@ -104,7 +104,6 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
 	}
 
-	// configure the goja VM (1)
 	rt := goja.New()
 
 	// enable the HTTP test server only when necessary
@@ -118,7 +117,7 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 		require.NoError(t, err)
 	}
 
-	// configure the goja VM (2)
+	// configure the goja
 	ctx = k6lib.WithState(ctx, state)
 	ctx = k6common.WithRuntime(ctx, rt)
 	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
