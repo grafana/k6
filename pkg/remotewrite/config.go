@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/kubernetes/helm/pkg/strvals"
@@ -24,6 +25,8 @@ type Config struct {
 	Mapping null.String `json:"mapping" envconfig:"K6_PROMETHEUS_MAPPING"`
 
 	Url null.String `json:"url" envconfig:"K6_PROMETHEUS_REMOTE_URL"` // here, in the name of env variable, we assume that we won't need to distinguish between remote write URL vs remote read URL
+
+	Headers map[string]string `json:"headers" envconfig:"K6_PROMETHEUS_HEADERS"`
 
 	InsecureSkipTLSVerify null.Bool   `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY"`
 	CACert                null.String `json:"caCertFile" envconfig:"K6_CA_CERT_FILE"`
@@ -48,6 +51,7 @@ func NewConfig() Config {
 		FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
 		KeepTags:              null.BoolFrom(true),
 		KeepNameTag:           null.BoolFrom(false),
+		Headers:               make(map[string]string),
 	}
 }
 
@@ -83,6 +87,7 @@ func (conf Config) ConstructRemoteConfig() (*remote.ClientConfig, error) {
 		Timeout:          model.Duration(defaultPrometheusTimeout),
 		HTTPClientConfig: httpConfig,
 		RetryOnRateLimit: true,
+		Headers:          conf.Headers,
 	}
 	return &remoteConfig, nil
 }
@@ -124,6 +129,12 @@ func (base Config) Apply(applied Config) Config {
 
 	if applied.KeepNameTag.Valid {
 		base.KeepNameTag = applied.KeepNameTag
+	}
+
+	if len(applied.Headers) > 0 {
+		for k, v := range applied.Headers {
+			base.Headers[k] = v
+		}
 	}
 
 	return base
@@ -175,6 +186,15 @@ func ParseArg(arg string) (Config, error) {
 		c.KeepNameTag = null.BoolFrom(v)
 	}
 
+	c.Headers = make(map[string]string)
+	if v, ok := params["headers"].(map[string]interface{}); ok {
+		for k, v := range v {
+			if v, ok := v.(string); ok {
+				c.Headers[k] = v
+			}
+		}
+	}
+
 	return c, nil
 }
 
@@ -199,6 +219,17 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 			}
 		}
 		return null.NewBool(false, false), nil
+	}
+
+	getEnvMap := func(env map[string]string, prefix string) map[string]string {
+		result := make(map[string]string)
+		for ek, ev := range env {
+			if strings.HasPrefix(ek, prefix) {
+				k := strings.TrimPrefix(ek, prefix)
+				result[k] = ev
+			}
+		}
+		return result
 	}
 
 	// envconfig is not processing some undefined vars (at least duration) so apply them manually
@@ -251,6 +282,11 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 		if b.Valid {
 			result.KeepNameTag = b
 		}
+	}
+
+	envHeaders := getEnvMap(env, "K6_PROMETHEUS_HEADERS_")
+	for k, v := range envHeaders {
+		result.Headers[k] = v
 	}
 
 	if arg != "" {
