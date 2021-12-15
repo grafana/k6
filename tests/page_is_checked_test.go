@@ -24,22 +24,11 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPageIsChecked(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
-
-	t.Run("Page.isChecked", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testPageIsChecked(t, bt) })
-	})
-}
-
-func testPageIsChecked(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
+	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<input type="checkbox" checked>`, nil)
 	assert.True(t, p.IsChecked("input", nil), "expected checkbox to be checked")

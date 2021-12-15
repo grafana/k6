@@ -27,11 +27,10 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
-//go:embed js/mouse_helper.js
+//go:embed static/mouse_helper.js
 var mouseHelperScriptSource string
 var htmlInputButton = fmt.Sprintf(`
 <!DOCTYPE html>
@@ -69,30 +68,19 @@ var htmlInputButton = fmt.Sprintf(`
 `, mouseHelperScriptSource)
 
 func TestElementHandleClick(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
-
-	t.Run("ElementHandle.click", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testElementHandleClick(t, bt) })
-		t.Run("should work with node removed", func(t *testing.T) { testElementHandleClickWithNodeRemoved(t, bt) })
-		t.Run("should throw with detached node", func(t *testing.T) { testElementHandleClickWithDetachedNode(t, bt) })
-	})
-}
-
-func testElementHandleClick(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
 
 	p.SetContent(htmlInputButton, nil)
 
 	button := p.Query("button")
-	button.Click(bt.Runtime.ToValue(struct {
+	button.Click(tb.rt.ToValue(struct {
 		NoWaitAfter bool `js:"noWaitAfter"`
 	}{
 		NoWaitAfter: true, // FIX: this is just a workaround because navigation is never triggered and we'd be waiting for it to happen otherwise!
 	}))
 
-	result := p.Evaluate(bt.Runtime.ToValue("() => window['result']")).(goja.Value)
+	result := p.Evaluate(tb.rt.ToValue("() => window['result']")).(goja.Value)
 	switch result.ExportType().Kind() {
 	case reflect.String:
 		assert.Equal(t, result.String(), "Clicked", "expected button to be clicked, but got %q", result.String())
@@ -101,23 +89,23 @@ func testElementHandleClick(t *testing.T, bt *browsertest.BrowserTest) {
 	}
 }
 
-func testElementHandleClickWithNodeRemoved(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
+func TestElementHandleClickWithNodeRemoved(t *testing.T) {
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
 
 	p.SetContent(htmlInputButton, nil)
 
 	// Remove all nodes
-	p.Evaluate(bt.Runtime.ToValue("() => delete window['Node']"))
+	p.Evaluate(tb.rt.ToValue("() => delete window['Node']"))
 
 	button := p.Query("button")
-	button.Click(bt.Runtime.ToValue(struct {
+	button.Click(tb.rt.ToValue(struct {
 		NoWaitAfter bool `js:"noWaitAfter"`
 	}{
 		NoWaitAfter: true, // FIX: this is just a workaround because navigation is never triggered and we'd be waiting for it to happen otherwise!
 	}))
 
-	result := p.Evaluate(bt.Runtime.ToValue("() => window['result']")).(goja.Value)
+	result := p.Evaluate(tb.rt.ToValue("() => window['result']")).(goja.Value)
 	switch result.ExportType().Kind() {
 	case reflect.String:
 		assert.Equal(t, result.String(), "Clicked", "expected button to be clicked, but got %q", result.String())
@@ -126,16 +114,16 @@ func testElementHandleClickWithNodeRemoved(t *testing.T, bt *browsertest.Browser
 	}
 }
 
-func testElementHandleClickWithDetachedNode(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
+func TestElementHandleClickWithDetachedNode(t *testing.T) {
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
 
 	p.SetContent(htmlInputButton, nil)
 
 	button := p.Query("button")
 
 	// Detach node
-	p.Evaluate(bt.Runtime.ToValue("button => button.remove()"), bt.Runtime.ToValue(button))
+	p.Evaluate(tb.rt.ToValue("button => button.remove()"), tb.rt.ToValue(button))
 
 	// We expect the click to fail with the correct error raised
 	errorMsg := ""
@@ -145,7 +133,7 @@ func testElementHandleClickWithDetachedNode(t *testing.T, bt *browsertest.Browse
 				errorMsg = err.(*goja.Object).String()
 			}
 		}()
-		button.Click(bt.Runtime.ToValue(struct {
+		button.Click(tb.rt.ToValue(struct {
 			NoWaitAfter bool `js:"noWaitAfter"`
 		}{
 			NoWaitAfter: true, // FIX: this is just a workaround because navigation is never triggered and we'd be waiting for it to happen otherwise!

@@ -26,42 +26,34 @@ import (
 	"image/png"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestElementHandleScreenshot(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
 
-	t.Run("ElementHandle.screenshot", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testElementHandleScreenshot(t, bt) })
-	})
-}
-
-func testElementHandleScreenshot(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
-
-	p.SetViewportSize(bt.Runtime.ToValue(struct {
+	p.SetViewportSize(tb.rt.ToValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{Width: 800, Height: 600}))
-	p.Evaluate(bt.Runtime.ToValue(`
-         () => {
-             document.body.style.margin = '0';
-             document.body.style.padding = '0';
-             document.documentElement.style.margin = '0';
-             document.documentElement.style.padding = '0';
-             const div = document.createElement('div');
-             div.style.marginTop = '400px';
-             div.style.marginLeft = '100px';
-             div.style.width = '100px';
-             div.style.height = '100px';
-             div.style.background = 'red';
-             document.body.appendChild(div);
-         }
-    `))
+	p.Evaluate(tb.rt.ToValue(`
+		() => {
+			document.body.style.margin = '0';
+			document.body.style.padding = '0';
+			document.documentElement.style.margin = '0';
+			document.documentElement.style.padding = '0';
+
+			const div = document.createElement('div');
+			div.style.marginTop = '400px';
+			div.style.marginLeft = '100px';
+			div.style.width = '100px';
+			div.style.height = '100px';
+			div.style.background = 'red';
+			
+			document.body.appendChild(div);
+		}
+    	`))
 
 	elem := p.Query("div")
 	buf := elem.Screenshot(nil)

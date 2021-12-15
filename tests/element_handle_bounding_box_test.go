@@ -25,23 +25,11 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/require"
 )
 
-func TestElementHandleBoundingBox(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
-
-	t.Run("ElementHandle.boundingBox", func(t *testing.T) {
-		t.Run("should return null for invisible elements", func(t *testing.T) { testElementHandleBoundingBoxInvisibleElement(t, bt) })
-		t.Run("should work with SVG nodes", func(t *testing.T) { testElementHandleBoundingBoxSVG(t, bt) })
-	})
-}
-
-func testElementHandleBoundingBoxInvisibleElement(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
+func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {
+	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<div style="display:none">hello</div>`, nil)
 	element := p.Query("div")
@@ -49,9 +37,9 @@ func testElementHandleBoundingBoxInvisibleElement(t *testing.T, bt *browsertest.
 	require.Nil(t, element.BoundingBox())
 }
 
-func testElementHandleBoundingBoxSVG(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
+func TestElementHandleBoundingBoxSVG(t *testing.T) {
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
 
 	p.SetContent(`
         <svg xmlns="http://www.w3.org/2000/svg" width="500" height="500">
@@ -64,8 +52,8 @@ func testElementHandleBoundingBoxSVG(t *testing.T, bt *browsertest.BrowserTest) 
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     }`
 	var r api.Rect
-	webBbox := p.Evaluate(bt.Runtime.ToValue(pageFn), bt.Runtime.ToValue(element))
-	bt.Runtime.ExportTo(webBbox.(goja.Value), &r)
+	webBbox := p.Evaluate(tb.rt.ToValue(pageFn), tb.rt.ToValue(element))
+	_ = tb.rt.ExportTo(webBbox.(goja.Value), &r)
 
 	require.EqualValues(t, bbox, &r)
 }

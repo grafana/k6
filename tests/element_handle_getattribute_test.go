@@ -24,20 +24,13 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestElementHandleGetAttribute(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	p := bt.Browser.NewPage(nil)
-	t.Cleanup(func() {
-		p.Close(nil)
-		bt.Browser.Close()
-	})
-
 	const want = "https://somewhere"
 
+	p := newTestBrowser(t).NewPage(nil)
 	p.SetContent(`
 		<a id="dark-mode-toggle-X" href="https://somewhere">Dark</a>
 	`, nil)

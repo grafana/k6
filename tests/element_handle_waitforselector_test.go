@@ -24,21 +24,16 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/require"
 )
 
 func TestElementHandleWaitForSelector(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	p := bt.Browser.NewPage(nil)
-	t.Cleanup(func() {
-		p.Close(nil)
-		bt.Browser.Close()
-	})
-
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
 	p.SetContent(`<div class="root"></div>`, nil)
+
 	root := p.Query(".root")
-	p.Evaluate(bt.Runtime.ToValue(`
+	p.Evaluate(tb.rt.ToValue(`
         () => {
 		setTimeout(() => {
 			const div = document.createElement('div');
@@ -48,10 +43,12 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 			root.appendChild(div);
 			}, 100);
 		}
-		`))
-	element := root.WaitForSelector(".element-to-appear", bt.Runtime.ToValue(struct {
+	`))
+	element := root.WaitForSelector(".element-to-appear", tb.rt.ToValue(struct {
 		Timeout int64 `js:"timeout"`
 	}{Timeout: 1000}))
+
 	require.NotNil(t, element, "expected element to have been found after wait")
+
 	element.Dispose()
 }

@@ -25,29 +25,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
-var browserModuleTests = map[string]func(*testing.T, api.Browser){
-	"NewPage":   testBrowserNewPage,
-	"Version":   testBrowserVersion,
-	"UserAgent": testBrowserUserAgent,
-}
-
-func TestBrowserModule(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	t.Cleanup(bt.Browser.Close)
-
-	for name, test := range browserModuleTests {
-		t.Run(name, func(t *testing.T) {
-			test(t, bt.Browser)
-		})
-	}
-}
-
-func testBrowserNewPage(t *testing.T, b api.Browser) {
+func TestBrowserNewPage(t *testing.T) {
+	b := newTestBrowser(t)
 	p := b.NewPage(nil)
 	l := len(b.Contexts())
 	assert.Equal(t, 1, l, "expected there to be 1 browser context, but found %d", l)
@@ -65,17 +47,19 @@ func testBrowserNewPage(t *testing.T, b api.Browser) {
 }
 
 // This only works for Chrome!
-func testBrowserVersion(t *testing.T, b api.Browser) {
+func TestBrowserVersion(t *testing.T) {
 	const re = `^\d+\.\d+\.\d+\.\d+$`
 	r, _ := regexp.Compile(re)
-	ver := b.Version()
+	ver := newTestBrowser(t).Version()
 	assert.Regexp(t, r, ver, "expected browser version to match regex %q, but found %q", re, ver)
 }
 
 // This only works for Chrome!
 // TODO: Improve this test, see:
 // https://github.com/grafana/xk6-browser/pull/51#discussion_r742696736
-func testBrowserUserAgent(t *testing.T, b api.Browser) {
+func TestBrowserUserAgent(t *testing.T) {
+	b := newTestBrowser(t)
+
 	// testBrowserVersion() tests the version already
 	// just look for "Headless" in UserAgent
 	ua := b.UserAgent()

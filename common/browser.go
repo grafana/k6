@@ -380,7 +380,7 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 	browserContextID, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "browserContextID: %v", browserContextID)
 	if err != nil {
-		k6Throw(b.ctx, "unable to execute %T: %w", action, err)
+		k6Throw(b.ctx, "cannot create browser context (%s): %w", browserContextID, err)
 	}
 
 	browserCtxOpts := NewBrowserContextOptions()

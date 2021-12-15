@@ -26,24 +26,13 @@ import (
 	"testing"
 
 	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestBrowserContextOptions(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	t.Cleanup(bt.Browser.Close)
+func TestBrowserContextOptionsDefaultValues(t *testing.T) {
+	t.Parallel()
 
-	t.Run("BrowserContextOptions", func(t *testing.T) {
-		t.Run("should have correct default values", func(t *testing.T) { testBrowserContextOptionsDefaultValues(t, bt) })
-		t.Run("should correctly set default viewport", func(t *testing.T) { testBrowserContextOptionsDefaultViewport(t, bt) })
-		t.Run("should correctly set custom viewport", func(t *testing.T) { testBrowserContextOptionsSetViewport(t, bt) })
-		t.Run("should correctly set extra headers", func(t *testing.T) { testBrowserContextOptionsExtraHTTPHeaders(t, bt) })
-	})
-}
-
-func testBrowserContextOptionsDefaultValues(t *testing.T, bt *browsertest.BrowserTest) {
 	opts := common.NewBrowserContextOptions()
 	assert.False(t, opts.AcceptDownloads)
 	assert.False(t, opts.BypassCSP)
@@ -66,17 +55,17 @@ func testBrowserContextOptionsDefaultValues(t *testing.T, bt *browsertest.Browse
 	assert.Equal(t, &common.Viewport{Width: common.DefaultScreenWidth, Height: common.DefaultScreenHeight}, opts.Viewport)
 }
 
-func testBrowserContextOptionsDefaultViewport(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
-	t.Cleanup(func() { p.Close(nil) })
+func TestBrowserContextOptionsDefaultViewport(t *testing.T) {
+	p := newTestBrowser(t).NewPage(nil)
 
 	viewportSize := p.ViewportSize()
 	assert.Equal(t, float64(common.DefaultScreenWidth), viewportSize["width"])
 	assert.Equal(t, float64(common.DefaultScreenHeight), viewportSize["height"])
 }
 
-func testBrowserContextOptionsSetViewport(t *testing.T, bt *browsertest.BrowserTest) {
-	bctx := bt.Browser.NewContext(bt.Runtime.ToValue(struct {
+func TestBrowserContextOptionsSetViewport(t *testing.T) {
+	tb := newTestBrowser(t)
+	bctx := tb.NewContext(tb.rt.ToValue(struct {
 		Viewport common.Viewport `js:"viewport"`
 	}{
 		Viewport: common.Viewport{
@@ -92,8 +81,9 @@ func testBrowserContextOptionsSetViewport(t *testing.T, bt *browsertest.BrowserT
 	assert.Equal(t, float64(600), viewportSize["height"])
 }
 
-func testBrowserContextOptionsExtraHTTPHeaders(t *testing.T, bt *browsertest.BrowserTest) {
-	bctx := bt.Browser.NewContext(bt.Runtime.ToValue(struct {
+func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
+	tb := newTestBrowser(t, withHTTPServer())
+	bctx := tb.NewContext(tb.rt.ToValue(struct {
 		ExtraHTTPHeaders map[string]string `js:"extraHTTPHeaders"`
 	}{
 		ExtraHTTPHeaders: map[string]string{
@@ -103,7 +93,7 @@ func testBrowserContextOptionsExtraHTTPHeaders(t *testing.T, bt *browsertest.Bro
 	t.Cleanup(bctx.Close)
 
 	p := bctx.NewPage()
-	resp := p.Goto(bt.HTTPMultiBin.ServerHTTP.URL+"/get", nil)
+	resp := p.Goto(tb.URL("/get"), nil)
 
 	require.NotNil(t, resp)
 	var body struct{ Headers map[string][]string }

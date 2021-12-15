@@ -26,42 +26,34 @@ import (
 	"image/png"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPageScreenshot(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
+func TestPageScreenshotFullpage(t *testing.T) {
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
 
-	t.Run("Page.screenshot", func(t *testing.T) {
-		t.Run("should work with full page", func(t *testing.T) { testPageScreenshotFullpage(t, bt) })
-	})
-}
-
-func testPageScreenshotFullpage(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
-
-	p.SetViewportSize(bt.Runtime.ToValue(struct {
+	p.SetViewportSize(tb.rt.ToValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{Width: 1280, Height: 800}))
-	p.Evaluate(bt.Runtime.ToValue(`
-        () => {
-            document.body.style.margin = '0';
-            document.body.style.padding = '0';
-            document.documentElement.style.margin = '0';
-            document.documentElement.style.padding = '0';
-            const div = document.createElement('div');
-            div.style.width = '1280px';
-            div.style.height = '8000px';
-            div.style.background = 'linear-gradient(red, blue)';
-            document.body.appendChild(div);
-        }
-    `))
+	p.Evaluate(tb.rt.ToValue(`
+	() => {
+		document.body.style.margin = '0';
+		document.body.style.padding = '0';
+		document.documentElement.style.margin = '0';
+		document.documentElement.style.padding = '0';
 
-	buf := p.Screenshot(bt.Runtime.ToValue(struct {
+		const div = document.createElement('div');
+		div.style.width = '1280px';
+		div.style.height = '8000px';
+		div.style.background = 'linear-gradient(red, blue)';
+		
+		document.body.appendChild(div);
+	}
+    	`))
+
+	buf := p.Screenshot(tb.rt.ToValue(struct {
 		FullPage bool `js:"fullPage"`
 	}{FullPage: true}))
 

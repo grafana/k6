@@ -24,24 +24,14 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPageTitle(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
-
-	t.Run("Page.title", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testPageTitle(t, bt) })
-	})
-}
-
-func testPageTitle(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
+	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)
+
 	title := p.Title()
 	assert.Equal(t, "Some title", title, `expected title to be "Some title", got %q`, title)
 }

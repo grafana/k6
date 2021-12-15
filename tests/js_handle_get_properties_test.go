@@ -24,30 +24,22 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/grafana/xk6-browser/testutils/browsertest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestJSHandleGetProperties(t *testing.T) {
-	bt := browsertest.NewBrowserTest(t)
-	defer bt.Browser.Close()
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
 
-	t.Run("JSHandle.getProperties", func(t *testing.T) {
-		t.Run("should work", func(t *testing.T) { testJSHandleGetProperties(t, bt) })
-	})
-}
-
-func testJSHandleGetProperties(t *testing.T, bt *browsertest.BrowserTest) {
-	p := bt.Browser.NewPage(nil)
-	defer p.Close(nil)
-
-	handle := p.EvaluateHandle(bt.Runtime.ToValue(`() => {
-        return {
-            prop1: "one",
-            prop2: "two",
-            prop3: "three"
-        };
-    }`))
+	handle := p.EvaluateHandle(tb.rt.ToValue(`
+	() => {
+		return {
+			prop1: "one",
+			prop2: "two",
+			prop3: "three"
+		};
+	}
+	`))
 
 	props := handle.GetProperties()
 	value := props["prop1"].JSONValue().String()
