@@ -7,9 +7,10 @@ reviewGroups:
   old:
     - na--
     - MStoykov
-  new: # TODO: combine a few months from now
     - codebien
+  new: # TODO: combine a few months from now
     - yorugac
     - oleiade
+    - olegbespalov
 skipKeywords:
   - wip
