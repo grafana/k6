@@ -30,8 +30,6 @@ import (
 )
 
 func TestElementHandleScreenshot(t *testing.T) {
-	t.Parallel()
-
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
@@ -40,20 +38,22 @@ func TestElementHandleScreenshot(t *testing.T) {
 		Height float64 `js:"height"`
 	}{Width: 800, Height: 600}))
 	p.Evaluate(tb.rt.ToValue(`
-         () => {
-             document.body.style.margin = '0';
-             document.body.style.padding = '0';
-             document.documentElement.style.margin = '0';
-             document.documentElement.style.padding = '0';
-             const div = document.createElement('div');
-             div.style.marginTop = '400px';
-             div.style.marginLeft = '100px';
-             div.style.width = '100px';
-             div.style.height = '100px';
-             div.style.background = 'red';
-             document.body.appendChild(div);
-         }
-    `))
+		() => {
+			document.body.style.margin = '0';
+			document.body.style.padding = '0';
+			document.documentElement.style.margin = '0';
+			document.documentElement.style.padding = '0';
+
+			const div = document.createElement('div');
+			div.style.marginTop = '400px';
+			div.style.marginLeft = '100px';
+			div.style.width = '100px';
+			div.style.height = '100px';
+			div.style.background = 'red';
+			
+			document.body.appendChild(div);
+		}
+    	`))
 
 	elem := p.Query("div")
 	buf := elem.Screenshot(nil)

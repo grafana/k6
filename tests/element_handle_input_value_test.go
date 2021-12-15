@@ -28,8 +28,6 @@ import (
 )
 
 func TestElementHandleInputValue(t *testing.T) {
-	t.Parallel()
-
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`

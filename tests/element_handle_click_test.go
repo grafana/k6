@@ -68,8 +68,6 @@ var htmlInputButton = fmt.Sprintf(`
 `, mouseHelperScriptSource)
 
 func TestElementHandleClick(t *testing.T) {
-	t.Parallel()
-
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
@@ -92,8 +90,6 @@ func TestElementHandleClick(t *testing.T) {
 }
 
 func TestElementHandleClickWithNodeRemoved(t *testing.T) {
-	t.Parallel()
-
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
@@ -119,8 +115,6 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 }
 
 func TestElementHandleClickWithDetachedNode(t *testing.T) {
-	t.Parallel()
-
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 

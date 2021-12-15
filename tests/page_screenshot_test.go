@@ -30,8 +30,6 @@ import (
 )
 
 func TestPageScreenshotFullpage(t *testing.T) {
-	t.Parallel()
-
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
@@ -40,18 +38,20 @@ func TestPageScreenshotFullpage(t *testing.T) {
 		Height float64 `js:"height"`
 	}{Width: 1280, Height: 800}))
 	p.Evaluate(tb.rt.ToValue(`
-        () => {
-            document.body.style.margin = '0';
-            document.body.style.padding = '0';
-            document.documentElement.style.margin = '0';
-            document.documentElement.style.padding = '0';
-            const div = document.createElement('div');
-            div.style.width = '1280px';
-            div.style.height = '8000px';
-            div.style.background = 'linear-gradient(red, blue)';
-            document.body.appendChild(div);
-        }
-    `))
+	() => {
+		document.body.style.margin = '0';
+		document.body.style.padding = '0';
+		document.documentElement.style.margin = '0';
+		document.documentElement.style.padding = '0';
+
+		const div = document.createElement('div');
+		div.style.width = '1280px';
+		div.style.height = '8000px';
+		div.style.background = 'linear-gradient(red, blue)';
+		
+		document.body.appendChild(div);
+	}
+    	`))
 
 	buf := p.Screenshot(tb.rt.ToValue(struct {
 		FullPage bool `js:"fullPage"`

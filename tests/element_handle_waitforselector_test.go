@@ -28,8 +28,6 @@ import (
 )
 
 func TestElementHandleWaitForSelector(t *testing.T) {
-	t.Parallel()
-
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 	p.SetContent(`<div class="root"></div>`, nil)

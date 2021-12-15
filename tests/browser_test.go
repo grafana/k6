@@ -29,8 +29,6 @@ import (
 )
 
 func TestBrowserNewPage(t *testing.T) {
-	t.Parallel()
-
 	b := newTestBrowser(t)
 	p := b.NewPage(nil)
 	l := len(b.Contexts())
@@ -50,8 +48,6 @@ func TestBrowserNewPage(t *testing.T) {
 
 // This only works for Chrome!
 func TestBrowserVersion(t *testing.T) {
-	t.Parallel()
-
 	const re = `^\d+\.\d+\.\d+\.\d+$`
 	r, _ := regexp.Compile(re)
 	ver := newTestBrowser(t).Version()
@@ -62,8 +58,6 @@ func TestBrowserVersion(t *testing.T) {
 // TODO: Improve this test, see:
 // https://github.com/grafana/xk6-browser/pull/51#discussion_r742696736
 func TestBrowserUserAgent(t *testing.T) {
-	t.Parallel()
-
 	b := newTestBrowser(t)
 
 	// testBrowserVersion() tests the version already

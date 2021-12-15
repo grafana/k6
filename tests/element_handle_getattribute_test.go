@@ -28,8 +28,6 @@ import (
 )
 
 func TestElementHandleGetAttribute(t *testing.T) {
-	t.Parallel()
-
 	const want = "https://somewhere"
 
 	p := newTestBrowser(t).NewPage(nil)

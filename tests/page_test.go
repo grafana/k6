@@ -31,8 +31,6 @@ import (
 )
 
 func TestPageGoto(t *testing.T) {
-	t.Parallel()
-
 	b := newTestBrowser(t, withFileServer())
 
 	p := b.NewPage(nil)
@@ -44,8 +42,6 @@ func TestPageGoto(t *testing.T) {
 }
 
 func TestPageGotoDataURI(t *testing.T) {
-	t.Parallel()
-
 	p := newTestBrowser(t).NewPage(nil)
 
 	r := p.Goto("data:text/html,hello", nil)
@@ -54,8 +50,6 @@ func TestPageGotoDataURI(t *testing.T) {
 }
 
 func TestPageGotoWaitUntilLoad(t *testing.T) {
-	t.Parallel()
-
 	b := newTestBrowser(t, withFileServer())
 
 	p := b.NewPage(nil)
@@ -72,8 +66,6 @@ func TestPageGotoWaitUntilLoad(t *testing.T) {
 }
 
 func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
-	t.Parallel()
-
 	b := newTestBrowser(t, withFileServer())
 
 	p := b.NewPage(nil)
@@ -90,8 +82,6 @@ func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 }
 
 func TestPageSetExtraHTTPHeaders(t *testing.T) {
-	t.Parallel()
-
 	b := newTestBrowser(t, withHTTPServer())
 
 	p := b.NewPage(nil)

@@ -28,8 +28,6 @@ import (
 )
 
 func TestPageInputValue(t *testing.T) {
-	t.Parallel()
-
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`
@@ -50,8 +48,6 @@ func TestPageInputValue(t *testing.T) {
 
 // test for: https://github.com/grafana/xk6-browser/issues/132
 func TestPageInputSpecialCharacters(t *testing.T) {
-	t.Parallel()
-
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<input id="special">`, nil)

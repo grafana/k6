@@ -28,8 +28,6 @@ import (
 )
 
 func TestPageIsChecked(t *testing.T) {
-	t.Parallel()
-
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<input type="checkbox" checked>`, nil)

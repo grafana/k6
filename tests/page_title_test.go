@@ -28,8 +28,6 @@ import (
 )
 
 func TestPageTitle(t *testing.T) {
-	t.Parallel()
-
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)
