@@ -31,6 +31,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/errext"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/output"
@@ -263,9 +264,12 @@ func (e *Engine) startBackgroundProcesses(
 			if err != nil {
 				e.logger.WithError(err).Debug("run: execution scheduler returned an error")
 				var serr errext.Exception
-				if errors.As(err, &serr) {
+				switch {
+				case errors.As(err, &serr):
 					e.setRunStatus(lib.RunStatusAbortedScriptError)
-				} else {
+				case common.IsInterruptError(err):
+					e.setRunStatus(lib.RunStatusAbortedUser)
+				default:
 					e.setRunStatus(lib.RunStatusAbortedSystem)
 				}
 			} else {
