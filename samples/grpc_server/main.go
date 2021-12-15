@@ -45,6 +45,13 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
+// It generates the Go code for protobuf and the gRPC server used by this implementation. Check the following links for getting more details about protoc generation:
+// * https://grpc.io/docs/protoc-installation
+// * https://grpc.io/docs/languages/go/quickstart/
+//
+//
+//go:generate protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative route_guide.proto
+
 func init() {
 	rand.Seed(time.Now().UnixNano())
 }
