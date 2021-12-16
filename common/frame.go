@@ -1375,8 +1375,8 @@ func (f *Frame) WaitForSelector(selector string, opts goja.Value) api.ElementHan
 func (f *Frame) WaitForTimeout(timeout int64) {
 	to := time.Duration(timeout) * time.Millisecond
 
-	f.log.Debugf("Frame:WaitForTimeout", "fid:%s furl:%q to:%s", f.id, f.url, to)
-	defer f.log.Debugf("Frame:WaitForTimeout:return", "fid:%s furl:%q to:%s", f.id, f.url, to)
+	f.log.Debugf("Frame:WaitForTimeout", "fid:%s furl:%q timeout:%s", f.id, f.url, to)
+	defer f.log.Debugf("Frame:WaitForTimeout:return", "fid:%s furl:%q timeout:%s", f.id, f.url, to)
 
 	select {
 	case <-f.ctx.Done():
