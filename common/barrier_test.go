@@ -29,20 +29,18 @@ import (
 )
 
 func TestBarrier(t *testing.T) {
-	t.Run("should work", func(t *testing.T) {
-		ctx := context.Background()
+	ctx := context.Background()
 
-		log := NewLogger(ctx, NullLogger(), false, nil)
+	log := NewLogger(ctx, NullLogger(), false, nil)
 
-		timeoutSetings := NewTimeoutSettings(nil)
-		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, log)
-		frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"), log)
+	timeoutSetings := NewTimeoutSettings(nil)
+	frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, log)
+	frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"), log)
 
-		barrier := NewBarrier()
-		barrier.AddFrameNavigation(frame)
-		frame.emit(EventFrameNavigation, "some data")
+	barrier := NewBarrier()
+	barrier.AddFrameNavigation(frame)
+	frame.emit(EventFrameNavigation, "some data")
 
-		err := barrier.Wait(ctx)
-		require.Nil(t, err)
-	})
+	err := barrier.Wait(ctx)
+	require.Nil(t, err)
 }
