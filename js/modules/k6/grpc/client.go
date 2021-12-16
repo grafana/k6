@@ -342,7 +342,7 @@ type fileDescriptorLookupKey struct {
 }
 
 func resolveServiceFileDescriptors(
-	mc reflectpb.ServerReflection_ServerReflectionInfoClient,
+	client sendReceiver,
 	res *reflectpb.ListServiceResponse,
 ) (*descriptorpb.FileDescriptorSet, error) {
 	services := res.GetService()
@@ -357,7 +357,7 @@ func resolveServiceFileDescriptors(
 				FileContainingSymbol: service.GetName(),
 			},
 		}
-		resp, err := sendReceive(mc, req)
+		resp, err := sendReceive(client, req)
 		if err != nil {
 			return nil, fmt.Errorf("can't get method on service %q: %w", service, err)
 		}
@@ -384,10 +384,21 @@ func resolveServiceFileDescriptors(
 	return fdset, nil
 }
 
+// sendReceiver is a smaller interface for decoupling
+// from `reflectpb.ServerReflection_ServerReflectionInfoClient`,
+// that has the dependency from `grpc.ClientStream`,
+// which is too much in the case the requirement is to just make a reflection's request.
+// It makes the API more restricted and with a controlled surface,
+// in this way the testing should be easier also.
+type sendReceiver interface {
+	Send(*reflectpb.ServerReflectionRequest) error
+	Recv() (*reflectpb.ServerReflectionResponse, error)
+}
+
 // sendReceive sends a request to a reflection client and,
 // receives a response.
 func sendReceive(
-	client reflectpb.ServerReflection_ServerReflectionInfoClient,
+	client sendReceiver,
 	req *reflectpb.ServerReflectionRequest,
 ) (*reflectpb.ServerReflectionResponse, error) {
 	if err := client.Send(req); err != nil {
