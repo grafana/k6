@@ -1386,7 +1386,7 @@ func (h *ElementHandle) SetChecked(checked bool, opts goja.Value) {
 func (h *ElementHandle) SetInputFiles(files goja.Value, opts goja.Value) {
 	// TODO: implement
 	rt := k6common.GetRuntime(h.ctx)
-	k6common.Throw(rt, errors.New("ElementHandle.setInputFiles() has not been implemented yet!"))
+	k6common.Throw(rt, errors.New("ElementHandle.setInputFiles() has not been implemented yet"))
 }
 
 func (h *ElementHandle) Tap(opts goja.Value) {

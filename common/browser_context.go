@@ -29,6 +29,7 @@ import (
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/storage"
+	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	k6common "go.k6.io/k6/js/common"
@@ -77,7 +78,7 @@ func (b *BrowserContext) AddCookies(cookies goja.Value) {
 
 // AddInitScript adds a script that will be initialized on all new pages.
 func (b *BrowserContext) AddInitScript(script goja.Value, arg goja.Value) {
-	b.logger.Debugf("BrowserContext:AddInitScript", "")
+	b.logger.Debugf("BrowserContext:AddInitScript", "bctxid:%v", b.id)
 
 	rt := k6common.GetRuntime(b.ctx)
 
@@ -118,6 +119,8 @@ func (b *BrowserContext) Browser() api.Browser {
 
 // ClearCookies clears cookies.
 func (b *BrowserContext) ClearCookies() {
+	b.logger.Debugf("BrowserContext:ClearCookies", "bctxid:%v", b.id)
+
 	action := storage.ClearCookies().WithBrowserContextID(b.id)
 	if err := action.Do(b.ctx); err != nil {
 		k6Throw(b.ctx, "unable to clear cookies permissions: %w", err)
@@ -126,6 +129,8 @@ func (b *BrowserContext) ClearCookies() {
 
 // ClearPermissions clears any permission overrides.
 func (b *BrowserContext) ClearPermissions() {
+	b.logger.Debugf("BrowserContext:ClearPermissions", "bctxid:%v", b.id)
+
 	action := cdpbrowser.ResetPermissions().WithBrowserContextID(b.id)
 	if err := action.Do(b.ctx); err != nil {
 		k6Throw(b.ctx, "unable to clear override permissions: %w", err)
@@ -134,6 +139,8 @@ func (b *BrowserContext) ClearPermissions() {
 
 // Close shuts down the browser context.
 func (b *BrowserContext) Close() {
+	b.logger.Debugf("BrowserContext:Close", "bctxid:%v", b.id)
+
 	if b.id == "" {
 		k6Throw(b.ctx, "default browser context can't be closed")
 	}
@@ -157,7 +164,8 @@ func (b *BrowserContext) ExposeFunction(name string, callback goja.Callable) {
 
 // GrantPermissions enables the specified permissions, all others will be disabled.
 func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value) {
-	b.logger.Debugf("BrowserContext:GrantPermissions", "")
+	b.logger.Debugf("BrowserContext:GrantPermissions", "bctxid:%v", b.id)
+
 	permsToProtocol := map[string]cdpbrowser.PermissionType{
 		"geolocation":          cdpbrowser.PermissionTypeGeolocation,
 		"midi":                 cdpbrowser.PermissionTypeMidi,
@@ -207,12 +215,25 @@ func (b *BrowserContext) NewCDPSession() api.CDPSession {
 
 // NewPage creates a new page inside this browser context.
 func (b *BrowserContext) NewPage() api.Page {
-	b.logger.Debugf("BrowserContext:NewPage", "bid:%v", b.id)
+	b.logger.Debugf("BrowserContext:NewPage", "bctxid:%v", b.id)
+
 	p, err := b.browser.newPageInContext(b.id)
 	if err != nil {
 		k6Throw(b.ctx, "cannot create a new page: %w", err)
 	}
-	b.logger.Debugf("BrowserContext:NewPage:returns", "bid:%v ptid:%s", b.id, p.targetID)
+
+	var (
+		bctxid cdp.BrowserContextID
+		ptid   target.ID
+	)
+	if b != nil {
+		bctxid = b.id
+	}
+	if p != nil {
+		ptid = p.targetID
+	}
+	b.logger.Debugf("BrowserContext:NewPage:return", "bctxid:%v ptid:%s", bctxid, ptid)
+
 	return p
 }
 
@@ -231,11 +252,15 @@ func (b *BrowserContext) Route(url goja.Value, handler goja.Callable) {
 
 // SetDefaultNavigationTimeout sets the default navigation timeout in milliseconds.
 func (b *BrowserContext) SetDefaultNavigationTimeout(timeout int64) {
+	b.logger.Debugf("BrowserContext:SetDefaultNavigationTimeout", "bctxid:%v timeout:%d", b.id, timeout)
+
 	b.timeoutSettings.setDefaultNavigationTimeout(timeout)
 }
 
 // SetDefaultTimeout sets the default maximum timeout in milliseconds.
 func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
+	b.logger.Debugf("BrowserContext:SetDefaultTimeout", "bctxid:%v timeout:%d", b.id, timeout)
+
 	b.timeoutSettings.setDefaultTimeout(timeout)
 }
 
@@ -245,6 +270,8 @@ func (b *BrowserContext) SetExtraHTTPHeaders(headers map[string]string) {
 
 // SetGeolocation overrides the geo location of the user.
 func (b *BrowserContext) SetGeolocation(geolocation goja.Value) {
+	b.logger.Debugf("BrowserContext:SetGeolocation", "bctxid:%v", b.id)
+
 	g := NewGeolocation()
 	if err := g.Parse(b.ctx, geolocation); err != nil {
 		k6Throw(b.ctx, "cannot parse geo location: %w", err)
@@ -260,6 +287,8 @@ func (b *BrowserContext) SetGeolocation(geolocation goja.Value) {
 
 // SetHTTPCredentials sets username/password credentials to use for HTTP authentication.
 func (b *BrowserContext) SetHTTPCredentials(httpCredentials goja.Value) {
+	b.logger.Debugf("BrowserContext:SetHTTPCredentials", "bctxid:%v", b.id)
+
 	c := NewCredentials()
 	if err := c.Parse(b.ctx, httpCredentials); err != nil {
 		k6Throw(b.ctx, "cannot set HTTP credentials: %w", err)
@@ -273,6 +302,8 @@ func (b *BrowserContext) SetHTTPCredentials(httpCredentials goja.Value) {
 
 // SetOffline toggles the browser's connectivity on/off.
 func (b *BrowserContext) SetOffline(offline bool) {
+	b.logger.Debugf("BrowserContext:SetOffline", "bctxid:%v offline:%t", b.id, offline)
+
 	b.opts.Offline = offline
 	for _, p := range b.browser.getPages() {
 		p.updateOffline()
@@ -288,8 +319,8 @@ func (b *BrowserContext) Unroute(url goja.Value, handler goja.Callable) {
 }
 
 func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) interface{} {
-	b.logger.Debugf("BrowserContext:WaitForEvent", "event:%q", event)
 	// TODO: This public API needs Promise support (as return value) to be useful in JS!
+	b.logger.Debugf("BrowserContext:WaitForEvent", "bctxid:%v event:%q", b.id, event)
 
 	rt := k6common.GetRuntime(b.ctx)
 
@@ -325,16 +356,16 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 	ch := make(chan interface{})
 
 	go func() {
-		b.logger.Debugf("BrowserContext:WaitForEvent:go()", "starts")
-		defer b.logger.Debugf("BrowserContext:WaitForEvent:go()", "returns")
+		b.logger.Debugf("BrowserContext:WaitForEvent:go():starts", "bctxid:%v", b.id)
+		defer b.logger.Debugf("BrowserContext:WaitForEvent:go():returns", "bctxid:%v", b.id)
 		for {
 			select {
 			case <-evCancelCtx.Done():
-				b.logger.Debugf("BrowserContext:WaitForEvent:go()", "evCancelCtx done")
+				b.logger.Debugf("BrowserContext:WaitForEvent:go():evCancelCtx:done", "bctxid:%v", b.id)
 				return
 			case ev := <-chEvHandler:
 				if ev.typ == EventBrowserContextClose {
-					b.logger.Debugf("BrowserContext:WaitForEvent:go()", "EventBrowserContextClose returns")
+					b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextClose:return", "bctxid:%v", b.id)
 					ch <- nil
 					close(ch)
 
@@ -344,11 +375,11 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 					return
 				}
 				if ev.typ == EventBrowserContextPage {
-					b.logger.Debugf("BrowserContext:WaitForEvent:go()", "EventBrowserContextPage")
+					b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage", "bctxid:%v", b.id)
 					p := ev.data.(*Page)
 					exported := k6common.Bind(rt, p, &b.ctx)
 					if retVal, err := predicateFn(rt.ToValue(exported)); err == nil && retVal.ToBoolean() {
-						b.logger.Debugf("BrowserContext:WaitForEvent:go()", "EventBrowserContextPage returns")
+						b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage:return", "bctxid:%v", b.id)
 						ch <- p
 						close(ch)
 
@@ -367,13 +398,13 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 
 	select {
 	case <-b.ctx.Done():
-		b.logger.Debugf("BrowserContext:WaitForEvent", "b.ctx Done")
+		b.logger.Debugf("BrowserContext:WaitForEvent:ctx.Done", "bctxid:%v event:%q", b.id, event)
 	case <-time.After(timeout):
-		b.logger.Debugf("BrowserContext:WaitForEvent", "timeout")
+		b.logger.Debugf("BrowserContext:WaitForEvent:timeout", "bctxid:%v event:%q", b.id, event)
 	case evData := <-ch:
-		b.logger.Debugf("BrowserContext:WaitForEvent", "evData")
+		b.logger.Debugf("BrowserContext:WaitForEvent:evData", "bctxid:%v event:%q", b.id, event)
 		return evData
 	}
-	b.logger.Debugf("BrowserContext:WaitForEvent", "nil return")
+	b.logger.Debugf("BrowserContext:WaitForEvent:return nil", "bctxid:%v event:%q", b.id, event)
 	return nil
 }
