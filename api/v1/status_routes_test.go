@@ -29,7 +29,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/manyminds/api2go/jsonapi"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -59,17 +58,15 @@ func TestGetStatus(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
 	t.Run("document", func(t *testing.T) {
-		var doc jsonapi.Document
+		var doc statusEnvelop
 		assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &doc))
-		if !assert.NotNil(t, doc.Data.DataObject) {
-			return
-		}
-		assert.Equal(t, "status", doc.Data.DataObject.Type)
+		assert.Equal(t, "status", doc.Data.Type)
 	})
 
 	t.Run("status", func(t *testing.T) {
-		var status Status
-		assert.NoError(t, jsonapi.Unmarshal(rw.Body.Bytes(), &status))
+		status, err := unmarshalStatusEnvelopJSON(rw.Body.Bytes())
+
+		assert.NoError(t, err)
 		assert.True(t, status.Paused.Valid)
 		assert.True(t, status.VUs.Valid)
 		assert.True(t, status.VUsMax.Valid)
@@ -117,7 +114,7 @@ func TestPatchStatus(t *testing.T) {
 			// wait for the executor to initialize to avoid a potential data race below
 			time.Sleep(100 * time.Millisecond)
 
-			body, err := jsonapi.Marshal(indata.Status)
+			body, err := json.Marshal(newStatusEnvelop(indata.Status))
 			require.NoError(t, err)
 
 			rw := httptest.NewRecorder()
