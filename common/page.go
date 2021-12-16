@@ -174,8 +174,8 @@ func (p *Page) getFrameElement(f *Frame) (*ElementHandle, error) {
 		return nil, errors.New("frame has been detached 1")
 	}
 
-	parentSession := p.getFrameSession(parent.id)
-	action := dom.GetFrameOwner(f.id)
+	parentSession := p.getFrameSession(cdp.FrameID(parent.ID()))
+	action := dom.GetFrameOwner(cdp.FrameID(f.ID()))
 	backendNodeId, _, err := action.Do(cdp.WithExecutor(p.ctx, parentSession.session))
 	if err != nil {
 		if strings.Contains(err.Error(), "frame with the given id was not found") {

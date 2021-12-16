@@ -136,11 +136,11 @@ func (m *FrameManager) frameAbortedNavigation(frameID cdp.FrameID, errorText, do
 
 	m.logger.Debugf("FrameManager:frameAbortedNavigation:emit:EventFrameNavigation",
 		"fmid:%d fid:%v err:%s docid:%s fname:%s furl:%s",
-		m.ID(), frameID, errorText, documentID, frame.name, frame.url)
+		m.ID(), frameID, errorText, documentID, frame.Name(), frame.URL())
 
 	frame.emit(EventFrameNavigation, &NavigationEvent{
-		url:         frame.url,
-		name:        frame.name,
+		url:         frame.URL(),
+		name:        frame.Name(),
 		newDocument: frame.pendingDocument,
 		err:         errors.New(errorText),
 	})
@@ -337,10 +337,10 @@ func (m *FrameManager) frameNavigatedWithinDocument(frameID cdp.FrameID, url str
 	}
 
 	m.logger.Debugf("FrameManager:frameNavigatedWithinDocument",
-		"fmid:%d fid:%v furl:%s url:%s", m.ID(), frameID, frame.url, url)
+		"fmid:%d fid:%v furl:%s url:%s", m.ID(), frameID, frame.URL(), url)
 
-	frame.url = url
-	frame.emit(EventFrameNavigation, &NavigationEvent{url: url, name: frame.name})
+	frame.setURL(url)
+	frame.emit(EventFrameNavigation, &NavigationEvent{url: url, name: frame.Name()})
 }
 
 func (m *FrameManager) frameRequestedNavigation(frameID cdp.FrameID, url string, documentID string) error {
@@ -447,7 +447,7 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 
 			m.logger.Debugf("FrameManager:requestFailed:rc<=10",
 				"reqID:%s inflightURL:%s frameID:%s",
-				reqID, req.url, frame.id)
+				reqID, req.URL(), frame.ID())
 		}
 	}
 
@@ -461,11 +461,13 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	if canceled {
 		errorText += "; maybe frame was detached?"
 	}
-	m.frameAbortedNavigation(frame.id, errorText, frame.pendingDocument.documentID)
+	m.frameAbortedNavigation(cdp.FrameID(frame.ID()), errorText,
+		frame.pendingDocument.documentID)
 }
 
 func (m *FrameManager) requestFinished(req *Request) {
-	m.logger.Debugf("FrameManager:requestFinished", "fmid:%d rurl:%s", m.ID(), req.URL())
+	m.logger.Debugf("FrameManager:requestFinished", "fmid:%d rurl:%s",
+		m.ID(), req.URL())
 
 	delete(m.inflightRequests, req.getID())
 	defer m.page.emit(EventPageRequestFinished, req)
@@ -568,7 +570,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 	})
 	defer evCancelFn2() // Remove event handler
 
-	fs := frame.page.getFrameSession(frame.id)
+	fs := frame.page.getFrameSession(cdp.FrameID(frame.ID()))
 	if fs == nil {
 		m.logger.Debugf("FrameManager:NavigateFrame",
 			"fmid:%d fid:%v furl:%s url:%s fs:nil",
@@ -660,10 +662,10 @@ func (m *FrameManager) Page() api.Page {
 func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api.Response {
 	m.logger.Debugf("FrameManager:WaitForFrameNavigation",
 		"fmid:%d fid:%s furl:%s",
-		m.ID(), frame.id, frame.url)
+		m.ID(), frame.ID(), frame.URL())
 	defer m.logger.Debugf("FrameManager:WaitForFrameNavigation:return",
 		"fmid:%d fid:%s furl:%s",
-		m.ID(), frame.id, frame.url)
+		m.ID(), frame.ID(), frame.URL())
 
 	rt := k6common.GetRuntime(m.ctx)
 	parsedOpts := NewFrameWaitForNavigationOptions(time.Duration(m.timeoutSettings.timeout()) * time.Second)

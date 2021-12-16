@@ -103,11 +103,13 @@ type Frame struct {
 
 	childFramesMu sync.RWMutex
 	childFrames   map[api.Frame]bool
-	id            cdp.FrameID
-	loaderID      string
-	name          string
-	url           string
-	detached      bool
+
+	propertiesMu sync.RWMutex
+	id           cdp.FrameID
+	loaderID     string
+	name         string
+	url          string
+	detached     bool
 
 	// A life cycle event is only considered triggered for a frame if the entire
 	// frame subtree has also had the life cycle event triggered.
@@ -173,7 +175,7 @@ func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID 
 func (f *Frame) addChildFrame(child *Frame) {
 	f.log.Debugf("Frame:addChildFrame",
 		"fid:%s cfid:%s furl:%q cfurl:%q",
-		f.id, child.id, f.url, child.url)
+		f.ID(), child.ID(), f.URL(), child.URL())
 
 	f.childFramesMu.Lock()
 	f.childFrames[child] = true
@@ -181,7 +183,7 @@ func (f *Frame) addChildFrame(child *Frame) {
 }
 
 func (f *Frame) addRequest(id network.RequestID) {
-	f.log.Debugf("Frame:addRequest", "fid:%s furl:%q rid:%s", f.id, f.url, id)
+	f.log.Debugf("Frame:addRequest", "fid:%s furl:%q rid:%s", f.ID(), f.URL(), id)
 
 	f.inflightRequestsMu.Lock()
 	defer f.inflightRequestsMu.Unlock()
@@ -190,7 +192,7 @@ func (f *Frame) addRequest(id network.RequestID) {
 }
 
 func (f *Frame) deleteRequest(id network.RequestID) {
-	f.log.Debugf("Frame:deleteRequest", "fid:%s furl:%q rid:%s", f.id, f.url, id)
+	f.log.Debugf("Frame:deleteRequest", "fid:%s furl:%q rid:%s", f.ID(), f.URL(), id)
 
 	f.inflightRequestsMu.Lock()
 	defer f.inflightRequestsMu.Unlock()
@@ -205,7 +207,7 @@ func (f *Frame) inflightRequestsLen() int {
 }
 
 func (f *Frame) clearLifecycle() {
-	f.log.Debugf("Frame:clearLifecycle", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:clearLifecycle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	// clear lifecycle events
 	f.lifecycleEventsMu.Lock()
@@ -244,7 +246,7 @@ func (f *Frame) clearLifecycle() {
 }
 
 func (f *Frame) recalculateLifecycle() {
-	f.log.Debugf("Frame:recalculateLifecycle", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:recalculateLifecycle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	// Start with triggered events.
 	var events map[LifecycleEvent]bool = make(map[LifecycleEvent]bool)
@@ -297,7 +299,7 @@ func (f *Frame) recalculateLifecycle() {
 }
 
 func (f *Frame) stopNetworkIdleTimer() {
-	f.log.Debugf("Frame:stopNetworkIdleTimer", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:stopNetworkIdleTimer", "fid:%s furl:%q", f.ID(), f.URL())
 
 	select {
 	case f.networkIdleCh <- struct{}{}:
@@ -306,9 +308,9 @@ func (f *Frame) stopNetworkIdleTimer() {
 }
 
 func (f *Frame) startNetworkIdleTimer() {
-	f.log.Debugf("Frame:startNetworkIdleTimer", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:startNetworkIdleTimer", "fid:%s furl:%q", f.ID(), f.URL())
 
-	if f.hasLifecycleEventFired(LifecycleEventNetworkIdle) || f.detached {
+	if f.hasLifecycleEventFired(LifecycleEventNetworkIdle) || f.IsDetached() {
 		return
 	}
 
@@ -319,16 +321,16 @@ func (f *Frame) startNetworkIdleTimer() {
 		case <-f.ctx.Done():
 		case <-f.networkIdleCh:
 		case <-time.After(LifeCycleNetworkIdleTimeout):
-			f.manager.frameLifecycleEvent(f.id, LifecycleEventNetworkIdle)
+			f.manager.frameLifecycleEvent(cdp.FrameID(f.ID()), LifecycleEventNetworkIdle)
 		}
 	}()
 }
 
 func (f *Frame) detach() {
-	f.log.Debugf("Frame:detach", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:detach", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.stopNetworkIdleTimer()
-	f.detached = true
+	f.setDetached(true)
 	if f.parentFrame != nil {
 		f.parentFrame.removeChildFrame(f)
 	}
@@ -343,7 +345,7 @@ func (f *Frame) defaultTimeout() time.Duration {
 }
 
 func (f *Frame) document() (*ElementHandle, error) {
-	f.log.Debugf("Frame:document", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:document", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := k6common.GetRuntime(f.ctx)
 	if f.documentHandle != nil {
@@ -377,18 +379,22 @@ func (f *Frame) hasContext(world string) bool {
 func (f *Frame) hasLifecycleEventFired(event LifecycleEvent) bool {
 	f.lifecycleEventsMu.RLock()
 	defer f.lifecycleEventsMu.RUnlock()
+
 	return f.lifecycleEvents[event]
 }
 
 func (f *Frame) hasSubtreeLifecycleEventFired(event LifecycleEvent) bool {
 	f.lifecycleEventsMu.RLock()
 	defer f.lifecycleEventsMu.RUnlock()
+
 	return f.subtreeLifecycleEvents[event]
 }
 
 func (f *Frame) navigated(name string, url string, loaderID string) {
-	f.log.Debugf("Frame:navigated", "fid:%s furl:%q lid:%s name:%q url:%q", f.id, f.url, loaderID, name, url)
+	f.log.Debugf("Frame:navigated", "fid:%s furl:%q lid:%s name:%q url:%q", f.ID(), f.URL(), loaderID, name, url)
 
+	f.propertiesMu.Lock()
+	defer f.propertiesMu.Unlock()
 	f.name = name
 	f.url = url
 	f.loaderID = loaderID
@@ -396,7 +402,7 @@ func (f *Frame) navigated(name string, url string, loaderID string) {
 }
 
 func (f *Frame) nullContext(execCtxID runtime.ExecutionContextID) {
-	f.log.Debugf("Frame:nullContext", "fid:%s furl:%q ectxid:%d ", f.id, f.url, execCtxID)
+	f.log.Debugf("Frame:nullContext", "fid:%s furl:%q ectxid:%d ", f.ID(), f.URL(), execCtxID)
 
 	if f.mainExecutionContext != nil && f.mainExecutionContext.ID() == execCtxID {
 		f.mainExecutionContext = nil
@@ -413,7 +419,7 @@ func (f *Frame) nullContexts() {
 }
 
 func (f *Frame) onLifecycleEvent(event LifecycleEvent) {
-	f.log.Debugf("Frame:onLifecycleEvent", "fid:%s furl:%q event:%s", f.id, f.url, event)
+	f.log.Debugf("Frame:onLifecycleEvent", "fid:%s furl:%q event:%s", f.ID(), f.URL(), event)
 
 	f.lifecycleEventsMu.Lock()
 	defer f.lifecycleEventsMu.Unlock()
@@ -424,13 +430,13 @@ func (f *Frame) onLifecycleEvent(event LifecycleEvent) {
 }
 
 func (f *Frame) onLoadingStarted() {
-	f.log.Debugf("Frame:onLoadingStarted", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:onLoadingStarted", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.loadingStartedTime = time.Now()
 }
 
 func (f *Frame) onLoadingStopped() {
-	f.log.Debugf("Frame:onLoadingStopped", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:onLoadingStopped", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.lifecycleEventsMu.Lock()
 	defer f.lifecycleEventsMu.Unlock()
@@ -453,7 +459,8 @@ func (f *Frame) position() *Position {
 }
 
 func (f *Frame) removeChildFrame(child *Frame) {
-	f.log.Debugf("Frame:removeChildFrame", "fid:%s furl:%q cfid:%s curl:%q", f.id, f.url, child.id, child.url)
+	f.log.Debugf("Frame:removeChildFrame", "fid:%s furl:%q cfid:%s curl:%q",
+		f.ID(), f.URL(), child.ID(), child.URL())
 
 	f.childFramesMu.Lock()
 	delete(f.childFrames, child)
@@ -461,7 +468,7 @@ func (f *Frame) removeChildFrame(child *Frame) {
 }
 
 func (f *Frame) requestByID(reqID network.RequestID) *Request {
-	frameSession := f.page.getFrameSession(f.id)
+	frameSession := f.page.getFrameSession(cdp.FrameID(f.ID()))
 	if frameSession == nil {
 		frameSession = f.page.mainFrameSession
 	}
@@ -469,7 +476,8 @@ func (f *Frame) requestByID(reqID network.RequestID) *Request {
 }
 
 func (f *Frame) setContext(world string, execCtx frameExecutionContext) {
-	f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s", f.id, f.url, execCtx.ID(), world)
+	f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s",
+		f.ID(), f.URL(), execCtx.ID(), world)
 
 	if world == "main" {
 		f.mainExecutionContext = execCtx
@@ -485,11 +493,15 @@ func (f *Frame) setContext(world string, execCtx frameExecutionContext) {
 }
 
 func (f *Frame) setID(id cdp.FrameID) {
+	f.propertiesMu.Lock()
+	defer f.propertiesMu.Unlock()
+
 	f.id = id
 }
 
 func (f *Frame) waitForExecutionContext(world string) {
-	f.log.Debugf("Frame:waitForExecutionContext", "fid:%s furl:%q world:%s", f.id, f.url, world)
+	f.log.Debugf("Frame:waitForExecutionContext", "fid:%s furl:%q world:%s",
+		f.ID(), f.URL(), world)
 
 	if world == "main" && atomic.CompareAndSwapInt32(&f.mainExecutionContextHasWaited, 0, 1) {
 		select {
@@ -508,7 +520,7 @@ func (f *Frame) waitForFunction(apiCtx context.Context, world string, predicateF
 	f.log.Debugf(
 		"Frame:waitForFunction",
 		"fid:%s furl:%q world:%s pt:%s timeout:%s",
-		f.id, f.url, world, polling, timeout)
+		f.ID(), f.URL(), world, polling, timeout)
 
 	rt := k6common.GetRuntime(f.ctx)
 	f.waitForExecutionContext(world)
@@ -545,7 +557,7 @@ func (f *Frame) waitForFunction(apiCtx context.Context, world string, predicateF
 }
 
 func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
-	f.log.Debugf("Frame:waitForSelector", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:waitForSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	document, err := f.document()
 	if err != nil {
@@ -586,7 +598,7 @@ func (f *Frame) AddStyleTag(opts goja.Value) {
 
 // Check clicks the first element found that matches selector
 func (f *Frame) Check(selector string, opts goja.Value) {
-	f.log.Debugf("Frame:Check", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:Check", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameCheckOptions(f.defaultTimeout())
@@ -621,7 +633,7 @@ func (f *Frame) ChildFrames() []api.Frame {
 
 // Click clicks the first element found that matches selector
 func (f *Frame) Click(selector string, opts goja.Value) {
-	f.log.Debugf("Frame:Click", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:Click", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameClickOptions(f.defaultTimeout())
@@ -644,7 +656,7 @@ func (f *Frame) Click(selector string, opts goja.Value) {
 
 // Content returns the HTML content of the frame
 func (f *Frame) Content() string {
-	f.log.Debugf("Frame:Content", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:Content", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := k6common.GetRuntime(f.ctx)
 	js := `let content = '';
@@ -660,7 +672,7 @@ func (f *Frame) Content() string {
 
 // Dblclick double clicks an element matching provided selector
 func (f *Frame) Dblclick(selector string, opts goja.Value) {
-	f.log.Debugf("Frame:DblClick", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:DblClick", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameDblClickOptions(f.defaultTimeout())
@@ -682,7 +694,7 @@ func (f *Frame) Dblclick(selector string, opts goja.Value) {
 }
 
 func (f *Frame) DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value) {
-	f.log.Debugf("Frame:DispatchEvent", "fid:%s furl:%q sel:%q typ:%s", f.id, f.url, selector, typ)
+	f.log.Debugf("Frame:DispatchEvent", "fid:%s furl:%q sel:%q typ:%s", f.ID(), f.URL(), selector, typ)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameDblClickOptions(f.defaultTimeout())
@@ -704,7 +716,7 @@ func (f *Frame) DispatchEvent(selector string, typ string, eventInit goja.Value,
 
 // Evaluate will evaluate provided page function within an execution context
 func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
-	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := k6common.GetRuntime(f.ctx)
 	f.waitForExecutionContext("main")
@@ -718,7 +730,7 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 
 // EvaluateHandle will evaluate provided page function within an execution context
 func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHandle {
-	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := k6common.GetRuntime(f.ctx)
 	f.waitForExecutionContext("main")
@@ -731,7 +743,7 @@ func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHa
 }
 
 func (f *Frame) Fill(selector string, value string, opts goja.Value) {
-	f.log.Debugf("Frame:Fill", "fid:%s furl:%q sel:%q val:%s", f.id, f.url, selector, value)
+	f.log.Debugf("Frame:Fill", "fid:%s furl:%q sel:%q val:%s", f.ID(), f.URL(), selector, value)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameFillOptions(f.defaultTimeout())
@@ -753,7 +765,7 @@ func (f *Frame) Fill(selector string, value string, opts goja.Value) {
 
 // Focus fetches an element with selector and focuses it
 func (f *Frame) Focus(selector string, opts goja.Value) {
-	f.log.Debugf("Frame:Focus", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:Focus", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameBaseOptions(f.defaultTimeout())
@@ -774,7 +786,7 @@ func (f *Frame) Focus(selector string, opts goja.Value) {
 }
 
 func (f *Frame) FrameElement() api.ElementHandle {
-	f.log.Debugf("Frame:FrameElement", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:FrameElement", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := k6common.GetRuntime(f.ctx)
 	element, err := f.page.getFrameElement(f)
@@ -785,7 +797,7 @@ func (f *Frame) FrameElement() api.ElementHandle {
 }
 
 func (f *Frame) GetAttribute(selector string, name string, opts goja.Value) goja.Value {
-	f.log.Debugf("Frame:GetAttribute", "fid:%s furl:%q sel:%q name:%s", f.id, f.url, selector, name)
+	f.log.Debugf("Frame:GetAttribute", "fid:%s furl:%q sel:%q name:%s", f.ID(), f.URL(), selector, name)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameBaseOptions(f.defaultTimeout())
@@ -815,7 +827,7 @@ func (f *Frame) Goto(url string, opts goja.Value) api.Response {
 
 // Hover hovers an element identified by provided selector
 func (f *Frame) Hover(selector string, opts goja.Value) {
-	f.log.Debugf("Frame:Hover", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:Hover", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameHoverOptions(f.defaultTimeout())
@@ -837,7 +849,7 @@ func (f *Frame) Hover(selector string, opts goja.Value) {
 }
 
 func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
-	f.log.Debugf("Frame:InnerHTML", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:InnerHTML", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameInnerHTMLOptions(f.defaultTimeout())
@@ -859,7 +871,7 @@ func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
 }
 
 func (f *Frame) InnerText(selector string, opts goja.Value) string {
-	f.log.Debugf("Frame:InnerText", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:InnerText", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameInnerHTMLOptions(f.defaultTimeout())
@@ -881,7 +893,7 @@ func (f *Frame) InnerText(selector string, opts goja.Value) string {
 }
 
 func (f *Frame) InputValue(selector string, opts goja.Value) string {
-	f.log.Debugf("Frame:InputValue", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:InputValue", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameInputValueOptions(f.defaultTimeout())
@@ -903,7 +915,7 @@ func (f *Frame) InputValue(selector string, opts goja.Value) string {
 }
 
 func (f *Frame) IsChecked(selector string, opts goja.Value) bool {
-	f.log.Debugf("Frame:IsChecked", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:IsChecked", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameIsCheckedOptions(f.defaultTimeout())
@@ -930,11 +942,22 @@ func (f *Frame) IsChecked(selector string, opts goja.Value) bool {
 
 // IsDetached returns whether the frame is detached or not
 func (f *Frame) IsDetached() bool {
+	f.propertiesMu.RLock()
+	defer f.propertiesMu.RUnlock()
+
 	return f.detached
 }
 
+// setDetached sets the frame detachment.
+func (f *Frame) setDetached(detached bool) {
+	f.propertiesMu.Lock()
+	defer f.propertiesMu.Unlock()
+
+	f.detached = detached
+}
+
 func (f *Frame) IsDisabled(selector string, opts goja.Value) bool {
-	f.log.Debugf("Frame:IsDisabled", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:IsDisabled", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameIsDisabledOptions(f.defaultTimeout())
@@ -960,7 +983,7 @@ func (f *Frame) IsDisabled(selector string, opts goja.Value) bool {
 }
 
 func (f *Frame) IsEditable(selector string, opts goja.Value) bool {
-	f.log.Debugf("Frame:IsEditable", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:IsEditable", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameIsEditableOptions(f.defaultTimeout())
@@ -986,7 +1009,7 @@ func (f *Frame) IsEditable(selector string, opts goja.Value) bool {
 }
 
 func (f *Frame) IsEnabled(selector string, opts goja.Value) bool {
-	f.log.Debugf("Frame:IsEnabled", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:IsEnabled", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameIsEnabledOptions(f.defaultTimeout())
@@ -1012,7 +1035,7 @@ func (f *Frame) IsEnabled(selector string, opts goja.Value) bool {
 }
 
 func (f *Frame) IsHidden(selector string, opts goja.Value) bool {
-	f.log.Debugf("Frame:IsHidden", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:IsHidden", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameIsHiddenOptions(f.defaultTimeout())
@@ -1038,7 +1061,7 @@ func (f *Frame) IsHidden(selector string, opts goja.Value) bool {
 }
 
 func (f *Frame) IsVisible(selector string, opts goja.Value) bool {
-	f.log.Debugf("Frame:IsVisible", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:IsVisible", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameIsVisibleOptions(f.defaultTimeout())
@@ -1065,23 +1088,32 @@ func (f *Frame) IsVisible(selector string, opts goja.Value) bool {
 
 // ID returns the frame id
 func (f *Frame) ID() string {
+	f.propertiesMu.RLock()
+	defer f.propertiesMu.RUnlock()
+
 	return f.id.String()
 }
 
 // LoaderID returns the ID of the frame that loaded this frame
 func (f *Frame) LoaderID() string {
+	f.propertiesMu.RLock()
+	defer f.propertiesMu.RUnlock()
+
 	return f.loaderID
 }
 
 // Name returns the frame name
 func (f *Frame) Name() string {
+	f.propertiesMu.RLock()
+	defer f.propertiesMu.RUnlock()
+
 	return f.name
 }
 
 // Query runs a selector query against the document tree, returning the first matching element or
 // "null" if no match is found
 func (f *Frame) Query(selector string) api.ElementHandle {
-	f.log.Debugf("Frame:Query", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:Query", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	document, err := f.document()
@@ -1096,7 +1128,7 @@ func (f *Frame) Query(selector string) api.ElementHandle {
 }
 
 func (f *Frame) QueryAll(selector string) []api.ElementHandle {
-	f.log.Debugf("Frame:QueryAll", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:QueryAll", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	document, err := f.document()
@@ -1121,7 +1153,7 @@ func (f *Frame) ParentFrame() api.Frame {
 }
 
 func (f *Frame) Press(selector string, key string, opts goja.Value) {
-	f.log.Debugf("Frame:Press", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:Press", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFramePressOptions(f.defaultTimeout())
@@ -1142,7 +1174,7 @@ func (f *Frame) Press(selector string, key string, opts goja.Value) {
 }
 
 func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value) []string {
-	f.log.Debugf("Frame:SelectOption", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:SelectOption", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameSelectOptionOptions(f.defaultTimeout())
@@ -1177,7 +1209,7 @@ func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value
 
 // SetContent replaces the entire HTML document content
 func (f *Frame) SetContent(html string, opts goja.Value) {
-	f.log.Debugf("Frame:SetContent", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:SetContent", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameSetContentOptions(f.defaultTimeout())
@@ -1207,7 +1239,7 @@ func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value
 }
 
 func (f *Frame) Tap(selector string, opts goja.Value) {
-	f.log.Debugf("Frame:Tap", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:Tap", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameTapOptions(f.defaultTimeout())
@@ -1229,7 +1261,7 @@ func (f *Frame) Tap(selector string, opts goja.Value) {
 }
 
 func (f *Frame) TextContent(selector string, opts goja.Value) string {
-	f.log.Debugf("Frame:TextContent", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:TextContent", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameTextContentOptions(f.defaultTimeout())
@@ -1251,14 +1283,14 @@ func (f *Frame) TextContent(selector string, opts goja.Value) string {
 }
 
 func (f *Frame) Title() string {
-	f.log.Debugf("Frame:Title", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:Title", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := k6common.GetRuntime(f.ctx)
 	return f.Evaluate(rt.ToValue("document.title")).(string)
 }
 
 func (f *Frame) Type(selector string, text string, opts goja.Value) {
-	f.log.Debugf("Frame:Type", "fid:%s furl:%q sel:%q text:%s", f.id, f.url, selector, text)
+	f.log.Debugf("Frame:Type", "fid:%s furl:%q sel:%q text:%s", f.ID(), f.URL(), selector, text)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameTypeOptions(f.defaultTimeout())
@@ -1279,7 +1311,7 @@ func (f *Frame) Type(selector string, text string, opts goja.Value) {
 }
 
 func (f *Frame) Uncheck(selector string, opts goja.Value) {
-	f.log.Debugf("Frame:Uncheck", "fid:%s furl:%q sel:%q", f.id, f.url, selector)
+	f.log.Debugf("Frame:Uncheck", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameUncheckOptions(f.defaultTimeout())
@@ -1300,14 +1332,25 @@ func (f *Frame) Uncheck(selector string, opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
-// URL returns the frame URL
+// URL returns the frame URL.
 func (f *Frame) URL() string {
+	f.propertiesMu.RLock()
+	defer f.propertiesMu.RUnlock()
+
 	return f.url
+}
+
+// URL set the frame URL.
+func (f *Frame) setURL(url string) {
+	defer f.propertiesMu.Unlock()
+	f.propertiesMu.Lock()
+
+	f.url = url
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value
 func (f *Frame) WaitForFunction(pageFunc goja.Value, opts goja.Value, args ...goja.Value) api.JSHandle {
-	f.log.Debugf("Frame:WaitForFunction", "fid:%s furl:%q", f.id, f.url)
+	f.log.Debugf("Frame:WaitForFunction", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameWaitForFunctionOptions(f.defaultTimeout())
@@ -1325,8 +1368,8 @@ func (f *Frame) WaitForFunction(pageFunc goja.Value, opts goja.Value, args ...go
 
 // WaitForLoadState waits for the given load state to be reached
 func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
-	f.log.Debugf("Frame:WaitForLoadState", "fid:%s furl:%q state:%s", f.id, f.url, state)
-	defer f.log.Debugf("Frame:WaitForLoadState:return", "fid:%s furl:%q state:%s", f.id, f.url, state)
+	f.log.Debugf("Frame:WaitForLoadState", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
+	defer f.log.Debugf("Frame:WaitForLoadState:return", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameWaitForLoadStateOptions(f.defaultTimeout())
@@ -1375,8 +1418,8 @@ func (f *Frame) WaitForSelector(selector string, opts goja.Value) api.ElementHan
 func (f *Frame) WaitForTimeout(timeout int64) {
 	to := time.Duration(timeout) * time.Millisecond
 
-	f.log.Debugf("Frame:WaitForTimeout", "fid:%s furl:%q timeout:%s", f.id, f.url, to)
-	defer f.log.Debugf("Frame:WaitForTimeout:return", "fid:%s furl:%q timeout:%s", f.id, f.url, to)
+	f.log.Debugf("Frame:WaitForTimeout", "fid:%s furl:%q timeout:%s", f.ID(), f.URL(), to)
+	defer f.log.Debugf("Frame:WaitForTimeout:return", "fid:%s furl:%q timeout:%s", f.ID(), f.URL(), to)
 
 	select {
 	case <-f.ctx.Done():

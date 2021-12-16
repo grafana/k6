@@ -29,6 +29,7 @@ import (
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/storage"
+	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
 	k6common "go.k6.io/k6/js/common"
@@ -220,7 +221,19 @@ func (b *BrowserContext) NewPage() api.Page {
 	if err != nil {
 		k6Throw(b.ctx, "cannot create a new page: %w", err)
 	}
-	b.logger.Debugf("BrowserContext:NewPage:return", "bctxid:%v ptid:%s", b.id, p.targetID)
+
+	var (
+		bctxid cdp.BrowserContextID
+		ptid   target.ID
+	)
+	if b != nil {
+		bctxid = b.id
+	}
+	if p != nil {
+		ptid = p.targetID
+	}
+	b.logger.Debugf("BrowserContext:NewPage:return", "bctxid:%v ptid:%s", bctxid, ptid)
+
 	return p
 }
 

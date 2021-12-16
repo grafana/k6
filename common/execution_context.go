@@ -73,8 +73,8 @@ func NewExecutionContext(
 		e.stid = cdp.FrameID(session.targetID)
 	}
 	if frame != nil {
-		e.fid = frame.id
-		e.furl = frame.url
+		e.fid = cdp.FrameID(frame.ID())
+		e.furl = frame.URL()
 	}
 	logger.Debugf(
 		"NewExecutionContext",
@@ -114,7 +114,7 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 		esid target.SessionID
 	)
 	if eh.frame != nil {
-		efid = eh.frame.id
+		efid = cdp.FrameID(eh.frame.ID())
 	}
 	if eh.session != nil {
 		esid = eh.session.id
