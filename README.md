@@ -1,4 +1,4 @@
-<p align="center"><a href="https://k6.io/"><img src="assets/logo.svg" alt="k6" width="220" height="213" /></a></p>
+<p align="center"><a href="https://k6.io/"><img src="assets/k6-logo-with-grafana.svg" alt="k6" width="258" height="210" /></a></p>
 
 <h3 align="center">Like unit testing, for performance</h3>
 <p align="center">A modern load testing tool for developers and testers in the DevOps era.</p>
