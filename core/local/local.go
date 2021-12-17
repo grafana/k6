@@ -30,7 +30,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/errext"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/stats"
 	"go.k6.io/k6/ui/pb"
@@ -346,7 +348,13 @@ func (e *ExecutionScheduler) Run(
 	executorsCount := len(e.executors)
 	logger := e.logger.WithField("phase", "local-execution-scheduler-run")
 	e.initProgress.Modify(pb.WithConstLeft("Run"))
-	defer e.state.MarkEnded()
+	var interrupted bool
+	defer func() {
+		e.state.MarkEnded()
+		if interrupted {
+			e.state.SetExecutionStatus(lib.ExecutionStatusInterrupted)
+		}
+	}()
 
 	if e.state.IsPaused() {
 		logger.Debug("Execution is paused, waiting for resume or interrupt...")
@@ -386,8 +394,14 @@ func (e *ExecutionScheduler) Run(
 	// Start all executors at their particular startTime in a separate goroutine...
 	logger.Debug("Start all executors...")
 	e.state.SetExecutionStatus(lib.ExecutionStatusRunning)
+
+	// We are using this context to allow lib.Executor implementations to cancel
+	// this context effectively stopping all executions.
+	//
+	// This is for addressing test.abort().
+	execCtx := executor.Context(runSubCtx)
 	for _, exec := range e.executors {
-		go e.runExecutor(runSubCtx, runResults, engineOut, exec, builtinMetrics)
+		go e.runExecutor(execCtx, runResults, engineOut, exec, builtinMetrics)
 	}
 
 	// Wait for all executors to finish
@@ -414,7 +428,10 @@ func (e *ExecutionScheduler) Run(
 			return err
 		}
 	}
-
+	if err := executor.CancelReason(execCtx); err != nil && common.IsInterruptError(err) {
+		interrupted = true
+		return err
+	}
 	return firstErr
 }
 
