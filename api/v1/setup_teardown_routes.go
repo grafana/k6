@@ -25,8 +25,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/manyminds/api2go/jsonapi"
-
 	"go.k6.io/k6/api/common"
 )
 
@@ -57,9 +55,9 @@ func handleSetupDataOutput(rw http.ResponseWriter, setupData json.RawMessage) {
 	var data []byte
 
 	if setupData == nil {
-		data, err = jsonapi.Marshal(NullSetupData{Data: nil})
+		data, err = json.Marshal(newSetUpJSONAPI(NullSetupData{Data: nil}))
 	} else {
-		data, err = jsonapi.Marshal(SetupData{setupData})
+		data, err = json.Marshal(newSetUpJSONAPI(SetupData{setupData}))
 	}
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
