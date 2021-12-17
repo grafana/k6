@@ -36,7 +36,7 @@ func handleGetMetrics(rw http.ResponseWriter, r *http.Request) {
 		t = engine.ExecutionScheduler.GetState().GetCurrentTestRunDuration()
 	}
 
-	metrics := newMetricsEnvelop(engine.Metrics, t)
+	metrics := newMetricsJSONAPI(engine.Metrics, t)
 	data, err := json.Marshal(metrics)
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)

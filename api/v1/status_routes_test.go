@@ -58,13 +58,13 @@ func TestGetStatus(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
 	t.Run("document", func(t *testing.T) {
-		var doc statusEnvelop
+		var doc statusJSONAPI
 		assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &doc))
 		assert.Equal(t, "status", doc.Data.Type)
 	})
 
 	t.Run("status", func(t *testing.T) {
-		status, err := unmarshalStatusEnvelopJSON(rw.Body.Bytes())
+		status, err := unmarshalStatusJSONAPI(rw.Body.Bytes())
 
 		assert.NoError(t, err)
 		assert.True(t, status.Paused.Valid)
@@ -114,7 +114,7 @@ func TestPatchStatus(t *testing.T) {
 			// wait for the executor to initialize to avoid a potential data race below
 			time.Sleep(100 * time.Millisecond)
 
-			body, err := json.Marshal(newStatusEnvelop(indata.Status))
+			body, err := json.Marshal(newStatusJSONAPI(indata.Status))
 			require.NoError(t, err)
 
 			rw := httptest.NewRecorder()

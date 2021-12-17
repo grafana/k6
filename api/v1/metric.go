@@ -82,20 +82,6 @@ type Metric struct {
 	Sample map[string]float64 `json:"sample" yaml:"sample"`
 }
 
-type metricEnvelop struct {
-	Data metricData `json:"data"`
-}
-
-type metricsEnvelop struct {
-	Data []metricData `json:"data"`
-}
-
-type metricData struct {
-	Type       string `json:"type"`
-	ID         string `json:"id"`
-	Attributes Metric `json:"attributes"`
-}
-
 func NewMetric(m *stats.Metric, t time.Duration) Metric {
 	return Metric{
 		Name:     m.Name,
@@ -115,33 +101,4 @@ func (m Metric) GetID() string {
 func (m *Metric) SetID(id string) error {
 	m.Name = id
 	return nil
-}
-
-func newMetricEnvelope(m *stats.Metric, t time.Duration) metricEnvelop {
-	return metricEnvelop{
-		Data: newMetricData(m, t),
-	}
-}
-
-func newMetricsEnvelop(list map[string]*stats.Metric, t time.Duration) metricsEnvelop {
-	metrics := make([]metricData, 0, len(list))
-
-	// TODO: lock ?
-	for _, m := range list {
-		metrics = append(metrics, newMetricData(m, t))
-	}
-
-	return metricsEnvelop{
-		Data: metrics,
-	}
-}
-
-func newMetricData(m *stats.Metric, t time.Duration) metricData {
-	metric := NewMetric(m, t)
-
-	return metricData{
-		Type:       "metrics",
-		ID:         metric.Name,
-		Attributes: metric,
-	}
 }

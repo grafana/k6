@@ -61,7 +61,7 @@ func TestGetMetrics(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
 	t.Run("document", func(t *testing.T) {
-		var doc metricsEnvelop
+		var doc metricsJSONAPI
 		assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &doc))
 		if !assert.NotNil(t, doc.Data) {
 			return
@@ -70,7 +70,7 @@ func TestGetMetrics(t *testing.T) {
 	})
 
 	t.Run("metrics", func(t *testing.T) {
-		var envelop metricsEnvelop
+		var envelop metricsJSONAPI
 		assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &envelop))
 
 		metrics := envelop.Data
@@ -119,14 +119,14 @@ func TestGetMetric(t *testing.T) {
 		assert.Equal(t, http.StatusOK, res.StatusCode)
 
 		t.Run("document", func(t *testing.T) {
-			var doc metricEnvelop
+			var doc metricJSONAPI
 			assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &doc))
 
 			assert.Equal(t, "metrics", doc.Data.Type)
 		})
 
 		t.Run("metric", func(t *testing.T) {
-			var envelop metricEnvelop
+			var envelop metricJSONAPI
 
 			assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &envelop))
 

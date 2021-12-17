@@ -34,7 +34,7 @@ import (
 func handleGetStatus(rw http.ResponseWriter, r *http.Request) {
 	engine := common.GetEngine(r.Context())
 
-	status := newStatusEnvelopFromEngine(engine)
+	status := newStatusJSONAPIFromEngine(engine)
 	data, err := json.Marshal(status)
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
@@ -64,7 +64,7 @@ func handlePatchStatus(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, err := unmarshalStatusEnvelopJSON(body)
+	status, err := unmarshalStatusJSONAPI(body)
 	if err != nil {
 		apiError(rw, "Invalid data", err.Error(), http.StatusBadRequest)
 		return
@@ -103,7 +103,7 @@ func handlePatchStatus(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	data, err := json.Marshal(newStatusEnvelopFromEngine(engine))
+	data, err := json.Marshal(newStatusJSONAPIFromEngine(engine))
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return

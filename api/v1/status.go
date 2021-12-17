@@ -21,8 +21,6 @@
 package v1
 
 import (
-	"encoding/json"
-
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/core"
@@ -38,16 +36,6 @@ type Status struct {
 	Stopped bool      `json:"stopped" yaml:"stopped"`
 	Running bool      `json:"running" yaml:"running"`
 	Tainted bool      `json:"tainted" yaml:"tainted"`
-}
-
-type statusEnvelop struct {
-	Data statusData `json:"data"`
-}
-
-type statusData struct {
-	Type       string `json:"type"`
-	ID         string `json:"id"`
-	Attributes Status `json:"attributes"`
 }
 
 func NewStatus(engine *core.Engine) Status {
@@ -76,30 +64,4 @@ func (s Status) GetID() string {
 // SetID TODO: delete
 func (s Status) SetID(id string) error {
 	return nil
-}
-
-// newStatusEnvelopFromEngine creates status envelop from the engine
-func newStatusEnvelopFromEngine(engine *core.Engine) statusEnvelop {
-	return newStatusEnvelop(NewStatus(engine))
-}
-
-// newStatusEnvelop envelopes the status
-func newStatusEnvelop(s Status) statusEnvelop {
-	return statusEnvelop{
-		Data: statusData{
-			ID:         "default",
-			Type:       "status",
-			Attributes: s,
-		},
-	}
-}
-
-// unmarshalStatusEnvelopJSON name properly
-func unmarshalStatusEnvelopJSON(data []byte) (Status, error) {
-	var envelop statusEnvelop
-	if err := json.Unmarshal(data, &envelop); err != nil {
-		return Status{}, err
-	}
-
-	return envelop.Data.Attributes, nil
 }

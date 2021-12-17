@@ -93,6 +93,7 @@ func (g *Group) SetID(v string) error {
 	return nil
 }
 
+// GetReferences TODO delete
 func (g Group) GetReferences() []jsonapi.Reference {
 	return []jsonapi.Reference{
 		{
@@ -108,6 +109,7 @@ func (g Group) GetReferences() []jsonapi.Reference {
 	}
 }
 
+// GetReferencedIDs TODO delete
 func (g Group) GetReferencedIDs() []jsonapi.ReferenceID {
 	refs := []jsonapi.ReferenceID{}
 	if g.Parent != nil {
