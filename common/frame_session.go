@@ -549,7 +549,7 @@ func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionC
 	if err := json.Unmarshal(auxData, &i); err != nil {
 		k6Throw(fs.ctx, "unable to unmarshal JSON: %w", err)
 	}
-	var world string = ""
+	var world executionWorld
 	frame := fs.manager.getFrameByID(i.FrameID)
 	if frame != nil {
 		if i.IsDefault {

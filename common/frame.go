@@ -337,7 +337,7 @@ func (f *Frame) document() (*ElementHandle, error) {
 	return f.documentHandle, err
 }
 
-func (f *Frame) hasContext(world string) bool {
+func (f *Frame) hasContext(world executionWorld) bool {
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
@@ -443,7 +443,7 @@ func (f *Frame) requestByID(reqID network.RequestID) *Request {
 	return frameSession.networkManager.requestFromID(reqID)
 }
 
-func (f *Frame) setContext(world string, execCtx frameExecutionContext) {
+func (f *Frame) setContext(world executionWorld, execCtx frameExecutionContext) {
 	f.executionContextMu.Lock()
 	defer f.executionContextMu.Unlock()
 
@@ -472,7 +472,7 @@ func (f *Frame) setID(id cdp.FrameID) {
 	f.id = id
 }
 
-func (f *Frame) waitForExecutionContext(world string) {
+func (f *Frame) waitForExecutionContext(world executionWorld) {
 	f.log.Debugf("Frame:waitForExecutionContext", "fid:%s furl:%q world:%s",
 		f.ID(), f.URL(), world)
 
@@ -490,7 +490,7 @@ func (f *Frame) waitForExecutionContext(world string) {
 	}
 }
 
-func (f *Frame) waitForFunction(apiCtx context.Context, world string, predicateFn goja.Value, polling PollingType, interval int64, timeout time.Duration, args ...goja.Value) (interface{}, error) {
+func (f *Frame) waitForFunction(apiCtx context.Context, world executionWorld, predicateFn goja.Value, polling PollingType, interval int64, timeout time.Duration, args ...goja.Value) (interface{}, error) {
 	f.log.Debugf(
 		"Frame:waitForFunction",
 		"fid:%s furl:%q world:%s pt:%s timeout:%s",
@@ -1434,7 +1434,7 @@ func (f *Frame) WaitForTimeout(timeout int64) {
 	}
 }
 
-func (f *Frame) adoptBackendNodeID(world string, id cdp.BackendNodeID) (*ElementHandle, error) {
+func (f *Frame) adoptBackendNodeID(world executionWorld, id cdp.BackendNodeID) (*ElementHandle, error) {
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
@@ -1442,7 +1442,7 @@ func (f *Frame) adoptBackendNodeID(world string, id cdp.BackendNodeID) (*Element
 	return ec.adoptBackendNodeID(id)
 }
 
-func (f *Frame) evaluate(world string, apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
+func (f *Frame) evaluate(world executionWorld, apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
@@ -1452,7 +1452,7 @@ func (f *Frame) evaluate(world string, apiCtx context.Context, opts evaluateOpti
 
 // getExecCtx returns an execution context using a given world name.
 // Unsafe to use concurrently.
-func (f *Frame) getExecCtx(world string) frameExecutionContext {
+func (f *Frame) getExecCtx(world executionWorld) frameExecutionContext {
 	ec := f.mainExecutionContext
 	if world == utilityWorld {
 		ec = f.utilityExecutionContext

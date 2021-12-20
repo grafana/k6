@@ -38,9 +38,11 @@ const evaluationScriptURL = "__xk6_browser_evaluation_script__"
 
 var sourceURLRegex = regexp.MustCompile(`^(?s)[\040\t]*//[@#] sourceURL=\s*(\S*?)\s*$`)
 
+type executionWorld string
+
 const (
-	mainWorld    = "main"
-	utilityWorld = "utility"
+	mainWorld    executionWorld = "main"
+	utilityWorld executionWorld = "utility"
 )
 
 type evaluateOptions struct {
