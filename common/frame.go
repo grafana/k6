@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -71,12 +70,9 @@ type Frame struct {
 
 	documentHandle *ElementHandle
 
-	mainExecutionContext             frameExecutionContext
-	utilityExecutionContext          frameExecutionContext
-	mainExecutionContextCh           chan bool
-	utilityExecutionContextCh        chan bool
-	mainExecutionContextHasWaited    int32
-	utilityExecutionContextHasWaited int32
+	executionContextMu      sync.RWMutex
+	mainExecutionContext    frameExecutionContext
+	utilityExecutionContext frameExecutionContext
 
 	loadingStartedTime time.Time
 
@@ -106,21 +102,19 @@ func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID 
 	}
 
 	return &Frame{
-		BaseEventEmitter:          NewBaseEventEmitter(ctx),
-		ctx:                       ctx,
-		page:                      m.page,
-		manager:                   m,
-		parentFrame:               parentFrame,
-		childFrames:               make(map[api.Frame]bool),
-		id:                        frameID,
-		lifecycleEvents:           make(map[LifecycleEvent]bool),
-		subtreeLifecycleEvents:    make(map[LifecycleEvent]bool),
-		mainExecutionContextCh:    make(chan bool, 1),
-		utilityExecutionContextCh: make(chan bool, 1),
-		inflightRequests:          make(map[network.RequestID]bool),
-		currentDocument:           &DocumentInfo{},
-		networkIdleCh:             make(chan struct{}),
-		log:                       log,
+		BaseEventEmitter:       NewBaseEventEmitter(ctx),
+		ctx:                    ctx,
+		page:                   m.page,
+		manager:                m,
+		parentFrame:            parentFrame,
+		childFrames:            make(map[api.Frame]bool),
+		id:                     frameID,
+		lifecycleEvents:        make(map[LifecycleEvent]bool),
+		subtreeLifecycleEvents: make(map[LifecycleEvent]bool),
+		inflightRequests:       make(map[network.RequestID]bool),
+		currentDocument:        &DocumentInfo{},
+		networkIdleCh:          make(chan struct{}),
+		log:                    log,
 	}
 }
 
@@ -316,6 +310,9 @@ func (f *Frame) document() (*ElementHandle, error) {
 
 	f.waitForExecutionContext("main")
 
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
 	result, err := f.mainExecutionContext.evaluate(f.ctx, false, false, rt.ToValue("document"), nil)
 	if err != nil {
 		return nil, fmt.Errorf("frame document: cannot evaluate in main execution context: %w", err)
@@ -329,6 +326,9 @@ func (f *Frame) document() (*ElementHandle, error) {
 }
 
 func (f *Frame) hasContext(world string) bool {
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
 	switch world {
 	case "main":
 		return f.mainExecutionContext != nil
@@ -366,18 +366,15 @@ func (f *Frame) navigated(name string, url string, loaderID string) {
 func (f *Frame) nullContext(execCtxID runtime.ExecutionContextID) {
 	f.log.Debugf("Frame:nullContext", "fid:%s furl:%q ectxid:%d ", f.ID(), f.URL(), execCtxID)
 
+	f.executionContextMu.Lock()
+	defer f.executionContextMu.Unlock()
+
 	if f.mainExecutionContext != nil && f.mainExecutionContext.ID() == execCtxID {
 		f.mainExecutionContext = nil
 		f.documentHandle = nil
 	} else if f.utilityExecutionContext != nil && f.utilityExecutionContext.ID() == execCtxID {
 		f.utilityExecutionContext = nil
 	}
-}
-
-func (f *Frame) nullContexts() {
-	f.mainExecutionContext = nil
-	f.utilityExecutionContext = nil
-	f.documentHandle = nil
 }
 
 func (f *Frame) onLifecycleEvent(event LifecycleEvent) {
@@ -441,19 +438,24 @@ func (f *Frame) requestByID(reqID network.RequestID) *Request {
 }
 
 func (f *Frame) setContext(world string, execCtx frameExecutionContext) {
+	f.executionContextMu.Lock()
+	defer f.executionContextMu.Unlock()
+
 	f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s",
 		f.ID(), f.URL(), execCtx.ID(), world)
 
-	if world == "main" {
-		f.mainExecutionContext = execCtx
-		if len(f.mainExecutionContextCh) == 0 {
-			f.mainExecutionContextCh <- true
+	switch world {
+	case "main":
+		if f.mainExecutionContext == nil {
+			f.mainExecutionContext = execCtx
 		}
-	} else if world == "utility" {
-		f.utilityExecutionContext = execCtx
-		if len(f.utilityExecutionContextCh) == 0 {
-			f.utilityExecutionContextCh <- true
+	case "utility":
+		if f.utilityExecutionContext == nil {
+			f.utilityExecutionContext = execCtx
 		}
+	default:
+		err := fmt.Errorf("unknown world: %q, it should be either main or utility", world)
+		panic(err)
 	}
 }
 
@@ -468,17 +470,29 @@ func (f *Frame) waitForExecutionContext(world string) {
 	f.log.Debugf("Frame:waitForExecutionContext", "fid:%s furl:%q world:%s",
 		f.ID(), f.URL(), world)
 
-	if world == "main" && atomic.CompareAndSwapInt32(&f.mainExecutionContextHasWaited, 0, 1) {
+	wait := func(done chan struct{}) {
+		var ok bool
 		select {
 		case <-f.ctx.Done():
-		case <-f.mainExecutionContextCh:
+			ok = true
+		default:
+			ok = f.hasContext(world)
 		}
-	} else if world == "utility" && atomic.CompareAndSwapInt32(&f.utilityExecutionContextHasWaited, 0, 1) {
-		select {
-		case <-f.ctx.Done():
-		case <-f.utilityExecutionContextCh:
+		if !ok {
+			// TODO: change sleeping with something else
+			time.Sleep(time.Millisecond * 50)
+			return
 		}
+		done <- struct{}{}
 	}
+
+	done := make(chan struct{})
+	go func() {
+		for {
+			wait(done)
+		}
+	}()
+	<-done
 }
 
 func (f *Frame) waitForFunction(apiCtx context.Context, world string, predicateFn goja.Value, polling PollingType, interval int64, timeout time.Duration, args ...goja.Value) (interface{}, error) {
@@ -489,6 +503,10 @@ func (f *Frame) waitForFunction(apiCtx context.Context, world string, predicateF
 
 	rt := k6common.GetRuntime(f.ctx)
 	f.waitForExecutionContext(world)
+
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
 	execCtx := f.mainExecutionContext
 	if world == "utility" {
 		execCtx = f.utilityExecutionContext
@@ -538,6 +556,9 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	}
 
 	// We always return ElementHandles in the main execution context (aka "DOM world")
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
 	if handle.execCtx != f.mainExecutionContext {
 		defer handle.Dispose()
 		handle, err = f.mainExecutionContext.adoptElementHandle(handle)
@@ -680,29 +701,43 @@ func (f *Frame) DispatchEvent(selector string, typ string, eventInit goja.Value,
 }
 
 // Evaluate will evaluate provided page function within an execution context
-func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
+func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) (result interface{}) {
 	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := k6common.GetRuntime(f.ctx)
 	f.waitForExecutionContext("main")
-	i, err := f.mainExecutionContext.Evaluate(f.ctx, pageFunc, args...)
-	if err != nil {
-		k6common.Throw(rt, err)
+
+	var err error
+	f.executionContextMu.RLock()
+	{
+		result, err = f.mainExecutionContext.Evaluate(f.ctx, pageFunc, args...)
+		if err != nil {
+			k6common.Throw(rt, err)
+		}
 	}
+	f.executionContextMu.RUnlock()
+
 	applySlowMo(f.ctx)
-	return i
+	return result
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context
-func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHandle {
+func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle api.JSHandle) {
 	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := k6common.GetRuntime(f.ctx)
 	f.waitForExecutionContext("main")
-	handle, err := f.mainExecutionContext.EvaluateHandle(f.ctx, pageFunc, args...)
-	if err != nil {
-		k6common.Throw(rt, err)
+
+	var err error
+	f.executionContextMu.RLock()
+	{
+		handle, err = f.mainExecutionContext.EvaluateHandle(f.ctx, pageFunc, args...)
+		if err != nil {
+			k6common.Throw(rt, err)
+		}
 	}
+	f.executionContextMu.RUnlock()
+
 	applySlowMo(f.ctx)
 	return handle
 }
