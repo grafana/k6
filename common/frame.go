@@ -70,9 +70,8 @@ type Frame struct {
 
 	documentHandle *ElementHandle
 
-	executionContextMu      sync.RWMutex
-	mainExecutionContext    frameExecutionContext
-	utilityExecutionContext frameExecutionContext
+	executionContextMu sync.RWMutex
+	executionContexts  map[executionWorld]frameExecutionContext
 
 	loadingStartedTime time.Time
 
@@ -112,6 +111,7 @@ func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID 
 		lifecycleEvents:        make(map[LifecycleEvent]bool),
 		subtreeLifecycleEvents: make(map[LifecycleEvent]bool),
 		inflightRequests:       make(map[network.RequestID]bool),
+		executionContexts:      make(map[executionWorld]frameExecutionContext),
 		currentDocument:        &DocumentInfo{},
 		networkIdleCh:          make(chan struct{}),
 		log:                    log,
@@ -341,7 +341,7 @@ func (f *Frame) hasContext(world executionWorld) bool {
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
-	return f.getExecCtx(world) != nil
+	return f.executionContexts[world] != nil
 }
 
 func (f *Frame) hasLifecycleEventFired(event LifecycleEvent) bool {
@@ -375,11 +375,13 @@ func (f *Frame) nullContext(execCtxID runtime.ExecutionContextID) {
 	f.executionContextMu.Lock()
 	defer f.executionContextMu.Unlock()
 
-	if f.mainExecutionContext != nil && f.mainExecutionContext.ID() == execCtxID {
-		f.mainExecutionContext = nil
+	if ec := f.executionContexts[mainWorld]; ec != nil && ec.ID() == execCtxID {
+		f.executionContexts[mainWorld] = nil
 		f.documentHandle = nil
-	} else if f.utilityExecutionContext != nil && f.utilityExecutionContext.ID() == execCtxID {
-		f.utilityExecutionContext = nil
+		return
+	}
+	if ec := f.executionContexts[utilityWorld]; ec != nil && ec.ID() == execCtxID {
+		f.executionContexts[utilityWorld] = nil
 	}
 }
 
@@ -450,19 +452,20 @@ func (f *Frame) setContext(world executionWorld, execCtx frameExecutionContext) 
 	f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s",
 		f.ID(), f.URL(), execCtx.ID(), world)
 
-	switch world {
-	case mainWorld:
-		if f.mainExecutionContext == nil {
-			f.mainExecutionContext = execCtx
-		}
-	case utilityWorld:
-		if f.utilityExecutionContext == nil {
-			f.utilityExecutionContext = execCtx
-		}
-	default:
+	if !world.valid() {
 		err := fmt.Errorf("unknown world: %q, it should be either main or utility", world)
 		panic(err)
 	}
+
+	if f.executionContexts[world] != nil {
+		f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s, world exists",
+			f.ID(), f.URL(), execCtx.ID(), world)
+		return
+	}
+
+	f.executionContexts[world] = execCtx
+	f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s, world set",
+		f.ID(), f.URL(), execCtx.ID(), world)
 }
 
 func (f *Frame) setID(id cdp.FrameID) {
@@ -501,7 +504,7 @@ func (f *Frame) waitForFunction(apiCtx context.Context, world executionWorld, pr
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
-	execCtx := f.getExecCtx(world)
+	execCtx := f.executionContexts[world]
 	injected, err := execCtx.getInjectedScript(apiCtx)
 	if err != nil {
 		return nil, err
@@ -556,10 +559,9 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
-	if handle.execCtx != f.mainExecutionContext {
+	if ec := f.executionContexts[mainWorld]; handle.execCtx != ec {
 		defer handle.Dispose()
-		handle, err = f.mainExecutionContext.adoptElementHandle(handle)
-		if err != nil {
+		if handle, err = ec.adoptElementHandle(handle); err != nil {
 			return nil, err
 		}
 	}
@@ -730,7 +732,8 @@ func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle 
 	var err error
 	f.executionContextMu.RLock()
 	{
-		handle, err = f.mainExecutionContext.EvaluateHandle(f.ctx, pageFunc, args...)
+		ec := f.executionContexts[mainWorld]
+		handle, err = ec.EvaluateHandle(f.ctx, pageFunc, args...)
 	}
 	f.executionContextMu.RUnlock()
 	if err != nil {
@@ -1438,7 +1441,7 @@ func (f *Frame) adoptBackendNodeID(world executionWorld, id cdp.BackendNodeID) (
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
-	ec := f.getExecCtx(world)
+	ec := f.executionContexts[world]
 	return ec.adoptBackendNodeID(id)
 }
 
@@ -1446,18 +1449,8 @@ func (f *Frame) evaluate(world executionWorld, apiCtx context.Context, opts eval
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
-	ec := f.getExecCtx(world)
+	ec := f.executionContexts[world]
 	return ec.evaluate(apiCtx, opts, pageFunc, args...)
-}
-
-// getExecCtx returns an execution context using a given world name.
-// Unsafe to use concurrently.
-func (f *Frame) getExecCtx(world executionWorld) frameExecutionContext {
-	ec := f.mainExecutionContext
-	if world == utilityWorld {
-		ec = f.utilityExecutionContext
-	}
-	return ec
 }
 
 // frameExecutionContext represents a JS execution context that belongs to Frame.

@@ -45,6 +45,10 @@ const (
 	utilityWorld executionWorld = "utility"
 )
 
+func (ew executionWorld) valid() bool {
+	return ew == mainWorld || ew == utilityWorld
+}
+
 type evaluateOptions struct {
 	forceCallable, returnByValue bool
 }

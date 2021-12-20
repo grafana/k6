@@ -801,7 +801,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 		}
 		// Erroneous cases
 		defer fs.logger.Debugf("FrameSession:onAttachedToTarget:NewFrameSession",
-			"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q err:%t",
+			"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q err:%v",
 			fs.session.id, fs.targetID, event.SessionID,
 			event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
 			event.TargetInfo.Type, err)
