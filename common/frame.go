@@ -476,29 +476,18 @@ func (f *Frame) waitForExecutionContext(world string) {
 	f.log.Debugf("Frame:waitForExecutionContext", "fid:%s furl:%q world:%s",
 		f.ID(), f.URL(), world)
 
-	wait := func(done chan struct{}) {
-		var ok bool
+	t := time.NewTimer(50 * time.Millisecond)
+	defer t.Stop()
+	for {
 		select {
+		case <-t.C:
+			if f.hasContext(world) {
+				return
+			}
 		case <-f.ctx.Done():
-			ok = true
-		default:
-			ok = f.hasContext(world)
-		}
-		if !ok {
-			// TODO: change sleeping with something else
-			time.Sleep(time.Millisecond * 50)
 			return
 		}
-		done <- struct{}{}
 	}
-
-	done := make(chan struct{})
-	go func() {
-		for {
-			wait(done)
-		}
-	}()
-	<-done
 }
 
 func (f *Frame) waitForFunction(apiCtx context.Context, world string, predicateFn goja.Value, polling PollingType, interval int64, timeout time.Duration, args ...goja.Value) (interface{}, error) {
