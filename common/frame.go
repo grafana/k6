@@ -345,13 +345,7 @@ func (f *Frame) hasContext(world string) bool {
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
-	switch world {
-	case mainWorld:
-		return f.mainExecutionContext != nil
-	case utilityWorld:
-		return f.utilityExecutionContext != nil
-	}
-	return false // Should never reach here!
+	return f.getExecCtx(world) != nil
 }
 
 func (f *Frame) hasLifecycleEventFired(event LifecycleEvent) bool {
@@ -517,20 +511,18 @@ func (f *Frame) waitForFunction(apiCtx context.Context, world string, predicateF
 		"fid:%s furl:%q world:%s pt:%s timeout:%s",
 		f.ID(), f.URL(), world, polling, timeout)
 
-	rt := k6common.GetRuntime(f.ctx)
 	f.waitForExecutionContext(world)
 
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
-	execCtx := f.mainExecutionContext
-	if world == utilityWorld {
-		execCtx = f.utilityExecutionContext
-	}
+	execCtx := f.getExecCtx(world)
 	injected, err := execCtx.getInjectedScript(apiCtx)
 	if err != nil {
 		return nil, err
 	}
+
+	rt := k6common.GetRuntime(f.ctx)
 	pageFn := rt.ToValue(`
 		(injected, predicate, polling, timeout, ...args) => {
 			return injected.waitForPredicateFunction(predicate, polling, timeout, ...args);
@@ -1241,7 +1233,12 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 		document.write(html);
 		document.close();
 	}`
-	f.waitForExecutionContext(utilityExecutionContext)
+
+	f.waitForExecutionContext(utilityWorld)
+
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
 	_, err := f.utilityExecutionContext.evaluate(f.ctx, true, true, rt.ToValue(js), rt.ToValue(html))
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1377,6 +1374,9 @@ func (f *Frame) WaitForFunction(pageFunc goja.Value, opts goja.Value, args ...go
 		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
 	handle, err := f.waitForFunction(f.ctx, utilityWorld, pageFunc, parsedOpts.Polling, parsedOpts.Interval, parsedOpts.Timeout, args...)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1443,6 +1443,32 @@ func (f *Frame) WaitForTimeout(timeout int64) {
 	case <-f.ctx.Done():
 	case <-time.After(to):
 	}
+}
+
+func (f *Frame) adoptBackendNodeID(world string, id cdp.BackendNodeID) (*ElementHandle, error) {
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
+	ec := f.getExecCtx(world)
+	return ec.adoptBackendNodeID(id)
+}
+
+func (f *Frame) evaluate(world string, apiCtx context.Context, forceCallable bool, returnByValue bool, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
+	ec := f.getExecCtx(world)
+	return ec.evaluate(apiCtx, forceCallable, returnByValue, pageFunc, args...)
+}
+
+// getExecCtx returns an execution context using a given world name.
+// Unsafe to use concurrently.
+func (f *Frame) getExecCtx(world string) frameExecutionContext {
+	ec := f.mainExecutionContext
+	if world == utilityWorld {
+		ec = f.utilityExecutionContext
+	}
+	return ec
 }
 
 // frameExecutionContext represents a JS execution context that belongs to Frame.

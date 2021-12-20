@@ -47,7 +47,7 @@ func newScreenshotter(ctx context.Context) *screenshotter {
 
 func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
 	rt := k6common.GetRuntime(s.ctx)
-	result, err := p.frameManager.mainFrame.mainExecutionContext.evaluate(s.ctx, true, true, rt.ToValue(`
+	result, err := p.frameManager.mainFrame.evaluate(mainWorld, s.ctx, true, true, rt.ToValue(`
         () => {
             if (!document.body || !document.documentElement) {
                 return null;

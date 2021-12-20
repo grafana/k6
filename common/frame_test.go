@@ -52,7 +52,7 @@ func TestFrameNilDocument(t *testing.T) {
 	// document() waits for the main execution context
 	ok := make(chan struct{}, 1)
 	go func() {
-		frame.setContext(mainExecutionContext, stub)
+		frame.setContext(mainWorld, stub)
 		ok <- struct{}{}
 	}()
 	select {

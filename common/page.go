@@ -193,7 +193,7 @@ func (p *Page) evaluateOnNewDocument(source string) {
 	// TODO: implement
 }
 
-func (p *Page) getFrameElement(f *Frame) (*ElementHandle, error) {
+func (p *Page) getFrameElement(f *Frame) (handle *ElementHandle, _ error) {
 	if f == nil {
 		p.logger.Debugf("Page:getFrameElement", "sid:%v frame:nil", p.sessionID())
 	} else {
@@ -220,8 +220,7 @@ func (p *Page) getFrameElement(f *Frame) (*ElementHandle, error) {
 	if parent == nil {
 		return nil, errors.New("frame has been detached 2")
 	}
-	handle, err := parent.mainExecutionContext.adoptBackendNodeID(backendNodeId)
-	return handle, err
+	return parent.adoptBackendNodeID(mainWorld, backendNodeId)
 }
 
 func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.FrameID {
