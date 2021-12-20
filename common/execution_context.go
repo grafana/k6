@@ -43,6 +43,14 @@ const (
 	utilityWorld = "utility"
 )
 
+type evaluateOptions struct {
+	forceCallable, returnByValue bool
+}
+
+func (ea evaluateOptions) String() string {
+	return fmt.Sprintf("forceCallable:%t returnByValue:%t", ea.forceCallable, ea.returnByValue)
+}
+
 // ExecutionContext represents a JS execution context
 type ExecutionContext struct {
 	ctx            context.Context
@@ -150,23 +158,19 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 
 // evaluate will evaluate provided callable within this execution context
 // and return by value or handle
-func (e *ExecutionContext) evaluate(
-	apiCtx context.Context,
-	forceCallable bool, returnByValue bool,
-	pageFunc goja.Value, args ...goja.Value,
-) (res interface{}, err error) {
+func (e *ExecutionContext) evaluate(apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
 	e.logger.Debugf(
 		"ExecutionContext:evaluate",
-		"sid:%s stid:%s fid:%s ectxid:%d furl:%q forceCallable:%t returnByvalue:%t",
-		e.sid, e.stid, e.fid, e.id, e.furl, forceCallable, returnByValue)
+		"sid:%s stid:%s fid:%s ectxid:%d furl:%q %s",
+		e.sid, e.stid, e.fid, e.id, e.furl, opts)
 
 	suffix := `//# sourceURL=` + evaluationScriptURL
 
 	var (
-		isCallable = forceCallable
+		isCallable = opts.forceCallable
 		expression = pageFunc.ToString().String()
 	)
-	if !forceCallable {
+	if !isCallable {
 		_, isCallable = goja.AssertFunction(pageFunc)
 	}
 	if !isCallable {
@@ -181,7 +185,7 @@ func (e *ExecutionContext) evaluate(
 		)
 		action := runtime.Evaluate(expressionWithSourceURL).
 			WithContextID(e.id).
-			WithReturnByValue(returnByValue).
+			WithReturnByValue(opts.returnByValue).
 			WithAwaitPromise(true).
 			WithUserGesture(true)
 		if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
@@ -193,7 +197,7 @@ func (e *ExecutionContext) evaluate(
 		if remoteObject == nil {
 			return
 		}
-		if returnByValue {
+		if opts.returnByValue {
 			res, err = valueFromRemoteObject(apiCtx, remoteObject)
 			if err != nil {
 				return nil, fmt.Errorf("cannot extract value from remote object (%s): %w", remoteObject.ObjectID, err)
@@ -220,7 +224,7 @@ func (e *ExecutionContext) evaluate(
 		action := runtime.CallFunctionOn(expressionWithSourceURL).
 			WithArguments(arguments).
 			WithExecutionContextID(e.id).
-			WithReturnByValue(returnByValue).
+			WithReturnByValue(opts.returnByValue).
 			WithAwaitPromise(true).
 			WithUserGesture(true)
 		if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
@@ -232,7 +236,7 @@ func (e *ExecutionContext) evaluate(
 		if remoteObject == nil {
 			return
 		}
-		if returnByValue {
+		if opts.returnByValue {
 			res, err = valueFromRemoteObject(apiCtx, remoteObject)
 			if err != nil {
 				return nil, fmt.Errorf("cannot extract value from remote object (%s): %w", remoteObject.ObjectID, err)
@@ -263,7 +267,11 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 			expressionWithSourceURL = expression + "\n" + suffix
 		}
 
-		handle, err := e.evaluate(apiCtx, false, false, rt.ToValue(expressionWithSourceURL))
+		opts := evaluateOptions{
+			forceCallable: false,
+			returnByValue: false,
+		}
+		handle, err := e.evaluate(apiCtx, opts, rt.ToValue(expressionWithSourceURL))
 		if handle == nil || err != nil {
 			return nil, fmt.Errorf("cannot get injected script (%q): %w", suffix, err)
 		}
@@ -277,7 +285,11 @@ func (e *ExecutionContext) Evaluate(
 	apiCtx context.Context,
 	pageFunc goja.Value, args ...goja.Value,
 ) (interface{}, error) {
-	return e.evaluate(apiCtx, true, true, pageFunc, args...)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	return e.evaluate(apiCtx, opts, pageFunc, args...)
 }
 
 // EvaluateHandle will evaluate provided page function within this execution context
@@ -285,7 +297,11 @@ func (e *ExecutionContext) EvaluateHandle(
 	apiCtx context.Context,
 	pageFunc goja.Value, args ...goja.Value,
 ) (api.JSHandle, error) {
-	res, err := e.evaluate(apiCtx, true, false, pageFunc, args...)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: false,
+	}
+	res, err := e.evaluate(apiCtx, opts, pageFunc, args...)
 	if err != nil {
 		return nil, err
 	}

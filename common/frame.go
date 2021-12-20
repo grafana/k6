@@ -321,15 +321,11 @@ func (f *Frame) document() (*ElementHandle, error) {
 
 	f.waitForExecutionContext(mainWorld)
 
-	var (
-		result interface{}
-		err    error
-	)
-	f.executionContextMu.RLock()
-	{
-		result, err = f.mainExecutionContext.evaluate(f.ctx, false, false, rt.ToValue("document"), nil)
+	opts := evaluateOptions{
+		forceCallable: false,
+		returnByValue: false,
 	}
-	f.executionContextMu.RUnlock()
+	result, err := f.evaluate(mainWorld, f.ctx, opts, rt.ToValue("document"))
 	if err != nil {
 		return nil, fmt.Errorf("frame document: cannot evaluate in main execution context: %w", err)
 	}
@@ -535,8 +531,12 @@ func (f *Frame) waitForFunction(apiCtx context.Context, world string, predicateF
 	} else {
 		predicate = fmt.Sprintf("return (%s)(...args);", predicateFn.ToString().String())
 	}
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: false,
+	}
 	result, err := execCtx.evaluate(
-		apiCtx, true, false, pageFn, append([]goja.Value{
+		apiCtx, opts, pageFn, append([]goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(predicate),
 			rt.ToValue(polling),
@@ -716,17 +716,17 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) (result interf
 
 	f.waitForExecutionContext(mainWorld)
 
-	var err error
-	f.executionContextMu.RLock()
-	{
-		result, err = f.mainExecutionContext.Evaluate(f.ctx, pageFunc, args...)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
 	}
-	f.executionContextMu.RUnlock()
+	result, err := f.evaluate(mainWorld, f.ctx, opts, pageFunc, args...)
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
 
 	applySlowMo(f.ctx)
+
 	return result
 }
 
@@ -1236,11 +1236,11 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 
 	f.waitForExecutionContext(utilityWorld)
 
-	f.executionContextMu.RLock()
-	defer f.executionContextMu.RUnlock()
-
-	_, err := f.utilityExecutionContext.evaluate(f.ctx, true, true, rt.ToValue(js), rt.ToValue(html))
-	if err != nil {
+	eopts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	if _, err := f.evaluate(utilityWorld, f.ctx, eopts, rt.ToValue(js), rt.ToValue(html)); err != nil {
 		k6common.Throw(rt, err)
 	}
 
@@ -1453,12 +1453,12 @@ func (f *Frame) adoptBackendNodeID(world string, id cdp.BackendNodeID) (*Element
 	return ec.adoptBackendNodeID(id)
 }
 
-func (f *Frame) evaluate(world string, apiCtx context.Context, forceCallable bool, returnByValue bool, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
+func (f *Frame) evaluate(world string, apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
 	ec := f.getExecCtx(world)
-	return ec.evaluate(apiCtx, forceCallable, returnByValue, pageFunc, args...)
+	return ec.evaluate(apiCtx, opts, pageFunc, args...)
 }
 
 // getExecCtx returns an execution context using a given world name.
@@ -1485,7 +1485,7 @@ type frameExecutionContext interface {
 	// context and return by value or handle.
 	evaluate(
 		apiCtx context.Context,
-		forceCallable bool, returnByValue bool,
+		opts evaluateOptions,
 		pageFunc goja.Value, args ...goja.Value,
 	) (res interface{}, err error)
 

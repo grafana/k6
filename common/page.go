@@ -236,7 +236,12 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.Frame
       		return node.ownerDocument ? node.ownerDocument.documentElement : null;
 		}
 	`)
-	result, err := h.execCtx.evaluate(apiCtx, true, false, pageFn, []goja.Value{rt.ToValue(h)}...)
+
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: false,
+	}
+	result, err := h.execCtx.evaluate(apiCtx, opts, pageFn, []goja.Value{rt.ToValue(h)}...)
 	if err != nil {
 		p.logger.Debugf("Page:getOwnerFrame:return", "sid:%v err:%v", p.sessionID(), err)
 		return ""
