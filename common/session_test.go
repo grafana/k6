@@ -34,6 +34,8 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/tests/ws"
 )
 
 func TestSessionCreateSession(t *testing.T) {
@@ -59,18 +61,18 @@ func TestSessionCreateSession(t *testing.T) {
 			case cdproto.MethodType(cdproto.CommandTargetAttachToTarget):
 				writeCh <- cdproto.Message{
 					Method: cdproto.EventTargetAttachedToTarget,
-					Params: easyjson.RawMessage([]byte(DEFAULT_CDP_TARGET_ATTACHED_TO_TARGET_MSG)),
+					Params: easyjson.RawMessage([]byte(ws.CDPTargetAttachedToTargetRequest)),
 				}
 				writeCh <- cdproto.Message{
 					ID:        msg.ID,
 					SessionID: msg.SessionID,
-					Result:    easyjson.RawMessage([]byte(DEFAULT_CDP_TARGET_ATTACH_TO_TARGET_RESPONSE)),
+					Result:    easyjson.RawMessage([]byte(ws.CDPTargetAttachedToTargetResponse)),
 				}
 			}
 		}
 	}
 
-	server := NewWSServerWithCDPHandler(t, handler, &cmdsReceived)
+	server := ws.NewWSServerWithCDPHandler(t, handler, &cmdsReceived)
 	defer server.Cleanup()
 
 	t.Run("send and recv session commands", func(t *testing.T) {
@@ -81,9 +83,9 @@ func TestSessionCreateSession(t *testing.T) {
 
 		if assert.NoError(t, err) {
 			session, err := conn.createSession(&target.Info{
-				TargetID:         DEFAULT_CDP_TARGET_ID,
+				TargetID:         ws.DummyCDPTargetID,
 				Type:             "page",
-				BrowserContextID: DEFAULT_CDP_BROWSER_CONTEXT_ID,
+				BrowserContextID: ws.DummyCDPBrowserContextID,
 			})
 
 			if assert.NoError(t, err) {

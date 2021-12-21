@@ -33,10 +33,12 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/tests/ws"
 )
 
 func TestConnection(t *testing.T) {
-	server := NewWSServerWithEcho(t)
+	server := ws.NewWSServerWithEcho(t)
 	defer server.Cleanup()
 
 	t.Run("connect", func(t *testing.T) {
@@ -51,7 +53,7 @@ func TestConnection(t *testing.T) {
 }
 
 func TestConnectionClosureAbnormal(t *testing.T) {
-	server := NewWSServerWithClosureAbnormal(t)
+	server := ws.NewWSServerWithClosureAbnormal(t)
 	defer server.Cleanup()
 
 	t.Run("closure abnormal", func(t *testing.T) {
@@ -69,7 +71,7 @@ func TestConnectionClosureAbnormal(t *testing.T) {
 }
 
 func TestConnectionSendRecv(t *testing.T) {
-	server := NewWSServerWithCDPHandler(t, CDPDefaultHandler, nil)
+	server := ws.NewWSServerWithCDPHandler(t, ws.CDPDefaultHandler, nil)
 	defer server.Cleanup()
 
 	t.Run("send command with empty reply", func(t *testing.T) {
@@ -133,7 +135,7 @@ func TestConnectionCreateSession(t *testing.T) {
 		}
 	}
 
-	server := NewWSServerWithCDPHandler(t, handler, &cmdsReceived)
+	server := ws.NewWSServerWithCDPHandler(t, handler, &cmdsReceived)
 	defer server.Cleanup()
 
 	t.Run("create session for target", func(t *testing.T) {
