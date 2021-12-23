@@ -346,8 +346,8 @@ func (b *Browser) Close() {
 		b.logger.Debugf("Browser:Close", "already in a closing state")
 		return
 	}
-	b.browserProc.GracefulClose()
-	defer b.browserProc.Terminate()
+
+	atomic.CompareAndSwapInt64(&b.state, b.state, BrowserStateClosed)
 
 	action := cdpbrowser.Close()
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
@@ -355,7 +355,12 @@ func (b *Browser) Close() {
 			k6Throw(b.ctx, "unable to execute %T: %v", action, err)
 		}
 	}
-	atomic.CompareAndSwapInt64(&b.state, b.state, BrowserStateClosed)
+
+	// terminate the browser process early on, then tell the CDP
+	// afterwards. this will take a little bit of time, and CDP
+	// will stop emitting events.
+	b.browserProc.GracefulClose()
+	b.browserProc.Terminate()
 }
 
 // Contexts returns list of browser contexts

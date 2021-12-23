@@ -805,8 +805,10 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 			fs.session.id, fs.targetID, event.SessionID,
 			event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
 			event.TargetInfo.Type, err)
-		// If we're no longer connected to browser, then ignore WebSocket errors
-		if !fs.page.browserCtx.browser.connected && strings.Contains(err.Error(), "websocket: close 1006 (abnormal closure)") {
+		// ignore errors if we're no longer connected to browser
+		// this happens when there is no browser but we still want to
+		// attach a frame to it.
+		if !fs.page.browserCtx.browser.IsConnected() {
 			return
 		}
 		// Ignore context canceled error to gracefuly handle shutting down
@@ -843,8 +845,10 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	// Handle new worker
 	w, err := NewWorker(fs.ctx, session, targetID, event.TargetInfo.URL)
 	if err != nil {
-		if !fs.page.browserCtx.browser.connected && strings.Contains(err.Error(), "websocket: close 1006 (abnormal closure)") {
-			// If we're no longer connected to browser, then ignore WebSocket errors
+		// ignore errors if we're no longer connected to browser
+		// this happens when there is no browser but we still want to
+		// attach a worker to it.
+		if !fs.page.browserCtx.browser.connected {
 			return
 		}
 		select {
