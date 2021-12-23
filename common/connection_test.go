@@ -33,11 +33,12 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/tests/ws"
 )
 
 func TestConnection(t *testing.T) {
-	server := NewWSServerWithEcho(t)
-	defer server.Cleanup()
+	server := ws.NewServer(t, ws.WithEchoHandler("/echo"))
 
 	t.Run("connect", func(t *testing.T) {
 		ctx := context.Background()
@@ -51,8 +52,7 @@ func TestConnection(t *testing.T) {
 }
 
 func TestConnectionClosureAbnormal(t *testing.T) {
-	server := NewWSServerWithClosureAbnormal(t)
-	defer server.Cleanup()
+	server := ws.NewServer(t, ws.WithClosureAbnormalHandler("/closure-abnormal"))
 
 	t.Run("closure abnormal", func(t *testing.T) {
 		ctx := context.Background()
@@ -69,8 +69,7 @@ func TestConnectionClosureAbnormal(t *testing.T) {
 }
 
 func TestConnectionSendRecv(t *testing.T) {
-	server := NewWSServerWithCDPHandler(t, CDPDefaultHandler, nil)
-	defer server.Cleanup()
+	server := ws.NewServer(t, ws.WithCDPHandler("/cdp", ws.CDPDefaultHandler, nil))
 
 	t.Run("send command with empty reply", func(t *testing.T) {
 		ctx := context.Background()
@@ -109,19 +108,19 @@ func TestConnectionCreateSession(t *testing.T) {
 					writeCh <- cdproto.Message{
 						Method: cdproto.EventTargetAttachedToTarget,
 						Params: easyjson.RawMessage([]byte(`
-                            {
-                                "sessionId": "0123456789",
-                                "targetInfo": {
-                                    "targetId": "abcdef0123456789",
-                                    "type": "page",
-                                    "title": "",
-                                    "url": "about:blank",
-                                    "attached": true,
-                                    "browserContextId": "0123456789876543210"
-                                },
-                                "waitingForDebugger": false
-                            }
-                        `)),
+						{
+							"sessionId": "0123456789",
+							"targetInfo": {
+								"targetId": "abcdef0123456789",
+								"type": "page",
+								"title": "",
+								"url": "about:blank",
+								"attached": true,
+								"browserContextId": "0123456789876543210"
+							},
+							"waitingForDebugger": false
+						}
+						`)),
 					}
 					writeCh <- cdproto.Message{
 						ID:        msg.ID,
@@ -133,8 +132,7 @@ func TestConnectionCreateSession(t *testing.T) {
 		}
 	}
 
-	server := NewWSServerWithCDPHandler(t, handler, &cmdsReceived)
-	defer server.Cleanup()
+	server := ws.NewServer(t, ws.WithCDPHandler("/cdp", handler, &cmdsReceived))
 
 	t.Run("create session for target", func(t *testing.T) {
 		ctx := context.Background()

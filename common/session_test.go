@@ -34,9 +34,36 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/tests/ws"
 )
 
 func TestSessionCreateSession(t *testing.T) {
+	const (
+		cdpTargetID         = "target_id_0123456789"
+		cdpBrowserContextID = "browser_context_id_0123456789"
+
+		targetAttachedToTargetEvent = `
+		{
+			"sessionId": "session_id_0123456789",
+			"targetInfo": {
+				"targetId": "target_id_0123456789",
+				"type": "page",
+				"title": "",
+				"url": "about:blank",
+				"attached": true,
+				"browserContextId": "browser_context_id_0123456789"
+			},
+			"waitingForDebugger": false
+		}`
+
+		targetAttachedToTargetResult = `
+		{
+			"sessionId":"session_id_0123456789"
+		}
+		`
+	)
+
 	cmdsReceived := make([]cdproto.MethodType, 0)
 	handler := func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}) {
 		if msg.SessionID != "" && msg.Method != "" {
@@ -59,19 +86,18 @@ func TestSessionCreateSession(t *testing.T) {
 			case cdproto.MethodType(cdproto.CommandTargetAttachToTarget):
 				writeCh <- cdproto.Message{
 					Method: cdproto.EventTargetAttachedToTarget,
-					Params: easyjson.RawMessage([]byte(DEFAULT_CDP_TARGET_ATTACHED_TO_TARGET_MSG)),
+					Params: easyjson.RawMessage([]byte(targetAttachedToTargetEvent)),
 				}
 				writeCh <- cdproto.Message{
 					ID:        msg.ID,
 					SessionID: msg.SessionID,
-					Result:    easyjson.RawMessage([]byte(DEFAULT_CDP_TARGET_ATTACH_TO_TARGET_RESPONSE)),
+					Result:    easyjson.RawMessage([]byte(targetAttachedToTargetResult)),
 				}
 			}
 		}
 	}
 
-	server := NewWSServerWithCDPHandler(t, handler, &cmdsReceived)
-	defer server.Cleanup()
+	server := ws.NewServer(t, ws.WithCDPHandler("/cdp", handler, &cmdsReceived))
 
 	t.Run("send and recv session commands", func(t *testing.T) {
 		ctx := context.Background()
@@ -81,9 +107,9 @@ func TestSessionCreateSession(t *testing.T) {
 
 		if assert.NoError(t, err) {
 			session, err := conn.createSession(&target.Info{
-				TargetID:         DEFAULT_CDP_TARGET_ID,
 				Type:             "page",
-				BrowserContextID: DEFAULT_CDP_BROWSER_CONTEXT_ID,
+				TargetID:         cdpTargetID,
+				BrowserContextID: cdpBrowserContextID,
 			})
 
 			if assert.NoError(t, err) {
