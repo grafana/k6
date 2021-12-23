@@ -53,7 +53,7 @@ const (
 )
 
 var (
-	CDPTargetAttachedToTargetRequest = fmt.Sprintf(`
+	TargetAttachedToTargetEvent = fmt.Sprintf(`
 	{
 		"sessionId": "%s",
 		"targetInfo": {
@@ -68,19 +68,19 @@ var (
 	}
 	`, DummyCDPSessionID, DummyCDPTargetID, DummyCDPBrowserContextID)
 
-	CDPTargetAttachedToTargetResponse = fmt.Sprintf(`{"sessionId":"%s"}`, DummyCDPSessionID)
+	TargetAttachedToTargetResult = fmt.Sprintf(`{"sessionId":"%s"}`, DummyCDPSessionID)
 )
 
-// NewWSServerWithCDPHandler creates a WS test server with a custom CDP handler function
-func NewWSServerWithCDPHandler(
+// NewServerWithCDPHandler creates a WS test server with a custom CDP handler function
+func NewServerWithCDPHandler(
 	t testing.TB,
 	fn func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}),
-	cmdsReceived *[]cdproto.MethodType) *WSTestServer {
-	return NewWSServer(t, "/cdp", getWebsocketHandlerCDP(fn, cmdsReceived))
+	cmdsReceived *[]cdproto.MethodType) *Server {
+	return NewServer(t, "/cdp", getWebsocketHandlerCDP(fn, cmdsReceived))
 }
 
-// WSTestServer can be used as a test alternative to a real CDP compatible browser.
-type WSTestServer struct {
+// Server can be used as a test alternative to a real CDP compatible browser.
+type Server struct {
 	Mux           *http.ServeMux
 	ServerHTTP    *httptest.Server
 	Dialer        *k6netext.Dialer
@@ -89,18 +89,18 @@ type WSTestServer struct {
 	Cleanup       func()
 }
 
-// NewWSServerWithClosureAbnormal creates a WS test server with abnormal closure behavior
-func NewWSServerWithClosureAbnormal(t testing.TB) *WSTestServer {
-	return NewWSServer(t, "/closure-abnormal", getWebsocketHandlerAbnormalClosure())
+// NewServerWithClosureAbnormal creates a WS test server with abnormal closure behavior
+func NewServerWithClosureAbnormal(t testing.TB) *Server {
+	return NewServer(t, "/closure-abnormal", getWebsocketHandlerAbnormalClosure())
 }
 
-// NewWSServerWithEcho creates a WS test server with an echo handler
-func NewWSServerWithEcho(t testing.TB) *WSTestServer {
-	return NewWSServer(t, "/echo", getWebsocketHandlerEcho())
+// NewServerWithEcho creates a WS test server with an echo handler
+func NewServerWithEcho(t testing.TB) *Server {
+	return NewServer(t, "/echo", getWebsocketHandlerEcho())
 }
 
-// NewWSServer returns a fully configured and running WS test server
-func NewWSServer(t testing.TB, path string, handler http.Handler) *WSTestServer {
+// NewServer returns a fully configured and running WS test server
+func NewServer(t testing.TB, path string, handler http.Handler) *Server {
 	t.Helper()
 
 	// Create a http.ServeMux and set the httpbin handler as the default
@@ -135,7 +135,7 @@ func NewWSServer(t testing.TB, path string, handler http.Handler) *WSTestServer 
 	require.NoError(t, http2.ConfigureTransport(transport))
 
 	ctx, ctxCancel := context.WithCancel(context.Background())
-	return &WSTestServer{
+	return &Server{
 		Mux:           mux,
 		ServerHTTP:    httpSrv,
 		Dialer:        dialer,
@@ -147,6 +147,8 @@ func NewWSServer(t testing.TB, path string, handler http.Handler) *WSTestServer 
 		},
 	}
 }
+
+// TODO: make a websocket.Conn wrapper for CDPxxx methods
 
 // CDPDefaultCDPHandler is a default handler for the CDP WS server
 func CDPDefaultHandler(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}) {
@@ -163,12 +165,12 @@ func CDPDefaultHandler(conn *websocket.Conn, msg *cdproto.Message, writeCh chan 
 		case cdproto.MethodType(cdproto.CommandTargetAttachToTarget):
 			writeCh <- cdproto.Message{
 				Method: cdproto.EventTargetAttachedToTarget,
-				Params: easyjson.RawMessage([]byte(CDPTargetAttachedToTargetRequest)),
+				Params: easyjson.RawMessage([]byte(TargetAttachedToTargetEvent)),
 			}
 			writeCh <- cdproto.Message{
 				ID:        msg.ID,
 				SessionID: msg.SessionID,
-				Result:    easyjson.RawMessage([]byte(CDPTargetAttachedToTargetResponse)),
+				Result:    easyjson.RawMessage([]byte(TargetAttachedToTargetResult)),
 			}
 		default:
 			writeCh <- cdproto.Message{

@@ -61,18 +61,18 @@ func TestSessionCreateSession(t *testing.T) {
 			case cdproto.MethodType(cdproto.CommandTargetAttachToTarget):
 				writeCh <- cdproto.Message{
 					Method: cdproto.EventTargetAttachedToTarget,
-					Params: easyjson.RawMessage([]byte(ws.CDPTargetAttachedToTargetRequest)),
+					Params: easyjson.RawMessage([]byte(ws.TargetAttachedToTargetEvent)),
 				}
 				writeCh <- cdproto.Message{
 					ID:        msg.ID,
 					SessionID: msg.SessionID,
-					Result:    easyjson.RawMessage([]byte(ws.CDPTargetAttachedToTargetResponse)),
+					Result:    easyjson.RawMessage([]byte(ws.TargetAttachedToTargetResult)),
 				}
 			}
 		}
 	}
 
-	server := ws.NewWSServerWithCDPHandler(t, handler, &cmdsReceived)
+	server := ws.NewServerWithCDPHandler(t, handler, &cmdsReceived)
 	defer server.Cleanup()
 
 	t.Run("send and recv session commands", func(t *testing.T) {
