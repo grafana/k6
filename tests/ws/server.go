@@ -71,16 +71,9 @@ var (
 	TargetAttachedToTargetResult = fmt.Sprintf(`{"sessionId":"%s"}`, DummyCDPSessionID)
 )
 
-// NewServerWithCDPHandler creates a WS test server with a custom CDP handler function
-func NewServerWithCDPHandler(
-	t testing.TB,
-	fn func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}),
-	cmdsReceived *[]cdproto.MethodType) *Server {
-	return NewServer(t, "/cdp", getWebsocketHandlerCDP(fn, cmdsReceived))
-}
-
 // Server can be used as a test alternative to a real CDP compatible browser.
 type Server struct {
+	t             testing.TB
 	Mux           *http.ServeMux
 	ServerHTTP    *httptest.Server
 	Dialer        *k6netext.Dialer
@@ -88,23 +81,12 @@ type Server struct {
 	Context       context.Context
 }
 
-// NewServerWithClosureAbnormal creates a WS test server with abnormal closure behavior
-func NewServerWithClosureAbnormal(t testing.TB) *Server {
-	return NewServer(t, "/closure-abnormal", getWebsocketHandlerAbnormalClosure())
-}
-
-// NewServerWithEcho creates a WS test server with an echo handler
-func NewServerWithEcho(t testing.TB) *Server {
-	return NewServer(t, "/echo", getWebsocketHandlerEcho())
-}
-
 // NewServer returns a fully configured and running WS test server
-func NewServer(t testing.TB, path string, handler http.Handler) *Server {
+func NewServer(t testing.TB, opts ...func(*Server)) *Server {
 	t.Helper()
 
 	// Create a http.ServeMux and set the httpbin handler as the default
 	mux := http.NewServeMux()
-	mux.Handle(path, handler)
 	mux.Handle("/", httpbin.New().Handler())
 
 	// Initialize the HTTP server and get its details
@@ -137,12 +119,127 @@ func NewServer(t testing.TB, path string, handler http.Handler) *Server {
 		server.Close()
 		cancel()
 	})
-	return &Server{
+	s := &Server{
+		t:             t,
 		Mux:           mux,
 		ServerHTTP:    server,
 		Dialer:        dialer,
 		HTTPTransport: transport,
 		Context:       ctx,
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// WithClosureAbnormalHandler attaches an abnormal closure behavior to Server.
+func WithClosureAbnormalHandler(path string) func(*Server) {
+	handler := func(w http.ResponseWriter, req *http.Request) {
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+		if err != nil {
+			// TODO: log
+			return
+		}
+		err = conn.Close() // This forces a connection closure without a proper WS close message exchange
+		if err != nil {
+			// TODO: log
+			return
+		}
+	}
+	return func(s *Server) {
+		s.Mux.Handle(path, http.HandlerFunc(handler))
+	}
+}
+
+// NewServerWithEcho attaches an echo handler to Server.
+func WithEchoHandler(path string) func(*Server) {
+	handler := func(w http.ResponseWriter, req *http.Request) {
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+		if err != nil {
+			return
+		}
+		messageType, r, e := conn.NextReader()
+		if e != nil {
+			return
+		}
+		var wc io.WriteCloser
+		wc, err = conn.NextWriter(messageType)
+		if err != nil {
+			return
+		}
+		if _, err = io.Copy(wc, r); err != nil {
+			return
+		}
+		if err = wc.Close(); err != nil {
+			return
+		}
+		err = conn.WriteControl(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
+			time.Now().Add(10*time.Second),
+		)
+		if err != nil {
+			return
+		}
+	}
+	return func(s *Server) {
+		s.Mux.Handle(path, http.HandlerFunc(handler))
+	}
+}
+
+// WithCDPHandler attaches a a custom CDP handler function to Server.
+func WithCDPHandler(
+	path string,
+	fn func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}),
+	cmdsReceived *[]cdproto.MethodType,
+) func(*Server) {
+	handler := func(w http.ResponseWriter, req *http.Request) {
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+		if err != nil {
+			return
+		}
+
+		done := make(chan struct{})
+		writeCh := make(chan cdproto.Message)
+
+		// Read
+		go func() {
+			for {
+				select {
+				case <-done:
+					return
+				default:
+				}
+
+				msg, err := CDPReadMsg(conn)
+				if err != nil {
+					close(done)
+					return
+				}
+
+				if msg.Method != "" && cmdsReceived != nil {
+					*cmdsReceived = append(*cmdsReceived, msg.Method)
+				}
+
+				fn(conn, msg, writeCh, done)
+			}
+		}()
+		// Write
+		go func() {
+			for {
+				select {
+				case msg := <-writeCh:
+					CDPWriteMsg(conn, &msg)
+				case <-done:
+					return
+				}
+			}
+		}()
+
+		<-done // Wait for done channel to be closed before closing connection
+	}
+	return func(s *Server) {
+		s.Mux.Handle(path, http.HandlerFunc(handler))
 	}
 }
 
@@ -215,99 +312,4 @@ func CDPWriteMsg(conn *websocket.Conn, msg *cdproto.Message) {
 	if err := writer.Close(); err != nil {
 		return
 	}
-}
-
-func getWebsocketHandlerCDP(
-	fn func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}),
-	cmdsReceived *[]cdproto.MethodType) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
-		if err != nil {
-			return
-		}
-
-		done := make(chan struct{})
-		writeCh := make(chan cdproto.Message)
-
-		// Read loop
-		go func() {
-			for {
-				select {
-				case <-done:
-					return
-				default:
-				}
-
-				msg, err := CDPReadMsg(conn)
-				if err != nil {
-					close(done)
-					return
-				}
-
-				if msg.Method != "" && cmdsReceived != nil {
-					*cmdsReceived = append(*cmdsReceived, msg.Method)
-				}
-
-				fn(conn, msg, writeCh, done)
-			}
-		}()
-
-		// Write loop
-		go func() {
-			for {
-				select {
-				case msg := <-writeCh:
-					CDPWriteMsg(conn, &msg)
-				case <-done:
-					return
-				}
-			}
-		}()
-
-		<-done // Wait for done channel to be closed before closing connection
-	})
-}
-
-func getWebsocketHandlerEcho() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
-		if err != nil {
-			return
-		}
-		messageType, r, e := conn.NextReader()
-		if e != nil {
-			return
-		}
-		var wc io.WriteCloser
-		wc, err = conn.NextWriter(messageType)
-		if err != nil {
-			return
-		}
-		if _, err = io.Copy(wc, r); err != nil {
-			return
-		}
-		if err = wc.Close(); err != nil {
-			return
-		}
-		err = conn.WriteControl(websocket.CloseMessage,
-			websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
-			time.Now().Add(10*time.Second),
-		)
-		if err != nil {
-			return
-		}
-	})
-}
-
-func getWebsocketHandlerAbnormalClosure() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
-		if err != nil {
-			return
-		}
-		err = conn.Close() // This forces a connection closure without a proper WS close message exchange
-		if err != nil {
-			return
-		}
-	})
 }

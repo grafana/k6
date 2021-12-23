@@ -72,7 +72,7 @@ func TestSessionCreateSession(t *testing.T) {
 		}
 	}
 
-	server := ws.NewServerWithCDPHandler(t, handler, &cmdsReceived)
+	server := ws.NewServer(t, ws.WithCDPHandler("/cdp", handler, &cmdsReceived))
 
 	t.Run("send and recv session commands", func(t *testing.T) {
 		ctx := context.Background()
