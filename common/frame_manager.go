@@ -457,9 +457,7 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	}
 
 	if frame.pendingDocument == nil || frame.pendingDocument.request != req {
-		m.logger.Debugf("FrameManager:requestFailed:return",
-			"fmid:%d pdoc:nil pdoc.req!=req:%t",
-			m.ID(), frame.pendingDocument.request != req)
+		m.logger.Debugf("FrameManager:requestFailed:return", "fmid:%d pdoc:nil", m.ID())
 		return
 	}
 	errorText := req.errorText
