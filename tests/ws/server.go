@@ -162,7 +162,7 @@ func WithEchoHandler(path string) func(*Server) {
 	}
 }
 
-// WithCDPHandler attaches a a custom CDP handler function to Server.
+// WithCDPHandler attaches a custom CDP handler function to Server.
 func WithCDPHandler(
 	path string,
 	fn func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}),
