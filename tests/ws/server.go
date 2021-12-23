@@ -81,7 +81,7 @@ type Server struct {
 	Context       context.Context
 }
 
-// NewServer returns a fully configured and running WS test server
+// NewServer returns a fully configured and running WS test server.
 func NewServer(t testing.TB, opts ...func(*Server)) *Server {
 	t.Helper()
 
@@ -152,7 +152,7 @@ func WithClosureAbnormalHandler(path string) func(*Server) {
 	}
 }
 
-// NewServerWithEcho attaches an echo handler to Server.
+// WithEchoHandler attaches an echo handler to Server.
 func WithEchoHandler(path string) func(*Server) {
 	handler := func(w http.ResponseWriter, req *http.Request) {
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
@@ -202,8 +202,23 @@ func WithCDPHandler(
 		done := make(chan struct{})
 		writeCh := make(chan cdproto.Message)
 
-		// Read
 		go func() {
+			read := func(conn *websocket.Conn) (*cdproto.Message, error) {
+				_, buf, err := conn.ReadMessage()
+				if err != nil {
+					return nil, err
+				}
+
+				var msg cdproto.Message
+				decoder := jlexer.Lexer{Data: buf}
+				msg.UnmarshalEasyJSON(&decoder)
+				if err := decoder.Error(); err != nil {
+					return nil, err
+				}
+
+				return &msg, nil
+			}
+
 			for {
 				select {
 				case <-done:
@@ -211,7 +226,7 @@ func WithCDPHandler(
 				default:
 				}
 
-				msg, err := CDPReadMsg(conn)
+				msg, err := read(conn)
 				if err != nil {
 					close(done)
 					return
@@ -224,12 +239,31 @@ func WithCDPHandler(
 				fn(conn, msg, writeCh, done)
 			}
 		}()
-		// Write
+
 		go func() {
+			write := func(conn *websocket.Conn, msg *cdproto.Message) {
+				encoder := jwriter.Writer{}
+				msg.MarshalEasyJSON(&encoder)
+				if err := encoder.Error; err != nil {
+					return
+				}
+
+				writer, err := conn.NextWriter(websocket.TextMessage)
+				if err != nil {
+					return
+				}
+				if _, err := encoder.DumpTo(writer); err != nil {
+					return
+				}
+				if err := writer.Close(); err != nil {
+					return
+				}
+			}
+
 			for {
 				select {
 				case msg := <-writeCh:
-					CDPWriteMsg(conn, &msg)
+					write(conn, &msg)
 				case <-done:
 					return
 				}
@@ -243,9 +277,7 @@ func WithCDPHandler(
 	}
 }
 
-// TODO: make a websocket.Conn wrapper for CDPxxx methods
-
-// CDPDefaultCDPHandler is a default handler for the CDP WS server
+// CDPDefaultHandler is a default handler for the CDP WS server.
 func CDPDefaultHandler(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}) {
 	if msg.SessionID != "" && msg.Method != "" {
 		switch msg.Method {
@@ -274,42 +306,5 @@ func CDPDefaultHandler(conn *websocket.Conn, msg *cdproto.Message, writeCh chan 
 				Result:    easyjson.RawMessage([]byte("{}")),
 			}
 		}
-	}
-}
-
-// CDPReadMsg reads a CDP message to the provided Websocket connection
-func CDPReadMsg(conn *websocket.Conn) (*cdproto.Message, error) {
-	_, buf, err := conn.ReadMessage()
-	if err != nil {
-		return nil, err
-	}
-
-	var msg cdproto.Message
-	decoder := jlexer.Lexer{Data: buf}
-	msg.UnmarshalEasyJSON(&decoder)
-	if err := decoder.Error(); err != nil {
-		return nil, err
-	}
-
-	return &msg, nil
-}
-
-// CDPWriteMsg writes a CDP message to the provided Websocket connection
-func CDPWriteMsg(conn *websocket.Conn, msg *cdproto.Message) {
-	encoder := jwriter.Writer{}
-	msg.MarshalEasyJSON(&encoder)
-	if err := encoder.Error; err != nil {
-		return
-	}
-
-	writer, err := conn.NextWriter(websocket.TextMessage)
-	if err != nil {
-		return
-	}
-	if _, err := encoder.DumpTo(writer); err != nil {
-		return
-	}
-	if err := writer.Close(); err != nil {
-		return
 	}
 }
