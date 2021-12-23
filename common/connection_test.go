@@ -39,7 +39,6 @@ import (
 
 func TestConnection(t *testing.T) {
 	server := ws.NewServerWithEcho(t)
-	defer server.Cleanup()
 
 	t.Run("connect", func(t *testing.T) {
 		ctx := context.Background()
@@ -54,7 +53,6 @@ func TestConnection(t *testing.T) {
 
 func TestConnectionClosureAbnormal(t *testing.T) {
 	server := ws.NewServerWithClosureAbnormal(t)
-	defer server.Cleanup()
 
 	t.Run("closure abnormal", func(t *testing.T) {
 		ctx := context.Background()
@@ -72,7 +70,6 @@ func TestConnectionClosureAbnormal(t *testing.T) {
 
 func TestConnectionSendRecv(t *testing.T) {
 	server := ws.NewServerWithCDPHandler(t, ws.CDPDefaultHandler, nil)
-	defer server.Cleanup()
 
 	t.Run("send command with empty reply", func(t *testing.T) {
 		ctx := context.Background()
@@ -136,7 +133,6 @@ func TestConnectionCreateSession(t *testing.T) {
 	}
 
 	server := ws.NewServerWithCDPHandler(t, handler, &cmdsReceived)
-	defer server.Cleanup()
 
 	t.Run("create session for target", func(t *testing.T) {
 		ctx := context.Background()

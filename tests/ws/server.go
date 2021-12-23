@@ -86,7 +86,6 @@ type Server struct {
 	Dialer        *k6netext.Dialer
 	HTTPTransport *http.Transport
 	Context       context.Context
-	Cleanup       func()
 }
 
 // NewServerWithClosureAbnormal creates a WS test server with abnormal closure behavior
@@ -109,13 +108,12 @@ func NewServer(t testing.TB, path string, handler http.Handler) *Server {
 	mux.Handle("/", httpbin.New().Handler())
 
 	// Initialize the HTTP server and get its details
-	httpSrv := httptest.NewServer(mux)
-	httpURL, err := url.Parse(httpSrv.URL)
+	server := httptest.NewServer(mux)
+	url, err := url.Parse(server.URL)
 	require.NoError(t, err)
-	httpIP := net.ParseIP(httpURL.Hostname())
-	require.NotNil(t, httpIP)
-
-	httpDomainValue, err := k6lib.NewHostAddress(httpIP, "")
+	ip := net.ParseIP(url.Hostname())
+	require.NotNil(t, ip)
+	domain, err := k6lib.NewHostAddress(ip, "")
 	require.NoError(t, err)
 
 	// Set up the dialer with shorter timeouts and the custom domains
@@ -125,7 +123,7 @@ func NewServer(t testing.TB, path string, handler http.Handler) *Server {
 		DualStack: true,
 	}, k6netext.NewResolver(net.LookupIP, 0, k6types.DNSfirst, k6types.DNSpreferIPv4))
 	dialer.Hosts = map[string]*k6lib.HostAddress{
-		WebSocketServerURL: httpDomainValue,
+		WebSocketServerURL: domain,
 	}
 
 	// Pre-configure the HTTP client transport with the dialer and TLS config (incl. HTTP2 support)
@@ -134,17 +132,17 @@ func NewServer(t testing.TB, path string, handler http.Handler) *Server {
 	}
 	require.NoError(t, http2.ConfigureTransport(transport))
 
-	ctx, ctxCancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(func() {
+		server.Close()
+		cancel()
+	})
 	return &Server{
 		Mux:           mux,
-		ServerHTTP:    httpSrv,
+		ServerHTTP:    server,
 		Dialer:        dialer,
 		HTTPTransport: transport,
 		Context:       ctx,
-		Cleanup: func() {
-			httpSrv.Close()
-			ctxCancel()
-		},
 	}
 }
 
