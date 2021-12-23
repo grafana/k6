@@ -39,6 +39,31 @@ import (
 )
 
 func TestSessionCreateSession(t *testing.T) {
+	const (
+		cdpTargetID         = "target_id_0123456789"
+		cdpBrowserContextID = "browser_context_id_0123456789"
+
+		targetAttachedToTargetEvent = `
+		{
+			"sessionId": "session_id_0123456789",
+			"targetInfo": {
+				"targetId": "target_id_0123456789",
+				"type": "page",
+				"title": "",
+				"url": "about:blank",
+				"attached": true,
+				"browserContextId": "browser_context_id_0123456789"
+			},
+			"waitingForDebugger": false
+		}`
+
+		targetAttachedToTargetResult = `
+		{
+			"sessionId":"session_id_0123456789"
+		}
+		`
+	)
+
 	cmdsReceived := make([]cdproto.MethodType, 0)
 	handler := func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}) {
 		if msg.SessionID != "" && msg.Method != "" {
@@ -61,12 +86,12 @@ func TestSessionCreateSession(t *testing.T) {
 			case cdproto.MethodType(cdproto.CommandTargetAttachToTarget):
 				writeCh <- cdproto.Message{
 					Method: cdproto.EventTargetAttachedToTarget,
-					Params: easyjson.RawMessage([]byte(ws.TargetAttachedToTargetEvent)),
+					Params: easyjson.RawMessage([]byte(targetAttachedToTargetEvent)),
 				}
 				writeCh <- cdproto.Message{
 					ID:        msg.ID,
 					SessionID: msg.SessionID,
-					Result:    easyjson.RawMessage([]byte(ws.TargetAttachedToTargetResult)),
+					Result:    easyjson.RawMessage([]byte(targetAttachedToTargetResult)),
 				}
 			}
 		}
@@ -82,9 +107,9 @@ func TestSessionCreateSession(t *testing.T) {
 
 		if assert.NoError(t, err) {
 			session, err := conn.createSession(&target.Info{
-				TargetID:         ws.DummyCDPTargetID,
 				Type:             "page",
-				BrowserContextID: ws.DummyCDPBrowserContextID,
+				TargetID:         cdpTargetID,
+				BrowserContextID: cdpBrowserContextID,
 			})
 
 			if assert.NoError(t, err) {

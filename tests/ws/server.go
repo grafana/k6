@@ -22,7 +22,6 @@ package ws
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -43,32 +42,6 @@ import (
 	k6lib "go.k6.io/k6/lib"
 	k6netext "go.k6.io/k6/lib/netext"
 	k6types "go.k6.io/k6/lib/types"
-)
-
-const (
-	DummyCDPSessionID        = "session_id_0123456789"
-	DummyCDPTargetID         = "target_id_0123456789"
-	DummyCDPBrowserContextID = "browser_context_id_0123456789"
-	WebSocketServerURL       = "wsbin.local"
-)
-
-var (
-	TargetAttachedToTargetEvent = fmt.Sprintf(`
-	{
-		"sessionId": "%s",
-		"targetInfo": {
-			"targetId": "%s",
-			"type": "page",
-			"title": "",
-			"url": "about:blank",
-			"attached": true,
-			"browserContextId": "%s"
-		},
-		"waitingForDebugger": false
-	}
-	`, DummyCDPSessionID, DummyCDPTargetID, DummyCDPBrowserContextID)
-
-	TargetAttachedToTargetResult = fmt.Sprintf(`{"sessionId":"%s"}`, DummyCDPSessionID)
 )
 
 // Server can be used as a test alternative to a real CDP compatible browser.
@@ -104,8 +77,10 @@ func NewServer(t testing.TB, opts ...func(*Server)) *Server {
 		KeepAlive: 10 * time.Second,
 		DualStack: true,
 	}, k6netext.NewResolver(net.LookupIP, 0, k6types.DNSfirst, k6types.DNSpreferIPv4))
+
+	const wsURL = "wsbin.local"
 	dialer.Hosts = map[string]*k6lib.HostAddress{
-		WebSocketServerURL: domain,
+		wsURL: domain,
 	}
 
 	// Pre-configure the HTTP client transport with the dialer and TLS config (incl. HTTP2 support)
@@ -279,6 +254,27 @@ func WithCDPHandler(
 
 // CDPDefaultHandler is a default handler for the CDP WS server.
 func CDPDefaultHandler(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}) {
+	const (
+		targetAttachedToTargetEvent = `
+		{
+			"sessionId": "session_id_0123456789",
+			"targetInfo": {
+				"targetId": "target_id_0123456789",
+				"type": "page",
+				"title": "",
+				"url": "about:blank",
+				"attached": true,
+				"browserContextId": "browser_context_id_0123456789"
+			},
+			"waitingForDebugger": false
+		}`
+
+		targetAttachedToTargetResult = `
+		{
+			"sessionId":"session_id_0123456789"
+		}`
+	)
+
 	if msg.SessionID != "" && msg.Method != "" {
 		switch msg.Method {
 		default:
@@ -292,12 +288,12 @@ func CDPDefaultHandler(conn *websocket.Conn, msg *cdproto.Message, writeCh chan 
 		case cdproto.MethodType(cdproto.CommandTargetAttachToTarget):
 			writeCh <- cdproto.Message{
 				Method: cdproto.EventTargetAttachedToTarget,
-				Params: easyjson.RawMessage([]byte(TargetAttachedToTargetEvent)),
+				Params: easyjson.RawMessage([]byte(targetAttachedToTargetEvent)),
 			}
 			writeCh <- cdproto.Message{
 				ID:        msg.ID,
 				SessionID: msg.SessionID,
-				Result:    easyjson.RawMessage([]byte(TargetAttachedToTargetResult)),
+				Result:    easyjson.RawMessage([]byte(targetAttachedToTargetResult)),
 			}
 		default:
 			writeCh <- cdproto.Message{
