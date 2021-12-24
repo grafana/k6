@@ -85,21 +85,16 @@ type Browser struct {
 // NewBrowser creates a new browser
 func NewBrowser(ctx context.Context, cancelFn context.CancelFunc, browserProc *BrowserProcess, launchOpts *LaunchOptions, logger *Logger) (*Browser, error) {
 	b := Browser{
-		BaseEventEmitter:      NewBaseEventEmitter(ctx),
-		ctx:                   ctx,
-		cancelFn:              cancelFn,
-		state:                 int64(BrowserStateOpen),
-		browserProc:           browserProc,
-		conn:                  nil,
-		connected:             false,
-		launchOpts:            launchOpts,
-		contexts:              make(map[cdp.BrowserContextID]*BrowserContext),
-		defaultContext:        nil,
-		pagesMu:               sync.RWMutex{},
-		pages:                 make(map[target.ID]*Page),
-		sessionIDtoTargetIDMu: sync.RWMutex{},
-		sessionIDtoTargetID:   make(map[target.SessionID]target.ID),
-		logger:                logger,
+		BaseEventEmitter:    NewBaseEventEmitter(ctx),
+		ctx:                 ctx,
+		cancelFn:            cancelFn,
+		state:               int64(BrowserStateOpen),
+		browserProc:         browserProc,
+		launchOpts:          launchOpts,
+		contexts:            make(map[cdp.BrowserContextID]*BrowserContext),
+		pages:               make(map[target.ID]*Page),
+		sessionIDtoTargetID: make(map[target.SessionID]target.ID),
+		logger:              logger,
 	}
 	if err := b.connect(); err != nil {
 		return nil, err
@@ -116,21 +111,27 @@ func (b *Browser) connect() error {
 	}
 
 	b.connMu.Lock()
-	defer b.connMu.Unlock()
 	b.connected = true
+	b.connMu.Unlock()
+
+	// We don't need to lock this because `connect()` is called only in NewBrowser
 	b.defaultContext = NewBrowserContext(b.ctx, b.conn, b, "", NewBrowserContextOptions(), b.logger)
+
 	return b.initEvents()
 }
 
 func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 	b.logger.Debugf("Browser:disposeContext", "bctxid:%v", id)
+
 	action := target.DisposeBrowserContext(id)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
 		return fmt.Errorf("unable to dispose browser context %T: %w", action, err)
 	}
+
 	b.contextsMu.Lock()
 	defer b.contextsMu.Unlock()
 	delete(b.contexts, id)
+
 	return nil
 }
 
@@ -198,12 +199,12 @@ func (b *Browser) initEvents() error {
 
 func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	b.contextsMu.RLock()
-	var browserCtx *BrowserContext = b.defaultContext
+	browserCtx := b.defaultContext
 	bctx, ok := b.contexts[ev.TargetInfo.BrowserContextID]
 	if ok {
 		browserCtx = bctx
 	}
-	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v bctx nil=%t", ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID, bctx == nil)
+	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v bctx nil:%t", ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID, bctx == nil)
 	b.contextsMu.RUnlock()
 
 	// We're not interested in the top-level browser target, other targets or DevTools targets right now.
@@ -213,7 +214,8 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		return
 	}
 
-	if ev.TargetInfo.Type == "background_page" {
+	switch ev.TargetInfo.Type {
+	case "background_page":
 		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, nil, false, b.logger)
 		if err != nil {
 			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
@@ -225,15 +227,17 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 			}
 			k6Throw(b.ctx, "cannot create NewPage for background_page event: %w", err)
 		}
+
 		b.pagesMu.Lock()
 		b.logger.Debugf("Browser:onAttachedToTarget:background_page:addTid", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
 		b.pages[ev.TargetInfo.TargetID] = p
 		b.pagesMu.Unlock()
+
 		b.sessionIDtoTargetIDMu.Lock()
 		b.logger.Debugf("Browser:onAttachedToTarget:background_page:addSid", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
 		b.sessionIDtoTargetID[ev.SessionID] = ev.TargetInfo.TargetID
 		b.sessionIDtoTargetIDMu.Unlock()
-	} else if ev.TargetInfo.Type == "page" {
+	case "page":
 		var opener *Page = nil
 		b.pagesMu.RLock()
 		if t, ok := b.pages[ev.TargetInfo.OpenerID]; ok {
@@ -260,6 +264,10 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		b.sessionIDtoTargetID[ev.SessionID] = ev.TargetInfo.TargetID
 		b.sessionIDtoTargetIDMu.Unlock()
 		browserCtx.emit(EventBrowserContextPage, p)
+	default:
+		b.logger.Warnf(
+			"Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v bctx nil:%t, warning: unknownTargetType",
+			ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID, bctx == nil)
 	}
 }
 
@@ -379,6 +387,7 @@ func (b *Browser) Contexts() []api.BrowserContext {
 func (b *Browser) IsConnected() bool {
 	b.connMu.RLock()
 	defer b.connMu.RUnlock()
+
 	return b.connected
 }
 

@@ -197,7 +197,7 @@ func (f *Frame) recalculateLifecycle() {
 	f.log.Debugf("Frame:recalculateLifecycle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	// Start with triggered events.
-	var events map[LifecycleEvent]bool = make(map[LifecycleEvent]bool)
+	events := make(map[LifecycleEvent]bool)
 	f.lifecycleEventsMu.RLock()
 	{
 		for k, v := range f.lifecycleEvents {
@@ -325,7 +325,7 @@ func (f *Frame) document() (*ElementHandle, error) {
 		forceCallable: false,
 		returnByValue: false,
 	}
-	result, err := f.evaluate(mainWorld, f.ctx, opts, rt.ToValue("document"))
+	result, err := f.evaluate(f.ctx, mainWorld, opts, rt.ToValue("document"))
 	if err != nil {
 		return nil, fmt.Errorf("frame document: cannot evaluate in main execution context: %w", err)
 	}
@@ -493,7 +493,12 @@ func (f *Frame) waitForExecutionContext(world executionWorld) {
 	}
 }
 
-func (f *Frame) waitForFunction(apiCtx context.Context, world executionWorld, predicateFn goja.Value, polling PollingType, interval int64, timeout time.Duration, args ...goja.Value) (interface{}, error) {
+func (f *Frame) waitForFunction(
+	apiCtx context.Context,
+	world executionWorld, predicateFn goja.Value,
+	polling PollingType, interval int64, timeout time.Duration,
+	args ...goja.Value,
+) (interface{}, error) {
 	f.log.Debugf(
 		"Frame:waitForFunction",
 		"fid:%s furl:%q world:%s pt:%s timeout:%s",
@@ -505,6 +510,9 @@ func (f *Frame) waitForFunction(apiCtx context.Context, world executionWorld, pr
 	defer f.executionContextMu.RUnlock()
 
 	execCtx := f.executionContexts[world]
+	if execCtx == nil {
+		return nil, fmt.Errorf("cannot find execution context: %q", world)
+	}
 	injected, err := execCtx.getInjectedScript(apiCtx)
 	if err != nil {
 		return nil, err
@@ -700,7 +708,7 @@ func (f *Frame) DispatchEvent(selector string, typ string, eventInit goja.Value,
 }
 
 // Evaluate will evaluate provided page function within an execution context
-func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) (result interface{}) {
+func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := k6common.GetRuntime(f.ctx)
@@ -711,7 +719,7 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) (result interf
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := f.evaluate(mainWorld, f.ctx, opts, pageFunc, args...)
+	result, err := f.evaluate(f.ctx, mainWorld, opts, pageFunc, args...)
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
@@ -1232,7 +1240,7 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 		forceCallable: true,
 		returnByValue: true,
 	}
-	if _, err := f.evaluate(utilityWorld, f.ctx, eopts, rt.ToValue(js), rt.ToValue(html)); err != nil {
+	if _, err := f.evaluate(f.ctx, utilityWorld, eopts, rt.ToValue(js), rt.ToValue(html)); err != nil {
 		k6common.Throw(rt, err)
 	}
 
@@ -1438,18 +1446,32 @@ func (f *Frame) WaitForTimeout(timeout int64) {
 }
 
 func (f *Frame) adoptBackendNodeID(world executionWorld, id cdp.BackendNodeID) (*ElementHandle, error) {
+	f.log.Debugf("Frame:adoptBackendNodeID", "fid:%s furl:%q world:%s id:%d", f.ID(), f.URL(), world, id)
+
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
 	ec := f.executionContexts[world]
+	if ec == nil {
+		return nil, fmt.Errorf("cannot find execution context: %q for %d", world, id)
+	}
 	return ec.adoptBackendNodeID(id)
 }
 
-func (f *Frame) evaluate(world executionWorld, apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
+func (f *Frame) evaluate(
+	apiCtx context.Context,
+	world executionWorld,
+	opts evaluateOptions, pageFunc goja.Value, args ...goja.Value,
+) (interface{}, error) {
+	f.log.Debugf("Frame:evaluate", "fid:%s furl:%q world:%s opts:%s", f.ID(), f.URL(), world, opts)
+
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
 	ec := f.executionContexts[world]
+	if ec == nil {
+		return nil, fmt.Errorf("cannot find execution context: %q", world)
+	}
 	return ec.evaluate(apiCtx, opts, pageFunc, args...)
 }
 

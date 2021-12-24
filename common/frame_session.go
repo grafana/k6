@@ -848,7 +848,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 		// ignore errors if we're no longer connected to browser
 		// this happens when there is no browser but we still want to
 		// attach a worker to it.
-		if !fs.page.browserCtx.browser.connected {
+		if !fs.page.browserCtx.browser.IsConnected() {
 			return
 		}
 		select {
@@ -860,9 +860,8 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 				event.TargetInfo.Type)
 			return
 		default:
-			k6Throw(fs.ctx, "cannot create frame session (worker): %w", err)
+			k6Throw(fs.ctx, "cannot create new worker: %w", err)
 		}
-		k6Throw(fs.ctx, "cannot create new worker: %w", err)
 	}
 	fs.page.workers[session.id] = w
 }

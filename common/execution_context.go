@@ -164,7 +164,10 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 
 // evaluate will evaluate provided callable within this execution context
 // and return by value or handle
-func (e *ExecutionContext) evaluate(apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
+func (e *ExecutionContext) evaluate(
+	apiCtx context.Context,
+	opts evaluateOptions, pageFunc goja.Value, args ...goja.Value,
+) (res interface{}, err error) {
 	e.logger.Debugf(
 		"ExecutionContext:evaluate",
 		"sid:%s stid:%s fid:%s ectxid:%d furl:%q %s",
