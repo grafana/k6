@@ -143,7 +143,7 @@ func TestConvertArgument(t *testing.T) {
 
 	t.Run("*BaseJSHandle", func(t *testing.T) {
 		execCtx, ctx, rt := newExecCtx()
-		log := NewLogger(ctx, NullLogger(), false, nil)
+		log := NewNullLogger()
 
 		timeoutSetings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, log)
@@ -166,7 +166,7 @@ func TestConvertArgument(t *testing.T) {
 
 	t.Run("*BaseJSHandle wrong context", func(t *testing.T) {
 		execCtx, ctx, rt := newExecCtx()
-		log := NewLogger(ctx, NullLogger(), false, nil)
+		log := NewNullLogger()
 
 		timeoutSetings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, log)
@@ -188,7 +188,7 @@ func TestConvertArgument(t *testing.T) {
 
 	t.Run("*BaseJSHandle is disposed", func(t *testing.T) {
 		execCtx, ctx, rt := newExecCtx()
-		log := NewLogger(ctx, NullLogger(), false, nil)
+		log := NewNullLogger()
 
 		timeoutSetings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, log)
@@ -210,7 +210,7 @@ func TestConvertArgument(t *testing.T) {
 
 	t.Run("*BaseJSHandle as *ElementHandle", func(t *testing.T) {
 		execCtx, ctx, rt := newExecCtx()
-		log := NewLogger(ctx, NullLogger(), false, nil)
+		log := NewNullLogger()
 
 		timeoutSetings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, log)

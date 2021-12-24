@@ -238,8 +238,12 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, p Position) (bo
 			return injected.checkHitTargetAt(node, point);
 		}
 	`)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
 	result, err := h.execCtx.evaluate(
-		apiCtx, true, true, pageFn, []goja.Value{
+		apiCtx, opts, pageFn, []goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(h),
 			rt.ToValue(p),
@@ -270,8 +274,12 @@ func (h *ElementHandle) checkElementState(apiCtx context.Context, state string) 
 			return injected.checkElementState(node, state);
 		}
 	`)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
 	result, err := h.execCtx.evaluate(
-		apiCtx, true, true, pageFn, []goja.Value{
+		apiCtx, opts, pageFn, []goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(h),
 			rt.ToValue(state),
@@ -397,8 +405,12 @@ func (h *ElementHandle) dispatchEvent(apiCtx context.Context, typ string, eventI
 			injected.dispatchEvent(node, type, eventInit);
 		}
 	`)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
 	_, err = h.execCtx.evaluate(
-		apiCtx, true, true, pageFn, []goja.Value{
+		apiCtx, opts, pageFn, []goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(h),
 			rt.ToValue(typ),
@@ -421,8 +433,12 @@ func (h *ElementHandle) fill(apiCtx context.Context, value string) (interface{},
 				return injected.fill(node, value);
 			}
 		`)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
 	result, err := h.execCtx.evaluate(
-		apiCtx, true, true, pageFn, []goja.Value{
+		apiCtx, opts, pageFn, []goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(h),
 			rt.ToValue(value),
@@ -450,8 +466,12 @@ func (h *ElementHandle) focus(apiCtx context.Context, resetSelectionIfNotFocused
 			return injected.focusNode(node, resetSelectionIfNotFocused);
 		}
 	`)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
 	result, err := h.execCtx.evaluate(
-		apiCtx, true, true, pageFn, []goja.Value{
+		apiCtx, opts, pageFn, []goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(h),
 			rt.ToValue(resetSelectionIfNotFocused),
@@ -473,7 +493,11 @@ func (h *ElementHandle) getAttribute(apiCtx context.Context, name string) (inter
 		return element.getAttribute('` + name + `');
 	}`
 	rt := k6common.GetRuntime(apiCtx)
-	return h.execCtx.evaluate(apiCtx, true, true, rt.ToValue(js), rt.ToValue(h))
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	return h.execCtx.evaluate(apiCtx, opts, rt.ToValue(js), rt.ToValue(h))
 }
 
 func (h *ElementHandle) hover(apiCtx context.Context, p *Position) error {
@@ -485,7 +509,11 @@ func (h *ElementHandle) innerHTML(apiCtx context.Context) (interface{}, error) {
 	js := `(element) => {
 		return element.innerHTML;
 	}`
-	return h.execCtx.evaluate(apiCtx, true, true, rt.ToValue(js), rt.ToValue(h))
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	return h.execCtx.evaluate(apiCtx, opts, rt.ToValue(js), rt.ToValue(h))
 }
 
 func (h *ElementHandle) innerText(apiCtx context.Context) (interface{}, error) {
@@ -493,7 +521,11 @@ func (h *ElementHandle) innerText(apiCtx context.Context) (interface{}, error) {
 	js := `(element) => {
 		return element.innerText;
 	}`
-	return h.execCtx.evaluate(apiCtx, true, true, rt.ToValue(js), rt.ToValue(h))
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	return h.execCtx.evaluate(apiCtx, opts, rt.ToValue(js), rt.ToValue(h))
 }
 
 func (h *ElementHandle) inputValue(apiCtx context.Context) (interface{}, error) {
@@ -504,7 +536,11 @@ func (h *ElementHandle) inputValue(apiCtx context.Context) (interface{}, error) 
 		}
 		return element.value;
 	}`
-	return h.execCtx.evaluate(apiCtx, true, true, rt.ToValue(js), rt.ToValue(h))
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	return h.execCtx.evaluate(apiCtx, opts, rt.ToValue(js), rt.ToValue(h))
 }
 
 func (h *ElementHandle) isChecked(apiCtx context.Context, timeout time.Duration) (bool, error) {
@@ -543,8 +579,12 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 			return injected.getElementBorderWidth(node);
 		}
 	`)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
 	result, err := h.execCtx.evaluate(
-		apiCtx, true, true, pageFn, []goja.Value{
+		apiCtx, opts, pageFn, []goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(h),
 		}...)
@@ -709,8 +749,12 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values goja.Value) 
 				return injected.selectOptions(node, values);
 			}
 		`)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: false,
+	}
 	result, err := h.execCtx.evaluate(
-		apiCtx, true, false, pageFn, []goja.Value{
+		apiCtx, opts, pageFn, []goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(h),
 			rt.ToValue(convValues),
@@ -738,8 +782,12 @@ func (h *ElementHandle) selectText(apiCtx context.Context) error {
 				return injected.selectText(node);
 			}
 		`)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
 	result, err := h.execCtx.evaluate(
-		apiCtx, true, true, pageFn, []goja.Value{
+		apiCtx, opts, pageFn, []goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(h),
 		}...)
@@ -789,7 +837,11 @@ func (h *ElementHandle) textContent(apiCtx context.Context) (interface{}, error)
 	js := `(element) => {
 		return element.textContent;
 	}`
-	return h.execCtx.evaluate(apiCtx, true, true, rt.ToValue(js), rt.ToValue(h))
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	return h.execCtx.evaluate(apiCtx, opts, rt.ToValue(js), rt.ToValue(h))
 }
 
 func (h *ElementHandle) typ(apiCtx context.Context, text string, opts *KeyboardOptions) error {
@@ -811,7 +863,11 @@ func (h *ElementHandle) waitAndScrollIntoViewIfNeeded(apiCtx context.Context, fo
 			element.scrollIntoViewIfNeeded(true);
 			return [window.scrollX, window.scrollY];
 		}`)
-		return h.execCtx.evaluate(apiCtx, true, true, pageFn, rt.ToValue(h))
+		opts := evaluateOptions{
+			forceCallable: true,
+			returnByValue: true,
+		}
+		return h.execCtx.evaluate(apiCtx, opts, pageFn, rt.ToValue(h))
 	}
 	actFn := elementHandleActionFn(h, []string{"visible", "stable"}, fn, force, noWaitAfter, timeout)
 	_, err := callApiWithTimeout(h.ctx, actFn, timeout)
@@ -832,8 +888,12 @@ func (h *ElementHandle) waitForElementState(apiCtx context.Context, states []str
 			return injected.waitForElementStates(node, states, timeout);
 		}
 	`)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
 	result, err := h.execCtx.evaluate(
-		apiCtx, true, true, pageFn, []goja.Value{
+		apiCtx, opts, pageFn, []goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(h),
 			rt.ToValue(states),
@@ -873,8 +933,12 @@ func (h *ElementHandle) waitForSelector(apiCtx context.Context, selector string,
 			return injected.waitForSelector(selector, scope, strict, state, 'raf', timeout, ...args);
 		}
 	`)
+	eopts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: false,
+	}
 	result, err := h.execCtx.evaluate(
-		apiCtx, true, false, pageFn, []goja.Value{
+		apiCtx, eopts, pageFn, []goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(parsedSelector),
 			rt.ToValue(h),
@@ -1166,7 +1230,11 @@ func (h *ElementHandle) OwnerFrame() api.Frame {
 			return injected.getDocumentElement(node);
 		}
 	`)
-	res, err := h.execCtx.evaluate(h.ctx, true, false, pageFn, []goja.Value{rt.ToValue(injected), rt.ToValue(h)}...)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: false,
+	}
+	res, err := h.execCtx.evaluate(h.ctx, opts, pageFn, []goja.Value{rt.ToValue(injected), rt.ToValue(h)}...)
 	if err != nil {
 		k6common.Throw(rt, fmt.Errorf("failed getting document element: %w", err))
 	}
@@ -1226,8 +1294,12 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 			return injected.querySelector(selector, scope || document, false);
 		}
 	`)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: false,
+	}
 	result, err := h.execCtx.evaluate(
-		h.ctx, true, false, pageFn, []goja.Value{
+		h.ctx, opts, pageFn, []goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(parsedSelector),
 			rt.ToValue(h),
@@ -1267,8 +1339,12 @@ func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 			return injected.querySelectorAll(selector, scope || document, false);
 		}
 	`)
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: false,
+	}
 	result, err := h.execCtx.evaluate(
-		h.ctx, true, false, pageFn, []goja.Value{
+		h.ctx, opts, pageFn, []goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(parsedSelector),
 			rt.ToValue(h),

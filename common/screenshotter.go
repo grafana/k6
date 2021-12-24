@@ -47,7 +47,11 @@ func newScreenshotter(ctx context.Context) *screenshotter {
 
 func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
 	rt := k6common.GetRuntime(s.ctx)
-	result, err := p.frameManager.mainFrame.mainExecutionContext.evaluate(s.ctx, true, true, rt.ToValue(`
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	result, err := p.frameManager.mainFrame.evaluate(s.ctx, mainWorld, opts, rt.ToValue(`
         () => {
             if (!document.body || !document.documentElement) {
                 return null;
@@ -86,7 +90,12 @@ func (s *screenshotter) originalViewportSize(p *Page) (*Size, *Size, error) {
 	if viewportSize.Width != 0 || viewportSize.Height != 0 {
 		return &viewportSize, &originalViewportSize, nil
 	}
-	result, err := p.frameManager.mainFrame.mainExecutionContext.evaluate(s.ctx, true, true, rt.ToValue(`
+
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	result, err := p.frameManager.mainFrame.evaluate(s.ctx, mainWorld, opts, rt.ToValue(`
 	() => (
 		{ width: window.innerWidth, height: window.innerHeight }
 	)`))

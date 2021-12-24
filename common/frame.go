@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -38,54 +37,6 @@ import (
 
 // Ensure frame implements the Frame interface
 var _ api.Frame = &Frame{}
-
-func frameActionFn(f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandleActionFn, states []string, force, noWaitAfter bool, timeout time.Duration) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
-	// We execute a frame action in the following steps:
-	// 1. Find element matching specified selector
-	// 2. Wait for it to reach specified DOM state
-	// 3. Run element handle action (incl. actionability checks)
-
-	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
-		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
-		waitOpts.State = state
-		waitOpts.Strict = strict
-		handle, err := f.waitForSelector(selector, waitOpts)
-		if err != nil {
-			errCh <- err
-			return
-		}
-		if handle == nil {
-			resultCh <- nil
-			return
-		}
-		actFn := elementHandleActionFn(handle, states, fn, false, false, timeout)
-		actFn(apiCtx, resultCh, errCh)
-	}
-}
-
-func framePointerActionFn(f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandlePointerActionFn, opts *ElementHandleBasePointerOptions) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
-	// We execute a frame pointer action in the following steps:
-	// 1. Find element matching specified selector
-	// 2. Wait for it to reach specified DOM state
-	// 3. Run element handle action (incl. actionability checks)
-
-	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
-		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
-		waitOpts.State = state
-		waitOpts.Strict = strict
-		handle, err := f.waitForSelector(selector, waitOpts)
-		if err != nil {
-			errCh <- err
-			return
-		}
-		if handle == nil {
-			resultCh <- nil
-			return
-		}
-		pointerActFn := elementHandlePointerActionFn(handle, true, fn, opts)
-		pointerActFn(apiCtx, resultCh, errCh)
-	}
-}
 
 type DocumentInfo struct {
 	documentID string
@@ -119,12 +70,8 @@ type Frame struct {
 
 	documentHandle *ElementHandle
 
-	mainExecutionContext             frameExecutionContext
-	utilityExecutionContext          frameExecutionContext
-	mainExecutionContextCh           chan bool
-	utilityExecutionContextCh        chan bool
-	mainExecutionContextHasWaited    int32
-	utilityExecutionContextHasWaited int32
+	executionContextMu sync.RWMutex
+	executionContexts  map[executionWorld]frameExecutionContext
 
 	loadingStartedTime time.Time
 
@@ -154,21 +101,20 @@ func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID 
 	}
 
 	return &Frame{
-		BaseEventEmitter:          NewBaseEventEmitter(ctx),
-		ctx:                       ctx,
-		page:                      m.page,
-		manager:                   m,
-		parentFrame:               parentFrame,
-		childFrames:               make(map[api.Frame]bool),
-		id:                        frameID,
-		lifecycleEvents:           make(map[LifecycleEvent]bool),
-		subtreeLifecycleEvents:    make(map[LifecycleEvent]bool),
-		mainExecutionContextCh:    make(chan bool, 1),
-		utilityExecutionContextCh: make(chan bool, 1),
-		inflightRequests:          make(map[network.RequestID]bool),
-		currentDocument:           &DocumentInfo{},
-		networkIdleCh:             make(chan struct{}),
-		log:                       log,
+		BaseEventEmitter:       NewBaseEventEmitter(ctx),
+		ctx:                    ctx,
+		page:                   m.page,
+		manager:                m,
+		parentFrame:            parentFrame,
+		childFrames:            make(map[api.Frame]bool),
+		id:                     frameID,
+		lifecycleEvents:        make(map[LifecycleEvent]bool),
+		subtreeLifecycleEvents: make(map[LifecycleEvent]bool),
+		inflightRequests:       make(map[network.RequestID]bool),
+		executionContexts:      make(map[executionWorld]frameExecutionContext),
+		currentDocument:        &DocumentInfo{},
+		networkIdleCh:          make(chan struct{}),
+		log:                    log,
 	}
 }
 
@@ -178,8 +124,9 @@ func (f *Frame) addChildFrame(child *Frame) {
 		f.ID(), child.ID(), f.URL(), child.URL())
 
 	f.childFramesMu.Lock()
+	defer f.childFramesMu.Unlock()
+
 	f.childFrames[child] = true
-	f.childFramesMu.Unlock()
 }
 
 func (f *Frame) addRequest(id network.RequestID) {
@@ -203,6 +150,7 @@ func (f *Frame) deleteRequest(id network.RequestID) {
 func (f *Frame) inflightRequestsLen() int {
 	f.inflightRequestsMu.RLock()
 	defer f.inflightRequestsMu.RUnlock()
+
 	return len(f.inflightRequests)
 }
 
@@ -249,51 +197,70 @@ func (f *Frame) recalculateLifecycle() {
 	f.log.Debugf("Frame:recalculateLifecycle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	// Start with triggered events.
-	var events map[LifecycleEvent]bool = make(map[LifecycleEvent]bool)
-	f.lifecycleEventsMu.Lock()
-	for k, v := range f.lifecycleEvents {
-		events[k] = v
+	events := make(map[LifecycleEvent]bool)
+	f.lifecycleEventsMu.RLock()
+	{
+		for k, v := range f.lifecycleEvents {
+			events[k] = v
+		}
 	}
-	f.lifecycleEventsMu.Unlock()
+	f.lifecycleEventsMu.RUnlock()
 
 	// Only consider a life cycle event as fired if it has triggered for all of subtree.
 	f.childFramesMu.RLock()
-	for child := range f.childFrames {
-		child.(*Frame).recalculateLifecycle()
-		for k := range events {
-			if !child.(*Frame).hasSubtreeLifecycleEventFired(k) {
-				delete(events, k)
+	{
+		for child := range f.childFrames {
+			cf := child.(*Frame)
+			// a precaution for preventing a deadlock in *Frame.childFramesMu
+			if cf == f {
+				continue
+			}
+			cf.recalculateLifecycle()
+			for k := range events {
+				if !cf.hasSubtreeLifecycleEventFired(k) {
+					delete(events, k)
+				}
 			}
 		}
 	}
 	f.childFramesMu.RUnlock()
 
 	// Check if any of the fired events should be considered fired when looking at the entire subtree.
-	mainFrame := f.manager.mainFrame
+	mainFrame := f.manager.MainFrame()
 	for k := range events {
-		if !f.hasSubtreeLifecycleEventFired(k) {
-			f.emit(EventFrameAddLifecycle, k)
-			if f == mainFrame && k == LifecycleEventLoad {
-				f.page.emit(EventPageLoad, nil)
-			} else if f == mainFrame && k == LifecycleEventDOMContentLoad {
-				f.page.emit(EventPageDOMContentLoaded, nil)
-			}
+		if f.hasSubtreeLifecycleEventFired(k) {
+			continue
+		}
+		f.emit(EventFrameAddLifecycle, k)
+
+		if f != mainFrame {
+			continue
+		}
+		switch k {
+		case LifecycleEventLoad:
+			f.page.emit(EventPageLoad, nil)
+		case LifecycleEventDOMContentLoad:
+			f.page.emit(EventPageDOMContentLoaded, nil)
 		}
 	}
 
 	// Emit removal events
 	f.lifecycleEventsMu.RLock()
-	for k := range f.subtreeLifecycleEvents {
-		if ok := events[k]; !ok {
-			f.emit(EventFrameRemoveLifecycle, k)
+	{
+		for k := range f.subtreeLifecycleEvents {
+			if ok := events[k]; !ok {
+				f.emit(EventFrameRemoveLifecycle, k)
+			}
 		}
 	}
 	f.lifecycleEventsMu.RUnlock()
 
 	f.lifecycleEventsMu.Lock()
-	f.subtreeLifecycleEvents = make(map[LifecycleEvent]bool)
-	for k, v := range events {
-		f.subtreeLifecycleEvents[k] = v
+	{
+		f.subtreeLifecycleEvents = make(map[LifecycleEvent]bool)
+		for k, v := range events {
+			f.subtreeLifecycleEvents[k] = v
+		}
 	}
 	f.lifecycleEventsMu.Unlock()
 }
@@ -352,9 +319,13 @@ func (f *Frame) document() (*ElementHandle, error) {
 		return f.documentHandle, nil
 	}
 
-	f.waitForExecutionContext("main")
+	f.waitForExecutionContext(mainWorld)
 
-	result, err := f.mainExecutionContext.evaluate(f.ctx, false, false, rt.ToValue("document"), nil)
+	opts := evaluateOptions{
+		forceCallable: false,
+		returnByValue: false,
+	}
+	result, err := f.evaluate(f.ctx, mainWorld, opts, rt.ToValue("document"))
 	if err != nil {
 		return nil, fmt.Errorf("frame document: cannot evaluate in main execution context: %w", err)
 	}
@@ -366,14 +337,11 @@ func (f *Frame) document() (*ElementHandle, error) {
 	return f.documentHandle, err
 }
 
-func (f *Frame) hasContext(world string) bool {
-	switch world {
-	case "main":
-		return f.mainExecutionContext != nil
-	case "utility":
-		return f.utilityExecutionContext != nil
-	}
-	return false // Should never reach here!
+func (f *Frame) hasContext(world executionWorld) bool {
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
+	return f.executionContexts[world] != nil
 }
 
 func (f *Frame) hasLifecycleEventFired(event LifecycleEvent) bool {
@@ -404,18 +372,17 @@ func (f *Frame) navigated(name string, url string, loaderID string) {
 func (f *Frame) nullContext(execCtxID runtime.ExecutionContextID) {
 	f.log.Debugf("Frame:nullContext", "fid:%s furl:%q ectxid:%d ", f.ID(), f.URL(), execCtxID)
 
-	if f.mainExecutionContext != nil && f.mainExecutionContext.ID() == execCtxID {
-		f.mainExecutionContext = nil
-		f.documentHandle = nil
-	} else if f.utilityExecutionContext != nil && f.utilityExecutionContext.ID() == execCtxID {
-		f.utilityExecutionContext = nil
-	}
-}
+	f.executionContextMu.Lock()
+	defer f.executionContextMu.Unlock()
 
-func (f *Frame) nullContexts() {
-	f.mainExecutionContext = nil
-	f.utilityExecutionContext = nil
-	f.documentHandle = nil
+	if ec := f.executionContexts[mainWorld]; ec != nil && ec.ID() == execCtxID {
+		f.executionContexts[mainWorld] = nil
+		f.documentHandle = nil
+		return
+	}
+	if ec := f.executionContexts[utilityWorld]; ec != nil && ec.ID() == execCtxID {
+		f.executionContexts[utilityWorld] = nil
+	}
 }
 
 func (f *Frame) onLifecycleEvent(event LifecycleEvent) {
@@ -423,6 +390,7 @@ func (f *Frame) onLifecycleEvent(event LifecycleEvent) {
 
 	f.lifecycleEventsMu.Lock()
 	defer f.lifecycleEventsMu.Unlock()
+
 	if ok := f.lifecycleEvents[event]; ok {
 		return
 	}
@@ -440,6 +408,7 @@ func (f *Frame) onLoadingStopped() {
 
 	f.lifecycleEventsMu.Lock()
 	defer f.lifecycleEventsMu.Unlock()
+
 	f.lifecycleEvents[LifecycleEventDOMContentLoad] = true
 	f.lifecycleEvents[LifecycleEventLoad] = true
 	f.lifecycleEvents[LifecycleEventNetworkIdle] = true
@@ -463,8 +432,9 @@ func (f *Frame) removeChildFrame(child *Frame) {
 		f.ID(), f.URL(), child.ID(), child.URL())
 
 	f.childFramesMu.Lock()
+	defer f.childFramesMu.Unlock()
+
 	delete(f.childFrames, child)
-	f.childFramesMu.Unlock()
 }
 
 func (f *Frame) requestByID(reqID network.RequestID) *Request {
@@ -475,21 +445,27 @@ func (f *Frame) requestByID(reqID network.RequestID) *Request {
 	return frameSession.networkManager.requestFromID(reqID)
 }
 
-func (f *Frame) setContext(world string, execCtx frameExecutionContext) {
+func (f *Frame) setContext(world executionWorld, execCtx frameExecutionContext) {
+	f.executionContextMu.Lock()
+	defer f.executionContextMu.Unlock()
+
 	f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s",
 		f.ID(), f.URL(), execCtx.ID(), world)
 
-	if world == "main" {
-		f.mainExecutionContext = execCtx
-		if len(f.mainExecutionContextCh) == 0 {
-			f.mainExecutionContextCh <- true
-		}
-	} else if world == "utility" {
-		f.utilityExecutionContext = execCtx
-		if len(f.utilityExecutionContextCh) == 0 {
-			f.utilityExecutionContextCh <- true
-		}
+	if !world.valid() {
+		err := fmt.Errorf("unknown world: %q, it should be either main or utility", world)
+		panic(err)
 	}
+
+	if f.executionContexts[world] != nil {
+		f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s, world exists",
+			f.ID(), f.URL(), execCtx.ID(), world)
+		return
+	}
+
+	f.executionContexts[world] = execCtx
+	f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s, world set",
+		f.ID(), f.URL(), execCtx.ID(), world)
 }
 
 func (f *Frame) setID(id cdp.FrameID) {
@@ -499,39 +475,50 @@ func (f *Frame) setID(id cdp.FrameID) {
 	f.id = id
 }
 
-func (f *Frame) waitForExecutionContext(world string) {
+func (f *Frame) waitForExecutionContext(world executionWorld) {
 	f.log.Debugf("Frame:waitForExecutionContext", "fid:%s furl:%q world:%s",
 		f.ID(), f.URL(), world)
 
-	if world == "main" && atomic.CompareAndSwapInt32(&f.mainExecutionContextHasWaited, 0, 1) {
+	t := time.NewTimer(50 * time.Millisecond)
+	defer t.Stop()
+	for {
 		select {
+		case <-t.C:
+			if f.hasContext(world) {
+				return
+			}
 		case <-f.ctx.Done():
-		case <-f.mainExecutionContextCh:
-		}
-	} else if world == "utility" && atomic.CompareAndSwapInt32(&f.utilityExecutionContextHasWaited, 0, 1) {
-		select {
-		case <-f.ctx.Done():
-		case <-f.utilityExecutionContextCh:
+			return
 		}
 	}
 }
 
-func (f *Frame) waitForFunction(apiCtx context.Context, world string, predicateFn goja.Value, polling PollingType, interval int64, timeout time.Duration, args ...goja.Value) (interface{}, error) {
+func (f *Frame) waitForFunction(
+	apiCtx context.Context,
+	world executionWorld, predicateFn goja.Value,
+	polling PollingType, interval int64, timeout time.Duration,
+	args ...goja.Value,
+) (interface{}, error) {
 	f.log.Debugf(
 		"Frame:waitForFunction",
 		"fid:%s furl:%q world:%s pt:%s timeout:%s",
 		f.ID(), f.URL(), world, polling, timeout)
 
-	rt := k6common.GetRuntime(f.ctx)
 	f.waitForExecutionContext(world)
-	execCtx := f.mainExecutionContext
-	if world == "utility" {
-		execCtx = f.utilityExecutionContext
+
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
+	execCtx := f.executionContexts[world]
+	if execCtx == nil {
+		return nil, fmt.Errorf("cannot find execution context: %q", world)
 	}
 	injected, err := execCtx.getInjectedScript(apiCtx)
 	if err != nil {
 		return nil, err
 	}
+
+	rt := k6common.GetRuntime(f.ctx)
 	pageFn := rt.ToValue(`
 		(injected, predicate, polling, timeout, ...args) => {
 			return injected.waitForPredicateFunction(predicate, polling, timeout, ...args);
@@ -544,8 +531,12 @@ func (f *Frame) waitForFunction(apiCtx context.Context, world string, predicateF
 	} else {
 		predicate = fmt.Sprintf("return (%s)(...args);", predicateFn.ToString().String())
 	}
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: false,
+	}
 	result, err := execCtx.evaluate(
-		apiCtx, true, false, pageFn, append([]goja.Value{
+		apiCtx, opts, pageFn, append([]goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(predicate),
 			rt.ToValue(polling),
@@ -573,10 +564,18 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	}
 
 	// We always return ElementHandles in the main execution context (aka "DOM world")
-	if handle.execCtx != f.mainExecutionContext {
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
+	ec := f.executionContexts[mainWorld]
+	if ec == nil {
+		return nil, fmt.Errorf("cannot find execution context: %q", mainWorld)
+	}
+	// an element should belong to the current execution context.
+	// otherwise, we should adopt it to this execution context.
+	if ec != handle.execCtx {
 		defer handle.Dispose()
-		handle, err = f.mainExecutionContext.adoptElementHandle(handle)
-		if err != nil {
+		if handle, err = ec.adoptElementHandle(handle); err != nil {
 			return nil, err
 		}
 	}
@@ -719,25 +718,45 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := k6common.GetRuntime(f.ctx)
-	f.waitForExecutionContext("main")
-	i, err := f.mainExecutionContext.Evaluate(f.ctx, pageFunc, args...)
+
+	f.waitForExecutionContext(mainWorld)
+
+	opts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	result, err := f.evaluate(f.ctx, mainWorld, opts, pageFunc, args...)
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
+
 	applySlowMo(f.ctx)
-	return i
+
+	return result
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context
-func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHandle {
+func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle api.JSHandle) {
 	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := k6common.GetRuntime(f.ctx)
-	f.waitForExecutionContext("main")
-	handle, err := f.mainExecutionContext.EvaluateHandle(f.ctx, pageFunc, args...)
+
+	f.waitForExecutionContext(mainWorld)
+
+	var err error
+	f.executionContextMu.RLock()
+	{
+		ec := f.executionContexts[mainWorld]
+		if ec == nil {
+			k6common.Throw(rt, fmt.Errorf("cannot find execution context: %q", mainWorld))
+		}
+		handle, err = ec.EvaluateHandle(f.ctx, pageFunc, args...)
+	}
+	f.executionContextMu.RUnlock()
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
+
 	applySlowMo(f.ctx)
 	return handle
 }
@@ -1223,9 +1242,14 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 		document.write(html);
 		document.close();
 	}`
-	f.waitForExecutionContext("utility")
-	_, err := f.utilityExecutionContext.evaluate(f.ctx, true, true, rt.ToValue(js), rt.ToValue(html))
-	if err != nil {
+
+	f.waitForExecutionContext(utilityWorld)
+
+	eopts := evaluateOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	if _, err := f.evaluate(f.ctx, utilityWorld, eopts, rt.ToValue(js), rt.ToValue(html)); err != nil {
 		k6common.Throw(rt, err)
 	}
 
@@ -1359,7 +1383,10 @@ func (f *Frame) WaitForFunction(pageFunc goja.Value, opts goja.Value, args ...go
 		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
-	handle, err := f.waitForFunction(f.ctx, "utility", pageFunc, parsedOpts.Polling, parsedOpts.Interval, parsedOpts.Timeout, args...)
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
+	handle, err := f.waitForFunction(f.ctx, utilityWorld, pageFunc, parsedOpts.Polling, parsedOpts.Interval, parsedOpts.Timeout, args...)
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
@@ -1427,6 +1454,36 @@ func (f *Frame) WaitForTimeout(timeout int64) {
 	}
 }
 
+func (f *Frame) adoptBackendNodeID(world executionWorld, id cdp.BackendNodeID) (*ElementHandle, error) {
+	f.log.Debugf("Frame:adoptBackendNodeID", "fid:%s furl:%q world:%s id:%d", f.ID(), f.URL(), world, id)
+
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
+	ec := f.executionContexts[world]
+	if ec == nil {
+		return nil, fmt.Errorf("cannot find execution context: %q for %d", world, id)
+	}
+	return ec.adoptBackendNodeID(id)
+}
+
+func (f *Frame) evaluate(
+	apiCtx context.Context,
+	world executionWorld,
+	opts evaluateOptions, pageFunc goja.Value, args ...goja.Value,
+) (interface{}, error) {
+	f.log.Debugf("Frame:evaluate", "fid:%s furl:%q world:%s opts:%s", f.ID(), f.URL(), world, opts)
+
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
+	ec := f.executionContexts[world]
+	if ec == nil {
+		return nil, fmt.Errorf("cannot find execution context: %q", world)
+	}
+	return ec.evaluate(apiCtx, opts, pageFunc, args...)
+}
+
 // frameExecutionContext represents a JS execution context that belongs to Frame.
 type frameExecutionContext interface {
 	// adoptBackendNodeID adopts specified backend node into this execution
@@ -1441,7 +1498,7 @@ type frameExecutionContext interface {
 	// context and return by value or handle.
 	evaluate(
 		apiCtx context.Context,
-		forceCallable bool, returnByValue bool,
+		opts evaluateOptions,
 		pageFunc goja.Value, args ...goja.Value,
 	) (res interface{}, err error)
 
@@ -1468,4 +1525,52 @@ type frameExecutionContext interface {
 
 	// id returns the CDP runtime ID of this execution context.
 	ID() runtime.ExecutionContextID
+}
+
+func frameActionFn(f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandleActionFn, states []string, force, noWaitAfter bool, timeout time.Duration) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+	// We execute a frame action in the following steps:
+	// 1. Find element matching specified selector
+	// 2. Wait for it to reach specified DOM state
+	// 3. Run element handle action (incl. actionability checks)
+
+	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
+		waitOpts.State = state
+		waitOpts.Strict = strict
+		handle, err := f.waitForSelector(selector, waitOpts)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		if handle == nil {
+			resultCh <- nil
+			return
+		}
+		actFn := elementHandleActionFn(handle, states, fn, false, false, timeout)
+		actFn(apiCtx, resultCh, errCh)
+	}
+}
+
+func framePointerActionFn(f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandlePointerActionFn, opts *ElementHandleBasePointerOptions) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+	// We execute a frame pointer action in the following steps:
+	// 1. Find element matching specified selector
+	// 2. Wait for it to reach specified DOM state
+	// 3. Run element handle action (incl. actionability checks)
+
+	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
+		waitOpts.State = state
+		waitOpts.Strict = strict
+		handle, err := f.waitForSelector(selector, waitOpts)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		if handle == nil {
+			resultCh <- nil
+			return
+		}
+		pointerActFn := elementHandlePointerActionFn(handle, true, fn, opts)
+		pointerActFn(apiCtx, resultCh, errCh)
+	}
 }

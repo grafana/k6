@@ -23,6 +23,7 @@ package common
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -85,7 +86,7 @@ type FrameSession struct {
 func NewFrameSession(
 	ctx context.Context, session *Session, page *Page, parent *FrameSession,
 	targetID target.ID, logger *Logger,
-) (*FrameSession, error) {
+) (_ *FrameSession, err error) {
 	logger.Debugf("NewFrameSession", "sid:%v tid:%v", session.id, targetID)
 
 	fs := FrameSession{
@@ -109,7 +110,7 @@ func NewFrameSession(
 			Formatter: &consoleLogFormatter{logger.log.Formatter},
 		},
 	}
-	var err error
+
 	if fs.parent != nil {
 		fs.networkManager, err = NewNetworkManager(ctx, session, fs.manager, fs.parent.networkManager)
 		if err != nil {
@@ -175,11 +176,6 @@ func NewFrameSession(
 
 		return nil, err
 	}
-
-	logger.Debugf(
-		"NewFrameSession",
-		"sid:%v tid:%v wid:%v err:%v",
-		session.id, targetID, fs.windowID, err)
 
 	return &fs, nil
 }
@@ -359,7 +355,13 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	action2 := cdppage.AddScriptToEvaluateOnNewDocument(`//# sourceURL=` + evaluationScriptURL).
 		WithWorldName(name)
 	if _, err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		// TODO: find out whether select is necessary here
+		// select {
+		// case <-fs.ctx.Done():
+		// 	return nil
+		// default:
 		return fmt.Errorf("unable to add script to evaluate for isolated world: %w", err)
+		// }
 	}
 	return nil
 }
@@ -498,7 +500,6 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 }
 
 func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
-	// TODO: switch to using browser logger instead of directly outputting to k6 logging system
 	l := fs.serializer.
 		WithTime(event.Timestamp.Time()).
 		WithField("source", "browser-console-api")
@@ -548,16 +549,16 @@ func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionC
 	if err := json.Unmarshal(auxData, &i); err != nil {
 		k6Throw(fs.ctx, "unable to unmarshal JSON: %w", err)
 	}
-	var world string = ""
+	var world executionWorld
 	frame := fs.manager.getFrameByID(i.FrameID)
 	if frame != nil {
 		if i.IsDefault {
-			world = "main"
-		} else if event.Context.Name == utilityWorldName && !frame.hasContext("utility") {
+			world = mainWorld
+		} else if event.Context.Name == utilityWorldName && !frame.hasContext(utilityWorld) {
 			// In case of multiple sessions to the same target, there's a race between
 			// connections so we might end up creating multiple isolated worlds.
 			// We can use either.
-			world = "utility"
+			world = utilityWorld
 		}
 	}
 	if i.Type == "isolated" {
@@ -595,9 +596,10 @@ func (fs *FrameSession) onExecutionContextsCleared() {
 
 	fs.contextIDToContextMu.Lock()
 	defer fs.contextIDToContextMu.Unlock()
+
 	for _, context := range fs.contextIDToContext {
 		if context.Frame() != nil {
-			context.Frame().nullContexts()
+			context.Frame().nullContext(context.id)
 		}
 	}
 	for k := range fs.contextIDToContext {
@@ -788,27 +790,43 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 		if frame == nil {
 			return
 		}
+
 		fs.manager.removeChildFramesRecursively(frame)
+
+		// Successful case
 		frameSession, err := NewFrameSession(fs.ctx, session, fs.page, fs, targetID, fs.logger)
-		if err != nil {
-			if !fs.page.browserCtx.browser.connected && strings.Contains(err.Error(), "websocket: close 1006 (abnormal closure)") {
-				// If we're no longer connected to browser, then ignore WebSocket errors
-				return
-			}
-			select {
-			case <-fs.ctx.Done():
-				fs.logger.Debugf("FrameSession:onAttachedToTarget:NewFrameSession:<-ctx.Done",
-					"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q",
-					fs.session.id, fs.targetID, event.SessionID,
-					event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
-					event.TargetInfo.Type)
-				return
-			default:
-				k6Throw(fs.ctx, "cannot create frame session (iframe): %w", err)
-			}
+		if err == nil {
+			fs.page.attachFrameSession(cdp.FrameID(targetID), frameSession)
+			return
 		}
-		fs.page.frameSessions[cdp.FrameID(targetID)] = frameSession
-		return
+		// Erroneous cases
+		defer fs.logger.Debugf("FrameSession:onAttachedToTarget:NewFrameSession",
+			"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q err:%v",
+			fs.session.id, fs.targetID, event.SessionID,
+			event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
+			event.TargetInfo.Type, err)
+		// ignore errors if we're no longer connected to browser
+		// this happens when there is no browser but we still want to
+		// attach a frame to it.
+		if !fs.page.browserCtx.browser.IsConnected() {
+			return
+		}
+		// Ignore context canceled error to gracefuly handle shutting down
+		// of the extension. This may happen because of generated events
+		// while a frame session is being created.
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		// Final chance:
+		// Throw a k6 error if the error is something different than a context
+		// cancelation.
+		select {
+		case <-fs.ctx.Done():
+			// ignore
+			return
+		default:
+			k6Throw(fs.ctx, "cannot create frame session (iframe): %w", err)
+		}
 	}
 
 	if event.TargetInfo.Type != "worker" {
@@ -827,8 +845,10 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	// Handle new worker
 	w, err := NewWorker(fs.ctx, session, targetID, event.TargetInfo.URL)
 	if err != nil {
-		if !fs.page.browserCtx.browser.connected && strings.Contains(err.Error(), "websocket: close 1006 (abnormal closure)") {
-			// If we're no longer connected to browser, then ignore WebSocket errors
+		// ignore errors if we're no longer connected to browser
+		// this happens when there is no browser but we still want to
+		// attach a worker to it.
+		if !fs.page.browserCtx.browser.IsConnected() {
 			return
 		}
 		select {
@@ -836,13 +856,12 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 			fs.logger.Debugf("FrameSession:onAttachedToTarget:NewWorker:<-ctx.Done",
 				"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q",
 				fs.session.id, fs.targetID, event.SessionID,
-				event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID, event.TargetInfo.Type)
-
+				event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
+				event.TargetInfo.Type)
 			return
 		default:
-			k6Throw(fs.ctx, "cannot create frame session (worker): %w", err)
+			k6Throw(fs.ctx, "cannot create new worker: %w", err)
 		}
-		k6Throw(fs.ctx, "cannot create new worker: %w", err)
 	}
 	fs.page.workers[session.id] = w
 }

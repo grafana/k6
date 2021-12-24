@@ -31,7 +31,7 @@ import (
 func TestBarrier(t *testing.T) {
 	ctx := context.Background()
 
-	log := NewLogger(ctx, NullLogger(), false, nil)
+	log := NewNullLogger()
 
 	timeoutSetings := NewTimeoutSettings(nil)
 	frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, log)

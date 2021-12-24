@@ -98,15 +98,19 @@ func (s *Session) readLoop() {
 		select {
 		case msg := <-s.readCh:
 			ev, err := cdproto.UnmarshalMessage(msg)
+			if errors.Is(err, cdp.ErrUnknownCommandOrEvent("")) && msg.Method == "" {
+				// Results from commands may not always have methods in them.
+				// This is the reason of this error. So it's harmless.
+				//
+				// Also:
+				// This is most likely an event received from an older
+				// Chrome which a newer cdproto doesn't have, as it is
+				// deprecated. Ignore that error, and emit raw cdproto.Message.
+				s.emit("", msg)
+				continue
+			}
 			if err != nil {
 				s.logger.Debugf("Session:readLoop:<-s.readCh", "sid:%v tid:%v cannot unmarshal: %v", s.id, s.targetID, err)
-				if _, ok := err.(cdp.ErrUnknownCommandOrEvent); ok {
-					// This is most likely an event received from an older
-					// Chrome which a newer cdproto doesn't have, as it is
-					// deprecated. Ignore that error, and emit raw cdproto.Message.
-					s.emit("", msg)
-					continue
-				}
 				state.Logger.Errorf("%s", err)
 				continue
 			}

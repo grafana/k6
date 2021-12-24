@@ -36,14 +36,14 @@ func TestFrameNilDocument(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	logger := NewLogger(ctx, NullLogger(), false, nil)
+	log := NewNullLogger()
 
-	fm := NewFrameManager(ctx, nil, nil, nil, logger)
-	frame := NewFrame(ctx, fm, nil, cdp.FrameID("42"), logger)
+	fm := NewFrameManager(ctx, nil, nil, nil, log)
+	frame := NewFrame(ctx, fm, nil, cdp.FrameID("42"), log)
 
 	// frame should not panic with a nil document
 	stub := &executionContextTestStub{
-		evaluateFn: func(apiCtx context.Context, forceCallable bool, returnByValue bool, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
+		evaluateFn: func(apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
 			// return nil to test for panic
 			return nil, nil
 		},
@@ -52,7 +52,7 @@ func TestFrameNilDocument(t *testing.T) {
 	// document() waits for the main execution context
 	ok := make(chan struct{}, 1)
 	go func() {
-		frame.setContext("main", stub)
+		frame.setContext(mainWorld, stub)
 		ok <- struct{}{}
 	}()
 	select {
@@ -68,7 +68,7 @@ func TestFrameNilDocument(t *testing.T) {
 
 	// frame gets the document from the evaluate call
 	want := &ElementHandle{}
-	stub.evaluateFn = func(apiCtx context.Context, forceCallable bool, returnByValue bool, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
+	stub.evaluateFn = func(apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
 		return want, nil
 	}
 	got, err := frame.document()
@@ -82,9 +82,9 @@ func TestFrameNilDocument(t *testing.T) {
 
 type executionContextTestStub struct {
 	ExecutionContext
-	evaluateFn func(apiCtx context.Context, forceCallable bool, returnByValue bool, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error)
+	evaluateFn func(apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error)
 }
 
-func (e executionContextTestStub) evaluate(apiCtx context.Context, forceCallable bool, returnByValue bool, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
-	return e.evaluateFn(apiCtx, forceCallable, returnByValue, pageFunc, args...)
+func (e executionContextTestStub) evaluate(apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
+	return e.evaluateFn(apiCtx, opts, pageFunc, args...)
 }
