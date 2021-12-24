@@ -198,76 +198,84 @@ func (b *Browser) initEvents() error {
 }
 
 func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
+	evti := ev.TargetInfo
+
 	b.contextsMu.RLock()
 	browserCtx := b.defaultContext
-	bctx, ok := b.contexts[ev.TargetInfo.BrowserContextID]
+	bctx, ok := b.contexts[evti.BrowserContextID]
 	if ok {
 		browserCtx = bctx
 	}
-	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v bctx nil:%t", ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID, bctx == nil)
 	b.contextsMu.RUnlock()
 
+	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v bctx nil:%t",
+		ev.SessionID, evti.TargetID, evti.BrowserContextID, browserCtx == nil)
+
 	// We're not interested in the top-level browser target, other targets or DevTools targets right now.
-	isDevTools := strings.HasPrefix(ev.TargetInfo.URL, "devtools://devtools")
-	if ev.TargetInfo.Type == "browser" || ev.TargetInfo.Type == "other" || isDevTools {
-		b.logger.Debugf("Browser:onAttachedToTarget:return", "sid:%v tid:%v (devtools)", ev.SessionID, ev.TargetInfo.TargetID)
+	isDevTools := strings.HasPrefix(evti.URL, "devtools://devtools")
+	if evti.Type == "browser" || evti.Type == "other" || isDevTools {
+		b.logger.Debugf("Browser:onAttachedToTarget:return", "sid:%v tid:%v (devtools)", ev.SessionID, evti.TargetID)
 		return
 	}
 
-	switch ev.TargetInfo.Type {
+	switch evti.Type {
 	case "background_page":
-		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, nil, false, b.logger)
+		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, evti.TargetID, nil, false, b.logger)
 		if err != nil {
 			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
 				// If we're no longer connected to browser, then ignore WebSocket errors
 				b.logger.Debugf("Browser:onAttachedToTarget:background_page:return", "sid:%v tid:%v websocket err:%v",
-					ev.SessionID, ev.TargetInfo.TargetID, err)
+					ev.SessionID, evti.TargetID, err)
 				return
 			}
 			k6Throw(b.ctx, "cannot create NewPage for background_page event: %w", err)
 		}
 
 		b.pagesMu.Lock()
-		b.logger.Debugf("Browser:onAttachedToTarget:background_page:addTid", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
-		b.pages[ev.TargetInfo.TargetID] = p
+		b.logger.Debugf("Browser:onAttachedToTarget:background_page:addTid", "sid:%v tid:%v", ev.SessionID, evti.TargetID)
+		b.pages[evti.TargetID] = p
 		b.pagesMu.Unlock()
 
 		b.sessionIDtoTargetIDMu.Lock()
-		b.logger.Debugf("Browser:onAttachedToTarget:background_page:addSid", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
-		b.sessionIDtoTargetID[ev.SessionID] = ev.TargetInfo.TargetID
+		b.logger.Debugf("Browser:onAttachedToTarget:background_page:addSid", "sid:%v tid:%v", ev.SessionID, evti.TargetID)
+		b.sessionIDtoTargetID[ev.SessionID] = evti.TargetID
 		b.sessionIDtoTargetIDMu.Unlock()
 	case "page":
 		var opener *Page = nil
 		b.pagesMu.RLock()
-		if t, ok := b.pages[ev.TargetInfo.OpenerID]; ok {
+		if t, ok := b.pages[evti.OpenerID]; ok {
 			opener = t
 		}
-		b.logger.Debugf("Browser:onAttachedToTarget:page", "sid:%v tid:%v opener nil:%t", ev.SessionID, ev.TargetInfo.TargetID, opener == nil)
+		b.logger.Debugf("Browser:onAttachedToTarget:page", "sid:%v tid:%v opener nil:%t", ev.SessionID, evti.TargetID, opener == nil)
 		b.pagesMu.RUnlock()
-		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, ev.TargetInfo.TargetID, opener, true, b.logger)
+
+		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, evti.TargetID, opener, true, b.logger)
 		if err != nil {
 			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
 				// If we're no longer connected to browser, then ignore WebSocket errors
-				b.logger.Debugf("Browser:onAttachedToTarget:page:return", "sid:%v tid:%v websocket err:", ev.SessionID, ev.TargetInfo.TargetID)
+				b.logger.Debugf("Browser:onAttachedToTarget:page:return", "sid:%v tid:%v websocket err:", ev.SessionID, evti.TargetID)
 				return
 			}
 			k6Throw(b.ctx, "cannot create NewPage for page event: %w", err)
 		}
+
 		b.pagesMu.Lock()
-		b.logger.Debugf("Browser:onAttachedToTarget:page:addTarget", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
-		b.pages[ev.TargetInfo.TargetID] = p
+		b.logger.Debugf("Browser:onAttachedToTarget:page:addTarget", "sid:%v tid:%v", ev.SessionID, evti.TargetID)
+		b.pages[evti.TargetID] = p
 		b.pagesMu.Unlock()
+
 		b.sessionIDtoTargetIDMu.Lock()
-		b.logger.Debugf("Browser:onAttachedToTarget:page:sidToTid", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
-		b.sessionIDtoTargetID[ev.SessionID] = ev.TargetInfo.TargetID
+		b.logger.Debugf("Browser:onAttachedToTarget:page:sidToTid", "sid:%v tid:%v", ev.SessionID, evti.TargetID)
+		b.sessionIDtoTargetID[ev.SessionID] = evti.TargetID
 		b.sessionIDtoTargetIDMu.Unlock()
+
 		browserCtx.emit(EventBrowserContextPage, p)
 	default:
 		b.logger.Warnf(
-			"Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v bctx nil:%t, warning: unknownTargetType",
-			ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID, bctx == nil)
+			"Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v bctx nil:%t, unknown target type: %q",
+			ev.SessionID, evti.TargetID, evti.BrowserContextID, browserCtx == nil, evti.Type)
 	}
 }
 

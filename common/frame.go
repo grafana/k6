@@ -567,7 +567,13 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
-	if ec := f.executionContexts[mainWorld]; handle.execCtx != ec {
+	ec := f.executionContexts[mainWorld]
+	if ec == nil {
+		return nil, fmt.Errorf("cannot find execution context: %q", mainWorld)
+	}
+	// an element should belong to the current execution context.
+	// otherwise, we should adopt it to this execution context.
+	if ec != handle.execCtx {
 		defer handle.Dispose()
 		if handle, err = ec.adoptElementHandle(handle); err != nil {
 			return nil, err
@@ -741,6 +747,9 @@ func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle 
 	f.executionContextMu.RLock()
 	{
 		ec := f.executionContexts[mainWorld]
+		if ec == nil {
+			k6common.Throw(rt, fmt.Errorf("cannot find execution context: %q", mainWorld))
+		}
 		handle, err = ec.EvaluateHandle(f.ctx, pageFunc, args...)
 	}
 	f.executionContextMu.RUnlock()
