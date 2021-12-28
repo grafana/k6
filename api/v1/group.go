@@ -23,8 +23,6 @@ package v1
 import (
 	"fmt"
 
-	"github.com/manyminds/api2go/jsonapi"
-
 	"go.k6.io/k6/lib"
 )
 
@@ -82,63 +80,6 @@ func NewGroup(g *lib.Group, parent *Group) *Group {
 	}
 
 	return group
-}
-
-// GetID gets a group ID
-// Deprecated: use instead g.ID directly
-// This method will be removed with the one of the PRs of (https://github.com/grafana/k6/issues/911)
-func (g Group) GetID() string {
-	return g.ID
-}
-
-// SetID sets a group ID
-// Deprecated: use instead g.ID directly
-// This method will be removed with the one of the PRs of (https://github.com/grafana/k6/issues/911)
-func (g *Group) SetID(v string) error {
-	g.ID = v
-	return nil
-}
-
-// GetReferences returns the slice of jsonapi.References
-// Deprecated: use instead g.Groups properties
-// This method will be removed with the one of the PRs of (https://github.com/grafana/k6/issues/911)
-func (g Group) GetReferences() []jsonapi.Reference {
-	return []jsonapi.Reference{
-		{
-			Type:         "groups",
-			Name:         "parent",
-			Relationship: jsonapi.ToOneRelationship,
-		},
-		{
-			Type:         "groups",
-			Name:         "groups",
-			Relationship: jsonapi.ToManyRelationship,
-		},
-	}
-}
-
-// GetReferencedIDs returns the slice of jsonapi.ReferenceID
-// Deprecated: use instead g.GroupIDs properties
-// This method will be removed with the one of the PRs of (https://github.com/grafana/k6/issues/911)
-func (g Group) GetReferencedIDs() []jsonapi.ReferenceID {
-	refs := []jsonapi.ReferenceID{}
-	if g.Parent != nil {
-		refs = append(refs, jsonapi.ReferenceID{
-			ID:           g.Parent.GetID(),
-			Type:         "groups",
-			Name:         "parent",
-			Relationship: jsonapi.ToOneRelationship,
-		})
-	}
-	for _, gp := range g.Groups {
-		refs = append(refs, jsonapi.ReferenceID{
-			ID:           gp.GetID(),
-			Type:         "groups",
-			Name:         "groups",
-			Relationship: jsonapi.ToManyRelationship,
-		})
-	}
-	return refs
 }
 
 func (g *Group) SetToManyReferenceIDs(name string, ids []string) error {

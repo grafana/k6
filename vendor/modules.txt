@@ -36,9 +36,6 @@ github.com/dop251/goja/unistring
 # github.com/fatih/color v1.12.0
 ## explicit; go 1.13
 github.com/fatih/color
-# github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813
-## explicit
-github.com/gedex/inflector
 # github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible
 ## explicit
 github.com/go-sourcemap/sourcemap
@@ -94,9 +91,6 @@ github.com/mailru/easyjson
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/manyminds/api2go v0.0.0-20180125085803-95be7bd0455e
-## explicit
-github.com/manyminds/api2go/jsonapi
 # github.com/mattn/go-colorable v0.1.8
 ## explicit; go 1.13
 github.com/mattn/go-colorable
@@ -296,8 +290,6 @@ google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/known/typepb
 google.golang.org/protobuf/types/known/wrapperspb
 google.golang.org/protobuf/types/pluginpb
-# gopkg.in/guregu/null.v2 v2.1.2
-## explicit
 # gopkg.in/guregu/null.v3 v3.3.0
 ## explicit
 gopkg.in/guregu/null.v3
