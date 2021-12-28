@@ -31,6 +31,8 @@ import (
 )
 
 func TestNullMetricTypeJSON(t *testing.T) {
+	t.Parallel()
+
 	values := map[NullMetricType]string{
 		{}:                    `null`,
 		{stats.Counter, true}: `"counter"`,
@@ -39,8 +41,12 @@ func TestNullMetricTypeJSON(t *testing.T) {
 		{stats.Rate, true}:    `"rate"`,
 	}
 	t.Run("Marshal", func(t *testing.T) {
+		t.Parallel()
+
 		for mt, val := range values {
 			t.Run(val, func(t *testing.T) {
+				t.Parallel()
+
 				data, err := json.Marshal(mt)
 				assert.NoError(t, err)
 				assert.Equal(t, val, string(data))
@@ -48,8 +54,12 @@ func TestNullMetricTypeJSON(t *testing.T) {
 		}
 	})
 	t.Run("Unmarshal", func(t *testing.T) {
+		t.Parallel()
+
 		for mt, val := range values {
 			t.Run(val, func(t *testing.T) {
+				t.Parallel()
+
 				var value NullMetricType
 				assert.NoError(t, json.Unmarshal([]byte(val), &value))
 				assert.Equal(t, mt, value)
@@ -59,14 +69,20 @@ func TestNullMetricTypeJSON(t *testing.T) {
 }
 
 func TestNullValueTypeJSON(t *testing.T) {
+	t.Parallel()
+
 	values := map[NullValueType]string{
 		{}:                    `null`,
 		{stats.Default, true}: `"default"`,
 		{stats.Time, true}:    `"time"`,
 	}
 	t.Run("Marshal", func(t *testing.T) {
+		t.Parallel()
+
 		for mt, val := range values {
 			t.Run(val, func(t *testing.T) {
+				t.Parallel()
+
 				data, err := json.Marshal(mt)
 				assert.NoError(t, err)
 				assert.Equal(t, val, string(data))
@@ -74,8 +90,12 @@ func TestNullValueTypeJSON(t *testing.T) {
 		}
 	})
 	t.Run("Unmarshal", func(t *testing.T) {
+		t.Parallel()
+
 		for mt, val := range values {
 			t.Run(val, func(t *testing.T) {
+				t.Parallel()
+
 				var value NullValueType
 				assert.NoError(t, json.Unmarshal([]byte(val), &value))
 				assert.Equal(t, mt, value)
@@ -85,6 +105,8 @@ func TestNullValueTypeJSON(t *testing.T) {
 }
 
 func TestNewMetric(t *testing.T) {
+	t.Parallel()
+
 	old := stats.New("name", stats.Trend, stats.Time)
 	old.Tainted = null.BoolFrom(true)
 	m := NewMetric(old, 0)

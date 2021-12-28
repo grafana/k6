@@ -50,7 +50,6 @@ func newMetricEnvelope(m *stats.Metric, t time.Duration) metricJSONAPI {
 func newMetricsJSONAPI(list map[string]*stats.Metric, t time.Duration) MetricsJSONAPI {
 	metrics := make([]metricData, 0, len(list))
 
-	// TODO: lock ?
 	for _, m := range list {
 		metrics = append(metrics, newMetricData(m, t))
 	}

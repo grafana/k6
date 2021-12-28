@@ -41,6 +41,8 @@ import (
 )
 
 func TestGetMetrics(t *testing.T) {
+	t.Parallel()
+
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
@@ -61,6 +63,8 @@ func TestGetMetrics(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
 	t.Run("document", func(t *testing.T) {
+		t.Parallel()
+
 		var doc MetricsJSONAPI
 		assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &doc))
 		if !assert.NotNil(t, doc.Data) {
@@ -70,6 +74,8 @@ func TestGetMetrics(t *testing.T) {
 	})
 
 	t.Run("metrics", func(t *testing.T) {
+		t.Parallel()
+
 		var envelop MetricsJSONAPI
 		assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &envelop))
 
@@ -91,6 +97,8 @@ func TestGetMetrics(t *testing.T) {
 }
 
 func TestGetMetric(t *testing.T) {
+	t.Parallel()
+
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
@@ -106,6 +114,8 @@ func TestGetMetric(t *testing.T) {
 	engine.Metrics["my_metric"].Tainted = null.BoolFrom(true)
 
 	t.Run("nonexistent", func(t *testing.T) {
+		t.Parallel()
+
 		rw := httptest.NewRecorder()
 		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics/notreal", nil))
 		res := rw.Result()
@@ -113,12 +123,16 @@ func TestGetMetric(t *testing.T) {
 	})
 
 	t.Run("real", func(t *testing.T) {
+		t.Parallel()
+
 		rw := httptest.NewRecorder()
 		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics/my_metric", nil))
 		res := rw.Result()
 		assert.Equal(t, http.StatusOK, res.StatusCode)
 
 		t.Run("document", func(t *testing.T) {
+			t.Parallel()
+
 			var doc metricJSONAPI
 			assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &doc))
 
