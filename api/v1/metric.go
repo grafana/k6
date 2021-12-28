@@ -92,12 +92,16 @@ func NewMetric(m *stats.Metric, t time.Duration) Metric {
 	}
 }
 
-// GetID TODO: delete
+// GetID gets a metric ID (name)
+// Deprecated: use instead m.Name directly
+// This method will be removed with the one of the PRs of (https://github.com/grafana/k6/issues/911)
 func (m Metric) GetID() string {
 	return m.Name
 }
 
-// SetID TODO: delete
+// SetID sets a metric ID (name)
+// Deprecated: use instead m.Name directly
+// This method will be removed with the one of the PRs of (https://github.com/grafana/k6/issues/911)
 func (m *Metric) SetID(id string) error {
 	m.Name = id
 	return nil

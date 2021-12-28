@@ -21,27 +21,17 @@
 package v1
 
 import (
-	"encoding/json"
-
 	"go.k6.io/k6/core"
 )
 
-type statusJSONAPI struct {
+// StatusJSONAPI is JSON API envelop for metrics
+type StatusJSONAPI struct {
 	Data statusData `json:"data"`
 }
 
-type statusData struct {
-	Type       string `json:"type"`
-	ID         string `json:"id"`
-	Attributes Status `json:"attributes"`
-}
-
-func newStatusJSONAPIFromEngine(engine *core.Engine) statusJSONAPI {
-	return newStatusJSONAPI(NewStatus(engine))
-}
-
-func newStatusJSONAPI(s Status) statusJSONAPI {
-	return statusJSONAPI{
+// NewStatusJSONAPI creates the JSON API status envelop
+func NewStatusJSONAPI(s Status) StatusJSONAPI {
+	return StatusJSONAPI{
 		Data: statusData{
 			ID:         "default",
 			Type:       "status",
@@ -50,12 +40,17 @@ func newStatusJSONAPI(s Status) statusJSONAPI {
 	}
 }
 
-// unmarshalStatusJSONAPI unmarshal JSON API status, and extract status
-func unmarshalStatusJSONAPI(data []byte) (Status, error) {
-	var envelop statusJSONAPI
-	if err := json.Unmarshal(data, &envelop); err != nil {
-		return Status{}, err
-	}
+// Status extract the v1.Status from the JSON API envelop
+func (s StatusJSONAPI) Status() Status {
+	return s.Data.Attributes
+}
 
-	return envelop.Data.Attributes, nil
+type statusData struct {
+	Type       string `json:"type"`
+	ID         string `json:"id"`
+	Attributes Status `json:"attributes"`
+}
+
+func newStatusJSONAPIFromEngine(engine *core.Engine) StatusJSONAPI {
+	return NewStatusJSONAPI(NewStatus(engine))
 }

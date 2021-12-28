@@ -64,11 +64,13 @@ func handlePatchStatus(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, err := unmarshalStatusJSONAPI(body)
-	if err != nil {
+	var statusEnvelop StatusJSONAPI
+	if err = json.Unmarshal(body, &statusEnvelop); err != nil {
 		apiError(rw, "Invalid data", err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	status := statusEnvelop.Status()
 
 	if status.Stopped { //nolint:nestif
 		engine.Stop()

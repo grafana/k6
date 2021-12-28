@@ -26,12 +26,13 @@ import (
 	"go.k6.io/k6/stats"
 )
 
-type metricJSONAPI struct {
-	Data metricData `json:"data"`
+// MetricsJSONAPI is JSON API envelop for metrics
+type MetricsJSONAPI struct {
+	Data []metricData `json:"data"`
 }
 
-type metricsJSONAPI struct {
-	Data []metricData `json:"data"`
+type metricJSONAPI struct {
+	Data metricData `json:"data"`
 }
 
 type metricData struct {
@@ -46,7 +47,7 @@ func newMetricEnvelope(m *stats.Metric, t time.Duration) metricJSONAPI {
 	}
 }
 
-func newMetricsJSONAPI(list map[string]*stats.Metric, t time.Duration) metricsJSONAPI {
+func newMetricsJSONAPI(list map[string]*stats.Metric, t time.Duration) MetricsJSONAPI {
 	metrics := make([]metricData, 0, len(list))
 
 	// TODO: lock ?
@@ -54,7 +55,7 @@ func newMetricsJSONAPI(list map[string]*stats.Metric, t time.Duration) metricsJS
 		metrics = append(metrics, newMetricData(m, t))
 	}
 
-	return metricsJSONAPI{
+	return MetricsJSONAPI{
 		Data: metrics,
 	}
 }
@@ -67,4 +68,15 @@ func newMetricData(m *stats.Metric, t time.Duration) metricData {
 		ID:         metric.Name,
 		Attributes: metric,
 	}
+}
+
+// Metrics extract the []v1.Metric from the JSON API envelop
+func (m MetricsJSONAPI) Metrics() []Metric {
+	list := make([]Metric, 0, len(m.Data))
+
+	for _, metric := range m.Data {
+		list = append(list, metric.Attributes)
+	}
+
+	return list
 }

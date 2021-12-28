@@ -51,17 +51,21 @@ func NewStatus(engine *core.Engine) Status {
 	}
 }
 
-// GetName TODO: delete
+// GetName gets the entity name, implementation of the interface for the jsonapi
+// Deprecated: use a constant value instead
+// This method will be removed with the one of the PRs of (https://github.com/grafana/k6/issues/911)
 func (s Status) GetName() string {
 	return "status"
 }
 
-// GetID TODO: delete
+// GetID gets a status ID (there is no real ID for the status)
+// Deprecated: use a constant value instead
+// This method will be removed with the one of the PRs of (https://github.com/grafana/k6/issues/911)
 func (s Status) GetID() string {
 	return "default"
 }
 
-// SetID TODO: delete
+// SetID do nothing, required by the jsonapi interface
 func (s Status) SetID(id string) error {
 	return nil
 }

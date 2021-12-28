@@ -84,16 +84,24 @@ func NewGroup(g *lib.Group, parent *Group) *Group {
 	return group
 }
 
+// GetID gets a group ID
+// Deprecated: use instead g.ID directly
+// This method will be removed with the one of the PRs of (https://github.com/grafana/k6/issues/911)
 func (g Group) GetID() string {
 	return g.ID
 }
 
+// SetID sets a group ID
+// Deprecated: use instead g.ID directly
+// This method will be removed with the one of the PRs of (https://github.com/grafana/k6/issues/911)
 func (g *Group) SetID(v string) error {
 	g.ID = v
 	return nil
 }
 
-// GetReferences TODO delete
+// GetReferences returns the slice of jsonapi.References
+// Deprecated: use instead g.Groups properties
+// This method will be removed with the one of the PRs of (https://github.com/grafana/k6/issues/911)
 func (g Group) GetReferences() []jsonapi.Reference {
 	return []jsonapi.Reference{
 		{
@@ -109,7 +117,9 @@ func (g Group) GetReferences() []jsonapi.Reference {
 	}
 }
 
-// GetReferencedIDs TODO delete
+// GetReferencedIDs returns the slice of jsonapi.ReferenceID
+// Deprecated: use instead g.GroupIDs properties
+// This method will be removed with the one of the PRs of (https://github.com/grafana/k6/issues/911)
 func (g Group) GetReferencedIDs() []jsonapi.ReferenceID {
 	refs := []jsonapi.ReferenceID{}
 	if g.Parent != nil {
