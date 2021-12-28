@@ -47,6 +47,7 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/js"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/metrics"
@@ -120,7 +121,7 @@ a commandline interface for interacting with it.`,
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 			initRunner, err := newRunner(logger, src, runType, filesystems, runtimeOptions, builtinMetrics, registry)
 			if err != nil {
-				return err
+				return common.UnwrapGojaInterruptedError(err)
 			}
 
 			logger.Debug("Getting the script options...")
@@ -250,6 +251,7 @@ a commandline interface for interacting with it.`,
 			initBar.Modify(pb.WithConstProgress(0, "Init VUs..."))
 			engineRun, engineWait, err := engine.Init(globalCtx, runCtx)
 			if err != nil {
+				err = common.UnwrapGojaInterruptedError(err)
 				// Add a generic engine exit code if we don't have a more specific one
 				return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
 			}
@@ -273,8 +275,18 @@ a commandline interface for interacting with it.`,
 
 			// Start the test run
 			initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
-			if err := engineRun(); err != nil {
-				return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
+			var interrupt error
+			err = engineRun()
+			if err != nil {
+				err = common.UnwrapGojaInterruptedError(err)
+				if common.IsInterruptError(err) {
+					// Don't return here since we need to work with --linger,
+					// show the end-of-test summary and exit cleanly.
+					interrupt = err
+				}
+				if !conf.Linger.Bool && interrupt == nil {
+					return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
+				}
 			}
 			runCancel()
 			logger.Debug("Engine run terminated cleanly")
@@ -323,6 +335,9 @@ a commandline interface for interacting with it.`,
 			logger.Debug("Waiting for engine processes to finish...")
 			engineWait()
 			logger.Debug("Everything has finished, exiting k6!")
+			if interrupt != nil {
+				return interrupt
+			}
 			if engine.IsTainted() {
 				return errext.WithExitCodeIfNone(errors.New("some thresholds have failed"), exitcodes.ThresholdsHaveFailed)
 			}

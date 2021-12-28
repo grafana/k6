@@ -726,6 +726,15 @@ func (u *ActiveVU) RunOnce() error {
 
 	// Call the exported function.
 	_, isFullIteration, totalTime, err := u.runFn(u.RunContext, true, fn, u.setupData)
+	if err != nil {
+		var x *goja.InterruptedError
+		if errors.As(err, &x) {
+			if v, ok := x.Value().(*common.InterruptError); ok {
+				v.Reason = x.Error()
+				err = v
+			}
+		}
+	}
 
 	// If MinIterationDuration is specified and the iteration wasn't canceled
 	// and was less than it, sleep for the remainder

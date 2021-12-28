@@ -22,19 +22,28 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/lib/testutils"
 )
 
 type mockWriter struct {
@@ -124,4 +133,86 @@ func TestHandleSummaryResultError(t *testing.T) {
 	files := getFiles(t, fs)
 	assertEqual(t, "file summary 1", files[filePath1])
 	assertEqual(t, "file summary 2", files[filePath2])
+}
+
+func TestAbortTest(t *testing.T) { //nolint: tparallel
+	t.Parallel()
+
+	testCases := []struct {
+		testFilename, expLogOutput string
+	}{
+		{
+			testFilename: "abort.js",
+		},
+		{
+			testFilename: "abort_initerr.js",
+		},
+		{
+			testFilename: "abort_initvu.js",
+		},
+		{
+			testFilename: "abort_teardown.js",
+			expLogOutput: "Calling teardown function after test.abort()",
+		},
+	}
+
+	for _, tc := range testCases { //nolint: paralleltest
+		tc := tc
+		t.Run(tc.testFilename, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			logger := logrus.New()
+			logger.SetLevel(logrus.InfoLevel)
+			logger.Out = ioutil.Discard
+			hook := testutils.SimpleLogrusHook{
+				HookedLevels: []logrus.Level{logrus.InfoLevel},
+			}
+			logger.AddHook(&hook)
+
+			cmd := getRunCmd(ctx, logger)
+			// Redefine the flag to avoid a nil pointer panic on lookup.
+			cmd.Flags().AddFlag(&pflag.Flag{
+				Name:   "address",
+				Hidden: true,
+			})
+			a, err := filepath.Abs(path.Join("testdata", tc.testFilename))
+			require.NoError(t, err)
+			cmd.SetArgs([]string{a})
+			err = cmd.Execute()
+			var e errext.HasExitCode
+			require.ErrorAs(t, err, &e)
+			assert.Equalf(t, exitcodes.ScriptAborted, e.ExitCode(),
+				"Status code must be %d", exitcodes.ScriptAborted)
+			assert.Contains(t, e.Error(), common.AbortTest)
+
+			if tc.expLogOutput != "" {
+				var gotMsg bool
+				for _, entry := range hook.Drain() {
+					if strings.Contains(entry.Message, tc.expLogOutput) {
+						gotMsg = true
+						break
+					}
+				}
+				assert.True(t, gotMsg)
+			}
+		})
+	}
+}
+
+func TestInitErrExitCode(t *testing.T) { //nolint: paralleltest
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	logger := testutils.NewLogger(t)
+
+	cmd := getRunCmd(ctx, logger)
+	a, err := filepath.Abs("testdata/initerr.js")
+	require.NoError(t, err)
+	cmd.SetArgs([]string{a})
+	err = cmd.Execute()
+	var e errext.HasExitCode
+	require.ErrorAs(t, err, &e)
+	assert.Equalf(t, exitcodes.ScriptException, e.ExitCode(),
+		"Status code must be %d", exitcodes.ScriptException)
+	assert.Contains(t, err.Error(), "ReferenceError: someUndefinedVar is not defined")
 }

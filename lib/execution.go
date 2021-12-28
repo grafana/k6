@@ -123,6 +123,7 @@ const (
 	ExecutionStatusRunning
 	ExecutionStatusTeardown
 	ExecutionStatusEnded
+	ExecutionStatusInterrupted
 )
 
 // ExecutionState contains a few different things:
