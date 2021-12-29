@@ -88,40 +88,40 @@ func TestGetStatus(t *testing.T) {
 func TestPatchStatus(t *testing.T) {
 	t.Parallel()
 
-	testdata := map[string]struct {
-		StatusCode     int
-		ExpectedStatus Status
-		Payload        []byte
+	testData := map[string]struct {
+		ExpectedStatusCode int
+		ExpectedStatus     Status
+		Payload            []byte
 	}{
 		"nothing": {
-			StatusCode:     200,
-			ExpectedStatus: Status{},
-			Payload:        []byte(`{"data":{"type":"status","id":"default","attributes":{"status":0,"paused":null,"vus":null,"vus-max":null,"stopped":false,"running":false,"tainted":false}}}`),
+			ExpectedStatusCode: 200,
+			ExpectedStatus:     Status{},
+			Payload:            []byte(`{"data":{"type":"status","id":"default","attributes":{"status":0,"paused":null,"vus":null,"vus-max":null,"stopped":false,"running":false,"tainted":false}}}`),
 		},
 		"paused": {
-			StatusCode:     200,
-			ExpectedStatus: Status{Paused: null.BoolFrom(true)},
-			Payload:        []byte(`{"data":{"type":"status","id":"default","attributes":{"status":0,"paused":true,"vus":null,"vus-max":null,"stopped":false,"running":false,"tainted":false}}}`),
+			ExpectedStatusCode: 200,
+			ExpectedStatus:     Status{Paused: null.BoolFrom(true)},
+			Payload:            []byte(`{"data":{"type":"status","id":"default","attributes":{"status":0,"paused":true,"vus":null,"vus-max":null,"stopped":false,"running":false,"tainted":false}}}`),
 		},
 		"max vus": {
-			StatusCode:     200,
-			ExpectedStatus: Status{VUsMax: null.IntFrom(20)},
-			Payload:        []byte(`{"data":{"type":"status","id":"default","attributes":{"status":0,"paused":null,"vus":null,"vus-max":20,"stopped":false,"running":false,"tainted":false}}}`),
+			ExpectedStatusCode: 200,
+			ExpectedStatus:     Status{VUsMax: null.IntFrom(20)},
+			Payload:            []byte(`{"data":{"type":"status","id":"default","attributes":{"status":0,"paused":null,"vus":null,"vus-max":20,"stopped":false,"running":false,"tainted":false}}}`),
 		},
 		"max vus below initial": {
-			StatusCode:     400,
-			ExpectedStatus: Status{VUsMax: null.IntFrom(5)},
-			Payload:        []byte(`{"data":{"type":"status","id":"default","attributes":{"status":0,"paused":null,"vus":null,"vus-max":5,"stopped":false,"running":false,"tainted":false}}}`),
+			ExpectedStatusCode: 400,
+			ExpectedStatus:     Status{VUsMax: null.IntFrom(5)},
+			Payload:            []byte(`{"data":{"type":"status","id":"default","attributes":{"status":0,"paused":null,"vus":null,"vus-max":5,"stopped":false,"running":false,"tainted":false}}}`),
 		},
 		"too many vus": {
-			StatusCode:     400,
-			ExpectedStatus: Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(0)},
-			Payload:        []byte(`{"data":{"type":"status","id":"default","attributes":{"status":0,"paused":null,"vus":10,"vus-max":0,"stopped":false,"running":false,"tainted":false}}}`),
+			ExpectedStatusCode: 400,
+			ExpectedStatus:     Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(0)},
+			Payload:            []byte(`{"data":{"type":"status","id":"default","attributes":{"status":0,"paused":null,"vus":10,"vus-max":0,"stopped":false,"running":false,"tainted":false}}}`),
 		},
 		"vus": {
-			StatusCode:     200,
-			ExpectedStatus: Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(10)},
-			Payload:        []byte(`{"data":{"type":"status","id":"default","attributes":{"status":0,"paused":null,"vus":10,"vus-max":10,"stopped":false,"running":false,"tainted":false}}}`),
+			ExpectedStatusCode: 200,
+			ExpectedStatus:     Status{VUs: null.IntFrom(10), VUsMax: null.IntFrom(10)},
+			Payload:            []byte(`{"data":{"type":"status","id":"default","attributes":{"status":0,"paused":null,"vus":10,"vus-max":10,"stopped":false,"running":false,"tainted":false}}}`),
 		},
 	}
 	logger := logrus.New()
@@ -136,7 +136,7 @@ func TestPatchStatus(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 
-	for name, inData := range testdata {
+	for name, testCase := range testData {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -154,25 +154,24 @@ func TestPatchStatus(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 
 			rw := httptest.NewRecorder()
-			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "PATCH", "/v1/status", bytes.NewReader(inData.Payload)))
+			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "PATCH", "/v1/status", bytes.NewReader(testCase.Payload)))
 			res := rw.Result()
 
-			if !assert.Equal(t, inData.StatusCode, res.StatusCode) {
-				return
-			}
-			if inData.StatusCode != 200 {
+			require.Equal(t, testCase.ExpectedStatusCode, res.StatusCode)
+
+			if testCase.ExpectedStatusCode != 200 {
 				return
 			}
 
 			status := NewStatus(engine)
-			if inData.ExpectedStatus.Paused.Valid {
-				assert.Equal(t, inData.ExpectedStatus.Paused, status.Paused)
+			if testCase.ExpectedStatus.Paused.Valid {
+				assert.Equal(t, testCase.ExpectedStatus.Paused, status.Paused)
 			}
-			if inData.ExpectedStatus.VUs.Valid {
-				assert.Equal(t, inData.ExpectedStatus.VUs, status.VUs)
+			if testCase.ExpectedStatus.VUs.Valid {
+				assert.Equal(t, testCase.ExpectedStatus.VUs, status.VUs)
 			}
-			if inData.ExpectedStatus.VUsMax.Valid {
-				assert.Equal(t, inData.ExpectedStatus.VUsMax, status.VUsMax)
+			if testCase.ExpectedStatus.VUsMax.Valid {
+				assert.Equal(t, testCase.ExpectedStatus.VUsMax, status.VUsMax)
 			}
 		})
 	}
