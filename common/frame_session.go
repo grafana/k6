@@ -160,17 +160,17 @@ func NewFrameSession(
 
 		return nil, err
 	}
-	if err = fs.initDomains(); err != nil {
+	if err = fs.initOptions(); err != nil {
 		logger.Debugf(
-			"NewFrameSession:initDomains",
+			"NewFrameSession:initOptions",
 			"sid:%v tid:%v err:%v",
 			session.id, targetID, err)
 
 		return nil, err
 	}
-	if err = fs.initOptions(); err != nil {
+	if err = fs.initDomains(); err != nil {
 		logger.Debugf(
-			"NewFrameSession:initOptions",
+			"NewFrameSession:initDomains",
 			"sid:%v tid:%v err:%v",
 			session.id, targetID, err)
 
@@ -208,7 +208,8 @@ func (fs *FrameSession) getNetworkManager() *NetworkManager {
 
 func (fs *FrameSession) initDomains() error {
 	actions := []Action{
-		dom.Enable(), // TODO: can we get rid of this by doing DOM related stuff in JS instead?
+		// TODO: can we get rid of the following by doing DOM related stuff in JS instead?
+		dom.Enable(),
 		log.Enable(),
 		runtime.Enable(),
 		target.SetAutoAttach(true, true).WithFlatten(true),
@@ -241,45 +242,55 @@ func (fs *FrameSession) initEvents() {
 
 		for {
 			select {
+			case <-fs.session.done:
+				fs.logger.Debugf("NewFrameSession:initEvents:go:session.done",
+					"sid:%v tid:%v", fs.session.id, fs.targetID)
+				return
 			case <-fs.ctx.Done():
 				fs.logger.Debugf("NewFrameSession:initEvents:go:ctx.Done",
 					"sid:%v tid:%v", fs.session.id, fs.targetID)
 
 				return
 			case event := <-fs.eventCh:
-				if ev, ok := event.data.(*inspector.EventTargetCrashed); ok {
+				switch ev := event.data.(type) {
+				case *inspector.EventTargetCrashed:
 					fs.onTargetCrashed(ev)
-				} else if ev, ok := event.data.(*log.EventEntryAdded); ok {
+				case *log.EventEntryAdded:
 					fs.onLogEntryAdded(ev)
-				} else if ev, ok := event.data.(*cdppage.EventFrameAttached); ok {
+				case *cdppage.EventFrameAttached:
 					fs.onFrameAttached(ev.FrameID, ev.ParentFrameID)
-				} else if ev, ok := event.data.(*cdppage.EventFrameDetached); ok {
-					fs.onFrameDetached(ev.FrameID)
-				} else if ev, ok := event.data.(*cdppage.EventFrameNavigated); ok {
-					fs.onFrameNavigated(ev.Frame, false)
-				} else if ev, ok := event.data.(*cdppage.EventFrameRequestedNavigation); ok {
+				case *cdppage.EventFrameDetached:
+					fs.onFrameDetached(ev.FrameID, ev.Reason)
+				case *cdppage.EventFrameNavigated:
+					const initial = false
+					fs.onFrameNavigated(ev.Frame, initial)
+				case *cdppage.EventFrameRequestedNavigation:
 					fs.onFrameRequestedNavigation(ev)
-				} else if ev, ok := event.data.(*cdppage.EventFrameStartedLoading); ok {
+				case *cdppage.EventFrameStartedLoading:
 					fs.onFrameStartedLoading(ev.FrameID)
-				} else if ev, ok := event.data.(*cdppage.EventFrameStoppedLoading); ok {
+				case *cdppage.EventFrameStoppedLoading:
 					fs.onFrameStoppedLoading(ev.FrameID)
-				} else if ev, ok := event.data.(*cdppage.EventLifecycleEvent); ok {
+				case *cdppage.EventLifecycleEvent:
 					fs.onPageLifecycle(ev)
-				} else if ev, ok := event.data.(*cdppage.EventNavigatedWithinDocument); ok {
+				case *cdppage.EventNavigatedWithinDocument:
 					fs.onPageNavigatedWithinDocument(ev)
-				} else if ev, ok := event.data.(*runtime.EventConsoleAPICalled); ok {
+				case *runtime.EventConsoleAPICalled:
 					fs.onConsoleAPICalled(ev)
-				} else if ev, ok := event.data.(*runtime.EventExceptionThrown); ok {
+				case *runtime.EventExceptionThrown:
 					fs.onExceptionThrown(ev)
-				} else if ev, ok := event.data.(*runtime.EventExecutionContextCreated); ok {
+				case *runtime.EventExecutionContextCreated:
 					fs.onExecutionContextCreated(ev)
-				} else if ev, ok := event.data.(*runtime.EventExecutionContextDestroyed); ok {
+				case *runtime.EventExecutionContextDestroyed:
 					fs.onExecutionContextDestroyed(ev.ExecutionContextID)
-				} else if _, ok := event.data.(*runtime.EventExecutionContextsCleared); ok {
+				case *runtime.EventExecutionContextsCleared:
 					fs.onExecutionContextsCleared()
-				} else if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
+				case *target.EventAttachedToTarget:
+					// handle target attachment in a new goroutine
+					// so that other frame events won't go stale.
 					fs.onAttachedToTarget(ev)
-				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
+				case *target.EventDetachedFromTarget:
+					// handle target detachment in a new goroutine
+					// so that other frame events won't go stale.
 					fs.onDetachedFromTarget(ev)
 				}
 			}
@@ -355,13 +366,7 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	action2 := cdppage.AddScriptToEvaluateOnNewDocument(`//# sourceURL=` + evaluationScriptURL).
 		WithWorldName(name)
 	if _, err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		// TODO: find out whether select is necessary here
-		// select {
-		// case <-fs.ctx.Done():
-		// 	return nil
-		// default:
 		return fmt.Errorf("unable to add script to evaluate for isolated world: %w", err)
-		// }
 	}
 	return nil
 }
@@ -616,10 +621,10 @@ func (fs *FrameSession) onFrameAttached(frameID cdp.FrameID, parentFrameID cdp.F
 	fs.manager.frameAttached(frameID, parentFrameID)
 }
 
-func (fs *FrameSession) onFrameDetached(frameID cdp.FrameID) {
+func (fs *FrameSession) onFrameDetached(frameID cdp.FrameID, reason cdppage.FrameDetachedReason) {
 	fs.logger.Debugf("NewFrameSession:onFrameDetached",
-		"sid:%v tid:%v fid:%v",
-		fs.session.id, fs.targetID, frameID)
+		"sid:%v tid:%v fid:%v reason:%s",
+		fs.session.id, fs.targetID, frameID, reason)
 
 	fs.manager.frameDetached(frameID)
 }
@@ -776,6 +781,12 @@ func (fs *FrameSession) onPageNavigatedWithinDocument(event *cdppage.EventNaviga
 }
 
 func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) {
+	var (
+		ti  = event.TargetInfo
+		sid = event.SessionID
+		err error
+	)
+
 	fs.logger.Debugf("NewFrameSession:onAttachedToTarget",
 		"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q",
 		fs.session.id, fs.targetID, event.SessionID,
@@ -783,87 +794,96 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 		event.TargetInfo.Type)
 
 	session := fs.page.browserCtx.conn.getSession(event.SessionID)
-	targetID := event.TargetInfo.TargetID
-
-	if event.TargetInfo.Type == "iframe" {
-		frame := fs.manager.getFrameByID(cdp.FrameID(targetID))
-		if frame == nil {
-			return
-		}
-
-		fs.manager.removeChildFramesRecursively(frame)
-
-		// Successful case
-		frameSession, err := NewFrameSession(fs.ctx, session, fs.page, fs, targetID, fs.logger)
-		if err == nil {
-			fs.page.attachFrameSession(cdp.FrameID(targetID), frameSession)
-			return
-		}
-		// Erroneous cases
-		defer fs.logger.Debugf("FrameSession:onAttachedToTarget:NewFrameSession",
-			"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q err:%v",
-			fs.session.id, fs.targetID, event.SessionID,
-			event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
-			event.TargetInfo.Type, err)
-		// ignore errors if we're no longer connected to browser
-		// this happens when there is no browser but we still want to
-		// attach a frame to it.
-		if !fs.page.browserCtx.browser.IsConnected() {
-			return
-		}
-		// Ignore context canceled error to gracefuly handle shutting down
-		// of the extension. This may happen because of generated events
-		// while a frame session is being created.
-		if errors.Is(err, context.Canceled) {
-			return
-		}
-		// Final chance:
-		// Throw a k6 error if the error is something different than a context
-		// cancelation.
-		select {
-		case <-fs.ctx.Done():
-			// ignore
-			return
-		default:
-			k6Throw(fs.ctx, "cannot create frame session (iframe): %w", err)
-		}
-	}
-
-	if event.TargetInfo.Type != "worker" {
-		fs.logger.Debugf("FrameSession:onAttachedToTarget returns: target is not a worker",
-			"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q",
+	if session == nil {
+		fs.logger.Debugf("FrameSession:onAttachedToTarget:NewFrameSession",
+			"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q err:nil session",
 			fs.session.id, fs.targetID, event.SessionID,
 			event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
 			event.TargetInfo.Type)
-
-		// Just unblock (debugger continue) these targets and detach from them.
-		session.ExecuteWithoutExpectationOnReply(fs.ctx, runtime.CommandRunIfWaitingForDebugger, nil, nil)
-		session.ExecuteWithoutExpectationOnReply(fs.ctx, target.CommandDetachFromTarget, &target.DetachFromTargetParams{SessionID: session.id}, nil)
 		return
 	}
 
-	// Handle new worker
-	w, err := NewWorker(fs.ctx, session, targetID, event.TargetInfo.URL)
-	if err != nil {
-		// ignore errors if we're no longer connected to browser
-		// this happens when there is no browser but we still want to
-		// attach a worker to it.
-		if !fs.page.browserCtx.browser.IsConnected() {
-			return
-		}
-		select {
-		case <-fs.ctx.Done():
-			fs.logger.Debugf("FrameSession:onAttachedToTarget:NewWorker:<-ctx.Done",
-				"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q",
-				fs.session.id, fs.targetID, event.SessionID,
-				event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
-				event.TargetInfo.Type)
-			return
-		default:
-			k6Throw(fs.ctx, "cannot create new worker: %w", err)
-		}
+	switch ti.Type {
+	case "iframe":
+		err = fs.attachIFrameToTarget(ti, sid)
+	case "worker":
+		err = fs.attachWorkerToTarget(ti, sid)
+	default:
+		// Just unblock (debugger continue) these targets and detach from them.
+		s := fs.page.browserCtx.conn.getSession(sid)
+		_ = s.ExecuteWithoutExpectationOnReply(fs.ctx, runtime.CommandRunIfWaitingForDebugger, nil, nil)
+		_ = s.ExecuteWithoutExpectationOnReply(fs.ctx, target.CommandDetachFromTarget,
+			&target.DetachFromTargetParams{SessionID: s.id}, nil)
 	}
-	fs.page.workers[session.id] = w
+	if err == nil {
+		return
+	}
+	// Handle or ignore errors.
+	defer fs.logger.Debugf("FrameSession:onAttachedToTarget:return",
+		"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q err:%v",
+		fs.session.id, fs.targetID, sid,
+		ti.TargetID, ti.BrowserContextID,
+		ti.Type, err)
+	// Ignore errors if we're no longer connected to browser.
+	// This happens when there is no browser but we still want to
+	// attach a frame/worker to it.
+	if !fs.page.browserCtx.browser.IsConnected() {
+		return // ignore
+	}
+	// Ignore context canceled error to gracefuly handle shutting down
+	// of the extension. This may happen because of generated events
+	// while a frame session is being created.
+	if errors.Is(err, context.Canceled) {
+		return // ignore
+	}
+	// Final chance:
+	// Ignore the error if the context was canceled, otherwise,
+	// throw a k6 error.
+	select {
+	case <-fs.ctx.Done():
+		return
+	case <-session.done:
+		return
+	default:
+		k6Throw(fs.ctx, "cannot attach %v: %w", ti.Type, err)
+	}
+}
+
+// attachIFrameToTarget attaches an IFrame target to a given session.
+func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.SessionID) error {
+	fr := fs.manager.getFrameByID(cdp.FrameID(ti.TargetID))
+	if fr == nil {
+		// IFrame should be attached to fs.page with EventFrameAttached
+		// event before.
+		return nil
+	}
+	// Remove all children of the previously attached frame.
+	fs.manager.removeChildFramesRecursively(fr)
+
+	nfs, err := NewFrameSession(
+		fs.ctx,
+		fs.page.browserCtx.conn.getSession(sid),
+		fs.page, fs, ti.TargetID,
+		fs.logger)
+	if err != nil {
+		return fmt.Errorf("cannot attach iframe target (%v) to session (%v): %w",
+			ti.TargetID, sid, err)
+	}
+	fs.page.attachFrameSession(cdp.FrameID(ti.TargetID), nfs)
+
+	return nil
+}
+
+// attachWorkerToTarget attaches a Worker target to a given session.
+func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, sid target.SessionID) error {
+	w, err := NewWorker(fs.ctx, fs.page.browserCtx.conn.getSession(sid), ti.TargetID, ti.URL)
+	if err != nil {
+		return fmt.Errorf("cannot attach worker target (%v) to session (%v): %w",
+			ti.TargetID, sid, err)
+	}
+	fs.page.workers[sid] = w
+
+	return nil
 }
 
 func (fs *FrameSession) onDetachedFromTarget(event *target.EventDetachedFromTarget) {
