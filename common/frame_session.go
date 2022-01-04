@@ -243,11 +243,11 @@ func (fs *FrameSession) initEvents() {
 		for {
 			select {
 			case <-fs.session.done:
-				fs.logger.Debugf("NewFrameSession:initEvents:go:session.done",
+				fs.logger.Debugf("FrameSession:initEvents:go:session.done",
 					"sid:%v tid:%v", fs.session.id, fs.targetID)
 				return
 			case <-fs.ctx.Done():
-				fs.logger.Debugf("NewFrameSession:initEvents:go:ctx.Done",
+				fs.logger.Debugf("FrameSession:initEvents:go:ctx.Done",
 					"sid:%v tid:%v", fs.session.id, fs.targetID)
 
 				return
@@ -285,12 +285,8 @@ func (fs *FrameSession) initEvents() {
 				case *runtime.EventExecutionContextsCleared:
 					fs.onExecutionContextsCleared()
 				case *target.EventAttachedToTarget:
-					// handle target attachment in a new goroutine
-					// so that other frame events won't go stale.
 					fs.onAttachedToTarget(ev)
 				case *target.EventDetachedFromTarget:
-					// handle target detachment in a new goroutine
-					// so that other frame events won't go stale.
 					fs.onDetachedFromTarget(ev)
 				}
 			}
@@ -476,7 +472,7 @@ func (fs *FrameSession) isMainFrame() bool {
 }
 
 func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree) {
-	fs.logger.Debugf("NewFrameSession:handleFrameTree",
+	fs.logger.Debugf("FrameSession:handleFrameTree",
 		"sid:%v tid:%v", fs.session.id, fs.targetID)
 
 	if frameTree.Frame.ParentID != "" {
@@ -492,7 +488,7 @@ func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree) {
 }
 
 func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (string, error) {
-	fs.logger.Debugf("NewFrameSession:navigateFrame",
+	fs.logger.Debugf("FrameSession:navigateFrame",
 		"sid:%v tid:%v url:%q referrer:%q",
 		fs.session.id, fs.targetID, url, referrer)
 
@@ -541,7 +537,7 @@ func (fs *FrameSession) onExceptionThrown(event *runtime.EventExceptionThrown) {
 }
 
 func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionContextCreated) {
-	fs.logger.Debugf("NewFrameSession:onExecutionContextCreated",
+	fs.logger.Debugf("FrameSession:onExecutionContextCreated",
 		"sid:%v tid:%v ectxid:%d",
 		fs.session.id, fs.targetID, event.Context.ID)
 
@@ -579,7 +575,7 @@ func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionC
 }
 
 func (fs *FrameSession) onExecutionContextDestroyed(execCtxID runtime.ExecutionContextID) {
-	fs.logger.Debugf("NewFrameSession:onExecutionContextDestroyed",
+	fs.logger.Debugf("FrameSession:onExecutionContextDestroyed",
 		"sid:%v tid:%v ectxid:%d",
 		fs.session.id, fs.targetID, execCtxID)
 
@@ -596,7 +592,7 @@ func (fs *FrameSession) onExecutionContextDestroyed(execCtxID runtime.ExecutionC
 }
 
 func (fs *FrameSession) onExecutionContextsCleared() {
-	fs.logger.Debugf("NewFrameSession:onExecutionContextsCleared",
+	fs.logger.Debugf("FrameSession:onExecutionContextsCleared",
 		"sid:%v tid:%v", fs.session.id, fs.targetID)
 
 	fs.contextIDToContextMu.Lock()
@@ -613,7 +609,7 @@ func (fs *FrameSession) onExecutionContextsCleared() {
 }
 
 func (fs *FrameSession) onFrameAttached(frameID cdp.FrameID, parentFrameID cdp.FrameID) {
-	fs.logger.Debugf("NewFrameSession:onFrameAttached",
+	fs.logger.Debugf("FrameSession:onFrameAttached",
 		"sid:%v tid:%v fid:%v pfid:%v",
 		fs.session.id, fs.targetID, frameID, parentFrameID)
 
@@ -622,7 +618,7 @@ func (fs *FrameSession) onFrameAttached(frameID cdp.FrameID, parentFrameID cdp.F
 }
 
 func (fs *FrameSession) onFrameDetached(frameID cdp.FrameID, reason cdppage.FrameDetachedReason) {
-	fs.logger.Debugf("NewFrameSession:onFrameDetached",
+	fs.logger.Debugf("FrameSession:onFrameDetached",
 		"sid:%v tid:%v fid:%v reason:%s",
 		fs.session.id, fs.targetID, frameID, reason)
 
@@ -630,7 +626,7 @@ func (fs *FrameSession) onFrameDetached(frameID cdp.FrameID, reason cdppage.Fram
 }
 
 func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
-	fs.logger.Debugf("NewFrameSession:onFrameNavigated",
+	fs.logger.Debugf("FrameSession:onFrameNavigated",
 		"sid:%v tid:%v fid:%v",
 		fs.session.id, fs.targetID, frame.ID)
 
@@ -641,7 +637,7 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 }
 
 func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequestedNavigation) {
-	fs.logger.Debugf("NewFrameSession:onFrameRequestedNavigation",
+	fs.logger.Debugf("FrameSession:onFrameRequestedNavigation",
 		"sid:%v tid:%v fid:%v url:%q",
 		fs.session.id, fs.targetID, event.FrameID, event.URL)
 
@@ -654,7 +650,7 @@ func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequ
 }
 
 func (fs *FrameSession) onFrameStartedLoading(frameID cdp.FrameID) {
-	fs.logger.Debugf("NewFrameSession:onFrameStartedLoading",
+	fs.logger.Debugf("FrameSession:onFrameStartedLoading",
 		"sid:%v tid:%v fid:%v",
 		fs.session.id, fs.targetID, frameID)
 
@@ -662,7 +658,7 @@ func (fs *FrameSession) onFrameStartedLoading(frameID cdp.FrameID) {
 }
 
 func (fs *FrameSession) onFrameStoppedLoading(frameID cdp.FrameID) {
-	fs.logger.Debugf("NewFrameSession:onFrameStoppedLoading",
+	fs.logger.Debugf("FrameSession:onFrameStoppedLoading",
 		"sid:%v tid:%v fid:%v",
 		fs.session.id, fs.targetID, frameID)
 
@@ -692,7 +688,7 @@ func (fs *FrameSession) onLogEntryAdded(event *log.EventEntryAdded) {
 }
 
 func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
-	fs.logger.Debugf("NewFrameSession:onPageLifecycle",
+	fs.logger.Debugf("FrameSession:onPageLifecycle",
 		"sid:%v tid:%v fid:%v event:%q",
 		fs.session.id, fs.targetID, event.FrameID, event.Name)
 
@@ -773,7 +769,7 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 }
 
 func (fs *FrameSession) onPageNavigatedWithinDocument(event *cdppage.EventNavigatedWithinDocument) {
-	fs.logger.Debugf("NewFrameSession:onPageNavigatedWithinDocument",
+	fs.logger.Debugf("FrameSession:onPageNavigatedWithinDocument",
 		"sid:%v tid:%v fid:%v",
 		fs.session.id, fs.targetID, event.FrameID)
 
@@ -787,7 +783,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 		err error
 	)
 
-	fs.logger.Debugf("NewFrameSession:onAttachedToTarget",
+	fs.logger.Debugf("FrameSession:onAttachedToTarget",
 		"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q",
 		fs.session.id, fs.targetID, event.SessionID,
 		event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
@@ -819,21 +815,19 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 		return
 	}
 	// Handle or ignore errors.
-	defer fs.logger.Debugf("FrameSession:onAttachedToTarget:return",
-		"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q err:%v",
-		fs.session.id, fs.targetID, sid,
-		ti.TargetID, ti.BrowserContextID,
-		ti.Type, err)
+	var reason string
+	defer func() {
+		fs.logger.Debugf("FrameSession:onAttachedToTarget:return",
+			"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q reason:%s",
+			fs.session.id, fs.targetID, sid,
+			ti.TargetID, ti.BrowserContextID,
+			ti.Type, reason)
+	}()
 	// Ignore errors if we're no longer connected to browser.
 	// This happens when there is no browser but we still want to
 	// attach a frame/worker to it.
 	if !fs.page.browserCtx.browser.IsConnected() {
-		return // ignore
-	}
-	// Ignore context canceled error to gracefuly handle shutting down
-	// of the extension. This may happen because of generated events
-	// while a frame session is being created.
-	if errors.Is(err, context.Canceled) {
+		reason = "browser disconnected"
 		return // ignore
 	}
 	// Final chance:
@@ -841,10 +835,20 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	// throw a k6 error.
 	select {
 	case <-fs.ctx.Done():
+		reason = "frame session context canceled"
 		return
 	case <-session.done:
+		reason = "session closed"
 		return
 	default:
+		// Ignore context canceled error to gracefuly handle shutting down
+		// of the extension. This may happen because of generated events
+		// while a frame session is being created.
+		if errors.Is(err, context.Canceled) {
+			reason = "context canceled"
+			return // ignore
+		}
+		reason = "fatal"
 		k6Throw(fs.ctx, "cannot attach %v: %w", ti.Type, err)
 	}
 }
@@ -855,6 +859,10 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 	if fr == nil {
 		// IFrame should be attached to fs.page with EventFrameAttached
 		// event before.
+		fs.logger.Debugf("FrameSession:attachIFrameToTarget:return",
+			"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q, nil frame",
+			fs.session.id, fs.targetID,
+			sid, ti.TargetID, ti.BrowserContextID, ti.Type)
 		return nil
 	}
 	// Remove all children of the previously attached frame.
@@ -887,7 +895,7 @@ func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, sid target.Session
 }
 
 func (fs *FrameSession) onDetachedFromTarget(event *target.EventDetachedFromTarget) {
-	fs.logger.Debugf("NewFrameSession:onDetachedFromTarget",
+	fs.logger.Debugf("FrameSession:onDetachedFromTarget",
 		"sid:%v tid:%v esid:%v",
 		fs.session.id, fs.targetID, event.SessionID)
 
@@ -895,7 +903,7 @@ func (fs *FrameSession) onDetachedFromTarget(event *target.EventDetachedFromTarg
 }
 
 func (fs *FrameSession) onTargetCrashed(event *inspector.EventTargetCrashed) {
-	fs.logger.Debugf("NewFrameSession:onTargetCrashed", "sid:%v tid:%v", fs.session.id, fs.targetID)
+	fs.logger.Debugf("FrameSession:onTargetCrashed", "sid:%v tid:%v", fs.session.id, fs.targetID)
 
 	fs.session.markAsCrashed()
 	fs.page.didCrash()
