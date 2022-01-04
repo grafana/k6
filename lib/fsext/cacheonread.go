@@ -21,27 +21,77 @@
 package fsext
 
 import (
+	"errors"
+	"sync"
 	"time"
 
 	"github.com/spf13/afero"
 )
+
+// ErrFileNeverOpenedBefore represent an error when file never opened before
+var ErrFileNeverOpenedBefore = errors.New("file wasn't opened before")
 
 // CacheOnReadFs is wrapper around afero.CacheOnReadFs with the ability to return the filesystem
 // that is used as cache
 type CacheOnReadFs struct {
 	afero.Fs
 	cache afero.Fs
+
+	lock       *sync.Mutex
+	openedOnly bool
+	opened     map[string]struct{}
+}
+
+// OnlyOpenedEnabler enables the mode of FS that allows to open
+// already opened files (e.g. serve from cache only)
+type OnlyOpenedEnabler interface {
+	AllowOnlyOpened()
+}
+
+// CacheLayerGetter provide a direct access to a cache layer
+type CacheLayerGetter interface {
+	GetCachingFs() afero.Fs
 }
 
 // NewCacheOnReadFs returns a new CacheOnReadFs
 func NewCacheOnReadFs(base, layer afero.Fs, cacheTime time.Duration) afero.Fs {
-	return CacheOnReadFs{
+	return &CacheOnReadFs{
 		Fs:    afero.NewCacheOnReadFs(base, layer, cacheTime),
 		cache: layer,
+
+		lock:       &sync.Mutex{},
+		openedOnly: false,
+		opened:     map[string]struct{}{},
 	}
 }
 
 // GetCachingFs returns the afero.Fs being used for cache
-func (c CacheOnReadFs) GetCachingFs() afero.Fs {
+func (c *CacheOnReadFs) GetCachingFs() afero.Fs { // nolint:ireturn
 	return c.cache
+}
+
+// AllowOnlyOpened enables the opened only mode of the CacheOnReadFs
+func (c *CacheOnReadFs) AllowOnlyOpened() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.openedOnly = true
+}
+
+// Open opens file and track the history of opened files
+// if CacheOnReadFs is in the opened only mode it should return
+// an error if file wasn't open before
+func (c *CacheOnReadFs) Open(name string) (afero.File, error) { // nolint:ireturn
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if !c.openedOnly {
+		c.opened[name] = struct{}{}
+	} else {
+		if _, ok := c.opened[name]; !ok {
+			return nil, ErrFileNeverOpenedBefore
+		}
+	}
+
+	return c.Fs.Open(name)
 }

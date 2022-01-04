@@ -251,7 +251,7 @@ func (arc *Archive) Write(out io.Writer) error {
 	normalizeAndAnonymizeURL(metaArc.PwdURL)
 	metaArc.Filename = getURLtoString(metaArc.FilenameURL)
 	metaArc.Pwd = getURLtoString(metaArc.PwdURL)
-	var actualDataPath, err = url.PathUnescape(path.Join(getURLPathOnFs(metaArc.FilenameURL)))
+	actualDataPath, err := url.PathUnescape(path.Join(getURLPathOnFs(metaArc.FilenameURL)))
 	if err != nil {
 		return err
 	}
@@ -286,7 +286,7 @@ func (arc *Archive) Write(out io.Writer) error {
 		if !ok {
 			continue
 		}
-		if cachedfs, ok := filesystem.(fsext.CacheOnReadFs); ok {
+		if cachedfs, ok := filesystem.(fsext.CacheLayerGetter); ok {
 			filesystem = cachedfs.GetCachingFs()
 		}
 
@@ -344,7 +344,7 @@ func (arc *Archive) Write(out io.Writer) error {
 		}
 
 		for _, filePath := range paths {
-			var fullFilePath = path.Clean(path.Join(name, filePath))
+			fullFilePath := path.Clean(path.Join(name, filePath))
 			// we either have opaque
 			if fullFilePath == actualDataPath {
 				madeLinkToData = true

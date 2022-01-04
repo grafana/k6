@@ -55,6 +55,7 @@ import (
 	"go.k6.io/k6/js/modules/k6/ws"
 	"go.k6.io/k6/lib"
 	_ "go.k6.io/k6/lib/executor" // TODO: figure out something better
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
@@ -1155,6 +1156,31 @@ func TestVUIntegrationOpenFunctionErrorWhenSneaky(t *testing.T) {
 	err = vu.RunOnce()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "only available in the init stage")
+}
+
+func TestVUDoesNotOpenUnderConditions(t *testing.T) {
+	t.Parallel()
+
+	baseFS := afero.NewMemMapFs()
+	data := `			
+	      if (__VU > 0) {
+		      data = open("/home/somebody/test.json");
+			}
+			exports.default = function(data) {
+				console.log("hey")
+			}
+		`
+	require.NoError(t, afero.WriteFile(baseFS, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
+	require.NoError(t, afero.WriteFile(baseFS, "/script.js", []byte(data), os.ModePerm))
+
+	fs := fsext.NewCacheOnReadFs(baseFS, afero.NewMemMapFs(), 0)
+
+	r, err := getSimpleRunner(t, "/script.js", data, fs)
+	require.NoError(t, err)
+
+	_, err = r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "open() can't be used under the conditions")
 }
 
 func TestVUIntegrationCookiesReset(t *testing.T) {

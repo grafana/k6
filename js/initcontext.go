@@ -48,6 +48,7 @@ import (
 	"go.k6.io/k6/js/modules/k6/metrics"
 	"go.k6.io/k6/js/modules/k6/ws"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/loader"
 )
 
@@ -299,13 +300,8 @@ func (i *InitContext) Open(ctx context.Context, filename string, args ...string)
 	if filename[0:1] != afero.FilePathSeparator {
 		filename = afero.FilePathSeparator + filename
 	}
-	// Workaround for https://github.com/spf13/afero/issues/201
-	if isDir, err := afero.IsDir(fs, filename); err != nil {
-		return nil, err
-	} else if isDir {
-		return nil, fmt.Errorf("open() can't be used with directories, path: %q", filename)
-	}
-	data, err := afero.ReadFile(fs, filename)
+
+	data, err := readFile(fs, filename)
 	if err != nil {
 		return nil, err
 	}
@@ -315,6 +311,40 @@ func (i *InitContext) Open(ctx context.Context, filename string, args ...string)
 		return i.runtime.ToValue(&ab), nil
 	}
 	return i.runtime.ToValue(string(data)), nil
+}
+
+func readFile(fileSystem afero.Fs, filename string) ([]byte, error) {
+	// Workaround for https://github.com/spf13/afero/issues/201
+	if isDir, err := afero.IsDir(fileSystem, filename); err != nil {
+		return nil, err
+	} else if isDir {
+		return nil, fmt.Errorf("open() can't be used with directories, path: %q", filename)
+	}
+
+	data, err := afero.ReadFile(fileSystem, filename)
+	if err == nil {
+		return data, nil
+	}
+
+	// loading different files per VU is not supported, so all files should are going
+	// to be used inside the scenario should be opened during the init step (without any conditions)
+	if errors.Is(err, fsext.ErrFileNeverOpenedBefore) {
+		return nil, fmt.Errorf("open() can't be used under the conditions, path: %q", filename)
+	}
+
+	return nil, err
+}
+
+// allowOnlyOpenedFiles enables seen only files
+func (i *InitContext) allowOnlyOpenedFiles() {
+	fs := i.filesystems["file"]
+
+	alreadyOpenedFS, ok := fs.(fsext.OnlyOpenedEnabler)
+	if !ok {
+		return
+	}
+
+	alreadyOpenedFS.AllowOnlyOpened()
 }
 
 func getInternalJSModules() map[string]interface{} {
