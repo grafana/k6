@@ -39,7 +39,7 @@ type CacheOnReadFs struct {
 
 	lock       *sync.Mutex
 	openedOnly bool
-	opened     map[string]struct{}
+	opened     map[string]bool
 }
 
 // OnlyOpenedEnabler enables the mode of FS that allows to open
@@ -61,12 +61,12 @@ func NewCacheOnReadFs(base, layer afero.Fs, cacheTime time.Duration) afero.Fs {
 
 		lock:       &sync.Mutex{},
 		openedOnly: false,
-		opened:     map[string]struct{}{},
+		opened:     make(map[string]bool),
 	}
 }
 
 // GetCachingFs returns the afero.Fs being used for cache
-func (c *CacheOnReadFs) GetCachingFs() afero.Fs { // nolint:ireturn
+func (c *CacheOnReadFs) GetCachingFs() afero.Fs {
 	return c.cache
 }
 
@@ -81,16 +81,14 @@ func (c *CacheOnReadFs) AllowOnlyOpened() {
 // Open opens file and track the history of opened files
 // if CacheOnReadFs is in the opened only mode it should return
 // an error if file wasn't open before
-func (c *CacheOnReadFs) Open(name string) (afero.File, error) { // nolint:ireturn
+func (c *CacheOnReadFs) Open(name string) (afero.File, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	if !c.openedOnly {
-		c.opened[name] = struct{}{}
-	} else {
-		if _, ok := c.opened[name]; !ok {
-			return nil, ErrFileNeverOpenedBefore
-		}
+		c.opened[name] = true
+	} else if c.openedOnly && !c.opened[name] {
+		return nil, ErrFileNeverOpenedBefore
 	}
 
 	return c.Fs.Open(name)
