@@ -118,6 +118,14 @@ type (
 		Identifier Identifier
 	}
 
+	OptionalChain struct {
+		Expression
+	}
+
+	Optional struct {
+		Expression
+	}
+
 	FunctionLiteral struct {
 		Function      file.Idx
 		Name          *Identifier

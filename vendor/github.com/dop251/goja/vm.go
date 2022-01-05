@@ -3340,6 +3340,20 @@ func (j jdefP) exec(vm *vm) {
 	vm.sp--
 }
 
+type jopt int32
+
+func (j jopt) exec(vm *vm) {
+	switch vm.stack[vm.sp-1] {
+	case _null:
+		vm.stack[vm.sp-1] = _undefined
+		fallthrough
+	case _undefined:
+		vm.pc += int(j)
+	default:
+		vm.pc++
+	}
+}
+
 type _not struct{}
 
 var not _not

@@ -544,7 +544,8 @@ func (self *_parser) parseCallExpression(left ast.Expression) ast.Expression {
 }
 
 func (self *_parser) parseDotMember(left ast.Expression) ast.Expression {
-	period := self.expect(token.PERIOD)
+	period := self.idx
+	self.next()
 
 	literal := self.parsedLiteral
 	idx := self.idx
@@ -653,11 +654,14 @@ func (self *_parser) parseLeftHandSideExpressionAllowCall() ast.Expression {
 	}()
 
 	var left ast.Expression
+	start := self.idx
 	if self.token == token.NEW {
 		left = self.parseNewExpression()
 	} else {
 		left = self.parsePrimaryExpression()
 	}
+
+	optionalChain := false
 L:
 	for {
 		switch self.token {
@@ -668,12 +672,30 @@ L:
 		case token.LEFT_PARENTHESIS:
 			left = self.parseCallExpression(left)
 		case token.BACKTICK:
+			if optionalChain {
+				self.error(self.idx, "Invalid template literal on optional chain")
+				self.nextStatement()
+				return &ast.BadExpression{From: start, To: self.idx}
+			}
 			left = self.parseTaggedTemplateLiteral(left)
+		case token.QUESTION_DOT:
+			optionalChain = true
+			left = &ast.Optional{Expression: left}
+
+			switch self.peek() {
+			case token.LEFT_BRACKET, token.LEFT_PARENTHESIS, token.BACKTICK:
+				self.next()
+			default:
+				left = self.parseDotMember(left)
+			}
 		default:
 			break L
 		}
 	}
 
+	if optionalChain {
+		left = &ast.OptionalChain{Expression: left}
+	}
 	return left
 }
 
