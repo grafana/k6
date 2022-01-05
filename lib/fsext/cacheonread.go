@@ -30,7 +30,7 @@ import (
 )
 
 // ErrPathNeverRequestedBefore represent an error when path never opened/requested before
-var ErrPathNeverRequestedBefore = errors.New("path nevere requested before")
+var ErrPathNeverRequestedBefore = errors.New("path never requested before")
 
 // CacheOnReadFs is wrapper around afero.CacheOnReadFs with the ability to return the filesystem
 // that is used as cache
