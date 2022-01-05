@@ -203,7 +203,7 @@ func (m *FrameManager) frameLifecycleEvent(frameID cdp.FrameID, event LifecycleE
 	frame := m.getFrameByID(frameID)
 	if frame != nil {
 		frame.onLifecycleEvent(event)
-		m.mainFrame.recalculateLifecycle() // Recalculate life cycle state from the top
+		m.MainFrame().recalculateLifecycle() // Recalculate life cycle state from the top
 	}
 }
 
@@ -253,23 +253,26 @@ func (m *FrameManager) frameNavigated(frameID cdp.FrameID, parentFrameID cdp.Fra
 		}
 	}
 
-	if isMainFrame {
-		if frame != nil {
-			m.logger.Debugf("FrameManager:frameNavigated:MainFrame:delete",
-				"fmid:%d fid:%v pfid:%v docid:%s fname:%s furl:%s initial:%t oldfid:%v",
-				m.ID(), frameID, parentFrameID, documentID, name, url, initial, frame.ID())
+	var mainFrame *Frame
+	if isMainFrame && frame == nil {
+		m.logger.Debugf("FrameManager:frameNavigated:MainFrame:initialMainFrameNavigation",
+			"fmid:%d fid:%v pfid:%v docid:%s fname:%s furl:%s initial:%t",
+			m.ID(), frameID, parentFrameID, documentID, name, url, initial)
 
-			// Update frame ID to retain frame identity on cross-process navigation.
-			delete(m.frames, cdp.FrameID(frame.ID()))
-			frame.setID(frameID)
-		} else {
-			m.logger.Debugf("FrameManager:frameNavigated:MainFrame:initialMainFrameNavigation",
-				"fmid:%d fid:%v pfid:%v docid:%s fname:%s furl:%s initial:%t",
-				m.ID(), frameID, parentFrameID, documentID, name, url, initial)
+		// Initial main frame navigation.
+		frame = NewFrame(m.ctx, m, nil, frameID, m.logger)
+		mainFrame = frame
+	} else if isMainFrame && frame.ID() != string(frameID) {
+		m.logger.Debugf("FrameManager:frameNavigated:MainFrame:delete",
+			"fmid:%d fid:%v pfid:%v docid:%s fname:%s furl:%s initial:%t oldfid:%v",
+			m.ID(), frameID, parentFrameID, documentID, name, url, initial, frame.ID())
 
-			// Initial main frame navigation.
-			frame = NewFrame(m.ctx, m, nil, frameID, m.logger)
-		}
+		// Update frame ID to retain frame identity on cross-process navigation.
+		delete(m.frames, cdp.FrameID(frame.ID()))
+		frame.setID(frameID)
+		mainFrame = frame
+	}
+	if mainFrame != nil {
 		m.frames[frameID] = frame
 		m.setMainFrame(frame)
 	}
@@ -548,6 +551,11 @@ func (m *FrameManager) MainFrame() *Frame {
 func (m *FrameManager) setMainFrame(f *Frame) {
 	m.mainFrameMu.Lock()
 	defer m.mainFrameMu.Unlock()
+
+	m.logger.Debugf("FrameManager:setMainFrame",
+		"fmid:%d fid:%v furl:%s",
+		m.ID(), f.ID(), f.URL())
+
 	m.mainFrame = f
 }
 

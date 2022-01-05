@@ -51,7 +51,7 @@ func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := p.frameManager.mainFrame.evaluate(s.ctx, mainWorld, opts, rt.ToValue(`
+	result, err := p.frameManager.MainFrame().evaluate(s.ctx, mainWorld, opts, rt.ToValue(`
         () => {
             if (!document.body || !document.documentElement) {
                 return null;
@@ -95,7 +95,7 @@ func (s *screenshotter) originalViewportSize(p *Page) (*Size, *Size, error) {
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := p.frameManager.mainFrame.evaluate(s.ctx, mainWorld, opts, rt.ToValue(`
+	result, err := p.frameManager.MainFrame().evaluate(s.ctx, mainWorld, opts, rt.ToValue(`
 	() => (
 		{ width: window.innerWidth, height: window.innerHeight }
 	)`))

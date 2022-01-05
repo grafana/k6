@@ -693,7 +693,7 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
 
-	ch, evCancelFn := createWaitForEventHandler(p.ctx, p.frameManager.mainFrame, []string{EventFrameNavigation}, func(data interface{}) bool {
+	ch, evCancelFn := createWaitForEventHandler(p.ctx, p.frameManager.MainFrame(), []string{EventFrameNavigation}, func(data interface{}) bool {
 		return true // Both successful and failed navigations are considered
 	})
 	defer evCancelFn() // Remove event handler
@@ -713,7 +713,7 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 	}
 
 	if p.frameManager.mainFrame.hasSubtreeLifecycleEventFired(parsedOpts.WaitUntil) {
-		waitForEvent(p.ctx, p.frameManager.mainFrame, []string{EventFrameAddLifecycle}, func(data interface{}) bool {
+		_, _ = waitForEvent(p.ctx, p.frameManager.MainFrame(), []string{EventFrameAddLifecycle}, func(data interface{}) bool {
 			return data.(LifecycleEvent) == parsedOpts.WaitUntil
 		}, parsedOpts.Timeout)
 	}
