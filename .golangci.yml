@@ -28,11 +28,6 @@ issues:
      - paralleltest # false positive: https://github.com/kunwardeep/paralleltest/issues/8.
      text: "does not use range value in test Run"
 
-  exclude:
-   #TODO: remove this exclusion after https://github.com/golang/lint/issues/381
-   # is fixed by https://github.com/golang/lint/pull/380 or something else
-   - "should have a package comment, unless it's in another file for this package"
-
 linters-settings:
   govet:
     check-shadowing: true
