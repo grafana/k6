@@ -345,7 +345,7 @@ func (c *Connection) recvLoop() {
 	}
 }
 
-func (c *Connection) send(msg *cdproto.Message, recvCh chan *cdproto.Message, res easyjson.Unmarshaler) error {
+func (c *Connection) send(ctx context.Context, msg *cdproto.Message, recvCh chan *cdproto.Message, res easyjson.Unmarshaler) error {
 	select {
 	case c.sendCh <- msg:
 	case err := <-c.errorCh:
@@ -358,9 +358,12 @@ func (c *Connection) send(msg *cdproto.Message, recvCh chan *cdproto.Message, re
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
 		return nil
+	case <-ctx.Done():
+		c.logger.Errorf("Connection:send:<-ctx.Done()", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
+		return ctx.Err()
 	case <-c.ctx.Done():
 		c.logger.Errorf("Connection:send:<-c.ctx.Done()", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
-		return nil
+		return ctx.Err()
 	}
 
 	// Block waiting for response.
@@ -395,13 +398,12 @@ func (c *Connection) send(msg *cdproto.Message, recvCh chan *cdproto.Message, re
 		return &websocket.CloseError{Code: code}
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done #2", "sid:%v tid:%v wsURL:%q", msg.SessionID, tid, c.wsURL)
+	case <-ctx.Done():
+		c.logger.Debugf("Connection:send:<-ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v", msg.SessionID, tid, c.wsURL, c.ctx.Err())
+		return ctx.Err()
 	case <-c.ctx.Done():
 		c.logger.Debugf("Connection:send:<-c.ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v", msg.SessionID, tid, c.wsURL, c.ctx.Err())
-		// TODO: this brings many bugs to the surface
 		return c.ctx.Err()
-		// TODO: add a timeout?
-		// case <-timeout:
-		// 	return
 	}
 	return nil
 }
@@ -443,15 +445,13 @@ func (c *Connection) sendLoop() {
 		case code := <-c.closeCh:
 			c.logger.Debugf("Connection:sendLoop:<-c.closeCh", "wsURL:%q code:%d", c.wsURL, code)
 			_ = c.closeConnection(code)
+			return
 		case <-c.done:
 			c.logger.Debugf("Connection:sendLoop:<-c.done#2", "wsURL:%q", c.wsURL)
+			return
 		case <-c.ctx.Done():
 			c.logger.Debugf("connection:sendLoop", "returning, ctx.Err: %q", c.ctx.Err())
 			return
-			// case <-time.After(time.Second * 10):
-			// 	c.logger.Errorf("connection:sendLoop", "returning, timeout")
-			// 	c.Close()
-			// 	return
 		}
 	}
 }
@@ -513,5 +513,5 @@ func (c *Connection) Execute(ctx context.Context, method string, params easyjson
 		Method: cdproto.MethodType(method),
 		Params: buf,
 	}
-	return c.send(msg, ch, res)
+	return c.send(c.ctx, msg, ch, res)
 }

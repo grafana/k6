@@ -40,7 +40,6 @@ var _ cdp.Executor = &Session{}
 type Session struct {
 	BaseEventEmitter
 
-	ctx      context.Context
 	conn     *Connection
 	id       target.SessionID
 	targetID target.ID
@@ -57,7 +56,6 @@ type Session struct {
 func NewSession(ctx context.Context, conn *Connection, id target.SessionID, tid target.ID, logger *Logger) *Session {
 	s := Session{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
-		ctx:              ctx,
 		conn:             conn,
 		id:               id,
 		targetID:         tid,
@@ -164,7 +162,8 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 	s.onAll(evCancelCtx, chEvHandler)
 	defer evCancelFn() // Remove event handler
 
-	// Send the message
+	s.logger.Debugf("Session:Execute:s.conn.send", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
+
 	var buf []byte
 	if params != nil {
 		var err error
@@ -179,8 +178,7 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 		Method:    cdproto.MethodType(method),
 		Params:    buf,
 	}
-	s.logger.Debugf("Session:Execute:s.conn.send", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
-	return s.conn.send(msg, ch, res)
+	return s.conn.send(contextWithDoneChan(ctx, s.done), msg, ch, res)
 }
 
 func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
@@ -194,9 +192,8 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 		return ErrTargetCrashed
 	}
 
-	id := atomic.AddInt64(&s.msgID, 1)
+	s.logger.Debugf("Session:Execute:s.conn.send", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
 
-	// Send the message
 	var buf []byte
 	if params != nil {
 		var err error
@@ -207,7 +204,7 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 		}
 	}
 	msg := &cdproto.Message{
-		ID: id,
+		ID: atomic.AddInt64(&s.msgID, 1),
 		// We use different sessions to send messages to "targets"
 		// (browser, page, frame etc.) in CDP.
 		//
@@ -226,5 +223,5 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 		Method:    cdproto.MethodType(method),
 		Params:    buf,
 	}
-	return s.conn.send(msg, nil, res)
+	return s.conn.send(contextWithDoneChan(ctx, s.done), msg, nil, res)
 }

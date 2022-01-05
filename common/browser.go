@@ -242,13 +242,15 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		b.sessionIDtoTargetID[ev.SessionID] = evti.TargetID
 		b.sessionIDtoTargetIDMu.Unlock()
 	case "page":
-		var opener *Page = nil
+		// Opener is nil for the initial page
+		var opener *Page
 		b.pagesMu.RLock()
 		if t, ok := b.pages[evti.OpenerID]; ok {
 			opener = t
 		}
-		b.logger.Debugf("Browser:onAttachedToTarget:page", "sid:%v tid:%v opener nil:%t", ev.SessionID, evti.TargetID, opener == nil)
 		b.pagesMu.RUnlock()
+
+		b.logger.Debugf("Browser:onAttachedToTarget:page", "sid:%v tid:%v opener nil:%t", ev.SessionID, evti.TargetID, opener == nil)
 
 		p, err := NewPage(b.ctx, b.conn.getSession(ev.SessionID), browserCtx, evti.TargetID, opener, true, b.logger)
 		if err != nil {
@@ -279,6 +281,8 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	}
 }
 
+// onDetachedFromTarget event can be issued multiple times per target if multiple
+// sessions have been attached to it. So we'll remove the page only once.
 func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
 	b.sessionIDtoTargetIDMu.RLock()
 	targetID, ok := b.sessionIDtoTargetID[ev.SessionID]

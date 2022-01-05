@@ -542,7 +542,7 @@ func (f *Frame) waitForFunction(
 			rt.ToValue(polling),
 		}, args...)...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("frame cannot wait for function: %w", err)
 	}
 	return result, nil
 }
@@ -569,14 +569,14 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 
 	ec := f.executionContexts[mainWorld]
 	if ec == nil {
-		return nil, fmt.Errorf("cannot find execution context: %q", mainWorld)
+		return nil, fmt.Errorf("wait for selector cannot find execution context: %q", mainWorld)
 	}
 	// an element should belong to the current execution context.
 	// otherwise, we should adopt it to this execution context.
 	if ec != handle.execCtx {
 		defer handle.Dispose()
 		if handle, err = ec.adoptElementHandle(handle); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("wait for selector cannot adopt element handle: %w", err)
 		}
 	}
 
@@ -1481,7 +1481,11 @@ func (f *Frame) evaluate(
 	if ec == nil {
 		return nil, fmt.Errorf("cannot find execution context: %q", world)
 	}
-	return ec.evaluate(apiCtx, opts, pageFunc, args...)
+	eh, err := ec.evaluate(apiCtx, opts, pageFunc, args...)
+	if err != nil {
+		return nil, fmt.Errorf("frame cannot evaluate: %w", err)
+	}
+	return eh, nil
 }
 
 // frameExecutionContext represents a JS execution context that belongs to Frame.

@@ -137,24 +137,12 @@ func NewPage(
 	p.Mouse = NewMouse(ctx, session, p.frameManager.MainFrame(), browserCtx.timeoutSettings, p.Keyboard)
 	p.Touchscreen = NewTouchscreen(ctx, session, p.Keyboard)
 
-	if err := p.initEvents(); err != nil {
-		p.logger.Debugf("Page:NewPage:initEvents:return", "sid:%v tid:%v err:%v",
-			p.sessionID(), targetID, err)
-
-		return nil, err
+	action := target.SetAutoAttach(true, true).WithFlatten(true)
+	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+		return nil, fmt.Errorf("cannot execute %T: %w", action, err)
 	}
 
 	return &p, nil
-}
-
-func (p *Page) initEvents() error {
-	p.logger.Debugf("Page:initEvents", "sid:%v", p.sessionID())
-
-	action := target.SetAutoAttach(true, true).WithFlatten(true)
-	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return fmt.Errorf("unable to execute %T: %w", action, err)
-	}
-	return nil
 }
 
 func (p *Page) closeWorker(sessionID target.SessionID) {
