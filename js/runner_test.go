@@ -1162,9 +1162,9 @@ func TestVUDoesNotOpenUnderConditions(t *testing.T) {
 	t.Parallel()
 
 	baseFS := afero.NewMemMapFs()
-	data := `			
-	      if (__VU > 0) {
-		      data = open("/home/somebody/test.json");
+	data := `
+			if (__VU > 0) {
+				data = open("/home/somebody/test.json");
 			}
 			exports.default = function(data) {
 				console.log("hey")
@@ -1180,7 +1180,31 @@ func TestVUDoesNotOpenUnderConditions(t *testing.T) {
 
 	_, err = r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "open() can't be used under the conditions")
+	assert.Contains(t, err.Error(), "open() can't be used under with files that weren't opened during initialization")
+}
+
+func TestVUDoesNonExistingPathnUnderConditions(t *testing.T) {
+	t.Parallel()
+
+	baseFS := afero.NewMemMapFs()
+	data := `
+			if (__VU == 1) {
+				data = open("/home/nobody");
+			}
+			exports.default = function(data) {
+				console.log("hey")
+			}
+		`
+	require.NoError(t, afero.WriteFile(baseFS, "/script.js", []byte(data), os.ModePerm))
+
+	fs := fsext.NewCacheOnReadFs(baseFS, afero.NewMemMapFs(), 0)
+
+	r, err := getSimpleRunner(t, "/script.js", data, fs)
+	require.NoError(t, err)
+
+	_, err = r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "open() can't be used under with files that weren't opened during initialization")
 }
 
 func TestVUIntegrationCookiesReset(t *testing.T) {

@@ -313,7 +313,18 @@ func (i *InitContext) Open(ctx context.Context, filename string, args ...string)
 	return i.runtime.ToValue(string(data)), nil
 }
 
-func readFile(fileSystem afero.Fs, filename string) ([]byte, error) {
+func readFile(fileSystem afero.Fs, filename string) (data []byte, err error) {
+	defer func() {
+		if errors.Is(err, fsext.ErrPathNeverRequestedBefore) {
+			// loading different files per VU is not supported, so all files should are going
+			// to be used inside the scenario should be opened during the init step (without any conditions)
+			err = fmt.Errorf(
+				"open() can't be used under with files that weren't opened during initialization (__VU==0), path: %q",
+				filename,
+			)
+		}
+	}()
+
 	// Workaround for https://github.com/spf13/afero/issues/201
 	if isDir, err := afero.IsDir(fileSystem, filename); err != nil {
 		return nil, err
@@ -321,18 +332,7 @@ func readFile(fileSystem afero.Fs, filename string) ([]byte, error) {
 		return nil, fmt.Errorf("open() can't be used with directories, path: %q", filename)
 	}
 
-	data, err := afero.ReadFile(fileSystem, filename)
-	if err == nil {
-		return data, nil
-	}
-
-	// loading different files per VU is not supported, so all files should are going
-	// to be used inside the scenario should be opened during the init step (without any conditions)
-	if errors.Is(err, fsext.ErrFileNeverOpenedBefore) {
-		return nil, fmt.Errorf("open() can't be used under the conditions, path: %q", filename)
-	}
-
-	return nil, err
+	return afero.ReadFile(fileSystem, filename)
 }
 
 // allowOnlyOpenedFiles enables seen only files

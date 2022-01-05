@@ -22,14 +22,15 @@ package fsext
 
 import (
 	"errors"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/spf13/afero"
 )
 
-// ErrFileNeverOpenedBefore represent an error when file never opened before
-var ErrFileNeverOpenedBefore = errors.New("file wasn't opened before")
+// ErrPathNeverRequestedBefore represent an error when path never opened/requested before
+var ErrPathNeverRequestedBefore = errors.New("path nevere requested before")
 
 // CacheOnReadFs is wrapper around afero.CacheOnReadFs with the ability to return the filesystem
 // that is used as cache
@@ -73,23 +74,42 @@ func (c *CacheOnReadFs) GetCachingFs() afero.Fs {
 // AllowOnlyOpened enables the opened only mode of the CacheOnReadFs
 func (c *CacheOnReadFs) AllowOnlyOpened() {
 	c.lock.Lock()
-	defer c.lock.Unlock()
-
 	c.openedOnly = true
+	c.lock.Unlock()
 }
 
 // Open opens file and track the history of opened files
 // if CacheOnReadFs is in the opened only mode it should return
 // an error if file wasn't open before
 func (c *CacheOnReadFs) Open(name string) (afero.File, error) {
+	if err := c.checkOrRemember(name); err != nil {
+		return nil, err
+	}
+
+	return c.Fs.Open(name)
+}
+
+// Stat returns a FileInfo describing the named file, or an error, if any
+// happens.
+// if CacheOnReadFs is in the opened only mode it should return
+// an error if path wasn't open before
+func (c *CacheOnReadFs) Stat(path string) (os.FileInfo, error) {
+	if err := c.checkOrRemember(path); err != nil {
+		return nil, err
+	}
+
+	return c.Fs.Stat(path)
+}
+
+func (c *CacheOnReadFs) checkOrRemember(path string) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	if !c.openedOnly {
-		c.opened[name] = true
-	} else if c.openedOnly && !c.opened[name] {
-		return nil, ErrFileNeverOpenedBefore
+		c.opened[path] = true
+	} else if !c.opened[path] {
+		return ErrPathNeverRequestedBefore
 	}
 
-	return c.Fs.Open(name)
+	return nil
 }
