@@ -1,3 +1,5 @@
+GOLANGCI_VERSION = $(shell head -n 1 .golangci.yml | sed 's/# //g')
+
 all: build
 
 .PHONY: build
@@ -10,7 +12,7 @@ format:
 
 .PHONY: ci-like-lint
 ci-like-lint :
-	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:$(shell head -n 1 .golangci.version) make lint
+	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:$(GOLANGCI_VERSION) make lint
 
 .PHONY: lint
 lint :

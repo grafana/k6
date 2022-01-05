@@ -1,3 +1,5 @@
+# v1.43.0
+# Please don't remove the first line. It uses in CI to determine the golangci version
 run:
   deadline: 5m
 
@@ -50,7 +52,7 @@ linters-settings:
     template-path: ".license-template"
     values:
       const:
-        year: 2022
+        year: "2022"
       regexp:
         year-range: (\d\d\d\d|{{year}})
 

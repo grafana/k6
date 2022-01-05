@@ -55,7 +55,7 @@ jobs:
       - name: Install golangci-lint
         working-directory: /tmp
         run: |
-          GOLANG_CI_VERSION=$(head -n 1 .golangci.version)
+          GOLANG_CI_VERSION=$(head -n 1 "${GITHUB_WORKSPACE}/.golangci.yml" | sed 's/# //g')
           go install "github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANG_CI_VERSION"
       - name: Run linters
         run: |
