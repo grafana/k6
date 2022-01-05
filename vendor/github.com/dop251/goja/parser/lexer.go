@@ -405,7 +405,12 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 			case '~':
 				tkn = token.BITWISE_NOT
 			case '?':
-				tkn = token.QUESTION_MARK
+				if self.chr == '.' && !isDecimalDigit(self._peek()) {
+					self.read()
+					tkn = token.QUESTION_DOT
+				} else {
+					tkn = token.QUESTION_MARK
+				}
 			case '"', '\'':
 				insertSemicolon = true
 				tkn = token.STRING

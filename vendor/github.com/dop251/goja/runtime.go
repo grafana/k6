@@ -294,9 +294,20 @@ type uncatchableException struct {
 	err error
 }
 
+func (ue *uncatchableException) Unwrap() error {
+	return ue.err
+}
+
 type InterruptedError struct {
 	Exception
 	iface interface{}
+}
+
+func (e *InterruptedError) Unwrap() error {
+	if err, ok := e.iface.(error); ok {
+		return err
+	}
+	return nil
 }
 
 type StackOverflowError struct {

@@ -188,6 +188,16 @@ type compiledSpreadCallArgument struct {
 	expr compiledExpr
 }
 
+type compiledOptionalChain struct {
+	baseCompiledExpr
+	expr compiledExpr
+}
+
+type compiledOptional struct {
+	baseCompiledExpr
+	expr compiledExpr
+}
+
 func (e *defaultDeleteExpr) emitGetter(putOnStack bool) {
 	e.expr.emitGetter(false)
 	if putOnStack {
@@ -264,6 +274,18 @@ func (c *compiler) compileExpression(v ast.Expression) compiledExpr {
 		return c.compileObjectAssignmentPattern(v)
 	case *ast.ArrayPattern:
 		return c.compileArrayAssignmentPattern(v)
+	case *ast.OptionalChain:
+		r := &compiledOptionalChain{
+			expr: c.compileExpression(v.Expression),
+		}
+		r.init(c, v.Idx0())
+		return r
+	case *ast.Optional:
+		r := &compiledOptional{
+			expr: c.compileExpression(v.Expression),
+		}
+		r.init(c, v.Idx0())
+		return r
 	default:
 		panic(fmt.Errorf("Unknown expression type: %T", v))
 	}
@@ -300,7 +322,7 @@ func (e *baseCompiledExpr) emitUnary(func(), func(), bool, bool) {
 
 func (e *baseCompiledExpr) addSrcMap() {
 	if e.offset >= 0 {
-		e.c.p.srcMap = append(e.c.p.srcMap, srcMapItem{pc: len(e.c.p.code), srcPos: e.offset})
+		e.c.p.addSrcMap(e.offset)
 	}
 }
 
@@ -1948,6 +1970,12 @@ func (c *compiler) emitCallee(callee compiledExpr) (calleeName unistring.String)
 	case *compiledIdentifierExpr:
 		calleeName = callee.name
 		callee.emitGetterAndCallee()
+	case *compiledOptionalChain:
+		c.startOptChain()
+		c.emitCallee(callee.expr)
+		c.endOptChain()
+	case *compiledOptional:
+		c.emitCallee(callee.expr)
 	default:
 		c.emit(loadUndef)
 		callee.emitGetter(true)
@@ -2360,5 +2388,37 @@ func (e *compiledSpreadCallArgument) emitGetter(putOnStack bool) {
 	e.expr.emitGetter(putOnStack)
 	if putOnStack {
 		e.c.emit(pushSpread)
+	}
+}
+
+func (c *compiler) startOptChain() {
+	c.block = &block{
+		typ:   blockOptChain,
+		outer: c.block,
+	}
+}
+
+func (c *compiler) endOptChain() {
+	lbl := len(c.p.code)
+	for _, item := range c.block.breaks {
+		c.p.code[item] = jopt(lbl - item)
+	}
+	c.block = c.block.outer
+}
+
+func (e *compiledOptionalChain) emitGetter(putOnStack bool) {
+	e.c.startOptChain()
+	e.expr.emitGetter(true)
+	e.c.endOptChain()
+	if !putOnStack {
+		e.c.emit(pop)
+	}
+}
+
+func (e *compiledOptional) emitGetter(putOnStack bool) {
+	e.expr.emitGetter(putOnStack)
+	if putOnStack {
+		e.c.block.breaks = append(e.c.block.breaks, len(e.c.p.code))
+		e.c.emit(nil)
 	}
 }

@@ -67,6 +67,7 @@ const (
 	SEMICOLON         // ;
 	COLON             // :
 	QUESTION_MARK     // ?
+	QUESTION_DOT      // ?.
 	ARROW             // =>
 	ELLIPSIS          // ...
 	BACKTICK          // `
@@ -174,6 +175,7 @@ var token2string = [...]string{
 	SEMICOLON:                   ";",
 	COLON:                       ":",
 	QUESTION_MARK:               "?",
+	QUESTION_DOT:                "?.",
 	ARROW:                       "=>",
 	ELLIPSIS:                    "...",
 	BACKTICK:                    "`",
