@@ -976,3 +976,33 @@ func TestBundleMakeArchive(t *testing.T) {
 		})
 	}
 }
+
+func TestPromiseRejectionHandler(t *testing.T) {
+	t.Parallel()
+	logger := logrus.New()
+	logger.SetLevel(logrus.InfoLevel)
+	logger.Out = ioutil.Discard
+	hook := testutils.SimpleLogrusHook{
+		HookedLevels: []logrus.Level{logrus.WarnLevel, logrus.InfoLevel, logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel},
+	}
+	logger.AddHook(&hook)
+	_, err := getSimpleBundle(t, "/script.js", `
+		export let options = {
+			vus: 5,
+			teardownTimeout: '1s',
+		};
+		let val = true;
+		Promise.reject("here").catch((l) => console.log("caught", l));
+		export default function() {}
+	`, logger)
+	require.NoError(t, err)
+
+	entries := hook.Drain()
+	require.Len(t, entries, 2)
+	first := entries[0]
+	assert.Equal(t, logrus.WarnLevel, first.Level)
+	assert.Contains(t, first.Message, "Uncaught (in Promise) here")
+	second := entries[1]
+	assert.Equal(t, logrus.InfoLevel, second.Level)
+	assert.Contains(t, second.Message, "caught here")
+}

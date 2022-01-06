@@ -307,6 +307,28 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	}
 	rt.Set("__ENV", env)
 	rt.Set("__VU", vuID)
+	rt.SetPromiseRejectionTracker(func(p *goja.Promise, op goja.PromiseRejectionOperation) {
+		// TODO this only handles the case where a promise get's rejected without having a reject handler added.
+		// But the other case where for an already rejected promise (one that this call has already handled)
+		// there is now a reject handler attached is not handled.
+		//
+		// More complete implementation might need to wait for some time, the end of an iteration,
+		// some other event before logging a "rejection" that never got "handled"
+		//
+		// Read Notes on https://tc39.es/ecma262/#sec-host-promise-rejection-tracker
+		// see issue https://github.com/grafana/k6/issues/2318 for more info
+		if op == goja.PromiseRejectionReject {
+			frames := rt.CaptureCallStack(20, nil)
+			buf := &bytes.Buffer{}
+			for _, frame := range frames {
+				frame.Write(buf)
+				buf.WriteRune('\n')
+			}
+
+			logger.Warnf("Uncaught (in Promise) %s\n %s", p.Result(), buf.String())
+		}
+	})
+
 	rt.Set("console", common.Bind(rt, newConsole(logger), init.ctxPtr))
 
 	if init.compatibilityMode == lib.CompatibilityModeExtended {
