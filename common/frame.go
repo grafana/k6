@@ -1107,10 +1107,6 @@ func (f *Frame) IsVisible(selector string, opts goja.Value) bool {
 
 // ID returns the frame id
 func (f *Frame) ID() string {
-	if f == nil {
-		return ""
-	}
-
 	f.propertiesMu.RLock()
 	defer f.propertiesMu.RUnlock()
 
@@ -1119,10 +1115,6 @@ func (f *Frame) ID() string {
 
 // LoaderID returns the ID of the frame that loaded this frame
 func (f *Frame) LoaderID() string {
-	if f == nil {
-		return ""
-	}
-
 	f.propertiesMu.RLock()
 	defer f.propertiesMu.RUnlock()
 
@@ -1131,10 +1123,6 @@ func (f *Frame) LoaderID() string {
 
 // Name returns the frame name
 func (f *Frame) Name() string {
-	if f == nil {
-		return ""
-	}
-
 	f.propertiesMu.RLock()
 	defer f.propertiesMu.RUnlock()
 

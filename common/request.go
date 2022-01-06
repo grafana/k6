@@ -264,8 +264,5 @@ func (r *Request) Timing() goja.Value {
 
 // URL returns the request URL
 func (r *Request) URL() string {
-	if r == nil {
-		return ""
-	}
 	return r.url.String()
 }
