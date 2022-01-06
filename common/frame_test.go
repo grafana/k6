@@ -31,7 +31,7 @@ import (
 )
 
 // Test calling Frame.document does not panic with a nil document.
-// See: issue #53 for details.
+// See: Issue #53 for details.
 func TestFrameNilDocument(t *testing.T) {
 	t.Parallel()
 
@@ -78,6 +78,40 @@ func TestFrameNilDocument(t *testing.T) {
 	// frame sets documentHandle in the document method
 	got = frame.documentHandle
 	require.Equal(t, want, got)
+}
+
+// See: Issue #177 for details.
+func TestFrameManagerFrameAbortedNavigationShouldEmitANonNilPendingDocument(t *testing.T) {
+	t.Parallel()
+
+	ctx, log := context.Background(), NewNullLogger()
+
+	// add the frame to frame manager
+	fm := NewFrameManager(ctx, nil, nil, NewTimeoutSettings(nil), log)
+	frame := NewFrame(ctx, fm, nil, cdp.FrameID("42"), log)
+	fm.frames[frame.id] = frame
+
+	// listen for frame navigation events
+	recv := make(chan Event)
+	frame.on(ctx, []string{EventFrameNavigation}, recv)
+
+	// emit the navigation event
+	frame.pendingDocument = &DocumentInfo{
+		documentID: "42",
+	}
+	fm.frameAbortedNavigation(frame.id, "any error", frame.pendingDocument.documentID)
+
+	// receive the emitted event and verify that emitted document
+	// is not nil.
+	e := <-recv
+	require.IsType(t, &NavigationEvent{}, e.data, "event should be a navigation event")
+	ne := e.data.(*NavigationEvent)
+	require.NotNil(t, ne, "event should not be nil")
+	require.NotNil(t, ne.newDocument, "emitted document should not be nil")
+
+	// since the navigation is aborted, the aborting frame should have
+	// a nil pending document.
+	require.Nil(t, frame.pendingDocument)
 }
 
 type executionContextTestStub struct {

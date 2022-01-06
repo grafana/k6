@@ -137,18 +137,19 @@ func (m *FrameManager) frameAbortedNavigation(frameID cdp.FrameID, errorText, do
 	if documentID != "" && frame.pendingDocument.documentID != documentID {
 		return
 	}
-	frame.pendingDocument = nil
 
 	m.logger.Debugf("FrameManager:frameAbortedNavigation:emit:EventFrameNavigation",
 		"fmid:%d fid:%v err:%s docid:%s fname:%s furl:%s",
 		m.ID(), frameID, errorText, documentID, frame.Name(), frame.URL())
 
-	frame.emit(EventFrameNavigation, &NavigationEvent{
+	ne := &NavigationEvent{
 		url:         frame.URL(),
 		name:        frame.Name(),
 		newDocument: frame.pendingDocument,
 		err:         errors.New(errorText),
-	})
+	}
+	frame.pendingDocument = nil
+	frame.emit(EventFrameNavigation, ne)
 }
 
 func (m *FrameManager) frameAttached(frameID cdp.FrameID, parentFrameID cdp.FrameID) {
