@@ -319,7 +319,7 @@ func readFile(fileSystem afero.Fs, filename string) (data []byte, err error) {
 			// loading different files per VU is not supported, so all files should are going
 			// to be used inside the scenario should be opened during the init step (without any conditions)
 			err = fmt.Errorf(
-				"open() can't be used under with files that weren't opened during initialization (__VU==0), path: %q",
+				"open() can't be used with files that weren't previously opened during initialization (__VU==0), path: %q",
 				filename,
 			)
 		}
@@ -339,12 +339,12 @@ func readFile(fileSystem afero.Fs, filename string) (data []byte, err error) {
 func (i *InitContext) allowOnlyOpenedFiles() {
 	fs := i.filesystems["file"]
 
-	alreadyOpenedFS, ok := fs.(fsext.OnlyOpenedEnabler)
+	alreadyOpenedFS, ok := fs.(fsext.OnlyCachedEnabler)
 	if !ok {
 		return
 	}
 
-	alreadyOpenedFS.AllowOnlyOpened()
+	alreadyOpenedFS.AllowOnlyCached()
 }
 
 func getInternalJSModules() map[string]interface{} {

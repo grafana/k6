@@ -1158,15 +1158,39 @@ func TestVUIntegrationOpenFunctionErrorWhenSneaky(t *testing.T) {
 	assert.Contains(t, err.Error(), "only available in the init stage")
 }
 
+func TestVUDoesOpenUnderV0Condition(t *testing.T) {
+	t.Parallel()
+
+	baseFS := afero.NewMemMapFs()
+	data := `
+			if (__VU == 0) {
+				let data = open("/home/somebody/test.json");
+			}
+			exports.default = function() {
+				console.log("hey")
+			}
+		`
+	require.NoError(t, afero.WriteFile(baseFS, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
+	require.NoError(t, afero.WriteFile(baseFS, "/script.js", []byte(data), os.ModePerm))
+
+	fs := fsext.NewCacheOnReadFs(baseFS, afero.NewMemMapFs(), 0)
+
+	r, err := getSimpleRunner(t, "/script.js", data, fs)
+	require.NoError(t, err)
+
+	_, err = r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
+	assert.NoError(t, err)
+}
+
 func TestVUDoesNotOpenUnderConditions(t *testing.T) {
 	t.Parallel()
 
 	baseFS := afero.NewMemMapFs()
 	data := `
 			if (__VU > 0) {
-				data = open("/home/somebody/test.json");
+				let data = open("/home/somebody/test.json");
 			}
-			exports.default = function(data) {
+			exports.default = function() {
 				console.log("hey")
 			}
 		`
@@ -1180,7 +1204,7 @@ func TestVUDoesNotOpenUnderConditions(t *testing.T) {
 
 	_, err = r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "open() can't be used under with files that weren't opened during initialization")
+	assert.Contains(t, err.Error(), "open() can't be used with files that weren't previously opened during initialization (__VU==0)")
 }
 
 func TestVUDoesNonExistingPathnUnderConditions(t *testing.T) {
@@ -1189,9 +1213,9 @@ func TestVUDoesNonExistingPathnUnderConditions(t *testing.T) {
 	baseFS := afero.NewMemMapFs()
 	data := `
 			if (__VU == 1) {
-				data = open("/home/nobody");
+				let data = open("/home/nobody");
 			}
-			exports.default = function(data) {
+			exports.default = function() {
 				console.log("hey")
 			}
 		`
@@ -1204,7 +1228,7 @@ func TestVUDoesNonExistingPathnUnderConditions(t *testing.T) {
 
 	_, err = r.NewVU(1, 1, make(chan stats.SampleContainer, 100))
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "open() can't be used under with files that weren't opened during initialization")
+	assert.Contains(t, err.Error(), "open() can't be used with files that weren't previously opened during initialization (__VU==0)")
 }
 
 func TestVUIntegrationCookiesReset(t *testing.T) {

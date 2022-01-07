@@ -39,14 +39,14 @@ type CacheOnReadFs struct {
 	cache afero.Fs
 
 	lock       *sync.Mutex
-	openedOnly bool
-	opened     map[string]bool
+	cachedOnly bool
+	cached     map[string]bool
 }
 
-// OnlyOpenedEnabler enables the mode of FS that allows to open
+// OnlyCachedEnabler enables the mode of FS that allows to open
 // already opened files (e.g. serve from cache only)
-type OnlyOpenedEnabler interface {
-	AllowOnlyOpened()
+type OnlyCachedEnabler interface {
+	AllowOnlyCached()
 }
 
 // CacheLayerGetter provide a direct access to a cache layer
@@ -61,8 +61,8 @@ func NewCacheOnReadFs(base, layer afero.Fs, cacheTime time.Duration) afero.Fs {
 		cache: layer,
 
 		lock:       &sync.Mutex{},
-		openedOnly: false,
-		opened:     make(map[string]bool),
+		cachedOnly: false,
+		cached:     make(map[string]bool),
 	}
 }
 
@@ -71,10 +71,10 @@ func (c *CacheOnReadFs) GetCachingFs() afero.Fs {
 	return c.cache
 }
 
-// AllowOnlyOpened enables the opened only mode of the CacheOnReadFs
-func (c *CacheOnReadFs) AllowOnlyOpened() {
+// AllowOnlyCached enables the cached only mode of the CacheOnReadFs
+func (c *CacheOnReadFs) AllowOnlyCached() {
 	c.lock.Lock()
-	c.openedOnly = true
+	c.cachedOnly = true
 	c.lock.Unlock()
 }
 
@@ -105,9 +105,9 @@ func (c *CacheOnReadFs) checkOrRemember(path string) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if !c.openedOnly {
-		c.opened[path] = true
-	} else if !c.opened[path] {
+	if !c.cachedOnly {
+		c.cached[path] = true
+	} else if !c.cached[path] {
 		return ErrPathNeverRequestedBefore
 	}
 
