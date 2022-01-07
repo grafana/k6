@@ -198,10 +198,14 @@ func (e *ExecutionContext) evaluate(
 			WithAwaitPromise(true).
 			WithUserGesture(true)
 		if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
-			return nil, fmt.Errorf("cannot evaluate expression (%s): %w", expressionWithSourceURL, exceptionDetails)
+			return nil, fmt.Errorf("cannot call function on expression (%q) "+
+				"in execution context (%d) in frame (%v): %w",
+				expressionWithSourceURL, e.id, e.Frame().ID(), err)
 		}
 		if exceptionDetails != nil {
-			return nil, fmt.Errorf("cannot evaluate expression (%s): %w", expressionWithSourceURL, exceptionDetails)
+			return nil, fmt.Errorf("cannot call function on expression (%q) "+
+				"in execution context (%d) in frame (%v): %w",
+				expressionWithSourceURL, e.id, e.Frame().ID(), err)
 		}
 		if remoteObject == nil {
 			return
@@ -209,7 +213,9 @@ func (e *ExecutionContext) evaluate(
 		if opts.returnByValue {
 			res, err = valueFromRemoteObject(apiCtx, remoteObject)
 			if err != nil {
-				return nil, fmt.Errorf("cannot extract value from remote object (%s): %w", remoteObject.ObjectID, err)
+				return nil, fmt.Errorf("cannot extract value from remote object (%s) "+
+					"using (%s) in execution context (%d) in frame (%v): %w",
+					remoteObject.ObjectID, expressionWithSourceURL, e.id, e.Frame().ID(), err)
 			}
 		} else if remoteObject.ObjectID != "" {
 			// Note: we don't use the passed in apiCtx here as it could be tied to a timeout
@@ -220,7 +226,9 @@ func (e *ExecutionContext) evaluate(
 		for _, arg := range args {
 			result, err := convertArgument(apiCtx, e, arg)
 			if err != nil {
-				return nil, fmt.Errorf("cannot convert argument (%q): %w", arg, err)
+				return nil, fmt.Errorf("cannot convert argument (%q) "+
+					"in execution context (%d) in frame (%v): %w",
+					arg, e.id, e.Frame().ID(), err)
 			}
 			arguments = append(arguments, result)
 		}
@@ -237,10 +245,14 @@ func (e *ExecutionContext) evaluate(
 			WithAwaitPromise(true).
 			WithUserGesture(true)
 		if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
-			return nil, fmt.Errorf("cannot call function on expression (%q) in execution context (%d): %w", expressionWithSourceURL, e.id, err)
+			return nil, fmt.Errorf("cannot call function on expression (%q) "+
+				"in execution context (%d) in frame (%v): %w",
+				expressionWithSourceURL, e.id, e.Frame().ID(), err)
 		}
 		if exceptionDetails != nil {
-			return nil, fmt.Errorf("cannot call function on expression (%q) in execution context (%d): %w", expressionWithSourceURL, e.id, err)
+			return nil, fmt.Errorf("cannot call function on expression (%q) "+
+				"in execution context (%d) in frame (%v): %w",
+				expressionWithSourceURL, e.id, e.Frame().ID(), err)
 		}
 		if remoteObject == nil {
 			return
@@ -248,7 +260,9 @@ func (e *ExecutionContext) evaluate(
 		if opts.returnByValue {
 			res, err = valueFromRemoteObject(apiCtx, remoteObject)
 			if err != nil {
-				return nil, fmt.Errorf("cannot extract value from remote object (%s): %w", remoteObject.ObjectID, err)
+				return nil, fmt.Errorf("cannot extract value from remote object (%s) "+
+					"in execution context (%d) in frame (%v): %w",
+					remoteObject.ObjectID, e.id, e.Frame().ID(), err)
 			}
 		} else if remoteObject.ObjectID != "" {
 			// Note: we don't use the passed in apiCtx here as it could be tied to a timeout

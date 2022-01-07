@@ -153,8 +153,9 @@ func NewConnection(ctx context.Context, wsURL string, logger *Logger) (*Connecti
 // closeConnection cleanly closes the WebSocket connection.
 // Returns an error if sending the close control frame fails.
 func (c *Connection) closeConnection(code int) error {
-	var err error
+	c.logger.Debugf("Connection:closeConnection", "code:%d", code)
 
+	var err error
 	c.shutdownOnce.Do(func() {
 		defer func() {
 			_ = c.conn.Close()
@@ -234,6 +235,7 @@ func (c *Connection) handleIOError(err error) {
 func (c *Connection) getSession(id target.SessionID) *Session {
 	c.sessionsMu.RLock()
 	defer c.sessionsMu.RUnlock()
+
 	return c.sessions[id]
 }
 
