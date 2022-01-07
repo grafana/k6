@@ -166,7 +166,7 @@ func (f *Frame) clearLifecycle() {
 	}
 	f.lifecycleEventsMu.Unlock()
 
-	f.page.frameManager.mainFrame.recalculateLifecycle()
+	f.page.frameManager.MainFrame().recalculateLifecycle()
 
 	// keep the request related to the document if present
 	// in f.inflightRequests
@@ -419,7 +419,7 @@ func (f *Frame) position() *Position {
 	if frame == nil {
 		return nil
 	}
-	if frame == f.page.frameManager.mainFrame {
+	if frame == f.page.frameManager.MainFrame() {
 		return &Position{X: 0, Y: 0}
 	}
 	element := frame.FrameElement()
@@ -1358,6 +1358,10 @@ func (f *Frame) Uncheck(selector string, opts goja.Value) {
 
 // URL returns the frame URL.
 func (f *Frame) URL() string {
+	if f == nil {
+		return ""
+	}
+
 	f.propertiesMu.RLock()
 	defer f.propertiesMu.RUnlock()
 
