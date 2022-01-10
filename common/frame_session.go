@@ -1005,7 +1005,9 @@ func (fs *FrameSession) updateViewport() error {
 	// this method shouldn't be called for them.
 	// this is just a sanity check.
 	if !fs.isMainFrame() {
-		panic("updateViewport should be called only in the main frame")
+		err := fmt.Errorf("updateViewport should be called only in the main frame."+
+			" (sid:%v tid:%v)", fs.session.id, fs.targetID)
+		panic(err)
 	}
 
 	opts := fs.page.browserCtx.opts
@@ -1028,32 +1030,49 @@ func (fs *FrameSession) updateViewport() error {
 		WithScreenOrientation(&orientation).
 		WithScreenWidth(screen.Width).
 		WithScreenHeight(screen.Height)
-	var inset Viewport
-	if !fs.page.browserCtx.browser.launchOpts.Headless {
-		// TODO: popup windows have their own insets.
-		inset = Viewport{Width: 24, Height: 88}
-		// TODO: get the OS externally and test it for each OS
-		os := runtime.GOOS
-		switch os {
-		case "windows":
-			inset = Viewport{Width: 16, Height: 88}
-		case "linux":
-			inset = Viewport{Width: 8, Height: 85}
-		case "darwin":
-			// Playwright is using w:2 h:80 here but I checked it
-			// on my Mac and w:0 h:79 works best.
-			inset = Viewport{Width: 0, Height: 79}
-		}
-	}
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		return fmt.Errorf("unable to emulate viewport: %w", err)
 	}
+
+	// add an inset to viewport depending on the operating system.
+	// this won't add an inset if we're running in headless mode.
+	addInsetToViewport(
+		viewport,
+		fs.page.browserCtx.browser.launchOpts.Headless,
+		runtime.GOOS,
+	)
 	action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{
-		Width:  viewport.Width + inset.Width,
-		Height: viewport.Height + inset.Height,
+		Width:  viewport.Width,
+		Height: viewport.Height,
 	})
 	if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		return fmt.Errorf("unable to set window bounds: %w", err)
 	}
+
 	return nil
+}
+
+// addInsetToViewport calculates an inset depending on a given operating
+// system (os) and adds the inset width and height to Viewport.
+// It won't update the Viewport if headless is true.
+func addInsetToViewport(vp *Viewport, headless bool, os string) {
+	if headless {
+		return
+	}
+	// TODO: popup windows have their own insets.
+	var inset Viewport
+	switch os {
+	default:
+		inset = Viewport{Width: 24, Height: 88}
+	case "windows":
+		inset = Viewport{Width: 16, Height: 88}
+	case "linux":
+		inset = Viewport{Width: 8, Height: 85}
+	case "darwin":
+		// Playwright is using w:2 h:80 here but I checked it
+		// on my Mac and w:0 h:79 works best.
+		inset = Viewport{Width: 0, Height: 79}
+	}
+	vp.Width += inset.Width
+	vp.Height += inset.Height
 }
