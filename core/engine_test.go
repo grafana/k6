@@ -411,7 +411,7 @@ func getMetricMax(mo *mockoutput.MockOutput, name string) (result float64) {
 	return
 }
 
-const expectedHeaderMaxLength = 500
+const expectedHeaderMaxLength = 550
 
 // FIXME: This test is too brittle, consider simplifying.
 func TestSentReceivedMetrics(t *testing.T) {
@@ -430,6 +430,9 @@ func TestSentReceivedMetrics(t *testing.T) {
 			export default function() {
 				http.get("HTTPBIN_URL/bytes/15000");
 			}`), 1, 0, 15000},
+		// NOTE: This needs to be improved, in the case of HTTPS IN URL
+		// it's highly possible to meet the case when data received is out
+		// of in the possible interval
 		{tr(`import http from "k6/http";
 			export default function() {
 				http.get("HTTPBIN_URL/bytes/5000");
