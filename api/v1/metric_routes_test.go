@@ -26,7 +26,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/manyminds/api2go/jsonapi"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,6 +41,8 @@ import (
 )
 
 func TestGetMetrics(t *testing.T) {
+	t.Parallel()
+
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
@@ -62,31 +63,42 @@ func TestGetMetrics(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
 	t.Run("document", func(t *testing.T) {
-		var doc jsonapi.Document
+		t.Parallel()
+
+		var doc MetricsJSONAPI
 		assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &doc))
-		if !assert.NotNil(t, doc.Data.DataArray) {
+		if !assert.NotNil(t, doc.Data) {
 			return
 		}
-		assert.Equal(t, "metrics", doc.Data.DataArray[0].Type)
+		assert.Equal(t, "metrics", doc.Data[0].Type)
 	})
 
 	t.Run("metrics", func(t *testing.T) {
-		var metrics []Metric
-		assert.NoError(t, jsonapi.Unmarshal(rw.Body.Bytes(), &metrics))
+		t.Parallel()
+
+		var envelop MetricsJSONAPI
+		assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &envelop))
+
+		metrics := envelop.Data
 		if !assert.Len(t, metrics, 1) {
 			return
 		}
-		assert.Equal(t, "my_metric", metrics[0].Name)
-		assert.True(t, metrics[0].Type.Valid)
-		assert.Equal(t, stats.Trend, metrics[0].Type.Type)
-		assert.True(t, metrics[0].Contains.Valid)
-		assert.Equal(t, stats.Time, metrics[0].Contains.Type)
-		assert.True(t, metrics[0].Tainted.Valid)
-		assert.True(t, metrics[0].Tainted.Bool)
+
+		metric := metrics[0].Attributes
+
+		assert.Equal(t, "my_metric", metrics[0].ID)
+		assert.True(t, metric.Type.Valid)
+		assert.Equal(t, stats.Trend, metric.Type.Type)
+		assert.True(t, metric.Contains.Valid)
+		assert.Equal(t, stats.Time, metric.Contains.Type)
+		assert.True(t, metric.Tainted.Valid)
+		assert.True(t, metric.Tainted.Bool)
 	})
 }
 
 func TestGetMetric(t *testing.T) {
+	t.Parallel()
+
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
@@ -102,6 +114,8 @@ func TestGetMetric(t *testing.T) {
 	engine.Metrics["my_metric"].Tainted = null.BoolFrom(true)
 
 	t.Run("nonexistent", func(t *testing.T) {
+		t.Parallel()
+
 		rw := httptest.NewRecorder()
 		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics/notreal", nil))
 		res := rw.Result()
@@ -109,24 +123,30 @@ func TestGetMetric(t *testing.T) {
 	})
 
 	t.Run("real", func(t *testing.T) {
+		t.Parallel()
+
 		rw := httptest.NewRecorder()
 		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics/my_metric", nil))
 		res := rw.Result()
 		assert.Equal(t, http.StatusOK, res.StatusCode)
 
 		t.Run("document", func(t *testing.T) {
-			var doc jsonapi.Document
+			t.Parallel()
+
+			var doc metricJSONAPI
 			assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &doc))
-			if !assert.NotNil(t, doc.Data.DataObject) {
-				return
-			}
-			assert.Equal(t, "metrics", doc.Data.DataObject.Type)
+
+			assert.Equal(t, "metrics", doc.Data.Type)
 		})
 
 		t.Run("metric", func(t *testing.T) {
-			var metric Metric
-			assert.NoError(t, jsonapi.Unmarshal(rw.Body.Bytes(), &metric))
-			assert.Equal(t, "my_metric", metric.Name)
+			var envelop metricJSONAPI
+
+			assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &envelop))
+
+			metric := envelop.Data.Attributes
+
+			assert.Equal(t, "my_metric", envelop.Data.ID)
 			assert.True(t, metric.Type.Valid)
 			assert.Equal(t, stats.Trend, metric.Type.Type)
 			assert.True(t, metric.Contains.Valid)

@@ -21,9 +21,8 @@
 package v1
 
 import (
+	"encoding/json"
 	"net/http"
-
-	"github.com/manyminds/api2go/jsonapi"
 
 	"go.k6.io/k6/api/common"
 )
@@ -34,7 +33,7 @@ func handleGetGroups(rw http.ResponseWriter, r *http.Request) {
 	root := NewGroup(engine.ExecutionScheduler.GetRunner().GetDefaultGroup(), nil)
 	groups := FlattenGroup(root)
 
-	data, err := jsonapi.Marshal(groups)
+	data, err := json.Marshal(newGroupsJSONAPI(groups))
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return
@@ -60,7 +59,7 @@ func handleGetGroup(rw http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 
-	data, err := jsonapi.Marshal(group)
+	data, err := json.Marshal(newGroupJSONAPI(group))
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return

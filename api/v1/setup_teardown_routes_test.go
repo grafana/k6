@@ -30,7 +30,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/manyminds/api2go/jsonapi"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -142,6 +141,7 @@ func TestSetupData(t *testing.T) {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+
 			runner, err := js.New(
 				logger,
 				&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: testCase.script},
@@ -186,12 +186,13 @@ func TestSetupData(t *testing.T) {
 					return
 				}
 
-				var doc jsonapi.Document
+				var doc setUpJSONAPI
 				assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &doc))
-				require.NotNil(t, doc.Data)
-				require.NotNil(t, doc.Data.DataObject)
-				assert.Equal(t, "setupData", doc.Data.DataObject.Type)
-				assert.JSONEq(t, expResult, string(doc.Data.DataObject.Attributes))
+				assert.Equal(t, "setupData", doc.Data.Type)
+
+				encoded, err := json.Marshal(doc.Data.Attributes)
+				assert.NoError(t, err)
+				assert.JSONEq(t, expResult, string(encoded))
 			}
 
 			for _, setupRun := range testCase.setupRuns {

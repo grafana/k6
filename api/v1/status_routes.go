@@ -21,11 +21,10 @@
 package v1
 
 import (
+	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"net/http"
-
-	"github.com/manyminds/api2go/jsonapi"
 
 	"go.k6.io/k6/api/common"
 	"go.k6.io/k6/lib"
@@ -35,8 +34,8 @@ import (
 func handleGetStatus(rw http.ResponseWriter, r *http.Request) {
 	engine := common.GetEngine(r.Context())
 
-	status := NewStatus(engine)
-	data, err := jsonapi.Marshal(status)
+	status := newStatusJSONAPIFromEngine(engine)
+	data, err := json.Marshal(status)
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return
@@ -65,11 +64,13 @@ func handlePatchStatus(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var status Status
-	if err := jsonapi.Unmarshal(body, &status); err != nil {
+	var statusEnvelop StatusJSONAPI
+	if err = json.Unmarshal(body, &statusEnvelop); err != nil {
 		apiError(rw, "Invalid data", err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	status := statusEnvelop.Status()
 
 	if status.Stopped { //nolint:nestif
 		engine.Stop()
@@ -104,7 +105,7 @@ func handlePatchStatus(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	data, err := jsonapi.Marshal(NewStatus(engine))
+	data, err := json.Marshal(newStatusJSONAPIFromEngine(engine))
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return

@@ -18,6 +18,7 @@
  *
  */
 
+// Package v1 implements the v1 of the k6's REST API
 package v1
 
 import (

@@ -1,7 +1,7 @@
 /*
  *
  * k6 - a next-generation load testing tool
- * Copyright (C) 2017 Load Impact
+ * Copyright (C) 2021 Load Impact
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,24 +18,24 @@
  *
  */
 
-package client
+package v1
 
-import (
-	"context"
-	"net/http"
-	"net/url"
+type setUpJSONAPI struct {
+	Data setUpData `json:"data"`
+}
 
-	v1 "go.k6.io/k6/api/v1"
-)
+type setUpData struct {
+	Type       string      `json:"type"`
+	ID         string      `json:"id"`
+	Attributes interface{} `json:"attributes"`
+}
 
-// Metrics returns the current metrics summary.
-func (c *Client) Metrics(ctx context.Context) (ret []v1.Metric, err error) {
-	var resp v1.MetricsJSONAPI
-
-	err = c.CallAPI(ctx, http.MethodGet, &url.URL{Path: "/v1/metrics"}, nil, &resp)
-	if err != nil {
-		return ret, err
+func newSetUpJSONAPI(setup interface{}) setUpJSONAPI {
+	return setUpJSONAPI{
+		Data: setUpData{
+			Type:       "setupData",
+			ID:         "default",
+			Attributes: setup,
+		},
 	}
-
-	return resp.Metrics(), nil
 }

@@ -21,10 +21,9 @@
 package v1
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
-
-	"github.com/manyminds/api2go/jsonapi"
 
 	"go.k6.io/k6/api/common"
 )
@@ -37,12 +36,11 @@ func handleGetMetrics(rw http.ResponseWriter, r *http.Request) {
 		t = engine.ExecutionScheduler.GetState().GetCurrentTestRunDuration()
 	}
 
-	metrics := make([]Metric, 0)
-	for _, m := range engine.Metrics {
-		metrics = append(metrics, NewMetric(m, t))
-	}
+	engine.MetricsLock.Lock()
+	metrics := newMetricsJSONAPI(engine.Metrics, t)
+	engine.MetricsLock.Unlock()
 
-	data, err := jsonapi.Marshal(metrics)
+	data, err := json.Marshal(metrics)
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return
@@ -58,22 +56,13 @@ func handleGetMetric(rw http.ResponseWriter, r *http.Request, id string) {
 		t = engine.ExecutionScheduler.GetState().GetCurrentTestRunDuration()
 	}
 
-	var metric Metric
-	var found bool
-	for _, m := range engine.Metrics {
-		if m.Name == id {
-			metric = NewMetric(m, t)
-			found = true
-			break
-		}
-	}
-
-	if !found {
+	metric, ok := engine.Metrics[id]
+	if !ok {
 		apiError(rw, "Not Found", "No metric with that ID was found", http.StatusNotFound)
 		return
 	}
 
-	data, err := jsonapi.Marshal(metric)
+	data, err := json.Marshal(newMetricEnvelope(metric, t))
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return

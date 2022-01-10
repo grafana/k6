@@ -72,15 +72,52 @@ func WithHTTPClient(httpClient *http.Client) Option {
 	})
 }
 
-// WithLogger sets the specifield logger to the client.
+// WithLogger sets the specified logger to the client.
 func WithLogger(logger *logrus.Entry) Option {
 	return Option(func(c *Client) {
 		c.logger = logger
 	})
 }
 
+// CallAPI executes the desired REST API request.
+// it's expected that the body and out are the structs that follows the JSON:API
+func (c *Client) CallAPI(ctx context.Context, method string, rel *url.URL, body, out interface{}) (err error) {
+	return c.call(ctx, method, rel, marshaler{
+		marshal:   json.Marshal,
+		unmarshal: json.Unmarshal,
+	}, body, out)
+}
+
 // Call executes the desired REST API request.
+// Deprecated: use instead client.CallAPI
 func (c *Client) Call(ctx context.Context, method string, rel *url.URL, body, out interface{}) (err error) {
+	if c.logger != nil {
+		c.logger.Warnf(
+			"client.Call is deprecated and will be removed soon, please migrate to a client.CallAPI for %s request to '%s'",
+			method,
+			rel.String(),
+		)
+	}
+
+	return c.call(ctx, method, rel, marshaler{
+		marshal:   jsonapi.Marshal,
+		unmarshal: jsonapi.Unmarshal,
+	}, body, out)
+}
+
+// marshaler is the temporary struct that keeps the marshal/unmarshal methods
+type marshaler struct {
+	marshal   func(interface{}) ([]byte, error)
+	unmarshal func([]byte, interface{}) error
+}
+
+func (c *Client) call(
+	ctx context.Context,
+	method string,
+	rel *url.URL,
+	marshaler marshaler,
+	body, out interface{},
+) (err error) {
 	if c.logger != nil {
 		c.logger.Debugf("[REST API] Making a %s request to '%s'", method, rel.String())
 		defer func() {
@@ -99,7 +136,7 @@ func (c *Client) Call(ctx context.Context, method string, rel *url.URL, body, ou
 		case string:
 			bodyData = []byte(val)
 		default:
-			bodyData, err = jsonapi.Marshal(body)
+			bodyData, err = marshaler.marshal(body)
 			if err != nil {
 				return err
 			}
@@ -134,7 +171,7 @@ func (c *Client) Call(ctx context.Context, method string, rel *url.URL, body, ou
 	}
 
 	if out != nil {
-		return jsonapi.Unmarshal(data, out)
+		return marshaler.unmarshal(data, out)
 	}
 	return nil
 }

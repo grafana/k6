@@ -26,7 +26,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/manyminds/api2go/jsonapi"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,38 +65,40 @@ func TestGetGroups(t *testing.T) {
 		assert.NotEmpty(t, body)
 
 		t.Run("document", func(t *testing.T) {
-			var doc jsonapi.Document
+			var doc groupsJSONAPI
 			assert.NoError(t, json.Unmarshal(body, &doc))
-			assert.Nil(t, doc.Data.DataObject)
-			if assert.NotEmpty(t, doc.Data.DataArray) {
-				assert.Equal(t, "groups", doc.Data.DataArray[0].Type)
+			if assert.NotEmpty(t, doc.Data) {
+				assert.Equal(t, "groups", doc.Data[0].Type)
 			}
 		})
 
 		t.Run("groups", func(t *testing.T) {
-			var groups []Group
-			require.NoError(t, jsonapi.Unmarshal(body, &groups))
-			require.Len(t, groups, 3)
-			for _, g := range groups {
-				switch g.ID {
+			var envelop groupsJSONAPI
+			require.NoError(t, json.Unmarshal(body, &envelop))
+			require.Len(t, envelop.Data, 3)
+
+			for _, data := range envelop.Data {
+				current := data.Attributes
+
+				switch current.ID {
 				case g0.ID:
-					assert.Equal(t, "", g.Name)
-					assert.Nil(t, g.Parent)
-					assert.Equal(t, "", g.ParentID)
-					assert.Len(t, g.GroupIDs, 1)
-					assert.EqualValues(t, []string{g1.ID}, g.GroupIDs)
+					assert.Equal(t, "", current.Name)
+					assert.Nil(t, current.Parent)
+					assert.Equal(t, "", current.ParentID)
+					assert.Len(t, current.GroupIDs, 1)
+					assert.EqualValues(t, []string{g1.ID}, current.GroupIDs)
 				case g1.ID:
-					assert.Equal(t, "group 1", g.Name)
-					assert.Nil(t, g.Parent)
-					assert.Equal(t, g0.ID, g.ParentID)
-					assert.EqualValues(t, []string{g2.ID}, g.GroupIDs)
+					assert.Equal(t, "group 1", current.Name)
+					assert.Nil(t, current.Parent)
+					assert.Equal(t, g0.ID, current.ParentID)
+					assert.EqualValues(t, []string{g2.ID}, current.GroupIDs)
 				case g2.ID:
-					assert.Equal(t, "group 2", g.Name)
-					assert.Nil(t, g.Parent)
-					assert.Equal(t, g1.ID, g.ParentID)
-					assert.EqualValues(t, []string{}, g.GroupIDs)
+					assert.Equal(t, "group 2", current.Name)
+					assert.Nil(t, current.Parent)
+					assert.Equal(t, g1.ID, current.ParentID)
+					assert.EqualValues(t, []string{}, current.GroupIDs)
 				default:
-					assert.Fail(t, "Unknown ID: "+g.ID)
+					assert.Fail(t, "Unknown ID: "+current.ID)
 				}
 			}
 		})
