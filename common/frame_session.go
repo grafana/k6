@@ -998,6 +998,13 @@ func (fs *FrameSession) updateRequestInterception(initial bool) error {
 func (fs *FrameSession) updateViewport() error {
 	fs.logger.Debugf("NewFrameSession:updateViewport", "sid:%v tid:%v", fs.session.id, fs.targetID)
 
+	// other frames don't have viewports and,
+	// this method shouldn't be called for them.
+	// this is just a sanity check.
+	if !fs.isMainFrame() {
+		panic("updateViewport should be called only in the main frame")
+	}
+
 	opts := fs.page.browserCtx.opts
 	emulatedSize := fs.page.emulatedSize
 	if emulatedSize == nil {
