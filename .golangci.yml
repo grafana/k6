@@ -43,6 +43,22 @@ linters-settings:
   funlen:
     lines: 80
     statements: 60
+  varnamelen:
+    ignore-type-assert-ok: true
+    ignore-map-index-ok: true
+    ignore-chan-recv-ok: true
+    ignore-names:
+      - i
+      - wg
+      - fn
+      - ch
+      - fs
+      - tc
+      - r
+      - w
+      - rw
+      - vu
+      - rt
   goheader:
     template-path: ".license-template"
     values:
