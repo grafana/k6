@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"time"
@@ -38,7 +39,7 @@ import (
 	"github.com/chromedp/cdproto/log"
 	"github.com/chromedp/cdproto/network"
 	cdppage "github.com/chromedp/cdproto/page"
-	"github.com/chromedp/cdproto/runtime"
+	runtime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/cdproto/target"
 	"github.com/grafana/xk6-browser/api"
@@ -367,6 +368,7 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	return nil
 }
 
+// TODO: pass OS here? or hold it in the frame session
 func (fs *FrameSession) initOptions() error {
 	fs.logger.Debugf("NewFrameSession:initOptions",
 		"sid:%v tid:%v", fs.session.id, fs.targetID)
@@ -376,6 +378,7 @@ func (fs *FrameSession) initOptions() error {
 
 	if fs.isMainFrame() {
 		optActions = append(optActions, emulation.SetFocusEmulationEnabled(true))
+		// TODO: pass OS here? or hold it in the frame session
 		if err := fs.updateViewport(); err != nil {
 			fs.logger.Debugf("NewFrameSession:initOptions:updateViewport",
 				"sid:%v tid:%v, err:%v",
@@ -1012,6 +1015,7 @@ func (fs *FrameSession) updateViewport() error {
 	}
 	viewport := emulatedSize.Viewport
 	screen := emulatedSize.Screen
+
 	orientation := emulation.ScreenOrientation{
 		Angle: 0.0,
 		Type:  emulation.OrientationTypePortraitPrimary,
@@ -1024,12 +1028,29 @@ func (fs *FrameSession) updateViewport() error {
 		WithScreenOrientation(&orientation).
 		WithScreenWidth(screen.Width).
 		WithScreenHeight(screen.Height)
+	var inset Viewport
+	if !fs.page.browserCtx.browser.launchOpts.Headless {
+		// TODO: popup windows have their own insets.
+		inset = Viewport{Width: 24, Height: 88}
+		// TODO: get the OS externally and test it for each OS
+		os := goruntime.GOOS
+		switch os {
+		case "windows":
+			inset = Viewport{Width: 16, Height: 88}
+		case "linux":
+			inset = Viewport{Width: 8, Height: 85}
+		case "darwin":
+			// Playwright is using w:2 h:80 here but I checked it
+			// on my Mac and w:0 h:79 works best.
+			inset = Viewport{Width: 0, Height: 79}
+		}
+	}
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		return fmt.Errorf("unable to emulate viewport: %w", err)
 	}
 	action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{
-		Width:  viewport.Width,
-		Height: viewport.Height,
+		Width:  viewport.Width + inset.Width,
+		Height: viewport.Height + inset.Height,
 	})
 	if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		return fmt.Errorf("unable to set window bounds: %w", err)
