@@ -283,9 +283,6 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	})
 
 	if connErr != nil {
-		// Pass the error to the user script before exiting immediately
-		socket.handleEvent("error", rt.ToValue(connErr))
-
 		return nil, connErr
 	}
 
