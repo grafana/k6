@@ -96,11 +96,12 @@ func assertMetricEmittedCount(t *testing.T, metricName string, sampleContainers 
 }
 
 type testState struct {
-	ctxPtr  *context.Context
-	rt      *goja.Runtime
-	tb      *httpmultibin.HTTPMultiBin
-	state   *lib.State
-	samples chan stats.SampleContainer
+	ctxPtr    *context.Context
+	cancelCtx func()
+	rt        *goja.Runtime
+	tb        *httpmultibin.HTTPMultiBin
+	state     *lib.State
+	samples   chan stats.SampleContainer
 }
 
 func newTestState(t testing.TB) testState {
@@ -133,6 +134,7 @@ func newTestState(t testing.TB) testState {
 	}
 
 	ctx := lib.WithState(tb.Context, state)
+	ctx, cancel := context.WithCancel(ctx)
 	ctx = common.WithRuntime(ctx, rt)
 
 	m := New().NewModuleInstance(&modulestest.VU{
@@ -144,11 +146,12 @@ func newTestState(t testing.TB) testState {
 	require.NoError(t, rt.Set("ws", m.Exports().Default))
 
 	return testState{
-		ctxPtr:  &ctx,
-		rt:      rt,
-		tb:      tb,
-		state:   state,
-		samples: samples,
+		ctxPtr:    &ctx,
+		cancelCtx: cancel,
+		rt:        rt,
+		tb:        tb,
+		state:     state,
+		samples:   samples,
 	}
 }
 
@@ -1316,4 +1319,90 @@ func TestCookieJar(t *testing.T) {
 	require.NoError(t, err)
 
 	assertSessionMetricsEmitted(t, stats.GetBufferedSamples(ts.samples), "", sr("WSBIN_URL/ws-echo-someheader"), statusProtocolSwitch, "")
+}
+
+func testSlowServerDoesntBlock(t *testing.T, code string) {
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	ch := make(chan error)
+	ts.tb.Mux.HandleFunc("/ws-slow", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, nil)
+		if err != nil {
+			t.Fatalf("/ws-echo-someheader cannot upgrade request: %v", err)
+		}
+		_, r, err := conn.NextReader() // this is slightly faster than `conn.ReadMessage`
+		if err != nil {
+			ch <- err
+			close(ch)
+			return
+		}
+		n, _ := io.Copy(io.Discard, r)
+		if n == 9000 { // this is exactly how big it should be
+			close(ch)
+		}
+		time.Sleep(time.Second * 5)
+
+		err = conn.Close()
+		if err != nil {
+			t.Logf("error while closing connection in /ws-echo-someheader: %v", err)
+		}
+	}))
+
+	// This is really big predominantly because the race detector slows down the whole test by *a lot*
+	timeout := time.Millisecond * 500
+	go func() {
+		time.Sleep(timeout)
+		ts.rt.Interrupt("interrupt")
+		ts.cancelCtx()
+	}()
+
+	mii := &modulestest.VU{
+		RuntimeField: ts.rt,
+		InitEnvField: &common.InitEnvironment{Registry: metrics.NewRegistry()},
+		CtxField:     *ts.ctxPtr,
+		StateField:   ts.state,
+	}
+	err := ts.rt.Set("http", httpModule.New().NewModuleInstance(mii).Exports().Default)
+	require.NoError(t, err)
+	ts.state.CookieJar, _ = cookiejar.New(nil)
+	start := time.Now()
+	_, err = ts.rt.RunString(sr(code))
+	took := time.Since(start)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "interrupt")
+	require.Less(t, took, timeout+time.Millisecond*100) // 50 milliseconds more for actually getting it through
+	select {
+	case err := <-ch:
+		require.NoError(t, err)
+	// we read one really long message
+	default:
+		t.Fatal("ws server didn't actually receive the first long message")
+	}
+}
+
+func TestSlowServerDoesntBlockSetup(t *testing.T) {
+	t.Parallel()
+	testSlowServerDoesntBlock(t, `
+  var res = ws.connect("WSBIN_URL/ws-slow", function(socket){
+    socket.send("something".repeat(1000));
+    socket.send("something".repeat(1000000));// we block on this
+    throw "never get here"
+  })
+  `)
+}
+
+func TestSlowServerDoesntBlockLoop(t *testing.T) {
+	t.Parallel()
+	testSlowServerDoesntBlock(t, `
+  var res = ws.connect("WSBIN_URL/ws-slow", function(socket){
+    socket.setInterval(function() {
+      socket.send("something".repeat(1000));
+      socket.send("something".repeat(1000000));// we block on this
+      throw "never get here"
+    }, 1);
+
+  })
+  `)
 }

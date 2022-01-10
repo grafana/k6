@@ -289,6 +289,36 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 		return nil, connErr
 	}
 
+	// we do it here as below we can panic, which translates to an exception in js code
+	defer func() {
+		socket.Close() // just in case
+		end := time.Now()
+		sessionDuration := stats.D(end.Sub(start))
+
+		stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
+			Metric: socket.builtinMetrics.WSSessionDuration,
+			Tags:   socket.sampleTags,
+			Time:   start,
+			Value:  sessionDuration,
+		})
+	}()
+
+	go func() {
+		// Wait for the context to be over and close the underlying connection directly
+		// This will *not* send CloseMessage or trigger any `close` events but prevents a slow event handler to take forever
+		select {
+		case <-ctx.Done():
+			t := time.NewTimer(time.Millisecond * 50)
+			select {
+			case <-t.C: // wait 5 milliseconds in case the event loop below isn't blocked
+				_ = socket.conn.Close() // directly close the connection so that it unblocks the loop below
+			case <-socket.done: // the event loop below stopped on it's own
+				t.Stop() // stop the timer so we don't have a bunch of timers created and never stopped
+			}
+		case <-socket.done:
+		}
+	}()
+
 	// Run the user-provided set up function
 	if _, err := setupFn(goja.Undefined(), rt.ToValue(&socket)); err != nil {
 		_ = socket.closeConnection(websocket.CloseGoingAway)
@@ -324,20 +354,6 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 
 	// Wraps a couple of channels around conn.ReadMessage
 	go socket.readPump(readDataChan, readErrChan, readCloseChan)
-
-	// we do it here as below we can panic, which translates to an exception in js code
-	defer func() {
-		socket.Close() // just in case
-		end := time.Now()
-		sessionDuration := stats.D(end.Sub(start))
-
-		stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
-			Metric: socket.builtinMetrics.WSSessionDuration,
-			Tags:   socket.sampleTags,
-			Time:   start,
-			Value:  sessionDuration,
-		})
-	}()
 
 	// This is the main control loop. All JS code (including error handlers)
 	// should only be executed by this thread to avoid race conditions
