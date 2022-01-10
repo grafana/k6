@@ -1,3 +1,5 @@
+# v1.43.0
+# Please don't remove the first line. It uses in CI to determine the golangci version
 run:
   deadline: 5m
 
@@ -17,7 +19,7 @@ issues:
    # files (due to common repeats and long functions in test code)
    - path: _(test|gen)\.go
      linters:
-       - gocyclo
+       - cyclop
        - dupl
        - gocognit
        - funlen
@@ -26,19 +28,10 @@ issues:
      - paralleltest # false positive: https://github.com/kunwardeep/paralleltest/issues/8.
      text: "does not use range value in test Run"
 
-  exclude:
-   #TODO: remove this exclusion after https://github.com/golang/lint/issues/381
-   # is fixed by https://github.com/golang/lint/pull/380 or something else
-   - "should have a package comment, unless it's in another file for this package"
-
 linters-settings:
   govet:
     check-shadowing: true
-  golint:
-    min-confidence: 0
-  gocyclo:
-    min-complexity: 25
-  cyclop: #TODO: see https://github.com/grafana/k6/issues/2294, leave only one of these?
+  cyclop:
     max-complexity: 25
   maligned:
     suggest-new: true
@@ -54,7 +47,7 @@ linters-settings:
     template-path: ".license-template"
     values:
       const:
-        year: 2021
+        year: "2022"
       regexp:
         year-range: (\d\d\d\d|{{year}})
 
@@ -74,8 +67,10 @@ linters:
   - goheader
   - exhaustivestruct
   - thelper
+  - gocyclo # replaced by cyclop since it also calculates the package complexity
   - maligned # replaced by govet 'fieldalignment'
   - interfacer # deprecated
   - scopelint # deprecated, replaced by exportloopref
   - wrapcheck # a little bit too much for k6, maybe after https://github.com/tomarrell/wrapcheck/issues/2 is fixed
+  - golint # this linter is deprecated
   fast: false
