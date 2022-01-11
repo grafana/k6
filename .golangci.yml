@@ -75,4 +75,5 @@ linters:
   - golint # this linter is deprecated
   - varnamelen # disabled before the final decision in (https://github.com/grafana/k6/pull/2323)
   - ireturn
+  - tagliatelle
   fast: false
