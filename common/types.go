@@ -138,10 +138,57 @@ type EmulatedSize struct {
 	Screen   *Screen
 }
 
+func NewEmulatedSize(viewport *Viewport, screen *Screen) *EmulatedSize {
+	return &EmulatedSize{
+		Viewport: viewport,
+		Screen:   screen,
+	}
+}
+
 type Geolocation struct {
 	Latitude  float64 `js:"latitude"`
 	Longitude float64 `js:"longitude"`
 	Accurracy float64 `js:"accurracy"`
+}
+
+func NewGeolocation() *Geolocation {
+	return &Geolocation{}
+}
+
+func (g *Geolocation) Parse(ctx context.Context, opts goja.Value) error {
+	rt := k6common.GetRuntime(ctx)
+	longitude := 0.0
+	latitude := 0.0
+	accuracy := 0.0
+
+	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+		opts := opts.ToObject(rt)
+		for _, k := range opts.Keys() {
+			switch k {
+			case "accuracy":
+				accuracy = opts.Get(k).ToFloat()
+			case "latitude":
+				latitude = opts.Get(k).ToFloat()
+			case "longitude":
+				longitude = opts.Get(k).ToFloat()
+			}
+		}
+	}
+
+	if longitude < -180 || longitude > 180 {
+		return fmt.Errorf(`invalid longitude "%.2f": precondition -180 <= LONGITUDE <= 180 failed`, longitude)
+	}
+	if latitude < -90 || latitude > 90 {
+		return fmt.Errorf(`invalid latitude "%.2f": precondition -90 <= LATITUDE <= 90 failed`, latitude)
+	}
+	if accuracy < 0 {
+		return fmt.Errorf(`invalid accuracy "%.2f": precondition 0 <= ACCURACY failed`, accuracy)
+	}
+
+	g.Accurracy = accuracy
+	g.Latitude = latitude
+	g.Longitude = longitude
+	return nil
 }
 
 // ImageFormat represents an image file format
@@ -294,6 +341,18 @@ type Rect struct {
 	Height float64 `js:"height"`
 }
 
+func (r *Rect) enclosingIntRect() *Rect {
+	x := math.Floor(r.X + 1e-3)
+	y := math.Floor(r.Y + 1e-3)
+	x2 := math.Ceil(r.X + r.Width - 1e-3)
+	y2 := math.Ceil(r.Y + r.Height - 1e-3)
+	return &Rect{X: x, Y: y, Width: x2 - x, Height: y2 - y}
+}
+
+func (r *Rect) toApiRect() *api.Rect {
+	return &api.Rect{X: r.X, Y: r.Y, Width: r.Width, Height: r.Height}
+}
+
 // ReducedMotion represents a browser reduce-motion setting
 type ReducedMotion string
 
@@ -355,102 +414,6 @@ type Screen struct {
 	Height int64 `js:"height"`
 }
 
-type SelectOption struct {
-	Value *string `json:"value"`
-	Label *string `json:"label"`
-	Index *int64  `json:"index"`
-}
-
-type Size struct {
-	Width  float64 `js:"width"`
-	Height float64 `js:"height"`
-}
-
-// Viewport represents a page viewport
-type Viewport struct {
-	Width  int64 `js:"width"`
-	Height int64 `js:"height"`
-}
-
-func NewCredentials() *Credentials {
-	return &Credentials{}
-}
-
-func (c *Credentials) Parse(ctx context.Context, credentials goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
-	if credentials != nil && !goja.IsUndefined(credentials) && !goja.IsNull(credentials) {
-		credentials := credentials.ToObject(rt)
-		for _, k := range credentials.Keys() {
-			switch k {
-			case "username":
-				c.Username = credentials.Get(k).String()
-			case "password":
-				c.Password = credentials.Get(k).String()
-			}
-		}
-	}
-	return nil
-}
-
-func NewEmulatedSize(viewport *Viewport, screen *Screen) *EmulatedSize {
-	return &EmulatedSize{
-		Viewport: viewport,
-		Screen:   screen,
-	}
-}
-
-func NewGeolocation() *Geolocation {
-	return &Geolocation{}
-}
-
-func (g *Geolocation) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
-	longitude := 0.0
-	latitude := 0.0
-	accuracy := 0.0
-
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "accuracy":
-				accuracy = opts.Get(k).ToFloat()
-			case "latitude":
-				latitude = opts.Get(k).ToFloat()
-			case "longitude":
-				longitude = opts.Get(k).ToFloat()
-			}
-		}
-	}
-
-	if longitude < -180 || longitude > 180 {
-		return fmt.Errorf(`invalid longitude "%.2f": precondition -180 <= LONGITUDE <= 180 failed`, longitude)
-	}
-	if latitude < -90 || latitude > 90 {
-		return fmt.Errorf(`invalid latitude "%.2f": precondition -90 <= LATITUDE <= 90 failed`, latitude)
-	}
-	if accuracy < 0 {
-		return fmt.Errorf(`invalid accuracy "%.2f": precondition 0 <= ACCURACY failed`, accuracy)
-	}
-
-	g.Accurracy = accuracy
-	g.Latitude = latitude
-	g.Longitude = longitude
-	return nil
-}
-
-func (r *Rect) enclosingIntRect() *Rect {
-	x := math.Floor(r.X + 1e-3)
-	y := math.Floor(r.Y + 1e-3)
-	x2 := math.Ceil(r.X + r.Width - 1e-3)
-	y2 := math.Ceil(r.Y + r.Height - 1e-3)
-	return &Rect{X: x, Y: y, Width: x2 - x, Height: y2 - y}
-}
-
-func (r *Rect) toApiRect() *api.Rect {
-	return &api.Rect{X: r.X, Y: r.Y, Width: r.Width, Height: r.Height}
-}
-
 func (s *Screen) Parse(ctx context.Context, screen goja.Value) error {
 	rt := k6common.GetRuntime(ctx)
 	if screen != nil && !goja.IsUndefined(screen) && !goja.IsNull(screen) {
@@ -465,6 +428,17 @@ func (s *Screen) Parse(ctx context.Context, screen goja.Value) error {
 		}
 	}
 	return nil
+}
+
+type SelectOption struct {
+	Value *string `json:"value"`
+	Label *string `json:"label"`
+	Index *int64  `json:"index"`
+}
+
+type Size struct {
+	Width  float64 `js:"width"`
+	Height float64 `js:"height"`
 }
 
 func (s Size) enclosingIntSize() *Size {
@@ -490,6 +464,13 @@ func (s *Size) Parse(ctx context.Context, viewport goja.Value) error {
 	return nil
 }
 
+// Viewport represents a page viewport.
+type Viewport struct {
+	Width  int64 `js:"width"`
+	Height int64 `js:"height"`
+}
+
+// Parse viewport details from a given goja viewport value.
 func (v *Viewport) Parse(ctx context.Context, viewport goja.Value) error {
 	rt := k6common.GetRuntime(ctx)
 	if viewport != nil && !goja.IsUndefined(viewport) && !goja.IsNull(viewport) {
@@ -500,6 +481,51 @@ func (v *Viewport) Parse(ctx context.Context, viewport goja.Value) error {
 				v.Width = viewport.Get(k).ToInteger()
 			case "height":
 				v.Height = viewport.Get(k).ToInteger()
+			}
+		}
+	}
+	return nil
+}
+
+// calculateInset depending on a given operating system and,
+// add the calculated inset width and height to Viewport.
+// It won't update the Viewport if headless is true.
+func (v *Viewport) calculateInset(headless bool, os string) {
+	if headless {
+		return
+	}
+	// TODO: popup windows have their own insets.
+	var inset Viewport
+	switch os {
+	default:
+		inset = Viewport{Width: 24, Height: 88}
+	case "windows":
+		inset = Viewport{Width: 16, Height: 88}
+	case "linux":
+		inset = Viewport{Width: 8, Height: 85}
+	case "darwin":
+		// Playwright is using w:2 h:80 here but I checked it
+		// on my Mac and w:0 h:79 works best.
+		inset = Viewport{Width: 0, Height: 79}
+	}
+	v.Width += inset.Width
+	v.Height += inset.Height
+}
+
+func NewCredentials() *Credentials {
+	return &Credentials{}
+}
+
+func (c *Credentials) Parse(ctx context.Context, credentials goja.Value) error {
+	rt := k6common.GetRuntime(ctx)
+	if credentials != nil && !goja.IsUndefined(credentials) && !goja.IsNull(credentials) {
+		credentials := credentials.ToObject(rt)
+		for _, k := range credentials.Keys() {
+			switch k {
+			case "username":
+				c.Username = credentials.Get(k).String()
+			case "password":
+				c.Password = credentials.Get(k).String()
 			}
 		}
 	}

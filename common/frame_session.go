@@ -368,7 +368,6 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	return nil
 }
 
-// TODO: pass OS here? or hold it in the frame session
 func (fs *FrameSession) initOptions() error {
 	fs.logger.Debugf("NewFrameSession:initOptions",
 		"sid:%v tid:%v", fs.session.id, fs.targetID)
@@ -378,7 +377,6 @@ func (fs *FrameSession) initOptions() error {
 
 	if fs.isMainFrame() {
 		optActions = append(optActions, emulation.SetFocusEmulationEnabled(true))
-		// TODO: pass OS here? or hold it in the frame session
 		if err := fs.updateViewport(); err != nil {
 			fs.logger.Debugf("NewFrameSession:initOptions:updateViewport",
 				"sid:%v tid:%v, err:%v",
@@ -1036,8 +1034,7 @@ func (fs *FrameSession) updateViewport() error {
 
 	// add an inset to viewport depending on the operating system.
 	// this won't add an inset if we're running in headless mode.
-	addInsetToViewport(
-		viewport,
+	viewport.calculateInset(
 		fs.page.browserCtx.browser.launchOpts.Headless,
 		runtime.GOOS,
 	)
@@ -1050,29 +1047,4 @@ func (fs *FrameSession) updateViewport() error {
 	}
 
 	return nil
-}
-
-// addInsetToViewport calculates an inset depending on a given operating
-// system (os) and adds the inset width and height to Viewport.
-// It won't update the Viewport if headless is true.
-func addInsetToViewport(vp *Viewport, headless bool, os string) {
-	if headless {
-		return
-	}
-	// TODO: popup windows have their own insets.
-	var inset Viewport
-	switch os {
-	default:
-		inset = Viewport{Width: 24, Height: 88}
-	case "windows":
-		inset = Viewport{Width: 16, Height: 88}
-	case "linux":
-		inset = Viewport{Width: 8, Height: 85}
-	case "darwin":
-		// Playwright is using w:2 h:80 here but I checked it
-		// on my Mac and w:0 h:79 works best.
-		inset = Viewport{Width: 0, Height: 79}
-	}
-	vp.Width += inset.Width
-	vp.Height += inset.Height
 }
