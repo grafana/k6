@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -38,7 +39,7 @@ import (
 	"github.com/chromedp/cdproto/log"
 	"github.com/chromedp/cdproto/network"
 	cdppage "github.com/chromedp/cdproto/page"
-	"github.com/chromedp/cdproto/runtime"
+	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/cdproto/target"
 	"github.com/grafana/xk6-browser/api"
@@ -71,7 +72,7 @@ type FrameSession struct {
 	// the relationship betwween them have a look at the following doc:
 	// https://chromium.googlesource.com/chromium/src/+/master/third_party/blink/renderer/bindings/core/v8/V8BindingDesign.md
 	contextIDToContextMu sync.Mutex
-	contextIDToContext   map[runtime.ExecutionContextID]*ExecutionContext
+	contextIDToContext   map[cdpruntime.ExecutionContextID]*ExecutionContext
 	isolatedWorlds       map[string]bool
 
 	eventCh chan Event
@@ -99,7 +100,7 @@ func NewFrameSession(
 		targetID:             targetID,
 		initTime:             &cdp.MonotonicTime{},
 		contextIDToContextMu: sync.Mutex{},
-		contextIDToContext:   make(map[runtime.ExecutionContextID]*ExecutionContext),
+		contextIDToContext:   make(map[cdpruntime.ExecutionContextID]*ExecutionContext),
 		isolatedWorlds:       make(map[string]bool),
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
@@ -211,7 +212,7 @@ func (fs *FrameSession) initDomains() error {
 		// TODO: can we get rid of the following by doing DOM related stuff in JS instead?
 		dom.Enable(),
 		log.Enable(),
-		runtime.Enable(),
+		cdpruntime.Enable(),
 		target.SetAutoAttach(true, true).WithFlatten(true),
 	}
 	for _, action := range actions {
@@ -274,15 +275,15 @@ func (fs *FrameSession) initEvents() {
 					fs.onPageLifecycle(ev)
 				case *cdppage.EventNavigatedWithinDocument:
 					fs.onPageNavigatedWithinDocument(ev)
-				case *runtime.EventConsoleAPICalled:
+				case *cdpruntime.EventConsoleAPICalled:
 					fs.onConsoleAPICalled(ev)
-				case *runtime.EventExceptionThrown:
+				case *cdpruntime.EventExceptionThrown:
 					fs.onExceptionThrown(ev)
-				case *runtime.EventExecutionContextCreated:
+				case *cdpruntime.EventExecutionContextCreated:
 					fs.onExecutionContextCreated(ev)
-				case *runtime.EventExecutionContextDestroyed:
+				case *cdpruntime.EventExecutionContextDestroyed:
 					fs.onExecutionContextDestroyed(ev.ExecutionContextID)
-				case *runtime.EventExecutionContextsCleared:
+				case *cdpruntime.EventExecutionContextsCleared:
 					fs.onExecutionContextsCleared()
 				case *target.EventAttachedToTarget:
 					fs.onAttachedToTarget(ev)
@@ -429,7 +430,7 @@ func (fs *FrameSession) initOptions() error {
 	  for (const source of this._crPage._page._evaluateOnNewDocumentSources)
 	      promises.push(this._evaluateOnNewDocument(source, 'main'));*/
 
-	optActions = append(optActions, runtime.RunIfWaitingForDebugger())
+	optActions = append(optActions, cdpruntime.RunIfWaitingForDebugger())
 
 	for _, action := range optActions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
@@ -500,7 +501,7 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 	return documentID.String(), err
 }
 
-func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
+func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	l := fs.serializer.
 		WithTime(event.Timestamp.Time()).
 		WithField("source", "browser-console-api")
@@ -532,11 +533,11 @@ func (fs *FrameSession) onConsoleAPICalled(event *runtime.EventConsoleAPICalled)
 	}
 }
 
-func (fs *FrameSession) onExceptionThrown(event *runtime.EventExceptionThrown) {
+func (fs *FrameSession) onExceptionThrown(event *cdpruntime.EventExceptionThrown) {
 	fs.page.emit(EventPageError, event.ExceptionDetails)
 }
 
-func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionContextCreated) {
+func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecutionContextCreated) {
 	fs.logger.Debugf("FrameSession:onExecutionContextCreated",
 		"sid:%v tid:%v ectxid:%d",
 		fs.session.id, fs.targetID, event.Context.ID)
@@ -574,7 +575,7 @@ func (fs *FrameSession) onExecutionContextCreated(event *runtime.EventExecutionC
 	fs.contextIDToContextMu.Unlock()
 }
 
-func (fs *FrameSession) onExecutionContextDestroyed(execCtxID runtime.ExecutionContextID) {
+func (fs *FrameSession) onExecutionContextDestroyed(execCtxID cdpruntime.ExecutionContextID) {
 	fs.logger.Debugf("FrameSession:onExecutionContextDestroyed",
 		"sid:%v tid:%v ectxid:%d",
 		fs.session.id, fs.targetID, execCtxID)
@@ -807,7 +808,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	default:
 		// Just unblock (debugger continue) these targets and detach from them.
 		s := fs.page.browserCtx.conn.getSession(sid)
-		_ = s.ExecuteWithoutExpectationOnReply(fs.ctx, runtime.CommandRunIfWaitingForDebugger, nil, nil)
+		_ = s.ExecuteWithoutExpectationOnReply(fs.ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
 		_ = s.ExecuteWithoutExpectationOnReply(fs.ctx, target.CommandDetachFromTarget,
 			&target.DetachFromTargetParams{SessionID: s.id}, nil)
 	}
@@ -998,6 +999,15 @@ func (fs *FrameSession) updateRequestInterception(initial bool) error {
 func (fs *FrameSession) updateViewport() error {
 	fs.logger.Debugf("NewFrameSession:updateViewport", "sid:%v tid:%v", fs.session.id, fs.targetID)
 
+	// other frames don't have viewports and,
+	// this method shouldn't be called for them.
+	// this is just a sanity check.
+	if !fs.isMainFrame() {
+		err := fmt.Errorf("updateViewport should be called only in the main frame."+
+			" (sid:%v tid:%v)", fs.session.id, fs.targetID)
+		panic(err)
+	}
+
 	opts := fs.page.browserCtx.opts
 	emulatedSize := fs.page.emulatedSize
 	if emulatedSize == nil {
@@ -1005,6 +1015,7 @@ func (fs *FrameSession) updateViewport() error {
 	}
 	viewport := emulatedSize.Viewport
 	screen := emulatedSize.Screen
+
 	orientation := emulation.ScreenOrientation{
 		Angle: 0.0,
 		Type:  emulation.OrientationTypePortraitPrimary,
@@ -1020,6 +1031,13 @@ func (fs *FrameSession) updateViewport() error {
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		return fmt.Errorf("unable to emulate viewport: %w", err)
 	}
+
+	// add an inset to viewport depending on the operating system.
+	// this won't add an inset if we're running in headless mode.
+	viewport.calculateInset(
+		fs.page.browserCtx.browser.launchOpts.Headless,
+		runtime.GOOS,
+	)
 	action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{
 		Width:  viewport.Width,
 		Height: viewport.Height,
@@ -1027,5 +1045,6 @@ func (fs *FrameSession) updateViewport() error {
 	if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		return fmt.Errorf("unable to set window bounds: %w", err)
 	}
+
 	return nil
 }
