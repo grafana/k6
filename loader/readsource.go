@@ -44,7 +44,7 @@ func ReadSource(
 			return nil, err
 		}
 		// TODO: don't do it in this way ...
-		err = afero.WriteFile(filesystems["file"].(fsext.CacheOnReadFs).GetCachingFs(), "/-", data, 0644)
+		err = afero.WriteFile(filesystems["file"].(fsext.CacheLayerGetter).GetCachingFs(), "/-", data, 0o644)
 		if err != nil {
 			return nil, fmt.Errorf("caching data read from -: %w", err)
 		}
