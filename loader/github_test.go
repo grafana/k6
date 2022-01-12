@@ -33,6 +33,7 @@ import (
 )
 
 func TestGithub(t *testing.T) {
+	t.Parallel()
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 	path := "github.com/github/gitignore/Go.gitignore"
@@ -44,12 +45,13 @@ func TestGithub(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expectedEndSrc, src)
 
-	var root = &url.URL{Scheme: "https", Host: "example.com", Path: "/something/"}
+	root := &url.URL{Scheme: "https", Host: "example.com", Path: "/something/"}
 	resolvedURL, err := Resolve(root, path)
 	require.NoError(t, err)
 	require.Empty(t, resolvedURL.Scheme)
 	require.Equal(t, path, resolvedURL.Opaque)
 	t.Run("not cached", func(t *testing.T) {
+		t.Parallel()
 		data, err := Load(logger, map[string]afero.Fs{"https": afero.NewMemMapFs()}, resolvedURL, path)
 		require.NoError(t, err)
 		assert.Equal(t, data.URL, resolvedURL)
@@ -58,10 +60,11 @@ func TestGithub(t *testing.T) {
 	})
 
 	t.Run("cached", func(t *testing.T) {
+		t.Parallel()
 		fs := afero.NewMemMapFs()
 		testData := []byte("test data")
 
-		err := afero.WriteFile(fs, "/github.com/github/gitignore/Go.gitignore", testData, 0644)
+		err := afero.WriteFile(fs, "/github.com/github/gitignore/Go.gitignore", testData, 0o644)
 		require.NoError(t, err)
 
 		data, err := Load(logger, map[string]afero.Fs{"https": fs}, resolvedURL, path)
@@ -71,7 +74,8 @@ func TestGithub(t *testing.T) {
 	})
 
 	t.Run("relative", func(t *testing.T) {
-		var tests = map[string]string{
+		t.Parallel()
+		tests := map[string]string{
 			"./something.else":  "github.com/github/gitignore/something.else",
 			"../something.else": "github.com/github/something.else",
 			"/something.else":   "github.com/something.else",
@@ -84,6 +88,7 @@ func TestGithub(t *testing.T) {
 	})
 
 	t.Run("dir", func(t *testing.T) {
+		t.Parallel()
 		require.Equal(t, &url.URL{Opaque: "github.com/github/gitignore"}, Dir(resolvedURL))
 	})
 }
