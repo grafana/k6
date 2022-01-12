@@ -38,6 +38,7 @@ import (
 )
 
 func TestDir(t *testing.T) {
+	t.Parallel()
 	testdata := map[string]string{
 		"/path/to/file.txt": filepath.FromSlash("/path/to/"),
 		"-":                 "/",
@@ -46,29 +47,34 @@ func TestDir(t *testing.T) {
 		nameURL := &url.URL{Scheme: "file", Path: name}
 		dirURL := &url.URL{Scheme: "file", Path: filepath.ToSlash(dir)}
 		t.Run("path="+name, func(t *testing.T) {
+			t.Parallel()
 			assert.Equal(t, dirURL, loader.Dir(nameURL))
 		})
 	}
 }
 
 func TestResolve(t *testing.T) {
-
+	t.Parallel()
 	t.Run("Blank", func(t *testing.T) {
+		t.Parallel()
 		_, err := loader.Resolve(nil, "")
 		assert.EqualError(t, err, "local or remote path required")
 	})
 
 	t.Run("Protocol", func(t *testing.T) {
+		t.Parallel()
 		root, err := url.Parse("file:///")
 		require.NoError(t, err)
 
 		t.Run("Missing", func(t *testing.T) {
+			t.Parallel()
 			u, err := loader.Resolve(root, "example.com/html")
 			require.NoError(t, err)
 			assert.Equal(t, u.String(), "//example.com/html")
 			// TODO: check that warning will be emitted if Loaded
 		})
 		t.Run("WS", func(t *testing.T) {
+			t.Parallel()
 			moduleSpecifier := "ws://example.com/html"
 			_, err := loader.Resolve(root, moduleSpecifier)
 			assert.EqualError(t, err,
@@ -76,6 +82,7 @@ func TestResolve(t *testing.T) {
 		})
 
 		t.Run("HTTP", func(t *testing.T) {
+			t.Parallel()
 			moduleSpecifier := "http://example.com/html"
 			_, err := loader.Resolve(root, moduleSpecifier)
 			assert.EqualError(t, err,
@@ -84,6 +91,7 @@ func TestResolve(t *testing.T) {
 	})
 
 	t.Run("Remote Lifting Denied", func(t *testing.T) {
+		t.Parallel()
 		pwdURL, err := url.Parse("https://example.com/")
 		require.NoError(t, err)
 
@@ -92,6 +100,7 @@ func TestResolve(t *testing.T) {
 	})
 
 	t.Run("Fixes missing slash in pwd", func(t *testing.T) {
+		t.Parallel()
 		pwdURL, err := url.Parse("https://example.com/path/to")
 		require.NoError(t, err)
 
@@ -100,41 +109,59 @@ func TestResolve(t *testing.T) {
 		require.Equal(t, "https://example.com/path/to/something", moduleURL.String())
 		require.Equal(t, "https://example.com/path/to", pwdURL.String())
 	})
-
 }
+
+//nolint:tparallel // this touch the global http.DefaultTransport
 func TestLoad(t *testing.T) {
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	sr := tb.Replacer.Replace
 
+	// TODO figure out a way to not replace the default transport globally so we can have this tool be in parallel and
+	// then break it into separate tests instead of having one very long one.
 	oldHTTPTransport := http.DefaultTransport
 	http.DefaultTransport = tb.HTTPTransport
-
-	defer func() {
+	t.Cleanup(func() {
 		http.DefaultTransport = oldHTTPTransport
-	}()
+	})
+	// All of the below handlerFuncs are here as they are used through the test
+	const responseStr = "export function fn() {\r\n    return 1234;\r\n}"
+	tb.Mux.HandleFunc("/raw/something", func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := r.URL.Query()["_k6"]; ok {
+			http.Error(w, "Internal server error", 500)
+			return
+		}
+		_, err := fmt.Fprint(w, responseStr)
+		assert.NoError(t, err)
+	})
+
+	tb.Mux.HandleFunc("/invalid", func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "Internal server error", 500)
+	})
 
 	t.Run("Local", func(t *testing.T) {
-		filesystems := make(map[string]afero.Fs)
-		filesystems["file"] = afero.NewMemMapFs()
-		assert.NoError(t, filesystems["file"].MkdirAll("/path/to", 0755))
-		assert.NoError(t, afero.WriteFile(filesystems["file"], "/path/to/file.txt", []byte("hi"), 0644))
-
+		t.Parallel()
 		testdata := map[string]struct{ pwd, path string }{
 			"Absolute": {"/path/", "/path/to/file.txt"},
 			"Relative": {"/path/", "./to/file.txt"},
 			"Adjacent": {"/path/to/", "./file.txt"},
 		}
+
 		for name, data := range testdata {
 			data := data
 			t.Run(name, func(t *testing.T) {
+				t.Parallel()
 				pwdURL, err := url.Parse("file://" + data.pwd)
 				require.NoError(t, err)
 
 				moduleURL, err := loader.Resolve(pwdURL, data.path)
 				require.NoError(t, err)
 
+				filesystems := make(map[string]afero.Fs)
+				filesystems["file"] = afero.NewMemMapFs()
+				assert.NoError(t, filesystems["file"].MkdirAll("/path/to", 0o755))
+				assert.NoError(t, afero.WriteFile(filesystems["file"], "/path/to/file.txt", []byte("hi"), 0o644))
 				src, err := loader.Load(logger, filesystems, moduleURL, data.path)
 				require.NoError(t, err)
 
@@ -144,6 +171,12 @@ func TestLoad(t *testing.T) {
 		}
 
 		t.Run("Nonexistent", func(t *testing.T) {
+			t.Parallel()
+			filesystems := make(map[string]afero.Fs)
+			filesystems["file"] = afero.NewMemMapFs()
+			assert.NoError(t, filesystems["file"].MkdirAll("/path/to", 0o755))
+			assert.NoError(t, afero.WriteFile(filesystems["file"], "/path/to/file.txt", []byte("hi"), 0o644))
+
 			root, err := url.Parse("file:///")
 			require.NoError(t, err)
 
@@ -160,8 +193,10 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("Remote", func(t *testing.T) {
-		filesystems := map[string]afero.Fs{"https": afero.NewMemMapFs()}
+		t.Parallel()
 		t.Run("From local", func(t *testing.T) {
+			t.Parallel()
+			filesystems := map[string]afero.Fs{"https": afero.NewMemMapFs()}
 			root, err := url.Parse("file:///")
 			require.NoError(t, err)
 
@@ -176,6 +211,8 @@ func TestLoad(t *testing.T) {
 		})
 
 		t.Run("Absolute", func(t *testing.T) {
+			t.Parallel()
+			filesystems := map[string]afero.Fs{"https": afero.NewMemMapFs()}
 			pwdURL, err := url.Parse(sr("HTTPSBIN_URL"))
 			require.NoError(t, err)
 
@@ -190,6 +227,8 @@ func TestLoad(t *testing.T) {
 		})
 
 		t.Run("Relative", func(t *testing.T) {
+			t.Parallel()
+			filesystems := map[string]afero.Fs{"https": afero.NewMemMapFs()}
 			pwdURL, err := url.Parse(sr("HTTPSBIN_URL"))
 			require.NoError(t, err)
 
@@ -204,17 +243,8 @@ func TestLoad(t *testing.T) {
 		})
 	})
 
-	const responseStr = "export function fn() {\r\n    return 1234;\r\n}"
-	tb.Mux.HandleFunc("/raw/something", func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := r.URL.Query()["_k6"]; ok {
-			http.Error(w, "Internal server error", 500)
-			return
-		}
-		_, err := fmt.Fprint(w, responseStr)
-		assert.NoError(t, err)
-	})
-
 	t.Run("No _k6=1 Fallback", func(t *testing.T) {
+		t.Parallel()
 		root, err := url.Parse("file:///")
 		require.NoError(t, err)
 
@@ -230,21 +260,19 @@ func TestLoad(t *testing.T) {
 		assert.Equal(t, responseStr, string(src.Data))
 	})
 
-	tb.Mux.HandleFunc("/invalid", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "Internal server error", 500)
-	})
-
 	t.Run("Invalid", func(t *testing.T) {
+		t.Parallel()
 		root, err := url.Parse("file:///")
 		require.NoError(t, err)
 
 		t.Run("IP URL", func(t *testing.T) {
+			t.Parallel()
 			_, err := loader.Resolve(root, "192.168.0.%31")
 			require.Error(t, err)
 			require.Contains(t, err.Error(), `invalid URL escape "%31"`)
 		})
 
-		var testData = [...]struct {
+		testData := [...]struct {
 			name, moduleSpecifier string
 		}{
 			{"URL", sr("HTTPSBIN_URL/invalid")},

@@ -18,9 +18,11 @@
  *
  */
 
+// Package loader is about loading files from either the filesystem or through https requests.
 package loader
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -97,33 +99,7 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 	}
 
 	if moduleSpecifier[0] == '.' || moduleSpecifier[0] == '/' || filepath.IsAbs(moduleSpecifier) {
-		if pwd.Opaque != "" { // this is a loader reference
-			parts := strings.SplitN(pwd.Opaque, "/", 2)
-			if moduleSpecifier[0] == '/' {
-				return &url.URL{Opaque: path.Join(parts[0], moduleSpecifier)}, nil
-			}
-			return &url.URL{Opaque: path.Join(parts[0], path.Join(path.Dir(parts[1]+"/"), moduleSpecifier))}, nil
-		}
-
-		// The file is in format like C:/something/path.js. But this will be decoded as scheme `C`
-		// ... which is not what we want we want it to be decode as file:///C:/something/path.js
-		if filepath.VolumeName(moduleSpecifier) != "" {
-			moduleSpecifier = "/" + moduleSpecifier
-		}
-
-		// we always want for the pwd to end in a slash, but filepath/path.Clean strips it so we read
-		// it if it's missing
-		var finalPwd = pwd
-		if pwd.Opaque != "" {
-			if !strings.HasSuffix(pwd.Opaque, "/") {
-				finalPwd = &url.URL{Opaque: pwd.Opaque + "/"}
-			}
-		} else if !strings.HasSuffix(pwd.Path, "/") {
-			finalPwd = &url.URL{}
-			*finalPwd = *pwd
-			finalPwd.Path += "/"
-		}
-		return finalPwd.Parse(moduleSpecifier)
+		return resolveFilePath(pwd, moduleSpecifier)
 	}
 
 	if strings.Contains(moduleSpecifier, "://") {
@@ -153,6 +129,36 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 		return u, nil
 	}
 	return &url.URL{Opaque: moduleSpecifier}, nil
+}
+
+func resolveFilePath(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
+	if pwd.Opaque != "" { // this is a loader reference
+		parts := strings.SplitN(pwd.Opaque, "/", 2)
+		if moduleSpecifier[0] == '/' {
+			return &url.URL{Opaque: path.Join(parts[0], moduleSpecifier)}, nil
+		}
+		return &url.URL{Opaque: path.Join(parts[0], path.Join(path.Dir(parts[1]+"/"), moduleSpecifier))}, nil
+	}
+
+	// The file is in format like C:/something/path.js. But this will be decoded as scheme `C`
+	// ... which is not what we want we want it to be decode as file:///C:/something/path.js
+	if filepath.VolumeName(moduleSpecifier) != "" {
+		moduleSpecifier = "/" + moduleSpecifier
+	}
+
+	// we always want for the pwd to end in a slash, but filepath/path.Clean strips it so we read
+	// it if it's missing
+	finalPwd := pwd
+	if pwd.Opaque != "" {
+		if !strings.HasSuffix(pwd.Opaque, "/") {
+			finalPwd = &url.URL{Opaque: pwd.Opaque + "/"}
+		}
+	} else if !strings.HasSuffix(pwd.Path, "/") {
+		finalPwd = &url.URL{}
+		*finalPwd = *pwd
+		finalPwd.Path += "/"
+	}
+	return finalPwd.Parse(moduleSpecifier)
 }
 
 // Dir returns the directory for the path.
@@ -203,7 +209,7 @@ func Load(
 		return nil, err
 	}
 	if scheme == "https" {
-		var finalModuleSpecifierURL = &url.URL{}
+		finalModuleSpecifierURL := &url.URL{}
 
 		switch {
 		case moduleSpecifier.Opaque != "": // This is loader
@@ -226,7 +232,7 @@ func Load(
 			result.URL = moduleSpecifier
 			// TODO maybe make an afero.Fs which makes request directly and than use CacheOnReadFs
 			// on top of as with the `file` scheme fs
-			_ = afero.WriteFile(filesystems[scheme], pathOnFs, result.Data, 0644)
+			_ = afero.WriteFile(filesystems[scheme], pathOnFs, result.Data, 0o644)
 			return result, nil
 		}
 
@@ -255,7 +261,7 @@ func resolveUsingLoaders(logger logrus.FieldLogger, name string) (*url.URL, erro
 }
 
 func loadRemoteURL(logger logrus.FieldLogger, u *url.URL) (*SourceData, error) {
-	var oldQuery = u.RawQuery
+	oldQuery := u.RawQuery
 	if u.RawQuery != "" {
 		u.RawQuery += "&"
 	}
@@ -292,7 +298,13 @@ func pickLoader(path string) (string, loaderFunc, []string) {
 func fetch(logger logrus.FieldLogger, u string) ([]byte, error) {
 	logger.WithField("url", u).Debug("Fetching source...")
 	startTime := time.Now()
-	res, err := http.Get(u)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

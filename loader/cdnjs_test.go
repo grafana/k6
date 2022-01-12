@@ -34,6 +34,7 @@ import (
 
 func TestCDNJS(t *testing.T) {
 	t.Skip("skipped to avoid inconsistent API responses")
+	t.Parallel()
 
 	paths := map[string]struct {
 		parts []string
@@ -69,12 +70,13 @@ func TestCDNJS(t *testing.T) {
 		},
 	}
 
-	var root = &url.URL{Scheme: "https", Host: "example.com", Path: "/something/"}
+	root := &url.URL{Scheme: "https", Host: "example.com", Path: "/something/"}
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 	for path, expected := range paths {
 		path, expected := path, expected
 		t.Run(path, func(t *testing.T) {
+			t.Parallel()
 			name, loader, parts := pickLoader(path)
 			assert.Equal(t, "cdnjs", name)
 			assert.Equal(t, expected.parts, parts)
@@ -96,6 +98,7 @@ func TestCDNJS(t *testing.T) {
 	}
 
 	t.Run("cdnjs.com/libraries/nonexistent", func(t *testing.T) {
+		t.Parallel()
 		path := "cdnjs.com/libraries/nonexistent"
 		name, loader, parts := pickLoader(path)
 		assert.Equal(t, "cdnjs", name)
@@ -105,6 +108,7 @@ func TestCDNJS(t *testing.T) {
 	})
 
 	t.Run("cdnjs.com/libraries/Faker/3.1.0/nonexistent.js", func(t *testing.T) {
+		t.Parallel()
 		path := "cdnjs.com/libraries/Faker/3.1.0/nonexistent.js"
 		name, loader, parts := pickLoader(path)
 		assert.Equal(t, "cdnjs", name)
