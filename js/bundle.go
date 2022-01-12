@@ -334,15 +334,13 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	unbindInit()
 	*init.ctxPtr = nil
 
-	if isInitialInstantiation(vuID) {
+	// If we've already initialized the original VU init context, forbid
+	// any subsequent VUs to open new files
+	if vuID == 0 {
 		init.allowOnlyOpenedFiles()
 	}
 
 	rt.SetRandSource(common.NewRandSource())
 
 	return nil
-}
-
-func isInitialInstantiation(vu uint64) bool {
-	return vu == 0
 }
