@@ -106,14 +106,18 @@ func (s String) AsUtf16() []uint16 {
 	if len(s) < 4 || len(s)&1 != 0 {
 		return nil
 	}
-	l := len(s) / 2
+
+	var a []uint16
 	raw := string(s)
-	hdr := (*reflect.StringHeader)(unsafe.Pointer(&raw))
-	a := *(*[]uint16)(unsafe.Pointer(&reflect.SliceHeader{
-		Data: hdr.Data,
-		Len:  l,
-		Cap:  l,
-	}))
+
+	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&a))
+	sliceHeader.Data = (*reflect.StringHeader)(unsafe.Pointer(&raw)).Data
+
+	l := len(raw) / 2
+
+	sliceHeader.Len = l
+	sliceHeader.Cap = l
+
 	if a[0] == BOM {
 		return a
 	}

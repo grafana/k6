@@ -567,12 +567,6 @@ func (self *_parser) skipWhiteSpace() {
 	}
 }
 
-func (self *_parser) skipLineWhiteSpace() {
-	for isLineWhiteSpace(self.chr) {
-		self.read()
-	}
-}
-
 func (self *_parser) scanMantissa(base int) {
 	for digitValue(self.chr) < base {
 		self.read()
