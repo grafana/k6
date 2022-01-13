@@ -58,11 +58,10 @@ type BrowserContext struct {
 }
 
 // NewBrowserContext creates a new browser context.
-func NewBrowserContext(ctx context.Context, conn *Connection, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *Logger) *BrowserContext {
+func NewBrowserContext(ctx context.Context, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *Logger) *BrowserContext {
 	b := BrowserContext{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
-		conn:             conn,
 		browser:          browser,
 		id:               id,
 		opts:             opts,
@@ -219,7 +218,7 @@ func (b *BrowserContext) NewPage() api.Page {
 
 	p, err := b.browser.newPageInContext(b.id)
 	if err != nil {
-		k6Throw(b.ctx, "cannot create a new page: %w", err)
+		k6Throw(b.ctx, "newPageInContext: %w", err)
 	}
 
 	var (

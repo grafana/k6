@@ -703,6 +703,11 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 	var event *NavigationEvent
 	select {
 	case <-m.ctx.Done():
+		// ignore: the extension is shutting down
+		m.logger.Warnf("FrameManager:WaitForFrameNavigation",
+			"fmid:%d furl:%s context canceled",
+			m.ID(), frame.URL())
+		return nil
 	case <-time.After(parsedOpts.Timeout):
 		k6common.Throw(rt, ErrTimedOut)
 	case data := <-ch:
@@ -719,14 +724,7 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 		}, parsedOpts.Timeout)
 	}
 
-	var resp *Response
-	req := event.newDocument.request
-	if req != nil {
-		if req.response != nil {
-			resp = req.response
-		}
-	}
-	return resp
+	return event.newDocument.request.response
 }
 
 // ID returns the unique ID of a FrameManager value.
