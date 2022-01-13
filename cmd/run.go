@@ -63,7 +63,7 @@ const (
 //nolint:gochecknoglobals
 var runType = os.Getenv("K6_TYPE")
 
-//nolint:funlen,gocognit,gocyclo
+//nolint:funlen,gocognit,gocyclo,cyclop
 func getRunCmd(ctx context.Context, logger *logrus.Logger) *cobra.Command {
 	// runCmd represents the run command.
 	runCmd := &cobra.Command{
@@ -176,7 +176,7 @@ a commandline interface for interacting with it.`,
 				for _, s := range execScheduler.GetExecutors() {
 					pbs = append(pbs, s.GetProgress())
 				}
-				showProgress(progressCtx, conf, pbs, logger)
+				showProgress(progressCtx, pbs, logger)
 				progressBarWG.Done()
 			}()
 
@@ -365,7 +365,7 @@ func reportUsage(execScheduler *local.ExecutionScheduler) error {
 	if err != nil {
 		return err
 	}
-	res, err := http.Post("https://reports.k6.io/", "application/json", bytes.NewBuffer(body))
+	res, err := http.Post("https://reports.k6.io/", "application/json", bytes.NewBuffer(body)) //nolint:noctx
 	defer func() {
 		if err == nil {
 			_ = res.Body.Close()
@@ -433,7 +433,7 @@ func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[strin
 		case "stderr":
 			return stdErr, nil
 		default:
-			return fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+			return fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o666)
 		}
 	}
 

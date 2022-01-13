@@ -289,6 +289,7 @@ var runtimeOptionsTestCases = map[string]runtimeOptionsTestCase{ //nolint:gochec
 }
 
 func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
+	t.Helper()
 	flags := runtimeOptionFlagSet(tc.useSysEnv)
 	require.NoError(t, flags.Parse(tc.cliFlags))
 
@@ -362,6 +363,7 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 }
 
 func TestRuntimeOptions(t *testing.T) {
+	t.Parallel()
 	for name, tc := range runtimeOptionsTestCases {
 		tc := tc
 		t.Run(fmt.Sprintf("RuntimeOptions test '%s'", name), func(t *testing.T) {

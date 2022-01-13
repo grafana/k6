@@ -32,8 +32,10 @@ import (
 )
 
 // Verify that the fields implement the interface
-var _ Field = StringField{}
-var _ Field = PasswordField{}
+var (
+	_ Field = StringField{}
+	_ Field = PasswordField{}
+)
 
 // StringField is just a simple field for reading cleartext strings
 type StringField struct {
@@ -81,13 +83,13 @@ func (f StringField) GetContents(r io.Reader) (string, error) {
 }
 
 // Clean trims the spaces in the string and checks for min and max length
-func (f StringField) Clean(s string) (interface{}, error) {
+func (f StringField) Clean(s string) (string, error) {
 	s = strings.TrimSpace(s)
 	if f.Min != 0 && len(s) < f.Min {
-		return nil, fmt.Errorf("invalid input, min length is %d", f.Min)
+		return "", fmt.Errorf("invalid input, min length is %d", f.Min)
 	}
 	if f.Max != 0 && len(s) > f.Max {
-		return nil, fmt.Errorf("invalid input, max length is %d", f.Max)
+		return "", fmt.Errorf("invalid input, max length is %d", f.Max)
 	}
 	if s == "" {
 		s = f.Default
@@ -138,9 +140,9 @@ func (f PasswordField) GetContents(r io.Reader) (string, error) {
 }
 
 // Clean just checks if the minimum length is exceeded, it doesn't trim the string!
-func (f PasswordField) Clean(s string) (interface{}, error) {
+func (f PasswordField) Clean(s string) (string, error) {
 	if f.Min != 0 && len(s) < f.Min {
-		return nil, fmt.Errorf("invalid input, min length is %d", f.Min)
+		return "", fmt.Errorf("invalid input, min length is %d", f.Min)
 	}
 	return s, nil
 }

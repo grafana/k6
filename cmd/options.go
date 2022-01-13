@@ -36,9 +36,9 @@ import (
 )
 
 var (
-	ErrTagEmptyName   = errors.New("Invalid tag, empty name")
-	ErrTagEmptyValue  = errors.New("Invalid tag, empty value")
-	ErrTagEmptyString = errors.New("Invalid tag, empty string")
+	errTagEmptyName   = errors.New("invalid tag, empty name")
+	errTagEmptyValue  = errors.New("invalid tag, empty value")
+	errTagEmptyString = errors.New("invalid tag, empty string")
 )
 
 func optionFlagSet() *pflag.FlagSet {
@@ -63,7 +63,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Int64("batch-per-host", 6, "max parallel batch reqs per host")
 	flags.Int64("rps", 0, "limit requests per second")
 	flags.String("user-agent", fmt.Sprintf("k6/%s (https://k6.io/)", consts.Version), "user agent for http requests")
-	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full'")
+	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full'") //nolint:lll
 	flags.Lookup("http-debug").NoOptDefVal = "headers"
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	flags.Bool("no-connection-reuse", false, "disable keep-alive connections")
@@ -81,7 +81,7 @@ func optionFlagSet() *pflag.FlagSet {
 		strings.Join(lib.DefaultSummaryTrendStats, ","),
 	)
 	flags.StringSlice("summary-trend-stats", nil, sumTrendStatsHelp)
-	flags.String("summary-time-unit", "", "define the time unit used to display the trend stats. Possible units are: 's', 'ms' and 'us'")
+	flags.String("summary-time-unit", "", "define the time unit used to display the trend stats. Possible units are: 's', 'ms' and 'us'") //nolint:lll
 	// system-tags must have a default value, but we can't specify it here, otherwiese, it will always override others.
 	// set it to nil here, and add the default in applyDefault() instead.
 	systemTagsCliHelpText := fmt.Sprintf(
@@ -102,6 +102,7 @@ func optionFlagSet() *pflag.FlagSet {
 	return flags
 }
 
+//nolint:funlen,gocognit,cyclop // this needs breaking up but probably should wait for croconf
 func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	opts := lib.Options{
 		VUs:                   getNullInt64(flags, "vus"),
@@ -247,7 +248,8 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	if len(runTags) > 0 {
 		parsedRunTags := make(map[string]string, len(runTags))
 		for _, s := range runTags {
-			name, value, err := parseTagNameValue(s)
+			var name, value string
+			name, value, err = parseTagNameValue(s)
 			if err != nil {
 				return opts, fmt.Errorf("error parsing tag '%s': %w", s, err)
 			}
@@ -278,16 +280,16 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 
 func parseTagNameValue(nv string) (string, string, error) {
 	if nv == "" {
-		return "", "", ErrTagEmptyString
+		return "", "", errTagEmptyString
 	}
 
 	idx := strings.IndexRune(nv, '=')
 
 	switch idx {
 	case 0:
-		return "", "", ErrTagEmptyName
+		return "", "", errTagEmptyName
 	case -1, len(nv) - 1:
-		return "", "", ErrTagEmptyValue
+		return "", "", errTagEmptyValue
 	default:
 		return nv[:idx], nv[idx+1:], nil
 	}

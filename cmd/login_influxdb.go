@@ -36,6 +36,7 @@ import (
 	"go.k6.io/k6/ui"
 )
 
+//nolint:funlen
 func getLoginInfluxDBCommand(logger logrus.FieldLogger) *cobra.Command {
 	// loginInfluxDBCommand represents the 'login influxdb' command
 	loginInfluxDBCommand := &cobra.Command{
@@ -100,10 +101,10 @@ This will set the default server used when just "-o influxdb" is passed.`,
 				return err
 			}
 
-			conf.Addr = null.StringFrom(vals["Addr"].(string))
-			conf.DB = null.StringFrom(vals["DB"].(string))
-			conf.Username = null.StringFrom(vals["Username"].(string))
-			conf.Password = null.StringFrom(vals["Password"].(string))
+			conf.Addr = null.StringFrom(vals["Addr"])
+			conf.DB = null.StringFrom(vals["DB"])
+			conf.Username = null.StringFrom(vals["Username"])
+			conf.Password = null.StringFrom(vals["Password"])
 
 			client, err := influxdb.MakeClient(conf)
 			if err != nil {

@@ -55,7 +55,7 @@ var (
 	showCloudLogs = true
 )
 
-//nolint:funlen,gocognit,gocyclo
+//nolint:funlen,gocognit,gocyclo,cyclop
 func getCloudCmd(ctx context.Context, logger *logrus.Logger) *cobra.Command {
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
@@ -250,7 +250,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			defer progressBarWG.Wait()
 			defer progressCancel()
 			go func() {
-				showProgress(progressCtx, conf, []*pb.ProgressBar{progressBar}, logger)
+				showProgress(progressCtx, []*pb.ProgressBar{progressBar}, logger)
 				progressBarWG.Done()
 			}()
 

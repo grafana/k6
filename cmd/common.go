@@ -38,8 +38,11 @@ import (
 )
 
 // Use these when interacting with fs and writing to terminal, makes a command testable
-var defaultFs = afero.NewOsFs()
-var defaultWriter io.Writer = os.Stdout
+//nolint:gochecknoglobals
+var (
+	defaultFs               = afero.NewOsFs()
+	defaultWriter io.Writer = os.Stdout
+)
 
 // Panic if the given error is not nil.
 func must(err error) {
@@ -48,7 +51,7 @@ func must(err error) {
 	}
 }
 
-//TODO: refactor the CLI config so these functions aren't needed - they
+// TODO: refactor the CLI config so these functions aren't needed - they
 // can mask errors by failing only at runtime, not at compile time
 func getNullBool(flags *pflag.FlagSet, key string) null.Bool {
 	v, err := flags.GetBool(key)

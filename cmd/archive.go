@@ -31,6 +31,7 @@ import (
 	"go.k6.io/k6/lib/metrics"
 )
 
+//nolint:gochecknoglobals
 var archiveOut = "archive.tar"
 
 func getArchiveCmd(logger *logrus.Logger) *cobra.Command {

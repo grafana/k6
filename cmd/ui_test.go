@@ -87,6 +87,7 @@ left 2   [   0% ] right 2  000
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			pbs := createTestProgressBars(3, tc.padding, 1)
 			out, longestLine := renderMultipleBars(false, false, 6+tc.padding, 80, tc.widthDelta, pbs)
 			assert.Equal(t, tc.expOut, out)
