@@ -49,6 +49,7 @@ type testCmdTest struct {
 }
 
 func TestConfigCmd(t *testing.T) {
+	t.Parallel()
 	testdata := []testCmdData{
 		{
 			Name: "Out",
@@ -75,8 +76,10 @@ func TestConfigCmd(t *testing.T) {
 
 	for _, data := range testdata {
 		t.Run(data.Name, func(t *testing.T) {
+			t.Parallel()
 			for _, test := range data.Tests {
 				t.Run(`"`+test.Name+`"`, func(t *testing.T) {
+					t.Parallel()
 					fs := configFlagSet()
 					fs.AddFlagSet(optionFlagSet())
 					assert.NoError(t, fs.Parse(test.Args))
@@ -90,6 +93,7 @@ func TestConfigCmd(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // this user testutils.SetEnv
 func TestConfigEnv(t *testing.T) {
 	testdata := map[struct{ Name, Key string }]map[string]func(Config){
 		{"Linger", "K6_LINGER"}: {
@@ -125,15 +129,19 @@ func TestConfigEnv(t *testing.T) {
 }
 
 func TestConfigApply(t *testing.T) {
+	t.Parallel()
 	t.Run("Linger", func(t *testing.T) {
+		t.Parallel()
 		conf := Config{}.Apply(Config{Linger: null.BoolFrom(true)})
 		assert.Equal(t, null.BoolFrom(true), conf.Linger)
 	})
 	t.Run("NoUsageReport", func(t *testing.T) {
+		t.Parallel()
 		conf := Config{}.Apply(Config{NoUsageReport: null.BoolFrom(true)})
 		assert.Equal(t, null.BoolFrom(true), conf.NoUsageReport)
 	})
 	t.Run("Out", func(t *testing.T) {
+		t.Parallel()
 		conf := Config{}.Apply(Config{Out: []string{"influxdb"}})
 		assert.Equal(t, []string{"influxdb"}, conf.Out)
 
@@ -152,23 +160,37 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 		err    string
 	}{
 		{"defaultOK", Config{}, true, ""},
-		{"defaultErr", Config{}, false,
-			"executor default: function 'default' not found in exports"},
-		{"nonDefaultOK", Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
-			"per_vu_iters": executor.PerVUIterationsConfig{BaseConfig: executor.BaseConfig{
-				Name: "per_vu_iters", Type: "per-vu-iterations", Exec: null.StringFrom("nonDefault")},
-				VUs:         null.IntFrom(1),
-				Iterations:  null.IntFrom(1),
-				MaxDuration: types.NullDurationFrom(time.Second),
-			}}}}, true, "",
+		{
+			"defaultErr",
+			Config{},
+			false,
+			"executor default: function 'default' not found in exports",
 		},
-		{"nonDefaultErr", Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
-			"per_vu_iters": executor.PerVUIterationsConfig{BaseConfig: executor.BaseConfig{
-				Name: "per_vu_iters", Type: "per-vu-iterations", Exec: null.StringFrom("nonDefaultErr")},
-				VUs:         null.IntFrom(1),
-				Iterations:  null.IntFrom(1),
-				MaxDuration: types.NullDurationFrom(time.Second),
-			}}}}, false,
+		{
+			"nonDefaultOK", Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"per_vu_iters": executor.PerVUIterationsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "per_vu_iters", Type: "per-vu-iterations", Exec: null.StringFrom("nonDefault"),
+					},
+					VUs:         null.IntFrom(1),
+					Iterations:  null.IntFrom(1),
+					MaxDuration: types.NullDurationFrom(time.Second),
+				},
+			}}}, true, "",
+		},
+		{
+			"nonDefaultErr",
+			Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"per_vu_iters": executor.PerVUIterationsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "per_vu_iters", Type: "per-vu-iterations", Exec: null.StringFrom("nonDefaultErr"),
+					},
+					VUs:         null.IntFrom(1),
+					Iterations:  null.IntFrom(1),
+					MaxDuration: types.NullDurationFrom(time.Second),
+				},
+			}}},
+			false,
 			"executor per_vu_iters: function 'nonDefaultErr' not found in exports",
 		},
 	}
@@ -176,6 +198,7 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := deriveAndValidateConfig(tc.conf,
 				func(_ string) bool { return tc.isExec })
 			if tc.err != "" {

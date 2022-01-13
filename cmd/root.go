@@ -18,6 +18,7 @@
  *
  */
 
+// Package cmd the package implementing all of cli interface of k6
 package cmd
 
 import (

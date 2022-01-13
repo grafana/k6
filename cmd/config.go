@@ -51,6 +51,7 @@ func configFlagSet() *pflag.FlagSet {
 	return flags
 }
 
+// Config ...
 type Config struct {
 	lib.Options
 
@@ -65,12 +66,13 @@ type Config struct {
 // Validate checks if all of the specified options make sense
 func (c Config) Validate() []error {
 	errors := c.Options.Validate()
-	//TODO: validate all of the other options... that we should have already been validating...
-	//TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
+	// TODO: validate all of the other options... that we should have already been validating...
+	// TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
 
 	return errors
 }
 
+// Apply the provided config on top of the current one, returning a new one. The provided config has priority.
 func (c Config) Apply(cfg Config) Config {
 	c.Options = c.Options.Apply(cfg.Options)
 	if len(cfg.Out) > 0 {
@@ -146,11 +148,11 @@ func writeDiskConfig(fs afero.Fs, configPath string, conf Config) error {
 		return err
 	}
 
-	if err := fs.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+	if err := fs.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
 		return err
 	}
 
-	return afero.WriteFile(fs, configPath, data, 0644)
+	return afero.WriteFile(fs, configPath, data, 0o644)
 }
 
 // Reads configuration variables from the environment.

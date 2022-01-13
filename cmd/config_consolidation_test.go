@@ -240,7 +240,8 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		},
 		{opts{cli: []string{"-u", "1", "-i", "6", "-d", "10s"}}, exp{}, func(t *testing.T, c Config) {
 			verifySharedIters(I(1), I(6))(t, c)
-			sharedIterConfig := c.Scenarios[lib.DefaultScenarioName].(executor.SharedIterationsConfig)
+			sharedIterConfig, ok := c.Scenarios[lib.DefaultScenarioName].(executor.SharedIterationsConfig)
+			require.True(t, ok)
 			assert.Equal(t, sharedIterConfig.MaxDuration.TimeDuration(), 10*time.Second)
 		}},
 		// This should get a validation error since VUs are more than the shared iterations
@@ -535,6 +536,7 @@ func runTestCase(
 	newFlagSet flagSetInit,
 	logHook *testutils.SimpleLogrusHook,
 ) {
+	t.Helper()
 	t.Logf("Test with opts=%#v and exp=%#v\n", testCase.options, testCase.expected)
 	output := testutils.NewTestOutput(t)
 	logrus.SetOutput(output)
@@ -595,8 +597,7 @@ func runTestCase(
 	}
 	require.NoError(t, err)
 
-	warnings := logHook.Drain()
-	if testCase.expected.logWarning {
+	if warnings := logHook.Drain(); testCase.expected.logWarning {
 		assert.NotEmpty(t, warnings)
 	} else {
 		assert.Empty(t, warnings)
@@ -614,6 +615,7 @@ func runTestCase(
 	}
 }
 
+//nolint:paralleltest // see comments in test
 func TestConfigConsolidation(t *testing.T) {
 	// This test and its subtests shouldn't be ran in parallel, since they unfortunately have
 	// to mess with shared global objects (env vars, variables, the log, ... santa?)
@@ -623,6 +625,7 @@ func TestConfigConsolidation(t *testing.T) {
 	defer logrus.SetOutput(os.Stderr)
 
 	for tcNum, testCase := range getConfigConsolidationTestCases() {
+		tcNum, testCase := tcNum, testCase
 		flagSetInits := testCase.options.cliFlagSetInits
 		if flagSetInits == nil { // handle the most common case
 			flagSetInits = mostFlagSets()
@@ -630,7 +633,7 @@ func TestConfigConsolidation(t *testing.T) {
 		for fsNum, flagSet := range flagSetInits {
 			// I want to paralelize this, but I cannot... due to global variables and other
 			// questionable architectural choices... :|
-			testCase, flagSet := testCase, flagSet
+			fsNum, flagSet := fsNum, flagSet
 			t.Run(
 				fmt.Sprintf("TestCase#%d_FlagSet#%d", tcNum, fsNum),
 				func(t *testing.T) { runTestCase(t, testCase, flagSet, &logHook) },

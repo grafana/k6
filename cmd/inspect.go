@@ -91,7 +91,7 @@ func getInspectCmd(logger *logrus.Logger) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(data))
+			fmt.Println(string(data)) //nolint:forbidigo // yes we want to just print it
 
 			return nil
 		},

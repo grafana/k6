@@ -38,7 +38,7 @@ import (
 	"go.k6.io/k6/ui"
 )
 
-//nolint:funlen
+//nolint:funlen,gocognit
 func getLoginCloudCommand(logger logrus.FieldLogger) *cobra.Command {
 	// loginCloudCommand represents the 'login cloud' command
 	loginCloudCommand := &cobra.Command{
@@ -111,12 +111,13 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 				if !term.IsTerminal(int(syscall.Stdin)) { // nolint: unconvert
 					logger.Warn("Stdin is not a terminal, falling back to plain text input")
 				}
-				vals, err := form.Run(os.Stdin, stdout)
+				var vals map[string]string
+				vals, err = form.Run(os.Stdin, stdout)
 				if err != nil {
 					return err
 				}
-				email := vals["Email"].(string)
-				password := vals["Password"].(string)
+				email := vals["Email"]
+				password := vals["Password"]
 
 				client := cloudapi.NewClient(
 					logger,
@@ -125,7 +126,8 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 					consts.Version,
 					consolidatedCurrentConfig.Timeout.TimeDuration())
 
-				res, err := client.Login(email, password)
+				var res *cloudapi.LoginResponse
+				res, err = client.Login(email, password)
 				if err != nil {
 					return err
 				}

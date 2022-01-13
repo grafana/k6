@@ -27,7 +27,7 @@ import (
 )
 
 func TestParseTagKeyValue(t *testing.T) {
-
+	t.Parallel()
 	testData := []struct {
 		input string
 		name  string
@@ -38,31 +38,31 @@ func TestParseTagKeyValue(t *testing.T) {
 			"",
 			"",
 			"",
-			ErrTagEmptyString,
+			errTagEmptyString,
 		},
 		{
 			"=",
 			"",
 			"",
-			ErrTagEmptyName,
+			errTagEmptyName,
 		},
 		{
 			"=test",
 			"",
 			"",
-			ErrTagEmptyName,
+			errTagEmptyName,
 		},
 		{
 			"test",
 			"",
 			"",
-			ErrTagEmptyValue,
+			errTagEmptyValue,
 		},
 		{
 			"test=",
 			"",
 			"",
-			ErrTagEmptyValue,
+			errTagEmptyValue,
 		},
 		{
 			"myTag=foo",
@@ -73,12 +73,13 @@ func TestParseTagKeyValue(t *testing.T) {
 	}
 
 	for _, data := range testData {
+		data := data
 		t.Run(data.input, func(t *testing.T) {
+			t.Parallel()
 			name, value, err := parseTagNameValue(data.input)
 			assert.Equal(t, name, data.name)
 			assert.Equal(t, value, data.value)
 			assert.Equal(t, err, data.err)
 		})
 	}
-
 }

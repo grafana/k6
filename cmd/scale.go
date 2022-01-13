@@ -38,11 +38,11 @@ func getScaleCmd(ctx context.Context) *cobra.Command {
 		Long: `Scale a running test.
 
   Use the global --address flag to specify the URL to the API server.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			vus := getNullInt64(cmd.Flags(), "vus")
 			max := getNullInt64(cmd.Flags(), "max")
 			if !vus.Valid && !max.Valid {
-				return errors.New("Specify either -u/--vus or -m/--max") //nolint:golint
+				return errors.New("Specify either -u/--vus or -m/--max") //nolint:golint,stylecheck
 			}
 
 			c, err := client.New(address)
