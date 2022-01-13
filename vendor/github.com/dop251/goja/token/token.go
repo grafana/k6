@@ -24,7 +24,7 @@ func (tkn Token) String() string {
 	return "token(" + strconv.Itoa(int(tkn)) + ")"
 }
 
-// This is not used for anything
+//lint:ignore U1000 This is not used for anything
 func (tkn Token) precedence(in bool) int {
 
 	switch tkn {
