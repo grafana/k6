@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"gopkg.in/guregu/null.v3"
 
@@ -33,24 +34,21 @@ import (
 	"go.k6.io/k6/lib"
 )
 
-// TODO: fix this... or remove k6 convert
-//nolint: gochecknoglobals
-var (
-	convertOutput       string
-	optionsFilePath     string
-	minSleep            uint
-	maxSleep            uint
-	enableChecks        bool
-	returnOnFailedCheck bool
-	correlate           bool
-	threshold           uint
-	nobatch             bool
-	only                []string
-	skip                []string
-)
-
 //nolint:funlen,gocognit
-func getConvertCmd() *cobra.Command {
+func getConvertCmd(defaultFs afero.Fs, defaultWriter io.Writer) *cobra.Command {
+	var (
+		convertOutput       string
+		optionsFilePath     string
+		minSleep            uint
+		maxSleep            uint
+		enableChecks        bool
+		returnOnFailedCheck bool
+		correlate           bool
+		threshold           uint
+		nobatch             bool
+		only                []string
+		skip                []string
+	)
 	convertCmd := &cobra.Command{
 		Use:   "convert",
 		Short: "Convert a HAR file to a k6 script",
