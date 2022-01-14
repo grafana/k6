@@ -29,13 +29,17 @@ import (
 	k6types "go.k6.io/k6/lib/types"
 )
 
-func TestDataURLSkipRequest(t *testing.T) {
+func TestURLSkipRequest(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t, withLogCache())
 	p := tb.NewPage(nil)
 
 	p.Goto("data:text/html,hello", nil)
-
 	assert.True(t, tb.logCache.contains("skipped request handling of data URL"))
+
+	p.Goto("blob:something", nil)
+	assert.True(t, tb.logCache.contains("skipped request handling of blob URL"))
 }
 
 func TestBlockHostnames(t *testing.T) {

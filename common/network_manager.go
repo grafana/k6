@@ -417,11 +417,16 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 		}
 	}
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
-	if req.url.Scheme != "data" {
+	// Skip data and blob URLs when emitting metrics, since they're internal to the browser.
+	if !isInternalURL(req.url) {
 		m.emitResponseMetrics(req.response, req)
 	}
 	m.deleteRequestByID(event.RequestID)
 	m.frameManager.requestFinished(req)
+}
+
+func isInternalURL(u *url.URL) bool {
+	return u.Scheme == "data" || u.Scheme == "blob"
 }
 
 func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interceptionID string) {
@@ -454,8 +459,9 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 		m.logger.Errorf("NetworkManager", "cannot create Request: %s", err)
 		return
 	}
-	if req.url.Scheme == "data" {
-		m.logger.Debugf("NetworkManager", "skipped request handling of data URL")
+	// Skip data and blob URLs, since they're internal to the browser.
+	if isInternalURL(req.url) {
+		m.logger.Debugf("NetworkManager", "skipped request handling of %s URL", req.url.Scheme)
 		return
 	}
 	m.reqsMu.Lock()
