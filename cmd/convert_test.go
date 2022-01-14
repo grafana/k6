@@ -121,9 +121,10 @@ export default function() {
 }
 `
 
-//nolint:paralleltest // a lot of global variables, hopefully convert will just be dropped
 func TestIntegrationConvertCmd(t *testing.T) {
+	t.Parallel()
 	t.Run("Correlate", func(t *testing.T) {
+		t.Parallel()
 		harFile, err := filepath.Abs("correlate.har")
 		require.NoError(t, err)
 		har, err := ioutil.ReadFile("testdata/example.har")
@@ -132,15 +133,14 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		expectedTestPlan, err := ioutil.ReadFile("testdata/example.js")
 		require.NoError(t, err)
 
-		defaultFs = afero.NewMemMapFs()
+		defaultFs := afero.NewMemMapFs()
 
 		err = afero.WriteFile(defaultFs, harFile, har, 0o644)
 		require.NoError(t, err)
 
 		buf := &bytes.Buffer{}
-		defaultWriter = buf
 
-		convertCmd := getConvertCmd()
+		convertCmd := getConvertCmd(defaultFs, buf)
 		assert.NoError(t, convertCmd.Flags().Set("correlate", "true"))
 		assert.NoError(t, convertCmd.Flags().Set("no-batch", "true"))
 		assert.NoError(t, convertCmd.Flags().Set("enable-status-code-checks", "true"))
@@ -175,28 +175,29 @@ func TestIntegrationConvertCmd(t *testing.T) {
 		}
 	})
 	t.Run("Stdout", func(t *testing.T) {
+		t.Parallel()
 		harFile, err := filepath.Abs("stdout.har")
 		require.NoError(t, err)
-		defaultFs = afero.NewMemMapFs()
+		defaultFs := afero.NewMemMapFs()
 		err = afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0o644)
 		assert.NoError(t, err)
 
 		buf := &bytes.Buffer{}
-		defaultWriter = buf
 
-		convertCmd := getConvertCmd()
+		convertCmd := getConvertCmd(defaultFs, buf)
 		err = convertCmd.RunE(convertCmd, []string{harFile})
 		assert.NoError(t, err)
 		assert.Equal(t, testHARConvertResult, buf.String())
 	})
 	t.Run("Output file", func(t *testing.T) {
+		t.Parallel()
 		harFile, err := filepath.Abs("output.har")
 		require.NoError(t, err)
-		defaultFs = afero.NewMemMapFs()
+		defaultFs := afero.NewMemMapFs()
 		err = afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0o644)
 		assert.NoError(t, err)
 
-		convertCmd := getConvertCmd()
+		convertCmd := getConvertCmd(defaultFs, nil)
 		err = convertCmd.Flags().Set("output", "/output.js")
 		defer func() {
 			err = convertCmd.Flags().Set("output", "")

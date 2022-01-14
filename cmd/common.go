@@ -37,13 +37,6 @@ import (
 	"go.k6.io/k6/loader"
 )
 
-// Use these when interacting with fs and writing to terminal, makes a command testable
-//nolint:gochecknoglobals
-var (
-	defaultFs               = afero.NewOsFs()
-	defaultWriter io.Writer = os.Stdout
-)
-
 // Panic if the given error is not nil.
 func must(err error) {
 	if err != nil {

@@ -36,6 +36,7 @@ import (
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -167,7 +168,7 @@ func Execute() {
 	c.cmd.AddCommand(
 		getArchiveCmd(logger),
 		getCloudCmd(ctx, logger),
-		getConvertCmd(),
+		getConvertCmd(afero.NewOsFs(), stdout),
 		getInspectCmd(logger),
 		loginCmd,
 		getPauseCmd(ctx),
