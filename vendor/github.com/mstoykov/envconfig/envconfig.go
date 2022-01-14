@@ -19,8 +19,10 @@ import (
 // ErrInvalidSpecification indicates that a specification is of the wrong type.
 var ErrInvalidSpecification = errors.New("specification must be a struct pointer")
 
-var gatherRegexp = regexp.MustCompile("([^A-Z]+|[A-Z]+[^A-Z]+|[A-Z]+)")
-var acronymRegexp = regexp.MustCompile("([A-Z]+)([A-Z][^A-Z]+)")
+var (
+	gatherRegexp  = regexp.MustCompile("([^A-Z]+|[A-Z]+[^A-Z]+|[A-Z]+)")
+	acronymRegexp = regexp.MustCompile("([A-Z]+)([A-Z][^A-Z]+)")
+)
 
 // A ParseError occurs when an environment variable cannot be converted to
 // the type required by a struct field during assignment.
@@ -181,7 +183,11 @@ func CheckDisallowed(prefix string, spec interface{}) error {
 }
 
 // Process populates the specified struct based on environment variables
-func Process(prefix string, spec interface{}) error {
+func Process(prefix string, spec interface{}, args ...func(string) (string, bool)) error {
+	lookupEnvF := lookupEnv
+	if len(args) == 1 {
+		lookupEnvF = args[0]
+	}
 	infos, err := gatherInfo(prefix, spec)
 
 	for _, info := range infos {
@@ -190,9 +196,9 @@ func Process(prefix string, spec interface{}) error {
 		// and an unset value. `os.LookupEnv` is preferred to `syscall.Getenv`,
 		// but it is only available in go1.5 or newer. We're using Go build tags
 		// here to use os.LookupEnv for >=go1.5
-		value, ok := lookupEnv(info.Key)
+		value, ok := lookupEnvF(info.Key)
 		if !ok && info.Alt != "" {
-			value, ok = lookupEnv(info.Alt)
+			value, ok = lookupEnvF(info.Alt)
 		}
 
 		def := info.Tags.Get("default")

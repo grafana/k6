@@ -25,7 +25,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
@@ -36,11 +35,6 @@ import (
 	"go.k6.io/k6/lib/types"
 )
 
-func init() {
-	_ = os.Setenv("K6CLOUD_HOST", "")
-	_ = os.Setenv("K6CLOUD_TOKEN", "")
-}
-
 func fprintf(t *testing.T, w io.Writer, format string, a ...interface{}) int {
 	n, err := fmt.Fprintf(w, format, a...)
 	require.NoError(t, err)
@@ -48,6 +42,7 @@ func fprintf(t *testing.T, w io.Writer, format string, a ...interface{}) int {
 }
 
 func TestCreateTestRun(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fprintf(t, w, `{"reference_id": "1", "config": {"aggregationPeriod": "2s"}}`)
 	}))
@@ -69,6 +64,7 @@ func TestCreateTestRun(t *testing.T) {
 }
 
 func TestFinished(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fprintf(t, w, "")
 	}))
@@ -87,6 +83,7 @@ func TestFinished(t *testing.T) {
 }
 
 func TestAuthorizedError(t *testing.T) {
+	t.Parallel()
 	called := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called++
@@ -105,6 +102,7 @@ func TestAuthorizedError(t *testing.T) {
 }
 
 func TestDetailsError(t *testing.T) {
+	t.Parallel()
 	called := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called++
@@ -179,6 +177,7 @@ func TestClientRetrySuccessOnSecond(t *testing.T) {
 }
 
 func TestIdempotencyKey(t *testing.T) {
+	t.Parallel()
 	const idempotencyKey = "xxx"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotK6IdempotencyKey := r.Header.Get(k6IdempotencyKeyHeader)
