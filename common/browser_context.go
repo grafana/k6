@@ -47,7 +47,6 @@ type BrowserContext struct {
 	BaseEventEmitter
 
 	ctx             context.Context
-	conn            *Connection
 	browser         *Browser
 	id              cdp.BrowserContextID
 	opts            *BrowserContextOptions
@@ -406,4 +405,8 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 	}
 	b.logger.Debugf("BrowserContext:WaitForEvent:return nil", "bctxid:%v event:%q", b.id, event)
 	return nil
+}
+
+func (b *BrowserContext) getSession(id target.SessionID) *Session {
+	return b.browser.connSessions.getSession(id)
 }

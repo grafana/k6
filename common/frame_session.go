@@ -790,7 +790,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 		event.TargetInfo.TargetID, event.TargetInfo.BrowserContextID,
 		event.TargetInfo.Type)
 
-	session := fs.page.browserCtx.conn.getSession(event.SessionID)
+	session := fs.page.browserCtx.getSession(event.SessionID)
 	if session == nil {
 		fs.logger.Debugf("FrameSession:onAttachedToTarget:NewFrameSession",
 			"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q err:nil session",
@@ -807,7 +807,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 		err = fs.attachWorkerToTarget(ti, sid)
 	default:
 		// Just unblock (debugger continue) these targets and detach from them.
-		s := fs.page.browserCtx.conn.getSession(sid)
+		s := fs.page.browserCtx.getSession(sid)
 		_ = s.ExecuteWithoutExpectationOnReply(fs.ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
 		_ = s.ExecuteWithoutExpectationOnReply(fs.ctx, target.CommandDetachFromTarget,
 			&target.DetachFromTargetParams{SessionID: s.id}, nil)
@@ -871,7 +871,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 
 	nfs, err := NewFrameSession(
 		fs.ctx,
-		fs.page.browserCtx.conn.getSession(sid),
+		fs.page.browserCtx.getSession(sid),
 		fs.page, fs, ti.TargetID,
 		fs.logger)
 	if err != nil {
@@ -885,7 +885,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 
 // attachWorkerToTarget attaches a Worker target to a given session.
 func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, sid target.SessionID) error {
-	w, err := NewWorker(fs.ctx, fs.page.browserCtx.conn.getSession(sid), ti.TargetID, ti.URL)
+	w, err := NewWorker(fs.ctx, fs.page.browserCtx.getSession(sid), ti.TargetID, ti.URL)
 	if err != nil {
 		return fmt.Errorf("cannot attach worker target (%v) to session (%v): %w",
 			ti.TargetID, sid, err)
