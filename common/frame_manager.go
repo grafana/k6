@@ -704,9 +704,9 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 	select {
 	case <-m.ctx.Done():
 		// ignore: the extension is shutting down
-		m.logger.Warnf("FrameManager:WaitForFrameNavigation",
-			"fmid:%d furl:%s context canceled",
-			m.ID(), frame.URL())
+		m.logger.Warnf("FrameManager:WaitForFrameNavigation:<-ctx.Done",
+			"fmid:%d furl:%s err:%v",
+			m.ID(), frame.URL(), m.ctx.Err())
 		return nil
 	case <-time.After(parsedOpts.Timeout):
 		k6common.Throw(rt, ErrTimedOut)
