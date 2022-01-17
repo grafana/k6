@@ -22,9 +22,6 @@ package html
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var textTests = []struct {
@@ -402,15 +399,11 @@ const testGenElems = `<html><body>
 
 func TestGenElements(t *testing.T) {
 	t.Parallel()
-	rt, mi := getTestModuleInstance(t)
-	require.NoError(t, rt.Set("src", testGenElems))
-
-	_, err := rt.RunString("var doc = html.parseHTML(src)")
-
-	require.NoError(t, err)
-	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 
 	t.Run("Test text properties", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testGenElems)
+
 		for _, test := range textTests {
 			v, err := rt.RunString(`doc.find("#` + test.id + `").get(0).` + test.property + `()`)
 			if err != nil {
@@ -422,6 +415,9 @@ func TestGenElements(t *testing.T) {
 	})
 
 	t.Run("Test bool properties", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testGenElems)
+
 		for _, test := range boolTests {
 			vT, errT := rt.RunString(`doc.find("#` + test.idTrue + `").get(0).` + test.property + `()`)
 			if errT != nil {
@@ -440,6 +436,9 @@ func TestGenElements(t *testing.T) {
 	})
 
 	t.Run("Test int64 properties", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testGenElems)
+
 		for _, test := range intTests {
 			v, err := rt.RunString(`doc.find("#` + test.id + `").get(0).` + test.property + `()`)
 			if err != nil {
@@ -451,6 +450,9 @@ func TestGenElements(t *testing.T) {
 	})
 
 	t.Run("Test nullable properties", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testGenElems)
+
 		for _, test := range nullTests {
 			v, err := rt.RunString(`doc.find("#` + test.id + `").get(0).` + test.property + `()`)
 			if err != nil {
@@ -462,6 +464,9 @@ func TestGenElements(t *testing.T) {
 	})
 
 	t.Run("Test url properties", func(t *testing.T) {
+		t.Parallel()
+		rt, mi := getTestRuntimeAndModuleInstanceWithDoc(t, testGenElems)
+
 		sel, parseError := mi.parseHTML(testGenElems)
 		if parseError != nil {
 			t.Errorf("Unable to parse html")

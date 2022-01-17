@@ -95,64 +95,72 @@ const (
 	methodGet  = "get"
 )
 
-type HrefElement struct{ Element }
-type MediaElement struct{ Element }
-type FormFieldElement struct{ Element }
-type ModElement struct{ Element }
-type TableSectionElement struct{ Element }
-type TableCellElement struct{ Element }
+//revive:disable:exported
 
-type AnchorElement struct{ HrefElement }
-type AreaElement struct{ HrefElement }
-type AudioElement struct{ MediaElement }
-type BaseElement struct{ Element }
-type ButtonElement struct{ FormFieldElement }
-type CanvasElement struct{ Element }
-type DataElement struct{ Element }
-type DataListElement struct{ Element }
-type DelElement struct{ ModElement }
-type InsElement struct{ ModElement }
-type EmbedElement struct{ Element }
-type FieldSetElement struct{ Element }
-type FormElement struct{ Element }
-type IFrameElement struct{ Element }
-type ImageElement struct{ Element }
-type InputElement struct{ FormFieldElement }
-type KeygenElement struct{ Element }
-type LabelElement struct{ Element }
-type LegendElement struct{ Element }
-type LiElement struct{ Element }
-type LinkElement struct{ Element }
-type MapElement struct{ Element }
-type MetaElement struct{ Element }
-type MeterElement struct{ Element }
-type ObjectElement struct{ Element }
-type OListElement struct{ Element }
-type OptGroupElement struct{ Element }
-type OptionElement struct{ Element }
-type OutputElement struct{ Element }
-type ParamElement struct{ Element }
-type PreElement struct{ Element }
-type ProgressElement struct{ Element }
-type QuoteElement struct{ Element }
-type ScriptElement struct{ Element }
-type SelectElement struct{ Element }
-type SourceElement struct{ Element }
-type StyleElement struct{ Element }
-type TableElement struct{ Element }
-type TableHeadElement struct{ TableSectionElement }
-type TableFootElement struct{ TableSectionElement }
-type TableBodyElement struct{ TableSectionElement }
-type TableRowElement struct{ Element }
-type TableColElement struct{ Element }
-type TableDataCellElement struct{ TableCellElement }
-type TableHeaderCellElement struct{ TableCellElement }
-type TextAreaElement struct{ Element }
-type TimeElement struct{ Element }
-type TitleElement struct{ Element }
-type TrackElement struct{ Element }
-type UListElement struct{ Element }
-type VideoElement struct{ MediaElement }
+type (
+	HrefElement         struct{ Element }
+	MediaElement        struct{ Element }
+	FormFieldElement    struct{ Element }
+	ModElement          struct{ Element }
+	TableSectionElement struct{ Element }
+	TableCellElement    struct{ Element }
+)
+
+type (
+	AnchorElement          struct{ HrefElement }
+	AreaElement            struct{ HrefElement }
+	AudioElement           struct{ MediaElement }
+	BaseElement            struct{ Element }
+	ButtonElement          struct{ FormFieldElement }
+	CanvasElement          struct{ Element }
+	DataElement            struct{ Element }
+	DataListElement        struct{ Element }
+	DelElement             struct{ ModElement }
+	InsElement             struct{ ModElement }
+	EmbedElement           struct{ Element }
+	FieldSetElement        struct{ Element }
+	FormElement            struct{ Element }
+	IFrameElement          struct{ Element }
+	ImageElement           struct{ Element }
+	InputElement           struct{ FormFieldElement }
+	KeygenElement          struct{ Element }
+	LabelElement           struct{ Element }
+	LegendElement          struct{ Element }
+	LiElement              struct{ Element }
+	LinkElement            struct{ Element }
+	MapElement             struct{ Element }
+	MetaElement            struct{ Element }
+	MeterElement           struct{ Element }
+	ObjectElement          struct{ Element }
+	OListElement           struct{ Element }
+	OptGroupElement        struct{ Element }
+	OptionElement          struct{ Element }
+	OutputElement          struct{ Element }
+	ParamElement           struct{ Element }
+	PreElement             struct{ Element }
+	ProgressElement        struct{ Element }
+	QuoteElement           struct{ Element }
+	ScriptElement          struct{ Element }
+	SelectElement          struct{ Element }
+	SourceElement          struct{ Element }
+	StyleElement           struct{ Element }
+	TableElement           struct{ Element }
+	TableHeadElement       struct{ TableSectionElement }
+	TableFootElement       struct{ TableSectionElement }
+	TableBodyElement       struct{ TableSectionElement }
+	TableRowElement        struct{ Element }
+	TableColElement        struct{ Element }
+	TableDataCellElement   struct{ TableCellElement }
+	TableHeaderCellElement struct{ TableCellElement }
+	TextAreaElement        struct{ Element }
+	TimeElement            struct{ Element }
+	TitleElement           struct{ Element }
+	TrackElement           struct{ Element }
+	UListElement           struct{ Element }
+	VideoElement           struct{ MediaElement }
+)
+
+//revive:enable:exported
 
 func (h HrefElement) hrefURL() *url.URL {
 	href, exists := h.attrAsURL("href")
