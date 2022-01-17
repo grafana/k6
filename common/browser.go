@@ -243,9 +243,9 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 			}
 			select {
 			case <-b.ctx.Done():
-				b.logger.Debugf("Browser:onAttachedToTarget:background_page:return",
-					"sid:%v tid:%v context canceled",
-					ev.SessionID, evti.TargetID)
+				b.logger.Debugf("Browser:onAttachedToTarget:background_page:return:<-ctx.Done",
+					"sid:%v tid:%v err:%v",
+					ev.SessionID, evti.TargetID, b.ctx.Err())
 				return // ignore
 			default:
 				k6Throw(b.ctx, "cannot create NewPage for background_page event: %w", err)
@@ -282,9 +282,9 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 			}
 			select {
 			case <-b.ctx.Done():
-				b.logger.Debugf("Browser:onAttachedToTarget:page:return",
-					"sid:%v tid:%v context canceled",
-					ev.SessionID, evti.TargetID)
+				b.logger.Debugf("Browser:onAttachedToTarget:page:return:<-ctx.Done",
+					"sid:%v tid:%v err:%v",
+					ev.SessionID, evti.TargetID, b.ctx.Err())
 				return // ignore
 			default:
 				k6Throw(b.ctx, "cannot create NewPage for page event: %w", err)
@@ -381,7 +381,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (page *Page, err err
 		page = b.pages[tid]
 		b.pagesMu.RUnlock()
 	case <-ctx.Done():
-		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v", tid, id)
+		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, ctx.Err())
 		err = ctx.Err()
 	}
 	return page, err
