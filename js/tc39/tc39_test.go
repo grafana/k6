@@ -71,7 +71,6 @@ var (
 		"logical-assignment-operators",
 		"coalesce-expression",
 		"import.meta",
-		"optional-chaining",
 		"Atomics",
 		"Atomics.waitAsync",
 		"FinalizationRegistry",
