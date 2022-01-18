@@ -24,6 +24,9 @@ import (
 	_ "embed" // we need this for embedding Babel
 	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -34,7 +37,24 @@ import (
 	"go.k6.io/k6/lib"
 )
 
-const maxSrcLenForBabelSourceMap = 500 * 1024 // 500kb
+//nolint:gochecknoglobals
+var maxSrcLenForBabelSourceMap = 250 * 1024
+
+const maxSrcLenForBabelSourceMapVarName = "K6_DEBUG_SOURCEMAP_FILESIZE_LIMIT"
+
+//  drop this code and everything it's connected to when goja is dropped
+func init() {
+	v := os.Getenv(maxSrcLenForBabelSourceMapVarName)
+	if len(v) > 0 {
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			//nolint:forbidigo
+			fmt.Printf("Tried to parse %q from %s as integer but couldn't %s\n",
+				v, maxSrcLenForBabelSourceMapVarName, err)
+		}
+		maxSrcLenForBabelSourceMap = i
+	}
+}
 
 //go:embed lib/babel.min.js
 var babelSrc string //nolint:gochecknoglobals
@@ -129,8 +149,9 @@ func (c *Compiler) Transform(src, filename string, inputSrcMap []byte) (code str
 	sourceMapEnabled := c.Options.SourceMapLoader != nil
 	if sourceMapEnabled && len(src) > maxSrcLenForBabelSourceMap {
 		sourceMapEnabled = false
-		c.logger.Warnf("the source for `%s` needs to go through babel but is over 500kb. "+
-			"For performance reasons sourcemaps support will be disabled for this particular file.", filename)
+		c.logger.Warnf("the source for `%s` needs to go through babel but is over %d bytes. "+
+			"For performance reasons sourcemaps support will be disabled for this particular file.",
+			filename, maxSrcLenForBabelSourceMap)
 	}
 
 	code, srcMap, err = c.babel.transformImpl(c.logger, src, filename, sourceMapEnabled, inputSrcMap)
