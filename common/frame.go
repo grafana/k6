@@ -560,7 +560,7 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 		return nil, err
 	}
 	if handle == nil {
-		return nil, errors.New("wait for selector didn't resulted in any nodes")
+		return nil, fmt.Errorf("wait for selector %q did not result in any nodes", selector)
 	}
 
 	// We always return ElementHandles in the main execution context (aka "DOM world")
@@ -569,14 +569,14 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 
 	ec := f.executionContexts[mainWorld]
 	if ec == nil {
-		return nil, fmt.Errorf("wait for selector cannot find execution context: %q", mainWorld)
+		return nil, fmt.Errorf("wait for selector %q cannot find execution context: %q", selector, mainWorld)
 	}
 	// an element should belong to the current execution context.
 	// otherwise, we should adopt it to this execution context.
 	if ec != handle.execCtx {
 		defer handle.Dispose()
 		if handle, err = ec.adoptElementHandle(handle); err != nil {
-			return nil, fmt.Errorf("wait for selector cannot adopt element handle: %w", err)
+			return nil, fmt.Errorf("wait for selector %q cannot adopt element handle: %w", selector, err)
 		}
 	}
 
