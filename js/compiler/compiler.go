@@ -149,7 +149,7 @@ func (c *Compiler) Transform(src, filename string, inputSrcMap []byte) (code str
 	if sourceMapEnabled && len(src) > maxSrcLenForBabelSourceMap {
 		sourceMapEnabled = false
 		c.logger.Warnf("the source for `%s` needs to go through babel but is over %d bytes. "+
-			"For performance reasons sourcemaps support will be disabled for this particular file.",
+			"For performance reasons source map support will be disabled for this particular file.",
 			filename, maxSrcLenForBabelSourceMap)
 	}
 
