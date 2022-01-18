@@ -620,7 +620,7 @@ func (s *Socket) readPump(readChan chan *message, errorChan chan error, closeCha
 		}
 
 		select {
-		case readChan <- &message{messageType, data}:
+		case readChan <- &message{mtype: messageType, data: data}:
 		case <-s.done:
 			return
 		}

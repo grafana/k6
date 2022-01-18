@@ -216,7 +216,7 @@ func TestOptions(t *testing.T) {
 	})
 	t.Run("TLSAuth", func(t *testing.T) {
 		tlsAuth := []*TLSAuth{
-			{TLSAuthFields{
+			{TLSAuthFields: TLSAuthFields{
 				Domains: []string{"example.com", "*.example.com"},
 				Cert: "-----BEGIN CERTIFICATE-----\n" +
 					"MIIBoTCCAUegAwIBAgIUQl0J1Gkd6U2NIMwMDnpfH8c1myEwCgYIKoZIzj0EAwIw\n" +
@@ -234,8 +234,8 @@ func TestOptions(t *testing.T) {
 					"AwEHoUQDQgAEtp/EQ6YEeTNup33/RVlf/f2o7bJCrYbPl9pF2/LfyS4swJX70dit\n" +
 					"8zHoZgJnNNQirqHxBc6uWBhOLG5RV+Ek1Q==\n" +
 					"-----END EC PRIVATE KEY-----",
-			}, nil},
-			{TLSAuthFields{
+			}},
+			{TLSAuthFields: TLSAuthFields{
 				Domains: []string{"sub.example.com"},
 				Cert: "-----BEGIN CERTIFICATE-----\n" +
 					"MIIBojCCAUegAwIBAgIUWMpVQhmGoLUDd2x6XQYoOOV6C9AwCgYIKoZIzj0EAwIw\n" +
@@ -253,7 +253,7 @@ func TestOptions(t *testing.T) {
 					"AwEHoUQDQgAEF8XzmC7x8Ns0Y2Wyu2c77ge+6I/ghcDTjWOMZzMPmRRDxqKFLuGD\n" +
 					"zW1Kss13WODGSS8+j7dNCPOeLKyK6cbeIg==\n" +
 					"-----END EC PRIVATE KEY-----",
-			}, nil},
+			}},
 		}
 		opts := Options{}.Apply(Options{TLSAuth: tlsAuth})
 		assert.Equal(t, tlsAuth, opts.TLSAuth)

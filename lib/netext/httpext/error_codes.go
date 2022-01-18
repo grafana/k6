@@ -230,7 +230,7 @@ type K6Error struct {
 
 // NewK6Error is the constructor for K6Error
 func NewK6Error(code errCode, msg string, originalErr error) K6Error {
-	return K6Error{code, msg, originalErr}
+	return K6Error{Code: code, Message: msg, OriginalError: originalErr}
 }
 
 // Error implements the `error` interface, so K6Errors are normal Go errors.
