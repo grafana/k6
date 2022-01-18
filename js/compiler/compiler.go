@@ -24,7 +24,6 @@ import (
 	_ "embed" // we need this for embedding Babel
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"strconv"
 	"sync"
@@ -36,25 +35,6 @@ import (
 
 	"go.k6.io/k6/lib"
 )
-
-//nolint:gochecknoglobals
-var maxSrcLenForBabelSourceMap = 250 * 1024
-
-const maxSrcLenForBabelSourceMapVarName = "K6_DEBUG_SOURCEMAP_FILESIZE_LIMIT"
-
-// TODO: drop this code and everything it's connected to when babel is dropped
-func init() {
-	v := os.Getenv(maxSrcLenForBabelSourceMapVarName)
-	if len(v) > 0 {
-		i, err := strconv.Atoi(v)
-		if err != nil {
-			//nolint:forbidigo
-			fmt.Printf("Tried to parse %q from %s as integer but couldn't %s\n",
-				v, maxSrcLenForBabelSourceMapVarName, err)
-		}
-		maxSrcLenForBabelSourceMap = i
-	}
-}
 
 //go:embed lib/babel.min.js
 var babelSrc string //nolint:gochecknoglobals
@@ -103,6 +83,9 @@ var (
 		"highlightCode": false,
 	}
 
+	maxSrcLenForBabelSourceMap     = 250 * 1024 //nolint:gochecknoglobals
+	maxSrcLenForBabelSourceMapOnce sync.Once    //nolint:gochecknoglobals
+
 	onceBabelCode      sync.Once     // nolint:gochecknoglobals
 	globalBabelCode    *goja.Program // nolint:gochecknoglobals
 	globalBabelCodeErr error         // nolint:gochecknoglobals
@@ -110,7 +93,10 @@ var (
 	globalBabel        *babel        // nolint:gochecknoglobals
 )
 
-const sourceMapURLFromBabel = "k6://internal-should-not-leak/file.map"
+const (
+	maxSrcLenForBabelSourceMapVarName = "K6_DEBUG_SOURCEMAP_FILESIZE_LIMIT"
+	sourceMapURLFromBabel             = "k6://internal-should-not-leak/file.map"
+)
 
 // A Compiler compiles JavaScript source code (ES5.1 or ES6) into a goja.Program
 type Compiler struct {
@@ -147,6 +133,19 @@ func (c *Compiler) Transform(src, filename string, inputSrcMap []byte) (code str
 	}
 
 	sourceMapEnabled := c.Options.SourceMapLoader != nil
+	maxSrcLenForBabelSourceMapOnce.Do(func() {
+		// TODO: drop this code and everything it's connected to when babel is dropped
+		v := os.Getenv(maxSrcLenForBabelSourceMapVarName)
+		if len(v) > 0 {
+			i, err := strconv.Atoi(v)
+			if err != nil {
+				c.logger.Warnf("Tried to parse %q from %s as integer but couldn't %s\n",
+					v, maxSrcLenForBabelSourceMapVarName, err)
+				return
+			}
+			maxSrcLenForBabelSourceMap = i
+		}
+	})
 	if sourceMapEnabled && len(src) > maxSrcLenForBabelSourceMap {
 		sourceMapEnabled = false
 		c.logger.Warnf("the source for `%s` needs to go through babel but is over %d bytes. "+
