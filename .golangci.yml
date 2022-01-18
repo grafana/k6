@@ -31,6 +31,8 @@ issues:
 linters-settings:
   govet:
     check-shadowing: true
+    enable:
+      - fieldalignment
   cyclop:
     max-complexity: 25
   maligned:
