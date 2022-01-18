@@ -21,6 +21,7 @@
 package tests
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"testing"
@@ -100,4 +101,13 @@ func TestPageSetExtraHTTPHeaders(t *testing.T) {
 	h := body.Headers["Some-Header"]
 	require.NotEmpty(t, h)
 	assert.Equal(t, "Some-Value", h[0])
+}
+
+// See: The issue #187 for details.
+func TestPageWaitForNavigationShouldNotPanic(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	p := newTestBrowser(t, withContext(ctx)).NewPage(nil)
+	go cancel()
+	<-ctx.Done()
+	require.NotPanics(t, func() { p.WaitForNavigation(nil) })
 }

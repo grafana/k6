@@ -112,10 +112,9 @@ type BaseEventEmitter struct {
 // NewBaseEventEmitter creates a new instance of a base event emitter
 func NewBaseEventEmitter(ctx context.Context) BaseEventEmitter {
 	bem := BaseEventEmitter{
-		handlers:    make(map[string][]eventHandler),
-		handlersAll: make([]eventHandler, 0),
-		syncCh:      make(chan syncFunc),
-		ctx:         ctx,
+		handlers: make(map[string][]eventHandler),
+		syncCh:   make(chan syncFunc),
+		ctx:      ctx,
 	}
 	go bem.syncAll(ctx)
 	return bem

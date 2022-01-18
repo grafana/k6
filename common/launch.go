@@ -59,16 +59,9 @@ type LaunchPersistentContextOptions struct {
 
 func NewLaunchOptions() *LaunchOptions {
 	launchOpts := LaunchOptions{
-		Args:              make([]string, 0),
-		Debug:             false,
-		Devtools:          false,
 		Env:               make(map[string]string),
-		ExecutablePath:    "",
 		Headless:          true,
-		IgnoreDefaultArgs: make([]string, 0),
 		LogCategoryFilter: ".*",
-		Proxy:             ProxyOptions{},
-		SlowMo:            0.0,
 		Timeout:           DefaultTimeout,
 	}
 	return &launchOpts
