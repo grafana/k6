@@ -335,7 +335,7 @@ func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
 	}
 }
 
-func (b *Browser) newPageInContext(id cdp.BrowserContextID) (page *Page, err error) {
+func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 	b.contextsMu.RLock()
 	browserCtx, ok := b.contexts[id]
 	b.contextsMu.RUnlock()
@@ -374,6 +374,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (page *Page, err err
 	}
 	// let the event handler know about the new page.
 	targetID <- tid
+	var page *Page
 	select {
 	case <-waitForPage:
 		b.logger.Debugf("Browser:newPageInContext:<-waitForPage", "tid:%v bctxid:%v", tid, id)
