@@ -34,6 +34,8 @@ import (
 	"go.k6.io/k6/lib"
 )
 
+const maxSrcLenForBabelSourceMap = 500 * 1024 // 500kb
+
 //go:embed lib/babel.min.js
 var babelSrc string //nolint:gochecknoglobals
 
@@ -124,7 +126,14 @@ func (c *Compiler) Transform(src, filename string, inputSrcMap []byte) (code str
 		return
 	}
 
-	code, srcMap, err = c.babel.transformImpl(c.logger, src, filename, c.Options.SourceMapLoader != nil, inputSrcMap)
+	sourceMapEnabled := c.Options.SourceMapLoader != nil
+	if sourceMapEnabled && len(src) > maxSrcLenForBabelSourceMap {
+		sourceMapEnabled = false
+		c.logger.Warnf("the source for `%s` needs to go through babel but is over 500kb. "+
+			"For performance reasons sourcemaps support will be disabled for this particular file.", filename)
+	}
+
+	code, srcMap, err = c.babel.transformImpl(c.logger, src, filename, sourceMapEnabled, inputSrcMap)
 	return
 }
 
