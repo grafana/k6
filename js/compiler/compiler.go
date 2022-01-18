@@ -42,7 +42,7 @@ var maxSrcLenForBabelSourceMap = 250 * 1024
 
 const maxSrcLenForBabelSourceMapVarName = "K6_DEBUG_SOURCEMAP_FILESIZE_LIMIT"
 
-//  drop this code and everything it's connected to when goja is dropped
+// TODO: drop this code and everything it's connected to when babel is dropped
 func init() {
 	v := os.Getenv(maxSrcLenForBabelSourceMapVarName)
 	if len(v) > 0 {
