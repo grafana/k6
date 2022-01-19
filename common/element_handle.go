@@ -198,7 +198,7 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 	var err error
 	action := dom.GetBoxModel().WithObjectID(h.remoteObject.ObjectID)
 	if box, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		return nil, fmt.Errorf("unable to get box model of DOM node: %w", err)
+		return nil, fmt.Errorf("cannot get bounding box model of DOM node: %w", err)
 	}
 
 	quad := box.Border
@@ -220,7 +220,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 			return false, err
 		}
 		if box == nil {
-			return false, errors.New("unable to get bounding box of element")
+			return false, errors.New("cannot get bounding box of element")
 		}
 		// Translate from viewport coordinates to frame coordinates.
 		point.X = point.X - box.X
@@ -275,7 +275,7 @@ func (h *ElementHandle) checkElementState(apiCtx context.Context, state string) 
 		*returnVal = value.ToBoolean()
 		return returnVal, nil
 	}
-	return nil, fmt.Errorf("unable to check state %q of element: %q", state, reflect.TypeOf(result))
+	return nil, fmt.Errorf("cannot check state %q of element: %q", state, reflect.TypeOf(result))
 }
 
 func (h *ElementHandle) click(p *Position, opts *MouseClickOptions) error {
@@ -290,7 +290,7 @@ func (h *ElementHandle) clickablePoint() (*Position, error) {
 	action := dom.GetContentQuads().
 		WithObjectID(h.remoteObject.ObjectID)
 	if quads, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		return nil, fmt.Errorf("unable to request node content quads %T: %w", action, err)
+		return nil, fmt.Errorf("cannot request node content quads %T: %w", action, err)
 	}
 	if len(quads) == 0 {
 		return nil, fmt.Errorf("node is either not visible or not an HTMLElement: %w", err)
@@ -298,7 +298,7 @@ func (h *ElementHandle) clickablePoint() (*Position, error) {
 
 	action2 := cdppage.GetLayoutMetrics()
 	if layoutViewport, _, _, _, _, _, err = action2.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		return nil, fmt.Errorf("unable to get page layout metrics %T: %w", action, err)
+		return nil, fmt.Errorf("cannot get page layout metrics %T: %w", action, err)
 	}
 
 	// Filter out quads that have too small area to click into.
@@ -826,7 +826,7 @@ func (h *ElementHandle) waitForElementState(apiCtx context.Context, states []str
 	case reflect.Bool:
 		return value.ToBoolean(), nil
 	}
-	return false, fmt.Errorf("unable to check states %v of element: %q", states, reflect.TypeOf(result))
+	return false, fmt.Errorf("cannot check states %v of element: %q", states, reflect.TypeOf(result))
 }
 
 func (h *ElementHandle) waitForSelector(apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
@@ -881,10 +881,9 @@ func (h *ElementHandle) Check(opts goja.Value) {
 // Click scrolls element into view and clicks in the center of the element
 // TODO: look into making more robust using retries (see: https://github.com/microsoft/playwright/blob/master/src/server/dom.ts#L298)
 func (h *ElementHandle) Click(opts goja.Value) {
-	rt := k6common.GetRuntime(h.ctx)
 	actionOpts := NewElementHandleClickOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(h.ctx, "cannot parse element click options: %w", err)
 	}
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
 		return nil, handle.click(p, actionOpts.ToMouseClickOptions())
@@ -892,21 +891,20 @@ func (h *ElementHandle) Click(opts goja.Value) {
 	pointerFn := elementHandlePointerActionFn(h, true, fn, &actionOpts.ElementHandleBasePointerOptions)
 	_, err := callApiWithTimeout(h.ctx, pointerFn, actionOpts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot click on element: %w", err)
 	}
 	applySlowMo(h.ctx)
 }
 
 func (h *ElementHandle) ContentFrame() api.Frame {
-	rt := k6common.GetRuntime(h.ctx)
-
-	var node *cdp.Node
-	var err error
+	var (
+		node *cdp.Node
+		err  error
+	)
 	action := dom.DescribeNode().WithObjectID(h.remoteObject.ObjectID)
 	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to describe DOM node: %w", err))
+		k6Throw(h.ctx, "cannot get remote node %q: %w", h.remoteObject.ObjectID, err)
 	}
-
 	if node == nil || node.FrameID == "" {
 		return nil
 	}
@@ -915,10 +913,9 @@ func (h *ElementHandle) ContentFrame() api.Frame {
 }
 
 func (h *ElementHandle) Dblclick(opts goja.Value) {
-	rt := k6common.GetRuntime(h.ctx)
 	actionOpts := NewElementHandleDblclickOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(h.ctx, "cannot parse element double click options: %w", err)
 	}
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
 		return nil, handle.dblClick(p, actionOpts.ToMouseClickOptions())
@@ -926,13 +923,12 @@ func (h *ElementHandle) Dblclick(opts goja.Value) {
 	pointerFn := elementHandlePointerActionFn(h, true, fn, &actionOpts.ElementHandleBasePointerOptions)
 	_, err := callApiWithTimeout(h.ctx, pointerFn, actionOpts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot double click on element: %w", err)
 	}
 	applySlowMo(h.ctx)
 }
 
 func (h *ElementHandle) DispatchEvent(typ string, eventInit goja.Value) {
-	rt := k6common.GetRuntime(h.ctx)
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.dispatchEvent(apiCtx, typ, eventInit)
 	}
@@ -940,16 +936,15 @@ func (h *ElementHandle) DispatchEvent(typ string, eventInit goja.Value) {
 	actFn := elementHandleActionFn(h, []string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
 	_, err := callApiWithTimeout(h.ctx, actFn, opts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot dispatch element event: %w", err)
 	}
 	applySlowMo(h.ctx)
 }
 
 func (h *ElementHandle) Fill(value string, opts goja.Value) {
-	rt := k6common.GetRuntime(h.ctx)
 	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(h.ctx, "cannot parse element fill options: %w", err)
 	}
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.fill(apiCtx, value)
@@ -957,14 +952,13 @@ func (h *ElementHandle) Fill(value string, opts goja.Value) {
 	actFn := elementHandleActionFn(h, []string{"visible", "enabled", "editable"}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
 	_, err := callApiWithTimeout(h.ctx, actFn, actionOpts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot handle element fill action: %w", err)
 	}
 	applySlowMo(h.ctx)
 }
 
 // Focus scrolls element into view and focuses the element
 func (h *ElementHandle) Focus() {
-	rt := k6common.GetRuntime(h.ctx)
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return nil, handle.focus(apiCtx, false)
 	}
@@ -972,7 +966,7 @@ func (h *ElementHandle) Focus() {
 	actFn := elementHandleActionFn(h, []string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
 	_, err := callApiWithTimeout(h.ctx, actFn, opts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot focus on element: %w", err)
 	}
 	applySlowMo(h.ctx)
 }
@@ -986,7 +980,7 @@ func (h *ElementHandle) GetAttribute(name string) goja.Value {
 	actFn := elementHandleActionFn(h, []string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
 	value, err := callApiWithTimeout(h.ctx, actFn, opts.Timeout)
 	if err != nil {
-		k6Throw(h.ctx, "GetAttribute(%q): %q", name, err)
+		k6Throw(h.ctx, "cannot get attribute of %q: %q", name, err)
 	}
 	applySlowMo(h.ctx)
 	return value.(goja.Value)
@@ -994,10 +988,9 @@ func (h *ElementHandle) GetAttribute(name string) goja.Value {
 
 // Hover scrolls element into view and hovers over its center point
 func (h *ElementHandle) Hover(opts goja.Value) {
-	rt := k6common.GetRuntime(h.ctx)
 	actionOpts := NewElementHandleHoverOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(h.ctx, "cannot parse element hover options: %w", err)
 	}
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
 		return nil, handle.hover(apiCtx, p)
@@ -1005,14 +998,13 @@ func (h *ElementHandle) Hover(opts goja.Value) {
 	pointerFn := elementHandlePointerActionFn(h, true, fn, &actionOpts.ElementHandleBasePointerOptions)
 	_, err := callApiWithTimeout(h.ctx, pointerFn, actionOpts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot hover on element: %w", err)
 	}
 	applySlowMo(h.ctx)
 }
 
 // InnerHTML returns the inner HTML of the element
 func (h *ElementHandle) InnerHTML() string {
-	rt := k6common.GetRuntime(h.ctx)
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.innerHTML(apiCtx)
 	}
@@ -1020,7 +1012,7 @@ func (h *ElementHandle) InnerHTML() string {
 	actFn := elementHandleActionFn(h, []string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
 	value, err := callApiWithTimeout(h.ctx, actFn, opts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot get element's inner HTML: %w", err)
 	}
 	applySlowMo(h.ctx)
 	return value.(goja.Value).String()
@@ -1028,7 +1020,6 @@ func (h *ElementHandle) InnerHTML() string {
 
 // InnerText returns the inner text of the element
 func (h *ElementHandle) InnerText() string {
-	rt := k6common.GetRuntime(h.ctx)
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.innerText(apiCtx)
 	}
@@ -1036,17 +1027,16 @@ func (h *ElementHandle) InnerText() string {
 	actFn := elementHandleActionFn(h, []string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
 	value, err := callApiWithTimeout(h.ctx, actFn, opts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot get element's inner text: %w", err)
 	}
 	applySlowMo(h.ctx)
 	return value.(goja.Value).String()
 }
 
 func (h *ElementHandle) InputValue(opts goja.Value) string {
-	rt := k6common.GetRuntime(h.ctx)
 	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(h.ctx, "cannot parse element input value options: %w", err)
 	}
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.inputValue(apiCtx)
@@ -1054,7 +1044,7 @@ func (h *ElementHandle) InputValue(opts goja.Value) string {
 	actFn := elementHandleActionFn(h, []string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
 	value, err := callApiWithTimeout(h.ctx, actFn, actionOpts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot get element's input value: %w", err)
 	}
 	applySlowMo(h.ctx)
 	return value.(goja.Value).String()
@@ -1062,60 +1052,54 @@ func (h *ElementHandle) InputValue(opts goja.Value) string {
 
 // IsChecked checks if a checkbox or radio is checked
 func (h *ElementHandle) IsChecked() bool {
-	rt := k6common.GetRuntime(h.ctx)
 	result, err := h.isChecked(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot handle element is check: %w", err)
 	}
 	return result
 }
 
 // IsDisabled checks if the element is disabled
 func (h *ElementHandle) IsDisabled() bool {
-	rt := k6common.GetRuntime(h.ctx)
 	result, err := h.isDisabled(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot handle element is disabled: %w", err)
 	}
 	return result
 }
 
 // IsEditable checks if the element is editable
 func (h *ElementHandle) IsEditable() bool {
-	rt := k6common.GetRuntime(h.ctx)
 	result, err := h.isEditable(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot handle element is editable: %w", err)
 	}
 	return result
 }
 
 // IsEnabled checks if the element is enabled
 func (h *ElementHandle) IsEnabled() bool {
-	rt := k6common.GetRuntime(h.ctx)
 	result, err := h.isEnabled(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot handle element is enabled: %w", err)
 	}
 	return result
 }
 
 // IsHidden checks if the element is hidden
 func (h *ElementHandle) IsHidden() bool {
-	rt := k6common.GetRuntime(h.ctx)
 	result, err := h.isHidden(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot handle element is hidden: %w", err)
 	}
 	return result
 }
 
 // IsVisible checks if the element is visible
 func (h *ElementHandle) IsVisible() bool {
-	rt := k6common.GetRuntime(h.ctx)
 	result, err := h.isVisible(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot check element is visible: %w", err)
 	}
 	return result
 }
@@ -1148,7 +1132,7 @@ func (h *ElementHandle) OwnerFrame() api.Frame {
 	var node *cdp.Node
 	action := dom.DescribeNode().WithObjectID(documentHandle.remoteObject.ObjectID)
 	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6Throw(h.ctx, "cannot describe DOM node: %w", err)
+		k6Throw(h.ctx, "cannot describe owner frame DOM node: %w", err)
 	}
 	if node == nil || node.FrameID == "" {
 		return nil
@@ -1158,7 +1142,6 @@ func (h *ElementHandle) OwnerFrame() api.Frame {
 }
 
 func (h *ElementHandle) Press(key string, opts goja.Value) {
-	rt := k6common.GetRuntime(h.ctx)
 	parsedOpts := NewElementHandlePressOptions(h.defaultTimeout())
 	parsedOpts.Parse(h.ctx, opts)
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1167,7 +1150,7 @@ func (h *ElementHandle) Press(key string, opts goja.Value) {
 	actFn := elementHandleActionFn(h, []string{}, fn, false, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
 	_, err := callApiWithTimeout(h.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot handle element key (%q) press: %w", key, err)
 	}
 	applySlowMo(h.ctx)
 }
@@ -1175,10 +1158,9 @@ func (h *ElementHandle) Press(key string, opts goja.Value) {
 // Query runs "element.querySelector" within the page. If no element matches the selector,
 // the return value resolves to "null"
 func (h *ElementHandle) Query(selector string) api.ElementHandle {
-	rt := k6common.GetRuntime(h.ctx)
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot parse selector (%q) in element query: %w", selector, err)
 	}
 	fn := `
 		(node, injected, selector) => {
@@ -1191,7 +1173,7 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 	}
 	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot query element for selector (%q): %w", selector, err)
 	}
 	if result == nil {
 		return nil
@@ -1214,7 +1196,7 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
-		k6Throw(h.ctx, "cannot parse selector %q: %v", selector, err)
+		k6Throw(h.ctx, "cannot parse selector %q in element query all: %v", selector, err)
 	}
 	fn := `
 		(node, injected, selector) => {
@@ -1253,26 +1235,25 @@ func (h *ElementHandle) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	rt := k6common.GetRuntime(h.ctx)
 	parsedOpts := NewElementHandleScreenshotOptions(h.defaultTimeout())
 	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(h.ctx, "cannot parse element screenshoot options: %w", err)
 	}
 
 	s := newScreenshotter(h.ctx)
 	buf, err := s.screenshotElement(h, parsedOpts)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot take screenshot: %w", err)
 	}
 	return rt.NewArrayBuffer(*buf)
 }
 
 func (h *ElementHandle) ScrollIntoViewIfNeeded(opts goja.Value) {
-	rt := k6common.GetRuntime(h.ctx)
 	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(h.ctx, "cannot parse element scroll into view options: %w", err)
 	}
 	err := h.waitAndScrollIntoViewIfNeeded(h.ctx, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot handle element scroll into view: %w", err)
 	}
 	applySlowMo(h.ctx)
 }
@@ -1281,7 +1262,7 @@ func (h *ElementHandle) SelectOption(values goja.Value, opts goja.Value) []strin
 	rt := k6common.GetRuntime(h.ctx)
 	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(h.ctx, "cannot parse element selection options: %w", err)
 	}
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.selectOption(apiCtx, values)
@@ -1289,21 +1270,20 @@ func (h *ElementHandle) SelectOption(values goja.Value, opts goja.Value) []strin
 	actFn := elementHandleActionFn(h, []string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
 	selectedOptions, err := callApiWithTimeout(h.ctx, actFn, actionOpts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot handle element select option: %w", err)
 	}
 	var returnVal []string
 	if err := rt.ExportTo(selectedOptions.(goja.Value), &returnVal); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to unpack selected options: %w", err))
+		k6Throw(h.ctx, "cannot unpack options in element select option: %w", err)
 	}
 	applySlowMo(h.ctx)
 	return returnVal
 }
 
 func (h *ElementHandle) SelectText(opts goja.Value) {
-	rt := k6common.GetRuntime(h.ctx)
 	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot parse element select text options: %w", err)
 	}
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return nil, handle.selectText(apiCtx)
@@ -1311,18 +1291,17 @@ func (h *ElementHandle) SelectText(opts goja.Value) {
 	actFn := elementHandleActionFn(h, []string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
 	_, err := callApiWithTimeout(h.ctx, actFn, actionOpts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot select element text: %w", err)
 	}
 	applySlowMo(h.ctx)
 }
 
 // SetChecked checks or unchecks an element.
 func (h *ElementHandle) SetChecked(checked bool, opts goja.Value) {
-	rt := k6common.GetRuntime(h.ctx)
 	parsedOpts := NewElementHandleSetCheckedOptions(h.defaultTimeout())
 	err := parsedOpts.Parse(h.ctx, opts)
 	if err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(h.ctx, "cannot parse element set checked options: %w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
@@ -1331,23 +1310,21 @@ func (h *ElementHandle) SetChecked(checked bool, opts goja.Value) {
 	pointerFn := elementHandlePointerActionFn(h, true, fn, &parsedOpts.ElementHandleBasePointerOptions)
 	_, err = callApiWithTimeout(h.ctx, pointerFn, parsedOpts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot check element: %w", err)
 	}
 	applySlowMo(h.ctx)
 }
 
 func (h *ElementHandle) SetInputFiles(files goja.Value, opts goja.Value) {
 	// TODO: implement
-	rt := k6common.GetRuntime(h.ctx)
-	k6common.Throw(rt, errors.New("ElementHandle.setInputFiles() has not been implemented yet"))
+	k6Throw(h.ctx, "ElementHandle.setInputFiles() has not been implemented yet")
 }
 
 func (h *ElementHandle) Tap(opts goja.Value) {
-	rt := k6common.GetRuntime(h.ctx)
 	parsedOpts := NewElementHandleTapOptions(h.defaultTimeout())
 	err := parsedOpts.Parse(h.ctx, opts)
 	if err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(h.ctx, "cannot parse element tap options: %w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
@@ -1356,13 +1333,12 @@ func (h *ElementHandle) Tap(opts goja.Value) {
 	pointerFn := elementHandlePointerActionFn(h, true, fn, &parsedOpts.ElementHandleBasePointerOptions)
 	_, err = callApiWithTimeout(h.ctx, pointerFn, parsedOpts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot tap element: %w", err)
 	}
 	applySlowMo(h.ctx)
 }
 
 func (h *ElementHandle) TextContent() string {
-	rt := k6common.GetRuntime(h.ctx)
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.textContent(apiCtx)
 	}
@@ -1370,7 +1346,7 @@ func (h *ElementHandle) TextContent() string {
 	actFn := elementHandleActionFn(h, []string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
 	value, err := callApiWithTimeout(h.ctx, actFn, opts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot get text content of element: %w", err)
 	}
 	applySlowMo(h.ctx)
 	return value.(goja.Value).String()
@@ -1378,7 +1354,6 @@ func (h *ElementHandle) TextContent() string {
 
 // Type scrolls element into view, focuses element and types text
 func (h *ElementHandle) Type(text string, opts goja.Value) {
-	rt := k6common.GetRuntime(h.ctx)
 	parsedOpts := NewElementHandleTypeOptions(h.defaultTimeout())
 	parsedOpts.Parse(h.ctx, opts)
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1387,7 +1362,7 @@ func (h *ElementHandle) Type(text string, opts goja.Value) {
 	actFn := elementHandleActionFn(h, []string{}, fn, false, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
 	_, err := callApiWithTimeout(h.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot type (%q) into element: %w", text, err)
 	}
 	applySlowMo(h.ctx)
 }
@@ -1398,28 +1373,26 @@ func (h *ElementHandle) Uncheck(opts goja.Value) {
 }
 
 func (h *ElementHandle) WaitForElementState(state string, opts goja.Value) {
-	rt := k6common.GetRuntime(h.ctx)
 	parsedOpts := NewElementHandleWaitForElementStateOptions(time.Duration(h.frame.manager.timeoutSettings.timeout()) * time.Second)
 	err := parsedOpts.Parse(h.ctx, opts)
 	if err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(h.ctx, "cannt parse element wait for state options: %w", err)
 	}
 	_, err = h.waitForElementState(h.ctx, []string{state}, parsedOpts.Timeout)
 	if err != nil {
-		k6common.Throw(rt, fmt.Errorf("error while waiting for state: %w", err))
+		k6Throw(h.ctx, "error while waiting for state: %w", err)
 	}
 }
 
 func (h *ElementHandle) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
-	rt := k6common.GetRuntime(h.ctx)
 	parsedOpts := NewFrameWaitForSelectorOptions(h.defaultTimeout())
 	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(h.ctx, "cannot parse element wait for selector options: %w", err)
 	}
 
 	handle, err := h.waitForSelector(h.ctx, selector, parsedOpts)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "error while waiting for selector (%q): %w", selector, err)
 	}
 
 	return handle
@@ -1457,7 +1430,7 @@ func (h *ElementHandle) eval(
 	// call the javascript function.
 	result, err := h.execCtx.evaluate(ctx, opts, rt.ToValue(js), gargs...)
 	if err != nil {
-		err = fmt.Errorf("evaluate: %w", err)
+		err = fmt.Errorf("element handle cannot evaluate: %w", err)
 	}
 	return result, err
 }
