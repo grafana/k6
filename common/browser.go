@@ -230,9 +230,11 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		return
 	}
 
+	session := b.connSessions.getSession(ev.SessionID)
+
 	switch evti.Type {
 	case "background_page":
-		p, err := NewPage(b.ctx, b.connSessions.getSession(ev.SessionID), browserCtx, evti.TargetID, nil, false, b.logger)
+		p, err := NewPage(b.ctx, session, browserCtx, evti.TargetID, nil, false, b.logger)
 		if err != nil {
 			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
@@ -272,7 +274,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 
 		b.logger.Debugf("Browser:onAttachedToTarget:page", "sid:%v tid:%v opener nil:%t", ev.SessionID, evti.TargetID, opener == nil)
 
-		p, err := NewPage(b.ctx, b.connSessions.getSession(ev.SessionID), browserCtx, evti.TargetID, opener, true, b.logger)
+		p, err := NewPage(b.ctx, session, browserCtx, evti.TargetID, opener, true, b.logger)
 		if err != nil {
 			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {

@@ -32,9 +32,13 @@ import (
 	k6lib "go.k6.io/k6/lib"
 )
 
-// Ensure Session implements the EventEmitter and Executor interfaces
-var _ EventEmitter = &Session{}
-var _ cdp.Executor = &Session{}
+var _ session = &Session{}
+
+type session interface {
+	EventEmitter
+	cdp.Executor
+	ID() target.SessionID
+}
 
 // Session represents a CDP session to a target
 type Session struct {
@@ -67,6 +71,11 @@ func NewSession(ctx context.Context, conn *Connection, id target.SessionID, tid 
 	s.logger.Debugf("Session:NewSession", "sid:%v tid:%v", id, tid)
 	go s.readLoop()
 	return &s
+}
+
+// ID returns the session ID.
+func (s *Session) ID() target.SessionID {
+	return s.id
 }
 
 func (s *Session) close() {
