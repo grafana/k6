@@ -1054,7 +1054,7 @@ func (h *ElementHandle) InputValue(opts goja.Value) string {
 func (h *ElementHandle) IsChecked() bool {
 	result, err := h.isChecked(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6Throw(h.ctx, "cannot handle element is check: %w", err)
+		k6Throw(h.ctx, "cannot handle element is checked: %w", err)
 	}
 	return result
 }
@@ -1236,7 +1236,7 @@ func (h *ElementHandle) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	rt := k6common.GetRuntime(h.ctx)
 	parsedOpts := NewElementHandleScreenshotOptions(h.defaultTimeout())
 	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
-		k6Throw(h.ctx, "cannot parse element screenshoot options: %w", err)
+		k6Throw(h.ctx, "cannot parse element screenshot options: %w", err)
 	}
 
 	s := newScreenshotter(h.ctx)
@@ -1377,7 +1377,7 @@ func (h *ElementHandle) WaitForElementState(state string, opts goja.Value) {
 	parsedOpts := NewElementHandleWaitForElementStateOptions(time.Duration(h.frame.manager.timeoutSettings.timeout()) * time.Second)
 	err := parsedOpts.Parse(h.ctx, opts)
 	if err != nil {
-		k6Throw(h.ctx, "cannt parse element wait for state options: %w", err)
+		k6Throw(h.ctx, "cannot parse element wait for state options: %w", err)
 	}
 	_, err = h.waitForElementState(h.ctx, []string{state}, parsedOpts.Timeout)
 	if err != nil {
