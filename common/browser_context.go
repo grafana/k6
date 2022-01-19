@@ -157,7 +157,7 @@ func (b *BrowserContext) ExposeBinding(name string, callback goja.Callable, opts
 }
 
 func (b *BrowserContext) ExposeFunction(name string, callback goja.Callable) {
-	k6Throw(b.ctx, "BrowserContext.newCDPSession(name, callback) has not been implemented yet")
+	k6Throw(b.ctx, "BrowserContext.exposeFunction(name, callback) has not been implemented yet")
 }
 
 // GrantPermissions enables the specified permissions, all others will be disabled.
@@ -245,7 +245,7 @@ func (b *BrowserContext) Pages() []api.Page {
 }
 
 func (b *BrowserContext) Route(url goja.Value, handler goja.Callable) {
-	k6Throw(b.ctx, "BrowserContext.setHTTPCredentials(httpCredentials) has not been implemented yet")
+	k6Throw(b.ctx, "BrowserContext.route(url, handler) has not been implemented yet")
 }
 
 // SetDefaultNavigationTimeout sets the default navigation timeout in milliseconds.
@@ -263,7 +263,7 @@ func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 }
 
 func (b *BrowserContext) SetExtraHTTPHeaders(headers map[string]string) {
-	k6Throw(b.ctx, "BrowserContext.setHTTPCredentials(httpCredentials) has not been implemented yet")
+	k6Throw(b.ctx, "BrowserContext.setExtraHTTPHeaders(headers) has not been implemented yet")
 }
 
 // SetGeolocation overrides the geo location of the user.
