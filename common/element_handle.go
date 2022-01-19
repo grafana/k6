@@ -211,7 +211,7 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 	return &Rect{X: x + position.X, Y: y + position.Y, Width: width, Height: height}, nil
 }
 
-func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, p Position) (bool, error) {
+func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position) (bool, error) {
 	frame := h.ownerFrame(apiCtx)
 	if frame != nil && frame.parentFrame != nil {
 		element := h.frame.FrameElement().(*ElementHandle)
@@ -222,32 +222,20 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, p Position) (bo
 		if box == nil {
 			return false, errors.New("unable to get bounding box of element")
 		}
-
 		// Translate from viewport coordinates to frame coordinates.
-		p.X = p.X - box.X
-		p.Y = p.Y - box.Y
+		point.X = point.X - box.X
+		point.Y = point.Y - box.Y
 	}
-
-	rt := k6common.GetRuntime(h.ctx)
-	injected, err := h.execCtx.getInjectedScript(apiCtx)
-	if err != nil {
-		return false, err
-	}
-	pageFn := rt.ToValue(`
-		(injected, node, point) => {
+	fn := `
+		(node, injected, point) => {
 			return injected.checkHitTargetAt(node, point);
 		}
-	`)
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.execCtx.evaluate(
-		apiCtx, opts, pageFn, []goja.Value{
-			rt.ToValue(injected),
-			rt.ToValue(h),
-			rt.ToValue(p),
-		}...)
+	result, err := h.evalWithScript(h.ctx, opts, fn, point)
 	if err != nil {
 		return false, err
 	}
@@ -264,26 +252,16 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, p Position) (bo
 }
 
 func (h *ElementHandle) checkElementState(apiCtx context.Context, state string) (*bool, error) {
-	rt := k6common.GetRuntime(apiCtx)
-	injected, err := h.execCtx.getInjectedScript(apiCtx)
-	if err != nil {
-		return nil, err
-	}
-	pageFn := rt.ToValue(`
-		(injected, node, state) => {
+	fn := `
+		(node, injected, state) => {
 			return injected.checkElementState(node, state);
 		}
-	`)
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.execCtx.evaluate(
-		apiCtx, opts, pageFn, []goja.Value{
-			rt.ToValue(injected),
-			rt.ToValue(h),
-			rt.ToValue(state),
-		}...)
+	result, err := h.evalWithScript(h.ctx, opts, fn, state)
 	if err != nil {
 		return nil, err
 	}
@@ -395,54 +373,30 @@ func (h *ElementHandle) defaultTimeout() time.Duration {
 }
 
 func (h *ElementHandle) dispatchEvent(apiCtx context.Context, typ string, eventInit goja.Value) (interface{}, error) {
-	rt := k6common.GetRuntime(apiCtx)
-	injected, err := h.execCtx.getInjectedScript(apiCtx)
-	if err != nil {
-		return nil, err
-	}
-	pageFn := rt.ToValue(`
-		(injected, node, type, eventInit) => {
+	fn := `
+		(node, injected, type, eventInit) => {
 			injected.dispatchEvent(node, type, eventInit);
 		}
-	`)
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	_, err = h.execCtx.evaluate(
-		apiCtx, opts, pageFn, []goja.Value{
-			rt.ToValue(injected),
-			rt.ToValue(h),
-			rt.ToValue(typ),
-			eventInit,
-		}...)
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
+	_, err := h.evalWithScript(h.ctx, opts, fn, typ, eventInit)
+	return nil, err
 }
 
 func (h *ElementHandle) fill(apiCtx context.Context, value string) (interface{}, error) {
-	rt := k6common.GetRuntime(apiCtx)
-	injected, err := h.execCtx.getInjectedScript(apiCtx)
-	if err != nil {
-		return nil, err
-	}
-	pageFn := rt.ToValue(`
-			(injected, node, value) => {
-				return injected.fill(node, value);
-			}
-		`)
+	fn := `
+		(node, injected, value) => {
+			return injected.fill(node, value);
+		}
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.execCtx.evaluate(
-		apiCtx, opts, pageFn, []goja.Value{
-			rt.ToValue(injected),
-			rt.ToValue(h),
-			rt.ToValue(value),
-		}...)
+	result, err := h.evalWithScript(h.ctx, opts, fn, value)
 	if err != nil {
 		return nil, err
 	}
@@ -456,26 +410,16 @@ func (h *ElementHandle) fill(apiCtx context.Context, value string) (interface{},
 }
 
 func (h *ElementHandle) focus(apiCtx context.Context, resetSelectionIfNotFocused bool) error {
-	rt := k6common.GetRuntime(apiCtx)
-	injected, err := h.execCtx.getInjectedScript(apiCtx)
-	if err != nil {
-		return err
-	}
-	pageFn := rt.ToValue(`
-		(injected, node, resetSelectionIfNotFocused) => {
+	fn := `
+		(node, injected, resetSelectionIfNotFocused) => {
 			return injected.focusNode(node, resetSelectionIfNotFocused);
 		}
-	`)
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.execCtx.evaluate(
-		apiCtx, opts, pageFn, []goja.Value{
-			rt.ToValue(injected),
-			rt.ToValue(h),
-			rt.ToValue(resetSelectionIfNotFocused),
-		}...)
+	result, err := h.evalWithScript(apiCtx, opts, fn, resetSelectionIfNotFocused)
 	if err != nil {
 		return err
 	}
@@ -489,15 +433,16 @@ func (h *ElementHandle) focus(apiCtx context.Context, resetSelectionIfNotFocused
 }
 
 func (h *ElementHandle) getAttribute(apiCtx context.Context, name string) (interface{}, error) {
-	js := `(element) => {
-		return element.getAttribute('` + name + `');
-	}`
-	rt := k6common.GetRuntime(apiCtx)
+	js := `
+		(element) => {
+			return element.getAttribute('` + name + `');
+		}
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	return h.execCtx.evaluate(apiCtx, opts, rt.ToValue(js), rt.ToValue(h))
+	return h.eval(apiCtx, opts, js)
 }
 
 func (h *ElementHandle) hover(apiCtx context.Context, p *Position) error {
@@ -505,42 +450,45 @@ func (h *ElementHandle) hover(apiCtx context.Context, p *Position) error {
 }
 
 func (h *ElementHandle) innerHTML(apiCtx context.Context) (interface{}, error) {
-	rt := k6common.GetRuntime(apiCtx)
-	js := `(element) => {
-		return element.innerHTML;
-	}`
+	js := `
+		(element) => {
+			return element.innerHTML;
+		}
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	return h.execCtx.evaluate(apiCtx, opts, rt.ToValue(js), rt.ToValue(h))
+	return h.eval(apiCtx, opts, js)
 }
 
 func (h *ElementHandle) innerText(apiCtx context.Context) (interface{}, error) {
-	rt := k6common.GetRuntime(apiCtx)
-	js := `(element) => {
-		return element.innerText;
-	}`
+	js := `
+		(element) => {
+			return element.innerText;
+		}
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	return h.execCtx.evaluate(apiCtx, opts, rt.ToValue(js), rt.ToValue(h))
+	return h.eval(apiCtx, opts, js)
 }
 
 func (h *ElementHandle) inputValue(apiCtx context.Context) (interface{}, error) {
-	rt := k6common.GetRuntime(apiCtx)
-	js := `(element) => {
-		if (element.nodeType !== Node.ELEMENT_NODE || (element.nodeName !== 'INPUT' && element.nodeName !== 'TEXTAREA' && element.nodeName !== 'SELECT')) {
-        	throw Error('Node is not an <input>, <textarea> or <select> element');
+	js := `
+		(element) => {
+			if (element.nodeType !== Node.ELEMENT_NODE || (element.nodeName !== 'INPUT' && element.nodeName !== 'TEXTAREA' && element.nodeName !== 'SELECT')) {
+        			throw Error('Node is not an <input>, <textarea> or <select> element');
+			}
+			return element.value;
 		}
-		return element.value;
-	}`
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	return h.execCtx.evaluate(apiCtx, opts, rt.ToValue(js), rt.ToValue(h))
+	return h.eval(apiCtx, opts, js)
 }
 
 func (h *ElementHandle) isChecked(apiCtx context.Context, timeout time.Duration) (bool, error) {
@@ -568,30 +516,21 @@ func (h *ElementHandle) isVisible(apiCtx context.Context, timeout time.Duration)
 }
 
 func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position) (*Position, error) {
-	rt := k6common.GetRuntime(apiCtx)
-	box := h.BoundingBox()
-	injected, err := h.execCtx.getInjectedScript(apiCtx)
-	if err != nil {
-		return nil, err
-	}
-	pageFn := rt.ToValue(`
-		(injected, node) => {
+	fn := `
+		(node, injected) => {
 			return injected.getElementBorderWidth(node);
 		}
-	`)
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.execCtx.evaluate(
-		apiCtx, opts, pageFn, []goja.Value{
-			rt.ToValue(injected),
-			rt.ToValue(h),
-		}...)
+	result, err := h.evalWithScript(apiCtx, opts, fn)
 	if err != nil {
 		return nil, err
 	}
 
+	rt := k6common.GetRuntime(apiCtx)
 	var border struct{ Top, Left float64 }
 	switch result := result.(type) {
 	case goja.Value:
@@ -608,6 +547,7 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 		}
 	}
 
+	box := h.BoundingBox()
 	if box == nil || (border.Left == 0 && border.Top == 0) {
 		return nil, errorFromDOMError("error:notvisible")
 	}
@@ -665,20 +605,16 @@ func (h *ElementHandle) press(apiCtx context.Context, key string, opts *Keyboard
 }
 
 func (h *ElementHandle) selectOption(apiCtx context.Context, values goja.Value) (interface{}, error) {
-	rt := k6common.GetRuntime(apiCtx)
-	injected, err := h.execCtx.getInjectedScript(apiCtx)
-	if err != nil {
-		return nil, err
-	}
-
 	convertSelectOptionValues := func(values goja.Value) ([]interface{}, error) {
 		if goja.IsNull(values) || goja.IsUndefined(values) {
 			return nil, nil
 		}
 
-		opts := make([]interface{}, 0)
-
-		t := values.Export()
+		var (
+			opts []interface{}
+			t    = values.Export()
+			rt   = k6common.GetRuntime(h.ctx)
+		)
 		switch values.ExportType().Kind() {
 		case reflect.Map:
 			s := reflect.ValueOf(t)
@@ -744,21 +680,16 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values goja.Value) 
 		return nil, err
 	}
 
-	pageFn := rt.ToValue(`
-			(injected, node, values) => {
-				return injected.selectOptions(node, values);
-			}
-		`)
+	fn := `
+		(node, injected, values) => {
+			return injected.selectOptions(node, values);
+		}
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.execCtx.evaluate(
-		apiCtx, opts, pageFn, []goja.Value{
-			rt.ToValue(injected),
-			rt.ToValue(h),
-			rt.ToValue(convValues),
-		}...)
+	result, err := h.evalWithScript(apiCtx, opts, fn, convValues)
 	if err != nil {
 		return nil, err
 	}
@@ -772,25 +703,16 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values goja.Value) 
 }
 
 func (h *ElementHandle) selectText(apiCtx context.Context) error {
-	rt := k6common.GetRuntime(apiCtx)
-	injected, err := h.execCtx.getInjectedScript(apiCtx)
-	if err != nil {
-		return err
-	}
-	pageFn := rt.ToValue(`
-			(injected, node) => {
-				return injected.selectText(node);
-			}
-		`)
+	fn := `
+		(node, injected) => {
+			return injected.selectText(node);
+		}
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.execCtx.evaluate(
-		apiCtx, opts, pageFn, []goja.Value{
-			rt.ToValue(injected),
-			rt.ToValue(h),
-		}...)
+	result, err := h.evalWithScript(apiCtx, opts, fn)
 	if err != nil {
 		return err
 	}
@@ -833,15 +755,16 @@ func (h *ElementHandle) tap(apiCtx context.Context, p *Position) error {
 }
 
 func (h *ElementHandle) textContent(apiCtx context.Context) (interface{}, error) {
-	rt := k6common.GetRuntime(apiCtx)
-	js := `(element) => {
-		return element.textContent;
-	}`
+	js := `
+		(element) => {
+			return element.textContent;
+		}
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	return h.execCtx.evaluate(apiCtx, opts, rt.ToValue(js), rt.ToValue(h))
+	return h.eval(apiCtx, opts, js)
 }
 
 func (h *ElementHandle) typ(apiCtx context.Context, text string, opts *KeyboardOptions) error {
@@ -857,17 +780,18 @@ func (h *ElementHandle) typ(apiCtx context.Context, text string, opts *KeyboardO
 }
 
 func (h *ElementHandle) waitAndScrollIntoViewIfNeeded(apiCtx context.Context, force, noWaitAfter bool, timeout time.Duration) error {
-	rt := k6common.GetRuntime(apiCtx)
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
-		pageFn := rt.ToValue(`(element) => {
-			element.scrollIntoViewIfNeeded(true);
-			return [window.scrollX, window.scrollY];
-		}`)
+		fn := `
+			(element) => {
+				element.scrollIntoViewIfNeeded(true);
+				return [window.scrollX, window.scrollY];
+			}
+		`
 		opts := evaluateOptions{
 			forceCallable: true,
 			returnByValue: true,
 		}
-		return h.execCtx.evaluate(apiCtx, opts, pageFn, rt.ToValue(h))
+		return h.eval(apiCtx, opts, fn)
 	}
 	actFn := elementHandleActionFn(h, []string{"visible", "stable"}, fn, force, noWaitAfter, timeout)
 	_, err := callApiWithTimeout(h.ctx, actFn, timeout)
@@ -878,27 +802,16 @@ func (h *ElementHandle) waitAndScrollIntoViewIfNeeded(apiCtx context.Context, fo
 }
 
 func (h *ElementHandle) waitForElementState(apiCtx context.Context, states []string, timeout time.Duration) (bool, error) {
-	rt := k6common.GetRuntime(apiCtx)
-	injected, err := h.execCtx.getInjectedScript(apiCtx)
-	if err != nil {
-		return false, err
-	}
-	pageFn := rt.ToValue(`
-		(injected, node, states, timeout) => {
+	fn := `
+		(node, injected, states, timeout) => {
 			return injected.waitForElementStates(node, states, timeout);
 		}
-	`)
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.execCtx.evaluate(
-		apiCtx, opts, pageFn, []goja.Value{
-			rt.ToValue(injected),
-			rt.ToValue(h),
-			rt.ToValue(states),
-			rt.ToValue(timeout.Milliseconds()),
-		}...)
+	result, err := h.evalWithScript(apiCtx, opts, fn, states, timeout.Milliseconds())
 	if err != nil {
 		return false, err
 	}
@@ -917,35 +830,24 @@ func (h *ElementHandle) waitForElementState(apiCtx context.Context, states []str
 }
 
 func (h *ElementHandle) waitForSelector(apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
-	rt := k6common.GetRuntime(apiCtx)
-	injected, err := h.execCtx.getInjectedScript(apiCtx)
-	if err != nil {
-		return nil, err
-	}
-
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		return nil, err
 	}
-
-	pageFn := rt.ToValue(`
-		(injected, selector, scope, strict, state, timeout, ...args) => {
-			return injected.waitForSelector(selector, scope, strict, state, 'raf', timeout, ...args);
+	fn := `
+		(node, injected, selector, strict, state, timeout, ...args) => {
+			return injected.waitForSelector(selector, node, strict, state, 'raf', timeout, ...args);
 		}
-	`)
+	`
 	eopts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.execCtx.evaluate(
-		apiCtx, eopts, pageFn, []goja.Value{
-			rt.ToValue(injected),
-			rt.ToValue(parsedSelector),
-			rt.ToValue(h),
-			rt.ToValue(opts.Strict),
-			rt.ToValue(opts.State.String()),
-			rt.ToValue(opts.Timeout.Milliseconds()),
-		}...)
+	result, err := h.evalWithScript(
+		apiCtx,
+		eopts, fn, parsedSelector,
+		opts.Strict, opts.State.String(), opts.Timeout.Milliseconds(),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1220,23 +1122,18 @@ func (h *ElementHandle) IsVisible() bool {
 
 // OwnerFrame returns the frame containing this element
 func (h *ElementHandle) OwnerFrame() api.Frame {
-	rt := k6common.GetRuntime(h.ctx)
-	injected, err := h.execCtx.getInjectedScript(h.ctx)
-	if err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to run injection script: %w", err))
-	}
-	pageFn := rt.ToValue(`
-		(injected, node) => {
+	fn := `
+		(node, injected) => {
 			return injected.getDocumentElement(node);
 		}
-	`)
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
-	res, err := h.execCtx.evaluate(h.ctx, opts, pageFn, []goja.Value{rt.ToValue(injected), rt.ToValue(h)}...)
+	res, err := h.evalWithScript(h.ctx, opts, fn)
 	if err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed getting document element: %w", err))
+		k6Throw(h.ctx, "cannot get document element: %w", err)
 	}
 	if res == nil {
 		return nil
@@ -1251,9 +1148,8 @@ func (h *ElementHandle) OwnerFrame() api.Frame {
 	var node *cdp.Node
 	action := dom.DescribeNode().WithObjectID(documentHandle.remoteObject.ObjectID)
 	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to describe DOM node: %w", err))
+		k6Throw(h.ctx, "cannot describe DOM node: %w", err)
 	}
-
 	if node == nil || node.FrameID == "" {
 		return nil
 	}
@@ -1284,26 +1180,16 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
-
-	injected, err := h.execCtx.getInjectedScript(h.ctx)
-	if err != nil {
-		k6common.Throw(rt, err)
-	}
-	pageFn := rt.ToValue(`
-		(injected, selector, scope) => {
-			return injected.querySelector(selector, scope || document, false);
+	fn := `
+		(node, injected, selector) => {
+			return injected.querySelector(selector, node || document, false);
 		}
-	`)
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.execCtx.evaluate(
-		h.ctx, opts, pageFn, []goja.Value{
-			rt.ToValue(injected),
-			rt.ToValue(parsedSelector),
-			rt.ToValue(h),
-		}...)
+	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector)
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
@@ -1311,8 +1197,10 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 		return nil
 	}
 
-	handle := result.(api.JSHandle)
-	element := handle.AsElement()
+	var (
+		handle  = result.(api.JSHandle)
+		element = handle.AsElement()
+	)
 	applySlowMo(h.ctx)
 	if element != nil {
 		return element
@@ -1324,33 +1212,22 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 // QueryAll queries element subtree for matching elements. If no element matches the selector,
 // the return value resolves to "null"
 func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
-	rt := k6common.GetRuntime(h.ctx)
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot parse selector %q: %v", selector, err)
 	}
-
-	injected, err := h.execCtx.getInjectedScript(h.ctx)
-	if err != nil {
-		k6common.Throw(rt, err)
-	}
-	pageFn := rt.ToValue(`
-		(injected, selector, scope) => {
-			return injected.querySelectorAll(selector, scope || document, false);
+	fn := `
+		(node, injected, selector) => {
+			return injected.querySelectorAll(selector, node || document, false);
 		}
-	`)
+	`
 	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.execCtx.evaluate(
-		h.ctx, opts, pageFn, []goja.Value{
-			rt.ToValue(injected),
-			rt.ToValue(parsedSelector),
-			rt.ToValue(h),
-		}...)
+	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(h.ctx, "cannot evaluate selector %q: %v", selector, err)
 	}
 	if result == nil {
 		return nil
@@ -1363,7 +1240,7 @@ func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 	for _, property := range properties {
 		elementHandle := property.AsElement()
 		if elementHandle != nil {
-			result = append(elements, elementHandle)
+			elements = append(elements, elementHandle)
 		} else {
 			property.Dispose()
 		}
@@ -1546,4 +1423,41 @@ func (h *ElementHandle) WaitForSelector(selector string, opts goja.Value) api.El
 	}
 
 	return handle
+}
+
+// evalWithScript evaluates a given js function in the scope of this ElementHandle and allows to call the injected
+// script's functions.
+func (h *ElementHandle) evalWithScript(
+	ctx context.Context,
+	opts evaluateOptions, js string, args ...interface{},
+) (interface{}, error) {
+	// get the injected script's handle so that js function can call its functions.
+	script, err := h.execCtx.getInjectedScript(h.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get injected script: %w", err)
+	}
+	// passing `script` allows `js` to use `script`'s functions.
+	args = append(append([]interface{}(nil), script), args...)
+	return h.eval(ctx, opts, js, args...)
+}
+
+// eval evaluates a given js function in the scope of this ElementHandle.
+func (h *ElementHandle) eval(
+	ctx context.Context,
+	opts evaluateOptions, js string, args ...interface{},
+) (interface{}, error) {
+	// passing `h` makes it evaluate js code in the element handle's scope.
+	args = append(append([]interface{}(nil), h), args...)
+	// convert the arguments to goja values.
+	rt := k6common.GetRuntime(ctx)
+	gargs := make([]goja.Value, len(args))
+	for i, arg := range args {
+		gargs[i] = rt.ToValue(arg)
+	}
+	// call the javascript function.
+	result, err := h.execCtx.evaluate(ctx, opts, rt.ToValue(js), gargs...)
+	if err != nil {
+		err = fmt.Errorf("evaluate: %w", err)
+	}
+	return result, err
 }
