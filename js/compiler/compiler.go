@@ -24,6 +24,8 @@ import (
 	_ "embed" // we need this for embedding Babel
 	"encoding/json"
 	"errors"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -81,6 +83,9 @@ var (
 		"highlightCode": false,
 	}
 
+	maxSrcLenForBabelSourceMap     = 250 * 1024 //nolint:gochecknoglobals
+	maxSrcLenForBabelSourceMapOnce sync.Once    //nolint:gochecknoglobals
+
 	onceBabelCode      sync.Once     // nolint:gochecknoglobals
 	globalBabelCode    *goja.Program // nolint:gochecknoglobals
 	globalBabelCodeErr error         // nolint:gochecknoglobals
@@ -88,7 +93,10 @@ var (
 	globalBabel        *babel        // nolint:gochecknoglobals
 )
 
-const sourceMapURLFromBabel = "k6://internal-should-not-leak/file.map"
+const (
+	maxSrcLenForBabelSourceMapVarName = "K6_DEBUG_SOURCEMAP_FILESIZE_LIMIT"
+	sourceMapURLFromBabel             = "k6://internal-should-not-leak/file.map"
+)
 
 // A Compiler compiles JavaScript source code (ES5.1 or ES6) into a goja.Program
 type Compiler struct {
@@ -124,7 +132,28 @@ func (c *Compiler) Transform(src, filename string, inputSrcMap []byte) (code str
 		return
 	}
 
-	code, srcMap, err = c.babel.transformImpl(c.logger, src, filename, c.Options.SourceMapLoader != nil, inputSrcMap)
+	sourceMapEnabled := c.Options.SourceMapLoader != nil
+	maxSrcLenForBabelSourceMapOnce.Do(func() {
+		// TODO: drop this code and everything it's connected to when babel is dropped
+		v := os.Getenv(maxSrcLenForBabelSourceMapVarName)
+		if len(v) > 0 {
+			i, err := strconv.Atoi(v) //nolint:govet // we shadow err on purpose
+			if err != nil {
+				c.logger.Warnf("Tried to parse %q from %s as integer but couldn't %s\n",
+					v, maxSrcLenForBabelSourceMapVarName, err)
+				return
+			}
+			maxSrcLenForBabelSourceMap = i
+		}
+	})
+	if sourceMapEnabled && len(src) > maxSrcLenForBabelSourceMap {
+		sourceMapEnabled = false
+		c.logger.Warnf("The source for `%s` needs to go through babel but is over %d bytes. "+
+			"For performance reasons source map support will be disabled for this particular file.",
+			filename, maxSrcLenForBabelSourceMap)
+	}
+
+	code, srcMap, err = c.babel.transformImpl(c.logger, src, filename, sourceMapEnabled, inputSrcMap)
 	return
 }
 
