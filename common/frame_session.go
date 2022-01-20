@@ -112,26 +112,15 @@ func NewFrameSession(
 		},
 	}
 
+	var parentNM *NetworkManager
 	if fs.parent != nil {
-		fs.networkManager, err = NewNetworkManager(ctx, session, fs.manager, fs.parent.networkManager)
-		if err != nil {
-			logger.Debugf(
-				"NewFrameSession:NewNetworkManager",
-				"sid:%v tid:%v err:%v",
-				session.id, targetID, err)
-
-			return nil, err
-		}
-	} else {
-		fs.networkManager, err = NewNetworkManager(ctx, session, fs.manager, nil)
-		if err != nil {
-			logger.Debugf(
-				"NewFrameSession:NewNetworkManager#2",
-				"sid:%v tid:%v err:%v",
-				session.id, targetID, err)
-
-			return nil, err
-		}
+		parentNM = fs.parent.networkManager
+	}
+	fs.networkManager, err = NewNetworkManager(ctx, session, fs.manager, parentNM)
+	if err != nil {
+		logger.Debugf("NewFrameSession:NewNetworkManager", "sid:%v tid:%v err:%v",
+			session.id, targetID, err)
+		return nil, err
 	}
 
 	action := browser.GetWindowForTarget().WithTargetID(fs.targetID)
