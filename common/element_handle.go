@@ -1411,7 +1411,7 @@ func (h *ElementHandle) evalWithScript(
 		return nil, fmt.Errorf("cannot get injected script: %w", err)
 	}
 	// passing `script` allows `js` to use `script`'s functions.
-	args = append(append([]interface{}(nil), script), args...)
+	args = append([]interface{}{script}, args...)
 	return h.eval(ctx, opts, js, args...)
 }
 
@@ -1421,7 +1421,7 @@ func (h *ElementHandle) eval(
 	opts evaluateOptions, js string, args ...interface{},
 ) (interface{}, error) {
 	// passing `h` makes it evaluate js code in the element handle's scope.
-	args = append(append([]interface{}(nil), h), args...)
+	args = append([]interface{}{h}, args...)
 	// convert the arguments to goja values.
 	rt := k6common.GetRuntime(ctx)
 	gargs := make([]goja.Value, len(args))
