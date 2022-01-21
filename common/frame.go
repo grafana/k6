@@ -321,7 +321,7 @@ func (f *Frame) document() (*ElementHandle, error) {
 
 	f.waitForExecutionContext(mainWorld)
 
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: false,
 		returnByValue: false,
 	}
@@ -531,11 +531,11 @@ func (f *Frame) waitForFunction(
 	} else {
 		predicate = fmt.Sprintf("return (%s)(...args);", predicateFn.ToString().String())
 	}
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := execCtx.evaluate(
+	result, err := execCtx.eval(
 		apiCtx, opts, pageFn, append([]goja.Value{
 			rt.ToValue(injected),
 			rt.ToValue(predicate),
@@ -721,7 +721,7 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 
 	f.waitForExecutionContext(mainWorld)
 
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -750,7 +750,7 @@ func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle 
 		if ec == nil {
 			k6common.Throw(rt, fmt.Errorf("cannot find execution context: %q", mainWorld))
 		}
-		handle, err = ec.EvaluateHandle(f.ctx, pageFunc, args...)
+		handle, err = ec.EvalHandle(f.ctx, pageFunc, args...)
 	}
 	f.executionContextMu.RUnlock()
 	if err != nil {
@@ -1245,7 +1245,7 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 
 	f.waitForExecutionContext(utilityWorld)
 
-	eopts := evaluateOptions{
+	eopts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -1474,7 +1474,7 @@ func (f *Frame) adoptBackendNodeID(world executionWorld, id cdp.BackendNodeID) (
 func (f *Frame) evaluate(
 	apiCtx context.Context,
 	world executionWorld,
-	opts evaluateOptions, pageFunc goja.Value, args ...goja.Value,
+	opts evalOptions, pageFunc goja.Value, args ...goja.Value,
 ) (interface{}, error) {
 	f.log.Debugf("Frame:evaluate", "fid:%s furl:%q world:%s opts:%s", f.ID(), f.URL(), world, opts)
 
@@ -1485,7 +1485,7 @@ func (f *Frame) evaluate(
 	if ec == nil {
 		return nil, fmt.Errorf("cannot find execution context: %q", world)
 	}
-	eh, err := ec.evaluate(apiCtx, opts, pageFunc, args...)
+	eh, err := ec.eval(apiCtx, opts, pageFunc, args...)
 	if err != nil {
 		return nil, fmt.Errorf("frame cannot evaluate: %w", err)
 	}
@@ -1502,11 +1502,11 @@ type frameExecutionContext interface {
 	// execution context from another execution context.
 	adoptElementHandle(elementHandle *ElementHandle) (*ElementHandle, error)
 
-	// evaluate will evaluate provided callable within this execution
+	// eval will evaluate provided callable within this execution
 	// context and return by value or handle.
-	evaluate(
+	eval(
 		apiCtx context.Context,
-		opts evaluateOptions,
+		opts evalOptions,
 		pageFunc goja.Value, args ...goja.Value,
 	) (res interface{}, err error)
 
@@ -1514,16 +1514,16 @@ type frameExecutionContext interface {
 	// functions.
 	getInjectedScript(apiCtx context.Context) (api.JSHandle, error)
 
-	// Evaluate will evaluate provided page function within this execution
+	// Eval will evaluate provided page function within this execution
 	// context.
-	Evaluate(
+	Eval(
 		apiCtx context.Context,
 		pageFunc goja.Value, args ...goja.Value,
 	) (interface{}, error)
 
-	// EvaluateHandle will evaluate provided page function within this
+	// EvalHandle will evaluate provided page function within this
 	// execution context.
-	EvaluateHandle(
+	EvalHandle(
 		apiCtx context.Context,
 		pageFunc goja.Value, args ...goja.Value,
 	) (api.JSHandle, error)

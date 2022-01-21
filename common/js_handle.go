@@ -95,7 +95,7 @@ func (h *BaseJSHandle) Dispose() {
 func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 	rt := k6common.GetRuntime(h.ctx)
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
-	res, err := h.execCtx.Evaluate(h.ctx, pageFunc, args...)
+	res, err := h.execCtx.Eval(h.ctx, pageFunc, args...)
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
@@ -106,7 +106,7 @@ func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) interfa
 func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHandle {
 	rt := k6common.GetRuntime(h.ctx)
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
-	res, err := h.execCtx.EvaluateHandle(h.ctx, pageFunc, args...)
+	res, err := h.execCtx.EvalHandle(h.ctx, pageFunc, args...)
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
