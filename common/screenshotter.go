@@ -47,7 +47,7 @@ func newScreenshotter(ctx context.Context) *screenshotter {
 
 func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
 	rt := k6common.GetRuntime(s.ctx)
-	opts := evalOptions{
+	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -91,7 +91,7 @@ func (s *screenshotter) originalViewportSize(p *Page) (*Size, *Size, error) {
 		return &viewportSize, &originalViewportSize, nil
 	}
 
-	opts := evalOptions{
+	opts := evaluateOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
