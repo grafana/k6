@@ -23,7 +23,6 @@ package common
 import (
 	"context"
 	"fmt"
-	"net"
 	"strconv"
 	"sync"
 	"time"
@@ -360,32 +359,6 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	m.reqsMu.Unlock()
 	m.emitRequestMetrics(req)
 	m.frameManager.requestStarted(req)
-
-	if m.userReqInterceptionEnabled {
-		state := k6lib.GetState(m.ctx)
-		ip := net.ParseIP(req.url.Host)
-		blockedHosts := state.Options.BlockedHostnames.Trie
-		if blockedHosts != nil && ip == nil {
-			if match, blocked := blockedHosts.Contains(req.url.Host); blocked {
-				// Tell browser we've blocked this request.
-				fetch.FailRequest(fetch.RequestID(req.getID()), network.ErrorReasonBlockedByClient)
-
-				// Throw exception into JS runtime
-				rt := k6common.GetRuntime(m.ctx)
-				// TODO: create PR to make netext.BlockedHostError a public struct in k6 perhaps?
-				k6common.Throw(rt, fmt.Errorf("hostname (%s) is in a blocked pattern (%s)", req.url.Host, match))
-			}
-		}
-
-		/*
-			TODO: is there a way to do IP filtering without requiring a lookup here?
-			for _, ipnet := range state.Options.BlacklistIPs {
-				if ipnet.Contains(ev.Request.URL) {
-					return "", netext.BlackListedIPError{ip: remote.IP, net: ipnet}
-				}
-			}
-		*/
-	}
 }
 
 func (m *NetworkManager) onRequestServedFromCache(event *network.EventRequestServedFromCache) {
