@@ -1414,7 +1414,7 @@ func (h *ElementHandle) evalWithScript(
 	return h.eval(ctx, opts, js, args...)
 }
 
-// eval evaluates a given js function in the scope of this ElementHandle.
+// eval evaluates the given js code in the scope of this ElementHandle and returns the result.
 func (h *ElementHandle) eval(
 	ctx context.Context,
 	opts evaluateOptions, js string, args ...interface{},
