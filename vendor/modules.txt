@@ -16,6 +16,9 @@ github.com/andybalholm/brotli
 # github.com/andybalholm/cascadia v1.1.0
 ## explicit
 github.com/andybalholm/cascadia
+# github.com/benbjohnson/clock v1.3.0
+## explicit; go 1.15
+github.com/benbjohnson/clock
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew

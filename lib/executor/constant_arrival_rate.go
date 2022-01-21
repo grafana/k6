@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
@@ -59,6 +60,8 @@ type ConstantArrivalRateConfig struct {
 	TimeUnit types.NullDuration `json:"timeUnit"`
 	Duration types.NullDuration `json:"duration"`
 
+	clock clock.Clock `json:"-"`
+
 	// Initialize `PreAllocatedVUs` number of VUs, and if more than that are needed,
 	// they will be dynamically allocated, until `MaxVUs` is reached, which is an
 	// absolutely hard limit on the number of VUs the executor will use
@@ -71,6 +74,7 @@ func NewConstantArrivalRateConfig(name string) *ConstantArrivalRateConfig {
 	return &ConstantArrivalRateConfig{
 		BaseConfig: NewBaseConfig(name, constantArrivalRateType),
 		TimeUnit:   types.NewNullDuration(1*time.Second, false),
+		clock:      clock.New(),
 	}
 }
 
@@ -251,7 +255,7 @@ func (car ConstantArrivalRate) Run(
 	progIters := fmt.Sprintf(
 		pb.GetFixedLengthFloatFormat(arrivalRatePerSec, 0)+" iters/s", arrivalRatePerSec)
 	progressFn := func() (float64, []string) {
-		spent := time.Since(startTime)
+		spent := car.config.clock.Since(startTime)
 		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
 		progVUs := fmt.Sprintf(vusFmt+"/"+vusFmt+" VUs",
 			vusPool.Running(), currActiveVUs)
@@ -324,7 +328,7 @@ func (car ConstantArrivalRate) Run(
 	}
 
 	start, offsets, _ := car.et.GetStripedOffsets()
-	timer := time.NewTimer(time.Hour * 24)
+	timer := time.NewTimer(time.Hour * 24) // TODO: check this out
 	// here the we need the not scaled one
 	notScaledTickerPeriod := getTickerPeriod(
 		big.NewRat(
@@ -335,8 +339,12 @@ func (car ConstantArrivalRate) Run(
 	droppedIterationMetric := builtinMetrics.DroppedIterations
 	shownWarning := false
 	metricTags := car.getMetricTags(nil)
-	for li, gi := 0, start; ; li, gi = li+1, gi+offsets[li%len(offsets)] {
-		t := notScaledTickerPeriod*time.Duration(gi) - time.Since(startTime)
+
+	lowerInterval := 0
+	greaterInterval := start
+
+	for ; ; lowerInterval, greaterInterval = lowerInterval+1, greaterInterval+offsets[lowerInterval%len(offsets)] {
+		t := notScaledTickerPeriod*time.Duration(greaterInterval) - time.Since(startTime)
 		timer.Reset(t)
 		select {
 		case <-timer.C:
@@ -349,7 +357,7 @@ func (car ConstantArrivalRate) Run(
 
 			stats.PushIfNotDone(parentCtx, out, stats.Sample{
 				Value: 1, Metric: droppedIterationMetric,
-				Tags: metricTags, Time: time.Now(),
+				Tags: metricTags, Time: car.config.clock.Now(),
 			})
 
 			// We'll try to start allocating another VU in the background,
