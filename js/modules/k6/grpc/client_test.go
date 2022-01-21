@@ -51,6 +51,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/metrics"
@@ -669,11 +670,16 @@ func TestClient(t *testing.T) {
 
 			ts := setup(t)
 
-			// create and attach the GRPC module to goja
 			ctx := common.WithRuntime(context.Background(), ts.rt)
-			ctx = common.WithInitEnv(ctx, ts.env)
-			err := ts.rt.Set("grpc", common.Bind(ts.rt, New(), &ctx))
-			require.NoError(t, err)
+			mvu := &modulestest.VU{
+				RuntimeField: ts.rt,
+				InitEnvField: ts.env,
+				CtxField:     ctx,
+			}
+
+			m, ok := New().NewModuleInstance(mvu).(*ModuleInstance)
+			require.True(t, ok)
+			require.NoError(t, ts.rt.Set("grpc", m.Exports().Named))
 
 			// setup necessary environment if needed by a test
 			if tt.setup != nil {
@@ -687,7 +693,7 @@ func TestClient(t *testing.T) {
 			val, err := replace(tt.initString.code)
 			assertResponse(t, tt.initString, err, val, ts)
 
-			ctx = lib.WithState(ctx, ts.vuState)
+			mvu.StateField = ts.vuState
 			val, err = replace(tt.vuString.code)
 			assertResponse(t, tt.vuString, err, val, ts)
 		})
