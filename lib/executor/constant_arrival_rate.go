@@ -328,7 +328,7 @@ func (car ConstantArrivalRate) Run(
 	}
 
 	start, offsets, _ := car.et.GetStripedOffsets()
-	timer := time.NewTimer(time.Hour * 24) // TODO: check this out
+	timer := car.config.clock.Timer(time.Hour * 24) // TODO: check this out
 	// here the we need the not scaled one
 	notScaledTickerPeriod := getTickerPeriod(
 		big.NewRat(

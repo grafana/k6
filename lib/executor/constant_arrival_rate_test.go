@@ -137,15 +137,15 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 	// t.Parallel()
 	tests := []struct {
-		segment  *lib.ExecutionSegment
-		sequence *lib.ExecutionSegmentSequence
-		start    time.Duration
-		steps    []int64
+		segment                *lib.ExecutionSegment
+		sequence               *lib.ExecutionSegmentSequence
+		wantExecutionStartTime time.Duration
+		steps                  []int64
 	}{
 		{
-			segment: newExecutionSegmentFromString("0:1/3"),
-			start:   time.Millisecond * 20,
-			steps:   []int64{40, 60, 60, 60, 60, 60, 60},
+			segment:                newExecutionSegmentFromString("0:1/3"),
+			wantExecutionStartTime: time.Millisecond * 20,
+			steps:                  []int64{40, 60, 60, 60, 60, 60, 60},
 		},
 		// {
 		// 	segment: newExecutionSegmentFromString("1/3:2/3"),
@@ -195,38 +195,54 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 
 		t.Run(fmt.Sprintf("segment %s sequence %s", test.segment, test.sequence), func(t *testing.T) {
 			t.Parallel()
+
 			et, err := lib.NewExecutionTuple(test.segment, test.sequence)
 			require.NoError(t, err)
 			es := lib.NewExecutionState(lib.Options{
 				ExecutionSegment:         test.segment,
 				ExecutionSegmentSequence: test.sequence,
 			}, et, 10, 50)
-			var count int64
+			var numberOfRuns int64
 			seconds := 2
 			config := getTestConstantArrivalRateConfig()
-			config.clock = clock.NewMock()
-
+			mockClock := clock.New()
+			config.clock = mockClock
 			config.Duration.Duration = types.Duration(time.Second * time.Duration(seconds))
 			newET, err := es.ExecutionTuple.GetNewExecutionTupleFromValue(config.MaxVUs.Int64)
 			require.NoError(t, err)
-			rateScaled := newET.ScaleInt64(config.Rate.Int64)
-			startTime := time.Now()
-			expectedTimeInt64 := int64(test.start)
+			// FIXME: Ignore above
+
+			numberOfIterationsPerSegment := newET.ScaleInt64(config.Rate.Int64)
+			startTime := config.clock.Now()
+			expectedTimeInt64 := int64(test.wantExecutionStartTime)
 			ctx, cancel, executor, logHook := setupExecutor(
 				t, config, es,
 				simpleRunner(func(ctx context.Context) error {
-					current := atomic.AddInt64(&count, 1)
+					// HERE we don't care about what the runner does.
+					// Instead, we're verifying that the executor interacts
+					// with it at the moment(s) we expect. Because the role
+					// of the executor as we understand it, is to do just that:
+					// execute our VU script code at the right moment and interval (Orchestrator).
+					//
+					// simpleRunner = 1 iteration (synonyms)
+					//
+					// * simpleRunner, here, registers itself as running through the count
+					//   atomic variable
+					currentRunCount := atomic.AddInt64(&numberOfRuns, 1)
 
-					expectedTime := test.start
-					if current != 1 {
-						expectedTime = time.Duration(atomic.AddInt64(&expectedTimeInt64,
-							int64(time.Millisecond)*test.steps[(current-2)%int64(len(test.steps))]))
+					fmt.Printf("currentRunCount=%d\n", currentRunCount)
+
+					expectedRunTime := test.wantExecutionStartTime
+					if currentRunCount != 1 {
+						// et = et + {value at step X} ms
+						expectedRunTime = time.Duration(atomic.AddInt64(&expectedTimeInt64, int64(time.Millisecond)*test.steps[(currentRunCount-2)%int64(len(test.steps))]))
 					}
+
 					assert.WithinDuration(t,
-						startTime.Add(expectedTime),
-						time.Now(),
-						time.Millisecond*12,
-						"%d expectedTime %s", current, expectedTime,
+						startTime.Add(expectedRunTime),
+						config.clock.Now(),
+						time.Microsecond*2,
+						"%d expectedTime %s", currentRunCount, expectedRunTime,
 					)
 
 					return nil
@@ -236,15 +252,19 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 			defer cancel()
 			var wg sync.WaitGroup
 			wg.Add(1)
+
+			// This is some testing-oriented control execut
 			go func() {
 				defer wg.Done()
 				// check that we got around the amount of VU iterations as we would expect
-				var currentCount int64
+				var currentRunCount int64 = 0
 
 				for i := 0; i < seconds; i++ {
 					time.Sleep(time.Second)
-					currentCount = atomic.LoadInt64(&count)
-					assert.InDelta(t, int64(i+1)*rateScaled, currentCount, 3)
+					currentRunCount = atomic.LoadInt64(&numberOfRuns) // Read NumberOfRuns
+					// TODO: put the comment, why here is 3
+					fmt.Printf("numberOfIterationsPerSegment=%d, currentRunCount=%d\n", numberOfIterationsPerSegment, currentRunCount)
+					assert.InDelta(t, int64(i+1)*numberOfIterationsPerSegment, currentRunCount, 3) // Is NumberOfRuns within
 				}
 			}()
 			startTime = time.Now()
