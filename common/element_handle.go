@@ -231,7 +231,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 			return injected.checkHitTargetAt(node, point);
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -257,7 +257,7 @@ func (h *ElementHandle) checkElementState(apiCtx context.Context, state string) 
 			return injected.checkElementState(node, state);
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -378,7 +378,7 @@ func (h *ElementHandle) dispatchEvent(apiCtx context.Context, typ string, eventI
 			injected.dispatchEvent(node, type, eventInit);
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -392,7 +392,7 @@ func (h *ElementHandle) fill(apiCtx context.Context, value string) (interface{},
 			return injected.fill(node, value);
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -415,7 +415,7 @@ func (h *ElementHandle) focus(apiCtx context.Context, resetSelectionIfNotFocused
 			return injected.focusNode(node, resetSelectionIfNotFocused);
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -438,7 +438,7 @@ func (h *ElementHandle) getAttribute(apiCtx context.Context, name string) (inter
 			return element.getAttribute('` + name + `');
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -455,7 +455,7 @@ func (h *ElementHandle) innerHTML(apiCtx context.Context) (interface{}, error) {
 			return element.innerHTML;
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -468,7 +468,7 @@ func (h *ElementHandle) innerText(apiCtx context.Context) (interface{}, error) {
 			return element.innerText;
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -484,7 +484,7 @@ func (h *ElementHandle) inputValue(apiCtx context.Context) (interface{}, error) 
 			return element.value;
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -521,7 +521,7 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 			return injected.getElementBorderWidth(node);
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -685,7 +685,7 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values goja.Value) 
 			return injected.selectOptions(node, values);
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
@@ -708,7 +708,7 @@ func (h *ElementHandle) selectText(apiCtx context.Context) error {
 			return injected.selectText(node);
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -760,7 +760,7 @@ func (h *ElementHandle) textContent(apiCtx context.Context) (interface{}, error)
 			return element.textContent;
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -787,7 +787,7 @@ func (h *ElementHandle) waitAndScrollIntoViewIfNeeded(apiCtx context.Context, fo
 				return [window.scrollX, window.scrollY];
 			}
 		`
-		opts := evaluateOptions{
+		opts := evalOptions{
 			forceCallable: true,
 			returnByValue: true,
 		}
@@ -807,7 +807,7 @@ func (h *ElementHandle) waitForElementState(apiCtx context.Context, states []str
 			return injected.waitForElementStates(node, states, timeout);
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
@@ -839,7 +839,7 @@ func (h *ElementHandle) waitForSelector(apiCtx context.Context, selector string,
 			return injected.waitForSelector(selector, node, strict, state, 'raf', timeout, ...args);
 		}
 	`
-	eopts := evaluateOptions{
+	eopts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
@@ -1111,7 +1111,7 @@ func (h *ElementHandle) OwnerFrame() api.Frame {
 			return injected.getDocumentElement(node);
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
@@ -1167,7 +1167,7 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 			return injected.querySelector(selector, node || document, false);
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
@@ -1203,7 +1203,7 @@ func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 			return injected.querySelectorAll(selector, node || document, false);
 		}
 	`
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
@@ -1402,7 +1402,7 @@ func (h *ElementHandle) WaitForSelector(selector string, opts goja.Value) api.El
 // The js code can call helper functions from injected_script.js.
 func (h *ElementHandle) evalWithScript(
 	ctx context.Context,
-	opts evaluateOptions, js string, args ...interface{},
+	opts evalOptions, js string, args ...interface{},
 ) (interface{}, error) {
 	script, err := h.execCtx.getInjectedScript(h.ctx)
 	if err != nil {
@@ -1415,7 +1415,7 @@ func (h *ElementHandle) evalWithScript(
 // eval evaluates the given js code in the scope of this ElementHandle and returns the result.
 func (h *ElementHandle) eval(
 	ctx context.Context,
-	opts evaluateOptions, js string, args ...interface{},
+	opts evalOptions, js string, args ...interface{},
 ) (interface{}, error) {
 	// passing `h` makes it evaluate js code in the element handle's scope.
 	args = append([]interface{}{h}, args...)
@@ -1424,7 +1424,7 @@ func (h *ElementHandle) eval(
 	for i, arg := range args {
 		gargs[i] = rt.ToValue(arg)
 	}
-	result, err := h.execCtx.evaluate(ctx, opts, rt.ToValue(js), gargs...)
+	result, err := h.execCtx.eval(ctx, opts, rt.ToValue(js), gargs...)
 	if err != nil {
 		err = fmt.Errorf("element handle cannot evaluate: %w", err)
 	}

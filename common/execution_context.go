@@ -49,11 +49,11 @@ func (ew executionWorld) valid() bool {
 	return ew == mainWorld || ew == utilityWorld
 }
 
-type evaluateOptions struct {
+type evalOptions struct {
 	forceCallable, returnByValue bool
 }
 
-func (ea evaluateOptions) String() string {
+func (ea evalOptions) String() string {
 	return fmt.Sprintf("forceCallable:%t returnByValue:%t", ea.forceCallable, ea.returnByValue)
 }
 
@@ -162,11 +162,10 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 	return e.adoptBackendNodeID(node.BackendNodeID)
 }
 
-// evaluate will evaluate provided callable within this execution context
-// and return by value or handle
-func (e *ExecutionContext) evaluate(
+// eval will evaluate provided callable within this execution context and return by value or handle.
+func (e *ExecutionContext) eval(
 	apiCtx context.Context,
-	opts evaluateOptions, pageFunc goja.Value, args ...goja.Value,
+	opts evalOptions, pageFunc goja.Value, args ...goja.Value,
 ) (res interface{}, err error) {
 	e.logger.Debugf(
 		"ExecutionContext:evaluate",
@@ -290,11 +289,11 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 			expressionWithSourceURL = expression + "\n" + suffix
 		}
 
-		opts := evaluateOptions{
+		opts := evalOptions{
 			forceCallable: false,
 			returnByValue: false,
 		}
-		handle, err := e.evaluate(apiCtx, opts, rt.ToValue(expressionWithSourceURL))
+		handle, err := e.eval(apiCtx, opts, rt.ToValue(expressionWithSourceURL))
 		if handle == nil || err != nil {
 			return nil, fmt.Errorf("cannot get injected script (%q): %w", suffix, err)
 		}
@@ -303,28 +302,28 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 	return e.injectedScript, nil
 }
 
-// Evaluate will evaluate provided page function within this execution context
-func (e *ExecutionContext) Evaluate(
+// Eval will evaluate provided page function within this execution context
+func (e *ExecutionContext) Eval(
 	apiCtx context.Context,
 	pageFunc goja.Value, args ...goja.Value,
 ) (interface{}, error) {
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	return e.evaluate(apiCtx, opts, pageFunc, args...)
+	return e.eval(apiCtx, opts, pageFunc, args...)
 }
 
-// EvaluateHandle will evaluate provided page function within this execution context
-func (e *ExecutionContext) EvaluateHandle(
+// EvalHandle will evaluate provided page function within this execution context
+func (e *ExecutionContext) EvalHandle(
 	apiCtx context.Context,
 	pageFunc goja.Value, args ...goja.Value,
 ) (api.JSHandle, error) {
-	opts := evaluateOptions{
+	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
-	res, err := e.evaluate(apiCtx, opts, pageFunc, args...)
+	res, err := e.eval(apiCtx, opts, pageFunc, args...)
 	if err != nil {
 		return nil, err
 	}
