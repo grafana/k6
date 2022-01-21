@@ -1399,8 +1399,8 @@ func (h *ElementHandle) WaitForSelector(selector string, opts goja.Value) api.El
 	return handle
 }
 
-// evalWithScript evaluates a given js function in the scope of this ElementHandle and allows to call the injected
-// script's functions.
+// evalWithScript evaluates the given js code in the scope of this ElementHandle and returns the result.
+// The js code can call helper functions from injected_script.js.
 func (h *ElementHandle) evalWithScript(
 	ctx context.Context,
 	opts evaluateOptions, js string, args ...interface{},
