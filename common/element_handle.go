@@ -1404,12 +1404,10 @@ func (h *ElementHandle) evalWithScript(
 	ctx context.Context,
 	opts evaluateOptions, js string, args ...interface{},
 ) (interface{}, error) {
-	// get the injected script's handle so that js function can call its functions.
 	script, err := h.execCtx.getInjectedScript(h.ctx)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get injected script: %w", err)
 	}
-	// passing `script` allows `js` to use `script`'s functions.
 	args = append([]interface{}{script}, args...)
 	return h.eval(ctx, opts, js, args...)
 }
@@ -1421,13 +1419,11 @@ func (h *ElementHandle) eval(
 ) (interface{}, error) {
 	// passing `h` makes it evaluate js code in the element handle's scope.
 	args = append([]interface{}{h}, args...)
-	// convert the arguments to goja values.
 	rt := k6common.GetRuntime(ctx)
 	gargs := make([]goja.Value, len(args))
 	for i, arg := range args {
 		gargs[i] = rt.ToValue(arg)
 	}
-	// call the javascript function.
 	result, err := h.execCtx.evaluate(ctx, opts, rt.ToValue(js), gargs...)
 	if err != nil {
 		err = fmt.Errorf("element handle cannot evaluate: %w", err)
