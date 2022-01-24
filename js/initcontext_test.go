@@ -344,7 +344,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 
 		assert.NoError(t, r.ParseMultipartForm(32<<20))
 		file, _, err := r.FormFile("file")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		defer func() {
 			assert.NoError(t, file.Close())
 		}()
