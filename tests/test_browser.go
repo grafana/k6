@@ -35,6 +35,7 @@ import (
 	"github.com/stretchr/testify/require"
 	k6common "go.k6.io/k6/js/common"
 	k6http "go.k6.io/k6/js/modules/k6/http"
+	k6modulestest "go.k6.io/k6/js/modulestest"
 	k6lib "go.k6.io/k6/lib"
 	k6metrics "go.k6.io/k6/lib/metrics"
 	k6test "go.k6.io/k6/lib/testutils/httpmultibin"
@@ -104,7 +105,7 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
 	}
 
-	rt := goja.New()
+	rt, _ := getHTTPTestModuleInstance(t, ctx, state)
 
 	// enable the HTTP test server only when necessary
 	var testServer *k6test.HTTPMultiBin
@@ -112,15 +113,11 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 		testServer = k6test.NewHTTPMultiBin(t)
 		state.TLSConfig = testServer.TLSClientConfig
 		state.Transport = testServer.HTTPTransport
-
-		err = rt.Set("http", k6common.Bind(rt, new(k6http.GlobalHTTP).NewModuleInstancePerVU(), &ctx))
-		require.NoError(t, err)
 	}
 
-	// configure the goja
+	// configure goja
 	ctx = k6lib.WithState(ctx, state)
 	ctx = k6common.WithRuntime(ctx, rt)
-	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
 
 	// launch the browser
 	bt := chromium.NewBrowserType(ctx).(*chromium.BrowserType)
@@ -275,3 +272,34 @@ func withFileServer() fileServerOption {
 // withContext is used to detect whether to use a custom context in the test
 // browser.
 type withContext = context.Context
+
+//nolint: golint, revive
+// Copied from https://github.com/grafana/k6/blob/v0.36.0/js/modules/k6/http/http_test.go#L39
+func getHTTPTestModuleInstance(
+	t testing.TB, ctx context.Context, state *k6lib.State,
+) (*goja.Runtime, *k6http.ModuleInstance) {
+	rt := goja.New()
+	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
+
+	if ctx == nil {
+		dummyCtx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+		ctx = dummyCtx
+	}
+
+	root := k6http.New()
+	mockVU := &k6modulestest.VU{
+		RuntimeField: rt,
+		InitEnvField: &k6common.InitEnvironment{
+			Registry: k6metrics.NewRegistry(),
+		},
+		CtxField:   ctx,
+		StateField: state,
+	}
+	mi, ok := root.NewModuleInstance(mockVU).(*k6http.ModuleInstance)
+	require.True(t, ok)
+
+	require.NoError(t, rt.Set("http", mi.Exports().Default))
+
+	return rt, mi
+}
