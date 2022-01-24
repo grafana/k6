@@ -23,6 +23,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -60,6 +61,7 @@ func newExecutionSegmentSequenceFromString(str string) *lib.ExecutionSegmentSequ
 func getTestConstantArrivalRateConfig() *ConstantArrivalRateConfig {
 	return &ConstantArrivalRateConfig{
 		BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(1 * time.Second)},
+		clock:           clock.New(),
 		TimeUnit:        types.NullDurationFrom(time.Second),
 		Rate:            null.IntFrom(50),
 		Duration:        types.NullDurationFrom(5 * time.Second),
@@ -147,46 +149,46 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 			wantExecutionStartTime: time.Millisecond * 20,
 			steps:                  []int64{40, 60, 60, 60, 60, 60, 60},
 		},
-		// {
-		// 	segment: newExecutionSegmentFromString("1/3:2/3"),
-		// 	start:   time.Millisecond * 20,
-		// 	steps:   []int64{60, 60, 60, 60, 60, 60, 40},
-		// },
-		// {
-		// 	segment: newExecutionSegmentFromString("2/3:1"),
-		// 	start:   time.Millisecond * 20,
-		// 	steps:   []int64{40, 60, 60, 60, 60, 60, 60},
-		// },
-		// {
-		// 	segment: newExecutionSegmentFromString("1/6:3/6"),
-		// 	start:   time.Millisecond * 20,
-		// 	steps:   []int64{40, 80, 40, 80, 40, 80, 40},
-		// },
-		// {
-		// 	segment:  newExecutionSegmentFromString("1/6:3/6"),
-		// 	sequence: newExecutionSegmentSequenceFromString("1/6,3/6"),
-		// 	start:    time.Millisecond * 20,
-		// 	steps:    []int64{40, 80, 40, 80, 40, 80, 40},
-		// },
-		// // sequences
-		// {
-		// 	segment:  newExecutionSegmentFromString("0:1/3"),
-		// 	sequence: newExecutionSegmentSequenceFromString("0,1/3,2/3,1"),
-		// 	start:    time.Millisecond * 0,
-		// 	steps:    []int64{60, 60, 60, 60, 60, 60, 40},
-		// },
-		// {
-		// 	segment:  newExecutionSegmentFromString("1/3:2/3"),
-		// 	sequence: newExecutionSegmentSequenceFromString("0,1/3,2/3,1"),
-		// 	start:    time.Millisecond * 20,
-		// 	steps:    []int64{60, 60, 60, 60, 60, 60, 40},
-		// },
-		// {
-		// 	segment:  newExecutionSegmentFromString("2/3:1"),
-		// 	sequence: newExecutionSegmentSequenceFromString("0,1/3,2/3,1"),
-		// 	start:    time.Millisecond * 40,
-		// 	steps:    []int64{60, 60, 60, 60, 60, 100},
-		// },
+		{
+			segment:                newExecutionSegmentFromString("1/3:2/3"),
+			wantExecutionStartTime: time.Millisecond * 20,
+			steps:                  []int64{60, 60, 60, 60, 60, 60, 40},
+		},
+		{
+			segment:                newExecutionSegmentFromString("2/3:1"),
+			wantExecutionStartTime: time.Millisecond * 20,
+			steps:                  []int64{40, 60, 60, 60, 60, 60, 60},
+		},
+		{
+			segment:                newExecutionSegmentFromString("1/6:3/6"),
+			wantExecutionStartTime: time.Millisecond * 20,
+			steps:                  []int64{40, 80, 40, 80, 40, 80, 40},
+		},
+		{
+			segment:                newExecutionSegmentFromString("1/6:3/6"),
+			sequence:               newExecutionSegmentSequenceFromString("1/6,3/6"),
+			wantExecutionStartTime: time.Millisecond * 20,
+			steps:                  []int64{40, 80, 40, 80, 40, 80, 40},
+		},
+		// sequences
+		{
+			segment:                newExecutionSegmentFromString("0:1/3"),
+			sequence:               newExecutionSegmentSequenceFromString("0,1/3,2/3,1"),
+			wantExecutionStartTime: time.Millisecond * 0,
+			steps:                  []int64{60, 60, 60, 60, 60, 60, 40},
+		},
+		{
+			segment:                newExecutionSegmentFromString("1/3:2/3"),
+			sequence:               newExecutionSegmentSequenceFromString("0,1/3,2/3,1"),
+			wantExecutionStartTime: time.Millisecond * 20,
+			steps:                  []int64{60, 60, 60, 60, 60, 60, 40},
+		},
+		{
+			segment:                newExecutionSegmentFromString("2/3:1"),
+			sequence:               newExecutionSegmentSequenceFromString("0,1/3,2/3,1"),
+			wantExecutionStartTime: time.Millisecond * 40,
+			steps:                  []int64{60, 60, 60, 60, 60, 100},
+		},
 	}
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -205,12 +207,11 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 			var numberOfRuns int64
 			seconds := 2
 			config := getTestConstantArrivalRateConfig()
-			mockClock := clock.New()
+			mockClock := clock.NewMock()
 			config.clock = mockClock
 			config.Duration.Duration = types.Duration(time.Second * time.Duration(seconds))
 			newET, err := es.ExecutionTuple.GetNewExecutionTupleFromValue(config.MaxVUs.Int64)
 			require.NoError(t, err)
-			// FIXME: Ignore above
 
 			numberOfIterationsPerSegment := newET.ScaleInt64(config.Rate.Int64)
 			startTime := config.clock.Now()
@@ -230,8 +231,6 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 					//   atomic variable
 					currentRunCount := atomic.AddInt64(&numberOfRuns, 1)
 
-					fmt.Printf("currentRunCount=%d\n", currentRunCount)
-
 					expectedRunTime := test.wantExecutionStartTime
 					if currentRunCount != 1 {
 						// et = et + {value at step X} ms
@@ -241,7 +240,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 					assert.WithinDuration(t,
 						startTime.Add(expectedRunTime),
 						config.clock.Now(),
-						time.Microsecond*2,
+						time.Millisecond*12,
 						"%d expectedTime %s", currentRunCount, expectedRunTime,
 					)
 
@@ -251,25 +250,37 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 
 			defer cancel()
 			var wg sync.WaitGroup
-			wg.Add(1)
 
-			// This is some testing-oriented control execut
+			checkFn := func(step int64) func() {
+				return func() {
+					defer wg.Done()
+					// check that we got around the amount of VU iterations as we would expect
+					currentRunCount := atomic.LoadInt64(&numberOfRuns)                       // Read NumberOfRuns
+					assert.InDelta(t, step*numberOfIterationsPerSegment, currentRunCount, 3) // Is NumberOfRuns within
+				}
+			}
+
+			wg.Add(2)
+			mockClock.AfterFunc(1001*time.Millisecond, checkFn(1))
+			mockClock.AfterFunc(2001*time.Millisecond, checkFn(2))
+
+			startTime = config.clock.Now()
+			engineOut := make(chan stats.SampleContainer, 1000)
+
 			go func() {
-				defer wg.Done()
-				// check that we got around the amount of VU iterations as we would expect
-				var currentRunCount int64 = 0
+				err = executor.Run(ctx, engineOut, builtinMetrics)
+			}()
 
-				for i := 0; i < seconds; i++ {
-					time.Sleep(time.Second)
-					currentRunCount = atomic.LoadInt64(&numberOfRuns) // Read NumberOfRuns
-					// TODO: put the comment, why here is 3
-					fmt.Printf("numberOfIterationsPerSegment=%d, currentRunCount=%d\n", numberOfIterationsPerSegment, currentRunCount)
-					assert.InDelta(t, int64(i+1)*numberOfIterationsPerSegment, currentRunCount, 3) // Is NumberOfRuns within
+			// running the time
+			// TODO: make this as helper
+			go func() {
+				step := 6
+				for i := 0; i < 2100; i += step {
+					mockClock.Add(time.Millisecond * time.Duration(step))
+					runtime.Gosched()
 				}
 			}()
-			startTime = time.Now()
-			engineOut := make(chan stats.SampleContainer, 1000)
-			err = executor.Run(ctx, engineOut, builtinMetrics)
+
 			wg.Wait()
 			require.NoError(t, err)
 			require.Empty(t, logHook.Drain())
@@ -347,6 +358,7 @@ func TestConstantArrivalRateDroppedIterations(t *testing.T) {
 		Duration:        types.NullDurationFrom(950 * time.Millisecond),
 		PreAllocatedVUs: null.IntFrom(5),
 		MaxVUs:          null.IntFrom(5),
+		clock:           clock.New(),
 	}
 
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
@@ -381,6 +393,7 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 		Duration:        types.NullDurationFrom(1 * time.Second),
 		PreAllocatedVUs: null.IntFrom(5),
 		MaxVUs:          null.IntFrom(5),
+		clock:           clock.New(),
 	}
 
 	testCases := []struct {

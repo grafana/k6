@@ -27,6 +27,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/errext"
@@ -205,14 +206,24 @@ func getIterationRunner(
 func getDurationContexts(parentCtx context.Context, regularDuration, gracefulStop time.Duration) (
 	startTime time.Time, maxDurationCtx, regDurationCtx context.Context, maxDurationCancel func(),
 ) {
-	startTime = time.Now()
+	return getDurationContextsUsingClock(parentCtx, clock.New(), regularDuration, gracefulStop)
+}
+
+func getDurationContextsUsingClock(
+	parentCtx context.Context,
+	clock clock.Clock,
+	regularDuration, gracefulStop time.Duration,
+) (
+	startTime time.Time, maxDurationCtx, regDurationCtx context.Context, maxDurationCancel func(),
+) {
+	startTime = clock.Now()
 	maxEndTime := startTime.Add(regularDuration + gracefulStop)
 
-	maxDurationCtx, maxDurationCancel = context.WithDeadline(parentCtx, maxEndTime)
+	maxDurationCtx, maxDurationCancel = clock.WithDeadline(parentCtx, maxEndTime)
 	if gracefulStop == 0 {
 		return startTime, maxDurationCtx, maxDurationCtx, maxDurationCancel
 	}
-	regDurationCtx, _ = context.WithDeadline(maxDurationCtx, startTime.Add(regularDuration)) //nolint:govet
+	regDurationCtx, _ = clock.WithDeadline(maxDurationCtx, startTime.Add(regularDuration))
 	return startTime, maxDurationCtx, regDurationCtx, maxDurationCancel
 }
 

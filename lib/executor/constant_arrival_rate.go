@@ -237,7 +237,12 @@ func (car ConstantArrivalRate) Run(
 	activeVUsWg := &sync.WaitGroup{}
 
 	returnedVUs := make(chan struct{})
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContextsUsingClock(
+		parentCtx,
+		car.config.clock,
+		duration,
+		gracefulStop,
+	)
 
 	vusPool := newActiveVUPool()
 	defer func() {
@@ -344,7 +349,7 @@ func (car ConstantArrivalRate) Run(
 	greaterInterval := start
 
 	for ; ; lowerInterval, greaterInterval = lowerInterval+1, greaterInterval+offsets[lowerInterval%len(offsets)] {
-		t := notScaledTickerPeriod*time.Duration(greaterInterval) - time.Since(startTime)
+		t := notScaledTickerPeriod*time.Duration(greaterInterval) - car.config.clock.Since(startTime)
 		timer.Reset(t)
 		select {
 		case <-timer.C:
