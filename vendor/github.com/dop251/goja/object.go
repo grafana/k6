@@ -142,7 +142,7 @@ func (p *PropertyDescriptor) complete() {
 type objectExportCacheItem map[reflect.Type]interface{}
 
 type objectExportCtx struct {
-	cache map[objectImpl]interface{}
+	cache map[*Object]interface{}
 }
 
 type objectImpl interface {
@@ -193,6 +193,8 @@ type objectImpl interface {
 
 	export(ctx *objectExportCtx) interface{}
 	exportType() reflect.Type
+	exportToMap(m reflect.Value, typ reflect.Type, ctx *objectExportCtx) error
+	exportToArrayOrSlice(s reflect.Value, typ reflect.Type, ctx *objectExportCtx) error
 	equal(objectImpl) bool
 
 	iterateStringKeys() iterNextFunc
@@ -943,12 +945,12 @@ func (o *baseObject) swap(i, j int64) {
 }
 
 func (o *baseObject) export(ctx *objectExportCtx) interface{} {
-	if v, exists := ctx.get(o); exists {
+	if v, exists := ctx.get(o.val); exists {
 		return v
 	}
 	keys := o.stringKeys(false, nil)
 	m := make(map[string]interface{}, len(keys))
-	ctx.put(o, m)
+	ctx.put(o.val, m)
 	for _, itemName := range keys {
 		itemNameStr := itemName.String()
 		v := o.val.self.getStr(itemName.string(), nil)
@@ -964,6 +966,114 @@ func (o *baseObject) export(ctx *objectExportCtx) interface{} {
 
 func (o *baseObject) exportType() reflect.Type {
 	return reflectTypeMap
+}
+
+func genericExportToMap(o *Object, dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
+	if dst.IsNil() {
+		dst.Set(reflect.MakeMap(typ))
+	}
+	ctx.putTyped(o, typ, dst.Interface())
+	keyTyp := typ.Key()
+	elemTyp := typ.Elem()
+	needConvertKeys := !reflectTypeString.AssignableTo(keyTyp)
+	iter := &enumerableIter{
+		o:       o,
+		wrapped: o.self.iterateStringKeys(),
+	}
+	r := o.runtime
+	for item, next := iter.next(); next != nil; item, next = next() {
+		var kv reflect.Value
+		var err error
+		if needConvertKeys {
+			kv = reflect.New(keyTyp).Elem()
+			err = r.toReflectValue(item.name, kv, ctx)
+			if err != nil {
+				return fmt.Errorf("could not convert map key %s to %v: %w", item.name.String(), typ, err)
+			}
+		} else {
+			kv = reflect.ValueOf(item.name.String())
+		}
+
+		ival := o.self.getStr(item.name.string(), nil)
+		if ival != nil {
+			vv := reflect.New(elemTyp).Elem()
+			err = r.toReflectValue(ival, vv, ctx)
+			if err != nil {
+				return fmt.Errorf("could not convert map value %v to %v at key %s: %w", ival, typ, item.name.String(), err)
+			}
+			dst.SetMapIndex(kv, vv)
+		} else {
+			dst.SetMapIndex(kv, reflect.Zero(elemTyp))
+		}
+	}
+
+	return nil
+}
+
+func (o *baseObject) exportToMap(m reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
+	return genericExportToMap(o.val, m, typ, ctx)
+}
+
+func genericExportToArrayOrSlice(o *Object, dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) (err error) {
+	r := o.runtime
+
+	if method := toMethod(r.getV(o, SymIterator)); method != nil {
+		// iterable
+
+		var values []Value
+		// cannot change (append to) the slice once it's been put into the cache, so we need to know its length beforehand
+		ex := r.try(func() {
+			values = r.iterableToList(o, method)
+		})
+		if ex != nil {
+			return ex
+		}
+		if dst.Len() != len(values) {
+			if typ.Kind() == reflect.Array {
+				return fmt.Errorf("cannot convert an iterable into an array, lengths mismatch (have %d, need %d)", len(values), dst.Len())
+			} else {
+				dst.Set(reflect.MakeSlice(typ, len(values), len(values)))
+			}
+		}
+		ctx.putTyped(o, typ, dst.Interface())
+		for i, val := range values {
+			err = r.toReflectValue(val, dst.Index(i), ctx)
+			if err != nil {
+				return
+			}
+		}
+	} else {
+		// array-like
+		var lp Value
+		if _, ok := o.self.assertCallable(); !ok {
+			lp = o.self.getStr("length", nil)
+		}
+		if lp == nil {
+			return fmt.Errorf("cannot convert %v to %v: not an array or iterable", o, typ)
+		}
+		l := toIntStrict(toLength(lp))
+		if dst.Len() != l {
+			if typ.Kind() == reflect.Array {
+				return fmt.Errorf("cannot convert an array-like object into an array, lengths mismatch (have %d, need %d)", l, dst.Len())
+			} else {
+				dst.Set(reflect.MakeSlice(typ, l, l))
+			}
+		}
+		ctx.putTyped(o, typ, dst.Interface())
+		for i := 0; i < l; i++ {
+			val := nilSafe(o.self.getIdx(valueInt(i), nil))
+			err = r.toReflectValue(val, dst.Index(i), ctx)
+			if err != nil {
+				return
+			}
+		}
+	}
+
+	return
+}
+
+func (o *baseObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
+	return genericExportToArrayOrSlice(o.val, dst, typ, ctx)
 }
 
 type enumerableFlag int
@@ -1561,10 +1671,10 @@ func (o *guardedObject) deleteStr(name unistring.String, throw bool) bool {
 	return res
 }
 
-func (ctx *objectExportCtx) get(key objectImpl) (interface{}, bool) {
+func (ctx *objectExportCtx) get(key *Object) (interface{}, bool) {
 	if v, exists := ctx.cache[key]; exists {
 		if item, ok := v.(objectExportCacheItem); ok {
-			r, exists := item[key.exportType()]
+			r, exists := item[key.self.exportType()]
 			return r, exists
 		} else {
 			return v, true
@@ -1573,7 +1683,7 @@ func (ctx *objectExportCtx) get(key objectImpl) (interface{}, bool) {
 	return nil, false
 }
 
-func (ctx *objectExportCtx) getTyped(key objectImpl, typ reflect.Type) (interface{}, bool) {
+func (ctx *objectExportCtx) getTyped(key *Object, typ reflect.Type) (interface{}, bool) {
 	if v, exists := ctx.cache[key]; exists {
 		if item, ok := v.(objectExportCacheItem); ok {
 			r, exists := item[typ]
@@ -1587,20 +1697,20 @@ func (ctx *objectExportCtx) getTyped(key objectImpl, typ reflect.Type) (interfac
 	return nil, false
 }
 
-func (ctx *objectExportCtx) put(key objectImpl, value interface{}) {
+func (ctx *objectExportCtx) put(key *Object, value interface{}) {
 	if ctx.cache == nil {
-		ctx.cache = make(map[objectImpl]interface{})
+		ctx.cache = make(map[*Object]interface{})
 	}
 	if item, ok := ctx.cache[key].(objectExportCacheItem); ok {
-		item[key.exportType()] = value
+		item[key.self.exportType()] = value
 	} else {
 		ctx.cache[key] = value
 	}
 }
 
-func (ctx *objectExportCtx) putTyped(key objectImpl, typ reflect.Type, value interface{}) {
+func (ctx *objectExportCtx) putTyped(key *Object, typ reflect.Type, value interface{}) {
 	if ctx.cache == nil {
-		ctx.cache = make(map[objectImpl]interface{})
+		ctx.cache = make(map[*Object]interface{})
 	}
 	v, exists := ctx.cache[key]
 	if exists {
@@ -1608,7 +1718,7 @@ func (ctx *objectExportCtx) putTyped(key objectImpl, typ reflect.Type, value int
 			item[typ] = value
 		} else {
 			m := make(objectExportCacheItem, 2)
-			m[key.exportType()] = v
+			m[key.self.exportType()] = v
 			m[typ] = value
 			ctx.cache[key] = m
 		}

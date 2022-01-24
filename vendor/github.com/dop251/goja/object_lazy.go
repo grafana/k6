@@ -253,6 +253,18 @@ func (o *lazyObject) exportType() reflect.Type {
 	return obj.exportType()
 }
 
+func (o *lazyObject) exportToMap(m reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
+	obj := o.create(o.val)
+	o.val.self = obj
+	return obj.exportToMap(m, typ, ctx)
+}
+
+func (o *lazyObject) exportToArrayOrSlice(s reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
+	obj := o.create(o.val)
+	o.val.self = obj
+	return obj.exportToArrayOrSlice(s, typ, ctx)
+}
+
 func (o *lazyObject) equal(other objectImpl) bool {
 	obj := o.create(o.val)
 	o.val.self = obj

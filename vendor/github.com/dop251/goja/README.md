@@ -3,7 +3,7 @@ goja
 
 ECMAScript 5.1(+) implementation in Go.
 
-[![GoDoc](https://godoc.org/github.com/dop251/goja?status.svg)](https://godoc.org/github.com/dop251/goja)
+[![Go Reference](https://pkg.go.dev/badge/github.com/dop251/goja.svg)](https://pkg.go.dev/github.com/dop251/goja)
 
 Goja is an implementation of ECMAScript 5.1 in pure Go with emphasis on standard compliance and
 performance.
@@ -17,7 +17,7 @@ Features
 
  * Full ECMAScript 5.1 support (including regex and strict mode).
  * Passes nearly all [tc39 tests](https://github.com/tc39/test262) for the features implemented so far. The goal is to
-   pass all of them. Note, the current working commit is https://github.com/tc39/test262/commit/26f1f4567ee7e33163d961c867d689173cbb9065.
+   pass all of them. See .tc39_test262_checkout.sh for the latest working commit id.
  * Capable of running Babel, Typescript compiler and pretty much anything written in ES5.
  * Sourcemaps.
  * Most of ES6 functionality, still work in progress, see https://github.com/dop251/goja/milestone/1?closed=1
@@ -153,13 +153,13 @@ if num := v.Export().(int64); num != 4 {
 
 Passing Values to JS
 --------------------
-Any Go value can be passed to JS using Runtime.ToValue() method. See the method's [documentation](https://godoc.org/github.com/dop251/goja#Runtime.ToValue) for more details.
+Any Go value can be passed to JS using Runtime.ToValue() method. See the method's [documentation](https://pkg.go.dev/github.com/dop251/goja#Runtime.ToValue) for more details.
 
 Exporting Values from JS
 ------------------------
 A JS value can be exported into its default Go representation using Value.Export() method.
 
-Alternatively it can be exported into a specific Go variable using [Runtime.ExportTo()](https://godoc.org/github.com/dop251/goja#Runtime.ExportTo) method.
+Alternatively it can be exported into a specific Go variable using [Runtime.ExportTo()](https://pkg.go.dev/github.com/dop251/goja#Runtime.ExportTo) method.
 
 Within a single export operation the same Object will be represented by the same Go value (either the same map, slice or
 a pointer to the same struct). This includes circular objects and makes it possible to export them.
@@ -168,7 +168,7 @@ Calling JS functions from Go
 ----------------------------
 There are 2 approaches:
 
-- Using [AssertFunction()](https://godoc.org/github.com/dop251/goja#AssertFunction):
+- Using [AssertFunction()](https://pkg.go.dev/github.com/dop251/goja#AssertFunction):
 ```go
 vm := New()
 _, err := vm.RunString(`
@@ -191,7 +191,7 @@ if err != nil {
 fmt.Println(res)
 // Output: 42
 ```
-- Using [Runtime.ExportTo()](https://godoc.org/github.com/dop251/goja#Runtime.ExportTo):
+- Using [Runtime.ExportTo()](https://pkg.go.dev/github.com/dop251/goja#Runtime.ExportTo):
 ```go
 const SCRIPT = `
 function f(param) {
@@ -222,7 +222,7 @@ Mapping struct field and method names
 -------------------------------------
 By default, the names are passed through as is which means they are capitalised. This does not match
 the standard JavaScript naming convention, so if you need to make your JS code look more natural or if you are
-dealing with a 3rd party library, you can use a [FieldNameMapper](https://godoc.org/github.com/dop251/goja#FieldNameMapper):
+dealing with a 3rd party library, you can use a [FieldNameMapper](https://pkg.go.dev/github.com/dop251/goja#FieldNameMapper):
 
 ```go
 vm := New()
@@ -236,14 +236,14 @@ fmt.Println(res.Export())
 // Output: 42
 ```
 
-There are two standard mappers: [TagFieldNameMapper](https://godoc.org/github.com/dop251/goja#TagFieldNameMapper) and
-[UncapFieldNameMapper](https://godoc.org/github.com/dop251/goja#UncapFieldNameMapper), or you can use your own implementation.
+There are two standard mappers: [TagFieldNameMapper](https://pkg.go.dev/github.com/dop251/goja#TagFieldNameMapper) and
+[UncapFieldNameMapper](https://pkg.go.dev/github.com/dop251/goja#UncapFieldNameMapper), or you can use your own implementation.
 
 Native Constructors
 -------------------
 
 In order to implement a constructor function in Go use `func (goja.ConstructorCall) *goja.Object`.
-See [Runtime.ToValue()](https://godoc.org/github.com/dop251/goja#Runtime.ToValue) documentation for more details.
+See [Runtime.ToValue()](https://pkg.go.dev/github.com/dop251/goja#Runtime.ToValue) documentation for more details.
 
 Regular Expressions
 -------------------

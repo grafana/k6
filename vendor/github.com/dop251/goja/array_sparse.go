@@ -1,6 +1,7 @@
 package goja
 
 import (
+	"fmt"
 	"math"
 	"math/bits"
 	"reflect"
@@ -420,11 +421,11 @@ func (a *sparseArrayObject) sortLen() int64 {
 }
 
 func (a *sparseArrayObject) export(ctx *objectExportCtx) interface{} {
-	if v, exists := ctx.get(a); exists {
+	if v, exists := ctx.get(a.val); exists {
 		return v
 	}
 	arr := make([]interface{}, a.length)
-	ctx.put(a, arr)
+	ctx.put(a.val, arr)
 	var prevIdx uint32
 	for _, item := range a.items {
 		idx := item.idx
@@ -456,4 +457,35 @@ func (a *sparseArrayObject) export(ctx *objectExportCtx) interface{} {
 
 func (a *sparseArrayObject) exportType() reflect.Type {
 	return reflectTypeArray
+}
+
+func (a *sparseArrayObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
+	r := a.val.runtime
+	if iter := a.getSym(SymIterator, nil); iter == r.global.arrayValues || iter == nil {
+		l := toIntStrict(int64(a.length))
+		if dst.Len() != l {
+			if typ.Kind() == reflect.Array {
+				return fmt.Errorf("cannot convert an Array into an array, lengths mismatch (have %d, need %d)", l, dst.Len())
+			} else {
+				dst.Set(reflect.MakeSlice(typ, l, l))
+			}
+		}
+		ctx.putTyped(a.val, typ, dst.Interface())
+		for _, item := range a.items {
+			val := item.value
+			if p, ok := val.(*valueProperty); ok {
+				val = p.get(a.val)
+			}
+			idx := toIntStrict(int64(item.idx))
+			if idx >= l {
+				break
+			}
+			err := r.toReflectValue(val, dst.Index(idx), ctx)
+			if err != nil {
+				return fmt.Errorf("could not convert array element %v to %v at %d: %w", item.value, typ, idx, err)
+			}
+		}
+		return nil
+	}
+	return a.baseObject.exportToArrayOrSlice(dst, typ, ctx)
 }

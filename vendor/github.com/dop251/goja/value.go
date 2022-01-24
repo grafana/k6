@@ -53,6 +53,21 @@ var (
 
 var intCache [256]Value
 
+// Value represents an ECMAScript value.
+//
+// Export returns a "plain" Go value which type depends on the type of the Value.
+//
+// For integer numbers it's int64.
+//
+// For any other numbers (including Infinities, NaN and negative zero) it's float64.
+//
+// For string it's a string. Note that unicode strings are converted into UTF-8 with invalid code points replaced with utf8.RuneError.
+//
+// For boolean it's bool.
+//
+// For null and undefined it's nil.
+//
+// For Object it depends on the Object type, see Object.Export() for more details.
 type Value interface {
 	ToInteger() int64
 	toString() valueString
@@ -731,8 +746,28 @@ func (o *Object) baseObject(*Runtime) *Object {
 	return o
 }
 
-// Export the Object to a plain Go type. The returned value will be map[string]interface{} unless
-// the Object is a wrapped Go value (created using ToValue()).
+// Export the Object to a plain Go type.
+// If the Object is a wrapped Go value (created using ToValue()) returns the original value.
+//
+// If the Object is a function, returns func(FunctionCall) Value. Note that exceptions thrown inside the function
+// result in panics, which can also leave the Runtime in an unusable state. Therefore, these values should only
+// be used inside another ES function implemented in Go. For calling a function from Go, use AssertFunction() or
+// Runtime.ExportTo() as described in the README.
+//
+// For a Map, returns the list of entries as [][2]interface{}.
+//
+// For a Set, returns the list of elements as []interface{}.
+//
+// For a Proxy, returns Proxy.
+//
+// For a Promise, returns Promise.
+//
+// For a DynamicObject or a DynamicArray, returns the underlying handler.
+//
+// For an array, returns its items as []interface{}.
+//
+// In all other cases returns own enumerable non-symbol properties as map[string]interface{}.
+//
 // This method will panic with an *Exception if a JavaScript exception is thrown in the process.
 func (o *Object) Export() (ret interface{}) {
 	o.runtime.tryPanic(func() {
@@ -742,6 +777,7 @@ func (o *Object) Export() (ret interface{}) {
 	return
 }
 
+// ExportType returns the type of the value that is returned by Export().
 func (o *Object) ExportType() reflect.Type {
 	return o.self.exportType()
 }

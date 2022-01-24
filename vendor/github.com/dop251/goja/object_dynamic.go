@@ -483,6 +483,14 @@ func (o *dynamicObject) exportType() reflect.Type {
 	return reflect.TypeOf(o.d)
 }
 
+func (o *baseDynamicObject) exportToMap(dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
+	return genericExportToMap(o.val, dst, typ, ctx)
+}
+
+func (o *baseDynamicObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
+	return genericExportToArrayOrSlice(o.val, dst, typ, ctx)
+}
+
 func (o *dynamicObject) equal(impl objectImpl) bool {
 	if other, ok := impl.(*dynamicObject); ok {
 		return o.d == other.d
