@@ -1463,6 +1463,8 @@ Export()'ed and therefore copied. This may result in an unexpected behaviour in 
  `)
  fmt.Println(m["obj"].(map[string]interface{})["test"]) // prints "false"
 
+Non-addressable structs, slices and arrays get copied (as if they were passed as a function parameter, by value).
+
 Notes on individual types:
 
 Primitive types
@@ -1539,8 +1541,7 @@ Structs
 Structs are converted to Object-like values. Fields and methods are available as properties, their values are
 results of this method (ToValue()) applied to the corresponding Go value.
 
-Field properties are writable (if the struct is addressable) and non-configurable.
-Method properties are non-writable and non-configurable.
+Field properties are writable and non-configurable. Method properties are non-writable and non-configurable.
 
 Attempt to define a new property or delete an existing property will fail (throw in strict mode) unless it's a Symbol
 property. Symbol properties only exist in the wrapper and do not affect the underlying Go value.
@@ -1610,6 +1611,11 @@ prototype and all the usual methods should work. There is, however, a caveat: co
 an index < length will set it to a zero value (but the property will remain). Nil slice elements are be converted to
 `null`. Accessing an element beyond `length` returns `undefined`. Also see the warning above about passing slices as
 values (as opposed to pointers).
+
+Arrays
+
+Arrays are converted similarly to slices, except the resulting Arrays are not resizable (and therefore the 'length'
+property is non-writable).
 
 Any other type is converted to a generic reflect based host object. Depending on the underlying type it behaves similar
 to a Number, String, Boolean or Object.
@@ -1767,15 +1773,31 @@ func (r *Runtime) ToValue(i interface{}) Value {
 				return obj
 			}
 		}
-	case reflect.Slice:
+	case reflect.Array:
 		obj := &Object{runtime: r}
-		a := &objectGoSliceReflect{
+		a := &objectGoArrayReflect{
 			objectGoReflect: objectGoReflect{
 				baseObject: baseObject{
 					val: obj,
 				},
 				origValue: origValue,
 				value:     value,
+			},
+		}
+		a.init()
+		obj.self = a
+		return obj
+	case reflect.Slice:
+		obj := &Object{runtime: r}
+		a := &objectGoSliceReflect{
+			objectGoArrayReflect: objectGoArrayReflect{
+				objectGoReflect: objectGoReflect{
+					baseObject: baseObject{
+						val: obj,
+					},
+					origValue: origValue,
+					value:     value,
+				},
 			},
 		}
 		a.init()
@@ -1822,7 +1844,6 @@ func (r *Runtime) wrapReflectFunc(value reflect.Value) func(FunctionCall) Value 
 			in = make([]reflect.Value, l)
 		}
 
-		callSlice := false
 		for i, a := range call.Arguments {
 			var t reflect.Type
 
@@ -1839,34 +1860,15 @@ func (r *Runtime) wrapReflectFunc(value reflect.Value) func(FunctionCall) Value 
 				t = typ.In(n)
 			}
 
-			// if this is a variadic Go function, and the caller has supplied
-			// exactly the number of JavaScript arguments required, and this
-			// is the last JavaScript argument, try treating the it as the
-			// actual set of variadic Go arguments. if that succeeds, break
-			// out of the loop.
-			if typ.IsVariadic() && len(call.Arguments) == nargs && i == nargs-1 {
-				v := reflect.New(typ.In(n)).Elem()
-				if err := r.toReflectValue(a, v, &objectExportCtx{}); err == nil {
-					in[i] = v
-					callSlice = true
-					break
-				}
-			}
 			v := reflect.New(t).Elem()
 			err := r.toReflectValue(a, v, &objectExportCtx{})
 			if err != nil {
-				panic(r.newError(r.global.TypeError, "could not convert function call parameter %v to %v", a, t))
+				panic(r.NewTypeError("could not convert function call parameter %d: %v", i, err))
 			}
 			in[i] = v
 		}
 
-		var out []reflect.Value
-		if callSlice {
-			out = value.CallSlice(in)
-		} else {
-			out = value.Call(in)
-		}
-
+		out := value.Call(in)
 		if len(out) == 0 {
 			return _undefined
 		}
@@ -2012,84 +2014,31 @@ func (r *Runtime) toReflectValue(v Value, dst reflect.Value, ctx *objectExportCt
 	case reflect.Float32:
 		dst.Set(reflect.ValueOf(toFloat32(v)).Convert(typ))
 		return nil
-	case reflect.Slice:
+	case reflect.Slice, reflect.Array:
 		if o, ok := v.(*Object); ok {
-			if o.self.className() == classArray {
-				if v, exists := ctx.getTyped(o.self, typ); exists {
-					dst.Set(reflect.ValueOf(v))
-					return nil
-				}
-				l := int(toLength(o.self.getStr("length", nil)))
-				if dst.IsNil() || dst.Len() != l {
-					dst.Set(reflect.MakeSlice(typ, l, l))
-				}
-				s := dst
-				ctx.putTyped(o.self, typ, s.Interface())
-				for i := 0; i < l; i++ {
-					item := o.self.getIdx(valueInt(int64(i)), nil)
-					err := r.toReflectValue(item, s.Index(i), ctx)
-					if err != nil {
-						return fmt.Errorf("could not convert array element %v to %v at %d: %w", v, typ, i, err)
-					}
-				}
-				return nil
-			}
-		}
-	case reflect.Map:
-		if o, ok := v.(*Object); ok {
-			if v, exists := ctx.getTyped(o.self, typ); exists {
+			if v, exists := ctx.getTyped(o, typ); exists {
 				dst.Set(reflect.ValueOf(v))
 				return nil
 			}
-			if dst.IsNil() {
-				dst.Set(reflect.MakeMap(typ))
+			return o.self.exportToArrayOrSlice(dst, typ, ctx)
+		}
+	case reflect.Map:
+		if o, ok := v.(*Object); ok {
+			if v, exists := ctx.getTyped(o, typ); exists {
+				dst.Set(reflect.ValueOf(v))
+				return nil
 			}
-			m := dst
-			ctx.putTyped(o.self, typ, m.Interface())
-			keyTyp := typ.Key()
-			elemTyp := typ.Elem()
-			needConvertKeys := !reflect.ValueOf("").Type().AssignableTo(keyTyp)
-			iter := &enumerableIter{
-				o:       o,
-				wrapped: o.self.iterateStringKeys(),
-			}
-			for item, next := iter.next(); next != nil; item, next = next() {
-				var kv reflect.Value
-				var err error
-				if needConvertKeys {
-					kv = reflect.New(keyTyp).Elem()
-					err = r.toReflectValue(item.name, kv, ctx)
-					if err != nil {
-						return fmt.Errorf("could not convert map key %s to %v", item.name.String(), typ)
-					}
-				} else {
-					kv = reflect.ValueOf(item.name.String())
-				}
-
-				ival := o.self.getStr(item.name.string(), nil)
-				if ival != nil {
-					vv := reflect.New(elemTyp).Elem()
-					err := r.toReflectValue(ival, vv, ctx)
-					if err != nil {
-						return fmt.Errorf("could not convert map value %v to %v at key %s", ival, typ, item.name.String())
-					}
-					m.SetMapIndex(kv, vv)
-				} else {
-					m.SetMapIndex(kv, reflect.Zero(elemTyp))
-				}
-			}
-
-			return nil
+			return o.self.exportToMap(dst, typ, ctx)
 		}
 	case reflect.Struct:
 		if o, ok := v.(*Object); ok {
 			t := reflect.PtrTo(typ)
-			if v, exists := ctx.getTyped(o.self, t); exists {
+			if v, exists := ctx.getTyped(o, t); exists {
 				dst.Set(reflect.ValueOf(v).Elem())
 				return nil
 			}
 			s := dst
-			ctx.putTyped(o.self, t, s.Addr().Interface())
+			ctx.putTyped(o, t, s.Addr().Interface())
 			for i := 0; i < typ.NumField(); i++ {
 				field := typ.Field(i)
 				if ast.IsExported(field.Name) {
@@ -2121,7 +2070,7 @@ func (r *Runtime) toReflectValue(v Value, dst reflect.Value, ctx *objectExportCt
 		}
 	case reflect.Ptr:
 		if o, ok := v.(*Object); ok {
-			if v, exists := ctx.getTyped(o.self, typ); exists {
+			if v, exists := ctx.getTyped(o, typ); exists {
 				dst.Set(reflect.ValueOf(v))
 				return nil
 			}
@@ -2173,10 +2122,73 @@ func (r *Runtime) wrapJSFunc(fn Callable, typ reflect.Type) func(args []reflect.
 }
 
 // ExportTo converts a JavaScript value into the specified Go value. The second parameter must be a non-nil pointer.
-// Exporting to an interface{} results in a value of the same type as Export() would produce.
-// Exporting to numeric types uses the standard ECMAScript conversion operations, same as used when assigning
-// values to non-clamped typed array items, e.g. https://262.ecma-international.org/#sec-toint32
 // Returns error if conversion is not possible.
+//
+// Notes on specific cases:
+//
+// Empty interface
+//
+// Exporting to an interface{} results in a value of the same type as Value.Export() would produce.
+//
+// Numeric types
+//
+// Exporting to numeric types uses the standard ECMAScript conversion operations, same as used when assigning
+// values to non-clamped typed array items, e.g. https://262.ecma-international.org/#sec-toint32.
+//
+// Functions
+//
+// Exporting to a 'func' creates a strictly typed 'gateway' into an ES function which can be called from Go.
+// The arguments are converted into ES values using Runtime.ToValue(). If the func has no return values,
+// the return value is ignored. If the func has exactly one return value, it is converted to the appropriate
+// type using ExportTo(). If the func has exactly 2 return values and the second value is 'error', exceptions
+// are caught and returned as *Exception. In all other cases exceptions result in a panic. Any extra return values
+// are zeroed.
+//
+// Note, if you want to catch and return exceptions as an `error` and you don't need the return value,
+// 'func(...) error' will not work as expected. The 'error' in this case is mapped to the function return value, not
+// the exception which will still result in a panic. Use 'func(...) (Value, error)' instead, and ignore the Value.
+//
+// 'this' value will always be set to 'undefined'.
+//
+// For a more low-level mechanism see AssertFunction().
+//
+// Map types
+//
+// An ES Map can be exported into a Go map type. If any exported key value is non-hashable, the operation panics
+// (as reflect.Value.SetMapIndex() would). Symbol.iterator is ignored.
+//
+// Exporting an ES Set into a map type results in the map being populated with (element) -> (zero value) key/value
+// pairs. If any value is non-hashable, the operation panics (as reflect.Value.SetMapIndex() would).
+// Symbol.iterator is ignored.
+//
+// Any other Object populates the map with own enumerable non-symbol properties.
+//
+// Slice types
+//
+// Exporting an ES Set into a slice type results in its elements being exported.
+//
+// Exporting any Object that implements the iterable protocol (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#the_iterable_protocol)
+// into a slice type results in the slice being populated with the results of the iteration.
+//
+// Array is treated as iterable (i.e. overwriting Symbol.iterator affects the result).
+//
+// If an object has a 'length' property and is not a function it is treated as array-like. The resulting slice
+// will contain obj[0], ... obj[length-1].
+//
+// For any other Object an error is returned.
+//
+// Array types
+//
+// Anything that can be exported to a slice type can also be exported to an array type, as long as the lengths
+// match. If they do not, an error is returned.
+//
+// Proxy
+//
+// Proxy objects are treated the same way as if they were accessed from ES code in regard to their properties
+// (such as 'length' or [Symbol.iterator]). This means exporting them to slice types works, however
+// exporting a proxied Map into a map type does not produce its contents, because the Proxy is not recognised
+// as a Map. Same applies to a proxied Set.
+//
 func (r *Runtime) ExportTo(v Value, target interface{}) error {
 	tval := reflect.ValueOf(target)
 	if tval.Kind() != reflect.Ptr || tval.IsNil() {
@@ -2689,8 +2701,8 @@ func (r *Runtime) invoke(v Value, p unistring.String, args ...Value) Value {
 	return r.toCallable(o.self.getStr(p, nil))(FunctionCall{This: v, Arguments: args})
 }
 
-func (r *Runtime) iterableToList(items Value, method func(FunctionCall) Value) []Value {
-	iter := r.getIterator(items, method)
+func (r *Runtime) iterableToList(iterable Value, method func(FunctionCall) Value) []Value {
+	iter := r.getIterator(iterable, method)
 	var values []Value
 	iter.iterate(func(item Value) {
 		values = append(values, item)
