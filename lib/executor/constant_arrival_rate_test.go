@@ -269,7 +269,9 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 
 			go func() {
 				err = executor.Run(ctx, engineOut, builtinMetrics)
+				require.NoError(t, err)
 			}()
+			runtime.Gosched()
 
 			// running the time
 			// TODO: make this as helper
@@ -277,12 +279,11 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 				step := 6
 				for i := 0; i < 2100; i += step {
 					mockClock.Add(time.Millisecond * time.Duration(step))
-					runtime.Gosched()
+					// runtime.Gosched()
 				}
 			}()
 
 			wg.Wait()
-			require.NoError(t, err)
 			require.Empty(t, logHook.Drain())
 		})
 	}
