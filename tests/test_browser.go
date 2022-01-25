@@ -45,11 +45,12 @@ import (
 
 // testBrowser is a test testBrowser for integration testing.
 type testBrowser struct {
-	ctx     context.Context
-	rt      *goja.Runtime
-	state   *k6lib.State
-	http    *k6test.HTTPMultiBin
-	samples chan k6stats.SampleContainer
+	ctx      context.Context
+	rt       *goja.Runtime
+	state    *k6lib.State
+	http     *k6test.HTTPMultiBin
+	logCache *logCache
+	samples  chan k6stats.SampleContainer
 	api.Browser
 }
 
@@ -66,6 +67,7 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 		launchOpts         = defaultLaunchOpts()
 		enableHTTPMultiBin = false
 		enableFileServer   = false
+		enableLogCache     = false
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
@@ -76,6 +78,8 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 		case fileServerOption:
 			enableFileServer = true
 			enableHTTPMultiBin = true
+		case logCacheOption:
+			enableLogCache = true
 		case withContext:
 			ctx = opt
 		}
@@ -119,6 +123,11 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 	ctx = k6lib.WithState(ctx, state)
 	ctx = k6common.WithRuntime(ctx, rt)
 
+	var lc *logCache
+	if enableLogCache {
+		lc = attachLogCache(state.Logger)
+	}
+
 	// launch the browser
 	bt := chromium.NewBrowserType(ctx).(*chromium.BrowserType)
 	b := bt.Launch(rt.ToValue(launchOpts))
@@ -131,12 +140,13 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 	})
 
 	tb := &testBrowser{
-		ctx:     bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
-		rt:      rt,
-		state:   state,
-		http:    testServer,
-		samples: samples,
-		Browser: b,
+		ctx:      bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
+		rt:       rt,
+		state:    state,
+		http:     testServer,
+		samples:  samples,
+		logCache: lc,
+		Browser:  b,
 	}
 	if enableFileServer {
 		tb = tb.withFileServer()
@@ -272,6 +282,18 @@ func withFileServer() fileServerOption {
 // withContext is used to detect whether to use a custom context in the test
 // browser.
 type withContext = context.Context
+
+// logCacheOption is used to detect whether to enable the log cache.
+type logCacheOption struct{}
+
+// withLogCache enables the log cache.
+//
+// example:
+//
+//    b := TestBrowser(t, withLogCache())
+func withLogCache() logCacheOption {
+	return struct{}{}
+}
 
 //nolint: golint, revive
 // Copied from https://github.com/grafana/k6/blob/v0.36.0/js/modules/k6/http/http_test.go#L39
