@@ -384,31 +384,42 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 		"sid:%s url:%v", m.session.ID(), event.Request.URL)
 
 	var (
-		failReason string
-		state      = k6lib.GetState(m.ctx)
+		failErr error
+		state   = k6lib.GetState(m.ctx)
 	)
 
-	defer func() { m.failOrContinueRequest(event, failReason) }()
+	defer func() { m.failOrContinueRequest(event, failErr) }()
 
 	purl, err := url.Parse(event.Request.URL)
 	if err != nil {
 		m.logger.Errorf("NetworkManager:onRequestPaused",
-			"error parsing URL: %s", err.Error())
+			"error parsing URL %q: %s", event.Request.URL, err.Error())
 		return
 	}
 
-	failReason = handleBlockedHosts(purl, state.Options.BlockedHostnames.Trie)
+	host, _, err := net.SplitHostPort(purl.Host)
+	if err != nil {
+		// no port, fallback to original
+		host = purl.Host
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		failErr = checkBlockedHosts(host, state.Options.BlockedHostnames.Trie)
+	} else {
+		failErr = checkBlockedIPs(ip, state.Options.BlacklistIPs)
+	}
 }
 
-func (m *NetworkManager) failOrContinueRequest(event *fetch.EventRequestPaused, failReason string) {
-	if failReason != "" {
+func (m *NetworkManager) failOrContinueRequest(event *fetch.EventRequestPaused, failErr error) {
+	if failErr != nil {
 		action := fetch.FailRequest(event.RequestID, network.ErrorReasonBlockedByClient)
 		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 			m.logger.Errorf("NetworkManager:onRequestPaused",
 				"error interrupting request: %s", err.Error())
 		} else {
 			m.logger.Warnf("NetworkManager:onRequestPaused",
-				"request %s %s was interrupted: %s", event.Request.Method, event.Request.URL, failReason)
+				"request %s %s was interrupted: %s", event.Request.Method, event.Request.URL, failErr)
 			return
 		}
 	}
@@ -419,14 +430,22 @@ func (m *NetworkManager) failOrContinueRequest(event *fetch.EventRequestPaused, 
 	}
 }
 
-func handleBlockedHosts(u *url.URL, blockedHosts *k6types.HostnameTrie) string {
-	ip := net.ParseIP(u.Host)
-	if ip == nil {
-		if match, blocked := blockedHosts.Contains(u.Host); blocked {
-			return fmt.Sprintf("hostname %s is in a blocked pattern (%s)", u.Host, match)
+func checkBlockedHosts(host string, blockedHosts *k6types.HostnameTrie) error {
+	if match, blocked := blockedHosts.Contains(host); blocked {
+		return fmt.Errorf("hostname %s is in a blocked pattern (%s)", host, match)
+	}
+	return nil
+}
+
+func checkBlockedIPs(ip net.IP, blockedIPs []*k6lib.IPNet) error {
+	for _, ipnet := range blockedIPs {
+		if ipnet.Contains(ip) {
+			// TODO: Return netext.BlackListedIPError here once its private
+			// fields are exported, or there's a constructor for it.
+			return fmt.Errorf("IP (%s) is in a blacklisted range (%s)", ip, ipnet)
 		}
 	}
-	return ""
+	return nil
 }
 
 func (m *NetworkManager) onRequestServedFromCache(event *network.EventRequestServedFromCache) {

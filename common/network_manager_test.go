@@ -64,7 +64,9 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 	return nm, session
 }
 
-func TestOnRequestPaused(t *testing.T) {
+func TestOnRequestPausedBlockedHostnames(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name, reqURL                  string
 		blockedHostnames, expCDPCalls []string
@@ -90,7 +92,7 @@ func TestOnRequestPaused(t *testing.T) {
 		{
 			name:             "ok_continue_ip",
 			blockedHostnames: []string{"*.test"},
-			reqURL:           "http://127.0.0.1/",
+			reqURL:           "http://127.0.0.1:8000/",
 			expCDPCalls:      []string{"Fetch.continueRequest"},
 		},
 		{
@@ -108,6 +110,60 @@ func TestOnRequestPaused(t *testing.T) {
 			require.NoError(t, err)
 
 			k6opts := k6lib.Options{BlockedHostnames: blocked}
+			nm, session := newTestNetworkManager(t, k6opts)
+			ev := &fetch.EventRequestPaused{
+				RequestID: "1234",
+				Request: &network.Request{
+					Method: "GET",
+					URL:    tc.reqURL,
+				},
+			}
+
+			nm.onRequestPaused(ev)
+
+			assert.Equal(t, tc.expCDPCalls, session.cdpCalls)
+		})
+	}
+}
+
+func TestOnRequestPausedBlockedIPs(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name, reqURL            string
+		blockedIPs, expCDPCalls []string
+	}{
+		{
+			name:        "ok_fail_simple",
+			blockedIPs:  []string{"10.0.0.0/8", "192.168.0.0/16"},
+			reqURL:      "http://10.0.0.1:8000/",
+			expCDPCalls: []string{"Fetch.failRequest"},
+		},
+		{
+			name:        "ok_continue_simple",
+			blockedIPs:  []string{"127.0.0.0/8"},
+			reqURL:      "http://10.0.0.1:8000/",
+			expCDPCalls: []string{"Fetch.continueRequest"},
+		},
+		{
+			name:        "ok_continue_empty",
+			blockedIPs:  nil,
+			reqURL:      "http://127.0.0.1/",
+			expCDPCalls: []string{"Fetch.continueRequest"},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			blockedIPs := make([]*k6lib.IPNet, 0, len(tc.blockedIPs))
+			for _, ipcidr := range tc.blockedIPs {
+				ipnet, err := k6lib.ParseCIDR(ipcidr)
+				require.NoError(t, err)
+				blockedIPs = append(blockedIPs, ipnet)
+			}
+
+			k6opts := k6lib.Options{BlacklistIPs: blockedIPs}
 			nm, session := newTestNetworkManager(t, k6opts)
 			ev := &fetch.EventRequestPaused{
 				RequestID: "1234",
