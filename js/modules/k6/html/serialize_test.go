@@ -25,7 +25,6 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 const testSerializeHTML = `
@@ -68,19 +67,17 @@ const testSerializeHTML = `
 
 func TestSerialize(t *testing.T) {
 	t.Parallel()
-	rt, _ := getTestModuleInstance(t)
-	require.NoError(t, rt.Set("src", testSerializeHTML))
-
-	_, err := rt.RunString(`var doc = html.parseHTML(src)`)
-	require.NoError(t, err)
-	assert.IsType(t, Selection{}, rt.Get("doc").Export())
 
 	t.Run("SerializeArray", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testSerializeHTML)
+
 		t.Run("form", func(t *testing.T) {
 			v, err := rt.RunString(`doc.find("form").serializeArray()`)
 			if assert.NoError(t, err) {
-				arr := v.Export().([]FormValue)
-				assert.Equal(t, 11, len(arr))
+				arr, ok := v.Export().([]FormValue)
+				assert.True(t, ok)
+				assert.Len(t, arr, 11)
 
 				assert.Equal(t, "text_input", arr[0].Name)
 				assert.Equal(t, "input-text-value", arr[0].Value.String())
@@ -97,7 +94,9 @@ func TestSerialize(t *testing.T) {
 				assert.Equal(t, "select_text", arr[4].Name)
 				assert.Equal(t, "yes text", arr[4].Value.String())
 
-				multiValues := arr[5].Value.Export().([]string)
+				multiValues, ok := arr[5].Value.Export().([]string)
+
+				assert.True(t, ok)
 				assert.Equal(t, "select_multi", arr[5].Name)
 				assert.Equal(t, 2, len(multiValues))
 				assert.Equal(t, "option 2", multiValues[0])
@@ -123,8 +122,10 @@ func TestSerialize(t *testing.T) {
 		t.Run("controls", func(t *testing.T) {
 			v, err := rt.RunString(`doc.find("input").serializeArray()`)
 			if assert.NoError(t, err) {
-				arr := v.Export().([]FormValue)
-				assert.Equal(t, 7, len(arr))
+				arr, ok := v.Export().([]FormValue)
+
+				assert.True(t, ok)
+				assert.Len(t, arr, 7)
 
 				assert.Equal(t, "text_input", arr[0].Name)
 				assert.Equal(t, "input-text-value", arr[0].Value.String())
@@ -151,9 +152,14 @@ func TestSerialize(t *testing.T) {
 	})
 
 	t.Run("SerializeObject", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testSerializeHTML)
+
 		v, err := rt.RunString(`doc.find("form").serializeObject()`)
 		if assert.NoError(t, err) {
-			obj := v.Export().(map[string]goja.Value)
+			obj, ok := v.Export().(map[string]goja.Value)
+
+			assert.True(t, ok)
 			assert.Equal(t, 11, len(obj))
 
 			assert.Equal(t, "input-text-value", obj["text_input"].String())
@@ -167,13 +173,18 @@ func TestSerialize(t *testing.T) {
 			assert.Equal(t, "some radio", obj["radio1"].String())
 			assert.Equal(t, "on", obj["radio2"].String())
 
-			multiValues := obj["select_multi"].Export().([]string)
+			multiValues, ok := obj["select_multi"].Export().([]string)
+
+			assert.True(t, ok)
 			assert.Equal(t, "option 2", multiValues[0])
 			assert.Equal(t, "option 3", multiValues[1])
 		}
 	})
 
 	t.Run("Serialize", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testSerializeHTML)
+
 		v, err := rt.RunString(`doc.find("form").serialize()`)
 		if assert.NoError(t, err) {
 			url := v.String()
