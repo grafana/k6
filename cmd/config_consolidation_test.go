@@ -580,7 +580,7 @@ func runTestCase(
 	}
 
 	consolidatedConfig, err := getConsolidatedConfig(testCase.options.fs, cliConf, runnerOpts,
-		// TODO: just makes testcase.options.env in map[string]string
+		// TODO: just make testcase.options.env in map[string]string
 		buildEnvMap(testCase.options.env))
 	if testCase.expected.consolidationError {
 		require.Error(t, err)
