@@ -128,7 +128,7 @@ a commandline interface for interacting with it.`,
 				return err
 			}
 
-			conf, err = deriveAndValidateConfig(conf, initRunner.IsExecutable)
+			conf, err = deriveAndValidateConfig(conf, initRunner.IsExecutable, logger)
 			if err != nil {
 				return err
 			}

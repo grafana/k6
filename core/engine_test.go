@@ -65,16 +65,15 @@ func newTestEngine( //nolint:golint
 		runCtx, runCancel = context.WithCancel(globalCtx)
 	}
 
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
 	newOpts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		MetricSamplesBufferSize: null.NewInt(200, false),
-	}.Apply(runner.GetOptions()).Apply(opts))
+	}.Apply(runner.GetOptions()).Apply(opts), logger)
 	require.NoError(t, err)
 	require.Empty(t, newOpts.Validate())
 
 	require.NoError(t, runner.SetOptions(newOpts))
-
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
 
 	execScheduler, err := local.NewExecutionScheduler(runner, logger)
 	require.NoError(t, err)
@@ -820,7 +819,7 @@ func TestVuInitException(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	opts, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions())
+	opts, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions(), nil)
 	require.NoError(t, err)
 	require.Empty(t, opts.Validate())
 	require.NoError(t, runner.SetOptions(opts))
@@ -1206,7 +1205,7 @@ func TestActiveVUsCount(t *testing.T) {
 
 	opts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		MetricSamplesBufferSize: null.NewInt(200, false),
-	}.Apply(runner.GetOptions()))
+	}.Apply(runner.GetOptions()), nil)
 	require.NoError(t, err)
 	require.Empty(t, opts.Validate())
 	require.NoError(t, runner.SetOptions(opts))

@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/mstoykov/envconfig"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
@@ -233,9 +234,11 @@ func applyDefault(conf Config) Config {
 	return conf
 }
 
-func deriveAndValidateConfig(conf Config, isExecutable func(string) bool) (result Config, err error) {
+func deriveAndValidateConfig(
+	conf Config, isExecutable func(string) bool, logger logrus.FieldLogger,
+) (result Config, err error) {
 	result = conf
-	result.Options, err = executor.DeriveScenariosFromShortcuts(conf.Options)
+	result.Options, err = executor.DeriveScenariosFromShortcuts(conf.Options, logger)
 	if err == nil {
 		err = validateConfig(result, isExecutable)
 	}

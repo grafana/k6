@@ -69,7 +69,7 @@ func getSharedIterationsScenario(iters null.Int, duration types.NullDuration, vu
 // DeriveScenariosFromShortcuts checks for conflicting options and turns any
 // shortcut options (i.e. duration, iterations, stages) into the proper
 // long-form scenario/executor configuration in the scenarios property.
-func DeriveScenariosFromShortcuts(opts lib.Options) (lib.Options, error) {
+func DeriveScenariosFromShortcuts(opts lib.Options, logger logrus.FieldLogger) (lib.Options, error) {
 	result := opts
 
 	switch {
@@ -98,7 +98,7 @@ func DeriveScenariosFromShortcuts(opts lib.Options) (lib.Options, error) {
 			)
 		}
 		if opts.Duration.Duration <= 0 {
-			//TODO: move this validation to Validate()?
+			// TODO: move this validation to Validate()?
 			return result, ExecutionConflictError(
 				"`duration` should be more than 0, for infinite duration use the externally-controlled executor",
 			)
@@ -119,18 +119,18 @@ func DeriveScenariosFromShortcuts(opts lib.Options) (lib.Options, error) {
 	default:
 		// Check if we should emit some warnings
 		if opts.VUs.Valid && opts.VUs.Int64 != 1 {
-			logrus.Warnf(
+			logger.Warnf(
 				"the `vus=%d` option will be ignored, it only works in conjunction with `iterations`, `duration`, or `stages`",
 				opts.VUs.Int64,
 			)
 		}
 		if opts.Stages != nil && len(opts.Stages) == 0 {
 			// No someone explicitly set stages to empty
-			logrus.Warnf("`stages` was explicitly set to an empty value, running the script with 1 iteration in 1 VU")
+			logger.Warnf("`stages` was explicitly set to an empty value, running the script with 1 iteration in 1 VU")
 		}
 		if opts.Scenarios != nil && len(opts.Scenarios) == 0 {
 			// No shortcut, and someone explicitly set execution to empty
-			logrus.Warnf("`scenarios` was explicitly set to an empty value, running the script with 1 iteration in 1 VU")
+			logger.Warnf("`scenarios` was explicitly set to an empty value, running the script with 1 iteration in 1 VU")
 		}
 		// No execution parameters whatsoever were specified, so we'll create a per-VU iterations config
 		// with 1 VU and 1 iteration.
@@ -139,7 +139,7 @@ func DeriveScenariosFromShortcuts(opts lib.Options) (lib.Options, error) {
 		}
 	}
 
-	//TODO: validate the config; questions:
+	// TODO: validate the config; questions:
 	// - separately validate the duration, iterations and stages for better error messages?
 	// - or reuse the execution validation somehow, at the end? or something mixed?
 	// - here or in getConsolidatedConfig() or somewhere else?
