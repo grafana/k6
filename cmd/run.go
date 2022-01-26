@@ -51,6 +51,7 @@ import (
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/loader"
+	"go.k6.io/k6/stats"
 	"go.k6.io/k6/ui/pb"
 )
 
@@ -110,6 +111,10 @@ a commandline interface for interacting with it.`,
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 			initRunner, err := newRunner(logger, src, globalFlags.runType, filesystems, runtimeOptions, builtinMetrics, registry)
 			if err != nil {
+				if errors.Is(err, stats.ErrThresholdParsing) {
+					return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+				}
+
 				return common.UnwrapGojaInterruptedError(err)
 			}
 
@@ -125,7 +130,7 @@ a commandline interface for interacting with it.`,
 				return err
 			}
 
-			conf, err = deriveAndValidateConfig(conf, initRunner.IsExecutable, logger)
+			conf, err = deriveAndValidateConfig(conf, registry, initRunner.IsExecutable, logger)
 			if err != nil {
 				return err
 			}

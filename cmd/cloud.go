@@ -114,7 +114,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				return err
 			}
 
-			derivedConf, err := deriveAndValidateConfig(conf, r.IsExecutable, logger)
+			derivedConf, err := deriveAndValidateConfig(conf, registry, r.IsExecutable, logger)
 			if err != nil {
 				return err
 			}
