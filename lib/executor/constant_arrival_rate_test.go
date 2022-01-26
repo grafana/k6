@@ -135,9 +135,9 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	require.Empty(t, logHook.Drain())
 }
 
-//nolint:tparallel,paralleltest // this is flaky if ran with other tests
 func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
+
 	tests := []struct {
 		segment                *lib.ExecutionSegment
 		sequence               *lib.ExecutionSegmentSequence
@@ -273,19 +273,25 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 			}()
 			runtime.Gosched()
 
-			// running the time
-			// TODO: make this as helper
-			go func() {
-				step := 6
-				for i := 0; i < 2100; i += step {
-					mockClock.Add(time.Millisecond * time.Duration(step))
-					// runtime.Gosched()
-				}
-			}()
+			passTime(t, mockClock, time.Millisecond*6, time.Millisecond*2050)
 
 			wg.Wait()
 			require.Empty(t, logHook.Drain())
 		})
+	}
+}
+
+// passTime emulates a time passing
+func passTime(t *testing.T, mockClock *clock.Mock, step, total time.Duration) {
+	t.Helper()
+
+	cur := time.Duration(0)
+	for cur < total {
+		cur += step
+		mockClock.Add(step)
+
+		// do some real work
+		runtime.Gosched()
 	}
 }
 
