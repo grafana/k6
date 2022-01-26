@@ -24,7 +24,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/kelseyhightower/envconfig"
+	"github.com/mstoykov/envconfig"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib/types"
@@ -101,7 +101,10 @@ func getConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, _
 
 	envConfig := config{}
 	_ = env // TODO: get rid of envconfig and actually use the env parameter...
-	if err := envconfig.Process("", &envConfig); err != nil {
+	if err := envconfig.Process("", &envConfig, func(key string) (string, bool) {
+		v, ok := env[key]
+		return v, ok
+	}); err != nil {
 		return result, err
 	}
 	result = result.Apply(envConfig)

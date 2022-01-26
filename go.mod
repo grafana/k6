@@ -14,7 +14,6 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.10.0
-	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/klauspost/compress v1.13.6
 	github.com/mailru/easyjson v0.7.7
 	github.com/manyminds/api2go v0.0.0-20180125085803-95be7bd0455e
@@ -50,6 +49,7 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+	github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1
 	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/onsi/gomega v1.10.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect

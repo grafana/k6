@@ -21,7 +21,6 @@ package cloudapi
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 )
 
 func TestConfigApply(t *testing.T) {
+	t.Parallel()
 	empty := Config{}
 	defaults := NewConfig()
 
@@ -74,7 +74,8 @@ func TestConfigApply(t *testing.T) {
 	assert.Equal(t, full, defaults.Apply(full))
 }
 
-func TestGetConsolidatedConfig(t *testing.T) { //nolint:paralleltest
+func TestGetConsolidatedConfig(t *testing.T) {
+	t.Parallel()
 	config, err := GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "", nil)
 	require.NoError(t, err)
 	require.Equal(t, config.Token.String, "jsonraw")
@@ -84,9 +85,7 @@ func TestGetConsolidatedConfig(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, err)
 	require.Equal(t, config.Token.String, "ext")
 
-	require.NoError(t, os.Setenv("K6_CLOUD_TOKEN", "envvalue")) // TODO drop when we don't use envconfig
-	defer os.Unsetenv("K6_CLOUD_TOKEN")                         //nolint:errcheck
-	config, err = GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "",
+	config, err = GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), map[string]string{"K6_CLOUD_TOKEN": "envvalue"}, "",
 		map[string]json.RawMessage{"loadimpact": json.RawMessage(`{"token":"ext"}`)})
 	require.NoError(t, err)
 	require.Equal(t, config.Token.String, "envvalue")

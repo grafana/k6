@@ -542,9 +542,6 @@ func runTestCase(
 	logrus.SetOutput(output)
 	logHook.Drain()
 
-	restoreEnv := testutils.SetEnv(t, testCase.options.env)
-	defer restoreEnv()
-
 	flagSet := newFlagSet()
 	defer resetStickyGlobalVars()
 	flagSet.SetOutput(output)
@@ -582,7 +579,9 @@ func runTestCase(
 		testCase.options.fs = afero.NewMemMapFs() // create an empty FS if it wasn't supplied
 	}
 
-	consolidatedConfig, err := getConsolidatedConfig(testCase.options.fs, cliConf, runnerOpts)
+	consolidatedConfig, err := getConsolidatedConfig(testCase.options.fs, cliConf, runnerOpts,
+		// TODO: just make testcase.options.env in map[string]string
+		buildEnvMap(testCase.options.env))
 	if testCase.expected.consolidationError {
 		require.Error(t, err)
 		return

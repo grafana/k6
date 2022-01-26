@@ -123,7 +123,7 @@ a commandline interface for interacting with it.`,
 			if err != nil {
 				return err
 			}
-			conf, err := getConsolidatedConfig(afero.NewOsFs(), cliConf, initRunner.GetOptions())
+			conf, err := getConsolidatedConfig(afero.NewOsFs(), cliConf, initRunner.GetOptions(), buildEnvMap(os.Environ()))
 			if err != nil {
 				return err
 			}

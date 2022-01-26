@@ -23,18 +23,16 @@ package lib
 import (
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"net"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/kelseyhightower/envconfig"
+	"github.com/mstoykov/envconfig"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/stats"
 )
@@ -432,6 +430,7 @@ func TestOptions(t *testing.T) {
 }
 
 func TestOptionsEnv(t *testing.T) {
+	t.Parallel()
 	mustIPPool := func(s string) *types.IPPool {
 		p, err := types.NewIPPool(s)
 		require.NoError(t, err)
@@ -528,13 +527,18 @@ func TestOptionsEnv(t *testing.T) {
 	for field, data := range testdata {
 		field, data := field, data
 		t.Run(field.Name, func(t *testing.T) {
+			t.Parallel()
 			for str, val := range data {
 				str, val := str, val
 				t.Run(`"`+str+`"`, func(t *testing.T) {
-					restore := testutils.SetEnv(t, []string{fmt.Sprintf("%s=%s", field.Key, str)})
-					defer restore()
+					t.Parallel()
 					var opts Options
-					assert.NoError(t, envconfig.Process("k6", &opts))
+					assert.NoError(t, envconfig.Process("k6", &opts, func(k string) (string, bool) {
+						if k == field.Key {
+							return str, true
+						}
+						return "", false
+					}))
 					assert.Equal(t, val, reflect.ValueOf(opts).FieldByName(field.Name).Interface())
 				})
 			}

@@ -21,11 +21,10 @@
 package cmd
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
-	"github.com/kelseyhightower/envconfig"
+	"github.com/mstoykov/envconfig"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 
@@ -33,7 +32,6 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
-	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
 )
 
@@ -93,8 +91,8 @@ func TestConfigCmd(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // this user testutils.SetEnv
 func TestConfigEnv(t *testing.T) {
+	t.Parallel()
 	testdata := map[struct{ Name, Key string }]map[string]func(Config){
 		{"Linger", "K6_LINGER"}: {
 			"":      func(c Config) { assert.Equal(t, null.Bool{}, c.Linger) },
@@ -114,13 +112,18 @@ func TestConfigEnv(t *testing.T) {
 	for field, data := range testdata {
 		field, data := field, data
 		t.Run(field.Name, func(t *testing.T) {
+			t.Parallel()
 			for value, fn := range data {
 				value, fn := value, fn
 				t.Run(`"`+value+`"`, func(t *testing.T) {
-					restore := testutils.SetEnv(t, []string{fmt.Sprintf("%s=%s", field.Key, value)})
-					defer restore()
+					t.Parallel()
 					var config Config
-					assert.NoError(t, envconfig.Process("", &config))
+					assert.NoError(t, envconfig.Process("", &config, func(key string) (string, bool) {
+						if key == field.Key {
+							return value, true
+						}
+						return "", false
+					}))
 					fn(config)
 				})
 			}

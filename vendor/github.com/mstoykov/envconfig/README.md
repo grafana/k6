@@ -188,5 +188,44 @@ type DNSConfig struct {
 }
 ```
 
+Example for decoding the environment variables into map[string][]structName type
+
+```Bash
+export SMS_PROVIDER_WITH_WEIGHT= `IND=[{"name":"SMSProvider1","weight":70},{"name":"SMSProvider2","weight":30}];US=[{"name":"SMSProvider1","weight":100}]`
+```
+
+```GO
+type providerDetails struct {
+	Name   string
+	Weight int
+}
+
+type SMSProviderDecoder map[string][]providerDetails
+
+func (sd *SMSProviderDecoder) Decode(value string) error {
+	smsProvider := map[string][]providerDetails{}
+	pairs := strings.Split(value, ";")
+	for _, pair := range pairs {
+		providerdata := []providerDetails{}
+		kvpair := strings.Split(pair, "=")
+		if len(kvpair) != 2 {
+			return fmt.Errorf("invalid map item: %q", pair)
+		}
+		err := json.Unmarshal([]byte(kvpair[1]), &providerdata)
+		if err != nil {
+			return fmt.Errorf("invalid map json: %w", err)
+		}
+		smsProvider[kvpair[0]] = providerdata
+
+	}
+	*sd = SMSProviderDecoder(smsProvider)
+	return nil
+}
+
+type SMSProviderConfig struct {
+    ProviderWithWeight SMSProviderDecoder `envconfig:"SMS_PROVIDER_WITH_WEIGHT"`
+}
+```
+
 Also, envconfig will use a `Set(string) error` method like from the
 [flag.Value](https://godoc.org/flag#Value) interface if implemented.
