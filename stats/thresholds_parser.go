@@ -21,6 +21,7 @@
 package stats
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -28,9 +29,12 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-// thresholdExpression holds the parsed result of a threshold expression,
+// ErrThresholdParsing is returned by failing threshold parsing operations.
+var ErrThresholdParsing = errors.New("parsing threshold expression failed")
+
+// ThresholdExpression holds the parsed result of a threshold expression,
 // as described in: https://k6.io/docs/using-k6/thresholds/#threshold-syntax
-type thresholdExpression struct {
+type ThresholdExpression struct {
 	// AggregationMethod holds the aggregation method parsed
 	// from the threshold expression. Possible values are described
 	// by `aggregationMethodTokens`.
@@ -47,6 +51,49 @@ type thresholdExpression struct {
 
 	// Value holds the value parsed from the threshold expression.
 	Value float64
+}
+
+// NewThresholdExpression instantiates a new ThresholdExpression
+func NewThresholdExpression(
+	aggregationMethod string,
+	aggregationValue null.Float,
+	operator string,
+	value float64,
+) *ThresholdExpression {
+	return &ThresholdExpression{
+		AggregationMethod: aggregationMethod,
+		AggregationValue:  aggregationValue,
+		Operator:          operator,
+		Value:             value,
+	}
+}
+
+// NewThresholdExpressionFrom parses a threshold expression from an input string
+// and returns it as a ThresholdExpression pointer.
+func NewThresholdExpressionFrom(input string) (*ThresholdExpression, error) {
+	return parseThresholdExpression(input)
+}
+
+// SinkKey computes the key used to index a ThresholdExpression in the engine's sinks.
+//
+// During execution, the engine "sinks" metrics into a internal mapping, so that
+// thresholds can be tried against them. This method is a helper to normalize the
+// sink the threshold expression should be applied to.
+//
+// Because a theshold expression's aggregation method can either be
+// a static keyword ("count", "rate", etc...), or a parametric
+// expression ("p(somefloatingpointvalue)"), we need to handle this
+// case specifically. If we encounter the percentile aggregation method token,
+// we recompute the whole "p(value)" expression in order to look for it in the
+// sinks.
+func (te *ThresholdExpression) SinkKey() string {
+	//
+	sinkKey := te.AggregationMethod
+	if te.AggregationMethod == TokenPercentile {
+		sinkKey = fmt.Sprintf("%s(%g)", TokenPercentile, te.AggregationValue.Float64)
+	}
+
+	return sinkKey
 }
 
 // parseThresholdAssertion parses a threshold condition expression,
@@ -68,25 +115,31 @@ type thresholdExpression struct {
 // digit               -> "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 // whitespace          -> " "
 // ```
-func parseThresholdExpression(input string) (*thresholdExpression, error) {
+func parseThresholdExpression(input string) (*ThresholdExpression, error) {
 	// Scanning makes no assumption on the underlying values, and only
 	// checks that the expression has the right format.
 	method, operator, value, err := scanThresholdExpression(input)
 	if err != nil {
-		return nil, fmt.Errorf("failed parsing threshold expression; reason: %w", err)
+		return nil, fmt.Errorf("%w '%s'; reason: %v", ErrThresholdParsing, input, err)
 	}
 
 	parsedMethod, parsedMethodValue, err := parseThresholdAggregationMethod(method)
 	if err != nil {
-		return nil, fmt.Errorf("failed parsing threshold expression's left hand side; reason: %w", err)
+		return nil, fmt.Errorf("%w '%s'; reason: %v", ErrThresholdParsing, input, err)
 	}
 
 	parsedValue, err := strconv.ParseFloat(value, 64)
 	if err != nil {
-		return nil, fmt.Errorf("failed parsing threshold expresion's right hand side; reason: %w", err)
+		return nil, fmt.Errorf(
+			"%w '%s', right hand side could not be parsed as a "+
+				"64-bit precision floating point value; reason: %v",
+			ErrThresholdParsing,
+			input,
+			err,
+		)
 	}
 
-	condition := &thresholdExpression{
+	condition := &ThresholdExpression{
 		AggregationMethod: parsedMethod,
 		AggregationValue:  parsedMethodValue,
 		Operator:          operator,
@@ -98,13 +151,13 @@ func parseThresholdExpression(input string) (*thresholdExpression, error) {
 
 // Define accepted threshold expression operators tokens
 const (
-	tokenLessEqual     = "<="
-	tokenLess          = "<"
-	tokenGreaterEqual  = ">="
-	tokenGreater       = ">"
-	tokenStrictlyEqual = "==="
-	tokenLooselyEqual  = "=="
-	tokenBangEqual     = "!="
+	TokenLessEqual     = "<="
+	TokenLess          = "<"
+	TokenGreaterEqual  = ">="
+	TokenGreater       = ">"
+	TokenStrictlyEqual = "==="
+	TokenLooselyEqual  = "=="
+	TokenBangEqual     = "!="
 )
 
 // operatorTokens defines the list of operator-related tokens
@@ -119,13 +172,13 @@ const (
 // Longer tokens with symbols in common with shorter ones must appear
 // first in the list in order to be effectively matched.
 var operatorTokens = [7]string{ // nolint:gochecknoglobals
-	tokenLessEqual,
-	tokenLess,
-	tokenGreaterEqual,
-	tokenGreater,
-	tokenStrictlyEqual,
-	tokenLooselyEqual,
-	tokenBangEqual,
+	TokenLessEqual,
+	TokenLess,
+	TokenGreaterEqual,
+	TokenGreater,
+	TokenStrictlyEqual,
+	TokenLooselyEqual,
+	TokenBangEqual,
 }
 
 // scanThresholdExpression scans a threshold condition expression of the
@@ -142,20 +195,23 @@ func scanThresholdExpression(input string) (string, string, string, error) {
 		}
 	}
 
-	return "", "", "", fmt.Errorf("malformed threshold expression")
+	return "", "", "", fmt.Errorf(
+		"no valid operator found in the threshold expression. " +
+			"valid operators are: <, <=, >, >=, ==, !=, ===",
+	)
 }
 
 // Define accepted threshold expression aggregation tokens
 // Percentile token `p(..)` is accepted too but handled separately.
 const (
-	tokenValue      = "value"
-	tokenCount      = "count"
-	tokenRate       = "rate"
-	tokenAvg        = "avg"
-	tokenMin        = "min"
-	tokenMed        = "med"
-	tokenMax        = "max"
-	tokenPercentile = "p"
+	TokenValue      = "value"
+	TokenCount      = "count"
+	TokenRate       = "rate"
+	TokenAvg        = "avg"
+	TokenMin        = "min"
+	TokenMed        = "med"
+	TokenMax        = "max"
+	TokenPercentile = "p"
 )
 
 // aggregationMethodTokens defines the list of aggregation method
@@ -165,14 +221,14 @@ const (
 // Although declared as a `var`, being an array, it is effectively
 // immutable and can be considered constant.
 var aggregationMethodTokens = [8]string{ // nolint:gochecknoglobals
-	tokenValue,
-	tokenCount,
-	tokenRate,
-	tokenAvg,
-	tokenMin,
-	tokenMed,
-	tokenMax,
-	tokenPercentile,
+	TokenValue,
+	TokenCount,
+	TokenRate,
+	TokenAvg,
+	TokenMin,
+	TokenMed,
+	TokenMax,
+	TokenPercentile,
 }
 
 // parseThresholdMethod will parse a threshold condition expression's method.
@@ -186,21 +242,21 @@ func parseThresholdAggregationMethod(input string) (string, null.Float, error) {
 		// Percentile expressions being of the form p(value),
 		// they won't be matched here.
 		if m == input {
-			return input, null.Float{}, nil
+			return m, null.Float{}, nil
 		}
 	}
 
 	// Otherwise, attempt to parse a percentile expression
-	if strings.HasPrefix(input, tokenPercentile+"(") && strings.HasSuffix(input, ")") {
+	if strings.HasPrefix(input, TokenPercentile+"(") && strings.HasSuffix(input, ")") {
 		aggregationValue, err := strconv.ParseFloat(trimDelimited("p(", input, ")"), 64)
 		if err != nil {
 			return "", null.Float{}, fmt.Errorf("malformed percentile value; reason: %w", err)
 		}
 
-		return input, null.FloatFrom(aggregationValue), nil
+		return TokenPercentile, null.FloatFrom(aggregationValue), nil
 	}
 
-	return "", null.Float{}, fmt.Errorf("failed parsing method from expression")
+	return "", null.Float{}, fmt.Errorf("no valid aggregation method found in the threshold expression")
 }
 
 func trimDelimited(prefix, input, suffix string) string {

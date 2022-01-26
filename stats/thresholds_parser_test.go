@@ -33,7 +33,7 @@ func TestParseThresholdExpression(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          string
-		wantExpression *thresholdExpression
+		wantExpression *ThresholdExpression
 		wantErr        bool
 	}{
 		{
@@ -57,7 +57,7 @@ func TestParseThresholdExpression(t *testing.T) {
 		{
 			name:           "valid threshold expression syntax",
 			input:          "count>20",
-			wantExpression: &thresholdExpression{AggregationMethod: "count", Operator: ">", Value: 20},
+			wantExpression: &ThresholdExpression{AggregationMethod: "count", Operator: ">", Value: 20},
 			wantErr:        false,
 		},
 	}
@@ -103,63 +103,63 @@ func TestParseThresholdAggregationMethod(t *testing.T) {
 		{
 			name:            "count method is parsed",
 			input:           "count",
-			wantMethod:      "count",
+			wantMethod:      TokenCount,
 			wantMethodValue: null.Float{},
 			wantErr:         false,
 		},
 		{
 			name:            "rate method is parsed",
 			input:           "rate",
-			wantMethod:      "rate",
+			wantMethod:      TokenRate,
 			wantMethodValue: null.Float{},
 			wantErr:         false,
 		},
 		{
 			name:            "value method is parsed",
 			input:           "value",
-			wantMethod:      "value",
+			wantMethod:      TokenValue,
 			wantMethodValue: null.Float{},
 			wantErr:         false,
 		},
 		{
 			name:            "avg method is parsed",
 			input:           "avg",
-			wantMethod:      "avg",
+			wantMethod:      TokenAvg,
 			wantMethodValue: null.Float{},
 			wantErr:         false,
 		},
 		{
 			name:            "min method is parsed",
 			input:           "min",
-			wantMethod:      "min",
+			wantMethod:      TokenMin,
 			wantMethodValue: null.Float{},
 			wantErr:         false,
 		},
 		{
 			name:            "max method is parsed",
 			input:           "max",
-			wantMethod:      "max",
+			wantMethod:      TokenMax,
 			wantMethodValue: null.Float{},
 			wantErr:         false,
 		},
 		{
 			name:            "med method is parsed",
 			input:           "med",
-			wantMethod:      "med",
+			wantMethod:      TokenMed,
 			wantMethodValue: null.Float{},
 			wantErr:         false,
 		},
 		{
 			name:            "percentile method with integer value is parsed",
 			input:           "p(99)",
-			wantMethod:      "p(99)",
+			wantMethod:      TokenPercentile,
 			wantMethodValue: null.FloatFrom(99),
 			wantErr:         false,
 		},
 		{
 			name:            "percentile method with floating point value is parsed",
 			input:           "p(99.9)",
-			wantMethod:      "p(99.9)",
+			wantMethod:      TokenPercentile,
 			wantMethodValue: null.FloatFrom(99.9),
 			wantErr:         false,
 		},
