@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
 	"sync"
 	"time"
@@ -36,6 +37,7 @@ import (
 	"github.com/dop251/goja"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
+	k6types "go.k6.io/k6/lib/types"
 	k6stats "go.k6.io/k6/stats"
 )
 
@@ -48,7 +50,7 @@ type NetworkManager struct {
 
 	ctx          context.Context
 	logger       *Logger
-	session      *Session
+	session      session
 	parent       *NetworkManager
 	frameManager *FrameManager
 	credentials  *Credentials
@@ -235,10 +237,20 @@ func (m *NetworkManager) handleRequestRedirect(req *Request, redirectResponse *n
 }
 
 func (m *NetworkManager) initDomains() error {
-	action := network.Enable()
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		return fmt.Errorf("unable to execute %T: %w", action, err)
+	actions := []Action{network.Enable()}
+
+	// Only enable the Fetch domain if necessary, as it has a performance overhead.
+	if m.userReqInterceptionEnabled {
+		actions = append(actions,
+			network.SetCacheDisabled(true),
+			fetch.Enable().WithPatterns([]*fetch.RequestPattern{{URLPattern: "*"}}))
 	}
+	for _, action := range actions {
+		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+			return fmt.Errorf("unable to execute %T: %w", action, err)
+		}
+	}
+
 	return nil
 }
 
@@ -250,6 +262,7 @@ func (m *NetworkManager) initEvents() {
 		cdproto.EventNetworkRequestWillBeSent,
 		cdproto.EventNetworkRequestServedFromCache,
 		cdproto.EventNetworkResponseReceived,
+		cdproto.EventFetchRequestPaused,
 	}, chHandler)
 
 	go func() {
@@ -279,6 +292,8 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 			m.onRequestServedFromCache(ev)
 		case *network.EventResponseReceived:
 			m.onResponseReceived(ev)
+		case *fetch.EventRequestPaused:
+			m.onRequestPaused(ev)
 		}
 	}
 	return true
@@ -360,32 +375,58 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	m.reqsMu.Unlock()
 	m.emitRequestMetrics(req)
 	m.frameManager.requestStarted(req)
+}
 
-	if m.userReqInterceptionEnabled {
-		state := k6lib.GetState(m.ctx)
-		ip := net.ParseIP(req.url.Host)
-		blockedHosts := state.Options.BlockedHostnames.Trie
-		if blockedHosts != nil && ip == nil {
-			if match, blocked := blockedHosts.Contains(req.url.Host); blocked {
-				// Tell browser we've blocked this request.
-				fetch.FailRequest(fetch.RequestID(req.getID()), network.ErrorReasonBlockedByClient)
+func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
+	m.logger.Debugf("NetworkManager:onRequestPaused",
+		"sid:%s url:%v", m.session.ID(), event.Request.URL)
+	defer m.logger.Debugf("NetworkManager:onRequestPaused:return",
+		"sid:%s url:%v", m.session.ID(), event.Request.URL)
 
-				// Throw exception into JS runtime
-				rt := k6common.GetRuntime(m.ctx)
-				// TODO: create PR to make netext.BlockedHostError a public struct in k6 perhaps?
-				k6common.Throw(rt, fmt.Errorf("hostname (%s) is in a blocked pattern (%s)", req.url.Host, match))
-			}
-		}
+	var (
+		failReason string
+		state      = k6lib.GetState(m.ctx)
+	)
 
-		/*
-			TODO: is there a way to do IP filtering without requiring a lookup here?
-			for _, ipnet := range state.Options.BlacklistIPs {
-				if ipnet.Contains(ev.Request.URL) {
-					return "", netext.BlackListedIPError{ip: remote.IP, net: ipnet}
-				}
-			}
-		*/
+	defer func() { m.failOrContinueRequest(event, failReason) }()
+
+	purl, err := url.Parse(event.Request.URL)
+	if err != nil {
+		m.logger.Errorf("NetworkManager:onRequestPaused",
+			"error parsing URL: %s", err.Error())
+		return
 	}
+
+	failReason = handleBlockedHosts(purl, state.Options.BlockedHostnames.Trie)
+}
+
+func (m *NetworkManager) failOrContinueRequest(event *fetch.EventRequestPaused, failReason string) {
+	if failReason != "" {
+		action := fetch.FailRequest(event.RequestID, network.ErrorReasonBlockedByClient)
+		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+			m.logger.Errorf("NetworkManager:onRequestPaused",
+				"error interrupting request: %s", err.Error())
+		} else {
+			m.logger.Warnf("NetworkManager:onRequestPaused",
+				"request %s %s was interrupted: %s", event.Request.Method, event.Request.URL, failReason)
+			return
+		}
+	}
+	action := fetch.ContinueRequest(event.RequestID)
+	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		m.logger.Errorf("NetworkManager:onRequestPaused",
+			"error continuing request: %s", err.Error())
+	}
+}
+
+func handleBlockedHosts(u *url.URL, blockedHosts *k6types.HostnameTrie) string {
+	ip := net.ParseIP(u.Host)
+	if ip == nil {
+		if match, blocked := blockedHosts.Contains(u.Host); blocked {
+			return fmt.Sprintf("hostname %s is in a blocked pattern (%s)", u.Host, match)
+		}
+	}
+	return ""
 }
 
 func (m *NetworkManager) onRequestServedFromCache(event *network.EventRequestServedFromCache) {

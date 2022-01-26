@@ -24,15 +24,33 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	k6types "go.k6.io/k6/lib/types"
 )
 
 func TestDataURLSkipRequest(t *testing.T) {
-	tb := newTestBrowser(t)
+	tb := newTestBrowser(t, withLogCache())
 	p := tb.NewPage(nil)
-
-	lc := attachLogCache(tb.state.Logger)
 
 	p.Goto("data:text/html,hello", nil)
 
-	assert.True(t, lc.contains("skipped request handling of data URL"))
+	assert.True(t, tb.logCache.contains("skipped request handling of data URL"))
+}
+
+func TestBlockHostnames(t *testing.T) {
+	tb := newTestBrowser(t, withHTTPServer(), withLogCache())
+
+	blocked, err := k6types.NewNullHostnameTrie([]string{"*.test"})
+	require.NoError(t, err)
+	tb.state.Options.BlockedHostnames = blocked
+
+	p := tb.NewPage(nil)
+	res := p.Goto("http://host.test/", nil)
+	assert.Nil(t, res)
+
+	assert.True(t, tb.logCache.contains("was interrupted: hostname host.test is in a blocked pattern"))
+
+	// Ensure other requests go through
+	resp := p.Goto(tb.URL("/get"), nil)
+	assert.NotNil(t, resp)
 }

@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -573,7 +574,8 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 		"fmid:%d fid:%v furl:%s url:%s", fmid, fid, furl, url)
 
 	rt := k6common.GetRuntime(m.ctx)
-	defaultReferer := m.page.mainFrameSession.getNetworkManager().extraHTTPHeaders["referer"]
+	netMgr := m.page.mainFrameSession.getNetworkManager()
+	defaultReferer := netMgr.extraHTTPHeaders["referer"]
 	parsedOpts := NewFrameGotoOptions(defaultReferer, time.Duration(m.timeoutSettings.navigationTimeout())*time.Second)
 	if err := parsedOpts.Parse(m.ctx, opts); err != nil {
 		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
@@ -627,10 +629,16 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 		if err != nil {
 			k6common.Throw(rt, err)
 		}
+
 		event = data.(*NavigationEvent)
 		if event.newDocument.documentID != newDocumentID {
-			k6common.Throw(rt, errors.New("navigation interrupted by another one"))
-		} else if event.err != nil {
+			m.logger.Debugf("FrameManager:NavigateFrame:interrupted",
+				"fmid:%d fid:%v furl:%s url:%s docID:%s newDocID:%s",
+				fmid, fid, furl, url, event.newDocument.documentID, newDocumentID)
+		} else if event.err != nil &&
+			// TODO: A more graceful way of avoiding Throw()?
+			!(netMgr.userReqInterceptionEnabled &&
+				strings.Contains(event.err.Error(), "ERR_BLOCKED_BY_CLIENT")) {
 			k6common.Throw(rt, event.err)
 		}
 	} else {
