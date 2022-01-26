@@ -65,6 +65,13 @@ const (
 type commandFlags struct {
 	defaultConfigFilePath string
 	configFilePath        string
+	exitOnRunning         bool
+	showCloudLogs         bool
+	runType               string
+	archiveOut            string
+	quiet                 bool
+	noColor               bool
+	address               string
 }
 
 func newCommandFlags() *commandFlags {
@@ -83,16 +90,12 @@ func newCommandFlags() *commandFlags {
 	return &commandFlags{
 		defaultConfigFilePath: defaultConfigFilePath,  // Updated with the user's config folder in the init() function below
 		configFilePath:        os.Getenv("K6_CONFIG"), // Overridden by `-c`/`--config` flag!
+		exitOnRunning:         os.Getenv("K6_EXIT_ON_RUNNING") != "",
+		showCloudLogs:         true,
+		runType:               os.Getenv("K6_TYPE"),
+		archiveOut:            "archive.tar",
 	}
 }
-
-//nolint:gochecknoglobals
-var (
-	// TODO: have environment variables for configuring these? hopefully after we move away from global vars though...
-	quiet   bool
-	noColor bool
-	address string
-)
 
 // This is to keep all fields needed for the main/root k6 command
 type rootCommand struct {
@@ -119,7 +122,7 @@ func newRootCommand(ctx context.Context, logger *logrus.Logger, fallbackLogger l
 	c.cmd = &cobra.Command{
 		Use:               "k6",
 		Short:             "a next-generation load generator",
-		Long:              "\n" + getBanner(noColor || !stdoutTTY),
+		Long:              "\n" + getBanner(c.commandFlags.noColor || !stdoutTTY),
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
@@ -183,12 +186,12 @@ func Execute() {
 		getConvertCmd(afero.NewOsFs(), stdout),
 		getInspectCmd(logger, c.commandFlags),
 		loginCmd,
-		getPauseCmd(ctx),
-		getResumeCmd(ctx),
-		getScaleCmd(ctx),
+		getPauseCmd(ctx, c.commandFlags),
+		getResumeCmd(ctx, c.commandFlags),
+		getScaleCmd(ctx, c.commandFlags),
 		getRunCmd(ctx, logger, c.commandFlags),
-		getStatsCmd(ctx),
-		getStatusCmd(ctx),
+		getStatsCmd(ctx, c.commandFlags),
+		getStatusCmd(ctx, c.commandFlags),
 		getVersionCmd(),
 	)
 
@@ -239,12 +242,12 @@ func (c *rootCommand) rootCmdPersistentFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	// TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
 	flags.BoolVarP(&c.verbose, "verbose", "v", false, "enable verbose logging")
-	flags.BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
-	flags.BoolVar(&noColor, "no-color", false, "disable colored output")
+	flags.BoolVarP(&c.commandFlags.quiet, "quiet", "q", false, "disable progress updates")
+	flags.BoolVar(&c.commandFlags.noColor, "no-color", false, "disable colored output")
 	flags.StringVar(&c.logOutput, "log-output", "stderr",
 		"change the output for k6 logs, possible values are stderr,stdout,none,loki[=host:port]")
 	flags.StringVar(&c.logFmt, "logformat", "", "log output format") // TODO rename to log-format and warn on old usage
-	flags.StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
+	flags.StringVarP(&c.commandFlags.address, "address", "a", "localhost:6565", "address for the api server")
 
 	// TODO: Fix... This default value needed, so both CLI flags and environment variables work
 	flags.StringVarP(&c.commandFlags.configFilePath, "config", "c", c.commandFlags.configFilePath, "JSON config file")
@@ -277,10 +280,10 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 	loggerForceColors := false // disable color by default
 	switch c.logOutput {
 	case "stderr":
-		loggerForceColors = !noColor && stderrTTY
+		loggerForceColors = !c.commandFlags.noColor && stderrTTY
 		c.logger.SetOutput(stderr)
 	case "stdout":
-		loggerForceColors = !noColor && stdoutTTY
+		loggerForceColors = !c.commandFlags.noColor && stdoutTTY
 		c.logger.SetOutput(stdout)
 	case "none":
 		c.logger.SetOutput(ioutil.Discard)
@@ -306,7 +309,7 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 		c.logger.SetFormatter(&logrus.JSONFormatter{})
 		c.logger.Debug("Logger format: JSON")
 	default:
-		c.logger.SetFormatter(&logrus.TextFormatter{ForceColors: loggerForceColors, DisableColors: noColor})
+		c.logger.SetFormatter(&logrus.TextFormatter{ForceColors: loggerForceColors, DisableColors: c.commandFlags.noColor})
 		c.logger.Debug("Logger format: TEXT")
 	}
 	return ch, nil

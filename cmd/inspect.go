@@ -60,7 +60,11 @@ func getInspectCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Comm
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 
 			var b *js.Bundle
-			switch getRunType(src) {
+			typ := globalFlags.runType
+			if typ == "" {
+				typ = detectType(src.Data)
+			}
+			switch typ {
 			// this is an exhaustive list
 			case typeArchive:
 				var arc *lib.Archive
@@ -99,7 +103,7 @@ func getInspectCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Comm
 
 	inspectCmd.Flags().SortFlags = false
 	inspectCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
-	inspectCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
+	inspectCmd.Flags().StringVarP(&globalFlags.runType, "type", "t", globalFlags.runType, "override file `type`, \"js\" or \"archive\"") //nolint:lll
 	inspectCmd.Flags().BoolVar(&addExecReqs,
 		"execution-requirements",
 		false,

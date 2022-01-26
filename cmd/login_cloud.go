@@ -151,7 +151,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			}
 
 			if newCloudConf.Token.Valid {
-				valueColor := getColor(noColor || !stdoutTTY, color.FgCyan)
+				valueColor := getColor(globalFlags.noColor || !stdoutTTY, color.FgCyan)
 				fprintf(stdout, "  token: %s\n", valueColor.Sprint(newCloudConf.Token.String))
 			}
 			return nil

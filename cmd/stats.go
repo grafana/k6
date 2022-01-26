@@ -28,7 +28,7 @@ import (
 	"go.k6.io/k6/api/v1/client"
 )
 
-func getStatsCmd(ctx context.Context) *cobra.Command {
+func getStatsCmd(ctx context.Context, globalFlags *commandFlags) *cobra.Command {
 	// statsCmd represents the stats command
 	statsCmd := &cobra.Command{
 		Use:   "stats",
@@ -37,7 +37,7 @@ func getStatsCmd(ctx context.Context) *cobra.Command {
 
   Use the global --address flag to specify the URL to the API server.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := client.New(address)
+			c, err := client.New(globalFlags.address)
 			if err != nil {
 				return err
 			}
