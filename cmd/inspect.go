@@ -37,7 +37,7 @@ import (
 	"go.k6.io/k6/lib/types"
 )
 
-func getInspectCmd(logger *logrus.Logger) *cobra.Command {
+func getInspectCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Command {
 	var addExecReqs bool
 
 	// inspectCmd represents the inspect command
@@ -81,7 +81,7 @@ func getInspectCmd(logger *logrus.Logger) *cobra.Command {
 			inspectOutput := interface{}(b.Options)
 
 			if addExecReqs {
-				inspectOutput, err = addExecRequirements(b, builtinMetrics, registry, logger)
+				inspectOutput, err = addExecRequirements(b, builtinMetrics, registry, logger, globalFlags)
 				if err != nil {
 					return err
 				}
@@ -110,7 +110,7 @@ func getInspectCmd(logger *logrus.Logger) *cobra.Command {
 
 func addExecRequirements(b *js.Bundle,
 	builtinMetrics *metrics.BuiltinMetrics, registry *metrics.Registry,
-	logger *logrus.Logger) (interface{}, error) {
+	logger *logrus.Logger, globalFlags *commandFlags) (interface{}, error) {
 	// TODO: after #1048 issue, consider rewriting this without a Runner:
 	// just creating ExecutionPlan directly from validated options
 
@@ -119,7 +119,8 @@ func addExecRequirements(b *js.Bundle,
 		return nil, err
 	}
 
-	conf, err := getConsolidatedConfig(afero.NewOsFs(), Config{}, runner.GetOptions(), buildEnvMap(os.Environ()))
+	conf, err := getConsolidatedConfig(
+		afero.NewOsFs(), Config{}, runner.GetOptions(), buildEnvMap(os.Environ()), globalFlags)
 	if err != nil {
 		return nil, err
 	}

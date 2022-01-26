@@ -56,7 +56,7 @@ var (
 )
 
 //nolint:funlen,gocognit,gocyclo,cyclop
-func getCloudCmd(ctx context.Context, logger *logrus.Logger) *cobra.Command {
+func getCloudCmd(ctx context.Context, logger *logrus.Logger, globalFlags *commandFlags) *cobra.Command {
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
 		Short: "Run a test on the cloud",
@@ -115,7 +115,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				return err
 			}
 			conf, err := getConsolidatedConfig(
-				afero.NewOsFs(), Config{Options: cliOpts}, r.GetOptions(), buildEnvMap(os.Environ()))
+				afero.NewOsFs(), Config{Options: cliOpts}, r.GetOptions(), buildEnvMap(os.Environ()), globalFlags)
 			if err != nil {
 				return err
 			}

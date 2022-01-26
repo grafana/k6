@@ -61,11 +61,30 @@ const (
 	waitRemoteLoggerTimeout = time.Second * 5
 )
 
-//TODO: remove these global variables
-//nolint:gochecknoglobals
-var defaultConfigFilePath = defaultConfigFileName // Updated with the user's config folder in the init() function below
-//nolint:gochecknoglobals
-var configFilePath = os.Getenv("K6_CONFIG") // Overridden by `-c`/`--config` flag!
+// TODO better name - there are other command flags these are just ... non lib.Options ones :shrug:
+type commandFlags struct {
+	defaultConfigFilePath string
+	configFilePath        string
+}
+
+func newCommandFlags() *commandFlags {
+	confDir, err := os.UserConfigDir()
+	if err != nil {
+		logrus.WithError(err).Warn("could not get config directory")
+		confDir = ".config"
+	}
+	defaultConfigFilePath := filepath.Join(
+		confDir,
+		"loadimpact",
+		"k6",
+		defaultConfigFileName,
+	)
+
+	return &commandFlags{
+		defaultConfigFilePath: defaultConfigFilePath,  // Updated with the user's config folder in the init() function below
+		configFilePath:        os.Getenv("K6_CONFIG"), // Overridden by `-c`/`--config` flag!
+	}
+}
 
 //nolint:gochecknoglobals
 var (
@@ -86,6 +105,7 @@ type rootCommand struct {
 	logFmt         string
 	loggerIsRemote bool
 	verbose        bool
+	commandFlags   *commandFlags
 }
 
 func newRootCommand(ctx context.Context, logger *logrus.Logger, fallbackLogger logrus.FieldLogger) *rootCommand {
@@ -93,6 +113,7 @@ func newRootCommand(ctx context.Context, logger *logrus.Logger, fallbackLogger l
 		ctx:            ctx,
 		logger:         logger,
 		fallbackLogger: fallbackLogger,
+		commandFlags:   newCommandFlags(),
 	}
 	// the base command when called without any subcommands.
 	c.cmd = &cobra.Command{
@@ -103,18 +124,6 @@ func newRootCommand(ctx context.Context, logger *logrus.Logger, fallbackLogger l
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
 	}
-
-	confDir, err := os.UserConfigDir()
-	if err != nil {
-		logrus.WithError(err).Warn("could not get config directory")
-		confDir = ".config"
-	}
-	defaultConfigFilePath = filepath.Join(
-		confDir,
-		"loadimpact",
-		"k6",
-		defaultConfigFileName,
-	)
 
 	c.cmd.PersistentFlags().AddFlagSet(c.rootCmdPersistentFlagSet())
 	return c
@@ -164,17 +173,20 @@ func Execute() {
 	c := newRootCommand(ctx, logger, fallbackLogger)
 
 	loginCmd := getLoginCmd()
-	loginCmd.AddCommand(getLoginCloudCommand(logger), getLoginInfluxDBCommand(logger))
+	loginCmd.AddCommand(
+		getLoginCloudCommand(logger, c.commandFlags),
+		getLoginInfluxDBCommand(logger, c.commandFlags),
+	)
 	c.cmd.AddCommand(
-		getArchiveCmd(logger),
-		getCloudCmd(ctx, logger),
+		getArchiveCmd(logger, c.commandFlags),
+		getCloudCmd(ctx, logger, c.commandFlags),
 		getConvertCmd(afero.NewOsFs(), stdout),
-		getInspectCmd(logger),
+		getInspectCmd(logger, c.commandFlags),
 		loginCmd,
 		getPauseCmd(ctx),
 		getResumeCmd(ctx),
 		getScaleCmd(ctx),
-		getRunCmd(ctx, logger),
+		getRunCmd(ctx, logger, c.commandFlags),
 		getStatsCmd(ctx),
 		getStatusCmd(ctx),
 		getVersionCmd(),
@@ -235,10 +247,10 @@ func (c *rootCommand) rootCmdPersistentFlagSet() *pflag.FlagSet {
 	flags.StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
 
 	// TODO: Fix... This default value needed, so both CLI flags and environment variables work
-	flags.StringVarP(&configFilePath, "config", "c", configFilePath, "JSON config file")
+	flags.StringVarP(&c.commandFlags.configFilePath, "config", "c", c.commandFlags.configFilePath, "JSON config file")
 	// And we also need to explicitly set the default value for the usage message here, so things
 	// like `K6_CONFIG="blah" k6 run -h` don't produce a weird usage message
-	flags.Lookup("config").DefValue = defaultConfigFilePath
+	flags.Lookup("config").DefValue = c.commandFlags.defaultConfigFilePath
 	must(cobra.MarkFlagFilename(flags, "config"))
 	return flags
 }

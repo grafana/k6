@@ -20,7 +20,10 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -131,13 +134,14 @@ func mostFlagSets() []flagSetInit {
 	// getConsolidatedConfig() is used, but they also have differences in their CLI flags :/
 	// sigh... compromises...
 	result := []flagSetInit{}
-	for i, fsi := range []flagSetInit{runCmdFlagSet, archiveCmdFlagSet, cloudCmdFlagSet} {
+	for i, fsi := range []func() *pflag.FlagSet{runCmdFlagSet, archiveCmdFlagSet, cloudCmdFlagSet} {
 		i, fsi := i, fsi // go...
-		result = append(result, func() *pflag.FlagSet {
+		root := newRootCommand(context.Background(), nil, nil)
+		result = append(result, func() (*pflag.FlagSet, *commandFlags) {
 			flags := pflag.NewFlagSet(fmt.Sprintf("superContrivedFlags_%d", i), pflag.ContinueOnError)
-			flags.AddFlagSet(new(rootCommand).rootCmdPersistentFlagSet())
+			flags.AddFlagSet(root.rootCmdPersistentFlagSet())
 			flags.AddFlagSet(fsi())
-			return flags
+			return flags, root.commandFlags
 		})
 	}
 	return result
@@ -155,11 +159,7 @@ func getFS(files []file) afero.Fs {
 	return fs
 }
 
-func defaultConfig(jsonConfig string) afero.Fs {
-	return getFS([]file{{defaultConfigFilePath, jsonConfig}})
-}
-
-type flagSetInit func() *pflag.FlagSet
+type flagSetInit func() (*pflag.FlagSet, *commandFlags)
 
 type opts struct {
 	cli    []string
@@ -183,7 +183,6 @@ type opts struct {
 func resetStickyGlobalVars() {
 	// TODO: remove after fixing the config, obviously a dirty hack
 	exitOnRunning = false
-	configFilePath = ""
 	runType = ""
 }
 
@@ -206,6 +205,21 @@ type configConsolidationTestCase struct {
 }
 
 func getConfigConsolidationTestCases() []configConsolidationTestCase {
+	defaultConfig := func(jsonConfig string) afero.Fs {
+		confDir, err := os.UserConfigDir()
+		if err != nil {
+			confDir = ".config"
+		}
+		return getFS([]file{{
+			filepath.Join(
+				confDir,
+				"loadimpact",
+				"k6",
+				defaultConfigFileName,
+			),
+			jsonConfig,
+		}})
+	}
 	I := null.IntFrom // shortcut for "Valid" (i.e. user-specified) ints
 	// This is a function, because some of these test cases actually need for the init() functions
 	// to be executed, since they depend on defaultConfigFilePath
@@ -545,7 +559,7 @@ func runTestCase(
 	logger.AddHook(logHook)
 	logger.SetOutput(output)
 
-	flagSet := newFlagSet()
+	flagSet, globalFlags := newFlagSet()
 	defer resetStickyGlobalVars()
 	flagSet.SetOutput(output)
 	// flagSet.PrintDefaults()
@@ -581,10 +595,9 @@ func runTestCase(
 		t.Logf("Creating an empty FS for this test")
 		testCase.options.fs = afero.NewMemMapFs() // create an empty FS if it wasn't supplied
 	}
-
 	consolidatedConfig, err := getConsolidatedConfig(testCase.options.fs, cliConf, runnerOpts,
 		// TODO: just make testcase.options.env in map[string]string
-		buildEnvMap(testCase.options.env))
+		buildEnvMap(testCase.options.env), globalFlags)
 	if testCase.expected.consolidationError {
 		require.Error(t, err)
 		return

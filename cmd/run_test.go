@@ -169,7 +169,7 @@ func TestAbortTest(t *testing.T) {
 			}
 			logger.AddHook(&hook)
 
-			cmd := getRunCmd(ctx, logger)
+			cmd := getRunCmd(ctx, logger, newCommandFlags())
 			// Redefine the flag to avoid a nil pointer panic on lookup.
 			cmd.Flags().AddFlag(&pflag.Flag{
 				Name:   "address",
@@ -205,7 +205,7 @@ func TestInitErrExitCode(t *testing.T) {
 	defer cancel()
 	logger := testutils.NewLogger(t)
 
-	cmd := getRunCmd(ctx, logger)
+	cmd := getRunCmd(ctx, logger, newCommandFlags())
 	a, err := filepath.Abs("testdata/initerr.js")
 	require.NoError(t, err)
 	cmd.SetArgs([]string{a})
