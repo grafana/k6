@@ -85,3 +85,11 @@ func (r *Registry) MustNewMetric(name string, typ stats.MetricType, t ...stats.V
 	}
 	return m
 }
+
+// Get returns the metric with the provided name.
+// Similar to maps, if the metric with the provided name was found,
+// the second return value will be true, false otherwise.
+func (r *Registry) Get(name string) (*stats.Metric, bool) {
+	m, ok := r.metrics[name]
+	return m, ok
+}

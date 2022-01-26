@@ -66,3 +66,14 @@ func Min(a, b int64) int64 {
 	}
 	return b
 }
+
+// Contains checks if a string is present in a slice
+func Contains(slice []string, str string) bool {
+	for _, element := range slice {
+		if element == str {
+			return true
+		}
+	}
+
+	return false
+}

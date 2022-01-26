@@ -211,3 +211,48 @@ func TestInitErrExitCode(t *testing.T) {
 		"Status code must be %d", exitcodes.ScriptException)
 	assert.Contains(t, err.Error(), "ReferenceError: someUndefinedVar is not defined")
 }
+
+func TestInvalidOptionsThresholdErrExitCode(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name         string
+		testFilename string
+	}{
+		{
+			"run should fail with exit status 104 on a malformed threshold expression",
+			"testdata/thresholds/malformed_expression.js",
+		},
+		{
+			"run should fail with exit status 104 on a threshold applied to a non existing metric",
+			"testdata/thresholds/non_existing_metric.js",
+		},
+		{
+			"run should fail with exit status 104 on a threshold method being unsupported by the metric",
+			"testdata/thresholds/unsupported_aggregation_method.js",
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			cmd := getRunCmd(ctx, testutils.NewLogger(t), newCommandFlags())
+			a, err := filepath.Abs(testCase.testFilename)
+			require.NoError(t, err)
+			cmd.SetArgs([]string{a})
+			wantExitCode := exitcodes.InvalidConfig
+
+			var gotErrExt errext.HasExitCode
+			gotErr := cmd.Execute()
+
+			require.ErrorAs(t, gotErr, &gotErrExt)
+			assert.Equalf(t, wantExitCode, gotErrExt.ExitCode(),
+				"status code must be %d", wantExitCode,
+			)
+		})
+	}
+}

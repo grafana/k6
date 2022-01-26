@@ -26,13 +26,15 @@ import (
 
 	"github.com/mstoykov/envconfig"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/guregu/null.v3"
-
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
+	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/stats"
+	"gopkg.in/guregu/null.v3"
 )
 
 type testCmdData struct {
@@ -202,7 +204,7 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := deriveAndValidateConfig(tc.conf,
+			_, err := deriveAndValidateConfig(tc.conf, metrics.NewRegistry(),
 				func(_ string) bool { return tc.isExec }, nil)
 			if tc.err != "" {
 				var ecerr errext.HasExitCode
@@ -215,3 +217,403 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateConfig(t *testing.T) {
+	t.Parallel()
+
+	// A registry filled with builtin metrics
+	builtinMetricsRegistry := metrics.NewRegistry()
+	metrics.RegisterBuiltinMetrics(builtinMetricsRegistry)
+
+	// A registry filled with a custom metric
+	customMetricsRegistry := metrics.NewRegistry()
+	customMetricsRegistry.MustNewMetric("counter_ok", stats.Counter)
+
+	testCases := []struct {
+		name         string
+		conf         Config
+		registry     *metrics.Registry
+		wantErr      bool
+		wantExitCode bool
+	}{
+		{
+			name: "config applying a threshold over an existing builtin metric succeeds",
+			conf: Config{Options: lib.Options{Thresholds: map[string]stats.Thresholds{
+				metrics.HTTPReqsName: {Thresholds: []*stats.Threshold{
+					{Parsed: stats.NewThresholdExpression(stats.TokenCount, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+				}},
+			}}},
+			registry:     builtinMetricsRegistry,
+			wantErr:      false,
+			wantExitCode: false,
+		},
+		{
+			name: "config applying a threshold over an existing custom metric succeeds",
+			conf: Config{Options: lib.Options{Thresholds: map[string]stats.Thresholds{
+				"counter_ok": {Thresholds: []*stats.Threshold{
+					{Parsed: stats.NewThresholdExpression(stats.TokenCount, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+				}},
+			}}},
+			registry:     customMetricsRegistry,
+			wantErr:      false,
+			wantExitCode: false,
+		},
+		{
+			name:         "passes when no thresholds are defined, and the provided registry is nil",
+			conf:         Config{},
+			registry:     nil,
+			wantErr:      false,
+			wantExitCode: false,
+		},
+		{
+			name: "fails when thresholds are defined, and the provided registry is nil",
+			conf: Config{Options: lib.Options{Thresholds: map[string]stats.Thresholds{
+				"counter_ok": {Thresholds: []*stats.Threshold{
+					{Parsed: stats.NewThresholdExpression(stats.TokenCount, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+				}},
+			}}},
+			registry:     nil,
+			wantErr:      true,
+			wantExitCode: false,
+		},
+		{
+			name: "config applying a threshold to a non-existing metric fails",
+			conf: Config{Options: lib.Options{Thresholds: map[string]stats.Thresholds{
+				"nonexisting": {Thresholds: []*stats.Threshold{
+					{Parsed: stats.NewThresholdExpression(stats.TokenCount, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+				}},
+			}}},
+			registry:     builtinMetricsRegistry,
+			wantErr:      true,
+			wantExitCode: true,
+		},
+		{
+			name: "config applying a threshold to an existing metric not supporting its aggregation method",
+			conf: Config{Options: lib.Options{Thresholds: map[string]stats.Thresholds{
+				metrics.HTTPReqFailedName: {Thresholds: []*stats.Threshold{
+					{Parsed: stats.NewThresholdExpression(stats.TokenPercentile, null.NewFloat(99, true), stats.TokenGreater, 1)},
+				}},
+			}}},
+			registry:     builtinMetricsRegistry,
+			wantErr:      true,
+			wantExitCode: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			// TODO: when/if scenario validation is tested, the isExecutable should be part of testCase
+			gotErr := validateConfig(testCase.conf, testCase.registry, func(string) bool { return true })
+
+			assert.Equal(t, testCase.wantErr, gotErr != nil)
+			if testCase.wantErr == true && testCase.wantExitCode == true {
+				var ecerr errext.HasExitCode
+				assert.ErrorAs(t, gotErr, &ecerr)
+				assert.Equal(t, exitcodes.InvalidConfig, ecerr.ExitCode())
+			}
+		})
+	}
+}
+
+func TestValidateThresholdsConfig(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		thresholds []*stats.Threshold
+		metric     *stats.Metric
+		wantErr    bool
+	}{
+		{
+			name: "threshold using count method over Counter metric is valid",
+			thresholds: []*stats.Threshold{
+				{Parsed: stats.NewThresholdExpression(stats.TokenCount, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+			},
+			metric:  &stats.Metric{Type: stats.Counter},
+			wantErr: false,
+		},
+		{
+			name: "threshold using rate method over Counter metric is valid",
+			thresholds: []*stats.Threshold{
+				{Parsed: stats.NewThresholdExpression(stats.TokenRate, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+			},
+			metric:  &stats.Metric{Type: stats.Counter},
+			wantErr: false,
+		},
+		{
+			name: "threshold using unsupported method over Counter metric is invalid",
+			thresholds: []*stats.Threshold{
+				{Parsed: stats.NewThresholdExpression(stats.TokenValue, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+			},
+			metric:  &stats.Metric{Type: stats.Counter},
+			wantErr: true,
+		},
+		{
+			name: "mixed threshold using supported/unsupported method over Counter metric is invalid",
+			thresholds: []*stats.Threshold{
+				{
+					// valid method over counter metric
+					Parsed: stats.NewThresholdExpression(stats.TokenCount, null.FloatFromPtr(nil), stats.TokenGreater, 1),
+				},
+				{
+					// invalid method over counter metric
+					Parsed: stats.NewThresholdExpression(stats.TokenValue, null.FloatFromPtr(nil), stats.TokenGreater, 1),
+				},
+			},
+			metric:  &stats.Metric{Type: stats.Counter},
+			wantErr: true,
+		},
+		{
+			name: "threshold using value method over Gauge metric is valid",
+			thresholds: []*stats.Threshold{
+				{Parsed: stats.NewThresholdExpression(stats.TokenValue, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+			},
+			metric:  &stats.Metric{Type: stats.Gauge},
+			wantErr: false,
+		},
+		{
+			name: "threshold using unsupported method over Gauge metric is invalid",
+			thresholds: []*stats.Threshold{
+				{Parsed: stats.NewThresholdExpression(stats.TokenRate, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+			},
+			metric:  &stats.Metric{Type: stats.Gauge},
+			wantErr: true,
+		},
+		{
+			name: "mixed threshold using supported/unsupported method over Gauge metric is invalid",
+			thresholds: []*stats.Threshold{
+				{
+					// valid method over counter metric
+					Parsed: stats.NewThresholdExpression(stats.TokenValue, null.FloatFromPtr(nil), stats.TokenGreater, 1),
+				},
+				{
+					// invalid method over counter metric
+					Parsed: stats.NewThresholdExpression(stats.TokenRate, null.FloatFromPtr(nil), stats.TokenGreater, 1),
+				},
+			},
+			metric:  &stats.Metric{Type: stats.Gauge},
+			wantErr: true,
+		},
+		{
+			name: "threshold using rate method over Rate metric is valid",
+			thresholds: []*stats.Threshold{
+				{Parsed: stats.NewThresholdExpression(stats.TokenRate, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+			},
+			metric:  &stats.Metric{Type: stats.Rate},
+			wantErr: false,
+		},
+		{
+			name: "threshold using unsupported method over Rate metric is invalid",
+			thresholds: []*stats.Threshold{
+				{Parsed: stats.NewThresholdExpression(stats.TokenAvg, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+			},
+			metric:  &stats.Metric{Type: stats.Rate},
+			wantErr: true,
+		},
+		{
+			name: "mixed threshold using supported/unsupported method over Rate metric is invalid",
+			thresholds: []*stats.Threshold{
+				{
+					// valid method over counter metric
+					Parsed: stats.NewThresholdExpression(stats.TokenRate, null.FloatFromPtr(nil), stats.TokenGreater, 1),
+				},
+				{
+					// invalid method over counter metric
+					Parsed: stats.NewThresholdExpression(stats.TokenAvg, null.FloatFromPtr(nil), stats.TokenGreater, 1),
+				},
+			},
+			metric:  &stats.Metric{Type: stats.Gauge},
+			wantErr: true,
+		},
+
+		{
+			name: "threshold using avg method over Trend metric is valid",
+			thresholds: []*stats.Threshold{
+				{Parsed: stats.NewThresholdExpression(stats.TokenAvg, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+			},
+			metric:  &stats.Metric{Type: stats.Trend},
+			wantErr: false,
+		},
+		{
+			name: "threshold using min method over Trend metric is valid",
+			thresholds: []*stats.Threshold{
+				{Parsed: stats.NewThresholdExpression(stats.TokenMin, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+			},
+			metric:  &stats.Metric{Type: stats.Trend},
+			wantErr: false,
+		},
+		{
+			name: "threshold using med method over Trend metric is valid",
+			thresholds: []*stats.Threshold{
+				{Parsed: stats.NewThresholdExpression(stats.TokenMed, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+			},
+			metric:  &stats.Metric{Type: stats.Trend},
+			wantErr: false,
+		},
+		{
+			name: "threshold using p(N) method over Trend metric is valid",
+			thresholds: []*stats.Threshold{
+				{Parsed: stats.NewThresholdExpression(stats.TokenPercentile, null.NewFloat(99, true), stats.TokenGreater, 1)},
+			},
+			metric:  &stats.Metric{Type: stats.Trend},
+			wantErr: false,
+		},
+		{
+			name: "threshold using unsupported method over Trend metric is invalid",
+			thresholds: []*stats.Threshold{
+				{Parsed: stats.NewThresholdExpression(stats.TokenCount, null.FloatFromPtr(nil), stats.TokenGreater, 1)},
+			},
+			metric:  &stats.Metric{Type: stats.Trend},
+			wantErr: true,
+		},
+		{
+			name: "mixed threshold using supported/unsupported method over Trend metric is invalid",
+			thresholds: []*stats.Threshold{
+				{
+					// valid method over counter metric
+					Parsed: stats.NewThresholdExpression(stats.TokenAvg, null.FloatFromPtr(nil), stats.TokenGreater, 1),
+				},
+				{
+					// invalid method over counter metric
+					Parsed: stats.NewThresholdExpression(stats.TokenCount, null.FloatFromPtr(nil), stats.TokenGreater, 1),
+				},
+			},
+			metric:  &stats.Metric{Type: stats.Trend},
+			wantErr: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			wrappedThresholds := stats.Thresholds{Thresholds: testCase.thresholds}
+
+			gotErr := validateThresholdsConfig("ignoreme", wrappedThresholds, testCase.metric)
+
+			assert.Equal(t, testCase.wantErr, gotErr != nil)
+		})
+	}
+}
+
+// FIXME: Remove these...
+// func TestValidateThresholdsConfigWithNilRegistry(t *testing.T) {
+// 	t.Parallel()
+// 	var registry *metrics.Registry
+// 	config := Config{}
+// 	var wantErrType errext.HasExitCode
+
+// 	gotErr := validateThresholdsConfig(config, registry)
+
+// 	assert.Error(t, gotErr, "validateThresholdsConfig should fail when passed registry is nil")
+// 	assert.ErrorAs(t, gotErr, &wantErrType, "validateThresholdsConfig error should be an instance of errext.HasExitCode")
+// }
+
+// func TestValidateThresholdsConfigAppliesToBuiltinMetrics(t *testing.T) {
+// 	t.Parallel()
+// 	// Prepare a registry loaded with builtin metrics
+// 	registry := metrics.NewRegistry()
+// 	metrics.RegisterBuiltinMetrics(registry)
+
+// 	// Assuming builtin metrics are indeed registered, and
+// 	// thresholds parsing works as expected, we prepare
+// 	// thresholds for a counter builting metric; namely http_reqs
+// 	HTTPReqsThresholds, err := stats.NewThresholds([]string{"count>0", "rate>1"})
+// 	require.NoError(t, err, "instantiating Thresholds with expression 'count>0' should not fail")
+// 	options := lib.Options{
+// 		Thresholds: map[string]stats.Thresholds{
+// 			metrics.HTTPReqsName: HTTPReqsThresholds,
+// 		},
+// 	}
+// 	config := Config{Options: options}
+
+// 	gotErr := validateThresholdsConfig(config, registry)
+
+// 	assert.NoError(t, gotErr, "validateThresholdsConfig should not fail against builtin metrics")
+// }
+
+// func TestValidateThresholdsConfigAppliesToCustomMetrics(t *testing.T) {
+// 	t.Parallel()
+
+// 	// Prepare a registry loaded with both builtin metrics,
+// 	// and a custom counter metric.
+// 	testCounterMetricName := "testcounter"
+// 	registry := metrics.NewRegistry()
+// 	metrics.RegisterBuiltinMetrics(registry)
+// 	_, err := registry.NewMetric(testCounterMetricName, stats.Counter)
+// 	require.NoError(t, err, "registering custom counter metric should not fail")
+
+// 	// Prepare a configuration containing a Threshold
+// 	counterThresholds, err := stats.NewThresholds([]string{"count>0", "rate>1"})
+// 	require.NoError(t, err, "instantiating Thresholds with expression 'count>0' should not fail")
+// 	options := lib.Options{
+// 		Thresholds: map[string]stats.Thresholds{
+// 			testCounterMetricName: counterThresholds,
+// 		},
+// 	}
+// 	config := Config{Options: options}
+
+// 	gotErr := validateThresholdsConfig(config, registry)
+
+// 	// Assert
+// 	assert.NoError(t, gotErr, "validateThresholdsConfig should not fail against existing and valid custom metric")
+// }
+
+// func TestValidateThresholdsConfigFailsOnNonExistingMetric(t *testing.T) {
+// 	t.Parallel()
+
+// 	// Prepare a registry loaded with builtin metrics only
+// 	registry := metrics.NewRegistry()
+// 	metrics.RegisterBuiltinMetrics(registry)
+
+// 	// Prepare a configuration containing a Threshold applying to
+// 	// a non-existing metric
+// 	counterThresholds, err := stats.NewThresholds([]string{"count>0", "rate>1"})
+// 	require.NoError(t, err, "instantiating Thresholds with expression 'count>0' should not fail")
+// 	options := lib.Options{
+// 		Thresholds: map[string]stats.Thresholds{
+// 			"nonexisting": counterThresholds,
+// 		},
+// 	}
+// 	config := Config{Options: options}
+// 	var wantErrType errext.HasExitCode
+
+// 	gotErr := validateThresholdsConfig(config, registry)
+
+// 	// Assert
+// 	assert.Error(t, gotErr, "validateThresholdsConfig should fail on thresholds applied to a non-existing metric")
+// 	assert.ErrorAs(t, gotErr, &wantErrType, "validateThresholdsConfig error should be an instance of errext.HasExitCode")
+// }
+
+// func TestValidateThresholdsConfigFailsOnThresholdInvalidMetricType(t *testing.T) {
+// 	t.Parallel()
+
+// 	// Prepare a registry loaded with builtin metrics only
+// 	registry := metrics.NewRegistry()
+// 	metrics.RegisterBuiltinMetrics(registry)
+
+// 	// Prepare a configuration containing a Threshold using a Counter metric
+// 	// specific aggregation method, against a metric of type Gauge: which doesn't support
+// 	// that method.
+// 	VUsThresholds, err := stats.NewThresholds([]string{"count>0"})
+// 	require.NoError(t, err, "instantiating Thresholds with expression 'count>0' should not fail")
+// 	options := lib.Options{
+// 		Thresholds: map[string]stats.Thresholds{
+// 			metrics.VUsName: VUsThresholds,
+// 		},
+// 	}
+// 	config := Config{Options: options}
+// 	var wantErrType errext.HasExitCode
+
+// 	gotErr := validateThresholdsConfig(config, registry)
+
+// 	// Assert
+// 	assert.Error(t, gotErr, "validateThresholdsConfig should fail applying the count method to a Gauge metric")
+// 	assert.ErrorAs(t, gotErr, &wantErrType, "validateThresholdsConfig error should be an instance of errext.HasExitCode")
+// }

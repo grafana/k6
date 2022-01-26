@@ -38,6 +38,7 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
+	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/stats"
 )
@@ -235,17 +236,21 @@ func applyDefault(conf Config) Config {
 }
 
 func deriveAndValidateConfig(
-	conf Config, isExecutable func(string) bool, logger logrus.FieldLogger,
+	conf Config,
+	registry *metrics.Registry,
+	isExecutable func(string) bool,
+	logger logrus.FieldLogger,
 ) (result Config, err error) {
 	result = conf
 	result.Options, err = executor.DeriveScenariosFromShortcuts(conf.Options, logger)
 	if err == nil {
-		err = validateConfig(result, isExecutable)
+		err = validateConfig(result, registry, isExecutable)
 	}
+
 	return result, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 }
 
-func validateConfig(conf Config, isExecutable func(string) bool) error {
+func validateConfig(conf Config, registry *metrics.Registry, isExecutable func(string) bool) error {
 	errList := conf.Validate()
 
 	for _, ec := range conf.Scenarios {
@@ -254,7 +259,76 @@ func validateConfig(conf Config, isExecutable func(string) bool) error {
 		}
 	}
 
+	// If there are thresholds to validate, the registry paramater is not allowed to be nil.
+	// Note that the reason for passing it as a pointer in the first place is
+	// because it holds a Mutex, which effectively forbids passing it by value.
+	if conf.Thresholds != nil && len(conf.Thresholds) > 0 && registry == nil {
+		err := fmt.Errorf(
+			"unable to validate thresholds configuration; " +
+				"reason: provided registry is nil",
+		)
+		errList = append(errList, err)
+		return consolidateErrorMessage(errList, "there were problems while validating the specified script configuration: ")
+	}
+
+	for thresholdName, thresholds := range conf.Thresholds {
+		// Fetch metric matching the threshold's name
+		metric, ok := registry.Get(thresholdName)
+		if !ok {
+			// The defined threshold applies to a non-existing metrics
+			err := fmt.Errorf("invalid threshold defined on %s; reason: no metric named %s found", thresholdName, thresholdName)
+			return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+		}
+
+		// Validate the threshold definition against its matching
+		// metric.
+		err := validateThresholdsConfig(thresholdName, thresholds, metric)
+		if err != nil {
+			return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+		}
+	}
+
 	return consolidateErrorMessage(errList, "There were problems with the specified script configuration:")
+}
+
+// validateThresholdsConfig validates a threshold definition is consistent with the metric it applies to.
+// Given a threshold name, expressions and a metric to apply the expressions too, validateThresholdConfig will
+// assert that each expression uses an aggregation method that's supported by the provided metric. It returns
+// an error otherwise. Note that this function expects the passed in thresholds to have been parsed already, and
+// have their Parsed (ThresholdExpression) field already filled.
+func validateThresholdsConfig(thresholdName string, expressions stats.Thresholds, metric *stats.Metric) error {
+	var supportedMethods []string
+
+	switch metric.Type {
+	case stats.Counter:
+		supportedMethods = []string{stats.TokenCount, stats.TokenRate}
+	case stats.Gauge:
+		supportedMethods = []string{stats.TokenValue}
+	case stats.Rate:
+		supportedMethods = []string{stats.TokenRate}
+	case stats.Trend:
+		supportedMethods = []string{
+			stats.TokenAvg,
+			stats.TokenMin,
+			stats.TokenMax,
+			stats.TokenMed,
+			stats.TokenPercentile,
+		}
+	}
+
+	for _, expression := range expressions.Thresholds {
+		if !lib.Contains(supportedMethods, expression.Parsed.AggregationMethod) {
+			return fmt.Errorf(
+				"invalid threshold expression %s: '%s'; "+
+					"reason: invalid aggregation method '%s' applied to the '%s' metric. "+
+					"%s is a metric of type %s, did you mean to use the any of the "+
+					"'count' or 'rate' aggregation methods instead?",
+				thresholdName, expression.Source, expression.Parsed.AggregationMethod, thresholdName, thresholdName, metric.Type,
+			)
+		}
+	}
+
+	return nil
 }
 
 func consolidateErrorMessage(errList []error, title string) error {
