@@ -46,7 +46,7 @@ func getStatsCmd(ctx context.Context, globalFlags *commandFlags) *cobra.Command 
 				return err
 			}
 
-			return yamlPrint(stdout, metrics)
+			return yamlPrint(globalFlags.stdout, metrics)
 		},
 	}
 	return statsCmd

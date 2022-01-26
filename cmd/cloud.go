@@ -74,7 +74,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				}
 			}
 			// TODO: disable in quiet mode?
-			_, _ = fmt.Fprintf(stdout, "\n%s\n\n", getBanner(globalFlags.noColor || !stdoutTTY))
+			_, _ = fmt.Fprintf(globalFlags.stdout, "\n%s\n\n", getBanner(globalFlags.noColor || !globalFlags.stdoutTTY))
 
 			progressBar := pb.New(
 				pb.WithConstLeft("Init"),
@@ -230,7 +230,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			executionPlan := derivedConf.Scenarios.GetFullExecutionRequirements(et)
 			printExecutionDescription(
 				"cloud", filename, testURL, derivedConf, et,
-				executionPlan, nil, globalFlags.noColor || !stdoutTTY,
+				executionPlan, nil, globalFlags.noColor || !globalFlags.stdoutTTY, globalFlags,
 			)
 
 			modifyAndPrintBar(
@@ -320,8 +320,8 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				return errext.WithExitCodeIfNone(errors.New("Test progress error"), exitcodes.CloudFailedToGetProgress)
 			}
 
-			valueColor := getColor(globalFlags.noColor || !stdoutTTY, color.FgCyan)
-			fprintf(stdout, "     test status: %s\n", valueColor.Sprint(testProgress.RunStatusText))
+			valueColor := getColor(globalFlags.noColor || !globalFlags.stdoutTTY, color.FgCyan)
+			fprintf(globalFlags.stdout, "     test status: %s\n", valueColor.Sprint(testProgress.RunStatusText))
 
 			if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
 				// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)

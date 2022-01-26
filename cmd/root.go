@@ -45,17 +45,6 @@ import (
 	"go.k6.io/k6/log"
 )
 
-//TODO: remove these global variables
-//nolint:gochecknoglobals
-var (
-	outMutex   = &sync.Mutex{}
-	isDumbTerm = os.Getenv("TERM") == "dumb"
-	stdoutTTY  = !isDumbTerm && (isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()))
-	stderrTTY  = !isDumbTerm && (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()))
-	stdout     = &consoleWriter{colorable.NewColorableStdout(), stdoutTTY, outMutex, nil}
-	stderr     = &consoleWriter{colorable.NewColorableStderr(), stderrTTY, outMutex, nil}
-)
-
 const (
 	defaultConfigFileName   = "config.json"
 	waitRemoteLoggerTimeout = time.Second * 5
@@ -72,6 +61,9 @@ type commandFlags struct {
 	quiet                 bool
 	noColor               bool
 	address               string
+	outMutex              *sync.Mutex
+	stdoutTTY, stderrTTY  bool
+	stdout, stderr        *consoleWriter
 }
 
 func newCommandFlags() *commandFlags {
@@ -87,6 +79,10 @@ func newCommandFlags() *commandFlags {
 		defaultConfigFileName,
 	)
 
+	isDumbTerm := os.Getenv("TERM") == "dumb"
+	stdoutTTY := !isDumbTerm && (isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()))
+	stderrTTY := !isDumbTerm && (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()))
+	outMutex := &sync.Mutex{}
 	return &commandFlags{
 		defaultConfigFilePath: defaultConfigFilePath,  // Updated with the user's config folder in the init() function below
 		configFilePath:        os.Getenv("K6_CONFIG"), // Overridden by `-c`/`--config` flag!
@@ -94,6 +90,11 @@ func newCommandFlags() *commandFlags {
 		showCloudLogs:         true,
 		runType:               os.Getenv("K6_TYPE"),
 		archiveOut:            "archive.tar",
+		outMutex:              outMutex,
+		stdoutTTY:             stdoutTTY,
+		stderrTTY:             stderrTTY,
+		stdout:                &consoleWriter{colorable.NewColorableStdout(), stdoutTTY, outMutex, nil},
+		stderr:                &consoleWriter{colorable.NewColorableStderr(), stderrTTY, outMutex, nil},
 	}
 }
 
@@ -122,7 +123,7 @@ func newRootCommand(ctx context.Context, logger *logrus.Logger, fallbackLogger l
 	c.cmd = &cobra.Command{
 		Use:               "k6",
 		Short:             "a next-generation load generator",
-		Long:              "\n" + getBanner(c.commandFlags.noColor || !stdoutTTY),
+		Long:              "\n" + getBanner(c.commandFlags.noColor || !c.commandFlags.stdoutTTY),
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
@@ -183,7 +184,7 @@ func Execute() {
 	c.cmd.AddCommand(
 		getArchiveCmd(logger, c.commandFlags),
 		getCloudCmd(ctx, logger, c.commandFlags),
-		getConvertCmd(afero.NewOsFs(), stdout),
+		getConvertCmd(afero.NewOsFs(), c.commandFlags.stdout),
 		getInspectCmd(logger, c.commandFlags),
 		loginCmd,
 		getPauseCmd(ctx, c.commandFlags),
@@ -280,11 +281,11 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 	loggerForceColors := false // disable color by default
 	switch c.logOutput {
 	case "stderr":
-		loggerForceColors = !c.commandFlags.noColor && stderrTTY
-		c.logger.SetOutput(stderr)
+		loggerForceColors = !c.commandFlags.noColor && c.commandFlags.stderrTTY
+		c.logger.SetOutput(c.commandFlags.stderr)
 	case "stdout":
-		loggerForceColors = !c.commandFlags.noColor && stdoutTTY
-		c.logger.SetOutput(stdout)
+		loggerForceColors = !c.commandFlags.noColor && c.commandFlags.stdoutTTY
+		c.logger.SetOutput(c.commandFlags.stdout)
 	case "none":
 		c.logger.SetOutput(ioutil.Discard)
 	default:

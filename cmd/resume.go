@@ -50,7 +50,7 @@ func getResumeCmd(ctx context.Context, globalFlags *commandFlags) *cobra.Command
 				return err
 			}
 
-			return yamlPrint(stdout, status)
+			return yamlPrint(globalFlags.stdout, status)
 		},
 	}
 	return resumeCmd
