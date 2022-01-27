@@ -37,7 +37,7 @@ import (
 	"github.com/dop251/goja"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
-	k6types "go.k6.io/k6/lib/types"
+	k6netext "go.k6.io/k6/lib/netext"
 	k6stats "go.k6.io/k6/stats"
 )
 
@@ -54,6 +54,7 @@ type NetworkManager struct {
 	parent       *NetworkManager
 	frameManager *FrameManager
 	credentials  *Credentials
+	resolver     k6netext.Resolver
 
 	// TODO: manage inflight requests seperately (move them between the two maps as they transition from inflight -> completed)
 	reqIDToRequest map[network.RequestID]*Request
@@ -73,6 +74,12 @@ func NewNetworkManager(
 	ctx context.Context, session *Session, manager *FrameManager, parent *NetworkManager,
 ) (*NetworkManager, error) {
 	state := k6lib.GetState(ctx)
+
+	resolver, err := newResolver(state.Options.DNS)
+	if err != nil {
+		return nil, err
+	}
+
 	m := NetworkManager{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
@@ -82,6 +89,7 @@ func NewNetworkManager(
 		session:                        session,
 		parent:                         parent,
 		frameManager:                   manager,
+		resolver:                       resolver,
 		credentials:                    nil,
 		reqIDToRequest:                 make(map[network.RequestID]*Request),
 		reqsMu:                         sync.RWMutex{},
@@ -404,9 +412,19 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 	}
 
 	ip := net.ParseIP(host)
-	if ip == nil {
-		failErr = checkBlockedHosts(host, state.Options.BlockedHostnames.Trie)
-	} else {
+	if ip != nil {
+		failErr = checkBlockedIPs(ip, state.Options.BlacklistIPs)
+		return
+	}
+	failErr = checkBlockedHosts(host, state.Options.BlockedHostnames.Trie)
+	if failErr == nil {
+		// Do one last check of the resolved IP
+		ip, err = m.resolver.LookupIP(host)
+		if err != nil {
+			m.logger.Debugf("NetworkManager:onRequestPaused",
+				"error resolving %q: %s", host, err.Error())
+			return
+		}
 		failErr = checkBlockedIPs(ip, state.Options.BlacklistIPs)
 	}
 }
@@ -428,24 +446,6 @@ func (m *NetworkManager) failOrContinueRequest(event *fetch.EventRequestPaused, 
 		m.logger.Errorf("NetworkManager:onRequestPaused",
 			"error continuing request: %s", err.Error())
 	}
-}
-
-func checkBlockedHosts(host string, blockedHosts *k6types.HostnameTrie) error {
-	if match, blocked := blockedHosts.Contains(host); blocked {
-		return fmt.Errorf("hostname %s is in a blocked pattern (%s)", host, match)
-	}
-	return nil
-}
-
-func checkBlockedIPs(ip net.IP, blockedIPs []*k6lib.IPNet) error {
-	for _, ipnet := range blockedIPs {
-		if ipnet.Contains(ip) {
-			// TODO: Return netext.BlackListedIPError here once its private
-			// fields are exported, or there's a constructor for it.
-			return fmt.Errorf("IP (%s) is in a blacklisted range (%s)", ip, ipnet)
-		}
-	}
-	return nil
 }
 
 func (m *NetworkManager) onRequestServedFromCache(event *network.EventRequestServedFromCache) {

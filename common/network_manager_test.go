@@ -2,6 +2,8 @@ package common
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"testing"
 
 	"github.com/chromedp/cdproto/fetch"
@@ -13,9 +15,12 @@ import (
 	k6lib "go.k6.io/k6/lib"
 	k6metrics "go.k6.io/k6/lib/metrics"
 	k6test "go.k6.io/k6/lib/testutils"
+	k6mockres "go.k6.io/k6/lib/testutils/mockresolver"
 	k6types "go.k6.io/k6/lib/types"
 	k6stats "go.k6.io/k6/stats"
 )
+
+const mockHostname = "host.test"
 
 type testSession struct {
 	*Session
@@ -55,10 +60,22 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 		},
 	}
 
+	mr := k6mockres.New(map[string][]net.IP{
+		mockHostname: {
+			net.ParseIP("127.0.0.10"),
+			net.ParseIP("127.0.0.11"),
+			net.ParseIP("127.0.0.12"),
+			net.ParseIP("2001:db8::10"),
+			net.ParseIP("2001:db8::11"),
+			net.ParseIP("2001:db8::12"),
+		},
+	}, nil)
+
 	nm := &NetworkManager{
-		ctx:     ctx,
-		logger:  logger,
-		session: session,
+		ctx:      ctx,
+		logger:   logger,
+		session:  session,
+		resolver: mr,
 	}
 
 	return nm, session
@@ -74,7 +91,7 @@ func TestOnRequestPausedBlockedHostnames(t *testing.T) {
 		{
 			name:             "ok_fail_simple",
 			blockedHostnames: []string{"*.test"},
-			reqURL:           "http://host.test/",
+			reqURL:           fmt.Sprintf("http://%s/", mockHostname),
 			expCDPCalls:      []string{"Fetch.failRequest"},
 		},
 		{
@@ -138,6 +155,18 @@ func TestOnRequestPausedBlockedIPs(t *testing.T) {
 			blockedIPs:  []string{"10.0.0.0/8", "192.168.0.0/16"},
 			reqURL:      "http://10.0.0.1:8000/",
 			expCDPCalls: []string{"Fetch.failRequest"},
+		},
+		{
+			name:        "ok_fail_resolved_ip",
+			blockedIPs:  []string{"127.0.0.10/32"},
+			reqURL:      fmt.Sprintf("http://%s/", mockHostname),
+			expCDPCalls: []string{"Fetch.failRequest"},
+		},
+		{
+			name:        "ok_continue_resolved_ip",
+			blockedIPs:  []string{"127.0.0.50/32"},
+			reqURL:      fmt.Sprintf("http://%s/", mockHostname),
+			expCDPCalls: []string{"Fetch.continueRequest"},
 		},
 		{
 			name:        "ok_continue_simple",
