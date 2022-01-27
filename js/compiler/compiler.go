@@ -161,8 +161,8 @@ func (c *Compiler) Transform(src, filename string, inputSrcMap []byte) (code str
 			sourceMapEnabled = false
 			inputSrcMap = nil
 			c.logger.WithError(err).Warnf(
-				"The source for `%s` needs to go through babel, but it's source map will"+
-					" not be accepted by babel, so it gets disabled", filename)
+				"The source for `%s` needs to be transpiled by Babel, but its source map will"+
+					" not be accepted by Babel, so it was disabled", filename)
 		}
 	}
 	code, srcMap, err = c.babel.transformImpl(c.logger, src, filename, sourceMapEnabled, inputSrcMap)
@@ -416,7 +416,7 @@ func (c *Pool) Put(co *Compiler) {
 
 func verifySourceMapForBabel(srcMap []byte) error {
 	// this function exists to do what babel checks in sourcemap before we give it to it.
-	m := make(map[string]interface{})
+	m := make(map[string]json.RawMessage)
 	err := json.Unmarshal(srcMap, &m)
 	if err != nil {
 		return fmt.Errorf("source map is not valid json: %w", err)
