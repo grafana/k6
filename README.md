@@ -139,7 +139,7 @@ In case there isn't an official package for your operating system or architectur
 
 k6 is written in Go, so it's just a single statically-linked executable and very easy to build and distribute. To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.16 or newer). Follow these instructions:
 
-- Run `go get go.k6.io/k6` which will:
+- Run `go install go.k6.io/k6` which will:
   - git clone the repo and put the source in `$GOPATH/src/go.k6.io/k6`
   - build a `k6` binary and put it in `$GOPATH/bin`
 - Make sure you have `$GOPATH/bin` in your `PATH` (or copy the `k6` binary somewhere in your `PATH`), so you are able to run k6 from any location.
