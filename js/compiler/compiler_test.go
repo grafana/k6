@@ -229,15 +229,20 @@ func TestCorruptSourceMapOnlyForBabel(t *testing.T) {
 		},
 	}
 	_, _, err := compiler.Compile("class s {};\n//# sourceMappingURL=somefile", "somefile", false)
-	// Ideally we will figure out a way to not error in this case
-	require.Error(t, err)
-	require.Equal(t, err.Error(), `Error: somefile: "version" is a required argument. at <internal/k6/compiler/lib/babel.min.js>:2:28536(109)`)
+	require.NoError(t, err)
+	entries := hook.Drain()
+	require.Len(t, entries, 1)
+	msg, err := entries[0].String() // we need this in order to get the field error
+	require.NoError(t, err)
+
+	require.Contains(t, msg, `needs to go through babel, but it's source map will not be accepted by babel`)
+	require.Contains(t, msg, `source map missing required 'version' field`)
 }
 
 func TestMinimalSourceMap(t *testing.T) {
 	t.Parallel()
 	// this is the minimal sourcemap valid for both go and babel implementations
-	corruptSourceMap := []byte(`{"version": 3, "mappings": ";", "sources": []}`)
+	corruptSourceMap := []byte(`{"version":3,"mappings":";","sources":[]}`)
 
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
@@ -257,4 +262,5 @@ func TestMinimalSourceMap(t *testing.T) {
 	}
 	_, _, err := compiler.Compile("class s {};\n//# sourceMappingURL=somefile", "somefile", false)
 	require.NoError(t, err)
+	require.Empty(t, hook.Drain())
 }

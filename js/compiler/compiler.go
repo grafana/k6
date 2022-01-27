@@ -24,6 +24,7 @@ import (
 	_ "embed" // we need this for embedding Babel
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"sync"
@@ -154,6 +155,16 @@ func (c *Compiler) Transform(src, filename string, inputSrcMap []byte) (code str
 			filename, maxSrcLenForBabelSourceMap)
 	}
 
+	// check that babel will likely be able to parse the inputSrcMap
+	if sourceMapEnabled && len(inputSrcMap) != 0 {
+		if err := verifySourceMapForBabel(inputSrcMap); err != nil {
+			sourceMapEnabled = false
+			inputSrcMap = nil
+			c.logger.WithError(err).Warnf(
+				"The source for `%s` needs to go through babel, but it's source map will"+
+					" not be accepted by babel, so it gets disabled", filename)
+		}
+	}
 	code, srcMap, err = c.babel.transformImpl(c.logger, src, filename, sourceMapEnabled, inputSrcMap)
 	return
 }
@@ -401,4 +412,34 @@ func (c *Pool) Get() *Compiler {
 // Put a compiler back in the pool.
 func (c *Pool) Put(co *Compiler) {
 	c.c <- co
+}
+
+func verifySourceMapForBabel(srcMap []byte) error {
+	// this function exists to do what babel checks in sourcemap before we give it to it.
+	m := make(map[string]interface{})
+	err := json.Unmarshal(srcMap, &m)
+	if err != nil {
+		return fmt.Errorf("source map is not valid json: %w", err)
+	}
+	if v, ok := m["version"]; !ok {
+		return fmt.Errorf("source map missing required 'version' field")
+	} else {
+		// there are no checks on it's value in babel
+		// we technically only support v3 though
+		_ = v
+	}
+
+	// This actually gets checked by the go implementation
+	if v, ok := m["mappings"]; !ok {
+		return fmt.Errorf("source map missing required 'mappings' field")
+	} else {
+		_ = v
+	}
+	if v, ok := m["sources"]; !ok {
+		return fmt.Errorf("source map missing required 'sources' field")
+	} else {
+		// the go implementation checks the value even if it doesn't require it exists
+		_ = v
+	}
+	return nil
 }
