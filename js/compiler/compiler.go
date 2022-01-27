@@ -157,7 +157,7 @@ func (c *Compiler) Transform(src, filename string, inputSrcMap []byte) (code str
 
 	// check that babel will likely be able to parse the inputSrcMap
 	if sourceMapEnabled && len(inputSrcMap) != 0 {
-		if err := verifySourceMapForBabel(inputSrcMap); err != nil {
+		if err = verifySourceMapForBabel(inputSrcMap); err != nil {
 			sourceMapEnabled = false
 			inputSrcMap = nil
 			c.logger.WithError(err).Warnf(
@@ -421,25 +421,19 @@ func verifySourceMapForBabel(srcMap []byte) error {
 	if err != nil {
 		return fmt.Errorf("source map is not valid json: %w", err)
 	}
-	if v, ok := m["version"]; !ok {
+	// there are no checks on it's value in babel
+	// we technically only support v3 though
+	if _, ok := m["version"]; !ok {
 		return fmt.Errorf("source map missing required 'version' field")
-	} else {
-		// there are no checks on it's value in babel
-		// we technically only support v3 though
-		_ = v
 	}
 
-	// This actually gets checked by the go implementation
-	if v, ok := m["mappings"]; !ok {
+	// This actually gets checked by the go implementation so it's not really necessary
+	if _, ok := m["mappings"]; !ok {
 		return fmt.Errorf("source map missing required 'mappings' field")
-	} else {
-		_ = v
 	}
-	if v, ok := m["sources"]; !ok {
+	// the go implementation checks the value even if it doesn't require it exists
+	if _, ok := m["sources"]; !ok {
 		return fmt.Errorf("source map missing required 'sources' field")
-	} else {
-		// the go implementation checks the value even if it doesn't require it exists
-		_ = v
 	}
 	return nil
 }
