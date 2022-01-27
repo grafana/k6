@@ -235,7 +235,7 @@ func TestCorruptSourceMapOnlyForBabel(t *testing.T) {
 	msg, err := entries[0].String() // we need this in order to get the field error
 	require.NoError(t, err)
 
-	require.Contains(t, msg, `needs to go through babel, but it's source map will not be accepted by babel`)
+	require.Contains(t, msg, `needs to be transpiled by Babel, but its source map will not be accepted by Babel`)
 	require.Contains(t, msg, `source map missing required 'version' field`)
 }
 
