@@ -203,5 +203,58 @@ func TestCorruptSourceMap(t *testing.T) {
 	msg, err := entries[0].String() // we need this in order to get the field error
 	require.NoError(t, err)
 
-	require.Contains(t, msg, `Could not load source map: missing \"mappings\" in sourcemap`)
+	require.Contains(t, msg, `Couldn't load source map for somefile`)
+	require.Contains(t, msg, `json: cannot unmarshal number into Go struct field v3.mappings of type string`)
+}
+
+func TestCorruptSourceMapOnlyForBabel(t *testing.T) {
+	t.Parallel()
+	// this a valid source map for the go implementation but babel doesn't like it
+	corruptSourceMap := []byte(`{"mappings": ";"}`)
+
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
+	logger.Out = ioutil.Discard
+	hook := testutils.SimpleLogrusHook{
+		HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.WarnLevel},
+	}
+	logger.AddHook(&hook)
+
+	compiler := New(logger)
+	compiler.Options = Options{
+		CompatibilityMode: lib.CompatibilityModeExtended,
+		Strict:            true,
+		SourceMapLoader: func(string) ([]byte, error) {
+			return corruptSourceMap, nil
+		},
+	}
+	_, _, err := compiler.Compile("class s {};\n//# sourceMappingURL=somefile", "somefile", false)
+	// Ideally we will figure out a way to not error in this case
+	require.Error(t, err)
+	require.Equal(t, err.Error(), `Error: somefile: "version" is a required argument. at <internal/k6/compiler/lib/babel.min.js>:2:28536(109)`)
+}
+
+func TestMinimalSourceMap(t *testing.T) {
+	t.Parallel()
+	// this is the minimal sourcemap valid for both go and babel implementations
+	corruptSourceMap := []byte(`{"version": 3, "mappings": ";", "sources": []}`)
+
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
+	logger.Out = ioutil.Discard
+	hook := testutils.SimpleLogrusHook{
+		HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.WarnLevel},
+	}
+	logger.AddHook(&hook)
+
+	compiler := New(logger)
+	compiler.Options = Options{
+		CompatibilityMode: lib.CompatibilityModeExtended,
+		Strict:            true,
+		SourceMapLoader: func(string) ([]byte, error) {
+			return corruptSourceMap, nil
+		},
+	}
+	_, _, err := compiler.Compile("class s {};\n//# sourceMappingURL=somefile", "somefile", false)
+	require.NoError(t, err)
 }

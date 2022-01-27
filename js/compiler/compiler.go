@@ -31,6 +31,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
+	"github.com/go-sourcemap/sourcemap"
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/lib"
@@ -169,8 +170,9 @@ type compilationState struct {
 	// set when we couldn't load external source map so we can try parsing without loading it
 	couldntLoadSourceMap bool
 	// srcMap is the current full sourceMap that has been generated read so far
-	srcMap []byte
-	main   bool
+	srcMap      []byte
+	srcMapError error
+	main        bool
 
 	compiler *Compiler
 }
@@ -190,16 +192,21 @@ func (c *compilationState) sourceMapLoader(path string) ([]byte, error) {
 		}
 		return c.srcMap, nil
 	}
-	var err error
-	c.srcMap, err = c.compiler.Options.SourceMapLoader(path)
-	if err != nil {
+	c.srcMap, c.srcMapError = c.compiler.Options.SourceMapLoader(path)
+	if c.srcMapError != nil {
 		c.couldntLoadSourceMap = true
-		return nil, err
+		return nil, c.srcMapError
+	}
+	_, c.srcMapError = sourcemap.Parse(path, c.srcMap)
+	if c.srcMapError != nil {
+		c.couldntLoadSourceMap = true
+		c.srcMap = nil
+		return nil, c.srcMapError
 	}
 	if !c.main {
 		return c.increaseMappingsByOne(c.srcMap)
 	}
-	return c.srcMap, err
+	return c.srcMap, nil
 }
 
 func (c *Compiler) compileImpl(
@@ -220,7 +227,7 @@ func (c *Compiler) compileImpl(
 		state.couldntLoadSourceMap = false // reset
 		// we probably don't want to abort scripts which have source maps but they can't be found,
 		// this also will be a breaking change, so if we couldn't we retry with it disabled
-		c.logger.WithError(err).Warnf("Couldn't load source map for %s", filename)
+		c.logger.WithError(state.srcMapError).Warnf("Couldn't load source map for %s", filename)
 		ast, err = parser.ParseFile(nil, filename, code, 0, parser.WithDisableSourceMaps)
 	}
 	if err != nil {
