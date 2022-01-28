@@ -21,20 +21,26 @@
 package chromium
 
 import (
+	"net"
 	"runtime"
 	"testing"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	k6lib "go.k6.io/k6/lib"
 )
 
 func TestBrowserTypeFlags(t *testing.T) {
 	t.Parallel()
 
+	host, err := k6lib.NewHostAddress(net.ParseIP("127.0.0.1"), "8000")
+	require.NoError(t, err)
+
 	testCases := []struct {
 		flag                      string
 		changeOpts                *common.LaunchOptions
+		changeK6Opts              *k6lib.Options
 		expInitVal, expChangedVal interface{}
 		pre                       func(t *testing.T)
 		post                      func(t *testing.T, flags map[string]interface{})
@@ -83,6 +89,19 @@ func TestBrowserTypeFlags(t *testing.T) {
 			},
 		},
 		{
+			flag:       "host-resolver-rules",
+			expInitVal: nil,
+			changeOpts: &common.LaunchOptions{Args: []string{
+				`host-resolver-rules="MAP * www.example.com, EXCLUDE *.youtube.*"`}},
+			changeK6Opts: &k6lib.Options{
+				Hosts: map[string]*k6lib.HostAddress{
+					"test.k6.io":         host,
+					"httpbin.test.k6.io": host,
+				}},
+			expChangedVal: "MAP * www.example.com, EXCLUDE *.youtube.*," +
+				"MAP httpbin.test.k6.io 127.0.0.1:8000,MAP test.k6.io 127.0.0.1:8000",
+		},
+		{
 			flag:       "enable-use-zoom-for-dsf",
 			expInitVal: false,
 			pre: func(t *testing.T) {
@@ -115,7 +134,7 @@ func TestBrowserTypeFlags(t *testing.T) {
 
 			var (
 				bt    BrowserType
-				flags = bt.flags(&common.LaunchOptions{})
+				flags = bt.flags(&common.LaunchOptions{}, nil)
 			)
 
 			if tc.expInitVal != nil {
@@ -125,8 +144,8 @@ func TestBrowserTypeFlags(t *testing.T) {
 				require.NotContains(t, flags, tc.flag)
 			}
 
-			if tc.changeOpts != nil {
-				flags = bt.flags(tc.changeOpts)
+			if tc.changeOpts != nil || tc.changeK6Opts != nil {
+				flags = bt.flags(tc.changeOpts, tc.changeK6Opts)
 				if tc.expChangedVal != nil {
 					assert.Equal(t, tc.expChangedVal, flags[tc.flag])
 				}

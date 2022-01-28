@@ -27,6 +27,7 @@ import (
 	"os"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -76,9 +77,11 @@ func (b *BrowserType) ExecutablePath() string {
 
 // Launch creates a new client to remote control a Chrome browser.
 func (b *BrowserType) Launch(opts goja.Value) api.Browser {
-	rt := k6common.GetRuntime(b.Ctx)
-
-	launchOpts := common.NewLaunchOptions()
+	var (
+		rt         = k6common.GetRuntime(b.Ctx)
+		state      = k6lib.GetState(b.Ctx)
+		launchOpts = common.NewLaunchOptions()
+	)
 	launchOpts.Parse(b.Ctx, opts)
 
 	b.Ctx = common.WithLaunchOptions(b.Ctx, launchOpts)
@@ -88,7 +91,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	allocator := NewAllocator(b.flags(launchOpts), envs)
+	allocator := NewAllocator(b.flags(launchOpts, &state.Options), envs)
 	browserProc, err := allocator.Allocate(b.Ctx, launchOpts)
 	if browserProc == nil {
 		k6common.Throw(rt, fmt.Errorf("cannot allocate browser: %w", err))
@@ -121,7 +124,7 @@ func (b *BrowserType) Name() string {
 	return "chromium"
 }
 
-func (b *BrowserType) flags(lopts *common.LaunchOptions) map[string]interface{} {
+func (b *BrowserType) flags(lopts *common.LaunchOptions, k6opts *k6lib.Options) map[string]interface{} {
 	// After Puppeteer's and Playwright's default behavior.
 	f := map[string]interface{}{
 		"disable-background-networking":                      true,
@@ -167,6 +170,7 @@ func (b *BrowserType) flags(lopts *common.LaunchOptions) map[string]interface{} 
 	}
 
 	setFlagsFromArgs(f, lopts.Args)
+	setFlagsFromK6Options(f, k6opts)
 
 	return f
 }
@@ -204,4 +208,29 @@ func setFlagsFromArgs(flags map[string]interface{}, args []string) {
 		}
 		flags[argname] = argval
 	}
+}
+
+func setFlagsFromK6Options(flags map[string]interface{}, k6opts *k6lib.Options) {
+	if k6opts == nil {
+		return
+	}
+
+	hostResolver := []string{}
+	if currHostResolver, ok := flags["host-resolver-rules"]; ok {
+		hostResolver = append(hostResolver, fmt.Sprintf("%s", currHostResolver))
+	}
+	sortedHostKeys := sortHosts(k6opts.Hosts)
+	for _, k := range sortedHostKeys {
+		hostResolver = append(hostResolver, fmt.Sprintf("MAP %s %s", k, k6opts.Hosts[k]))
+	}
+	flags["host-resolver-rules"] = strings.Join(hostResolver, ",")
+}
+
+func sortHosts(m map[string]*k6lib.HostAddress) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
