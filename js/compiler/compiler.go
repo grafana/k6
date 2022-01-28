@@ -24,6 +24,7 @@ import (
 	_ "embed" // we need this for embedding Babel
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"sync"
@@ -31,6 +32,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
+	"github.com/go-sourcemap/sourcemap"
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/lib"
@@ -153,6 +155,16 @@ func (c *Compiler) Transform(src, filename string, inputSrcMap []byte) (code str
 			filename, maxSrcLenForBabelSourceMap)
 	}
 
+	// check that babel will likely be able to parse the inputSrcMap
+	if sourceMapEnabled && len(inputSrcMap) != 0 {
+		if err = verifySourceMapForBabel(inputSrcMap); err != nil {
+			sourceMapEnabled = false
+			inputSrcMap = nil
+			c.logger.WithError(err).Warnf(
+				"The source for `%s` needs to be transpiled by Babel, but its source map will"+
+					" not be accepted by Babel, so it was disabled", filename)
+		}
+	}
 	code, srcMap, err = c.babel.transformImpl(c.logger, src, filename, sourceMapEnabled, inputSrcMap)
 	return
 }
@@ -169,8 +181,9 @@ type compilationState struct {
 	// set when we couldn't load external source map so we can try parsing without loading it
 	couldntLoadSourceMap bool
 	// srcMap is the current full sourceMap that has been generated read so far
-	srcMap []byte
-	main   bool
+	srcMap      []byte
+	srcMapError error
+	main        bool
 
 	compiler *Compiler
 }
@@ -190,16 +203,21 @@ func (c *compilationState) sourceMapLoader(path string) ([]byte, error) {
 		}
 		return c.srcMap, nil
 	}
-	var err error
-	c.srcMap, err = c.compiler.Options.SourceMapLoader(path)
-	if err != nil {
+	c.srcMap, c.srcMapError = c.compiler.Options.SourceMapLoader(path)
+	if c.srcMapError != nil {
 		c.couldntLoadSourceMap = true
-		return nil, err
+		return nil, c.srcMapError
+	}
+	_, c.srcMapError = sourcemap.Parse(path, c.srcMap)
+	if c.srcMapError != nil {
+		c.couldntLoadSourceMap = true
+		c.srcMap = nil
+		return nil, c.srcMapError
 	}
 	if !c.main {
 		return c.increaseMappingsByOne(c.srcMap)
 	}
-	return c.srcMap, err
+	return c.srcMap, nil
 }
 
 func (c *Compiler) compileImpl(
@@ -220,7 +238,7 @@ func (c *Compiler) compileImpl(
 		state.couldntLoadSourceMap = false // reset
 		// we probably don't want to abort scripts which have source maps but they can't be found,
 		// this also will be a breaking change, so if we couldn't we retry with it disabled
-		c.logger.WithError(err).Warnf("Couldn't load source map for %s", filename)
+		c.logger.WithError(state.srcMapError).Warnf("Couldn't load source map for %s", filename)
 		ast, err = parser.ParseFile(nil, filename, code, 0, parser.WithDisableSourceMaps)
 	}
 	if err != nil {
@@ -394,4 +412,28 @@ func (c *Pool) Get() *Compiler {
 // Put a compiler back in the pool.
 func (c *Pool) Put(co *Compiler) {
 	c.c <- co
+}
+
+func verifySourceMapForBabel(srcMap []byte) error {
+	// this function exists to do what babel checks in sourcemap before we give it to it.
+	m := make(map[string]json.RawMessage)
+	err := json.Unmarshal(srcMap, &m)
+	if err != nil {
+		return fmt.Errorf("source map is not valid json: %w", err)
+	}
+	// there are no checks on it's value in babel
+	// we technically only support v3 though
+	if _, ok := m["version"]; !ok {
+		return fmt.Errorf("source map missing required 'version' field")
+	}
+
+	// This actually gets checked by the go implementation so it's not really necessary
+	if _, ok := m["mappings"]; !ok {
+		return fmt.Errorf("source map missing required 'mappings' field")
+	}
+	// the go implementation checks the value even if it doesn't require it exists
+	if _, ok := m["sources"]; !ok {
+		return fmt.Errorf("source map missing required 'sources' field")
+	}
+	return nil
 }
