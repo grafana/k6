@@ -37,7 +37,7 @@ import (
 	"go.k6.io/k6/lib/types"
 )
 
-func getInspectCmd(logger *logrus.Logger) *cobra.Command {
+func getInspectCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Command {
 	var addExecReqs bool
 
 	// inspectCmd represents the inspect command
@@ -60,7 +60,11 @@ func getInspectCmd(logger *logrus.Logger) *cobra.Command {
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 
 			var b *js.Bundle
-			switch getRunType(src) {
+			typ := globalFlags.runType
+			if typ == "" {
+				typ = detectType(src.Data)
+			}
+			switch typ {
 			// this is an exhaustive list
 			case typeArchive:
 				var arc *lib.Archive
@@ -81,7 +85,7 @@ func getInspectCmd(logger *logrus.Logger) *cobra.Command {
 			inspectOutput := interface{}(b.Options)
 
 			if addExecReqs {
-				inspectOutput, err = addExecRequirements(b, builtinMetrics, registry, logger)
+				inspectOutput, err = addExecRequirements(b, builtinMetrics, registry, logger, globalFlags)
 				if err != nil {
 					return err
 				}
@@ -99,7 +103,7 @@ func getInspectCmd(logger *logrus.Logger) *cobra.Command {
 
 	inspectCmd.Flags().SortFlags = false
 	inspectCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
-	inspectCmd.Flags().StringVarP(&runType, "type", "t", runType, "override file `type`, \"js\" or \"archive\"")
+	inspectCmd.Flags().StringVarP(&globalFlags.runType, "type", "t", globalFlags.runType, "override file `type`, \"js\" or \"archive\"") //nolint:lll
 	inspectCmd.Flags().BoolVar(&addExecReqs,
 		"execution-requirements",
 		false,
@@ -110,7 +114,7 @@ func getInspectCmd(logger *logrus.Logger) *cobra.Command {
 
 func addExecRequirements(b *js.Bundle,
 	builtinMetrics *metrics.BuiltinMetrics, registry *metrics.Registry,
-	logger *logrus.Logger) (interface{}, error) {
+	logger *logrus.Logger, globalFlags *commandFlags) (interface{}, error) {
 	// TODO: after #1048 issue, consider rewriting this without a Runner:
 	// just creating ExecutionPlan directly from validated options
 
@@ -119,7 +123,8 @@ func addExecRequirements(b *js.Bundle,
 		return nil, err
 	}
 
-	conf, err := getConsolidatedConfig(afero.NewOsFs(), Config{}, runner.GetOptions(), buildEnvMap(os.Environ()))
+	conf, err := getConsolidatedConfig(
+		afero.NewOsFs(), Config{}, runner.GetOptions(), buildEnvMap(os.Environ()), globalFlags)
 	if err != nil {
 		return nil, err
 	}

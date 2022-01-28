@@ -35,7 +35,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
-	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -62,7 +61,7 @@ var _ io.Writer = mockWriter{}
 
 func getFiles(t *testing.T, fs afero.Fs) map[string]*bytes.Buffer {
 	result := map[string]*bytes.Buffer{}
-	walkFn := func(filePath string, info os.FileInfo, err error) error {
+	walkFn := func(filePath string, _ os.FileInfo, err error) error {
 		if filePath == "/" || filePath == "\\" {
 			return nil
 		}
@@ -135,8 +134,8 @@ func TestHandleSummaryResultError(t *testing.T) {
 	assertEqual(t, "file summary 2", files[filePath2])
 }
 
-//nolint:paralleltest // this test touchs RunType which is global variable
 func TestAbortTest(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		testFilename, expLogOutput string
 	}{
@@ -155,9 +154,10 @@ func TestAbortTest(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases { //nolint: paralleltest
+	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.testFilename, func(t *testing.T) {
+			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -169,12 +169,7 @@ func TestAbortTest(t *testing.T) {
 			}
 			logger.AddHook(&hook)
 
-			cmd := getRunCmd(ctx, logger)
-			// Redefine the flag to avoid a nil pointer panic on lookup.
-			cmd.Flags().AddFlag(&pflag.Flag{
-				Name:   "address",
-				Hidden: true,
-			})
+			cmd := getRunCmd(ctx, logger, newCommandFlags())
 			a, err := filepath.Abs(path.Join("testdata", tc.testFilename))
 			require.NoError(t, err)
 			cmd.SetArgs([]string{a})
@@ -205,7 +200,7 @@ func TestInitErrExitCode(t *testing.T) {
 	defer cancel()
 	logger := testutils.NewLogger(t)
 
-	cmd := getRunCmd(ctx, logger)
+	cmd := getRunCmd(ctx, logger, newCommandFlags())
 	a, err := filepath.Abs("testdata/initerr.js")
 	require.NoError(t, err)
 	cmd.SetArgs([]string{a})

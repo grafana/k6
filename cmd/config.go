@@ -115,16 +115,16 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 // an error will be returned.
 // If there's no custom config specified and no file exists in the default config path, it will
 // return an empty config struct, the default config location and *no* error.
-func readDiskConfig(fs afero.Fs) (Config, string, error) {
-	realConfigFilePath := configFilePath
+func readDiskConfig(fs afero.Fs, globalFlags *commandFlags) (Config, string, error) {
+	realConfigFilePath := globalFlags.configFilePath
 	if realConfigFilePath == "" {
 		// The user didn't specify K6_CONFIG or --config, use the default path
-		realConfigFilePath = defaultConfigFilePath
+		realConfigFilePath = globalFlags.defaultConfigFilePath
 	}
 
 	// Try to see if the file exists in the supplied filesystem
 	if _, err := fs.Stat(realConfigFilePath); err != nil {
-		if os.IsNotExist(err) && configFilePath == "" {
+		if os.IsNotExist(err) && globalFlags.configFilePath == "" {
 			// If the file doesn't exist, but it was the default config file (i.e. the user
 			// didn't specify anything), silence the error
 			err = nil
@@ -177,11 +177,11 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
 func getConsolidatedConfig(
-	fs afero.Fs, cliConf Config, runnerOpts lib.Options, envMap map[string]string,
+	fs afero.Fs, cliConf Config, runnerOpts lib.Options, envMap map[string]string, globalFlags *commandFlags,
 ) (conf Config, err error) {
 	// TODO: use errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig) where it makes sense?
 
-	fileConf, _, err := readDiskConfig(fs)
+	fileConf, _, err := readDiskConfig(fs, globalFlags)
 	if err != nil {
 		return conf, err
 	}

@@ -30,7 +30,7 @@ import (
 	"go.k6.io/k6/api/v1/client"
 )
 
-func getScaleCmd(ctx context.Context) *cobra.Command {
+func getScaleCmd(ctx context.Context, globalFlags *commandFlags) *cobra.Command {
 	// scaleCmd represents the scale command
 	scaleCmd := &cobra.Command{
 		Use:   "scale",
@@ -45,7 +45,7 @@ func getScaleCmd(ctx context.Context) *cobra.Command {
 				return errors.New("Specify either -u/--vus or -m/--max") //nolint:golint,stylecheck
 			}
 
-			c, err := client.New(address)
+			c, err := client.New(globalFlags.address)
 			if err != nil {
 				return err
 			}
@@ -54,7 +54,7 @@ func getScaleCmd(ctx context.Context) *cobra.Command {
 				return err
 			}
 
-			return yamlPrint(stdout, status)
+			return yamlPrint(globalFlags.stdout, status)
 		},
 	}
 

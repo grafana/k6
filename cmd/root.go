@@ -45,35 +45,58 @@ import (
 	"go.k6.io/k6/log"
 )
 
-//TODO: remove these global variables
-//nolint:gochecknoglobals
-var (
-	outMutex   = &sync.Mutex{}
-	isDumbTerm = os.Getenv("TERM") == "dumb"
-	stdoutTTY  = !isDumbTerm && (isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()))
-	stderrTTY  = !isDumbTerm && (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()))
-	stdout     = &consoleWriter{colorable.NewColorableStdout(), stdoutTTY, outMutex, nil}
-	stderr     = &consoleWriter{colorable.NewColorableStderr(), stderrTTY, outMutex, nil}
-)
-
 const (
 	defaultConfigFileName   = "config.json"
 	waitRemoteLoggerTimeout = time.Second * 5
 )
 
-//TODO: remove these global variables
-//nolint:gochecknoglobals
-var defaultConfigFilePath = defaultConfigFileName // Updated with the user's config folder in the init() function below
-//nolint:gochecknoglobals
-var configFilePath = os.Getenv("K6_CONFIG") // Overridden by `-c`/`--config` flag!
+// TODO better name - there are other command flags these are just ... non lib.Options ones :shrug:
+type commandFlags struct {
+	defaultConfigFilePath string
+	configFilePath        string
+	exitOnRunning         bool
+	showCloudLogs         bool
+	runType               string
+	archiveOut            string
+	quiet                 bool
+	noColor               bool
+	address               string
+	outMutex              *sync.Mutex
+	stdoutTTY, stderrTTY  bool
+	stdout, stderr        *consoleWriter
+}
 
-//nolint:gochecknoglobals
-var (
-	// TODO: have environment variables for configuring these? hopefully after we move away from global vars though...
-	quiet   bool
-	noColor bool
-	address string
-)
+func newCommandFlags() *commandFlags {
+	confDir, err := os.UserConfigDir()
+	if err != nil {
+		logrus.WithError(err).Warn("could not get config directory")
+		confDir = ".config"
+	}
+	defaultConfigFilePath := filepath.Join(
+		confDir,
+		"loadimpact",
+		"k6",
+		defaultConfigFileName,
+	)
+
+	isDumbTerm := os.Getenv("TERM") == "dumb"
+	stdoutTTY := !isDumbTerm && (isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()))
+	stderrTTY := !isDumbTerm && (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()))
+	outMutex := &sync.Mutex{}
+	return &commandFlags{
+		defaultConfigFilePath: defaultConfigFilePath,  // Updated with the user's config folder in the init() function below
+		configFilePath:        os.Getenv("K6_CONFIG"), // Overridden by `-c`/`--config` flag!
+		exitOnRunning:         os.Getenv("K6_EXIT_ON_RUNNING") != "",
+		showCloudLogs:         true,
+		runType:               os.Getenv("K6_TYPE"),
+		archiveOut:            "archive.tar",
+		outMutex:              outMutex,
+		stdoutTTY:             stdoutTTY,
+		stderrTTY:             stderrTTY,
+		stdout:                &consoleWriter{colorable.NewColorableStdout(), stdoutTTY, outMutex, nil},
+		stderr:                &consoleWriter{colorable.NewColorableStderr(), stderrTTY, outMutex, nil},
+	}
+}
 
 // This is to keep all fields needed for the main/root k6 command
 type rootCommand struct {
@@ -86,6 +109,7 @@ type rootCommand struct {
 	logFmt         string
 	loggerIsRemote bool
 	verbose        bool
+	commandFlags   *commandFlags
 }
 
 func newRootCommand(ctx context.Context, logger *logrus.Logger, fallbackLogger logrus.FieldLogger) *rootCommand {
@@ -93,28 +117,17 @@ func newRootCommand(ctx context.Context, logger *logrus.Logger, fallbackLogger l
 		ctx:            ctx,
 		logger:         logger,
 		fallbackLogger: fallbackLogger,
+		commandFlags:   newCommandFlags(),
 	}
 	// the base command when called without any subcommands.
 	c.cmd = &cobra.Command{
 		Use:               "k6",
 		Short:             "a next-generation load generator",
-		Long:              "\n" + getBanner(noColor || !stdoutTTY),
+		Long:              "\n" + getBanner(c.commandFlags.noColor || !c.commandFlags.stdoutTTY),
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
 	}
-
-	confDir, err := os.UserConfigDir()
-	if err != nil {
-		logrus.WithError(err).Warn("could not get config directory")
-		confDir = ".config"
-	}
-	defaultConfigFilePath = filepath.Join(
-		confDir,
-		"loadimpact",
-		"k6",
-		defaultConfigFileName,
-	)
 
 	c.cmd.PersistentFlags().AddFlagSet(c.rootCmdPersistentFlagSet())
 	return c
@@ -164,19 +177,22 @@ func Execute() {
 	c := newRootCommand(ctx, logger, fallbackLogger)
 
 	loginCmd := getLoginCmd()
-	loginCmd.AddCommand(getLoginCloudCommand(logger), getLoginInfluxDBCommand(logger))
+	loginCmd.AddCommand(
+		getLoginCloudCommand(logger, c.commandFlags),
+		getLoginInfluxDBCommand(logger, c.commandFlags),
+	)
 	c.cmd.AddCommand(
-		getArchiveCmd(logger),
-		getCloudCmd(ctx, logger),
-		getConvertCmd(afero.NewOsFs(), stdout),
-		getInspectCmd(logger),
+		getArchiveCmd(logger, c.commandFlags),
+		getCloudCmd(ctx, logger, c.commandFlags),
+		getConvertCmd(afero.NewOsFs(), c.commandFlags.stdout),
+		getInspectCmd(logger, c.commandFlags),
 		loginCmd,
-		getPauseCmd(ctx),
-		getResumeCmd(ctx),
-		getScaleCmd(ctx),
-		getRunCmd(ctx, logger),
-		getStatsCmd(ctx),
-		getStatusCmd(ctx),
+		getPauseCmd(ctx, c.commandFlags),
+		getResumeCmd(ctx, c.commandFlags),
+		getScaleCmd(ctx, c.commandFlags),
+		getRunCmd(ctx, logger, c.commandFlags),
+		getStatsCmd(ctx, c.commandFlags),
+		getStatusCmd(ctx, c.commandFlags),
 		getVersionCmd(),
 	)
 
@@ -227,18 +243,18 @@ func (c *rootCommand) rootCmdPersistentFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	// TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
 	flags.BoolVarP(&c.verbose, "verbose", "v", false, "enable verbose logging")
-	flags.BoolVarP(&quiet, "quiet", "q", false, "disable progress updates")
-	flags.BoolVar(&noColor, "no-color", false, "disable colored output")
+	flags.BoolVarP(&c.commandFlags.quiet, "quiet", "q", false, "disable progress updates")
+	flags.BoolVar(&c.commandFlags.noColor, "no-color", false, "disable colored output")
 	flags.StringVar(&c.logOutput, "log-output", "stderr",
 		"change the output for k6 logs, possible values are stderr,stdout,none,loki[=host:port]")
 	flags.StringVar(&c.logFmt, "logformat", "", "log output format") // TODO rename to log-format and warn on old usage
-	flags.StringVarP(&address, "address", "a", "localhost:6565", "address for the api server")
+	flags.StringVarP(&c.commandFlags.address, "address", "a", "localhost:6565", "address for the api server")
 
 	// TODO: Fix... This default value needed, so both CLI flags and environment variables work
-	flags.StringVarP(&configFilePath, "config", "c", configFilePath, "JSON config file")
+	flags.StringVarP(&c.commandFlags.configFilePath, "config", "c", c.commandFlags.configFilePath, "JSON config file")
 	// And we also need to explicitly set the default value for the usage message here, so things
 	// like `K6_CONFIG="blah" k6 run -h` don't produce a weird usage message
-	flags.Lookup("config").DefValue = defaultConfigFilePath
+	flags.Lookup("config").DefValue = c.commandFlags.defaultConfigFilePath
 	must(cobra.MarkFlagFilename(flags, "config"))
 	return flags
 }
@@ -265,11 +281,11 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 	loggerForceColors := false // disable color by default
 	switch c.logOutput {
 	case "stderr":
-		loggerForceColors = !noColor && stderrTTY
-		c.logger.SetOutput(stderr)
+		loggerForceColors = !c.commandFlags.noColor && c.commandFlags.stderrTTY
+		c.logger.SetOutput(c.commandFlags.stderr)
 	case "stdout":
-		loggerForceColors = !noColor && stdoutTTY
-		c.logger.SetOutput(stdout)
+		loggerForceColors = !c.commandFlags.noColor && c.commandFlags.stdoutTTY
+		c.logger.SetOutput(c.commandFlags.stdout)
 	case "none":
 		c.logger.SetOutput(ioutil.Discard)
 	default:
@@ -294,7 +310,7 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 		c.logger.SetFormatter(&logrus.JSONFormatter{})
 		c.logger.Debug("Logger format: JSON")
 	default:
-		c.logger.SetFormatter(&logrus.TextFormatter{ForceColors: loggerForceColors, DisableColors: noColor})
+		c.logger.SetFormatter(&logrus.TextFormatter{ForceColors: loggerForceColors, DisableColors: c.commandFlags.noColor})
 		c.logger.Debug("Logger format: TEXT")
 	}
 	return ch, nil
