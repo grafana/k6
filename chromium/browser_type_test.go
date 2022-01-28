@@ -32,101 +32,68 @@ import (
 func TestBrowserTypeFlags(t *testing.T) {
 	t.Parallel()
 
-	t.Run("devtools", func(t *testing.T) {
-		t.Parallel()
+	testCases := []struct {
+		flag                      string
+		changeOpts                *common.LaunchOptions
+		expInitVal, expChangedVal interface{}
+		pre                       func(t *testing.T)
+		post                      func(t *testing.T, flags map[string]interface{})
+	}{
+		{
+			flag:          "auto-open-devtools-for-tabs",
+			expInitVal:    false,
+			changeOpts:    &common.LaunchOptions{Devtools: true},
+			expChangedVal: true,
+		},
+		{
+			flag:       "enable-use-zoom-for-dsf",
+			expInitVal: false,
+			pre: func(t *testing.T) {
+				if runtime.GOOS != "darwin" {
+					t.Skip()
+				}
+			},
+		},
+		{
+			flag:          "headless",
+			expInitVal:    false,
+			changeOpts:    &common.LaunchOptions{Headless: true},
+			expChangedVal: true,
+			post: func(t *testing.T, flags map[string]interface{}) {
+				extraFlags := []string{"hide-scrollbars", "mute-audio", "blink-settings"}
+				for _, f := range extraFlags {
+					assert.Contains(t, flags, f)
+				}
+			},
+		},
+	}
 
-		const devToolsFlag = "auto-open-devtools-for-tabs"
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.flag, func(t *testing.T) {
+			t.Parallel()
+			if tc.pre != nil {
+				tc.pre(t)
+			}
 
-		var (
-			bt    BrowserType
-			lopts = &common.LaunchOptions{}
-		)
+			var (
+				bt    BrowserType
+				flags = bt.flags(&common.LaunchOptions{})
+			)
 
-		flags := bt.flags(lopts)
-		require.Contains(t, flags, devToolsFlag)
+			if tc.expInitVal != nil {
+				require.Contains(t, flags, tc.flag)
+				assert.Equal(t, tc.expInitVal, flags[tc.flag])
+			}
 
-		_, ok := flags[devToolsFlag].(bool)
-		require.Truef(t, ok, "%q should be a bool", devToolsFlag)
+			if tc.changeOpts != nil {
+				flags = bt.flags(tc.changeOpts)
+				assert.Equal(t, tc.expChangedVal, flags[tc.flag])
+			}
 
-		lopts.Devtools = false
-		assert.Falsef(t,
-			flags[devToolsFlag].(bool),
-			"%q should also be false if launch options Devtools is false", devToolsFlag,
-		)
-
-		flags = bt.flags(&common.LaunchOptions{
-			Devtools: true,
+			if tc.post != nil {
+				tc.post(t, flags)
+			}
 		})
-		assert.Truef(t,
-			flags[devToolsFlag].(bool),
-			"%q should be true when launch options Devtools is true", devToolsFlag,
-		)
-	})
-
-	t.Run("headless", func(t *testing.T) {
-		t.Parallel()
-
-		const headlessFlag = "headless"
-
-		var (
-			bt    BrowserType
-			lopts = &common.LaunchOptions{}
-		)
-
-		flags := bt.flags(lopts)
-		require.Contains(t, flags, headlessFlag)
-
-		_, ok := flags[headlessFlag].(bool)
-		require.Truef(t, ok, "%q should be a bool", headlessFlag)
-
-		lopts.Headless = false
-		assert.Falsef(t,
-			flags[headlessFlag].(bool),
-			"%q should also be false if launch options Headless is false", headlessFlag,
-		)
-
-		flags = bt.flags(&common.LaunchOptions{
-			Headless: true,
-		})
-		assert.Truef(t,
-			flags[headlessFlag].(bool),
-			"%q should be true when launch options Headless is true", headlessFlag,
-		)
-	})
-
-	t.Run("headless/enabled", func(t *testing.T) {
-		t.Parallel()
-
-		var (
-			before, after int
-			bt            BrowserType
-			lopts         = &common.LaunchOptions{}
-		)
-
-		lopts.Headless = false
-		before = len(bt.flags(lopts))
-
-		lopts.Headless = true
-		after = len(bt.flags(lopts))
-
-		assert.NotEqual(t, before, after, "enabling headless mode did not add flags")
-	})
-
-	t.Run("darwin", func(t *testing.T) {
-		t.Parallel()
-		if runtime.GOOS != "darwin" {
-			t.Skip()
-		}
-
-		const zoomFlag = "enable-use-zoom-for-dsf"
-
-		var bt BrowserType
-		f := bt.flags(&common.LaunchOptions{})
-
-		assert.Containsf(t, f, zoomFlag, "%q should exist for OSX (darwin)", zoomFlag)
-
-		flag, ok := f[zoomFlag].(bool)
-		require.Truef(t, ok, "%q should be a bool", zoomFlag)
-		assert.False(t, flag, zoomFlag)
-	})
+	}
 }
