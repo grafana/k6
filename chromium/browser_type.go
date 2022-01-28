@@ -27,6 +27,7 @@ import (
 	"os"
 	"regexp"
 	"runtime"
+	"strings"
 
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-browser/api"
@@ -164,6 +165,9 @@ func (b *BrowserType) flags(lopts *common.LaunchOptions) map[string]interface{} 
 		f["mute-audio"] = true
 		f["blink-settings"] = "primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4"
 	}
+
+	setFlagsFromArgs(f, lopts.Args)
+
 	return f
 }
 
@@ -188,4 +192,16 @@ func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*common.
 		logger.ReportCaller()
 	}
 	return logger, nil
+}
+
+func setFlagsFromArgs(flags map[string]interface{}, args []string) {
+	var argname, argval string
+	for _, arg := range args {
+		pair := strings.SplitN(arg, "=", 2)
+		argname, argval = strings.TrimSpace(pair[0]), ""
+		if len(pair) > 1 {
+			argval = common.TrimQuotes(strings.TrimSpace(pair[1]))
+		}
+		flags[argname] = argval
+	}
 }

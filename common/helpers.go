@@ -277,3 +277,16 @@ func k6ThrowUnsafe(ctx context.Context, format string, a ...interface{}) {
 // tb := testBrowser(t, withContext(ctx))
 // cancel()
 var k6ThrowOnce sync.Once
+
+// TrimQuotes removes surrounding single or double quotes from s.
+// We're not using strings.Trim() to avoid trimming unbalanced values,
+// e.g. `"'arg` shouldn't change.
+// Source: https://stackoverflow.com/a/48451906
+func TrimQuotes(s string) string {
+	if len(s) >= 2 {
+		if c := s[len(s)-1]; s[0] == c && (c == '"' || c == '\'') {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
+}

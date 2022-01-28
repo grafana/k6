@@ -22,6 +22,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -76,10 +77,10 @@ func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value) error {
 			switch k {
 			case "args":
 				v := opts.Get(k)
-				switch v.ExportType() {
-				case reflect.TypeOf(goja.Object{}):
-					args := v.Export().([]string)
-					l.Args = append(l.Args, args...)
+				if args, ok := v.Export().([]interface{}); ok {
+					for _, argv := range args {
+						l.Args = append(l.Args, fmt.Sprintf("%v", argv))
+					}
 				}
 			case "debug":
 				l.Debug = opts.Get(k).ToBoolean()

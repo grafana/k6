@@ -46,6 +46,43 @@ func TestBrowserTypeFlags(t *testing.T) {
 			expChangedVal: true,
 		},
 		{
+			flag:          "browser-arg",
+			expInitVal:    nil,
+			changeOpts:    &common.LaunchOptions{Args: []string{"browser-arg=value"}},
+			expChangedVal: "value",
+		},
+		{
+			flag:          "browser-arg-flag",
+			expInitVal:    nil,
+			changeOpts:    &common.LaunchOptions{Args: []string{"browser-arg-flag"}},
+			expChangedVal: "",
+		},
+		{
+			flag:       "browser-arg-trim-double-quote",
+			expInitVal: nil,
+			changeOpts: &common.LaunchOptions{Args: []string{
+				`   browser-arg-trim-double-quote =  "value  "  `}},
+			expChangedVal: "value  ",
+		},
+		{
+			flag:       "browser-arg-trim-single-quote",
+			expInitVal: nil,
+			changeOpts: &common.LaunchOptions{Args: []string{
+				`   browser-arg-trim-single-quote=' value '`}},
+			expChangedVal: " value ",
+		},
+		{
+			flag:       "browser-args",
+			expInitVal: nil,
+			changeOpts: &common.LaunchOptions{Args: []string{
+				"browser-arg1='value1", "browser-arg2=''value2''", "browser-flag"}},
+			post: func(t *testing.T, flags map[string]interface{}) {
+				assert.Equal(t, "'value1", flags["browser-arg1"])
+				assert.Equal(t, "'value2'", flags["browser-arg2"])
+				assert.Equal(t, "", flags["browser-flag"])
+			},
+		},
+		{
 			flag:       "enable-use-zoom-for-dsf",
 			expInitVal: false,
 			pre: func(t *testing.T) {
@@ -84,11 +121,15 @@ func TestBrowserTypeFlags(t *testing.T) {
 			if tc.expInitVal != nil {
 				require.Contains(t, flags, tc.flag)
 				assert.Equal(t, tc.expInitVal, flags[tc.flag])
+			} else {
+				require.NotContains(t, flags, tc.flag)
 			}
 
 			if tc.changeOpts != nil {
 				flags = bt.flags(tc.changeOpts)
-				assert.Equal(t, tc.expChangedVal, flags[tc.flag])
+				if tc.expChangedVal != nil {
+					assert.Equal(t, tc.expChangedVal, flags[tc.flag])
+				}
 			}
 
 			if tc.post != nil {

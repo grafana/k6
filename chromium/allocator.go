@@ -78,6 +78,8 @@ func (a *Allocator) buildCmdArgs(userDataDir *string, removeDir *bool) ([]string
 			return nil, errors.New("invalid browser command line flag")
 		}
 	}
+	// TODO: Refactor the creation of a temp dir out of here. This method should
+	// only build command line arguments and not have side effects.
 	*removeDir = false
 	var ok bool
 	*userDataDir, ok = a.initFlags["user-data-dir"].(string)
