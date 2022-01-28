@@ -136,6 +136,8 @@ func mostFlagSets() []flagSetInit {
 	result := []flagSetInit{}
 	for i, fsi := range []func(globalFlags *commandFlags) *pflag.FlagSet{runCmdFlagSet, archiveCmdFlagSet, cloudCmdFlagSet} {
 		i, fsi := i, fsi // go...
+		// TODO: this still uses os.GetEnv which needs to be removed
+		// before/along adding tests for those fields
 		root := newRootCommand(context.Background(), nil, nil)
 		result = append(result, func() (*pflag.FlagSet, *commandFlags) {
 			flags := pflag.NewFlagSet(fmt.Sprintf("superContrivedFlags_%d", i), pflag.ContinueOnError)
