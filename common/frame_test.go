@@ -43,7 +43,7 @@ func TestFrameNilDocument(t *testing.T) {
 
 	// frame should not panic with a nil document
 	stub := &executionContextTestStub{
-		evalFn: func(apiCtx context.Context, opts evalOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
+		evaluateFn: func(apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
 			// return nil to test for panic
 			return nil, nil
 		},
@@ -68,7 +68,7 @@ func TestFrameNilDocument(t *testing.T) {
 
 	// frame gets the document from the evaluate call
 	want := &ElementHandle{}
-	stub.evalFn = func(apiCtx context.Context, opts evalOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
+	stub.evaluateFn = func(apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
 		return want, nil
 	}
 	got, err := frame.document()
@@ -116,9 +116,9 @@ func TestFrameManagerFrameAbortedNavigationShouldEmitANonNilPendingDocument(t *t
 
 type executionContextTestStub struct {
 	ExecutionContext
-	evalFn func(apiCtx context.Context, opts evalOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error)
+	evaluateFn func(apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error)
 }
 
-func (e executionContextTestStub) eval(apiCtx context.Context, opts evalOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
-	return e.evalFn(apiCtx, opts, pageFunc, args...)
+func (e executionContextTestStub) evaluate(apiCtx context.Context, opts evaluateOptions, pageFunc goja.Value, args ...goja.Value) (res interface{}, err error) {
+	return e.evaluateFn(apiCtx, opts, pageFunc, args...)
 }
