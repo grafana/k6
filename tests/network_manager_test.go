@@ -68,7 +68,7 @@ func TestBlockIPs(t *testing.T) {
 	assert.Nil(t, res)
 
 	assert.True(t, tb.logCache.contains(
-		"was interrupted: IP (10.0.0.1) is in a blacklisted range (10.0.0.0/8)"))
+		`was interrupted: IP 10.0.0.1 is in a blacklisted range "10.0.0.0/8"`))
 
 	// Ensure other requests go through
 	resp := p.Goto(tb.URL("/get"), nil)

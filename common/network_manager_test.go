@@ -185,11 +185,11 @@ func TestOnRequestPausedBlockedIPs(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			blockedIPs := make([]*k6lib.IPNet, 0, len(tc.blockedIPs))
-			for _, ipcidr := range tc.blockedIPs {
+			blockedIPs := make([]*k6lib.IPNet, len(tc.blockedIPs))
+			for i, ipcidr := range tc.blockedIPs {
 				ipnet, err := k6lib.ParseCIDR(ipcidr)
 				require.NoError(t, err)
-				blockedIPs = append(blockedIPs, ipnet)
+				blockedIPs[i] = ipnet
 			}
 
 			k6opts := k6lib.Options{BlacklistIPs: blockedIPs}
