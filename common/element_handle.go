@@ -1363,6 +1363,7 @@ func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 	for _, property := range properties {
 		elementHandle := property.AsElement()
 		if elementHandle != nil {
+			//nolint
 			result = append(elements, elementHandle)
 		} else {
 			property.Dispose()
