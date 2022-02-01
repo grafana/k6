@@ -82,8 +82,9 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		state      = k6lib.GetState(b.Ctx)
 		launchOpts = common.NewLaunchOptions()
 	)
-	launchOpts.Parse(b.Ctx, opts)
-
+	if err := launchOpts.Parse(b.Ctx, opts); err != nil {
+		k6common.Throw(rt, fmt.Errorf("cannot parse launch options: %v", err))
+	}
 	b.Ctx = common.WithLaunchOptions(b.Ctx, launchOpts)
 
 	envs := make([]string, 0, len(launchOpts.Env))

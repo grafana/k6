@@ -1402,11 +1402,10 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 	f.log.Debugf("Frame:WaitForLoadState", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 	defer f.log.Debugf("Frame:WaitForLoadState:return", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 
-	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameWaitForLoadStateOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6Throw(f.ctx, "failed parsing wait for load state options: %v", err)
 	}
 
 	waitUntil := LifecycleEventLoad
@@ -1421,9 +1420,12 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 		return
 	}
 
-	waitForEvent(f.ctx, f, []string{EventFrameAddLifecycle}, func(data interface{}) bool {
+	_, err = waitForEvent(f.ctx, f, []string{EventFrameAddLifecycle}, func(data interface{}) bool {
 		return data.(LifecycleEvent) == waitUntil
 	}, parsedOpts.Timeout)
+	if err != nil {
+		k6Throw(f.ctx, "cannot wait for event: %v", err)
+	}
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen
