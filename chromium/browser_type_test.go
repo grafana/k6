@@ -102,6 +102,13 @@ func TestBrowserTypeFlags(t *testing.T) {
 				"MAP httpbin.test.k6.io 127.0.0.1:8000,MAP test.k6.io 127.0.0.1:8000",
 		},
 		{
+			flag:          "host-resolver-rules",
+			expInitVal:    nil,
+			changeOpts:    &common.LaunchOptions{},
+			changeK6Opts:  &k6lib.Options{},
+			expChangedVal: nil,
+		},
+		{
 			flag:       "enable-use-zoom-for-dsf",
 			expInitVal: false,
 			pre: func(t *testing.T) {
@@ -148,6 +155,8 @@ func TestBrowserTypeFlags(t *testing.T) {
 				flags = bt.flags(tc.changeOpts, tc.changeK6Opts)
 				if tc.expChangedVal != nil {
 					assert.Equal(t, tc.expChangedVal, flags[tc.flag])
+				} else {
+					assert.NotContains(t, flags, tc.flag)
 				}
 			}
 

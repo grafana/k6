@@ -219,9 +219,13 @@ func setFlagsFromK6Options(flags map[string]interface{}, k6opts *k6lib.Options) 
 	if currHostResolver, ok := flags["host-resolver-rules"]; ok {
 		hostResolver = append(hostResolver, fmt.Sprintf("%s", currHostResolver))
 	}
+
 	for k, v := range k6opts.Hosts {
 		hostResolver = append(hostResolver, fmt.Sprintf("MAP %s %s", k, v))
 	}
-	sort.Strings(hostResolver)
-	flags["host-resolver-rules"] = strings.Join(hostResolver, ",")
+
+	if len(hostResolver) > 0 {
+		sort.Strings(hostResolver)
+		flags["host-resolver-rules"] = strings.Join(hostResolver, ",")
+	}
 }
