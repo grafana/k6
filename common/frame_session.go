@@ -407,7 +407,8 @@ func (fs *FrameSession) initOptions() error {
 	fs.updateExtraHTTPHeaders(true)
 
 	var reqIntercept bool
-	if state.Options.BlockedHostnames.Trie != nil {
+	if state.Options.BlockedHostnames.Trie != nil ||
+		len(state.Options.BlacklistIPs) > 0 {
 		reqIntercept = true
 	}
 	if err := fs.updateRequestInterception(reqIntercept); err != nil {

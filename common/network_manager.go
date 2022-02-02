@@ -38,6 +38,7 @@ import (
 	"github.com/dop251/goja"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
+	k6netext "go.k6.io/k6/lib/netext"
 	k6types "go.k6.io/k6/lib/types"
 	k6stats "go.k6.io/k6/stats"
 )
@@ -59,6 +60,7 @@ type NetworkManager struct {
 	parent       *NetworkManager
 	frameManager *FrameManager
 	credentials  *Credentials
+	resolver     k6netext.Resolver
 
 	// TODO: manage inflight requests seperately (move them between the two maps as they transition from inflight -> completed)
 	reqIDToRequest map[network.RequestID]*Request
@@ -78,6 +80,12 @@ func NewNetworkManager(
 	ctx context.Context, session *Session, manager *FrameManager, parent *NetworkManager,
 ) (*NetworkManager, error) {
 	state := k6lib.GetState(ctx)
+
+	resolver, err := newResolver(state.Options.DNS)
+	if err != nil {
+		return nil, fmt.Errorf("newResolver(%+v): %w", state.Options.DNS, err)
+	}
+
 	m := NetworkManager{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
@@ -87,6 +95,7 @@ func NewNetworkManager(
 		session:                        session,
 		parent:                         parent,
 		frameManager:                   manager,
+		resolver:                       resolver,
 		credentials:                    nil,
 		reqIDToRequest:                 make(map[network.RequestID]*Request),
 		reqsMu:                         sync.RWMutex{},
@@ -102,6 +111,50 @@ func NewNetworkManager(
 		return nil, err
 	}
 	return &m, nil
+}
+
+// Returns a new Resolver.
+// Copied with minor changes from
+// https://github.com/grafana/k6/blob/fb70bc6f3d3f22a40e65f32deea3cea1b6d70a76/js/runner.go#L459
+func newResolver(conf k6types.DNSConfig) (k6netext.Resolver, error) {
+	ttl, err := parseTTL(conf.TTL.String)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse TTL: %w", err)
+	}
+
+	dnsSel := conf.Select
+	if !dnsSel.Valid {
+		dnsSel = k6types.DefaultDNSConfig().Select
+	}
+	dnsPol := conf.Policy
+	if !dnsPol.Valid {
+		dnsPol = k6types.DefaultDNSConfig().Policy
+	}
+	return k6netext.NewResolver(
+		net.LookupIP, ttl, dnsSel.DNSSelect, dnsPol.DNSPolicy), nil
+}
+
+// Parse a string representation of TTL to time.Duration.
+// Copied from https://github.com/grafana/k6/blob/fb70bc6f3d3f22a40e65f32deea3cea1b6d70a76/js/runner.go#L479
+func parseTTL(ttlS string) (time.Duration, error) {
+	ttl := time.Duration(0)
+	switch ttlS {
+	case "inf":
+		// cache "infinitely"
+		ttl = time.Hour * 24 * 365
+	case "0":
+		// disable cache
+	case "":
+		ttlS = k6types.DefaultDNSConfig().TTL.String
+		fallthrough
+	default:
+		var err error
+		ttl, err = k6types.ParseExtendedDuration(ttlS)
+		if ttl < 0 || err != nil {
+			return ttl, fmt.Errorf("invalid DNS TTL: %s", ttlS)
+		}
+	}
+	return ttl, nil
 }
 
 func (m *NetworkManager) deleteRequestByID(reqID network.RequestID) {
@@ -388,50 +441,77 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 	defer m.logger.Debugf("NetworkManager:onRequestPaused:return",
 		"sid:%s url:%v", m.session.ID(), event.Request.URL)
 
-	var (
-		failReason string
-		state      = k6lib.GetState(m.ctx)
-	)
+	var failErr error
 
-	defer func() { m.failOrContinueRequest(event, failReason) }()
+	defer func() {
+		if failErr != nil {
+			action := fetch.FailRequest(event.RequestID, network.ErrorReasonBlockedByClient)
+			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+				m.logger.Errorf("NetworkManager:onRequestPaused",
+					"error interrupting request: %s", err)
+			} else {
+				m.logger.Warnf("NetworkManager:onRequestPaused",
+					"request %s %s was interrupted: %s", event.Request.Method, event.Request.URL, failErr)
+				return
+			}
+		}
+		action := fetch.ContinueRequest(event.RequestID)
+		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+			m.logger.Errorf("NetworkManager:onRequestPaused",
+				"error continuing request: %s", err)
+		}
+	}()
 
 	purl, err := url.Parse(event.Request.URL)
 	if err != nil {
 		m.logger.Errorf("NetworkManager:onRequestPaused",
-			"error parsing URL: %s", err.Error())
+			"error parsing URL %q: %s", event.Request.URL, err)
 		return
 	}
 
-	failReason = handleBlockedHosts(purl, state.Options.BlockedHostnames.Trie)
+	var (
+		host  = purl.Hostname()
+		ip    = net.ParseIP(host)
+		state = k6lib.GetState(m.ctx)
+	)
+	if ip != nil {
+		failErr = checkBlockedIPs(ip, state.Options.BlacklistIPs)
+		return
+	}
+	failErr = checkBlockedHosts(host, state.Options.BlockedHostnames.Trie)
+	if failErr != nil {
+		return
+	}
+
+	// Do one last check of the resolved IP
+	ip, err = m.resolver.LookupIP(host)
+	if err != nil {
+		m.logger.Debugf("NetworkManager:onRequestPaused",
+			"error resolving %q: %s", host, err)
+		return
+	}
+	failErr = checkBlockedIPs(ip, state.Options.BlacklistIPs)
 }
 
-func (m *NetworkManager) failOrContinueRequest(event *fetch.EventRequestPaused, failReason string) {
-	if failReason != "" {
-		action := fetch.FailRequest(event.RequestID, network.ErrorReasonBlockedByClient)
-		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-			m.logger.Errorf("NetworkManager:onRequestPaused",
-				"error interrupting request: %s", err.Error())
-		} else {
-			m.logger.Warnf("NetworkManager:onRequestPaused",
-				"request %s %s was interrupted: %s", event.Request.Method, event.Request.URL, failReason)
-			return
-		}
+func checkBlockedHosts(host string, blockedHosts *k6types.HostnameTrie) error {
+	if blockedHosts == nil {
+		return nil
 	}
-	action := fetch.ContinueRequest(event.RequestID)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		m.logger.Errorf("NetworkManager:onRequestPaused",
-			"error continuing request: %s", err.Error())
+	if match, blocked := blockedHosts.Contains(host); blocked {
+		return fmt.Errorf("hostname %s is in a blocked pattern %q", host, match)
 	}
+	return nil
 }
 
-func handleBlockedHosts(u *url.URL, blockedHosts *k6types.HostnameTrie) string {
-	ip := net.ParseIP(u.Host)
-	if ip == nil {
-		if match, blocked := blockedHosts.Contains(u.Host); blocked {
-			return fmt.Sprintf("hostname %s is in a blocked pattern (%s)", u.Host, match)
+func checkBlockedIPs(ip net.IP, blockedIPs []*k6lib.IPNet) error {
+	for _, ipnet := range blockedIPs {
+		if ipnet.Contains(ip) {
+			// TODO: Return netext.BlackListedIPError here once its private
+			// fields are exported, or there's a constructor for it.
+			return fmt.Errorf("IP %s is in a blacklisted range %q", ip, ipnet)
 		}
 	}
-	return ""
+	return nil
 }
 
 func (m *NetworkManager) onRequestServedFromCache(event *network.EventRequestServedFromCache) {

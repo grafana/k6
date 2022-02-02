@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	k6lib "go.k6.io/k6/lib"
 	k6types "go.k6.io/k6/lib/types"
 )
 
@@ -49,6 +50,25 @@ func TestBlockHostnames(t *testing.T) {
 	assert.Nil(t, res)
 
 	assert.True(t, tb.logCache.contains("was interrupted: hostname host.test is in a blocked pattern"))
+
+	// Ensure other requests go through
+	resp := p.Goto(tb.URL("/get"), nil)
+	assert.NotNil(t, resp)
+}
+
+func TestBlockIPs(t *testing.T) {
+	tb := newTestBrowser(t, withHTTPServer(), withLogCache())
+
+	ipnet, err := k6lib.ParseCIDR("10.0.0.0/8")
+	require.NoError(t, err)
+	tb.state.Options.BlacklistIPs = []*k6lib.IPNet{ipnet}
+
+	p := tb.NewPage(nil)
+	res := p.Goto("http://10.0.0.1:8000/", nil)
+	assert.Nil(t, res)
+
+	assert.True(t, tb.logCache.contains(
+		`was interrupted: IP 10.0.0.1 is in a blacklisted range "10.0.0.0/8"`))
 
 	// Ensure other requests go through
 	resp := p.Goto(tb.URL("/get"), nil)
