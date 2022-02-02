@@ -34,6 +34,7 @@ import (
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
@@ -48,9 +49,13 @@ var _ EventEmitter = &NetworkManager{}
 type NetworkManager struct {
 	BaseEventEmitter
 
-	ctx          context.Context
-	logger       *Logger
-	session      session
+	ctx     context.Context
+	logger  *Logger
+	session interface {
+		EventEmitter
+		cdp.Executor
+		ID() target.SessionID
+	}
 	parent       *NetworkManager
 	frameManager *FrameManager
 	credentials  *Credentials

@@ -32,13 +32,9 @@ import (
 	k6lib "go.k6.io/k6/lib"
 )
 
-var _ session = &Session{}
-
-type session interface {
-	EventEmitter
-	cdp.Executor
-	ID() target.SessionID
-}
+// Ensure Session implements the EventEmitter and Executor interfaces
+var _ EventEmitter = &Session{}
+var _ cdp.Executor = &Session{}
 
 // Session represents a CDP session to a target
 type Session struct {
