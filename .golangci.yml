@@ -1,0 +1,90 @@
+run:
+  timeout: 5m
+
+issues:
+  # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
+  max-issues-per-linter: 0
+
+  # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
+  max-same-issues: 0
+
+  # Disable default exclude rules, see `golangci-lint run --help`.
+  # When true it disables revive's comment warnings, and we want them enabled.
+  exclude-use-default: false
+
+linters:
+  disable-all: true
+  enable:
+    - cyclop
+    - deadcode
+    - dogsled
+    - dupl
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - funlen
+    - gci
+    - gochecknoglobals
+    - gocognit
+    - goconst
+    - gocritic
+    - godot
+    - gofmt
+    - gofumpt
+    - goimports
+    - gosec
+    - gosimple
+    - govet
+    - ifshort
+    - importas
+    - ineffassign
+    - lll
+    - makezero
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - nlreturn
+    - nolintlint
+    - predeclared
+    - prealloc
+    - revive
+    - staticcheck
+    - structcheck
+    - tagliatelle
+    - thelper
+    - tparallel
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - varnamelen
+    - wastedassign
+    - whitespace
+    - wrapcheck
+
+linters-settings:
+  gci:
+    local: github.com/grafana/xk6-browser
+  dupl:
+    threshold: 400
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: github.com/grafana/xk6-browser
+  importas:
+    alias:
+      - pkg: go.k6.io/k6/.*/(\w+)
+        alias: k6$1
+  nlreturn:
+    block-size: 10
+  lll:
+    maxlength: 120
