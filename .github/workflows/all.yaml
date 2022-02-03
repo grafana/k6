@@ -35,7 +35,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     env:
-        GOLANG_CI_VERSION: "1.39.0"
+        GOLANG_CI_VERSION: "1.44.0"
         GO111MODULE: 'on'
     steps:
       - name: Checkout code
