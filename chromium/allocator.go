@@ -174,7 +174,7 @@ readLoop:
 		// Copy the rest of the output in a separate goroutine, as we
 		// need to return with the websocket URL.
 		go func() {
-			io.Copy(forward, bufr)
+			_, _ = io.Copy(forward, bufr)
 			done()
 		}()
 	}
@@ -182,12 +182,19 @@ readLoop:
 }
 
 // Allocate starts a new local browser process
-func (a *Allocator) Allocate(ctx context.Context, launchOpts *common.LaunchOptions) (*common.BrowserProcess, error) {
+func (a *Allocator) Allocate(ctx context.Context, launchOpts *common.LaunchOptions) (_ *common.BrowserProcess, rerr error) {
 	// Create cancelable context for the browser process
 	ctx, cancel := context.WithCancel(ctx)
+	defer func() {
+		if rerr != nil {
+			cancel()
+		}
+	}()
 
-	var userDataDir string
-	var removeDir bool
+	var (
+		userDataDir string
+		removeDir   bool
+	)
 	args, err := a.buildCmdArgs(&userDataDir, &removeDir)
 	if err != nil {
 		return nil, err
@@ -229,7 +236,7 @@ func (a *Allocator) Allocate(ctx context.Context, launchOpts *common.LaunchOptio
 		a.wg.Add(1) // for the io.Copy in a separate goroutine
 	}
 	go func() {
-		cmd.Wait()
+		_ = cmd.Wait()
 
 		// Delete the temporary user data directory, if needed.
 		if removeDir {

@@ -1143,14 +1143,16 @@ func (h *ElementHandle) OwnerFrame() api.Frame {
 
 func (h *ElementHandle) Press(key string, opts goja.Value) {
 	parsedOpts := NewElementHandlePressOptions(h.defaultTimeout())
-	parsedOpts.Parse(h.ctx, opts)
+	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
+		k6Throw(h.ctx, "cannot parse press options: %v", err)
+	}
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return nil, handle.press(apiCtx, key, NewKeyboardOptions())
 	}
 	actFn := elementHandleActionFn(h, []string{}, fn, false, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
 	_, err := callApiWithTimeout(h.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6Throw(h.ctx, "cannot handle element key (%q) press: %w", key, err)
+		k6Throw(h.ctx, "cannot handle element key (%q) press: %v", key, err)
 	}
 	applySlowMo(h.ctx)
 }
@@ -1355,7 +1357,9 @@ func (h *ElementHandle) TextContent() string {
 // Type scrolls element into view, focuses element and types text
 func (h *ElementHandle) Type(text string, opts goja.Value) {
 	parsedOpts := NewElementHandleTypeOptions(h.defaultTimeout())
-	parsedOpts.Parse(h.ctx, opts)
+	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
+		k6Throw(h.ctx, "cannot parse element handle type options: %v", err)
+	}
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return nil, handle.typ(apiCtx, text, NewKeyboardOptions())
 	}

@@ -339,11 +339,15 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	}
 	for _, frame := range frames {
 		// A frame could have been removed before we execute this, so don't wait around for a reply.
-		fs.session.ExecuteWithoutExpectationOnReply(fs.ctx, cdppage.CommandCreateIsolatedWorld, &cdppage.CreateIsolatedWorldParams{
-			FrameID:             cdp.FrameID(frame.ID()),
-			WorldName:           name,
-			GrantUniveralAccess: true,
-		}, nil)
+		_ = fs.session.ExecuteWithoutExpectationOnReply(
+			fs.ctx,
+			cdppage.CommandCreateIsolatedWorld,
+			&cdppage.CreateIsolatedWorldParams{
+				FrameID:             cdp.FrameID(frame.ID()),
+				WorldName:           name,
+				GrantUniveralAccess: true,
+			},
+			nil)
 	}
 
 	fs.logger.Debugf("NewFrameSession:initIsolatedWorld:AddScriptToEvaluateOnNewDocument",
