@@ -190,24 +190,9 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 	return rtn, nil
 }
 
-type transportCreds struct {
-	credentials.TransportCredentials
-	errc chan<- error
-}
-
-func (t transportCreds) ClientHandshake(ctx context.Context,
-	addr string, in net.Conn) (net.Conn, credentials.AuthInfo, error) {
-	out, auth, err := t.TransportCredentials.ClientHandshake(ctx, addr, in)
-	if err != nil {
-		t.errc <- err
-	}
-
-	return out, auth, err
-}
-
 // Connect is a block dial to the gRPC server at the given address (host:port)
 func (c *Client) Connect(addr string, params map[string]interface{}) (bool, error) {
-	state := c.vu.State() //nolint:ifshort
+	state := c.vu.State()
 	if state == nil {
 		return false, errConnectInInitContext
 	}
@@ -217,67 +202,60 @@ func (c *Client) Connect(addr string, params map[string]interface{}) (bool, erro
 		return false, err
 	}
 
-	// (rogchap) Even with FailOnNonTempDialError, if there is a TLS error this will timeout
-	// rather than report the error, so we can't rely on WithBlock. By running in a goroutine
-	// we can then wait on the error channel instead, which could happen before the Dial
-	// returns. We only need to close the channel to un-block in a non-error scenario;
-	// otherwise it can be GCd without closing as we return on an error on the channel.
-	errc := make(chan error, 1)
+	opts := make([]grpc.DialOption, 0, 2)
 
-	go func() {
-		opts := []grpc.DialOption{
-			grpc.WithBlock(),
-			grpc.FailOnNonTempDialError(true),
-			grpc.WithStatsHandler(c),
-		}
+	if !p.IsPlaintext {
+		tlsCfg := state.TLSConfig.Clone()
+		tlsCfg.NextProtos = []string{"h2"}
 
-		if ua := state.Options.UserAgent; ua.Valid {
-			opts = append(opts, grpc.WithUserAgent(ua.ValueOrZero()))
-		}
+		// TODO(rogchap): Would be good to add support for custom RootCAs (self signed)
 
-		if !p.IsPlaintext {
-			tlsCfg := state.TLSConfig.Clone()
-			tlsCfg.NextProtos = []string{"h2"}
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)))
+	} else {
+		opts = append(opts, grpc.WithInsecure())
+	}
 
-			// TODO(rogchap): Would be good to add support for custom RootCAs (self signed)
+	if ua := state.Options.UserAgent; ua.Valid {
+		opts = append(opts, grpc.WithUserAgent(ua.ValueOrZero()))
+	}
 
-			// (rogchap) we create a wrapper for transport credentials so that we can report
-			// on any TLS errors.
-			creds := transportCreds{
-				TransportCredentials: credentials.NewTLS(tlsCfg),
-				errc:                 errc,
-			}
+	dialer := func(ctx context.Context, addr string) (net.Conn, error) {
+		return state.Dialer.DialContext(ctx, "tcp", addr)
+	}
+	opts = append(opts, grpc.WithContextDialer(dialer))
 
-			opts = append(opts, grpc.WithTransportCredentials(creds))
-		} else {
-			opts = append(opts, grpc.WithInsecure())
-		}
+	ctx, cancel := context.WithTimeout(c.vu.Context(), p.Timeout)
+	defer cancel()
 
-		dialer := func(ctx context.Context, addr string) (net.Conn, error) {
-			return state.Dialer.DialContext(ctx, "tcp", addr)
-		}
-		opts = append(opts, grpc.WithContextDialer(dialer))
+	err = c.dial(ctx, addr, p.UseReflectionProtocol, opts...)
+	return err != nil, err
+}
 
-		ctx, cancel := context.WithTimeout(c.vu.Context(), p.Timeout)
-		defer cancel()
+func (c *Client) dial(
+	ctx context.Context,
+	addr string,
+	reflect bool,
+	options ...grpc.DialOption,
+) error {
+	opts := []grpc.DialOption{
+		grpc.WithBlock(),
+		grpc.FailOnNonTempDialError(true),
+		grpc.WithStatsHandler(c),
+		grpc.WithReturnConnectionError(),
+	}
+	opts = append(opts, options...)
 
-		var err error
-		c.conn, err = grpc.DialContext(ctx, addr, opts...)
-		if err != nil {
-			errc <- err
-			return
-		}
-		if p.UseReflectionProtocol {
-			err := c.reflect(ctx)
-			if err != nil {
-				errc <- err
-				return
-			}
-		}
-		close(errc)
-	}()
-	err = <-errc
-	return err == nil, err
+	var err error
+	c.conn, err = grpc.DialContext(ctx, addr, opts...)
+	if err != nil {
+		return err
+	}
+
+	if !reflect {
+		return nil
+	}
+
+	return c.reflect(ctx)
 }
 
 // reflect will use the grpc reflection api to make the file descriptors available to request.
