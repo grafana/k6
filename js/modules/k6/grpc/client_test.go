@@ -26,6 +26,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"runtime"
@@ -56,6 +57,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	"go.k6.io/k6/stats"
 )
@@ -436,7 +438,7 @@ func TestClient(t *testing.T) {
 			},
 			vuString: codeBlock{code: `
 				client.connect("GRPCBIN_ADDR");
-				var resp = client.invoke("grpc.testing.TestService/EmptyCall", {}, { headers: { "X-Load-Tester": "k6" } })
+				var resp = client.invoke("grpc.testing.TestService/EmptyCall", {}, { metadata: { "X-Load-Tester": "k6" } })
 				if (resp.status !== grpc.StatusOK) {
 					throw new Error("failed to send correct headers in the request")
 				}
@@ -791,6 +793,36 @@ func TestDebugStat(t *testing.T) {
 			assert.Contains(t, b.String(), tt.expected)
 		})
 	}
+}
+
+func TestClientInvokeHeadersDeprecated(t *testing.T) {
+	t.Parallel()
+
+	logHook := &testutils.SimpleLogrusHook{
+		HookedLevels: []logrus.Level{logrus.WarnLevel},
+	}
+	testLog := logrus.New()
+	testLog.AddHook(logHook)
+	testLog.SetOutput(ioutil.Discard)
+
+	c := Client{
+		vu: &modulestest.VU{
+			StateField: &lib.State{
+				Logger: testLog,
+			},
+		},
+	}
+	params := map[string]interface{}{
+		"headers": map[string]interface{}{
+			"X-HEADER-FOO": "bar",
+		},
+	}
+	_, err := c.parseParams(params)
+	require.NoError(t, err)
+
+	entries := logHook.Drain()
+	require.Len(t, entries, 1)
+	require.Contains(t, entries[0].Message, "headers property is deprecated")
 }
 
 func TestResolveFileDescriptors(t *testing.T) {
