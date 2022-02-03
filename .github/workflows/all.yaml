@@ -51,9 +51,7 @@ jobs:
         run: go install "github.com/golangci/golangci-lint/cmd/golangci-lint@v$GOLANG_CI_VERSION"
       - name: Run linters
         run: |
-          BASEREV=$(git merge-base HEAD origin/main)
-          echo "Base revision: $BASEREV"
-          golangci-lint run --timeout=3m --out-format=tab --new-from-rev "$BASEREV" ./...
+          golangci-lint run --timeout=3m --out-format=tab ./...
 
   test-prev:
     strategy:
