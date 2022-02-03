@@ -2,15 +2,12 @@ addReviewers: true
 addAssignees: false
 useReviewGroups: true
 useAssigneeGroups: false
-numberOfReviewers: 1
-reviewGroups:
-  old:
-    - na--
-    - MStoykov
-    - codebien
-  new: # TODO: combine a few months from now
-    - yorugac
-    - oleiade
-    - olegbespalov
+numberOfReviewers: 2
+reviewers:
+  - na--
+  - MStoykov
+  - codebien
+  - oleiade
+  - olegbespalov
 skipKeywords:
   - wip
