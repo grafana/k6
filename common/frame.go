@@ -1405,7 +1405,7 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 	parsedOpts := NewFrameWaitForLoadStateOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6Throw(f.ctx, "failed parsing wait for load state options: %v", err)
+		k6Throw(f.ctx, "cannot parse waitForLoadState options: %v", err)
 	}
 
 	waitUntil := LifecycleEventLoad
@@ -1424,7 +1424,7 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 		return data.(LifecycleEvent) == waitUntil
 	}, parsedOpts.Timeout)
 	if err != nil {
-		k6Throw(f.ctx, "cannot wait for event: %v", err)
+		k6Throw(f.ctx, "cannot waitForEvent: %v", err)
 	}
 }
 

@@ -1144,7 +1144,7 @@ func (h *ElementHandle) OwnerFrame() api.Frame {
 func (h *ElementHandle) Press(key string, opts goja.Value) {
 	parsedOpts := NewElementHandlePressOptions(h.defaultTimeout())
 	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
-		k6Throw(h.ctx, "cannot parse element handle press options: %w", err)
+		k6Throw(h.ctx, "cannot parse press options: %v", err)
 	}
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return nil, handle.press(apiCtx, key, NewKeyboardOptions())
@@ -1152,7 +1152,7 @@ func (h *ElementHandle) Press(key string, opts goja.Value) {
 	actFn := elementHandleActionFn(h, []string{}, fn, false, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
 	_, err := callApiWithTimeout(h.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6Throw(h.ctx, "cannot handle element key (%q) press: %w", key, err)
+		k6Throw(h.ctx, "cannot handle element key (%q) press: %v", key, err)
 	}
 	applySlowMo(h.ctx)
 }

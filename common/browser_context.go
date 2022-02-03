@@ -272,7 +272,7 @@ func (b *BrowserContext) SetGeolocation(geolocation goja.Value) {
 
 	g := NewGeolocation()
 	if err := g.Parse(b.ctx, geolocation); err != nil {
-		k6Throw(b.ctx, "cannot parse geo location: %w", err)
+		k6Throw(b.ctx, "cannot parse geo location: %v", err)
 	}
 
 	b.opts.Geolocation = g

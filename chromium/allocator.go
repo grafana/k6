@@ -182,11 +182,11 @@ readLoop:
 }
 
 // Allocate starts a new local browser process
-func (a *Allocator) Allocate(ctx context.Context, launchOpts *common.LaunchOptions) (_ *common.BrowserProcess, err error) {
+func (a *Allocator) Allocate(ctx context.Context, launchOpts *common.LaunchOptions) (_ *common.BrowserProcess, rerr error) {
 	// Create cancelable context for the browser process
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
-		if err != nil {
+		if rerr != nil {
 			cancel()
 		}
 	}()
