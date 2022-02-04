@@ -194,10 +194,10 @@ func (s *screenshotter) screenshot(session *Session, documentRect *Rect, viewpor
 	// TODO: we should not write to disk here but put it on some queue for async disk writes
 	if path != "" {
 		dir := filepath.Dir(path)
-		if err := os.MkdirAll(dir, 0o775); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, fmt.Errorf("cannot create directory for screenshot: %w", err)
 		}
-		if err := ioutil.WriteFile(path, buf, 0o664); err != nil {
+		if err := ioutil.WriteFile(path, buf, 0o644); err != nil {
 			return nil, fmt.Errorf("cannot save screenshot to file: %w", err)
 		}
 	}

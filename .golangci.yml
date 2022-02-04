@@ -88,3 +88,7 @@ linters-settings:
     block-size: 10
   lll:
     maxlength: 120
+  gosec:
+    config:
+      G301: '0755'
+      G306: '0644'
