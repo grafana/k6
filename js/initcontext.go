@@ -69,6 +69,7 @@ type InitContext struct {
 	runtime  *goja.Runtime
 	compiler *compiler.Compiler
 
+	moduleVUImpl *moduleVUImpl
 	// Pointer to a context that bridged modules are invoked with.
 	ctxPtr *context.Context
 
@@ -101,10 +102,11 @@ func NewInitContext(
 		compatibilityMode: compatMode,
 		logger:            logger,
 		modules:           getJSModules(),
+		moduleVUImpl:      &moduleVUImpl{ctxPtr: ctxPtr},
 	}
 }
 
-func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Runtime) *InitContext {
+func newBoundInitContext(base *InitContext, rt *goja.Runtime, vuImpl *moduleVUImpl) *InitContext {
 	// we don't copy the exports as otherwise they will be shared and we don't want this.
 	// this means that all the files will be executed again but once again only once per compilation
 	// of the main file.
@@ -117,7 +119,7 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 	}
 	return &InitContext{
 		runtime: rt,
-		ctxPtr:  ctxPtr,
+		ctxPtr:  vuImpl.ctxPtr, // remove this
 
 		filesystems: base.filesystems,
 		pwd:         base.pwd,
@@ -127,6 +129,7 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 		compatibilityMode: base.compatibilityMode,
 		logger:            base.logger,
 		modules:           base.modules,
+		moduleVUImpl:      vuImpl,
 	}
 }
 
@@ -156,6 +159,12 @@ func (i *InitContext) Require(arg string) goja.Value {
 type moduleVUImpl struct {
 	ctxPtr *context.Context
 	// we can technically put lib.State here as well as anything else
+}
+
+func newModuleVUImpl() *moduleVUImpl {
+	return &moduleVUImpl{
+		ctxPtr: new(context.Context),
+	}
 }
 
 func (m *moduleVUImpl) Context() context.Context {
@@ -203,7 +212,7 @@ func (i *InitContext) requireModule(name string) (goja.Value, error) {
 		return nil, fmt.Errorf("unknown module: %s", name)
 	}
 	if m, ok := mod.(modules.Module); ok {
-		instance := m.NewModuleInstance(&moduleVUImpl{ctxPtr: i.ctxPtr})
+		instance := m.NewModuleInstance(i.moduleVUImpl)
 		return i.runtime.ToValue(toESModuleExports(instance.Exports())), nil
 	}
 	if perInstance, ok := mod.(modules.HasModuleInstancePerVU); ok {

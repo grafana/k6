@@ -150,7 +150,8 @@ func (r *Runner) NewVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 // nolint:funlen
 func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
-	bi, err := r.Bundle.Instantiate(r.Logger, idLocal)
+	moduleVUImpl := &moduleVUImpl{ctxPtr: new(context.Context)}
+	bi, err := r.Bundle.Instantiate(r.Logger, idLocal, moduleVUImpl)
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +239,7 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 		BPool:          bpool.NewBufferPool(100),
 		Samples:        samplesOut,
 		scenarioIter:   make(map[string]uint64),
+		moduleVUImpl:   moduleVUImpl,
 	}
 
 	vu.state = &lib.State{
@@ -584,6 +586,8 @@ type VU struct {
 	state *lib.State
 	// count of iterations executed by this VU in each scenario
 	scenarioIter map[string]uint64
+
+	moduleVUImpl *moduleVUImpl
 }
 
 // Verify that interfaces are implemented
