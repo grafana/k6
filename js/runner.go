@@ -258,6 +258,7 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 		Group:          r.defaultGroup,
 		BuiltinMetrics: r.builtinMetrics,
 	}
+	vu.moduleVUImpl.state = vu.state
 	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
 
 	// This is here mostly so if someone tries they get a nice message

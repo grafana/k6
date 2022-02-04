@@ -102,11 +102,13 @@ func NewInitContext(
 		compatibilityMode: compatMode,
 		logger:            logger,
 		modules:           getJSModules(),
-		moduleVUImpl:      &moduleVUImpl{ctxPtr: ctxPtr},
+		moduleVUImpl: &moduleVUImpl{
+			ctxPtr: ctxPtr, runtime: rt,
+		},
 	}
 }
 
-func newBoundInitContext(base *InitContext, rt *goja.Runtime, vuImpl *moduleVUImpl) *InitContext {
+func newBoundInitContext(base *InitContext, vuImpl *moduleVUImpl) *InitContext {
 	// we don't copy the exports as otherwise they will be shared and we don't want this.
 	// this means that all the files will be executed again but once again only once per compilation
 	// of the main file.
@@ -118,8 +120,8 @@ func newBoundInitContext(base *InitContext, rt *goja.Runtime, vuImpl *moduleVUIm
 		}
 	}
 	return &InitContext{
-		runtime: rt,
-		ctxPtr:  vuImpl.ctxPtr, // remove this
+		runtime: vuImpl.runtime, // remove this
+		ctxPtr:  vuImpl.ctxPtr,  // remove this
 
 		filesystems: base.filesystems,
 		pwd:         base.pwd,
@@ -155,10 +157,11 @@ func (i *InitContext) Require(arg string) goja.Value {
 	}
 }
 
-// TODO this likely should just be part of the initialized VU or at least to take stuff directly from it.
 type moduleVUImpl struct {
-	ctxPtr *context.Context
-	// we can technically put lib.State here as well as anything else
+	ctxPtr  *context.Context
+	initEnv *common.InitEnvironment
+	state   *lib.State
+	runtime *goja.Runtime
 }
 
 func newModuleVUImpl() *moduleVUImpl {
@@ -172,15 +175,15 @@ func (m *moduleVUImpl) Context() context.Context {
 }
 
 func (m *moduleVUImpl) InitEnv() *common.InitEnvironment {
-	return common.GetInitEnv(*m.ctxPtr) // TODO thread it correctly instead
+	return m.initEnv
 }
 
 func (m *moduleVUImpl) State() *lib.State {
-	return lib.GetState(*m.ctxPtr) // TODO thread it correctly instead
+	return m.state
 }
 
 func (m *moduleVUImpl) Runtime() *goja.Runtime {
-	return common.GetRuntime(*m.ctxPtr) // TODO thread it correctly instead
+	return m.runtime
 }
 
 func toESModuleExports(exp modules.Exports) interface{} {

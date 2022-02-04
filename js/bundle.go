@@ -257,12 +257,13 @@ func (b *Bundle) Instantiate(
 ) (bi *BundleInstance, instErr error) {
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
-	rt := goja.New()
-	init := newBoundInitContext(b.BaseInitContext, rt, vuImpl)
-	if err := b.instantiate(logger, rt, init, vuID); err != nil {
+	vuImpl.runtime = goja.New()
+	init := newBoundInitContext(b.BaseInitContext, vuImpl)
+	if err := b.instantiate(logger, vuImpl.runtime, init, vuID); err != nil {
 		return nil, err
 	}
 
+	rt := vuImpl.runtime
 	bi = &BundleInstance{
 		Runtime: rt,
 		Context: vuImpl.ctxPtr,
@@ -327,6 +328,7 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 		CWD:         init.pwd,
 		Registry:    b.registry,
 	}
+	init.moduleVUImpl.initEnv = initenv
 	ctx := common.WithInitEnv(context.Background(), initenv)
 	*init.ctxPtr = common.WithRuntime(ctx, rt)
 	unbindInit := common.BindToGlobal(rt, common.Bind(rt, init, init.ctxPtr))

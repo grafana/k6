@@ -377,7 +377,8 @@ func TestRequestWithBinaryFile(t *testing.T) {
 			`, srv.URL), fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(testutils.NewLogger(t), 0, newModuleVUImpl())
+	vuImpl := newModuleVUImpl()
+	bi, err := b.Instantiate(testutils.NewLogger(t), 0, vuImpl)
 	assert.NoError(t, err)
 
 	root, err := lib.NewGroup("", nil)
@@ -389,7 +390,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	state := &lib.State{
+	vuImpl.state = &lib.State{
 		Options: lib.Options{},
 		Logger:  logger,
 		Group:   root,
@@ -411,7 +412,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx = lib.WithState(ctx, state)
+	ctx = lib.WithState(ctx, vuImpl.state)
 	ctx = common.WithRuntime(ctx, bi.Runtime)
 	*bi.Context = ctx
 
@@ -526,7 +527,8 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 			`, srv.URL), fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(testutils.NewLogger(t), 0, newModuleVUImpl())
+	vuImpl := newModuleVUImpl()
+	bi, err := b.Instantiate(testutils.NewLogger(t), 0, vuImpl)
 	assert.NoError(t, err)
 
 	root, err := lib.NewGroup("", nil)
@@ -538,7 +540,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	state := &lib.State{
+	vuImpl.state = &lib.State{
 		Options: lib.Options{},
 		Logger:  logger,
 		Group:   root,
@@ -560,7 +562,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx = lib.WithState(ctx, state)
+	ctx = lib.WithState(ctx, vuImpl.state)
 	ctx = common.WithRuntime(ctx, bi.Runtime)
 	*bi.Context = ctx
 
