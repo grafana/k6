@@ -1,6 +1,5 @@
 addReviewers: true
 addAssignees: false
-useReviewGroups: true
 useAssigneeGroups: false
 numberOfReviewers: 2
 reviewers:
