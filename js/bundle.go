@@ -314,7 +314,7 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	}
 	rt.Set("__ENV", env)
 	rt.Set("__VU", vuID)
-	rt.Set("console", common.Bind(rt, newConsole(logger), init.moduleVUImpl.ctxPtr))
+	_ = rt.Set("console", newConsole(logger))
 
 	if init.compatibilityMode == lib.CompatibilityModeExtended {
 		rt.Set("global", rt.GlobalObject())

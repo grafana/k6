@@ -259,7 +259,7 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 		BuiltinMetrics: r.builtinMetrics,
 	}
 	vu.moduleVUImpl.state = vu.state
-	vu.Runtime.Set("console", common.Bind(vu.Runtime, vu.Console, vu.Context))
+	_ = vu.Runtime.Set("console", vu.Console)
 
 	// This is here mostly so if someone tries they get a nice message
 	// instead of "Value is not an object: undefined  ..."
