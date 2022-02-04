@@ -29,5 +29,5 @@ type Mouse interface {
 	Down(x float64, y float64, opts goja.Value)
 	Move(x float64, y float64, opts goja.Value)
 	Up(x float64, y float64, opts goja.Value)
-	//Wheel(opts goja.Value)
+	// Wheel(opts goja.Value)
 }

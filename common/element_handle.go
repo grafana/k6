@@ -58,8 +58,10 @@ import (
 var _ api.ElementHandle = &ElementHandle{}
 var _ api.JSHandle = &ElementHandle{}
 
-type ElementHandleActionFn func(context.Context, *ElementHandle) (interface{}, error)
-type ElementHandlePointerActionFn func(context.Context, *ElementHandle, *Position) (interface{}, error)
+type (
+	ElementHandleActionFn        func(context.Context, *ElementHandle) (interface{}, error)
+	ElementHandlePointerActionFn func(context.Context, *ElementHandle, *Position) (interface{}, error)
+)
 
 func elementHandleActionFn(h *ElementHandle, states []string, fn ElementHandleActionFn, force, noWaitAfter bool, timeout time.Duration) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// All or a subset of the following actionability checks are made before performing the actual action:

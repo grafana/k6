@@ -632,7 +632,6 @@ func (p *Page) MainFrame() api.Frame {
 		p.logger.Debugf("Page:MainFrame",
 			"sid:%v mfid:%v mflid:%v mfurl:%v",
 			p.sessionID(), mf.id, mf.loaderID, mf.url)
-
 	}
 
 	return mf

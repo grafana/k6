@@ -237,7 +237,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	case "background_page":
 		p, err := NewPage(b.ctx, session, browserCtx, evti.TargetID, nil, false, b.logger)
 		if err != nil {
-			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
+			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() // b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
 				// If we're no longer connected to browser, then ignore WebSocket errors
 				b.logger.Debugf("Browser:onAttachedToTarget:background_page:return", "sid:%v tid:%v websocket err:%v",
@@ -277,7 +277,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 
 		p, err := NewPage(b.ctx, session, browserCtx, evti.TargetID, opener, true, b.logger)
 		if err != nil {
-			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() //b.conn.isConnected()
+			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() // b.conn.isConnected()
 			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
 				// If we're no longer connected to browser, then ignore WebSocket errors
 				b.logger.Debugf("Browser:onAttachedToTarget:page:return", "sid:%v tid:%v websocket err:", ev.SessionID, evti.TargetID)

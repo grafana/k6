@@ -104,8 +104,8 @@ func (a *Allocator) buildCmdArgs(userDataDir *string, removeDir *bool) ([]string
 
 	// Force the first page to be blank, instead of the welcome page;
 	// --no-first-run doesn't enforce that.
-	//args = append(args, "about:blank")
-	//args = append(args, "--no-startup-window")
+	// args = append(args, "about:blank")
+	// args = append(args, "--no-startup-window")
 	return args, nil
 }
 
