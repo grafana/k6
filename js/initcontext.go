@@ -69,8 +69,6 @@ type InitContext struct {
 	compiler *compiler.Compiler
 
 	moduleVUImpl *moduleVUImpl
-	// Pointer to a context that bridged modules are invoked with.
-	ctxPtr *context.Context
 
 	// Filesystem to load files and scripts from with the map key being the scheme
 	filesystems map[string]afero.Fs
@@ -93,7 +91,6 @@ func NewInitContext(
 ) *InitContext {
 	return &InitContext{
 		compiler:          c,
-		ctxPtr:            ctxPtr,
 		filesystems:       filesystems,
 		pwd:               pwd,
 		programs:          make(map[string]programWithSource),
@@ -118,8 +115,6 @@ func newBoundInitContext(base *InitContext, vuImpl *moduleVUImpl) *InitContext {
 		}
 	}
 	return &InitContext{
-		ctxPtr: vuImpl.ctxPtr, // remove this
-
 		filesystems: base.filesystems,
 		pwd:         base.pwd,
 		compiler:    base.compiler,
@@ -219,7 +214,7 @@ func (i *InitContext) requireModule(name string) (goja.Value, error) {
 		mod = perInstance.NewModuleInstancePerVU()
 	}
 
-	return i.moduleVUImpl.runtime.ToValue(common.Bind(i.moduleVUImpl.runtime, mod, i.ctxPtr)), nil
+	return i.moduleVUImpl.runtime.ToValue(common.Bind(i.moduleVUImpl.runtime, mod, i.moduleVUImpl.ctxPtr)), nil
 }
 
 func (i *InitContext) requireFile(name string) (goja.Value, error) {
