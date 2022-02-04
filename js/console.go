@@ -21,7 +21,6 @@
 package js
 
 import (
-	"context"
 	"os"
 	"strings"
 
@@ -53,15 +52,7 @@ func newFileConsole(filepath string, formatter logrus.Formatter) (*console, erro
 	return &console{l}, nil
 }
 
-func (c console) log(ctx *context.Context, level logrus.Level, msgobj goja.Value, args ...goja.Value) {
-	if ctx != nil && *ctx != nil {
-		select {
-		case <-(*ctx).Done():
-			return
-		default:
-		}
-	}
-
+func (c console) log(level logrus.Level, msgobj goja.Value, args ...goja.Value) {
 	msg := msgobj.String()
 	if len(args) > 0 {
 		strs := make([]string, 1+len(args))
@@ -84,22 +75,22 @@ func (c console) log(ctx *context.Context, level logrus.Level, msgobj goja.Value
 	}
 }
 
-func (c console) Log(ctx *context.Context, msg goja.Value, args ...goja.Value) {
-	c.Info(ctx, msg, args...)
+func (c console) Log(msg goja.Value, args ...goja.Value) {
+	c.Info(msg, args...)
 }
 
-func (c console) Debug(ctx *context.Context, msg goja.Value, args ...goja.Value) {
-	c.log(ctx, logrus.DebugLevel, msg, args...)
+func (c console) Debug(msg goja.Value, args ...goja.Value) {
+	c.log(logrus.DebugLevel, msg, args...)
 }
 
-func (c console) Info(ctx *context.Context, msg goja.Value, args ...goja.Value) {
-	c.log(ctx, logrus.InfoLevel, msg, args...)
+func (c console) Info(msg goja.Value, args ...goja.Value) {
+	c.log(logrus.InfoLevel, msg, args...)
 }
 
-func (c console) Warn(ctx *context.Context, msg goja.Value, args ...goja.Value) {
-	c.log(ctx, logrus.WarnLevel, msg, args...)
+func (c console) Warn(msg goja.Value, args ...goja.Value) {
+	c.log(logrus.WarnLevel, msg, args...)
 }
 
-func (c console) Error(ctx *context.Context, msg goja.Value, args ...goja.Value) {
-	c.log(ctx, logrus.ErrorLevel, msg, args...)
+func (c console) Error(msg goja.Value, args ...goja.Value) {
+	c.log(logrus.ErrorLevel, msg, args...)
 }
