@@ -106,6 +106,7 @@ func getElementHandleActionFn(
 	}
 }
 
+//nolint:funlen,gocognit,cyclop,unparam
 func getElementHandlePointerActionFn(
 	h *ElementHandle, checkEnabled bool, fn elementHandlePointerActionFn, opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
