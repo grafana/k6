@@ -49,14 +49,12 @@ func TestCryptoAlgorithms(t *testing.T) {
 
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	ctx := context.Background()
-	ctx = common.WithRuntime(ctx, rt)
 
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
 			InitEnvField: &common.InitEnvironment{},
-			CtxField:     ctx,
+			CtxField:     context.Background(),
 			StateField:   nil,
 		},
 	).(*Crypto)
@@ -201,15 +199,13 @@ func TestStreamingApi(t *testing.T) {
 	state := &lib.State{Group: root}
 
 	ctx := context.Background()
-	ctx = lib.WithState(ctx, state)
-	ctx = common.WithRuntime(ctx, rt)
 
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
 			InitEnvField: &common.InitEnvironment{},
 			CtxField:     ctx,
-			StateField:   nil,
+			StateField:   state,
 		},
 	).(*Crypto)
 	require.True(t, ok)
@@ -271,18 +267,11 @@ func TestOutputEncoding(t *testing.T) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-	root, _ := lib.NewGroup("", nil)
-	state := &lib.State{Group: root}
-
-	ctx := context.Background()
-	ctx = lib.WithState(ctx, state)
-	ctx = common.WithRuntime(ctx, rt)
-
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
 			InitEnvField: &common.InitEnvironment{},
-			CtxField:     ctx,
+			CtxField:     context.Background(),
 			StateField:   nil,
 		},
 	).(*Crypto)
@@ -359,18 +348,11 @@ func TestHMac(t *testing.T) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-	root, _ := lib.NewGroup("", nil)
-	state := &lib.State{Group: root}
-
-	ctx := context.Background()
-	ctx = lib.WithState(ctx, state)
-	ctx = common.WithRuntime(ctx, rt)
-
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
 			InitEnvField: &common.InitEnvironment{},
-			CtxField:     ctx,
+			CtxField:     context.Background(),
 			StateField:   nil,
 		},
 	).(*Crypto)
@@ -499,13 +481,12 @@ func TestAWSv4(t *testing.T) {
 	// example values from https://docs.aws.amazon.com/general/latest/gr/signature-v4-examples.html
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	ctx := common.WithRuntime(context.Background(), rt)
 
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
 			InitEnvField: &common.InitEnvironment{},
-			CtxField:     ctx,
+			CtxField:     context.Background(),
 			StateField:   nil,
 		},
 	).(*Crypto)
