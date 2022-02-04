@@ -99,7 +99,7 @@ func (p *BrowserProcess) Pid() int {
 	return p.process.Pid
 }
 
-// WithLogger attaches a logger to the browser process.
+// AttachLogger attaches a logger to the browser process.
 func (p *BrowserProcess) AttachLogger(logger *Logger) {
 	p.logger = logger
 }

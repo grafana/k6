@@ -409,7 +409,7 @@ type ResourceTiming struct {
 	ResponseEnd           float64 `js:"responseEnd"`
 }
 
-// Viewport represents a device screen.
+// Screen represents a device screen.
 type Screen struct {
 	Width  int64 `js:"width"`
 	Height int64 `js:"height"`

@@ -28,22 +28,27 @@ import (
 var _ EventEmitter = &BaseEventEmitter{}
 
 const (
-	// Browser.
+	// Browser
+
 	EventBrowserDisconnected string = "disconnected"
 
-	// BrowserContext.
+	// BrowserContext
+
 	EventBrowserContextClose string = "close"
 	EventBrowserContextPage  string = "page"
 
-	// Connection.
+	// Connection
+
 	EventConnectionClose string = "close"
 
-	// Frame.
+	// Frame
+
 	EventFrameNavigation      string = "navigation"
 	EventFrameAddLifecycle    string = "addlifecycle"
 	EventFrameRemoveLifecycle string = "removelifecycle"
 
-	// Page.
+	// Page
+
 	EventPageClose            string = "close"
 	EventPageConsole          string = "console"
 	EventPageCrash            string = "crash"
@@ -64,10 +69,12 @@ const (
 	EventPageWebSocket        string = "websocket"
 	EventPageWorker           string = "worker"
 
-	// Session.
+	// Session
+
 	EventSessionClosed string = "close"
 
-	// Worker.
+	// Worker
+
 	EventWorkerClose string = "close"
 )
 

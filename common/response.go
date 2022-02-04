@@ -307,7 +307,7 @@ func (r *Response) SecurityDetails() goja.Value {
 	return rt.ToValue(r.securityDetails)
 }
 
-// ServerAdd returns the remote address of the server.
+// ServerAddr returns the remote address of the server.
 func (r *Response) ServerAddr() goja.Value {
 	rt := k6common.GetRuntime(r.ctx)
 	return rt.ToValue(r.remoteAddress)

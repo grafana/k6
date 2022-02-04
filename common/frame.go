@@ -1539,7 +1539,7 @@ type frameExecutionContext interface {
 }
 
 func frameActionFn(
-	f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandleActionFn, states []string,
+	f *Frame, selector string, state DOMElementState, strict bool, fn elementHandleActionFn, states []string,
 	force, noWaitAfter bool, timeout time.Duration,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// We execute a frame action in the following steps:
@@ -1560,13 +1560,13 @@ func frameActionFn(
 			resultCh <- nil
 			return
 		}
-		actFn := elementHandleActionFn(handle, states, fn, false, false, timeout)
+		actFn := getElementHandleActionFn(handle, states, fn, false, false, timeout)
 		actFn(apiCtx, resultCh, errCh)
 	}
 }
 
 func framePointerActionFn(
-	f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandlePointerActionFn,
+	f *Frame, selector string, state DOMElementState, strict bool, fn elementHandlePointerActionFn,
 	opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// We execute a frame pointer action in the following steps:
@@ -1587,7 +1587,7 @@ func framePointerActionFn(
 			resultCh <- nil
 			return
 		}
-		pointerActFn := elementHandlePointerActionFn(handle, true, fn, opts)
+		pointerActFn := getElementHandlePointerActionFn(handle, true, fn, opts)
 		pointerActFn(apiCtx, resultCh, errCh)
 	}
 }
