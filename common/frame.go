@@ -1539,7 +1539,7 @@ type frameExecutionContext interface {
 }
 
 func frameActionFn(
-	f *Frame, selector string, state DOMElementState, strict bool, fn elementHandleActionFn, states []string,
+	frame *Frame, selector string, state DOMElementState, strict bool, ehaFn elementHandleActionFn, states []string,
 	force, noWaitAfter bool, timeout time.Duration,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// We execute a frame action in the following steps:
@@ -1548,10 +1548,10 @@ func frameActionFn(
 	// 3. Run element handle action (incl. actionability checks)
 
 	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
-		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
+		waitOpts := NewFrameWaitForSelectorOptions(frame.defaultTimeout())
 		waitOpts.State = state
 		waitOpts.Strict = strict
-		handle, err := f.waitForSelector(selector, waitOpts)
+		handle, err := frame.waitForSelector(selector, waitOpts)
 		if err != nil {
 			errCh <- err
 			return
@@ -1560,13 +1560,13 @@ func frameActionFn(
 			resultCh <- nil
 			return
 		}
-		actFn := getElementHandleActionFn(handle, states, fn, false, false, timeout)
+		actFn := getElementHandleActionFn(handle, states, ehaFn, false, false, timeout)
 		actFn(apiCtx, resultCh, errCh)
 	}
 }
 
 func framePointerActionFn(
-	f *Frame, selector string, state DOMElementState, strict bool, fn elementHandlePointerActionFn,
+	frame *Frame, selector string, state DOMElementState, strict bool, ehpaFn elementHandlePointerActionFn,
 	opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// We execute a frame pointer action in the following steps:
@@ -1575,10 +1575,10 @@ func framePointerActionFn(
 	// 3. Run element handle action (incl. actionability checks)
 
 	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
-		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
+		waitOpts := NewFrameWaitForSelectorOptions(frame.defaultTimeout())
 		waitOpts.State = state
 		waitOpts.Strict = strict
-		handle, err := f.waitForSelector(selector, waitOpts)
+		handle, err := frame.waitForSelector(selector, waitOpts)
 		if err != nil {
 			errCh <- err
 			return
@@ -1587,7 +1587,7 @@ func framePointerActionFn(
 			resultCh <- nil
 			return
 		}
-		pointerActFn := getElementHandlePointerActionFn(handle, true, fn, opts)
+		pointerActFn := getElementHandlePointerActionFn(handle, true, ehpaFn, opts)
 		pointerActFn(apiCtx, resultCh, errCh)
 	}
 }

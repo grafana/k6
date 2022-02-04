@@ -60,7 +60,7 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 		},
 	}
 
-	mr := k6mockresolver.New(map[string][]net.IP{
+	mockRes := k6mockresolver.New(map[string][]net.IP{
 		mockHostname: {
 			net.ParseIP("127.0.0.10"),
 			net.ParseIP("127.0.0.11"),
@@ -75,7 +75,7 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 		ctx:      ctx,
 		logger:   logger,
 		session:  session,
-		resolver: mr,
+		resolver: mockRes,
 	}
 
 	return nm, session
