@@ -190,32 +190,57 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	})
 }
 
-func (m *NetworkManager) emitResponseMetrics(resp *Response) {
+func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	state := k6lib.GetState(m.ctx)
+
+	// In some scenarios we might not receive a ResponseReceived CDP event, in
+	// which case the response won't be created. So to emit as much metric data
+	// as possible we set some sensible defaults instead.
+	var (
+		status, bodySize                    int64
+		ipAddress, protocol                 string
+		fromCache, fromPreCache, fromSvcWrk bool
+		url                                 = req.url.String()
+		timestamp                           = time.Now()
+	)
+	if resp != nil {
+		status = resp.status
+		bodySize = resp.Size().Total()
+		ipAddress = resp.remoteAddress.IPAddress
+		protocol = resp.protocol
+		fromCache = resp.fromDiskCache
+		fromPreCache = resp.fromPrefetchCache
+		fromSvcWrk = resp.fromServiceWorker
+		timestamp = resp.timestamp
+		url = resp.url
+	} else {
+		m.logger.Debugf("NetworkManager:emitResponseMetrics",
+			"response is nil url:%s method:%s", req.url, req.method)
+	}
 
 	tags := state.CloneTags()
 	if state.Options.SystemTags.Has(k6stats.TagGroup) {
 		tags["group"] = state.Group.Path
 	}
 	if state.Options.SystemTags.Has(k6stats.TagMethod) {
-		tags["method"] = resp.request.method
+		tags["method"] = req.method
 	}
 	if state.Options.SystemTags.Has(k6stats.TagURL) {
-		tags["url"] = resp.url
+		tags["url"] = url
 	}
 	if state.Options.SystemTags.Has(k6stats.TagIP) {
-		tags["ip"] = resp.remoteAddress.IPAddress
+		tags["ip"] = ipAddress
 	}
 	if state.Options.SystemTags.Has(k6stats.TagStatus) {
-		tags["status"] = strconv.Itoa(int(resp.status))
+		tags["status"] = strconv.Itoa(int(status))
 	}
 	if state.Options.SystemTags.Has(k6stats.TagProto) {
-		tags["proto"] = resp.protocol
+		tags["proto"] = protocol
 	}
 
-	tags["from_cache"] = strconv.FormatBool(resp.fromDiskCache)
-	tags["from_prefetch_cache"] = strconv.FormatBool(resp.fromPrefetchCache)
-	tags["from_service_worker"] = strconv.FormatBool(resp.fromServiceWorker)
+	tags["from_cache"] = strconv.FormatBool(fromCache)
+	tags["from_prefetch_cache"] = strconv.FormatBool(fromPreCache)
+	tags["from_service_worker"] = strconv.FormatBool(fromSvcWrk)
 
 	sampleTags := k6stats.IntoSampleTags(&tags)
 	k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
@@ -224,7 +249,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response) {
 				Metric: state.BuiltinMetrics.HTTPReqs,
 				Tags:   sampleTags,
 				Value:  1,
-				Time:   resp.timestamp,
+				Time:   timestamp,
 			},
 			{
 				Metric: state.BuiltinMetrics.HTTPReqDuration,
@@ -235,18 +260,19 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response) {
 				// issues with the parsing and conversion to `time.Time`.
 				// Have not spent time looking for the root cause of this in the Chromium source to file a bug report, and neither
 				// Puppeteer nor Playwright seems to care about the `responseTime` value and don't use/expose it.
-				Value: k6stats.D(resp.timestamp.Sub(resp.request.timestamp)),
-				Time:  resp.timestamp,
+				Value: k6stats.D(timestamp.Sub(req.timestamp)),
+				Time:  timestamp,
 			},
 			{
 				Metric: state.BuiltinMetrics.DataReceived,
 				Tags:   sampleTags,
-				Value:  float64(resp.Size().Total()),
-				Time:   resp.timestamp,
+				Value:  float64(bodySize),
+				Time:   timestamp,
 			},
 		},
 	})
-	if resp.timing != nil {
+
+	if resp != nil && resp.timing != nil {
 		k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
 			Samples: []k6stats.Sample{
 				{
@@ -283,8 +309,8 @@ func (m *NetworkManager) handleRequestRedirect(req *Request, redirectResponse *n
 	req.response = resp
 	req.redirectChain = append(req.redirectChain, req)
 
+	m.emitResponseMetrics(resp, req)
 	m.deleteRequestByID(req.requestID)
-	m.emitResponseMetrics(resp)
 
 	/*
 		delete(m.attemptedAuth, req.interceptionID);
@@ -391,8 +417,16 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 		}
 	}
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
+	// Skip data and blob URLs when emitting metrics, since they're internal to the browser.
+	if !isInternalURL(req.url) {
+		m.emitResponseMetrics(req.response, req)
+	}
 	m.deleteRequestByID(event.RequestID)
 	m.frameManager.requestFinished(req)
+}
+
+func isInternalURL(u *url.URL) bool {
+	return u.Scheme == "data" || u.Scheme == "blob"
 }
 
 func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interceptionID string) {
@@ -416,7 +450,8 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 		frame = m.frameManager.getFrameByID(event.FrameID)
 	}
 	if frame == nil {
-		m.logger.Debugf("NetworkManager", "frame is nil")
+		m.logger.Debugf("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s frame is nil",
+			event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
 	}
 
 	req, err := NewRequest(m.ctx, event, frame, redirectChain, interceptionID, m.userReqInterceptionEnabled)
@@ -424,8 +459,9 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 		m.logger.Errorf("NetworkManager", "cannot create Request: %s", err)
 		return
 	}
-	if req.url.Scheme == "data" {
-		m.logger.Debugf("NetworkManager", "skipped request handling of data URL")
+	// Skip data and blob URLs, since they're internal to the browser.
+	if isInternalURL(req.url) {
+		m.logger.Debugf("NetworkManager", "skipped request handling of %s URL", req.url.Scheme)
 		return
 	}
 	m.reqsMu.Lock()
@@ -528,9 +564,6 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 	}
 	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
 	req.response = resp
-	if req.url.Scheme != "data" {
-		m.emitResponseMetrics(resp)
-	}
 	m.frameManager.requestReceivedResponse(resp)
 }
 

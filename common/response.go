@@ -24,7 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strconv"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -147,7 +147,7 @@ func (r *Response) fetchBody() error {
 	action := network.GetResponseBody(r.request.requestID)
 	body, err := action.Do(cdp.WithExecutor(r.ctx, r.request.frame.manager.session))
 	if err != nil {
-		return err
+		return fmt.Errorf("error fetching response body: %w", err)
 	}
 	r.bodyMu.Lock()
 	r.body = body
@@ -191,21 +191,15 @@ func (r *Response) Body() goja.ArrayBuffer {
 }
 
 // bodySize returns the size in bytes of the response body.
-// It first attempts to get the size specified in the content-length
-// header, and if unavailable falls back to the size as returned by CDP in
-// r.fetchBody(). This is because the CDP Network.getResponseBody call
-// is unreliable, see https://github.com/ChromeDevTools/devtools-protocol/issues/12#issuecomment-306947275 .
 func (r *Response) bodySize() int64 {
-	if v, ok := r.headers["content-length"]; ok && len(v) > 0 {
-		cl, err := strconv.ParseInt(v[0], 10, 64)
-		if err == nil {
-			return cl
-		}
-		r.logger.Warnf("cdp", "error parsing content-length header: %s", err)
+	// Skip redirect responses
+	if r.status >= 300 && r.status <= 399 {
+		return 0
 	}
 
 	if err := r.fetchBody(); err != nil {
-		r.logger.Warnf("cdp", "error fetching response body for '%s': %s", r.url, err)
+		r.logger.Warnf("Response:bodySize:fetchBody",
+			"url:%s method:%s err:%s", r.url, r.request.method, err)
 	}
 
 	r.bodyMu.RLock()
