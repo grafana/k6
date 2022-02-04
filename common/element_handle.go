@@ -891,7 +891,7 @@ func (h *ElementHandle) Check(opts goja.Value) {
 func (h *ElementHandle) Click(opts goja.Value) {
 	actionOpts := NewElementHandleClickOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6Throw(h.ctx, "cannot parse element click options: %w", err)
+		k6Throw(h.ctx, "cannot parse element click options: %v", err)
 	}
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
 		return nil, handle.click(p, actionOpts.ToMouseClickOptions())
@@ -899,7 +899,7 @@ func (h *ElementHandle) Click(opts goja.Value) {
 	pointerFn := getElementHandlePointerActionFn(h, true, fn, &actionOpts.ElementHandleBasePointerOptions)
 	_, err := callApiWithTimeout(h.ctx, pointerFn, actionOpts.Timeout)
 	if err != nil {
-		k6Throw(h.ctx, "cannot click on element: %w", err)
+		k6Throw(h.ctx, "cannot click on element: %v", err)
 	}
 	applySlowMo(h.ctx)
 }
