@@ -21,7 +21,9 @@
 package js
 
 import (
+	"encoding/json"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -52,17 +54,16 @@ func newFileConsole(filepath string, formatter logrus.Formatter) (*console, erro
 	return &console{l}, nil
 }
 
-func (c console) log(level logrus.Level, msgobj goja.Value, args ...goja.Value) {
-	msg := msgobj.String()
-	if len(args) > 0 {
-		strs := make([]string, 1+len(args))
-		strs[0] = msg
-		for i, v := range args {
-			strs[i+1] = v.String()
+func (c console) log(level logrus.Level, args ...goja.Value) {
+	var strs strings.Builder
+	for i := 0; i < len(args); i++ {
+		if i > 0 {
+			strs.WriteString(" ")
 		}
-
-		msg = strings.Join(strs, " ")
+		strs.WriteString(c.valueString(args[i]))
 	}
+	msg := strs.String()
+
 	switch level { //nolint:exhaustive
 	case logrus.DebugLevel:
 		c.logger.Debug(msg)
@@ -75,22 +76,40 @@ func (c console) log(level logrus.Level, msgobj goja.Value, args ...goja.Value) 
 	}
 }
 
-func (c console) Log(msg goja.Value, args ...goja.Value) {
-	c.Info(msg, args...)
+func (c console) Log(args ...goja.Value) {
+	c.Info(args...)
 }
 
-func (c console) Debug(msg goja.Value, args ...goja.Value) {
-	c.log(logrus.DebugLevel, msg, args...)
+func (c console) Debug(args ...goja.Value) {
+	c.log(logrus.DebugLevel, args...)
 }
 
-func (c console) Info(msg goja.Value, args ...goja.Value) {
-	c.log(logrus.InfoLevel, msg, args...)
+func (c console) Info(args ...goja.Value) {
+	c.log(logrus.InfoLevel, args...)
 }
 
-func (c console) Warn(msg goja.Value, args ...goja.Value) {
-	c.log(logrus.WarnLevel, msg, args...)
+func (c console) Warn(args ...goja.Value) {
+	c.log(logrus.WarnLevel, args...)
 }
 
-func (c console) Error(msg goja.Value, args ...goja.Value) {
-	c.log(logrus.ErrorLevel, msg, args...)
+func (c console) Error(args ...goja.Value) {
+	c.log(logrus.ErrorLevel, args...)
+}
+
+func (c console) valueString(v goja.Value) string {
+	exptype := v.ExportType()
+	if exptype == nil {
+		return v.String()
+	}
+
+	kind := exptype.Kind()
+	if kind != reflect.Map && kind != reflect.Slice {
+		return v.String()
+	}
+
+	b, err := json.Marshal(v)
+	if err != nil {
+		return v.String()
+	}
+	return string(b)
 }
