@@ -1538,7 +1538,10 @@ type frameExecutionContext interface {
 	ID() runtime.ExecutionContextID
 }
 
-func frameActionFn(f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandleActionFn, states []string, force, noWaitAfter bool, timeout time.Duration) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+func frameActionFn(
+	f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandleActionFn, states []string,
+	force, noWaitAfter bool, timeout time.Duration,
+) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// We execute a frame action in the following steps:
 	// 1. Find element matching specified selector
 	// 2. Wait for it to reach specified DOM state
@@ -1562,7 +1565,10 @@ func frameActionFn(f *Frame, selector string, state DOMElementState, strict bool
 	}
 }
 
-func framePointerActionFn(f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandlePointerActionFn, opts *ElementHandleBasePointerOptions) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+func framePointerActionFn(
+	f *Frame, selector string, state DOMElementState, strict bool, fn ElementHandlePointerActionFn,
+	opts *ElementHandleBasePointerOptions,
+) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// We execute a frame pointer action in the following steps:
 	// 1. Find element matching specified selector
 	// 2. Wait for it to reach specified DOM state

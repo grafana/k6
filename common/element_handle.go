@@ -63,7 +63,9 @@ type (
 	ElementHandlePointerActionFn func(context.Context, *ElementHandle, *Position) (interface{}, error)
 )
 
-func elementHandleActionFn(h *ElementHandle, states []string, fn ElementHandleActionFn, force, noWaitAfter bool, timeout time.Duration) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+func elementHandleActionFn(
+	h *ElementHandle, states []string, fn ElementHandleActionFn, force, noWaitAfter bool, timeout time.Duration,
+) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// All or a subset of the following actionability checks are made before performing the actual action:
 	// 1. Attached to DOM
 	// 2. Visible
@@ -104,7 +106,9 @@ func elementHandleActionFn(h *ElementHandle, states []string, fn ElementHandleAc
 	}
 }
 
-func elementHandlePointerActionFn(h *ElementHandle, checkEnabled bool, fn ElementHandlePointerActionFn, opts *ElementHandleBasePointerOptions) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+func elementHandlePointerActionFn(
+	h *ElementHandle, checkEnabled bool, fn ElementHandlePointerActionFn, opts *ElementHandleBasePointerOptions,
+) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// All or a subset of the following actionability checks are made before performing the actual action:
 	// 1. Attached to DOM
 	// 2. Visible
@@ -952,7 +956,8 @@ func (h *ElementHandle) Fill(value string, opts goja.Value) {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.fill(apiCtx, value)
 	}
-	actFn := elementHandleActionFn(h, []string{"visible", "enabled", "editable"}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
+	actFn := elementHandleActionFn(h, []string{"visible", "enabled", "editable"},
+		fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
 	_, err := callApiWithTimeout(h.ctx, actFn, actionOpts.Timeout)
 	if err != nil {
 		k6Throw(h.ctx, "cannot handle element fill action: %w", err)
