@@ -846,7 +846,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 		reason = "session closed"
 		return
 	default:
-		// Ignore context canceled error to gracefuly handle shutting down
+		// Ignore context canceled error to gracefully handle shutting down
 		// of the extension. This may happen because of generated events
 		// while a frame session is being created.
 		if errors.Is(err, context.Canceled) {

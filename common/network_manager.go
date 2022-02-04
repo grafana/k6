@@ -62,7 +62,7 @@ type NetworkManager struct {
 	credentials  *Credentials
 	resolver     k6netext.Resolver
 
-	// TODO: manage inflight requests seperately (move them between the two maps as they transition from inflight -> completed)
+	// TODO: manage inflight requests separately (move them between the two maps as they transition from inflight -> completed)
 	reqIDToRequest map[network.RequestID]*Request
 	reqsMu         sync.RWMutex
 

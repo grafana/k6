@@ -562,7 +562,7 @@ func (m *FrameManager) setMainFrame(f *Frame) {
 	m.mainFrame = f
 }
 
-// NavigateFrame will navigate specified frame to specifed URL.
+// NavigateFrame will navigate specified frame to specified URL.
 func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) api.Response {
 	var (
 		fmid = m.ID()
