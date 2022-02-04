@@ -1538,6 +1538,7 @@ type frameExecutionContext interface {
 	ID() runtime.ExecutionContextID
 }
 
+//nolint:unparam
 func frameActionFn(
 	frame *Frame, selector string, state DOMElementState, strict bool, ehaFn elementHandleActionFn, states []string,
 	force, noWaitAfter bool, timeout time.Duration,
@@ -1565,6 +1566,7 @@ func frameActionFn(
 	}
 }
 
+//nolint:unparam
 func framePointerActionFn(
 	frame *Frame, selector string, state DOMElementState, strict bool, ehpaFn elementHandlePointerActionFn,
 	opts *ElementHandleBasePointerOptions,
