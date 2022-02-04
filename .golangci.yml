@@ -1,3 +1,6 @@
+# v1.44.0
+# Please don't remove the first line. It's used in CI to determine the
+# golangci-lint version. See the lint step in .github/workflows/all.yaml
 run:
   timeout: 5m
 
