@@ -92,7 +92,6 @@ func convertArgument(ctx context.Context, execCtx *ExecutionContext, arg goja.Va
 	case reflect.TypeOf(&BaseJSHandle{}):
 		objHandle := arg.Export().(*BaseJSHandle)
 		return convertBaseJSHandleTypes(ctx, execCtx, objHandle)
-
 	}
 	b, err := json.Marshal(arg.Export())
 	return &cdpruntime.CallArgument{Value: b}, err
