@@ -42,10 +42,10 @@ import (
 	"strings"
 )
 
-// Matches `name:body`, a query engine name and selector for that engine
+// Matches `name:body`, a query engine name and selector for that engine.
 var reQueryEngine *regexp.Regexp = regexp.MustCompile(`^[a-zA-Z_0-9-+:*]+$`)
 
-// Matches start of XPath query
+// Matches start of XPath query.
 var reXPathSelector *regexp.Regexp = regexp.MustCompile(`^\(*//`)
 
 type SelectorPart struct {

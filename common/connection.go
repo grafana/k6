@@ -40,7 +40,7 @@ import (
 
 const wsWriteBufferSize = 1 << 20
 
-// Ensure Connection implements the EventEmitter and Executor interfaces
+// Ensure Connection implements the EventEmitter and Executor interfaces.
 var _ EventEmitter = &Connection{}
 var _ cdp.Executor = &Connection{}
 
@@ -88,7 +88,7 @@ func (f ActionFunc) Do(ctx context.Context) error {
 │Registers with session as a├─────────────■                    │                         │                    │
 │handler for a specific CDP │             │   Event Listener   │      *  *  *  *  *      │   Event Listener   │
 │       Domain event.       │             │                    │                         │                    │
-└───────────────────────────┘             └────────────────────┘                         └────────────────────┘
+└───────────────────────────┘             └────────────────────┘                         └────────────────────┘.
 */
 type Connection struct {
 	BaseEventEmitter
@@ -113,7 +113,7 @@ type Connection struct {
 	encoder jwriter.Writer
 }
 
-// NewConnection creates a new browser
+// NewConnection creates a new browser.
 func NewConnection(ctx context.Context, wsURL string, logger *Logger) (*Connection, error) {
 	var header http.Header
 	var tlsConfig *tls.Config
@@ -467,7 +467,7 @@ func (c *Connection) Close(args ...goja.Value) {
 	_ = c.closeConnection(code)
 }
 
-// Execute implements cdproto.Executor and performs a synchronous send and receive
+// Execute implements cdproto.Executor and performs a synchronous send and receive.
 func (c *Connection) Execute(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
 	c.logger.Debugf("connection:Execute", "wsURL:%q method:%q", c.wsURL, method)
 	id := atomic.AddInt64(&c.msgID, 1)

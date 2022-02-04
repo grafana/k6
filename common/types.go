@@ -33,10 +33,10 @@ import (
 	"github.com/grafana/xk6-browser/api"
 )
 
-// ColorScheme represents a browser color scheme
+// ColorScheme represents a browser color scheme.
 type ColorScheme string
 
-// Valid color schemes
+// Valid color schemes.
 const (
 	ColorSchemeLight        ColorScheme = "light"
 	ColorSchemeDark         ColorScheme = "dark"
@@ -59,7 +59,7 @@ var colorSchemeToID = map[string]ColorScheme{
 	"no-preference": ColorSchemeNoPreference,
 }
 
-// MarshalJSON marshals the enum as a quoted JSON string
+// MarshalJSON marshals the enum as a quoted JSON string.
 func (c ColorScheme) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
 	buffer.WriteString(colorSchemeToString[c])
@@ -67,7 +67,7 @@ func (c ColorScheme) MarshalJSON() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-// UnmarshalJSON unmarshals a quoted JSON string to the enum value
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
 func (c *ColorScheme) UnmarshalJSON(b []byte) error {
 	var j string
 	err := json.Unmarshal(b, &j)
@@ -79,16 +79,16 @@ func (c *ColorScheme) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// Credentials holds HTTP authentication credentials
+// Credentials holds HTTP authentication credentials.
 type Credentials struct {
 	Username string `js:"username"`
 	Password string `js:"password"`
 }
 
-// DOMElementState represents a DOM element state
+// DOMElementState represents a DOM element state.
 type DOMElementState int
 
-// Valid DOM element states
+// Valid DOM element states.
 const (
 	DOMElementStateAttached DOMElementState = iota
 	DOMElementStateDetached
@@ -114,7 +114,7 @@ var domElementStateToID = map[string]DOMElementState{
 	"hidden":   DOMElementStateHidden,
 }
 
-// MarshalJSON marshals the enum as a quoted JSON string
+// MarshalJSON marshals the enum as a quoted JSON string.
 func (s DOMElementState) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
 	buffer.WriteString(domElementStateToString[s])
@@ -122,7 +122,7 @@ func (s DOMElementState) MarshalJSON() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-// UnmarshalJSON unmarshals a quoted JSON string to the enum value
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
 func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	var j string
 	err := json.Unmarshal(b, &j)
@@ -192,10 +192,10 @@ func (g *Geolocation) Parse(ctx context.Context, opts goja.Value) error {
 	return nil
 }
 
-// ImageFormat represents an image file format
+// ImageFormat represents an image file format.
 type ImageFormat string
 
-// Valid image format options
+// Valid image format options.
 const (
 	ImageFormatJPEG ImageFormat = "jpeg"
 	ImageFormatPNG  ImageFormat = "png"
@@ -215,7 +215,7 @@ var imageFormatToID = map[string]ImageFormat{
 	"png":  ImageFormatPNG,
 }
 
-// MarshalJSON marshals the enum as a quoted JSON string
+// MarshalJSON marshals the enum as a quoted JSON string.
 func (f ImageFormat) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
 	buffer.WriteString(imageFormatToString[f])
@@ -223,7 +223,7 @@ func (f ImageFormat) MarshalJSON() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-// UnmarshalJSON unmarshals a quoted JSON string to the enum value
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
 func (f *ImageFormat) UnmarshalJSON(b []byte) error {
 	var j string
 	err := json.Unmarshal(b, &j)
@@ -259,7 +259,7 @@ var lifecycleEventToID = map[string]LifecycleEvent{
 	"networkidle":      LifecycleEventNetworkIdle,
 }
 
-// MarshalJSON marshals the enum as a quoted JSON string
+// MarshalJSON marshals the enum as a quoted JSON string.
 func (l LifecycleEvent) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
 	buffer.WriteString(lifecycleEventToString[l])
@@ -267,7 +267,7 @@ func (l LifecycleEvent) MarshalJSON() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-// UnmarshalJSON unmarshals a quoted JSON string to the enum value
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
 func (l *LifecycleEvent) UnmarshalJSON(b []byte) error {
 	var j string
 	err := json.Unmarshal(b, &j)
@@ -310,7 +310,7 @@ var pollingTypeToID = map[string]PollingType{
 	"interval": PollingInterval,
 }
 
-// MarshalJSON marshals the enum as a quoted JSON string
+// MarshalJSON marshals the enum as a quoted JSON string.
 func (p PollingType) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
 	buffer.WriteString(pollingTypeToString[p])
@@ -318,7 +318,7 @@ func (p PollingType) MarshalJSON() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-// UnmarshalJSON unmarshals a quoted JSON string to the enum value
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
 func (p *PollingType) UnmarshalJSON(b []byte) error {
 	var j string
 	err := json.Unmarshal(b, &j)
@@ -354,10 +354,10 @@ func (r *Rect) toApiRect() *api.Rect {
 	return &api.Rect{X: r.X, Y: r.Y, Width: r.Width, Height: r.Height}
 }
 
-// ReducedMotion represents a browser reduce-motion setting
+// ReducedMotion represents a browser reduce-motion setting.
 type ReducedMotion string
 
-// Valid reduce-motion options
+// Valid reduce-motion options.
 const (
 	ReducedMotionReduce       ReducedMotion = "reduce"
 	ReducedMotionNoPreference ReducedMotion = "no-preference"
@@ -377,7 +377,7 @@ var reducedMotionToID = map[string]ReducedMotion{
 	"no-preference": ReducedMotionNoPreference,
 }
 
-// MarshalJSON marshals the enum as a quoted JSON string
+// MarshalJSON marshals the enum as a quoted JSON string.
 func (r ReducedMotion) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
 	buffer.WriteString(reducedMotionToString[r])
@@ -385,7 +385,7 @@ func (r ReducedMotion) MarshalJSON() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-// UnmarshalJSON unmarshals a quoted JSON string to the enum value
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
 func (r *ReducedMotion) UnmarshalJSON(b []byte) error {
 	var j string
 	err := json.Unmarshal(b, &j)
@@ -409,7 +409,7 @@ type ResourceTiming struct {
 	ResponseEnd           float64 `js:"responseEnd"`
 }
 
-// Viewport represents a device screen
+// Viewport represents a device screen.
 type Screen struct {
 	Width  int64 `js:"width"`
 	Height int64 `js:"height"`

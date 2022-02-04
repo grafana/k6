@@ -37,7 +37,7 @@ import (
 	"github.com/grafana/xk6-browser/api"
 )
 
-// Ensure Browser implements the EventEmitter and Browser interfaces
+// Ensure Browser implements the EventEmitter and Browser interfaces.
 var _ EventEmitter = &Browser{}
 var _ api.Browser = &Browser{}
 
@@ -47,7 +47,7 @@ const (
 	BrowserStateClosed
 )
 
-// Browser stores a Browser context
+// Browser stores a Browser context.
 type Browser struct {
 	BaseEventEmitter
 
@@ -391,7 +391,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 	return page, err
 }
 
-// Close shuts down the browser
+// Close shuts down the browser.
 func (b *Browser) Close() {
 	b.logger.Debugf("Browser:Close", "")
 	if !atomic.CompareAndSwapInt64(&b.state, b.state, BrowserStateClosing) {
@@ -416,7 +416,7 @@ func (b *Browser) Close() {
 	b.browserProc.Terminate()
 }
 
-// Contexts returns list of browser contexts
+// Contexts returns list of browser contexts.
 func (b *Browser) Contexts() []api.BrowserContext {
 	b.contextsMu.RLock()
 	defer b.contextsMu.RUnlock()
@@ -436,7 +436,7 @@ func (b *Browser) IsConnected() bool {
 	return b.connected
 }
 
-// NewContext creates a new incognito-like browser context
+// NewContext creates a new incognito-like browser context.
 func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 	action := target.CreateBrowserContext().WithDisposeOnDetach(true)
 	browserContextID, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
@@ -458,13 +458,13 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 	return browserCtx
 }
 
-// NewPage creates a new tab in the browser window
+// NewPage creates a new tab in the browser window.
 func (b *Browser) NewPage(opts goja.Value) api.Page {
 	browserCtx := b.NewContext(opts)
 	return browserCtx.NewPage()
 }
 
-// UserAgent returns the controlled browser's user agent string
+// UserAgent returns the controlled browser's user agent string.
 func (b *Browser) UserAgent() string {
 	action := cdpbrowser.GetVersion()
 	_, _, _, ua, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
@@ -474,7 +474,7 @@ func (b *Browser) UserAgent() string {
 	return ua
 }
 
-// Version returns the controlled browser's version
+// Version returns the controlled browser's version.
 func (b *Browser) Version() string {
 	action := cdpbrowser.GetVersion()
 	_, product, _, _, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))

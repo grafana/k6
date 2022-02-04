@@ -181,7 +181,7 @@ readLoop:
 	return wsURL, nil
 }
 
-// Allocate starts a new local browser process
+// Allocate starts a new local browser process.
 func (a *Allocator) Allocate(ctx context.Context, launchOpts *common.LaunchOptions) (_ *common.BrowserProcess, rerr error) {
 	// Create cancelable context for the browser process
 	ctx, cancel := context.WithCancel(ctx)

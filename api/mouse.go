@@ -22,7 +22,7 @@ package api
 
 import "github.com/dop251/goja"
 
-// Mouse is the interface of a mouse input device
+// Mouse is the interface of a mouse input device.
 type Mouse interface {
 	Click(x float64, y float64, opts goja.Value)
 	DblClick(x float64, y float64, opts goja.Value)

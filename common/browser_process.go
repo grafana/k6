@@ -77,29 +77,29 @@ func (p *BrowserProcess) didLoseConnection() {
 	close(p.lostConnection)
 }
 
-// GracefulClose triggers a graceful closing of the browser process
+// GracefulClose triggers a graceful closing of the browser process.
 func (p *BrowserProcess) GracefulClose() {
 	p.logger.Debugf("Browser:GracefulClose", "")
 	close(p.processIsGracefullyClosing)
 }
 
-// Terminate triggers the termination of the browser process
+// Terminate triggers the termination of the browser process.
 func (p *BrowserProcess) Terminate() {
 	p.logger.Debugf("Browser:Close", "browserProc terminate")
 	p.cancel()
 }
 
-// WsURL returns the Websocket URL that the browser is listening on for CDP clients
+// WsURL returns the Websocket URL that the browser is listening on for CDP clients.
 func (p *BrowserProcess) WsURL() string {
 	return p.wsURL
 }
 
-// Pid returns the browser process ID
+// Pid returns the browser process ID.
 func (p *BrowserProcess) Pid() int {
 	return p.process.Pid
 }
 
-// WithLogger attaches a logger to the browser process
+// WithLogger attaches a logger to the browser process.
 func (p *BrowserProcess) AttachLogger(logger *Logger) {
 	p.logger = logger
 }

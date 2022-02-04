@@ -39,7 +39,7 @@ type (
 	// instances for each VU.
 	RootModule struct{}
 
-	// JSModule is the entrypoint into the browser JS module
+	// JSModule is the entrypoint into the browser JS module.
 	JSModule struct {
 		vu      k6modules.VU
 		Devices map[string]common.Device

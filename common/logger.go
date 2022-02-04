@@ -122,7 +122,7 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...i
 }
 
 // SetLevel sets the logger level from a level string.
-// Accepted values:
+// Accepted values:.
 func (l *Logger) SetLevel(level string) error {
 	pl, err := logrus.ParseLevel(level)
 	if err != nil {

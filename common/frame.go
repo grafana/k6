@@ -36,7 +36,7 @@ import (
 	"github.com/grafana/xk6-browser/api"
 )
 
-// Ensure frame implements the Frame interface
+// Ensure frame implements the Frame interface.
 var _ api.Frame = &Frame{}
 
 type DocumentInfo struct {
@@ -44,7 +44,7 @@ type DocumentInfo struct {
 	request    *Request
 }
 
-// Frame represents a frame in an HTML document
+// Frame represents a frame in an HTML document.
 type Frame struct {
 	BaseEventEmitter
 
@@ -87,7 +87,7 @@ type Frame struct {
 	log *Logger
 }
 
-// NewFrame creates a new HTML document frame
+// NewFrame creates a new HTML document frame.
 func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID cdp.FrameID, log *Logger) *Frame {
 	if log.DebugMode() {
 		var pfid string
@@ -596,7 +596,7 @@ func (f *Frame) AddStyleTag(opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
-// Check clicks the first element found that matches selector
+// Check clicks the first element found that matches selector.
 func (f *Frame) Check(selector string, opts goja.Value) {
 	f.log.Debugf("Frame:Check", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
@@ -619,7 +619,7 @@ func (f *Frame) Check(selector string, opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
-// ChildFrames returns a list of child frames
+// ChildFrames returns a list of child frames.
 func (f *Frame) ChildFrames() []api.Frame {
 	f.childFramesMu.RLock()
 	defer f.childFramesMu.RUnlock()
@@ -631,7 +631,7 @@ func (f *Frame) ChildFrames() []api.Frame {
 	return l
 }
 
-// Click clicks the first element found that matches selector
+// Click clicks the first element found that matches selector.
 func (f *Frame) Click(selector string, opts goja.Value) {
 	f.log.Debugf("Frame:Click", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
@@ -654,7 +654,7 @@ func (f *Frame) Click(selector string, opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
-// Content returns the HTML content of the frame
+// Content returns the HTML content of the frame.
 func (f *Frame) Content() string {
 	f.log.Debugf("Frame:Content", "fid:%s furl:%q", f.ID(), f.URL())
 
@@ -670,7 +670,7 @@ func (f *Frame) Content() string {
 	return f.Evaluate(rt.ToValue(js)).(string)
 }
 
-// Dblclick double clicks an element matching provided selector
+// Dblclick double clicks an element matching provided selector.
 func (f *Frame) Dblclick(selector string, opts goja.Value) {
 	f.log.Debugf("Frame:DblClick", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
@@ -714,7 +714,7 @@ func (f *Frame) DispatchEvent(selector string, typ string, eventInit goja.Value,
 	applySlowMo(f.ctx)
 }
 
-// Evaluate will evaluate provided page function within an execution context
+// Evaluate will evaluate provided page function within an execution context.
 func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.ID(), f.URL())
 
@@ -736,7 +736,7 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 	return result
 }
 
-// EvaluateHandle will evaluate provided page function within an execution context
+// EvaluateHandle will evaluate provided page function within an execution context.
 func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle api.JSHandle) {
 	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.ID(), f.URL())
 
@@ -783,7 +783,7 @@ func (f *Frame) Fill(selector string, value string, opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
-// Focus fetches an element with selector and focuses it
+// Focus fetches an element with selector and focuses it.
 func (f *Frame) Focus(selector string, opts goja.Value) {
 	f.log.Debugf("Frame:Focus", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
@@ -838,14 +838,14 @@ func (f *Frame) GetAttribute(selector string, name string, opts goja.Value) goja
 	return value.(goja.Value)
 }
 
-// Goto will navigate the frame to the specified URL and return a HTTP response object
+// Goto will navigate the frame to the specified URL and return a HTTP response object.
 func (f *Frame) Goto(url string, opts goja.Value) api.Response {
 	resp := f.manager.NavigateFrame(f, url, opts)
 	applySlowMo(f.ctx)
 	return resp
 }
 
-// Hover hovers an element identified by provided selector
+// Hover hovers an element identified by provided selector.
 func (f *Frame) Hover(selector string, opts goja.Value) {
 	f.log.Debugf("Frame:Hover", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
@@ -960,7 +960,7 @@ func (f *Frame) IsChecked(selector string, opts goja.Value) bool {
 	return value.(bool)
 }
 
-// IsDetached returns whether the frame is detached or not
+// IsDetached returns whether the frame is detached or not.
 func (f *Frame) IsDetached() bool {
 	f.propertiesMu.RLock()
 	defer f.propertiesMu.RUnlock()
@@ -1106,7 +1106,7 @@ func (f *Frame) IsVisible(selector string, opts goja.Value) bool {
 	return value.(bool)
 }
 
-// ID returns the frame id
+// ID returns the frame id.
 func (f *Frame) ID() string {
 	f.propertiesMu.RLock()
 	defer f.propertiesMu.RUnlock()
@@ -1114,7 +1114,7 @@ func (f *Frame) ID() string {
 	return f.id.String()
 }
 
-// LoaderID returns the ID of the frame that loaded this frame
+// LoaderID returns the ID of the frame that loaded this frame.
 func (f *Frame) LoaderID() string {
 	f.propertiesMu.RLock()
 	defer f.propertiesMu.RUnlock()
@@ -1122,7 +1122,7 @@ func (f *Frame) LoaderID() string {
 	return f.loaderID
 }
 
-// Name returns the frame name
+// Name returns the frame name.
 func (f *Frame) Name() string {
 	f.propertiesMu.RLock()
 	defer f.propertiesMu.RUnlock()
@@ -1131,7 +1131,7 @@ func (f *Frame) Name() string {
 }
 
 // Query runs a selector query against the document tree, returning the first matching element or
-// "null" if no match is found
+// "null" if no match is found.
 func (f *Frame) Query(selector string) api.ElementHandle {
 	f.log.Debugf("Frame:Query", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
@@ -1162,12 +1162,12 @@ func (f *Frame) QueryAll(selector string) []api.ElementHandle {
 	return nil
 }
 
-// Page returns page that owns frame
+// Page returns page that owns frame.
 func (f *Frame) Page() api.Page {
 	return f.manager.page
 }
 
-// ParentFrame returns the parent frame, if one exists
+// ParentFrame returns the parent frame, if one exists.
 func (f *Frame) ParentFrame() api.Frame {
 	return f.parentFrame
 }
@@ -1227,7 +1227,7 @@ func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value
 	return strArr
 }
 
-// SetContent replaces the entire HTML document content
+// SetContent replaces the entire HTML document content.
 func (f *Frame) SetContent(html string, opts goja.Value) {
 	f.log.Debugf("Frame:SetContent", "fid:%s furl:%q", f.ID(), f.URL())
 
@@ -1377,7 +1377,7 @@ func (f *Frame) setURL(url string) {
 	f.url = url
 }
 
-// WaitForFunction waits for the given predicate to return a truthy value
+// WaitForFunction waits for the given predicate to return a truthy value.
 func (f *Frame) WaitForFunction(pageFunc goja.Value, opts goja.Value, args ...goja.Value) api.JSHandle {
 	f.log.Debugf("Frame:WaitForFunction", "fid:%s furl:%q", f.ID(), f.URL())
 
@@ -1398,7 +1398,7 @@ func (f *Frame) WaitForFunction(pageFunc goja.Value, opts goja.Value, args ...go
 	return handle.(api.JSHandle)
 }
 
-// WaitForLoadState waits for the given load state to be reached
+// WaitForLoadState waits for the given load state to be reached.
 func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 	f.log.Debugf("Frame:WaitForLoadState", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 	defer f.log.Debugf("Frame:WaitForLoadState:return", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
@@ -1429,12 +1429,12 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 	}
 }
 
-// WaitForNavigation waits for the given navigation lifecycle event to happen
+// WaitForNavigation waits for the given navigation lifecycle event to happen.
 func (f *Frame) WaitForNavigation(opts goja.Value) api.Response {
 	return f.manager.WaitForFrameNavigation(f, opts)
 }
 
-// WaitForSelector waits for the given selector to match the waiting criteria
+// WaitForSelector waits for the given selector to match the waiting criteria.
 func (f *Frame) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
 	rt := k6common.GetRuntime(f.ctx)
 	parsedOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
@@ -1448,7 +1448,7 @@ func (f *Frame) WaitForSelector(selector string, opts goja.Value) api.ElementHan
 	return handle
 }
 
-// WaitForTimeout waits the specified amount of milliseconds
+// WaitForTimeout waits the specified amount of milliseconds.
 func (f *Frame) WaitForTimeout(timeout int64) {
 	to := time.Duration(timeout) * time.Millisecond
 

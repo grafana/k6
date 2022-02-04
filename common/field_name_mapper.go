@@ -26,7 +26,7 @@ import (
 	k6common "go.k6.io/k6/js/common"
 )
 
-// FieldNameMapper for goja.Runtime.SetFieldNameMapper()
+// FieldNameMapper for goja.Runtime.SetFieldNameMapper().
 type FieldNameMapper struct {
 	parent k6common.FieldNameMapper
 }

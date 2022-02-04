@@ -43,7 +43,7 @@ import (
 var _ EventEmitter = &Page{}
 var _ api.Page = &Page{}
 
-// Page stores Page/tab related context
+// Page stores Page/tab related context.
 type Page struct {
 	BaseEventEmitter
 
@@ -85,7 +85,7 @@ type Page struct {
 	logger *Logger
 }
 
-// NewPage creates a new browser page context
+// NewPage creates a new browser page context.
 func NewPage(
 	ctx context.Context,
 	session *Session,
@@ -357,7 +357,7 @@ func (p *Page) viewportSize() Size {
 	}
 }
 
-// AddInitScript adds script to run in all new frames
+// AddInitScript adds script to run in all new frames.
 func (p *Page) AddInitScript(script goja.Value, arg goja.Value) {
 	rt := k6common.GetRuntime(p.ctx)
 	k6common.Throw(rt, errors.New("Page.addInitScript(script, arg) has not been implemented yet"))
@@ -373,7 +373,7 @@ func (p *Page) AddStyleTag(opts goja.Value) {
 	k6common.Throw(rt, errors.New("Page.addStyleTag(opts) has not been implemented yet"))
 }
 
-// BringToFront activates the browser tab for this page
+// BringToFront activates the browser tab for this page.
 func (p *Page) BringToFront() {
 	p.logger.Debugf("Page:BringToFront", "sid:%v", p.sessionID())
 
@@ -384,40 +384,40 @@ func (p *Page) BringToFront() {
 	}
 }
 
-// Check checks an element matching provided selector
+// Check checks an element matching provided selector.
 func (p *Page) Check(selector string, opts goja.Value) {
 	p.logger.Debugf("Page:Check", "sid:%v selector:%s", p.sessionID(), selector)
 
 	p.MainFrame().Check(selector, opts)
 }
 
-// Click clicks an element matching provided selector
+// Click clicks an element matching provided selector.
 func (p *Page) Click(selector string, opts goja.Value) {
 	p.logger.Debugf("Page:Click", "sid:%v selector:%s", p.sessionID(), selector)
 
 	p.MainFrame().Click(selector, opts)
 }
 
-// Close closes the page
+// Close closes the page.
 func (p *Page) Close(opts goja.Value) {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
 
 	p.browserCtx.Close()
 }
 
-// Content returns the HTML content of the page
+// Content returns the HTML content of the page.
 func (p *Page) Content() string {
 	p.logger.Debugf("Page:Content", "sid:%v", p.sessionID())
 
 	return p.MainFrame().Content()
 }
 
-// Context closes the page
+// Context closes the page.
 func (p *Page) Context() api.BrowserContext {
 	return p.browserCtx
 }
 
-// Dblclick double clicks an element matching provided selector
+// Dblclick double clicks an element matching provided selector.
 func (p *Page) Dblclick(selector string, opts goja.Value) {
 	p.logger.Debugf("Page:Dblclick", "sid:%v selector:%s", p.sessionID(), selector)
 
@@ -457,7 +457,7 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 	applySlowMo(p.ctx)
 }
 
-// EmulateVisionDeficiency activates/deactivates emulation of a vision deficiency
+// EmulateVisionDeficiency activates/deactivates emulation of a vision deficiency.
 func (p *Page) EmulateVisionDeficiency(typ string) {
 	p.logger.Debugf("Page:EmulateVisionDeficiency", "sid:%v typ:%s", p.sessionID(), typ)
 
@@ -483,7 +483,7 @@ func (p *Page) EmulateVisionDeficiency(typ string) {
 	applySlowMo(p.ctx)
 }
 
-// Evaluate runs JS code within the execution context of the main frame of the page
+// Evaluate runs JS code within the execution context of the main frame of the page.
 func (p *Page) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 	p.logger.Debugf("Page:Evaluate", "sid:%v", p.sessionID())
 
@@ -524,7 +524,7 @@ func (p *Page) Frame(frameSelector goja.Value) api.Frame {
 	return nil
 }
 
-// Frames returns a list of frames on the page
+// Frames returns a list of frames on the page.
 func (p *Page) Frames() []api.Frame {
 	return p.frameManager.Frames()
 }
@@ -548,7 +548,7 @@ func (p *Page) GoForward(opts goja.Value) api.Response {
 	return nil
 }
 
-// Goto will navigate the page to the specified URL and return a HTTP response object
+// Goto will navigate the page to the specified URL and return a HTTP response object.
 func (p *Page) Goto(url string, opts goja.Value) api.Response {
 	p.logger.Debugf("Page:Goto", "sid:%v url:%q", p.sessionID(), url)
 
@@ -622,7 +622,7 @@ func (p *Page) IsVisible(selector string, opts goja.Value) bool {
 	return p.MainFrame().IsVisible(selector, opts)
 }
 
-// MainFrame returns the main frame on the page
+// MainFrame returns the main frame on the page.
 func (p *Page) MainFrame() api.Frame {
 	mf := p.frameManager.MainFrame()
 
@@ -638,7 +638,7 @@ func (p *Page) MainFrame() api.Frame {
 	return mf
 }
 
-// Opener returns the opener of the target
+// Opener returns the opener of the target.
 func (p *Page) Opener() api.Page {
 	return p.opener
 }
@@ -672,7 +672,7 @@ func (p *Page) QueryAll(selector string) []api.ElementHandle {
 	return p.frameManager.MainFrame().QueryAll(selector)
 }
 
-// Reload will reload the current page
+// Reload will reload the current page.
 func (p *Page) Reload(opts goja.Value) api.Response {
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
 
@@ -723,7 +723,7 @@ func (p *Page) Route(url goja.Value, handler goja.Callable) {
 	k6common.Throw(rt, errors.New("Page.route(url, handler) has not been implemented yet"))
 }
 
-// Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file
+// Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file.
 func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	rt := k6common.GetRuntime(p.ctx)
 	parsedOpts := NewPageScreenshotOptions()
@@ -750,21 +750,21 @@ func (p *Page) SetContent(html string, opts goja.Value) {
 	p.MainFrame().SetContent(html, opts)
 }
 
-// SetDefaultNavigationTimeout sets the default navigation timeout in milliseconds
+// SetDefaultNavigationTimeout sets the default navigation timeout in milliseconds.
 func (p *Page) SetDefaultNavigationTimeout(timeout int64) {
 	p.logger.Debugf("Page:SetDefaultNavigationTimeout", "sid:%v timeout:%d", p.sessionID(), timeout)
 
 	p.timeoutSettings.setDefaultNavigationTimeout(timeout)
 }
 
-// SetDefaultTimeout sets the default maximum timeout in milliseconds
+// SetDefaultTimeout sets the default maximum timeout in milliseconds.
 func (p *Page) SetDefaultTimeout(timeout int64) {
 	p.logger.Debugf("Page:SetDefaultTimeout", "sid:%v timeout:%d", p.sessionID(), timeout)
 
 	p.timeoutSettings.setDefaultTimeout(timeout)
 }
 
-// SetExtraHTTPHeaders sets default HTTP headers for page and whole frame hierarchy
+// SetExtraHTTPHeaders sets default HTTP headers for page and whole frame hierarchy.
 func (p *Page) SetExtraHTTPHeaders(headers map[string]string) {
 	p.logger.Debugf("Page:SetExtraHTTPHeaders", "sid:%v", p.sessionID())
 
@@ -778,7 +778,7 @@ func (p *Page) SetInputFiles(selector string, files goja.Value, opts goja.Value)
 	// TODO: needs slowMo
 }
 
-// SetViewportSize will update the viewport width and height
+// SetViewportSize will update the viewport width and height.
 func (p *Page) SetViewportSize(viewportSize goja.Value) {
 	p.logger.Debugf("Page:SetViewportSize", "sid:%v", p.sessionID())
 
@@ -830,20 +830,20 @@ func (p *Page) Unroute(url goja.Value, handler goja.Callable) {
 	k6common.Throw(rt, errors.New("Page.unroute(url, handler) has not been implemented yet"))
 }
 
-// URL returns the location of the page
+// URL returns the location of the page.
 func (p *Page) URL() string {
 	rt := k6common.GetRuntime(p.ctx)
 	return p.Evaluate(rt.ToValue("document.location.toString()")).(string)
 }
 
-// Video returns information of recorded video
+// Video returns information of recorded video.
 func (p *Page) Video() api.Video {
 	rt := k6common.GetRuntime(p.ctx)
 	k6common.Throw(rt, errors.New("Page.video() has not been implemented yet"))
 	return nil
 }
 
-// ViewportSize will return information on the viewport width and height
+// ViewportSize will return information on the viewport width and height.
 func (p *Page) ViewportSize() map[string]float64 {
 	p.logger.Debugf("Page:ViewportSize", "sid:%v", p.sessionID())
 
@@ -854,28 +854,28 @@ func (p *Page) ViewportSize() map[string]float64 {
 	}
 }
 
-// WaitForEvent waits for the specified event to trigger
+// WaitForEvent waits for the specified event to trigger.
 func (p *Page) WaitForEvent(event string, optsOrPredicate goja.Value) interface{} {
 	rt := k6common.GetRuntime(p.ctx)
 	k6common.Throw(rt, errors.New("Page.waitForEvent(event, optsOrPredicate) has not been implemented yet"))
 	return nil
 }
 
-// WaitForFunction waits for the given predicate to return a truthy value
+// WaitForFunction waits for the given predicate to return a truthy value.
 func (p *Page) WaitForFunction(pageFunc goja.Value, arg goja.Value, opts goja.Value) api.JSHandle {
 	p.logger.Debugf("Page:WaitForFunction", "sid:%v", p.sessionID())
 
 	return p.frameManager.MainFrame().WaitForFunction(pageFunc, opts, arg)
 }
 
-// WaitForLoadState waits for the specified page life cycle event
+// WaitForLoadState waits for the specified page life cycle event.
 func (p *Page) WaitForLoadState(state string, opts goja.Value) {
 	p.logger.Debugf("Page:WaitForLoadState", "sid:%v state:%q", p.sessionID(), state)
 
 	p.frameManager.MainFrame().WaitForLoadState(state, opts)
 }
 
-// WaitForNavigation waits for the given navigation lifecycle event to happen
+// WaitForNavigation waits for the given navigation lifecycle event to happen.
 func (p *Page) WaitForNavigation(opts goja.Value) api.Response {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.sessionID())
 
@@ -894,7 +894,7 @@ func (p *Page) WaitForResponse(urlOrPredicate, opts goja.Value) api.Response {
 	return nil
 }
 
-// WaitForSelector waits for the given selector to match the waiting criteria
+// WaitForSelector waits for the given selector to match the waiting criteria.
 func (p *Page) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
 	p.logger.Debugf("Page:WaitForSelector",
 		"sid:%v stid:%v ptid:%v selector:%s",
@@ -903,14 +903,14 @@ func (p *Page) WaitForSelector(selector string, opts goja.Value) api.ElementHand
 	return p.frameManager.MainFrame().WaitForSelector(selector, opts)
 }
 
-// WaitForTimeout waits the specified number of milliseconds
+// WaitForTimeout waits the specified number of milliseconds.
 func (p *Page) WaitForTimeout(timeout int64) {
 	p.logger.Debugf("Page:WaitForTimeout", "sid:%v timeout:%d", p.sessionID(), timeout)
 
 	p.frameManager.MainFrame().WaitForTimeout(timeout)
 }
 
-// Workers returns all WebWorkers of page
+// Workers returns all WebWorkers of page.
 func (p *Page) Workers() []api.Worker {
 	workers := make([]api.Worker, 0, len(p.workers))
 	for _, w := range p.workers {

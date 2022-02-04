@@ -187,7 +187,7 @@ func elementHandlePointerActionFn(h *ElementHandle, checkEnabled bool, fn Elemen
 	}
 }
 
-// ElementHandle represents a HTML element JS object inside an execution context
+// ElementHandle represents a HTML element JS object inside an execution context.
 type ElementHandle struct {
 	BaseJSHandle
 
@@ -860,12 +860,12 @@ func (h *ElementHandle) waitForSelector(apiCtx context.Context, selector string,
 	}
 }
 
-// AsElement returns this element handle
+// AsElement returns this element handle.
 func (h *ElementHandle) AsElement() api.ElementHandle {
 	return h
 }
 
-// BoundingBox returns this element's bounding box
+// BoundingBox returns this element's bounding box.
 func (h *ElementHandle) BoundingBox() *api.Rect {
 	bbox, err := h.boundingBox()
 	if err != nil {
@@ -874,7 +874,7 @@ func (h *ElementHandle) BoundingBox() *api.Rect {
 	return bbox.toApiRect()
 }
 
-// Check scrolls element into view and clicks in the center of the element
+// Check scrolls element into view and clicks in the center of the element.
 func (h *ElementHandle) Check(opts goja.Value) {
 	h.SetChecked(true, opts)
 }
@@ -958,7 +958,7 @@ func (h *ElementHandle) Fill(value string, opts goja.Value) {
 	applySlowMo(h.ctx)
 }
 
-// Focus scrolls element into view and focuses the element
+// Focus scrolls element into view and focuses the element.
 func (h *ElementHandle) Focus() {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return nil, handle.focus(apiCtx, false)
@@ -972,7 +972,7 @@ func (h *ElementHandle) Focus() {
 	applySlowMo(h.ctx)
 }
 
-// GetAttribute retrieves the value of specified element attribute
+// GetAttribute retrieves the value of specified element attribute.
 func (h *ElementHandle) GetAttribute(name string) goja.Value {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.getAttribute(apiCtx, name)
@@ -987,7 +987,7 @@ func (h *ElementHandle) GetAttribute(name string) goja.Value {
 	return value.(goja.Value)
 }
 
-// Hover scrolls element into view and hovers over its center point
+// Hover scrolls element into view and hovers over its center point.
 func (h *ElementHandle) Hover(opts goja.Value) {
 	actionOpts := NewElementHandleHoverOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
@@ -1004,7 +1004,7 @@ func (h *ElementHandle) Hover(opts goja.Value) {
 	applySlowMo(h.ctx)
 }
 
-// InnerHTML returns the inner HTML of the element
+// InnerHTML returns the inner HTML of the element.
 func (h *ElementHandle) InnerHTML() string {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.innerHTML(apiCtx)
@@ -1019,7 +1019,7 @@ func (h *ElementHandle) InnerHTML() string {
 	return value.(goja.Value).String()
 }
 
-// InnerText returns the inner text of the element
+// InnerText returns the inner text of the element.
 func (h *ElementHandle) InnerText() string {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.innerText(apiCtx)
@@ -1051,7 +1051,7 @@ func (h *ElementHandle) InputValue(opts goja.Value) string {
 	return value.(goja.Value).String()
 }
 
-// IsChecked checks if a checkbox or radio is checked
+// IsChecked checks if a checkbox or radio is checked.
 func (h *ElementHandle) IsChecked() bool {
 	result, err := h.isChecked(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
@@ -1060,7 +1060,7 @@ func (h *ElementHandle) IsChecked() bool {
 	return result
 }
 
-// IsDisabled checks if the element is disabled
+// IsDisabled checks if the element is disabled.
 func (h *ElementHandle) IsDisabled() bool {
 	result, err := h.isDisabled(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
@@ -1069,7 +1069,7 @@ func (h *ElementHandle) IsDisabled() bool {
 	return result
 }
 
-// IsEditable checks if the element is editable
+// IsEditable checks if the element is editable.
 func (h *ElementHandle) IsEditable() bool {
 	result, err := h.isEditable(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
@@ -1078,7 +1078,7 @@ func (h *ElementHandle) IsEditable() bool {
 	return result
 }
 
-// IsEnabled checks if the element is enabled
+// IsEnabled checks if the element is enabled.
 func (h *ElementHandle) IsEnabled() bool {
 	result, err := h.isEnabled(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
@@ -1087,7 +1087,7 @@ func (h *ElementHandle) IsEnabled() bool {
 	return result
 }
 
-// IsHidden checks if the element is hidden
+// IsHidden checks if the element is hidden.
 func (h *ElementHandle) IsHidden() bool {
 	result, err := h.isHidden(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
@@ -1096,7 +1096,7 @@ func (h *ElementHandle) IsHidden() bool {
 	return result
 }
 
-// IsVisible checks if the element is visible
+// IsVisible checks if the element is visible.
 func (h *ElementHandle) IsVisible() bool {
 	result, err := h.isVisible(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
@@ -1105,7 +1105,7 @@ func (h *ElementHandle) IsVisible() bool {
 	return result
 }
 
-// OwnerFrame returns the frame containing this element
+// OwnerFrame returns the frame containing this element.
 func (h *ElementHandle) OwnerFrame() api.Frame {
 	fn := `
 		(node, injected) => {
@@ -1159,7 +1159,7 @@ func (h *ElementHandle) Press(key string, opts goja.Value) {
 }
 
 // Query runs "element.querySelector" within the page. If no element matches the selector,
-// the return value resolves to "null"
+// the return value resolves to "null".
 func (h *ElementHandle) Query(selector string) api.ElementHandle {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
@@ -1195,7 +1195,7 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 }
 
 // QueryAll queries element subtree for matching elements. If no element matches the selector,
-// the return value resolves to "null"
+// the return value resolves to "null".
 func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
@@ -1355,7 +1355,7 @@ func (h *ElementHandle) TextContent() string {
 	return value.(goja.Value).String()
 }
 
-// Type scrolls element into view, focuses element and types text
+// Type scrolls element into view, focuses element and types text.
 func (h *ElementHandle) Type(text string, opts goja.Value) {
 	parsedOpts := NewElementHandleTypeOptions(h.defaultTimeout())
 	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
@@ -1372,7 +1372,7 @@ func (h *ElementHandle) Type(text string, opts goja.Value) {
 	applySlowMo(h.ctx)
 }
 
-// Uncheck scrolls element into view and clicks in the center of the element
+// Uncheck scrolls element into view and clicks in the center of the element.
 func (h *ElementHandle) Uncheck(opts goja.Value) {
 	h.SetChecked(false, opts)
 }

@@ -177,7 +177,7 @@ func (b *BrowserType) flags(lopts *common.LaunchOptions, k6opts *k6lib.Options) 
 	return f
 }
 
-// makes an extension wide logger
+// makes an extension wide logger.
 func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*common.Logger, error) {
 	var (
 		k6Logger            = k6lib.GetState(ctx).Logger

@@ -20,14 +20,14 @@
 
 package common
 
-// TimeoutSettings holds information on timeout settings
+// TimeoutSettings holds information on timeout settings.
 type TimeoutSettings struct {
 	parent                   *TimeoutSettings
 	defaultTimeout           *int64
 	defaultNavigationTimeout *int64
 }
 
-// NewTimeoutSettings creates a new timeout settings object
+// NewTimeoutSettings creates a new timeout settings object.
 func NewTimeoutSettings(parent *TimeoutSettings) *TimeoutSettings {
 	t := &TimeoutSettings{
 		parent:                   parent,

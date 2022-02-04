@@ -36,7 +36,7 @@ import (
 	"github.com/grafana/xk6-browser/api"
 )
 
-// Ensure BrowserContext implements the EventEmitter and api.BrowserContext interfaces
+// Ensure BrowserContext implements the EventEmitter and api.BrowserContext interfaces.
 var _ EventEmitter = &BrowserContext{}
 var _ api.BrowserContext = &BrowserContext{}
 
@@ -206,7 +206,7 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value)
 	}
 }
 
-// NewCDPSession returns a new CDP session attached to this target
+// NewCDPSession returns a new CDP session attached to this target.
 func (b *BrowserContext) NewCDPSession() api.CDPSession {
 	k6Throw(b.ctx, "BrowserContext.newCDPSession() has not been implemented yet")
 	return nil

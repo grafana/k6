@@ -58,7 +58,7 @@ func (ea evalOptions) String() string {
 	return fmt.Sprintf("forceCallable:%t returnByValue:%t", ea.forceCallable, ea.returnByValue)
 }
 
-// ExecutionContext represents a JS execution context
+// ExecutionContext represents a JS execution context.
 type ExecutionContext struct {
 	ctx            context.Context
 	logger         *Logger
@@ -74,7 +74,7 @@ type ExecutionContext struct {
 	furl string           // Frame URL
 }
 
-// NewExecutionContext creates a new JS execution context
+// NewExecutionContext creates a new JS execution context.
 func NewExecutionContext(
 	ctx context.Context, session *Session, frame *Frame,
 	id runtime.ExecutionContextID, logger *Logger,
@@ -104,7 +104,7 @@ func NewExecutionContext(
 	return e
 }
 
-// Adopts specified backend node into this execution context from another execution context
+// Adopts specified backend node into this execution context from another execution context.
 func (e *ExecutionContext) adoptBackendNodeID(backendNodeID cdp.BackendNodeID) (*ElementHandle, error) {
 	e.logger.Debugf(
 		"ExecutionContext:adoptBackendNodeID",
@@ -127,7 +127,7 @@ func (e *ExecutionContext) adoptBackendNodeID(backendNodeID cdp.BackendNodeID) (
 	return NewJSHandle(e.ctx, e.session, e, e.frame, remoteObj, e.logger).AsElement().(*ElementHandle), nil
 }
 
-// Adopts the specified element handle into this execution context from another execution context
+// Adopts the specified element handle into this execution context from another execution context.
 func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle, error) {
 	var (
 		efid cdp.FrameID
@@ -273,7 +273,7 @@ func (e *ExecutionContext) eval(
 	return res, nil
 }
 
-// getInjectedScript returns a JS handle to the injected script of helper functions
+// getInjectedScript returns a JS handle to the injected script of helper functions.
 func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHandle, error) {
 	e.logger.Debugf(
 		"ExecutionContext:getInjectedScript",
@@ -303,7 +303,7 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 	return e.injectedScript, nil
 }
 
-// Eval will evaluate provided page function within this execution context
+// Eval will evaluate provided page function within this execution context.
 func (e *ExecutionContext) Eval(
 	apiCtx context.Context,
 	pageFunc goja.Value, args ...goja.Value,
@@ -315,7 +315,7 @@ func (e *ExecutionContext) Eval(
 	return e.eval(apiCtx, opts, pageFunc, args...)
 }
 
-// EvalHandle will evaluate provided page function within this execution context
+// EvalHandle will evaluate provided page function within this execution context.
 func (e *ExecutionContext) EvalHandle(
 	apiCtx context.Context,
 	pageFunc goja.Value, args ...goja.Value,
@@ -331,7 +331,7 @@ func (e *ExecutionContext) EvalHandle(
 	return res.(api.JSHandle), nil
 }
 
-// Frame returns the frame that this execution context belongs to
+// Frame returns the frame that this execution context belongs to.
 func (e *ExecutionContext) Frame() *Frame {
 	return e.frame
 }

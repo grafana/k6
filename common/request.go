@@ -36,10 +36,10 @@ import (
 	"github.com/grafana/xk6-browser/api"
 )
 
-// Ensure Request implements the api.Request interface
+// Ensure Request implements the api.Request interface.
 var _ api.Request = &Request{}
 
-// Request represents a browser HTTP request
+// Request represents a browser HTTP request.
 type Request struct {
 	ctx                 context.Context
 	frame               *Frame
@@ -62,7 +62,7 @@ type Request struct {
 	responseEndTiming   float64
 }
 
-// NewRequest creates a new HTTP request
+// NewRequest creates a new HTTP request.
 func NewRequest(
 	ctx context.Context, event *network.EventRequestWillBeSent, f *Frame,
 	redirectChain []*Request, interceptionID string, allowInterception bool,
@@ -156,7 +156,7 @@ func (r *Request) Failure() goja.Value {
 	return nil
 }
 
-// Frame returns the frame within which the request was made
+// Frame returns the frame within which the request was made.
 func (r *Request) Frame() api.Frame {
 	return r.frame
 }
@@ -171,7 +171,7 @@ func (r *Request) HeaderValue(name string) goja.Value {
 	return rt.ToValue(val)
 }
 
-// Headers returns the request headers
+// Headers returns the request headers.
 func (r *Request) Headers() map[string]string {
 	headers := make(map[string]string)
 	for n, v := range r.headers {
@@ -190,28 +190,28 @@ func (r *Request) HeadersArray() []api.HTTPHeader {
 	return headers
 }
 
-// IsNavigationRequest returns whether this was a navigation request or not
+// IsNavigationRequest returns whether this was a navigation request or not.
 func (r *Request) IsNavigationRequest() bool {
 	return r.isNavigationRequest
 }
 
-// Method returns the request method
+// Method returns the request method.
 func (r *Request) Method() string {
 	return r.method
 }
 
-// PostData returns the request post data, if any
+// PostData returns the request post data, if any.
 func (r *Request) PostData() string {
 	return r.postData
 }
 
-// PostDataBuffer returns the request post data as an ArrayBuffer
+// PostDataBuffer returns the request post data as an ArrayBuffer.
 func (r *Request) PostDataBuffer() goja.ArrayBuffer {
 	rt := k6common.GetRuntime(r.ctx)
 	return rt.NewArrayBuffer([]byte(r.postData))
 }
 
-// PostDataJSON returns the request post data as a JS object
+// PostDataJSON returns the request post data as a JS object.
 func (r *Request) PostDataJSON() string {
 	rt := k6common.GetRuntime(r.ctx)
 	k6common.Throw(rt, errors.New("Request.postDataJSON() has not been implemented yet"))
@@ -230,12 +230,12 @@ func (r *Request) RedirectedTo() api.Request {
 	return nil
 }
 
-// ResourceType returns the request resource type
+// ResourceType returns the request resource type.
 func (r *Request) ResourceType() string {
 	return r.resourceType
 }
 
-// Response returns the response for the request, if received
+// Response returns the response for the request, if received.
 func (r *Request) Response() api.Response {
 	return r.response
 }
@@ -263,7 +263,7 @@ func (r *Request) Timing() goja.Value {
 	})
 }
 
-// URL returns the request URL
+// URL returns the request URL.
 func (r *Request) URL() string {
 	return r.url.String()
 }

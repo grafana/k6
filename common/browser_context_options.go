@@ -27,7 +27,7 @@ import (
 	k6common "go.k6.io/k6/js/common"
 )
 
-// BrowserContextOptions stores browser context options
+// BrowserContextOptions stores browser context options.
 type BrowserContextOptions struct {
 	AcceptDownloads   bool              `js:"acceptDownloads"`
 	BypassCSP         bool              `js:"bypassCSP"`
@@ -51,7 +51,7 @@ type BrowserContextOptions struct {
 	Viewport          *Viewport         `js:"viewport"`
 }
 
-// NewBrowserContextOptions creates a default set of browser context options
+// NewBrowserContextOptions creates a default set of browser context options.
 func NewBrowserContextOptions() *BrowserContextOptions {
 	return &BrowserContextOptions{
 		AcceptDownloads:   false,

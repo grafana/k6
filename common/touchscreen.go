@@ -31,7 +31,7 @@ import (
 	"github.com/grafana/xk6-browser/api"
 )
 
-// Ensure Touchscreen implements the EventEmitter and api.Touchscreen interfaces
+// Ensure Touchscreen implements the EventEmitter and api.Touchscreen interfaces.
 var _ EventEmitter = &Touchscreen{}
 var _ api.Touchscreen = &Touchscreen{}
 

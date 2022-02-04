@@ -22,7 +22,7 @@ package api
 
 import "github.com/dop251/goja"
 
-// Request is the interface of an HTTP request
+// Request is the interface of an HTTP request.
 type Request interface {
 	AllHeaders() map[string]string
 	Failure() goja.Value

@@ -24,26 +24,26 @@ import (
 	"context"
 )
 
-// Ensure BaseEventEmitter implements the EventEmitter interface
+// Ensure BaseEventEmitter implements the EventEmitter interface.
 var _ EventEmitter = &BaseEventEmitter{}
 
 const (
-	// Browser
+	// Browser.
 	EventBrowserDisconnected string = "disconnected"
 
-	// BrowserContext
+	// BrowserContext.
 	EventBrowserContextClose string = "close"
 	EventBrowserContextPage  string = "page"
 
-	// Connection
+	// Connection.
 	EventConnectionClose string = "close"
 
-	// Frame
+	// Frame.
 	EventFrameNavigation      string = "navigation"
 	EventFrameAddLifecycle    string = "addlifecycle"
 	EventFrameRemoveLifecycle string = "removelifecycle"
 
-	// Page
+	// Page.
 	EventPageClose            string = "close"
 	EventPageConsole          string = "console"
 	EventPageCrash            string = "crash"
@@ -64,14 +64,14 @@ const (
 	EventPageWebSocket        string = "websocket"
 	EventPageWorker           string = "worker"
 
-	// Session
+	// Session.
 	EventSessionClosed string = "close"
 
-	// Worker
+	// Worker.
 	EventWorkerClose string = "close"
 )
 
-// Event as emitted by an EventEmiter
+// Event as emitted by an EventEmiter.
 type Event struct {
 	typ  string
 	data interface{}
@@ -89,7 +89,7 @@ type eventHandler struct {
 	ch  chan Event
 }
 
-// EventEmitter that all event emitters need to implement
+// EventEmitter that all event emitters need to implement.
 type EventEmitter interface {
 	emit(event string, data interface{})
 	on(ctx context.Context, events []string, ch chan Event)
@@ -100,7 +100,7 @@ type EventEmitter interface {
 // eventHandler requests.
 type syncFunc func() (done chan struct{})
 
-// BaseEventEmitter emits events to registered handlers
+// BaseEventEmitter emits events to registered handlers.
 type BaseEventEmitter struct {
 	handlers    map[string][]eventHandler
 	handlersAll []eventHandler
@@ -109,7 +109,7 @@ type BaseEventEmitter struct {
 	ctx    context.Context
 }
 
-// NewBaseEventEmitter creates a new instance of a base event emitter
+// NewBaseEventEmitter creates a new instance of a base event emitter.
 func NewBaseEventEmitter(ctx context.Context) BaseEventEmitter {
 	bem := BaseEventEmitter{
 		handlers: make(map[string][]eventHandler),
@@ -180,7 +180,7 @@ func (e *BaseEventEmitter) emit(event string, data interface{}) {
 	})
 }
 
-// On registers a handler for a specific event
+// On registers a handler for a specific event.
 func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Event) {
 	e.sync(func() {
 		for _, event := range events {
@@ -194,7 +194,7 @@ func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Even
 	})
 }
 
-// OnAll registers a handler for all events
+// OnAll registers a handler for all events.
 func (e *BaseEventEmitter) onAll(ctx context.Context, ch chan Event) {
 	e.sync(func() {
 		e.handlersAll = append(e.handlersAll, eventHandler{ctx, ch})

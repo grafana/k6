@@ -43,10 +43,10 @@ import (
 	k6stats "go.k6.io/k6/stats"
 )
 
-// Ensure NetworkManager implements the EventEmitter interface
+// Ensure NetworkManager implements the EventEmitter interface.
 var _ EventEmitter = &NetworkManager{}
 
-// NetworkManager manages all frames in HTML document
+// NetworkManager manages all frames in HTML document.
 type NetworkManager struct {
 	BaseEventEmitter
 
@@ -75,7 +75,7 @@ type NetworkManager struct {
 	protocolReqInterceptionEnabled bool
 }
 
-// NewNetworkManager creates a new network manager
+// NewNetworkManager creates a new network manager.
 func NewNetworkManager(
 	ctx context.Context, session *Session, manager *FrameManager, parent *NetworkManager,
 ) (*NetworkManager, error) {
@@ -620,7 +620,7 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 	return nil
 }
 
-// Authenticate sets HTTP authentication credentials to use
+// Authenticate sets HTTP authentication credentials to use.
 func (m *NetworkManager) Authenticate(credentials *Credentials) {
 	m.credentials = credentials
 	if err := m.updateProtocolRequestInterception(); err != nil {
@@ -629,13 +629,13 @@ func (m *NetworkManager) Authenticate(credentials *Credentials) {
 	}
 }
 
-// ExtraHTTPHeaders returns the currently set extra HTTP request headers
+// ExtraHTTPHeaders returns the currently set extra HTTP request headers.
 func (m *NetworkManager) ExtraHTTPHeaders() goja.Value {
 	rt := k6common.GetRuntime(m.ctx)
 	return rt.ToValue(m.extraHTTPHeaders)
 }
 
-// SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request
+// SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
 func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) {
 	rt := k6common.GetRuntime(m.ctx)
 	action := network.SetExtraHTTPHeaders(headers)
@@ -644,7 +644,7 @@ func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) {
 	}
 }
 
-// SetOfflineMode toggles offline mode on/off
+// SetOfflineMode toggles offline mode on/off.
 func (m *NetworkManager) SetOfflineMode(offline bool) {
 	rt := k6common.GetRuntime(m.ctx)
 	if m.offline == offline {
@@ -658,7 +658,7 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 	}
 }
 
-// SetUserAgent overrides the browser user agent string
+// SetUserAgent overrides the browser user agent string.
 func (m *NetworkManager) SetUserAgent(userAgent string) {
 	rt := k6common.GetRuntime(m.ctx)
 	action := emulation.SetUserAgentOverride(userAgent)
@@ -667,7 +667,7 @@ func (m *NetworkManager) SetUserAgent(userAgent string) {
 	}
 }
 
-// SetCacheEnabled toggles cache on/off
+// SetCacheEnabled toggles cache on/off.
 func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 	m.userCacheDisabled = !enabled
 	if err := m.updateProtocolCacheDisabled(); err != nil {
