@@ -85,6 +85,7 @@ func (*RootModule) NewModuleInstance(m modules.VU) modules.Instance {
 var ErrWSInInitContext = common.NewInitContextError("using websockets in the init context is not supported")
 
 type Socket struct {
+	rt            *goja.Runtime
 	ctx           context.Context
 	conn          *websocket.Conn
 	eventHandlers map[string][]goja.Callable
@@ -263,6 +264,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 
 	socket := Socket{
 		ctx:                ctx,
+		rt:                 rt,
 		conn:               conn,
 		eventHandlers:      make(map[string][]goja.Callable),
 		pingSendTimestamps: make(map[string]time.Time),
@@ -407,7 +409,7 @@ func (s *Socket) handleEvent(event string, args ...goja.Value) {
 	if handlers, ok := s.eventHandlers[event]; ok {
 		for _, handler := range handlers {
 			if _, err := handler(goja.Undefined(), args...); err != nil {
-				common.Throw(common.GetRuntime(s.ctx), err)
+				common.Throw(s.rt, err)
 			}
 		}
 	}
@@ -416,7 +418,7 @@ func (s *Socket) handleEvent(event string, args ...goja.Value) {
 // Send writes the given string message to the connection.
 func (s *Socket) Send(message string) {
 	if err := s.conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
-		s.handleEvent("error", common.GetRuntime(s.ctx).ToValue(err))
+		s.handleEvent("error", s.rt.ToValue(err))
 	}
 
 	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
@@ -430,24 +432,23 @@ func (s *Socket) Send(message string) {
 // SendBinary writes the given ArrayBuffer message to the connection.
 func (s *Socket) SendBinary(message goja.Value) {
 	if message == nil {
-		common.Throw(common.GetRuntime(s.ctx), errors.New("missing argument, expected ArrayBuffer"))
+		common.Throw(s.rt, errors.New("missing argument, expected ArrayBuffer"))
 	}
 
 	msg := message.Export()
 	if ab, ok := msg.(goja.ArrayBuffer); ok {
 		if err := s.conn.WriteMessage(websocket.BinaryMessage, ab.Bytes()); err != nil {
-			s.handleEvent("error", common.GetRuntime(s.ctx).ToValue(err))
+			s.handleEvent("error", s.rt.ToValue(err))
 		}
 	} else {
-		rt := common.GetRuntime(s.ctx)
 		var jsType string
 		switch {
 		case goja.IsNull(message), goja.IsUndefined(message):
 			jsType = message.String()
 		default:
-			jsType = message.ToObject(rt).ClassName()
+			jsType = message.ToObject(s.rt).ClassName()
 		}
-		common.Throw(rt, fmt.Errorf("expected ArrayBuffer as argument, received: %s", jsType))
+		common.Throw(s.rt, fmt.Errorf("expected ArrayBuffer as argument, received: %s", jsType))
 	}
 
 	stats.PushIfNotDone(s.ctx, s.samplesOutput, stats.Sample{
@@ -459,14 +460,13 @@ func (s *Socket) SendBinary(message goja.Value) {
 }
 
 func (s *Socket) Ping() {
-	rt := common.GetRuntime(s.ctx)
 	deadline := time.Now().Add(writeWait)
 	pingID := strconv.Itoa(s.pingSendCounter)
 	data := []byte(pingID)
 
 	err := s.conn.WriteControl(websocket.PingMessage, data, deadline)
 	if err != nil {
-		s.handleEvent("error", rt.ToValue(err))
+		s.handleEvent("error", s.rt.ToValue(err))
 		return
 	}
 
@@ -578,19 +578,17 @@ func (s *Socket) closeConnection(code int) error {
 			// Stop the main control loop
 			close(s.done)
 		}()
-		rt := common.GetRuntime(s.ctx)
-
 		err = s.conn.WriteControl(websocket.CloseMessage,
 			websocket.FormatCloseMessage(code, ""),
 			time.Now().Add(writeWait),
 		)
 		if err != nil {
 			// Call the user-defined error handler
-			s.handleEvent("error", rt.ToValue(err))
+			s.handleEvent("error", s.rt.ToValue(err))
 		}
 
 		// Call the user-defined close handler
-		s.handleEvent("close", rt.ToValue(code))
+		s.handleEvent("close", s.rt.ToValue(code))
 	})
 
 	return err

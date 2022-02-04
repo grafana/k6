@@ -37,12 +37,11 @@ import (
 func makeRuntime(t *testing.T) *goja.Runtime {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	ctx := common.WithRuntime(context.Background(), rt)
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
 			InitEnvField: &common.InitEnvironment{},
-			CtxField:     ctx,
+			CtxField:     context.Background(),
 			StateField:   nil,
 		},
 	).(*X509)
