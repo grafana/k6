@@ -24,8 +24,9 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/api"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/api"
 )
 
 func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {

@@ -31,8 +31,9 @@ import (
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/api"
 	k6common "go.k6.io/k6/js/common"
+
+	"github.com/grafana/xk6-browser/api"
 )
 
 // Ensure frame implements the Frame interface

@@ -33,6 +33,7 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+
 	"github.com/grafana/xk6-browser/api"
 )
 

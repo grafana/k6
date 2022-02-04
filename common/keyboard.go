@@ -28,6 +28,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
 	"github.com/dop251/goja"
+
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/keyboardlayout"
 )

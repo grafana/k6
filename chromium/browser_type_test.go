@@ -25,10 +25,11 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/grafana/xk6-browser/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	k6lib "go.k6.io/k6/lib"
+
+	"github.com/grafana/xk6-browser/common"
 )
 
 func TestBrowserTypeFlags(t *testing.T) {

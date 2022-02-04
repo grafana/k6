@@ -30,6 +30,7 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
+
 	"github.com/grafana/xk6-browser/api"
 )
 

@@ -32,9 +32,10 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/api"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
+
+	"github.com/grafana/xk6-browser/api"
 )
 
 // Ensure Response implements the api.Response interface

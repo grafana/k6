@@ -25,9 +25,10 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/stretchr/testify/require"
+
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
-	"github.com/stretchr/testify/require"
 )
 
 func TestLaunchOptionsSlowMo(t *testing.T) {

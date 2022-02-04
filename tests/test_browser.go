@@ -28,8 +28,6 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/chromium"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -41,6 +39,9 @@ import (
 	k6test "go.k6.io/k6/lib/testutils/httpmultibin"
 	k6stats "go.k6.io/k6/stats"
 	"gopkg.in/guregu/null.v3"
+
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/chromium"
 )
 
 // testBrowser is a test testBrowser for integration testing.
