@@ -38,7 +38,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/metrics"
@@ -413,8 +412,6 @@ func TestRequestWithBinaryFile(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx = lib.WithState(ctx, vuImpl.state)
-	ctx = common.WithRuntime(ctx, bi.Runtime)
 	*bi.Context = ctx
 
 	v, err := bi.exports[consts.DefaultFn](goja.Undefined())
@@ -563,8 +560,6 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx = lib.WithState(ctx, vuImpl.state)
-	ctx = common.WithRuntime(ctx, bi.Runtime)
 	*bi.Context = ctx
 
 	v, err := bi.exports[consts.DefaultFn](goja.Undefined())
