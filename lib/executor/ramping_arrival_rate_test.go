@@ -72,7 +72,7 @@ func TestRampingArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestRampingArrivalRateConfig(), es,
-		simpleRunner(func(ctx context.Context) error {
+		simpleRunner(func(ctx context.Context, _ *lib.State) error {
 			time.Sleep(time.Second)
 			return nil
 		}),
@@ -101,7 +101,7 @@ func TestRampingArrivalRateRunCorrectRate(t *testing.T) {
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestRampingArrivalRateConfig(), es,
-		simpleRunner(func(ctx context.Context) error {
+		simpleRunner(func(ctx context.Context, _ *lib.State) error {
 			atomic.AddInt64(&count, 1)
 			return nil
 		}),
@@ -143,7 +143,7 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 	var count int64
 	ch := make(chan struct{})  // closed when new unplannedVU is started and signal to get to next iterations
 	ch2 := make(chan struct{}) // closed when a second iteration was started on an old VU in order to test it won't start a second unplanned VU in parallel or at all
-	runner := simpleRunner(func(ctx context.Context) error {
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
 		cur := atomic.AddInt64(&count, 1)
 		if cur == 1 {
 			<-ch // wait to start again
@@ -209,7 +209,7 @@ func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 	es := lib.NewExecutionState(lib.Options{}, et, 1, 3)
 	var count int64
 	ch := make(chan struct{}) // closed when new unplannedVU is started and signal to get to next iterations
-	runner := simpleRunner(func(ctx context.Context) error {
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
 		cur := atomic.AddInt64(&count, 1)
 		if cur == 1 {
 			<-ch // wait to start again
@@ -260,7 +260,7 @@ func TestRampingArrivalRateRunGracefulStop(t *testing.T) {
 	require.NoError(t, err)
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 10)
 
-	runner := simpleRunner(func(ctx context.Context) error {
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
 		time.Sleep(5 * time.Second)
 		return nil
 	})
@@ -318,7 +318,7 @@ func BenchmarkRampingArrivalRateRun(b *testing.B) {
 			es := lib.NewExecutionState(lib.Options{}, mustNewExecutionTuple(nil, nil), uint64(tc.prealloc.Int64), uint64(tc.prealloc.Int64))
 
 			var count int64
-			runner := simpleRunner(func(ctx context.Context) error {
+			runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
 				atomic.AddInt64(&count, 1)
 				return nil
 			})
@@ -750,8 +750,7 @@ func TestRampingArrivalRateGlobalIters(t *testing.T) {
 
 			gotIters := []uint64{}
 			var mx sync.Mutex
-			runner.Fn = func(ctx context.Context, _ chan<- stats.SampleContainer) error {
-				state := lib.GetState(ctx)
+			runner.Fn = func(ctx context.Context, state *lib.State, _ chan<- stats.SampleContainer) error {
 				mx.Lock()
 				gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
 				mx.Unlock()

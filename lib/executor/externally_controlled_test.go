@@ -55,7 +55,7 @@ func TestExternallyControlledRun(t *testing.T) {
 	doneIters := new(uint64)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, getTestExternallyControlledConfig(), es,
-		simpleRunner(func(ctx context.Context) error {
+		simpleRunner(func(ctx context.Context, _ *lib.State) error {
 			time.Sleep(200 * time.Millisecond)
 			atomic.AddUint64(doneIters, 1)
 			return nil

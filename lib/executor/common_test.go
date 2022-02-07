@@ -34,10 +34,10 @@ import (
 	"go.k6.io/k6/stats"
 )
 
-func simpleRunner(vuFn func(context.Context) error) lib.Runner {
+func simpleRunner(vuFn func(context.Context, *lib.State) error) lib.Runner {
 	return &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, _ chan<- stats.SampleContainer) error {
-			return vuFn(ctx)
+		Fn: func(ctx context.Context, state *lib.State, _ chan<- stats.SampleContainer) error {
+			return vuFn(ctx, state)
 		},
 	}
 }
