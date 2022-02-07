@@ -106,11 +106,13 @@ func TestEngineRun(t *testing.T) {
 	t.Run("exits with context", func(t *testing.T) {
 		t.Parallel()
 		done := make(chan struct{})
-		runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-			<-ctx.Done()
-			close(done)
-			return nil
-		}}
+		runner := &minirunner.MiniRunner{
+			Fn: func(ctx context.Context, _ *lib.State, _ chan<- stats.SampleContainer) error {
+				<-ctx.Done()
+				close(done)
+				return nil
+			},
+		}
 
 		duration := 100 * time.Millisecond
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
@@ -141,13 +143,15 @@ func TestEngineRun(t *testing.T) {
 
 		signalChan := make(chan interface{})
 
-		runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-			stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
-			close(signalChan)
-			<-ctx.Done()
-			stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
-			return nil
-		}}
+		runner := &minirunner.MiniRunner{
+			Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
+				stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
+				close(signalChan)
+				<-ctx.Done()
+				stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
+				return nil
+			},
+		}
 
 		mockOutput := mockoutput.New()
 		ctx, cancel := context.WithCancel(context.Background())
@@ -209,10 +213,12 @@ func TestEngineOutput(t *testing.T) {
 	t.Parallel()
 	testMetric := stats.New("test_metric", stats.Trend)
 
-	runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-		out <- stats.Sample{Metric: testMetric}
-		return nil
-	}}
+	runner := &minirunner.MiniRunner{
+		Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
+			out <- stats.Sample{Metric: testMetric}
+			return nil
+		},
+	}
 
 	mockOutput := mockoutput.New()
 	e, run, wait := newTestEngine(t, nil, runner, []output.Output{mockOutput}, lib.Options{
@@ -311,12 +317,14 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 	thresholds := map[string]stats.Thresholds{metric.Name: ths}
 
 	done := make(chan struct{})
-	runner := &minirunner.MiniRunner{Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-		out <- stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}
-		<-ctx.Done()
-		close(done)
-		return nil
-	}}
+	runner := &minirunner.MiniRunner{
+		Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
+			out <- stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}
+			<-ctx.Done()
+			close(done)
+			return nil
+		},
+	}
 
 	_, run, wait := newTestEngine(t, nil, runner, nil, lib.Options{Thresholds: thresholds})
 	defer wait()
@@ -1114,7 +1122,7 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
 			cancel() // we cancel the runCtx immediately after the test starts
 			return nil
 		},

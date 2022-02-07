@@ -820,7 +820,7 @@ func TestExecutionSchedulerStages(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			runner := &minirunner.MiniRunner{
-				Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+				Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
 					time.Sleep(100 * time.Millisecond)
 					return nil
 				},
@@ -839,7 +839,7 @@ func TestExecutionSchedulerStages(t *testing.T) {
 func TestExecutionSchedulerEndTime(t *testing.T) {
 	t.Parallel()
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
 			time.Sleep(100 * time.Millisecond)
 			return nil
 		},
@@ -866,7 +866,7 @@ func TestExecutionSchedulerEndTime(t *testing.T) {
 func TestExecutionSchedulerRuntimeErrors(t *testing.T) {
 	t.Parallel()
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
 			time.Sleep(10 * time.Millisecond)
 			return errors.New("hi")
 		},
@@ -906,7 +906,7 @@ func TestExecutionSchedulerEndErrors(t *testing.T) {
 	exec.GracefulStop = types.NullDurationFrom(0 * time.Second)
 
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
 			<-ctx.Done()
 			return errors.New("hi")
 		},
@@ -946,7 +946,7 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 
 	var i int64
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
 			select {
 			case <-ctx.Done():
 			default:
@@ -987,7 +987,7 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 func TestExecutionSchedulerIsRunning(t *testing.T) {
 	t.Parallel()
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
+		Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
 			<-ctx.Done()
 			return nil
 		},
