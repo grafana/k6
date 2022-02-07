@@ -534,7 +534,7 @@ func TestVURunContext(t *testing.T) {
 	r1, err := getSimpleRunner(t, "/script.js", `
 		exports.options = { vus: 10 };
 		exports.default = function() { fn(); }
-		`)
+	`)
 	require.NoError(t, err)
 	r1.SetOptions(r1.GetOptions().Apply(lib.Options{Throw: null.BoolFrom(true)}))
 
@@ -555,17 +555,13 @@ func TestVURunContext(t *testing.T) {
 			vu.Runtime.Set("fn", func() {
 				fnCalled = true
 
-				assert.Equal(t, vu.Runtime, common.GetRuntime(*vu.Context), "incorrect runtime in context")
-				assert.Nil(t, common.GetInitEnv(*vu.Context)) // shouldn't get this in the vu context
-
-				state := lib.GetState(*vu.Context)
-				if assert.NotNil(t, state) {
-					assert.Equal(t, null.IntFrom(10), state.Options.VUs)
-					assert.Equal(t, null.BoolFrom(true), state.Options.Throw)
-					assert.NotNil(t, state.Logger)
-					assert.Equal(t, r.GetDefaultGroup(), state.Group)
-					assert.Equal(t, vu.Transport, state.Transport)
-				}
+				state := vu.moduleVUImpl.State()
+				require.NotNil(t, state)
+				assert.Equal(t, null.IntFrom(10), state.Options.VUs)
+				assert.Equal(t, null.BoolFrom(true), state.Options.Throw)
+				assert.NotNil(t, state.Logger)
+				assert.Equal(t, r.GetDefaultGroup(), state.Group)
+				assert.Equal(t, vu.Transport, state.Transport)
 			})
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -700,17 +696,17 @@ func TestVUIntegrationGroups(t *testing.T) {
 			fnNestedCalled := false
 			vu.Runtime.Set("fnOuter", func() {
 				fnOuterCalled = true
-				assert.Equal(t, r.GetDefaultGroup(), lib.GetState(*vu.Context).Group)
+				assert.Equal(t, r.GetDefaultGroup(), vu.state.Group)
 			})
 			vu.Runtime.Set("fnInner", func() {
 				fnInnerCalled = true
-				g := lib.GetState(*vu.Context).Group
+				g := vu.state.Group
 				assert.Equal(t, "my group", g.Name)
 				assert.Equal(t, r.GetDefaultGroup(), g.Parent)
 			})
 			vu.Runtime.Set("fnNested", func() {
 				fnNestedCalled = true
-				g := lib.GetState(*vu.Context).Group
+				g := vu.state.Group
 				assert.Equal(t, "nested group", g.Name)
 				assert.Equal(t, "my group", g.Parent.Name)
 				assert.Equal(t, r.GetDefaultGroup(), g.Parent.Parent)
@@ -1844,8 +1840,6 @@ func TestSystemTags(t *testing.T) {
 		num, tc := num, tc
 		t.Run(fmt.Sprintf("TC %d with only %s", num, tc.tag), func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			samples := make(chan stats.SampleContainer, 100)
 			r, err := getSimpleRunner(t, "/script.js", tb.Replacer.Replace(`
 				var http = require("k6/http");
@@ -1868,6 +1862,9 @@ func TestSystemTags(t *testing.T) {
 				SystemTags:            stats.ToSystemTagSet([]string{tc.tag}),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
 			})))
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			vu, err := r.NewVU(uint64(num), 0, samples)
 			require.NoError(t, err)
