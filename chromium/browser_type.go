@@ -31,10 +31,11 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/common"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
+
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common"
 )
 
 // Ensure BrowserType implements the api.BrowserType interface.
@@ -176,7 +177,7 @@ func (b *BrowserType) flags(lopts *common.LaunchOptions, k6opts *k6lib.Options) 
 	return f
 }
 
-// makes an extension wide logger
+// makes an extension wide logger.
 func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*common.Logger, error) {
 	var (
 		k6Logger            = k6lib.GetState(ctx).Logger

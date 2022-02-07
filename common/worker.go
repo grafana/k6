@@ -30,14 +30,15 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
+
 	"github.com/grafana/xk6-browser/api"
 )
 
-// Ensure Worker implements the EventEmitter, Target and api.Worker interfaces
+// Ensure Worker implements the EventEmitter, Target and api.Worker interfaces.
 var _ EventEmitter = &Worker{}
 var _ api.Worker = &Worker{}
 
-// Worker represents a WebWorker
+// Worker represents a WebWorker.
 type Worker struct {
 	BaseEventEmitter
 
@@ -48,7 +49,7 @@ type Worker struct {
 	url      string
 }
 
-// NewWorker creates a new page viewport
+// NewWorker creates a new page viewport.
 func NewWorker(ctx context.Context, session *Session, id target.ID, url string) (*Worker, error) {
 	w := Worker{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
@@ -81,19 +82,19 @@ func (w *Worker) initEvents() error {
 	return nil
 }
 
-// Evaluate evaluates a page function in the context of the web worker
+// Evaluate evaluates a page function in the context of the web worker.
 func (w *Worker) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 	// TODO: implement
 	return nil
 }
 
-// EvaluateHandle evaluates a page function in the context of the web worker and returns a JS handle
+// EvaluateHandle evaluates a page function in the context of the web worker and returns a JS handle.
 func (w *Worker) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHandle {
 	// TODO: implement
 	return nil
 }
 
-// URL returns the URL of the web worker
+// URL returns the URL of the web worker.
 func (w *Worker) URL() string {
 	return w.url
 }

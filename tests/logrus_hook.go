@@ -29,7 +29,7 @@ import (
 )
 
 // logCache implements the logrus.Hook interface and could be used to check
-// if log messages were outputted
+// if log messages were outputted.
 type logCache struct {
 	HookedLevels []logrus.Level
 
@@ -37,12 +37,12 @@ type logCache struct {
 	entries []logrus.Entry
 }
 
-// Levels just returns whatever was stored in the HookedLevels slice
+// Levels just returns whatever was stored in the HookedLevels slice.
 func (lc *logCache) Levels() []logrus.Level {
 	return lc.HookedLevels
 }
 
-// Fire saves whatever message the logrus library passed in the cache
+// Fire saves whatever message the logrus library passed in the cache.
 func (lc *logCache) Fire(e *logrus.Entry) error {
 	lc.mu.Lock()
 	defer lc.mu.Unlock()

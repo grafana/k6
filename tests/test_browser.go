@@ -28,8 +28,6 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/chromium"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -38,9 +36,12 @@ import (
 	k6modulestest "go.k6.io/k6/js/modulestest"
 	k6lib "go.k6.io/k6/lib"
 	k6metrics "go.k6.io/k6/lib/metrics"
-	k6test "go.k6.io/k6/lib/testutils/httpmultibin"
+	k6httpmultibin "go.k6.io/k6/lib/testutils/httpmultibin"
 	k6stats "go.k6.io/k6/stats"
 	"gopkg.in/guregu/null.v3"
+
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/chromium"
 )
 
 // testBrowser is a test testBrowser for integration testing.
@@ -48,7 +49,7 @@ type testBrowser struct {
 	ctx      context.Context
 	rt       *goja.Runtime
 	state    *k6lib.State
-	http     *k6test.HTTPMultiBin
+	http     *k6httpmultibin.HTTPMultiBin
 	logCache *logCache
 	samples  chan k6stats.SampleContainer
 	api.Browser
@@ -112,9 +113,9 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 	rt, _ := getHTTPTestModuleInstance(t, ctx, state)
 
 	// enable the HTTP test server only when necessary
-	var testServer *k6test.HTTPMultiBin
+	var testServer *k6httpmultibin.HTTPMultiBin
 	if enableHTTPMultiBin {
-		testServer = k6test.NewHTTPMultiBin(t)
+		testServer = k6httpmultibin.NewHTTPMultiBin(t)
 		state.TLSConfig = testServer.TLSClientConfig
 		state.Transport = testServer.HTTPTransport
 	}

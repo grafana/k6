@@ -22,7 +22,7 @@ package api
 
 import "github.com/dop251/goja"
 
-// Frame is the interface of a CDP target frame
+// Frame is the interface of a CDP target frame.
 type Frame interface {
 	AddScriptTag(opts goja.Value)
 	AddStyleTag(opts goja.Value)

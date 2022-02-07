@@ -92,7 +92,6 @@ func convertArgument(ctx context.Context, execCtx *ExecutionContext, arg goja.Va
 	case reflect.TypeOf(&BaseJSHandle{}):
 		objHandle := arg.Export().(*BaseJSHandle)
 		return convertBaseJSHandleTypes(ctx, execCtx, objHandle)
-
 	}
 	b, err := json.Marshal(arg.Export())
 	return &cdpruntime.CallArgument{Value: b}, err
@@ -234,7 +233,7 @@ func waitForEvent(ctx context.Context, emitter EventEmitter, events []string, pr
 
 // k6Throw throws a k6 error, and before throwing the error, it finds the
 // browser process from the context and kills it if it still exists.
-// TODO: test
+// TODO: test.
 func k6Throw(ctx context.Context, format string, a ...interface{}) {
 	k6ThrowOnce.Do(func() {
 		k6ThrowUnsafe(ctx, format, a...)
@@ -275,7 +274,7 @@ func k6ThrowUnsafe(ctx context.Context, format string, a ...interface{}) {
 //
 // ctx, cancel := context.WithCancel(context.Background())
 // tb := testBrowser(t, withContext(ctx))
-// cancel()
+// cancel().
 var k6ThrowOnce sync.Once
 
 // TrimQuotes removes surrounding single or double quotes from s.

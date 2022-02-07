@@ -35,8 +35,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     env:
-        GOLANG_CI_VERSION: "1.39.0"
-        GO111MODULE: 'on'
+      GO111MODULE: 'on'
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -48,7 +47,9 @@ jobs:
           go-version: 1.17.x
       - name: Install golangci-lint
         working-directory: /tmp
-        run: go install "github.com/golangci/golangci-lint/cmd/golangci-lint@v$GOLANG_CI_VERSION"
+        run: |
+          GOLANGCI_LINT_VERSION=$(head -n 1 "${GITHUB_WORKSPACE}/.golangci.yml" | tr -d '# ')
+          go install "github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANGCI_LINT_VERSION"
       - name: Run linters
         run: |
           BASEREV=$(git merge-base HEAD origin/main)

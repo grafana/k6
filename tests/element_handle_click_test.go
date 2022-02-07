@@ -32,6 +32,7 @@ import (
 
 //go:embed static/mouse_helper.js
 var mouseHelperScriptSource string
+
 var htmlInputButton = fmt.Sprintf(`
 <!DOCTYPE html>
 <html>

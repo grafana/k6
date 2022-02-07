@@ -32,21 +32,22 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/api"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
+
+	"github.com/grafana/xk6-browser/api"
 )
 
-// Ensure Response implements the api.Response interface
+// Ensure Response implements the api.Response interface.
 var _ api.Response = &Response{}
 
-// RemoteAddress contains informationa about a remote target
+// RemoteAddress contains informationa about a remote target.
 type RemoteAddress struct {
 	IPAddress string `json:"ipAddress"`
 	Port      int64  `json:"port"`
 }
 
-// SecurityDetails contains informationa about the security details of a TLS connection
+// SecurityDetails contains informationa about the security details of a TLS connection.
 type SecurityDetails struct {
 	SubjectName string   `json:"subjectName"`
 	Issuer      string   `json:"issuer"`
@@ -56,7 +57,7 @@ type SecurityDetails struct {
 	SANList     []string `json:"sanList"`
 }
 
-// Response represents a browser HTTP response
+// Response represents a browser HTTP response.
 type Response struct {
 	ctx               context.Context
 	logger            *Logger
@@ -80,7 +81,7 @@ type Response struct {
 	cachedJSON interface{}
 }
 
-// NewHTTPResponse creates a new HTTP response
+// NewHTTPResponse creates a new HTTP response.
 func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, timestamp *cdp.MonotonicTime) *Response {
 	state := k6lib.GetState(ctx)
 	r := Response{
@@ -176,7 +177,7 @@ func (r *Response) AllHeaders() map[string]string {
 	return headers
 }
 
-// Body returns the response body as a binary buffer
+// Body returns the response body as a binary buffer.
 func (r *Response) Body() goja.ArrayBuffer {
 	rt := k6common.GetRuntime(r.ctx)
 	if r.status >= 300 && r.status <= 399 {
@@ -207,7 +208,7 @@ func (r *Response) bodySize() int64 {
 	return int64(len(r.body))
 }
 
-// Finished waits for response to finish, return error if request failed
+// Finished waits for response to finish, return error if request failed.
 func (r *Response) Finished() bool {
 	// TODO: should return nil|Error
 	rt := k6common.GetRuntime(r.ctx)
@@ -215,7 +216,7 @@ func (r *Response) Finished() bool {
 	return false
 }
 
-// Frame returns the frame within which the response was received
+// Frame returns the frame within which the response was received.
 func (r *Response) Frame() api.Frame {
 	return r.request.frame
 }
@@ -235,22 +236,22 @@ func (r *Response) HeaderValues(name string) []string {
 	return strings.Split(headers[name], ",")
 }
 
-// FromCache returns whether this response was served from disk cache
+// FromCache returns whether this response was served from disk cache.
 func (r *Response) FromCache() bool {
 	return r.fromDiskCache
 }
 
-// FromPrefetchCache returns whether this response was served from prefetch cache
+// FromPrefetchCache returns whether this response was served from prefetch cache.
 func (r *Response) FromPrefetchCache() bool {
 	return r.fromPrefetchCache
 }
 
-// FromServiceWorker returns whether this response was served by a service worker
+// FromServiceWorker returns whether this response was served by a service worker.
 func (r *Response) FromServiceWorker() bool {
 	return r.fromServiceWorker
 }
 
-// Headers returns the response headers
+// Headers returns the response headers.
 func (r *Response) Headers() map[string]string {
 	headers := make(map[string]string)
 	for n, v := range r.headers {
@@ -269,7 +270,7 @@ func (r *Response) HeadersArray() []api.HTTPHeader {
 	return headers
 }
 
-// JSON returns the response body as JSON data
+// JSON returns the response body as JSON data.
 func (r *Response) JSON() goja.Value {
 	rt := k6common.GetRuntime(r.ctx)
 	if r.cachedJSON == nil {
@@ -288,7 +289,7 @@ func (r *Response) JSON() goja.Value {
 	return rt.ToValue(r.cachedJSON)
 }
 
-// Ok returns true if status code of response if considered ok, otherwise returns false
+// Ok returns true if status code of response if considered ok, otherwise returns false.
 func (r *Response) Ok() bool {
 	if r.status == 0 || (r.status >= 200 && r.status <= 299) {
 		return true
@@ -296,7 +297,7 @@ func (r *Response) Ok() bool {
 	return false
 }
 
-// Request returns the request that led to this response
+// Request returns the request that led to this response.
 func (r *Response) Request() api.Request {
 	return r.request
 }
@@ -306,7 +307,7 @@ func (r *Response) SecurityDetails() goja.Value {
 	return rt.ToValue(r.securityDetails)
 }
 
-// ServerAdd returns the remote address of the server
+// ServerAddr returns the remote address of the server.
 func (r *Response) ServerAddr() goja.Value {
 	rt := k6common.GetRuntime(r.ctx)
 	return rt.ToValue(r.remoteAddress)
@@ -319,17 +320,17 @@ func (r *Response) Size() api.HTTPMessageSize {
 	}
 }
 
-// Status returns the response status code
+// Status returns the response status code.
 func (r *Response) Status() int64 {
 	return r.status
 }
 
-// StatusText returns the response status text
+// StatusText returns the response status text.
 func (r *Response) StatusText() string {
 	return r.statusText
 }
 
-// Text returns the response body as a string
+// Text returns the response body as a string.
 func (r *Response) Text() string {
 	rt := k6common.GetRuntime(r.ctx)
 	if err := r.fetchBody(); err != nil {
@@ -340,7 +341,7 @@ func (r *Response) Text() string {
 	return string(r.body)
 }
 
-// URL returns the request URL
+// URL returns the request URL.
 func (r *Response) URL() string {
 	return r.url
 }

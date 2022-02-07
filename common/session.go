@@ -32,11 +32,11 @@ import (
 	k6lib "go.k6.io/k6/lib"
 )
 
-// Ensure Session implements the EventEmitter and Executor interfaces
+// Ensure Session implements the EventEmitter and Executor interfaces.
 var _ EventEmitter = &Session{}
 var _ cdp.Executor = &Session{}
 
-// Session represents a CDP session to a target
+// Session represents a CDP session to a target.
 type Session struct {
 	BaseEventEmitter
 
@@ -52,7 +52,7 @@ type Session struct {
 	logger *Logger
 }
 
-// NewSession creates a new session
+// NewSession creates a new session.
 func NewSession(ctx context.Context, conn *Connection, id target.SessionID, tid target.ID, logger *Logger) *Session {
 	s := Session{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
@@ -93,7 +93,7 @@ func (s *Session) markAsCrashed() {
 	s.crashed = true
 }
 
-// Wraps conn.ReadMessage in a channel
+// Wraps conn.ReadMessage in a channel.
 func (s *Session) readLoop() {
 	state := k6lib.GetState(s.ctx)
 
@@ -125,7 +125,7 @@ func (s *Session) readLoop() {
 	}
 }
 
-// Execute implements the cdp.Executor interface
+// Execute implements the cdp.Executor interface.
 func (s *Session) Execute(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
 	s.logger.Debugf("Session:Execute", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
 	// Certain methods aren't available to the user directly.

@@ -37,7 +37,7 @@ type ProxyOptions struct {
 	Password string
 }
 
-// LaunchOptions stores browser launch options
+// LaunchOptions stores browser launch options.
 type LaunchOptions struct {
 	Args              []string
 	Debug             bool
@@ -52,7 +52,7 @@ type LaunchOptions struct {
 	Timeout           time.Duration
 }
 
-// LaunchPersistentContextOptions stores browser launch options for persistent context
+// LaunchPersistentContextOptions stores browser launch options for persistent context.
 type LaunchPersistentContextOptions struct {
 	LaunchOptions
 	BrowserContextOptions

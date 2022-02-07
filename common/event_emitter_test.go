@@ -124,5 +124,4 @@ func TestEventEmitterAllEvents(t *testing.T) {
 			require.Equal(t, "hello world", msg.data)
 		})
 	})
-
 }

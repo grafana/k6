@@ -32,8 +32,9 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/api"
 	k6common "go.k6.io/k6/js/common"
+
+	"github.com/grafana/xk6-browser/api"
 )
 
 // FrameManager manages all frames in a page and their life-cycles, it's a purely internal component.
@@ -63,7 +64,7 @@ type FrameManager struct {
 	id     int64
 }
 
-// frameManagerID is used for giving a unique ID to a frame manager
+// frameManagerID is used for giving a unique ID to a frame manager.
 var frameManagerID int64
 
 // NewFrameManager creates a new HTML document frame manager.
@@ -530,7 +531,7 @@ func (m *FrameManager) requestStarted(req *Request) {
 	m.logger.Debugf("FrameManager:requestStarted", "fmid:%d rurl:%s pdoc:nil", m.ID(), req.URL())
 }
 
-// Frames returns a list of frames on the page
+// Frames returns a list of frames on the page.
 func (m *FrameManager) Frames() []api.Frame {
 	m.framesMu.RLock()
 	defer m.framesMu.RUnlock()
@@ -541,7 +542,7 @@ func (m *FrameManager) Frames() []api.Frame {
 	return frames
 }
 
-// MainFrame returns the main frame of the page
+// MainFrame returns the main frame of the page.
 func (m *FrameManager) MainFrame() *Frame {
 	m.mainFrameMu.RLock()
 	defer m.mainFrameMu.RUnlock()
@@ -549,7 +550,7 @@ func (m *FrameManager) MainFrame() *Frame {
 	return m.mainFrame
 }
 
-// setMainFrame sets the main frame of the page
+// setMainFrame sets the main frame of the page.
 func (m *FrameManager) setMainFrame(f *Frame) {
 	m.mainFrameMu.Lock()
 	defer m.mainFrameMu.Unlock()
@@ -561,7 +562,7 @@ func (m *FrameManager) setMainFrame(f *Frame) {
 	m.mainFrame = f
 }
 
-// NavigateFrame will navigate specified frame to specifed URL
+// NavigateFrame will navigate specified frame to specified URL.
 func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) api.Response {
 	var (
 		fmid = m.ID()
@@ -680,7 +681,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 	return resp
 }
 
-// Page returns the page that this frame manager belongs to
+// Page returns the page that this frame manager belongs to.
 func (m *FrameManager) Page() api.Page {
 	if m.page != nil {
 		return m.page
@@ -688,7 +689,7 @@ func (m *FrameManager) Page() api.Page {
 	return nil
 }
 
-// WaitForFrameNavigation waits for the given navigation lifecycle event to happen
+// WaitForFrameNavigation waits for the given navigation lifecycle event to happen.
 func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api.Response {
 	m.logger.Debugf("FrameManager:WaitForFrameNavigation",
 		"fmid:%d fid:%s furl:%s",

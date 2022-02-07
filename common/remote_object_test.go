@@ -171,7 +171,6 @@ func TestValueFromRemoteObject(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, rt.ToValue(map[string]interface{}{"num": float64(1)}), val)
 	})
-
 }
 
 func TestParseRemoteObject(t *testing.T) {

@@ -24,11 +24,12 @@ import (
 	"errors"
 
 	"github.com/dop251/goja"
+	k6common "go.k6.io/k6/js/common"
+	k6modules "go.k6.io/k6/js/modules"
+
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
-	k6common "go.k6.io/k6/js/common"
-	k6modules "go.k6.io/k6/js/modules"
 )
 
 const version = "v0.1.3"
@@ -38,7 +39,7 @@ type (
 	// instances for each VU.
 	RootModule struct{}
 
-	// JSModule is the entrypoint into the browser JS module
+	// JSModule is the entrypoint into the browser JS module.
 	JSModule struct {
 		vu      k6modules.VU
 		Devices map[string]common.Device

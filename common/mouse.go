@@ -28,14 +28,15 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/api"
 	k6common "go.k6.io/k6/js/common"
+
+	"github.com/grafana/xk6-browser/api"
 )
 
-// Ensure Mouse implements the api.Mouse interface
+// Ensure Mouse implements the api.Mouse interface.
 var _ api.Mouse = &Mouse{}
 
-// Mouse represents a mouse input device
+// Mouse represents a mouse input device.
 type Mouse struct {
 	ctx             context.Context
 	session         *Session
@@ -47,7 +48,7 @@ type Mouse struct {
 	button          input.MouseButton
 }
 
-// NewMouse creates a new mouse
+// NewMouse creates a new mouse.
 func NewMouse(ctx context.Context, session *Session, frame *Frame, timeoutSettings *TimeoutSettings, keyboard *Keyboard) *Mouse {
 	m := &Mouse{
 		ctx:             ctx,
@@ -152,7 +153,7 @@ func (m *Mouse) up(x float64, y float64, opts *MouseDownUpOptions) error {
 	return nil
 }
 
-// Click will trigger a series of MouseMove, MouseDown and MouseUp events in the browser
+// Click will trigger a series of MouseMove, MouseDown and MouseUp events in the browser.
 func (m *Mouse) Click(x float64, y float64, opts goja.Value) {
 	rt := k6common.GetRuntime(m.ctx)
 	mouseOpts := NewMouseClickOptions()
@@ -175,7 +176,7 @@ func (m *Mouse) DblClick(x float64, y float64, opts goja.Value) {
 	}
 }
 
-// Down will trigger a MouseDown event in the browser
+// Down will trigger a MouseDown event in the browser.
 func (m *Mouse) Down(x float64, y float64, opts goja.Value) {
 	rt := k6common.GetRuntime(m.ctx)
 	mouseOpts := NewMouseDownUpOptions()
@@ -187,7 +188,7 @@ func (m *Mouse) Down(x float64, y float64, opts goja.Value) {
 	}
 }
 
-// Move will trigger a MouseMoved event in the browser
+// Move will trigger a MouseMoved event in the browser.
 func (m *Mouse) Move(x float64, y float64, opts goja.Value) {
 	rt := k6common.GetRuntime(m.ctx)
 	mouseOpts := NewMouseDownUpOptions()
@@ -199,7 +200,7 @@ func (m *Mouse) Move(x float64, y float64, opts goja.Value) {
 	}
 }
 
-// Up will trigger a MouseUp event in the browser
+// Up will trigger a MouseUp event in the browser.
 func (m *Mouse) Up(x float64, y float64, opts goja.Value) {
 	rt := k6common.GetRuntime(m.ctx)
 	mouseOpts := NewMouseDownUpOptions()

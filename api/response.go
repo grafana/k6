@@ -22,7 +22,7 @@ package api
 
 import "github.com/dop251/goja"
 
-// Response is the interface of an HTTP response
+// Response is the interface of an HTTP response.
 type Response interface {
 	AllHeaders() map[string]string
 	Body() goja.ArrayBuffer

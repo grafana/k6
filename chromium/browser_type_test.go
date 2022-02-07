@@ -25,10 +25,11 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/grafana/xk6-browser/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	k6lib "go.k6.io/k6/lib"
+
+	"github.com/grafana/xk6-browser/common"
 )
 
 func TestBrowserTypeFlags(t *testing.T) {
@@ -67,21 +68,24 @@ func TestBrowserTypeFlags(t *testing.T) {
 			flag:       "browser-arg-trim-double-quote",
 			expInitVal: nil,
 			changeOpts: &common.LaunchOptions{Args: []string{
-				`   browser-arg-trim-double-quote =  "value  "  `}},
+				`   browser-arg-trim-double-quote =  "value  "  `,
+			}},
 			expChangedVal: "value  ",
 		},
 		{
 			flag:       "browser-arg-trim-single-quote",
 			expInitVal: nil,
 			changeOpts: &common.LaunchOptions{Args: []string{
-				`   browser-arg-trim-single-quote=' value '`}},
+				`   browser-arg-trim-single-quote=' value '`,
+			}},
 			expChangedVal: " value ",
 		},
 		{
 			flag:       "browser-args",
 			expInitVal: nil,
 			changeOpts: &common.LaunchOptions{Args: []string{
-				"browser-arg1='value1", "browser-arg2=''value2''", "browser-flag"}},
+				"browser-arg1='value1", "browser-arg2=''value2''", "browser-flag",
+			}},
 			post: func(t *testing.T, flags map[string]interface{}) {
 				assert.Equal(t, "'value1", flags["browser-arg1"])
 				assert.Equal(t, "'value2'", flags["browser-arg2"])
@@ -92,12 +96,14 @@ func TestBrowserTypeFlags(t *testing.T) {
 			flag:       "host-resolver-rules",
 			expInitVal: nil,
 			changeOpts: &common.LaunchOptions{Args: []string{
-				`host-resolver-rules="MAP * www.example.com, EXCLUDE *.youtube.*"`}},
+				`host-resolver-rules="MAP * www.example.com, EXCLUDE *.youtube.*"`,
+			}},
 			changeK6Opts: &k6lib.Options{
 				Hosts: map[string]*k6lib.HostAddress{
 					"test.k6.io":         host,
 					"httpbin.test.k6.io": host,
-				}},
+				},
+			},
 			expChangedVal: "MAP * www.example.com, EXCLUDE *.youtube.*," +
 				"MAP httpbin.test.k6.io 127.0.0.1:8000,MAP test.k6.io 127.0.0.1:8000",
 		},

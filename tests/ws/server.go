@@ -37,11 +37,10 @@ import (
 	"github.com/mailru/easyjson/jwriter"
 	"github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/http2"
-
 	k6lib "go.k6.io/k6/lib"
 	k6netext "go.k6.io/k6/lib/netext"
 	k6types "go.k6.io/k6/lib/types"
+	"golang.org/x/net/http2"
 )
 
 // Server can be used as a test alternative to a real CDP compatible browser.

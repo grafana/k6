@@ -42,10 +42,11 @@ import (
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/cdproto/target"
-	"github.com/grafana/xk6-browser/api"
 	"github.com/sirupsen/logrus"
 	k6lib "go.k6.io/k6/lib"
 	k6stats "go.k6.io/k6/stats"
+
+	"github.com/grafana/xk6-browser/api"
 )
 
 const utilityWorldName = "__k6_browser_utility_world__"
@@ -845,7 +846,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 		reason = "session closed"
 		return
 	default:
-		// Ignore context canceled error to gracefuly handle shutting down
+		// Ignore context canceled error to gracefully handle shutting down
 		// of the extension. This may happen because of generated events
 		// while a frame session is being created.
 		if errors.Is(err, context.Canceled) {

@@ -27,14 +27,15 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/api"
 	k6common "go.k6.io/k6/js/common"
+
+	"github.com/grafana/xk6-browser/api"
 )
 
 // Ensure BaseJSHandle implements the api.JSHandle interface.
 var _ api.JSHandle = &BaseJSHandle{}
 
-// BaseJSHandle represents a JS object in an execution context
+// BaseJSHandle represents a JS object in an execution context.
 type BaseJSHandle struct {
 	ctx          context.Context
 	logger       *Logger
@@ -44,7 +45,7 @@ type BaseJSHandle struct {
 	disposed     bool
 }
 
-// NewJSHandle creates a new JS handle referencing a remote object
+// NewJSHandle creates a new JS handle referencing a remote object.
 func NewJSHandle(
 	ctx context.Context, session *Session, execCtx *ExecutionContext,
 	frame *Frame, remoteObject *runtime.RemoteObject, logger *Logger,
@@ -68,12 +69,12 @@ func NewJSHandle(
 	return eh
 }
 
-// AsElement returns an element handle if this JSHandle is a reference to a JS HTML element
+// AsElement returns an element handle if this JSHandle is a reference to a JS HTML element.
 func (h *BaseJSHandle) AsElement() api.ElementHandle {
 	return nil
 }
 
-// Dispose releases the remote object
+// Dispose releases the remote object.
 func (h *BaseJSHandle) Dispose() {
 	rt := k6common.GetRuntime(h.ctx)
 	if h.disposed {
@@ -91,7 +92,7 @@ func (h *BaseJSHandle) Dispose() {
 	}
 }
 
-// Evaluate will evaluate provided page function within an execution context
+// Evaluate will evaluate provided page function within an execution context.
 func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 	rt := k6common.GetRuntime(h.ctx)
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
@@ -102,7 +103,7 @@ func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) interfa
 	return res
 }
 
-// EvaluateHandle will evaluate provided page function within an execution context
+// EvaluateHandle will evaluate provided page function within an execution context.
 func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHandle {
 	rt := k6common.GetRuntime(h.ctx)
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
@@ -113,7 +114,7 @@ func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) a
 	return res
 }
 
-// GetProperties retreives the JS handle's properties
+// GetProperties retreives the JS handle's properties.
 func (h *BaseJSHandle) GetProperties() map[string]api.JSHandle {
 	rt := k6common.GetRuntime(h.ctx)
 
@@ -137,12 +138,12 @@ func (h *BaseJSHandle) GetProperties() map[string]api.JSHandle {
 	return props
 }
 
-// GetProperty retreves a single property of the JS handle
+// GetProperty retreves a single property of the JS handle.
 func (h *BaseJSHandle) GetProperty(propertyName string) api.JSHandle {
 	return nil
 }
 
-// JSONValue returns a JSON version of this JS handle
+// JSONValue returns a JSON version of this JS handle.
 func (h *BaseJSHandle) JSONValue() goja.Value {
 	rt := k6common.GetRuntime(h.ctx)
 	if h.remoteObject.ObjectID != "" {

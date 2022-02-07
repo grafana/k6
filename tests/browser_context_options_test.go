@@ -25,9 +25,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/grafana/xk6-browser/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/common"
 )
 
 func TestBrowserContextOptionsDefaultValues(t *testing.T) {

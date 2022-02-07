@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 	k6lib "go.k6.io/k6/lib"
 	k6metrics "go.k6.io/k6/lib/metrics"
-	k6test "go.k6.io/k6/lib/testutils"
-	k6mockres "go.k6.io/k6/lib/testutils/mockresolver"
+	k6testutils "go.k6.io/k6/lib/testutils"
+	k6mockresolver "go.k6.io/k6/lib/testutils/mockresolver"
 	k6types "go.k6.io/k6/lib/types"
 	k6stats "go.k6.io/k6/stats"
 )
@@ -43,7 +43,7 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 
 	state := &k6lib.State{
 		Options:        k6opts,
-		Logger:         k6test.NewLogger(t),
+		Logger:         k6testutils.NewLogger(t),
 		Group:          root,
 		BPool:          bpool.NewBufferPool(1),
 		Samples:        make(chan k6stats.SampleContainer, 1000),
@@ -60,7 +60,7 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 		},
 	}
 
-	mr := k6mockres.New(map[string][]net.IP{
+	mr := k6mockresolver.New(map[string][]net.IP{
 		mockHostname: {
 			net.ParseIP("127.0.0.10"),
 			net.ParseIP("127.0.0.11"),
