@@ -50,13 +50,12 @@ func TestConstantVUsRun(t *testing.T) {
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, getTestConstantVUsConfig(), es,
-		simpleRunner(func(ctx context.Context) error {
+		simpleRunner(func(ctx context.Context, state *lib.State) error {
 			select {
 			case <-ctx.Done():
 				return nil
 			default:
 			}
-			state := lib.GetState(ctx)
 			currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
 			result.Store(state.VUID, currIter.(uint64)+1)
 			time.Sleep(210 * time.Millisecond)

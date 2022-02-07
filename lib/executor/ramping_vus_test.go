@@ -87,7 +87,7 @@ func TestRampingVUsRun(t *testing.T) {
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, config, es,
-		simpleRunner(func(ctx context.Context) error {
+		simpleRunner(func(ctx context.Context, _ *lib.State) error {
 			// Sleeping for a weird duration somewhat offset from the
 			// executor ticks to hopefully keep race conditions out of
 			// our control from failing the test.
@@ -144,7 +144,7 @@ func TestRampingVUsGracefulStopWaits(t *testing.T) {
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, config, es,
-		simpleRunner(func(ctx context.Context) error {
+		simpleRunner(func(ctx context.Context, _ *lib.State) error {
 			close(started)
 			defer close(stopped)
 			select {
@@ -193,7 +193,7 @@ func TestRampingVUsGracefulStopStops(t *testing.T) {
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, config, es,
-		simpleRunner(func(ctx context.Context) error {
+		simpleRunner(func(ctx context.Context, _ *lib.State) error {
 			close(started)
 			defer close(stopped)
 			select {
@@ -247,8 +247,8 @@ func TestRampingVUsGracefulRampDown(t *testing.T) {
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, config, es,
-		simpleRunner(func(ctx context.Context) error {
-			if lib.GetState(ctx).VUID == 1 { // the first VU will wait here to do stuff
+		simpleRunner(func(ctx context.Context, state *lib.State) error {
+			if state.VUID == 1 { // the first VU will wait here to do stuff
 				close(started)
 				defer close(stopped)
 				select {
@@ -333,7 +333,7 @@ func TestRampingVUsHandleRemainingVUs(t *testing.T) {
 		gotVuInterrupted uint32
 		gotVuFinished    uint32
 	)
-	iteration := func(ctx context.Context) error {
+	iteration := func(ctx context.Context, _ *lib.State) error {
 		select {
 		case <-time.After(vuSleepDuration):
 			atomic.AddUint32(&gotVuFinished, 1)
@@ -385,7 +385,7 @@ func TestRampingVUsRampDownNoWobble(t *testing.T) {
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, config, es,
-		simpleRunner(func(ctx context.Context) error {
+		simpleRunner(func(ctx context.Context, _ *lib.State) error {
 			time.Sleep(500 * time.Millisecond)
 			return nil
 		}),

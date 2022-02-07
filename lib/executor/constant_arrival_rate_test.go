@@ -74,7 +74,7 @@ func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestConstantArrivalRateConfig(), es,
-		simpleRunner(func(ctx context.Context) error {
+		simpleRunner(func(ctx context.Context, _ *lib.State) error {
 			time.Sleep(time.Second)
 			return nil
 		}),
@@ -104,7 +104,7 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestConstantArrivalRateConfig(), es,
-		simpleRunner(func(ctx context.Context) error {
+		simpleRunner(func(ctx context.Context, _ *lib.State) error {
 			atomic.AddInt64(&count, 1)
 			return nil
 		}),
@@ -211,7 +211,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 			expectedTimeInt64 := int64(test.start)
 			ctx, cancel, executor, logHook := setupExecutor(
 				t, config, es,
-				simpleRunner(func(ctx context.Context) error {
+				simpleRunner(func(ctx context.Context, _ *lib.State) error {
 					current := atomic.AddInt64(&count, 1)
 
 					expectedTime := test.start
@@ -277,7 +277,7 @@ func TestArrivalRateCancel(t *testing.T) {
 			require.NoError(t, err)
 			es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 			ctx, cancel, executor, logHook := setupExecutor(
-				t, config, es, simpleRunner(func(ctx context.Context) error {
+				t, config, es, simpleRunner(func(ctx context.Context, _ *lib.State) error {
 					select {
 					case <-ch:
 						<-ch
@@ -332,7 +332,7 @@ func TestConstantArrivalRateDroppedIterations(t *testing.T) {
 	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, config, es,
-		simpleRunner(func(ctx context.Context) error {
+		simpleRunner(func(ctx context.Context, _ *lib.State) error {
 			atomic.AddInt64(&count, 1)
 			<-ctx.Done()
 			return nil
@@ -392,8 +392,7 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 
 			gotIters := []uint64{}
 			var mx sync.Mutex
-			runner.Fn = func(ctx context.Context, _ chan<- stats.SampleContainer) error {
-				state := lib.GetState(ctx)
+			runner.Fn = func(ctx context.Context, state *lib.State, _ chan<- stats.SampleContainer) error {
 				mx.Lock()
 				gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
 				mx.Unlock()
