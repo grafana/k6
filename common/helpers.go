@@ -29,7 +29,6 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
@@ -235,15 +234,6 @@ func waitForEvent(ctx context.Context, emitter EventEmitter, events []string, pr
 // browser process from the context and kills it if it still exists.
 // TODO: test.
 func k6Throw(ctx context.Context, format string, a ...interface{}) {
-	k6ThrowOnce.Do(func() {
-		k6ThrowUnsafe(ctx, format, a...)
-	})
-}
-
-// k6ThrowUnsafe is the real k6Throw but it's not protected from concurrency
-// errors.
-// see: k6ThrowOnce
-func k6ThrowUnsafe(ctx context.Context, format string, a ...interface{}) {
 	rt := k6common.GetRuntime(ctx)
 	if rt == nil {
 		// this should never happen unless a programmer error
@@ -267,15 +257,6 @@ func k6ThrowUnsafe(ctx context.Context, format string, a ...interface{}) {
 	_ = p.Release()
 	_ = p.Kill()
 }
-
-// There is a data-race in Goja, and this prevents it from happening.
-//
-// Reproduce with an integration test in tests/:
-//
-// ctx, cancel := context.WithCancel(context.Background())
-// tb := testBrowser(t, withContext(ctx))
-// cancel().
-var k6ThrowOnce sync.Once
 
 // TrimQuotes removes surrounding single or double quotes from s.
 // We're not using strings.Trim() to avoid trimming unbalanced values,

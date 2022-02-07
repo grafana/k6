@@ -127,7 +127,7 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	p.Evaluate(tb.rt.ToValue("button => button.remove()"), tb.rt.ToValue(button))
 
 	// We expect the click to fail with the correct error raised
-	errorMsg := ""
+	var errorMsg string
 	panicTestFn := func() {
 		defer func() {
 			if err := recover(); err != nil {
@@ -137,9 +137,12 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 		button.Click(tb.rt.ToValue(struct {
 			NoWaitAfter bool `js:"noWaitAfter"`
 		}{
-			NoWaitAfter: true, // FIX: this is just a workaround because navigation is never triggered and we'd be waiting for it to happen otherwise!
+			// FIX: this is just a workaround because navigation is never triggered and we'd be waiting for
+			// it to happen otherwise!
+			NoWaitAfter: true,
 		}))
 	}
 	panicTestFn()
-	assert.Contains(t, errorMsg, "element is not attached to the DOM", "expected click to result in correct error to be thrown")
+	assert.Contains(t, errorMsg, "element is not attached to the DOM",
+		"expected click to result in correct error to be thrown")
 }
