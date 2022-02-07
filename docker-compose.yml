@@ -29,7 +29,7 @@ services:
       - ./grafana:/etc/grafana/provisioning/
 
   k6:
-    image: loadimpact/k6:latest
+    image: grafana/k6:latest
     networks:
       - k6
     ports:
