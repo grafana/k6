@@ -15,7 +15,9 @@ defaults:
 
 env:
   APP_NAME: "k6"
-  DOCKER_IMAGE_ID: "loadimpact/k6" # TODO change if we move to a new docker org
+  # We'll push to two DockerHub repos at once; `loadimpact/k6` repo is required for backwards compatibility
+  LI_DOCKER_IMAGE_ID: "loadimpact/k6"
+  DOCKER_IMAGE_ID: "grafana/k6"
   GHCR_IMAGE_ID: ${{ github.repository }}
 
 jobs:
@@ -287,17 +289,21 @@ jobs:
             docker push "ghcr.io/$GHCR_IMAGE_ID:latest"
           fi
 
-          echo "Publish Docker ($DOCKER_IMAGE_ID:$VERSION)"
+          echo "Publish Docker ($DOCKER_IMAGE_ID:$VERSION) and ($LI_DOCKER_IMAGE_ID:$VERSION)"
 
           # Log into Docker Hub Registry
           echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
           docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:$VERSION"
+          docker tag "$DOCKER_IMAGE_ID" "$LI_DOCKER_IMAGE_ID:$VERSION"
           docker push "$DOCKER_IMAGE_ID:$VERSION"
+          docker push "$LI_DOCKER_IMAGE_ID:$VERSION"
           # We also want to tag the latest stable version as latest
           if [[ "$VERSION" != "master" ]] && [[ ! "$VERSION" =~ (RC|rc) ]]; then
             echo 'Publish Docker (latest)'
             docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:latest"
+            docker tag "$DOCKER_IMAGE_ID" "$LI_DOCKER_IMAGE_ID:latest"
             docker push "$DOCKER_IMAGE_ID:latest"
+            docker push "$LI_DOCKER_IMAGE_ID:latest"
           fi
 
   package-windows:

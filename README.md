@@ -128,7 +128,7 @@ sudo rm /etc/yum.repos.d/bintray-loadimpact-rpm.repo
 ### Docker
 
 ```bash
-docker pull loadimpact/k6
+docker pull grafana/k6
 ```
 
 ### Pre-built binaries & other platforms
@@ -162,7 +162,7 @@ export default function() {
 
 The script details and how we can extend and configure it will be explained below, but for now, simply save the above snippet as a `script.js` file somewhere on your system. Assuming that you've [installed k6](#install) correctly, on Linux and Mac, you can run the saved script by executing `k6 run script.js` from the same folder. For Windows, the command is almost the same - `k6.exe run script.js`.
 
-If you decide to use the [k6 docker image](https://hub.docker.com/r/loadimpact/k6/), the command will be slightly different. Instead of passing the script filename to k6, a dash is used to instruct k6 to read the script contents directly via the standard input. This allows us to avoid messing with docker volumes for such a simple single-file script, greatly simplifying the docker command: `docker run -i loadimpact/k6 run - <script.js`.
+If you decide to use the [k6 docker image](https://hub.docker.com/r/grafana/k6/), the command will be slightly different. Instead of passing the script filename to k6, a dash is used to instruct k6 to read the script contents directly via the standard input. This allows us to avoid messing with docker volumes for such a simple single-file script, greatly simplifying the docker command: `docker run -i grafana/k6 run - <script.js`.
 
 In some situations, it may also be useful to execute remote scripts. You can do that with HTTP**S** URLs in k6 by [importing them](https://k6.io/docs/using-k6/modules#section-remote-modules) in the script via their URL or simply specifying their URL in the CLI command: `k6 run github.com/k6io/k6/samples/http_2.js` (k6 "knows" a bit about GitHub and cdnjs URLs, so this command is shorthand for `k6 run raw.githubusercontent.com/k6io/k6/master/samples/http_2.js`)
 
@@ -209,7 +209,7 @@ By default, if nothing is specified, k6 runs a script with only 1 VU and for 1 i
 
 Let's say that you want to specify the number of VUs in your script. In order of precedence, you can use any of the following configuration mechanisms to do it:
 1. Command-line flags: `k6 run --vus 10 script.js`, or via the short `-u` flag syntax if we want to save 3 keystrokes (`k6 run -u 10 script.js`).
-2. Environment variables: setting `K6_VUS=20` before you run the script with k6. Especially useful when using the [docker k6 image](https://hub.docker.com/r/loadimpact/k6/) and when running in containerized environments like Kubernetes.
+2. Environment variables: setting `K6_VUS=20` before you run the script with k6. Especially useful when using the [docker k6 image](https://hub.docker.com/r/grafana/k6/) and when running in containerized environments like Kubernetes.
 3. Your script can `export` an `options` object that k6 reads and uses to set any options you want; for example, setting VUs would look like this:
     ```js
     export let options = {
