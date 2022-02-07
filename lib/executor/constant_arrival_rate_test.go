@@ -220,7 +220,8 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 							int64(time.Millisecond)*test.steps[(current-2)%int64(len(test.steps))]))
 					}
 
-					// TODO:replace this check with the testing (unit) of the schedule without dependency moment of execution
+					// FIXME: replace this check with a unit test asserting that the scheduling is correct,
+					// without depending on the execution time itself
 					assert.WithinDuration(t,
 						startTime.Add(expectedTime),
 						time.Now(),
