@@ -40,6 +40,7 @@ const (
 	ErrChannelClosed                Error = "channel closed"
 	ErrFrameDetached                Error = "frame detached"
 	ErrJSHandleDisposed             Error = "JS handle is disposed"
+	ErrJSHandleInvalid              Error = "JS handle is invalid"
 	ErrTargetCrashed                Error = "Target has crashed"
 	ErrTimedOut                     Error = "timed out"
 	ErrWrongExecutionContext        Error = "JS handles can be evaluated only in the context they were created"
