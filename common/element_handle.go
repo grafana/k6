@@ -64,7 +64,7 @@ type (
 )
 
 func getElementHandleActionFn(
-	elh *ElementHandle, states []string, ehaFn elementHandleActionFn, force, noWaitAfter bool, timeout time.Duration,
+	h *ElementHandle, states []string, fn elementHandleActionFn, force, noWaitAfter bool, timeout time.Duration,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// All or a subset of the following actionability checks are made before performing the actual action:
 	// 1. Attached to DOM
@@ -78,7 +78,7 @@ func getElementHandleActionFn(
 
 		// Check if we should run actionability checks
 		if !force {
-			_, err = elh.waitForElementState(apiCtx, states, timeout)
+			_, err = h.waitForElementState(apiCtx, states, timeout)
 			if err != nil {
 				errCh <- err
 				return
@@ -86,10 +86,10 @@ func getElementHandleActionFn(
 		}
 
 		b := NewBarrier()
-		elh.frame.manager.addBarrier(b)
-		defer elh.frame.manager.removeBarrier(b)
+		h.frame.manager.addBarrier(b)
+		defer h.frame.manager.removeBarrier(b)
 
-		result, err = ehaFn(apiCtx, elh)
+		result, err = fn(apiCtx, h)
 		if err != nil {
 			errCh <- err
 			return
@@ -108,7 +108,7 @@ func getElementHandleActionFn(
 
 //nolint:funlen,gocognit,cyclop,unparam
 func getElementHandlePointerActionFn(
-	elh *ElementHandle, checkEnabled bool, ehpaFn elementHandlePointerActionFn, opts *ElementHandleBasePointerOptions,
+	h *ElementHandle, checkEnabled bool, fn elementHandlePointerActionFn, opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// All or a subset of the following actionability checks are made before performing the actual action:
 	// 1. Attached to DOM
@@ -127,7 +127,7 @@ func getElementHandlePointerActionFn(
 			if checkEnabled {
 				states = append(states, "enabled")
 			}
-			_, err = elh.waitForElementState(apiCtx, states, opts.Timeout)
+			_, err = h.waitForElementState(apiCtx, states, opts.Timeout)
 			if err != nil {
 				errCh <- err
 				return
@@ -142,20 +142,20 @@ func getElementHandlePointerActionFn(
 		if p != nil {
 			rect = &dom.Rect{X: p.X, Y: p.Y, Width: 0, Height: 0}
 		}
-		err = elh.scrollRectIntoViewIfNeeded(apiCtx, rect)
+		err = h.scrollRectIntoViewIfNeeded(apiCtx, rect)
 		if err != nil {
 			errCh <- err
 			return
 		}
 
 		if p != nil {
-			p, err = elh.offsetPosition(apiCtx, opts.Position)
+			p, err = h.offsetPosition(apiCtx, opts.Position)
 			if err != nil {
 				errCh <- err
 				return
 			}
 		} else {
-			p, err = elh.clickablePoint()
+			p, err = h.clickablePoint()
 			if err != nil {
 				errCh <- err
 				return
@@ -164,7 +164,7 @@ func getElementHandlePointerActionFn(
 
 		// Do a final actionability check to see if element can receive events at mouse position in question
 		if !opts.Force {
-			if ok, localErr := elh.checkHitTargetAt(apiCtx, *p); !ok {
+			if ok, localErr := h.checkHitTargetAt(apiCtx, *p); !ok {
 				errCh <- localErr
 				return
 			}
@@ -173,10 +173,10 @@ func getElementHandlePointerActionFn(
 		// Are we only "trialing" the action (ie. running the actionability checks) but not actually performing it
 		if !opts.Trial {
 			b := NewBarrier()
-			elh.frame.manager.addBarrier(b)
-			defer elh.frame.manager.removeBarrier(b)
+			h.frame.manager.addBarrier(b)
+			defer h.frame.manager.removeBarrier(b)
 
-			result, err = ehpaFn(apiCtx, elh, p)
+			result, err = fn(apiCtx, h, p)
 			if err != nil {
 				errCh <- err
 				return
