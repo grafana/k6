@@ -219,10 +219,12 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 						expectedTime = time.Duration(atomic.AddInt64(&expectedTimeInt64,
 							int64(time.Millisecond)*test.steps[(current-2)%int64(len(test.steps))]))
 					}
+
+					// TODO:replace this check with the testing (unit) of the schedule without dependency moment of execution
 					assert.WithinDuration(t,
 						startTime.Add(expectedTime),
 						time.Now(),
-						time.Millisecond*12,
+						time.Millisecond*24,
 						"%d expectedTime %s", current, expectedTime,
 					)
 
