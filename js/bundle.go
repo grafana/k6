@@ -344,6 +344,7 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	}
 	unbindInit()
 	*init.moduleVUImpl.ctxPtr = nil
+	init.moduleVUImpl.initEnv = nil
 
 	// If we've already initialized the original VU init context, forbid
 	// any subsequent VUs to open new files
