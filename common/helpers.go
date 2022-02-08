@@ -23,12 +23,10 @@ package common
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"os"
 	"reflect"
-	"strings"
 	"time"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
@@ -121,49 +119,6 @@ func callApiWithTimeout(ctx context.Context, fn func(context.Context, chan inter
 	}
 
 	return result, err
-}
-
-func errorFromDOMError(domErr string) error {
-	switch domErr {
-	case "error:notconnected":
-		return errors.New("element is not attached to the DOM")
-	case "error:notelement":
-		return errors.New("node is not an element")
-	case "error:nothtmlelement":
-		return errors.New("not an HTMLElement")
-	case "error:notfillableelement":
-		return errors.New("element is not an <input>, <textarea> or [contenteditable] element")
-	case "error:notfillableinputtype":
-		return errors.New("input of this type cannot be filled")
-	case "error:notfillablenumberinput":
-		return errors.New("cannot type text into input[type=number]")
-	case "error:notvaliddate":
-		return errors.New("malformed value")
-	case "error:notinput":
-		return errors.New("node is not an HTMLInputElement")
-	case "error:hasnovalue":
-		return errors.New("node is not an HTMLInputElement or HTMLTextAreaElement or HTMLSelectElement")
-	case "error:notselect":
-		return errors.New("element is not a <select> element")
-	case "error:notcheckbox":
-		return errors.New("not a checkbox or radio button")
-	case "error:notmultiplefileinput":
-		return errors.New("non-multiple file input can only accept single file")
-	case "error:strictmodeviolation":
-		return errors.New("strict mode violation, multiple elements were returned for selector query")
-	case "error:notqueryablenode":
-		return errors.New("node is not queryable")
-	case "error:nthnocapture":
-		return errors.New("can't query n-th element in a chained selector with capture")
-	case "error:timeout":
-		return ErrTimedOut
-	default:
-		if strings.HasPrefix(domErr, "error:expectednode:") {
-			i := strings.LastIndex(domErr, ":")
-			return fmt.Errorf("expected node but got %s", domErr[i:])
-		}
-	}
-	return fmt.Errorf(domErr)
 }
 
 func stringSliceContains(s []string, e string) bool {

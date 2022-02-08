@@ -1443,3 +1443,35 @@ func (h *ElementHandle) eval(
 	}
 	return result, err
 }
+
+func errorFromDOMError(derr string) error {
+	// return the same sentinel error value for the timed out err
+	if derr == "error:timeout" {
+		return ErrTimedOut
+	}
+	if s := "error:expectednode:"; strings.HasPrefix(derr, s) {
+		return fmt.Errorf("expected node but got %s", strings.TrimPrefix(derr, s))
+	}
+	errs := map[string]string{
+		"error:notconnected":           "element is not attached to the DOM",
+		"error:notelement":             "node is not an element",
+		"error:nothtmlelement":         "not an HTMLElement",
+		"error:notfillableelement":     "element is not an <input>, <textarea> or [contenteditable] element",
+		"error:notfillableinputtype":   "input of this type cannot be filled",
+		"error:notfillablenumberinput": "cannot type text into input[type=number]",
+		"error:notvaliddate":           "malformed value",
+		"error:notinput":               "node is not an HTMLInputElement",
+		"error:hasnovalue":             "node is not an HTMLInputElement or HTMLTextAreaElement or HTMLSelectElement",
+		"error:notselect":              "element is not a <select> element",
+		"error:notcheckbox":            "not a checkbox or radio button",
+		"error:notmultiplefileinput":   "non-multiple file input can only accept single file",
+		"error:strictmodeviolation":    "strict mode violation, multiple elements returned for selector query",
+		"error:notqueryablenode":       "node is not queryable",
+		"error:nthnocapture":           "can't query n-th element in a chained selector with capture",
+	}
+	if err, ok := errs[derr]; ok {
+		return errors.New(err)
+	}
+
+	return errors.New(derr)
+}
