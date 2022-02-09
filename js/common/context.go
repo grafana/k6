@@ -26,6 +26,9 @@ import (
 	"github.com/dop251/goja"
 )
 
+// TODO: https://github.com/grafana/k6/issues/2385
+// Rid all the context-based utils functions
+
 type ctxKey int
 
 const (
@@ -34,11 +37,15 @@ const (
 )
 
 // WithRuntime attaches the given goja runtime to the context.
+//
+// Deprecated: Implement the modules.VU interface for sharing the Runtime.
 func WithRuntime(ctx context.Context, rt *goja.Runtime) context.Context {
 	return context.WithValue(ctx, ctxKeyRuntime, rt)
 }
 
 // GetRuntime retrieves the attached goja runtime from the given context.
+//
+// Deprecated: Use modules.VU for get the Runtime.
 func GetRuntime(ctx context.Context) *goja.Runtime {
 	v := ctx.Value(ctxKeyRuntime)
 	if v == nil {
@@ -48,11 +55,15 @@ func GetRuntime(ctx context.Context) *goja.Runtime {
 }
 
 // WithInitEnv attaches the given init environment to the context.
+//
+// Deprecated: Implement the modules.VU interface for sharing the init environment.
 func WithInitEnv(ctx context.Context, initEnv *InitEnvironment) context.Context {
 	return context.WithValue(ctx, ctxKeyInitEnv, initEnv)
 }
 
 // GetInitEnv retrieves the attached init environment struct from the given context.
+//
+// Deprecated: Use modules.VU for get the init environment.
 func GetInitEnv(ctx context.Context) *InitEnvironment {
 	v := ctx.Value(ctxKeyInitEnv)
 	if v == nil {
