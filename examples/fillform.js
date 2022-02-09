@@ -1,10 +1,9 @@
 import launcher from 'k6/x/browser';
-import { check, sleep } from 'k6';
+import { check } from 'k6';
 
 export default function() {
   const browser = launcher.launch('chromium', {
     headless: __ENV.XK6_HEADLESS ? true : false,
-	slowMo: '500ms' // slow down by 500ms
   });
   const context = browser.newContext();
   const page = context.newPage();
@@ -19,11 +18,9 @@ export default function() {
   page.$('input[name="password"]').type('123');
   page.$('input[type="submit"]').click();
 
-  sleep(5);
-  // Wait for next page to load
-  // FIXME: This doesn't work without the above sleep.
-  // Same with state 'domcontentloaded'.
-  page.waitForLoadState('networkidle');
+  // We expect the above form submission to trigger a navigation, so wait for it
+  // and the page to be loaded.
+  page.waitForNavigation();
 
   check(page, {
     'header': page.$('h2').textContent() == 'Welcome, admin!',
