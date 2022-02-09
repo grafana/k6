@@ -62,6 +62,10 @@ var _ api.JSHandle = &ElementHandle{}
 type (
 	elementHandleActionFn        func(context.Context, *ElementHandle) (interface{}, error)
 	elementHandlePointerActionFn func(context.Context, *ElementHandle, *Position) (interface{}, error)
+
+	// evalFunc is currently one of evalWithScript and eval.
+	// It helps abstracting these methods to aid with testing.
+	evalFunc func(ctx context.Context, opts evalOptions, js string, args ...interface{}) (interface{}, error)
 )
 
 func getElementHandleActionFn(
@@ -1208,7 +1212,7 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 	defer applySlowMo(h.ctx)
 
-	handles, err := h.queryAll(selector)
+	handles, err := h.queryAll(selector, h.evalWithScript)
 	if err != nil {
 		k6Throw(h.ctx, "QueryAll: %w", err)
 	}
@@ -1216,12 +1220,12 @@ func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 	return handles
 }
 
-func (h *ElementHandle) queryAll(selector string) ([]api.ElementHandle, error) {
+func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]api.ElementHandle, error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse selector %q: %w", selector, err)
 	}
-	result, err := h.evalWithScript(
+	result, err := eval(
 		h.ctx,
 		evalOptions{forceCallable: true, returnByValue: false},
 		js.QueryAll,
