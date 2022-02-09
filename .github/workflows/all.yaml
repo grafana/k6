@@ -92,7 +92,7 @@ jobs:
           set -x
           go version
           export GOMAXPROCS=2
-          go test -v -p 2 -race -timeout 60s ./...
+          go test -v -p 2 -race -timeout 300s ./...
 
   test-tip:
     runs-on: ubuntu-latest
@@ -134,7 +134,7 @@ jobs:
           which go
           go version
           export GOMAXPROCS=2
-          go test -v -p 2 -race -timeout 60s ./...
+          go test -v -p 2 -race -timeout 300s ./...
 
   test-current-cov:
     strategy:
@@ -178,7 +178,7 @@ jobs:
                   list=$(echo "$list" | cut -f1 -d ' ' | sort -u | paste -sd, -)
               fi
 
-              go test -v -p 2 -race -timeout 60s --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
+              go test -v -p 2 -race -timeout 300s --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
           done
           grep -h -v "^mode:" *.coverage >> coverage.txt
           rm -f *.coverage
