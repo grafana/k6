@@ -22,6 +22,8 @@ package common
 
 import (
 	"context"
+	_ "embed"
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -273,6 +275,10 @@ func (e *ExecutionContext) eval(
 	return res, nil
 }
 
+// Based on: https://github.com/microsoft/playwright/blob/master/src/server/injected/injectedScript.ts
+//go:embed js/injected_script.js
+var injectedScriptSource string
+
 // getInjectedScript returns a JS handle to the injected script of helper functions.
 func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHandle, error) {
 	e.logger.Debugf(
@@ -280,26 +286,37 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 		"sid:%s stid:%s fid:%s ectxid:%d efurl:%s",
 		e.sid, e.stid, e.fid, e.id, e.furl)
 
-	if e.injectedScript == nil {
-		rt := k6common.GetRuntime(e.ctx)
-		suffix := `//# sourceURL=` + evaluationScriptURL
-		source := fmt.Sprintf(`(() => {%s; return new InjectedScript();})()`, injectedScriptSource)
-		expression := source
-		expressionWithSourceURL := expression
-		if !sourceURLRegex.Match([]byte(expression)) {
-			expressionWithSourceURL = expression + "\n" + suffix
-		}
-
-		opts := evalOptions{
-			forceCallable: false,
-			returnByValue: false,
-		}
-		handle, err := e.eval(apiCtx, opts, rt.ToValue(expressionWithSourceURL))
-		if handle == nil || err != nil {
-			return nil, fmt.Errorf("cannot get injected script (%q): %w", suffix, err)
-		}
-		e.injectedScript = handle.(api.JSHandle)
+	if e.injectedScript != nil {
+		return e.injectedScript, nil
 	}
+
+	var (
+		rt                      = k6common.GetRuntime(e.ctx)
+		suffix                  = `//# sourceURL=` + evaluationScriptURL
+		source                  = fmt.Sprintf(`(() => {%s; return new InjectedScript();})()`, injectedScriptSource)
+		expression              = source
+		expressionWithSourceURL = expression
+	)
+	if !sourceURLRegex.Match([]byte(expression)) {
+		expressionWithSourceURL = expression + "\n" + suffix
+	}
+	handle, err := e.eval(
+		apiCtx,
+		evalOptions{forceCallable: false, returnByValue: false},
+		rt.ToValue(expressionWithSourceURL),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get injected script: %w", err)
+	}
+	if handle == nil {
+		return nil, errors.New("cannot get injected script: handle is nil")
+	}
+	injectedScript, ok := handle.(api.JSHandle)
+	if !ok {
+		return nil, fmt.Errorf("cannot get injected script: %w", ErrJSHandleInvalid)
+	}
+	e.injectedScript = injectedScript
+
 	return e.injectedScript, nil
 }
 
