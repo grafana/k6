@@ -134,6 +134,9 @@ func BindToGlobal(rt *goja.Runtime, data map[string]interface{}) func() {
 }
 
 // Bind the provided value v to the provided runtime
+//
+// Deprecated: JS modules can implement the modules.VU interface for getting the context,
+// goja runtime and the VU State, so the goja.Runtime.Set method can be used for data binding.
 func Bind(rt *goja.Runtime, v interface{}, ctxPtr *context.Context) map[string]interface{} {
 	exports := make(map[string]interface{})
 
