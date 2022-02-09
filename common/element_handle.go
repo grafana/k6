@@ -1206,9 +1206,20 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 // QueryAll queries element subtree for matching elements.
 // If no element matches the selector, the return value resolves to "null".
 func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
+	defer applySlowMo(h.ctx)
+
+	handles, err := h.queryAll(selector)
+	if err != nil {
+		k6Throw(h.ctx, "QueryAll: %w", err)
+	}
+
+	return handles
+}
+
+func (h *ElementHandle) queryAll(selector string) ([]api.ElementHandle, error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
-		k6Throw(h.ctx, "cannot parse selector %q in element query all: %v", selector, err)
+		return nil, fmt.Errorf("cannot parse selector %q: %w", selector, err)
 	}
 	result, err := h.evalWithScript(
 		h.ctx,
@@ -1217,15 +1228,16 @@ func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 		parsedSelector,
 	)
 	if err != nil {
-		k6Throw(h.ctx, "cannot evaluate selector %q: %v", selector, err)
+		return nil, fmt.Errorf("cannot evaluate selector %q: %w", selector, err)
 	}
 	if result == nil {
-		return nil
+		// it is ok to return a nil slice because it means we didn't find any elements.
+		return nil, nil
 	}
 
 	handles, ok := result.(api.JSHandle)
 	if !ok {
-		k6Throw(h.ctx, "cannot get selector (%q) handle: %w", selector, ErrJSHandleInvalid)
+		return nil, fmt.Errorf("cannot get selector (%q) handle: %w", selector, ErrJSHandleInvalid)
 	}
 	defer handles.Dispose()
 	var (
@@ -1239,9 +1251,8 @@ func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 			prop.Dispose()
 		}
 	}
-	applySlowMo(h.ctx)
 
-	return els
+	return els, nil
 }
 
 func (h *ElementHandle) Screenshot(opts goja.Value) goja.ArrayBuffer {
