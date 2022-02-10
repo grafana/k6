@@ -1,11 +1,14 @@
 package common
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/api"
 )
 
 func TestErrorFromDOMError(t *testing.T) {
@@ -27,4 +30,146 @@ func TestErrorFromDOMError(t *testing.T) {
 			assert.EqualError(t, tc.want, got.Error())
 		}
 	}
+}
+
+//nolint:funlen
+func TestQueryAll(t *testing.T) {
+	t.Parallel()
+
+	var (
+		nilHandle    = func() api.ElementHandle { return nil }
+		nonNilHandle = func() api.ElementHandle { return &ElementHandle{} }
+	)
+
+	for name, tt := range map[string]struct {
+		selector                      string
+		returnHandle                  func() interface{}
+		returnErr                     error
+		wantErr                       bool
+		wantHandles, wantDisposeCalls int
+	}{
+		"invalid_selector": {
+			selector:     "*=*>>*=*",
+			returnHandle: func() interface{} { return nil },
+			returnErr:    errors.New("any"),
+			wantErr:      true,
+		},
+		"cannot_evaluate": {
+			selector:     "*",
+			returnHandle: func() interface{} { return nil },
+			returnErr:    errors.New("any"),
+			wantErr:      true,
+		},
+		"nil_handles_no_err": {
+			selector:     "*",
+			returnHandle: func() interface{} { return nil },
+			returnErr:    nil,
+			wantErr:      false,
+		},
+		"invalid_js_handle": {
+			selector:     "*",
+			returnHandle: func() interface{} { return "an invalid handle" },
+			wantErr:      true,
+		},
+		"disposes_main_handle": {
+			selector:         "*",
+			returnHandle:     func() interface{} { return &jsHandleStub{} },
+			wantDisposeCalls: 1,
+		},
+		// disposes the main handler and all its nil children
+		"disposes_handles": {
+			selector: "*",
+			returnHandle: func() interface{} {
+				handles := &jsHandleStub{
+					asElementFn: nilHandle,
+				}
+				handles.getPropertiesFn = func() map[string]api.JSHandle {
+					return map[string]api.JSHandle{
+						"1": handles,
+						"2": handles,
+					}
+				}
+
+				return handles
+			},
+			wantDisposeCalls: 3,
+		},
+		// only returns non-nil handles
+		"returns_elems": {
+			selector: "*",
+			returnHandle: func() interface{} {
+				childHandles := map[string]api.JSHandle{
+					"1": &jsHandleStub{asElementFn: nonNilHandle},
+					"2": &jsHandleStub{asElementFn: nonNilHandle},
+					"3": &jsHandleStub{asElementFn: nilHandle},
+				}
+				return &jsHandleStub{
+					getPropertiesFn: func() map[string]api.JSHandle {
+						return childHandles
+					},
+				}
+			},
+			wantHandles: 2,
+		},
+	} {
+		name, tt := name, tt
+
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				returnHandle = tt.returnHandle()
+				evalFunc     = func(_ context.Context, _ evalOptions, _ string, _ ...interface{}) (interface{}, error) {
+					return returnHandle, tt.returnErr
+				}
+			)
+
+			handles, err := (&ElementHandle{}).queryAll(tt.selector, evalFunc)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Nil(t, handles)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Len(t, handles, tt.wantHandles)
+
+			if want := tt.wantDisposeCalls; want > 0 {
+				stub, ok := returnHandle.(*jsHandleStub)
+				assert.True(t, ok)
+				assert.Equal(t, want, stub.disposeCalls)
+			}
+		})
+	}
+}
+
+type jsHandleStub struct {
+	api.JSHandle
+
+	disposeFn    func()
+	disposeCalls int
+
+	asElementFn     func() api.ElementHandle
+	getPropertiesFn func() map[string]api.JSHandle
+}
+
+func (s *jsHandleStub) AsElement() api.ElementHandle {
+	if s.asElementFn == nil {
+		return nil
+	}
+	return s.asElementFn()
+}
+
+func (s *jsHandleStub) Dispose() {
+	s.disposeCalls++
+	if s.disposeFn != nil {
+		s.disposeFn()
+	}
+}
+
+func (s *jsHandleStub) GetProperties() map[string]api.JSHandle {
+	if s.getPropertiesFn == nil {
+		return nil
+	}
+	return s.getPropertiesFn()
 }
