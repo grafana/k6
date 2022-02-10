@@ -52,6 +52,7 @@ import (
 	k6common "go.k6.io/k6/js/common"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common/js"
 )
 
 // Ensure ElementHandle implements the api.ElementHandle and api.JSHandle interfaces.
@@ -1202,23 +1203,19 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 	return nil
 }
 
-// QueryAll queries element subtree for matching elements. If no element matches the selector,
-// the return value resolves to "null".
+// QueryAll queries element subtree for matching elements.
+// If no element matches the selector, the return value resolves to "null".
 func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		k6Throw(h.ctx, "cannot parse selector %q in element query all: %v", selector, err)
 	}
-	fn := `
-		(node, injected, selector) => {
-			return injected.querySelectorAll(selector, node || document, false);
-		}
-	`
-	opts := evalOptions{
-		forceCallable: true,
-		returnByValue: false,
-	}
-	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector)
+	result, err := h.evalWithScript(
+		h.ctx,
+		evalOptions{forceCallable: true, returnByValue: false},
+		js.QueryAll,
+		parsedSelector,
+	)
 	if err != nil {
 		k6Throw(h.ctx, "cannot evaluate selector %q: %v", selector, err)
 	}
@@ -1226,20 +1223,25 @@ func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 		return nil
 	}
 
-	arrayHandle := result.(api.JSHandle)
-	defer arrayHandle.Dispose()
-	properties := arrayHandle.GetProperties()
-	elements := make([]api.ElementHandle, 0, len(properties))
-	for _, property := range properties {
-		elementHandle := property.AsElement()
-		if elementHandle != nil {
-			elements = append(elements, elementHandle)
+	handles, ok := result.(api.JSHandle)
+	if !ok {
+		k6Throw(h.ctx, "cannot get selector (%q) handle: %w", selector, ErrJSHandleInvalid)
+	}
+	defer handles.Dispose()
+	var (
+		props = handles.GetProperties()
+		els   = make([]api.ElementHandle, 0, len(props))
+	)
+	for _, prop := range props {
+		if el := prop.AsElement(); el != nil {
+			els = append(els, el)
 		} else {
-			property.Dispose()
+			prop.Dispose()
 		}
 	}
 	applySlowMo(h.ctx)
-	return elements
+
+	return els
 }
 
 func (h *ElementHandle) Screenshot(opts goja.Value) goja.ArrayBuffer {
