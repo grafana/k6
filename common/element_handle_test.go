@@ -77,7 +77,7 @@ func TestQueryAll(t *testing.T) {
 			returnHandle:     func() interface{} { return &jsHandleStub{} },
 			wantDisposeCalls: 1,
 		},
-		// disposes the main handler and all its nil children
+		// disposes the main handle and all its nil children
 		"disposes_handles": {
 			selector: "*",
 			returnHandle: func() interface{} {
@@ -137,7 +137,7 @@ func TestQueryAll(t *testing.T) {
 
 			if want := tt.wantDisposeCalls; want > 0 {
 				stub, ok := returnHandle.(*jsHandleStub)
-				assert.True(t, ok)
+				require.True(t, ok)
 				assert.Equal(t, want, stub.disposeCalls)
 			}
 		})

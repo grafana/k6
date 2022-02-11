@@ -63,7 +63,7 @@ type (
 	elementHandleActionFn        func(context.Context, *ElementHandle) (interface{}, error)
 	elementHandlePointerActionFn func(context.Context, *ElementHandle, *Position) (interface{}, error)
 
-	// evalFunc is currently one of evalWithScript and eval.
+	// evalFunc is a common interface for both evalWithScript and eval.
 	// It helps abstracting these methods to aid with testing.
 	evalFunc func(ctx context.Context, opts evalOptions, js string, args ...interface{}) (interface{}, error)
 )
