@@ -57,13 +57,6 @@ func Register(name string, mod interface{}) {
 	modules[name] = mod
 }
 
-// HasModuleInstancePerVU should be implemented by all native Golang modules that
-// would require per-VU state. k6 will call their NewModuleInstancePerVU() methods
-// every time a VU imports the module and use its result as the returned object.
-type HasModuleInstancePerVU interface {
-	NewModuleInstancePerVU() interface{}
-}
-
 // Module is the interface js modules should implement in order to get access to the VU
 type Module interface {
 	// NewModuleInstance will get modules.VU that should provide the module with a way to interact with the VU
