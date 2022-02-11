@@ -169,7 +169,6 @@ func TestQueryAll(t *testing.T) {
 type jsHandleStub struct {
 	api.JSHandle
 
-	disposeFn    func()
 	disposeCalls int
 
 	asElementFn     func() api.ElementHandle
@@ -185,9 +184,6 @@ func (s *jsHandleStub) AsElement() api.ElementHandle {
 
 func (s *jsHandleStub) Dispose() {
 	s.disposeCalls++
-	if s.disposeFn != nil {
-		s.disposeFn()
-	}
 }
 
 func (s *jsHandleStub) GetProperties() map[string]api.JSHandle {
