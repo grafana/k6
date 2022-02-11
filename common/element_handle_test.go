@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common/js"
 )
 
 func TestErrorFromDOMError(t *testing.T) {
@@ -141,6 +142,28 @@ func TestQueryAll(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("eval_call", func(t *testing.T) {
+		const selector = "body"
+
+		_, _ = (&ElementHandle{}).queryAll(
+			selector,
+			func(_ context.Context, opts evalOptions, jsFunc string, args ...interface{}) (interface{}, error) {
+				assert.Equal(t, js.QueryAll, jsFunc)
+
+				assert.Equal(t, opts.forceCallable, true)
+				assert.Equal(t, opts.returnByValue, false)
+
+				assert.NotEmpty(t, args)
+				assert.IsType(t, args[0], &Selector{})
+				sel, ok := args[0].(*Selector)
+				require.True(t, ok)
+				assert.Equal(t, sel.Selector, selector)
+
+				return nil, nil //nolint:nilnil
+			},
+		)
+	})
 }
 
 type jsHandleStub struct {
