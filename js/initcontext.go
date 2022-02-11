@@ -214,9 +214,6 @@ func (i *InitContext) requireModule(name string) (goja.Value, error) {
 		instance := m.NewModuleInstance(i.moduleVUImpl)
 		return i.moduleVUImpl.runtime.ToValue(toESModuleExports(instance.Exports())), nil
 	}
-	if perInstance, ok := mod.(modules.HasModuleInstancePerVU); ok {
-		mod = perInstance.NewModuleInstancePerVU()
-	}
 
 	onceBindWarning.Do(func() {
 		i.logger.Warnf(`Module '%s' is using deprecated APIs that will be removed in k6 v0.38.0,`+
