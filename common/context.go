@@ -70,8 +70,11 @@ func GetProcessID(ctx context.Context) int {
 func contextWithDoneChan(ctx context.Context, done chan struct{}) context.Context {
 	ctx, cancel := context.WithCancel(ctx)
 	go func() {
-		<-done
-		cancel()
+		defer cancel()
+		select {
+		case <-done:
+		case <-ctx.Done():
+		}
 	}()
 	return ctx
 }
