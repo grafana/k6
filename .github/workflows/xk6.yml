@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         go: [stable, tip]
-        platform: [ubuntu-latest, windows-latest, macos-latest]
+        platform: [ubuntu-latest, windows-2019, macos-latest]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
