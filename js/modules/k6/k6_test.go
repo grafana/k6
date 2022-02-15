@@ -331,6 +331,16 @@ func TestCheckLiteral(t *testing.T) {
 	assert.Len(t, stats.GetBufferedSamples(samples), 0)
 }
 
+func TestCheckNull(t *testing.T) {
+	t.Parallel()
+	rt, samples, _ := checkTestRuntime(t)
+
+	_, err := rt.RunString(`k6.check(5)`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "No checks provided")
+	assert.Len(t, stats.GetBufferedSamples(samples), 0)
+}
+
 func TestCheckThrows(t *testing.T) {
 	t.Parallel()
 	rt, samples, builtinMetrics := checkTestRuntime(t)
