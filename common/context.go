@@ -65,8 +65,8 @@ func GetProcessID(ctx context.Context) int {
 	return v // it will return zero on error
 }
 
-// contextWithDoneChan returns a new context that is canceled when the done channel
-// is closed. The context will leak if the done channel is never closed.
+// contextWithDoneChan returns a new context that is canceled either
+// when the done channel is closed or ctx is canceled.
 func contextWithDoneChan(ctx context.Context, done chan struct{}) context.Context {
 	ctx, cancel := context.WithCancel(ctx)
 	go func() {
