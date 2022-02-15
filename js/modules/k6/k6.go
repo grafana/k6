@@ -23,7 +23,6 @@ package k6
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"sync/atomic"
 	"time"
@@ -160,7 +159,7 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 		return false, ErrCheckInInitContext
 	}
 	if checks == nil {
-		return false, fmt.Errorf("No checks provided to `check`")
+		return false, errors.New("No checks provided to `check`") //nolint:stylecheck
 	}
 	ctx := mi.vu.Context()
 	rt := mi.vu.Runtime()
