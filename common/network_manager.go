@@ -348,6 +348,7 @@ func (m *NetworkManager) initEvents() {
 		cdproto.EventNetworkRequestServedFromCache,
 		cdproto.EventNetworkResponseReceived,
 		cdproto.EventFetchRequestPaused,
+		cdproto.EventFetchAuthRequired,
 	}, chHandler)
 
 	go func() {
@@ -379,6 +380,8 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 			m.onResponseReceived(ev)
 		case *fetch.EventRequestPaused:
 			m.onRequestPaused(ev)
+		case *fetch.EventAuthRequired:
+			m.onAuthRequired(ev)
 		}
 	}
 	return true
@@ -551,6 +554,22 @@ func checkBlockedIPs(ip net.IP, blockedIPs []*k6lib.IPNet) error {
 	return nil
 }
 
+func (m *NetworkManager) onAuthRequired(event *fetch.EventAuthRequired) {
+	err := fetch.ContinueWithAuth(
+		event.RequestID,
+		&fetch.AuthChallengeResponse{
+			Response: fetch.AuthChallengeResponseResponseProvideCredentials,
+			Username: m.credentials.Username,
+			Password: m.credentials.Password,
+		},
+	).Do(cdp.WithExecutor(m.ctx, m.session))
+	if err != nil {
+		m.logger.Debugf("NetworkManager:onAuthRequired", "continueWithAuth url:%q err:%v", event.Request.URL, err)
+	} else {
+		m.logger.Debugf("NetworkManager:onAuthRequired", "continueWithAuth url:%q OK", event.Request.URL)
+	}
+}
+
 func (m *NetworkManager) onRequestServedFromCache(event *network.EventRequestServedFromCache) {
 	req := m.requestFromID(event.RequestID)
 	if req != nil {
@@ -588,7 +607,7 @@ func (m *NetworkManager) updateProtocolCacheDisabled() error {
 }
 
 func (m *NetworkManager) updateProtocolRequestInterception() error {
-	enabled := m.userReqInterceptionEnabled
+	enabled := m.userReqInterceptionEnabled || m.credentials != nil
 	if enabled == m.protocolReqInterceptionEnabled {
 		return nil
 	}
@@ -599,7 +618,7 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 			fetch.Enable().
 				WithHandleAuthRequests(true).
 				WithPatterns([]*fetch.RequestPattern{
-					{URLPattern: "*"},
+					{URLPattern: "*", RequestStage: fetch.RequestStageRequest},
 				}),
 		}
 		for _, action := range actions {

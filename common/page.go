@@ -346,7 +346,7 @@ func (p *Page) updateHttpCredentials() {
 	p.logger.Debugf("Page:updateHttpCredentials", "sid:%v", p.sessionID())
 
 	for _, fs := range p.frameSessions {
-		fs.updateHttpCredentials(false)
+		fs.updateHTTPCredentials(false)
 	}
 }
 
