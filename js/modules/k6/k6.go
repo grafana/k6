@@ -158,6 +158,9 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 	if state == nil {
 		return false, ErrCheckInInitContext
 	}
+	if checks == nil {
+		return false, errors.New("no checks provided to `check`")
+	}
 	ctx := mi.vu.Context()
 	rt := mi.vu.Runtime()
 	t := time.Now()
