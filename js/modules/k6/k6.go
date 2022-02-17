@@ -159,7 +159,7 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 		return false, ErrCheckInInitContext
 	}
 	if checks == nil {
-		return false, errors.New("No checks provided to `check`") //nolint:stylecheck
+		return false, errors.New("no checks provided to `check`")
 	}
 	ctx := mi.vu.Context()
 	rt := mi.vu.Runtime()
