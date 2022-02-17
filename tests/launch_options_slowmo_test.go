@@ -32,6 +32,10 @@ import (
 )
 
 func TestLaunchOptionsSlowMo(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	tb := newTestBrowser(t, withFileServer())
 
 	t.Run("Page", func(t *testing.T) {
