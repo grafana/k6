@@ -337,7 +337,7 @@ func TestCheckNull(t *testing.T) {
 
 	_, err := rt.RunString(`k6.check(5)`)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "No checks provided")
+	assert.Contains(t, err.Error(), "no checks provided")
 	assert.Len(t, stats.GetBufferedSamples(samples), 0)
 }
 
