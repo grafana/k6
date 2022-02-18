@@ -85,6 +85,7 @@ type Response struct {
 	Timings        ResponseTimings          `json:"timings"`
 	TLSVersion     string                   `json:"tls_version"`
 	TLSCipherSuite string                   `json:"tls_cipher_suite"`
+	TLSIssuer      string                   `json:"tls_issuer"`
 	OCSP           netext.OCSP              `json:"ocsp"`
 	Error          string                   `json:"error"`
 	ErrorCode      int                      `json:"error_code"`
@@ -102,5 +103,6 @@ func (res *Response) setTLSInfo(tlsState *tls.ConnectionState) {
 	tlsInfo, oscp := netext.ParseTLSConnState(tlsState)
 	res.TLSVersion = tlsInfo.Version
 	res.TLSCipherSuite = tlsInfo.CipherSuite
+	res.TLSIssuer = tlsInfo.Issuer
 	res.OCSP = oscp
 }

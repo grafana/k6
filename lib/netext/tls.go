@@ -53,6 +53,7 @@ const (
 type TLSInfo struct {
 	Version     string
 	CipherSuite string
+	Issuer      string
 }
 type OCSP struct {
 	ProducedAt       int64  `json:"produced_at"`
@@ -76,6 +77,7 @@ func ParseTLSConnState(tlsState *tls.ConnectionState) (TLSInfo, OCSP) {
 		tlsInfo.Version = TLS_1_3
 	}
 
+	tlsInfo.Issuer = tlsState.PeerCertificates[0].Issuer.Organization[0]
 	tlsInfo.CipherSuite = lib.SupportedTLSCipherSuitesToString[tlsState.CipherSuite]
 	ocspStapledRes := OCSP{Status: OCSP_STATUS_UNKNOWN}
 
