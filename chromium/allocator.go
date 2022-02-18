@@ -34,12 +34,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/xk6-browser/allocation"
 	"github.com/grafana/xk6-browser/common"
 )
-
-// Ensure Allocator implements the browser.Allocator interface.
-var _ allocation.Allocator = &Allocator{}
 
 type Allocator struct {
 	execPath  string
@@ -52,7 +48,8 @@ type Allocator struct {
 	combinedOutputWriter io.Writer
 }
 
-func NewAllocator(flags map[string]interface{}, env []string) allocation.Allocator {
+// NewAllocator returns a new Allocator with a path to a Chrome executable.
+func NewAllocator(flags map[string]interface{}, env []string) *Allocator {
 	a := Allocator{
 		execPath:  "google-chrome",
 		initFlags: flags,
@@ -208,7 +205,7 @@ func (a *Allocator) Allocate(ctx context.Context, launchOpts *common.LaunchOptio
 			os.RemoveAll(userDataDir)
 		}
 	}()
-	allocation.AllocateCmdOptions(cmd)
+	KillAfterParent(cmd)
 
 	// Pipe stderr to stdout
 	stdout, err := cmd.StdoutPipe()
