@@ -17,18 +17,19 @@ import (
 	"github.com/grafana/xk6-browser/common"
 )
 
+// Allocator provides facilities for finding, running, and interacting with a Chromium browser.
 type Allocator struct {
-	execPath  string
-	initFlags map[string]interface{}
-	initEnv   []string
-	tempDir   string
+	execPath  string                 // path to the Chromium executable
+	initFlags map[string]interface{} // CLI flags to pass to the Chromium executable
+	initEnv   []string               // environment variables to pass to the Chromium executable
+	tempDir   string                 // path for storing the extension and user specific data
 
 	wg sync.WaitGroup
 
 	combinedOutputWriter io.Writer
 }
 
-// NewAllocator returns a new Allocator with a path to a Chrome executable.
+// NewAllocator returns a new Allocator with a path to a Chromium executable.
 func NewAllocator(flags map[string]interface{}, env []string) *Allocator {
 	a := Allocator{
 		execPath:  "google-chrome",
@@ -40,7 +41,8 @@ func NewAllocator(flags map[string]interface{}, env []string) *Allocator {
 	return &a
 }
 
-func (a *Allocator) buildCmdArgs(userDataDir *string, removeDir *bool) ([]string, error) {
+// parseArgs parses command-line arguments and returns them.
+func (a *Allocator) parseArgs(userDataDir *string, removeDir *bool) ([]string, error) {
 	// Build command line args list
 	var args []string
 	for name, value := range a.initFlags {
@@ -70,7 +72,7 @@ func (a *Allocator) buildCmdArgs(userDataDir *string, removeDir *bool) ([]string
 		*removeDir = true
 	}
 	if _, ok := a.initFlags["no-sandbox"]; !ok && os.Getuid() == 0 {
-		// Running as root, for example in a Linux container. Chrome
+		// Running as root, for example in a Linux container. Chromium
 		// needs --no-sandbox when running as root, so make that the
 		// default, unless the user set "no-sandbox": false.
 		args = append(args, "--no-sandbox")
@@ -86,6 +88,7 @@ func (a *Allocator) buildCmdArgs(userDataDir *string, removeDir *bool) ([]string
 	return args, nil
 }
 
+// fincExecPath finds the path to the Chromium executable.
 func (a *Allocator) findExecPath() {
 	for _, path := range [...]string{
 		// Unix-like
@@ -107,7 +110,6 @@ func (a *Allocator) findExecPath() {
 		filepath.Join(os.Getenv("USERPROFILE"), `AppData\Local\Google\Chrome\Application\chrome.exe`),
 
 		// Mac (from https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Mac/857950/)
-		//"/Users/robin/Downloads/chrome-mac 2/Chromium.app/Contents/MacOS/Chromium",
 		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 		"/Applications/Chromium.app/Contents/MacOS/Chromium",
 	} {
@@ -119,8 +121,8 @@ func (a *Allocator) findExecPath() {
 	}
 }
 
-// readOutput grabs the websocket address from chrome's output, returning as
-// soon as it is found. All read output is forwarded to forward, if non-nil.
+// readOutput grabs the websocket address from chrome's output and returns it.
+// All read output is forwarded to forward, if non-nil.
 // done is used to signal that the asynchronous io.Copy is done, if any.
 func (a *Allocator) readOutput(rc io.ReadCloser, forward io.Writer, done func()) (wsURL string, _ error) {
 	prefix := []byte("DevTools listening on")
@@ -158,7 +160,7 @@ readLoop:
 	return wsURL, nil
 }
 
-// Allocate starts a new local browser process.
+// Allocate starts a new Chromium browser process.
 func (a *Allocator) Allocate(ctx context.Context, launchOpts *common.LaunchOptions) (_ *common.BrowserProcess, rerr error) {
 	// Create cancelable context for the browser process
 	ctx, cancel := context.WithCancel(ctx)
@@ -172,7 +174,7 @@ func (a *Allocator) Allocate(ctx context.Context, launchOpts *common.LaunchOptio
 		userDataDir string
 		removeDir   bool
 	)
-	args, err := a.buildCmdArgs(&userDataDir, &removeDir)
+	args, err := a.parseArgs(&userDataDir, &removeDir)
 	if err != nil {
 		return nil, err
 	}

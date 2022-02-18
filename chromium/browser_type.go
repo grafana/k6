@@ -21,6 +21,8 @@ import (
 // Ensure BrowserType implements the api.BrowserType interface.
 var _ api.BrowserType = &BrowserType{}
 
+// BrowserType provides methods to launch a Chrome browser instance or connect to an existing one.
+// It's the entry point for interacting with the browser.
 type BrowserType struct {
 	Ctx             context.Context
 	CancelFn        context.CancelFunc
@@ -28,12 +30,16 @@ type BrowserType struct {
 	fieldNameMapper *common.FieldNameMapper
 }
 
+// NewBrowserType returns a new Chrome browser type.
+// Before returning a new browser type:
+// - Initializes the extension-wide context
+// - Initializes the goja runtime.
 func NewBrowserType(ctx context.Context) api.BrowserType {
 	rt := k6common.GetRuntime(ctx)
 	hooks := common.NewHooks()
 
-	// Create extension master context. If this context is cancelled we'll
-	// initiate an extension wide cancellation and shutdown.
+	// Create the extension master context.
+	// If this context is cancelled we'll initiate an extension wide cancellation and shutdown.
 	extensionCtx, extensionCancelFn := context.WithCancel(ctx)
 	extensionCtx = common.WithHooks(extensionCtx, hooks)
 
@@ -47,16 +53,19 @@ func NewBrowserType(ctx context.Context) api.BrowserType {
 	return &b
 }
 
+// Connect attaches k6 browser to an existing browser instance.
 func (b *BrowserType) Connect(opts goja.Value) {
 	rt := k6common.GetRuntime(b.Ctx)
 	k6common.Throw(rt, errors.New("BrowserType.connect() has not been implemented yet"))
 }
 
+// ExecutablePath returns the path where the extension expects to find the browser executable.
 func (b *BrowserType) ExecutablePath() string {
 	return "chromium"
 }
 
-// Launch creates a new client to remote control a Chrome browser.
+// Launch allocates a new Chrome browser process and returns a new browser value.
+// The returned browser value can be used for controlling the Chrome browser.
 func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 	var (
 		rt         = k6common.GetRuntime(b.Ctx)
@@ -96,12 +105,14 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 	return browser
 }
 
+// LaunchPersistentContext launches the browser with persistent storage.
 func (b *BrowserType) LaunchPersistentContext(userDataDir string, opts goja.Value) api.Browser {
 	rt := k6common.GetRuntime(b.Ctx)
 	k6common.Throw(rt, errors.New("BrowserType.LaunchPersistentContext(userDataDir, opts) has not been implemented yet"))
 	return nil
 }
 
+// Name returns the name of this browser type.
 func (b *BrowserType) Name() string {
 	return "chromium"
 }
@@ -157,7 +168,7 @@ func (b *BrowserType) flags(lopts *common.LaunchOptions, k6opts *k6lib.Options) 
 	return f
 }
 
-// makes an extension wide logger.
+// makeLogger makes and returns an extension wide logger.
 func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*common.Logger, error) {
 	var (
 		k6Logger            = k6lib.GetState(ctx).Logger
@@ -180,6 +191,9 @@ func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*common.
 	return logger, nil
 }
 
+// setFlagsFromArgs fills flags by parsing the args slice.
+// This is used for passing the "arg=value" arguments along with other launch options
+// when launching a new Chrome browser.
 func setFlagsFromArgs(flags map[string]interface{}, args []string) {
 	var argname, argval string
 	for _, arg := range args {
@@ -192,6 +206,8 @@ func setFlagsFromArgs(flags map[string]interface{}, args []string) {
 	}
 }
 
+// setFlagsFromK6Options adds additional data to flags considering the k6 options.
+// Such as: "host-resolver-rules" for blocking requests.
 func setFlagsFromK6Options(flags map[string]interface{}, k6opts *k6lib.Options) {
 	if k6opts == nil {
 		return
