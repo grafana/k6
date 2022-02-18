@@ -2,7 +2,6 @@ package chromium
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,68 +9,50 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync"
-	"time"
+	"strings"
 
 	"github.com/grafana/xk6-browser/common"
 )
 
 // Allocator provides facilities for finding, running, and interacting with a Chromium browser.
 type Allocator struct {
-	execPath  string                 // path to the Chromium executable
-	initFlags map[string]interface{} // CLI flags to pass to the Chromium executable
-	initEnv   []string               // environment variables to pass to the Chromium executable
-	tempDir   string                 // path for storing the extension and user specific data
-
-	wg sync.WaitGroup
-
-	combinedOutputWriter io.Writer
+	execPath      string                 // path to the Chromium executable
+	initFlags     map[string]interface{} // CLI flags to pass to the Chromium executable
+	initEnv       []string               // environment variables to pass to the Chromium executable
+	tempDir       string                 // path for storing the extension and user specific data
+	removeTempDir func()                 // for removing the tempDir
 }
 
 // NewAllocator returns a new Allocator with a path to a Chromium executable.
 func NewAllocator(flags map[string]interface{}, env []string) *Allocator {
-	a := Allocator{
-		execPath:  "google-chrome",
-		initFlags: flags,
-		initEnv:   env,
-		tempDir:   "",
+	return &Allocator{
+		execPath:      findExecPath(),
+		initFlags:     flags,
+		initEnv:       env,
+		tempDir:       "",
+		removeTempDir: func() {},
 	}
-	a.findExecPath()
-	return &a
 }
 
-// Allocate starts a new Chromium browser process.
+// Allocate starts a new Chromium browser process and returns it.
 func (a *Allocator) Allocate(
 	ctx context.Context, launchOpts *common.LaunchOptions,
 ) (_ *common.BrowserProcess, rerr error) {
-	// Create cancelable context for the browser process
+	args, err := a.prepareArgs()
+	if err != nil {
+		return nil, fmt.Errorf("cannot prepare args: %w", err)
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
+	cmd := exec.CommandContext(ctx, a.execPath, args...) //nolint:gosec
+	killAfterParent(cmd)
+
 	defer func() {
 		if rerr != nil {
 			cancel()
+			a.removeTempDir()
 		}
 	}()
-
-	// use the provided directory or create a temporary one.
-	usrDir, removeUsrDir, err := makeUserDataDir(a.tempDir, a.initFlags["user-data-dir"])
-	if err != nil {
-		return nil, fmt.Errorf("cannot make user temp directory: %w", err)
-	}
-	// add dir to flags so that parseArgs can parse it.
-	a.initFlags["user-data-dir"] = usrDir
-
-	args, err := a.parseArgs()
-	if err != nil {
-		return nil, err
-	}
-
-	cmd := exec.CommandContext(ctx, a.execPath, args...)
-	defer func() {
-		if cmd.Process == nil {
-			removeUsrDir()
-		}
-	}()
-	KillAfterParent(cmd)
 
 	// Pipe stderr to stdout
 	stdout, err := cmd.StdoutPipe()
@@ -94,37 +75,37 @@ func (a *Allocator) Allocate(
 		return nil, fmt.Errorf("context err after command start: %w", ctx.Err())
 	}
 
-	a.wg.Add(1) // for the entire allocator
-	if a.combinedOutputWriter != nil {
-		a.wg.Add(1) // for the io.Copy in a separate goroutine
-	}
 	go func() {
 		_ = cmd.Wait()
-		removeUsrDir()
-		a.wg.Done()
+		a.removeTempDir()
 	}()
 
-	var wsURL string
-	wsURLChan := make(chan struct{}, 1)
-	go func() {
-		wsURL, err = a.readOutput(stdout, a.combinedOutputWriter, a.wg.Done)
-		wsURLChan <- struct{}{}
-	}()
-	select {
-	case <-wsURLChan:
-	case <-time.After(launchOpts.Timeout):
-		err = errors.New("websocket url timeout reached")
-	}
+	ctxTimeout, cancel := context.WithTimeout(ctx, launchOpts.Timeout)
+	defer cancel()
+
+	wsURL, err := a.parseWebsocketURL(ctxTimeout, stdout)
 	if err != nil {
-		if a.combinedOutputWriter != nil {
-			// There's no io.Copy goroutine to call the done func.
-			// TODO: a cleaner way to deal with this edge case?
-			a.wg.Done()
-		}
-		return nil, err
+		return nil, fmt.Errorf("cannot parse websocket url: %w", err)
 	}
+	_ = stdout.Close()
 
-	return common.NewBrowserProcess(ctx, cancel, cmd.Process, wsURL, usrDir), nil
+	return common.NewBrowserProcess(ctx, cancel, cmd.Process, wsURL, a.tempDir), nil
+}
+
+// prepareArgs for launching a Chrome browser with the args.
+func (a *Allocator) prepareArgs() (args []string, err error) {
+	// use the provided directory or create a temporary one.
+	a.tempDir, a.removeTempDir, err = makeUserDataDir(a.tempDir, a.initFlags["user-data-dir"])
+	if err != nil {
+		return nil, fmt.Errorf("cannot make user temp directory: %w", err)
+	}
+	// add dir to flags so that parseArgs can parse it.
+	a.initFlags["user-data-dir"] = a.tempDir
+
+	// parse all arguments
+	args, err = a.parseArgs()
+
+	return args, err
 }
 
 const k6BrowserTempDirPattern = "xk6-browser-user-data-*"
@@ -185,8 +166,40 @@ func (a *Allocator) parseArgs() ([]string, error) {
 	return args, nil
 }
 
-// fincExecPath finds the path to the Chromium executable.
-func (a *Allocator) findExecPath() {
+// parseWebsocketURL grabs the websocket address from chrome's output and returns it.
+func (a *Allocator) parseWebsocketURL(ctx context.Context, rc io.Reader) (wsURL string, _ error) {
+	type result struct {
+		wsURL string
+		err   error
+	}
+	c := make(chan result, 1)
+	go func() {
+		const prefix = "DevTools listening on "
+
+		scanner := bufio.NewScanner(rc)
+		for scanner.Scan() {
+			if s := scanner.Text(); strings.HasPrefix(s, prefix) {
+				c <- result{
+					strings.TrimPrefix(strings.TrimSpace(s), prefix),
+					nil,
+				}
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			c <- result{"", fmt.Errorf("scanner err: %w", err)}
+		}
+	}()
+	select {
+	case r := <-c:
+		return r.wsURL, r.err
+	case <-ctx.Done():
+		return "", fmt.Errorf("ctx err: %w", ctx.Err())
+	}
+}
+
+// fincExecPath finds the path to the Chromium executable and returns it.
+func findExecPath() string {
 	for _, path := range [...]string{
 		// Unix-like
 		"headless_shell",
@@ -210,50 +223,10 @@ func (a *Allocator) findExecPath() {
 		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 		"/Applications/Chromium.app/Contents/MacOS/Chromium",
 	} {
-		_, err := exec.LookPath(path)
-		if err == nil {
-			a.execPath = path
-			break
+		if _, err := exec.LookPath(path); err == nil {
+			return path
 		}
 	}
-}
 
-// readOutput grabs the websocket address from chrome's output and returns it.
-// All read output is forwarded to forward, if non-nil.
-// done is used to signal that the asynchronous io.Copy is done, if any.
-func (a *Allocator) readOutput(rc io.ReadCloser, forward io.Writer, done func()) (wsURL string, _ error) {
-	prefix := []byte("DevTools listening on")
-	var accumulated bytes.Buffer
-	bufr := bufio.NewReader(rc)
-readLoop:
-	for {
-		line, err := bufr.ReadBytes('\n')
-		if err != nil {
-			return "", fmt.Errorf("chrome failed to start:\n%s", accumulated.Bytes())
-		}
-		if forward != nil {
-			if _, err := forward.Write(line); err != nil {
-				return "", fmt.Errorf("cannot forward data from chrome: %w", err)
-			}
-		}
-
-		if bytes.HasPrefix(line, prefix) {
-			wsURL = string(bytes.TrimSpace(line[len(prefix):]))
-			break readLoop
-		}
-		accumulated.Write(line)
-	}
-	if forward == nil {
-		// We don't need the process's output anymore.
-		_ = rc.Close()
-	} else {
-		// Copy the rest of the output in a separate goroutine, as we
-		// need to return with the websocket URL.
-		go func() {
-			_, _ = io.Copy(forward, bufr)
-			done()
-		}()
-	}
-
-	return wsURL, nil
+	return ""
 }

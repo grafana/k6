@@ -1,5 +1,5 @@
-import launcher from 'k6/x/browser';
 import { check } from 'k6';
+import launcher from 'k6/x/browser';
 
 export default function() {
   const browser = launcher.launch('chromium', {

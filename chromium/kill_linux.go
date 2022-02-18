@@ -8,8 +8,8 @@ import (
 	"syscall"
 )
 
-// KillAfterParent kills the child process when the parent process dies.
-func KillAfterParent(cmd *exec.Cmd) {
+// killAfterParent kills the child process when the parent process dies.
+func killAfterParent(cmd *exec.Cmd) {
 	if cmd.SysProcAttr == nil {
 		cmd.SysProcAttr = new(syscall.SysProcAttr)
 	}

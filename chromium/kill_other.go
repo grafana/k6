@@ -5,6 +5,6 @@ package chromium
 
 import "os/exec"
 
-// KillAfterParent kills the child process when the parent process dies.
-func KillAfterParent(cmd *exec.Cmd) {
+// killAfterParent kills the child process when the parent process dies.
+func killAfterParent(cmd *exec.Cmd) {
 }
