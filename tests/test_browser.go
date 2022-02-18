@@ -46,6 +46,7 @@ import (
 
 // testBrowser is a test testBrowser for integration testing.
 type testBrowser struct {
+	t        testing.TB
 	ctx      context.Context
 	rt       *goja.Runtime
 	state    *k6lib.State
@@ -60,7 +61,10 @@ type testBrowser struct {
 //
 // opts provides a way to customize the newTestBrowser.
 // see: withLaunchOptions for an example.
-func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
+//nolint:funlen,cyclop
+func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
+	tb.Helper()
+
 	ctx := context.Background()
 
 	// set default options and then customize them
@@ -88,7 +92,7 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 
 	// create a k6 state
 	root, err := k6lib.NewGroup("", nil)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	samples := make(chan k6stats.SampleContainer, 1000)
 
@@ -110,12 +114,12 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
 	}
 
-	rt, _ := getHTTPTestModuleInstance(t, ctx, state)
+	rt, _ := getHTTPTestModuleInstance(tb, ctx, state)
 
 	// enable the HTTP test server only when necessary
 	var testServer *k6httpmultibin.HTTPMultiBin
 	if enableHTTPMultiBin {
-		testServer = k6httpmultibin.NewHTTPMultiBin(t)
+		testServer = k6httpmultibin.NewHTTPMultiBin(tb)
 		state.TLSConfig = testServer.TLSClientConfig
 		state.Transport = testServer.HTTPTransport
 	}
@@ -130,9 +134,9 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 	}
 
 	// launch the browser
-	bt := chromium.NewBrowserType(ctx).(*chromium.BrowserType)
+	bt := chromium.NewBrowserType(ctx).(*chromium.BrowserType) //nolint:forcetypeassert
 	b := bt.Launch(rt.ToValue(launchOpts))
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		select {
 		case <-ctx.Done():
 		default:
@@ -140,7 +144,8 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 		}
 	})
 
-	tb := &testBrowser{
+	tbr := &testBrowser{
+		t:        tb,
 		ctx:      bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
 		rt:       rt,
 		state:    state,
@@ -150,16 +155,19 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 		Browser:  b,
 	}
 	if enableFileServer {
-		tb = tb.withFileServer()
+		tbr = tbr.withFileServer()
 	}
-	return tb
+
+	return tbr
 }
 
 // withHandler adds the given handler to the HTTP test server and makes it
 // accessible with the given pattern.
 func (b *testBrowser) withHandler(pattern string, handler http.HandlerFunc) *testBrowser {
+	b.t.Helper()
+
 	if b.http == nil {
-		panic("You should enable HTTP test server, see: withHTTPServer option")
+		b.t.Fatalf("You should enable HTTP test server, see: withHTTPServer option")
 	}
 	b.http.Mux.Handle(pattern, handler)
 	return b
@@ -173,6 +181,8 @@ const testBrowserStaticDir = "static"
 // This method is for enabling the static file server after starting a test
 // browser. For early starting the file server see withFileServer function.
 func (b *testBrowser) withFileServer() *testBrowser {
+	b.t.Helper()
+
 	const (
 		slash = string(os.PathSeparator)
 		path  = slash + testBrowserStaticDir + slash
@@ -185,19 +195,25 @@ func (b *testBrowser) withFileServer() *testBrowser {
 
 // URL returns the listening HTTP test server's URL combined with the given path.
 func (b *testBrowser) URL(path string) string {
+	b.t.Helper()
+
 	if b.http == nil {
-		panic("You should enable HTTP test server, see: withHTTPServer option")
+		b.t.Fatalf("You should enable HTTP test server, see: withHTTPServer option")
 	}
 	return b.http.ServerHTTP.URL + path
 }
 
 // staticURL is a helper for URL("/`testBrowserStaticDir`/"+ path).
 func (b *testBrowser) staticURL(path string) string {
+	b.t.Helper()
+
 	return b.URL("/" + testBrowserStaticDir + "/" + path)
 }
 
 // attachFrame attaches the frame to the page and returns it.
 func (b *testBrowser) attachFrame(page api.Page, frameID string, url string) api.Frame {
+	b.t.Helper()
+
 	pageFn := `
 	async (frameId, url) => {
 		const frame = document.createElement('iframe');
@@ -208,6 +224,7 @@ func (b *testBrowser) attachFrame(page api.Page, frameID string, url string) api
 		return frame;
 	}
 	`
+
 	return page.EvaluateHandle(
 		b.rt.ToValue(pageFn),
 		b.rt.ToValue(frameID),
@@ -299,14 +316,16 @@ func withLogCache() logCacheOption {
 //nolint: golint, revive
 // Copied from https://github.com/grafana/k6/blob/v0.36.0/js/modules/k6/http/http_test.go#L39
 func getHTTPTestModuleInstance(
-	t testing.TB, ctx context.Context, state *k6lib.State,
+	tb testing.TB, ctx context.Context, state *k6lib.State,
 ) (*goja.Runtime, *k6http.ModuleInstance) {
+	tb.Helper()
+
 	rt := goja.New()
 	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
 
 	if ctx == nil {
 		dummyCtx, cancel := context.WithCancel(context.Background())
-		t.Cleanup(cancel)
+		tb.Cleanup(cancel)
 		ctx = dummyCtx
 	}
 
@@ -320,9 +339,9 @@ func getHTTPTestModuleInstance(
 		StateField: state,
 	}
 	mi, ok := root.NewModuleInstance(mockVU).(*k6http.ModuleInstance)
-	require.True(t, ok)
+	require.True(tb, ok)
 
-	require.NoError(t, rt.Set("http", mi.Exports().Default))
+	require.NoError(tb, rt.Set("http", mi.Exports().Default))
 
 	return rt, mi
 }
