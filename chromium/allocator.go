@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,7 +41,7 @@ func NewAllocator(flags map[string]interface{}, env []string) *Allocator {
 }
 
 // parseArgs parses command-line arguments and returns them.
-func (a *Allocator) parseArgs(userDataDir *string, removeDir *bool) ([]string, error) {
+func (a *Allocator) parseArgs() ([]string, error) {
 	// Build command line args list
 	var args []string
 	for name, value := range a.initFlags {
@@ -56,20 +55,6 @@ func (a *Allocator) parseArgs(userDataDir *string, removeDir *bool) ([]string, e
 		default:
 			return nil, errors.New("invalid browser command line flag")
 		}
-	}
-	// TODO: Refactor the creation of a temp dir out of here. This method should
-	// only build command line arguments and not have side effects.
-	*removeDir = false
-	var ok bool
-	*userDataDir, ok = a.initFlags["user-data-dir"].(string)
-	if !ok {
-		tempDir, err := ioutil.TempDir(a.tempDir, "xk6-browser-user-data-*")
-		if err != nil {
-			return nil, err
-		}
-		args = append(args, "--user-data-dir="+tempDir)
-		*userDataDir = tempDir
-		*removeDir = true
 	}
 	if _, ok := a.initFlags["no-sandbox"]; !ok && os.Getuid() == 0 {
 		// Running as root, for example in a Linux container. Chromium
@@ -161,7 +146,9 @@ readLoop:
 }
 
 // Allocate starts a new Chromium browser process.
-func (a *Allocator) Allocate(ctx context.Context, launchOpts *common.LaunchOptions) (_ *common.BrowserProcess, rerr error) {
+func (a *Allocator) Allocate(
+	ctx context.Context, launchOpts *common.LaunchOptions,
+) (_ *common.BrowserProcess, rerr error) {
 	// Create cancelable context for the browser process
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
@@ -170,21 +157,23 @@ func (a *Allocator) Allocate(ctx context.Context, launchOpts *common.LaunchOptio
 		}
 	}()
 
-	var (
-		userDataDir string
-		removeDir   bool
-	)
-	args, err := a.parseArgs(&userDataDir, &removeDir)
+	// use the provided directory or create a temporary one.
+	usrDir, removeUsrDir, err := makeUserDataDir(a.tempDir, a.initFlags["user-data-dir"])
+	if err != nil {
+		return nil, fmt.Errorf("cannot make user temp directory: %w", err)
+	}
+	// add dir to flags so that parseArgs can parse it.
+	a.initFlags["user-data-dir"] = usrDir
+
+	args, err := a.parseArgs()
 	if err != nil {
 		return nil, err
 	}
+
 	cmd := exec.CommandContext(ctx, a.execPath, args...)
 	defer func() {
-		if removeDir && cmd.Process == nil {
-			// We couldn't start the process, so we didn't get to
-			// the goroutine that handles RemoveAll below. Remove it
-			// to not leave an empty directory.
-			os.RemoveAll(userDataDir)
+		if cmd.Process == nil {
+			removeUsrDir()
 		}
 	}()
 	KillAfterParent(cmd)
@@ -216,11 +205,7 @@ func (a *Allocator) Allocate(ctx context.Context, launchOpts *common.LaunchOptio
 	}
 	go func() {
 		_ = cmd.Wait()
-
-		// Delete the temporary user data directory, if needed.
-		if removeDir {
-			os.RemoveAll(userDataDir)
-		}
+		removeUsrDir()
 		a.wg.Done()
 	}()
 
@@ -243,5 +228,30 @@ func (a *Allocator) Allocate(ctx context.Context, launchOpts *common.LaunchOptio
 		}
 		return nil, err
 	}
-	return common.NewBrowserProcess(ctx, cancel, cmd.Process, wsURL, userDataDir), nil
+	return common.NewBrowserProcess(ctx, cancel, cmd.Process, wsURL, usrDir), nil
+}
+
+const k6BrowserTempDirPattern = "xk6-browser-user-data-*"
+
+// makeUserDataDir creates a new temporary directory for user specific data,
+// returns its path, and a remove func for removing it.
+// When usrDir is not empty, no directory will be created and the remove
+// function will be no-op.
+func makeUserDataDir(tmpDir string, usrDir interface{}) (dir string, remove func(), _ error) {
+	// used for when there is no directory to remove.
+	noop := func() {}
+
+	// use the provided dir.
+	if d, ok := usrDir.(string); ok && d != "" {
+		return d, noop, nil
+	}
+
+	// create a temporary dir because the provided dir is empty.
+	var err error
+	dir, err = os.MkdirTemp(tmpDir, k6BrowserTempDirPattern)
+	if err != nil {
+		return "", noop, fmt.Errorf("mkdir: %w", err)
+	}
+
+	return dir, func() { _ = os.RemoveAll(dir) }, nil
 }
