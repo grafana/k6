@@ -46,6 +46,7 @@ import (
 
 // testBrowser is a test testBrowser for integration testing.
 type testBrowser struct {
+	t        testing.TB
 	ctx      context.Context
 	rt       *goja.Runtime
 	state    *k6lib.State
@@ -144,6 +145,7 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 	})
 
 	tbr := &testBrowser{
+		t:        tb,
 		ctx:      bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
 		rt:       rt,
 		state:    state,
@@ -162,8 +164,10 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 // withHandler adds the given handler to the HTTP test server and makes it
 // accessible with the given pattern.
 func (b *testBrowser) withHandler(pattern string, handler http.HandlerFunc) *testBrowser {
+	b.t.Helper()
+
 	if b.http == nil {
-		panic("You should enable HTTP test server, see: withHTTPServer option")
+		b.t.Fatalf("You should enable HTTP test server, see: withHTTPServer option")
 	}
 	b.http.Mux.Handle(pattern, handler)
 	return b
@@ -177,6 +181,8 @@ const testBrowserStaticDir = "static"
 // This method is for enabling the static file server after starting a test
 // browser. For early starting the file server see withFileServer function.
 func (b *testBrowser) withFileServer() *testBrowser {
+	b.t.Helper()
+
 	const (
 		slash = string(os.PathSeparator)
 		path  = slash + testBrowserStaticDir + slash
@@ -189,19 +195,25 @@ func (b *testBrowser) withFileServer() *testBrowser {
 
 // URL returns the listening HTTP test server's URL combined with the given path.
 func (b *testBrowser) URL(path string) string {
+	b.t.Helper()
+
 	if b.http == nil {
-		panic("You should enable HTTP test server, see: withHTTPServer option")
+		b.t.Fatalf("You should enable HTTP test server, see: withHTTPServer option")
 	}
 	return b.http.ServerHTTP.URL + path
 }
 
 // staticURL is a helper for URL("/`testBrowserStaticDir`/"+ path).
 func (b *testBrowser) staticURL(path string) string {
+	b.t.Helper()
+
 	return b.URL("/" + testBrowserStaticDir + "/" + path)
 }
 
 // attachFrame attaches the frame to the page and returns it.
 func (b *testBrowser) attachFrame(page api.Page, frameID string, url string) api.Frame {
+	b.t.Helper()
+
 	pageFn := `
 	async (frameId, url) => {
 		const frame = document.createElement('iframe');
