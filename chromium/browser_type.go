@@ -50,6 +50,7 @@ func NewBrowserType(ctx context.Context) api.BrowserType {
 		fieldNameMapper: common.NewFieldNameMapper(),
 	}
 	rt.SetFieldNameMapper(b.fieldNameMapper)
+
 	return &b
 }
 
@@ -73,7 +74,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		launchOpts = common.NewLaunchOptions()
 	)
 	if err := launchOpts.Parse(b.Ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("cannot parse launch options: %v", err))
+		k6common.Throw(rt, fmt.Errorf("cannot parse launch options: %w", err))
 	}
 	b.Ctx = common.WithLaunchOptions(b.Ctx, launchOpts)
 
@@ -102,6 +103,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
+
 	return browser
 }
 
@@ -130,21 +132,22 @@ func (b *BrowserType) flags(lopts *common.LaunchOptions, k6opts *k6lib.Options) 
 		"disable-default-apps":                               true,
 		"disable-dev-shm-usage":                              true,
 		"disable-extensions":                                 true,
-		"disable-features":                                   "ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,AcceptCHFrame",
-		"disable-hang-monitor":                               true,
-		"disable-ipc-flooding-protection":                    true,
-		"disable-popup-blocking":                             true,
-		"disable-prompt-on-repost":                           true,
-		"disable-renderer-backgrounding":                     true,
-		"disable-sync":                                       true,
-		"force-color-profile":                                "srgb",
-		"metrics-recording-only":                             true,
-		"no-first-run":                                       true,
-		"safebrowsing-disable-auto-update":                   true,
-		"enable-automation":                                  true,
-		"password-store":                                     "basic",
-		"use-mock-keychain":                                  true,
-		"no-service-autorun":                                 true,
+		//nolint:lll
+		"disable-features":                 "ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,AcceptCHFrame",
+		"disable-hang-monitor":             true,
+		"disable-ipc-flooding-protection":  true,
+		"disable-popup-blocking":           true,
+		"disable-prompt-on-repost":         true,
+		"disable-renderer-backgrounding":   true,
+		"disable-sync":                     true,
+		"force-color-profile":              "srgb",
+		"metrics-recording-only":           true,
+		"no-first-run":                     true,
+		"safebrowsing-disable-auto-update": true,
+		"enable-automation":                true,
+		"password-store":                   "basic",
+		"use-mock-keychain":                true,
+		"no-service-autorun":               true,
 
 		"no-startup-window":           true,
 		"no-default-browser-check":    true,
@@ -182,12 +185,13 @@ func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*common.
 	}
 	if el, ok := os.LookupEnv("XK6_BROWSER_LOG"); ok {
 		if err := logger.SetLevel(el); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cannot set logger level: %w", err)
 		}
 	}
 	if _, ok := os.LookupEnv("XK6_BROWSER_CALLER"); ok {
 		logger.ReportCaller()
 	}
+
 	return logger, nil
 }
 

@@ -76,7 +76,7 @@ func (a *Allocator) Allocate(
 	// Pipe stderr to stdout
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot pipe stdout: %w", err)
 	}
 	cmd.Stderr = cmd.Stdout
 
@@ -88,10 +88,10 @@ func (a *Allocator) Allocate(
 	// We must start the cmd before calling cmd.Wait, as otherwise the two
 	// can run into a data race.
 	if err := cmd.Start(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot start browser executable: %w", err)
 	}
 	if ctx.Err() != nil {
-		return nil, ctx.Err()
+		return nil, fmt.Errorf("context err after command start: %w", ctx.Err())
 	}
 
 	a.wg.Add(1) // for the entire allocator
@@ -233,7 +233,7 @@ readLoop:
 		}
 		if forward != nil {
 			if _, err := forward.Write(line); err != nil {
-				return "", err
+				return "", fmt.Errorf("cannot forward data from chrome: %w", err)
 			}
 		}
 
@@ -245,7 +245,7 @@ readLoop:
 	}
 	if forward == nil {
 		// We don't need the process's output anymore.
-		rc.Close()
+		_ = rc.Close()
 	} else {
 		// Copy the rest of the output in a separate goroutine, as we
 		// need to return with the websocket URL.
@@ -254,5 +254,6 @@ readLoop:
 			done()
 		}()
 	}
+
 	return wsURL, nil
 }

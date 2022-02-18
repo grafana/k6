@@ -12,6 +12,7 @@ import (
 	"github.com/grafana/xk6-browser/common"
 )
 
+//nolint:funlen
 func TestBrowserTypeFlags(t *testing.T) {
 	t.Parallel()
 
@@ -67,6 +68,8 @@ func TestBrowserTypeFlags(t *testing.T) {
 				"browser-arg1='value1", "browser-arg2=''value2''", "browser-flag",
 			}},
 			post: func(t *testing.T, flags map[string]interface{}) {
+				t.Helper()
+
 				assert.Equal(t, "'value1", flags["browser-arg1"])
 				assert.Equal(t, "'value2'", flags["browser-arg2"])
 				assert.Equal(t, "", flags["browser-flag"])
@@ -98,6 +101,8 @@ func TestBrowserTypeFlags(t *testing.T) {
 			flag:       "enable-use-zoom-for-dsf",
 			expInitVal: false,
 			pre: func(t *testing.T) {
+				t.Helper()
+
 				if runtime.GOOS != "darwin" {
 					t.Skip()
 				}
@@ -109,6 +114,8 @@ func TestBrowserTypeFlags(t *testing.T) {
 			changeOpts:    &common.LaunchOptions{Headless: true},
 			expChangedVal: true,
 			post: func(t *testing.T, flags map[string]interface{}) {
+				t.Helper()
+
 				extraFlags := []string{"hide-scrollbars", "mute-audio", "blink-settings"}
 				for _, f := range extraFlags {
 					assert.Contains(t, flags, f)
