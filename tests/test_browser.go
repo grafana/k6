@@ -60,7 +60,10 @@ type testBrowser struct {
 //
 // opts provides a way to customize the newTestBrowser.
 // see: withLaunchOptions for an example.
-func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
+//nolint:funlen,cyclop
+func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
+	tb.Helper()
+
 	ctx := context.Background()
 
 	// set default options and then customize them
@@ -88,7 +91,7 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 
 	// create a k6 state
 	root, err := k6lib.NewGroup("", nil)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	samples := make(chan k6stats.SampleContainer, 1000)
 
@@ -110,12 +113,12 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
 	}
 
-	rt, _ := getHTTPTestModuleInstance(t, ctx, state)
+	rt, _ := getHTTPTestModuleInstance(tb, ctx, state)
 
 	// enable the HTTP test server only when necessary
 	var testServer *k6httpmultibin.HTTPMultiBin
 	if enableHTTPMultiBin {
-		testServer = k6httpmultibin.NewHTTPMultiBin(t)
+		testServer = k6httpmultibin.NewHTTPMultiBin(tb)
 		state.TLSConfig = testServer.TLSClientConfig
 		state.Transport = testServer.HTTPTransport
 	}
@@ -130,9 +133,9 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 	}
 
 	// launch the browser
-	bt := chromium.NewBrowserType(ctx).(*chromium.BrowserType)
+	bt := chromium.NewBrowserType(ctx).(*chromium.BrowserType) //nolint:forcetypeassert
 	b := bt.Launch(rt.ToValue(launchOpts))
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		select {
 		case <-ctx.Done():
 		default:
@@ -140,7 +143,7 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 		}
 	})
 
-	tb := &testBrowser{
+	tbr := &testBrowser{
 		ctx:      bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
 		rt:       rt,
 		state:    state,
@@ -150,9 +153,10 @@ func newTestBrowser(t testing.TB, opts ...interface{}) *testBrowser {
 		Browser:  b,
 	}
 	if enableFileServer {
-		tb = tb.withFileServer()
+		tbr = tbr.withFileServer()
 	}
-	return tb
+
+	return tbr
 }
 
 // withHandler adds the given handler to the HTTP test server and makes it
@@ -208,6 +212,7 @@ func (b *testBrowser) attachFrame(page api.Page, frameID string, url string) api
 		return frame;
 	}
 	`
+
 	return page.EvaluateHandle(
 		b.rt.ToValue(pageFn),
 		b.rt.ToValue(frameID),
@@ -299,14 +304,16 @@ func withLogCache() logCacheOption {
 //nolint: golint, revive
 // Copied from https://github.com/grafana/k6/blob/v0.36.0/js/modules/k6/http/http_test.go#L39
 func getHTTPTestModuleInstance(
-	t testing.TB, ctx context.Context, state *k6lib.State,
+	tb testing.TB, ctx context.Context, state *k6lib.State,
 ) (*goja.Runtime, *k6http.ModuleInstance) {
+	tb.Helper()
+
 	rt := goja.New()
 	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
 
 	if ctx == nil {
 		dummyCtx, cancel := context.WithCancel(context.Background())
-		t.Cleanup(cancel)
+		tb.Cleanup(cancel)
 		ctx = dummyCtx
 	}
 
@@ -320,9 +327,9 @@ func getHTTPTestModuleInstance(
 		StateField: state,
 	}
 	mi, ok := root.NewModuleInstance(mockVU).(*k6http.ModuleInstance)
-	require.True(t, ok)
+	require.True(tb, ok)
 
-	require.NoError(t, rt.Set("http", mi.Exports().Default))
+	require.NoError(tb, rt.Set("http", mi.Exports().Default))
 
 	return rt, mi
 }
