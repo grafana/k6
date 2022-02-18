@@ -40,6 +40,118 @@ func NewAllocator(flags map[string]interface{}, env []string) *Allocator {
 	return &a
 }
 
+// Allocate starts a new Chromium browser process.
+func (a *Allocator) Allocate(
+	ctx context.Context, launchOpts *common.LaunchOptions,
+) (_ *common.BrowserProcess, rerr error) {
+	// Create cancelable context for the browser process
+	ctx, cancel := context.WithCancel(ctx)
+	defer func() {
+		if rerr != nil {
+			cancel()
+		}
+	}()
+
+	// use the provided directory or create a temporary one.
+	usrDir, removeUsrDir, err := makeUserDataDir(a.tempDir, a.initFlags["user-data-dir"])
+	if err != nil {
+		return nil, fmt.Errorf("cannot make user temp directory: %w", err)
+	}
+	// add dir to flags so that parseArgs can parse it.
+	a.initFlags["user-data-dir"] = usrDir
+
+	args, err := a.parseArgs()
+	if err != nil {
+		return nil, err
+	}
+
+	cmd := exec.CommandContext(ctx, a.execPath, args...)
+	defer func() {
+		if cmd.Process == nil {
+			removeUsrDir()
+		}
+	}()
+	KillAfterParent(cmd)
+
+	// Pipe stderr to stdout
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	cmd.Stderr = cmd.Stdout
+
+	// Set up environment variable for process
+	if len(a.initEnv) > 0 {
+		cmd.Env = append(os.Environ(), a.initEnv...)
+	}
+
+	// We must start the cmd before calling cmd.Wait, as otherwise the two
+	// can run into a data race.
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	a.wg.Add(1) // for the entire allocator
+	if a.combinedOutputWriter != nil {
+		a.wg.Add(1) // for the io.Copy in a separate goroutine
+	}
+	go func() {
+		_ = cmd.Wait()
+		removeUsrDir()
+		a.wg.Done()
+	}()
+
+	var wsURL string
+	wsURLChan := make(chan struct{}, 1)
+	go func() {
+		wsURL, err = a.readOutput(stdout, a.combinedOutputWriter, a.wg.Done)
+		wsURLChan <- struct{}{}
+	}()
+	select {
+	case <-wsURLChan:
+	case <-time.After(launchOpts.Timeout):
+		err = errors.New("websocket url timeout reached")
+	}
+	if err != nil {
+		if a.combinedOutputWriter != nil {
+			// There's no io.Copy goroutine to call the done func.
+			// TODO: a cleaner way to deal with this edge case?
+			a.wg.Done()
+		}
+		return nil, err
+	}
+
+	return common.NewBrowserProcess(ctx, cancel, cmd.Process, wsURL, usrDir), nil
+}
+
+const k6BrowserTempDirPattern = "xk6-browser-user-data-*"
+
+// makeUserDataDir creates a new temporary directory for user specific data,
+// returns its path, and a remove func for removing it.
+// When usrDir is not empty, no directory will be created and the remove
+// function will be no-op.
+func makeUserDataDir(tmpDir string, usrDir interface{}) (dir string, remove func(), _ error) {
+	// used for when there is no directory to remove.
+	noop := func() {}
+
+	// use the provided dir.
+	if d, ok := usrDir.(string); ok && d != "" {
+		return d, noop, nil
+	}
+
+	// create a temporary dir because the provided dir is empty.
+	var err error
+	dir, err = os.MkdirTemp(tmpDir, k6BrowserTempDirPattern)
+	if err != nil {
+		return "", noop, fmt.Errorf("mkdir: %w", err)
+	}
+
+	return dir, func() { _ = os.RemoveAll(dir) }, nil
+}
+
 // parseArgs parses command-line arguments and returns them.
 func (a *Allocator) parseArgs() ([]string, error) {
 	// Build command line args list
@@ -143,115 +255,4 @@ readLoop:
 		}()
 	}
 	return wsURL, nil
-}
-
-// Allocate starts a new Chromium browser process.
-func (a *Allocator) Allocate(
-	ctx context.Context, launchOpts *common.LaunchOptions,
-) (_ *common.BrowserProcess, rerr error) {
-	// Create cancelable context for the browser process
-	ctx, cancel := context.WithCancel(ctx)
-	defer func() {
-		if rerr != nil {
-			cancel()
-		}
-	}()
-
-	// use the provided directory or create a temporary one.
-	usrDir, removeUsrDir, err := makeUserDataDir(a.tempDir, a.initFlags["user-data-dir"])
-	if err != nil {
-		return nil, fmt.Errorf("cannot make user temp directory: %w", err)
-	}
-	// add dir to flags so that parseArgs can parse it.
-	a.initFlags["user-data-dir"] = usrDir
-
-	args, err := a.parseArgs()
-	if err != nil {
-		return nil, err
-	}
-
-	cmd := exec.CommandContext(ctx, a.execPath, args...)
-	defer func() {
-		if cmd.Process == nil {
-			removeUsrDir()
-		}
-	}()
-	KillAfterParent(cmd)
-
-	// Pipe stderr to stdout
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-	cmd.Stderr = cmd.Stdout
-
-	// Set up environment variable for process
-	if len(a.initEnv) > 0 {
-		cmd.Env = append(os.Environ(), a.initEnv...)
-	}
-
-	// We must start the cmd before calling cmd.Wait, as otherwise the two
-	// can run into a data race.
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
-	}
-
-	a.wg.Add(1) // for the entire allocator
-	if a.combinedOutputWriter != nil {
-		a.wg.Add(1) // for the io.Copy in a separate goroutine
-	}
-	go func() {
-		_ = cmd.Wait()
-		removeUsrDir()
-		a.wg.Done()
-	}()
-
-	var wsURL string
-	wsURLChan := make(chan struct{}, 1)
-	go func() {
-		wsURL, err = a.readOutput(stdout, a.combinedOutputWriter, a.wg.Done)
-		wsURLChan <- struct{}{}
-	}()
-	select {
-	case <-wsURLChan:
-	case <-time.After(launchOpts.Timeout):
-		err = errors.New("websocket url timeout reached")
-	}
-	if err != nil {
-		if a.combinedOutputWriter != nil {
-			// There's no io.Copy goroutine to call the done func.
-			// TODO: a cleaner way to deal with this edge case?
-			a.wg.Done()
-		}
-		return nil, err
-	}
-	return common.NewBrowserProcess(ctx, cancel, cmd.Process, wsURL, usrDir), nil
-}
-
-const k6BrowserTempDirPattern = "xk6-browser-user-data-*"
-
-// makeUserDataDir creates a new temporary directory for user specific data,
-// returns its path, and a remove func for removing it.
-// When usrDir is not empty, no directory will be created and the remove
-// function will be no-op.
-func makeUserDataDir(tmpDir string, usrDir interface{}) (dir string, remove func(), _ error) {
-	// used for when there is no directory to remove.
-	noop := func() {}
-
-	// use the provided dir.
-	if d, ok := usrDir.(string); ok && d != "" {
-		return d, noop, nil
-	}
-
-	// create a temporary dir because the provided dir is empty.
-	var err error
-	dir, err = os.MkdirTemp(tmpDir, k6BrowserTempDirPattern)
-	if err != nil {
-		return "", noop, fmt.Errorf("mkdir: %w", err)
-	}
-
-	return dir, func() { _ = os.RemoveAll(dir) }, nil
 }
