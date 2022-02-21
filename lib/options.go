@@ -292,7 +292,7 @@ type Options struct {
 	// We should support specifying execution segments via environment
 	// variables, but we currently can't, because envconfig has this nasty bug
 	// (among others): https://github.com/kelseyhightower/envconfig/issues/113
-	Scenarios                ScenarioConfigs           `json:"scenarios,omitempty" ignored:"true"`
+	Scenarios                ScenarioConfigs           `json:"scenarios" ignored:"true"`
 	ExecutionSegment         *ExecutionSegment         `json:"executionSegment" ignored:"true"`
 	ExecutionSegmentSequence *ExecutionSegmentSequence `json:"executionSegmentSequence" ignored:"true"`
 
