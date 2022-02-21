@@ -1,0 +1,17 @@
+<html>
+  <head>
+    <title>Navigation test within the same document</title>
+  </head>
+  <body>
+    <a id="nav-history" href="#">Navigate with History API</a>
+    <a id="nav-anchor" href="#anchor">Navigate with anchor link</a>
+    <div id="anchor">Some div...</div>
+    <script>
+      const el = document.querySelector('a#nav-history');
+      el.addEventListener('click', function(evt) {
+        evt.preventDefault();
+        history.pushState({}, 'navigated', '/nav2');
+      });
+    </script>
+  </body>
+</html>

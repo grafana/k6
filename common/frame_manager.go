@@ -703,9 +703,10 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 		k6Throw(m.ctx, "cannot parse waitForNavigation options: %v", err)
 	}
 
-	ch, evCancelFn := createWaitForEventHandler(m.ctx, frame, []string{EventFrameNavigation}, func(data interface{}) bool {
-		return true // Both successful and failed navigations are considered
-	})
+	ch, evCancelFn := createWaitForEventHandler(m.ctx, frame, []string{EventFrameNavigation},
+		func(data interface{}) bool {
+			return true // Both successful and failed navigations are considered
+		})
 	defer evCancelFn() // Remove event handler
 
 	var event *NavigationEvent
@@ -720,6 +721,13 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 		k6Throw(m.ctx, "waitForFrameNavigation timed out after %s", parsedOpts.Timeout)
 	case data := <-ch:
 		event = data.(*NavigationEvent)
+	}
+
+	if event.newDocument == nil {
+		// In case of navigation within the same document (e.g. via an anchor
+		// link or the History API), there is no new document and a
+		// LifecycleEvent will not be fired, so we don't need to wait for it.
+		return nil
 	}
 
 	if frame.hasSubtreeLifecycleEventFired(parsedOpts.WaitUntil) {

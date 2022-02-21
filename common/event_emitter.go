@@ -84,6 +84,11 @@ type Event struct {
 	data interface{}
 }
 
+// NavigationEvent is emitted when we receive a Page.frameNavigated or
+// Page.navigatedWithinDocument CDP event.
+// See:
+// - https://chromedevtools.github.io/devtools-protocol/tot/Page/#event-frameNavigated
+// - https://chromedevtools.github.io/devtools-protocol/tot/Page/#event-navigatedWithinDocument
 type NavigationEvent struct {
 	newDocument *DocumentInfo
 	url         string
