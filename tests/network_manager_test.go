@@ -21,6 +21,7 @@
 package tests
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -89,16 +90,7 @@ func TestBasicAuth(t *testing.T) {
 		validPassword = "validpass"
 	)
 
-	browser := newTestBrowser(t, withHTTPServer()).
-		withHandler("/auth", func(w http.ResponseWriter, r *http.Request) {
-			user, pass, ok := r.BasicAuth()
-			if !ok {
-				w.Header().Set("WWW-Authenticate", `Basic realm="u=User,p=Pass"`)
-			}
-			if user != validUser || pass != validPassword {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			}
-		})
+	browser := newTestBrowser(t, withHTTPServer())
 
 	auth := func(tb testing.TB, user, pass string) api.Response {
 		tb.Helper()
@@ -114,7 +106,7 @@ func TestBasicAuth(t *testing.T) {
 			})).
 			NewPage().
 			Goto(
-				browser.URL("/auth"),
+				browser.URL(fmt.Sprintf("/basic-auth/%s/%s", validUser, validPassword)),
 				browser.rt.ToValue(struct {
 					WaitUntil string `js:"waitUntil"`
 				}{
@@ -128,7 +120,6 @@ func TestBasicAuth(t *testing.T) {
 		require.NotNil(t, resp)
 		assert.Equal(t, http.StatusOK, int(resp.Status()))
 	})
-
 	t.Run("invalid", func(t *testing.T) {
 		resp := auth(t, "invalidUser", "invalidPassword")
 		require.NotNil(t, resp)

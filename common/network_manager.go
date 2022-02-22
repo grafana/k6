@@ -67,7 +67,7 @@ type NetworkManager struct {
 	reqIDToRequest map[network.RequestID]*Request
 	reqsMu         sync.RWMutex
 
-	attemptedAuth map[network.RequestID]*Request
+	attemptedAuth map[fetch.RequestID]bool
 
 	extraHTTPHeaders               map[string]string
 	offline                        bool
@@ -100,7 +100,7 @@ func NewNetworkManager(
 		credentials:                    nil,
 		reqIDToRequest:                 make(map[network.RequestID]*Request),
 		reqsMu:                         sync.RWMutex{},
-		attemptedAuth:                  make(map[network.RequestID]*Request),
+		attemptedAuth:                  make(map[fetch.RequestID]bool),
 		extraHTTPHeaders:               make(map[string]string),
 		offline:                        false,
 		userCacheDisabled:              false,
@@ -111,6 +111,7 @@ func NewNetworkManager(
 	if err := m.initDomains(); err != nil {
 		return nil, err
 	}
+
 	return &m, nil
 }
 
@@ -555,12 +556,34 @@ func checkBlockedIPs(ip net.IP, blockedIPs []*k6lib.IPNet) error {
 }
 
 func (m *NetworkManager) onAuthRequired(event *fetch.EventAuthRequired) {
+	var (
+		res = fetch.AuthChallengeResponseResponseDefault
+		rid = event.RequestID
+
+		username, password string
+	)
+
+	switch {
+	case m.attemptedAuth[rid]:
+		delete(m.attemptedAuth, rid)
+		res = fetch.AuthChallengeResponseResponseCancelAuth
+	case m.credentials != nil:
+		// TODO: remove requests from attemptedAuth when:
+		//       - request is redirected
+		//       - loading finished
+		m.attemptedAuth[rid] = true
+		res = fetch.AuthChallengeResponseResponseProvideCredentials
+		// The Fetch.AuthChallengeResponse docs mention username and password should only be set
+		// if the response is ProvideCredentials.
+		// See: https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#type-AuthChallengeResponse
+		username, password = m.credentials.Username, m.credentials.Password
+	}
 	err := fetch.ContinueWithAuth(
-		event.RequestID,
+		rid,
 		&fetch.AuthChallengeResponse{
-			Response: fetch.AuthChallengeResponseResponseProvideCredentials,
-			Username: m.credentials.Username,
-			Password: m.credentials.Password,
+			Response: res,
+			Username: username,
+			Password: password,
 		},
 	).Do(cdp.WithExecutor(m.ctx, m.session))
 	if err != nil {
