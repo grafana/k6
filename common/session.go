@@ -29,7 +29,6 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
 	"github.com/mailru/easyjson"
-	k6lib "go.k6.io/k6/lib"
 )
 
 // Ensure Session implements the EventEmitter and Executor interfaces.
@@ -95,8 +94,6 @@ func (s *Session) markAsCrashed() {
 
 // Wraps conn.ReadMessage in a channel.
 func (s *Session) readLoop() {
-	state := k6lib.GetState(s.ctx)
-
 	for {
 		select {
 		case msg := <-s.readCh:
@@ -114,7 +111,6 @@ func (s *Session) readLoop() {
 			}
 			if err != nil {
 				s.logger.Debugf("Session:readLoop:<-s.readCh", "sid:%v tid:%v cannot unmarshal: %v", s.id, s.targetID, err)
-				state.Logger.Errorf("%s", err)
 				continue
 			}
 			s.emit(string(msg.Method), ev)
