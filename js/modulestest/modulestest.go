@@ -33,10 +33,11 @@ var _ modules.VU = &VU{}
 
 // VU is a modules.VU implementation meant to be used within tests
 type VU struct {
-	CtxField     context.Context
-	InitEnvField *common.InitEnvironment
-	StateField   *lib.State
-	RuntimeField *goja.Runtime
+	CtxField              context.Context
+	InitEnvField          *common.InitEnvironment
+	StateField            *lib.State
+	RuntimeField          *goja.Runtime
+	RegisterCallbackField func() func(f func() error)
 }
 
 // Context returns internally set field to conform to modules.VU interface
@@ -61,6 +62,5 @@ func (m *VU) Runtime() *goja.Runtime {
 
 // RegisterCallback is not really implemented
 func (m *VU) RegisterCallback() func(f func() error) {
-	// TODO Implement
-	return nil
+	return m.RegisterCallbackField()
 }

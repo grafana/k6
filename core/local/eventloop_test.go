@@ -10,6 +10,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js"
+	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/js/modulestest/testmodules/events"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
@@ -23,7 +25,7 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.WarnLevel, logrus.ErrorLevel}}
 	logger.AddHook(logHook)
 
-	script = []byte(`import {setTimeout} from "k6/experimental";
+	script = []byte(`import {setTimeout} from "k6/x/events";
   ` + string(script))
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -56,6 +58,10 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 	case <-time.After(10 * time.Second):
 		t.Fatal("timed out")
 	}
+}
+
+func init() {
+	modules.Register("k6/x/events", events.New())
 }
 
 func TestEventLoop(t *testing.T) {
@@ -147,7 +153,10 @@ export default function() {
 		for i, entry := range entries {
 			msgs[i] = entry.Message
 		}
-		require.Equal(t, []string{"second"}, msgs)
+		require.Equal(t, []string{
+			"setTimeout 1 was stopped because the VU iteration was interrupted",
+			"second",
+		}, msgs)
 	})
 }
 
@@ -178,6 +187,9 @@ export default function() {
 		for i, entry := range entries {
 			msgs[i] = entry.Message
 		}
-		require.Equal(t, []string{"just error\n\tat /script.js:13:4(15)\n\tat native\n", "1"}, msgs)
+		require.Equal(t, []string{
+			"setTimeout 1 was stopped because the VU iteration was interrupted",
+			"just error\n\tat /script.js:13:4(15)\n\tat native\n", "1",
+		}, msgs)
 	})
 }
