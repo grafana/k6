@@ -44,6 +44,12 @@ type BrowserContext interface {
 	SetDefaultTimeout(timeout int64)
 	SetExtraHTTPHeaders(headers map[string]string)
 	SetGeolocation(geolocation goja.Value)
+	// SetHTTPCredentials sets username/password credentials to use for HTTP authentication.
+	//
+	// Deprecated: Create a new BrowserContext with httpCredentials instead.
+	// See for details:
+	// - https://github.com/microsoft/playwright/issues/2196#issuecomment-627134837
+	// - https://github.com/microsoft/playwright/pull/2763
 	SetHTTPCredentials(httpCredentials goja.Value)
 	SetOffline(offline bool)
 	StorageState(opts goja.Value)
