@@ -630,7 +630,7 @@ func (m *NetworkManager) updateProtocolCacheDisabled() error {
 }
 
 func (m *NetworkManager) updateProtocolRequestInterception() error {
-	enabled := m.userReqInterceptionEnabled || m.credentials != nil
+	enabled := m.userReqInterceptionEnabled
 	if enabled == m.protocolReqInterceptionEnabled {
 		return nil
 	}
@@ -666,6 +666,9 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 // Authenticate sets HTTP authentication credentials to use.
 func (m *NetworkManager) Authenticate(credentials *Credentials) {
 	m.credentials = credentials
+	if credentials != nil {
+		m.userReqInterceptionEnabled = true
+	}
 	if err := m.updateProtocolRequestInterception(); err != nil {
 		rt := k6common.GetRuntime(m.ctx)
 		k6common.Throw(rt, err)
