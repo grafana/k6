@@ -635,31 +635,30 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 		return nil
 	}
 	m.protocolReqInterceptionEnabled = enabled
-	if enabled {
-		actions := []Action{
-			network.SetCacheDisabled(true),
-			fetch.Enable().
-				WithHandleAuthRequests(true).
-				WithPatterns([]*fetch.RequestPattern{
-					{URLPattern: "*", RequestStage: fetch.RequestStageRequest},
-				}),
-		}
-		for _, action := range actions {
-			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-				return fmt.Errorf("unable to execute %T: %w", action, err)
-			}
-		}
-	} else {
-		actions := []Action{
+
+	actions := []Action{
+		network.SetCacheDisabled(true),
+		fetch.Enable().
+			WithHandleAuthRequests(true).
+			WithPatterns([]*fetch.RequestPattern{
+				{
+					URLPattern:   "*",
+					RequestStage: fetch.RequestStageRequest,
+				},
+			}),
+	}
+	if !enabled {
+		actions = []Action{
 			network.SetCacheDisabled(false),
 			fetch.Disable(),
 		}
-		for _, action := range actions {
-			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-				return fmt.Errorf("unable to execute %T: %w", action, err)
-			}
+	}
+	for _, action := range actions {
+		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+			return fmt.Errorf("cannot execute %T: %w", action, err)
 		}
 	}
+
 	return nil
 }
 
