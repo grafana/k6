@@ -36,6 +36,7 @@ import (
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/compiler"
+	"go.k6.io/k6/js/eventloop"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/metrics"
@@ -331,8 +332,8 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	init.moduleVUImpl.initEnv = initenv
 	init.moduleVUImpl.ctx = context.Background()
 	unbindInit := b.setInitGlobals(rt, init)
-	init.moduleVUImpl.eventLoop = newEventLoop(init.moduleVUImpl)
-	err := init.moduleVUImpl.eventLoop.start(func() error {
+	init.moduleVUImpl.eventLoop = eventloop.New(init.moduleVUImpl)
+	err := init.moduleVUImpl.eventLoop.Start(func() error {
 		_, err := rt.RunProgram(b.Program)
 		return err
 	})

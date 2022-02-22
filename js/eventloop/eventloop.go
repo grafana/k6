@@ -1,4 +1,5 @@
-package js
+// Package eventloop implements an event loop to be used thought js and it's subpackages
+package eventloop
 
 import (
 	"fmt"
@@ -8,7 +9,7 @@ import (
 	"go.k6.io/k6/js/modules"
 )
 
-// eventLoop implements an event with
+// EventLoop implements an event with
 // handling of unhandled rejected promises.
 //
 // A specific thing about this event loop is that it will wait to return
@@ -20,7 +21,7 @@ import (
 // but also they need to end when all the instructions are done.
 // Additionally because of this on any error while the event loop will exit it's
 // required to wait on the event loop to be empty before the execution can continue.
-type eventLoop struct {
+type EventLoop struct {
 	lock                sync.Mutex
 	queue               []func() error
 	wakeupCh            chan struct{} // TODO: maybe use sync.Cond ?
@@ -33,10 +34,11 @@ type eventLoop struct {
 	pendingPromiseRejections map[*goja.Promise]struct{}
 }
 
-// newEventLoop returns a new event loop with a few helpers attached to it:
+// New returns a new event loop with a few helpers attached to it:
+// - adding setTimeout javascript implementation
 // - reporting (and aborting on) unhandled promise rejections
-func newEventLoop(vu modules.VU) *eventLoop {
-	e := &eventLoop{
+func New(vu modules.VU) *EventLoop {
+	e := &EventLoop{
 		wakeupCh:                 make(chan struct{}, 1),
 		pendingPromiseRejections: make(map[*goja.Promise]struct{}),
 		vu:                       vu,
@@ -46,18 +48,18 @@ func newEventLoop(vu modules.VU) *eventLoop {
 	return e
 }
 
-func (e *eventLoop) wakeup() {
+func (e *EventLoop) wakeup() {
 	select {
 	case e.wakeupCh <- struct{}{}:
 	default:
 	}
 }
 
-// registerCallback register that a callback will be invoked on the loop, preventing it from returning/finishing.
+// RegisterCallback register that a callback will be invoked on the loop, preventing it from returning/finishing.
 // The returned function, upon invocation, will queue its argument and wakeup the loop if needed.
 // If the eventLoop has since stopped, it will not be executed.
 // This function *must* be called from within running on the event loop, but its result can be called from anywhere.
-func (e *eventLoop) registerCallback() func(func() error) {
+func (e *EventLoop) RegisterCallback() func(func() error) {
 	e.lock.Lock()
 	e.registeredCallbacks++
 	e.lock.Unlock()
@@ -71,7 +73,7 @@ func (e *eventLoop) registerCallback() func(func() error) {
 	}
 }
 
-func (e *eventLoop) promiseRejectionTracker(p *goja.Promise, op goja.PromiseRejectionOperation) {
+func (e *EventLoop) promiseRejectionTracker(p *goja.Promise, op goja.PromiseRejectionOperation) {
 	// No locking necessary here as the goja runtime will call this synchronously
 	// Read Notes on https://tc39.es/ecma262/#sec-host-promise-rejection-tracker
 	if op == goja.PromiseRejectionReject {
@@ -81,7 +83,7 @@ func (e *eventLoop) promiseRejectionTracker(p *goja.Promise, op goja.PromiseReje
 	}
 }
 
-func (e *eventLoop) popAll() (queue []func() error, awaiting bool) {
+func (e *EventLoop) popAll() (queue []func() error, awaiting bool) {
 	e.lock.Lock()
 	queue = e.queue
 	e.queue = make([]func() error, 0, len(queue))
@@ -90,10 +92,10 @@ func (e *eventLoop) popAll() (queue []func() error, awaiting bool) {
 	return
 }
 
-// start will run the event loop until it's empty and there are no uninvoked registered callbacks
+// Start will run the event loop until it's empty and there are no uninvoked registered callbacks
 // or a queued function returns an error. The provided firstCallback will be the first thing executed.
-// After start returns the event loop can be reused as long as waitOnRegistered is called.
-func (e *eventLoop) start(firstCallback func() error) error {
+// After Start returns the event loop can be reused as long as waitOnRegistered is called.
+func (e *EventLoop) Start(firstCallback func() error) error {
 	e.queue = []func() error{firstCallback}
 	for {
 		queue, awaiting := e.popAll()
@@ -129,8 +131,8 @@ func (e *eventLoop) start(firstCallback func() error) error {
 	}
 }
 
-// Wait on all registered callbacks so we know nothing is still doing work.
-func (e *eventLoop) waitOnRegistered() {
+// WaitOnRegistered waits on all registered callbacks so we know nothing is still doing work.
+func (e *EventLoop) WaitOnRegistered() {
 	for {
 		_, awaiting := e.popAll()
 		if !awaiting {
