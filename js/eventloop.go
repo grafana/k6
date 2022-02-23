@@ -1,11 +1,13 @@
 package js
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/dop251/goja"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
 
@@ -145,6 +147,9 @@ func (e *eventLoop) waitOnRegistered() {
 
 func (e *eventLoop) addSetTimeout() {
 	_ = e.vu.Runtime().Set("setTimeout", func(f goja.Callable, t float64) {
+		if f == nil {
+			common.Throw(e.vu.Runtime(), errors.New("setTimeout requires a function as first argument"))
+		}
 		// TODO maybe really return something to use with `clearTimeout
 		// TODO support arguments ... maybe
 		runOnLoop := e.registerCallback()
