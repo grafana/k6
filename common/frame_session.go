@@ -421,7 +421,7 @@ func (fs *FrameSession) initOptions() error {
 	}
 
 	fs.updateOffline(true)
-	fs.updateHttpCredentials(true)
+	fs.updateHTTPCredentials(true)
 	if err := fs.updateEmulateMedia(true); err != nil {
 		return err
 	}
@@ -976,7 +976,7 @@ func (fs *FrameSession) updateGeolocation(initial bool) error {
 	return nil
 }
 
-func (fs *FrameSession) updateHttpCredentials(initial bool) {
+func (fs *FrameSession) updateHTTPCredentials(initial bool) {
 	fs.logger.Debugf("NewFrameSession:updateHttpCredentials", "sid:%v tid:%v", fs.session.id, fs.targetID)
 
 	credentials := fs.page.browserCtx.opts.HttpCredentials

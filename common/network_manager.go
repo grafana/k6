@@ -67,7 +67,7 @@ type NetworkManager struct {
 	reqIDToRequest map[network.RequestID]*Request
 	reqsMu         sync.RWMutex
 
-	attemptedAuth map[network.RequestID]*Request
+	attemptedAuth map[fetch.RequestID]bool
 
 	extraHTTPHeaders               map[string]string
 	offline                        bool
@@ -100,7 +100,7 @@ func NewNetworkManager(
 		credentials:                    nil,
 		reqIDToRequest:                 make(map[network.RequestID]*Request),
 		reqsMu:                         sync.RWMutex{},
-		attemptedAuth:                  make(map[network.RequestID]*Request),
+		attemptedAuth:                  make(map[fetch.RequestID]bool),
 		extraHTTPHeaders:               make(map[string]string),
 		offline:                        false,
 		userCacheDisabled:              false,
@@ -111,6 +111,7 @@ func NewNetworkManager(
 	if err := m.initDomains(); err != nil {
 		return nil, err
 	}
+
 	return &m, nil
 }
 
@@ -348,6 +349,7 @@ func (m *NetworkManager) initEvents() {
 		cdproto.EventNetworkRequestServedFromCache,
 		cdproto.EventNetworkResponseReceived,
 		cdproto.EventFetchRequestPaused,
+		cdproto.EventFetchAuthRequired,
 	}, chHandler)
 
 	go func() {
@@ -379,6 +381,8 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 			m.onResponseReceived(ev)
 		case *fetch.EventRequestPaused:
 			m.onRequestPaused(ev)
+		case *fetch.EventAuthRequired:
+			m.onAuthRequired(ev)
 		}
 	}
 	return true
@@ -551,6 +555,44 @@ func checkBlockedIPs(ip net.IP, blockedIPs []*k6lib.IPNet) error {
 	return nil
 }
 
+func (m *NetworkManager) onAuthRequired(event *fetch.EventAuthRequired) {
+	var (
+		res = fetch.AuthChallengeResponseResponseDefault
+		rid = event.RequestID
+
+		username, password string
+	)
+
+	switch {
+	case m.attemptedAuth[rid]:
+		delete(m.attemptedAuth, rid)
+		res = fetch.AuthChallengeResponseResponseCancelAuth
+	case m.credentials != nil:
+		// TODO: remove requests from attemptedAuth when:
+		//       - request is redirected
+		//       - loading finished
+		m.attemptedAuth[rid] = true
+		res = fetch.AuthChallengeResponseResponseProvideCredentials
+		// The Fetch.AuthChallengeResponse docs mention username and password should only be set
+		// if the response is ProvideCredentials.
+		// See: https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#type-AuthChallengeResponse
+		username, password = m.credentials.Username, m.credentials.Password
+	}
+	err := fetch.ContinueWithAuth(
+		rid,
+		&fetch.AuthChallengeResponse{
+			Response: res,
+			Username: username,
+			Password: password,
+		},
+	).Do(cdp.WithExecutor(m.ctx, m.session))
+	if err != nil {
+		m.logger.Debugf("NetworkManager:onAuthRequired", "continueWithAuth url:%q err:%v", event.Request.URL, err)
+	} else {
+		m.logger.Debugf("NetworkManager:onAuthRequired", "continueWithAuth url:%q OK", event.Request.URL)
+	}
+}
+
 func (m *NetworkManager) onRequestServedFromCache(event *network.EventRequestServedFromCache) {
 	req := m.requestFromID(event.RequestID)
 	if req != nil {
@@ -593,37 +635,39 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 		return nil
 	}
 	m.protocolReqInterceptionEnabled = enabled
-	if enabled {
-		actions := []Action{
-			network.SetCacheDisabled(true),
-			fetch.Enable().
-				WithHandleAuthRequests(true).
-				WithPatterns([]*fetch.RequestPattern{
-					{URLPattern: "*"},
-				}),
-		}
-		for _, action := range actions {
-			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-				return fmt.Errorf("unable to execute %T: %w", action, err)
-			}
-		}
-	} else {
-		actions := []Action{
+
+	actions := []Action{
+		network.SetCacheDisabled(true),
+		fetch.Enable().
+			WithHandleAuthRequests(true).
+			WithPatterns([]*fetch.RequestPattern{
+				{
+					URLPattern:   "*",
+					RequestStage: fetch.RequestStageRequest,
+				},
+			}),
+	}
+	if !enabled {
+		actions = []Action{
 			network.SetCacheDisabled(false),
 			fetch.Disable(),
 		}
-		for _, action := range actions {
-			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-				return fmt.Errorf("unable to execute %T: %w", action, err)
-			}
+	}
+	for _, action := range actions {
+		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+			return fmt.Errorf("cannot execute %T: %w", action, err)
 		}
 	}
+
 	return nil
 }
 
 // Authenticate sets HTTP authentication credentials to use.
 func (m *NetworkManager) Authenticate(credentials *Credentials) {
 	m.credentials = credentials
+	if credentials != nil {
+		m.userReqInterceptionEnabled = true
+	}
 	if err := m.updateProtocolRequestInterception(); err != nil {
 		rt := k6common.GetRuntime(m.ctx)
 		k6common.Throw(rt, err)

@@ -21,12 +21,17 @@
 package tests
 
 import (
+	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	k6lib "go.k6.io/k6/lib"
 	k6types "go.k6.io/k6/lib/types"
+
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common"
 )
 
 func TestURLSkipRequest(t *testing.T) {
@@ -77,4 +82,47 @@ func TestBlockIPs(t *testing.T) {
 	// Ensure other requests go through
 	resp := p.Goto(tb.URL("/get"), nil)
 	assert.NotNil(t, resp)
+}
+
+func TestBasicAuth(t *testing.T) {
+	const (
+		validUser     = "validuser"
+		validPassword = "validpass"
+	)
+
+	browser := newTestBrowser(t, withHTTPServer())
+
+	auth := func(tb testing.TB, user, pass string) api.Response {
+		tb.Helper()
+
+		return browser.NewContext(
+			browser.rt.ToValue(struct {
+				HttpCredentials *common.Credentials `js:"httpCredentials"` //nolint:revive
+			}{
+				HttpCredentials: &common.Credentials{
+					Username: user,
+					Password: pass,
+				},
+			})).
+			NewPage().
+			Goto(
+				browser.URL(fmt.Sprintf("/basic-auth/%s/%s", validUser, validPassword)),
+				browser.rt.ToValue(struct {
+					WaitUntil string `js:"waitUntil"`
+				}{
+					WaitUntil: "load",
+				}),
+			)
+	}
+
+	t.Run("valid", func(t *testing.T) {
+		resp := auth(t, validUser, validPassword)
+		require.NotNil(t, resp)
+		assert.Equal(t, http.StatusOK, int(resp.Status()))
+	})
+	t.Run("invalid", func(t *testing.T) {
+		resp := auth(t, "invalidUser", "invalidPassword")
+		require.NotNil(t, resp)
+		assert.Equal(t, http.StatusUnauthorized, int(resp.Status()))
+	})
 }
