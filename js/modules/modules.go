@@ -117,6 +117,10 @@ type VU interface {
 	// It is the module responsibility to monitor the context and abort on it being done.
 	// This still means that the returned function here *needs* to be called to signal that the module
 	// has aborted the operation and will not do anything more, not doing so will block k6.
+	//
+	// Experimental
+	//
+	// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 	RegisterCallback() func(func() error)
 
 	// sealing field will help probably with pointing users that they just need to embed this in their Instance
