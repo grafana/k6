@@ -23,7 +23,7 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.WarnLevel, logrus.ErrorLevel}}
 	logger.AddHook(logHook)
 
-	script = []byte(`import {setTimeout} from "k6";
+	script = []byte(`import {setTimeout} from "k6/experimental";
   ` + string(script))
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)

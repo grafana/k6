@@ -43,6 +43,7 @@ import (
 	"go.k6.io/k6/js/modules/k6/data"
 	"go.k6.io/k6/js/modules/k6/encoding"
 	"go.k6.io/k6/js/modules/k6/execution"
+	"go.k6.io/k6/js/modules/k6/experimental"
 	"go.k6.io/k6/js/modules/k6/grpc"
 	"go.k6.io/k6/js/modules/k6/html"
 	"go.k6.io/k6/js/modules/k6/http"
@@ -383,17 +384,18 @@ func (i *InitContext) allowOnlyOpenedFiles() {
 
 func getInternalJSModules() map[string]interface{} {
 	return map[string]interface{}{
-		"k6":             k6.New(),
-		"k6/crypto":      crypto.New(),
-		"k6/crypto/x509": x509.New(),
-		"k6/data":        data.New(),
-		"k6/encoding":    encoding.New(),
-		"k6/execution":   execution.New(),
-		"k6/net/grpc":    grpc.New(),
-		"k6/html":        html.New(),
-		"k6/http":        http.New(),
-		"k6/metrics":     metrics.New(),
-		"k6/ws":          ws.New(),
+		"k6":              k6.New(),
+		"k6/crypto":       crypto.New(),
+		"k6/crypto/x509":  x509.New(),
+		"k6/data":         data.New(),
+		"k6/encoding":     encoding.New(),
+		"k6/execution":    execution.New(),
+		"k6/net/grpc":     grpc.New(),
+		"k6/html":         html.New(),
+		"k6/http":         http.New(),
+		"k6/metrics":      metrics.New(),
+		"k6/ws":           ws.New(),
+		"k6/experimental": experimental.New(),
 	}
 }
 
