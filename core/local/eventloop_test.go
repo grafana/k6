@@ -23,6 +23,8 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.WarnLevel, logrus.ErrorLevel}}
 	logger.AddHook(logHook)
 
+	script = []byte(`import {setTimeout} from "k6";
+  ` + string(script))
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
@@ -176,6 +178,6 @@ export default function() {
 		for i, entry := range entries {
 			msgs[i] = entry.Message
 		}
-		require.Equal(t, []string{"just error\n\tat /script.js:12:4(13)\n\tat native\n", "1"}, msgs)
+		require.Equal(t, []string{"just error\n\tat /script.js:13:4(15)\n\tat native\n", "1"}, msgs)
 	})
 }

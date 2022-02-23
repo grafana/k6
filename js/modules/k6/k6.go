@@ -78,6 +78,7 @@ func (mi *K6) Exports() modules.Exports {
 			"group":      mi.Group,
 			"randomSeed": mi.RandomSeed,
 			"sleep":      mi.Sleep,
+			"setTimeout": mi.setTimeout,
 		},
 	}
 }
@@ -230,4 +231,28 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 	}
 
 	return succ, nil
+}
+
+func (mi *K6) setTimeout(f goja.Callable, t float64) {
+	if f == nil {
+		common.Throw(mi.vu.Runtime(), errors.New("setTimeout requires a function as first argument"))
+	}
+	// TODO maybe really return something to use with `clearTimeout
+	// TODO support arguments ... maybe
+	runOnLoop := mi.vu.RegisterCallback()
+	go func() {
+		timer := time.NewTimer(time.Duration(t * float64(time.Millisecond)))
+		select {
+		case <-timer.C:
+			runOnLoop(func() error {
+				_, err := f(goja.Undefined())
+				return err
+			})
+		case <-mi.vu.Context().Done():
+			// TODO log something?
+
+			timer.Stop()
+			runOnLoop(func() error { return nil })
+		}
+	}()
 }
