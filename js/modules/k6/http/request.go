@@ -90,7 +90,31 @@ func (c *Client) Request(method string, url goja.Value, args ...goja.Value) (*Re
 		return nil, err
 	}
 	c.processResponse(resp, req.ResponseType)
-	return c.responseFromHTTPext(resp), nil
+	res := c.responseFromHTTPext(resp)
+
+	rt := c.moduleInstance.vu.Runtime()
+	res.Request = rt.NewProxy(rt.ToValue(res.Response.Request).ToObject(rt), &goja.ProxyTrapConfig{
+		Get: func(target *goja.Object, prop string, receiver goja.Value) goja.Value {
+			obj := target.Get(prop)
+			if prop == "body" {
+				body, ok := obj.Export().(*[]uint8)
+				if !ok {
+					// TODO: should we raise an error here?
+					return rt.ToValue(obj.String())
+				}
+				var s strings.Builder
+				if len(*body) > 0 {
+					s.Grow(len(*body))
+					for i := 0; i < len(*body); i++ {
+						s.WriteByte((*body)[i])
+					}
+				}
+				return rt.ToValue(s.String())
+			}
+			return obj
+		},
+	})
+	return res, nil
 }
 
 // processResponse stores the body as an ArrayBuffer if indicated by
@@ -163,14 +187,14 @@ func (c *Client) parseRequest(
 				}
 				bodyQuery.Set(k, formatFormVal(v))
 			}
-			result.Body = bytes.NewBufferString(bodyQuery.Encode())
+			result.Body = []byte(bodyQuery.Encode())
 			result.Req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			return nil
 		}
 
 		// handling multipart request
-		result.Body = &bytes.Buffer{}
-		mpw := multipart.NewWriter(result.Body)
+		bbuf := &bytes.Buffer{}
+		mpw := multipart.NewWriter(bbuf)
 
 		// For parameters of type common.FileData, created with open(file, "b"),
 		// we write the file boundary to the body buffer.
@@ -213,6 +237,7 @@ func (c *Client) parseRequest(
 			return err
 		}
 
+		result.Body = bbuf.Bytes()
 		result.Req.Header.Set("Content-Type", mpw.FormDataContentType())
 		return nil
 	}
@@ -229,15 +254,15 @@ func (c *Client) parseRequest(
 				return nil, err
 			}
 		case goja.ArrayBuffer:
-			result.Body = bytes.NewBuffer(data.Bytes())
+			result.Body = data.Bytes()
 		case map[string]interface{}:
 			if err := handleObjectBody(data); err != nil {
 				return nil, err
 			}
 		case string:
-			result.Body = bytes.NewBufferString(data)
+			result.Body = []byte(data)
 		case []byte:
-			result.Body = bytes.NewBuffer(data)
+			result.Body = data
 		default:
 			return nil, fmt.Errorf("unknown request body type %T", body)
 		}

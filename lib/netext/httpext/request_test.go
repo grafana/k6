@@ -21,7 +21,6 @@
 package httpext
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -115,7 +114,7 @@ func TestMakeRequestError(t *testing.T) {
 		require.False(t, badCompressionType.IsACompressionType())
 		preq := &ParsedHTTPRequest{
 			Req:          req,
-			Body:         new(bytes.Buffer),
+			Body:         []byte{},
 			Compressions: []CompressionType{badCompressionType},
 		}
 		state := &lib.State{
@@ -151,7 +150,7 @@ func TestMakeRequestError(t *testing.T) {
 		preq := &ParsedHTTPRequest{
 			Req:     req,
 			URL:     &URL{u: req.URL},
-			Body:    new(bytes.Buffer),
+			Body:    nil,
 			Timeout: 10 * time.Second,
 		}
 
@@ -206,7 +205,7 @@ func TestResponseStatus(t *testing.T) {
 				preq := &ParsedHTTPRequest{
 					Req:          req,
 					URL:          &URL{u: req.URL},
-					Body:         new(bytes.Buffer),
+					Body:         nil,
 					Timeout:      10 * time.Second,
 					ResponseType: ResponseTypeNone,
 				}
@@ -286,7 +285,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: srv.URL},
-		Body:             new(bytes.Buffer),
+		Body:             nil,
 		Timeout:          50 * time.Millisecond,
 		ResponseCallback: func(i int) bool { return i == 0 },
 	}
@@ -363,7 +362,7 @@ func TestTrailFailed(t *testing.T) {
 			preq := &ParsedHTTPRequest{
 				Req:              req,
 				URL:              &URL{u: req.URL, URL: srv.URL},
-				Body:             new(bytes.Buffer),
+				Body:             nil,
 				Timeout:          10 * time.Millisecond,
 				ResponseCallback: responseCallback,
 			}
@@ -430,7 +429,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: req.URL.String()},
-		Body:             new(bytes.Buffer),
+		Body:             nil,
 		Timeout:          500 * time.Millisecond,
 		ResponseCallback: func(i int) bool { return i == 0 },
 	}
@@ -484,7 +483,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: srv.URL},
-		Body:             new(bytes.Buffer),
+		Body:             nil,
 		Timeout:          50 * time.Millisecond,
 		ResponseCallback: func(i int) bool { return i == 0 },
 	}

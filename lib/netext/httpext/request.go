@@ -23,6 +23,7 @@ package httpext
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -53,14 +54,31 @@ type Request struct {
 	Method  string                          `json:"method"`
 	URL     string                          `json:"url"`
 	Headers map[string][]string             `json:"headers"`
-	Body    string                          `json:"body"`
+	Body    []byte                          `json:"body"`
 	Cookies map[string][]*HTTPRequestCookie `json:"cookies"`
+}
+
+// MarshalJSON implements json.Marshaler.
+func (r *Request) MarshalJSON() ([]byte, error) {
+	m := map[string]interface{}{
+		"method":  r.Method,
+		"url":     r.URL,
+		"headers": r.Headers,
+		"cookies": r.Cookies,
+	}
+
+	var b string
+	if len(r.Body) > 0 {
+		b = string(r.Body)
+	}
+	m["body"] = b
+	return json.Marshal(m)
 }
 
 // ParsedHTTPRequest a represantion of a request after it has been parsed from a user script
 type ParsedHTTPRequest struct {
 	URL              *URL
-	Body             *bytes.Buffer
+	Body             []byte
 	Req              *http.Request
 	Timeout          time.Duration
 	Auth             string
@@ -140,12 +158,8 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 	}
 
 	if preq.Body != nil {
-		// TODO: maybe hide this behind of flag in order for this to not happen for big post/puts?
-		// should we set this after the compression? what will be the point ?
-		respReq.Body = preq.Body.String()
-
 		if len(preq.Compressions) > 0 {
-			compressedBody, contentEncoding, err := compressBody(preq.Compressions, ioutil.NopCloser(preq.Body))
+			compressedBody, contentEncoding, err := compressBody(preq.Compressions, ioutil.NopCloser(bytes.NewReader(preq.Body)))
 			if err != nil {
 				return nil, err
 			}
@@ -163,14 +177,15 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 			}
 		}
 
-		preq.Req.ContentLength = int64(preq.Body.Len()) // This will make Go set the content-length header
+		preq.Req.ContentLength = int64(len(preq.Body)) // This will make Go set the content-length header
 		preq.Req.GetBody = func() (io.ReadCloser, error) {
 			//  using `Bytes()` should reuse the same buffer and as such help with the memory usage. We
 			//  should not be writing to it any way so there shouldn't be way to corrupt it (?)
-			return ioutil.NopCloser(bytes.NewBuffer(preq.Body.Bytes())), nil
+			return io.NopCloser(bytes.NewReader(preq.Body)), nil
 		}
 		// as per the documentation using GetBody still requires setting the Body.
 		preq.Req.Body, _ = preq.Req.GetBody()
+		respReq.Body = preq.Body
 	}
 
 	if contentLengthHeader := preq.Req.Header.Get("Content-Length"); contentLengthHeader != "" {

@@ -39,7 +39,9 @@ import (
 // Response is a representation of an HTTP response to be returned to the goja VM
 type Response struct {
 	*httpext.Response `js:"-"`
-	client            *Client
+	Request           goja.Proxy `json:"-"`
+
+	client *Client
 
 	cachedJSON    interface{}
 	validatedJSON bool

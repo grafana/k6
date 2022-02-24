@@ -994,6 +994,7 @@ func TestRequestAndBatch(t *testing.T) {
 					headers: { "host": "HTTPBIN_DOMAIN" },
 				});
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				if (res.request.method != "GET") { throw new Error("wrong method") }
 				if (res.request.headers["Host"] != "HTTPBIN_DOMAIN") { throw new Error("wrong Host: " + res.request.headers["Host"]); }
 				`))
 				assert.NoError(t, err)
@@ -1552,7 +1553,7 @@ func TestRequestAndBatch(t *testing.T) {
 			_, err := rt.RunString(sr(`
 				var res = http.post("HTTPBIN_URL/post", {a: "a", b: 2}, {headers: {"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"}});
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-				if (res.request["body"] != "a=a&b=2") { throw new Error("http request body was not set properly: " + JSON.stringify(res.request))}
+				if (res.request["body"] != "a=a&b=2") { throw new Error("http request body was not set properly: " + res.request.body)}
 				`))
 			assert.NoError(t, err)
 		})

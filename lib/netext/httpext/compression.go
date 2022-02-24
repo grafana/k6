@@ -56,7 +56,7 @@ const (
 	// https://en.wikipedia.org/wiki/HTTP_compression#Content-Encoding_tokens
 )
 
-func compressBody(algos []CompressionType, body io.ReadCloser) (*bytes.Buffer, string, error) {
+func compressBody(algos []CompressionType, body io.ReadCloser) ([]byte, string, error) {
 	var contentEncoding string
 	var prevBuf io.Reader = body
 	var buf *bytes.Buffer
@@ -84,7 +84,7 @@ func compressBody(algos []CompressionType, body io.ReadCloser) (*bytes.Buffer, s
 			return nil, "", fmt.Errorf("unknown compressionType %s", compressionType)
 		}
 		// we don't close in defer because zlib will write it's checksum again if it closes twice :(
-		var _, err = io.Copy(w, prevBuf)
+		_, err := io.Copy(w, prevBuf)
 		if err != nil {
 			_ = w.Close()
 			return nil, "", err
@@ -95,7 +95,7 @@ func compressBody(algos []CompressionType, body io.ReadCloser) (*bytes.Buffer, s
 		}
 	}
 
-	return buf, contentEncoding, body.Close()
+	return buf.Bytes(), contentEncoding, body.Close()
 }
 
 //nolint:gochecknoglobals
