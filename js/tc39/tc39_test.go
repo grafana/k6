@@ -307,17 +307,17 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	}
 
 	var out []string
-	async := meta.hasFlag("async")
+	async := meta.hasFlag("async") //nolint:ifshort // false positive
 	if async {
-		err := ctx.runFile(ctx.base, path.Join("harness", "doneprintHandle.js"), vm)
+		err = ctx.runFile(ctx.base, path.Join("harness", "doneprintHandle.js"), vm)
 		if err != nil {
 			t.Fatal(err)
 		}
-		vm.Set("print", func(msg string) {
+		_ = vm.Set("print", func(msg string) {
 			out = append(out, msg)
 		})
 	} else {
-		vm.Set("print", t.Log)
+		_ = vm.Set("print", t.Log)
 	}
 	early, origErr, err := ctx.runTC39Script(name, src, meta.Includes, vm)
 
