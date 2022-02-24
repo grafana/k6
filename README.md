@@ -74,7 +74,7 @@ Then:
 
 2. Build the binary:
   ```shell
-  xk6 build v0.35.0 --output xk6-browser --with github.com/grafana/xk6-browser
+  xk6 build --output xk6-browser --with github.com/grafana/xk6-browser
   ```
 
   This will create a `xk6-browser` binary file in the current working directory. This file can be used exactly the same as the main `k6` binary, with the addition of being able to run xk6-browser scripts.
