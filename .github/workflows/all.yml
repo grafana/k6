@@ -43,8 +43,6 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-    env:
-        GO111MODULE: 'on'
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -54,16 +52,16 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.17.x
-      - name: Install golangci-lint
-        working-directory: /tmp
+      - name: Retrieve golangci-lint version
         run: |
-          GOLANGCI_LINT_VERSION=$(head -n 1 "${GITHUB_WORKSPACE}/.golangci.yml" | tr -d '# ')
-          go install "github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANGCI_LINT_VERSION"
-      - name: Run linters
-        run: |
-          BASEREV=$(git merge-base HEAD origin/master)
-          echo "Base revision: $BASEREV"
-          golangci-lint run --out-format=tab --new-from-rev "$BASEREV" ./...
+          echo "::set-output name=Version::$(head -n 1 "${GITHUB_WORKSPACE}/.golangci.yml" | tr -d '# ')"
+        id: version
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: ${{ steps.version.outputs.Version }}
+          only-new-issues: true
 
   test-prev:
     strategy:
