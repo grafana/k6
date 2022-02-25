@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -12,6 +13,13 @@ import (
 func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 	t.Parallel()
 
+	var timeout time.Duration = 200
+	if os.Getenv("CI") == "true" {
+		// Increase the timeout on underprovisioned CI machines to minimize
+		// chances of intermittent failures.
+		timeout *= 3
+	}
+
 	testCases := []struct {
 		name, selector string
 	}{
@@ -22,7 +30,6 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
 
@@ -32,7 +39,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 			// A click right away could possibly trigger navigation before we
 			// had a chance to call WaitForNavigation below, so give it some
 			// time to simulate the JS overhead, waiting for XHR response, etc.
-			time.AfterFunc(200*time.Millisecond, func() {
+			time.AfterFunc(timeout*time.Millisecond, func() { //nolint:durationcheck
 				p.Click(tc.selector, nil)
 			})
 
@@ -40,7 +47,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 			go func() {
 				require.NotPanics(t, func() {
 					p.WaitForNavigation(tb.rt.ToValue(&common.FrameWaitForNavigationOptions{
-						Timeout: 1000, // 1s
+						Timeout: timeout * 3, // interpreted as ms
 					}))
 				})
 				done <- struct{}{}
@@ -48,7 +55,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 
 			select {
 			case <-done:
-			case <-time.After(2 * time.Second):
+			case <-time.After(timeout * 5 * time.Millisecond): //nolint:durationcheck
 				t.Fatal("Test timed out")
 			}
 		})
