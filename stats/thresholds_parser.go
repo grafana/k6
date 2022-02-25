@@ -73,17 +73,23 @@ func parseThresholdExpression(input string) (*thresholdExpression, error) {
 	// checks that the expression has the right format.
 	method, operator, value, err := scanThresholdExpression(input)
 	if err != nil {
-		return nil, fmt.Errorf("failed parsing threshold expression; reason: %w", err)
+		return nil, fmt.Errorf("failed parsing threshold expression %q; reason: %w", input, err)
 	}
 
 	parsedMethod, parsedMethodValue, err := parseThresholdAggregationMethod(method)
 	if err != nil {
-		return nil, fmt.Errorf("failed parsing threshold expression's left hand side; reason: %w", err)
+		err = fmt.Errorf("failed parsing threshold expression's %q left hand side; "+
+			"reason: %w", input, err,
+		)
+		return nil, err
 	}
 
 	parsedValue, err := strconv.ParseFloat(value, 64)
 	if err != nil {
-		return nil, fmt.Errorf("failed parsing threshold expresion's right hand side; reason: %w", err)
+		err = fmt.Errorf("failed parsing threshold expresion's %q right hand side; "+
+			"reason: %w", input, err,
+		)
+		return nil, err
 	}
 
 	condition := &thresholdExpression{

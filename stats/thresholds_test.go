@@ -37,29 +37,14 @@ func TestNewThreshold(t *testing.T) {
 	src := `rate<0.01`
 	abortOnFail := false
 	gracePeriod := types.NullDurationFrom(2 * time.Second)
-	wantParsed := &thresholdExpression{tokenRate, null.Float{}, tokenLess, 0.01}
 
-	gotThreshold, err := newThreshold(src, abortOnFail, gracePeriod)
+	gotThreshold := newThreshold(src, abortOnFail, gracePeriod)
 
-	assert.NoError(t, err)
 	assert.Equal(t, src, gotThreshold.Source)
 	assert.False(t, gotThreshold.LastFailed)
 	assert.Equal(t, abortOnFail, gotThreshold.AbortOnFail)
 	assert.Equal(t, gracePeriod, gotThreshold.AbortGracePeriod)
-	assert.Equal(t, wantParsed, gotThreshold.parsed)
-}
-
-func TestNewThreshold_InvalidThresholdConditionExpression(t *testing.T) {
-	t.Parallel()
-
-	src := "1+1==2"
-	abortOnFail := false
-	gracePeriod := types.NullDurationFrom(2 * time.Second)
-
-	gotThreshold, err := newThreshold(src, abortOnFail, gracePeriod)
-
-	assert.Error(t, err, "instantiating a threshold with an invalid expression should fail")
-	assert.Nil(t, gotThreshold, "instantiating a threshold with an invalid expression should return a nil Threshold")
+	assert.Nil(t, gotThreshold.parsed)
 }
 
 func TestThreshold_runNoTaint(t *testing.T) {
@@ -219,8 +204,10 @@ func TestThresholdRun(t *testing.T) {
 		t.Parallel()
 
 		sinks := map[string]float64{"rate": 0.0001}
-		threshold, err := newThreshold(`rate<0.01`, false, types.NullDuration{})
-		assert.NoError(t, err)
+		parsed, parseErr := parseThresholdExpression("rate<0.01")
+		require.NoError(t, parseErr)
+		threshold := newThreshold(`rate<0.01`, false, types.NullDuration{})
+		threshold.parsed = parsed
 
 		t.Run("no taint", func(t *testing.T) {
 			b, err := threshold.runNoTaint(sinks)
@@ -243,8 +230,10 @@ func TestThresholdRun(t *testing.T) {
 		t.Parallel()
 
 		sinks := map[string]float64{"rate": 1}
-		threshold, err := newThreshold(`rate<0.01`, false, types.NullDuration{})
-		assert.NoError(t, err)
+		parsed, parseErr := parseThresholdExpression("rate<0.01")
+		require.NoError(t, parseErr)
+		threshold := newThreshold(`rate<0.01`, false, types.NullDuration{})
+		threshold.parsed = parsed
 
 		t.Run("no taint", func(t *testing.T) {
 			b, err := threshold.runNoTaint(sinks)
@@ -262,22 +251,103 @@ func TestThresholdRun(t *testing.T) {
 	})
 }
 
+func TestThresholdsParse(t *testing.T) {
+	t.Parallel()
+
+	t.Run("valid threshold expressions", func(t *testing.T) {
+		t.Parallel()
+
+		// Prepare a Thresholds collection containing syntaxically
+		// correct thresholds
+		ts := Thresholds{
+			Thresholds: []*Threshold{
+				newThreshold("rate<1", false, types.NullDuration{}),
+			},
+		}
+
+		// Collect the result of the parsing operation
+		gotErr := ts.Parse()
+
+		assert.NoError(t, gotErr, "Parse shouldn't fail parsing valid expressions")
+		assert.Condition(t, func() bool {
+			for _, threshold := range ts.Thresholds {
+				if threshold.parsed == nil {
+					return false
+				}
+			}
+
+			return true
+		}, "Parse did not fail, but some Thresholds' parsed field is left empty")
+	})
+
+	t.Run("invalid threshold expressions", func(t *testing.T) {
+		t.Parallel()
+
+		// Prepare a Thresholds collection containing syntaxically
+		// correct thresholds
+		ts := Thresholds{
+			Thresholds: []*Threshold{
+				newThreshold("foo&1", false, types.NullDuration{}),
+			},
+		}
+
+		// Collect the result of the parsing operation
+		gotErr := ts.Parse()
+
+		assert.Error(t, gotErr, "Parse should fail parsing invalid expressions")
+		assert.Condition(t, func() bool {
+			for _, threshold := range ts.Thresholds {
+				if threshold.parsed == nil {
+					return true
+				}
+			}
+
+			return false
+		}, "Parse failed, but some Thresholds' parsed field was not empty")
+	})
+
+	t.Run("mixed valid/invalid threshold expressions", func(t *testing.T) {
+		t.Parallel()
+
+		// Prepare a Thresholds collection containing syntaxically
+		// correct thresholds
+		ts := Thresholds{
+			Thresholds: []*Threshold{
+				newThreshold("rate<1", false, types.NullDuration{}),
+				newThreshold("foo&1", false, types.NullDuration{}),
+			},
+		}
+
+		// Collect the result of the parsing operation
+		gotErr := ts.Parse()
+
+		assert.Error(t, gotErr, "Parse should fail parsing invalid expressions")
+		assert.Condition(t, func() bool {
+			for _, threshold := range ts.Thresholds {
+				if threshold.parsed == nil {
+					return true
+				}
+			}
+
+			return false
+		}, "Parse failed, but some Thresholds' parsed field was not empty")
+	})
+}
+
 func TestNewThresholds(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
 
-		ts, err := NewThresholds([]string{})
-		assert.NoError(t, err)
+		ts := NewThresholds([]string{})
 		assert.Len(t, ts.Thresholds, 0)
 	})
 	t.Run("two", func(t *testing.T) {
 		t.Parallel()
 
 		sources := []string{`rate<0.01`, `p(95)<200`}
-		ts, err := NewThresholds(sources)
-		assert.NoError(t, err)
+		ts := NewThresholds(sources)
 		assert.Len(t, ts.Thresholds, 2)
 		for i, th := range ts.Thresholds {
 			assert.Equal(t, sources[i], th.Source)
@@ -293,8 +363,7 @@ func TestNewThresholdsWithConfig(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
 
-		ts, err := NewThresholds([]string{})
-		assert.NoError(t, err)
+		ts := NewThresholds([]string{})
 		assert.Len(t, ts.Thresholds, 0)
 	})
 	t.Run("two", func(t *testing.T) {
@@ -304,8 +373,7 @@ func TestNewThresholdsWithConfig(t *testing.T) {
 			{`rate<0.01`, false, types.NullDuration{}},
 			{`p(95)<200`, true, types.NullDuration{}},
 		}
-		ts, err := newThresholdsWithConfig(configs)
-		assert.NoError(t, err)
+		ts := newThresholdsWithConfig(configs)
 		assert.Len(t, ts.Thresholds, 2)
 		for i, th := range ts.Thresholds {
 			assert.Equal(t, configs[i].Threshold, th.Source)
@@ -342,14 +410,14 @@ func TestThresholdsRunAll(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			thresholds, err := NewThresholds(data.sources)
+			thresholds := NewThresholds(data.sources)
+			gotParseErr := thresholds.Parse()
+			require.NoError(t, gotParseErr)
 			thresholds.sinked = map[string]float64{"rate": 0.0001, "p(95)": 500}
 			thresholds.Thresholds[0].AbortOnFail = data.abort
 			thresholds.Thresholds[0].AbortGracePeriod = data.grace
 
 			runDuration := 1500 * time.Millisecond
-
-			assert.NoError(t, err)
 
 			succeeded, err := thresholds.runAll(runDuration)
 
@@ -411,8 +479,9 @@ func TestThresholds_Run(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			thresholds, err := NewThresholds([]string{"p(95)<2000"})
-			require.NoError(t, err, "Initializing new thresholds should not fail")
+			thresholds := NewThresholds([]string{"p(95)<2000"})
+			gotParseErr := thresholds.Parse()
+			require.NoError(t, gotParseErr)
 
 			gotOk, gotErr := thresholds.Run(testCase.args.sink, testCase.args.duration)
 			assert.Equal(t, gotErr != nil, testCase.wantErr, "Thresholds.Run() error = %v, wantErr %v", gotErr, testCase.wantErr)
@@ -536,7 +605,6 @@ func TestThresholdsJSON(t *testing.T) {
 		t.Parallel()
 
 		var ts Thresholds
-		assert.Error(t, json.Unmarshal([]byte(`["="]`), &ts))
 		assert.Nil(t, ts.Thresholds)
 		assert.False(t, ts.Abort)
 	})

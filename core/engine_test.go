@@ -263,8 +263,9 @@ func TestEngine_processSamples(t *testing.T) {
 	})
 	t.Run("submetric", func(t *testing.T) {
 		t.Parallel()
-		ths, err := stats.NewThresholds([]string{`value<2`})
-		assert.NoError(t, err)
+		ths := stats.NewThresholds([]string{`value<2`})
+		gotParseErr := ths.Parse()
+		require.NoError(t, gotParseErr)
 
 		e, _, wait := newTestEngine(t, nil, nil, nil, lib.Options{
 			Thresholds: map[string]stats.Thresholds{
@@ -294,8 +295,9 @@ func TestEngineThresholdsWillAbort(t *testing.T) {
 	// The incoming samples for the metric set it to 1.25. Considering
 	// the metric is of type Gauge, value > 1.25 should always fail, and
 	// trigger an abort.
-	ths, err := stats.NewThresholds([]string{"value>1.25"})
-	assert.NoError(t, err)
+	ths := stats.NewThresholds([]string{"value>1.25"})
+	gotParseErr := ths.Parse()
+	require.NoError(t, gotParseErr)
 	ths.Thresholds[0].AbortOnFail = true
 
 	thresholds := map[string]stats.Thresholds{metric.Name: ths}
@@ -317,8 +319,9 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 	// the metric is of type Gauge, value > 1.25 should always fail, and
 	// trigger an abort.
 	// **N.B**: a threshold returning an error, won't trigger an abort.
-	ths, err := stats.NewThresholds([]string{"value>1.25"})
-	assert.NoError(t, err)
+	ths := stats.NewThresholds([]string{"value>1.25"})
+	gotParseErr := ths.Parse()
+	require.NoError(t, gotParseErr)
 	ths.Thresholds[0].AbortOnFail = true
 
 	thresholds := map[string]stats.Thresholds{metric.Name: ths}
@@ -373,8 +376,9 @@ func TestEngine_processThresholds(t *testing.T) {
 			t.Parallel()
 			thresholds := make(map[string]stats.Thresholds, len(data.ths))
 			for m, srcs := range data.ths {
-				ths, err := stats.NewThresholds(srcs)
-				assert.NoError(t, err)
+				ths := stats.NewThresholds(srcs)
+				gotParseErr := ths.Parse()
+				require.NoError(t, gotParseErr)
 				ths.Thresholds[0].AbortOnFail = data.abort
 				thresholds[m] = ths
 			}

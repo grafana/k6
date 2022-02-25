@@ -44,18 +44,13 @@ type Threshold struct {
 	parsed *thresholdExpression
 }
 
-func newThreshold(src string, abortOnFail bool, gracePeriod types.NullDuration) (*Threshold, error) {
-	parsedExpression, err := parseThresholdExpression(src)
-	if err != nil {
-		return nil, err
-	}
-
+func newThreshold(src string, abortOnFail bool, gracePeriod types.NullDuration) *Threshold {
 	return &Threshold{
 		Source:           src,
 		AbortOnFail:      abortOnFail,
 		AbortGracePeriod: gracePeriod,
-		parsed:           parsedExpression,
-	}, nil
+		parsed:           nil,
+	}
 }
 
 func (t *Threshold) runNoTaint(sinks map[string]float64) (bool, error) {
@@ -143,7 +138,7 @@ type Thresholds struct {
 }
 
 // NewThresholds returns Thresholds objects representing the provided source strings
-func NewThresholds(sources []string) (Thresholds, error) {
+func NewThresholds(sources []string) Thresholds {
 	tcs := make([]thresholdConfig, len(sources))
 	for i, source := range sources {
 		tcs[i].Threshold = source
@@ -152,19 +147,16 @@ func NewThresholds(sources []string) (Thresholds, error) {
 	return newThresholdsWithConfig(tcs)
 }
 
-func newThresholdsWithConfig(configs []thresholdConfig) (Thresholds, error) {
+func newThresholdsWithConfig(configs []thresholdConfig) Thresholds {
 	thresholds := make([]*Threshold, len(configs))
 	sinked := make(map[string]float64)
 
 	for i, config := range configs {
-		t, err := newThreshold(config.Threshold, config.AbortOnFail, config.AbortGracePeriod)
-		if err != nil {
-			return Thresholds{}, fmt.Errorf("threshold %d error: %w", i, err)
-		}
+		t := newThreshold(config.Threshold, config.AbortOnFail, config.AbortGracePeriod)
 		thresholds[i] = t
 	}
 
-	return Thresholds{thresholds, false, sinked}, nil
+	return Thresholds{thresholds, false, sinked}
 }
 
 func (ts *Thresholds) runAll(timeSpentInTest time.Duration) (bool, error) {
@@ -237,17 +229,30 @@ func (ts *Thresholds) Run(sink Sink, duration time.Duration) (bool, error) {
 	return ts.runAll(duration)
 }
 
+// Parse parses the Thresholds and fills each Threshold.parsed field with the result.
+// It effectively asserts they are syntaxically correct.
+func (ts *Thresholds) Parse() error {
+	for _, t := range ts.Thresholds {
+		parsed, err := parseThresholdExpression(t.Source)
+		if err != nil {
+			return err
+		}
+
+		t.parsed = parsed
+	}
+
+	return nil
+}
+
 // UnmarshalJSON is implementation of json.Unmarshaler
 func (ts *Thresholds) UnmarshalJSON(data []byte) error {
 	var configs []thresholdConfig
 	if err := json.Unmarshal(data, &configs); err != nil {
 		return err
 	}
-	newts, err := newThresholdsWithConfig(configs)
-	if err != nil {
-		return err
-	}
-	*ts = newts
+
+	*ts = newThresholdsWithConfig(configs)
+
 	return nil
 }
 
@@ -279,5 +284,7 @@ func MarshalJSONWithoutHTMLEscape(t interface{}) ([]byte, error) {
 	return bytes, err
 }
 
-var _ json.Unmarshaler = &Thresholds{}
-var _ json.Marshaler = &Thresholds{}
+var (
+	_ json.Unmarshaler = &Thresholds{}
+	_ json.Marshaler   = &Thresholds{}
+)
