@@ -57,7 +57,7 @@ jobs:
         run: chrome --version
       - name: Chrome version
         if: runner.os == 'Windows'
-        shell: powershell
+        shell: pwsh
         # chrome --version doesn't work on Windows :-/
         # See https://bugs.chromium.org/p/chromium/issues/detail?id=158372
         run: (get-command chrome.exe).Version
