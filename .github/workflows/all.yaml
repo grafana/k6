@@ -18,7 +18,7 @@ env:
 
 jobs:
   deps:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -33,7 +33,7 @@ jobs:
           test -z "$(go generate ./... && git status --porcelain)"
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     env:
       GO111MODULE: 'on'
     steps:
@@ -61,8 +61,8 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.16.x]
-        #platform: [ubuntu-latest, macos-latest, windows-latest]
-        platform: [ubuntu-latest]
+        #platform: [ubuntu-20.04, macos-11, windows-2019]
+        platform: [ubuntu-20.04]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -95,7 +95,7 @@ jobs:
           go test -v -p 2 -race -timeout 300s ./...
 
   test-tip:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     continue-on-error: true
     steps:
       - name: Checkout code
@@ -141,8 +141,8 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.17.x]
-        #platform: [ubuntu-latest, macos-latest, windows-latest]
-        platform: [ubuntu-latest]
+        #platform: [ubuntu-20.04, macos-latest, windows-2019]
+        platform: [ubuntu-20.04]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -191,7 +191,7 @@ jobs:
           path: coverage.html
 
   configure:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     outputs:
       version: ${{ steps.get_version.outputs.version }}
     steps:
@@ -203,7 +203,7 @@ jobs:
           echo "::set-output name=version::${VERSION}"
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: [configure, deps, lint, test-current-cov]
     if: startsWith(github.ref, 'refs/tags/v')
     env:
@@ -266,7 +266,7 @@ jobs:
           retention-days: 7
 
   package-windows:
-    runs-on: windows-latest
+    runs-on: windows-2019
     defaults:
       run:
         shell: powershell
@@ -327,7 +327,7 @@ jobs:
           retention-days: 7
 
   publish-github:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: [configure, deps, lint, test-current-cov, build, package-windows]
     if: startsWith(github.ref, 'refs/tags/v')
     env:
