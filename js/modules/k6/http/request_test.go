@@ -1136,10 +1136,11 @@ func TestRequestAndBatch(t *testing.T) {
 	})
 	t.Run("HEAD", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
-		var res = http.head("HTTPBIN_URL/get?a=1&b=2");
+		var res = http.head("HTTPBIN_URL/get?a=1&b=2", {headers: {"X-We-Want-This": "value"}});
 		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 		if (res.body.length != 0) { throw new Error("HEAD responses shouldn't have a body"); }
 		if (!res.headers["Content-Length"]) { throw new Error("Missing or invalid Content-Length header!"); }
+		if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
 		`))
 		assert.NoError(t, err)
 		assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "HEAD", sr("HTTPBIN_URL/get?a=1&b=2"), "", 200, "")
