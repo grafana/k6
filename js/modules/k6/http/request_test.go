@@ -1113,12 +1113,13 @@ func TestRequestAndBatch(t *testing.T) {
 
 	t.Run("GET", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
-		var res = http.get("HTTPBIN_URL/get?a=1&b=2");
+		var res = http.get("HTTPBIN_URL/get?a=1&b=2", {headers: {"X-We-Want-This": "value"}});
 		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 		if (res.json().args.a != "1") { throw new Error("wrong ?a: " + res.json().args.a); }
 		if (res.json().args.b != "2") { throw new Error("wrong ?b: " + res.json().args.b); }
+		if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
 		`))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get?a=1&b=2"), "", 200, "")
 
 		t.Run("Tagged", func(t *testing.T) {
@@ -1148,11 +1149,12 @@ func TestRequestAndBatch(t *testing.T) {
 
 	t.Run("OPTIONS", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
-		var res = http.options("HTTPBIN_URL/?a=1&b=2");
+		var res = http.options("HTTPBIN_URL/?a=1&b=2", null, {headers: {"X-We-Want-This": "value"}});
 		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 		if (!res.headers["Access-Control-Allow-Methods"]) { throw new Error("Missing Access-Control-Allow-Methods header!"); }
+		if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
 		`))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "OPTIONS", sr("HTTPBIN_URL/?a=1&b=2"), "", 200, "")
 	})
 
@@ -1162,11 +1164,12 @@ func TestRequestAndBatch(t *testing.T) {
 	// https://tools.ietf.org/html/rfc7231#section-4.3.5
 	t.Run("DELETE", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
-		var res = http.del("HTTPBIN_URL/delete?test=mest");
+		var res = http.del("HTTPBIN_URL/delete?test=mest", null, {headers: {"X-We-Want-This": "value"}});
 		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 		if (res.json().args.test != "mest") { throw new Error("wrong args: " + JSON.stringify(res.json().args)); }
+		if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
 		`))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), "DELETE", sr("HTTPBIN_URL/delete?test=mest"), "", 200, "")
 	})
 
@@ -1178,12 +1181,13 @@ func TestRequestAndBatch(t *testing.T) {
 	for method, fn := range postMethods {
 		t.Run(method, func(t *testing.T) {
 			_, err := rt.RunString(fmt.Sprintf(sr(`
-				var res = http.%s("HTTPBIN_URL/%s", "data");
+				var res = http.%s("HTTPBIN_URL/%s", "data", {headers: {"X-We-Want-This": "value"}});
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				if (res.json().data != "data") { throw new Error("wrong data: " + res.json().data); }
 				if (res.json().headers["Content-Type"]) { throw new Error("content type set: " + res.json().headers["Content-Type"]); }
+				if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
 				`), fn, strings.ToLower(method)))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assertRequestMetricsEmitted(t, stats.GetBufferedSamples(samples), method, sr("HTTPBIN_URL/")+strings.ToLower(method), "", 200, "")
 
 			t.Run("object", func(t *testing.T) {
