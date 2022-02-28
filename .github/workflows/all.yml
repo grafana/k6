@@ -144,7 +144,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [configure, deps, lint, test-current-cov]
+    needs: [configure, test-current-cov]
     if: startsWith(github.ref, 'refs/tags/v')
     env:
       VERSION: ${{ needs.configure.outputs.version }}
@@ -205,7 +205,7 @@ jobs:
 
   build-docker:
     runs-on: ubuntu-latest
-    needs: [deps, lint, test-current-cov, configure]
+    needs: [test-current-cov, configure]
     env:
       VERSION: ${{ needs.configure.outputs.version }}
     steps:
@@ -267,7 +267,7 @@ jobs:
     defaults:
       run:
         shell: powershell
-    needs: [deps, lint, test-current-cov, configure, build]
+    needs: [test-current-cov, configure, build]
     if: startsWith(github.ref, 'refs/tags/v')
     env:
       VERSION: ${{ needs.configure.outputs.version }}
@@ -354,7 +354,7 @@ jobs:
 
   publish-github:
     runs-on: ubuntu-latest
-    needs: [configure, deps, lint, test-current-cov, build, package-windows]
+    needs: [configure, test-current-cov, build, package-windows]
     if: startsWith(github.ref, 'refs/tags/v')
     env:
       VERSION: ${{ needs.configure.outputs.version }}
