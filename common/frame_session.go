@@ -572,6 +572,9 @@ func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecuti
 	}
 	context := NewExecutionContext(fs.ctx, fs.session, frame, event.Context.ID, fs.logger)
 	if world != "" {
+		fs.logger.Debugf("FrameSession:setContext",
+			"sid:%v fid:%v ectxid:%d",
+			fs.session.id, frame.ID(), event.Context.ID)
 		frame.setContext(world, context)
 	}
 	fs.contextIDToContextMu.Lock()
