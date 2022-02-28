@@ -36,6 +36,9 @@ import (
 	"github.com/grafana/xk6-browser/api"
 )
 
+// maxRetry controls how many times to retry if an action fails.
+const maxRetry = 1
+
 // Ensure frame implements the Frame interface.
 var _ api.Frame = &Frame{}
 
@@ -546,6 +549,18 @@ func (f *Frame) waitForFunction(
 		return nil, fmt.Errorf("frame cannot wait for function: %w", err)
 	}
 	return result, nil
+}
+
+func (f *Frame) waitForSelectorRetry(
+	selector string, opts *FrameWaitForSelectorOptions, retry int,
+) (h *ElementHandle, err error) {
+	for ; retry >= 0; retry-- {
+		if h, err = f.waitForSelector(selector, opts); err == nil {
+			return h, nil
+		}
+	}
+
+	return nil, err
 }
 
 func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
@@ -1441,7 +1456,7 @@ func (f *Frame) WaitForSelector(selector string, opts goja.Value) api.ElementHan
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
 		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
 	}
-	handle, err := f.waitForSelector(selector, parsedOpts)
+	handle, err := f.waitForSelectorRetry(selector, parsedOpts, maxRetry)
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
