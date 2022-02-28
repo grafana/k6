@@ -21,48 +21,6 @@ env:
   GHCR_IMAGE_ID: ${{ github.repository }}
 
 jobs:
-  deps:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.17.x
-      - name: Check dependencies
-        run: |
-            go version
-            test -z "$(go mod tidy && go mod vendor && git status --porcelain)"
-            go mod verify
-      - name: Check code generation
-        run: |
-          go install github.com/alvaroloes/enumer@v1.1.2
-          go install github.com/mailru/easyjson/easyjson@v0.7.7
-          test -z "$(go generate ./... && git status --porcelain)"
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.17.x
-      - name: Retrieve golangci-lint version
-        run: |
-          echo "::set-output name=Version::$(head -n 1 "${GITHUB_WORKSPACE}/.golangci.yml" | tr -d '# ')"
-        id: version
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-          version: ${{ steps.version.outputs.Version }}
-          only-new-issues: true
-
   test-prev:
     strategy:
       fail-fast: false
