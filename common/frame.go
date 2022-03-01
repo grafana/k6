@@ -315,27 +315,51 @@ func (f *Frame) defaultTimeout() time.Duration {
 func (f *Frame) document() (*ElementHandle, error) {
 	f.log.Debugf("Frame:document", "fid:%s furl:%q", f.ID(), f.URL())
 
-	rt := k6common.GetRuntime(f.ctx)
-	if f.documentHandle != nil {
-		return f.documentHandle, nil
+	if cdh, ok := f.cachedDocumentHandle(); ok {
+		return cdh, nil
 	}
 
 	f.waitForExecutionContext(mainWorld)
+
+	dh, err := f.newDocumentHandle()
+	if err != nil {
+		return nil, fmt.Errorf("newDocumentHandle: %w", err)
+	}
+	f.executionContextMu.Lock()
+	defer f.executionContextMu.Unlock()
+	f.documentHandle = dh
+
+	return dh, nil
+}
+
+func (f *Frame) cachedDocumentHandle() (*ElementHandle, bool) {
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
+	return f.documentHandle, f.documentHandle != nil
+}
+
+func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
+	rt := k6common.GetRuntime(f.ctx)
+	doc := rt.ToValue("document")
 
 	opts := evalOptions{
 		forceCallable: false,
 		returnByValue: false,
 	}
-	result, err := f.evaluate(f.ctx, mainWorld, opts, rt.ToValue("document"))
+	result, err := f.evaluate(f.ctx, mainWorld, opts, doc)
 	if err != nil {
-		return nil, fmt.Errorf("frame document: cannot evaluate in main execution context: %w", err)
+		return nil, fmt.Errorf("cannot evaluate in main execution context: %w", err)
 	}
 	if result == nil {
-		return nil, errors.New("frame document: evaluate result is nil in main execution context")
+		return nil, errors.New("evaluate result is nil in main execution context")
+	}
+	dh, ok := result.(*ElementHandle)
+	if !ok {
+		return nil, fmt.Errorf("invalid document handle")
 	}
 
-	f.documentHandle = result.(*ElementHandle)
-	return f.documentHandle, err
+	return dh, nil
 }
 
 func (f *Frame) hasContext(world executionWorld) bool {
