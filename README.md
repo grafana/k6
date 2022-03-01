@@ -170,7 +170,7 @@ export default function() {
     page.goto('http://whatsmyuseragent.org/');
 
     // Find element using CSS selector
-    const ip = page.$('.ip-address p').textContent();
+    let ip = page.$('.ip-address p').textContent();
     console.log("CSS selector: ", ip);
 
     // Find element using XPath expression
