@@ -801,6 +801,14 @@ func (u *VU) runFn(
 		v, err = fn(goja.Undefined(), args...) // Actually run the JS script
 		return err
 	})
+
+	select {
+	case <-ctx.Done():
+		isFullIteration = false
+	default:
+		isFullIteration = true
+	}
+
 	if err != nil && isDefault {
 		cancel()
 		u.moduleVUImpl.eventLoop.waitOnRegistered()
@@ -809,13 +817,6 @@ func (u *VU) runFn(
 	var exception *goja.Exception
 	if errors.As(err, &exception) {
 		err = &scriptException{inner: exception}
-	}
-
-	select {
-	case <-ctx.Done():
-		isFullIteration = false
-	default:
-		isFullIteration = true
 	}
 
 	if u.Runner.Bundle.Options.NoVUConnectionReuse.Bool {
