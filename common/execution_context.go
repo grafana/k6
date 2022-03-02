@@ -201,13 +201,13 @@ func (e *ExecutionContext) eval(
 			WithUserGesture(true)
 		if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
 			return nil, fmt.Errorf("cannot call function on expression (%q) "+
-				"in execution context (%d) in frame (%v): %w",
-				expressionWithSourceURL, e.id, e.Frame().ID(), err)
+				"in execution context (%d) in frame (%v) with session (%v): %w",
+				expressionWithSourceURL, e.id, e.Frame().ID(), e.session.ID(), err)
 		}
 		if exceptionDetails != nil {
 			return nil, fmt.Errorf("cannot call function on expression (%q) "+
-				"in execution context (%d) in frame (%v): %w",
-				expressionWithSourceURL, e.id, e.Frame().ID(), err)
+				"in execution context (%d) in frame (%v) with session (%v): %w",
+				expressionWithSourceURL, e.id, e.Frame().ID(), e.session.ID(), err)
 		}
 		if remoteObject == nil {
 			return
@@ -248,13 +248,13 @@ func (e *ExecutionContext) eval(
 			WithUserGesture(true)
 		if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
 			return nil, fmt.Errorf("cannot call function on expression (%q) "+
-				"in execution context (%d) in frame (%v): %w",
-				expressionWithSourceURL, e.id, e.Frame().ID(), err)
+				"in execution context (%d) in frame (%v) with session (%v): %w",
+				expressionWithSourceURL, e.id, e.Frame().ID(), e.session.ID(), err)
 		}
 		if exceptionDetails != nil {
 			return nil, fmt.Errorf("cannot call function on expression (%q) "+
-				"in execution context (%d) in frame (%v): %w",
-				expressionWithSourceURL, e.id, e.Frame().ID(), err)
+				"in execution context (%d) in frame (%v) with session (%v): %w",
+				expressionWithSourceURL, e.id, e.Frame().ID(), e.session.ID(), err)
 		}
 		if remoteObject == nil {
 			return
