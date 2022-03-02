@@ -809,7 +809,7 @@ func (u *VU) runFn(
 		isFullIteration = true
 	}
 
-	if err != nil && isDefault {
+	if cancel != nil {
 		cancel()
 		u.moduleVUImpl.eventLoop.waitOnRegistered()
 	}
