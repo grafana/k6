@@ -114,6 +114,18 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				return err
 			}
 
+			// Parse the thresholds, only if the --no-threshold flag is not set.
+			// If parsing the threshold expressions failed, consider it as an
+			// invalid configuration error.
+			if !runtimeOptions.NoThresholds.Bool {
+				for _, thresholds := range conf.Options.Thresholds {
+					err = thresholds.Parse()
+					if err != nil {
+						return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+					}
+				}
+			}
+
 			derivedConf, err := deriveAndValidateConfig(conf, r.IsExecutable, logger)
 			if err != nil {
 				return err

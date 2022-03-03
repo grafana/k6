@@ -263,8 +263,9 @@ func TestEngine_processSamples(t *testing.T) {
 	})
 	t.Run("submetric", func(t *testing.T) {
 		t.Parallel()
-		ths, err := stats.NewThresholds([]string{`1+1==2`})
-		assert.NoError(t, err)
+		ths := stats.NewThresholds([]string{`value<2`})
+		gotParseErr := ths.Parse()
+		require.NoError(t, gotParseErr)
 
 		e, _, wait := newTestEngine(t, nil, nil, nil, lib.Options{
 			Thresholds: map[string]stats.Thresholds{
@@ -291,8 +292,12 @@ func TestEngineThresholdsWillAbort(t *testing.T) {
 	t.Parallel()
 	metric := stats.New("my_metric", stats.Gauge)
 
-	ths, err := stats.NewThresholds([]string{"1+1==3"})
-	assert.NoError(t, err)
+	// The incoming samples for the metric set it to 1.25. Considering
+	// the metric is of type Gauge, value > 1.25 should always fail, and
+	// trigger an abort.
+	ths := stats.NewThresholds([]string{"value>1.25"})
+	gotParseErr := ths.Parse()
+	require.NoError(t, gotParseErr)
 	ths.Thresholds[0].AbortOnFail = true
 
 	thresholds := map[string]stats.Thresholds{metric.Name: ths}
@@ -310,8 +315,13 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 	t.Parallel()
 	metric := stats.New("my_metric", stats.Gauge)
 
-	ths, err := stats.NewThresholds([]string{"1+1==3"})
-	assert.NoError(t, err)
+	// The MiniRunner sets the value of the metric to 1.25. Considering
+	// the metric is of type Gauge, value > 1.25 should always fail, and
+	// trigger an abort.
+	// **N.B**: a threshold returning an error, won't trigger an abort.
+	ths := stats.NewThresholds([]string{"value>1.25"})
+	gotParseErr := ths.Parse()
+	require.NoError(t, gotParseErr)
 	ths.Thresholds[0].AbortOnFail = true
 
 	thresholds := map[string]stats.Thresholds{metric.Name: ths}
@@ -350,14 +360,14 @@ func TestEngine_processThresholds(t *testing.T) {
 		ths   map[string][]string
 		abort bool
 	}{
-		"passing":  {true, map[string][]string{"my_metric": {"1+1==2"}}, false},
-		"failing":  {false, map[string][]string{"my_metric": {"1+1==3"}}, false},
-		"aborting": {false, map[string][]string{"my_metric": {"1+1==3"}}, true},
+		"passing":  {true, map[string][]string{"my_metric": {"value<2"}}, false},
+		"failing":  {false, map[string][]string{"my_metric": {"value>1.25"}}, false},
+		"aborting": {false, map[string][]string{"my_metric": {"value>1.25"}}, true},
 
-		"submetric,match,passing":   {true, map[string][]string{"my_metric{a:1}": {"1+1==2"}}, false},
-		"submetric,match,failing":   {false, map[string][]string{"my_metric{a:1}": {"1+1==3"}}, false},
-		"submetric,nomatch,passing": {true, map[string][]string{"my_metric{a:2}": {"1+1==2"}}, false},
-		"submetric,nomatch,failing": {true, map[string][]string{"my_metric{a:2}": {"1+1==3"}}, false},
+		"submetric,match,passing":   {true, map[string][]string{"my_metric{a:1}": {"value<2"}}, false},
+		"submetric,match,failing":   {false, map[string][]string{"my_metric{a:1}": {"value>1.25"}}, false},
+		"submetric,nomatch,passing": {true, map[string][]string{"my_metric{a:2}": {"value<2"}}, false},
+		"submetric,nomatch,failing": {true, map[string][]string{"my_metric{a:2}": {"value>1.25"}}, false},
 	}
 
 	for name, data := range testdata {
@@ -366,8 +376,9 @@ func TestEngine_processThresholds(t *testing.T) {
 			t.Parallel()
 			thresholds := make(map[string]stats.Thresholds, len(data.ths))
 			for m, srcs := range data.ths {
-				ths, err := stats.NewThresholds(srcs)
-				assert.NoError(t, err)
+				ths := stats.NewThresholds(srcs)
+				gotParseErr := ths.Parse()
+				require.NoError(t, gotParseErr)
 				ths.Thresholds[0].AbortOnFail = data.abort
 				thresholds[m] = ths
 			}

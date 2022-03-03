@@ -125,6 +125,18 @@ a commandline interface for interacting with it.`,
 				return err
 			}
 
+			// Parse the thresholds, only if the --no-threshold flag is not set.
+			// If parsing the threshold expressions failed, consider it as an
+			// invalid configuration error.
+			if !runtimeOptions.NoThresholds.Bool {
+				for _, thresholds := range conf.Options.Thresholds {
+					err = thresholds.Parse()
+					if err != nil {
+						return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+					}
+				}
+			}
+
 			conf, err = deriveAndValidateConfig(conf, initRunner.IsExecutable, logger)
 			if err != nil {
 				return err
