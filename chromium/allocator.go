@@ -16,21 +16,18 @@ import (
 
 // Allocator provides facilities for finding, running, and interacting with a Chromium browser.
 type Allocator struct {
-	execPath      string                 // path to the Chromium executable
-	initFlags     map[string]interface{} // CLI flags to pass to the Chromium executable
-	initEnv       []string               // environment variables to pass to the Chromium executable
-	tempDir       string                 // path for storing the extension and user specific data
-	removeTempDir func()                 // for removing the tempDir
+	execPath  string                 // path to the Chromium executable
+	initFlags map[string]interface{} // CLI flags to pass to the Chromium executable
+	initEnv   []string               // environment variables to pass to the Chromium executable
+	storage   DataStore              // stores temporary data for the extension and user
 }
 
 // NewAllocator returns a new Allocator with a path to a Chromium executable.
 func NewAllocator(flags map[string]interface{}, env []string) *Allocator {
 	return &Allocator{
-		execPath:      findExecPath(),
-		initFlags:     flags,
-		initEnv:       env,
-		tempDir:       "",
-		removeTempDir: func() {},
+		initFlags: flags,
+		initEnv:   env,
+		execPath:  findExecPath(),
 	}
 }
 
@@ -50,7 +47,7 @@ func (a *Allocator) Allocate(
 	defer func() {
 		if rerr != nil {
 			cancel()
-			a.removeTempDir()
+			a.storage.Cleanup()
 		}
 	}()
 
@@ -77,7 +74,7 @@ func (a *Allocator) Allocate(
 
 	go func() {
 		_ = cmd.Wait()
-		a.removeTempDir()
+		a.storage.Cleanup()
 	}()
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, launchOpts.Timeout)
@@ -89,48 +86,22 @@ func (a *Allocator) Allocate(
 	}
 	_ = stdout.Close()
 
-	return common.NewBrowserProcess(ctx, cancel, cmd.Process, wsURL, a.tempDir), nil
+	return common.NewBrowserProcess(ctx, cancel, cmd.Process, wsURL, a.storage.Dir), nil
 }
 
 // prepareArgs for launching a Chrome browser with the args.
 func (a *Allocator) prepareArgs() (args []string, err error) {
 	// use the provided directory or create a temporary one.
-	a.tempDir, a.removeTempDir, err = makeUserDataDir(a.tempDir, a.initFlags["user-data-dir"])
-	if err != nil {
+	if err = a.storage.Make("", a.initFlags["user-data-dir"]); err != nil {
 		return nil, fmt.Errorf("cannot make user temp directory: %w", err)
 	}
 	// add dir to flags so that parseArgs can parse it.
-	a.initFlags["user-data-dir"] = a.tempDir
+	a.initFlags["user-data-dir"] = a.storage.Dir
 
 	// parse all arguments
 	args, err = a.parseArgs()
 
 	return args, err
-}
-
-const k6BrowserTempDirPattern = "xk6-browser-user-data-*"
-
-// makeUserDataDir creates a new temporary directory for user specific data,
-// returns its path, and a remove func for removing it.
-// When usrDir is not empty, no directory will be created and the remove
-// function will be no-op.
-func makeUserDataDir(tmpDir string, usrDir interface{}) (dir string, remove func(), _ error) {
-	// used for when there is no directory to remove.
-	noop := func() {}
-
-	// use the provided dir.
-	if d, ok := usrDir.(string); ok && d != "" {
-		return d, noop, nil
-	}
-
-	// create a temporary dir because the provided dir is empty.
-	var err error
-	dir, err = os.MkdirTemp(tmpDir, k6BrowserTempDirPattern)
-	if err != nil {
-		return "", noop, fmt.Errorf("mkdir: %w", err)
-	}
-
-	return dir, func() { _ = os.RemoveAll(dir) }, nil
 }
 
 // parseArgs parses command-line arguments and returns them.
