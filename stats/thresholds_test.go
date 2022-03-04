@@ -52,7 +52,7 @@ func TestThreshold_runNoTaint(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		parsed           *thresholdExpression
+		operator         string
 		abortGracePeriod types.NullDuration
 		sinks            map[string]float64
 		wantOk           bool
@@ -60,7 +60,7 @@ func TestThreshold_runNoTaint(t *testing.T) {
 	}{
 		{
 			name:             "valid expression using the > operator over passing threshold",
-			parsed:           &thresholdExpression{tokenRate, null.Float{}, tokenGreater, 0.01},
+			operator:         tokenGreater,
 			abortGracePeriod: types.NullDurationFrom(0 * time.Second),
 			sinks:            map[string]float64{"rate": 1},
 			wantOk:           true,
@@ -68,7 +68,7 @@ func TestThreshold_runNoTaint(t *testing.T) {
 		},
 		{
 			name:             "valid expression using the > operator over passing threshold and defined abort grace period",
-			parsed:           &thresholdExpression{tokenRate, null.Float{}, tokenGreater, 0.01},
+			operator:         tokenGreater,
 			abortGracePeriod: types.NullDurationFrom(2 * time.Second),
 			sinks:            map[string]float64{"rate": 1},
 			wantOk:           true,
@@ -76,7 +76,7 @@ func TestThreshold_runNoTaint(t *testing.T) {
 		},
 		{
 			name:             "valid expression using the >= operator over passing threshold",
-			parsed:           &thresholdExpression{tokenRate, null.Float{}, tokenGreaterEqual, 0.01},
+			operator:         tokenGreaterEqual,
 			abortGracePeriod: types.NullDurationFrom(0 * time.Second),
 			sinks:            map[string]float64{"rate": 0.01},
 			wantOk:           true,
@@ -84,7 +84,7 @@ func TestThreshold_runNoTaint(t *testing.T) {
 		},
 		{
 			name:             "valid expression using the <= operator over passing threshold",
-			parsed:           &thresholdExpression{tokenRate, null.Float{}, tokenLessEqual, 0.01},
+			operator:         tokenLessEqual,
 			abortGracePeriod: types.NullDurationFrom(0 * time.Second),
 			sinks:            map[string]float64{"rate": 0.01},
 			wantOk:           true,
@@ -92,7 +92,7 @@ func TestThreshold_runNoTaint(t *testing.T) {
 		},
 		{
 			name:             "valid expression using the < operator over passing threshold",
-			parsed:           &thresholdExpression{tokenRate, null.Float{}, tokenLess, 0.01},
+			operator:         tokenLess,
 			abortGracePeriod: types.NullDurationFrom(0 * time.Second),
 			sinks:            map[string]float64{"rate": 0.00001},
 			wantOk:           true,
@@ -100,7 +100,7 @@ func TestThreshold_runNoTaint(t *testing.T) {
 		},
 		{
 			name:             "valid expression using the == operator over passing threshold",
-			parsed:           &thresholdExpression{tokenRate, null.Float{}, tokenLooselyEqual, 0.01},
+			operator:         tokenLooselyEqual,
 			abortGracePeriod: types.NullDurationFrom(0 * time.Second),
 			sinks:            map[string]float64{"rate": 0.01},
 			wantOk:           true,
@@ -108,7 +108,7 @@ func TestThreshold_runNoTaint(t *testing.T) {
 		},
 		{
 			name:             "valid expression using the === operator over passing threshold",
-			parsed:           &thresholdExpression{tokenRate, null.Float{}, tokenStrictlyEqual, 0.01},
+			operator:         tokenStrictlyEqual,
 			abortGracePeriod: types.NullDurationFrom(0 * time.Second),
 			sinks:            map[string]float64{"rate": 0.01},
 			wantOk:           true,
@@ -116,7 +116,7 @@ func TestThreshold_runNoTaint(t *testing.T) {
 		},
 		{
 			name:             "valid expression using != operator over passing threshold",
-			parsed:           &thresholdExpression{tokenRate, null.Float{}, tokenBangEqual, 0.01},
+			operator:         tokenBangEqual,
 			abortGracePeriod: types.NullDurationFrom(0 * time.Second),
 			sinks:            map[string]float64{"rate": 0.02},
 			wantOk:           true,
@@ -124,7 +124,7 @@ func TestThreshold_runNoTaint(t *testing.T) {
 		},
 		{
 			name:             "valid expression over failing threshold",
-			parsed:           &thresholdExpression{tokenRate, null.Float{}, tokenGreater, 0.01},
+			operator:         tokenGreater,
 			abortGracePeriod: types.NullDurationFrom(0 * time.Second),
 			sinks:            map[string]float64{"rate": 0.00001},
 			wantOk:           false,
@@ -132,7 +132,7 @@ func TestThreshold_runNoTaint(t *testing.T) {
 		},
 		{
 			name:             "valid expression over non-existing sink",
-			parsed:           &thresholdExpression{tokenRate, null.Float{}, tokenGreater, 0.01},
+			operator:         tokenGreater,
 			abortGracePeriod: types.NullDurationFrom(0 * time.Second),
 			sinks:            map[string]float64{"med": 27.2},
 			wantOk:           false,
@@ -142,7 +142,7 @@ func TestThreshold_runNoTaint(t *testing.T) {
 			// The ParseThresholdCondition constructor should ensure that no invalid
 			// operator gets through, but let's protect our future selves anyhow.
 			name:             "invalid expression operator",
-			parsed:           &thresholdExpression{tokenRate, null.Float{}, "&", 0.01},
+			operator:         "&",
 			abortGracePeriod: types.NullDurationFrom(0 * time.Second),
 			sinks:            map[string]float64{"rate": 0.00001},
 			wantOk:           false,
@@ -159,7 +159,12 @@ func TestThreshold_runNoTaint(t *testing.T) {
 				LastFailed:       false,
 				AbortOnFail:      false,
 				AbortGracePeriod: testCase.abortGracePeriod,
-				parsed:           testCase.parsed,
+				parsed: &thresholdExpression{
+					AggregationMethod: tokenRate,
+					Operator:          testCase.operator,
+					AggregationValue:  null.Float{},
+					Value:             0.01,
+				},
 			}
 
 			gotOk, gotErr := threshold.runNoTaint(testCase.sinks)
@@ -185,7 +190,12 @@ func BenchmarkRunNoTaint(b *testing.B) {
 		LastFailed:       false,
 		AbortOnFail:      false,
 		AbortGracePeriod: types.NullDurationFrom(2 * time.Second),
-		parsed:           &thresholdExpression{tokenRate, null.Float{}, tokenGreater, 0.01},
+		parsed: &thresholdExpression{
+			AggregationMethod: tokenRate,
+			Operator:          tokenGreater,
+			AggregationValue:  null.Float{},
+			Value:             0.01,
+		},
 	}
 
 	sinks := map[string]float64{"rate": 1}
