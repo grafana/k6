@@ -20,13 +20,6 @@ type Allocator struct {
 	storage  DataStore // stores temporary data for the extension and user
 }
 
-// NewAllocator returns a new Allocator with a path to a Chromium executable.
-func NewAllocator() *Allocator {
-	return &Allocator{
-		execPath: findExecPath(),
-	}
-}
-
 // Allocate starts a new Chromium browser process and returns it.
 // flags are CLI flags to pass to the Chromium executable,
 // and env is environment variables to pass to the Chromium executable.
@@ -49,6 +42,10 @@ func (a *Allocator) Allocate(
 		return nil, fmt.Errorf("cannot parse args: %w", err)
 	}
 
+	a.execPath = opts.ExecutablePath
+	if a.execPath == "" {
+		a.execPath = findExecPath()
+	}
 	ctx, cancel := context.WithCancel(ctx)
 	cmd := exec.CommandContext(ctx, a.execPath, args...) //nolint:gosec
 	killAfterParent(cmd)
@@ -77,7 +74,11 @@ func (a *Allocator) Allocate(
 
 	// We must start the cmd before calling cmd.Wait, as otherwise the two
 	// can run into a data race.
-	if err := cmd.Start(); err != nil {
+	err = cmd.Start()
+	if os.IsNotExist(err) {
+		return nil, fmt.Errorf("cannot find browser executable in %s", a.execPath)
+	}
+	if err != nil {
 		return nil, fmt.Errorf("cannot start browser executable: %w", err)
 	}
 	if ctx.Err() != nil {

@@ -28,6 +28,7 @@ type BrowserType struct {
 	CancelFn        context.CancelFunc
 	hooks           *common.Hooks
 	fieldNameMapper *common.FieldNameMapper
+	allocator       Allocator
 }
 
 // NewBrowserType returns a new Chrome browser type.
@@ -83,7 +84,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	browserProc, err := NewAllocator().Allocate(
+	browserProc, err := b.allocator.Allocate(
 		b.Ctx,
 		launchOpts,
 		b.flags(launchOpts, &state.Options),
