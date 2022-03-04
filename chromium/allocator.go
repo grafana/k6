@@ -32,12 +32,20 @@ func NewAllocator(flags map[string]interface{}, env []string) *Allocator {
 }
 
 // Allocate starts a new Chromium browser process and returns it.
+//nolint:funlen
 func (a *Allocator) Allocate(
 	ctx context.Context, launchOpts *common.LaunchOptions,
 ) (_ *common.BrowserProcess, rerr error) {
-	args, err := a.prepareArgs()
+	// use the provided directory or create a temporary one.
+	if err := a.storage.Make("", a.initFlags["user-data-dir"]); err != nil {
+		return nil, fmt.Errorf("cannot make temp data directory: %w", err)
+	}
+	// add dir to flags so that parseArgs can parse it.
+	a.initFlags["user-data-dir"] = a.storage.Dir
+
+	args, err := parseArgs(a.initFlags)
 	if err != nil {
-		return nil, fmt.Errorf("cannot prepare args: %w", err)
+		return nil, fmt.Errorf("cannot parse args: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -56,6 +64,9 @@ func (a *Allocator) Allocate(
 	if err != nil {
 		return nil, fmt.Errorf("cannot pipe stdout: %w", err)
 	}
+	defer func() {
+		_ = stdout.Close()
+	}()
 	cmd.Stderr = cmd.Stdout
 
 	// Set up environment variable for process
@@ -80,35 +91,19 @@ func (a *Allocator) Allocate(
 	ctxTimeout, cancel := context.WithTimeout(ctx, launchOpts.Timeout)
 	defer cancel()
 
-	wsURL, err := a.parseWebsocketURL(ctxTimeout, stdout)
+	wsURL, err := parseWebsocketURL(ctxTimeout, stdout)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse websocket url: %w", err)
 	}
-	_ = stdout.Close()
 
 	return common.NewBrowserProcess(ctx, cancel, cmd.Process, wsURL, a.storage.Dir), nil
 }
 
-// prepareArgs for launching a Chrome browser with the args.
-func (a *Allocator) prepareArgs() (args []string, err error) {
-	// use the provided directory or create a temporary one.
-	if err = a.storage.Make("", a.initFlags["user-data-dir"]); err != nil {
-		return nil, fmt.Errorf("cannot make user temp directory: %w", err)
-	}
-	// add dir to flags so that parseArgs can parse it.
-	a.initFlags["user-data-dir"] = a.storage.Dir
-
-	// parse all arguments
-	args, err = a.parseArgs()
-
-	return args, err
-}
-
 // parseArgs parses command-line arguments and returns them.
-func (a *Allocator) parseArgs() ([]string, error) {
+func parseArgs(initFlags map[string]interface{}) ([]string, error) {
 	// Build command line args list
 	var args []string
-	for name, value := range a.initFlags {
+	for name, value := range initFlags {
 		switch value := value.(type) {
 		case string:
 			args = append(args, fmt.Sprintf("--%s=%s", name, value))
@@ -120,13 +115,13 @@ func (a *Allocator) parseArgs() ([]string, error) {
 			return nil, errors.New("invalid browser command line flag")
 		}
 	}
-	if _, ok := a.initFlags["no-sandbox"]; !ok && os.Getuid() == 0 {
+	if _, ok := initFlags["no-sandbox"]; !ok && os.Getuid() == 0 {
 		// Running as root, for example in a Linux container. Chromium
 		// needs --no-sandbox when running as root, so make that the
 		// default, unless the user set "no-sandbox": false.
 		args = append(args, "--no-sandbox")
 	}
-	if _, ok := a.initFlags["remote-debugging-port"]; !ok {
+	if _, ok := initFlags["remote-debugging-port"]; !ok {
 		args = append(args, "--remote-debugging-port=0")
 	}
 
@@ -138,7 +133,7 @@ func (a *Allocator) parseArgs() ([]string, error) {
 }
 
 // parseWebsocketURL grabs the websocket address from chrome's output and returns it.
-func (a *Allocator) parseWebsocketURL(ctx context.Context, rc io.Reader) (wsURL string, _ error) {
+func parseWebsocketURL(ctx context.Context, rc io.Reader) (wsURL string, _ error) {
 	type result struct {
 		wsURL string
 		err   error
