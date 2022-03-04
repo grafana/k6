@@ -1,10 +1,14 @@
 package chromium
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
@@ -28,7 +32,9 @@ type BrowserType struct {
 	CancelFn        context.CancelFunc
 	hooks           *common.Hooks
 	fieldNameMapper *common.FieldNameMapper
-	allocator       Allocator
+
+	execPath string    // path to the Chromium executable
+	storage  DataStore // stores temporary data for the extension and user
 }
 
 // NewBrowserType returns a new Chrome browser type.
@@ -62,12 +68,47 @@ func (b *BrowserType) Connect(opts goja.Value) {
 }
 
 // ExecutablePath returns the path where the extension expects to find the browser executable.
-func (b *BrowserType) ExecutablePath() string {
-	return "chromium"
+func (b *BrowserType) ExecutablePath() (execPath string) {
+	if b.execPath != "" {
+		return b.execPath
+	}
+	defer func() {
+		b.execPath = execPath
+	}()
+
+	for _, path := range [...]string{
+		// Unix-like
+		"headless_shell",
+		"headless-shell",
+		"chromium",
+		"chromium-browser",
+		"google-chrome",
+		"google-chrome-stable",
+		"google-chrome-beta",
+		"google-chrome-unstable",
+		"/usr/bin/google-chrome",
+
+		// Windows
+		"chrome",
+		"chrome.exe", // in case PATHEXT is misconfigured
+		`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`,
+		`C:\Program Files\Google\Chrome\Application\chrome.exe`,
+		filepath.Join(os.Getenv("USERPROFILE"), `AppData\Local\Google\Chrome\Application\chrome.exe`),
+
+		// Mac (from https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Mac/857950/)
+		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+		"/Applications/Chromium.app/Contents/MacOS/Chromium",
+	} {
+		if _, err := exec.LookPath(path); err == nil {
+			return path
+		}
+	}
+
+	return ""
 }
 
-// Launch allocates a new Chrome browser process and returns a new browser value.
-// The returned browser value can be used for controlling the Chrome browser.
+// Launch allocates a new Chrome browser process and returns a new api.Browser value,
+// which can be used for controlling the Chrome browser.
 func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 	var (
 		rt         = k6common.GetRuntime(b.Ctx)
@@ -84,10 +125,9 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	browserProc, err := b.allocator.Allocate(
-		b.Ctx,
+	browserProc, err := b.allocate(
 		launchOpts,
-		b.flags(launchOpts, &state.Options),
+		prepareFlags(launchOpts, &state.Options),
 		envs,
 	)
 	if browserProc == nil {
@@ -124,7 +164,83 @@ func (b *BrowserType) Name() string {
 	return "chromium"
 }
 
-func (b *BrowserType) flags(lopts *common.LaunchOptions, k6opts *k6lib.Options) map[string]interface{} {
+// allocate starts a new Chromium browser process and returns it.
+func (b *BrowserType) allocate(
+	opts *common.LaunchOptions,
+	flags map[string]interface{},
+	env []string,
+) (_ *common.BrowserProcess, rerr error) {
+	// use the provided directory or create a temporary one.
+	if err := b.storage.Make("", flags["user-data-dir"]); err != nil {
+		return nil, fmt.Errorf("cannot make temp data directory: %w", err)
+	}
+	// add dir to flags so that parseArgs can parse it.
+	flags["user-data-dir"] = b.storage.Dir
+
+	args, err := parseArgs(flags)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse args: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(b.Ctx, opts.Timeout)
+	defer func() {
+		b.storage.Cleanup()
+		if rerr != nil {
+			cancel()
+		}
+	}()
+	path := opts.ExecutablePath
+	if path == "" {
+		path = b.ExecutablePath()
+	}
+
+	cmd, stdout, err := execute(ctx, path, args, env)
+	if err != nil {
+		return nil, fmt.Errorf("cannot start browser: %w", err)
+	}
+
+	wsURL, err := parseWebsocketURL(ctx, stdout)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse websocket url: %w", err)
+	}
+
+	return common.NewBrowserProcess(ctx, cancel, cmd.Process, wsURL, b.storage.Dir), nil
+}
+
+// parseArgs parses command-line arguments and returns them.
+func parseArgs(flags map[string]interface{}) ([]string, error) {
+	// Build command line args list
+	var args []string
+	for name, value := range flags {
+		switch value := value.(type) {
+		case string:
+			args = append(args, fmt.Sprintf("--%s=%s", name, value))
+		case bool:
+			if value {
+				args = append(args, fmt.Sprintf("--%s", name))
+			}
+		default:
+			return nil, errors.New("invalid browser command line flag")
+		}
+	}
+	if _, ok := flags["no-sandbox"]; !ok && os.Getuid() == 0 {
+		// Running as root, for example in a Linux container. Chromium
+		// needs --no-sandbox when running as root, so make that the
+		// default, unless the user set "no-sandbox": false.
+		args = append(args, "--no-sandbox")
+	}
+	if _, ok := flags["remote-debugging-port"]; !ok {
+		args = append(args, "--remote-debugging-port=0")
+	}
+
+	// Force the first page to be blank, instead of the welcome page;
+	// --no-first-run doesn't enforce that.
+	// args = append(args, "about:blank")
+	// args = append(args, "--no-startup-window")
+	return args, nil
+}
+
+func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) map[string]interface{} {
 	// After Puppeteer's and Playwright's default behavior.
 	f := map[string]interface{}{
 		"disable-background-networking":                      true,
@@ -176,30 +292,6 @@ func (b *BrowserType) flags(lopts *common.LaunchOptions, k6opts *k6lib.Options) 
 	return f
 }
 
-// makeLogger makes and returns an extension wide logger.
-func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*common.Logger, error) {
-	var (
-		k6Logger            = k6lib.GetState(ctx).Logger
-		reCategoryFilter, _ = regexp.Compile(launchOpts.LogCategoryFilter)
-		logger              = common.NewLogger(ctx, k6Logger, launchOpts.Debug, reCategoryFilter)
-	)
-
-	// set the log level from the launch options (usually from a script's options).
-	if launchOpts.Debug {
-		_ = logger.SetLevel("debug")
-	}
-	if el, ok := os.LookupEnv("XK6_BROWSER_LOG"); ok {
-		if err := logger.SetLevel(el); err != nil {
-			return nil, fmt.Errorf("cannot set logger level: %w", err)
-		}
-	}
-	if _, ok := os.LookupEnv("XK6_BROWSER_CALLER"); ok {
-		logger.ReportCaller()
-	}
-
-	return logger, nil
-}
-
 // setFlagsFromArgs fills flags by parsing the args slice.
 // This is used for passing the "arg=value" arguments along with other launch options
 // when launching a new Chrome browser.
@@ -235,4 +327,95 @@ func setFlagsFromK6Options(flags map[string]interface{}, k6opts *k6lib.Options) 
 		sort.Strings(hostResolver)
 		flags["host-resolver-rules"] = strings.Join(hostResolver, ",")
 	}
+}
+
+func execute(ctx context.Context, path string, args, env []string) (*exec.Cmd, io.Reader, error) {
+	cmd := exec.CommandContext(ctx, path, args...)
+	killAfterParent(cmd)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot pipe stdout: %w", err)
+	}
+	cmd.Stderr = cmd.Stdout
+
+	// Set up environment variable for process
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
+
+	// We must start the cmd before calling cmd.Wait, as otherwise the two
+	// can run into a data race.
+	err = cmd.Start()
+	if os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("does not exist: %s", path)
+	}
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w", err)
+	}
+	if ctx.Err() != nil {
+		return nil, nil, fmt.Errorf("context err: %w", ctx.Err())
+	}
+	go func() {
+		_ = cmd.Wait()
+		_ = stdout.Close()
+	}()
+
+	return cmd, stdout, nil
+}
+
+// parseWebsocketURL grabs the websocket address from chrome's output and returns it.
+func parseWebsocketURL(ctx context.Context, rc io.Reader) (wsURL string, _ error) {
+	type result struct {
+		wsURL string
+		err   error
+	}
+	c := make(chan result, 1)
+	go func() {
+		const prefix = "DevTools listening on "
+
+		scanner := bufio.NewScanner(rc)
+		for scanner.Scan() {
+			if s := scanner.Text(); strings.HasPrefix(s, prefix) {
+				c <- result{
+					strings.TrimPrefix(strings.TrimSpace(s), prefix),
+					nil,
+				}
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			c <- result{"", fmt.Errorf("scanner err: %w", err)}
+		}
+	}()
+	select {
+	case r := <-c:
+		return r.wsURL, r.err
+	case <-ctx.Done():
+		return "", fmt.Errorf("ctx err: %w", ctx.Err())
+	}
+}
+
+// makeLogger makes and returns an extension wide logger.
+func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*common.Logger, error) {
+	var (
+		k6Logger            = k6lib.GetState(ctx).Logger
+		reCategoryFilter, _ = regexp.Compile(launchOpts.LogCategoryFilter)
+		logger              = common.NewLogger(ctx, k6Logger, launchOpts.Debug, reCategoryFilter)
+	)
+
+	// set the log level from the launch options (usually from a script's options).
+	if launchOpts.Debug {
+		_ = logger.SetLevel("debug")
+	}
+	if el, ok := os.LookupEnv("XK6_BROWSER_LOG"); ok {
+		if err := logger.SetLevel(el); err != nil {
+			return nil, fmt.Errorf("cannot set logger level: %w", err)
+		}
+	}
+	if _, ok := os.LookupEnv("XK6_BROWSER_CALLER"); ok {
+		logger.ReportCaller()
+	}
+
+	return logger, nil
 }

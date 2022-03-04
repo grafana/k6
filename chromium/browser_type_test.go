@@ -132,10 +132,7 @@ func TestBrowserTypeFlags(t *testing.T) {
 				tc.pre(t)
 			}
 
-			var (
-				bt    BrowserType
-				flags = bt.flags(&common.LaunchOptions{}, nil)
-			)
+			flags := prepareFlags(&common.LaunchOptions{}, nil)
 
 			if tc.expInitVal != nil {
 				require.Contains(t, flags, tc.flag)
@@ -145,7 +142,7 @@ func TestBrowserTypeFlags(t *testing.T) {
 			}
 
 			if tc.changeOpts != nil || tc.changeK6Opts != nil {
-				flags = bt.flags(tc.changeOpts, tc.changeK6Opts)
+				flags = prepareFlags(tc.changeOpts, tc.changeK6Opts)
 				if tc.expChangedVal != nil {
 					assert.Equal(t, tc.expChangedVal, flags[tc.flag])
 				} else {
