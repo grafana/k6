@@ -223,9 +223,9 @@ func errorCodeForError(err error) (errCode, string) {
 // K6Error is a helper struct that enhances Go errors with custom k6-specific
 // error-codes and more user-readable error messages.
 type K6Error struct {
-	Code          errCode
-	Message       string
 	OriginalError error
+	Message       string
+	Code          errCode
 }
 
 // NewK6Error is the constructor for K6Error

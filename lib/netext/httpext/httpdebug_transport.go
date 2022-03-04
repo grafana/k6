@@ -31,8 +31,8 @@ import (
 
 type httpDebugTransport struct {
 	originalTransport http.RoundTripper
-	httpDebugOption   string
 	logger            logrus.FieldLogger
+	httpDebugOption   string
 }
 
 // RoundTrip prints passing HTTP requests and received responses

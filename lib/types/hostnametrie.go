@@ -147,8 +147,8 @@ func (t *HostnameTrie) Contains(s string) (matchedPattern string, matchFound boo
 }
 
 type trieNode struct {
-	isLeaf   bool
 	children map[rune]*trieNode
+	isLeaf   bool
 }
 
 func (t *trieNode) insert(s string) error {

@@ -42,8 +42,8 @@ type Sink interface {
 }
 
 type CounterSink struct {
-	Value float64
 	First time.Time
+	Value float64
 }
 
 func (c *CounterSink) Add(s Sample) {

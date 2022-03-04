@@ -46,9 +46,9 @@ type Response struct {
 }
 
 type jsonError struct {
+	err       error
 	line      int
 	character int
-	err       error
 }
 
 func (j jsonError) Error() string {

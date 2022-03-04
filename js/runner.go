@@ -600,11 +600,11 @@ var (
 type ActiveVU struct {
 	*VU
 	*lib.VUActivationParams
-	busy chan struct{}
-
-	scenarioName              string
-	getNextIterationCounters  func() (uint64, uint64)
-	scIterLocal, scIterGlobal uint64
+	busy                     chan struct{}
+	getNextIterationCounters func() (uint64, uint64)
+	scenarioName             string
+	scIterLocal              uint64
+	scIterGlobal             uint64
 }
 
 // GetID returns the unique VU ID.

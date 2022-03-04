@@ -77,14 +77,14 @@ func (mi *X509) Exports() modules.Exports {
 
 // Certificate is an X.509 certificate
 type Certificate struct {
-	Subject            Subject
-	Issuer             Issuer
+	PublicKey          PublicKey `js:"publicKey"`
 	NotBefore          string    `js:"notBefore"`
 	NotAfter           string    `js:"notAfter"`
-	AltNames           []string  `js:"altNames"`
 	SignatureAlgorithm string    `js:"signatureAlgorithm"`
-	FingerPrint        []byte    `js:"fingerPrint"`
-	PublicKey          PublicKey `js:"publicKey"`
+	Subject            Subject
+	Issuer             Issuer
+	AltNames           []string `js:"altNames"`
+	FingerPrint        []byte   `js:"fingerPrint"`
 }
 
 // RDN is a component of an X.509 distinguished name
@@ -118,8 +118,8 @@ type Issuer struct {
 
 // PublicKey is used for decryption and signature verification
 type PublicKey struct {
-	Algorithm string
 	Key       interface{}
+	Algorithm string
 }
 
 // parse produces an entire X.509 certificate

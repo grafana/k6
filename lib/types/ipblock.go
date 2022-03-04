@@ -42,8 +42,8 @@ type ipPoolBlock struct {
 
 // IPPool represent a slice of IPBlocks
 type IPPool struct {
-	list  []ipPoolBlock
 	count *big.Int
+	list  []ipPoolBlock
 }
 
 func getIPBlock(s string) (*ipBlock, error) {

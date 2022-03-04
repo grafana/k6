@@ -40,17 +40,18 @@ const (
 type ThresholdResult map[string]map[string]bool
 
 type TestRun struct {
+	Thresholds map[string][]string `json:"thresholds"`
 	Name       string              `json:"name"`
 	ProjectID  int64               `json:"project_id,omitempty"`
 	VUsMax     int64               `json:"vus"`
-	Thresholds map[string][]string `json:"thresholds"`
+
 	// Duration of test in seconds. -1 for unknown length, 0 for continuous running.
 	Duration int64 `json:"duration"`
 }
 
 type CreateTestRunResponse struct {
-	ReferenceID    string  `json:"reference_id"`
 	ConfigOverride *Config `json:"config"`
+	ReferenceID    string  `json:"reference_id"`
 }
 
 type TestProgressResponse struct {
@@ -136,9 +137,9 @@ func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, ta
 	}
 
 	data := struct {
+		Thresholds   ThresholdResult `json:"thresholds"`
 		ResultStatus ResultStatus    `json:"result_status"`
 		RunStatus    lib.RunStatus   `json:"run_status"`
-		Thresholds   ThresholdResult `json:"thresholds"`
 	}{
 		ResultStatus: resultStatus,
 		RunStatus:    runStatus,

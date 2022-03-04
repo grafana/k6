@@ -36,11 +36,10 @@ var ErrPathNeverRequestedBefore = errors.New("path never requested before")
 // that is used as cache
 type CacheOnReadFs struct {
 	afero.Fs
-	cache afero.Fs
-
+	cache      afero.Fs
 	lock       *sync.Mutex
-	cachedOnly bool
 	cached     map[string]bool
+	cachedOnly bool
 }
 
 // OnlyCachedEnabler enables the mode of FS that allows to open

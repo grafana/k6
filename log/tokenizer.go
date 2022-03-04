@@ -28,9 +28,9 @@ type token struct {
 }
 
 type tokenizer struct {
-	i          int
 	s          string
 	currentKey string
+	i          int
 }
 
 func (t *tokenizer) readKey() (string, error) {

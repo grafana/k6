@@ -52,18 +52,20 @@ const (
 
 // TODO better name - there are other command flags these are just ... non lib.Options ones :shrug:
 type commandFlags struct {
-	defaultConfigFilePath string
+	stderr                *consoleWriter
+	stdout                *consoleWriter
+	outMutex              *sync.Mutex
 	configFilePath        string
-	exitOnRunning         bool
-	showCloudLogs         bool
 	runType               string
 	archiveOut            string
-	quiet                 bool
-	noColor               bool
 	address               string
-	outMutex              *sync.Mutex
-	stdoutTTY, stderrTTY  bool
-	stdout, stderr        *consoleWriter
+	defaultConfigFilePath string
+	quiet                 bool
+	showCloudLogs         bool
+	stdoutTTY             bool
+	stderrTTY             bool
+	exitOnRunning         bool
+	noColor               bool
 }
 
 func newCommandFlags() *commandFlags {
@@ -101,15 +103,15 @@ func newCommandFlags() *commandFlags {
 // This is to keep all fields needed for the main/root k6 command
 type rootCommand struct {
 	ctx            context.Context
-	logger         *logrus.Logger
 	fallbackLogger logrus.FieldLogger
+	logger         *logrus.Logger
 	cmd            *cobra.Command
 	loggerStopped  <-chan struct{}
+	commandFlags   *commandFlags
 	logOutput      string
 	logFmt         string
 	loggerIsRemote bool
 	verbose        bool
-	commandFlags   *commandFlags
 }
 
 func newRootCommand(ctx context.Context, logger *logrus.Logger, fallbackLogger logrus.FieldLogger) *rootCommand {

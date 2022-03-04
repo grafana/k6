@@ -43,11 +43,9 @@ type MiniRunner struct {
 	SetupFn         func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error)
 	TeardownFn      func(ctx context.Context, out chan<- stats.SampleContainer) error
 	HandleSummaryFn func(context.Context, *lib.Summary) (map[string]io.Reader, error)
-
-	SetupData []byte
-
-	Group   *lib.Group
-	Options lib.Options
+	Group           *lib.Group
+	Options         lib.Options
+	SetupData       []byte
 }
 
 // MakeArchive isn't implemented, it always returns nil and is just here to
@@ -131,11 +129,13 @@ func (r *MiniRunner) HandleSummary(ctx context.Context, s *lib.Summary) (map[str
 
 // VU is a mock VU, spawned by a MiniRunner.
 type VU struct {
-	R            *MiniRunner
-	Out          chan<- stats.SampleContainer
-	ID, IDGlobal uint64
-	Iteration    int64
-	state        *lib.State
+	R         *MiniRunner
+	Out       chan<- stats.SampleContainer
+	state     *lib.State
+	ID        uint64
+	IDGlobal  uint64
+	Iteration int64
+
 	// count of iterations executed by this VU in each scenario
 	scenarioIter map[string]uint64
 }
@@ -144,11 +144,11 @@ type VU struct {
 type ActiveVU struct {
 	*VU
 	*lib.VUActivationParams
-	busy chan struct{}
-
-	scenarioName              string
-	getNextIterations         func() (uint64, uint64)
-	scIterLocal, scIterGlobal uint64
+	busy              chan struct{}
+	getNextIterations func() (uint64, uint64)
+	scenarioName      string
+	scIterLocal       uint64
+	scIterGlobal      uint64
 }
 
 // GetID returns the unique VU ID.

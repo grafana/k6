@@ -35,21 +35,18 @@ import (
 )
 
 type Config struct {
-	// Connection.
 	Addr             null.String        `json:"addr" envconfig:"K6_INFLUXDB_ADDR"`
 	Username         null.String        `json:"username,omitempty" envconfig:"K6_INFLUXDB_USERNAME"`
 	Password         null.String        `json:"password,omitempty" envconfig:"K6_INFLUXDB_PASSWORD"`
-	Insecure         null.Bool          `json:"insecure,omitempty" envconfig:"K6_INFLUXDB_INSECURE"`
+	Retention        null.String        `json:"retention,omitempty" envconfig:"K6_INFLUXDB_RETENTION"`
+	Consistency      null.String        `json:"consistency,omitempty" envconfig:"K6_INFLUXDB_CONSISTENCY"`
+	TagsAsFields     []string           `json:"tagsAsFields,omitempty" envconfig:"K6_INFLUXDB_TAGS_AS_FIELDS"`
+	DB               null.String        `json:"db" envconfig:"K6_INFLUXDB_DB"`
+	Precision        null.String        `json:"precision,omitempty" envconfig:"K6_INFLUXDB_PRECISION"`
+	ConcurrentWrites null.Int           `json:"concurrentWrites,omitempty" envconfig:"K6_INFLUXDB_CONCURRENT_WRITES"`
 	PayloadSize      null.Int           `json:"payloadSize,omitempty" envconfig:"K6_INFLUXDB_PAYLOAD_SIZE"`
 	PushInterval     types.NullDuration `json:"pushInterval,omitempty" envconfig:"K6_INFLUXDB_PUSH_INTERVAL"`
-	ConcurrentWrites null.Int           `json:"concurrentWrites,omitempty" envconfig:"K6_INFLUXDB_CONCURRENT_WRITES"`
-
-	// Samples.
-	DB           null.String `json:"db" envconfig:"K6_INFLUXDB_DB"`
-	Precision    null.String `json:"precision,omitempty" envconfig:"K6_INFLUXDB_PRECISION"`
-	Retention    null.String `json:"retention,omitempty" envconfig:"K6_INFLUXDB_RETENTION"`
-	Consistency  null.String `json:"consistency,omitempty" envconfig:"K6_INFLUXDB_CONSISTENCY"`
-	TagsAsFields []string    `json:"tagsAsFields,omitempty" envconfig:"K6_INFLUXDB_TAGS_AS_FIELDS"`
+	Insecure         null.Bool          `json:"insecure,omitempty" envconfig:"K6_INFLUXDB_INSECURE"`
 }
 
 // NewConfig creates a new InfluxDB output config with some default values.

@@ -36,14 +36,14 @@ type thresholdExpression struct {
 	// by `aggregationMethodTokens`.
 	AggregationMethod string
 
+	// Operator holds the operator parsed from the threshold expression.
+	// Possible values are described by `operatorTokens`.
+	Operator string
+
 	// AggregationValue will hold the aggregation method's pivot value
 	// in the event it is a percentile. For instance: an expression of the form p(99.9) < 200,
 	// would result in AggregationValue to be set to 99.9.
 	AggregationValue null.Float
-
-	// Operator holds the operator parsed from the threshold expression.
-	// Possible values are described by `operatorTokens`.
-	Operator string
 
 	// Value holds the value parsed from the threshold expression.
 	Value float64

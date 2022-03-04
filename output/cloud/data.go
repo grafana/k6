@@ -48,9 +48,9 @@ func toMicroSecond(t time.Time) int64 {
 // Sample is the generic struct that contains all types of data that we send to the cloud.
 //easyjson:json
 type Sample struct {
+	Data   interface{} `json:"data"`
 	Type   string      `json:"type"`
 	Metric string      `json:"metric"`
-	Data   interface{} `json:"data"`
 }
 
 // UnmarshalJSON decodes the Data into the corresponding struct
@@ -90,9 +90,9 @@ func (ct *Sample) UnmarshalJSON(p []byte) error {
 // SampleDataSingle is used in all simple un-aggregated single-value samples.
 //easyjson:json
 type SampleDataSingle struct {
+	Tags  *stats.SampleTags `json:"tags,omitempty"`
 	Time  int64             `json:"time,string"`
 	Type  stats.MetricType  `json:"type"`
-	Tags  *stats.SampleTags `json:"tags,omitempty"`
 	Value float64           `json:"value"`
 }
 
@@ -101,10 +101,10 @@ type SampleDataSingle struct {
 // requests (`http_req_li_all`).
 //easyjson:json
 type SampleDataMap struct {
-	Time   int64              `json:"time,string"`
-	Type   stats.MetricType   `json:"type"`
 	Tags   *stats.SampleTags  `json:"tags,omitempty"`
 	Values map[string]float64 `json:"values,omitempty"`
+	Time   int64              `json:"time,string"`
+	Type   stats.MetricType   `json:"type"`
 }
 
 // NewSampleFromTrail just creates a ready-to-send Sample instance
@@ -141,10 +141,8 @@ func NewSampleFromTrail(trail *httpext.Trail) *Sample {
 // SampleDataAggregatedHTTPReqs is used in aggregated samples for HTTP requests.
 //easyjson:json
 type SampleDataAggregatedHTTPReqs struct {
-	Time   int64             `json:"time,string"`
-	Type   string            `json:"type"`
-	Count  uint64            `json:"count"`
 	Tags   *stats.SampleTags `json:"tags,omitempty"`
+	Type   string            `json:"type"`
 	Values struct {
 		Duration       AggregatedMetric `json:"http_req_duration"`
 		Blocked        AggregatedMetric `json:"http_req_blocked"`
@@ -155,6 +153,8 @@ type SampleDataAggregatedHTTPReqs struct {
 		Receiving      AggregatedMetric `json:"http_req_receiving"`
 		Failed         AggregatedRate   `json:"http_req_failed,omitempty"`
 	} `json:"values"`
+	Time  int64  `json:"time,string"`
+	Count uint64 `json:"count"`
 }
 
 // Add updates all agregated values with the supplied trail data

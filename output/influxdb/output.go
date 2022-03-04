@@ -54,14 +54,14 @@ type Output struct {
 	output.SampleBuffer
 
 	Client    client.Client
-	Config    Config
 	BatchConf client.BatchPointsConfig
+	Config    Config
 
 	logger          logrus.FieldLogger
-	params          output.Params
 	fieldKinds      map[string]FieldKind
-	periodicFlusher *output.PeriodicFlusher
 	semaphoreCh     chan struct{}
+	periodicFlusher *output.PeriodicFlusher
+	params          output.Params
 	wg              sync.WaitGroup
 }
 

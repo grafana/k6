@@ -33,9 +33,9 @@ import (
 // remote service asynchronously. We want to do it only every several seconds,
 // and we don't want to block the Engine in the meantime.
 type SampleBuffer struct {
-	sync.Mutex
 	buffer []stats.SampleContainer
 	maxLen int
+	sync.Mutex
 }
 
 // AddMetricSamples adds the given metric samples to the internal buffer.
@@ -73,11 +73,11 @@ func (sc *SampleBuffer) GetBufferedSamples() []stats.SampleContainer {
 // samples on regular intervals. The biggest benefit is having a Stop() method
 // that waits for one last flush before it returns.
 type PeriodicFlusher struct {
-	period        time.Duration
 	flushCallback func()
 	stop          chan struct{}
 	stopped       chan struct{}
 	once          *sync.Once
+	period        time.Duration
 }
 
 func (pf *PeriodicFlusher) run() {

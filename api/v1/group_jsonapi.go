@@ -31,19 +31,19 @@ type groupsJSONAPI struct {
 }
 
 type groupData struct {
+	Relationships groupRelations `json:"relationships"`
 	Type          string         `json:"type"`
 	ID            string         `json:"id"`
 	Attributes    Group          `json:"attributes"`
-	Relationships groupRelations `json:"relationships"`
 }
 
 type groupRelations struct {
-	Groups struct {
-		Data []groupRelation `json:"data"`
-	} `json:"groups"`
 	Parent struct {
 		Data *groupRelation `json:"data"`
 	} `json:"parent"`
+	Groups struct {
+		Data []groupRelation `json:"data"`
+	} `json:"groups"`
 }
 
 type groupRelation struct {
@@ -54,10 +54,10 @@ type groupRelation struct {
 // UnmarshalJSON unmarshal group data properly (extract the ID)
 func (g *groupData) UnmarshalJSON(data []byte) error {
 	var raw struct {
+		Relationships groupRelations `json:"relationships"`
 		Type          string         `json:"type"`
 		ID            string         `json:"id"`
 		Attributes    Group          `json:"attributes"`
-		Relationships groupRelations `json:"relationships"`
 	}
 
 	if err := json.Unmarshal(data, &raw); err != nil {

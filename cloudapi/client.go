@@ -45,13 +45,11 @@ const (
 
 // Client handles communication with Load Impact cloud API.
 type Client struct {
-	client  *http.Client
-	token   string
-	baseURL string
-	version string
-
-	logger logrus.FieldLogger
-
+	logger        logrus.FieldLogger
+	client        *http.Client
+	token         string
+	baseURL       string
+	version       string
 	retries       int
 	retryInterval time.Duration
 }

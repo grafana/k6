@@ -35,13 +35,12 @@ var (
 
 // ErrorResponse represents an error cause by talking to the API
 type ErrorResponse struct {
-	Response *http.Response `json:"-"`
-
-	Code        int                 `json:"code"`
-	Message     string              `json:"message"`
+	Response    *http.Response      `json:"-"`
 	Details     map[string][]string `json:"details"`
 	FieldErrors map[string][]string `json:"field_errors"`
+	Message     string              `json:"message"`
 	Errors      []string            `json:"errors"`
+	Code        int                 `json:"code"`
 }
 
 func contains(s []string, e string) bool {

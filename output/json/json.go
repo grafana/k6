@@ -40,15 +40,14 @@ const flushPeriod = 200 * time.Millisecond // TODO: make this configurable
 type Output struct {
 	output.SampleBuffer
 
-	params          output.Params
+	logger          logrus.FieldLogger
+	closeFn         func() error
+	seenMetrics     map[string]struct{}
 	periodicFlusher *output.PeriodicFlusher
-
-	logger      logrus.FieldLogger
-	filename    string
-	encoder     *stdlibjson.Encoder
-	closeFn     func() error
-	seenMetrics map[string]struct{}
-	thresholds  map[string][]*stats.Threshold
+	encoder         *stdlibjson.Encoder
+	thresholds      map[string][]*stats.Threshold
+	filename        string
+	params          output.Params
 }
 
 // New returns a new JSON output.

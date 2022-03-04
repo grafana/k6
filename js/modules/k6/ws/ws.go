@@ -85,33 +85,31 @@ func (*RootModule) NewModuleInstance(m modules.VU) modules.Instance {
 var ErrWSInInitContext = common.NewInitContextError("using websockets in the init context is not supported")
 
 type Socket struct {
-	rt            *goja.Runtime
-	ctx           context.Context
-	conn          *websocket.Conn
-	eventHandlers map[string][]goja.Callable
-	scheduled     chan goja.Callable
-	done          chan struct{}
-	shutdownOnce  sync.Once
-
+	ctx                context.Context
+	rt                 *goja.Runtime
+	conn               *websocket.Conn
+	eventHandlers      map[string][]goja.Callable
+	scheduled          chan goja.Callable
+	done               chan struct{}
 	pingSendTimestamps map[string]time.Time
+	sampleTags         *stats.SampleTags
+	samplesOutput      chan<- stats.SampleContainer
+	builtinMetrics     *metrics.BuiltinMetrics
 	pingSendCounter    int
-
-	sampleTags     *stats.SampleTags
-	samplesOutput  chan<- stats.SampleContainer
-	builtinMetrics *metrics.BuiltinMetrics
+	shutdownOnce       sync.Once
 }
 
 type WSHTTPResponse struct {
-	URL     string            `json:"url"`
-	Status  int               `json:"status"`
 	Headers map[string]string `json:"headers"`
+	URL     string            `json:"url"`
 	Body    string            `json:"body"`
 	Error   string            `json:"error"`
+	Status  int               `json:"status"`
 }
 
 type message struct {
-	mtype int // message type consts as defined in gorilla/websocket/conn.go
 	data  []byte
+	mtype int // message type consts as defined in gorilla/websocket/conn.go
 }
 
 const writeWait = 10 * time.Second

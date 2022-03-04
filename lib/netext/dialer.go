@@ -38,14 +38,12 @@ import (
 // tracing, blacklists and DNS cache and aliases.
 type Dialer struct {
 	net.Dialer
-
 	Resolver         Resolver
-	Blacklist        []*lib.IPNet
 	BlockedHostnames *types.HostnameTrie
 	Hosts            map[string]*lib.HostAddress
-
-	BytesRead    int64
-	BytesWritten int64
+	Blacklist        []*lib.IPNet
+	BytesRead        int64
+	BytesWritten     int64
 }
 
 // NewDialer constructs a new Dialer with the given DNS resolver.
@@ -58,8 +56,8 @@ func NewDialer(dialer net.Dialer, resolver Resolver) *Dialer {
 
 // BlackListedIPError is an error that is returned when a given IP is blacklisted
 type BlackListedIPError struct {
-	ip  net.IP
 	net *lib.IPNet
+	ip  net.IP
 }
 
 func (b BlackListedIPError) Error() string {
@@ -218,13 +216,13 @@ func (d *Dialer) getConfiguredHost(addr, host, port string) (*lib.HostAddress, e
 // NetTrail contains information about the exchanged data size and length of a
 // series of connections from a particular netext.Dialer
 type NetTrail struct {
-	BytesRead     int64
-	BytesWritten  int64
-	FullIteration bool
 	StartTime     time.Time
 	EndTime       time.Time
 	Tags          *stats.SampleTags
 	Samples       []stats.Sample
+	BytesWritten  int64
+	BytesRead     int64
+	FullIteration bool
 }
 
 // Ensure that interfaces are implemented correctly

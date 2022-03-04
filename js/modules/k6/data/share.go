@@ -32,12 +32,11 @@ type sharedArray struct {
 }
 
 type wrappedSharedArray struct {
-	sharedArray
-
 	rt       *goja.Runtime
 	freeze   goja.Callable
 	isFrozen goja.Callable
 	parse    goja.Callable
+	sharedArray
 }
 
 func (s sharedArray) wrap(rt *goja.Runtime) goja.Value {

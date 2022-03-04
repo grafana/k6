@@ -98,8 +98,8 @@ func baseTest(t *testing.T,
 	myRate := stats.New("my_rate", stats.Rate)
 	myCheck := stats.New("my_check", stats.Rate)
 	testMatrix := []struct {
-		input  []stats.SampleContainer
 		output string
+		input  []stats.SampleContainer
 	}{
 		{
 			input: []stats.SampleContainer{

@@ -40,17 +40,16 @@ import (
 
 // ExecutionScheduler is the local implementation of lib.ExecutionScheduler
 type ExecutionScheduler struct {
-	runner  lib.Runner
-	options lib.Options
-	logger  *logrus.Logger
-
+	runner          lib.Runner
+	logger          *logrus.Logger
 	initProgress    *pb.ProgressBar
+	state           *lib.ExecutionState
+	options         lib.Options
 	executorConfigs []lib.ExecutorConfig // sorted by (startTime, ID)
 	executors       []lib.Executor       // sorted by (startTime, ID), excludes executors with no work
 	executionPlan   []lib.ExecutionStep
 	maxDuration     time.Duration // cached value derived from the execution plan
 	maxPossibleVUs  uint64        // cached value derived from the execution plan
-	state           *lib.ExecutionState
 }
 
 // Check to see if we implement the lib.ExecutionScheduler interface

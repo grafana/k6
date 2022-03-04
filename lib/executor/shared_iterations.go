@@ -158,8 +158,8 @@ func (sic SharedIterationsConfig) NewExecutor(
 // all shared by the configured VUs.
 type SharedIterations struct {
 	*BaseExecutor
-	config SharedIterationsConfig
 	et     *lib.ExecutionTuple
+	config SharedIterationsConfig
 }
 
 // Make sure we implement the lib.Executor interface.

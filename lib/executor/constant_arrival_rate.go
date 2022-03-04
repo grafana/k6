@@ -183,8 +183,8 @@ func (carc ConstantArrivalRateConfig) HasWork(et *lib.ExecutionTuple) bool {
 // specific period.
 type ConstantArrivalRate struct {
 	*BaseExecutor
-	config ConstantArrivalRateConfig
 	et     *lib.ExecutionTuple
+	config ConstantArrivalRateConfig
 }
 
 // Make sure we implement the lib.Executor interface.

@@ -25,9 +25,9 @@ type setUpJSONAPI struct {
 }
 
 type setUpData struct {
+	Attributes interface{} `json:"attributes"`
 	Type       string      `json:"type"`
 	ID         string      `json:"id"`
-	Attributes interface{} `json:"attributes"`
 }
 
 func newSetUpJSONAPI(setup interface{}) setUpJSONAPI {

@@ -62,14 +62,13 @@ const (
 // ProgressBar is a simple thread-safe progressbar implementation with
 // callbacks.
 type ProgressBar struct {
-	mutex  sync.RWMutex
-	width  int
-	logger *logrus.Entry
-	status Status
-
+	hijack   func() string
+	logger   *logrus.Entry
 	left     func() string
 	progress func() (progress float64, right []string)
-	hijack   func() string
+	width    int
+	mutex    sync.RWMutex
+	status   Status
 }
 
 // ProgressBarOption is used for helper functions that modify the progressbar
@@ -162,11 +161,14 @@ func (pb *ProgressBar) Modify(options ...ProgressBarOption) {
 // elements in the terminal output (e.g. for responsive progress
 // bars).
 type ProgressBarRender struct {
-	Right                                   []string
-	progress, progressFill, progressPadding string
-	Left, Hijack                            string
-	status                                  Status
-	Color                                   bool
+	progress        string
+	progressFill    string
+	progressPadding string
+	Left            string
+	Hijack          string
+	Right           []string
+	status          Status
+	Color           bool
 }
 
 // Status returns an optionally colorized status string

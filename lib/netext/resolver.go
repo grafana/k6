@@ -39,23 +39,24 @@ type Resolver interface {
 
 type resolver struct {
 	resolve     MultiResolver
-	selectIndex types.DNSSelect
-	policy      types.DNSPolicy
 	rrm         *sync.Mutex
 	rand        *rand.Rand
 	roundRobin  map[string]uint8
+	selectIndex types.DNSSelect
+	policy      types.DNSPolicy
 }
 
 type cacheRecord struct {
-	ips        []net.IP
 	lastLookup time.Time
+	ips        []net.IP
 }
 
 type cacheResolver struct {
 	resolver
-	ttl   time.Duration
+
 	cm    *sync.Mutex
 	cache map[string]cacheRecord
+	ttl   time.Duration
 }
 
 // NewResolver returns a new DNS resolver. If ttl is not 0, responses

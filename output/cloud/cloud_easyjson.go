@@ -101,12 +101,6 @@ func easyjson9def2ecdDecodeGoK6IoK6OutputCloud1(in *jlexer.Lexer, out *SampleDat
 			continue
 		}
 		switch key {
-		case "time":
-			out.Time = int64(in.Int64Str())
-		case "type":
-			if data := in.UnsafeBytes(); in.Ok() {
-				in.AddError((out.Type).UnmarshalText(data))
-			}
 		case "tags":
 			if in.IsNull() {
 				in.Skip()
@@ -118,6 +112,12 @@ func easyjson9def2ecdDecodeGoK6IoK6OutputCloud1(in *jlexer.Lexer, out *SampleDat
 				if data := in.Raw(); in.Ok() {
 					in.AddError((*out.Tags).UnmarshalJSON(data))
 				}
+			}
+		case "time":
+			out.Time = int64(in.Int64Str())
+		case "type":
+			if data := in.UnsafeBytes(); in.Ok() {
+				in.AddError((out.Type).UnmarshalText(data))
 			}
 		case "value":
 			out.Value = float64(in.Float64())
@@ -135,20 +135,26 @@ func easyjson9def2ecdEncodeGoK6IoK6OutputCloud1(out *jwriter.Writer, in SampleDa
 	out.RawByte('{')
 	first := true
 	_ = first
+	if in.Tags != nil {
+		const prefix string = ",\"tags\":"
+		first = false
+		out.RawString(prefix[1:])
+		(*in.Tags).MarshalEasyJSON(out)
+	}
 	{
 		const prefix string = ",\"time\":"
-		out.RawString(prefix[1:])
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.Int64Str(int64(in.Time))
 	}
 	{
 		const prefix string = ",\"type\":"
 		out.RawString(prefix)
 		out.Raw((in.Type).MarshalJSON())
-	}
-	if in.Tags != nil {
-		const prefix string = ",\"tags\":"
-		out.RawString(prefix)
-		(*in.Tags).MarshalEasyJSON(out)
 	}
 	{
 		const prefix string = ",\"value\":"
@@ -186,12 +192,6 @@ func easyjson9def2ecdDecodeGoK6IoK6OutputCloud2(in *jlexer.Lexer, out *SampleDat
 			continue
 		}
 		switch key {
-		case "time":
-			out.Time = int64(in.Int64Str())
-		case "type":
-			if data := in.UnsafeBytes(); in.Ok() {
-				in.AddError((out.Type).UnmarshalText(data))
-			}
 		case "tags":
 			if in.IsNull() {
 				in.Skip()
@@ -224,6 +224,12 @@ func easyjson9def2ecdDecodeGoK6IoK6OutputCloud2(in *jlexer.Lexer, out *SampleDat
 				}
 				in.Delim('}')
 			}
+		case "time":
+			out.Time = int64(in.Int64Str())
+		case "type":
+			if data := in.UnsafeBytes(); in.Ok() {
+				in.AddError((out.Type).UnmarshalText(data))
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -238,24 +244,20 @@ func easyjson9def2ecdEncodeGoK6IoK6OutputCloud2(out *jwriter.Writer, in SampleDa
 	out.RawByte('{')
 	first := true
 	_ = first
-	{
-		const prefix string = ",\"time\":"
-		out.RawString(prefix[1:])
-		out.Int64Str(int64(in.Time))
-	}
-	{
-		const prefix string = ",\"type\":"
-		out.RawString(prefix)
-		out.Raw((in.Type).MarshalJSON())
-	}
 	if in.Tags != nil {
 		const prefix string = ",\"tags\":"
-		out.RawString(prefix)
+		first = false
+		out.RawString(prefix[1:])
 		(*in.Tags).MarshalEasyJSON(out)
 	}
 	if len(in.Values) != 0 {
 		const prefix string = ",\"values\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		{
 			out.RawByte('{')
 			v5First := true
@@ -271,6 +273,21 @@ func easyjson9def2ecdEncodeGoK6IoK6OutputCloud2(out *jwriter.Writer, in SampleDa
 			}
 			out.RawByte('}')
 		}
+	}
+	{
+		const prefix string = ",\"time\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int64Str(int64(in.Time))
+	}
+	{
+		const prefix string = ",\"type\":"
+		out.RawString(prefix)
+		out.Raw((in.Type).MarshalJSON())
 	}
 	out.RawByte('}')
 }
@@ -303,12 +320,6 @@ func easyjson9def2ecdDecodeGoK6IoK6OutputCloud3(in *jlexer.Lexer, out *SampleDat
 			continue
 		}
 		switch key {
-		case "time":
-			out.Time = int64(in.Int64Str())
-		case "type":
-			out.Type = string(in.String())
-		case "count":
-			out.Count = uint64(in.Uint64())
 		case "tags":
 			if in.IsNull() {
 				in.Skip()
@@ -321,8 +332,14 @@ func easyjson9def2ecdDecodeGoK6IoK6OutputCloud3(in *jlexer.Lexer, out *SampleDat
 					in.AddError((*out.Tags).UnmarshalJSON(data))
 				}
 			}
+		case "type":
+			out.Type = string(in.String())
 		case "values":
 			easyjson9def2ecdDecode(in, &out.Values)
+		case "time":
+			out.Time = int64(in.Int64Str())
+		case "count":
+			out.Count = uint64(in.Uint64())
 		default:
 			in.SkipRecursive()
 		}
@@ -337,30 +354,36 @@ func easyjson9def2ecdEncodeGoK6IoK6OutputCloud3(out *jwriter.Writer, in SampleDa
 	out.RawByte('{')
 	first := true
 	_ = first
-	{
-		const prefix string = ",\"time\":"
+	if in.Tags != nil {
+		const prefix string = ",\"tags\":"
+		first = false
 		out.RawString(prefix[1:])
-		out.Int64Str(int64(in.Time))
+		(*in.Tags).MarshalEasyJSON(out)
 	}
 	{
 		const prefix string = ",\"type\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.String(string(in.Type))
-	}
-	{
-		const prefix string = ",\"count\":"
-		out.RawString(prefix)
-		out.Uint64(uint64(in.Count))
-	}
-	if in.Tags != nil {
-		const prefix string = ",\"tags\":"
-		out.RawString(prefix)
-		(*in.Tags).MarshalEasyJSON(out)
 	}
 	{
 		const prefix string = ",\"values\":"
 		out.RawString(prefix)
 		easyjson9def2ecdEncode(out, in.Values)
+	}
+	{
+		const prefix string = ",\"time\":"
+		out.RawString(prefix)
+		out.Int64Str(int64(in.Time))
+	}
+	{
+		const prefix string = ",\"count\":"
+		out.RawString(prefix)
+		out.Uint64(uint64(in.Count))
 	}
 	out.RawByte('}')
 }
@@ -607,10 +630,6 @@ func easyjson9def2ecdDecodeGoK6IoK6OutputCloud6(in *jlexer.Lexer, out *Sample) {
 			continue
 		}
 		switch key {
-		case "type":
-			out.Type = string(in.String())
-		case "metric":
-			out.Metric = string(in.String())
 		case "data":
 			if m, ok := out.Data.(easyjson.Unmarshaler); ok {
 				m.UnmarshalEasyJSON(in)
@@ -619,6 +638,10 @@ func easyjson9def2ecdDecodeGoK6IoK6OutputCloud6(in *jlexer.Lexer, out *Sample) {
 			} else {
 				out.Data = in.Interface()
 			}
+		case "type":
+			out.Type = string(in.String())
+		case "metric":
+			out.Metric = string(in.String())
 		default:
 			in.SkipRecursive()
 		}
@@ -634,18 +657,8 @@ func easyjson9def2ecdEncodeGoK6IoK6OutputCloud6(out *jwriter.Writer, in Sample) 
 	first := true
 	_ = first
 	{
-		const prefix string = ",\"type\":"
-		out.RawString(prefix[1:])
-		out.String(string(in.Type))
-	}
-	{
-		const prefix string = ",\"metric\":"
-		out.RawString(prefix)
-		out.String(string(in.Metric))
-	}
-	{
 		const prefix string = ",\"data\":"
-		out.RawString(prefix)
+		out.RawString(prefix[1:])
 		if m, ok := in.Data.(easyjson.Marshaler); ok {
 			m.MarshalEasyJSON(out)
 		} else if m, ok := in.Data.(json.Marshaler); ok {
@@ -653,6 +666,16 @@ func easyjson9def2ecdEncodeGoK6IoK6OutputCloud6(out *jwriter.Writer, in Sample) 
 		} else {
 			out.Raw(json.Marshal(in.Data))
 		}
+	}
+	{
+		const prefix string = ",\"type\":"
+		out.RawString(prefix)
+		out.String(string(in.Type))
+	}
+	{
+		const prefix string = ",\"metric\":"
+		out.RawString(prefix)
+		out.String(string(in.Metric))
 	}
 	out.RawByte('}')
 }

@@ -50,11 +50,11 @@ type HTTPRequestCookie struct {
 
 // Request represent an http request
 type Request struct {
+	Headers map[string][]string             `json:"headers"`
+	Cookies map[string][]*HTTPRequestCookie `json:"cookies"`
 	Method  string                          `json:"method"`
 	URL     string                          `json:"url"`
-	Headers map[string][]string             `json:"headers"`
 	Body    string                          `json:"body"`
-	Cookies map[string][]*HTTPRequestCookie `json:"cookies"`
 }
 
 // ParsedHTTPRequest a represantion of a request after it has been parsed from a user script
@@ -62,16 +62,16 @@ type ParsedHTTPRequest struct {
 	URL              *URL
 	Body             *bytes.Buffer
 	Req              *http.Request
-	Timeout          time.Duration
-	Auth             string
-	Throw            bool
-	ResponseType     ResponseType
+	Cookies          map[string]*HTTPRequestCookie
+	ActiveJar        *cookiejar.Jar
 	ResponseCallback func(int) bool
+	Tags             map[string]string
+	Auth             string
 	Compressions     []CompressionType
 	Redirects        null.Int
-	ActiveJar        *cookiejar.Jar
-	Cookies          map[string]*HTTPRequestCookie
-	Tags             map[string]string
+	Timeout          time.Duration
+	ResponseType     ResponseType
+	Throw            bool
 }
 
 // Matches non-compliant io.Closer implementations (e.g. zstd.Decoder)

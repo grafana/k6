@@ -55,12 +55,10 @@ var _ output.Output = &Output{}
 type Output struct {
 	output.SampleBuffer
 
+	logger          logrus.FieldLogger
 	periodicFlusher *output.PeriodicFlusher
-
-	config config
-
-	logger logrus.FieldLogger
-	client *statsd.Client
+	client          *statsd.Client
+	config          config
 }
 
 func (o *Output) dispatch(entry stats.Sample) error {

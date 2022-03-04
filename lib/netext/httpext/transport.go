@@ -64,8 +64,8 @@ type finishedRequest struct {
 	*unfinishedRequest
 	trail     *Trail
 	tlsInfo   netext.TLSInfo
-	errorCode errCode
 	errorMsg  string
+	errorCode errCode
 }
 
 var _ http.RoundTripper = &transport{}

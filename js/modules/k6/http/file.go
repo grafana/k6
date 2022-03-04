@@ -30,9 +30,9 @@ import (
 
 // FileData represents a binary file requiring multipart request encoding
 type FileData struct {
-	Data        []byte
 	Filename    string
 	ContentType string
+	Data        []byte
 }
 
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")

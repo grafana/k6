@@ -29,9 +29,9 @@ import (
 // MockResolver implements netext.Resolver, and allows changing the host
 // mapping at runtime.
 type MockResolver struct {
-	m        sync.RWMutex
 	hosts    map[string][]net.IP
 	fallback func(host string) ([]net.IP, error)
+	m        sync.RWMutex
 }
 
 // New returns a new MockResolver.

@@ -75,19 +75,19 @@ type Client struct {
 
 // MethodInfo holds information on any parsed method descriptors that can be used by the goja VM
 type MethodInfo struct {
-	grpc.MethodInfo `json:"-" js:"-"`
 	Package         string
 	Service         string
 	FullMethod      string
+	grpc.MethodInfo `json:"-" js:"-"`
 }
 
 // Response is a gRPC response that can be used by the goja VM
 type Response struct {
-	Status   codes.Code
 	Message  interface{}
+	Error    interface{}
 	Headers  map[string][]string
 	Trailers map[string][]string
-	Error    interface{}
+	Status   codes.Code
 }
 
 func walkFileDescriptors(seen map[string]struct{}, fd *desc.FileDescriptor) []*descriptorpb.FileDescriptorProto {

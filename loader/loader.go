@@ -41,8 +41,8 @@ import (
 
 // SourceData wraps a source file; data and filename.
 type SourceData struct {
-	Data []byte
 	URL  *url.URL
+	Data []byte
 }
 
 type loaderFunc func(logger logrus.FieldLogger, path string, parts []string) (string, error)

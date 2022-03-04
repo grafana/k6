@@ -34,13 +34,12 @@ func New() *MockOutput {
 
 // MockOutput can be used in tests to mock an actual output.
 type MockOutput struct {
+	DescFn           func() string
+	StartFn          func() error
+	StopFn           func() error
 	SampleContainers []stats.SampleContainer
 	Samples          []stats.Sample
 	RunStatus        lib.RunStatus
-
-	DescFn  func() string
-	StartFn func() error
-	StopFn  func() error
 }
 
 var _ output.WithRunStatusUpdates = &MockOutput{}

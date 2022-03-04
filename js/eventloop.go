@@ -21,11 +21,11 @@ import (
 // Additionally because of this on any error while the event loop will exit it's
 // required to wait on the event loop to be empty before the execution can continue.
 type eventLoop struct {
-	lock                sync.Mutex
-	queue               []func() error
-	wakeupCh            chan struct{} // TODO: maybe use sync.Cond ?
-	registeredCallbacks int
 	vu                  modules.VU
+	wakeupCh            chan struct{} // TODO: maybe use sync.Cond ?
+	queue               []func() error
+	registeredCallbacks int
+	lock                sync.Mutex
 
 	// pendingPromiseRejections are rejected promises with no handler,
 	// if there is something in this map at an end of an event loop then it will exit with an error.

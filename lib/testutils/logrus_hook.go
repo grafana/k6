@@ -30,8 +30,8 @@ import (
 // if log messages were outputted
 type SimpleLogrusHook struct {
 	HookedLevels []logrus.Level
-	mutex        sync.Mutex
 	messageCache []logrus.Entry
+	mutex        sync.Mutex
 }
 
 // Levels just returns whatever was stored in the HookedLevels slice

@@ -100,17 +100,16 @@ var _ stats.ConnectedSampleContainer = &Trail{}
 // It's NOT safe to reuse Tracers between requests.
 // Cheers, love, the cavalry's here.
 type Tracer struct {
+	connRemoteAddr       net.Addr
 	getConn              int64
 	connectStart         int64
 	connectDone          int64
-	tlsHandshakeStart    int64
 	tlsHandshakeDone     int64
 	gotConn              int64
 	wroteRequest         int64
 	gotFirstResponseByte int64
-
-	connReused     bool
-	connRemoteAddr net.Addr
+	tlsHandshakeStart    int64
+	connReused           bool
 }
 
 // Trace returns a premade ClientTrace that calls all of the Tracer's hooks.

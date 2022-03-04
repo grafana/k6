@@ -33,13 +33,13 @@ import (
 type Threshold struct {
 	// Source is the text based source of the threshold
 	Source string
+	// AbortGracePeriod is a the minimum amount of time a test should be running before a failing
+	// this threshold will abort the test
+	AbortGracePeriod types.NullDuration
 	// LastFailed is a marker if the last testing of this threshold failed
 	LastFailed bool
 	// AbortOnFail marks if a given threshold fails that the whole test should be aborted
 	AbortOnFail bool
-	// AbortGracePeriod is a the minimum amount of time a test should be running before a failing
-	// this threshold will abort the test
-	AbortGracePeriod types.NullDuration
 	// parsed is the threshold expression parsed from the Source
 	parsed *thresholdExpression
 }
@@ -132,9 +132,9 @@ func (tc thresholdConfig) MarshalJSON() ([]byte, error) {
 
 // Thresholds is the combination of all Thresholds for a given metric
 type Thresholds struct {
+	sinked     map[string]float64
 	Thresholds []*Threshold
 	Abort      bool
-	sinked     map[string]float64
 }
 
 // NewThresholds returns Thresholds objects representing the provided source strings
@@ -156,7 +156,11 @@ func newThresholdsWithConfig(configs []thresholdConfig) Thresholds {
 		thresholds[i] = t
 	}
 
-	return Thresholds{thresholds, false, sinked}
+	return Thresholds{
+		Thresholds: thresholds,
+		sinked:     sinked,
+		Abort:      false,
+	}
 }
 
 func (ts *Thresholds) runAll(timeSpentInTest time.Duration) (bool, error) {

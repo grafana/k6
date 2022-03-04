@@ -41,19 +41,17 @@ import (
 type Output struct {
 	output.SampleBuffer
 
-	params          output.Params
+	logger          logrus.FieldLogger
+	closeFn         func() error
 	periodicFlusher *output.PeriodicFlusher
-
-	logger    logrus.FieldLogger
-	fname     string
-	csvWriter *csv.Writer
-	csvLock   sync.Mutex
-	closeFn   func() error
-
-	resTags      []string
-	ignoredTags  []string
-	row          []string
-	saveInterval time.Duration
+	csvWriter       *csv.Writer
+	fname           string
+	params          output.Params
+	resTags         []string
+	ignoredTags     []string
+	row             []string
+	saveInterval    time.Duration
+	csvLock         sync.Mutex
 }
 
 // New Creates new instance of CSV output

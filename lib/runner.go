@@ -53,9 +53,11 @@ type InitializedVU interface {
 type VUActivationParams struct {
 	RunContext               context.Context
 	DeactivateCallback       func(InitializedVU)
-	Env, Tags                map[string]string
-	Exec, Scenario           string
+	Env                      map[string]string
+	Tags                     map[string]string
 	GetNextIterationCounters func() (uint64, uint64)
+	Exec                     string
+	Scenario                 string
 }
 
 // A Runner is a factory for VUs. It should precompute as much as possible upon

@@ -28,8 +28,8 @@ import (
 )
 
 type FormValue struct {
-	Name  string
 	Value goja.Value
+	Name  string
 }
 
 // nolint: goconst

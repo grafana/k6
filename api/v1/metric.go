@@ -73,13 +73,11 @@ func (t *NullValueType) UnmarshalJSON(data []byte) error {
 }
 
 type Metric struct {
-	Name string `json:"-" yaml:"name"`
-
-	Type     NullMetricType `json:"type" yaml:"type"`
-	Contains NullValueType  `json:"contains" yaml:"contains"`
-	Tainted  null.Bool      `json:"tainted" yaml:"tainted"`
-
-	Sample map[string]float64 `json:"sample" yaml:"sample"`
+	Sample   map[string]float64 `json:"sample" yaml:"sample"`
+	Name     string             `json:"-" yaml:"name"`
+	Type     NullMetricType     `json:"type" yaml:"type"`
+	Contains NullValueType      `json:"contains" yaml:"contains"`
+	Tainted  null.Bool          `json:"tainted" yaml:"tainted"`
 }
 
 func NewMetric(m *stats.Metric, t time.Duration) Metric {

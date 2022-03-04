@@ -113,9 +113,10 @@ type ExecutorConfig interface {
 // ScenarioState holds runtime scenario information returned by the k6/execution
 // JS module.
 type ScenarioState struct {
-	Name, Executor string
-	StartTime      time.Time
-	ProgressFn     func() (float64, []string)
+	StartTime  time.Time
+	ProgressFn func() (float64, []string)
+	Name       string
+	Executor   string
 }
 
 // InitVUFunc is just a shorthand so we don't have to type the function
