@@ -16,34 +16,35 @@ import (
 
 // Allocator provides facilities for finding, running, and interacting with a Chromium browser.
 type Allocator struct {
-	execPath  string                 // path to the Chromium executable
-	initFlags map[string]interface{} // CLI flags to pass to the Chromium executable
-	initEnv   []string               // environment variables to pass to the Chromium executable
-	storage   DataStore              // stores temporary data for the extension and user
+	execPath string    // path to the Chromium executable
+	storage  DataStore // stores temporary data for the extension and user
 }
 
 // NewAllocator returns a new Allocator with a path to a Chromium executable.
-func NewAllocator(flags map[string]interface{}, env []string) *Allocator {
+func NewAllocator() *Allocator {
 	return &Allocator{
-		initFlags: flags,
-		initEnv:   env,
-		execPath:  findExecPath(),
+		execPath: findExecPath(),
 	}
 }
 
 // Allocate starts a new Chromium browser process and returns it.
+// flags are CLI flags to pass to the Chromium executable,
+// and env is environment variables to pass to the Chromium executable.
 //nolint:funlen
 func (a *Allocator) Allocate(
-	ctx context.Context, launchOpts *common.LaunchOptions,
+	ctx context.Context,
+	opts *common.LaunchOptions,
+	flags map[string]interface{},
+	env []string,
 ) (_ *common.BrowserProcess, rerr error) {
 	// use the provided directory or create a temporary one.
-	if err := a.storage.Make("", a.initFlags["user-data-dir"]); err != nil {
+	if err := a.storage.Make("", flags["user-data-dir"]); err != nil {
 		return nil, fmt.Errorf("cannot make temp data directory: %w", err)
 	}
 	// add dir to flags so that parseArgs can parse it.
-	a.initFlags["user-data-dir"] = a.storage.Dir
+	flags["user-data-dir"] = a.storage.Dir
 
-	args, err := parseArgs(a.initFlags)
+	args, err := parseArgs(flags)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse args: %w", err)
 	}
@@ -70,8 +71,8 @@ func (a *Allocator) Allocate(
 	cmd.Stderr = cmd.Stdout
 
 	// Set up environment variable for process
-	if len(a.initEnv) > 0 {
-		cmd.Env = append(os.Environ(), a.initEnv...)
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
 	}
 
 	// We must start the cmd before calling cmd.Wait, as otherwise the two
@@ -88,7 +89,7 @@ func (a *Allocator) Allocate(
 		a.storage.Cleanup()
 	}()
 
-	ctxTimeout, cancel := context.WithTimeout(ctx, launchOpts.Timeout)
+	ctxTimeout, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
 	wsURL, err := parseWebsocketURL(ctxTimeout, stdout)
@@ -100,10 +101,10 @@ func (a *Allocator) Allocate(
 }
 
 // parseArgs parses command-line arguments and returns them.
-func parseArgs(initFlags map[string]interface{}) ([]string, error) {
+func parseArgs(flags map[string]interface{}) ([]string, error) {
 	// Build command line args list
 	var args []string
-	for name, value := range initFlags {
+	for name, value := range flags {
 		switch value := value.(type) {
 		case string:
 			args = append(args, fmt.Sprintf("--%s=%s", name, value))
@@ -115,13 +116,13 @@ func parseArgs(initFlags map[string]interface{}) ([]string, error) {
 			return nil, errors.New("invalid browser command line flag")
 		}
 	}
-	if _, ok := initFlags["no-sandbox"]; !ok && os.Getuid() == 0 {
+	if _, ok := flags["no-sandbox"]; !ok && os.Getuid() == 0 {
 		// Running as root, for example in a Linux container. Chromium
 		// needs --no-sandbox when running as root, so make that the
 		// default, unless the user set "no-sandbox": false.
 		args = append(args, "--no-sandbox")
 	}
-	if _, ok := initFlags["remote-debugging-port"]; !ok {
+	if _, ok := flags["remote-debugging-port"]; !ok {
 		args = append(args, "--remote-debugging-port=0")
 	}
 

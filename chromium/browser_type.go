@@ -83,8 +83,12 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	allocator := NewAllocator(b.flags(launchOpts, &state.Options), envs)
-	browserProc, err := allocator.Allocate(b.Ctx, launchOpts)
+	browserProc, err := NewAllocator().Allocate(
+		b.Ctx,
+		launchOpts,
+		b.flags(launchOpts, &state.Options),
+		envs,
+	)
 	if browserProc == nil {
 		k6common.Throw(rt, fmt.Errorf("cannot allocate browser: %w", err))
 	}
