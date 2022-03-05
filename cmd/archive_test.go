@@ -40,10 +40,12 @@ func TestArchiveThresholds(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
+			tmpPath := filepath.Join(t.TempDir(), "archive.tar")
+
 			cmd := getArchiveCmd(testutils.NewLogger(t), newCommandFlags())
 			filename, err := filepath.Abs(testCase.testFilename)
 			require.NoError(t, err)
-			args := []string{filename}
+			args := []string{filename, "--archive-out", tmpPath}
 			if testCase.noThresholds {
 				args = append(args, "--no-thresholds")
 			}
