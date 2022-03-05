@@ -23,8 +23,6 @@ package cmd
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
-	"path/filepath"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -35,7 +33,7 @@ import (
 )
 
 //nolint:funlen,gocognit
-func getConvertCmd(defaultFs afero.Fs, defaultWriter io.Writer) *cobra.Command {
+func getConvertCmd(globalState *globalState) *cobra.Command {
 	var (
 		convertOutput       string
 		optionsFilePath     string
@@ -68,11 +66,7 @@ func getConvertCmd(defaultFs afero.Fs, defaultWriter io.Writer) *cobra.Command {
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse the HAR file
-			filePath, err := filepath.Abs(args[0])
-			if err != nil {
-				return err
-			}
-			r, err := defaultFs.Open(filePath)
+			r, err := globalState.fs.Open(args[0])
 			if err != nil {
 				return err
 			}
@@ -88,9 +82,9 @@ func getConvertCmd(defaultFs afero.Fs, defaultWriter io.Writer) *cobra.Command {
 			options := lib.Options{MaxRedirects: null.IntFrom(0)}
 
 			if optionsFilePath != "" {
-				optionsFileContents, err := ioutil.ReadFile(optionsFilePath) //nolint:gosec,govet
-				if err != nil {
-					return err
+				optionsFileContents, readErr := afero.ReadFile(globalState.fs, optionsFilePath)
+				if readErr != nil {
+					return readErr
 				}
 				var injectedOptions lib.Options
 				if err := json.Unmarshal(optionsFileContents, &injectedOptions); err != nil {
@@ -108,11 +102,11 @@ func getConvertCmd(defaultFs afero.Fs, defaultWriter io.Writer) *cobra.Command {
 
 			// Write script content to stdout or file
 			if convertOutput == "" || convertOutput == "-" { //nolint:nestif
-				if _, err := io.WriteString(defaultWriter, script); err != nil {
+				if _, err := io.WriteString(globalState.stdOut, script); err != nil {
 					return err
 				}
 			} else {
-				f, err := defaultFs.Create(convertOutput)
+				f, err := globalState.fs.Create(convertOutput)
 				if err != nil {
 					return err
 				}

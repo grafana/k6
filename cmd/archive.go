@@ -21,10 +21,6 @@
 package cmd
 
 import (
-	"os"
-
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -33,7 +29,8 @@ import (
 	"go.k6.io/k6/lib/metrics"
 )
 
-func getArchiveCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Command {
+func getArchiveCmd(globalState *globalState) *cobra.Command { // nolint: funlen
+	archiveOut := "archive.tar"
 	// archiveCmd represents the archive command
 	archiveCmd := &cobra.Command{
 		Use:   "archive",
@@ -49,19 +46,22 @@ An archive is a fully self-contained test run, and can be executed identically e
   k6 run myarchive.tar`[1:],
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			src, filesystems, err := readSource(args[0], logger)
+			src, filesystems, err := readSource(globalState, args[0])
 			if err != nil {
 				return err
 			}
 
-			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), buildEnvMap(os.Environ()))
+			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), globalState.envVars)
 			if err != nil {
 				return err
 			}
 
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			r, err := newRunner(logger, src, globalFlags.runType, filesystems, runtimeOptions, builtinMetrics, registry)
+			r, err := newRunner(
+				globalState.logger, src, globalState.flags.runType,
+				filesystems, runtimeOptions, builtinMetrics, registry,
+			)
 			if err != nil {
 				return err
 			}
@@ -70,9 +70,7 @@ An archive is a fully self-contained test run, and can be executed identically e
 			if err != nil {
 				return err
 			}
-			conf, err := getConsolidatedConfig(
-				afero.NewOsFs(), Config{Options: cliOpts}, r.GetOptions(), buildEnvMap(os.Environ()), globalFlags,
-			)
+			conf, err := getConsolidatedConfig(globalState, Config{Options: cliOpts}, r.GetOptions())
 			if err != nil {
 				return err
 			}
@@ -89,7 +87,7 @@ An archive is a fully self-contained test run, and can be executed identically e
 				}
 			}
 
-			_, err = deriveAndValidateConfig(conf, r.IsExecutable, logger)
+			_, err = deriveAndValidateConfig(conf, r.IsExecutable, globalState.logger)
 			if err != nil {
 				return err
 			}
@@ -101,7 +99,7 @@ An archive is a fully self-contained test run, and can be executed identically e
 
 			// Archive.
 			arc := r.MakeArchive()
-			f, err := os.Create(globalFlags.archiveOut)
+			f, err := globalState.fs.Create(archiveOut)
 			if err != nil {
 				return err
 			}
@@ -115,16 +113,16 @@ An archive is a fully self-contained test run, and can be executed identically e
 	}
 
 	archiveCmd.Flags().SortFlags = false
-	archiveCmd.Flags().AddFlagSet(archiveCmdFlagSet(globalFlags))
+	archiveCmd.Flags().AddFlagSet(archiveCmdFlagSet(&archiveOut))
 
 	return archiveCmd
 }
 
-func archiveCmdFlagSet(globalFlags *commandFlags) *pflag.FlagSet {
+func archiveCmdFlagSet(archiveOut *string) *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SortFlags = false
 	flags.AddFlagSet(optionFlagSet())
 	flags.AddFlagSet(runtimeOptionFlagSet(false))
-	flags.StringVarP(&globalFlags.archiveOut, "archive-out", "O", globalFlags.archiveOut, "archive output filename")
+	flags.StringVarP(archiveOut, "archive-out", "O", *archiveOut, "archive output filename")
 	return flags
 }
