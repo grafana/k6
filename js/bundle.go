@@ -314,6 +314,12 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	}
 	rt.Set("__ENV", env)
 	rt.Set("__VU", vuID)
+	if(b.RuntimeOptions.Http3Mode.Bool){
+		rt.Set("__bhttp3", true)
+	}else{
+		rt.Set("__bhttp3", false)
+	}
+	//rt.Set("__bhttp3",true)
 	_ = rt.Set("console", newConsole(logger))
 
 	if init.compatibilityMode == lib.CompatibilityModeExtended {

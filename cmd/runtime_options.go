@@ -100,6 +100,7 @@ func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib
 		NoThresholds:         getNullBool(flags, "no-thresholds"),
 		NoSummary:            getNullBool(flags, "no-summary"),
 		SummaryExport:        getNullString(flags, "summary-export"),
+		Http3Mode:        getNullBool(flags, "http3"),
 		Env:                  make(map[string]string),
 	}
 

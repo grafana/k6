@@ -29,3 +29,5 @@
 
 /packaging/.env
 /packaging/*.gpg
+*.*.bak
+script.js

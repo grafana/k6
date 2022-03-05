@@ -23,6 +23,8 @@ package httpext
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -38,6 +40,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/lucas-clemente/quic-go/http3"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/stats"
 )
@@ -206,9 +210,25 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 			return nil, err
 		}
 	}
+	rt := common.GetRuntime(ctx)
+	//println(rt)
+	bhttp3 := rt.Get("__bhttp3").ToBoolean()
+	//println("enable http3", bhttp3)
 
 	tracerTransport := newTransport(ctx, state, tags, preq.ResponseCallback)
 	var transport http.RoundTripper = tracerTransport
+	if bhttp3 {
+		pool, _ := x509.SystemCertPool()
+		roundTripper := &http3.RoundTripper{
+			TLSClientConfig: &tls.Config{
+				RootCAs:            pool,
+				InsecureSkipVerify: true,
+			},
+			//QuicConfig: &qconf,
+		}
+		state.Transport = roundTripper
+		//transport = roundTripper
+	}
 
 	// Combine tags with common log fields
 	combinedLogFields := map[string]interface{}{"source": "http-debug", "vu": state.VUID, "iter": state.Iteration}
@@ -313,8 +333,12 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 				preq.ActiveJar.SetCookies(res.Request.URL, rc)
 			}
 		}
+		if res.Request == nil {
+			resp.URL = mreq.URL.String()
+		} else {
+			resp.URL = res.Request.URL.String()
+		}
 
-		resp.URL = res.Request.URL.String()
 		resp.Status = res.StatusCode
 		resp.StatusText = res.Status
 		resp.Proto = res.Proto

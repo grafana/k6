@@ -109,6 +109,7 @@ type rootCommand struct {
 	logFmt         string
 	loggerIsRemote bool
 	verbose        bool
+	h3             bool
 	commandFlags   *commandFlags
 }
 
@@ -243,6 +244,7 @@ func (c *rootCommand) rootCmdPersistentFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	// TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
 	flags.BoolVarP(&c.verbose, "verbose", "v", false, "enable verbose logging")
+	flags.BoolVarP(&c.h3, "http3", "3", false, "enable http3")
 	flags.BoolVarP(&c.commandFlags.quiet, "quiet", "q", false, "disable progress updates")
 	flags.BoolVar(&c.commandFlags.noColor, "no-color", false, "disable colored output")
 	flags.StringVar(&c.logOutput, "log-output", "stderr",

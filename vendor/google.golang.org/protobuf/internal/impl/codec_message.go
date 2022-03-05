@@ -85,6 +85,27 @@ func (mi *MessageInfo) makeCoderMethods(t reflect.Type, si structInfo) {
 		var funcs pointerCoderFuncs
 		var childMessage *MessageInfo
 		switch {
+		case ft == nil:
+			// This never occurs for generated message types.
+			// It implies that a hand-crafted type has missing Go fields
+			// for specific protobuf message fields.
+			funcs = pointerCoderFuncs{
+				size: func(p pointer, f *coderFieldInfo, opts marshalOptions) int {
+					return 0
+				},
+				marshal: func(b []byte, p pointer, f *coderFieldInfo, opts marshalOptions) ([]byte, error) {
+					return nil, nil
+				},
+				unmarshal: func(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (unmarshalOutput, error) {
+					panic("missing Go struct field for " + string(fd.FullName()))
+				},
+				isInit: func(p pointer, f *coderFieldInfo) error {
+					panic("missing Go struct field for " + string(fd.FullName()))
+				},
+				merge: func(dst, src pointer, f *coderFieldInfo, opts mergeOptions) {
+					panic("missing Go struct field for " + string(fd.FullName()))
+				},
+			}
 		case isOneof:
 			fieldOffset = offsetOf(fs, mi.Exporter)
 		case fd.IsWeak():

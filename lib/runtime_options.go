@@ -58,6 +58,7 @@ type RuntimeOptions struct {
 	NoThresholds  null.Bool   `json:"noThresholds"`
 	NoSummary     null.Bool   `json:"noSummary"`
 	SummaryExport null.String `json:"summaryExport"`
+	Http3Mode     null.Bool   `json:"Http3Mode"`
 }
 
 // ValidateCompatibilityMode checks if the provided val is a valid compatibility mode
