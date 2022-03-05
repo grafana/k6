@@ -212,7 +212,16 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 	}
 	rt := common.GetRuntime(ctx)
 	//println(rt)
-	bhttp3 := rt.Get("__bhttp3").ToBoolean()
+	bhttp3 := false
+	if(rt!=nil){
+		bNode := rt.Get("__bhttp3")
+		if bNode != nil {
+			bhttp3 = bNode.ToBoolean()
+		}
+	}
+	//rt.g
+
+
 	//println("enable http3", bhttp3)
 
 	tracerTransport := newTransport(ctx, state, tags, preq.ResponseCallback)

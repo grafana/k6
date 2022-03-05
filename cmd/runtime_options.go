@@ -72,6 +72,7 @@ extended: base + Babel with parts of ES2015 preset
 		"",
 		"output the end-of-test summary report to JSON file",
 	)
+	flags.Bool("http3", false, "don't enable HTTP3")
 	return flags
 }
 
@@ -100,7 +101,7 @@ func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib
 		NoThresholds:         getNullBool(flags, "no-thresholds"),
 		NoSummary:            getNullBool(flags, "no-summary"),
 		SummaryExport:        getNullString(flags, "summary-export"),
-		Http3Mode:        getNullBool(flags, "http3"),
+		Http3Mode:            getNullBool(flags, "http3"),
 		Env:                  make(map[string]string),
 	}
 

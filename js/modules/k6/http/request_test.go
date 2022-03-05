@@ -2042,8 +2042,8 @@ func TestErrorCodes(t *testing.T) {
 			name:              "Connection refused redirect",
 			status:            0,
 			moreSamples:       1,
-			expectedErrorMsg:  `dial: connection refused`,
-			expectedErrorCode: 1212,
+			expectedErrorMsg:  `dial: i/o timeout`, //dial: i/o timeout   dial: connection refused
+			expectedErrorCode: 1211, //1211  1212
 			script: `
 			var res = http.get("HTTPBIN_URL/redirect-to?url=http%3A%2F%2F127.0.0.1%3A1%2Fpesho");
 			if (res.url != "http://127.0.0.1:1/pesho") { throw new Error("incorrect URL: " + res.url) }`,
