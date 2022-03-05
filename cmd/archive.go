@@ -105,7 +105,12 @@ An archive is a fully self-contained test run, and can be executed identically e
 			if err != nil {
 				return err
 			}
-			return arc.Write(f)
+
+			err = arc.Write(f)
+			if cerr := f.Close(); err == nil && cerr != nil {
+				err = cerr
+			}
+			return err
 		},
 	}
 
