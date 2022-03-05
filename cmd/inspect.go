@@ -30,7 +30,6 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
-	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
@@ -57,7 +56,6 @@ func getInspectCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Comm
 				return err
 			}
 			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 
 			var b *js.Bundle
 			typ := globalFlags.runType
@@ -85,7 +83,7 @@ func getInspectCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Comm
 			inspectOutput := interface{}(b.Options)
 
 			if addExecReqs {
-				inspectOutput, err = addExecRequirements(b, builtinMetrics, registry, logger, globalFlags)
+				inspectOutput, err = addExecRequirements(b, logger, globalFlags)
 				if err != nil {
 					return err
 				}
@@ -112,37 +110,24 @@ func getInspectCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Comm
 	return inspectCmd
 }
 
-func addExecRequirements(b *js.Bundle,
-	builtinMetrics *metrics.BuiltinMetrics, registry *metrics.Registry,
-	logger *logrus.Logger, globalFlags *commandFlags) (interface{}, error) {
-	// TODO: after #1048 issue, consider rewriting this without a Runner:
-	// just creating ExecutionPlan directly from validated options
-
-	runner, err := js.NewFromBundle(logger, b, builtinMetrics, registry)
-	if err != nil {
-		return nil, err
-	}
-
+func addExecRequirements(b *js.Bundle, logger *logrus.Logger, globalFlags *commandFlags) (interface{}, error) {
 	conf, err := getConsolidatedConfig(
-		afero.NewOsFs(), Config{}, runner.GetOptions(), buildEnvMap(os.Environ()), globalFlags)
+		afero.NewOsFs(), Config{}, b.Options, buildEnvMap(os.Environ()), globalFlags)
 	if err != nil {
 		return nil, err
 	}
 
-	conf, err = deriveAndValidateConfig(conf, runner.IsExecutable, logger)
+	conf, err = deriveAndValidateConfig(conf, b.IsExecutable, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = runner.SetOptions(conf.Options); err != nil {
-		return nil, err
-	}
-	execScheduler, err := local.NewExecutionScheduler(runner, logger)
+	et, err := lib.NewExecutionTuple(conf.ExecutionSegment, conf.ExecutionSegmentSequence)
 	if err != nil {
 		return nil, err
 	}
 
-	executionPlan := execScheduler.GetExecutionPlan()
+	executionPlan := conf.Scenarios.GetFullExecutionRequirements(et)
 	duration, _ := lib.GetEndOffset(executionPlan)
 
 	return struct {
