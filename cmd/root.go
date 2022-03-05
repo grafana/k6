@@ -25,9 +25,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	stdlog "log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -50,96 +52,194 @@ const (
 	waitRemoteLoggerTimeout = time.Second * 5
 )
 
-// TODO better name - there are other command flags these are just ... non lib.Options ones :shrug:
-type commandFlags struct {
-	defaultConfigFilePath string
-	configFilePath        string
-	exitOnRunning         bool
-	showCloudLogs         bool
-	runType               string
-	archiveOut            string
-	quiet                 bool
-	noColor               bool
-	address               string
-	outMutex              *sync.Mutex
-	stdoutTTY, stderrTTY  bool
-	stdout, stderr        *consoleWriter
+// globalFlags contains global config values that apply for all k6 sub-commands.
+type globalFlags struct {
+	configFilePath string
+	runType        string
+	quiet          bool
+	noColor        bool
+	address        string
+	logOutput      string
+	logFormat      string
+	verbose        bool
 }
 
-func newCommandFlags() *commandFlags {
-	confDir, err := os.UserConfigDir()
-	if err != nil {
-		logrus.WithError(err).Warn("could not get config directory")
-		confDir = ".config"
-	}
-	defaultConfigFilePath := filepath.Join(
-		confDir,
-		"loadimpact",
-		"k6",
-		defaultConfigFileName,
-	)
+// globalState contains the globalFlags and accessors for most of the global
+// process-external state like CLI arguments, env vars, standard input, output
+// and error, etc. In practice, most of it is normally accessed through the `os`
+// package from the Go stdlib.
+//
+// We group them here so we can prevent direct access to them from the rest of
+// the k6 codebase. This gives us the ability to mock them and have robust and
+// easy-to-write integration-like tests to check the k6 end-to-end behavior in
+// any simulated conditions.
+//
+// `newGlobalState()` returns a globalState object with the real `os`
+// parameters, while `newGlobalTestState()` can be used in tests to create
+// simulated environments.
+type globalState struct {
+	ctx context.Context
 
+	fs      afero.Fs
+	getwd   func() (string, error)
+	args    []string
+	envVars map[string]string
+
+	defaultFlags, flags globalFlags
+
+	outMutex       *sync.Mutex
+	stdOut, stdErr *consoleWriter
+	stdIn          *os.File
+
+	signalNotify func(chan<- os.Signal, ...os.Signal)
+	signalStop   func(chan<- os.Signal)
+
+	// TODO: add os.Exit()?
+
+	logger         *logrus.Logger
+	fallbackLogger logrus.FieldLogger
+}
+
+// Ideally, this should be the only function in the whole codebase where we use
+// global variables and functions from the os package. Anywhere else, things
+// like os.Stdout, os.Stderr, os.Stdin, os.Getenv(), etc. should be removed and
+// the respective properties of globalState used instead.
+func newGlobalState(ctx context.Context) *globalState {
 	isDumbTerm := os.Getenv("TERM") == "dumb"
 	stdoutTTY := !isDumbTerm && (isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()))
 	stderrTTY := !isDumbTerm && (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()))
 	outMutex := &sync.Mutex{}
-	return &commandFlags{
-		defaultConfigFilePath: defaultConfigFilePath,  // Updated with the user's config folder in the init() function below
-		configFilePath:        os.Getenv("K6_CONFIG"), // Overridden by `-c`/`--config` flag!
-		exitOnRunning:         os.Getenv("K6_EXIT_ON_RUNNING") != "",
-		showCloudLogs:         true,
-		runType:               os.Getenv("K6_TYPE"),
-		archiveOut:            "archive.tar",
-		outMutex:              outMutex,
-		stdoutTTY:             stdoutTTY,
-		stderrTTY:             stderrTTY,
-		stdout:                &consoleWriter{colorable.NewColorableStdout(), stdoutTTY, outMutex, nil},
-		stderr:                &consoleWriter{colorable.NewColorableStderr(), stderrTTY, outMutex, nil},
+	stdOut := &consoleWriter{os.Stdout, colorable.NewColorable(os.Stdout), stdoutTTY, outMutex, nil}
+	stdErr := &consoleWriter{os.Stderr, colorable.NewColorable(os.Stderr), stderrTTY, outMutex, nil}
+
+	logger := getDefaultLogger(stdErr)
+
+	confDir, err := os.UserConfigDir()
+	if err != nil {
+		logger.WithError(err).Warn("could not get config directory")
+		confDir = ".config"
 	}
+
+	envVars := buildEnvMap(os.Environ())
+	defaultFlags := getDefaultFlags(confDir)
+
+	return &globalState{
+		ctx:            ctx,
+		fs:             afero.NewOsFs(),
+		getwd:          os.Getwd,
+		args:           append(make([]string, 0, len(os.Args)), os.Args...), // copy
+		envVars:        envVars,
+		defaultFlags:   defaultFlags,
+		flags:          getFlags(defaultFlags, envVars),
+		outMutex:       outMutex,
+		stdOut:         stdOut,
+		stdErr:         stdErr,
+		stdIn:          os.Stdin,
+		signalNotify:   signal.Notify,
+		signalStop:     signal.Stop,
+		logger:         logger,
+		fallbackLogger: getDefaultLogger(stdErr), // we may modify the other one
+	}
+}
+
+func getDefaultLogger(out io.Writer) *logrus.Logger {
+	return &logrus.Logger{
+		Out:       out,
+		Formatter: new(logrus.TextFormatter),
+		Hooks:     make(logrus.LevelHooks),
+		Level:     logrus.InfoLevel,
+	}
+}
+
+func getDefaultFlags(homeFolder string) globalFlags {
+	return globalFlags{
+		address:        "localhost:6565",
+		configFilePath: filepath.Join(homeFolder, "loadimpact", "k6", defaultConfigFileName),
+		logOutput:      "stderr",
+	}
+}
+
+func getFlags(defaultFlags globalFlags, env map[string]string) globalFlags {
+	result := defaultFlags
+
+	// TODO: add env vars for the rest of the values (after adjusting
+	// rootCmdPersistentFlagSet(), of course)
+
+	if val, ok := env["K6_CONFIG"]; ok {
+		result.configFilePath = val
+	}
+	if val, ok := env["K6_TYPE"]; ok {
+		result.runType = val
+	}
+	if val, ok := env["K6_LOG_OUTPUT"]; ok {
+		result.logOutput = val
+	}
+	if val, ok := env["K6_LOG_FORMAT"]; ok {
+		result.logFormat = val
+	}
+	return result
+}
+
+func parseEnvKeyValue(kv string) (string, string) {
+	if idx := strings.IndexRune(kv, '='); idx != -1 {
+		return kv[:idx], kv[idx+1:]
+	}
+	return kv, ""
+}
+
+func buildEnvMap(environ []string) map[string]string {
+	env := make(map[string]string, len(environ))
+	for _, kv := range environ {
+		k, v := parseEnvKeyValue(kv)
+		env[k] = v
+	}
+	return env
 }
 
 // This is to keep all fields needed for the main/root k6 command
 type rootCommand struct {
-	ctx            context.Context
-	logger         *logrus.Logger
-	fallbackLogger logrus.FieldLogger
+	globalState *globalState
+
 	cmd            *cobra.Command
 	loggerStopped  <-chan struct{}
-	logOutput      string
-	logFmt         string
 	loggerIsRemote bool
-	verbose        bool
-	commandFlags   *commandFlags
 }
 
-func newRootCommand(ctx context.Context, logger *logrus.Logger, fallbackLogger logrus.FieldLogger) *rootCommand {
+func newRootCommand(gs *globalState) *rootCommand {
 	c := &rootCommand{
-		ctx:            ctx,
-		logger:         logger,
-		fallbackLogger: fallbackLogger,
-		commandFlags:   newCommandFlags(),
+		globalState: gs,
 	}
 	// the base command when called without any subcommands.
-	c.cmd = &cobra.Command{
+	rootCmd := &cobra.Command{
 		Use:               "k6",
 		Short:             "a next-generation load generator",
-		Long:              "\n" + getBanner(c.commandFlags.noColor || !c.commandFlags.stdoutTTY),
+		Long:              "\n" + getBanner(c.globalState.flags.noColor || !c.globalState.stdOut.isTTY),
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
 	}
 
-	c.cmd.PersistentFlags().AddFlagSet(c.rootCmdPersistentFlagSet())
+	loginCmd := getLoginCmd()
+	loginCmd.AddCommand(
+		getLoginCloudCommand(gs),
+		getLoginInfluxDBCommand(gs),
+	)
+	rootCmd.AddCommand(
+		getArchiveCmd(gs), getCloudCmd(gs), getConvertCmd(gs), getInspectCmd(gs),
+		loginCmd, getPauseCmd(gs), getResumeCmd(gs), getScaleCmd(gs), getRunCmd(gs),
+		getStatsCmd(gs), getStatusCmd(gs), getVersionCmd(gs),
+	)
+
+	rootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet(gs))
+	rootCmd.SetArgs(gs.args[1:])
+	c.cmd = rootCmd
+
 	return c
 }
 
 func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error {
 	var err error
-	if !cmd.Flags().Changed("log-output") {
-		if envLogOutput, ok := os.LookupEnv("K6_LOG_OUTPUT"); ok {
-			c.logOutput = envLogOutput
-		}
-	}
+
 	c.loggerStopped, err = c.setupLoggers()
 	if err != nil {
 		return err
@@ -150,8 +250,8 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error
 		c.loggerIsRemote = true
 	}
 
-	stdlog.SetOutput(c.logger.Writer())
-	c.logger.Debugf("k6 version: v%s", consts.FullVersion())
+	stdlog.SetOutput(c.globalState.logger.Writer())
+	c.globalState.logger.Debugf("k6 version: v%s", consts.FullVersion())
 	return nil
 }
 
@@ -160,43 +260,12 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error
 func Execute() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	logger := &logrus.Logger{
-		Out:       os.Stderr,
-		Formatter: new(logrus.TextFormatter),
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.InfoLevel,
-	}
 
-	var fallbackLogger logrus.FieldLogger = &logrus.Logger{
-		Out:       os.Stderr,
-		Formatter: new(logrus.TextFormatter),
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.InfoLevel,
-	}
+	globalState := newGlobalState(ctx)
 
-	c := newRootCommand(ctx, logger, fallbackLogger)
+	rootCmd := newRootCommand(globalState)
 
-	loginCmd := getLoginCmd()
-	loginCmd.AddCommand(
-		getLoginCloudCommand(logger, c.commandFlags),
-		getLoginInfluxDBCommand(logger, c.commandFlags),
-	)
-	c.cmd.AddCommand(
-		getArchiveCmd(logger, c.commandFlags),
-		getCloudCmd(ctx, logger, c.commandFlags),
-		getConvertCmd(afero.NewOsFs(), c.commandFlags.stdout),
-		getInspectCmd(logger, c.commandFlags),
-		loginCmd,
-		getPauseCmd(ctx, c.commandFlags),
-		getResumeCmd(ctx, c.commandFlags),
-		getScaleCmd(ctx, c.commandFlags),
-		getRunCmd(ctx, logger, c.commandFlags),
-		getStatsCmd(ctx, c.commandFlags),
-		getStatusCmd(ctx, c.commandFlags),
-		getVersionCmd(),
-	)
-
-	if err := c.cmd.Execute(); err != nil {
+	if err := rootCmd.cmd.Execute(); err != nil {
 		exitCode := -1
 		var ecerr errext.HasExitCode
 		if errors.As(err, &ecerr) {
@@ -215,18 +284,18 @@ func Execute() {
 			fields["hint"] = herr.Hint()
 		}
 
-		logger.WithFields(fields).Error(errText)
-		if c.loggerIsRemote {
-			fallbackLogger.WithFields(fields).Error(errText)
+		globalState.logger.WithFields(fields).Error(errText)
+		if rootCmd.loggerIsRemote {
+			globalState.fallbackLogger.WithFields(fields).Error(errText)
 			cancel()
-			c.waitRemoteLogger()
+			rootCmd.waitRemoteLogger()
 		}
 
 		os.Exit(exitCode) //nolint:gocritic
 	}
 
 	cancel()
-	c.waitRemoteLogger()
+	rootCmd.waitRemoteLogger()
 }
 
 func (c *rootCommand) waitRemoteLogger() {
@@ -234,28 +303,48 @@ func (c *rootCommand) waitRemoteLogger() {
 		select {
 		case <-c.loggerStopped:
 		case <-time.After(waitRemoteLoggerTimeout):
-			c.fallbackLogger.Error("Remote logger didn't stop in %s", waitRemoteLoggerTimeout)
+			c.globalState.fallbackLogger.Errorf("Remote logger didn't stop in %s", waitRemoteLoggerTimeout)
 		}
 	}
 }
 
-func (c *rootCommand) rootCmdPersistentFlagSet() *pflag.FlagSet {
+func rootCmdPersistentFlagSet(gs *globalState) *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-	// TODO: figure out a better way to handle the CLI flags - global variables are not very testable... :/
-	flags.BoolVarP(&c.verbose, "verbose", "v", false, "enable verbose logging")
-	flags.BoolVarP(&c.commandFlags.quiet, "quiet", "q", false, "disable progress updates")
-	flags.BoolVar(&c.commandFlags.noColor, "no-color", false, "disable colored output")
-	flags.StringVar(&c.logOutput, "log-output", "stderr",
-		"change the output for k6 logs, possible values are stderr,stdout,none,loki[=host:port],file[=./path.fileformat]")
-	flags.StringVar(&c.logFmt, "logformat", "", "log output format") // TODO rename to log-format and warn on old usage
-	flags.StringVarP(&c.commandFlags.address, "address", "a", "localhost:6565", "address for the api server")
+	// TODO: refactor this config, the default value management with pflag is
+	// simply terrible... :/
+	//
+	// We need to use `gs.flags.<value>` both as the destination and as
+	// the value here, since the config values could have already been set by
+	// their respective environment variables. However, we then also have to
+	// explicitly set the DefValue to the respective default value from
+	// `gs.defaultFlags.<value>`, so that the `k6 --help` message is
+	// not messed up...
 
-	// TODO: Fix... This default value needed, so both CLI flags and environment variables work
-	flags.StringVarP(&c.commandFlags.configFilePath, "config", "c", c.commandFlags.configFilePath, "JSON config file")
+	flags.StringVar(&gs.flags.logOutput, "log-output", gs.flags.logOutput,
+		"change the output for k6 logs, possible values are stderr,stdout,none,loki[=host:port],file[=./path.fileformat]")
+	flags.Lookup("log-output").DefValue = gs.defaultFlags.logOutput
+
+	flags.StringVar(&gs.flags.logFormat, "logformat", gs.flags.logFormat, "log output format")
+	oldLogFormat := flags.Lookup("logformat")
+	oldLogFormat.Hidden = true
+	oldLogFormat.Deprecated = "log-format"
+	oldLogFormat.DefValue = gs.defaultFlags.logFormat
+	flags.StringVar(&gs.flags.logFormat, "log-format", gs.flags.logFormat, "log output format")
+	flags.Lookup("log-format").DefValue = gs.defaultFlags.logFormat
+
+	flags.StringVarP(&gs.flags.configFilePath, "config", "c", gs.flags.configFilePath, "JSON config file")
 	// And we also need to explicitly set the default value for the usage message here, so things
 	// like `K6_CONFIG="blah" k6 run -h` don't produce a weird usage message
-	flags.Lookup("config").DefValue = c.commandFlags.defaultConfigFilePath
+	flags.Lookup("config").DefValue = gs.defaultFlags.configFilePath
 	must(cobra.MarkFlagFilename(flags, "config"))
+
+	// TODO: support configuring these through environment variables as well?
+	// either with croconf or through the hack above...
+	flags.BoolVarP(&gs.flags.verbose, "verbose", "v", gs.defaultFlags.verbose, "enable verbose logging")
+	flags.BoolVarP(&gs.flags.quiet, "quiet", "q", gs.defaultFlags.quiet, "disable progress updates")
+	flags.BoolVar(&gs.flags.noColor, "no-color", gs.defaultFlags.noColor, "disable colored output")
+	flags.StringVarP(&gs.flags.address, "address", "a", gs.defaultFlags.address, "address for the REST API server")
+
 	return flags
 }
 
@@ -274,55 +363,57 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 	ch := make(chan struct{})
 	close(ch)
 
-	if c.verbose {
-		c.logger.SetLevel(logrus.DebugLevel)
+	if c.globalState.flags.verbose {
+		c.globalState.logger.SetLevel(logrus.DebugLevel)
 	}
 
 	loggerForceColors := false // disable color by default
-	switch line := c.logOutput; {
+	switch line := c.globalState.flags.logOutput; {
 	case line == "stderr":
-		loggerForceColors = !c.commandFlags.noColor && c.commandFlags.stderrTTY
-		c.logger.SetOutput(c.commandFlags.stderr)
+		loggerForceColors = !c.globalState.flags.noColor && c.globalState.stdErr.isTTY
+		c.globalState.logger.SetOutput(c.globalState.stdErr)
 	case line == "stdout":
-		loggerForceColors = !c.commandFlags.noColor && c.commandFlags.stdoutTTY
-		c.logger.SetOutput(c.commandFlags.stdout)
+		loggerForceColors = !c.globalState.flags.noColor && c.globalState.stdOut.isTTY
+		c.globalState.logger.SetOutput(c.globalState.stdOut)
 	case line == "none":
-		c.logger.SetOutput(ioutil.Discard)
+		c.globalState.logger.SetOutput(ioutil.Discard)
 
 	case strings.HasPrefix(line, "loki"):
 		ch = make(chan struct{}) // TODO: refactor, get it from the constructor
-		hook, err := log.LokiFromConfigLine(c.ctx, c.fallbackLogger, line, ch)
+		hook, err := log.LokiFromConfigLine(c.globalState.ctx, c.globalState.fallbackLogger, line, ch)
 		if err != nil {
 			return nil, err
 		}
-		c.logger.AddHook(hook)
-		c.logger.SetOutput(ioutil.Discard) // don't output to anywhere else
-		c.logFmt = "raw"
+		c.globalState.logger.AddHook(hook)
+		c.globalState.logger.SetOutput(ioutil.Discard) // don't output to anywhere else
+		c.globalState.flags.logFormat = "raw"
 
 	case strings.HasPrefix(line, "file"):
 		ch = make(chan struct{}) // TODO: refactor, get it from the constructor
-		hook, err := log.FileHookFromConfigLine(c.ctx, c.fallbackLogger, line, ch)
+		hook, err := log.FileHookFromConfigLine(c.globalState.ctx, c.globalState.fs, c.globalState.fallbackLogger, line, ch)
 		if err != nil {
 			return nil, err
 		}
 
-		c.logger.AddHook(hook)
-		c.logger.SetOutput(ioutil.Discard)
+		c.globalState.logger.AddHook(hook)
+		c.globalState.logger.SetOutput(ioutil.Discard)
 
 	default:
-		return nil, fmt.Errorf("unsupported log output `%s`", line)
+		return nil, fmt.Errorf("unsupported log output '%s'", line)
 	}
 
-	switch c.logFmt {
+	switch c.globalState.flags.logFormat {
 	case "raw":
-		c.logger.SetFormatter(&RawFormatter{})
-		c.logger.Debug("Logger format: RAW")
+		c.globalState.logger.SetFormatter(&RawFormatter{})
+		c.globalState.logger.Debug("Logger format: RAW")
 	case "json":
-		c.logger.SetFormatter(&logrus.JSONFormatter{})
-		c.logger.Debug("Logger format: JSON")
+		c.globalState.logger.SetFormatter(&logrus.JSONFormatter{})
+		c.globalState.logger.Debug("Logger format: JSON")
 	default:
-		c.logger.SetFormatter(&logrus.TextFormatter{ForceColors: loggerForceColors, DisableColors: c.commandFlags.noColor})
-		c.logger.Debug("Logger format: TEXT")
+		c.globalState.logger.SetFormatter(&logrus.TextFormatter{
+			ForceColors: loggerForceColors, DisableColors: c.globalState.flags.noColor,
+		})
+		c.globalState.logger.Debug("Logger format: TEXT")
 	}
 	return ch, nil
 }

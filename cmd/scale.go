@@ -21,7 +21,6 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 
 	"github.com/spf13/cobra"
@@ -30,7 +29,7 @@ import (
 	"go.k6.io/k6/api/v1/client"
 )
 
-func getScaleCmd(ctx context.Context, globalFlags *commandFlags) *cobra.Command {
+func getScaleCmd(globalState *globalState) *cobra.Command {
 	// scaleCmd represents the scale command
 	scaleCmd := &cobra.Command{
 		Use:   "scale",
@@ -45,16 +44,16 @@ func getScaleCmd(ctx context.Context, globalFlags *commandFlags) *cobra.Command 
 				return errors.New("Specify either -u/--vus or -m/--max") //nolint:golint,stylecheck
 			}
 
-			c, err := client.New(globalFlags.address)
+			c, err := client.New(globalState.flags.address)
 			if err != nil {
 				return err
 			}
-			status, err := c.SetStatus(ctx, v1.Status{VUs: vus, VUsMax: max})
+			status, err := c.SetStatus(globalState.ctx, v1.Status{VUs: vus, VUsMax: max})
 			if err != nil {
 				return err
 			}
 
-			return yamlPrint(globalFlags.stdout, status)
+			return yamlPrint(globalState.stdOut, status)
 		},
 	}
 

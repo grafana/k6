@@ -25,9 +25,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -91,14 +89,14 @@ func exactArgsWithMsg(n int, msg string) cobra.PositionalArgs {
 
 // readSource is a small wrapper around loader.ReadSource returning
 // result of the load and filesystems map
-func readSource(filename string, logger *logrus.Logger) (*loader.SourceData, map[string]afero.Fs, error) {
-	pwd, err := os.Getwd()
+func readSource(globalState *globalState, filename string) (*loader.SourceData, map[string]afero.Fs, error) {
+	pwd, err := globalState.getwd()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	filesystems := loader.CreateFilesystems()
-	src, err := loader.ReadSource(logger, filename, pwd, filesystems, os.Stdin)
+	filesystems := loader.CreateFilesystems(globalState.fs)
+	src, err := loader.ReadSource(globalState.logger, filename, pwd, filesystems, globalState.stdIn)
 	return src, filesystems, err
 }
 

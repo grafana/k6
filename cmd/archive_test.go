@@ -1,14 +1,15 @@
 package cmd
 
 import (
+	"io/ioutil"
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib/testutils"
 )
 
 func TestArchiveThresholds(t *testing.T) {
@@ -40,20 +41,17 @@ func TestArchiveThresholds(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			tmpPath := filepath.Join(t.TempDir(), "archive.tar")
-
-			cmd := getArchiveCmd(testutils.NewLogger(t), newCommandFlags())
-			filename, err := filepath.Abs(testCase.testFilename)
+			testScript, err := ioutil.ReadFile(testCase.testFilename)
 			require.NoError(t, err)
-			args := []string{filename, "--archive-out", tmpPath}
-			if testCase.noThresholds {
-				args = append(args, "--no-thresholds")
-			}
-			cmd.SetArgs(args)
-			wantExitCode := exitcodes.InvalidConfig
 
-			var gotErrExt errext.HasExitCode
-			gotErr := cmd.Execute()
+			testState := newGlobalTestState(t)
+			require.NoError(t, afero.WriteFile(testState.fs, filepath.Join(testState.cwd, testCase.testFilename), testScript, 0o644))
+			testState.args = []string{"k6", "archive", testCase.testFilename}
+			if testCase.noThresholds {
+				testState.args = append(testState.args, "--no-thresholds")
+			}
+
+			gotErr := newRootCommand(testState.globalState).cmd.Execute()
 
 			assert.Equal(t,
 				testCase.wantErr,
@@ -62,9 +60,10 @@ func TestArchiveThresholds(t *testing.T) {
 			)
 
 			if testCase.wantErr {
+				var gotErrExt errext.HasExitCode
 				require.ErrorAs(t, gotErr, &gotErrExt)
-				assert.Equalf(t, wantExitCode, gotErrExt.ExitCode(),
-					"status code must be %d", wantExitCode,
+				assert.Equalf(t, exitcodes.InvalidConfig, gotErrExt.ExitCode(),
+					"status code must be %d", exitcodes.InvalidConfig,
 				)
 			}
 		})

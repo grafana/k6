@@ -21,9 +21,7 @@
 package cmd
 
 import (
-	"bytes"
 	"io/ioutil"
-	"path/filepath"
 	"regexp"
 	"testing"
 
@@ -121,95 +119,70 @@ export default function() {
 }
 `
 
-func TestIntegrationConvertCmd(t *testing.T) {
+func TestConvertCmdCorrelate(t *testing.T) {
 	t.Parallel()
-	t.Run("Correlate", func(t *testing.T) {
-		t.Parallel()
-		harFile, err := filepath.Abs("correlate.har")
-		require.NoError(t, err)
-		har, err := ioutil.ReadFile("testdata/example.har")
-		require.NoError(t, err)
+	har, err := ioutil.ReadFile("testdata/example.har")
+	require.NoError(t, err)
 
-		expectedTestPlan, err := ioutil.ReadFile("testdata/example.js")
-		require.NoError(t, err)
+	expectedTestPlan, err := ioutil.ReadFile("testdata/example.js")
+	require.NoError(t, err)
 
-		defaultFs := afero.NewMemMapFs()
+	testState := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(testState.fs, "correlate.har", har, 0o644))
+	testState.args = []string{
+		"k6", "convert", "--output=result.js", "--correlate=true", "--no-batch=true",
+		"--enable-status-code-checks=true", "--return-on-failed-check=true", "correlate.har",
+	}
 
-		err = afero.WriteFile(defaultFs, harFile, har, 0o644)
-		require.NoError(t, err)
+	require.NoError(t, newRootCommand(testState.globalState).cmd.Execute())
 
-		buf := &bytes.Buffer{}
+	result, err := afero.ReadFile(testState.fs, "result.js")
+	require.NoError(t, err)
 
-		convertCmd := getConvertCmd(defaultFs, buf)
-		assert.NoError(t, convertCmd.Flags().Set("correlate", "true"))
-		assert.NoError(t, convertCmd.Flags().Set("no-batch", "true"))
-		assert.NoError(t, convertCmd.Flags().Set("enable-status-code-checks", "true"))
-		assert.NoError(t, convertCmd.Flags().Set("return-on-failed-check", "true"))
+	// Sanitizing to avoid windows problems with carriage returns
+	re := regexp.MustCompile(`\r`)
+	expected := re.ReplaceAllString(string(expectedTestPlan), ``)
+	resultStr := re.ReplaceAllString(string(result), ``)
 
-		err = convertCmd.RunE(convertCmd, []string{harFile})
+	if assert.NoError(t, err) {
+		// assert.Equal suppresses the diff it is too big, so we add it as the test error message manually as well.
+		diff, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+			A:        difflib.SplitLines(expected),
+			B:        difflib.SplitLines(resultStr),
+			FromFile: "Expected",
+			FromDate: "",
+			ToFile:   "Actual",
+			ToDate:   "",
+			Context:  1,
+		})
 
-		// reset the convertCmd to default flags. There must be a nicer and less error prone way to do this...
-		assert.NoError(t, convertCmd.Flags().Set("correlate", "false"))
-		assert.NoError(t, convertCmd.Flags().Set("no-batch", "false"))
-		assert.NoError(t, convertCmd.Flags().Set("enable-status-code-checks", "false"))
-		assert.NoError(t, convertCmd.Flags().Set("return-on-failed-check", "false"))
-
-		// Sanitizing to avoid windows problems with carriage returns
-		re := regexp.MustCompile(`\r`)
-		expected := re.ReplaceAllString(string(expectedTestPlan), ``)
-		result := re.ReplaceAllString(buf.String(), ``)
-
-		if assert.NoError(t, err) {
-			// assert.Equal suppresses the diff it is too big, so we add it as the test error message manually as well.
-			diff, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
-				A:        difflib.SplitLines(expected),
-				B:        difflib.SplitLines(result),
-				FromFile: "Expected",
-				FromDate: "",
-				ToFile:   "Actual",
-				ToDate:   "",
-				Context:  1,
-			})
-
-			assert.Equal(t, expected, result, diff)
-		}
-	})
-	t.Run("Stdout", func(t *testing.T) {
-		t.Parallel()
-		harFile, err := filepath.Abs("stdout.har")
-		require.NoError(t, err)
-		defaultFs := afero.NewMemMapFs()
-		err = afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0o644)
-		assert.NoError(t, err)
-
-		buf := &bytes.Buffer{}
-
-		convertCmd := getConvertCmd(defaultFs, buf)
-		err = convertCmd.RunE(convertCmd, []string{harFile})
-		assert.NoError(t, err)
-		assert.Equal(t, testHARConvertResult, buf.String())
-	})
-	t.Run("Output file", func(t *testing.T) {
-		t.Parallel()
-		harFile, err := filepath.Abs("output.har")
-		require.NoError(t, err)
-		defaultFs := afero.NewMemMapFs()
-		err = afero.WriteFile(defaultFs, harFile, []byte(testHAR), 0o644)
-		assert.NoError(t, err)
-
-		convertCmd := getConvertCmd(defaultFs, nil)
-		err = convertCmd.Flags().Set("output", "/output.js")
-		defer func() {
-			err = convertCmd.Flags().Set("output", "")
-		}()
-		assert.NoError(t, err)
-		err = convertCmd.RunE(convertCmd, []string{harFile})
-		assert.NoError(t, err)
-
-		output, err := afero.ReadFile(defaultFs, "/output.js")
-		assert.NoError(t, err)
-		assert.Equal(t, testHARConvertResult, string(output))
-	})
-	// TODO: test options injection; right now that's difficult because when there are multiple
-	// options, they can be emitted in different order in the JSON
+		assert.Equal(t, expected, resultStr, diff)
+	}
 }
+
+func TestConvertCmdStdout(t *testing.T) {
+	t.Parallel()
+	testState := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(testState.fs, "stdout.har", []byte(testHAR), 0o644))
+	testState.args = []string{"k6", "convert", "stdout.har"}
+
+	require.NoError(t, newRootCommand(testState.globalState).cmd.Execute())
+	assert.Equal(t, testHARConvertResult, testState.stdOut.String())
+}
+
+func TestConvertCmdOutputFile(t *testing.T) {
+	t.Parallel()
+
+	testState := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(testState.fs, "output.har", []byte(testHAR), 0o644))
+	testState.args = []string{"k6", "convert", "--output", "result.js", "output.har"}
+
+	require.NoError(t, newRootCommand(testState.globalState).cmd.Execute())
+
+	output, err := afero.ReadFile(testState.fs, "result.js")
+	assert.NoError(t, err)
+	assert.Equal(t, testHARConvertResult, string(output))
+}
+
+// TODO: test options injection; right now that's difficult because when there are multiple
+// options, they can be emitted in different order in the JSON

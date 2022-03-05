@@ -22,8 +22,8 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -33,7 +33,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,7 +41,6 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/testutils"
 )
 
 type mockWriter struct {
@@ -134,139 +132,94 @@ func TestHandleSummaryResultError(t *testing.T) {
 	assertEqual(t, "file summary 2", files[filePath2])
 }
 
-func TestAbortTest(t *testing.T) {
+func TestRunScriptErrorsAndAbort(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
-		testFilename, expLogOutput string
+		testFilename, name   string
+		expErr, expLogOutput string
+		expExitCode          errext.ExitCode
+		extraArgs            []string
 	}{
 		{
 			testFilename: "abort.js",
+			expErr:       common.AbortTest,
+			expExitCode:  exitcodes.ScriptAborted,
 		},
 		{
 			testFilename: "abort_initerr.js",
+			expErr:       common.AbortTest,
+			expExitCode:  exitcodes.ScriptAborted,
 		},
 		{
 			testFilename: "abort_initvu.js",
+			expErr:       common.AbortTest,
+			expExitCode:  exitcodes.ScriptAborted,
 		},
 		{
 			testFilename: "abort_teardown.js",
+			expErr:       common.AbortTest,
+			expExitCode:  exitcodes.ScriptAborted,
 			expLogOutput: "Calling teardown function after test.abort()",
+		},
+		{
+			testFilename: "initerr.js",
+			expErr:       "ReferenceError: someUndefinedVar is not defined",
+			expExitCode:  exitcodes.ScriptException,
+		},
+		{
+			testFilename: "thresholds/malformed_expression.js",
+			name:         "run should fail with exit status 104 on a malformed threshold expression",
+			expErr:       "malformed threshold expression",
+			expExitCode:  exitcodes.InvalidConfig,
+		},
+		{
+			testFilename: "thresholds/malformed_expression.js",
+			name:         "run should on a malformed threshold expression but --no-thresholds flag set",
+			extraArgs:    []string{"--no-thresholds"},
+			// we don't expect an error
 		},
 	}
 
 	for _, tc := range testCases {
 		tc := tc
-		t.Run(tc.testFilename, func(t *testing.T) {
+		name := tc.testFilename
+		if tc.name != "" {
+			name = fmt.Sprintf("%s (%s)", tc.testFilename, tc.name)
+		}
+		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 
-			logger := logrus.New()
-			logger.SetLevel(logrus.InfoLevel)
-			logger.Out = ioutil.Discard
-			hook := testutils.SimpleLogrusHook{
-				HookedLevels: []logrus.Level{logrus.InfoLevel},
-			}
-			logger.AddHook(&hook)
-
-			cmd := getRunCmd(ctx, logger, newCommandFlags())
-			a, err := filepath.Abs(path.Join("testdata", tc.testFilename))
+			testScript, err := ioutil.ReadFile(path.Join("testdata", tc.testFilename))
 			require.NoError(t, err)
-			cmd.SetArgs([]string{a})
-			err = cmd.Execute()
-			var e errext.HasExitCode
-			require.ErrorAs(t, err, &e)
-			assert.Equalf(t, exitcodes.ScriptAborted, e.ExitCode(),
-				"Status code must be %d", exitcodes.ScriptAborted)
-			assert.Contains(t, e.Error(), common.AbortTest)
+
+			testState := newGlobalTestState(t)
+			require.NoError(t, afero.WriteFile(testState.fs, filepath.Join(testState.cwd, tc.testFilename), testScript, 0o644))
+			testState.args = append([]string{"k6", "run", tc.testFilename}, tc.extraArgs...)
+
+			err = newRootCommand(testState.globalState).cmd.Execute()
+
+			if tc.expErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tc.expExitCode != 0 {
+				var e errext.HasExitCode
+				require.ErrorAs(t, err, &e)
+				assert.Equalf(t, tc.expExitCode, e.ExitCode(), "Status code must be %d", tc.expExitCode)
+			}
 
 			if tc.expLogOutput != "" {
 				var gotMsg bool
-				for _, entry := range hook.Drain() {
+				for _, entry := range testState.loggerHook.Drain() {
 					if strings.Contains(entry.Message, tc.expLogOutput) {
 						gotMsg = true
 						break
 					}
 				}
 				assert.True(t, gotMsg)
-			}
-		})
-	}
-}
-
-func TestInitErrExitCode(t *testing.T) {
-	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	logger := testutils.NewLogger(t)
-
-	cmd := getRunCmd(ctx, logger, newCommandFlags())
-	a, err := filepath.Abs("testdata/initerr.js")
-	require.NoError(t, err)
-	cmd.SetArgs([]string{a})
-	err = cmd.Execute()
-	var e errext.HasExitCode
-	require.ErrorAs(t, err, &e)
-	assert.Equalf(t, exitcodes.ScriptException, e.ExitCode(),
-		"Status code must be %d", exitcodes.ScriptException)
-	assert.Contains(t, err.Error(), "ReferenceError: someUndefinedVar is not defined")
-}
-
-func TestRunThresholds(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name         string
-		noThresholds bool
-		testFilename string
-
-		wantErr bool
-	}{
-		{
-			name:         "run should fail with exit status 104 on a malformed threshold expression",
-			noThresholds: false,
-			testFilename: "testdata/thresholds/malformed_expression.js",
-			wantErr:      true,
-		},
-		{
-			name:         "run should on a malformed threshold expression but --no-thresholds flag set",
-			noThresholds: true,
-			testFilename: "testdata/thresholds/malformed_expression.js",
-			wantErr:      false,
-		},
-	}
-
-	for _, testCase := range testCases {
-		testCase := testCase
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			cmd := getRunCmd(ctx, testutils.NewLogger(t), newCommandFlags())
-			filename, err := filepath.Abs(testCase.testFilename)
-			require.NoError(t, err)
-			args := []string{filename}
-			if testCase.noThresholds {
-				args = append(args, "--no-thresholds")
-			}
-			cmd.SetArgs(args)
-			wantExitCode := exitcodes.InvalidConfig
-
-			var gotErrExt errext.HasExitCode
-			gotErr := cmd.Execute()
-
-			assert.Equal(t,
-				testCase.wantErr,
-				gotErr != nil,
-				"run command error = %v, wantErr %v", gotErr, testCase.wantErr,
-			)
-
-			if testCase.wantErr {
-				require.ErrorAs(t, gotErr, &gotErrExt)
-				assert.Equalf(t, wantExitCode, gotErrExt.ExitCode(),
-					"status code must be %d", wantExitCode,
-				)
 			}
 		})
 	}
