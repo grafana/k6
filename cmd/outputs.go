@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/loader"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/output/cloud"
 	"go.k6.io/k6/output/csv"
@@ -78,28 +77,25 @@ func getPossibleIDList(constrs map[string]func(output.Params) (output.Output, er
 	return strings.Join(res, ", ")
 }
 
-func createOutputs(
-	gs *globalState, src *loader.SourceData, conf Config,
-	rtOpts lib.RuntimeOptions, executionPlan []lib.ExecutionStep,
-) ([]output.Output, error) {
+func createOutputs(gs *globalState, test *loadedTest, executionPlan []lib.ExecutionStep) ([]output.Output, error) {
 	outputConstructors, err := getAllOutputConstructors()
 	if err != nil {
 		return nil, err
 	}
 	baseParams := output.Params{
-		ScriptPath:     src.URL,
+		ScriptPath:     test.source.URL,
 		Logger:         gs.logger,
 		Environment:    gs.envVars,
 		StdOut:         gs.stdOut,
 		StdErr:         gs.stdErr,
 		FS:             gs.fs,
-		ScriptOptions:  conf.Options,
-		RuntimeOptions: rtOpts,
+		ScriptOptions:  test.derivedConfig.Options,
+		RuntimeOptions: test.runtimeOptions,
 		ExecutionPlan:  executionPlan,
 	}
-	result := make([]output.Output, 0, len(conf.Out))
+	result := make([]output.Output, 0, len(test.derivedConfig.Out))
 
-	for _, outputFullArg := range conf.Out {
+	for _, outputFullArg := range test.derivedConfig.Out {
 		outputType, outputArg := parseOutputArgument(outputFullArg)
 		outputConstructor, ok := outputConstructors[outputType]
 		if !ok {
@@ -112,7 +108,7 @@ func createOutputs(
 		params := baseParams
 		params.OutputType = outputType
 		params.ConfigArgument = outputArg
-		params.JSONConfig = conf.Collectors[outputType]
+		params.JSONConfig = test.derivedConfig.Collectors[outputType]
 
 		output, err := outputConstructor(params)
 		if err != nil {

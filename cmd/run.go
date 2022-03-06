@@ -136,7 +136,7 @@ a commandline interface for interacting with it.`,
 
 			// Create all outputs.
 			executionPlan := execScheduler.GetExecutionPlan()
-			outputs, err := createOutputs(globalState, test.source, conf, test.runtimeOptions, executionPlan)
+			outputs, err := createOutputs(globalState, test, executionPlan)
 			if err != nil {
 				return err
 			}
