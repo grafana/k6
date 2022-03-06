@@ -21,6 +21,7 @@
 package testutils
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -57,3 +58,14 @@ func (smh *SimpleLogrusHook) Drain() []logrus.Entry {
 }
 
 var _ logrus.Hook = &SimpleLogrusHook{}
+
+// LogContains is a helper function that checks the provided list of log entries
+// for a message matching the provided level and contents.
+func LogContains(logEntries []logrus.Entry, expLevel logrus.Level, expContents string) bool {
+	for _, entry := range logEntries {
+		if entry.Level == expLevel && strings.Contains(entry.Message, expContents) {
+			return true
+		}
+	}
+	return false
+}

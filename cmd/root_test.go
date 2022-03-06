@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"os"
 	"os/signal"
 	"runtime"
 	"sync"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/lib/testutils"
 )
@@ -63,11 +63,37 @@ func newGlobalTestState(t *testing.T) *globalTestState {
 		outMutex:       outMutex,
 		stdOut:         &consoleWriter{nil, ts.stdOut, false, outMutex, nil},
 		stdErr:         &consoleWriter{nil, ts.stdErr, false, outMutex, nil},
-		stdIn:          os.Stdin, // TODO: spoof?
+		stdIn:          new(bytes.Buffer),
 		signalNotify:   signal.Notify,
 		signalStop:     signal.Stop,
 		logger:         logger,
 		fallbackLogger: testutils.NewLogger(t).WithField("fallback", true),
 	}
 	return ts
+}
+
+func TestDeprecatedOptionWarning(t *testing.T) {
+	t.Parallel()
+
+	ts := newGlobalTestState(t)
+	ts.args = []string{"k6", "--logformat", "json", "run", "-"}
+	ts.stdIn = bytes.NewBuffer([]byte(`
+		console.log('foo');
+		export default function() { console.log('bar'); };
+	`))
+
+	root := newRootCommand(ts.globalState)
+
+	require.NoError(t, root.cmd.Execute())
+
+	logMsgs := ts.loggerHook.Drain()
+	assert.True(t, testutils.LogContains(logMsgs, logrus.InfoLevel, "foo"))
+	assert.True(t, testutils.LogContains(logMsgs, logrus.InfoLevel, "bar"))
+	assert.Contains(t, ts.stdErr.String(), `"level":"info","msg":"foo","source":"console"`)
+	assert.Contains(t, ts.stdErr.String(), `"level":"info","msg":"bar","source":"console"`)
+
+	// TODO: after we get rid of cobra, actually emit this message to stderr
+	// and, ideally, through the log, not just print it...
+	assert.False(t, testutils.LogContains(logMsgs, logrus.InfoLevel, "logformat"))
+	assert.Contains(t, ts.stdOut.String(), `--logformat has been deprecated`)
 }
