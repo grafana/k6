@@ -30,7 +30,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/fatih/color"
@@ -190,13 +189,10 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			}
 
 			// Trap Interrupts, SIGINTs and SIGTERMs.
-			sigC := make(chan os.Signal, 2)
-			globalState.signalNotify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-			defer globalState.signalStop(sigC)
-			go func() {
-				sig := <-sigC
+			gracefulStop := func(sig os.Signal) {
 				logger.WithField("sig", sig).Print("Stopping cloud test run in response to signal...")
-				// Do this in a separate goroutine so that if it blocks the second signal can stop the execution
+				// Do this in a separate goroutine so that if it blocks, the
+				// second signal can still abort the process execution.
 				go func() {
 					stopErr := client.StopCloudTestRun(refID)
 					if stopErr != nil {
@@ -206,11 +202,12 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 					}
 					globalCancel()
 				}()
-
-				sig = <-sigC
+			}
+			hardStop := func(sig os.Signal) {
 				logger.WithField("sig", sig).Error("Aborting k6 in response to signal, we won't wait for the test to end.")
-				os.Exit(int(exitcodes.ExternalAbort))
-			}()
+			}
+			stopSignalHandling := handleTestAbortSignals(globalState, gracefulStop, hardStop)
+			defer stopSignalHandling()
 
 			et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
 			if err != nil {
