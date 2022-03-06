@@ -89,7 +89,7 @@ type globalState struct {
 
 	outMutex       *sync.Mutex
 	stdOut, stdErr *consoleWriter
-	stdIn          *os.File
+	stdIn          io.Reader
 
 	signalNotify func(chan<- os.Signal, ...os.Signal)
 	signalStop   func(chan<- os.Signal)
@@ -219,6 +219,12 @@ func newRootCommand(gs *globalState) *rootCommand {
 		PersistentPreRunE: c.persistentPreRunE,
 	}
 
+	rootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet(gs))
+	rootCmd.SetArgs(gs.args[1:])
+	rootCmd.SetOut(gs.stdOut)
+	rootCmd.SetErr(gs.stdErr) // TODO: use gs.logger.WriterLevel(logrus.ErrorLevel)?
+	rootCmd.SetIn(gs.stdIn)
+
 	loginCmd := getLoginCmd()
 	loginCmd.AddCommand(
 		getLoginCloudCommand(gs),
@@ -230,10 +236,7 @@ func newRootCommand(gs *globalState) *rootCommand {
 		getStatsCmd(gs), getStatusCmd(gs), getVersionCmd(gs),
 	)
 
-	rootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet(gs))
-	rootCmd.SetArgs(gs.args[1:])
 	c.cmd = rootCmd
-
 	return c
 }
 
