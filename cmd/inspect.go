@@ -68,8 +68,6 @@ func getInspectCmd(gs *globalState) *cobra.Command {
 
 	inspectCmd.Flags().SortFlags = false
 	inspectCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
-	inspectCmd.Flags().StringVarP(&gs.flags.testType, "type", "t",
-		gs.flags.testType, "override file `type`, \"js\" or \"archive\"")
 	inspectCmd.Flags().BoolVar(&addExecReqs,
 		"execution-requirements",
 		false,

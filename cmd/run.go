@@ -293,7 +293,7 @@ a commandline interface for interacting with it.`,
 	}
 
 	runCmd.Flags().SortFlags = false
-	runCmd.Flags().AddFlagSet(runCmdFlagSet(globalState))
+	runCmd.Flags().AddFlagSet(runCmdFlagSet())
 
 	return runCmd
 }
@@ -329,23 +329,12 @@ func reportUsage(execScheduler *local.ExecutionScheduler) error {
 	return err
 }
 
-func runCmdFlagSet(globalState *globalState) *pflag.FlagSet {
+func runCmdFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SortFlags = false
 	flags.AddFlagSet(optionFlagSet())
 	flags.AddFlagSet(runtimeOptionFlagSet(true))
 	flags.AddFlagSet(configFlagSet())
-
-	// TODO: Figure out a better way to handle the CLI flags:
-	// - the default values are specified in this way so we don't overwrire whatever
-	//   was specified via the environment variables
-	// - but we need to manually specify the DefValue, since that's the default value
-	//   that will be used in the help/usage message - if we don't set it, the environment
-	//   variables will affect the usage message
-	// - and finally, global variables are not very testable... :/
-	flags.StringVarP(&globalState.flags.testType, "type", "t",
-		globalState.flags.testType, "override file `type`, \"js\" or \"archive\"")
-	flags.Lookup("type").DefValue = ""
 	return flags
 }
 

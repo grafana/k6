@@ -89,7 +89,7 @@ func (lt *loadedTest) initializeFirstRunner(gs *globalState) error {
 	testPath := lt.source.URL.String()
 	logger := gs.logger.WithField("test_path", testPath)
 
-	testType := gs.flags.testType
+	testType := lt.runtimeOptions.TestType.String
 	if testType == "" {
 		logger.Debug("Detecting test type for...")
 		testType = detectTestType(lt.source.Data)
