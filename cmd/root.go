@@ -56,7 +56,6 @@ const (
 // globalFlags contains global config values that apply for all k6 sub-commands.
 type globalFlags struct {
 	configFilePath string
-	testType       string // TODO: move to RuntimeOptions, it's not trully global
 	quiet          bool
 	noColor        bool
 	address        string
@@ -174,9 +173,6 @@ func getFlags(defaultFlags globalFlags, env map[string]string) globalFlags {
 
 	if val, ok := env["K6_CONFIG"]; ok {
 		result.configFilePath = val
-	}
-	if val, ok := env["K6_TYPE"]; ok {
-		result.testType = val
 	}
 	if val, ok := env["K6_LOG_OUTPUT"]; ok {
 		result.logOutput = val
