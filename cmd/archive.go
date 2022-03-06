@@ -23,13 +23,9 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib/metrics"
 )
 
-func getArchiveCmd(globalState *globalState) *cobra.Command { // nolint: funlen
+func getArchiveCmd(gs *globalState) *cobra.Command {
 	archiveOut := "archive.tar"
 	// archiveCmd represents the archive command
 	archiveCmd := &cobra.Command{
@@ -46,60 +42,24 @@ An archive is a fully self-contained test run, and can be executed identically e
   k6 run myarchive.tar`[1:],
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			src, filesystems, err := readSource(globalState, args[0])
+			test, err := loadTest(gs, cmd, args, getPartialConfig)
 			if err != nil {
 				return err
 			}
 
-			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), globalState.envVars)
-			if err != nil {
-				return err
-			}
-
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			r, err := newRunner(
-				globalState.logger, src, globalState.flags.runType,
-				filesystems, runtimeOptions, builtinMetrics, registry,
-			)
-			if err != nil {
-				return err
-			}
-
-			cliOpts, err := getOptions(cmd.Flags())
-			if err != nil {
-				return err
-			}
-			conf, err := getConsolidatedConfig(globalState, Config{Options: cliOpts}, r.GetOptions())
-			if err != nil {
-				return err
-			}
-
-			// Parse the thresholds, only if the --no-threshold flag is not set.
-			// If parsing the threshold expressions failed, consider it as an
-			// invalid configuration error.
-			if !runtimeOptions.NoThresholds.Bool {
-				for _, thresholds := range conf.Options.Thresholds {
-					err = thresholds.Parse()
-					if err != nil {
-						return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-					}
-				}
-			}
-
-			_, err = deriveAndValidateConfig(conf, r.IsExecutable, globalState.logger)
-			if err != nil {
-				return err
-			}
-
-			err = r.SetOptions(conf.Options)
+			// It's important to NOT set the derived options back to the runner
+			// here, only the consolidated ones. Otherwise, if the script used
+			// an execution shortcut option (e.g. `iterations` or `duration`),
+			// we will have multiple conflicting execution options since the
+			// derivation will set `scenarios` as well.
+			err = test.initRunner.SetOptions(test.consolidatedConfig.Options)
 			if err != nil {
 				return err
 			}
 
 			// Archive.
-			arc := r.MakeArchive()
-			f, err := globalState.fs.Create(archiveOut)
+			arc := test.initRunner.MakeArchive()
+			f, err := gs.fs.Create(archiveOut)
 			if err != nil {
 				return err
 			}

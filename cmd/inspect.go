@@ -21,19 +21,15 @@
 package cmd
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
-	"go.k6.io/k6/js"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/types"
 )
 
-func getInspectCmd(globalState *globalState) *cobra.Command {
+func getInspectCmd(gs *globalState) *cobra.Command {
 	var addExecReqs bool
 
 	// inspectCmd represents the inspect command
@@ -43,44 +39,18 @@ func getInspectCmd(globalState *globalState) *cobra.Command {
 		Long:  `Inspect a script or archive.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			src, filesystems, err := readSource(globalState, args[0])
+			test, err := loadTest(gs, cmd, args, nil)
 			if err != nil {
 				return err
 			}
 
-			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), globalState.envVars)
-			if err != nil {
-				return err
-			}
-			registry := metrics.NewRegistry()
-
-			var b *js.Bundle
-			typ := globalState.flags.runType
-			if typ == "" {
-				typ = detectType(src.Data)
-			}
-			switch typ {
-			// this is an exhaustive list
-			case typeArchive:
-				var arc *lib.Archive
-				arc, err = lib.ReadArchive(bytes.NewBuffer(src.Data))
-				if err != nil {
-					return err
-				}
-				b, err = js.NewBundleFromArchive(globalState.logger, arc, runtimeOptions, registry)
-
-			case typeJS:
-				b, err = js.NewBundle(globalState.logger, src, filesystems, runtimeOptions, registry)
-			}
-			if err != nil {
-				return err
-			}
-
-			// ATM, output can take 2 forms: standard (equal to lib.Options struct) and extended, with additional fields.
-			inspectOutput := interface{}(b.Options)
+			// At the moment, `k6 inspect` output can take 2 forms: standard
+			// (equal to the lib.Options struct) and extended, with additional
+			// fields with execution requirements.
+			inspectOutput := interface{}(test.initRunner.GetOptions())
 
 			if addExecReqs {
-				inspectOutput, err = addExecRequirements(globalState, b)
+				inspectOutput, err = addExecRequirements(gs, cmd, test)
 				if err != nil {
 					return err
 				}
@@ -90,7 +60,7 @@ func getInspectCmd(globalState *globalState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(data)) //nolint:forbidigo // yes we want to just print it
+			printToStdout(gs, string(data))
 
 			return nil
 		},
@@ -98,8 +68,8 @@ func getInspectCmd(globalState *globalState) *cobra.Command {
 
 	inspectCmd.Flags().SortFlags = false
 	inspectCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
-	inspectCmd.Flags().StringVarP(&globalState.flags.runType, "type", "t",
-		globalState.flags.runType, "override file `type`, \"js\" or \"archive\"")
+	inspectCmd.Flags().StringVarP(&gs.flags.testType, "type", "t",
+		gs.flags.testType, "override file `type`, \"js\" or \"archive\"")
 	inspectCmd.Flags().BoolVar(&addExecReqs,
 		"execution-requirements",
 		false,
@@ -108,23 +78,18 @@ func getInspectCmd(globalState *globalState) *cobra.Command {
 	return inspectCmd
 }
 
-func addExecRequirements(gs *globalState, b *js.Bundle) (interface{}, error) {
-	conf, err := getConsolidatedConfig(gs, Config{}, b.Options)
+func addExecRequirements(gs *globalState, cmd *cobra.Command, test *loadedTest) (interface{}, error) {
+	// we don't actually support CLI flags here, so we pass nil as the getter
+	if err := test.consolidateDeriveAndValidateConfig(gs, cmd, nil); err != nil {
+		return nil, err
+	}
+
+	et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
 	if err != nil {
 		return nil, err
 	}
 
-	conf, err = deriveAndValidateConfig(conf, b.IsExecutable, gs.logger)
-	if err != nil {
-		return nil, err
-	}
-
-	et, err := lib.NewExecutionTuple(conf.ExecutionSegment, conf.ExecutionSegmentSequence)
-	if err != nil {
-		return nil, err
-	}
-
-	executionPlan := conf.Scenarios.GetFullExecutionRequirements(et)
+	executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
 	duration, _ := lib.GetEndOffset(executionPlan)
 
 	return struct {
@@ -132,7 +97,7 @@ func addExecRequirements(gs *globalState, b *js.Bundle) (interface{}, error) {
 		TotalDuration types.NullDuration `json:"totalDuration"`
 		MaxVUs        uint64             `json:"maxVUs"`
 	}{
-		conf.Options,
+		test.derivedConfig.Options,
 		types.NewNullDuration(duration, true),
 		lib.GetMaxPossibleVUs(executionPlan),
 	}, nil
