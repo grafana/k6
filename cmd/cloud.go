@@ -89,8 +89,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO: disable in quiet mode?
-			_, _ = fmt.Fprintf(globalState.stdOut, "\n%s\n\n", getBanner(globalState.flags.noColor || !globalState.stdOut.isTTY))
+			printBanner(globalState)
 
 			logger := globalState.logger
 			progressBar := pb.New(
@@ -344,8 +343,14 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 				return errext.WithExitCodeIfNone(errors.New("Test progress error"), exitcodes.CloudFailedToGetProgress)
 			}
 
-			valueColor := getColor(globalState.flags.noColor || !globalState.stdOut.isTTY, color.FgCyan)
-			fprintf(globalState.stdOut, "     test status: %s\n", valueColor.Sprint(testProgress.RunStatusText))
+			if !globalState.flags.quiet {
+				valueColor := getColor(globalState.flags.noColor || !globalState.stdOut.isTTY, color.FgCyan)
+				printToStdout(globalState, fmt.Sprintf(
+					"     test status: %s\n", valueColor.Sprint(testProgress.RunStatusText),
+				))
+			} else {
+				logger.WithField("run_status", testProgress.RunStatusText).Debug("Test finished")
+			}
 
 			if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
 				// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
