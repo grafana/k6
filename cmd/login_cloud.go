@@ -23,6 +23,7 @@ package cmd
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"syscall"
 
 	"github.com/fatih/color"
@@ -86,7 +87,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			switch {
 			case reset.Valid:
 				newCloudConf.Token = null.StringFromPtr(nil)
-				fprintf(globalState.stdOut, "  token reset\n")
+				printToStdout(globalState, "  token reset\n")
 			case show.Bool:
 			case token.Valid:
 				newCloudConf.Token = token
@@ -147,7 +148,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 
 			if newCloudConf.Token.Valid {
 				valueColor := getColor(globalState.flags.noColor || !globalState.stdOut.isTTY, color.FgCyan)
-				fprintf(globalState.stdOut, "  token: %s\n", valueColor.Sprint(newCloudConf.Token.String))
+				printToStdout(globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
 			}
 			return nil
 		},

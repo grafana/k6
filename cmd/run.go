@@ -88,8 +88,7 @@ a commandline interface for interacting with it.`,
   k6 run -o influxdb=http://1.2.3.4:8086/k6`[1:],
 		Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// TODO: disable in quiet mode?
-			_, _ = fmt.Fprintf(globalState.stdOut, "\n%s\n\n", getBanner(globalState.flags.noColor || !globalState.stdOut.isTTY))
+			printBanner(globalState)
 
 			logger := globalState.logger
 			logger.Debug("Initializing the runner...")
@@ -328,7 +327,9 @@ a commandline interface for interacting with it.`,
 					// do nothing, we were interrupted by Ctrl+C already
 				default:
 					logger.Debug("Linger set; waiting for Ctrl+C...")
-					fprintf(globalState.stdOut, "Linger set; waiting for Ctrl+C...")
+					if !globalState.flags.quiet {
+						printToStdout(globalState, "Linger set; waiting for Ctrl+C...")
+					}
 					<-lingerCtx.Done()
 					logger.Debug("Ctrl+C received, exiting...")
 				}
