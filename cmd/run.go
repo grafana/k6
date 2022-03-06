@@ -31,7 +31,6 @@ import (
 	"os"
 	"runtime"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/spf13/afero"
@@ -182,21 +181,16 @@ a commandline interface for interacting with it.`,
 			)
 
 			// Trap Interrupts, SIGINTs and SIGTERMs.
-			sigC := make(chan os.Signal, 2)
-			globalState.signalNotify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-			defer globalState.signalStop(sigC)
-			go func() {
-				sig := <-sigC
+			gracefulStop := func(sig os.Signal) {
 				logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
 				lingerCancel() // stop the test run, metric processing is cancelled below
-
-				// If we get a second signal, we immediately exit, so something like
-				// https://github.com/k6io/k6/issues/971 never happens again
-				sig = <-sigC
+			}
+			hardStop := func(sig os.Signal) {
 				logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
 				globalCancel() // not that it matters, given the following command...
-				os.Exit(int(exitcodes.ExternalAbort))
-			}()
+			}
+			stopSignalHandling := handleTestAbortSignals(globalState, gracefulStop, hardStop)
+			defer stopSignalHandling()
 
 			// Initialize the engine
 			initBar.Modify(pb.WithConstProgress(0, "Init VUs..."))
