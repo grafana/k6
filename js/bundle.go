@@ -296,13 +296,6 @@ func (b *Bundle) Instantiate(
 	return bi, instErr
 }
 
-// IsExecutable returns whether the given name is an exported and
-// executable function in the script.
-func (b *Bundle) IsExecutable(name string) bool {
-	_, exists := b.exports[name]
-	return exists
-}
-
 // Instantiates the bundle into an existing runtime. Not public because it also messes with a bunch
 // of other things, will potentially thrash data and makes a mess in it if the operation fails.
 func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *InitContext, vuID uint64) error {
