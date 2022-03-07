@@ -1227,7 +1227,19 @@ func TestRequestAndBatch(t *testing.T) {
 				throw              bool
 			}{
 				{
-					name: "invalid arg", code: `"https://somevalidurl.com"`,
+					name: "no arg", code: ``,
+					expErr: `no argument was provided to http.batch()`, throw: true,
+				},
+				{
+					name: "invalid null arg", code: `null`,
+					expErr: `invalid http.batch() argument type <nil>`, throw: true,
+				},
+				{
+					name: "invalid undefined arg", code: `undefined`,
+					expErr: `invalid http.batch() argument type <nil>`, throw: true,
+				},
+				{
+					name: "invalid string arg", code: `"https://somevalidurl.com"`,
 					expErr: `invalid http.batch() argument type string`, throw: true,
 				},
 				{
