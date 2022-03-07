@@ -340,14 +340,15 @@ func (f *Frame) cachedDocumentHandle() (*ElementHandle, bool) {
 }
 
 func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
-	rt := k6common.GetRuntime(f.ctx)
-	doc := rt.ToValue("document")
-
-	opts := evalOptions{
-		forceCallable: false,
-		returnByValue: false,
-	}
-	result, err := f.evaluate(f.ctx, mainWorld, opts, doc)
+	result, err := f.evaluate(
+		f.ctx,
+		mainWorld,
+		evalOptions{
+			forceCallable: false,
+			returnByValue: false,
+		},
+		k6common.GetRuntime(f.ctx).ToValue("document"),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("cannot evaluate in main execution context: %w", err)
 	}
