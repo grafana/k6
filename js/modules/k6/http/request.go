@@ -449,6 +449,9 @@ func (c *Client) Batch(reqsV goja.Value) (interface{}, error) {
 		results   interface{} // either []*Response or map[string]*Response
 	)
 
+	if reqsV == nil {
+		return nil, errors.New("no argument was provided to http.batch()")
+	}
 	switch v := reqsV.Export().(type) {
 	case []interface{}:
 		batchReqs, results, err = c.prepareBatchArray(v)
