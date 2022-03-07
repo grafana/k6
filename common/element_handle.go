@@ -113,7 +113,10 @@ func getElementHandleActionFn(
 
 //nolint:funlen,gocognit,cyclop,unparam
 func getElementHandlePointerActionFn(
-	h *ElementHandle, checkEnabled bool, fn elementHandlePointerActionFn, opts *ElementHandleBasePointerOptions,
+	h *ElementHandle,
+	checkEnabled bool,
+	fn elementHandlePointerActionFn,
+	opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// All or a subset of the following actionability checks are made before performing the actual action:
 	// 1. Attached to DOM
@@ -121,21 +124,15 @@ func getElementHandlePointerActionFn(
 	// 3. Stable
 	// 4. Enabled
 	// 5. Receives events
-
-	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
-		var result interface{}
-		var err error
-
+	pointerFunc := func(apiCtx context.Context) (res interface{}, err error) {
 		// Check if we should run actionability checks
 		if !opts.Force {
 			states := []string{"visible", "stable"}
 			if checkEnabled {
 				states = append(states, "enabled")
 			}
-			_, err = h.waitForElementState(apiCtx, states, opts.Timeout)
-			if err != nil {
-				errCh <- err
-				return
+			if _, err = h.waitForElementState(apiCtx, states, opts.Timeout); err != nil {
+				return nil, err
 			}
 		}
 
@@ -147,56 +144,55 @@ func getElementHandlePointerActionFn(
 		if p != nil {
 			rect = &dom.Rect{X: p.X, Y: p.Y, Width: 0, Height: 0}
 		}
-		err = h.scrollRectIntoViewIfNeeded(apiCtx, rect)
-		if err != nil {
-			errCh <- err
-			return
+		if err = h.scrollRectIntoViewIfNeeded(apiCtx, rect); err != nil {
+			return nil, err
 		}
-
+		// Get the clickable point
 		if p != nil {
 			p, err = h.offsetPosition(apiCtx, opts.Position)
-			if err != nil {
-				errCh <- err
-				return
-			}
 		} else {
 			p, err = h.clickablePoint()
-			if err != nil {
-				errCh <- err
-				return
-			}
 		}
-
-		// Do a final actionability check to see if element can receive events at mouse position in question
+		if err != nil {
+			return nil, err
+		}
+		// Do a final actionability check to see if element can receive events
+		// at mouse position in question
 		if !opts.Force {
-			if ok, localErr := h.checkHitTargetAt(apiCtx, *p); !ok {
-				errCh <- localErr
-				return
+			if ok, err := h.checkHitTargetAt(apiCtx, *p); !ok {
+				return nil, err
 			}
 		}
-
-		// Are we only "trialing" the action (ie. running the actionability checks) but not actually performing it
+		// Are we only "trialing" the action but not actually performing
+		// it (ie. running the actionability checks).
 		if !opts.Trial {
 			b := NewBarrier()
 			h.frame.manager.addBarrier(b)
 			defer h.frame.manager.removeBarrier(b)
 
-			result, err = fn(apiCtx, h, p)
-			if err != nil {
-				errCh <- err
-				return
+			if res, err = fn(apiCtx, h, p); err != nil {
+				return nil, err
 			}
-
 			// Do we need to wait for navigation to happen
 			if !opts.NoWaitAfter {
-				if err := b.Wait(apiCtx); err != nil {
-					errCh <- err
+				if err = b.Wait(apiCtx); err != nil {
+					return nil, err
 				}
 			}
 		}
 
-		resultCh <- result
+		return res, nil
 	}
+
+	do := func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+		if res, err := pointerFunc(apiCtx); err != nil {
+			errCh <- err
+		} else {
+			resultCh <- res
+		}
+	}
+
+	return do
 }
 
 // ElementHandle represents a HTML element JS object inside an execution context.
