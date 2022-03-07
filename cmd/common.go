@@ -112,7 +112,7 @@ func handleTestAbortSignals(gs *globalState, firstHandler, secondHandler func(os
 			}
 			// If we get a second signal, we immediately exit, so something like
 			// https://github.com/k6io/k6/issues/971 never happens again
-			os.Exit(int(exitcodes.ExternalAbort))
+			gs.osExit(int(exitcodes.ExternalAbort))
 		case <-done:
 			return
 		}
