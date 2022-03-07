@@ -44,15 +44,19 @@ type fileHook struct {
 	w              io.WriteCloser
 	bw             *bufio.Writer
 	levels         []logrus.Level
+	done           chan struct{}
 }
 
 // FileHookFromConfigLine returns new fileHook hook.
 func FileHookFromConfigLine(
-	ctx context.Context, fallbackLogger logrus.FieldLogger, line string,
+	ctx context.Context, fallbackLogger logrus.FieldLogger, line string, done chan struct{},
 ) (logrus.Hook, error) {
+	// TODO: fix this so it works correctly with relative paths from the CWD
+
 	hook := &fileHook{
 		fallbackLogger: fallbackLogger,
 		levels:         logrus.AllLevels,
+		done:           done,
 	}
 
 	parts := strings.SplitN(line, "=", 2)
@@ -120,6 +124,7 @@ func (h *fileHook) loop(ctx context.Context) chan []byte {
 	loglines := make(chan []byte, fileHookBufferSize)
 
 	go func() {
+		defer close(h.done)
 		for {
 			select {
 			case entry := <-loglines:

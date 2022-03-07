@@ -290,7 +290,7 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 		c.logger.SetOutput(ioutil.Discard)
 
 	case strings.HasPrefix(line, "loki"):
-		ch = make(chan struct{})
+		ch = make(chan struct{}) // TODO: refactor, get it from the constructor
 		hook, err := log.LokiFromConfigLine(c.ctx, c.fallbackLogger, line, ch)
 		if err != nil {
 			return nil, err
@@ -300,7 +300,8 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 		c.logFmt = "raw"
 
 	case strings.HasPrefix(line, "file"):
-		hook, err := log.FileHookFromConfigLine(c.ctx, c.fallbackLogger, line)
+		ch = make(chan struct{}) // TODO: refactor, get it from the constructor
+		hook, err := log.FileHookFromConfigLine(c.ctx, c.fallbackLogger, line, ch)
 		if err != nil {
 			return nil, err
 		}
