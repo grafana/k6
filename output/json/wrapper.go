@@ -26,45 +26,41 @@ import (
 	"go.k6.io/k6/stats"
 )
 
-// Envelope is the data format we use to export both metrics and metric samples
-// to the JSON file.
-type Envelope struct {
-	Type   string      `json:"type"`
-	Data   interface{} `json:"data"`
-	Metric string      `json:"metric,omitempty"`
+//go:generate easyjson -pkg -no_std_marshalers -gen_build_flags -mod=mod .
+
+//easyjson:json
+type sampleEnvelope struct {
+	Type string `json:"type"`
+	Data struct {
+		Time  time.Time         `json:"time"`
+		Value float64           `json:"value"`
+		Tags  *stats.SampleTags `json:"tags"`
+	} `json:"data"`
+	Metric string `json:"metric"`
 }
 
-// Sample is the data format for metric sample data in the JSON file.
-type Sample struct {
-	Time  time.Time         `json:"time"`
-	Value float64           `json:"value"`
-	Tags  *stats.SampleTags `json:"tags"`
-}
-
-func newJSONSample(sample stats.Sample) Sample {
-	return Sample{
-		Time:  sample.Time,
-		Value: sample.Value,
-		Tags:  sample.Tags,
-	}
-}
-
-// WrapSample is used to package a metric sample in a way that's nice to export
+// wrapSample is used to package a metric sample in a way that's nice to export
 // to JSON.
-func WrapSample(sample stats.Sample) Envelope {
-	return Envelope{
+func wrapSample(sample stats.Sample) sampleEnvelope {
+	s := sampleEnvelope{
 		Type:   "Point",
 		Metric: sample.Metric.Name,
-		Data:   newJSONSample(sample),
 	}
+	s.Data.Time = sample.Time
+	s.Data.Value = sample.Value
+	s.Data.Tags = sample.Tags
+	return s
 }
 
-func wrapMetric(metric *stats.Metric) *Envelope {
-	if metric == nil {
-		return nil
-	}
+//easyjson:json
+type metricEnvelope struct {
+	Type   string        `json:"type"`
+	Data   *stats.Metric `json:"data"`
+	Metric string        `json:"metric"`
+}
 
-	return &Envelope{
+func wrapMetric(metric *stats.Metric) metricEnvelope {
+	return metricEnvelope{
 		Type:   "Metric",
 		Metric: metric.Name,
 		Data:   metric,
