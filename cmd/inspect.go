@@ -47,13 +47,14 @@ func getInspectCmd(gs *globalState) *cobra.Command {
 			// At the moment, `k6 inspect` output can take 2 forms: standard
 			// (equal to the lib.Options struct) and extended, with additional
 			// fields with execution requirements.
-			inspectOutput := interface{}(test.initRunner.GetOptions())
-
+			var inspectOutput interface{}
 			if addExecReqs {
-				inspectOutput, err = addExecRequirements(gs, cmd, test)
+				inspectOutput, err = inspectOutputWithExecRequirements(gs, cmd, test)
 				if err != nil {
 					return err
 				}
+			} else {
+				inspectOutput = test.initRunner.GetOptions()
 			}
 
 			data, err := json.MarshalIndent(inspectOutput, "", "  ")
@@ -76,7 +77,9 @@ func getInspectCmd(gs *globalState) *cobra.Command {
 	return inspectCmd
 }
 
-func addExecRequirements(gs *globalState, cmd *cobra.Command, test *loadedTest) (interface{}, error) {
+// If --execution-requirements is enabled, this will consolidate the config,
+// derive the value of `scenarios` and calculate the max test duration and VUs.
+func inspectOutputWithExecRequirements(gs *globalState, cmd *cobra.Command, test *loadedTest) (interface{}, error) {
 	// we don't actually support CLI flags here, so we pass nil as the getter
 	if err := test.consolidateDeriveAndValidateConfig(gs, cmd, nil); err != nil {
 		return nil, err
