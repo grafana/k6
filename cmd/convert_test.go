@@ -134,7 +134,7 @@ func TestConvertCmdCorrelate(t *testing.T) {
 		"--enable-status-code-checks=true", "--return-on-failed-check=true", "correlate.har",
 	}
 
-	require.NoError(t, newRootCommand(testState.globalState).cmd.Execute())
+	newRootCommand(testState.globalState).execute()
 
 	result, err := afero.ReadFile(testState.fs, "result.js")
 	require.NoError(t, err)
@@ -166,7 +166,7 @@ func TestConvertCmdStdout(t *testing.T) {
 	require.NoError(t, afero.WriteFile(testState.fs, "stdout.har", []byte(testHAR), 0o644))
 	testState.args = []string{"k6", "convert", "stdout.har"}
 
-	require.NoError(t, newRootCommand(testState.globalState).cmd.Execute())
+	newRootCommand(testState.globalState).execute()
 	assert.Equal(t, testHARConvertResult, testState.stdOut.String())
 }
 
@@ -177,7 +177,7 @@ func TestConvertCmdOutputFile(t *testing.T) {
 	require.NoError(t, afero.WriteFile(testState.fs, "output.har", []byte(testHAR), 0o644))
 	testState.args = []string{"k6", "convert", "--output", "result.js", "output.har"}
 
-	require.NoError(t, newRootCommand(testState.globalState).cmd.Execute())
+	newRootCommand(testState.globalState).execute()
 
 	output, err := afero.ReadFile(testState.fs, "result.js")
 	assert.NoError(t, err)

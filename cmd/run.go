@@ -160,7 +160,7 @@ a commandline interface for interacting with it.`,
 						// Only exit k6 if the user has explicitly set the REST API address
 						if cmd.Flags().Lookup("address").Changed {
 							logger.WithError(aerr).Error("Error from API server")
-							os.Exit(int(exitcodes.CannotStartRESTAPI))
+							globalState.osExit(int(exitcodes.CannotStartRESTAPI))
 						} else {
 							logger.WithError(aerr).Warn("Error from API server")
 						}
