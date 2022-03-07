@@ -410,7 +410,10 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 
 	case strings.HasPrefix(line, "file"):
 		ch = make(chan struct{}) // TODO: refactor, get it from the constructor
-		hook, err := log.FileHookFromConfigLine(c.globalState.ctx, c.globalState.fs, c.globalState.fallbackLogger, line, ch)
+		hook, err := log.FileHookFromConfigLine(
+			c.globalState.ctx, c.globalState.fs, c.globalState.getwd,
+			c.globalState.fallbackLogger, line, ch,
+		)
 		if err != nil {
 			return nil, err
 		}

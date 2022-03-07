@@ -14,6 +14,7 @@ import (
 
 const (
 	noopDefaultFunc   = `export default function() {};`
+	fooLogDefaultFunc = `export default function() { console.log('foo'); };`
 	noopHandleSummary = `
 		export function handleSummary(data) {
 			return {}; // silence the end of test summary
@@ -61,10 +62,10 @@ func TestStdoutAndStderrAreEmptyWithQuietAndLogsForwarded(t *testing.T) {
 		"k6", "--quiet", "--log-output", "file=" + logFilePath,
 		"--log-format", "raw", "run", "--no-summary", "-",
 	}
-	ts.stdIn = bytes.NewBufferString(`export default function() { console.log('foo'); };`)
+	ts.stdIn = bytes.NewBufferString(fooLogDefaultFunc)
 	newRootCommand(ts.globalState).execute()
 
-	// The our test state hook still catches this message
+	// The test state hook still catches this message
 	assert.True(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.InfoLevel, `foo`))
 
 	// But it's not shown on stderr or stdout
@@ -75,6 +76,30 @@ func TestStdoutAndStderrAreEmptyWithQuietAndLogsForwarded(t *testing.T) {
 	logContents, err := afero.ReadFile(ts.fs, logFilePath)
 	require.NoError(t, err)
 	assert.Equal(t, "foo\n", string(logContents))
+}
+
+func TestRelativeLogPathWithSetupAndTeardown(t *testing.T) {
+	t.Parallel()
+
+	ts := newGlobalTestState(t)
+
+	ts.args = []string{"k6", "--log-output", "file=test.log", "--log-format", "raw", "run", "-i", "2", "-"}
+	ts.stdIn = bytes.NewBufferString(fooLogDefaultFunc + `
+		export function setup() { console.log('bar'); };
+		export function teardown() { console.log('baz'); };
+	`)
+	newRootCommand(ts.globalState).execute()
+
+	// The test state hook still catches these messages
+	logEntries := ts.loggerHook.Drain()
+	assert.True(t, testutils.LogContains(logEntries, logrus.InfoLevel, `foo`))
+	assert.True(t, testutils.LogContains(logEntries, logrus.InfoLevel, `bar`))
+	assert.True(t, testutils.LogContains(logEntries, logrus.InfoLevel, `baz`))
+
+	// And check that the log file also contains everything
+	logContents, err := afero.ReadFile(ts.fs, filepath.Join(ts.cwd, "test.log"))
+	require.NoError(t, err)
+	assert.Equal(t, "bar\nfoo\nfoo\nbaz\n", string(logContents))
 }
 
 func TestWrongCliFlagIterations(t *testing.T) {
