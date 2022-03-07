@@ -303,6 +303,9 @@ func (f *Frame) detach() {
 		f.parentFrame.removeChildFrame(f)
 	}
 	f.parentFrame = nil
+	// detach() is called by the same frame Goroutine that manages execution
+	// context switches. so this should be safe.
+	// we don't need to protect the following with executionContextMu.
 	if f.documentHandle != nil {
 		f.documentHandle.Dispose()
 	}
@@ -325,6 +328,9 @@ func (f *Frame) document() (*ElementHandle, error) {
 	if err != nil {
 		return nil, fmt.Errorf("newDocumentHandle: %w", err)
 	}
+
+	// each execution context switch modifies documentHandle.
+	// see: nullContext().
 	f.executionContextMu.Lock()
 	defer f.executionContextMu.Unlock()
 	f.documentHandle = dh
@@ -333,6 +339,8 @@ func (f *Frame) document() (*ElementHandle, error) {
 }
 
 func (f *Frame) cachedDocumentHandle() (*ElementHandle, bool) {
+	// each execution context switch modifies documentHandle.
+	// see: nullContext().
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
