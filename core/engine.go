@@ -23,6 +23,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -57,7 +58,7 @@ type Engine struct {
 	ExecutionScheduler lib.ExecutionScheduler
 	executionState     *lib.ExecutionState
 
-	Options        lib.Options
+	options        lib.Options
 	runtimeOptions lib.RuntimeOptions
 	outputs        []output.Output
 
@@ -65,15 +66,15 @@ type Engine struct {
 	stopOnce sync.Once
 	stopChan chan struct{}
 
-	Metrics     map[string]*stats.Metric
+	Metrics     map[string]*stats.Metric // TODO: refactor, this doesn't need to be a map
 	MetricsLock sync.Mutex
 
+	registry       *metrics.Registry
 	builtinMetrics *metrics.BuiltinMetrics
 	Samples        chan stats.SampleContainer
 
-	// Assigned to metrics upon first received sample.
-	thresholds map[string]stats.Thresholds
-	submetrics map[string][]*stats.Submetric
+	// These can be both top-level metrics or sub-metrics
+	metricsWithThresholds []*stats.Metric
 
 	// Are thresholds tainted?
 	thresholdsTainted bool
@@ -82,7 +83,7 @@ type Engine struct {
 // NewEngine instantiates a new Engine, without doing any heavy initialization.
 func NewEngine(
 	ex lib.ExecutionScheduler, opts lib.Options, rtOpts lib.RuntimeOptions, outputs []output.Output, logger *logrus.Logger,
-	builtinMetrics *metrics.BuiltinMetrics,
+	registry *metrics.Registry, builtinMetrics *metrics.BuiltinMetrics,
 ) (*Engine, error) {
 	if ex == nil {
 		return nil, errors.New("missing ExecutionScheduler instance")
@@ -92,42 +93,78 @@ func NewEngine(
 		ExecutionScheduler: ex,
 		executionState:     ex.GetState(),
 
-		Options:        opts,
+		options:        opts,
 		runtimeOptions: rtOpts,
 		outputs:        outputs,
 		Metrics:        make(map[string]*stats.Metric),
 		Samples:        make(chan stats.SampleContainer, opts.MetricSamplesBufferSize.Int64),
 		stopChan:       make(chan struct{}),
 		logger:         logger.WithField("component", "engine"),
+		registry:       registry,
 		builtinMetrics: builtinMetrics,
 	}
 
-	e.thresholds = opts.Thresholds
-	e.submetrics = make(map[string][]*stats.Submetric)
-	for name := range e.thresholds {
-		if !strings.Contains(name, "{") {
-			continue
-		}
-
-		parent, sm := stats.NewSubmetric(name)
-		e.submetrics[parent] = append(e.submetrics[parent], sm)
-	}
-
-	// TODO: refactor this out of here when https://github.com/k6io/k6/issues/1832 lands and
-	// there is a better way to enable a metric with tag
-	if opts.SystemTags.Has(stats.TagExpectedResponse) {
-		for _, name := range []string{
-			"http_req_duration{expected_response:true}",
-		} {
-			if _, ok := e.thresholds[name]; ok {
-				continue
-			}
-			parent, sm := stats.NewSubmetric(name)
-			e.submetrics[parent] = append(e.submetrics[parent], sm)
+	if !(e.runtimeOptions.NoSummary.Bool && e.runtimeOptions.NoThresholds.Bool) {
+		err := e.initSubMetricsAndThresholds()
+		if err != nil {
+			return nil, err
 		}
 	}
 
 	return e, nil
+}
+
+func (e *Engine) getOrInitPotentialSubmetric(name string) (*stats.Metric, error) {
+	// TODO: replace with strings.Cut after Go 1.18
+	nameParts := strings.SplitN(name, "{", 2)
+
+	metric := e.registry.Get(nameParts[0])
+	if metric == nil {
+		return nil, fmt.Errorf("metric '%s' does not exist in the script", nameParts[0])
+	}
+	if len(nameParts) == 1 { // no sub-metric
+		return metric, nil
+	}
+
+	if nameParts[1][len(nameParts[1])-1] != '}' {
+		return nil, fmt.Errorf("missing ending bracket, sub-metric format needs to be 'metric{key:value}'")
+	}
+	sm, err := metric.AddSubmetric(nameParts[1][:len(nameParts[1])-1])
+	if err != nil {
+		return nil, err
+	}
+	return sm.Metric, nil
+}
+
+func (e *Engine) initSubMetricsAndThresholds() error {
+	for metricName, thresholds := range e.options.Thresholds {
+		metric, err := e.getOrInitPotentialSubmetric(metricName)
+
+		if e.runtimeOptions.NoThresholds.Bool {
+			if err != nil {
+				e.logger.WithError(err).Warnf("Invalid metric '%s' in threshold definitions", metricName)
+			}
+			continue
+		}
+
+		if err != nil {
+			return fmt.Errorf("invalid metric '%s' in threshold definitions: %w", metricName, err)
+		}
+
+		metric.Thresholds = thresholds
+		e.metricsWithThresholds = append(e.metricsWithThresholds, metric)
+	}
+
+	// TODO: refactor out of here when https://github.com/grafana/k6/issues/1321
+	// lands and there is a better way to enable a metric with tag
+	if e.options.SystemTags.Has(stats.TagExpectedResponse) {
+		_, err := e.getOrInitPotentialSubmetric("http_req_duration{expected_response:true}")
+		if err != nil {
+			return err // shouldn't happen, but ¯\_(ツ)_/¯
+		}
+	}
+
+	return nil
 }
 
 // Init is used to initialize the execution scheduler and all metrics processing
@@ -382,15 +419,15 @@ func (e *Engine) emitMetrics() {
 				Time:   t,
 				Metric: e.builtinMetrics.VUs,
 				Value:  float64(executionState.GetCurrentlyActiveVUsCount()),
-				Tags:   e.Options.RunTags,
+				Tags:   e.options.RunTags,
 			}, {
 				Time:   t,
 				Metric: e.builtinMetrics.VUsMax,
 				Value:  float64(executionState.GetInitializedVUsCount()),
-				Tags:   e.Options.RunTags,
+				Tags:   e.options.RunTags,
 			},
 		},
-		Tags: e.Options.RunTags,
+		Tags: e.options.RunTags,
 		Time: t,
 	}})
 }
@@ -427,7 +464,7 @@ func (e *Engine) processThresholds() (shouldAbort bool) {
 	return shouldAbort
 }
 
-func (e *Engine) processSamplesForMetrics(sampleContainers []stats.SampleContainer) {
+func (e *Engine) processMetricsInSamples(sampleContainers []stats.SampleContainer) {
 	for _, sampleContainer := range sampleContainers {
 		samples := sampleContainer.GetSamples()
 
@@ -436,25 +473,25 @@ func (e *Engine) processSamplesForMetrics(sampleContainers []stats.SampleContain
 		}
 
 		for _, sample := range samples {
-			m, ok := e.Metrics[sample.Metric.Name]
-			if !ok {
-				m = stats.New(sample.Metric.Name, sample.Metric.Type, sample.Metric.Contains)
-				m.Thresholds = e.thresholds[m.Name]
-				m.Submetrics = e.submetrics[m.Name]
+			m := sample.Metric // this should have come from the Registry, no need to look it up
+			if !m.Observed {
+				// But we need to add it here, so we can show data in the
+				// end-of-test summary for this metric
 				e.Metrics[m.Name] = m
+				m.Observed = true
 			}
-			m.Sink.Add(sample)
+			m.Sink.Add(sample) // add its value to its own sink
 
+			// and also add it to any submetrics that match
 			for _, sm := range m.Submetrics {
 				if !sample.Tags.Contains(sm.Tags) {
 					continue
 				}
-
-				if sm.Metric == nil {
-					sm.Metric = stats.New(sm.Name, sample.Metric.Type, sample.Metric.Contains)
-					sm.Metric.Sub = *sm
-					sm.Metric.Thresholds = e.thresholds[sm.Name]
-					e.Metrics[sm.Name] = sm.Metric
+				if !sm.Metric.Observed {
+					// But we need to add it here, so we can show data in the
+					// end-of-test summary for this metric
+					e.Metrics[sm.Metric.Name] = sm.Metric
+					sm.Metric.Observed = true
 				}
 				sm.Metric.Sink.Add(sample)
 			}
@@ -473,7 +510,7 @@ func (e *Engine) processSamples(sampleContainers []stats.SampleContainer) {
 
 	// TODO: run this and the below code in goroutines?
 	if !(e.runtimeOptions.NoSummary.Bool && e.runtimeOptions.NoThresholds.Bool) {
-		e.processSamplesForMetrics(sampleContainers)
+		e.processMetricsInSamples(sampleContainers)
 	}
 
 	for _, out := range e.outputs {

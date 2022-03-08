@@ -311,7 +311,7 @@ func TestSetupDataIsolation(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	engine, err := core.NewEngine(
-		execScheduler, options, lib.RuntimeOptions{}, []output.Output{mockOutput}, testutils.NewLogger(t), builtinMetrics,
+		execScheduler, options, lib.RuntimeOptions{}, []output.Output{mockOutput}, testutils.NewLogger(t), registry, builtinMetrics,
 	)
 	require.NoError(t, err)
 
