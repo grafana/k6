@@ -51,7 +51,7 @@ Features
 - **Batteries included**: [Cookies](https://k6.io/docs/using-k6/cookies), [Crypto](https://k6.io/docs/javascript-api/k6-crypto), [Custom metrics](https://k6.io/docs/using-k6/metrics#custom-metrics), [Encodings](https://k6.io/docs/javascript-api/k6-encoding), [Environment variables](https://k6.io/docs/using-k6/environment-variables), JSON, [HTML forms](https://k6.io/docs/using-k6/html/working-with-html-forms), [files](https://k6.io/docs/javascript-api/init-context/open-filepath-mode), [flexible execution control](https://k6.io/docs/getting-started/running-k6#section-stages-ramping-updown-vus), and more.
 - **Built-in HAR converter**: record browser sessions as [`.har` files](https://en.wikipedia.org/wiki/.har) and [directly convert them to k6 scripts](https://k6.io/docs/using-k6/session-recording-har-support)
 - **Flexible metrics storage and visualization**: [InfluxDB](https://k6.io/docs/results-visualization/influxdb-+-grafana) (+Grafana), [JSON](https://k6.io/docs/getting-started/results-output/json) or [k6 Cloud](https://k6.io/docs/cloud/analyzing-results/overview)
-- [**Cloud execution**](https://k6.io/docs/using-k6/cloud-execution) and distributed tests _(currently only on infrastructure managed by [us k6 cloud](https://k6.io/cloud), with native distributed execution in k6 [planned](https://github.com/grafana/k6/wiki/Roadmap) for the near future!)_
+- [**Cloud execution**](https://k6.io/docs/using-k6/cloud-execution) and distributed tests _(currently only on infrastructure managed by [us k6 cloud](https://k6.io/cloud), with native distributed execution in k6 [planned](https://github.com/grafana/k6/issues/140) for the near future!)_
 
 There's even more! [See all features available in k6.](https://k6.io/docs/)
 
