@@ -59,7 +59,7 @@ type Browser struct {
 	browserProc *BrowserProcess
 	launchOpts  *LaunchOptions
 
-	// Connection to browser to talk CDP protocol.
+	// Connection to the browser to talk CDP protocol.
 	// A *Connection is saved to this field, see: connect().
 	conn connection
 
@@ -398,6 +398,7 @@ func (b *Browser) Close() {
 	// will stop emitting events.
 	b.browserProc.GracefulClose()
 	b.browserProc.Terminate()
+	b.conn.Close()
 }
 
 // Contexts returns list of browser contexts.

@@ -32,7 +32,7 @@ type BrowserProcess struct {
 	// The process of the browser, if running locally.
 	process *os.Process
 
-	// Channels to for managing termination.
+	// Channels for managing termination.
 	lostConnection             chan struct{}
 	processIsGracefullyClosing chan struct{}
 
