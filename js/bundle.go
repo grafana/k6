@@ -38,8 +38,8 @@ import (
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/loader"
+	"go.k6.io/k6/metrics"
 )
 
 // A Bundle is a self-contained bundle of scripts and resources.

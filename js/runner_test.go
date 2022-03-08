@@ -56,12 +56,12 @@ import (
 	"go.k6.io/k6/lib"
 	_ "go.k6.io/k6/lib/executor" // TODO: figure out something better
 	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	"go.k6.io/k6/lib/testutils/mockoutput"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/stats"
 )

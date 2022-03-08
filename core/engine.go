@@ -33,7 +33,7 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/stats"
 )
