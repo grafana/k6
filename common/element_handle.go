@@ -124,7 +124,10 @@ func getElementHandlePointerActionFn(
 	// 3. Stable
 	// 4. Enabled
 	// 5. Receives events
-	pointerFunc := func(apiCtx context.Context) (res interface{}, err error) {
+	pointerFunc := func(
+		apiCtx context.Context,
+		sopts *ScrollIntoViewOptions,
+	) (res interface{}, err error) {
 		// Check if we should run actionability checks
 		if !opts.Force {
 			states := []string{"visible", "stable"}
@@ -139,14 +142,34 @@ func getElementHandlePointerActionFn(
 		// Decide position where a mouse down should happen if needed by action
 		p := opts.Position
 
-		// Scroll element into view
-		var rect *dom.Rect
-		if p != nil {
-			rect = &dom.Rect{X: p.X, Y: p.Y, Width: 0, Height: 0}
+		// Change scrolling action depending on the scrolling options
+		if sopts == nil {
+			var rect *dom.Rect
+			if p != nil {
+				rect = &dom.Rect{X: p.X, Y: p.Y}
+			}
+			err = h.scrollRectIntoViewIfNeeded(apiCtx, rect)
+		} else {
+			scrollIntoView := `
+				(node, injected, options) => {
+					// we can only scroll to element nodes
+					if (node.nodeType !== 1 /* Node.ELEMENT_NODE */) {
+						return;
+					}
+					return node.scrollIntoView(options);
+				}
+			`
+			_, err = h.evalWithScript(
+				apiCtx,
+				evalOptions{forceCallable: true, returnByValue: true},
+				scrollIntoView,
+				sopts,
+			)
 		}
-		if err = h.scrollRectIntoViewIfNeeded(apiCtx, rect); err != nil {
+		if err != nil {
 			return nil, err
 		}
+
 		// Get the clickable point
 		if p != nil {
 			p, err = h.offsetPosition(apiCtx, opts.Position)
@@ -165,34 +188,54 @@ func getElementHandlePointerActionFn(
 		}
 		// Are we only "trialing" the action but not actually performing
 		// it (ie. running the actionability checks).
-		if !opts.Trial {
-			b := NewBarrier()
-			h.frame.manager.addBarrier(b)
-			defer h.frame.manager.removeBarrier(b)
+		if opts.Trial {
+			return nil, nil //nolint:nilnil
+		}
 
-			if res, err = fn(apiCtx, h, p); err != nil {
+		b := NewBarrier()
+		h.frame.manager.addBarrier(b)
+		defer h.frame.manager.removeBarrier(b)
+		if res, err = fn(apiCtx, h, p); err != nil {
+			return nil, err
+		}
+		// Do we need to wait for navigation to happen
+		if !opts.NoWaitAfter {
+			if err = b.Wait(apiCtx); err != nil {
 				return nil, err
-			}
-			// Do we need to wait for navigation to happen
-			if !opts.NoWaitAfter {
-				if err = b.Wait(apiCtx); err != nil {
-					return nil, err
-				}
 			}
 		}
 
 		return res, nil
 	}
 
-	do := func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
-		if res, err := pointerFunc(apiCtx); err != nil {
+	retry := func(apiCtx context.Context) (res interface{}, err error) {
+		// try the default scrolling
+		if res, err = pointerFunc(apiCtx, nil); opts.Force || err == nil {
+			return res, err
+		}
+		// try with different scrolling options
+		for _, p := range []ScrollPosition{
+			ScrollPositionStart,
+			ScrollPositionCenter,
+			ScrollPositionEnd,
+			ScrollPositionNearest,
+		} {
+			s := ScrollIntoViewOptions{Block: p, Inline: p}
+			if res, err = pointerFunc(apiCtx, &s); err == nil {
+				break
+			}
+		}
+
+		return res, err
+	}
+
+	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+		if res, err := retry(apiCtx); err != nil {
 			errCh <- err
 		} else {
 			resultCh <- res
 		}
 	}
-
-	return do
 }
 
 // ElementHandle represents a HTML element JS object inside an execution context.
