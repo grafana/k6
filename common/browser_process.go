@@ -77,6 +77,16 @@ func (p *BrowserProcess) didLoseConnection() {
 	close(p.lostConnection)
 }
 
+func (p *BrowserProcess) isConnected() bool {
+	var ok bool
+	select {
+	case _, ok = <-p.lostConnection:
+	default:
+		ok = true
+	}
+	return ok
+}
+
 // GracefulClose triggers a graceful closing of the browser process.
 func (p *BrowserProcess) GracefulClose() {
 	p.logger.Debugf("Browser:GracefulClose", "")

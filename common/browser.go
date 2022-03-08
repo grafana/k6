@@ -61,9 +61,7 @@ type Browser struct {
 
 	// Connection to browser to talk CDP protocol.
 	// A *Connection is saved to this field, see: connect().
-	conn        connection
-	connectedMu sync.RWMutex
-	connected   bool
+	conn connection
 
 	contextsMu     sync.RWMutex
 	contexts       map[cdp.BrowserContextID]*BrowserContext
@@ -116,10 +114,6 @@ func (b *Browser) connect() error {
 	}
 
 	b.conn = conn
-
-	b.connectedMu.Lock()
-	b.connected = true
-	b.connectedMu.Unlock()
 
 	// We don't need to lock this because `connect()` is called only in NewBrowser
 	b.defaultContext = NewBrowserContext(b.ctx, b, "", NewBrowserContextOptions(), b.logger)
@@ -177,10 +171,6 @@ func (b *Browser) initEvents() error {
 					b.onDetachedFromTarget(ev)
 				} else if event.typ == EventConnectionClose {
 					b.logger.Debugf("Browser:initEvents:EventConnectionClose", "")
-
-					b.connectedMu.Lock()
-					b.connected = false
-					b.connectedMu.Unlock()
 					b.browserProc.didLoseConnection()
 					b.cancelFn()
 				}
@@ -423,11 +413,10 @@ func (b *Browser) Contexts() []api.BrowserContext {
 	return contexts
 }
 
+// IsConnected returns whether the WebSocket connection to the browser process
+// is active or not.
 func (b *Browser) IsConnected() bool {
-	b.connectedMu.RLock()
-	defer b.connectedMu.RUnlock()
-
-	return b.connected
+	return b.browserProc.isConnected()
 }
 
 // NewContext creates a new incognito-like browser context.
