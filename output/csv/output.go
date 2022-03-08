@@ -54,6 +54,7 @@ type Output struct {
 	ignoredTags  []string
 	row          []string
 	saveInterval time.Duration
+	timeFormat   TimeFormat
 }
 
 // New Creates new instance of CSV output
@@ -87,6 +88,7 @@ func newOutput(params output.Params) (*Output, error) {
 
 	saveInterval := config.SaveInterval.TimeDuration()
 	fname := config.FileName.String
+	timeFormat := config.TimeFormat
 
 	if fname == "" || fname == "-" {
 		stdoutWriter := csv.NewWriter(os.Stdout)
@@ -97,6 +99,7 @@ func newOutput(params output.Params) (*Output, error) {
 			csvWriter:    stdoutWriter,
 			row:          make([]string, 3+len(resTags)+1),
 			saveInterval: saveInterval,
+			timeFormat:   timeFormat,
 			closeFn:      func() error { return nil },
 			logger:       logger,
 			params:       params,
@@ -114,6 +117,7 @@ func newOutput(params output.Params) (*Output, error) {
 		ignoredTags:  ignoredTags,
 		row:          make([]string, 3+len(resTags)+1),
 		saveInterval: saveInterval,
+		timeFormat:   timeFormat,
 		logger:       logger,
 		params:       params,
 	}
@@ -182,7 +186,7 @@ func (o *Output) flushMetrics() {
 		for _, sc := range samples {
 			for _, sample := range sc.GetSamples() {
 				sample := sample
-				row := SampleToRow(&sample, o.resTags, o.ignoredTags, o.row)
+				row := SampleToRow(&sample, o.resTags, o.ignoredTags, o.row, o.timeFormat)
 				err := o.csvWriter.Write(row)
 				if err != nil {
 					o.logger.WithField("filename", o.fname).Error("CSV: Error writing to file")
@@ -200,9 +204,17 @@ func MakeHeader(tags []string) []string {
 }
 
 // SampleToRow converts sample into array of strings
-func SampleToRow(sample *metrics.Sample, resTags []string, ignoredTags []string, row []string) []string {
+func SampleToRow(sample *metrics.Sample, resTags []string, ignoredTags []string, row []string,
+	timeFormat TimeFormat,
+) []string {
 	row[0] = sample.Metric.Name
-	row[1] = fmt.Sprintf("%d", sample.Time.Unix())
+
+	if timeFormat == RFC3399 {
+		row[1] = fmt.Sprint(sample.Time.Format(time.RFC3339))
+	} else {
+		row[1] = fmt.Sprintf("%d", sample.Time.Unix())
+	}
+
 	row[2] = fmt.Sprintf("%f", sample.Value)
 	sampleTags := sample.Tags.CloneTags()
 

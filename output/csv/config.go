@@ -38,6 +38,7 @@ type Config struct {
 	// Samples.
 	FileName     null.String        `json:"file_name" envconfig:"K6_CSV_FILENAME"`
 	SaveInterval types.NullDuration `json:"save_interval" envconfig:"K6_CSV_SAVE_INTERVAL"`
+	TimeFormat   TimeFormat         `json:"time_format" envconfig:"K6_CSV_TIME_FORMAT"`
 }
 
 // NewConfig creates a new Config instance with default values for some fields.
@@ -45,6 +46,7 @@ func NewConfig() Config {
 	return Config{
 		FileName:     null.StringFrom("file.csv"),
 		SaveInterval: types.NullDurationFrom(1 * time.Second),
+		TimeFormat:   Unix,
 	}
 }
 
@@ -56,6 +58,7 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.SaveInterval.Valid {
 		c.SaveInterval = cfg.SaveInterval
 	}
+	c.TimeFormat = cfg.TimeFormat
 	return c
 }
 
@@ -66,6 +69,7 @@ func ParseArg(arg string, logger *logrus.Logger) (Config, error) {
 	if !strings.Contains(arg, "=") {
 		c.FileName = null.StringFrom(arg)
 		c.SaveInterval = types.NullDurationFrom(1 * time.Second)
+		c.TimeFormat = Unix
 		return c, nil
 	}
 
@@ -89,6 +93,12 @@ func ParseArg(arg string, logger *logrus.Logger) (Config, error) {
 			fallthrough
 		case "fileName":
 			c.FileName = null.StringFrom(r[1])
+		case "timeFormat":
+			c.TimeFormat = TimeFormat(r[1])
+			if !c.TimeFormat.IsValid() {
+				return c, fmt.Errorf("unknown value %q as argument for csv output timeFormat, expected 'unix' or 'rfc3399'", arg)
+			}
+
 		default:
 			return c, fmt.Errorf("unknown key %q as argument for csv output", r[0])
 		}
