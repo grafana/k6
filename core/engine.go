@@ -153,6 +153,16 @@ func (e *Engine) initSubMetricsAndThresholds() error {
 
 		metric.Thresholds = thresholds
 		e.metricsWithThresholds = append(e.metricsWithThresholds, metric)
+
+		// Mark the metric (and the parent metricq, if we're dealing with a
+		// submetric) as observed, so they are shown in the end-of-test summary,
+		// even if they don't have any metric samples during the test run
+		metric.Observed = true
+		e.Metrics[metric.Name] = metric
+		if metric.Sub != nil {
+			metric.Sub.Metric.Observed = true
+			e.Metrics[metric.Sub.Metric.Name] = metric.Sub.Metric
+		}
 	}
 
 	// TODO: refactor out of here when https://github.com/grafana/k6/issues/1321
@@ -439,7 +449,7 @@ func (e *Engine) processThresholds() (shouldAbort bool) {
 	t := e.executionState.GetCurrentTestRunDuration()
 
 	e.thresholdsTainted = false
-	for _, m := range e.Metrics {
+	for _, m := range e.metricsWithThresholds {
 		if len(m.Thresholds.Thresholds) == 0 {
 			continue
 		}

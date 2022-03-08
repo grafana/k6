@@ -395,7 +395,12 @@ func TestEngine_processThresholds(t *testing.T) {
 		"submetric,match,passing":   {true, map[string][]string{"my_metric{a:1}": {"value<2"}}, false},
 		"submetric,match,failing":   {false, map[string][]string{"my_metric{a:1}": {"value>1.25"}}, false},
 		"submetric,nomatch,passing": {true, map[string][]string{"my_metric{a:2}": {"value<2"}}, false},
-		"submetric,nomatch,failing": {true, map[string][]string{"my_metric{a:2}": {"value>1.25"}}, false},
+		"submetric,nomatch,failing": {false, map[string][]string{"my_metric{a:2}": {"value>1.25"}}, false},
+
+		"unused,passing":      {true, map[string][]string{"unused_counter": {"count==0"}}, false},
+		"unused,failing":      {false, map[string][]string{"unused_counter": {"count>1"}}, false},
+		"unused,subm,passing": {true, map[string][]string{"unused_counter{a:2}": {"count<1"}}, false},
+		"unused,subm,failing": {false, map[string][]string{"unused_counter{a:2}": {"count>1"}}, false},
 	}
 
 	for name, data := range testdata {
@@ -405,6 +410,8 @@ func TestEngine_processThresholds(t *testing.T) {
 
 			registry := metrics.NewRegistry()
 			metric, err := registry.NewMetric("my_metric", stats.Gauge)
+			require.NoError(t, err)
+			_, err = registry.NewMetric("unused_counter", stats.Counter)
 			require.NoError(t, err)
 
 			thresholds := make(map[string]stats.Thresholds, len(data.ths))
