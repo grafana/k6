@@ -139,20 +139,12 @@ func NewEngine(
 func (e *Engine) StartOutputs() error {
 	e.logger.Debugf("Starting %d outputs...", len(e.outputs))
 	for i, out := range e.outputs {
-		if thresholdOut, ok := out.(output.WithThresholds); ok {
-			thresholdOut.SetThresholds(e.thresholds)
-		}
-
 		if stopOut, ok := out.(output.WithTestRunStop); ok {
 			stopOut.SetTestRunStopCallback(
 				func(err error) {
 					e.logger.WithError(err).Error("Received error to stop from output")
 					e.Stop()
 				})
-		}
-
-		if builtinMetricOut, ok := out.(output.WithBuiltinMetrics); ok {
-			builtinMetricOut.SetBuiltinMetrics(e.builtinMetrics)
 		}
 
 		if err := out.Start(); err != nil {
