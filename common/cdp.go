@@ -14,13 +14,13 @@ type executorEmitter interface {
 	EventEmitter
 }
 
-type cdpConn interface {
+type connection interface {
 	executorEmitter
 	Close(...goja.Value)
 	getSession(target.SessionID) *Session
 }
 
-type cdpSession interface {
+type session interface {
 	cdp.Executor
 	executorEmitter
 	ExecuteWithoutExpectationOnReply(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error

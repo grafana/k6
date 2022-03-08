@@ -58,7 +58,7 @@ const utilityWorldName = "__k6_browser_utility_world__"
 */
 type FrameSession struct {
 	ctx            context.Context
-	session        cdpSession
+	session        session
 	page           *Page
 	parent         *FrameSession
 	manager        *FrameManager
@@ -87,7 +87,7 @@ type FrameSession struct {
 
 func NewFrameSession(
 	ctx context.Context,
-	session cdpSession,
+	session session,
 	page *Page,
 	parent *FrameSession,
 	targetID target.ID,

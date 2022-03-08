@@ -23,7 +23,7 @@ import (
 const mockHostname = "host.test"
 
 type fakeSession struct {
-	cdpSession
+	session
 	cdpCalls []string
 }
 
@@ -55,7 +55,7 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 	logger := NewLogger(ctx, state.Logger, false, nil)
 
 	session := &fakeSession{
-		cdpSession: &Session{
+		session: &Session{
 			id: "1234",
 		},
 	}

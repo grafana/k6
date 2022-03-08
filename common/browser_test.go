@@ -170,7 +170,7 @@ func TestBrowserNewPageInContext(t *testing.T) {
 }
 
 type fakeConn struct {
-	cdpConn
+	connection
 	execute func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error
 }
 

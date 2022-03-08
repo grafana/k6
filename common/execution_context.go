@@ -64,7 +64,7 @@ func (ea evalOptions) String() string {
 type ExecutionContext struct {
 	ctx            context.Context
 	logger         *Logger
-	session        cdpSession
+	session        session
 	frame          *Frame
 	id             runtime.ExecutionContextID
 	injectedScript api.JSHandle
@@ -79,7 +79,7 @@ type ExecutionContext struct {
 // NewExecutionContext creates a new JS execution context.
 func NewExecutionContext(
 	ctx context.Context,
-	session cdpSession,
+	session session,
 	frame *Frame,
 	id runtime.ExecutionContextID,
 	logger *Logger,

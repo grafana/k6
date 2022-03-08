@@ -39,7 +39,7 @@ var _ api.Mouse = &Mouse{}
 // Mouse represents a mouse input device.
 type Mouse struct {
 	ctx             context.Context
-	session         cdpSession
+	session         session
 	frame           *Frame
 	timeoutSettings *TimeoutSettings
 	keyboard        *Keyboard
@@ -49,7 +49,7 @@ type Mouse struct {
 }
 
 // NewMouse creates a new mouse.
-func NewMouse(ctx context.Context, session cdpSession, frame *Frame, timeoutSettings *TimeoutSettings, keyboard *Keyboard) *Mouse {
+func NewMouse(ctx context.Context, session session, frame *Frame, timeoutSettings *TimeoutSettings, keyboard *Keyboard) *Mouse {
 	m := &Mouse{
 		ctx:             ctx,
 		session:         session,

@@ -61,7 +61,7 @@ type Browser struct {
 
 	// Connection to browser to talk CDP protocol.
 	// A *Connection is saved to this field, see: connect().
-	conn        cdpConn
+	conn        connection
 	connectedMu sync.RWMutex
 	connected   bool
 

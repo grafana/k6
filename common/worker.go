@@ -43,14 +43,14 @@ type Worker struct {
 	BaseEventEmitter
 
 	ctx     context.Context
-	session cdpSession
+	session session
 
 	targetID target.ID
 	url      string
 }
 
 // NewWorker creates a new page viewport.
-func NewWorker(ctx context.Context, session cdpSession, id target.ID, url string) (*Worker, error) {
+func NewWorker(ctx context.Context, session session, id target.ID, url string) (*Worker, error) {
 	w := Worker{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,

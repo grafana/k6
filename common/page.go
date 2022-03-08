@@ -55,7 +55,7 @@ type Page struct {
 
 	// what it really needs is an executor with
 	// SessionID and TargetID
-	session cdpSession
+	session session
 
 	browserCtx      *BrowserContext
 	targetID        target.ID
@@ -92,7 +92,7 @@ type Page struct {
 // NewPage creates a new browser page context.
 func NewPage(
 	ctx context.Context,
-	session cdpSession,
+	session session,
 	browserCtx *BrowserContext,
 	targetID target.ID,
 	opener *Page,

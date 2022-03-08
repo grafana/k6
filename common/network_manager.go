@@ -51,7 +51,7 @@ type NetworkManager struct {
 
 	ctx          context.Context
 	logger       *Logger
-	session      cdpSession
+	session      session
 	parent       *NetworkManager
 	frameManager *FrameManager
 	credentials  *Credentials
@@ -73,7 +73,7 @@ type NetworkManager struct {
 
 // NewNetworkManager creates a new network manager.
 func NewNetworkManager(
-	ctx context.Context, session cdpSession, manager *FrameManager, parent *NetworkManager,
+	ctx context.Context, session session, manager *FrameManager, parent *NetworkManager,
 ) (*NetworkManager, error) {
 	state := k6lib.GetState(ctx)
 

@@ -39,7 +39,7 @@ var _ api.JSHandle = &BaseJSHandle{}
 type BaseJSHandle struct {
 	ctx          context.Context
 	logger       *Logger
-	session      cdpSession
+	session      session
 	execCtx      *ExecutionContext
 	remoteObject *runtime.RemoteObject
 	disposed     bool
@@ -48,7 +48,7 @@ type BaseJSHandle struct {
 // NewJSHandle creates a new JS handle referencing a remote object.
 func NewJSHandle(
 	ctx context.Context,
-	session cdpSession,
+	session session,
 	execCtx *ExecutionContext,
 	frame *Frame,
 	remoteObject *runtime.RemoteObject,
