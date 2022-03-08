@@ -301,34 +301,34 @@ func (h *ElementHandle) click(p *Position, opts *MouseClickOptions) error {
 
 func (h *ElementHandle) clickablePoint() (*Position, error) {
 	var (
-		layoutViewport *cdppage.LayoutViewport
-		quads          []dom.Quad
-		err            error
+		quads []dom.Quad
+		err   error
 	)
-	action := dom.GetContentQuads().WithObjectID(h.remoteObject.ObjectID)
-	if quads, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		return nil, fmt.Errorf("cannot request node content quads %T: %w", action, err)
+	getContentQuads := dom.GetContentQuads().WithObjectID(h.remoteObject.ObjectID)
+	if quads, err = getContentQuads.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+		return nil, fmt.Errorf("cannot request node content quads %T: %w", getContentQuads, err)
 	}
 	if len(quads) == 0 {
 		return nil, fmt.Errorf("node is either not visible or not an HTMLElement: %w", err)
 	}
 
 	// Filter out quads that have too small area to click into.
-	action2 := cdppage.GetLayoutMetrics()
-	if _, _, _, layoutViewport, _, _, err = action2.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		return nil, fmt.Errorf("cannot get page layout metrics %T: %w", action, err)
+	var layoutViewport *cdppage.LayoutViewport
+	getLayoutMetrics := cdppage.GetLayoutMetrics()
+	if _, _, _, layoutViewport, _, _, err = getLayoutMetrics.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+		return nil, fmt.Errorf("cannot get page layout metrics %T: %w", getLayoutMetrics, err)
 	}
-	var (
-		filteredQuads []dom.Quad
 
-		clientWidth  = layoutViewport.ClientWidth
-		clientHeight = layoutViewport.ClientHeight
-	)
+	return filterQuads(layoutViewport.ClientWidth, layoutViewport.ClientHeight, quads)
+}
+
+func filterQuads(viewportWidth, viewportHeight int64, quads []dom.Quad) (*Position, error) {
+	var filteredQuads []dom.Quad
 	for _, q := range quads {
 		nq := q
 		for i := 0; i < len(q); i += 2 {
-			nq[i] = math.Min(math.Max(q[i], 0), float64(clientWidth))
-			nq[i+1] = math.Min(math.Max(q[i+1], 0), float64(clientHeight))
+			nq[i] = math.Min(math.Max(q[i], 0), float64(viewportWidth))
+			nq[i+1] = math.Min(math.Max(q[i+1], 0), float64(viewportHeight))
 		}
 		// Compute sum of all directed areas of adjacent triangles
 		// https://en.wikipedia.org/wiki/Polygon#Area
@@ -343,18 +343,19 @@ func (h *ElementHandle) clickablePoint() (*Position, error) {
 		}
 	}
 	if len(filteredQuads) == 0 {
-		return nil, fmt.Errorf("node is either not visible or not an HTMLElement: %w", err)
+		return nil, errors.New("node is either not visible or not an HTMLElement")
 	}
+
 	// Return the middle point of the first quad.
 	var (
-		content = filteredQuads[0]
-		c       = len(content)
-		n       = (float64(c) / 2)
-		p       Position
+		first = filteredQuads[0]
+		l     = len(first)
+		n     = (float64(l) / 2)
+		p     Position
 	)
-	for i := 0; i < c; i += 2 {
-		p.X += content[i] / n
-		p.Y += content[i+1] / n
+	for i := 0; i < l; i += 2 {
+		p.X += first[i] / n
+		p.Y += first[i+1] / n
 	}
 
 	p = compensateHalfIntegerRoundingError(p)
