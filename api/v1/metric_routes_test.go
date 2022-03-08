@@ -93,6 +93,10 @@ func TestGetMetrics(t *testing.T) {
 		assert.Equal(t, stats.Time, metric.Contains.Type)
 		assert.True(t, metric.Tainted.Valid)
 		assert.True(t, metric.Tainted.Bool)
+
+		resMetrics := envelop.Metrics()
+		assert.Len(t, resMetrics, 1)
+		assert.Equal(t, resMetrics[0].Name, "my_metric")
 	})
 }
 
