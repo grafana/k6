@@ -135,7 +135,7 @@ func getElementHandlePointerActionFn(
 				states = append(states, "enabled")
 			}
 			if _, err = h.waitForElementState(apiCtx, states, opts.Timeout); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("cannot wait for element state: %w", err)
 			}
 		}
 
@@ -167,7 +167,7 @@ func getElementHandlePointerActionFn(
 			)
 		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cannot scroll into view: %w", err)
 		}
 
 		// Get the clickable point
@@ -177,13 +177,13 @@ func getElementHandlePointerActionFn(
 			p, err = h.clickablePoint()
 		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cannot get element position: %w", err)
 		}
 		// Do a final actionability check to see if element can receive events
 		// at mouse position in question
 		if !opts.Force {
 			if ok, err := h.checkHitTargetAt(apiCtx, *p); !ok {
-				return nil, err
+				return nil, fmt.Errorf("cannot check hit target: %w", err)
 			}
 		}
 		// Are we only "trialing" the action but not actually performing
@@ -196,12 +196,12 @@ func getElementHandlePointerActionFn(
 		h.frame.manager.addBarrier(b)
 		defer h.frame.manager.removeBarrier(b)
 		if res, err = fn(apiCtx, h, p); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cannot evaluate pointer action: %w", err)
 		}
 		// Do we need to wait for navigation to happen
 		if !opts.NoWaitAfter {
 			if err = b.Wait(apiCtx); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("cannot wait for navigation: %w", err)
 			}
 		}
 
