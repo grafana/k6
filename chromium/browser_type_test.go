@@ -1,23 +1,3 @@
-/*
- *
- * xk6-browser - a browser automation extension for k6
- * Copyright (C) 2021 Load Impact
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
 package chromium
 
 import (
@@ -32,7 +12,8 @@ import (
 	"github.com/grafana/xk6-browser/common"
 )
 
-func TestBrowserTypeFlags(t *testing.T) {
+//nolint:funlen
+func TestBrowserTypePrepareFlags(t *testing.T) {
 	t.Parallel()
 
 	host, err := k6lib.NewHostAddress(net.ParseIP("127.0.0.1"), "8000")
@@ -87,6 +68,8 @@ func TestBrowserTypeFlags(t *testing.T) {
 				"browser-arg1='value1", "browser-arg2=''value2''", "browser-flag",
 			}},
 			post: func(t *testing.T, flags map[string]interface{}) {
+				t.Helper()
+
 				assert.Equal(t, "'value1", flags["browser-arg1"])
 				assert.Equal(t, "'value2'", flags["browser-arg2"])
 				assert.Equal(t, "", flags["browser-flag"])
@@ -118,6 +101,8 @@ func TestBrowserTypeFlags(t *testing.T) {
 			flag:       "enable-use-zoom-for-dsf",
 			expInitVal: false,
 			pre: func(t *testing.T) {
+				t.Helper()
+
 				if runtime.GOOS != "darwin" {
 					t.Skip()
 				}
@@ -129,6 +114,8 @@ func TestBrowserTypeFlags(t *testing.T) {
 			changeOpts:    &common.LaunchOptions{Headless: true},
 			expChangedVal: true,
 			post: func(t *testing.T, flags map[string]interface{}) {
+				t.Helper()
+
 				extraFlags := []string{"hide-scrollbars", "mute-audio", "blink-settings"}
 				for _, f := range extraFlags {
 					assert.Contains(t, flags, f)
@@ -145,10 +132,7 @@ func TestBrowserTypeFlags(t *testing.T) {
 				tc.pre(t)
 			}
 
-			var (
-				bt    BrowserType
-				flags = bt.flags(&common.LaunchOptions{}, nil)
-			)
+			flags := prepareFlags(&common.LaunchOptions{}, nil)
 
 			if tc.expInitVal != nil {
 				require.Contains(t, flags, tc.flag)
@@ -158,7 +142,7 @@ func TestBrowserTypeFlags(t *testing.T) {
 			}
 
 			if tc.changeOpts != nil || tc.changeK6Opts != nil {
-				flags = bt.flags(tc.changeOpts, tc.changeK6Opts)
+				flags = prepareFlags(tc.changeOpts, tc.changeK6Opts)
 				if tc.expChangedVal != nil {
 					assert.Equal(t, tc.expChangedVal, flags[tc.flag])
 				} else {
