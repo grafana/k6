@@ -26,7 +26,7 @@ import (
 	"go.k6.io/k6/api/v1/client"
 )
 
-func getStatusCmd(globalState *globalState) *cobra.Command {
+func getCmdStatus(globalState *globalState) *cobra.Command {
 	// statusCmd represents the status command
 	statusCmd := &cobra.Command{
 		Use:   "status",
