@@ -401,6 +401,15 @@ func TestEngine_processThresholds(t *testing.T) {
 		"unused,failing":      {false, map[string][]string{"unused_counter": {"count>1"}}, false},
 		"unused,subm,passing": {true, map[string][]string{"unused_counter{a:2}": {"count<1"}}, false},
 		"unused,subm,failing": {false, map[string][]string{"unused_counter{a:2}": {"count>1"}}, false},
+
+		"used,passing":               {true, map[string][]string{"used_counter": {"count==2"}}, false},
+		"used,failing":               {false, map[string][]string{"used_counter": {"count<1"}}, false},
+		"used,subm,passing":          {true, map[string][]string{"used_counter{b:1}": {"count==2"}}, false},
+		"used,not-subm,passing":      {true, map[string][]string{"used_counter{b:2}": {"count==0"}}, false},
+		"used,invalid-subm,passing1": {true, map[string][]string{"used_counter{c:''}": {"count==0"}}, false},
+		"used,invalid-subm,failing1": {false, map[string][]string{"used_counter{c:''}": {"count>0"}}, false},
+		"used,invalid-subm,passing2": {true, map[string][]string{"used_counter{c:}": {"count==0"}}, false},
+		"used,invalid-subm,failing2": {false, map[string][]string{"used_counter{c:}": {"count>0"}}, false},
 	}
 
 	for name, data := range testdata {
@@ -409,7 +418,9 @@ func TestEngine_processThresholds(t *testing.T) {
 			t.Parallel()
 
 			registry := metrics.NewRegistry()
-			metric, err := registry.NewMetric("my_metric", stats.Gauge)
+			gaugeMetric, err := registry.NewMetric("my_metric", stats.Gauge)
+			require.NoError(t, err)
+			counterMetric, err := registry.NewMetric("used_counter", stats.Counter)
 			require.NoError(t, err)
 			_, err = registry.NewMetric("unused_counter", stats.Counter)
 			require.NoError(t, err)
@@ -427,7 +438,10 @@ func TestEngine_processThresholds(t *testing.T) {
 			defer wait()
 
 			e.processSamples(
-				[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
+				[]stats.SampleContainer{
+					stats.Sample{Metric: gaugeMetric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})},
+					stats.Sample{Metric: counterMetric, Value: 2, Tags: stats.IntoSampleTags(&map[string]string{"b": "1"})},
+				},
 			)
 
 			assert.Equal(t, data.abort, e.processThresholds())
