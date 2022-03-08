@@ -233,7 +233,7 @@ func (st *SampleTags) Contains(other *SampleTags) bool {
 	}
 
 	for k, v := range other.tags {
-		if st.tags[k] != v {
+		if myv, ok := st.tags[k]; !ok || myv != v {
 			return false
 		}
 	}
