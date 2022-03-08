@@ -40,7 +40,7 @@ import (
 // FrameManager manages all frames in a page and their life-cycles, it's a purely internal component.
 type FrameManager struct {
 	ctx             context.Context
-	session         *Session
+	session         cdpSession
 	page            *Page
 	timeoutSettings *TimeoutSettings
 
@@ -70,7 +70,8 @@ var frameManagerID int64
 // NewFrameManager creates a new HTML document frame manager.
 func NewFrameManager(
 	ctx context.Context,
-	session *Session, page *Page,
+	session cdpSession,
+	page *Page,
 	timeoutSettings *TimeoutSettings,
 	logger *Logger,
 ) *FrameManager {

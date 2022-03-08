@@ -61,11 +61,7 @@ type Browser struct {
 
 	// Connection to browser to talk CDP protocol.
 	// A *Connection is saved to this field, see: connect().
-	conn         cdp.Executor
-	connEvents   EventEmitter
-	connSessions interface {
-		getSession(target.SessionID) *Session
-	}
+	conn        cdpConn
 	connectedMu sync.RWMutex
 	connected   bool
 
@@ -120,8 +116,6 @@ func (b *Browser) connect() error {
 	}
 
 	b.conn = conn
-	b.connEvents = conn
-	b.connSessions = conn
 
 	b.connectedMu.Lock()
 	b.connected = true
@@ -163,7 +157,7 @@ func (b *Browser) initEvents() error {
 	cancelCtx, b.evCancelFn = context.WithCancel(b.ctx)
 	chHandler := make(chan Event)
 
-	b.connEvents.on(cancelCtx, []string{
+	b.conn.on(cancelCtx, []string{
 		cdproto.EventTargetAttachedToTarget,
 		cdproto.EventTargetDetachedFromTarget,
 		EventConnectionClose,
@@ -231,7 +225,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		return
 	}
 
-	session := b.connSessions.getSession(ev.SessionID)
+	session := b.conn.getSession(ev.SessionID)
 
 	switch evti.Type {
 	case "background_page":

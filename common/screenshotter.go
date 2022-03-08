@@ -118,7 +118,7 @@ func (s *screenshotter) restoreViewport(p *Page, originalViewport *Size) error {
 	return p.resetViewport()
 }
 
-func (s *screenshotter) screenshot(session *Session, documentRect *Rect, viewportRect *Rect, format ImageFormat, omitBackground bool, quality int64, path string) (*[]byte, error) {
+func (s *screenshotter) screenshot(session cdpSession, documentRect *Rect, viewportRect *Rect, format ImageFormat, omitBackground bool, quality int64, path string) (*[]byte, error) {
 	var (
 		buf  []byte
 		clip *cdppage.Viewport

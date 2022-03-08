@@ -51,8 +51,12 @@ type Page struct {
 	Mouse       *Mouse       `js:"mouse"`       // Public JS API
 	Touchscreen *Touchscreen `js:"touchscreen"` // Public JS API
 
-	ctx             context.Context
-	session         *Session
+	ctx context.Context
+
+	// what it really needs is an executor with
+	// SessionID and TargetID
+	session cdpSession
+
 	browserCtx      *BrowserContext
 	targetID        target.ID
 	opener          *Page
@@ -88,7 +92,7 @@ type Page struct {
 // NewPage creates a new browser page context.
 func NewPage(
 	ctx context.Context,
-	session *Session,
+	session cdpSession,
 	browserCtx *BrowserContext,
 	targetID target.ID,
 	opener *Page,
@@ -264,7 +268,7 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.Frame
 }
 
 func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) {
-	p.logger.Debugf("Page:attachFrameSession", "sid:%v fid=%v", p.session.id, fid)
+	p.logger.Debugf("Page:attachFrameSession", "sid:%v fid=%v", p.session.SessionID(), fid)
 	fs.page.frameSessions[fid] = fs
 }
 
@@ -897,7 +901,7 @@ func (p *Page) WaitForResponse(urlOrPredicate, opts goja.Value) api.Response {
 func (p *Page) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
 	p.logger.Debugf("Page:WaitForSelector",
 		"sid:%v stid:%v ptid:%v selector:%s",
-		p.sessionID(), p.session.targetID, p.targetID, selector)
+		p.sessionID(), p.session.TargetID(), p.targetID, selector)
 
 	return p.frameManager.MainFrame().WaitForSelector(selector, opts)
 }
@@ -922,7 +926,7 @@ func (p *Page) Workers() []api.Worker {
 // It should be used internally in the Page.
 func (p *Page) sessionID() (sid target.SessionID) {
 	if p != nil && p.session != nil {
-		sid = p.session.id
+		sid = p.session.SessionID()
 	}
 	return sid
 }

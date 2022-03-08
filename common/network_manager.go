@@ -34,7 +34,6 @@ import (
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
-	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	k6common "go.k6.io/k6/js/common"
 	k6lib "go.k6.io/k6/lib"
@@ -50,13 +49,9 @@ var _ EventEmitter = &NetworkManager{}
 type NetworkManager struct {
 	BaseEventEmitter
 
-	ctx     context.Context
-	logger  *Logger
-	session interface {
-		EventEmitter
-		cdp.Executor
-		ID() target.SessionID
-	}
+	ctx          context.Context
+	logger       *Logger
+	session      cdpSession
 	parent       *NetworkManager
 	frameManager *FrameManager
 	credentials  *Credentials
@@ -78,7 +73,7 @@ type NetworkManager struct {
 
 // NewNetworkManager creates a new network manager.
 func NewNetworkManager(
-	ctx context.Context, session *Session, manager *FrameManager, parent *NetworkManager,
+	ctx context.Context, session cdpSession, manager *FrameManager, parent *NetworkManager,
 ) (*NetworkManager, error) {
 	state := k6lib.GetState(ctx)
 
@@ -478,9 +473,9 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 
 func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 	m.logger.Debugf("NetworkManager:onRequestPaused",
-		"sid:%s url:%v", m.session.ID(), event.Request.URL)
+		"sid:%s url:%v", m.session.SessionID(), event.Request.URL)
 	defer m.logger.Debugf("NetworkManager:onRequestPaused:return",
-		"sid:%s url:%v", m.session.ID(), event.Request.URL)
+		"sid:%s url:%v", m.session.SessionID(), event.Request.URL)
 
 	var failErr error
 

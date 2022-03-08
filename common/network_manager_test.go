@@ -22,20 +22,20 @@ import (
 
 const mockHostname = "host.test"
 
-type testSession struct {
-	*Session
+type fakeSession struct {
+	cdpSession
 	cdpCalls []string
 }
 
 // Execute implements the cdp.Executor interface to record calls made to it and
 // allow assertions in tests.
-func (s *testSession) Execute(ctx context.Context, method string,
+func (s *fakeSession) Execute(ctx context.Context, method string,
 	params easyjson.Marshaler, res easyjson.Unmarshaler) error {
 	s.cdpCalls = append(s.cdpCalls, method)
 	return nil
 }
 
-func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager, *testSession) {
+func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager, *fakeSession) {
 	ctx := context.Background()
 
 	root, err := k6lib.NewGroup("", nil)
@@ -54,8 +54,8 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 	ctx = k6lib.WithState(ctx, state)
 	logger := NewLogger(ctx, state.Logger, false, nil)
 
-	session := &testSession{
-		Session: &Session{
+	session := &fakeSession{
+		cdpSession: &Session{
 			id: "1234",
 		},
 	}

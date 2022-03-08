@@ -416,5 +416,5 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 }
 
 func (b *BrowserContext) getSession(id target.SessionID) *Session {
-	return b.browser.connSessions.getSession(id)
+	return b.browser.conn.getSession(id)
 }

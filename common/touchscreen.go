@@ -40,11 +40,11 @@ type Touchscreen struct {
 	BaseEventEmitter
 
 	ctx      context.Context
-	session  *Session
+	session  cdpSession
 	keyboard *Keyboard
 }
 
-func NewTouchscreen(ctx context.Context, session *Session, keyboard *Keyboard) *Touchscreen {
+func NewTouchscreen(ctx context.Context, session cdpSession, keyboard *Keyboard) *Touchscreen {
 	t := Touchscreen{
 		ctx:      ctx,
 		session:  session,

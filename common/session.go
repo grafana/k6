@@ -73,6 +73,14 @@ func (s *Session) ID() target.SessionID {
 	return s.id
 }
 
+func (s *Session) SessionID() target.SessionID {
+	return s.id
+}
+
+func (s *Session) TargetID() target.ID {
+	return s.targetID
+}
+
 func (s *Session) close() {
 	s.logger.Debugf("Session:close", "sid:%v tid:%v", s.id, s.targetID)
 	if s.closed {
@@ -225,4 +233,8 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 		Params:    buf,
 	}
 	return s.conn.send(contextWithDoneChan(ctx, s.done), msg, nil, res)
+}
+
+func (s *Session) Done() <-chan struct{} {
+	return s.done
 }

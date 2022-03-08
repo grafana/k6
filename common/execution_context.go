@@ -64,7 +64,7 @@ func (ea evalOptions) String() string {
 type ExecutionContext struct {
 	ctx            context.Context
 	logger         *Logger
-	session        *Session
+	session        cdpSession
 	frame          *Frame
 	id             runtime.ExecutionContextID
 	injectedScript api.JSHandle
@@ -78,8 +78,11 @@ type ExecutionContext struct {
 
 // NewExecutionContext creates a new JS execution context.
 func NewExecutionContext(
-	ctx context.Context, session *Session, frame *Frame,
-	id runtime.ExecutionContextID, logger *Logger,
+	ctx context.Context,
+	session cdpSession,
+	frame *Frame,
+	id runtime.ExecutionContextID,
+	logger *Logger,
 ) *ExecutionContext {
 	e := &ExecutionContext{
 		ctx:            ctx,
@@ -91,8 +94,8 @@ func NewExecutionContext(
 	}
 
 	if session != nil {
-		e.sid = session.id
-		e.stid = cdp.FrameID(session.targetID)
+		e.sid = session.SessionID()
+		e.stid = cdp.FrameID(session.TargetID())
 	}
 	if frame != nil {
 		e.fid = cdp.FrameID(frame.ID())
@@ -139,7 +142,7 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 		efid = cdp.FrameID(eh.frame.ID())
 	}
 	if eh.session != nil {
-		esid = eh.session.id
+		esid = eh.session.SessionID()
 	}
 	e.logger.Debugf(
 		"ExecutionContext:adoptElementHandle",
@@ -202,12 +205,12 @@ func (e *ExecutionContext) eval(
 		if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
 			return nil, fmt.Errorf("cannot call function on expression (%q) "+
 				"in execution context (%d) in frame (%v) with session (%v): %w",
-				expressionWithSourceURL, e.id, e.Frame().ID(), e.session.ID(), err)
+				expressionWithSourceURL, e.id, e.Frame().ID(), e.session.SessionID(), err)
 		}
 		if exceptionDetails != nil {
 			return nil, fmt.Errorf("cannot call function on expression (%q) "+
 				"in execution context (%d) in frame (%v) with session (%v): %w",
-				expressionWithSourceURL, e.id, e.Frame().ID(), e.session.ID(), err)
+				expressionWithSourceURL, e.id, e.Frame().ID(), e.session.SessionID(), err)
 		}
 		if remoteObject == nil {
 			return
@@ -249,12 +252,12 @@ func (e *ExecutionContext) eval(
 		if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
 			return nil, fmt.Errorf("cannot call function on expression (%q) "+
 				"in execution context (%d) in frame (%v) with session (%v): %w",
-				expressionWithSourceURL, e.id, e.Frame().ID(), e.session.ID(), err)
+				expressionWithSourceURL, e.id, e.Frame().ID(), e.session.SessionID(), err)
 		}
 		if exceptionDetails != nil {
 			return nil, fmt.Errorf("cannot call function on expression (%q) "+
 				"in execution context (%d) in frame (%v) with session (%v): %w",
-				expressionWithSourceURL, e.id, e.Frame().ID(), e.session.ID(), err)
+				expressionWithSourceURL, e.id, e.Frame().ID(), e.session.SessionID(), err)
 		}
 		if remoteObject == nil {
 			return

@@ -99,7 +99,7 @@ func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID 
 		}
 		var sid string
 		if m != nil && m.session != nil {
-			sid = string(m.session.id)
+			sid = string(m.session.SessionID())
 		}
 		log.Debugf("NewFrame", "sid:%s fid:%s pfid:%s", sid, frameID, pfid)
 	}
