@@ -42,8 +42,8 @@ import (
 	httpModule "go.k6.io/k6/js/modules/k6/http"
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
+	"go.k6.io/k6/metrics"
 
 	"go.k6.io/k6/stats"
 )
