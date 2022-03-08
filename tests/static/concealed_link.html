@@ -1,0 +1,50 @@
+<html>
+<head>
+    <title>Concealed element test</title>
+    <style>
+        * {
+            padding: 0;
+            margin: 0;
+        }
+        ol {
+            padding-top: 160px;
+        }
+        li {
+            height: 80px;
+            border: 1px solid black;
+        }
+        .sticky {
+            z-index: 9999;
+            width: 100%;
+            position: fixed;
+            height: 160px;
+            background: black;
+        }
+    </style>
+</head>
+<body>    
+    <div class="sticky"></div>
+    <ol>
+        <li>item 1</li>
+        <li>item 2</li>
+        <li>item 3</li>
+        <li id="concealed">item 4</li>
+        <li>item 5</li>
+        <li>item 6</li>
+        <li>item 7</li>
+        <li>item 8</li>
+        <li>item 9</li>
+        <li id="last">item 10</li>
+    </ol>
+
+    <script type="text/javascript">
+        window.clickResult = '🙈';
+
+        el = document.querySelector('#concealed');
+        el.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            window.clickResult = "🐵";
+        })
+    </script>
+</body>
+</html>
