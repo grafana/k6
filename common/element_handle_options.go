@@ -41,6 +41,34 @@ type ElementHandleBasePointerOptions struct {
 	Trial    bool      `json:"trial"`
 }
 
+// ScrollPosition is a parameter for scrolling an element.
+type ScrollPosition string
+
+const (
+	// ScrollPositionStart scrolls an element at the top of its parent.
+	ScrollPositionStart ScrollPosition = "start"
+	// ScrollPositionCenter scrolls an element at the center of its parent.
+	ScrollPositionCenter ScrollPosition = "center"
+	// ScrollPositionEnd scrolls an element at the end of its parent.
+	ScrollPositionEnd ScrollPosition = "end"
+	// ScrollPositionNearest scrolls an element at the nearest position of its parent.
+	ScrollPositionNearest ScrollPosition = "nearest"
+)
+
+// ScrollIntoViewOptions change the behavior of ScrollIntoView.
+// See: https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView
+type ScrollIntoViewOptions struct {
+	// Block defines vertical alignment.
+	// One of start, center, end, or nearest.
+	// Defaults to start.
+	Block ScrollPosition `json:"block"`
+
+	// Inline defines horizontal alignment.
+	// One of start, center, end, or nearest.
+	// Defaults to nearest.
+	Inline ScrollPosition `json:"inline"`
+}
+
 type ElementHandleCheckOptions struct {
 	ElementHandleBasePointerOptions
 }
