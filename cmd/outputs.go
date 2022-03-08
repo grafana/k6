@@ -110,11 +110,20 @@ func createOutputs(gs *globalState, test *loadedTest, executionPlan []lib.Execut
 		params.ConfigArgument = outputArg
 		params.JSONConfig = test.derivedConfig.Collectors[outputType]
 
-		output, err := outputConstructor(params)
+		out, err := outputConstructor(params)
 		if err != nil {
 			return nil, fmt.Errorf("could not create the '%s' output: %w", outputType, err)
 		}
-		result = append(result, output)
+
+		if thresholdOut, ok := out.(output.WithThresholds); ok {
+			thresholdOut.SetThresholds(test.derivedConfig.Thresholds)
+		}
+
+		if builtinMetricOut, ok := out.(output.WithBuiltinMetrics); ok {
+			builtinMetricOut.SetBuiltinMetrics(test.builtInMetrics)
+		}
+
+		result = append(result, out)
 	}
 
 	return result, nil
