@@ -29,7 +29,8 @@ import (
 	"go.k6.io/k6/lib/types"
 )
 
-func getInspectCmd(gs *globalState) *cobra.Command {
+// TODO: split apart like `k6 run` and `k6 archive`
+func getCmdInspect(gs *globalState) *cobra.Command {
 	var addExecReqs bool
 
 	// inspectCmd represents the inspect command

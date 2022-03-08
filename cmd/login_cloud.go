@@ -37,7 +37,7 @@ import (
 )
 
 //nolint:funlen,gocognit
-func getLoginCloudCommand(globalState *globalState) *cobra.Command {
+func getCmdLoginCloud(globalState *globalState) *cobra.Command {
 	// loginCloudCommand represents the 'login cloud' command
 	loginCloudCommand := &cobra.Command{
 		Use:   "cloud",

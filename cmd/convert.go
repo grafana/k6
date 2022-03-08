@@ -32,8 +32,9 @@ import (
 	"go.k6.io/k6/lib"
 )
 
+// TODO: split apart like `k6 run` and `k6 archive`?
 //nolint:funlen,gocognit
-func getConvertCmd(globalState *globalState) *cobra.Command {
+func getCmdConvert(globalState *globalState) *cobra.Command {
 	var (
 		convertOutput       string
 		optionsFilePath     string

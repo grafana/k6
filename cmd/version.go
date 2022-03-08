@@ -26,7 +26,7 @@ import (
 	"go.k6.io/k6/lib/consts"
 )
 
-func getVersionCmd(globalState *globalState) *cobra.Command {
+func getCmdVersion(globalState *globalState) *cobra.Command {
 	// versionCmd represents the version command.
 	versionCmd := &cobra.Command{
 		Use:   "version",
