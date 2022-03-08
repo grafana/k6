@@ -130,45 +130,6 @@ func NewEngine(
 	return e, nil
 }
 
-// StartOutputs spins up all configured outputs, giving the thresholds to any
-// that can accept them. And if some output fails, stop the already started
-// ones. This may take some time, since some outputs make initial network
-// requests to set up whatever remote services are going to listen to them.
-//
-// TODO: this doesn't really need to be in the Engine, so take it out?
-func (e *Engine) StartOutputs() error {
-	e.logger.Debugf("Starting %d outputs...", len(e.outputs))
-	for i, out := range e.outputs {
-		if stopOut, ok := out.(output.WithTestRunStop); ok {
-			stopOut.SetTestRunStopCallback(
-				func(err error) {
-					e.logger.WithError(err).Error("Received error to stop from output")
-					e.Stop()
-				})
-		}
-
-		if err := out.Start(); err != nil {
-			e.stopOutputs(i)
-			return err
-		}
-	}
-	return nil
-}
-
-// StopOutputs stops all configured outputs.
-func (e *Engine) StopOutputs() {
-	e.stopOutputs(len(e.outputs))
-}
-
-func (e *Engine) stopOutputs(upToID int) {
-	e.logger.Debugf("Stopping %d outputs...", upToID)
-	for i := 0; i < upToID; i++ {
-		if err := e.outputs[i].Stop(); err != nil {
-			e.logger.WithError(err).Errorf("Stopping output %d failed", i)
-		}
-	}
-}
-
 // Init is used to initialize the execution scheduler and all metrics processing
 // in the engine. The first is a costly operation, since it initializes all of
 // the planned VUs and could potentially take a long time.

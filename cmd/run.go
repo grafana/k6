@@ -45,6 +45,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/output"
 	"go.k6.io/k6/ui/pb"
 )
 
@@ -119,6 +120,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// TODO: remove
 	// Create the engine.
 	initBar.Modify(pb.WithConstProgress(0, "Init engine"))
 	engine, err := core.NewEngine(
@@ -148,11 +150,17 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 
 	// We do this here so we can get any output URLs below.
 	initBar.Modify(pb.WithConstProgress(0, "Starting outputs"))
-	err = engine.StartOutputs()
+	outputManager := output.NewManager(outputs, logger, func(err error) {
+		if err != nil {
+			logger.WithError(err).Error("Received error to stop from output")
+		}
+		runCancel()
+	})
+	err = outputManager.StartOutputs()
 	if err != nil {
 		return err
 	}
-	defer engine.StopOutputs()
+	defer outputManager.StopOutputs()
 
 	printExecutionDescription(
 		c.gs, "local", args[0], "", conf, execScheduler.GetState().ExecutionTuple, executionPlan, outputs,
@@ -227,7 +235,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	if !test.runtimeOptions.NoSummary.Bool {
 		summaryResult, err := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
 			Metrics:         engine.Metrics,
-			RootGroup:       engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
+			RootGroup:       execScheduler.GetRunner().GetDefaultGroup(),
 			TestRunDuration: executionState.GetCurrentTestRunDuration(),
 			NoColor:         c.gs.flags.noColor,
 			UIState: lib.UIState{

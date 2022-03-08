@@ -18,6 +18,9 @@
  *
  */
 
+// Package output contains the interfaces that k6 outputs (and output
+// extensions) have to implement, as well as some helpers to make their
+// implementation and management easier.
 package output
 
 import (
