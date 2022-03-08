@@ -150,19 +150,10 @@ func getElementHandlePointerActionFn(
 			}
 			err = h.scrollRectIntoViewIfNeeded(apiCtx, rect)
 		} else {
-			scrollIntoView := `
-				(node, injected, options) => {
-					// we can only scroll to element nodes
-					if (node.nodeType !== 1 /* Node.ELEMENT_NODE */) {
-						return;
-					}
-					return node.scrollIntoView(options);
-				}
-			`
-			_, err = h.evalWithScript(
+			_, err = h.eval(
 				apiCtx,
-				evalOptions{forceCallable: true, returnByValue: true},
-				scrollIntoView,
+				evalOptions{forceCallable: true, returnByValue: false},
+				js.ScrollIntoView,
 				sopts,
 			)
 		}
