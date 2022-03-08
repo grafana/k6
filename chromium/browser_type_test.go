@@ -13,7 +13,7 @@ import (
 )
 
 //nolint:funlen
-func TestBrowserTypeFlags(t *testing.T) {
+func TestBrowserTypePrepareFlags(t *testing.T) {
 	t.Parallel()
 
 	host, err := k6lib.NewHostAddress(net.ParseIP("127.0.0.1"), "8000")
