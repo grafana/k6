@@ -125,7 +125,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	initBar.Modify(pb.WithConstProgress(0, "Init engine"))
 	engine, err := core.NewEngine(
 		execScheduler, conf.Options, test.runtimeOptions,
-		outputs, logger, test.builtInMetrics,
+		outputs, logger, test.metricsRegistry, test.builtInMetrics,
 	)
 	if err != nil {
 		return err
@@ -136,6 +136,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 		initBar.Modify(pb.WithConstProgress(0, "Init API server"))
 		go func() {
 			logger.Debugf("Starting the REST API server on %s", c.gs.flags.address)
+			// TODO: send the ExecutionState and MetricsEngine instead of the Engine
 			if aerr := api.ListenAndServe(c.gs.flags.address, engine, logger); aerr != nil {
 				// Only exit k6 if the user has explicitly set the REST API address
 				if cmd.Flags().Lookup("address").Changed {
