@@ -99,7 +99,7 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 	}
 
 	// return/throw exception if throw enabled, otherwise just log
-	raiseErr := func(err error) (bool, error) {
+	raiseErr := func(err error) (bool, error) { //nolint:unparam // we want to just do `return raiseErr(...)`
 		if state.Options.Throw.Bool {
 			return false, err
 		}
