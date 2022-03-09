@@ -84,6 +84,7 @@ func newTestEngineWithRegistry( //nolint:golint
 
 	engine, err = NewEngine(execScheduler, opts, lib.RuntimeOptions{}, outputs, logger, registry)
 	require.NoError(t, err)
+	require.NoError(t, engine.OutputManager.StartOutputs())
 
 	run, waitFn, err := engine.Init(globalCtx, runCtx)
 	require.NoError(t, err)
@@ -94,6 +95,7 @@ func newTestEngineWithRegistry( //nolint:golint
 		}
 		globalCancel()
 		waitFn()
+		engine.OutputManager.StopOutputs()
 	}
 }
 
@@ -249,7 +251,7 @@ func TestEngineOutput(t *testing.T) {
 			cSamples = append(cSamples, sample)
 		}
 	}
-	metric := e.Metrics["test_metric"]
+	metric := e.MetricsEngine.ObservedMetrics["test_metric"]
 	if assert.NotNil(t, metric) {
 		sink := metric.Sink.(*stats.TrendSink)
 		if assert.NotNil(t, sink) {
@@ -271,13 +273,15 @@ func TestEngine_processSamples(t *testing.T) {
 		require.NoError(t, err)
 
 		e, _, wait := newTestEngineWithRegistry(t, nil, nil, nil, lib.Options{}, registry)
-		defer wait()
 
-		e.processSamples(
+		e.OutputManager.AddMetricSamples(
 			[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
 		)
 
-		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric"].Sink)
+		e.Stop()
+		wait()
+
+		assert.IsType(t, &stats.GaugeSink{}, e.MetricsEngine.ObservedMetrics["my_metric"].Sink)
 	})
 	t.Run("submetric", func(t *testing.T) {
 		t.Parallel()
@@ -295,19 +299,20 @@ func TestEngine_processSamples(t *testing.T) {
 				"my_metric{a:1}": ths,
 			},
 		}, registry)
-		defer wait()
 
-		assert.Len(t, e.metricsWithThresholds, 1)
-		sms := e.metricsWithThresholds[0]
-		assert.Equal(t, "my_metric{a:1}", sms.Name)
-		assert.EqualValues(t, map[string]string{"a": "1"}, sms.Sub.Tags.CloneTags())
-
-		e.processSamples(
+		e.OutputManager.AddMetricSamples(
 			[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1", "b": "2"})}},
 		)
 
-		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric"].Sink)
-		assert.IsType(t, &stats.GaugeSink{}, e.Metrics["my_metric{a:1}"].Sink)
+		e.Stop()
+		wait()
+
+		assert.Len(t, e.MetricsEngine.ObservedMetrics, 2)
+		sms := e.MetricsEngine.ObservedMetrics["my_metric{a:1}"]
+		assert.EqualValues(t, map[string]string{"a": "1"}, sms.Sub.Tags.CloneTags())
+
+		assert.IsType(t, &stats.GaugeSink{}, e.MetricsEngine.ObservedMetrics["my_metric"].Sink)
+		assert.IsType(t, &stats.GaugeSink{}, e.MetricsEngine.ObservedMetrics["my_metric{a:1}"].Sink)
 	})
 }
 
@@ -329,12 +334,13 @@ func TestEngineThresholdsWillAbort(t *testing.T) {
 	thresholds := map[string]stats.Thresholds{metric.Name: ths}
 
 	e, _, wait := newTestEngineWithRegistry(t, nil, nil, nil, lib.Options{Thresholds: thresholds}, registry)
-	defer wait()
 
-	e.processSamples(
+	e.OutputManager.AddMetricSamples(
 		[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
 	)
-	assert.True(t, e.processThresholds())
+	e.Stop()
+	wait()
+	assert.True(t, e.thresholdsTainted)
 }
 
 func TestEngineAbortedByThresholds(t *testing.T) {
@@ -384,32 +390,30 @@ func TestEngine_processThresholds(t *testing.T) {
 	t.Parallel()
 
 	testdata := map[string]struct {
-		pass  bool
-		ths   map[string][]string
-		abort bool
+		pass bool
+		ths  map[string][]string
 	}{
-		"passing":  {true, map[string][]string{"my_metric": {"value<2"}}, false},
-		"failing":  {false, map[string][]string{"my_metric": {"value>1.25"}}, false},
-		"aborting": {false, map[string][]string{"my_metric": {"value>1.25"}}, true},
+		"passing": {true, map[string][]string{"my_metric": {"value<2"}}},
+		"failing": {false, map[string][]string{"my_metric": {"value>1.25"}}},
 
-		"submetric,match,passing":   {true, map[string][]string{"my_metric{a:1}": {"value<2"}}, false},
-		"submetric,match,failing":   {false, map[string][]string{"my_metric{a:1}": {"value>1.25"}}, false},
-		"submetric,nomatch,passing": {true, map[string][]string{"my_metric{a:2}": {"value<2"}}, false},
-		"submetric,nomatch,failing": {false, map[string][]string{"my_metric{a:2}": {"value>1.25"}}, false},
+		"submetric,match,passing":   {true, map[string][]string{"my_metric{a:1}": {"value<2"}}},
+		"submetric,match,failing":   {false, map[string][]string{"my_metric{a:1}": {"value>1.25"}}},
+		"submetric,nomatch,passing": {true, map[string][]string{"my_metric{a:2}": {"value<2"}}},
+		"submetric,nomatch,failing": {false, map[string][]string{"my_metric{a:2}": {"value>1.25"}}},
 
-		"unused,passing":      {true, map[string][]string{"unused_counter": {"count==0"}}, false},
-		"unused,failing":      {false, map[string][]string{"unused_counter": {"count>1"}}, false},
-		"unused,subm,passing": {true, map[string][]string{"unused_counter{a:2}": {"count<1"}}, false},
-		"unused,subm,failing": {false, map[string][]string{"unused_counter{a:2}": {"count>1"}}, false},
+		"unused,passing":      {true, map[string][]string{"unused_counter": {"count==0"}}},
+		"unused,failing":      {false, map[string][]string{"unused_counter": {"count>1"}}},
+		"unused,subm,passing": {true, map[string][]string{"unused_counter{a:2}": {"count<1"}}},
+		"unused,subm,failing": {false, map[string][]string{"unused_counter{a:2}": {"count>1"}}},
 
-		"used,passing":               {true, map[string][]string{"used_counter": {"count==2"}}, false},
-		"used,failing":               {false, map[string][]string{"used_counter": {"count<1"}}, false},
-		"used,subm,passing":          {true, map[string][]string{"used_counter{b:1}": {"count==2"}}, false},
-		"used,not-subm,passing":      {true, map[string][]string{"used_counter{b:2}": {"count==0"}}, false},
-		"used,invalid-subm,passing1": {true, map[string][]string{"used_counter{c:''}": {"count==0"}}, false},
-		"used,invalid-subm,failing1": {false, map[string][]string{"used_counter{c:''}": {"count>0"}}, false},
-		"used,invalid-subm,passing2": {true, map[string][]string{"used_counter{c:}": {"count==0"}}, false},
-		"used,invalid-subm,failing2": {false, map[string][]string{"used_counter{c:}": {"count>0"}}, false},
+		"used,passing":               {true, map[string][]string{"used_counter": {"count==2"}}},
+		"used,failing":               {false, map[string][]string{"used_counter": {"count<1"}}},
+		"used,subm,passing":          {true, map[string][]string{"used_counter{b:1}": {"count==2"}}},
+		"used,not-subm,passing":      {true, map[string][]string{"used_counter{b:2}": {"count==0"}}},
+		"used,invalid-subm,passing1": {true, map[string][]string{"used_counter{c:''}": {"count==0"}}},
+		"used,invalid-subm,failing1": {false, map[string][]string{"used_counter{c:''}": {"count>0"}}},
+		"used,invalid-subm,passing2": {true, map[string][]string{"used_counter{c:}": {"count==0"}}},
+		"used,invalid-subm,failing2": {false, map[string][]string{"used_counter{c:}": {"count>0"}}},
 	}
 
 	for name, data := range testdata {
@@ -430,21 +434,25 @@ func TestEngine_processThresholds(t *testing.T) {
 				ths := stats.NewThresholds(srcs)
 				gotParseErr := ths.Parse()
 				require.NoError(t, gotParseErr)
-				ths.Thresholds[0].AbortOnFail = data.abort
 				thresholds[m] = ths
 			}
 
-			e, _, wait := newTestEngineWithRegistry(t, nil, nil, nil, lib.Options{Thresholds: thresholds}, registry)
-			defer wait()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			e, run, wait := newTestEngineWithRegistry(
+				t, ctx, &minirunner.MiniRunner{}, nil, lib.Options{Thresholds: thresholds}, registry,
+			)
 
-			e.processSamples(
+			e.OutputManager.AddMetricSamples(
 				[]stats.SampleContainer{
 					stats.Sample{Metric: gaugeMetric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})},
 					stats.Sample{Metric: counterMetric, Value: 2, Tags: stats.IntoSampleTags(&map[string]string{"b": "1"})},
 				},
 			)
 
-			assert.Equal(t, data.abort, e.processThresholds())
+			require.NoError(t, run())
+			wait()
+
 			assert.Equal(t, data.pass, !e.IsTainted())
 		})
 	}
@@ -1289,6 +1297,7 @@ func TestActiveVUsCount(t *testing.T) {
 	require.NoError(t, err)
 	engine, err := NewEngine(execScheduler, opts, rtOpts, []output.Output{mockOutput}, logger, registry)
 	require.NoError(t, err)
+	require.NoError(t, engine.OutputManager.StartOutputs())
 	run, waitFn, err := engine.Init(ctx, ctx) // no need for 2 different contexts
 	require.NoError(t, err)
 
@@ -1302,6 +1311,7 @@ func TestActiveVUsCount(t *testing.T) {
 		require.NoError(t, err)
 		cancel()
 		waitFn()
+		engine.OutputManager.StopOutputs()
 		require.False(t, engine.IsTainted())
 	}
 

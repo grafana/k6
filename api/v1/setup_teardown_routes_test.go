@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -133,12 +134,14 @@ func TestSetupData(t *testing.T) {
 			},
 		},
 	}
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	for _, testCase := range testCases {
-		testCase := testCase
+
+	runTestCase := func(t *testing.T, tcid int) {
+		testCase := testCases[tcid]
+		logger := logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+		registry := metrics.NewRegistry()
+		builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -164,13 +167,16 @@ func TestSetupData(t *testing.T) {
 			engine, err := core.NewEngine(execScheduler, runner.GetOptions(), lib.RuntimeOptions{}, nil, logger, registry)
 			require.NoError(t, err)
 
+			require.NoError(t, engine.OutputManager.StartOutputs())
+			defer engine.OutputManager.StopOutputs()
+
 			globalCtx, globalCancel := context.WithCancel(context.Background())
 			runCtx, runCancel := context.WithCancel(globalCtx)
 			run, wait, err := engine.Init(globalCtx, runCtx)
+			require.NoError(t, err)
+
 			defer wait()
 			defer globalCancel()
-
-			require.NoError(t, err)
 
 			errC := make(chan error)
 			go func() { errC <- run() }()
@@ -209,6 +215,14 @@ func TestSetupData(t *testing.T) {
 				runCancel()
 				require.NoError(t, err)
 			}
+		})
+	}
+
+	for id := range testCases {
+		id := id
+		t.Run(fmt.Sprintf("testcase_%d", id), func(t *testing.T) {
+			t.Parallel()
+			runTestCase(t, id)
 		})
 	}
 }

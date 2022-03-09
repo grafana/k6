@@ -45,7 +45,6 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/output"
 	"go.k6.io/k6/ui/pb"
 )
 
@@ -120,7 +119,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// TODO: remove
+	// TODO: create a MetricsEngine here and add its ingester to the list of
+	// outputs (unless both NoThresholds and NoSummary were enabled)
+
+	// TODO: remove this completely
 	// Create the engine.
 	initBar.Modify(pb.WithConstProgress(0, "Init engine"))
 	engine, err := core.NewEngine(
@@ -151,17 +153,20 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 
 	// We do this here so we can get any output URLs below.
 	initBar.Modify(pb.WithConstProgress(0, "Starting outputs"))
-	outputManager := output.NewManager(outputs, logger, func(err error) {
-		if err != nil {
-			logger.WithError(err).Error("Received error to stop from output")
-		}
-		runCancel()
-	})
-	err = outputManager.StartOutputs()
+	// TODO: re-enable the code below
+	/*
+		outputManager := output.NewManager(outputs, logger, func(err error) {
+			if err != nil {
+				logger.WithError(err).Error("Received error to stop from output")
+			}
+			runCancel()
+		})
+	*/
+	err = engine.OutputManager.StartOutputs()
 	if err != nil {
 		return err
 	}
-	defer outputManager.StopOutputs()
+	defer engine.OutputManager.StopOutputs()
 
 	printExecutionDescription(
 		c.gs, "local", args[0], "", conf, execScheduler.GetState().ExecutionTuple, executionPlan, outputs,
@@ -234,8 +239,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 
 	// Handle the end-of-test summary.
 	if !test.runtimeOptions.NoSummary.Bool {
+		engine.MetricsEngine.MetricsLock.Lock() // TODO: refactor so this is not needed
 		summaryResult, err := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
-			Metrics:         engine.Metrics,
+			Metrics:         engine.MetricsEngine.ObservedMetrics,
 			RootGroup:       execScheduler.GetRunner().GetDefaultGroup(),
 			TestRunDuration: executionState.GetCurrentTestRunDuration(),
 			NoColor:         c.gs.flags.noColor,
@@ -244,6 +250,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 				IsStdErrTTY: c.gs.stdErr.isTTY,
 			},
 		})
+		engine.MetricsEngine.MetricsLock.Unlock()
 		if err == nil {
 			err = handleSummaryResult(c.gs.fs, c.gs.stdOut, c.gs.stdErr, summaryResult)
 		}
