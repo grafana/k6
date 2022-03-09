@@ -54,7 +54,9 @@ func TestSharedIterationsRun(t *testing.T) {
 	var doneIters uint64
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, getTestSharedIterationsConfig(), es,
 		simpleRunner(func(ctx context.Context, _ *lib.State) error {
@@ -63,9 +65,7 @@ func TestSharedIterationsRun(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	err = executor.Run(ctx, nil, builtinMetrics)
+	err = executor.Run(ctx, nil)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(100), doneIters)
 }
@@ -80,7 +80,9 @@ func TestSharedIterationsRunVariableVU(t *testing.T) {
 	)
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, getTestSharedIterationsConfig(), es,
 		simpleRunner(func(ctx context.Context, state *lib.State) error {
@@ -99,9 +101,7 @@ func TestSharedIterationsRunVariableVU(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	err = executor.Run(ctx, nil, builtinMetrics)
+	err = executor.Run(ctx, nil)
 	require.NoError(t, err)
 
 	var totalIters uint64
@@ -130,7 +130,9 @@ func TestSharedIterationsEmitDroppedIterations(t *testing.T) {
 		MaxDuration: types.NullDurationFrom(1 * time.Second),
 	}
 
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, config, es,
 		simpleRunner(func(ctx context.Context, _ *lib.State) error {
@@ -141,9 +143,7 @@ func TestSharedIterationsEmitDroppedIterations(t *testing.T) {
 	)
 	defer cancel()
 	engineOut := make(chan stats.SampleContainer, 1000)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	err = executor.Run(ctx, engineOut, builtinMetrics)
+	err = executor.Run(ctx, engineOut)
 	require.NoError(t, err)
 	assert.Empty(t, logHook.Drain())
 	assert.Equal(t, int64(5), count)
@@ -178,7 +178,9 @@ func TestSharedIterationsGlobalIters(t *testing.T) {
 			require.NoError(t, err)
 			et, err := lib.NewExecutionTuple(seg, &ess)
 			require.NoError(t, err)
-			es := lib.NewExecutionState(lib.Options{}, et, 5, 5)
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 5, 5)
 
 			runner := &minirunner.MiniRunner{}
 			ctx, cancel, executor, _ := setupExecutor(t, config, es, runner)
@@ -194,9 +196,7 @@ func TestSharedIterationsGlobalIters(t *testing.T) {
 			}
 
 			engineOut := make(chan stats.SampleContainer, 100)
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			err = executor.Run(ctx, engineOut, builtinMetrics)
+			err = executor.Run(ctx, engineOut)
 			require.NoError(t, err)
 			sort.Slice(gotIters, func(i, j int) bool { return gotIters[i] < gotIters[j] })
 			assert.Equal(t, tc.expIters, gotIters)

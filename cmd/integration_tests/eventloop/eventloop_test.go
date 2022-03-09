@@ -51,11 +51,11 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 		lib.Options{
 			TeardownTimeout: types.NullDurationFrom(time.Second),
 			SetupTimeout:    types.NullDurationFrom(time.Second),
-		})
+		}, builtinMetrics)
 	defer cancel()
 
 	errCh := make(chan error, 1)
-	go func() { errCh <- execScheduler.Run(ctx, ctx, samples, builtinMetrics) }()
+	go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
 
 	select {
 	case err := <-errCh:
@@ -200,7 +200,7 @@ export default function() {
 }
 
 func newTestExecutionScheduler(
-	t *testing.T, runner lib.Runner, logger *logrus.Logger, opts lib.Options,
+	t *testing.T, runner lib.Runner, logger *logrus.Logger, opts lib.Options, builtinMetrics *metrics.BuiltinMetrics,
 ) (ctx context.Context, cancel func(), execScheduler *local.ExecutionScheduler, samples chan stats.SampleContainer) {
 	if runner == nil {
 		runner = &minirunner.MiniRunner{}
@@ -219,7 +219,7 @@ func newTestExecutionScheduler(
 		logger.SetOutput(testutils.NewTestOutput(t))
 	}
 
-	execScheduler, err = local.NewExecutionScheduler(runner, logger)
+	execScheduler, err = local.NewExecutionScheduler(runner, builtinMetrics, logger)
 	require.NoError(t, err)
 
 	samples = make(chan stats.SampleContainer, newOpts.MetricSamplesBufferSize.Int64)

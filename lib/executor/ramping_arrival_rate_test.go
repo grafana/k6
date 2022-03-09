@@ -69,7 +69,9 @@ func TestRampingArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestRampingArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context, _ *lib.State) error {
@@ -79,9 +81,7 @@ func TestRampingArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	)
 	defer cancel()
 	engineOut := make(chan stats.SampleContainer, 1000)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	err = executor.Run(ctx, engineOut, builtinMetrics)
+	err = executor.Run(ctx, engineOut)
 	require.NoError(t, err)
 	entries := logHook.Drain()
 	require.NotEmpty(t, entries)
@@ -98,7 +98,9 @@ func TestRampingArrivalRateRunCorrectRate(t *testing.T) {
 	var count int64
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
 	ctx, cancel, executor, logHook := setupExecutor(
 		t, getTestRampingArrivalRateConfig(), es,
 		simpleRunner(func(ctx context.Context, _ *lib.State) error {
@@ -127,9 +129,7 @@ func TestRampingArrivalRateRunCorrectRate(t *testing.T) {
 		assert.InDelta(t, 50, currentCount, 3)
 	}()
 	engineOut := make(chan stats.SampleContainer, 1000)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	err = executor.Run(ctx, engineOut, builtinMetrics)
+	err = executor.Run(ctx, engineOut)
 	wg.Wait()
 	require.NoError(t, err)
 	require.Empty(t, logHook.Drain())
@@ -139,7 +139,9 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 1, 3)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 1, 3)
 	var count int64
 	ch := make(chan struct{})  // closed when new unplannedVU is started and signal to get to next iterations
 	ch2 := make(chan struct{}) // closed when a second iteration was started on an old VU in order to test it won't start a second unplanned VU in parallel or at all
@@ -192,9 +194,8 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 		idl, idg := es.GetUniqueVUIdentifiers()
 		return runner.NewVU(idl, idg, engineOut)
 	})
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	err = executor.Run(ctx, engineOut, builtinMetrics)
+
+	err = executor.Run(ctx, engineOut)
 	assert.NoError(t, err)
 	assert.Empty(t, logHook.Drain())
 
@@ -206,7 +207,9 @@ func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 1, 3)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 1, 3)
 	var count int64
 	ch := make(chan struct{}) // closed when new unplannedVU is started and signal to get to next iterations
 	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
@@ -245,9 +248,8 @@ func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 		idl, idg := es.GetUniqueVUIdentifiers()
 		return runner.NewVU(idl, idg, engineOut)
 	})
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	err = executor.Run(ctx, engineOut, builtinMetrics)
+
+	err = executor.Run(ctx, engineOut)
 	assert.NoError(t, err)
 	assert.Empty(t, logHook.Drain())
 	assert.Equal(t, int64(0), es.GetCurrentlyActiveVUsCount())
@@ -258,7 +260,9 @@ func TestRampingArrivalRateRunGracefulStop(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 10)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 10)
 
 	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
 		time.Sleep(5 * time.Second)
@@ -286,9 +290,7 @@ func TestRampingArrivalRateRunGracefulStop(t *testing.T) {
 	engineOut := make(chan stats.SampleContainer, 1000)
 	defer close(engineOut)
 
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	err = executor.Run(ctx, engineOut, builtinMetrics)
+	err = executor.Run(ctx, engineOut)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), es.GetCurrentlyActiveVUsCount())
 	assert.Equal(t, int64(10), es.GetInitializedVUsCount())
@@ -315,7 +317,12 @@ func BenchmarkRampingArrivalRateRun(b *testing.B) {
 				}
 			}()
 
-			es := lib.NewExecutionState(lib.Options{}, mustNewExecutionTuple(nil, nil), uint64(tc.prealloc.Int64), uint64(tc.prealloc.Int64))
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			es := lib.NewExecutionState(
+				lib.Options{}, mustNewExecutionTuple(nil, nil), builtinMetrics,
+				uint64(tc.prealloc.Int64), uint64(tc.prealloc.Int64),
+			)
 
 			var count int64
 			runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
@@ -348,9 +355,7 @@ func BenchmarkRampingArrivalRateRun(b *testing.B) {
 			b.ResetTimer()
 			start := time.Now()
 
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			err := executor.Run(ctx, engineOut, builtinMetrics)
+			err := executor.Run(ctx, engineOut)
 			took := time.Since(start)
 			assert.NoError(b, err)
 
@@ -742,7 +747,9 @@ func TestRampingArrivalRateGlobalIters(t *testing.T) {
 			require.NoError(t, err)
 			et, err := lib.NewExecutionTuple(seg, &ess)
 			require.NoError(t, err)
-			es := lib.NewExecutionState(lib.Options{}, et, 5, 5)
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 5, 5)
 
 			runner := &minirunner.MiniRunner{}
 			ctx, cancel, executor, _ := setupExecutor(t, config, es, runner)
@@ -758,9 +765,7 @@ func TestRampingArrivalRateGlobalIters(t *testing.T) {
 			}
 
 			engineOut := make(chan stats.SampleContainer, 100)
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			err = executor.Run(ctx, engineOut, builtinMetrics)
+			err = executor.Run(ctx, engineOut)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expIters, gotIters)
 		})
@@ -783,7 +788,10 @@ func TestRampingArrivalRateCornerCase(t *testing.T) {
 
 	et, err := lib.NewExecutionTuple(newExecutionSegmentFromString("1/5:2/5"), newExecutionSegmentSequenceFromString("0,1/5,2/5,1"))
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+
+	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
 
 	executor, err := config.NewExecutor(es, nil)
 	require.NoError(t, err)

@@ -47,11 +47,11 @@ func TestGetStatus(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
-	require.NoError(t, err)
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry, builtinMetrics)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, builtinMetrics, logger)
+	require.NoError(t, err)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry)
 	require.NoError(t, err)
 
 	rw := httptest.NewRecorder()
@@ -140,9 +140,9 @@ func TestPatchStatus(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Options: options}, logger)
+			execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Options: options}, builtinMetrics, logger)
 			require.NoError(t, err)
-			engine, err := core.NewEngine(execScheduler, options, lib.RuntimeOptions{}, nil, logger, registry, builtinMetrics)
+			engine, err := core.NewEngine(execScheduler, options, lib.RuntimeOptions{}, nil, logger, registry)
 			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()

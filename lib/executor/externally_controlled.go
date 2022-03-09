@@ -34,7 +34,6 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/stats"
 	"go.k6.io/k6/ui/pb"
 )
@@ -500,9 +499,7 @@ func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg Extern
 // dynamically controlled number of VUs either for the specified duration, or
 // until the test is manually stopped.
 // nolint:funlen,gocognit,cyclop
-func (mex *ExternallyControlled) Run(
-	parentCtx context.Context, out chan<- stats.SampleContainer, _ *metrics.BuiltinMetrics,
-) (err error) {
+func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
 	mex.configLock.RLock()
 	// Safely get the current config - it's important that the close of the
 	// hasStarted channel is inside of the lock, so that there are no data races

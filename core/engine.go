@@ -40,7 +40,6 @@ import (
 )
 
 const (
-	metricsRate    = 1 * time.Second
 	collectRate    = 50 * time.Millisecond
 	thresholdsRate = 2 * time.Second
 )
@@ -69,9 +68,8 @@ type Engine struct {
 	Metrics     map[string]*stats.Metric // TODO: refactor, this doesn't need to be a map
 	MetricsLock sync.Mutex
 
-	registry       *metrics.Registry
-	builtinMetrics *metrics.BuiltinMetrics
-	Samples        chan stats.SampleContainer
+	registry *metrics.Registry
+	Samples  chan stats.SampleContainer
 
 	// These can be both top-level metrics or sub-metrics
 	metricsWithThresholds []*stats.Metric
@@ -83,7 +81,7 @@ type Engine struct {
 // NewEngine instantiates a new Engine, without doing any heavy initialization.
 func NewEngine(
 	ex lib.ExecutionScheduler, opts lib.Options, rtOpts lib.RuntimeOptions, outputs []output.Output, logger *logrus.Logger,
-	registry *metrics.Registry, builtinMetrics *metrics.BuiltinMetrics,
+	registry *metrics.Registry,
 ) (*Engine, error) {
 	if ex == nil {
 		return nil, errors.New("missing ExecutionScheduler instance")
@@ -101,7 +99,6 @@ func NewEngine(
 		stopChan:       make(chan struct{}),
 		logger:         logger.WithField("component", "engine"),
 		registry:       registry,
-		builtinMetrics: builtinMetrics,
 	}
 
 	if !(e.runtimeOptions.NoSummary.Bool && e.runtimeOptions.NoThresholds.Bool) {
@@ -206,7 +203,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 	processMetricsAfterRun := make(chan struct{})
 	runFn := func() error {
 		e.logger.Debug("Execution scheduler starting...")
-		err := e.ExecutionScheduler.Run(globalCtx, runSubCtx, e.Samples, e.builtinMetrics)
+		err := e.ExecutionScheduler.Run(globalCtx, runSubCtx, e.Samples)
 		e.logger.WithError(err).Debug("Execution scheduler terminated")
 
 		select {
@@ -242,16 +239,6 @@ func (e *Engine) startBackgroundProcesses(
 	go func() {
 		defer processes.Done()
 		e.processMetrics(globalCtx, processMetricsAfterRun)
-	}()
-
-	// Run VU metrics emission, only while the test is running.
-	// TODO: move? this seems like something the ExecutionScheduler should emit...
-	processes.Add(1)
-	go func() {
-		defer processes.Done()
-		e.logger.Debug("Starting emission of VU metrics...")
-		e.runMetricsEmission(runCtx)
-		e.logger.Debug("Metrics emission terminated")
 	}()
 
 	// Update the test run status when the test finishes
@@ -404,42 +391,6 @@ func (e *Engine) IsStopped() bool {
 	default:
 		return false
 	}
-}
-
-func (e *Engine) runMetricsEmission(ctx context.Context) {
-	ticker := time.NewTicker(metricsRate)
-	for {
-		select {
-		case <-ticker.C:
-			e.emitMetrics()
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (e *Engine) emitMetrics() {
-	t := time.Now()
-
-	executionState := e.ExecutionScheduler.GetState()
-	// TODO: optimize and move this, it shouldn't call processSamples() directly
-	e.processSamples([]stats.SampleContainer{stats.ConnectedSamples{
-		Samples: []stats.Sample{
-			{
-				Time:   t,
-				Metric: e.builtinMetrics.VUs,
-				Value:  float64(executionState.GetCurrentlyActiveVUsCount()),
-				Tags:   e.options.RunTags,
-			}, {
-				Time:   t,
-				Metric: e.builtinMetrics.VUsMax,
-				Value:  float64(executionState.GetInitializedVUsCount()),
-				Tags:   e.options.RunTags,
-			},
-		},
-		Tags: e.options.RunTags,
-		Time: t,
-	}})
 }
 
 func (e *Engine) processThresholds() (shouldAbort bool) {

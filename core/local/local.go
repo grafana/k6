@@ -42,7 +42,7 @@ import (
 type ExecutionScheduler struct {
 	runner  lib.Runner
 	options lib.Options
-	logger  *logrus.Logger
+	logger  logrus.FieldLogger
 
 	initProgress    *pb.ProgressBar
 	executorConfigs []lib.ExecutorConfig // sorted by (startTime, ID)
@@ -51,6 +51,10 @@ type ExecutionScheduler struct {
 	maxDuration     time.Duration // cached value derived from the execution plan
 	maxPossibleVUs  uint64        // cached value derived from the execution plan
 	state           *lib.ExecutionState
+
+	// TODO: remove these when we don't have separate Init() and Run() methods
+	// and can use a context + a WaitGroup (or something like that)
+	stopVusEmission, vusEmissionStopped chan struct{}
 }
 
 // Check to see if we implement the lib.ExecutionScheduler interface
@@ -60,7 +64,9 @@ var _ lib.ExecutionScheduler = &ExecutionScheduler{}
 // instance, without initializing it beyond the bare minimum. Specifically, it
 // creates the needed executor instances and a lot of state placeholders, but it
 // doesn't initialize the executors and it doesn't initialize or run VUs.
-func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*ExecutionScheduler, error) {
+func NewExecutionScheduler(
+	runner lib.Runner, builtinMetrics *metrics.BuiltinMetrics, logger logrus.FieldLogger,
+) (*ExecutionScheduler, error) {
 	options := runner.GetOptions()
 	et, err := lib.NewExecutionTuple(options.ExecutionSegment, options.ExecutionSegmentSequence)
 	if err != nil {
@@ -70,7 +76,7 @@ func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*Execution
 	maxPlannedVUs := lib.GetMaxPlannedVUs(executionPlan)
 	maxPossibleVUs := lib.GetMaxPossibleVUs(executionPlan)
 
-	executionState := lib.NewExecutionState(options, et, maxPlannedVUs, maxPossibleVUs)
+	executionState := lib.NewExecutionState(options, et, builtinMetrics, maxPlannedVUs, maxPossibleVUs)
 	maxDuration, _ := lib.GetEndOffset(executionPlan) // we don't care if the end offset is final
 
 	executorConfigs := options.Scenarios.GetSortedConfigs()
@@ -112,6 +118,9 @@ func NewExecutionScheduler(runner lib.Runner, logger *logrus.Logger) (*Execution
 		maxDuration:     maxDuration,
 		maxPossibleVUs:  maxPossibleVUs,
 		state:           executionState,
+
+		stopVusEmission:    make(chan struct{}),
+		vusEmissionStopped: make(chan struct{}),
 	}, nil
 }
 
@@ -225,11 +234,58 @@ func (e *ExecutionScheduler) initVUsConcurrently(
 	return doneInits
 }
 
+func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- stats.SampleContainer) {
+	e.logger.Debug("Starting emission of VUs and VUsMax metrics...")
+
+	emitMetrics := func() {
+		t := time.Now()
+		samples := stats.ConnectedSamples{
+			Samples: []stats.Sample{
+				{
+					Time:   t,
+					Metric: e.state.BuiltinMetrics.VUs,
+					Value:  float64(e.state.GetCurrentlyActiveVUsCount()),
+					Tags:   e.options.RunTags,
+				}, {
+					Time:   t,
+					Metric: e.state.BuiltinMetrics.VUsMax,
+					Value:  float64(e.state.GetInitializedVUsCount()),
+					Tags:   e.options.RunTags,
+				},
+			},
+			Tags: e.options.RunTags,
+			Time: t,
+		}
+		stats.PushIfNotDone(ctx, out, samples)
+	}
+
+	ticker := time.NewTicker(1 * time.Second)
+	go func() {
+		defer func() {
+			ticker.Stop()
+			e.logger.Debug("Metrics emission of VUs and VUsMax metrics stopped")
+			close(e.vusEmissionStopped)
+		}()
+
+		for {
+			select {
+			case <-ticker.C:
+				emitMetrics()
+			case <-ctx.Done():
+				return
+			case <-e.stopVusEmission:
+				return
+			}
+		}
+	}()
+}
+
 // Init concurrently initializes all of the planned VUs and then sequentially
 // initializes all of the configured executors.
 func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- stats.SampleContainer) error {
-	logger := e.logger.WithField("phase", "local-execution-scheduler-init")
+	e.emitVUsAndVUsMax(ctx, samplesOut)
 
+	logger := e.logger.WithField("phase", "local-execution-scheduler-init")
 	vusToInitialize := lib.GetMaxPlannedVUs(e.executionPlan)
 	logger.WithFields(logrus.Fields{
 		"neededVUs":      vusToInitialize,
@@ -293,7 +349,6 @@ func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- stats.S
 // method.
 func (e *ExecutionScheduler) runExecutor(
 	runCtx context.Context, runResults chan<- error, engineOut chan<- stats.SampleContainer, executor lib.Executor,
-	builtinMetrics *metrics.BuiltinMetrics,
 ) {
 	executorConfig := executor.GetConfig()
 	executorStartTime := executorConfig.GetStartTime()
@@ -330,7 +385,7 @@ func (e *ExecutionScheduler) runExecutor(
 		pb.WithConstProgress(0, "started"),
 	)
 	executorLogger.Debugf("Starting executor")
-	err := executor.Run(runCtx, engineOut, builtinMetrics) // executor should handle context cancel itself
+	err := executor.Run(runCtx, engineOut) // executor should handle context cancel itself
 	if err == nil {
 		executorLogger.Debugf("Executor finished successfully")
 	} else {
@@ -341,10 +396,13 @@ func (e *ExecutionScheduler) runExecutor(
 
 // Run the ExecutionScheduler, funneling all generated metric samples through the supplied
 // out channel.
-//nolint:cyclop
-func (e *ExecutionScheduler) Run(
-	globalCtx, runCtx context.Context, engineOut chan<- stats.SampleContainer, builtinMetrics *metrics.BuiltinMetrics,
-) error {
+//nolint:funlen
+func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- stats.SampleContainer) error {
+	defer func() {
+		close(e.stopVusEmission)
+		<-e.vusEmissionStopped
+	}()
+
 	executorsCount := len(e.executors)
 	logger := e.logger.WithField("phase", "local-execution-scheduler-run")
 	e.initProgress.Modify(pb.WithConstLeft("Run"))
@@ -401,7 +459,7 @@ func (e *ExecutionScheduler) Run(
 	// This is for addressing test.abort().
 	execCtx := executor.Context(runSubCtx)
 	for _, exec := range e.executors {
-		go e.runExecutor(execCtx, runResults, engineOut, exec, builtinMetrics)
+		go e.runExecutor(execCtx, runResults, engineOut, exec)
 	}
 
 	// Wait for all executors to finish
