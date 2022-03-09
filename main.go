@@ -91,8 +91,10 @@ func (m *JSModule) Launch(browserName string, opts goja.Value) api.Browser {
 		<-ctx.Done()
 	}()*/
 
+	ctx := common.WithVU(m.vu.Context(), m.vu)
+
 	if browserName == "chromium" {
-		bt := chromium.NewBrowserType(m.vu.Context())
+		bt := chromium.NewBrowserType(ctx)
 		return bt.Launch(opts)
 	}
 
