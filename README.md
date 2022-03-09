@@ -4,16 +4,16 @@
 <p align="center">A modern load testing tool for developers and testers in the DevOps era.</p>
 
 <p align="center">
-  <a href="https://github.com/k6io/k6/releases"><img src="https://img.shields.io/github/release/k6io/k6.svg" alt="Github release"></a>
-  <a href="https://github.com/k6io/k6/actions/workflows/all.yml"><img src="https://github.com/k6io/k6/actions/workflows/all.yml/badge.svg" alt="Build status"></a>
-  <a href="https://goreportcard.com/report/github.com/k6io/k6"><img src="https://goreportcard.com/badge/github.com/k6io/k6" alt="Go Report Card"></a>
-  <a href="https://codecov.io/gh/k6io/k6"><img src="https://img.shields.io/codecov/c/github/k6io/k6/master.svg" alt="Codecov branch"></a>
+  <a href="https://github.com/grafana/k6/releases"><img src="https://img.shields.io/github/release/grafana/k6.svg" alt="Github release"></a>
+  <a href="https://github.com/grafana/k6/actions/workflows/all.yml"><img src="https://github.com/grafana/k6/actions/workflows/all.yml/badge.svg" alt="Build status"></a>
+  <a href="https://goreportcard.com/report/github.com/grafana/k6"><img src="https://goreportcard.com/badge/github.com/grafana/k6" alt="Go Report Card"></a>
+  <a href="https://codecov.io/gh/grafana/k6"><img src="https://img.shields.io/codecov/c/github/grafana/k6/master.svg" alt="Codecov branch"></a>
   <br>
   <a href="https://twitter.com/k6_io"><img src="https://img.shields.io/badge/twitter-@k6_io-55acee.svg" alt="@k6_io on Twitter"></a>
   <a href="https://k6.io/slack"><img src="https://img.shields.io/badge/Slack-k6-ff69b4.svg" alt="Slack channel"></a>
 </p>
 <p align="center">
-    <a href="https://github.com/k6io/k6/releases">Download</a> ·
+    <a href="https://github.com/grafana/k6/releases">Download</a> ·
     <a href="#install">Install</a> ·
     <a href="https://k6.io/docs">Documentation</a> ·
     <a href="https://community.k6.io/">Community Forum</a>
@@ -51,7 +51,7 @@ Features
 - **Batteries included**: [Cookies](https://k6.io/docs/using-k6/cookies), [Crypto](https://k6.io/docs/javascript-api/k6-crypto), [Custom metrics](https://k6.io/docs/using-k6/metrics#custom-metrics), [Encodings](https://k6.io/docs/javascript-api/k6-encoding), [Environment variables](https://k6.io/docs/using-k6/environment-variables), JSON, [HTML forms](https://k6.io/docs/using-k6/html/working-with-html-forms), [files](https://k6.io/docs/javascript-api/init-context/open-filepath-mode), [flexible execution control](https://k6.io/docs/getting-started/running-k6#section-stages-ramping-updown-vus), and more.
 - **Built-in HAR converter**: record browser sessions as [`.har` files](https://en.wikipedia.org/wiki/.har) and [directly convert them to k6 scripts](https://k6.io/docs/using-k6/session-recording-har-support)
 - **Flexible metrics storage and visualization**: [InfluxDB](https://k6.io/docs/results-visualization/influxdb-+-grafana) (+Grafana), [JSON](https://k6.io/docs/getting-started/results-output/json) or [k6 Cloud](https://k6.io/docs/cloud/analyzing-results/overview)
-- [**Cloud execution**](https://k6.io/docs/using-k6/cloud-execution) and distributed tests _(currently only on infrastructure managed by [us k6 cloud](https://k6.io/cloud), with native distributed execution in k6 [planned](https://github.com/k6io/k6/wiki/Roadmap) for the near future!)_
+- [**Cloud execution**](https://k6.io/docs/using-k6/cloud-execution) and distributed tests _(currently only on infrastructure managed by [us k6 cloud](https://k6.io/cloud), with native distributed execution in k6 [planned](https://github.com/grafana/k6/issues/140) for the near future!)_
 
 There's even more! [See all features available in k6.](https://k6.io/docs/)
 
@@ -133,7 +133,7 @@ docker pull grafana/k6
 
 ### Pre-built binaries & other platforms
 
-In case there isn't an official package for your operating system or architecture, or if you don't want to install a custom repository, you can easily grab a pre-built binary from [the GitHub Releases page](https://github.com/k6io/k6/releases). Once you download and unpack the release, you can optionally copy the `k6` binary it contains somewhere in your `PATH`, so you are able to run k6 from any location on your system.
+In case there isn't an official package for your operating system or architecture, or if you don't want to install a custom repository, you can easily grab a pre-built binary from [the GitHub Releases page](https://github.com/grafana/k6/releases). Once you download and unpack the release, you can optionally copy the `k6` binary it contains somewhere in your `PATH`, so you are able to run k6 from any location on your system.
 
 ### Build from source
 
@@ -164,7 +164,7 @@ The script details and how we can extend and configure it will be explained belo
 
 If you decide to use the [k6 docker image](https://hub.docker.com/r/grafana/k6/), the command will be slightly different. Instead of passing the script filename to k6, a dash is used to instruct k6 to read the script contents directly via the standard input. This allows us to avoid messing with docker volumes for such a simple single-file script, greatly simplifying the docker command: `docker run -i grafana/k6 run - <script.js`.
 
-In some situations, it may also be useful to execute remote scripts. You can do that with HTTP**S** URLs in k6 by [importing them](https://k6.io/docs/using-k6/modules#section-remote-modules) in the script via their URL or simply specifying their URL in the CLI command: `k6 run github.com/k6io/k6/samples/http_2.js` (k6 "knows" a bit about GitHub and cdnjs URLs, so this command is shorthand for `k6 run raw.githubusercontent.com/k6io/k6/master/samples/http_2.js`)
+In some situations, it may also be useful to execute remote scripts. You can do that with HTTP**S** URLs in k6 by [importing them](https://k6.io/docs/using-k6/modules#section-remote-modules) in the script via their URL or simply specifying their URL in the CLI command: `k6 run github.com/grafana/k6/samples/http_2.js` (k6 "knows" a bit about GitHub and cdnjs URLs, so this command is shorthand for `k6 run raw.githubusercontent.com/grafana/k6/master/samples/http_2.js`)
 
 For more information on how to get started running k6, please look at the [Running k6](https://k6.io/docs/getting-started/running-k6) documentation page. If you want to know more about making and measuring HTTP requests with k6, take a look [here](https://k6.io/docs/using-k6/http-requests) and [here](https://k6.io/docs/javascript-api/k6-http). And for information about the commercial k6 services like distributed cloud execution (the `k6 cloud` command) or Cloud Results (`k6 run -o cloud`), you can visit [k6.io](https://k6.io/cloud) or view the [cloud documentation](https://k6.io/docs/cloud).
 
@@ -185,7 +185,7 @@ There are two reasons for this. The first is, of course, performance. If you rea
 
 But there's another, more interesting reason. By forcing all imports and file reads into the init context, we design for distributed execution. We know which files will be needed, so we distribute only those files to each node in the cluster. We know which modules will be imported, so we can bundle them up in an [archive](https://k6.io/docs/using-k6/archives-for-bundling-sharing-a-test) from the get-go. And, tying into the performance point above, the other nodes don't even need writable file systems - everything can be kept in memory.
 
-This means that if your script works when it's executed with `k6 run` locally, it should also work without any modifications in a distributed execution environment like `k6 cloud` (that executes it in the commercial [k6 cloud infrastructure](https://k6.io/cloud)) or, in the future, with the [planned](https://github.com/k6io/k6/wiki/Roadmap) k6 native cluster execution mode.
+This means that if your script works when it's executed with `k6 run` locally, it should also work without any modifications in a distributed execution environment like `k6 cloud` (that executes it in the commercial [k6 cloud infrastructure](https://k6.io/cloud)) or, in the future, with the [planned](https://github.com/grafana/k6/wiki/Roadmap) k6 native cluster execution mode.
 
 ### Script execution
 
@@ -285,7 +285,7 @@ A copy of whatever data `setup()` returns will be passed as the first argument t
 
 ### Metrics, tags, and groups
 
-By default k6 measures and collects a lot of metrics about the things your scripts do - the duration of different script iterations, how much data was sent and received, how many HTTP requests were made, the duration of those HTTP requests, and even how long did the TLS handshake of a particular HTTPS request take. To see a summary of these built-in metrics in the output, you can run a simple k6 test, e.g. `k6 run github.com/k6io/k6/samples/http_get.js`. More information about the different built-in metrics collected by k6 (and how some of them can be accessed from inside the scripts) is available in the docs [here](https://k6.io/docs/using-k6/metrics).
+By default k6 measures and collects a lot of metrics about the things your scripts do - the duration of different script iterations, how much data was sent and received, how many HTTP requests were made, the duration of those HTTP requests, and even how long did the TLS handshake of a particular HTTPS request take. To see a summary of these built-in metrics in the output, you can run a simple k6 test, e.g. `k6 run github.com/grafana/k6/samples/http_get.js`. More information about the different built-in metrics collected by k6 (and how some of them can be accessed from inside the scripts) is available in the docs [here](https://k6.io/docs/using-k6/metrics).
 
 k6 also allows the creation of user-defined `Counter`, `Gauge`, `Rate`, and `Trend` metrics. They can be used to more precisely track and measure a custom subset of the things that k6 measures by default, or anything else the user wants, for example tracking non-timing information that is returned from the remote system. You can find more information about them [here](https://k6.io/docs/using-k6/metrics#custom-metrics) and a description of their APIs [here](https://k6.io/docs/javascript-api/k6-metrics).
 
@@ -368,7 +368,7 @@ export default function () {
 }
 ```
 
-You can save the above example as a local file and run it, or you can also run it directly from the [github copy of the file](https://github.com/k6io/k6/blob/master/samples/thresholds_readme_example.js) with the `k6 run github.com/k6io/k6/samples/thresholds_readme_example.js` command. You can find (and contribute!) more k6 script examples here: [https://github.com/k6io/k6/tree/master/samples](https://github.com/k6io/k6/tree/master/samples)
+You can save the above example as a local file and run it, or you can also run it directly from the [github copy of the file](https://github.com/grafana/k6/blob/master/samples/thresholds_readme_example.js) with the `k6 run github.com/grafana/k6/samples/thresholds_readme_example.js` command. You can find (and contribute!) more k6 script examples here: [https://github.com/grafana/k6/tree/master/samples](https://github.com/grafana/k6/tree/master/samples)
 
 ### Outputs
 
@@ -392,4 +392,4 @@ To get help about usage, report bugs, suggest features and discuss k6 with other
 Contributing
 ------------
 
-If you want to contribute or help with the development of k6, start by reading [CONTRIBUTING.md](https://github.com/k6io/k6/blob/master/CONTRIBUTING.md). Before you start coding, especially when it comes to big changes and features, it might be a good idea to first discuss your plans and implementation details with the k6 maintainers. You can do this either in the [github issue](https://github.com/k6io/k6/issues) for the problem you're solving (create one if it doesn't exist) or in the `#developers` channel on [Slack](https://k6.io/slack).
+If you want to contribute or help with the development of k6, start by reading [CONTRIBUTING.md](CONTRIBUTING.md). Before you start coding, especially when it comes to big changes and features, it might be a good idea to first discuss your plans and implementation details with the k6 maintainers. You can do this either in the [github issue](https://github.com/grafana/k6/issues) for the problem you're solving (create one if it doesn't exist) or in the `#developers` channel on [Slack](https://k6.io/slack).
