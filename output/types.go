@@ -53,6 +53,8 @@ type Params struct {
 	ExecutionPlan  []lib.ExecutionStep
 }
 
+// TODO: make v2 with buffered channels?
+
 // An Output abstracts the process of funneling samples to an external storage
 // backend, such as a file or something like an InfluxDB instance.
 //

@@ -23,18 +23,16 @@ package core
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/metrics/engine"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/stats"
 )
@@ -54,28 +52,25 @@ type Engine struct {
 	// expects to be able to get information from the Engine and is initialized
 	// before the Init() call...
 
+	// TODO: completely remove the engine and use all of these separately, in a
+	// much more composable and testable manner
 	ExecutionScheduler lib.ExecutionScheduler
-	executionState     *lib.ExecutionState
+	MetricsEngine      *engine.MetricsEngine
+	OutputManager      *output.Manager
 
-	options        lib.Options
 	runtimeOptions lib.RuntimeOptions
-	outputs        []output.Output
+
+	ingester output.Output
 
 	logger   *logrus.Entry
 	stopOnce sync.Once
 	stopChan chan struct{}
 
-	Metrics     map[string]*stats.Metric // TODO: refactor, this doesn't need to be a map
-	MetricsLock sync.Mutex
-
-	registry *metrics.Registry
-	Samples  chan stats.SampleContainer
-
-	// These can be both top-level metrics or sub-metrics
-	metricsWithThresholds []*stats.Metric
+	Samples chan stats.SampleContainer
 
 	// Are thresholds tainted?
-	thresholdsTainted bool
+	thresholdsTaintedLock sync.Mutex
+	thresholdsTainted     bool
 }
 
 // NewEngine instantiates a new Engine, without doing any heavy initialization.
@@ -89,89 +84,32 @@ func NewEngine(
 
 	e := &Engine{
 		ExecutionScheduler: ex,
-		executionState:     ex.GetState(),
 
-		options:        opts,
 		runtimeOptions: rtOpts,
-		outputs:        outputs,
-		Metrics:        make(map[string]*stats.Metric),
 		Samples:        make(chan stats.SampleContainer, opts.MetricSamplesBufferSize.Int64),
 		stopChan:       make(chan struct{}),
 		logger:         logger.WithField("component", "engine"),
-		registry:       registry,
 	}
 
-	if !(e.runtimeOptions.NoSummary.Bool && e.runtimeOptions.NoThresholds.Bool) {
-		err := e.initSubMetricsAndThresholds()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return e, nil
-}
-
-func (e *Engine) getOrInitPotentialSubmetric(name string) (*stats.Metric, error) {
-	// TODO: replace with strings.Cut after Go 1.18
-	nameParts := strings.SplitN(name, "{", 2)
-
-	metric := e.registry.Get(nameParts[0])
-	if metric == nil {
-		return nil, fmt.Errorf("metric '%s' does not exist in the script", nameParts[0])
-	}
-	if len(nameParts) == 1 { // no sub-metric
-		return metric, nil
-	}
-
-	if nameParts[1][len(nameParts[1])-1] != '}' {
-		return nil, fmt.Errorf("missing ending bracket, sub-metric format needs to be 'metric{key:value}'")
-	}
-	sm, err := metric.AddSubmetric(nameParts[1][:len(nameParts[1])-1])
+	me, err := engine.NewMetricsEngine(registry, ex.GetState(), opts, rtOpts, logger)
 	if err != nil {
 		return nil, err
 	}
-	return sm.Metric, nil
-}
+	e.MetricsEngine = me
 
-func (e *Engine) initSubMetricsAndThresholds() error {
-	for metricName, thresholds := range e.options.Thresholds {
-		metric, err := e.getOrInitPotentialSubmetric(metricName)
-
-		if e.runtimeOptions.NoThresholds.Bool {
-			if err != nil {
-				e.logger.WithError(err).Warnf("Invalid metric '%s' in threshold definitions", metricName)
-			}
-			continue
-		}
-
-		if err != nil {
-			return fmt.Errorf("invalid metric '%s' in threshold definitions: %w", metricName, err)
-		}
-
-		metric.Thresholds = thresholds
-		e.metricsWithThresholds = append(e.metricsWithThresholds, metric)
-
-		// Mark the metric (and the parent metricq, if we're dealing with a
-		// submetric) as observed, so they are shown in the end-of-test summary,
-		// even if they don't have any metric samples during the test run
-		metric.Observed = true
-		e.Metrics[metric.Name] = metric
-		if metric.Sub != nil {
-			metric.Sub.Metric.Observed = true
-			e.Metrics[metric.Sub.Metric.Name] = metric.Sub.Metric
-		}
+	if !(rtOpts.NoSummary.Bool && rtOpts.NoThresholds.Bool) {
+		e.ingester = me.GetIngester()
+		outputs = append(outputs, e.ingester)
 	}
 
-	// TODO: refactor out of here when https://github.com/grafana/k6/issues/1321
-	// lands and there is a better way to enable a metric with tag
-	if e.options.SystemTags.Has(stats.TagExpectedResponse) {
-		_, err := e.getOrInitPotentialSubmetric("http_req_duration{expected_response:true}")
+	e.OutputManager = output.NewManager(outputs, logger, func(err error) {
 		if err != nil {
-			return err // shouldn't happen, but ¯\_(ツ)_/¯
+			logger.WithError(err).Error("Received error to stop from output")
 		}
-	}
+		e.Stop()
+	})
 
-	return nil
+	return e, nil
 }
 
 // Init is used to initialize the execution scheduler and all metrics processing
@@ -253,27 +191,27 @@ func (e *Engine) startBackgroundProcesses(
 				var serr errext.Exception
 				switch {
 				case errors.As(err, &serr):
-					e.setRunStatus(lib.RunStatusAbortedScriptError)
+					e.OutputManager.SetRunStatus(lib.RunStatusAbortedScriptError)
 				case common.IsInterruptError(err):
-					e.setRunStatus(lib.RunStatusAbortedUser)
+					e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
 				default:
-					e.setRunStatus(lib.RunStatusAbortedSystem)
+					e.OutputManager.SetRunStatus(lib.RunStatusAbortedSystem)
 				}
 			} else {
 				e.logger.Debug("run: execution scheduler terminated")
-				e.setRunStatus(lib.RunStatusFinished)
+				e.OutputManager.SetRunStatus(lib.RunStatusFinished)
 			}
 		case <-runCtx.Done():
 			e.logger.Debug("run: context expired; exiting...")
-			e.setRunStatus(lib.RunStatusAbortedUser)
+			e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
 		case <-e.stopChan:
 			runSubCancel()
 			e.logger.Debug("run: stopped by user; exiting...")
-			e.setRunStatus(lib.RunStatusAbortedUser)
+			e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
 		case <-thresholdAbortChan:
 			e.logger.Debug("run: stopped by thresholds; exiting...")
 			runSubCancel()
-			e.setRunStatus(lib.RunStatusAbortedThreshold)
+			e.OutputManager.SetRunStatus(lib.RunStatusAbortedThreshold)
 		}
 	}()
 
@@ -289,7 +227,11 @@ func (e *Engine) startBackgroundProcesses(
 			for {
 				select {
 				case <-ticker.C:
-					if e.processThresholds() {
+					thresholdsTainted, shouldAbort := e.MetricsEngine.ProcessThresholds()
+					e.thresholdsTaintedLock.Lock()
+					e.thresholdsTainted = thresholdsTainted
+					e.thresholdsTaintedLock.Unlock()
+					if shouldAbort {
 						close(thresholdAbortChan)
 						return
 					}
@@ -315,10 +257,14 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 		for sc := range e.Samples {
 			sampleContainers = append(sampleContainers, sc)
 		}
-		e.processSamples(sampleContainers)
+		e.OutputManager.AddMetricSamples(sampleContainers)
 
 		if !e.runtimeOptions.NoThresholds.Bool {
-			e.processThresholds() // Process the thresholds one final time
+			// Process the thresholds one final time
+			thresholdsTainted, _ := e.MetricsEngine.ProcessThresholds()
+			e.thresholdsTaintedLock.Lock()
+			e.thresholdsTainted = thresholdsTainted
+			e.thresholdsTaintedLock.Unlock()
 		}
 	}()
 
@@ -328,7 +274,7 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 	e.logger.Debug("Metrics processing started...")
 	processSamples := func() {
 		if len(sampleContainers) > 0 {
-			e.processSamples(sampleContainers)
+			e.OutputManager.AddMetricSamples(sampleContainers)
 			// Make the new container with the same size as the previous
 			// one, assuming that we produce roughly the same amount of
 			// metrics data between ticks...
@@ -352,7 +298,12 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 			e.logger.Debug("Processing metrics and thresholds after the test run has ended...")
 			processSamples()
 			if !e.runtimeOptions.NoThresholds.Bool {
-				e.processThresholds()
+				// Ensure the ingester flushes any buffered metrics
+				_ = e.ingester.Stop()
+				thresholdsTainted, _ := e.MetricsEngine.ProcessThresholds()
+				e.thresholdsTaintedLock.Lock()
+				e.thresholdsTainted = thresholdsTainted
+				e.thresholdsTaintedLock.Unlock()
 			}
 			processMetricsAfterRun <- struct{}{}
 
@@ -364,15 +315,9 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 	}
 }
 
-func (e *Engine) setRunStatus(status lib.RunStatus) {
-	for _, out := range e.outputs {
-		if statUpdOut, ok := out.(output.WithRunStatusUpdates); ok {
-			statUpdOut.SetRunStatus(status)
-		}
-	}
-}
-
 func (e *Engine) IsTainted() bool {
+	e.thresholdsTaintedLock.Lock()
+	defer e.thresholdsTaintedLock.Unlock()
 	return e.thresholdsTainted
 }
 
@@ -390,91 +335,5 @@ func (e *Engine) IsStopped() bool {
 		return true
 	default:
 		return false
-	}
-}
-
-func (e *Engine) processThresholds() (shouldAbort bool) {
-	e.MetricsLock.Lock()
-	defer e.MetricsLock.Unlock()
-
-	t := e.executionState.GetCurrentTestRunDuration()
-
-	e.thresholdsTainted = false
-	for _, m := range e.metricsWithThresholds {
-		if len(m.Thresholds.Thresholds) == 0 {
-			continue
-		}
-		m.Tainted = null.BoolFrom(false)
-
-		e.logger.WithField("m", m.Name).Debug("running thresholds")
-		succ, err := m.Thresholds.Run(m.Sink, t)
-		if err != nil {
-			e.logger.WithField("m", m.Name).WithError(err).Error("Threshold error")
-			continue
-		}
-		if !succ {
-			e.logger.WithField("m", m.Name).Debug("Thresholds failed")
-			m.Tainted = null.BoolFrom(true)
-			e.thresholdsTainted = true
-			if m.Thresholds.Abort {
-				shouldAbort = true
-			}
-		}
-	}
-
-	return shouldAbort
-}
-
-func (e *Engine) processMetricsInSamples(sampleContainers []stats.SampleContainer) {
-	for _, sampleContainer := range sampleContainers {
-		samples := sampleContainer.GetSamples()
-
-		if len(samples) == 0 {
-			continue
-		}
-
-		for _, sample := range samples {
-			m := sample.Metric // this should have come from the Registry, no need to look it up
-			if !m.Observed {
-				// But we need to add it here, so we can show data in the
-				// end-of-test summary for this metric
-				e.Metrics[m.Name] = m
-				m.Observed = true
-			}
-			m.Sink.Add(sample) // add its value to its own sink
-
-			// and also add it to any submetrics that match
-			for _, sm := range m.Submetrics {
-				if !sample.Tags.Contains(sm.Tags) {
-					continue
-				}
-				if !sm.Metric.Observed {
-					// But we need to add it here, so we can show data in the
-					// end-of-test summary for this metric
-					e.Metrics[sm.Metric.Name] = sm.Metric
-					sm.Metric.Observed = true
-				}
-				sm.Metric.Sink.Add(sample)
-			}
-		}
-	}
-}
-
-func (e *Engine) processSamples(sampleContainers []stats.SampleContainer) {
-	if len(sampleContainers) == 0 {
-		return
-	}
-
-	// TODO: optimize this...
-	e.MetricsLock.Lock()
-	defer e.MetricsLock.Unlock()
-
-	// TODO: run this and the below code in goroutines?
-	if !(e.runtimeOptions.NoSummary.Bool && e.runtimeOptions.NoThresholds.Bool) {
-		e.processMetricsInSamples(sampleContainers)
-	}
-
-	for _, out := range e.outputs {
-		out.AddMetricSamples(sampleContainers)
 	}
 }

@@ -314,6 +314,8 @@ func TestSetupDataIsolation(t *testing.T) {
 		execScheduler, options, lib.RuntimeOptions{}, []output.Output{mockOutput}, testutils.NewLogger(t), registry,
 	)
 	require.NoError(t, err)
+	require.NoError(t, engine.OutputManager.StartOutputs())
+	defer engine.OutputManager.StopOutputs()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	run, wait, err := engine.Init(ctx, ctx)
