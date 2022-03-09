@@ -29,13 +29,19 @@ type fakeSession struct {
 
 // Execute implements the cdp.Executor interface to record calls made to it and
 // allow assertions in tests.
-func (s *fakeSession) Execute(ctx context.Context, method string,
-	params easyjson.Marshaler, res easyjson.Unmarshaler) error {
+func (s *fakeSession) Execute(
+	ctx context.Context,
+	method string,
+	params easyjson.Marshaler,
+	res easyjson.Unmarshaler,
+) error {
 	s.cdpCalls = append(s.cdpCalls, method)
 	return nil
 }
 
 func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager, *fakeSession) {
+	t.Helper()
+
 	ctx := context.Background()
 
 	root, err := k6lib.NewGroup("", nil)

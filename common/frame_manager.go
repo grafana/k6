@@ -70,20 +70,20 @@ var frameManagerID int64
 // NewFrameManager creates a new HTML document frame manager.
 func NewFrameManager(
 	ctx context.Context,
-	session session,
-	page *Page,
-	timeoutSettings *TimeoutSettings,
-	logger *Logger,
+	s session,
+	p *Page,
+	ts *TimeoutSettings,
+	l *Logger,
 ) *FrameManager {
 	m := &FrameManager{
 		ctx:              ctx,
-		session:          session,
-		page:             page,
-		timeoutSettings:  timeoutSettings,
+		session:          s,
+		page:             p,
+		timeoutSettings:  ts,
 		frames:           make(map[cdp.FrameID]*Frame),
 		inflightRequests: make(map[network.RequestID]bool),
 		barriers:         make([]*Barrier, 0),
-		logger:           logger,
+		logger:           l,
 		id:               atomic.AddInt64(&frameManagerID, 1),
 	}
 

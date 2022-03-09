@@ -85,35 +85,36 @@ type FrameSession struct {
 	serializer *logrus.Logger
 }
 
+// NewFrameSession initializes and returns a new FrameSession.
+//nolint:funlen
 func NewFrameSession(
 	ctx context.Context,
-	session session,
-	page *Page,
+	s session,
+	p *Page,
 	parent *FrameSession,
-	targetID target.ID,
-	logger *Logger,
+	tid target.ID,
+	l *Logger,
 ) (_ *FrameSession, err error) {
-	logger.Debugf("NewFrameSession", "sid:%v tid:%v", session.SessionID(), targetID)
+	l.Debugf("NewFrameSession", "sid:%v tid:%v", s.SessionID(), tid)
 
 	fs := FrameSession{
 		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
-		session:              session,
-		page:                 page,
+		session:              s,
+		page:                 p,
 		parent:               parent,
-		manager:              page.frameManager,
-		networkManager:       nil,
-		targetID:             targetID,
+		manager:              p.frameManager,
+		targetID:             tid,
 		initTime:             &cdp.MonotonicTime{},
 		contextIDToContextMu: sync.Mutex{},
 		contextIDToContext:   make(map[cdpruntime.ExecutionContextID]*ExecutionContext),
 		isolatedWorlds:       make(map[string]bool),
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
-		logger:               logger,
+		logger:               l,
 		serializer: &logrus.Logger{
-			Out:       logger.log.Out,
-			Level:     logger.log.Level,
-			Formatter: &consoleLogFormatter{logger.log.Formatter},
+			Out:       l.log.Out,
+			Level:     l.log.Level,
+			Formatter: &consoleLogFormatter{l.log.Formatter},
 		},
 	}
 
@@ -121,53 +122,53 @@ func NewFrameSession(
 	if fs.parent != nil {
 		parentNM = fs.parent.networkManager
 	}
-	fs.networkManager, err = NewNetworkManager(ctx, session, fs.manager, parentNM)
+	fs.networkManager, err = NewNetworkManager(ctx, s, fs.manager, parentNM)
 	if err != nil {
-		logger.Debugf("NewFrameSession:NewNetworkManager", "sid:%v tid:%v err:%v",
-			session.SessionID(), targetID, err)
+		l.Debugf("NewFrameSession:NewNetworkManager", "sid:%v tid:%v err:%v",
+			s.SessionID(), tid, err)
 		return nil, err
 	}
 
 	action := browser.GetWindowForTarget().WithTargetID(fs.targetID)
 	if fs.windowID, _, err = action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		logger.Debugf(
+		l.Debugf(
 			"NewFrameSession:GetWindowForTarget",
 			"sid:%v tid:%v err:%v",
-			session.SessionID(), targetID, err)
+			s.SessionID(), tid, err)
 
 		return nil, fmt.Errorf(`unable to get window ID: %w`, err)
 	}
 
 	fs.initEvents()
 	if err = fs.initFrameTree(); err != nil {
-		logger.Debugf(
+		l.Debugf(
 			"NewFrameSession:initFrameTree",
 			"sid:%v tid:%v err:%v",
-			session.SessionID(), targetID, err)
+			s.SessionID(), tid, err)
 
 		return nil, err
 	}
 	if err = fs.initIsolatedWorld(utilityWorldName); err != nil {
-		logger.Debugf(
+		l.Debugf(
 			"NewFrameSession:initIsolatedWorld",
 			"sid:%v tid:%v err:%v",
-			session.SessionID(), targetID, err)
+			s.SessionID(), tid, err)
 
 		return nil, err
 	}
 	if err = fs.initOptions(); err != nil {
-		logger.Debugf(
+		l.Debugf(
 			"NewFrameSession:initOptions",
 			"sid:%v tid:%v err:%v",
-			session.SessionID(), targetID, err)
+			s.SessionID(), tid, err)
 
 		return nil, err
 	}
 	if err = fs.initDomains(); err != nil {
-		logger.Debugf(
+		l.Debugf(
 			"NewFrameSession:initDomains",
 			"sid:%v tid:%v err:%v",
-			session.SessionID(), targetID, err)
+			s.SessionID(), tid, err)
 
 		return nil, err
 	}
@@ -918,7 +919,7 @@ func (fs *FrameSession) onTargetCrashed(event *inspector.EventTargetCrashed) {
 	fs.logger.Debugf("FrameSession:onTargetCrashed", "sid:%v tid:%v", fs.session.SessionID(), fs.targetID)
 
 	// TODO:?
-	fs.session.(*Session).markAsCrashed()
+	fs.session.(*Session).markAsCrashed() //nolint:forcetypeassert
 	fs.page.didCrash()
 }
 
@@ -1003,7 +1004,11 @@ func (fs *FrameSession) updateOffline(initial bool) {
 }
 
 func (fs *FrameSession) updateRequestInterception(enable bool) error {
-	fs.logger.Debugf("NewFrameSession:updateRequestInterception", "sid:%v tid:%v on:%v", fs.session.SessionID(), fs.targetID, enable)
+	fs.logger.Debugf("NewFrameSession:updateRequestInterception",
+		"sid:%v tid:%v on:%v",
+		fs.session.SessionID(),
+		fs.targetID, enable)
+
 	return fs.networkManager.setRequestInterception(enable || fs.page.hasRoutes())
 }
 

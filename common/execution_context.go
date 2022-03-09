@@ -79,29 +79,28 @@ type ExecutionContext struct {
 // NewExecutionContext creates a new JS execution context.
 func NewExecutionContext(
 	ctx context.Context,
-	session session,
-	frame *Frame,
+	s session,
+	f *Frame,
 	id runtime.ExecutionContextID,
-	logger *Logger,
+	l *Logger,
 ) *ExecutionContext {
 	e := &ExecutionContext{
 		ctx:            ctx,
-		session:        session,
-		frame:          frame,
+		session:        s,
+		frame:          f,
 		id:             id,
 		injectedScript: nil,
-		logger:         logger,
+		logger:         l,
 	}
-
-	if session != nil {
-		e.sid = session.SessionID()
-		e.stid = cdp.FrameID(session.TargetID())
+	if s != nil {
+		e.sid = s.SessionID()
+		e.stid = cdp.FrameID(s.TargetID())
 	}
-	if frame != nil {
-		e.fid = cdp.FrameID(frame.ID())
-		e.furl = frame.URL()
+	if f != nil {
+		e.fid = cdp.FrameID(f.ID())
+		e.furl = f.URL()
 	}
-	logger.Debugf(
+	l.Debugf(
 		"NewExecutionContext",
 		"sid:%s stid:%s fid:%s ectxid:%d furl:%q",
 		e.sid, e.stid, e.fid, id, e.furl)

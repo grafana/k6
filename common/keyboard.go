@@ -55,10 +55,10 @@ type Keyboard struct {
 }
 
 // NewKeyboard returns a new keyboard with a "us" layout.
-func NewKeyboard(ctx context.Context, session session) *Keyboard {
+func NewKeyboard(ctx context.Context, s session) *Keyboard {
 	return &Keyboard{
 		ctx:         ctx,
-		session:     session,
+		session:     s,
 		pressedKeys: make(map[int64]bool),
 		layoutName:  "us",
 		layout:      keyboardlayout.GetKeyboardLayout("us"),

@@ -92,27 +92,27 @@ type Page struct {
 // NewPage creates a new browser page context.
 func NewPage(
 	ctx context.Context,
-	session session,
-	browserCtx *BrowserContext,
-	targetID target.ID,
+	s session,
+	bctx *BrowserContext,
+	tid target.ID,
 	opener *Page,
-	backgroundPage bool,
+	bp bool,
 	logger *Logger,
 ) (*Page, error) {
 	p := Page{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
-		session:          session,
-		browserCtx:       browserCtx,
-		targetID:         targetID,
+		session:          s,
+		browserCtx:       bctx,
+		targetID:         tid,
 		opener:           opener,
-		backgroundPage:   backgroundPage,
+		backgroundPage:   bp,
 		mediaType:        MediaTypeScreen,
-		colorScheme:      browserCtx.opts.ColorScheme,
-		reducedMotion:    browserCtx.opts.ReducedMotion,
-		extraHTTPHeaders: browserCtx.opts.ExtraHTTPHeaders,
-		timeoutSettings:  NewTimeoutSettings(browserCtx.timeoutSettings),
-		Keyboard:         NewKeyboard(ctx, session),
+		colorScheme:      bctx.opts.ColorScheme,
+		reducedMotion:    bctx.opts.ReducedMotion,
+		extraHTTPHeaders: bctx.opts.ExtraHTTPHeaders,
+		timeoutSettings:  NewTimeoutSettings(bctx.timeoutSettings),
+		Keyboard:         NewKeyboard(ctx, s),
 		jsEnabled:        true,
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
@@ -121,26 +121,26 @@ func NewPage(
 	}
 
 	p.logger.Debugf("Page:NewPage", "sid:%v tid:%v backgroundPage:%t",
-		p.sessionID(), targetID, backgroundPage)
+		p.sessionID(), tid, bp)
 
 	// We need to init viewport and screen size before initializing the main frame session,
 	// as that's where the emulation is activated.
-	if browserCtx.opts.Viewport != nil {
-		p.emulatedSize = NewEmulatedSize(browserCtx.opts.Viewport, browserCtx.opts.Screen)
+	if bctx.opts.Viewport != nil {
+		p.emulatedSize = NewEmulatedSize(bctx.opts.Viewport, bctx.opts.Screen)
 	}
 
 	var err error
-	p.frameManager = NewFrameManager(ctx, session, &p, browserCtx.timeoutSettings, p.logger)
-	p.mainFrameSession, err = NewFrameSession(ctx, session, &p, nil, targetID, p.logger)
+	p.frameManager = NewFrameManager(ctx, s, &p, bctx.timeoutSettings, p.logger)
+	p.mainFrameSession, err = NewFrameSession(ctx, s, &p, nil, tid, p.logger)
 	if err != nil {
 		p.logger.Debugf("Page:NewPage:NewFrameSession:return", "sid:%v tid:%v err:%v",
-			p.sessionID(), targetID, err)
+			p.sessionID(), tid, err)
 
 		return nil, err
 	}
-	p.frameSessions[cdp.FrameID(targetID)] = p.mainFrameSession
-	p.Mouse = NewMouse(ctx, session, p.frameManager.MainFrame(), browserCtx.timeoutSettings, p.Keyboard)
-	p.Touchscreen = NewTouchscreen(ctx, session, p.Keyboard)
+	p.frameSessions[cdp.FrameID(tid)] = p.mainFrameSession
+	p.Mouse = NewMouse(ctx, s, p.frameManager.MainFrame(), bctx.timeoutSettings, p.Keyboard)
+	p.Touchscreen = NewTouchscreen(ctx, s, p.Keyboard)
 
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {

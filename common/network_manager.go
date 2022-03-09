@@ -73,7 +73,7 @@ type NetworkManager struct {
 
 // NewNetworkManager creates a new network manager.
 func NewNetworkManager(
-	ctx context.Context, session session, manager *FrameManager, parent *NetworkManager,
+	ctx context.Context, s session, fm *FrameManager, parent *NetworkManager,
 ) (*NetworkManager, error) {
 	state := k6lib.GetState(ctx)
 
@@ -87,20 +87,15 @@ func NewNetworkManager(
 		ctx:              ctx,
 		// TODO: Pass an internal logger instead of basing it on k6's logger?
 		// See https://github.com/grafana/xk6-browser/issues/54
-		logger:                         NewLogger(ctx, state.Logger, false, nil),
-		session:                        session,
-		parent:                         parent,
-		frameManager:                   manager,
-		resolver:                       resolver,
-		credentials:                    nil,
-		reqIDToRequest:                 make(map[network.RequestID]*Request),
-		reqsMu:                         sync.RWMutex{},
-		attemptedAuth:                  make(map[fetch.RequestID]bool),
-		extraHTTPHeaders:               make(map[string]string),
-		offline:                        false,
-		userCacheDisabled:              false,
-		userReqInterceptionEnabled:     false,
-		protocolReqInterceptionEnabled: false,
+		logger:           NewLogger(ctx, state.Logger, false, nil),
+		session:          s,
+		parent:           parent,
+		frameManager:     fm,
+		resolver:         resolver,
+		reqIDToRequest:   make(map[network.RequestID]*Request),
+		reqsMu:           sync.RWMutex{},
+		attemptedAuth:    make(map[fetch.RequestID]bool),
+		extraHTTPHeaders: make(map[string]string),
 	}
 	m.initEvents()
 	if err := m.initDomains(); err != nil {

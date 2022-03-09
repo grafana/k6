@@ -38,7 +38,6 @@ import (
 var _ EventEmitter = &Worker{}
 var _ api.Worker = &Worker{}
 
-// Worker represents a WebWorker.
 type Worker struct {
 	BaseEventEmitter
 
@@ -50,17 +49,18 @@ type Worker struct {
 }
 
 // NewWorker creates a new page viewport.
-func NewWorker(ctx context.Context, session session, id target.ID, url string) (*Worker, error) {
+func NewWorker(ctx context.Context, s session, id target.ID, url string) (*Worker, error) {
 	w := Worker{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
-		session:          session,
+		session:          s,
 		targetID:         id,
 		url:              url,
 	}
 	if err := w.initEvents(); err != nil {
 		return nil, err
 	}
+
 	return &w, nil
 }
 
