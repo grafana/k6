@@ -362,9 +362,9 @@ type ConnectedSampleContainer interface {
 // implementation that will be used when there's no need for
 // extra information
 type ConnectedSamples struct {
-	Samples []Sample
-	Tags    *SampleTags
 	Time    time.Time
+	Tags    *SampleTags
+	Samples []Sample
 }
 
 // GetSamples implements the SampleContainer and ConnectedSampleContainer
@@ -440,14 +440,14 @@ func PushIfNotDone(ctx context.Context, output chan<- SampleContainer, sample Sa
 
 // A Metric defines the shape of a set of data.
 type Metric struct {
-	Name       string       `json:"name"`
-	Type       MetricType   `json:"type"`
-	Contains   ValueType    `json:"contains"`
-	Tainted    null.Bool    `json:"tainted"`
-	Thresholds Thresholds   `json:"thresholds"`
-	Submetrics []*Submetric `json:"submetrics"`
 	Sub        Submetric    `json:"sub,omitempty"`
 	Sink       Sink         `json:"-"`
+	Name       string       `json:"name"`
+	Submetrics []*Submetric `json:"submetrics"`
+	Thresholds Thresholds   `json:"thresholds"`
+	Contains   ValueType    `json:"contains"`
+	Type       MetricType   `json:"type"`
+	Tainted    null.Bool    `json:"tainted"`
 }
 
 // Sample samples the metric at the given time, with the provided tags and value
@@ -483,11 +483,11 @@ func New(name string, typ MetricType, t ...ValueType) *Metric {
 
 // A Submetric represents a filtered dataset based on a parent metric.
 type Submetric struct {
+	Tags   *SampleTags `json:"tags"`
+	Metric *Metric     `json:"-"`
 	Name   string      `json:"name"`
 	Parent string      `json:"parent"`
 	Suffix string      `json:"suffix"`
-	Tags   *SampleTags `json:"tags"`
-	Metric *Metric     `json:"-"`
 }
 
 // Creates a submetric from a name.

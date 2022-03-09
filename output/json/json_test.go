@@ -47,7 +47,7 @@ func getValidator(t *testing.T, expected []string) func(io.Reader) {
 				t.Errorf("Read unexpected line number %d, expected only %d entries", i, len(expected))
 				continue
 			}
-			assert.Equal(t, expected[i-1], string(s.Bytes()))
+			assert.JSONEq(t, expected[i-1], string(s.Bytes()))
 		}
 		assert.NoError(t, s.Err())
 		assert.Equal(t, len(expected), i)
