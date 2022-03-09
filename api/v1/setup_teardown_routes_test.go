@@ -159,9 +159,9 @@ func TestSetupData(t *testing.T) {
 				SetupTimeout:    types.NullDurationFrom(5 * time.Second),
 				TeardownTimeout: types.NullDurationFrom(5 * time.Second),
 			})
-			execScheduler, err := local.NewExecutionScheduler(runner, logger)
+			execScheduler, err := local.NewExecutionScheduler(runner, builtinMetrics, logger)
 			require.NoError(t, err)
-			engine, err := core.NewEngine(execScheduler, runner.GetOptions(), lib.RuntimeOptions{}, nil, logger, registry, builtinMetrics)
+			engine, err := core.NewEngine(execScheduler, runner.GetOptions(), lib.RuntimeOptions{}, nil, logger, registry)
 			require.NoError(t, err)
 
 			globalCtx, globalCancel := context.WithCancel(context.Background())

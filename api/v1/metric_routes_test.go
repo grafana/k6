@@ -45,11 +45,11 @@ func TestGetMetrics(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
-	require.NoError(t, err)
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry, builtinMetrics)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, builtinMetrics, logger)
+	require.NoError(t, err)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry)
 	require.NoError(t, err)
 
 	engine.Metrics = map[string]*stats.Metric{
@@ -101,11 +101,11 @@ func TestGetMetric(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
-	require.NoError(t, err)
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry, builtinMetrics)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, builtinMetrics, logger)
+	require.NoError(t, err)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry)
 	require.NoError(t, err)
 
 	engine.Metrics = map[string]*stats.Metric{

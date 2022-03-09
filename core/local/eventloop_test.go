@@ -48,7 +48,7 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 	defer cancel()
 
 	errCh := make(chan error, 1)
-	go func() { errCh <- execScheduler.Run(ctx, ctx, samples, builtinMetrics) }()
+	go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
 
 	select {
 	case err := <-errCh:

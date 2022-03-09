@@ -49,11 +49,11 @@ func TestGetGroups(t *testing.T) {
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Group: g0}, logger)
-	require.NoError(t, err)
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry, builtinMetrics)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Group: g0}, builtinMetrics, logger)
+	require.NoError(t, err)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry)
 	require.NoError(t, err)
 
 	t.Run("list", func(t *testing.T) {

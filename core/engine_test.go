@@ -78,11 +78,11 @@ func newTestEngineWithRegistry( //nolint:golint
 
 	require.NoError(t, runner.SetOptions(newOpts))
 
-	execScheduler, err := local.NewExecutionScheduler(runner, logger)
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	execScheduler, err := local.NewExecutionScheduler(runner, builtinMetrics, logger)
 	require.NoError(t, err)
 
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	engine, err = NewEngine(execScheduler, opts, lib.RuntimeOptions{}, outputs, logger, registry, builtinMetrics)
+	engine, err = NewEngine(execScheduler, opts, lib.RuntimeOptions{}, outputs, logger, registry)
 	require.NoError(t, err)
 
 	run, waitFn, err := engine.Init(globalCtx, runCtx)
@@ -897,9 +897,9 @@ func TestVuInitException(t *testing.T) {
 	require.Empty(t, opts.Validate())
 	require.NoError(t, runner.SetOptions(opts))
 
-	execScheduler, err := local.NewExecutionScheduler(runner, logger)
+	execScheduler, err := local.NewExecutionScheduler(runner, builtinMetrics, logger)
 	require.NoError(t, err)
-	engine, err := NewEngine(execScheduler, opts, lib.RuntimeOptions{}, nil, logger, registry, builtinMetrics)
+	engine, err := NewEngine(execScheduler, opts, lib.RuntimeOptions{}, nil, logger, registry)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1285,9 +1285,9 @@ func TestActiveVUsCount(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, opts.Validate())
 	require.NoError(t, runner.SetOptions(opts))
-	execScheduler, err := local.NewExecutionScheduler(runner, logger)
+	execScheduler, err := local.NewExecutionScheduler(runner, builtinMetrics, logger)
 	require.NoError(t, err)
-	engine, err := NewEngine(execScheduler, opts, rtOpts, []output.Output{mockOutput}, logger, registry, builtinMetrics)
+	engine, err := NewEngine(execScheduler, opts, rtOpts, []output.Output{mockOutput}, logger, registry)
 	require.NoError(t, err)
 	run, waitFn, err := engine.Init(ctx, ctx) // no need for 2 different contexts
 	require.NoError(t, err)

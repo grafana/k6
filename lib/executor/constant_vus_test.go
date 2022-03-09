@@ -47,7 +47,7 @@ func TestConstantVUsRun(t *testing.T) {
 	var result sync.Map
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 50)
+	es := lib.NewExecutionState(lib.Options{}, et, nil, 10, 50)
 	ctx, cancel, executor, _ := setupExecutor(
 		t, getTestConstantVUsConfig(), es,
 		simpleRunner(func(ctx context.Context, state *lib.State) error {
@@ -63,7 +63,7 @@ func TestConstantVUsRun(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	err = executor.Run(ctx, nil, nil)
+	err = executor.Run(ctx, nil)
 	require.NoError(t, err)
 
 	var totalIters uint64
