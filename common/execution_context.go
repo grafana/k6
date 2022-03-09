@@ -64,7 +64,7 @@ func (ea evalOptions) String() string {
 type ExecutionContext struct {
 	ctx            context.Context
 	logger         *Logger
-	session        *Session
+	session        session
 	frame          *Frame
 	id             runtime.ExecutionContextID
 	injectedScript api.JSHandle
@@ -78,27 +78,25 @@ type ExecutionContext struct {
 
 // NewExecutionContext creates a new JS execution context.
 func NewExecutionContext(
-	ctx context.Context, session *Session, frame *Frame,
-	id runtime.ExecutionContextID, logger *Logger,
+	ctx context.Context, s session, f *Frame, id runtime.ExecutionContextID, l *Logger,
 ) *ExecutionContext {
 	e := &ExecutionContext{
 		ctx:            ctx,
-		session:        session,
-		frame:          frame,
+		session:        s,
+		frame:          f,
 		id:             id,
 		injectedScript: nil,
-		logger:         logger,
+		logger:         l,
 	}
-
-	if session != nil {
-		e.sid = session.id
-		e.stid = cdp.FrameID(session.targetID)
+	if s != nil {
+		e.sid = s.ID()
+		e.stid = cdp.FrameID(s.TargetID())
 	}
-	if frame != nil {
-		e.fid = cdp.FrameID(frame.ID())
-		e.furl = frame.URL()
+	if f != nil {
+		e.fid = cdp.FrameID(f.ID())
+		e.furl = f.URL()
 	}
-	logger.Debugf(
+	l.Debugf(
 		"NewExecutionContext",
 		"sid:%s stid:%s fid:%s ectxid:%d furl:%q",
 		e.sid, e.stid, e.fid, id, e.furl)
@@ -139,7 +137,7 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 		efid = cdp.FrameID(eh.frame.ID())
 	}
 	if eh.session != nil {
-		esid = eh.session.id
+		esid = eh.session.ID()
 	}
 	e.logger.Debugf(
 		"ExecutionContext:adoptElementHandle",

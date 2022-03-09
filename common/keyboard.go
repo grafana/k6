@@ -46,7 +46,7 @@ const (
 // Each Page has a publicly accessible Keyboard.
 type Keyboard struct {
 	ctx     context.Context
-	session *Session
+	session session
 
 	modifiers   int64          // like shift, alt, ctrl, ...
 	pressedKeys map[int64]bool // tracks keys through down() and up()
@@ -55,10 +55,10 @@ type Keyboard struct {
 }
 
 // NewKeyboard returns a new keyboard with a "us" layout.
-func NewKeyboard(ctx context.Context, session *Session) *Keyboard {
+func NewKeyboard(ctx context.Context, s session) *Keyboard {
 	return &Keyboard{
 		ctx:         ctx,
-		session:     session,
+		session:     s,
 		pressedKeys: make(map[int64]bool),
 		layoutName:  "us",
 		layout:      keyboardlayout.GetKeyboardLayout("us"),

@@ -39,7 +39,7 @@ var _ api.JSHandle = &BaseJSHandle{}
 type BaseJSHandle struct {
 	ctx          context.Context
 	logger       *Logger
-	session      *Session
+	session      session
 	execCtx      *ExecutionContext
 	remoteObject *runtime.RemoteObject
 	disposed     bool
@@ -47,22 +47,26 @@ type BaseJSHandle struct {
 
 // NewJSHandle creates a new JS handle referencing a remote object.
 func NewJSHandle(
-	ctx context.Context, session *Session, execCtx *ExecutionContext,
-	frame *Frame, remoteObject *runtime.RemoteObject, logger *Logger,
+	ctx context.Context,
+	s session,
+	ectx *ExecutionContext,
+	f *Frame,
+	ro *runtime.RemoteObject,
+	l *Logger,
 ) api.JSHandle {
 	eh := &BaseJSHandle{
 		ctx:          ctx,
-		session:      session,
-		execCtx:      execCtx,
-		remoteObject: remoteObject,
+		session:      s,
+		execCtx:      ectx,
+		remoteObject: ro,
 		disposed:     false,
-		logger:       logger,
+		logger:       l,
 	}
 
-	if remoteObject.Subtype == "node" && execCtx.Frame() != nil {
+	if ro.Subtype == "node" && ectx.Frame() != nil {
 		return &ElementHandle{
 			BaseJSHandle: *eh,
-			frame:        frame,
+			frame:        f,
 		}
 	}
 

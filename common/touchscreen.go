@@ -40,17 +40,17 @@ type Touchscreen struct {
 	BaseEventEmitter
 
 	ctx      context.Context
-	session  *Session
+	session  session
 	keyboard *Keyboard
 }
 
-func NewTouchscreen(ctx context.Context, session *Session, keyboard *Keyboard) *Touchscreen {
-	t := Touchscreen{
+// NewTouchscreen returns a new TouchScreen.
+func NewTouchscreen(ctx context.Context, s session, k *Keyboard) *Touchscreen {
+	return &Touchscreen{
 		ctx:      ctx,
-		session:  session,
-		keyboard: keyboard,
+		session:  s,
+		keyboard: k,
 	}
-	return &t
 }
 
 func (t *Touchscreen) tap(x float64, y float64) error {

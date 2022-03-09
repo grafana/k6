@@ -68,9 +68,14 @@ func NewSession(ctx context.Context, conn *Connection, id target.SessionID, tid 
 	return &s
 }
 
-// ID returns the session ID.
+// ID returns session ID.
 func (s *Session) ID() target.SessionID {
 	return s.id
+}
+
+// TargetID returns session's target ID.
+func (s *Session) TargetID() target.ID {
+	return s.targetID
 }
 
 func (s *Session) close() {
@@ -225,4 +230,9 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 		Params:    buf,
 	}
 	return s.conn.send(contextWithDoneChan(ctx, s.done), msg, nil, res)
+}
+
+// Done returns a channel that is closed when this session is closed.
+func (s *Session) Done() <-chan struct{} {
+	return s.done
 }

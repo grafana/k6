@@ -44,6 +44,26 @@ const wsWriteBufferSize = 1 << 20
 var _ EventEmitter = &Connection{}
 var _ cdp.Executor = &Connection{}
 
+type executorEmitter interface {
+	cdp.Executor
+	EventEmitter
+}
+
+type connection interface {
+	executorEmitter
+	Close(...goja.Value)
+	getSession(target.SessionID) *Session
+}
+
+type session interface {
+	cdp.Executor
+	executorEmitter
+	ExecuteWithoutExpectationOnReply(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error
+	ID() target.SessionID
+	TargetID() target.ID
+	Done() <-chan struct{}
+}
+
 // Action is the general interface of an CDP action.
 type Action interface {
 	Do(context.Context) error

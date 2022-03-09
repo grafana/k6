@@ -45,26 +45,28 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		// newPageInContext will return this page by searching it by its targetID in the wait event handler.
 		tc.b.pages[targetID] = &Page{targetID: targetID}
 
-		tc.b.conn = executorTestFunc(func(
-			ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
-		) error {
-			require.Equal(t, target.CommandCreateTarget, method)
-			tp := params.(*target.CreateTargetParams)
-			require.Equal(t, "about:blank", tp.URL)
-			require.Equal(t, browserContextID, tp.BrowserContextID)
+		tc.b.conn = fakeConn{
+			execute: func(
+				ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
+			) error {
+				require.Equal(t, target.CommandCreateTarget, method)
+				tp := params.(*target.CreateTargetParams) //nolint:forcetypeassert
+				require.Equal(t, "about:blank", tp.URL)
+				require.Equal(t, browserContextID, tp.BrowserContextID)
 
-			// newPageInContext event handler will catch this target ID, and compare it to
-			// the new page's target ID to detect whether the page is loaded.
-			res.(*target.CreateTargetReturns).TargetID = targetID
+				// newPageInContext event handler will catch this target ID, and compare it to
+				// the new page's target ID to detect whether the page is loaded.
+				res.(*target.CreateTargetReturns).TargetID = targetID //nolint:forcetypeassert
 
-			// for the event handler to work, there needs to be an event called
-			// EventBrowserContextPage to be fired. this normally happens when the browser's
-			// onAttachedToTarget event is fired. here, we imitate as if the browser created a target for
-			// the page.
-			tc.bc.emit(EventBrowserContextPage, &Page{targetID: targetID})
+				// for the event handler to work, there needs to be an event called
+				// EventBrowserContextPage to be fired. this normally happens when the browser's
+				// onAttachedToTarget event is fired. here, we imitate as if the browser created a target for
+				// the page.
+				tc.bc.emit(EventBrowserContextPage, &Page{targetID: targetID})
 
-			return nil
-		})
+				return nil
+			},
+		}
 
 		page, err := tc.b.newPageInContext(browserContextID)
 		require.NoError(t, err)
@@ -94,10 +96,11 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		const wantErr = "anything"
 
 		tc := newTestCase(browserContextID)
-		tc.b.conn = executorTestFunc(
-			func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error {
+		tc.b.conn = fakeConn{
+			execute: func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error {
 				return errors.New(wantErr)
-			})
+			},
+		}
 		page, err := tc.b.newPageInContext(browserContextID)
 
 		require.NotNil(t, err)
@@ -114,12 +117,13 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		const timeout = 100 * time.Millisecond
 		// set the timeout for the browser value.
 		tc.b.launchOpts.Timeout = timeout
-		tc.b.conn = executorTestFunc(
-			func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error {
+		tc.b.conn = fakeConn{
+			execute: func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error {
 				// executor takes more time than the timeout.
 				time.Sleep(2 * timeout)
 				return nil
-			})
+			},
+		}
 
 		var (
 			page *Page
@@ -147,10 +151,11 @@ func TestBrowserNewPageInContext(t *testing.T) {
 
 		tc := newTestCase(browserContextID)
 
-		tc.b.conn = executorTestFunc(
-			func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error {
+		tc.b.conn = fakeConn{
+			execute: func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error {
 				return nil
-			})
+			},
+		}
 
 		var cancel func()
 		tc.b.ctx, cancel = context.WithCancel(tc.b.ctx)
@@ -164,10 +169,13 @@ func TestBrowserNewPageInContext(t *testing.T) {
 	})
 }
 
-type executorTestFunc func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error
+type fakeConn struct {
+	connection
+	execute func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error
+}
 
-func (f executorTestFunc) Execute(
+func (c fakeConn) Execute(
 	ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
 ) error {
-	return f(ctx, method, params, res)
+	return c.execute(ctx, method, params, res)
 }

@@ -118,7 +118,10 @@ func (s *screenshotter) restoreViewport(p *Page, originalViewport *Size) error {
 	return p.resetViewport()
 }
 
-func (s *screenshotter) screenshot(session *Session, documentRect *Rect, viewportRect *Rect, format ImageFormat, omitBackground bool, quality int64, path string) (*[]byte, error) {
+//nolint:funlen,cyclop
+func (s *screenshotter) screenshot(
+	sess session, doc, viewport *Rect, format ImageFormat, omitBackground bool, quality int64, path string,
+) (*[]byte, error) {
 	var (
 		buf  []byte
 		clip *cdppage.Viewport
@@ -129,13 +132,14 @@ func (s *screenshotter) screenshot(session *Session, documentRect *Rect, viewpor
 	if shouldSetDefaultBackground {
 		action := emulation.SetDefaultBackgroundColorOverride().
 			WithColor(&cdp.RGBA{R: 0, G: 0, B: 0, A: 0})
-		if err := action.Do(cdp.WithExecutor(s.ctx, session)); err != nil {
+		if err := action.Do(cdp.WithExecutor(s.ctx, sess)); err != nil {
 			return nil, fmt.Errorf("cannot set screenshot background transparency: %w", err)
 		}
 	}
 
 	// Add common options
 	capture.WithQuality(quality)
+	// nolint:exhaustive
 	switch format {
 	case ImageFormatJPEG:
 		capture.WithFormat(cdppage.CaptureScreenshotFormatJpeg)
@@ -144,33 +148,34 @@ func (s *screenshotter) screenshot(session *Session, documentRect *Rect, viewpor
 	}
 
 	// Add clip region
-	_, visualViewport, _, _, _, _, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(s.ctx, session))
+	//nolint:dogsled
+	_, visualViewport, _, _, _, _, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(s.ctx, sess))
 	if err != nil {
 		return nil, fmt.Errorf("cannot get layout metrics for screenshot: %w", err)
 	}
 
-	if documentRect == nil {
+	if doc == nil {
 		s := Size{
-			Width:  viewportRect.Width / visualViewport.Scale,
-			Height: viewportRect.Height / visualViewport.Scale,
+			Width:  viewport.Width / visualViewport.Scale,
+			Height: viewport.Height / visualViewport.Scale,
 		}.enclosingIntSize()
-		documentRect = &Rect{
-			X:      visualViewport.PageX + viewportRect.X,
-			Y:      visualViewport.PageY + viewportRect.Y,
+		doc = &Rect{
+			X:      visualViewport.PageX + viewport.X,
+			Y:      visualViewport.PageY + viewport.Y,
 			Width:  s.Width,
 			Height: s.Height,
 		}
 	}
 
 	scale := 1.0
-	if viewportRect != nil {
+	if viewport != nil {
 		scale = visualViewport.Scale
 	}
 	clip = &cdppage.Viewport{
-		X:      documentRect.X,
-		Y:      documentRect.Y,
-		Width:  documentRect.Width,
-		Height: documentRect.Height,
+		X:      doc.X,
+		Y:      doc.Y,
+		Width:  doc.Width,
+		Height: doc.Height,
 		Scale:  scale,
 	}
 	if clip.Width > 0 && clip.Height > 0 {
@@ -178,14 +183,14 @@ func (s *screenshotter) screenshot(session *Session, documentRect *Rect, viewpor
 	}
 
 	// Capture screenshot
-	buf, err = capture.Do(cdp.WithExecutor(s.ctx, session))
+	buf, err = capture.Do(cdp.WithExecutor(s.ctx, sess))
 	if err != nil {
 		return nil, fmt.Errorf("cannot capture screenshot: %w", err)
 	}
 
 	if shouldSetDefaultBackground {
 		action := emulation.SetDefaultBackgroundColorOverride()
-		if err := action.Do(cdp.WithExecutor(s.ctx, session)); err != nil {
+		if err := action.Do(cdp.WithExecutor(s.ctx, sess)); err != nil {
 			return nil, fmt.Errorf("cannot reset screenshot background color: %w", err)
 		}
 	}
@@ -201,6 +206,7 @@ func (s *screenshotter) screenshot(session *Session, documentRect *Rect, viewpor
 			return nil, fmt.Errorf("cannot save screenshot to file: %w", err)
 		}
 	}
+
 	return &buf, nil
 }
 
