@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -130,6 +132,101 @@ func TestWrongEnvVarIterations(t *testing.T) {
 	assert.Contains(t, stdOut, "4 complete and 0 interrupted iterations")
 	assert.Empty(t, ts.stdErr.Bytes())
 	assert.Empty(t, ts.loggerHook.Drain())
+}
+
+func TestMetricsAndThresholds(t *testing.T) {
+	t.Parallel()
+	script := `
+		import { Counter } from 'k6/metrics';
+
+		var setupCounter = new Counter('setup_counter');
+		var teardownCounter = new Counter('teardown_counter');
+		var defaultCounter = new Counter('default_counter');
+		let unusedCounter = new Counter('unused_counter');
+
+		export const options = {
+			scenarios: {
+				sc1: {
+					executor: 'per-vu-iterations',
+					vus: 1,
+					iterations: 1,
+				},
+				sc2: {
+					executor: 'shared-iterations',
+					vus: 1,
+					iterations: 1,
+				},
+			},
+			thresholds: {
+				'setup_counter': ['count == 1'],
+				'teardown_counter': ['count == 1'],
+				'default_counter': ['count == 2'],
+				'default_counter{scenario:sc1}': ['count == 1'],
+				'default_counter{scenario:sc2}': ['count == 1'],
+				'iterations': ['count == 2'],
+				'iterations{scenario:sc1}': ['count == 1'],
+				'iterations{scenario:sc2}': ['count == 1'],
+				'default_counter{nonexistent:tag}': ['count == 0'],
+				'unused_counter': ['count == 0'],
+				'http_req_duration{status:200}': [' max == 0'], // no HTTP requests
+			},
+		};
+
+		export function setup() {
+			console.log('setup() start');
+			setupCounter.add(1);
+			console.log('setup() end');
+			return { foo: 'bar' }
+		}
+
+		export default function (data) {
+			console.log('default(' + JSON.stringify(data) + ')');
+			defaultCounter.add(1);
+		}
+
+		export function teardown(data) {
+			console.log('teardown(' + JSON.stringify(data) + ')');
+			teardownCounter.add(1);
+		}
+
+		export function handleSummary(data) {
+			console.log('handleSummary()');
+			return { stdout: JSON.stringify(data, null, 4) }
+		}
+	`
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), []byte(script), 0o644))
+	ts.args = []string{"k6", "run", "--quiet", "--log-format=raw", "test.js"}
+
+	newRootCommand(ts.globalState).execute()
+
+	expLogLines := []string{
+		`setup() start`, `setup() end`, `default({"foo":"bar"})`,
+		`default({"foo":"bar"})`, `teardown({"foo":"bar"})`, `handleSummary()`,
+	}
+
+	logHookEntries := ts.loggerHook.Drain()
+	require.Len(t, logHookEntries, len(expLogLines))
+	for i, expLogLine := range expLogLines {
+		assert.Equal(t, expLogLine, logHookEntries[i].Message)
+	}
+
+	assert.Equal(t, strings.Join(expLogLines, "\n")+"\n", ts.stdErr.String())
+
+	var summary map[string]interface{}
+	require.NoError(t, json.Unmarshal(ts.stdOut.Bytes(), &summary))
+
+	metrics, ok := summary["metrics"].(map[string]interface{})
+	require.True(t, ok)
+
+	teardownCounter, ok := metrics["teardown_counter"].(map[string]interface{})
+	require.True(t, ok)
+
+	teardownThresholds, ok := teardownCounter["thresholds"].(map[string]interface{})
+	require.True(t, ok)
+
+	expected := map[string]interface{}{"count == 1": map[string]interface{}{"ok": true}}
+	require.Equal(t, expected, teardownThresholds)
 }
 
 // TODO: add a hell of a lot more integration tests, including some that spin up
