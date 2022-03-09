@@ -99,16 +99,22 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 	}
 
 	// return/throw exception if throw enabled, otherwise just log
-	raiseNan := func() (bool, error) {
-		err := fmt.Errorf("'%s' is an invalid value for metric '%s', a number or a boolean value is expected",
-			limitValue(v.String()), m.metric.Name)
+	raiseErr := func(err error) (bool, error) {
 		if state.Options.Throw.Bool {
 			return false, err
 		}
 		state.Logger.Warn(err)
 		return false, nil
 	}
+	raiseNan := func() (bool, error) {
+		return raiseErr(fmt.Errorf("'%s' is an invalid value for metric '%s', a number or a boolean value is expected",
+			limitValue(v.String()), m.metric.Name))
+	}
 
+	if v == nil {
+		return raiseErr(fmt.Errorf("no value was provided for metric '%s', a number or a boolean value is expected",
+			m.metric.Name))
+	}
 	if goja.IsNull(v) {
 		return raiseNan()
 	}

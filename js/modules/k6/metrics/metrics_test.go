@@ -40,9 +40,10 @@ import (
 )
 
 type addTestValue struct {
-	JS      string
-	Float   float64
-	isError bool
+	JS     string
+	Float  float64
+	errStr string
+	noTags bool
 }
 
 type addTest struct {
@@ -59,16 +60,16 @@ type addTest struct {
 
 func (a addTest) run(t *testing.T) {
 	_, err := a.rt.RunString(a.js)
-	if a.val.isError && a.isThrow {
+	if len(a.val.errStr) != 0 && a.isThrow {
 		if assert.Error(t, err) {
 			return
 		}
 	} else {
 		assert.NoError(t, err)
-		if a.val.isError && !a.isThrow {
+		if len(a.val.errStr) != 0 && !a.isThrow {
 			lines := a.hook.Drain()
 			require.Len(t, lines, 1)
-			assert.Contains(t, lines[0].Message, "is an invalid value for metric")
+			assert.Contains(t, lines[0].Message, a.val.errStr)
 			return
 		}
 	}
@@ -99,13 +100,14 @@ func TestMetrics(t *testing.T) {
 		"Int":                   {JS: `5`, Float: 5.0},
 		"True":                  {JS: `true`, Float: 1.0},
 		"False":                 {JS: `false`, Float: 0.0},
-		"null":                  {JS: `null`, isError: true},
-		"undefined":             {JS: `undefined`, isError: true},
-		"NaN":                   {JS: `NaN`, isError: true},
-		"string":                {JS: `"string"`, isError: true},
+		"null":                  {JS: `null`, errStr: "is an invalid value for metric"},
+		"undefined":             {JS: `undefined`, errStr: "is an invalid value for metric"},
+		"NaN":                   {JS: `NaN`, errStr: "is an invalid value for metric"},
+		"string":                {JS: `"string"`, errStr: "is an invalid value for metric"},
 		"string 5":              {JS: `"5.3"`, Float: 5.3},
-		"some object":           {JS: `{something: 3}`, isError: true},
-		"another metric object": {JS: `m`, isError: true},
+		"some object":           {JS: `{something: 3}`, errStr: "is an invalid value for metric"},
+		"another metric object": {JS: `m`, errStr: "is an invalid value for metric"},
+		"no argument":           {JS: ``, errStr: "no value was provided", noTags: true},
 	}
 	for fn, mtyp := range types {
 		fn, mtyp := fn, mtyp
@@ -168,11 +170,13 @@ func TestMetrics(t *testing.T) {
 								test.expectedTags = map[string]string{"key": "value"}
 								test.run(t)
 							})
-							t.Run(fmt.Sprintf("%s/isThrow=%v/Tags", name, isThrow), func(t *testing.T) {
-								test.js = fmt.Sprintf(`m.add(%v, {a:1})`, val.JS)
-								test.expectedTags = map[string]string{"key": "value", "a": "1"}
-								test.run(t)
-							})
+							if !val.noTags {
+								t.Run(fmt.Sprintf("%s/isThrow=%v/Tags", name, isThrow), func(t *testing.T) {
+									test.js = fmt.Sprintf(`m.add(%v, {a:1})`, val.JS)
+									test.expectedTags = map[string]string{"key": "value", "a": "1"}
+									test.run(t)
+								})
+							}
 						}
 					}
 				})
