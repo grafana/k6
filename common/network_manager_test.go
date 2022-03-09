@@ -30,10 +30,7 @@ type fakeSession struct {
 // Execute implements the cdp.Executor interface to record calls made to it and
 // allow assertions in tests.
 func (s *fakeSession) Execute(
-	ctx context.Context,
-	method string,
-	params easyjson.Marshaler,
-	res easyjson.Unmarshaler,
+	ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
 ) error {
 	s.cdpCalls = append(s.cdpCalls, method)
 	return nil

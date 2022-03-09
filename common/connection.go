@@ -59,7 +59,7 @@ type session interface {
 	cdp.Executor
 	executorEmitter
 	ExecuteWithoutExpectationOnReply(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error
-	SessionID() target.SessionID
+	ID() target.SessionID
 	TargetID() target.ID
 	Done() <-chan struct{}
 }

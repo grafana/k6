@@ -68,8 +68,8 @@ func NewSession(ctx context.Context, conn *Connection, id target.SessionID, tid 
 	return &s
 }
 
-// SessionID returns session ID.
-func (s *Session) SessionID() target.SessionID {
+// ID returns session ID.
+func (s *Session) ID() target.SessionID {
 	return s.id
 }
 

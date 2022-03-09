@@ -120,12 +120,7 @@ func (s *screenshotter) restoreViewport(p *Page, originalViewport *Size) error {
 
 //nolint:funlen,cyclop
 func (s *screenshotter) screenshot(
-	sess session,
-	doc, viewport *Rect,
-	format ImageFormat,
-	omitBackground bool,
-	quality int64,
-	path string,
+	sess session, doc, viewport *Rect, format ImageFormat, omitBackground bool, quality int64, path string,
 ) (*[]byte, error) {
 	var (
 		buf  []byte

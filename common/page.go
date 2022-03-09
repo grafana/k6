@@ -268,7 +268,7 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.Frame
 }
 
 func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) {
-	p.logger.Debugf("Page:attachFrameSession", "sid:%v fid=%v", p.session.SessionID(), fid)
+	p.logger.Debugf("Page:attachFrameSession", "sid:%v fid=%v", p.session.ID(), fid)
 	fs.page.frameSessions[fid] = fs
 }
 
@@ -926,7 +926,7 @@ func (p *Page) Workers() []api.Worker {
 // It should be used internally in the Page.
 func (p *Page) sessionID() (sid target.SessionID) {
 	if p != nil && p.session != nil {
-		sid = p.session.SessionID()
+		sid = p.session.ID()
 	}
 	return sid
 }

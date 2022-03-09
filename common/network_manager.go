@@ -93,7 +93,6 @@ func NewNetworkManager(
 		frameManager:     fm,
 		resolver:         resolver,
 		reqIDToRequest:   make(map[network.RequestID]*Request),
-		reqsMu:           sync.RWMutex{},
 		attemptedAuth:    make(map[fetch.RequestID]bool),
 		extraHTTPHeaders: make(map[string]string),
 	}
@@ -468,9 +467,9 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 
 func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 	m.logger.Debugf("NetworkManager:onRequestPaused",
-		"sid:%s url:%v", m.session.SessionID(), event.Request.URL)
+		"sid:%s url:%v", m.session.ID(), event.Request.URL)
 	defer m.logger.Debugf("NetworkManager:onRequestPaused:return",
-		"sid:%s url:%v", m.session.SessionID(), event.Request.URL)
+		"sid:%s url:%v", m.session.ID(), event.Request.URL)
 
 	var failErr error
 
