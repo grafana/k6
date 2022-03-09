@@ -112,6 +112,9 @@ github.com/nu7hatch/gouuid
 ## explicit; go 1.13
 # github.com/onsi/gomega v1.10.1
 ## explicit
+# github.com/openhistogram/circonusllhist v0.3.1-0.20210609143308-c78ce013c914
+## explicit; go 1.16
+github.com/openhistogram/circonusllhist
 # github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 ## explicit; go 1.12
 github.com/oxtoacart/bpool

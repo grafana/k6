@@ -202,10 +202,10 @@ func (ts *Thresholds) Run(sink Sink, duration time.Duration) (bool, error) {
 	case *GaugeSink:
 		ts.sinked["value"] = sinkImpl.Value
 	case *TrendSink:
-		ts.sinked["min"] = sinkImpl.Min
-		ts.sinked["max"] = sinkImpl.Max
-		ts.sinked["avg"] = sinkImpl.Avg
-		ts.sinked["med"] = sinkImpl.Med
+		ts.sinked["min"] = sinkImpl.Min()
+		ts.sinked["max"] = sinkImpl.Max()
+		ts.sinked["avg"] = sinkImpl.Avg()
+		ts.sinked["med"] = sinkImpl.P(0.5)
 
 		// Parse the percentile thresholds and insert them in
 		// the sinks mapping.

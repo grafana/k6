@@ -256,7 +256,7 @@ func TestEngineOutput(t *testing.T) {
 		sink := metric.Sink.(*stats.TrendSink)
 		if assert.NotNil(t, sink) {
 			numOutputSamples := len(cSamples)
-			numEngineSamples := len(sink.Values)
+			numEngineSamples := int(sink.Count())
 			assert.Equal(t, numEngineSamples, numOutputSamples)
 		}
 	}
