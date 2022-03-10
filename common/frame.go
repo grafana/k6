@@ -306,6 +306,9 @@ func (f *Frame) detach() {
 		f.parentFrame.removeChildFrame(f)
 	}
 	f.parentFrame = nil
+	// detach() is called by the same frame Goroutine that manages execution
+	// context switches. so this should be safe.
+	// we don't need to protect the following with executionContextMu.
 	if f.documentHandle != nil {
 		f.documentHandle.Dispose()
 	}
@@ -318,27 +321,57 @@ func (f *Frame) defaultTimeout() time.Duration {
 func (f *Frame) document() (*ElementHandle, error) {
 	f.log.Debugf("Frame:document", "fid:%s furl:%q", f.ID(), f.URL())
 
-	rt := k6common.GetRuntime(f.ctx)
-	if f.documentHandle != nil {
-		return f.documentHandle, nil
+	if cdh, ok := f.cachedDocumentHandle(); ok {
+		return cdh, nil
 	}
 
 	f.waitForExecutionContext(mainWorld)
 
-	opts := evalOptions{
-		forceCallable: false,
-		returnByValue: false,
-	}
-	result, err := f.evaluate(f.ctx, mainWorld, opts, rt.ToValue("document"))
+	dh, err := f.newDocumentHandle()
 	if err != nil {
-		return nil, fmt.Errorf("frame document: cannot evaluate in main execution context: %w", err)
-	}
-	if result == nil {
-		return nil, errors.New("frame document: evaluate result is nil in main execution context")
+		return nil, fmt.Errorf("newDocumentHandle: %w", err)
 	}
 
-	f.documentHandle = result.(*ElementHandle)
-	return f.documentHandle, err
+	// each execution context switch modifies documentHandle.
+	// see: nullContext().
+	f.executionContextMu.Lock()
+	defer f.executionContextMu.Unlock()
+	f.documentHandle = dh
+
+	return dh, nil
+}
+
+func (f *Frame) cachedDocumentHandle() (*ElementHandle, bool) {
+	// each execution context switch modifies documentHandle.
+	// see: nullContext().
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
+	return f.documentHandle, f.documentHandle != nil
+}
+
+func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
+	result, err := f.evaluate(
+		f.ctx,
+		mainWorld,
+		evalOptions{
+			forceCallable: false,
+			returnByValue: false,
+		},
+		k6common.GetRuntime(f.ctx).ToValue("document"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("cannot evaluate in main execution context: %w", err)
+	}
+	if result == nil {
+		return nil, errors.New("evaluate result is nil in main execution context")
+	}
+	dh, ok := result.(*ElementHandle)
+	if !ok {
+		return nil, fmt.Errorf("invalid document handle")
+	}
+
+	return dh, nil
 }
 
 func (f *Frame) hasContext(world executionWorld) bool {
