@@ -36,7 +36,7 @@ type loadedTest struct {
 	derivedConfig      Config
 }
 
-func loadTest(
+func loadLocalTest(
 	gs *globalState, cmd *cobra.Command, args []string,
 	// supply this if you want the test config consolidated and validated
 	cliConfigGetter func(flags *pflag.FlagSet) (Config, error), // TODO: obviate

@@ -42,6 +42,7 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/execution"
+	"go.k6.io/k6/execution/local"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
@@ -51,20 +52,24 @@ import (
 	"go.k6.io/k6/ui/pb"
 )
 
-// cmdRun handles the `k6 run` sub-command
-type cmdRun struct {
+// cmdsRunAndAgent handles the `k6 run` and `k6 agent` sub-commands
+type cmdsRunAndAgent struct {
 	gs *globalState
+
+	// TODO: figure out something more elegant?
+	loadTest          func(cmd *cobra.Command, args []string) (*loadedTest, execution.Controller, error)
+	metricsEngineHook func(*engine.MetricsEngine) func()
 }
 
 // TODO: split apart some more
 //nolint:funlen,gocognit,gocyclo,cyclop
-func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
+func (c *cmdsRunAndAgent) run(cmd *cobra.Command, args []string) (err error) {
 	printBanner(c.gs)
 	defer func() {
 		c.gs.logger.Debugf("Everything has finished, exiting k6 with error '%s'!", err)
 	}()
 
-	test, err := loadTest(c.gs, cmd, args, getConfig)
+	test, controller, err := c.loadTest(cmd, args)
 	if err != nil {
 		return err
 	}
@@ -81,7 +86,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	logger := c.gs.logger
 	// Create a local execution scheduler wrapping the runner.
 	logger.Debug("Initializing the execution scheduler...")
-	execScheduler, err := execution.NewScheduler(test.initRunner, test.builtInMetrics, logger)
+	execScheduler, err := execution.NewScheduler(test.initRunner, controller, test.builtInMetrics, logger)
 	if err != nil {
 		return err
 	}
@@ -119,7 +124,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	if !test.runtimeOptions.NoSummary.Bool || !test.runtimeOptions.NoThresholds.Bool {
+	if !test.runtimeOptions.NoSummary.Bool || !test.runtimeOptions.NoThresholds.Bool || c.metricsEngineHook != nil {
 		// We'll need to pipe metrics to the MetricsEngine if either the
 		// thresholds or the end-of-test summary are enabled.
 		outputs = append(outputs, metricsEngine.CreateIngester())
@@ -193,6 +198,11 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		outputManager.SetRunStatus(runStatus)
 		outputManager.StopOutputs()
 	}()
+
+	if c.metricsEngineHook != nil {
+		hookFinalize := c.metricsEngineHook(metricsEngine)
+		defer hookFinalize()
+	}
 
 	if !test.runtimeOptions.NoThresholds.Bool {
 		finalizeThresholds := metricsEngine.StartThresholdCalculations(runAbort)
@@ -326,7 +336,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	return nil
 }
 
-func (c *cmdRun) flagSet() *pflag.FlagSet {
+func (c *cmdsRunAndAgent) flagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SortFlags = false
 	flags.AddFlagSet(optionFlagSet())
@@ -336,8 +346,12 @@ func (c *cmdRun) flagSet() *pflag.FlagSet {
 }
 
 func getCmdRun(gs *globalState) *cobra.Command {
-	c := &cmdRun{
+	c := &cmdsRunAndAgent{
 		gs: gs,
+		loadTest: func(cmd *cobra.Command, args []string) (*loadedTest, execution.Controller, error) {
+			test, err := loadLocalTest(gs, cmd, args, getConfig)
+			return test, local.NewController(), err
+		},
 	}
 
 	runCmd := &cobra.Command{

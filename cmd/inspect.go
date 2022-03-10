@@ -40,7 +40,7 @@ func getCmdInspect(gs *globalState) *cobra.Command {
 		Long:  `Inspect a script or archive.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			test, err := loadTest(gs, cmd, args, nil)
+			test, err := loadLocalTest(gs, cmd, args, nil)
 			if err != nil {
 				return err
 			}
