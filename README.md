@@ -49,3 +49,33 @@ If remote endpoint responds too slowly or the k6 test run generates too many met
 ### Prometheus as remote-write agent
 
 To enable remote write in Prometheus 2.x use `--enable-feature=remote-write-receiver` option. See docker-compose samples in `example/`. Options for remote write storage can be found [here](https://prometheus.io/docs/operating/integrations/). 
+
+
+# Docker Compose
+
+This repo includes a [docker-compose.yml](./docker-compose.yml) file that starts _Prometheus_, _Grafana_, and a custom build of _k6_ having the `xk6-output-prometheus-remote` extension.
+
+> This is just a quick setup to show the usage. For a real use case, you will want to deploy outside of docker.
+
+Clone the repo to get started and follow these steps: 
+
+1. Start the docker compose environment.
+	```shell
+	docker-compose up -d
+	```
+    
+    > Some users have encountered failures for the k6 build portion. A workaround may be to disable the _"Use Docker Compose V2"_ checkbox in the _General_ section of Docker Desktop settings.
+
+	```shell
+	# Output
+	Creating xk6-output-prometheus-remote_grafana_1     ... done
+	Creating xk6-output-prometheus-remote_prometheus_1  ... done
+	Creating xk6-output-prometheus-remote_k6_1          ... done
+	```
+
+2. Use the k6 Docker image to run the k6 script and send metrics to the Prometheus container started on the previous step. The [test.js](./example/test.js) sets a [test-wide tag](https://k6.io/docs/using-k6/tags-and-groups/#test-wide-tags) with a unique identifier to segment the metrics into discrete test runs for Grafana dashboards.
+	```shell
+	docker-compose run --rm k6 -<example/test.js
+	```
+
+3. Visit http://localhost:3000/ to view results in Grafana.

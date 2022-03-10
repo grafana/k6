@@ -1,0 +1,16 @@
+# For configuration options, see 
+#   https://grafana.com/docs/grafana/latest/administration/provisioning/#example-data-source-config-file
+
+apiVersion: 1
+
+datasources:
+  - name: prometheus-in-docker
+    type: prometheus
+    access: proxy
+    url: prometheus:9090
+    basicAuth: false
+    isDefault: true
+    jsonData:
+      tlsAuth: false
+      tlsAuthWithCACert: false
+    editable: false

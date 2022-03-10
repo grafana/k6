@@ -1,0 +1,15 @@
+# For configuration options, see 
+#   https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards
+
+apiVersion: 1
+
+providers:
+  # We're defining a directory from which to load file-based dashboards
+  - name: 'a unique provider name'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true
