@@ -33,7 +33,6 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 // Params contains all possible constructor parameters an output may need.
@@ -74,7 +73,7 @@ type Output interface {
 	// method is never called concurrently, so do not do anything blocking here
 	// that might take a long time. Preferably, just use the SampleBuffer or
 	// something like it to buffer metrics until they are flushed.
-	AddMetricSamples(samples []stats.SampleContainer)
+	AddMetricSamples(samples []metrics.SampleContainer)
 
 	// Flush all remaining metrics and finalize the test run.
 	Stop() error
@@ -84,7 +83,7 @@ type Output interface {
 // thresholds before it can be started.
 type WithThresholds interface {
 	Output
-	SetThresholds(map[string]stats.Thresholds)
+	SetThresholds(map[string]metrics.Thresholds)
 }
 
 // WithTestRunStop is an output that can stop the Engine mid-test, interrupting

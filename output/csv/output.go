@@ -33,8 +33,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
-	"go.k6.io/k6/stats"
 )
 
 // Output implements the lib.Output interface for saving to CSV files.
@@ -200,7 +200,7 @@ func MakeHeader(tags []string) []string {
 }
 
 // SampleToRow converts sample into array of strings
-func SampleToRow(sample *stats.Sample, resTags []string, ignoredTags []string, row []string) []string {
+func SampleToRow(sample *metrics.Sample, resTags []string, ignoredTags []string, row []string) []string {
 	row[0] = sample.Metric.Name
 	row[1] = fmt.Sprintf("%d", sample.Time.Unix())
 	row[2] = fmt.Sprintf("%f", sample.Value)

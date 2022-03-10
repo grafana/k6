@@ -34,7 +34,6 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 func getTestPerVUIterationsConfig() PerVUIterationsConfig {
@@ -64,7 +63,7 @@ func TestPerVUIterationsRun(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	engineOut := make(chan stats.SampleContainer, 1000)
+	engineOut := make(chan metrics.SampleContainer, 1000)
 	err = executor.Run(ctx, engineOut)
 	require.NoError(t, err)
 
@@ -103,7 +102,7 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	engineOut := make(chan stats.SampleContainer, 1000)
+	engineOut := make(chan metrics.SampleContainer, 1000)
 	err = executor.Run(ctx, engineOut)
 	require.NoError(t, err)
 
@@ -150,7 +149,7 @@ func TestPerVuIterationsEmitDroppedIterations(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	engineOut := make(chan stats.SampleContainer, 1000)
+	engineOut := make(chan metrics.SampleContainer, 1000)
 	err = executor.Run(ctx, engineOut)
 	require.NoError(t, err)
 	assert.Empty(t, logHook.Drain())

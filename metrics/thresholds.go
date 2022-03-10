@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package stats
+package metrics
 
 import (
 	"bytes"
@@ -188,10 +188,10 @@ func (ts *Thresholds) Run(sink Sink, duration time.Duration) (bool, error) {
 	// Initialize the sinks store
 	ts.sinked = make(map[string]float64)
 
-	// FIXME: Remove this comment as soon as the stats.Sink does not expose Format anymore.
+	// FIXME: Remove this comment as soon as the metrics.Sink does not expose Format anymore.
 	//
 	// As of December 2021, this block reproduces the behavior of the
-	// stats.Sink.Format behavior. As we intend to try to get away from it,
+	// metrics.Sink.Format behavior. As we intend to try to get away from it,
 	// we instead implement the behavior directly here.
 	//
 	// For more details, see https://github.com/grafana/k6/issues/2320

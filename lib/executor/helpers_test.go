@@ -20,10 +20,10 @@
 
 package executor
 
-import "go.k6.io/k6/stats"
+import "go.k6.io/k6/metrics"
 
-func sumMetricValues(samples chan stats.SampleContainer, metricName string) (sum float64) {
-	for _, sc := range stats.GetBufferedSamples(samples) {
+func sumMetricValues(samples chan metrics.SampleContainer, metricName string) (sum float64) { // nolint: unparam
+	for _, sc := range metrics.GetBufferedSamples(samples) {
 		samples := sc.GetSamples()
 		for _, s := range samples {
 			if s.Metric.Name == metricName {

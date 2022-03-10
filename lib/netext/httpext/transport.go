@@ -31,7 +31,7 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/netext"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 // transport is an implementation of http.RoundTripper that will measure and emit
@@ -106,9 +106,9 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 	}
 
 	enabledTags := t.state.Options.SystemTags
-	urlEnabled := enabledTags.Has(stats.TagURL)
+	urlEnabled := enabledTags.Has(metrics.TagURL)
 	var setName bool
-	if _, ok := tags["name"]; !ok && enabledTags.Has(stats.TagName) {
+	if _, ok := tags["name"]; !ok && enabledTags.Has(metrics.TagName) {
 		setName = true
 	}
 	if urlEnabled || setName {
@@ -121,49 +121,49 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 		}
 	}
 
-	if enabledTags.Has(stats.TagMethod) {
+	if enabledTags.Has(metrics.TagMethod) {
 		tags["method"] = unfReq.request.Method
 	}
 
 	if unfReq.err != nil {
 		result.errorCode, result.errorMsg = errorCodeForError(unfReq.err)
-		if enabledTags.Has(stats.TagError) {
+		if enabledTags.Has(metrics.TagError) {
 			tags["error"] = result.errorMsg
 		}
 
-		if enabledTags.Has(stats.TagErrorCode) {
+		if enabledTags.Has(metrics.TagErrorCode) {
 			tags["error_code"] = strconv.Itoa(int(result.errorCode))
 		}
 
-		if enabledTags.Has(stats.TagStatus) {
+		if enabledTags.Has(metrics.TagStatus) {
 			tags["status"] = "0"
 		}
 	} else {
-		if enabledTags.Has(stats.TagStatus) {
+		if enabledTags.Has(metrics.TagStatus) {
 			tags["status"] = strconv.Itoa(unfReq.response.StatusCode)
 		}
 		if unfReq.response.StatusCode >= 400 {
-			if enabledTags.Has(stats.TagErrorCode) {
+			if enabledTags.Has(metrics.TagErrorCode) {
 				result.errorCode = errCode(1000 + unfReq.response.StatusCode)
 				tags["error_code"] = strconv.Itoa(int(result.errorCode))
 			}
 		}
-		if enabledTags.Has(stats.TagProto) {
+		if enabledTags.Has(metrics.TagProto) {
 			tags["proto"] = unfReq.response.Proto
 		}
 
 		if unfReq.response.TLS != nil {
 			tlsInfo, oscp := netext.ParseTLSConnState(unfReq.response.TLS)
-			if enabledTags.Has(stats.TagTLSVersion) {
+			if enabledTags.Has(metrics.TagTLSVersion) {
 				tags["tls_version"] = tlsInfo.Version
 			}
-			if enabledTags.Has(stats.TagOCSPStatus) {
+			if enabledTags.Has(metrics.TagOCSPStatus) {
 				tags["ocsp_status"] = oscp.Status
 			}
 			result.tlsInfo = tlsInfo
 		}
 	}
-	if enabledTags.Has(stats.TagIP) && trail.ConnRemoteAddr != nil {
+	if enabledTags.Has(metrics.TagIP) && trail.ConnRemoteAddr != nil {
 		if ip, _, err := net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
 			tags["ip"] = ip
 		}
@@ -179,12 +179,12 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 			failed = 1
 		}
 
-		if enabledTags.Has(stats.TagExpectedResponse) {
-			tags[stats.TagExpectedResponse.String()] = strconv.FormatBool(expected)
+		if enabledTags.Has(metrics.TagExpectedResponse) {
+			tags[metrics.TagExpectedResponse.String()] = strconv.FormatBool(expected)
 		}
 	}
 
-	finalTags := stats.IntoSampleTags(&tags)
+	finalTags := metrics.IntoSampleTags(&tags)
 	builtinMetrics := t.state.BuiltinMetrics
 	trail.SaveSamples(builtinMetrics, finalTags)
 	if t.responseCallback != nil {
@@ -193,12 +193,12 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 			trail.Failed.Bool = true
 		}
 		trail.Samples = append(trail.Samples,
-			stats.Sample{
+			metrics.Sample{
 				Metric: builtinMetrics.HTTPReqFailed, Time: trail.EndTime, Tags: finalTags, Value: failed,
 			},
 		)
 	}
-	stats.PushIfNotDone(t.ctx, t.state.Samples, trail)
+	metrics.PushIfNotDone(t.ctx, t.state.Samples, trail)
 
 	return result
 }

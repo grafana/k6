@@ -37,7 +37,6 @@ import (
 	"go.k6.io/k6/lib/testutils/minirunner"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 func getTestSharedIterationsConfig() SharedIterationsConfig {
@@ -142,7 +141,7 @@ func TestSharedIterationsEmitDroppedIterations(t *testing.T) {
 		}),
 	)
 	defer cancel()
-	engineOut := make(chan stats.SampleContainer, 1000)
+	engineOut := make(chan metrics.SampleContainer, 1000)
 	err = executor.Run(ctx, engineOut)
 	require.NoError(t, err)
 	assert.Empty(t, logHook.Drain())
@@ -188,14 +187,14 @@ func TestSharedIterationsGlobalIters(t *testing.T) {
 
 			gotIters := []uint64{}
 			var mx sync.Mutex
-			runner.Fn = func(ctx context.Context, state *lib.State, _ chan<- stats.SampleContainer) error {
+			runner.Fn = func(ctx context.Context, state *lib.State, _ chan<- metrics.SampleContainer) error {
 				mx.Lock()
 				gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
 				mx.Unlock()
 				return nil
 			}
 
-			engineOut := make(chan stats.SampleContainer, 100)
+			engineOut := make(chan metrics.SampleContainer, 100)
 			err = executor.Run(ctx, engineOut)
 			require.NoError(t, err)
 			sort.Slice(gotIters, func(i, j int) bool { return gotIters[i] < gotIters[j] })

@@ -50,10 +50,9 @@ import (
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
-	"go.k6.io/k6/stats"
 )
 
-func tagEqual(expected, got *stats.SampleTags) bool {
+func tagEqual(expected, got *metrics.SampleTags) bool {
 	expectedMap := expected.CloneTags()
 	gotMap := got.CloneTags()
 
@@ -185,7 +184,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s", "noCompress": true}`, tb.ServerHTTP.URL)),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &stats.DefaultSystemTagSet,
+			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
@@ -210,10 +209,10 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 
 	now := time.Now()
 	tagMap := map[string]string{"test": "mest", "a": "b", "name": "name", "url": "url"}
-	tags := stats.IntoSampleTags(&tagMap)
+	tags := metrics.IntoSampleTags(&tagMap)
 	expectedTagMap := tags.CloneTags()
 	expectedTagMap["url"], _ = tags.Get("name")
-	expectedTags := stats.IntoSampleTags(&expectedTagMap)
+	expectedTags := metrics.IntoSampleTags(&expectedTagMap)
 
 	expSamples := make(chan []Sample)
 	defer close(expSamples)
@@ -222,7 +221,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 		rw.WriteHeader(http.StatusOK) // silence a test warning
 	})
 
-	out.AddMetricSamples([]stats.SampleContainer{stats.Sample{
+	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		Time:   now,
 		Metric: builtinMetrics.VUs,
 		Tags:   tags,
@@ -252,12 +251,12 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 		Duration:     1500 * time.Millisecond,
 		Tags:         tags,
 	}
-	out.AddMetricSamples([]stats.SampleContainer{&simpleTrail})
+	out.AddMetricSamples([]metrics.SampleContainer{&simpleTrail})
 	expSamples <- []Sample{*NewSampleFromTrail(&simpleTrail)}
 
 	smallSkew := 0.02
 
-	trails := []stats.SampleContainer{}
+	trails := []metrics.SampleContainer{}
 	durations := make([]time.Duration, len(trails))
 	for i := int64(0); i < out.config.AggregationMinSamples.Int64; i++ {
 		similarTrail := skewTrail(r, simpleTrail, 1.0, 1.0+smallSkew)
@@ -270,9 +269,9 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 	checkAggrMetric := func(normal time.Duration, aggr AggregatedMetric) {
 		assert.True(t, aggr.Min <= aggr.Avg)
 		assert.True(t, aggr.Avg <= aggr.Max)
-		assert.InEpsilon(t, normal, stats.ToD(aggr.Min), smallSkew)
-		assert.InEpsilon(t, normal, stats.ToD(aggr.Avg), smallSkew)
-		assert.InEpsilon(t, normal, stats.ToD(aggr.Max), smallSkew)
+		assert.InEpsilon(t, normal, metrics.ToD(aggr.Min), smallSkew)
+		assert.InEpsilon(t, normal, metrics.ToD(aggr.Avg), smallSkew)
+		assert.InEpsilon(t, normal, metrics.ToD(aggr.Max), smallSkew)
 	}
 
 	outlierTrail := skewTrail(r, simpleTrail, 2.0+smallSkew, 3.0+smallSkew)
@@ -330,14 +329,14 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s", "noCompress": true}`, tb.ServerHTTP.URL)),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &stats.DefaultSystemTagSet,
+			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
 	require.NoError(t, err)
 	require.NoError(t, err)
 	now := time.Now()
-	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
+	tags := metrics.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
 	gotTheLimit := false
 	var m sync.Mutex
 
@@ -357,14 +356,14 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 
 	require.NoError(t, out.Start())
 
-	out.AddMetricSamples([]stats.SampleContainer{stats.Sample{
+	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		Time:   now,
 		Metric: builtinMetrics.VUs,
-		Tags:   stats.NewSampleTags(tags.CloneTags()),
+		Tags:   metrics.NewSampleTags(tags.CloneTags()),
 		Value:  1.0,
 	}})
 	for j := time.Duration(1); j <= 200; j++ {
-		container := make([]stats.SampleContainer, 0, 500)
+		container := make([]metrics.SampleContainer, 0, 500)
 		for i := time.Duration(1); i <= 50; i++ {
 			container = append(container, &httpext.Trail{
 				Blocked:        i % 200 * 100 * time.Millisecond,
@@ -377,7 +376,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 				EndTime:      now.Add(i * 100),
 				ConnDuration: 500 * time.Millisecond,
 				Duration:     j * i * 1500 * time.Millisecond,
-				Tags:         stats.NewSampleTags(tags.CloneTags()),
+				Tags:         metrics.NewSampleTags(tags.CloneTags()),
 			})
 		}
 		out.AddMetricSamples(container)
@@ -435,7 +434,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 		}`, tb.ServerHTTP.URL, stopOnError)),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &stats.DefaultSystemTagSet,
+			SystemTags: &metrics.DefaultSystemTagSet,
 			External: map[string]json.RawMessage{
 				"loadimpact": json.RawMessage(`{"name": "my-custom-name"}`),
 			},
@@ -452,7 +451,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	}
 	require.NoError(t, err)
 	now := time.Now()
-	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
+	tags := metrics.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
 
 	count := 1
 	max := 5
@@ -482,14 +481,14 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 
 	require.NoError(t, out.Start())
 
-	out.AddMetricSamples([]stats.SampleContainer{stats.Sample{
+	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		Time:   now,
 		Metric: builtinMetrics.VUs,
-		Tags:   stats.NewSampleTags(tags.CloneTags()),
+		Tags:   metrics.NewSampleTags(tags.CloneTags()),
 		Value:  1.0,
 	}})
 	for j := time.Duration(1); j <= 200; j++ {
-		container := make([]stats.SampleContainer, 0, 500)
+		container := make([]metrics.SampleContainer, 0, 500)
 		for i := time.Duration(1); i <= 50; i++ {
 			container = append(container, &httpext.Trail{
 				Blocked:        i % 200 * 100 * time.Millisecond,
@@ -502,7 +501,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 				EndTime:      now.Add(i * 100),
 				ConnDuration: 500 * time.Millisecond,
 				Duration:     j * i * 1500 * time.Millisecond,
-				Tags:         stats.NewSampleTags(tags.CloneTags()),
+				Tags:         metrics.NewSampleTags(tags.CloneTags()),
 			})
 		}
 		out.AddMetricSamples(container)
@@ -522,10 +521,10 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 
 	nBufferSamples := len(out.bufferSamples)
 	nBufferHTTPTrails := len(out.bufferHTTPTrails)
-	out.AddMetricSamples([]stats.SampleContainer{stats.Sample{
+	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		Time:   now,
 		Metric: builtinMetrics.VUs,
-		Tags:   stats.NewSampleTags(tags.CloneTags()),
+		Tags:   metrics.NewSampleTags(tags.CloneTags()),
 		Value:  1.0,
 	}})
 	if nBufferSamples != len(out.bufferSamples) || nBufferHTTPTrails != len(out.bufferHTTPTrails) {
@@ -539,7 +538,7 @@ func TestCloudOutputRequireScriptName(t *testing.T) {
 		Logger: testutils.NewLogger(t),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &stats.DefaultSystemTagSet,
+			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: ""},
 	})
@@ -572,7 +571,7 @@ func TestCloudOutputAggregationPeriodZeroNoBlock(t *testing.T) {
 		}`, tb.ServerHTTP.URL)),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &stats.DefaultSystemTagSet,
+			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
@@ -627,7 +626,7 @@ func TestCloudOutputPushRefID(t *testing.T) {
 		}`, tb.ServerHTTP.URL)),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &stats.DefaultSystemTagSet,
+			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
@@ -638,9 +637,9 @@ func TestCloudOutputPushRefID(t *testing.T) {
 	assert.Equal(t, "333", out.referenceID)
 
 	now := time.Now()
-	tags := stats.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
+	tags := metrics.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
 
-	out.AddMetricSamples([]stats.SampleContainer{stats.Sample{
+	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		Time:   now,
 		Metric: builtinMetrics.HTTPReqDuration,
 		Tags:   tags,
@@ -691,7 +690,7 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 		}`, tb.ServerHTTP.URL)),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &stats.DefaultSystemTagSet,
+			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "path/to/script.js"},
 	})
@@ -735,7 +734,7 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 		FullIteration: true,
 		StartTime:     now.Add(-time.Minute),
 		EndTime:       now,
-		Samples: []stats.Sample{
+		Samples: []metrics.Sample{
 			{
 				Time:   now,
 				Metric: builtinMetrics.DataSent,
@@ -754,7 +753,7 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 		},
 	}
 
-	out.AddMetricSamples([]stats.SampleContainer{&simpleNetTrail})
+	out.AddMetricSamples([]metrics.SampleContainer{&simpleNetTrail})
 	require.NoError(t, out.Stop())
 	require.True(t, gotIterations)
 }
@@ -799,7 +798,7 @@ func TestNewName(t *testing.T) {
 				Logger: testutils.NewLogger(t),
 				ScriptOptions: lib.Options{
 					Duration:   types.NullDurationFrom(1 * time.Second),
-					SystemTags: &stats.DefaultSystemTagSet,
+					SystemTags: &metrics.DefaultSystemTagSet,
 				},
 				ScriptPath: testCase.url,
 			})
@@ -838,7 +837,7 @@ func TestPublishMetric(t *testing.T) {
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s", "noCompress": false}`, server.URL)),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &stats.DefaultSystemTagSet,
+			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "script.js"},
 	})
@@ -872,7 +871,7 @@ func TestNewOutputClientTimeout(t *testing.T) {
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s",  "timeout": "2ms"}`, ts.URL)),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &stats.DefaultSystemTagSet,
+			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "script.js"},
 	})

@@ -20,10 +20,6 @@
 
 package metrics
 
-import (
-	"go.k6.io/k6/stats"
-)
-
 const (
 	VUsName               = "vus" //nolint:revive
 	VUsMaxName            = "vus_max"
@@ -59,75 +55,75 @@ const (
 
 // BuiltinMetrics represent all the builtin metrics of k6
 type BuiltinMetrics struct {
-	VUs               *stats.Metric
-	VUsMax            *stats.Metric
-	Iterations        *stats.Metric
-	IterationDuration *stats.Metric
-	DroppedIterations *stats.Metric
+	VUs               *Metric
+	VUsMax            *Metric
+	Iterations        *Metric
+	IterationDuration *Metric
+	DroppedIterations *Metric
 
 	// Runner-emitted.
-	Checks        *stats.Metric
-	GroupDuration *stats.Metric
+	Checks        *Metric
+	GroupDuration *Metric
 
 	// HTTP-related.
-	HTTPReqs              *stats.Metric
-	HTTPReqFailed         *stats.Metric
-	HTTPReqDuration       *stats.Metric
-	HTTPReqBlocked        *stats.Metric
-	HTTPReqConnecting     *stats.Metric
-	HTTPReqTLSHandshaking *stats.Metric
-	HTTPReqSending        *stats.Metric
-	HTTPReqWaiting        *stats.Metric
-	HTTPReqReceiving      *stats.Metric
+	HTTPReqs              *Metric
+	HTTPReqFailed         *Metric
+	HTTPReqDuration       *Metric
+	HTTPReqBlocked        *Metric
+	HTTPReqConnecting     *Metric
+	HTTPReqTLSHandshaking *Metric
+	HTTPReqSending        *Metric
+	HTTPReqWaiting        *Metric
+	HTTPReqReceiving      *Metric
 
 	// Websocket-related
-	WSSessions         *stats.Metric
-	WSMessagesSent     *stats.Metric
-	WSMessagesReceived *stats.Metric
-	WSPing             *stats.Metric
-	WSSessionDuration  *stats.Metric
-	WSConnecting       *stats.Metric
+	WSSessions         *Metric
+	WSMessagesSent     *Metric
+	WSMessagesReceived *Metric
+	WSPing             *Metric
+	WSSessionDuration  *Metric
+	WSConnecting       *Metric
 
 	// gRPC-related
-	GRPCReqDuration *stats.Metric
+	GRPCReqDuration *Metric
 
 	// Network-related; used for future protocols as well.
-	DataSent     *stats.Metric
-	DataReceived *stats.Metric
+	DataSent     *Metric
+	DataReceived *Metric
 }
 
 // RegisterBuiltinMetrics register and returns the builtin metrics in the provided registry
 func RegisterBuiltinMetrics(registry *Registry) *BuiltinMetrics {
 	return &BuiltinMetrics{
-		VUs:               registry.MustNewMetric(VUsName, stats.Gauge),
-		VUsMax:            registry.MustNewMetric(VUsMaxName, stats.Gauge),
-		Iterations:        registry.MustNewMetric(IterationsName, stats.Counter),
-		IterationDuration: registry.MustNewMetric(IterationDurationName, stats.Trend, stats.Time),
-		DroppedIterations: registry.MustNewMetric(DroppedIterationsName, stats.Counter),
+		VUs:               registry.MustNewMetric(VUsName, Gauge),
+		VUsMax:            registry.MustNewMetric(VUsMaxName, Gauge),
+		Iterations:        registry.MustNewMetric(IterationsName, Counter),
+		IterationDuration: registry.MustNewMetric(IterationDurationName, Trend, Time),
+		DroppedIterations: registry.MustNewMetric(DroppedIterationsName, Counter),
 
-		Checks:        registry.MustNewMetric(ChecksName, stats.Rate),
-		GroupDuration: registry.MustNewMetric(GroupDurationName, stats.Trend, stats.Time),
+		Checks:        registry.MustNewMetric(ChecksName, Rate),
+		GroupDuration: registry.MustNewMetric(GroupDurationName, Trend, Time),
 
-		HTTPReqs:              registry.MustNewMetric(HTTPReqsName, stats.Counter),
-		HTTPReqFailed:         registry.MustNewMetric(HTTPReqFailedName, stats.Rate),
-		HTTPReqDuration:       registry.MustNewMetric(HTTPReqDurationName, stats.Trend, stats.Time),
-		HTTPReqBlocked:        registry.MustNewMetric(HTTPReqBlockedName, stats.Trend, stats.Time),
-		HTTPReqConnecting:     registry.MustNewMetric(HTTPReqConnectingName, stats.Trend, stats.Time),
-		HTTPReqTLSHandshaking: registry.MustNewMetric(HTTPReqTLSHandshakingName, stats.Trend, stats.Time),
-		HTTPReqSending:        registry.MustNewMetric(HTTPReqSendingName, stats.Trend, stats.Time),
-		HTTPReqWaiting:        registry.MustNewMetric(HTTPReqWaitingName, stats.Trend, stats.Time),
-		HTTPReqReceiving:      registry.MustNewMetric(HTTPReqReceivingName, stats.Trend, stats.Time),
+		HTTPReqs:              registry.MustNewMetric(HTTPReqsName, Counter),
+		HTTPReqFailed:         registry.MustNewMetric(HTTPReqFailedName, Rate),
+		HTTPReqDuration:       registry.MustNewMetric(HTTPReqDurationName, Trend, Time),
+		HTTPReqBlocked:        registry.MustNewMetric(HTTPReqBlockedName, Trend, Time),
+		HTTPReqConnecting:     registry.MustNewMetric(HTTPReqConnectingName, Trend, Time),
+		HTTPReqTLSHandshaking: registry.MustNewMetric(HTTPReqTLSHandshakingName, Trend, Time),
+		HTTPReqSending:        registry.MustNewMetric(HTTPReqSendingName, Trend, Time),
+		HTTPReqWaiting:        registry.MustNewMetric(HTTPReqWaitingName, Trend, Time),
+		HTTPReqReceiving:      registry.MustNewMetric(HTTPReqReceivingName, Trend, Time),
 
-		WSSessions:         registry.MustNewMetric(WSSessionsName, stats.Counter),
-		WSMessagesSent:     registry.MustNewMetric(WSMessagesSentName, stats.Counter),
-		WSMessagesReceived: registry.MustNewMetric(WSMessagesReceivedName, stats.Counter),
-		WSPing:             registry.MustNewMetric(WSPingName, stats.Trend, stats.Time),
-		WSSessionDuration:  registry.MustNewMetric(WSSessionDurationName, stats.Trend, stats.Time),
-		WSConnecting:       registry.MustNewMetric(WSConnectingName, stats.Trend, stats.Time),
+		WSSessions:         registry.MustNewMetric(WSSessionsName, Counter),
+		WSMessagesSent:     registry.MustNewMetric(WSMessagesSentName, Counter),
+		WSMessagesReceived: registry.MustNewMetric(WSMessagesReceivedName, Counter),
+		WSPing:             registry.MustNewMetric(WSPingName, Trend, Time),
+		WSSessionDuration:  registry.MustNewMetric(WSSessionDurationName, Trend, Time),
+		WSConnecting:       registry.MustNewMetric(WSConnectingName, Trend, Time),
 
-		GRPCReqDuration: registry.MustNewMetric(GRPCReqDurationName, stats.Trend, stats.Time),
+		GRPCReqDuration: registry.MustNewMetric(GRPCReqDurationName, Trend, Time),
 
-		DataSent:     registry.MustNewMetric(DataSentName, stats.Counter, stats.Data),
-		DataReceived: registry.MustNewMetric(DataReceivedName, stats.Counter, stats.Data),
+		DataSent:     registry.MustNewMetric(DataSentName, Counter, Data),
+		DataReceived: registry.MustNewMetric(DataReceivedName, Counter, Data),
 	}
 }

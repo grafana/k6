@@ -34,7 +34,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 func TestOptions(t *testing.T) {
@@ -355,9 +355,9 @@ func TestOptions(t *testing.T) {
 	})
 
 	t.Run("Thresholds", func(t *testing.T) {
-		opts := Options{}.Apply(Options{Thresholds: map[string]stats.Thresholds{
+		opts := Options{}.Apply(Options{Thresholds: map[string]metrics.Thresholds{
 			"metric": {
-				Thresholds: []*stats.Threshold{{}},
+				Thresholds: []*metrics.Threshold{{}},
 			},
 		}})
 		assert.NotNil(t, opts.Thresholds)
@@ -377,23 +377,23 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, Options{}, opts)
 	})
 	t.Run("SystemTags", func(t *testing.T) {
-		opts := Options{}.Apply(Options{SystemTags: stats.NewSystemTagSet(stats.TagProto)})
+		opts := Options{}.Apply(Options{SystemTags: metrics.NewSystemTagSet(metrics.TagProto)})
 		assert.NotNil(t, opts.SystemTags)
 		assert.NotEmpty(t, opts.SystemTags)
-		assert.True(t, opts.SystemTags.Has(stats.TagProto))
+		assert.True(t, opts.SystemTags.Has(metrics.TagProto))
 
 		t.Run("JSON", func(t *testing.T) {
 			t.Run("Array", func(t *testing.T) {
 				var opts Options
 				jsonStr := `{"systemTags":["url"]}`
 				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
-				assert.Equal(t, *stats.NewSystemTagSet(stats.TagURL), *opts.SystemTags)
+				assert.Equal(t, *metrics.NewSystemTagSet(metrics.TagURL), *opts.SystemTags)
 
 				t.Run("Roundtrip", func(t *testing.T) {
 					data, err := json.Marshal(opts.SystemTags)
 					assert.NoError(t, err)
 					assert.Equal(t, `["url"]`, string(data))
-					var vers2 stats.SystemTagSet
+					var vers2 metrics.SystemTagSet
 					assert.NoError(t, json.Unmarshal(data, &vers2))
 					assert.Equal(t, vers2, *opts.SystemTags)
 				})
@@ -402,7 +402,7 @@ func TestOptions(t *testing.T) {
 				var opts Options
 				jsonStr := `{"systemTags":[]}`
 				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
-				assert.Equal(t, stats.SystemTagSet(0), *opts.SystemTags)
+				assert.Equal(t, metrics.SystemTagSet(0), *opts.SystemTags)
 			})
 		})
 	})
@@ -412,7 +412,7 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, stats, opts.SummaryTrendStats)
 	})
 	t.Run("RunTags", func(t *testing.T) {
-		tags := stats.IntoSampleTags(&map[string]string{"myTag": "hello"})
+		tags := metrics.IntoSampleTags(&map[string]string{"myTag": "hello"})
 		opts := Options{}.Apply(Options{RunTags: tags})
 		assert.Equal(t, tags, opts.RunTags)
 	})

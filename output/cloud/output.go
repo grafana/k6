@@ -40,7 +40,6 @@ import (
 	"go.k6.io/k6/lib/netext"
 	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 // TestName is the default Load Impact Cloud test name
@@ -53,7 +52,7 @@ type Output struct {
 
 	executionPlan []lib.ExecutionStep
 	duration      int64 // in seconds
-	thresholds    map[string][]*stats.Threshold
+	thresholds    map[string][]*metrics.Threshold
 	client        *MetricsClient
 
 	runStatus lib.RunStatus
@@ -110,7 +109,7 @@ func newOutput(params output.Params) (*Output, error) {
 	logger := params.Logger.WithFields(logrus.Fields{"output": "cloud"})
 
 	if conf.AggregationPeriod.Duration > 0 &&
-		(params.ScriptOptions.SystemTags.Has(stats.TagVU) || params.ScriptOptions.SystemTags.Has(stats.TagIter)) {
+		(params.ScriptOptions.SystemTags.Has(metrics.TagVU) || params.ScriptOptions.SystemTags.Has(metrics.TagIter)) {
 		return nil, errors.New("aggregation cannot be enabled if the 'vu' or 'iter' system tag is also enabled")
 	}
 
@@ -163,10 +162,15 @@ func newOutput(params output.Params) (*Output, error) {
 }
 
 // validateRequiredSystemTags checks if all required tags are present.
-func validateRequiredSystemTags(scriptTags *stats.SystemTagSet) error {
+func validateRequiredSystemTags(scriptTags *metrics.SystemTagSet) error {
 	missingRequiredTags := []string{}
-	requiredTags := stats.TagName | stats.TagMethod | stats.TagStatus | stats.TagError | stats.TagCheck | stats.TagGroup
-	for _, tag := range stats.SystemTagSetValues() {
+	requiredTags := metrics.TagName |
+		metrics.TagMethod |
+		metrics.TagStatus |
+		metrics.TagError |
+		metrics.TagCheck |
+		metrics.TagGroup
+	for _, tag := range metrics.SystemTagSetValues() {
 		if requiredTags.Has(tag) && !scriptTags.Has(tag) {
 			missingRequiredTags = append(missingRequiredTags, tag.String())
 		}
@@ -309,8 +313,8 @@ func (out *Output) SetRunStatus(status lib.RunStatus) {
 }
 
 // SetThresholds receives the thresholds before the output is Start()-ed.
-func (out *Output) SetThresholds(scriptThresholds map[string]stats.Thresholds) {
-	thresholds := make(map[string][]*stats.Threshold)
+func (out *Output) SetThresholds(scriptThresholds map[string]metrics.Thresholds) {
+	thresholds := make(map[string][]*metrics.Threshold)
 	for name, t := range scriptThresholds {
 		thresholds[name] = append(thresholds[name], t.Thresholds...)
 	}
@@ -334,7 +338,7 @@ func useCloudTags(source *httpext.Trail) *httpext.Trail {
 
 	dest := new(httpext.Trail)
 	*dest = *source
-	dest.Tags = stats.IntoSampleTags(&newTags)
+	dest.Tags = metrics.IntoSampleTags(&newTags)
 	dest.Samples = nil
 
 	return dest
@@ -343,7 +347,7 @@ func useCloudTags(source *httpext.Trail) *httpext.Trail {
 // AddMetricSamples receives a set of metric samples. This method is never
 // called concurrently, so it defers as much of the work as possible to the
 // asynchronous goroutines initialized in Start().
-func (out *Output) AddMetricSamples(sampleContainers []stats.SampleContainer) {
+func (out *Output) AddMetricSamples(sampleContainers []metrics.SampleContainer) {
 	select {
 	case <-out.stopSendingMetrics:
 		return
@@ -375,7 +379,7 @@ func (out *Output) AddMetricSamples(sampleContainers []stats.SampleContainer) {
 			}
 
 			if sc.FullIteration {
-				values[metrics.IterationDurationName] = stats.D(sc.EndTime.Sub(sc.StartTime))
+				values[metrics.IterationDurationName] = metrics.D(sc.EndTime.Sub(sc.StartTime))
 				values[metrics.IterationsName] = 1
 			}
 

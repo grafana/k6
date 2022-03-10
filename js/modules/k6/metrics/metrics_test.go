@@ -36,7 +36,6 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 type addTestValue struct {
@@ -50,10 +49,10 @@ type addTest struct {
 	val          addTestValue
 	rt           *goja.Runtime
 	hook         *testutils.SimpleLogrusHook
-	samples      chan stats.SampleContainer
+	samples      chan metrics.SampleContainer
 	isThrow      bool
-	mtyp         stats.MetricType
-	valueType    stats.ValueType
+	mtyp         metrics.MetricType
+	valueType    metrics.ValueType
 	js           string
 	expectedTags map[string]string
 }
@@ -73,9 +72,9 @@ func (a addTest) run(t *testing.T) {
 			return
 		}
 	}
-	bufSamples := stats.GetBufferedSamples(a.samples)
+	bufSamples := metrics.GetBufferedSamples(a.samples)
 	if assert.Len(t, bufSamples, 1) {
-		sample, ok := bufSamples[0].(stats.Sample)
+		sample, ok := bufSamples[0].(metrics.Sample)
 		require.True(t, ok)
 
 		assert.NotZero(t, sample.Time)
@@ -89,11 +88,11 @@ func (a addTest) run(t *testing.T) {
 
 func TestMetrics(t *testing.T) {
 	t.Parallel()
-	types := map[string]stats.MetricType{
-		"Counter": stats.Counter,
-		"Gauge":   stats.Gauge,
-		"Trend":   stats.Trend,
-		"Rate":    stats.Rate,
+	types := map[string]metrics.MetricType{
+		"Counter": metrics.Counter,
+		"Gauge":   metrics.Gauge,
+		"Trend":   metrics.Trend,
+		"Rate":    metrics.Rate,
 	}
 	values := map[string]addTestValue{
 		"Float":                 {JS: `2.5`, Float: 2.5},
@@ -113,7 +112,7 @@ func TestMetrics(t *testing.T) {
 		fn, mtyp := fn, mtyp
 		t.Run(fn, func(t *testing.T) {
 			t.Parallel()
-			for isTime, valueType := range map[bool]stats.ValueType{false: stats.Default, true: stats.Time} {
+			for isTime, valueType := range map[bool]metrics.ValueType{false: metrics.Default, true: metrics.Time} {
 				isTime, valueType := isTime, valueType
 				t.Run(fmt.Sprintf("isTime=%v", isTime), func(t *testing.T) {
 					t.Parallel()
@@ -131,7 +130,7 @@ func TestMetrics(t *testing.T) {
 					m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 					require.True(t, ok)
 					require.NoError(t, test.rt.Set("metrics", m.Exports().Named))
-					test.samples = make(chan stats.SampleContainer, 1000)
+					test.samples = make(chan metrics.SampleContainer, 1000)
 					state := &lib.State{
 						Options: lib.Options{},
 						Samples: test.samples,

@@ -25,7 +25,7 @@ import (
 	"io"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 // Ensure mock implementations conform to the interfaces.
@@ -39,9 +39,9 @@ var (
 // using a real JS runtime, it allows us to directly specify the options and
 // functions with Go code.
 type MiniRunner struct {
-	Fn              func(ctx context.Context, state *lib.State, out chan<- stats.SampleContainer) error
-	SetupFn         func(ctx context.Context, out chan<- stats.SampleContainer) ([]byte, error)
-	TeardownFn      func(ctx context.Context, out chan<- stats.SampleContainer) error
+	Fn              func(ctx context.Context, state *lib.State, out chan<- metrics.SampleContainer) error
+	SetupFn         func(ctx context.Context, out chan<- metrics.SampleContainer) ([]byte, error)
+	TeardownFn      func(ctx context.Context, out chan<- metrics.SampleContainer) error
 	HandleSummaryFn func(context.Context, *lib.Summary) (map[string]io.Reader, error)
 
 	SetupData []byte
@@ -57,7 +57,7 @@ func (r MiniRunner) MakeArchive() *lib.Archive {
 }
 
 // NewVU returns a new VU with an incremental ID.
-func (r *MiniRunner) NewVU(idLocal, idGlobal uint64, out chan<- stats.SampleContainer) (lib.InitializedVU, error) {
+func (r *MiniRunner) NewVU(idLocal, idGlobal uint64, out chan<- metrics.SampleContainer) (lib.InitializedVU, error) {
 	state := &lib.State{VUID: idLocal, VUIDGlobal: idGlobal, Iteration: int64(-1)}
 	return &VU{
 		R:            r,
@@ -70,7 +70,7 @@ func (r *MiniRunner) NewVU(idLocal, idGlobal uint64, out chan<- stats.SampleCont
 }
 
 // Setup calls the supplied mock setup() function, if present.
-func (r *MiniRunner) Setup(ctx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (r *MiniRunner) Setup(ctx context.Context, out chan<- metrics.SampleContainer) (err error) {
 	if fn := r.SetupFn; fn != nil {
 		r.SetupData, err = fn(ctx, out)
 	}
@@ -89,7 +89,7 @@ func (r *MiniRunner) SetSetupData(data []byte) {
 }
 
 // Teardown calls the supplied mock teardown() function, if present.
-func (r MiniRunner) Teardown(ctx context.Context, out chan<- stats.SampleContainer) error {
+func (r MiniRunner) Teardown(ctx context.Context, out chan<- metrics.SampleContainer) error {
 	if fn := r.TeardownFn; fn != nil {
 		return fn(ctx, out)
 	}
@@ -132,7 +132,7 @@ func (r *MiniRunner) HandleSummary(ctx context.Context, s *lib.Summary) (map[str
 // VU is a mock VU, spawned by a MiniRunner.
 type VU struct {
 	R            *MiniRunner
-	Out          chan<- stats.SampleContainer
+	Out          chan<- metrics.SampleContainer
 	ID, IDGlobal uint64
 	Iteration    int64
 	state        *lib.State

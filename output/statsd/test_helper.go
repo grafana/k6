@@ -32,7 +32,6 @@ import (
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 type getOutputFn func(
@@ -45,7 +44,7 @@ type getOutputFn func(
 //nolint:funlen
 func baseTest(t *testing.T,
 	getOutput getOutputFn,
-	checkResult func(t *testing.T, samples []stats.SampleContainer, expectedOutput, output string),
+	checkResult func(t *testing.T, samples []metrics.SampleContainer, expectedOutput, output string),
 ) {
 	t.Helper()
 	testNamespace := "testing.things." // to be dynamic
@@ -86,31 +85,31 @@ func baseTest(t *testing.T,
 	defer func() {
 		require.NoError(t, collector.Stop())
 	}()
-	newSample := func(m *stats.Metric, value float64, tags map[string]string) stats.Sample {
-		return stats.Sample{
+	newSample := func(m *metrics.Metric, value float64, tags map[string]string) metrics.Sample {
+		return metrics.Sample{
 			Time:   time.Now(),
-			Metric: m, Value: value, Tags: stats.IntoSampleTags(&tags),
+			Metric: m, Value: value, Tags: metrics.IntoSampleTags(&tags),
 		}
 	}
 
 	registry := metrics.NewRegistry()
-	myCounter, err := registry.NewMetric("my_counter", stats.Counter)
+	myCounter, err := registry.NewMetric("my_counter", metrics.Counter)
 	require.NoError(t, err)
-	myGauge, err := registry.NewMetric("my_gauge", stats.Gauge)
+	myGauge, err := registry.NewMetric("my_gauge", metrics.Gauge)
 	require.NoError(t, err)
-	myTrend, err := registry.NewMetric("my_trend", stats.Trend)
+	myTrend, err := registry.NewMetric("my_trend", metrics.Trend)
 	require.NoError(t, err)
-	myRate, err := registry.NewMetric("my_rate", stats.Rate)
+	myRate, err := registry.NewMetric("my_rate", metrics.Rate)
 	require.NoError(t, err)
-	myCheck, err := registry.NewMetric("my_check", stats.Rate)
+	myCheck, err := registry.NewMetric("my_check", metrics.Rate)
 	require.NoError(t, err)
 
 	testMatrix := []struct {
-		input  []stats.SampleContainer
+		input  []metrics.SampleContainer
 		output string
 	}{
 		{
-			input: []stats.SampleContainer{
+			input: []metrics.SampleContainer{
 				newSample(myCounter, 12, map[string]string{
 					"tag1": "value1",
 					"tag3": "value3",
@@ -119,7 +118,7 @@ func baseTest(t *testing.T,
 			output: "testing.things.my_counter:12|c",
 		},
 		{
-			input: []stats.SampleContainer{
+			input: []metrics.SampleContainer{
 				newSample(myGauge, 13, map[string]string{
 					"tag1": "value1",
 					"tag3": "value3",
@@ -128,7 +127,7 @@ func baseTest(t *testing.T,
 			output: "testing.things.my_gauge:13.000000|g",
 		},
 		{
-			input: []stats.SampleContainer{
+			input: []metrics.SampleContainer{
 				newSample(myTrend, 14, map[string]string{
 					"tag1": "value1",
 					"tag3": "value3",
@@ -137,7 +136,7 @@ func baseTest(t *testing.T,
 			output: "testing.things.my_trend:14.000000|ms",
 		},
 		{
-			input: []stats.SampleContainer{
+			input: []metrics.SampleContainer{
 				newSample(myRate, 15, map[string]string{
 					"tag1": "value1",
 					"tag3": "value3",
@@ -146,7 +145,7 @@ func baseTest(t *testing.T,
 			output: "testing.things.my_rate:15|c",
 		},
 		{
-			input: []stats.SampleContainer{
+			input: []metrics.SampleContainer{
 				newSample(myCheck, 16, map[string]string{
 					"tag1":  "value1",
 					"tag3":  "value3",

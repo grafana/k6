@@ -18,7 +18,7 @@
  *
  */
 
-package stats
+package metrics
 
 import (
 	"encoding/json"
@@ -29,6 +29,8 @@ import (
 )
 
 func TestSystemTagSetMarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		tagset   SystemTagSet
 		expected string
@@ -47,6 +49,8 @@ func TestSystemTagSetMarshalJSON(t *testing.T) {
 }
 
 func TestSystemTagSet_UnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		tags []byte
 		sets []SystemTagSet
@@ -65,6 +69,8 @@ func TestSystemTagSet_UnmarshalJSON(t *testing.T) {
 }
 
 func TestSystemTagSetTextUnmarshal(t *testing.T) {
+	t.Parallel()
+
 	testMatrix := map[string]SystemTagSet{
 		"":                      0,
 		"ip":                    TagIP,
@@ -83,6 +89,8 @@ func TestSystemTagSetTextUnmarshal(t *testing.T) {
 }
 
 func TestTagSetMarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		tagset   TagSet
 		expected string
@@ -100,6 +108,8 @@ func TestTagSetMarshalJSON(t *testing.T) {
 }
 
 func TestTagSet_UnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		tags []byte
 		sets TagSet
@@ -118,6 +128,8 @@ func TestTagSet_UnmarshalJSON(t *testing.T) {
 }
 
 func TestTagSetTextUnmarshal(t *testing.T) {
+	t.Parallel()
+
 	testMatrix := map[string]TagSet{
 		"":                           make(TagSet),
 		"ip":                         {"ip": true},

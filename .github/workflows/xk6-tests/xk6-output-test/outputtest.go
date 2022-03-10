@@ -22,9 +22,9 @@ package outputtest
 import (
 	"strconv"
 
-	"go.k6.io/k6/output"
-	"go.k6.io/k6/stats"
 	"github.com/spf13/afero"
+	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/output"
 )
 
 func init() {
@@ -57,7 +57,7 @@ func (o *Output) Start() error {
 }
 
 // AddMetricSamples just plucks out the metric we're interested in.
-func (o *Output) AddMetricSamples(sampleContainers []stats.SampleContainer) {
+func (o *Output) AddMetricSamples(sampleContainers []metrics.SampleContainer) {
 	for _, sc := range sampleContainers {
 		for _, sample := range sc.GetSamples() {
 			if sample.Metric.Name == "foos" {

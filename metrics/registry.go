@@ -24,20 +24,18 @@ import (
 	"fmt"
 	"regexp"
 	"sync"
-
-	"go.k6.io/k6/stats"
 )
 
 // Registry is what can create metrics
 type Registry struct {
-	metrics map[string]*stats.Metric
+	metrics map[string]*Metric
 	l       sync.RWMutex
 }
 
 // NewRegistry returns a new registry
 func NewRegistry() *Registry {
 	return &Registry{
-		metrics: make(map[string]*stats.Metric),
+		metrics: make(map[string]*Metric),
 	}
 }
 
@@ -51,7 +49,7 @@ func checkName(name string) bool {
 
 // NewMetric returns new metric registered to this registry
 // TODO have multiple versions returning specific metric types when we have such things
-func (r *Registry) NewMetric(name string, typ stats.MetricType, t ...stats.ValueType) (*stats.Metric, error) {
+func (r *Registry) NewMetric(name string, typ MetricType, t ...ValueType) (*Metric, error) {
 	r.l.Lock()
 	defer r.l.Unlock()
 
@@ -78,7 +76,7 @@ func (r *Registry) NewMetric(name string, typ stats.MetricType, t ...stats.Value
 }
 
 // MustNewMetric is like NewMetric, but will panic if there is an error
-func (r *Registry) MustNewMetric(name string, typ stats.MetricType, t ...stats.ValueType) *stats.Metric {
+func (r *Registry) MustNewMetric(name string, typ MetricType, t ...ValueType) *Metric {
 	m, err := r.NewMetric(name, typ, t...)
 	if err != nil {
 		panic(err)
@@ -88,32 +86,6 @@ func (r *Registry) MustNewMetric(name string, typ stats.MetricType, t ...stats.V
 
 // Get returns the Metric with the given name. If that metric doesn't exist,
 // Get() will return a nil value.
-func (r *Registry) Get(name string) *stats.Metric {
+func (r *Registry) Get(name string) *Metric {
 	return r.metrics[name]
-}
-
-func newMetric(name string, mt stats.MetricType, vt ...stats.ValueType) *stats.Metric {
-	valueType := stats.Default
-	if len(vt) > 0 {
-		valueType = vt[0]
-	}
-	var sink stats.Sink
-	switch mt {
-	case stats.Counter:
-		sink = &stats.CounterSink{}
-	case stats.Gauge:
-		sink = &stats.GaugeSink{}
-	case stats.Trend:
-		sink = &stats.TrendSink{}
-	case stats.Rate:
-		sink = &stats.RateSink{}
-	default:
-		return nil
-	}
-	return &stats.Metric{
-		Name:     name,
-		Type:     mt,
-		Contains: valueType,
-		Sink:     sink,
-	}
 }

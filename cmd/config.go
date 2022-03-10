@@ -39,7 +39,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 // configFlagSet returns a FlagSet with the default run configuration flags.
@@ -201,7 +201,7 @@ func getConsolidatedConfig(globalState *globalState, cliConf Config, runnerOpts 
 	// for CLI flags in cmd.getOptions, in case other configuration sources
 	// (e.g. env vars) overrode our default value. This is not done in
 	// lib.Options.Validate to avoid circular imports.
-	if _, err = stats.GetResolversForTrendColumns(conf.SummaryTrendStats); err != nil {
+	if _, err = metrics.GetResolversForTrendColumns(conf.SummaryTrendStats); err != nil {
 		return conf, err
 	}
 
@@ -214,7 +214,7 @@ func getConsolidatedConfig(globalState *globalState, cliConf Config, runnerOpts 
 // Note that if you add option default value here, also add it in command line argument help text.
 func applyDefault(conf Config) Config {
 	if conf.Options.SystemTags == nil {
-		conf.Options.SystemTags = &stats.DefaultSystemTagSet
+		conf.Options.SystemTags = &metrics.DefaultSystemTagSet
 	}
 	if conf.Options.SummaryTrendStats == nil {
 		conf.Options.SummaryTrendStats = lib.DefaultSummaryTrendStats

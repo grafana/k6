@@ -3,7 +3,7 @@ package output
 import (
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 // Manager can be used to manage multiple outputs at the same time.
@@ -70,7 +70,7 @@ func (om *Manager) SetRunStatus(status lib.RunStatus) {
 // current Engine. It needs to be replaced with the full metric pump.
 //
 // TODO: refactor
-func (om *Manager) AddMetricSamples(sampleContainers []stats.SampleContainer) {
+func (om *Manager) AddMetricSamples(sampleContainers []metrics.SampleContainer) {
 	if len(sampleContainers) == 0 {
 		return
 	}

@@ -32,7 +32,7 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/ui/pb"
 )
 
@@ -183,7 +183,7 @@ func (si *SharedIterations) Init(ctx context.Context) error {
 // Run executes a specific total number of iterations, which are all shared by
 // the configured VUs.
 // nolint:funlen
-func (si SharedIterations) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (si SharedIterations) Run(parentCtx context.Context, out chan<- metrics.SampleContainer) (err error) {
 	numVUs := si.config.GetVUs(si.executionState.ExecutionTuple)
 	iterations := si.et.ScaleInt64(si.config.Iterations.Int64)
 	duration := si.config.MaxDuration.TimeDuration()
@@ -223,7 +223,7 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- stats.Sampl
 	defer func() {
 		activeVUs.Wait()
 		if attemptedIters < totalIters {
-			stats.PushIfNotDone(parentCtx, out, stats.Sample{
+			metrics.PushIfNotDone(parentCtx, out, metrics.Sample{
 				Value:  float64(totalIters - attemptedIters),
 				Metric: si.executionState.BuiltinMetrics.DroppedIterations,
 				Tags:   si.getMetricTags(nil), Time: time.Now(),

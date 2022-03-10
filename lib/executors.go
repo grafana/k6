@@ -31,7 +31,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/ui/pb"
 )
 
@@ -128,7 +128,7 @@ type Executor interface {
 	GetLogger() *logrus.Entry
 
 	Init(ctx context.Context) error
-	Run(ctx context.Context, engineOut chan<- stats.SampleContainer) error
+	Run(ctx context.Context, engineOut chan<- metrics.SampleContainer) error
 }
 
 // PausableExecutor should be implemented by the executors that can be paused

@@ -30,7 +30,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 func TestExpectedStatuses(t *testing.T) {
@@ -278,7 +277,7 @@ func TestResponseCallbackInAction(t *testing.T) {
 
 			_, err := rt.RunString(sr(testCase.code))
 			assert.NoError(t, err)
-			bufSamples := stats.GetBufferedSamples(samples)
+			bufSamples := metrics.GetBufferedSamples(samples)
 
 			reqsCount := 0
 			for _, container := range bufSamples {
@@ -387,7 +386,7 @@ func TestResponseCallbackBatch(t *testing.T) {
 
 			_, err := rt.RunString(sr(testCase.code))
 			assert.NoError(t, err)
-			bufSamples := stats.GetBufferedSamples(samples)
+			bufSamples := metrics.GetBufferedSamples(samples)
 
 			reqsCount := 0
 			for _, container := range bufSamples {
@@ -427,11 +426,11 @@ func TestResponseCallbackInActionWithoutPassedTag(t *testing.T) {
 		metrics.HTTPReqWaitingName,
 		metrics.HTTPReqTLSHandshakingName,
 	}
-	deleteSystemTag(state, stats.TagExpectedResponse.String())
+	deleteSystemTag(state, metrics.TagExpectedResponse.String())
 
 	_, err := rt.RunString(sr(`http.request("GET", "HTTPBIN_URL/redirect/1", null, {responseCallback: http.expectedStatuses(200)});`))
 	assert.NoError(t, err)
-	bufSamples := stats.GetBufferedSamples(samples)
+	bufSamples := metrics.GetBufferedSamples(samples)
 
 	reqsCount := 0
 	for _, container := range bufSamples {
@@ -452,7 +451,7 @@ func TestResponseCallbackInActionWithoutPassedTag(t *testing.T) {
 		"group":  "",
 		"proto":  "HTTP/1.1",
 	}
-	assertRequestMetricsEmittedSingle(t, bufSamples[0], tags, allHTTPMetrics, func(sample stats.Sample) {
+	assertRequestMetricsEmittedSingle(t, bufSamples[0], tags, allHTTPMetrics, func(sample metrics.Sample) {
 		if sample.Metric.Name == metrics.HTTPReqFailedName {
 			require.EqualValues(t, sample.Value, 1)
 		}
@@ -460,7 +459,7 @@ func TestResponseCallbackInActionWithoutPassedTag(t *testing.T) {
 	tags["url"] = sr("HTTPBIN_URL/get")
 	tags["name"] = tags["url"]
 	tags["status"] = "200"
-	assertRequestMetricsEmittedSingle(t, bufSamples[1], tags, allHTTPMetrics, func(sample stats.Sample) {
+	assertRequestMetricsEmittedSingle(t, bufSamples[1], tags, allHTTPMetrics, func(sample metrics.Sample) {
 		if sample.Metric.Name == metrics.HTTPReqFailedName {
 			require.EqualValues(t, sample.Value, 0)
 		}
@@ -492,7 +491,7 @@ func TestDigestWithResponseCallback(t *testing.T) {
 		if (res.error_code !== 0) { throw new Error("wrong error code: " + res.error_code); }
 	`, urlWithCreds))
 	require.NoError(t, err)
-	bufSamples := stats.GetBufferedSamples(samples)
+	bufSamples := metrics.GetBufferedSamples(samples)
 
 	reqsCount := 0
 	for _, container := range bufSamples {
@@ -518,14 +517,14 @@ func TestDigestWithResponseCallback(t *testing.T) {
 		"expected_response": "true",
 		"error_code":        "1401",
 	}
-	assertRequestMetricsEmittedSingle(t, bufSamples[0], tags, allHTTPMetrics, func(sample stats.Sample) {
+	assertRequestMetricsEmittedSingle(t, bufSamples[0], tags, allHTTPMetrics, func(sample metrics.Sample) {
 		if sample.Metric.Name == metrics.HTTPReqFailedName {
 			require.EqualValues(t, sample.Value, 0)
 		}
 	})
 	tags["status"] = "200"
 	delete(tags, "error_code")
-	assertRequestMetricsEmittedSingle(t, bufSamples[1], tags, allHTTPMetrics, func(sample stats.Sample) {
+	assertRequestMetricsEmittedSingle(t, bufSamples[1], tags, allHTTPMetrics, func(sample metrics.Sample) {
 		if sample.Metric.Name == metrics.HTTPReqFailedName {
 			require.EqualValues(t, sample.Value, 0)
 		}
@@ -539,5 +538,5 @@ func deleteSystemTag(state *lib.State, tag string) {
 	for k := range enabledTags {
 		tagsList = append(tagsList, k)
 	}
-	state.Options.SystemTags = stats.ToSystemTagSet(tagsList)
+	state.Options.SystemTags = metrics.ToSystemTagSet(tagsList)
 }

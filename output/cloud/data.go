@@ -29,7 +29,6 @@ import (
 
 	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 // DataType constants
@@ -90,10 +89,10 @@ func (ct *Sample) UnmarshalJSON(p []byte) error {
 // SampleDataSingle is used in all simple un-aggregated single-value samples.
 //easyjson:json
 type SampleDataSingle struct {
-	Time  int64             `json:"time,string"`
-	Type  stats.MetricType  `json:"type"`
-	Tags  *stats.SampleTags `json:"tags,omitempty"`
-	Value float64           `json:"value"`
+	Time  int64               `json:"time,string"`
+	Type  metrics.MetricType  `json:"type"`
+	Tags  *metrics.SampleTags `json:"tags,omitempty"`
+	Value float64             `json:"value"`
 }
 
 // SampleDataMap is used by samples that contain multiple values, currently
@@ -101,10 +100,10 @@ type SampleDataSingle struct {
 // requests (`http_req_li_all`).
 //easyjson:json
 type SampleDataMap struct {
-	Time   int64              `json:"time,string"`
-	Type   stats.MetricType   `json:"type"`
-	Tags   *stats.SampleTags  `json:"tags,omitempty"`
-	Values map[string]float64 `json:"values,omitempty"`
+	Time   int64               `json:"time,string"`
+	Type   metrics.MetricType  `json:"type"`
+	Tags   *metrics.SampleTags `json:"tags,omitempty"`
+	Values map[string]float64  `json:"values,omitempty"`
 }
 
 // NewSampleFromTrail just creates a ready-to-send Sample instance
@@ -117,15 +116,15 @@ func NewSampleFromTrail(trail *httpext.Trail) *Sample {
 
 	values := make(map[string]float64, length)
 	values[metrics.HTTPReqsName] = 1
-	values[metrics.HTTPReqDurationName] = stats.D(trail.Duration)
-	values[metrics.HTTPReqBlockedName] = stats.D(trail.Blocked)
-	values[metrics.HTTPReqConnectingName] = stats.D(trail.Connecting)
-	values[metrics.HTTPReqTLSHandshakingName] = stats.D(trail.TLSHandshaking)
-	values[metrics.HTTPReqSendingName] = stats.D(trail.Sending)
-	values[metrics.HTTPReqWaitingName] = stats.D(trail.Waiting)
-	values[metrics.HTTPReqReceivingName] = stats.D(trail.Receiving)
+	values[metrics.HTTPReqDurationName] = metrics.D(trail.Duration)
+	values[metrics.HTTPReqBlockedName] = metrics.D(trail.Blocked)
+	values[metrics.HTTPReqConnectingName] = metrics.D(trail.Connecting)
+	values[metrics.HTTPReqTLSHandshakingName] = metrics.D(trail.TLSHandshaking)
+	values[metrics.HTTPReqSendingName] = metrics.D(trail.Sending)
+	values[metrics.HTTPReqWaitingName] = metrics.D(trail.Waiting)
+	values[metrics.HTTPReqReceivingName] = metrics.D(trail.Receiving)
 	if trail.Failed.Valid { // this is done so the adding of 1 map element doesn't reexpand the map as this is a hotpath
-		values[metrics.HTTPReqFailedName] = stats.B(trail.Failed.Bool)
+		values[metrics.HTTPReqFailedName] = metrics.B(trail.Failed.Bool)
 	}
 	return &Sample{
 		Type:   DataTypeMap,
@@ -141,10 +140,10 @@ func NewSampleFromTrail(trail *httpext.Trail) *Sample {
 // SampleDataAggregatedHTTPReqs is used in aggregated samples for HTTP requests.
 //easyjson:json
 type SampleDataAggregatedHTTPReqs struct {
-	Time   int64             `json:"time,string"`
-	Type   string            `json:"type"`
-	Count  uint64            `json:"count"`
-	Tags   *stats.SampleTags `json:"tags,omitempty"`
+	Time   int64               `json:"time,string"`
+	Type   string              `json:"type"`
+	Count  uint64              `json:"count"`
+	Tags   *metrics.SampleTags `json:"tags,omitempty"`
 	Values struct {
 		Duration       AggregatedMetric `json:"http_req_duration"`
 		Blocked        AggregatedMetric `json:"http_req_blocked"`
@@ -229,12 +228,12 @@ func (am *AggregatedMetric) Add(t time.Duration) {
 
 // Calc populates the float fields for min and max and calculates the average value
 func (am *AggregatedMetric) Calc(count float64) {
-	am.Min = stats.D(am.minD)
-	am.Max = stats.D(am.maxD)
-	am.Avg = stats.D(am.sumD) / count
+	am.Min = metrics.D(am.minD)
+	am.Max = metrics.D(am.maxD)
+	am.Avg = metrics.D(am.sumD) / count
 }
 
-type aggregationBucket map[*stats.SampleTags][]*httpext.Trail
+type aggregationBucket map[*metrics.SampleTags][]*httpext.Trail
 
 type durations []time.Duration
 

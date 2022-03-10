@@ -28,7 +28,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/ui/pb"
 )
 
@@ -92,13 +92,13 @@ func (bs *BaseExecutor) GetProgress() *pb.ProgressBar {
 
 // getMetricTags returns a tag set that can be used to emit metrics by the
 // executor. The VU ID is optional.
-func (bs *BaseExecutor) getMetricTags(vuID *uint64) *stats.SampleTags {
+func (bs *BaseExecutor) getMetricTags(vuID *uint64) *metrics.SampleTags {
 	tags := bs.executionState.Options.RunTags.CloneTags()
-	if bs.executionState.Options.SystemTags.Has(stats.TagScenario) {
+	if bs.executionState.Options.SystemTags.Has(metrics.TagScenario) {
 		tags["scenario"] = bs.config.GetName()
 	}
-	if vuID != nil && bs.executionState.Options.SystemTags.Has(stats.TagVU) {
+	if vuID != nil && bs.executionState.Options.SystemTags.Has(metrics.TagVU) {
 		tags["vu"] = strconv.FormatUint(*vuID, 10)
 	}
-	return stats.IntoSampleTags(&tags)
+	return metrics.IntoSampleTags(&tags)
 }

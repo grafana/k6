@@ -34,7 +34,6 @@ import (
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/metrics/engine"
 	"go.k6.io/k6/output"
-	"go.k6.io/k6/stats"
 )
 
 const (
@@ -66,7 +65,7 @@ type Engine struct {
 	stopOnce sync.Once
 	stopChan chan struct{}
 
-	Samples chan stats.SampleContainer
+	Samples chan metrics.SampleContainer
 
 	// Are thresholds tainted?
 	thresholdsTaintedLock sync.Mutex
@@ -86,7 +85,7 @@ func NewEngine(
 		ExecutionScheduler: ex,
 
 		runtimeOptions: rtOpts,
-		Samples:        make(chan stats.SampleContainer, opts.MetricSamplesBufferSize.Int64),
+		Samples:        make(chan metrics.SampleContainer, opts.MetricSamplesBufferSize.Int64),
 		stopChan:       make(chan struct{}),
 		logger:         logger.WithField("component", "engine"),
 	}
@@ -246,7 +245,7 @@ func (e *Engine) startBackgroundProcesses(
 }
 
 func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRun chan struct{}) {
-	sampleContainers := []stats.SampleContainer{}
+	sampleContainers := []metrics.SampleContainer{}
 
 	defer func() {
 		// Process any remaining metrics in the pipeline, by this point Run()
@@ -278,7 +277,7 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 			// Make the new container with the same size as the previous
 			// one, assuming that we produce roughly the same amount of
 			// metrics data between ticks...
-			sampleContainers = make([]stats.SampleContainer, 0, cap(sampleContainers))
+			sampleContainers = make([]metrics.SampleContainer, 0, cap(sampleContainers))
 		}
 	}
 	for {

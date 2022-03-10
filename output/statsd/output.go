@@ -27,8 +27,8 @@ import (
 	"github.com/DataDog/datadog-go/statsd"
 	"github.com/sirupsen/logrus"
 
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
-	"go.k6.io/k6/stats"
 )
 
 // New creates a new statsd connector client
@@ -63,20 +63,20 @@ type Output struct {
 	client *statsd.Client
 }
 
-func (o *Output) dispatch(entry stats.Sample) error {
+func (o *Output) dispatch(entry metrics.Sample) error {
 	var tagList []string
 	if o.config.EnableTags.Bool {
 		tagList = processTags(o.config.TagBlocklist, entry.Tags.CloneTags())
 	}
 
 	switch entry.Metric.Type {
-	case stats.Counter:
+	case metrics.Counter:
 		return o.client.Count(entry.Metric.Name, int64(entry.Value), tagList, 1)
-	case stats.Trend:
+	case metrics.Trend:
 		return o.client.TimeInMilliseconds(entry.Metric.Name, entry.Value, tagList, 1)
-	case stats.Gauge:
+	case metrics.Gauge:
 		return o.client.Gauge(entry.Metric.Name, entry.Value, tagList, 1)
-	case stats.Rate:
+	case metrics.Rate:
 		if check, ok := entry.Tags.Get("check"); ok {
 			return o.client.Count(
 				checkToString(check, entry.Value),

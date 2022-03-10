@@ -34,7 +34,6 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 	"go.k6.io/k6/ui/pb"
 )
 
@@ -167,7 +166,7 @@ func (e *ExecutionScheduler) GetExecutionPlan() []lib.ExecutionStep {
 // in the Init() method, and also passed to executors so they can initialize
 // any unplanned VUs themselves.
 func (e *ExecutionScheduler) initVU(
-	samplesOut chan<- stats.SampleContainer, logger *logrus.Entry,
+	samplesOut chan<- metrics.SampleContainer, logger *logrus.Entry,
 ) (lib.InitializedVU, error) {
 	// Get the VU IDs here, so that the VUs are (mostly) ordered by their
 	// number in the channel buffer
@@ -202,7 +201,7 @@ func (e *ExecutionScheduler) getRunStats() string {
 }
 
 func (e *ExecutionScheduler) initVUsConcurrently(
-	ctx context.Context, samplesOut chan<- stats.SampleContainer, count uint64,
+	ctx context.Context, samplesOut chan<- metrics.SampleContainer, count uint64,
 	concurrency int, logger *logrus.Entry,
 ) chan error {
 	doneInits := make(chan error, count) // poor man's early-return waitgroup
@@ -234,13 +233,13 @@ func (e *ExecutionScheduler) initVUsConcurrently(
 	return doneInits
 }
 
-func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- stats.SampleContainer) {
+func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- metrics.SampleContainer) {
 	e.logger.Debug("Starting emission of VUs and VUsMax metrics...")
 
 	emitMetrics := func() {
 		t := time.Now()
-		samples := stats.ConnectedSamples{
-			Samples: []stats.Sample{
+		samples := metrics.ConnectedSamples{
+			Samples: []metrics.Sample{
 				{
 					Time:   t,
 					Metric: e.state.BuiltinMetrics.VUs,
@@ -256,7 +255,7 @@ func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- st
 			Tags: e.options.RunTags,
 			Time: t,
 		}
-		stats.PushIfNotDone(ctx, out, samples)
+		metrics.PushIfNotDone(ctx, out, samples)
 	}
 
 	ticker := time.NewTicker(1 * time.Second)
@@ -282,7 +281,7 @@ func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- st
 
 // Init concurrently initializes all of the planned VUs and then sequentially
 // initializes all of the configured executors.
-func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- stats.SampleContainer) error {
+func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- metrics.SampleContainer) error {
 	e.emitVUsAndVUsMax(ctx, samplesOut)
 
 	logger := e.logger.WithField("phase", "local-execution-scheduler-init")
@@ -348,7 +347,7 @@ func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- stats.S
 // configured startTime for the specific executor and then running its Run()
 // method.
 func (e *ExecutionScheduler) runExecutor(
-	runCtx context.Context, runResults chan<- error, engineOut chan<- stats.SampleContainer, executor lib.Executor,
+	runCtx context.Context, runResults chan<- error, engineOut chan<- metrics.SampleContainer, executor lib.Executor,
 ) {
 	executorConfig := executor.GetConfig()
 	executorStartTime := executorConfig.GetStartTime()
@@ -397,7 +396,7 @@ func (e *ExecutionScheduler) runExecutor(
 // Run the ExecutionScheduler, funneling all generated metric samples through the supplied
 // out channel.
 //nolint:funlen
-func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- stats.SampleContainer) error {
+func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- metrics.SampleContainer) error {
 	defer func() {
 		close(e.stopVUsEmission)
 		<-e.vusEmissionStopped
