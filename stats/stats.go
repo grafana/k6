@@ -497,13 +497,8 @@ type Submetric struct {
 	Parent *Metric `json:"-"`
 }
 
-// AddSubmetric creates a new submetric from the key:value threshold definition
-// and adds it to the metric's submetrics list.
-func (m *Metric) AddSubmetric(keyValues string) (*Submetric, error) {
+func parseSubmetricKeyValues(keyValues string) *SampleTags {
 	keyValues = strings.TrimSpace(keyValues)
-	if len(keyValues) == 0 {
-		return nil, fmt.Errorf("submetric criteria for metric '%s' cannot be empty", m.Name)
-	}
 	kvs := strings.Split(keyValues, ",")
 	rawTags := make(map[string]string, len(kvs))
 	for _, kv := range kvs {
@@ -522,15 +517,34 @@ func (m *Metric) AddSubmetric(keyValues string) (*Submetric, error) {
 		rawTags[key] = value
 	}
 
-	tags := IntoSampleTags(&rawTags)
+	return IntoSampleTags(&rawTags)
+}
+
+func (m *Metric) GetSubmetric(keyValues string) (*Submetric, error) {
+	if len(keyValues) == 0 {
+		return nil, fmt.Errorf("submetric criteria for metric '%s' cannot be empty", m.Name)
+	}
+	tags := parseSubmetricKeyValues(keyValues)
 
 	for _, sm := range m.Submetrics {
 		if sm.Tags.IsEqual(tags) {
-			return nil, fmt.Errorf(
-				"sub-metric with params '%s' already exists for metric %s: %s",
-				keyValues, m.Name, sm.Name,
-			)
+			return sm, nil
 		}
+	}
+
+	return nil, fmt.Errorf("sub-metric with params '%s' doesn't exist for metric %s", keyValues, m.Name)
+}
+
+// AddSubmetric creates a new submetric from the key:value threshold definition
+// and adds it to the metric's submetrics list.
+func (m *Metric) AddSubmetric(keyValues string) (*Submetric, error) {
+	if len(keyValues) == 0 {
+		return nil, fmt.Errorf("submetric criteria for metric '%s' cannot be empty", m.Name)
+	}
+	tags := parseSubmetricKeyValues(keyValues)
+
+	if sm, err := m.GetSubmetric(keyValues); sm != nil || err == nil {
+		return nil, fmt.Errorf("submetric with tags '%s' already exists for metric '%s'", keyValues, m.Name)
 	}
 
 	subMetric := &Submetric{

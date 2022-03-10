@@ -21,7 +21,8 @@
 package stats
 
 import (
-	"errors"
+	"bytes"
+	"fmt"
 	"math"
 	"time"
 
@@ -33,12 +34,13 @@ var (
 	_ Sink = &GaugeSink{}
 	_ Sink = &TrendSink{}
 	_ Sink = &RateSink{}
-	_ Sink = &DummySink{}
 )
 
 type Sink interface {
 	Add(s Sample)                              // Add a sample to the sink.
 	Format(t time.Duration) map[string]float64 // Data for thresholds.
+	Drain() ([]byte, error)
+	Merge([]byte) error
 }
 
 type CounterSink struct {
@@ -60,14 +62,38 @@ func (c *CounterSink) Format(t time.Duration) map[string]float64 {
 	}
 }
 
+// TODO: something more robust and efficient
+func (c *CounterSink) Drain() ([]byte, error) {
+	res := []byte(fmt.Sprintf("%d %b", c.First.UnixMilli(), c.Value))
+	c.Value = 0
+	return res, nil
+}
+
+func (c *CounterSink) Merge(from []byte) error {
+	var firstMs int64
+	var val float64
+	_, err := fmt.Sscanf(string(from), "%d %b", &firstMs, &val)
+	if err != nil {
+		return err
+	}
+
+	c.Value += val
+	if first := time.UnixMilli(firstMs); c.First.After(first) {
+		c.First = first
+	}
+
+	return nil
+}
+
 type GaugeSink struct {
-	// TODO: add time
+	Last     time.Time
 	Value    float64
 	Max, Min float64
 	minSet   bool
 }
 
 func (g *GaugeSink) Add(s Sample) {
+	g.Last = s.Time
 	g.Value = s.Value
 	if s.Value > g.Max {
 		g.Max = s.Value
@@ -80,6 +106,41 @@ func (g *GaugeSink) Add(s Sample) {
 
 func (g *GaugeSink) Format(t time.Duration) map[string]float64 {
 	return map[string]float64{"value": g.Value}
+}
+
+// TODO: something more robust and efficient
+func (g *GaugeSink) Drain() ([]byte, error) {
+	res := []byte(fmt.Sprintf("%d %b %b %b", g.Last.UnixMilli(), g.Value, g.Min, g.Max))
+
+	g.Last = time.Time{}
+	g.Value = 0
+
+	return res, nil
+}
+
+func (g *GaugeSink) Merge(from []byte) error {
+	var lastMms int64
+	var val, min, max float64
+	_, err := fmt.Sscanf(string(from), "%d %b %b %b", &lastMms, &val, &min, &max)
+	if err != nil {
+		return err
+	}
+
+	last := time.UnixMilli(lastMms)
+	if last.After(g.Last) {
+		g.Last = last
+		g.Value = val
+	}
+
+	if max > g.Max {
+		g.Max = max
+	}
+	if min < g.Min || !g.minSet {
+		g.Min = min
+		g.minSet = true
+	}
+
+	return nil
 }
 
 // NewTrendSink makes a Trend sink with the OpenHistogram circllhist histogram.
@@ -143,6 +204,29 @@ func (t *TrendSink) Format(tt time.Duration) map[string]float64 {
 	}
 }
 
+func (t *TrendSink) Drain() ([]byte, error) {
+	b := &bytes.Buffer{} // TODO: reuse buffers?
+	if err := t.hist.Serialize(b); err != nil {
+		return nil, err
+	}
+	t.hist.Reset()
+	return b.Bytes(), nil
+}
+
+func (t *TrendSink) Merge(from []byte) error {
+	b := bytes.NewBuffer(from)
+
+	hist, err := circonusllhist.DeserializeWithOptions(
+		b, circonusllhist.NoLocks(), // TODO: investigate circonusllhist.NoLookup
+	)
+	if err != nil {
+		return err
+	}
+
+	t.hist.Merge(hist)
+	return nil
+}
+
 type RateSink struct {
 	Trues int64
 	Total int64
@@ -159,12 +243,22 @@ func (r RateSink) Format(t time.Duration) map[string]float64 {
 	return map[string]float64{"rate": float64(r.Trues) / float64(r.Total)}
 }
 
-type DummySink map[string]float64
-
-func (d DummySink) Add(s Sample) {
-	panic(errors.New("you can't add samples to a dummy sink"))
+// TODO: something more robust and efficient
+func (r *RateSink) Drain() ([]byte, error) {
+	res := []byte(fmt.Sprintf("%d %d", r.Trues, r.Total))
+	r.Trues = 0
+	r.Total = 0
+	return res, nil
 }
 
-func (d DummySink) Format(t time.Duration) map[string]float64 {
-	return map[string]float64(d)
+func (r *RateSink) Merge(from []byte) error {
+	var trues, total int64
+	_, err := fmt.Sscanf(string(from), "%d %d", &trues, &total)
+	if err != nil {
+		return err
+	}
+
+	r.Trues += trues
+	r.Total += total
+	return nil
 }

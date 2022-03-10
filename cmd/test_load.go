@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -14,6 +15,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/metrics/engine"
 )
 
 const (
@@ -36,7 +38,7 @@ type loadedTest struct {
 	derivedConfig      Config
 }
 
-func loadTest(
+func loadLocalTest(
 	gs *globalState, cmd *cobra.Command, args []string,
 	// supply this if you want the test config consolidated and validated
 	cliConfigGetter func(flags *pflag.FlagSet) (Config, error), // TODO: obviate
@@ -132,6 +134,13 @@ func (lt *loadedTest) initializeFirstRunner(gs *globalState) error {
 	default:
 		return fmt.Errorf("unknown or unspecified test type '%s' for '%s'", testType, testPath)
 	}
+}
+
+func (lt *loadedTest) newMetricsEngine(shouldProcess bool, logger logrus.FieldLogger) (*engine.MetricsEngine, error) {
+	return engine.NewMetricsEngine(
+		lt.metricsRegistry, lt.derivedConfig.Options.Thresholds, shouldProcess,
+		lt.runtimeOptions.NoThresholds.Bool, lt.derivedConfig.Options.SystemTags, logger,
+	)
 }
 
 // readSource is a small wrapper around loader.ReadSource returning
