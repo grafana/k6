@@ -31,7 +31,6 @@ services:
       - ./example/config-datasources.yaml:/etc/grafana/provisioning/datasources/datasource.yaml
       - ./example/config-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
       - ./example/dashboards:/var/lib/grafana/dashboards
-      - ./example/grafana.dashboard.json:/var/lib/grafana/dashboards/grafana.dashboard.json
 
   k6:
     build: .
