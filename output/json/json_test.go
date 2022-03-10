@@ -37,7 +37,7 @@ import (
 	"go.k6.io/k6/stats"
 )
 
-func getValidator(t *testing.T, expected []string) func(io.Reader) {
+func getValidator(t testing.TB, expected []string) func(io.Reader) {
 	return func(rawJSONLines io.Reader) {
 		s := bufio.NewScanner(rawJSONLines)
 		i := 0
@@ -54,7 +54,7 @@ func getValidator(t *testing.T, expected []string) func(io.Reader) {
 	}
 }
 
-func generateTestMetricSamples(t *testing.T) ([]stats.SampleContainer, func(io.Reader)) {
+func generateTestMetricSamples(t testing.TB) ([]stats.SampleContainer, func(io.Reader)) {
 	metric1 := stats.New("my_metric1", stats.Gauge)
 	metric2 := stats.New("my_metric2", stats.Counter, stats.Data)
 	time1 := time.Date(2021, time.February, 24, 13, 37, 10, 0, time.UTC)
