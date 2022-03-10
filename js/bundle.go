@@ -266,7 +266,7 @@ func (b *Bundle) Instantiate(
 	rt := vuImpl.runtime
 	bi = &BundleInstance{
 		Runtime: rt,
-		Context: vuImpl.ctxPtr,
+		Context: &vuImpl.ctx,
 		exports: make(map[string]goja.Callable),
 		env:     b.RuntimeOptions.Env,
 	}
@@ -336,8 +336,7 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 		Registry:    b.registry,
 	}
 	init.moduleVUImpl.initEnv = initenv
-	ctx := common.WithInitEnv(context.Background(), initenv)
-	*init.moduleVUImpl.ctxPtr = common.WithRuntime(ctx, rt)
+	init.moduleVUImpl.ctx = context.Background()
 	unbindInit := common.BindToGlobal(rt, map[string]interface{}{
 		"require": init.Require,
 		"open":    init.Open,
@@ -355,7 +354,7 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 		return err
 	}
 	unbindInit()
-	*init.moduleVUImpl.ctxPtr = nil
+	init.moduleVUImpl.ctx = nil
 	init.moduleVUImpl.initEnv = nil
 
 	// If we've already initialized the original VU init context, forbid

@@ -157,7 +157,7 @@ func (r *Runner) NewVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 // nolint:funlen
 func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleContainer) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
-	moduleVUImpl := &moduleVUImpl{ctxPtr: new(context.Context)}
+	moduleVUImpl := newModuleVUImpl()
 	bi, err := r.Bundle.Instantiate(r.Logger, idLocal, moduleVUImpl)
 	if err != nil {
 		return nil, err
@@ -396,8 +396,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 			return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
 		}
 	}
-	ctx = common.WithRuntime(ctx, vu.Runtime)
-	ctx = lib.WithState(ctx, vu.state)
+
 	ctx, cancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.HandleSummaryFn))
 	defer cancel()
 	go func() {
@@ -533,8 +532,6 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 		return goja.Undefined(), nil
 	}
 
-	ctx = common.WithRuntime(ctx, vu.Runtime)
-	ctx = lib.WithState(ctx, vu.state)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	go func() {
@@ -667,9 +664,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		u.state.Tags.Set("scenario", params.Scenario)
 	}
 
-	ctx := common.WithRuntime(params.RunContext, u.Runtime)
-	ctx = lib.WithState(ctx, u.state)
-	params.RunContext = ctx
+	ctx := params.RunContext
 	*u.Context = ctx
 
 	u.state.GetScenarioVUIter = func() uint64 {
@@ -749,7 +744,7 @@ func (u *ActiveVU) RunOnce() error {
 
 	ctx, cancel := context.WithCancel(u.RunContext)
 	defer cancel()
-	*u.moduleVUImpl.ctxPtr = ctx
+	u.moduleVUImpl.ctx = ctx
 	// Call the exported function.
 	_, isFullIteration, totalTime, err := u.runFn(ctx, true, fn, cancel, u.setupData)
 	if err != nil {
