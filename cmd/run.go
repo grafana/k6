@@ -39,7 +39,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"go.k6.io/k6/api"
-	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/execution"
@@ -82,7 +81,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	logger := c.gs.logger
 	// Create a local execution scheduler wrapping the runner.
 	logger.Debug("Initializing the execution scheduler...")
-	execScheduler, err := local.NewExecutionScheduler(test.initRunner, test.builtInMetrics, logger)
+	execScheduler, err := execution.NewScheduler(test.initRunner, test.builtInMetrics, logger)
 	if err != nil {
 		return err
 	}
@@ -258,6 +257,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// Trap Interrupts, SIGINTs and SIGTERMs.
 	gracefulStop := func(sig os.Signal) {
 		logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
+		// TODO: fix and implement in a way that doesn't mask other errors like the thresholds failing?
 		err = errext.WithExitCodeIfNone(fmt.Errorf("signal '%s' received", sig), exitcodes.ExternalAbort)
 		err = lib.WithRunStatusIfNone(err, lib.RunStatusAbortedUser)
 		runAbort(err)  // first abort the test run this way, to propagate the error
@@ -375,7 +375,7 @@ a commandline interface for interacting with it.`,
 	return runCmd
 }
 
-func reportUsage(execScheduler *local.ExecutionScheduler) error {
+func reportUsage(execScheduler *execution.Scheduler) error {
 	execState := execScheduler.GetState()
 	executorConfigs := execScheduler.GetExecutorConfigs()
 

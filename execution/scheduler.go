@@ -1,24 +1,4 @@
-/*
- *
- * k6 - a next-generation load testing tool
- * Copyright (C) 2016 Load Impact
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
-package local
+package execution
 
 import (
 	"context"
@@ -31,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/errext"
-	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
@@ -39,8 +18,11 @@ import (
 	"go.k6.io/k6/ui/pb"
 )
 
-// ExecutionScheduler is the local implementation of lib.ExecutionScheduler
-type ExecutionScheduler struct {
+// An ExecutionScheduler is in charge of initializing VUs and executors and the
+// actually running a test with them by starting the configured scenarios at the
+// appropriate times. It decouples how a swarm of VUs is controlled from the
+// details of how or even where they're scheduled.
+type Scheduler struct {
 	runner  lib.Runner
 	options lib.Options
 	logger  logrus.FieldLogger
@@ -54,13 +36,13 @@ type ExecutionScheduler struct {
 	state           *lib.ExecutionState
 }
 
-// NewExecutionScheduler creates and returns a new local lib.ExecutionScheduler
-// instance, without initializing it beyond the bare minimum. Specifically, it
-// creates the needed executor instances and a lot of state placeholders, but it
-// doesn't initialize the executors and it doesn't initialize or run VUs.
-func NewExecutionScheduler(
+// NewScheduler creates and returns a new Scheduler instance, without
+// initializing it beyond the bare minimum. Specifically, it creates the needed
+// executor instances and a lot of state placeholders, but it doesn't initialize
+// the executors and it doesn't initialize or run VUs.
+func NewScheduler(
 	runner lib.Runner, builtinMetrics *metrics.BuiltinMetrics, logger logrus.FieldLogger,
-) (*ExecutionScheduler, error) {
+) (*Scheduler, error) {
 	options := runner.GetOptions()
 	et, err := lib.NewExecutionTuple(options.ExecutionSegment, options.ExecutionSegmentSequence)
 	if err != nil {
@@ -100,7 +82,7 @@ func NewExecutionScheduler(
 		}
 	}
 
-	return &ExecutionScheduler{
+	return &Scheduler{
 		runner:  runner,
 		logger:  logger,
 		options: options,
@@ -116,48 +98,48 @@ func NewExecutionScheduler(
 }
 
 // GetRunner returns the wrapped lib.Runner instance.
-func (e *ExecutionScheduler) GetRunner() lib.Runner {
+func (e *Scheduler) GetRunner() lib.Runner {
 	return e.runner
 }
 
-// GetState returns a pointer to the execution state struct for the local
-// execution scheduler. It's guaranteed to be initialized and present, though
-// see the documentation in lib/execution.go for caveats about its usage. The
-// most important one is that none of the methods beyond the pause-related ones
+// GetState returns a pointer to the execution state struct for the execution
+// scheduler. It's guaranteed to be initialized and present, though see the
+// documentation in lib/execution.go for caveats about its usage. The most
+// important one is that none of the methods beyond the pause-related ones
 // should be used for synchronization.
-func (e *ExecutionScheduler) GetState() *lib.ExecutionState {
+func (e *Scheduler) GetState() *lib.ExecutionState {
 	return e.state
 }
 
 // GetExecutors returns the slice of configured executor instances which
 // have work, sorted by their (startTime, name) in an ascending order.
-func (e *ExecutionScheduler) GetExecutors() []lib.Executor {
+func (e *Scheduler) GetExecutors() []lib.Executor {
 	return e.executors
 }
 
 // GetExecutorConfigs returns the slice of all executor configs, sorted by
 // their (startTime, name) in an ascending order.
-func (e *ExecutionScheduler) GetExecutorConfigs() []lib.ExecutorConfig {
+func (e *Scheduler) GetExecutorConfigs() []lib.ExecutorConfig {
 	return e.executorConfigs
 }
 
 // GetInitProgressBar returns the progress bar associated with the Init
 // function. After the Init is done, it is "hijacked" to display real-time
 // execution statistics as a text bar.
-func (e *ExecutionScheduler) GetInitProgressBar() *pb.ProgressBar {
+func (e *Scheduler) GetInitProgressBar() *pb.ProgressBar {
 	return e.initProgress
 }
 
 // GetExecutionPlan is a helper method so users of the local execution scheduler
 // don't have to calculate the execution plan again.
-func (e *ExecutionScheduler) GetExecutionPlan() []lib.ExecutionStep {
+func (e *Scheduler) GetExecutionPlan() []lib.ExecutionStep {
 	return e.executionPlan
 }
 
 // initVU is a helper method that's used to both initialize the planned VUs
 // in the Init() method, and also passed to executors so they can initialize
 // any unplanned VUs themselves.
-func (e *ExecutionScheduler) initVU(
+func (e *Scheduler) initVU(
 	samplesOut chan<- stats.SampleContainer, logger *logrus.Entry,
 ) (lib.InitializedVU, error) {
 	// Get the VU IDs here, so that the VUs are (mostly) ordered by their
@@ -174,7 +156,7 @@ func (e *ExecutionScheduler) initVU(
 
 // getRunStats is a helper function that can be used as the execution
 // scheduler's progressbar substitute (i.e. hijack).
-func (e *ExecutionScheduler) getRunStats() string {
+func (e *Scheduler) getRunStats() string {
 	status := "running"
 	if e.state.IsPaused() {
 		status = "paused"
@@ -192,7 +174,7 @@ func (e *ExecutionScheduler) getRunStats() string {
 	)
 }
 
-func (e *ExecutionScheduler) initVUsConcurrently(
+func (e *Scheduler) initVUsConcurrently(
 	ctx context.Context, samplesOut chan<- stats.SampleContainer, count uint64,
 	concurrency int, logger *logrus.Entry,
 ) chan error {
@@ -225,7 +207,7 @@ func (e *ExecutionScheduler) initVUsConcurrently(
 	return doneInits
 }
 
-func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- stats.SampleContainer) func() {
+func (e *Scheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- stats.SampleContainer) func() {
 	e.logger.Debug("Starting emission of VUs and VUsMax metrics...")
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
@@ -275,7 +257,7 @@ func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- st
 
 // initVusAndExecutors concurrently initializes all of the planned VUs and then
 // sequentially initializes all of the configured executors.
-func (e *ExecutionScheduler) initVusAndExecutors(ctx context.Context, samplesOut chan<- stats.SampleContainer) error {
+func (e *Scheduler) initVusAndExecutors(ctx context.Context, samplesOut chan<- stats.SampleContainer) error {
 	e.initProgress.Modify(pb.WithConstProgress(0, "Init VUs..."))
 	logger := e.logger.WithField("phase", "local-execution-scheduler-init")
 	vusToInitialize := lib.GetMaxPlannedVUs(e.executionPlan)
@@ -339,7 +321,7 @@ func (e *ExecutionScheduler) initVusAndExecutors(ctx context.Context, samplesOut
 // executor, each time in a new goroutine. It is responsible for waiting out the
 // configured startTime for the specific executor and then running its Run()
 // method.
-func (e *ExecutionScheduler) runExecutor(
+func (e *Scheduler) runExecutor(
 	runCtx context.Context, runResults chan<- error, engineOut chan<- stats.SampleContainer, executor lib.Executor,
 ) {
 	executorConfig := executor.GetConfig()
@@ -389,7 +371,7 @@ func (e *ExecutionScheduler) runExecutor(
 // Run the ExecutionScheduler, funneling all generated metric samples through the supplied
 // out channel.
 //nolint:funlen
-func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- stats.SampleContainer) error {
+func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- stats.SampleContainer) error {
 	execSchedRunCtx, execSchedRunCancel := context.WithCancel(runCtx)
 	waitForVUsMetricPush := e.emitVUsAndVUsMax(execSchedRunCtx, samplesOut)
 	defer waitForVUsMetricPush()
@@ -480,17 +462,33 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, samplesOut c
 			return err
 		}
 	}
-	if err := execution.GetCancelReasonIfTestAborted(executorsRunCtx); err != nil && common.IsInterruptError(err) {
+	if err := GetCancelReasonIfTestAborted(executorsRunCtx); err != nil && common.IsInterruptError(err) {
 		interrupted = true
 		return err
 	}
 	return firstErr
 }
 
-// SetPaused pauses a test, if called with true. And if called with false, tries
-// to start/resume it. See the lib.ExecutionScheduler interface documentation of
-// the methods for the various caveats about its usage.
-func (e *ExecutionScheduler) SetPaused(pause bool) error {
+// Pause the test, or start/resume it. To check if a test is paused, use
+// GetState().IsPaused().
+//
+// Currently, any executor, so any test, can be started in a paused state. This
+// will cause k6 to initialize all needed VUs, but it won't actually start the
+// test. Later, the test can be started for real by resuming/unpausing it from
+// the REST API.
+//
+// After a test is actually started, it may become impossible to pause it again.
+// That is denoted by having SetPaused(true) return an error. The likely cause
+// is that some of the executors for the test don't support pausing after the
+// test has been started.
+//
+// IMPORTANT: Currently only the externally controlled executor can be paused
+// and resumed multiple times in the middle of the test execution! Even then,
+// "pausing" is a bit misleading, since k6 won't pause in the middle of the
+// currently executing iterations. It will allow the currently in progress
+// iterations to finish, and it just won't start any new ones nor will it
+// increment the value returned by GetCurrentTestRunDuration().
+func (e *Scheduler) SetPaused(pause bool) error {
 	if !e.state.HasStarted() && e.state.IsPaused() {
 		if pause {
 			return fmt.Errorf("execution is already paused")

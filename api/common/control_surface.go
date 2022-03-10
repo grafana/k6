@@ -24,7 +24,7 @@ import (
 	"context"
 
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/core/local"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/metrics/engine"
 	"go.k6.io/k6/stats"
 )
@@ -35,6 +35,6 @@ type ControlSurface struct {
 	RunCtx             context.Context
 	Samples            chan stats.SampleContainer
 	MetricsEngine      *engine.MetricsEngine
-	ExecutionScheduler *local.ExecutionScheduler
+	ExecutionScheduler *execution.Scheduler
 	Logger             logrus.FieldLogger
 }

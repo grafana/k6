@@ -2,8 +2,7 @@
 // control individual k6 tests.
 package execution
 
-// TODO: move the "local" ExecutionScheudler here and delete the interface (no
-// plans for a second implementation)
+// TODO: move the ExecutionScheudler tests from /core/local here and fix them
 
 // TODO: move ExecutionSegment and ESS here
 

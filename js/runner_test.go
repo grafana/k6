@@ -46,7 +46,7 @@ import (
 	"google.golang.org/grpc/test/grpc_testing"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/core/local"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules/k6"
 	k6http "go.k6.io/k6/js/modules/k6/http"
@@ -2333,7 +2333,7 @@ func TestExecutionInfo(t *testing.T) {
 
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			execScheduler, err := local.NewExecutionScheduler(r, builtinMetrics, testutils.NewLogger(t))
+			execScheduler, err := execution.NewScheduler(r, builtinMetrics, testutils.NewLogger(t))
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())

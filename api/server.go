@@ -29,7 +29,7 @@ import (
 
 	"go.k6.io/k6/api/common"
 	v1 "go.k6.io/k6/api/v1"
-	"go.k6.io/k6/core/local"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/metrics/engine"
 	"go.k6.io/k6/stats"
 )
@@ -45,7 +45,7 @@ func newHandler(cs *common.ControlSurface) http.Handler {
 // NewAPIServer returns a new *unstarted* HTTP REST API server.
 func NewAPIServer(
 	runCtx context.Context, addr string, samples chan stats.SampleContainer,
-	me *engine.MetricsEngine, es *local.ExecutionScheduler, logger logrus.FieldLogger,
+	me *engine.MetricsEngine, es *execution.Scheduler, logger logrus.FieldLogger,
 ) *http.Server {
 	// TODO: reduce the control surface as much as possible... For example, if
 	// we refactor the Runner API, we won't need to send the Samples channel.

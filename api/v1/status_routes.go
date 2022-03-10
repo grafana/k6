@@ -28,7 +28,6 @@ import (
 	"net/http"
 
 	"go.k6.io/k6/api/common"
-	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/execution"
@@ -47,7 +46,7 @@ func handleGetStatus(cs *common.ControlSurface, rw http.ResponseWriter, r *http.
 }
 
 func getFirstExternallyControlledExecutor(
-	execScheduler *local.ExecutionScheduler,
+	execScheduler *execution.Scheduler,
 ) (*executor.ExternallyControlled, error) {
 	executors := execScheduler.GetExecutors()
 	for _, s := range executors {
