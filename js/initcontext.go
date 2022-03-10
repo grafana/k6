@@ -28,7 +28,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
@@ -100,7 +99,8 @@ func NewInitContext(
 		logger:            logger,
 		modules:           getJSModules(),
 		moduleVUImpl: &moduleVUImpl{
-			ctxPtr: ctxPtr, runtime: rt,
+			ctx:     *ctxPtr,
+			runtime: rt,
 		},
 	}
 }
@@ -152,7 +152,7 @@ func (i *InitContext) Require(arg string) goja.Value {
 }
 
 type moduleVUImpl struct {
-	ctxPtr    *context.Context
+	ctx       context.Context
 	initEnv   *common.InitEnvironment
 	state     *lib.State
 	runtime   *goja.Runtime
@@ -161,12 +161,12 @@ type moduleVUImpl struct {
 
 func newModuleVUImpl() *moduleVUImpl {
 	return &moduleVUImpl{
-		ctxPtr: new(context.Context),
+		ctx: context.Background(),
 	}
 }
 
 func (m *moduleVUImpl) Context() context.Context {
-	return *m.ctxPtr
+	return m.ctx
 }
 
 func (m *moduleVUImpl) InitEnv() *common.InitEnvironment {
@@ -227,9 +227,6 @@ func toESModuleExports(exp modules.Exports) interface{} {
 	return result
 }
 
-// TODO: https://github.com/grafana/k6/issues/2385
-var onceBindWarning sync.Once //nolint: gochecknoglobals
-
 func (i *InitContext) requireModule(name string) (goja.Value, error) {
 	mod, ok := i.modules[name]
 	if !ok {
@@ -240,13 +237,7 @@ func (i *InitContext) requireModule(name string) (goja.Value, error) {
 		return i.moduleVUImpl.runtime.ToValue(toESModuleExports(instance.Exports())), nil
 	}
 
-	onceBindWarning.Do(func() {
-		i.logger.Warnf(`Module '%s' is using deprecated APIs that will be removed in k6 v0.38.0,`+
-			` for more details on how to update it see`+
-			` https://k6.io/docs/extensions/guides/create-an-extension/#advanced-javascript-extension`, name)
-	})
-
-	return i.moduleVUImpl.runtime.ToValue(common.Bind(i.moduleVUImpl.runtime, mod, i.moduleVUImpl.ctxPtr)), nil
+	return i.moduleVUImpl.runtime.ToValue(mod), nil
 }
 
 func (i *InitContext) requireFile(name string) (goja.Value, error) {

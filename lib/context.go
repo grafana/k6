@@ -27,31 +27,9 @@ import (
 type ctxKey int
 
 const (
-	ctxKeyState ctxKey = iota
-	ctxKeyExecState
+	ctxKeyExecState ctxKey = iota
 	ctxKeyScenario
 )
-
-// TODO: https://github.com/grafana/k6/issues/2385
-// Rid the State's context-based utils functions
-
-// WithState embeds a State in ctx.
-//
-// Deprecated: Implement the modules.VU interface for sharing the State.
-func WithState(ctx context.Context, state *State) context.Context {
-	return context.WithValue(ctx, ctxKeyState, state)
-}
-
-// GetState returns a State from ctx.
-//
-// Deprecated: Use modules.VU for get the State.
-func GetState(ctx context.Context) *State {
-	v := ctx.Value(ctxKeyState)
-	if v == nil {
-		return nil
-	}
-	return v.(*State)
-}
 
 // WithExecutionState embeds an ExecutionState in ctx.
 func WithExecutionState(ctx context.Context, s *ExecutionState) context.Context {

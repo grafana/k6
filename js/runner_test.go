@@ -555,11 +555,6 @@ func TestVURunContext(t *testing.T) {
 			vu.Runtime.Set("fn", func() {
 				fnCalled = true
 
-				// Assert to maintain the retro-compatibility
-				// with the old context-based getters
-				assert.Equal(t, vu.Runtime, common.GetRuntime(*vu.Context), "incorrect runtime in context")
-				assert.Nil(t, common.GetInitEnv(*vu.Context)) // shouldn't get this in the vu context
-
 				require.NotNil(t, vu.moduleVUImpl.Runtime())
 				require.Nil(t, vu.moduleVUImpl.InitEnv())
 
