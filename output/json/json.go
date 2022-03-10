@@ -21,6 +21,7 @@
 package json
 
 import (
+	"bufio"
 	"compress/gzip"
 	stdlibjson "encoding/json"
 	"fmt"
@@ -78,27 +79,33 @@ func (o *Output) Start() error {
 	o.logger.Debug("Starting...")
 
 	if o.filename == "" || o.filename == "-" {
-		o.encoder = stdlibjson.NewEncoder(o.params.StdOut)
+		w := bufio.NewWriter(o.params.StdOut)
+		o.encoder = stdlibjson.NewEncoder(w)
 		o.closeFn = func() error {
-			return nil
+			return w.Flush()
 		}
 	} else {
 		logfile, err := o.params.FS.Create(o.filename)
 		if err != nil {
 			return err
 		}
+		w := bufio.NewWriter(logfile)
 
 		if strings.HasSuffix(o.filename, ".gz") {
-			outfile := gzip.NewWriter(logfile)
+			outfile := gzip.NewWriter(w)
 
 			o.closeFn = func() error {
 				_ = outfile.Close()
+				_ = w.Flush()
 				return logfile.Close()
 			}
 			o.encoder = stdlibjson.NewEncoder(outfile)
 		} else {
-			o.closeFn = logfile.Close
-			o.encoder = stdlibjson.NewEncoder(logfile)
+			o.closeFn = func() error {
+				_ = w.Flush()
+				return logfile.Close()
+			}
+			o.encoder = stdlibjson.NewEncoder(w)
 		}
 	}
 
