@@ -21,6 +21,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -28,22 +29,35 @@ import (
 
 	"go.k6.io/k6/api/common"
 	v1 "go.k6.io/k6/api/v1"
-	"go.k6.io/k6/core"
+	"go.k6.io/k6/core/local"
+	"go.k6.io/k6/metrics/engine"
+	"go.k6.io/k6/stats"
 )
 
-func newHandler(logger logrus.FieldLogger) http.Handler {
+func newHandler(cs *common.ControlSurface) http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("/v1/", v1.NewHandler())
-	mux.Handle("/ping", handlePing(logger))
-	mux.Handle("/", handlePing(logger))
+	mux.Handle("/v1/", v1.NewHandler(cs))
+	mux.Handle("/ping", handlePing(cs.Logger))
+	mux.Handle("/", handlePing(cs.Logger))
 	return mux
 }
 
-// ListenAndServe is analogous to the stdlib one but also takes a core.Engine and logrus.FieldLogger
-func ListenAndServe(addr string, engine *core.Engine, logger logrus.FieldLogger) error {
-	mux := newHandler(logger)
+// NewAPIServer returns a new *unstarted* HTTP REST API server.
+func NewAPIServer(
+	runCtx context.Context, addr string, samples chan stats.SampleContainer,
+	me *engine.MetricsEngine, es *local.ExecutionScheduler, logger logrus.FieldLogger,
+) *http.Server {
+	// TODO: reduce the control surface as much as possible... For example, if
+	// we refactor the Runner API, we won't need to send the Samples channel.
+	cs := &common.ControlSurface{
+		RunCtx:             runCtx,
+		Samples:            samples,
+		MetricsEngine:      me,
+		ExecutionScheduler: es,
+		Logger:             logger,
+	}
 
-	return http.ListenAndServe(addr, withEngine(engine, newLogger(logger, mux)))
+	return &http.Server{Addr: addr, Handler: newHandler(cs)}
 }
 
 type wrappedResponseWriter struct {
@@ -64,13 +78,6 @@ func newLogger(l logrus.FieldLogger, next http.Handler) http.HandlerFunc {
 
 		l.WithField("status", wrapped.status).Debugf("%s %s", r.Method, r.URL.Path)
 	}
-}
-
-func withEngine(engine *core.Engine, next http.Handler) http.HandlerFunc {
-	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		r = r.WithContext(common.WithEngine(r.Context(), engine))
-		next.ServeHTTP(rw, r)
-	})
 }
 
 func handlePing(logger logrus.FieldLogger) http.Handler {

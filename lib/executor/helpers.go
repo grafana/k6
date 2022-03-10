@@ -30,6 +30,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/errext"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
@@ -77,56 +78,12 @@ func validateStages(stages []Stage) []error {
 	return errors
 }
 
-// cancelKey is the key used to store the cancel function for the context of an
-// executor. This is a work around to avoid excessive changes for the ability of
-// nested functions to cancel the passed context.
-type cancelKey struct{}
-
-type cancelExec struct {
-	cancel context.CancelFunc
-	reason error
-}
-
-// Context returns context.Context that can be cancelled by calling
-// CancelExecutorContext. Use this to initialize context that will be passed to
-// executors.
-//
-// This allows executors to globally halt any executions that uses this context.
-// Example use case is when a script calls test.abort().
-func Context(ctx context.Context) context.Context {
-	ctx, cancel := context.WithCancel(ctx)
-	return context.WithValue(ctx, cancelKey{}, &cancelExec{cancel: cancel})
-}
-
-// cancelExecutorContext cancels executor context found in ctx, ctx can be a
-// child of a context that was created with Context function.
-func cancelExecutorContext(ctx context.Context, err error) {
-	if x := ctx.Value(cancelKey{}); x != nil {
-		if v, ok := x.(*cancelExec); ok {
-			v.reason = err
-			v.cancel()
-		}
-	}
-}
-
-// CancelReason returns a reason the executor context was cancelled. This will
-// return nil if ctx is not an executor context(ctx or any of its parents was
-// never created by Context function).
-func CancelReason(ctx context.Context) error {
-	if x := ctx.Value(cancelKey{}); x != nil {
-		if v, ok := x.(*cancelExec); ok {
-			return v.reason
-		}
-	}
-	return nil
-}
-
 // handleInterrupt returns true if err is InterruptError and if so it
 // cancels the executor context passed with ctx.
 func handleInterrupt(ctx context.Context, err error) bool {
 	if err != nil {
 		if common.IsInterruptError(err) {
-			cancelExecutorContext(ctx, err)
+			execution.AbortTestRun(ctx, err)
 			return true
 		}
 	}

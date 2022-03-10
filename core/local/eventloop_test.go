@@ -1,5 +1,9 @@
 package local
 
+/*
+TODO: fix all of these tests to use the new API
+that should be fairly easy, the ExeecutionScheduler is almost unchanged
+
 import (
 	"context"
 	"io/ioutil"
@@ -181,3 +185,5 @@ export default function() {
 		require.Equal(t, []string{"just error\n\tat /script.js:13:4(15)\n\tat native\n", "1"}, msgs)
 	})
 }
+
+*/

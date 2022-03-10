@@ -34,6 +34,8 @@ import (
 	"go.k6.io/k6/stats"
 )
 
+// TODO: remove this interface, we don't need more than 1 implementation
+
 // An ExecutionScheduler is in charge of initializing executors and using them
 // to initialize and schedule VUs created by a wrapped Runner. It decouples how
 // a swarm of VUs is controlled from the details of how or even where they're

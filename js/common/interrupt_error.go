@@ -26,6 +26,7 @@ import (
 	"github.com/dop251/goja"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/lib"
 )
 
 // InterruptError is an error that halts engine execution
@@ -34,6 +35,7 @@ type InterruptError struct {
 }
 
 var _ errext.HasExitCode = &InterruptError{}
+var _ lib.HasRunStatus = &InterruptError{}
 
 // Error returns the reason of the interruption.
 func (i *InterruptError) Error() string {
@@ -43,6 +45,11 @@ func (i *InterruptError) Error() string {
 // ExitCode returns the status code used when the k6 process exits.
 func (i *InterruptError) ExitCode() errext.ExitCode {
 	return exitcodes.ScriptAborted
+}
+
+// RunStatus returns the run status for the test run.
+func (i *InterruptError) RunStatus() lib.RunStatus {
+	return lib.RunStatusAbortedUser // TODO: create a new status?
 }
 
 // AbortTest is the reason emitted when a test script calls test.abort()

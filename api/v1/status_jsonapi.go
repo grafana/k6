@@ -20,9 +20,7 @@
 
 package v1
 
-import (
-	"go.k6.io/k6/core"
-)
+import "go.k6.io/k6/api/common"
 
 // StatusJSONAPI is JSON API envelop for metrics
 type StatusJSONAPI struct {
@@ -51,6 +49,6 @@ type statusData struct {
 	Attributes Status `json:"attributes"`
 }
 
-func newStatusJSONAPIFromEngine(engine *core.Engine) StatusJSONAPI {
-	return NewStatusJSONAPI(NewStatus(engine))
+func newStatusJSONAPIFromEngine(cs *common.ControlSurface) StatusJSONAPI {
+	return NewStatusJSONAPI(NewStatus(cs))
 }

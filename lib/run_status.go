@@ -20,7 +20,9 @@
 
 package lib
 
-// TODO: move to some other package - types? models?
+import "errors"
+
+// TODO: move to some other package - execution?
 
 // RunStatus values can be used by k6 to denote how a script run ends
 // and by the cloud executor and collector so that k6 knows the current
@@ -41,3 +43,41 @@ const (
 	RunStatusAbortedScriptError RunStatus = 7
 	RunStatusAbortedThreshold   RunStatus = 8
 )
+
+// HasRunStatus is a wrapper around an error with an attached run status.
+type HasRunStatus interface {
+	error
+	RunStatus() RunStatus
+}
+
+// WithRunStatusIfNone can attach a run code to the given error, if it doesn't
+// have one already. It won't do anything if the error already had a run status
+// attached. Similarly, if there is no error (i.e. the given error is nil), it
+// also won't do anything.
+func WithRunStatusIfNone(err error, runStatus RunStatus) error {
+	if err == nil {
+		// No error, do nothing
+		return nil
+	}
+	var ecerr HasRunStatus
+	if errors.As(err, &ecerr) {
+		// The given error already has a run status, do nothing
+		return err
+	}
+	return withRunStatus{err, runStatus}
+}
+
+type withRunStatus struct {
+	error
+	runStatus RunStatus
+}
+
+func (wh withRunStatus) Unwrap() error {
+	return wh.error
+}
+
+func (wh withRunStatus) RunStatus() RunStatus {
+	return wh.runStatus
+}
+
+var _ HasRunStatus = withRunStatus{}

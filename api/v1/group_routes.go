@@ -27,10 +27,8 @@ import (
 	"go.k6.io/k6/api/common"
 )
 
-func handleGetGroups(rw http.ResponseWriter, r *http.Request) {
-	engine := common.GetEngine(r.Context())
-
-	root := NewGroup(engine.ExecutionScheduler.GetRunner().GetDefaultGroup(), nil)
+func handleGetGroups(cs *common.ControlSurface, rw http.ResponseWriter, r *http.Request) {
+	root := NewGroup(cs.ExecutionScheduler.GetRunner().GetDefaultGroup(), nil)
 	groups := FlattenGroup(root)
 
 	data, err := json.Marshal(newGroupsJSONAPI(groups))
@@ -41,10 +39,8 @@ func handleGetGroups(rw http.ResponseWriter, r *http.Request) {
 	_, _ = rw.Write(data)
 }
 
-func handleGetGroup(rw http.ResponseWriter, r *http.Request, id string) {
-	engine := common.GetEngine(r.Context())
-
-	root := NewGroup(engine.ExecutionScheduler.GetRunner().GetDefaultGroup(), nil)
+func handleGetGroup(cs *common.ControlSurface, rw http.ResponseWriter, r *http.Request, id string) {
+	root := NewGroup(cs.ExecutionScheduler.GetRunner().GetDefaultGroup(), nil)
 	groups := FlattenGroup(root)
 
 	var group *Group

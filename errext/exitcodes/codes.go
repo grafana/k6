@@ -31,7 +31,7 @@ const (
 	SetupTimeout             errext.ExitCode = 100
 	TeardownTimeout          errext.ExitCode = 101
 	GenericTimeout           errext.ExitCode = 102 // TODO: remove?
-	GenericEngine            errext.ExitCode = 103
+	GenericEngine            errext.ExitCode = 103 // TODO: remove?
 	InvalidConfig            errext.ExitCode = 104
 	ExternalAbort            errext.ExitCode = 105
 	CannotStartRESTAPI       errext.ExitCode = 106

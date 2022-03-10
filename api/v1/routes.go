@@ -23,17 +23,19 @@ package v1
 
 import (
 	"net/http"
+
+	"go.k6.io/k6/api/common"
 )
 
-func NewHandler() http.Handler {
+func NewHandler(cs *common.ControlSurface) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/v1/status", func(rw http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			handleGetStatus(rw, r)
+			handleGetStatus(cs, rw, r)
 		case http.MethodPatch:
-			handlePatchStatus(rw, r)
+			handlePatchStatus(cs, rw, r)
 		default:
 			rw.WriteHeader(http.StatusMethodNotAllowed)
 		}
@@ -44,7 +46,7 @@ func NewHandler() http.Handler {
 			rw.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		handleGetMetrics(rw, r)
+		handleGetMetrics(cs, rw, r)
 	})
 
 	mux.HandleFunc("/v1/metrics/", func(rw http.ResponseWriter, r *http.Request) {
@@ -54,7 +56,7 @@ func NewHandler() http.Handler {
 		}
 
 		id := r.URL.Path[len("/v1/metrics/"):]
-		handleGetMetric(rw, r, id)
+		handleGetMetric(cs, rw, r, id)
 	})
 
 	mux.HandleFunc("/v1/groups", func(rw http.ResponseWriter, r *http.Request) {
@@ -63,7 +65,7 @@ func NewHandler() http.Handler {
 			return
 		}
 
-		handleGetGroups(rw, r)
+		handleGetGroups(cs, rw, r)
 	})
 
 	mux.HandleFunc("/v1/groups/", func(rw http.ResponseWriter, r *http.Request) {
@@ -73,17 +75,17 @@ func NewHandler() http.Handler {
 		}
 
 		id := r.URL.Path[len("/v1/groups/"):]
-		handleGetGroup(rw, r, id)
+		handleGetGroup(cs, rw, r, id)
 	})
 
 	mux.HandleFunc("/v1/setup", func(rw http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			handleRunSetup(rw, r)
+			handleRunSetup(cs, rw, r)
 		case http.MethodPut:
-			handleSetSetupData(rw, r)
+			handleSetSetupData(cs, rw, r)
 		case http.MethodGet:
-			handleGetSetupData(rw, r)
+			handleGetSetupData(cs, rw, r)
 		default:
 			rw.WriteHeader(http.StatusMethodNotAllowed)
 		}
@@ -95,7 +97,7 @@ func NewHandler() http.Handler {
 			return
 		}
 
-		handleRunTeardown(rw, r)
+		handleRunTeardown(cs, rw, r)
 	})
 
 	return mux

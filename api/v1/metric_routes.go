@@ -28,17 +28,15 @@ import (
 	"go.k6.io/k6/api/common"
 )
 
-func handleGetMetrics(rw http.ResponseWriter, r *http.Request) {
-	engine := common.GetEngine(r.Context())
-
+func handleGetMetrics(cs *common.ControlSurface, rw http.ResponseWriter, r *http.Request) {
 	var t time.Duration
-	if engine.ExecutionScheduler != nil {
-		t = engine.ExecutionScheduler.GetState().GetCurrentTestRunDuration()
+	if cs.ExecutionScheduler != nil {
+		t = cs.ExecutionScheduler.GetState().GetCurrentTestRunDuration()
 	}
 
-	engine.MetricsEngine.MetricsLock.Lock()
-	metrics := newMetricsJSONAPI(engine.MetricsEngine.ObservedMetrics, t)
-	engine.MetricsEngine.MetricsLock.Unlock()
+	cs.MetricsEngine.MetricsLock.Lock()
+	metrics := newMetricsJSONAPI(cs.MetricsEngine.ObservedMetrics, t)
+	cs.MetricsEngine.MetricsLock.Unlock()
 
 	data, err := json.Marshal(metrics)
 	if err != nil {
@@ -48,23 +46,21 @@ func handleGetMetrics(rw http.ResponseWriter, r *http.Request) {
 	_, _ = rw.Write(data)
 }
 
-func handleGetMetric(rw http.ResponseWriter, r *http.Request, id string) {
-	engine := common.GetEngine(r.Context())
-
+func handleGetMetric(cs *common.ControlSurface, rw http.ResponseWriter, r *http.Request, id string) {
 	var t time.Duration
-	if engine.ExecutionScheduler != nil {
-		t = engine.ExecutionScheduler.GetState().GetCurrentTestRunDuration()
+	if cs.ExecutionScheduler != nil {
+		t = cs.ExecutionScheduler.GetState().GetCurrentTestRunDuration()
 	}
 
-	engine.MetricsEngine.MetricsLock.Lock()
-	metric, ok := engine.MetricsEngine.ObservedMetrics[id]
+	cs.MetricsEngine.MetricsLock.Lock()
+	metric, ok := cs.MetricsEngine.ObservedMetrics[id]
 	if !ok {
-		engine.MetricsEngine.MetricsLock.Unlock()
+		cs.MetricsEngine.MetricsLock.Unlock()
 		apiError(rw, "Not Found", "No metric with that ID was found", http.StatusNotFound)
 		return
 	}
 	wrappedMetric := newMetricEnvelope(metric, t)
-	engine.MetricsEngine.MetricsLock.Unlock()
+	cs.MetricsEngine.MetricsLock.Unlock()
 
 	data, err := json.Marshal(wrappedMetric)
 	if err != nil {

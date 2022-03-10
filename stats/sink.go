@@ -63,6 +63,7 @@ func (c *CounterSink) Format(t time.Duration) map[string]float64 {
 }
 
 type GaugeSink struct {
+	// TODO: add time
 	Value    float64
 	Max, Min float64
 	minSet   bool

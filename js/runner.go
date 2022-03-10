@@ -853,6 +853,7 @@ var (
 	_ errext.Exception   = &scriptException{}
 	_ errext.HasExitCode = &scriptException{}
 	_ errext.HasHint     = &scriptException{}
+	_ lib.HasRunStatus   = &scriptException{}
 )
 
 func (s *scriptException) Error() string {
@@ -862,6 +863,10 @@ func (s *scriptException) Error() string {
 
 func (s *scriptException) StackTrace() string {
 	return s.inner.String()
+}
+
+func (s *scriptException) RunStatus() lib.RunStatus {
+	return lib.RunStatusAbortedScriptError
 }
 
 func (s *scriptException) Unwrap() error {
