@@ -28,6 +28,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 //go:embed static/mouse_helper.js
@@ -145,4 +146,17 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	panicTestFn()
 	assert.Contains(t, errorMsg, "element is not attached to the DOM",
 		"expected click to result in correct error to be thrown")
+}
+
+func TestElementHandleNonClickable(t *testing.T) {
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewContext(nil).NewPage()
+
+	require.NotNil(t, p.Goto(tb.staticURL("/non_clickable.html"), nil))
+	require.Panicsf(t,
+		func() {
+			p.Click("#non-clickable", nil)
+		},
+		"element should not be clickable",
+	)
 }
