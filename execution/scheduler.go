@@ -486,8 +486,16 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- sta
 
 		// We run teardown() with the global context, so it isn't interrupted by
 		// aborts caused by thresholds or even Ctrl+C (unless used twice).
-		if err := e.runner.Teardown(globalCtx, samplesOut); err != nil {
-			logger.WithField("error", err).Debug("teardown() aborted by error")
+
+		// TODO: add a `sync.Once` equivalent?
+		_, err := e.controller.GetOrCreateData("teardown", func() ([]byte, error) {
+			if err := e.runner.Teardown(globalCtx, samplesOut); err != nil {
+				logger.WithField("error", err).Debug("teardown() aborted by error")
+				return nil, err
+			}
+			return nil, nil
+		})
+		if err != nil {
 			return err
 		}
 	}

@@ -13,9 +13,32 @@ service DistributedTest {
 
 message RegisterRequest {}
 message RegisterResponse {
-  bytes archive = 1; // TODO: send this with a `stream` of bytes chunks
-  bytes options = 2;
+  uint32 instanceID = 1;
+  bytes archive = 2; // TODO: send this with a `stream` of bytes chunks
+  bytes options = 3;
 }
 
-message AgentMessage {}
-message ControllerMessage {}
+message AgentMessage {
+  // TODO: actually use random session IDs to prevent spoofing
+  oneof Message {
+    uint32 initInstanceID = 1;
+    string signalAndWaitOnID = 2;
+    string getOrCreateDataWithID = 3;
+    DataPacket createdData = 4;
+  }
+}
+
+message ControllerMessage {
+  uint32 instanceID = 1;
+  oneof Message {
+    string doneWaitWithID = 2;
+    string createDataWithID = 3;
+    DataPacket dataWithID = 4;
+  }
+}
+
+message DataPacket {
+  string id = 1;
+  bytes data = 2;
+  string error = 3;
+}

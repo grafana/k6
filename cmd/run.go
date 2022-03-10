@@ -59,6 +59,7 @@ type cmdsRunAndAgent struct {
 	// TODO: figure out something more elegant?
 	loadTest          func(cmd *cobra.Command, args []string) (*loadedTest, execution.Controller, error)
 	metricsEngineHook func(*engine.MetricsEngine) func()
+	testEndHook       func(err error)
 }
 
 // TODO: split apart some more
@@ -67,6 +68,9 @@ func (c *cmdsRunAndAgent) run(cmd *cobra.Command, args []string) (err error) {
 	printBanner(c.gs)
 	defer func() {
 		c.gs.logger.Debugf("Everything has finished, exiting k6 with error '%s'!", err)
+		if c.testEndHook != nil {
+			c.testEndHook(err)
+		}
 	}()
 
 	test, controller, err := c.loadTest(cmd, args)

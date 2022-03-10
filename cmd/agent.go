@@ -2,13 +2,11 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/execution/distributed"
-	"go.k6.io/k6/execution/local"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/loader"
@@ -17,23 +15,28 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-// TODO: a whole lot of cleanup and error handling
+// TODO: a whole lot of cleanup, refactoring, error handling and hardening
 func getCmdAgent(gs *globalState) *cobra.Command { //nolint: funlen
 	c := &cmdsRunAndAgent{gs: gs}
 
 	c.loadTest = func(cmd *cobra.Command, args []string) (*loadedTest, execution.Controller, error) {
-		ctx, cancel := context.WithCancel(gs.ctx)
-		defer cancel()
-
 		conn, err := grpc.Dial(args[0], grpc.WithInsecure())
 		if err != nil {
 			return nil, nil, err
 		}
-		defer conn.Close()
+		c.testEndHook = func(err error) {
+			gs.logger.Debug("k6 agent run ended with err=%s", err)
+			conn.Close()
+		}
 
 		client := distributed.NewDistributedTestClient(conn)
 
-		resp, err := client.Register(ctx, &distributed.RegisterRequest{})
+		resp, err := client.Register(gs.ctx, &distributed.RegisterRequest{})
+		if err != nil {
+			return nil, nil, err
+		}
+
+		controller, err := distributed.NewAgentController(gs.ctx, resp.InstanceID, client, gs.logger)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -96,7 +99,7 @@ func getCmdAgent(gs *globalState) *cobra.Command { //nolint: funlen
 
 		gs.flags.address = "" // TODO: fix, this is a hack so agents don't start an API server
 
-		return test, local.NewController(), nil // TODO
+		return test, controller, nil // TODO
 	}
 
 	agentCmd := &cobra.Command{
