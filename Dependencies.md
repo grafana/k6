@@ -1,10 +1,11 @@
-## Updating dependencies in k6
+# Updating dependencies in k6
 
 k6 has a not small amount of dependencies, some of which are used more than others which affects how often if at all they should be updated.
 
-Some original discussion can be found in [this issue](https://github.com/grafana/k6/issues/1933)
+Some original discussions can be found in [this issue](https://github.com/grafana/k6/issues/1933).
 
-### General rule:
+## General rule
+
 The general rule is to update *direct* dependencies just after the release has been made.
 
 This is mostly so that we keep up with dependencies for which we want new features or bug fixes and can be skipped on case by case basis if there is no bandwidth to be done or any other good reason.
@@ -12,18 +13,19 @@ This is mostly so that we keep up with dependencies for which we want new featur
 For example some dependencies that were in the middle of big updates were skipped as they didn't add anything of value at the time, but were being updated day after day seemingly fixing bugs added the previous day. As in that case that wasn't a dependency we wanted to be on top off - we skipped it.
 
 Through the rest of the development cycle dependencies shouldn't be updated unless:
-1. needed for development
+1. required for development
 2. a particular bug fix/feature is really important
 	
 	
 The last part predominantly goes for `golang.org/x/*` and particularly `golang.org/x/net` which usually have updates through the development of Go itself.
 [Goja](https://github.com/dop251/goja) has special considerations as it's heavily used and bug fixes there or new features usually have high impact on k6. Which means that we usually try to update it whenever something new lands there.
 
-As the stability of any k6 release is pretty important this should be done only when adequate testing can be done and in general the changelog for each dependencies should be consulted on what has changed.
+As the stability of any k6 release is pretty essential, this should be done only when adequate testing can be done, and in general, the changelog for each dependency should be consulted on what has changed.
 
 The latter also serves as a time to open/close issues that are related to the updates. There might be a bug fix for an open issue - we should test it and close the issue. Or there might be new functionality that can be used - probably an issue should be open.
 
-### Exceptions:
+## Exceptions
+
 There are some dependencies that we really don't use all that much, intend on removing and as a general note don't need anything else from them. Given that we currently have no problems that updates will fix - we prefer to not update them as not to introduce bugs. Also, for some they bring additional dependencies that we do not want, which is just one more reason not to update them.
 
 List (as of March 2022):
@@ -38,11 +40,12 @@ List (as of March 2022):
 - google.golang.org/genproto, google.golang.org/protobuf, github.com/golang/protobuf - get update by `google.golang.org/grpc` when needed
 
 
-### How to do it:
+## How to do it
+
 
 Currently, I will recommend using [modtools](https://github.com/dop251/modtools).
 
-Running `modtools check` will give you a list of packages that aren't frozen (the ones above in the exceptions).  Also, important that this lists both direct and indirect, so some care need to be taken. Alternatively just running `go get <dependency>` for each direct one also will tell you if there were update.
+Running `modtools check` will give you a list of packages that aren't frozen (the ones above in the exceptions).  Also, important that this lists both direct and indirect, so some care needs to be taken. Alternatively just running `go get <dependency>` for each direct one also will tell you if there were updates.
 
 Then go at look at the changelog between the version we are at and the latest version.
  
