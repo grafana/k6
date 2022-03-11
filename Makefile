@@ -19,12 +19,12 @@ ci-like-lint :
 lint :
 	golangci-lint run --out-format=tab --new-from-rev master ./...
 
-tests :
+test :
 	go test -race -timeout 210s ./...
 
-check : ci-like-lint tests
+check : ci-like-lint test
 
 container:
 	docker build --rm --pull --no-cache -t grafana/k6 .
 
-.PHONY: build format ci-like-lint lint tests check container
+.PHONY: build format ci-like-lint lint test check container
