@@ -24,8 +24,8 @@ var _ api.ElementHandle = &ElementHandle{}
 var _ api.JSHandle = &ElementHandle{}
 
 type (
-	elementHandleActionFn        func(context.Context, *ElementHandle) (interface{}, error)
-	elementHandlePointerActionFn func(context.Context, *ElementHandle, *Position) (interface{}, error)
+	elementHandleActionFunc        func(context.Context, *ElementHandle) (interface{}, error)
+	elementHandlePointerActionFunc func(context.Context, *ElementHandle, *Position) (interface{}, error)
 
 	// evalFunc is a common interface for both evalWithScript and eval.
 	// It helps abstracting these methods to aid with testing.
@@ -33,7 +33,7 @@ type (
 )
 
 func getElementHandleActionFn(
-	h *ElementHandle, states []string, fn elementHandleActionFn, force, noWaitAfter bool, timeout time.Duration,
+	h *ElementHandle, states []string, fn elementHandleActionFunc, force, noWaitAfter bool, timeout time.Duration,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// All or a subset of the following actionability checks are made before performing the actual action:
 	// 1. Attached to DOM
@@ -79,7 +79,7 @@ func getElementHandleActionFn(
 func getElementHandlePointerActionFn(
 	h *ElementHandle,
 	checkEnabled bool,
-	fn elementHandlePointerActionFn,
+	fn elementHandlePointerActionFunc,
 	opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// All or a subset of the following actionability checks are made before performing the actual action:

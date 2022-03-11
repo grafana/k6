@@ -1588,7 +1588,7 @@ type frameExecutionContext interface {
 
 //nolint:unparam
 func frameActionFn(
-	f *Frame, selector string, state DOMElementState, strict bool, fn elementHandleActionFn, states []string,
+	f *Frame, selector string, state DOMElementState, strict bool, fn elementHandleActionFunc, states []string,
 	force, noWaitAfter bool, timeout time.Duration,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// We execute a frame action in the following steps:
@@ -1616,7 +1616,7 @@ func frameActionFn(
 
 //nolint:unparam
 func framePointerActionFn(
-	f *Frame, selector string, state DOMElementState, strict bool, fn elementHandlePointerActionFn,
+	f *Frame, selector string, state DOMElementState, strict bool, fn elementHandlePointerActionFunc,
 	opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// We execute a frame pointer action in the following steps:
