@@ -33,6 +33,7 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -78,6 +79,8 @@ type Browser struct {
 	sessionIDtoTargetIDMu sync.RWMutex
 	sessionIDtoTargetID   map[target.SessionID]target.ID
 
+	vu k6modules.VU
+
 	logger *Logger
 }
 
@@ -102,6 +105,7 @@ func newBrowser(ctx context.Context, cancelFn context.CancelFunc, browserProc *B
 		contexts:            make(map[cdp.BrowserContextID]*BrowserContext),
 		pages:               make(map[target.ID]*Page),
 		sessionIDtoTargetID: make(map[target.SessionID]target.ID),
+		vu:                  GetVU(ctx),
 		logger:              logger,
 	}
 }
@@ -173,6 +177,7 @@ func (b *Browser) initEvents() error {
 					b.logger.Debugf("Browser:initEvents:EventConnectionClose", "")
 					b.browserProc.didLoseConnection()
 					b.cancelFn()
+					return
 				}
 			}
 		}
@@ -446,6 +451,35 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 func (b *Browser) NewPage(opts goja.Value) api.Page {
 	browserCtx := b.NewContext(opts)
 	return browserCtx.NewPage()
+}
+
+// On returns a Promise that is resolved when the browser process is disconnected.
+// The only accepted event value is "disconnected".
+func (b *Browser) On(event string) *goja.Promise {
+	if event != EventBrowserDisconnected {
+		k6Throw(b.ctx, "unknown browser event: %q, must be %q", event, EventBrowserDisconnected)
+	}
+
+	rt := b.vu.Runtime()
+	cb := b.vu.RegisterCallback()
+	p, resolve, reject := rt.NewPromise()
+
+	go func() {
+		select {
+		case <-b.browserProc.lostConnection:
+			cb(func() error {
+				resolve(true)
+				return nil
+			})
+		case <-b.ctx.Done():
+			cb(func() error {
+				reject(fmt.Errorf("browser.on promise rejected: %w", b.ctx.Err()))
+				return nil
+			})
+		}
+	}()
+
+	return p
 }
 
 // UserAgent returns the controlled browser's user agent string.
