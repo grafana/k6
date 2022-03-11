@@ -227,7 +227,7 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position) (bool, error) {
 	frame := h.ownerFrame(apiCtx)
 	if frame != nil && frame.parentFrame != nil {
-		element := h.frame.FrameElement().(*ElementHandle)
+		element := h.frame.FrameElement().(*ElementHandle) //nolint:forcetypeassert
 		box, err := element.boundingBox()
 		if err != nil {
 			return false, err
@@ -236,8 +236,8 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 			return false, errors.New("cannot get bounding box of element")
 		}
 		// Translate from viewport coordinates to frame coordinates.
-		point.X = point.X - box.X
-		point.Y = point.Y - box.Y
+		point.X -= box.X
+		point.Y -= box.Y
 	}
 	fn := `
 		(node, injected, point) => {
@@ -253,15 +253,24 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 		return false, err
 	}
 
+	// Either we're done or an error happened (returned as "error:..." from JS)
+	const done = "done"
+	//nolint:forcetypeassert
 	value := result.(goja.Value)
-	switch value.ExportType().Kind() {
-	case reflect.String: // Either we're done or an error happened (returned as "error:..." from JS)
-		if value.String() == "done" {
-			return true, nil
-		}
+	if value.ExportType().Kind() != reflect.String {
+		// We got a { hitTargetDescription: ... } result
+		// Meaning: Another element is preventing pointer events.
+		//
+		// It's safe to count an object return as an interception.
+		// We just don't interpret what is intercepting with the target element
+		// because we don't need any more functionality from this JS function
+		// right now.
+		return false, errorFromDOMError("error:intercept")
+	} else if value.String() != done {
 		return false, errorFromDOMError(value.String())
 	}
-	return true, nil // We got a { hitTargetDescription: ... } result
+
+	return true, nil
 }
 
 func (h *ElementHandle) checkElementState(apiCtx context.Context, state string) (*bool, error) {
@@ -296,85 +305,89 @@ func (h *ElementHandle) click(p *Position, opts *MouseClickOptions) error {
 }
 
 func (h *ElementHandle) clickablePoint() (*Position, error) {
-	var quads []dom.Quad
-	var layoutViewport *cdppage.LayoutViewport
-	var err error
-
-	action := dom.GetContentQuads().
-		WithObjectID(h.remoteObject.ObjectID)
-	if quads, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		return nil, fmt.Errorf("cannot request node content quads %T: %w", action, err)
+	var (
+		quads []dom.Quad
+		err   error
+	)
+	getContentQuads := dom.GetContentQuads().WithObjectID(h.remoteObject.ObjectID)
+	if quads, err = getContentQuads.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+		return nil, fmt.Errorf("cannot request node content quads %T: %w", getContentQuads, err)
 	}
 	if len(quads) == 0 {
 		return nil, fmt.Errorf("node is either not visible or not an HTMLElement: %w", err)
 	}
 
-	action2 := cdppage.GetLayoutMetrics()
-	if layoutViewport, _, _, _, _, _, err = action2.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		return nil, fmt.Errorf("cannot get page layout metrics %T: %w", action, err)
+	// Filter out quads that have too small area to click into.
+	var layoutViewport *cdppage.LayoutViewport
+	getLayoutMetrics := cdppage.GetLayoutMetrics()
+	if _, _, _, layoutViewport, _, _, err = getLayoutMetrics.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+		return nil, fmt.Errorf("cannot get page layout metrics %T: %w", getLayoutMetrics, err)
 	}
 
-	// Filter out quads that have too small area to click into.
-	clientWidth := layoutViewport.ClientWidth
-	clientHeight := layoutViewport.ClientHeight
+	return filterQuads(layoutViewport.ClientWidth, layoutViewport.ClientHeight, quads)
+}
+
+func filterQuads(viewportWidth, viewportHeight int64, quads []dom.Quad) (*Position, error) {
 	var filteredQuads []dom.Quad
 	for _, q := range quads {
+		// Keep the points within the viewport and positive.
 		nq := q
 		for i := 0; i < len(q); i += 2 {
-			nq[i] = math.Min(math.Max(q[i], 0), float64(clientWidth))
-			nq[i+1] = math.Min(math.Max(q[i+1], 0), float64(clientHeight))
+			nq[i] = math.Min(math.Max(q[i], 0), float64(viewportWidth))
+			nq[i+1] = math.Min(math.Max(q[i+1], 0), float64(viewportHeight))
 		}
-
 		// Compute sum of all directed areas of adjacent triangles
 		// https://en.wikipedia.org/wiki/Polygon#Area
-		var area float64 = 0
+		var area float64
 		for i := 0; i < len(q); i += 2 {
 			p2 := (i + 2) % (len(q) / 2)
 			area += (q[i]*q[p2+1] - q[p2]*q[i+1]) / 2
 		}
-
-		if math.Abs(area) > 1 {
+		// We don't want to click on something less than a pixel.
+		if math.Abs(area) > 0.99 {
 			filteredQuads = append(filteredQuads, q)
 		}
 	}
-
 	if len(filteredQuads) == 0 {
-		return nil, fmt.Errorf("node is either not visible or not an HTMLElement: %w", err)
+		return nil, errors.New("node is either not visible or not an HTMLElement")
 	}
 
 	// Return the middle point of the first quad.
-	content := filteredQuads[0]
-	c := len(content)
-	var x, y float64
-	for i := 0; i < c; i += 2 {
-		x += content[i]
-		y += content[i+1]
+	var (
+		first = filteredQuads[0]
+		l     = len(first)
+		n     = (float64(l) / 2)
+		p     Position
+	)
+	for i := 0; i < l; i += 2 {
+		p.X += first[i] / n
+		p.Y += first[i+1] / n
 	}
-	x /= float64(c / 2)
-	y /= float64(c / 2)
-	p := Position{X: x, Y: y}
 
-	// Firefox internally uses integer coordinates, so 8.5 is converted to 9 when clicking.
-	//
-	// This does not work nicely for small elements. For example, 1x1 square with corners
-	// (8;8) and (9;9) is targeted when clicking at (8;8) but not when clicking at (9;9).
-	// So, clicking at (8.5;8.5) will effectively click at (9;9) and miss the target.
-	//
-	// Therefore, we skew half-integer values from the interval (8.49, 8.51) towards
-	// (8.47, 8.49) that is rounded towards 8. This means clicking at (8.5;8.5) will
-	// be replaced with (8.48;8.48) and will effectively click at (8;8).
-	//
-	// Other browsers use float coordinates, so this change should not matter.
-	remainderX := p.X - math.Floor(p.X)
-	if remainderX > 0.49 && remainderX < 0.51 {
-		p.X -= 0.02
-	}
-	remainderY := p.Y - math.Floor(p.Y)
-	if remainderY > 0.49 && remainderY < 0.51 {
-		p.Y -= 0.02
-	}
+	p = compensateHalfIntegerRoundingError(p)
 
 	return &p, nil
+}
+
+// Firefox internally uses integer coordinates, so 8.5 is converted to 9 when clicking.
+//
+// This does not work nicely for small elements. For example, 1x1 square with corners
+// (8;8) and (9;9) is targeted when clicking at (8;8) but not when clicking at (9;9).
+// So, clicking at (8.5;8.5) will effectively click at (9;9) and miss the target.
+//
+// Therefore, we skew half-integer values from the interval (8.49, 8.51) towards
+// (8.47, 8.49) that is rounded towards 8. This means clicking at (8.5;8.5) will
+// be replaced with (8.48;8.48) and will effectively click at (8;8).
+//
+// Other browsers use float coordinates, so this change should not matter.
+func compensateHalfIntegerRoundingError(p Position) Position {
+	if rx := p.X - math.Floor(p.X); rx > 0.49 && rx < 0.51 {
+		p.X -= 0.02
+	}
+	if ry := p.Y - math.Floor(p.Y); ry > 0.49 && ry < 0.51 {
+		p.Y -= 0.02
+	}
+	return p
 }
 
 func (h *ElementHandle) dblClick(p *Position, opts *MouseClickOptions) error {
@@ -1485,6 +1498,7 @@ func errorFromDOMError(derr string) error {
 		"error:strictmodeviolation":    "strict mode violation, multiple elements returned for selector query",
 		"error:notqueryablenode":       "node is not queryable",
 		"error:nthnocapture":           "can't query n-th element in a chained selector with capture",
+		"error:intercept":              "another element is intercepting with pointer action",
 	}
 	if err, ok := errs[derr]; ok {
 		return errors.New(err)
