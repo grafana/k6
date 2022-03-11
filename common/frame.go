@@ -1609,8 +1609,8 @@ func frameActionFn(
 			resultCh <- nil
 			return
 		}
-		actFn := getElementHandleActionFn(handle, states, fn, false, false, timeout)
-		actFn(apiCtx, resultCh, errCh)
+		f := handle.newAction(states, fn, false, false, timeout)
+		f(apiCtx, resultCh, errCh)
 	}
 }
 
@@ -1637,7 +1637,7 @@ func framePointerActionFn(
 			resultCh <- nil
 			return
 		}
-		pointerActFn := getElementHandlePointerActionFn(handle, true, fn, opts)
-		pointerActFn(apiCtx, resultCh, errCh)
+		f := handle.newPointerAction(fn, opts)
+		f(apiCtx, resultCh, errCh)
 	}
 }
