@@ -260,6 +260,11 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 	if value.ExportType().Kind() != reflect.String {
 		// We got a { hitTargetDescription: ... } result
 		// Meaning: Another element is preventing pointer events.
+		//
+		// It's safe to count an object return as an interception.
+		// We just don't interpret what is intercepting with the target element
+		// because we don't need any more functionality from this JS function
+		// right now.
 		return false, errorFromDOMError("error:intercept")
 	} else if value.String() != done {
 		return false, errorFromDOMError(value.String())
@@ -325,6 +330,7 @@ func (h *ElementHandle) clickablePoint() (*Position, error) {
 func filterQuads(viewportWidth, viewportHeight int64, quads []dom.Quad) (*Position, error) {
 	var filteredQuads []dom.Quad
 	for _, q := range quads {
+		// Keep the points within the viewport and positive.
 		nq := q
 		for i := 0; i < len(q); i += 2 {
 			nq[i] = math.Min(math.Max(q[i], 0), float64(viewportWidth))
@@ -337,7 +343,7 @@ func filterQuads(viewportWidth, viewportHeight int64, quads []dom.Quad) (*Positi
 			p2 := (i + 2) % (len(q) / 2)
 			area += (q[i]*q[p2+1] - q[p2]*q[i+1]) / 2
 		}
-		// Count any area above 0.99px is clickable
+		// We don't want to click on something less than a pixel.
 		if math.Abs(area) > 0.99 {
 			filteredQuads = append(filteredQuads, q)
 		}
