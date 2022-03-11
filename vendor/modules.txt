@@ -80,7 +80,9 @@ github.com/josharian/intern
 # github.com/klauspost/compress v1.13.6
 ## explicit; go 1.15
 github.com/klauspost/compress
+github.com/klauspost/compress/flate
 github.com/klauspost/compress/fse
+github.com/klauspost/compress/gzip
 github.com/klauspost/compress/huff0
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd

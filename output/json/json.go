@@ -22,11 +22,12 @@ package json
 
 import (
 	"bufio"
-	"compress/gzip"
 	"fmt"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/klauspost/compress/gzip"
 
 	"github.com/mailru/easyjson/jwriter"
 
