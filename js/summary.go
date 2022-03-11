@@ -49,8 +49,6 @@ func metricValueGetter(summaryTrendStats []string) func(stats.Sink, time.Duratio
 	}
 
 	return func(sink stats.Sink, t time.Duration) (result map[string]float64) {
-		sink.Calc()
-
 		switch sink := sink.(type) {
 		case *stats.CounterSink:
 			result = sink.Format(t)
