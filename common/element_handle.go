@@ -1316,17 +1316,11 @@ func (h *ElementHandle) newAction(
 	// 2. Visible
 	// 3. Stable
 	// 4. Enabled
-
-	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
-		var result interface{}
-		var err error
-
+	actionFn := func(apiCtx context.Context) (interface{}, error) {
 		// Check if we should run actionability checks
 		if !force {
-			_, err = h.waitForElementState(apiCtx, states, timeout)
-			if err != nil {
-				errCh <- err
-				return
+			if _, err := h.waitForElementState(apiCtx, states, timeout); err != nil {
+				return nil, err
 			}
 		}
 
@@ -1334,21 +1328,26 @@ func (h *ElementHandle) newAction(
 		h.frame.manager.addBarrier(b)
 		defer h.frame.manager.removeBarrier(b)
 
-		result, err = fn(apiCtx, h)
+		res, err := fn(apiCtx, h)
 		if err != nil {
-			errCh <- err
-			return
+			return nil, err
 		}
-
 		// Do we need to wait for navigation to happen
 		if !noWaitAfter {
 			if err := b.Wait(apiCtx); err != nil {
-				errCh <- err
-				return
+				return nil, err
 			}
 		}
 
-		resultCh <- result
+		return res, nil
+	}
+
+	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
+		if res, err := actionFn(apiCtx); err != nil {
+			errCh <- err
+		} else {
+			resultCh <- res
+		}
 	}
 }
 
