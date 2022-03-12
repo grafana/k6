@@ -78,13 +78,6 @@ You can also run the linter inside the docker container, which will benefit from
 make ci-like-lint
 ```
 
-If you've added new dependencies (and just in case [we have a policy about it](Dependencies.md)) you might also want to check and make sure all dependencies exists in `vendor/` folder by running:
-
-```bash
-go get -u github.com/FiloSottile/vendorcheck
-vendorcheck ./...
-```
-
 **Running the test suite**:
 
 To exercise the entire test suite:
@@ -110,6 +103,10 @@ Combining the two above we can run a specific test case in a specific package:
 ```bash
 go test -race go.k6.io/k6/core -run ^TestEngineRun$
 ```
+
+**Dependencies**:
+
+Actual policy about managing k6's dependencies you can find in the [Dependencies.md](Dependencies.md).
 
 Style guide
 -----------
