@@ -23,6 +23,8 @@ package common
 import (
 	"context"
 	"crypto/tls"
+	"errors"
+	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -277,8 +279,10 @@ func (c *Connection) recvLoop() {
 	for {
 		_, buf, err := c.conn.ReadMessage()
 		if err != nil {
-			c.handleIOError(err)
-			c.logger.Debugf("Connection:recvLoop", "wsURL:%q ioErr:%v", c.wsURL, err)
+			if !errors.Is(err, net.ErrClosed) {
+				c.logger.Debugf("Connection:recvLoop", "wsURL:%q ioErr:%v", c.wsURL, err)
+				c.handleIOError(err)
+			}
 			return
 		}
 

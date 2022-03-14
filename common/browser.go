@@ -33,6 +33,7 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -59,11 +60,9 @@ type Browser struct {
 	browserProc *BrowserProcess
 	launchOpts  *LaunchOptions
 
-	// Connection to browser to talk CDP protocol.
+	// Connection to the browser to talk CDP protocol.
 	// A *Connection is saved to this field, see: connect().
-	conn        connection
-	connectedMu sync.RWMutex
-	connected   bool
+	conn connection
 
 	contextsMu     sync.RWMutex
 	contexts       map[cdp.BrowserContextID]*BrowserContext
@@ -79,6 +78,8 @@ type Browser struct {
 
 	sessionIDtoTargetIDMu sync.RWMutex
 	sessionIDtoTargetID   map[target.SessionID]target.ID
+
+	vu k6modules.VU
 
 	logger *Logger
 }
@@ -104,6 +105,7 @@ func newBrowser(ctx context.Context, cancelFn context.CancelFunc, browserProc *B
 		contexts:            make(map[cdp.BrowserContextID]*BrowserContext),
 		pages:               make(map[target.ID]*Page),
 		sessionIDtoTargetID: make(map[target.SessionID]target.ID),
+		vu:                  GetVU(ctx),
 		logger:              logger,
 	}
 }
@@ -116,10 +118,6 @@ func (b *Browser) connect() error {
 	}
 
 	b.conn = conn
-
-	b.connectedMu.Lock()
-	b.connected = true
-	b.connectedMu.Unlock()
 
 	// We don't need to lock this because `connect()` is called only in NewBrowser
 	b.defaultContext = NewBrowserContext(b.ctx, b, "", NewBrowserContextOptions(), b.logger)
@@ -177,12 +175,9 @@ func (b *Browser) initEvents() error {
 					b.onDetachedFromTarget(ev)
 				} else if event.typ == EventConnectionClose {
 					b.logger.Debugf("Browser:initEvents:EventConnectionClose", "")
-
-					b.connectedMu.Lock()
-					b.connected = false
-					b.connectedMu.Unlock()
 					b.browserProc.didLoseConnection()
 					b.cancelFn()
+					return
 				}
 			}
 		}
@@ -408,6 +403,7 @@ func (b *Browser) Close() {
 	// will stop emitting events.
 	b.browserProc.GracefulClose()
 	b.browserProc.Terminate()
+	b.conn.Close()
 }
 
 // Contexts returns list of browser contexts.
@@ -423,11 +419,10 @@ func (b *Browser) Contexts() []api.BrowserContext {
 	return contexts
 }
 
+// IsConnected returns whether the WebSocket connection to the browser process
+// is active or not.
 func (b *Browser) IsConnected() bool {
-	b.connectedMu.RLock()
-	defer b.connectedMu.RUnlock()
-
-	return b.connected
+	return b.browserProc.isConnected()
 }
 
 // NewContext creates a new incognito-like browser context.
@@ -456,6 +451,35 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 func (b *Browser) NewPage(opts goja.Value) api.Page {
 	browserCtx := b.NewContext(opts)
 	return browserCtx.NewPage()
+}
+
+// On returns a Promise that is resolved when the browser process is disconnected.
+// The only accepted event value is "disconnected".
+func (b *Browser) On(event string) *goja.Promise {
+	if event != EventBrowserDisconnected {
+		k6Throw(b.ctx, "unknown browser event: %q, must be %q", event, EventBrowserDisconnected)
+	}
+
+	rt := b.vu.Runtime()
+	cb := b.vu.RegisterCallback()
+	p, resolve, reject := rt.NewPromise()
+
+	go func() {
+		select {
+		case <-b.browserProc.lostConnection:
+			cb(func() error {
+				resolve(true)
+				return nil
+			})
+		case <-b.ctx.Done():
+			cb(func() error {
+				reject(fmt.Errorf("browser.on promise rejected: %w", b.ctx.Err()))
+				return nil
+			})
+		}
+	}()
+
+	return p
 }
 
 // UserAgent returns the controlled browser's user agent string.

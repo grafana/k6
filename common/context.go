@@ -20,7 +20,11 @@
 
 package common
 
-import "context"
+import (
+	"context"
+
+	k6modules "go.k6.io/k6/js/modules"
+)
 
 type ctxKey int
 
@@ -28,6 +32,7 @@ const (
 	ctxKeyLaunchOptions ctxKey = iota
 	ctxKeyPid
 	ctxKeyHooks
+	ctxKeyVU
 )
 
 func WithHooks(ctx context.Context, hooks *Hooks) context.Context {
@@ -63,6 +68,23 @@ func WithProcessID(ctx context.Context, pid int) context.Context {
 func GetProcessID(ctx context.Context) int {
 	v, _ := ctx.Value(ctxKeyPid).(int)
 	return v // it will return zero on error
+}
+
+// WithVU returns a new context based on ctx with the k6 VU instance attached.
+func WithVU(ctx context.Context, vu k6modules.VU) context.Context {
+	return context.WithValue(ctx, ctxKeyVU, vu)
+}
+
+// GetVU returns the attached k6 VU instance from ctx, which can be used to
+// retrieve the goja runtime and other k6 objects relevant to the currently
+// executing VU.
+// See https://github.com/grafana/k6/blob/v0.38.0/js/initcontext.go#L168-L186
+func GetVU(ctx context.Context) k6modules.VU {
+	v := ctx.Value(ctxKeyVU)
+	if vu, ok := v.(k6modules.VU); ok {
+		return vu
+	}
+	return nil
 }
 
 // contextWithDoneChan returns a new context that is canceled either

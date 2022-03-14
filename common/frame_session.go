@@ -302,10 +302,11 @@ func (fs *FrameSession) initFrameTree() error {
 	action2 := cdppage.GetFrameTree()
 	if frameTree, err = action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		return fmt.Errorf("unable to get page frame tree: %w", err)
+	} else if frameTree == nil {
+		// This can happen with very short scripts when we might not have enough
+		// time to initialize properly.
+		return fmt.Errorf("got a nil page frame tree")
 	}
-
-	// FIXME: frameTree is sometimes nil on Windows
-	// https://github.com/grafana/xk6-browser/runs/4036384507
 
 	if fs.isMainFrame() {
 		fs.handleFrameTree(frameTree)

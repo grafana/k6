@@ -32,7 +32,7 @@ type BrowserProcess struct {
 	// The process of the browser, if running locally.
 	process *os.Process
 
-	// Channels to for managing termination.
+	// Channels for managing termination.
 	lostConnection             chan struct{}
 	processIsGracefullyClosing chan struct{}
 
@@ -75,6 +75,16 @@ func NewBrowserProcess(
 
 func (p *BrowserProcess) didLoseConnection() {
 	close(p.lostConnection)
+}
+
+func (p *BrowserProcess) isConnected() bool {
+	var ok bool
+	select {
+	case _, ok = <-p.lostConnection:
+	default:
+		ok = true
+	}
+	return ok
 }
 
 // GracefulClose triggers a graceful closing of the browser process.
