@@ -45,13 +45,13 @@ List (as of March 2022):
 
 Currently, I will recommend using [modtools](https://github.com/dop251/modtools).
 
-Running `modtools check` will give you a list of packages that aren't frozen (the ones above in the exceptions).  Also, important that this lists both direct and indirect, so some care needs to be taken. Alternatively just running `go get <dependency>` for each direct one also will tell you if there were updates.
+Running `modtools check --direct-only` will give you a list of packages that aren't frozen (the ones above in the exceptions). Alternatively just running `go get <dependency>` for each direct dependency, which also will tell you if there was an update.
 
-Then go at look at the changelog between the version we are at and the latest version.
+Then take a look at the changelog between the versions.
  
-You can use the command `modtools check` provides you to update it. Run test and if relevant check that bugs are fixed or any other verification that is appropriate.
+You can use the command `modtools check --direct-only` provided you, to update it. Run tests and if relevant check that bugs are fixed or any other verification that is appropriate.
 
-Commit dependencies one by one with a message like `Update <dependency> from vX.Y.Z to vX.Y.Z` and a relevant changelog for k6. Sometimes that means "nothing of relevant for k6", sometimes it means a list of bugfixes or new features.
+Commit dependencies one by one with a message like `Update <dependency> from vX.Y.Z to vX.Y.Z` and a relevant changelog for k6. Sometimes that means "nothing of relevance for k6", sometimes it means a list of bug fixes or new features.
 
 It's preferable to make multiple PRs - in most cases you can split them in three:
 - update for goja - which usually needs to happen.
