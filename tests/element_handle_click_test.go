@@ -29,6 +29,8 @@ import (
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/common"
 )
 
 //go:embed static/mouse_helper.js
@@ -159,4 +161,40 @@ func TestElementHandleNonClickable(t *testing.T) {
 		},
 		"element should not be clickable",
 	)
+}
+
+func TestElementHandleClickConcealedLink(t *testing.T) {
+	const (
+		wantBefore = "🙈"
+		wantAfter  = "🐵"
+	)
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewContext(
+		tb.rt.ToValue(struct {
+			Viewport common.Viewport `js:"viewport"`
+		}{
+			Viewport: common.Viewport{
+				Width:  500,
+				Height: 240,
+			},
+		}),
+	).NewPage()
+
+	clickResult := func() string {
+		const cmd = `
+			() => window.clickResult
+		`
+		cr := p.Evaluate(tb.rt.ToValue(cmd))
+		return cr.(goja.Value).String() //nolint:forcetypeassert
+	}
+	require.NotNil(t, p.Goto(tb.staticURL("/concealed_link.html"), nil))
+	require.Equal(t, wantBefore, clickResult())
+	require.NotPanicsf(t,
+		func() {
+			p.Click("#concealed", nil)
+		},
+		"element should be clickable",
+	)
+	require.Equal(t, wantAfter, clickResult())
 }
