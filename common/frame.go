@@ -658,7 +658,9 @@ func (f *Frame) Check(selector string, opts goja.Value) {
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
 		return nil, handle.setChecked(apiCtx, true, p)
 	}
-	actFn := framePointerActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions)
+	actFn := f.newPointerAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
+	)
 	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -693,7 +695,9 @@ func (f *Frame) Click(selector string, opts goja.Value) {
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
 		return nil, handle.click(p, parsedOpts.ToMouseClickOptions())
 	}
-	actFn := framePointerActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions)
+	actFn := f.newPointerAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
+	)
 	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -732,7 +736,9 @@ func (f *Frame) Dblclick(selector string, opts goja.Value) {
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
 		return nil, handle.dblClick(p, parsedOpts.ToMouseClickOptions())
 	}
-	actFn := framePointerActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions)
+	actFn := f.newPointerAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
+	)
 	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -753,7 +759,10 @@ func (f *Frame) DispatchEvent(selector string, typ string, eventInit goja.Value,
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.dispatchEvent(apiCtx, typ, eventInit)
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, parsedOpts.Force, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{},
+		parsedOpts.Force, parsedOpts.NoWaitAfter, parsedOpts.Timeout,
+	)
 	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -822,7 +831,10 @@ func (f *Frame) Fill(selector string, value string, opts goja.Value) {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.fill(apiCtx, value)
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{"visible", "enabled", "editable"}, parsedOpts.Force, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{"visible", "enabled", "editable"},
+		parsedOpts.Force, parsedOpts.NoWaitAfter, parsedOpts.Timeout,
+	)
 	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -844,7 +856,9 @@ func (f *Frame) Focus(selector string, opts goja.Value) {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return nil, handle.focus(apiCtx, true)
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	)
 	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -876,7 +890,9 @@ func (f *Frame) GetAttribute(selector string, name string, opts goja.Value) goja
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.getAttribute(apiCtx, name)
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -907,7 +923,9 @@ func (f *Frame) Hover(selector string, opts goja.Value) {
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
 		return nil, handle.hover(apiCtx, p)
 	}
-	actFn := framePointerActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions)
+	actFn := f.newPointerAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
+	)
 	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -928,7 +946,9 @@ func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.innerHTML(apiCtx)
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -950,7 +970,9 @@ func (f *Frame) InnerText(selector string, opts goja.Value) string {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.innerText(apiCtx)
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -972,7 +994,9 @@ func (f *Frame) InputValue(selector string, opts goja.Value) string {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.inputValue(apiCtx)
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -998,7 +1022,9 @@ func (f *Frame) IsChecked(selector string, opts goja.Value) bool {
 		}
 		return value, err
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1040,7 +1066,9 @@ func (f *Frame) IsDisabled(selector string, opts goja.Value) bool {
 		}
 		return value, err
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1066,7 +1094,9 @@ func (f *Frame) IsEditable(selector string, opts goja.Value) bool {
 		}
 		return value, err
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1092,7 +1122,9 @@ func (f *Frame) IsEnabled(selector string, opts goja.Value) bool {
 		}
 		return value, err
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1118,7 +1150,9 @@ func (f *Frame) IsHidden(selector string, opts goja.Value) bool {
 		}
 		return value, err
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1144,7 +1178,9 @@ func (f *Frame) IsVisible(selector string, opts goja.Value) bool {
 		}
 		return value, err
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1232,7 +1268,10 @@ func (f *Frame) Press(selector string, key string, opts goja.Value) {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return nil, handle.press(apiCtx, key, parsedOpts.ToKeyboardOptions())
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false,
+		parsedOpts.NoWaitAfter, parsedOpts.Timeout,
+	)
 	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1253,7 +1292,10 @@ func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.selectOption(apiCtx, values)
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, parsedOpts.Force, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{},
+		parsedOpts.Force, parsedOpts.NoWaitAfter, parsedOpts.Timeout,
+	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1324,7 +1366,9 @@ func (f *Frame) Tap(selector string, opts goja.Value) {
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
 		return nil, handle.tap(apiCtx, p)
 	}
-	actFn := framePointerActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions)
+	actFn := f.newPointerAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
+	)
 	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1345,7 +1389,9 @@ func (f *Frame) TextContent(selector string, opts goja.Value) string {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.textContent(apiCtx)
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1374,7 +1420,10 @@ func (f *Frame) Type(selector string, text string, opts goja.Value) {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return nil, handle.typ(apiCtx, text, parsedOpts.ToKeyboardOptions())
 	}
-	actFn := frameActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false,
+		parsedOpts.NoWaitAfter, parsedOpts.Timeout,
+	)
 	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1396,7 +1445,9 @@ func (f *Frame) Uncheck(selector string, opts goja.Value) {
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
 		return nil, handle.setChecked(apiCtx, false, p)
 	}
-	actFn := framePointerActionFn(f, selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions)
+	actFn := f.newPointerAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
+	)
 	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -1439,7 +1490,8 @@ func (f *Frame) WaitForFunction(pageFunc goja.Value, opts goja.Value, args ...go
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
-	handle, err := f.waitForFunction(f.ctx, utilityWorld, pageFunc, parsedOpts.Polling, parsedOpts.Interval, parsedOpts.Timeout, args...)
+	handle, err := f.waitForFunction(f.ctx, utilityWorld, pageFunc,
+		parsedOpts.Polling, parsedOpts.Interval, parsedOpts.Timeout, args...)
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
@@ -1587,15 +1639,14 @@ type frameExecutionContext interface {
 }
 
 //nolint:unparam
-func frameActionFn(
-	f *Frame, selector string, state DOMElementState, strict bool, fn elementHandleActionFunc, states []string,
+func (f *Frame) newAction(
+	selector string, state DOMElementState, strict bool, fn elementHandleActionFunc, states []string,
 	force, noWaitAfter bool, timeout time.Duration,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// We execute a frame action in the following steps:
 	// 1. Find element matching specified selector
 	// 2. Wait for it to reach specified DOM state
 	// 3. Run element handle action (incl. actionability checks)
-
 	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 		waitOpts.State = state
@@ -1615,15 +1666,14 @@ func frameActionFn(
 }
 
 //nolint:unparam
-func framePointerActionFn(
-	f *Frame, selector string, state DOMElementState, strict bool, fn elementHandlePointerActionFunc,
+func (f *Frame) newPointerAction(
+	selector string, state DOMElementState, strict bool, fn elementHandlePointerActionFunc,
 	opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 	// We execute a frame pointer action in the following steps:
 	// 1. Find element matching specified selector
 	// 2. Wait for it to reach specified DOM state
 	// 3. Run element handle action (incl. actionability checks)
-
 	return func(apiCtx context.Context, resultCh chan interface{}, errCh chan error) {
 		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 		waitOpts.State = state
