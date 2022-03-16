@@ -33,7 +33,7 @@ List (as of March 2022):
 - github.com/andybalholm/cascadia - a dependency of `github.com/PuerkitoBio/goquery`
 - github.com/sirupsen/logrus - it's in maintenance mode and we want to remove it - also no update for a long time, but also no bugs.
 - github.com/spf13/afero - there are plans to be [replaced by io/fs](https://github.com/grafana/k6/issues/1079) and we don't need anything from it. We have already worked around some bugs so updating might break something
-- github.com/spf13/cobra - none of the newer features are particularly needed, but adds a bunch of new dependencies. Might want to replace it with https://github.com/muesli/coral
+- github.com/spf13/cobra - none of the newer features are particularly needed, but adds a bunch of new dependencies.
 - github.com/spf13/pflag - similar to above
 - gopkg.in/guregu/null.v3 - no new interesting features and we probably want to drop it in favor of [croconf](https://github.com/grafana/croconf)
 - gopkg.in/yaml.v3 - no new features wanted - actually used directly in only one place to output yaml to stdout.
@@ -58,4 +58,4 @@ It's preferable to make multiple PRs - in most cases you can split them in three
 - update for `golang.org/x/*` - also again happen literally every release
 - everything else - this in general doesn't include more than 5-6 small updates.
 
-Further splitting is recommended if PRs become too big. 
+Further splitting is recommended if PRs become too big.
