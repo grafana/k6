@@ -104,6 +104,18 @@ func getBanner(noColor bool) string {
 	return c.Sprint(consts.Banner())
 }
 
+func printBanner(gs *globalState) {
+	if gs.flags.quiet {
+		return // do not print banner when --quiet is enabled
+	}
+
+	banner := getBanner(gs.flags.noColor || !gs.stdOut.isTTY)
+	_, err := fmt.Fprintf(gs.stdOut, "\n%s\n\n", banner)
+	if err != nil {
+		gs.logger.Warnf("could not print k6 banner message to stdout: %s", err.Error())
+	}
+}
+
 func printBar(gs *globalState, bar *pb.ProgressBar) {
 	if gs.flags.quiet {
 		return
@@ -124,7 +136,7 @@ func printBar(gs *globalState, bar *pb.ProgressBar) {
 	}
 	rendered := bar.Render(0, widthDelta)
 	// Only output the left and middle part of the progress bar
-	fprintf(gs.stdOut, "%s%s", rendered.String(), end)
+	printToStdout(gs, rendered.String()+end)
 }
 
 func modifyAndPrintBar(gs *globalState, bar *pb.ProgressBar, options ...pb.ProgressBarOption) {
@@ -141,8 +153,9 @@ func printExecutionDescription(
 	noColor := gs.flags.noColor || !gs.stdOut.isTTY
 	valueColor := getColor(noColor, color.FgCyan)
 
-	fprintf(gs.stdOut, "  execution: %s\n", valueColor.Sprint(execution))
-	fprintf(gs.stdOut, "     script: %s\n", valueColor.Sprint(filename))
+	buf := &strings.Builder{}
+	fmt.Fprintf(buf, "  execution: %s\n", valueColor.Sprint(execution))
+	fmt.Fprintf(buf, "     script: %s\n", valueColor.Sprint(filename))
 
 	var outputDescriptions []string
 	switch {
@@ -156,8 +169,8 @@ func printExecutionDescription(
 		}
 	}
 
-	fprintf(gs.stdOut, "     output: %s\n", valueColor.Sprint(strings.Join(outputDescriptions, ", ")))
-	fprintf(gs.stdOut, "\n")
+	fmt.Fprintf(buf, "     output: %s\n", valueColor.Sprint(strings.Join(outputDescriptions, ", ")))
+	fmt.Fprintf(buf, "\n")
 
 	maxDuration, _ := lib.GetEndOffset(execPlan)
 	executorConfigs := conf.Scenarios.GetSortedConfigs()
@@ -167,16 +180,22 @@ func printExecutionDescription(
 		scenarioDesc = fmt.Sprintf("%d scenarios", len(executorConfigs))
 	}
 
-	fprintf(gs.stdOut, "  scenarios: %s\n", valueColor.Sprintf(
+	fmt.Fprintf(buf, "  scenarios: %s\n", valueColor.Sprintf(
 		"(%.2f%%) %s, %d max VUs, %s max duration (incl. graceful stop):",
 		conf.ExecutionSegment.FloatLength()*100, scenarioDesc,
 		lib.GetMaxPossibleVUs(execPlan), maxDuration.Round(100*time.Millisecond)),
 	)
 	for _, ec := range executorConfigs {
-		fprintf(gs.stdOut, "           * %s: %s\n",
+		fmt.Fprintf(buf, "           * %s: %s\n",
 			ec.GetName(), ec.GetDescription(et))
 	}
-	fprintf(gs.stdOut, "\n")
+	fmt.Fprintf(buf, "\n")
+
+	if gs.flags.quiet {
+		gs.logger.Debug(buf.String())
+	} else {
+		printToStdout(gs, buf.String())
+	}
 }
 
 //nolint: funlen
