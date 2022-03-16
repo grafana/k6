@@ -366,6 +366,11 @@ func (n *SignedFloatLiteralNode) AsFloat() float64 {
 }
 
 // BoolLiteralNode represents a boolean literal.
+//
+// Deprecated: The AST uses IdentNode for boolean literals, where the
+// identifier value is "true" or "false". This is required because an
+// identifier "true" is not necessarily a boolean value as it could also
+// be an enum value named "true" (ditto for "false").
 type BoolLiteralNode struct {
 	*KeywordNode
 	Val bool
@@ -526,8 +531,9 @@ type MessageFieldNode struct {
 	compositeNode
 	Name *FieldReferenceNode
 	// Sep represents the ':' separator between the name and value. If
-	// the value is a message literal (and thus starts with '<' or '{'),
-	// then the separator is optional, and thus may be nil.
+	// the value is a message literal (and thus starts with '<' or '{')
+	// or an array literal (starting with '[') then the separator is
+	// optional, and thus may be nil.
 	Sep *RuneNode
 	Val ValueNode
 }

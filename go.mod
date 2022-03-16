@@ -10,10 +10,10 @@ require (
 	github.com/andybalholm/brotli v1.0.3
 	github.com/dop251/goja v0.0.0-20220214123719-b09a6bfa842f
 	github.com/fatih/color v1.12.0
-	github.com/golang/protobuf v1.4.3
+	github.com/golang/protobuf v1.5.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
-	github.com/jhump/protoreflect v1.10.0
+	github.com/jhump/protoreflect v1.12.0
 	github.com/klauspost/compress v1.13.6
 	github.com/mailru/easyjson v0.7.7
 	github.com/mattn/go-colorable v0.1.8
@@ -35,7 +35,7 @@ require (
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65
 	google.golang.org/grpc v1.41.0
-	google.golang.org/protobuf v1.25.1-0.20200805231151-a709e31e5d12
+	google.golang.org/protobuf v1.26.0
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 )

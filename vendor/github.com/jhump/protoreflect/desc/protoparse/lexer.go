@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -237,7 +238,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			if cn >= '0' && cn <= '9' {
 				l.adjustPos(cn)
 				token := l.readNumber(c, cn)
-				f, err := strconv.ParseFloat(token, 64)
+				f, err := parseFloat(token)
 				if err != nil {
 					l.setError(lval, numError(err, "float", token))
 					return _ERROR
@@ -278,7 +279,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			}
 			if strings.Contains(token, ".") || strings.Contains(token, "e") || strings.Contains(token, "E") {
 				// floating point!
-				f, err := strconv.ParseFloat(token, 64)
+				f, err := parseFloat(token)
 				if err != nil {
 					l.setError(lval, numError(err, "float", token))
 					return _ERROR
@@ -287,14 +288,21 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 				return _FLOAT_LIT
 			}
 			// integer! (decimal or octal)
-			ui, err := strconv.ParseUint(token, 0, 64)
+			base := 10
+			if token[0] == '0' {
+				base = 8
+			}
+			ui, err := strconv.ParseUint(token, base, 64)
 			if err != nil {
 				kind := "integer"
+				if base == 8 {
+					kind = "octal integer"
+				}
 				if numErr, ok := err.(*strconv.NumError); ok && numErr.Err == strconv.ErrRange {
 					// if it's too big to be an int, parse it as a float
 					var f float64
 					kind = "float"
-					f, err = strconv.ParseFloat(token, 64)
+					f, err = parseFloat(token)
 					if err == nil {
 						l.setFloat(lval, f)
 						return _FLOAT_LIT
@@ -327,7 +335,10 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			}
 			if cn == '/' {
 				l.adjustPos(cn)
-				hitNewline := l.skipToEndOfLineComment()
+				hitNewline, hasErr := l.skipToEndOfLineComment(lval)
+				if hasErr {
+					return _ERROR
+				}
 				comment := l.newComment()
 				comment.PosRange.End.Col++
 				if hitNewline {
@@ -341,24 +352,52 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			}
 			if cn == '*' {
 				l.adjustPos(cn)
-				if ok := l.skipToEndOfBlockComment(); !ok {
+				ok, hasErr := l.skipToEndOfBlockComment(lval)
+				if hasErr {
+					return _ERROR
+				}
+				if !ok {
 					l.setError(lval, errors.New("block comment never terminates, unexpected EOF"))
 					return _ERROR
-				} else {
-					l.comments = append(l.comments, l.newComment())
 				}
+				l.comments = append(l.comments, l.newComment())
 				continue
 			}
 			l.input.unreadRune(cn)
 		}
 
-		if c > 255 {
+		if c < 32 || c == 127 {
+			l.setError(lval, errors.New("invalid control character"))
+			return _ERROR
+		}
+		if !strings.ContainsRune(";,.:=-+(){}[]<>/", c) {
 			l.setError(lval, errors.New("invalid character"))
 			return _ERROR
 		}
 		l.setRune(lval, c)
 		return int(c)
 	}
+}
+
+func parseFloat(token string) (float64, error) {
+	// strconv.ParseFloat allows _ to separate digits, but protobuf does not
+	if strings.ContainsRune(token, '_') {
+		return 0, &strconv.NumError{
+			Func: "parseFloat",
+			Num:  token,
+			Err:  strconv.ErrSyntax,
+		}
+	}
+	f, err := strconv.ParseFloat(token, 64)
+	if err == nil {
+		return f, nil
+	}
+	if numErr, ok := err.(*strconv.NumError); ok && numErr.Err == strconv.ErrRange && math.IsInf(f, 1) {
+		// protoc doesn't complain about float overflow and instead just uses "infinity"
+		// so we mirror that behavior by just returning infinity and ignoring the error
+		return f, nil
+	}
+	return f, err
 }
 
 func (l *protoLex) posRange() ast.PosRange {
@@ -714,34 +753,42 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 	return buf.String(), nil
 }
 
-func (l *protoLex) skipToEndOfLineComment() bool {
+func (l *protoLex) skipToEndOfLineComment(lval *protoSymType) (ok, hasErr bool) {
 	for {
 		c, _, err := l.input.readRune()
 		if err != nil {
-			return false
+			return false, false
 		}
-		if c == '\n' {
-			return true
+		switch c {
+		case '\n':
+			return true, false
+		case 0:
+			l.setError(lval, errors.New("invalid control character"))
+			return false, true
 		}
 		l.adjustPos(c)
 	}
 }
 
-func (l *protoLex) skipToEndOfBlockComment() bool {
+func (l *protoLex) skipToEndOfBlockComment(lval *protoSymType) (ok, hasErr bool) {
 	for {
 		c, _, err := l.input.readRune()
 		if err != nil {
-			return false
+			return false, false
+		}
+		if c == 0 {
+			l.setError(lval, errors.New("invalid control character"))
+			return false, true
 		}
 		l.adjustPos(c)
 		if c == '*' {
 			c, _, err := l.input.readRune()
 			if err != nil {
-				return false
+				return false, false
 			}
 			if c == '/' {
 				l.adjustPos(c)
-				return true
+				return true, false
 			}
 			l.input.unreadRune(c)
 		}

@@ -279,13 +279,7 @@ scalarConstant : stringLit {
 	}
 	| numLit
 	| name {
-		if $1.Val == "true" || $1.Val == "false" {
-			$$ = ast.NewBoolLiteralNode($1.ToKeyword())
-		} else if $1.Val == "inf" || $1.Val == "nan" {
-			$$ = ast.NewSpecialFloatLiteralNode($1.ToKeyword())
-		} else {
-			$$ = $1
-		}
+        $$ = $1
 	}
 
 numLit : _FLOAT_LIT {
@@ -388,10 +382,27 @@ aggFieldEntry : aggName ':' scalarConstant {
 			$$ = nil
 		}
 	}
+	| aggName '[' ']' {
+		if $1 != nil {
+			val := ast.NewArrayLiteralNode($2, nil, nil, $3)
+			$$ = ast.NewMessageFieldNode($1, nil, val)
+		} else {
+			$$ = nil
+		}
+	}
 	| aggName ':' '[' ']' {
 		if $1 != nil {
 			val := ast.NewArrayLiteralNode($3, nil, nil, $4)
 			$$ = ast.NewMessageFieldNode($1, $2, val)
+		} else {
+			$$ = nil
+		}
+	}
+	| aggName '[' constantList ']' {
+		if $1 != nil {
+			vals, commas := $3.toNodes()
+			val := ast.NewArrayLiteralNode($2, vals, commas, $4)
+			$$ = ast.NewMessageFieldNode($1, nil, val)
 		} else {
 			$$ = nil
 		}
@@ -450,8 +461,11 @@ aggFieldEntry : aggName ':' scalarConstant {
 aggName : name {
 		$$ = ast.NewFieldReferenceNode($1)
 	}
-	| '[' typeIdent ']' {
-		$$ = ast.NewExtensionFieldReferenceNode($1, $2, $3)
+	| '[' ident ']' {
+		$$ = ast.NewExtensionFieldReferenceNode($1, $2.toIdentValueNode(nil), $3)
+	}
+	| '[' ident '/' ident ']' {
+		$$ = ast.NewAnyTypeReferenceNode($1, $2.toIdentValueNode(nil), $3, $4.toIdentValueNode(nil), $5)
 	}
 	| '[' error ']' {
 		$$ = nil

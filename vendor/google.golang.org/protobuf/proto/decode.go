@@ -45,12 +45,14 @@ type UnmarshalOptions struct {
 }
 
 // Unmarshal parses the wire-format message in b and places the result in m.
+// The provided message must be mutable (e.g., a non-nil pointer to a message).
 func Unmarshal(b []byte, m Message) error {
 	_, err := UnmarshalOptions{}.unmarshal(b, m.ProtoReflect())
 	return err
 }
 
 // Unmarshal parses the wire-format message in b and places the result in m.
+// The provided message must be mutable (e.g., a non-nil pointer to a message).
 func (o UnmarshalOptions) Unmarshal(b []byte, m Message) error {
 	_, err := o.unmarshal(b, m.ProtoReflect())
 	return err

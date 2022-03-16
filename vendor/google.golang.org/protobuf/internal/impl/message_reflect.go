@@ -58,10 +58,16 @@ func (mi *MessageInfo) makeKnownFieldsFunc(si structInfo) {
 	for i := 0; i < fds.Len(); i++ {
 		fd := fds.Get(i)
 		fs := si.fieldsByNumber[fd.Number()]
+		isOneof := fd.ContainingOneof() != nil && !fd.ContainingOneof().IsSynthetic()
+		if isOneof {
+			fs = si.oneofsByName[fd.ContainingOneof().Name()]
+		}
 		var fi fieldInfo
 		switch {
-		case fd.ContainingOneof() != nil && !fd.ContainingOneof().IsSynthetic():
-			fi = fieldInfoForOneof(fd, si.oneofsByName[fd.ContainingOneof().Name()], mi.Exporter, si.oneofWrappersByNumber[fd.Number()])
+		case fs.Type == nil:
+			fi = fieldInfoForMissing(fd) // never occurs for officially generated message types
+		case isOneof:
+			fi = fieldInfoForOneof(fd, fs, mi.Exporter, si.oneofWrappersByNumber[fd.Number()])
 		case fd.IsMap():
 			fi = fieldInfoForMap(fd, fs, mi.Exporter)
 		case fd.IsList():
@@ -179,8 +185,15 @@ func (mi *MessageInfo) makeFieldTypes(si structInfo) {
 		var ft reflect.Type
 		fd := fds.Get(i)
 		fs := si.fieldsByNumber[fd.Number()]
+		isOneof := fd.ContainingOneof() != nil && !fd.ContainingOneof().IsSynthetic()
+		if isOneof {
+			fs = si.oneofsByName[fd.ContainingOneof().Name()]
+		}
+		var isMessage bool
 		switch {
-		case fd.ContainingOneof() != nil && !fd.ContainingOneof().IsSynthetic():
+		case fs.Type == nil:
+			continue // never occurs for officially generated message types
+		case isOneof:
 			if fd.Enum() != nil || fd.Message() != nil {
 				ft = si.oneofWrappersByNumber[fd.Number()].Field(0).Type
 			}
@@ -188,13 +201,15 @@ func (mi *MessageInfo) makeFieldTypes(si structInfo) {
 			if fd.MapValue().Enum() != nil || fd.MapValue().Message() != nil {
 				ft = fs.Type.Elem()
 			}
+			isMessage = fd.MapValue().Message() != nil
 		case fd.IsList():
 			if fd.Enum() != nil || fd.Message() != nil {
 				ft = fs.Type.Elem()
 			}
+			isMessage = fd.Message() != nil
 		case fd.Enum() != nil:
 			ft = fs.Type
-			if fd.HasPresence() {
+			if fd.HasPresence() && ft.Kind() == reflect.Ptr {
 				ft = ft.Elem()
 			}
 		case fd.Message() != nil:
@@ -202,6 +217,10 @@ func (mi *MessageInfo) makeFieldTypes(si structInfo) {
 			if fd.IsWeak() {
 				ft = nil
 			}
+			isMessage = true
+		}
+		if isMessage && ft != nil && ft.Kind() != reflect.Ptr {
+			ft = reflect.PtrTo(ft) // never occurs for officially generated message types
 		}
 		if ft != nil {
 			if mi.fieldTypes == nil {
@@ -391,6 +410,17 @@ func (mi *MessageInfo) MessageOf(m interface{}) pref.Message {
 func (m *messageReflectWrapper) pointer() pointer          { return m.p }
 func (m *messageReflectWrapper) messageInfo() *MessageInfo { return m.mi }
 
+// Reset implements the v1 proto.Message.Reset method.
+func (m *messageIfaceWrapper) Reset() {
+	if mr, ok := m.protoUnwrap().(interface{ Reset() }); ok {
+		mr.Reset()
+		return
+	}
+	rv := reflect.ValueOf(m.protoUnwrap())
+	if rv.Kind() == reflect.Ptr && !rv.IsNil() {
+		rv.Elem().Set(reflect.Zero(rv.Type().Elem()))
+	}
+}
 func (m *messageIfaceWrapper) ProtoReflect() pref.Message {
 	return (*messageReflectWrapper)(m)
 }

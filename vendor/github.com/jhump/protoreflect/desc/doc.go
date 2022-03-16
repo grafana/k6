@@ -24,11 +24,24 @@
 // properties that are not immediately accessible through rich descriptor's
 // methods.
 //
+// Also see the grpcreflect, dynamic, and grpcdynamic packages in this same
+// repo to see just how useful rich descriptors really are.
+//
+//
+// Loading Descriptors
+//
 // Rich descriptors can be accessed in similar ways as their "poor" cousins
 // (descriptor protos). Instead of using proto.FileDescriptor, use
 // desc.LoadFileDescriptor. Message descriptors and extension field descriptors
 // can also be easily accessed using desc.LoadMessageDescriptor and
 // desc.LoadFieldDescriptorForExtension, respectively.
+//
+// If you are using the protoc-gen-gosrcinfo plugin (also in this repo), then
+// the descriptors returned from these Load* functions will include source code
+// information, and thus include comments for elements.
+//
+//
+// Creating Descriptors
 //
 // It is also possible create rich descriptors for proto messages that a given
 // Go program doesn't even know about. For example, they could be loaded from a
@@ -36,6 +49,17 @@
 // server. This enables interesting things like dynamic clients: where a Go
 // program can be an RPC client of a service it wasn't compiled to know about.
 //
-// Also see the grpcreflect, dynamic, and grpcdynamic packages in this same
-// repo to see just how useful rich descriptors really are.
+// You cannot create a message descriptor without also creating its enclosing
+// file, because the enclosing file is what contains other relevant information
+// like other symbols and dependencies/imports, which is how type references
+// are resolved (such as when a field in a message has a type that is another
+// message or enum).
+//
+// So the functions in this package for creating descriptors are all for
+// creating *file* descriptors. See the various Create* functions for more
+// information.
+//
+// Also see the desc/builder sub-package, for another API that makes it easier
+// to synthesize descriptors programmatically.
+//
 package desc

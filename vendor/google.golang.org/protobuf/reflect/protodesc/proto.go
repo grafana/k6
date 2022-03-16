@@ -21,8 +21,10 @@ import (
 func ToFileDescriptorProto(file protoreflect.FileDescriptor) *descriptorpb.FileDescriptorProto {
 	p := &descriptorpb.FileDescriptorProto{
 		Name:    proto.String(file.Path()),
-		Package: proto.String(string(file.Package())),
 		Options: proto.Clone(file.Options()).(*descriptorpb.FileOptions),
+	}
+	if file.Package() != "" {
+		p.Package = proto.String(string(file.Package()))
 	}
 	for i, imports := 0, file.Imports(); i < imports.Len(); i++ {
 		imp := imports.Get(i)

@@ -188,7 +188,7 @@ func (n *RangeNode) EndValueAsInt32(min, max int32) (int32, bool) {
 	return AsInt32(n.EndVal, min, max)
 }
 
-// ReservedNode represents reserved declaration, whic can be used to reserve
+// ReservedNode represents reserved declaration, which can be used to reserve
 // either names or numbers. Examples:
 //
 //   reserved 1, 10-12, 15;
