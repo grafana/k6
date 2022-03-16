@@ -31,6 +31,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 )
 
 // fileHookBufferSize is a default size for the fileHook's loglines channel.
@@ -38,6 +39,7 @@ const fileHookBufferSize = 100
 
 // fileHook is a hook to handle writing to local files.
 type fileHook struct {
+	fs             afero.Fs
 	fallbackLogger logrus.FieldLogger
 	loglines       chan []byte
 	path           string
@@ -49,11 +51,12 @@ type fileHook struct {
 
 // FileHookFromConfigLine returns new fileHook hook.
 func FileHookFromConfigLine(
-	ctx context.Context, fallbackLogger logrus.FieldLogger, line string, done chan struct{},
+	ctx context.Context, fs afero.Fs, fallbackLogger logrus.FieldLogger, line string, done chan struct{},
 ) (logrus.Hook, error) {
 	// TODO: fix this so it works correctly with relative paths from the CWD
 
 	hook := &fileHook{
+		fs:             fs,
 		fallbackLogger: fallbackLogger,
 		levels:         logrus.AllLevels,
 		done:           done,
@@ -105,11 +108,11 @@ func (h *fileHook) parseArgs(line string) error {
 
 // openFile opens logfile and initializes writers.
 func (h *fileHook) openFile() error {
-	if _, err := os.Stat(filepath.Dir(h.path)); os.IsNotExist(err) {
+	if _, err := h.fs.Stat(filepath.Dir(h.path)); os.IsNotExist(err) {
 		return fmt.Errorf("provided directory '%s' does not exist", filepath.Dir(h.path))
 	}
 
-	file, err := os.OpenFile(h.path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
+	file, err := h.fs.OpenFile(h.path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to open logfile %s: %w", h.path, err)
 	}

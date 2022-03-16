@@ -24,10 +24,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"go.k6.io/k6/js"
@@ -36,7 +33,7 @@ import (
 	"go.k6.io/k6/lib/types"
 )
 
-func getInspectCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Command {
+func getInspectCmd(globalState *globalState) *cobra.Command {
 	var addExecReqs bool
 
 	// inspectCmd represents the inspect command
@@ -46,19 +43,19 @@ func getInspectCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Comm
 		Long:  `Inspect a script or archive.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			src, filesystems, err := readSource(args[0], logger)
+			src, filesystems, err := readSource(globalState, args[0])
 			if err != nil {
 				return err
 			}
 
-			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), buildEnvMap(os.Environ()))
+			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), globalState.envVars)
 			if err != nil {
 				return err
 			}
 			registry := metrics.NewRegistry()
 
 			var b *js.Bundle
-			typ := globalFlags.runType
+			typ := globalState.flags.runType
 			if typ == "" {
 				typ = detectType(src.Data)
 			}
@@ -70,10 +67,10 @@ func getInspectCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Comm
 				if err != nil {
 					return err
 				}
-				b, err = js.NewBundleFromArchive(logger, arc, runtimeOptions, registry)
+				b, err = js.NewBundleFromArchive(globalState.logger, arc, runtimeOptions, registry)
 
 			case typeJS:
-				b, err = js.NewBundle(logger, src, filesystems, runtimeOptions, registry)
+				b, err = js.NewBundle(globalState.logger, src, filesystems, runtimeOptions, registry)
 			}
 			if err != nil {
 				return err
@@ -83,7 +80,7 @@ func getInspectCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Comm
 			inspectOutput := interface{}(b.Options)
 
 			if addExecReqs {
-				inspectOutput, err = addExecRequirements(b, logger, globalFlags)
+				inspectOutput, err = addExecRequirements(globalState, b)
 				if err != nil {
 					return err
 				}
@@ -101,7 +98,8 @@ func getInspectCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Comm
 
 	inspectCmd.Flags().SortFlags = false
 	inspectCmd.Flags().AddFlagSet(runtimeOptionFlagSet(false))
-	inspectCmd.Flags().StringVarP(&globalFlags.runType, "type", "t", globalFlags.runType, "override file `type`, \"js\" or \"archive\"") //nolint:lll
+	inspectCmd.Flags().StringVarP(&globalState.flags.runType, "type", "t",
+		globalState.flags.runType, "override file `type`, \"js\" or \"archive\"")
 	inspectCmd.Flags().BoolVar(&addExecReqs,
 		"execution-requirements",
 		false,
@@ -110,14 +108,13 @@ func getInspectCmd(logger *logrus.Logger, globalFlags *commandFlags) *cobra.Comm
 	return inspectCmd
 }
 
-func addExecRequirements(b *js.Bundle, logger *logrus.Logger, globalFlags *commandFlags) (interface{}, error) {
-	conf, err := getConsolidatedConfig(
-		afero.NewOsFs(), Config{}, b.Options, buildEnvMap(os.Environ()), globalFlags)
+func addExecRequirements(gs *globalState, b *js.Bundle) (interface{}, error) {
+	conf, err := getConsolidatedConfig(gs, Config{}, b.Options)
 	if err != nil {
 		return nil, err
 	}
 
-	conf, err = deriveAndValidateConfig(conf, b.IsExecutable, logger)
+	conf, err = deriveAndValidateConfig(conf, b.IsExecutable, gs.logger)
 	if err != nil {
 		return nil, err
 	}

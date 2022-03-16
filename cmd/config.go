@@ -109,51 +109,42 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 	}, nil
 }
 
-// Reads the configuration file from the supplied filesystem and returns it and its path.
-// It will first try to see if the user explicitly specified a custom config file and will
-// try to read that. If there's a custom config specified and it couldn't be read or parsed,
-// an error will be returned.
-// If there's no custom config specified and no file exists in the default config path, it will
-// return an empty config struct, the default config location and *no* error.
-func readDiskConfig(fs afero.Fs, globalFlags *commandFlags) (Config, string, error) {
-	realConfigFilePath := globalFlags.configFilePath
-	if realConfigFilePath == "" {
-		// The user didn't specify K6_CONFIG or --config, use the default path
-		realConfigFilePath = globalFlags.defaultConfigFilePath
-	}
-
+// Reads the configuration file from the supplied filesystem and returns it or
+// an error. The only situation in which an error won't be returned is if the
+// user didn't explicitly specify a config file path and the default config file
+// doesn't exist.
+func readDiskConfig(globalState *globalState) (Config, error) {
 	// Try to see if the file exists in the supplied filesystem
-	if _, err := fs.Stat(realConfigFilePath); err != nil {
-		if os.IsNotExist(err) && globalFlags.configFilePath == "" {
+	if _, err := globalState.fs.Stat(globalState.flags.configFilePath); err != nil {
+		if os.IsNotExist(err) && globalState.flags.configFilePath == globalState.defaultFlags.configFilePath {
 			// If the file doesn't exist, but it was the default config file (i.e. the user
 			// didn't specify anything), silence the error
 			err = nil
 		}
-		return Config{}, realConfigFilePath, err
+		return Config{}, err
 	}
 
-	data, err := afero.ReadFile(fs, realConfigFilePath)
+	data, err := afero.ReadFile(globalState.fs, globalState.flags.configFilePath)
 	if err != nil {
-		return Config{}, realConfigFilePath, err
+		return Config{}, err
 	}
 	var conf Config
-	err = json.Unmarshal(data, &conf)
-	return conf, realConfigFilePath, err
+	return conf, json.Unmarshal(data, &conf)
 }
 
 // Serializes the configuration to a JSON file and writes it in the supplied
 // location on the supplied filesystem
-func writeDiskConfig(fs afero.Fs, configPath string, conf Config) error {
+func writeDiskConfig(globalState *globalState, conf Config) error {
 	data, err := json.MarshalIndent(conf, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	if err := fs.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+	if err := globalState.fs.MkdirAll(filepath.Dir(globalState.flags.configFilePath), 0o755); err != nil {
 		return err
 	}
 
-	return afero.WriteFile(fs, configPath, data, 0o644)
+	return afero.WriteFile(globalState.fs, globalState.flags.configFilePath, data, 0o644)
 }
 
 // Reads configuration variables from the environment.
@@ -176,16 +167,14 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 // - set some defaults if they weren't previously specified
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
-func getConsolidatedConfig(
-	fs afero.Fs, cliConf Config, runnerOpts lib.Options, envMap map[string]string, globalFlags *commandFlags,
-) (conf Config, err error) {
+func getConsolidatedConfig(globalState *globalState, cliConf Config, runnerOpts lib.Options) (conf Config, err error) {
 	// TODO: use errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig) where it makes sense?
 
-	fileConf, _, err := readDiskConfig(fs, globalFlags)
+	fileConf, err := readDiskConfig(globalState)
 	if err != nil {
 		return conf, err
 	}
-	envConf, err := readEnvConfig(envMap)
+	envConf, err := readEnvConfig(globalState.envVars)
 	if err != nil {
 		return conf, err
 	}

@@ -26,9 +26,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
-
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/output"
@@ -82,9 +79,8 @@ func getPossibleIDList(constrs map[string]func(output.Params) (output.Output, er
 }
 
 func createOutputs(
-	outputFullArguments []string, src *loader.SourceData, conf Config, rtOpts lib.RuntimeOptions,
-	executionPlan []lib.ExecutionStep, osEnvironment map[string]string, logger logrus.FieldLogger,
-	globalFlags *commandFlags,
+	gs *globalState, src *loader.SourceData, conf Config,
+	rtOpts lib.RuntimeOptions, executionPlan []lib.ExecutionStep,
 ) ([]output.Output, error) {
 	outputConstructors, err := getAllOutputConstructors()
 	if err != nil {
@@ -92,18 +88,18 @@ func createOutputs(
 	}
 	baseParams := output.Params{
 		ScriptPath:     src.URL,
-		Logger:         logger,
-		Environment:    osEnvironment,
-		StdOut:         globalFlags.stdout,
-		StdErr:         globalFlags.stderr,
-		FS:             afero.NewOsFs(),
+		Logger:         gs.logger,
+		Environment:    gs.envVars,
+		StdOut:         gs.stdOut,
+		StdErr:         gs.stdErr,
+		FS:             gs.fs,
 		ScriptOptions:  conf.Options,
 		RuntimeOptions: rtOpts,
 		ExecutionPlan:  executionPlan,
 	}
-	result := make([]output.Output, 0, len(outputFullArguments))
+	result := make([]output.Output, 0, len(conf.Out))
 
-	for _, outputFullArg := range outputFullArguments {
+	for _, outputFullArg := range conf.Out {
 		outputType, outputArg := parseOutputArgument(outputFullArg)
 		outputConstructor, ok := outputConstructors[outputType]
 		if !ok {

@@ -24,13 +24,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"fmt"
 	"io"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,16 +61,12 @@ func TestFileHookFromConfigLine(t *testing.T) {
 			},
 		},
 		{
-			line: fmt.Sprintf("file=%s/k6.log,level=info", os.TempDir()),
+			line: "file=/k6.log,level=info",
 			err:  false,
 			res: fileHook{
-				path:   fmt.Sprintf("%s/k6.log", os.TempDir()),
+				path:   "/k6.log",
 				levels: logrus.AllLevels[:5],
 			},
-		},
-		{
-			line: "file=./",
-			err:  true,
 		},
 		{
 			line: "file=/a/c/",
@@ -116,7 +111,7 @@ func TestFileHookFromConfigLine(t *testing.T) {
 			t.Parallel()
 
 			res, err := FileHookFromConfigLine(
-				context.Background(), logrus.New(), test.line, make(chan struct{}),
+				context.Background(), afero.NewMemMapFs(), logrus.New(), test.line, make(chan struct{}),
 			)
 
 			if test.err {
