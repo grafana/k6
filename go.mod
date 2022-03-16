@@ -11,7 +11,7 @@ require (
 	github.com/dop251/goja v0.0.0-20220214123719-b09a6bfa842f
 	github.com/fatih/color v1.12.0
 	github.com/golang/protobuf v1.4.3
-	github.com/gorilla/websocket v1.4.2
+	github.com/gorilla/websocket v1.5.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.10.0
 	github.com/klauspost/compress v1.13.6
