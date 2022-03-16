@@ -17,5 +17,4 @@ COPY --from=builder /tmp/k6 /usr/bin/k6
 USER 12345
 WORKDIR /home/k6
 
-# By default, the image is setup for running js scripts.
-ENTRYPOINT ["k6", "run"]
+ENTRYPOINT ["k6"]
