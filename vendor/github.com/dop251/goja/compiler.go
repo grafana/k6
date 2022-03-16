@@ -395,10 +395,8 @@ func (p *Program) addSrcMap(srcPos int) {
 func (s *scope) lookupName(name unistring.String) (binding *binding, noDynamics bool) {
 	noDynamics = true
 	toStash := false
-	for curScope := s; curScope != nil; curScope = curScope.outer {
-		if curScope.dynamic {
-			noDynamics = false
-		} else {
+	for curScope := s; ; curScope = curScope.outer {
+		if curScope.outer != nil {
 			if b, exists := curScope.boundNames[name]; exists {
 				if toStash && !b.inStash {
 					b.moveToStash()
@@ -406,6 +404,12 @@ func (s *scope) lookupName(name unistring.String) (binding *binding, noDynamics 
 				binding = b
 				return
 			}
+		} else {
+			noDynamics = false
+			return
+		}
+		if curScope.dynamic {
+			noDynamics = false
 		}
 		if name == "arguments" && curScope.function && !curScope.arrow {
 			curScope.argsNeeded = true
@@ -416,7 +420,6 @@ func (s *scope) lookupName(name unistring.String) (binding *binding, noDynamics 
 			toStash = true
 		}
 	}
-	return
 }
 
 func (s *scope) ensureBoundNamesCreated() {

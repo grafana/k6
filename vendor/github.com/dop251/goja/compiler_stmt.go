@@ -9,7 +9,6 @@ import (
 )
 
 func (c *compiler) compileStatement(v ast.Statement, needResult bool) {
-	// log.Printf("compileStatement(): %T", v)
 
 	switch v := v.(type) {
 	case *ast.BlockStatement:
@@ -158,7 +157,7 @@ func (c *compiler) compileTryStatement(v *ast.TryStatement, needResult bool) {
 			if pattern, ok := v.Catch.Parameter.(ast.Pattern); ok {
 				c.scope.bindings[0].emitGet()
 				c.emitPattern(pattern, func(target, init compiledExpr) {
-					c.emitPatternLexicalAssign(target, init, false)
+					c.emitPatternLexicalAssign(target, init)
 				}, false)
 			}
 			for _, decl := range funcs {
@@ -392,7 +391,7 @@ func (c *compiler) compileForInto(into ast.ForInto, needResult bool) (enter *ent
 			c.createLexicalBinding(target, into.IsConst)
 			c.emit(enumGet)
 			c.emitPattern(target, func(target, init compiledExpr) {
-				c.emitPatternLexicalAssign(target, init, into.IsConst)
+				c.emitPatternLexicalAssign(target, init)
 			}, false)
 		default:
 			c.throwSyntaxError(int(into.Idx)-1, "Unsupported ForBinding: %T", into.Target)
@@ -725,7 +724,7 @@ func (c *compiler) compileIfStatement(v *ast.IfStatement, needResult bool) {
 
 func (c *compiler) compileReturnStatement(v *ast.ReturnStatement) {
 	if v.Argument != nil {
-		c.compileExpression(v.Argument).emitGetter(true)
+		c.emitExpr(c.compileExpression(v.Argument), true)
 	} else {
 		c.emit(loadUndef)
 	}
@@ -754,10 +753,17 @@ func (c *compiler) checkVarConflict(name unistring.String, offset int) {
 func (c *compiler) emitVarAssign(name unistring.String, offset int, init compiledExpr) {
 	c.checkVarConflict(name, offset)
 	if init != nil {
-		c.emitVarRef(name, offset)
-		c.emitNamed(init, name)
-		c.p.addSrcMap(offset)
-		c.emit(initValueP)
+		b, noDyn := c.scope.lookupName(name)
+		if noDyn {
+			c.emitNamedOrConst(init, name)
+			c.p.addSrcMap(offset)
+			b.emitInit()
+		} else {
+			c.emitVarRef(name, offset, b)
+			c.emitNamedOrConst(init, name)
+			c.p.addSrcMap(offset)
+			c.emit(initValueP)
+		}
 	}
 }
 
@@ -773,16 +779,16 @@ func (c *compiler) compileVarBinding(expr *ast.Binding) {
 	}
 }
 
-func (c *compiler) emitLexicalAssign(name unistring.String, offset int, init compiledExpr, isConst bool) {
+func (c *compiler) emitLexicalAssign(name unistring.String, offset int, init compiledExpr) {
 	b := c.scope.boundNames[name]
 	if b == nil {
 		panic("Lexical declaration for an unbound name")
 	}
 	if init != nil {
-		c.emitNamed(init, name)
+		c.emitNamedOrConst(init, name)
 		c.p.addSrcMap(offset)
 	} else {
-		if isConst {
+		if b.isConst {
 			c.throwSyntaxError(offset, "Missing initializer in const declaration")
 		}
 		c.emit(loadUndef)
@@ -799,29 +805,37 @@ func (c *compiler) emitPatternVarAssign(target, init compiledExpr) {
 	c.emitVarAssign(id.name, id.offset, init)
 }
 
-func (c *compiler) emitPatternLexicalAssign(target, init compiledExpr, isConst bool) {
+func (c *compiler) emitPatternLexicalAssign(target, init compiledExpr) {
 	id := target.(*compiledIdentifierExpr)
-	c.emitLexicalAssign(id.name, id.offset, init, isConst)
+	c.emitLexicalAssign(id.name, id.offset, init)
 }
 
 func (c *compiler) emitPatternAssign(target, init compiledExpr) {
-	target.emitRef()
 	if id, ok := target.(*compiledIdentifierExpr); ok {
-		c.emitNamed(init, id.name)
+		b, noDyn := c.scope.lookupName(id.name)
+		if noDyn {
+			c.emitNamedOrConst(init, id.name)
+			b.emitSetP()
+		} else {
+			c.emitVarRef(id.name, id.offset, b)
+			c.emitNamedOrConst(init, id.name)
+			c.emit(putValueP)
+		}
 	} else {
-		init.emitGetter(true)
+		target.emitRef()
+		c.emitExpr(init, true)
+		c.emit(putValueP)
 	}
-	c.emit(initValueP)
 }
 
-func (c *compiler) compileLexicalBinding(expr *ast.Binding, isConst bool) {
+func (c *compiler) compileLexicalBinding(expr *ast.Binding) {
 	switch target := expr.Target.(type) {
 	case *ast.Identifier:
-		c.emitLexicalAssign(target.Name, int(target.Idx)-1, c.compileExpression(expr.Initializer), isConst)
+		c.emitLexicalAssign(target.Name, int(target.Idx)-1, c.compileExpression(expr.Initializer))
 	case ast.Pattern:
 		c.compileExpression(expr.Initializer).emitGetter(true)
 		c.emitPattern(target, func(target, init compiledExpr) {
-			c.emitPatternLexicalAssign(target, init, isConst)
+			c.emitPatternLexicalAssign(target, init)
 		}, false)
 	default:
 		c.throwSyntaxError(int(target.Idx0()-1), "unsupported lexical binding target: %T", target)
@@ -835,9 +849,8 @@ func (c *compiler) compileVariableStatement(v *ast.VariableStatement) {
 }
 
 func (c *compiler) compileLexicalDeclaration(v *ast.LexicalDeclaration) {
-	isConst := v.Token == token.CONST
 	for _, e := range v.List {
-		c.compileLexicalBinding(e, isConst)
+		c.compileLexicalBinding(e)
 	}
 }
 
@@ -964,12 +977,7 @@ func (c *compiler) compileBlockStatement(v *ast.BlockStatement, needResult bool)
 }
 
 func (c *compiler) compileExpressionStatement(v *ast.ExpressionStatement, needResult bool) {
-	expr := c.compileExpression(v.Expression)
-	if expr.constant() {
-		c.emitConst(expr, needResult)
-	} else {
-		expr.emitGetter(needResult)
-	}
+	c.emitExpr(c.compileExpression(v.Expression), needResult)
 	if needResult {
 		c.emit(saveResult)
 	}

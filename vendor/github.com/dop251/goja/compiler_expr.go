@@ -395,11 +395,11 @@ func (e *compiledIdentifierExpr) emitGetterAndCallee() {
 func (e *compiledIdentifierExpr) emitVarSetter1(putOnStack bool, emitRight func(isRef bool)) {
 	e.addSrcMap()
 	c := e.c
-	if c.scope.strict {
-		c.checkIdentifierLName(e.name, e.offset)
-	}
 
 	if b, noDynamics := c.scope.lookupName(e.name); noDynamics {
+		if c.scope.strict {
+			c.checkIdentifierLName(e.name, e.offset)
+		}
 		emitRight(false)
 		if b != nil {
 			if putOnStack {
@@ -418,15 +418,7 @@ func (e *compiledIdentifierExpr) emitVarSetter1(putOnStack bool, emitRight func(
 			}
 		}
 	} else {
-		if b != nil {
-			b.emitResolveVar(c.scope.strict)
-		} else {
-			if c.scope.strict {
-				c.emit(resolveVar1Strict(e.name))
-			} else {
-				c.emit(resolveVar1(e.name))
-			}
-		}
+		c.emitVarRef(e.name, e.offset, b)
 		emitRight(true)
 		if putOnStack {
 			c.emit(putValue)
@@ -438,16 +430,15 @@ func (e *compiledIdentifierExpr) emitVarSetter1(putOnStack bool, emitRight func(
 
 func (e *compiledIdentifierExpr) emitVarSetter(valueExpr compiledExpr, putOnStack bool) {
 	e.emitVarSetter1(putOnStack, func(bool) {
-		e.c.emitExpr(valueExpr, true)
+		e.c.emitNamedOrConst(valueExpr, e.name)
 	})
 }
 
-func (c *compiler) emitVarRef(name unistring.String, offset int) {
+func (c *compiler) emitVarRef(name unistring.String, offset int, b *binding) {
 	if c.scope.strict {
 		c.checkIdentifierLName(name, offset)
 	}
 
-	b, _ := c.scope.lookupName(name)
 	if b != nil {
 		b.emitResolveVar(c.scope.strict)
 	} else {
@@ -460,7 +451,8 @@ func (c *compiler) emitVarRef(name unistring.String, offset int) {
 }
 
 func (e *compiledIdentifierExpr) emitRef() {
-	e.c.emitVarRef(e.name, e.offset)
+	b, _ := e.c.scope.lookupName(e.name)
+	e.c.emitVarRef(e.name, e.offset, b)
 }
 
 func (e *compiledIdentifierExpr) emitSetter(valueExpr compiledExpr, putOnStack bool) {
@@ -773,13 +765,6 @@ func (e *deleteGlobalExpr) emitGetter(putOnStack bool) {
 func (e *compiledAssignExpr) emitGetter(putOnStack bool) {
 	switch e.operator {
 	case token.ASSIGN:
-		if fn, ok := e.right.(*compiledFunctionLiteral); ok {
-			if fn.name == nil {
-				if id, ok := e.left.(*compiledIdentifierExpr); ok {
-					fn.lhsName = id.name
-				}
-			}
-		}
 		e.left.emitSetter(e.right, putOnStack)
 	case token.PLUS:
 		e.left.emitUnary(nil, func() {
@@ -1065,14 +1050,14 @@ func (e *compiledFunctionLiteral) emitGetter(putOnStack bool) {
 					}
 				}, item.Initializer, item.Target.Idx0()).emitGetter(true)
 				e.c.emitPattern(pattern, func(target, init compiledExpr) {
-					e.c.emitPatternLexicalAssign(target, init, false)
+					e.c.emitPatternLexicalAssign(target, init)
 				}, false)
 			} else if item.Initializer != nil {
 				markGet := len(e.c.p.code)
 				e.c.emit(nil)
 				mark := len(e.c.p.code)
 				e.c.emit(nil)
-				e.c.compileExpression(item.Initializer).emitGetter(true)
+				e.c.emitExpr(e.c.compileExpression(item.Initializer), true)
 				if firstForwardRef == -1 && (s.isDynamic() || s.bindings[i].useCount() > 0) {
 					firstForwardRef = i
 				}
@@ -1100,7 +1085,7 @@ func (e *compiledFunctionLiteral) emitGetter(putOnStack bool) {
 					e.c.emit(createArgsRestStack(paramsCount))
 				}, rest.Idx0()),
 				func(target, init compiledExpr) {
-					e.c.emitPatternLexicalAssign(target, init, false)
+					e.c.emitPatternLexicalAssign(target, init)
 				})
 		}
 		if firstForwardRef != -1 {
@@ -1471,14 +1456,6 @@ func (c *compiler) emitConst(expr compiledExpr, putOnStack bool) {
 	}
 }
 
-func (c *compiler) emitExpr(expr compiledExpr, putOnStack bool) {
-	if expr.constant() {
-		c.emitConst(expr, putOnStack)
-	} else {
-		expr.emitGetter(putOnStack)
-	}
-}
-
 func (c *compiler) evalConst(expr compiledExpr) (Value, *Exception) {
 	if expr, ok := expr.(*compiledLiteral); ok {
 		return expr.val, nil
@@ -1825,7 +1802,7 @@ func (e *compiledObjectLiteral) emitGetter(putOnStack bool) {
 			}
 			if computed {
 				e.c.emit(_toPropertyKey{})
-				valueExpr.emitGetter(true)
+				e.c.emitExpr(valueExpr, true)
 				switch prop.Kind {
 				case ast.PropertyKindValue, ast.PropertyKindMethod:
 					if anonFn != nil {
@@ -1852,7 +1829,7 @@ func (e *compiledObjectLiteral) emitGetter(putOnStack bool) {
 				if anonFn != nil && !isProto {
 					anonFn.lhsName = key
 				}
-				valueExpr.emitGetter(true)
+				e.c.emitExpr(valueExpr, true)
 				switch prop.Kind {
 				case ast.PropertyKindValue:
 					if isProto {
@@ -1912,7 +1889,7 @@ func (e *compiledArrayLiteral) emitGetter(putOnStack bool) {
 			e.c.emit(pushArraySpread)
 		} else {
 			if v != nil {
-				e.c.compileExpression(v).emitGetter(true)
+				e.c.emitExpr(e.c.compileExpression(v), true)
 			} else {
 				e.c.emit(loadNil)
 			}
@@ -2195,6 +2172,14 @@ func (e *compiledArrayAssignmentPattern) emitGetter(putOnStack bool) {
 	}
 }
 
+func (c *compiler) emitExpr(expr compiledExpr, putOnStack bool) {
+	if expr.constant() {
+		c.emitConst(expr, putOnStack)
+	} else {
+		expr.emitGetter(putOnStack)
+	}
+}
+
 func (c *compiler) emitNamed(expr compiledExpr, name unistring.String) {
 	if en, ok := expr.(interface {
 		emitNamed(name unistring.String)
@@ -2202,6 +2187,14 @@ func (c *compiler) emitNamed(expr compiledExpr, name unistring.String) {
 		en.emitNamed(name)
 	} else {
 		expr.emitGetter(true)
+	}
+}
+
+func (c *compiler) emitNamedOrConst(expr compiledExpr, name unistring.String) {
+	if expr.constant() {
+		c.emitConst(expr, true)
+	} else {
+		c.emitNamed(expr, name)
 	}
 }
 
@@ -2327,7 +2320,7 @@ func (e *compiledPatternInitExpr) emitGetter(putOnStack bool) {
 	if e.def != nil {
 		mark := len(e.c.p.code)
 		e.c.emit(nil)
-		e.def.emitGetter(true)
+		e.c.emitExpr(e.def, true)
 		e.c.p.code[mark] = jdef(len(e.c.p.code) - mark)
 	}
 }
@@ -2337,7 +2330,7 @@ func (e *compiledPatternInitExpr) emitNamed(name unistring.String) {
 	if e.def != nil {
 		mark := len(e.c.p.code)
 		e.c.emit(nil)
-		e.c.emitNamed(e.def, name)
+		e.c.emitNamedOrConst(e.def, name)
 		e.c.p.code[mark] = jdef(len(e.c.p.code) - mark)
 	}
 }

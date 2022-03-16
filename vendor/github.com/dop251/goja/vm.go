@@ -97,7 +97,7 @@ func (r *stashRefLex) set(v Value) {
 }
 
 func (r *stashRefLex) init(v Value) {
-	r.set(v)
+	(*r.v)[r.idx] = v
 }
 
 type stashRefConst struct {
@@ -111,14 +111,11 @@ func (r *stashRefConst) set(v Value) {
 	}
 }
 
-func (r *stashRefConst) init(v Value) {
-	r.set(v)
-}
-
 type objRef struct {
-	base   objectImpl
-	name   unistring.String
-	strict bool
+	base    objectImpl
+	name    unistring.String
+	strict  bool
+	binding bool
 }
 
 func (r *objRef) get() Value {
@@ -126,7 +123,7 @@ func (r *objRef) get() Value {
 }
 
 func (r *objRef) set(v Value) {
-	if r.strict && !r.base.hasOwnPropertyStr(r.name) {
+	if r.strict && r.binding && !r.base.hasOwnPropertyStr(r.name) {
 		panic(referenceError(fmt.Sprintf("%s is not defined", r.name)))
 	}
 	r.base.setOwnStr(r.name, v, r.strict)
@@ -314,9 +311,10 @@ func (s *stash) getRefByName(name unistring.String, strict bool) ref {
 	if obj := s.obj; obj != nil {
 		if stashObjHas(obj, name) {
 			return &objRef{
-				base:   obj.self,
-				name:   name,
-				strict: strict,
+				base:    obj.self,
+				name:    name,
+				strict:  strict,
+				binding: true,
 			}
 		}
 	} else {
@@ -1943,8 +1941,9 @@ func (s resolveVar1) exec(vm *vm) {
 	}
 
 	ref = &objRef{
-		base: vm.r.globalObject.self,
-		name: name,
+		base:    vm.r.globalObject.self,
+		name:    name,
+		binding: true,
 	}
 
 end:
@@ -2023,9 +2022,10 @@ func (s resolveVar1Strict) exec(vm *vm) {
 
 	if vm.r.globalObject.self.hasPropertyStr(name) {
 		ref = &objRef{
-			base:   vm.r.globalObject.self,
-			name:   name,
-			strict: true,
+			base:    vm.r.globalObject.self,
+			name:    name,
+			binding: true,
+			strict:  true,
 		}
 		goto end
 	}
