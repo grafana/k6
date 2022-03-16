@@ -23,7 +23,7 @@
   minVersion: v1.4.2
   validUntil: 2029-08-04T17:01:43+03:00
 - path: github.com/spf13/cobra
-  minVersion: v1.1.3
+  minVersion: v1.4.0
   validUntil: 2049-07-26T17:21:52+03:00
 - path: github.com/spf13/pflag
   minVersion: v1.0.5
