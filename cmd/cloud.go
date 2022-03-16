@@ -95,7 +95,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			)
 			printBar(globalState, progressBar)
 
-			test, err := loadTest(globalState, cmd, args, getPartialConfig)
+			test, err := loadAndConfigureTest(globalState, cmd, args, getPartialConfig)
 			if err != nil {
 				return err
 			}
@@ -166,7 +166,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 
 			name := cloudConfig.Name.String
 			if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
-				name = filepath.Base(test.testPath)
+				name = filepath.Base(test.sourceRootPath)
 			}
 
 			globalCtx, globalCancel := context.WithCancel(globalState.ctx)
@@ -216,7 +216,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			testURL := cloudapi.URLForResults(refID, cloudConfig)
 			executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
 			printExecutionDescription(
-				globalState, "cloud", test.testPath, testURL, test.derivedConfig, et, executionPlan, nil,
+				globalState, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
 			)
 
 			modifyAndPrintBar(

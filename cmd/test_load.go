@@ -21,8 +21,10 @@ const (
 	testTypeArchive = "archive"
 )
 
+// loadedTest contains all of data, details and dependencies of a fully-loaded
+// and configured k6 test.
 type loadedTest struct {
-	testPath        string // contains the raw string the user supplied
+	sourceRootPath  string // contains the raw string the user supplied
 	source          *loader.SourceData
 	fileSystems     map[string]afero.Fs
 	runtimeOptions  lib.RuntimeOptions
@@ -30,13 +32,13 @@ type loadedTest struct {
 	builtInMetrics  *metrics.BuiltinMetrics
 	initRunner      lib.Runner // TODO: rename to something more appropriate
 
-	// Only set if cliConfigGetter is supplied to loadTest() or if
+	// Only set if cliConfigGetter is supplied to loadAndConfigureTest() or if
 	// consolidateDeriveAndValidateConfig() is manually called.
 	consolidatedConfig Config
 	derivedConfig      Config
 }
 
-func loadTest(
+func loadAndConfigureTest(
 	gs *globalState, cmd *cobra.Command, args []string,
 	// supply this if you want the test config consolidated and validated
 	cliConfigGetter func(flags *pflag.FlagSet) (Config, error), // TODO: obviate
@@ -45,14 +47,17 @@ func loadTest(
 		return nil, fmt.Errorf("k6 needs at least one argument to load the test")
 	}
 
-	testPath := args[0]
-	gs.logger.Debugf("Resolving and reading test '%s'...", testPath)
-	src, fileSystems, err := readSource(gs, testPath)
+	sourceRootPath := args[0]
+	gs.logger.Debugf("Resolving and reading test '%s'...", sourceRootPath)
+	src, fileSystems, err := readSource(gs, sourceRootPath)
 	if err != nil {
 		return nil, err
 	}
 	resolvedPath := src.URL.String()
-	gs.logger.Debugf("'%s' resolved to '%s' and successfully loaded %d bytes!", testPath, resolvedPath, len(src.Data))
+	gs.logger.Debugf(
+		"'%s' resolved to '%s' and successfully loaded %d bytes!",
+		sourceRootPath, resolvedPath, len(src.Data),
+	)
 
 	gs.logger.Debugf("Gathering k6 runtime options...")
 	runtimeOptions, err := getRuntimeOptions(cmd.Flags(), gs.envVars)
@@ -62,7 +67,7 @@ func loadTest(
 
 	registry := metrics.NewRegistry()
 	test := &loadedTest{
-		testPath:        testPath,
+		sourceRootPath:  sourceRootPath,
 		source:          src,
 		fileSystems:     fileSystems,
 		runtimeOptions:  runtimeOptions,
@@ -70,9 +75,9 @@ func loadTest(
 		builtInMetrics:  metrics.RegisterBuiltinMetrics(registry),
 	}
 
-	gs.logger.Debugf("Initializing k6 runner for '%s' (%s)...", testPath, resolvedPath)
+	gs.logger.Debugf("Initializing k6 runner for '%s' (%s)...", sourceRootPath, resolvedPath)
 	if err := test.initializeFirstRunner(gs); err != nil {
-		return nil, fmt.Errorf("could not initialize '%s': %w", testPath, err)
+		return nil, fmt.Errorf("could not initialize '%s': %w", sourceRootPath, err)
 	}
 	gs.logger.Debug("Runner successfully initialized!")
 

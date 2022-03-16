@@ -42,7 +42,7 @@ An archive is a fully self-contained test run, and can be executed identically e
   k6 run myarchive.tar`[1:],
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			test, err := loadTest(gs, cmd, args, getPartialConfig)
+			test, err := loadAndConfigureTest(gs, cmd, args, getPartialConfig)
 			if err != nil {
 				return err
 			}

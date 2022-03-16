@@ -80,7 +80,7 @@ a commandline interface for interacting with it.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			printBanner(globalState)
 
-			test, err := loadTest(globalState, cmd, args, getConfig)
+			test, err := loadAndConfigureTest(globalState, cmd, args, getConfig)
 			if err != nil {
 				return err
 			}

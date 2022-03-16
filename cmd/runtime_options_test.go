@@ -81,7 +81,7 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 	ts := newGlobalTestState(t) // TODO: move upwards, make this into an almost full integration test
 	registry := metrics.NewRegistry()
 	test := &loadedTest{
-		testPath:        "script.js",
+		sourceRootPath:  "script.js",
 		source:          &loader.SourceData{Data: jsCode.Bytes(), URL: &url.URL{Path: "/script.js", Scheme: "file"}},
 		fileSystems:     map[string]afero.Fs{"file": fs},
 		runtimeOptions:  rtOpts,
@@ -97,7 +97,7 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 
 	getRunnerErr := func(rtOpts lib.RuntimeOptions) *loadedTest {
 		return &loadedTest{
-			testPath:        "script.tar",
+			sourceRootPath:  "script.tar",
 			source:          &loader.SourceData{Data: archiveBuf.Bytes(), URL: &url.URL{Path: "/script.tar", Scheme: "file"}},
 			fileSystems:     map[string]afero.Fs{"file": fs},
 			runtimeOptions:  rtOpts,
