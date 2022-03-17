@@ -4,7 +4,7 @@ github.com/Azure/go-ntlmssp
 # github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
 ## explicit
 github.com/DataDog/datadog-go/statsd
-# github.com/PuerkitoBio/goquery v1.6.1
+# github.com/PuerkitoBio/goquery v1.8.0
 ## explicit; go 1.13
 github.com/PuerkitoBio/goquery
 # github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
@@ -13,8 +13,8 @@ github.com/Soontao/goHttpDigestClient
 # github.com/andybalholm/brotli v1.0.3
 ## explicit; go 1.12
 github.com/andybalholm/brotli
-# github.com/andybalholm/cascadia v1.1.0
-## explicit
+# github.com/andybalholm/cascadia v1.3.1
+## explicit; go 1.16
 github.com/andybalholm/cascadia
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
