@@ -10,7 +10,7 @@ github.com/PuerkitoBio/goquery
 # github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 ## explicit
 github.com/Soontao/goHttpDigestClient
-# github.com/andybalholm/brotli v1.0.3
+# github.com/andybalholm/brotli v1.0.4
 ## explicit; go 1.12
 github.com/andybalholm/brotli
 # github.com/andybalholm/cascadia v1.3.1
