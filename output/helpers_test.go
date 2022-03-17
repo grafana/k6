@@ -29,14 +29,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/stats"
 )
 
 func TestSampleBufferBasics(t *testing.T) {
 	t.Parallel()
+
+	registry := metrics.NewRegistry()
+	metric, err := registry.NewMetric("my_metric", stats.Rate)
+	require.NoError(t, err)
+
 	single := stats.Sample{
 		Time:   time.Now(),
-		Metric: stats.New("my_metric", stats.Rate),
+		Metric: metric,
 		Value:  float64(123),
 		Tags:   stats.NewSampleTags(map[string]string{"tag1": "val1"}),
 	}
@@ -70,6 +76,10 @@ func TestSampleBufferConcurrently(t *testing.T) {
 	r := rand.New(rand.NewSource(seed)) //nolint:gosec
 	t.Logf("Random source seeded with %d\n", seed)
 
+	registry := metrics.NewRegistry()
+	metric, err := registry.NewMetric("my_metric", stats.Gauge)
+	require.NoError(t, err)
+
 	producersCount := 50 + r.Intn(50)
 	sampleCount := 10 + r.Intn(10)
 	sleepModifier := 10 + r.Intn(10)
@@ -80,7 +90,7 @@ func TestSampleBufferConcurrently(t *testing.T) {
 		for i := 0; i < sampleCount; i++ {
 			buffer.AddMetricSamples([]stats.SampleContainer{stats.Sample{
 				Time:   time.Unix(1562324644, 0),
-				Metric: stats.New("my_metric", stats.Gauge),
+				Metric: metric,
 				Value:  float64(i),
 				Tags:   stats.NewSampleTags(map[string]string{"tag1": "val1"}),
 			}})

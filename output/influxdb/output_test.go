@@ -36,6 +36,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/stats"
 )
@@ -108,10 +109,14 @@ func testOutputCycle(t testing.TB, handler http.HandlerFunc, body func(testing.T
 func TestOutput(t *testing.T) {
 	t.Parallel()
 
+	metric, err := metrics.NewRegistry().NewMetric("test_gauge", stats.Gauge)
+	require.NoError(t, err)
+
 	var samplesRead int
 	defer func() {
 		require.Equal(t, samplesRead, 20)
 	}()
+
 	testOutputCycle(t, func(rw http.ResponseWriter, r *http.Request) {
 		b := bytes.NewBuffer(nil)
 		_, _ = io.Copy(b, r.Body)
@@ -130,7 +135,7 @@ func TestOutput(t *testing.T) {
 		samples := make(stats.Samples, 10)
 		for i := 0; i < len(samples); i++ {
 			samples[i] = stats.Sample{
-				Metric: stats.New("testGauge", stats.Gauge),
+				Metric: metric,
 				Time:   time.Now(),
 				Tags: stats.NewSampleTags(map[string]string{
 					"something": "else",
@@ -152,6 +157,7 @@ func TestOutputFlushMetricsConcurrency(t *testing.T) {
 		requests = int32(0)
 		block    = make(chan struct{})
 	)
+
 	wg := sync.WaitGroup{}
 	ts := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		// block all the received requests
@@ -170,6 +176,9 @@ func TestOutputFlushMetricsConcurrency(t *testing.T) {
 		ts.Close()
 	}()
 
+	metric, err := metrics.NewRegistry().NewMetric("test_gauge", stats.Gauge)
+	require.NoError(t, err)
+
 	o, err := newOutput(output.Params{
 		Logger:         testutils.NewLogger(t),
 		ConfigArgument: ts.URL,
@@ -183,7 +192,7 @@ func TestOutputFlushMetricsConcurrency(t *testing.T) {
 			wg.Add(1)
 			o.AddMetricSamples([]stats.SampleContainer{stats.Samples{
 				stats.Sample{
-					Metric: stats.New("gauge", stats.Gauge),
+					Metric: metric,
 					Value:  2.0,
 				},
 			}})

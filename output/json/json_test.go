@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/stats"
 )
@@ -55,8 +56,14 @@ func getValidator(t testing.TB, expected []string) func(io.Reader) {
 }
 
 func generateTestMetricSamples(t testing.TB) ([]stats.SampleContainer, func(io.Reader)) {
-	metric1 := stats.New("my_metric1", stats.Gauge)
-	metric2 := stats.New("my_metric2", stats.Counter, stats.Data)
+	registry := metrics.NewRegistry()
+
+	metric1, err := registry.NewMetric("my_metric1", stats.Gauge)
+	require.NoError(t, err)
+
+	metric2, err := registry.NewMetric("my_metric2", stats.Counter, stats.Data)
+	require.NoError(t, err)
+
 	time1 := time.Date(2021, time.February, 24, 13, 37, 10, 0, time.UTC)
 	time2 := time1.Add(10 * time.Second)
 	time3 := time2.Add(10 * time.Second)
