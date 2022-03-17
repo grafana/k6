@@ -1,23 +1,3 @@
-/*
- *
- * k6 - a next-generation load testing tool
- * Copyright (C) 2016 Load Impact
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
 package common
 
 import (
@@ -113,21 +93,3 @@ func (FieldNameMapper) FieldName(t reflect.Type, f reflect.StructField) string {
 // MethodName is part of the goja.FieldNameMapper interface
 // https://godoc.org/github.com/dop251/goja#FieldNameMapper
 func (FieldNameMapper) MethodName(t reflect.Type, m reflect.Method) string { return MethodName(t, m) }
-
-// BindToGlobal Binds an object's members to the global scope. Returns a function that un-binds them.
-// Note that this will panic if passed something that isn't a struct; please don't do that.
-func BindToGlobal(rt *goja.Runtime, data map[string]interface{}) func() {
-	keys := make([]string, len(data))
-	i := 0
-	for k, v := range data {
-		rt.Set(k, v)
-		keys[i] = k
-		i++
-	}
-
-	return func() {
-		for _, k := range keys {
-			rt.Set(k, goja.Undefined())
-		}
-	}
-}
