@@ -337,10 +337,7 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	}
 	init.moduleVUImpl.initEnv = initenv
 	init.moduleVUImpl.ctx = context.Background()
-	unbindInit := common.BindToGlobal(rt, map[string]interface{}{
-		"require": init.Require,
-		"open":    init.Open,
-	})
+	unbindInit := b.setInitGlobals(rt, init)
 	init.moduleVUImpl.eventLoop = newEventLoop(init.moduleVUImpl)
 	err := init.moduleVUImpl.eventLoop.start(func() error {
 		_, err := rt.RunProgram(b.Program)
@@ -366,6 +363,20 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	rt.SetRandSource(common.NewRandSource())
 
 	return nil
+}
+
+func (b *Bundle) setInitGlobals(rt *goja.Runtime, init *InitContext) (unset func()) {
+	mustSet := func(k string, v interface{}) {
+		if err := rt.Set(k, v); err != nil {
+			panic(fmt.Errorf("failed to set '%s' global object: %w", k, err))
+		}
+	}
+	mustSet("require", init.Require)
+	mustSet("open", init.Open)
+	return func() {
+		mustSet("require", goja.Undefined())
+		mustSet("open", goja.Undefined())
+	}
 }
 
 func generateSourceMapLoader(logger logrus.FieldLogger, filesystems map[string]afero.Fs,
