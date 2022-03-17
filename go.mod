@@ -10,7 +10,7 @@ require (
 	github.com/andybalholm/brotli v1.0.4
 	github.com/dop251/goja v0.0.0-20220214123719-b09a6bfa842f
 	github.com/fatih/color v1.12.0
-	github.com/golang/protobuf v1.5.0
+	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/websocket v1.5.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.12.0
@@ -34,7 +34,7 @@ require (
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65
-	google.golang.org/grpc v1.41.0
+	google.golang.org/grpc v1.45.0
 	google.golang.org/protobuf v1.26.0
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c

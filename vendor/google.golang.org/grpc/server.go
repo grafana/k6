@@ -885,13 +885,11 @@ func (s *Server) newHTTP2Transport(c net.Conn) transport.ServerTransport {
 		// ErrConnDispatched means that the connection was dispatched away from
 		// gRPC; those connections should be left open.
 		if err != credentials.ErrConnDispatched {
-			c.Close()
-		}
-		// Don't log on ErrConnDispatched and io.EOF to prevent log spam.
-		if err != credentials.ErrConnDispatched {
+			// Don't log on ErrConnDispatched and io.EOF to prevent log spam.
 			if err != io.EOF {
 				channelz.Warning(logger, s.channelzID, "grpc: Server.Serve failed to create ServerTransport: ", err)
 			}
+			c.Close()
 		}
 		return nil
 	}
@@ -1106,16 +1104,21 @@ func chainUnaryServerInterceptors(s *Server) {
 
 func chainUnaryInterceptors(interceptors []UnaryServerInterceptor) UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *UnaryServerInfo, handler UnaryHandler) (interface{}, error) {
-		var i int
-		var next UnaryHandler
-		next = func(ctx context.Context, req interface{}) (interface{}, error) {
-			if i == len(interceptors)-1 {
-				return interceptors[i](ctx, req, info, handler)
-			}
-			i++
-			return interceptors[i-1](ctx, req, info, next)
+		// the struct ensures the variables are allocated together, rather than separately, since we
+		// know they should be garbage collected together. This saves 1 allocation and decreases
+		// time/call by about 10% on the microbenchmark.
+		var state struct {
+			i    int
+			next UnaryHandler
 		}
-		return next(ctx, req)
+		state.next = func(ctx context.Context, req interface{}) (interface{}, error) {
+			if state.i == len(interceptors)-1 {
+				return interceptors[state.i](ctx, req, info, handler)
+			}
+			state.i++
+			return interceptors[state.i-1](ctx, req, info, state.next)
+		}
+		return state.next(ctx, req)
 	}
 }
 
@@ -1280,9 +1283,10 @@ func (s *Server) processUnaryRPC(t transport.ServerTransport, stream *transport.
 	if appErr != nil {
 		appStatus, ok := status.FromError(appErr)
 		if !ok {
-			// Convert appErr if it is not a grpc status error.
-			appErr = status.Error(codes.Unknown, appErr.Error())
-			appStatus, _ = status.FromError(appErr)
+			// Convert non-status application error to a status error with code
+			// Unknown, but handle context errors specifically.
+			appStatus = status.FromContextError(appErr)
+			appErr = appStatus.Err()
 		}
 		if trInfo != nil {
 			trInfo.tr.LazyLog(stringer(appStatus.Message()), true)
@@ -1391,16 +1395,21 @@ func chainStreamServerInterceptors(s *Server) {
 
 func chainStreamInterceptors(interceptors []StreamServerInterceptor) StreamServerInterceptor {
 	return func(srv interface{}, ss ServerStream, info *StreamServerInfo, handler StreamHandler) error {
-		var i int
-		var next StreamHandler
-		next = func(srv interface{}, ss ServerStream) error {
-			if i == len(interceptors)-1 {
-				return interceptors[i](srv, ss, info, handler)
-			}
-			i++
-			return interceptors[i-1](srv, ss, info, next)
+		// the struct ensures the variables are allocated together, rather than separately, since we
+		// know they should be garbage collected together. This saves 1 allocation and decreases
+		// time/call by about 10% on the microbenchmark.
+		var state struct {
+			i    int
+			next StreamHandler
 		}
-		return next(srv, ss)
+		state.next = func(srv interface{}, ss ServerStream) error {
+			if state.i == len(interceptors)-1 {
+				return interceptors[state.i](srv, ss, info, handler)
+			}
+			state.i++
+			return interceptors[state.i-1](srv, ss, info, state.next)
+		}
+		return state.next(srv, ss)
 	}
 }
 
@@ -1541,7 +1550,9 @@ func (s *Server) processStreamingRPC(t transport.ServerTransport, stream *transp
 	if appErr != nil {
 		appStatus, ok := status.FromError(appErr)
 		if !ok {
-			appStatus = status.New(codes.Unknown, appErr.Error())
+			// Convert non-status application error to a status error with code
+			// Unknown, but handle context errors specifically.
+			appStatus = status.FromContextError(appErr)
 			appErr = appStatus.Err()
 		}
 		if trInfo != nil {
