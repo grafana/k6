@@ -466,13 +466,15 @@ func (m *Metric) Sample(t time.Time, tags *SampleTags, value float64) Sample {
 	}
 }
 
-func New(name string, typ MetricType, t ...ValueType) *Metric {
-	vt := Default
-	if len(t) > 0 {
-		vt = t[0]
+// newMetric instantiates a new Metric
+func newMetric(name string, mt MetricType, vt ...ValueType) *Metric {
+	contains := Default
+	if len(vt) > 0 {
+		contains = vt[0]
 	}
+
 	var sink Sink
-	switch typ {
+	switch mt {
 	case Counter:
 		sink = &CounterSink{}
 	case Gauge:
@@ -484,7 +486,8 @@ func New(name string, typ MetricType, t ...ValueType) *Metric {
 	default:
 		return nil
 	}
-	return &Metric{Name: name, Type: typ, Contains: vt, Sink: sink}
+
+	return &Metric{Name: name, Type: mt, Contains: contains, Sink: sink}
 }
 
 // A Submetric represents a filtered dataset based on a parent metric.
@@ -539,7 +542,7 @@ func (m *Metric) AddSubmetric(keyValues string) (*Submetric, error) {
 		Tags:   tags,
 		Parent: m,
 	}
-	subMetricMetric := New(subMetric.Name, m.Type, m.Contains)
+	subMetricMetric := newMetric(subMetric.Name, m.Type, m.Contains)
 	subMetricMetric.Sub = subMetric // sigh
 	subMetric.Metric = subMetricMetric
 
