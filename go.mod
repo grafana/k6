@@ -16,7 +16,7 @@ require (
 	github.com/jhump/protoreflect v1.12.0
 	github.com/klauspost/compress v1.13.6
 	github.com/mailru/easyjson v0.7.7
-	github.com/mattn/go-colorable v0.1.9
+	github.com/mattn/go-colorable v0.1.12
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
