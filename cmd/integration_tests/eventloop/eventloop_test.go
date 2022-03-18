@@ -1,4 +1,4 @@
-package local
+package tests
 
 import (
 	"context"
@@ -9,14 +9,19 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/modulestest/testmodules/events"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/lib/testutils/minirunner"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
+	"go.k6.io/k6/stats"
+	"gopkg.in/guregu/null.v3"
 )
 
 func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context, lib.Runner, error, *testutils.SimpleLogrusHook)) {
@@ -192,4 +197,43 @@ export default function() {
 			"just error\n\tat /script.js:13:4(15)\n\tat native\n", "1",
 		}, msgs)
 	})
+}
+
+func newTestExecutionScheduler(
+	t *testing.T, runner lib.Runner, logger *logrus.Logger, opts lib.Options,
+) (ctx context.Context, cancel func(), execScheduler *local.ExecutionScheduler, samples chan stats.SampleContainer) {
+	if runner == nil {
+		runner = &minirunner.MiniRunner{}
+	}
+	ctx, cancel = context.WithCancel(context.Background())
+	newOpts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
+		MetricSamplesBufferSize: null.NewInt(200, false),
+	}.Apply(runner.GetOptions()).Apply(opts), nil)
+	require.NoError(t, err)
+	require.Empty(t, newOpts.Validate())
+
+	require.NoError(t, runner.SetOptions(newOpts))
+
+	if logger == nil {
+		logger = logrus.New()
+		logger.SetOutput(testutils.NewTestOutput(t))
+	}
+
+	execScheduler, err = local.NewExecutionScheduler(runner, logger)
+	require.NoError(t, err)
+
+	samples = make(chan stats.SampleContainer, newOpts.MetricSamplesBufferSize.Int64)
+	go func() {
+		for {
+			select {
+			case <-samples:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	require.NoError(t, execScheduler.Init(ctx, samples))
+
+	return ctx, cancel, execScheduler, samples
 }
