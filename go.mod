@@ -14,7 +14,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.12.0
-	github.com/klauspost/compress v1.13.6
+	github.com/klauspost/compress v1.15.1
 	github.com/mailru/easyjson v0.7.7
 	github.com/mattn/go-colorable v0.1.12
 	github.com/mattn/go-isatty v0.0.14
