@@ -51,10 +51,9 @@ type fileHook struct {
 
 // FileHookFromConfigLine returns new fileHook hook.
 func FileHookFromConfigLine(
-	ctx context.Context, fs afero.Fs, fallbackLogger logrus.FieldLogger, line string, done chan struct{},
+	ctx context.Context, fs afero.Fs, getCwd func() (string, error),
+	fallbackLogger logrus.FieldLogger, line string, done chan struct{},
 ) (logrus.Hook, error) {
-	// TODO: fix this so it works correctly with relative paths from the CWD
-
 	hook := &fileHook{
 		fs:             fs,
 		fallbackLogger: fallbackLogger,
@@ -71,7 +70,7 @@ func FileHookFromConfigLine(
 		return nil, err
 	}
 
-	if err := hook.openFile(); err != nil {
+	if err := hook.openFile(getCwd); err != nil {
 		return nil, err
 	}
 
@@ -107,14 +106,23 @@ func (h *fileHook) parseArgs(line string) error {
 }
 
 // openFile opens logfile and initializes writers.
-func (h *fileHook) openFile() error {
-	if _, err := h.fs.Stat(filepath.Dir(h.path)); os.IsNotExist(err) {
-		return fmt.Errorf("provided directory '%s' does not exist", filepath.Dir(h.path))
+func (h *fileHook) openFile(getCwd func() (string, error)) error {
+	path := h.path
+	if !filepath.IsAbs(path) {
+		cwd, err := getCwd()
+		if err != nil {
+			return fmt.Errorf("'%s' is a relative path but could not determine CWD: %w", path, err)
+		}
+		path = filepath.Join(cwd, path)
 	}
 
-	file, err := h.fs.OpenFile(h.path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
+	if _, err := h.fs.Stat(filepath.Dir(path)); os.IsNotExist(err) {
+		return fmt.Errorf("provided directory '%s' does not exist", filepath.Dir(path))
+	}
+
+	file, err := h.fs.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
 	if err != nil {
-		return fmt.Errorf("failed to open logfile %s: %w", h.path, err)
+		return fmt.Errorf("failed to open logfile %s: %w", path, err)
 	}
 
 	h.w = file

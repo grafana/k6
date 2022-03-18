@@ -47,6 +47,7 @@ base: pure goja - Golang JS VM supporting ES5.1+
 extended: base + Babel with parts of ES2015 preset
 		  slower to compile in case the script uses syntax unsupported by base
 `)
+	flags.StringP("type", "t", "", "override test type, \"js\" or \"archive\"")
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
 	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
@@ -78,6 +79,7 @@ func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib
 	// TODO: refactor with composable helpers as a part of #883, to reduce copy-paste
 	// TODO: get these options out of the JSON config file as well?
 	opts := lib.RuntimeOptions{
+		TestType:             getNullString(flags, "type"),
 		IncludeSystemEnvVars: getNullBool(flags, "include-system-env-vars"),
 		CompatibilityMode:    getNullString(flags, "compatibility-mode"),
 		NoThresholds:         getNullBool(flags, "no-thresholds"),
@@ -86,11 +88,13 @@ func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib
 		Env:                  make(map[string]string),
 	}
 
-	if envVar, ok := environment["K6_COMPATIBILITY_MODE"]; ok {
+	if envVar, ok := environment["K6_TYPE"]; ok && !opts.TestType.Valid {
 		// Only override if not explicitly set via the CLI flag
-		if !opts.CompatibilityMode.Valid {
-			opts.CompatibilityMode = null.StringFrom(envVar)
-		}
+		opts.TestType = null.StringFrom(envVar)
+	}
+	if envVar, ok := environment["K6_COMPATIBILITY_MODE"]; ok && !opts.CompatibilityMode.Valid {
+		// Only override if not explicitly set via the CLI flag
+		opts.CompatibilityMode = null.StringFrom(envVar)
 	}
 	if _, err := lib.ValidateCompatibilityMode(opts.CompatibilityMode.String); err != nil {
 		// some early validation

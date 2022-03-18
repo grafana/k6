@@ -33,7 +33,6 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/metrics"
-	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
 )
 
@@ -78,44 +77,42 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/script.js", jsCode.Bytes(), 0o644))
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	runner, err := newRunner(
-		testutils.NewLogger(t),
-		&loader.SourceData{Data: jsCode.Bytes(), URL: &url.URL{Path: "/script.js", Scheme: "file"}},
-		typeJS,
-		map[string]afero.Fs{"file": fs},
-		rtOpts,
-		builtinMetrics,
-		registry,
-	)
-	require.NoError(t, err)
 
-	archive := runner.MakeArchive()
+	ts := newGlobalTestState(t) // TODO: move upwards, make this into an almost full integration test
+	registry := metrics.NewRegistry()
+	test := &loadedTest{
+		sourceRootPath:  "script.js",
+		source:          &loader.SourceData{Data: jsCode.Bytes(), URL: &url.URL{Path: "/script.js", Scheme: "file"}},
+		fileSystems:     map[string]afero.Fs{"file": fs},
+		runtimeOptions:  rtOpts,
+		metricsRegistry: registry,
+		builtInMetrics:  metrics.RegisterBuiltinMetrics(registry),
+	}
+
+	require.NoError(t, test.initializeFirstRunner(ts.globalState))
+
+	archive := test.initRunner.MakeArchive()
 	archiveBuf := &bytes.Buffer{}
 	require.NoError(t, archive.Write(archiveBuf))
 
-	getRunnerErr := func(rtOpts lib.RuntimeOptions) (lib.Runner, error) {
-		return newRunner(
-			testutils.NewLogger(t),
-			&loader.SourceData{
-				Data: archiveBuf.Bytes(),
-				URL:  &url.URL{Path: "/script.js"},
-			},
-			typeArchive,
-			nil,
-			rtOpts,
-			builtinMetrics,
-			registry,
-		)
+	getRunnerErr := func(rtOpts lib.RuntimeOptions) *loadedTest {
+		return &loadedTest{
+			sourceRootPath:  "script.tar",
+			source:          &loader.SourceData{Data: archiveBuf.Bytes(), URL: &url.URL{Path: "/script.tar", Scheme: "file"}},
+			fileSystems:     map[string]afero.Fs{"file": fs},
+			runtimeOptions:  rtOpts,
+			metricsRegistry: registry,
+			builtInMetrics:  metrics.RegisterBuiltinMetrics(registry),
+		}
 	}
 
-	_, err = getRunnerErr(lib.RuntimeOptions{})
-	require.NoError(t, err)
+	archTest := getRunnerErr(lib.RuntimeOptions{})
+	require.NoError(t, archTest.initializeFirstRunner(ts.globalState))
+
 	for key, val := range tc.expRTOpts.Env {
-		r, err := getRunnerErr(lib.RuntimeOptions{Env: map[string]string{key: "almost " + val}})
-		assert.NoError(t, err)
-		assert.Equal(t, r.MakeArchive().Env[key], "almost "+val)
+		archTest = getRunnerErr(lib.RuntimeOptions{Env: map[string]string{key: "almost " + val}})
+		require.NoError(t, archTest.initializeFirstRunner(ts.globalState))
+		assert.Equal(t, archTest.initRunner.MakeArchive().Env[key], "almost "+val)
 	}
 }
 

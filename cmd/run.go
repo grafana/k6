@@ -31,10 +31,8 @@ import (
 	"os"
 	"runtime"
 	"sync"
-	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -44,18 +42,10 @@ import (
 	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/js"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/lib/metrics"
-	"go.k6.io/k6/loader"
 	"go.k6.io/k6/ui/pb"
-)
-
-const (
-	typeJS      = "js"
-	typeArchive = "archive"
 )
 
 //nolint:funlen,gocognit,gocyclo,cyclop
@@ -90,59 +80,14 @@ a commandline interface for interacting with it.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			printBanner(globalState)
 
-			logger := globalState.logger
-			logger.Debug("Initializing the runner...")
-
-			// Create the Runner.
-			src, filesystems, err := readSource(globalState, args[0])
+			test, err := loadAndConfigureTest(globalState, cmd, args, getConfig)
 			if err != nil {
 				return err
 			}
 
-			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), globalState.envVars)
-			if err != nil {
-				return err
-			}
-
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			initRunner, err := newRunner(
-				logger, src, globalState.flags.runType, filesystems, runtimeOptions, builtinMetrics, registry,
-			)
-			if err != nil {
-				return common.UnwrapGojaInterruptedError(err)
-			}
-
-			logger.Debug("Getting the script options...")
-
-			cliConf, err := getConfig(cmd.Flags())
-			if err != nil {
-				return err
-			}
-			conf, err := getConsolidatedConfig(globalState, cliConf, initRunner.GetOptions())
-			if err != nil {
-				return err
-			}
-
-			// Parse the thresholds, only if the --no-threshold flag is not set.
-			// If parsing the threshold expressions failed, consider it as an
-			// invalid configuration error.
-			if !runtimeOptions.NoThresholds.Bool {
-				for _, thresholds := range conf.Options.Thresholds {
-					err = thresholds.Parse()
-					if err != nil {
-						return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-					}
-				}
-			}
-
-			conf, err = deriveAndValidateConfig(conf, initRunner.IsExecutable, logger)
-			if err != nil {
-				return err
-			}
-
-			// Write options back to the runner too.
-			if err = initRunner.SetOptions(conf.Options); err != nil {
+			// Write the full consolidated *and derived* options back to the Runner.
+			conf := test.derivedConfig
+			if err = test.initRunner.SetOptions(conf.Options); err != nil {
 				return err
 			}
 
@@ -163,9 +108,10 @@ a commandline interface for interacting with it.`,
 			runCtx, runCancel := context.WithCancel(lingerCtx)
 			defer runCancel()
 
+			logger := globalState.logger
 			// Create a local execution scheduler wrapping the runner.
 			logger.Debug("Initializing the execution scheduler...")
-			execScheduler, err := local.NewExecutionScheduler(initRunner, logger)
+			execScheduler, err := local.NewExecutionScheduler(test.initRunner, logger)
 			if err != nil {
 				return err
 			}
@@ -190,14 +136,17 @@ a commandline interface for interacting with it.`,
 
 			// Create all outputs.
 			executionPlan := execScheduler.GetExecutionPlan()
-			outputs, err := createOutputs(globalState, src, conf, runtimeOptions, executionPlan)
+			outputs, err := createOutputs(globalState, test, executionPlan)
 			if err != nil {
 				return err
 			}
 
 			// Create the engine.
 			initBar.Modify(pb.WithConstProgress(0, "Init engine"))
-			engine, err := core.NewEngine(execScheduler, conf.Options, runtimeOptions, outputs, logger, builtinMetrics)
+			engine, err := core.NewEngine(
+				execScheduler, conf.Options, test.runtimeOptions,
+				outputs, logger, test.builtInMetrics,
+			)
 			if err != nil {
 				return err
 			}
@@ -211,7 +160,7 @@ a commandline interface for interacting with it.`,
 						// Only exit k6 if the user has explicitly set the REST API address
 						if cmd.Flags().Lookup("address").Changed {
 							logger.WithError(aerr).Error("Error from API server")
-							os.Exit(int(exitcodes.CannotStartRESTAPI))
+							globalState.osExit(int(exitcodes.CannotStartRESTAPI))
 						} else {
 							logger.WithError(aerr).Warn("Error from API server")
 						}
@@ -232,21 +181,16 @@ a commandline interface for interacting with it.`,
 			)
 
 			// Trap Interrupts, SIGINTs and SIGTERMs.
-			sigC := make(chan os.Signal, 2)
-			globalState.signalNotify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-			defer globalState.signalStop(sigC)
-			go func() {
-				sig := <-sigC
+			gracefulStop := func(sig os.Signal) {
 				logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
 				lingerCancel() // stop the test run, metric processing is cancelled below
-
-				// If we get a second signal, we immediately exit, so something like
-				// https://github.com/k6io/k6/issues/971 never happens again
-				sig = <-sigC
+			}
+			hardStop := func(sig os.Signal) {
 				logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
 				globalCancel() // not that it matters, given the following command...
-				os.Exit(int(exitcodes.ExternalAbort))
-			}()
+			}
+			stopSignalHandling := handleTestAbortSignals(globalState, gracefulStop, hardStop)
+			defer stopSignalHandling()
 
 			// Initialize the engine
 			initBar.Modify(pb.WithConstProgress(0, "Init VUs..."))
@@ -302,8 +246,8 @@ a commandline interface for interacting with it.`,
 			}
 
 			// Handle the end-of-test summary.
-			if !runtimeOptions.NoSummary.Bool {
-				summaryResult, err := initRunner.HandleSummary(globalCtx, &lib.Summary{
+			if !test.runtimeOptions.NoSummary.Bool {
+				summaryResult, err := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
 					Metrics:         engine.Metrics,
 					RootGroup:       engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
 					TestRunDuration: executionState.GetCurrentTestRunDuration(),
@@ -349,7 +293,7 @@ a commandline interface for interacting with it.`,
 	}
 
 	runCmd.Flags().SortFlags = false
-	runCmd.Flags().AddFlagSet(runCmdFlagSet(globalState))
+	runCmd.Flags().AddFlagSet(runCmdFlagSet())
 
 	return runCmd
 }
@@ -385,53 +329,13 @@ func reportUsage(execScheduler *local.ExecutionScheduler) error {
 	return err
 }
 
-func runCmdFlagSet(globalState *globalState) *pflag.FlagSet {
+func runCmdFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SortFlags = false
 	flags.AddFlagSet(optionFlagSet())
 	flags.AddFlagSet(runtimeOptionFlagSet(true))
 	flags.AddFlagSet(configFlagSet())
-
-	// TODO: Figure out a better way to handle the CLI flags:
-	// - the default values are specified in this way so we don't overwrire whatever
-	//   was specified via the environment variables
-	// - but we need to manually specify the DefValue, since that's the default value
-	//   that will be used in the help/usage message - if we don't set it, the environment
-	//   variables will affect the usage message
-	// - and finally, global variables are not very testable... :/
-	flags.StringVarP(&globalState.flags.runType, "type", "t",
-		globalState.flags.runType, "override file `type`, \"js\" or \"archive\"")
-	flags.Lookup("type").DefValue = ""
 	return flags
-}
-
-// Creates a new runner.
-func newRunner(
-	logger *logrus.Logger, src *loader.SourceData, typ string, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
-	builtinMetrics *metrics.BuiltinMetrics, registry *metrics.Registry,
-) (runner lib.Runner, err error) {
-	switch typ {
-	case "":
-		runner, err = newRunner(logger, src, detectType(src.Data), filesystems, rtOpts, builtinMetrics, registry)
-	case typeJS:
-		runner, err = js.New(logger, src, filesystems, rtOpts, builtinMetrics, registry)
-	case typeArchive:
-		var arc *lib.Archive
-		arc, err = lib.ReadArchive(bytes.NewReader(src.Data))
-		if err != nil {
-			return nil, err
-		}
-		switch arc.Type {
-		case typeJS:
-			runner, err = js.NewFromArchive(logger, arc, rtOpts, builtinMetrics, registry)
-		default:
-			return nil, fmt.Errorf("archive requests unsupported runner: %s", arc.Type)
-		}
-	default:
-		return nil, fmt.Errorf("unknown -t/--type: %s", typ)
-	}
-
-	return runner, err
 }
 
 func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[string]io.Reader) error {

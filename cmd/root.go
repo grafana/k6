@@ -56,7 +56,6 @@ const (
 // globalFlags contains global config values that apply for all k6 sub-commands.
 type globalFlags struct {
 	configFilePath string
-	runType        string
 	quiet          bool
 	noColor        bool
 	address        string
@@ -92,10 +91,9 @@ type globalState struct {
 	stdOut, stdErr *consoleWriter
 	stdIn          io.Reader
 
+	osExit       func(int)
 	signalNotify func(chan<- os.Signal, ...os.Signal)
 	signalStop   func(chan<- os.Signal)
-
-	// TODO: add os.Exit()?
 
 	logger         *logrus.Logger
 	fallbackLogger logrus.FieldLogger
@@ -145,6 +143,7 @@ func newGlobalState(ctx context.Context) *globalState {
 		stdOut:       stdOut,
 		stdErr:       stdErr,
 		stdIn:        os.Stdin,
+		osExit:       os.Exit,
 		signalNotify: signal.Notify,
 		signalStop:   signal.Stop,
 		logger:       logger,
@@ -173,9 +172,6 @@ func getFlags(defaultFlags globalFlags, env map[string]string) globalFlags {
 
 	if val, ok := env["K6_CONFIG"]; ok {
 		result.configFilePath = val
-	}
-	if val, ok := env["K6_TYPE"]; ok {
-		result.runType = val
 	}
 	if val, ok := env["K6_LOG_OUTPUT"]; ok {
 		result.logOutput = val
@@ -272,47 +268,52 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error
 	return nil
 }
 
+func (c *rootCommand) execute() {
+	ctx, cancel := context.WithCancel(c.globalState.ctx)
+	defer cancel()
+	c.globalState.ctx = ctx
+
+	err := c.cmd.Execute()
+	if err == nil {
+		cancel()
+		c.waitRemoteLogger()
+		return
+	}
+
+	exitCode := -1
+	var ecerr errext.HasExitCode
+	if errors.As(err, &ecerr) {
+		exitCode = int(ecerr.ExitCode())
+	}
+
+	errText := err.Error()
+	var xerr errext.Exception
+	if errors.As(err, &xerr) {
+		errText = xerr.StackTrace()
+	}
+
+	fields := logrus.Fields{}
+	var herr errext.HasHint
+	if errors.As(err, &herr) {
+		fields["hint"] = herr.Hint()
+	}
+
+	c.globalState.logger.WithFields(fields).Error(errText)
+	if c.loggerIsRemote {
+		c.globalState.fallbackLogger.WithFields(fields).Error(errText)
+		cancel()
+		c.waitRemoteLogger()
+	}
+
+	c.globalState.osExit(exitCode)
+}
+
 // Execute adds all child commands to the root command sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	gs := newGlobalState(context.Background())
 
-	globalState := newGlobalState(ctx)
-
-	rootCmd := newRootCommand(globalState)
-
-	if err := rootCmd.cmd.Execute(); err != nil {
-		exitCode := -1
-		var ecerr errext.HasExitCode
-		if errors.As(err, &ecerr) {
-			exitCode = int(ecerr.ExitCode())
-		}
-
-		errText := err.Error()
-		var xerr errext.Exception
-		if errors.As(err, &xerr) {
-			errText = xerr.StackTrace()
-		}
-
-		fields := logrus.Fields{}
-		var herr errext.HasHint
-		if errors.As(err, &herr) {
-			fields["hint"] = herr.Hint()
-		}
-
-		globalState.logger.WithFields(fields).Error(errText)
-		if rootCmd.loggerIsRemote {
-			globalState.fallbackLogger.WithFields(fields).Error(errText)
-			cancel()
-			rootCmd.waitRemoteLogger()
-		}
-
-		os.Exit(exitCode) //nolint:gocritic
-	}
-
-	cancel()
-	rootCmd.waitRemoteLogger()
+	newRootCommand(gs).execute()
 }
 
 func (c *rootCommand) waitRemoteLogger() {
@@ -409,7 +410,10 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 
 	case strings.HasPrefix(line, "file"):
 		ch = make(chan struct{}) // TODO: refactor, get it from the constructor
-		hook, err := log.FileHookFromConfigLine(c.globalState.ctx, c.globalState.fs, c.globalState.fallbackLogger, line, ch)
+		hook, err := log.FileHookFromConfigLine(
+			c.globalState.ctx, c.globalState.fs, c.globalState.getwd,
+			c.globalState.fallbackLogger, line, ch,
+		)
 		if err != nil {
 			return nil, err
 		}

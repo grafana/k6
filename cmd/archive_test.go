@@ -6,9 +6,7 @@ import (
 	"testing"
 
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 )
 
@@ -51,21 +49,10 @@ func TestArchiveThresholds(t *testing.T) {
 				testState.args = append(testState.args, "--no-thresholds")
 			}
 
-			gotErr := newRootCommand(testState.globalState).cmd.Execute()
-
-			assert.Equal(t,
-				testCase.wantErr,
-				gotErr != nil,
-				"archive command error = %v, wantErr %v", gotErr, testCase.wantErr,
-			)
-
 			if testCase.wantErr {
-				var gotErrExt errext.HasExitCode
-				require.ErrorAs(t, gotErr, &gotErrExt)
-				assert.Equalf(t, exitcodes.InvalidConfig, gotErrExt.ExitCode(),
-					"status code must be %d", exitcodes.InvalidConfig,
-				)
+				testState.expectedExitCode = int(exitcodes.InvalidConfig)
 			}
+			newRootCommand(testState.globalState).execute()
 		})
 	}
 }

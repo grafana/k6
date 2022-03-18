@@ -30,7 +30,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/fatih/color"
@@ -42,7 +41,6 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/ui/pb"
 )
 
@@ -91,56 +89,23 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 		RunE: func(cmd *cobra.Command, args []string) error {
 			printBanner(globalState)
 
-			logger := globalState.logger
 			progressBar := pb.New(
 				pb.WithConstLeft("Init"),
-				pb.WithConstProgress(0, "Parsing script"),
+				pb.WithConstProgress(0, "Loading test script..."),
 			)
 			printBar(globalState, progressBar)
 
-			// Runner
-			filename := args[0]
-			src, filesystems, err := readSource(globalState, filename)
+			test, err := loadAndConfigureTest(globalState, cmd, args, getPartialConfig)
 			if err != nil {
 				return err
 			}
 
-			runtimeOptions, err := getRuntimeOptions(cmd.Flags(), globalState.envVars)
-			if err != nil {
-				return err
-			}
-
-			modifyAndPrintBar(globalState, progressBar, pb.WithConstProgress(0, "Getting script options"))
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			r, err := newRunner(logger, src, globalState.flags.runType, filesystems, runtimeOptions, builtinMetrics, registry)
-			if err != nil {
-				return err
-			}
-
-			modifyAndPrintBar(globalState, progressBar, pb.WithConstProgress(0, "Consolidating options"))
-			cliOpts, err := getOptions(cmd.Flags())
-			if err != nil {
-				return err
-			}
-			conf, err := getConsolidatedConfig(globalState, Config{Options: cliOpts}, r.GetOptions())
-			if err != nil {
-				return err
-			}
-
-			// Parse the thresholds, only if the --no-threshold flag is not set.
-			// If parsing the threshold expressions failed, consider it as an
-			// invalid configuration error.
-			if !runtimeOptions.NoThresholds.Bool {
-				for _, thresholds := range conf.Options.Thresholds {
-					err = thresholds.Parse()
-					if err != nil {
-						return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-					}
-				}
-			}
-
-			derivedConf, err := deriveAndValidateConfig(conf, r.IsExecutable, logger)
+			// It's important to NOT set the derived options back to the runner
+			// here, only the consolidated ones. Otherwise, if the script used
+			// an execution shortcut option (e.g. `iterations` or `duration`),
+			// we will have multiple conflicting execution options since the
+			// derivation will set `scenarios` as well.
+			err = test.initRunner.SetOptions(test.consolidatedConfig.Options)
 			if err != nil {
 				return err
 			}
@@ -149,13 +114,9 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			// TODO: validate for externally controlled executor (i.e. executors that aren't distributable)
 			// TODO: move those validations to a separate function and reuse validateConfig()?
 
-			err = r.SetOptions(conf.Options)
-			if err != nil {
-				return err
-			}
+			modifyAndPrintBar(globalState, progressBar, pb.WithConstProgress(0, "Building the archive..."))
+			arc := test.initRunner.MakeArchive()
 
-			modifyAndPrintBar(globalState, progressBar, pb.WithConstProgress(0, "Building the archive"))
-			arc := r.MakeArchive()
 			// TODO: Fix this
 			// We reuse cloud.Config for parsing options.ext.loadimpact, but this probably shouldn't be
 			// done, as the idea of options.ext is that they are extensible without touching k6. But in
@@ -174,7 +135,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 
 			// Cloud config
 			cloudConfig, err := cloudapi.GetConsolidatedConfig(
-				derivedConf.Collectors["cloud"], globalState.envVars, "", arc.Options.External)
+				test.derivedConfig.Collectors["cloud"], globalState.envVars, "", arc.Options.External)
 			if err != nil {
 				return err
 			}
@@ -205,11 +166,13 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 
 			name := cloudConfig.Name.String
 			if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
-				name = filepath.Base(filename)
+				name = filepath.Base(test.sourceRootPath)
 			}
 
 			globalCtx, globalCancel := context.WithCancel(globalState.ctx)
 			defer globalCancel()
+
+			logger := globalState.logger
 
 			// Start cloud test run
 			modifyAndPrintBar(globalState, progressBar, pb.WithConstProgress(0, "Validating script options"))
@@ -226,13 +189,10 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 			}
 
 			// Trap Interrupts, SIGINTs and SIGTERMs.
-			sigC := make(chan os.Signal, 2)
-			globalState.signalNotify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-			defer globalState.signalStop(sigC)
-			go func() {
-				sig := <-sigC
+			gracefulStop := func(sig os.Signal) {
 				logger.WithField("sig", sig).Print("Stopping cloud test run in response to signal...")
-				// Do this in a separate goroutine so that if it blocks the second signal can stop the execution
+				// Do this in a separate goroutine so that if it blocks, the
+				// second signal can still abort the process execution.
 				go func() {
 					stopErr := client.StopCloudTestRun(refID)
 					if stopErr != nil {
@@ -242,20 +202,21 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 					}
 					globalCancel()
 				}()
-
-				sig = <-sigC
+			}
+			hardStop := func(sig os.Signal) {
 				logger.WithField("sig", sig).Error("Aborting k6 in response to signal, we won't wait for the test to end.")
-				os.Exit(int(exitcodes.ExternalAbort))
-			}()
+			}
+			stopSignalHandling := handleTestAbortSignals(globalState, gracefulStop, hardStop)
+			defer stopSignalHandling()
 
-			et, err := lib.NewExecutionTuple(derivedConf.ExecutionSegment, derivedConf.ExecutionSegmentSequence)
+			et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
 			if err != nil {
 				return err
 			}
 			testURL := cloudapi.URLForResults(refID, cloudConfig)
-			executionPlan := derivedConf.Scenarios.GetFullExecutionRequirements(et)
+			executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
 			printExecutionDescription(
-				globalState, "cloud", filename, testURL, derivedConf, et, executionPlan, nil,
+				globalState, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
 			)
 
 			modifyAndPrintBar(
