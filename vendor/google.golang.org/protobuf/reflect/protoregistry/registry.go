@@ -17,7 +17,7 @@ package protoregistry
 
 import (
 	"fmt"
-	"log"
+	"os"
 	"strings"
 	"sync"
 
@@ -27,16 +27,39 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
+// conflictPolicy configures the policy for handling registration conflicts.
+//
+// It can be over-written at compile time with a linker-initialized variable:
+//	go build -ldflags "-X google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=warn"
+//
+// It can be over-written at program execution with an environment variable:
+//	GOLANG_PROTOBUF_REGISTRATION_CONFLICT=warn ./main
+//
+// Neither of the above are covered by the compatibility promise and
+// may be removed in a future release of this module.
+var conflictPolicy = "panic" // "panic" | "warn" | "ignore"
+
 // ignoreConflict reports whether to ignore a registration conflict
 // given the descriptor being registered and the error.
 // It is a variable so that the behavior is easily overridden in another file.
 var ignoreConflict = func(d protoreflect.Descriptor, err error) bool {
-	log.Printf(""+
-		"WARNING: %v\n"+
-		"A future release will panic on registration conflicts. See:\n"+
-		"https://developers.google.com/protocol-buffers/docs/reference/go/faq#namespace-conflict\n"+
-		"\n", err)
-	return true
+	const env = "GOLANG_PROTOBUF_REGISTRATION_CONFLICT"
+	const faq = "https://developers.google.com/protocol-buffers/docs/reference/go/faq#namespace-conflict"
+	policy := conflictPolicy
+	if v := os.Getenv(env); v != "" {
+		policy = v
+	}
+	switch policy {
+	case "panic":
+		panic(fmt.Sprintf("%v\nSee %v\n", err, faq))
+	case "warn":
+		fmt.Fprintf(os.Stderr, "WARNING: %v\nSee %v\n\n", err, faq)
+		return true
+	case "ignore":
+		return true
+	default:
+		panic("invalid " + env + " value: " + os.Getenv(env))
+	}
 }
 
 var globalMutex sync.RWMutex
@@ -98,38 +121,7 @@ func (r *Files) RegisterFile(file protoreflect.FileDescriptor) error {
 	}
 	path := file.Path()
 	if prev := r.filesByPath[path]; prev != nil {
-		// TODO: Remove this after some soak-in period after moving these types.
-		var prevPath string
-		const prevModule = "google.golang.org/genproto"
-		const prevVersion = "cb27e3aa (May 26th, 2020)"
-		switch path {
-		case "google/protobuf/field_mask.proto":
-			prevPath = prevModule + "/protobuf/field_mask"
-		case "google/protobuf/api.proto":
-			prevPath = prevModule + "/protobuf/api"
-		case "google/protobuf/type.proto":
-			prevPath = prevModule + "/protobuf/ptype"
-		case "google/protobuf/source_context.proto":
-			prevPath = prevModule + "/protobuf/source_context"
-		}
-		if r == GlobalFiles && prevPath != "" {
-			pkgName := strings.TrimSuffix(strings.TrimPrefix(path, "google/protobuf/"), ".proto")
-			pkgName = strings.Replace(pkgName, "_", "", -1) + "pb"
-			currPath := "google.golang.org/protobuf/types/known/" + pkgName
-			panic(fmt.Sprintf(""+
-				"duplicate registration of %q\n"+
-				"\n"+
-				"The generated definition for this file has moved:\n"+
-				"\tfrom: %q\n"+
-				"\tto:   %q\n"+
-				"A dependency on the %q module must\n"+
-				"be at version %v or higher.\n"+
-				"\n"+
-				"Upgrade the dependency by running:\n"+
-				"\tgo get -u %v\n",
-				path, prevPath, currPath, prevModule, prevVersion, prevPath))
-		}
-
+		r.checkGenProtoConflict(path)
 		err := errors.New("file %q is already registered", file.Path())
 		err = amendErrorWithCaller(err, prev, file)
 		if r == GlobalFiles && ignoreConflict(file, err) {
@@ -178,6 +170,47 @@ func (r *Files) RegisterFile(file protoreflect.FileDescriptor) error {
 	})
 	r.filesByPath[path] = file
 	return nil
+}
+
+// Several well-known types were hosted in the google.golang.org/genproto module
+// but were later moved to this module. To avoid a weak dependency on the
+// genproto module (and its relatively large set of transitive dependencies),
+// we rely on a registration conflict to determine whether the genproto version
+// is too old (i.e., does not contain aliases to the new type declarations).
+func (r *Files) checkGenProtoConflict(path string) {
+	if r != GlobalFiles {
+		return
+	}
+	var prevPath string
+	const prevModule = "google.golang.org/genproto"
+	const prevVersion = "cb27e3aa (May 26th, 2020)"
+	switch path {
+	case "google/protobuf/field_mask.proto":
+		prevPath = prevModule + "/protobuf/field_mask"
+	case "google/protobuf/api.proto":
+		prevPath = prevModule + "/protobuf/api"
+	case "google/protobuf/type.proto":
+		prevPath = prevModule + "/protobuf/ptype"
+	case "google/protobuf/source_context.proto":
+		prevPath = prevModule + "/protobuf/source_context"
+	default:
+		return
+	}
+	pkgName := strings.TrimSuffix(strings.TrimPrefix(path, "google/protobuf/"), ".proto")
+	pkgName = strings.Replace(pkgName, "_", "", -1) + "pb" // e.g., "field_mask" => "fieldmaskpb"
+	currPath := "google.golang.org/protobuf/types/known/" + pkgName
+	panic(fmt.Sprintf(""+
+		"duplicate registration of %q\n"+
+		"\n"+
+		"The generated definition for this file has moved:\n"+
+		"\tfrom: %q\n"+
+		"\tto:   %q\n"+
+		"A dependency on the %q module must\n"+
+		"be at version %v or higher.\n"+
+		"\n"+
+		"Upgrade the dependency by running:\n"+
+		"\tgo get -u %v\n",
+		path, prevPath, currPath, prevModule, prevVersion, prevPath))
 }
 
 // FindDescriptorByName looks up a descriptor by the full name.

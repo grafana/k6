@@ -163,21 +163,41 @@ func NewOptionNameNode(parts []*FieldReferenceNode, dots []*RuneNode) *OptionNam
 }
 
 // FieldReferenceNode is a reference to a field name. It can indicate a regular
-// field (simple unqualified name) or an extension field (possibly-qualified
-// name that is enclosed either in brackets or parentheses).
+// field (simple unqualified name), an extension field (possibly-qualified name
+// that is enclosed either in brackets or parentheses), or an "any" type
+// reference (a type URL in the form "server.host/fully.qualified.Name" that is
+// enclosed in brackets).
 //
-// This is used in options to indicate the names of custom options (which are
+// Extension names are used in options to refer to custom options (which are
 // actually extensions), in which case the name is enclosed in parentheses "("
-// and ")". It is also used in message literals to set extension fields, in
-// which case the name is enclosed in square brackets "[" and "]".
+// and ")". They can also be used to refer to extension fields of options.
 //
-// Example:
+// Extension names are also used in message literals to set extension fields,
+// in which case the name is enclosed in square brackets "[" and "]".
+//
+// "Any" type references can only be used in message literals, and are not
+// allowed in option names. They are always enclosed in square brackets. An
+// "any" type reference is distinguished from an extension name by the presence
+// of a slash, which must be present in an "any" type reference and must be
+// absent in an extension name.
+//
+// Examples:
+//   foobar
 //   (foo.bar)
+//   [foo.bar]
+//   [type.googleapis.com/foo.bar]
+//
 type FieldReferenceNode struct {
 	compositeNode
-	Open  *RuneNode // only present for extension names
-	Name  IdentValueNode
-	Close *RuneNode // only present for extension names
+	Open *RuneNode // only present for extension names and "any" type references
+
+	// only present for "any" type references
+	UrlPrefix IdentValueNode
+	Slash     *RuneNode
+
+	Name IdentValueNode
+
+	Close *RuneNode // only present for extension names and "any" type references
 }
 
 // NewFieldReferenceNode creates a new *FieldReferenceNode for a regular field.
@@ -219,14 +239,55 @@ func NewExtensionFieldReferenceNode(openSym *RuneNode, name IdentValueNode, clos
 	}
 }
 
+// NewAnyTypeReferenceNode creates a new *FieldReferenceNode for an "any"
+// type reference. All args must be non-nil. The openSym and closeSym runes
+// should be "[" and "]". The slashSym run should be "/".
+func NewAnyTypeReferenceNode(openSym *RuneNode, urlPrefix IdentValueNode, slashSym *RuneNode, name IdentValueNode, closeSym *RuneNode) *FieldReferenceNode {
+	if name == nil {
+		panic("name is nil")
+	}
+	if openSym == nil {
+		panic("openSym is nil")
+	}
+	if closeSym == nil {
+		panic("closeSym is nil")
+	}
+	if urlPrefix == nil {
+		panic("urlPrefix is nil")
+	}
+	if slashSym == nil {
+		panic("slashSym is nil")
+	}
+	children := []Node{openSym, urlPrefix, slashSym, name, closeSym}
+	return &FieldReferenceNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		Open:      openSym,
+		UrlPrefix: urlPrefix,
+		Slash:     slashSym,
+		Name:      name,
+		Close:     closeSym,
+	}
+}
+
 // IsExtension reports if this is an extension name or not (e.g. enclosed in
 // punctuation, such as parentheses or brackets).
 func (a *FieldReferenceNode) IsExtension() bool {
-	return a.Open != nil
+	return a.Open != nil && a.Slash == nil
+}
+
+// IsExtension reports if this is an extension name or not (e.g. enclosed in
+// punctuation, such as parentheses or brackets).
+func (a *FieldReferenceNode) IsAnyTypeReference() bool {
+	return a.Slash != nil
 }
 
 func (a *FieldReferenceNode) Value() string {
 	if a.Open != nil {
+		if a.Slash != nil {
+			return string(a.Open.Rune) + string(a.UrlPrefix.AsIdentifier()) + string(a.Slash.Rune) + string(a.Name.AsIdentifier()) + string(a.Close.Rune)
+		}
 		return string(a.Open.Rune) + string(a.Name.AsIdentifier()) + string(a.Close.Rune)
 	} else {
 		return string(a.Name.AsIdentifier())

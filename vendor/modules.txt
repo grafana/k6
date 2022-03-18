@@ -4,17 +4,17 @@ github.com/Azure/go-ntlmssp
 # github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
 ## explicit
 github.com/DataDog/datadog-go/statsd
-# github.com/PuerkitoBio/goquery v1.6.1
+# github.com/PuerkitoBio/goquery v1.8.0
 ## explicit; go 1.13
 github.com/PuerkitoBio/goquery
 # github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 ## explicit
 github.com/Soontao/goHttpDigestClient
-# github.com/andybalholm/brotli v1.0.3
+# github.com/andybalholm/brotli v1.0.4
 ## explicit; go 1.12
 github.com/andybalholm/brotli
-# github.com/andybalholm/cascadia v1.1.0
-## explicit
+# github.com/andybalholm/cascadia v1.3.1
+## explicit; go 1.16
 github.com/andybalholm/cascadia
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
@@ -40,7 +40,7 @@ github.com/fatih/color
 ## explicit
 github.com/go-sourcemap/sourcemap
 github.com/go-sourcemap/sourcemap/internal/base64vlq
-# github.com/golang/protobuf v1.4.3
+# github.com/golang/protobuf v1.5.2
 ## explicit; go 1.9
 github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
@@ -53,7 +53,7 @@ github.com/golang/protobuf/ptypes/empty
 github.com/golang/protobuf/ptypes/struct
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
-# github.com/gorilla/websocket v1.4.2
+# github.com/gorilla/websocket v1.5.0
 ## explicit; go 1.12
 github.com/gorilla/websocket
 # github.com/inconshreveable/mousetrap v1.0.0
@@ -64,13 +64,14 @@ github.com/inconshreveable/mousetrap
 github.com/influxdata/influxdb1-client/models
 github.com/influxdata/influxdb1-client/pkg/escape
 github.com/influxdata/influxdb1-client/v2
-# github.com/jhump/protoreflect v1.10.0
+# github.com/jhump/protoreflect v1.12.0
 ## explicit; go 1.13
 github.com/jhump/protoreflect/codec
 github.com/jhump/protoreflect/desc
 github.com/jhump/protoreflect/desc/internal
 github.com/jhump/protoreflect/desc/protoparse
 github.com/jhump/protoreflect/desc/protoparse/ast
+github.com/jhump/protoreflect/desc/sourceinfo
 github.com/jhump/protoreflect/dynamic
 github.com/jhump/protoreflect/internal
 github.com/jhump/protoreflect/internal/codec
@@ -137,11 +138,11 @@ github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.5
 ## explicit; go 1.12
 github.com/spf13/pflag
-# github.com/stretchr/testify v1.7.0
+# github.com/stretchr/testify v1.7.1
 ## explicit; go 1.13
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# github.com/tidwall/gjson v1.10.2
+# github.com/tidwall/gjson v1.14.0
 ## explicit; go 1.12
 github.com/tidwall/gjson
 # github.com/tidwall/match v1.1.1
@@ -199,7 +200,7 @@ google.golang.org/genproto/protobuf/api
 google.golang.org/genproto/protobuf/field_mask
 google.golang.org/genproto/protobuf/ptype
 google.golang.org/genproto/protobuf/source_context
-# google.golang.org/grpc v1.41.0
+# google.golang.org/grpc v1.45.0
 ## explicit; go 1.14
 google.golang.org/grpc
 google.golang.org/grpc/attributes
@@ -212,6 +213,7 @@ google.golang.org/grpc/binarylog/grpc_binarylog_v1
 google.golang.org/grpc/codes
 google.golang.org/grpc/connectivity
 google.golang.org/grpc/credentials
+google.golang.org/grpc/credentials/insecure
 google.golang.org/grpc/encoding
 google.golang.org/grpc/encoding/proto
 google.golang.org/grpc/grpclog
@@ -237,7 +239,6 @@ google.golang.org/grpc/internal/status
 google.golang.org/grpc/internal/syscall
 google.golang.org/grpc/internal/transport
 google.golang.org/grpc/internal/transport/networktype
-google.golang.org/grpc/internal/xds/env
 google.golang.org/grpc/keepalive
 google.golang.org/grpc/metadata
 google.golang.org/grpc/peer
@@ -249,7 +250,7 @@ google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
 google.golang.org/grpc/test/grpc_testing
-# google.golang.org/protobuf v1.25.1-0.20200805231151-a709e31e5d12
+# google.golang.org/protobuf v1.26.0
 ## explicit; go 1.9
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext

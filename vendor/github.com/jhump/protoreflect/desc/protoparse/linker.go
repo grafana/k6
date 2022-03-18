@@ -71,7 +71,7 @@ func (l *linker) linkFiles() (map[string]*desc.FileDescriptor, error) {
 		}
 		// we should now have any message_set_wire_format options parsed
 		// and can do further validation on tag ranges
-		if err := checkExtensionsInFile(fd, r); err != nil {
+		if err := l.checkExtensionsInFile(fd, r); err != nil {
 			return nil, err
 		}
 	}
@@ -145,7 +145,7 @@ func (l *linker) createDescriptorPool() error {
 					file1, file2 = file2, file1
 					desc1, desc2 = desc2, desc1
 				}
-				node := l.files[file2].nodes[desc2]
+				node := l.files[file2].getNode(desc2)
 				if err := l.errs.handleErrorWithPos(node.Start(), "duplicate symbol %s: already defined as %s in %q", k, descriptorType(desc1), file1); err != nil {
 					return err
 				}
@@ -180,6 +180,11 @@ func addMessageToPool(r *parseResult, pool map[string]proto.Message, errs *error
 		return err
 	}
 	prefix = fqn + "."
+	for _, ood := range md.OneofDecl {
+		if err := addOneofToPool(r, pool, errs, prefix, ood); err != nil {
+			return err
+		}
+	}
 	for _, fld := range md.Field {
 		if err := addFieldToPool(r, pool, errs, prefix, fld); err != nil {
 			return err
@@ -206,6 +211,11 @@ func addMessageToPool(r *parseResult, pool map[string]proto.Message, errs *error
 func addFieldToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler, prefix string, fld *dpb.FieldDescriptorProto) error {
 	fqn := prefix + fld.GetName()
 	return addToPool(r, pool, errs, fqn, fld)
+}
+
+func addOneofToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler, prefix string, ood *dpb.OneofDescriptorProto) error {
+	fqn := prefix + ood.GetName()
+	return addToPool(r, pool, errs, fqn, ood)
 }
 
 func addEnumToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler, prefix string, ed *dpb.EnumDescriptorProto) error {
@@ -281,6 +291,8 @@ func descriptorType(m proto.Message) string {
 		return "method"
 	case *dpb.FileDescriptorProto:
 		return "file"
+	case *dpb.OneofDescriptorProto:
+		return "oneof"
 	default:
 		// shouldn't be possible
 		return fmt.Sprintf("%T", m)
@@ -299,7 +311,7 @@ func (l *linker) resolveReferences() error {
 			prefix += "."
 		}
 		if fd.Options != nil {
-			if err := l.resolveOptions(r, fd, "file", fd.GetName(), proto.MessageName(fd.Options), fd.Options.UninterpretedOption, scopes); err != nil {
+			if err := l.resolveOptions(r, fd, "file", fd.GetName(), fd.Options.UninterpretedOption, scopes); err != nil {
 				return err
 			}
 		}
@@ -330,14 +342,14 @@ func (l *linker) resolveReferences() error {
 func (l *linker) resolveEnumTypes(r *parseResult, fd *dpb.FileDescriptorProto, prefix string, ed *dpb.EnumDescriptorProto, scopes []scope) error {
 	enumFqn := prefix + ed.GetName()
 	if ed.Options != nil {
-		if err := l.resolveOptions(r, fd, "enum", enumFqn, proto.MessageName(ed.Options), ed.Options.UninterpretedOption, scopes); err != nil {
+		if err := l.resolveOptions(r, fd, "enum", enumFqn, ed.Options.UninterpretedOption, scopes); err != nil {
 			return err
 		}
 	}
 	for _, evd := range ed.Value {
 		if evd.Options != nil {
 			evFqn := enumFqn + "." + evd.GetName()
-			if err := l.resolveOptions(r, fd, "enum value", evFqn, proto.MessageName(evd.Options), evd.Options.UninterpretedOption, scopes); err != nil {
+			if err := l.resolveOptions(r, fd, "enum value", evFqn, evd.Options.UninterpretedOption, scopes); err != nil {
 				return err
 			}
 		}
@@ -347,15 +359,20 @@ func (l *linker) resolveEnumTypes(r *parseResult, fd *dpb.FileDescriptorProto, p
 
 func (l *linker) resolveMessageTypes(r *parseResult, fd *dpb.FileDescriptorProto, prefix string, md *dpb.DescriptorProto, scopes []scope) error {
 	fqn := prefix + md.GetName()
-	scope := messageScope(fqn, isProto3(fd), l, fd)
-	scopes = append(scopes, scope)
-	prefix = fqn + "."
 
+	// Strangely, when protoc resolves extension names, it uses the *enclosing* scope
+	// instead of the message's scope. So if the message contains an extension named "i",
+	// an option cannot refer to it as simply "i" but must qualify it (at a minimum "Msg.i").
+	// So we don't add this messages scope to our scopes slice until *after* we do options.
 	if md.Options != nil {
-		if err := l.resolveOptions(r, fd, "message", fqn, proto.MessageName(md.Options), md.Options.UninterpretedOption, scopes); err != nil {
+		if err := l.resolveOptions(r, fd, "message", fqn, md.Options.UninterpretedOption, scopes); err != nil {
 			return err
 		}
 	}
+
+	scope := messageScope(fqn, isProto3(fd), l, fd)
+	scopes = append(scopes, scope)
+	prefix = fqn + "."
 
 	for _, nmd := range md.NestedType {
 		if err := l.resolveMessageTypes(r, fd, prefix, nmd, scopes); err != nil {
@@ -375,7 +392,7 @@ func (l *linker) resolveMessageTypes(r *parseResult, fd *dpb.FileDescriptorProto
 	for _, ood := range md.OneofDecl {
 		if ood.Options != nil {
 			ooName := fmt.Sprintf("%s.%s", fqn, ood.GetName())
-			if err := l.resolveOptions(r, fd, "oneof", ooName, proto.MessageName(ood.Options), ood.Options.UninterpretedOption, scopes); err != nil {
+			if err := l.resolveOptions(r, fd, "oneof", ooName, ood.Options.UninterpretedOption, scopes); err != nil {
 				return err
 			}
 		}
@@ -388,7 +405,7 @@ func (l *linker) resolveMessageTypes(r *parseResult, fd *dpb.FileDescriptorProto
 	for _, er := range md.ExtensionRange {
 		if er.Options != nil {
 			erName := fmt.Sprintf("%s:%d-%d", fqn, er.GetStart(), er.GetEnd()-1)
-			if err := l.resolveOptions(r, fd, "extension range", erName, proto.MessageName(er.Options), er.Options.UninterpretedOption, scopes); err != nil {
+			if err := l.resolveOptions(r, fd, "extension range", erName, er.Options.UninterpretedOption, scopes); err != nil {
 				return err
 			}
 		}
@@ -447,7 +464,7 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 	}
 
 	if fld.Options != nil {
-		if err := l.resolveOptions(r, fd, elemType, thisName, proto.MessageName(fld.Options), fld.Options.UninterpretedOption, scopes); err != nil {
+		if err := l.resolveOptions(r, fd, elemType, thisName, fld.Options.UninterpretedOption, scopes); err != nil {
 			return err
 		}
 	}
@@ -489,7 +506,7 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 func (l *linker) resolveServiceTypes(r *parseResult, fd *dpb.FileDescriptorProto, prefix string, sd *dpb.ServiceDescriptorProto, scopes []scope) error {
 	svcFqn := prefix + sd.GetName()
 	if sd.Options != nil {
-		if err := l.resolveOptions(r, fd, "service", svcFqn, proto.MessageName(sd.Options), sd.Options.UninterpretedOption, scopes); err != nil {
+		if err := l.resolveOptions(r, fd, "service", svcFqn, sd.Options.UninterpretedOption, scopes); err != nil {
 			return err
 		}
 	}
@@ -500,7 +517,7 @@ func (l *linker) resolveServiceTypes(r *parseResult, fd *dpb.FileDescriptorProto
 
 	for _, mtd := range sd.Method {
 		if mtd.Options != nil {
-			if err := l.resolveOptions(r, fd, "method", svcFqn+"."+mtd.GetName(), proto.MessageName(mtd.Options), mtd.Options.UninterpretedOption, scopes); err != nil {
+			if err := l.resolveOptions(r, fd, "method", svcFqn+"."+mtd.GetName(), mtd.Options.UninterpretedOption, scopes); err != nil {
 				return err
 			}
 		}
@@ -546,46 +563,106 @@ func (l *linker) resolveServiceTypes(r *parseResult, fd *dpb.FileDescriptorProto
 	return nil
 }
 
-func (l *linker) resolveOptions(r *parseResult, fd *dpb.FileDescriptorProto, elemType, elemName, optType string, opts []*dpb.UninterpretedOption, scopes []scope) error {
-	var scope string
-	if elemType != "file" {
-		scope = fmt.Sprintf("%s %s: ", elemType, elemName)
+func (l *linker) resolveOptions(r *parseResult, fd *dpb.FileDescriptorProto, elemType, elemName string, opts []*dpb.UninterpretedOption, scopes []scope) error {
+	mc := &messageContext{
+		res:         r,
+		elementName: elemName,
+		elementType: elemType,
 	}
 opts:
 	for _, opt := range opts {
+		// resolve any extension names found in option names
 		for _, nm := range opt.Name {
 			if nm.GetIsExtension() {
-				node := r.getOptionNamePartNode(nm)
-				fqn, dsc, _ := l.resolve(fd, nm.GetNamePart(), false, scopes)
-				if dsc == nil {
-					if err := l.errs.handleErrorWithPos(node.Start(), "%sunknown extension %s", scope, nm.GetNamePart()); err != nil {
+				fqn, err := l.resolveExtensionName(nm.GetNamePart(), fd, scopes)
+				if err != nil {
+					node := r.getOptionNamePartNode(nm)
+					if err := l.errs.handleErrorWithPos(node.Start(), "%v%v", mc, err); err != nil {
 						return err
 					}
 					continue opts
 				}
-				if dsc == sentinelMissingSymbol {
-					if err := l.errs.handleErrorWithPos(node.Start(), "%sunknown extension %s; resolved to %s which is not defined; consider using a leading dot", scope, nm.GetNamePart(), fqn); err != nil {
+				nm.NamePart = proto.String(fqn)
+			}
+		}
+		// also resolve any extension names found inside message literals in option values
+		mc.option = opt
+		optVal := r.getOptionNode(opt).GetValue()
+		if err := l.resolveOptionValue(r, mc, fd, optVal, scopes); err != nil {
+			return err
+		}
+		mc.option = nil
+	}
+	return nil
+}
+
+func (l *linker) resolveOptionValue(r *parseResult, mc *messageContext, fd *dpb.FileDescriptorProto, val ast.ValueNode, scopes []scope) error {
+	optVal := val.Value()
+	switch optVal := optVal.(type) {
+	case []ast.ValueNode:
+		origPath := mc.optAggPath
+		defer func() {
+			mc.optAggPath = origPath
+		}()
+		for i, v := range optVal {
+			mc.optAggPath = fmt.Sprintf("%s[%d]", origPath, i)
+			if err := l.resolveOptionValue(r, mc, fd, v, scopes); err != nil {
+				return err
+			}
+		}
+	case []*ast.MessageFieldNode:
+		origPath := mc.optAggPath
+		defer func() {
+			mc.optAggPath = origPath
+		}()
+		for _, fld := range optVal {
+			// check for extension name
+			if fld.Name.IsExtension() {
+				fqn, err := l.resolveExtensionName(string(fld.Name.Name.AsIdentifier()), fd, scopes)
+				if err != nil {
+					if err := l.errs.handleErrorWithPos(fld.Name.Name.Start(), "%v%v", mc, err); err != nil {
 						return err
 					}
-					continue opts
+				} else {
+					r.optionQualifiedNames[fld.Name.Name] = fqn
 				}
-				if ext, ok := dsc.(*dpb.FieldDescriptorProto); !ok {
-					otherType := descriptorType(dsc)
-					if err := l.errs.handleErrorWithPos(node.Start(), "%sinvalid extension: %s is a %s, not an extension", scope, nm.GetNamePart(), otherType); err != nil {
-						return err
-					}
-					continue opts
-				} else if ext.GetExtendee() == "" {
-					if err := l.errs.handleErrorWithPos(node.Start(), "%sinvalid extension: %s is a field but not an extension", scope, nm.GetNamePart()); err != nil {
-						return err
-					}
-					continue opts
-				}
-				nm.NamePart = proto.String("." + fqn)
+			}
+
+			// recurse into value
+			mc.optAggPath = origPath
+			if origPath != "" {
+				mc.optAggPath += "."
+			}
+			if fld.Name.IsExtension() {
+				mc.optAggPath = fmt.Sprintf("%s[%s]", mc.optAggPath, string(fld.Name.Name.AsIdentifier()))
+			} else {
+				mc.optAggPath = fmt.Sprintf("%s%s", mc.optAggPath, string(fld.Name.Name.AsIdentifier()))
+			}
+
+			if err := l.resolveOptionValue(r, mc, fd, fld.Val, scopes); err != nil {
+				return err
 			}
 		}
 	}
+
 	return nil
+}
+
+func (l *linker) resolveExtensionName(name string, fd *dpb.FileDescriptorProto, scopes []scope) (string, error) {
+	fqn, dsc, _ := l.resolve(fd, name, false, scopes)
+	if dsc == nil {
+		return "", fmt.Errorf("unknown extension %s", name)
+	}
+	if dsc == sentinelMissingSymbol {
+		return "", fmt.Errorf("unknown extension %s; resolved to %s which is not defined; consider using a leading dot", name, fqn)
+	}
+	if ext, ok := dsc.(*dpb.FieldDescriptorProto); !ok {
+		otherType := descriptorType(dsc)
+		return "", fmt.Errorf("invalid extension: %s is a %s, not an extension", name, otherType)
+	} else if ext.GetExtendee() == "" {
+		return "", fmt.Errorf("invalid extension: %s is a field but not an extension", name)
+	}
+	return "." + fqn, nil
 }
 
 func (l *linker) resolve(fd *dpb.FileDescriptorProto, name string, onlyTypes bool, scopes []scope) (fqn string, element proto.Message, proto3 bool) {
@@ -918,7 +995,63 @@ func (l *linker) checkForUnusedImports(filename string) {
 			if pos == nil {
 				pos = ast.UnknownPos(r.fd.GetName())
 			}
-			r.errs.warn(pos, errUnusedImport(dep))
+			l.errs.warn(pos, errUnusedImport(dep))
 		}
 	}
+}
+
+func (l *linker) checkExtensionsInFile(fd *desc.FileDescriptor, res *parseResult) error {
+	for _, fld := range fd.GetExtensions() {
+		if err := l.checkExtension(fld, res); err != nil {
+			return err
+		}
+	}
+	for _, md := range fd.GetMessageTypes() {
+		if err := l.checkExtensionsInMessage(md, res); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l *linker) checkExtensionsInMessage(md *desc.MessageDescriptor, res *parseResult) error {
+	for _, fld := range md.GetNestedExtensions() {
+		if err := l.checkExtension(fld, res); err != nil {
+			return err
+		}
+	}
+	for _, nmd := range md.GetNestedMessageTypes() {
+		if err := l.checkExtensionsInMessage(nmd, res); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l *linker) checkExtension(fld *desc.FieldDescriptor, res *parseResult) error {
+	// NB: It's a little gross that we don't enforce these in validateBasic().
+	// But requires some minimal linking to resolve the extendee, so we can
+	// interrogate its descriptor.
+	if fld.GetOwner().GetMessageOptions().GetMessageSetWireFormat() {
+		// Message set wire format requires that all extensions be messages
+		// themselves (no scalar extensions)
+		if fld.GetType() != dpb.FieldDescriptorProto_TYPE_MESSAGE {
+			pos := res.getFieldNode(fld.AsFieldDescriptorProto()).FieldType().Start()
+			return l.errs.handleErrorWithPos(pos, "messages with message-set wire format cannot contain scalar extensions, only messages")
+		}
+		if fld.IsRepeated() {
+			pos := res.getFieldNode(fld.AsFieldDescriptorProto()).FieldLabel().Start()
+			return l.errs.handleErrorWithPos(pos, "messages with message-set wire format cannot contain repeated extensions, only optional")
+		}
+	} else {
+		// In validateBasic() we just made sure these were within bounds for any message. But
+		// now that things are linked, we can check if the extendee is messageset wire format
+		// and, if not, enforce tighter limit.
+		if fld.GetNumber() > internal.MaxNormalTag {
+			pos := res.getFieldNode(fld.AsFieldDescriptorProto()).FieldTag().Start()
+			return l.errs.handleErrorWithPos(pos, "tag number %d is higher than max allowed tag number (%d)", fld.GetNumber(), internal.MaxNormalTag)
+		}
+	}
+
+	return nil
 }

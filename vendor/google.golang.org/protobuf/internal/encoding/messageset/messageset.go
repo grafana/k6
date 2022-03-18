@@ -13,7 +13,7 @@ import (
 	pref "google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// The MessageSet wire format is equivalent to a message defiend as follows,
+// The MessageSet wire format is equivalent to a message defined as follows,
 // where each Item defines an extension field with a field number of 'type_id'
 // and content of 'message'. MessageSet extensions must be non-repeated message
 // fields.

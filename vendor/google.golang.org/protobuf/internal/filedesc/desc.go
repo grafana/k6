@@ -100,15 +100,6 @@ func (fd *File) lazyInitOnce() {
 	fd.mu.Unlock()
 }
 
-// ProtoLegacyRawDesc is a pseudo-internal API for allowing the v1 code
-// to be able to retrieve the raw descriptor.
-//
-// WARNING: This method is exempt from the compatibility promise and may be
-// removed in the future without warning.
-func (fd *File) ProtoLegacyRawDesc() []byte {
-	return fd.builder.RawDescriptor
-}
-
 // GoPackagePath is a pseudo-internal API for determining the Go package path
 // that this file descriptor is declared in.
 //

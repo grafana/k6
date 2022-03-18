@@ -189,6 +189,9 @@ func (fd *FileDescriptor) GetServices() []*ServiceDescriptor {
 // element with the given fully-qualified symbol name. If no such element
 // exists then this method returns nil.
 func (fd *FileDescriptor) FindSymbol(symbol string) Descriptor {
+	if len(symbol) == 0 {
+		return nil
+	}
 	if symbol[0] == '.' {
 		symbol = symbol[1:]
 	}
