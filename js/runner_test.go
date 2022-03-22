@@ -1941,7 +1941,7 @@ func TestVUPanic(t *testing.T) {
 			vu.(*ActiveVU).Console.logger = logger.WithField("source", "console")
 			err = vu.RunOnce()
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "a panic occurred in VU code but was caught: here we panic")
+			assert.Contains(t, err.Error(), "a panic occurred in VU code: here we panic")
 			entries := hook.Drain()
 			require.Len(t, entries, 1)
 			assert.Equal(t, logrus.ErrorLevel, entries[0].Level)
@@ -2048,16 +2048,16 @@ func TestComplicatedFileImportsForGRPC(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	protoFile, err := ioutil.ReadFile("../vendor/google.golang.org/grpc/test/grpc_testing/test.proto")
 	require.NoError(t, err)
-	require.NoError(t, afero.WriteFile(fs, "/path/to/service.proto", protoFile, 0644))
+	require.NoError(t, afero.WriteFile(fs, "/path/to/service.proto", protoFile, 0o644))
 	require.NoError(t, afero.WriteFile(fs, "/path/to/same-dir.proto", []byte(
 		`syntax = "proto3";package whatever;import "service.proto";`,
-	), 0644))
+	), 0o644))
 	require.NoError(t, afero.WriteFile(fs, "/path/subdir.proto", []byte(
 		`syntax = "proto3";package whatever;import "to/service.proto";`,
-	), 0644))
+	), 0o644))
 	require.NoError(t, afero.WriteFile(fs, "/path/to/abs.proto", []byte(
 		`syntax = "proto3";package whatever;import "/path/to/service.proto";`,
-	), 0644))
+	), 0o644))
 
 	grpcTestCase := func(expInitErr, expVUErr bool, cwd, loadCode string) multiFileTestCase {
 		script := tb.Replacer.Replace(fmt.Sprintf(`
