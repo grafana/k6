@@ -40,6 +40,7 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
 )
@@ -209,6 +210,86 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			if tc.expLogOutput != "" {
 				assert.True(t, testutils.LogContains(logs, logrus.InfoLevel, tc.expLogOutput))
 			}
+		})
+	}
+}
+
+// alarmist is a mock module that do a panic
+type alarmist struct {
+	vu modules.VU
+}
+
+var _ modules.Module = &alarmist{}
+
+func (a *alarmist) NewModuleInstance(vu modules.VU) modules.Instance {
+	return &alarmist{
+		vu: vu,
+	}
+}
+
+func (a *alarmist) Exports() modules.Exports {
+	return modules.Exports{
+		Named: map[string]interface{}{
+			"panic": a.panic,
+		},
+	}
+}
+
+func (a *alarmist) panic(s string) {
+	panic(s)
+}
+
+func TestRunScriptPanicsErrorsAndAbort(t *testing.T) {
+	t.Parallel()
+
+	modules.Register("k6/x/alarmist", new(alarmist))
+
+	testCases := []struct {
+		caseName, testScript, expectedLogMessage string
+	}{
+		{
+			caseName: "panic in the VU context",
+			testScript: `
+			import { panic } from 'k6/x/alarmist';
+
+			export default function() {
+				panic('hey')
+			}
+			`,
+			expectedLogMessage: "a panic occurred in VU code: hey",
+		},
+		{
+			caseName: "panic in the init context",
+			testScript: `
+			import { panic } from 'k6/x/alarmist';
+
+			panic('hey')
+			export default function() {
+				console.log('lorem ipsum');
+			}
+			`,
+			expectedLogMessage: "a panic occurred in the init context code: hey",
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		name := tc.caseName
+
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			testFilename := "script.js"
+			testState := newGlobalTestState(t)
+			require.NoError(t, afero.WriteFile(testState.fs, filepath.Join(testState.cwd, testFilename), []byte(tc.testScript), 0o644))
+			testState.args = []string{"k6", "run", testFilename}
+
+			testState.expectedExitCode = int(exitcodes.ScriptAborted)
+			newRootCommand(testState.globalState).execute()
+
+			logs := testState.loggerHook.Drain()
+
+			assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, tc.expectedLogMessage))
 		})
 	}
 }

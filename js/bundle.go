@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"net/url"
 	"runtime"
+	"runtime/debug"
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
@@ -299,7 +300,24 @@ func (b *Bundle) Instantiate(
 
 // Instantiates the bundle into an existing runtime. Not public because it also messes with a bunch
 // of other things, will potentially thrash data and makes a mess in it if the operation fails.
-func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *InitContext, vuID uint64) error {
+func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *InitContext, vuID uint64) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			gojaStack := rt.CaptureCallStack(20, nil)
+
+			err = &common.InterruptError{Reason: fmt.Sprintf("a panic occurred in the init context code: %s", r)}
+			// TODO figure out how to use PanicLevel without panicing .. this might require changing
+			// the logger we use see
+			// https://github.com/sirupsen/logrus/issues/1028
+			// https://github.com/sirupsen/logrus/issues/993
+			b := new(bytes.Buffer)
+			for _, s := range gojaStack {
+				s.Write(b)
+			}
+			logger.Error("panic: ", r, "\n", string(debug.Stack()), "\nGoja stack:\n", b.String())
+		}
+	}()
+
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
@@ -333,7 +351,7 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	init.moduleVUImpl.ctx = context.Background()
 	unbindInit := b.setInitGlobals(rt, init)
 	init.moduleVUImpl.eventLoop = eventloop.New(init.moduleVUImpl)
-	err := init.moduleVUImpl.eventLoop.Start(func() error {
+	err = init.moduleVUImpl.eventLoop.Start(func() error {
 		_, err := rt.RunProgram(b.Program)
 		return err
 	})
