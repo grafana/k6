@@ -68,13 +68,13 @@ var (
 // fully-initialized and usable execution segment.
 func NewExecutionSegment(from, to *big.Rat) (*ExecutionSegment, error) {
 	if from.Cmp(zeroRat) < 0 {
-		return nil, fmt.Errorf("segment start value should be at least 0 but was %s", from.FloatString(2))
+		return nil, fmt.Errorf("segment start value must be at least 0 but was %s", from.FloatString(2))
 	}
 	if from.Cmp(to) >= 0 {
-		return nil, fmt.Errorf("segment start(%s) should be less than its end(%s)", from.FloatString(2), to.FloatString(2))
+		return nil, fmt.Errorf("segment start(%s) must be less than its end(%s)", from.FloatString(2), to.FloatString(2))
 	}
 	if to.Cmp(oneRat) > 0 {
-		return nil, fmt.Errorf("segment end value shouldn't be more than 1 but was %s", to.FloatString(2))
+		return nil, fmt.Errorf("segment end value can't be more than 1 but was %s", to.FloatString(2))
 	}
 	return newExecutionSegment(from, to), nil
 }
@@ -181,7 +181,7 @@ func (es *ExecutionSegment) FloatLength() float64 {
 // equal consecutive execution sub-segments.
 func (es *ExecutionSegment) Split(numParts int64) ([]*ExecutionSegment, error) {
 	if numParts < 1 {
-		return nil, fmt.Errorf("the number of parts should be at least 1, %d received", numParts)
+		return nil, fmt.Errorf("the number of parts must be at least 1, %d received", numParts)
 	}
 
 	from, to := zeroRat, oneRat
@@ -323,7 +323,7 @@ func NewExecutionSegmentSequence(segments ...*ExecutionSegment) (ExecutionSegmen
 		for i, segment := range segments[1:] {
 			if segment.from.Cmp(to) != 0 {
 				return nil, fmt.Errorf(
-					"the start value %s of segment #%d should be equal to the end value of the previous one, but it is %s",
+					"the start value %s of segment #%d must be equal to the end value of the previous one, but it is %s",
 					segment.from, i+1, to,
 				)
 			}

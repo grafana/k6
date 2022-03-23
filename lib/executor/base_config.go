@@ -67,7 +67,7 @@ func (bc BaseConfig) Validate() (errors []error) {
 	// Some just-in-case checks, since those things are likely checked in other places or
 	// even assigned by us:
 	if bc.Name == "" {
-		errors = append(errors, fmt.Errorf("executor name shouldn't be empty"))
+		errors = append(errors, fmt.Errorf("executor name can't be empty"))
 	}
 	if !executorNameWhitelist.MatchString(bc.Name) {
 		errors = append(errors, fmt.Errorf(executorNameErr))

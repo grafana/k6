@@ -69,7 +69,7 @@ type ExternallyControlledConfigParams struct {
 // Validate just checks the control options in isolation.
 func (mecc ExternallyControlledConfigParams) Validate() (errors []error) {
 	if mecc.VUs.Int64 < 0 {
-		errors = append(errors, fmt.Errorf("the number of VUs shouldn't be negative"))
+		errors = append(errors, fmt.Errorf("the number of VUs can't be negative"))
 	}
 
 	if mecc.MaxVUs.Int64 < mecc.VUs.Int64 {
@@ -80,10 +80,10 @@ func (mecc ExternallyControlledConfigParams) Validate() (errors []error) {
 	}
 
 	if !mecc.Duration.Valid {
-		errors = append(errors, fmt.Errorf("the duration should be specified, for infinite duration use 0"))
+		errors = append(errors, fmt.Errorf("the duration must be specified, for infinite duration use 0"))
 	} else if mecc.Duration.TimeDuration() < 0 {
 		errors = append(errors, fmt.Errorf(
-			"the duration shouldn't be negative, for infinite duration use 0",
+			"the duration can't be negative, for infinite duration use 0",
 		))
 	}
 

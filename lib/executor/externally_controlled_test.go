@@ -116,7 +116,7 @@ func TestExternallyControlledRun(t *testing.T) {
 						"invalid configuration supplied: the number of active VUs (15)"+
 							" must be less than or equal to the number of maxVUs (10)")
 					updateConfig(-1, 10,
-						"invalid configuration supplied: the number of VUs shouldn't be negative")
+						"invalid configuration supplied: the number of VUs can't be negative")
 				}
 				ticks++
 			case <-doneCh:
