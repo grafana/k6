@@ -79,7 +79,7 @@ var _ lib.ExecutorConfig = &RampingArrivalRateConfig{}
 
 // GetPreAllocatedVUs is just a helper method that returns the scaled pre-allocated VUs.
 func (varc RampingArrivalRateConfig) GetPreAllocatedVUs(et *lib.ExecutionTuple) int64 {
-	return et.Segment.Scale(varc.PreAllocatedVUs.Int64)
+	return et.ScaleInt64(varc.PreAllocatedVUs.Int64)
 }
 
 // GetMaxVUs is just a helper method that returns the scaled max VUs.
@@ -90,9 +90,9 @@ func (varc RampingArrivalRateConfig) GetMaxVUs(et *lib.ExecutionTuple) int64 {
 // GetDescription returns a human-readable description of the executor options
 func (varc RampingArrivalRateConfig) GetDescription(et *lib.ExecutionTuple) string {
 	// TODO: something better? always show iterations per second?
-	maxVUsRange := fmt.Sprintf("maxVUs: %d", et.Segment.Scale(varc.PreAllocatedVUs.Int64))
+	maxVUsRange := fmt.Sprintf("maxVUs: %d", et.ScaleInt64(varc.PreAllocatedVUs.Int64))
 	if varc.MaxVUs.Int64 > varc.PreAllocatedVUs.Int64 {
-		maxVUsRange += fmt.Sprintf("-%d", et.Segment.Scale(varc.MaxVUs.Int64))
+		maxVUsRange += fmt.Sprintf("-%d", et.ScaleInt64(varc.MaxVUs.Int64))
 	}
 	maxUnscaledRate := getStagesUnscaledMaxTarget(varc.StartRate.Int64, varc.Stages)
 	maxArrRatePerSec, _ := getArrivalRatePerSec(
@@ -143,8 +143,8 @@ func (varc RampingArrivalRateConfig) GetExecutionRequirements(et *lib.ExecutionT
 	return []lib.ExecutionStep{
 		{
 			TimeOffset:      0,
-			PlannedVUs:      uint64(et.Segment.Scale(varc.PreAllocatedVUs.Int64)),
-			MaxUnplannedVUs: uint64(et.Segment.Scale(varc.MaxVUs.Int64 - varc.PreAllocatedVUs.Int64)),
+			PlannedVUs:      uint64(et.ScaleInt64(varc.PreAllocatedVUs.Int64)),
+			MaxUnplannedVUs: uint64(et.ScaleInt64(varc.MaxVUs.Int64 - varc.PreAllocatedVUs.Int64)),
 		},
 		{
 			TimeOffset:      sumStagesDuration(varc.Stages) + varc.GracefulStop.TimeDuration(),
