@@ -144,8 +144,8 @@ func (mec ExternallyControlledConfig) Validate() []error {
 func (mec ExternallyControlledConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
 	startVUs := lib.ExecutionStep{
 		TimeOffset:      0,
-		PlannedVUs:      uint64(et.Segment.Scale(mec.MaxVUs.Int64)), // user-configured, VUs to be pre-initialized
-		MaxUnplannedVUs: 0,                                          // intentional, see function comment
+		PlannedVUs:      uint64(et.ScaleInt64(mec.MaxVUs.Int64)), // user-configured, VUs to be pre-initialized
+		MaxUnplannedVUs: 0,                                       // intentional, see function comment
 	}
 
 	maxDuration := mec.Duration.TimeDuration()
@@ -434,11 +434,11 @@ func (rs *externallyControlledRunState) progressFn() (float64, []string) {
 
 func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg ExternallyControlledConfigParams) error {
 	executionState := rs.executor.executionState
-	segment := executionState.Options.ExecutionSegment
-	oldActiveVUs := segment.Scale(oldCfg.VUs.Int64)
-	oldMaxVUs := segment.Scale(oldCfg.MaxVUs.Int64)
-	newActiveVUs := segment.Scale(newCfg.VUs.Int64)
-	newMaxVUs := segment.Scale(newCfg.MaxVUs.Int64)
+	et := executionState.ExecutionTuple
+	oldActiveVUs := et.ScaleInt64(oldCfg.VUs.Int64)
+	oldMaxVUs := et.ScaleInt64(oldCfg.MaxVUs.Int64)
+	newActiveVUs := et.ScaleInt64(newCfg.VUs.Int64)
+	newMaxVUs := et.ScaleInt64(newCfg.MaxVUs.Int64)
 
 	rs.executor.logger.WithFields(logrus.Fields{
 		"oldActiveVUs": oldActiveVUs, "oldMaxVUs": oldMaxVUs,
@@ -523,7 +523,7 @@ func (mex *ExternallyControlled) Run(
 		logrus.Fields{"type": externallyControlledType, "duration": duration},
 	).Debug("Starting executor run...")
 
-	startMaxVUs := mex.executionState.Options.ExecutionSegment.Scale(mex.config.MaxVUs.Int64)
+	startMaxVUs := mex.executionState.ExecutionTuple.ScaleInt64(mex.config.MaxVUs.Int64)
 
 	ss := &lib.ScenarioState{
 		Name:      mex.config.Name,
