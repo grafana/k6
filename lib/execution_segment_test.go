@@ -188,26 +188,6 @@ func TestExecutionSegmentSplit(t *testing.T) {
 	assert.Equal(t, "7/16:1/2", segments[3].String())
 }
 
-func TestExecutionSegmentFailures(t *testing.T) {
-	t.Parallel()
-	es := new(ExecutionSegment)
-	require.NoError(t, es.UnmarshalText([]byte("0:0.25")))
-	require.Equal(t, int64(1), es.Scale(2))
-	require.Equal(t, int64(1), es.Scale(3))
-
-	require.NoError(t, es.UnmarshalText([]byte("0.25:0.5")))
-	require.Equal(t, int64(0), es.Scale(2))
-	require.Equal(t, int64(1), es.Scale(3))
-
-	require.NoError(t, es.UnmarshalText([]byte("0.5:0.75")))
-	require.Equal(t, int64(1), es.Scale(2))
-	require.Equal(t, int64(0), es.Scale(3))
-
-	require.NoError(t, es.UnmarshalText([]byte("0.75:1")))
-	require.Equal(t, int64(0), es.Scale(2))
-	require.Equal(t, int64(1), es.Scale(3))
-}
-
 func TestExecutionTupleScale(t *testing.T) {
 	t.Parallel()
 	es := new(ExecutionSegment)
@@ -246,24 +226,6 @@ func TestBigScale(t *testing.T) {
 	et, err := NewExecutionTuple(es, &ess)
 	require.NoError(t, err)
 	require.Equal(t, int64(18), et.ScaleInt64(50))
-}
-
-func TestExecutionSegmentCopyScaleRat(t *testing.T) {
-	t.Parallel()
-	es := new(ExecutionSegment)
-	twoRat := big.NewRat(2, 1)
-	threeRat := big.NewRat(3, 1)
-	require.NoError(t, es.UnmarshalText([]byte("0.5")))
-	require.Equal(t, oneRat, es.CopyScaleRat(twoRat))
-	require.Equal(t, big.NewRat(3, 2), es.CopyScaleRat(threeRat))
-
-	require.NoError(t, es.UnmarshalText([]byte("0.5:1.0")))
-	require.Equal(t, oneRat, es.CopyScaleRat(twoRat))
-	require.Equal(t, big.NewRat(3, 2), es.CopyScaleRat(threeRat))
-
-	var nilEs *ExecutionSegment
-	require.Equal(t, twoRat, nilEs.CopyScaleRat(twoRat))
-	require.Equal(t, threeRat, nilEs.CopyScaleRat(threeRat))
 }
 
 func TestExecutionSegmentInPlaceScaleRat(t *testing.T) {
@@ -450,30 +412,6 @@ func generateRandomSequence(t testing.TB, n, m int64, r *rand.Rand) ExecutionSeg
 	}
 
 	return ess
-}
-
-// Ensure that the sum of scaling all execution segments in
-// the same sequence with scaling factor M results in M itself.
-func TestExecutionSegmentScaleConsistency(t *testing.T) {
-	t.Parallel()
-
-	seed := time.Now().UnixNano()
-	r := rand.New(rand.NewSource(seed))
-	t.Logf("Random source seeded with %d\n", seed)
-
-	const numTests = 10
-	for i := 0; i < numTests; i++ {
-		scale := rand.Int31n(99) + 2
-		seq := generateRandomSequence(t, r.Int63n(9)+2, 100, r)
-
-		t.Run(fmt.Sprintf("%d_%s", scale, seq), func(t *testing.T) {
-			var total int64
-			for _, segment := range seq {
-				total += segment.Scale(int64(scale))
-			}
-			assert.Equal(t, int64(scale), total)
-		})
-	}
 }
 
 // Ensure that the sum of scaling all execution segments in
@@ -898,11 +836,6 @@ func BenchmarkExecutionSegmentScale(b *testing.B) {
 			require.NoError(b, err)
 			for _, value := range []int64{5, 5523, 5000000, 67280421310721} {
 				value := value
-				b.Run(fmt.Sprintf("segment.Scale(%d)", value), func(b *testing.B) {
-					for i := 0; i < b.N; i++ {
-						segment.Scale(value)
-					}
-				})
 
 				b.Run(fmt.Sprintf("et.Scale(%d)", value), func(b *testing.B) {
 					for i := 0; i < b.N; i++ {

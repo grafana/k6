@@ -253,41 +253,6 @@ func (es *ExecutionSegment) SubSegment(child *ExecutionSegment) *ExecutionSegmen
 	}
 }
 
-// helper function for rounding (up) of rational numbers to big.Int values
-func roundUp(rat *big.Rat) *big.Int {
-	quo, rem := new(big.Int).QuoRem(rat.Num(), rat.Denom(), new(big.Int))
-
-	if rem.Mul(rem, twoBigInt).Cmp(rat.Denom()) >= 0 {
-		return quo.Add(quo, oneBigInt)
-	}
-	return quo
-}
-
-// Scale proportionally scales the supplied value, according to the execution
-// segment's position and size of the work.
-func (es *ExecutionSegment) Scale(value int64) int64 {
-	if es == nil { // no execution segment, i.e. 100%
-		return value
-	}
-	// Instead of the first proposal that used remainders and floor:
-	//    floor( (value * from) % 1 + value * length )
-	// We're using an alternative approach with rounding that (hopefully) has
-	// the same properties, but it's simpler and has better precision:
-	//    round( (value * from) - round(value * from) + (value * (to - from)) )?
-	// which reduces to:
-	//    round( (value * to) - round(value * from) )?
-
-	toValue := big.NewRat(value, 1)
-	toValue.Mul(toValue, es.to)
-
-	fromValue := big.NewRat(value, 1)
-	fromValue.Mul(fromValue, es.from)
-
-	toValue.Sub(toValue, new(big.Rat).SetFrac(roundUp(fromValue), oneBigInt))
-
-	return roundUp(toValue).Int64()
-}
-
 // InPlaceScaleRat scales rational numbers in-place - it changes the passed
 // argument (and also returns it, to allow for chaining, like many other big.Rat
 // methods).
@@ -296,15 +261,6 @@ func (es *ExecutionSegment) InPlaceScaleRat(value *big.Rat) *big.Rat {
 		return value
 	}
 	return value.Mul(value, es.length)
-}
-
-// CopyScaleRat scales rational numbers without changing them - creates a new
-// bit.Rat object and uses it for the calculation.
-func (es *ExecutionSegment) CopyScaleRat(value *big.Rat) *big.Rat {
-	if es == nil { // no execution segment, i.e. 100%
-		return value
-	}
-	return new(big.Rat).Mul(value, es.length)
 }
 
 // ExecutionSegmentSequence represents an ordered chain of execution segments,
