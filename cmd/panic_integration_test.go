@@ -56,7 +56,8 @@ func TestRunScriptPanicsErrorsAndAbort(t *testing.T) {
 			import { panic } from 'k6/x/alarmist';
 
 			export default function() {
-				panic('hey')
+				panic('hey');
+				console.log('lorem ipsum');
 			}
 			`,
 			expectedLogMessage: "a panic occurred in VU code: hey",
@@ -66,7 +67,7 @@ func TestRunScriptPanicsErrorsAndAbort(t *testing.T) {
 			testScript: `
 			import { panic } from 'k6/x/alarmist';
 
-			panic('hey')
+			panic('hey');
 			export default function() {
 				console.log('lorem ipsum');
 			}
@@ -93,6 +94,7 @@ func TestRunScriptPanicsErrorsAndAbort(t *testing.T) {
 			logs := testState.loggerHook.Drain()
 
 			assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, tc.expectedLogMessage))
+			assert.False(t, testutils.LogContains(logs, logrus.InfoLevel, "lorem ipsum"))
 		})
 	}
 }
