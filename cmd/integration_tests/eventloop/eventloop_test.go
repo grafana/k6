@@ -9,10 +9,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/cmd/integration_tests/testmodules/events"
 	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/modulestest/testmodules/events"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/metrics"
