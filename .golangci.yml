@@ -15,6 +15,11 @@ issues:
   # When true it disables revive's comment warnings, and we want them enabled.
   exclude-use-default: false
 
+  exclude-rules:
+    - linters:
+        - funlen
+      source: "^func Test"
+
 linters:
   disable-all: true
   enable:
