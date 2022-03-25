@@ -168,6 +168,22 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			expExitCode:  exitcodes.ScriptException,
 		},
 		{
+			testFilename: "thresholds/non_existing_metric.js",
+			name:         "run should fail with exit status 104 on a threshold applied to a non existing metric",
+			expErr:       "invalid threshold",
+			expExitCode:  exitcodes.InvalidConfig,
+		},
+		{
+			testFilename: "thresholds/non_existing_metric.js",
+			name:         "run should succeed on a threshold applied to a non existing metric with the --no-thresholds flag set",
+			extraArgs:    []string{"--no-thresholds"},
+		},
+		{
+			testFilename: "thresholds/non_existing_metric.js",
+			name:         "run should succeed on a threshold applied to a non existing submetric with the --no-thresholds flag set",
+			extraArgs:    []string{"--no-thresholds"},
+		},
+		{
 			testFilename: "thresholds/malformed_expression.js",
 			name:         "run should fail with exit status 104 on a malformed threshold expression",
 			expErr:       "malformed threshold expression",
@@ -178,6 +194,17 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			name:         "run should on a malformed threshold expression but --no-thresholds flag set",
 			extraArgs:    []string{"--no-thresholds"},
 			// we don't expect an error
+		},
+		{
+			testFilename: "thresholds/unsupported_aggregation_method.js",
+			name:         "run should fail with exit status 104 on a threshold applying an unsupported aggregation method to a metric",
+			expErr:       "invalid threshold",
+			expExitCode:  exitcodes.InvalidConfig,
+		},
+		{
+			testFilename: "thresholds/unsupported_aggregation_method.js",
+			name:         "run should succeed on a threshold applying an unsupported aggregation method to a metric with the --no-thresholds flag set",
+			extraArgs:    []string{"--no-thresholds"},
 		},
 	}
 
@@ -209,6 +236,51 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			if tc.expLogOutput != "" {
 				assert.True(t, testutils.LogContains(logs, logrus.InfoLevel, tc.expLogOutput))
 			}
+		})
+	}
+}
+
+func TestInvalidOptionsThresholdErrExitCode(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name         string
+		testFilename string
+		expExitCode  errext.ExitCode
+		extraArgs    []string
+	}{
+		{
+			name:         "run should fail with exit status 104 on a malformed threshold expression",
+			testFilename: "thresholds/malformed_expression.js",
+			expExitCode:  exitcodes.InvalidConfig,
+		},
+		{
+			name:         "run should fail with exit status 104 on a threshold applied to a non existing metric",
+			testFilename: "thresholds/non_existing_metric.js",
+			expExitCode:  exitcodes.InvalidConfig,
+		},
+		{
+			name:         "run should fail with exit status 104 on a threshold method being unsupported by the metric",
+			testFilename: "thresholds/unsupported_aggregation_method.js",
+			expExitCode:  exitcodes.InvalidConfig,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			testScript, err := ioutil.ReadFile(path.Join("testdata", tc.testFilename))
+			require.NoError(t, err)
+
+			testState := newGlobalTestState(t)
+			require.NoError(t, afero.WriteFile(testState.fs, filepath.Join(testState.cwd, tc.testFilename), testScript, 0o644))
+			testState.args = append([]string{"k6", "run", tc.testFilename}, tc.extraArgs...)
+
+			testState.expectedExitCode = int(tc.expExitCode)
+			newRootCommand(testState.globalState).execute()
 		})
 	}
 }
