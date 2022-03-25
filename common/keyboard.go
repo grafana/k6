@@ -197,6 +197,8 @@ func (k *Keyboard) keyDefinitionFromKey(key keyboardlayout.KeyInput) keyboardlay
 	var keyDef keyboardlayout.KeyDefinition
 	if srcKeyDef.Key != "" {
 		keyDef.Key = srcKeyDef.Key
+	}
+	if len(srcKeyDef.Key) == 1 {
 		keyDef.Text = srcKeyDef.Key
 	}
 	if shift != 0 && srcKeyDef.ShiftKeyCode != 0 {
