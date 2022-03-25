@@ -1842,9 +1842,11 @@ func (_newArrayFromIter) exec(vm *vm) {
 	iter := vm.iterStack[l].iter
 	vm.iterStack[l] = iterStackItem{}
 	vm.iterStack = vm.iterStack[:l]
-	iter.iterate(func(val Value) {
-		values = append(values, val)
-	})
+	if iter.iterator != nil {
+		iter.iterate(func(val Value) {
+			values = append(values, val)
+		})
+	}
 	vm.push(vm.r.newArrayValues(values))
 	vm.pc++
 }
