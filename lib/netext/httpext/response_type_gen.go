@@ -60,7 +60,7 @@ func (i ResponseType) MarshalJSON() ([]byte, error) {
 func (i *ResponseType) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
-		return fmt.Errorf("ResponseType must be a string, got %s", data)
+		return fmt.Errorf("ResponseType should be a string, got %s", data)
 	}
 
 	var err error
