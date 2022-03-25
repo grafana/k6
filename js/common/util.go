@@ -24,8 +24,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"runtime/debug"
 
 	"github.com/dop251/goja"
+	"github.com/sirupsen/logrus"
 )
 
 // Throw a JS error; avoids re-wrapping GoErrors.
@@ -78,4 +80,26 @@ func ToString(data interface{}) (string, error) {
 	default:
 		return "", fmt.Errorf("invalid type %T, expected string, []byte or ArrayBuffer", data)
 	}
+}
+
+// RunWithPanicCatching catches panic and converts into an InterruptError error that should abort a script
+func RunWithPanicCatching(logger logrus.FieldLogger, rt *goja.Runtime, fn func() error) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			gojaStack := rt.CaptureCallStack(20, nil)
+
+			err = &InterruptError{Reason: fmt.Sprintf("a panic occurred during JS execution: %s", r)}
+			// TODO figure out how to use PanicLevel without panicing .. this might require changing
+			// the logger we use see
+			// https://github.com/sirupsen/logrus/issues/1028
+			// https://github.com/sirupsen/logrus/issues/993
+			b := new(bytes.Buffer)
+			for _, s := range gojaStack {
+				s.Write(b)
+			}
+			logger.Error("panic: ", r, "\n", string(debug.Stack()), "\nGoja stack:\n", b.String())
+		}
+	}()
+
+	return fn()
 }

@@ -1941,7 +1941,7 @@ func TestVUPanic(t *testing.T) {
 			vu.(*ActiveVU).Console.logger = logger.WithField("source", "console")
 			err = vu.RunOnce()
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "a panic occurred in VU code: here we panic")
+			assert.Contains(t, err.Error(), "a panic occurred during JS execution: here we panic")
 			entries := hook.Drain()
 			require.Len(t, entries, 1)
 			assert.Equal(t, logrus.ErrorLevel, entries[0].Level)

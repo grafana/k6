@@ -60,7 +60,7 @@ func TestRunScriptPanicsErrorsAndAbort(t *testing.T) {
 				console.log('lorem ipsum');
 			}
 			`,
-			expectedLogMessage: "a panic occurred in VU code: hey",
+			expectedLogMessage: "a panic occurred during JS execution: hey",
 		},
 		{
 			caseName: "panic in the init context",
@@ -72,7 +72,7 @@ func TestRunScriptPanicsErrorsAndAbort(t *testing.T) {
 				console.log('lorem ipsum');
 			}
 			`,
-			expectedLogMessage: "a panic occurred in the init context code: hey",
+			expectedLogMessage: "a panic occurred during JS execution: hey",
 		},
 	}
 
