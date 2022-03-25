@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -40,6 +41,7 @@ func newMetric(name string, mt MetricType, vt ...ValueType) *Metric {
 	if len(vt) > 0 {
 		valueType = vt[0]
 	}
+
 	var sink Sink
 	switch mt {
 	case Counter:
@@ -53,6 +55,7 @@ func newMetric(name string, mt MetricType, vt ...ValueType) *Metric {
 	default:
 		return nil
 	}
+
 	return &Metric{
 		Name:     name,
 		Type:     mt,
@@ -120,4 +123,61 @@ func (m *Metric) AddSubmetric(keyValues string) (*Submetric, error) {
 	m.Submetrics = append(m.Submetrics, subMetric)
 
 	return subMetric, nil
+}
+
+// ErrMetricNameParsing indicates parsing a metric name failed
+var ErrMetricNameParsing = errors.New("parsing metric name failed")
+
+// ParseMetricName parses a metric name expression of the form metric_name{tag_key:tag_value,...}
+// Its first return value is the parsed metric name, second are parsed tags as as slice
+// of "key:value" strings. On failure, it returns an error containing the `ErrMetricNameParsing` in its chain.
+func ParseMetricName(name string) (string, []string, error) {
+	openingTokenPos := strings.IndexByte(name, '{')
+	closingTokenPos := strings.IndexByte(name, '}')
+	containsOpeningToken := openingTokenPos != -1
+	containsClosingToken := closingTokenPos != -1
+
+	// Neither the opening '{' token nor the closing '}' token
+	// are present, thus the metric name only consists of a literal.
+	if !containsOpeningToken && !containsClosingToken {
+		return name, nil, nil
+	}
+
+	// If the name contains an opening or closing token, but not
+	// its counterpart, the expression is malformed.
+	if (containsOpeningToken && !containsClosingToken) ||
+		(!containsOpeningToken && containsClosingToken) {
+		return "", nil, fmt.Errorf("%w; reason: unmatched opening/close curly brace", ErrMetricNameParsing)
+	}
+
+	if closingTokenPos < openingTokenPos {
+		return "", nil, fmt.Errorf("%w; reason: closing curly brace appears before opening one", ErrMetricNameParsing)
+	}
+
+	parserFn := func(c rune) bool {
+		return c == '{' || c == '}'
+	}
+
+	// Split the metric_name{tag_key:tag_value,...} expression
+	// into two "metric_name" and "tag_key:tag_value,..." strings.
+	parts := strings.FieldsFunc(name, parserFn)
+	if len(parts) == 0 || len(parts) > 2 {
+		return "", nil, ErrMetricNameParsing
+	}
+
+	// Split the tag key values
+	tags := strings.Split(parts[1], ",")
+
+	// For each tag definition, ensure
+	for i, t := range tags {
+		keyValue := strings.SplitN(t, ":", 2)
+
+		if len(keyValue) != 2 || keyValue[1] == "" {
+			return "", nil, fmt.Errorf("%w; reason: malformed tag expression %q", ErrMetricNameParsing, t)
+		}
+
+		tags[i] = strings.TrimSpace(t)
+	}
+
+	return parts[0], tags, nil
 }
