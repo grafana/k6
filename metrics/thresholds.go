@@ -22,10 +22,13 @@ package metrics
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/types"
 )
 
@@ -56,7 +59,7 @@ func newThreshold(src string, abortOnFail bool, gracePeriod types.NullDuration) 
 func (t *Threshold) runNoTaint(sinks map[string]float64) (bool, error) {
 	// Extract the sink value for the aggregation method used in the threshold
 	// expression
-	lhs, ok := sinks[t.parsed.AggregationMethod]
+	lhs, ok := sinks[t.parsed.SinkKey()]
 	if !ok {
 		return false, fmt.Errorf("unable to apply threshold %s over metrics; reason: "+
 			"no metric supporting the %s aggregation method found",
@@ -210,11 +213,12 @@ func (ts *Thresholds) Run(sink Sink, duration time.Duration) (bool, error) {
 		// Parse the percentile thresholds and insert them in
 		// the sinks mapping.
 		for _, threshold := range ts.Thresholds {
-			if !strings.HasPrefix(threshold.parsed.AggregationMethod, "p(") {
+			if threshold.parsed.AggregationMethod != tokenPercentile {
 				continue
 			}
 
-			ts.sinked[threshold.parsed.AggregationMethod] = sinkImpl.P(threshold.parsed.AggregationValue.Float64 / 100)
+			key := fmt.Sprintf("p(%g)", threshold.parsed.AggregationValue.Float64)
+			ts.sinked[key] = sinkImpl.P(threshold.parsed.AggregationValue.Float64 / 100)
 		}
 	case *RateSink:
 		ts.sinked["rate"] = float64(sinkImpl.Trues) / float64(sinkImpl.Total)
@@ -239,6 +243,63 @@ func (ts *Thresholds) Parse() error {
 		}
 
 		t.parsed = parsed
+	}
+
+	return nil
+}
+
+// ErrInvalidThreshold indicates a threshold is not valid
+var ErrInvalidThreshold = errors.New("invalid threshold")
+
+// Validate ensures a threshold definition is consistent with the metric it applies to.
+// Given a metric registry and a metric name to apply the expressions too, Validate will
+// assert that each threshold expression uses an aggregation method that's supported by the
+// provided metric. It returns an error otherwise.
+// Note that this function expects the passed in thresholds to have been parsed already, and
+// have their Parsed (ThresholdExpression) field already filled.
+func (ts *Thresholds) Validate(metricName string, r *Registry) error {
+	parsedMetricName, _, err := ParseMetricName(metricName)
+	if err != nil {
+		err := fmt.Errorf("unable to validate threshold expressions: %w", ErrMetricNameParsing)
+		return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+	}
+
+	// Obtain the metric the thresholds apply to from the registry.
+	// if the metric doesn't exist, then we return an error indicating
+	// the InvalidConfig exitcode should be used.
+	metric := r.Get(parsedMetricName)
+	if metric == nil {
+		err := fmt.Errorf("%w defined on %s; reason: no metric name %q found", ErrInvalidThreshold, metricName, metricName)
+		return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+	}
+
+	for _, threshold := range ts.Thresholds {
+		// Return a digestable error if we attempt to validate a threshold
+		// that hasn't been parsed yet.
+		if threshold.parsed == nil {
+			thresholdExpression, err := parseThresholdExpression(threshold.Source)
+			if err != nil {
+				return fmt.Errorf("unable to validate threshold %q on metric %s; reason: "+
+					"parsing threshold failed %w", threshold.Source, metricName, err)
+			}
+
+			threshold.parsed = thresholdExpression
+		}
+
+		// If the threshold's expression aggregation method is not
+		// supported for the metric we validate against, then we return
+		// an error indicating the InvalidConfig exitcode should be used.
+		if !metric.Type.supportsAggregationMethod(threshold.parsed.AggregationMethod) {
+			err := fmt.Errorf(
+				"%w %q applied on metric %s; reason: "+
+					"unsupported aggregation method %s on metric of type %s. "+
+					"supported aggregation methods for this metric are: %s",
+				ErrInvalidThreshold, threshold.Source, metricName,
+				threshold.parsed.AggregationMethod, metric.Type,
+				strings.Join(metric.Type.supportedAggregationMethods(), ", "),
+			)
+			return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+		}
 	}
 
 	return nil

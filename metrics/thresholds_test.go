@@ -27,6 +27,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
@@ -149,6 +151,7 @@ func TestThreshold_runNoTaint(t *testing.T) {
 			wantErr:          true,
 		},
 	}
+
 	for _, testCase := range tests {
 		testCase := testCase
 
@@ -331,6 +334,219 @@ func TestThresholdsParse(t *testing.T) {
 
 			return false
 		}, "Parse failed, but some Thresholds' parsed field was not empty")
+	})
+}
+
+func TestThresholdsValidate(t *testing.T) {
+	t.Parallel()
+
+	t.Run("validating thresholds applied to a non existing metric fails", func(t *testing.T) {
+		t.Parallel()
+
+		testRegistry := NewRegistry()
+
+		// Prepare a Thresholds collection containing syntaxically
+		// correct thresholds
+		ts := Thresholds{
+			Thresholds: []*Threshold{
+				newThreshold("rate<1", false, types.NullDuration{}),
+			},
+		}
+
+		parseErr := ts.Parse()
+		require.NoError(t, parseErr)
+
+		var wantErr errext.HasExitCode
+
+		// Collect the result of the parsing operation
+		gotErr := ts.Validate("non-existing", testRegistry)
+
+		assert.Error(t, gotErr)
+		assert.ErrorIs(t, gotErr, ErrInvalidThreshold)
+		assert.ErrorAs(t, gotErr, &wantErr)
+		assert.Equal(t, exitcodes.InvalidConfig, wantErr.ExitCode())
+	})
+
+	t.Run("validating unparsed thresholds fails", func(t *testing.T) {
+		t.Parallel()
+
+		testRegistry := NewRegistry()
+		_, err := testRegistry.NewMetric("test_counter", Counter)
+		require.NoError(t, err)
+
+		// Prepare a Thresholds collection containing syntaxically
+		// correct thresholds
+		ts := Thresholds{
+			Thresholds: []*Threshold{
+				newThreshold("rate<1", false, types.NullDuration{}),
+			},
+		}
+
+		// Note that we're not parsing the thresholds
+
+		// Collect the result of the parsing operation
+		gotErr := ts.Validate("non-existing", testRegistry)
+
+		assert.Error(t, gotErr)
+	})
+
+	t.Run("thresholds supported aggregation methods for metrics", func(t *testing.T) {
+		t.Parallel()
+
+		testRegistry := NewRegistry()
+		testCounter, err := testRegistry.NewMetric("test_counter", Counter)
+		require.NoError(t, err)
+		_, err = testCounter.AddSubmetric("foo:bar")
+		require.NoError(t, err)
+		_, err = testCounter.AddSubmetric("abc:123,easyas:doremi")
+		require.NoError(t, err)
+
+		_, err = testRegistry.NewMetric("test_rate", Rate)
+		require.NoError(t, err)
+
+		_, err = testRegistry.NewMetric("test_gauge", Gauge)
+		require.NoError(t, err)
+
+		_, err = testRegistry.NewMetric("test_trend", Trend)
+		require.NoError(t, err)
+
+		tests := []struct {
+			name       string
+			metricName string
+			thresholds Thresholds
+			wantErr    bool
+		}{
+			{
+				name:       "threshold expression using 'count' is valid against a counter metric",
+				metricName: "test_counter",
+				thresholds: Thresholds{
+					Thresholds: []*Threshold{newThreshold("count==1", false, types.NullDuration{})},
+				},
+				wantErr: false,
+			},
+			{
+				name:       "threshold expression using 'rate' is valid against a counter metric",
+				metricName: "test_counter",
+				thresholds: Thresholds{
+					Thresholds: []*Threshold{newThreshold("rate==1", false, types.NullDuration{})},
+				},
+				wantErr: false,
+			},
+			{
+				name:       "threshold expression using 'rate' is valid against a counter single tag submetric",
+				metricName: "test_counter{foo:bar}",
+				thresholds: Thresholds{
+					Thresholds: []*Threshold{newThreshold("rate==1", false, types.NullDuration{})},
+				},
+				wantErr: false,
+			},
+			{
+				name:       "threshold expression using 'rate' is valid against a counter multi-tag submetric",
+				metricName: "test_counter{abc:123,easyas:doremi}",
+				thresholds: Thresholds{
+					Thresholds: []*Threshold{newThreshold("rate==1", false, types.NullDuration{})},
+				},
+				wantErr: false,
+			},
+			{
+				name:       "threshold expression using 'value' is valid against a gauge metric",
+				metricName: "test_gauge",
+				thresholds: Thresholds{
+					Thresholds: []*Threshold{newThreshold("value==1", false, types.NullDuration{})},
+				},
+				wantErr: false,
+			},
+			{
+				name:       "threshold expression using 'rate' is valid against a rate metric",
+				metricName: "test_rate",
+				thresholds: Thresholds{
+					Thresholds: []*Threshold{newThreshold("rate==1", false, types.NullDuration{})},
+				},
+				wantErr: false,
+			},
+			{
+				name:       "threshold expression using 'avg' is valid against a trend metric",
+				metricName: "test_trend",
+				thresholds: Thresholds{
+					Thresholds: []*Threshold{newThreshold("avg==1", false, types.NullDuration{})},
+				},
+				wantErr: false,
+			},
+			{
+				name:       "threshold expression using 'min' is valid against a trend metric",
+				metricName: "test_trend",
+				thresholds: Thresholds{
+					Thresholds: []*Threshold{newThreshold("min==1", false, types.NullDuration{})},
+				},
+				wantErr: false,
+			},
+			{
+				name:       "threshold expression using 'max' is valid against a trend metric",
+				metricName: "test_trend",
+				thresholds: Thresholds{
+					Thresholds: []*Threshold{newThreshold("max==1", false, types.NullDuration{})},
+				},
+				wantErr: false,
+			},
+			{
+				name:       "threshold expression using 'med' is valid against a trend metric",
+				metricName: "test_trend",
+				thresholds: Thresholds{
+					Thresholds: []*Threshold{newThreshold("med==1", false, types.NullDuration{})},
+				},
+				wantErr: false,
+			},
+			{
+				name:       "threshold expression using 'p(value)' is valid against a trend metric",
+				metricName: "test_trend",
+				thresholds: Thresholds{
+					Thresholds: []*Threshold{newThreshold("p(99)==1", false, types.NullDuration{})},
+				},
+				wantErr: false,
+			},
+		}
+
+		for _, testCase := range tests {
+			testCase := testCase
+
+			t.Run(testCase.name, func(t *testing.T) {
+				t.Parallel()
+
+				// Ensure thresholds are parsed
+				parseErr := testCase.thresholds.Parse()
+				require.NoError(t, parseErr)
+
+				gotErr := testCase.thresholds.Validate(testCase.metricName, testRegistry)
+
+				assert.Equal(t,
+					testCase.wantErr,
+					gotErr != nil,
+					"Thresholds.Validate() error = %v, wantErr %v", gotErr, testCase.wantErr,
+				)
+
+				if testCase.wantErr {
+					var targetErr errext.HasExitCode
+
+					assert.ErrorIs(t,
+						gotErr,
+						ErrInvalidThreshold,
+						"Validate error chain should contain an ErrInvalidThreshold error",
+					)
+
+					assert.ErrorAs(t,
+						gotErr,
+						&targetErr,
+						"Validate error chain should contain an errext.HasExitCode error",
+					)
+
+					assert.Equal(t,
+						exitcodes.InvalidConfig,
+						targetErr.ExitCode(),
+						"Validate error should have been exitcodes.InvalidConfig",
+					)
+				}
+			})
+		}
 	})
 }
 
