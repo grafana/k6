@@ -54,7 +54,7 @@ type ExecutionScheduler struct {
 
 	// TODO: remove these when we don't have separate Init() and Run() methods
 	// and can use a context + a WaitGroup (or something like that)
-	stopVusEmission, vusEmissionStopped chan struct{}
+	stopVUsEmission, vusEmissionStopped chan struct{}
 }
 
 // Check to see if we implement the lib.ExecutionScheduler interface
@@ -119,7 +119,7 @@ func NewExecutionScheduler(
 		maxPossibleVUs:  maxPossibleVUs,
 		state:           executionState,
 
-		stopVusEmission:    make(chan struct{}),
+		stopVUsEmission:    make(chan struct{}),
 		vusEmissionStopped: make(chan struct{}),
 	}, nil
 }
@@ -273,7 +273,7 @@ func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- st
 				emitMetrics()
 			case <-ctx.Done():
 				return
-			case <-e.stopVusEmission:
+			case <-e.stopVUsEmission:
 				return
 			}
 		}
@@ -399,7 +399,7 @@ func (e *ExecutionScheduler) runExecutor(
 //nolint:funlen
 func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- stats.SampleContainer) error {
 	defer func() {
-		close(e.stopVusEmission)
+		close(e.stopVUsEmission)
 		<-e.vusEmissionStopped
 	}()
 

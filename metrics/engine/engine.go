@@ -71,7 +71,7 @@ func (me *MetricsEngine) GetIngester() output.Output {
 	}
 }
 
-func (me *MetricsEngine) getOrInitPotentialSubmetric(name string) (*stats.Metric, error) {
+func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*stats.Metric, error) {
 	// TODO: replace with strings.Cut after Go 1.18
 	nameParts := strings.SplitN(name, "{", 2)
 
@@ -83,10 +83,11 @@ func (me *MetricsEngine) getOrInitPotentialSubmetric(name string) (*stats.Metric
 		return metric, nil
 	}
 
-	if nameParts[1][len(nameParts[1])-1] != '}' {
+	submetricDefinition := nameParts[1]
+	if submetricDefinition[len(submetricDefinition)-1] != '}' {
 		return nil, fmt.Errorf("missing ending bracket, sub-metric format needs to be 'metric{key:value}'")
 	}
-	sm, err := metric.AddSubmetric(nameParts[1][:len(nameParts[1])-1])
+	sm, err := metric.AddSubmetric(submetricDefinition[:len(submetricDefinition)-1])
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +103,7 @@ func (me *MetricsEngine) markObserved(metric *stats.Metric) {
 
 func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 	for metricName, thresholds := range me.options.Thresholds {
-		metric, err := me.getOrInitPotentialSubmetric(metricName)
+		metric, err := me.getThresholdMetricOrSubmetric(metricName)
 
 		if me.runtimeOptions.NoThresholds.Bool {
 			if err != nil {
@@ -130,7 +131,7 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 	// TODO: refactor out of here when https://github.com/grafana/k6/issues/1321
 	// lands and there is a better way to enable a metric with tag
 	if me.options.SystemTags.Has(stats.TagExpectedResponse) {
-		_, err := me.getOrInitPotentialSubmetric("http_req_duration{expected_response:true}")
+		_, err := me.getThresholdMetricOrSubmetric("http_req_duration{expected_response:true}")
 		if err != nil {
 			return err // shouldn't happen, but ¯\_(ツ)_/¯
 		}
@@ -139,10 +140,10 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 	return nil
 }
 
-// ProcessThresholds processes all of the thresholds.
+// EvaluateThresholds processes all of the thresholds.
 //
 // TODO: refactor, make private, optimize
-func (me *MetricsEngine) ProcessThresholds() (thresholdsTainted, shouldAbort bool) {
+func (me *MetricsEngine) EvaluateThresholds() (thresholdsTainted, shouldAbort bool) {
 	me.MetricsLock.Lock()
 	defer me.MetricsLock.Unlock()
 
@@ -154,19 +155,20 @@ func (me *MetricsEngine) ProcessThresholds() (thresholdsTainted, shouldAbort boo
 		}
 		m.Tainted = null.BoolFrom(false)
 
-		me.logger.WithField("m", m.Name).Debug("running thresholds")
+		me.logger.WithField("metric_name", m.Name).Debug("running thresholds")
 		succ, err := m.Thresholds.Run(m.Sink, t)
 		if err != nil {
-			me.logger.WithField("m", m.Name).WithError(err).Error("Threshold error")
+			me.logger.WithField("metric_name", m.Name).WithError(err).Error("Threshold error")
 			continue
 		}
-		if !succ {
-			me.logger.WithField("m", m.Name).Debug("Thresholds failed")
-			m.Tainted = null.BoolFrom(true)
-			thresholdsTainted = true
-			if m.Thresholds.Abort {
-				shouldAbort = true
-			}
+		if succ {
+			continue // threshold passed
+		}
+		me.logger.WithField("metric_name", m.Name).Debug("Thresholds failed")
+		m.Tainted = null.BoolFrom(true)
+		thresholdsTainted = true
+		if m.Thresholds.Abort {
+			shouldAbort = true
 		}
 	}
 

@@ -153,15 +153,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 
 	// We do this here so we can get any output URLs below.
 	initBar.Modify(pb.WithConstProgress(0, "Starting outputs"))
-	// TODO: re-enable the code below
-	/*
-		outputManager := output.NewManager(outputs, logger, func(err error) {
-			if err != nil {
-				logger.WithError(err).Error("Received error to stop from output")
-			}
-			runCancel()
-		})
-	*/
+	// TODO: directly create the MutputManager here, not in the Engine
 	err = engine.OutputManager.StartOutputs()
 	if err != nil {
 		return err
