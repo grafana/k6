@@ -311,8 +311,6 @@ func easyjson42239ddeDecodeGoK6IoK6Stats(in *jlexer.Lexer, out *stats.Metric) {
 				}
 				in.Delim(']')
 			}
-		case "sub":
-			easyjson42239ddeDecodeGoK6IoK6Stats1(in, &out.Sub)
 		default:
 			in.SkipRecursive()
 		}
@@ -372,11 +370,6 @@ func easyjson42239ddeEncodeGoK6IoK6Stats(out *jwriter.Writer, in stats.Metric) {
 			out.RawByte(']')
 		}
 	}
-	if true {
-		const prefix string = ",\"sub\":"
-		out.RawString(prefix)
-		easyjson42239ddeEncodeGoK6IoK6Stats1(out, in.Sub)
-	}
 	out.RawByte('}')
 }
 func easyjson42239ddeDecodeGoK6IoK6Stats1(in *jlexer.Lexer, out *stats.Submetric) {
@@ -400,8 +393,6 @@ func easyjson42239ddeDecodeGoK6IoK6Stats1(in *jlexer.Lexer, out *stats.Submetric
 		switch key {
 		case "name":
 			out.Name = string(in.String())
-		case "parent":
-			out.Parent = string(in.String())
 		case "suffix":
 			out.Suffix = string(in.String())
 		case "tags":
@@ -434,11 +425,6 @@ func easyjson42239ddeEncodeGoK6IoK6Stats1(out *jwriter.Writer, in stats.Submetri
 		const prefix string = ",\"name\":"
 		out.RawString(prefix[1:])
 		out.String(string(in.Name))
-	}
-	{
-		const prefix string = ",\"parent\":"
-		out.RawString(prefix)
-		out.String(string(in.Parent))
 	}
 	{
 		const prefix string = ",\"suffix\":"

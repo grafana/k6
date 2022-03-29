@@ -33,7 +33,6 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/stats"
 	"go.k6.io/k6/ui/pb"
@@ -212,9 +211,7 @@ func (car *ConstantArrivalRate) Init(ctx context.Context) error {
 // This will allow us to implement https://github.com/k6io/k6/issues/1386
 // and things like all of the TODOs below in one place only.
 //nolint:funlen,cyclop
-func (car ConstantArrivalRate) Run(
-	parentCtx context.Context, out chan<- stats.SampleContainer, builtinMetrics *metrics.BuiltinMetrics,
-) (err error) {
+func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
 	gracefulStop := car.config.GetGracefulStop()
 	duration := car.config.Duration.TimeDuration()
 	preAllocatedVUs := car.config.GetPreAllocatedVUs(car.executionState.ExecutionTuple)
@@ -332,7 +329,7 @@ func (car ConstantArrivalRate) Run(
 			int64(car.config.TimeUnit.TimeDuration()),
 		)).TimeDuration()
 
-	droppedIterationMetric := builtinMetrics.DroppedIterations
+	droppedIterationMetric := car.executionState.BuiltinMetrics.DroppedIterations
 	shownWarning := false
 	metricTags := car.getMetricTags(nil)
 	for li, gi := 0, start; ; li, gi = li+1, gi+offsets[li%len(offsets)] {

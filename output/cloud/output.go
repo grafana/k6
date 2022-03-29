@@ -37,9 +37,9 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/netext"
 	"go.k6.io/k6/lib/netext/httpext"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/stats"
 )
 

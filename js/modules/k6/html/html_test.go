@@ -30,7 +30,7 @@ import (
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/metrics"
 )
 
 const testHTML = `

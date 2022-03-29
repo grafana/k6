@@ -92,7 +92,7 @@ func printToStdout(gs *globalState, s string) {
 }
 
 // Trap Interrupts, SIGINTs and SIGTERMs and call the given.
-func handleTestAbortSignals(gs *globalState, firstHandler, secondHandler func(os.Signal)) (stop func()) {
+func handleTestAbortSignals(gs *globalState, gracefulStopHandler, onHardStop func(os.Signal)) (stop func()) {
 	sigC := make(chan os.Signal, 2)
 	done := make(chan struct{})
 	gs.signalNotify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -100,15 +100,15 @@ func handleTestAbortSignals(gs *globalState, firstHandler, secondHandler func(os
 	go func() {
 		select {
 		case sig := <-sigC:
-			firstHandler(sig)
+			gracefulStopHandler(sig)
 		case <-done:
 			return
 		}
 
 		select {
 		case sig := <-sigC:
-			if secondHandler != nil {
-				secondHandler(sig)
+			if onHardStop != nil {
+				onHardStop(sig)
 			}
 			// If we get a second signal, we immediately exit, so something like
 			// https://github.com/k6io/k6/issues/971 never happens again

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNew(t *testing.T) {
@@ -52,33 +53,39 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestNewSubmetric(t *testing.T) {
+func TestAddSubmetric(t *testing.T) {
 	t.Parallel()
 	testdata := map[string]struct {
-		parent string
-		tags   map[string]string
+		err  bool
+		tags map[string]string
 	}{
-		"my_metric":                 {"my_metric", nil},
-		"my_metric{}":               {"my_metric", nil},
-		"my_metric{a}":              {"my_metric", map[string]string{"a": ""}},
-		"my_metric{a:1}":            {"my_metric", map[string]string{"a": "1"}},
-		"my_metric{ a : 1 }":        {"my_metric", map[string]string{"a": "1"}},
-		"my_metric{a,b}":            {"my_metric", map[string]string{"a": "", "b": ""}},
-		"my_metric{a:1,b:2}":        {"my_metric", map[string]string{"a": "1", "b": "2"}},
-		"my_metric{ a : 1, b : 2 }": {"my_metric", map[string]string{"a": "1", "b": "2"}},
+		"":                        {true, nil},
+		"  ":                      {true, nil},
+		"a":                       {false, map[string]string{"a": ""}},
+		"a:1":                     {false, map[string]string{"a": "1"}},
+		" a : 1 ":                 {false, map[string]string{"a": "1"}},
+		"a,b":                     {false, map[string]string{"a": "", "b": ""}},
+		` a:"",b: ''`:             {false, map[string]string{"a": "", "b": ""}},
+		`a:1,b:2`:                 {false, map[string]string{"a": "1", "b": "2"}},
+		` a : 1, b : 2 `:          {false, map[string]string{"a": "1", "b": "2"}},
+		`a : '1' , b : "2"`:       {false, map[string]string{"a": "1", "b": "2"}},
+		`" a" : ' 1' , b : "2 " `: {false, map[string]string{" a": " 1", "b": "2 "}}, //nolint:gocritic
 	}
 
-	for name, data := range testdata {
-		name, data := name, data
+	for name, expected := range testdata {
+		name, expected := name, expected
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			parent, sm := NewSubmetric(name)
-			assert.Equal(t, data.parent, parent)
-			if data.tags != nil {
-				assert.EqualValues(t, data.tags, sm.Tags.tags)
-			} else {
-				assert.Nil(t, sm.Tags)
+
+			m := New("metric", Trend)
+			sm, err := m.AddSubmetric(name)
+			if expected.err {
+				require.Error(t, err)
+				return
 			}
+			require.NoError(t, err)
+			require.NotNil(t, sm)
+			assert.EqualValues(t, expected.tags, sm.Tags.tags)
 		})
 	}
 }
@@ -125,6 +132,7 @@ func TestSampleTags(t *testing.T) {
 	assert.False(t, tags.IsEqual(IntoSampleTags(&map[string]string{"key1": "val1", "key2": "val3"})))
 	assert.True(t, tags.Contains(IntoSampleTags(&map[string]string{"key1": "val1"})))
 	assert.False(t, tags.Contains(IntoSampleTags(&map[string]string{"key3": "val1"})))
+	assert.False(t, tags.Contains(IntoSampleTags(&map[string]string{"nonexistent_key": ""})))
 	assert.Equal(t, tagMap, tags.CloneTags())
 
 	assert.Nil(t, tags.json) // No cache

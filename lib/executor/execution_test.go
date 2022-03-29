@@ -61,7 +61,7 @@ func TestExecutionStateVUIDs(t *testing.T) {
 			require.NoError(t, err)
 
 			start, offsets, _ := et.GetStripedOffsets()
-			es := lib.NewExecutionState(lib.Options{}, et, 0, 0)
+			es := lib.NewExecutionState(lib.Options{}, et, nil, 0, 0)
 
 			idl, idg := es.GetUniqueVUIdentifiers()
 			assert.Equal(t, uint64(1), idl)
@@ -102,7 +102,7 @@ func TestExecutionStateGettingVUsWhenNonAreAvailable(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 0, 0)
+	es := lib.NewExecutionState(lib.Options{}, et, nil, 0, 0)
 	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
@@ -128,7 +128,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 10, 20)
+	es := lib.NewExecutionState(lib.Options{}, et, nil, 10, 20)
 	es.SetInitVUFunc(func(_ context.Context, _ *logrus.Entry) (lib.InitializedVU, error) {
 		return &minirunner.VU{}, nil
 	})
@@ -193,7 +193,7 @@ func TestMarkStartedPanicsOnSecondRun(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 0, 0)
+	es := lib.NewExecutionState(lib.Options{}, et, nil, 0, 0)
 	require.False(t, es.HasStarted())
 	es.MarkStarted()
 	require.True(t, es.HasStarted())
@@ -204,7 +204,7 @@ func TestMarkEnded(t *testing.T) {
 	t.Parallel()
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, 0, 0)
+	es := lib.NewExecutionState(lib.Options{}, et, nil, 0, 0)
 	require.False(t, es.HasEnded())
 	es.MarkEnded()
 	require.True(t, es.HasEnded())

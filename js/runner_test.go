@@ -56,12 +56,12 @@ import (
 	"go.k6.io/k6/lib"
 	_ "go.k6.io/k6/lib/executor" // TODO: figure out something better
 	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	"go.k6.io/k6/lib/testutils/mockoutput"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/stats"
 )
@@ -304,16 +304,18 @@ func TestSetupDataIsolation(t *testing.T) {
 	options := runner.GetOptions()
 	require.Empty(t, options.Validate())
 
-	execScheduler, err := local.NewExecutionScheduler(runner, testutils.NewLogger(t))
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	execScheduler, err := local.NewExecutionScheduler(runner, builtinMetrics, testutils.NewLogger(t))
 	require.NoError(t, err)
 
 	mockOutput := mockoutput.New()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	engine, err := core.NewEngine(
-		execScheduler, options, lib.RuntimeOptions{}, []output.Output{mockOutput}, testutils.NewLogger(t), builtinMetrics,
+		execScheduler, options, lib.RuntimeOptions{}, []output.Output{mockOutput}, testutils.NewLogger(t), registry,
 	)
 	require.NoError(t, err)
+	require.NoError(t, engine.OutputManager.StartOutputs())
+	defer engine.OutputManager.StopOutputs()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	run, wait, err := engine.Init(ctx, ctx)
@@ -2327,7 +2329,9 @@ func TestExecutionInfo(t *testing.T) {
 			initVU, err := r.NewVU(1, 10, samples)
 			require.NoError(t, err)
 
-			execScheduler, err := local.NewExecutionScheduler(r, testutils.NewLogger(t))
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			execScheduler, err := local.NewExecutionScheduler(r, builtinMetrics, testutils.NewLogger(t))
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())

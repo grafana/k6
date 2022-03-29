@@ -34,9 +34,9 @@ import (
 	"go.k6.io/k6/core"
 	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/minirunner"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/stats"
 )
 
@@ -45,17 +45,17 @@ func TestGetMetrics(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
-	require.NoError(t, err)
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, builtinMetrics)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, builtinMetrics, logger)
+	require.NoError(t, err)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry)
 	require.NoError(t, err)
 
-	engine.Metrics = map[string]*stats.Metric{
+	engine.MetricsEngine.ObservedMetrics = map[string]*stats.Metric{
 		"my_metric": stats.New("my_metric", stats.Trend, stats.Time),
 	}
-	engine.Metrics["my_metric"].Tainted = null.BoolFrom(true)
+	engine.MetricsEngine.ObservedMetrics["my_metric"].Tainted = null.BoolFrom(true)
 
 	rw := httptest.NewRecorder()
 	NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics", nil))
@@ -105,17 +105,17 @@ func TestGetMetric(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, logger)
-	require.NoError(t, err)
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, builtinMetrics)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, builtinMetrics, logger)
+	require.NoError(t, err)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry)
 	require.NoError(t, err)
 
-	engine.Metrics = map[string]*stats.Metric{
+	engine.MetricsEngine.ObservedMetrics = map[string]*stats.Metric{
 		"my_metric": stats.New("my_metric", stats.Trend, stats.Time),
 	}
-	engine.Metrics["my_metric"].Tainted = null.BoolFrom(true)
+	engine.MetricsEngine.ObservedMetrics["my_metric"].Tainted = null.BoolFrom(true)
 
 	t.Run("nonexistent", func(t *testing.T) {
 		t.Parallel()

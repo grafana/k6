@@ -18,6 +18,9 @@
  *
  */
 
+// Package output contains the interfaces that k6 outputs (and output
+// extensions) have to implement, as well as some helpers to make their
+// implementation and management easier.
 package output
 
 import (
@@ -29,7 +32,7 @@ import (
 	"github.com/spf13/afero"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/metrics"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/stats"
 )
 
@@ -49,6 +52,8 @@ type Params struct {
 	RuntimeOptions lib.RuntimeOptions
 	ExecutionPlan  []lib.ExecutionStep
 }
+
+// TODO: make v2 with buffered channels?
 
 // An Output abstracts the process of funneling samples to an external storage
 // backend, such as a file or something like an InfluxDB instance.

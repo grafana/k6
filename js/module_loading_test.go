@@ -31,9 +31,9 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/stats"
 )
 

@@ -89,7 +89,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	logger := c.gs.logger
 	// Create a local execution scheduler wrapping the runner.
 	logger.Debug("Initializing the execution scheduler...")
-	execScheduler, err := local.NewExecutionScheduler(test.initRunner, logger)
+	execScheduler, err := local.NewExecutionScheduler(test.initRunner, test.builtInMetrics, logger)
 	if err != nil {
 		return err
 	}
@@ -119,11 +119,15 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// TODO: create a MetricsEngine here and add its ingester to the list of
+	// outputs (unless both NoThresholds and NoSummary were enabled)
+
+	// TODO: remove this completely
 	// Create the engine.
 	initBar.Modify(pb.WithConstProgress(0, "Init engine"))
 	engine, err := core.NewEngine(
 		execScheduler, conf.Options, test.runtimeOptions,
-		outputs, logger, test.builtInMetrics,
+		outputs, logger, test.metricsRegistry,
 	)
 	if err != nil {
 		return err
@@ -134,6 +138,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 		initBar.Modify(pb.WithConstProgress(0, "Init API server"))
 		go func() {
 			logger.Debugf("Starting the REST API server on %s", c.gs.flags.address)
+			// TODO: send the ExecutionState and MetricsEngine instead of the Engine
 			if aerr := api.ListenAndServe(c.gs.flags.address, engine, logger); aerr != nil {
 				// Only exit k6 if the user has explicitly set the REST API address
 				if cmd.Flags().Lookup("address").Changed {
@@ -148,11 +153,12 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 
 	// We do this here so we can get any output URLs below.
 	initBar.Modify(pb.WithConstProgress(0, "Starting outputs"))
-	err = engine.StartOutputs()
+	// TODO: directly create the MutputManager here, not in the Engine
+	err = engine.OutputManager.StartOutputs()
 	if err != nil {
 		return err
 	}
-	defer engine.StopOutputs()
+	defer engine.OutputManager.StopOutputs()
 
 	printExecutionDescription(
 		c.gs, "local", args[0], "", conf, execScheduler.GetState().ExecutionTuple, executionPlan, outputs,
@@ -163,11 +169,11 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 		logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
 		lingerCancel() // stop the test run, metric processing is cancelled below
 	}
-	hardStop := func(sig os.Signal) {
+	onHardStop := func(sig os.Signal) {
 		logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
 		globalCancel() // not that it matters, given the following command...
 	}
-	stopSignalHandling := handleTestAbortSignals(c.gs, gracefulStop, hardStop)
+	stopSignalHandling := handleTestAbortSignals(c.gs, gracefulStop, onHardStop)
 	defer stopSignalHandling()
 
 	// Initialize the engine
@@ -225,9 +231,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 
 	// Handle the end-of-test summary.
 	if !test.runtimeOptions.NoSummary.Bool {
+		engine.MetricsEngine.MetricsLock.Lock() // TODO: refactor so this is not needed
 		summaryResult, err := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
-			Metrics:         engine.Metrics,
-			RootGroup:       engine.ExecutionScheduler.GetRunner().GetDefaultGroup(),
+			Metrics:         engine.MetricsEngine.ObservedMetrics,
+			RootGroup:       execScheduler.GetRunner().GetDefaultGroup(),
 			TestRunDuration: executionState.GetCurrentTestRunDuration(),
 			NoColor:         c.gs.flags.noColor,
 			UIState: lib.UIState{
@@ -235,6 +242,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 				IsStdErrTTY: c.gs.stdErr.isTTY,
 			},
 		})
+		engine.MetricsEngine.MetricsLock.Unlock()
 		if err == nil {
 			err = handleSummaryResult(c.gs.fs, c.gs.stdOut, c.gs.stdErr, summaryResult)
 		}

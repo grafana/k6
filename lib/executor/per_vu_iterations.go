@@ -31,7 +31,6 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/metrics"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/stats"
 	"go.k6.io/k6/ui/pb"
@@ -152,9 +151,7 @@ var _ lib.Executor = &PerVUIterations{}
 
 // Run executes a specific number of iterations with each configured VU.
 // nolint:funlen
-func (pvi PerVUIterations) Run(
-	parentCtx context.Context, out chan<- stats.SampleContainer, builtinMetrics *metrics.BuiltinMetrics,
-) (err error) {
+func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
 	numVUs := pvi.config.GetVUs(pvi.executionState.ExecutionTuple)
 	iterations := pvi.config.GetIterations()
 	duration := pvi.config.MaxDuration.TimeDuration()
@@ -214,7 +211,7 @@ func (pvi PerVUIterations) Run(
 		activeVUs.Done()
 	}
 
-	droppedIterationMetric := builtinMetrics.DroppedIterations
+	droppedIterationMetric := pvi.executionState.BuiltinMetrics.DroppedIterations
 	handleVU := func(initVU lib.InitializedVU) {
 		defer handleVUsWG.Done()
 		ctx, cancel := context.WithCancel(maxDurationCtx)
