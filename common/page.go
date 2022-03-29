@@ -34,7 +34,7 @@ import (
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
+	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -85,6 +85,7 @@ type Page struct {
 	frameSessions map[cdp.FrameID]*FrameSession
 	workers       map[target.SessionID]*Worker
 	routes        []api.Route
+	vu            k6modules.VU
 
 	logger *Logger
 }
@@ -117,6 +118,7 @@ func NewPage(
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
 		routes:           make([]api.Route, 0),
+		vu:               GetVU(ctx),
 		logger:           logger,
 	}
 
@@ -220,7 +222,7 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.Frame
 	p.logger.Debugf("Page:getOwnerFrame", "sid:%v", p.sessionID())
 
 	// document.documentElement has frameId of the owner frame
-	rt := k6common.GetRuntime(p.ctx)
+	rt := p.vu.Runtime()
 	pageFn := rt.ToValue(`
 		node => {
 			const doc = node;
@@ -666,7 +668,6 @@ func (p *Page) QueryAll(selector string) []api.ElementHandle {
 func (p *Page) Reload(opts goja.Value) api.Response {
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
 
-	rt := k6common.GetRuntime(p.ctx)
 	parsedOpts := NewPageReloadOptions(LifecycleEventLoad, p.defaultTimeout())
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
 		k6Throw(p.ctx, "failed parsing options: %w", err)
@@ -723,7 +724,7 @@ func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	if err != nil {
 		k6Throw(p.ctx, "cannot capture screenshot: %w", err)
 	}
-	rt := k6common.GetRuntime(p.ctx)
+	rt := p.vu.Runtime()
 	return rt.NewArrayBuffer(*buf)
 }
 
@@ -795,7 +796,7 @@ func (p *Page) TextContent(selector string, opts goja.Value) string {
 func (p *Page) Title() string {
 	p.logger.Debugf("Page:Title", "sid:%v", p.sessionID())
 
-	rt := k6common.GetRuntime(p.ctx)
+	rt := p.vu.Runtime()
 	js := `() => document.title`
 	return p.Evaluate(rt.ToValue(js)).(goja.Value).String()
 }

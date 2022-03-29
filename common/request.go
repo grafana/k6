@@ -30,7 +30,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
+	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -59,6 +59,7 @@ type Request struct {
 	timestamp           time.Time
 	wallTime            time.Time
 	responseEndTiming   float64
+	vu                  k6modules.VU
 }
 
 // NewRequest creates a new HTTP request.
@@ -95,6 +96,7 @@ func NewRequest(
 		errorText:           "",
 		timestamp:           event.Timestamp.Time(),
 		wallTime:            event.WallTime.Time(),
+		vu:                  GetVU(ctx),
 	}
 	for n, v := range event.Request.Headers {
 		switch v := v.(type) {
@@ -160,7 +162,7 @@ func (r *Request) Frame() api.Frame {
 }
 
 func (r *Request) HeaderValue(name string) goja.Value {
-	rt := k6common.GetRuntime(r.ctx)
+	rt := r.vu.Runtime()
 	headers := r.AllHeaders()
 	val, ok := headers[name]
 	if !ok {
@@ -205,7 +207,7 @@ func (r *Request) PostData() string {
 
 // PostDataBuffer returns the request post data as an ArrayBuffer.
 func (r *Request) PostDataBuffer() goja.ArrayBuffer {
-	rt := k6common.GetRuntime(r.ctx)
+	rt := r.vu.Runtime()
 	return rt.NewArrayBuffer([]byte(r.postData))
 }
 
@@ -243,7 +245,7 @@ func (r *Request) Size() api.HTTPMessageSize {
 }
 
 func (r *Request) Timing() goja.Value {
-	rt := k6common.GetRuntime(r.ctx)
+	rt := r.vu.Runtime()
 	timing := r.response.timing
 	return rt.ToValue(&ResourceTiming{
 		StartTime:             (timing.RequestTime - float64(r.timestamp.Unix()) + float64(r.wallTime.Unix())) * 1000,

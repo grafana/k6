@@ -33,7 +33,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
-	k6common "go.k6.io/k6/js/common"
 )
 
 type objectOverflowError struct{}
@@ -139,7 +138,7 @@ func valueFromRemoteObject(ctx context.Context, robj *cdpruntime.RemoteObject) (
 	if val == "undefined" {
 		return goja.Undefined(), err
 	}
-	return k6common.GetRuntime(ctx).ToValue(val), err
+	return GetVU(ctx).Runtime().ToValue(val), err
 }
 
 func handleParseRemoteObjectErr(ctx context.Context, err error, logger *logrus.Entry) {

@@ -31,8 +31,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
-	k6lib "go.k6.io/k6/lib"
+	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -76,13 +75,15 @@ type Response struct {
 	timestamp         time.Time
 	responseTime      time.Time
 	timing            *network.ResourceTiming
+	vu                k6modules.VU
 
 	cachedJSON interface{}
 }
 
 // NewHTTPResponse creates a new HTTP response.
 func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, timestamp *cdp.MonotonicTime) *Response {
-	state := k6lib.GetState(ctx)
+	vu := GetVU(ctx)
+	state := vu.State()
 	r := Response{
 		ctx: ctx,
 		// TODO: Pass an internal logger instead of basing it on k6's logger?
@@ -103,6 +104,7 @@ func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, 
 		timestamp:         timestamp.Time(),
 		responseTime:      time.Time{},
 		timing:            resp.Timing,
+		vu:                vu,
 	}
 
 	for n, v := range resp.Headers {
@@ -186,7 +188,7 @@ func (r *Response) Body() goja.ArrayBuffer {
 	}
 	r.bodyMu.RLock()
 	defer r.bodyMu.RUnlock()
-	rt := k6common.GetRuntime(r.ctx)
+	rt := r.vu.Runtime()
 	return rt.NewArrayBuffer(r.body)
 }
 
@@ -220,12 +222,12 @@ func (r *Response) Frame() api.Frame {
 }
 
 func (r *Response) HeaderValue(name string) goja.Value {
-	rt := k6common.GetRuntime(r.ctx)
 	headers := r.AllHeaders()
 	val, ok := headers[name]
 	if !ok {
 		return goja.Null()
 	}
+	rt := r.vu.Runtime()
 	return rt.ToValue(val)
 }
 
@@ -283,7 +285,7 @@ func (r *Response) JSON() goja.Value {
 		}
 		r.cachedJSON = v
 	}
-	rt := k6common.GetRuntime(r.ctx)
+	rt := r.vu.Runtime()
 	return rt.ToValue(r.cachedJSON)
 }
 
@@ -301,13 +303,13 @@ func (r *Response) Request() api.Request {
 }
 
 func (r *Response) SecurityDetails() goja.Value {
-	rt := k6common.GetRuntime(r.ctx)
+	rt := r.vu.Runtime()
 	return rt.ToValue(r.securityDetails)
 }
 
 // ServerAddr returns the remote address of the server.
 func (r *Response) ServerAddr() goja.Value {
-	rt := k6common.GetRuntime(r.ctx)
+	rt := r.vu.Runtime()
 	return rt.ToValue(r.remoteAddress)
 }
 

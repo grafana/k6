@@ -13,7 +13,6 @@ import (
 	"github.com/chromedp/cdproto/dom"
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common/js"
@@ -390,7 +389,7 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 		return nil, err
 	}
 
-	rt := k6common.GetRuntime(apiCtx)
+	rt := h.execCtx.vu.Runtime()
 	var border struct{ Top, Left float64 }
 	switch result := result.(type) {
 	case goja.Value:
@@ -473,7 +472,7 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values goja.Value) 
 		var (
 			opts []interface{}
 			t    = values.Export()
-			rt   = k6common.GetRuntime(h.ctx)
+			rt   = h.execCtx.vu.Runtime()
 		)
 		switch values.ExportType().Kind() {
 		case reflect.Map:
@@ -1107,7 +1106,7 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]api.ElementH
 }
 
 func (h *ElementHandle) Screenshot(opts goja.Value) goja.ArrayBuffer {
-	rt := k6common.GetRuntime(h.ctx)
+	rt := h.execCtx.vu.Runtime()
 	parsedOpts := NewElementHandleScreenshotOptions(h.defaultTimeout())
 	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
 		k6Throw(h.ctx, "cannot parse element screenshot options: %w", err)
@@ -1134,7 +1133,7 @@ func (h *ElementHandle) ScrollIntoViewIfNeeded(opts goja.Value) {
 }
 
 func (h *ElementHandle) SelectOption(values goja.Value, opts goja.Value) []string {
-	rt := k6common.GetRuntime(h.ctx)
+	rt := h.execCtx.vu.Runtime()
 	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
 		k6Throw(h.ctx, "cannot parse element selection options: %w", err)
@@ -1296,7 +1295,7 @@ func (h *ElementHandle) eval(
 ) (interface{}, error) {
 	// passing `h` makes it evaluate js code in the element handle's scope.
 	args = append([]interface{}{h}, args...)
-	rt := k6common.GetRuntime(ctx)
+	rt := h.execCtx.vu.Runtime()
 	gargs := make([]goja.Value, len(args))
 	for i, arg := range args {
 		gargs[i] = rt.ToValue(arg)

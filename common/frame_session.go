@@ -43,7 +43,7 @@ import (
 	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/cdproto/target"
 	"github.com/sirupsen/logrus"
-	k6lib "go.k6.io/k6/lib"
+	k6modules "go.k6.io/k6/js/modules"
 	k6stats "go.k6.io/k6/stats"
 
 	"github.com/grafana/xk6-browser/api"
@@ -79,6 +79,7 @@ type FrameSession struct {
 	eventCh chan Event
 
 	childSessions map[cdp.FrameID]*FrameSession
+	vu            k6modules.VU
 
 	logger *Logger
 	// logger that will properly serialize RemoteObject instances
@@ -105,6 +106,7 @@ func NewFrameSession(
 		isolatedWorlds:       make(map[string]bool),
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
+		vu:                   GetVU(ctx),
 		logger:               l,
 		serializer: &logrus.Logger{
 			Out:       l.log.Out,
@@ -370,7 +372,7 @@ func (fs *FrameSession) initOptions() error {
 	var (
 		opts       = fs.manager.page.browserCtx.opts
 		optActions = []Action{}
-		state      = k6lib.GetState(fs.ctx)
+		state      = fs.vu.State()
 	)
 
 	if fs.isMainFrame() {
@@ -511,7 +513,7 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 		WithTime(event.Timestamp.Time()).
 		WithField("source", "browser-console-api")
 
-	if s := k6lib.GetState(fs.ctx); s.Group.Path != "" {
+	if s := fs.vu.State(); s.Group.Path != "" {
 		l = l.WithField("group", s.Group.Path)
 	}
 
@@ -681,7 +683,7 @@ func (fs *FrameSession) onLogEntryAdded(event *log.EventEntryAdded) {
 		WithField("url", event.Entry.URL).
 		WithField("browser_source", event.Entry.Source.String()).
 		WithField("line_number", event.Entry.LineNumber)
-	if s := k6lib.GetState(fs.ctx); s.Group.Path != "" {
+	if s := fs.vu.State(); s.Group.Path != "" {
 		l = l.WithField("group", s.Group.Path)
 	}
 	switch event.Entry.Level {
@@ -701,7 +703,7 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 		"sid:%v tid:%v fid:%v event:%q",
 		fs.session.ID(), fs.targetID, event.FrameID, event.Name)
 
-	state := k6lib.GetState(fs.ctx)
+	state := fs.vu.State()
 	if event.Name == "init" || event.Name == "commit" {
 		fs.initTime = event.Timestamp
 	}

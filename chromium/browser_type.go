@@ -16,6 +16,7 @@ import (
 
 	"github.com/dop251/goja"
 	k6common "go.k6.io/k6/js/common"
+	k6modules "go.k6.io/k6/js/modules"
 	k6lib "go.k6.io/k6/lib"
 
 	"github.com/grafana/xk6-browser/api"
@@ -32,6 +33,7 @@ type BrowserType struct {
 	CancelFn        context.CancelFunc
 	hooks           *common.Hooks
 	fieldNameMapper *common.FieldNameMapper
+	vu              k6modules.VU
 
 	execPath string    // path to the Chromium executable
 	storage  DataStore // stores temporary data for the extension and user
@@ -42,8 +44,11 @@ type BrowserType struct {
 // - Initializes the extension-wide context
 // - Initializes the goja runtime.
 func NewBrowserType(ctx context.Context) api.BrowserType {
-	rt := k6common.GetRuntime(ctx)
-	hooks := common.NewHooks()
+	var (
+		vu    = common.GetVU(ctx)
+		rt    = vu.Runtime()
+		hooks = common.NewHooks()
+	)
 
 	// Create the extension master context.
 	// If this context is cancelled we'll initiate an extension wide cancellation and shutdown.
@@ -55,6 +60,7 @@ func NewBrowserType(ctx context.Context) api.BrowserType {
 		CancelFn:        extensionCancelFn,
 		hooks:           hooks,
 		fieldNameMapper: common.NewFieldNameMapper(),
+		vu:              vu,
 	}
 	rt.SetFieldNameMapper(b.fieldNameMapper)
 
@@ -63,7 +69,7 @@ func NewBrowserType(ctx context.Context) api.BrowserType {
 
 // Connect attaches k6 browser to an existing browser instance.
 func (b *BrowserType) Connect(opts goja.Value) {
-	rt := k6common.GetRuntime(b.Ctx)
+	rt := b.vu.Runtime()
 	k6common.Throw(rt, errors.New("BrowserType.connect() has not been implemented yet"))
 }
 
@@ -111,8 +117,8 @@ func (b *BrowserType) ExecutablePath() (execPath string) {
 // which can be used for controlling the Chrome browser.
 func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 	var (
-		rt         = k6common.GetRuntime(b.Ctx)
-		state      = k6lib.GetState(b.Ctx)
+		rt         = b.vu.Runtime()
+		state      = b.vu.State()
 		launchOpts = common.NewLaunchOptions()
 	)
 	if err := launchOpts.Parse(b.Ctx, opts); err != nil {
@@ -154,7 +160,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 
 // LaunchPersistentContext launches the browser with persistent storage.
 func (b *BrowserType) LaunchPersistentContext(userDataDir string, opts goja.Value) api.Browser {
-	rt := k6common.GetRuntime(b.Ctx)
+	rt := b.vu.Runtime()
 	k6common.Throw(rt, errors.New("BrowserType.LaunchPersistentContext(userDataDir, opts) has not been implemented yet"))
 	return nil
 }
@@ -399,7 +405,7 @@ func parseWebsocketURL(ctx context.Context, rc io.Reader) (wsURL string, _ error
 // makeLogger makes and returns an extension wide logger.
 func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*common.Logger, error) {
 	var (
-		k6Logger            = k6lib.GetState(ctx).Logger
+		k6Logger            = common.GetVU(ctx).State().Logger
 		reCategoryFilter, _ = regexp.Compile(launchOpts.LogCategoryFilter)
 		logger              = common.NewLogger(ctx, k6Logger, launchOpts.Debug, reCategoryFilter)
 	)

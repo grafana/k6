@@ -54,8 +54,6 @@ func NewMouse(ctx context.Context, s session, f *Frame, ts *TimeoutSettings, k *
 		frame:           f,
 		timeoutSettings: ts,
 		keyboard:        k,
-		x:               0,
-		y:               0,
 		button:          input.None,
 	}
 }

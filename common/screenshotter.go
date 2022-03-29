@@ -34,7 +34,6 @@ import (
 	"github.com/chromedp/cdproto/emulation"
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
 )
 
 type screenshotter struct {
@@ -46,7 +45,7 @@ func newScreenshotter(ctx context.Context) *screenshotter {
 }
 
 func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
-	rt := k6common.GetRuntime(s.ctx)
+	rt := p.vu.Runtime()
 	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
@@ -84,7 +83,7 @@ func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
 }
 
 func (s *screenshotter) originalViewportSize(p *Page) (*Size, *Size, error) {
-	rt := k6common.GetRuntime(s.ctx)
+	rt := p.vu.Runtime()
 	originalViewportSize := p.viewportSize()
 	viewportSize := originalViewportSize
 	if viewportSize.Width != 0 || viewportSize.Height != 0 {
@@ -260,7 +259,7 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 	}
 
 	documentRect := bbox
-	rt := k6common.GetRuntime(s.ctx)
+	rt := h.execCtx.vu.Runtime()
 	scrollOffset := h.Evaluate(rt.ToValue(`() => { return {x: window.scrollX, y: window.scrollY};}`))
 	switch s := scrollOffset.(type) {
 	case goja.Value:

@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
 )
 
 type FrameBaseOptions struct {
@@ -167,7 +166,7 @@ func NewFrameBaseOptions(defaultTimeout time.Duration) *FrameBaseOptions {
 }
 
 func (o *FrameBaseOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -190,7 +189,7 @@ func NewFrameCheckOptions(defaultTimeout time.Duration) *FrameCheckOptions {
 }
 
 func (o *FrameCheckOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -214,7 +213,7 @@ func NewFrameClickOptions(defaultTimeout time.Duration) *FrameClickOptions {
 }
 
 func (o *FrameClickOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if err := o.ElementHandleClickOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -238,7 +237,7 @@ func NewFrameDblClickOptions(defaultTimeout time.Duration) *FrameDblclickOptions
 }
 
 func (o *FrameDblclickOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if err := o.ElementHandleDblclickOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -262,7 +261,7 @@ func NewFrameFillOptions(defaultTimeout time.Duration) *FrameFillOptions {
 }
 
 func (o *FrameFillOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -287,7 +286,7 @@ func NewFrameGotoOptions(defaultReferer string, defaultTimeout time.Duration) *F
 }
 
 func (o *FrameGotoOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -317,7 +316,7 @@ func NewFrameHoverOptions(defaultTimeout time.Duration) *FrameHoverOptions {
 }
 
 func (o *FrameHoverOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if err := o.ElementHandleHoverOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -471,7 +470,7 @@ func NewFrameSelectOptionOptions(defaultTimeout time.Duration) *FrameSelectOptio
 }
 
 func (o *FrameSelectOptionOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -495,7 +494,7 @@ func NewFrameSetContentOptions(defaultTimeout time.Duration) *FrameSetContentOpt
 }
 
 func (o *FrameSetContentOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
@@ -526,7 +525,7 @@ func NewFrameTapOptions(defaultTimeout time.Duration) *FrameTapOptions {
 }
 
 func (o *FrameTapOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -582,7 +581,7 @@ func NewFrameUncheckOptions(defaultTimeout time.Duration) *FrameUncheckOptions {
 }
 
 func (o *FrameUncheckOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -607,7 +606,7 @@ func NewFrameWaitForFunctionOptions(defaultTimeout time.Duration) *FrameWaitForF
 }
 
 func (o *FrameWaitForFunctionOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
@@ -637,7 +636,7 @@ func NewFrameWaitForLoadStateOptions(defaultTimeout time.Duration) *FrameWaitFor
 }
 
 func (o *FrameWaitForLoadStateOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -659,7 +658,7 @@ func NewFrameWaitForNavigationOptions(defaultTimeout time.Duration) *FrameWaitFo
 }
 
 func (o *FrameWaitForNavigationOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -690,7 +689,7 @@ func NewFrameWaitForSelectorOptions(defaultTimeout time.Duration) *FrameWaitForS
 }
 
 func (o *FrameWaitForSelectorOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)

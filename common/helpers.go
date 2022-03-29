@@ -189,7 +189,7 @@ func waitForEvent(ctx context.Context, emitter EventEmitter, events []string, pr
 // browser process from the context and kills it if it still exists.
 // TODO: test.
 func k6Throw(ctx context.Context, format string, a ...interface{}) {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if rt == nil {
 		// this should never happen unless a programmer error
 		panic("cannot get k6 runtime")

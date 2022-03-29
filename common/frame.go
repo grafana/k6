@@ -31,7 +31,7 @@ import (
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
+	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -65,6 +65,7 @@ type Frame struct {
 	name         string
 	url          string
 	detached     bool
+	vu           k6modules.VU
 
 	// A life cycle event is only considered triggered for a frame if the entire
 	// frame subtree has also had the life cycle event triggered.
@@ -112,6 +113,7 @@ func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID 
 		parentFrame:            parentFrame,
 		childFrames:            make(map[api.Frame]bool),
 		id:                     frameID,
+		vu:                     GetVU(ctx),
 		lifecycleEvents:        make(map[LifecycleEvent]bool),
 		subtreeLifecycleEvents: make(map[LifecycleEvent]bool),
 		inflightRequests:       make(map[network.RequestID]bool),
@@ -358,7 +360,7 @@ func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
 			forceCallable: false,
 			returnByValue: false,
 		},
-		k6common.GetRuntime(f.ctx).ToValue("document"),
+		f.vu.Runtime().ToValue("document"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("cannot evaluate in main execution context: %w", err)
@@ -555,7 +557,7 @@ func (f *Frame) waitForFunction(
 		return nil, err
 	}
 
-	rt := k6common.GetRuntime(f.ctx)
+	rt := f.vu.Runtime()
 	pageFn := rt.ToValue(`
 		(injected, predicate, polling, timeout, ...args) => {
 			return injected.waitForPredicateFunction(predicate, polling, timeout, ...args);
@@ -706,7 +708,7 @@ func (f *Frame) Click(selector string, opts goja.Value) {
 func (f *Frame) Content() string {
 	f.log.Debugf("Frame:Content", "fid:%s furl:%q", f.ID(), f.URL())
 
-	rt := k6common.GetRuntime(f.ctx)
+	rt := f.vu.Runtime()
 	js := `let content = '';
 		if (document.doctype) {
 			content = new XMLSerializer().serializeToString(document.doctype);
@@ -1373,7 +1375,7 @@ func (f *Frame) TextContent(selector string, opts goja.Value) string {
 func (f *Frame) Title() string {
 	f.log.Debugf("Frame:Title", "fid:%s furl:%q", f.ID(), f.URL())
 
-	rt := k6common.GetRuntime(f.ctx)
+	rt := f.vu.Runtime()
 	return f.Evaluate(rt.ToValue("document.title")).(string)
 }
 

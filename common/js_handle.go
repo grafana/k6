@@ -26,7 +26,6 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -96,7 +95,7 @@ func (h *BaseJSHandle) Dispose() {
 
 // Evaluate will evaluate provided page function within an execution context.
 func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
-	rt := k6common.GetRuntime(h.ctx)
+	rt := h.execCtx.vu.Runtime()
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
 	res, err := h.execCtx.Eval(h.ctx, pageFunc, args...)
 	if err != nil {
@@ -107,7 +106,7 @@ func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) interfa
 
 // EvaluateHandle will evaluate provided page function within an execution context.
 func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHandle {
-	rt := k6common.GetRuntime(h.ctx)
+	rt := h.execCtx.vu.Runtime()
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
 	res, err := h.execCtx.EvalHandle(h.ctx, pageFunc, args...)
 	if err != nil {

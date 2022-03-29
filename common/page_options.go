@@ -28,7 +28,6 @@ import (
 
 	"github.com/chromedp/cdproto/page"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
 )
 
 type PageEmulateMediaOptions struct {
@@ -60,7 +59,7 @@ func NewPageEmulateMediaOptions(defaultMedia MediaType, defaultColorScheme Color
 }
 
 func (o *PageEmulateMediaOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -85,7 +84,7 @@ func NewPageReloadOptions(defaultWaitUntil LifecycleEvent, defaultTimeout time.D
 }
 
 func (o *PageReloadOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -117,7 +116,7 @@ func NewPageScreenshotOptions() *PageScreenshotOptions {
 }
 
 func (o *PageScreenshotOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		formatSpecified := false
 		opts := opts.ToObject(rt)

@@ -35,7 +35,7 @@ import (
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
+	k6modules "go.k6.io/k6/js/modules"
 	k6lib "go.k6.io/k6/lib"
 	k6netext "go.k6.io/k6/lib/netext"
 	k6types "go.k6.io/k6/lib/types"
@@ -56,6 +56,7 @@ type NetworkManager struct {
 	frameManager *FrameManager
 	credentials  *Credentials
 	resolver     k6netext.Resolver
+	vu           k6modules.VU
 
 	// TODO: manage inflight requests separately (move them between the two maps
 	// as they transition from inflight -> completed)
@@ -75,7 +76,8 @@ type NetworkManager struct {
 func NewNetworkManager(
 	ctx context.Context, s session, fm *FrameManager, parent *NetworkManager,
 ) (*NetworkManager, error) {
-	state := k6lib.GetState(ctx)
+	vu := GetVU(ctx)
+	state := vu.State()
 
 	resolver, err := newResolver(state.Options.DNS)
 	if err != nil {
@@ -92,6 +94,7 @@ func NewNetworkManager(
 		parent:           parent,
 		frameManager:     fm,
 		resolver:         resolver,
+		vu:               vu,
 		reqIDToRequest:   make(map[network.RequestID]*Request),
 		attemptedAuth:    make(map[fetch.RequestID]bool),
 		extraHTTPHeaders: make(map[string]string),
@@ -155,7 +158,7 @@ func (m *NetworkManager) deleteRequestByID(reqID network.RequestID) {
 }
 
 func (m *NetworkManager) emitRequestMetrics(req *Request) {
-	state := k6lib.GetState(m.ctx)
+	state := m.vu.State()
 
 	tags := state.CloneTags()
 	if state.Options.SystemTags.Has(k6stats.TagGroup) {
@@ -182,7 +185,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 }
 
 func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
-	state := k6lib.GetState(m.ctx)
+	state := m.vu.State()
 
 	// In some scenarios we might not receive a ResponseReceived CDP event, in
 	// which case the response won't be created. So to emit as much metric data
@@ -502,7 +505,7 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 	var (
 		host  = purl.Hostname()
 		ip    = net.ParseIP(host)
-		state = k6lib.GetState(m.ctx)
+		state = m.vu.State()
 	)
 	if ip != nil {
 		failErr = checkBlockedIPs(ip, state.Options.BlacklistIPs)
@@ -664,7 +667,7 @@ func (m *NetworkManager) Authenticate(credentials *Credentials) {
 
 // ExtraHTTPHeaders returns the currently set extra HTTP request headers.
 func (m *NetworkManager) ExtraHTTPHeaders() goja.Value {
-	rt := k6common.GetRuntime(m.ctx)
+	rt := m.vu.Runtime()
 	return rt.ToValue(m.extraHTTPHeaders)
 }
 

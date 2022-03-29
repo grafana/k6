@@ -32,7 +32,7 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
+	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -68,6 +68,7 @@ type ExecutionContext struct {
 	frame          *Frame
 	id             runtime.ExecutionContextID
 	injectedScript api.JSHandle
+	vu             k6modules.VU
 
 	// Used for logging
 	sid  target.SessionID // Session ID
@@ -86,6 +87,7 @@ func NewExecutionContext(
 		frame:          f,
 		id:             id,
 		injectedScript: nil,
+		vu:             GetVU(ctx),
 		logger:         l,
 	}
 	if s != nil {
@@ -289,7 +291,7 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 	}
 
 	var (
-		rt                      = k6common.GetRuntime(e.ctx)
+		rt                      = e.vu.Runtime()
 		suffix                  = `//# sourceURL=` + evaluationScriptURL
 		source                  = fmt.Sprintf(`(() => {%s; return new InjectedScript();})()`, injectedScriptSource)
 		expression              = source
