@@ -124,34 +124,44 @@ func TestPatchStatus(t *testing.T) {
 			Payload:            []byte(`{"data":{"type":"status","id":"default","attributes":{"status":0,"paused":null,"vus":10,"vus-max":10,"stopped":false,"running":false,"tainted":false}}}`),
 		},
 	}
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
-
-	scenarios := lib.ScenarioConfigs{}
-	err := json.Unmarshal([]byte(`
-			{"external": {"executor": "externally-controlled",
-			"vus": 0, "maxVUs": 10, "duration": "1s"}}`), &scenarios)
-	require.NoError(t, err)
-	options := lib.Options{Scenarios: scenarios}
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 
 	for name, testCase := range testData {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
 
+			scenarios := lib.ScenarioConfigs{}
+			err := json.Unmarshal([]byte(`
+			{"external": {"executor": "externally-controlled",
+			"vus": 0, "maxVUs": 10, "duration": "0"}}`), &scenarios)
+			require.NoError(t, err)
+			options := lib.Options{Scenarios: scenarios}
+
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 			execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Options: options}, builtinMetrics, logger)
 			require.NoError(t, err)
 			engine, err := core.NewEngine(execScheduler, options, lib.RuntimeOptions{}, nil, logger, registry)
 			require.NoError(t, err)
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			run, _, err := engine.Init(ctx, ctx)
+
+			require.NoError(t, engine.OutputManager.StartOutputs())
+			defer engine.OutputManager.StopOutputs()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			run, wait, err := engine.Init(ctx, ctx)
 			require.NoError(t, err)
 
-			go func() { _ = run() }()
+			defer func() {
+				cancel()
+				wait()
+			}()
+
+			go func() {
+				assert.NoError(t, run())
+			}()
 			// wait for the executor to initialize to avoid a potential data race below
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(200 * time.Millisecond)
 
 			rw := httptest.NewRecorder()
 			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "PATCH", "/v1/status", bytes.NewReader(testCase.Payload)))

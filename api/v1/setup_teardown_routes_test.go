@@ -137,13 +137,13 @@ func TestSetupData(t *testing.T) {
 
 	runTestCase := func(t *testing.T, tcid int) {
 		testCase := testCases[tcid]
-		logger := logrus.New()
-		logger.SetOutput(testutils.NewTestOutput(t))
-		registry := metrics.NewRegistry()
-		builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
+
+			logger := logrus.New()
+			logger.SetOutput(testutils.NewTestOutput(t))
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 
 			runner, err := js.New(
 				logger,
