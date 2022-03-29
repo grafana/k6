@@ -1,10 +1,8 @@
 package common
 
 import (
-	"context"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,10 +35,10 @@ func TestLaunchOptionsParse(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			rt := goja.New()
-			opts := rt.ToValue(tc.opts)
+			mockVU := newMockVU(t)
+			opts := mockVU.RuntimeField.ToValue(tc.opts)
 			lopts := NewLaunchOptions()
-			err := lopts.Parse(context.Background(), opts)
+			err := lopts.Parse(mockVU.CtxField, opts)
 			require.NoError(t, err)
 			tc.assert(t, lopts)
 		})
