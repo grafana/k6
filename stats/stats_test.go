@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNew(t *testing.T) {
+func TestNewMetric(t *testing.T) {
 	t.Parallel()
 	testdata := map[string]struct {
 		Type     MetricType
@@ -46,7 +46,7 @@ func TestNew(t *testing.T) {
 		name, data := name, data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			m := New("my_metric", data.Type)
+			m := newMetric("my_metric", data.Type)
 			assert.Equal(t, "my_metric", m.Name)
 			assert.IsType(t, data.SinkType, m.Sink)
 		})
@@ -77,7 +77,7 @@ func TestAddSubmetric(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			m := New("metric", Trend)
+			m := newMetric("metric", Trend)
 			sm, err := m.AddSubmetric(name)
 			if expected.err {
 				require.Error(t, err)
@@ -156,7 +156,7 @@ func TestSampleImplementations(t *testing.T) {
 	now := time.Now()
 
 	sample := Sample{
-		Metric: New("test_metric", Counter),
+		Metric: newMetric("test_metric", Counter),
 		Time:   now,
 		Tags:   NewSampleTags(tagMap),
 		Value:  1.0,

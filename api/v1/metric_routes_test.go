@@ -47,13 +47,15 @@ func TestGetMetrics(t *testing.T) {
 	logger.SetOutput(testutils.NewTestOutput(t))
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	testMetric, err := registry.NewMetric("my_metric", stats.Trend, stats.Time)
+	require.NoError(t, err)
 	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, builtinMetrics, logger)
 	require.NoError(t, err)
 	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry)
 	require.NoError(t, err)
 
 	engine.MetricsEngine.ObservedMetrics = map[string]*stats.Metric{
-		"my_metric": stats.New("my_metric", stats.Trend, stats.Time),
+		"my_metric": testMetric,
 	}
 	engine.MetricsEngine.ObservedMetrics["my_metric"].Tainted = null.BoolFrom(true)
 
@@ -106,6 +108,8 @@ func TestGetMetric(t *testing.T) {
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 	registry := metrics.NewRegistry()
+	testMetric, err := registry.NewMetric("my_metric", stats.Trend, stats.Time)
+	require.NoError(t, err)
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, builtinMetrics, logger)
 	require.NoError(t, err)
@@ -113,7 +117,7 @@ func TestGetMetric(t *testing.T) {
 	require.NoError(t, err)
 
 	engine.MetricsEngine.ObservedMetrics = map[string]*stats.Metric{
-		"my_metric": stats.New("my_metric", stats.Trend, stats.Time),
+		"my_metric": testMetric,
 	}
 	engine.MetricsEngine.ObservedMetrics["my_metric"].Tainted = null.BoolFrom(true)
 
