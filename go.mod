@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/chromedp/cdproto v0.0.0-20220304215434-892afa710589
-	github.com/dop251/goja v0.0.0-20220214123719-b09a6bfa842f
+	github.com/dop251/goja v0.0.0-20220324112439-a18ffb9c5866
 	github.com/fatih/color v1.13.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -12,8 +12,8 @@ require (
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 	github.com/sirupsen/logrus v1.8.1
-	github.com/stretchr/testify v1.7.0
-	go.k6.io/k6 v0.36.1-0.20220309155151-55c7ccd53d6c
+	github.com/stretchr/testify v1.7.1
+	go.k6.io/k6 v0.37.1-0.20220329074230-0b7144304e38
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
 	gopkg.in/guregu/null.v3 v3.5.0
 )
@@ -31,7 +31,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/klauspost/compress v1.15.0 // indirect
+	github.com/klauspost/compress v1.15.1 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
@@ -42,7 +42,7 @@ require (
 	github.com/tidwall/gjson v1.14.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
-	golang.org/x/crypto v0.0.0-20220307211146-efcb8507fb70 // indirect
+	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
 	golang.org/x/sys v0.0.0-20220310020820-b874c991c1a5 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
