@@ -113,32 +113,32 @@ func (carc *ConstantArrivalRateConfig) Validate() []error {
 	if !carc.Rate.Valid {
 		errors = append(errors, fmt.Errorf("the iteration rate isn't specified"))
 	} else if carc.Rate.Int64 <= 0 {
-		errors = append(errors, fmt.Errorf("the iteration rate should be more than 0"))
+		errors = append(errors, fmt.Errorf("the iteration rate must be more than 0"))
 	}
 
 	if carc.TimeUnit.TimeDuration() <= 0 {
-		errors = append(errors, fmt.Errorf("the timeUnit should be more than 0"))
+		errors = append(errors, fmt.Errorf("the timeUnit must be more than 0"))
 	}
 
 	if !carc.Duration.Valid {
 		errors = append(errors, fmt.Errorf("the duration is unspecified"))
 	} else if carc.Duration.TimeDuration() < minDuration {
 		errors = append(errors, fmt.Errorf(
-			"the duration should be at least %s, but is %s", minDuration, carc.Duration,
+			"the duration must be at least %s, but is %s", minDuration, carc.Duration,
 		))
 	}
 
 	if !carc.PreAllocatedVUs.Valid {
 		errors = append(errors, fmt.Errorf("the number of preAllocatedVUs isn't specified"))
 	} else if carc.PreAllocatedVUs.Int64 < 0 {
-		errors = append(errors, fmt.Errorf("the number of preAllocatedVUs shouldn't be negative"))
+		errors = append(errors, fmt.Errorf("the number of preAllocatedVUs can't be negative"))
 	}
 
 	if !carc.MaxVUs.Valid {
 		// TODO: don't change the config while validating
 		carc.MaxVUs.Int64 = carc.PreAllocatedVUs.Int64
 	} else if carc.MaxVUs.Int64 < carc.PreAllocatedVUs.Int64 {
-		errors = append(errors, fmt.Errorf("maxVUs shouldn't be less than preAllocatedVUs"))
+		errors = append(errors, fmt.Errorf("maxVUs can't be less than preAllocatedVUs"))
 	}
 
 	return errors

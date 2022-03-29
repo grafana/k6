@@ -85,14 +85,14 @@ func (clvc ConstantVUsConfig) GetDescription(et *lib.ExecutionTuple) string {
 func (clvc ConstantVUsConfig) Validate() []error {
 	errors := clvc.BaseConfig.Validate()
 	if clvc.VUs.Int64 <= 0 {
-		errors = append(errors, fmt.Errorf("the number of VUs should be more than 0"))
+		errors = append(errors, fmt.Errorf("the number of VUs must be more than 0"))
 	}
 
 	if !clvc.Duration.Valid {
 		errors = append(errors, fmt.Errorf("the duration is unspecified"))
 	} else if clvc.Duration.TimeDuration() < minDuration {
 		errors = append(errors, fmt.Errorf(
-			"the duration should be at least %s, but is %s", minDuration, clvc.Duration,
+			"the duration must be at least %s, but is %s", minDuration, clvc.Duration,
 		))
 	}
 

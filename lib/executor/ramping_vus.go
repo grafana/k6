@@ -99,11 +99,11 @@ func (vlvc RampingVUsConfig) GetDescription(et *lib.ExecutionTuple) string {
 func (vlvc RampingVUsConfig) Validate() []error {
 	errors := vlvc.BaseConfig.Validate()
 	if vlvc.StartVUs.Int64 < 0 {
-		errors = append(errors, fmt.Errorf("the number of start VUs shouldn't be negative"))
+		errors = append(errors, fmt.Errorf("the number of start VUs can't be negative"))
 	}
 
 	if getStagesUnscaledMaxTarget(vlvc.StartVUs.Int64, vlvc.Stages) <= 0 {
-		errors = append(errors, fmt.Errorf("either startVUs or one of the stages' target value should be greater than 0"))
+		errors = append(errors, fmt.Errorf("either startVUs or one of the stages' target values must be greater than 0"))
 	}
 
 	return append(errors, validateStages(vlvc.Stages)...)

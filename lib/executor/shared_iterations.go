@@ -96,19 +96,19 @@ func (sic SharedIterationsConfig) GetDescription(et *lib.ExecutionTuple) string 
 func (sic SharedIterationsConfig) Validate() []error {
 	errors := sic.BaseConfig.Validate()
 	if sic.VUs.Int64 <= 0 {
-		errors = append(errors, fmt.Errorf("the number of VUs should be more than 0"))
+		errors = append(errors, fmt.Errorf("the number of VUs must be more than 0"))
 	}
 
 	if sic.Iterations.Int64 < sic.VUs.Int64 {
 		errors = append(errors, fmt.Errorf(
-			"the number of iterations (%d) shouldn't be less than the number of VUs (%d)",
+			"the number of iterations (%d) can't be less than the number of VUs (%d)",
 			sic.Iterations.Int64, sic.VUs.Int64,
 		))
 	}
 
 	if sic.MaxDuration.TimeDuration() < minDuration {
 		errors = append(errors, fmt.Errorf(
-			"the maxDuration should be at least %s, but is %s", minDuration, sic.MaxDuration,
+			"the maxDuration must be at least %s, but is %s", minDuration, sic.MaxDuration,
 		))
 	}
 
