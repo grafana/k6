@@ -40,4 +40,5 @@ const (
 	RunStatusAbortedSystem      RunStatus = 6
 	RunStatusAbortedScriptError RunStatus = 7
 	RunStatusAbortedThreshold   RunStatus = 8
+	RunStatusAbortedLimit       RunStatus = 9
 )
