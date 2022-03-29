@@ -23,7 +23,6 @@ package common
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -179,15 +178,15 @@ func (r *Response) AllHeaders() map[string]string {
 
 // Body returns the response body as a binary buffer.
 func (r *Response) Body() goja.ArrayBuffer {
-	rt := k6common.GetRuntime(r.ctx)
 	if r.status >= 300 && r.status <= 399 {
-		k6common.Throw(rt, errors.New("Response body is unavailable for redirect responses"))
+		k6Throw(r.ctx, "Response body is unavailable for redirect responses")
 	}
 	if err := r.fetchBody(); err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(r.ctx, "error getting response body: %w", err)
 	}
 	r.bodyMu.RLock()
 	defer r.bodyMu.RUnlock()
+	rt := k6common.GetRuntime(r.ctx)
 	return rt.NewArrayBuffer(r.body)
 }
 
@@ -211,8 +210,7 @@ func (r *Response) bodySize() int64 {
 // Finished waits for response to finish, return error if request failed.
 func (r *Response) Finished() bool {
 	// TODO: should return nil|Error
-	rt := k6common.GetRuntime(r.ctx)
-	k6common.Throw(rt, errors.New("Response.finished() has not been implemented yet"))
+	k6Throw(r.ctx, "Response.finished() has not been implemented yet")
 	return false
 }
 
@@ -272,20 +270,20 @@ func (r *Response) HeadersArray() []api.HTTPHeader {
 
 // JSON returns the response body as JSON data.
 func (r *Response) JSON() goja.Value {
-	rt := k6common.GetRuntime(r.ctx)
 	if r.cachedJSON == nil {
 		if err := r.fetchBody(); err != nil {
-			k6common.Throw(rt, err)
+			k6Throw(r.ctx, "error getting response body: %w", err)
 		}
 
 		var v interface{}
 		r.bodyMu.RLock()
 		defer r.bodyMu.RUnlock()
 		if err := json.Unmarshal(r.body, &v); err != nil {
-			k6common.Throw(rt, err)
+			k6Throw(r.ctx, "error unmarshalling response body to JSON: %w", err)
 		}
 		r.cachedJSON = v
 	}
+	rt := k6common.GetRuntime(r.ctx)
 	return rt.ToValue(r.cachedJSON)
 }
 
@@ -332,9 +330,8 @@ func (r *Response) StatusText() string {
 
 // Text returns the response body as a string.
 func (r *Response) Text() string {
-	rt := k6common.GetRuntime(r.ctx)
 	if err := r.fetchBody(); err != nil {
-		k6common.Throw(rt, err)
+		k6Throw(r.ctx, "error getting response body as text: %w", err)
 	}
 	r.bodyMu.RLock()
 	defer r.bodyMu.RUnlock()

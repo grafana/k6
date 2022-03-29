@@ -658,8 +658,7 @@ func (m *NetworkManager) Authenticate(credentials *Credentials) {
 		m.userReqInterceptionEnabled = true
 	}
 	if err := m.updateProtocolRequestInterception(); err != nil {
-		rt := k6common.GetRuntime(m.ctx)
-		k6common.Throw(rt, err)
+		k6Throw(m.ctx, "error setting authentication credentials: %w", err)
 	}
 }
 
@@ -671,16 +670,14 @@ func (m *NetworkManager) ExtraHTTPHeaders() goja.Value {
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
 func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) {
-	rt := k6common.GetRuntime(m.ctx)
 	action := network.SetExtraHTTPHeaders(headers)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to set extra HTTP headers: %w", err))
+		k6Throw(m.ctx, "unable to set extra HTTP headers: %w", err)
 	}
 }
 
 // SetOfflineMode toggles offline mode on/off.
 func (m *NetworkManager) SetOfflineMode(offline bool) {
-	rt := k6common.GetRuntime(m.ctx)
 	if m.offline == offline {
 		return
 	}
@@ -688,16 +685,15 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 
 	action := network.EmulateNetworkConditions(m.offline, 0, -1, -1)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to set offline mode: %w", err))
+		k6Throw(m.ctx, "unable to set offline mode: %w", err)
 	}
 }
 
 // SetUserAgent overrides the browser user agent string.
 func (m *NetworkManager) SetUserAgent(userAgent string) {
-	rt := k6common.GetRuntime(m.ctx)
 	action := emulation.SetUserAgentOverride(userAgent)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to set user agent override: %w", err))
+		k6Throw(m.ctx, "unable to set user agent override: %w", err)
 	}
 }
 
@@ -705,7 +701,6 @@ func (m *NetworkManager) SetUserAgent(userAgent string) {
 func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 	m.userCacheDisabled = !enabled
 	if err := m.updateProtocolCacheDisabled(); err != nil {
-		rt := k6common.GetRuntime(m.ctx)
-		k6common.Throw(rt, err)
+		k6Throw(m.ctx, "error toggling cache: %w", err)
 	}
 }
