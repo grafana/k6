@@ -21,7 +21,6 @@
 package js
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -32,7 +31,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"os"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -794,25 +792,11 @@ func (u *VU) runFn(
 	if u.moduleVUImpl.eventLoop == nil {
 		u.moduleVUImpl.eventLoop = eventloop.New(u.moduleVUImpl)
 	}
-	err = u.moduleVUImpl.eventLoop.Start(func() (err error) {
-		// here the returned value purposefully shadows the external one as they can be different
-		defer func() {
-			if r := recover(); r != nil {
-				gojaStack := u.Runtime.CaptureCallStack(20, nil)
-				err = fmt.Errorf("a panic occurred in VU code but was caught: %s", r)
-				// TODO figure out how to use PanicLevel without panicing .. this might require changing
-				// the logger we use see
-				// https://github.com/sirupsen/logrus/issues/1028
-				// https://github.com/sirupsen/logrus/issues/993
-				b := new(bytes.Buffer)
-				for _, s := range gojaStack {
-					s.Write(b)
-				}
-				u.state.Logger.Log(logrus.ErrorLevel, "panic: ", r, "\n", string(debug.Stack()), "\nGoja stack:\n", b.String())
-			}
-		}()
-		v, err = fn(goja.Undefined(), args...) // Actually run the JS script
-		return err
+	err = common.RunWithPanicCatching(u.state.Logger, u.Runtime, func() error {
+		return u.moduleVUImpl.eventLoop.Start(func() (err error) {
+			v, err = fn(goja.Undefined(), args...) // Actually run the JS script
+			return err
+		})
 	})
 
 	select {

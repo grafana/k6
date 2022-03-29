@@ -48,7 +48,7 @@ func (j *JSTest) Exports() modules.Exports {
 func (j JSTest) Foo(arg float64) (bool, error) {
 	state := j.vu.State()
 	if state == nil {
-		return false, fmt.Errorf("the VU State is not avaialble in the init context")
+		return false, fmt.Errorf("the VU State is not available in the init context")
 	}
 
 	ctx := j.vu.Context()
