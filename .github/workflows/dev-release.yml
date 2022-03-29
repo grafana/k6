@@ -1,0 +1,144 @@
+name: Dev Build
+on:
+  workflow_dispatch:
+    inputs:
+      k6_version:
+        description: 'The version of the release, it must use the semantic versioning format with the v prefix. It is a development release so it is suggested to append a build metadata (e.g. v0.38.0-dev).'
+        required: true
+      k6_branch_or_commit:
+        description: 'k6 branch, tag or commit'
+        default: 'master'
+        required: true
+      go_version:
+        description: 'Go version for building binaries'
+        default: '1.17.x'
+        required: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.event.inputs.k6_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.k6_branch_or_commit }}
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ github.event.inputs.go_version }}
+      - name: Install package builders
+        env:
+          GO111MODULE: 'off'
+        run: |
+          gopath="$(go env GOPATH)"
+          go get github.com/Masterminds/glide
+          go get -d github.com/mh-cbon/go-bin-deb \
+              && (cd "$gopath/src/github.com/mh-cbon/go-bin-deb" \
+              && glide install \
+              && go install)
+          go get -d github.com/mh-cbon/go-bin-rpm \
+              && (cd "$gopath/src/github.com/mh-cbon/go-bin-rpm" \
+              && glide install \
+              && go install)
+          sudo apt-get update -y
+          sudo apt-get install -y fakeroot rpm
+      - name: Generate Windows binary metadata
+        run: |
+          (cd && GO111MODULE=on go get github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.2.0)
+          IFS=. read -a version <<< "$(echo $VERSION | sed 's:[^0-9\.]::g')"
+          # Need a blank versioninfo.json for the CLI overrides to work.
+          echo '{}' > versioninfo.json
+          goversioninfo -64 \
+            -platform-specific=true \
+            -charset="1200" \
+            -company="Load Impact AB" \
+            -copyright="© Load Impact AB. Licensed under AGPL." \
+            -description="A modern load testing tool, using Go and JavaScript" \
+            -icon=packaging/k6.ico \
+            -internal-name="k6" \
+            -original-name="k6.exe" \
+            -product-name="k6" \
+            -translation="0x0409" \
+            -ver-major="${version[0]}" \
+            -ver-minor="${version[1]}" \
+            -ver-patch="${version[2]}" \
+            -product-version="${VERSION#v}"
+      - name: Build
+        run: |
+          go version
+          ./build-release.sh "dist" ${VERSION}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: binaries
+          path: dist/
+          retention-days: 1
+
+  package-windows:
+    runs-on: windows-2019
+    defaults:
+      run:
+        shell: powershell
+    needs: [build]
+    env:
+      VERSION: ${{ github.event.inputs.k6_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.k6_branch_or_commit }}
+      - name: Install pandoc
+        uses: crazy-max/ghaction-chocolatey@b6061d587628735be315d74358228b83a7dba9a7
+        with:
+          args: install -y pandoc
+      - name: Install wix tools
+        run: |
+          curl -O wix311-binaries.zip https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
+          Expand-Archive -Path .\wix311-binaries.zip -DestinationPath .\wix311\
+          echo "$pwd\wix311" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Download binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries
+          path: dist
+      - name: Unzip Windows binary
+        run: |
+          Expand-Archive -Path ".\dist\k6-$env:VERSION-windows-amd64.zip" -DestinationPath .\packaging\
+          move .\packaging\k6-$env:VERSION-windows-amd64\k6.exe .\packaging\
+          rmdir .\packaging\k6-$env:VERSION-windows-amd64\
+      - name: Add signtool to PATH
+        run: echo "${env:ProgramFiles(x86)}\Windows Kits\10\bin\x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Convert base64 certificate to PFX
+        run: |
+          $bytes = [Convert]::FromBase64String("${{ secrets.WIN_SIGN_CERT }}")
+          [IO.File]::WriteAllBytes("k6.pfx", $bytes)
+      - name: Sign Windows binary
+        run: signtool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.exe"
+      - name: Create MSI package
+        run: |
+          $env:VERSION = $env:VERSION -replace 'v(\d+\.\d+\.\d+).*','$1'
+          pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
+          cd .\packaging
+          candle.exe -arch x64 "-dVERSION=0.0.65534" k6.wxs
+          light.exe -ext WixUIExtension k6.wixobj
+      - name: Sign MSI package
+        run: signtool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.msi"
+      - name: Cleanup signing artifacts
+        run: del k6.pfx
+      - name: Rename MSI package
+        # To keep it consistent with the other artifacts
+        run: move "packaging\k6.msi" "packaging\k6-$env:VERSION-windows-amd64.msi"
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: binaries-windows
+          path: |
+            packaging/k6-*.msi
+            packaging/k6.*.nupkg
+          retention-days: 1
