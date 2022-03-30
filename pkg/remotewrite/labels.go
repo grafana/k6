@@ -22,6 +22,10 @@ func tagsToLabels(tags *stats.SampleTags, config Config) ([]prompb.Label, error)
 			continue
 		}
 
+		if !config.KeepUrlTag.Bool && name == "url" {
+			continue
+		}
+
 		labelPairs = append(labelPairs, prompb.Label{
 			Name:  name,
 			Value: value,
