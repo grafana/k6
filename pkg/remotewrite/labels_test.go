@@ -48,6 +48,27 @@ func TestTagsToLabels(t *testing.T) {
 				{Name: "name", Value: "nnn"},
 			},
 		},
+		"url-tag-discard": {
+			tags: stats.NewSampleTags(map[string]string{"foo": "bar", "url": "uuu"}),
+			config: Config{
+				KeepTags:   null.BoolFrom(true),
+				KeepUrlTag: null.BoolFrom(false),
+			},
+			labels: []prompb.Label{
+				{Name: "foo", Value: "bar"},
+			},
+		},
+		"url-tag-keep": {
+			tags: stats.NewSampleTags(map[string]string{"foo": "bar", "url": "uuu"}),
+			config: Config{
+				KeepTags:   null.BoolFrom(true),
+				KeepUrlTag: null.BoolFrom(true),
+			},
+			labels: []prompb.Label{
+				{Name: "foo", Value: "bar"},
+				{Name: "url", Value: "uuu"},
+			},
+		},
 		"discard-tags": {
 			tags: stats.NewSampleTags(map[string]string{"foo": "bar", "name": "nnn"}),
 			config: Config{

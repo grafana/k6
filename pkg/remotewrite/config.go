@@ -38,6 +38,7 @@ type Config struct {
 
 	KeepTags    null.Bool `json:"keepTags" envconfig:"K6_KEEP_TAGS"`
 	KeepNameTag null.Bool `json:"keepNameTag" envconfig:"K6_KEEP_NAME_TAG"`
+	KeepUrlTag  null.Bool `json:"keepUrlTag" envconfig:"K6_KEEP_URL_TAG"`
 }
 
 func NewConfig() Config {
@@ -51,6 +52,7 @@ func NewConfig() Config {
 		FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
 		KeepTags:              null.BoolFrom(true),
 		KeepNameTag:           null.BoolFrom(false),
+		KeepUrlTag:            null.BoolFrom(true),
 		Headers:               make(map[string]string),
 	}
 }
@@ -131,6 +133,10 @@ func (base Config) Apply(applied Config) Config {
 		base.KeepNameTag = applied.KeepNameTag
 	}
 
+	if applied.KeepUrlTag.Valid {
+		base.KeepUrlTag = applied.KeepUrlTag
+	}
+
 	if len(applied.Headers) > 0 {
 		for k, v := range applied.Headers {
 			base.Headers[k] = v
@@ -184,6 +190,10 @@ func ParseArg(arg string) (Config, error) {
 
 	if v, ok := params["keepNameTag"].(bool); ok {
 		c.KeepNameTag = null.BoolFrom(v)
+	}
+
+	if v, ok := params["keepUrlTag"].(bool); ok {
+		c.KeepUrlTag = null.BoolFrom(v)
 	}
 
 	c.Headers = make(map[string]string)
@@ -281,6 +291,14 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 	} else {
 		if b.Valid {
 			result.KeepNameTag = b
+		}
+	}
+
+	if b, err := getEnvBool(env, "K6_KEEP_URL_TAG"); err != nil {
+		return result, err
+	} else {
+		if b.Valid {
+			result.KeepUrlTag = b
 		}
 	}
 
