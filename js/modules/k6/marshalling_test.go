@@ -36,7 +36,6 @@ import (
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 func TestSetupDataMarshalling(t *testing.T) {
@@ -137,7 +136,7 @@ func TestSetupDataMarshalling(t *testing.T) {
 
 	require.NoError(t, err)
 
-	samples := make(chan<- stats.SampleContainer, 100)
+	samples := make(chan<- metrics.SampleContainer, 100)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

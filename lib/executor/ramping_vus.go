@@ -32,7 +32,7 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/ui/pb"
 )
 
@@ -506,7 +506,7 @@ func (vlv *RampingVUs) Init(_ context.Context) error {
 
 // Run constantly loops through as many iterations as possible on a variable
 // number of VUs for the specified stages.
-func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- stats.SampleContainer) error {
+func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- metrics.SampleContainer) error {
 	regularDuration, isFinal := lib.GetEndOffset(vlv.rawSteps)
 	if !isFinal {
 		return fmt.Errorf("%s expected raw end offset at %s to be final", vlv.config.GetName(), regularDuration)

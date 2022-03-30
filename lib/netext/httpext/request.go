@@ -39,7 +39,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 // HTTPRequestCookie is a representation of a cookie used for request objects
@@ -117,13 +117,13 @@ func updateK6Response(k6Response *Response, finishedReq *finishedRequest) {
 		k6Response.RemotePort = remotePort
 	}
 	k6Response.Timings = ResponseTimings{
-		Duration:       stats.D(trail.Duration),
-		Blocked:        stats.D(trail.Blocked),
-		Connecting:     stats.D(trail.Connecting),
-		TLSHandshaking: stats.D(trail.TLSHandshaking),
-		Sending:        stats.D(trail.Sending),
-		Waiting:        stats.D(trail.Waiting),
-		Receiving:      stats.D(trail.Receiving),
+		Duration:       metrics.D(trail.Duration),
+		Blocked:        metrics.D(trail.Blocked),
+		Connecting:     metrics.D(trail.Connecting),
+		TLSHandshaking: metrics.D(trail.TLSHandshaking),
+		Sending:        metrics.D(trail.Sending),
+		Waiting:        metrics.D(trail.Waiting),
+		Receiving:      metrics.D(trail.Receiving),
 	}
 }
 
@@ -195,7 +195,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 
 	// Only set the name system tag if the user didn't explicitly set it beforehand,
 	// and the Name was generated from a tagged template string (via http.url).
-	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(stats.TagName) &&
+	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(metrics.TagName) &&
 		preq.URL.Name != "" && preq.URL.Name != preq.URL.Clean() {
 		tags["name"] = preq.URL.Name
 	}

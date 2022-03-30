@@ -38,7 +38,6 @@ import (
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
-	"go.k6.io/k6/stats"
 )
 
 func TestBadConcurrentWrites(t *testing.T) {
@@ -109,7 +108,7 @@ func testOutputCycle(t testing.TB, handler http.HandlerFunc, body func(testing.T
 func TestOutput(t *testing.T) {
 	t.Parallel()
 
-	metric, err := metrics.NewRegistry().NewMetric("test_gauge", stats.Gauge)
+	metric, err := metrics.NewRegistry().NewMetric("test_gauge", metrics.Gauge)
 	require.NoError(t, err)
 
 	var samplesRead int
@@ -132,12 +131,12 @@ func TestOutput(t *testing.T) {
 
 		rw.WriteHeader(204)
 	}, func(tb testing.TB, c *Output) {
-		samples := make(stats.Samples, 10)
+		samples := make(metrics.Samples, 10)
 		for i := 0; i < len(samples); i++ {
-			samples[i] = stats.Sample{
+			samples[i] = metrics.Sample{
 				Metric: metric,
 				Time:   time.Now(),
-				Tags: stats.NewSampleTags(map[string]string{
+				Tags: metrics.NewSampleTags(map[string]string{
 					"something": "else",
 					"VU":        "21",
 					"else":      "something",
@@ -145,8 +144,8 @@ func TestOutput(t *testing.T) {
 				Value: 2.0,
 			}
 		}
-		c.AddMetricSamples([]stats.SampleContainer{samples})
-		c.AddMetricSamples([]stats.SampleContainer{samples})
+		c.AddMetricSamples([]metrics.SampleContainer{samples})
+		c.AddMetricSamples([]metrics.SampleContainer{samples})
 	})
 }
 
@@ -176,7 +175,7 @@ func TestOutputFlushMetricsConcurrency(t *testing.T) {
 		ts.Close()
 	}()
 
-	metric, err := metrics.NewRegistry().NewMetric("test_gauge", stats.Gauge)
+	metric, err := metrics.NewRegistry().NewMetric("test_gauge", metrics.Gauge)
 	require.NoError(t, err)
 
 	o, err := newOutput(output.Params{
@@ -190,8 +189,8 @@ func TestOutputFlushMetricsConcurrency(t *testing.T) {
 		case o.semaphoreCh <- struct{}{}:
 			<-o.semaphoreCh
 			wg.Add(1)
-			o.AddMetricSamples([]stats.SampleContainer{stats.Samples{
-				stats.Sample{
+			o.AddMetricSamples([]metrics.SampleContainer{metrics.Samples{
+				metrics.Sample{
 					Metric: metric,
 					Value:  2.0,
 				},

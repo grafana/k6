@@ -43,7 +43,6 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 type reader func([]byte) (int, error)
@@ -119,7 +118,7 @@ func TestMakeRequestError(t *testing.T) {
 			Compressions: []CompressionType{badCompressionType},
 		}
 		state := &lib.State{
-			Options:   lib.Options{RunTags: &stats.SampleTags{}},
+			Options:   lib.Options{RunTags: &metrics.SampleTags{}},
 			Transport: http.DefaultTransport,
 			Logger:    logrus.New(),
 			Tags:      lib.NewTagMap(nil),
@@ -142,7 +141,7 @@ func TestMakeRequestError(t *testing.T) {
 		logger := logrus.New()
 		logger.Level = logrus.DebugLevel
 		state := &lib.State{
-			Options:   lib.Options{RunTags: &stats.SampleTags{}},
+			Options:   lib.Options{RunTags: &metrics.SampleTags{}},
 			Transport: srv.Client().Transport,
 			Logger:    logger,
 			Tags:      lib.NewTagMap(nil),
@@ -190,10 +189,10 @@ func TestResponseStatus(t *testing.T) {
 				defer server.Close()
 				logger := logrus.New()
 				logger.Level = logrus.DebugLevel
-				samples := make(chan<- stats.SampleContainer, 1)
+				samples := make(chan<- metrics.SampleContainer, 1)
 				registry := metrics.NewRegistry()
 				state := &lib.State{
-					Options:        lib.Options{RunTags: &stats.SampleTags{}},
+					Options:        lib.Options{RunTags: &metrics.SampleTags{}},
 					Transport:      server.Client().Transport,
 					Logger:         logger,
 					Samples:        samples,
@@ -266,14 +265,14 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 	defer srv.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	samples := make(chan stats.SampleContainer, 10)
+	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
 	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
-			RunTags:    &stats.SampleTags{},
-			SystemTags: &stats.DefaultSystemTagSet,
+			RunTags:    &metrics.SampleTags{},
+			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Transport:      srv.Client().Transport,
 		Samples:        samples,
@@ -343,14 +342,14 @@ func TestTrailFailed(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 
-			samples := make(chan stats.SampleContainer, 10)
+			samples := make(chan metrics.SampleContainer, 10)
 			logger := logrus.New()
 			logger.Level = logrus.DebugLevel
 			registry := metrics.NewRegistry()
 			state := &lib.State{
 				Options: lib.Options{
-					RunTags:    &stats.SampleTags{},
-					SystemTags: &stats.DefaultSystemTagSet,
+					RunTags:    &metrics.SampleTags{},
+					SystemTags: &metrics.DefaultSystemTagSet,
 				},
 				Transport:      srv.Client().Transport,
 				Samples:        samples,
@@ -405,14 +404,14 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 	}()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	samples := make(chan stats.SampleContainer, 10)
+	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
 	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
-			RunTags:    &stats.SampleTags{},
-			SystemTags: &stats.DefaultSystemTagSet,
+			RunTags:    &metrics.SampleTags{},
+			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Transport: &http.Transport{
 			DialContext: (&net.Dialer{
@@ -464,14 +463,14 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 	defer srv.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	samples := make(chan stats.SampleContainer, 10)
+	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
 	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
-			RunTags:    &stats.SampleTags{},
-			SystemTags: &stats.DefaultSystemTagSet,
+			RunTags:    &metrics.SampleTags{},
+			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Transport:      srv.Client().Transport,
 		Samples:        samples,

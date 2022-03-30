@@ -1,24 +1,4 @@
-/*
- *
- * k6 - a next-generation load testing tool
- * Copyright (C) 2016 Load Impact
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
-package stats
+package metrics
 
 import (
 	"encoding/json"
@@ -27,68 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
-
-func TestNewMetric(t *testing.T) {
-	t.Parallel()
-	testdata := map[string]struct {
-		Type     MetricType
-		SinkType Sink
-	}{
-		"Counter": {Counter, &CounterSink{}},
-		"Gauge":   {Gauge, &GaugeSink{}},
-		"Trend":   {Trend, &TrendSink{}},
-		"Rate":    {Rate, &RateSink{}},
-	}
-
-	for name, data := range testdata {
-		name, data := name, data
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			m := newMetric("my_metric", data.Type)
-			assert.Equal(t, "my_metric", m.Name)
-			assert.IsType(t, data.SinkType, m.Sink)
-		})
-	}
-}
-
-func TestAddSubmetric(t *testing.T) {
-	t.Parallel()
-	testdata := map[string]struct {
-		err  bool
-		tags map[string]string
-	}{
-		"":                        {true, nil},
-		"  ":                      {true, nil},
-		"a":                       {false, map[string]string{"a": ""}},
-		"a:1":                     {false, map[string]string{"a": "1"}},
-		" a : 1 ":                 {false, map[string]string{"a": "1"}},
-		"a,b":                     {false, map[string]string{"a": "", "b": ""}},
-		` a:"",b: ''`:             {false, map[string]string{"a": "", "b": ""}},
-		`a:1,b:2`:                 {false, map[string]string{"a": "1", "b": "2"}},
-		` a : 1, b : 2 `:          {false, map[string]string{"a": "1", "b": "2"}},
-		`a : '1' , b : "2"`:       {false, map[string]string{"a": "1", "b": "2"}},
-		`" a" : ' 1' , b : "2 " `: {false, map[string]string{" a": " 1", "b": "2 "}}, //nolint:gocritic
-	}
-
-	for name, expected := range testdata {
-		name, expected := name, expected
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
-			m := newMetric("metric", Trend)
-			sm, err := m.AddSubmetric(name)
-			if expected.err {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			require.NotNil(t, sm)
-			assert.EqualValues(t, expected.tags, sm.Tags.tags)
-		})
-	}
-}
 
 func TestSampleTags(t *testing.T) {
 	t.Parallel()
@@ -208,17 +127,9 @@ func TestGetResolversForTrendColumnsValidation(t *testing.T) {
 	}
 }
 
-func createTestTrendSink(count int) *TrendSink {
-	sink := TrendSink{}
+func TestGetResolversForTrendColumnsCalculation(t *testing.T) {
+	t.Parallel()
 
-	for i := 0; i < count; i++ {
-		sink.Add(Sample{Value: float64(i)})
-	}
-
-	return &sink
-}
-
-func TestResolversForTrendColumnsCalculation(t *testing.T) {
 	customResolversTests := []struct {
 		stats      string
 		percentile float64
@@ -230,11 +141,12 @@ func TestResolversForTrendColumnsCalculation(t *testing.T) {
 		{"p(99.999)", 0.99999},
 	}
 
-	sink := createTestTrendSink(100)
-
 	for _, tc := range customResolversTests {
 		tc := tc
 		t.Run(fmt.Sprintf("%v", tc.stats), func(t *testing.T) {
+			t.Parallel()
+			sink := createTestTrendSink(100)
+
 			res, err := GetResolversForTrendColumns([]string{tc.stats})
 			assert.NoError(t, err)
 			assert.Len(t, res, 1)
@@ -243,4 +155,14 @@ func TestResolversForTrendColumnsCalculation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func createTestTrendSink(count int) *TrendSink {
+	sink := TrendSink{}
+
+	for i := 0; i < count; i++ {
+		sink.Add(Sample{Value: float64(i)})
+	}
+
+	return &sink
 }

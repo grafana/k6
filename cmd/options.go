@@ -32,7 +32,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 var (
@@ -86,7 +86,7 @@ func optionFlagSet() *pflag.FlagSet {
 	// set it to nil here, and add the default in applyDefault() instead.
 	systemTagsCliHelpText := fmt.Sprintf(
 		"only include these system tags in metrics (default %q)",
-		stats.DefaultSystemTagSet.SetString(),
+		metrics.DefaultSystemTagSet.SetString(),
 	)
 	flags.StringSlice("system-tags", nil, systemTagsCliHelpText)
 	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
@@ -181,7 +181,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		if err != nil {
 			return opts, err
 		}
-		opts.SystemTags = stats.ToSystemTagSet(systemTagList)
+		opts.SystemTags = metrics.ToSystemTagSet(systemTagList)
 	}
 
 	blacklistIPStrings, err := flags.GetStringSlice("blacklist-ip")
@@ -223,7 +223,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		if errSts != nil {
 			return opts, errSts
 		}
-		if _, errSts = stats.GetResolversForTrendColumns(trendStats); err != nil {
+		if _, errSts = metrics.GetResolversForTrendColumns(trendStats); err != nil {
 			return opts, errSts
 		}
 		opts.SummaryTrendStats = trendStats
@@ -255,7 +255,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 			}
 			parsedRunTags[name] = value
 		}
-		opts.RunTags = stats.IntoSampleTags(&parsedRunTags)
+		opts.RunTags = metrics.IntoSampleTags(&parsedRunTags)
 	}
 
 	redirectConFile, err := flags.GetString("console-output")

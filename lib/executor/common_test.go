@@ -31,12 +31,12 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/minirunner"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 func simpleRunner(vuFn func(context.Context, *lib.State) error) lib.Runner {
 	return &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, state *lib.State, _ chan<- stats.SampleContainer) error {
+		Fn: func(ctx context.Context, state *lib.State, _ chan<- metrics.SampleContainer) error {
 			return vuFn(ctx, state)
 		},
 	}
@@ -46,7 +46,7 @@ func setupExecutor(t testing.TB, config lib.ExecutorConfig, es *lib.ExecutionSta
 	context.Context, context.CancelFunc, lib.Executor, *testutils.SimpleLogrusHook,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
-	engineOut := make(chan stats.SampleContainer, 100) // TODO: return this for more complicated tests?
+	engineOut := make(chan metrics.SampleContainer, 100) // TODO: return this for more complicated tests?
 
 	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
 	testLog := logrus.New()

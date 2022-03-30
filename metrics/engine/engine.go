@@ -11,7 +11,6 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
-	"go.k6.io/k6/stats"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -26,7 +25,7 @@ type MetricsEngine struct {
 	logger         logrus.FieldLogger
 
 	// These can be both top-level metrics or sub-metrics
-	metricsWithThresholds []*stats.Metric
+	metricsWithThresholds []*metrics.Metric
 
 	// TODO: completely refactor:
 	//   - make these private,
@@ -34,7 +33,7 @@ type MetricsEngine struct {
 	//   - have one lock per metric instead of a a global one, when
 	//     the metrics are decoupled from their types
 	MetricsLock     sync.Mutex
-	ObservedMetrics map[string]*stats.Metric
+	ObservedMetrics map[string]*metrics.Metric
 }
 
 // NewMetricsEngine creates a new metrics Engine with the given parameters.
@@ -49,7 +48,7 @@ func NewMetricsEngine(
 		runtimeOptions: rtOpts,
 		logger:         logger.WithField("component", "metrics-engine"),
 
-		ObservedMetrics: make(map[string]*stats.Metric),
+		ObservedMetrics: make(map[string]*metrics.Metric),
 	}
 
 	if !(me.runtimeOptions.NoSummary.Bool && me.runtimeOptions.NoThresholds.Bool) {
@@ -71,7 +70,7 @@ func (me *MetricsEngine) GetIngester() output.Output {
 	}
 }
 
-func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*stats.Metric, error) {
+func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Metric, error) {
 	// TODO: replace with strings.Cut after Go 1.18
 	nameParts := strings.SplitN(name, "{", 2)
 
@@ -94,7 +93,7 @@ func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*stats.Metr
 	return sm.Metric, nil
 }
 
-func (me *MetricsEngine) markObserved(metric *stats.Metric) {
+func (me *MetricsEngine) markObserved(metric *metrics.Metric) {
 	if !metric.Observed {
 		metric.Observed = true
 		me.ObservedMetrics[metric.Name] = metric
@@ -130,7 +129,7 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 
 	// TODO: refactor out of here when https://github.com/grafana/k6/issues/1321
 	// lands and there is a better way to enable a metric with tag
-	if me.options.SystemTags.Has(stats.TagExpectedResponse) {
+	if me.options.SystemTags.Has(metrics.TagExpectedResponse) {
 		_, err := me.getThresholdMetricOrSubmetric("http_req_duration{expected_response:true}")
 		if err != nil {
 			return err // shouldn't happen, but ¯\_(ツ)_/¯

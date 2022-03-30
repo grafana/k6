@@ -27,11 +27,11 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 type NullMetricType struct {
-	Type  stats.MetricType
+	Type  metrics.MetricType
 	Valid bool
 }
 
@@ -52,7 +52,7 @@ func (t *NullMetricType) UnmarshalJSON(data []byte) error {
 }
 
 type NullValueType struct {
-	Type  stats.ValueType
+	Type  metrics.ValueType
 	Valid bool
 }
 
@@ -82,7 +82,8 @@ type Metric struct {
 	Sample map[string]float64 `json:"sample" yaml:"sample"`
 }
 
-func NewMetric(m *stats.Metric, t time.Duration) Metric {
+// NewMetric constructs a new Metric
+func NewMetric(m *metrics.Metric, t time.Duration) Metric {
 	return Metric{
 		Name:     m.Name,
 		Type:     NullMetricType{m.Type, true},

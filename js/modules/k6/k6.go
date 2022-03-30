@@ -31,7 +31,7 @@ import (
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 var (
@@ -123,7 +123,7 @@ func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
 	old := state.Group
 	state.Group = g
 
-	shouldUpdateTag := state.Options.SystemTags.Has(stats.TagGroup)
+	shouldUpdateTag := state.Options.SystemTags.Has(metrics.TagGroup)
 	if shouldUpdateTag {
 		state.Tags.Set("group", g.Path)
 	}
@@ -141,11 +141,11 @@ func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
 	tags := state.CloneTags()
 
 	ctx := mi.vu.Context()
-	stats.PushIfNotDone(ctx, state.Samples, stats.Sample{
+	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
 		Time:   t,
 		Metric: state.BuiltinMetrics.GroupDuration,
-		Tags:   stats.IntoSampleTags(&tags),
-		Value:  stats.D(t.Sub(startTime)),
+		Tags:   metrics.IntoSampleTags(&tags),
+		Value:  metrics.D(t.Sub(startTime)),
 	})
 
 	return ret, err
@@ -190,7 +190,7 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 		if err != nil {
 			return false, err
 		}
-		if state.Options.SystemTags.Has(stats.TagCheck) {
+		if state.Options.SystemTags.Has(metrics.TagCheck) {
 			tags["check"] = check.Name
 		}
 
@@ -205,7 +205,7 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 			}
 		}
 
-		sampleTags := stats.IntoSampleTags(&tags)
+		sampleTags := metrics.IntoSampleTags(&tags)
 
 		// Emit! (But only if we have a valid context.)
 		select {
@@ -213,12 +213,12 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 		default:
 			if val.ToBoolean() {
 				atomic.AddInt64(&check.Passes, 1)
-				stats.PushIfNotDone(ctx, state.Samples,
-					stats.Sample{Time: t, Metric: state.BuiltinMetrics.Checks, Tags: sampleTags, Value: 1})
+				metrics.PushIfNotDone(ctx, state.Samples,
+					metrics.Sample{Time: t, Metric: state.BuiltinMetrics.Checks, Tags: sampleTags, Value: 1})
 			} else {
 				atomic.AddInt64(&check.Fails, 1)
-				stats.PushIfNotDone(ctx, state.Samples,
-					stats.Sample{Time: t, Metric: state.BuiltinMetrics.Checks, Tags: sampleTags, Value: 0})
+				metrics.PushIfNotDone(ctx, state.Samples,
+					metrics.Sample{Time: t, Metric: state.BuiltinMetrics.Checks, Tags: sampleTags, Value: 0})
 				// A single failure makes the return value false.
 				succ = false
 			}

@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -56,43 +55,43 @@ type Trail struct {
 
 	Failed null.Bool
 	// Populated by SaveSamples()
-	Tags    *stats.SampleTags
-	Samples []stats.Sample
+	Tags    *metrics.SampleTags
+	Samples []metrics.Sample
 }
 
 // SaveSamples populates the Trail's sample slice so they're accesible via GetSamples()
-func (tr *Trail) SaveSamples(builtinMetrics *metrics.BuiltinMetrics, tags *stats.SampleTags) {
+func (tr *Trail) SaveSamples(builtinMetrics *metrics.BuiltinMetrics, tags *metrics.SampleTags) {
 	tr.Tags = tags
-	tr.Samples = make([]stats.Sample, 0, 9) // this is with 1 more for a possible HTTPReqFailed
-	tr.Samples = append(tr.Samples, []stats.Sample{
+	tr.Samples = make([]metrics.Sample, 0, 9) // this is with 1 more for a possible HTTPReqFailed
+	tr.Samples = append(tr.Samples, []metrics.Sample{
 		{Metric: builtinMetrics.HTTPReqs, Time: tr.EndTime, Tags: tags, Value: 1},
-		{Metric: builtinMetrics.HTTPReqDuration, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Duration)},
-		{Metric: builtinMetrics.HTTPReqBlocked, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Blocked)},
-		{Metric: builtinMetrics.HTTPReqConnecting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Connecting)},
-		{Metric: builtinMetrics.HTTPReqTLSHandshaking, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.TLSHandshaking)},
-		{Metric: builtinMetrics.HTTPReqSending, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Sending)},
-		{Metric: builtinMetrics.HTTPReqWaiting, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Waiting)},
-		{Metric: builtinMetrics.HTTPReqReceiving, Time: tr.EndTime, Tags: tags, Value: stats.D(tr.Receiving)},
+		{Metric: builtinMetrics.HTTPReqDuration, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.Duration)},
+		{Metric: builtinMetrics.HTTPReqBlocked, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.Blocked)},
+		{Metric: builtinMetrics.HTTPReqConnecting, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.Connecting)},
+		{Metric: builtinMetrics.HTTPReqTLSHandshaking, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.TLSHandshaking)},
+		{Metric: builtinMetrics.HTTPReqSending, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.Sending)},
+		{Metric: builtinMetrics.HTTPReqWaiting, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.Waiting)},
+		{Metric: builtinMetrics.HTTPReqReceiving, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.Receiving)},
 	}...)
 }
 
-// GetSamples implements the stats.SampleContainer interface.
-func (tr *Trail) GetSamples() []stats.Sample {
+// GetSamples implements the metrics.SampleContainer interface.
+func (tr *Trail) GetSamples() []metrics.Sample {
 	return tr.Samples
 }
 
-// GetTags implements the stats.ConnectedSampleContainer interface.
-func (tr *Trail) GetTags() *stats.SampleTags {
+// GetTags implements the metrics.ConnectedSampleContainer interface.
+func (tr *Trail) GetTags() *metrics.SampleTags {
 	return tr.Tags
 }
 
-// GetTime implements the stats.ConnectedSampleContainer interface.
+// GetTime implements the metrics.ConnectedSampleContainer interface.
 func (tr *Trail) GetTime() time.Time {
 	return tr.EndTime
 }
 
 // Ensure that interfaces are implemented correctly
-var _ stats.ConnectedSampleContainer = &Trail{}
+var _ metrics.ConnectedSampleContainer = &Trail{}
 
 // A Tracer wraps "net/http/httptrace" to collect granular timings for HTTP requests.
 // Note that since there is not yet an event for the end of a request (there's a PR to

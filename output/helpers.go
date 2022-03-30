@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 // SampleBuffer is a simple thread-safe buffer for metric samples. It should be
@@ -34,12 +34,12 @@ import (
 // and we don't want to block the Engine in the meantime.
 type SampleBuffer struct {
 	sync.Mutex
-	buffer []stats.SampleContainer
+	buffer []metrics.SampleContainer
 	maxLen int
 }
 
 // AddMetricSamples adds the given metric samples to the internal buffer.
-func (sc *SampleBuffer) AddMetricSamples(samples []stats.SampleContainer) {
+func (sc *SampleBuffer) AddMetricSamples(samples []metrics.SampleContainer) {
 	if len(samples) == 0 {
 		return
 	}
@@ -51,7 +51,7 @@ func (sc *SampleBuffer) AddMetricSamples(samples []stats.SampleContainer) {
 // GetBufferedSamples returns the currently buffered metric samples and makes a
 // new internal buffer with some hopefully realistic size. If the internal
 // buffer is empty, it will return nil.
-func (sc *SampleBuffer) GetBufferedSamples() []stats.SampleContainer {
+func (sc *SampleBuffer) GetBufferedSamples() []metrics.SampleContainer {
 	sc.Lock()
 	defer sc.Unlock()
 
@@ -64,7 +64,7 @@ func (sc *SampleBuffer) GetBufferedSamples() []stats.SampleContainer {
 	}
 	// Make the new buffer halfway between the previously allocated size and the
 	// maximum buffer size we've seen so far, to hopefully reduce copying a bit.
-	sc.buffer = make([]stats.SampleContainer, 0, (bufferedLen+sc.maxLen)/2)
+	sc.buffer = make([]metrics.SampleContainer, 0, (bufferedLen+sc.maxLen)/2)
 
 	return buffered
 }

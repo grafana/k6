@@ -32,7 +32,6 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 func TestNewSharedArrayIntegration(t *testing.T) {
@@ -97,7 +96,7 @@ exports.default = function() {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			samples := make(chan stats.SampleContainer, 100)
+			samples := make(chan metrics.SampleContainer, 100)
 			initVU, err := r.NewVU(1, 1, samples)
 			require.NoError(t, err)
 

@@ -40,7 +40,6 @@ import (
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 func TestConsoleContext(t *testing.T) {
@@ -137,7 +136,7 @@ func TestConsole(t *testing.T) {
 					))
 					assert.NoError(t, err)
 
-					samples := make(chan stats.SampleContainer, 100)
+					samples := make(chan metrics.SampleContainer, 100)
 					initVU, err := r.newVU(1, 1, samples)
 					assert.NoError(t, err)
 
@@ -239,7 +238,7 @@ func TestFileConsole(t *testing.T) {
 							})
 							assert.NoError(t, err)
 
-							samples := make(chan stats.SampleContainer, 100)
+							samples := make(chan metrics.SampleContainer, 100)
 							initVU, err := r.newVU(1, 1, samples)
 							assert.NoError(t, err)
 

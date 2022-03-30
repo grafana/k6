@@ -53,7 +53,6 @@ import (
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 // Ensure Runner implements the lib.Runner interface
@@ -145,7 +144,7 @@ func (r *Runner) MakeArchive() *lib.Archive {
 }
 
 // NewVU returns a new initialized VU.
-func (r *Runner) NewVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleContainer) (lib.InitializedVU, error) {
+func (r *Runner) NewVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.SampleContainer) (lib.InitializedVU, error) {
 	vu, err := r.newVU(idLocal, idGlobal, samplesOut)
 	if err != nil {
 		return nil, err
@@ -154,7 +153,7 @@ func (r *Runner) NewVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleC
 }
 
 // nolint:funlen
-func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- stats.SampleContainer) (*VU, error) {
+func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.SampleContainer) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
 	moduleVUImpl := newModuleVUImpl()
 	bi, err := r.Bundle.Instantiate(r.Logger, idLocal, moduleVUImpl)
@@ -305,7 +304,7 @@ func forceHTTP1() bool {
 }
 
 // Setup runs the setup function if there is one and sets the setupData to the returned value
-func (r *Runner) Setup(ctx context.Context, out chan<- stats.SampleContainer) error {
+func (r *Runner) Setup(ctx context.Context, out chan<- metrics.SampleContainer) error {
 	setupCtx, setupCancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.SetupFn))
 	defer setupCancel()
 
@@ -337,7 +336,8 @@ func (r *Runner) SetSetupData(data []byte) {
 	r.setupData = data
 }
 
-func (r *Runner) Teardown(ctx context.Context, out chan<- stats.SampleContainer) error {
+// Teardown runs the teardown function if there is one.
+func (r *Runner) Teardown(ctx context.Context, out chan<- metrics.SampleContainer) error {
 	teardownCtx, teardownCancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.TeardownFn))
 	defer teardownCancel()
 
@@ -372,7 +372,7 @@ func (r *Runner) IsExecutable(name string) bool {
 func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[string]io.Reader, error) {
 	summaryDataForJS := summarizeMetricsToObject(summary, r.Bundle.Options, r.setupData)
 
-	out := make(chan stats.SampleContainer, 100)
+	out := make(chan metrics.SampleContainer, 100)
 	defer close(out)
 
 	go func() { // discard all metrics
@@ -516,7 +516,12 @@ func parseTTL(ttlS string) (time.Duration, error) {
 
 // Runs an exported function in its own temporary VU, optionally with an argument. Execution is
 // interrupted if the context expires. No error is returned if the part does not exist.
-func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, name string, arg interface{}) (goja.Value, error) {
+func (r *Runner) runPart(
+	ctx context.Context,
+	out chan<- metrics.SampleContainer,
+	name string,
+	arg interface{},
+) (goja.Value, error) {
 	vu, err := r.newVU(0, 0, out)
 	if err != nil {
 		return goja.Undefined(), err
@@ -543,7 +548,7 @@ func (r *Runner) runPart(ctx context.Context, out chan<- stats.SampleContainer, 
 		return goja.Undefined(), err
 	}
 
-	if r.Bundle.Options.SystemTags.Has(stats.TagGroup) {
+	if r.Bundle.Options.SystemTags.Has(metrics.TagGroup) {
 		vu.state.Tags.Set("group", group.Path)
 	}
 	vu.state.Group = group
@@ -592,7 +597,7 @@ type VU struct {
 	Console *console
 	BPool   *bpool.BufferPool
 
-	Samples chan<- stats.SampleContainer
+	Samples chan<- metrics.SampleContainer
 
 	setupData goja.Value
 
@@ -649,16 +654,16 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	for k, v := range params.Tags {
 		u.state.Tags.Set(k, v)
 	}
-	if opts.SystemTags.Has(stats.TagVU) {
+	if opts.SystemTags.Has(metrics.TagVU) {
 		u.state.Tags.Set("vu", strconv.FormatUint(u.ID, 10))
 	}
-	if opts.SystemTags.Has(stats.TagIter) {
+	if opts.SystemTags.Has(metrics.TagIter) {
 		u.state.Tags.Set("iter", strconv.FormatInt(u.iteration, 10))
 	}
-	if opts.SystemTags.Has(stats.TagGroup) {
+	if opts.SystemTags.Has(metrics.TagGroup) {
 		u.state.Tags.Set("group", u.state.Group.Path)
 	}
-	if opts.SystemTags.Has(stats.TagScenario) {
+	if opts.SystemTags.Has(metrics.TagScenario) {
 		u.state.Tags.Set("scenario", params.Scenario)
 	}
 
@@ -783,7 +788,7 @@ func (u *VU) runFn(
 	}
 
 	opts := &u.Runner.Bundle.Options
-	if opts.SystemTags.Has(stats.TagIter) {
+	if opts.SystemTags.Has(metrics.TagIter) {
 		u.state.Tags.Set("iter", strconv.FormatInt(u.state.Iteration, 10))
 	}
 
@@ -820,7 +825,7 @@ func (u *VU) runFn(
 		u.Transport.CloseIdleConnections()
 	}
 
-	sampleTags := stats.NewSampleTags(u.state.CloneTags())
+	sampleTags := metrics.NewSampleTags(u.state.CloneTags())
 	u.state.Samples <- u.Dialer.GetTrail(
 		startTime, endTime, isFullIteration, isDefault, sampleTags, u.Runner.builtinMetrics)
 

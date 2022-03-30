@@ -34,7 +34,7 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/ui/pb"
 )
 
@@ -211,7 +211,7 @@ func (car *ConstantArrivalRate) Init(ctx context.Context) error {
 // This will allow us to implement https://github.com/k6io/k6/issues/1386
 // and things like all of the TODOs below in one place only.
 //nolint:funlen,cyclop
-func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.SampleContainer) (err error) {
+func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- metrics.SampleContainer) (err error) {
 	gracefulStop := car.config.GetGracefulStop()
 	duration := car.config.Duration.TimeDuration()
 	preAllocatedVUs := car.config.GetPreAllocatedVUs(car.executionState.ExecutionTuple)
@@ -344,7 +344,7 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- stats.S
 			// Since there aren't any free VUs available, consider this iteration
 			// dropped - we aren't going to try to recover it, but
 
-			stats.PushIfNotDone(parentCtx, out, stats.Sample{
+			metrics.PushIfNotDone(parentCtx, out, metrics.Sample{
 				Value: 1, Metric: droppedIterationMetric,
 				Tags: metricTags, Time: time.Now(),
 			})

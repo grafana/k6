@@ -58,7 +58,7 @@ func (oi *outputIngester) flushMetrics() {
 	oi.metricsEngine.MetricsLock.Lock()
 	defer oi.metricsEngine.MetricsLock.Unlock()
 
-	// TODO: split metric samples in buckets with a *stats.Metric key; this will
+	// TODO: split metric samples in buckets with a *metrics.Metric key; this will
 	// allow us to have a per-bucket lock, instead of one global one, and it
 	// will allow us to split apart the metric Name and Type from its Sink and
 	// Observed fields...

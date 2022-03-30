@@ -47,7 +47,6 @@ import (
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
-	"go.k6.io/k6/stats"
 )
 
 const isWindows = runtime.GOOS == "windows"
@@ -117,7 +116,7 @@ func TestEngineRun(t *testing.T) {
 		t.Parallel()
 		done := make(chan struct{})
 		runner := &minirunner.MiniRunner{
-			Fn: func(ctx context.Context, _ *lib.State, _ chan<- stats.SampleContainer) error {
+			Fn: func(ctx context.Context, _ *lib.State, _ chan<- metrics.SampleContainer) error {
 				<-ctx.Done()
 				close(done)
 				return nil
@@ -151,17 +150,17 @@ func TestEngineRun(t *testing.T) {
 		t.Parallel()
 
 		registry := metrics.NewRegistry()
-		testMetric, err := registry.NewMetric("test_metric", stats.Trend)
+		testMetric, err := registry.NewMetric("test_metric", metrics.Trend)
 		require.NoError(t, err)
 
 		signalChan := make(chan interface{})
 
 		runner := &minirunner.MiniRunner{
-			Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
-				stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
+			Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+				metrics.PushIfNotDone(ctx, out, metrics.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
 				close(signalChan)
 				<-ctx.Done()
-				stats.PushIfNotDone(ctx, out, stats.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
+				metrics.PushIfNotDone(ctx, out, metrics.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
 				return nil
 			},
 		}
@@ -226,12 +225,12 @@ func TestEngineOutput(t *testing.T) {
 	t.Parallel()
 
 	registry := metrics.NewRegistry()
-	testMetric, err := registry.NewMetric("test_metric", stats.Trend)
+	testMetric, err := registry.NewMetric("test_metric", metrics.Trend)
 	require.NoError(t, err)
 
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
-			out <- stats.Sample{Metric: testMetric}
+		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+			out <- metrics.Sample{Metric: testMetric}
 			return nil
 		},
 	}
@@ -245,7 +244,7 @@ func TestEngineOutput(t *testing.T) {
 	assert.NoError(t, run())
 	wait()
 
-	cSamples := []stats.Sample{}
+	cSamples := []metrics.Sample{}
 	for _, sample := range mockOutput.Samples {
 		if sample.Metric == testMetric {
 			cSamples = append(cSamples, sample)
@@ -253,7 +252,7 @@ func TestEngineOutput(t *testing.T) {
 	}
 	metric := e.MetricsEngine.ObservedMetrics["test_metric"]
 	if assert.NotNil(t, metric) {
-		sink := metric.Sink.(*stats.TrendSink)
+		sink := metric.Sink.(*metrics.TrendSink) // nolint: forcetypeassert
 		if assert.NotNil(t, sink) {
 			numOutputSamples := len(cSamples)
 			numEngineSamples := len(sink.Values)
@@ -269,39 +268,39 @@ func TestEngine_processSamples(t *testing.T) {
 		t.Parallel()
 
 		registry := metrics.NewRegistry()
-		metric, err := registry.NewMetric("my_metric", stats.Gauge)
+		metric, err := registry.NewMetric("my_metric", metrics.Gauge)
 		require.NoError(t, err)
 
 		e, _, wait := newTestEngineWithRegistry(t, nil, nil, nil, lib.Options{}, registry)
 
 		e.OutputManager.AddMetricSamples(
-			[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
+			[]metrics.SampleContainer{metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1"})}},
 		)
 
 		e.Stop()
 		wait()
 
-		assert.IsType(t, &stats.GaugeSink{}, e.MetricsEngine.ObservedMetrics["my_metric"].Sink)
+		assert.IsType(t, &metrics.GaugeSink{}, e.MetricsEngine.ObservedMetrics["my_metric"].Sink)
 	})
 	t.Run("submetric", func(t *testing.T) {
 		t.Parallel()
 
 		registry := metrics.NewRegistry()
-		metric, err := registry.NewMetric("my_metric", stats.Gauge)
+		metric, err := registry.NewMetric("my_metric", metrics.Gauge)
 		require.NoError(t, err)
 
-		ths := stats.NewThresholds([]string{`value<2`})
+		ths := metrics.NewThresholds([]string{`value<2`})
 		gotParseErr := ths.Parse()
 		require.NoError(t, gotParseErr)
 
 		e, _, wait := newTestEngineWithRegistry(t, nil, nil, nil, lib.Options{
-			Thresholds: map[string]stats.Thresholds{
+			Thresholds: map[string]metrics.Thresholds{
 				"my_metric{a:1}": ths,
 			},
 		}, registry)
 
 		e.OutputManager.AddMetricSamples(
-			[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1", "b": "2"})}},
+			[]metrics.SampleContainer{metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1", "b": "2"})}},
 		)
 
 		e.Stop()
@@ -311,8 +310,8 @@ func TestEngine_processSamples(t *testing.T) {
 		sms := e.MetricsEngine.ObservedMetrics["my_metric{a:1}"]
 		assert.EqualValues(t, map[string]string{"a": "1"}, sms.Sub.Tags.CloneTags())
 
-		assert.IsType(t, &stats.GaugeSink{}, e.MetricsEngine.ObservedMetrics["my_metric"].Sink)
-		assert.IsType(t, &stats.GaugeSink{}, e.MetricsEngine.ObservedMetrics["my_metric{a:1}"].Sink)
+		assert.IsType(t, &metrics.GaugeSink{}, e.MetricsEngine.ObservedMetrics["my_metric"].Sink)
+		assert.IsType(t, &metrics.GaugeSink{}, e.MetricsEngine.ObservedMetrics["my_metric{a:1}"].Sink)
 	})
 }
 
@@ -320,23 +319,23 @@ func TestEngineThresholdsWillAbort(t *testing.T) {
 	t.Parallel()
 
 	registry := metrics.NewRegistry()
-	metric, err := registry.NewMetric("my_metric", stats.Gauge)
+	metric, err := registry.NewMetric("my_metric", metrics.Gauge)
 	require.NoError(t, err)
 
 	// The incoming samples for the metric set it to 1.25. Considering
 	// the metric is of type Gauge, value > 1.25 should always fail, and
 	// trigger an abort.
-	ths := stats.NewThresholds([]string{"value>1.25"})
+	ths := metrics.NewThresholds([]string{"value>1.25"})
 	gotParseErr := ths.Parse()
 	require.NoError(t, gotParseErr)
 	ths.Thresholds[0].AbortOnFail = true
 
-	thresholds := map[string]stats.Thresholds{metric.Name: ths}
+	thresholds := map[string]metrics.Thresholds{metric.Name: ths}
 
 	e, _, wait := newTestEngineWithRegistry(t, nil, nil, nil, lib.Options{Thresholds: thresholds}, registry)
 
 	e.OutputManager.AddMetricSamples(
-		[]stats.SampleContainer{stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}},
+		[]metrics.SampleContainer{metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1"})}},
 	)
 	e.Stop()
 	wait()
@@ -347,24 +346,24 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 	t.Parallel()
 
 	registry := metrics.NewRegistry()
-	metric, err := registry.NewMetric("my_metric", stats.Gauge)
+	metric, err := registry.NewMetric("my_metric", metrics.Gauge)
 	require.NoError(t, err)
 
 	// The MiniRunner sets the value of the metric to 1.25. Considering
 	// the metric is of type Gauge, value > 1.25 should always fail, and
 	// trigger an abort.
 	// **N.B**: a threshold returning an error, won't trigger an abort.
-	ths := stats.NewThresholds([]string{"value>1.25"})
+	ths := metrics.NewThresholds([]string{"value>1.25"})
 	gotParseErr := ths.Parse()
 	require.NoError(t, gotParseErr)
 	ths.Thresholds[0].AbortOnFail = true
 
-	thresholds := map[string]stats.Thresholds{metric.Name: ths}
+	thresholds := map[string]metrics.Thresholds{metric.Name: ths}
 
 	done := make(chan struct{})
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
-			out <- stats.Sample{Metric: metric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})}
+		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+			out <- metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1"})}
 			<-ctx.Done()
 			close(done)
 			return nil
@@ -422,16 +421,16 @@ func TestEngine_processThresholds(t *testing.T) {
 			t.Parallel()
 
 			registry := metrics.NewRegistry()
-			gaugeMetric, err := registry.NewMetric("my_metric", stats.Gauge)
+			gaugeMetric, err := registry.NewMetric("my_metric", metrics.Gauge)
 			require.NoError(t, err)
-			counterMetric, err := registry.NewMetric("used_counter", stats.Counter)
+			counterMetric, err := registry.NewMetric("used_counter", metrics.Counter)
 			require.NoError(t, err)
-			_, err = registry.NewMetric("unused_counter", stats.Counter)
+			_, err = registry.NewMetric("unused_counter", metrics.Counter)
 			require.NoError(t, err)
 
-			thresholds := make(map[string]stats.Thresholds, len(data.ths))
+			thresholds := make(map[string]metrics.Thresholds, len(data.ths))
 			for m, srcs := range data.ths {
-				ths := stats.NewThresholds(srcs)
+				ths := metrics.NewThresholds(srcs)
 				gotParseErr := ths.Parse()
 				require.NoError(t, gotParseErr)
 				thresholds[m] = ths
@@ -444,9 +443,9 @@ func TestEngine_processThresholds(t *testing.T) {
 			)
 
 			e.OutputManager.AddMetricSamples(
-				[]stats.SampleContainer{
-					stats.Sample{Metric: gaugeMetric, Value: 1.25, Tags: stats.IntoSampleTags(&map[string]string{"a": "1"})},
-					stats.Sample{Metric: counterMetric, Value: 2, Tags: stats.IntoSampleTags(&map[string]string{"b": "1"})},
+				[]metrics.SampleContainer{
+					metrics.Sample{Metric: gaugeMetric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1"})},
+					metrics.Sample{Metric: counterMetric, Value: 2, Tags: metrics.IntoSampleTags(&map[string]string{"b": "1"})},
 				},
 			)
 
@@ -635,7 +634,7 @@ func TestRunTags(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	runTagsMap := map[string]string{"foo": "bar", "test": "mest", "over": "written"}
-	runTags := stats.NewSampleTags(runTagsMap)
+	runTags := metrics.NewSampleTags(runTagsMap)
 
 	script := []byte(tb.Replacer.Replace(`
 		import http from "k6/http";
@@ -706,7 +705,7 @@ func TestRunTags(t *testing.T) {
 		VUs:                   null.IntFrom(2),
 		Hosts:                 tb.Dialer.Hosts,
 		RunTags:               runTags,
-		SystemTags:            &stats.DefaultSystemTagSet,
+		SystemTags:            &metrics.DefaultSystemTagSet,
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 	})
 
@@ -796,7 +795,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	require.NoError(t, err)
 
 	engine, run, wait := newTestEngine(t, nil, runner, nil, lib.Options{
-		SystemTags:      &stats.DefaultSystemTagSet,
+		SystemTags:      &metrics.DefaultSystemTagSet,
 		SetupTimeout:    types.NullDurationFrom(3 * time.Second),
 		TeardownTimeout: types.NullDurationFrom(3 * time.Second),
 		VUs:             null.IntFrom(3),
@@ -849,7 +848,7 @@ func TestSetupException(t *testing.T) {
 	require.NoError(t, err)
 
 	_, run, wait := newTestEngine(t, nil, runner, nil, lib.Options{
-		SystemTags:      &stats.DefaultSystemTagSet,
+		SystemTags:      &metrics.DefaultSystemTagSet,
 		SetupTimeout:    types.NullDurationFrom(3 * time.Second),
 		TeardownTimeout: types.NullDurationFrom(3 * time.Second),
 		VUs:             null.IntFrom(3),
@@ -1192,18 +1191,18 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 	t.Parallel()
 
 	registry := metrics.NewRegistry()
-	testMetric, err := registry.NewMetric("teardown_metric", stats.Counter)
+	testMetric, err := registry.NewMetric("teardown_metric", metrics.Counter)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, _ *lib.State, out chan<- stats.SampleContainer) error {
+		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
 			cancel() // we cancel the runCtx immediately after the test starts
 			return nil
 		},
-		TeardownFn: func(ctx context.Context, out chan<- stats.SampleContainer) error {
-			out <- stats.Sample{Metric: testMetric, Value: 1}
+		TeardownFn: func(ctx context.Context, out chan<- metrics.SampleContainer) error {
+			out <- metrics.Sample{Metric: testMetric, Value: 1}
 			return nil
 		},
 	}

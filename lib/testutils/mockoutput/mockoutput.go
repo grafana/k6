@@ -22,8 +22,8 @@ package mockoutput
 
 import (
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
-	"go.k6.io/k6/stats"
 )
 
 // New exists so that the usage from tests avoids repetition, i.e. is
@@ -34,8 +34,8 @@ func New() *MockOutput {
 
 // MockOutput can be used in tests to mock an actual output.
 type MockOutput struct {
-	SampleContainers []stats.SampleContainer
-	Samples          []stats.Sample
+	SampleContainers []metrics.SampleContainer
+	Samples          []metrics.Sample
 	RunStatus        lib.RunStatus
 
 	DescFn  func() string
@@ -46,7 +46,7 @@ type MockOutput struct {
 var _ output.WithRunStatusUpdates = &MockOutput{}
 
 // AddMetricSamples just saves the results in memory.
-func (mo *MockOutput) AddMetricSamples(scs []stats.SampleContainer) {
+func (mo *MockOutput) AddMetricSamples(scs []metrics.SampleContainer) {
 	mo.SampleContainers = append(mo.SampleContainers, scs...)
 	for _, sc := range scs {
 		mo.Samples = append(mo.Samples, sc.GetSamples()...)

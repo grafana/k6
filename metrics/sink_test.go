@@ -18,7 +18,7 @@
  *
  */
 
-package stats
+package metrics
 
 import (
 	"testing"

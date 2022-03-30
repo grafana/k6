@@ -34,7 +34,7 @@ import (
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -52,7 +52,7 @@ func setupTagsExecEnv(t *testing.T) execEnv {
 
 	state := &lib.State{
 		Options: lib.Options{
-			SystemTags: stats.NewSystemTagSet(stats.TagVU),
+			SystemTags: metrics.NewSystemTagSet(metrics.TagVU),
 		},
 		Tags: lib.NewTagMap(map[string]string{
 			"vu": "42",

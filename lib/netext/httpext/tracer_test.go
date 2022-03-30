@@ -44,7 +44,6 @@ import (
 	"go.k6.io/k6/lib/netext"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 const traceDelay = 100 * time.Millisecond
@@ -150,7 +149,7 @@ func TestTracer(t *testing.T) {
 				time.Sleep(traceDelay)
 			}
 			trail := tracer.Done()
-			trail.SaveSamples(builtinMetrics, stats.IntoSampleTags(&map[string]string{"tag": "value"}))
+			trail.SaveSamples(builtinMetrics, metrics.IntoSampleTags(&map[string]string{"tag": "value"}))
 			samples := trail.GetSamples()
 
 			assertLaterOrZero(t, tracer.getConn, isReuse)
@@ -166,7 +165,7 @@ func TestTracer(t *testing.T) {
 			assert.Equal(t, strings.TrimPrefix(srv.URL, "https://"), trail.ConnRemoteAddr.String())
 
 			assert.Len(t, samples, 8)
-			seenMetrics := map[*stats.Metric]bool{}
+			seenMetrics := map[*metrics.Metric]bool{}
 			for i, s := range samples {
 				assert.NotContains(t, seenMetrics, s.Metric)
 				seenMetrics[s.Metric] = true

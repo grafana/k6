@@ -30,7 +30,7 @@ import (
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 // Copied from https://github.com/k6io/jslib.k6.io/tree/master/lib/k6-summary
@@ -42,32 +42,32 @@ var summaryWrapperLambdaCode string //nolint:gochecknoglobals
 
 // TODO: figure out something saner... refactor the sinks and how we deal with
 // metrics in general... so much pain and misery... :sob:
-func metricValueGetter(summaryTrendStats []string) func(stats.Sink, time.Duration) map[string]float64 {
-	trendResolvers, err := stats.GetResolversForTrendColumns(summaryTrendStats)
+func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Duration) map[string]float64 {
+	trendResolvers, err := metrics.GetResolversForTrendColumns(summaryTrendStats)
 	if err != nil {
 		panic(err.Error()) // this should have been validated already
 	}
 
-	return func(sink stats.Sink, t time.Duration) (result map[string]float64) {
+	return func(sink metrics.Sink, t time.Duration) (result map[string]float64) {
 		sink.Calc()
 
 		switch sink := sink.(type) {
-		case *stats.CounterSink:
+		case *metrics.CounterSink:
 			result = sink.Format(t)
 			rate := 0.0
 			if t > 0 {
 				rate = sink.Value / (float64(t) / float64(time.Second))
 			}
 			result["rate"] = rate
-		case *stats.GaugeSink:
+		case *metrics.GaugeSink:
 			result = sink.Format(t)
 			result["min"] = sink.Min
 			result["max"] = sink.Max
-		case *stats.RateSink:
+		case *metrics.RateSink:
 			result = sink.Format(t)
 			result["passes"] = float64(sink.Trues)
 			result["fails"] = float64(sink.Total - sink.Trues)
-		case *stats.TrendSink:
+		case *metrics.TrendSink:
 			result = make(map[string]float64, len(summaryTrendStats))
 			for _, col := range summaryTrendStats {
 				result[col] = trendResolvers[col](sink)

@@ -35,7 +35,6 @@ import (
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
-	"go.k6.io/k6/stats"
 )
 
 func getValidator(t testing.TB, expected []string) func(io.Reader) {
@@ -55,28 +54,29 @@ func getValidator(t testing.TB, expected []string) func(io.Reader) {
 	}
 }
 
-func generateTestMetricSamples(t testing.TB) ([]stats.SampleContainer, func(io.Reader)) {
+func generateTestMetricSamples(t testing.TB) ([]metrics.SampleContainer, func(io.Reader)) {
 	registry := metrics.NewRegistry()
 
-	metric1, err := registry.NewMetric("my_metric1", stats.Gauge)
+	metric1, err := registry.NewMetric("my_metric1", metrics.Gauge)
 	require.NoError(t, err)
 
-	metric2, err := registry.NewMetric("my_metric2", stats.Counter, stats.Data)
+	metric2, err := registry.NewMetric("my_metric2", metrics.Counter, metrics.Data)
 	require.NoError(t, err)
 
 	time1 := time.Date(2021, time.February, 24, 13, 37, 10, 0, time.UTC)
 	time2 := time1.Add(10 * time.Second)
 	time3 := time2.Add(10 * time.Second)
-	connTags := stats.NewSampleTags(map[string]string{"key": "val"})
 
-	samples := []stats.SampleContainer{
-		stats.Sample{Time: time1, Metric: metric1, Value: float64(1), Tags: stats.NewSampleTags(map[string]string{"tag1": "val1"})},
-		stats.Sample{Time: time1, Metric: metric1, Value: float64(2), Tags: stats.NewSampleTags(map[string]string{"tag2": "val2"})},
-		stats.ConnectedSamples{Samples: []stats.Sample{
+	connTags := metrics.NewSampleTags(map[string]string{"key": "val"})
+
+	samples := []metrics.SampleContainer{
+		metrics.Sample{Time: time1, Metric: metric1, Value: float64(1), Tags: metrics.NewSampleTags(map[string]string{"tag1": "val1"})},
+		metrics.Sample{Time: time1, Metric: metric1, Value: float64(2), Tags: metrics.NewSampleTags(map[string]string{"tag2": "val2"})},
+		metrics.ConnectedSamples{Samples: []metrics.Sample{
 			{Time: time2, Metric: metric2, Value: float64(3), Tags: connTags},
 			{Time: time2, Metric: metric1, Value: float64(4), Tags: connTags},
 		}, Time: time2, Tags: connTags},
-		stats.Sample{Time: time3, Metric: metric2, Value: float64(5), Tags: stats.NewSampleTags(map[string]string{"tag3": "val3"})},
+		metrics.Sample{Time: time3, Metric: metric2, Value: float64(5), Tags: metrics.NewSampleTags(map[string]string{"tag3": "val3"})},
 	}
 	expected := []string{
 		`{"type":"Metric","data":{"name":"my_metric1","type":"gauge","contains":"default","tainted":null,"thresholds":["rate<0.01","p(99)<250"],"submetrics":null},"metric":"my_metric1"}`,
@@ -186,15 +186,15 @@ func TestJsonOutputFileGzipped(t *testing.T) {
 
 func TestWrapSampleWithSamplePointer(t *testing.T) {
 	t.Parallel()
-	out := wrapSample(stats.Sample{
-		Metric: &stats.Metric{},
+	out := wrapSample(metrics.Sample{
+		Metric: &metrics.Metric{},
 	})
 	assert.NotEqual(t, out, (*sampleEnvelope)(nil))
 }
 
 func TestWrapMetricWithMetricPointer(t *testing.T) {
 	t.Parallel()
-	out := wrapMetric(&stats.Metric{})
+	out := wrapMetric(&metrics.Metric{})
 	assert.NotEqual(t, out, (*metricEnvelope)(nil))
 }
 
@@ -204,7 +204,7 @@ func setThresholds(t *testing.T, out output.Output) {
 	jout, ok := out.(*Output)
 	require.True(t, ok)
 
-	ts := stats.NewThresholds([]string{"rate<0.01", "p(99)<250"})
+	ts := metrics.NewThresholds([]string{"rate<0.01", "p(99)<250"})
 
-	jout.SetThresholds(map[string]stats.Thresholds{"my_metric1": ts})
+	jout.SetThresholds(map[string]metrics.Thresholds{"my_metric1": ts})
 }

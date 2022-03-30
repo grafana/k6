@@ -28,13 +28,13 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 func BenchmarkMeasureAndEmitMetrics(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	samples := make(chan stats.SampleContainer, 10)
+	samples := make(chan metrics.SampleContainer, 10)
 	defer close(samples)
 	go func() {
 		for range samples {
@@ -45,8 +45,8 @@ func BenchmarkMeasureAndEmitMetrics(b *testing.B) {
 
 	state := &lib.State{
 		Options: lib.Options{
-			RunTags:    &stats.SampleTags{},
-			SystemTags: &stats.DefaultSystemTagSet,
+			RunTags:    &metrics.SampleTags{},
+			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Samples: samples,
 		Logger:  logger,

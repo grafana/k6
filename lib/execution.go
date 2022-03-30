@@ -31,7 +31,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/stats"
 )
 
 // An ExecutionScheduler is in charge of initializing executors and using them
@@ -58,11 +57,11 @@ type ExecutionScheduler interface {
 	GetExecutors() []Executor
 
 	// Init initializes all executors, including all of their needed VUs.
-	Init(ctx context.Context, samplesOut chan<- stats.SampleContainer) error
+	Init(ctx context.Context, samplesOut chan<- metrics.SampleContainer) error
 
 	// Run the ExecutionScheduler, funneling the generated metric samples
 	// through the supplied out channel.
-	Run(globalCtx, runCtx context.Context, samplesOut chan<- stats.SampleContainer) error
+	Run(globalCtx, runCtx context.Context, samplesOut chan<- metrics.SampleContainer) error
 
 	// Pause a test, or start/resume it. To check if a test is paused, use
 	// GetState().IsPaused().
