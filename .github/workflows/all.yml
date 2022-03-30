@@ -266,7 +266,7 @@ jobs:
     runs-on: windows-2019
     defaults:
       run:
-        shell: powershell
+        shell: pwsh
     needs: [test-current-cov, configure, build]
     if: startsWith(github.ref, 'refs/tags/v')
     env:
@@ -280,9 +280,9 @@ jobs:
           args: install -y pandoc
       - name: Install wix tools
         run: |
-          curl -O wix311-binaries.zip https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
+          curl -Lso wix311-binaries.zip https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
           Expand-Archive -Path .\wix311-binaries.zip -DestinationPath .\wix311\
-          echo "$pwd\wix311" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "$pwd\wix311" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Download binaries
         uses: actions/download-artifact@v2
         with:
@@ -294,7 +294,7 @@ jobs:
           move .\packaging\k6-$env:VERSION-windows-amd64\k6.exe .\packaging\
           rmdir .\packaging\k6-$env:VERSION-windows-amd64\
       - name: Add signtool to PATH
-        run: echo "${env:ProgramFiles(x86)}\Windows Kits\10\bin\x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        run: echo "${env:ProgramFiles(x86)}\Windows Kits\10\bin\x64" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Convert base64 certificate to PFX
         run: |
           $bytes = [Convert]::FromBase64String("${{ secrets.WIN_SIGN_CERT }}")
