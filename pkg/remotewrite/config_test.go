@@ -117,6 +117,7 @@ func TestConstructRemoteConfig(t *testing.T) {
 				FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
 				KeepTags:              null.BoolFrom(true),
 				KeepNameTag:           null.BoolFrom(false),
+				KeepUrlTag:            null.BoolFrom(true),
 				Headers:               make(map[string]string),
 			},
 			errString: "",
@@ -146,6 +147,7 @@ func TestConstructRemoteConfig(t *testing.T) {
 				FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
 				KeepTags:              null.BoolFrom(true),
 				KeepNameTag:           null.BoolFrom(false),
+				KeepUrlTag:            null.BoolFrom(true),
 				Headers:               make(map[string]string),
 			},
 			errString: "",
@@ -194,6 +196,7 @@ func TestConstructRemoteConfig(t *testing.T) {
 				FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
 				KeepTags:              null.BoolFrom(true),
 				KeepNameTag:           null.BoolFrom(false),
+				KeepUrlTag:            null.BoolFrom(true),
 				Headers: map[string]string{
 					"X-Header": "value",
 				},
@@ -230,6 +233,7 @@ func TestConstructRemoteConfig(t *testing.T) {
 				FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
 				KeepTags:              null.BoolFrom(true),
 				KeepNameTag:           null.BoolFrom(false),
+				KeepUrlTag:            null.BoolFrom(true),
 				Headers: map[string]string{
 					"X-Header": "value_from_env",
 				},
@@ -266,6 +270,7 @@ func TestConstructRemoteConfig(t *testing.T) {
 				FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
 				KeepTags:              null.BoolFrom(true),
 				KeepNameTag:           null.BoolFrom(false),
+				KeepUrlTag:            null.BoolFrom(true),
 				Headers: map[string]string{
 					"X-Header": "value_from_arg",
 				},
@@ -315,6 +320,7 @@ func assertConfig(t *testing.T, actual, expected Config) {
 	assert.Equal(t, expected.FlushPeriod, actual.FlushPeriod)
 	assert.Equal(t, expected.KeepTags, actual.KeepTags)
 	assert.Equal(t, expected.KeepNameTag, expected.KeepNameTag)
+	assert.Equal(t, expected.KeepUrlTag, expected.KeepUrlTag)
 	assert.Equal(t, expected.Headers, actual.Headers)
 }
 
