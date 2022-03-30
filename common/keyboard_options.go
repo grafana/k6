@@ -24,7 +24,6 @@ import (
 	"context"
 
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
 )
 
 type KeyboardOptions struct {
@@ -38,7 +37,7 @@ func NewKeyboardOptions() *KeyboardOptions {
 }
 
 func (o *KeyboardOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6common.GetRuntime(ctx)
+	rt := GetVU(ctx).Runtime()
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {

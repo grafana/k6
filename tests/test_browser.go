@@ -28,20 +28,16 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/oxtoacart/bpool"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	k6common "go.k6.io/k6/js/common"
 	k6http "go.k6.io/k6/js/modules/k6/http"
 	k6modulestest "go.k6.io/k6/js/modulestest"
 	k6lib "go.k6.io/k6/lib"
-	k6metrics "go.k6.io/k6/lib/metrics"
 	k6httpmultibin "go.k6.io/k6/lib/testutils/httpmultibin"
 	k6stats "go.k6.io/k6/stats"
-	"gopkg.in/guregu/null.v3"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
+	"github.com/grafana/xk6-browser/common"
 )
 
 // testBrowser is a test testBrowser for integration testing.
@@ -52,7 +48,7 @@ type testBrowser struct {
 	state    *k6lib.State
 	http     *k6httpmultibin.HTTPMultiBin
 	logCache *logCache
-	samples  chan k6stats.SampleContainer
+	samples  chan<- k6stats.SampleContainer
 	api.Browser
 }
 
@@ -65,14 +61,13 @@ type testBrowser struct {
 func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 	tb.Helper()
 
-	ctx := context.Background()
-
 	// set default options and then customize them
 	var (
 		launchOpts         = defaultLaunchOpts()
 		enableHTTPMultiBin = false
 		enableFileServer   = false
 		enableLogCache     = false
+		ctx                context.Context
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
@@ -90,31 +85,22 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 		}
 	}
 
-	// create a k6 state
-	root, err := k6lib.NewGroup("", nil)
-	require.NoError(tb, err)
+	mockVU := setupHTTPTestModuleInstance(tb)
 
-	samples := make(chan k6stats.SampleContainer, 1000)
-
-	state := &k6lib.State{
-		Options: k6lib.Options{
-			MaxRedirects: null.IntFrom(10),
-			UserAgent:    null.StringFrom("TestUserAgent"),
-			Throw:        null.BoolFrom(true),
-			SystemTags:   &k6stats.DefaultSystemTagSet,
-			Batch:        null.IntFrom(20),
-			BatchPerHost: null.IntFrom(20),
-			// HTTPDebug:    null.StringFrom("full"),
-		},
-		Logger:         logrus.StandardLogger(),
-		Group:          root,
-		BPool:          bpool.NewBufferPool(1),
-		Samples:        samples,
-		Tags:           k6lib.NewTagMap(map[string]string{"group": root.Path}),
-		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
+	if ctx == nil {
+		dummyCtx, cancel := context.WithCancel(mockVU.CtxField)
+		tb.Cleanup(cancel)
+		mockVU.CtxField = dummyCtx
+	} else {
+		// Attach the mock VU to the passed context
+		ctx = common.WithVU(ctx, mockVU)
+		mockVU.CtxField = ctx
 	}
 
-	rt, _ := getHTTPTestModuleInstance(tb, ctx, state)
+	var (
+		state = mockVU.StateField
+		rt    = mockVU.RuntimeField
+	)
 
 	// enable the HTTP test server only when necessary
 	var testServer *k6httpmultibin.HTTPMultiBin
@@ -124,21 +110,17 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 		state.Transport = testServer.HTTPTransport
 	}
 
-	// configure goja
-	ctx = k6lib.WithState(ctx, state)
-	ctx = k6common.WithRuntime(ctx, rt)
-
 	var lc *logCache
 	if enableLogCache {
 		lc = attachLogCache(state.Logger)
 	}
 
 	// launch the browser
-	bt := chromium.NewBrowserType(ctx).(*chromium.BrowserType) //nolint:forcetypeassert
+	bt := chromium.NewBrowserType(mockVU.CtxField).(*chromium.BrowserType) //nolint:forcetypeassert
 	b := bt.Launch(rt.ToValue(launchOpts))
 	tb.Cleanup(func() {
 		select {
-		case <-ctx.Done():
+		case <-mockVU.CtxField.Done():
 		default:
 			b.Close()
 		}
@@ -150,7 +132,7 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 		rt:       rt,
 		state:    state,
 		http:     testServer,
-		samples:  samples,
+		samples:  state.Samples,
 		logCache: lc,
 		Browser:  b,
 	}
@@ -313,35 +295,18 @@ func withLogCache() logCacheOption {
 	return struct{}{}
 }
 
-//nolint: golint, revive
-// Copied from https://github.com/grafana/k6/blob/v0.36.0/js/modules/k6/http/http_test.go#L39
-func getHTTPTestModuleInstance(
-	tb testing.TB, ctx context.Context, state *k6lib.State,
-) (*goja.Runtime, *k6http.ModuleInstance) {
+func setupHTTPTestModuleInstance(tb testing.TB) *k6modulestest.VU {
 	tb.Helper()
 
-	rt := goja.New()
-	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
+	var (
+		mockVU = newMockVU(tb)
+		root   = k6http.New()
+	)
 
-	if ctx == nil {
-		dummyCtx, cancel := context.WithCancel(context.Background())
-		tb.Cleanup(cancel)
-		ctx = dummyCtx
-	}
-
-	root := k6http.New()
-	mockVU := &k6modulestest.VU{
-		RuntimeField: rt,
-		InitEnvField: &k6common.InitEnvironment{
-			Registry: k6metrics.NewRegistry(),
-		},
-		CtxField:   ctx,
-		StateField: state,
-	}
 	mi, ok := root.NewModuleInstance(mockVU).(*k6http.ModuleInstance)
 	require.True(tb, ok)
 
-	require.NoError(tb, rt.Set("http", mi.Exports().Default))
+	require.NoError(tb, mockVU.RuntimeField.Set("http", mi.Exports().Default))
 
-	return rt, mi
+	return mockVU
 }

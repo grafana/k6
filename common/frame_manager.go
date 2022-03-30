@@ -33,6 +33,7 @@ import (
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
 	k6common "go.k6.io/k6/js/common"
+	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -60,6 +61,8 @@ type FrameManager struct {
 	barriersMu sync.RWMutex
 	barriers   []*Barrier
 
+	vu k6modules.VU
+
 	logger *Logger
 	id     int64
 }
@@ -83,6 +86,7 @@ func NewFrameManager(
 		frames:           make(map[cdp.FrameID]*Frame),
 		inflightRequests: make(map[network.RequestID]bool),
 		barriers:         make([]*Barrier, 0),
+		vu:               GetVU(ctx),
 		logger:           l,
 		id:               atomic.AddInt64(&frameManagerID, 1),
 	}
@@ -575,7 +579,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 	defer m.logger.Debugf("FrameManager:NavigateFrame:return",
 		"fmid:%d fid:%v furl:%s url:%s", fmid, fid, furl, url)
 
-	rt := k6common.GetRuntime(m.ctx)
+	rt := m.vu.Runtime()
 	netMgr := m.page.mainFrameSession.getNetworkManager()
 	defaultReferer := netMgr.extraHTTPHeaders["referer"]
 	parsedOpts := NewFrameGotoOptions(defaultReferer, time.Duration(m.timeoutSettings.navigationTimeout())*time.Second)

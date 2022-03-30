@@ -9,15 +9,11 @@ import (
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/mailru/easyjson"
-	"github.com/oxtoacart/bpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	k6lib "go.k6.io/k6/lib"
-	k6metrics "go.k6.io/k6/lib/metrics"
-	k6testutils "go.k6.io/k6/lib/testutils"
 	k6mockresolver "go.k6.io/k6/lib/testutils/mockresolver"
 	k6types "go.k6.io/k6/lib/types"
-	k6stats "go.k6.io/k6/stats"
 )
 
 const mockHostname = "host.test"
@@ -39,24 +35,6 @@ func (s *fakeSession) Execute(
 func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager, *fakeSession) {
 	t.Helper()
 
-	ctx := context.Background()
-
-	root, err := k6lib.NewGroup("", nil)
-	require.NoError(t, err)
-
-	state := &k6lib.State{
-		Options:        k6opts,
-		Logger:         k6testutils.NewLogger(t),
-		Group:          root,
-		BPool:          bpool.NewBufferPool(1),
-		Samples:        make(chan k6stats.SampleContainer, 1000),
-		Tags:           k6lib.NewTagMap(map[string]string{"group": root.Path}),
-		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
-	}
-
-	ctx = k6lib.WithState(ctx, state)
-	logger := NewLogger(ctx, state.Logger, false, nil)
-
 	session := &fakeSession{
 		session: &Session{
 			id: "1234",
@@ -74,11 +52,15 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 		},
 	}, nil)
 
+	mockVU := newMockVU(t)
+	mockVU.StateField.Options = k6opts
+	logger := NewLogger(mockVU.CtxField, mockVU.StateField.Logger, false, nil)
 	nm := &NetworkManager{
-		ctx:      ctx,
+		ctx:      mockVU.CtxField,
 		logger:   logger,
 		session:  session,
 		resolver: mr,
+		vu:       mockVU,
 	}
 
 	return nm, session

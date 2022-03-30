@@ -35,7 +35,7 @@ import (
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
+	k6modules "go.k6.io/k6/js/modules"
 	k6lib "go.k6.io/k6/lib"
 	k6netext "go.k6.io/k6/lib/netext"
 	k6types "go.k6.io/k6/lib/types"
@@ -56,6 +56,7 @@ type NetworkManager struct {
 	frameManager *FrameManager
 	credentials  *Credentials
 	resolver     k6netext.Resolver
+	vu           k6modules.VU
 
 	// TODO: manage inflight requests separately (move them between the two maps
 	// as they transition from inflight -> completed)
@@ -75,7 +76,8 @@ type NetworkManager struct {
 func NewNetworkManager(
 	ctx context.Context, s session, fm *FrameManager, parent *NetworkManager,
 ) (*NetworkManager, error) {
-	state := k6lib.GetState(ctx)
+	vu := GetVU(ctx)
+	state := vu.State()
 
 	resolver, err := newResolver(state.Options.DNS)
 	if err != nil {
@@ -92,6 +94,7 @@ func NewNetworkManager(
 		parent:           parent,
 		frameManager:     fm,
 		resolver:         resolver,
+		vu:               vu,
 		reqIDToRequest:   make(map[network.RequestID]*Request),
 		attemptedAuth:    make(map[fetch.RequestID]bool),
 		extraHTTPHeaders: make(map[string]string),
@@ -155,7 +158,7 @@ func (m *NetworkManager) deleteRequestByID(reqID network.RequestID) {
 }
 
 func (m *NetworkManager) emitRequestMetrics(req *Request) {
-	state := k6lib.GetState(m.ctx)
+	state := m.vu.State()
 
 	tags := state.CloneTags()
 	if state.Options.SystemTags.Has(k6stats.TagGroup) {
@@ -182,7 +185,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 }
 
 func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
-	state := k6lib.GetState(m.ctx)
+	state := m.vu.State()
 
 	// In some scenarios we might not receive a ResponseReceived CDP event, in
 	// which case the response won't be created. So to emit as much metric data
@@ -502,7 +505,7 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 	var (
 		host  = purl.Hostname()
 		ip    = net.ParseIP(host)
-		state = k6lib.GetState(m.ctx)
+		state = m.vu.State()
 	)
 	if ip != nil {
 		failErr = checkBlockedIPs(ip, state.Options.BlacklistIPs)
@@ -658,29 +661,26 @@ func (m *NetworkManager) Authenticate(credentials *Credentials) {
 		m.userReqInterceptionEnabled = true
 	}
 	if err := m.updateProtocolRequestInterception(); err != nil {
-		rt := k6common.GetRuntime(m.ctx)
-		k6common.Throw(rt, err)
+		k6Throw(m.ctx, "error setting authentication credentials: %w", err)
 	}
 }
 
 // ExtraHTTPHeaders returns the currently set extra HTTP request headers.
 func (m *NetworkManager) ExtraHTTPHeaders() goja.Value {
-	rt := k6common.GetRuntime(m.ctx)
+	rt := m.vu.Runtime()
 	return rt.ToValue(m.extraHTTPHeaders)
 }
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
 func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) {
-	rt := k6common.GetRuntime(m.ctx)
 	action := network.SetExtraHTTPHeaders(headers)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to set extra HTTP headers: %w", err))
+		k6Throw(m.ctx, "unable to set extra HTTP headers: %w", err)
 	}
 }
 
 // SetOfflineMode toggles offline mode on/off.
 func (m *NetworkManager) SetOfflineMode(offline bool) {
-	rt := k6common.GetRuntime(m.ctx)
 	if m.offline == offline {
 		return
 	}
@@ -688,16 +688,15 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 
 	action := network.EmulateNetworkConditions(m.offline, 0, -1, -1)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to set offline mode: %w", err))
+		k6Throw(m.ctx, "unable to set offline mode: %w", err)
 	}
 }
 
 // SetUserAgent overrides the browser user agent string.
 func (m *NetworkManager) SetUserAgent(userAgent string) {
-	rt := k6common.GetRuntime(m.ctx)
 	action := emulation.SetUserAgentOverride(userAgent)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to set user agent override: %w", err))
+		k6Throw(m.ctx, "unable to set user agent override: %w", err)
 	}
 }
 
@@ -705,7 +704,6 @@ func (m *NetworkManager) SetUserAgent(userAgent string) {
 func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 	m.userCacheDisabled = !enabled
 	if err := m.updateProtocolCacheDisabled(); err != nil {
-		rt := k6common.GetRuntime(m.ctx)
-		k6common.Throw(rt, err)
+		k6Throw(m.ctx, "error toggling cache: %w", err)
 	}
 }

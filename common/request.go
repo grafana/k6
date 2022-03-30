@@ -22,7 +22,6 @@ package common
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -31,7 +30,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
+	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -60,6 +59,7 @@ type Request struct {
 	timestamp           time.Time
 	wallTime            time.Time
 	responseEndTiming   float64
+	vu                  k6modules.VU
 }
 
 // NewRequest creates a new HTTP request.
@@ -96,6 +96,7 @@ func NewRequest(
 		errorText:           "",
 		timestamp:           event.Timestamp.Time(),
 		wallTime:            event.WallTime.Time(),
+		vu:                  GetVU(ctx),
 	}
 	for n, v := range event.Request.Headers {
 		switch v := v.(type) {
@@ -151,8 +152,7 @@ func (r *Request) AllHeaders() map[string]string {
 }
 
 func (r *Request) Failure() goja.Value {
-	rt := k6common.GetRuntime(r.ctx)
-	k6common.Throw(rt, errors.New("Request.failure() has not been implemented yet"))
+	k6Throw(r.ctx, "Request.failure() has not been implemented yet")
 	return nil
 }
 
@@ -162,7 +162,7 @@ func (r *Request) Frame() api.Frame {
 }
 
 func (r *Request) HeaderValue(name string) goja.Value {
-	rt := k6common.GetRuntime(r.ctx)
+	rt := r.vu.Runtime()
 	headers := r.AllHeaders()
 	val, ok := headers[name]
 	if !ok {
@@ -207,26 +207,23 @@ func (r *Request) PostData() string {
 
 // PostDataBuffer returns the request post data as an ArrayBuffer.
 func (r *Request) PostDataBuffer() goja.ArrayBuffer {
-	rt := k6common.GetRuntime(r.ctx)
+	rt := r.vu.Runtime()
 	return rt.NewArrayBuffer([]byte(r.postData))
 }
 
 // PostDataJSON returns the request post data as a JS object.
 func (r *Request) PostDataJSON() string {
-	rt := k6common.GetRuntime(r.ctx)
-	k6common.Throw(rt, errors.New("Request.postDataJSON() has not been implemented yet"))
+	k6Throw(r.ctx, "Request.postDataJSON() has not been implemented yet")
 	return ""
 }
 
 func (r *Request) RedirectedFrom() api.Request {
-	rt := k6common.GetRuntime(r.ctx)
-	k6common.Throw(rt, errors.New("Request.redirectedFrom() has not been implemented yet"))
+	k6Throw(r.ctx, "Request.redirectedFrom() has not been implemented yet")
 	return nil
 }
 
 func (r *Request) RedirectedTo() api.Request {
-	rt := k6common.GetRuntime(r.ctx)
-	k6common.Throw(rt, errors.New("Request.redirectedTo() has not been implemented yet"))
+	k6Throw(r.ctx, "Request.redirectedTo() has not been implemented yet")
 	return nil
 }
 
@@ -248,7 +245,7 @@ func (r *Request) Size() api.HTTPMessageSize {
 }
 
 func (r *Request) Timing() goja.Value {
-	rt := k6common.GetRuntime(r.ctx)
+	rt := r.vu.Runtime()
 	timing := r.response.timing
 	return rt.ToValue(&ResourceTiming{
 		StartTime:             (timing.RequestTime - float64(r.timestamp.Unix()) + float64(r.wallTime.Unix())) * 1000,

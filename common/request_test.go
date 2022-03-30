@@ -21,24 +21,19 @@
 package common
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	k6common "go.k6.io/k6/js/common"
 
 	"github.com/grafana/xk6-browser/api"
 )
 
 func TestRequest(t *testing.T) {
 	t.Parallel()
-	rt := goja.New()
-	ctx := k6common.WithRuntime(context.Background(), rt)
 	ts := cdp.MonotonicTime(time.Now())
 	wt := cdp.TimeSinceEpoch(time.Now())
 	headers := map[string]interface{}{"key": "value"}
@@ -53,7 +48,8 @@ func TestRequest(t *testing.T) {
 		Timestamp: &ts,
 		WallTime:  &wt,
 	}
-	req, err := NewRequest(ctx, evt, nil, nil, "intercept", false)
+	mockVU := newMockVU(t)
+	req, err := NewRequest(mockVU.CtxField, evt, nil, nil, "intercept", false)
 	require.NoError(t, err)
 
 	t.Run("error_parse_url", func(t *testing.T) {
@@ -69,7 +65,8 @@ func TestRequest(t *testing.T) {
 			Timestamp: &ts,
 			WallTime:  &wt,
 		}
-		req, err := NewRequest(ctx, evt, nil, nil, "intercept", false)
+		mockVU := newMockVU(t)
+		req, err := NewRequest(mockVU.CtxField, evt, nil, nil, "intercept", false)
 		require.EqualError(t, err, `cannot parse URL: parse ":": missing protocol scheme`)
 		require.Nil(t, req)
 	})

@@ -22,11 +22,9 @@ package common
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
-	k6common "go.k6.io/k6/js/common"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -69,8 +67,7 @@ func (t *Touchscreen) tap(x float64, y float64) error {
 
 // Tap dispatches a tap start and tap end event.
 func (t *Touchscreen) Tap(x float64, y float64) {
-	rt := k6common.GetRuntime(t.ctx)
 	if err := t.tap(x, y); err != nil {
-		k6common.Throw(rt, fmt.Errorf("unable to tap: %w", err))
+		k6Throw(t.ctx, "unable to tap: %w", err)
 	}
 }

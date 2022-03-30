@@ -31,7 +31,7 @@ import (
 	"github.com/chromedp/cdproto/storage"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
+	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -53,6 +53,7 @@ type BrowserContext struct {
 	opts            *BrowserContextOptions
 	timeoutSettings *TimeoutSettings
 	logger          *Logger
+	vu              k6modules.VU
 
 	evaluateOnNewDocumentSources []string
 }
@@ -66,6 +67,7 @@ func NewBrowserContext(ctx context.Context, browser *Browser, id cdp.BrowserCont
 		id:               id,
 		opts:             opts,
 		logger:           logger,
+		vu:               GetVU(ctx),
 		timeoutSettings:  NewTimeoutSettings(nil),
 	}
 	return &b
@@ -79,7 +81,7 @@ func (b *BrowserContext) AddCookies(cookies goja.Value) {
 func (b *BrowserContext) AddInitScript(script goja.Value, arg goja.Value) {
 	b.logger.Debugf("BrowserContext:AddInitScript", "bctxid:%v", b.id)
 
-	rt := k6common.GetRuntime(b.ctx)
+	rt := b.vu.Runtime()
 
 	source := ""
 	if script != nil && !goja.IsUndefined(script) && !goja.IsNull(script) {
@@ -184,7 +186,7 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value)
 	}
 	origin := ""
 
-	rt := k6common.GetRuntime(b.ctx)
+	rt := b.vu.Runtime()
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -328,7 +330,7 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 	// TODO: This public API needs Promise support (as return value) to be useful in JS!
 	b.logger.Debugf("BrowserContext:WaitForEvent", "bctxid:%v event:%q", b.id, event)
 
-	rt := k6common.GetRuntime(b.ctx)
+	rt := b.vu.Runtime()
 
 	var isCallable bool
 	var predicateFn goja.Callable = nil
@@ -382,9 +384,8 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 				}
 				if ev.typ == EventBrowserContextPage {
 					b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage", "bctxid:%v", b.id)
-					p := ev.data.(*Page)
-					exported := k6common.Bind(rt, p, &b.ctx)
-					if retVal, err := predicateFn(rt.ToValue(exported)); err == nil && retVal.ToBoolean() {
+					p, _ := ev.data.(*Page)
+					if retVal, err := predicateFn(rt.ToValue(p)); err == nil && retVal.ToBoolean() {
 						b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage:return", "bctxid:%v", b.id)
 						ch <- p
 						close(ch)
