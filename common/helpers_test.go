@@ -34,6 +34,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	k6common "go.k6.io/k6/js/common"
+	k6eventloop "go.k6.io/k6/js/eventloop"
 	k6modulestest "go.k6.io/k6/js/modulestest"
 	k6lib "go.k6.io/k6/lib"
 	k6metrics "go.k6.io/k6/lib/metrics"
@@ -276,6 +277,9 @@ func newMockVU(tb testing.TB) *k6modulestest.VU {
 	}
 	ctx := WithVU(context.Background(), mockVU)
 	mockVU.CtxField = ctx
+
+	loop := k6eventloop.New(mockVU)
+	mockVU.RegisterCallbackField = loop.RegisterCallback
 
 	return mockVU
 }
