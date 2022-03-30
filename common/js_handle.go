@@ -100,7 +100,7 @@ func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) interfa
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
 	res, err := h.execCtx.Eval(h.ctx, pageFunc, args...)
 	if err != nil {
-		k6Throw(h.ctx, "%s", err)
+		k6Throw(h.ctx, "%w", err)
 	}
 	return res
 }
@@ -111,7 +111,7 @@ func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) a
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
 	res, err := h.execCtx.EvalHandle(h.ctx, pageFunc, args...)
 	if err != nil {
-		k6Throw(h.ctx, "%s", err)
+		k6Throw(h.ctx, "%w", err)
 	}
 	return res
 }

@@ -686,7 +686,7 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 	select {
 	case <-p.ctx.Done():
 	case <-time.After(parsedOpts.Timeout):
-		k6Throw(p.ctx, "%s", ErrTimedOut)
+		k6Throw(p.ctx, "%w", ErrTimedOut)
 	case data := <-ch:
 		event = data.(*NavigationEvent)
 	}
