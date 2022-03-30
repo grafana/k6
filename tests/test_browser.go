@@ -30,7 +30,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
 	k6http "go.k6.io/k6/js/modules/k6/http"
-	k6modulestest "go.k6.io/k6/js/modulestest"
 	k6lib "go.k6.io/k6/lib"
 	k6httpmultibin "go.k6.io/k6/lib/testutils/httpmultibin"
 	k6stats "go.k6.io/k6/stats"
@@ -42,11 +41,14 @@ import (
 
 // testBrowser is a test testBrowser for integration testing.
 type testBrowser struct {
-	t        testing.TB
+	t testing.TB
+	// TODO: Consider dropping the rt, state and samples fields since they're
+	// accessible via vu.
 	ctx      context.Context
 	rt       *goja.Runtime
 	state    *k6lib.State
 	http     *k6httpmultibin.HTTPMultiBin
+	vu       *mockVU
 	logCache *logCache
 	samples  chan<- k6stats.SampleContainer
 	api.Browser
@@ -132,6 +134,7 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 		rt:       rt,
 		state:    state,
 		http:     testServer,
+		vu:       mockVU,
 		samples:  state.Samples,
 		logCache: lc,
 		Browser:  b,
@@ -295,7 +298,7 @@ func withLogCache() logCacheOption {
 	return struct{}{}
 }
 
-func setupHTTPTestModuleInstance(tb testing.TB) *k6modulestest.VU {
+func setupHTTPTestModuleInstance(tb testing.TB) *mockVU {
 	tb.Helper()
 
 	var (
