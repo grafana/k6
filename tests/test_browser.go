@@ -65,11 +65,12 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 
 	// set default options and then customize them
 	var (
+		ctx                context.Context
 		launchOpts         = defaultLaunchOpts()
 		enableHTTPMultiBin = false
 		enableFileServer   = false
 		enableLogCache     = false
-		ctx                context.Context
+		skipClose          = false
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
@@ -84,6 +85,8 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 			enableLogCache = true
 		case withContext:
 			ctx = opt
+		case skipCloseOption:
+			skipClose = true
 		}
 	}
 
@@ -124,7 +127,9 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 		select {
 		case <-mockVU.CtxField.Done():
 		default:
-			b.Close()
+			if !skipClose {
+				b.Close()
+			}
 		}
 	})
 
@@ -295,6 +300,19 @@ type logCacheOption struct{}
 //
 //    b := TestBrowser(t, withLogCache())
 func withLogCache() logCacheOption {
+	return struct{}{}
+}
+
+// skipCloseOption is used to indicate that we shouldn't call Browser.Close() in
+// t.Cleanup(), since it will presumably be done by the test.
+type skipCloseOption struct{}
+
+// withSkipClose skips calling Browser.Close() in t.Cleanup().
+//
+// example:
+//
+//    b := TestBrowser(t, withSkipClose())
+func withSkipClose() skipCloseOption {
 	return struct{}{}
 }
 
