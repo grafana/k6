@@ -21,11 +21,15 @@
 package tests
 
 import (
+	"context"
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBrowserNewPage(t *testing.T) {
@@ -44,6 +48,76 @@ func TestBrowserNewPage(t *testing.T) {
 	p2.Close(nil)
 	l = len(b.Contexts())
 	assert.Equal(t, 0, l, "expected there to be 0 browser context after second page close, but found %d", l)
+}
+
+func TestBrowserOn(t *testing.T) {
+	t.Parallel()
+
+	script := `
+		b.on('%s').then((val) => {
+			log('ok: '+val);
+		}, (val) => {
+			log('err: '+val);
+		});`
+
+	t.Run("err_wrong_event", func(t *testing.T) {
+		t.Parallel()
+
+		b := newTestBrowser(t)
+		rt := b.vu.Runtime()
+		require.NoError(t, rt.Set("b", b.Browser))
+
+		err := b.vu.loop.Start(func() error {
+			if _, err := rt.RunString(fmt.Sprintf(script, "wrongevent")); err != nil {
+				return fmt.Errorf("%w", err)
+			}
+			return nil
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(),
+			`unknown browser event: "wrongevent", must be "disconnected"`)
+	})
+
+	t.Run("ok_promise_resolved", func(t *testing.T) {
+		t.Parallel()
+
+		b := newTestBrowser(t, withSkipClose())
+		rt := b.vu.Runtime()
+		require.NoError(t, rt.Set("b", b.Browser))
+		var log []string
+		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
+
+		err := b.vu.loop.Start(func() error {
+			time.AfterFunc(100*time.Millisecond, func() { b.Browser.Close() })
+			if _, err := rt.RunString(fmt.Sprintf(script, "disconnected")); err != nil {
+				return fmt.Errorf("%w", err)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+		assert.Contains(t, log, "ok: true")
+	})
+
+	t.Run("ok_promise_rejected", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		b := newTestBrowser(t, ctx)
+		rt := b.vu.Runtime()
+		require.NoError(t, rt.Set("b", b.Browser))
+		var log []string
+		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
+
+		err := b.vu.loop.Start(func() error {
+			time.AfterFunc(100*time.Millisecond, func() { cancel() })
+			if _, err := rt.RunString(fmt.Sprintf(script, "disconnected")); err != nil {
+				return fmt.Errorf("%w", err)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+		assert.Contains(t, log, "err: browser.on promise rejected: context canceled")
+	})
 }
 
 // This only works for Chrome!
