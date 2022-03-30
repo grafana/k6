@@ -19,7 +19,12 @@ import (
 	"github.com/grafana/xk6-browser/common"
 )
 
-func newMockVU(tb testing.TB) *k6modulestest.VU {
+type mockVU struct {
+	*k6modulestest.VU
+	loop *k6eventloop.EventLoop
+}
+
+func newMockVU(tb testing.TB) *mockVU {
 	tb.Helper()
 
 	rt := goja.New()
@@ -47,12 +52,14 @@ func newMockVU(tb testing.TB) *k6modulestest.VU {
 		Tags:           k6lib.NewTagMap(map[string]string{"group": root.Path}),
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
 	}
-	mockVU := &k6modulestest.VU{
-		RuntimeField: rt,
-		InitEnvField: &k6common.InitEnvironment{
-			Registry: k6metrics.NewRegistry(),
+	mockVU := &mockVU{
+		VU: &k6modulestest.VU{
+			RuntimeField: rt,
+			InitEnvField: &k6common.InitEnvironment{
+				Registry: k6metrics.NewRegistry(),
+			},
+			StateField: state,
 		},
-		StateField: state,
 	}
 	ctx := context.Background()
 	ctx = common.WithVU(ctx, mockVU)
@@ -60,6 +67,7 @@ func newMockVU(tb testing.TB) *k6modulestest.VU {
 
 	loop := k6eventloop.New(mockVU)
 	mockVU.RegisterCallbackField = loop.RegisterCallback
+	mockVU.loop = loop
 
 	return mockVU
 }
