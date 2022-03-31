@@ -673,6 +673,14 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	u.state.GetScenarioVUIter = func() uint64 {
 		return u.scenarioIter[params.Scenario]
 	}
+	if keyWriter := u.Runner.Bundle.RuntimeOptions.KeyWriter; keyWriter.Valid {
+		f, err := os.OpenFile(keyWriter.String, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+		if err != nil {
+			u.state.Logger.WithError(err).Warn("couldn't open SSLKEYLOGGER file")
+		} else {
+			u.state.TLSConfig.KeyLogWriter = f
+		}
+	}
 
 	avu := &ActiveVU{
 		VU:                       u,
@@ -699,6 +707,13 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		// Wait for the VU to stop running, if it was, and prevent it from
 		// running again for this activation
 		avu.busy <- struct{}{}
+		if u.TLSConfig.KeyLogWriter != nil {
+			if f, ok := u.TLSConfig.KeyLogWriter.(*os.File); ok {
+				if err := f.Close(); err != nil {
+					u.state.Logger.WithError(err).Warn("couldn't close SSLKEYLOGGER file")
+				}
+			}
+		}
 
 		if params.DeactivateCallback != nil {
 			params.DeactivateCallback(u)
