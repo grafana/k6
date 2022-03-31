@@ -237,7 +237,8 @@ func (s Selection) Siblings(def ...string) Selection {
 	return s.adjacent(s.sel.Siblings, s.sel.SiblingsFiltered, def...)
 }
 
-// PrevUntil, NextUntil and ParentsUntil support two arguments with mutable type.
+// PrevUntil returns all preceding siblings of each element up to but not including the element matched by the selector.
+// The arguments are:
 // 1st argument is the selector. Either a selector string, a Selection object, or nil
 // 2nd argument is the filter. Either a selector string or nil/undefined
 func (s Selection) PrevUntil(def ...goja.Value) Selection {
@@ -250,6 +251,10 @@ func (s Selection) PrevUntil(def ...goja.Value) Selection {
 	)
 }
 
+// NextUntil returns all following siblings of each element up to but not including the element matched by the selector.
+// The arguments are:
+// 1st argument is the selector. Either a selector string, a Selection object, or nil
+// 2nd argument is the filter. Either a selector string or nil/undefined
 func (s Selection) NextUntil(def ...goja.Value) Selection {
 	return s.adjacentUntil(
 		s.sel.NextUntil,
@@ -260,6 +265,11 @@ func (s Selection) NextUntil(def ...goja.Value) Selection {
 	)
 }
 
+// ParentsUntil returns the ancestors of each element in the current set of matched elements,
+// up to but not including the element matched by the selector
+// The arguments are:
+// 1st argument is the selector. Either a selector string, a Selection object, or nil
+// 2nd argument is the filter. Either a selector string or nil/undefined
 func (s Selection) ParentsUntil(def ...goja.Value) Selection {
 	return s.adjacentUntil(
 		s.sel.ParentsUntil,
