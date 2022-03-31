@@ -110,10 +110,7 @@ func TestProgressBarRenderPaddingMaxLeft(t *testing.T) {
 	}{
 		{-1, "left", "left   [--------------------------------------]"},
 		{0, "left", "left   [--------------------------------------]"},
-		{
-			10, "left_truncated",
-			"left_tr...   [--------------------------------------]",
-		},
+		{10, "left_truncated", "left_tr...   [--------------------------------------]"},
 	}
 
 	for _, tc := range testCases {
