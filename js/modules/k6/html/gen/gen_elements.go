@@ -33,72 +33,78 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Generate elements_gen.go. There are two sections of code which need to be generated. The selToElement function and the attribute accessor methods.
+// Generate elements_gen.go.
+// There are two sections of code which need to be generated.
+// The selToElement function and the attribute accessor methods.
 
-// Thhe first step to generate the selToElement function is parse the TagName constants and Element structs in elements.go using ast.Inspect
+// The first step to generate the selToElement function is parse the TagName constants and Element structs
+// in elements.go using ast.Inspect
 // One of NodeHandlerFunc methods is called for each ast.Node parsed by ast.Inspect
 // The NodeHandlerFunc methods build ElemInfo structs and populate elemInfos in AstInspectState
 // The template later iterates over elemInfos to build the selToElement function
 
-type NodeHandlerFunc func(node ast.Node) NodeHandlerFunc
+type nodeHandlerFunc func(node ast.Node) nodeHandlerFunc
 
-type AstInspectState struct {
-	handler   NodeHandlerFunc
+type astInspectState struct {
+	handler   nodeHandlerFunc
 	elemName  string
-	elemInfos map[string]*ElemInfo
+	elemInfos map[string]*elemInfo
 }
 
-type ElemInfo struct {
+type elemInfo struct {
 	StructName    string
 	PrtStructName string
 }
 
-// The attribute accessors are build using function definitions. Each funcion definition has a TemplateType.
+// The attribute accessors are build using function definitions. Each funcion definition has a templateType.
 // The number of TemplateArgs varies based on the TenplateType and is documented below.
-type TemplateType string
-type TemplateArg string
+type (
+	templateType string
+	templateArg  string
+)
 
 const (
-	stringTemplate       TemplateType = "typeString"
-	urlTemplate          TemplateType = "typeUrl"
-	boolTemplate         TemplateType = "typeBool"
-	intTemplate          TemplateType = "typeInt"
-	constTemplate        TemplateType = "typeConst"
-	enumTemplate         TemplateType = "typeEnum"
-	nullableEnumTemplate TemplateType = "typeEnumNullable"
+	stringTemplate       templateType = "typeString"
+	urlTemplate          templateType = "typeURL"
+	boolTemplate         templateType = "typeBool"
+	intTemplate          templateType = "typeInt"
+	constTemplate        templateType = "typeConst"
+	enumTemplate         templateType = "typeEnum"
+	nullableEnumTemplate templateType = "typeEnumNullable"
 )
 
 // Some common TemplateArgs
+//nolint:lll,gochecknoglobals
 var (
 	// Default return values for urlTemplate functions. Either an empty string or the current URL.
-	defaultURLEmpty   = []TemplateArg{"\"\""}
-	defaultURLCurrent = []TemplateArg{"e.sel.URL"}
+	defaultURLEmpty   = []templateArg{"\"\""}
+	defaultURLCurrent = []templateArg{"e.sel.URL"}
 
 	// Common default return values for intTemplates
-	defaultInt0      = []TemplateArg{"0"}
-	defaultIntMinus1 = []TemplateArg{"-1"}
-	defaultIntPlus1  = []TemplateArg{"1"}
+	defaultInt0      = []templateArg{"0"}
+	defaultIntMinus1 = []templateArg{"-1"}
+	defaultIntPlus1  = []templateArg{"1"}
 
 	// The following are the for various attributes using enumTemplate.
 	// The first item in the list is the default value.
-	autocompleteOpts = []TemplateArg{"on", "off"}
-	referrerOpts     = []TemplateArg{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}
-	preloadOpts      = []TemplateArg{"auto", "metadata", "none"}
-	btnTypeOpts      = []TemplateArg{"submit", "button", "menu", "reset"}
-	encTypeOpts      = []TemplateArg{"application/x-www-form-urlencoded", "multipart/form-data", "text/plain"}
-	inputTypeOpts    = []TemplateArg{"text", "button", "checkbox", "color", "date", "datetime-local", "email", "file", "hidden", "image", "month", "number", "password", "radio", "range", "reset", "search", "submit", "tel", "time", "url", "week"}
-	keyTypeOpts      = []TemplateArg{"RSA", "DSA", "EC"}
-	keygenTypeOpts   = []TemplateArg{"keygen"}
-	liTypeOpts       = []TemplateArg{"", "1", "a", "A", "i", "I", "disc", "square", "circle"}
-	httpEquivOpts    = []TemplateArg{"content-type", "default-style", "refresh"}
-	olistTypeOpts    = []TemplateArg{"1", "a", "A", "i", "I"}
-	scopeOpts        = []TemplateArg{"", "row", "col", "colgroup", "rowgroup"}
-	autocapOpts      = []TemplateArg{"sentences", "none", "off", "characters", "words"}
-	wrapOpts         = []TemplateArg{"soft", "hard", "off"}
-	kindOpts         = []TemplateArg{"subtitle", "captions", "descriptions", "chapters", "metadata"}
+	autocompleteOpts = []templateArg{"on", "off"}
+	referrerOpts     = []templateArg{"", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "unsafe-url"}
+	preloadOpts      = []templateArg{"auto", "metadata", "none"}
+	btnTypeOpts      = []templateArg{"submit", "button", "menu", "reset"}
+	encTypeOpts      = []templateArg{"application/x-www-form-urlencoded", "multipart/form-data", "text/plain"}
+	inputTypeOpts    = []templateArg{"text", "button", "checkbox", "color", "date", "datetime-local", "email", "file", "hidden", "image", "month", "number", "password", "radio", "range", "reset", "search", "submit", "tel", "time", "url", "week"}
+	keyTypeOpts      = []templateArg{"RSA", "DSA", "EC"}
+	keygenTypeOpts   = []templateArg{"keygen"}
+	liTypeOpts       = []templateArg{"", "1", "a", "A", "i", "I", "disc", "square", "circle"}
+	httpEquivOpts    = []templateArg{"content-type", "default-style", "refresh"}
+	olistTypeOpts    = []templateArg{"1", "a", "A", "i", "I"}
+	scopeOpts        = []templateArg{"", "row", "col", "colgroup", "rowgroup"}
+	autocapOpts      = []templateArg{"sentences", "none", "off", "characters", "words"}
+	wrapOpts         = []templateArg{"soft", "hard", "off"}
+	kindOpts         = []templateArg{"subtitle", "captions", "descriptions", "chapters", "metadata"}
 
 	// These are the values allowed for the crossorigin attribute, used by the nullableEnumTemplates is always goja.Undefined
-	crossOriginOpts = []TemplateArg{"anonymous", "use-credentials"}
+	crossOriginOpts = []templateArg{"anonymous", "use-credentials"}
 )
 
 // Elem is one of the Element struct names from elements.go
@@ -113,13 +119,16 @@ var (
 //   constTemplate: uses 1 Template Arg, the generated function always returns that value
 //   intTemplate: needs 1 TemplateArg, used as the default return value (when the attribute was empty).
 //   urlTemplate: needs 1 TemplateArg, used as the default, either "defaultURLEmpty" or "defaultURLCurrent"
-//   enumTemplate: uses any number or more TemplateArg, the gen'd func always returns one of the values in the TemplateArgs.
-//                 The first item in the list is used as the default when the attribute was invalid or unset.
-//   nullableEnumTemplate: similar to the enumTemplate except the default is goja.Undefined and the return type is goja.Value
+//   enumTemplate: uses any number or more TemplateArg, the gen'd func always returns one of the values in
+//                 the TemplateArgs. The first item in the list is used as the default when the attribute
+//                 was invalid or unset.
+//   nullableEnumTemplate: similar to the enumTemplate except the default is goja.Undefined and the
+//                         return type is goja.Value
+//nolint:gochecknoglobals
 var funcDefs = []struct {
 	Elem, Method, Attr string
-	TemplateType       TemplateType
-	TemplateArgs       []TemplateArg
+	TemplateType       templateType
+	TemplateArgs       []templateArg
 }{
 	{"HrefElement", "Download", "download", stringTemplate, nil},
 	{"HrefElement", "ReferrerPolicy", "referrerpolicy", enumTemplate, referrerOpts},
@@ -253,7 +262,7 @@ var funcDefs = []struct {
 	{"OptionElement", "Selected", "selected", boolTemplate, nil},
 	{"OutputElement", "HtmlFor", "for", stringTemplate, nil},
 	{"OutputElement", "Name", "name", stringTemplate, nil},
-	{"OutputElement", "Type", "type", constTemplate, []TemplateArg{"output"}},
+	{"OutputElement", "Type", "type", constTemplate, []templateArg{"output"}},
 	{"ParamElement", "Name", "name", stringTemplate, nil},
 	{"ParamElement", "Value", "value", stringTemplate, nil},
 	{"PreElement", "Name", "name", stringTemplate, nil},
@@ -286,7 +295,7 @@ var funcDefs = []struct {
 	{"TableHeaderCellElement", "Abbr", "abbr", stringTemplate, nil},
 	{"TableHeaderCellElement", "Scope", "scope", enumTemplate, scopeOpts},
 	{"TableHeaderCellElement", "Sorted", "sorted", boolTemplate, nil},
-	{"TextAreaElement", "Type", "type", constTemplate, []TemplateArg{"textarea"}},
+	{"TextAreaElement", "Type", "type", constTemplate, []templateArg{"textarea"}},
 	{"TextAreaElement", "Value", "value", stringTemplate, nil},
 	{"TextAreaElement", "DefaultValue", "value", stringTemplate, nil},
 	{"TextAreaElement", "Placeholder", "placeholder", stringTemplate, nil},
@@ -317,10 +326,10 @@ func main() {
 	}
 
 	// Initialise the AstInspectState
-	collector := &AstInspectState{}
+	collector := &astInspectState{}
 
 	collector.handler = collector.defaultHandler
-	collector.elemInfos = make(map[string]*ElemInfo)
+	collector.elemInfos = make(map[string]*elemInfo)
 
 	// Populate collector.elemInfos
 	ast.Inspect(parsedFile, func(n ast.Node) bool {
@@ -333,17 +342,19 @@ func main() {
 	// elemInfos and funcDefs are now complete and the template can be executed.
 	var buf bytes.Buffer
 	err := elemFuncsTemplate.Execute(&buf, struct {
-		ElemInfos map[string]*ElemInfo
+		ElemInfos map[string]*elemInfo
 		FuncDefs  []struct {
 			Elem, Method, Attr string
-			TemplateType       TemplateType
-			TemplateArgs       []TemplateArg
+			TemplateType       templateType
+			TemplateArgs       []templateArg
 		}
-		TemplateTypes struct{ String, Url, Enum, Bool, GojaEnum, Int, Const TemplateType }
+		TemplateTypes struct{ String, URL, Enum, Bool, GojaEnum, Int, Const templateType }
 	}{
 		collector.elemInfos,
 		funcDefs,
-		struct{ String, Url, Enum, Bool, GojaEnum, Int, Const TemplateType }{stringTemplate, urlTemplate, enumTemplate, boolTemplate, nullableEnumTemplate, intTemplate, constTemplate},
+		struct{ String, URL, Enum, Bool, GojaEnum, Int, Const templateType }{
+			stringTemplate, urlTemplate, enumTemplate, boolTemplate, nullableEnumTemplate, intTemplate, constTemplate,
+		},
 	})
 	if err != nil {
 		logrus.WithError(err).Fatal("Unable to execute template")
@@ -369,11 +380,11 @@ func main() {
 	}
 }
 
+//nolint:gochecknoglobals
 var elemFuncsTemplate = template.Must(template.New("").Funcs(template.FuncMap{
 	"buildStruct": buildStruct,
 	"returnType":  returnType,
-}).Parse(`// generated by js/modules/k6/html/gen/gen_elements.go directed by js/modules/k6/html/elements.go;  DO NOT EDIT
-// nolint: goconst
+}).Parse(`// generated by js/modules/k6/html/gen/gen_elements.go;  DO NOT EDIT
 package html
 
 import "github.com/dop251/goja"
@@ -428,7 +439,7 @@ func (e {{$funcDef.Elem}}) {{$funcDef.Method}}() {{ returnType $funcDef.Template
 	}
 {{- else if eq $funcDef.TemplateType $templateTypes.Const }}
 	return "{{ index $funcDef.TemplateArgs 0 }}"
-{{- else if eq $funcDef.TemplateType $templateTypes.Url }}
+{{- else if eq $funcDef.TemplateType $templateTypes.URL }}
 	return e.attrAsURLString("{{ $funcDef.Attr }}", {{ index $funcDef.TemplateArgs 0 }})
 {{- else if eq $funcDef.TemplateType $templateTypes.String }}
 	return e.attrAsString("{{ $funcDef.Attr }}")
@@ -439,18 +450,18 @@ func (e {{$funcDef.Elem}}) {{$funcDef.Method}}() {{ returnType $funcDef.Template
 {{ end }}
 `))
 
-// generate the nested struct, either one or two levels of nesting, ie "BaseElement{elem}" or "ButtonElement{FormFieldElement{elem}})"
-func buildStruct(elemInfo ElemInfo) string {
-	if elemInfo.PrtStructName == "Element" {
-		return elemInfo.StructName + "{elem}"
-	} else {
-		return elemInfo.StructName + "{" + elemInfo.PrtStructName + "{elem}}"
+// generate the nested struct, either one or two levels of nesting,
+// ie "BaseElement{elem}" or "ButtonElement{FormFieldElement{elem}})"
+func buildStruct(ei elemInfo) string {
+	if ei.PrtStructName == "Element" {
+		return ei.StructName + "{elem}"
 	}
+	return ei.StructName + "{" + ei.PrtStructName + "{elem}}"
 }
 
 // Select the correct return type for one of the attribute accessor methods
-func returnType(templateType TemplateType) string {
-	switch templateType {
+func returnType(tt templateType) string {
+	switch tt {
 	case boolTemplate:
 		return "bool"
 	case intTemplate:
@@ -463,7 +474,7 @@ func returnType(templateType TemplateType) string {
 }
 
 // Default node handler functions for ast.Inspect. Return itself unless it's found a "const" or "struct" keyword
-func (ce *AstInspectState) defaultHandler(node ast.Node) NodeHandlerFunc {
+func (ce *astInspectState) defaultHandler(node ast.Node) nodeHandlerFunc {
 	ce.elemName = ""
 	switch node.(type) {
 	case *ast.TypeSpec: // struct keyword
@@ -477,13 +488,14 @@ func (ce *AstInspectState) defaultHandler(node ast.Node) NodeHandlerFunc {
 	}
 }
 
-// Found a tagname constant. The code 'const AnchorTagName = "a"' will add an ElemInfo called "Anchor", like elemInfos["Anchor"] = ElemInfo{"", ""}
-func (ce *AstInspectState) elementTagNameHandler(node ast.Node) NodeHandlerFunc {
+// Found a tagname constant. The code 'const AnchorTagName = "a"' will add an ElemInfo called "Anchor",
+// like elemInfos["Anchor"] = ElemInfo{"", ""}
+func (ce *astInspectState) elementTagNameHandler(node ast.Node) nodeHandlerFunc {
 	switch x := node.(type) {
 	case *ast.Ident:
 		if strings.HasSuffix(x.Name, "TagName") {
 			ce.elemName = strings.TrimSuffix(x.Name, "TagName")
-			ce.elemInfos[ce.elemName] = &ElemInfo{"", ""}
+			ce.elemInfos[ce.elemName] = &elemInfo{"", ""}
 		}
 
 		return ce.defaultHandler
@@ -494,10 +506,11 @@ func (ce *AstInspectState) elementTagNameHandler(node ast.Node) NodeHandlerFunc 
 }
 
 // A struct definition was found, keep the elem handler if it's for an Element struct
-// Element structs nest the "Element" struct or an intermediate struct like "HrefElement", the name of the 'parent' struct is contained in the
+// Element structs nest the "Element" struct or an intermediate struct like "HrefElement",
+// the name of the 'parent' struct is contained in the
 // *ast.Ident node located a few nodes after the TypeSpec node containing struct keyword
 // The nodes in between the ast.TypeSpec and ast.Ident are ignored
-func (ce *AstInspectState) elementStructHandler(node ast.Node) NodeHandlerFunc {
+func (ce *astInspectState) elementStructHandler(node ast.Node) nodeHandlerFunc {
 	switch x := node.(type) {
 	case *ast.Ident:
 		if !strings.HasSuffix(x.Name, "Element") {
@@ -506,18 +519,20 @@ func (ce *AstInspectState) elementStructHandler(node ast.Node) NodeHandlerFunc {
 
 		if ce.elemName == "" {
 			ce.elemName = strings.TrimSuffix(x.Name, "Element")
-			// Ignore elements which don't have a tag name constant meaning no elemInfo structure was created by the TagName handle.
-			// It skips the Href, Media, FormField, Mod, TableSection or TableCell structs as these structs are inherited by other elements and not created indepedently.
+			// Ignore elements which don't have a tag name constant meaning no elemInfo
+			// structure was created by the TagName handle.
+			// It skips the Href, Media, FormField, Mod, TableSection or TableCell structs
+			// as these structs are inherited by other elements and not created indepedently.
 			if _, ok := ce.elemInfos[ce.elemName]; !ok {
 				return ce.defaultHandler
 			}
 
 			ce.elemInfos[ce.elemName].StructName = x.Name
 			return ce.elementStructHandler
-		} else {
-			ce.elemInfos[ce.elemName].PrtStructName = x.Name
-			return ce.defaultHandler
 		}
+
+		ce.elemInfos[ce.elemName].PrtStructName = x.Name
+		return ce.defaultHandler
 
 	case *ast.StructType:
 		return ce.elementStructHandler
