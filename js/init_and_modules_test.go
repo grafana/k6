@@ -78,15 +78,17 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		logger,
+		&lib.RuntimeState{
+			Logger:         logger,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+			RuntimeOptions: rtOptions,
+		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: "blah", Scheme: "file"},
 			Data: []byte(script),
 		},
 		map[string]afero.Fs{"file": afero.NewMemMapFs(), "https": afero.NewMemMapFs()},
-		rtOptions,
-		builtinMetrics,
-		registry,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, checkModule.initCtxCalled, 1)
@@ -112,7 +114,13 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	assert.Equal(t, checkModule.initCtxCalled, 2) // shouldn't change, we're not executing the init context again
 	assert.Equal(t, checkModule.vuCtxCalled, 2)
 
-	runnerFromArc, err := js.NewFromArchive(logger, arc, rtOptions, builtinMetrics, registry)
+	runnerFromArc, err := js.NewFromArchive(
+		&lib.RuntimeState{
+			Logger:         logger,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+			RuntimeOptions: rtOptions,
+		}, arc)
 	require.NoError(t, err)
 	assert.Equal(t, checkModule.initCtxCalled, 3) // changes because we need to get the exported functions
 	assert.Equal(t, checkModule.vuCtxCalled, 2)

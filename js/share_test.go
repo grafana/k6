@@ -84,7 +84,12 @@ exports.default = function() {
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(logger, r1.MakeArchive(), lib.RuntimeOptions{}, builtinMetrics, registry)
+	r2, err := NewFromArchive(
+		&lib.RuntimeState{
+			Logger:         logger,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		}, r1.MakeArchive())
 	require.NoError(t, err)
 	entries = hook.Drain()
 	require.Len(t, entries, 1)

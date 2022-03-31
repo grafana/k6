@@ -552,12 +552,13 @@ func TestSentReceivedMetrics(t *testing.T) {
 		registry := metrics.NewRegistry()
 		builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 		r, err := js.New(
-			testutils.NewLogger(t),
+			&lib.RuntimeState{
+				Logger:         testutils.NewLogger(t),
+				BuiltinMetrics: builtinMetrics,
+				Registry:       registry,
+			},
 			&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(ts.Code)},
 			nil,
-			lib.RuntimeOptions{},
-			builtinMetrics,
-			registry,
 		)
 		require.NoError(t, err)
 
@@ -690,12 +691,13 @@ func TestRunTags(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r, err := js.New(
-		testutils.NewLogger(t),
+		&lib.RuntimeState{
+			Logger:         testutils.NewLogger(t),
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		},
 		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		nil,
-		lib.RuntimeOptions{},
-		builtinMetrics,
-		registry,
 	)
 	require.NoError(t, err)
 
@@ -785,12 +787,13 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		testutils.NewLogger(t),
+		&lib.RuntimeState{
+			Logger:         testutils.NewLogger(t),
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		},
 		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		nil,
-		lib.RuntimeOptions{},
-		builtinMetrics,
-		registry,
 	)
 	require.NoError(t, err)
 
@@ -838,12 +841,13 @@ func TestSetupException(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		testutils.NewLogger(t),
+		&lib.RuntimeState{
+			Logger:         testutils.NewLogger(t),
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		},
 		&loader.SourceData{URL: &url.URL{Scheme: "file", Path: "/script.js"}, Data: script},
 		map[string]afero.Fs{"file": memfs},
-		lib.RuntimeOptions{},
-		builtinMetrics,
-		registry,
 	)
 	require.NoError(t, err)
 
@@ -891,11 +895,13 @@ func TestVuInitException(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		logger,
+		&lib.RuntimeState{
+			Logger:         testutils.NewLogger(t),
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		},
 		&loader.SourceData{URL: &url.URL{Scheme: "file", Path: "/script.js"}, Data: script},
-		nil, lib.RuntimeOptions{},
-		builtinMetrics,
-		registry,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -962,12 +968,13 @@ func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		testutils.NewLogger(t),
+		&lib.RuntimeState{
+			Logger:         testutils.NewLogger(t),
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		},
 		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
 		nil,
-		lib.RuntimeOptions{},
-		builtinMetrics,
-		registry,
 	)
 	require.NoError(t, err)
 
@@ -1050,7 +1057,11 @@ func TestMetricsEmission(t *testing.T) {
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 			runner, err := js.New(
-				testutils.NewLogger(t),
+				&lib.RuntimeState{
+					Logger:         testutils.NewLogger(t),
+					BuiltinMetrics: builtinMetrics,
+					Registry:       registry,
+				},
 				&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(fmt.Sprintf(`
 				import { sleep } from "k6";
 				import { Counter } from "k6/metrics";
@@ -1074,9 +1085,6 @@ func TestMetricsEmission(t *testing.T) {
 				}
 				`, tc.minIterDuration, tc.defaultBody))},
 				nil,
-				lib.RuntimeOptions{},
-				builtinMetrics,
-				registry,
 			)
 			require.NoError(t, err)
 
@@ -1162,12 +1170,13 @@ func TestMinIterationDurationInSetupTeardownStage(t *testing.T) {
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 			runner, err := js.New(
-				testutils.NewLogger(t),
+				&lib.RuntimeState{
+					Logger:         testutils.NewLogger(t),
+					BuiltinMetrics: builtinMetrics,
+					Registry:       registry,
+				},
 				&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script)},
 				nil,
-				lib.RuntimeOptions{},
-				builtinMetrics,
-				registry,
 			)
 			require.NoError(t, err)
 
@@ -1278,8 +1287,13 @@ func TestActiveVUsCount(t *testing.T) {
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	runner, err := js.New(logger, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil, rtOpts,
-		builtinMetrics, registry)
+	runner, err := js.New(
+		&lib.RuntimeState{
+			Logger:         logger,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+			RuntimeOptions: rtOpts,
+		}, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
 	require.NoError(t, err)
 
 	mockOutput := mockoutput.New()

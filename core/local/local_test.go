@@ -133,10 +133,14 @@ func TestExecutionSchedulerRunNonDefault(t *testing.T) {
 			logger.SetOutput(testutils.NewTestOutput(t))
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			runner, err := js.New(logger, &loader.SourceData{
-				URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script),
-			},
-				nil, lib.RuntimeOptions{}, builtinMetrics, registry)
+			runner, err := js.New(
+				&lib.RuntimeState{
+					Logger:         logger,
+					BuiltinMetrics: builtinMetrics,
+					Registry:       registry,
+				}, &loader.SourceData{
+					URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script),
+				}, nil)
 			require.NoError(t, err)
 
 			execScheduler, err := NewExecutionScheduler(runner, builtinMetrics, logger)
@@ -244,11 +248,16 @@ func TestExecutionSchedulerRunEnv(t *testing.T) {
 			logger.SetOutput(testutils.NewTestOutput(t))
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			runner, err := js.New(logger, &loader.SourceData{
-				URL:  &url.URL{Path: "/script.js"},
-				Data: []byte(tc.script),
-			},
-				nil, lib.RuntimeOptions{Env: map[string]string{"TESTVAR": "global"}}, builtinMetrics, registry)
+			runner, err := js.New(
+				&lib.RuntimeState{
+					Logger:         logger,
+					BuiltinMetrics: builtinMetrics,
+					Registry:       registry,
+					RuntimeOptions: lib.RuntimeOptions{Env: map[string]string{"TESTVAR": "global"}},
+				}, &loader.SourceData{
+					URL:  &url.URL{Path: "/script.js"},
+					Data: []byte(tc.script),
+				}, nil)
 			require.NoError(t, err)
 
 			execScheduler, err := NewExecutionScheduler(runner, builtinMetrics, logger)
@@ -311,11 +320,15 @@ func TestExecutionSchedulerSystemTags(t *testing.T) {
 	logger.SetOutput(testutils.NewTestOutput(t))
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	runner, err := js.New(logger, &loader.SourceData{
-		URL:  &url.URL{Path: "/script.js"},
-		Data: []byte(script),
-	},
-		nil, lib.RuntimeOptions{}, builtinMetrics, registry)
+	runner, err := js.New(
+		&lib.RuntimeState{
+			Logger:         logger,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		}, &loader.SourceData{
+			URL:  &url.URL{Path: "/script.js"},
+			Data: []byte(script),
+		}, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, runner.SetOptions(runner.GetOptions().Apply(lib.Options{
@@ -452,11 +465,17 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			runner, err := js.New(logger, &loader.SourceData{
-				URL:  &url.URL{Path: "/script.js"},
-				Data: []byte(tc.script),
-			},
-				nil, lib.RuntimeOptions{}, builtinMetrics, registry)
+			runner, err := js.New(
+				&lib.RuntimeState{
+					Logger:         logger,
+					BuiltinMetrics: builtinMetrics,
+					Registry:       registry,
+				},
+				&loader.SourceData{
+					URL:  &url.URL{Path: "/script.js"},
+					Data: []byte(tc.script),
+				},
+				nil)
 			require.NoError(t, err)
 
 			execScheduler, err := NewExecutionScheduler(runner, builtinMetrics, logger)
@@ -615,11 +634,17 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	runner, err := js.New(logger, &loader.SourceData{
-		URL:  &url.URL{Path: "/script.js"},
-		Data: []byte(script),
-	},
-		nil, lib.RuntimeOptions{Env: map[string]string{"TESTGLOBALVAR": "global"}}, builtinMetrics, registry)
+	runner, err := js.New(
+		&lib.RuntimeState{
+			Logger:         logger,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+			RuntimeOptions: lib.RuntimeOptions{Env: map[string]string{"TESTGLOBALVAR": "global"}},
+		}, &loader.SourceData{
+			URL:  &url.URL{Path: "/script.js"},
+			Data: []byte(script),
+		},
+		nil)
 	require.NoError(t, err)
 
 	execScheduler, err := NewExecutionScheduler(runner, builtinMetrics, logger)
@@ -1063,9 +1088,15 @@ func TestDNSResolver(t *testing.T) {
 
 				registry := metrics.NewRegistry()
 				builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-				runner, err := js.New(logger, &loader.SourceData{
-					URL: &url.URL{Path: "/script.js"}, Data: []byte(script),
-				}, nil, lib.RuntimeOptions{}, builtinMetrics, registry)
+				runner, err := js.New(
+					&lib.RuntimeState{
+						Logger:         logger,
+						BuiltinMetrics: builtinMetrics,
+						Registry:       registry,
+					},
+					&loader.SourceData{
+						URL: &url.URL{Path: "/script.js"}, Data: []byte(script),
+					}, nil)
 				require.NoError(t, err)
 
 				mr := mockresolver.New(nil, net.LookupIP)
@@ -1145,8 +1176,11 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		logger, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil,
-		lib.RuntimeOptions{}, builtinMetrics, registry)
+		&lib.RuntimeState{
+			Logger:         logger,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		}, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
 	require.NoError(t, err)
 
 	options, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions().Apply(lib.Options{
@@ -1415,15 +1449,16 @@ func TestNewExecutionSchedulerHasWork(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		logger,
+		&lib.RuntimeState{
+			Logger:         logger,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: "/script.js"},
 			Data: script,
 		},
 		nil,
-		lib.RuntimeOptions{},
-		builtinMetrics,
-		registry,
 	)
 	require.NoError(t, err)
 
