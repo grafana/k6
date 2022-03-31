@@ -33,13 +33,13 @@ import (
 
 func attrToProperty(s string) string {
 	if idx := strings.Index(s, "-"); idx != -1 {
-		return s[0:idx] + snaker.SnakeToCamel(strings.Replace(s[idx+1:], "-", "_", -1))
+		return s[0:idx] + snaker.SnakeToCamel(strings.ReplaceAll(s[idx+1:], "-", "_"))
 	}
 	return s
 }
 
 func propertyToAttr(attrName string) string {
-	return strings.Replace(snaker.CamelToSnake(attrName), "_", "-", -1)
+	return strings.ReplaceAll(snaker.CamelToSnake(attrName), "_", "-")
 }
 
 func namespaceURI(prefix string) string {
@@ -108,35 +108,35 @@ func toNumeric(val string) (float64, bool) {
 func convertDataAttrVal(val string) interface{} {
 	if len(val) == 0 {
 		return goja.Undefined()
-	} else if val[0] == '{' || val[0] == '[' {
+	}
+
+	if val[0] == '{' || val[0] == '[' {
 		var subdata interface{}
 
 		err := json.Unmarshal([]byte(val), &subdata)
 		if err == nil {
 			return subdata
-		} else {
-			return val
 		}
-	} else {
-		switch val {
-		case "true":
-			return true
+		return val
+	}
 
-		case "false":
-			return false
+	switch val {
+	case "true":
+		return true
 
-		case "null":
-			return goja.Undefined()
+	case "false":
+		return false
 
-		case "undefined":
-			return goja.Undefined()
+	case "null":
+		return goja.Undefined()
 
-		default:
-			if fltVal, isOk := toNumeric(val); isOk {
-				return fltVal
-			} else {
-				return val
-			}
+	case "undefined":
+		return goja.Undefined()
+
+	default:
+		if fltVal, isOk := toNumeric(val); isOk {
+			return fltVal
 		}
+		return val
 	}
 }

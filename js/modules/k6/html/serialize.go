@@ -32,7 +32,6 @@ type FormValue struct {
 	Value goja.Value
 }
 
-// nolint: goconst
 func (s Selection) SerializeArray() []FormValue {
 	submittableSelector := "input,select,textarea,keygen"
 	var formElements *goquery.Selection
@@ -42,7 +41,7 @@ func (s Selection) SerializeArray() []FormValue {
 		formElements = s.sel.Filter(submittableSelector)
 	}
 
-	formElements = formElements.FilterFunction(func(i int, sel *goquery.Selection) bool {
+	formElements = formElements.FilterFunction(func(_ int, sel *goquery.Selection) bool {
 		name := sel.AttrOr("name", "")
 		inputType := sel.AttrOr("type", "")
 		disabled := sel.AttrOr("disabled", "")
@@ -55,7 +54,8 @@ func (s Selection) SerializeArray() []FormValue {
 			inputType != "reset" &&
 			inputType != "image" && // Must not be an image or file
 			inputType != "file" &&
-			(checked == "checked" || (inputType != "checkbox" && inputType != "radio")) // Must be checked if it is an checkbox or radio
+			(checked == "checked" ||
+				(inputType != "checkbox" && inputType != "radio")) // Must be checked if it is an checkbox or radio
 	})
 
 	result := make([]FormValue, len(formElements.Nodes))

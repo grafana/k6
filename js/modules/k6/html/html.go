@@ -237,7 +237,7 @@ func (s Selection) Siblings(def ...string) Selection {
 	return s.adjacent(s.sel.Siblings, s.sel.SiblingsFiltered, def...)
 }
 
-// prevUntil, nextUntil and parentsUntil support two arguments with mutable type.
+// PrevUntil, NextUntil and ParentsUntil support two arguments with mutable type.
 // 1st argument is the selector. Either a selector string, a Selection object, or nil
 // 2nd argument is the filter. Either a selector string or nil/undefined
 func (s Selection) PrevUntil(def ...goja.Value) Selection {
@@ -317,7 +317,6 @@ func (s Selection) Html() goja.Value {
 	return s.rt.ToValue(val)
 }
 
-// nolint: goconst
 func (s Selection) Val() goja.Value {
 	switch goquery.NodeName(s.sel) {
 	case InputTagName:
@@ -501,16 +500,14 @@ func (s Selection) Data(def ...string) goja.Value {
 		val, exists := s.sel.Attr("data-" + propertyToAttr(def[0]))
 		if exists {
 			return s.rt.ToValue(convertDataAttrVal(val))
-		} else {
-			return goja.Undefined()
 		}
-	} else {
-		data := make(map[string]interface{})
-		for _, attr := range s.sel.Nodes[0].Attr {
-			if strings.HasPrefix(attr.Key, "data-") && len(attr.Key) > 5 {
-				data[attrToProperty(attr.Key[5:])] = convertDataAttrVal(attr.Val)
-			}
-		}
-		return s.rt.ToValue(data)
+		return goja.Undefined()
 	}
+	data := make(map[string]interface{})
+	for _, attr := range s.sel.Nodes[0].Attr {
+		if strings.HasPrefix(attr.Key, "data-") && len(attr.Key) > 5 {
+			data[attrToProperty(attr.Key[5:])] = convertDataAttrVal(attr.Val)
+		}
+	}
+	return s.rt.ToValue(data)
 }

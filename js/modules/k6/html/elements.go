@@ -32,6 +32,7 @@ import (
 //go:generate go run gen/gen_elements.go
 //go:generate gofumpt -w .
 
+//nolint:gochecknoglobals
 var defaultPorts = map[string]string{
 	"http":  "80",
 	"https": "443",
@@ -99,15 +100,12 @@ const (
 //revive:disable:exported
 
 type (
-	HrefElement         struct{ Element }
-	MediaElement        struct{ Element }
-	FormFieldElement    struct{ Element }
-	ModElement          struct{ Element }
-	TableSectionElement struct{ Element }
-	TableCellElement    struct{ Element }
-)
-
-type (
+	HrefElement            struct{ Element }
+	MediaElement           struct{ Element }
+	FormFieldElement       struct{ Element }
+	ModElement             struct{ Element }
+	TableSectionElement    struct{ Element }
+	TableCellElement       struct{ Element }
 	AnchorElement          struct{ HrefElement }
 	AreaElement            struct{ HrefElement }
 	AudioElement           struct{ MediaElement }
@@ -248,7 +246,6 @@ func (h HrefElement) Password() string {
 	return pwd
 }
 
-// nolint: goconst
 func (h HrefElement) Origin() string {
 	href := h.hrefURL()
 
@@ -331,7 +328,6 @@ func (f FormFieldElement) FormAction() string {
 	return actionURL.String()
 }
 
-// nolint: goconst
 func (f FormFieldElement) FormEnctype() string {
 	enctype, _ := f.formOrElemAttr("enctype")
 
@@ -426,7 +422,6 @@ func (f FormElement) Method() string {
 	return methodGet
 }
 
-// nolint: goconst
 func (i InputElement) List() goja.Value {
 	listId := i.attrAsString("list")
 
@@ -662,17 +657,15 @@ func (s SelectElement) SelectedOptions() []goja.Value {
 func (s SelectElement) Size() int {
 	if s.attrIsPresent("multiple") {
 		return 4
-	} else {
-		return 1
 	}
+	return 1
 }
 
 func (s SelectElement) Type() string {
 	if s.attrIsPresent("multiple") {
 		return "select-multiple"
-	} else {
-		return "select"
 	}
+	return "select"
 }
 
 func (s SelectElement) Value() string {
