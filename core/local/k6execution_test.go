@@ -88,15 +88,16 @@ func TestExecutionInfoVUSharing(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		logger,
+		&lib.RuntimeState{
+			Logger:         logger,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: "/script.js"},
 			Data: script,
 		},
 		nil,
-		lib.RuntimeOptions{},
-		builtinMetrics,
-		registry,
 	)
 	require.NoError(t, err)
 
@@ -200,15 +201,16 @@ func TestExecutionInfoScenarioIter(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		logger,
+		&lib.RuntimeState{
+			Logger:         logger,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: "/script.js"},
 			Data: script,
 		},
 		nil,
-		lib.RuntimeOptions{},
-		builtinMetrics,
-		registry,
 	)
 	require.NoError(t, err)
 
@@ -281,15 +283,16 @@ func TestSharedIterationsStable(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		logger,
+		&lib.RuntimeState{
+			Logger:         logger,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: "/script.js"},
 			Data: script,
 		},
 		nil,
-		lib.RuntimeOptions{},
-		builtinMetrics,
-		registry,
 	)
 	require.NoError(t, err)
 
@@ -414,10 +417,16 @@ func TestExecutionInfoAll(t *testing.T) {
 
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			runner, err := js.New(logger, &loader.SourceData{
-				URL:  &url.URL{Path: "/script.js"},
-				Data: []byte(tc.script),
-			}, nil, lib.RuntimeOptions{}, builtinMetrics, registry)
+			runner, err := js.New(
+				&lib.RuntimeState{
+					Logger:         logger,
+					BuiltinMetrics: builtinMetrics,
+					Registry:       registry,
+				},
+				&loader.SourceData{
+					URL:  &url.URL{Path: "/script.js"},
+					Data: []byte(tc.script),
+				}, nil)
 			require.NoError(t, err)
 
 			ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, lib.Options{})

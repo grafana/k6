@@ -146,12 +146,13 @@ func TestSetupData(t *testing.T) {
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 
 			runner, err := js.New(
-				logger,
+				&lib.RuntimeState{
+					Logger:         logger,
+					BuiltinMetrics: builtinMetrics,
+					Registry:       registry,
+				},
 				&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: testCase.script},
 				nil,
-				lib.RuntimeOptions{},
-				builtinMetrics,
-				registry,
 			)
 			require.NoError(t, err)
 			runner.SetOptions(lib.Options{

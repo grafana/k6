@@ -83,15 +83,17 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	return New(
-		logger,
+		&lib.RuntimeState{
+			Logger:         logger,
+			RuntimeOptions: rtOpts,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),
 		},
 		map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()},
-		rtOpts,
-		builtinMetrics,
-		registry,
 	)
 }
 

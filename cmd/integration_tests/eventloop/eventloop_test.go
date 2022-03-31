@@ -34,15 +34,16 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		logger,
+		&lib.RuntimeState{
+			Logger:         logger,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: "/script.js"},
 			Data: script,
 		},
 		nil,
-		lib.RuntimeOptions{},
-		builtinMetrics,
-		registry,
 	)
 	require.NoError(t, err)
 
