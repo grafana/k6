@@ -317,7 +317,7 @@ func main() {
 	}
 
 	// Initialise the AstInspectState
-	var collector = &AstInspectState{}
+	collector := &AstInspectState{}
 
 	collector.handler = collector.defaultHandler
 	collector.elemInfos = make(map[string]*ElemInfo)

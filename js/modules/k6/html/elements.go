@@ -30,6 +30,7 @@ import (
 )
 
 //go:generate go run gen/gen_elements.go
+//go:generate gofumpt -w .
 
 var defaultPorts = map[string]string{
 	"http":  "80",
