@@ -44,10 +44,14 @@ func TestProgressBarRender(t *testing.T) {
 		pbWidthDelta int
 		expected     string
 	}{
-		{[]ProgressBarOption{WithLeft(func() string { return "left" })},
-			0, "left   [--------------------------------------]"},
-		{[]ProgressBarOption{WithConstLeft("constLeft")},
-			0, "constLeft   [--------------------------------------]"},
+		{
+			[]ProgressBarOption{WithLeft(func() string { return "left" })},
+			0, "left   [--------------------------------------]",
+		},
+		{
+			[]ProgressBarOption{WithConstLeft("constLeft")},
+			0, "constLeft   [--------------------------------------]",
+		},
 		{[]ProgressBarOption{
 			WithLeft(func() string { return "left" }),
 			WithStatus(Done),
@@ -79,13 +83,16 @@ func TestProgressBarRender(t *testing.T) {
 		{[]ProgressBarOption{
 			WithHijack(func() string { return "progressbar hijack!" }),
 		}, 0, "progressbar hijack!"},
-		{[]ProgressBarOption{WithConstProgress(0.25, "")},
-			-DefaultWidth, "   [  25% ] "},
+		{
+			[]ProgressBarOption{WithConstProgress(0.25, "")},
+			-DefaultWidth, "   [  25% ] ",
+		},
 	}
 
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.expected, func(t *testing.T) {
+			t.Parallel()
 			pbar := New(tc.options...)
 			assert.NotNil(t, pbar)
 			assert.Equal(t, tc.expected, pbar.Render(0, tc.pbWidthDelta).String())
@@ -103,13 +110,16 @@ func TestProgressBarRenderPaddingMaxLeft(t *testing.T) {
 	}{
 		{-1, "left", "left   [--------------------------------------]"},
 		{0, "left", "left   [--------------------------------------]"},
-		{10, "left_truncated",
-			"left_tr...   [--------------------------------------]"},
+		{
+			10, "left_truncated",
+			"left_tr...   [--------------------------------------]",
+		},
 	}
 
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.left, func(t *testing.T) {
+			t.Parallel()
 			pbar := New(WithLeft(func() string { return tc.left }))
 			assert.NotNil(t, pbar)
 			assert.Equal(t, tc.expected, pbar.Render(tc.maxLen, 0).String())
@@ -131,6 +141,7 @@ func TestProgressBarLeft(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.expected, func(t *testing.T) {
+			t.Parallel()
 			pbar := New(WithLeft(tc.left))
 			assert.NotNil(t, pbar)
 			assert.Equal(t, tc.expected, pbar.Left())
