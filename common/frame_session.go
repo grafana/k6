@@ -28,7 +28,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/browser"
@@ -67,8 +66,6 @@ type FrameSession struct {
 	targetID target.ID
 	windowID browser.WindowID
 
-	initTime *cdp.MonotonicTime
-
 	// To understand the concepts of Isolated Worlds, Contexts and Frames and
 	// the relationship betwween them have a look at the following doc:
 	// https://chromium.googlesource.com/chromium/src/+/master/third_party/blink/renderer/bindings/core/v8/V8BindingDesign.md
@@ -100,7 +97,6 @@ func NewFrameSession(
 		parent:               parent,
 		manager:              p.frameManager,
 		targetID:             tid,
-		initTime:             &cdp.MonotonicTime{},
 		contextIDToContextMu: sync.Mutex{},
 		contextIDToContext:   make(map[cdpruntime.ExecutionContextID]*ExecutionContext),
 		isolatedWorlds:       make(map[string]bool),
@@ -700,82 +696,34 @@ func (fs *FrameSession) onLogEntryAdded(event *log.EventEntryAdded) {
 
 func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 	fs.logger.Debugf("FrameSession:onPageLifecycle",
-		"sid:%v tid:%v fid:%v event:%q",
-		fs.session.ID(), fs.targetID, event.FrameID, event.Name)
+		"sid:%v tid:%v fid:%v event:%s eventTime:%q",
+		fs.session.ID(), fs.targetID, event.FrameID, event.Name, event.Timestamp.Time())
 
-	state := fs.vu.State()
-	if event.Name == "init" || event.Name == "commit" {
-		fs.initTime = event.Timestamp
+	frame := fs.manager.getFrameByID(event.FrameID)
+	if frame == nil {
+		return
 	}
-	if event.Name == "load" {
+
+	switch event.Name {
+	case "init", "commit":
+		frame.initTime = event.Timestamp.Time()
+		return
+	case "load":
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventLoad)
-		frame := fs.manager.getFrameByID(event.FrameID)
-		if frame != nil {
-			endTime := event.Timestamp.Time()
-			tags := state.CloneTags()
-			if state.Options.SystemTags.Has(k6stats.TagURL) {
-				tags["url"] = frame.URL()
-			}
-			sampleTags := k6stats.IntoSampleTags(&tags)
-			k6stats.PushIfNotDone(fs.ctx, state.Samples, k6stats.ConnectedSamples{
-				Samples: []k6stats.Sample{
-					{
-						Metric: BrowserLoaded,
-						Tags:   sampleTags,
-						Value:  k6stats.D(endTime.Sub(fs.initTime.Time())),
-						Time:   time.Now(),
-					},
-				},
-			})
-		}
-	} else if event.Name == "DOMContentLoaded" {
+	case "DOMContentLoaded":
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventDOMContentLoad)
-		frame := fs.manager.getFrameByID(event.FrameID)
-		if frame != nil {
-			endTime := event.Timestamp.Time()
-			tags := state.CloneTags()
-			if state.Options.SystemTags.Has(k6stats.TagURL) {
-				tags["url"] = frame.URL()
-			}
-			sampleTags := k6stats.IntoSampleTags(&tags)
-			k6stats.PushIfNotDone(fs.ctx, state.Samples, k6stats.ConnectedSamples{
-				Samples: []k6stats.Sample{
-					{
-						Metric: BrowserDOMContentLoaded,
-						Tags:   sampleTags,
-						Value:  k6stats.D(endTime.Sub(fs.initTime.Time())),
-						Time:   time.Now(),
-					},
-				},
-			})
-		}
-	} else {
-		eventToMetric := map[string]*k6stats.Metric{
-			"firstPaint":           BrowserFirstPaint,
-			"firstContentfulPaint": BrowserFirstContentfulPaint,
-			"firstMeaningfulPaint": BrowserFirstMeaningfulPaint,
-		}
-		frame := fs.manager.getFrameByID(event.FrameID)
-		if frame != nil {
-			if metric, ok := eventToMetric[event.Name]; ok {
-				endTime := event.Timestamp.Time()
-				tags := state.CloneTags()
-				if state.Options.SystemTags.Has(k6stats.TagURL) {
-					tags["url"] = frame.URL()
-				}
-				sampleTags := k6stats.IntoSampleTags(&tags)
-				k6stats.PushIfNotDone(fs.ctx, state.Samples, k6stats.ConnectedSamples{
-					Samples: []k6stats.Sample{
-						{
-							Metric: metric,
-							Tags:   sampleTags,
-							Value:  k6stats.D(endTime.Sub(fs.initTime.Time())),
-							Time:   time.Now(),
-						},
-					},
-				})
-			}
-		}
+	}
+
+	eventToMetric := map[string]*k6stats.Metric{
+		"load":                 BrowserLoaded,
+		"DOMContentLoaded":     BrowserDOMContentLoaded,
+		"firstPaint":           BrowserFirstPaint,
+		"firstContentfulPaint": BrowserFirstContentfulPaint,
+		"firstMeaningfulPaint": BrowserFirstMeaningfulPaint,
+	}
+
+	if m, ok := eventToMetric[event.Name]; ok {
+		frame.emitMetric(m, event.Timestamp.Time())
 	}
 }
 
