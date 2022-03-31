@@ -106,7 +106,7 @@ func getTestTracer(t *testing.T) (*Tracer, *httptrace.ClientTrace) {
 	return tracer, ct
 }
 
-func TestTracer(t *testing.T) {
+func TestTracer(t *testing.T) { //nolint:tparallel
 	t.Parallel()
 	srv := httptest.NewTLSServer(httpbin.New().Handler())
 	defer srv.Close()
@@ -132,7 +132,7 @@ func TestTracer(t *testing.T) {
 	}
 	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
 
-	for tnum, isReuse := range []bool{false, true, true} {
+	for tnum, isReuse := range []bool{false, true, true} { //nolint:paralleltest
 		t.Run(fmt.Sprintf("Test #%d", tnum), func(t *testing.T) {
 			// Do not enable parallel testing, test relies on sequential execution
 			req, err := http.NewRequest("GET", srv.URL+"/get", nil)
@@ -277,7 +277,6 @@ func TestCancelledRequest(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	cancelTest := func(t *testing.T) {
-		t.Parallel()
 		tracer := &Tracer{}
 		req, err := http.NewRequestWithContext(context.Background(), "GET", srv.URL+"/delay/1", nil)
 		require.NoError(t, err)
@@ -300,7 +299,11 @@ func TestCancelledRequest(t *testing.T) {
 	t.Run("group", func(t *testing.T) {
 		t.Parallel()
 		for i := 0; i < 200; i++ {
-			t.Run(fmt.Sprintf("TestCancelledRequest_%d", i), cancelTest)
+			t.Run(fmt.Sprintf("TestCancelledRequest_%d", i),
+				func(t *testing.T) {
+					t.Parallel()
+					cancelTest(t)
+				})
 		}
 	})
 }

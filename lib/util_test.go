@@ -62,6 +62,7 @@ func TestSumStages(t *testing.T) {
 */
 
 func TestSplitKV(t *testing.T) {
+	t.Parallel()
 	testdata := map[string]struct {
 		k string
 		v string
@@ -74,6 +75,7 @@ func TestSplitKV(t *testing.T) {
 
 	for s, data := range testdata {
 		t.Run(s, func(t *testing.T) {
+			t.Parallel()
 			k, v := SplitKV(s)
 			assert.Equal(t, data.k, k)
 			assert.Equal(t, data.v, v)
@@ -82,6 +84,7 @@ func TestSplitKV(t *testing.T) {
 }
 
 func TestLerp(t *testing.T) {
+	t.Parallel()
 	// data[x][y][t] = v
 	data := map[int64]map[int64]map[float64]int64{
 		0: {
@@ -96,11 +99,17 @@ func TestLerp(t *testing.T) {
 	}
 
 	for x, data := range data {
+		x, data := x, data
 		t.Run("x="+strconv.FormatInt(x, 10), func(t *testing.T) {
+			t.Parallel()
 			for y, data := range data {
+				y, data := y, data
 				t.Run("y="+strconv.FormatInt(y, 10), func(t *testing.T) {
+					t.Parallel()
 					for t_, x1 := range data {
+						t_, x1 := t_, x1
 						t.Run("t="+strconv.FormatFloat(t_, 'f', 2, 64), func(t *testing.T) {
+							t.Parallel()
 							assert.Equal(t, x1, Lerp(x, y, t_))
 						})
 					}
@@ -111,6 +120,7 @@ func TestLerp(t *testing.T) {
 }
 
 func TestClampf(t *testing.T) {
+	t.Parallel()
 	testdata := map[float64]map[struct {
 		Min, Max float64
 	}]float64{
@@ -147,9 +157,13 @@ func TestClampf(t *testing.T) {
 	}
 
 	for val, ranges := range testdata {
+		val, ranges := val, ranges
 		t.Run(fmt.Sprintf("val=%.1f", val), func(t *testing.T) {
+			t.Parallel()
 			for r, result := range ranges {
+				r, result := r, result
 				t.Run(fmt.Sprintf("min=%.1f,max=%.1f", r.Min, r.Max), func(t *testing.T) {
+					t.Parallel()
 					assert.Equal(t, result, Clampf(val, r.Min, r.Max))
 				})
 			}
@@ -158,11 +172,13 @@ func TestClampf(t *testing.T) {
 }
 
 func TestMin(t *testing.T) {
+	t.Parallel()
 	assert.Equal(t, int64(10), Min(10, 100))
 	assert.Equal(t, int64(10), Min(100, 10))
 }
 
 func TestMax(t *testing.T) {
+	t.Parallel()
 	assert.Equal(t, int64(100), Max(10, 100))
 	assert.Equal(t, int64(100), Max(100, 10))
 }
