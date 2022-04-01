@@ -39,7 +39,7 @@ func StrictJSONUnmarshal(data []byte, v interface{}) error {
 		return err
 	}
 	if dec.More() {
-		//TODO: use a custom error?
+		// TODO: use a custom error?
 		return fmt.Errorf("unexpected data after the JSON object")
 	}
 	return nil
