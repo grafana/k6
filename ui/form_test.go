@@ -29,12 +29,15 @@ import (
 )
 
 func TestForm(t *testing.T) {
+	t.Parallel()
 	t.Run("Blank", func(t *testing.T) {
+		t.Parallel()
 		data, err := Form{}.Run(strings.NewReader(""), bytes.NewBuffer(nil))
 		assert.NoError(t, err)
 		assert.Equal(t, map[string]string{}, data)
 	})
 	t.Run("Banner", func(t *testing.T) {
+		t.Parallel()
 		out := bytes.NewBuffer(nil)
 		data, err := Form{Banner: "Hi!"}.Run(strings.NewReader(""), out)
 		assert.NoError(t, err)
@@ -42,6 +45,7 @@ func TestForm(t *testing.T) {
 		assert.Equal(t, "Hi!\n\n", out.String())
 	})
 	t.Run("Field", func(t *testing.T) {
+		t.Parallel()
 		f := Form{
 			Fields: []Field{
 				StringField{Key: "key", Label: "label"},
@@ -55,6 +59,7 @@ func TestForm(t *testing.T) {
 		assert.Equal(t, "  label: ", out.String())
 	})
 	t.Run("Fields", func(t *testing.T) {
+		t.Parallel()
 		f := Form{
 			Fields: []Field{
 				StringField{Key: "a", Label: "label a"},
@@ -69,6 +74,7 @@ func TestForm(t *testing.T) {
 		assert.Equal(t, "  label a:   label b: ", out.String())
 	})
 	t.Run("Defaults", func(t *testing.T) {
+		t.Parallel()
 		f := Form{
 			Fields: []Field{
 				StringField{Key: "a", Label: "label a", Default: "default a"},
@@ -83,6 +89,7 @@ func TestForm(t *testing.T) {
 		assert.Equal(t, "  label a [default a]:   label b [default b]: ", out.String())
 	})
 	t.Run("Errors", func(t *testing.T) {
+		t.Parallel()
 		f := Form{
 			Fields: []Field{
 				StringField{Key: "key", Label: "label", Min: 6, Max: 10},

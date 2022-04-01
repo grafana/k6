@@ -34,6 +34,7 @@ import (
 )
 
 func TestGetFixedLengthInt(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		val, maxVal int64
 		expRes      string
@@ -64,6 +65,7 @@ func TestGetFixedLengthInt(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.expRes, func(t *testing.T) {
+			t.Parallel()
 			fmtFormat := GetFixedLengthIntFormat(tc.maxVal)
 			res := fmt.Sprintf(fmtFormat, tc.val)
 			assert.Equal(t, tc.expRes, res)
@@ -73,7 +75,9 @@ func TestGetFixedLengthInt(t *testing.T) {
 		})
 	}
 }
+
 func TestGetFixedLengthFloat(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		val, maxVal float64
 		precision   uint
@@ -108,6 +112,7 @@ func TestGetFixedLengthFloat(t *testing.T) {
 	for i, tc := range testCases {
 		tc := tc
 		t.Run(fmt.Sprintf("tc%d_exp_%s", i, tc.expRes), func(t *testing.T) {
+			t.Parallel()
 			fmtFormat := GetFixedLengthFloatFormat(tc.maxVal, tc.precision)
 			res := fmt.Sprintf(fmtFormat, tc.val)
 			assert.Equal(t, tc.expRes, res)
@@ -122,6 +127,7 @@ func TestGetFixedLengthFloat(t *testing.T) {
 }
 
 func TestGetFixedLengthDuration(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		val, maxVal time.Duration
 		expRes      string
@@ -155,6 +161,7 @@ func TestGetFixedLengthDuration(t *testing.T) {
 	for i, tc := range testCases {
 		tc := tc
 		t.Run(fmt.Sprintf("tc%d_exp_%s", i, tc.expRes), func(t *testing.T) {
+			t.Parallel()
 			res := GetFixedLengthDuration(tc.val, tc.maxVal)
 			assert.Equal(t, tc.expRes, res)
 
