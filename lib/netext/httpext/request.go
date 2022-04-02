@@ -286,6 +286,19 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 	mreq := preq.Req.WithContext(reqCtx)
 	res, resErr := client.Do(mreq)
 
+	// due to https://github.com/golang/go/commit/a41763539c7ad09a22720a517a28e6018ca4db0f
+	// redirects with missing Location are no longer errors. But they were up to that point
+	// (possibly realeased in go 1.19).
+	// In order to not have a change in behaviour depending on the version compiled we still
+	// make it an error to not have Location header on a redirect
+	if res != nil && resErr == nil {
+		switch res.StatusCode {
+		case 301, 302, 303:
+			if res.Header.Get("Location") == "" {
+				resErr = NewK6Error(defaultErrorCode, fmt.Sprintf("%d response missing Location header", res.StatusCode), nil)
+			}
+		}
+	}
 	// TODO(imiric): It would be safer to check for a writeable
 	// response body here instead of status code, but those are
 	// wrapped in a read-only body when using client timeouts and are
