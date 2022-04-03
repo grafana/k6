@@ -59,66 +59,6 @@ type bridgeTestErrorType struct{}
 
 func (bridgeTestErrorType) Error() error { return errors.New("error") }
 
-type bridgeTestJSValueType struct{}
-
-func (bridgeTestJSValueType) Func(arg goja.Value) goja.Value { return arg }
-
-type bridgeTestJSValueErrorType struct{}
-
-func (bridgeTestJSValueErrorType) Func(arg goja.Value) (goja.Value, error) {
-	if goja.IsUndefined(arg) {
-		return goja.Undefined(), errors.New("missing argument")
-	}
-	return arg, nil
-}
-
-type bridgeTestJSValueContextType struct{}
-
-func (bridgeTestJSValueContextType) Func(ctx context.Context, arg goja.Value) goja.Value {
-	return arg
-}
-
-type bridgeTestJSValueContextErrorType struct{}
-
-func (bridgeTestJSValueContextErrorType) Func(ctx context.Context, arg goja.Value) (goja.Value, error) {
-	if goja.IsUndefined(arg) {
-		return goja.Undefined(), errors.New("missing argument")
-	}
-	return arg, nil
-}
-
-type bridgeTestNativeFunctionType struct{}
-
-func (bridgeTestNativeFunctionType) Func(call goja.FunctionCall) goja.Value {
-	return call.Argument(0)
-}
-
-type bridgeTestNativeFunctionErrorType struct{}
-
-func (bridgeTestNativeFunctionErrorType) Func(call goja.FunctionCall) (goja.Value, error) {
-	arg := call.Argument(0)
-	if goja.IsUndefined(arg) {
-		return goja.Undefined(), errors.New("missing argument")
-	}
-	return arg, nil
-}
-
-type bridgeTestNativeFunctionContextType struct{}
-
-func (bridgeTestNativeFunctionContextType) Func(ctx context.Context, call goja.FunctionCall) goja.Value {
-	return call.Argument(0)
-}
-
-type bridgeTestNativeFunctionContextErrorType struct{}
-
-func (bridgeTestNativeFunctionContextErrorType) Func(ctx context.Context, call goja.FunctionCall) (goja.Value, error) {
-	arg := call.Argument(0)
-	if goja.IsUndefined(arg) {
-		return goja.Undefined(), errors.New("missing argument")
-	}
-	return arg, nil
-}
-
 type bridgeTestAddType struct{}
 
 func (bridgeTestAddType) Add(a, b int) int { return a + b }
@@ -152,18 +92,6 @@ func (bridgeTestContextAddWithErrorType) ContextAddWithError(ctx context.Context
 	}
 	return res, nil
 }
-
-type bridgeTestContextInjectType struct {
-	ctx context.Context
-}
-
-func (t *bridgeTestContextInjectType) ContextInject(ctx context.Context) { t.ctx = ctx }
-
-type bridgeTestContextInjectPtrType struct {
-	ctxPtr *context.Context
-}
-
-func (t *bridgeTestContextInjectPtrType) ContextInjectPtr(ctxPtr *context.Context) { t.ctxPtr = ctxPtr }
 
 type bridgeTestSumType struct{}
 
@@ -209,15 +137,6 @@ func (m bridgeTestSumWithContextAndErrorType) SumWithContextAndError(ctx context
 		return 0, errors.New("answer is negative")
 	}
 	return sum, nil
-}
-
-type bridgeTestCounterType struct {
-	Counter int
-}
-
-func (m *bridgeTestCounterType) Count() int {
-	m.Counter++
-	return m.Counter
 }
 
 type bridgeTestConstructorType struct{}
