@@ -4,8 +4,8 @@
     <id>k6.portable</id>
     <title>k6 (Portable)</title>
     <version>__REPLACE__</version>
-    <authors>Load Impact</authors>
-    <owners>Load Impact</owners>
+    <authors>Raintank Inc. d.b.a. Grafana Labs</authors>
+    <owners>Raintank Inc. d.b.a. Grafana Labs</owners>
     <summary>Load testing for the 21st century</summary>
     <description>
         k6 is a developer centric open source load testing tool for testing the performance of your backend infrastructure. It’s built with Go and JavaScript to integrate well into your development workflow, so you can stay on top of performance without fuzz.
