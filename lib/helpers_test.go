@@ -54,6 +54,7 @@ func TestStrictJSONUnmarshal(t *testing.T) {
 	for i, tc := range testCases {
 		tc := tc
 		t.Run(fmt.Sprintf("TestCase#%d", i), func(t *testing.T) {
+			t.Parallel()
 			err := StrictJSONUnmarshal([]byte(tc.data), &tc.destination)
 			if tc.expectedError {
 				require.Error(t, err)
@@ -65,4 +66,4 @@ func TestStrictJSONUnmarshal(t *testing.T) {
 	}
 }
 
-//TODO: test EventStream very thoroughly
+// TODO: test EventStream very thoroughly

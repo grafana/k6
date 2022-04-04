@@ -203,7 +203,7 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = afero.WriteFile(arc.getFs(scheme), pathOnFs, arc.Data, 0644) // TODO fix the mode ?
+	err = afero.WriteFile(arc.getFs(scheme), pathOnFs, arc.Data, 0o644) // TODO fix the mode ?
 	if err != nil {
 		return nil, err
 	}
@@ -262,7 +262,7 @@ func (arc *Archive) Write(out io.Writer) error {
 	}
 	_ = w.WriteHeader(&tar.Header{
 		Name:     "metadata.json",
-		Mode:     0644,
+		Mode:     0o644,
 		Size:     int64(len(metadata)),
 		ModTime:  now,
 		Typeflag: tar.TypeReg,
@@ -273,7 +273,7 @@ func (arc *Archive) Write(out io.Writer) error {
 
 	_ = w.WriteHeader(&tar.Header{
 		Name:     "data",
-		Mode:     0644,
+		Mode:     0o644,
 		Size:     int64(len(arc.Data)),
 		ModTime:  now,
 		Typeflag: tar.TypeReg,
@@ -335,10 +335,10 @@ func (arc *Archive) Write(out io.Writer) error {
 		for _, dirPath := range dirs {
 			_ = w.WriteHeader(&tar.Header{
 				Name:       path.Clean(path.Join(name, dirPath)),
-				Mode:       0755, // MemMapFs is buggy
-				AccessTime: now,  // MemMapFs is buggy
-				ChangeTime: now,  // MemMapFs is buggy
-				ModTime:    now,  // MemMapFs is buggy
+				Mode:       0o755, // MemMapFs is buggy
+				AccessTime: now,   // MemMapFs is buggy
+				ChangeTime: now,   // MemMapFs is buggy
+				ModTime:    now,   // MemMapFs is buggy
 				Typeflag:   tar.TypeDir,
 			})
 		}
@@ -357,7 +357,7 @@ func (arc *Archive) Write(out io.Writer) error {
 			} else {
 				err = w.WriteHeader(&tar.Header{
 					Name:       fullFilePath,
-					Mode:       0644, // MemMapFs is buggy
+					Mode:       0o644, // MemMapFs is buggy
 					Size:       int64(len(files[filePath])),
 					AccessTime: infos[filePath].ModTime(),
 					ChangeTime: infos[filePath].ModTime(),

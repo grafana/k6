@@ -36,8 +36,8 @@ import (
 )
 
 func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
-	var b = bytes.NewBuffer(nil)
-	var w = tar.NewWriter(b)
+	b := bytes.NewBuffer(nil)
+	w := tar.NewWriter(b)
 	err := fsext.Walk(fs, afero.FilePathSeparator,
 		filepath.WalkFunc(func(filePath string, info os.FileInfo, err error) error {
 			if filePath == afero.FilePathSeparator {
@@ -49,7 +49,7 @@ func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
 			if info.IsDir() {
 				return w.WriteHeader(&tar.Header{
 					Name:     path.Clean(filepath.ToSlash(filePath)[1:]),
-					Mode:     0555,
+					Mode:     0o555,
 					Typeflag: tar.TypeDir,
 				})
 			}
@@ -60,7 +60,7 @@ func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
 			}
 			err = w.WriteHeader(&tar.Header{
 				Name:     path.Clean(filepath.ToSlash(filePath)[1:]),
-				Mode:     0644,
+				Mode:     0o644,
 				Size:     int64(len(data)),
 				Typeflag: tar.TypeReg,
 			})
@@ -80,7 +80,8 @@ func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
 }
 
 func TestOldArchive(t *testing.T) {
-	var testCases = map[string]string{
+	t.Parallel()
+	testCases := map[string]string{
 		// map of filename to data for each main file tested
 		"github.com/k6io/k6/samples/example.js": `github file`,
 		"cdnjs.com/packages/Faker":              `faker file`,
@@ -90,6 +91,7 @@ func TestOldArchive(t *testing.T) {
 	for filename, data := range testCases {
 		filename, data := filename, data
 		t.Run(filename, func(t *testing.T) {
+			t.Parallel()
 			metadata := `{"filename": "` + filename + `", "options": {}}`
 			fs := makeMemMapFs(t, map[string][]byte{
 				// files
@@ -112,24 +114,22 @@ func TestOldArchive(t *testing.T) {
 			buf, err := dumpMemMapFsToBuf(fs)
 			require.NoError(t, err)
 
-			var (
-				expectedFilesystems = map[string]afero.Fs{
-					"file": makeMemMapFs(t, map[string][]byte{
-						"/C:/something/path":  []byte(`windows file`),
-						"/absolulte/path":     []byte(`unix file`),
-						"/C:/something/path2": []byte(`windows script`),
-						"/absolulte/path2":    []byte(`unix script`),
-					}),
-					"https": makeMemMapFs(t, map[string][]byte{
-						"/example.com/path/to.js":                 []byte(`example.com file`),
-						"/example.com/path/too.js":                []byte(`example.com script`),
-						"/github.com/k6io/k6/samples/example.js":  []byte(`github file`),
-						"/cdnjs.com/packages/Faker":               []byte(`faker file`),
-						"/github.com/k6io/k6/samples/example.js2": []byte(`github script`),
-						"/cdnjs.com/packages/Faker2":              []byte(`faker script`),
-					}),
-				}
-			)
+			expectedFilesystems := map[string]afero.Fs{
+				"file": makeMemMapFs(t, map[string][]byte{
+					"/C:/something/path":  []byte(`windows file`),
+					"/absolulte/path":     []byte(`unix file`),
+					"/C:/something/path2": []byte(`windows script`),
+					"/absolulte/path2":    []byte(`unix script`),
+				}),
+				"https": makeMemMapFs(t, map[string][]byte{
+					"/example.com/path/to.js":                 []byte(`example.com file`),
+					"/example.com/path/too.js":                []byte(`example.com script`),
+					"/github.com/k6io/k6/samples/example.js":  []byte(`github file`),
+					"/cdnjs.com/packages/Faker":               []byte(`faker file`),
+					"/github.com/k6io/k6/samples/example.js2": []byte(`github script`),
+					"/cdnjs.com/packages/Faker2":              []byte(`faker script`),
+				}),
+			}
 
 			arc, err := ReadArchive(buf)
 			require.NoError(t, err)
@@ -140,6 +140,7 @@ func TestOldArchive(t *testing.T) {
 }
 
 func TestUnknownPrefix(t *testing.T) {
+	t.Parallel()
 	fs := makeMemMapFs(t, map[string][]byte{
 		"/strange/something": []byte(`github file`),
 	})
@@ -153,7 +154,8 @@ func TestUnknownPrefix(t *testing.T) {
 }
 
 func TestFilenamePwdResolve(t *testing.T) {
-	var tests = []struct {
+	t.Parallel()
+	tests := []struct {
 		Filename, Pwd, version              string
 		expectedFilenameURL, expectedPwdURL *url.URL
 		expectedError                       string
@@ -229,8 +231,9 @@ func TestFilenamePwdResolve(t *testing.T) {
 }
 
 func TestDerivedExecutionDiscarding(t *testing.T) {
+	t.Parallel()
 	var emptyConfigMap ScenarioConfigs
-	var tests = []struct {
+	tests := []struct {
 		metadata     string
 		expScenarios interface{}
 		expError     string

@@ -20,37 +20,6 @@
 
 package lib
 
-import (
-	"strings"
-)
-
-// Splits a string in the form "key=value".
-func SplitKV(s string) (key, value string) {
-	parts := strings.SplitN(s, "=", 2)
-	if len(parts) == 1 {
-		return parts[0], ""
-	}
-	return parts[0], parts[1]
-}
-
-// Lerp is a linear interpolation between two values x and y, returning the value at the point t,
-// where t is a fraction in the range [0.0 - 1.0].
-func Lerp(x, y int64, t float64) int64 {
-	return x + int64(t*float64(y-x))
-}
-
-// Clampf returns the given value, "clamped" to the range [min, max].
-func Clampf(val, min, max float64) float64 {
-	switch {
-	case val < min:
-		return min
-	case val > max:
-		return max
-	default:
-		return val
-	}
-}
-
 // Returns the maximum value of a and b.
 func Max(a, b int64) int64 {
 	if a > b {

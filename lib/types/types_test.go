@@ -31,6 +31,7 @@ import (
 )
 
 func TestParseExtendedDuration(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		durStr string
 		expErr bool
@@ -68,6 +69,7 @@ func TestParseExtendedDuration(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(fmt.Sprintf("tc_%s_exp", tc.durStr), func(t *testing.T) {
+			t.Parallel()
 			result, err := ParseExtendedDuration(tc.durStr)
 			if tc.expErr {
 				assert.Error(t, err)
@@ -80,33 +82,42 @@ func TestParseExtendedDuration(t *testing.T) {
 }
 
 func TestDuration(t *testing.T) {
+	t.Parallel()
 	t.Run("String", func(t *testing.T) {
+		t.Parallel()
 		assert.Equal(t, "1m15s", Duration(75*time.Second).String())
 	})
 	t.Run("JSON", func(t *testing.T) {
+		t.Parallel()
 		t.Run("Unmarshal", func(t *testing.T) {
+			t.Parallel()
 			t.Run("Number", func(t *testing.T) {
+				t.Parallel()
 				var d Duration
 				assert.NoError(t, json.Unmarshal([]byte(`75000`), &d))
 				assert.Equal(t, Duration(75*time.Second), d)
 			})
 			t.Run("Seconds", func(t *testing.T) {
+				t.Parallel()
 				var d Duration
 				assert.NoError(t, json.Unmarshal([]byte(`"75s"`), &d))
 				assert.Equal(t, Duration(75*time.Second), d)
 			})
 			t.Run("String", func(t *testing.T) {
+				t.Parallel()
 				var d Duration
 				assert.NoError(t, json.Unmarshal([]byte(`"1m15s"`), &d))
 				assert.Equal(t, Duration(75*time.Second), d)
 			})
 			t.Run("Extended", func(t *testing.T) {
+				t.Parallel()
 				var d Duration
 				assert.NoError(t, json.Unmarshal([]byte(`"1d2h1m15s"`), &d))
 				assert.Equal(t, Duration(26*time.Hour+75*time.Second), d)
 			})
 		})
 		t.Run("Marshal", func(t *testing.T) {
+			t.Parallel()
 			d := Duration(75 * time.Second)
 			data, err := json.Marshal(d)
 			assert.NoError(t, err)
@@ -114,6 +125,7 @@ func TestDuration(t *testing.T) {
 		})
 	})
 	t.Run("Text", func(t *testing.T) {
+		t.Parallel()
 		var d Duration
 		assert.NoError(t, d.UnmarshalText([]byte(`10s`)))
 		assert.Equal(t, Duration(10*time.Second), d)
@@ -121,40 +133,51 @@ func TestDuration(t *testing.T) {
 }
 
 func TestNullDuration(t *testing.T) {
+	t.Parallel()
 	t.Run("String", func(t *testing.T) {
+		t.Parallel()
 		assert.Equal(t, "1m15s", Duration(75*time.Second).String())
 	})
 	t.Run("JSON", func(t *testing.T) {
+		t.Parallel()
 		t.Run("Unmarshal", func(t *testing.T) {
+			t.Parallel()
 			t.Run("Number", func(t *testing.T) {
+				t.Parallel()
 				var d NullDuration
 				assert.NoError(t, json.Unmarshal([]byte(`75000`), &d))
 				assert.Equal(t, NullDuration{Duration(75 * time.Second), true}, d)
 			})
 			t.Run("Seconds", func(t *testing.T) {
+				t.Parallel()
 				var d NullDuration
 				assert.NoError(t, json.Unmarshal([]byte(`"75s"`), &d))
 				assert.Equal(t, NullDuration{Duration(75 * time.Second), true}, d)
 			})
 			t.Run("String", func(t *testing.T) {
+				t.Parallel()
 				var d NullDuration
 				assert.NoError(t, json.Unmarshal([]byte(`"1m15s"`), &d))
 				assert.Equal(t, NullDuration{Duration(75 * time.Second), true}, d)
 			})
 			t.Run("Null", func(t *testing.T) {
+				t.Parallel()
 				var d NullDuration
 				assert.NoError(t, json.Unmarshal([]byte(`null`), &d))
 				assert.Equal(t, NullDuration{Duration(0), false}, d)
 			})
 		})
 		t.Run("Marshal", func(t *testing.T) {
+			t.Parallel()
 			t.Run("Valid", func(t *testing.T) {
+				t.Parallel()
 				d := NullDuration{Duration(75 * time.Second), true}
 				data, err := json.Marshal(d)
 				assert.NoError(t, err)
 				assert.Equal(t, `"1m15s"`, string(data))
 			})
 			t.Run("null", func(t *testing.T) {
+				t.Parallel()
 				var d NullDuration
 				data, err := json.Marshal(d)
 				assert.NoError(t, err)
@@ -163,11 +186,13 @@ func TestNullDuration(t *testing.T) {
 		})
 	})
 	t.Run("Text", func(t *testing.T) {
+		t.Parallel()
 		var d NullDuration
 		assert.NoError(t, d.UnmarshalText([]byte(`10s`)))
 		assert.Equal(t, NullDurationFrom(10*time.Second), d)
 
 		t.Run("Empty", func(t *testing.T) {
+			t.Parallel()
 			var d NullDuration
 			assert.NoError(t, d.UnmarshalText([]byte(``)))
 			assert.Equal(t, NullDuration{}, d)
@@ -176,10 +201,12 @@ func TestNullDuration(t *testing.T) {
 }
 
 func TestNullDurationFrom(t *testing.T) {
+	t.Parallel()
 	assert.Equal(t, NullDuration{Duration(10 * time.Second), true}, NullDurationFrom(10*time.Second))
 }
 
 func TestGetDurationValue(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		val      interface{}
 		expError bool
@@ -219,6 +246,7 @@ func TestGetDurationValue(t *testing.T) {
 	for i, tc := range testCases {
 		i, tc := i, tc
 		t.Run(fmt.Sprintf("testcase_%02d", i), func(t *testing.T) {
+			t.Parallel()
 			res, err := GetDurationValue(tc.val)
 			if tc.expError {
 				assert.Error(t, err)
