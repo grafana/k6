@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-    <Product Id="*" UpgradeCode="8C5F9495-F697-4780-ABFD-90DCC2F681B6" Version="$(var.VERSION)" Language="1033" Name="k6" Manufacturer="Load Impact AB">
+    <Product Id="*" UpgradeCode="8C5F9495-F697-4780-ABFD-90DCC2F681B6" Version="$(var.VERSION)" Language="1033" Name="k6" Manufacturer="Raintank Inc. d.b.a. Grafana Labs">
         <Package InstallerVersion="300" Compressed="yes"/>
         <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A later version of [ProductName] is already installed. Setup will now exit."/>
 

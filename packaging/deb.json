@@ -1,8 +1,8 @@
 {
     "name": "k6",
-    "maintainer": "Load Impact AB",
+    "maintainer": "Raintank Inc. d.b.a. Grafana Labs",
     "description": "Load testing for the 21st century",
-    "changelog-cmd": "echo \"* $(date \"+%a %b %d %Y\") Load Impact \n - Go to the release page for more details on the changelog.\n\n https://github.com/k6io/k6/releases/tag/v!version!\"",
+    "changelog-cmd": "echo \"* $(date \"+%a %b %d %Y\") Grafana Labs \n - Go to the release page for more details on the changelog.\n\n https://github.com/k6io/k6/releases/tag/v!version!\"",
     "homepage": "https://k6.io/",
     "files": [
       {
@@ -15,7 +15,7 @@
     "copyrights": [
       {
         "files": "*",
-        "copyright": "2020 Load Impact AB",
+        "copyright": "2022 Raintank Inc. d.b.a. Grafana Labs",
         "license": "AGPL-3.0",
         "file": "LICENSE"
       }
