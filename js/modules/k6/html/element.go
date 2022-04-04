@@ -120,12 +120,12 @@ func (e Element) ownerFormSel() (*goquery.Selection, bool) {
 		return prtForm, true
 	}
 
-	formId := e.attrAsString("form")
-	if formId == "" {
+	formID := e.attrAsString("form")
+	if formID == "" {
 		return nil, false
 	}
 
-	findForm := e.sel.sel.Parents().Last().Find("#" + formId)
+	findForm := e.sel.sel.Parents().Last().Find("#" + formID)
 	if findForm.Length() == 0 {
 		return nil, false
 	}
@@ -198,7 +198,7 @@ func (e Element) GetAttribute(name string) goja.Value {
 }
 
 func (e Element) GetAttributeNode(name string) goja.Value {
-	if attr := getHtmlAttr(e.node, name); attr != nil {
+	if attr := getHTMLAttr(e.node, name); attr != nil {
 		return e.sel.rt.ToValue(Attribute{&e, attr.Key, attr.Namespace, attr.Val})
 	}
 
@@ -375,7 +375,7 @@ func (e Element) ClassName() goja.Value {
 }
 
 func (e Element) Lang() goja.Value {
-	if attr := getHtmlAttr(e.node, "lang"); attr != nil && attr.Namespace == "" {
+	if attr := getHTMLAttr(e.node, "lang"); attr != nil && attr.Namespace == "" {
 		return e.sel.rt.ToValue(attr.Val)
 	}
 

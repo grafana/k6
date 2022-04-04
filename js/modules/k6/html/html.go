@@ -113,7 +113,8 @@ func (s Selection) buildMatcher(v goja.Value, gojaFn goja.Callable) func(int, *g
 func (s Selection) varargFnCall(arg interface{},
 	strFilter func(string) *goquery.Selection,
 	selFilter func(*goquery.Selection) *goquery.Selection,
-	nodeFilter func(...*gohtml.Node) *goquery.Selection) Selection {
+	nodeFilter func(...*gohtml.Node) *goquery.Selection,
+) Selection {
 	switch v := arg.(type) {
 	case Selection:
 		return Selection{s.rt, selFilter(v.sel), s.URL}
@@ -135,7 +136,8 @@ func (s Selection) varargFnCall(arg interface{},
 
 func (s Selection) adjacent(unfiltered func() *goquery.Selection,
 	filtered func(string) *goquery.Selection,
-	def ...string) Selection {
+	def ...string,
+) Selection {
 	if len(def) > 0 {
 		return Selection{s.rt, filtered(def[0]), s.URL}
 	}
@@ -147,7 +149,8 @@ func (s Selection) adjacentUntil(until func(string) *goquery.Selection,
 	untilSelection func(*goquery.Selection) *goquery.Selection,
 	filteredUntil func(string, string) *goquery.Selection,
 	filteredUntilSelection func(string, *goquery.Selection) *goquery.Selection,
-	def ...goja.Value) Selection {
+	def ...goja.Value,
+) Selection {
 	switch len(def) {
 	case 0:
 		return Selection{s.rt, until(""), s.URL}
@@ -234,7 +237,8 @@ func (s Selection) Siblings(def ...string) Selection {
 	return s.adjacent(s.sel.Siblings, s.sel.SiblingsFiltered, def...)
 }
 
-// prevUntil, nextUntil and parentsUntil support two arguments with mutable type.
+// PrevUntil returns all preceding siblings of each element up to but not including the element matched by the selector.
+// The arguments are:
 // 1st argument is the selector. Either a selector string, a Selection object, or nil
 // 2nd argument is the filter. Either a selector string or nil/undefined
 func (s Selection) PrevUntil(def ...goja.Value) Selection {
@@ -247,6 +251,10 @@ func (s Selection) PrevUntil(def ...goja.Value) Selection {
 	)
 }
 
+// NextUntil returns all following siblings of each element up to but not including the element matched by the selector.
+// The arguments are:
+// 1st argument is the selector. Either a selector string, a Selection object, or nil
+// 2nd argument is the filter. Either a selector string or nil/undefined
 func (s Selection) NextUntil(def ...goja.Value) Selection {
 	return s.adjacentUntil(
 		s.sel.NextUntil,
@@ -257,6 +265,11 @@ func (s Selection) NextUntil(def ...goja.Value) Selection {
 	)
 }
 
+// ParentsUntil returns the ancestors of each element in the current set of matched elements,
+// up to but not including the element matched by the selector
+// The arguments are:
+// 1st argument is the selector. Either a selector string, a Selection object, or nil
+// 2nd argument is the filter. Either a selector string or nil/undefined
 func (s Selection) ParentsUntil(def ...goja.Value) Selection {
 	return s.adjacentUntil(
 		s.sel.ParentsUntil,
@@ -314,7 +327,6 @@ func (s Selection) Html() goja.Value {
 	return s.rt.ToValue(val)
 }
 
-// nolint: goconst
 func (s Selection) Val() goja.Value {
 	switch goquery.NodeName(s.sel) {
 	case InputTagName:
@@ -498,16 +510,14 @@ func (s Selection) Data(def ...string) goja.Value {
 		val, exists := s.sel.Attr("data-" + propertyToAttr(def[0]))
 		if exists {
 			return s.rt.ToValue(convertDataAttrVal(val))
-		} else {
-			return goja.Undefined()
 		}
-	} else {
-		data := make(map[string]interface{})
-		for _, attr := range s.sel.Nodes[0].Attr {
-			if strings.HasPrefix(attr.Key, "data-") && len(attr.Key) > 5 {
-				data[attrToProperty(attr.Key[5:])] = convertDataAttrVal(attr.Val)
-			}
-		}
-		return s.rt.ToValue(data)
+		return goja.Undefined()
 	}
+	data := make(map[string]interface{})
+	for _, attr := range s.sel.Nodes[0].Attr {
+		if strings.HasPrefix(attr.Key, "data-") && len(attr.Key) > 5 {
+			data[attrToProperty(attr.Key[5:])] = convertDataAttrVal(attr.Val)
+		}
+	}
+	return s.rt.ToValue(data)
 }

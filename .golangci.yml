@@ -29,6 +29,8 @@ issues:
      text: "does not use range value in test Run"
 
 linters-settings:
+  exhaustive:
+    default-signifies-exhaustive: true
   govet:
     check-shadowing: true
   cyclop:
