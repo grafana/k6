@@ -293,7 +293,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 	// make it an error to not have Location header on a redirect
 	if res != nil && resErr == nil {
 		switch res.StatusCode {
-		case 301, 302, 303:
+		case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther:
 			if res.Header.Get("Location") == "" {
 				resErr = NewK6Error(defaultErrorCode, fmt.Sprintf("%d response missing Location header", res.StatusCode), nil)
 			}
