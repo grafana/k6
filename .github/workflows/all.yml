@@ -182,8 +182,8 @@ jobs:
           goversioninfo -64 \
             -platform-specific=true \
             -charset="1200" \
-            -company="Load Impact AB" \
-            -copyright="© Load Impact AB. Licensed under AGPL." \
+            -company="Raintank Inc. d.b.a. Grafana Labs" \
+            -copyright="© Raintank Inc. d.b.a. Grafana Labs. Licensed under AGPL." \
             -description="A modern load testing tool, using Go and JavaScript" \
             -icon=packaging/k6.ico \
             -internal-name="k6" \
