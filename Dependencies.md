@@ -59,3 +59,5 @@ It's preferable to make multiple PRs - in most cases you can split them in three
 - everything else - this in general doesn't include more than 5-6 small updates.
 
 Further splitting is recommended if PRs become too big.
+
+When updating goja it's recommended to run the tc39 tests in `js/tc39`. And if needed, update the breaking ones as explained in an [Introduction to a k6's TC39 testing](./js/tc39/README.md).
