@@ -53,24 +53,14 @@ type BrowserContextOptions struct {
 // NewBrowserContextOptions creates a default set of browser context options.
 func NewBrowserContextOptions() *BrowserContextOptions {
 	return &BrowserContextOptions{
-		AcceptDownloads:   false,
-		BypassCSP:         false,
 		ColorScheme:       ColorSchemeLight,
 		DeviceScaleFactor: 1.0,
 		ExtraHTTPHeaders:  make(map[string]string),
-		Geolocation:       nil,
-		HasTouch:          false,
-		HttpCredentials:   nil,
-		IgnoreHTTPSErrors: false,
-		IsMobile:          false,
 		JavaScriptEnabled: true,
 		Locale:            DefaultLocale,
-		Offline:           false,
-		Permissions:       make([]string, 0),
+		Permissions:       []string{},
 		ReducedMotion:     ReducedMotionNoPreference,
 		Screen:            &Screen{Width: DefaultScreenWidth, Height: DefaultScreenHeight},
-		TimezoneID:        "",
-		UserAgent:         "",
 		Viewport:          &Viewport{Width: DefaultScreenWidth, Height: DefaultScreenHeight},
 	}
 }
