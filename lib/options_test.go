@@ -253,6 +253,7 @@ func TestOptions(t *testing.T) {
 					"AwEHoUQDQgAEF8XzmC7x8Ns0Y2Wyu2c77ge+6I/ghcDTjWOMZzMPmRRDxqKFLuGD\n" +
 					"zW1Kss13WODGSS8+j7dNCPOeLKyK6cbeIg==\n" +
 					"-----END EC PRIVATE KEY-----",
+				Password: "iNGNlsrtnO+4HiQAwRgIhANYDaM18sXAdkjyvuiP4IXA041jdK48Jd6a8aD",
 			}, nil},
 		}
 		opts := Options{}.Apply(Options{TLSAuth: tlsAuth})
@@ -286,6 +287,124 @@ func TestOptions(t *testing.T) {
 			assert.Error(t, json.Unmarshal([]byte(jsonStr), &opts))
 		})
 	})
+
+	t.Run("TLSAuth encrypted key and invalid password", func(t *testing.T) {
+		tlsAuth := []*TLSAuth{
+			{TLSAuthFields{
+				Domains: []string{"example.com", "*.example.com"},
+				Cert: "-----BEGIN CERTIFICATE-----\n" +
+					"MIIBoTCCAUegAwIBAgIUQl0J1Gkd6U2NIMwMDnpfH8c1myEwCgYIKoZIzj0EAwIw\n" +
+					"EDEOMAwGA1UEAxMFTXkgQ0EwHhcNMTcwODE1MTYxODAwWhcNMTgwODE1MTYxODAw\n" +
+					"WjAQMQ4wDAYDVQQDEwV1c2VyMTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABLaf\n" +
+					"xEOmBHkzbqd9/0VZX/39qO2yQq2Gz5faRdvy38kuLMCV+9HYrfMx6GYCZzTUIq6h\n" +
+					"8QXOrlgYTixuUVfhJNWjfzB9MA4GA1UdDwEB/wQEAwIFoDAdBgNVHSUEFjAUBggr\n" +
+					"BgEFBQcDAQYIKwYBBQUHAwIwDAYDVR0TAQH/BAIwADAdBgNVHQ4EFgQUxmQiq5K3\n" +
+					"KUnVME945Byt3Ysvkh8wHwYDVR0jBBgwFoAU3qEhcpRgpsqo9V+LFns9a+oZIYww\n" +
+					"CgYIKoZIzj0EAwIDSAAwRQIgSGxnJ+/cLUNTzt7fhr/mjJn7ShsTW33dAdfLM7H2\n" +
+					"z/gCIQDyVf8DePtxlkMBScTxZmIlMQdNc6+6VGZQ4QscruVLmg==\n" +
+					"-----END CERTIFICATE-----",
+				Key: "-----BEGIN EC PRIVATE KEY-----\n" +
+					"Proc-Type: 4,ENCRYPTED\n" +
+					"DEK-Info: AES-256-CBC,DF2445CBFE2E5B112FB2B721063757E5\n" +
+					"o/VKNZjQcRM2hatqUkQ0dTolL7i2i5hJX9XYsl+TMsq8ZkC83uY/JdR986QS+W2c\n" +
+					"EoQGtVGVeL0KGvGpzjTX3YAKXM7Lg5btAeS8GvJ9S7YFd8s0q1pqDdffl2RyjJav\n" +
+					"t1jx6XvLu2nBrOUARvHqjkkJQCTdRf2a34GJdbZqE+4=\n" +
+					"-----END EC PRIVATE KEY-----",
+				Password: "iZfYGcrgFHOg4nweEo7ufT",
+			}, nil},
+		}
+		opts := Options{}.Apply(Options{TLSAuth: tlsAuth})
+		assert.Equal(t, tlsAuth, opts.TLSAuth)
+
+		t.Run("Roundtrip", func(t *testing.T) {
+			optsData, err := json.Marshal(opts)
+			assert.NoError(t, err)
+
+			var opts2 Options
+			errMsg := "x509: decryption password incorrect"
+			err = json.Unmarshal(optsData, &opts2)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), errMsg)
+		})
+	})
+
+	t.Run("TLSAuth encrypted key and valid password", func(t *testing.T) {
+		tlsAuth := []*TLSAuth{
+			{TLSAuthFields{
+				Domains: []string{"example.com", "*.example.com"},
+				Cert: "-----BEGIN CERTIFICATE-----\n" +
+					"MIIBoTCCAUegAwIBAgIUQl0J1Gkd6U2NIMwMDnpfH8c1myEwCgYIKoZIzj0EAwIw\n" +
+					"EDEOMAwGA1UEAxMFTXkgQ0EwHhcNMTcwODE1MTYxODAwWhcNMTgwODE1MTYxODAw\n" +
+					"WjAQMQ4wDAYDVQQDEwV1c2VyMTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABLaf\n" +
+					"xEOmBHkzbqd9/0VZX/39qO2yQq2Gz5faRdvy38kuLMCV+9HYrfMx6GYCZzTUIq6h\n" +
+					"8QXOrlgYTixuUVfhJNWjfzB9MA4GA1UdDwEB/wQEAwIFoDAdBgNVHSUEFjAUBggr\n" +
+					"BgEFBQcDAQYIKwYBBQUHAwIwDAYDVR0TAQH/BAIwADAdBgNVHQ4EFgQUxmQiq5K3\n" +
+					"KUnVME945Byt3Ysvkh8wHwYDVR0jBBgwFoAU3qEhcpRgpsqo9V+LFns9a+oZIYww\n" +
+					"CgYIKoZIzj0EAwIDSAAwRQIgSGxnJ+/cLUNTzt7fhr/mjJn7ShsTW33dAdfLM7H2\n" +
+					"z/gCIQDyVf8DePtxlkMBScTxZmIlMQdNc6+6VGZQ4QscruVLmg==\n" +
+					"-----END CERTIFICATE-----",
+				Key: "-----BEGIN EC PRIVATE KEY-----\n" +
+					"Proc-Type: 4,ENCRYPTED\n" +
+					"DEK-Info: AES-256-CBC,DF2445CBFE2E5B112FB2B721063757E5\n" +
+					"o/VKNZjQcRM2hatqUkQ0dTolL7i2i5hJX9XYsl+TMsq8ZkC83uY/JdR986QS+W2c\n" +
+					"EoQGtVGVeL0KGvGpzjTX3YAKXM7Lg5btAeS8GvJ9S7YFd8s0q1pqDdffl2RyjJav\n" +
+					"t1jx6XvLu2nBrOUARvHqjkkJQCTdRf2a34GJdbZqE+4=\n" +
+					"-----END EC PRIVATE KEY-----",
+				Password: "12345",
+			}, nil},
+		}
+		opts := Options{}.Apply(Options{TLSAuth: tlsAuth})
+		assert.Equal(t, tlsAuth, opts.TLSAuth)
+
+		t.Run("Roundtrip", func(t *testing.T) {
+			optsData, err := json.Marshal(opts)
+			assert.NoError(t, err)
+
+			var opts2 Options
+			err = json.Unmarshal(optsData, &opts2)
+			assert.NoError(t, err)
+		})
+	})
+	t.Run("TLSAuth encrypted pks8 format key and valid password", func(t *testing.T) {
+		tlsAuth := []*TLSAuth{
+			{TLSAuthFields{
+				Domains: []string{"example.com", "*.example.com"},
+				Cert: "-----BEGIN CERTIFICATE-----\n" +
+					"MIIBoTCCAUegAwIBAgIUQl0J1Gkd6U2NIMwMDnpfH8c1myEwCgYIKoZIzj0EAwIw\n" +
+					"EDEOMAwGA1UEAxMFTXkgQ0EwHhcNMTcwODE1MTYxODAwWhcNMTgwODE1MTYxODAw\n" +
+					"WjAQMQ4wDAYDVQQDEwV1c2VyMTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABLaf\n" +
+					"xEOmBHkzbqd9/0VZX/39qO2yQq2Gz5faRdvy38kuLMCV+9HYrfMx6GYCZzTUIq6h\n" +
+					"8QXOrlgYTixuUVfhJNWjfzB9MA4GA1UdDwEB/wQEAwIFoDAdBgNVHSUEFjAUBggr\n" +
+					"BgEFBQcDAQYIKwYBBQUHAwIwDAYDVR0TAQH/BAIwADAdBgNVHQ4EFgQUxmQiq5K3\n" +
+					"KUnVME945Byt3Ysvkh8wHwYDVR0jBBgwFoAU3qEhcpRgpsqo9V+LFns9a+oZIYww\n" +
+					"CgYIKoZIzj0EAwIDSAAwRQIgSGxnJ+/cLUNTzt7fhr/mjJn7ShsTW33dAdfLM7H2\n" +
+					"z/gCIQDyVf8DePtxlkMBScTxZmIlMQdNc6+6VGZQ4QscruVLmg==\n" +
+					"-----END CERTIFICATE-----",
+				Key: "-----BEGIN ENCRYPTED PRIVATE KEY-----\n" +
+					"MIHsMFcGCSqGSIb3DQEFDTBKMCkGCSqGSIb3DQEFDDAcBAjcfarGfrRgUgICCAAw\n" +
+					"DAYIKoZIhvcNAgkFADAdBglghkgBZQMEASoEEFmtmKEFmThbkbpxmC6iBvoEgZCE\n" +
+					"pDCpH/yCLmSpjdi/PC74I794nzHyCWf/oS0JhM0Q7J+abZP+p5pnreKft1f15Dbw\n" +
+					"QG9alfoM6EffJcVo3gf1tgQrpGGFMwczc4VhQgSGDy0XjZSbd2K0QCFGSmD2ZIR1\n" +
+					"qPG3WepWjKmIsYffGeKZx+FjXHSFeGk7RnssNAyKcPruDQIdWWyXxX1+ugBKuBw=\n" +
+					"-----END ENCRYPTED PRIVATE KEY-----\n",
+				Password: "12345",
+			}, nil},
+		}
+		opts := Options{}.Apply(Options{TLSAuth: tlsAuth})
+		assert.Equal(t, tlsAuth, opts.TLSAuth)
+
+		t.Run("Roundtrip", func(t *testing.T) {
+			optsData, err := json.Marshal(opts)
+			assert.NoError(t, err)
+
+			var opts2 Options
+			errMsg := "tls: failed to parse private key"
+			err = json.Unmarshal(optsData, &opts2)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), errMsg)
+		})
+	})
+
 	t.Run("NoConnectionReuse", func(t *testing.T) {
 		opts := Options{}.Apply(Options{NoConnectionReuse: null.BoolFrom(true)})
 		assert.True(t, opts.NoConnectionReuse.Valid)
