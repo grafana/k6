@@ -1624,6 +1624,10 @@ Note that the underlying type is not lost, calling Export() returns the original
 reflect based types.
 */
 func (r *Runtime) ToValue(i interface{}) Value {
+	return r.toValue(i, reflect.Value{})
+}
+
+func (r *Runtime) toValue(i interface{}, origValue reflect.Value) Value {
 	switch i := i.(type) {
 	case nil:
 		return _null
@@ -1739,7 +1743,18 @@ func (r *Runtime) ToValue(i interface{}) Value {
 		return obj
 	}
 
-	origValue := reflect.ValueOf(i)
+	if !origValue.IsValid() {
+		origValue = reflect.ValueOf(i)
+	} else {
+		// If origValue was a result of an Index(), or Field(), or such, its Kind may be Interface:
+		// 	a := []interface{}{(*S)(nil)}
+		//	a0 := reflect.ValueOf(a).Index(0) // a0.Kind() is reflect.Interface
+		//	a1 := reflect.ValueOf(a[0]) // a1.Kind() is reflect.Ptr
+		// Need to "dereference" it to make it consistent with plain value being passed.
+		for origValue.Kind() == reflect.Interface {
+			origValue = origValue.Elem()
+		}
+	}
 	value := origValue
 	for value.Kind() == reflect.Ptr {
 		value = reflect.Indirect(value)

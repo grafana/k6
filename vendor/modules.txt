@@ -23,7 +23,7 @@ github.com/davecgh/go-spew/spew
 ## explicit
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
-# github.com/dop251/goja v0.0.0-20220324112439-a18ffb9c5866
+# github.com/dop251/goja v0.0.0-20220405120441-9037c2b61cbf
 ## explicit; go 1.14
 github.com/dop251/goja
 github.com/dop251/goja/ast

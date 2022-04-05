@@ -155,22 +155,15 @@ func (o *objectGoReflect) _getMethod(jsName string) reflect.Value {
 	return reflect.Value{}
 }
 
-func (o *objectGoReflect) getAddr(v reflect.Value) reflect.Value {
-	if (v.Kind() == reflect.Struct || v.Kind() == reflect.Slice) && v.CanAddr() {
-		return v.Addr()
-	}
-	return v
-}
-
 func (o *objectGoReflect) _get(name string) Value {
 	if o.value.Kind() == reflect.Struct {
 		if v := o._getField(name); v.IsValid() {
-			return o.val.runtime.ToValue(o.getAddr(v).Interface())
+			return o.val.runtime.toValue(v.Interface(), v)
 		}
 	}
 
 	if v := o._getMethod(name); v.IsValid() {
-		return o.val.runtime.ToValue(v.Interface())
+		return o.val.runtime.toValue(v.Interface(), v)
 	}
 
 	return nil
@@ -181,7 +174,7 @@ func (o *objectGoReflect) getOwnPropStr(name unistring.String) Value {
 	if o.value.Kind() == reflect.Struct {
 		if v := o._getField(n); v.IsValid() {
 			return &valueProperty{
-				value:      o.val.runtime.ToValue(o.getAddr(v).Interface()),
+				value:      o.val.runtime.toValue(v.Interface(), v),
 				writable:   v.CanSet(),
 				enumerable: true,
 			}
@@ -190,7 +183,7 @@ func (o *objectGoReflect) getOwnPropStr(name unistring.String) Value {
 
 	if v := o._getMethod(n); v.IsValid() {
 		return &valueProperty{
-			value:      o.val.runtime.ToValue(v.Interface()),
+			value:      o.val.runtime.toValue(v.Interface(), v),
 			enumerable: true,
 		}
 	}

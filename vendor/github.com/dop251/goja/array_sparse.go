@@ -78,9 +78,6 @@ func (a *sparseArrayObject) setLengthInt(l uint32, throw bool) bool {
 }
 
 func (a *sparseArrayObject) setLength(v uint32, throw bool) bool {
-	if v == a.length {
-		return true
-	}
 	if !a.lengthProp.writable {
 		a.val.runtime.typeErrorResult(throw, "length is not writable")
 		return false
@@ -120,7 +117,7 @@ func (a *sparseArrayObject) getIdx(idx valueInt, receiver Value) Value {
 	return prop
 }
 
-func (a *sparseArrayObject) getLengthProp() Value {
+func (a *sparseArrayObject) getLengthProp() *valueProperty {
 	a.lengthProp.value = intToValue(int64(a.length))
 	return &a.lengthProp
 }
@@ -369,7 +366,7 @@ func (a *sparseArrayObject) defineOwnPropertyStr(name unistring.String, descr Pr
 		return a._defineIdxProperty(idx, descr, throw)
 	}
 	if name == "length" {
-		return a.val.runtime.defineArrayLength(&a.lengthProp, descr, a.setLength, throw)
+		return a.val.runtime.defineArrayLength(a.getLengthProp(), descr, a.setLength, throw)
 	}
 	return a.baseObject.defineOwnPropertyStr(name, descr, throw)
 }
