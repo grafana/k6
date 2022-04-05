@@ -11,11 +11,11 @@
         k6 is a developer centric open source load testing tool for testing the performance of your backend infrastructure. It’s built with Go and JavaScript to integrate well into your development workflow, so you can stay on top of performance without fuzz.
     </description>
     <projectUrl>https://k6.io</projectUrl>
-    <packageSourceUrl>https://github.com/k6io/k6</packageSourceUrl>
-    <projectSourceUrl>https://github.com/k6io/k6</projectSourceUrl>
+    <packageSourceUrl>https://github.com/grafana/k6</packageSourceUrl>
+    <projectSourceUrl>https://github.com/grafana/k6</projectSourceUrl>
     <tags></tags>
     <copyright></copyright>
-    <licenseUrl>https://github.com/k6io/k6/blob/master/LICENSE.md</licenseUrl>
+    <licenseUrl>https://github.com/grafana/k6/blob/master/LICENSE.md</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
   </metadata>
 </package>
