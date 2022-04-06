@@ -333,6 +333,9 @@ func (self *_parser) parseObjectProperty() ast.Property {
 	}
 	keyStartIdx := self.idx
 	literal, parsedLiteral, value, tkn := self.parseObjectPropertyKey()
+	if value == nil {
+		return nil
+	}
 	if tkn == token.IDENTIFIER || tkn == token.STRING || tkn == token.KEYWORD || tkn == token.ILLEGAL {
 		switch {
 		case self.token == token.LEFT_PARENTHESIS:
@@ -367,12 +370,21 @@ func (self *_parser) parseObjectProperty() ast.Property {
 					Initializer: initializer,
 				}
 			}
-		case literal == "get" && self.token != token.COLON:
+		case (literal == "get" || literal == "set") && self.token != token.COLON:
 			_, _, keyValue, _ := self.parseObjectPropertyKey()
+			if keyValue == nil {
+				return nil
+			}
+			var kind ast.PropertyKind
 			idx1 := self.idx
 			parameterList := self.parseFunctionParameterList()
-			if len(parameterList.List) > 0 || parameterList.Rest != nil {
-				self.error(idx1, "Getter must not have any formal parameters.")
+			if literal == "get" {
+				kind = ast.PropertyKindGet
+				if len(parameterList.List) > 0 || parameterList.Rest != nil {
+					self.error(idx1, "Getter must not have any formal parameters.")
+				}
+			} else {
+				kind = ast.PropertyKindSet
 			}
 			node := &ast.FunctionLiteral{
 				Function:      keyStartIdx,
@@ -382,39 +394,19 @@ func (self *_parser) parseObjectProperty() ast.Property {
 			node.Source = self.slice(keyStartIdx, node.Body.Idx1())
 			return &ast.PropertyKeyed{
 				Key:   keyValue,
-				Kind:  ast.PropertyKindGet,
-				Value: node,
-			}
-		case literal == "set" && self.token != token.COLON:
-			_, _, keyValue, _ := self.parseObjectPropertyKey()
-			parameterList := self.parseFunctionParameterList()
-
-			node := &ast.FunctionLiteral{
-				Function:      keyStartIdx,
-				ParameterList: parameterList,
-			}
-
-			node.Body, node.DeclarationList = self.parseFunctionBlock()
-			node.Source = self.slice(keyStartIdx, node.Body.Idx1())
-
-			return &ast.PropertyKeyed{
-				Key:   keyValue,
-				Kind:  ast.PropertyKindSet,
+				Kind:  kind,
 				Value: node,
 			}
 		}
 	}
 
 	self.expect(token.COLON)
-	if value != nil {
-		return &ast.PropertyKeyed{
-			Key:      value,
-			Kind:     ast.PropertyKindValue,
-			Value:    self.parseAssignmentExpression(),
-			Computed: tkn == token.ILLEGAL,
-		}
+	return &ast.PropertyKeyed{
+		Key:      value,
+		Kind:     ast.PropertyKindValue,
+		Value:    self.parseAssignmentExpression(),
+		Computed: tkn == token.ILLEGAL,
 	}
-	return nil
 }
 
 func (self *_parser) parseObjectLiteral() *ast.ObjectLiteral {
