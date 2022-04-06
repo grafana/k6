@@ -389,6 +389,9 @@ type Options struct {
 
 	// Specify client IP ranges and/or CIDR from which VUs will make requests
 	LocalIPs types.NullIPPool `json:"-" envconfig:"K6_LOCAL_IPS"`
+
+	// Enable TLS/SSL key logging
+	SslKeyLog null.Bool `json:"sslkeylog" envconfig:"K6_SSL_KEYLOG"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.

@@ -208,6 +208,25 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 		Certificates:       certs,
 		Renegotiation:      tls.RenegotiateFreelyAsClient,
 	}
+	if r.Bundle.Options.SslKeyLog.Valid {
+		r.Logger.Warn("SSL key logging ENABLED: use for debug mode only!")
+		SSLKEYLOGFILE := os.Getenv("SSLKEYLOGFILE")
+
+		file, err := os.OpenFile(SSLKEYLOGFILE, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		if err != nil {
+			r.Logger.Fatal(err)
+		}
+		tlsConfig = &tls.Config{
+			InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool, //nolint:gosec
+			CipherSuites:       cipherSuites,
+			MinVersion:         uint16(tlsVersions.Min),
+			MaxVersion:         uint16(tlsVersions.Max),
+			Certificates:       certs,
+			Renegotiation:      tls.RenegotiateFreelyAsClient,
+			KeyLogWriter:       file,
+		}
+	}
+
 	// Follow NameToCertificate in https://pkg.go.dev/crypto/tls@go1.17.6#Config, leave this field nil
 	// when it is empty
 	if len(nameToCert) > 0 {

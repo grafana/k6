@@ -99,6 +99,8 @@ func optionFlagSet() *pflag.FlagSet {
 		"Milliseconds are assumed if no unit is provided.\n"+
 		"Possible select values to return a single IP are: 'first', 'random' or 'roundRobin'.\n"+
 		"Possible policy values are: 'preferIPv4', 'preferIPv6', 'onlyIPv4', 'onlyIPv6' or 'any'.\n")
+	flags.Bool("sslkeylog", false, "If enabled, output TLS secrets to env:SSLKEYLOGFILE")
+
 	return flags
 }
 
@@ -129,6 +131,8 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		TeardownTimeout: types.NullDuration{Duration: types.Duration(60 * time.Second), Valid: false},
 
 		MetricSamplesBufferSize: null.NewInt(1000, false),
+
+		SslKeyLog: getNullBool(flags, "sslkeylog"),
 	}
 
 	// Using Changed() because GetStringSlice() doesn't differentiate between empty and no value
