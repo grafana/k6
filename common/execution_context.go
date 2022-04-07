@@ -165,7 +165,8 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 	return e.adoptBackendNodeID(node.BackendNodeID)
 }
 
-// eval will evaluate provided callable within this execution context and return by value or handle.
+// eval evaluates the provided JavaScript within this execution context and
+// returns a value or handle.
 func (e *ExecutionContext) eval(
 	apiCtx context.Context, opts evalOptions, js string, args ...interface{},
 ) (interface{}, error) {
@@ -295,7 +296,8 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 	return e.injectedScript, nil
 }
 
-// Eval will evaluate provided page function within this execution context.
+// Eval evaluates the provided JavaScript within this execution context and
+// returns a value or handle.
 func (e *ExecutionContext) Eval(
 	apiCtx context.Context, js goja.Value, args ...goja.Value,
 ) (interface{}, error) {
@@ -310,7 +312,8 @@ func (e *ExecutionContext) Eval(
 	return e.eval(apiCtx, opts, js.ToString().String(), evalArgs...)
 }
 
-// EvalHandle will evaluate provided page function within this execution context.
+// EvalHandle evaluates the provided JavaScript within this execution context
+// and returns a JSHandle.
 func (e *ExecutionContext) EvalHandle(
 	apiCtx context.Context, js goja.Value, args ...goja.Value,
 ) (api.JSHandle, error) {

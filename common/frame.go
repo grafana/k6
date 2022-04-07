@@ -1614,8 +1614,8 @@ type frameExecutionContext interface {
 	// execution context from another execution context.
 	adoptElementHandle(elementHandle *ElementHandle) (*ElementHandle, error)
 
-	// eval will evaluate provided callable within this execution
-	// context and return by value or handle.
+	// eval evaluates the provided JavaScript within this execution context and
+	// returns a value or handle.
 	eval(
 		apiCtx context.Context, opts evalOptions, js string, args ...interface{},
 	) (res interface{}, err error)
@@ -1624,19 +1624,13 @@ type frameExecutionContext interface {
 	// functions.
 	getInjectedScript(apiCtx context.Context) (api.JSHandle, error)
 
-	// Eval will evaluate provided page function within this execution
-	// context.
-	Eval(
-		apiCtx context.Context,
-		pageFunc goja.Value, args ...goja.Value,
-	) (interface{}, error)
+	// Eval evaluates the provided JavaScript within this execution context and
+	// returns a value or handle.
+	Eval(apiCtx context.Context, js goja.Value, args ...goja.Value) (interface{}, error)
 
-	// EvalHandle will evaluate provided page function within this
-	// execution context.
-	EvalHandle(
-		apiCtx context.Context,
-		pageFunc goja.Value, args ...goja.Value,
-	) (api.JSHandle, error)
+	// EvalHandle evaluates the provided JavaScript within this execution
+	// context and returns a JSHandle.
+	EvalHandle(apiCtx context.Context, js goja.Value, args ...goja.Value) (api.JSHandle, error)
 
 	// Frame returns the frame that this execution context belongs to.
 	Frame() *Frame
