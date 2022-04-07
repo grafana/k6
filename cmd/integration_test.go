@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/testutils"
 )
 
@@ -23,6 +25,24 @@ const (
 		};
 	`
 )
+
+func TestVersion(t *testing.T) {
+	t.Parallel()
+
+	ts := newGlobalTestState(t)
+	ts.args = []string{"k6", "version"}
+	newRootCommand(ts.globalState).execute()
+
+	stdOut := ts.stdOut.String()
+	assert.Contains(t, stdOut, "k6 v"+consts.Version)
+	assert.Contains(t, stdOut, runtime.Version())
+	assert.Contains(t, stdOut, runtime.GOOS)
+	assert.Contains(t, stdOut, runtime.GOARCH)
+	assert.NotContains(t, stdOut[:len(stdOut)-1], "\n")
+
+	assert.Empty(t, ts.stdErr.Bytes())
+	assert.Empty(t, ts.loggerHook.Drain())
+}
 
 func TestSimpleTestStdin(t *testing.T) {
 	t.Parallel()

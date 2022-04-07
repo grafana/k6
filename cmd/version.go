@@ -21,6 +21,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"go.k6.io/k6/lib/consts"
@@ -28,13 +30,12 @@ import (
 
 func getCmdVersion(globalState *globalState) *cobra.Command {
 	// versionCmd represents the version command.
-	versionCmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "version",
 		Short: "Show application version",
 		Long:  `Show the application version and exit.`,
 		Run: func(_ *cobra.Command, _ []string) {
-			printToStdout(globalState, "k6 v\n"+consts.FullVersion())
+			printToStdout(globalState, fmt.Sprintf("k6 v%s\n", consts.FullVersion()))
 		},
 	}
-	return versionCmd
 }
