@@ -80,8 +80,8 @@ type Runner struct {
 	console   *console
 	setupData []byte
 
-	keylogger      *os.File
-	keyloggermutex *sync.Mutex
+	keylogger      *keyloggerWriter
+	keyloggerMutex *sync.Mutex
 	keyloggerUsers int
 }
 
@@ -136,7 +136,7 @@ func NewFromBundle(
 		ActualResolver: net.LookupIP,
 		builtinMetrics: builtinMetrics,
 		registry:       registry,
-		keyloggermutex: new(sync.Mutex),
+		keyloggerMutex: new(sync.Mutex),
 	}
 
 	err = r.SetOptions(r.Bundle.Options)
@@ -587,30 +587,35 @@ func (r *Runner) getTimeoutFor(stage string) time.Duration {
 	return d
 }
 
-func (r *Runner) getKeylogger() *os.File { // TODO maybe use custom type
-	r.keyloggermutex.Lock()
+func (r *Runner) getKeylogger() *keyloggerWriter {
+	r.keyloggerMutex.Lock()
 	if r.keylogger == nil {
 		var err error
-		r.keylogger, err = os.OpenFile(r.Bundle.RuntimeOptions.KeyWriter.String, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+		var f *os.File
+		f, err = os.OpenFile(r.Bundle.RuntimeOptions.KeyWriter.String, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
 		if err != nil {
 			r.Logger.WithError(err).Warn("couldn't open SSLKEYLOGGER file")
 		}
+		r.keylogger = &keyloggerWriter{
+			f: f,
+			m: new(sync.Mutex),
+		}
 	}
 	r.keyloggerUsers++
-	r.keyloggermutex.Unlock()
+	r.keyloggerMutex.Unlock()
 	return r.keylogger
 }
 
 func (r *Runner) freeKeylogger() {
-	r.keyloggermutex.Lock()
+	r.keyloggerMutex.Lock()
 	r.keyloggerUsers--
 	if r.keyloggerUsers == 0 {
-		if err := r.keylogger.Close(); err != nil {
+		if err := r.keylogger.f.Close(); err != nil {
 			r.Logger.WithError(err).Warn("couldn't close SSLKEYLOGGER file")
 		}
 		r.keylogger = nil
 	}
-	r.keyloggermutex.Unlock()
+	r.keyloggerMutex.Unlock()
 }
 
 type VU struct {
