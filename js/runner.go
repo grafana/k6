@@ -79,6 +79,10 @@ type Runner struct {
 
 	console   *console
 	setupData []byte
+
+	keylogger      *os.File
+	keyloggermutex *sync.Mutex
+	keyloggerUsers int
 }
 
 // New returns a new Runner for the provide source
@@ -132,6 +136,7 @@ func NewFromBundle(
 		ActualResolver: net.LookupIP,
 		builtinMetrics: builtinMetrics,
 		registry:       registry,
+		keyloggermutex: new(sync.Mutex),
 	}
 
 	err = r.SetOptions(r.Bundle.Options)
@@ -582,6 +587,32 @@ func (r *Runner) getTimeoutFor(stage string) time.Duration {
 	return d
 }
 
+func (r *Runner) getKeylogger() *os.File { // TODO maybe use custom type
+	r.keyloggermutex.Lock()
+	if r.keylogger == nil {
+		var err error
+		r.keylogger, err = os.OpenFile(r.Bundle.RuntimeOptions.KeyWriter.String, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+		if err != nil {
+			r.Logger.WithError(err).Warn("couldn't open SSLKEYLOGGER file")
+		}
+	}
+	r.keyloggerUsers++
+	r.keyloggermutex.Unlock()
+	return r.keylogger
+}
+
+func (r *Runner) freeKeylogger() {
+	r.keyloggermutex.Lock()
+	r.keyloggerUsers--
+	if r.keyloggerUsers == 0 {
+		if err := r.keylogger.Close(); err != nil {
+			r.Logger.WithError(err).Warn("couldn't close SSLKEYLOGGER file")
+		}
+		r.keylogger = nil
+	}
+	r.keyloggermutex.Unlock()
+}
+
 type VU struct {
 	BundleInstance
 
@@ -674,12 +705,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		return u.scenarioIter[params.Scenario]
 	}
 	if keyWriter := u.Runner.Bundle.RuntimeOptions.KeyWriter; keyWriter.Valid {
-		f, err := os.OpenFile(keyWriter.String, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
-		if err != nil {
-			u.state.Logger.WithError(err).Warn("couldn't open SSLKEYLOGGER file")
-		} else {
-			u.state.TLSConfig.KeyLogWriter = f
-		}
+		u.state.TLSConfig.KeyLogWriter = u.Runner.getKeylogger()
 	}
 
 	avu := &ActiveVU{
@@ -708,11 +734,8 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		// running again for this activation
 		avu.busy <- struct{}{}
 		if u.TLSConfig.KeyLogWriter != nil {
-			if f, ok := u.TLSConfig.KeyLogWriter.(*os.File); ok {
-				if err := f.Close(); err != nil {
-					u.state.Logger.WithError(err).Warn("couldn't close SSLKEYLOGGER file")
-				}
-			}
+			u.TLSConfig.KeyLogWriter = nil
+			u.Runner.freeKeylogger()
 		}
 
 		if params.DeactivateCallback != nil {
