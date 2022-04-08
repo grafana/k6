@@ -1,6 +1,8 @@
 package lib
 
 import (
+	"io"
+
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/metrics"
 )
@@ -11,5 +13,6 @@ type RuntimeState struct {
 	// TODO maybe have a struct `Metrics` with `Registry` and `Builtin` ?
 	Registry       *metrics.Registry
 	BuiltinMetrics *metrics.BuiltinMetrics
+	KeyLogger      io.Writer
 	Logger         *logrus.Logger
 }

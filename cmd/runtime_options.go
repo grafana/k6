@@ -117,6 +117,12 @@ func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib
 		}
 	}
 
+	if envVar, ok := environment["SSLKEYLOGFILE"]; ok {
+		if !opts.KeyWriter.Valid {
+			opts.KeyWriter = null.StringFrom(envVar)
+		}
+	}
+
 	if opts.IncludeSystemEnvVars.Bool { // If enabled, gather the actual system environment variables
 		opts.Env = environment
 	}
