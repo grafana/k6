@@ -398,7 +398,7 @@ func TestOptions(t *testing.T) {
 			assert.NoError(t, err)
 
 			var opts2 Options
-			errMsg := "tls: failed to parse private key"
+			errMsg := "encrypted pkcs8 formatted key is not supported"
 			err = json.Unmarshal(optsData, &opts2)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), errMsg)
