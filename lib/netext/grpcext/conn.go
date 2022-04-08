@@ -85,9 +85,12 @@ func (c *Conn) ReflectionClient() (*ReflectionClient, error) {
 }
 
 // Invoke executes a unary gRPC request.
-//
-// TODO: should we support grpc.CallOption?
-func (c *Conn) Invoke(ctx context.Context, method string, md metadata.MD, req Request) (*Response, error) {
+func (c *Conn) Invoke(
+	ctx context.Context,
+	method string,
+	md metadata.MD,
+	req Request,
+	opts ...grpc.CallOption) (*Response, error) {
 	if method == "" {
 		return nil, fmt.Errorf("method is required")
 	}
@@ -109,7 +112,12 @@ func (c *Conn) Invoke(ctx context.Context, method string, md metadata.MD, req Re
 
 	resp := dynamicpb.NewMessage(req.MethodDescriptor.Output())
 	header, trailer := metadata.New(nil), metadata.New(nil)
-	err := c.raw.Invoke(ctx, method, reqdm, resp, grpc.Header(&header), grpc.Trailer(&trailer))
+
+	copts := make([]grpc.CallOption, 0, len(opts)+2)
+	copts = append(copts, opts...)
+	copts = append(copts, grpc.Header(&header), grpc.Trailer(&trailer))
+
+	err := c.raw.Invoke(ctx, method, reqdm, resp, copts...)
 
 	response := Response{
 		Headers:  header,

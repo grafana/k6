@@ -26,7 +26,7 @@ import (
 func TestInvoke(t *testing.T) {
 	t.Parallel()
 
-	helloReply := func(in, out *dynamicpb.Message) error {
+	helloReply := func(in, out *dynamicpb.Message, _ ...grpc.CallOption) error {
 		err := protojson.Unmarshal([]byte(`{"reply":"text reply"}`), out)
 		require.NoError(t, err)
 
@@ -35,7 +35,7 @@ func TestInvoke(t *testing.T) {
 
 	c := Conn{raw: invokemock(helloReply)}
 	r := Request{
-		MethodDescriptor: methodFromProto("./testdata/hello.proto", "SayHello"),
+		MethodDescriptor: methodFromProto("SayHello"),
 		Message:          []byte(`{"greeting":"text request"}`),
 	}
 	res, err := c.Invoke(context.Background(), "/hello.HelloService/SayHello", metadata.New(nil), r)
@@ -46,16 +46,34 @@ func TestInvoke(t *testing.T) {
 	assert.Empty(t, res.Error)
 }
 
+func TestInvokeWithCallOptions(t *testing.T) {
+	t.Parallel()
+
+	reply := func(in, out *dynamicpb.Message, opts ...grpc.CallOption) error {
+		assert.Len(t, opts, 3) // two by default plus one injected
+		return nil
+	}
+
+	c := Conn{raw: invokemock(reply)}
+	r := Request{
+		MethodDescriptor: methodFromProto("NoOp"),
+		Message:          []byte(`{"greeting":"text request"}`),
+	}
+	res, err := c.Invoke(context.Background(), "/hello.HelloService/NoOp", metadata.New(nil), r, grpc.UseCompressor("fakeone"))
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+}
+
 func TestInvokeReturnError(t *testing.T) {
 	t.Parallel()
 
-	helloReply := func(in, out *dynamicpb.Message) error {
+	helloReply := func(in, out *dynamicpb.Message, _ ...grpc.CallOption) error {
 		return fmt.Errorf("test error")
 	}
 
 	c := Conn{raw: invokemock(helloReply)}
 	r := Request{
-		MethodDescriptor: methodFromProto("./testdata/hello.proto", "SayHello"),
+		MethodDescriptor: methodFromProto("SayHello"),
 		Message:          []byte(`{"greeting":"text request"}`),
 	}
 	res, err := c.Invoke(context.Background(), "/hello.HelloService/SayHello", metadata.New(nil), r)
@@ -74,7 +92,7 @@ func TestConnInvokeInvalid(t *testing.T) {
 		ctx        = context.Background()
 		method     = "not-empty-method"
 		md         = metadata.New(nil)
-		methodDesc = methodFromProto("./testdata/hello.proto", "SayHello")
+		methodDesc = methodFromProto("SayHello")
 		payload    = []byte(`{"greeting":"test"}`)
 	)
 
@@ -232,7 +250,7 @@ func (m *getServiceFileDescriptorMock) Recv() (*reflectpb.ServerReflectionRespon
 	return srr, nil
 }
 
-func methodFromProto(proto string, method string) protoreflect.MethodDescriptor {
+func methodFromProto(method string) protoreflect.MethodDescriptor {
 	parser := protoparse.Parser{
 		InferImportPaths: false,
 		Accessor: protoparse.FileAccessor(func(filename string) (io.ReadCloser, error) {
@@ -243,6 +261,7 @@ package hello;
 
 service HelloService {
   rpc SayHello(HelloRequest) returns (HelloResponse);
+  rpc NoOp(HelloRequest) returns (Empty);
   rpc LotsOfReplies(HelloRequest) returns (stream HelloResponse);
   rpc LotsOfGreetings(stream HelloRequest) returns (HelloResponse);
   rpc BidiHello(stream HelloRequest) returns (stream HelloResponse);
@@ -254,12 +273,16 @@ message HelloRequest {
 
 message HelloResponse {
   string reply = 1;
+}
+
+message Empty {
+
 }`
 			return io.NopCloser(bytes.NewBufferString(b)), nil
 		}),
 	}
 
-	fds, err := parser.ParseFiles(proto)
+	fds, err := parser.ParseFiles("any-path")
 	if err != nil {
 		panic(err)
 	}
@@ -277,7 +300,7 @@ message HelloResponse {
 }
 
 // invokemock is a mock for the grpc connection supporting only unary requests.
-type invokemock func(in, out *dynamicpb.Message) error
+type invokemock func(in, out *dynamicpb.Message, opts ...grpc.CallOption) error
 
 func (im invokemock) Invoke(ctx context.Context, method string, payload interface{}, reply interface{}, opts ...grpc.CallOption) error {
 	in, ok := payload.(*dynamicpb.Message)
@@ -288,7 +311,7 @@ func (im invokemock) Invoke(ctx context.Context, method string, payload interfac
 	if !ok {
 		return fmt.Errorf("unexpected type for reply")
 	}
-	return im(in, out)
+	return im(in, out, opts...)
 }
 
 func (invokemock) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
