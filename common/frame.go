@@ -32,6 +32,7 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 	k6modules "go.k6.io/k6/js/modules"
+	k6stats "go.k6.io/k6/stats"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -66,6 +67,7 @@ type Frame struct {
 	url          string
 	detached     bool
 	vu           k6modules.VU
+	initTime     time.Time
 
 	// A life cycle event is only considered triggered for a frame if the entire
 	// frame subtree has also had the life cycle event triggered.
@@ -350,6 +352,38 @@ func (f *Frame) cachedDocumentHandle() (*ElementHandle, bool) {
 	defer f.executionContextMu.RUnlock()
 
 	return f.documentHandle, f.documentHandle != nil
+}
+
+func (f *Frame) emitMetric(m *k6stats.Metric, t time.Time) {
+	value := k6stats.D(t.Sub(f.initTime))
+	f.log.Debugf("Frame:emitMetric", "fid:%s furl:%q m:%s init:%q t:%q v:%f",
+		f.ID(), f.URL(), m.Name, f.initTime, t, value)
+
+	if f.initTime.IsZero() {
+		// Internal race condition: we haven't processed the init/commit event
+		// yet, so the value will be wrong and emitting the metric would skew
+		// the results (i.e. the value would be in the order of years). Choose
+		// the lesser of 2 wrongs for now and ignore it instead.
+		// See https://github.com/grafana/xk6-browser/discussions/142#discussioncomment-2416943
+		return
+	}
+
+	state := f.vu.State()
+	tags := state.CloneTags()
+	if state.Options.SystemTags.Has(k6stats.TagURL) {
+		tags["url"] = f.URL()
+	}
+	sampleTags := k6stats.IntoSampleTags(&tags)
+	k6stats.PushIfNotDone(f.ctx, state.Samples, k6stats.ConnectedSamples{
+		Samples: []k6stats.Sample{
+			{
+				Metric: m,
+				Tags:   sampleTags,
+				Value:  value,
+				Time:   time.Now(),
+			},
+		},
+	})
 }
 
 func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
