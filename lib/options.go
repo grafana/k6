@@ -160,7 +160,7 @@ func (c *TLSAuth) Certificate() (*tls.Certificate, error) {
 	key := []byte(c.Key)
 	var err error
 	if c.Password != "" {
-		key, err = parsePrivateKey(c.Key, c.Password)
+		key, err = decryptPrivateKey(c.Key, c.Password)
 		if err != nil {
 			return nil, err
 		}
@@ -175,12 +175,14 @@ func (c *TLSAuth) Certificate() (*tls.Certificate, error) {
 	return c.certificate, nil
 }
 
-func parsePrivateKey(privKey, password string) ([]byte, error) {
+func decryptPrivateKey(privKey, password string) ([]byte, error) {
 	key := []byte(privKey)
+
 	block, _ := pem.Decode(key)
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM key")
 	}
+
 	blockType := block.Type
 	if blockType == "ENCRYPTED PRIVATE KEY" {
 		return nil, fmt.Errorf("encrypted pkcs8 formatted key is not supported")
