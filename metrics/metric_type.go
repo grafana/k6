@@ -84,3 +84,39 @@ func (t MetricType) String() string {
 		return "[INVALID]"
 	}
 }
+
+// supportedAggregationMethods returns the list of threshold aggregation methods
+// that can be used against this MetricType.
+func (t MetricType) supportedAggregationMethods() []string {
+	switch t {
+	case Counter:
+		return []string{tokenCount, tokenRate}
+	case Gauge:
+		return []string{tokenValue}
+	case Rate:
+		return []string{tokenRate}
+	case Trend:
+		return []string{
+			tokenAvg,
+			tokenMin,
+			tokenMax,
+			tokenMed,
+			tokenPercentile,
+		}
+	default:
+		// unreachable!
+		panic("unreachable")
+	}
+}
+
+// supportsAggregationMethod returns whether the MetricType supports a
+// given threshold aggregation method or not.
+func (t MetricType) supportsAggregationMethod(aggregationMethod string) bool {
+	for _, m := range t.supportedAggregationMethods() {
+		if aggregationMethod == m {
+			return true
+		}
+	}
+
+	return false
+}

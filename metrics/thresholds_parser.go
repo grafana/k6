@@ -49,6 +49,26 @@ type thresholdExpression struct {
 	Value float64
 }
 
+// SinkKey computes the key used to index a thresholdExpression in the engine's sinks.
+//
+// During execution, the engine "sinks" metrics into a internal mapping, so that
+// thresholds can be asserted against them. This method is a helper to normalize the
+// sink the threshold expression should be applied to.
+//
+// Because a threshold expression's aggregation method can either be
+// a static keyword ("count", "rate", etc...), or a parametric
+// expression ("p(somefloatingpointvalue)"), we need to handle this
+// case specifically. If we encounter the percentile aggregation method token,
+// we recompute the whole "p(value)" expression in order to look for it in the
+// sinks.
+func (te *thresholdExpression) SinkKey() string {
+	if te.AggregationMethod == tokenPercentile {
+		return fmt.Sprintf("%s(%g)", tokenPercentile, te.AggregationValue.Float64)
+	}
+
+	return te.AggregationMethod
+}
+
 // parseThresholdAssertion parses a threshold condition expression,
 // as defined in a JS script (for instance p(95)<1000), into a thresholdExpression
 // instance.
@@ -192,7 +212,7 @@ func parseThresholdAggregationMethod(input string) (string, null.Float, error) {
 		// Percentile expressions being of the form p(value),
 		// they won't be matched here.
 		if m == input {
-			return input, null.Float{}, nil
+			return m, null.Float{}, nil
 		}
 	}
 
@@ -203,7 +223,7 @@ func parseThresholdAggregationMethod(input string) (string, null.Float, error) {
 			return "", null.Float{}, fmt.Errorf("malformed percentile value; reason: %w", err)
 		}
 
-		return input, null.FloatFrom(aggregationValue), nil
+		return tokenPercentile, null.FloatFrom(aggregationValue), nil
 	}
 
 	return "", null.Float{}, fmt.Errorf("failed parsing method from expression")
