@@ -289,6 +289,13 @@ func (b *Bundle) Instantiate(
 		jsOptionsObj = jsOptions.ToObject(rt)
 	}
 	b.Options.ForEachSpecified("json", func(key string, val interface{}) {
+		// goja.ToValue generates an empty Object `{}` for the scenarios's value.
+		// This skips the set preserving the original `options.scenarios` value.
+		//
+		// TODO: rid this part when #883 will be implemented
+		if key == "scenarios" {
+			return
+		}
 		if err := jsOptionsObj.Set(key, val); err != nil {
 			instErr = err
 		}
