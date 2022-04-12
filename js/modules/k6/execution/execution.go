@@ -21,6 +21,7 @@
 package execution
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -167,6 +168,9 @@ func (mi *ModuleInstance) newInstanceInfo() (*goja.Object, error) {
 // newTestInfo returns a goja.Object with property accessors to retrieve
 // information and control execution of the overall test run.
 func (mi *ModuleInstance) newTestInfo() (*goja.Object, error) {
+	// the cache of goja.Object in the optimal parsed form
+	// for the consolidated and derived lib.Options
+	var optionsObject *goja.Object
 	rt := mi.vu.Runtime()
 	ti := map[string]func() interface{}{
 		// stop the test run
@@ -178,6 +182,16 @@ func (mi *ModuleInstance) newTestInfo() (*goja.Object, error) {
 				}
 				rt.Interrupt(&common.InterruptError{Reason: reason})
 			}
+		},
+		"options": func() interface{} {
+			if optionsObject == nil {
+				opts, err := optionsAsObject(rt, mi.vu.State().Options)
+				if err != nil {
+					common.Throw(rt, err)
+				}
+				optionsObject = opts
+			}
+			return optionsObject
 		},
 	}
 
@@ -225,6 +239,69 @@ func newInfoObj(rt *goja.Runtime, props map[string]func() interface{}) (*goja.Ob
 	}
 
 	return o, nil
+}
+
+// optionsAsObject maps the lib.Options struct that contains the consolidated
+// and derived options configuration in a goja.Object.
+//
+// When values are not set then the default value returned from JSON is used.
+// Most of the lib.Options are Nullable types so they will be null on default.
+func optionsAsObject(rt *goja.Runtime, options lib.Options) (*goja.Object, error) {
+	b, err := json.Marshal(options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode the lib.Options as json: %w", err)
+	}
+
+	// Using the native JS parser function guarantees getting
+	// the supported types for deep freezing the complex object.
+	jsonParse, _ := goja.AssertFunction(rt.GlobalObject().Get("JSON").ToObject(rt).Get("parse"))
+	parsed, err := jsonParse(goja.Undefined(), rt.ToValue(string(b)))
+	if err != nil {
+		common.Throw(rt, err)
+	}
+
+	obj := parsed.ToObject(rt)
+
+	mustDelete := func(prop string) {
+		delErr := obj.Delete(prop)
+		if err != nil {
+			common.Throw(rt, delErr)
+		}
+	}
+	mustSetReadOnlyProperty := func(k string, v interface{}) {
+		defErr := obj.DefineDataProperty(k, rt.ToValue(v), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
+		if err != nil {
+			common.Throw(rt, defErr)
+		}
+	}
+
+	mustDelete("vus")
+	mustDelete("iterations")
+	mustDelete("duration")
+	mustDelete("stages")
+
+	consoleOutput := goja.Null()
+	if options.ConsoleOutput.Valid {
+		consoleOutput = rt.ToValue(options.ConsoleOutput.String)
+	}
+	mustSetReadOnlyProperty("consoleOutput", consoleOutput)
+
+	localIPs := goja.Null()
+	if options.LocalIPs.Valid {
+		raw, marshalErr := options.LocalIPs.MarshalText()
+		if err != nil {
+			common.Throw(rt, marshalErr)
+		}
+		localIPs = rt.ToValue(string(raw))
+	}
+	mustSetReadOnlyProperty("localIPs", localIPs)
+
+	err = common.FreezeObject(rt, obj)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+
+	return obj, nil
 }
 
 type tagsDynamicObject struct {
