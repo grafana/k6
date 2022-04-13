@@ -114,6 +114,16 @@ func parseRemoteObjectValue(t cdpruntime.Type, val string, op *cdpruntime.Object
 	return v, nil
 }
 
+func parseExceptionDetails(exc *cdpruntime.ExceptionDetails) string {
+	errMsg := fmt.Sprintf("%s", exc)
+	if exc.Exception != nil {
+		if o, _ := parseRemoteObject(exc.Exception); o != nil {
+			errMsg += fmt.Sprintf("%s", o)
+		}
+	}
+	return errMsg
+}
+
 func parseRemoteObject(obj *cdpruntime.RemoteObject) (interface{}, error) {
 	if obj.UnserializableValue == "" {
 		return parseRemoteObjectValue(obj.Type, string(obj.Value), obj.Preview)

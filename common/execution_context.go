@@ -230,8 +230,9 @@ func (e *ExecutionContext) eval(
 	}
 	if exceptionDetails != nil {
 		return nil, fmt.Errorf("cannot call function on expression (%q) "+
-			"in execution context (%d) in frame (%v) with session (%v): %w",
-			expression, e.id, e.Frame().ID(), e.session.ID(), exceptionDetails)
+			"in execution context (%d) in frame (%v) with session (%v): %s",
+			expression, e.id, e.Frame().ID(), e.session.ID(),
+			parseExceptionDetails(exceptionDetails))
 	}
 	var res interface{}
 	if remoteObject == nil {
