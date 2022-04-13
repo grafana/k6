@@ -3,28 +3,28 @@ TMPDIR ?= /tmp
 
 all: build
 
-build:
+build :
 	go build
 
-format:
+format :
 	find . -name '*.go' -exec gofmt -s -w {} +
 
-ci-like-lint:
+ci-like-lint :
 	@docker run --rm -t -v $(shell pwd):/app \
 		-v $(TMPDIR)/golangci-cache-$(GOLANGCI_LINT_VERSION):/golangci-cache \
 		--env "GOLANGCI_LINT_CACHE=/golangci-cache" \
 		-w /app golangci/golangci-lint:$(GOLANGCI_LINT_VERSION) \
 		make lint
 
-lint:
+lint :
 	golangci-lint run --out-format=tab --new-from-rev master ./...
 
-test:
+tests :
 	go test -race -timeout 210s ./...
 
-check: ci-like-lint test
+check : ci-like-lint tests
 
 container:
 	docker build --rm --pull --no-cache -t grafana/k6 .
 
-.PHONY: build format ci-like-lint lint test check container
+.PHONY: build format ci-like-lint lint tests check container
