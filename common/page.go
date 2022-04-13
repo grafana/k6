@@ -222,21 +222,20 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.Frame
 	p.logger.Debugf("Page:getOwnerFrame", "sid:%v", p.sessionID())
 
 	// document.documentElement has frameId of the owner frame
-	rt := p.vu.Runtime()
-	pageFn := rt.ToValue(`
+	pageFn := `
 		node => {
 			const doc = node;
       		if (doc.documentElement && doc.documentElement.ownerDocument === doc)
         		return doc.documentElement;
       		return node.ownerDocument ? node.ownerDocument.documentElement : null;
 		}
-	`)
+	`
 
 	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.execCtx.eval(apiCtx, opts, pageFn, []goja.Value{rt.ToValue(h)}...)
+	result, err := h.execCtx.eval(apiCtx, opts, pageFn, h)
 	if err != nil {
 		p.logger.Debugf("Page:getOwnerFrame:return", "sid:%v err:%v", p.sessionID(), err)
 		return ""

@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"reflect"
 	"time"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
@@ -52,46 +51,57 @@ func convertBaseJSHandleTypes(ctx context.Context, execCtx *ExecutionContext, ob
 	return &cdpruntime.CallArgument{ObjectID: objHandle.remoteObject.ObjectID}, nil
 }
 
-func convertArgument(ctx context.Context, execCtx *ExecutionContext, arg goja.Value) (*cdpruntime.CallArgument, error) {
-	switch arg.ExportType() {
-	case reflect.TypeOf(int64(0)):
-		if arg.ToInteger() > math.MaxInt32 {
-			return &cdpruntime.CallArgument{
-				UnserializableValue: cdpruntime.UnserializableValue(fmt.Sprintf("%dn", arg.ToInteger())),
-			}, nil
-		}
-		b, err := json.Marshal(arg.ToInteger())
-		return &cdpruntime.CallArgument{Value: b}, err
-	case reflect.TypeOf(float64(0)):
-		f := arg.ToFloat()
-		if f == math.Float64frombits(0|(1<<63)) {
-			return &cdpruntime.CallArgument{
-				UnserializableValue: cdpruntime.UnserializableValue("-0"),
-			}, nil
-		} else if f == math.Inf(0) {
-			return &cdpruntime.CallArgument{
-				UnserializableValue: cdpruntime.UnserializableValue("Infinity"),
-			}, nil
-		} else if f == math.Inf(-1) {
-			return &cdpruntime.CallArgument{
-				UnserializableValue: cdpruntime.UnserializableValue("-Infinity"),
-			}, nil
-		} else if math.IsNaN(f) {
-			return &cdpruntime.CallArgument{
-				UnserializableValue: cdpruntime.UnserializableValue("NaN"),
-			}, nil
-		}
-		b, err := json.Marshal(f)
-		return &cdpruntime.CallArgument{Value: b}, err
-	case reflect.TypeOf(&ElementHandle{}):
-		objHandle := arg.Export().(*ElementHandle)
-		return convertBaseJSHandleTypes(ctx, execCtx, &objHandle.BaseJSHandle)
-	case reflect.TypeOf(&BaseJSHandle{}):
-		objHandle := arg.Export().(*BaseJSHandle)
-		return convertBaseJSHandleTypes(ctx, execCtx, objHandle)
+//nolint: cyclop
+func convertArgument(
+	ctx context.Context, execCtx *ExecutionContext, arg interface{},
+) (*cdpruntime.CallArgument, error) {
+	if gojaVal, ok := arg.(goja.Value); ok {
+		arg = gojaVal.Export()
 	}
-	b, err := json.Marshal(arg.Export())
-	return &cdpruntime.CallArgument{Value: b}, err
+	switch a := arg.(type) {
+	case int64:
+		if a > math.MaxInt32 {
+			return &cdpruntime.CallArgument{
+				UnserializableValue: cdpruntime.UnserializableValue(fmt.Sprintf("%dn", a)),
+			}, nil
+		}
+		b, err := json.Marshal(a)
+		return &cdpruntime.CallArgument{Value: b}, err
+	case float64:
+		var unserVal string
+		switch a {
+		case math.Float64frombits(0 | (1 << 63)):
+			unserVal = "-0"
+		case math.Inf(0):
+			unserVal = "Infinity"
+		case math.Inf(-1):
+			unserVal = "-Infinity"
+		default:
+			if math.IsNaN(a) {
+				unserVal = "NaN" //nolint: goconst
+			}
+		}
+
+		if unserVal != "" {
+			return &cdpruntime.CallArgument{
+				UnserializableValue: cdpruntime.UnserializableValue(unserVal),
+			}, nil
+		}
+
+		b, err := json.Marshal(a)
+		if err != nil {
+			err = fmt.Errorf("error converting argument '%v': %w", arg, err)
+		}
+
+		return &cdpruntime.CallArgument{Value: b}, err
+	case *ElementHandle:
+		return convertBaseJSHandleTypes(ctx, execCtx, &a.BaseJSHandle)
+	case *BaseJSHandle:
+		return convertBaseJSHandleTypes(ctx, execCtx, a)
+	default:
+		b, err := json.Marshal(a)
+		return &cdpruntime.CallArgument{Value: b}, err
+	}
 }
 
 func callApiWithTimeout(ctx context.Context, fn func(context.Context, chan interface{}, chan error), timeout time.Duration) (interface{}, error) {

@@ -167,8 +167,7 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 
 // eval will evaluate provided callable within this execution context and return by value or handle.
 func (e *ExecutionContext) eval(
-	apiCtx context.Context, opts evalOptions, pageFunc goja.Value,
-	args ...goja.Value,
+	apiCtx context.Context, opts evalOptions, js string, args ...interface{},
 ) (interface{}, error) {
 	e.logger.Debugf(
 		"ExecutionContext:eval",
@@ -177,22 +176,16 @@ func (e *ExecutionContext) eval(
 
 	suffix := `//# sourceURL=` + evaluationScriptURL
 
-	var (
-		isCallable = opts.forceCallable
-		action     interface {
-			Do(context.Context) (*runtime.RemoteObject, *runtime.ExceptionDetails, error)
-		}
-		expression = pageFunc.ToString().String()
-	)
-	if !isCallable {
-		_, isCallable = goja.AssertFunction(pageFunc)
+	var action interface {
+		Do(context.Context) (*runtime.RemoteObject, *runtime.ExceptionDetails, error)
 	}
-	if !isCallable {
-		if !sourceURLRegex.Match([]byte(expression)) {
-			expression += "\n" + suffix
+
+	if !opts.forceCallable {
+		if !sourceURLRegex.Match([]byte(js)) {
+			js += "\n" + suffix
 		}
 
-		action = runtime.Evaluate(expression).
+		action = runtime.Evaluate(js).
 			WithContextID(e.id).
 			WithReturnByValue(opts.returnByValue).
 			WithAwaitPromise(true).
@@ -209,8 +202,8 @@ func (e *ExecutionContext) eval(
 			arguments = append(arguments, result)
 		}
 
-		expression += "\n" + suffix + "\n"
-		action = runtime.CallFunctionOn(expression).
+		js += "\n" + suffix + "\n"
+		action = runtime.CallFunctionOn(js).
 			WithArguments(arguments).
 			WithExecutionContextID(e.id).
 			WithReturnByValue(opts.returnByValue).
@@ -226,12 +219,12 @@ func (e *ExecutionContext) eval(
 	if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
 		return nil, fmt.Errorf("cannot call function on expression (%q) "+
 			"in execution context (%d) in frame (%v) with session (%v): %w",
-			expression, e.id, e.Frame().ID(), e.session.ID(), err)
+			js, e.id, e.Frame().ID(), e.session.ID(), err)
 	}
 	if exceptionDetails != nil {
 		return nil, fmt.Errorf("cannot call function on expression (%q) "+
 			"in execution context (%d) in frame (%v) with session (%v): %s",
-			expression, e.id, e.Frame().ID(), e.session.ID(),
+			js, e.id, e.Frame().ID(), e.session.ID(),
 			parseExceptionDetails(exceptionDetails))
 	}
 	var res interface{}
@@ -248,7 +241,7 @@ func (e *ExecutionContext) eval(
 		if err != nil {
 			return nil, fmt.Errorf("cannot extract value from remote object (%s) "+
 				"using (%s) in execution context (%d) in frame (%v): %w",
-				remoteObject.ObjectID, expression, e.id, e.Frame().ID(), err)
+				remoteObject.ObjectID, js, e.id, e.Frame().ID(), err)
 		}
 	} else if remoteObject.ObjectID != "" {
 		// Note: we don't use the passed in apiCtx here as it could be tied to a timeout
@@ -274,7 +267,6 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 	}
 
 	var (
-		rt                      = e.vu.Runtime()
 		suffix                  = `//# sourceURL=` + evaluationScriptURL
 		source                  = fmt.Sprintf(`(() => {%s; return new InjectedScript();})()`, injectedScriptSource)
 		expression              = source
@@ -286,7 +278,7 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 	handle, err := e.eval(
 		apiCtx,
 		evalOptions{forceCallable: false, returnByValue: false},
-		rt.ToValue(expressionWithSourceURL),
+		expressionWithSourceURL,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get injected script: %w", err)
@@ -305,26 +297,32 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 
 // Eval will evaluate provided page function within this execution context.
 func (e *ExecutionContext) Eval(
-	apiCtx context.Context,
-	pageFunc goja.Value, args ...goja.Value,
+	apiCtx context.Context, js goja.Value, args ...goja.Value,
 ) (interface{}, error) {
 	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
-	return e.eval(apiCtx, opts, pageFunc, args...)
+	evalArgs := make([]interface{}, 0, len(args))
+	for _, a := range args {
+		evalArgs = append(evalArgs, a.Export())
+	}
+	return e.eval(apiCtx, opts, js.ToString().String(), evalArgs...)
 }
 
 // EvalHandle will evaluate provided page function within this execution context.
 func (e *ExecutionContext) EvalHandle(
-	apiCtx context.Context,
-	pageFunc goja.Value, args ...goja.Value,
+	apiCtx context.Context, js goja.Value, args ...goja.Value,
 ) (api.JSHandle, error) {
 	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
-	res, err := e.eval(apiCtx, opts, pageFunc, args...)
+	evalArgs := make([]interface{}, 0, len(args))
+	for _, a := range args {
+		evalArgs = append(evalArgs, a.Export())
+	}
+	res, err := e.eval(apiCtx, opts, js.ToString().String(), evalArgs...)
 	if err != nil {
 		return nil, err
 	}

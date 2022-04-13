@@ -1295,12 +1295,7 @@ func (h *ElementHandle) eval(
 ) (interface{}, error) {
 	// passing `h` makes it evaluate js code in the element handle's scope.
 	args = append([]interface{}{h}, args...)
-	rt := h.execCtx.vu.Runtime()
-	gargs := make([]goja.Value, len(args))
-	for i, arg := range args {
-		gargs[i] = rt.ToValue(arg)
-	}
-	result, err := h.execCtx.eval(ctx, opts, rt.ToValue(js), gargs...)
+	result, err := h.execCtx.eval(ctx, opts, js, args...)
 	if err != nil {
 		err = fmt.Errorf("element handle cannot evaluate: %w", err)
 	}
