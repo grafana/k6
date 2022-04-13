@@ -187,16 +187,14 @@ func decryptPrivateKey(privKey, password string) ([]byte, error) {
 	if blockType == "ENCRYPTED PRIVATE KEY" {
 		return nil, fmt.Errorf("encrypted pkcs8 formatted key is not supported")
 	}
-	if encrypted := x509.IsEncryptedPEMBlock(block); encrypted {
-		decryptedKey, err := x509.DecryptPEMBlock(block, []byte(password))
-		if err != nil {
-			return nil, err
-		}
-		key = pem.EncodeToMemory(&pem.Block{
-			Type:  blockType,
-			Bytes: decryptedKey,
-		})
+	decryptedKey, err := x509.DecryptPEMBlock(block, []byte(password))
+	if err != nil {
+		return nil, err
 	}
+	key = pem.EncodeToMemory(&pem.Block{
+		Type:  blockType,
+		Bytes: decryptedKey,
+	})
 	return key, nil
 }
 
