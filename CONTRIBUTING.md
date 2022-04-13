@@ -39,7 +39,7 @@ If you'd like to contribute code to k6, this is the basic procedure. Make sure t
 Development setup
 -----------------
 
-To get a basic development environment for Go and k6 up and running, first make sure you have **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.10 or newer) installed and working properly.
+To get a basic development environment for Go and k6 up and running, first make sure you have **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.17 or newer) installed and working properly.
 
 Once that's done, you can get the k6 source into your Go workspace (`$GOPATH/src`) by running:
 
@@ -106,7 +106,7 @@ go test -race go.k6.io/k6/core -run ^TestEngineRun$
 
 **Dependencies**:
 
-Actual policy about managing k6's dependencies you can find in the [Dependencies.md](Dependencies.md).
+Consult [Dependencies.md](Dependencies.md) to find out more about how we manage k6's dependencies, and our policy regarding dependencies management and update.
 
 Style guide
 -----------
