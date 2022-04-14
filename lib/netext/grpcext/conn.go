@@ -87,12 +87,12 @@ func (c *Conn) ReflectionClient() (*ReflectionClient, error) {
 // Invoke executes a unary gRPC request.
 func (c *Conn) Invoke(
 	ctx context.Context,
-	method string,
+	url string,
 	md metadata.MD,
 	req Request,
 	opts ...grpc.CallOption) (*Response, error) {
-	if method == "" {
-		return nil, fmt.Errorf("method is required")
+	if url == "" {
+		return nil, fmt.Errorf("url is required")
 	}
 	if req.MethodDescriptor == nil {
 		return nil, fmt.Errorf("request method descriptor is required")
@@ -117,7 +117,7 @@ func (c *Conn) Invoke(
 	copts = append(copts, opts...)
 	copts = append(copts, grpc.Header(&header), grpc.Trailer(&trailer))
 
-	err := c.raw.Invoke(ctx, method, reqdm, resp, copts...)
+	err := c.raw.Invoke(ctx, url, reqdm, resp, copts...)
 
 	response := Response{
 		Headers:  header,

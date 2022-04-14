@@ -90,7 +90,7 @@ func TestConnInvokeInvalid(t *testing.T) {
 	var (
 		// valid arguments
 		ctx        = context.Background()
-		method     = "not-empty-method"
+		url        = "not-empty-url-for-method"
 		md         = metadata.New(nil)
 		methodDesc = methodFromProto("SayHello")
 		payload    = []byte(`{"greeting":"test"}`)
@@ -105,22 +105,22 @@ func TestConnInvokeInvalid(t *testing.T) {
 		name   string
 		ctx    context.Context
 		md     metadata.MD
-		method string
+		url    string
 		req    Request
 		experr string
 	}{
 		{
 			name:   "EmptyMethod",
 			ctx:    ctx,
-			method: "",
+			url:    "",
 			md:     md,
 			req:    req,
-			experr: "method is required",
+			experr: "url is required",
 		},
 		{
 			name:   "NullMethodDescriptor",
 			ctx:    ctx,
-			method: method,
+			url:    url,
 			md:     nil,
 			req:    Request{Message: payload},
 			experr: "method descriptor is required",
@@ -128,7 +128,7 @@ func TestConnInvokeInvalid(t *testing.T) {
 		{
 			name:   "NullMessage",
 			ctx:    ctx,
-			method: method,
+			url:    url,
 			md:     nil,
 			req:    Request{MethodDescriptor: methodDesc},
 			experr: "message is required",
@@ -141,7 +141,7 @@ func TestConnInvokeInvalid(t *testing.T) {
 			t.Parallel()
 
 			c := Conn{}
-			res, err := c.Invoke(tt.ctx, tt.method, tt.md, tt.req)
+			res, err := c.Invoke(tt.ctx, tt.url, tt.md, tt.req)
 			require.Error(t, err)
 			require.Nil(t, res)
 			assert.Contains(t, err.Error(), tt.experr)
@@ -302,7 +302,7 @@ message Empty {
 // invokemock is a mock for the grpc connection supporting only unary requests.
 type invokemock func(in, out *dynamicpb.Message, opts ...grpc.CallOption) error
 
-func (im invokemock) Invoke(ctx context.Context, method string, payload interface{}, reply interface{}, opts ...grpc.CallOption) error {
+func (im invokemock) Invoke(ctx context.Context, url string, payload interface{}, reply interface{}, opts ...grpc.CallOption) error {
 	in, ok := payload.(*dynamicpb.Message)
 	if !ok {
 		return fmt.Errorf("unexpected type for payload")
