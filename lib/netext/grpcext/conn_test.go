@@ -57,7 +57,7 @@ func TestInvokeWithCallOptions(t *testing.T) {
 	c := Conn{raw: invokemock(reply)}
 	r := Request{
 		MethodDescriptor: methodFromProto("NoOp"),
-		Message:          []byte(`{"greeting":"text request"}`),
+		Message:          []byte(`{}`),
 	}
 	res, err := c.Invoke(context.Background(), "/hello.HelloService/NoOp", metadata.New(nil), r, grpc.UseCompressor("fakeone"))
 	require.NoError(t, err)
@@ -131,6 +131,14 @@ func TestConnInvokeInvalid(t *testing.T) {
 			url:    url,
 			md:     nil,
 			req:    Request{MethodDescriptor: methodDesc},
+			experr: "message is required",
+		},
+		{
+			name:   "EmptyMessage",
+			ctx:    ctx,
+			url:    url,
+			md:     nil,
+			req:    Request{MethodDescriptor: methodDesc, Message: []byte{}},
 			experr: "message is required",
 		},
 	}
@@ -261,7 +269,7 @@ package hello;
 
 service HelloService {
   rpc SayHello(HelloRequest) returns (HelloResponse);
-  rpc NoOp(HelloRequest) returns (Empty);
+  rpc NoOp(Empty) returns (Empty);
   rpc LotsOfReplies(HelloRequest) returns (stream HelloResponse);
   rpc LotsOfGreetings(stream HelloRequest) returns (HelloResponse);
   rpc BidiHello(stream HelloRequest) returns (stream HelloResponse);
