@@ -254,7 +254,6 @@ func TestOptions(t *testing.T) {
 					"AwEHoUQDQgAEF8XzmC7x8Ns0Y2Wyu2c77ge+6I/ghcDTjWOMZzMPmRRDxqKFLuGD\n" +
 					"zW1Kss13WODGSS8+j7dNCPOeLKyK6cbeIg==\n" +
 					"-----END EC PRIVATE KEY-----",
-				Password: "iNGNlsrtnO+4HiQAwRgIhANYDaM18sXAdkjyvuiP4IXA041jdK48Jd6a8aD",
 			}, nil},
 		}
 		opts := Options{}.Apply(Options{TLSAuth: tlsAuth})
@@ -347,6 +346,17 @@ func TestOptions(t *testing.T) {
 				password:     "12345",
 				hasError:     true,
 				errorMessage: "encrypted pkcs8 formatted key is not supported",
+			},
+			{
+				name: "non encrypted key and password",
+				privateKey: "-----BEGIN EC PRIVATE KEY-----\n" +
+					"MHcCAQEEINVilD5qOBkSy+AYfd41X0QPB5N3Z6OzgoBj8FZmSJOFoAoGCCqGSM49\n" +
+					"AwEHoUQDQgAEF8XzmC7x8Ns0Y2Wyu2c77ge+6I/ghcDTjWOMZzMPmRRDxqKFLuGD\n" +
+					"zW1Kss13WODGSS8+j7dNCPOeLKyK6cbeIg==\n" +
+					"-----END EC PRIVATE KEY-----",
+				password:     "12345",
+				hasError:     true,
+				errorMessage: "x509: no DEK-Info header in block",
 			},
 		}
 		for _, tc := range tests {
