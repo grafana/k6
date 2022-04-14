@@ -1,13 +1,18 @@
 GOLANGCI_LINT_VERSION = $(shell head -n 1 .golangci.yml | tr -d '\# ')
-K6_DEV_TOOLS_CONTAINER = k6-dev-tools
+TMPDIR ?= /tmp
+K6_DEV_TOOLS_IMAGE = k6-dev-tools
 
-# todo: check if the image exists and if not suggest to run build-k6-dev-tools
-# todo: implement validation if tool inside isn't outdated
+# TODO: check if the image exists and if not suggest to run build-k6-dev-tools
+# TODO: implement validation if tool inside isn't outdated
+# TODO: a better cache key (maybe a image id)
 define run_k6_tools
-	@docker run --rm -t \
+	@mkdir -p $(TMPDIR)/k6-dev-cache-$(GOLANGCI_LINT_VERSION)
+	@docker run --rm -it \
 		--user "$(shell id -u $(USER))" \
+		-v $(TMPDIR)/k6-dev-cache-$(GOLANGCI_LINT_VERSION):/golangci-cache \
+		--env "GOLANGCI_LINT_CACHE=/golangci-cache" \
 		-v $(shell pwd):/app \
-		-w /app $(K6_DEV_TOOLS_CONTAINER) \
+		-w /app $(K6_DEV_TOOLS_IMAGE) \
 		$(1)
 endef
 
@@ -36,6 +41,10 @@ tests:
 
 check: lint tests
 
+# enter into the k6 tools container
+k6-dev-tools:
+	$(call run_k6_tools,bash)
+
 # builds the container with all required dev-tools
 build-k6-dev-tools:
 	docker build \
@@ -44,6 +53,6 @@ build-k6-dev-tools:
 		--build-arg GID=$(shell id -g) \
 		--build-arg GOLANGCI_LINT_VERSION=$(GOLANGCI_LINT_VERSION) \
 		-f Dockerfile.dev \
-		--tag $(K6_DEV_TOOLS_CONTAINER) .
+		--tag $(K6_DEV_TOOLS_IMAGE) .
 
 .PHONY: build format lint tests check build-k6-dev-tools generate fix
