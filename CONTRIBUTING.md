@@ -9,7 +9,6 @@ Before you begin, make sure to familiarize yourself with the [Code of Conduct](C
 If you want to chat with the team or the community, you can [join our community forums](https://community.k6.io/).
 
 ## Filing issues
--------------
 
 Don't be afraid to file issues! Nobody can fix a bug we don't know exists, or add a feature we didn't think of.
 
@@ -23,7 +22,6 @@ If you'd like to contribute code to k6, this is the basic procedure. Make sure t
 
 1. Find an issue you'd like to fix. If there is none already, or you'd like to add a feature, please open one, and we can talk about how to do it.  Out of respect for your time, please start a discussion regarding any bigger contributions either in a GitHub Issue, in the community forums **before** you get started on the implementation.
   
-   
    Remember, there's more to software development than code; if it's not properly planned, stuff gets messy real fast.
 
 2. Create a fork and open a feature branch - `feature/my-cool-feature` is the classic way to name these, but it really doesn't matter.
@@ -47,7 +45,7 @@ For alternative ways of cloning the k6 repository, please refer to [GitHub's clo
 
 #### Running the linter
 
-We make use of the [golangci-lint](https://github.com/golangci/golangci-lint) tool to lint the code in CI. To run it locally, first [install it](https://golangci-lint.run/usage/install/#local-installation), then run:
+We make use of the [golangci-lint](https://github.com/golangci/golangci-lint) tool to lint the code in CI. The actual version you can find in our [`.golangci.yml`](https://github.com/grafana/k6/blob/master/.golangci.yml#L1). To run it locally, first [install it](https://golangci-lint.run/usage/install/#local-installation), then run:
 
 ```bash
 make lint
@@ -110,9 +108,3 @@ If you're writing a longer block of text to a terminal, wrap it at 80 characters
 
    Endpoint: /v1/status
 ```
-
-### License
-
-If you make a new source file, you must copy the license preamble from an existing file to the top of it. We can't merge a PR with unlicensed source files. We also can't merge PRs unless all authors have signed the [Contributor License Agreement](https://cla-assistant.io/grafana/k6).
-
-This doesn't apply to documentation or sample code; only files that make up the application itself.
