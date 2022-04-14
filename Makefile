@@ -1,3 +1,4 @@
+MAKEFLAGS += --silent
 GOLANGCI_LINT_VERSION = $(shell head -n 1 .golangci.yml | tr -d '\# ')
 TMPDIR ?= /tmp
 K6_DEV_TOOLS_IMAGE = k6-dev-tools
@@ -16,36 +17,54 @@ define run_k6_tools
 		$(1)
 endef
 
-all: build
+all: build check
 
+## help: Prints a list of available build targets.
+help:
+	echo "Usage: make <OPTIONS> ... <TARGETS>"
+	echo ""
+	echo "Available targets are:"
+	echo ''
+	sed -n 's/^##//p' ${PWD}/Makefile | column -t -s ':' | sed -e 's/^/ /'
+	echo
+	echo "Targets run by default are: `sed -n 's/^all: //p' ./Makefile | sed -e 's/ /, /g' | sed -e 's/\(.*\), /\1, and /'`"
+
+## clean: Removes any previously created build artifacts.
+clean:
+	rm -f ./k6
+
+## build: Builds the 'k6' binary.
 build:
 	go build
 
+## format: Applies Go formatting to code.
 format:
 	$(call run_k6_tools,gofumpt -w .)
 
-# lint files
+## fix: Runs golangci-lint with the verson that used inside the CI.
 lint:
 	$(call run_k6_tools,golangci-lint run --out-format=tab --new-from-rev master ./...)
 
-# fix apply all possible auto-fixes
+## fix: Applies all possible auto-fixes that are detected by golangci-lint.
 fix:
 	$(call run_k6_tools,golangci-lint run --fix --new-from-rev master ./...)
 
-# generates files like easyjson, enum, etc
+## generate: Generates code, e.g. easyjson, enum, etc
 generate:
 	$(call run_k6_tools,go generate ./...)
 
-tests:
+## test: Executes any unit tests.
+test:
 	go test -race -timeout 210s ./...
 
+## check: Performs most common checks like linting and unit testing.
 check: lint tests
 
-# enter into the k6 tools container
+## k6-dev-tools: Enters into the container.
 k6-dev-tools:
 	$(call run_k6_tools,bash)
 
-# builds the container with all required dev-tools
+## build-k6-dev-tools: Builds the container with all tools for the development.
 build-k6-dev-tools:
 	docker build \
 		--build-arg USER=$(USER) \
@@ -55,4 +74,4 @@ build-k6-dev-tools:
 		-f Dockerfile.dev \
 		--tag $(K6_DEV_TOOLS_IMAGE) .
 
-.PHONY: build format lint tests check build-k6-dev-tools generate fix
+.PHONY: build format lint test check build-k6-dev-tools k6-dev-tools generate fix
