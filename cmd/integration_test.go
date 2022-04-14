@@ -288,3 +288,26 @@ func TestSSLKEYLOGFILE(t *testing.T) {
 // TODO: also add a test that starts multiple k6 "instances", for example:
 //  - one with `k6 run --paused` and another with `k6 resume`
 //  - one with `k6 run` and another with `k6 stats` or `k6 status`
+
+func TestExecutionTestOptionsDefaultValues(t *testing.T) {
+	t.Parallel()
+	script := `
+		import exec from 'k6/execution';
+
+		export default function () {
+			console.log(exec.test.options)
+		}
+	`
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), []byte(script), 0o644))
+	ts.args = []string{"k6", "run", "--iterations", "1", "test.js"}
+
+	newRootCommand(ts.globalState).execute()
+
+	loglines := ts.loggerHook.Drain()
+	require.Len(t, loglines, 1)
+
+	expected := `{"paused":null,"executionSegment":null,"executionSegmentSequence":null,"noSetup":null,"setupTimeout":null,"noTeardown":null,"teardownTimeout":null,"rps":null,"dns":{"ttl":null,"select":null,"policy":null},"maxRedirects":null,"userAgent":null,"batch":null,"batchPerHost":null,"httpDebug":null,"insecureSkipTLSVerify":null,"tlsCipherSuites":null,"tlsVersion":null,"tlsAuth":null,"throw":null,"thresholds":null,"blacklistIPs":null,"blockHostnames":null,"hosts":null,"noConnectionReuse":null,"noVUConnectionReuse":null,"minIterationDuration":null,"ext":null,"summaryTrendStats":["avg", "min", "med", "max", "p(90)", "p(95)"],"summaryTimeUnit":null,"systemTags":["check","error","error_code","expected_response","group","method","name","proto","scenario","service","status","subproto","tls_version","url"],"tags":null,"metricSamplesBufferSize":null,"noCookiesReset":null,"discardResponseBodies":null,"consoleOutput":null,"scenarios":{"default":{"vus":null,"iterations":1,"executor":"shared-iterations","maxDuration":null,"startTime":null,"env":null,"tags":null,"gracefulStop":null,"exec":null}},"localIPs":null}`
+	assert.JSONEq(t, expected, loglines[0].Message)
+}
