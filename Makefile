@@ -8,7 +8,7 @@ K6_DEV_TOOLS_IMAGE = k6-dev-tools
 # TODO: a better cache key (maybe a image id)
 define run_k6_tools
 	@mkdir -p $(TMPDIR)/k6-dev-cache-$(GOLANGCI_LINT_VERSION)
-	@docker run --rm -it \
+	@docker run --rm -t \
 		--user "$(shell id -u $(USER))" \
 		-v $(TMPDIR)/k6-dev-cache-$(GOLANGCI_LINT_VERSION):/golangci-cache \
 		--env "GOLANGCI_LINT_CACHE=/golangci-cache" \
@@ -58,11 +58,7 @@ test:
 	go test -race -timeout 210s ./...
 
 ## check: Performs most common checks like linting and unit testing.
-check: lint tests
-
-## k6-dev-tools: Enters into the container.
-k6-dev-tools:
-	$(call run_k6_tools,bash)
+check: lint test
 
 ## build-k6-dev-tools: Builds the container with all tools for the development.
 build-k6-dev-tools:
