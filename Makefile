@@ -3,9 +3,9 @@ GOLANGCI_LINT_VERSION = $(shell head -n 1 .golangci.yml | tr -d '\# ')
 TMPDIR ?= /tmp
 K6_DEV_TOOLS_IMAGE = k6-dev-tools
 
-# TODO: check if the image exists and if not suggest to run build-k6-dev-tools
-# TODO: implement validation if tool inside isn't outdated
-# TODO: a better cache key (maybe a image id)
+# TODO: check if the image non exists and suggest running build-k6-dev-tools
+# TODO: implement validation if tools inside aren't outdated
+# TODO: pick a better cache key (maybe an image id)
 define run_k6_tools
 	@mkdir -p $(TMPDIR)/k6-dev-cache-$(GOLANGCI_LINT_VERSION)
 	@docker run --rm -t \
@@ -41,7 +41,7 @@ build:
 format:
 	$(call run_k6_tools,gofumpt -w .)
 
-## fix: Runs golangci-lint with the verson that used inside the CI.
+## lint: Runs golangci-lint with the version that is used inside the CI.
 lint:
 	$(call run_k6_tools,golangci-lint run --out-format=tab --new-from-rev master ./...)
 
@@ -57,7 +57,7 @@ generate:
 test:
 	go test -race -timeout 210s ./...
 
-## check: Performs most common checks like linting and unit testing.
+## check: Performs the most common checks like linting and unit testing.
 check: lint test
 
 ## build-k6-dev-tools: Builds the container with all tools for the development.
@@ -70,4 +70,4 @@ build-k6-dev-tools:
 		-f Dockerfile.dev \
 		--tag $(K6_DEV_TOOLS_IMAGE) .
 
-.PHONY: build format lint test check build-k6-dev-tools k6-dev-tools generate fix
+.PHONY: build format lint test check build-k6-dev-tools generate fix
