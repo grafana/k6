@@ -1,30 +1,49 @@
 GOLANGCI_LINT_VERSION = $(shell head -n 1 .golangci.yml | tr -d '\# ')
-TMPDIR ?= /tmp
+K6_DEV_TOOLS_CONTAINER = k6-dev-tools
+
+# todo: check if the image exists and if not suggest to run build-k6-dev-tools
+# todo: implement validation if tool inside isn't outdated
+define run_k6_tools
+	@docker run --rm -t \
+		--user "$(shell id -u $(USER))" \
+		-v $(shell pwd):/app \
+		-w /app $(K6_DEV_TOOLS_CONTAINER) \
+		$(1)
+endef
 
 all: build
 
-build :
+build:
 	go build
 
-format :
-	find . -name '*.go' -exec gofmt -s -w {} +
+format:
+	$(call run_k6_tools,gofumpt -w .)
 
-ci-like-lint :
-	@docker run --rm -t -v $(shell pwd):/app \
-		-v $(TMPDIR)/golangci-cache-$(GOLANGCI_LINT_VERSION):/golangci-cache \
-		--env "GOLANGCI_LINT_CACHE=/golangci-cache" \
-		-w /app golangci/golangci-lint:$(GOLANGCI_LINT_VERSION) \
-		make lint
+# lint files
+lint:
+	$(call run_k6_tools,golangci-lint run --out-format=tab --new-from-rev master ./...)
 
-lint :
-	golangci-lint run --out-format=tab --new-from-rev master ./...
+# fix apply all possible auto-fixes
+fix:
+	$(call run_k6_tools,golangci-lint run --fix --new-from-rev master ./...)
 
-tests :
+# generates files like easyjson, enum, etc
+generate:
+	$(call run_k6_tools,go generate ./...)
+
+tests:
 	go test -race -timeout 210s ./...
 
-check : ci-like-lint tests
+check: lint tests
 
-container:
-	docker build --rm --pull --no-cache -t grafana/k6 .
+# builds the container with all required dev-tools
+build-k6-dev-tools:
+	docker build \
+		--build-arg USER=$(USER) \
+		--build-arg UID=$(shell id -u) \
+		--build-arg GID=$(shell id -g) \
+		--build-arg GOLANGCI_LINT_VERSION=$(GOLANGCI_LINT_VERSION) \
+		-f Dockerfile.dev \
+		--tag $(K6_DEV_TOOLS_CONTAINER) .
 
-.PHONY: build format ci-like-lint lint tests check container
+.PHONY: build format lint tests check build-k6-dev-tools generate fix

@@ -1,0 +1,19 @@
+FROM golang:1.17
+
+ARG USER=dev
+ARG UID=1000
+ARG GID=1000
+ARG GOLANGCI_LINT_VERSION=v1.43.0
+
+# add user in order to properly handle file changes
+RUN useradd -m ${USER} --uid=${UID}
+
+USER ${UID}:${GID}
+
+WORKDIR /home/${USER}
+
+# todo single source of true (this, CI, go.mod)
+RUN go install github.com/alvaroloes/enumer@v1.1.2
+RUN go install mvdan.cc/gofumpt@v0.3.1
+RUN go install github.com/mailru/easyjson/easyjson@v0.7.7
+RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}
