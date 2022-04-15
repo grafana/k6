@@ -11,8 +11,8 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/storage/remote"
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
-	"go.k6.io/k6/stats"
 )
 
 type Output struct {
@@ -128,7 +128,7 @@ func (o *Output) flush() {
 	}
 }
 
-func (o *Output) convertToTimeSeries(samplesContainers []stats.SampleContainer) []prompb.TimeSeries {
+func (o *Output) convertToTimeSeries(samplesContainers []metrics.SampleContainer) []prompb.TimeSeries {
 	promTimeSeries := make([]prompb.TimeSeries, 0)
 
 	for _, samplesContainer := range samplesContainers {

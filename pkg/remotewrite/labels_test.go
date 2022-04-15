@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -15,12 +15,12 @@ func TestTagsToLabels(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		tags   *stats.SampleTags
+		tags   *metrics.SampleTags
 		config Config
 		labels []prompb.Label
 	}{
 		"empty-tags": {
-			tags: &stats.SampleTags{},
+			tags: &metrics.SampleTags{},
 			config: Config{
 				KeepTags:    null.BoolFrom(true),
 				KeepNameTag: null.BoolFrom(false),
@@ -28,7 +28,7 @@ func TestTagsToLabels(t *testing.T) {
 			labels: []prompb.Label{},
 		},
 		"name-tag-discard": {
-			tags: stats.NewSampleTags(map[string]string{"foo": "bar", "name": "nnn"}),
+			tags: metrics.NewSampleTags(map[string]string{"foo": "bar", "name": "nnn"}),
 			config: Config{
 				KeepTags:    null.BoolFrom(true),
 				KeepNameTag: null.BoolFrom(false),
@@ -38,7 +38,7 @@ func TestTagsToLabels(t *testing.T) {
 			},
 		},
 		"name-tag-keep": {
-			tags: stats.NewSampleTags(map[string]string{"foo": "bar", "name": "nnn"}),
+			tags: metrics.NewSampleTags(map[string]string{"foo": "bar", "name": "nnn"}),
 			config: Config{
 				KeepTags:    null.BoolFrom(true),
 				KeepNameTag: null.BoolFrom(true),
@@ -49,7 +49,7 @@ func TestTagsToLabels(t *testing.T) {
 			},
 		},
 		"url-tag-discard": {
-			tags: stats.NewSampleTags(map[string]string{"foo": "bar", "url": "uuu"}),
+			tags: metrics.NewSampleTags(map[string]string{"foo": "bar", "url": "uuu"}),
 			config: Config{
 				KeepTags:   null.BoolFrom(true),
 				KeepUrlTag: null.BoolFrom(false),
@@ -59,7 +59,7 @@ func TestTagsToLabels(t *testing.T) {
 			},
 		},
 		"url-tag-keep": {
-			tags: stats.NewSampleTags(map[string]string{"foo": "bar", "url": "uuu"}),
+			tags: metrics.NewSampleTags(map[string]string{"foo": "bar", "url": "uuu"}),
 			config: Config{
 				KeepTags:   null.BoolFrom(true),
 				KeepUrlTag: null.BoolFrom(true),
@@ -70,7 +70,7 @@ func TestTagsToLabels(t *testing.T) {
 			},
 		},
 		"discard-tags": {
-			tags: stats.NewSampleTags(map[string]string{"foo": "bar", "name": "nnn"}),
+			tags: metrics.NewSampleTags(map[string]string{"foo": "bar", "name": "nnn"}),
 			config: Config{
 				KeepTags: null.BoolFrom(false),
 			},

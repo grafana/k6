@@ -5,7 +5,7 @@ import (
 
 	"github.com/prometheus/prometheus/pkg/timestamp"
 	"github.com/prometheus/prometheus/prompb"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 // Note: k6 Registry is not used here since Output is getting
@@ -13,18 +13,18 @@ import (
 
 // metricsStorage is an in-memory gather point for metrics
 type metricsStorage struct {
-	m map[string]stats.Sample
+	m map[string]metrics.Sample
 }
 
 func newMetricsStorage() *metricsStorage {
 	return &metricsStorage{
-		m: make(map[string]stats.Sample),
+		m: make(map[string]metrics.Sample),
 	}
 }
 
 // update modifies metricsStorage and returns updated sample
 // so that the stored metric and the returned metric hold the same value
-func (ms *metricsStorage) update(sample stats.Sample, add func(current, s stats.Sample) stats.Sample) stats.Sample {
+func (ms *metricsStorage) update(sample metrics.Sample, add func(current, s metrics.Sample) metrics.Sample) metrics.Sample {
 	if current, ok := ms.m[sample.Metric.Name]; ok {
 		if add == nil {
 			current.Metric.Sink.Add(sample)
@@ -47,20 +47,20 @@ func (ms *metricsStorage) update(sample stats.Sample, add func(current, s stats.
 }
 
 // transform k6 sample into TimeSeries for remote-write
-func (ms *metricsStorage) transform(mapping Mapping, sample stats.Sample, labels []prompb.Label) ([]prompb.TimeSeries, error) {
+func (ms *metricsStorage) transform(mapping Mapping, sample metrics.Sample, labels []prompb.Label) ([]prompb.TimeSeries, error) {
 	var newts []prompb.TimeSeries
 
 	switch sample.Metric.Type {
-	case stats.Counter:
+	case metrics.Counter:
 		newts = mapping.MapCounter(ms, sample, labels)
 
-	case stats.Gauge:
+	case metrics.Gauge:
 		newts = mapping.MapGauge(ms, sample, labels)
 
-	case stats.Rate:
+	case metrics.Rate:
 		newts = mapping.MapRate(ms, sample, labels)
 
-	case stats.Trend:
+	case metrics.Trend:
 		newts = mapping.MapTrend(ms, sample, labels)
 
 	default:
@@ -74,10 +74,10 @@ func (ms *metricsStorage) transform(mapping Mapping, sample stats.Sample, labels
 // remote agent. As each remote agent can use different ways to store metrics as well as
 // expect different values on remote write endpoint, they must have their own support.
 type Mapping interface {
-	MapCounter(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries
-	MapGauge(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries
-	MapRate(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries
-	MapTrend(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries
+	MapCounter(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries
+	MapGauge(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries
+	MapRate(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries
+	MapTrend(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries
 
 	// AdjustLabels(labels []prompb.Label) []prompb.Label
 }
@@ -93,23 +93,23 @@ func NewMapping(mapping string) Mapping {
 
 type RawMapping struct{}
 
-func (rm *RawMapping) MapCounter(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+func (rm *RawMapping) MapCounter(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries {
 	return rm.processSample(sample, labels)
 }
 
-func (rm *RawMapping) MapGauge(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+func (rm *RawMapping) MapGauge(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries {
 	return rm.processSample(sample, labels)
 }
 
-func (rm *RawMapping) MapRate(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+func (rm *RawMapping) MapRate(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries {
 	return rm.processSample(sample, labels)
 }
 
-func (rm *RawMapping) MapTrend(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+func (rm *RawMapping) MapTrend(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries {
 	return rm.processSample(sample, labels)
 }
 
-func (rm *RawMapping) processSample(sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+func (rm *RawMapping) processSample(sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries {
 	return []prompb.TimeSeries{
 		{
 			Labels: append(labels, prompb.Label{

@@ -7,12 +7,12 @@ import (
 
 	"github.com/prometheus/prometheus/pkg/timestamp"
 	"github.com/prometheus/prometheus/prompb"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 type PrometheusMapping struct{}
 
-func (pm *PrometheusMapping) MapCounter(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+func (pm *PrometheusMapping) MapCounter(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries {
 	sample = ms.update(sample, nil)
 	aggr := sample.Metric.Sink.Format(0)
 
@@ -32,7 +32,7 @@ func (pm *PrometheusMapping) MapCounter(ms *metricsStorage, sample stats.Sample,
 	}
 }
 
-func (pm *PrometheusMapping) MapGauge(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+func (pm *PrometheusMapping) MapGauge(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries {
 	sample = ms.update(sample, nil)
 	aggr := sample.Metric.Sink.Format(0)
 
@@ -52,7 +52,7 @@ func (pm *PrometheusMapping) MapGauge(ms *metricsStorage, sample stats.Sample, l
 	}
 }
 
-func (pm *PrometheusMapping) MapRate(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+func (pm *PrometheusMapping) MapRate(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries {
 	sample = ms.update(sample, nil)
 	aggr := sample.Metric.Sink.Format(0)
 
@@ -72,10 +72,10 @@ func (pm *PrometheusMapping) MapRate(ms *metricsStorage, sample stats.Sample, la
 	}
 }
 
-func (pm *PrometheusMapping) MapTrend(ms *metricsStorage, sample stats.Sample, labels []prompb.Label) []prompb.TimeSeries {
+func (pm *PrometheusMapping) MapTrend(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries {
 	sample = ms.update(sample, trendAdd)
 
-	s := sample.Metric.Sink.(*stats.TrendSink)
+	s := sample.Metric.Sink.(*metrics.TrendSink)
 	aggr := map[string]float64{
 		"min":   s.Min,
 		"max":   s.Max,
@@ -166,11 +166,11 @@ func (pm *PrometheusMapping) MapTrend(ms *metricsStorage, sample stats.Sample, l
 }
 
 // The following functions are an attempt to add ad-hoc optimization to TrendSink,
-// and are a partial copy-paste from k6/stats.
+// and are a partial copy-paste from k6/metrics.
 // TODO: re-write & refactor this once metrics refactoring progresses in k6.
 
-func trendAdd(current, s stats.Sample) stats.Sample {
-	t := current.Metric.Sink.(*stats.TrendSink)
+func trendAdd(current, s metrics.Sample) metrics.Sample {
+	t := current.Metric.Sink.(*metrics.TrendSink)
 
 	// insert into sorted array instead of sorting anew on each addition
 	index := sort.Search(len(t.Values), func(i int) bool {
@@ -201,7 +201,7 @@ func trendAdd(current, s stats.Sample) stats.Sample {
 	return current
 }
 
-func p(t *stats.TrendSink, pct float64) float64 {
+func p(t *metrics.TrendSink, pct float64) float64 {
 	switch t.Count {
 	case 0:
 		return 0
