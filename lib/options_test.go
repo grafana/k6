@@ -473,17 +473,19 @@ func TestOptions(t *testing.T) {
 	})
 	t.Run("ClientIPRanges", func(t *testing.T) {
 		t.Parallel()
-		clientIPRanges, err := types.NewIPPool("129.112.232.12,123.12.0.0/32")
+		clientIPRanges := types.NullIPPool{}
+		err := clientIPRanges.UnmarshalText([]byte("129.112.232.12,123.12.0.0/32"))
 		require.NoError(t, err)
-		opts := Options{}.Apply(Options{LocalIPs: types.NullIPPool{Pool: clientIPRanges, Valid: true}})
+		opts := Options{}.Apply(Options{LocalIPs: clientIPRanges})
 		assert.NotNil(t, opts.LocalIPs)
 	})
 }
 
 func TestOptionsEnv(t *testing.T) {
 	t.Parallel()
-	mustIPPool := func(s string) *types.IPPool {
-		p, err := types.NewIPPool(s)
+	mustNullIPPool := func(s string) types.NullIPPool {
+		p := types.NullIPPool{}
+		err := p.UnmarshalText([]byte(s))
 		require.NoError(t, err)
 		return p
 	}
@@ -559,8 +561,8 @@ func TestOptionsEnv(t *testing.T) {
 		},
 		{"LocalIPs", "K6_LOCAL_IPS"}: {
 			"":                 types.NullIPPool{},
-			"192.168.220.2":    types.NullIPPool{Pool: mustIPPool("192.168.220.2"), Valid: true},
-			"192.168.220.2/24": types.NullIPPool{Pool: mustIPPool("192.168.220.0/24"), Valid: true},
+			"192.168.220.2":    mustNullIPPool("192.168.220.2"),
+			"192.168.220.0/24": mustNullIPPool("192.168.220.0/24"),
 		},
 		{"Throw", "K6_THROW"}: {
 			"":      null.Bool{},

@@ -29,10 +29,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//nolint:gochecknoglobals
-var max64 = new(big.Int).Exp(big.NewInt(2), big.NewInt(64), nil)
-
 func get128BigInt(hi, lo int64) *big.Int {
+	max64 := new(big.Int).Exp(big.NewInt(2), big.NewInt(64), nil)
 	h := big.NewInt(hi)
 	h.Mul(h, max64)
 	return h.Add(h, big.NewInt(lo))
@@ -159,4 +157,21 @@ func TestIpBlockError(t *testing.T) {
 			require.Contains(t, err.Error(), data)
 		})
 	}
+}
+
+func TestNullIPPoolMarshalText(t *testing.T) {
+	t.Parallel()
+
+	rangeInput := "192.168.20.12-192.168.20.15,192.168.10.0/27"
+	p, err := NewIPPool(rangeInput)
+	require.NoError(t, err)
+
+	nullpool := NullIPPool{
+		Pool:  p,
+		Valid: true,
+		raw:   []byte(rangeInput),
+	}
+	text, err := nullpool.MarshalText()
+	require.NoError(t, err)
+	assert.Equal(t, "192.168.20.12-192.168.20.15,192.168.10.0/27", string(text))
 }
