@@ -18,6 +18,7 @@
  *
  */
 
+// Package common contains helpers for interacting with the JavaScript runtime.
 package common
 
 import (
