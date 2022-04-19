@@ -10,12 +10,12 @@ RUN apk add build-base git
 # add user in order to properly handle file changes
 RUN adduser -D -u ${UID} -g ${GID} ${USER}
 
+USER ${UID}:${GID}
+
 # todo single source of true (this, CI, go.mod)
 RUN go install github.com/alvaroloes/enumer@v1.1.2
 RUN go install mvdan.cc/gofumpt@v0.3.1
 RUN go install github.com/mailru/easyjson/easyjson@v0.7.7
 RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}
-
-USER ${UID}:${GID}
 
 WORKDIR /home/${USER}
