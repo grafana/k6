@@ -24,12 +24,78 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestPageEvaluate(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok/func", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+
+		got := p.Evaluate(tb.rt.ToValue("() => document.location.toString()"))
+
+		require.IsType(t, tb.rt.ToValue(""), got)
+		gotVal, _ := got.(goja.Value)
+		assert.Equal(t, "about:blank", gotVal.Export())
+	})
+
+	t.Run("err", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []struct {
+			name, js, errMsg string
+		}{
+			{
+				"promise",
+				`async () => { return await new Promise((res, rej) => { rej('rejected'); }); }`,
+				`exception "Uncaught (in promise)" (0:0): rejected`,
+			},
+			{
+				"syntax", `() => {`,
+				`exception "Uncaught" (2:0): SyntaxError: Unexpected token ')'`,
+			},
+			{"undef", "undef", `ReferenceError: undef is not defined`},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				// Not using assert.Panics* because we want to match on an error substring.
+				defer func() {
+					r := recover()
+					require.NotNil(t, r)
+					require.IsType(t, &goja.Object{}, r)
+					gotObj, _ := r.(*goja.Object)
+					got := gotObj.Export()
+					expErr := fmt.Errorf("%w", errors.New(tc.errMsg))
+					require.IsType(t, expErr, got)
+					gotErr, ok := got.(error)
+					require.True(t, ok)
+					assert.Contains(t, gotErr.Error(), expErr.Error())
+				}()
+
+				tb := newTestBrowser(t)
+				p := tb.NewPage(nil)
+
+				p.Evaluate(tb.rt.ToValue(tc.js))
+
+				t.Error("did not panic")
+			})
+		}
+	})
+}
 
 func TestPageGoto(t *testing.T) {
 	b := newTestBrowser(t, withFileServer())

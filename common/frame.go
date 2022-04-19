@@ -567,10 +567,9 @@ func (f *Frame) waitForExecutionContext(world executionWorld) {
 }
 
 func (f *Frame) waitForFunction(
-	apiCtx context.Context,
-	world executionWorld, predicateFn goja.Value,
+	apiCtx context.Context, world executionWorld, predicateFn string,
 	polling PollingType, interval int64, timeout time.Duration,
-	args ...goja.Value,
+	args ...interface{},
 ) (interface{}, error) {
 	f.log.Debugf(
 		"Frame:waitForFunction",
@@ -591,28 +590,20 @@ func (f *Frame) waitForFunction(
 		return nil, err
 	}
 
-	rt := f.vu.Runtime()
-	pageFn := rt.ToValue(`
+	pageFn := `
 		(injected, predicate, polling, timeout, ...args) => {
 			return injected.waitForPredicateFunction(predicate, polling, timeout, ...args);
 		}
-	`)
-	predicate := ""
-	_, isCallable := goja.AssertFunction(predicateFn)
-	if !isCallable {
-		predicate = fmt.Sprintf("return (%s);", predicateFn.ToString().String())
-	} else {
-		predicate = fmt.Sprintf("return (%s)(...args);", predicateFn.ToString().String())
-	}
+	`
 	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
 	result, err := execCtx.eval(
-		apiCtx, opts, pageFn, append([]goja.Value{
-			rt.ToValue(injected),
-			rt.ToValue(predicate),
-			rt.ToValue(polling),
+		apiCtx, opts, pageFn, append([]interface{}{
+			injected,
+			predicateFn,
+			polling,
 		}, args...)...)
 	if err != nil {
 		return nil, fmt.Errorf("frame cannot wait for function: %w", err)
@@ -1480,7 +1471,7 @@ func (f *Frame) setURL(url string) {
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value.
-func (f *Frame) WaitForFunction(pageFunc goja.Value, opts goja.Value, args ...goja.Value) api.JSHandle {
+func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.Value) api.JSHandle {
 	f.log.Debugf("Frame:WaitForFunction", "fid:%s furl:%q", f.ID(), f.URL())
 
 	parsedOpts := NewFrameWaitForFunctionOptions(f.defaultTimeout())
@@ -1492,7 +1483,18 @@ func (f *Frame) WaitForFunction(pageFunc goja.Value, opts goja.Value, args ...go
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
-	handle, err := f.waitForFunction(f.ctx, utilityWorld, pageFunc,
+	js := fn.ToString().String()
+	_, isCallable := goja.AssertFunction(fn)
+	if !isCallable {
+		js = fmt.Sprintf("() => (%s)", js)
+	}
+
+	args := make([]interface{}, 0, len(jsArgs))
+	for _, a := range jsArgs {
+		args = append(args, a.Export())
+	}
+
+	handle, err := f.waitForFunction(f.ctx, utilityWorld, js,
 		parsedOpts.Polling, parsedOpts.Interval, parsedOpts.Timeout, args...)
 	if err != nil {
 		k6Throw(f.ctx, "%w", err)
@@ -1589,10 +1591,16 @@ func (f *Frame) evaluate(
 	if ec == nil {
 		return nil, fmt.Errorf("cannot find execution context: %q", world)
 	}
-	eh, err := ec.eval(apiCtx, opts, pageFunc, args...)
+
+	evalArgs := make([]interface{}, 0, len(args))
+	for _, a := range args {
+		evalArgs = append(evalArgs, a.Export())
+	}
+	eh, err := ec.eval(apiCtx, opts, pageFunc.ToString().String(), evalArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("frame cannot evaluate: %w", err)
 	}
+
 	return eh, nil
 }
 
@@ -1606,31 +1614,23 @@ type frameExecutionContext interface {
 	// execution context from another execution context.
 	adoptElementHandle(elementHandle *ElementHandle) (*ElementHandle, error)
 
-	// eval will evaluate provided callable within this execution
-	// context and return by value or handle.
+	// eval evaluates the provided JavaScript within this execution context and
+	// returns a value or handle.
 	eval(
-		apiCtx context.Context,
-		opts evalOptions,
-		pageFunc goja.Value, args ...goja.Value,
+		apiCtx context.Context, opts evalOptions, js string, args ...interface{},
 	) (res interface{}, err error)
 
 	// getInjectedScript returns a JS handle to the injected script of helper
 	// functions.
 	getInjectedScript(apiCtx context.Context) (api.JSHandle, error)
 
-	// Eval will evaluate provided page function within this execution
-	// context.
-	Eval(
-		apiCtx context.Context,
-		pageFunc goja.Value, args ...goja.Value,
-	) (interface{}, error)
+	// Eval evaluates the provided JavaScript within this execution context and
+	// returns a value or handle.
+	Eval(apiCtx context.Context, js goja.Value, args ...goja.Value) (interface{}, error)
 
-	// EvalHandle will evaluate provided page function within this
-	// execution context.
-	EvalHandle(
-		apiCtx context.Context,
-		pageFunc goja.Value, args ...goja.Value,
-	) (api.JSHandle, error)
+	// EvalHandle evaluates the provided JavaScript within this execution
+	// context and returns a JSHandle.
+	EvalHandle(apiCtx context.Context, js goja.Value, args ...goja.Value) (api.JSHandle, error)
 
 	// Frame returns the frame that this execution context belongs to.
 	Frame() *Frame
