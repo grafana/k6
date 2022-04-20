@@ -168,3 +168,8 @@ func (h *BaseJSHandle) JSONValue() goja.Value {
 	}
 	return res
 }
+
+// ObjectID returns the remote object ID.
+func (h *BaseJSHandle) ObjectID() runtime.RemoteObjectID {
+	return h.remoteObject.ObjectID
+}

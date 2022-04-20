@@ -67,7 +67,7 @@ type Frame interface {
 	Type(selector string, text string, opts goja.Value)
 	Uncheck(selector string, opts goja.Value)
 	URL() string
-	WaitForFunction(pageFunc goja.Value, opts goja.Value, args ...goja.Value) JSHandle
+	WaitForFunction(pageFunc, opts goja.Value, args ...goja.Value) *goja.Promise
 	WaitForLoadState(state string, opts goja.Value)
 	WaitForNavigation(opts goja.Value) Response
 	WaitForSelector(selector string, opts goja.Value) ElementHandle

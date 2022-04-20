@@ -20,7 +20,10 @@
 
 package api
 
-import "github.com/dop251/goja"
+import (
+	cdpruntime "github.com/chromedp/cdproto/runtime"
+	"github.com/dop251/goja"
+)
 
 // JSHandle is the interface of an in-page JS object.
 type JSHandle interface {
@@ -31,4 +34,5 @@ type JSHandle interface {
 	GetProperties() map[string]JSHandle
 	GetProperty(propertyName string) JSHandle
 	JSONValue() goja.Value
+	ObjectID() cdpruntime.RemoteObjectID
 }

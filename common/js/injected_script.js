@@ -49,17 +49,17 @@ const eventType = new Map([
     ['mouseup', 'mouse'],
     ['mouseleave', 'mouse'],
     ['mousewheel', 'mouse'],
-  
+
     ['keydown', 'keyboard'],
     ['keyup', 'keyboard'],
     ['keypress', 'keyboard'],
     ['textInput', 'keyboard'],
-  
+
     ['touchstart', 'touch'],
     ['touchmove', 'touch'],
     ['touchend', 'touch'],
     ['touchcancel', 'touch'],
-  
+
     ['pointerover', 'pointer'],
     ['pointerout', 'pointer'],
     ['pointerenter', 'pointer'],
@@ -70,10 +70,10 @@ const eventType = new Map([
     ['pointercancel', 'pointer'],
     ['gotpointercapture', 'pointer'],
     ['lostpointercapture', 'pointer'],
-  
+
     ['focus', 'focus'],
     ['blur', 'focus'],
-  
+
     ['drag', 'drag'],
     ['dragstart', 'drag'],
     ['dragend', 'drag'],
@@ -138,6 +138,7 @@ class InjectedScript {
     constructor() {
         this._replaceRafWithTimeout = false;
         this._stableRafCount = 10;
+        this.continuePolling = continuePolling;
         this._queryEngines = {
             'css': new CSSQueryEngine(),
             'text': new TextQueryEngine(),
@@ -587,30 +588,42 @@ class InjectedScript {
     }
 
     async waitForPredicateFunction(predicate, polling, timeout, ...args) {
-        predicate();
         let timedOut = false;
-        if (timeout !== undefined || timeout !== null ) setTimeout(() => (timedOut = true), timeout);
+        let timeoutPoll = null;
+        if (timeout !== undefined || timeout !== null) {
+          setTimeout(() => {
+            timedOut = true;
+            if (timeoutPoll) timeoutPoll();
+          }, timeout);
+        }
         if (polling === 'raf') return await pollRaf();
         if (polling === 'mutation') return await pollMutation();
         if (typeof polling === 'number') return await pollInterval(polling);
 
         async function pollMutation() {
-            const success = await predicate(...args);
-            if (success) return Promise.resolve(success);
+            const success = predicate(...args);
+            if (success !== continuePolling) return Promise.resolve(success);
 
-            let fulfill;
-            const result = new Promise((x) => (fulfill = x));
+            let resolve, reject;
+            const result = new Promise((res, rej) => {
+              resolve = res;
+              reject = rej;
+            });
             const observer = new MutationObserver(async () => {
                 if (timedOut) {
                     observer.disconnect();
-                    fulfill("error:timeout");
+                    reject(`timed out after ${timeout}ms`);
                 }
                 const success = predicate(...args);
                 if (success !== continuePolling) {
                     observer.disconnect();
-                    fulfill(success);
+                    resolve(success);
                 }
             });
+            timeoutPoll = () => {
+              observer.disconnect();
+              reject(`timed out after ${timeout}ms`);
+            };
             observer.observe(document, {
                 childList: true,
                 subtree: true,
@@ -620,35 +633,41 @@ class InjectedScript {
         }
 
         async function pollRaf() {
-            let fulfill;
-            const result = new Promise((x) => (fulfill = x));
+            let resolve, reject;
+            const result = new Promise((res, rej) => {
+              resolve = res;
+              reject = rej;
+            });
             await onRaf();
             return result;
 
             async function onRaf() {
                 if (timedOut) {
-                    fulfill("error:timeout");
+                    reject(`timed out after ${timeout}ms`);
                     return;
                 }
                 const success = predicate(...args);
-                if (success !== continuePolling) fulfill(success);
+                if (success !== continuePolling) resolve(success);
                 else requestAnimationFrame(onRaf);
             }
         }
 
         async function pollInterval(pollInterval) {
-            let fulfill;
-            const result = new Promise((x) => (fulfill = x));
+            let resolve, reject;
+            const result = new Promise((res, rej) => {
+              resolve = res;
+              reject = rej;
+            });
             await onTimeout();
             return result;
 
             async function onTimeout() {
                 if (timedOut) {
-                    fulfill("error:timeout");
+                    reject(`timed out after ${timeout}ms`);
                     return;
                 }
                 const success = predicate(...args);
-                if (success !== continuePolling) fulfill(success);
+                if (success !== continuePolling) resolve(success);
                 else setTimeout(onTimeout, pollInterval);
             }
         }

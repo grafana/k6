@@ -605,22 +605,31 @@ func NewFrameWaitForFunctionOptions(defaultTimeout time.Duration) *FrameWaitForF
 	}
 }
 
+// Parse JavaScript waitForFunction options.
 func (o *FrameWaitForFunctionOptions) Parse(ctx context.Context, opts goja.Value) error {
 	rt := GetVU(ctx).Runtime()
 
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
+			v := opts.Get(k)
 			switch k {
 			case "timeout":
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
+				o.Timeout = time.Duration(v.ToInteger()) * time.Millisecond
 			case "polling":
-				switch opts.Get(k).ExportType().Kind() {
+				switch v.ExportType().Kind() { //nolint: exhaustive
 				case reflect.Int64:
 					o.Polling = PollingInterval
-					o.Interval = opts.Get(k).ToInteger()
+					o.Interval = v.ToInteger()
+				case reflect.String:
+					if p, ok := pollingTypeToID[v.ToString().String()]; ok {
+						o.Polling = p
+						break
+					}
+					fallthrough
 				default:
-					o.Polling = PollingRaf
+					return fmt.Errorf("wrong polling option value: %q; "+
+						`possible values: "raf", "mutation" or number`, v)
 				}
 			}
 		}

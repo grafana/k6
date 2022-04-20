@@ -148,6 +148,16 @@ func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 	assert.EqualValues(t, "DOMContentLoaded", actual[0], `expected "DOMContentLoaded" event to have fired`)
 }
 
+func TestPageIsChecked(t *testing.T) {
+	p := newTestBrowser(t).NewPage(nil)
+
+	p.SetContent(`<input type="checkbox" checked>`, nil)
+	assert.True(t, p.IsChecked("input", nil), "expected checkbox to be checked")
+
+	p.SetContent(`<input type="checkbox">`, nil)
+	assert.False(t, p.IsChecked("input", nil), "expected checkbox to be unchecked")
+}
+
 func TestPageSetExtraHTTPHeaders(t *testing.T) {
 	b := newTestBrowser(t, withHTTPServer())
 
@@ -167,6 +177,229 @@ func TestPageSetExtraHTTPHeaders(t *testing.T) {
 	h := body.Headers["Some-Header"]
 	require.NotEmpty(t, h)
 	assert.Equal(t, "Some-Value", h[0])
+}
+
+func TestPageWaitForFunction(t *testing.T) {
+	t.Parallel()
+
+	script := `
+        page.waitForFunction(%s, %s, %s).then(ok => {
+            log('ok: '+ok);
+        }, err => {
+            log('err: '+err);
+        });`
+
+	t.Run("ok_func_raf_default", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		var log []string
+		require.NoError(t, tb.rt.Set("log", func(s string) { log = append(log, s) }))
+		require.NoError(t, tb.rt.Set("page", p))
+
+		_, err := tb.rt.RunString(`fn = () => {
+			if (typeof window._cnt == 'undefined') window._cnt = 0;
+			if (window._cnt >= 50) return true;
+			window._cnt++;
+			return false;
+		}`)
+		require.NoError(t, err)
+
+		err = tb.vu.loop.Start(func() error {
+			if _, err := tb.rt.RunString(fmt.Sprintf(script, "fn", "{}", "null")); err != nil {
+				return fmt.Errorf("%w", err)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+		assert.Contains(t, log, "ok: null")
+	})
+
+	t.Run("ok_func_raf_default_arg", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		require.NoError(t, tb.rt.Set("page", p))
+		var log []string
+		require.NoError(t, tb.rt.Set("log", func(s string) { log = append(log, s) }))
+
+		_, err := tb.rt.RunString(`fn = arg => {
+			window._arg = arg;
+			return true;
+		}`)
+		require.NoError(t, err)
+
+		arg := "raf_arg"
+		err = tb.vu.loop.Start(func() error {
+			if _, err := tb.rt.RunString(
+				fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("%q", arg)),
+			); err != nil {
+				return fmt.Errorf("%w", err)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+		assert.Contains(t, log, "ok: null")
+
+		argEvalJS := p.Evaluate(tb.rt.ToValue("() => window._arg"))
+		argEval, ok := argEvalJS.(goja.Value)
+		require.True(t, ok)
+		var gotArg string
+		_ = tb.rt.ExportTo(argEval, &gotArg)
+		assert.Equal(t, arg, gotArg)
+	})
+
+	t.Run("ok_func_raf_default_args", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		require.NoError(t, tb.rt.Set("page", p))
+		var log []string
+		require.NoError(t, tb.rt.Set("log", func(s string) { log = append(log, s) }))
+
+		_, err := tb.rt.RunString(`fn = (...args) => {
+			window._args = args;
+			return true;
+		}`)
+		require.NoError(t, err)
+
+		args := []int{1, 2, 3}
+		argsJS, err := json.Marshal(args)
+		require.NoError(t, err)
+
+		err = tb.vu.loop.Start(func() error {
+			if _, err := tb.rt.RunString(
+				fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("...%s", string(argsJS))),
+			); err != nil {
+				return fmt.Errorf("%w", err)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+		assert.Contains(t, log, "ok: null")
+
+		argEvalJS := p.Evaluate(tb.rt.ToValue("() => window._args"))
+		argEval, ok := argEvalJS.(goja.Value)
+		require.True(t, ok)
+		var gotArgs []int
+		_ = tb.rt.ExportTo(argEval, &gotArgs)
+		assert.Equal(t, args, gotArgs)
+	})
+
+	t.Run("err_expr_raf_timeout", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		rt := tb.vu.Runtime()
+		var log []string
+		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
+		require.NoError(t, rt.Set("page", p))
+
+		err := tb.vu.loop.Start(func() error {
+			if _, err := rt.RunString(fmt.Sprintf(script, "false",
+				"{ polling: 'raf', timeout: 500, }", "null")); err != nil {
+				return fmt.Errorf("%w", err)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+		require.Len(t, log, 1)
+		assert.Contains(t, log[0], "timed out after 500ms")
+	})
+
+	t.Run("err_wrong_polling", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		rt := tb.vu.Runtime()
+		require.NoError(t, rt.Set("page", p))
+
+		err := tb.vu.loop.Start(func() error {
+			if _, err := rt.RunString(fmt.Sprintf(script, "false",
+				"{ polling: 'blah' }", "null")); err != nil {
+				return fmt.Errorf("%w", err)
+			}
+			return nil
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(),
+			`error parsing waitForFunction options: wrong polling option value:`,
+			`"blah"; possible values: "raf", "mutation" or number`)
+	})
+
+	t.Run("ok_expr_poll_interval", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		require.NoError(t, tb.rt.Set("page", p))
+		var log []string
+		require.NoError(t, tb.rt.Set("log", func(s string) { log = append(log, s) }))
+
+		p.Evaluate(tb.rt.ToValue(`() => {
+			setTimeout(() => {
+				const el = document.createElement('h1');
+				el.innerHTML = 'Hello';
+				document.body.appendChild(el);
+			}, 1000);
+		}`))
+
+		script := `
+	        page.waitForFunction(%s, %s, %s).then(ok => {
+	            log('ok: '+ok.innerHTML());
+	        }, err => {
+	            log('err: '+err);
+	        });`
+
+		err := tb.vu.loop.Start(func() error {
+			if _, err := tb.rt.RunString(fmt.Sprintf(script,
+				fmt.Sprintf("%q", "document.querySelector('h1')"),
+				"{ polling: 100, timeout: 2000, }", "null")); err != nil {
+				return fmt.Errorf("%w", err)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+		assert.Contains(t, log, "ok: Hello")
+	})
+
+	t.Run("ok_func_poll_mutation", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		require.NoError(t, tb.rt.Set("page", p))
+		var log []string
+		require.NoError(t, tb.rt.Set("log", func(s string) { log = append(log, s) }))
+
+		_, err := tb.rt.RunString(`fn = () => document.querySelector('h1') !== null`)
+		require.NoError(t, err)
+
+		p.Evaluate(tb.rt.ToValue(`() => {
+			console.log('calling setTimeout...');
+			setTimeout(() => {
+				console.log('creating element...');
+				const el = document.createElement('h1');
+				el.innerHTML = 'Hello';
+				document.body.appendChild(el);
+			}, 1000);
+		}`))
+
+		err = tb.vu.loop.Start(func() error {
+			if _, err := tb.rt.RunString(fmt.Sprintf(script, "fn",
+				"{ polling: 'mutation', timeout: 2000, }", "null")); err != nil {
+				return fmt.Errorf("%w", err)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+		assert.Contains(t, log, "ok: null")
+	})
 }
 
 // See: The issue #187 for details.

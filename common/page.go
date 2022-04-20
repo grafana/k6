@@ -846,10 +846,10 @@ func (p *Page) WaitForEvent(event string, optsOrPredicate goja.Value) interface{
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value.
-func (p *Page) WaitForFunction(pageFunc goja.Value, arg goja.Value, opts goja.Value) api.JSHandle {
+func (p *Page) WaitForFunction(fn, opts goja.Value, args ...goja.Value) *goja.Promise {
 	p.logger.Debugf("Page:WaitForFunction", "sid:%v", p.sessionID())
 
-	return p.frameManager.MainFrame().WaitForFunction(pageFunc, opts, arg)
+	return p.frameManager.MainFrame().WaitForFunction(fn, opts, args...)
 }
 
 // WaitForLoadState waits for the specified page life cycle event.

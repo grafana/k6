@@ -672,7 +672,7 @@ func (h *ElementHandle) waitForElementState(apiCtx context.Context, states []str
 	}
 	result, err := h.evalWithScript(apiCtx, opts, fn, states, timeout.Milliseconds())
 	if err != nil {
-		return false, err
+		return false, errorFromDOMError(err.Error())
 	}
 
 	value := result.(goja.Value)
@@ -1249,7 +1249,7 @@ func (h *ElementHandle) Uncheck(opts goja.Value) {
 }
 
 func (h *ElementHandle) WaitForElementState(state string, opts goja.Value) {
-	parsedOpts := NewElementHandleWaitForElementStateOptions(time.Duration(h.frame.manager.timeoutSettings.timeout()) * time.Second)
+	parsedOpts := NewElementHandleWaitForElementStateOptions(h.defaultTimeout())
 	err := parsedOpts.Parse(h.ctx, opts)
 	if err != nil {
 		k6Throw(h.ctx, "cannot parse element wait for state options: %w", err)
@@ -1458,7 +1458,7 @@ func retryPointerAction(
 
 func errorFromDOMError(derr string) error {
 	// return the same sentinel error value for the timed out err
-	if derr == "error:timeout" {
+	if strings.Contains(derr, "timed out") {
 		return ErrTimedOut
 	}
 	if s := "error:expectednode:"; strings.HasPrefix(derr, s) {

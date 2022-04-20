@@ -18,7 +18,7 @@ func TestErrorFromDOMError(t *testing.T) {
 		sentinel bool // if it returns the same error value
 		want     error
 	}{
-		{in: "error:timeout", want: ErrTimedOut, sentinel: true},
+		{in: "timed out", want: ErrTimedOut, sentinel: true},
 		{in: "error:notconnected", want: errors.New("element is not attached to the DOM")},
 		{in: "error:expectednode:anything", want: errors.New("expected node but got anything")},
 		{in: "nonexistent error", want: errors.New("nonexistent error")},
