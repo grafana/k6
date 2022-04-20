@@ -188,9 +188,9 @@ func decryptPrivateKey(privKey, password string) ([]byte, error) {
 		return nil, fmt.Errorf("encrypted pkcs8 formatted key is not supported")
 	}
 	/*
-	   Even though `DecryptPEMBlock` has been depecrated since 1.16.x it is still
-	   being used here because there are not alternatives in the standard library
-	   to decrypt PEM encoded files.
+	   Even though `DecryptPEMBlock` has been deprecated since 1.16.x it is still
+	   being used here because it is deprecated due to it not supporting *good* crypography
+	   ultimately though we want to support something so we will be using it for now.
 	*/
 	decryptedKey, err := x509.DecryptPEMBlock(block, []byte(password)) // nolint: staticcheck
 	if err != nil {
