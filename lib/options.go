@@ -132,9 +132,9 @@ func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
 // Fields for TLSAuth. Unmarshalling hack.
 type TLSAuthFields struct {
 	// Certificate and key as a PEM-encoded string, including "-----BEGIN CERTIFICATE-----".
-	Cert     string `json:"cert"`
-	Key      string `json:"key"`
-	Password string `json:"password"`
+	Cert     string      `json:"cert"`
+	Key      string      `json:"key"`
+	Password null.String `json:"password"`
 
 	// Domains to present the certificate to. May contain wildcards, eg. "*.example.com".
 	Domains []string `json:"domains"`
@@ -159,8 +159,8 @@ func (c *TLSAuth) UnmarshalJSON(data []byte) error {
 func (c *TLSAuth) Certificate() (*tls.Certificate, error) {
 	key := []byte(c.Key)
 	var err error
-	if c.Password != "" {
-		key, err = decryptPrivateKey(c.Key, c.Password)
+	if c.Password.Valid {
+		key, err = decryptPrivateKey(c.Key, c.Password.String)
 		if err != nil {
 			return nil, err
 		}
