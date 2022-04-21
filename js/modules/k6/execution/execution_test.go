@@ -213,7 +213,7 @@ func TestAbortTest(t *testing.T) { //nolint:tparallel
 func TestOptionsTestFull(t *testing.T) {
 	t.Parallel()
 
-	expected := `{"paused":true,"scenarios":{"const-vus":{"executor":"constant-vus","startTime":"10s","gracefulStop":"30s","env":{"FOO":"bar"},"exec":"default","tags":{"tagkey":"tagvalue"},"vus":50,"duration":"10m0s"}},"executionSegment":"0:1/4","executionSegmentSequence":"0,1/4,1/2,1","noSetup":true,"setupTimeout":"1m0s","noTeardown":true,"teardownTimeout":"5m0s","rps":100,"dns":{"ttl":"1m","select":"roundRobin","policy":"any"},"maxRedirects":3,"userAgent":"k6-user-agent","batch":15,"batchPerHost":5,"httpDebug":"full","insecureSkipTLSVerify":true,"tlsCipherSuites":["TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"],"tlsVersion":{"min":"tls1.2","max":"tls1.3"},"tlsAuth":[{"domains":["example.com"],"cert":"mycert.pem","key":"mycert-key.pem"}],"throw":true,"thresholds":{"http_req_duration":[{"threshold":"rate>0.01","abortOnFail":true,"delayAbortEval":"10s"}]},"blacklistIPs":["192.0.2.0/24"],"blockHostnames":["test.k6.io","*.example.com"],"hosts":{"test.k6.io":"1.2.3.4:8443"},"noConnectionReuse":true,"noVUConnectionReuse":true,"minIterationDuration":"10s","ext":{"ext-one":{"rawkey":"rawvalue"}},"summaryTrendStats":["avg","min","max"],"summaryTimeUnit":"ms","systemTags":["iter","vu"],"tags":null,"metricSamplesBufferSize":8,"noCookiesReset":true,"discardResponseBodies":true,"consoleOutput":"loadtest.log","tags":{"runtag-key":"runtag-value"},"localIPs":"192.168.20.12-192.168.20.15,192.168.10.0/27"}`
+	expected := `{"paused":true,"scenarios":{"const-vus":{"executor":"constant-vus","startTime":"10s","gracefulStop":"30s","env":{"FOO":"bar"},"exec":"default","tags":{"tagkey":"tagvalue"},"vus":50,"duration":"10m0s"}},"executionSegment":"0:1/4","executionSegmentSequence":"0,1/4,1/2,1","noSetup":true,"setupTimeout":"1m0s","noTeardown":true,"teardownTimeout":"5m0s","rps":100,"dns":{"ttl":"1m","select":"roundRobin","policy":"any"},"maxRedirects":3,"userAgent":"k6-user-agent","batch":15,"batchPerHost":5,"httpDebug":"full","insecureSkipTLSVerify":true,"tlsCipherSuites":["TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"],"tlsVersion":{"min":"tls1.2","max":"tls1.3"},"tlsAuth":[{"domains":["example.com"],"cert":"mycert.pem","key":"mycert-key.pem","password":"mypwd"}],"throw":true,"thresholds":{"http_req_duration":[{"threshold":"rate>0.01","abortOnFail":true,"delayAbortEval":"10s"}]},"blacklistIPs":["192.0.2.0/24"],"blockHostnames":["test.k6.io","*.example.com"],"hosts":{"test.k6.io":"1.2.3.4:8443"},"noConnectionReuse":true,"noVUConnectionReuse":true,"minIterationDuration":"10s","ext":{"ext-one":{"rawkey":"rawvalue"}},"summaryTrendStats":["avg","min","max"],"summaryTimeUnit":"ms","systemTags":["iter","vu"],"tags":null,"metricSamplesBufferSize":8,"noCookiesReset":true,"discardResponseBodies":true,"consoleOutput":"loadtest.log","tags":{"runtag-key":"runtag-value"},"localIPs":"192.168.20.12-192.168.20.15,192.168.10.0/27"}`
 
 	var (
 		rt    = goja.New()
@@ -279,9 +279,10 @@ func TestOptionsTestFull(t *testing.T) {
 				TLSAuth: []*lib.TLSAuth{
 					{
 						TLSAuthFields: lib.TLSAuthFields{
-							Cert:    "mycert.pem",
-							Key:     "mycert-key.pem",
-							Domains: []string{"example.com"},
+							Cert:     "mycert.pem",
+							Key:      "mycert-key.pem",
+							Password: null.StringFrom("mypwd"),
+							Domains:  []string{"example.com"},
 						},
 					},
 				},

@@ -397,7 +397,7 @@ func TestOptions(t *testing.T) {
 						Domains:  domains,
 						Cert:     cert,
 						Key:      tc.privateKey,
-						Password: tc.password,
+						Password: null.StringFrom(tc.password),
 					}, nil},
 				}
 				opts := Options{}.Apply(Options{TLSAuth: tlsAuth})
