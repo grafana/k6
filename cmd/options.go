@@ -44,12 +44,8 @@ var (
 func optionFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", 0)
 	flags.SortFlags = false
+
 	flags.Int64P("vus", "u", 1, "number of virtual users")
-
-	// TODO: delete in a few versions
-	flags.Int64P("max", "m", 0, "max available virtual users")
-	_ = flags.MarkDeprecated("max", "the global MaxVUs option is obsolete and doesn't affect the k6 script execution")
-
 	flags.DurationP("duration", "d", 0, "test duration limit")
 	flags.Int64P("iterations", "i", 0, "script total iteration limit (among all VUs)")
 	flags.StringSliceP("stage", "s", nil, "add a `stage`, as `[duration]:[target]`")
