@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
@@ -101,29 +100,24 @@ func optionFlagSet() *pflag.FlagSet {
 //nolint:funlen,gocognit,cyclop // this needs breaking up but probably should wait for croconf
 func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	opts := lib.Options{
-		VUs:                   getNullInt64(flags, "vus"),
-		Duration:              getNullDuration(flags, "duration"),
-		Iterations:            getNullInt64(flags, "iterations"),
-		Paused:                getNullBool(flags, "paused"),
-		NoSetup:               getNullBool(flags, "no-setup"),
-		NoTeardown:            getNullBool(flags, "no-teardown"),
-		MaxRedirects:          getNullInt64(flags, "max-redirects"),
-		Batch:                 getNullInt64(flags, "batch"),
-		BatchPerHost:          getNullInt64(flags, "batch-per-host"),
-		RPS:                   getNullInt64(flags, "rps"),
-		UserAgent:             getNullString(flags, "user-agent"),
-		HTTPDebug:             getNullString(flags, "http-debug"),
-		InsecureSkipTLSVerify: getNullBool(flags, "insecure-skip-tls-verify"),
-		NoConnectionReuse:     getNullBool(flags, "no-connection-reuse"),
-		NoVUConnectionReuse:   getNullBool(flags, "no-vu-connection-reuse"),
-		MinIterationDuration:  getNullDuration(flags, "min-iteration-duration"),
-		Throw:                 getNullBool(flags, "throw"),
-		DiscardResponseBodies: getNullBool(flags, "discard-response-bodies"),
-		// Default values for options without CLI flags:
-		// TODO: find a saner and more dev-friendly and error-proof way to handle options
-		SetupTimeout:    types.NullDuration{Duration: types.Duration(60 * time.Second), Valid: false},
-		TeardownTimeout: types.NullDuration{Duration: types.Duration(60 * time.Second), Valid: false},
-
+		VUs:                     getNullInt64(flags, "vus"),
+		Duration:                getNullDuration(flags, "duration"),
+		Iterations:              getNullInt64(flags, "iterations"),
+		Paused:                  getNullBool(flags, "paused"),
+		NoSetup:                 getNullBool(flags, "no-setup"),
+		NoTeardown:              getNullBool(flags, "no-teardown"),
+		MaxRedirects:            getNullInt64(flags, "max-redirects"),
+		Batch:                   getNullInt64(flags, "batch"),
+		BatchPerHost:            getNullInt64(flags, "batch-per-host"),
+		RPS:                     getNullInt64(flags, "rps"),
+		UserAgent:               getNullString(flags, "user-agent"),
+		HTTPDebug:               getNullString(flags, "http-debug"),
+		InsecureSkipTLSVerify:   getNullBool(flags, "insecure-skip-tls-verify"),
+		NoConnectionReuse:       getNullBool(flags, "no-connection-reuse"),
+		NoVUConnectionReuse:     getNullBool(flags, "no-vu-connection-reuse"),
+		MinIterationDuration:    getNullDuration(flags, "min-iteration-duration"),
+		Throw:                   getNullBool(flags, "throw"),
+		DiscardResponseBodies:   getNullBool(flags, "discard-response-bodies"),
 		MetricSamplesBufferSize: null.NewInt(1000, false),
 	}
 
