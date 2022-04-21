@@ -1,0 +1,74 @@
+# v1.43.0
+# Please don't remove the first line. It uses in CI to determine the golangci version
+run:
+  deadline: 5m
+
+issues:
+  # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
+  max-issues-per-linter: 0
+  # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
+  max-same-issues: 0
+
+  # We want to try and improve the comments in the k6 codebase, so individual
+  # non-golint items from the default exclusion list will gradually be addded
+  # to the exclude-rules below
+  exclude-use-default: false
+
+  exclude-rules:
+   # Exclude duplicate code and function length and complexity checking in test
+   # files (due to common repeats and long functions in test code)
+   - path: _(test|gen)\.go
+     linters:
+       - cyclop
+       - dupl
+       - gocognit
+       - funlen
+       - lll
+   - linters:
+     - paralleltest # false positive: https://github.com/kunwardeep/paralleltest/issues/8.
+     text: "does not use range value in test Run"
+
+linters-settings:
+  exhaustive:
+    default-signifies-exhaustive: true
+  govet:
+    check-shadowing: true
+  cyclop:
+    max-complexity: 25
+  maligned:
+    suggest-new: true
+  dupl:
+    threshold: 150
+  goconst:
+    min-len: 10
+    min-occurrences: 4
+  funlen:
+    lines: 80
+    statements: 60
+
+linters:
+  enable-all: true
+  disable:
+  - nlreturn
+  - gci
+  - gochecknoinits
+  - godot
+  - godox
+  - gomodguard
+  - testpackage
+  - wsl
+  - gomnd
+  - goerr113 # most of the errors here are meant for humans
+  - goheader
+  - exhaustivestruct
+  - thelper
+  - gocyclo # replaced by cyclop since it also calculates the package complexity
+  - maligned # replaced by govet 'fieldalignment'
+  - interfacer # deprecated
+  - scopelint # deprecated, replaced by exportloopref
+  - wrapcheck # a little bit too much for k6, maybe after https://github.com/tomarrell/wrapcheck/issues/2 is fixed
+  - golint # this linter is deprecated
+  - varnamelen # disabled before the final decision in (https://github.com/grafana/k6/pull/2323)
+  - ireturn
+  - tagliatelle
+  fast: false
