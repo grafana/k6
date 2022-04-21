@@ -22,7 +22,9 @@ package lib
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"reflect"
@@ -130,8 +132,9 @@ func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
 // Fields for TLSAuth. Unmarshalling hack.
 type TLSAuthFields struct {
 	// Certificate and key as a PEM-encoded string, including "-----BEGIN CERTIFICATE-----".
-	Cert string `json:"cert"`
-	Key  string `json:"key"`
+	Cert     string `json:"cert"`
+	Key      string `json:"key"`
+	Password string `json:"password"`
 
 	// Domains to present the certificate to. May contain wildcards, eg. "*.example.com".
 	Domains []string `json:"domains"`
@@ -154,14 +157,50 @@ func (c *TLSAuth) UnmarshalJSON(data []byte) error {
 }
 
 func (c *TLSAuth) Certificate() (*tls.Certificate, error) {
+	key := []byte(c.Key)
+	var err error
+	if c.Password != "" {
+		key, err = decryptPrivateKey(c.Key, c.Password)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if c.certificate == nil {
-		cert, err := tls.X509KeyPair([]byte(c.Cert), []byte(c.Key))
+		cert, err := tls.X509KeyPair([]byte(c.Cert), key)
 		if err != nil {
 			return nil, err
 		}
 		c.certificate = &cert
 	}
 	return c.certificate, nil
+}
+
+func decryptPrivateKey(privKey, password string) ([]byte, error) {
+	key := []byte(privKey)
+
+	block, _ := pem.Decode(key)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode PEM key")
+	}
+
+	blockType := block.Type
+	if blockType == "ENCRYPTED PRIVATE KEY" {
+		return nil, fmt.Errorf("encrypted pkcs8 formatted key is not supported")
+	}
+	/*
+	   Even though `DecryptPEMBlock` has been deprecated since 1.16.x it is still
+	   being used here because it is deprecated due to it not supporting *good* crypography
+	   ultimately though we want to support something so we will be using it for now.
+	*/
+	decryptedKey, err := x509.DecryptPEMBlock(block, []byte(password)) // nolint: staticcheck
+	if err != nil {
+		return nil, err
+	}
+	key = pem.EncodeToMemory(&pem.Block{
+		Type:  blockType,
+		Bytes: decryptedKey,
+	})
+	return key, nil
 }
 
 // IPNet is a wrapper around net.IPNet for JSON unmarshalling
