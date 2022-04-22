@@ -41,6 +41,13 @@ type emulateMediaOpts struct {
 	ReducedMotion string `js:"reducedMotion"`
 }
 
+type jsFrameBaseOpts struct {
+	Timeout string
+	Strict  bool
+}
+
+const sampleHTML = `<div><b>Test</b><ol><li><i>One</i></li></ol></div>`
+
 func TestPageEmulateMedia(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
@@ -106,18 +113,8 @@ func TestPageEvaluate(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
-				// Not using assert.Panics* because we want to match on an error substring.
 				defer func() {
-					r := recover()
-					require.NotNil(t, r)
-					require.IsType(t, &goja.Object{}, r)
-					gotObj, _ := r.(*goja.Object)
-					got := gotObj.Export()
-					expErr := fmt.Errorf("%w", errors.New(tc.errMsg))
-					require.IsType(t, expErr, got)
-					gotErr, ok := got.(error)
-					require.True(t, ok)
-					assert.Contains(t, gotErr.Error(), expErr.Error())
+					assertPanicErrorContains(t, recover(), tc.errMsg)
 				}()
 
 				tb := newTestBrowser(t)
@@ -180,6 +177,41 @@ func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 	_ = b.rt.ExportTo(results.(goja.Value), &actual)
 
 	assert.EqualValues(t, "DOMContentLoaded", actual[0], `expected "DOMContentLoaded" event to have fired`)
+}
+
+func TestPageInnerHTML(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
+		p := newTestBrowser(t).NewPage(nil)
+		p.SetContent(sampleHTML, nil)
+		assert.Equal(t, `<b>Test</b><ol><li><i>One</i></li></ol>`, p.InnerHTML("div", nil))
+	})
+
+	t.Run("err_empty_selector", func(t *testing.T) {
+		t.Parallel()
+
+		defer func() {
+			assertPanicErrorContains(t, recover(), "The provided selector is empty")
+		}()
+
+		p := newTestBrowser(t).NewPage(nil)
+		p.InnerHTML("", nil)
+		t.Error("did not panic")
+	})
+
+	t.Run("err_wrong_selector", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		p.SetContent(sampleHTML, nil)
+		assert.Equal(t, "", p.InnerHTML("p", tb.rt.ToValue(jsFrameBaseOpts{
+			Timeout: "100",
+		})))
+	})
 }
 
 func TestPageInputValue(t *testing.T) {
@@ -534,4 +566,18 @@ func TestPageWaitForNavigationShouldNotPanic(t *testing.T) {
 	go cancel()
 	<-ctx.Done()
 	require.NotPanics(t, func() { p.WaitForNavigation(nil) })
+}
+
+func assertPanicErrorContains(t *testing.T, err interface{}, expErrMsg string) {
+	t.Helper()
+
+	require.NotNil(t, err)
+	require.IsType(t, &goja.Object{}, err)
+	gotObj, _ := err.(*goja.Object)
+	got := gotObj.Export()
+	expErr := fmt.Errorf("%w", errors.New(expErrMsg))
+	require.IsType(t, expErr, got)
+	gotErr, ok := got.(error)
+	require.True(t, ok)
+	assert.Contains(t, gotErr.Error(), expErr.Error())
 }
