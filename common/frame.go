@@ -1009,6 +1009,7 @@ func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
 	return val.ToString().String()
 }
 
+// InnerText returns the innerText attribute of the element located by selector.
 func (f *Frame) InnerText(selector string, opts goja.Value) string {
 	f.log.Debugf("Frame:InnerText", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
@@ -1029,7 +1030,17 @@ func (f *Frame) InnerText(selector string, opts goja.Value) string {
 	}
 
 	applySlowMo(f.ctx)
-	return value.(string)
+
+	if value == nil {
+		return ""
+	}
+
+	val, ok := value.(goja.Value)
+	if !ok {
+		k6Throw(f.ctx, "unexpected innerText value type: %T", value)
+	}
+
+	return val.ToString().String()
 }
 
 func (f *Frame) InputValue(selector string, opts goja.Value) string {
