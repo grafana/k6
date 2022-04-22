@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"image/png"
-	"reflect"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -19,6 +18,7 @@ import (
 //go:embed static/mouse_helper.js
 var mouseHelperScriptSource string
 
+//nolint:gochecknoglobals
 var htmlInputButton = fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
@@ -79,7 +79,9 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
     }`
 	var r api.Rect
 	webBbox := p.Evaluate(tb.rt.ToValue(pageFn), tb.rt.ToValue(element))
-	_ = tb.rt.ExportTo(webBbox.(goja.Value), &r)
+	wb, _ := webBbox.(goja.Value)
+	err := tb.rt.ExportTo(wb, &r)
+	require.NoError(t, err)
 
 	require.EqualValues(t, bbox, &r)
 }
@@ -94,16 +96,15 @@ func TestElementHandleClick(t *testing.T) {
 	button.Click(tb.rt.ToValue(struct {
 		NoWaitAfter bool `js:"noWaitAfter"`
 	}{
-		NoWaitAfter: true, // FIX: this is just a workaround because navigation is never triggered and we'd be waiting for it to happen otherwise!
+		// FIX: this is just a workaround because navigation is never triggered
+		// and we'd be waiting for it to happen otherwise!
+		NoWaitAfter: true,
 	}))
 
-	result := p.Evaluate(tb.rt.ToValue("() => window['result']")).(goja.Value)
-	switch result.ExportType().Kind() {
-	case reflect.String:
-		assert.Equal(t, result.String(), "Clicked", "expected button to be clicked, but got %q", result.String())
-	default:
-		t.Fail()
-	}
+	result := p.Evaluate(tb.rt.ToValue("() => window['result']"))
+	res, ok := result.(goja.Value)
+	require.True(t, ok)
+	assert.Equal(t, res.String(), "Clicked")
 }
 
 func TestElementHandleClickWithNodeRemoved(t *testing.T) {
@@ -119,16 +120,15 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 	button.Click(tb.rt.ToValue(struct {
 		NoWaitAfter bool `js:"noWaitAfter"`
 	}{
-		NoWaitAfter: true, // FIX: this is just a workaround because navigation is never triggered and we'd be waiting for it to happen otherwise!
+		// FIX: this is just a workaround because navigation is never triggered
+		// and we'd be waiting for it to happen otherwise!
+		NoWaitAfter: true,
 	}))
 
-	result := p.Evaluate(tb.rt.ToValue("() => window['result']")).(goja.Value)
-	switch result.ExportType().Kind() {
-	case reflect.String:
-		assert.Equal(t, result.String(), "Clicked", "expected button to be clicked, but got %q", result.String())
-	default:
-		t.Fail()
-	}
+	result := p.Evaluate(tb.rt.ToValue("() => window['result']"))
+	res, ok := result.(goja.Value)
+	require.True(t, ok)
+	assert.Equal(t, res.String(), "Clicked")
 }
 
 func TestElementHandleClickWithDetachedNode(t *testing.T) {
@@ -147,7 +147,9 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	panicTestFn := func() {
 		defer func() {
 			if err := recover(); err != nil {
-				errorMsg = err.(*goja.Object).String()
+				errMsg, ok := err.(*goja.Object)
+				require.True(t, ok)
+				errorMsg = errMsg.String()
 			}
 		}()
 		button.Click(tb.rt.ToValue(struct {

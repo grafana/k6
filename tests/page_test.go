@@ -28,7 +28,6 @@ import (
 	"errors"
 	"fmt"
 	"image/png"
-	"reflect"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -52,29 +51,20 @@ func TestPageEmulateMedia(t *testing.T) {
 		ReducedMotion: "reduce",
 	}))
 
-	result := p.Evaluate(tb.rt.ToValue("() => matchMedia('print').matches")).(goja.Value)
-	switch result.ExportType().Kind() {
-	case reflect.Bool:
-		assert.True(t, result.ToBoolean(), "expected media 'print'")
-	default:
-		t.Fail()
-	}
+	result := p.Evaluate(tb.rt.ToValue("() => matchMedia('print').matches"))
+	res, ok := result.(goja.Value)
+	require.True(t, ok)
+	assert.True(t, res.ToBoolean(), "expected media 'print'")
 
-	result = p.Evaluate(tb.rt.ToValue("() => matchMedia('(prefers-color-scheme: dark)').matches")).(goja.Value)
-	switch result.ExportType().Kind() {
-	case reflect.Bool:
-		assert.True(t, result.ToBoolean(), "expected color scheme 'dark'")
-	default:
-		t.Fail()
-	}
+	result = p.Evaluate(tb.rt.ToValue("() => matchMedia('(prefers-color-scheme: dark)').matches"))
+	res, ok = result.(goja.Value)
+	require.True(t, ok)
+	assert.True(t, res.ToBoolean(), "expected color scheme 'dark'")
 
-	result = p.Evaluate(tb.rt.ToValue("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).(goja.Value)
-	switch result.ExportType().Kind() {
-	case reflect.Bool:
-		assert.True(t, result.ToBoolean(), "expected reduced motion setting to be 'reduce'")
-	default:
-		t.Fail()
-	}
+	result = p.Evaluate(tb.rt.ToValue("() => matchMedia('(prefers-reduced-motion: reduce)').matches"))
+	res, ok = result.(goja.Value)
+	require.True(t, ok)
+	assert.True(t, res.ToBoolean(), "expected reduced motion setting to be 'reduce'")
 }
 
 func TestPageEvaluate(t *testing.T) {
