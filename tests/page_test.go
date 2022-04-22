@@ -249,6 +249,41 @@ func TestPageInnerText(t *testing.T) {
 	})
 }
 
+func TestPageTextContent(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
+		p := newTestBrowser(t).NewPage(nil)
+		p.SetContent(sampleHTML, nil)
+		assert.Equal(t, "TestOne", p.TextContent("div", nil))
+	})
+
+	t.Run("err_empty_selector", func(t *testing.T) {
+		t.Parallel()
+
+		defer func() {
+			assertPanicErrorContains(t, recover(), "The provided selector is empty")
+		}()
+
+		p := newTestBrowser(t).NewPage(nil)
+		p.TextContent("", nil)
+		t.Error("did not panic")
+	})
+
+	t.Run("err_wrong_selector", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		p.SetContent(sampleHTML, nil)
+		assert.Equal(t, "", p.TextContent("p", tb.rt.ToValue(jsFrameBaseOpts{
+			Timeout: "100",
+		})))
+	})
+}
+
 func TestPageInputValue(t *testing.T) {
 	p := newTestBrowser(t).NewPage(nil)
 

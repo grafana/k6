@@ -1425,6 +1425,7 @@ func (f *Frame) Tap(selector string, opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
+// TextContent returns the textContent attribute of the element located by selector.
 func (f *Frame) TextContent(selector string, opts goja.Value) string {
 	f.log.Debugf("Frame:TextContent", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
@@ -1445,7 +1446,17 @@ func (f *Frame) TextContent(selector string, opts goja.Value) string {
 	}
 
 	applySlowMo(f.ctx)
-	return value.(string)
+
+	if value == nil {
+		return ""
+	}
+
+	val, ok := value.(goja.Value)
+	if !ok {
+		k6Throw(f.ctx, "unexpected textContent value type: %T", value)
+	}
+
+	return val.ToString().String()
 }
 
 func (f *Frame) Title() string {
