@@ -21,17 +21,51 @@
 package tests
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image/png"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type emulateMediaOpts struct {
+	Media         string `js:"media"`
+	ColorScheme   string `js:"colorScheme"`
+	ReducedMotion string `js:"reducedMotion"`
+}
+
+func TestPageEmulateMedia(t *testing.T) {
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+
+	p.EmulateMedia(tb.rt.ToValue(emulateMediaOpts{
+		Media:         "print",
+		ColorScheme:   "dark",
+		ReducedMotion: "reduce",
+	}))
+
+	result := p.Evaluate(tb.rt.ToValue("() => matchMedia('print').matches"))
+	res, ok := result.(goja.Value)
+	require.True(t, ok)
+	assert.True(t, res.ToBoolean(), "expected media 'print'")
+
+	result = p.Evaluate(tb.rt.ToValue("() => matchMedia('(prefers-color-scheme: dark)').matches"))
+	res, ok = result.(goja.Value)
+	require.True(t, ok)
+	assert.True(t, res.ToBoolean(), "expected color scheme 'dark'")
+
+	result = p.Evaluate(tb.rt.ToValue("() => matchMedia('(prefers-reduced-motion: reduce)').matches"))
+	res, ok = result.(goja.Value)
+	require.True(t, ok)
+	assert.True(t, res.ToBoolean(), "expected reduced motion setting to be 'reduce'")
+}
 
 func TestPageEvaluate(t *testing.T) {
 	t.Parallel()
@@ -148,6 +182,48 @@ func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 	assert.EqualValues(t, "DOMContentLoaded", actual[0], `expected "DOMContentLoaded" event to have fired`)
 }
 
+func TestPageInputValue(t *testing.T) {
+	p := newTestBrowser(t).NewPage(nil)
+
+	p.SetContent(`
+		<input value="hello1">
+		<select><option value="hello2" selected></option></select>
+		<textarea>hello3</textarea>
+     	`, nil)
+
+	got, want := p.InputValue("input", nil), "hello1"
+	assert.Equal(t, got, want)
+
+	got, want = p.InputValue("select", nil), "hello2"
+	assert.Equal(t, got, want)
+
+	got, want = p.InputValue("textarea", nil), "hello3"
+	assert.Equal(t, got, want)
+}
+
+// test for: https://github.com/grafana/xk6-browser/issues/132
+func TestPageInputSpecialCharacters(t *testing.T) {
+	p := newTestBrowser(t).NewPage(nil)
+
+	p.SetContent(`<input id="special">`, nil)
+	el := p.Query("#special")
+
+	wants := []string{
+		"test@k6.io",
+		"<hello WoRlD \\/>",
+		"{(hello world!)}",
+		"!#$%^&*()+_|~±",
+		`¯\_(ツ)_/¯`,
+	}
+	for _, want := range wants {
+		el.Fill("", nil)
+		el.Type(want, nil)
+
+		got := el.InputValue(nil)
+		assert.Equal(t, want, got)
+	}
+}
+
 func TestPageIsChecked(t *testing.T) {
 	p := newTestBrowser(t).NewPage(nil)
 
@@ -156,6 +232,55 @@ func TestPageIsChecked(t *testing.T) {
 
 	p.SetContent(`<input type="checkbox">`, nil)
 	assert.False(t, p.IsChecked("input", nil), "expected checkbox to be unchecked")
+}
+
+func TestPageScreenshotFullpage(t *testing.T) {
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+
+	p.SetViewportSize(tb.rt.ToValue(struct {
+		Width  float64 `js:"width"`
+		Height float64 `js:"height"`
+	}{Width: 1280, Height: 800}))
+	p.Evaluate(tb.rt.ToValue(`
+	() => {
+		document.body.style.margin = '0';
+		document.body.style.padding = '0';
+		document.documentElement.style.margin = '0';
+		document.documentElement.style.padding = '0';
+
+		const div = document.createElement('div');
+		div.style.width = '1280px';
+		div.style.height = '8000px';
+		div.style.background = 'linear-gradient(red, blue)';
+
+		document.body.appendChild(div);
+	}
+    	`))
+
+	buf := p.Screenshot(tb.rt.ToValue(struct {
+		FullPage bool `js:"fullPage"`
+	}{FullPage: true}))
+
+	reader := bytes.NewReader(buf.Bytes())
+	img, err := png.Decode(reader)
+	assert.Nil(t, err)
+
+	assert.Equal(t, 1280, img.Bounds().Max.X, "screenshot width is not 1280px as expected, but %dpx", img.Bounds().Max.X)
+	assert.Equal(t, 8000, img.Bounds().Max.Y, "screenshot height is not 8000px as expected, but %dpx", img.Bounds().Max.Y)
+
+	r, _, b, _ := img.At(0, 0).RGBA()
+	assert.Greater(t, r, uint32(128))
+	assert.Less(t, b, uint32(128))
+	r, _, b, _ = img.At(0, 7999).RGBA()
+	assert.Less(t, r, uint32(128))
+	assert.Greater(t, b, uint32(128))
+}
+
+func TestPageTitle(t *testing.T) {
+	p := newTestBrowser(t).NewPage(nil)
+	p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)
+	assert.Equal(t, "Some title", p.Title())
 }
 
 func TestPageSetExtraHTTPHeaders(t *testing.T) {
