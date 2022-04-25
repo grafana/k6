@@ -975,6 +975,7 @@ func (f *Frame) Hover(selector string, opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
+// InnerHTML returns the innerHTML attribute of the element located by selector.
 func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
 	f.log.Debugf("Frame:InnerHTML", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
@@ -995,13 +996,24 @@ func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
 	}
 
 	applySlowMo(f.ctx)
-	return value.(string)
+
+	if value == nil {
+		return ""
+	}
+
+	val, ok := value.(goja.Value)
+	if !ok {
+		k6Throw(f.ctx, "unexpected innerHTML value type: %T", value)
+	}
+
+	return val.ToString().String()
 }
 
+// InnerText returns the innerText attribute of the element located by selector.
 func (f *Frame) InnerText(selector string, opts goja.Value) string {
 	f.log.Debugf("Frame:InnerText", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameInnerHTMLOptions(f.defaultTimeout())
+	parsedOpts := NewFrameInnerTextOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
 		k6Throw(f.ctx, "%w", err)
 	}
@@ -1018,7 +1030,17 @@ func (f *Frame) InnerText(selector string, opts goja.Value) string {
 	}
 
 	applySlowMo(f.ctx)
-	return value.(string)
+
+	if value == nil {
+		return ""
+	}
+
+	val, ok := value.(goja.Value)
+	if !ok {
+		k6Throw(f.ctx, "unexpected innerText value type: %T", value)
+	}
+
+	return val.ToString().String()
 }
 
 func (f *Frame) InputValue(selector string, opts goja.Value) string {
@@ -1403,6 +1425,7 @@ func (f *Frame) Tap(selector string, opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
+// TextContent returns the textContent attribute of the element located by selector.
 func (f *Frame) TextContent(selector string, opts goja.Value) string {
 	f.log.Debugf("Frame:TextContent", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
@@ -1423,7 +1446,17 @@ func (f *Frame) TextContent(selector string, opts goja.Value) string {
 	}
 
 	applySlowMo(f.ctx)
-	return value.(string)
+
+	if value == nil {
+		return ""
+	}
+
+	val, ok := value.(goja.Value)
+	if !ok {
+		k6Throw(f.ctx, "unexpected textContent value type: %T", value)
+	}
+
+	return val.ToString().String()
 }
 
 func (f *Frame) Title() string {
