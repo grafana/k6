@@ -68,9 +68,10 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
 	p := tb.NewPage(nil)
 
 	p.SetContent(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="500" height="500">
-            <rect id="theRect" x="30" y="50" width="200" height="300"></rect>
-        </svg>`, nil)
+		<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500">
+			<rect id="theRect" x="30" y="50" width="200" height="300"></rect>
+		</svg>
+	`, nil)
 	element := p.Query("#therect")
 	bbox := element.BoundingBox()
 	pageFn := `e => {
