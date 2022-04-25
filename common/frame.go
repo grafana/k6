@@ -1013,7 +1013,7 @@ func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
 func (f *Frame) InnerText(selector string, opts goja.Value) string {
 	f.log.Debugf("Frame:InnerText", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameInnerHTMLOptions(f.defaultTimeout())
+	parsedOpts := NewFrameInnerTextOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
 		k6Throw(f.ctx, "%w", err)
 	}
