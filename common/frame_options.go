@@ -502,10 +502,8 @@ func (o *FrameSetContentOptions) Parse(ctx context.Context, opts goja.Value) err
 				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
 			case "waitUntil":
 				lifeCycle := opts.Get(k).String()
-				if l, ok := lifecycleEventToID[lifeCycle]; ok {
-					o.WaitUntil = l
-				} else {
-					return fmt.Errorf("%q is not a valid lifecycle", lifeCycle)
+				if err := o.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
+					return fmt.Errorf("error parsing setContent options: %w", err)
 				}
 			}
 		}

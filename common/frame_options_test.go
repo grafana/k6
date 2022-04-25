@@ -45,6 +45,41 @@ func TestFrameGotoOptionsParse(t *testing.T) {
 	})
 }
 
+func TestFrameSetContentOptionsParse(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
+		mockVU := newMockVU(t)
+		opts := mockVU.RuntimeField.ToValue(map[string]interface{}{
+			"waitUntil": "networkidle",
+		})
+		scOpts := NewFrameSetContentOptions(30 * time.Second)
+		err := scOpts.Parse(mockVU.CtxField, opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, 30*time.Second, scOpts.Timeout)
+		assert.Equal(t, LifecycleEventNetworkIdle, scOpts.WaitUntil)
+	})
+
+	t.Run("err/invalid_waitUntil", func(t *testing.T) {
+		t.Parallel()
+
+		mockVU := newMockVU(t)
+		opts := mockVU.RuntimeField.ToValue(map[string]interface{}{
+			"waitUntil": "none",
+		})
+		navOpts := NewFrameSetContentOptions(0)
+		err := navOpts.Parse(mockVU.CtxField, opts)
+
+		assert.EqualError(t, err,
+			`error parsing setContent options: `+
+				`invalid lifecycle event: "none"; must be one of: `+
+				`load, domcontentloaded, networkidle`)
+	})
+}
+
 func TestFrameWaitForNavigationOptionsParse(t *testing.T) {
 	t.Parallel()
 
