@@ -1583,9 +1583,11 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 		k6Throw(f.ctx, "cannot parse waitForLoadState options: %v", err)
 	}
 
-	var waitUntil LifecycleEvent
-	if err = waitUntil.UnmarshalText([]byte(state)); err != nil {
-		k6Throw(f.ctx, "waitForLoadState error: %v", err)
+	waitUntil := LifecycleEventLoad
+	if state != "" {
+		if err = waitUntil.UnmarshalText([]byte(state)); err != nil {
+			k6Throw(f.ctx, "waitForLoadState error: %v", err)
+		}
 	}
 
 	if f.hasLifecycleEventFired(waitUntil) {
