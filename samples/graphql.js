@@ -7,7 +7,7 @@ export default function() {
 
   let query = `
     query FindFirstIssue {
-      repository(owner:"loadimpact", name:"k6") {
+      repository(owner:"grafana", name:"k6") {
         issues(first:1) {
           edges {
             node {
