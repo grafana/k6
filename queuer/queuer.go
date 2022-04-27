@@ -73,6 +73,7 @@ func (fq *CallbackQueuer) innerQueueATask(f func() error) error {
 	if len(fq.queue) != 0 {
 		// fmt.Println("queue is not empty", len(fq.queue))
 		for _, newF := range fq.queue { // queue the queue
+			newF := newF
 			fq.registrerCallback()(func() error { return fq.innerQueueATask(newF) })
 		}
 		fq.queue = fq.queue[:0]
