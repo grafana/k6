@@ -116,11 +116,9 @@ In case there isn't an official package for your operating system or architectur
 
 ### Build from source
 
-k6 is written in Go, so it's just a single statically-linked executable and very easy to build and distribute. To build from source you need **[Git](https://git-scm.com/downloads)** and **[Go](https://golang.org/doc/install)** (1.16 or newer). Follow these instructions:
+k6 is written in Go, so it's just a single statically-linked executable and very easy to build and distribute. To build from source you need **[Go](https://go.dev/doc/install)** (1.17 or newer). Follow these instructions:
 
-- Run `go install go.k6.io/k6` which will:
-  - git clone the repo and put the source in `$GOPATH/src/go.k6.io/k6`
-  - build a `k6` binary and put it in `$GOPATH/bin`
+- Run `go install go.k6.io/k6@latest` which will build a `k6` binary and put it in the `$GOBIN` folder (which defaults to `$GOPATH/bin`).
 - Make sure you have `$GOPATH/bin` in your `PATH` (or copy the `k6` binary somewhere in your `PATH`), so you are able to run k6 from any location.
 - Tada, you can now run k6 using `k6 run script.js`
 
