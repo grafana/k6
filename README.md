@@ -66,6 +66,7 @@ Note that you **cannot** use the plain k6 binary released by the k6 project and 
 
 To build a `k6` binary with this extension, first ensure you have the prerequisites:
 
+- Make sure that you're running [the latest Go version](https://go.dev/dl/)
 - [Go toolchain](https://go101.org/article/go-toolchain.html)
 - Git
 
