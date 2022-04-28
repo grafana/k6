@@ -13,7 +13,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
-	"github.com/grafana/xk6-websockets/queuer"
+	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/metrics"
@@ -51,7 +51,7 @@ type webSocket struct {
 	url            *url.URL
 	conn           *websocket.Conn
 	tags           *metrics.SampleTags
-	fq             *queuer.CallbackQueuer
+	tq             *taskqueue.TaskQueue
 	builtinMetrics *metrics.BuiltinMetrics
 	obj            *goja.Object // the object that is given to js to interact with the WebSocket
 	started        time.Time
@@ -102,7 +102,7 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 	w := &webSocket{
 		vu:             r.vu,
 		url:            url,
-		fq:             queuer.New(registerCallback),
+		tq:             taskqueue.New(registerCallback),
 		readyState:     "CONNECTING",
 		builtinMetrics: r.vu.State().BuiltinMetrics,
 		done:           make(chan struct{}),
@@ -209,14 +209,14 @@ func (w *webSocket) establishConnection() {
 	if connErr != nil {
 		// fmt.Println(connErr)
 		// Pass the error to the user script before exiting immediately
-		w.fq.QueueATask(func() error {
+		w.tq.Queue(func() error {
 			// fmt.Println("conn err", connErr)
 			return w.connectionClosedWithError(connErr)
 		})
 		return
 	}
 	// fmt.Println("connected")
-	w.fq.QueueATask(func() error {
+	w.tq.Queue(func() error {
 		return w.connectionConnected()
 	})
 
@@ -230,7 +230,7 @@ func (w *webSocket) loop(ctx context.Context) {
 	// readErrChan := make(chan error)
 	samplesOutput := w.vu.State().Samples
 
-	defer w.fq.Close()
+	defer w.tq.Close()
 	// Wraps a couple of channels around conn.ReadMessage
 	go func() { // copied from k6/ws
 		for {
@@ -250,7 +250,7 @@ func (w *webSocket) loop(ctx context.Context) {
 					case <-w.done:
 					}
 				*/
-				w.fq.QueueATask(func() error {
+				w.tq.Queue(func() error {
 					_ = w.conn.Close() // TODO fix this
 					// fmt.Println("read message", err)
 					err = w.connectionClosedWithError(err)
@@ -281,7 +281,7 @@ func (w *webSocket) loop(ctx context.Context) {
 					size := len(msg.data)
 					err := w.conn.WriteMessage(msg.mtype, msg.data)
 					if err != nil {
-						w.fq.QueueATask(func() error {
+						w.tq.Queue(func() error {
 							_ = w.conn.Close() // TODO fix
 							// fmt.Println("write channel", err)
 							closeErr := w.connectionClosedWithError(err)
@@ -291,7 +291,7 @@ func (w *webSocket) loop(ctx context.Context) {
 					}
 					// This from the specification needs to happen like that instead of with
 					// atomics or locks outside of the event loop
-					w.fq.QueueATask(func() error {
+					w.tq.Queue(func() error {
 						w.bufferedAmount -= size
 						return nil
 					})
@@ -355,7 +355,7 @@ func (w *webSocket) loop(ctx context.Context) {
 		*/
 		case msg := <-readDataChan:
 			// fmt.Println("got message")
-			w.fq.QueueATask(func() error {
+			w.tq.Queue(func() error {
 				// fmt.Println("message being processed in state", w.readyState)
 				if w.readyState != "OPEN" {
 					return nil // TODO maybe still emit
@@ -457,7 +457,7 @@ func (w *webSocket) close() {
 }
 
 func (w *webSocket) queueClose() {
-	w.fq.QueueATask(func() error {
+	w.tq.Queue(func() error {
 		// fmt.Println("in close")
 		w.close()
 		return nil
