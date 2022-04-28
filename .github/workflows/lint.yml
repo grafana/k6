@@ -1,0 +1,45 @@
+name: Lint
+on: push
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  deps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17.x
+      - name: Check dependencies
+        run: |
+            go version
+            test -z "$(go mod tidy  && git status --porcelain)"
+            go mod verify
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17.x
+      - name: Retrieve golangci-lint version
+        run: |
+          echo "::set-output name=Version::$(head -n 1 "${GITHUB_WORKSPACE}/.golangci.yml" | tr -d '# ')"
+        id: version
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: ${{ steps.version.outputs.Version }}

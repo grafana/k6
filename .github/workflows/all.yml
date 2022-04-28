@@ -1,0 +1,33 @@
+name: CI
+on:
+  # Enable manually triggering this workflow via the API or web UI
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.x
+      - name: Run tests
+        run: |
+          set -x
+          which go
+          go version
+          export GOMAXPROCS=2
+          args=("-p" "2" "-race")
+          go test "${args[@]}" -timeout 800s ./...
