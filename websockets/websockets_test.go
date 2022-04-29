@@ -154,6 +154,33 @@ func TestReadyState(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestBinaryState(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	err := ts.ev.Start(func() error {
+		_, err := ts.rt.RunString(ts.tb.Replacer.Replace(`
+    var ws = new WebSocket("WSBIN_URL/ws-echo")
+    ws.addEventListener("open", () => ws.close())
+
+    if (ws.binaryType != "ArrayBuffer") {
+      throw new Error("Wrong binaryType value, expected ArrayBuffer got "+ ws.binaryType)
+    }
+
+    var thrown = false;
+    try {
+      ws.binaryType = "something"
+    } catch(e) {
+      thrown = true
+    }
+    if (!thrown) {
+      throw new Error("Expects ws.binaryType to not be writable")
+    }
+	`))
+		return err
+	})
+	require.NoError(t, err)
+}
+
 func TestExceptionDontPanic(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {

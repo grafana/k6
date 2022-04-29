@@ -24,3 +24,7 @@ It is implemented using the [xk6](https://k6.io/blog/extending-k6-with-xk6/) sys
   ```shell
   $ xk6 build --with github.com/grafana/xk6-websockets
   ```
+
+## Discrepancies with the specifications
+
+* binaryType is "ArrayBuffer" by default instead of "Blob" and will throw an exception if it's tried to be changed as "Blob" is not supported by k6.

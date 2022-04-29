@@ -148,7 +148,13 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 		"bufferedAmount", rt.ToValue(w.bufferedAmount), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	// extensions
 	// protocol
-	// binaryType
+	must(w.obj.DefineAccessorProperty(
+		"binaryType", rt.ToValue(func() goja.Value {
+			return rt.ToValue("ArrayBuffer")
+		}), rt.ToValue(func() goja.Value {
+			common.Throw(rt, errors.New("binaryType is not settable in k6 as it doesn't support Blob"))
+			return nil // it never gets to here
+		}), goja.FLAG_FALSE, goja.FLAG_TRUE))
 
 	go w.establishConnection()
 	return w.obj
