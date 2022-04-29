@@ -46,6 +46,20 @@ func (r *WebSocketsAPI) Exports() modules.Exports {
 	}
 }
 
+// ReadyState is websocket specification's readystate
+type ReadyState uint8
+
+const (
+	// CONNECTING is the state while the web socket is connecting
+	CONNECTING ReadyState = iota
+	// OPEN is the state after the websocket is established and before it starts closing
+	OPEN
+	// CLOSING is while the websocket is closing but is *not* closed yet
+	CLOSING
+	// CLOSED is when the websocket is finally closed
+	CLOSED
+)
+
 type webSocket struct {
 	vu             modules.VU
 	url            *url.URL
@@ -67,7 +81,7 @@ type webSocket struct {
 	closeListeners   []func(goja.Value) (goja.Value, error)
 
 	// fields that should be seen by js only be updated on the event loop
-	readyState     string
+	readyState     ReadyState
 	bufferedAmount int
 }
 
@@ -103,7 +117,7 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 		vu:             r.vu,
 		url:            url,
 		tq:             taskqueue.New(registerCallback),
-		readyState:     "CONNECTING",
+		readyState:     CONNECTING,
 		builtinMetrics: r.vu.State().BuiltinMetrics,
 		done:           make(chan struct{}),
 		writeQueueCh:   make(chan message, 10),
@@ -126,9 +140,10 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 		"close", rt.ToValue(w.close), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	must(w.obj.DefineDataProperty(
 		"url", rt.ToValue(urlString), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
-	// TODO this has to be int value :facepalm:
-	must(w.obj.DefineDataProperty(
-		"readystate", rt.ToValue(w.readyState), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+	must(w.obj.DefineAccessorProperty( // this needs to be with an accessor as we change the value
+		"readyState", rt.ToValue(func() ReadyState {
+			return w.readyState
+		}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	must(w.obj.DefineDataProperty(
 		"bufferedAmount", rt.ToValue(w.bufferedAmount), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	// extensions
@@ -357,7 +372,7 @@ func (w *webSocket) loop(ctx context.Context) {
 			// fmt.Println("got message")
 			w.tq.Queue(func() error {
 				// fmt.Println("message being processed in state", w.readyState)
-				if w.readyState != "OPEN" {
+				if w.readyState != OPEN {
 					return nil // TODO maybe still emit
 				}
 				// TODO maybe emit after all the listeners have fired and skip it if defaultPrevent was called?!?
@@ -422,7 +437,7 @@ func (w *webSocket) loop(ctx context.Context) {
 }
 
 func (w *webSocket) send(msg goja.Value) {
-	if w.readyState == "CONNECTING" {
+	if w.readyState == CONNECTING {
 		common.Throw(w.vu.Runtime(), errors.New("InvalidStateError"))
 	}
 	switch o := msg.Export().(type) {
@@ -467,17 +482,17 @@ func (w *webSocket) queueClose() {
 // to be run only on the eventloop
 // from https://websockets.spec.whatwg.org/#feedback-from-the-protocol
 func (w *webSocket) connectionConnected() error {
-	w.readyState = "OPEN"
+	w.readyState = OPEN
 	return w.callOpenListeners(time.Now()) // TODO fix time
 }
 
 // to be run only on the eventloop
 func (w *webSocket) connectionClosedWithError(err error) error {
-	if w.readyState == "CLOSED" {
+	if w.readyState == CLOSED {
 		return nil
 	}
 	// fmt.Println(w.url, "closing")
-	w.readyState = "CLOSED"
+	w.readyState = CLOSED
 	// fmt.Println("closing w.done")
 	close(w.done)
 	now := time.Now()

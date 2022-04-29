@@ -126,6 +126,34 @@ func TestBasic(t *testing.T) {
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
 }
 
+func TestReadyState(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	err := ts.ev.Start(func() error {
+		_, err := ts.rt.RunString(ts.tb.Replacer.Replace(`
+    var ws = new WebSocket("WSBIN_URL/ws-echo")
+    ws.addEventListener("open", () => {
+      if (ws.readyState != 1){
+        throw new Error("Expected ready state 1 got "+ ws.readyState)
+      }
+      ws.addEventListener("close", () => {
+        if (ws.readyState != 3){
+          throw new Error("Expected ready state 3 got "+ ws.readyState)
+        }
+
+      })
+      ws.send("something")
+      ws.close()
+    })
+    if (ws.readyState != 0){
+      throw new Error("Expected ready state 0 got "+ ws.readyState)
+    }
+	`))
+		return err
+	})
+	require.NoError(t, err)
+}
+
 func TestExceptionDontPanic(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
