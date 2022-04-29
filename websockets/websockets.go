@@ -251,9 +251,34 @@ func (w *webSocket) loop(ctx context.Context) {
 	// readErrChan := make(chan error)
 	samplesOutput := w.vu.State().Samples
 
-	defer w.tq.Close()
+	defer func() {
+		_ = w.conn.Close()
+		w.tq.Close()
+	}()
+	defer func() {
+		now := time.Now()
+		duration := metrics.D(time.Since(w.started))
+
+		metrics.PushIfNotDone(w.vu.Context(), w.vu.State().Samples, metrics.ConnectedSamples{
+			Samples: []metrics.Sample{
+				{Metric: w.builtinMetrics.WSSessionDuration, Time: now, Tags: w.tags, Value: duration},
+			},
+			Tags: w.tags,
+			Time: now,
+		})
+		ch := make(chan struct{})
+		w.tq.Queue(func() error {
+			defer close(ch)
+			return w.connectionClosedWithError(nil)
+		})
+		select {
+		case <-ch:
+		case <-ctx.Done():
+		}
+	}()
 	// Wraps a couple of channels around conn.ReadMessage
 	go func() { // copied from k6/ws
+		defer close(readDataChan)
 		for {
 			messageType, data, err := w.conn.ReadMessage()
 			if err != nil {
@@ -294,11 +319,13 @@ func (w *webSocket) loop(ctx context.Context) {
 
 	go func() {
 		writeChannel := make(chan message)
-		defer close(writeChannel)
 		go func() {
 			for {
 				select {
-				case msg := <-writeChannel:
+				case msg, ok := <-writeChannel:
+					if !ok {
+						return
+					}
 					size := len(msg.data)
 					err := w.conn.WriteMessage(msg.mtype, msg.data)
 					if err != nil {
@@ -329,6 +356,7 @@ func (w *webSocket) loop(ctx context.Context) {
 			}
 		}()
 		{
+			defer close(writeChannel)
 			queue := make([]message, 0)
 			var wch chan message
 			var msg message
@@ -374,7 +402,10 @@ func (w *webSocket) loop(ctx context.Context) {
 			socket.handleEvent("pong")
 
 		*/
-		case msg := <-readDataChan:
+		case msg, ok := <-readDataChan:
+			if !ok {
+				return
+			}
 			// fmt.Println("got message")
 			w.tq.Queue(func() error {
 				// fmt.Println("message being processed in state", w.readyState)
@@ -468,19 +499,23 @@ func (w *webSocket) send(msg goja.Value) {
 }
 
 // TODO support code and reason
-func (w *webSocket) close() {
+func (w *webSocket) close(code int, reason string) {
+	w.readyState = CLOSING
+	if code == 0 {
+		code = websocket.CloseNormalClosure
+	}
 	// fmt.Println("in Close")
-	_ = w.conn.Close() // TODO maybe use it ?!?
-	err := w.connectionClosedWithError(nil)
-	if err != nil {
-		common.Throw(w.vu.Runtime(), err)
+	w.writeQueueCh <- message{
+		mtype: websocket.CloseMessage,
+		data:  websocket.FormatCloseMessage(code, reason),
+		t:     time.Now(),
 	}
 }
 
 func (w *webSocket) queueClose() {
 	w.tq.Queue(func() error {
 		// fmt.Println("in close")
-		w.close()
+		w.close(websocket.CloseNormalClosure, "")
 		return nil
 	})
 }
@@ -501,16 +536,6 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 	w.readyState = CLOSED
 	// fmt.Println("closing w.done")
 	close(w.done)
-	now := time.Now()
-	duration := metrics.D(time.Since(w.started))
-
-	metrics.PushIfNotDone(w.vu.Context(), w.vu.State().Samples, metrics.ConnectedSamples{
-		Samples: []metrics.Sample{
-			{Metric: w.builtinMetrics.WSSessionDuration, Time: now, Tags: w.tags, Value: duration},
-		},
-		Tags: w.tags,
-		Time: now,
-	})
 
 	if err != nil {
 		if errList := w.callErrorListeners(err); errList != nil {
