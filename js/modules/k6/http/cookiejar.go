@@ -116,3 +116,16 @@ func (j CookieJar) Clear(url string, opts goja.Value) (bool, error) {
 
 	return true, nil
 }
+
+// Delete cookies for a particular URL
+func (j CookieJar) Delete(url, name string, opts goja.Value) (bool, error) {
+	u, err := neturl.Parse(url)
+	if err != nil {
+		return false, err
+	}
+
+	c := http.Cookie{Name: name, MaxAge: -1}
+	j.Jar.SetCookies(u, []*http.Cookie{&c})
+
+	return true, nil
+}
