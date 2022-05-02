@@ -87,20 +87,15 @@ func extractLogger(fl logrus.FieldLogger) *logrus.Logger {
 	return nil
 }
 
-func TestConsoleLogAndGojaObjectGoReflect(t *testing.T) {
+func TestConsoleLogWithGojaNativeObject(t *testing.T) {
 	t.Parallel()
-
-	type value struct {
-		Text string
-	}
-
-	v := &value{
-		Text: "test1",
-	}
 
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	obj := rt.ToValue(v)
+
+	obj := rt.NewObject()
+	err := obj.Set("text", "nativeObject")
+	require.NoError(t, err)
 
 	logger := testutils.NewLogger(t)
 	hook := logtest.NewLocal(logger)
@@ -110,8 +105,67 @@ func TestConsoleLogAndGojaObjectGoReflect(t *testing.T) {
 
 	entry := hook.LastEntry()
 	require.NotNil(t, entry, "nothing logged")
-	assert.Equal(t, `{"text":"test1"}`, entry.Message)
-	assert.Equal(t, logrus.Fields{"source": "console"}, entry.Data)
+	assert.JSONEq(t, `{"text":"nativeObject"}`, entry.Message)
+}
+
+func TestConsoleLogObjectsWithGoTypes(t *testing.T) {
+	t.Parallel()
+
+	type value struct {
+		Text string
+	}
+
+	tests := []struct {
+		name string
+		in   interface{}
+		exp  string
+	}{
+		{
+			name: "StructLiteral",
+			in: value{
+				Text: "test1",
+			},
+			exp: `{"text":"test1"}`,
+		},
+		{
+			name: "StructPointer",
+			in: &value{
+				Text: "test2",
+			},
+			exp: `{"text":"test2"}`,
+		},
+		{
+			name: "Map",
+			in: map[string]interface{}{
+				"text": "test3",
+			},
+			exp: `{"text":"test3"}`,
+		},
+	}
+
+	expFields := logrus.Fields{"source": "console"}
+	for _, tt := range tests {
+		tt := tt
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rt := goja.New()
+			rt.SetFieldNameMapper(common.FieldNameMapper{})
+			obj := rt.ToValue(tt.in)
+
+			logger := testutils.NewLogger(t)
+			hook := logtest.NewLocal(logger)
+
+			c := newConsole(logger)
+			c.Log(obj)
+
+			entry := hook.LastEntry()
+			require.NotNil(t, entry, "nothing logged")
+			assert.JSONEq(t, tt.exp, entry.Message)
+			assert.Equal(t, expFields, entry.Data)
+		})
+	}
 }
 
 func TestConsoleLog(t *testing.T) {
