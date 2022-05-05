@@ -260,7 +260,7 @@ var ErrInvalidThreshold = errors.New("invalid threshold")
 func (ts *Thresholds) Validate(metricName string, r *Registry) error {
 	parsedMetricName, _, err := ParseMetricName(metricName)
 	if err != nil {
-		err := fmt.Errorf("unable to validate threshold expressions: %w", ErrMetricNameParsing)
+		err := fmt.Errorf("unable to validate threshold expressions: %w", err)
 		return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 
