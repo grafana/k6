@@ -62,6 +62,7 @@ type FrameSession struct {
 	parent         *FrameSession
 	manager        *FrameManager
 	networkManager *NetworkManager
+	k6Metrics      *CustomK6Metrics
 
 	targetID target.ID
 	windowID browser.WindowID
@@ -103,6 +104,7 @@ func NewFrameSession(
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
 		vu:                   GetVU(ctx),
+		k6Metrics:            GetCustomK6Metrics(ctx),
 		logger:               l,
 		serializer: &logrus.Logger{
 			Out:       l.log.Out,
@@ -714,12 +716,12 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventDOMContentLoad)
 	}
 
-	eventToMetric := map[string]*k6stats.Metric{
-		"load":                 BrowserLoaded,
-		"DOMContentLoaded":     BrowserDOMContentLoaded,
-		"firstPaint":           BrowserFirstPaint,
-		"firstContentfulPaint": BrowserFirstContentfulPaint,
-		"firstMeaningfulPaint": BrowserFirstMeaningfulPaint,
+	eventToMetric := map[string]*k6metrics.Metric{
+		"load":                 fs.k6Metrics.BrowserLoaded,
+		"DOMContentLoaded":     fs.k6Metrics.BrowserDOMContentLoaded,
+		"firstPaint":           fs.k6Metrics.BrowserFirstPaint,
+		"firstContentfulPaint": fs.k6Metrics.BrowserFirstContentfulPaint,
+		"firstMeaningfulPaint": fs.k6Metrics.BrowserFirstMeaningfulPaint,
 	}
 
 	if m, ok := eventToMetric[event.Name]; ok {

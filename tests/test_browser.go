@@ -102,6 +102,10 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 		mockVU.CtxField = ctx
 	}
 
+	registry := k6metrics.NewRegistry()
+	k6m := common.RegisterCustomK6Metrics(registry)
+	mockVU.CtxField = common.WithCustomK6Metrics(mockVU.CtxField, k6m)
+
 	var (
 		state = mockVU.StateField
 		rt    = mockVU.RuntimeField
