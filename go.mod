@@ -10,8 +10,7 @@ require (
 	github.com/prometheus/prometheus v1.8.2-0.20211005150130-f29caccc4255
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.1
-	// TODO Switch to v0.38.0 once released instead of snapshot
-	go.k6.io/k6 v0.37.1-0.20220414112720-57e994242f10
+	go.k6.io/k6 v0.38.0
 	gopkg.in/guregu/null.v3 v3.5.0
 )
 
