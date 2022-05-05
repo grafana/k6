@@ -147,22 +147,25 @@ func ParseMetricName(name string) (string, []string, error) {
 	// its counterpart, the expression is malformed.
 	if (containsOpeningToken && !containsClosingToken) ||
 		(!containsOpeningToken && containsClosingToken) {
-		return "", nil, fmt.Errorf("%w; reason: unmatched opening/close curly brace", ErrMetricNameParsing)
+		return "", nil, fmt.Errorf(
+			"%w, metric %q has unmatched opening/close curly brace",
+			ErrMetricNameParsing, name,
+		)
 	}
 
 	// If the closing brace token appears before the opening one,
 	// the expression is malformed
 	if closingTokenPos < openingTokenPos {
-		return "", nil, fmt.Errorf("%w; reason: closing curly brace appears before opening one", ErrMetricNameParsing)
+		return "", nil, fmt.Errorf("%w, metric %q closing curly brace appears before opening one", ErrMetricNameParsing, name)
 	}
 
 	// If the last character is not a closing brace token,
 	// the expression is malformed.
 	if closingTokenPos != (len(name) - 1) {
 		err := fmt.Errorf(
-			"%w; reason: missing closing curly brace in last position"+
-				"of the threshold expression",
+			"%w, metric %q lacks a closing curly brace in its last position",
 			ErrMetricNameParsing,
+			name,
 		)
 		return "", nil, err
 	}
@@ -177,7 +180,7 @@ func ParseMetricName(name string) (string, []string, error) {
 		keyValue := strings.SplitN(t, ":", 2)
 
 		if len(keyValue) != 2 || keyValue[1] == "" {
-			return "", nil, fmt.Errorf("%w; reason: malformed tag expression %q", ErrMetricNameParsing, t)
+			return "", nil, fmt.Errorf("%w, metric %q tag expression is malformed", ErrMetricNameParsing, t)
 		}
 
 		tags[i] = strings.TrimSpace(t)
