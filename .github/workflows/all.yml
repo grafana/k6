@@ -30,11 +30,9 @@ jobs:
 
             export CGO_ENABLED=0
             
-            # Temporary hack to ignore the v0.33.0 tag change
-            export GONOSUMDB="go.k6.io/k6"
             go install go.k6.io/xk6/cmd/xk6@master
 
-            GOPROXY="direct" xk6 build \
+            GOPRIVATE="go.k6.io/k6" xk6 build \
               --output ./k6ext \
               --with github.com/grafana/xk6-output-prometheus-remote="."
             ./k6ext version
@@ -42,7 +40,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     env:
-        GOLANG_CI_VERSION: "1.39.0"
+        GOLANG_CI_VERSION: "1.43.0"
         GO111MODULE: 'on'
     steps:
       - name: Checkout code
