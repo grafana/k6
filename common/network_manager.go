@@ -39,7 +39,7 @@ import (
 	k6lib "go.k6.io/k6/lib"
 	k6netext "go.k6.io/k6/lib/netext"
 	k6types "go.k6.io/k6/lib/types"
-	k6stats "go.k6.io/k6/stats"
+	k6metrics "go.k6.io/k6/metrics"
 )
 
 // Ensure NetworkManager implements the EventEmitter interface.
@@ -161,19 +161,19 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	state := m.vu.State()
 
 	tags := state.CloneTags()
-	if state.Options.SystemTags.Has(k6stats.TagGroup) {
+	if state.Options.SystemTags.Has(k6metrics.TagGroup) {
 		tags["group"] = state.Group.Path
 	}
-	if state.Options.SystemTags.Has(k6stats.TagMethod) {
+	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
 		tags["method"] = req.method
 	}
-	if state.Options.SystemTags.Has(k6stats.TagURL) {
+	if state.Options.SystemTags.Has(k6metrics.TagURL) {
 		tags["url"] = req.URL()
 	}
 
-	sampleTags := k6stats.IntoSampleTags(&tags)
-	k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
-		Samples: []k6stats.Sample{
+	sampleTags := k6metrics.IntoSampleTags(&tags)
+	k6metrics.PushIfNotDone(m.ctx, state.Samples, k6metrics.ConnectedSamples{
+		Samples: []k6metrics.Sample{
 			{
 				Metric: state.BuiltinMetrics.DataSent,
 				Tags:   sampleTags,
@@ -213,22 +213,22 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	}
 
 	tags := state.CloneTags()
-	if state.Options.SystemTags.Has(k6stats.TagGroup) {
+	if state.Options.SystemTags.Has(k6metrics.TagGroup) {
 		tags["group"] = state.Group.Path
 	}
-	if state.Options.SystemTags.Has(k6stats.TagMethod) {
+	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
 		tags["method"] = req.method
 	}
-	if state.Options.SystemTags.Has(k6stats.TagURL) {
+	if state.Options.SystemTags.Has(k6metrics.TagURL) {
 		tags["url"] = url
 	}
-	if state.Options.SystemTags.Has(k6stats.TagIP) {
+	if state.Options.SystemTags.Has(k6metrics.TagIP) {
 		tags["ip"] = ipAddress
 	}
-	if state.Options.SystemTags.Has(k6stats.TagStatus) {
+	if state.Options.SystemTags.Has(k6metrics.TagStatus) {
 		tags["status"] = strconv.Itoa(int(status))
 	}
-	if state.Options.SystemTags.Has(k6stats.TagProto) {
+	if state.Options.SystemTags.Has(k6metrics.TagProto) {
 		tags["proto"] = protocol
 	}
 
@@ -236,9 +236,9 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	tags["from_prefetch_cache"] = strconv.FormatBool(fromPreCache)
 	tags["from_service_worker"] = strconv.FormatBool(fromSvcWrk)
 
-	sampleTags := k6stats.IntoSampleTags(&tags)
-	k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
-		Samples: []k6stats.Sample{
+	sampleTags := k6metrics.IntoSampleTags(&tags)
+	k6metrics.PushIfNotDone(m.ctx, state.Samples, k6metrics.ConnectedSamples{
+		Samples: []k6metrics.Sample{
 			{
 				Metric: state.BuiltinMetrics.HTTPReqs,
 				Tags:   sampleTags,
@@ -254,7 +254,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 				// issues with the parsing and conversion to `time.Time`.
 				// Have not spent time looking for the root cause of this in the Chromium source to file a bug report, and neither
 				// Puppeteer nor Playwright seems to care about the `responseTime` value and don't use/expose it.
-				Value: k6stats.D(timestamp.Sub(req.timestamp)),
+				Value: k6metrics.D(timestamp.Sub(req.timestamp)),
 				Time:  timestamp,
 			},
 			{
@@ -267,30 +267,30 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	})
 
 	if resp != nil && resp.timing != nil {
-		k6stats.PushIfNotDone(m.ctx, state.Samples, k6stats.ConnectedSamples{
-			Samples: []k6stats.Sample{
+		k6metrics.PushIfNotDone(m.ctx, state.Samples, k6metrics.ConnectedSamples{
+			Samples: []k6metrics.Sample{
 				{
 					Metric: state.BuiltinMetrics.HTTPReqConnecting,
 					Tags:   sampleTags,
-					Value:  k6stats.D(time.Duration(resp.timing.ConnectEnd-resp.timing.ConnectStart) * time.Millisecond),
+					Value:  k6metrics.D(time.Duration(resp.timing.ConnectEnd-resp.timing.ConnectStart) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 				{
 					Metric: state.BuiltinMetrics.HTTPReqTLSHandshaking,
 					Tags:   sampleTags,
-					Value:  k6stats.D(time.Duration(resp.timing.SslEnd-resp.timing.SslStart) * time.Millisecond),
+					Value:  k6metrics.D(time.Duration(resp.timing.SslEnd-resp.timing.SslStart) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 				{
 					Metric: state.BuiltinMetrics.HTTPReqSending,
 					Tags:   sampleTags,
-					Value:  k6stats.D(time.Duration(resp.timing.SendEnd-resp.timing.SendStart) * time.Millisecond),
+					Value:  k6metrics.D(time.Duration(resp.timing.SendEnd-resp.timing.SendStart) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 				{
 					Metric: state.BuiltinMetrics.HTTPReqReceiving,
 					Tags:   sampleTags,
-					Value:  k6stats.D(time.Duration(resp.timing.ReceiveHeadersEnd-resp.timing.SendEnd) * time.Millisecond),
+					Value:  k6metrics.D(time.Duration(resp.timing.ReceiveHeadersEnd-resp.timing.SendEnd) * time.Millisecond),
 					Time:   resp.timestamp,
 				},
 			},

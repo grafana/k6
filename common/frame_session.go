@@ -43,7 +43,7 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/sirupsen/logrus"
 	k6modules "go.k6.io/k6/js/modules"
-	k6stats "go.k6.io/k6/stats"
+	k6metrics "go.k6.io/k6/metrics"
 
 	"github.com/grafana/xk6-browser/api"
 )

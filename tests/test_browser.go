@@ -32,7 +32,7 @@ import (
 	k6http "go.k6.io/k6/js/modules/k6/http"
 	k6lib "go.k6.io/k6/lib"
 	k6httpmultibin "go.k6.io/k6/lib/testutils/httpmultibin"
-	k6stats "go.k6.io/k6/stats"
+	k6metrics "go.k6.io/k6/metrics"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
@@ -50,7 +50,7 @@ type testBrowser struct {
 	http     *k6httpmultibin.HTTPMultiBin
 	vu       *mockVU
 	logCache *logCache
-	samples  chan<- k6stats.SampleContainer
+	samples  chan<- k6metrics.SampleContainer
 	api.Browser
 }
 
