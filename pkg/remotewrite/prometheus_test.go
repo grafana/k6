@@ -7,7 +7,7 @@ import (
 	"math/rand"
 
 	"github.com/stretchr/testify/assert"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
 // check that ad-hoc optimization doesn't produce wrong values
@@ -15,17 +15,17 @@ func TestTrendAdd(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		current, s stats.Sample
+		current, s metrics.Sample
 	}{
 		{
-			current: stats.Sample{Metric: &stats.Metric{
-				Sink: &stats.TrendSink{},
+			current: metrics.Sample{Metric: &metrics.Metric{
+				Sink: &metrics.TrendSink{},
 			}},
-			s: stats.Sample{Value: 2},
+			s: metrics.Sample{Value: 2},
 		},
 		{
-			current: stats.Sample{Metric: &stats.Metric{
-				Sink: &stats.TrendSink{
+			current: metrics.Sample{Metric: &metrics.Metric{
+				Sink: &metrics.TrendSink{
 					Values: []float64{8, 3, 1, 7, 4, 2},
 					Count:  6,
 					Min:    1, Max: 8,
@@ -33,7 +33,7 @@ func TestTrendAdd(t *testing.T) {
 					Med: (3 + 4) / 2,
 				},
 			}},
-			s: stats.Sample{Value: 12.3},
+			s: metrics.Sample{Value: 12.3},
 		},
 	}
 
@@ -41,10 +41,10 @@ func TestTrendAdd(t *testing.T) {
 		// trendAdd should result in the same values as Sink.Add
 
 		s := trendAdd(testCase.current, testCase.s)
-		sink := s.Metric.Sink.(*stats.TrendSink)
+		sink := s.Metric.Sink.(*metrics.TrendSink)
 
 		testCase.current.Metric.Sink.Add(testCase.s)
-		expected := testCase.current.Metric.Sink.(*stats.TrendSink)
+		expected := testCase.current.Metric.Sink.(*metrics.TrendSink)
 
 		assert.Equal(t, expected.Count, sink.Count)
 		assert.Equal(t, expected.Min, sink.Min)
@@ -56,33 +56,33 @@ func TestTrendAdd(t *testing.T) {
 }
 
 func BenchmarkTrendAdd(b *testing.B) {
-	benchF := []func(b *testing.B, start stats.Sample){
-		func(b *testing.B, s stats.Sample) {
+	benchF := []func(b *testing.B, start metrics.Sample){
+		func(b *testing.B, s metrics.Sample) {
 			b.ResetTimer()
 			rand.Seed(time.Now().Unix())
 
 			for i := 0; i < b.N; i++ {
-				s = trendAdd(s, stats.Sample{Value: rand.Float64() * 1000})
-				sink := s.Metric.Sink.(*stats.TrendSink)
+				s = trendAdd(s, metrics.Sample{Value: rand.Float64() * 1000})
+				sink := s.Metric.Sink.(*metrics.TrendSink)
 				p(sink, 0.90)
 				p(sink, 0.95)
 			}
 		},
-		func(b *testing.B, start stats.Sample) {
+		func(b *testing.B, start metrics.Sample) {
 			b.ResetTimer()
 			rand.Seed(time.Now().Unix())
 
 			for i := 0; i < b.N; i++ {
-				start.Metric.Sink.Add(stats.Sample{Value: rand.Float64() * 1000})
+				start.Metric.Sink.Add(metrics.Sample{Value: rand.Float64() * 1000})
 				start.Metric.Sink.Format(0)
 			}
 		},
 	}
 
-	s := stats.Sample{
-		Metric: &stats.Metric{
-			Type: stats.Trend,
-			Sink: &stats.TrendSink{},
+	s := metrics.Sample{
+		Metric: &metrics.Metric{
+			Type: metrics.Trend,
+			Sink: &metrics.TrendSink{},
 		},
 	}
 

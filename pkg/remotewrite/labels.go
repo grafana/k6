@@ -2,10 +2,10 @@ package remotewrite
 
 import (
 	"github.com/prometheus/prometheus/prompb"
-	"go.k6.io/k6/stats"
+	"go.k6.io/k6/metrics"
 )
 
-func tagsToLabels(tags *stats.SampleTags, config Config) ([]prompb.Label, error) {
+func tagsToLabels(tags *metrics.SampleTags, config Config) ([]prompb.Label, error) {
 	if !config.KeepTags.Bool {
 		return []prompb.Label{}, nil
 	}
