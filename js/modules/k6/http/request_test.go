@@ -915,13 +915,12 @@ func TestRequestAndBatch(t *testing.T) {
 				state.CookieJar = cookieJar
 				_, err = rt.RunString(sr(`
 				var jar = http.cookieJar();
-				var res = http.request("GET", "HTTPBIN_URL/cookies/set?key1=value1&key2=value2");
-				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-				var jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
-				if (jarCookies.key1[0] != "value1" || jarCookies.key2[0] != "value2" || Object.keys(jarCookies).length != 2) { throw new Error("wrong cookies values in jar"); }
+				jar.set("HTTPBIN_URL/cookies", "key", "value");
+				var res = http.request("GET", "HTTPBIN_URL/cookies");
+				if (res.json().key != "value") { throw new Error("cookie 'key' unexpectedly don't found"); }
 				jar.clear('HTTPBIN_URL/cookies');
-				var jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
-				if (Object.keys(jarCookies).length != 0) { throw new Error("wrong clean: unexpected cookie in jar"); }
+				res = http.request("GET", "HTTPBIN_URL/cookies");
+				if (res.json().key == "value") { throw new Error("wrong clean: unexpected cookie in jar"); }
 				`))
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), "", 200, "")
@@ -933,13 +932,13 @@ func TestRequestAndBatch(t *testing.T) {
 				state.CookieJar = cookieJar
 				_, err = rt.RunString(sr(`
 				var jar = http.cookieJar();
-				var res = http.request("GET", "HTTPBIN_URL/cookies/set?key1=value1&key2=value2");
-				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-				var jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
-				if (jarCookies.key1[0] != "value1" || jarCookies.key2[0] != "value2" || Object.keys(jarCookies).length != 2) { throw new Error("wrong cookies values in jar"); }
-				jar.delete('HTTPBIN_URL/cookies', 'key1');
-				var jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
-				if (Object.keys(jarCookies).length != 1 || jarCookies.key2[0] != "value2") { throw new Error("wrong delete: unexpected cookie in jar"); }
+				jar.set("HTTPBIN_URL/cookies", "key1", "value1");
+				jar.set("HTTPBIN_URL/cookies", "key2", "value2");
+				var res = http.request("GET", "HTTPBIN_URL/cookies");
+				if (res.json().key1 != "value1" || res.json().key2 != "value2") { throw new Error("cookie 'keys' unexpectedly don't found"); }
+				jar.delete('HTTPBIN_URL/cookies', "key1");
+				res = http.request("GET", "HTTPBIN_URL/cookies");
+				if (res.json().key1 == "value1" || res.json().key2 != "value2"  ) { throw new Error("wrong clean: unexpected cookie in jar"); }
 				`))
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), "", 200, "")
