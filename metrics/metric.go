@@ -133,7 +133,7 @@ var ErrMetricNameParsing = errors.New("parsing metric name failed")
 // of "key:value" strings. On failure, it returns an error containing the `ErrMetricNameParsing` in its chain.
 func ParseMetricName(name string) (string, []string, error) {
 	openingTokenPos := strings.IndexByte(name, '{')
-	closingTokenPos := strings.IndexByte(name, '}')
+	closingTokenPos := strings.LastIndexByte(name, '}')
 	containsOpeningToken := openingTokenPos != -1
 	containsClosingToken := closingTokenPos != -1
 
@@ -150,25 +150,29 @@ func ParseMetricName(name string) (string, []string, error) {
 		return "", nil, fmt.Errorf("%w; reason: unmatched opening/close curly brace", ErrMetricNameParsing)
 	}
 
+	// If the closing brace token appears before the opening one,
+	// the expression is malformed
 	if closingTokenPos < openingTokenPos {
 		return "", nil, fmt.Errorf("%w; reason: closing curly brace appears before opening one", ErrMetricNameParsing)
 	}
 
-	parserFn := func(c rune) bool {
-		return c == '{' || c == '}'
+	// If the last character is not a closing brace token,
+	// the expression is malformed.
+	if closingTokenPos != (len(name) - 1) {
+		err := fmt.Errorf(
+			"%w; reason: missing closing curly brace in last position"+
+				"of the threshold expression",
+			ErrMetricNameParsing,
+		)
+		return "", nil, err
 	}
 
-	// Split the metric_name{tag_key:tag_value,...} expression
-	// into two "metric_name" and "tag_key:tag_value,..." strings.
-	parts := strings.FieldsFunc(name, parserFn)
-	if len(parts) == 0 || len(parts) > 2 {
-		return "", nil, ErrMetricNameParsing
-	}
+	// We already know the position of the opening and closing curly brace
+	// tokens. Thus, we extract the string in between them, and split its
+	// content to obtain the tags key values.
+	tags := strings.Split(name[openingTokenPos+1:closingTokenPos], ",")
 
-	// Split the tag key values
-	tags := strings.Split(parts[1], ",")
-
-	// For each tag definition, ensure
+	// For each tag definition, ensure it is correctly formed
 	for i, t := range tags {
 		keyValue := strings.SplitN(t, ":", 2)
 
@@ -179,5 +183,5 @@ func ParseMetricName(name string) (string, []string, error) {
 		tags[i] = strings.TrimSpace(t)
 	}
 
-	return parts[0], tags, nil
+	return name[0:openingTokenPos], tags, nil
 }
