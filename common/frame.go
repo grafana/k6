@@ -1550,9 +1550,7 @@ func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.V
 
 	args := make([]interface{}, 0, len(jsArgs))
 	for _, a := range jsArgs {
-		if a != nil {
-			args = append(args, a.Export())
-		}
+		args = append(args, a.Export())
 	}
 
 	var polling interface{} = parsedOpts.Polling
