@@ -77,17 +77,21 @@ func TestPageEmulateMedia(t *testing.T) {
 func TestPageEvaluate(t *testing.T) {
 	t.Parallel()
 
-	t.Run("ok/func", func(t *testing.T) {
+	t.Run("ok/func_arg", func(t *testing.T) {
 		t.Parallel()
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 
-		got := p.Evaluate(tb.rt.ToValue("() => document.location.toString()"))
+		got := p.Evaluate(
+			tb.rt.ToValue("(v) => { window.v = v; return window.v }"),
+			tb.rt.ToValue("test"),
+		)
 
 		require.IsType(t, tb.rt.ToValue(""), got)
-		gotVal, _ := got.(goja.Value)
-		assert.Equal(t, "about:blank", gotVal.Export())
+		gotVal, ok := got.(goja.Value)
+		require.True(t, ok)
+		assert.Equal(t, "test", gotVal.Export())
 	})
 
 	t.Run("err", func(t *testing.T) {
