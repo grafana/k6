@@ -123,7 +123,7 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 		// even if they don't have any metric samples during the test run
 		me.markObserved(metric)
 		if metric.Sub != nil {
-			me.markObserved(metric.Sub.Metric)
+			me.markObserved(metric.Sub.Parent)
 		}
 	}
 
