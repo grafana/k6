@@ -910,6 +910,7 @@ func TestRequestAndBatch(t *testing.T) {
 			})
 
 			t.Run("clear", func(t *testing.T) {
+				t.Parallel()
 				cookieJar, err := cookiejar.New(nil)
 				assert.NoError(t, err)
 				state.CookieJar = cookieJar
@@ -927,6 +928,7 @@ func TestRequestAndBatch(t *testing.T) {
 			})
 
 			t.Run("delete", func(t *testing.T) {
+				t.Parallel()
 				cookieJar, err := cookiejar.New(nil)
 				assert.NoError(t, err)
 				state.CookieJar = cookieJar
