@@ -32,7 +32,7 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 	k6modules "go.k6.io/k6/js/modules"
-	k6stats "go.k6.io/k6/stats"
+	k6metrics "go.k6.io/k6/metrics"
 
 	"github.com/grafana/xk6-browser/api"
 )
@@ -354,8 +354,8 @@ func (f *Frame) cachedDocumentHandle() (*ElementHandle, bool) {
 	return f.documentHandle, f.documentHandle != nil
 }
 
-func (f *Frame) emitMetric(m *k6stats.Metric, t time.Time) {
-	value := k6stats.D(t.Sub(f.initTime))
+func (f *Frame) emitMetric(m *k6metrics.Metric, t time.Time) {
+	value := k6metrics.D(t.Sub(f.initTime))
 	f.log.Debugf("Frame:emitMetric", "fid:%s furl:%q m:%s init:%q t:%q v:%f",
 		f.ID(), f.URL(), m.Name, f.initTime, t, value)
 
@@ -370,12 +370,12 @@ func (f *Frame) emitMetric(m *k6stats.Metric, t time.Time) {
 
 	state := f.vu.State()
 	tags := state.CloneTags()
-	if state.Options.SystemTags.Has(k6stats.TagURL) {
+	if state.Options.SystemTags.Has(k6metrics.TagURL) {
 		tags["url"] = f.URL()
 	}
-	sampleTags := k6stats.IntoSampleTags(&tags)
-	k6stats.PushIfNotDone(f.ctx, state.Samples, k6stats.ConnectedSamples{
-		Samples: []k6stats.Sample{
+	sampleTags := k6metrics.IntoSampleTags(&tags)
+	k6metrics.PushIfNotDone(f.ctx, state.Samples, k6metrics.ConnectedSamples{
+		Samples: []k6metrics.Sample{
 			{
 				Metric: m,
 				Tags:   sampleTags,

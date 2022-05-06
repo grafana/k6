@@ -37,8 +37,7 @@ import (
 	k6eventloop "go.k6.io/k6/js/eventloop"
 	k6modulestest "go.k6.io/k6/js/modulestest"
 	k6lib "go.k6.io/k6/lib"
-	k6metrics "go.k6.io/k6/lib/metrics"
-	k6stats "go.k6.io/k6/stats"
+	k6metrics "go.k6.io/k6/metrics"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -251,7 +250,7 @@ func newMockVU(tb testing.TB) *mockVU {
 	rt := goja.New()
 	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
 
-	samples := make(chan k6stats.SampleContainer, 1000)
+	samples := make(chan k6metrics.SampleContainer, 1000)
 
 	root, err := k6lib.NewGroup("", nil)
 	require.NoError(tb, err)
@@ -261,7 +260,7 @@ func newMockVU(tb testing.TB) *mockVU {
 			MaxRedirects: null.IntFrom(10),
 			UserAgent:    null.StringFrom("TestUserAgent"),
 			Throw:        null.BoolFrom(true),
-			SystemTags:   &k6stats.DefaultSystemTagSet,
+			SystemTags:   &k6metrics.DefaultSystemTagSet,
 			Batch:        null.IntFrom(20),
 			BatchPerHost: null.IntFrom(20),
 			// HTTPDebug:    null.StringFrom("full"),
