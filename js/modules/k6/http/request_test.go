@@ -909,7 +909,7 @@ func TestRequestAndBatch(t *testing.T) {
 				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), "", 200, "")
 			})
 
-			//nolint:parallel test
+			//nolint:paralleltest
 			t.Run("clear", func(t *testing.T) {
 				cookieJar, err := cookiejar.New(nil)
 				assert.NoError(t, err)
@@ -927,7 +927,7 @@ func TestRequestAndBatch(t *testing.T) {
 				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), "", 200, "")
 			})
 
-			//nolint:parallel test
+			//nolint:paralleltest
 			t.Run("delete", func(t *testing.T) {
 				cookieJar, err := cookiejar.New(nil)
 				assert.NoError(t, err)
