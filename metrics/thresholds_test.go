@@ -137,8 +137,8 @@ func TestThreshold_runNoTaint(t *testing.T) {
 			parsed:           &thresholdExpression{tokenRate, null.Float{}, tokenGreater, 0.01},
 			abortGracePeriod: types.NullDurationFrom(0 * time.Second),
 			sinks:            map[string]float64{"med": 27.2},
-			wantOk:           false,
-			wantErr:          true,
+			wantOk:           true,
+			wantErr:          false,
 		},
 		{
 			// The ParseThresholdCondition constructor should ensure that no invalid
@@ -672,22 +672,22 @@ func TestThresholds_Run(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			"Running thresholds of existing sink",
-			args{DummySink{"p(95)": 1234.5}, 0},
-			true,
-			false,
+			name:    "Running thresholds of existing sink",
+			args:    args{DummySink{"p(95)": 1234.5}, 0},
+			want:    true,
+			wantErr: false,
 		},
 		{
-			"Running thresholds of existing sink but failing threshold",
-			args{DummySink{"p(95)": 3000}, 0},
-			false,
-			false,
+			name:    "Running thresholds of existing sink but failing threshold",
+			args:    args{DummySink{"p(95)": 3000}, 0},
+			want:    false,
+			wantErr: false,
 		},
 		{
-			"Running threshold on non existing sink fails",
-			args{DummySink{"dummy": 0}, 0},
-			false,
-			true,
+			name:    "Running threshold on non existing sink does not fail",
+			args:    args{DummySink{"dummy": 0}, 0},
+			want:    true,
+			wantErr: false,
 		},
 	}
 	for _, testCase := range tests {
