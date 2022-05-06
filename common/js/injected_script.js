@@ -138,7 +138,6 @@ class InjectedScript {
     constructor() {
         this._replaceRafWithTimeout = false;
         this._stableRafCount = 10;
-        this.continuePolling = continuePolling;
         this._queryEngines = {
             'css': new CSSQueryEngine(),
             'text': new TextQueryEngine(),
@@ -587,9 +586,12 @@ class InjectedScript {
         return 'done';
     }
 
-    async waitForPredicateFunction(predicate, polling, timeout, ...args) {
+    async waitForPredicateFunction(predicateFn, polling, timeout, ...args) {
         let timedOut = false;
         let timeoutPoll = null;
+        const predicate = () => {
+          return predicateFn(...args) || continuePolling;
+        };
         if (timeout !== undefined || timeout !== null) {
           setTimeout(() => {
             timedOut = true;
@@ -601,7 +603,7 @@ class InjectedScript {
         if (typeof polling === 'number') return await pollInterval(polling);
 
         async function pollMutation() {
-            const success = predicate(...args);
+            const success = predicate();
             if (success !== continuePolling) return Promise.resolve(success);
 
             let resolve, reject;
@@ -614,7 +616,7 @@ class InjectedScript {
                     observer.disconnect();
                     reject(`timed out after ${timeout}ms`);
                 }
-                const success = predicate(...args);
+                const success = predicate();
                 if (success !== continuePolling) {
                     observer.disconnect();
                     resolve(success);
@@ -646,7 +648,7 @@ class InjectedScript {
                     reject(`timed out after ${timeout}ms`);
                     return;
                 }
-                const success = predicate(...args);
+                const success = predicate();
                 if (success !== continuePolling) resolve(success);
                 else requestAnimationFrame(onRaf);
             }
@@ -666,7 +668,7 @@ class InjectedScript {
                     reject(`timed out after ${timeout}ms`);
                     return;
                 }
-                const success = predicate(...args);
+                const success = predicate();
                 if (success !== continuePolling) resolve(success);
                 else setTimeout(onTimeout, pollInterval);
             }
