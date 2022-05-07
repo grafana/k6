@@ -8,6 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/dynamicpb"
+
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/netext/grpcext"
@@ -257,8 +260,19 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 				appendMethodInfo(fd, sd, md)
 			}
 		}
+		messages := fd.Messages()
+		for i := 0; i < messages.Len(); i++ {
+			message := messages.Get(i)
+			err = protoregistry.GlobalTypes.RegisterMessage(dynamicpb.NewMessageType(message))
+			if err != nil {
+				return false
+			}
+		}
 		return true
 	})
+	if err != nil {
+		return nil, err
+	}
 	return rtn, nil
 }
 
