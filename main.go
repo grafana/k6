@@ -32,7 +32,7 @@ import (
 	"github.com/grafana/xk6-browser/common"
 )
 
-const version = "v0.2.0"
+const version = "v0.3.0"
 
 type (
 	// RootModule is the global module instance that will create module
