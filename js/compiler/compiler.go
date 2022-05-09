@@ -71,7 +71,7 @@ var (
 			// "transform-regenerator", // Doesn't really work unless regeneratorRuntime is also added
 
 			// es2016 https://github.com/babel/babel/blob/v6.26.0/packages/babel-preset-es2016/src/index.js
-			"transform-exponentiation-operator",
+			// "transform-exponentiation-operator",
 
 			// es2017 https://github.com/babel/babel/blob/v6.26.0/packages/babel-preset-es2017/src/index.js
 			// "syntax-trailing-function-commas", // in goja

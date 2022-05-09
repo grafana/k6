@@ -470,7 +470,12 @@ func (r *Runtime) typeErrorResult(throw bool, args ...interface{}) {
 }
 
 func (r *Runtime) newError(typ *Object, format string, args ...interface{}) Value {
-	msg := fmt.Sprintf(format, args...)
+	var msg string
+	if len(args) > 0 {
+		msg = fmt.Sprintf(format, args...)
+	} else {
+		msg = format
+	}
 	return r.builtin_new(typ, []Value{newStringValue(msg)})
 }
 
