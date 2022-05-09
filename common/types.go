@@ -26,6 +26,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
+	"strings"
 
 	"github.com/dop251/goja"
 
@@ -275,6 +277,47 @@ func (l *LifecycleEvent) UnmarshalJSON(b []byte) error {
 	}
 	// Note that if the string cannot be found then it will be set to the zero value.
 	*l = lifecycleEventToID[j]
+	return nil
+}
+
+// MarshalText returns the string representation of the enum value.
+// It returns an error if the enum value is invalid.
+func (l *LifecycleEvent) MarshalText() ([]byte, error) {
+	if l == nil {
+		return []byte(""), nil
+	}
+	var (
+		ok bool
+		s  string
+	)
+	if s, ok = lifecycleEventToString[*l]; !ok {
+		return nil, fmt.Errorf("invalid lifecycle event: %v", int(*l))
+	}
+
+	return []byte(s), nil
+}
+
+// UnmarshalText unmarshals a text representation to the enum value.
+// It returns an error if given a wrong value.
+func (l *LifecycleEvent) UnmarshalText(text []byte) error {
+	var (
+		ok  bool
+		val = string(text)
+	)
+
+	if *l, ok = lifecycleEventToID[val]; !ok {
+		valid := make([]string, 0, len(lifecycleEventToID))
+		for k := range lifecycleEventToID {
+			valid = append(valid, k)
+		}
+		sort.Slice(valid, func(i, j int) bool {
+			return lifecycleEventToID[valid[j]] > lifecycleEventToID[valid[i]]
+		})
+		return fmt.Errorf(
+			"invalid lifecycle event: %q; must be one of: %s",
+			val, strings.Join(valid, ", "))
+	}
+
 	return nil
 }
 

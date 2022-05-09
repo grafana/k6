@@ -633,6 +633,26 @@ func TestPageWaitForFunction(t *testing.T) {
 	})
 }
 
+func TestPageWaitForLoadState(t *testing.T) {
+	t.Parallel()
+
+	// TODO: Add happy path tests once WaitForLoadState is not racy.
+
+	t.Run("err_wrong_event", func(t *testing.T) {
+		t.Parallel()
+
+		defer func() {
+			assertPanicErrorContains(t, recover(),
+				`invalid lifecycle event: "none"; `+
+					`must be one of: load, domcontentloaded, networkidle`)
+		}()
+
+		p := newTestBrowser(t).NewPage(nil)
+		p.WaitForLoadState("none", nil)
+		t.Error("did not panic")
+	})
+}
+
 // See: The issue #187 for details.
 func TestPageWaitForNavigationShouldNotPanic(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -649,8 +669,7 @@ func assertPanicErrorContains(t *testing.T, err interface{}, expErrMsg string) {
 	require.IsType(t, &goja.Object{}, err)
 	gotObj, _ := err.(*goja.Object)
 	got := gotObj.Export()
-	expErr := fmt.Errorf("%w", errors.New(expErrMsg))
-	require.IsType(t, expErr, got)
+	expErr := errors.New(expErrMsg)
 	gotErr, ok := got.(error)
 	require.True(t, ok)
 	assert.Contains(t, gotErr.Error(), expErr.Error())

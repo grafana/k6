@@ -297,10 +297,8 @@ func (o *FrameGotoOptions) Parse(ctx context.Context, opts goja.Value) error {
 				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
 			case "waitUntil":
 				lifeCycle := opts.Get(k).String()
-				if l, ok := lifecycleEventToID[lifeCycle]; ok {
-					o.WaitUntil = l
-				} else {
-					return fmt.Errorf("%q is not a valid lifecycle", lifeCycle)
+				if err := o.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
+					return fmt.Errorf("error parsing goto options: %w", err)
 				}
 			}
 		}
@@ -504,10 +502,8 @@ func (o *FrameSetContentOptions) Parse(ctx context.Context, opts goja.Value) err
 				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
 			case "waitUntil":
 				lifeCycle := opts.Get(k).String()
-				if l, ok := lifecycleEventToID[lifeCycle]; ok {
-					o.WaitUntil = l
-				} else {
-					return fmt.Errorf("%q is not a valid lifecycle", lifeCycle)
+				if err := o.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
+					return fmt.Errorf("error parsing setContent options: %w", err)
 				}
 			}
 		}
@@ -678,10 +674,8 @@ func (o *FrameWaitForNavigationOptions) Parse(ctx context.Context, opts goja.Val
 				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
 			case "waitUntil":
 				lifeCycle := opts.Get(k).String()
-				if l, ok := lifecycleEventToID[lifeCycle]; ok {
-					o.WaitUntil = l
-				} else {
-					return fmt.Errorf("%q is not a valid lifecycle", lifeCycle)
+				if err := o.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
+					return fmt.Errorf("error parsing waitForNavigation options: %w", err)
 				}
 			}
 		}
