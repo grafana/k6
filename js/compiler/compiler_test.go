@@ -133,9 +133,10 @@ func TestCompile(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
-		pgm, code, err := c.Compile(`3**2`, "script.js", true)
+		pgm, code, err := c.Compile(`class A {nine(){return 9}}; new A().nine()`, "script.js", true)
 		require.NoError(t, err)
-		assert.Equal(t, `"use strict";Math.pow(3, 2);`, code)
+		assert.Equal(t, `"use strict";var _createClass = function () {function defineProperties(target, props) {for (var i = 0; i < props.length; i++) {var descriptor = props[i];descriptor.enumerable = descriptor.enumerable || false;descriptor.configurable = true;if ("value" in descriptor) descriptor.writable = true;Object.defineProperty(target, descriptor.key, descriptor);}}return function (Constructor, protoProps, staticProps) {if (protoProps) defineProperties(Constructor.prototype, protoProps);if (staticProps) defineProperties(Constructor, staticProps);return Constructor;};}();function _classCallCheck(instance, Constructor) {if (!(instance instanceof Constructor)) {throw new TypeError("Cannot call a class as a function");}}let A = function () {function A() {_classCallCheck(this, A);}_createClass(A, [{ key: "nine", value: function nine() {return 9;} }]);return A;}();;new A().nine();`,
+			code)
 		v, err := goja.New().RunProgram(pgm)
 		if assert.NoError(t, err) {
 			assert.Equal(t, int64(9), v.Export())
@@ -146,9 +147,12 @@ func TestCompile(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
-		pgm, code, err := c.Compile(`exports.fn(3**2)`, "script.js", false)
+		pgm, code, err := c.Compile(`class A {nine(){return 9}}; exports.fn(new A().nine())`, "script.js", false)
 		require.NoError(t, err)
-		assert.Equal(t, "(function(module, exports){\n\"use strict\";exports.fn(Math.pow(3, 2));\n})\n", code)
+		assert.Equal(t, `(function(module, exports){
+"use strict";var _createClass = function () {function defineProperties(target, props) {for (var i = 0; i < props.length; i++) {var descriptor = props[i];descriptor.enumerable = descriptor.enumerable || false;descriptor.configurable = true;if ("value" in descriptor) descriptor.writable = true;Object.defineProperty(target, descriptor.key, descriptor);}}return function (Constructor, protoProps, staticProps) {if (protoProps) defineProperties(Constructor.prototype, protoProps);if (staticProps) defineProperties(Constructor, staticProps);return Constructor;};}();function _classCallCheck(instance, Constructor) {if (!(instance instanceof Constructor)) {throw new TypeError("Cannot call a class as a function");}}let A = function () {function A() {_classCallCheck(this, A);}_createClass(A, [{ key: "nine", value: function nine() {return 9;} }]);return A;}();;exports.fn(new A().nine());
+})
+`, code)
 		rt := goja.New()
 		v, err := rt.RunProgram(pgm)
 		if assert.NoError(t, err) {

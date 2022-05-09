@@ -757,9 +757,30 @@ func (self *_parser) parseUnaryExpression() ast.Expression {
 	return self.parsePostfixExpression()
 }
 
+func isUpdateExpression(expr ast.Expression) bool {
+	if ux, ok := expr.(*ast.UnaryExpression); ok {
+		return ux.Operator == token.INCREMENT || ux.Operator == token.DECREMENT
+	}
+	return true
+}
+
+func (self *_parser) parseExponentiationExpression() ast.Expression {
+	left := self.parseUnaryExpression()
+
+	for self.token == token.EXPONENT && isUpdateExpression(left) {
+		self.next()
+		left = &ast.BinaryExpression{
+			Operator: token.EXPONENT,
+			Left:     left,
+			Right:    self.parseExponentiationExpression(),
+		}
+	}
+
+	return left
+}
+
 func (self *_parser) parseMultiplicativeExpression() ast.Expression {
-	next := self.parseUnaryExpression
-	left := next()
+	left := self.parseExponentiationExpression()
 
 	for self.token == token.MULTIPLY || self.token == token.SLASH ||
 		self.token == token.REMAINDER {
@@ -768,7 +789,7 @@ func (self *_parser) parseMultiplicativeExpression() ast.Expression {
 		left = &ast.BinaryExpression{
 			Operator: tkn,
 			Left:     left,
-			Right:    next(),
+			Right:    self.parseExponentiationExpression(),
 		}
 	}
 
@@ -776,8 +797,7 @@ func (self *_parser) parseMultiplicativeExpression() ast.Expression {
 }
 
 func (self *_parser) parseAdditiveExpression() ast.Expression {
-	next := self.parseMultiplicativeExpression
-	left := next()
+	left := self.parseMultiplicativeExpression()
 
 	for self.token == token.PLUS || self.token == token.MINUS {
 		tkn := self.token
@@ -785,7 +805,7 @@ func (self *_parser) parseAdditiveExpression() ast.Expression {
 		left = &ast.BinaryExpression{
 			Operator: tkn,
 			Left:     left,
-			Right:    next(),
+			Right:    self.parseMultiplicativeExpression(),
 		}
 	}
 
@@ -793,8 +813,7 @@ func (self *_parser) parseAdditiveExpression() ast.Expression {
 }
 
 func (self *_parser) parseShiftExpression() ast.Expression {
-	next := self.parseAdditiveExpression
-	left := next()
+	left := self.parseAdditiveExpression()
 
 	for self.token == token.SHIFT_LEFT || self.token == token.SHIFT_RIGHT ||
 		self.token == token.UNSIGNED_SHIFT_RIGHT {
@@ -803,7 +822,7 @@ func (self *_parser) parseShiftExpression() ast.Expression {
 		left = &ast.BinaryExpression{
 			Operator: tkn,
 			Left:     left,
-			Right:    next(),
+			Right:    self.parseAdditiveExpression(),
 		}
 	}
 
@@ -811,8 +830,7 @@ func (self *_parser) parseShiftExpression() ast.Expression {
 }
 
 func (self *_parser) parseRelationalExpression() ast.Expression {
-	next := self.parseShiftExpression
-	left := next()
+	left := self.parseShiftExpression()
 
 	allowIn := self.scope.allowIn
 	self.scope.allowIn = true
@@ -855,8 +873,7 @@ func (self *_parser) parseRelationalExpression() ast.Expression {
 }
 
 func (self *_parser) parseEqualityExpression() ast.Expression {
-	next := self.parseRelationalExpression
-	left := next()
+	left := self.parseRelationalExpression()
 
 	for self.token == token.EQUAL || self.token == token.NOT_EQUAL ||
 		self.token == token.STRICT_EQUAL || self.token == token.STRICT_NOT_EQUAL {
@@ -865,7 +882,7 @@ func (self *_parser) parseEqualityExpression() ast.Expression {
 		left = &ast.BinaryExpression{
 			Operator:   tkn,
 			Left:       left,
-			Right:      next(),
+			Right:      self.parseRelationalExpression(),
 			Comparison: true,
 		}
 	}
@@ -874,8 +891,7 @@ func (self *_parser) parseEqualityExpression() ast.Expression {
 }
 
 func (self *_parser) parseBitwiseAndExpression() ast.Expression {
-	next := self.parseEqualityExpression
-	left := next()
+	left := self.parseEqualityExpression()
 
 	for self.token == token.AND {
 		tkn := self.token
@@ -883,7 +899,7 @@ func (self *_parser) parseBitwiseAndExpression() ast.Expression {
 		left = &ast.BinaryExpression{
 			Operator: tkn,
 			Left:     left,
-			Right:    next(),
+			Right:    self.parseEqualityExpression(),
 		}
 	}
 
@@ -891,8 +907,7 @@ func (self *_parser) parseBitwiseAndExpression() ast.Expression {
 }
 
 func (self *_parser) parseBitwiseExclusiveOrExpression() ast.Expression {
-	next := self.parseBitwiseAndExpression
-	left := next()
+	left := self.parseBitwiseAndExpression()
 
 	for self.token == token.EXCLUSIVE_OR {
 		tkn := self.token
@@ -900,7 +915,7 @@ func (self *_parser) parseBitwiseExclusiveOrExpression() ast.Expression {
 		left = &ast.BinaryExpression{
 			Operator: tkn,
 			Left:     left,
-			Right:    next(),
+			Right:    self.parseBitwiseAndExpression(),
 		}
 	}
 
@@ -908,8 +923,7 @@ func (self *_parser) parseBitwiseExclusiveOrExpression() ast.Expression {
 }
 
 func (self *_parser) parseBitwiseOrExpression() ast.Expression {
-	next := self.parseBitwiseExclusiveOrExpression
-	left := next()
+	left := self.parseBitwiseExclusiveOrExpression()
 
 	for self.token == token.OR {
 		tkn := self.token
@@ -917,7 +931,7 @@ func (self *_parser) parseBitwiseOrExpression() ast.Expression {
 		left = &ast.BinaryExpression{
 			Operator: tkn,
 			Left:     left,
-			Right:    next(),
+			Right:    self.parseBitwiseExclusiveOrExpression(),
 		}
 	}
 
@@ -925,8 +939,7 @@ func (self *_parser) parseBitwiseOrExpression() ast.Expression {
 }
 
 func (self *_parser) parseLogicalAndExpression() ast.Expression {
-	next := self.parseBitwiseOrExpression
-	left := next()
+	left := self.parseBitwiseOrExpression()
 
 	for self.token == token.LOGICAL_AND {
 		tkn := self.token
@@ -934,27 +947,71 @@ func (self *_parser) parseLogicalAndExpression() ast.Expression {
 		left = &ast.BinaryExpression{
 			Operator: tkn,
 			Left:     left,
-			Right:    next(),
+			Right:    self.parseBitwiseOrExpression(),
 		}
 	}
 
 	return left
 }
 
-func (self *_parser) parseLogicalOrExpression() ast.Expression {
-	next := self.parseLogicalAndExpression
-	left := next()
+func isLogicalAndExpr(expr ast.Expression) bool {
+	if bexp, ok := expr.(*ast.BinaryExpression); ok && bexp.Operator == token.LOGICAL_AND {
+		return true
+	}
+	return false
+}
 
-	for self.token == token.LOGICAL_OR {
-		tkn := self.token
-		self.next()
-		left = &ast.BinaryExpression{
-			Operator: tkn,
-			Left:     left,
-			Right:    next(),
+func (self *_parser) parseLogicalOrExpression() ast.Expression {
+	var idx file.Idx
+	parenthesis := self.token == token.LEFT_PARENTHESIS
+	left := self.parseLogicalAndExpression()
+
+	if self.token == token.LOGICAL_OR || !parenthesis && isLogicalAndExpr(left) {
+		for {
+			switch self.token {
+			case token.LOGICAL_OR:
+				self.next()
+				left = &ast.BinaryExpression{
+					Operator: token.LOGICAL_OR,
+					Left:     left,
+					Right:    self.parseLogicalAndExpression(),
+				}
+			case token.COALESCE:
+				idx = self.idx
+				goto mixed
+			default:
+				return left
+			}
+		}
+	} else {
+		for {
+			switch self.token {
+			case token.COALESCE:
+				idx = self.idx
+				self.next()
+
+				parenthesis := self.token == token.LEFT_PARENTHESIS
+				right := self.parseLogicalAndExpression()
+				if !parenthesis && isLogicalAndExpr(right) {
+					goto mixed
+				}
+
+				left = &ast.BinaryExpression{
+					Operator: token.COALESCE,
+					Left:     left,
+					Right:    right,
+				}
+			case token.LOGICAL_OR:
+				idx = self.idx
+				goto mixed
+			default:
+				return left
+			}
 		}
 	}
 
+mixed:
+	self.error(idx, "Logical expressions and coalesce expressions cannot be mixed. Wrap either by parentheses")
 	return left
 }
 
@@ -996,6 +1053,8 @@ func (self *_parser) parseAssignmentExpression() ast.Expression {
 		operator = token.MINUS
 	case token.MULTIPLY_ASSIGN:
 		operator = token.MULTIPLY
+	case token.EXPONENT_ASSIGN:
+		operator = token.EXPONENT
 	case token.QUOTIENT_ASSIGN:
 		operator = token.SLASH
 	case token.REMAINDER_ASSIGN:
@@ -1080,8 +1139,7 @@ func (self *_parser) parseExpression() ast.Expression {
 	if self.token == token.LET {
 		self.token = token.IDENTIFIER
 	}
-	next := self.parseAssignmentExpression
-	left := next()
+	left := self.parseAssignmentExpression()
 
 	if self.token == token.COMMA {
 		sequence := []ast.Expression{left}
@@ -1090,7 +1148,7 @@ func (self *_parser) parseExpression() ast.Expression {
 				break
 			}
 			self.next()
-			sequence = append(sequence, next())
+			sequence = append(sequence, self.parseAssignmentExpression())
 		}
 		return &ast.SequenceExpression{
 			Sequence: sequence,

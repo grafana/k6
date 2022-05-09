@@ -994,6 +994,16 @@ end:
 	vm.pc++
 }
 
+type _exp struct{}
+
+var exp _exp
+
+func (_exp) exec(vm *vm) {
+	vm.sp--
+	vm.stack[vm.sp-1] = pow(vm.stack[vm.sp-1], vm.stack[vm.sp])
+	vm.pc++
+}
+
 type _div struct{}
 
 var div _div
@@ -3314,6 +3324,7 @@ func (j jeq1) exec(vm *vm) {
 	if vm.stack[vm.sp-1].ToBoolean() {
 		vm.pc += int(j)
 	} else {
+		vm.sp--
 		vm.pc++
 	}
 }
@@ -3324,6 +3335,7 @@ func (j jneq1) exec(vm *vm) {
 	if !vm.stack[vm.sp-1].ToBoolean() {
 		vm.pc += int(j)
 	} else {
+		vm.sp--
 		vm.pc++
 	}
 }
@@ -3361,6 +3373,31 @@ func (j jopt) exec(vm *vm) {
 		vm.pc += int(j)
 	default:
 		vm.pc++
+	}
+}
+
+type joptc int32
+
+func (j joptc) exec(vm *vm) {
+	switch vm.stack[vm.sp-1].(type) {
+	case valueNull, valueUndefined, memberUnresolved:
+		vm.sp--
+		vm.stack[vm.sp-1] = _undefined
+		vm.pc += int(j)
+	default:
+		vm.pc++
+	}
+}
+
+type jcoalesc int32
+
+func (j jcoalesc) exec(vm *vm) {
+	switch vm.stack[vm.sp-1] {
+	case _undefined, _null:
+		vm.sp--
+		vm.pc++
+	default:
+		vm.pc += int(j)
 	}
 }
 

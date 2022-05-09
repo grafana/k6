@@ -181,9 +181,7 @@ NaNLoop:
 	return _NaN
 }
 
-func (r *Runtime) math_pow(call FunctionCall) Value {
-	x := call.Argument(0)
-	y := call.Argument(1)
+func pow(x, y Value) Value {
 	if x, ok := x.(valueInt); ok {
 		if y, ok := y.(valueInt); ok && y >= 0 && y < 64 {
 			if y == 0 {
@@ -207,6 +205,10 @@ func (r *Runtime) math_pow(call FunctionCall) Value {
 		return _NaN
 	}
 	return floatToValue(math.Pow(xf, yf))
+}
+
+func (r *Runtime) math_pow(call FunctionCall) Value {
+	return pow(call.Argument(0), call.Argument(1))
 }
 
 func (r *Runtime) math_random(call FunctionCall) Value {
