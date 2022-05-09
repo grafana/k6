@@ -39,6 +39,7 @@ type Sink interface {
 	Add(s Sample)                              // Add a sample to the sink.
 	Calc()                                     // Make final calculations.
 	Format(t time.Duration) map[string]float64 // Data for thresholds.
+	IsEmpty() bool                             // Check if the Sink is empty.
 }
 
 type CounterSink struct {
@@ -52,6 +53,9 @@ func (c *CounterSink) Add(s Sample) {
 		c.First = s.Time
 	}
 }
+
+// IsEmpty indicates whether the CounterSink is empty.
+func (c *CounterSink) IsEmpty() bool { return c.First.IsZero() }
 
 func (c *CounterSink) Calc() {}
 
@@ -67,6 +71,9 @@ type GaugeSink struct {
 	Max, Min float64
 	minSet   bool
 }
+
+// IsEmpty indicates whether the GaugeSink is empty.
+func (g *GaugeSink) IsEmpty() bool { return !g.minSet }
 
 func (g *GaugeSink) Add(s Sample) {
 	g.Value = s.Value
@@ -94,6 +101,9 @@ type TrendSink struct {
 	Sum, Avg float64
 	Med      float64
 }
+
+// IsEmpty indicates whether the TrendSink is empty.
+func (t *TrendSink) IsEmpty() bool { return t.Count == 0 }
 
 func (t *TrendSink) Add(s Sample) {
 	t.Values = append(t.Values, s.Value)
@@ -164,6 +174,9 @@ type RateSink struct {
 	Total int64
 }
 
+// IsEmpty indicates whether the RateSink is empty.
+func (r *RateSink) IsEmpty() bool { return r.Total == 0 }
+
 func (r *RateSink) Add(s Sample) {
 	r.Total += 1
 	if s.Value != 0 {
@@ -178,6 +191,9 @@ func (r RateSink) Format(t time.Duration) map[string]float64 {
 }
 
 type DummySink map[string]float64
+
+// IsEmpty indicates whether the DummySink is empty.
+func (d DummySink) IsEmpty() bool { return len(d) == 0 }
 
 func (d DummySink) Add(s Sample) {
 	panic(errors.New("you can't add samples to a dummy sink"))

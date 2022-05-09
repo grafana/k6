@@ -436,10 +436,9 @@ func TestEngine_processThresholds(t *testing.T) {
 				thresholds[m] = ths
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
+			runner := &minirunner.MiniRunner{}
 			e, run, wait := newTestEngineWithRegistry(
-				t, ctx, &minirunner.MiniRunner{}, nil, lib.Options{Thresholds: thresholds}, registry,
+				t, nil, runner, nil, lib.Options{Thresholds: thresholds}, registry,
 			)
 
 			e.OutputManager.AddMetricSamples(
