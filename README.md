@@ -33,6 +33,9 @@ Special acknowledgment to the authors of [Playwright](https://playwright.dev/) a
 - Aim for rough API compatibility with [Playwright](https://github.com/microsoft/playwright). The reason for this is two-fold; for one we don't want users to have to learn a completely new API just to use xk6-browser, and secondly, it opens up for using the [Playwright RPC server](https://github.com/mxschmitt/playwright-go) as an optional backend for xk6-browser should we decide to support that in the future.
 - Support for Chromium compatible browsers first, and eventually Firefox and WebKit-based browsers.
 
+See our [project roadmap](ROADMAP.md) for more details.
+
+
 ## FAQ
 
 - **Is this production ready?**<br>
