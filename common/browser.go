@@ -162,6 +162,12 @@ func (b *Browser) initEvents() error {
 	}, chHandler)
 
 	go func() {
+		defer func() {
+			b.browserProc.didLoseConnection()
+			if b.cancelFn != nil {
+				b.cancelFn()
+			}
+		}()
 		for {
 			select {
 			case <-cancelCtx.Done():
@@ -175,8 +181,6 @@ func (b *Browser) initEvents() error {
 					b.onDetachedFromTarget(ev)
 				} else if event.typ == EventConnectionClose {
 					b.logger.Debugf("Browser:initEvents:EventConnectionClose", "")
-					b.browserProc.didLoseConnection()
-					b.cancelFn()
 					return
 				}
 			}
