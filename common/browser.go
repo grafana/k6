@@ -163,6 +163,7 @@ func (b *Browser) initEvents() error {
 
 	go func() {
 		defer func() {
+			b.logger.Debugf("Browser:initEvents:defer", "ctx err: %v", cancelCtx.Err())
 			b.browserProc.didLoseConnection()
 			if b.cancelFn != nil {
 				b.cancelFn()
