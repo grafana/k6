@@ -50,6 +50,7 @@ import (
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/netext"
+	grpcanytesting "go.k6.io/k6/lib/testutils/httpmultibin/grpc_any_testing"
 	"go.k6.io/k6/lib/types"
 )
 
@@ -95,6 +96,7 @@ type HTTPMultiBin struct {
 	ServerHTTP2     *httptest.Server
 	ServerGRPC      *grpc.Server
 	GRPCStub        *GRPCStub
+	GRPCAnyStub     *GRPCAnyStub
 	Replacer        *strings.Replacer
 	TLSClientConfig *tls.Config
 	Dialer          *netext.Dialer
@@ -253,6 +255,21 @@ func (*GRPCStub) HalfDuplexCall(grpctest.TestService_HalfDuplexCallServer) error
 	return status.Errorf(codes.Unimplemented, "method HalfDuplexCall not implemented")
 }
 
+// GRPCAnyStub is an easily customisable AnyTestServiceServer
+type GRPCAnyStub struct {
+	grpcanytesting.AnyTestServiceServer
+	SumFunc func(context.Context, *grpcanytesting.SumRequest) (*grpcanytesting.SumReply, error)
+}
+
+// Sum implements the interface for the gRPC AnyTestServiceServer
+func (s *GRPCAnyStub) Sum(ctx context.Context, req *grpcanytesting.SumRequest) (*grpcanytesting.SumReply, error) {
+	if s.SumFunc != nil {
+		return s.SumFunc(ctx, req)
+	}
+
+	return nil, status.Errorf(codes.Unimplemented, "method Sum not implemented")
+}
+
 // NewHTTPMultiBin returns a fully configured and running HTTPMultiBin
 //nolint:funlen
 func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
@@ -286,6 +303,8 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	grpcSrv := grpc.NewServer()
 	stub := &GRPCStub{}
 	grpctest.RegisterTestServiceServer(grpcSrv, stub)
+	anyStub := &GRPCAnyStub{}
+	grpcanytesting.RegisterAnyTestServiceServer(grpcSrv, anyStub)
 
 	cmux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
@@ -340,6 +359,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 		ServerHTTP2: http2Srv,
 		ServerGRPC:  grpcSrv,
 		GRPCStub:    stub,
+		GRPCAnyStub: anyStub,
 		Replacer: strings.NewReplacer(
 			"HTTPBIN_IP_URL", httpSrv.URL,
 			"HTTPBIN_DOMAIN", httpDomain,
