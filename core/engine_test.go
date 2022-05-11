@@ -62,16 +62,11 @@ type testStruct struct {
 
 // Wrapper around NewEngine that applies a logger and manages the options.
 func newTestEngineWithRegistry( //nolint:golint
-	t *testing.T, runCtx context.Context, runner lib.Runner, outputs []output.Output, opts lib.Options,
+	t *testing.T, runTimeout *time.Duration, runner lib.Runner, outputs []output.Output, opts lib.Options,
 	registry *metrics.Registry,
-) testStruct {
+) *testStruct {
 	if runner == nil {
 		runner = &minirunner.MiniRunner{}
-	}
-	globalCtx, globalCancel := context.WithCancel(context.Background())
-	var runCancel func()
-	if runCtx == nil {
-		runCtx, runCancel = context.WithCancel(globalCtx)
 	}
 
 	logger := logrus.New()
@@ -92,28 +87,36 @@ func newTestEngineWithRegistry( //nolint:golint
 	require.NoError(t, err)
 	require.NoError(t, engine.OutputManager.StartOutputs())
 
+	globalCtx, globalCancel := context.WithCancel(context.Background())
+	var runCancel func()
+	var runCtx context.Context
+	if runTimeout != nil {
+		runCtx, runCancel = context.WithTimeout(globalCtx, *runTimeout)
+	} else {
+		runCtx, runCancel = context.WithCancel(globalCtx)
+	}
 	run, waitFn, err := engine.Init(globalCtx, runCtx)
 	require.NoError(t, err)
 
-	return testStruct{
+	var test *testStruct
+	test = &testStruct{
 		engine:    engine,
 		run:       run,
 		runCancel: runCancel,
 		wait: func() {
-			if runCancel != nil {
-				runCancel()
-			}
+			test.runCancel()
 			globalCancel()
 			waitFn()
 			engine.OutputManager.StopOutputs()
 		},
 	}
+	return test
 }
 
 func newTestEngine(
-	t *testing.T, runCtx context.Context, runner lib.Runner, outputs []output.Output, opts lib.Options, //nolint:revive
-) testStruct {
-	return newTestEngineWithRegistry(t, runCtx, runner, outputs, opts, metrics.NewRegistry())
+	t *testing.T, runTimeout *time.Duration, runner lib.Runner, outputs []output.Output, opts lib.Options,
+) *testStruct {
+	return newTestEngineWithRegistry(t, runTimeout, runner, outputs, opts, metrics.NewRegistry())
 }
 
 func TestEngineRun(t *testing.T) {
@@ -131,10 +134,7 @@ func TestEngineRun(t *testing.T) {
 		}
 
 		duration := 100 * time.Millisecond
-		ctx, cancel := context.WithTimeout(context.Background(), duration)
-		defer cancel()
-
-		test := newTestEngine(t, ctx, runner, nil, lib.Options{})
+		test := newTestEngine(t, &duration, runner, nil, lib.Options{})
 		defer test.wait()
 
 		startTime := time.Now()
@@ -173,8 +173,7 @@ func TestEngineRun(t *testing.T) {
 		}
 
 		mockOutput := mockoutput.New()
-		ctx, cancel := context.WithCancel(context.Background())
-		test := newTestEngineWithRegistry(t, ctx, runner, []output.Output{mockOutput}, lib.Options{
+		test := newTestEngineWithRegistry(t, nil, runner, []output.Output{mockOutput}, lib.Options{
 			VUs:        null.IntFrom(1),
 			Iterations: null.IntFrom(1),
 		}, registry)
@@ -182,7 +181,7 @@ func TestEngineRun(t *testing.T) {
 		errC := make(chan error)
 		go func() { errC <- test.run() }()
 		<-signalChan
-		cancel()
+		test.runCancel()
 		assert.NoError(t, <-errC)
 		test.wait()
 
@@ -200,9 +199,7 @@ func TestEngineRun(t *testing.T) {
 
 func TestEngineAtTime(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	test := newTestEngine(t, ctx, nil, nil, lib.Options{
+	test := newTestEngine(t, nil, nil, nil, lib.Options{
 		VUs:      null.IntFrom(2),
 		Duration: types.NullDurationFrom(20 * time.Second),
 	})
@@ -213,9 +210,7 @@ func TestEngineAtTime(t *testing.T) {
 
 func TestEngineStopped(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	test := newTestEngine(t, ctx, nil, nil, lib.Options{
+	test := newTestEngine(t, nil, nil, nil, lib.Options{
 		VUs:      null.IntFrom(1),
 		Duration: types.NullDurationFrom(20 * time.Second),
 	})
@@ -236,7 +231,7 @@ func TestEngineOutput(t *testing.T) {
 	require.NoError(t, err)
 
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+		Fn: func(_ context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
 			out <- metrics.Sample{Metric: testMetric}
 			return nil
 		},
@@ -1209,21 +1204,20 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 	testMetric, err := registry.NewMetric("teardown_metric", metrics.Counter)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-
+	var test *testStruct
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
-			cancel() // we cancel the runCtx immediately after the test starts
+		Fn: func(_ context.Context, _ *lib.State, _ chan<- metrics.SampleContainer) error {
+			test.runCancel() // we cancel the run immediately after the test starts
 			return nil
 		},
-		TeardownFn: func(ctx context.Context, out chan<- metrics.SampleContainer) error {
+		TeardownFn: func(_ context.Context, out chan<- metrics.SampleContainer) error {
 			out <- metrics.Sample{Metric: testMetric, Value: 1}
 			return nil
 		},
 	}
 
 	mockOutput := mockoutput.New()
-	test := newTestEngineWithRegistry(t, ctx, runner, []output.Output{mockOutput}, lib.Options{
+	test = newTestEngineWithRegistry(t, nil, runner, []output.Output{mockOutput}, lib.Options{
 		VUs: null.IntFrom(1), Iterations: null.IntFrom(1),
 	}, registry)
 
