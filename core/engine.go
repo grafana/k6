@@ -152,8 +152,11 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 
 		// Make the background jobs process the currently buffered metrics and
 		// run the thresholds, then wait for that to be done.
-		processMetricsAfterRun <- struct{}{}
-		<-processMetricsAfterRun
+		select {
+		case processMetricsAfterRun <- struct{}{}:
+			<-processMetricsAfterRun
+		case <-globalCtx.Done():
+		}
 
 		return err
 	}
