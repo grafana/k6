@@ -58,13 +58,12 @@ func newThreshold(src string, abortOnFail bool, gracePeriod types.NullDuration) 
 
 func (t *Threshold) runNoTaint(sinks map[string]float64) (bool, error) {
 	// Extract the sink value for the aggregation method used in the threshold
-	// expression
+	// expression. Considering we already validated thresholds before starting
+	// the execution, we assume that a missing sink entry means that no samples
+	// are available yet, and that it's safe to ignore this run.
 	lhs, ok := sinks[t.parsed.SinkKey()]
 	if !ok {
-		return false, fmt.Errorf("unable to apply threshold %s over metrics; reason: "+
-			"no metric supporting the %s aggregation method found",
-			t.Source,
-			t.parsed.AggregationMethod)
+		return true, nil
 	}
 
 	// Apply the threshold expression operator to the left and
@@ -221,7 +220,11 @@ func (ts *Thresholds) Run(sink Sink, duration time.Duration) (bool, error) {
 			ts.sinked[key] = sinkImpl.P(threshold.parsed.AggregationValue.Float64 / 100)
 		}
 	case *RateSink:
-		ts.sinked["rate"] = float64(sinkImpl.Trues) / float64(sinkImpl.Total)
+		// We want to avoid division by zero, which
+		// would lead to [#2520](https://github.com/grafana/k6/issues/2520)
+		if sinkImpl.Total > 0 {
+			ts.sinked["rate"] = float64(sinkImpl.Trues) / float64(sinkImpl.Total)
+		}
 	case DummySink:
 		for k, v := range sinkImpl {
 			ts.sinked[k] = v

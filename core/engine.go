@@ -166,6 +166,11 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 // test run status when it ends. It returns a function that can be used after
 // the provided context is called, to wait for the complete winding down of all
 // started goroutines.
+//
+// Because the background process is not aware of the execution's state, `processMetricsAfterRun`
+// will be used to signal that the test run is finished, no more metric samples will be produced,
+// and that the remaining metrics samples in the pipeline should be processed as the background
+// process is about to exit.
 func (e *Engine) startBackgroundProcesses(
 	globalCtx, runCtx context.Context, runResult <-chan error, runSubCancel func(), processMetricsAfterRun chan struct{},
 ) (wait func()) {
@@ -226,7 +231,7 @@ func (e *Engine) startBackgroundProcesses(
 			for {
 				select {
 				case <-ticker.C:
-					thresholdsTainted, shouldAbort := e.MetricsEngine.EvaluateThresholds()
+					thresholdsTainted, shouldAbort := e.MetricsEngine.EvaluateThresholds(true)
 					e.thresholdsTaintedLock.Lock()
 					e.thresholdsTainted = thresholdsTainted
 					e.thresholdsTaintedLock.Unlock()
@@ -244,6 +249,13 @@ func (e *Engine) startBackgroundProcesses(
 	return processes.Wait
 }
 
+// processMetrics process the execution's metrics samples as they are collected.
+// The processing of samples happens at a fixed rate defined by the `collectRate`
+// constant.
+//
+// The `processMetricsAfterRun` channel argument is used by the caller to signal
+// that the test run is finished, no more metric samples will be produced, and that
+// the metrics samples remaining in the pipeline should be should be processed.
 func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRun chan struct{}) {
 	sampleContainers := []metrics.SampleContainer{}
 
@@ -260,7 +272,7 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 
 		if !e.runtimeOptions.NoThresholds.Bool {
 			// Process the thresholds one final time
-			thresholdsTainted, _ := e.MetricsEngine.EvaluateThresholds()
+			thresholdsTainted, _ := e.MetricsEngine.EvaluateThresholds(false)
 			e.thresholdsTaintedLock.Lock()
 			e.thresholdsTainted = thresholdsTainted
 			e.thresholdsTaintedLock.Unlock()
@@ -299,7 +311,7 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 			if !e.runtimeOptions.NoThresholds.Bool {
 				// Ensure the ingester flushes any buffered metrics
 				_ = e.ingester.Stop()
-				thresholdsTainted, _ := e.MetricsEngine.EvaluateThresholds()
+				thresholdsTainted, _ := e.MetricsEngine.EvaluateThresholds(false)
 				e.thresholdsTaintedLock.Lock()
 				e.thresholdsTainted = thresholdsTainted
 				e.thresholdsTaintedLock.Unlock()
