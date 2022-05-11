@@ -414,7 +414,7 @@ func TestClient(t *testing.T) {
 					throw new Error("unexpected error: " + JSON.stringify(resp.error) + "or status: " + resp.status)
 				}
 				if (resp.message.data.v !== "3") {
-					throw new Error("unexpected resp message data v: ", resp.message.data.v)
+					throw new Error("unexpected resp message data")
 				}`,
 				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan metrics.SampleContainer, _ error) {
 					samplesBuf := metrics.GetBufferedSamples(samples)
