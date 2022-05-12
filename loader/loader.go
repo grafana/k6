@@ -236,7 +236,7 @@ func Load(
 			return result, nil
 		}
 
-		if moduleSpecifier.Scheme == "" || moduleSpecifier.Opaque == "" {
+		if moduleSpecifier.Scheme == "" && moduleSpecifier.Opaque == "" {
 			// we have an error and we did remote module resolution without a scheme
 			// let's write the coolest error message to try to help the lost soul who got to here
 			return nil, noSchemeRemoteModuleResolutionError{err: err, moduleSpecifier: originalModuleSpecifier}
