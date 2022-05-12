@@ -409,10 +409,12 @@ func TestParseHTML(t *testing.T) {
 		t.Run("Valid", func(t *testing.T) {
 			v, err := rt.RunString(`doc.find("#select_multi option").map(function(idx, val) { return val.text() })`)
 			if assert.NoError(t, err) {
-				mapped, ok := v.Export().([]string)
+				mapped, ok := v.Export().([]goja.Value)
 				assert.True(t, ok)
 				assert.Equal(t, 3, len(mapped))
-				assert.Equal(t, []string{"option 1", "option 2", "option 3"}, mapped)
+				assert.Equal(t, "option 1", mapped[0].String())
+				assert.Equal(t, "option 2", mapped[1].String())
+				assert.Equal(t, "option 3", mapped[2].String())
 			}
 		})
 		t.Run("Invalid arg", func(t *testing.T) {
@@ -425,10 +427,10 @@ func TestParseHTML(t *testing.T) {
 		t.Run("Map with attr must return string", func(t *testing.T) {
 			v, err := rt.RunString(`doc.find("#select_multi").map(function(idx, val) { return val.attr("name") })`)
 			if assert.NoError(t, err) {
-				mapped, ok := v.Export().([]string)
+				mapped, ok := v.Export().([]goja.Value)
 				assert.True(t, ok)
 				assert.Equal(t, 1, len(mapped))
-				assert.Equal(t, []string{"select_multi"}, mapped)
+				assert.Equal(t, "select_multi", mapped[0].String())
 			}
 		})
 	})

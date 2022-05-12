@@ -21,6 +21,7 @@
 package html
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -426,7 +427,7 @@ func (s Selection) Is(v goja.Value) bool {
 }
 
 // Map implements ES5 Array.prototype.map
-func (s Selection) Map(v goja.Value) []string {
+func (s Selection) Map(v goja.Value) []goja.Value {
 	gojaFn, isFn := goja.AssertFunction(v)
 	if !isFn {
 		common.Throw(s.rt, errors.New("the argument to map() must be a function"))
@@ -435,12 +436,30 @@ func (s Selection) Map(v goja.Value) []string {
 	fn := func(idx int, sel *goquery.Selection) string {
 		selection := &Selection{sel: sel, URL: s.URL, rt: s.rt}
 		if fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(selection)); fnErr == nil {
-			return fnRes.String()
+			// We want map to return a slice of goja.Value, but the underlying
+			// library we use to parse HTML maps over and returns strings. Thus,
+			// to be able to manipulate an actual Goja value, we marshal it
+			// as JSON, so we can unmarshal and cast it to a goja.Value later on.
+			m, _ := json.Marshal(fnRes)
+			return string(m)
 		}
+
 		return ""
 	}
 
-	return s.sel.Map(fn)
+	// Because goquery's Selection.Map method returns a slice of strings,
+	// while we would want it to return a slice of goja.Value, we loop
+	// through its result containing the JSON marshaled results, and
+	// cast them back to goja values.
+	mapped := s.sel.Map(fn)
+	result := make([]goja.Value, len(mapped))
+	for i, m := range mapped {
+		var v interface{}
+		json.Unmarshal([]byte(m), &v)
+		result[i] = s.rt.ToValue(v)
+	}
+
+	return result
 }
 
 func (s Selection) Slice(start int, def ...int) Selection {
