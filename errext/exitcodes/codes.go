@@ -22,8 +22,10 @@
 //nolint: golint
 package exitcodes
 
+// ExitCode is just a type representing a process exit code for k6
 type ExitCode uint8
 
+// list of exit codes used by k6
 const (
 	CloudTestRunFailed       ExitCode = 97 // This used to be 99 before k6 v0.33.0
 	CloudFailedToGetProgress ExitCode = 98
