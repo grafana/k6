@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/errext"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
@@ -197,16 +198,16 @@ func TestAbortTest(t *testing.T) { //nolint:tparallel
 		require.NotNil(t, err)
 		var x *goja.InterruptedError
 		assert.ErrorAs(t, err, &x)
-		v, ok := x.Value().(*common.InterruptError)
+		v, ok := x.Value().(*errext.InterruptError)
 		require.True(t, ok)
 		require.Equal(t, v.Reason, reason)
 	}
 
 	t.Run("default reason", func(t *testing.T) { //nolint: paralleltest
-		prove(t, "exec.test.abort()", common.AbortTest)
+		prove(t, "exec.test.abort()", errext.AbortTest)
 	})
 	t.Run("custom reason", func(t *testing.T) { //nolint: paralleltest
-		prove(t, `exec.test.abort("mayday")`, fmt.Sprintf("%s: mayday", common.AbortTest))
+		prove(t, `exec.test.abort("mayday")`, fmt.Sprintf("%s: mayday", errext.AbortTest))
 	})
 }
 

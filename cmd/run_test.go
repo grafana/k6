@@ -39,7 +39,6 @@ import (
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
 )
@@ -138,27 +137,27 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 	testCases := []struct {
 		testFilename, name   string
 		expErr, expLogOutput string
-		expExitCode          errext.ExitCode
+		expExitCode          exitcodes.ExitCode
 		extraArgs            []string
 	}{
 		{
 			testFilename: "abort.js",
-			expErr:       common.AbortTest,
+			expErr:       errext.AbortTest,
 			expExitCode:  exitcodes.ScriptAborted,
 		},
 		{
 			testFilename: "abort_initerr.js",
-			expErr:       common.AbortTest,
+			expErr:       errext.AbortTest,
 			expExitCode:  exitcodes.ScriptAborted,
 		},
 		{
 			testFilename: "abort_initvu.js",
-			expErr:       common.AbortTest,
+			expErr:       errext.AbortTest,
 			expExitCode:  exitcodes.ScriptAborted,
 		},
 		{
 			testFilename: "abort_teardown.js",
-			expErr:       common.AbortTest,
+			expErr:       errext.AbortTest,
 			expExitCode:  exitcodes.ScriptAborted,
 			expLogOutput: "Calling teardown function after test.abort()",
 		},
@@ -246,7 +245,7 @@ func TestInvalidOptionsThresholdErrExitCode(t *testing.T) {
 	testCases := []struct {
 		name         string
 		testFilename string
-		expExitCode  errext.ExitCode
+		expExitCode  exitcodes.ExitCode
 		extraArgs    []string
 	}{
 		{

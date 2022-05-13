@@ -48,7 +48,7 @@ import (
 
 	"go.k6.io/k6/core"
 	"go.k6.io/k6/core/local"
-	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/errext"
 	"go.k6.io/k6/js/modules/k6"
 	k6http "go.k6.io/k6/js/modules/k6/http"
 	k6metrics "go.k6.io/k6/js/modules/k6/metrics"
@@ -1690,7 +1690,7 @@ func TestInitContextForbidden(t *testing.T) {
 			`var test = require("k6/execution").test;
 			 test.abort();
 			 exports.default = function() { console.log("p"); }`,
-			common.AbortTest,
+			errext.AbortTest,
 		},
 		{
 			"group",

@@ -27,6 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/errext/exitcodes"
 )
 
 func assertHasHint(t *testing.T, err error, hint string) {
@@ -36,7 +37,7 @@ func assertHasHint(t *testing.T, err error, hint string) {
 	assert.Contains(t, err.Error(), typederr.Error())
 }
 
-func assertHasExitCode(t *testing.T, err error, exitcode ExitCode) {
+func assertHasExitCode(t *testing.T, err error, exitcode exitcodes.ExitCode) {
 	var typederr HasExitCode
 	require.ErrorAs(t, err, &typederr)
 	assert.Equal(t, typederr.ExitCode(), exitcode)
@@ -46,7 +47,7 @@ func assertHasExitCode(t *testing.T, err error, exitcode ExitCode) {
 func TestErrextHelpers(t *testing.T) {
 	t.Parallel()
 
-	const testExitCode ExitCode = 13
+	const testExitCode exitcodes.ExitCode = 13
 	assert.Nil(t, WithHint(nil, "test hint"))
 	assert.Nil(t, WithExitCodeIfNone(nil, testExitCode))
 
@@ -63,7 +64,7 @@ func TestErrextHelpers(t *testing.T) {
 	assertHasHint(t, errWithExitCode, "better hint (test hint)")
 	assertHasExitCode(t, errWithExitCode, testExitCode)
 
-	errWithExitCodeAgain := WithExitCodeIfNone(errWithExitCode, ExitCode(27))
+	errWithExitCodeAgain := WithExitCodeIfNone(errWithExitCode, exitcodes.ExitCode(27))
 	assertHasHint(t, errWithExitCodeAgain, "better hint (test hint)")
 	assertHasExitCode(t, errWithExitCodeAgain, testExitCode)
 

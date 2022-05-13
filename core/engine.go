@@ -29,7 +29,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/errext"
-	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/metrics/engine"
@@ -196,7 +195,7 @@ func (e *Engine) startBackgroundProcesses(
 				switch {
 				case errors.As(err, &serr):
 					e.OutputManager.SetRunStatus(lib.RunStatusAbortedScriptError)
-				case common.IsInterruptError(err):
+				case errext.IsInterruptError(err):
 					e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
 				default:
 					e.OutputManager.SetRunStatus(lib.RunStatusAbortedSystem)
