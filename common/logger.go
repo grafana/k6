@@ -85,6 +85,9 @@ func (l *Logger) Warnf(category string, msg string, args ...interface{}) {
 }
 
 func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...interface{}) {
+	if l == nil {
+		return
+	}
 	// don't log if the current log level isn't in the required level.
 	if l.log.GetLevel() < level {
 		return
