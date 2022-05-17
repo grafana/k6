@@ -103,10 +103,7 @@ func (m *Metric) AddSubmetric(keyValues string) (*Submetric, error) {
 
 	for _, sm := range m.Submetrics {
 		if sm.Tags.IsEqual(tags) {
-			return nil, fmt.Errorf(
-				"sub-metric with params '%s' already exists for metric %s: %s",
-				keyValues, m.Name, sm.Name,
-			)
+			return sm, nil
 		}
 	}
 
