@@ -1249,6 +1249,13 @@ func (f *Frame) ID() string {
 	return f.id.String()
 }
 
+// Locator creates and returns a new locator for this frame.
+func (f *Frame) Locator(selector string, opts goja.Value) api.Locator {
+	f.log.Debugf("Frame:Locator", "fid:%s furl:%q selector:%q opts:%+v", f.ID(), f.URL(), selector, opts)
+
+	return NewLocator(f.ctx, selector, f, f.log)
+}
+
 // LoaderID returns the ID of the frame that loaded this frame.
 func (f *Frame) LoaderID() string {
 	f.propertiesMu.RLock()
