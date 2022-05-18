@@ -61,6 +61,8 @@ type Page interface {
 	IsEnabled(selector string, opts goja.Value) bool
 	IsHidden(selector string, opts goja.Value) bool
 	IsVisible(selector string, opts goja.Value) bool
+	// Locator creates and returns a new locator for this page (main frame).
+	Locator(selector string, opts goja.Value) Locator
 	MainFrame() Frame
 	Opener() Page
 	Pause()

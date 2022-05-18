@@ -52,6 +52,8 @@ type Frame interface {
 	IsVisible(selector string, opts goja.Value) bool
 	ID() string
 	LoaderID() string
+	// Locator creates and returns a new locator for this frame.
+	Locator(selector string, opts goja.Value) Locator
 	Name() string
 	Query(selector string) ElementHandle
 	QueryAll(selector string) []ElementHandle
