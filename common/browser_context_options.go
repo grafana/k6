@@ -22,6 +22,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/dop251/goja"
 )
@@ -116,8 +117,11 @@ func (b *BrowserContextOptions) Parse(ctx context.Context, opts goja.Value) erro
 			case "offline":
 				b.Offline = opts.Get(k).ToBoolean()
 			case "permissions":
-				permissions := opts.Get(k).Export().([]string)
-				b.Permissions = append(b.Permissions, permissions...)
+				if ps, ok := opts.Get(k).Export().([]interface{}); ok {
+					for _, p := range ps {
+						b.Permissions = append(b.Permissions, fmt.Sprintf("%v", p))
+					}
+				}
 			case "reducedMotion":
 				switch ReducedMotion(opts.Get(k).String()) {
 				case "reduce":
