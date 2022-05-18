@@ -59,7 +59,9 @@ type BrowserContext struct {
 }
 
 // NewBrowserContext creates a new browser context.
-func NewBrowserContext(ctx context.Context, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *Logger) *BrowserContext {
+func NewBrowserContext(
+	ctx context.Context, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *Logger,
+) *BrowserContext {
 	b := BrowserContext{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
@@ -70,6 +72,11 @@ func NewBrowserContext(ctx context.Context, browser *Browser, id cdp.BrowserCont
 		vu:               GetVU(ctx),
 		timeoutSettings:  NewTimeoutSettings(nil),
 	}
+
+	if opts != nil && len(opts.Permissions) > 0 {
+		b.GrantPermissions(opts.Permissions, nil)
+	}
+
 	return &b
 }
 
@@ -190,21 +197,21 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
-			switch k {
-			case "origin":
+			if k == "origin" {
 				origin = opts.Get(k).String()
+				break
 			}
 		}
 	}
 
-	var perms []cdpbrowser.PermissionType
+	perms := make([]cdpbrowser.PermissionType, 0, len(permissions))
 	for _, p := range permissions {
 		perms = append(perms, permsToProtocol[p])
 	}
 
 	action := cdpbrowser.GrantPermissions(perms).WithOrigin(origin).WithBrowserContextID(b.id)
-	if err := action.Do(b.ctx); err != nil {
-		k6Throw(b.ctx, "unable to override permissions: %w", err)
+	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
+		k6Throw(b.ctx, "override permissions: %w", err)
 	}
 }
 
