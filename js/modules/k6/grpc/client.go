@@ -23,7 +23,9 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 // Client represents a gRPC client that can be used to make RPC requests
@@ -257,8 +259,22 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 				appendMethodInfo(fd, sd, md)
 			}
 		}
+		messages := fd.Messages()
+		for i := 0; i < messages.Len(); i++ {
+			message := messages.Get(i)
+			_, errFind := protoregistry.GlobalTypes.FindMessageByName(message.FullName())
+			if errors.Is(errFind, protoregistry.NotFound) {
+				err = protoregistry.GlobalTypes.RegisterMessage(dynamicpb.NewMessageType(message))
+				if err != nil {
+					return false
+				}
+			}
+		}
 		return true
 	})
+	if err != nil {
+		return nil, err
+	}
 	return rtn, nil
 }
 
