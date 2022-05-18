@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6"
 
 	k6modules "go.k6.io/k6/js/modules"
 
@@ -97,7 +98,7 @@ func NewRequest(
 		errorText:           "",
 		timestamp:           event.Timestamp.Time(),
 		wallTime:            event.WallTime.Time(),
-		vu:                  GetVU(ctx),
+		vu:                  k6.GetVU(ctx),
 	}
 	for n, v := range event.Request.Headers {
 		switch v := v.(type) {

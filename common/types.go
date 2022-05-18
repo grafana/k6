@@ -30,6 +30,7 @@ import (
 	"strings"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6"
 
 	"github.com/dop251/goja"
 )
@@ -158,7 +159,7 @@ func NewGeolocation() *Geolocation {
 }
 
 func (g *Geolocation) Parse(ctx context.Context, opts goja.Value) error {
-	rt := GetVU(ctx).Runtime()
+	rt := k6.Runtime(ctx)
 	longitude := 0.0
 	latitude := 0.0
 	accuracy := 0.0
@@ -458,7 +459,7 @@ type Screen struct {
 }
 
 func (s *Screen) Parse(ctx context.Context, screen goja.Value) error {
-	rt := GetVU(ctx).Runtime()
+	rt := k6.Runtime(ctx)
 	if screen != nil && !goja.IsUndefined(screen) && !goja.IsNull(screen) {
 		screen := screen.ToObject(rt)
 		for _, k := range screen.Keys() {
@@ -492,7 +493,7 @@ func (s Size) enclosingIntSize() *Size {
 }
 
 func (s *Size) Parse(ctx context.Context, viewport goja.Value) error {
-	rt := GetVU(ctx).Runtime()
+	rt := k6.Runtime(ctx)
 	if viewport != nil && !goja.IsUndefined(viewport) && !goja.IsNull(viewport) {
 		viewport := viewport.ToObject(rt)
 		for _, k := range viewport.Keys() {
@@ -515,7 +516,7 @@ type Viewport struct {
 
 // Parse viewport details from a given goja viewport value.
 func (v *Viewport) Parse(ctx context.Context, viewport goja.Value) error {
-	rt := GetVU(ctx).Runtime()
+	rt := k6.Runtime(ctx)
 	if viewport != nil && !goja.IsUndefined(viewport) && !goja.IsNull(viewport) {
 		viewport := viewport.ToObject(rt)
 		for _, k := range viewport.Keys() {
@@ -560,7 +561,7 @@ func NewCredentials() *Credentials {
 }
 
 func (c *Credentials) Parse(ctx context.Context, credentials goja.Value) error {
-	rt := GetVU(ctx).Runtime()
+	rt := k6.Runtime(ctx)
 	if credentials != nil && !goja.IsUndefined(credentials) && !goja.IsNull(credentials) {
 		credentials := credentials.ToObject(rt)
 		for _, k := range credentials.Keys() {

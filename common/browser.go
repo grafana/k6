@@ -28,6 +28,7 @@ import (
 	"sync/atomic"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6"
 
 	k6modules "go.k6.io/k6/js/modules"
 
@@ -106,7 +107,7 @@ func newBrowser(ctx context.Context, cancelFn context.CancelFunc, browserProc *B
 		contexts:            make(map[cdp.BrowserContextID]*BrowserContext),
 		pages:               make(map[target.ID]*Page),
 		sessionIDtoTargetID: make(map[target.SessionID]target.ID),
-		vu:                  GetVU(ctx),
+		vu:                  k6.GetVU(ctx),
 		logger:              logger,
 	}
 }

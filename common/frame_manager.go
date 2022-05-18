@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6"
 
 	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
@@ -87,7 +88,7 @@ func NewFrameManager(
 		frames:           make(map[cdp.FrameID]*Frame),
 		inflightRequests: make(map[network.RequestID]bool),
 		barriers:         make([]*Barrier, 0),
-		vu:               GetVU(ctx),
+		vu:               k6.GetVU(ctx),
 		logger:           l,
 		id:               atomic.AddInt64(&frameManagerID, 1),
 	}

@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6"
 
 	k6modules "go.k6.io/k6/js/modules"
 
@@ -119,7 +120,7 @@ func NewPage(
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
 		routes:           make([]api.Route, 0),
-		vu:               GetVU(ctx),
+		vu:               k6.GetVU(ctx),
 		logger:           logger,
 	}
 

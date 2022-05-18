@@ -30,9 +30,10 @@ import (
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/k6/k6test"
 
 	k6http "go.k6.io/k6/js/modules/k6/http"
-	k6lib "go.k6.io/k6/lib"
 	k6httpmultibin "go.k6.io/k6/lib/testutils/httpmultibin"
 	k6metrics "go.k6.io/k6/metrics"
 
@@ -43,15 +44,12 @@ import (
 // testBrowser is a test testBrowser for integration testing.
 type testBrowser struct {
 	t testing.TB
-	// TODO: Consider dropping the rt, state and samples fields since they're
-	// accessible via vu.
+
 	ctx      context.Context
-	rt       *goja.Runtime
-	state    *k6lib.State
 	http     *k6httpmultibin.HTTPMultiBin
-	vu       *mockVU
+	vu       *k6test.VU
 	logCache *logCache
-	samples  chan<- k6metrics.SampleContainer
+
 	api.Browser
 }
 
@@ -91,25 +89,25 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 		}
 	}
 
-	mockVU := setupHTTPTestModuleInstance(tb)
+	vu := setupHTTPTestModuleInstance(tb)
 
 	if ctx == nil {
-		dummyCtx, cancel := context.WithCancel(mockVU.CtxField)
+		dummyCtx, cancel := context.WithCancel(vu.Context())
 		tb.Cleanup(cancel)
-		mockVU.CtxField = dummyCtx
+		vu.CtxField = dummyCtx
 	} else {
 		// Attach the mock VU to the passed context
-		ctx = common.WithVU(ctx, mockVU)
-		mockVU.CtxField = ctx
+		ctx = k6.WithVU(ctx, vu)
+		vu.CtxField = ctx
 	}
 
 	registry := k6metrics.NewRegistry()
 	k6m := common.RegisterCustomK6Metrics(registry)
-	mockVU.CtxField = common.WithCustomK6Metrics(mockVU.CtxField, k6m)
+	vu.CtxField = common.WithCustomK6Metrics(vu.Context(), k6m)
 
 	var (
-		state = mockVU.StateField
-		rt    = mockVU.RuntimeField
+		state = vu.StateField
+		rt    = vu.RuntimeField
 	)
 
 	// enable the HTTP test server only when necessary
@@ -126,11 +124,11 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 	}
 
 	// launch the browser
-	bt := chromium.NewBrowserType(mockVU.CtxField).(*chromium.BrowserType) //nolint:forcetypeassert
+	bt := chromium.NewBrowserType(vu.Context()).(*chromium.BrowserType) //nolint:forcetypeassert
 	b := bt.Launch(rt.ToValue(launchOpts))
 	tb.Cleanup(func() {
 		select {
-		case <-mockVU.CtxField.Done():
+		case <-vu.Context().Done():
 		default:
 			if !skipClose {
 				b.Close()
@@ -141,11 +139,8 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 	tbr := &testBrowser{
 		t:        tb,
 		ctx:      bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
-		rt:       rt,
-		state:    state,
 		http:     testServer,
-		vu:       mockVU,
-		samples:  state.Samples,
+		vu:       vu,
 		logCache: lc,
 		Browser:  b,
 	}
@@ -221,12 +216,18 @@ func (b *testBrowser) attachFrame(page api.Page, frameID string, url string) api
 	`
 
 	return page.EvaluateHandle(
-		b.rt.ToValue(pageFn),
-		b.rt.ToValue(frameID),
-		b.rt.ToValue(url)).
+		b.toGojaValue(pageFn),
+		b.toGojaValue(frameID),
+		b.toGojaValue(url)).
 		AsElement().
 		ContentFrame()
 }
+
+// runtime returns a VU runtime.
+func (b *testBrowser) runtime() *goja.Runtime { return b.vu.Runtime() }
+
+// toGojaValue converts a value to goja value.
+func (b *testBrowser) toGojaValue(i interface{}) goja.Value { return b.runtime().ToValue(i) }
 
 // launchOptions provides a way to customize browser type
 // launch options in tests.
@@ -321,18 +322,18 @@ func withSkipClose() skipCloseOption {
 	return struct{}{}
 }
 
-func setupHTTPTestModuleInstance(tb testing.TB) *mockVU {
+func setupHTTPTestModuleInstance(tb testing.TB) *k6test.VU {
 	tb.Helper()
 
 	var (
-		mockVU = newMockVU(tb)
-		root   = k6http.New()
+		vu   = k6test.NewVU(tb)
+		root = k6http.New()
 	)
 
-	mi, ok := root.NewModuleInstance(mockVU).(*k6http.ModuleInstance)
+	mi, ok := root.NewModuleInstance(vu).(*k6http.ModuleInstance)
 	require.True(tb, ok)
 
-	require.NoError(tb, mockVU.RuntimeField.Set("http", mi.Exports().Default))
+	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))
 
-	return mockVU
+	return vu
 }

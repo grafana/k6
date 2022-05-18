@@ -46,7 +46,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 			done := make(chan struct{}, 1)
 			go func() {
 				require.NotPanics(t, func() {
-					p.WaitForNavigation(tb.rt.ToValue(&common.FrameWaitForNavigationOptions{
+					p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
 						Timeout: timeout * 3, // interpreted as ms
 					}))
 				})

@@ -67,7 +67,7 @@ func TestBrowserOn(t *testing.T) {
 		rt := b.vu.Runtime()
 		require.NoError(t, rt.Set("b", b.Browser))
 
-		err := b.vu.loop.Start(func() error {
+		err := b.vu.Loop.Start(func() error {
 			if _, err := rt.RunString(fmt.Sprintf(script, "wrongevent")); err != nil {
 				return fmt.Errorf("%w", err)
 			}
@@ -87,7 +87,7 @@ func TestBrowserOn(t *testing.T) {
 		var log []string
 		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
 
-		err := b.vu.loop.Start(func() error {
+		err := b.vu.Loop.Start(func() error {
 			time.AfterFunc(100*time.Millisecond, func() { b.Browser.Close() })
 			if _, err := rt.RunString(fmt.Sprintf(script, "disconnected")); err != nil {
 				return fmt.Errorf("%w", err)
@@ -108,7 +108,7 @@ func TestBrowserOn(t *testing.T) {
 		var log []string
 		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
 
-		err := b.vu.loop.Start(func() error {
+		err := b.vu.Loop.Start(func() error {
 			time.AfterFunc(100*time.Millisecond, func() { cancel() })
 			if _, err := rt.RunString(fmt.Sprintf(script, "disconnected")); err != nil {
 				return fmt.Errorf("%w", err)

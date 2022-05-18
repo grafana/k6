@@ -31,7 +31,7 @@ func TestJSHandleGetProperties(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	handle := p.EvaluateHandle(tb.rt.ToValue(`
+	handle := p.EvaluateHandle(tb.toGojaValue(`
 	() => {
 		return {
 			prop1: "one",

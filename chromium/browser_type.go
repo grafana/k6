@@ -16,6 +16,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/k6"
 
 	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
@@ -46,7 +47,7 @@ type BrowserType struct {
 // - Initializes the goja runtime.
 func NewBrowserType(ctx context.Context) api.BrowserType {
 	var (
-		vu    = common.GetVU(ctx)
+		vu    = k6.GetVU(ctx)
 		rt    = vu.Runtime()
 		hooks = common.NewHooks()
 	)
@@ -406,7 +407,7 @@ func parseWebsocketURL(ctx context.Context, rc io.Reader) (wsURL string, _ error
 // makeLogger makes and returns an extension wide logger.
 func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*common.Logger, error) {
 	var (
-		k6Logger            = common.GetVU(ctx).State().Logger
+		k6Logger            = k6.GetVU(ctx).State().Logger
 		reCategoryFilter, _ = regexp.Compile(launchOpts.LogCategoryFilter)
 		logger              = common.NewLogger(ctx, k6Logger, launchOpts.Debug, reCategoryFilter)
 	)

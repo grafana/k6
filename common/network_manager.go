@@ -29,6 +29,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/xk6-browser/k6"
+
 	k6modules "go.k6.io/k6/js/modules"
 	k6lib "go.k6.io/k6/lib"
 	k6netext "go.k6.io/k6/lib/netext"
@@ -77,7 +79,7 @@ type NetworkManager struct {
 func NewNetworkManager(
 	ctx context.Context, s session, fm *FrameManager, parent *NetworkManager,
 ) (*NetworkManager, error) {
-	vu := GetVU(ctx)
+	vu := k6.GetVU(ctx)
 	state := vu.State()
 
 	resolver, err := newResolver(state.Options.DNS)

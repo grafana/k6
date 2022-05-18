@@ -30,6 +30,7 @@ import (
 	"sync"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6"
 
 	k6modules "go.k6.io/k6/js/modules"
 	k6metrics "go.k6.io/k6/metrics"
@@ -104,7 +105,7 @@ func NewFrameSession(
 		isolatedWorlds:       make(map[string]bool),
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
-		vu:                   GetVU(ctx),
+		vu:                   k6.GetVU(ctx),
 		k6Metrics:            GetCustomK6Metrics(ctx),
 		logger:               l,
 		serializer: &logrus.Logger{

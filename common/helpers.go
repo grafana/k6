@@ -28,6 +28,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/grafana/xk6-browser/k6"
+
 	k6common "go.k6.io/k6/js/common"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
@@ -200,7 +202,7 @@ func waitForEvent(ctx context.Context, emitter EventEmitter, events []string, pr
 // browser process from the context and kills it if it still exists.
 // TODO: test.
 func k6Throw(ctx context.Context, format string, a ...interface{}) {
-	rt := GetVU(ctx).Runtime()
+	rt := k6.Runtime(ctx)
 	if rt == nil {
 		// this should never happen unless a programmer error
 		panic("cannot get k6 runtime")

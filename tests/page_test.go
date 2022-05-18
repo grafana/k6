@@ -52,23 +52,23 @@ func TestPageEmulateMedia(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	p.EmulateMedia(tb.rt.ToValue(emulateMediaOpts{
+	p.EmulateMedia(tb.toGojaValue(emulateMediaOpts{
 		Media:         "print",
 		ColorScheme:   "dark",
 		ReducedMotion: "reduce",
 	}))
 
-	result := p.Evaluate(tb.rt.ToValue("() => matchMedia('print').matches"))
+	result := p.Evaluate(tb.toGojaValue("() => matchMedia('print').matches"))
 	res, ok := result.(goja.Value)
 	require.True(t, ok)
 	assert.True(t, res.ToBoolean(), "expected media 'print'")
 
-	result = p.Evaluate(tb.rt.ToValue("() => matchMedia('(prefers-color-scheme: dark)').matches"))
+	result = p.Evaluate(tb.toGojaValue("() => matchMedia('(prefers-color-scheme: dark)').matches"))
 	res, ok = result.(goja.Value)
 	require.True(t, ok)
 	assert.True(t, res.ToBoolean(), "expected color scheme 'dark'")
 
-	result = p.Evaluate(tb.rt.ToValue("() => matchMedia('(prefers-reduced-motion: reduce)').matches"))
+	result = p.Evaluate(tb.toGojaValue("() => matchMedia('(prefers-reduced-motion: reduce)').matches"))
 	res, ok = result.(goja.Value)
 	require.True(t, ok)
 	assert.True(t, res.ToBoolean(), "expected reduced motion setting to be 'reduce'")
@@ -84,11 +84,11 @@ func TestPageEvaluate(t *testing.T) {
 		p := tb.NewPage(nil)
 
 		got := p.Evaluate(
-			tb.rt.ToValue("(v) => { window.v = v; return window.v }"),
-			tb.rt.ToValue("test"),
+			tb.toGojaValue("(v) => { window.v = v; return window.v }"),
+			tb.toGojaValue("test"),
 		)
 
-		require.IsType(t, tb.rt.ToValue(""), got)
+		require.IsType(t, tb.toGojaValue(""), got)
 		gotVal, ok := got.(goja.Value)
 		require.True(t, ok)
 		assert.Equal(t, "test", gotVal.Export())
@@ -124,7 +124,7 @@ func TestPageEvaluate(t *testing.T) {
 				tb := newTestBrowser(t)
 				p := tb.NewPage(nil)
 
-				p.Evaluate(tb.rt.ToValue(tc.js))
+				p.Evaluate(tb.toGojaValue(tc.js))
 
 				t.Error("did not panic")
 			})
@@ -156,13 +156,13 @@ func TestPageGotoWaitUntilLoad(t *testing.T) {
 
 	p := b.NewPage(nil)
 
-	p.Goto(b.staticURL("wait_until.html"), b.rt.ToValue(struct {
+	p.Goto(b.staticURL("wait_until.html"), b.toGojaValue(struct {
 		WaitUntil string `js:"waitUntil"`
 	}{WaitUntil: "load"}))
 
-	results := p.Evaluate(b.rt.ToValue("() => window.results"))
+	results := p.Evaluate(b.toGojaValue("() => window.results"))
 	var actual []string
-	_ = b.rt.ExportTo(results.(goja.Value), &actual)
+	_ = b.runtime().ExportTo(results.(goja.Value), &actual) //nolint:forcetypeassert
 
 	assert.EqualValues(t, []string{"DOMContentLoaded", "load"}, actual, `expected "load" event to have fired`)
 }
@@ -172,13 +172,13 @@ func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 
 	p := b.NewPage(nil)
 
-	p.Goto(b.staticURL("wait_until.html"), b.rt.ToValue(struct {
+	p.Goto(b.staticURL("wait_until.html"), b.toGojaValue(struct {
 		WaitUntil string `js:"waitUntil"`
 	}{WaitUntil: "domcontentloaded"}))
 
-	results := p.Evaluate(b.rt.ToValue("() => window.results"))
+	results := p.Evaluate(b.toGojaValue("() => window.results"))
 	var actual []string
-	_ = b.rt.ExportTo(results.(goja.Value), &actual)
+	_ = b.runtime().ExportTo(results.(goja.Value), &actual) //nolint:forcetypeassert
 
 	assert.EqualValues(t, "DOMContentLoaded", actual[0], `expected "DOMContentLoaded" event to have fired`)
 }
@@ -212,7 +212,7 @@ func TestPageInnerHTML(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		p.SetContent(sampleHTML, nil)
-		assert.Equal(t, "", p.InnerHTML("p", tb.rt.ToValue(jsFrameBaseOpts{
+		assert.Equal(t, "", p.InnerHTML("p", tb.toGojaValue(jsFrameBaseOpts{
 			Timeout: "100",
 		})))
 	})
@@ -247,7 +247,7 @@ func TestPageInnerText(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		p.SetContent(sampleHTML, nil)
-		assert.Equal(t, "", p.InnerText("p", tb.rt.ToValue(jsFrameBaseOpts{
+		assert.Equal(t, "", p.InnerText("p", tb.toGojaValue(jsFrameBaseOpts{
 			Timeout: "100",
 		})))
 	})
@@ -282,7 +282,7 @@ func TestPageTextContent(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		p.SetContent(sampleHTML, nil)
-		assert.Equal(t, "", p.TextContent("p", tb.rt.ToValue(jsFrameBaseOpts{
+		assert.Equal(t, "", p.TextContent("p", tb.toGojaValue(jsFrameBaseOpts{
 			Timeout: "100",
 		})))
 	})
@@ -344,11 +344,11 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	p.SetViewportSize(tb.rt.ToValue(struct {
+	p.SetViewportSize(tb.toGojaValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{Width: 1280, Height: 800}))
-	p.Evaluate(tb.rt.ToValue(`
+	p.Evaluate(tb.toGojaValue(`
 	() => {
 		document.body.style.margin = '0';
 		document.body.style.padding = '0';
@@ -364,7 +364,7 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	}
     	`))
 
-	buf := p.Screenshot(tb.rt.ToValue(struct {
+	buf := p.Screenshot(tb.toGojaValue(struct {
 		FullPage bool `js:"fullPage"`
 	}{FullPage: true}))
 
@@ -426,10 +426,10 @@ func TestPageWaitForFunction(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		var log []string
-		require.NoError(t, tb.rt.Set("log", func(s string) { log = append(log, s) }))
-		require.NoError(t, tb.rt.Set("page", p))
+		require.NoError(t, tb.runtime().Set("log", func(s string) { log = append(log, s) }))
+		require.NoError(t, tb.runtime().Set("page", p))
 
-		_, err := tb.rt.RunString(`fn = () => {
+		_, err := tb.runtime().RunString(`fn = () => {
 			if (typeof window._cnt == 'undefined') window._cnt = 0;
 			if (window._cnt >= 50) return true;
 			window._cnt++;
@@ -437,8 +437,8 @@ func TestPageWaitForFunction(t *testing.T) {
 		}`)
 		require.NoError(t, err)
 
-		err = tb.vu.loop.Start(func() error {
-			if _, err := tb.rt.RunString(fmt.Sprintf(script, "fn", "{}", "null")); err != nil {
+		err = tb.vu.Loop.Start(func() error {
+			if _, err := tb.runtime().RunString(fmt.Sprintf(script, "fn", "{}", "null")); err != nil {
 				return fmt.Errorf("%w", err)
 			}
 			return nil
@@ -452,19 +452,19 @@ func TestPageWaitForFunction(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		require.NoError(t, tb.rt.Set("page", p))
+		require.NoError(t, tb.runtime().Set("page", p))
 		var log []string
-		require.NoError(t, tb.rt.Set("log", func(s string) { log = append(log, s) }))
+		require.NoError(t, tb.runtime().Set("log", func(s string) { log = append(log, s) }))
 
-		_, err := tb.rt.RunString(`fn = arg => {
+		_, err := tb.runtime().RunString(`fn = arg => {
 			window._arg = arg;
 			return true;
 		}`)
 		require.NoError(t, err)
 
 		arg := "raf_arg"
-		err = tb.vu.loop.Start(func() error {
-			if _, err := tb.rt.RunString(
+		err = tb.vu.Loop.Start(func() error {
+			if _, err := tb.runtime().RunString(
 				fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("%q", arg)),
 			); err != nil {
 				return fmt.Errorf("%w", err)
@@ -474,11 +474,11 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: null")
 
-		argEvalJS := p.Evaluate(tb.rt.ToValue("() => window._arg"))
+		argEvalJS := p.Evaluate(tb.toGojaValue("() => window._arg"))
 		argEval, ok := argEvalJS.(goja.Value)
 		require.True(t, ok)
 		var gotArg string
-		_ = tb.rt.ExportTo(argEval, &gotArg)
+		_ = tb.runtime().ExportTo(argEval, &gotArg)
 		assert.Equal(t, arg, gotArg)
 	})
 
@@ -487,11 +487,11 @@ func TestPageWaitForFunction(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		require.NoError(t, tb.rt.Set("page", p))
+		require.NoError(t, tb.runtime().Set("page", p))
 		var log []string
-		require.NoError(t, tb.rt.Set("log", func(s string) { log = append(log, s) }))
+		require.NoError(t, tb.runtime().Set("log", func(s string) { log = append(log, s) }))
 
-		_, err := tb.rt.RunString(`fn = (...args) => {
+		_, err := tb.runtime().RunString(`fn = (...args) => {
 			window._args = args;
 			return true;
 		}`)
@@ -501,8 +501,8 @@ func TestPageWaitForFunction(t *testing.T) {
 		argsJS, err := json.Marshal(args)
 		require.NoError(t, err)
 
-		err = tb.vu.loop.Start(func() error {
-			if _, err := tb.rt.RunString(
+		err = tb.vu.Loop.Start(func() error {
+			if _, err := tb.runtime().RunString(
 				fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("...%s", string(argsJS))),
 			); err != nil {
 				return fmt.Errorf("%w", err)
@@ -512,11 +512,11 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: null")
 
-		argEvalJS := p.Evaluate(tb.rt.ToValue("() => window._args"))
+		argEvalJS := p.Evaluate(tb.toGojaValue("() => window._args"))
 		argEval, ok := argEvalJS.(goja.Value)
 		require.True(t, ok)
 		var gotArgs []int
-		_ = tb.rt.ExportTo(argEval, &gotArgs)
+		_ = tb.runtime().ExportTo(argEval, &gotArgs)
 		assert.Equal(t, args, gotArgs)
 	})
 
@@ -530,7 +530,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
 		require.NoError(t, rt.Set("page", p))
 
-		err := tb.vu.loop.Start(func() error {
+		err := tb.vu.Loop.Start(func() error {
 			if _, err := rt.RunString(fmt.Sprintf(script, "false",
 				"{ polling: 'raf', timeout: 500, }", "null")); err != nil {
 				return fmt.Errorf("%w", err)
@@ -550,7 +550,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		rt := tb.vu.Runtime()
 		require.NoError(t, rt.Set("page", p))
 
-		err := tb.vu.loop.Start(func() error {
+		err := tb.vu.Loop.Start(func() error {
 			if _, err := rt.RunString(fmt.Sprintf(script, "false",
 				"{ polling: 'blah' }", "null")); err != nil {
 				return fmt.Errorf("%w", err)
@@ -568,11 +568,11 @@ func TestPageWaitForFunction(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		require.NoError(t, tb.rt.Set("page", p))
+		require.NoError(t, tb.runtime().Set("page", p))
 		var log []string
-		require.NoError(t, tb.rt.Set("log", func(s string) { log = append(log, s) }))
+		require.NoError(t, tb.runtime().Set("log", func(s string) { log = append(log, s) }))
 
-		p.Evaluate(tb.rt.ToValue(`() => {
+		p.Evaluate(tb.toGojaValue(`() => {
 			setTimeout(() => {
 				const el = document.createElement('h1');
 				el.innerHTML = 'Hello';
@@ -587,8 +587,8 @@ func TestPageWaitForFunction(t *testing.T) {
 	            log('err: '+err);
 	        });`
 
-		err := tb.vu.loop.Start(func() error {
-			if _, err := tb.rt.RunString(fmt.Sprintf(script,
+		err := tb.vu.Loop.Start(func() error {
+			if _, err := tb.runtime().RunString(fmt.Sprintf(script,
 				fmt.Sprintf("%q", "document.querySelector('h1')"),
 				"{ polling: 100, timeout: 2000, }", "null")); err != nil {
 				return fmt.Errorf("%w", err)
@@ -604,14 +604,14 @@ func TestPageWaitForFunction(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		require.NoError(t, tb.rt.Set("page", p))
+		require.NoError(t, tb.runtime().Set("page", p))
 		var log []string
-		require.NoError(t, tb.rt.Set("log", func(s string) { log = append(log, s) }))
+		require.NoError(t, tb.runtime().Set("log", func(s string) { log = append(log, s) }))
 
-		_, err := tb.rt.RunString(`fn = () => document.querySelector('h1') !== null`)
+		_, err := tb.runtime().RunString(`fn = () => document.querySelector('h1') !== null`)
 		require.NoError(t, err)
 
-		p.Evaluate(tb.rt.ToValue(`() => {
+		p.Evaluate(tb.toGojaValue(`() => {
 			console.log('calling setTimeout...');
 			setTimeout(() => {
 				console.log('creating element...');
@@ -621,8 +621,8 @@ func TestPageWaitForFunction(t *testing.T) {
 			}, 1000);
 		}`))
 
-		err = tb.vu.loop.Start(func() error {
-			if _, err := tb.rt.RunString(fmt.Sprintf(script, "fn",
+		err = tb.vu.Loop.Start(func() error {
+			if _, err := tb.runtime().RunString(fmt.Sprintf(script, "fn",
 				"{ polling: 'mutation', timeout: 2000, }", "null")); err != nil {
 				return fmt.Errorf("%w", err)
 			}

@@ -26,6 +26,7 @@ import (
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/k6"
 
 	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
@@ -95,7 +96,7 @@ func (m *JSModule) Launch(browserName string, opts goja.Value) api.Browser {
 		<-ctx.Done()
 	}()*/
 
-	ctx := common.WithVU(m.vu.Context(), m.vu)
+	ctx := k6.WithVU(m.vu.Context(), m.vu)
 	ctx = common.WithCustomK6Metrics(ctx, m.k6Metrics)
 
 	if browserName == "chromium" {

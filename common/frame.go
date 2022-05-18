@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6"
 
 	k6modules "go.k6.io/k6/js/modules"
 	k6metrics "go.k6.io/k6/metrics"
@@ -116,7 +117,7 @@ func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID 
 		parentFrame:            parentFrame,
 		childFrames:            make(map[api.Frame]bool),
 		id:                     frameID,
-		vu:                     GetVU(ctx),
+		vu:                     k6.GetVU(ctx),
 		lifecycleEvents:        make(map[LifecycleEvent]bool),
 		subtreeLifecycleEvents: make(map[LifecycleEvent]bool),
 		inflightRequests:       make(map[network.RequestID]bool),

@@ -61,7 +61,7 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 		})
 		t.Run("emulateMedia", func(t *testing.T) {
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
-				p.EmulateMedia(tb.rt.ToValue(struct {
+				p.EmulateMedia(tb.toGojaValue(struct {
 					Media string `js:"media"`
 				}{
 					Media: "print",
@@ -70,12 +70,12 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 		})
 		t.Run("evaluate", func(t *testing.T) {
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
-				p.Evaluate(tb.rt.ToValue("() => void 0"))
+				p.Evaluate(tb.toGojaValue("() => void 0"))
 			})
 		})
 		t.Run("evaluateHandle", func(t *testing.T) {
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
-				p.EvaluateHandle(tb.rt.ToValue("() => window"))
+				p.EvaluateHandle(tb.toGojaValue("() => window"))
 			})
 		})
 		t.Run("fill", func(t *testing.T) {
@@ -120,7 +120,7 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 		})*/
 		t.Run("selectOption", func(t *testing.T) {
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
-				p.SelectOption("select", tb.rt.ToValue("foo"), nil)
+				p.SelectOption("select", tb.toGojaValue("foo"), nil)
 			})
 		})
 		t.Run("setViewportSize", func(t *testing.T) {
@@ -163,12 +163,12 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 		})
 		t.Run("evaluate", func(t *testing.T) {
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
-				f.Evaluate(tb.rt.ToValue("() => void 0"))
+				f.Evaluate(tb.toGojaValue("() => void 0"))
 			})
 		})
 		t.Run("evaluateHandle", func(t *testing.T) {
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
-				f.EvaluateHandle(tb.rt.ToValue("() => window"))
+				f.EvaluateHandle(tb.toGojaValue("() => window"))
 			})
 		})
 		t.Run("fill", func(t *testing.T) {
@@ -208,7 +208,7 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 		})*/
 		t.Run("selectOption", func(t *testing.T) {
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
-				f.SelectOption("select", tb.rt.ToValue("foo"), nil)
+				f.SelectOption("select", tb.toGojaValue("foo"), nil)
 			})
 		})
 		t.Run("type", func(t *testing.T) {
