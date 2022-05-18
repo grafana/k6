@@ -29,6 +29,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/grafana/xk6-browser/api"
+
+	k6modules "go.k6.io/k6/js/modules"
+	k6metrics "go.k6.io/k6/metrics"
+
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
@@ -42,10 +47,6 @@ import (
 	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/cdproto/target"
 	"github.com/sirupsen/logrus"
-	k6modules "go.k6.io/k6/js/modules"
-	k6metrics "go.k6.io/k6/metrics"
-
-	"github.com/grafana/xk6-browser/api"
 )
 
 const utilityWorldName = "__k6_browser_utility_world__"

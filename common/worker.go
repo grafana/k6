@@ -24,14 +24,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/grafana/xk6-browser/api"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/log"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
-
-	"github.com/grafana/xk6-browser/api"
 )
 
 // Ensure Worker implements the EventEmitter, Target and api.Worker interfaces.

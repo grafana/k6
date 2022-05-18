@@ -14,13 +14,14 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common"
+
 	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
 	k6lib "go.k6.io/k6/lib"
 
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/common"
+	"github.com/dop251/goja"
 )
 
 // Ensure BrowserType implements the api.BrowserType interface.

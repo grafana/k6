@@ -5,11 +5,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common/js"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestErrorFromDOMError(t *testing.T) {

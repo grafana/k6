@@ -27,15 +27,16 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/grafana/xk6-browser/api"
+
+	k6modules "go.k6.io/k6/js/modules"
+
 	"github.com/chromedp/cdproto"
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
-	k6modules "go.k6.io/k6/js/modules"
-
-	"github.com/grafana/xk6-browser/api"
 )
 
 // Ensure Browser implements the EventEmitter and Browser interfaces.

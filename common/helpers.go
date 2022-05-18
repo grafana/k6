@@ -28,9 +28,10 @@ import (
 	"os"
 	"time"
 
+	k6common "go.k6.io/k6/js/common"
+
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-	k6common "go.k6.io/k6/js/common"
 )
 
 func convertBaseJSHandleTypes(ctx context.Context, execCtx *ExecutionContext, objHandle *BaseJSHandle) (*cdpruntime.CallArgument, error) {

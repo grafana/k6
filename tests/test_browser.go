@@ -27,16 +27,17 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dop251/goja"
-	"github.com/stretchr/testify/require"
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/chromium"
+	"github.com/grafana/xk6-browser/common"
+
 	k6http "go.k6.io/k6/js/modules/k6/http"
 	k6lib "go.k6.io/k6/lib"
 	k6httpmultibin "go.k6.io/k6/lib/testutils/httpmultibin"
 	k6metrics "go.k6.io/k6/metrics"
 
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/chromium"
-	"github.com/grafana/xk6-browser/common"
+	"github.com/dop251/goja"
+	"github.com/stretchr/testify/require"
 )
 
 // testBrowser is a test testBrowser for integration testing.

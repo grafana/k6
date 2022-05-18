@@ -28,15 +28,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/xk6-browser/api"
+
+	k6modules "go.k6.io/k6/js/modules"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/emulation"
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
-	k6modules "go.k6.io/k6/js/modules"
-
-	"github.com/grafana/xk6-browser/api"
 )
 
 // Ensure page implements the EventEmitter, Target and Page interfaces.

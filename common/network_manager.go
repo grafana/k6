@@ -29,17 +29,18 @@ import (
 	"sync"
 	"time"
 
+	k6modules "go.k6.io/k6/js/modules"
+	k6lib "go.k6.io/k6/lib"
+	k6netext "go.k6.io/k6/lib/netext"
+	k6types "go.k6.io/k6/lib/types"
+	k6metrics "go.k6.io/k6/metrics"
+
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
-	k6modules "go.k6.io/k6/js/modules"
-	k6lib "go.k6.io/k6/lib"
-	k6netext "go.k6.io/k6/lib/netext"
-	k6types "go.k6.io/k6/lib/types"
-	k6metrics "go.k6.io/k6/metrics"
 )
 
 // Ensure NetworkManager implements the EventEmitter interface.
