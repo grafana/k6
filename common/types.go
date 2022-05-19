@@ -29,9 +29,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dop251/goja"
-
 	"github.com/grafana/xk6-browser/api"
+
+	"github.com/dop251/goja"
 )
 
 // ColorScheme represents a browser color scheme.

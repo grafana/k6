@@ -27,17 +27,18 @@ import (
 	"math"
 	"testing"
 
+	k6common "go.k6.io/k6/js/common"
+	k6eventloop "go.k6.io/k6/js/eventloop"
+	k6modulestest "go.k6.io/k6/js/modulestest"
+	k6lib "go.k6.io/k6/lib"
+	k6metrics "go.k6.io/k6/metrics"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	k6common "go.k6.io/k6/js/common"
-	k6eventloop "go.k6.io/k6/js/eventloop"
-	k6modulestest "go.k6.io/k6/js/modulestest"
-	k6lib "go.k6.io/k6/lib"
-	k6metrics "go.k6.io/k6/metrics"
 	"gopkg.in/guregu/null.v3"
 )
 

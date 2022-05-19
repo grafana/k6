@@ -6,14 +6,15 @@ import (
 	"net"
 	"testing"
 
+	k6lib "go.k6.io/k6/lib"
+	k6mockresolver "go.k6.io/k6/lib/testutils/mockresolver"
+	k6types "go.k6.io/k6/lib/types"
+
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	k6lib "go.k6.io/k6/lib"
-	k6mockresolver "go.k6.io/k6/lib/testutils/mockresolver"
-	k6types "go.k6.io/k6/lib/types"
 )
 
 const mockHostname = "host.test"

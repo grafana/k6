@@ -27,14 +27,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/xk6-browser/api"
+
+	k6modules "go.k6.io/k6/js/modules"
+	k6metrics "go.k6.io/k6/metrics"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-	k6modules "go.k6.io/k6/js/modules"
-	k6metrics "go.k6.io/k6/metrics"
-
-	"github.com/grafana/xk6-browser/api"
 )
 
 // maxRetry controls how many times to retry if an action fails.

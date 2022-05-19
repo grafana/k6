@@ -26,6 +26,8 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/grafana/xk6-browser/tests/ws"
+
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	cdppage "github.com/chromedp/cdproto/page"
@@ -34,8 +36,6 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/grafana/xk6-browser/tests/ws"
 )
 
 func TestSessionCreateSession(t *testing.T) {

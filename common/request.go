@@ -27,12 +27,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/xk6-browser/api"
+
+	k6modules "go.k6.io/k6/js/modules"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/dop251/goja"
-	k6modules "go.k6.io/k6/js/modules"
-
-	"github.com/grafana/xk6-browser/api"
 )
 
 // Ensure Request implements the api.Request interface.

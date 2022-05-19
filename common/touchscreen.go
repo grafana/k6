@@ -23,10 +23,10 @@ package common
 import (
 	"context"
 
+	"github.com/grafana/xk6-browser/api"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
-
-	"github.com/grafana/xk6-browser/api"
 )
 
 // Ensure Touchscreen implements the EventEmitter and api.Touchscreen interfaces.

@@ -5,11 +5,12 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/grafana/xk6-browser/common"
+
 	k6lib "go.k6.io/k6/lib"
 
-	"github.com/grafana/xk6-browser/common"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 //nolint:funlen

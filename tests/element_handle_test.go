@@ -7,12 +7,12 @@ import (
 	"image/png"
 	"testing"
 
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common"
+
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/common"
 )
 
 //go:embed static/mouse_helper.js

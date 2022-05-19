@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common/js"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/dop251/goja"
-
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/common/js"
 )
 
 // Ensure ElementHandle implements the api.ElementHandle and api.JSHandle interfaces.

@@ -26,14 +26,15 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/grafana/xk6-browser/api"
+
+	k6modules "go.k6.io/k6/js/modules"
+
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/storage"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
-	k6modules "go.k6.io/k6/js/modules"
-
-	"github.com/grafana/xk6-browser/api"
 )
 
 // Ensure BrowserContext implements the EventEmitter and api.BrowserContext interfaces.

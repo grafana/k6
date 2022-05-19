@@ -1,4 +1,4 @@
-# v1.44.0
+# v1.46.2
 # Please don't remove the first line. It's used in CI to determine the
 # golangci-lint version. See the lint step in .github/workflows/all.yaml
 run:
@@ -80,7 +80,11 @@ linters:
 
 linters-settings:
   gci:
-    local: github.com/grafana/xk6-browser
+    sections:
+      - standard
+      - prefix(github.com/grafana/xk6-browser)
+      - prefix(go.k6.io)
+      - default
   dupl:
     threshold: 400
   gofmt:

@@ -4,18 +4,19 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dop251/goja"
-	"github.com/oxtoacart/bpool"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
+	"github.com/grafana/xk6-browser/common"
+
 	k6common "go.k6.io/k6/js/common"
 	k6eventloop "go.k6.io/k6/js/eventloop"
 	k6modulestest "go.k6.io/k6/js/modulestest"
 	k6lib "go.k6.io/k6/lib"
 	k6metrics "go.k6.io/k6/metrics"
-	"gopkg.in/guregu/null.v3"
 
-	"github.com/grafana/xk6-browser/common"
+	"github.com/dop251/goja"
+	"github.com/oxtoacart/bpool"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 )
 
 type mockVU struct {
