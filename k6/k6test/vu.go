@@ -1,10 +1,10 @@
-package tests
+package k6test
 
 import (
 	"context"
 	"testing"
 
-	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/k6"
 
 	k6common "go.k6.io/k6/js/common"
 	k6eventloop "go.k6.io/k6/js/eventloop"
@@ -19,12 +19,17 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-type mockVU struct {
+// VU is a k6 VU instance.
+type VU struct {
 	*k6modulestest.VU
-	loop *k6eventloop.EventLoop
+	Loop *k6eventloop.EventLoop
 }
 
-func newMockVU(tb testing.TB) *mockVU {
+// ToGojaValue is a convenient method for converting any value to a goja value.
+func (v *VU) ToGojaValue(i interface{}) goja.Value { return v.Runtime().ToValue(i) }
+
+// NewVU returns a mock VU.
+func NewVU(tb testing.TB) *VU {
 	tb.Helper()
 
 	rt := goja.New()
@@ -52,7 +57,7 @@ func newMockVU(tb testing.TB) *mockVU {
 		Tags:           k6lib.NewTagMap(map[string]string{"group": root.Path}),
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
 	}
-	mockVU := &mockVU{
+	vu := &VU{
 		VU: &k6modulestest.VU{
 			RuntimeField: rt,
 			InitEnvField: &k6common.InitEnvironment{
@@ -61,13 +66,12 @@ func newMockVU(tb testing.TB) *mockVU {
 			StateField: state,
 		},
 	}
-	ctx := context.Background()
-	ctx = common.WithVU(ctx, mockVU)
-	mockVU.CtxField = ctx
+	ctx := k6.WithVU(context.Background(), vu)
+	vu.CtxField = ctx
 
-	loop := k6eventloop.New(mockVU)
-	mockVU.RegisterCallbackField = loop.RegisterCallback
-	mockVU.loop = loop
+	loop := k6eventloop.New(vu)
+	vu.RegisterCallbackField = loop.RegisterCallback
+	vu.Loop = loop
 
-	return mockVU
+	return vu
 }

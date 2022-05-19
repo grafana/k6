@@ -29,6 +29,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/grafana/xk6-browser/k6"
+
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 	"github.com/hashicorp/go-multierror"
@@ -148,7 +150,7 @@ func valueFromRemoteObject(ctx context.Context, robj *cdpruntime.RemoteObject) (
 	if val == "undefined" {
 		return goja.Undefined(), err
 	}
-	return GetVU(ctx).Runtime().ToValue(val), err
+	return k6.Runtime(ctx).ToValue(val), err
 }
 
 func handleParseRemoteObjectErr(ctx context.Context, err error, logger *logrus.Entry) {

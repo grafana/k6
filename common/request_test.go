@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6/k6test"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
@@ -48,8 +49,8 @@ func TestRequest(t *testing.T) {
 		Timestamp: &ts,
 		WallTime:  &wt,
 	}
-	mockVU := newMockVU(t)
-	req, err := NewRequest(mockVU.CtxField, evt, nil, nil, "intercept", false)
+	vu := k6test.NewVU(t)
+	req, err := NewRequest(vu.Context(), evt, nil, nil, "intercept", false)
 	require.NoError(t, err)
 
 	t.Run("error_parse_url", func(t *testing.T) {
@@ -65,8 +66,8 @@ func TestRequest(t *testing.T) {
 			Timestamp: &ts,
 			WallTime:  &wt,
 		}
-		mockVU := newMockVU(t)
-		req, err := NewRequest(mockVU.CtxField, evt, nil, nil, "intercept", false)
+		vu := k6test.NewVU(t)
+		req, err := NewRequest(vu.Context(), evt, nil, nil, "intercept", false)
 		require.EqualError(t, err, `cannot parse URL: parse ":": missing protocol scheme`)
 		require.Nil(t, req)
 	})

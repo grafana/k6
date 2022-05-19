@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/xk6-browser/k6/k6test"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,13 +16,13 @@ func TestFrameGotoOptionsParse(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 
-		mockVU := newMockVU(t)
-		opts := mockVU.RuntimeField.ToValue(map[string]interface{}{
+		vu := k6test.NewVU(t)
+		opts := vu.ToGojaValue(map[string]interface{}{
 			"timeout":   "1000",
 			"waitUntil": "networkidle",
 		})
 		gotoOpts := NewFrameGotoOptions("https://example.com/", 0)
-		err := gotoOpts.Parse(mockVU.CtxField, opts)
+		err := gotoOpts.Parse(vu.Context(), opts)
 		require.NoError(t, err)
 
 		assert.Equal(t, "https://example.com/", gotoOpts.Referer)
@@ -31,12 +33,12 @@ func TestFrameGotoOptionsParse(t *testing.T) {
 	t.Run("err/invalid_waitUntil", func(t *testing.T) {
 		t.Parallel()
 
-		mockVU := newMockVU(t)
-		opts := mockVU.RuntimeField.ToValue(map[string]interface{}{
+		vu := k6test.NewVU(t)
+		opts := vu.ToGojaValue(map[string]interface{}{
 			"waitUntil": "none",
 		})
 		navOpts := NewFrameGotoOptions("", 0)
-		err := navOpts.Parse(mockVU.CtxField, opts)
+		err := navOpts.Parse(vu.Context(), opts)
 
 		assert.EqualError(t, err,
 			`error parsing goto options: `+
@@ -51,12 +53,12 @@ func TestFrameSetContentOptionsParse(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 
-		mockVU := newMockVU(t)
-		opts := mockVU.RuntimeField.ToValue(map[string]interface{}{
+		vu := k6test.NewVU(t)
+		opts := vu.ToGojaValue(map[string]interface{}{
 			"waitUntil": "networkidle",
 		})
 		scOpts := NewFrameSetContentOptions(30 * time.Second)
-		err := scOpts.Parse(mockVU.CtxField, opts)
+		err := scOpts.Parse(vu.Context(), opts)
 		require.NoError(t, err)
 
 		assert.Equal(t, 30*time.Second, scOpts.Timeout)
@@ -66,12 +68,12 @@ func TestFrameSetContentOptionsParse(t *testing.T) {
 	t.Run("err/invalid_waitUntil", func(t *testing.T) {
 		t.Parallel()
 
-		mockVU := newMockVU(t)
-		opts := mockVU.RuntimeField.ToValue(map[string]interface{}{
+		vu := k6test.NewVU(t)
+		opts := vu.ToGojaValue(map[string]interface{}{
 			"waitUntil": "none",
 		})
 		navOpts := NewFrameSetContentOptions(0)
-		err := navOpts.Parse(mockVU.CtxField, opts)
+		err := navOpts.Parse(vu.Context(), opts)
 
 		assert.EqualError(t, err,
 			`error parsing setContent options: `+
@@ -86,14 +88,14 @@ func TestFrameWaitForNavigationOptionsParse(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 
-		mockVU := newMockVU(t)
-		opts := mockVU.RuntimeField.ToValue(map[string]interface{}{
+		vu := k6test.NewVU(t)
+		opts := vu.ToGojaValue(map[string]interface{}{
 			"url":       "https://example.com/",
 			"timeout":   "1000",
 			"waitUntil": "networkidle",
 		})
 		navOpts := NewFrameWaitForNavigationOptions(0)
-		err := navOpts.Parse(mockVU.CtxField, opts)
+		err := navOpts.Parse(vu.Context(), opts)
 		require.NoError(t, err)
 
 		assert.Equal(t, "https://example.com/", navOpts.URL)
@@ -104,12 +106,12 @@ func TestFrameWaitForNavigationOptionsParse(t *testing.T) {
 	t.Run("err/invalid_waitUntil", func(t *testing.T) {
 		t.Parallel()
 
-		mockVU := newMockVU(t)
-		opts := mockVU.RuntimeField.ToValue(map[string]interface{}{
+		vu := k6test.NewVU(t)
+		opts := vu.ToGojaValue(map[string]interface{}{
 			"waitUntil": "none",
 		})
 		navOpts := NewFrameWaitForNavigationOptions(0)
-		err := navOpts.Parse(mockVU.CtxField, opts)
+		err := navOpts.Parse(vu.Context(), opts)
 
 		assert.EqualError(t, err,
 			`error parsing waitForNavigation options: `+

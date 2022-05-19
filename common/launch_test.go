@@ -3,6 +3,8 @@ package common
 import (
 	"testing"
 
+	"github.com/grafana/xk6-browser/k6/k6test"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,10 +37,10 @@ func TestLaunchOptionsParse(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			mockVU := newMockVU(t)
-			opts := mockVU.RuntimeField.ToValue(tc.opts)
+			vu := k6test.NewVU(t)
+			opts := vu.ToGojaValue(tc.opts)
 			lopts := NewLaunchOptions()
-			err := lopts.Parse(mockVU.CtxField, opts)
+			err := lopts.Parse(vu.Context(), opts)
 			require.NoError(t, err)
 			tc.assert(t, lopts)
 		})

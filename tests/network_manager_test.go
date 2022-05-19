@@ -53,7 +53,7 @@ func TestBlockHostnames(t *testing.T) {
 
 	blocked, err := k6types.NewNullHostnameTrie([]string{"*.test"})
 	require.NoError(t, err)
-	tb.state.Options.BlockedHostnames = blocked
+	tb.vu.State().Options.BlockedHostnames = blocked
 
 	p := tb.NewPage(nil)
 	res := p.Goto("http://host.test/", nil)
@@ -71,7 +71,7 @@ func TestBlockIPs(t *testing.T) {
 
 	ipnet, err := k6lib.ParseCIDR("10.0.0.0/8")
 	require.NoError(t, err)
-	tb.state.Options.BlacklistIPs = []*k6lib.IPNet{ipnet}
+	tb.vu.State().Options.BlacklistIPs = []*k6lib.IPNet{ipnet}
 
 	p := tb.NewPage(nil)
 	res := p.Goto("http://10.0.0.1:8000/", nil)
@@ -97,7 +97,7 @@ func TestBasicAuth(t *testing.T) {
 		tb.Helper()
 
 		return browser.NewContext(
-			browser.rt.ToValue(struct {
+			browser.toGojaValue(struct {
 				HttpCredentials *common.Credentials `js:"httpCredentials"` //nolint:revive
 			}{
 				HttpCredentials: &common.Credentials{
@@ -108,7 +108,7 @@ func TestBasicAuth(t *testing.T) {
 			NewPage().
 			Goto(
 				browser.URL(fmt.Sprintf("/basic-auth/%s/%s", validUser, validPassword)),
-				browser.rt.ToValue(struct {
+				browser.toGojaValue(struct {
 					WaitUntil string `js:"waitUntil"`
 				}{
 					WaitUntil: "load",

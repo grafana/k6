@@ -79,9 +79,9 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     }`
 	var r api.Rect
-	webBbox := p.Evaluate(tb.rt.ToValue(pageFn), tb.rt.ToValue(element))
+	webBbox := p.Evaluate(tb.toGojaValue(pageFn), tb.toGojaValue(element))
 	wb, _ := webBbox.(goja.Value)
-	err := tb.rt.ExportTo(wb, &r)
+	err := tb.runtime().ExportTo(wb, &r)
 	require.NoError(t, err)
 
 	require.EqualValues(t, bbox, &r)
@@ -94,7 +94,7 @@ func TestElementHandleClick(t *testing.T) {
 	p.SetContent(htmlInputButton, nil)
 
 	button := p.Query("button")
-	button.Click(tb.rt.ToValue(struct {
+	button.Click(tb.toGojaValue(struct {
 		NoWaitAfter bool `js:"noWaitAfter"`
 	}{
 		// FIX: this is just a workaround because navigation is never triggered
@@ -102,7 +102,7 @@ func TestElementHandleClick(t *testing.T) {
 		NoWaitAfter: true,
 	}))
 
-	result := p.Evaluate(tb.rt.ToValue("() => window['result']"))
+	result := p.Evaluate(tb.toGojaValue("() => window['result']"))
 	res, ok := result.(goja.Value)
 	require.True(t, ok)
 	assert.Equal(t, res.String(), "Clicked")
@@ -115,10 +115,10 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 	p.SetContent(htmlInputButton, nil)
 
 	// Remove all nodes
-	p.Evaluate(tb.rt.ToValue("() => delete window['Node']"))
+	p.Evaluate(tb.toGojaValue("() => delete window['Node']"))
 
 	button := p.Query("button")
-	button.Click(tb.rt.ToValue(struct {
+	button.Click(tb.toGojaValue(struct {
 		NoWaitAfter bool `js:"noWaitAfter"`
 	}{
 		// FIX: this is just a workaround because navigation is never triggered
@@ -126,7 +126,7 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 		NoWaitAfter: true,
 	}))
 
-	result := p.Evaluate(tb.rt.ToValue("() => window['result']"))
+	result := p.Evaluate(tb.toGojaValue("() => window['result']"))
 	res, ok := result.(goja.Value)
 	require.True(t, ok)
 	assert.Equal(t, res.String(), "Clicked")
@@ -141,7 +141,7 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	button := p.Query("button")
 
 	// Detach node
-	p.Evaluate(tb.rt.ToValue("button => button.remove()"), tb.rt.ToValue(button))
+	p.Evaluate(tb.toGojaValue("button => button.remove()"), tb.toGojaValue(button))
 
 	// We expect the click to fail with the correct error raised
 	var errorMsg string
@@ -153,7 +153,7 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 				errorMsg = errMsg.String()
 			}
 		}()
-		button.Click(tb.rt.ToValue(struct {
+		button.Click(tb.toGojaValue(struct {
 			NoWaitAfter bool `js:"noWaitAfter"`
 		}{
 			// FIX: this is just a workaround because navigation is never triggered and we'd be waiting for
@@ -174,7 +174,7 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewContext(
-		tb.rt.ToValue(struct {
+		tb.toGojaValue(struct {
 			Viewport common.Viewport `js:"viewport"`
 		}{
 			Viewport: common.Viewport{
@@ -188,7 +188,7 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 		const cmd = `
 			() => window.clickResult
 		`
-		cr := p.Evaluate(tb.rt.ToValue(cmd))
+		cr := p.Evaluate(tb.toGojaValue(cmd))
 		return cr.(goja.Value).String() //nolint:forcetypeassert
 	}
 	require.NotNil(t, p.Goto(tb.staticURL("/concealed_link.html"), nil))
@@ -296,11 +296,11 @@ func TestElementHandleScreenshot(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	p.SetViewportSize(tb.rt.ToValue(struct {
+	p.SetViewportSize(tb.toGojaValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{Width: 800, Height: 600}))
-	p.Evaluate(tb.rt.ToValue(`
+	p.Evaluate(tb.toGojaValue(`
 		() => {
 			document.body.style.margin = '0';
 			document.body.style.padding = '0';
@@ -344,7 +344,7 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 	p.SetContent(`<div class="root"></div>`, nil)
 
 	root := p.Query(".root")
-	p.Evaluate(tb.rt.ToValue(`
+	p.Evaluate(tb.toGojaValue(`
         () => {
 		setTimeout(() => {
 			const div = document.createElement('div');
@@ -355,7 +355,7 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 			}, 100);
 		}
 	`))
-	element := root.WaitForSelector(".element-to-appear", tb.rt.ToValue(struct {
+	element := root.WaitForSelector(".element-to-appear", tb.toGojaValue(struct {
 		Timeout int64 `js:"timeout"`
 	}{Timeout: 1000}))
 

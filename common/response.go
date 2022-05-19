@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6"
 
 	k6modules "go.k6.io/k6/js/modules"
 
@@ -83,7 +84,7 @@ type Response struct {
 
 // NewHTTPResponse creates a new HTTP response.
 func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, timestamp *cdp.MonotonicTime) *Response {
-	vu := GetVU(ctx)
+	vu := k6.GetVU(ctx)
 	state := vu.State()
 	r := Response{
 		ctx: ctx,

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6"
 
 	k6modules "go.k6.io/k6/js/modules"
 
@@ -70,7 +71,7 @@ func NewBrowserContext(
 		id:               id,
 		opts:             opts,
 		logger:           logger,
-		vu:               GetVU(ctx),
+		vu:               k6.GetVU(ctx),
 		timeoutSettings:  NewTimeoutSettings(nil),
 	}
 

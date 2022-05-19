@@ -23,6 +23,8 @@ package common
 import (
 	"context"
 
+	"github.com/grafana/xk6-browser/k6"
+
 	"github.com/dop251/goja"
 )
 
@@ -55,7 +57,7 @@ func NewMouseClickOptions() *MouseClickOptions {
 }
 
 func (o *MouseClickOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := GetVU(ctx).Runtime()
+	rt := k6.Runtime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -87,7 +89,7 @@ func NewMouseDblClickOptions() *MouseDblClickOptions {
 }
 
 func (o *MouseDblClickOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := GetVU(ctx).Runtime()
+	rt := k6.Runtime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -116,7 +118,7 @@ func NewMouseDownUpOptions() *MouseDownUpOptions {
 }
 
 func (o *MouseDownUpOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := GetVU(ctx).Runtime()
+	rt := k6.Runtime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -138,7 +140,7 @@ func NewMouseMoveOptions() *MouseMoveOptions {
 }
 
 func (o *MouseMoveOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := GetVU(ctx).Runtime()
+	rt := k6.Runtime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
