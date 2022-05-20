@@ -31,7 +31,7 @@ func (l *Locator) Click(opts goja.Value) {
 	l.log.Debugf("Locator:Click", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	var err error
-	defer func() { throwOrSlowMo(l.ctx, err) }()
+	defer func() { panicOrSlowMo(l.ctx, err) }()
 
 	copts := NewFrameClickOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {

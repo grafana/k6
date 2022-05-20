@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6"
 	"github.com/grafana/xk6-browser/keyboardlayout"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -68,14 +69,14 @@ func NewKeyboard(ctx context.Context, s session) *Keyboard {
 // Down sends a key down message to a session target.
 func (k *Keyboard) Down(key string) {
 	if err := k.down(key); err != nil {
-		k6Throw(k.ctx, "cannot send key down: %w", err)
+		k6.Panic(k.ctx, "cannot send key down: %w", err)
 	}
 }
 
 // Up sends a key up message to a session target.
 func (k *Keyboard) Up(key string) {
 	if err := k.up(key); err != nil {
-		k6Throw(k.ctx, "cannot send key up: %w", err)
+		k6.Panic(k.ctx, "cannot send key up: %w", err)
 	}
 }
 
@@ -85,17 +86,17 @@ func (k *Keyboard) Up(key string) {
 func (k *Keyboard) Press(key string, opts goja.Value) {
 	kbdOpts := NewKeyboardOptions()
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		k6Throw(k.ctx, "cannot parse keyboard options: %w", err)
+		k6.Panic(k.ctx, "cannot parse keyboard options: %w", err)
 	}
 	if err := k.press(key, kbdOpts); err != nil {
-		k6Throw(k.ctx, "cannot press key: %w", err)
+		k6.Panic(k.ctx, "cannot press key: %w", err)
 	}
 }
 
 // InsertText inserts a text without dispatching key events.
 func (k *Keyboard) InsertText(text string) {
 	if err := k.insertText(text); err != nil {
-		k6Throw(k.ctx, "cannot insert text: %w", err)
+		k6.Panic(k.ctx, "cannot insert text: %w", err)
 	}
 }
 
@@ -107,10 +108,10 @@ func (k *Keyboard) InsertText(text string) {
 func (k *Keyboard) Type(text string, opts goja.Value) {
 	kbdOpts := NewKeyboardOptions()
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		k6Throw(k.ctx, "cannot parse keyboard options: %w", err)
+		k6.Panic(k.ctx, "cannot parse keyboard options: %w", err)
 	}
 	if err := k.typ(text, kbdOpts); err != nil {
-		k6Throw(k.ctx, "cannot type text: %w", err)
+		k6.Panic(k.ctx, "cannot type text: %w", err)
 	}
 }
 

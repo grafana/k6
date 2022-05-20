@@ -44,7 +44,7 @@ type (
 	// JSModule is the entrypoint into the browser JS module.
 	JSModule struct {
 		vu        k6modules.VU
-		k6Metrics *common.CustomK6Metrics
+		k6Metrics *k6.CustomMetrics
 		Devices   map[string]common.Device
 		Version   string
 	}
@@ -68,7 +68,7 @@ func New() *RootModule {
 // NewModuleInstance implements the k6modules.Module interface to return
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
-	k6m := common.RegisterCustomK6Metrics(vu.InitEnv().Registry)
+	k6m := k6.RegisterCustomMetrics(vu.InitEnv().Registry)
 	return &ModuleInstance{
 		mod: &JSModule{
 			vu:        vu,
@@ -97,7 +97,7 @@ func (m *JSModule) Launch(browserName string, opts goja.Value) api.Browser {
 	}()*/
 
 	ctx := k6.WithVU(m.vu.Context(), m.vu)
-	ctx = common.WithCustomK6Metrics(ctx, m.k6Metrics)
+	ctx = k6.WithCustomMetrics(ctx, m.k6Metrics)
 
 	if browserName == "chromium" {
 		bt := chromium.NewBrowserType(ctx)

@@ -664,7 +664,7 @@ func (m *NetworkManager) Authenticate(credentials *Credentials) {
 		m.userReqInterceptionEnabled = true
 	}
 	if err := m.updateProtocolRequestInterception(); err != nil {
-		k6Throw(m.ctx, "error setting authentication credentials: %w", err)
+		k6.Panic(m.ctx, "error setting authentication credentials: %w", err)
 	}
 }
 
@@ -678,7 +678,7 @@ func (m *NetworkManager) ExtraHTTPHeaders() goja.Value {
 func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) {
 	action := network.SetExtraHTTPHeaders(headers)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6Throw(m.ctx, "unable to set extra HTTP headers: %w", err)
+		k6.Panic(m.ctx, "unable to set extra HTTP headers: %w", err)
 	}
 }
 
@@ -691,7 +691,7 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 
 	action := network.EmulateNetworkConditions(m.offline, 0, -1, -1)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6Throw(m.ctx, "unable to set offline mode: %w", err)
+		k6.Panic(m.ctx, "unable to set offline mode: %w", err)
 	}
 }
 
@@ -699,7 +699,7 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 func (m *NetworkManager) SetUserAgent(userAgent string) {
 	action := emulation.SetUserAgentOverride(userAgent)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6Throw(m.ctx, "unable to set user agent override: %w", err)
+		k6.Panic(m.ctx, "unable to set user agent override: %w", err)
 	}
 }
 
@@ -707,6 +707,6 @@ func (m *NetworkManager) SetUserAgent(userAgent string) {
 func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 	m.userCacheDisabled = !enabled
 	if err := m.updateProtocolCacheDisabled(); err != nil {
-		k6Throw(m.ctx, "error toggling cache: %w", err)
+		k6.Panic(m.ctx, "error toggling cache: %w", err)
 	}
 }

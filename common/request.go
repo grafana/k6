@@ -154,7 +154,7 @@ func (r *Request) AllHeaders() map[string]string {
 }
 
 func (r *Request) Failure() goja.Value {
-	k6Throw(r.ctx, "Request.failure() has not been implemented yet")
+	k6.Panic(r.ctx, "Request.failure() has not been implemented yet")
 	return nil
 }
 
@@ -215,17 +215,17 @@ func (r *Request) PostDataBuffer() goja.ArrayBuffer {
 
 // PostDataJSON returns the request post data as a JS object.
 func (r *Request) PostDataJSON() string {
-	k6Throw(r.ctx, "Request.postDataJSON() has not been implemented yet")
+	k6.Panic(r.ctx, "Request.postDataJSON() has not been implemented yet")
 	return ""
 }
 
 func (r *Request) RedirectedFrom() api.Request {
-	k6Throw(r.ctx, "Request.redirectedFrom() has not been implemented yet")
+	k6.Panic(r.ctx, "Request.redirectedFrom() has not been implemented yet")
 	return nil
 }
 
 func (r *Request) RedirectedTo() api.Request {
-	k6Throw(r.ctx, "Request.redirectedTo() has not been implemented yet")
+	k6.Panic(r.ctx, "Request.redirectedTo() has not been implemented yet")
 	return nil
 }
 

@@ -24,6 +24,7 @@ import (
 	"context"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
@@ -89,7 +90,7 @@ func (h *BaseJSHandle) Dispose() {
 
 	action := runtime.ReleaseObject(h.remoteObject.ObjectID)
 	if err := action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6Throw(h.ctx, "unable to dispose element %T: %w", action, err)
+		k6.Panic(h.ctx, "unable to dispose element %T: %w", action, err)
 	}
 }
 
@@ -99,7 +100,7 @@ func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) interfa
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
 	res, err := h.execCtx.Eval(h.ctx, pageFunc, args...)
 	if err != nil {
-		k6Throw(h.ctx, "%w", err)
+		k6.Panic(h.ctx, "%w", err)
 	}
 	return res
 }
@@ -110,7 +111,7 @@ func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) a
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
 	res, err := h.execCtx.EvalHandle(h.ctx, pageFunc, args...)
 	if err != nil {
-		k6Throw(h.ctx, "%w", err)
+		k6.Panic(h.ctx, "%w", err)
 	}
 	return res
 }
@@ -125,7 +126,7 @@ func (h *BaseJSHandle) GetProperties() map[string]api.JSHandle {
 	action := runtime.GetProperties(h.remoteObject.ObjectID).
 		WithOwnProperties(true)
 	if result, _, _, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6Throw(h.ctx, "unable to get properties for JS handle %T: %w", action, err)
+		k6.Panic(h.ctx, "unable to get properties for JS handle %T: %w", action, err)
 	}
 
 	props := make(map[string]api.JSHandle, len(result))
@@ -154,17 +155,17 @@ func (h *BaseJSHandle) JSONValue() goja.Value {
 			WithAwaitPromise(true).
 			WithObjectID(h.remoteObject.ObjectID)
 		if result, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-			k6Throw(h.ctx, "unable to get properties for JS handle %T: %w", action, err)
+			k6.Panic(h.ctx, "unable to get properties for JS handle %T: %w", action, err)
 		}
 		res, err := valueFromRemoteObject(h.ctx, result)
 		if err != nil {
-			k6Throw(h.ctx, "unable to extract value from remote object: %w", err)
+			k6.Panic(h.ctx, "unable to extract value from remote object: %w", err)
 		}
 		return res
 	}
 	res, err := valueFromRemoteObject(h.ctx, h.remoteObject)
 	if err != nil {
-		k6Throw(h.ctx, "unable to extract value from remote object: %w", err)
+		k6.Panic(h.ctx, "unable to extract value from remote object: %w", err)
 	}
 	return res
 }

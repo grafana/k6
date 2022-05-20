@@ -150,8 +150,8 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 
 	// attach the browser process ID to the context
 	// so that we can kill it afterward if it lingers
-	// see: k6Throw function
-	b.Ctx = common.WithProcessID(b.Ctx, browserProc.Pid())
+	// see: k6.Panic function.
+	b.Ctx = k6.WithProcessID(b.Ctx, browserProc.Pid())
 	browser, err := common.NewBrowser(b.Ctx, b.CancelFn, browserProc, launchOpts, logger)
 	if err != nil {
 		k6common.Throw(rt, err)
