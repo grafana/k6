@@ -194,9 +194,8 @@ func waitForEvent(ctx context.Context, emitter EventEmitter, events []string, pr
 	return nil, nil
 }
 
-// throwOrSlowMo throws an error if err is not nil, otherwise applies
-// slow motion.
-func throwOrSlowMo(ctx context.Context, err error) {
+// panicOrSlowMo panics if err is not nil, otherwise applies slow motion.
+func panicOrSlowMo(ctx context.Context, err error) {
 	if err != nil {
 		k6.Panic(ctx, "%w", err)
 	}

@@ -728,7 +728,7 @@ func (h *ElementHandle) AsElement() api.ElementHandle {
 func (h *ElementHandle) BoundingBox() *api.Rect {
 	bbox, err := h.boundingBox()
 	if err != nil {
-		return nil // Don't throw an exception here, just return nil
+		return nil // Don't panic here, just return nil
 	}
 	return bbox.toApiRect()
 }

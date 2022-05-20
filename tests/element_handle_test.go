@@ -163,7 +163,7 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	}
 	panicTestFn()
 	assert.Contains(t, errorMsg, "element is not attached to the DOM",
-		"expected click to result in correct error to be thrown")
+		"expected click to result in correct error to panic")
 }
 
 func TestElementHandleClickConcealedLink(t *testing.T) {
