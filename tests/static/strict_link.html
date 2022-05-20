@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Clickable link test</title>
+</head>
+
+<body>
+    <a id="link" href="#" onclick="event.preventDefault()">Click</a>
+    <a href="#" onclick="event.preventDefault()">Click</a>
+    <script>
+        window.result = false;
+
+        document.querySelector('#link').addEventListener(
+            'click', e => { result = true; }, false
+        );
+    </script>
+</body>
+
+</html>

@@ -2,6 +2,8 @@ package common
 
 import (
 	"context"
+
+	"github.com/dop251/goja"
 )
 
 // Locator represent a way to find element(s) on the page at any moment.
@@ -22,4 +24,27 @@ func NewLocator(ctx context.Context, selector string, f *Frame, l *Logger) *Loca
 		ctx:      ctx,
 		log:      l,
 	}
+}
+
+// Click on an element using locator's selector with strict mode on.
+func (l *Locator) Click(opts goja.Value) {
+	l.log.Debugf("Locator:Click", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	var err error
+	defer func() { throwOrSlowMo(l.ctx, err) }()
+
+	copts := NewFrameClickOptions(l.frame.defaultTimeout())
+	if err = copts.Parse(l.ctx, opts); err != nil {
+		return
+	}
+	if err = l.click(copts); err != nil {
+		return
+	}
+}
+
+// click is like Click but takes parsed options and neither throws an
+// error, or applies slow motion.
+func (l *Locator) click(opts *FrameClickOptions) error {
+	opts.Strict = true
+	return l.frame.click(l.selector, opts)
 }
