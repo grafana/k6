@@ -8,8 +8,9 @@ import (
 	k6common "go.k6.io/k6/js/common"
 )
 
-// Panic throws a k6 error, and before throwing the error, it finds the
-// browser process from the context and kills it if it still exists.
+// Panic will cause a panic with the given error which will shut
+// the application down. Before panicking, it will find the
+// browser process from the context and kill it if it still exists.
 // TODO: test.
 func Panic(ctx context.Context, format string, a ...interface{}) {
 	rt := Runtime(ctx)
