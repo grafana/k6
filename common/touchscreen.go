@@ -24,6 +24,7 @@ import (
 	"context"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
@@ -68,6 +69,6 @@ func (t *Touchscreen) tap(x float64, y float64) error {
 // Tap dispatches a tap start and tap end event.
 func (t *Touchscreen) Tap(x float64, y float64) {
 	if err := t.tap(x, y); err != nil {
-		k6Throw(t.ctx, "unable to tap: %w", err)
+		k6.Panic(t.ctx, "unable to tap: %w", err)
 	}
 }

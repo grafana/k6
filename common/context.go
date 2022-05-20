@@ -28,7 +28,6 @@ type ctxKey int
 
 const (
 	ctxKeyLaunchOptions ctxKey = iota
-	ctxKeyPid
 	ctxKeyHooks
 	ctxKeyCustomK6Metrics
 )
@@ -55,17 +54,6 @@ func GetLaunchOptions(ctx context.Context) *LaunchOptions {
 		return nil
 	}
 	return v.(*LaunchOptions)
-}
-
-// WithProcessID saves the browser process ID to the context.
-func WithProcessID(ctx context.Context, pid int) context.Context {
-	return context.WithValue(ctx, ctxKeyPid, pid)
-}
-
-// GetProcessID returns the browser process ID from the context.
-func GetProcessID(ctx context.Context) int {
-	v, _ := ctx.Value(ctxKeyPid).(int)
-	return v // it will return zero on error
 }
 
 // WithCustomK6Metrics attaches the CustomK6Metrics object to the context.

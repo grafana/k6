@@ -83,7 +83,7 @@ func NewBrowserContext(
 }
 
 func (b *BrowserContext) AddCookies(cookies goja.Value) {
-	k6Throw(b.ctx, "BrowserContext.addCookies(cookies) has not been implemented yet")
+	k6.Panic(b.ctx, "BrowserContext.addCookies(cookies) has not been implemented yet")
 }
 
 // AddInitScript adds a script that will be initialized on all new pages.
@@ -133,7 +133,7 @@ func (b *BrowserContext) ClearCookies() {
 
 	action := storage.ClearCookies().WithBrowserContextID(b.id)
 	if err := action.Do(b.ctx); err != nil {
-		k6Throw(b.ctx, "unable to clear cookies permissions: %w", err)
+		k6.Panic(b.ctx, "unable to clear cookies permissions: %w", err)
 	}
 }
 
@@ -143,7 +143,7 @@ func (b *BrowserContext) ClearPermissions() {
 
 	action := cdpbrowser.ResetPermissions().WithBrowserContextID(b.id)
 	if err := action.Do(b.ctx); err != nil {
-		k6Throw(b.ctx, "unable to clear override permissions: %w", err)
+		k6.Panic(b.ctx, "unable to clear override permissions: %w", err)
 	}
 }
 
@@ -152,24 +152,24 @@ func (b *BrowserContext) Close() {
 	b.logger.Debugf("BrowserContext:Close", "bctxid:%v", b.id)
 
 	if b.id == "" {
-		k6Throw(b.ctx, "default browser context can't be closed")
+		k6.Panic(b.ctx, "default browser context can't be closed")
 	}
 	if err := b.browser.disposeContext(b.id); err != nil {
-		k6Throw(b.ctx, "cannot dispose browser context: %w", err)
+		k6.Panic(b.ctx, "cannot dispose browser context: %w", err)
 	}
 }
 
 func (b *BrowserContext) Cookies() []goja.Object {
-	k6Throw(b.ctx, "BrowserContext.cookies() has not been implemented yet")
+	k6.Panic(b.ctx, "BrowserContext.cookies() has not been implemented yet")
 	return nil
 }
 
 func (b *BrowserContext) ExposeBinding(name string, callback goja.Callable, opts goja.Value) {
-	k6Throw(b.ctx, "BrowserContext.exposeBinding(name, callback, opts) has not been implemented yet")
+	k6.Panic(b.ctx, "BrowserContext.exposeBinding(name, callback, opts) has not been implemented yet")
 }
 
 func (b *BrowserContext) ExposeFunction(name string, callback goja.Callable) {
-	k6Throw(b.ctx, "BrowserContext.exposeFunction(name, callback) has not been implemented yet")
+	k6.Panic(b.ctx, "BrowserContext.exposeFunction(name, callback) has not been implemented yet")
 }
 
 // GrantPermissions enables the specified permissions, all others will be disabled.
@@ -213,13 +213,13 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value)
 
 	action := cdpbrowser.GrantPermissions(perms).WithOrigin(origin).WithBrowserContextID(b.id)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
-		k6Throw(b.ctx, "override permissions: %w", err)
+		k6.Panic(b.ctx, "override permissions: %w", err)
 	}
 }
 
 // NewCDPSession returns a new CDP session attached to this target.
 func (b *BrowserContext) NewCDPSession() api.CDPSession {
-	k6Throw(b.ctx, "BrowserContext.newCDPSession() has not been implemented yet")
+	k6.Panic(b.ctx, "BrowserContext.newCDPSession() has not been implemented yet")
 	return nil
 }
 
@@ -229,7 +229,7 @@ func (b *BrowserContext) NewPage() api.Page {
 
 	p, err := b.browser.newPageInContext(b.id)
 	if err != nil {
-		k6Throw(b.ctx, "newPageInContext: %w", err)
+		k6.Panic(b.ctx, "newPageInContext: %w", err)
 	}
 
 	var (
@@ -257,7 +257,7 @@ func (b *BrowserContext) Pages() []api.Page {
 }
 
 func (b *BrowserContext) Route(url goja.Value, handler goja.Callable) {
-	k6Throw(b.ctx, "BrowserContext.route(url, handler) has not been implemented yet")
+	k6.Panic(b.ctx, "BrowserContext.route(url, handler) has not been implemented yet")
 }
 
 // SetDefaultNavigationTimeout sets the default navigation timeout in milliseconds.
@@ -275,7 +275,7 @@ func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 }
 
 func (b *BrowserContext) SetExtraHTTPHeaders(headers map[string]string) {
-	k6Throw(b.ctx, "BrowserContext.setExtraHTTPHeaders(headers) has not been implemented yet")
+	k6.Panic(b.ctx, "BrowserContext.setExtraHTTPHeaders(headers) has not been implemented yet")
 }
 
 // SetGeolocation overrides the geo location of the user.
@@ -284,13 +284,13 @@ func (b *BrowserContext) SetGeolocation(geolocation goja.Value) {
 
 	g := NewGeolocation()
 	if err := g.Parse(b.ctx, geolocation); err != nil {
-		k6Throw(b.ctx, "cannot parse geo location: %v", err)
+		k6.Panic(b.ctx, "cannot parse geo location: %v", err)
 	}
 
 	b.opts.Geolocation = g
 	for _, p := range b.browser.getPages() {
 		if err := p.updateGeolocation(); err != nil {
-			k6Throw(b.ctx, "cannot update geo location in target (%s): %w", p.targetID, err)
+			k6.Panic(b.ctx, "cannot update geo location in target (%s): %w", p.targetID, err)
 		}
 	}
 }
@@ -308,7 +308,7 @@ func (b *BrowserContext) SetHTTPCredentials(httpCredentials goja.Value) {
 
 	c := NewCredentials()
 	if err := c.Parse(b.ctx, httpCredentials); err != nil {
-		k6Throw(b.ctx, "cannot set HTTP credentials: %w", err)
+		k6.Panic(b.ctx, "cannot set HTTP credentials: %w", err)
 	}
 
 	b.opts.HttpCredentials = c
@@ -328,11 +328,11 @@ func (b *BrowserContext) SetOffline(offline bool) {
 }
 
 func (b *BrowserContext) StorageState(opts goja.Value) {
-	k6Throw(b.ctx, "BrowserContext.storageState(opts) has not been implemented yet")
+	k6.Panic(b.ctx, "BrowserContext.storageState(opts) has not been implemented yet")
 }
 
 func (b *BrowserContext) Unroute(url goja.Value, handler goja.Callable) {
-	k6Throw(b.ctx, "BrowserContext.unroute(url, handler) has not been implemented yet")
+	k6.Panic(b.ctx, "BrowserContext.unroute(url, handler) has not been implemented yet")
 }
 
 func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) interface{} {
@@ -354,7 +354,7 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 				case "predicate":
 					predicateFn, isCallable = goja.AssertFunction(opts.Get(k))
 					if !isCallable {
-						k6Throw(b.ctx, "expected callable predicate")
+						k6.Panic(b.ctx, "expected callable predicate")
 					}
 				case "timeout":
 					timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
@@ -363,7 +363,7 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 		default:
 			predicateFn, isCallable = goja.AssertFunction(optsOrPredicate)
 			if !isCallable {
-				k6Throw(b.ctx, "expected callable predicate")
+				k6.Panic(b.ctx, "expected callable predicate")
 			}
 		}
 	}

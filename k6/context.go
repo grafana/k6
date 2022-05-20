@@ -10,7 +10,10 @@ import (
 
 type ctxKey int
 
-const ctxKeyVU ctxKey = 1
+const (
+	ctxKeyVU ctxKey = iota
+	ctxKeyPid
+)
 
 // WithVU returns a new context based on ctx with the k6 VU instance attached.
 func WithVU(ctx context.Context, vu k6modules.VU) context.Context {
@@ -27,6 +30,17 @@ func GetVU(ctx context.Context) k6modules.VU {
 		return vu
 	}
 	return nil
+}
+
+// WithProcessID saves the browser process ID to the context.
+func WithProcessID(ctx context.Context, pid int) context.Context {
+	return context.WithValue(ctx, ctxKeyPid, pid)
+}
+
+// GetProcessID returns the browser process ID from the context.
+func GetProcessID(ctx context.Context) int {
+	v, _ := ctx.Value(ctxKeyPid).(int)
+	return v // it will return zero on error
 }
 
 // Runtime is a convenience function for getting a k6 VU runtime.

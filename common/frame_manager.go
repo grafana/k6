@@ -707,7 +707,7 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 
 	parsedOpts := NewFrameWaitForNavigationOptions(time.Duration(m.timeoutSettings.timeout()) * time.Second)
 	if err := parsedOpts.Parse(m.ctx, opts); err != nil {
-		k6Throw(m.ctx, "cannot parse waitForNavigation options: %v", err)
+		k6.Panic(m.ctx, "cannot parse waitForNavigation options: %v", err)
 	}
 
 	ch, evCancelFn := createWaitForEventHandler(m.ctx, frame, []string{EventFrameNavigation},
@@ -725,7 +725,7 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 			m.ID(), frame.URL(), m.ctx.Err())
 		return nil
 	case <-time.After(parsedOpts.Timeout):
-		k6Throw(m.ctx, "waitForFrameNavigation timed out after %s", parsedOpts.Timeout)
+		k6.Panic(m.ctx, "waitForFrameNavigation timed out after %s", parsedOpts.Timeout)
 	case data := <-ch:
 		event = data.(*NavigationEvent)
 	}
@@ -746,7 +746,7 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 			return data.(LifecycleEvent) == parsedOpts.WaitUntil
 		}, parsedOpts.Timeout)
 		if err != nil {
-			k6Throw(m.ctx, "waitForFrameNavigation cannot wait for event (EventFrameAddLifecycle): %v", err)
+			k6.Panic(m.ctx, "waitForFrameNavigation cannot wait for event (EventFrameAddLifecycle): %v", err)
 		}
 	}
 
