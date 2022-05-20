@@ -717,24 +717,28 @@ func (f *Frame) ChildFrames() []api.Frame {
 func (f *Frame) Click(selector string, opts goja.Value) {
 	f.log.Debugf("Frame:Click", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameClickOptions(f.defaultTimeout())
-	err := parsedOpts.Parse(f.ctx, opts)
-	if err != nil {
+	popts := NewFrameClickOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
 		k6Throw(f.ctx, "%w", err)
 	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
-		return nil, handle.click(p, parsedOpts.ToMouseClickOptions())
-	}
-	actFn := f.newPointerAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
-	)
-	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
+	if err := f.click(selector, popts); err != nil {
 		k6Throw(f.ctx, "%w", err)
 	}
-
 	applySlowMo(f.ctx)
+}
+
+func (f *Frame) click(selector string, opts *FrameClickOptions) error {
+	click := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
+		return nil, handle.click(p, opts.ToMouseClickOptions())
+	}
+	act := f.newPointerAction(
+		selector, DOMElementStateAttached, opts.Strict, click, &opts.ElementHandleBasePointerOptions,
+	)
+	if _, err := callApiWithTimeout(f.ctx, act, opts.Timeout); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Content returns the HTML content of the frame.

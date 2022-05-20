@@ -226,6 +226,15 @@ func k6Throw(ctx context.Context, format string, a ...interface{}) {
 	_ = p.Kill()
 }
 
+// throwOrSlowMo throws an error if err is not nil, otherwise applies
+// slow motion.
+func throwOrSlowMo(ctx context.Context, err error) {
+	if err != nil {
+		k6Throw(ctx, "%w", err)
+	}
+	applySlowMo(ctx)
+}
+
 // TrimQuotes removes surrounding single or double quotes from s.
 // We're not using strings.Trim() to avoid trimming unbalanced values,
 // e.g. `"'arg` shouldn't change.
