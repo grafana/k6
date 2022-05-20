@@ -13,6 +13,7 @@ type ctxKey int
 const (
 	ctxKeyVU ctxKey = iota
 	ctxKeyPid
+	ctxKeyCustomK6Metrics
 )
 
 // WithVU returns a new context based on ctx with the k6 VU instance attached.
@@ -41,6 +42,20 @@ func WithProcessID(ctx context.Context, pid int) context.Context {
 func GetProcessID(ctx context.Context) int {
 	v, _ := ctx.Value(ctxKeyPid).(int)
 	return v // it will return zero on error
+}
+
+// WithCustomMetrics attaches the CustomK6Metrics object to the context.
+func WithCustomMetrics(ctx context.Context, k6m *CustomMetrics) context.Context {
+	return context.WithValue(ctx, ctxKeyCustomK6Metrics, k6m)
+}
+
+// GetCustomMetrics returns the CustomK6Metrics object attached to the context.
+func GetCustomMetrics(ctx context.Context) *CustomMetrics {
+	v := ctx.Value(ctxKeyCustomK6Metrics)
+	if k6m, ok := v.(*CustomMetrics); ok {
+		return k6m
+	}
+	return nil
 }
 
 // Runtime is a convenience function for getting a k6 VU runtime.

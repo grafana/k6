@@ -64,7 +64,8 @@ type FrameSession struct {
 	parent         *FrameSession
 	manager        *FrameManager
 	networkManager *NetworkManager
-	k6Metrics      *CustomK6Metrics
+
+	k6Metrics *k6.CustomMetrics
 
 	targetID target.ID
 	windowID browser.WindowID
@@ -106,7 +107,7 @@ func NewFrameSession(
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
 		vu:                   k6.GetVU(ctx),
-		k6Metrics:            GetCustomK6Metrics(ctx),
+		k6Metrics:            k6.GetCustomMetrics(ctx),
 		logger:               l,
 		serializer: &logrus.Logger{
 			Out:       l.log.Out,

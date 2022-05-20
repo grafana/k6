@@ -29,7 +29,6 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
-	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6"
 	"github.com/grafana/xk6-browser/k6/k6test"
 
@@ -102,8 +101,8 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 	}
 
 	registry := k6metrics.NewRegistry()
-	k6m := common.RegisterCustomK6Metrics(registry)
-	vu.CtxField = common.WithCustomK6Metrics(vu.Context(), k6m)
+	k6m := k6.RegisterCustomMetrics(registry)
+	vu.CtxField = k6.WithCustomMetrics(vu.Context(), k6m)
 
 	var (
 		state = vu.StateField
