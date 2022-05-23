@@ -33,8 +33,8 @@ func TestBarrier(t *testing.T) {
 
 	log := NewNullLogger()
 
-	timeoutSetings := NewTimeoutSettings(nil)
-	frameManager := NewFrameManager(ctx, nil, nil, timeoutSetings, log)
+	timeoutSettings := NewTimeoutSettings(nil)
+	frameManager := NewFrameManager(ctx, nil, nil, timeoutSettings, log)
 	frame := NewFrame(ctx, frameManager, nil, cdp.FrameID("frame_id_0123456789"), log)
 
 	barrier := NewBarrier()
