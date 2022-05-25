@@ -264,7 +264,7 @@ export default function() {
     page.$('input[type="submit"]').click();
 
     // Wait for next page to load
-    page.waitForLoadState('networkdidle');
+    page.waitForLoadState('networkidle');
 
     page.close();
     browser.close();
