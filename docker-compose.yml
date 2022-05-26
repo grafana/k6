@@ -7,7 +7,7 @@ networks:
 
 services:
   prometheus:
-    image: prom/prometheus:v2.33.5
+    image: prom/prometheus:v2.35.0
     command: --web.enable-remote-write-receiver --config.file=/etc/prometheus/prometheus.yml
     networks:
       - k6
@@ -17,7 +17,7 @@ services:
       - "9090:9090"
 
   grafana:
-    image: grafana/grafana:8.2.6
+    image: grafana/grafana:8.5.3
     networks:
       - grafana
       - prometheus
@@ -41,3 +41,5 @@ services:
     environment:
       - K6_PROMETHEUS_REMOTE_URL=http://prometheus:9090/api/v1/write
       - K6_OUT=output-prometheus-remote
+    depends_on:
+      - prometheus

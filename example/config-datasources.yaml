@@ -7,7 +7,7 @@ datasources:
   - name: prometheus-in-docker
     type: prometheus
     access: proxy
-    url: prometheus:9090
+    url: http://prometheus:9090
     basicAuth: false
     isDefault: true
     jsonData:
