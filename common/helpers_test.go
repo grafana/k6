@@ -30,9 +30,10 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-	"github.com/grafana/xk6-browser/log"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/log"
 )
 
 func newExecCtx() (*ExecutionContext, context.Context, *goja.Runtime) {

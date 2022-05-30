@@ -25,8 +25,9 @@ import (
 	"testing"
 
 	"github.com/chromedp/cdproto/cdp"
-	"github.com/grafana/xk6-browser/log"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/log"
 )
 
 func TestBarrier(t *testing.T) {

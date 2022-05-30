@@ -506,7 +506,7 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 }
 
 func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
-	l := fs.serializer.Log.
+	l := fs.serializer.
 		WithTime(event.Timestamp.Time()).
 		WithField("source", "browser-console-api")
 
@@ -674,7 +674,7 @@ func (fs *FrameSession) onFrameStoppedLoading(frameID cdp.FrameID) {
 }
 
 func (fs *FrameSession) onLogEntryAdded(event *cdplog.EventEntryAdded) {
-	l := fs.logger.Log.
+	l := fs.logger.
 		WithTime(event.Entry.Timestamp.Time()).
 		WithField("source", "browser").
 		WithField("url", event.Entry.URL).

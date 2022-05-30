@@ -35,10 +35,11 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
-	"github.com/grafana/xk6-browser/log"
 	"github.com/mailru/easyjson"
 	"github.com/mailru/easyjson/jlexer"
 	"github.com/mailru/easyjson/jwriter"
+
+	"github.com/grafana/xk6-browser/log"
 )
 
 const wsWriteBufferSize = 1 << 20

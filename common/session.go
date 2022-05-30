@@ -28,8 +28,9 @@ import (
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
-	"github.com/grafana/xk6-browser/log"
 	"github.com/mailru/easyjson"
+
+	"github.com/grafana/xk6-browser/log"
 )
 
 // Ensure Session implements the EventEmitter and Executor interfaces.

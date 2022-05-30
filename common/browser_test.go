@@ -8,9 +8,10 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
-	"github.com/grafana/xk6-browser/log"
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/log"
 )
 
 func TestBrowserNewPageInContext(t *testing.T) {
