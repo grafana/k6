@@ -31,6 +31,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/logger"
 
 	k6modules "go.k6.io/k6/js/modules"
 	k6metrics "go.k6.io/k6/metrics"
@@ -47,7 +48,6 @@ import (
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/cdproto/target"
-	"github.com/sirupsen/logrus"
 )
 
 const utilityWorldName = "__k6_browser_utility_world__"
@@ -82,15 +82,15 @@ type FrameSession struct {
 	childSessions map[cdp.FrameID]*FrameSession
 	vu            k6modules.VU
 
-	logger *Logger
+	logger *logger.Logger
 	// logger that will properly serialize RemoteObject instances
-	serializer *logrus.Logger
+	serializer *logger.Logger
 }
 
 // NewFrameSession initializes and returns a new FrameSession.
 //nolint:funlen
 func NewFrameSession(
-	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *Logger,
+	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *logger.Logger,
 ) (_ *FrameSession, err error) {
 	l.Debugf("NewFrameSession", "sid:%v tid:%v", s.ID(), tid)
 
@@ -109,11 +109,7 @@ func NewFrameSession(
 		vu:                   k6.GetVU(ctx),
 		k6Metrics:            k6.GetCustomMetrics(ctx),
 		logger:               l,
-		serializer: &logrus.Logger{
-			Out:       l.log.Out,
-			Level:     l.log.Level,
-			Formatter: &consoleLogFormatter{l.log.Formatter},
-		},
+		serializer:           l.ConsoleLogFormatterSerializer(),
 	}
 
 	var parentNM *NetworkManager
@@ -510,7 +506,7 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 }
 
 func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
-	l := fs.serializer.
+	l := fs.serializer.Log.
 		WithTime(event.Timestamp.Time()).
 		WithField("source", "browser-console-api")
 
@@ -678,7 +674,7 @@ func (fs *FrameSession) onFrameStoppedLoading(frameID cdp.FrameID) {
 }
 
 func (fs *FrameSession) onLogEntryAdded(event *log.EventEntryAdded) {
-	l := fs.logger.log.
+	l := fs.logger.Log.
 		WithTime(event.Entry.Timestamp.Time()).
 		WithField("source", "browser").
 		WithField("url", event.Entry.URL).

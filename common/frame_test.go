@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/k6/k6test"
+	"github.com/grafana/xk6-browser/logger"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/stretchr/testify/require"
@@ -17,7 +18,7 @@ func TestFrameNilDocument(t *testing.T) {
 	t.Parallel()
 
 	vu := k6test.NewVU(t)
-	log := NewNullLogger()
+	log := logger.NewNullLogger()
 
 	fm := NewFrameManager(vu.Context(), nil, nil, nil, log)
 	frame := NewFrame(vu.Context(), fm, nil, cdp.FrameID("42"), log)
@@ -67,7 +68,7 @@ func TestFrameNilDocument(t *testing.T) {
 func TestFrameManagerFrameAbortedNavigationShouldEmitANonNilPendingDocument(t *testing.T) {
 	t.Parallel()
 
-	ctx, log := context.Background(), NewNullLogger()
+	ctx, log := context.Background(), logger.NewNullLogger()
 
 	// add the frame to frame manager
 	fm := NewFrameManager(ctx, nil, nil, NewTimeoutSettings(nil), log)

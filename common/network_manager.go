@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/logger"
 
 	k6modules "go.k6.io/k6/js/modules"
 	k6lib "go.k6.io/k6/lib"
@@ -53,7 +54,7 @@ type NetworkManager struct {
 	BaseEventEmitter
 
 	ctx          context.Context
-	logger       *Logger
+	logger       *logger.Logger
 	session      session
 	parent       *NetworkManager
 	frameManager *FrameManager
@@ -92,7 +93,7 @@ func NewNetworkManager(
 		ctx:              ctx,
 		// TODO: Pass an internal logger instead of basing it on k6's logger?
 		// See https://github.com/grafana/xk6-browser/issues/54
-		logger:           NewLogger(ctx, state.Logger, false, nil),
+		logger:           logger.New(state.Logger, false, nil),
 		session:          s,
 		parent:           parent,
 		frameManager:     fm,

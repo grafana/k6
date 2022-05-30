@@ -28,6 +28,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/logger"
 
 	k6modules "go.k6.io/k6/js/modules"
 
@@ -54,7 +55,7 @@ type BrowserContext struct {
 	id              cdp.BrowserContextID
 	opts            *BrowserContextOptions
 	timeoutSettings *TimeoutSettings
-	logger          *Logger
+	logger          *logger.Logger
 	vu              k6modules.VU
 
 	evaluateOnNewDocumentSources []string
@@ -62,7 +63,7 @@ type BrowserContext struct {
 
 // NewBrowserContext creates a new browser context.
 func NewBrowserContext(
-	ctx context.Context, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *Logger,
+	ctx context.Context, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *logger.Logger,
 ) *BrowserContext {
 	b := BrowserContext{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),

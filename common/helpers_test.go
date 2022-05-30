@@ -32,11 +32,13 @@ import (
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/logger"
 )
 
 func newExecCtx() (*ExecutionContext, context.Context, *goja.Runtime) {
 	ctx := context.Background()
-	logger := NewLogger(ctx, logrus.New(), false, nil)
+	logger := logger.New(logrus.New(), false, nil)
 	execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789), logger)
 
 	return execCtx, ctx, goja.New()
@@ -143,7 +145,7 @@ func TestConvertArgument(t *testing.T) {
 
 	t.Run("*BaseJSHandle", func(t *testing.T) {
 		execCtx, ctx, rt := newExecCtx()
-		log := NewNullLogger()
+		log := logger.NewNullLogger()
 
 		timeoutSettings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSettings, log)
@@ -166,7 +168,7 @@ func TestConvertArgument(t *testing.T) {
 
 	t.Run("*BaseJSHandle wrong context", func(t *testing.T) {
 		execCtx, ctx, rt := newExecCtx()
-		log := NewNullLogger()
+		log := logger.NewNullLogger()
 
 		timeoutSettings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSettings, log)
@@ -188,7 +190,7 @@ func TestConvertArgument(t *testing.T) {
 
 	t.Run("*BaseJSHandle is disposed", func(t *testing.T) {
 		execCtx, ctx, rt := newExecCtx()
-		log := NewNullLogger()
+		log := logger.NewNullLogger()
 
 		timeoutSettings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSettings, log)
@@ -210,7 +212,7 @@ func TestConvertArgument(t *testing.T) {
 
 	t.Run("*BaseJSHandle as *ElementHandle", func(t *testing.T) {
 		execCtx, ctx, rt := newExecCtx()
-		log := NewNullLogger()
+		log := logger.NewNullLogger()
 
 		timeoutSettings := NewTimeoutSettings(nil)
 		frameManager := NewFrameManager(ctx, nil, nil, timeoutSettings, log)

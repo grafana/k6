@@ -18,10 +18,9 @@
  *
  */
 
-package common
+package logger
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -37,28 +36,26 @@ import (
 )
 
 type Logger struct {
-	ctx            context.Context
-	log            *logrus.Logger
+	Log            *logrus.Logger
 	mu             sync.Mutex
 	lastLogCall    int64
 	debugOverride  bool
 	categoryFilter *regexp.Regexp
 }
 
-func NullLogger() *logrus.Logger {
+// NewNullLogger will create a logger where log lines will
+// be discarded and not logged anywhere.
+func NewNullLogger() *Logger {
 	log := logrus.New()
 	log.SetOutput(ioutil.Discard)
-	return log
+
+	return New(log, false, nil)
 }
 
-func NewNullLogger() *Logger {
-	return NewLogger(context.TODO(), NullLogger(), false, nil)
-}
-
-func NewLogger(ctx context.Context, logger *logrus.Logger, debugOverride bool, categoryFilter *regexp.Regexp) *Logger {
+// New creates a new logger.
+func New(logger *logrus.Logger, debugOverride bool, categoryFilter *regexp.Regexp) *Logger {
 	return &Logger{
-		ctx:            ctx,
-		log:            logger,
+		Log:            logger,
 		debugOverride:  debugOverride,
 		categoryFilter: categoryFilter,
 	}
@@ -89,7 +86,7 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...i
 		return
 	}
 	// don't log if the current log level isn't in the required level.
-	if l.log.GetLevel() < level {
+	if l.Log.GetLevel() < level {
 		return
 	}
 	l.mu.Lock()
@@ -107,17 +104,17 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...i
 	if l.categoryFilter != nil && !l.categoryFilter.Match([]byte(category)) {
 		return
 	}
-	if l.log == nil {
+	if l.Log == nil {
 		magenta := color.New(color.FgMagenta).SprintFunc()
 		fmt.Printf("%s [%d]: %s - %s ms\n", magenta(category), goRoutineID(), string(msg), magenta(elapsed))
 		return
 	}
-	entry := l.log.WithFields(logrus.Fields{
+	entry := l.Log.WithFields(logrus.Fields{
 		"category":  category,
 		"elapsed":   fmt.Sprintf("%d ms", elapsed),
 		"goroutine": goRoutineID(),
 	})
-	if l.log.GetLevel() < level && l.debugOverride {
+	if l.Log.GetLevel() < level && l.debugOverride {
 		entry.Printf(msg, args...)
 		return
 	}
@@ -131,13 +128,13 @@ func (l *Logger) SetLevel(level string) error {
 	if err != nil {
 		return err
 	}
-	l.log.SetLevel(pl)
+	l.Log.SetLevel(pl)
 	return nil
 }
 
 // DebugMode returns true if the logger level is set to Debug or higher.
 func (l *Logger) DebugMode() bool {
-	return l.log.GetLevel() >= logrus.DebugLevel
+	return l.Log.GetLevel() >= logrus.DebugLevel
 }
 
 // ReportCaller adds source file and function names to the log entries.
@@ -147,13 +144,25 @@ func (l *Logger) ReportCaller() {
 			return f.Func.Name(), fmt.Sprintf("%s:%d", f.File, f.Line)
 		}
 	}
-	l.log.SetFormatter(&logrus.TextFormatter{
+	l.Log.SetFormatter(&logrus.TextFormatter{
 		CallerPrettyfier: caller(),
 		FieldMap: logrus.FieldMap{
 			logrus.FieldKeyFile: "caller",
 		},
 	})
-	l.log.SetReportCaller(true)
+	l.Log.SetReportCaller(true)
+}
+
+// ConsoleLogFormatterSerializer creates a new logger that will
+// correctly serialize RemoteObject instances.
+func (l *Logger) ConsoleLogFormatterSerializer() *Logger {
+	return &Logger{
+		Log: &logrus.Logger{
+			Out:       l.Log.Out,
+			Level:     l.Log.Level,
+			Formatter: &consoleLogFormatter{l.Log.Formatter},
+		},
+	}
 }
 
 func goRoutineID() int {

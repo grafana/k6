@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/grafana/xk6-browser/logger"
 	"github.com/grafana/xk6-browser/tests/ws"
 
 	"github.com/chromedp/cdproto"
@@ -44,7 +45,7 @@ func TestConnection(t *testing.T) {
 		ctx := context.Background()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/echo", url.Host)
-		conn, err := NewConnection(ctx, wsURL, NewNullLogger())
+		conn, err := NewConnection(ctx, wsURL, logger.NewNullLogger())
 		conn.Close()
 
 		require.NoError(t, err)
@@ -58,7 +59,7 @@ func TestConnectionClosureAbnormal(t *testing.T) {
 		ctx := context.Background()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/closure-abnormal", url.Host)
-		conn, err := NewConnection(ctx, wsURL, NewNullLogger())
+		conn, err := NewConnection(ctx, wsURL, logger.NewNullLogger())
 
 		if assert.NoError(t, err) {
 			action := target.SetDiscoverTargets(true)
@@ -75,7 +76,7 @@ func TestConnectionSendRecv(t *testing.T) {
 		ctx := context.Background()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/cdp", url.Host)
-		conn, err := NewConnection(ctx, wsURL, NewNullLogger())
+		conn, err := NewConnection(ctx, wsURL, logger.NewNullLogger())
 
 		if assert.NoError(t, err) {
 			action := target.SetDiscoverTargets(true)
@@ -138,7 +139,7 @@ func TestConnectionCreateSession(t *testing.T) {
 		ctx := context.Background()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/cdp", url.Host)
-		conn, err := NewConnection(ctx, wsURL, NewNullLogger())
+		conn, err := NewConnection(ctx, wsURL, logger.NewNullLogger())
 
 		if assert.NoError(t, err) {
 			session, err := conn.createSession(&target.Info{

@@ -9,6 +9,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/logger"
 
 	k6modules "go.k6.io/k6/js/modules"
 	k6metrics "go.k6.io/k6/metrics"
@@ -72,11 +73,13 @@ type Frame struct {
 	currentDocument *DocumentInfo
 	pendingDocument *DocumentInfo
 
-	log *Logger
+	log *logger.Logger
 }
 
 // NewFrame creates a new HTML document frame.
-func NewFrame(ctx context.Context, m *FrameManager, parentFrame *Frame, frameID cdp.FrameID, log *Logger) *Frame {
+func NewFrame(
+	ctx context.Context, m *FrameManager, parentFrame *Frame, frameID cdp.FrameID, log *logger.Logger,
+) *Frame {
 	if log.DebugMode() {
 		var pfid string
 		if parentFrame != nil {

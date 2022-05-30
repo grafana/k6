@@ -25,6 +25,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/logger"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
@@ -37,7 +38,7 @@ var _ api.JSHandle = &BaseJSHandle{}
 // BaseJSHandle represents a JS object in an execution context.
 type BaseJSHandle struct {
 	ctx          context.Context
-	logger       *Logger
+	logger       *logger.Logger
 	session      session
 	execCtx      *ExecutionContext
 	remoteObject *runtime.RemoteObject
@@ -51,7 +52,7 @@ func NewJSHandle(
 	ectx *ExecutionContext,
 	f *Frame,
 	ro *runtime.RemoteObject,
-	l *Logger,
+	l *logger.Logger,
 ) api.JSHandle {
 	eh := &BaseJSHandle{
 		ctx:          ctx,
