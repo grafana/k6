@@ -28,6 +28,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
 
@@ -44,7 +45,7 @@ var _ api.BrowserContext = &BrowserContext{}
 
 // BrowserContext stores context information for a single independent browser session.
 // A newly launched browser instance contains a default browser context.
-// Any browser context created aside from the default will be considered an "ingognito"
+// Any browser context created aside from the default will be considered an "incognito"
 // browser context and will not store any data on disk.
 type BrowserContext struct {
 	BaseEventEmitter
@@ -54,7 +55,7 @@ type BrowserContext struct {
 	id              cdp.BrowserContextID
 	opts            *BrowserContextOptions
 	timeoutSettings *TimeoutSettings
-	logger          *Logger
+	logger          *log.Logger
 	vu              k6modules.VU
 
 	evaluateOnNewDocumentSources []string
@@ -62,7 +63,7 @@ type BrowserContext struct {
 
 // NewBrowserContext creates a new browser context.
 func NewBrowserContext(
-	ctx context.Context, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *Logger,
+	ctx context.Context, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *log.Logger,
 ) *BrowserContext {
 	b := BrowserContext{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),

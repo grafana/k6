@@ -27,17 +27,17 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/k6"
-
-	k6modules "go.k6.io/k6/js/modules"
-
 	"github.com/chromedp/cdproto"
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+	k6modules "go.k6.io/k6/js/modules"
+
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/log"
 )
 
 // Ensure Browser implements the EventEmitter and Browser interfaces.
@@ -83,11 +83,17 @@ type Browser struct {
 
 	vu k6modules.VU
 
-	logger *Logger
+	logger *log.Logger
 }
 
 // NewBrowser creates a new browser, connects to it, then returns it.
-func NewBrowser(ctx context.Context, cancel context.CancelFunc, browserProc *BrowserProcess, launchOpts *LaunchOptions, logger *Logger) (*Browser, error) {
+func NewBrowser(
+	ctx context.Context,
+	cancel context.CancelFunc,
+	browserProc *BrowserProcess,
+	launchOpts *LaunchOptions,
+	logger *log.Logger,
+) (*Browser, error) {
 	b := newBrowser(ctx, cancel, browserProc, launchOpts, logger)
 	if err := b.connect(); err != nil {
 		return nil, err
@@ -96,7 +102,13 @@ func NewBrowser(ctx context.Context, cancel context.CancelFunc, browserProc *Bro
 }
 
 // newBrowser returns a ready to use Browser without connecting to an actual browser.
-func newBrowser(ctx context.Context, cancelFn context.CancelFunc, browserProc *BrowserProcess, launchOpts *LaunchOptions, logger *Logger) *Browser {
+func newBrowser(
+	ctx context.Context,
+	cancelFn context.CancelFunc,
+	browserProc *BrowserProcess,
+	launchOpts *LaunchOptions,
+	logger *log.Logger,
+) *Browser {
 	return &Browser{
 		BaseEventEmitter:    NewBaseEventEmitter(ctx),
 		ctx:                 ctx,

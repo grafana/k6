@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/grafana/xk6-browser/k6/k6test"
+	"github.com/grafana/xk6-browser/log"
 
 	k6lib "go.k6.io/k6/lib"
 	k6mockresolver "go.k6.io/k6/lib/testutils/mockresolver"
@@ -58,7 +59,7 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 	vu := k6test.NewVU(t)
 	st := vu.State()
 	st.Options = k6opts
-	logger := NewLogger(vu.Context(), st.Logger, false, nil)
+	logger := log.New(st.Logger, false, nil)
 	nm := &NetworkManager{
 		ctx:      vu.Context(),
 		logger:   logger,

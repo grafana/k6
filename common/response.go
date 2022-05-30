@@ -30,6 +30,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
 
@@ -60,7 +61,7 @@ type SecurityDetails struct {
 // Response represents a browser HTTP response.
 type Response struct {
 	ctx               context.Context
-	logger            *Logger
+	logger            *log.Logger
 	request           *Request
 	remoteAddress     *RemoteAddress
 	securityDetails   *SecurityDetails
@@ -90,7 +91,7 @@ func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, 
 		ctx: ctx,
 		// TODO: Pass an internal logger instead of basing it on k6's logger?
 		// See https://github.com/grafana/xk6-browser/issues/54
-		logger:            NewLogger(ctx, state.Logger, false, nil),
+		logger:            log.New(state.Logger, false, nil),
 		request:           req,
 		remoteAddress:     &RemoteAddress{IPAddress: resp.RemoteIPAddress, Port: resp.RemotePort},
 		securityDetails:   nil,

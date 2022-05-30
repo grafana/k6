@@ -31,6 +31,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/log"
 
 	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
@@ -65,7 +66,7 @@ type FrameManager struct {
 
 	vu k6modules.VU
 
-	logger *Logger
+	logger *log.Logger
 	id     int64
 }
 
@@ -78,7 +79,7 @@ func NewFrameManager(
 	s session,
 	p *Page,
 	ts *TimeoutSettings,
-	l *Logger,
+	l *log.Logger,
 ) *FrameManager {
 	m := &FrameManager{
 		ctx:              ctx,

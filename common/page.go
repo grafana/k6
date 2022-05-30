@@ -30,6 +30,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
 
@@ -89,7 +90,7 @@ type Page struct {
 	routes        []api.Route
 	vu            k6modules.VU
 
-	logger *Logger
+	logger *log.Logger
 }
 
 // NewPage creates a new browser page context.
@@ -100,7 +101,7 @@ func NewPage(
 	tid target.ID,
 	opener *Page,
 	bp bool,
-	logger *Logger,
+	logger *log.Logger,
 ) (*Page, error) {
 	p := Page{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),

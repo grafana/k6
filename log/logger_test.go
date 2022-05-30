@@ -18,7 +18,7 @@
  *
  */
 
-package common
+package log
 
 import (
 	"testing"

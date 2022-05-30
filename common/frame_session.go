@@ -31,6 +31,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
 	k6metrics "go.k6.io/k6/metrics"
@@ -41,13 +42,12 @@ import (
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/inspector"
-	"github.com/chromedp/cdproto/log"
+	cdplog "github.com/chromedp/cdproto/log"
 	"github.com/chromedp/cdproto/network"
 	cdppage "github.com/chromedp/cdproto/page"
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/cdproto/target"
-	"github.com/sirupsen/logrus"
 )
 
 const utilityWorldName = "__k6_browser_utility_world__"
@@ -82,15 +82,15 @@ type FrameSession struct {
 	childSessions map[cdp.FrameID]*FrameSession
 	vu            k6modules.VU
 
-	logger *Logger
+	logger *log.Logger
 	// logger that will properly serialize RemoteObject instances
-	serializer *logrus.Logger
+	serializer *log.Logger
 }
 
 // NewFrameSession initializes and returns a new FrameSession.
 //nolint:funlen
 func NewFrameSession(
-	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *Logger,
+	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger,
 ) (_ *FrameSession, err error) {
 	l.Debugf("NewFrameSession", "sid:%v tid:%v", s.ID(), tid)
 
@@ -109,11 +109,7 @@ func NewFrameSession(
 		vu:                   k6.GetVU(ctx),
 		k6Metrics:            k6.GetCustomMetrics(ctx),
 		logger:               l,
-		serializer: &logrus.Logger{
-			Out:       l.log.Out,
-			Level:     l.log.Level,
-			Formatter: &consoleLogFormatter{l.log.Formatter},
-		},
+		serializer:           l.ConsoleLogFormatterSerializer(),
 	}
 
 	var parentNM *NetworkManager
@@ -204,7 +200,7 @@ func (fs *FrameSession) initDomains() error {
 	actions := []Action{
 		// TODO: can we get rid of the following by doing DOM related stuff in JS instead?
 		dom.Enable(),
-		log.Enable(),
+		cdplog.Enable(),
 		cdpruntime.Enable(),
 		target.SetAutoAttach(true, true).WithFlatten(true),
 	}
@@ -249,7 +245,7 @@ func (fs *FrameSession) initEvents() {
 				switch ev := event.data.(type) {
 				case *inspector.EventTargetCrashed:
 					fs.onTargetCrashed(ev)
-				case *log.EventEntryAdded:
+				case *cdplog.EventEntryAdded:
 					fs.onLogEntryAdded(ev)
 				case *cdppage.EventFrameAttached:
 					fs.onFrameAttached(ev.FrameID, ev.ParentFrameID)
@@ -677,8 +673,8 @@ func (fs *FrameSession) onFrameStoppedLoading(frameID cdp.FrameID) {
 	fs.manager.frameLoadingStopped(frameID)
 }
 
-func (fs *FrameSession) onLogEntryAdded(event *log.EventEntryAdded) {
-	l := fs.logger.log.
+func (fs *FrameSession) onLogEntryAdded(event *cdplog.EventEntryAdded) {
+	l := fs.logger.
 		WithTime(event.Entry.Timestamp.Time()).
 		WithField("source", "browser").
 		WithField("url", event.Entry.URL).

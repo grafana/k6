@@ -29,6 +29,7 @@ import (
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
+
 	"github.com/grafana/xk6-browser/k6"
 )
 
