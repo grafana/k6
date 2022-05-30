@@ -25,15 +25,14 @@ import (
 	"testing"
 
 	"github.com/chromedp/cdproto/cdp"
+	"github.com/grafana/xk6-browser/log"
 	"github.com/stretchr/testify/require"
-
-	"github.com/grafana/xk6-browser/logger"
 )
 
 func TestBarrier(t *testing.T) {
 	ctx := context.Background()
 
-	log := logger.NewNullLogger()
+	log := log.NewNullLogger()
 
 	timeoutSettings := NewTimeoutSettings(nil)
 	frameManager := NewFrameManager(ctx, nil, nil, timeoutSettings, log)

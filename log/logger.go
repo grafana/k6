@@ -18,7 +18,7 @@
  *
  */
 
-package logger
+package log
 
 import (
 	"encoding/json"

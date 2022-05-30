@@ -24,7 +24,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/grafana/xk6-browser/logger"
+	"github.com/grafana/xk6-browser/log"
 )
 
 type BrowserProcess struct {
@@ -44,7 +44,7 @@ type BrowserProcess struct {
 	// The directory where user data for the browser is stored.
 	userDataDir string
 
-	logger *logger.Logger
+	logger *log.Logger
 }
 
 func NewBrowserProcess(
@@ -112,6 +112,6 @@ func (p *BrowserProcess) Pid() int {
 }
 
 // AttachLogger attaches a logger to the browser process.
-func (p *BrowserProcess) AttachLogger(logger *logger.Logger) {
+func (p *BrowserProcess) AttachLogger(logger *log.Logger) {
 	p.logger = logger
 }

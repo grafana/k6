@@ -17,7 +17,7 @@ import (
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6"
-	"github.com/grafana/xk6-browser/logger"
+	"github.com/grafana/xk6-browser/log"
 
 	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
@@ -406,11 +406,11 @@ func parseWebsocketURL(ctx context.Context, rc io.Reader) (wsURL string, _ error
 }
 
 // makeLogger makes and returns an extension wide logger.
-func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*logger.Logger, error) {
+func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*log.Logger, error) {
 	var (
 		k6Logger            = k6.GetVU(ctx).State().Logger
 		reCategoryFilter, _ = regexp.Compile(launchOpts.LogCategoryFilter)
-		logger              = logger.New(k6Logger, launchOpts.Debug, reCategoryFilter)
+		logger              = log.New(k6Logger, launchOpts.Debug, reCategoryFilter)
 	)
 
 	// set the log level from the launch options (usually from a script's options).

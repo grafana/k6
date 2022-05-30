@@ -4,8 +4,7 @@ import (
 	"context"
 
 	"github.com/dop251/goja"
-
-	"github.com/grafana/xk6-browser/logger"
+	"github.com/grafana/xk6-browser/log"
 )
 
 // Locator represent a way to find element(s) on the page at any moment.
@@ -15,11 +14,11 @@ type Locator struct {
 	frame *Frame
 
 	ctx context.Context
-	log *logger.Logger
+	log *log.Logger
 }
 
 // NewLocator creates and returns a new locator.
-func NewLocator(ctx context.Context, selector string, f *Frame, l *logger.Logger) *Locator {
+func NewLocator(ctx context.Context, selector string, f *Frame, l *log.Logger) *Locator {
 	return &Locator{
 		selector: selector,
 		frame:    f,

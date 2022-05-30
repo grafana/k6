@@ -35,11 +35,10 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+	"github.com/grafana/xk6-browser/log"
 	"github.com/mailru/easyjson"
 	"github.com/mailru/easyjson/jlexer"
 	"github.com/mailru/easyjson/jwriter"
-
-	"github.com/grafana/xk6-browser/logger"
 )
 
 const wsWriteBufferSize = 1 << 20
@@ -119,7 +118,7 @@ type Connection struct {
 
 	ctx          context.Context
 	wsURL        string
-	logger       *logger.Logger
+	logger       *log.Logger
 	conn         *websocket.Conn
 	sendCh       chan *cdproto.Message
 	recvCh       chan *cdproto.Message
@@ -138,7 +137,7 @@ type Connection struct {
 }
 
 // NewConnection creates a new browser.
-func NewConnection(ctx context.Context, wsURL string, logger *logger.Logger) (*Connection, error) {
+func NewConnection(ctx context.Context, wsURL string, logger *log.Logger) (*Connection, error) {
 	var header http.Header
 	var tlsConfig *tls.Config
 	wsd := websocket.Dialer{

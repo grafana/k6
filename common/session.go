@@ -28,9 +28,8 @@ import (
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
+	"github.com/grafana/xk6-browser/log"
 	"github.com/mailru/easyjson"
-
-	"github.com/grafana/xk6-browser/logger"
 )
 
 // Ensure Session implements the EventEmitter and Executor interfaces.
@@ -50,12 +49,12 @@ type Session struct {
 	closed   bool
 	crashed  bool
 
-	logger *logger.Logger
+	logger *log.Logger
 }
 
 // NewSession creates a new session.
 func NewSession(
-	ctx context.Context, conn *Connection, id target.SessionID, tid target.ID, logger *logger.Logger,
+	ctx context.Context, conn *Connection, id target.SessionID, tid target.ID, logger *log.Logger,
 ) *Session {
 	s := Session{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),

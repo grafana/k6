@@ -29,7 +29,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6"
-	"github.com/grafana/xk6-browser/logger"
+	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
 
@@ -66,7 +66,7 @@ func (ea evalOptions) String() string {
 // ExecutionContext represents a JS execution context.
 type ExecutionContext struct {
 	ctx            context.Context
-	logger         *logger.Logger
+	logger         *log.Logger
 	session        session
 	frame          *Frame
 	id             runtime.ExecutionContextID
@@ -82,7 +82,7 @@ type ExecutionContext struct {
 
 // NewExecutionContext creates a new JS execution context.
 func NewExecutionContext(
-	ctx context.Context, s session, f *Frame, id runtime.ExecutionContextID, l *logger.Logger,
+	ctx context.Context, s session, f *Frame, id runtime.ExecutionContextID, l *log.Logger,
 ) *ExecutionContext {
 	e := &ExecutionContext{
 		ctx:            ctx,

@@ -8,10 +8,9 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
+	"github.com/grafana/xk6-browser/log"
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/require"
-
-	"github.com/grafana/xk6-browser/logger"
 )
 
 func TestBrowserNewPageInContext(t *testing.T) {
@@ -23,7 +22,7 @@ func TestBrowserNewPageInContext(t *testing.T) {
 	}
 	newTestCase := func(id cdp.BrowserContextID) *testCase {
 		ctx := context.Background()
-		b := newBrowser(ctx, nil, nil, NewLaunchOptions(), logger.NewNullLogger())
+		b := newBrowser(ctx, nil, nil, NewLaunchOptions(), log.NewNullLogger())
 		// set a new browser context in the browser with `id`, so that newPageInContext can find it.
 		b.contexts[id] = NewBrowserContext(ctx, b, id, nil, nil)
 		return &testCase{

@@ -37,7 +37,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6"
-	"github.com/grafana/xk6-browser/logger"
+	"github.com/grafana/xk6-browser/log"
 )
 
 // Ensure Browser implements the EventEmitter and Browser interfaces.
@@ -83,7 +83,7 @@ type Browser struct {
 
 	vu k6modules.VU
 
-	logger *logger.Logger
+	logger *log.Logger
 }
 
 // NewBrowser creates a new browser, connects to it, then returns it.
@@ -92,7 +92,7 @@ func NewBrowser(
 	cancel context.CancelFunc,
 	browserProc *BrowserProcess,
 	launchOpts *LaunchOptions,
-	logger *logger.Logger,
+	logger *log.Logger,
 ) (*Browser, error) {
 	b := newBrowser(ctx, cancel, browserProc, launchOpts, logger)
 	if err := b.connect(); err != nil {
@@ -107,7 +107,7 @@ func newBrowser(
 	cancelFn context.CancelFunc,
 	browserProc *BrowserProcess,
 	launchOpts *LaunchOptions,
-	logger *logger.Logger,
+	logger *log.Logger,
 ) *Browser {
 	return &Browser{
 		BaseEventEmitter:    NewBaseEventEmitter(ctx),
