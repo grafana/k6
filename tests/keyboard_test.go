@@ -91,7 +91,6 @@ func TestKeyboardPress(t *testing.T) {
 
 	// Replicates the test from https://playwright.dev/docs/api/class-keyboard
 	t.Run("selection", func(t *testing.T) {
-		t.Skip("FIXME") // See https://github.com/grafana/xk6-browser/issues/284
 		p := tb.NewPage(nil)
 		cp, ok := p.(*common.Page)
 		require.True(t, ok)

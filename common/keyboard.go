@@ -122,7 +122,7 @@ func (k *Keyboard) down(key string) error {
 	}
 
 	keyDef := k.keyDefinitionFromKey(keyInput)
-	k.modifiers &= ^k.modifierBitFromKeyName(keyDef.Key)
+	k.modifiers |= k.modifierBitFromKeyName(keyDef.Key)
 	text := keyDef.Text
 	_, autoRepeat := k.pressedKeys[keyDef.KeyCode]
 	k.pressedKeys[keyDef.KeyCode] = true
