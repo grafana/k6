@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//nolint:funlen
 func TestBrowserTypePrepareFlags(t *testing.T) {
 	t.Parallel()
 

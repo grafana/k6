@@ -29,8 +29,8 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
-	"github.com/grafana/xk6-browser/k6"
-	"github.com/grafana/xk6-browser/k6/k6test"
+	"github.com/grafana/xk6-browser/k6ext"
+	"github.com/grafana/xk6-browser/k6ext/k6test"
 
 	k6http "go.k6.io/k6/js/modules/k6/http"
 	k6httpmultibin "go.k6.io/k6/lib/testutils/httpmultibin"
@@ -96,13 +96,13 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 		vu.CtxField = dummyCtx
 	} else {
 		// Attach the mock VU to the passed context
-		ctx = k6.WithVU(ctx, vu)
+		ctx = k6ext.WithVU(ctx, vu)
 		vu.CtxField = ctx
 	}
 
 	registry := k6metrics.NewRegistry()
-	k6m := k6.RegisterCustomMetrics(registry)
-	vu.CtxField = k6.WithCustomMetrics(vu.Context(), k6m)
+	k6m := k6ext.RegisterCustomMetrics(registry)
+	vu.CtxField = k6ext.WithCustomMetrics(vu.Context(), k6m)
 
 	var (
 		state = vu.StateField

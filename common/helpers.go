@@ -29,8 +29,7 @@ import (
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-
-	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/k6ext"
 )
 
 func convertBaseJSHandleTypes(ctx context.Context, execCtx *ExecutionContext, objHandle *BaseJSHandle) (*cdpruntime.CallArgument, error) {
@@ -198,7 +197,7 @@ func waitForEvent(ctx context.Context, emitter EventEmitter, events []string, pr
 // panicOrSlowMo panics if err is not nil, otherwise applies slow motion.
 func panicOrSlowMo(ctx context.Context, err error) {
 	if err != nil {
-		k6.Panic(ctx, "%w", err)
+		k6ext.Panic(ctx, "%w", err)
 	}
 	applySlowMo(ctx)
 }

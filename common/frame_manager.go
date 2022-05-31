@@ -30,7 +30,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	k6common "go.k6.io/k6/js/common"
@@ -89,7 +89,7 @@ func NewFrameManager(
 		frames:           make(map[cdp.FrameID]*Frame),
 		inflightRequests: make(map[network.RequestID]bool),
 		barriers:         make([]*Barrier, 0),
-		vu:               k6.GetVU(ctx),
+		vu:               k6ext.GetVU(ctx),
 		logger:           l,
 		id:               atomic.AddInt64(&frameManagerID, 1),
 	}
@@ -708,7 +708,7 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 
 	parsedOpts := NewFrameWaitForNavigationOptions(time.Duration(m.timeoutSettings.timeout()) * time.Second)
 	if err := parsedOpts.Parse(m.ctx, opts); err != nil {
-		k6.Panic(m.ctx, "cannot parse waitForNavigation options: %v", err)
+		k6ext.Panic(m.ctx, "cannot parse waitForNavigation options: %v", err)
 	}
 
 	ch, evCancelFn := createWaitForEventHandler(m.ctx, frame, []string{EventFrameNavigation},
@@ -726,7 +726,7 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 			m.ID(), frame.URL(), m.ctx.Err())
 		return nil
 	case <-time.After(parsedOpts.Timeout):
-		k6.Panic(m.ctx, "waitForFrameNavigation timed out after %s", parsedOpts.Timeout)
+		k6ext.Panic(m.ctx, "waitForFrameNavigation timed out after %s", parsedOpts.Timeout)
 	case data := <-ch:
 		event = data.(*NavigationEvent)
 	}
@@ -747,7 +747,7 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 			return data.(LifecycleEvent) == parsedOpts.WaitUntil
 		}, parsedOpts.Timeout)
 		if err != nil {
-			k6.Panic(m.ctx, "waitForFrameNavigation cannot wait for event (EventFrameAddLifecycle): %v", err)
+			k6ext.Panic(m.ctx, "waitForFrameNavigation cannot wait for event (EventFrameAddLifecycle): %v", err)
 		}
 	}
 

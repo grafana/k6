@@ -26,9 +26,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/grafana/xk6-browser/k6"
-
 	"github.com/dop251/goja"
+	"github.com/grafana/xk6-browser/k6ext"
 )
 
 type ProxyOptions struct {
@@ -71,7 +70,7 @@ func NewLaunchOptions() *LaunchOptions {
 
 // Parse parses launch options from a JS object.
 func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6.Runtime(ctx)
+	rt := k6ext.Runtime(ctx)
 	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {

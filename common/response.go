@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
@@ -85,7 +85,7 @@ type Response struct {
 
 // NewHTTPResponse creates a new HTTP response.
 func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, timestamp *cdp.MonotonicTime) *Response {
-	vu := k6.GetVU(ctx)
+	vu := k6ext.GetVU(ctx)
 	state := vu.State()
 	r := Response{
 		ctx: ctx,
@@ -184,10 +184,10 @@ func (r *Response) AllHeaders() map[string]string {
 // Body returns the response body as a binary buffer.
 func (r *Response) Body() goja.ArrayBuffer {
 	if r.status >= 300 && r.status <= 399 {
-		k6.Panic(r.ctx, "Response body is unavailable for redirect responses")
+		k6ext.Panic(r.ctx, "Response body is unavailable for redirect responses")
 	}
 	if err := r.fetchBody(); err != nil {
-		k6.Panic(r.ctx, "error getting response body: %w", err)
+		k6ext.Panic(r.ctx, "error getting response body: %w", err)
 	}
 	r.bodyMu.RLock()
 	defer r.bodyMu.RUnlock()
@@ -215,7 +215,7 @@ func (r *Response) bodySize() int64 {
 // Finished waits for response to finish, return error if request failed.
 func (r *Response) Finished() bool {
 	// TODO: should return nil|Error
-	k6.Panic(r.ctx, "Response.finished() has not been implemented yet")
+	k6ext.Panic(r.ctx, "Response.finished() has not been implemented yet")
 	return false
 }
 
@@ -277,14 +277,14 @@ func (r *Response) HeadersArray() []api.HTTPHeader {
 func (r *Response) JSON() goja.Value {
 	if r.cachedJSON == nil {
 		if err := r.fetchBody(); err != nil {
-			k6.Panic(r.ctx, "error getting response body: %w", err)
+			k6ext.Panic(r.ctx, "error getting response body: %w", err)
 		}
 
 		var v interface{}
 		r.bodyMu.RLock()
 		defer r.bodyMu.RUnlock()
 		if err := json.Unmarshal(r.body, &v); err != nil {
-			k6.Panic(r.ctx, "error unmarshalling response body to JSON: %w", err)
+			k6ext.Panic(r.ctx, "error unmarshalling response body to JSON: %w", err)
 		}
 		r.cachedJSON = v
 	}
@@ -336,7 +336,7 @@ func (r *Response) StatusText() string {
 // Text returns the response body as a string.
 func (r *Response) Text() string {
 	if err := r.fetchBody(); err != nil {
-		k6.Panic(r.ctx, "error getting response body as text: %w", err)
+		k6ext.Panic(r.ctx, "error getting response body as text: %w", err)
 	}
 	r.bodyMu.RLock()
 	defer r.bodyMu.RUnlock()

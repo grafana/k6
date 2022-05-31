@@ -25,7 +25,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/grafana/xk6-browser/k6/k6test"
+	"github.com/grafana/xk6-browser/k6ext/k6test"
 
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"

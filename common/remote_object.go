@@ -29,7 +29,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/k6ext"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
@@ -150,7 +150,7 @@ func valueFromRemoteObject(ctx context.Context, robj *cdpruntime.RemoteObject) (
 	if val == "undefined" {
 		return goja.Undefined(), err
 	}
-	return k6.Runtime(ctx).ToValue(val), err
+	return k6ext.Runtime(ctx).ToValue(val), err
 }
 
 func handleParseRemoteObjectErr(ctx context.Context, err error, logger *logrus.Entry) {
@@ -161,7 +161,7 @@ func handleParseRemoteObjectErr(ctx context.Context, err error, logger *logrus.E
 	merr, ok := err.(*multierror.Error)
 	if !ok {
 		// If this panics it's a bug :)
-		k6.Panic(ctx, "unable to parse remote object value: %w", err)
+		k6ext.Panic(ctx, "unable to parse remote object value: %w", err)
 	}
 	for _, e := range merr.Errors {
 		switch {
@@ -171,7 +171,7 @@ func handleParseRemoteObjectErr(ctx context.Context, err error, logger *logrus.E
 			logger.WithError(ope).Error()
 		default:
 			// If this panics it's a bug :)
-			k6.Panic(ctx, "unable to parse remote object value: %w", e)
+			k6ext.Panic(ctx, "unable to parse remote object value: %w", e)
 		}
 	}
 }

@@ -30,7 +30,7 @@ import (
 	"sync"
 
 	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
@@ -65,7 +65,7 @@ type FrameSession struct {
 	manager        *FrameManager
 	networkManager *NetworkManager
 
-	k6Metrics *k6.CustomMetrics
+	k6Metrics *k6ext.CustomMetrics
 
 	targetID target.ID
 	windowID browser.WindowID
@@ -106,8 +106,8 @@ func NewFrameSession(
 		isolatedWorlds:       make(map[string]bool),
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
-		vu:                   k6.GetVU(ctx),
-		k6Metrics:            k6.GetCustomMetrics(ctx),
+		vu:                   k6ext.GetVU(ctx),
+		k6Metrics:            k6ext.GetCustomMetrics(ctx),
 		logger:               l,
 		serializer:           l.ConsoleLogFormatterSerializer(),
 	}
@@ -553,7 +553,7 @@ func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecuti
 		Type      string      `json:"type"`
 	}
 	if err := json.Unmarshal(auxData, &i); err != nil {
-		k6.Panic(fs.ctx, "unable to unmarshal JSON: %w", err)
+		k6ext.Panic(fs.ctx, "unable to unmarshal JSON: %w", err)
 	}
 	var world executionWorld
 	frame := fs.manager.getFrameByID(i.FrameID)
@@ -640,7 +640,7 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 
 	err := fs.manager.frameNavigated(frame.ID, frame.ParentID, frame.LoaderID.String(), frame.Name, frame.URL+frame.URLFragment, initial)
 	if err != nil {
-		k6.Panic(fs.ctx, "cannot handle frame navigation: %w", err)
+		k6ext.Panic(fs.ctx, "cannot handle frame navigation: %w", err)
 	}
 }
 
@@ -652,7 +652,7 @@ func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequ
 	if event.Disposition == "currentTab" {
 		err := fs.manager.frameRequestedNavigation(event.FrameID, event.URL, "")
 		if err != nil {
-			k6.Panic(fs.ctx, "cannot handle frame requested navigation: %w", err)
+			k6ext.Panic(fs.ctx, "cannot handle frame requested navigation: %w", err)
 		}
 	}
 }
@@ -809,7 +809,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 			return // ignore
 		}
 		reason = "fatal"
-		k6.Panic(fs.ctx, "cannot attach %v: %w", ti.Type, err)
+		k6ext.Panic(fs.ctx, "cannot attach %v: %w", ti.Type, err)
 	}
 }
 

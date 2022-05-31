@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/k6/k6test"
+	"github.com/grafana/xk6-browser/k6ext/k6test"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"

@@ -16,7 +16,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	k6common "go.k6.io/k6/js/common"
@@ -48,7 +48,7 @@ type BrowserType struct {
 // - Initializes the goja runtime.
 func NewBrowserType(ctx context.Context) api.BrowserType {
 	var (
-		vu    = k6.GetVU(ctx)
+		vu    = k6ext.GetVU(ctx)
 		rt    = vu.Runtime()
 		hooks = common.NewHooks()
 	)
@@ -151,8 +151,8 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 
 	// attach the browser process ID to the context
 	// so that we can kill it afterward if it lingers
-	// see: k6.Panic function.
-	b.Ctx = k6.WithProcessID(b.Ctx, browserProc.Pid())
+	// see: k6ext.Panic function.
+	b.Ctx = k6ext.WithProcessID(b.Ctx, browserProc.Pid())
 	browser, err := common.NewBrowser(b.Ctx, b.CancelFn, browserProc, launchOpts, logger)
 	if err != nil {
 		k6common.Throw(rt, err)
@@ -408,7 +408,7 @@ func parseWebsocketURL(ctx context.Context, rc io.Reader) (wsURL string, _ error
 // makeLogger makes and returns an extension wide logger.
 func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*log.Logger, error) {
 	var (
-		k6Logger            = k6.GetVU(ctx).State().Logger
+		k6Logger            = k6ext.GetVU(ctx).State().Logger
 		reCategoryFilter, _ = regexp.Compile(launchOpts.LogCategoryFilter)
 		logger              = log.New(k6Logger, launchOpts.Debug, reCategoryFilter)
 	)

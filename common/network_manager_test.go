@@ -6,7 +6,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/grafana/xk6-browser/k6/k6test"
+	"github.com/grafana/xk6-browser/k6ext/k6test"
 	"github.com/grafana/xk6-browser/log"
 
 	k6lib "go.k6.io/k6/lib"

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
@@ -100,7 +100,7 @@ func NewFrame(
 		parentFrame:            parentFrame,
 		childFrames:            make(map[api.Frame]bool),
 		id:                     frameID,
-		vu:                     k6.GetVU(ctx),
+		vu:                     k6ext.GetVU(ctx),
 		lifecycleEvents:        make(map[LifecycleEvent]bool),
 		subtreeLifecycleEvents: make(map[LifecycleEvent]bool),
 		inflightRequests:       make(map[network.RequestID]bool),
@@ -671,12 +671,12 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 }
 
 func (f *Frame) AddScriptTag(opts goja.Value) {
-	k6.Panic(f.ctx, "Frame.AddScriptTag() has not been implemented yet")
+	k6ext.Panic(f.ctx, "Frame.AddScriptTag() has not been implemented yet")
 	applySlowMo(f.ctx)
 }
 
 func (f *Frame) AddStyleTag(opts goja.Value) {
-	k6.Panic(f.ctx, "Frame.AddStyleTag() has not been implemented yet")
+	k6ext.Panic(f.ctx, "Frame.AddStyleTag() has not been implemented yet")
 	applySlowMo(f.ctx)
 }
 
@@ -687,7 +687,7 @@ func (f *Frame) Check(selector string, opts goja.Value) {
 	parsedOpts := NewFrameCheckOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
@@ -698,7 +698,7 @@ func (f *Frame) Check(selector string, opts goja.Value) {
 	)
 	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -722,10 +722,10 @@ func (f *Frame) Click(selector string, opts goja.Value) {
 
 	popts := NewFrameClickOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 	if err := f.click(selector, popts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -767,7 +767,7 @@ func (f *Frame) Dblclick(selector string, opts goja.Value) {
 	parsedOpts := NewFrameDblClickOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
@@ -778,7 +778,7 @@ func (f *Frame) Dblclick(selector string, opts goja.Value) {
 	)
 	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -789,7 +789,7 @@ func (f *Frame) DispatchEvent(selector string, typ string, eventInit goja.Value,
 
 	parsedOpts := NewFrameDblClickOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -801,7 +801,7 @@ func (f *Frame) DispatchEvent(selector string, typ string, eventInit goja.Value,
 	)
 	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -819,7 +819,7 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 	}
 	result, err := f.evaluate(f.ctx, mainWorld, opts, pageFunc, args...)
 	if err != nil {
-		k6.Panic(f.ctx, "error calling evaluate: %w", err)
+		k6ext.Panic(f.ctx, "error calling evaluate: %w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -838,13 +838,13 @@ func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle 
 	{
 		ec := f.executionContexts[mainWorld]
 		if ec == nil {
-			k6.Panic(f.ctx, "cannot find execution context: %q", mainWorld)
+			k6ext.Panic(f.ctx, "cannot find execution context: %q", mainWorld)
 		}
 		handle, err = ec.EvalHandle(f.ctx, pageFunc, args...)
 	}
 	f.executionContextMu.RUnlock()
 	if err != nil {
-		k6.Panic(f.ctx, "error evaluating handle: %w", err)
+		k6ext.Panic(f.ctx, "error evaluating handle: %w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -856,7 +856,7 @@ func (f *Frame) Fill(selector string, value string, opts goja.Value) {
 
 	parsedOpts := NewFrameFillOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -868,7 +868,7 @@ func (f *Frame) Fill(selector string, value string, opts goja.Value) {
 	)
 	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -880,7 +880,7 @@ func (f *Frame) Focus(selector string, opts goja.Value) {
 
 	parsedOpts := NewFrameBaseOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -891,7 +891,7 @@ func (f *Frame) Focus(selector string, opts goja.Value) {
 	)
 	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -902,7 +902,7 @@ func (f *Frame) FrameElement() api.ElementHandle {
 
 	element, err := f.page.getFrameElement(f)
 	if err != nil {
-		k6.Panic(f.ctx, "error getting frame element: %w", err)
+		k6ext.Panic(f.ctx, "error getting frame element: %w", err)
 	}
 	return element
 }
@@ -912,7 +912,7 @@ func (f *Frame) GetAttribute(selector string, name string, opts goja.Value) goja
 
 	parsedOpts := NewFrameBaseOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "error getting attribute: %w", err)
+		k6ext.Panic(f.ctx, "error getting attribute: %w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -923,7 +923,7 @@ func (f *Frame) GetAttribute(selector string, name string, opts goja.Value) goja
 	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "error getting attribute: %w", err)
+		k6ext.Panic(f.ctx, "error getting attribute: %w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -944,7 +944,7 @@ func (f *Frame) Hover(selector string, opts goja.Value) {
 	parsedOpts := NewFrameHoverOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
@@ -955,7 +955,7 @@ func (f *Frame) Hover(selector string, opts goja.Value) {
 	)
 	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -967,7 +967,7 @@ func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
 
 	parsedOpts := NewFrameInnerHTMLOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -978,7 +978,7 @@ func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
 	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -989,7 +989,7 @@ func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
 
 	val, ok := value.(goja.Value)
 	if !ok {
-		k6.Panic(f.ctx, "unexpected innerHTML value type: %T", value)
+		k6ext.Panic(f.ctx, "unexpected innerHTML value type: %T", value)
 	}
 
 	return val.ToString().String()
@@ -1001,7 +1001,7 @@ func (f *Frame) InnerText(selector string, opts goja.Value) string {
 
 	parsedOpts := NewFrameInnerTextOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1012,7 +1012,7 @@ func (f *Frame) InnerText(selector string, opts goja.Value) string {
 	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1023,7 +1023,7 @@ func (f *Frame) InnerText(selector string, opts goja.Value) string {
 
 	val, ok := value.(goja.Value)
 	if !ok {
-		k6.Panic(f.ctx, "unexpected innerText value type: %T", value)
+		k6ext.Panic(f.ctx, "unexpected innerText value type: %T", value)
 	}
 
 	return val.ToString().String()
@@ -1034,7 +1034,7 @@ func (f *Frame) InputValue(selector string, opts goja.Value) string {
 
 	parsedOpts := NewFrameInputValueOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1045,7 +1045,7 @@ func (f *Frame) InputValue(selector string, opts goja.Value) string {
 	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1057,7 +1057,7 @@ func (f *Frame) IsChecked(selector string, opts goja.Value) bool {
 
 	parsedOpts := NewFrameIsCheckedOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1072,7 +1072,7 @@ func (f *Frame) IsChecked(selector string, opts goja.Value) bool {
 	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1100,7 +1100,7 @@ func (f *Frame) IsDisabled(selector string, opts goja.Value) bool {
 
 	parsedOpts := NewFrameIsDisabledOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1115,7 +1115,7 @@ func (f *Frame) IsDisabled(selector string, opts goja.Value) bool {
 	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1127,7 +1127,7 @@ func (f *Frame) IsEditable(selector string, opts goja.Value) bool {
 
 	parsedOpts := NewFrameIsEditableOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1142,7 +1142,7 @@ func (f *Frame) IsEditable(selector string, opts goja.Value) bool {
 	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1154,7 +1154,7 @@ func (f *Frame) IsEnabled(selector string, opts goja.Value) bool {
 
 	parsedOpts := NewFrameIsEnabledOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1169,7 +1169,7 @@ func (f *Frame) IsEnabled(selector string, opts goja.Value) bool {
 	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1181,7 +1181,7 @@ func (f *Frame) IsHidden(selector string, opts goja.Value) bool {
 
 	parsedOpts := NewFrameIsHiddenOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1196,7 +1196,7 @@ func (f *Frame) IsHidden(selector string, opts goja.Value) bool {
 	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1208,7 +1208,7 @@ func (f *Frame) IsVisible(selector string, opts goja.Value) bool {
 
 	parsedOpts := NewFrameIsVisibleOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1223,7 +1223,7 @@ func (f *Frame) IsVisible(selector string, opts goja.Value) bool {
 	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1268,7 +1268,7 @@ func (f *Frame) Query(selector string) api.ElementHandle {
 
 	document, err := f.document()
 	if err != nil {
-		k6.Panic(f.ctx, "error getting document: %w", err)
+		k6ext.Panic(f.ctx, "error getting document: %w", err)
 	}
 	value := document.Query(selector)
 	if value != nil {
@@ -1282,7 +1282,7 @@ func (f *Frame) QueryAll(selector string) []api.ElementHandle {
 
 	document, err := f.document()
 	if err != nil {
-		k6.Panic(f.ctx, "error getting document: %w", err)
+		k6ext.Panic(f.ctx, "error getting document: %w", err)
 	}
 	value := document.QueryAll(selector)
 	if value != nil {
@@ -1306,7 +1306,7 @@ func (f *Frame) Press(selector string, key string, opts goja.Value) {
 
 	parsedOpts := NewFramePressOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1318,7 +1318,7 @@ func (f *Frame) Press(selector string, key string, opts goja.Value) {
 	)
 	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1329,7 +1329,7 @@ func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value
 
 	parsedOpts := NewFrameSelectOptionOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1341,12 +1341,12 @@ func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value
 	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	arrayHandle, ok := value.(api.JSHandle)
 	if !ok {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 	properties := arrayHandle.GetProperties()
 	strArr := make([]string, 0, len(properties))
@@ -1366,7 +1366,7 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 
 	parsedOpts := NewFrameSetContentOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(f.ctx, "failed parsing options: %w", err)
 	}
 
 	js := `(html) => {
@@ -1384,14 +1384,14 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 	}
 	rt := f.vu.Runtime()
 	if _, err := f.evaluate(f.ctx, utilityWorld, eopts, rt.ToValue(js), rt.ToValue(html)); err != nil {
-		k6.Panic(f.ctx, "error setting content: %w", err)
+		k6ext.Panic(f.ctx, "error setting content: %w", err)
 	}
 
 	applySlowMo(f.ctx)
 }
 
 func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value) {
-	k6.Panic(f.ctx, "Frame.setInputFiles(selector, files, opts) has not been implemented yet")
+	k6ext.Panic(f.ctx, "Frame.setInputFiles(selector, files, opts) has not been implemented yet")
 	// TODO: needs slowMo
 }
 
@@ -1401,7 +1401,7 @@ func (f *Frame) Tap(selector string, opts goja.Value) {
 	parsedOpts := NewFrameTapOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
@@ -1412,7 +1412,7 @@ func (f *Frame) Tap(selector string, opts goja.Value) {
 	)
 	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1424,7 +1424,7 @@ func (f *Frame) TextContent(selector string, opts goja.Value) string {
 
 	parsedOpts := NewFrameTextContentOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1435,7 +1435,7 @@ func (f *Frame) TextContent(selector string, opts goja.Value) string {
 	)
 	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1446,7 +1446,7 @@ func (f *Frame) TextContent(selector string, opts goja.Value) string {
 
 	val, ok := value.(goja.Value)
 	if !ok {
-		k6.Panic(f.ctx, "unexpected textContent value type: %T", value)
+		k6ext.Panic(f.ctx, "unexpected textContent value type: %T", value)
 	}
 
 	return val.ToString().String()
@@ -1464,7 +1464,7 @@ func (f *Frame) Type(selector string, text string, opts goja.Value) {
 
 	parsedOpts := NewFrameTypeOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
@@ -1476,7 +1476,7 @@ func (f *Frame) Type(selector string, text string, opts goja.Value) {
 	)
 	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1488,7 +1488,7 @@ func (f *Frame) Uncheck(selector string, opts goja.Value) {
 	parsedOpts := NewFrameUncheckOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
@@ -1499,7 +1499,7 @@ func (f *Frame) Uncheck(selector string, opts goja.Value) {
 	)
 	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1532,7 +1532,7 @@ func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.V
 	parsedOpts := NewFrameWaitForFunctionOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6.Panic(f.ctx, "error parsing waitForFunction options: %w", err)
+		k6ext.Panic(f.ctx, "error parsing waitForFunction options: %w", err)
 	}
 
 	f.executionContextMu.RLock()
@@ -1557,7 +1557,7 @@ func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.V
 	promise, err := f.waitForFunction(f.ctx, mainWorld, js,
 		polling, parsedOpts.Timeout, args...)
 	if err != nil {
-		k6.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "%w", err)
 	}
 
 	return promise
@@ -1571,13 +1571,13 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 	parsedOpts := NewFrameWaitForLoadStateOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6.Panic(f.ctx, "cannot parse waitForLoadState options: %v", err)
+		k6ext.Panic(f.ctx, "cannot parse waitForLoadState options: %v", err)
 	}
 
 	waitUntil := LifecycleEventLoad
 	if state != "" {
 		if err = waitUntil.UnmarshalText([]byte(state)); err != nil {
-			k6.Panic(f.ctx, "waitForLoadState error: %v", err)
+			k6ext.Panic(f.ctx, "waitForLoadState error: %v", err)
 		}
 	}
 
@@ -1589,7 +1589,7 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 		return data.(LifecycleEvent) == waitUntil
 	}, parsedOpts.Timeout)
 	if err != nil {
-		k6.Panic(f.ctx, "cannot waitForEvent: %v", err)
+		k6ext.Panic(f.ctx, "cannot waitForEvent: %v", err)
 	}
 }
 
@@ -1602,11 +1602,11 @@ func (f *Frame) WaitForNavigation(opts goja.Value) api.Response {
 func (f *Frame) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
 	parsedOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6.Panic(f.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(f.ctx, "failed parsing options: %w", err)
 	}
 	handle, err := f.waitForSelectorRetry(selector, parsedOpts, maxRetry)
 	if err != nil {
-		k6.Panic(f.ctx, "error waiting for selector: %w", err)
+		k6ext.Panic(f.ctx, "error waiting for selector: %w", err)
 	}
 	return handle
 }

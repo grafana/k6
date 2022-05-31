@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
@@ -121,7 +121,7 @@ func NewPage(
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
 		routes:           make([]api.Route, 0),
-		vu:               k6.GetVU(ctx),
+		vu:               k6ext.GetVU(ctx),
 		logger:           logger,
 	}
 
@@ -367,15 +367,15 @@ func (p *Page) viewportSize() Size {
 
 // AddInitScript adds script to run in all new frames.
 func (p *Page) AddInitScript(script goja.Value, arg goja.Value) {
-	k6.Panic(p.ctx, "Page.addInitScript(script, arg) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.addInitScript(script, arg) has not been implemented yet")
 }
 
 func (p *Page) AddScriptTag(opts goja.Value) {
-	k6.Panic(p.ctx, "Page.addScriptTag(opts) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.addScriptTag(opts) has not been implemented yet")
 }
 
 func (p *Page) AddStyleTag(opts goja.Value) {
-	k6.Panic(p.ctx, "Page.addStyleTag(opts) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.addStyleTag(opts) has not been implemented yet")
 }
 
 // BringToFront activates the browser tab for this page.
@@ -384,7 +384,7 @@ func (p *Page) BringToFront() {
 
 	action := cdppage.BringToFront()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6.Panic(p.ctx, "unable to bring page to front: %w", err)
+		k6ext.Panic(p.ctx, "unable to bring page to front: %w", err)
 	}
 }
 
@@ -435,7 +435,7 @@ func (p *Page) DispatchEvent(selector string, typ string, eventInit goja.Value, 
 }
 
 func (p *Page) DragAndDrop(source string, target string, opts goja.Value) {
-	k6.Panic(p.ctx, "Page.DragAndDrop(source, target, opts) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.DragAndDrop(source, target, opts) has not been implemented yet")
 }
 
 func (p *Page) EmulateMedia(opts goja.Value) {
@@ -443,7 +443,7 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 
 	parsedOpts := NewPageEmulateMediaOptions(p.mediaType, p.colorScheme, p.reducedMotion)
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6.Panic(p.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(p.ctx, "failed parsing options: %w", err)
 	}
 
 	p.mediaType = parsedOpts.Media
@@ -452,7 +452,7 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 
 	for _, fs := range p.frameSessions {
 		if err := fs.updateEmulateMedia(false); err != nil {
-			k6.Panic(p.ctx, "error emulating media: %w", err)
+			k6ext.Panic(p.ctx, "error emulating media: %w", err)
 		}
 	}
 
@@ -473,12 +473,12 @@ func (p *Page) EmulateVisionDeficiency(typ string) {
 	}
 	t, ok := validTypes[typ]
 	if !ok {
-		k6.Panic(p.ctx, "unsupported vision deficiency: '%s'", typ)
+		k6ext.Panic(p.ctx, "unsupported vision deficiency: '%s'", typ)
 	}
 
 	action := emulation.SetEmulatedVisionDeficiency(t)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6.Panic(p.ctx, "unable to set emulated vision deficiency '%s': %w", typ, err)
+		k6ext.Panic(p.ctx, "unable to set emulated vision deficiency '%s': %w", typ, err)
 	}
 
 	applySlowMo(p.ctx)
@@ -498,11 +498,11 @@ func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHan
 }
 
 func (p *Page) ExposeBinding(name string, callback goja.Callable, opts goja.Value) {
-	k6.Panic(p.ctx, "Page.exposeBinding(name, callback) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.exposeBinding(name, callback) has not been implemented yet")
 }
 
 func (p *Page) ExposeFunction(name string, callback goja.Callable) {
-	k6.Panic(p.ctx, "Page.exposeFunction(name, callback) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.exposeFunction(name, callback) has not been implemented yet")
 }
 
 func (p *Page) Fill(selector string, value string, opts goja.Value) {
@@ -518,7 +518,7 @@ func (p *Page) Focus(selector string, opts goja.Value) {
 }
 
 func (p *Page) Frame(frameSelector goja.Value) api.Frame {
-	k6.Panic(p.ctx, "Page.frame(frameSelector) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.frame(frameSelector) has not been implemented yet")
 	return nil
 }
 
@@ -535,12 +535,12 @@ func (p *Page) GetAttribute(selector string, name string, opts goja.Value) goja.
 }
 
 func (p *Page) GoBack(opts goja.Value) api.Response {
-	k6.Panic(p.ctx, "Page.goBack(opts) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.goBack(opts) has not been implemented yet")
 	return nil
 }
 
 func (p *Page) GoForward(opts goja.Value) api.Response {
-	k6.Panic(p.ctx, "Page.goForward(opts) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.goForward(opts) has not been implemented yet")
 	return nil
 }
 
@@ -646,12 +646,12 @@ func (p *Page) Opener() api.Page {
 }
 
 func (p *Page) Pause() {
-	k6.Panic(p.ctx, "Page.pause() has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.pause() has not been implemented yet")
 }
 
 func (p *Page) Pdf(opts goja.Value) goja.ArrayBuffer {
 	rt := p.vu.Runtime()
-	k6.Panic(p.ctx, "Page.pdf(opts) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.pdf(opts) has not been implemented yet")
 	return rt.NewArrayBuffer([]byte{})
 }
 
@@ -679,7 +679,7 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 
 	parsedOpts := NewPageReloadOptions(LifecycleEventLoad, p.defaultTimeout())
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6.Panic(p.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(p.ctx, "failed parsing options: %w", err)
 	}
 
 	ch, evCancelFn := createWaitForEventHandler(p.ctx, p.frameManager.MainFrame(), []string{EventFrameNavigation}, func(data interface{}) bool {
@@ -689,14 +689,14 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 
 	action := cdppage.Reload()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6.Panic(p.ctx, "unable to reload page: %w", err)
+		k6ext.Panic(p.ctx, "unable to reload page: %w", err)
 	}
 
 	var event *NavigationEvent
 	select {
 	case <-p.ctx.Done():
 	case <-time.After(parsedOpts.Timeout):
-		k6.Panic(p.ctx, "%w", ErrTimedOut)
+		k6ext.Panic(p.ctx, "%w", ErrTimedOut)
 	case data := <-ch:
 		event = data.(*NavigationEvent)
 	}
@@ -719,19 +719,19 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 }
 
 func (p *Page) Route(url goja.Value, handler goja.Callable) {
-	k6.Panic(p.ctx, "Page.route(url, handler) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.route(url, handler) has not been implemented yet")
 }
 
 // Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file.
 func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	parsedOpts := NewPageScreenshotOptions()
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6.Panic(p.ctx, "failed parsing screenshot options: %w", err)
+		k6ext.Panic(p.ctx, "failed parsing screenshot options: %w", err)
 	}
 	s := newScreenshotter(p.ctx)
 	buf, err := s.screenshotPage(p, parsedOpts)
 	if err != nil {
-		k6.Panic(p.ctx, "cannot capture screenshot: %w", err)
+		k6ext.Panic(p.ctx, "cannot capture screenshot: %w", err)
 	}
 	rt := p.vu.Runtime()
 	return rt.NewArrayBuffer(*buf)
@@ -772,7 +772,7 @@ func (p *Page) SetExtraHTTPHeaders(headers map[string]string) {
 }
 
 func (p *Page) SetInputFiles(selector string, files goja.Value, opts goja.Value) {
-	k6.Panic(p.ctx, "Page.textContent(selector, opts) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.textContent(selector, opts) has not been implemented yet")
 	// TODO: needs slowMo
 }
 
@@ -782,10 +782,10 @@ func (p *Page) SetViewportSize(viewportSize goja.Value) {
 
 	s := &Size{}
 	if err := s.Parse(p.ctx, viewportSize); err != nil {
-		k6.Panic(p.ctx, "error parsing viewport size: %w", err)
+		k6ext.Panic(p.ctx, "error parsing viewport size: %w", err)
 	}
 	if err := p.setViewportSize(s); err != nil {
-		k6.Panic(p.ctx, "error setting viewport size: %w", err)
+		k6ext.Panic(p.ctx, "error setting viewport size: %w", err)
 	}
 	applySlowMo(p.ctx)
 }
@@ -823,7 +823,7 @@ func (p *Page) Uncheck(selector string, opts goja.Value) {
 }
 
 func (p *Page) Unroute(url goja.Value, handler goja.Callable) {
-	k6.Panic(p.ctx, "Page.unroute(url, handler) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.unroute(url, handler) has not been implemented yet")
 }
 
 // URL returns the location of the page.
@@ -834,7 +834,7 @@ func (p *Page) URL() string {
 
 // Video returns information of recorded video.
 func (p *Page) Video() api.Video {
-	k6.Panic(p.ctx, "Page.video() has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.video() has not been implemented yet")
 	return nil
 }
 
@@ -851,7 +851,7 @@ func (p *Page) ViewportSize() map[string]float64 {
 
 // WaitForEvent waits for the specified event to trigger.
 func (p *Page) WaitForEvent(event string, optsOrPredicate goja.Value) interface{} {
-	k6.Panic(p.ctx, "Page.waitForEvent(event, optsOrPredicate) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.waitForEvent(event, optsOrPredicate) has not been implemented yet")
 	return nil
 }
 
@@ -877,12 +877,12 @@ func (p *Page) WaitForNavigation(opts goja.Value) api.Response {
 }
 
 func (p *Page) WaitForRequest(urlOrPredicate, opts goja.Value) api.Request {
-	k6.Panic(p.ctx, "Page.waitForRequest(urlOrPredicate, opts) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.waitForRequest(urlOrPredicate, opts) has not been implemented yet")
 	return nil
 }
 
 func (p *Page) WaitForResponse(urlOrPredicate, opts goja.Value) api.Response {
-	k6.Panic(p.ctx, "Page.waitForResponse(urlOrPredicate, opts) has not been implemented yet")
+	k6ext.Panic(p.ctx, "Page.waitForResponse(urlOrPredicate, opts) has not been implemented yet")
 	return nil
 }
 

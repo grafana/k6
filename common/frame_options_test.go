@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/xk6-browser/k6/k6test"
+	"github.com/grafana/xk6-browser/k6ext/k6test"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

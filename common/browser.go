@@ -27,17 +27,18 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6ext"
+	"github.com/grafana/xk6-browser/log"
+
+	k6modules "go.k6.io/k6/js/modules"
+
 	"github.com/chromedp/cdproto"
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
-	k6modules "go.k6.io/k6/js/modules"
-
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/k6"
-	"github.com/grafana/xk6-browser/log"
 )
 
 // Ensure Browser implements the EventEmitter and Browser interfaces.
@@ -119,7 +120,7 @@ func newBrowser(
 		contexts:            make(map[cdp.BrowserContextID]*BrowserContext),
 		pages:               make(map[target.ID]*Page),
 		sessionIDtoTargetID: make(map[target.SessionID]target.ID),
-		vu:                  k6.GetVU(ctx),
+		vu:                  k6ext.GetVU(ctx),
 		logger:              logger,
 	}
 }
@@ -259,7 +260,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 					ev.SessionID, evti.TargetID, b.ctx.Err())
 				return // ignore
 			default:
-				k6.Panic(b.ctx, "cannot create NewPage for background_page event: %w", err)
+				k6ext.Panic(b.ctx, "cannot create NewPage for background_page event: %w", err)
 			}
 		}
 
@@ -298,7 +299,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 					ev.SessionID, evti.TargetID, b.ctx.Err())
 				return // ignore
 			default:
-				k6.Panic(b.ctx, "cannot create NewPage for page event: %w", err)
+				k6ext.Panic(b.ctx, "cannot create NewPage for page event: %w", err)
 			}
 		}
 
@@ -413,7 +414,7 @@ func (b *Browser) Close() {
 	action := cdpbrowser.Close()
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
 		if _, ok := err.(*websocket.CloseError); !ok {
-			k6.Panic(b.ctx, "unable to execute %T: %v", action, err)
+			k6ext.Panic(b.ctx, "unable to execute %T: %v", action, err)
 		}
 	}
 
@@ -450,12 +451,12 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 	browserContextID, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
 	if err != nil {
-		k6.Panic(b.ctx, "cannot create browser context (%s): %w", browserContextID, err)
+		k6ext.Panic(b.ctx, "cannot create browser context (%s): %w", browserContextID, err)
 	}
 
 	browserCtxOpts := NewBrowserContextOptions()
 	if err := browserCtxOpts.Parse(b.ctx, opts); err != nil {
-		k6.Panic(b.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(b.ctx, "failed parsing options: %w", err)
 	}
 
 	b.contextsMu.Lock()
@@ -476,7 +477,7 @@ func (b *Browser) NewPage(opts goja.Value) api.Page {
 // The only accepted event value is "disconnected".
 func (b *Browser) On(event string) *goja.Promise {
 	if event != EventBrowserDisconnected {
-		k6.Panic(b.ctx, "unknown browser event: %q, must be %q", event, EventBrowserDisconnected)
+		k6ext.Panic(b.ctx, "unknown browser event: %q, must be %q", event, EventBrowserDisconnected)
 	}
 
 	rt := b.vu.Runtime()
@@ -506,7 +507,7 @@ func (b *Browser) UserAgent() string {
 	action := cdpbrowser.GetVersion()
 	_, _, _, ua, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	if err != nil {
-		k6.Panic(b.ctx, "unable to get browser user agent: %w", err)
+		k6ext.Panic(b.ctx, "unable to get browser user agent: %w", err)
 	}
 	return ua
 }
@@ -516,7 +517,7 @@ func (b *Browser) Version() string {
 	action := cdpbrowser.GetVersion()
 	_, product, _, _, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	if err != nil {
-		k6.Panic(b.ctx, "unable to get browser version: %w", err)
+		k6ext.Panic(b.ctx, "unable to get browser version: %w", err)
 	}
 	i := strings.Index(product, "/")
 	if i == -1 {

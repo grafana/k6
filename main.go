@@ -26,7 +26,7 @@ import (
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/k6ext"
 
 	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
@@ -44,7 +44,7 @@ type (
 	// JSModule is the entrypoint into the browser JS module.
 	JSModule struct {
 		vu        k6modules.VU
-		k6Metrics *k6.CustomMetrics
+		k6Metrics *k6ext.CustomMetrics
 		Devices   map[string]common.Device
 		Version   string
 	}
@@ -68,7 +68,7 @@ func New() *RootModule {
 // NewModuleInstance implements the k6modules.Module interface to return
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
-	k6m := k6.RegisterCustomMetrics(vu.InitEnv().Registry)
+	k6m := k6ext.RegisterCustomMetrics(vu.InitEnv().Registry)
 	return &ModuleInstance{
 		mod: &JSModule{
 			vu:        vu,
@@ -96,8 +96,8 @@ func (m *JSModule) Launch(browserName string, opts goja.Value) api.Browser {
 		<-ctx.Done()
 	}()*/
 
-	ctx := k6.WithVU(m.vu.Context(), m.vu)
-	ctx = k6.WithCustomMetrics(ctx, m.k6Metrics)
+	ctx := k6ext.WithVU(m.vu.Context(), m.vu)
+	ctx = k6ext.WithCustomMetrics(ctx, m.k6Metrics)
 
 	if browserName == "chromium" {
 		bt := chromium.NewBrowserType(ctx)

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/k6ext"
 
 	k6common "go.k6.io/k6/js/common"
 	k6eventloop "go.k6.io/k6/js/eventloop"
@@ -66,7 +66,7 @@ func NewVU(tb testing.TB) *VU {
 			StateField: state,
 		},
 	}
-	ctx := k6.WithVU(context.Background(), vu)
+	ctx := k6ext.WithVU(context.Background(), vu)
 	vu.CtxField = ctx
 
 	loop := k6eventloop.New(vu)

@@ -1,4 +1,4 @@
-package k6
+package k6ext
 
 import k6metrics "go.k6.io/k6/metrics"
 

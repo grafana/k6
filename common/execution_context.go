@@ -28,7 +28,7 @@ import (
 	"regexp"
 
 	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
@@ -90,7 +90,7 @@ func NewExecutionContext(
 		frame:          f,
 		id:             id,
 		injectedScript: nil,
-		vu:             k6.GetVU(ctx),
+		vu:             k6ext.GetVU(ctx),
 		logger:         l,
 	}
 	if s != nil {

@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/k6"
+	"github.com/grafana/xk6-browser/k6ext"
 
 	k6modules "go.k6.io/k6/js/modules"
 
@@ -98,7 +98,7 @@ func NewRequest(
 		errorText:           "",
 		timestamp:           event.Timestamp.Time(),
 		wallTime:            event.WallTime.Time(),
-		vu:                  k6.GetVU(ctx),
+		vu:                  k6ext.GetVU(ctx),
 	}
 	for n, v := range event.Request.Headers {
 		switch v := v.(type) {
@@ -154,7 +154,7 @@ func (r *Request) AllHeaders() map[string]string {
 }
 
 func (r *Request) Failure() goja.Value {
-	k6.Panic(r.ctx, "Request.failure() has not been implemented yet")
+	k6ext.Panic(r.ctx, "Request.failure() has not been implemented yet")
 	return nil
 }
 
@@ -215,17 +215,17 @@ func (r *Request) PostDataBuffer() goja.ArrayBuffer {
 
 // PostDataJSON returns the request post data as a JS object.
 func (r *Request) PostDataJSON() string {
-	k6.Panic(r.ctx, "Request.postDataJSON() has not been implemented yet")
+	k6ext.Panic(r.ctx, "Request.postDataJSON() has not been implemented yet")
 	return ""
 }
 
 func (r *Request) RedirectedFrom() api.Request {
-	k6.Panic(r.ctx, "Request.redirectedFrom() has not been implemented yet")
+	k6ext.Panic(r.ctx, "Request.redirectedFrom() has not been implemented yet")
 	return nil
 }
 
 func (r *Request) RedirectedTo() api.Request {
-	k6.Panic(r.ctx, "Request.redirectedTo() has not been implemented yet")
+	k6ext.Panic(r.ctx, "Request.redirectedTo() has not been implemented yet")
 	return nil
 }
 
