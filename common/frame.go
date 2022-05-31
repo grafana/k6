@@ -749,15 +749,24 @@ func (f *Frame) Content() string {
 	f.log.Debugf("Frame:Content", "fid:%s furl:%q", f.ID(), f.URL())
 
 	rt := f.vu.Runtime()
-	js := `let content = '';
-		if (document.doctype) {
-			content = new XMLSerializer().serializeToString(document.doctype);
-		}
-		if (document.documentElement) {
-			content += document.documentElement.outerHTML;
-		}
-		return content;`
-	return f.Evaluate(rt.ToValue(js)).(string)
+	js := `() => {
+			let content = '';
+			if (document.doctype) {
+				content = new XMLSerializer().serializeToString(document.doctype);
+			}
+			if (document.documentElement) {
+				content += document.documentElement.outerHTML;
+			}
+			return content;
+		}`
+
+	c := f.Evaluate(rt.ToValue(js))
+	content, ok := c.(goja.Value)
+	if !ok {
+		k6.Panic(f.ctx, "unexpected content() value type: %T", c)
+	}
+
+	return content.ToString().String()
 }
 
 // Dblclick double clicks an element matching provided selector.

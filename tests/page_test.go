@@ -74,6 +74,18 @@ func TestPageEmulateMedia(t *testing.T) {
 	assert.True(t, res.ToBoolean(), "expected reduced motion setting to be 'reduce'")
 }
 
+func TestPageContent(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+
+	content := `<!DOCTYPE html><html><head></head><body><h1>Hello</h1></body></html>`
+	p.SetContent(content, nil)
+
+	assert.Equal(t, content, p.Content())
+}
+
 func TestPageEvaluate(t *testing.T) {
 	t.Parallel()
 
