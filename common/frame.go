@@ -763,7 +763,7 @@ func (f *Frame) Content() string {
 	c := f.Evaluate(rt.ToValue(js))
 	content, ok := c.(goja.Value)
 	if !ok {
-		k6.Panic(f.ctx, "unexpected content() value type: %T", c)
+		k6ext.Panic(f.ctx, "unexpected content() value type: %T", c)
 	}
 
 	return content.ToString().String()
