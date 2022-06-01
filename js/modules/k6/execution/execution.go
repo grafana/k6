@@ -29,6 +29,7 @@ import (
 
 	"github.com/dop251/goja"
 
+	"go.k6.io/k6/errext"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
@@ -176,11 +177,11 @@ func (mi *ModuleInstance) newTestInfo() (*goja.Object, error) {
 		// stop the test run
 		"abort": func() interface{} {
 			return func(msg goja.Value) {
-				reason := common.AbortTest
+				reason := errext.AbortTest
 				if msg != nil && !goja.IsUndefined(msg) {
 					reason = fmt.Sprintf("%s: %s", reason, msg.String())
 				}
-				rt.Interrupt(&common.InterruptError{Reason: reason})
+				rt.Interrupt(&errext.InterruptError{Reason: reason})
 			}
 		},
 		"options": func() interface{} {

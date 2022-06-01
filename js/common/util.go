@@ -29,6 +29,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/errext"
 )
 
 // Throw a JS error; avoids re-wrapping GoErrors.
@@ -89,7 +90,7 @@ func RunWithPanicCatching(logger logrus.FieldLogger, rt *goja.Runtime, fn func()
 		if r := recover(); r != nil {
 			gojaStack := rt.CaptureCallStack(20, nil)
 
-			err = &InterruptError{Reason: fmt.Sprintf("a panic occurred during JS execution: %s", r)}
+			err = &errext.InterruptError{Reason: fmt.Sprintf("a panic occurred during JS execution: %s", r)}
 			// TODO figure out how to use PanicLevel without panicing .. this might require changing
 			// the logger we use see
 			// https://github.com/sirupsen/logrus/issues/1028

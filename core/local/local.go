@@ -30,7 +30,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/errext"
-	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/metrics"
@@ -485,7 +484,7 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut ch
 			return err
 		}
 	}
-	if err := executor.CancelReason(execCtx); err != nil && common.IsInterruptError(err) {
+	if err := executor.CancelReason(execCtx); err != nil && errext.IsInterruptError(err) {
 		interrupted = true
 		return err
 	}

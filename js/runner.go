@@ -751,7 +751,7 @@ func (u *ActiveVU) RunOnce() error {
 	if err != nil {
 		var x *goja.InterruptedError
 		if errors.As(err, &x) {
-			if v, ok := x.Value().(*common.InterruptError); ok {
+			if v, ok := x.Value().(*errext.InterruptError); ok {
 				v.Reason = x.Error()
 				err = v
 			}
@@ -872,6 +872,6 @@ func (s *scriptException) Hint() string {
 	return "script exception"
 }
 
-func (s *scriptException) ExitCode() errext.ExitCode {
+func (s *scriptException) ExitCode() exitcodes.ExitCode {
 	return exitcodes.ScriptException
 }

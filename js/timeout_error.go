@@ -65,7 +65,7 @@ func (t timeoutError) Hint() string {
 }
 
 // ExitCode returns the coresponding exit code value to the place.
-func (t timeoutError) ExitCode() errext.ExitCode {
+func (t timeoutError) ExitCode() exitcodes.ExitCode {
 	// TODO: add handleSummary()
 	switch t.place {
 	case consts.SetupFn:
