@@ -6,4 +6,6 @@ import "github.com/dop251/goja"
 type Locator interface {
 	// Click on an element using locator's selector with strict mode on.
 	Click(opts goja.Value)
+	// Dblclick double clicks on an element using locator's selector with strict mode on.
+	Dblclick(opts goja.Value)
 }
