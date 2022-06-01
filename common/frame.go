@@ -773,24 +773,27 @@ func (f *Frame) Content() string {
 func (f *Frame) Dblclick(selector string, opts goja.Value) {
 	f.log.Debugf("Frame:DblClick", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameDblClickOptions(f.defaultTimeout())
-	err := parsedOpts.Parse(f.ctx, opts)
-	if err != nil {
+	popts := NewFrameDblClickOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
-		return nil, handle.dblClick(p, parsedOpts.ToMouseClickOptions())
-	}
-	actFn := f.newPointerAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
-	)
-	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
+	if err := f.dblclick(selector, popts); err != nil {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
-
 	applySlowMo(f.ctx)
+}
+
+// dblclick is like Dblclick but takes parsed options and neither throws
+// an error, or applies slow motion.
+func (f *Frame) dblclick(selector string, opts *FrameDblclickOptions) error {
+	dblclick := func(apiCtx context.Context, eh *ElementHandle, p *Position) (interface{}, error) {
+		return nil, eh.dblClick(p, opts.ToMouseClickOptions())
+	}
+	act := f.newPointerAction(
+		selector, DOMElementStateAttached, opts.Strict, dblclick, &opts.ElementHandleBasePointerOptions,
+	)
+	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	return err
 }
 
 func (f *Frame) DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value) {
