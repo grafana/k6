@@ -11,6 +11,9 @@ import (
 )
 
 func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
+	if os.Getenv("SKIP_FLAKY") == "true" {
+		t.SkipNow()
+	}
 	t.Parallel()
 
 	var timeout time.Duration = 200
