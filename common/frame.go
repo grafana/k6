@@ -749,24 +749,25 @@ func (f *Frame) check(selector string, opts *FrameCheckOptions) error {
 func (f *Frame) Uncheck(selector string, opts goja.Value) {
 	f.log.Debugf("Frame:Uncheck", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameUncheckOptions(f.defaultTimeout())
-	err := parsedOpts.Parse(f.ctx, opts)
-	if err != nil {
+	popts := NewFrameUncheckOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
+	if err := f.uncheck(selector, popts); err != nil {
+		k6ext.Panic(f.ctx, "%w", err)
+	}
+	applySlowMo(f.ctx)
+}
 
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
+func (f *Frame) uncheck(selector string, opts *FrameUncheckOptions) error {
+	uncheck := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
 		return nil, handle.setChecked(apiCtx, false, p)
 	}
-	actFn := f.newPointerAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
+	act := f.newPointerAction(
+		selector, DOMElementStateAttached, opts.Strict, uncheck, &opts.ElementHandleBasePointerOptions,
 	)
-	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
-
-	applySlowMo(f.ctx)
+	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	return err
 }
 
 // Content returns the HTML content of the frame.
