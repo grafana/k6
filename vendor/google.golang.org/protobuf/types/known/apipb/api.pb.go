@@ -172,7 +172,7 @@ func (x *Api) GetSyntax() typepb.Syntax {
 	if x != nil {
 		return x.Syntax
 	}
-	return typepb.Syntax_SYNTAX_PROTO2
+	return typepb.Syntax(0)
 }
 
 // Method represents a method of an API interface.
@@ -275,7 +275,7 @@ func (x *Method) GetSyntax() typepb.Syntax {
 	if x != nil {
 		return x.Syntax
 	}
-	return typepb.Syntax_SYNTAX_PROTO2
+	return typepb.Syntax(0)
 }
 
 // Declares an API Interface to be included in this interface. The including
