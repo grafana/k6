@@ -680,30 +680,6 @@ func (f *Frame) AddStyleTag(opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
-// Check clicks the first element found that matches selector.
-func (f *Frame) Check(selector string, opts goja.Value) {
-	f.log.Debugf("Frame:Check", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
-
-	parsedOpts := NewFrameCheckOptions(f.defaultTimeout())
-	err := parsedOpts.Parse(f.ctx, opts)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
-		return nil, handle.setChecked(apiCtx, true, p)
-	}
-	actFn := f.newPointerAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
-	)
-	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
-
-	applySlowMo(f.ctx)
-}
-
 // ChildFrames returns a list of child frames.
 func (f *Frame) ChildFrames() []api.Frame {
 	f.childFramesMu.RLock()
@@ -742,6 +718,30 @@ func (f *Frame) click(selector string, opts *FrameClickOptions) error {
 	}
 
 	return nil
+}
+
+// Check clicks the first element found that matches selector.
+func (f *Frame) Check(selector string, opts goja.Value) {
+	f.log.Debugf("Frame:Check", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	parsedOpts := NewFrameCheckOptions(f.defaultTimeout())
+	err := parsedOpts.Parse(f.ctx, opts)
+	if err != nil {
+		k6ext.Panic(f.ctx, "%w", err)
+	}
+
+	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
+		return nil, handle.setChecked(apiCtx, true, p)
+	}
+	actFn := f.newPointerAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
+	)
+	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
+	if err != nil {
+		k6ext.Panic(f.ctx, "%w", err)
+	}
+
+	applySlowMo(f.ctx)
 }
 
 // Content returns the HTML content of the frame.
