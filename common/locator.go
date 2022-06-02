@@ -50,3 +50,26 @@ func (l *Locator) click(opts *FrameClickOptions) error {
 	opts.Strict = true
 	return l.frame.click(l.selector, opts)
 }
+
+// Dblclick double clicks on an element using locator's selector with strict mode on.
+func (l *Locator) Dblclick(opts goja.Value) {
+	l.log.Debugf("Locator:Dblclick", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	var err error
+	defer func() { panicOrSlowMo(l.ctx, err) }()
+
+	copts := NewFrameDblClickOptions(l.frame.defaultTimeout())
+	if err = copts.Parse(l.ctx, opts); err != nil {
+		return
+	}
+	if err = l.dblclick(copts); err != nil {
+		return
+	}
+}
+
+// Dblclick is like Dblclick but takes parsed options and neither throws an
+// error, or applies slow motion.
+func (l *Locator) dblclick(opts *FrameDblclickOptions) error {
+	opts.Strict = true
+	return l.frame.dblclick(l.selector, opts)
+}

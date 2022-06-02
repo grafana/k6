@@ -10,9 +10,13 @@
     <a href="#" onclick="event.preventDefault()">Click</a>
     <script>
         window.result = false;
+        window.dblclick = false;
 
         document.querySelector('#link').addEventListener(
             'click', e => { result = true; }, false
+        );
+        document.querySelector('#link').addEventListener(
+            'dblclick', e => { dblclick = true; }, false
         );
     </script>
 </body>
