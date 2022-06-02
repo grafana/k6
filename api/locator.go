@@ -8,4 +8,6 @@ type Locator interface {
 	Click(opts goja.Value)
 	// Dblclick double clicks on an element using locator's selector with strict mode on.
 	Dblclick(opts goja.Value)
+	// Check element using locator's selector with strict mode on.
+	Check(opts goja.Value)
 }
