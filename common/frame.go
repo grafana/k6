@@ -745,6 +745,30 @@ func (f *Frame) check(selector string, opts *FrameCheckOptions) error {
 	return err
 }
 
+// Uncheck the first found element that matches the selector.
+func (f *Frame) Uncheck(selector string, opts goja.Value) {
+	f.log.Debugf("Frame:Uncheck", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	parsedOpts := NewFrameUncheckOptions(f.defaultTimeout())
+	err := parsedOpts.Parse(f.ctx, opts)
+	if err != nil {
+		k6ext.Panic(f.ctx, "%w", err)
+	}
+
+	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
+		return nil, handle.setChecked(apiCtx, false, p)
+	}
+	actFn := f.newPointerAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
+	)
+	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
+	if err != nil {
+		k6ext.Panic(f.ctx, "%w", err)
+	}
+
+	applySlowMo(f.ctx)
+}
+
 // Content returns the HTML content of the frame.
 func (f *Frame) Content() string {
 	f.log.Debugf("Frame:Content", "fid:%s furl:%q", f.ID(), f.URL())
@@ -1488,29 +1512,6 @@ func (f *Frame) Type(selector string, text string, opts goja.Value) {
 		parsedOpts.NoWaitAfter, parsedOpts.Timeout,
 	)
 	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
-
-	applySlowMo(f.ctx)
-}
-
-func (f *Frame) Uncheck(selector string, opts goja.Value) {
-	f.log.Debugf("Frame:Uncheck", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
-
-	parsedOpts := NewFrameUncheckOptions(f.defaultTimeout())
-	err := parsedOpts.Parse(f.ctx, opts)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
-		return nil, handle.setChecked(apiCtx, false, p)
-	}
-	actFn := f.newPointerAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
-	)
-	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
