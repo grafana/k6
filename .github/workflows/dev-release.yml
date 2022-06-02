@@ -11,7 +11,7 @@ on:
         required: true
       go_version:
         description: 'Go version for building binaries'
-        default: '1.17.x'
+        default: '1.18.x'
         required: true
 
 defaults:

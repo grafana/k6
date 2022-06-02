@@ -25,8 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # We are going to keep 1.16.x version until we move the build process to 1.18.x
-        go-version: [1.16.x, 1.17.x]
+        go-version: [1.17.x]
         platform: [ubuntu-latest, windows-2019]
     runs-on: ${{ matrix.platform }}
     steps:
@@ -156,7 +155,7 @@ jobs:
         uses: actions/setup-go@v2
         with:
           # We plan to move to 1.18.x after the release of the first patch.
-          go-version: 1.17.x
+          go-version: 1.18.x
       - name: Install package builders
         env:
           GO111MODULE: 'off'

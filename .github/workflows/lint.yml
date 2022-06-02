@@ -19,7 +19,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17.x
+          go-version: 1.18.x
       - name: Check dependencies
         run: |
             go version
@@ -41,6 +41,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
+          # up this to 1.18.x when we update teh version of golangci-lint to latest
           go-version: 1.17.x
       - name: Retrieve golangci-lint version
         run: |
