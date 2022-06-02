@@ -10,10 +10,13 @@
     <a href="#" onclick="event.preventDefault()">Click</a>
     <input id="input" type="checkbox" />
     <input type="checkbox" />
+    <input id="checkedInput" type="checkbox" checked />
+    <input type="checkbox" checked />
     <script>
         window.result = false;
         window.dblclick = false;
         window.check = false;
+        window.uncheck = false;
 
         document.querySelector('#link').addEventListener(
             'click', e => { result = true; }, false
@@ -23,6 +26,9 @@
         );
         document.querySelector('#input').addEventListener(
             'change', e => { window.check = e.currentTarget.checked; }, false
+        );
+        document.querySelector('#checkedInput').addEventListener(
+            'change', e => { window.uncheck = !event.currentTarget.checked; }, false
         );
     </script>
 </body>

@@ -96,3 +96,26 @@ func (l *Locator) check(opts *FrameCheckOptions) error {
 	opts.Strict = true
 	return l.frame.check(l.selector, opts)
 }
+
+// Uncheck on an element using locator's selector with strict mode on.
+func (l *Locator) Uncheck(opts goja.Value) {
+	l.log.Debugf("Locator:Uncheck", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	var err error
+	defer func() { panicOrSlowMo(l.ctx, err) }()
+
+	copts := NewFrameUncheckOptions(l.frame.defaultTimeout())
+	if err = copts.Parse(l.ctx, opts); err != nil {
+		return
+	}
+	if err = l.uncheck(copts); err != nil {
+		return
+	}
+}
+
+// uncheck is like Uncheck but takes parsed options and neither throws
+// an error, or applies slow motion.
+func (l *Locator) uncheck(opts *FrameUncheckOptions) error {
+	opts.Strict = true
+	return l.frame.uncheck(l.selector, opts)
+}

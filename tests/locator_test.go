@@ -78,3 +78,29 @@ func TestLocatorCheck(t *testing.T) {
 		)
 	})
 }
+
+func TestLocatorUncheck(t *testing.T) {
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	// Selecting a single element and checking it is OK.
+	t.Run("ok", func(t *testing.T) {
+		uncheck := func() bool {
+			cr := p.Evaluate(tb.toGojaValue(`() => window.uncheck`))
+			return cr.(goja.Value).ToBoolean() //nolint:forcetypeassert
+		}
+		input := p.Locator("#checkedInput", nil)
+		input.Uncheck(nil)
+		require.True(t, uncheck(), "could not uncheck the input box")
+	})
+	// There are two checked input boxes in the document (locators.html).
+	// The strict mode should disallow selecting multiple elements.
+	t.Run("strict", func(t *testing.T) {
+		input := p.Locator("input", nil)
+		require.Panics(t,
+			func() { input.Uncheck(nil) },
+			"should not select multiple elements",
+		)
+	})
+}
