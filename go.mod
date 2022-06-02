@@ -51,7 +51,7 @@ require (
 	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/onsi/gomega v1.10.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
-	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e // indirect
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336 // indirect
 )
