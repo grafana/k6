@@ -58,19 +58,19 @@ func TestLocatorCheck(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	check := func() bool {
-		cr := p.Evaluate(tb.toGojaValue(`() => window.check`))
-		return cr.(goja.Value).ToBoolean() //nolint:forcetypeassert
-	}
-
 	t.Run("check", func(t *testing.T) {
-		checkbox := p.Locator("#inputCheckbox", nil)
-		checkbox.Check(nil)
+		check := func() bool {
+			cr := p.Evaluate(tb.toGojaValue(`() => window.check`))
+			return cr.(goja.Value).ToBoolean() //nolint:forcetypeassert
+		}
+
+		cb := p.Locator("#inputCheckbox", nil)
+		require.False(t, check(), "should be unchecked first")
+
+		cb.Check(nil)
 		require.True(t, check(), "could not check the input box")
-	})
-	t.Run("uncheck", func(t *testing.T) {
-		checkbox := p.Locator("#inputCheckbox", nil)
-		checkbox.Uncheck(nil)
+
+		cb.Uncheck(nil)
 		require.False(t, check(), "could not uncheck the input box")
 	})
 	// There are two input boxes in the document (locators.html).
