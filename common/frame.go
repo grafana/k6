@@ -808,8 +808,6 @@ func (f *Frame) isChecked(selector string, opts *FrameIsCheckedOptions) (bool, e
 		return false, fmt.Errorf("isChecked returned %T; want bool", v)
 	}
 
-	applySlowMo(f.ctx)
-
 	return bv, nil
 }
 
