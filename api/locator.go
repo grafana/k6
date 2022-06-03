@@ -12,4 +12,7 @@ type Locator interface {
 	Check(opts goja.Value)
 	// Uncheck element using locator's selector with strict mode on.
 	Uncheck(opts goja.Value)
+	// IsChecked returns true if the element matches the locator's
+	// selector and is checked. Otherwise, returns false.
+	IsChecked(opts goja.Value) bool
 }
