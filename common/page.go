@@ -388,11 +388,26 @@ func (p *Page) BringToFront() {
 	}
 }
 
-// Check checks an element matching provided selector.
+// Check checks an element matching the provided selector.
 func (p *Page) Check(selector string, opts goja.Value) {
 	p.logger.Debugf("Page:Check", "sid:%v selector:%s", p.sessionID(), selector)
 
 	p.MainFrame().Check(selector, opts)
+}
+
+// Uncheck unchecks an element matching the provided selector.
+func (p *Page) Uncheck(selector string, opts goja.Value) {
+	p.logger.Debugf("Page:Uncheck", "sid:%v selector:%s", p.sessionID(), selector)
+
+	p.MainFrame().Uncheck(selector, opts)
+}
+
+// IsChecked returns true if the first element that matches the selector
+// is checked. Otherwise, returns false.
+func (p *Page) IsChecked(selector string, opts goja.Value) bool {
+	p.logger.Debugf("Page:IsChecked", "sid:%v selector:%s", p.sessionID(), selector)
+
+	return p.MainFrame().IsChecked(selector, opts)
 }
 
 // Click clicks an element matching provided selector.
@@ -573,12 +588,6 @@ func (p *Page) InputValue(selector string, opts goja.Value) string {
 	p.logger.Debugf("Page:InputValue", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().InputValue(selector, opts)
-}
-
-func (p *Page) IsChecked(selector string, opts goja.Value) bool {
-	p.logger.Debugf("Page:IsChecked", "sid:%v selector:%s", p.sessionID(), selector)
-
-	return p.MainFrame().IsChecked(selector, opts)
 }
 
 func (p *Page) IsClosed() bool {
@@ -814,12 +823,6 @@ func (p *Page) Type(selector string, text string, opts goja.Value) {
 	p.logger.Debugf("Page:Type", "sid:%v selector:%s text:%s", p.sessionID(), selector, text)
 
 	p.MainFrame().Type(selector, text, opts)
-}
-
-func (p *Page) Uncheck(selector string, opts goja.Value) {
-	p.logger.Debugf("Page:Uncheck", "sid:%v selector:%s", p.sessionID(), selector)
-
-	p.MainFrame().Uncheck(selector, opts)
 }
 
 func (p *Page) Unroute(url goja.Value, handler goja.Callable) {

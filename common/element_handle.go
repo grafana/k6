@@ -585,31 +585,6 @@ func (h *ElementHandle) selectText(apiCtx context.Context) error {
 	return nil
 }
 
-func (h *ElementHandle) setChecked(apiCtx context.Context, checked bool, p *Position) error {
-	state, err := h.checkElementState(apiCtx, "checked")
-	if err != nil {
-		return err
-	}
-	if checked == *state {
-		return nil
-	}
-
-	err = h.click(p, NewMouseClickOptions())
-	if err != nil {
-		return err
-	}
-
-	state, err = h.checkElementState(apiCtx, "checked")
-	if err != nil {
-		return err
-	}
-	if checked != *state {
-		return errors.New("clicking the checkbox did not change its state")
-	}
-
-	return nil
-}
-
 func (h *ElementHandle) tap(apiCtx context.Context, p *Position) error {
 	return h.frame.page.Touchscreen.tap(p.X, p.X)
 }
@@ -731,11 +706,6 @@ func (h *ElementHandle) BoundingBox() *api.Rect {
 		return nil // Don't panic here, just return nil
 	}
 	return bbox.toApiRect()
-}
-
-// Check scrolls element into view and clicks in the center of the element.
-func (h *ElementHandle) Check(opts goja.Value) {
-	h.SetChecked(true, opts)
 }
 
 // Click scrolls element into view and clicks in the center of the element
@@ -1106,6 +1076,60 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]api.ElementH
 	return els, nil
 }
 
+// SetChecked checks or unchecks an element.
+func (h *ElementHandle) SetChecked(checked bool, opts goja.Value) {
+	parsedOpts := NewElementHandleSetCheckedOptions(h.defaultTimeout())
+	err := parsedOpts.Parse(h.ctx, opts)
+	if err != nil {
+		k6ext.Panic(h.ctx, "cannot parse element set checked options: %w", err)
+	}
+
+	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
+		return nil, handle.setChecked(apiCtx, checked, p)
+	}
+	pointerFn := h.newPointerAction(fn, &parsedOpts.ElementHandleBasePointerOptions)
+	_, err = callApiWithTimeout(h.ctx, pointerFn, parsedOpts.Timeout)
+	if err != nil {
+		k6ext.Panic(h.ctx, "cannot check element: %w", err)
+	}
+	applySlowMo(h.ctx)
+}
+
+// Uncheck scrolls element into view and clicks in the center of the element.
+func (h *ElementHandle) Uncheck(opts goja.Value) {
+	h.SetChecked(false, opts)
+}
+
+// Check scrolls element into view and clicks in the center of the element.
+func (h *ElementHandle) Check(opts goja.Value) {
+	h.SetChecked(true, opts)
+}
+
+func (h *ElementHandle) setChecked(apiCtx context.Context, checked bool, p *Position) error {
+	state, err := h.checkElementState(apiCtx, "checked")
+	if err != nil {
+		return err
+	}
+	if checked == *state {
+		return nil
+	}
+
+	err = h.click(p, NewMouseClickOptions())
+	if err != nil {
+		return err
+	}
+
+	state, err = h.checkElementState(apiCtx, "checked")
+	if err != nil {
+		return err
+	}
+	if checked != *state {
+		return errors.New("clicking the checkbox did not change its state")
+	}
+
+	return nil
+}
+
 func (h *ElementHandle) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	rt := h.execCtx.vu.Runtime()
 	parsedOpts := NewElementHandleScreenshotOptions(h.defaultTimeout())
@@ -1171,25 +1195,6 @@ func (h *ElementHandle) SelectText(opts goja.Value) {
 	applySlowMo(h.ctx)
 }
 
-// SetChecked checks or unchecks an element.
-func (h *ElementHandle) SetChecked(checked bool, opts goja.Value) {
-	parsedOpts := NewElementHandleSetCheckedOptions(h.defaultTimeout())
-	err := parsedOpts.Parse(h.ctx, opts)
-	if err != nil {
-		k6ext.Panic(h.ctx, "cannot parse element set checked options: %w", err)
-	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
-		return nil, handle.setChecked(apiCtx, checked, p)
-	}
-	pointerFn := h.newPointerAction(fn, &parsedOpts.ElementHandleBasePointerOptions)
-	_, err = callApiWithTimeout(h.ctx, pointerFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "cannot check element: %w", err)
-	}
-	applySlowMo(h.ctx)
-}
-
 func (h *ElementHandle) SetInputFiles(files goja.Value, opts goja.Value) {
 	// TODO: implement
 	k6ext.Panic(h.ctx, "ElementHandle.setInputFiles() has not been implemented yet")
@@ -1242,11 +1247,6 @@ func (h *ElementHandle) Type(text string, opts goja.Value) {
 		k6ext.Panic(h.ctx, "cannot type (%q) into element: %w", text, err)
 	}
 	applySlowMo(h.ctx)
-}
-
-// Uncheck scrolls element into view and clicks in the center of the element.
-func (h *ElementHandle) Uncheck(opts goja.Value) {
-	h.SetChecked(false, opts)
 }
 
 func (h *ElementHandle) WaitForElementState(state string, opts goja.Value) {
