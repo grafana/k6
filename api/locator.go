@@ -10,4 +10,6 @@ type Locator interface {
 	Dblclick(opts goja.Value)
 	// Check element using locator's selector with strict mode on.
 	Check(opts goja.Value)
+	// Uncheck element using locator's selector with strict mode on.
+	Uncheck(opts goja.Value)
 }
