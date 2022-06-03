@@ -10,7 +10,7 @@ import (
 func TestLocatorClick(t *testing.T) {
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewPage(nil)
-	require.NotNil(t, p.Goto(tb.staticURL("/strict_link.html"), nil))
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
 	// Selecting a single element and clicking on it is OK.
 	t.Run("ok", func(t *testing.T) {
@@ -22,7 +22,7 @@ func TestLocatorClick(t *testing.T) {
 		link.Click(nil)
 		require.True(t, result(), "could not click the link")
 	})
-	// There are two links in the document (strict_link.html).
+	// There are two links in the document (locators.html).
 	// The strict mode should disallow selecting multiple elements.
 	t.Run("strict", func(t *testing.T) {
 		link := p.Locator("a", nil)
@@ -33,7 +33,7 @@ func TestLocatorClick(t *testing.T) {
 func TestLocatorDblclick(t *testing.T) {
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewPage(nil)
-	require.NotNil(t, p.Goto(tb.staticURL("/strict_link.html"), nil))
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
 	// Selecting a single element and clicking on it is OK.
 	t.Run("ok", func(t *testing.T) {
@@ -45,10 +45,36 @@ func TestLocatorDblclick(t *testing.T) {
 		link.Dblclick(nil)
 		require.True(t, dblclick(), "could not double click the link")
 	})
-	// There are two links in the document (strict_link.html).
+	// There are two links in the document (locators.html).
 	// The strict mode should disallow selecting multiple elements.
 	t.Run("strict", func(t *testing.T) {
 		link := p.Locator("a", nil)
 		require.Panics(t, func() { link.Dblclick(nil) })
+	})
+}
+
+func TestLocatorCheck(t *testing.T) {
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	// Selecting a single element and checking it is OK.
+	t.Run("ok", func(t *testing.T) {
+		check := func() bool {
+			cr := p.Evaluate(tb.toGojaValue(`() => window.check`))
+			return cr.(goja.Value).ToBoolean() //nolint:forcetypeassert
+		}
+		input := p.Locator("#input", nil)
+		input.Check(nil)
+		require.True(t, check(), "could not check the input box")
+	})
+	// There are two input boxes in the document (locators.html).
+	// The strict mode should disallow selecting multiple elements.
+	t.Run("strict", func(t *testing.T) {
+		input := p.Locator("input", nil)
+		require.Panics(t,
+			func() { input.Check(nil) },
+			"should not select multiple elements",
+		)
 	})
 }
