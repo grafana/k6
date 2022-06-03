@@ -22,7 +22,7 @@
             'dblclick', e => { dblclick = true; }, false
         );
         document.querySelector('#input').addEventListener(
-            'change', e => { window.check = event.currentTarget.checked; }, false
+            'change', e => { window.check = e.currentTarget.checked; }, false
         );
     </script>
 </body>
