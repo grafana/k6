@@ -3,10 +3,10 @@ package common
 import (
 	"context"
 
-	"github.com/dop251/goja"
-
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
+
+	"github.com/dop251/goja"
 )
 
 // Locator represent a way to find element(s) on the page at any moment.
@@ -143,4 +143,28 @@ func (l *Locator) IsChecked(opts goja.Value) bool {
 func (l *Locator) isChecked(opts *FrameIsCheckedOptions) (bool, error) {
 	opts.Strict = true
 	return l.frame.isChecked(l.selector, opts)
+}
+
+// IsEditable returns true if the element matches the locator's
+// selector and is Editable. Otherwise, returns false.
+func (l *Locator) IsEditable(opts goja.Value) bool {
+	l.log.Debugf("Locator:IsEditable", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	copts := NewFrameIsEditableOptions(l.frame.defaultTimeout())
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		k6ext.Panic(l.ctx, "%w", err)
+	}
+	editable, err := l.isEditable(copts)
+	if err != nil {
+		k6ext.Panic(l.ctx, "%w", err)
+	}
+
+	return editable
+}
+
+// isEditable is like IsEditable but takes parsed options and does not
+// throw an error.
+func (l *Locator) isEditable(opts *FrameIsEditableOptions) (bool, error) {
+	opts.Strict = true
+	return l.frame.isEditable(l.selector, opts)
 }
