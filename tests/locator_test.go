@@ -124,4 +124,15 @@ func TestLocatorElementState(t *testing.T) {
 			require.False(t, tt.query(l))
 		})
 	}
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	for _, tt := range tests {
+		t.Run("strict/"+tt.state, func(t *testing.T) {
+			l := p.Locator("input", nil)
+			require.Panics(t, func() { tt.query(l) }, "should not select multiple elements")
+		})
+	}
 }
