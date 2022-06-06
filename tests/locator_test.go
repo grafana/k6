@@ -3,6 +3,8 @@ package tests
 import (
 	"testing"
 
+	"github.com/grafana/xk6-browser/api"
+
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
 )
@@ -92,38 +94,34 @@ func TestLocatorCheck(t *testing.T) {
 	})
 }
 
-func TestLocatorIsEditable(t *testing.T) {
-	tb := newTestBrowser(t, withFileServer())
-	p := tb.NewPage(nil)
-	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+func TestLocatorElementState(t *testing.T) {
+	tests := []struct {
+		state, eval string
+		query       func(api.Locator) bool
+	}{
+		{
+			"readOnly",
+			`() => document.getElementById('inputText').readOnly = true`,
+			func(l api.Locator) bool { return l.IsEditable(nil) },
+		},
+		{
+			"disabled",
+			`() => document.getElementById('inputText').disabled = true`,
+			func(l api.Locator) bool { return l.IsEnabled(nil) },
+		},
+	}
 
-	t.Run("editable", func(t *testing.T) {
-		el := p.Locator("#inputText", nil)
-		require.True(t, el.IsEditable(nil))
+	for _, tt := range tests {
+		t.Run(tt.state, func(t *testing.T) {
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-		p.Evaluate(tb.toGojaValue(`() => document.getElementById('inputText').readOnly = true`))
-		require.False(t, el.IsEditable(nil))
-	})
-	t.Run("strict", func(t *testing.T) {
-		input := p.Locator("input", nil)
-		require.Panics(t, func() { input.IsEditable(nil) }, "should not select multiple elements")
-	})
-}
+			l := p.Locator("#inputText", nil)
+			require.True(t, tt.query(l))
 
-func TestLocatorIsEnabled(t *testing.T) {
-	tb := newTestBrowser(t, withFileServer())
-	p := tb.NewPage(nil)
-	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
-
-	t.Run("enabled", func(t *testing.T) {
-		el := p.Locator("#inputText", nil)
-		require.True(t, el.IsEnabled(nil))
-
-		p.Evaluate(tb.toGojaValue(`() => document.getElementById('inputText').disabled = true`))
-		require.False(t, el.IsEnabled(nil))
-	})
-	t.Run("strict", func(t *testing.T) {
-		input := p.Locator("input", nil)
-		require.Panics(t, func() { input.IsEnabled(nil) }, "should not select multiple elements")
-	})
+			p.Evaluate(tb.toGojaValue(tt.eval))
+			require.False(t, tt.query(l))
+		})
+	}
 }
