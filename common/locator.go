@@ -168,3 +168,27 @@ func (l *Locator) isEditable(opts *FrameIsEditableOptions) (bool, error) {
 	opts.Strict = true
 	return l.frame.isEditable(l.selector, opts)
 }
+
+// IsEnabled returns true if the element matches the locator's
+// selector and is Enabled. Otherwise, returns false.
+func (l *Locator) IsEnabled(opts goja.Value) bool {
+	l.log.Debugf("Locator:IsEnabled", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	copts := NewFrameIsEnabledOptions(l.frame.defaultTimeout())
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		k6ext.Panic(l.ctx, "%w", err)
+	}
+	enabled, err := l.isEnabled(copts)
+	if err != nil {
+		k6ext.Panic(l.ctx, "%w", err)
+	}
+
+	return enabled
+}
+
+// isEnabled is like IsEnabled but takes parsed options and does not
+// throw an error.
+func (l *Locator) isEnabled(opts *FrameIsEnabledOptions) (bool, error) {
+	opts.Strict = true
+	return l.frame.isEnabled(l.selector, opts)
+}

@@ -109,3 +109,21 @@ func TestLocatorIsEditable(t *testing.T) {
 		require.Panics(t, func() { input.IsEditable(nil) }, "should not select multiple elements")
 	})
 }
+
+func TestLocatorIsEnabled(t *testing.T) {
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	t.Run("enabled", func(t *testing.T) {
+		el := p.Locator("#inputText", nil)
+		require.True(t, el.IsEnabled(nil))
+
+		p.Evaluate(tb.toGojaValue(`() => document.getElementById('inputText').disabled = true`))
+		require.False(t, el.IsEnabled(nil))
+	})
+	t.Run("strict", func(t *testing.T) {
+		input := p.Locator("input", nil)
+		require.Panics(t, func() { input.IsEnabled(nil) }, "should not select multiple elements")
+	})
+}
