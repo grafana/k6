@@ -51,12 +51,8 @@ func (ms *metricsStorage) update(sample metrics.Sample, add func(*metrics.Metric
 		ms.m[m.Name] = m
 	}
 
-	// TODO: this is just avoiding duplicates with the previous
-	// Implement a better and complete solution
-	// maybe discard any timestamp < latest?
+	// TODO: https://github.com/grafana/xk6-output-prometheus-remote/issues/11
 	//
-	//current.Time = sample.Time // to avoid duplicates in timestamps
-
 	// Sometimes remote write endpoint throws an error about duplicates even if the values
 	// sent were different. By current observations, this is a hard to repeat case and
 	// potentially a bug.
