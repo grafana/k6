@@ -770,6 +770,47 @@ func (f *Frame) uncheck(selector string, opts *FrameUncheckOptions) error {
 	return err
 }
 
+// IsChecked returns true if the first element that matches the selector
+// is checked. Otherwise, returns false.
+func (f *Frame) IsChecked(selector string, opts goja.Value) bool {
+	f.log.Debugf("Frame:IsChecked", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	popts := NewFrameIsCheckedOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "%w", err)
+	}
+	checked, err := f.isChecked(selector, popts)
+	if err != nil {
+		k6ext.Panic(f.ctx, "%w", err)
+	}
+
+	return checked
+}
+
+func (f *Frame) isChecked(selector string, opts *FrameIsCheckedOptions) (bool, error) {
+	isChecked := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+		v, err := handle.isChecked(apiCtx, 0) // Zero timeout when checking state
+		if errors.Is(err, ErrTimedOut) {      // We don't care about timeout errors here!
+			return v, nil
+		}
+		return v, err
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, isChecked, []string{}, false, true, opts.Timeout,
+	)
+	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	if err != nil {
+		return false, err
+	}
+
+	bv, ok := v.(bool)
+	if !ok {
+		return false, fmt.Errorf("isChecked returned %T; want bool", v)
+	}
+
+	return bv, nil
+}
+
 // Content returns the HTML content of the frame.
 func (f *Frame) Content() string {
 	f.log.Debugf("Frame:Content", "fid:%s furl:%q", f.ID(), f.URL())
@@ -1088,33 +1129,6 @@ func (f *Frame) InputValue(selector string, opts goja.Value) string {
 
 	applySlowMo(f.ctx)
 	return value.(goja.Value).String()
-}
-
-func (f *Frame) IsChecked(selector string, opts goja.Value) bool {
-	f.log.Debugf("Frame:IsChecked", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
-
-	parsedOpts := NewFrameIsCheckedOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
-		value, err := handle.isChecked(apiCtx, 0) // Zero timeout when checking state
-		if err == ErrTimedOut {                   // We don't care about timeout errors here!
-			return value, nil
-		}
-		return value, err
-	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
-	)
-	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
-
-	applySlowMo(f.ctx)
-	return value.(bool)
 }
 
 // IsDetached returns whether the frame is detached or not.

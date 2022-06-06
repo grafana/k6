@@ -73,13 +73,21 @@ func TestLocatorCheck(t *testing.T) {
 		cb.Uncheck(nil)
 		require.False(t, check(), "could not uncheck the input box")
 	})
+	t.Run("is_checked", func(t *testing.T) {
+		cb := p.Locator("#inputCheckbox", nil)
+
+		cb.Check(nil)
+		require.True(t, cb.IsChecked(nil))
+
+		cb.Uncheck(nil)
+		require.False(t, cb.IsChecked(nil))
+	})
 	// There are two input boxes in the document (locators.html).
 	// The strict mode should disallow selecting multiple elements.
 	t.Run("strict", func(t *testing.T) {
 		input := p.Locator("input", nil)
-		require.Panics(t,
-			func() { input.Check(nil) },
-			"should not select multiple elements",
-		)
+		require.Panics(t, func() { input.Check(nil) }, "should not select multiple elements")
+		require.Panics(t, func() { input.Uncheck(nil) }, "should not select multiple elements")
+		require.Panics(t, func() { input.IsChecked(nil) }, "should not select multiple elements")
 	})
 }

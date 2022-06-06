@@ -5,6 +5,7 @@ import (
 
 	"github.com/dop251/goja"
 
+	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 )
 
@@ -118,4 +119,28 @@ func (l *Locator) Uncheck(opts goja.Value) {
 func (l *Locator) uncheck(opts *FrameUncheckOptions) error {
 	opts.Strict = true
 	return l.frame.uncheck(l.selector, opts)
+}
+
+// IsChecked returns true if the element matches the locator's
+// selector and is checked. Otherwise, returns false.
+func (l *Locator) IsChecked(opts goja.Value) bool {
+	l.log.Debugf("Locator:IsChecked", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	copts := NewFrameIsCheckedOptions(l.frame.defaultTimeout())
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		k6ext.Panic(l.ctx, "%w", err)
+	}
+	checked, err := l.isChecked(copts)
+	if err != nil {
+		k6ext.Panic(l.ctx, "%w", err)
+	}
+
+	return checked
+}
+
+// isChecked is like IsChecked but takes parsed options and does not
+// throw an error.
+func (l *Locator) isChecked(opts *FrameIsCheckedOptions) (bool, error) {
+	opts.Strict = true
+	return l.frame.isChecked(l.selector, opts)
 }
