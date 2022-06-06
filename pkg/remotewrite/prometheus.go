@@ -13,8 +13,8 @@ import (
 type PrometheusMapping struct{}
 
 func (pm *PrometheusMapping) MapCounter(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries {
-	sample = ms.update(sample, nil)
-	aggr := sample.Metric.Sink.Format(0)
+	metric := ms.update(sample, nil)
+	aggr := metric.Sink.Format(0)
 
 	return []prompb.TimeSeries{
 		{
@@ -33,9 +33,6 @@ func (pm *PrometheusMapping) MapCounter(ms *metricsStorage, sample metrics.Sampl
 }
 
 func (pm *PrometheusMapping) MapGauge(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries {
-	sample = ms.update(sample, nil)
-	aggr := sample.Metric.Sink.Format(0)
-
 	return []prompb.TimeSeries{
 		{
 			Labels: append(labels, prompb.Label{
@@ -44,7 +41,9 @@ func (pm *PrometheusMapping) MapGauge(ms *metricsStorage, sample metrics.Sample,
 			}),
 			Samples: []prompb.Sample{
 				{
-					Value:     aggr["value"],
+					// Gauge is just the latest value
+					// so we can skip the sink using directly the value from the sample.
+					Value:     sample.Value,
 					Timestamp: timestamp.FromTime(sample.Time),
 				},
 			},
@@ -53,8 +52,8 @@ func (pm *PrometheusMapping) MapGauge(ms *metricsStorage, sample metrics.Sample,
 }
 
 func (pm *PrometheusMapping) MapRate(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries {
-	sample = ms.update(sample, nil)
-	aggr := sample.Metric.Sink.Format(0)
+	metric := ms.update(sample, nil)
+	aggr := metric.Sink.Format(0)
 
 	return []prompb.TimeSeries{
 		{
@@ -73,9 +72,13 @@ func (pm *PrometheusMapping) MapRate(ms *metricsStorage, sample metrics.Sample, 
 }
 
 func (pm *PrometheusMapping) MapTrend(ms *metricsStorage, sample metrics.Sample, labels []prompb.Label) []prompb.TimeSeries {
-	sample = ms.update(sample, trendAdd)
+	metric := ms.update(sample, trendAdd)
 
-	s := sample.Metric.Sink.(*metrics.TrendSink)
+	// Prometheus metric system does not support Trend so this mapping will store gauges
+	// to keep track of key values.
+	// TODO: when Prometheus implements support for sparse histograms, re-visit this implementation
+
+	s := metric.Sink.(*metrics.TrendSink)
 	aggr := map[string]float64{
 		"min":   s.Min,
 		"max":   s.Max,
@@ -84,10 +87,6 @@ func (pm *PrometheusMapping) MapTrend(ms *metricsStorage, sample metrics.Sample,
 		"p(90)": p(s, 0.90),
 		"p(95)": p(s, 0.95),
 	}
-
-	// Prometheus metric system does not support Trend so this mapping will store gauges
-	// to keep track of key values.
-	// TODO: when Prometheus implements support for sparse histograms, re-visit this implementation
 
 	return []prompb.TimeSeries{
 		{
@@ -169,8 +168,8 @@ func (pm *PrometheusMapping) MapTrend(ms *metricsStorage, sample metrics.Sample,
 // and are a partial copy-paste from k6/metrics.
 // TODO: re-write & refactor this once metrics refactoring progresses in k6.
 
-func trendAdd(current, s metrics.Sample) metrics.Sample {
-	t := current.Metric.Sink.(*metrics.TrendSink)
+func trendAdd(current *metrics.Metric, s metrics.Sample) {
+	t := current.Sink.(*metrics.TrendSink)
 
 	// insert into sorted array instead of sorting anew on each addition
 	index := sort.Search(len(t.Values), func(i int) bool {
@@ -197,8 +196,7 @@ func trendAdd(current, s metrics.Sample) metrics.Sample {
 		t.Med = t.Values[t.Count/2]
 	}
 
-	current.Metric.Sink = t
-	return current
+	current.Sink = t
 }
 
 func p(t *metrics.TrendSink, pct float64) float64 {

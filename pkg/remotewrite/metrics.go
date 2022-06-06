@@ -13,37 +13,62 @@ import (
 
 // metricsStorage is an in-memory gather point for metrics
 type metricsStorage struct {
-	m map[string]metrics.Sample
+	m map[string]*metrics.Metric
 }
 
 func newMetricsStorage() *metricsStorage {
 	return &metricsStorage{
-		m: make(map[string]metrics.Sample),
+		m: make(map[string]*metrics.Metric),
 	}
 }
 
 // update modifies metricsStorage and returns updated sample
 // so that the stored metric and the returned metric hold the same value
-func (ms *metricsStorage) update(sample metrics.Sample, add func(current, s metrics.Sample) metrics.Sample) metrics.Sample {
-	if current, ok := ms.m[sample.Metric.Name]; ok {
-		if add == nil {
-			current.Metric.Sink.Add(sample)
-		} else {
-			current = add(current, sample)
+func (ms *metricsStorage) update(sample metrics.Sample, add func(*metrics.Metric, metrics.Sample)) *metrics.Metric {
+	m, ok := ms.m[sample.Metric.Name]
+	if !ok {
+		var sink metrics.Sink
+		switch sample.Metric.Type {
+		case metrics.Counter:
+			sink = &metrics.CounterSink{}
+		case metrics.Gauge:
+			sink = &metrics.GaugeSink{}
+		case metrics.Trend:
+			sink = &metrics.TrendSink{}
+		case metrics.Rate:
+			sink = &metrics.RateSink{}
+		default:
+			panic("the Metric Type is not supported")
 		}
-		current.Time = sample.Time // to avoid duplicates in timestamps
-		// Sometimes remote write endpoint throws an error about duplicates even if the values
-		// sent were different. By current observations, this is a hard to repeat case and
-		// potentially a bug.
-		// Related: https://github.com/prometheus/prometheus/issues/9210
 
-		ms.m[current.Metric.Name] = current
-		return current
-	} else {
-		sample.Metric.Sink.Add(sample)
-		ms.m[sample.Metric.Name] = sample
-		return sample
+		m = &metrics.Metric{
+			Name:     sample.Metric.Name,
+			Type:     sample.Metric.Type,
+			Contains: sample.Metric.Contains,
+			Sink:     sink,
+		}
+
+		ms.m[m.Name] = m
 	}
+
+	// TODO: https://github.com/grafana/xk6-output-prometheus-remote/issues/11
+	//
+	// Sometimes remote write endpoint throws an error about duplicates even if the values
+	// sent were different. By current observations, this is a hard to repeat case and
+	// potentially a bug.
+	// Related: https://github.com/prometheus/prometheus/issues/9210
+
+	// TODO: Trend is the unique type that benefits from this logic.
+	// so this logic can be removed just creating
+	// a new implementation in this extension
+	// for TrendSink and its Add method.
+	if add == nil {
+		m.Sink.Add(sample)
+	} else {
+		add(m, sample)
+	}
+
+	return m
 }
 
 // transform k6 sample into TimeSeries for remote-write
