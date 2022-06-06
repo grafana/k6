@@ -1095,12 +1095,14 @@ func (h *ElementHandle) SetChecked(checked bool, opts goja.Value) {
 	applySlowMo(h.ctx)
 }
 
-// Uncheck scrolls element into view and clicks in the center of the element.
+// Uncheck scrolls element into view, and if it's an input element of type
+// checkbox that is already checked, clicks on it to mark it as unchecked.
 func (h *ElementHandle) Uncheck(opts goja.Value) {
 	h.SetChecked(false, opts)
 }
 
-// Check scrolls element into view and clicks in the center of the element.
+// Check scrolls element into view, and if it's an input element of type
+// checkbox that is unchecked, clicks on it to mark it as checked.
 func (h *ElementHandle) Check(opts goja.Value) {
 	h.SetChecked(true, opts)
 }
