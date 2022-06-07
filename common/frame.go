@@ -1229,31 +1229,45 @@ func (f *Frame) isEnabled(selector string, opts *FrameIsEnabledOptions) (bool, e
 	return bv, nil
 }
 
+// IsDisabled returns true if the first element that matches the selector
+// is disabled. Otherwise, returns false.
 func (f *Frame) IsDisabled(selector string, opts goja.Value) bool {
 	f.log.Debugf("Frame:IsDisabled", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameIsDisabledOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
+	popts := NewFrameIsDisabledOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
-		value, err := handle.isDisabled(apiCtx, 0) // Zero timeout when checking state
-		if err == ErrTimedOut {                    // We don't care about timeout errors here!
-			return value, nil
-		}
-		return value, err
-	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
-	)
-	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
+	disabled, err := f.isDisabled(selector, popts)
 	if err != nil {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
 
-	applySlowMo(f.ctx)
-	return value.(bool)
+	return disabled
+}
+
+func (f *Frame) isDisabled(selector string, opts *FrameIsDisabledOptions) (bool, error) {
+	isDisabled := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+		v, err := handle.isDisabled(apiCtx, 0) // Zero timeout when checking state
+		if errors.Is(err, ErrTimedOut) {       // We don't care about timeout errors here!
+			return v, nil
+		}
+		return v, err
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, isDisabled, []string{}, false, true, opts.Timeout,
+	)
+	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	if err != nil {
+		return false, err
+	}
+
+	bv, ok := v.(bool)
+	if !ok {
+		return false, fmt.Errorf("isDisabled returned %T; want bool", v)
+	}
+
+	return bv, nil
 }
 
 func (f *Frame) IsHidden(selector string, opts goja.Value) bool {
