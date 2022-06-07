@@ -1147,33 +1147,6 @@ func (f *Frame) setDetached(detached bool) {
 	f.detached = detached
 }
 
-func (f *Frame) IsDisabled(selector string, opts goja.Value) bool {
-	f.log.Debugf("Frame:IsDisabled", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
-
-	parsedOpts := NewFrameIsDisabledOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
-		value, err := handle.isDisabled(apiCtx, 0) // Zero timeout when checking state
-		if err == ErrTimedOut {                    // We don't care about timeout errors here!
-			return value, nil
-		}
-		return value, err
-	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
-	)
-	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
-
-	applySlowMo(f.ctx)
-	return value.(bool)
-}
-
 // IsEditable returns true if the first element that matches the selector
 // is editable. Otherwise, returns false.
 func (f *Frame) IsEditable(selector string, opts goja.Value) bool {
@@ -1254,6 +1227,33 @@ func (f *Frame) isEnabled(selector string, opts *FrameIsEnabledOptions) (bool, e
 	}
 
 	return bv, nil
+}
+
+func (f *Frame) IsDisabled(selector string, opts goja.Value) bool {
+	f.log.Debugf("Frame:IsDisabled", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	parsedOpts := NewFrameIsDisabledOptions(f.defaultTimeout())
+	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "%w", err)
+	}
+
+	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+		value, err := handle.isDisabled(apiCtx, 0) // Zero timeout when checking state
+		if err == ErrTimedOut {                    // We don't care about timeout errors here!
+			return value, nil
+		}
+		return value, err
+	}
+	actFn := f.newAction(
+		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	)
+	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
+	if err != nil {
+		k6ext.Panic(f.ctx, "%w", err)
+	}
+
+	applySlowMo(f.ctx)
+	return value.(bool)
 }
 
 func (f *Frame) IsHidden(selector string, opts goja.Value) bool {
