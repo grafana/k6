@@ -240,3 +240,27 @@ func (l *Locator) isVisible(opts *FrameIsVisibleOptions) (bool, error) {
 	opts.Strict = true
 	return l.frame.isVisible(l.selector, opts)
 }
+
+// IsHidden returns true if the element matches the locator's
+// selector and is hidden. Otherwise, returns false.
+func (l *Locator) IsHidden(opts goja.Value) bool {
+	l.log.Debugf("Locator:IsHidden", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	copts := NewFrameIsHiddenOptions(l.frame.defaultTimeout())
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		k6ext.Panic(l.ctx, "%w", err)
+	}
+	hidden, err := l.isHidden(copts)
+	if err != nil {
+		k6ext.Panic(l.ctx, "%w", err)
+	}
+
+	return hidden
+}
+
+// isHidden is like IsHidden but takes parsed options and does not
+// throw an error.
+func (l *Locator) isHidden(opts *FrameIsHiddenOptions) (bool, error) {
+	opts.Strict = true
+	return l.frame.isHidden(l.selector, opts)
+}
