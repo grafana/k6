@@ -105,9 +105,14 @@ func TestLocatorElementState(t *testing.T) {
 			func(l api.Locator) bool { return l.IsEditable(nil) },
 		},
 		{
-			"disabled",
+			"enabled",
 			`() => document.getElementById('inputText').disabled = true`,
 			func(l api.Locator) bool { return l.IsEnabled(nil) },
+		},
+		{
+			"disabled",
+			`() => document.getElementById('inputText').disabled = true`,
+			func(l api.Locator) bool { return !l.IsDisabled(nil) },
 		},
 	}
 

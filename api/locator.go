@@ -21,4 +21,7 @@ type Locator interface {
 	// IsEnabled returns true if the element matches the locator's
 	// selector and is enabled. Otherwise, returns false.
 	IsEnabled(opts goja.Value) bool
+	// IsDisabled returns true if the element matches the locator's
+	// selector and is disabled. Otherwise, returns false.
+	IsDisabled(opts goja.Value) bool
 }

@@ -192,3 +192,27 @@ func (l *Locator) isEnabled(opts *FrameIsEnabledOptions) (bool, error) {
 	opts.Strict = true
 	return l.frame.isEnabled(l.selector, opts)
 }
+
+// IsDisabled returns true if the element matches the locator's
+// selector and is disabled. Otherwise, returns false.
+func (l *Locator) IsDisabled(opts goja.Value) bool {
+	l.log.Debugf("Locator:IsDisabled", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	copts := NewFrameIsDisabledOptions(l.frame.defaultTimeout())
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		k6ext.Panic(l.ctx, "%w", err)
+	}
+	disabled, err := l.isDisabled(copts)
+	if err != nil {
+		k6ext.Panic(l.ctx, "%w", err)
+	}
+
+	return disabled
+}
+
+// IsDisabled is like IsDisabled but takes parsed options and does not
+// throw an error.
+func (l *Locator) isDisabled(opts *FrameIsDisabledOptions) (bool, error) {
+	opts.Strict = true
+	return l.frame.isDisabled(l.selector, opts)
+}
