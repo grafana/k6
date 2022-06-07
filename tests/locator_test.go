@@ -3,6 +3,8 @@ package tests
 import (
 	"testing"
 
+	"github.com/grafana/xk6-browser/api"
+
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
 )
@@ -92,20 +94,45 @@ func TestLocatorCheck(t *testing.T) {
 	})
 }
 
-func TestLocatorIsEditable(t *testing.T) {
+func TestLocatorElementState(t *testing.T) {
+	tests := []struct {
+		state, eval string
+		query       func(api.Locator) bool
+	}{
+		{
+			"readOnly",
+			`() => document.getElementById('inputText').readOnly = true`,
+			func(l api.Locator) bool { return l.IsEditable(nil) },
+		},
+		{
+			"disabled",
+			`() => document.getElementById('inputText').disabled = true`,
+			func(l api.Locator) bool { return l.IsEnabled(nil) },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.state, func(t *testing.T) {
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+			l := p.Locator("#inputText", nil)
+			require.True(t, tt.query(l))
+
+			p.Evaluate(tb.toGojaValue(tt.eval))
+			require.False(t, tt.query(l))
+		})
+	}
+
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("editable", func(t *testing.T) {
-		el := p.Locator("#inputText", nil)
-		require.True(t, el.IsEditable(nil))
-
-		p.Evaluate(tb.toGojaValue(`() => document.getElementById('inputText').readOnly = true`))
-		require.False(t, el.IsEditable(nil))
-	})
-	t.Run("strict", func(t *testing.T) {
-		input := p.Locator("input", nil)
-		require.Panics(t, func() { input.IsEditable(nil) }, "should not select multiple elements")
-	})
+	for _, tt := range tests {
+		t.Run("strict/"+tt.state, func(t *testing.T) {
+			l := p.Locator("input", nil)
+			require.Panics(t, func() { tt.query(l) }, "should not select multiple elements")
+		})
+	}
 }
