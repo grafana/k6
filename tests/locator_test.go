@@ -82,12 +82,30 @@ func TestLocatorCheck(t *testing.T) {
 		cb.Uncheck(nil)
 		require.False(t, cb.IsChecked(nil))
 	})
-	// There are two input boxes in the document (locators.html).
+	// There are multiple input boxes in the document (locators.html).
 	// The strict mode should disallow selecting multiple elements.
 	t.Run("strict", func(t *testing.T) {
 		input := p.Locator("input", nil)
 		require.Panics(t, func() { input.Check(nil) }, "should not select multiple elements")
 		require.Panics(t, func() { input.Uncheck(nil) }, "should not select multiple elements")
 		require.Panics(t, func() { input.IsChecked(nil) }, "should not select multiple elements")
+	})
+}
+
+func TestLocatorIsEditable(t *testing.T) {
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	t.Run("editable", func(t *testing.T) {
+		el := p.Locator("#inputText", nil)
+		require.True(t, el.IsEditable(nil))
+
+		p.Evaluate(tb.toGojaValue(`() => document.getElementById('inputText').readOnly = true`))
+		require.False(t, el.IsEditable(nil))
+	})
+	t.Run("strict", func(t *testing.T) {
+		input := p.Locator("input", nil)
+		require.Panics(t, func() { input.IsEditable(nil) }, "should not select multiple elements")
 	})
 }

@@ -15,4 +15,7 @@ type Locator interface {
 	// IsChecked returns true if the element matches the locator's
 	// selector and is checked. Otherwise, returns false.
 	IsChecked(opts goja.Value) bool
+	// IsEditable returns true if the element matches the locator's
+	// selector and is editable. Otherwise, returns false.
+	IsEditable(opts goja.Value) bool
 }
