@@ -448,7 +448,6 @@ class InjectedScript {
         "url",
       ]);
       if (!kTextInputTypes.has(type) && !kDateTypes.has(type)) {
-        console.log(`    input of type "${type}" cannot be filled`);
         return "error:notfillableinputtype";
       }
       value = value.trim();

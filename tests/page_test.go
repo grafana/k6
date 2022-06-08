@@ -345,21 +345,33 @@ func TestPageInputSpecialCharacters(t *testing.T) {
 func TestPageFill(t *testing.T) {
 	p := newTestBrowser(t).NewPage(nil)
 	p.SetContent(`
-		<input id="inputText" type="text" value="something" />
-		<input id="inputDate" type="date" value="2012-03-12"/>
+		<input id="text" type="text" value="something" />
+		<input id="date" type="date" value="2012-03-12"/>
+		<input id="number" type="number" value="42"/>
+		<input id="unfillable" type="radio" />
 	`, nil)
 
-	t.Run("text", func(t *testing.T) {
-		p.Fill("#inputText", "fill me up", nil)
-		require.Equal(t, "fill me up", p.InputValue("#inputText", nil))
-	})
-	t.Run("date", func(t *testing.T) {
-		p.Fill("#inputDate", "2012-03-13", nil)
-		require.Equal(t, "2012-03-13", p.InputValue("#inputDate", nil))
-	})
-	t.Run("invalid_date", func(t *testing.T) {
-		require.Panics(t, func() { p.Fill("#inputDate", "invalid", nil) }, "invalid date should panic")
-	})
+	happy := []struct{ name, selector, value string }{
+		{name: "text", selector: "#text", value: "fill me up"},
+		{name: "date", selector: "#date", value: "2012-03-13"},
+		{name: "number", selector: "#number", value: "42"},
+	}
+	sad := []struct{ name, selector, value string }{
+		{name: "date", selector: "#date", value: "invalid date"},
+		{name: "number", selector: "#number", value: "forty two"},
+		{name: "unfillable", selector: "#unfillable", value: "can't touch this"},
+	}
+	for _, tt := range happy {
+		t.Run("happy/"+tt.name, func(t *testing.T) {
+			p.Fill(tt.selector, tt.value, nil)
+			require.Equal(t, tt.value, p.InputValue(tt.selector, nil))
+		})
+	}
+	for _, tt := range sad {
+		t.Run("sad/"+tt.name, func(t *testing.T) {
+			require.Panics(t, func() { p.Fill(tt.selector, tt.value, nil) })
+		})
+	}
 }
 
 func TestPageIsChecked(t *testing.T) {
