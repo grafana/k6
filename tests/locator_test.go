@@ -114,6 +114,11 @@ func TestLocatorElementState(t *testing.T) {
 			`() => document.getElementById('inputText').disabled = true`,
 			func(l api.Locator) bool { return !l.IsDisabled(nil) },
 		},
+		{
+			"visible",
+			`() => document.getElementById('inputText').style.visibility = 'hidden'`,
+			func(l api.Locator) bool { return l.IsVisible(nil) },
+		},
 	}
 
 	for _, tt := range tests {

@@ -1297,31 +1297,45 @@ func (f *Frame) IsHidden(selector string, opts goja.Value) bool {
 	return value.(bool)
 }
 
+// IsVisible returns true if the first element that matches the selector
+// is visible. Otherwise, returns false.
 func (f *Frame) IsVisible(selector string, opts goja.Value) bool {
 	f.log.Debugf("Frame:IsVisible", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameIsVisibleOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
+	popts := NewFrameIsVisibleOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
-		value, err := handle.isVisible(apiCtx, 0) // Zero timeout when checking state
-		if err == ErrTimedOut {                   // We don't care about timeout errors here!
-			return value, nil
-		}
-		return value, err
-	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
-	)
-	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
+	visible, err := f.isVisible(selector, popts)
 	if err != nil {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
 
-	applySlowMo(f.ctx)
-	return value.(bool)
+	return visible
+}
+
+func (f *Frame) isVisible(selector string, opts *FrameIsVisibleOptions) (bool, error) {
+	isVisible := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+		v, err := handle.isVisible(apiCtx, 0) // Zero timeout when checking state
+		if errors.Is(err, ErrTimedOut) {      // We don't care about timeout errors here!
+			return v, nil
+		}
+		return v, err
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, isVisible, []string{}, false, true, opts.Timeout,
+	)
+	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	if err != nil {
+		return false, err
+	}
+
+	bv, ok := v.(bool)
+	if !ok {
+		return false, fmt.Errorf("isVisible returned %T; want bool", v)
+	}
+
+	return bv, nil
 }
 
 // ID returns the frame id.

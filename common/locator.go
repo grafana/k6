@@ -216,3 +216,27 @@ func (l *Locator) isDisabled(opts *FrameIsDisabledOptions) (bool, error) {
 	opts.Strict = true
 	return l.frame.isDisabled(l.selector, opts)
 }
+
+// IsVisible returns true if the element matches the locator's
+// selector and is visible. Otherwise, returns false.
+func (l *Locator) IsVisible(opts goja.Value) bool {
+	l.log.Debugf("Locator:IsVisible", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	copts := NewFrameIsVisibleOptions(l.frame.defaultTimeout())
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		k6ext.Panic(l.ctx, "%w", err)
+	}
+	visible, err := l.isVisible(copts)
+	if err != nil {
+		k6ext.Panic(l.ctx, "%w", err)
+	}
+
+	return visible
+}
+
+// isVisible is like IsVisible but takes parsed options and does not
+// throw an error.
+func (l *Locator) isVisible(opts *FrameIsVisibleOptions) (bool, error) {
+	opts.Strict = true
+	return l.frame.isVisible(l.selector, opts)
+}
