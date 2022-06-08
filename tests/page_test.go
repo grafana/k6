@@ -343,12 +343,23 @@ func TestPageInputSpecialCharacters(t *testing.T) {
 }
 
 func TestPageFill(t *testing.T) {
-	const value = "fill me up"
-
 	p := newTestBrowser(t).NewPage(nil)
-	p.SetContent(`<input type="text" value="something">`, nil)
-	p.Fill("input", value, nil)
-	require.Equal(t, value, p.InputValue("input", nil))
+	p.SetContent(`
+		<input id="inputText" type="text" value="something" />
+		<input id="inputDate" type="date" value="2012-03-12"/>
+	`, nil)
+
+	t.Run("text", func(t *testing.T) {
+		p.Fill("#inputText", "fill me up", nil)
+		require.Equal(t, "fill me up", p.InputValue("#inputText", nil))
+	})
+	t.Run("date", func(t *testing.T) {
+		p.Fill("#inputDate", "2012-03-13", nil)
+		require.Equal(t, "2012-03-13", p.InputValue("#inputDate", nil))
+	})
+	t.Run("invalid_date", func(t *testing.T) {
+		require.Panics(t, func() { p.Fill("#inputDate", "invalid", nil) }, "invalid date should panic")
+	})
 }
 
 func TestPageIsChecked(t *testing.T) {

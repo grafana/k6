@@ -19,6 +19,8 @@ import (
 	"github.com/dop251/goja"
 )
 
+const resultDone = "done"
+
 // Ensure ElementHandle implements the api.ElementHandle and api.JSHandle interfaces.
 var _ api.ElementHandle = &ElementHandle{}
 var _ api.JSHandle = &ElementHandle{}
@@ -246,7 +248,7 @@ func (h *ElementHandle) dispatchEvent(apiCtx context.Context, typ string, eventI
 	return nil, err
 }
 
-func (h *ElementHandle) fill(apiCtx context.Context, value string) (interface{}, error) {
+func (h *ElementHandle) fill(_ context.Context, value string) (interface{}, error) {
 	fn := `
 		(node, injected, value) => {
 			return injected.fill(node, value);
@@ -260,13 +262,16 @@ func (h *ElementHandle) fill(apiCtx context.Context, value string) (interface{},
 	if err != nil {
 		return nil, err
 	}
-	switch result := result.(type) {
-	case string: // Either we're done or an error happened (returned as "error:..." from JS)
-		if result != "done" {
-			return nil, errorFromDOMError(result)
-		}
+	r, ok := result.(goja.Value)
+	if !ok {
+		return nil, fmt.Errorf("expected goja value; got %T", result)
 	}
-	return nil, nil
+	if s := r.String(); s != resultDone {
+		// Either we're done or an error happened (returned as "error:..." from JS)
+		return nil, errorFromDOMError(s)
+	}
+
+	return nil, nil //nolint:nilnil
 }
 
 func (h *ElementHandle) focus(apiCtx context.Context, resetSelectionIfNotFocused bool) error {
