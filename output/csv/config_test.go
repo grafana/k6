@@ -39,6 +39,7 @@ func TestNewConfig(t *testing.T) {
 	config := NewConfig()
 	assert.Equal(t, "file.csv", config.FileName.String)
 	assert.Equal(t, "1s", config.SaveInterval.String())
+	assert.Equal(t, TimeFormat("unix"), config.TimeFormat)
 }
 
 func TestApply(t *testing.T) {
@@ -46,23 +47,28 @@ func TestApply(t *testing.T) {
 		{
 			FileName:     null.StringFrom(""),
 			SaveInterval: types.NullDurationFrom(2 * time.Second),
+			TimeFormat:   "unix",
 		},
 		{
 			FileName:     null.StringFrom("newPath"),
 			SaveInterval: types.NewNullDuration(time.Duration(1), false),
+			TimeFormat:   "unix",
 		},
 	}
 	expected := []struct {
 		FileName     string
 		SaveInterval string
+		TimeFormat   TimeFormat
 	}{
 		{
 			FileName:     "",
 			SaveInterval: "2s",
+			TimeFormat:   TimeFormat("unix"),
 		},
 		{
 			FileName:     "newPath",
 			SaveInterval: "1s",
+			TimeFormat:   TimeFormat("unix"),
 		},
 	}
 
@@ -75,6 +81,7 @@ func TestApply(t *testing.T) {
 
 			assert.Equal(t, expected.FileName, baseConfig.FileName.String)
 			assert.Equal(t, expected.SaveInterval, baseConfig.SaveInterval.String())
+			assert.Equal(t, expected.TimeFormat, baseConfig.TimeFormat)
 		})
 	}
 }
@@ -125,6 +132,12 @@ func TestParseArg(t *testing.T) {
 		},
 		"filename=test.csv,save_interval=5s": {
 			expectedErr: true,
+		},
+		"fileName=test.csv,timeFormat=rfc3399": {
+			config: Config{
+				FileName:   null.StringFrom("test.csv"),
+				TimeFormat: "rfc3399",
+			},
 		},
 	}
 
