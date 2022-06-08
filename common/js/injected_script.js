@@ -451,23 +451,18 @@ class InjectedScript {
         console.log(`    input of type "${type}" cannot be filled`);
         return "error:notfillableinputtype";
       }
-      if (type === "number") {
-        value = value.trim();
-        if (isNaN(Number(value))) {
-          return "error:notfillablenumberinput";
-        }
+      value = value.trim();
+      if (type === "number" && isNaN(Number(value))) {
+        return "error:notfillablenumberinput";
       }
-      if (kDateTypes.has(type)) {
-        value = value.trim();
-        input.focus();
-        input.value = value;
-        if (input.value !== value) {
-          return "error:notvaliddate";
-        }
-        element.dispatchEvent(new Event("input", { bubbles: true }));
-        element.dispatchEvent(new Event("change", { bubbles: true }));
-        return "done"; // We have already changed the value, no need to input it.
+      input.focus();
+      input.value = value;
+      if (kDateTypes.has(type) && input.value !== value) {
+        return "error:notvaliddate";
       }
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+      return "done"; // We have already changed the value, no need to input it.
     } else if (element.nodeName.toLowerCase() === "textarea") {
       // Nothing to check here.
     } else if (!element.isContentEditable) {

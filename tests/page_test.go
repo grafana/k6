@@ -342,6 +342,15 @@ func TestPageInputSpecialCharacters(t *testing.T) {
 	}
 }
 
+func TestPageFill(t *testing.T) {
+	const value = "fill me up"
+
+	p := newTestBrowser(t).NewPage(nil)
+	p.SetContent(`<input type="text" value="something">`, nil)
+	p.Fill("input", value, nil)
+	require.Equal(t, value, p.InputValue("input", nil))
+}
+
 func TestPageIsChecked(t *testing.T) {
 	p := newTestBrowser(t).NewPage(nil)
 
