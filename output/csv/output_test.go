@@ -110,7 +110,7 @@ func TestSampleToRow(t *testing.T) {
 			timeFormat:  "unix",
 		},
 		{
-			testname: "Two res tags, two ignored, with RFC3399 timestamp",
+			testname: "Two res tags, two ignored, with RFC3339 timestamp",
 			sample: &metrics.Sample{
 				Time:   time.Unix(1562324644, 0),
 				Metric: testMetric,
@@ -126,7 +126,7 @@ func TestSampleToRow(t *testing.T) {
 			},
 			resTags:     []string{"tag1", "tag3"},
 			ignoredTags: []string{"tag4", "tag6"},
-			timeFormat:  "rfc3399",
+			timeFormat:  "rfc3339",
 		},
 	}
 
@@ -318,7 +318,7 @@ func TestRun(t *testing.T) {
 			},
 			fileName:       "test",
 			fileReaderFunc: readUnCompressedFile,
-			timeFormat:     "rfc3399",
+			timeFormat:     "rfc3339",
 			outputContent:  "metric_name,timestamp,metric_value,check,error,extra_tags\n" + "my_metric,2019-07-05T11:04:04Z,1.000000,val1,val3,url=val2\n" + "my_metric,2019-07-05T11:04:04Z,1.000000,val1,val3,name=val4&url=val2\n",
 		},
 	}

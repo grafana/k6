@@ -48,7 +48,7 @@ type TimeFormat uint8
 // valid defined values for TimeFormat
 const (
 	TimeFormatUnix TimeFormat = iota
-	TimeFormatRFC3399
+	TimeFormatRFC3339
 )
 
 // NewConfig creates a new Config instance with default values for some fields.

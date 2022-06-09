@@ -53,7 +53,7 @@ func TestApply(t *testing.T) {
 		{
 			FileName:     null.StringFrom("newPath"),
 			SaveInterval: types.NewNullDuration(time.Duration(1), false),
-			TimeFormat:   null.StringFrom("rfc3399"),
+			TimeFormat:   null.StringFrom("rfc3339"),
 		},
 	}
 	expected := []struct {
@@ -69,7 +69,7 @@ func TestApply(t *testing.T) {
 		{
 			FileName:     "newPath",
 			SaveInterval: "1s",
-			TimeFormat:   "rfc3399",
+			TimeFormat:   "rfc3339",
 		},
 	}
 
@@ -141,11 +141,11 @@ func TestParseArg(t *testing.T) {
 		"filename=test.csv,save_interval=5s": {
 			expectedErr: true,
 		},
-		"fileName=test.csv,timeFormat=rfc3399": {
+		"fileName=test.csv,timeFormat=rfc3339": {
 			config: Config{
 				FileName:     null.StringFrom("test.csv"),
 				SaveInterval: types.NewNullDuration(1*time.Second, false),
-				TimeFormat:   null.StringFrom("rfc3399"),
+				TimeFormat:   null.StringFrom("rfc3339"),
 			},
 		},
 	}

@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-const _TimeFormatName = "unixrfc3399"
+const _TimeFormatName = "unixrfc3339"
 
 var _TimeFormatIndex = [...]uint8{0, 4, 11}
 
