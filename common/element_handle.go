@@ -248,7 +248,7 @@ func (h *ElementHandle) dispatchEvent(apiCtx context.Context, typ string, eventI
 	return nil, err
 }
 
-func (h *ElementHandle) fill(_ context.Context, value string) (interface{}, error) {
+func (h *ElementHandle) fill(_ context.Context, value string) error {
 	fn := `
 		(node, injected, value) => {
 			return injected.fill(node, value);
@@ -260,18 +260,18 @@ func (h *ElementHandle) fill(_ context.Context, value string) (interface{}, erro
 	}
 	result, err := h.evalWithScript(h.ctx, opts, fn, value)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	r, ok := result.(goja.Value)
 	if !ok {
-		return nil, fmt.Errorf("expected goja value; got %T", result)
+		return fmt.Errorf("expected goja value; got %T", result)
 	}
 	if s := r.String(); s != resultDone {
 		// Either we're done or an error happened (returned as "error:..." from JS)
-		return nil, errorFromDOMError(s)
+		return errorFromDOMError(s)
 	}
 
-	return nil, nil //nolint:nilnil
+	return nil
 }
 
 func (h *ElementHandle) focus(apiCtx context.Context, resetSelectionIfNotFocused bool) error {
@@ -782,7 +782,7 @@ func (h *ElementHandle) Fill(value string, opts goja.Value) {
 		k6ext.Panic(h.ctx, "cannot parse element fill options: %w", err)
 	}
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
-		return handle.fill(apiCtx, value)
+		return nil, handle.fill(apiCtx, value)
 	}
 	actFn := h.newAction([]string{"visible", "enabled", "editable"},
 		fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
