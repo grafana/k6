@@ -162,7 +162,7 @@ func TestSampleToRow(t *testing.T) {
 		{
 			baseRow: []string{
 				"my_metric",
-				"2019-07-05T11:04:04Z",
+				time.Unix(1562324644, 0).Format(time.RFC3339),
 				"1.000000",
 				"val1",
 				"val3",
@@ -319,7 +319,9 @@ func TestRun(t *testing.T) {
 			fileName:       "test",
 			fileReaderFunc: readUnCompressedFile,
 			timeFormat:     "rfc3339",
-			outputContent:  "metric_name,timestamp,metric_value,check,error,extra_tags\n" + "my_metric,2019-07-05T11:04:04Z,1.000000,val1,val3,url=val2\n" + "my_metric,2019-07-05T11:04:04Z,1.000000,val1,val3,name=val4&url=val2\n",
+			outputContent: "metric_name,timestamp,metric_value,check,error,extra_tags\n" +
+				"my_metric," + time.Unix(1562324644, 0).Format(time.RFC3339) + ",1.000000,val1,val3,url=val2\n" +
+				"my_metric," + time.Unix(1562324644, 0).Format(time.RFC3339) + ",1.000000,val1,val3,name=val4&url=val2\n",
 		},
 	}
 
