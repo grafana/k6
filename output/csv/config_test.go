@@ -30,6 +30,7 @@ import (
 
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
@@ -39,7 +40,7 @@ func TestNewConfig(t *testing.T) {
 	config := NewConfig()
 	assert.Equal(t, "file.csv", config.FileName.String)
 	assert.Equal(t, "1s", config.SaveInterval.String())
-	assert.Equal(t, TimeFormat("unix"), config.TimeFormat)
+	assert.Equal(t, "unix", config.TimeFormat.String)
 }
 
 func TestApply(t *testing.T) {
@@ -47,28 +48,28 @@ func TestApply(t *testing.T) {
 		{
 			FileName:     null.StringFrom(""),
 			SaveInterval: types.NullDurationFrom(2 * time.Second),
-			TimeFormat:   "unix",
+			TimeFormat:   null.StringFrom("unix"),
 		},
 		{
 			FileName:     null.StringFrom("newPath"),
 			SaveInterval: types.NewNullDuration(time.Duration(1), false),
-			TimeFormat:   "unix",
+			TimeFormat:   null.StringFrom("rfc3399"),
 		},
 	}
 	expected := []struct {
 		FileName     string
 		SaveInterval string
-		TimeFormat   TimeFormat
+		TimeFormat   string
 	}{
 		{
 			FileName:     "",
 			SaveInterval: "2s",
-			TimeFormat:   TimeFormat("unix"),
+			TimeFormat:   "unix",
 		},
 		{
 			FileName:     "newPath",
 			SaveInterval: "1s",
-			TimeFormat:   TimeFormat("unix"),
+			TimeFormat:   "rfc3399",
 		},
 	}
 
@@ -81,7 +82,7 @@ func TestApply(t *testing.T) {
 
 			assert.Equal(t, expected.FileName, baseConfig.FileName.String)
 			assert.Equal(t, expected.SaveInterval, baseConfig.SaveInterval.String())
-			assert.Equal(t, expected.TimeFormat, baseConfig.TimeFormat)
+			assert.Equal(t, expected.TimeFormat, baseConfig.TimeFormat.String)
 		})
 	}
 }
@@ -95,12 +96,15 @@ func TestParseArg(t *testing.T) {
 		"test_file.csv": {
 			config: Config{
 				FileName:     null.StringFrom("test_file.csv"),
-				SaveInterval: types.NullDurationFrom(1 * time.Second),
+				SaveInterval: types.NewNullDuration(1*time.Second, false),
+				TimeFormat:   null.NewString("unix", false),
 			},
 		},
 		"save_interval=5s": {
 			config: Config{
+				FileName:     null.NewString("file.csv", false),
 				SaveInterval: types.NullDurationFrom(5 * time.Second),
+				TimeFormat:   null.NewString("unix", false),
 			},
 			expectedLogEntries: []string{
 				"CSV output argument 'save_interval' is deprecated, please use 'saveInterval' instead.",
@@ -108,13 +112,16 @@ func TestParseArg(t *testing.T) {
 		},
 		"saveInterval=5s": {
 			config: Config{
+				FileName:     null.NewString("file.csv", false),
 				SaveInterval: types.NullDurationFrom(5 * time.Second),
+				TimeFormat:   null.NewString("unix", false),
 			},
 		},
 		"file_name=test.csv,save_interval=5s": {
 			config: Config{
 				FileName:     null.StringFrom("test.csv"),
 				SaveInterval: types.NullDurationFrom(5 * time.Second),
+				TimeFormat:   null.NewString("unix", false),
 			},
 			expectedLogEntries: []string{
 				"CSV output argument 'file_name' is deprecated, please use 'fileName' instead.",
@@ -125,6 +132,7 @@ func TestParseArg(t *testing.T) {
 			config: Config{
 				FileName:     null.StringFrom("test.csv"),
 				SaveInterval: types.NullDurationFrom(5 * time.Second),
+				TimeFormat:   null.NewString("unix", false),
 			},
 			expectedLogEntries: []string{
 				"CSV output argument 'save_interval' is deprecated, please use 'saveInterval' instead.",
@@ -135,8 +143,9 @@ func TestParseArg(t *testing.T) {
 		},
 		"fileName=test.csv,timeFormat=rfc3399": {
 			config: Config{
-				FileName:   null.StringFrom("test.csv"),
-				TimeFormat: "rfc3399",
+				FileName:     null.StringFrom("test.csv"),
+				SaveInterval: types.NewNullDuration(1*time.Second, false),
+				TimeFormat:   null.StringFrom("rfc3399"),
 			},
 		},
 	}
@@ -153,11 +162,11 @@ func TestParseArg(t *testing.T) {
 
 			if testCase.expectedErr {
 				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
+				return
 			}
-			assert.Equal(t, testCase.config.FileName.String, config.FileName.String)
-			assert.Equal(t, testCase.config.SaveInterval.String(), config.SaveInterval.String())
+
+			require.NoError(t, err)
+			assert.Equal(t, testCase.config, config)
 
 			var entries []string
 			for _, v := range hook.AllEntries() {

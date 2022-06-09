@@ -89,7 +89,7 @@ func TestSampleToRow(t *testing.T) {
 			},
 			resTags:     []string{"tag1"},
 			ignoredTags: []string{"tag2"},
-			timeFormat:  "",
+			timeFormat:  "unix",
 		},
 		{
 			testname: "Two res tags, three extra tags",
@@ -107,7 +107,7 @@ func TestSampleToRow(t *testing.T) {
 			},
 			resTags:     []string{"tag1", "tag2"},
 			ignoredTags: []string{},
-			timeFormat:  "",
+			timeFormat:  "unix",
 		},
 		{
 			testname: "Two res tags, two ignored, with RFC3399 timestamp",
@@ -177,7 +177,8 @@ func TestSampleToRow(t *testing.T) {
 	for i := range testData {
 		testname, sample := testData[i].testname, testData[i].sample
 		resTags, ignoredTags := testData[i].resTags, testData[i].ignoredTags
-		timeFormat := TimeFormat(testData[i].timeFormat)
+		timeFormat, err := TimeFormatString(testData[i].timeFormat)
+		require.NoError(t, err)
 		expectedRow := expected[i]
 
 		t.Run(testname, func(t *testing.T) {
@@ -322,29 +323,37 @@ func TestRun(t *testing.T) {
 		},
 	}
 
-	for _, data := range testData {
-		mem := afero.NewMemMapFs()
-		output, err := newOutput(output.Params{
-			Logger:         testutils.NewLogger(t),
-			FS:             mem,
-			ConfigArgument: data.fileName,
-			ScriptOptions: lib.Options{
-				SystemTags: metrics.NewSystemTagSet(metrics.TagError | metrics.TagCheck),
-			},
+	for i, data := range testData {
+		name := fmt.Sprint(i)
+		data := data
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			mem := afero.NewMemMapFs()
+			env := make(map[string]string)
+			if data.timeFormat != "" {
+				env["K6_CSV_TIME_FORMAT"] = data.timeFormat
+			}
+
+			output, err := newOutput(output.Params{
+				Logger:         testutils.NewLogger(t),
+				FS:             mem,
+				Environment:    env,
+				ConfigArgument: data.fileName,
+				ScriptOptions: lib.Options{
+					SystemTags: metrics.NewSystemTagSet(metrics.TagError | metrics.TagCheck),
+				},
+			})
+			require.NoError(t, err)
+			require.NotNil(t, output)
+
+			require.NoError(t, output.Start())
+			output.AddMetricSamples(data.samples)
+			time.Sleep(1 * time.Second)
+			require.NoError(t, output.Stop())
+
+			finalOutput := data.fileReaderFunc(data.fileName, mem)
+			assert.Equal(t, data.outputContent, sortExtraTagsForTest(t, finalOutput))
 		})
-
-		output.timeFormat = TimeFormat(data.timeFormat)
-
-		require.NoError(t, err)
-		require.NotNil(t, output)
-
-		require.NoError(t, output.Start())
-		output.AddMetricSamples(data.samples)
-		time.Sleep(1 * time.Second)
-		require.NoError(t, output.Stop())
-
-		finalOutput := data.fileReaderFunc(data.fileName, mem)
-		assert.Equal(t, data.outputContent, sortExtraTagsForTest(t, finalOutput))
 	}
 }
 
