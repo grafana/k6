@@ -215,7 +215,7 @@ func SampleToRow(sample *metrics.Sample, resTags []string, ignoredTags []string,
 
 	switch timeFormat {
 	case TimeFormatRFC3339:
-		row[1] = sample.Time.UTC().Format(time.RFC3339)
+		row[1] = sample.Time.Format(time.RFC3339)
 	case TimeFormatUnix:
 		row[1] = strconv.FormatInt(sample.Time.Unix(), 10)
 	}
