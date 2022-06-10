@@ -993,27 +993,42 @@ func (f *Frame) FrameElement() api.ElementHandle {
 	return element
 }
 
-func (f *Frame) GetAttribute(selector string, name string, opts goja.Value) goja.Value {
+// GetAttribute of the first element found that matches the selector.
+func (f *Frame) GetAttribute(selector, name string, opts goja.Value) goja.Value {
 	f.log.Debugf("Frame:GetAttribute", "fid:%s furl:%q sel:%q name:%s", f.ID(), f.URL(), selector, name)
 
-	parsedOpts := NewFrameBaseOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "error getting attribute: %w", err)
+	popts := NewFrameBaseOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "parse: %w", err)
 	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
-		return handle.getAttribute(apiCtx, name)
-	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
-	)
-	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
+	v, err := f.getAttribute(selector, name, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "error getting attribute: %w", err)
+		k6ext.Panic(f.ctx, "getAttribute: %w", err)
 	}
 
 	applySlowMo(f.ctx)
-	return value.(goja.Value)
+
+	return v
+}
+
+func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goja.Value, error) {
+	getAttribute := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+		return handle.getAttribute(apiCtx, name)
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, getAttribute,
+		[]string{}, false, true, opts.Timeout,
+	)
+	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	if err != nil {
+		return nil, err
+	}
+	gv, ok := v.(goja.Value)
+	if !ok {
+		return nil, fmt.Errorf("got %T; want goja value", v)
+	}
+
+	return gv, nil
 }
 
 // Goto will navigate the frame to the specified URL and return a HTTP response object.
