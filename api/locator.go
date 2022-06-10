@@ -34,4 +34,6 @@ type Locator interface {
 	Fill(value string, opts goja.Value)
 	// Focus on the element using locator's selector with strict mode on.
 	Focus(opts goja.Value)
+	// GetAttribute of the element using locator's selector with strict mode on.
+	GetAttribute(name string, opts goja.Value) goja.Value
 }
