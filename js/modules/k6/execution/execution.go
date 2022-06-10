@@ -341,8 +341,7 @@ func (o *tagsDynamicObject) Set(key string, val goja.Value) bool {
 	default:
 		reason := "only String, Boolean and Number types are accepted as a Tag value"
 		if o.State.Options.Throw.Bool {
-			common.Throw(o.Runtime, fmt.Errorf(reason))
-			return false
+			panic(o.Runtime.NewTypeError(reason))
 		}
 		o.State.Logger.Warnf("the execution.vu.tags.Set('%s') operation has been discarded because %s", key, reason)
 		return false
