@@ -32,4 +32,6 @@ type Locator interface {
 	IsHidden(opts goja.Value) bool
 	// Fill out the element using locator's selector with strict mode on.
 	Fill(value string, opts goja.Value)
+	// Focus on the element using locator's selector with strict mode on.
+	Focus(opts goja.Value)
 }
