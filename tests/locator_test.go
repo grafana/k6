@@ -10,6 +10,8 @@ import (
 )
 
 func TestLocatorClick(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
@@ -33,6 +35,8 @@ func TestLocatorClick(t *testing.T) {
 }
 
 func TestLocatorDblclick(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
@@ -56,6 +60,8 @@ func TestLocatorDblclick(t *testing.T) {
 }
 
 func TestLocatorCheck(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
@@ -95,6 +101,8 @@ func TestLocatorCheck(t *testing.T) {
 }
 
 func TestLocatorElementState(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		state, eval string
 		query       func(api.Locator) bool
@@ -153,6 +161,8 @@ func TestLocatorElementState(t *testing.T) {
 }
 
 func TestLocatorFill(t *testing.T) {
+	t.Parallel()
+
 	const value = "fill me up"
 
 	tb := newTestBrowser(t, withFileServer())
@@ -171,6 +181,8 @@ func TestLocatorFill(t *testing.T) {
 }
 
 func TestLocatorFocus(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
