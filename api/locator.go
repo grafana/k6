@@ -27,4 +27,7 @@ type Locator interface {
 	// IsVisible returns true if the element matches the locator's
 	// selector and is visible. Otherwise, returns false.
 	IsVisible(opts goja.Value) bool
+	// IsHidden returns true if the element matches the locator's
+	// selector and is hidden. Otherwise, returns false.
+	IsHidden(opts goja.Value) bool
 }
