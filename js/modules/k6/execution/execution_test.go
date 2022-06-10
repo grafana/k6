@@ -142,7 +142,7 @@ func TestVUTags(t *testing.T) {
 			assert.Equal(t, "vu101", val.String())
 		})
 
-		t.Run("DiscardWrongTypeRaisingError", func(t *testing.T) {
+		t.Run("DiscardWrongTypeAndRaisingError", func(t *testing.T) {
 			t.Parallel()
 
 			tenv := setupTagsExecEnv(t)
@@ -150,13 +150,17 @@ func TestVUTags(t *testing.T) {
 			state.Options.Throw = null.BoolFrom(true)
 			require.NotNil(t, state)
 
-			// array
-			_, err := tenv.Runtime.RunString(`exec.vu.tags["custom-tag"] = [1, 3, 5]`)
-			require.Contains(t, err.Error(), "only String, Boolean and Number")
+			cases := []string{
+				`[1, 3, 5]`,             // array
+				`{f1: "value1", f2: 4}`, // object
+			}
 
-			// object
-			_, err = tenv.Runtime.RunString(`exec.vu.tags["custom-tag"] = {f1: "value1", f2: 4}`)
-			require.Contains(t, err.Error(), "only String, Boolean and Number")
+			for _, val := range cases {
+				_, err := tenv.Runtime.RunString(`exec.vu.tags["custom-tag"] = ` + val)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "TypeError:")
+				assert.Contains(t, err.Error(), "only String, Boolean and Number")
+			}
 		})
 
 		t.Run("DiscardWrongTypeOnlyWarning", func(t *testing.T) {
@@ -177,7 +181,7 @@ func TestVUTags(t *testing.T) {
 			cases := []string{"null", "undefined"}
 			tenv := setupTagsExecEnv(t)
 			for _, val := range cases {
-				_, err := tenv.Runtime.RunString(`exec.vu.tags["any"] = ` + val)
+				_, err := tenv.Runtime.RunString(`exec.vu.tags["custom-tag"] = ` + val)
 				require.NoError(t, err)
 
 				entries := tenv.LogHook.Drain()
