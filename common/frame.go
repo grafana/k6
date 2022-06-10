@@ -939,7 +939,7 @@ func (f *Frame) Fill(selector string, value string, opts goja.Value) {
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
-		return handle.fill(apiCtx, value)
+		return nil, handle.fill(apiCtx, value)
 	}
 	actFn := f.newAction(
 		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{"visible", "enabled", "editable"},
