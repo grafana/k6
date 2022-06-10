@@ -169,3 +169,28 @@ func TestLocatorFill(t *testing.T) {
 		require.Panics(t, func() { link.Fill(value, nil) }, "should not select multiple elements")
 	})
 }
+
+func TestLocatorFocus(t *testing.T) {
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	t.Run("ok", func(t *testing.T) {
+		focused := func() bool {
+			ok := p.Evaluate(tb.toGojaValue(
+				`() => document.activeElement == document.getElementById('inputText')`,
+			))
+			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
+		}
+
+		link := p.Locator("#inputText", nil)
+		require.False(t, focused(), "should not be focused first")
+
+		link.Focus(nil)
+		require.True(t, focused(), "should be focused")
+	})
+	t.Run("strict", func(t *testing.T) {
+		link := p.Locator("input", nil)
+		require.Panics(t, func() { link.Focus(nil) }, "should not select multiple elements")
+	})
+}

@@ -957,27 +957,30 @@ func (f *Frame) fill(selector, value string, opts *FrameFillOptions) error {
 	return err
 }
 
-// Focus fetches an element with selector and focuses it.
+// Focus focuses on the first element that matches the selector.
 func (f *Frame) Focus(selector string, opts goja.Value) {
 	f.log.Debugf("Frame:Focus", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameBaseOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
+	popts := NewFrameBaseOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
+	if err := f.focus(selector, popts); err != nil {
+		k6ext.Panic(f.ctx, "%w", err)
+	}
+	applySlowMo(f.ctx)
+}
 
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+func (f *Frame) focus(selector string, opts *FrameBaseOptions) error {
+	focus := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return nil, handle.focus(apiCtx, true)
 	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, focus,
+		[]string{}, false, true, opts.Timeout,
 	)
-	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
-
-	applySlowMo(f.ctx)
+	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	return err
 }
 
 func (f *Frame) FrameElement() api.ElementHandle {
