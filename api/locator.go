@@ -30,4 +30,6 @@ type Locator interface {
 	// IsHidden returns true if the element matches the locator's
 	// selector and is hidden. Otherwise, returns false.
 	IsHidden(opts goja.Value) bool
+	// Fill out the element using locator's selector with strict mode on.
+	Fill(value string, opts goja.Value)
 }

@@ -151,3 +151,21 @@ func TestLocatorElementState(t *testing.T) {
 		})
 	}
 }
+
+func TestLocatorFill(t *testing.T) {
+	const value = "fill me up"
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	t.Run("ok", func(t *testing.T) {
+		link := p.Locator("#inputText", nil)
+		link.Fill(value, nil)
+		require.Equal(t, value, p.InputValue("#inputText", nil))
+	})
+	t.Run("strict", func(t *testing.T) {
+		link := p.Locator("input", nil)
+		require.Panics(t, func() { link.Fill(value, nil) }, "should not select multiple elements")
+	})
+}

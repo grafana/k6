@@ -930,27 +930,31 @@ func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle 
 	return handle
 }
 
-func (f *Frame) Fill(selector string, value string, opts goja.Value) {
-	f.log.Debugf("Frame:Fill", "fid:%s furl:%q sel:%q val:%s", f.ID(), f.URL(), selector, value)
+// Fill fills out the first element found that matches the selector.
+func (f *Frame) Fill(selector, value string, opts goja.Value) {
+	f.log.Debugf("Frame:Fill", "fid:%s furl:%q sel:%q val:%q", f.ID(), f.URL(), selector, value)
 
-	parsedOpts := NewFrameFillOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
+	popts := NewFrameFillOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
+	if err := f.fill(selector, value, popts); err != nil {
+		k6ext.Panic(f.ctx, "%w", err)
+	}
+	applySlowMo(f.ctx)
+}
 
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+func (f *Frame) fill(selector, value string, opts *FrameFillOptions) error {
+	fill := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return nil, handle.fill(apiCtx, value)
 	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{"visible", "enabled", "editable"},
-		parsedOpts.Force, parsedOpts.NoWaitAfter, parsedOpts.Timeout,
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict,
+		fill, []string{"visible", "enabled", "editable"},
+		opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
-	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
-
-	applySlowMo(f.ctx)
+	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	return err
 }
 
 // Focus fetches an element with selector and focuses it.
