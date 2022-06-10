@@ -19,18 +19,18 @@ func TestLocatorClick(t *testing.T) {
 	// Selecting a single element and clicking on it is OK.
 	t.Run("ok", func(t *testing.T) {
 		result := func() bool {
-			cr := p.Evaluate(tb.toGojaValue(`() => window.result`))
-			return cr.(goja.Value).ToBoolean() //nolint:forcetypeassert
+			ok := p.Evaluate(tb.toGojaValue(`() => window.result`))
+			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
 		}
-		link := p.Locator("#link", nil)
-		link.Click(nil)
+		l := p.Locator("#link", nil)
+		l.Click(nil)
 		require.True(t, result(), "could not click the link")
 	})
 	// There are two links in the document (locators.html).
 	// The strict mode should disallow selecting multiple elements.
 	t.Run("strict", func(t *testing.T) {
-		link := p.Locator("a", nil)
-		require.Panics(t, func() { link.Click(nil) })
+		l := p.Locator("a", nil)
+		require.Panics(t, func() { l.Click(nil) })
 	})
 }
 
@@ -44,18 +44,18 @@ func TestLocatorDblclick(t *testing.T) {
 	// Selecting a single element and clicking on it is OK.
 	t.Run("ok", func(t *testing.T) {
 		dblclick := func() bool {
-			cr := p.Evaluate(tb.toGojaValue(`() => window.dblclick`))
-			return cr.(goja.Value).ToBoolean() //nolint:forcetypeassert
+			ok := p.Evaluate(tb.toGojaValue(`() => window.dblclick`))
+			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
 		}
-		link := p.Locator("#link", nil)
-		link.Dblclick(nil)
+		l := p.Locator("#link", nil)
+		l.Dblclick(nil)
 		require.True(t, dblclick(), "could not double click the link")
 	})
 	// There are two links in the document (locators.html).
 	// The strict mode should disallow selecting multiple elements.
 	t.Run("strict", func(t *testing.T) {
-		link := p.Locator("a", nil)
-		require.Panics(t, func() { link.Dblclick(nil) })
+		l := p.Locator("a", nil)
+		require.Panics(t, func() { l.Dblclick(nil) })
 	})
 }
 
@@ -68,35 +68,35 @@ func TestLocatorCheck(t *testing.T) {
 
 	t.Run("check", func(t *testing.T) {
 		check := func() bool {
-			cr := p.Evaluate(tb.toGojaValue(`() => window.check`))
-			return cr.(goja.Value).ToBoolean() //nolint:forcetypeassert
+			ok := p.Evaluate(tb.toGojaValue(`() => window.check`))
+			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
 		}
 
-		cb := p.Locator("#inputCheckbox", nil)
+		l := p.Locator("#inputCheckbox", nil)
 		require.False(t, check(), "should be unchecked first")
 
-		cb.Check(nil)
+		l.Check(nil)
 		require.True(t, check(), "could not check the input box")
 
-		cb.Uncheck(nil)
+		l.Uncheck(nil)
 		require.False(t, check(), "could not uncheck the input box")
 	})
 	t.Run("is_checked", func(t *testing.T) {
-		cb := p.Locator("#inputCheckbox", nil)
+		l := p.Locator("#inputCheckbox", nil)
 
-		cb.Check(nil)
-		require.True(t, cb.IsChecked(nil))
+		l.Check(nil)
+		require.True(t, l.IsChecked(nil))
 
-		cb.Uncheck(nil)
-		require.False(t, cb.IsChecked(nil))
+		l.Uncheck(nil)
+		require.False(t, l.IsChecked(nil))
 	})
 	// There are multiple input boxes in the document (locators.html).
 	// The strict mode should disallow selecting multiple elements.
 	t.Run("strict", func(t *testing.T) {
-		input := p.Locator("input", nil)
-		require.Panics(t, func() { input.Check(nil) }, "should not select multiple elements")
-		require.Panics(t, func() { input.Uncheck(nil) }, "should not select multiple elements")
-		require.Panics(t, func() { input.IsChecked(nil) }, "should not select multiple elements")
+		l := p.Locator("input", nil)
+		require.Panics(t, func() { l.Check(nil) }, "should not select multiple elements")
+		require.Panics(t, func() { l.Uncheck(nil) }, "should not select multiple elements")
+		require.Panics(t, func() { l.IsChecked(nil) }, "should not select multiple elements")
 	})
 }
 
@@ -170,13 +170,13 @@ func TestLocatorFill(t *testing.T) {
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
 	t.Run("ok", func(t *testing.T) {
-		link := p.Locator("#inputText", nil)
-		link.Fill(value, nil)
+		l := p.Locator("#inputText", nil)
+		l.Fill(value, nil)
 		require.Equal(t, value, p.InputValue("#inputText", nil))
 	})
 	t.Run("strict", func(t *testing.T) {
-		link := p.Locator("input", nil)
-		require.Panics(t, func() { link.Fill(value, nil) }, "should not select multiple elements")
+		l := p.Locator("input", nil)
+		require.Panics(t, func() { l.Fill(value, nil) }, "should not select multiple elements")
 	})
 }
 
@@ -195,14 +195,14 @@ func TestLocatorFocus(t *testing.T) {
 			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
 		}
 
-		link := p.Locator("#inputText", nil)
+		l := p.Locator("#inputText", nil)
 		require.False(t, focused(), "should not be focused first")
 
-		link.Focus(nil)
+		l.Focus(nil)
 		require.True(t, focused(), "should be focused")
 	})
 	t.Run("strict", func(t *testing.T) {
-		link := p.Locator("input", nil)
-		require.Panics(t, func() { link.Focus(nil) }, "should not select multiple elements")
+		l := p.Locator("input", nil)
+		require.Panics(t, func() { l.Focus(nil) }, "should not select multiple elements")
 	})
 }
