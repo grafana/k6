@@ -221,8 +221,9 @@ func TestLocatorGetAttribute(t *testing.T) {
 		require.Equal(t, "something", v.ToString().String())
 	})
 	t.Run("strict", func(t *testing.T) {
-		l := p.Locator("input", nil)
-		require.Panics(t, func() { l.GetAttribute("value", nil) }, "should not select multiple elements")
+		require.Panics(t, func() {
+			p.Locator("input", nil).GetAttribute("value", nil)
+		}, "should not select multiple elements")
 	})
 }
 
