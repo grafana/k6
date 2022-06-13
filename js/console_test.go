@@ -393,7 +393,7 @@ func TestFileConsole(t *testing.T) {
 							entryStr, err := entry.String()
 							require.NoError(t, err)
 
-							f, err = os.Open(logFilename)
+							f, err = os.Open(logFilename) //nolint:gosec
 							require.NoError(t, err)
 
 							fileContent, err := ioutil.ReadAll(f)
