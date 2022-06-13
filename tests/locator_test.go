@@ -207,7 +207,7 @@ func TestLocatorFocus(t *testing.T) {
 	})
 }
 
-// Skip adding t.Parallel to subtests because they might cause flakiness.
+// Skip adding t.Parallel to subtests because goja or our code might race.
 //nolint:tparallel
 func TestLocatorGetAttribute(t *testing.T) {
 	t.Parallel()

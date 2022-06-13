@@ -2,6 +2,12 @@ package api
 
 import "github.com/dop251/goja"
 
+// Strict mode:
+// All operations on locators throw an exception if more
+// than one element matches the locator's selector.
+//
+// See Issue #100 for more details.
+
 // Locator represents a way to find element(s) on a page at any moment.
 type Locator interface {
 	// Click on an element using locator's selector with strict mode on.
