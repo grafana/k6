@@ -66,6 +66,25 @@ const testHTML = `
 </body>
 `
 
+const testXML = `
+<ListAllMyBucketsResult>
+   <Buckets>
+      <Bucket>
+          <CreationDate>1654852823</CreationDate>
+          <Name>firstBucket</Name>
+      </Bucket>
+	  <Bucket>
+	      <CreationDate>1654852825</CreationDate>
+		  <Name>secondBucket</Name>
+	  </Bucket>
+   </Buckets>
+   <Owner>
+      <DisplayName>string</DisplayName>
+      <ID>string</ID>
+   </Owner>
+</ListAllMyBucketsResult>
+`
+
 func getTestModuleInstance(t testing.TB) (*goja.Runtime, *ModuleInstance) {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
@@ -409,11 +428,38 @@ func TestParseHTML(t *testing.T) {
 		t.Run("Valid", func(t *testing.T) {
 			v, err := rt.RunString(`doc.find("#select_multi option").map(function(idx, val) { return val.text() })`)
 			if assert.NoError(t, err) {
-				mapped, ok := v.Export().([]string)
+				mapped, ok := v.Export().([]goja.Value)
 				assert.True(t, ok)
 				assert.Equal(t, 3, len(mapped))
-				assert.Equal(t, []string{"option 1", "option 2", "option 3"}, mapped)
+				assert.Equal(t, "option 1", mapped[0].String())
+				assert.Equal(t, "option 2", mapped[1].String())
+				assert.Equal(t, "option 3", mapped[2].String())
 			}
+		})
+		t.Run("Continues to work with strings", func(t *testing.T) {
+			_, err := rt.RunString(`
+				const values = doc
+					.find("#select_multi option")
+					.map(function(idx, val) { 
+						return val.text()
+					})
+				
+				if (values.length !== 3) {
+					throw new Error('Expected 3 values, got ' + values.length)
+				}
+
+				for (let i = 0; i < values.length; i++) {
+					if (typeof values[i] !== 'string') {
+						throw new Error('Expected string, got ' + values[i].toString())
+					}
+
+					if (values[i].toString() !== 'option ' + (i + 1)) {
+						throw new Error('Expected value ' + (i + 1) + ', got ' + values[i])
+					}
+				}
+			`)
+
+			assert.NoError(t, err)
 		})
 		t.Run("Invalid arg", func(t *testing.T) {
 			_, err := rt.RunString(`doc.find("#select_multi option").map("");`)
@@ -425,11 +471,60 @@ func TestParseHTML(t *testing.T) {
 		t.Run("Map with attr must return string", func(t *testing.T) {
 			v, err := rt.RunString(`doc.find("#select_multi").map(function(idx, val) { return val.attr("name") })`)
 			if assert.NoError(t, err) {
-				mapped, ok := v.Export().([]string)
+				mapped, ok := v.Export().([]goja.Value)
 				assert.True(t, ok)
 				assert.Equal(t, 1, len(mapped))
-				assert.Equal(t, []string{"select_multi"}, mapped)
+				assert.Equal(t, "select_multi", mapped[0].String())
 			}
+		})
+		t.Run("Valid XML", func(t *testing.T) {
+			rt := getTestRuntimeWithDoc(t, testXML)
+			testScript := `
+			const buckets = doc
+				.find('Buckets')
+				.children()
+				.map(function (idx, bucket) {
+					let bucketObj = {}
+					bucket.children().each(function (idx, elem) {
+						switch (elem.nodeName()) {
+							case 'name':
+								Object.assign(bucketObj, { name: elem.textContent() })
+								break
+							case 'creationdate':
+								Object.assign(bucketObj, { creationDate: parseInt(elem.textContent(), 10) })
+								break
+						}
+					})
+					return bucketObj
+				})
+		
+			if (buckets.length !== 2) {
+				throw new Error('Expected 2 buckets, got ' + buckets.length)
+			}
+		
+			if (buckets[0].name !== 'firstBucket') {
+				throw new Error('Expected bucket name to be "firstBucket", got ' + buckets[0].name)
+			}
+		
+			if (buckets[0].creationDate !== 1654852823) {
+				throw new Error(
+					'Expected bucket creation date to be 1654852823, got ' + buckets[0].creationDate
+				)
+			}
+		
+			if (buckets[1].name != 'secondBucket') {
+				throw new Error('Expected bucket name to be "secondBucket", got ' + buckets[1].name)
+			}
+		
+			if (buckets[1].creationDate !== 1654852825) {
+				throw new Error(
+					'Expected bucket creation date to be 1654852825, got ' + buckets[1].creationDate
+				)
+			}
+			`
+
+			_, err := rt.RunString(testScript)
+			assert.NoError(t, err)
 		})
 	})
 	t.Run("Next", func(t *testing.T) {
