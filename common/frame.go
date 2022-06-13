@@ -1578,38 +1578,46 @@ func (f *Frame) Tap(selector string, opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
-// TextContent returns the textContent attribute of the element located by selector.
+// TextContent returns the textContent attribute of the first element found
+// that matches the selector.
 func (f *Frame) TextContent(selector string, opts goja.Value) string {
 	f.log.Debugf("Frame:TextContent", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameTextContentOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+	popts := NewFrameTextContentOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "parse: %w", err)
 	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
-		return handle.textContent(apiCtx)
-	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
-	)
-	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
+	v, err := f.textContent(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "textContent: %w", err)
 	}
 
 	applySlowMo(f.ctx)
 
-	if value == nil {
-		return ""
-	}
+	return v
+}
 
-	val, ok := value.(goja.Value)
+func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (string, error) {
+	TextContent := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+		return handle.textContent(apiCtx)
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, TextContent,
+		[]string{}, false, true, opts.Timeout,
+	)
+	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	if err != nil {
+		return "", err
+	}
+	if v == nil {
+		return "", nil
+	}
+	gv, ok := v.(goja.Value)
 	if !ok {
-		k6ext.Panic(f.ctx, "unexpected textContent value type: %T", value)
+		return "", fmt.Errorf("got %T; want goja value", v)
 	}
 
-	return val.ToString().String()
+	return gv.ToString().String(), nil
 }
 
 func (f *Frame) Title() string {
