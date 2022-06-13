@@ -1062,38 +1062,46 @@ func (f *Frame) Hover(selector string, opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
-// InnerHTML returns the innerHTML attribute of the element located by selector.
+// InnerHTML returns the innerHTML attribute of the first element found
+// that matches the selector.
 func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
 	f.log.Debugf("Frame:InnerHTML", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameInnerHTMLOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+	popts := NewFrameInnerHTMLOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "parse: %w", err)
 	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
-		return handle.innerHTML(apiCtx)
-	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
-	)
-	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
+	v, err := f.innerHTML(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "innerHTML: %w", err)
 	}
 
 	applySlowMo(f.ctx)
 
-	if value == nil {
-		return ""
-	}
+	return v
+}
 
-	val, ok := value.(goja.Value)
+func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string, error) {
+	innerHTML := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+		return handle.innerHTML(apiCtx)
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, innerHTML,
+		[]string{}, false, true, opts.Timeout,
+	)
+	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	if err != nil {
+		return "", err
+	}
+	if v == nil {
+		return "", nil
+	}
+	gv, ok := v.(goja.Value)
 	if !ok {
-		k6ext.Panic(f.ctx, "unexpected innerHTML value type: %T", value)
+		return "", fmt.Errorf("got %T; want goja value", v)
 	}
 
-	return val.ToString().String()
+	return gv.ToString().String(), nil
 }
 
 // InnerText returns the innerText attribute of the element located by selector.
