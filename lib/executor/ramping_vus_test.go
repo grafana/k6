@@ -653,6 +653,47 @@ func TestRampingVUsConfigExecutionPlanZerosAtEnd(t *testing.T) {
 	assert.Equal(t, true, isFinal)
 }
 
+func TestRampingVUsConfigExecutionPlanZeroGracefuls(t *testing.T) {
+	t.Parallel()
+
+	config := RampingVUsConfig{
+		BaseConfig:       BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
+		StartVUs:         null.IntFrom(0),
+		GracefulRampDown: types.NullDurationFrom(0 * time.Second),
+		Stages: []Stage{
+			{
+				Duration: types.NullDurationFrom(1 * time.Second),
+				Target:   null.IntFrom(2),
+			},
+		},
+	}
+
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+	es := lib.NewExecutionState(lib.Options{}, et, nil, 10, 50)
+	var done int64
+	ctx, cancel, executor, _ := setupExecutor(
+		t, config, es,
+		simpleRunner(func(ctx context.Context, _ *lib.State) error {
+			atomic.AddInt64(&done, 1)
+			<-ctx.Done()
+
+			return nil
+		}),
+	)
+	defer cancel()
+	errCh := make(chan error)
+	go func() { errCh <- executor.Run(ctx, nil) }()
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second): // way too much time
+		t.Fatal("Execution should've ended already")
+	}
+	require.Equal(t, int64(1), atomic.LoadInt64(&done))
+}
+
 func TestRampingVUsExecutionTupleTests(t *testing.T) {
 	t.Parallel()
 
