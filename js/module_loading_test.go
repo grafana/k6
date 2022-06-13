@@ -25,6 +25,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
@@ -605,4 +606,89 @@ func TestLoadingSourceMapsDoesntErrorOut(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestShowcasingHowOptionsAreGlobalReadable(t *testing.T) {
+	t.Parallel()
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/A.js", []byte(`
+			export function A() {
+        // we can technically get a field set from outside of js this way
+				return options.someField;
+			}
+		`), os.ModePerm))
+	r1, err := getSimpleRunner(t, "/script.js", `
+			import { A } from "./A.js";
+      export let options = {
+        someField: "here is an option",
+      }
+
+			export default function(data) {
+        if (A() != "here is an option") {
+          throw "oops"
+        }
+			}
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
+	require.NoError(t, err)
+
+	arc := r1.MakeArchive()
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	r2, err := NewFromArchive(&lib.RuntimeState{
+		Logger:         testutils.NewLogger(t),
+		BuiltinMetrics: builtinMetrics,
+		Registry:       registry,
+	}, arc)
+	require.NoError(t, err)
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ch := newDevNullSampleChannel()
+			defer close(ch)
+			initVU, err := r.NewVU(1, 1, ch)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			require.NoError(t, err)
+			err = vu.RunOnce()
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestShowcasingHowOptionsAreGlobalWritable(t *testing.T) {
+	t.Parallel()
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/A.js", []byte(`
+    export function A() {
+      // this requires that this is defined
+      options.minIterationDuration = "1h"
+    }
+		`), os.ModePerm))
+	r1, err := getSimpleRunner(t, "/script.js", `
+    import {A} from "/A.js"
+    export let options = {minIterationDuration: "5m"}
+
+    export default () =>{}
+    A()
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
+	require.NoError(t, err)
+
+	// here it exists
+	require.EqualValues(t, time.Hour, r1.GetOptions().MinIterationDuration.Duration)
+	arc := r1.MakeArchive()
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	r2, err := NewFromArchive(&lib.RuntimeState{
+		Logger:         testutils.NewLogger(t),
+		BuiltinMetrics: builtinMetrics,
+		Registry:       registry,
+	}, arc)
+	require.NoError(t, err)
+
+	require.EqualValues(t, time.Hour, r2.GetOptions().MinIterationDuration.Duration)
 }
