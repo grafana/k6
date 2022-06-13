@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -280,6 +281,65 @@ func TestInvalidOptionsThresholdErrExitCode(t *testing.T) {
 
 			testState.expectedExitCode = int(tc.expExitCode)
 			newRootCommand(testState.globalState).execute()
+		})
+	}
+}
+
+func TestThresholdsRuntimeBehavior(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name                 string
+		testFilename         string
+		expExitCode          exitcodes.ExitCode
+		expStdoutContains    string
+		expStdoutNotContains string
+		extraArgs            []string
+	}{
+		{
+			name:              "#2518: submetrics without values should be rendered under their parent metric #2518",
+			testFilename:      "thresholds/thresholds_on_submetric_without_samples.js",
+			expExitCode:       0,
+			expStdoutContains: "     one..................: 0   0/s\n       { tag:xyz }........: 0   0/s\n",
+		},
+		{
+			name:         "#2512: parsing threshold names containing parsable tokens should be valid",
+			testFilename: "thresholds/name_contains_tokens.js",
+			expExitCode:  0,
+		},
+		{
+			name:                 "#2520: thresholds over metrics without values should avoid division by zero and displaying NaN values",
+			testFilename:         "thresholds/empty_sink_no_nan.js",
+			expExitCode:          0,
+			expStdoutContains:    "rate.................: 0.00%",
+			expStdoutNotContains: "NaN",
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			testScript, err := ioutil.ReadFile(path.Join("testdata", tc.testFilename))
+			require.NoError(t, err)
+
+			testState := newGlobalTestState(t)
+			require.NoError(t, afero.WriteFile(testState.fs, filepath.Join(testState.cwd, tc.testFilename), testScript, 0o644))
+
+			testState.args = []string{"k6", "run", tc.testFilename}
+			testState.expectedExitCode = int(tc.expExitCode)
+			newRootCommand(testState.globalState).execute()
+
+			if tc.expStdoutContains != "" {
+				assert.Contains(t, testState.stdOut.String(), tc.expStdoutContains)
+			}
+
+			if tc.expStdoutNotContains != "" {
+				log.Println(testState.stdOut.String())
+				assert.NotContains(t, testState.stdOut.String(), tc.expStdoutNotContains)
+			}
 		})
 	}
 }
