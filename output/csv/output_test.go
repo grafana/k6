@@ -89,7 +89,7 @@ func TestSampleToRow(t *testing.T) {
 			},
 			resTags:     []string{"tag1"},
 			ignoredTags: []string{"tag2"},
-			timeFormat:  "",
+			timeFormat:  "unix",
 		},
 		{
 			testname: "Two res tags, three extra tags",
@@ -107,10 +107,10 @@ func TestSampleToRow(t *testing.T) {
 			},
 			resTags:     []string{"tag1", "tag2"},
 			ignoredTags: []string{},
-			timeFormat:  "",
+			timeFormat:  "unix",
 		},
 		{
-			testname: "Two res tags, two ignored, with RFC3399 timestamp",
+			testname: "Two res tags, two ignored, with RFC3339 timestamp",
 			sample: &metrics.Sample{
 				Time:   time.Unix(1562324644, 0),
 				Metric: testMetric,
@@ -126,7 +126,7 @@ func TestSampleToRow(t *testing.T) {
 			},
 			resTags:     []string{"tag1", "tag3"},
 			ignoredTags: []string{"tag4", "tag6"},
-			timeFormat:  "rfc3399",
+			timeFormat:  "rfc3339",
 		},
 	}
 
@@ -162,7 +162,7 @@ func TestSampleToRow(t *testing.T) {
 		{
 			baseRow: []string{
 				"my_metric",
-				"2019-07-05T11:04:04Z",
+				time.Unix(1562324644, 0).Format(time.RFC3339),
 				"1.000000",
 				"val1",
 				"val3",
@@ -177,7 +177,8 @@ func TestSampleToRow(t *testing.T) {
 	for i := range testData {
 		testname, sample := testData[i].testname, testData[i].sample
 		resTags, ignoredTags := testData[i].resTags, testData[i].ignoredTags
-		timeFormat := TimeFormat(testData[i].timeFormat)
+		timeFormat, err := TimeFormatString(testData[i].timeFormat)
+		require.NoError(t, err)
 		expectedRow := expected[i]
 
 		t.Run(testname, func(t *testing.T) {
@@ -317,34 +318,44 @@ func TestRun(t *testing.T) {
 			},
 			fileName:       "test",
 			fileReaderFunc: readUnCompressedFile,
-			timeFormat:     "rfc3399",
-			outputContent:  "metric_name,timestamp,metric_value,check,error,extra_tags\n" + "my_metric,2019-07-05T11:04:04Z,1.000000,val1,val3,url=val2\n" + "my_metric,2019-07-05T11:04:04Z,1.000000,val1,val3,name=val4&url=val2\n",
+			timeFormat:     "rfc3339",
+			outputContent: "metric_name,timestamp,metric_value,check,error,extra_tags\n" +
+				"my_metric," + time.Unix(1562324644, 0).Format(time.RFC3339) + ",1.000000,val1,val3,url=val2\n" +
+				"my_metric," + time.Unix(1562324644, 0).Format(time.RFC3339) + ",1.000000,val1,val3,name=val4&url=val2\n",
 		},
 	}
 
-	for _, data := range testData {
-		mem := afero.NewMemMapFs()
-		output, err := newOutput(output.Params{
-			Logger:         testutils.NewLogger(t),
-			FS:             mem,
-			ConfigArgument: data.fileName,
-			ScriptOptions: lib.Options{
-				SystemTags: metrics.NewSystemTagSet(metrics.TagError | metrics.TagCheck),
-			},
+	for i, data := range testData {
+		name := fmt.Sprint(i)
+		data := data
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			mem := afero.NewMemMapFs()
+			env := make(map[string]string)
+			if data.timeFormat != "" {
+				env["K6_CSV_TIME_FORMAT"] = data.timeFormat
+			}
+
+			output, err := newOutput(output.Params{
+				Logger:         testutils.NewLogger(t),
+				FS:             mem,
+				Environment:    env,
+				ConfigArgument: data.fileName,
+				ScriptOptions: lib.Options{
+					SystemTags: metrics.NewSystemTagSet(metrics.TagError | metrics.TagCheck),
+				},
+			})
+			require.NoError(t, err)
+			require.NotNil(t, output)
+
+			require.NoError(t, output.Start())
+			output.AddMetricSamples(data.samples)
+			time.Sleep(1 * time.Second)
+			require.NoError(t, output.Stop())
+
+			finalOutput := data.fileReaderFunc(data.fileName, mem)
+			assert.Equal(t, data.outputContent, sortExtraTagsForTest(t, finalOutput))
 		})
-
-		output.timeFormat = TimeFormat(data.timeFormat)
-
-		require.NoError(t, err)
-		require.NotNil(t, output)
-
-		require.NoError(t, output.Start())
-		output.AddMetricSamples(data.samples)
-		time.Sleep(1 * time.Second)
-		require.NoError(t, output.Stop())
-
-		finalOutput := data.fileReaderFunc(data.fileName, mem)
-		assert.Equal(t, data.outputContent, sortExtraTagsForTest(t, finalOutput))
 	}
 }
 

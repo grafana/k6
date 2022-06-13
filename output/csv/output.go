@@ -86,6 +86,10 @@ func newOutput(params output.Params) (*Output, error) {
 	if err != nil {
 		return nil, err
 	}
+	timeFormat, err := TimeFormatString(config.TimeFormat.String)
+	if err != nil {
+		return nil, err
+	}
 
 	saveInterval := config.SaveInterval.TimeDuration()
 	fname := config.FileName.String
@@ -99,7 +103,7 @@ func newOutput(params output.Params) (*Output, error) {
 			csvWriter:    stdoutWriter,
 			row:          make([]string, 3+len(resTags)+1),
 			saveInterval: saveInterval,
-			timeFormat:   config.TimeFormat,
+			timeFormat:   timeFormat,
 			closeFn:      func() error { return nil },
 			logger:       logger,
 			params:       params,
@@ -117,7 +121,7 @@ func newOutput(params output.Params) (*Output, error) {
 		ignoredTags:  ignoredTags,
 		row:          make([]string, 3+len(resTags)+1),
 		saveInterval: saveInterval,
-		timeFormat:   config.TimeFormat,
+		timeFormat:   timeFormat,
 		logger:       logger,
 		params:       params,
 	}
@@ -209,9 +213,10 @@ func SampleToRow(sample *metrics.Sample, resTags []string, ignoredTags []string,
 ) []string {
 	row[0] = sample.Metric.Name
 
-	if timeFormat == RFC3399 {
+	switch timeFormat {
+	case TimeFormatRFC3339:
 		row[1] = sample.Time.Format(time.RFC3339)
-	} else {
+	case TimeFormatUnix:
 		row[1] = strconv.FormatInt(sample.Time.Unix(), 10)
 	}
 
