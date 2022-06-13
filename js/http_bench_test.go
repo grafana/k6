@@ -45,9 +45,7 @@ func BenchmarkHTTPRequests(b *testing.B) {
 				if (res.status != 200) { throw new Error("wrong status: " + res.status) }
 			}
 		`), lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
-	if !assert.NoError(b, err) {
-		return
-	}
+	require.NoError(b, err)
 	err = r.SetOptions(lib.Options{
 		Throw:          null.BoolFrom(true),
 		MaxRedirects:   null.IntFrom(10),
@@ -63,16 +61,13 @@ func BenchmarkHTTPRequests(b *testing.B) {
 		}
 	}()
 	initVU, err := r.NewVU(1, 1, ch)
-	if !assert.NoError(b, err) {
-		return
-	}
+	require.NoError(b, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		err = vu.RunOnce()
-		assert.NoError(b, err)
+		assert.NoError(b, vu.RunOnce())
 	}
 }
 
@@ -88,9 +83,7 @@ func BenchmarkHTTPRequestsBase(b *testing.B) {
 				if (res.status != 200) { throw new Error("wrong status: " + res.status) }
 			}
 		`))
-	if !assert.NoError(b, err) {
-		return
-	}
+	require.NoError(b, err)
 	err = r.SetOptions(lib.Options{
 		Throw:          null.BoolFrom(true),
 		MaxRedirects:   null.IntFrom(10),
@@ -106,15 +99,12 @@ func BenchmarkHTTPRequestsBase(b *testing.B) {
 		}
 	}()
 	initVU, err := r.NewVU(1, 1, ch)
-	if !assert.NoError(b, err) {
-		return
-	}
+	require.NoError(b, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		err = vu.RunOnce()
-		assert.NoError(b, err)
+		assert.NoError(b, vu.RunOnce())
 	}
 }
