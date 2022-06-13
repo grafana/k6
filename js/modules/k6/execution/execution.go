@@ -90,18 +90,20 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{Default: mi.obj}
 }
 
+var errRunInInitContext = errors.New("getting scenario information in the init context is not supported")
+
 // newScenarioInfo returns a goja.Object with property accessors to retrieve
 // information about the scenario the current VU is running in.
 func (mi *ModuleInstance) newScenarioInfo() (*goja.Object, error) {
 	rt := mi.vu.Runtime()
 	vuState := mi.vu.State()
 	if vuState == nil {
-		return nil, errors.New("getting scenario information in the init context is not supported")
+		return nil, errRunInInitContext
 	}
 	getScenarioState := func() *lib.ScenarioState {
 		ss := lib.GetScenarioState(mi.vu.Context())
 		if ss == nil {
-			common.Throw(rt, errors.New("getting scenario information in the init context is not supported"))
+			common.Throw(rt, errRunInInitContext)
 		}
 		return ss
 	}
@@ -126,9 +128,17 @@ func (mi *ModuleInstance) newScenarioInfo() (*goja.Object, error) {
 			return p
 		},
 		"iterationInInstance": func() interface{} {
+			if vuState.GetScenarioLocalVUIter == nil {
+				common.Throw(rt, errRunInInitContext)
+			}
+
 			return vuState.GetScenarioLocalVUIter()
 		},
 		"iterationInTest": func() interface{} {
+			if vuState.GetScenarioGlobalVUIter == nil {
+				common.Throw(rt, errRunInInitContext)
+			}
+
 			return vuState.GetScenarioGlobalVUIter()
 		},
 	}
