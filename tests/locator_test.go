@@ -13,6 +13,9 @@ import (
 // All operations on locators throw an exception if more
 // than one element matches the locator's selector.
 
+// Note:
+// We skip adding t.Parallel to subtests because goja or our code might race.
+
 func TestLocatorClick(t *testing.T) {
 	t.Parallel()
 
@@ -203,7 +206,6 @@ func TestLocatorFocus(t *testing.T) {
 	})
 }
 
-// Skip adding t.Parallel to subtests because goja or our code might race.
 //nolint:tparallel
 func TestLocatorGetAttribute(t *testing.T) {
 	t.Parallel()
@@ -221,5 +223,23 @@ func TestLocatorGetAttribute(t *testing.T) {
 	t.Run("strict", func(t *testing.T) {
 		l := p.Locator("input", nil)
 		require.Panics(t, func() { l.GetAttribute("value", nil) }, "should not select multiple elements")
+	})
+}
+
+//nolint:tparallel
+func TestLocatorInnerHTML(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	t.Run("ok", func(t *testing.T) {
+		require.Equal(t, `<span>hello</span>`, p.Locator("#divHello", nil).InnerHTML(nil))
+	})
+	t.Run("strict", func(t *testing.T) {
+		require.Panics(t, func() {
+			p.Locator("div", nil).InnerHTML(nil)
+		}, "should not select multiple elements")
 	})
 }

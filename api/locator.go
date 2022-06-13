@@ -42,4 +42,7 @@ type Locator interface {
 	Focus(opts goja.Value)
 	// GetAttribute of the element using locator's selector with strict mode on.
 	GetAttribute(name string, opts goja.Value) goja.Value
+	// InnerHTML returns the element's inner HTML that matches
+	// the locator's selector with strict mode on.
+	InnerHTML(opts goja.Value) string
 }
