@@ -24,7 +24,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib"
@@ -35,9 +34,6 @@ func BenchmarkEmptyIteration(b *testing.B) {
 	b.StopTimer()
 
 	r, err := getSimpleRunner(b, "/script.js", `exports.default = function() { }`)
-	if !assert.NoError(b, err) {
-		return
-	}
 	require.NoError(b, err)
 
 	ch := make(chan metrics.SampleContainer, 100)
@@ -47,15 +43,13 @@ func BenchmarkEmptyIteration(b *testing.B) {
 		}
 	}()
 	initVU, err := r.NewVU(1, 1, ch)
-	if !assert.NoError(b, err) {
-		return
-	}
+	require.NoError(b, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		err = vu.RunOnce()
-		assert.NoError(b, err)
+		require.NoError(b, err)
 	}
 }
