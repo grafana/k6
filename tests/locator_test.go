@@ -202,3 +202,24 @@ func TestLocatorFocus(t *testing.T) {
 		}, "should not select multiple elements")
 	})
 }
+
+// Skip adding t.Parallel to subtests because goja or our code might race.
+//nolint:tparallel
+func TestLocatorGetAttribute(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	t.Run("ok", func(t *testing.T) {
+		l := p.Locator("#inputText", nil)
+		v := l.GetAttribute("value", nil)
+		require.NotNil(t, v)
+		require.Equal(t, "something", v.ToString().String())
+	})
+	t.Run("strict", func(t *testing.T) {
+		l := p.Locator("input", nil)
+		require.Panics(t, func() { l.GetAttribute("value", nil) }, "should not select multiple elements")
+	})
+}
