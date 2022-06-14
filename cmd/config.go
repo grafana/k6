@@ -137,10 +137,14 @@ func readDiskConfig(globalState *globalState) (Config, error) {
 
 	data, err := afero.ReadFile(globalState.fs, globalState.flags.configFilePath)
 	if err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("couldn't load the configuration from %q: %w", globalState.flags.configFilePath, err)
 	}
 	var conf Config
-	return conf, json.Unmarshal(data, &conf)
+	err = json.Unmarshal(data, &conf)
+	if err != nil {
+		return Config{}, fmt.Errorf("couldn't parse the configuration from %q: %w", globalState.flags.configFilePath, err)
+	}
+	return conf, nil
 }
 
 // Serializes the configuration to a JSON file and writes it in the supplied
