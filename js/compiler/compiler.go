@@ -198,10 +198,7 @@ func (c *Compiler) Compile(src, filename string, main bool) (*goja.Program, stri
 // additioanlly it fixes off by one error in commonjs dependencies due to having to wrap them in a function.
 func (c *compilationState) sourceMapLoader(path string) ([]byte, error) {
 	if path == sourceMapURLFromBabel {
-		if !c.main {
-			return c.increaseMappingsByOne(c.srcMap)
-		}
-		return c.srcMap, nil
+		return c.increaseMappingsByOne(c.srcMap)
 	}
 	c.srcMap, c.srcMapError = c.compiler.Options.SourceMapLoader(path)
 	if c.srcMapError != nil {
@@ -214,10 +211,7 @@ func (c *compilationState) sourceMapLoader(path string) ([]byte, error) {
 		c.srcMap = nil
 		return nil, c.srcMapError
 	}
-	if !c.main {
-		return c.increaseMappingsByOne(c.srcMap)
-	}
-	return c.srcMap, nil
+	return c.increaseMappingsByOne(c.srcMap)
 }
 
 func (c *Compiler) compileImpl(

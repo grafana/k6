@@ -54,9 +54,10 @@ import (
 )
 
 type programWithSource struct {
-	pgm    *goja.Program
-	src    string
-	module *goja.Object
+	pgm     *goja.Program
+	src     string
+	module  *goja.Object
+	exports *goja.Object
 }
 
 const openCantBeUsedOutsideInitContextMsg = `The "open()" function is only available in the init stage ` +

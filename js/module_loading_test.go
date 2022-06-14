@@ -314,10 +314,10 @@ func TestLoadCycle(t *testing.T) {
 	// This is mostly the example from https://hacks.mozilla.org/2018/03/es-modules-a-cartoon-deep-dive/
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/counter.js", []byte(`
-			let message = require("./main.js").message;
+			let main = require("./main.js");
 			exports.count = 5;
 			export function a() {
-				return message;
+				return main.message;
 			}
 	`), os.ModePerm))
 
@@ -608,27 +608,36 @@ func TestLoadingSourceMapsDoesntErrorOut(t *testing.T) {
 	}
 }
 
-func TestShowcasingHowOptionsAreGlobalReadable(t *testing.T) {
+func TestOptionsAreGloballyReadable(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/A.js", []byte(`
-			export function A() {
+        export function A() {
         // we can technically get a field set from outside of js this way
-				return options.someField;
-			}
-		`), os.ModePerm))
+            return options.someField;
+        }`), os.ModePerm))
 	r1, err := getSimpleRunner(t, "/script.js", `
-			import { A } from "./A.js";
-      export let options = {
-        someField: "here is an option",
-      }
+     import { A } from "./A.js";
+     export let options = {
+       someField: "here is an option",
+     }
 
-			export default function(data) {
-        if (A() != "here is an option") {
-          throw "oops"
-        }
-			}
-		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
+        export default function(data) {
+            var caught = false;
+            try{
+                if (A() == "here is an option") {
+                  throw "oops"
+                }
+            } catch(e) {
+                if (e.message != "options is not defined") {
+                    throw e;
+                }
+                caught = true;
+            }
+            if (!caught) {
+                throw "expected exception"
+            }
+        } `, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
@@ -660,26 +669,36 @@ func TestShowcasingHowOptionsAreGlobalReadable(t *testing.T) {
 	}
 }
 
-func TestShowcasingHowOptionsAreGlobalWritable(t *testing.T) {
+func TestOptionsAreNotGloballyWritable(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/A.js", []byte(`
     export function A() {
-      // this requires that this is defined
-      options.minIterationDuration = "1h"
-    }
-		`), os.ModePerm))
+        // this requires that this is defined
+        options.minIterationDuration = "1h"
+    }`), os.ModePerm))
 	r1, err := getSimpleRunner(t, "/script.js", `
     import {A} from "/A.js"
     export let options = {minIterationDuration: "5m"}
 
     export default () =>{}
-    A()
-		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
+    var caught = false;
+    try{
+        A()
+    } catch(e) {
+        if (e.message != "options is not defined") {
+            throw e;
+        }
+        caught = true;
+    }
+
+    if (!caught) {
+        throw "expected exception"
+    }`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
 	// here it exists
-	require.EqualValues(t, time.Hour, r1.GetOptions().MinIterationDuration.Duration)
+	require.EqualValues(t, time.Minute*5, r1.GetOptions().MinIterationDuration.Duration)
 	arc := r1.MakeArchive()
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -690,5 +709,5 @@ func TestShowcasingHowOptionsAreGlobalWritable(t *testing.T) {
 	}, arc)
 	require.NoError(t, err)
 
-	require.EqualValues(t, time.Hour, r2.GetOptions().MinIterationDuration.Duration)
+	require.EqualValues(t, time.Minute*5, r2.GetOptions().MinIterationDuration.Duration)
 }

@@ -967,7 +967,7 @@ func TestVuInitException(t *testing.T) {
 
 	var exception errext.Exception
 	require.ErrorAs(t, err, &exception)
-	assert.Equal(t, "Error: oops in 2\n\tat file:///script.js:10:9(31)\n", err.Error())
+	assert.Equal(t, "Error: oops in 2\n\tat file:///script.js:10:9(30)\n\tat native\n", err.Error())
 
 	var errWithHint errext.HasHint
 	require.ErrorAs(t, err, &errWithHint)
