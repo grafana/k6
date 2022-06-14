@@ -336,3 +336,28 @@ func (l *Locator) getAttribute(name string, opts *FrameBaseOptions) (goja.Value,
 	opts.Strict = true
 	return l.frame.getAttribute(l.selector, name, opts)
 }
+
+// InnerHTML returns the element's inner HTML that matches
+// the locator's selector with strict mode on.
+func (l *Locator) InnerHTML(opts goja.Value) string {
+	l.log.Debugf("Locator:InnerHTML", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	var err error
+	defer func() { panicOrSlowMo(l.ctx, err) }()
+
+	copts := NewFrameInnerHTMLOptions(l.frame.defaultTimeout())
+	if err = copts.Parse(l.ctx, opts); err != nil {
+		return ""
+	}
+	var s string
+	if s, err = l.innerHTML(copts); err != nil {
+		return ""
+	}
+
+	return s
+}
+
+func (l *Locator) innerHTML(opts *FrameInnerHTMLOptions) (string, error) {
+	opts.Strict = true
+	return l.frame.innerHTML(l.selector, opts)
+}
