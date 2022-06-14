@@ -18,6 +18,7 @@ import (
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
+	"github.com/grafana/xk6-browser/storage"
 
 	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
@@ -38,8 +39,8 @@ type BrowserType struct {
 	fieldNameMapper *common.FieldNameMapper
 	vu              k6modules.VU
 
-	execPath string    // path to the Chromium executable
-	storage  DataStore // stores temporary data for the extension and user
+	execPath string      // path to the Chromium executable
+	storage  storage.Dir // stores temporary data for the extension and user
 }
 
 // NewBrowserType returns a new Chrome browser type.
@@ -134,26 +135,46 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
 
+	logger, err := makeLogger(b.Ctx, launchOpts)
+	if err != nil {
+		k6common.Throw(rt, fmt.Errorf("cannot make logger: %w", err))
+	}
+
+	flags := prepareFlags(launchOpts, &state.Options)
+
+	finalDirPath, cleanupFunc, err := b.createTempDir(flags["user-data-dir"], logger)
+	if err != nil {
+		k6common.Throw(rt, err)
+	}
+	flags["user-data-dir"] = finalDirPath
+
+	go func(ctx context.Context) {
+		defer cleanupFunc()
+		// There's a small chance that this might be called
+		// if the context is closed by the k6 runtime. To
+		// guarantee the cleanup we would need to orchestrate
+		// it correctly which https://github.com/grafana/k6/issues/2432
+		// will enable once it's complete.
+		<-ctx.Done()
+	}(b.Ctx)
+
 	browserProc, err := b.allocate(
 		launchOpts,
-		prepareFlags(launchOpts, &state.Options),
+		flags,
 		envs,
+		cleanupFunc,
 	)
 	if browserProc == nil {
 		k6common.Throw(rt, fmt.Errorf("cannot allocate browser: %w", err))
 	}
 
-	logger, err := makeLogger(b.Ctx, launchOpts)
-	if err != nil {
-		k6common.Throw(rt, fmt.Errorf("cannot make logger: %w", err))
-	}
 	browserProc.AttachLogger(logger)
 
 	// attach the browser process ID to the context
 	// so that we can kill it afterward if it lingers
 	// see: k6ext.Panic function.
 	b.Ctx = k6ext.WithProcessID(b.Ctx, browserProc.Pid())
-	browser, err := common.NewBrowser(b.Ctx, b.CancelFn, browserProc, launchOpts, logger)
+	browser, err := common.NewBrowser(b.Ctx, b.CancelFn, browserProc, launchOpts, logger, cleanupFunc)
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
@@ -173,37 +194,49 @@ func (b *BrowserType) Name() string {
 	return "chromium"
 }
 
+func (b *BrowserType) createTempDir(
+	dirPath interface{},
+	logger *log.Logger,
+) (finalDirPath string, c common.CleanupFunc, rerr error) {
+	// use the provided directory or create a temporary one.
+	if err := b.storage.Make("", dirPath); err != nil {
+		return "", nil, fmt.Errorf("cannot make temp data directory: %w", err)
+	}
+
+	finalDirPath = b.storage.Dir
+
+	return finalDirPath, func() {
+		if err := b.storage.Cleanup(); err != nil {
+			logger.Errorf("cleanup", "%s", err)
+		}
+	}, nil
+}
+
 // allocate starts a new Chromium browser process and returns it.
 func (b *BrowserType) allocate(
 	opts *common.LaunchOptions,
 	flags map[string]interface{},
 	env []string,
+	cleanupFunc func(),
 ) (_ *common.BrowserProcess, rerr error) {
-	// use the provided directory or create a temporary one.
-	if err := b.storage.Make("", flags["user-data-dir"]); err != nil {
-		return nil, fmt.Errorf("cannot make temp data directory: %w", err)
-	}
-	// add dir to flags so that parseArgs can parse it.
-	flags["user-data-dir"] = b.storage.Dir
+	ctx, cancel := context.WithTimeout(b.Ctx, opts.Timeout)
+	defer func() {
+		if rerr != nil {
+			cancel()
+		}
+	}()
 
 	args, err := parseArgs(flags)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse args: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(b.Ctx, opts.Timeout)
-	defer func() {
-		b.storage.Cleanup()
-		if rerr != nil {
-			cancel()
-		}
-	}()
 	path := opts.ExecutablePath
 	if path == "" {
 		path = b.ExecutablePath()
 	}
 
-	cmd, stdout, err := execute(ctx, path, args, env)
+	cmd, stdout, err := execute(ctx, path, args, env, cleanupFunc)
 	if err != nil {
 		return nil, fmt.Errorf("cannot start browser: %w", err)
 	}
@@ -338,7 +371,7 @@ func setFlagsFromK6Options(flags map[string]interface{}, k6opts *k6lib.Options) 
 	}
 }
 
-func execute(ctx context.Context, path string, args, env []string) (*exec.Cmd, io.Reader, error) {
+func execute(ctx context.Context, path string, args, env []string, cleanupFunc func()) (*exec.Cmd, io.Reader, error) {
 	cmd := exec.CommandContext(ctx, path, args...)
 	killAfterParent(cmd)
 
@@ -366,6 +399,7 @@ func execute(ctx context.Context, path string, args, env []string) (*exec.Cmd, i
 		return nil, nil, fmt.Errorf("context err: %w", ctx.Err())
 	}
 	go func() {
+		defer cleanupFunc()
 		_ = cmd.Wait()
 		_ = stdout.Close()
 	}()

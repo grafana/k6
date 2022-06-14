@@ -1,4 +1,4 @@
-package chromium
+package storage
 
 import (
 	"io/fs"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDataStoreMake(t *testing.T) {
+func TestDirMake(t *testing.T) {
 	tmpDir := os.TempDir()
 
 	t.Run("dir_provided", func(t *testing.T) {
@@ -18,28 +18,40 @@ func TestDataStoreMake(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = os.RemoveAll(dir) })
 
-		var s DataStore
+		var s Dir
 		require.NoError(t, s.Make("", dir))
 		require.Equal(t, dir, s.Dir, "should return the directory")
-		assert.NotPanics(t, s.Cleanup) // should be a no-op
+		assert.NotPanics(t, func() {
+			t.Helper()
+			err := s.Cleanup()
+			assert.NoError(t, err)
+		}) // should be a no-op
 		assert.DirExists(t, dir, "should not remove directory")
 	})
 
 	t.Run("dir_absent", func(t *testing.T) {
-		var s DataStore
+		var s Dir
 		require.NoError(t, s.Make("", ""))
 		require.True(t, strings.HasPrefix(s.Dir, tmpDir))
 		require.DirExists(t, s.Dir)
 
-		assert.NotPanics(t, s.Cleanup)
+		assert.NotPanics(t, func() {
+			t.Helper()
+			err := s.Cleanup()
+			assert.NoError(t, err)
+		})
 		require.NoDirExists(t, s.Dir)
 	})
 
 	t.Run("dir_mk_err", func(t *testing.T) {
-		var s DataStore
+		var s Dir
 		require.ErrorIs(t, s.Make("/NOT_EXISTING_DIRECTORY/K6/BROWSER", ""), fs.ErrNotExist)
 		assert.Empty(t, s.Dir)
 
-		assert.NotPanics(t, s.Cleanup)
+		assert.NotPanics(t, func() {
+			t.Helper()
+			err := s.Cleanup()
+			assert.NoError(t, err)
+		})
 	})
 }

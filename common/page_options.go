@@ -28,6 +28,7 @@ import (
 
 	"github.com/chromedp/cdproto/page"
 	"github.com/dop251/goja"
+
 	"github.com/grafana/xk6-browser/k6ext"
 )
 

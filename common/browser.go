@@ -51,6 +51,10 @@ const (
 	BrowserStateClosed
 )
 
+// CleanupFunc is the function signature that a upstream cleanup
+// function must match for Close() to successfully call.
+type CleanupFunc func()
+
 // Browser stores a Browser context.
 type Browser struct {
 	BaseEventEmitter
@@ -85,6 +89,11 @@ type Browser struct {
 	vu k6modules.VU
 
 	logger *log.Logger
+
+	// This is called when Close() is called. This allows us to hook into
+	// the browser close function to cleanup anything that was created
+	// upstream.
+	cleanupFunc CleanupFunc
 }
 
 // NewBrowser creates a new browser, connects to it, then returns it.
@@ -94,8 +103,9 @@ func NewBrowser(
 	browserProc *BrowserProcess,
 	launchOpts *LaunchOptions,
 	logger *log.Logger,
+	cleanupFunc CleanupFunc,
 ) (*Browser, error) {
-	b := newBrowser(ctx, cancel, browserProc, launchOpts, logger)
+	b := newBrowser(ctx, cancel, browserProc, launchOpts, logger, cleanupFunc)
 	if err := b.connect(); err != nil {
 		return nil, err
 	}
@@ -109,6 +119,7 @@ func newBrowser(
 	browserProc *BrowserProcess,
 	launchOpts *LaunchOptions,
 	logger *log.Logger,
+	cleanupFunc CleanupFunc,
 ) *Browser {
 	return &Browser{
 		BaseEventEmitter:    NewBaseEventEmitter(ctx),
@@ -122,6 +133,7 @@ func newBrowser(
 		sessionIDtoTargetID: make(map[target.SessionID]target.ID),
 		vu:                  k6ext.GetVU(ctx),
 		logger:              logger,
+		cleanupFunc:         cleanupFunc,
 	}
 }
 
@@ -402,6 +414,12 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 
 // Close shuts down the browser.
 func (b *Browser) Close() {
+	defer func() {
+		if b.cleanupFunc != nil {
+			b.cleanupFunc()
+		}
+	}()
+
 	b.logger.Debugf("Browser:Close", "")
 	if !atomic.CompareAndSwapInt64(&b.state, b.state, BrowserStateClosing) {
 		// If we're already in a closing state then no need to continue.

@@ -23,6 +23,8 @@ package tests
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -48,6 +50,31 @@ func TestBrowserNewPage(t *testing.T) {
 	p2.Close(nil)
 	l = len(b.Contexts())
 	assert.Equal(t, 0, l, "expected there to be 0 browser context after second page close, but found %d", l)
+}
+
+func TestTmpDirCleanup(t *testing.T) {
+	tmpDirPath := "./"
+
+	err := os.Setenv("TMPDIR", tmpDirPath)
+	assert.NoError(t, err)
+	defer func() {
+		err = os.Unsetenv("TMPDIR")
+		assert.NoError(t, err)
+	}()
+
+	b := newTestBrowser(t, withSkipClose())
+	p := b.NewPage(nil)
+	p.Close(nil)
+
+	matches, err := filepath.Glob(tmpDirPath + "xk6-browser-data-*")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, matches, "a dir should exist that matches the pattern `xk6-browser-data-*`")
+
+	b.Close()
+
+	matches, err = filepath.Glob(tmpDirPath + "xk6-browser-data-*")
+	assert.NoError(t, err)
+	assert.Empty(t, matches, "a dir shouldn't exist which matches the pattern `xk6-browser-data-*`")
 }
 
 func TestBrowserOn(t *testing.T) {

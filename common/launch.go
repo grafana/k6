@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+
 	"github.com/grafana/xk6-browser/k6ext"
 )
 
