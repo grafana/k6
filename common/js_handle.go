@@ -36,6 +36,7 @@ import (
 type jsHandle interface {
 	api.JSHandle
 	dispose() error
+	getProperties() (map[string]jsHandle, error)
 }
 
 var _ jsHandle = &BaseJSHandle{}
@@ -58,7 +59,7 @@ func NewJSHandle(
 	f *Frame,
 	ro *runtime.RemoteObject,
 	l *log.Logger,
-) api.JSHandle {
+) jsHandle {
 	eh := &BaseJSHandle{
 		ctx:          ctx,
 		session:      s,
@@ -131,26 +132,36 @@ func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) a
 
 // GetProperties retreives the JS handle's properties.
 func (h *BaseJSHandle) GetProperties() map[string]api.JSHandle {
-	var (
-		result []*runtime.PropertyDescriptor
-		err    error
-	)
-
-	action := runtime.GetProperties(h.remoteObject.ObjectID).
-		WithOwnProperties(true)
-	if result, _, _, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6ext.Panic(h.ctx, "unable to get properties for JS handle %T: %w", action, err)
+	handles, err := h.getProperties()
+	if err != nil {
+		k6ext.Panic(h.ctx, "getProperties: %w", err)
 	}
 
-	props := make(map[string]api.JSHandle, len(result))
-	for i := 0; i < len(result); i++ {
-		if !result[i].Enumerable {
+	jsHandles := make(map[string]api.JSHandle, len(handles))
+	for k, v := range handles {
+		jsHandles[k] = v
+	}
+
+	return jsHandles
+}
+
+// getProperties is like GetProperties, but does not panic.
+func (h *BaseJSHandle) getProperties() (map[string]jsHandle, error) {
+	act := runtime.GetProperties(h.remoteObject.ObjectID).WithOwnProperties(true)
+	result, _, _, _, err := act.Do(cdp.WithExecutor(h.ctx, h.session)) //nolint:dogsled
+	if err != nil {
+		return nil, fmt.Errorf("cannot get properties for element %T: %w", act, err)
+	}
+
+	props := make(map[string]jsHandle, len(result))
+	for _, r := range result {
+		if !r.Enumerable {
 			continue
 		}
-		props[result[i].Name] = NewJSHandle(
-			h.ctx, h.session, h.execCtx, h.execCtx.Frame(), result[i].Value, h.logger)
+		props[r.Name] = NewJSHandle(h.ctx, h.session, h.execCtx, h.execCtx.Frame(), r.Value, h.logger)
 	}
-	return props
+
+	return props, nil
 }
 
 // GetProperty retreves a single property of the JS handle.
