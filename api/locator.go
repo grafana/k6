@@ -45,4 +45,7 @@ type Locator interface {
 	// InnerHTML returns the element's inner HTML that matches
 	// the locator's selector with strict mode on.
 	InnerHTML(opts goja.Value) string
+	// InnerText returns the element's inner text that matches
+	// the locator's selector with strict mode on.
+	InnerText(opts goja.Value) string
 }
