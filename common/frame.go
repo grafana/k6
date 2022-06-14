@@ -1498,40 +1498,59 @@ func (f *Frame) Press(selector string, key string, opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
+// SelectOption selects the given options and returns the array of
+// option values of the first element found that matches the selector.
 func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value) []string {
 	f.log.Debugf("Frame:SelectOption", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameSelectOptionOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+	popts := NewFrameSelectOptionOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "parse: %w", err)
 	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
-		return handle.selectOption(apiCtx, values)
-	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{},
-		parsedOpts.Force, parsedOpts.NoWaitAfter, parsedOpts.Timeout,
-	)
-	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
+	v, err := f.selectOption(selector, values, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "selectOption: %w", err)
 	}
-
-	arrayHandle, ok := value.(api.JSHandle)
-	if !ok {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
-	properties := arrayHandle.GetProperties()
-	strArr := make([]string, 0, len(properties))
-	for _, property := range properties {
-		strArr = append(strArr, property.JSONValue().String())
-		property.Dispose()
-	}
-	arrayHandle.Dispose()
 
 	applySlowMo(f.ctx)
-	return strArr
+
+	return v
+}
+
+func (f *Frame) selectOption(selector string, values goja.Value, opts *FrameSelectOptionOptions) ([]string, error) {
+	selectOption := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+		return handle.selectOption(apiCtx, values)
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, selectOption,
+		[]string{}, opts.Force, opts.NoWaitAfter, opts.Timeout,
+	)
+	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	if err != nil {
+		return nil, err
+	}
+	selectHandle, ok := v.(jsHandle)
+	if !ok {
+		return nil, fmt.Errorf("unexpected select element type %T", v)
+	}
+
+	// gets <option> values inside <select>.
+	optHandles, err := selectHandle.getProperties()
+	if err != nil {
+		return nil, fmt.Errorf("getProperties: %w", err)
+	}
+	vals := make([]string, 0, len(optHandles))
+	for _, oh := range optHandles {
+		vals = append(vals, oh.JSONValue().String())
+		if err := oh.dispose(); err != nil {
+			return nil, fmt.Errorf("optionHandle.dispose: %w", err)
+		}
+	}
+	if err := selectHandle.dispose(); err != nil {
+		return nil, fmt.Errorf("selectHandle.dispose: %w", err)
+	}
+
+	return vals, nil
 }
 
 // SetContent replaces the entire HTML document content.
