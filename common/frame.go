@@ -1146,27 +1146,41 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 	return gv.ToString().String(), nil
 }
 
+// InputValue returns the input value of the first element found
+// that matches the selector.
 func (f *Frame) InputValue(selector string, opts goja.Value) string {
 	f.log.Debugf("Frame:InputValue", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameInputValueOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+	popts := NewFrameInputValueOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "parse: %w", err)
+	}
+	v, err := f.inputValue(selector, popts)
+	if err != nil {
+		k6ext.Panic(f.ctx, "inputValue: %w", err)
 	}
 
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+	return v
+}
+
+func (f *Frame) inputValue(selector string, opts *FrameInputValueOptions) (string, error) {
+	inputValue := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.inputValue(apiCtx)
 	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false, true, parsedOpts.Timeout,
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, inputValue,
+		[]string{}, false, true, opts.Timeout,
 	)
-	value, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
+	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		return "", err
+	}
+	gv, ok := v.(goja.Value)
+	if !ok {
+		return "", fmt.Errorf("got %T; want goja value", v)
 	}
 
-	applySlowMo(f.ctx)
-	return value.(goja.Value).String()
+	return gv.ToString().String(), nil
 }
 
 // IsDetached returns whether the frame is detached or not.
