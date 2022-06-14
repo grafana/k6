@@ -1025,7 +1025,7 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goj
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
-		return nil, fmt.Errorf("got %T; want goja value", v)
+		return nil, fmt.Errorf("unexpected type %T", v)
 	}
 
 	return gv, nil
@@ -1098,7 +1098,7 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
-		return "", fmt.Errorf("got %T; want goja value", v)
+		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
 	return gv.ToString().String(), nil
@@ -1140,7 +1140,7 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
-		return "", fmt.Errorf("got %T; want goja value", v)
+		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
 	return gv.ToString().String(), nil
@@ -1177,7 +1177,7 @@ func (f *Frame) inputValue(selector string, opts *FrameInputValueOptions) (strin
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
-		return "", fmt.Errorf("got %T; want goja value", v)
+		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
 	return gv.ToString().String(), nil
@@ -1628,7 +1628,7 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
-		return "", fmt.Errorf("got %T; want goja value", v)
+		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
 	return gv.ToString().String(), nil

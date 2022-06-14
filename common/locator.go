@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
@@ -38,9 +39,11 @@ func (l *Locator) Click(opts goja.Value) {
 
 	copts := NewFrameClickOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parse: %w", err)
 		return
 	}
 	if err = l.click(copts); err != nil {
+		err = fmt.Errorf("click: %w", err)
 		return
 	}
 }
@@ -61,9 +64,11 @@ func (l *Locator) Dblclick(opts goja.Value) {
 
 	copts := NewFrameDblClickOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parse: %w", err)
 		return
 	}
 	if err = l.dblclick(copts); err != nil {
+		err = fmt.Errorf("dblclick: %w", err)
 		return
 	}
 }
@@ -84,9 +89,11 @@ func (l *Locator) Check(opts goja.Value) {
 
 	copts := NewFrameCheckOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parse: %w", err)
 		return
 	}
 	if err = l.check(copts); err != nil {
+		err = fmt.Errorf("check: %w", err)
 		return
 	}
 }
@@ -107,9 +114,11 @@ func (l *Locator) Uncheck(opts goja.Value) {
 
 	copts := NewFrameUncheckOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parse: %w", err)
 		return
 	}
 	if err = l.uncheck(copts); err != nil {
+		err = fmt.Errorf("uncheck: %w", err)
 		return
 	}
 }
@@ -128,11 +137,11 @@ func (l *Locator) IsChecked(opts goja.Value) bool {
 
 	copts := NewFrameIsCheckedOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "parse: %w", err)
 	}
 	checked, err := l.isChecked(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "isChecked: %w", err)
 	}
 
 	return checked
@@ -152,11 +161,11 @@ func (l *Locator) IsEditable(opts goja.Value) bool {
 
 	copts := NewFrameIsEditableOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "parse: %w", err)
 	}
 	editable, err := l.isEditable(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "isEditable: %w", err)
 	}
 
 	return editable
@@ -176,11 +185,11 @@ func (l *Locator) IsEnabled(opts goja.Value) bool {
 
 	copts := NewFrameIsEnabledOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "parse: %w", err)
 	}
 	enabled, err := l.isEnabled(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "isEnabled: %w", err)
 	}
 
 	return enabled
@@ -200,11 +209,11 @@ func (l *Locator) IsDisabled(opts goja.Value) bool {
 
 	copts := NewFrameIsDisabledOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "parse: %w", err)
 	}
 	disabled, err := l.isDisabled(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "isDisabled: %w", err)
 	}
 
 	return disabled
@@ -224,11 +233,11 @@ func (l *Locator) IsVisible(opts goja.Value) bool {
 
 	copts := NewFrameIsVisibleOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "parse: %w", err)
 	}
 	visible, err := l.isVisible(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "isVisible: %w", err)
 	}
 
 	return visible
@@ -248,11 +257,11 @@ func (l *Locator) IsHidden(opts goja.Value) bool {
 
 	copts := NewFrameIsHiddenOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "parse: %w", err)
 	}
 	hidden, err := l.isHidden(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "isHidden: %w", err)
 	}
 
 	return hidden
@@ -277,9 +286,11 @@ func (l *Locator) Fill(value string, opts goja.Value) {
 
 	copts := NewFrameFillOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parse: %w", err)
 		return
 	}
 	if err = l.fill(value, copts); err != nil {
+		err = fmt.Errorf("fill: %w", err)
 		return
 	}
 }
@@ -298,9 +309,11 @@ func (l *Locator) Focus(opts goja.Value) {
 
 	copts := NewFrameBaseOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parse: %w", err)
 		return
 	}
 	if err = l.focus(copts); err != nil {
+		err = fmt.Errorf("focus: %w", err)
 		return
 	}
 }
@@ -322,10 +335,12 @@ func (l *Locator) GetAttribute(name string, opts goja.Value) goja.Value {
 
 	copts := NewFrameBaseOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parse: %w", err)
 		return nil
 	}
 	var v goja.Value
 	if v, err = l.getAttribute(name, copts); err != nil {
+		err = fmt.Errorf("getAttribute: %w", err)
 		return nil
 	}
 
@@ -347,10 +362,12 @@ func (l *Locator) InnerHTML(opts goja.Value) string {
 
 	copts := NewFrameInnerHTMLOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parse: %w", err)
 		return ""
 	}
 	var s string
 	if s, err = l.innerHTML(copts); err != nil {
+		err = fmt.Errorf("innerHTML: %w", err)
 		return ""
 	}
 
@@ -372,10 +389,12 @@ func (l *Locator) InnerText(opts goja.Value) string {
 
 	copts := NewFrameInnerTextOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parse: %w", err)
 		return ""
 	}
 	var s string
 	if s, err = l.innerText(copts); err != nil {
+		err = fmt.Errorf("innerText: %w", err)
 		return ""
 	}
 
@@ -397,10 +416,12 @@ func (l *Locator) TextContent(opts goja.Value) string {
 
 	copts := NewFrameTextContentOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parse: %w", err)
 		return ""
 	}
 	var s string
 	if s, err = l.textContent(copts); err != nil {
+		err = fmt.Errorf("textContent: %w", err)
 		return ""
 	}
 
@@ -419,11 +440,11 @@ func (l *Locator) InputValue(opts goja.Value) string {
 
 	copts := NewFrameInputValueOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "parse: %w", err)
 	}
 	v, err := l.inputValue(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "%w", err)
+		k6ext.Panic(l.ctx, "inputValue: %w", err)
 	}
 
 	return v
