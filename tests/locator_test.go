@@ -280,3 +280,27 @@ func TestLocatorTextContent(t *testing.T) {
 		}, "should not select multiple elements")
 	})
 }
+
+//nolint:tparallel
+func TestLocatorInputValue(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	t.Run("ok/input", func(t *testing.T) {
+		require.Equal(t, "something", p.Locator("#inputText", nil).InputValue(nil))
+	})
+	t.Run("ok/textarea", func(t *testing.T) {
+		require.Equal(t, "text area", p.Locator("textarea", nil).InputValue(nil))
+	})
+	t.Run("ok/select", func(t *testing.T) {
+		require.Equal(t, "option text", p.Locator("select", nil).InputValue(nil))
+	})
+	t.Run("strict", func(t *testing.T) {
+		require.Panics(t, func() {
+			p.Locator("input", nil).InputValue(nil)
+		}, "should not select multiple elements")
+	})
+}

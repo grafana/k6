@@ -1157,7 +1157,7 @@ func (f *Frame) InputValue(selector string, opts goja.Value) string {
 	}
 	v, err := f.inputValue(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "InputValue: %w", err)
+		k6ext.Panic(f.ctx, "inputValue: %w", err)
 	}
 
 	return v

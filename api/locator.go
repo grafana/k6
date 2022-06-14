@@ -51,4 +51,7 @@ type Locator interface {
 	// TextContent returns the element's text content that matches
 	// the locator's selector with strict mode on.
 	TextContent(opts goja.Value) string
+	// InputValue returns the element's input value that matches
+	// the locator's selector with strict mode on.
+	InputValue(opts goja.Value) string
 }
