@@ -22,6 +22,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -32,8 +33,12 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Ensure BaseJSHandle implements the api.JSHandle interface.
-var _ api.JSHandle = &BaseJSHandle{}
+type jsHandle interface {
+	api.JSHandle
+	dispose() error
+}
+
+var _ jsHandle = &BaseJSHandle{}
 
 // BaseJSHandle represents a JS object in an execution context.
 type BaseJSHandle struct {
@@ -80,19 +85,26 @@ func (h *BaseJSHandle) AsElement() api.ElementHandle {
 
 // Dispose releases the remote object.
 func (h *BaseJSHandle) Dispose() {
-	if h.disposed {
-		return
+	if err := h.dispose(); err != nil {
+		k6ext.Panic(h.ctx, "dispose: %w", err)
 	}
+}
 
+// dispose is like Dispose, but does not panic.
+func (h *BaseJSHandle) dispose() error {
+	if h.disposed {
+		return nil
+	}
 	h.disposed = true
 	if h.remoteObject.ObjectID == "" {
-		return
+		return nil
+	}
+	act := runtime.ReleaseObject(h.remoteObject.ObjectID)
+	if err := act.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+		return fmt.Errorf("cannot release element %T: %w", act, err)
 	}
 
-	action := runtime.ReleaseObject(h.remoteObject.ObjectID)
-	if err := action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6ext.Panic(h.ctx, "unable to dispose element %T: %w", action, err)
-	}
+	return nil
 }
 
 // Evaluate will evaluate provided page function within an execution context.
