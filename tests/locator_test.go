@@ -296,11 +296,31 @@ func TestLocatorInputValue(t *testing.T) {
 		require.Equal(t, "text area", p.Locator("textarea", nil).InputValue(nil))
 	})
 	t.Run("ok/select", func(t *testing.T) {
-		require.Equal(t, "option text", p.Locator("select", nil).InputValue(nil))
+		require.Equal(t, "option text", p.Locator("#selectElement", nil).InputValue(nil))
 	})
 	t.Run("strict", func(t *testing.T) {
 		require.Panics(t, func() {
 			p.Locator("input", nil).InputValue(nil)
+		}, "should not select multiple elements")
+	})
+}
+
+//nolint:tparallel
+func TestLocatorSelectOption(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	t.Run("ok", func(t *testing.T) {
+		rv := p.Locator("#selectElement", nil).SelectOption(tb.toGojaValue(`option text 2`), nil)
+		require.Len(t, rv, 1)
+		require.Equal(t, "option text 2", rv[0])
+	})
+	t.Run("strict", func(t *testing.T) {
+		require.Panics(t, func() {
+			p.Locator("select", nil).SelectOption(tb.toGojaValue(""), nil)
 		}, "should not select multiple elements")
 	})
 }

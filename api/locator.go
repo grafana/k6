@@ -54,4 +54,8 @@ type Locator interface {
 	// InputValue returns the element's input value that matches
 	// the locator's selector with strict mode on.
 	InputValue(opts goja.Value) string
+	// SelectOption selects the given options and returns the array of
+	// option values of the element found that matches the locator's
+	// selector with strict mode on.
+	SelectOption(values goja.Value, opts goja.Value) []string
 }
