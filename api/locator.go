@@ -48,4 +48,7 @@ type Locator interface {
 	// InnerText returns the element's inner text that matches
 	// the locator's selector with strict mode on.
 	InnerText(opts goja.Value) string
+	// TextContent returns the element's text content that matches
+	// the locator's selector with strict mode on.
+	TextContent(opts goja.Value) string
 }

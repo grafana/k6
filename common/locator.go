@@ -386,3 +386,28 @@ func (l *Locator) innerText(opts *FrameInnerTextOptions) (string, error) {
 	opts.Strict = true
 	return l.frame.innerText(l.selector, opts)
 }
+
+// TextContent returns the element's text content that matches
+// the locator's selector with strict mode on.
+func (l *Locator) TextContent(opts goja.Value) string {
+	l.log.Debugf("Locator:TextContent", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	var err error
+	defer func() { panicOrSlowMo(l.ctx, err) }()
+
+	copts := NewFrameTextContentOptions(l.frame.defaultTimeout())
+	if err = copts.Parse(l.ctx, opts); err != nil {
+		return ""
+	}
+	var s string
+	if s, err = l.textContent(copts); err != nil {
+		return ""
+	}
+
+	return s
+}
+
+func (l *Locator) textContent(opts *FrameTextContentOptions) (string, error) {
+	opts.Strict = true
+	return l.frame.textContent(l.selector, opts)
+}

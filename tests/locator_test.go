@@ -262,3 +262,21 @@ func TestLocatorInnerText(t *testing.T) {
 		}, "should not select multiple elements")
 	})
 }
+
+//nolint:tparallel
+func TestLocatorTextContent(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	t.Run("ok", func(t *testing.T) {
+		require.Equal(t, `hello`, p.Locator("#divHello", nil).TextContent(nil))
+	})
+	t.Run("strict", func(t *testing.T) {
+		require.Panics(t, func() {
+			p.Locator("div", nil).TextContent(nil)
+		}, "should not select multiple elements")
+	})
+}
