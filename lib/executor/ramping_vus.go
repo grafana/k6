@@ -209,8 +209,10 @@ func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEn
 
 		stageVUDiff := stageEndVUs - fromVUs
 		if stageVUDiff == 0 {
+			// skip those as this doesn't change anything
 			if i == len(vlvc.Stages)-1 {
-				// add the last step always
+				// don't skip the last step as we won't add another one after it
+				// unlike in any of the other cases
 				steps = append(steps, lib.ExecutionStep{TimeOffset: timeTillEnd, PlannedVUs: uint64(scaled)})
 			}
 			continue
