@@ -303,7 +303,8 @@ func (scs ScenarioConfigs) GetFullExecutionRequirements(et *ExecutionTuple) []Ex
 		stepsLen := len(consolidatedSteps)
 		if stepsLen == 0 ||
 			consolidatedSteps[stepsLen-1].PlannedVUs != newPlannedVUs ||
-			consolidatedSteps[stepsLen-1].MaxUnplannedVUs != newMaxUnplannedVUs {
+			consolidatedSteps[stepsLen-1].MaxUnplannedVUs != newMaxUnplannedVUs ||
+			consolidatedSteps[stepsLen-1].TimeOffset != currentTimeOffset {
 			consolidatedSteps = append(consolidatedSteps, ExecutionStep{
 				TimeOffset:      currentTimeOffset,
 				PlannedVUs:      newPlannedVUs,
