@@ -454,3 +454,26 @@ func (l *Locator) inputValue(opts *FrameInputValueOptions) (string, error) {
 	opts.Strict = true
 	return l.frame.inputValue(l.selector, opts)
 }
+
+// SelectOption filters option values of the first element that matches
+// the locator's selector (with strict mode on), selects the options,
+// and returns the filtered options.
+func (l *Locator) SelectOption(values goja.Value, opts goja.Value) []string {
+	l.log.Debugf("Locator:SelectOption", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	copts := NewFrameSelectOptionOptions(l.frame.defaultTimeout())
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		k6ext.Panic(l.ctx, "parse: %w", err)
+	}
+	v, err := l.selectOption(values, copts)
+	if err != nil {
+		k6ext.Panic(l.ctx, "selectOption: %w", err)
+	}
+
+	return v
+}
+
+func (l *Locator) selectOption(values goja.Value, opts *FrameSelectOptionOptions) ([]string, error) {
+	opts.Strict = true
+	return l.frame.selectOption(l.selector, values, opts)
+}
