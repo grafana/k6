@@ -455,8 +455,9 @@ func (l *Locator) inputValue(opts *FrameInputValueOptions) (string, error) {
 	return l.frame.inputValue(l.selector, opts)
 }
 
-// SelectOption returns the element's input value that matches
-// the locator's selector with strict mode on.
+// SelectOption filters option values of the first element that matches
+// the locator's selector (with strict mode on), selects the options,
+// and returns the filtered options.
 func (l *Locator) SelectOption(values goja.Value, opts goja.Value) []string {
 	l.log.Debugf("Locator:SelectOption", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 

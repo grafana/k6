@@ -1498,8 +1498,8 @@ func (f *Frame) Press(selector string, key string, opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
-// SelectOption selects the given options and returns the array of
-// option values of the first element found that matches the selector.
+// SelectOption filters option values of the first element that matches
+// the selector, selects the options, and returns the filtered options.
 func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value) []string {
 	f.log.Debugf("Frame:SelectOption", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
@@ -1534,7 +1534,7 @@ func (f *Frame) selectOption(selector string, values goja.Value, opts *FrameSele
 		return nil, fmt.Errorf("unexpected select element type %T", v)
 	}
 
-	// gets <option> values inside <select>.
+	// pack the selected <option> values inside <select> into a slice
 	optHandles, err := selectHandle.getProperties()
 	if err != nil {
 		return nil, fmt.Errorf("getProperties: %w", err)
