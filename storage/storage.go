@@ -15,9 +15,9 @@ type Dir struct {
 	remove bool   // whether to remove the temporary directory in cleanup
 
 	// FS abstractions
-	fsMkdirTemp       func(dir, pattern string) (string, error)
-	fsRemoveAll       func(path string) error
-	fsRemovalAllMutex sync.Mutex
+	fsMkdirTemp   func(dir, pattern string) (string, error)
+	fsRemoveAll   func(path string) error
+	fsRemoveAllMu sync.Mutex
 }
 
 // Make creates a new temporary directory in tmpDir, and stores the path to
@@ -52,8 +52,8 @@ func (d *Dir) Cleanup() error {
 		return nil
 	}
 
-	d.fsRemovalAllMutex.Lock()
-	defer d.fsRemovalAllMutex.Unlock()
+	d.fsRemoveAllMu.Lock()
+	defer d.fsRemoveAllMu.Unlock()
 
 	if d.fsRemoveAll == nil {
 		d.fsRemoveAll = os.RemoveAll
