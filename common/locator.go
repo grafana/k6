@@ -477,3 +477,28 @@ func (l *Locator) selectOption(values goja.Value, opts *FrameSelectOptionOptions
 	opts.Strict = true
 	return l.frame.selectOption(l.selector, values, opts)
 }
+
+// Press the given key on the element found that matches the locator's
+// selector with strict mode on.
+func (l *Locator) Press(key string, opts goja.Value) {
+	l.log.Debugf(
+		"Locator:Press", "fid:%s furl:%q sel:%q key:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, key, opts,
+	)
+
+	var err error
+	defer func() { panicOrSlowMo(l.ctx, err) }()
+
+	copts := NewFramePressOptions(l.frame.defaultTimeout())
+	if err = copts.Parse(l.ctx, opts); err != nil {
+		return
+	}
+	if err = l.press(key, copts); err != nil {
+		return
+	}
+}
+
+func (l *Locator) press(key string, opts *FramePressOptions) error {
+	opts.Strict = true
+	return l.frame.press(l.selector, key, opts)
+}
