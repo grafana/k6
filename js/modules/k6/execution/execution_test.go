@@ -418,3 +418,32 @@ func TestOptionsTestSetPropertyDenied(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, true, rt.ToValue(paused).ToBoolean())
 }
+
+func TestScenarioNoAvailableInInitContext(t *testing.T) {
+	t.Parallel()
+
+	rt := goja.New()
+	m, ok := New().NewModuleInstance(
+		&modulestest.VU{
+			RuntimeField: rt,
+			InitEnvField: &common.InitEnvironment{},
+			CtxField:     context.Background(),
+			StateField: &lib.State{
+				Options: lib.Options{
+					Paused: null.BoolFrom(true),
+				},
+			},
+		},
+	).(*ModuleInstance)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("exec", m.Exports().Default))
+
+	scenarioExportedProps := []string{"name", "executor", "startTime", "progress", "iterationInInstance", "iterationInTest"}
+
+	for _, code := range scenarioExportedProps {
+		prop := fmt.Sprintf("exec.scenario.%s", code)
+		_, err := rt.RunString(prop)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "getting scenario information outside of the VU context is not supported")
+	}
+}

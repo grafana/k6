@@ -2406,7 +2406,7 @@ func TestExecutionInfo(t *testing.T) {
 		{name: "scenario_err", script: `
 		var exec = require('k6/execution');
 		exec.scenario;
-		`, expErr: "getting scenario information in the init context is not supported"},
+		`, expErr: "getting scenario information outside of the VU context is not supported"},
 		{name: "test_ok", script: `
 		var exec = require('k6/execution');
 
