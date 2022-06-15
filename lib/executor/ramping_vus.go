@@ -470,14 +470,14 @@ func (vlvc RampingVUsConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []
 		steps = vlvc.reserveVUsForGracefulRampDowns(steps, executorEndOffset)
 	}
 	lastIndex := len(steps)
-	for ; lastIndex >= 0; lastIndex-- {
+	for ; lastIndex > 0; lastIndex-- {
 		if steps[lastIndex-1].PlannedVUs != 0 {
 			break
 		}
 	}
 
-	if len(steps) > lastIndex {
-		executorEndOffset = steps[lastIndex].TimeOffset + vlvc.GracefulStop.TimeDuration()
+	if len(steps) > lastIndex && steps[lastIndex].TimeOffset < executorEndOffset {
+		executorEndOffset = steps[lastIndex].TimeOffset
 	}
 	// add one step for the end of the gracefulStop
 	if steps[len(steps)-1].PlannedVUs != 0 || steps[len(steps)-1].TimeOffset < executorEndOffset {

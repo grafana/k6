@@ -581,7 +581,6 @@ func TestRampingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 		{TimeOffset: 1 * time.Second, PlannedVUs: 2},
 		{TimeOffset: 42 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 50 * time.Second, PlannedVUs: 0},
-		{TimeOffset: 80 * time.Second, PlannedVUs: 0},
 	}, conf.GetExecutionRequirements(et))
 
 	// Try a longer GracefulStop than the GracefulRampDown
@@ -591,7 +590,6 @@ func TestRampingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 		{TimeOffset: 1 * time.Second, PlannedVUs: 2},
 		{TimeOffset: 42 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 50 * time.Second, PlannedVUs: 0},
-		{TimeOffset: 130 * time.Second, PlannedVUs: 0},
 	}, conf.GetExecutionRequirements(et))
 
 	// Try a much shorter GracefulStop than the GracefulRampDown
