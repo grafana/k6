@@ -444,6 +444,6 @@ func TestScenarioNoAvailableInInitContext(t *testing.T) {
 		prop := fmt.Sprintf("exec.scenario.%s", code)
 		_, err := rt.RunString(prop)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "getting scenario information outside of vu code is not supported")
+		require.ErrorContains(t, err, "getting scenario information outside of the VU context is not supported")
 	}
 }

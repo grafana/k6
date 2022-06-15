@@ -90,7 +90,7 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{Default: mi.obj}
 }
 
-var errRunInInitContext = errors.New("getting scenario information outside of vu code is not supported")
+var errRunInInitContext = errors.New("getting scenario information outside of the VU context is not supported")
 
 // newScenarioInfo returns a goja.Object with property accessors to retrieve
 // information about the scenario the current VU is running in.
