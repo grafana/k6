@@ -1038,28 +1038,30 @@ func (f *Frame) Goto(url string, opts goja.Value) api.Response {
 	return resp
 }
 
-// Hover hovers an element identified by provided selector.
+// Hover the first element matches the selector.
 func (f *Frame) Hover(selector string, opts goja.Value) {
 	f.log.Debugf("Frame:Hover", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameHoverOptions(f.defaultTimeout())
-	err := parsedOpts.Parse(f.ctx, opts)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+	popts := NewFrameHoverOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "parse: %w", err)
 	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
-		return nil, handle.hover(apiCtx, p)
-	}
-	actFn := f.newPointerAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
-	)
-	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+	if err := f.hover(selector, popts); err != nil {
+		k6ext.Panic(f.ctx, "Hover: %w", err)
 	}
 
 	applySlowMo(f.ctx)
+}
+
+func (f *Frame) hover(selector string, opts *FrameHoverOptions) error {
+	hover := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
+		return nil, handle.hover(apiCtx, p)
+	}
+	act := f.newPointerAction(
+		selector, DOMElementStateAttached, opts.Strict, hover, &opts.ElementHandleBasePointerOptions,
+	)
+	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	return err
 }
 
 // InnerHTML returns the innerHTML attribute of the first element found
