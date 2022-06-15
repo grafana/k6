@@ -1664,27 +1664,31 @@ func (f *Frame) Title() string {
 	return f.Evaluate(rt.ToValue("document.title")).(string)
 }
 
-func (f *Frame) Type(selector string, text string, opts goja.Value) {
-	f.log.Debugf("Frame:Type", "fid:%s furl:%q sel:%q text:%s", f.ID(), f.URL(), selector, text)
+// Type text on the first element found matches the selector.
+func (f *Frame) Type(selector, text string, opts goja.Value) {
+	f.log.Debugf("Frame:Type", "fid:%s furl:%q sel:%q text:%q", f.ID(), f.URL(), selector, text)
 
-	parsedOpts := NewFrameTypeOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+	popts := NewFrameTypeOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "parse: %w", err)
 	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
-		return nil, handle.typ(apiCtx, text, parsedOpts.ToKeyboardOptions())
-	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false,
-		parsedOpts.NoWaitAfter, parsedOpts.Timeout,
-	)
-	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+	if err := f.typ(selector, text, popts); err != nil {
+		k6ext.Panic(f.ctx, "type: %w", err)
 	}
 
 	applySlowMo(f.ctx)
+}
+
+func (f *Frame) typ(selector, text string, opts *FrameTypeOptions) error {
+	typeText := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+		return nil, handle.typ(apiCtx, text, opts.ToKeyboardOptions())
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, typeText,
+		[]string{}, false, opts.NoWaitAfter, opts.Timeout,
+	)
+	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	return err
 }
 
 // URL returns the frame URL.
