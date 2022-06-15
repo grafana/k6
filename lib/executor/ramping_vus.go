@@ -430,14 +430,6 @@ func (vlvc RampingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:funlen
 		})
 		lastPlannedVUs = rawStep.PlannedVUs
 	}
-	/*
-		if newSteps[len(newSteps)-1].TimeOffset < rawSteps[len(rawSteps)-1].TimeOffset {
-			newSteps = append(newSteps, lib.ExecutionStep{
-				TimeOffset: rawSteps[len(rawSteps)-1].TimeOffset,
-				PlannedVUs: rawSteps[len(rawSteps)-1].PlannedVUs,
-			})
-		}
-	*/
 
 	return newSteps
 }
