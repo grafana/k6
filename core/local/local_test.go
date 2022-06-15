@@ -881,6 +881,37 @@ func TestExecutionSchedulerEndTime(t *testing.T) {
 	assert.True(t, runTime < 10*time.Second, "took more than 10 seconds")
 }
 
+func TestExecutionSchedulerEndTime0VUsAtEnd(t *testing.T) {
+	t.Parallel()
+	runner := &minirunner.MiniRunner{
+		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+			time.Sleep(100 * time.Millisecond)
+			return nil
+		},
+	}
+	_, cancel, execScheduler, _ := newTestExecutionScheduler(t, runner, nil, lib.Options{
+		Stages: []lib.Stage{
+			{
+				Duration: types.NullDurationFrom(time.Second),
+				Target:   null.IntFrom(1),
+			},
+			{
+				Duration: types.NullDurationFrom(time.Second),
+				Target:   null.IntFrom(0),
+			},
+			{
+				Duration: types.NullDurationFrom(time.Hour),
+				Target:   null.IntFrom(0),
+			},
+		},
+	})
+	defer cancel()
+
+	endTime, isFinal := lib.GetEndOffset(execScheduler.GetExecutionPlan())
+	assert.Equal(t, time.Hour+2*time.Second, endTime) // because of the big 0 vu stage at end
+	assert.True(t, isFinal)
+}
+
 func TestExecutionSchedulerRuntimeErrors(t *testing.T) {
 	t.Parallel()
 	runner := &minirunner.MiniRunner{

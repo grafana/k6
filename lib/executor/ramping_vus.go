@@ -202,13 +202,19 @@ func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEn
 		}
 	}
 
-	for _, stage := range vlvc.Stages {
+	for i, stage := range vlvc.Stages {
 		stageEndVUs := stage.Target.Int64
 		stageDuration := stage.Duration.TimeDuration()
 		timeTillEnd += stageDuration
 
 		stageVUDiff := stageEndVUs - fromVUs
 		if stageVUDiff == 0 {
+			// skip those as this doesn't change anything
+			if i == len(vlvc.Stages)-1 {
+				// don't skip the last step as we won't add another one after it
+				// unlike in any of the other cases
+				steps = append(steps, lib.ExecutionStep{TimeOffset: timeTillEnd, PlannedVUs: uint64(scaled)})
+			}
 			continue
 		}
 		if stageDuration == 0 {
@@ -244,7 +250,7 @@ func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEn
 	}
 
 	if zeroEnd {
-		steps = append(steps, lib.ExecutionStep{TimeOffset: timeTillEnd, PlannedVUs: 0})
+		addStep(timeTillEnd, 0)
 	}
 	return steps
 }
@@ -449,17 +455,32 @@ func (vlvc RampingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:funlen
 //     - If the last stage's target is more than 0, the VUs at the end of the
 //       executor's life will have more time to finish their last iterations.
 func (vlvc RampingVUsConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
-	steps := vlvc.getRawExecutionSteps(et, false)
+	origSteps := vlvc.getRawExecutionSteps(et, false)
 
 	executorEndOffset := sumStagesDuration(vlvc.Stages) + vlvc.GracefulStop.TimeDuration()
 	// Handle graceful ramp-downs, if we have them
+	steps := origSteps
 	if vlvc.GracefulRampDown.Duration > 0 {
 		steps = vlvc.reserveVUsForGracefulRampDowns(steps, executorEndOffset)
 	}
+	lastIndex := len(steps)
+	for ; lastIndex > 0; lastIndex-- {
+		if steps[lastIndex-1].PlannedVUs != 0 {
+			break
+		}
+	}
 
+	if len(steps) > lastIndex && steps[lastIndex].TimeOffset < executorEndOffset {
+		executorEndOffset = steps[lastIndex].TimeOffset
+	}
 	// add one step for the end of the gracefulStop
-	if steps[len(steps)-1].PlannedVUs != 0 || steps[len(steps)-1].TimeOffset != executorEndOffset {
+	if steps[len(steps)-1].PlannedVUs != 0 || steps[len(steps)-1].TimeOffset < executorEndOffset {
 		steps = append(steps, lib.ExecutionStep{TimeOffset: executorEndOffset, PlannedVUs: 0})
+	}
+
+	if steps[len(steps)-1].TimeOffset < origSteps[len(origSteps)-1].TimeOffset {
+		// This can only happen on multiple 0 vus stages at the end
+		steps = append(steps, lib.ExecutionStep{TimeOffset: origSteps[len(origSteps)-1].TimeOffset, PlannedVUs: 0})
 	}
 
 	return steps

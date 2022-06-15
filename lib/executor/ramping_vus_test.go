@@ -438,14 +438,14 @@ func TestRampingVUsConfigExecutionPlanExample(t *testing.T) {
 	conf := NewRampingVUsConfig("test")
 	conf.StartVUs = null.IntFrom(4)
 	conf.Stages = []Stage{
-		{Target: null.IntFrom(6), Duration: types.NullDurationFrom(2 * time.Second)},
-		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(5 * time.Second)},
-		{Target: null.IntFrom(5), Duration: types.NullDurationFrom(4 * time.Second)},
-		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(4 * time.Second)},
-		{Target: null.IntFrom(4), Duration: types.NullDurationFrom(3 * time.Second)},
-		{Target: null.IntFrom(4), Duration: types.NullDurationFrom(2 * time.Second)},
-		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(0 * time.Second)},
-		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(3 * time.Second)},
+		{Target: null.IntFrom(6), Duration: types.NullDurationFrom(2 * time.Second)}, // 2
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(5 * time.Second)}, // 7
+		{Target: null.IntFrom(5), Duration: types.NullDurationFrom(4 * time.Second)}, // 11
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(4 * time.Second)}, // 15
+		{Target: null.IntFrom(4), Duration: types.NullDurationFrom(3 * time.Second)}, // 18
+		{Target: null.IntFrom(4), Duration: types.NullDurationFrom(2 * time.Second)}, // 20
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(0 * time.Second)}, // 20
+		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(3 * time.Second)}, // 23
 	}
 
 	expRawStepsNoZeroEnd := []lib.ExecutionStep{
@@ -469,11 +469,12 @@ func TestRampingVUsConfigExecutionPlanExample(t *testing.T) {
 		{TimeOffset: 17 * time.Second, PlannedVUs: 3},
 		{TimeOffset: 18 * time.Second, PlannedVUs: 4},
 		{TimeOffset: 20 * time.Second, PlannedVUs: 1},
+		{TimeOffset: 23 * time.Second, PlannedVUs: 1},
 	}
 	rawStepsNoZeroEnd := conf.getRawExecutionSteps(et, false)
 	assert.Equal(t, expRawStepsNoZeroEnd, rawStepsNoZeroEnd)
 	endOffset, isFinal := lib.GetEndOffset(rawStepsNoZeroEnd)
-	assert.Equal(t, 20*time.Second, endOffset)
+	assert.Equal(t, 23*time.Second, endOffset)
 	assert.Equal(t, false, isFinal)
 
 	rawStepsZeroEnd := conf.getRawExecutionSteps(et, true)
@@ -559,13 +560,13 @@ func TestRampingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 		{TimeOffset: 15 * time.Second, PlannedVUs: 0},
 		{TimeOffset: 16 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 20 * time.Second, PlannedVUs: 0},
+		{TimeOffset: 23 * time.Second, PlannedVUs: 0},
 	}
 	expRawStepsZeroEnd := expRawStepsNoZeroEnd // no need to copy
-	expRawStepsZeroEnd = append(expRawStepsZeroEnd, lib.ExecutionStep{TimeOffset: 23 * time.Second, PlannedVUs: 0})
 	rawStepsNoZeroEnd := conf.getRawExecutionSteps(et, false)
 	assert.Equal(t, expRawStepsNoZeroEnd, rawStepsNoZeroEnd)
 	endOffset, isFinal := lib.GetEndOffset(rawStepsNoZeroEnd)
-	assert.Equal(t, 20*time.Second, endOffset)
+	assert.Equal(t, 23*time.Second, endOffset)
 	assert.Equal(t, true, isFinal)
 
 	rawStepsZeroEnd := conf.getRawExecutionSteps(et, true)
@@ -580,7 +581,6 @@ func TestRampingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 		{TimeOffset: 1 * time.Second, PlannedVUs: 2},
 		{TimeOffset: 42 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 50 * time.Second, PlannedVUs: 0},
-		{TimeOffset: 53 * time.Second, PlannedVUs: 0},
 	}, conf.GetExecutionRequirements(et))
 
 	// Try a longer GracefulStop than the GracefulRampDown
@@ -590,7 +590,6 @@ func TestRampingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 		{TimeOffset: 1 * time.Second, PlannedVUs: 2},
 		{TimeOffset: 42 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 50 * time.Second, PlannedVUs: 0},
-		{TimeOffset: 103 * time.Second, PlannedVUs: 0},
 	}, conf.GetExecutionRequirements(et))
 
 	// Try a much shorter GracefulStop than the GracefulRampDown
@@ -611,7 +610,7 @@ func TestRampingVUsConfigExecutionPlanExampleOneThird(t *testing.T) {
 
 	// Try a zero GracefulStop and GracefulRampDown, i.e. raw steps with 0 end cap
 	conf.GracefulRampDown = types.NullDurationFrom(0 * time.Second)
-	assert.Equal(t, rawStepsZeroEnd, conf.GetExecutionRequirements(et))
+	assert.Equal(t, expRawStepsZeroEnd, conf.GetExecutionRequirements(et))
 }
 
 func TestRampingVUsConfigExecutionPlanZerosAtEnd(t *testing.T) {
@@ -637,13 +636,13 @@ func TestRampingVUsConfigExecutionPlanZerosAtEnd(t *testing.T) {
 		{TimeOffset: 7 * time.Second, PlannedVUs: 2},
 		{TimeOffset: 8 * time.Second, PlannedVUs: 1},
 		{TimeOffset: 9 * time.Second, PlannedVUs: 0},
+		{TimeOffset: 14 * time.Second, PlannedVUs: 0},
 	}
 	expRawStepsZeroEnd := expRawStepsNoZeroEnd // no need to copy
-	expRawStepsZeroEnd = append(expRawStepsZeroEnd, lib.ExecutionStep{TimeOffset: 14 * time.Second, PlannedVUs: 0})
 	rawStepsNoZeroEnd := conf.getRawExecutionSteps(et, false)
 	assert.Equal(t, expRawStepsNoZeroEnd, rawStepsNoZeroEnd)
 	endOffset, isFinal := lib.GetEndOffset(rawStepsNoZeroEnd)
-	assert.Equal(t, 9*time.Second, endOffset)
+	assert.Equal(t, 14*time.Second, endOffset)
 	assert.Equal(t, true, isFinal)
 
 	rawStepsZeroEnd := conf.getRawExecutionSteps(et, true)
