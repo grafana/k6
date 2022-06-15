@@ -1475,31 +1475,35 @@ func (f *Frame) ParentFrame() api.Frame {
 	return f.parentFrame
 }
 
-func (f *Frame) Press(selector string, key string, opts goja.Value) {
-	f.log.Debugf("Frame:Press", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+// Press presses the given key for the first element found that matches the selector.
+func (f *Frame) Press(selector, key string, opts goja.Value) {
+	f.log.Debugf("Frame:Press", "fid:%s furl:%q sel:%q key:%q", f.ID(), f.URL(), selector, key)
 
-	parsedOpts := NewFramePressOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+	popts := NewFramePressOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "parse: %w", err)
 	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
-		return nil, handle.press(apiCtx, key, parsedOpts.ToKeyboardOptions())
-	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{}, false,
-		parsedOpts.NoWaitAfter, parsedOpts.Timeout,
-	)
-	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+	if err := f.press(selector, key, popts); err != nil {
+		k6ext.Panic(f.ctx, "press: %w", err)
 	}
 
 	applySlowMo(f.ctx)
 }
 
-// SelectOption filters option values of the first element that matches
-// the selector, selects the options, and returns the filtered options.
+func (f *Frame) press(selector, key string, opts *FramePressOptions) error {
+	press := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+		return nil, handle.press(apiCtx, key, opts.ToKeyboardOptions())
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, press,
+		[]string{}, false, opts.NoWaitAfter, opts.Timeout,
+	)
+	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	return err
+}
+
+// SelectOption selects the given options and returns the array of
+// option values of the first element found that matches the selector.
 func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value) []string {
 	f.log.Debugf("Frame:SelectOption", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
