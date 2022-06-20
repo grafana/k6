@@ -64,4 +64,7 @@ type Locator interface {
 	// Type text on the element found that matches the locator's
 	// selector with strict mode on.
 	Type(text string, opts goja.Value)
+	// Hover moves the pointer over the element that matches the locator's
+	// selector with strict mode on.
+	Hover(opts goja.Value)
 }

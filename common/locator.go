@@ -527,3 +527,25 @@ func (l *Locator) typ(text string, opts *FrameTypeOptions) error {
 	opts.Strict = true
 	return l.frame.typ(l.selector, text, opts)
 }
+
+// Hover moves the pointer over the element that matches the locator's
+// selector with strict mode on.
+func (l *Locator) Hover(opts goja.Value) {
+	l.log.Debugf("Locator:Hover", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	var err error
+	defer func() { panicOrSlowMo(l.ctx, err) }()
+
+	copts := NewFrameHoverOptions(l.frame.defaultTimeout())
+	if err = copts.Parse(l.ctx, opts); err != nil {
+		return
+	}
+	if err = l.hover(copts); err != nil {
+		return
+	}
+}
+
+func (l *Locator) hover(opts *FrameHoverOptions) error {
+	opts.Strict = true
+	return l.frame.hover(l.selector, opts)
+}

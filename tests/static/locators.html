@@ -22,13 +22,16 @@
         window.check = false;
 
         document.querySelector('#link').addEventListener(
-            'click', e => { result = true; }, false
+            'click', e => { window.result = true; }, false
         );
         document.querySelector('#link').addEventListener(
-            'dblclick', e => { dblclick = true; }, false
+            'dblclick', e => { window.dblclick = true; }, false
         );
         document.querySelector('#inputCheckbox').addEventListener(
             'change', e => { window.check = e.currentTarget.checked; }, false
+        );
+        document.querySelector('#inputText').addEventListener(
+            'mousemove', e => { window.result = true; }, false
         );
     </script>
 </body>
