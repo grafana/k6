@@ -1038,7 +1038,7 @@ func (f *Frame) Goto(url string, opts goja.Value) api.Response {
 	return resp
 }
 
-// Hover the first element matches the selector.
+// Hover moves the pointer over the first element that matches the selector.
 func (f *Frame) Hover(selector string, opts goja.Value) {
 	f.log.Debugf("Frame:Hover", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 

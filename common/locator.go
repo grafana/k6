@@ -528,8 +528,8 @@ func (l *Locator) typ(text string, opts *FrameTypeOptions) error {
 	return l.frame.typ(l.selector, text, opts)
 }
 
-// Hover the element found that matches the locator's selector with
-// strict mode on.
+// Hover moves the pointer over the element that matches the locator's
+// selector with strict mode on.
 func (l *Locator) Hover(opts goja.Value) {
 	l.log.Debugf("Locator:Hover", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
