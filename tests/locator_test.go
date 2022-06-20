@@ -324,3 +324,22 @@ func TestLocatorSelectOption(t *testing.T) {
 		}, "should not select multiple elements")
 	})
 }
+
+//nolint:tparallel
+func TestLocatorPress(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	t.Run("ok", func(t *testing.T) {
+		p.Locator("#inputText", nil).Press("x", nil)
+		require.Equal(t, "xsomething", p.InputValue("#inputText", nil))
+	})
+	t.Run("strict", func(t *testing.T) {
+		require.Panics(t, func() {
+			p.Locator("select", nil).Press("a", nil)
+		}, "should not select multiple elements")
+	})
+}

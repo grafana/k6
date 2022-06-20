@@ -58,4 +58,7 @@ type Locator interface {
 	// the locator's selector (with strict mode on), selects the
 	// options, and returns the filtered options.
 	SelectOption(values goja.Value, opts goja.Value) []string
+	// Press the given key on the element found that matches the locator's
+	// selector with strict mode on.
+	Press(key string, opts goja.Value)
 }
