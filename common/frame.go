@@ -1594,27 +1594,30 @@ func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value
 	// TODO: needs slowMo
 }
 
+// Tap the first element that matches the selector.
 func (f *Frame) Tap(selector string, opts goja.Value) {
 	f.log.Debugf("Frame:Tap", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	parsedOpts := NewFrameTapOptions(f.defaultTimeout())
-	err := parsedOpts.Parse(f.ctx, opts)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+	popts := NewFrameTapOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "parse: %w", err)
 	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
-		return nil, handle.tap(apiCtx, p)
-	}
-	actFn := f.newPointerAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, &parsedOpts.ElementHandleBasePointerOptions,
-	)
-	_, err = callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+	if err := f.tap(selector, popts); err != nil {
+		k6ext.Panic(f.ctx, "tap: %w", err)
 	}
 
 	applySlowMo(f.ctx)
+}
+
+func (f *Frame) tap(selector string, opts *FrameTapOptions) error {
+	tap := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
+		return nil, handle.tap(apiCtx, p)
+	}
+	act := f.newPointerAction(
+		selector, DOMElementStateAttached, opts.Strict, tap, &opts.ElementHandleBasePointerOptions,
+	)
+	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	return err
 }
 
 // TextContent returns the textContent attribute of the first element found
