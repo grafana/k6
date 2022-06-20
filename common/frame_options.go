@@ -717,3 +717,36 @@ func (o *FrameWaitForSelectorOptions) Parse(ctx context.Context, opts goja.Value
 
 	return nil
 }
+
+// FrameDispatchEventOptions are options for Frame.dispatchEvent.
+type FrameDispatchEventOptions struct {
+	ElementHandleDispatchEventOptions
+	Strict bool `json:"strict"`
+}
+
+// NewFrameDispatchEventOptions returns a new FrameDispatchEventOptions.
+func NewFrameDispatchEventOptions(defaultTimeout time.Duration) *FrameDispatchEventOptions {
+	return &FrameDispatchEventOptions{
+		ElementHandleDispatchEventOptions: *NewElementHandleDispatchEventOptions(defaultTimeout),
+		Strict:                            false,
+	}
+}
+
+// Parse the FrameDispatchEventOptions options from a goja value.
+func (o *FrameDispatchEventOptions) Parse(ctx context.Context, opts goja.Value) error {
+	if err := o.ElementHandleDispatchEventOptions.Parse(ctx, opts); err != nil {
+		return err
+	}
+	if !isGojaValueExists(opts) {
+		return nil
+	}
+	gopts := opts.ToObject(k6ext.Runtime(ctx))
+	for _, k := range gopts.Keys() {
+		if k == "strict" {
+			o.Strict = gopts.Get(k).ToBoolean()
+			break
+		}
+	}
+
+	return nil
+}

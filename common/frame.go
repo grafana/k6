@@ -863,27 +863,33 @@ func (f *Frame) dblclick(selector string, opts *FrameDblclickOptions) error {
 	return err
 }
 
-func (f *Frame) DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value) {
-	f.log.Debugf("Frame:DispatchEvent", "fid:%s furl:%q sel:%q typ:%s", f.ID(), f.URL(), selector, typ)
+// DispatchEvent dispatches an event for the first element matching the selector.
+func (f *Frame) DispatchEvent(selector, typ string, eventInit, opts goja.Value) {
+	f.log.Debugf("Frame:DispatchEvent", "fid:%s furl:%q sel:%q typ:%q", f.ID(), f.URL(), selector, typ)
 
-	parsedOpts := NewFrameDblClickOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+	popts := NewFrameDispatchEventOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "Frame.dispatchEvent options: %w", err)
 	}
+	if err := f.dispatchEvent(selector, typ, eventInit, popts); err != nil {
+		k6ext.Panic(f.ctx, "Frame.dispatchEvent: %w", err)
+	}
+	applySlowMo(f.ctx)
+}
 
-	fn := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
+// dispatchEvent is like DispatchEvent but takes parsed options and neither throws
+// an error, or applies slow motion.
+func (f *Frame) dispatchEvent(selector, typ string, eventInit goja.Value, opts *FrameDispatchEventOptions) error {
+	dispatchEvent := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.dispatchEvent(apiCtx, typ, eventInit)
 	}
-	actFn := f.newAction(
-		selector, DOMElementStateAttached, parsedOpts.Strict, fn, []string{},
-		parsedOpts.Force, parsedOpts.NoWaitAfter, parsedOpts.Timeout,
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, dispatchEvent, []string{},
+		opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
-	_, err := callApiWithTimeout(f.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
+	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 
-	applySlowMo(f.ctx)
+	return err
 }
 
 // Evaluate will evaluate provided page function within an execution context.

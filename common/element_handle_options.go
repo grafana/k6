@@ -495,3 +495,33 @@ func (o *ElementHandleWaitForElementStateOptions) Parse(ctx context.Context, opt
 	}
 	return nil
 }
+
+// ElementHandleDispatchEventOptions are options for ElementHandle.dispatchEvent.
+type ElementHandleDispatchEventOptions struct {
+	ElementHandleBasePointerOptions
+	Timeout time.Duration `json:"timeout"`
+}
+
+// NewElementHandleDispatchEventOptions returns a new ElementHandleDispatchEventOptions.
+func NewElementHandleDispatchEventOptions(defaultTimeout time.Duration) *ElementHandleDispatchEventOptions {
+	return &ElementHandleDispatchEventOptions{
+		Timeout: defaultTimeout,
+	}
+}
+
+// Parse the ElementHandleDispatchEvent options from a goja value.
+func (o *ElementHandleDispatchEventOptions) Parse(ctx context.Context, opts goja.Value) error {
+	if !isGojaValueExists(opts) {
+		return nil
+	}
+
+	gopts := opts.ToObject(k6ext.Runtime(ctx))
+	for _, k := range gopts.Keys() {
+		if k == "timeout" {
+			o.Timeout = time.Duration(gopts.Get(k).ToInteger()) * time.Millisecond
+			break
+		}
+	}
+
+	return nil
+}
