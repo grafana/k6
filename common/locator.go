@@ -502,3 +502,28 @@ func (l *Locator) press(key string, opts *FramePressOptions) error {
 	opts.Strict = true
 	return l.frame.press(l.selector, key, opts)
 }
+
+// Type text on the element found that matches the locator's
+// selector with strict mode on.
+func (l *Locator) Type(text string, opts goja.Value) {
+	l.log.Debugf(
+		"Locator:Type", "fid:%s furl:%q sel:%q text:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, text, opts,
+	)
+
+	var err error
+	defer func() { panicOrSlowMo(l.ctx, err) }()
+
+	copts := NewFrameTypeOptions(l.frame.defaultTimeout())
+	if err = copts.Parse(l.ctx, opts); err != nil {
+		return
+	}
+	if err = l.typ(text, copts); err != nil {
+		return
+	}
+}
+
+func (l *Locator) typ(text string, opts *FrameTypeOptions) error {
+	opts.Strict = true
+	return l.frame.typ(l.selector, text, opts)
+}

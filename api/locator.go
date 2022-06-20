@@ -61,4 +61,7 @@ type Locator interface {
 	// Press the given key on the element found that matches the locator's
 	// selector with strict mode on.
 	Press(key string, opts goja.Value)
+	// Type text on the element found that matches the locator's
+	// selector with strict mode on.
+	Type(text string, opts goja.Value)
 }
