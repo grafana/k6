@@ -67,4 +67,6 @@ type Locator interface {
 	// Hover moves the pointer over the element that matches the locator's
 	// selector with strict mode on.
 	Hover(opts goja.Value)
+	// Tap the element found that matches the locator's selector with strict mode on.
+	Tap(opts goja.Value)
 }
