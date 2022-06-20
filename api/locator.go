@@ -72,4 +72,7 @@ type Locator interface {
 	// DispatchEvent dispatches an event for the element matching the
 	// locator's selector with strict mode on.
 	DispatchEvent(typ string, eventInit, opts goja.Value)
+	// WaitFor waits for the element matching the locator's selector
+	// with strict mode on.
+	WaitFor(opts goja.Value)
 }
