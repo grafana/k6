@@ -591,7 +591,7 @@ func (h *ElementHandle) selectText(apiCtx context.Context) error {
 }
 
 func (h *ElementHandle) tap(apiCtx context.Context, p *Position) error {
-	return h.frame.page.Touchscreen.tap(p.X, p.X)
+	return h.frame.page.Touchscreen.tap(p.X, p.Y)
 }
 
 func (h *ElementHandle) textContent(apiCtx context.Context) (interface{}, error) {
