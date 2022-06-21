@@ -883,9 +883,13 @@ func (f *Frame) dispatchEvent(selector, typ string, eventInit goja.Value, opts *
 	dispatchEvent := func(apiCtx context.Context, handle *ElementHandle) (interface{}, error) {
 		return handle.dispatchEvent(apiCtx, typ, eventInit)
 	}
+	const (
+		force       = false
+		noWaitAfter = false
+	)
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, dispatchEvent, []string{},
-		opts.Force, opts.NoWaitAfter, opts.Timeout,
+		force, noWaitAfter, opts.Timeout,
 	)
 	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 
