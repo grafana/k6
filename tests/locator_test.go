@@ -5,7 +5,6 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,12 +24,8 @@ func TestLocatorClick(t *testing.T) {
 
 	// Selecting a single element and clicking on it is OK.
 	t.Run("ok", func(t *testing.T) {
-		result := func() bool {
-			ok := p.Evaluate(tb.toGojaValue(`() => window.result`))
-			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
-		}
 		p.Locator("#link", nil).Click(nil)
-		require.True(t, result(), "could not click the link")
+		require.True(t, tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.result`))), "could not click the link")
 	})
 	// The strict mode should disallow selecting multiple elements.
 	t.Run("strict", func(t *testing.T) {
@@ -46,12 +41,8 @@ func TestLocatorDblclick(t *testing.T) {
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
 	t.Run("ok", func(t *testing.T) {
-		dblclick := func() bool {
-			ok := p.Evaluate(tb.toGojaValue(`() => window.dblclick`))
-			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
-		}
 		p.Locator("#link", nil).Dblclick(nil)
-		require.True(t, dblclick(), "could not double click the link")
+		require.True(t, tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.dblclick`))), "could not double click the link")
 	})
 	t.Run("strict", func(t *testing.T) {
 		require.Panics(t, func() { p.Locator("a", nil).Dblclick(nil) })
@@ -67,8 +58,7 @@ func TestLocatorCheck(t *testing.T) {
 
 	t.Run("check", func(t *testing.T) {
 		check := func() bool {
-			ok := p.Evaluate(tb.toGojaValue(`() => window.check`))
-			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
+			return tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.check`)))
 		}
 
 		l := p.Locator("#inputCheckbox", nil)
@@ -187,12 +177,10 @@ func TestLocatorFocus(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		focused := func() bool {
-			ok := p.Evaluate(tb.toGojaValue(
+			return tb.asGojaBool(p.Evaluate(tb.toGojaValue(
 				`() => document.activeElement == document.getElementById('inputText')`,
-			))
-			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
+			)))
 		}
-
 		l := p.Locator("#inputText", nil)
 		require.False(t, focused(), "should not be focused first")
 
@@ -373,8 +361,7 @@ func TestLocatorHover(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		result := func() bool {
-			ok := p.Evaluate(tb.toGojaValue(`() => window.result`))
-			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
+			return tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.result`)))
 		}
 		require.False(t, result(), "should not be hovered first")
 		p.Locator("#inputText", nil).Hover(nil)
@@ -397,8 +384,7 @@ func TestLocatorTap(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		result := func() bool {
-			ok := p.Evaluate(tb.toGojaValue(`() => window.result`))
-			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
+			return tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.result`)))
 		}
 		require.False(t, result(), "should not be tapped first")
 		p.Locator("#inputText", nil).Tap(nil)
@@ -421,10 +407,8 @@ func TestLocatorDispatchEvent(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		result := func() bool {
-			ok := p.Evaluate(tb.toGojaValue(`() => window.result`))
-			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
+			return tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.result`)))
 		}
-
 		require.False(t, result(), "should not be clicked first")
 		p.Locator("#link", nil).DispatchEvent("click", tb.toGojaValue("mouseevent"), nil)
 		require.True(t, result(), "could not dispatch event")

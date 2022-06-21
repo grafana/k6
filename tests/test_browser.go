@@ -228,6 +228,22 @@ func (b *testBrowser) runtime() *goja.Runtime { return b.vu.Runtime() }
 // toGojaValue converts a value to goja value.
 func (b *testBrowser) toGojaValue(i interface{}) goja.Value { return b.runtime().ToValue(i) }
 
+// asGojaValue asserts that v is a goja value and returns v as a goja.value.
+func (b *testBrowser) asGojaValue(v interface{}) goja.Value {
+	b.t.Helper()
+	gv, ok := v.(goja.Value)
+	require.Truef(b.t, ok, "want goja.Value; got %T", v)
+	return gv
+}
+
+// asGojaBool asserts that v is a boolean goja value and returns v as a boolean.
+func (b *testBrowser) asGojaBool(v interface{}) bool {
+	b.t.Helper()
+	gv := b.asGojaValue(v)
+	require.IsType(b.t, b.toGojaValue(true), gv)
+	return gv.ToBoolean()
+}
+
 // launchOptions provides a way to customize browser type
 // launch options in tests.
 type launchOptions struct {
