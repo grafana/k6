@@ -39,8 +39,8 @@ type BrowserType struct {
 	fieldNameMapper *common.FieldNameMapper
 	vu              k6modules.VU
 
-	execPath string      // path to the Chromium executable
-	storage  storage.Dir // stores temporary data for the extension and user
+	execPath string       // path to the Chromium executable
+	storage  *storage.Dir // stores temporary data for the extension and user
 }
 
 // NewBrowserType returns a new Chrome browser type.
@@ -65,6 +65,7 @@ func NewBrowserType(ctx context.Context) api.BrowserType {
 		hooks:           hooks,
 		fieldNameMapper: common.NewFieldNameMapper(),
 		vu:              vu,
+		storage:         &storage.Dir{},
 	}
 	rt.SetFieldNameMapper(b.fieldNameMapper)
 
@@ -142,7 +143,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 
 	flags := prepareFlags(launchOpts, &state.Options)
 
-	dataDir := &b.storage
+	dataDir := b.storage
 	if err := dataDir.Make("", flags["user-data-dir"]); err != nil {
 		k6common.Throw(rt, fmt.Errorf("cannot make temp data directory: %w", err))
 	}
@@ -150,8 +151,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 
 	go func(ctx context.Context) {
 		defer func() {
-			err := dataDir.Cleanup()
-			if err != nil {
+			if err := dataDir.Cleanup(); err != nil {
 				logger.Errorf("BrowserType:Launch", "%v", err)
 			}
 		}()
@@ -163,7 +163,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		<-ctx.Done()
 	}(b.Ctx)
 
-	browserProc, err := b.allocate(launchOpts, flags, envs, dataDir)
+	browserProc, err := b.allocate(launchOpts, flags, envs, dataDir, logger)
 	if browserProc == nil {
 		k6common.Throw(rt, fmt.Errorf("cannot allocate browser: %w", err))
 	}
@@ -196,7 +196,7 @@ func (b *BrowserType) Name() string {
 
 // allocate starts a new Chromium browser process and returns it.
 func (b *BrowserType) allocate(
-	opts *common.LaunchOptions, flags map[string]interface{}, env []string, dataDir *storage.Dir,
+	opts *common.LaunchOptions, flags map[string]interface{}, env []string, dataDir *storage.Dir, logger *log.Logger,
 ) (_ *common.BrowserProcess, rerr error) {
 	ctx, cancel := context.WithTimeout(b.Ctx, opts.Timeout)
 	defer func() {
@@ -215,7 +215,7 @@ func (b *BrowserType) allocate(
 		path = b.ExecutablePath()
 	}
 
-	cmd, stdout, err := execute(ctx, path, args, env, dataDir)
+	cmd, stdout, err := execute(ctx, path, args, env, dataDir, logger)
 	if err != nil {
 		return nil, fmt.Errorf("cannot start browser: %w", err)
 	}
@@ -350,7 +350,9 @@ func setFlagsFromK6Options(flags map[string]interface{}, k6opts *k6lib.Options) 
 	}
 }
 
-func execute(ctx context.Context, path string, args, env []string, dataDir *storage.Dir) (*exec.Cmd, io.Reader, error) {
+func execute(
+	ctx context.Context, path string, args, env []string, dataDir *storage.Dir, logger *log.Logger,
+) (*exec.Cmd, io.Reader, error) {
 	cmd := exec.CommandContext(ctx, path, args...)
 	killAfterParent(cmd)
 
@@ -379,10 +381,18 @@ func execute(ctx context.Context, path string, args, env []string, dataDir *stor
 	}
 	go func() {
 		defer func() {
-			_ = dataDir.Cleanup() // Log when possible
+			if err := dataDir.Cleanup(); err != nil {
+				logger.Errorf("BrowserType:execute", "%v", err)
+			}
 		}()
-		_ = cmd.Wait()
-		_ = stdout.Close()
+
+		if err := cmd.Wait(); err != nil {
+			logger.Errorf("BrowserType:execute", "cmd.Wait: %v", err)
+		}
+
+		if err := stdout.Close(); err != nil {
+			logger.Errorf("BrowserType:execute", "stdout.Close: %v", err)
+		}
 	}()
 
 	return cmd, stdout, nil
