@@ -25,6 +25,7 @@ import (
 	"os"
 
 	"github.com/grafana/xk6-browser/log"
+	"github.com/grafana/xk6-browser/storage"
 )
 
 type BrowserProcess struct {
@@ -42,16 +43,13 @@ type BrowserProcess struct {
 	wsURL string
 
 	// The directory where user data for the browser is stored.
-	userDataDir string
+	userDataDir *storage.Dir
 
 	logger *log.Logger
 }
 
 func NewBrowserProcess(
-	ctx context.Context,
-	cancel context.CancelFunc,
-	process *os.Process,
-	wsURL, userDataDir string,
+	ctx context.Context, cancel context.CancelFunc, process *os.Process, wsURL string, dataDir *storage.Dir,
 ) *BrowserProcess {
 	p := BrowserProcess{
 		ctx:                        ctx,
@@ -60,7 +58,7 @@ func NewBrowserProcess(
 		lostConnection:             make(chan struct{}),
 		processIsGracefullyClosing: make(chan struct{}),
 		wsURL:                      wsURL,
-		userDataDir:                userDataDir,
+		userDataDir:                dataDir,
 	}
 	go func() {
 		// If we lose connection to the browser and we're not in-progress with clean

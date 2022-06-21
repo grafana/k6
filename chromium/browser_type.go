@@ -142,14 +142,19 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 
 	flags := prepareFlags(launchOpts, &state.Options)
 
-	finalDirPath, cleanupFunc, err := b.createTempDir(flags["user-data-dir"], logger)
-	if err != nil {
-		k6common.Throw(rt, err)
+	dataDir := &b.storage
+	if err := dataDir.Make("", flags["user-data-dir"]); err != nil {
+		k6common.Throw(rt, fmt.Errorf("cannot make temp data directory: %w", err))
 	}
-	flags["user-data-dir"] = finalDirPath
+	flags["user-data-dir"] = dataDir.Dir
 
 	go func(ctx context.Context) {
-		defer cleanupFunc()
+		defer func() {
+			err := dataDir.Cleanup()
+			if err != nil {
+				logger.Errorf("BrowserType:Launch", "%v", err)
+			}
+		}()
 		// There's a small chance that this might be called
 		// if the context is closed by the k6 runtime. To
 		// guarantee the cleanup we would need to orchestrate
@@ -158,12 +163,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		<-ctx.Done()
 	}(b.Ctx)
 
-	browserProc, err := b.allocate(
-		launchOpts,
-		flags,
-		envs,
-		cleanupFunc,
-	)
+	browserProc, err := b.allocate(launchOpts, flags, envs, dataDir)
 	if browserProc == nil {
 		k6common.Throw(rt, fmt.Errorf("cannot allocate browser: %w", err))
 	}
@@ -174,7 +174,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 	// so that we can kill it afterward if it lingers
 	// see: k6ext.Panic function.
 	b.Ctx = k6ext.WithProcessID(b.Ctx, browserProc.Pid())
-	browser, err := common.NewBrowser(b.Ctx, b.CancelFn, browserProc, launchOpts, logger, cleanupFunc)
+	browser, err := common.NewBrowser(b.Ctx, b.CancelFn, browserProc, launchOpts, logger)
 	if err != nil {
 		k6common.Throw(rt, err)
 	}
@@ -194,30 +194,9 @@ func (b *BrowserType) Name() string {
 	return "chromium"
 }
 
-func (b *BrowserType) createTempDir(
-	dirPath interface{},
-	logger *log.Logger,
-) (finalDirPath string, c common.CleanupFunc, rerr error) {
-	// use the provided directory or create a temporary one.
-	if err := b.storage.Make("", dirPath); err != nil {
-		return "", nil, fmt.Errorf("cannot make temp data directory: %w", err)
-	}
-
-	finalDirPath = b.storage.Dir
-
-	return finalDirPath, func() {
-		if err := b.storage.Cleanup(); err != nil {
-			logger.Errorf("cleanup", "%s", err)
-		}
-	}, nil
-}
-
 // allocate starts a new Chromium browser process and returns it.
 func (b *BrowserType) allocate(
-	opts *common.LaunchOptions,
-	flags map[string]interface{},
-	env []string,
-	cleanupFunc func(),
+	opts *common.LaunchOptions, flags map[string]interface{}, env []string, dataDir *storage.Dir,
 ) (_ *common.BrowserProcess, rerr error) {
 	ctx, cancel := context.WithTimeout(b.Ctx, opts.Timeout)
 	defer func() {
@@ -236,7 +215,7 @@ func (b *BrowserType) allocate(
 		path = b.ExecutablePath()
 	}
 
-	cmd, stdout, err := execute(ctx, path, args, env, cleanupFunc)
+	cmd, stdout, err := execute(ctx, path, args, env, dataDir)
 	if err != nil {
 		return nil, fmt.Errorf("cannot start browser: %w", err)
 	}
@@ -246,7 +225,7 @@ func (b *BrowserType) allocate(
 		return nil, fmt.Errorf("cannot parse websocket url: %w", err)
 	}
 
-	return common.NewBrowserProcess(ctx, cancel, cmd.Process, wsURL, b.storage.Dir), nil
+	return common.NewBrowserProcess(ctx, cancel, cmd.Process, wsURL, dataDir), nil
 }
 
 // parseArgs parses command-line arguments and returns them.
@@ -371,7 +350,7 @@ func setFlagsFromK6Options(flags map[string]interface{}, k6opts *k6lib.Options) 
 	}
 }
 
-func execute(ctx context.Context, path string, args, env []string, cleanupFunc func()) (*exec.Cmd, io.Reader, error) {
+func execute(ctx context.Context, path string, args, env []string, dataDir *storage.Dir) (*exec.Cmd, io.Reader, error) {
 	cmd := exec.CommandContext(ctx, path, args...)
 	killAfterParent(cmd)
 
@@ -399,7 +378,9 @@ func execute(ctx context.Context, path string, args, env []string, cleanupFunc f
 		return nil, nil, fmt.Errorf("context err: %w", ctx.Err())
 	}
 	go func() {
-		defer cleanupFunc()
+		defer func() {
+			_ = dataDir.Cleanup() // Log when possible
+		}()
 		_ = cmd.Wait()
 		_ = stdout.Close()
 	}()
