@@ -410,3 +410,26 @@ func TestLocatorTap(t *testing.T) {
 		}, "should not select multiple elements")
 	})
 }
+
+//nolint:tparallel
+func TestLocatorDispatchEvent(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	t.Run("ok", func(t *testing.T) {
+		result := func() bool {
+			ok := p.Evaluate(tb.toGojaValue(`() => window.result`))
+			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
+		}
+
+		require.False(t, result(), "should not be clicked first")
+		p.Locator("#link", nil).DispatchEvent("click", tb.toGojaValue("mouseevent"), nil)
+		require.True(t, result(), "could not dispatch event")
+	})
+	t.Run("strict", func(t *testing.T) {
+		require.Panics(t, func() { p.Locator("a", nil).DispatchEvent("click", tb.toGojaValue("mouseevent"), nil) })
+	})
+}

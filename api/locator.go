@@ -69,4 +69,7 @@ type Locator interface {
 	Hover(opts goja.Value)
 	// Tap the element found that matches the locator's selector with strict mode on.
 	Tap(opts goja.Value)
+	// DispatchEvent dispatches an event for the element matching the
+	// locator's selector with strict mode on.
+	DispatchEvent(typ string, eventInit, opts goja.Value)
 }

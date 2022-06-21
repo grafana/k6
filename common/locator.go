@@ -570,3 +570,28 @@ func (l *Locator) tap(opts *FrameTapOptions) error {
 	opts.Strict = true
 	return l.frame.tap(l.selector, opts)
 }
+
+// DispatchEvent dispatches an event for the element matching the
+// locator's selector with strict mode on.
+func (l *Locator) DispatchEvent(typ string, eventInit, opts goja.Value) {
+	l.log.Debugf(
+		"Locator:DispatchEvent", "fid:%s furl:%q sel:%q typ:%q eventInit:%+v opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, typ, eventInit, opts,
+	)
+
+	var err error
+	defer func() { panicOrSlowMo(l.ctx, err) }()
+
+	popts := NewFrameDispatchEventOptions(l.frame.defaultTimeout())
+	if err = popts.Parse(l.ctx, opts); err != nil {
+		return
+	}
+	if err = l.dispatchEvent(typ, eventInit, popts); err != nil {
+		return
+	}
+}
+
+func (l *Locator) dispatchEvent(typ string, eventInit goja.Value, opts *FrameDispatchEventOptions) error {
+	opts.Strict = true
+	return l.frame.dispatchEvent(l.selector, typ, eventInit, opts)
+}

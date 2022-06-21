@@ -717,3 +717,15 @@ func (o *FrameWaitForSelectorOptions) Parse(ctx context.Context, opts goja.Value
 
 	return nil
 }
+
+// FrameDispatchEventOptions are options for Frame.dispatchEvent.
+type FrameDispatchEventOptions struct {
+	*FrameBaseOptions
+}
+
+// NewFrameDispatchEventOptions returns a new FrameDispatchEventOptions.
+func NewFrameDispatchEventOptions(defaultTimeout time.Duration) *FrameDispatchEventOptions {
+	return &FrameDispatchEventOptions{
+		FrameBaseOptions: NewFrameBaseOptions(defaultTimeout),
+	}
+}

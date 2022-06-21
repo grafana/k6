@@ -234,7 +234,7 @@ func (h *ElementHandle) defaultTimeout() time.Duration {
 	return time.Duration(h.frame.manager.timeoutSettings.timeout()) * time.Second
 }
 
-func (h *ElementHandle) dispatchEvent(apiCtx context.Context, typ string, eventInit goja.Value) (interface{}, error) {
+func (h *ElementHandle) dispatchEvent(_ context.Context, typ string, eventInit goja.Value) (interface{}, error) {
 	fn := `
 		(node, injected, type, eventInit) => {
 			injected.dispatchEvent(node, type, eventInit);
@@ -245,6 +245,7 @@ func (h *ElementHandle) dispatchEvent(apiCtx context.Context, typ string, eventI
 		returnByValue: true,
 	}
 	_, err := h.evalWithScript(h.ctx, opts, fn, typ, eventInit)
+
 	return nil, err
 }
 
