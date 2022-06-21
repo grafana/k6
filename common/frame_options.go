@@ -737,7 +737,7 @@ func (o *FrameDispatchEventOptions) Parse(ctx context.Context, opts goja.Value) 
 	if err := o.ElementHandleDispatchEventOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if !isGojaValueExists(opts) {
+	if !gojaValueExists(opts) {
 		return nil
 	}
 	gopts := opts.ToObject(k6ext.Runtime(ctx))

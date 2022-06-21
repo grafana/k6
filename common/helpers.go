@@ -216,8 +216,8 @@ func TrimQuotes(s string) string {
 	return s
 }
 
-// isGojaValueExists returns true if a given value is not nil and exists
+// gojaValueExists returns true if a given value is not nil and exists
 // (defined and not null) in the goja runtime.
-func isGojaValueExists(v goja.Value) bool {
+func gojaValueExists(v goja.Value) bool {
 	return v != nil && !goja.IsUndefined(v) && !goja.IsNull(v)
 }

@@ -137,20 +137,21 @@ func NewElementHandleBaseOptions(defaultTimeout time.Duration) *ElementHandleBas
 }
 
 func (o *ElementHandleBaseOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "force":
-				o.Force = opts.Get(k).ToBoolean()
-			case "noWaitAfter":
-				o.NoWaitAfter = opts.Get(k).ToBoolean()
-			case "timeout":
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			}
+	if !gojaValueExists(opts) {
+		return nil
+	}
+	gopts := opts.ToObject(k6ext.Runtime(ctx))
+	for _, k := range gopts.Keys() {
+		switch k {
+		case "force":
+			o.Force = gopts.Get(k).ToBoolean()
+		case "noWaitAfter": //nolint:goconst
+			o.NoWaitAfter = gopts.Get(k).ToBoolean()
+		case "timeout":
+			o.Timeout = time.Duration(gopts.Get(k).ToInteger()) * time.Millisecond
 		}
 	}
+
 	return nil
 }
 
@@ -498,30 +499,12 @@ func (o *ElementHandleWaitForElementStateOptions) Parse(ctx context.Context, opt
 
 // ElementHandleDispatchEventOptions are options for ElementHandle.dispatchEvent.
 type ElementHandleDispatchEventOptions struct {
-	ElementHandleBasePointerOptions
-	Timeout time.Duration `json:"timeout"`
+	*ElementHandleBaseOptions
 }
 
 // NewElementHandleDispatchEventOptions returns a new ElementHandleDispatchEventOptions.
 func NewElementHandleDispatchEventOptions(defaultTimeout time.Duration) *ElementHandleDispatchEventOptions {
 	return &ElementHandleDispatchEventOptions{
-		Timeout: defaultTimeout,
+		ElementHandleBaseOptions: NewElementHandleBaseOptions(defaultTimeout),
 	}
-}
-
-// Parse the ElementHandleDispatchEvent options from a goja value.
-func (o *ElementHandleDispatchEventOptions) Parse(ctx context.Context, opts goja.Value) error {
-	if !isGojaValueExists(opts) {
-		return nil
-	}
-
-	gopts := opts.ToObject(k6ext.Runtime(ctx))
-	for _, k := range gopts.Keys() {
-		if k == "timeout" {
-			o.Timeout = time.Duration(gopts.Get(k).ToInteger()) * time.Millisecond
-			break
-		}
-	}
-
-	return nil
 }

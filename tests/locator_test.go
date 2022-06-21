@@ -424,6 +424,8 @@ func TestLocatorDispatchEvent(t *testing.T) {
 			ok := p.Evaluate(tb.toGojaValue(`() => window.result`))
 			return ok.(goja.Value).ToBoolean() //nolint:forcetypeassert
 		}
+
+		require.False(t, result(), "should not be clicked first")
 		p.Locator("#link", nil).DispatchEvent("click", tb.toGojaValue("mouseevent"), nil)
 		require.True(t, result(), "could not dispatch event")
 	})
