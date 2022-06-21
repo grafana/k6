@@ -595,3 +595,22 @@ func (l *Locator) dispatchEvent(typ string, eventInit goja.Value, opts *FrameDis
 	opts.Strict = true
 	return l.frame.dispatchEvent(l.selector, typ, eventInit, opts)
 }
+
+// WaitFor waits for the element matching the locator's selector with strict mode on.
+func (l *Locator) WaitFor(opts goja.Value) {
+	l.log.Debugf("Locator:WaitFor", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	popts := NewFrameWaitForSelectorOptions(l.frame.defaultTimeout())
+	if err := popts.Parse(l.ctx, opts); err != nil {
+		k6ext.Panic(l.ctx, "parse: %w", err)
+	}
+	if err := l.waitFor(popts); err != nil {
+		k6ext.Panic(l.ctx, "waitFor: %w", err)
+	}
+}
+
+func (l *Locator) waitFor(opts *FrameWaitForSelectorOptions) error {
+	opts.Strict = true
+	_, err := l.frame.waitForSelector(l.selector, opts)
+	return err
+}

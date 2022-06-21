@@ -433,3 +433,24 @@ func TestLocatorDispatchEvent(t *testing.T) {
 		require.Panics(t, func() { p.Locator("a", nil).DispatchEvent("click", tb.toGojaValue("mouseevent"), nil) })
 	})
 }
+
+//nolint:tparallel
+func TestLocatorWaitFor(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+
+	timeout := tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})
+
+	t.Run("exists", func(t *testing.T) {
+		require.NotPanics(t, func() { p.Locator("#link", nil).WaitFor(timeout) })
+	})
+	t.Run("not_exists", func(t *testing.T) {
+		require.Panics(t, func() { p.Locator("#notexists", nil).WaitFor(timeout) })
+	})
+	t.Run("strict", func(t *testing.T) {
+		require.Panics(t, func() { p.Locator("a", nil).WaitFor(timeout) })
+	})
+}
