@@ -5,6 +5,8 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 
+	"github.com/dop251/goja"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,14 +25,8 @@ func TestLocatorClick(t *testing.T) {
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
 	// Selecting a single element and clicking on it is OK.
-	t.Run("ok", func(t *testing.T) {
-		p.Locator("#link", nil).Click(nil)
-		require.True(t, tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.result`))), "could not click the link")
-	})
-	// The strict mode should disallow selecting multiple elements.
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() { p.Locator("a", nil).Click(nil) })
-	})
+	p.Locator("#link", nil).Click(nil)
+	require.True(t, tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.result`))), "could not click the link")
 }
 
 func TestLocatorDblclick(t *testing.T) {
@@ -40,15 +36,11 @@ func TestLocatorDblclick(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok", func(t *testing.T) {
-		p.Locator("#link", nil).Dblclick(nil)
-		require.True(t, tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.dblclick`))), "could not double click the link")
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() { p.Locator("a", nil).Dblclick(nil) })
-	})
+	p.Locator("#link", nil).Dblclick(nil)
+	require.True(t, tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.dblclick`))), "could not double click the link")
 }
 
+//nolint:tparallel
 func TestLocatorCheck(t *testing.T) {
 	t.Parallel()
 
@@ -79,14 +71,9 @@ func TestLocatorCheck(t *testing.T) {
 		l.Uncheck(nil)
 		require.False(t, l.IsChecked(nil))
 	})
-	t.Run("strict", func(t *testing.T) {
-		l := p.Locator("input", nil)
-		require.Panics(t, func() { l.Check(nil) }, "should not select multiple elements")
-		require.Panics(t, func() { l.Uncheck(nil) }, "should not select multiple elements")
-		require.Panics(t, func() { l.IsChecked(nil) }, "should not select multiple elements")
-	})
 }
 
+//nolint:tparallel
 func TestLocatorElementState(t *testing.T) {
 	t.Parallel()
 
@@ -134,18 +121,6 @@ func TestLocatorElementState(t *testing.T) {
 			require.False(t, tt.query(l))
 		})
 	}
-
-	tb := newTestBrowser(t, withFileServer())
-	p := tb.NewPage(nil)
-	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
-
-	for _, tt := range tests {
-		t.Run("strict/"+tt.state, func(t *testing.T) {
-			require.Panics(t, func() {
-				tt.query(p.Locator("input", nil))
-			}, "should not select multiple elements")
-		})
-	}
 }
 
 func TestLocatorFill(t *testing.T) {
@@ -157,15 +132,8 @@ func TestLocatorFill(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok", func(t *testing.T) {
-		p.Locator("#inputText", nil).Fill(value, nil)
-		require.Equal(t, value, p.InputValue("#inputText", nil))
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() {
-			p.Locator("input", nil).Fill(value, nil)
-		}, "should not select multiple elements")
-	})
+	p.Locator("#inputText", nil).Fill(value, nil)
+	require.Equal(t, value, p.InputValue("#inputText", nil))
 }
 
 func TestLocatorFocus(t *testing.T) {
@@ -175,26 +143,18 @@ func TestLocatorFocus(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok", func(t *testing.T) {
-		focused := func() bool {
-			return tb.asGojaBool(p.Evaluate(tb.toGojaValue(
-				`() => document.activeElement == document.getElementById('inputText')`,
-			)))
-		}
-		l := p.Locator("#inputText", nil)
-		require.False(t, focused(), "should not be focused first")
+	focused := func() bool {
+		return tb.asGojaBool(p.Evaluate(tb.toGojaValue(
+			`() => document.activeElement == document.getElementById('inputText')`,
+		)))
+	}
+	l := p.Locator("#inputText", nil)
+	require.False(t, focused(), "should not be focused first")
 
-		l.Focus(nil)
-		require.True(t, focused(), "should be focused")
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() {
-			p.Locator("input", nil).Focus(nil)
-		}, "should not select multiple elements")
-	})
+	l.Focus(nil)
+	require.True(t, focused(), "should be focused")
 }
 
-//nolint:tparallel
 func TestLocatorGetAttribute(t *testing.T) {
 	t.Parallel()
 
@@ -202,20 +162,12 @@ func TestLocatorGetAttribute(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok", func(t *testing.T) {
-		l := p.Locator("#inputText", nil)
-		v := l.GetAttribute("value", nil)
-		require.NotNil(t, v)
-		require.Equal(t, "something", v.ToString().String())
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() {
-			p.Locator("input", nil).GetAttribute("value", nil)
-		}, "should not select multiple elements")
-	})
+	l := p.Locator("#inputText", nil)
+	v := l.GetAttribute("value", nil)
+	require.NotNil(t, v)
+	require.Equal(t, "something", v.ToString().String())
 }
 
-//nolint:tparallel
 func TestLocatorInnerHTML(t *testing.T) {
 	t.Parallel()
 
@@ -223,17 +175,9 @@ func TestLocatorInnerHTML(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok", func(t *testing.T) {
-		require.Equal(t, `<span>hello</span>`, p.Locator("#divHello", nil).InnerHTML(nil))
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() {
-			p.Locator("div", nil).InnerHTML(nil)
-		}, "should not select multiple elements")
-	})
+	require.Equal(t, `<span>hello</span>`, p.Locator("#divHello", nil).InnerHTML(nil))
 }
 
-//nolint:tparallel
 func TestLocatorInnerText(t *testing.T) {
 	t.Parallel()
 
@@ -241,17 +185,9 @@ func TestLocatorInnerText(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok", func(t *testing.T) {
-		require.Equal(t, `hello`, p.Locator("#divHello > span", nil).InnerText(nil))
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() {
-			p.Locator("div", nil).InnerText(nil)
-		}, "should not select multiple elements")
-	})
+	require.Equal(t, `hello`, p.Locator("#divHello > span", nil).InnerText(nil))
 }
 
-//nolint:tparallel
 func TestLocatorTextContent(t *testing.T) {
 	t.Parallel()
 
@@ -259,14 +195,7 @@ func TestLocatorTextContent(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok", func(t *testing.T) {
-		require.Equal(t, `hello`, p.Locator("#divHello", nil).TextContent(nil))
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() {
-			p.Locator("div", nil).TextContent(nil)
-		}, "should not select multiple elements")
-	})
+	require.Equal(t, `hello`, p.Locator("#divHello", nil).TextContent(nil))
 }
 
 //nolint:tparallel
@@ -277,23 +206,17 @@ func TestLocatorInputValue(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok/input", func(t *testing.T) {
+	t.Run("input", func(t *testing.T) {
 		require.Equal(t, "something", p.Locator("#inputText", nil).InputValue(nil))
 	})
-	t.Run("ok/textarea", func(t *testing.T) {
+	t.Run("textarea", func(t *testing.T) {
 		require.Equal(t, "text area", p.Locator("textarea", nil).InputValue(nil))
 	})
-	t.Run("ok/select", func(t *testing.T) {
+	t.Run("select", func(t *testing.T) {
 		require.Equal(t, "option text", p.Locator("#selectElement", nil).InputValue(nil))
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() {
-			p.Locator("input", nil).InputValue(nil)
-		}, "should not select multiple elements")
 	})
 }
 
-//nolint:tparallel
 func TestLocatorSelectOption(t *testing.T) {
 	t.Parallel()
 
@@ -301,19 +224,11 @@ func TestLocatorSelectOption(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok", func(t *testing.T) {
-		rv := p.Locator("#selectElement", nil).SelectOption(tb.toGojaValue(`option text 2`), nil)
-		require.Len(t, rv, 1)
-		require.Equal(t, "option text 2", rv[0])
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() {
-			p.Locator("select", nil).SelectOption(tb.toGojaValue(""), nil)
-		}, "should not select multiple elements")
-	})
+	rv := p.Locator("#selectElement", nil).SelectOption(tb.toGojaValue(`option text 2`), nil)
+	require.Len(t, rv, 1)
+	require.Equal(t, "option text 2", rv[0])
 }
 
-//nolint:tparallel
 func TestLocatorPress(t *testing.T) {
 	t.Parallel()
 
@@ -321,18 +236,10 @@ func TestLocatorPress(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok", func(t *testing.T) {
-		p.Locator("#inputText", nil).Press("x", nil)
-		require.Equal(t, "xsomething", p.InputValue("#inputText", nil))
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() {
-			p.Locator("select", nil).Press("a", nil)
-		}, "should not select multiple elements")
-	})
+	p.Locator("#inputText", nil).Press("x", nil)
+	require.Equal(t, "xsomething", p.InputValue("#inputText", nil))
 }
 
-//nolint:tparallel
 func TestLocatorType(t *testing.T) {
 	t.Parallel()
 
@@ -340,18 +247,10 @@ func TestLocatorType(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok", func(t *testing.T) {
-		p.Locator("#inputText", nil).Type("real ", nil)
-		require.Equal(t, "real something", p.InputValue("#inputText", nil))
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() {
-			p.Locator("select", nil).Type("a", nil)
-		}, "should not select multiple elements")
-	})
+	p.Locator("#inputText", nil).Type("real ", nil)
+	require.Equal(t, "real something", p.InputValue("#inputText", nil))
 }
 
-//nolint:tparallel
 func TestLocatorHover(t *testing.T) {
 	t.Parallel()
 
@@ -359,22 +258,14 @@ func TestLocatorHover(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok", func(t *testing.T) {
-		result := func() bool {
-			return tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.result`)))
-		}
-		require.False(t, result(), "should not be hovered first")
-		p.Locator("#inputText", nil).Hover(nil)
-		require.True(t, result(), "should be hovered")
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() {
-			p.Locator("input", nil).Hover(nil)
-		}, "should not select multiple elements")
-	})
+	result := func() bool {
+		return tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.result`)))
+	}
+	require.False(t, result(), "should not be hovered first")
+	p.Locator("#inputText", nil).Hover(nil)
+	require.True(t, result(), "should be hovered")
 }
 
-//nolint:tparallel
 func TestLocatorTap(t *testing.T) {
 	t.Parallel()
 
@@ -382,22 +273,14 @@ func TestLocatorTap(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok", func(t *testing.T) {
-		result := func() bool {
-			return tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.result`)))
-		}
-		require.False(t, result(), "should not be tapped first")
-		p.Locator("#inputText", nil).Tap(nil)
-		require.True(t, result(), "should be tapped")
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() {
-			p.Locator("input", nil).Tap(nil)
-		}, "should not select multiple elements")
-	})
+	result := func() bool {
+		return tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.result`)))
+	}
+	require.False(t, result(), "should not be tapped first")
+	p.Locator("#inputText", nil).Tap(nil)
+	require.True(t, result(), "should be tapped")
 }
 
-//nolint:tparallel
 func TestLocatorDispatchEvent(t *testing.T) {
 	t.Parallel()
 
@@ -405,17 +288,12 @@ func TestLocatorDispatchEvent(t *testing.T) {
 	p := tb.NewPage(nil)
 	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
 
-	t.Run("ok", func(t *testing.T) {
-		result := func() bool {
-			return tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.result`)))
-		}
-		require.False(t, result(), "should not be clicked first")
-		p.Locator("#link", nil).DispatchEvent("click", tb.toGojaValue("mouseevent"), nil)
-		require.True(t, result(), "could not dispatch event")
-	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() { p.Locator("a", nil).DispatchEvent("click", tb.toGojaValue("mouseevent"), nil) })
-	})
+	result := func() bool {
+		return tb.asGojaBool(p.Evaluate(tb.toGojaValue(`() => window.result`)))
+	}
+	require.False(t, result(), "should not be clicked first")
+	p.Locator("#link", nil).DispatchEvent("click", tb.toGojaValue("mouseevent"), nil)
+	require.True(t, result(), "could not dispatch event")
 }
 
 //nolint:tparallel
@@ -434,7 +312,111 @@ func TestLocatorWaitFor(t *testing.T) {
 	t.Run("not_exists", func(t *testing.T) {
 		require.Panics(t, func() { p.Locator("#notexists", nil).WaitFor(timeout) })
 	})
-	t.Run("strict", func(t *testing.T) {
-		require.Panics(t, func() { p.Locator("a", nil).WaitFor(timeout) })
-	})
+}
+
+func TestLocatorSanity(t *testing.T) {
+	t.Parallel()
+
+	timeout := func(tb *testBrowser) goja.Value {
+		return tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})
+	}
+
+	tests := []struct {
+		name string
+		do   func(api.Locator, *testBrowser)
+	}{
+		{
+			"WaitFor", func(l api.Locator, tb *testBrowser) { l.WaitFor(timeout(tb)) },
+		},
+		{
+			"DispatchEvent", func(l api.Locator, tb *testBrowser) {
+				l.DispatchEvent("click", tb.toGojaValue("mouseevent"), timeout(tb))
+			},
+		},
+		{
+			"Tap", func(l api.Locator, tb *testBrowser) { l.Tap(timeout(tb)) },
+		},
+		{
+			"Hover", func(l api.Locator, tb *testBrowser) { l.Hover(timeout(tb)) },
+		},
+		{
+			"Type", func(l api.Locator, tb *testBrowser) { l.Type("a", timeout(tb)) },
+		},
+		{
+			"Press", func(l api.Locator, tb *testBrowser) { l.Press("a", timeout(tb)) },
+		},
+		{
+			"SelectOption", func(l api.Locator, tb *testBrowser) { l.SelectOption(tb.toGojaValue(""), timeout(tb)) },
+		},
+		{
+			"GetAttribute", func(l api.Locator, tb *testBrowser) { l.GetAttribute("value", timeout(tb)) },
+		},
+		{
+			"InnerHTML", func(l api.Locator, tb *testBrowser) { l.InnerHTML(timeout(tb)) },
+		},
+		{
+			"InnerText", func(l api.Locator, tb *testBrowser) { l.InnerText(timeout(tb)) },
+		},
+		{
+			"TextContent", func(l api.Locator, tb *testBrowser) { l.TextContent(timeout(tb)) },
+		},
+		{
+			"InputValue", func(l api.Locator, tb *testBrowser) { l.InputValue(timeout(tb)) },
+		},
+		{
+			"Focus", func(l api.Locator, tb *testBrowser) { l.Focus(timeout(tb)) },
+		},
+		{
+			"Fill", func(l api.Locator, tb *testBrowser) { l.Fill("fill me up", timeout(tb)) },
+		},
+		{
+			"Check", func(l api.Locator, tb *testBrowser) { l.Check(timeout(tb)) },
+		},
+		{
+			"Uncheck", func(l api.Locator, tb *testBrowser) { l.Uncheck(timeout(tb)) },
+		},
+		{
+			"IsChecked", func(l api.Locator, tb *testBrowser) { l.IsChecked(timeout(tb)) },
+		},
+		{
+			"Dblclick", func(l api.Locator, tb *testBrowser) { l.Dblclick(timeout(tb)) },
+		},
+		{
+			"Click", func(l api.Locator, tb *testBrowser) { l.Click(timeout(tb)) },
+		},
+		{
+			"IsEditable", func(l api.Locator, tb *testBrowser) { l.IsEditable(timeout(tb)) },
+		},
+		{
+			"IsEnabled", func(l api.Locator, tb *testBrowser) { l.IsEnabled(timeout(tb)) },
+		},
+		{
+			"IsDisabled", func(l api.Locator, tb *testBrowser) { l.IsDisabled(timeout(tb)) },
+		},
+		{
+			"IsVisible", func(l api.Locator, tb *testBrowser) { l.IsVisible(timeout(tb)) },
+		},
+		{
+			"IsHidden", func(l api.Locator, tb *testBrowser) { l.IsHidden(timeout(tb)) },
+		},
+	}
+	for _, tt := range tests {
+		t.Run("timeout/"+tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t)
+			p := tb.NewPage(nil)
+			p.SetContent("<html></html>", nil)
+			assert.Panics(t, func() { tt.do(p.Locator("NOTEXIST", nil), tb) })
+		})
+	}
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+	for _, tt := range tests {
+		t.Run("strict/"+tt.name, func(t *testing.T) {
+			assert.Panics(t, func() { tt.do(p.Locator("a", nil), tb) })
+		})
+	}
 }
