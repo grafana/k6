@@ -224,9 +224,7 @@ func TestPageInnerHTML(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		p.SetContent(sampleHTML, nil)
-		assert.Equal(t, "", p.InnerHTML("p", tb.toGojaValue(jsFrameBaseOpts{
-			Timeout: "100",
-		})))
+		require.Panics(t, func() { p.InnerHTML("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})) })
 	})
 }
 
@@ -259,9 +257,7 @@ func TestPageInnerText(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		p.SetContent(sampleHTML, nil)
-		assert.Equal(t, "", p.InnerText("p", tb.toGojaValue(jsFrameBaseOpts{
-			Timeout: "100",
-		})))
+		require.Panics(t, func() { p.InnerText("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})) })
 	})
 }
 
@@ -294,9 +290,7 @@ func TestPageTextContent(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		p.SetContent(sampleHTML, nil)
-		assert.Equal(t, "", p.TextContent("p", tb.toGojaValue(jsFrameBaseOpts{
-			Timeout: "100",
-		})))
+		require.Panics(t, func() { p.TextContent("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})) })
 	})
 }
 
