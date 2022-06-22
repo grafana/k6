@@ -23,6 +23,7 @@ package common
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -121,7 +122,8 @@ func callApiWithTimeout(ctx context.Context, fn func(context.Context, chan inter
 
 	select {
 	case <-apiCtx.Done():
-		if apiCtx.Err() == context.Canceled {
+		err = apiCtx.Err()
+		if errors.Is(err, context.DeadlineExceeded) {
 			err = ErrTimedOut
 		}
 	case result = <-resultCh:
