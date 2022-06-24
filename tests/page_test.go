@@ -115,13 +115,13 @@ func TestPageEvaluate(t *testing.T) {
 			{
 				"promise",
 				`async () => { return await new Promise((res, rej) => { rej('rejected'); }); }`,
-				`exception "Uncaught (in promise)" (0:0): rejected`,
+				"evaluating JS: rejected",
 			},
 			{
 				"syntax", `() => {`,
-				`exception "Uncaught" (2:0): SyntaxError: Unexpected token ')'`,
+				"evaluating JS: SyntaxError: Unexpected token ')'",
 			},
-			{"undef", "undef", `ReferenceError: undef is not defined`},
+			{"undef", "undef", "evaluating JS: ReferenceError: undef is not defined"},
 		}
 
 		for _, tc := range testCases {
