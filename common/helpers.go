@@ -189,7 +189,7 @@ func waitForEvent(ctx context.Context, emitter EventEmitter, events []string, pr
 	select {
 	case <-ctx.Done():
 	case <-time.After(timeout):
-		return nil, ErrTimedOut
+		return nil, fmt.Errorf("%w after %s", ErrTimedOut, timeout)
 	case evData := <-ch:
 		return evData, nil
 	}
