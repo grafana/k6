@@ -1034,7 +1034,7 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 	}
 	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector)
 	if err != nil {
-		k6ext.Panic(h.ctx, "cannot query element for selector (%q): %w", selector, err)
+		k6ext.Panic(h.ctx, "querying selector %q: %w", selector, err)
 	}
 	if result == nil {
 		return nil
