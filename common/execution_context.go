@@ -221,14 +221,12 @@ func (e *ExecutionContext) eval(
 		err              error
 	)
 	if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
-		return nil, fmt.Errorf("cannot call function on expression (%q) "+
-			"in execution context (%d) in frame (%v) with session (%v): %w",
-			js, e.id, e.Frame().ID(), e.session.ID(), err)
+		return nil, fmt.Errorf("evaluating JS expression "+
+			"in frame with URL %q: %w", e.Frame().URL(), err)
 	}
 	if exceptionDetails != nil {
-		return nil, fmt.Errorf("cannot call function on expression (%q) "+
-			"in execution context (%d) in frame (%v) with session (%v): %s",
-			js, e.id, e.Frame().ID(), e.session.ID(),
+		return nil, fmt.Errorf("evaluating JS expression "+
+			"in frame with URL %q: %s", e.Frame().URL(),
 			parseExceptionDetails(exceptionDetails))
 	}
 	var res interface{}
