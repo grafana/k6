@@ -1797,11 +1797,11 @@ func (f *Frame) WaitForNavigation(opts goja.Value) api.Response {
 func (f *Frame) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
 	parsedOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(f.ctx, "parsing waitForSelector %q options: %w", selector, err)
 	}
 	handle, err := f.waitForSelectorRetry(selector, parsedOpts, maxRetry)
 	if err != nil {
-		k6ext.Panic(f.ctx, "error waiting for selector: %w", err)
+		k6ext.Panic(f.ctx, "waitForSelector %q: %w", selector, err)
 	}
 	return handle
 }
