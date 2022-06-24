@@ -1331,7 +1331,7 @@ func (h *ElementHandle) eval(
 	args = append([]interface{}{h}, args...)
 	result, err := h.execCtx.eval(ctx, opts, js, args...)
 	if err != nil {
-		err = fmt.Errorf("element handle cannot evaluate: %w", err)
+		return nil, err
 	}
 	return result, err
 }
