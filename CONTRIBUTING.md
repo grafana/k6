@@ -62,7 +62,7 @@ make ci-like-lint
 To exercise the entire test suite, please run the following command
 
 ```bash
-make test
+make tests
 ```
 
 #### Dependencies
