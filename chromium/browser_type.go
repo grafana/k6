@@ -387,11 +387,14 @@ func execute(
 		}()
 
 		if err := cmd.Wait(); err != nil {
-			logger.Errorf("BrowserType:execute", "cmd.Wait: %v", err)
-		}
-
-		if err := stdout.Close(); err != nil {
-			logger.Errorf("BrowserType:execute", "stdout.Close: %v", err)
+			log := logger.Errorf
+			if err.Error() == "signal: killed" || err.Error() == "exit status 1" {
+				// The browser process is killed when the context is cancelled
+				// after a k6 iteration ends, so silence the log message until
+				// we can stop it gracefully. See #https://github.com/grafana/xk6-browser/issues/423
+				log = logger.Debugf
+			}
+			log("BrowserType:execute", "browser process with PID %d ended unexpectedly: %v", cmd.Process.Pid, err)
 		}
 	}()
 
