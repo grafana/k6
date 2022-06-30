@@ -385,11 +385,11 @@ func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
 		return nil, fmt.Errorf("cannot evaluate in main execution context: %w", err)
 	}
 	if result == nil {
-		return nil, errors.New("evaluate result is nil in main execution context")
+		return nil, fmt.Errorf("document element handle is nil")
 	}
 	dh, ok := result.(*ElementHandle)
 	if !ok {
-		return nil, fmt.Errorf("invalid document handle")
+		return nil, fmt.Errorf("invalid document handle type: %T", result)
 	}
 
 	return dh, nil
@@ -1853,7 +1853,7 @@ func (f *Frame) evaluate(
 	}
 	eh, err := ec.eval(apiCtx, opts, pageFunc.ToString().String(), evalArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("frame cannot evaluate: %w", err)
+		return nil, fmt.Errorf("%w", err)
 	}
 
 	return eh, nil
