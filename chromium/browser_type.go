@@ -241,7 +241,7 @@ func parseArgs(flags map[string]interface{}) ([]string, error) {
 				args = append(args, fmt.Sprintf("--%s", name))
 			}
 		default:
-			return nil, errors.New("invalid browser command line flag")
+			return nil, fmt.Errorf(`invalid browser command line flag: "%s=%s"`, name, value)
 		}
 	}
 	if _, ok := flags["no-sandbox"]; !ok && os.Getuid() == 0 {
@@ -358,7 +358,7 @@ func execute(
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot pipe stdout: %w", err)
+		return nil, nil, fmt.Errorf("%w", err)
 	}
 	cmd.Stderr = cmd.Stdout
 
@@ -371,15 +371,16 @@ func execute(
 	// can run into a data race.
 	err = cmd.Start()
 	if os.IsNotExist(err) {
-		return nil, nil, fmt.Errorf("does not exist: %s", path)
+		return nil, nil, fmt.Errorf("file does not exist: %s", path)
 	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("%w", err)
 	}
 	if ctx.Err() != nil {
-		return nil, nil, fmt.Errorf("context err: %w", ctx.Err())
+		return nil, nil, fmt.Errorf("%w", ctx.Err())
 	}
 	go func() {
+		// TODO: How to handle these errors?
 		defer func() {
 			if err := dataDir.Cleanup(); err != nil {
 				logger.Errorf("BrowserType:execute", "%v", err)
@@ -422,14 +423,14 @@ func parseWebsocketURL(ctx context.Context, rc io.Reader) (wsURL string, _ error
 			}
 		}
 		if err := scanner.Err(); err != nil {
-			c <- result{"", fmt.Errorf("scanner err: %w", err)}
+			c <- result{"", err}
 		}
 	}()
 	select {
 	case r := <-c:
 		return r.wsURL, r.err
 	case <-ctx.Done():
-		return "", fmt.Errorf("ctx err: %w", ctx.Err())
+		return "", fmt.Errorf("%w", ctx.Err())
 	}
 }
 
