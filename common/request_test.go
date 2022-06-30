@@ -68,7 +68,7 @@ func TestRequest(t *testing.T) {
 		}
 		vu := k6test.NewVU(t)
 		req, err := NewRequest(vu.Context(), evt, nil, nil, "intercept", false)
-		require.EqualError(t, err, `parsing URL ":": parse ":": missing protocol scheme`)
+		require.EqualError(t, err, `parsing URL ":": missing protocol scheme`)
 		require.Nil(t, req)
 	})
 

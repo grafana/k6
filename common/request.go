@@ -22,6 +22,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -76,6 +77,10 @@ func NewRequest(
 
 	u, err := url.Parse(event.Request.URL)
 	if err != nil {
+		var uerr *url.Error
+		if errors.As(err, &uerr) {
+			err = uerr.Err
+		}
 		return nil, fmt.Errorf("parsing URL %q: %w", event.Request.URL, err)
 	}
 
