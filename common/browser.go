@@ -129,7 +129,7 @@ func (b *Browser) connect() error {
 	b.logger.Debugf("Browser:connect", "wsURL:%q", b.browserProc.WsURL())
 	conn, err := NewConnection(b.ctx, b.browserProc.WsURL(), b.logger)
 	if err != nil {
-		return fmt.Errorf("unable to connect to browser WS URL: %w", err)
+		return fmt.Errorf("connecting to browser WS URL: %w", err)
 	}
 
 	b.conn = conn
@@ -145,7 +145,7 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 
 	action := target.DisposeBrowserContext(id)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		return fmt.Errorf("unable to dispose browser context %T: %w", action, err)
+		return fmt.Errorf("disposing browser context ID %s: %w", id, err)
 	}
 
 	b.contextsMu.Lock()
@@ -205,7 +205,7 @@ func (b *Browser) initEvents() error {
 
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		return fmt.Errorf("unable to execute %T: %w", action, err)
+		return fmt.Errorf("executing setAutoAttach: %w", err)
 	}
 
 	// Target.setAutoAttach has a bug where it does not wait for new Targets being attached.
@@ -213,7 +213,7 @@ func (b *Browser) initEvents() error {
 	// This can be removed after https://chromium-review.googlesource.com/c/chromium/src/+/2885888 lands in stable.
 	action2 := target.GetTargetInfo()
 	if _, err := action2.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		return fmt.Errorf("unable to execute %T: %w", action, err)
+		return fmt.Errorf("executing getTargetInfo: %w", err)
 	}
 
 	return nil
@@ -420,7 +420,7 @@ func (b *Browser) Close() {
 	action := cdpbrowser.Close()
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
 		if _, ok := err.(*websocket.CloseError); !ok {
-			k6ext.Panic(b.ctx, "unable to execute %T: %v", action, err)
+			k6ext.Panic(b.ctx, "executing browser close: %v", err)
 		}
 	}
 
@@ -513,7 +513,7 @@ func (b *Browser) UserAgent() string {
 	action := cdpbrowser.GetVersion()
 	_, _, _, ua, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	if err != nil {
-		k6ext.Panic(b.ctx, "unable to get browser user agent: %w", err)
+		k6ext.Panic(b.ctx, "getting browser user agent: %w", err)
 	}
 	return ua
 }
@@ -523,7 +523,7 @@ func (b *Browser) Version() string {
 	action := cdpbrowser.GetVersion()
 	_, product, _, _, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	if err != nil {
-		k6ext.Panic(b.ctx, "unable to get browser version: %w", err)
+		k6ext.Panic(b.ctx, "getting browser version: %w", err)
 	}
 	i := strings.Index(product, "/")
 	if i == -1 {

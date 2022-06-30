@@ -211,7 +211,7 @@ func (p *Page) getFrameElement(f *Frame) (handle *ElementHandle, _ error) {
 		if strings.Contains(err.Error(), "frame with the given id was not found") {
 			return nil, errors.New("frame has been detached")
 		}
-		return nil, fmt.Errorf("unable to get frame owner: %w", err)
+		return nil, fmt.Errorf("getting frame owner: %w", err)
 	}
 
 	parent = f.parentFrame
@@ -384,7 +384,7 @@ func (p *Page) BringToFront() {
 
 	action := cdppage.BringToFront()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6ext.Panic(p.ctx, "unable to bring page to front: %w", err)
+		k6ext.Panic(p.ctx, "bringing page to front: %w", err)
 	}
 }
 
@@ -493,7 +493,7 @@ func (p *Page) EmulateVisionDeficiency(typ string) {
 
 	action := emulation.SetEmulatedVisionDeficiency(t)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6ext.Panic(p.ctx, "unable to set emulated vision deficiency '%s': %w", typ, err)
+		k6ext.Panic(p.ctx, "setting emulated vision deficiency %q: %w", typ, err)
 	}
 
 	applySlowMo(p.ctx)
@@ -698,7 +698,7 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 
 	action := cdppage.Reload()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6ext.Panic(p.ctx, "unable to reload page: %w", err)
+		k6ext.Panic(p.ctx, "reloading page: %w", err)
 	}
 
 	var event *NavigationEvent

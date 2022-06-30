@@ -330,7 +330,7 @@ func (m *NetworkManager) initDomains() error {
 	}
 	for _, action := range actions {
 		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-			return fmt.Errorf("unable to execute %T: %w", action, err)
+			return fmt.Errorf("executing %T: %w", action, err)
 		}
 	}
 
@@ -621,7 +621,11 @@ func (m *NetworkManager) setRequestInterception(value bool) error {
 func (m *NetworkManager) updateProtocolCacheDisabled() error {
 	action := network.SetCacheDisabled(m.userCacheDisabled)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		return fmt.Errorf("unable to toggle cache on/off: %w", err)
+		errAction := "enabling"
+		if m.userCacheDisabled {
+			errAction = "disabling"
+		}
+		return fmt.Errorf("%s network cache: %w", errAction, err)
 	}
 	return nil
 }
@@ -680,7 +684,7 @@ func (m *NetworkManager) ExtraHTTPHeaders() goja.Value {
 func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) {
 	action := network.SetExtraHTTPHeaders(headers)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6ext.Panic(m.ctx, "unable to set extra HTTP headers: %w", err)
+		k6ext.Panic(m.ctx, "setting extra HTTP headers: %w", err)
 	}
 }
 
@@ -693,7 +697,7 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 
 	action := network.EmulateNetworkConditions(m.offline, 0, -1, -1)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6ext.Panic(m.ctx, "unable to set offline mode: %w", err)
+		k6ext.Panic(m.ctx, "setting offline mode: %w", err)
 	}
 }
 
@@ -701,7 +705,7 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 func (m *NetworkManager) SetUserAgent(userAgent string) {
 	action := emulation.SetUserAgentOverride(userAgent)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6ext.Panic(m.ctx, "unable to set user agent override: %w", err)
+		k6ext.Panic(m.ctx, "setting user agent: %w", err)
 	}
 }
 
@@ -709,6 +713,6 @@ func (m *NetworkManager) SetUserAgent(userAgent string) {
 func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 	m.userCacheDisabled = !enabled
 	if err := m.updateProtocolCacheDisabled(); err != nil {
-		k6ext.Panic(m.ctx, "toggling cache: %w", err)
+		k6ext.Panic(m.ctx, "%v", err)
 	}
 }

@@ -134,7 +134,7 @@ func (b *BrowserContext) ClearCookies() {
 
 	action := storage.ClearCookies().WithBrowserContextID(b.id)
 	if err := action.Do(b.ctx); err != nil {
-		k6ext.Panic(b.ctx, "unable to clear cookies permissions: %w", err)
+		k6ext.Panic(b.ctx, "clearing cookies: %w", err)
 	}
 }
 
@@ -144,7 +144,7 @@ func (b *BrowserContext) ClearPermissions() {
 
 	action := cdpbrowser.ResetPermissions().WithBrowserContextID(b.id)
 	if err := action.Do(b.ctx); err != nil {
-		k6ext.Panic(b.ctx, "unable to clear override permissions: %w", err)
+		k6ext.Panic(b.ctx, "clearing permissions: %w", err)
 	}
 }
 

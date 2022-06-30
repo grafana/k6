@@ -52,7 +52,7 @@ type BigIntParseError struct {
 
 // Error satisfies the builtin error interface.
 func (e BigIntParseError) Error() string {
-	return fmt.Sprintf("unable to parse bigint: %v", e.err)
+	return fmt.Sprintf("parsing bigint: %v", e.err)
 }
 
 // Is satisfies the builtin error Is interface.
