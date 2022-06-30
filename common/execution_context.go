@@ -33,6 +33,7 @@ import (
 
 	k6modules "go.k6.io/k6/js/modules"
 
+	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/runtime"
@@ -221,6 +222,10 @@ func (e *ExecutionContext) eval(
 		err              error
 	)
 	if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
+		var cdpe *cdproto.Error
+		if errors.As(err, &cdpe) && cdpe.Code == -32000 {
+			err = fmt.Errorf("execution context with ID %d not found", e.id)
+		}
 		return nil, err
 	}
 	if exceptionDetails != nil {
