@@ -300,7 +300,7 @@ func (o *FrameGotoOptions) Parse(ctx context.Context, opts goja.Value) error {
 			case "waitUntil":
 				lifeCycle := opts.Get(k).String()
 				if err := o.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
-					return fmt.Errorf("error parsing goto options: %w", err)
+					return fmt.Errorf("parsing goto options: %w", err)
 				}
 			}
 		}
@@ -505,7 +505,7 @@ func (o *FrameSetContentOptions) Parse(ctx context.Context, opts goja.Value) err
 			case "waitUntil":
 				lifeCycle := opts.Get(k).String()
 				if err := o.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
-					return fmt.Errorf("error parsing setContent options: %w", err)
+					return fmt.Errorf("parsing setContent options: %w", err)
 				}
 			}
 		}
@@ -677,7 +677,7 @@ func (o *FrameWaitForNavigationOptions) Parse(ctx context.Context, opts goja.Val
 			case "waitUntil":
 				lifeCycle := opts.Get(k).String()
 				if err := o.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
-					return fmt.Errorf("error parsing waitForNavigation options: %w", err)
+					return fmt.Errorf("parsing waitForNavigation options: %w", err)
 				}
 			}
 		}

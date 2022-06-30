@@ -91,7 +91,7 @@ func convertArgument(
 
 		b, err := json.Marshal(a)
 		if err != nil {
-			err = fmt.Errorf("error converting argument '%v': %w", arg, err)
+			err = fmt.Errorf("converting argument '%v': %w", arg, err)
 		}
 
 		return &cdpruntime.CallArgument{Value: b}, err

@@ -902,7 +902,7 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 	}
 	result, err := f.evaluate(f.ctx, mainWorld, opts, pageFunc, args...)
 	if err != nil {
-		k6ext.Panic(f.ctx, "error calling evaluate: %w", err)
+		k6ext.Panic(f.ctx, "evaluating JS: %v", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -927,7 +927,7 @@ func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle 
 	}
 	f.executionContextMu.RUnlock()
 	if err != nil {
-		k6ext.Panic(f.ctx, "error evaluating handle: %w", err)
+		k6ext.Panic(f.ctx, "evaluating handle: %w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -992,7 +992,7 @@ func (f *Frame) FrameElement() api.ElementHandle {
 
 	element, err := f.page.getFrameElement(f)
 	if err != nil {
-		k6ext.Panic(f.ctx, "error getting frame element: %w", err)
+		k6ext.Panic(f.ctx, "getting frame element: %w", err)
 	}
 	return element
 }
@@ -1448,7 +1448,7 @@ func (f *Frame) Query(selector string) api.ElementHandle {
 
 	document, err := f.document()
 	if err != nil {
-		k6ext.Panic(f.ctx, "error getting document: %w", err)
+		k6ext.Panic(f.ctx, "getting document: %w", err)
 	}
 	value := document.Query(selector)
 	if value != nil {
@@ -1462,7 +1462,7 @@ func (f *Frame) QueryAll(selector string) []api.ElementHandle {
 
 	document, err := f.document()
 	if err != nil {
-		k6ext.Panic(f.ctx, "error getting document: %w", err)
+		k6ext.Panic(f.ctx, "getting document: %w", err)
 	}
 	value := document.QueryAll(selector)
 	if value != nil {
@@ -1587,7 +1587,7 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 	}
 	rt := f.vu.Runtime()
 	if _, err := f.evaluate(f.ctx, utilityWorld, eopts, rt.ToValue(js), rt.ToValue(html)); err != nil {
-		k6ext.Panic(f.ctx, "error setting content: %w", err)
+		k6ext.Panic(f.ctx, "setting content: %w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1727,7 +1727,7 @@ func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.V
 	parsedOpts := NewFrameWaitForFunctionOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "error parsing waitForFunction options: %w", err)
+		k6ext.Panic(f.ctx, "parsing waitForFunction options: %w", err)
 	}
 
 	f.executionContextMu.RLock()
@@ -1772,7 +1772,7 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 	waitUntil := LifecycleEventLoad
 	if state != "" {
 		if err = waitUntil.UnmarshalText([]byte(state)); err != nil {
-			k6ext.Panic(f.ctx, "waitForLoadState error: %v", err)
+			k6ext.Panic(f.ctx, "waitForLoadState: %v", err)
 		}
 	}
 

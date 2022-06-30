@@ -601,7 +601,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
-			`error parsing waitForFunction options: wrong polling option value:`,
+			`parsing waitForFunction options: wrong polling option value:`,
 			`"blah"; possible values: "raf", "mutation" or number`)
 	})
 

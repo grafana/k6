@@ -41,7 +41,7 @@ func TestFrameGotoOptionsParse(t *testing.T) {
 		err := navOpts.Parse(vu.Context(), opts)
 
 		assert.EqualError(t, err,
-			`error parsing goto options: `+
+			`parsing goto options: `+
 				`invalid lifecycle event: "none"; must be one of: `+
 				`load, domcontentloaded, networkidle`)
 	})
@@ -76,7 +76,7 @@ func TestFrameSetContentOptionsParse(t *testing.T) {
 		err := navOpts.Parse(vu.Context(), opts)
 
 		assert.EqualError(t, err,
-			`error parsing setContent options: `+
+			`parsing setContent options: `+
 				`invalid lifecycle event: "none"; must be one of: `+
 				`load, domcontentloaded, networkidle`)
 	})
@@ -114,7 +114,7 @@ func TestFrameWaitForNavigationOptionsParse(t *testing.T) {
 		err := navOpts.Parse(vu.Context(), opts)
 
 		assert.EqualError(t, err,
-			`error parsing waitForNavigation options: `+
+			`parsing waitForNavigation options: `+
 				`invalid lifecycle event: "none"; must be one of: `+
 				`load, domcontentloaded, networkidle`)
 	})

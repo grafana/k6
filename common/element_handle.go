@@ -1292,7 +1292,7 @@ func (h *ElementHandle) WaitForElementState(state string, opts goja.Value) {
 	}
 	_, err = h.waitForElementState(h.ctx, []string{state}, parsedOpts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "error while waiting for state: %w", err)
+		k6ext.Panic(h.ctx, "waiting for element state %q: %w", state, err)
 	}
 }
 
@@ -1304,7 +1304,7 @@ func (h *ElementHandle) WaitForSelector(selector string, opts goja.Value) api.El
 
 	handle, err := h.waitForSelector(h.ctx, selector, parsedOpts)
 	if err != nil {
-		k6ext.Panic(h.ctx, "error while waiting for selector (%q): %w", selector, err)
+		k6ext.Panic(h.ctx, "waiting for selector %q: %w", selector, err)
 	}
 
 	return handle

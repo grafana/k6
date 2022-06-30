@@ -486,7 +486,7 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 			action := fetch.FailRequest(event.RequestID, network.ErrorReasonBlockedByClient)
 			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 				m.logger.Errorf("NetworkManager:onRequestPaused",
-					"error interrupting request: %s", err)
+					"interrupting request: %s", err)
 			} else {
 				m.logger.Warnf("NetworkManager:onRequestPaused",
 					"request %s %s was interrupted: %s", event.Request.Method, event.Request.URL, failErr)
@@ -496,14 +496,14 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 		action := fetch.ContinueRequest(event.RequestID)
 		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 			m.logger.Errorf("NetworkManager:onRequestPaused",
-				"error continuing request: %s", err)
+				"continuing request: %s", err)
 		}
 	}()
 
 	purl, err := url.Parse(event.Request.URL)
 	if err != nil {
 		m.logger.Errorf("NetworkManager:onRequestPaused",
-			"error parsing URL %q: %s", event.Request.URL, err)
+			"parsing URL %q: %s", event.Request.URL, err)
 		return
 	}
 
@@ -525,7 +525,7 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 	ip, err = m.resolver.LookupIP(host)
 	if err != nil {
 		m.logger.Debugf("NetworkManager:onRequestPaused",
-			"error resolving %q: %s", host, err)
+			"resolving %q: %s", host, err)
 		return
 	}
 	failErr = checkBlockedIPs(ip, state.Options.BlacklistIPs)
@@ -666,7 +666,7 @@ func (m *NetworkManager) Authenticate(credentials *Credentials) {
 		m.userReqInterceptionEnabled = true
 	}
 	if err := m.updateProtocolRequestInterception(); err != nil {
-		k6ext.Panic(m.ctx, "error setting authentication credentials: %w", err)
+		k6ext.Panic(m.ctx, "setting authentication credentials: %w", err)
 	}
 }
 
@@ -709,6 +709,6 @@ func (m *NetworkManager) SetUserAgent(userAgent string) {
 func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 	m.userCacheDisabled = !enabled
 	if err := m.updateProtocolCacheDisabled(); err != nil {
-		k6ext.Panic(m.ctx, "error toggling cache: %w", err)
+		k6ext.Panic(m.ctx, "toggling cache: %w", err)
 	}
 }

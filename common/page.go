@@ -467,7 +467,7 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 
 	for _, fs := range p.frameSessions {
 		if err := fs.updateEmulateMedia(false); err != nil {
-			k6ext.Panic(p.ctx, "error emulating media: %w", err)
+			k6ext.Panic(p.ctx, "emulating media: %w", err)
 		}
 	}
 
@@ -791,10 +791,10 @@ func (p *Page) SetViewportSize(viewportSize goja.Value) {
 
 	s := &Size{}
 	if err := s.Parse(p.ctx, viewportSize); err != nil {
-		k6ext.Panic(p.ctx, "error parsing viewport size: %w", err)
+		k6ext.Panic(p.ctx, "parsing viewport size: %w", err)
 	}
 	if err := p.setViewportSize(s); err != nil {
-		k6ext.Panic(p.ctx, "error setting viewport size: %w", err)
+		k6ext.Panic(p.ctx, "setting viewport size: %w", err)
 	}
 	applySlowMo(p.ctx)
 }
