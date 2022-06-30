@@ -116,3 +116,29 @@ func TestEventLoopReuse(t *testing.T) {
 		require.Greater(t, sleepTime+time.Millisecond*100, took2)
 	}
 }
+
+func TestEventLoopPanicOnDoubleCallback(t *testing.T) {
+	t.Parallel()
+	loop := New(&modulestest.VU{RuntimeField: goja.New()})
+	var ran int
+	f := func() error {
+		ran++
+		r := loop.RegisterCallback()
+		go func() {
+			time.Sleep(time.Second)
+			r(func() error {
+				ran++
+				return nil
+			})
+
+			require.Panics(t, func() { r(func() error { return nil }) })
+		}()
+		return nil
+	}
+	start := time.Now()
+	require.NoError(t, loop.Start(f))
+	took := time.Since(start)
+	require.Equal(t, 2, ran)
+	require.Less(t, time.Second, took)
+	require.Greater(t, time.Second+time.Millisecond*100, took)
+}
