@@ -508,6 +508,10 @@ func (s *Size) Parse(ctx context.Context, viewport goja.Value) error {
 	return nil
 }
 
+func (s Size) String() string {
+	return fmt.Sprintf("%fx%f", s.Width, s.Height)
+}
+
 // Viewport represents a page viewport.
 type Viewport struct {
 	Width  int64 `js:"width"`
@@ -529,6 +533,10 @@ func (v *Viewport) Parse(ctx context.Context, viewport goja.Value) error {
 		}
 	}
 	return nil
+}
+
+func (v Viewport) String() string {
+	return fmt.Sprintf("%dx%d", v.Width, v.Height)
 }
 
 // calculateInset depending on a given operating system and,

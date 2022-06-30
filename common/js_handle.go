@@ -102,7 +102,8 @@ func (h *BaseJSHandle) dispose() error {
 	}
 	act := runtime.ReleaseObject(h.remoteObject.ObjectID)
 	if err := act.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		return fmt.Errorf("cannot release element %T: %w", act, err)
+		return fmt.Errorf("disposing element with ID %s: %w",
+			h.remoteObject.ObjectID, err)
 	}
 
 	return nil
@@ -150,7 +151,8 @@ func (h *BaseJSHandle) getProperties() (map[string]jsHandle, error) {
 	act := runtime.GetProperties(h.remoteObject.ObjectID).WithOwnProperties(true)
 	result, _, _, _, err := act.Do(cdp.WithExecutor(h.ctx, h.session)) //nolint:dogsled
 	if err != nil {
-		return nil, fmt.Errorf("cannot get properties for element %T: %w", act, err)
+		return nil, fmt.Errorf("getting properties for element with ID %s: %w",
+			h.remoteObject.ObjectID, err)
 	}
 
 	props := make(map[string]jsHandle, len(result))

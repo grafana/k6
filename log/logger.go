@@ -179,7 +179,7 @@ func goRoutineID() int {
 	idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
 	id, err := strconv.Atoi(idField)
 	if err != nil {
-		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
+		panic(fmt.Sprintf("getting goroutine ID: %v", err))
 	}
 	return id
 }

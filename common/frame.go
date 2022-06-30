@@ -382,7 +382,7 @@ func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
 		f.vu.Runtime().ToValue("document"),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("cannot evaluate in main execution context: %w", err)
+		return nil, fmt.Errorf("getting document element handle: %w", err)
 	}
 	if result == nil {
 		return nil, fmt.Errorf("document element handle is nil")
@@ -567,7 +567,7 @@ func (f *Frame) waitForFunction(
 
 	execCtx := f.executionContexts[world]
 	if execCtx == nil {
-		return nil, fmt.Errorf("cannot find execution context: %q", world)
+		return nil, fmt.Errorf("execution context %q not found", world)
 	}
 	injected, err := execCtx.getInjectedScript(apiCtx)
 	if err != nil {
@@ -921,7 +921,7 @@ func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle 
 	{
 		ec := f.executionContexts[mainWorld]
 		if ec == nil {
-			k6ext.Panic(f.ctx, "cannot find execution context: %q", mainWorld)
+			k6ext.Panic(f.ctx, "execution context %q not found", mainWorld)
 		}
 		handle, err = ec.EvalHandle(f.ctx, pageFunc, args...)
 	}
@@ -1766,7 +1766,7 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 	parsedOpts := NewFrameWaitForLoadStateOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "cannot parse waitForLoadState options: %v", err)
+		k6ext.Panic(f.ctx, "parsing waitForLoadState %q options: %v", state, err)
 	}
 
 	waitUntil := LifecycleEventLoad
@@ -1784,7 +1784,7 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 		return data.(LifecycleEvent) == waitUntil
 	}, parsedOpts.Timeout)
 	if err != nil {
-		k6ext.Panic(f.ctx, "cannot waitForEvent: %v", err)
+		k6ext.Panic(f.ctx, "waitForLoadState %q: %v", state, err)
 	}
 }
 
@@ -1827,7 +1827,7 @@ func (f *Frame) adoptBackendNodeID(world executionWorld, id cdp.BackendNodeID) (
 
 	ec := f.executionContexts[world]
 	if ec == nil {
-		return nil, fmt.Errorf("cannot find execution context: %q for %d", world, id)
+		return nil, fmt.Errorf("execution context %q not found", world)
 	}
 	return ec.adoptBackendNodeID(id)
 }
@@ -1844,7 +1844,7 @@ func (f *Frame) evaluate(
 
 	ec := f.executionContexts[world]
 	if ec == nil {
-		return nil, fmt.Errorf("cannot find execution context: %q", world)
+		return nil, fmt.Errorf("execution context %q not found", world)
 	}
 
 	evalArgs := make([]interface{}, 0, len(args))

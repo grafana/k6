@@ -76,7 +76,7 @@ func NewRequest(
 
 	u, err := url.Parse(event.Request.URL)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse URL: %w", err)
+		return nil, fmt.Errorf("parsing URL %q: %w", event.Request.URL, err)
 	}
 
 	r := Request{

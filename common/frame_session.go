@@ -638,9 +638,12 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 		"sid:%v tid:%v fid:%v",
 		fs.session.ID(), fs.targetID, frame.ID)
 
-	err := fs.manager.frameNavigated(frame.ID, frame.ParentID, frame.LoaderID.String(), frame.Name, frame.URL+frame.URLFragment, initial)
+	err := fs.manager.frameNavigated(
+		frame.ID, frame.ParentID, frame.LoaderID.String(),
+		frame.Name, frame.URL+frame.URLFragment, initial)
 	if err != nil {
-		k6ext.Panic(fs.ctx, "cannot handle frame navigation: %w", err)
+		k6ext.Panic(fs.ctx, "handling frameNavigated event to %q: %w",
+			frame.URL+frame.URLFragment, err)
 	}
 }
 
@@ -652,7 +655,7 @@ func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequ
 	if event.Disposition == "currentTab" {
 		err := fs.manager.frameRequestedNavigation(event.FrameID, event.URL, "")
 		if err != nil {
-			k6ext.Panic(fs.ctx, "cannot handle frame requested navigation: %w", err)
+			k6ext.Panic(fs.ctx, "handling frameRequestedNavigation event to %q: %w", event.URL, err)
 		}
 	}
 }
@@ -809,7 +812,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 			return // ignore
 		}
 		reason = "fatal"
-		k6ext.Panic(fs.ctx, "cannot attach %v: %w", ti.Type, err)
+		k6ext.Panic(fs.ctx, "attaching %v: %w", ti.Type, err)
 	}
 }
 
@@ -834,7 +837,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 		fs.page, fs, ti.TargetID,
 		fs.logger)
 	if err != nil {
-		return fmt.Errorf("cannot attach iframe target (%v) to session (%v): %w",
+		return fmt.Errorf("attaching iframe target ID %v to session ID %v: %w",
 			ti.TargetID, sid, err)
 	}
 	fs.page.attachFrameSession(cdp.FrameID(ti.TargetID), nfs)
@@ -846,7 +849,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, sid target.SessionID) error {
 	w, err := NewWorker(fs.ctx, fs.page.browserCtx.getSession(sid), ti.TargetID, ti.URL)
 	if err != nil {
-		return fmt.Errorf("cannot attach worker target (%v) to session (%v): %w",
+		return fmt.Errorf("attaching worker target ID %v to session ID %v: %w",
 			ti.TargetID, sid, err)
 	}
 	fs.page.workers[sid] = w

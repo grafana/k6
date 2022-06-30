@@ -156,7 +156,7 @@ func (b *BrowserContext) Close() {
 		k6ext.Panic(b.ctx, "default browser context can't be closed")
 	}
 	if err := b.browser.disposeContext(b.id); err != nil {
-		k6ext.Panic(b.ctx, "cannot dispose browser context: %w", err)
+		k6ext.Panic(b.ctx, "disposing browser context: %w", err)
 	}
 }
 
@@ -285,13 +285,13 @@ func (b *BrowserContext) SetGeolocation(geolocation goja.Value) {
 
 	g := NewGeolocation()
 	if err := g.Parse(b.ctx, geolocation); err != nil {
-		k6ext.Panic(b.ctx, "cannot parse geo location: %v", err)
+		k6ext.Panic(b.ctx, "parsing geo location: %v", err)
 	}
 
 	b.opts.Geolocation = g
 	for _, p := range b.browser.getPages() {
 		if err := p.updateGeolocation(); err != nil {
-			k6ext.Panic(b.ctx, "cannot update geo location in target (%s): %w", p.targetID, err)
+			k6ext.Panic(b.ctx, "updating geo location in target ID %s: %w", p.targetID, err)
 		}
 	}
 }
@@ -309,7 +309,7 @@ func (b *BrowserContext) SetHTTPCredentials(httpCredentials goja.Value) {
 
 	c := NewCredentials()
 	if err := c.Parse(b.ctx, httpCredentials); err != nil {
-		k6ext.Panic(b.ctx, "cannot set HTTP credentials: %w", err)
+		k6ext.Panic(b.ctx, "setting HTTP credentials: %w", err)
 	}
 
 	b.opts.HttpCredentials = c

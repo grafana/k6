@@ -149,7 +149,7 @@ func NewPage(
 
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return nil, fmt.Errorf("cannot execute %T: %w", action, err)
+		return nil, fmt.Errorf("executing CDP action %T: %w", action, err)
 	}
 
 	return &p, nil
@@ -740,7 +740,7 @@ func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	s := newScreenshotter(p.ctx)
 	buf, err := s.screenshotPage(p, parsedOpts)
 	if err != nil {
-		k6ext.Panic(p.ctx, "cannot capture screenshot: %w", err)
+		k6ext.Panic(p.ctx, "capturing screenshot: %w", err)
 	}
 	rt := p.vu.Runtime()
 	return rt.NewArrayBuffer(*buf)

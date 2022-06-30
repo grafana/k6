@@ -127,7 +127,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		launchOpts = common.NewLaunchOptions()
 	)
 	if err := launchOpts.Parse(b.Ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("cannot parse launch options: %w", err))
+		k6common.Throw(rt, fmt.Errorf("parsing launch options: %w", err))
 	}
 	b.Ctx = common.WithLaunchOptions(b.Ctx, launchOpts)
 
@@ -138,14 +138,14 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 
 	logger, err := makeLogger(b.Ctx, launchOpts)
 	if err != nil {
-		k6common.Throw(rt, fmt.Errorf("cannot make logger: %w", err))
+		k6common.Throw(rt, fmt.Errorf("setting up logger: %w", err))
 	}
 
 	flags := prepareFlags(launchOpts, &state.Options)
 
 	dataDir := b.storage
 	if err := dataDir.Make("", flags["user-data-dir"]); err != nil {
-		k6common.Throw(rt, fmt.Errorf("cannot make temp data directory: %w", err))
+		k6common.Throw(rt, fmt.Errorf("making user data directory: %w", err))
 	}
 	flags["user-data-dir"] = dataDir.Dir
 
@@ -165,7 +165,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 
 	browserProc, err := b.allocate(launchOpts, flags, envs, dataDir, logger)
 	if browserProc == nil {
-		k6common.Throw(rt, fmt.Errorf("cannot allocate browser: %w", err))
+		k6ext.Panic(b.Ctx, "launching browser: %s", err)
 	}
 
 	browserProc.AttachLogger(logger)
@@ -207,7 +207,7 @@ func (b *BrowserType) allocate(
 
 	args, err := parseArgs(flags)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse args: %w", err)
+		return nil, err
 	}
 
 	path := opts.ExecutablePath
@@ -217,12 +217,12 @@ func (b *BrowserType) allocate(
 
 	cmd, stdout, err := execute(ctx, path, args, env, dataDir, logger)
 	if err != nil {
-		return nil, fmt.Errorf("cannot start browser: %w", err)
+		return nil, err
 	}
 
 	wsURL, err := parseWebsocketURL(ctx, stdout)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse websocket url: %w", err)
+		return nil, fmt.Errorf("getting DevTools URL: %w", err)
 	}
 
 	return common.NewBrowserProcess(ctx, cancel, cmd.Process, wsURL, dataDir), nil
@@ -448,7 +448,7 @@ func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*log.Log
 	}
 	if el, ok := os.LookupEnv("XK6_BROWSER_LOG"); ok {
 		if err := logger.SetLevel(el); err != nil {
-			return nil, fmt.Errorf("cannot set logger level: %w", err)
+			return nil, fmt.Errorf("setting logger level to %q: %w", el, err)
 		}
 	}
 	if _, ok := os.LookupEnv("XK6_BROWSER_CALLER"); ok {

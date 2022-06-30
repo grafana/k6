@@ -126,7 +126,7 @@ func (e *ExecutionContext) adoptBackendNodeID(backendNodeID cdp.BackendNodeID) (
 		WithExecutionContextID(e.id)
 
 	if remoteObj, err = action.Do(cdp.WithExecutor(e.ctx, e.session)); err != nil {
-		return nil, fmt.Errorf("cannot resolve DOM node: %w", err)
+		return nil, fmt.Errorf("resolving DOM node: %w", err)
 	}
 
 	return NewJSHandle(e.ctx, e.session, e, e.frame, remoteObj, e.logger).AsElement().(*ElementHandle), nil
@@ -151,10 +151,10 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 		efid, esid)
 
 	if eh.execCtx == e {
-		panic("Cannot adopt handle that already belongs to this execution context")
+		panic("cannot adopt handle that already belongs to this execution context")
 	}
 	if e.frame == nil {
-		panic("Cannot adopt handle without frame owner")
+		panic("cannot adopt handle without frame owner")
 	}
 
 	var node *cdp.Node
@@ -162,7 +162,7 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 
 	action := dom.DescribeNode().WithObjectID(eh.remoteObject.ObjectID)
 	if node, err = action.Do(cdp.WithExecutor(e.ctx, e.session)); err != nil {
-		return nil, fmt.Errorf("cannot describe DOM node: %w", err)
+		return nil, fmt.Errorf("describing DOM node: %w", err)
 	}
 
 	return e.adoptBackendNodeID(node.BackendNodeID)
@@ -199,8 +199,8 @@ func (e *ExecutionContext) eval(
 		for _, arg := range args {
 			result, err := convertArgument(apiCtx, e, arg)
 			if err != nil {
-				return nil, fmt.Errorf("cannot convert argument (%q) "+
-					"in execution context (%d) in frame (%v): %w",
+				return nil, fmt.Errorf("converting argument %q "+
+					"in execution context ID %d and frame ID %v: %w",
 					arg, e.id, e.Frame().ID(), err)
 			}
 			arguments = append(arguments, result)
@@ -241,7 +241,7 @@ func (e *ExecutionContext) eval(
 	if opts.returnByValue {
 		res, err = valueFromRemoteObject(apiCtx, remoteObject)
 		if err != nil {
-			return nil, fmt.Errorf("cannot extract value from remote object (%s) "+
+			return nil, fmt.Errorf("extracting value from remote object (%s) "+
 				"using (%s) in execution context (%d) in frame (%v): %w",
 				remoteObject.ObjectID, js, e.id, e.Frame().ID(), err)
 		}
@@ -283,14 +283,14 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 		expressionWithSourceURL,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get injected script: %w", err)
+		return nil, fmt.Errorf("getting injected script: %w", err)
 	}
 	if handle == nil {
-		return nil, errors.New("cannot get injected script: handle is nil")
+		return nil, errors.New("getting injected script: handle is nil")
 	}
 	injectedScript, ok := handle.(api.JSHandle)
 	if !ok {
-		return nil, fmt.Errorf("cannot get injected script: %w", ErrJSHandleInvalid)
+		return nil, fmt.Errorf("getting injected script: %w", ErrJSHandleInvalid)
 	}
 	e.injectedScript = injectedScript
 
