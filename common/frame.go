@@ -1569,7 +1569,7 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 
 	parsedOpts := NewFrameSetContentOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(f.ctx, "parsing setContent options: %w", err)
 	}
 
 	js := `(html) => {

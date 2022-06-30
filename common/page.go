@@ -458,7 +458,7 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 
 	parsedOpts := NewPageEmulateMediaOptions(p.mediaType, p.colorScheme, p.reducedMotion)
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6ext.Panic(p.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(p.ctx, "parsing emulateMedia options: %w", err)
 	}
 
 	p.mediaType = parsedOpts.Media
@@ -688,7 +688,7 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 
 	parsedOpts := NewPageReloadOptions(LifecycleEventLoad, p.defaultTimeout())
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6ext.Panic(p.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(p.ctx, "parsing reload options: %w", err)
 	}
 
 	ch, evCancelFn := createWaitForEventHandler(p.ctx, p.frameManager.MainFrame(), []string{EventFrameNavigation}, func(data interface{}) bool {
@@ -735,7 +735,7 @@ func (p *Page) Route(url goja.Value, handler goja.Callable) {
 func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	parsedOpts := NewPageScreenshotOptions()
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6ext.Panic(p.ctx, "failed parsing screenshot options: %w", err)
+		k6ext.Panic(p.ctx, "parsing screenshot options: %w", err)
 	}
 	s := newScreenshotter(p.ctx)
 	buf, err := s.screenshotPage(p, parsedOpts)

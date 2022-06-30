@@ -214,12 +214,12 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 	format := opts.Format
 	viewportSize, originalViewportSize, err := s.originalViewportSize(h.frame.page)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get original viewport size: %w", err)
+		return nil, fmt.Errorf("getting original viewport size: %w", err)
 	}
 
 	err = h.waitAndScrollIntoViewIfNeeded(h.ctx, false, true, opts.Timeout)
 	if err != nil {
-		return nil, fmt.Errorf("failed to scroll element into view: %w", err)
+		return nil, fmt.Errorf("scrolling element into view: %w", err)
 	}
 
 	bbox, err := h.boundingBox()

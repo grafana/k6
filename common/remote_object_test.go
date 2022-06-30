@@ -230,7 +230,7 @@ func TestParseRemoteObject(t *testing.T) {
 				},
 			},
 			expected: map[string]interface{}{},
-			expErr:   "failed parsing object property",
+			expErr:   "parsing object property",
 		},
 	}
 

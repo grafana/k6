@@ -153,7 +153,7 @@ func (m *Mouse) up(x float64, y float64, opts *MouseDownUpOptions) error {
 func (m *Mouse) Click(x float64, y float64, opts goja.Value) {
 	mouseOpts := NewMouseClickOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(m.ctx, "parsing click options: %w", err)
 	}
 	if err := m.click(x, y, mouseOpts); err != nil {
 		k6ext.Panic(m.ctx, "mouse click: %w", err)
@@ -163,7 +163,7 @@ func (m *Mouse) Click(x float64, y float64, opts goja.Value) {
 func (m *Mouse) DblClick(x float64, y float64, opts goja.Value) {
 	mouseOpts := NewMouseDblClickOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(m.ctx, "parsing dblclick options: %w", err)
 	}
 	if err := m.dblClick(x, y, mouseOpts); err != nil {
 		k6ext.Panic(m.ctx, "mouse double click: %w", err)
@@ -174,7 +174,7 @@ func (m *Mouse) DblClick(x float64, y float64, opts goja.Value) {
 func (m *Mouse) Down(x float64, y float64, opts goja.Value) {
 	mouseOpts := NewMouseDownUpOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(m.ctx, "parsing down options: %w", err)
 	}
 	if err := m.down(x, y, mouseOpts); err != nil {
 		k6ext.Panic(m.ctx, "mouse down: %w", err)
@@ -185,7 +185,7 @@ func (m *Mouse) Down(x float64, y float64, opts goja.Value) {
 func (m *Mouse) Move(x float64, y float64, opts goja.Value) {
 	mouseOpts := NewMouseDownUpOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(m.ctx, "parsing move options: %w", err)
 	}
 	if err := m.down(x, y, mouseOpts); err != nil {
 		k6ext.Panic(m.ctx, "mouse move: %w", err)
@@ -196,7 +196,7 @@ func (m *Mouse) Move(x float64, y float64, opts goja.Value) {
 func (m *Mouse) Up(x float64, y float64, opts goja.Value) {
 	mouseOpts := NewMouseDownUpOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(m.ctx, "parsing up options: %w", err)
 	}
 	if err := m.up(x, y, mouseOpts); err != nil {
 		k6ext.Panic(m.ctx, "mouse up: %w", err)

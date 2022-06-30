@@ -462,7 +462,7 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 
 	browserCtxOpts := NewBrowserContextOptions()
 	if err := browserCtxOpts.Parse(b.ctx, opts); err != nil {
-		k6ext.Panic(b.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(b.ctx, "parsing newContext options: %w", err)
 	}
 
 	b.contextsMu.Lock()

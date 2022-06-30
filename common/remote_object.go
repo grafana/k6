@@ -52,7 +52,7 @@ type objectPropertyParseError struct {
 // Error returns the reason of the failure, including the wrapper parsing error
 // message.
 func (pe *objectPropertyParseError) Error() string {
-	return fmt.Sprintf("failed parsing object property %q: %s", pe.property, pe.error)
+	return fmt.Sprintf("parsing object property %q: %s", pe.property, pe.error)
 }
 
 // Unwrap returns the wrapped parsing error.
