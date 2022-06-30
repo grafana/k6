@@ -71,11 +71,12 @@ func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
 	if err != nil {
 		return nil, err
 	}
-	r, ok := result.(goja.Value)
+	v, ok := result.(goja.Value)
 	if !ok {
-		return nil, fmt.Errorf("cannot convert result to goja value")
+		return nil, fmt.Errorf("unexpected type %T", result)
 	}
-	o := r.ToObject(rt)
+	o := v.ToObject(rt)
+
 	return &Size{
 		Width:  o.Get("width").ToFloat(),
 		Height: o.Get("height").ToFloat(),

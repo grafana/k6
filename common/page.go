@@ -814,9 +814,8 @@ func (p *Page) TextContent(selector string, opts goja.Value) string {
 func (p *Page) Title() string {
 	p.logger.Debugf("Page:Title", "sid:%v", p.sessionID())
 
-	rt := p.vu.Runtime()
-	js := `() => document.title`
-	return p.Evaluate(rt.ToValue(js)).(goja.Value).String()
+	v := p.vu.Runtime().ToValue(`() => document.title`)
+	return gojaValueToString(p.ctx, p.Evaluate(v))
 }
 
 func (p *Page) Type(selector string, text string, opts goja.Value) {
