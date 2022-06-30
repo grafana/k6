@@ -221,13 +221,10 @@ func (e *ExecutionContext) eval(
 		err              error
 	)
 	if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
-		return nil, fmt.Errorf("evaluating JS expression "+
-			"in frame with URL %q: %w", e.Frame().URL(), err)
+		return nil, err
 	}
 	if exceptionDetails != nil {
-		return nil, fmt.Errorf("evaluating JS expression "+
-			"in frame with URL %q: %s", e.Frame().URL(),
-			parseExceptionDetails(exceptionDetails))
+		return nil, fmt.Errorf("%s", parseExceptionDetails(exceptionDetails))
 	}
 	var res interface{}
 	if remoteObject == nil {
@@ -241,9 +238,9 @@ func (e *ExecutionContext) eval(
 	if opts.returnByValue {
 		res, err = valueFromRemoteObject(apiCtx, remoteObject)
 		if err != nil {
-			return nil, fmt.Errorf("extracting value from remote object (%s) "+
-				"using (%s) in execution context (%d) in frame (%v): %w",
-				remoteObject.ObjectID, js, e.id, e.Frame().ID(), err)
+			return nil, fmt.Errorf(
+				"extracting value from remote object with ID %s: %w",
+				remoteObject.ObjectID, err)
 		}
 	} else if remoteObject.ObjectID != "" {
 		// Note: we don't use the passed in apiCtx here as it could be tied to a timeout
