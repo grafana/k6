@@ -43,7 +43,7 @@ func (l *Locator) Click(opts goja.Value) {
 		return
 	}
 	if err = l.click(copts); err != nil {
-		err = fmt.Errorf("click: %w", err)
+		err = fmt.Errorf("click %q: %w", l.selector, err)
 		return
 	}
 }
@@ -68,7 +68,7 @@ func (l *Locator) Dblclick(opts goja.Value) {
 		return
 	}
 	if err = l.dblclick(copts); err != nil {
-		err = fmt.Errorf("dblclick: %w", err)
+		err = fmt.Errorf("dblclick %q: %w", l.selector, err)
 		return
 	}
 }
@@ -93,7 +93,7 @@ func (l *Locator) Check(opts goja.Value) {
 		return
 	}
 	if err = l.check(copts); err != nil {
-		err = fmt.Errorf("check: %w", err)
+		err = fmt.Errorf("check %q: %w", l.selector, err)
 		return
 	}
 }
@@ -118,7 +118,7 @@ func (l *Locator) Uncheck(opts goja.Value) {
 		return
 	}
 	if err = l.uncheck(copts); err != nil {
-		err = fmt.Errorf("uncheck: %w", err)
+		err = fmt.Errorf("uncheck %q: %w", l.selector, err)
 		return
 	}
 }
@@ -165,7 +165,7 @@ func (l *Locator) IsEditable(opts goja.Value) bool {
 	}
 	editable, err := l.isEditable(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "isEditable: %w", err)
+		k6ext.Panic(l.ctx, "isEditable %q: %w", l.selector, err)
 	}
 
 	return editable
@@ -189,7 +189,7 @@ func (l *Locator) IsEnabled(opts goja.Value) bool {
 	}
 	enabled, err := l.isEnabled(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "isEnabled: %w", err)
+		k6ext.Panic(l.ctx, "isEnabled %q: %w", l.selector, err)
 	}
 
 	return enabled
@@ -213,7 +213,7 @@ func (l *Locator) IsDisabled(opts goja.Value) bool {
 	}
 	disabled, err := l.isDisabled(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "isDisabled: %w", err)
+		k6ext.Panic(l.ctx, "isDisabled %q: %w", l.selector, err)
 	}
 
 	return disabled
@@ -237,7 +237,7 @@ func (l *Locator) IsVisible(opts goja.Value) bool {
 	}
 	visible, err := l.isVisible(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "isVisible: %w", err)
+		k6ext.Panic(l.ctx, "isVisible %q: %w", l.selector, err)
 	}
 
 	return visible
@@ -261,7 +261,7 @@ func (l *Locator) IsHidden(opts goja.Value) bool {
 	}
 	hidden, err := l.isHidden(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "isHidden: %w", err)
+		k6ext.Panic(l.ctx, "isHidden %q: %w", l.selector, err)
 	}
 
 	return hidden
@@ -290,7 +290,7 @@ func (l *Locator) Fill(value string, opts goja.Value) {
 		return
 	}
 	if err = l.fill(value, copts); err != nil {
-		err = fmt.Errorf("fill: %w", err)
+		err = fmt.Errorf("fill %q with %q: %w", l.selector, value, err)
 		return
 	}
 }
@@ -313,7 +313,7 @@ func (l *Locator) Focus(opts goja.Value) {
 		return
 	}
 	if err = l.focus(copts); err != nil {
-		err = fmt.Errorf("focus: %w", err)
+		err = fmt.Errorf("focus %q: %w", l.selector, err)
 		return
 	}
 }
@@ -340,7 +340,7 @@ func (l *Locator) GetAttribute(name string, opts goja.Value) goja.Value {
 	}
 	var v goja.Value
 	if v, err = l.getAttribute(name, copts); err != nil {
-		err = fmt.Errorf("getAttribute: %w", err)
+		err = fmt.Errorf("getAttribute %q of %q: %w", name, l.selector, err)
 		return nil
 	}
 
@@ -367,7 +367,7 @@ func (l *Locator) InnerHTML(opts goja.Value) string {
 	}
 	var s string
 	if s, err = l.innerHTML(copts); err != nil {
-		err = fmt.Errorf("innerHTML: %w", err)
+		err = fmt.Errorf("innerHTML of %q: %w", l.selector, err)
 		return ""
 	}
 
@@ -394,7 +394,7 @@ func (l *Locator) InnerText(opts goja.Value) string {
 	}
 	var s string
 	if s, err = l.innerText(copts); err != nil {
-		err = fmt.Errorf("innerText: %w", err)
+		err = fmt.Errorf("innerText of %q: %w", l.selector, err)
 		return ""
 	}
 
@@ -421,7 +421,7 @@ func (l *Locator) TextContent(opts goja.Value) string {
 	}
 	var s string
 	if s, err = l.textContent(copts); err != nil {
-		err = fmt.Errorf("textContent: %w", err)
+		err = fmt.Errorf("textContent of %q: %w", l.selector, err)
 		return ""
 	}
 
@@ -444,7 +444,7 @@ func (l *Locator) InputValue(opts goja.Value) string {
 	}
 	v, err := l.inputValue(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "inputValue: %w", err)
+		k6ext.Panic(l.ctx, "inputValue of %q: %w", l.selector, err)
 	}
 
 	return v
@@ -467,7 +467,7 @@ func (l *Locator) SelectOption(values goja.Value, opts goja.Value) []string {
 	}
 	v, err := l.selectOption(values, copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "selectOption: %w", err)
+		k6ext.Panic(l.ctx, "selectOption on %q: %w", l.selector, err)
 	}
 
 	return v
@@ -494,6 +494,7 @@ func (l *Locator) Press(key string, opts goja.Value) {
 		return
 	}
 	if err = l.press(key, copts); err != nil {
+		err = fmt.Errorf("press %q on %q: %w", key, l.selector, err)
 		return
 	}
 }
@@ -519,6 +520,7 @@ func (l *Locator) Type(text string, opts goja.Value) {
 		return
 	}
 	if err = l.typ(text, copts); err != nil {
+		err = fmt.Errorf("type %q in %q: %w", text, l.selector, err)
 		return
 	}
 }
@@ -541,6 +543,7 @@ func (l *Locator) Hover(opts goja.Value) {
 		return
 	}
 	if err = l.hover(copts); err != nil {
+		err = fmt.Errorf("hover %q: %w", l.selector, err)
 		return
 	}
 }
@@ -562,6 +565,7 @@ func (l *Locator) Tap(opts goja.Value) {
 		return
 	}
 	if err = l.tap(copts); err != nil {
+		err = fmt.Errorf("tap %q: %w", l.selector, err)
 		return
 	}
 }
@@ -587,6 +591,7 @@ func (l *Locator) DispatchEvent(typ string, eventInit, opts goja.Value) {
 		return
 	}
 	if err = l.dispatchEvent(typ, eventInit, popts); err != nil {
+		err = fmt.Errorf("dispatchEvent %q to %q: %w", typ, l.selector, err)
 		return
 	}
 }
