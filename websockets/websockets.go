@@ -193,9 +193,6 @@ func (w *webSocket) establishConnection() {
 	ctx := w.vu.Context()
 	start := time.Now()
 	conn, httpResponse, connErr := wsd.DialContext(ctx, w.url.String(), header)
-	defer func() {
-		_ = httpResponse.Body.Close()
-	}()
 	connectionEnd := time.Now()
 	connectionDuration := metrics.D(connectionEnd.Sub(start))
 	tags := state.CloneTags()
@@ -206,6 +203,9 @@ func (w *webSocket) establishConnection() {
 	}
 
 	if httpResponse != nil {
+		defer func() {
+			_ = httpResponse.Body.Close()
+		}()
 		if state.Options.SystemTags.Has(metrics.TagStatus) {
 			tags["status"] = strconv.Itoa(httpResponse.StatusCode)
 		}
