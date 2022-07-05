@@ -191,7 +191,7 @@ golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 golang.org/x/text/unicode/rangetable
-# golang.org/x/time v0.0.0-20220411224347-583f2d630306
+# golang.org/x/time v0.0.0-20220609170525-579cf78fd858
 ## explicit
 golang.org/x/time/rate
 # google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336
