@@ -1,8 +1,11 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -36,7 +39,16 @@ func (d *Dir) Make(tmpDir string, dir interface{}) error {
 	}
 	var err error
 	if d.Dir, err = d.fsMkdirTemp(tmpDir, k6BrowserDataDirPattern); err != nil {
-		return fmt.Errorf("mkdirTemp: %w", err)
+		var (
+			pe   *fs.PathError
+			path = filepath.Join(tmpDir, k6BrowserDataDirPattern)
+		)
+		if errors.As(err, &pe) {
+			path = pe.Path
+			err = pe.Err
+		}
+
+		return fmt.Errorf("making browser data directory %q: %w", path, err)
 	}
 	d.remove = true
 

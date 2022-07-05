@@ -145,7 +145,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 
 	dataDir := b.storage
 	if err := dataDir.Make("", flags["user-data-dir"]); err != nil {
-		k6common.Throw(rt, fmt.Errorf("making user data directory: %w", err))
+		k6common.Throw(rt, err)
 	}
 	flags["user-data-dir"] = dataDir.Dir
 
