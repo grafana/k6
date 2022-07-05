@@ -354,3 +354,32 @@ func TestTwoTalking(t *testing.T) {
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws/couple/1"), http.StatusSwitchingProtocols, "")
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws/couple/2"), http.StatusSwitchingProtocols, "")
 }
+
+func TestDialError(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	// without listeners
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+		var ws = new WebSocket("ws://127.0.0.2");
+	`))
+		return runErr
+	})
+	require.NoError(t, err)
+
+	// with the error listener
+	ts.ev.WaitOnRegistered()
+	err = ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+		var ws = new WebSocket("ws://127.0.0.2");
+		ws.addEventListener("error", (e) =>{
+			ws.close();
+			throw new Error("The provided url is an invalid endpoint")
+		})
+	`))
+		return runErr
+	})
+	assert.Error(t, err)
+}
