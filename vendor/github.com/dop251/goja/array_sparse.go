@@ -409,9 +409,9 @@ func (a *sparseArrayObject) deleteIdx(idx valueInt, throw bool) bool {
 	return a.baseObject.deleteStr(idx.string(), throw)
 }
 
-func (a *sparseArrayObject) sortLen() int64 {
+func (a *sparseArrayObject) sortLen() int {
 	if len(a.items) > 0 {
-		return int64(a.items[len(a.items)-1].idx) + 1
+		return toIntStrict(int64(a.items[len(a.items)-1].idx) + 1)
 	}
 
 	return 0
@@ -460,12 +460,12 @@ func (a *sparseArrayObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.
 	r := a.val.runtime
 	if iter := a.getSym(SymIterator, nil); iter == r.global.arrayValues || iter == nil {
 		l := toIntStrict(int64(a.length))
-		if dst.Len() != l {
-			if typ.Kind() == reflect.Array {
+		if typ.Kind() == reflect.Array {
+			if dst.Len() != l {
 				return fmt.Errorf("cannot convert an Array into an array, lengths mismatch (have %d, need %d)", l, dst.Len())
-			} else {
-				dst.Set(reflect.MakeSlice(typ, l, l))
 			}
+		} else {
+			dst.Set(reflect.MakeSlice(typ, l, l))
 		}
 		ctx.putTyped(a.val, typ, dst.Interface())
 		for _, item := range a.items {

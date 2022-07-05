@@ -31,8 +31,8 @@ github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91 h1:Izz0+t1Z5nI16/II7vuEo/nHjodOg0p7+OiDpjX5t1E=
 github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91/go.mod h1:2pZnwuY/m+8K6iRw6wQdMtk+rH5tNGR1i55kozfMjCc=
 github.com/dop251/goja v0.0.0-20211022113120-dc8c55024d06/go.mod h1:R9ET47fwRVRPZnOGvHxxhuZcbrMCuiqOz3Rlrh4KSnk=
-github.com/dop251/goja v0.0.0-20220516123900-4418d4575a41 h1:yRPjAkkuR/E/tsVG7QmhzEeEtD3P2yllxsT1/ftURb0=
-github.com/dop251/goja v0.0.0-20220516123900-4418d4575a41/go.mod h1:TQJQ+ZNyFVvUtUEtCZxBhfWiH7RJqR3EivNmvD6Waik=
+github.com/dop251/goja v0.0.0-20220705101429-189bfeb9f530 h1:936YSsrki8Z6H48PPFbATV674Gpmh444xXaX+O5wwFQ=
+github.com/dop251/goja v0.0.0-20220705101429-189bfeb9f530/go.mod h1:TQJQ+ZNyFVvUtUEtCZxBhfWiH7RJqR3EivNmvD6Waik=
 github.com/dop251/goja_nodejs v0.0.0-20210225215109-d91c329300e7/go.mod h1:hn7BA7c8pLvoGndExHudxTDKZ84Pyvv+90pbBjbTz0Y=
 github.com/dop251/goja_nodejs v0.0.0-20211022123610-8dd9abb0616d/go.mod h1:DngW8aVqWbuLRMHItjPUyqdj+HWPvnQe8V8y1nDpIbM=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
