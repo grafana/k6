@@ -273,13 +273,27 @@ func TestEngine_processSamples(t *testing.T) {
 		metric, err := registry.NewMetric("my_metric", metrics.Gauge)
 		require.NoError(t, err)
 
-		test := newTestEngineWithRegistry(t, nil, nil, nil, lib.Options{}, registry)
+		done := make(chan struct{})
+		runner := &minirunner.MiniRunner{
+			Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+				out <- metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1"})}
+				close(done)
+				return nil
+			},
+		}
+		test := newTestEngineWithRegistry(t, nil, runner, nil, lib.Options{}, registry)
 
-		test.engine.OutputManager.AddMetricSamples(
-			[]metrics.SampleContainer{metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1"})}},
-		)
+		go func() {
+			assert.NoError(t, test.run())
+		}()
 
-		test.engine.Stop()
+		select {
+		case <-done:
+			return
+		case <-time.After(10 * time.Second):
+			assert.Fail(t, "Test should have completed within 10 seconds")
+		}
+
 		test.wait()
 
 		assert.IsType(t, &metrics.GaugeSink{}, test.engine.MetricsEngine.ObservedMetrics["my_metric"].Sink)
@@ -295,17 +309,30 @@ func TestEngine_processSamples(t *testing.T) {
 		gotParseErr := ths.Parse()
 		require.NoError(t, gotParseErr)
 
-		test := newTestEngineWithRegistry(t, nil, nil, nil, lib.Options{
+		done := make(chan struct{})
+		runner := &minirunner.MiniRunner{
+			Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+				out <- metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1", "b": "2"})}
+				close(done)
+				return nil
+			},
+		}
+		test := newTestEngineWithRegistry(t, nil, runner, nil, lib.Options{
 			Thresholds: map[string]metrics.Thresholds{
 				"my_metric{a:1}": ths,
 			},
 		}, registry)
 
-		test.engine.OutputManager.AddMetricSamples(
-			[]metrics.SampleContainer{metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1", "b": "2"})}},
-		)
+		go func() {
+			assert.NoError(t, test.run())
+		}()
 
-		test.engine.Stop()
+		select {
+		case <-done:
+			return
+		case <-time.After(10 * time.Second):
+			assert.Fail(t, "Test should have completed within 10 seconds")
+		}
 		test.wait()
 
 		assert.Len(t, test.engine.MetricsEngine.ObservedMetrics, 2)
@@ -334,12 +361,28 @@ func TestEngineThresholdsWillAbort(t *testing.T) {
 
 	thresholds := map[string]metrics.Thresholds{metric.Name: ths}
 
-	test := newTestEngineWithRegistry(t, nil, nil, nil, lib.Options{Thresholds: thresholds}, registry)
+	done := make(chan struct{})
+	runner := &minirunner.MiniRunner{
+		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+			out <- metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1"})}
+			close(done)
+			return nil
+		},
+	}
+	test := newTestEngineWithRegistry(t, nil, runner, nil, lib.Options{
+		Thresholds: thresholds,
+	}, registry)
 
-	test.engine.OutputManager.AddMetricSamples(
-		[]metrics.SampleContainer{metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1"})}},
-	)
-	test.engine.Stop()
+	go func() {
+		assert.NoError(t, test.run())
+	}()
+
+	select {
+	case <-done:
+		return
+	case <-time.After(10 * time.Second):
+		assert.Fail(t, "Test should have completed within 10 seconds")
+	}
 	test.wait()
 	assert.True(t, test.engine.thresholdsTainted)
 }
