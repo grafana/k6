@@ -285,14 +285,14 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 		expressionWithSourceURL,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("getting injected script: %w", err)
+		return nil, err
 	}
 	if handle == nil {
-		return nil, errors.New("getting injected script: handle is nil")
+		return nil, errors.New("handle is nil")
 	}
 	injectedScript, ok := handle.(api.JSHandle)
 	if !ok {
-		return nil, fmt.Errorf("getting injected script: %w", ErrJSHandleInvalid)
+		return nil, ErrJSHandleInvalid
 	}
 	e.injectedScript = injectedScript
 

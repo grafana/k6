@@ -571,7 +571,7 @@ func (f *Frame) waitForFunction(
 	}
 	injected, err := execCtx.getInjectedScript(apiCtx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting injected script: %w", err)
 	}
 
 	pageFn := `
