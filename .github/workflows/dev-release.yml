@@ -33,24 +33,25 @@ jobs:
         with:
           go-version: ${{ github.event.inputs.go_version }}
       - name: Install package builders
+        # TODO: replace these packages with something newer and get rid of "go get" in GOPATH mode
         env:
           GO111MODULE: 'off'
         run: |
-          gopath="$(go env GOPATH)"
+          GOPATH="$(go env GOPATH)"
           go get github.com/Masterminds/glide
           go get -d github.com/mh-cbon/go-bin-deb \
-              && (cd "$gopath/src/github.com/mh-cbon/go-bin-deb" \
+              && (cd "$GOPATH/src/github.com/mh-cbon/go-bin-deb" \
               && glide install \
               && go install)
           go get -d github.com/mh-cbon/go-bin-rpm \
-              && (cd "$gopath/src/github.com/mh-cbon/go-bin-rpm" \
+              && (cd "$GOPATH/src/github.com/mh-cbon/go-bin-rpm" \
               && glide install \
               && go install)
           sudo apt-get update -y
           sudo apt-get install -y fakeroot rpm
       - name: Generate Windows binary metadata
         run: |
-          (cd && GO111MODULE=on go get github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.2.0)
+          (cd && GO111MODULE=on go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.2.0)
           IFS=. read -a version <<< "$(echo $VERSION | sed 's:[^0-9\.]::g')"
           # Need a blank versioninfo.json for the CLI overrides to work.
           echo '{}' > versioninfo.json
