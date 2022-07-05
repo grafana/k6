@@ -228,15 +228,13 @@ func (w *webSocket) establishConnection() {
 	})
 
 	if connErr != nil {
-		// fmt.Println(connErr)
 		// Pass the error to the user script before exiting immediately
 		w.tq.Queue(func() error {
-			// fmt.Println("conn err", connErr)
 			return w.connectionClosedWithError(connErr)
 		})
+		w.tq.Close()
 		return
 	}
-	// fmt.Println("connected")
 	w.tq.Queue(func() error {
 		return w.connectionConnected()
 	})
