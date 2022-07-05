@@ -445,8 +445,8 @@ func (c *Client) Batch(reqsValues ...goja.Value) (interface{}, error) {
 
 	if len(reqsValues) == 0 {
 		return nil, fmt.Errorf("no argument was provided to http.batch()")
-	} else if len(reqsValues) > 1 { // Validation for http.batch(["https://validurl"],["https://validurl"])
-		return nil, fmt.Errorf("http.batch() must have only one single array as an argument")
+	} else if len(reqsValues) > 1 {
+		return nil, fmt.Errorf("http.batch() accepts only an array or an object of requests.")
 	}
 
 	reqsV := reqsValues[0]

@@ -1307,8 +1307,8 @@ func TestRequestAndBatch(t *testing.T) {
 					expErr: `batch request 0 doesn't have a url key`, throw: true,
 				},
 				{
-					name: "multiple array as an argument", code: `["GET", "https://test.k6.io"],["GET", "https://test.k6.io"]`,
-					expErr: `http.batch() must have only one single array as an argument`, throw: true,
+					name: "multiple arguments", code: `["GET", "https://test.k6.io"],["GET", "https://test.k6.io"]`,
+					expErr: `http.batch() accepts only an array or an object of requests.`, throw: true,
 				},
 			}
 
