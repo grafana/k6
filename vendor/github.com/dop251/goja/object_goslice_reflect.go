@@ -31,6 +31,15 @@ func (o *objectGoSliceReflect) grow(size int) {
 		n := reflect.MakeSlice(o.value.Type(), size, growCap(size, o.value.Len(), oldcap))
 		reflect.Copy(n, o.value)
 		o.value.Set(n)
+		l := len(o.valueCache)
+		if l > size {
+			l = size
+		}
+		for i, w := range o.valueCache[:l] {
+			if w != nil {
+				w.setReflectValue(o.value.Index(i))
+			}
+		}
 	} else {
 		tail := o.value.Slice(o.value.Len(), size)
 		zero := reflect.Zero(o.value.Type().Elem())
@@ -43,6 +52,7 @@ func (o *objectGoSliceReflect) grow(size int) {
 }
 
 func (o *objectGoSliceReflect) shrink(size int) {
+	o.valueCache.shrink(size)
 	tail := o.value.Slice(size, o.value.Len())
 	zero := reflect.Zero(o.value.Type().Elem())
 	for i := 0; i < tail.Len(); i++ {
@@ -78,11 +88,4 @@ func (o *objectGoSliceReflect) defineOwnPropertyStr(name unistring.String, descr
 		return o.val.runtime.defineArrayLength(&o.lengthProp, descr, o.putLength, throw)
 	}
 	return o.objectGoArrayReflect.defineOwnPropertyStr(name, descr, throw)
-}
-
-func (o *objectGoSliceReflect) equal(other objectImpl) bool {
-	if other, ok := other.(*objectGoSliceReflect); ok {
-		return o.value.Interface() == other.value.Interface()
-	}
-	return false
 }

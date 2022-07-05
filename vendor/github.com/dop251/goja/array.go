@@ -178,11 +178,11 @@ func (a *arrayObject) getOwnPropIdx(idx valueInt) Value {
 	return a.baseObject.getOwnPropStr(idx.string())
 }
 
-func (a *arrayObject) sortLen() int64 {
-	return int64(len(a.values))
+func (a *arrayObject) sortLen() int {
+	return len(a.values)
 }
 
-func (a *arrayObject) sortGet(i int64) Value {
+func (a *arrayObject) sortGet(i int) Value {
 	v := a.values[i]
 	if p, ok := v.(*valueProperty); ok {
 		v = p.get(a.val)
@@ -190,7 +190,7 @@ func (a *arrayObject) sortGet(i int64) Value {
 	return v
 }
 
-func (a *arrayObject) swap(i, j int64) {
+func (a *arrayObject) swap(i int, j int) {
 	a.values[i], a.values[j] = a.values[j], a.values[i]
 }
 
@@ -511,12 +511,12 @@ func (a *arrayObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.Type, 
 	r := a.val.runtime
 	if iter := a.getSym(SymIterator, nil); iter == r.global.arrayValues || iter == nil {
 		l := toIntStrict(int64(a.length))
-		if dst.Len() != l {
-			if typ.Kind() == reflect.Array {
+		if typ.Kind() == reflect.Array {
+			if dst.Len() != l {
 				return fmt.Errorf("cannot convert an Array into an array, lengths mismatch (have %d, need %d)", l, dst.Len())
-			} else {
-				dst.Set(reflect.MakeSlice(typ, l, l))
 			}
+		} else {
+			dst.Set(reflect.MakeSlice(typ, l, l))
 		}
 		ctx.putTyped(a.val, typ, dst.Interface())
 		for i := 0; i < l; i++ {

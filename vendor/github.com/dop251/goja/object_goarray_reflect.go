@@ -11,7 +11,49 @@ type objectGoArrayReflect struct {
 	objectGoReflect
 	lengthProp valueProperty
 
+	valueCache valueArrayCache
+
 	putIdx func(idx int, v Value, throw bool) bool
+}
+
+type valueArrayCache []reflectValueWrapper
+
+func (c *valueArrayCache) get(idx int) reflectValueWrapper {
+	if idx < len(*c) {
+		return (*c)[idx]
+	}
+	return nil
+}
+
+func (c *valueArrayCache) grow(newlen int) {
+	oldcap := cap(*c)
+	if oldcap < newlen {
+		a := make([]reflectValueWrapper, newlen, growCap(newlen, len(*c), oldcap))
+		copy(a, *c)
+		*c = a
+	} else {
+		*c = (*c)[:newlen]
+	}
+}
+
+func (c *valueArrayCache) put(idx int, w reflectValueWrapper) {
+	if len(*c) <= idx {
+		c.grow(idx + 1)
+	}
+	(*c)[idx] = w
+}
+
+func (c *valueArrayCache) shrink(newlen int) {
+	if len(*c) > newlen {
+		tail := (*c)[newlen:]
+		for i, item := range tail {
+			if item != nil {
+				copyReflectValueWrapper(item)
+				tail[i] = nil
+			}
+		}
+		*c = (*c)[:newlen]
+	}
 }
 
 func (o *objectGoArrayReflect) _init() {
@@ -46,11 +88,18 @@ func (o *objectGoArrayReflect) _hasStr(name unistring.String) bool {
 }
 
 func (o *objectGoArrayReflect) _getIdx(idx int) Value {
-	v := o.value.Index(idx)
-	if (v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface) && v.IsNil() {
-		return _null
+	if v := o.valueCache.get(idx); v != nil {
+		return v.esValue()
 	}
-	return o.val.runtime.toValue(v.Interface(), v)
+
+	v := o.value.Index(idx)
+
+	res, w := o.elemToValue(v)
+	if w != nil {
+		o.valueCache.put(idx, w)
+	}
+
+	return res
 }
 
 func (o *objectGoArrayReflect) getIdx(idx valueInt, receiver Value) Value {
@@ -101,10 +150,22 @@ func (o *objectGoArrayReflect) getOwnPropIdx(idx valueInt) Value {
 }
 
 func (o *objectGoArrayReflect) _putIdx(idx int, v Value, throw bool) bool {
-	err := o.val.runtime.toReflectValue(v, o.value.Index(idx), &objectExportCtx{})
+	cached := o.valueCache.get(idx)
+	if cached != nil {
+		copyReflectValueWrapper(cached)
+	}
+
+	rv := o.value.Index(idx)
+	err := o.val.runtime.toReflectValue(v, rv, &objectExportCtx{})
 	if err != nil {
+		if cached != nil {
+			cached.setReflectValue(rv)
+		}
 		o.val.runtime.typeErrorResult(throw, "Go type conversion error: %v", err)
 		return false
+	}
+	if cached != nil {
+		o.valueCache[idx] = nil
 	}
 	return true
 }
@@ -211,6 +272,11 @@ func (o *objectGoArrayReflect) toPrimitive() Value {
 
 func (o *objectGoArrayReflect) _deleteIdx(idx int) {
 	if idx < o.value.Len() {
+		if cv := o.valueCache.get(idx); cv != nil {
+			copyReflectValueWrapper(cv)
+			o.valueCache[idx] = nil
+		}
+
 		o.value.Index(idx).Set(reflect.Zero(o.value.Type().Elem()))
 	}
 }
@@ -262,27 +328,39 @@ func (o *objectGoArrayReflect) iterateStringKeys() iterNextFunc {
 	}).next
 }
 
-func (o *objectGoArrayReflect) equal(other objectImpl) bool {
-	if other, ok := other.(*objectGoArrayReflect); ok {
-		return o.value.Interface() == other.value.Interface()
-	}
-	return false
+func (o *objectGoArrayReflect) sortLen() int {
+	return o.value.Len()
 }
 
-func (o *objectGoArrayReflect) sortLen() int64 {
-	return int64(o.value.Len())
-}
-
-func (o *objectGoArrayReflect) sortGet(i int64) Value {
+func (o *objectGoArrayReflect) sortGet(i int) Value {
 	return o.getIdx(valueInt(i), nil)
 }
 
-func (o *objectGoArrayReflect) swap(i, j int64) {
-	ii := toIntStrict(i)
-	jj := toIntStrict(j)
-	x := o._getIdx(ii)
-	y := o._getIdx(jj)
+func (o *objectGoArrayReflect) swap(i int, j int) {
+	vi := o.value.Index(i)
+	vj := o.value.Index(j)
+	tmp := reflect.New(o.value.Type().Elem()).Elem()
+	tmp.Set(vi)
+	vi.Set(vj)
+	vj.Set(tmp)
 
-	o._putIdx(ii, y, false)
-	o._putIdx(jj, x, false)
+	cachedI := o.valueCache.get(i)
+	cachedJ := o.valueCache.get(j)
+	if cachedI != nil {
+		cachedI.setReflectValue(vj)
+		o.valueCache.put(j, cachedI)
+	} else {
+		if j < len(o.valueCache) {
+			o.valueCache[j] = nil
+		}
+	}
+
+	if cachedJ != nil {
+		cachedJ.setReflectValue(vi)
+		o.valueCache.put(i, cachedJ)
+	} else {
+		if i < len(o.valueCache) {
+			o.valueCache[i] = nil
+		}
+	}
 }

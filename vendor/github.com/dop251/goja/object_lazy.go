@@ -295,19 +295,19 @@ func (o *lazyObject) setProto(proto *Object, throw bool) bool {
 	return obj.setProto(proto, throw)
 }
 
-func (o *lazyObject) sortLen() int64 {
+func (o *lazyObject) sortLen() int {
 	obj := o.create(o.val)
 	o.val.self = obj
 	return obj.sortLen()
 }
 
-func (o *lazyObject) sortGet(i int64) Value {
+func (o *lazyObject) sortGet(i int) Value {
 	obj := o.create(o.val)
 	o.val.self = obj
 	return obj.sortGet(i)
 }
 
-func (o *lazyObject) swap(i, j int64) {
+func (o *lazyObject) swap(i int, j int) {
 	obj := o.create(o.val)
 	o.val.self = obj
 	obj.swap(i, j)

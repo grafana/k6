@@ -65,12 +65,12 @@ func (so *setObject) export(ctx *objectExportCtx) interface{} {
 
 func (so *setObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
 	l := so.m.size
-	if dst.Len() != l {
-		if typ.Kind() == reflect.Array {
+	if typ.Kind() == reflect.Array {
+		if dst.Len() != l {
 			return fmt.Errorf("cannot convert a Set into an array, lengths mismatch: have %d, need %d)", l, dst.Len())
-		} else {
-			dst.Set(reflect.MakeSlice(typ, l, l))
 		}
+	} else {
+		dst.Set(reflect.MakeSlice(typ, l, l))
 	}
 	ctx.putTyped(so.val, typ, dst.Interface())
 	iter := so.m.newIter()
