@@ -3,7 +3,7 @@ module go.k6.io/k6
 go 1.17
 
 require (
-	github.com/Azure/go-ntlmssp v0.0.0-20211209120228-48547f28849e
+	github.com/Azure/go-ntlmssp v0.0.0-20220621081337-cb9428e4ac1e
 	github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
