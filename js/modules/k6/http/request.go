@@ -446,7 +446,7 @@ func (c *Client) Batch(reqsValues ...goja.Value) (interface{}, error) {
 	if len(reqsValues) == 0 {
 		return nil, fmt.Errorf("no argument was provided to http.batch()")
 	} else if len(reqsValues) > 1 {
-		return nil, fmt.Errorf("http.batch() accepts only an array or an object of requests.")
+		return nil, fmt.Errorf("http.batch() accepts only an array or an object of requests")
 	}
 
 	reqsV := reqsValues[0]

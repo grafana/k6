@@ -1308,7 +1308,7 @@ func TestRequestAndBatch(t *testing.T) {
 				},
 				{
 					name: "multiple arguments", code: `["GET", "https://test.k6.io"],["GET", "https://test.k6.io"]`,
-					expErr: `http.batch() accepts only an array or an object of requests.`, throw: true,
+					expErr: `http.batch() accepts only an array or an object of requests`, throw: true,
 				},
 			}
 
