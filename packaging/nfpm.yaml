@@ -1,0 +1,21 @@
+name: "k6"
+arch: "${GOARCH}"
+platform: "linux"
+version: "${VERSION}"
+version_schema: semver
+section: "default"
+maintainer: "Raintank Inc. d.b.a. Grafana Labs"
+description: |
+  Load testing for the 21st century.
+depends:
+- ca-certificates
+homepage: "https://k6.io"
+license: "AGPL-3.0"
+contents:
+- src: ./k6
+  dst: /usr/bin/k6
+
+deb:
+  compression: xz
+  fields:
+    Bugs: https://github.com/grafana/k6/issues
