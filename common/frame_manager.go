@@ -616,7 +616,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 	}
 	newDocumentID, err := fs.navigateFrame(frame, url, parsedOpts.Referer)
 	if err != nil {
-		k6ext.Panic(m.ctx, "frame navigation to %q: %v", url, err)
+		k6ext.Panic(m.ctx, "navigating to %q: %v", url, err)
 	}
 
 	var event *NavigationEvent
@@ -636,7 +636,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 			return false
 		}, parsedOpts.Timeout)
 		if err != nil {
-			k6ext.Panic(m.ctx, "frame navigation to %q: %v", url, err)
+			k6ext.Panic(m.ctx, "navigating to %q: %v", url, err)
 		}
 
 		event = data.(*NavigationEvent)
@@ -658,7 +658,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 		select {
 		case <-timeoutCtx.Done():
 			if timeoutCtx.Err() == context.DeadlineExceeded {
-				k6ext.Panic(m.ctx, "frame navigation to %q: %s after %s", url, ErrTimedOut, parsedOpts.Timeout)
+				k6ext.Panic(m.ctx, "navigating to %q: %s after %s", url, ErrTimedOut, parsedOpts.Timeout)
 			}
 		case data := <-chSameDoc:
 			event = data.(*NavigationEvent)
@@ -673,7 +673,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 		select {
 		case <-timeoutCtx.Done():
 			if timeoutCtx.Err() == context.DeadlineExceeded {
-				k6ext.Panic(m.ctx, "frame navigation to %q: %s after %s", url, ErrTimedOut, parsedOpts.Timeout)
+				k6ext.Panic(m.ctx, "navigating to %q: %s after %s", url, ErrTimedOut, parsedOpts.Timeout)
 			}
 		case <-chWaitUntilCh:
 		}

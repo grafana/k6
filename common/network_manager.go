@@ -330,7 +330,7 @@ func (m *NetworkManager) initDomains() error {
 	}
 	for _, action := range actions {
 		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-			return fmt.Errorf("executing %T: %w", action, err)
+			return fmt.Errorf("initializing networking %T: %w", action, err)
 		}
 	}
 

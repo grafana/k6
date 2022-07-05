@@ -933,7 +933,7 @@ func (fs *FrameSession) updateGeolocation(initial bool) error {
 			WithLongitude(geolocation.Longitude).
 			WithAccuracy(geolocation.Accurracy)
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-			return fmt.Errorf("setting geolocation override: %w", err)
+			return fmt.Errorf("overriding geolocation: %w", err)
 		}
 	}
 	return nil

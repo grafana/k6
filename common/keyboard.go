@@ -143,7 +143,7 @@ func (k *Keyboard) down(key string) error {
 		WithUnmodifiedText(text).
 		WithAutoRepeat(autoRepeat)
 	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
-		return fmt.Errorf("executing dispatch key event down: %w", err)
+		return fmt.Errorf("dispatching key event down: %w", err)
 	}
 
 	return nil
@@ -166,7 +166,7 @@ func (k *Keyboard) up(key string) error {
 		WithCode(keyDef.Code).
 		WithLocation(keyDef.Location)
 	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
-		return fmt.Errorf("executing dispatch key event up: %w", err)
+		return fmt.Errorf("dispatching key event up: %w", err)
 	}
 
 	return nil
@@ -175,7 +175,7 @@ func (k *Keyboard) up(key string) error {
 func (k *Keyboard) insertText(text string) error {
 	action := input.InsertText(text)
 	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
-		return fmt.Errorf("executing insert text: %w", err)
+		return fmt.Errorf("inserting text: %w", err)
 	}
 	return nil
 }

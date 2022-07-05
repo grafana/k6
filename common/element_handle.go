@@ -993,7 +993,7 @@ func (h *ElementHandle) OwnerFrame() api.Frame {
 	var node *cdp.Node
 	action := dom.DescribeNode().WithObjectID(documentHandle.remoteObject.ObjectID)
 	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6ext.Panic(h.ctx, "describing owner frame DOM node: %w", err)
+		k6ext.Panic(h.ctx, "getting node in frame: %w", err)
 	}
 	if node == nil || node.FrameID == "" {
 		return nil

@@ -129,7 +129,7 @@ func (b *Browser) connect() error {
 	b.logger.Debugf("Browser:connect", "wsURL:%q", b.browserProc.WsURL())
 	conn, err := NewConnection(b.ctx, b.browserProc.WsURL(), b.logger)
 	if err != nil {
-		return fmt.Errorf("connecting to browser WS URL: %w", err)
+		return fmt.Errorf("connecting to browser DevTools URL: %w", err)
 	}
 
 	b.conn = conn
@@ -420,7 +420,7 @@ func (b *Browser) Close() {
 	action := cdpbrowser.Close()
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
 		if _, ok := err.(*websocket.CloseError); !ok {
-			k6ext.Panic(b.ctx, "executing browser close: %v", err)
+			k6ext.Panic(b.ctx, "closing the browser: %v", err)
 		}
 	}
 
