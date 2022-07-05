@@ -52,13 +52,17 @@ func TestBrowserNewPageInContext(t *testing.T) {
 				ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
 			) error {
 				require.Equal(t, target.CommandCreateTarget, method)
-				tp := params.(*target.CreateTargetParams) //nolint:forcetypeassert
+				require.IsType(t, params, &target.CreateTargetParams{})
+				tp, _ := params.(*target.CreateTargetParams)
 				require.Equal(t, "about:blank", tp.URL)
 				require.Equal(t, browserContextID, tp.BrowserContextID)
 
 				// newPageInContext event handler will catch this target ID, and compare it to
-				// the new page's target ID to detect whether the page is loaded.
-				res.(*target.CreateTargetReturns).TargetID = targetID //nolint:forcetypeassert
+				// the new page's target ID to detect whether the page
+				// is loaded.
+				require.IsType(t, res, &target.CreateTargetReturns{})
+				v, _ := res.(*target.CreateTargetReturns)
+				v.TargetID = targetID
 
 				// for the event handler to work, there needs to be an event called
 				// EventBrowserContextPage to be fired. this normally happens when the browser's

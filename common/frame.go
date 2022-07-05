@@ -817,23 +817,17 @@ func (f *Frame) Content() string {
 
 	rt := f.vu.Runtime()
 	js := `() => {
-			let content = '';
-			if (document.doctype) {
-				content = new XMLSerializer().serializeToString(document.doctype);
-			}
-			if (document.documentElement) {
-				content += document.documentElement.outerHTML;
-			}
-			return content;
-		}`
+		let content = '';
+		if (document.doctype) {
+			content = new XMLSerializer().serializeToString(document.doctype);
+		}
+		if (document.documentElement) {
+			content += document.documentElement.outerHTML;
+		}
+		return content;
+	}`
 
-	c := f.Evaluate(rt.ToValue(js))
-	content, ok := c.(goja.Value)
-	if !ok {
-		k6ext.Panic(f.ctx, "unexpected content() value type: %T", c)
-	}
-
-	return content.ToString().String()
+	return gojaValueToString(f.ctx, f.Evaluate(rt.ToValue(js)))
 }
 
 // Dblclick double clicks an element matching provided selector.
@@ -1113,7 +1107,7 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
-	return gv.ToString().String(), nil
+	return gv.String(), nil
 }
 
 // InnerText returns the inner text of the first element found
@@ -1155,7 +1149,7 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
-	return gv.ToString().String(), nil
+	return gv.String(), nil
 }
 
 // InputValue returns the input value of the first element found
@@ -1192,7 +1186,7 @@ func (f *Frame) inputValue(selector string, opts *FrameInputValueOptions) (strin
 		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
-	return gv.ToString().String(), nil
+	return gv.String(), nil
 }
 
 // IsDetached returns whether the frame is detached or not.
@@ -1669,7 +1663,7 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
-	return gv.ToString().String(), nil
+	return gv.String(), nil
 }
 
 func (f *Frame) Title() string {

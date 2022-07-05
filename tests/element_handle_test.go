@@ -189,7 +189,7 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 			() => window.clickResult
 		`
 		cr := p.Evaluate(tb.toGojaValue(cmd))
-		return cr.(goja.Value).String() //nolint:forcetypeassert
+		return tb.asGojaValue(cr).String()
 	}
 	require.NotNil(t, p.Goto(tb.staticURL("/concealed_link.html"), nil))
 	require.Equal(t, wantBefore, clickResult())

@@ -223,3 +223,19 @@ func TrimQuotes(s string) string {
 func gojaValueExists(v goja.Value) bool {
 	return v != nil && !goja.IsUndefined(v) && !goja.IsNull(v)
 }
+
+// asGojaValue return v as a goja value.
+// panics if v is not a goja value.
+func asGojaValue(ctx context.Context, v interface{}) goja.Value {
+	gv, ok := v.(goja.Value)
+	if !ok {
+		k6ext.Panic(ctx, "unexpected type %T", v)
+	}
+	return gv
+}
+
+// gojaValueToString returns v as string.
+// panics if v is not a goja value.
+func gojaValueToString(ctx context.Context, v interface{}) string {
+	return asGojaValue(ctx, v).String()
+}

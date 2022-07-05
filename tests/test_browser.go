@@ -22,6 +22,7 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -123,7 +124,11 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 	}
 
 	// launch the browser
-	bt := chromium.NewBrowserType(vu.Context()).(*chromium.BrowserType) //nolint:forcetypeassert
+	v := chromium.NewBrowserType(vu.Context())
+	bt, ok := v.(*chromium.BrowserType)
+	if !ok {
+		panic(fmt.Errorf("testBrowser: unexpected browser type %T", v))
+	}
 	b := bt.Launch(rt.ToValue(launchOpts))
 	tb.Cleanup(func() {
 		select {

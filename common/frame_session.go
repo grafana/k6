@@ -866,7 +866,11 @@ func (fs *FrameSession) onTargetCrashed(event *inspector.EventTargetCrashed) {
 	fs.logger.Debugf("FrameSession:onTargetCrashed", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	// TODO:?
-	fs.session.(*Session).markAsCrashed() //nolint:forcetypeassert
+	s, ok := fs.session.(*Session)
+	if !ok {
+		k6ext.Panic(fs.ctx, "unexpected type %T", fs.session)
+	}
+	s.markAsCrashed()
 	fs.page.didCrash()
 }
 
