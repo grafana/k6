@@ -506,6 +506,9 @@ func (w *webSocket) send(msg goja.Value) {
 
 // TODO support code and reason
 func (w *webSocket) close(code int, reason string) {
+	if w.readyState == CLOSED || w.readyState == CLOSING {
+		return
+	}
 	w.readyState = CLOSING
 	if code == 0 {
 		code = websocket.CloseNormalClosure
@@ -529,6 +532,9 @@ func (w *webSocket) queueClose() {
 // to be run only on the eventloop
 // from https://websockets.spec.whatwg.org/#feedback-from-the-protocol
 func (w *webSocket) connectionConnected() error {
+	if w.readyState != CONNECTING {
+		return nil
+	}
 	w.readyState = OPEN
 	return w.callOpenListeners(time.Now()) // TODO fix time
 }
