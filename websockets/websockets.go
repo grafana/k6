@@ -600,9 +600,19 @@ func (w *webSocket) callOpenListeners(timestamp time.Time) error {
 	return nil
 }
 
-func (w *webSocket) callErrorListeners(_ error) error { // TODO use the error even thought it is not by the spec
+func (w *webSocket) callErrorListeners(e error) error { // TODO use the error even thought it is not by the spec
+	rt := w.vu.Runtime()
+	must := func(err error) {
+		if err != nil {
+			common.Throw(rt, err)
+		}
+	}
+	ev := w.newEvent("error", time.Now())
+	must(ev.DefineDataProperty("error",
+		rt.ToValue(e),
+		goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	for _, errorListener := range w.errorListeners {
-		if _, err := errorListener(w.newEvent("error", time.Now())); err != nil { // TODO fix timestamp
+		if _, err := errorListener(ev); err != nil { // TODO fix timestamp
 			return err
 		}
 	}
