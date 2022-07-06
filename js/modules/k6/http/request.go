@@ -453,7 +453,7 @@ func (c *Client) Batch(reqsV ...goja.Value) (interface{}, error) {
 		batchReqs []httpext.BatchParsedHTTPRequest
 		results   interface{} // either []*Response or map[string]*Response
 	)
-	
+
 	switch v := reqsV[0].Export().(type) {
 	case []interface{}:
 		batchReqs, results, err = c.prepareBatchArray(v)
