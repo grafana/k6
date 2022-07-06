@@ -487,7 +487,15 @@ func (w *webSocket) send(msg goja.Value) {
 		b := o.Bytes()
 		w.bufferedAmount += len(b)
 		w.writeQueueCh <- message{
-			mtype: websocket.TextMessage,
+			mtype: websocket.BinaryMessage,
+			data:  b,
+			t:     time.Now(),
+		}
+	case goja.ArrayBuffer:
+		b := o.Bytes()
+		w.bufferedAmount += len(b)
+		w.writeQueueCh <- message{
+			mtype: websocket.BinaryMessage,
 			data:  b,
 			t:     time.Now(),
 		}
