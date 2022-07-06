@@ -1306,6 +1306,10 @@ func TestRequestAndBatch(t *testing.T) {
 					name: "object no url key", code: `[ {method: "GET"} ]`,
 					expErr: `batch request 0 doesn't have a url key`, throw: true,
 				},
+				{
+					name: "multiple arguments", code: `["GET", "https://test.k6.io"],["GET", "https://test.k6.io"]`,
+					expErr: `http.batch() accepts only an array or an object of requests`, throw: true,
+				},
 			}
 
 			for _, tc := range testCases {
