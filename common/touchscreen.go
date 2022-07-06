@@ -69,6 +69,6 @@ func (t *Touchscreen) tap(x float64, y float64) error {
 // Tap dispatches a tap start and tap end event.
 func (t *Touchscreen) Tap(x float64, y float64) {
 	if err := t.tap(x, y); err != nil {
-		k6ext.Panic(t.ctx, "unable to tap: %w", err)
+		k6ext.Panic(t.ctx, "tapping: %w", err)
 	}
 }

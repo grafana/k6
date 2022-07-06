@@ -587,7 +587,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 	defaultReferer := netMgr.extraHTTPHeaders["referer"]
 	parsedOpts := NewFrameGotoOptions(defaultReferer, time.Duration(m.timeoutSettings.navigationTimeout())*time.Second)
 	if err := parsedOpts.Parse(m.ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("failed parsing options: %w", err))
+		k6ext.Panic(m.ctx, "parsing frame navigation options to %q: %v", url, err)
 	}
 
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(m.ctx, parsedOpts.Timeout)
@@ -616,7 +616,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 	}
 	newDocumentID, err := fs.navigateFrame(frame, url, parsedOpts.Referer)
 	if err != nil {
-		k6common.Throw(rt, err)
+		k6ext.Panic(m.ctx, "navigating to %q: %v", url, err)
 	}
 
 	var event *NavigationEvent
@@ -636,7 +636,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 			return false
 		}, parsedOpts.Timeout)
 		if err != nil {
-			k6common.Throw(rt, err)
+			k6ext.Panic(m.ctx, "navigating to %q: %v", url, err)
 		}
 
 		event = data.(*NavigationEvent)
@@ -658,7 +658,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 		select {
 		case <-timeoutCtx.Done():
 			if timeoutCtx.Err() == context.DeadlineExceeded {
-				k6common.Throw(rt, ErrTimedOut)
+				k6ext.Panic(m.ctx, "navigating to %q: %s after %s", url, ErrTimedOut, parsedOpts.Timeout)
 			}
 		case data := <-chSameDoc:
 			event = data.(*NavigationEvent)
@@ -673,7 +673,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 		select {
 		case <-timeoutCtx.Done():
 			if timeoutCtx.Err() == context.DeadlineExceeded {
-				k6common.Throw(rt, ErrTimedOut)
+				k6ext.Panic(m.ctx, "navigating to %q: %s after %s", url, ErrTimedOut, parsedOpts.Timeout)
 			}
 		case <-chWaitUntilCh:
 		}

@@ -152,7 +152,7 @@ func (r *Response) fetchBody() error {
 	action := network.GetResponseBody(r.request.requestID)
 	body, err := action.Do(cdp.WithExecutor(r.ctx, r.request.frame.manager.session))
 	if err != nil {
-		return fmt.Errorf("error fetching response body: %w", err)
+		return fmt.Errorf("fetching response body: %w", err)
 	}
 	r.bodyMu.Lock()
 	r.body = body
@@ -187,7 +187,7 @@ func (r *Response) Body() goja.ArrayBuffer {
 		k6ext.Panic(r.ctx, "Response body is unavailable for redirect responses")
 	}
 	if err := r.fetchBody(); err != nil {
-		k6ext.Panic(r.ctx, "error getting response body: %w", err)
+		k6ext.Panic(r.ctx, "getting response body: %w", err)
 	}
 	r.bodyMu.RLock()
 	defer r.bodyMu.RUnlock()
@@ -277,14 +277,14 @@ func (r *Response) HeadersArray() []api.HTTPHeader {
 func (r *Response) JSON() goja.Value {
 	if r.cachedJSON == nil {
 		if err := r.fetchBody(); err != nil {
-			k6ext.Panic(r.ctx, "error getting response body: %w", err)
+			k6ext.Panic(r.ctx, "getting response body: %w", err)
 		}
 
 		var v interface{}
 		r.bodyMu.RLock()
 		defer r.bodyMu.RUnlock()
 		if err := json.Unmarshal(r.body, &v); err != nil {
-			k6ext.Panic(r.ctx, "error unmarshalling response body to JSON: %w", err)
+			k6ext.Panic(r.ctx, "unmarshalling response body to JSON: %w", err)
 		}
 		r.cachedJSON = v
 	}
@@ -336,7 +336,7 @@ func (r *Response) StatusText() string {
 // Text returns the response body as a string.
 func (r *Response) Text() string {
 	if err := r.fetchBody(); err != nil {
-		k6ext.Panic(r.ctx, "error getting response body as text: %w", err)
+		k6ext.Panic(r.ctx, "getting response body as text: %w", err)
 	}
 	r.bodyMu.RLock()
 	defer r.bodyMu.RUnlock()

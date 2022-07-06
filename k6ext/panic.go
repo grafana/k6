@@ -16,14 +16,14 @@ func Panic(ctx context.Context, format string, a ...interface{}) {
 	rt := Runtime(ctx)
 	if rt == nil {
 		// this should never happen unless a programmer error
-		panic("cannot get k6 runtime")
+		panic("no k6 JS runtime in context")
 	}
 	defer k6common.Throw(rt, fmt.Errorf(format, a...))
 
 	pid := GetProcessID(ctx)
 	if pid == 0 {
 		// this should never happen unless a programmer error
-		panic("cannot find process id")
+		panic("no browser process ID in context")
 	}
 	p, err := os.FindProcess(pid)
 	if err != nil {

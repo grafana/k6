@@ -130,7 +130,7 @@ func NewFrameSession(
 			"sid:%v tid:%v err:%v",
 			s.ID(), tid, err)
 
-		return nil, fmt.Errorf(`unable to get window ID: %w`, err)
+		return nil, fmt.Errorf("getting window ID: %w", err)
 	}
 
 	fs.initEvents()
@@ -176,7 +176,7 @@ func (fs *FrameSession) emulateLocale() error {
 		if strings.Contains(err.Error(), "Another locale override is already in effect") {
 			return nil
 		}
-		return fmt.Errorf(`unable to set locale: %w`, err)
+		return fmt.Errorf("emulating locale %q: %w", fs.page.browserCtx.opts.Locale, err)
 	}
 	return nil
 }
@@ -187,7 +187,7 @@ func (fs *FrameSession) emulateTimezone() error {
 		if strings.Contains(err.Error(), "Timezone override is already in effect") {
 			return nil
 		}
-		return fmt.Errorf(`unable to set timezone ID: %w`, err)
+		return fmt.Errorf("emulating timezone %q: %w", fs.page.browserCtx.opts.TimezoneID, err)
 	}
 	return nil
 }
@@ -206,7 +206,7 @@ func (fs *FrameSession) initDomains() error {
 	}
 	for _, action := range actions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-			return fmt.Errorf("unable to execute %T: %w", action, err)
+			return fmt.Errorf("executing %T: %w", action, err)
 		}
 	}
 	return nil
@@ -290,7 +290,7 @@ func (fs *FrameSession) initFrameTree() error {
 
 	action := cdppage.Enable()
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return fmt.Errorf("unable to enable page domain: %w", err)
+		return fmt.Errorf("enabling page domain: %w", err)
 	}
 
 	var frameTree *cdppage.FrameTree
@@ -300,7 +300,7 @@ func (fs *FrameSession) initFrameTree() error {
 	// used for access and manipulation from JS.
 	action2 := cdppage.GetFrameTree()
 	if frameTree, err = action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return fmt.Errorf("unable to get page frame tree: %w", err)
+		return fmt.Errorf("getting page frame tree: %w", err)
 	} else if frameTree == nil {
 		// This can happen with very short scripts when we might not have enough
 		// time to initialize properly.
@@ -320,7 +320,7 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 
 	action := cdppage.SetLifecycleEventsEnabled(true)
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return fmt.Errorf(`unable to enable page lifecycle events: %w`, err)
+		return fmt.Errorf("enabling page lifecycle events: %w", err)
 	}
 
 	if _, ok := fs.isolatedWorlds[name]; ok {
@@ -357,7 +357,7 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	action2 := cdppage.AddScriptToEvaluateOnNewDocument(`//# sourceURL=` + evaluationScriptURL).
 		WithWorldName(name)
 	if _, err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return fmt.Errorf("unable to add script to evaluate for isolated world: %w", err)
+		return fmt.Errorf("adding script to evaluate on new document: %w", err)
 	}
 	return nil
 }
@@ -438,7 +438,7 @@ func (fs *FrameSession) initOptions() error {
 
 	for _, action := range optActions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-			return fmt.Errorf("unable to execute %T: %w", action, err)
+			return fmt.Errorf("executing %T: %w", action, err)
 		}
 	}
 
@@ -553,7 +553,7 @@ func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecuti
 		Type      string      `json:"type"`
 	}
 	if err := json.Unmarshal(auxData, &i); err != nil {
-		k6ext.Panic(fs.ctx, "unable to unmarshal JSON: %w", err)
+		k6ext.Panic(fs.ctx, "unmarshaling executionContextCreated event JSON: %w", err)
 	}
 	var world executionWorld
 	frame := fs.manager.getFrameByID(i.FrameID)
@@ -638,9 +638,12 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 		"sid:%v tid:%v fid:%v",
 		fs.session.ID(), fs.targetID, frame.ID)
 
-	err := fs.manager.frameNavigated(frame.ID, frame.ParentID, frame.LoaderID.String(), frame.Name, frame.URL+frame.URLFragment, initial)
+	err := fs.manager.frameNavigated(
+		frame.ID, frame.ParentID, frame.LoaderID.String(),
+		frame.Name, frame.URL+frame.URLFragment, initial)
 	if err != nil {
-		k6ext.Panic(fs.ctx, "cannot handle frame navigation: %w", err)
+		k6ext.Panic(fs.ctx, "handling frameNavigated event to %q: %w",
+			frame.URL+frame.URLFragment, err)
 	}
 }
 
@@ -652,7 +655,7 @@ func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequ
 	if event.Disposition == "currentTab" {
 		err := fs.manager.frameRequestedNavigation(event.FrameID, event.URL, "")
 		if err != nil {
-			k6ext.Panic(fs.ctx, "cannot handle frame requested navigation: %w", err)
+			k6ext.Panic(fs.ctx, "handling frameRequestedNavigation event to %q: %w", event.URL, err)
 		}
 	}
 }
@@ -809,7 +812,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 			return // ignore
 		}
 		reason = "fatal"
-		k6ext.Panic(fs.ctx, "cannot attach %v: %w", ti.Type, err)
+		k6ext.Panic(fs.ctx, "attaching %v: %w", ti.Type, err)
 	}
 }
 
@@ -834,7 +837,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 		fs.page, fs, ti.TargetID,
 		fs.logger)
 	if err != nil {
-		return fmt.Errorf("cannot attach iframe target (%v) to session (%v): %w",
+		return fmt.Errorf("attaching iframe target ID %v to session ID %v: %w",
 			ti.TargetID, sid, err)
 	}
 	fs.page.attachFrameSession(cdp.FrameID(ti.TargetID), nfs)
@@ -846,7 +849,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, sid target.SessionID) error {
 	w, err := NewWorker(fs.ctx, fs.page.browserCtx.getSession(sid), ti.TargetID, ti.URL)
 	if err != nil {
-		return fmt.Errorf("cannot attach worker target (%v) to session (%v): %w",
+		return fmt.Errorf("attaching worker target ID %v to session ID %v: %w",
 			ti.TargetID, sid, err)
 	}
 	fs.page.workers[sid] = w
@@ -899,7 +902,7 @@ func (fs *FrameSession) updateEmulateMedia(initial bool) error {
 		WithMedia(string(fs.page.mediaType)).
 		WithFeatures(features)
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return fmt.Errorf("unable to execute %T: %w", action, err)
+		return fmt.Errorf("executing %T: %w", action, err)
 	}
 	return nil
 }
@@ -930,7 +933,7 @@ func (fs *FrameSession) updateGeolocation(initial bool) error {
 			WithLongitude(geolocation.Longitude).
 			WithAccuracy(geolocation.Accurracy)
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-			return fmt.Errorf("unable to set geolocation override: %w", err)
+			return fmt.Errorf("overriding geolocation: %w", err)
 		}
 	}
 	return nil
@@ -996,7 +999,7 @@ func (fs *FrameSession) updateViewport() error {
 		WithScreenWidth(screen.Width).
 		WithScreenHeight(screen.Height)
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return fmt.Errorf("unable to emulate viewport: %w", err)
+		return fmt.Errorf("emulating viewport: %w", err)
 	}
 
 	// add an inset to viewport depending on the operating system.
@@ -1010,7 +1013,7 @@ func (fs *FrameSession) updateViewport() error {
 		Height: viewport.Height,
 	})
 	if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return fmt.Errorf("unable to set window bounds: %w", err)
+		return fmt.Errorf("setting window bounds: %w", err)
 	}
 
 	return nil

@@ -100,7 +100,7 @@ func (s *screenshotter) originalViewportSize(p *Page) (*Size, *Size, error) {
 		{ width: window.innerWidth, height: window.innerHeight }
 	)`))
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot evaluate page function: %w", err)
+		return nil, nil, fmt.Errorf("getting viewport dimensions: %w", err)
 	}
 	r, ok := result.(goja.Object)
 	if !ok {
@@ -133,7 +133,7 @@ func (s *screenshotter) screenshot(
 		action := emulation.SetDefaultBackgroundColorOverride().
 			WithColor(&cdp.RGBA{R: 0, G: 0, B: 0, A: 0})
 		if err := action.Do(cdp.WithExecutor(s.ctx, sess)); err != nil {
-			return nil, fmt.Errorf("cannot set screenshot background transparency: %w", err)
+			return nil, fmt.Errorf("setting screenshot background transparency: %w", err)
 		}
 	}
 
@@ -151,7 +151,7 @@ func (s *screenshotter) screenshot(
 	//nolint:dogsled
 	_, visualViewport, _, _, _, _, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(s.ctx, sess))
 	if err != nil {
-		return nil, fmt.Errorf("cannot get layout metrics for screenshot: %w", err)
+		return nil, fmt.Errorf("getting layout metrics for screenshot: %w", err)
 	}
 
 	if doc == nil {
@@ -185,13 +185,13 @@ func (s *screenshotter) screenshot(
 	// Capture screenshot
 	buf, err = capture.Do(cdp.WithExecutor(s.ctx, sess))
 	if err != nil {
-		return nil, fmt.Errorf("cannot capture screenshot: %w", err)
+		return nil, fmt.Errorf("capturing screenshot: %w", err)
 	}
 
 	if shouldSetDefaultBackground {
 		action := emulation.SetDefaultBackgroundColorOverride()
 		if err := action.Do(cdp.WithExecutor(s.ctx, sess)); err != nil {
-			return nil, fmt.Errorf("cannot reset screenshot background color: %w", err)
+			return nil, fmt.Errorf("resetting screenshot background color: %w", err)
 		}
 	}
 
@@ -200,10 +200,10 @@ func (s *screenshotter) screenshot(
 	if path != "" {
 		dir := filepath.Dir(path)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return nil, fmt.Errorf("cannot create directory for screenshot: %w", err)
+			return nil, fmt.Errorf("creating screenshot directory %q: %w", dir, err)
 		}
 		if err := ioutil.WriteFile(path, buf, 0o644); err != nil {
-			return nil, fmt.Errorf("cannot save screenshot to file: %w", err)
+			return nil, fmt.Errorf("saving screenshot to %q: %w", path, err)
 		}
 	}
 
@@ -214,12 +214,12 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 	format := opts.Format
 	viewportSize, originalViewportSize, err := s.originalViewportSize(h.frame.page)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get original viewport size: %w", err)
+		return nil, fmt.Errorf("getting original viewport size: %w", err)
 	}
 
 	err = h.waitAndScrollIntoViewIfNeeded(h.ctx, false, true, opts.Timeout)
 	if err != nil {
-		return nil, fmt.Errorf("failed to scroll element into view: %w", err)
+		return nil, fmt.Errorf("scrolling element into view: %w", err)
 	}
 
 	bbox, err := h.boundingBox()
@@ -241,11 +241,12 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 			Height: math.Max(viewportSize.Height, bbox.Height),
 		}.enclosingIntSize()
 		if err := h.frame.page.setViewportSize(overriddenViewportSize); err != nil {
-			return nil, fmt.Errorf("cannot set viewport size: %w", err)
+			return nil, fmt.Errorf("setting viewport size to %s: %w",
+				overriddenViewportSize, err)
 		}
 		err = h.waitAndScrollIntoViewIfNeeded(h.ctx, false, true, opts.Timeout)
 		if err != nil {
-			return nil, fmt.Errorf("cannot scroll element into view: %w", err)
+			return nil, fmt.Errorf("scrolling element into view: %w", err)
 		}
 		bbox, err = h.boundingBox()
 		if err != nil {
@@ -274,7 +275,7 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 	}
 	if overriddenViewportSize != nil {
 		if err := s.restoreViewport(h.frame.page, originalViewportSize); err != nil {
-			return nil, fmt.Errorf("cannot restore viewport: %w", err)
+			return nil, fmt.Errorf("restoring viewport: %w", err)
 		}
 	}
 	return buf, nil
@@ -292,13 +293,13 @@ func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) (*[
 
 	viewportSize, originalViewportSize, err := s.originalViewportSize(p)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get original viewport size: %w", err)
+		return nil, fmt.Errorf("getting original viewport size: %w", err)
 	}
 
 	if opts.FullPage {
 		fullPageSize, err := s.fullPageSize(p)
 		if err != nil {
-			return nil, fmt.Errorf("cannot get full page size: %w", err)
+			return nil, fmt.Errorf("getting full page size: %w", err)
 		}
 		documentRect := &Rect{
 			X:      0,
@@ -311,7 +312,8 @@ func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) (*[
 		if !fitsViewport {
 			overriddenViewportSize = fullPageSize
 			if err := p.setViewportSize(overriddenViewportSize); err != nil {
-				return nil, fmt.Errorf("cannot set viewport size: %w", err)
+				return nil, fmt.Errorf("setting viewport size to %s: %w",
+					overriddenViewportSize, err)
 			}
 		}
 		if opts.Clip != nil {
@@ -322,17 +324,18 @@ func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) (*[
 				Height: opts.Clip.Height,
 			}, &Size{Width: documentRect.Width, Height: documentRect.Height})
 			if err != nil {
-				return nil, fmt.Errorf("cannot trim clip to size: %w", err)
+				return nil, fmt.Errorf("trimming clip to size: %w", err)
 			}
 		}
 
 		buf, err := s.screenshot(p.session, documentRect, nil, format, opts.OmitBackground, opts.Quality, opts.Path)
 		if err != nil {
-			return nil, fmt.Errorf("cannot screenshot: %w", err)
+			return nil, err
 		}
 		if overriddenViewportSize != nil {
 			if err := s.restoreViewport(p, originalViewportSize); err != nil {
-				return nil, fmt.Errorf("cannot restore viewport: %w", err)
+				return nil, fmt.Errorf("restoring viewport to %s: %w",
+					originalViewportSize, err)
 			}
 		}
 		return buf, nil
@@ -352,7 +355,7 @@ func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) (*[
 			Height: opts.Clip.Height,
 		}, viewportSize)
 		if err != nil {
-			return nil, fmt.Errorf("cannot trim clip to size: %w", err)
+			return nil, fmt.Errorf("trimming clip to size: %w", err)
 		}
 	}
 	return s.screenshot(p.session, nil, viewportRect, format, opts.OmitBackground, opts.Quality, opts.Path)

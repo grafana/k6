@@ -76,7 +76,7 @@ func (w *Worker) initEvents() error {
 	}
 	for _, action := range actions {
 		if err := action.Do(cdp.WithExecutor(w.ctx, w.session)); err != nil {
-			return fmt.Errorf("unable to execute %T: %w", action, err)
+			return fmt.Errorf("protocol error while initializing worker %T: %w", action, err)
 		}
 	}
 	return nil

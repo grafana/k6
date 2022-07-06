@@ -149,7 +149,7 @@ func NewPage(
 
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return nil, fmt.Errorf("cannot execute %T: %w", action, err)
+		return nil, fmt.Errorf("executing CDP action %T: %w", action, err)
 	}
 
 	return &p, nil
@@ -211,7 +211,7 @@ func (p *Page) getFrameElement(f *Frame) (handle *ElementHandle, _ error) {
 		if strings.Contains(err.Error(), "frame with the given id was not found") {
 			return nil, errors.New("frame has been detached")
 		}
-		return nil, fmt.Errorf("unable to get frame owner: %w", err)
+		return nil, fmt.Errorf("getting frame owner: %w", err)
 	}
 
 	parent = f.parentFrame
@@ -384,7 +384,7 @@ func (p *Page) BringToFront() {
 
 	action := cdppage.BringToFront()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6ext.Panic(p.ctx, "unable to bring page to front: %w", err)
+		k6ext.Panic(p.ctx, "bringing page to front: %w", err)
 	}
 }
 
@@ -458,7 +458,7 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 
 	parsedOpts := NewPageEmulateMediaOptions(p.mediaType, p.colorScheme, p.reducedMotion)
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6ext.Panic(p.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(p.ctx, "parsing emulateMedia options: %w", err)
 	}
 
 	p.mediaType = parsedOpts.Media
@@ -467,7 +467,7 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 
 	for _, fs := range p.frameSessions {
 		if err := fs.updateEmulateMedia(false); err != nil {
-			k6ext.Panic(p.ctx, "error emulating media: %w", err)
+			k6ext.Panic(p.ctx, "emulating media: %w", err)
 		}
 	}
 
@@ -493,7 +493,7 @@ func (p *Page) EmulateVisionDeficiency(typ string) {
 
 	action := emulation.SetEmulatedVisionDeficiency(t)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6ext.Panic(p.ctx, "unable to set emulated vision deficiency '%s': %w", typ, err)
+		k6ext.Panic(p.ctx, "setting emulated vision deficiency %q: %w", typ, err)
 	}
 
 	applySlowMo(p.ctx)
@@ -688,7 +688,7 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 
 	parsedOpts := NewPageReloadOptions(LifecycleEventLoad, p.defaultTimeout())
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6ext.Panic(p.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(p.ctx, "parsing reload options: %w", err)
 	}
 
 	ch, evCancelFn := createWaitForEventHandler(p.ctx, p.frameManager.MainFrame(), []string{EventFrameNavigation}, func(data interface{}) bool {
@@ -698,7 +698,7 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 
 	action := cdppage.Reload()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6ext.Panic(p.ctx, "unable to reload page: %w", err)
+		k6ext.Panic(p.ctx, "reloading page: %w", err)
 	}
 
 	var event *NavigationEvent
@@ -735,12 +735,12 @@ func (p *Page) Route(url goja.Value, handler goja.Callable) {
 func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	parsedOpts := NewPageScreenshotOptions()
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6ext.Panic(p.ctx, "failed parsing screenshot options: %w", err)
+		k6ext.Panic(p.ctx, "parsing screenshot options: %w", err)
 	}
 	s := newScreenshotter(p.ctx)
 	buf, err := s.screenshotPage(p, parsedOpts)
 	if err != nil {
-		k6ext.Panic(p.ctx, "cannot capture screenshot: %w", err)
+		k6ext.Panic(p.ctx, "capturing screenshot: %w", err)
 	}
 	rt := p.vu.Runtime()
 	return rt.NewArrayBuffer(*buf)
@@ -791,10 +791,10 @@ func (p *Page) SetViewportSize(viewportSize goja.Value) {
 
 	s := &Size{}
 	if err := s.Parse(p.ctx, viewportSize); err != nil {
-		k6ext.Panic(p.ctx, "error parsing viewport size: %w", err)
+		k6ext.Panic(p.ctx, "parsing viewport size: %w", err)
 	}
 	if err := p.setViewportSize(s); err != nil {
-		k6ext.Panic(p.ctx, "error setting viewport size: %w", err)
+		k6ext.Panic(p.ctx, "setting viewport size: %w", err)
 	}
 	applySlowMo(p.ctx)
 }

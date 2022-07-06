@@ -91,7 +91,7 @@ func convertArgument(
 
 		b, err := json.Marshal(a)
 		if err != nil {
-			err = fmt.Errorf("error converting argument '%v': %w", arg, err)
+			err = fmt.Errorf("converting argument '%v': %w", arg, err)
 		}
 
 		return &cdpruntime.CallArgument{Value: b}, err
@@ -189,7 +189,7 @@ func waitForEvent(ctx context.Context, emitter EventEmitter, events []string, pr
 	select {
 	case <-ctx.Done():
 	case <-time.After(timeout):
-		return nil, ErrTimedOut
+		return nil, fmt.Errorf("%w after %s", ErrTimedOut, timeout)
 	case evData := <-ch:
 		return evData, nil
 	}

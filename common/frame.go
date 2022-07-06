@@ -382,14 +382,14 @@ func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
 		f.vu.Runtime().ToValue("document"),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("cannot evaluate in main execution context: %w", err)
+		return nil, fmt.Errorf("getting document element handle: %w", err)
 	}
 	if result == nil {
-		return nil, errors.New("evaluate result is nil in main execution context")
+		return nil, fmt.Errorf("document element handle is nil")
 	}
 	dh, ok := result.(*ElementHandle)
 	if !ok {
-		return nil, fmt.Errorf("invalid document handle")
+		return nil, fmt.Errorf("invalid document handle type: %T", result)
 	}
 
 	return dh, nil
@@ -567,11 +567,11 @@ func (f *Frame) waitForFunction(
 
 	execCtx := f.executionContexts[world]
 	if execCtx == nil {
-		return nil, fmt.Errorf("cannot find execution context: %q", world)
+		return nil, fmt.Errorf("execution context %q not found", world)
 	}
 	injected, err := execCtx.getInjectedScript(apiCtx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting injected script: %w", err)
 	}
 
 	pageFn := `
@@ -701,7 +701,7 @@ func (f *Frame) Click(selector string, opts goja.Value) {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
 	if err := f.click(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "click %q: %w", selector, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -714,7 +714,7 @@ func (f *Frame) click(selector string, opts *FrameClickOptions) error {
 		selector, DOMElementStateAttached, opts.Strict, click, &opts.ElementHandleBasePointerOptions,
 	)
 	if _, err := callApiWithTimeout(f.ctx, act, opts.Timeout); err != nil {
-		return err
+		return errorFromDOMError(err.Error())
 	}
 
 	return nil
@@ -729,7 +729,7 @@ func (f *Frame) Check(selector string, opts goja.Value) {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
 	if err := f.check(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "check %q: %w", selector, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -741,8 +741,11 @@ func (f *Frame) check(selector string, opts *FrameCheckOptions) error {
 	act := f.newPointerAction(
 		selector, DOMElementStateAttached, opts.Strict, check, &opts.ElementHandleBasePointerOptions,
 	)
-	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
-	return err
+	if _, err := callApiWithTimeout(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err.Error())
+	}
+
+	return nil
 }
 
 // Uncheck the first found element that matches the selector.
@@ -754,7 +757,7 @@ func (f *Frame) Uncheck(selector string, opts goja.Value) {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
 	if err := f.uncheck(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "uncheck %q: %w", selector, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -766,8 +769,11 @@ func (f *Frame) uncheck(selector string, opts *FrameUncheckOptions) error {
 	act := f.newPointerAction(
 		selector, DOMElementStateAttached, opts.Strict, uncheck, &opts.ElementHandleBasePointerOptions,
 	)
-	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
-	return err
+	if _, err := callApiWithTimeout(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err.Error())
+	}
+
+	return nil
 }
 
 // IsChecked returns true if the first element that matches the selector
@@ -781,7 +787,7 @@ func (f *Frame) IsChecked(selector string, opts goja.Value) bool {
 	}
 	checked, err := f.isChecked(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "isChecked %q: %w", selector, err)
 	}
 
 	return checked
@@ -800,7 +806,7 @@ func (f *Frame) isChecked(selector string, opts *FrameIsCheckedOptions) (bool, e
 	)
 	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return false, err
+		return false, errorFromDOMError(err.Error())
 	}
 
 	bv, ok := v.(bool)
@@ -839,7 +845,7 @@ func (f *Frame) Dblclick(selector string, opts goja.Value) {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
 	if err := f.dblclick(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "dblclick %q: %w", selector, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -853,8 +859,11 @@ func (f *Frame) dblclick(selector string, opts *FrameDblclickOptions) error {
 	act := f.newPointerAction(
 		selector, DOMElementStateAttached, opts.Strict, dblclick, &opts.ElementHandleBasePointerOptions,
 	)
-	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
-	return err
+	if _, err := callApiWithTimeout(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err.Error())
+	}
+
+	return nil
 }
 
 // DispatchEvent dispatches an event for the first element matching the selector.
@@ -866,7 +875,7 @@ func (f *Frame) DispatchEvent(selector, typ string, eventInit, opts goja.Value) 
 		k6ext.Panic(f.ctx, "Frame.dispatchEvent options: %w", err)
 	}
 	if err := f.dispatchEvent(selector, typ, eventInit, popts); err != nil {
-		k6ext.Panic(f.ctx, "Frame.dispatchEvent: %w", err)
+		k6ext.Panic(f.ctx, "dispatchEvent %q to %q: %w", typ, selector, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -885,9 +894,11 @@ func (f *Frame) dispatchEvent(selector, typ string, eventInit goja.Value, opts *
 		selector, DOMElementStateAttached, opts.Strict, dispatchEvent, []string{},
 		force, noWaitAfter, opts.Timeout,
 	)
-	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
+	if _, err := callApiWithTimeout(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err.Error())
+	}
 
-	return err
+	return nil
 }
 
 // Evaluate will evaluate provided page function within an execution context.
@@ -902,7 +913,7 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
 	}
 	result, err := f.evaluate(f.ctx, mainWorld, opts, pageFunc, args...)
 	if err != nil {
-		k6ext.Panic(f.ctx, "error calling evaluate: %w", err)
+		k6ext.Panic(f.ctx, "evaluating JS: %v", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -921,13 +932,13 @@ func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle 
 	{
 		ec := f.executionContexts[mainWorld]
 		if ec == nil {
-			k6ext.Panic(f.ctx, "cannot find execution context: %q", mainWorld)
+			k6ext.Panic(f.ctx, "execution context %q not found", mainWorld)
 		}
 		handle, err = ec.EvalHandle(f.ctx, pageFunc, args...)
 	}
 	f.executionContextMu.RUnlock()
 	if err != nil {
-		k6ext.Panic(f.ctx, "error evaluating handle: %w", err)
+		k6ext.Panic(f.ctx, "evaluating handle: %w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -943,7 +954,7 @@ func (f *Frame) Fill(selector, value string, opts goja.Value) {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
 	if err := f.fill(selector, value, popts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "fill %q with %q: %w", selector, value, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -957,8 +968,11 @@ func (f *Frame) fill(selector, value string, opts *FrameFillOptions) error {
 		fill, []string{"visible", "enabled", "editable"},
 		opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
-	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
-	return err
+	if _, err := callApiWithTimeout(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err.Error())
+	}
+
+	return nil
 }
 
 // Focus focuses on the first element that matches the selector.
@@ -970,7 +984,7 @@ func (f *Frame) Focus(selector string, opts goja.Value) {
 		k6ext.Panic(f.ctx, "%w", err)
 	}
 	if err := f.focus(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "focus %q: %w", selector, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -983,8 +997,11 @@ func (f *Frame) focus(selector string, opts *FrameBaseOptions) error {
 		selector, DOMElementStateAttached, opts.Strict, focus,
 		[]string{}, false, true, opts.Timeout,
 	)
-	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
-	return err
+	if _, err := callApiWithTimeout(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err.Error())
+	}
+
+	return nil
 }
 
 func (f *Frame) FrameElement() api.ElementHandle {
@@ -992,7 +1009,7 @@ func (f *Frame) FrameElement() api.ElementHandle {
 
 	element, err := f.page.getFrameElement(f)
 	if err != nil {
-		k6ext.Panic(f.ctx, "error getting frame element: %w", err)
+		k6ext.Panic(f.ctx, "getting frame element: %w", err)
 	}
 	return element
 }
@@ -1007,7 +1024,7 @@ func (f *Frame) GetAttribute(selector, name string, opts goja.Value) goja.Value 
 	}
 	v, err := f.getAttribute(selector, name, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getAttribute: %w", err)
+		k6ext.Panic(f.ctx, "getAttribute %q of %q: %w", name, selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1025,7 +1042,7 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goj
 	)
 	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return nil, err
+		return nil, errorFromDOMError(err.Error())
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
@@ -1051,7 +1068,7 @@ func (f *Frame) Hover(selector string, opts goja.Value) {
 		k6ext.Panic(f.ctx, "parse: %w", err)
 	}
 	if err := f.hover(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "Hover: %w", err)
+		k6ext.Panic(f.ctx, "hover %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1064,8 +1081,11 @@ func (f *Frame) hover(selector string, opts *FrameHoverOptions) error {
 	act := f.newPointerAction(
 		selector, DOMElementStateAttached, opts.Strict, hover, &opts.ElementHandleBasePointerOptions,
 	)
-	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
-	return err
+	if _, err := callApiWithTimeout(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err.Error())
+	}
+
+	return nil
 }
 
 // InnerHTML returns the innerHTML attribute of the first element found
@@ -1079,7 +1099,7 @@ func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
 	}
 	v, err := f.innerHTML(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "innerHTML: %w", err)
+		k6ext.Panic(f.ctx, "innerHTML of %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1097,7 +1117,7 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 	)
 	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return "", err
+		return "", errorFromDOMError(err.Error())
 	}
 	if v == nil {
 		return "", nil
@@ -1121,7 +1141,7 @@ func (f *Frame) InnerText(selector string, opts goja.Value) string {
 	}
 	v, err := f.innerText(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "innerText: %w", err)
+		k6ext.Panic(f.ctx, "innerText of %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1139,7 +1159,7 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 	)
 	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return "", err
+		return "", errorFromDOMError(err.Error())
 	}
 	if v == nil {
 		return "", nil
@@ -1163,7 +1183,7 @@ func (f *Frame) InputValue(selector string, opts goja.Value) string {
 	}
 	v, err := f.inputValue(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "inputValue: %w", err)
+		k6ext.Panic(f.ctx, "inputValue of %q: %w", selector, err)
 	}
 
 	return v
@@ -1179,7 +1199,7 @@ func (f *Frame) inputValue(selector string, opts *FrameInputValueOptions) (strin
 	)
 	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return "", err
+		return "", errorFromDOMError(err.Error())
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
@@ -1216,7 +1236,7 @@ func (f *Frame) IsEditable(selector string, opts goja.Value) bool {
 	}
 	editable, err := f.isEditable(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "isEditable %q: %w", selector, err)
 	}
 
 	return editable
@@ -1235,7 +1255,7 @@ func (f *Frame) isEditable(selector string, opts *FrameIsEditableOptions) (bool,
 	)
 	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return false, err
+		return false, errorFromDOMError(err.Error())
 	}
 
 	bv, ok := v.(bool)
@@ -1257,7 +1277,7 @@ func (f *Frame) IsEnabled(selector string, opts goja.Value) bool {
 	}
 	enabled, err := f.isEnabled(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "isEnabled %q: %w", selector, err)
 	}
 
 	return enabled
@@ -1276,7 +1296,7 @@ func (f *Frame) isEnabled(selector string, opts *FrameIsEnabledOptions) (bool, e
 	)
 	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return false, err
+		return false, errorFromDOMError(err.Error())
 	}
 
 	bv, ok := v.(bool)
@@ -1298,7 +1318,7 @@ func (f *Frame) IsDisabled(selector string, opts goja.Value) bool {
 	}
 	disabled, err := f.isDisabled(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "isDisabled %q: %w", selector, err)
 	}
 
 	return disabled
@@ -1317,7 +1337,7 @@ func (f *Frame) isDisabled(selector string, opts *FrameIsDisabledOptions) (bool,
 	)
 	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return false, err
+		return false, errorFromDOMError(err.Error())
 	}
 
 	bv, ok := v.(bool)
@@ -1339,7 +1359,7 @@ func (f *Frame) IsHidden(selector string, opts goja.Value) bool {
 	}
 	hidden, err := f.isHidden(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "isHidden %q: %w", selector, err)
 	}
 
 	return hidden
@@ -1358,7 +1378,7 @@ func (f *Frame) isHidden(selector string, opts *FrameIsHiddenOptions) (bool, err
 	)
 	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return false, err
+		return false, errorFromDOMError(err.Error())
 	}
 
 	bv, ok := v.(bool)
@@ -1380,7 +1400,7 @@ func (f *Frame) IsVisible(selector string, opts goja.Value) bool {
 	}
 	visible, err := f.isVisible(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "isVisible %q: %w", selector, err)
 	}
 
 	return visible
@@ -1399,7 +1419,7 @@ func (f *Frame) isVisible(selector string, opts *FrameIsVisibleOptions) (bool, e
 	)
 	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return false, err
+		return false, errorFromDOMError(err.Error())
 	}
 
 	bv, ok := v.(bool)
@@ -1448,7 +1468,7 @@ func (f *Frame) Query(selector string) api.ElementHandle {
 
 	document, err := f.document()
 	if err != nil {
-		k6ext.Panic(f.ctx, "error getting document: %w", err)
+		k6ext.Panic(f.ctx, "getting document: %w", err)
 	}
 	value := document.Query(selector)
 	if value != nil {
@@ -1462,7 +1482,7 @@ func (f *Frame) QueryAll(selector string) []api.ElementHandle {
 
 	document, err := f.document()
 	if err != nil {
-		k6ext.Panic(f.ctx, "error getting document: %w", err)
+		k6ext.Panic(f.ctx, "getting document: %w", err)
 	}
 	value := document.QueryAll(selector)
 	if value != nil {
@@ -1490,7 +1510,7 @@ func (f *Frame) Press(selector, key string, opts goja.Value) {
 		k6ext.Panic(f.ctx, "parse: %w", err)
 	}
 	if err := f.press(selector, key, popts); err != nil {
-		k6ext.Panic(f.ctx, "press: %w", err)
+		k6ext.Panic(f.ctx, "press %q on %q: %w", key, selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1504,8 +1524,11 @@ func (f *Frame) press(selector, key string, opts *FramePressOptions) error {
 		selector, DOMElementStateAttached, opts.Strict, press,
 		[]string{}, false, opts.NoWaitAfter, opts.Timeout,
 	)
-	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
-	return err
+	if _, err := callApiWithTimeout(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err.Error())
+	}
+
+	return nil
 }
 
 // SelectOption selects the given options and returns the array of
@@ -1519,7 +1542,7 @@ func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value
 	}
 	v, err := f.selectOption(selector, values, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "selectOption: %w", err)
+		k6ext.Panic(f.ctx, "selectOption on %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1537,7 +1560,7 @@ func (f *Frame) selectOption(selector string, values goja.Value, opts *FrameSele
 	)
 	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return nil, err
+		return nil, errorFromDOMError(err.Error())
 	}
 	selectHandle, ok := v.(jsHandle)
 	if !ok {
@@ -1569,7 +1592,7 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 
 	parsedOpts := NewFrameSetContentOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(f.ctx, "parsing setContent options: %w", err)
 	}
 
 	js := `(html) => {
@@ -1587,7 +1610,7 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 	}
 	rt := f.vu.Runtime()
 	if _, err := f.evaluate(f.ctx, utilityWorld, eopts, rt.ToValue(js), rt.ToValue(html)); err != nil {
-		k6ext.Panic(f.ctx, "error setting content: %w", err)
+		k6ext.Panic(f.ctx, "setting content: %w", err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1607,7 +1630,7 @@ func (f *Frame) Tap(selector string, opts goja.Value) {
 		k6ext.Panic(f.ctx, "parse: %w", err)
 	}
 	if err := f.tap(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "tap: %w", err)
+		k6ext.Panic(f.ctx, "tap %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1620,8 +1643,11 @@ func (f *Frame) tap(selector string, opts *FrameTapOptions) error {
 	act := f.newPointerAction(
 		selector, DOMElementStateAttached, opts.Strict, tap, &opts.ElementHandleBasePointerOptions,
 	)
-	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
-	return err
+	if _, err := callApiWithTimeout(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err.Error())
+	}
+
+	return nil
 }
 
 // TextContent returns the textContent attribute of the first element found
@@ -1635,7 +1661,7 @@ func (f *Frame) TextContent(selector string, opts goja.Value) string {
 	}
 	v, err := f.textContent(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "textContent: %w", err)
+		k6ext.Panic(f.ctx, "textContent of %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1653,7 +1679,7 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 	)
 	v, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return "", err
+		return "", errorFromDOMError(err.Error())
 	}
 	if v == nil {
 		return "", nil
@@ -1682,7 +1708,7 @@ func (f *Frame) Type(selector, text string, opts goja.Value) {
 		k6ext.Panic(f.ctx, "parse: %w", err)
 	}
 	if err := f.typ(selector, text, popts); err != nil {
-		k6ext.Panic(f.ctx, "type: %w", err)
+		k6ext.Panic(f.ctx, "type %q in %q: %w", text, selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1696,8 +1722,11 @@ func (f *Frame) typ(selector, text string, opts *FrameTypeOptions) error {
 		selector, DOMElementStateAttached, opts.Strict, typeText,
 		[]string{}, false, opts.NoWaitAfter, opts.Timeout,
 	)
-	_, err := callApiWithTimeout(f.ctx, act, opts.Timeout)
-	return err
+	if _, err := callApiWithTimeout(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err.Error())
+	}
+
+	return nil
 }
 
 // URL returns the frame URL.
@@ -1727,7 +1756,7 @@ func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.V
 	parsedOpts := NewFrameWaitForFunctionOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "error parsing waitForFunction options: %w", err)
+		k6ext.Panic(f.ctx, "parsing waitForFunction options: %w", err)
 	}
 
 	f.executionContextMu.RLock()
@@ -1766,13 +1795,13 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 	parsedOpts := NewFrameWaitForLoadStateOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "cannot parse waitForLoadState options: %v", err)
+		k6ext.Panic(f.ctx, "parsing waitForLoadState %q options: %v", state, err)
 	}
 
 	waitUntil := LifecycleEventLoad
 	if state != "" {
 		if err = waitUntil.UnmarshalText([]byte(state)); err != nil {
-			k6ext.Panic(f.ctx, "waitForLoadState error: %v", err)
+			k6ext.Panic(f.ctx, "waitForLoadState: %v", err)
 		}
 	}
 
@@ -1784,7 +1813,7 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 		return data.(LifecycleEvent) == waitUntil
 	}, parsedOpts.Timeout)
 	if err != nil {
-		k6ext.Panic(f.ctx, "cannot waitForEvent: %v", err)
+		k6ext.Panic(f.ctx, "waitForLoadState %q: %v", state, err)
 	}
 }
 
@@ -1797,11 +1826,11 @@ func (f *Frame) WaitForNavigation(opts goja.Value) api.Response {
 func (f *Frame) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
 	parsedOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "failed parsing options: %w", err)
+		k6ext.Panic(f.ctx, "parsing waitForSelector %q options: %w", selector, err)
 	}
 	handle, err := f.waitForSelectorRetry(selector, parsedOpts, maxRetry)
 	if err != nil {
-		k6ext.Panic(f.ctx, "error waiting for selector: %w", err)
+		k6ext.Panic(f.ctx, "waitForSelector %q: %w", selector, err)
 	}
 	return handle
 }
@@ -1827,7 +1856,7 @@ func (f *Frame) adoptBackendNodeID(world executionWorld, id cdp.BackendNodeID) (
 
 	ec := f.executionContexts[world]
 	if ec == nil {
-		return nil, fmt.Errorf("cannot find execution context: %q for %d", world, id)
+		return nil, fmt.Errorf("execution context %q not found", world)
 	}
 	return ec.adoptBackendNodeID(id)
 }
@@ -1844,7 +1873,7 @@ func (f *Frame) evaluate(
 
 	ec := f.executionContexts[world]
 	if ec == nil {
-		return nil, fmt.Errorf("cannot find execution context: %q", world)
+		return nil, fmt.Errorf("execution context %q not found", world)
 	}
 
 	evalArgs := make([]interface{}, 0, len(args))
@@ -1853,7 +1882,7 @@ func (f *Frame) evaluate(
 	}
 	eh, err := ec.eval(apiCtx, opts, pageFunc.ToString().String(), evalArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("frame cannot evaluate: %w", err)
+		return nil, fmt.Errorf("%w", err)
 	}
 
 	return eh, nil

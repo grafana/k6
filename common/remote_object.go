@@ -52,7 +52,7 @@ type objectPropertyParseError struct {
 // Error returns the reason of the failure, including the wrapper parsing error
 // message.
 func (pe *objectPropertyParseError) Error() string {
-	return fmt.Sprintf("failed parsing object property %q: %s", pe.property, pe.error)
+	return fmt.Sprintf("parsing object property %q: %s", pe.property, pe.error)
 }
 
 // Unwrap returns the wrapped parsing error.
@@ -117,10 +117,16 @@ func parseRemoteObjectValue(t cdpruntime.Type, val string, op *cdpruntime.Object
 }
 
 func parseExceptionDetails(exc *cdpruntime.ExceptionDetails) string {
-	errMsg := fmt.Sprintf("%s", exc)
+	if exc == nil {
+		return ""
+	}
+	var errMsg string
 	if exc.Exception != nil {
-		if o, _ := parseRemoteObject(exc.Exception); o != nil {
-			errMsg += fmt.Sprintf("%s", o)
+		errMsg = exc.Exception.Description
+		if errMsg == "" {
+			if o, _ := parseRemoteObject(exc.Exception); o != nil {
+				errMsg = fmt.Sprintf("%s", o)
+			}
 		}
 	}
 	return errMsg
@@ -161,7 +167,7 @@ func handleParseRemoteObjectErr(ctx context.Context, err error, logger *logrus.E
 	merr, ok := err.(*multierror.Error)
 	if !ok {
 		// If this panics it's a bug :)
-		k6ext.Panic(ctx, "unable to parse remote object value: %w", err)
+		k6ext.Panic(ctx, "parsing remote object value: %w", err)
 	}
 	for _, e := range merr.Errors {
 		switch {
@@ -171,7 +177,7 @@ func handleParseRemoteObjectErr(ctx context.Context, err error, logger *logrus.E
 			logger.WithError(ope).Error()
 		default:
 			// If this panics it's a bug :)
-			k6ext.Panic(ctx, "unable to parse remote object value: %w", e)
+			k6ext.Panic(ctx, "parsing remote object value: %w", e)
 		}
 	}
 }
