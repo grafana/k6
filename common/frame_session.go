@@ -206,7 +206,7 @@ func (fs *FrameSession) initDomains() error {
 	}
 	for _, action := range actions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-			return fmt.Errorf("executing %T: %w", action, err)
+			return fmt.Errorf("internal error while enabling %T: %w", action, err)
 		}
 	}
 	return nil
@@ -438,7 +438,7 @@ func (fs *FrameSession) initOptions() error {
 
 	for _, action := range optActions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-			return fmt.Errorf("executing %T: %w", action, err)
+			return fmt.Errorf("internal error while initializing frame %T: %w", action, err)
 		}
 	}
 
@@ -902,7 +902,7 @@ func (fs *FrameSession) updateEmulateMedia(initial bool) error {
 		WithMedia(string(fs.page.mediaType)).
 		WithFeatures(features)
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return fmt.Errorf("executing %T: %w", action, err)
+		return fmt.Errorf("internal error while updating emulated media: %w", err)
 	}
 	return nil
 }
