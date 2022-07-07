@@ -159,10 +159,6 @@ type moduleVUImpl struct {
 	eventLoop *eventloop.EventLoop
 }
 
-func newModuleVUImpl() *moduleVUImpl {
-	return &moduleVUImpl{}
-}
-
 func (m *moduleVUImpl) Context() context.Context {
 	return m.ctx
 }
