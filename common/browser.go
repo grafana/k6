@@ -205,7 +205,7 @@ func (b *Browser) initEvents() error {
 
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		return fmt.Errorf("executing setAutoAttach: %w", err)
+		return fmt.Errorf("internal error while auto-attaching to browser pages: %w", err)
 	}
 
 	// Target.setAutoAttach has a bug where it does not wait for new Targets being attached.
@@ -213,7 +213,7 @@ func (b *Browser) initEvents() error {
 	// This can be removed after https://chromium-review.googlesource.com/c/chromium/src/+/2885888 lands in stable.
 	action2 := target.GetTargetInfo()
 	if _, err := action2.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		return fmt.Errorf("executing getTargetInfo: %w", err)
+		return fmt.Errorf("internal error while getting browser target info: %w", err)
 	}
 
 	return nil
