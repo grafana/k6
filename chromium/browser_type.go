@@ -220,7 +220,7 @@ func (b *BrowserType) allocate(
 		return nil, err
 	}
 
-	wsURL, err := parseWebsocketURL(ctx, stdout)
+	wsURL, err := parseDevToolsURL(ctx, stdout)
 	if err != nil {
 		return nil, fmt.Errorf("getting DevTools URL: %w", err)
 	}
@@ -402,11 +402,11 @@ func execute(
 	return cmd, stdout, nil
 }
 
-// parseWebsocketURL grabs the websocket address from chrome's output and returns it.
-func parseWebsocketURL(ctx context.Context, rc io.Reader) (wsURL string, _ error) {
+// parseDevToolsURL grabs the websocket address from chrome's output and returns it.
+func parseDevToolsURL(ctx context.Context, rc io.Reader) (wsURL string, _ error) {
 	type result struct {
-		wsURL string
-		err   error
+		devToolsURL string
+		err         error
 	}
 	c := make(chan result, 1)
 	go func() {
@@ -428,7 +428,7 @@ func parseWebsocketURL(ctx context.Context, rc io.Reader) (wsURL string, _ error
 	}()
 	select {
 	case r := <-c:
-		return r.wsURL, r.err
+		return r.devToolsURL, r.err
 	case <-ctx.Done():
 		return "", fmt.Errorf("%w", ctx.Err())
 	}
