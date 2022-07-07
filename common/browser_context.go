@@ -214,7 +214,7 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value)
 
 	action := cdpbrowser.GrantPermissions(perms).WithOrigin(origin).WithBrowserContextID(b.id)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
-		k6ext.Panic(b.ctx, "override permissions: %w", err)
+		k6ext.Panic(b.ctx, "internal error while overriding browser permissions: %w", err)
 	}
 }
 
