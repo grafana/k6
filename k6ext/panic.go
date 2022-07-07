@@ -2,8 +2,10 @@ package k6ext
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	k6common "go.k6.io/k6/js/common"
 )
@@ -17,6 +19,12 @@ func Panic(ctx context.Context, format string, a ...interface{}) {
 	if rt == nil {
 		// this should never happen unless a programmer error
 		panic("no k6 JS runtime in context")
+	}
+	if len(a) > 0 {
+		err, ok := a[len(a)-1].(error)
+		if ok {
+			a[len(a)-1] = &userFriendlyError{err}
+		}
 	}
 	defer k6common.Throw(rt, fmt.Errorf(format, a...))
 
@@ -35,4 +43,21 @@ func Panic(ctx context.Context, format string, a ...interface{}) {
 	// dying.
 	_ = p.Release()
 	_ = p.Kill()
+}
+
+type userFriendlyError struct{ err error }
+
+func (e *userFriendlyError) Unwrap() error { return e.err }
+
+func (e *userFriendlyError) Error() string {
+	switch {
+	default:
+		return e.err.Error()
+	case e.err == nil:
+		return ""
+	case errors.Is(e.err, context.DeadlineExceeded):
+		return strings.ReplaceAll(e.err.Error(), context.DeadlineExceeded.Error(), "timed out")
+	case errors.Is(e.err, context.Canceled):
+		return "canceled"
+	}
 }
