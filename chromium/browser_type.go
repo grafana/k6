@@ -241,7 +241,7 @@ func parseArgs(flags map[string]interface{}) ([]string, error) {
 				args = append(args, fmt.Sprintf("--%s", name))
 			}
 		default:
-			return nil, fmt.Errorf(`invalid browser command line flag: "%s=%s"`, name, value)
+			return nil, fmt.Errorf(`invalid browser command line flag: "%s=%v"`, name, value)
 		}
 	}
 	if _, ok := flags["no-sandbox"]; !ok && os.Getuid() == 0 {
