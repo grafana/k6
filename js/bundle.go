@@ -63,7 +63,6 @@ type Bundle struct {
 // A BundleInstance is a self-contained instance of a Bundle.
 type BundleInstance struct {
 	Runtime *goja.Runtime
-	Context *context.Context
 
 	// TODO: maybe just have a reference to the Bundle? or save and pass rtOpts?
 	env map[string]string
@@ -96,11 +95,10 @@ func NewBundle(
 	// Make a bundle, instantiate it into a throwaway VM to populate caches.
 	rt := goja.New()
 	bundle := Bundle{
-		Filename: src.URL,
-		Source:   code,
-		Program:  pgm,
-		BaseInitContext: NewInitContext(logger, rt, c, compatMode, new(context.Context),
-			filesystems, loader.Dir(src.URL)),
+		Filename:          src.URL,
+		Source:            code,
+		Program:           pgm,
+		BaseInitContext:   NewInitContext(logger, rt, c, compatMode, filesystems, loader.Dir(src.URL)),
 		RuntimeOptions:    rtOpts,
 		CompatibilityMode: compatMode,
 		exports:           make(map[string]goja.Callable),
@@ -147,8 +145,7 @@ func NewBundleFromArchive(
 		return nil, err
 	}
 	rt := goja.New()
-	initctx := NewInitContext(logger, rt, c, compatMode,
-		new(context.Context), arc.Filesystems, arc.PwdURL)
+	initctx := NewInitContext(logger, rt, c, compatMode, arc.Filesystems, arc.PwdURL)
 
 	env := arc.Env
 	if env == nil {
@@ -267,7 +264,6 @@ func (b *Bundle) Instantiate(
 	rt := vuImpl.runtime
 	bi = &BundleInstance{
 		Runtime: rt,
-		Context: &vuImpl.ctx,
 		exports: make(map[string]goja.Callable),
 		env:     b.RuntimeOptions.Env,
 	}
@@ -321,17 +317,15 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 		rt.Set("global", rt.GlobalObject())
 	}
 
-	// TODO: get rid of the unused ctxPtr, use a real external context (so we
-	// can interrupt), build the common.InitEnvironment earlier and reuse it
 	initenv := &common.InitEnvironment{
 		Logger:      logger,
 		FileSystems: init.filesystems,
 		CWD:         init.pwd,
 		Registry:    b.registry,
 	}
-	init.moduleVUImpl.initEnv = initenv
-	init.moduleVUImpl.ctx = context.Background()
 	unbindInit := b.setInitGlobals(rt, init)
+	init.moduleVUImpl.ctx = context.Background()
+	init.moduleVUImpl.initEnv = initenv
 	init.moduleVUImpl.eventLoop = eventloop.New(init.moduleVUImpl)
 	err = common.RunWithPanicCatching(logger, rt, func() error {
 		return init.moduleVUImpl.eventLoop.Start(func() error {

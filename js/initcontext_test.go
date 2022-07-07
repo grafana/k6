@@ -407,7 +407,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	*bi.Context = ctx
+	vuImpl.ctx = ctx
 
 	v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 	require.NoError(t, err)
@@ -555,7 +555,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	*bi.Context = ctx
+	vuImpl.ctx = ctx
 
 	v, err := bi.exports[consts.DefaultFn](goja.Undefined())
 	require.NoError(t, err)
