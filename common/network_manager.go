@@ -656,7 +656,7 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 	}
 	for _, action := range actions {
 		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-			return fmt.Errorf("cannot execute %T: %w", action, err)
+			return fmt.Errorf("internal error while updating protocol request interception %T: %w", action, err)
 		}
 	}
 
