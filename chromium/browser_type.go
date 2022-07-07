@@ -152,7 +152,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 	go func(ctx context.Context) {
 		defer func() {
 			if err := dataDir.Cleanup(); err != nil {
-				logger.Errorf("BrowserType:Launch", "%v", err)
+				logger.Errorf("BrowserType:Launch", "cleaning up the user data directory: %v", err)
 			}
 		}()
 		// There's a small chance that this might be called
@@ -383,19 +383,22 @@ func execute(
 		// TODO: How to handle these errors?
 		defer func() {
 			if err := dataDir.Cleanup(); err != nil {
-				logger.Errorf("BrowserType:execute", "%v", err)
+				logger.Errorf("BrowserType:Close", "cleaning up the user data directory: %v", err)
 			}
 		}()
 
 		if err := cmd.Wait(); err != nil {
-			log := logger.Errorf
-			if err.Error() == "signal: killed" || err.Error() == "exit status 1" {
+			logErr := logger.Errorf
+			if s := err.Error(); strings.Contains(s, "signal: killed") || strings.Contains(s, "exit status 1") {
 				// The browser process is killed when the context is cancelled
 				// after a k6 iteration ends, so silence the log message until
 				// we can stop it gracefully. See #https://github.com/grafana/xk6-browser/issues/423
-				log = logger.Debugf
+				logErr = logger.Debugf
 			}
-			log("BrowserType:execute", "browser process with PID %d ended unexpectedly: %v", cmd.Process.Pid, err)
+			logErr(
+				"browser", "process with PID %d unexpectedly ended: %v",
+				cmd.Process.Pid, err,
+			)
 		}
 	}()
 

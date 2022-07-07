@@ -404,7 +404,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 func (b *Browser) Close() {
 	defer func() {
 		if err := b.browserProc.userDataDir.Cleanup(); err != nil {
-			b.logger.Errorf("Browser:Close", "%v", err)
+			b.logger.Errorf("Browser:Close", "cleaning up the user data directory: %v", err)
 		}
 	}()
 
