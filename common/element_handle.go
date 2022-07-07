@@ -75,7 +75,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 			return false, err
 		}
 		if box == nil {
-			return false, errors.New("getting bounding box of element")
+			return false, errors.New("missing bounding box of element")
 		}
 		// Translate from viewport coordinates to frame coordinates.
 		point.X -= box.X

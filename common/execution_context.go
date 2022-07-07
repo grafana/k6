@@ -152,10 +152,10 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 		efid, esid)
 
 	if eh.execCtx == e {
-		panic("cannot adopt handle that already belongs to this execution context")
+		return nil, errors.New("already belongs to the execution context")
 	}
 	if e.frame == nil {
-		panic("cannot adopt handle without frame owner")
+		return nil, errors.New("does not have a frame owner")
 	}
 
 	var node *cdp.Node
