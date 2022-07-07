@@ -260,7 +260,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 					ev.SessionID, evti.TargetID, b.ctx.Err())
 				return // ignore
 			default:
-				k6ext.Panic(b.ctx, "cannot create NewPage for background_page event: %w", err)
+				k6ext.Panic(b.ctx, "creating a new background page: %w", err)
 			}
 		}
 
@@ -299,7 +299,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 					ev.SessionID, evti.TargetID, b.ctx.Err())
 				return // ignore
 			default:
-				k6ext.Panic(b.ctx, "cannot create NewPage for page event: %w", err)
+				k6ext.Panic(b.ctx, "creating a new page: %w", err)
 			}
 		}
 
@@ -457,7 +457,7 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 	browserContextID, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
 	if err != nil {
-		k6ext.Panic(b.ctx, "cannot create browser context (%s): %w", browserContextID, err)
+		k6ext.Panic(b.ctx, "creating browser context ID %s: %w", browserContextID, err)
 	}
 
 	browserCtxOpts := NewBrowserContextOptions()
