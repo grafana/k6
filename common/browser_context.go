@@ -355,7 +355,7 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 				case "predicate":
 					predicateFn, isCallable = goja.AssertFunction(opts.Get(k))
 					if !isCallable {
-						k6ext.Panic(b.ctx, "expected callable predicate")
+						k6ext.Panic(b.ctx, "predicate function is not callable")
 					}
 				case "timeout":
 					timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
@@ -364,7 +364,7 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 		default:
 			predicateFn, isCallable = goja.AssertFunction(optsOrPredicate)
 			if !isCallable {
-				k6ext.Panic(b.ctx, "expected callable predicate")
+				k6ext.Panic(b.ctx, "predicate function is not callable")
 			}
 		}
 	}
