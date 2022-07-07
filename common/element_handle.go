@@ -146,7 +146,7 @@ func (h *ElementHandle) checkElementState(_ context.Context, state string) (*boo
 	}
 
 	return nil, fmt.Errorf(
-		"checking state %q of element: %q", state, reflect.TypeOf(result))
+		"checking state %q of element %q", state, reflect.TypeOf(result))
 }
 
 func (h *ElementHandle) click(p *Position, opts *MouseClickOptions) error {
@@ -687,7 +687,7 @@ func (h *ElementHandle) waitForElementState(
 	}
 
 	return false, fmt.Errorf(
-		"checking states %v of element: %q", states, reflect.TypeOf(result))
+		"waiting for states %v of element %q", states, reflect.TypeOf(result))
 }
 
 func (h *ElementHandle) waitForSelector(apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
@@ -915,7 +915,7 @@ func (h *ElementHandle) InputValue(opts goja.Value) string {
 func (h *ElementHandle) IsChecked() bool {
 	result, err := h.isChecked(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "element isChecked: %w", err)
+		k6ext.Panic(h.ctx, "checking element is checked: %w", err)
 	}
 	return result
 }
@@ -924,7 +924,7 @@ func (h *ElementHandle) IsChecked() bool {
 func (h *ElementHandle) IsDisabled() bool {
 	result, err := h.isDisabled(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "element isDisabled: %w", err)
+		k6ext.Panic(h.ctx, "checking element is disabled: %w", err)
 	}
 	return result
 }
@@ -933,7 +933,7 @@ func (h *ElementHandle) IsDisabled() bool {
 func (h *ElementHandle) IsEditable() bool {
 	result, err := h.isEditable(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "element isEditable: %w", err)
+		k6ext.Panic(h.ctx, "checking element is editable: %w", err)
 	}
 	return result
 }
@@ -942,7 +942,7 @@ func (h *ElementHandle) IsEditable() bool {
 func (h *ElementHandle) IsEnabled() bool {
 	result, err := h.isEnabled(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "element isEnabled: %w", err)
+		k6ext.Panic(h.ctx, "checking element is enabled: %w", err)
 	}
 	return result
 }
@@ -951,7 +951,7 @@ func (h *ElementHandle) IsEnabled() bool {
 func (h *ElementHandle) IsHidden() bool {
 	result, err := h.isHidden(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "element isHidden: %w", err)
+		k6ext.Panic(h.ctx, "checking element is hidden: %w", err)
 	}
 	return result
 }
@@ -960,7 +960,7 @@ func (h *ElementHandle) IsHidden() bool {
 func (h *ElementHandle) IsVisible() bool {
 	result, err := h.isVisible(h.ctx, 0)
 	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "element isVisible: %w", err)
+		k6ext.Panic(h.ctx, "checking element is visible: %w", err)
 	}
 	return result
 }
@@ -1061,7 +1061,7 @@ func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 
 	handles, err := h.queryAll(selector, h.evalWithScript)
 	if err != nil {
-		k6ext.Panic(h.ctx, "QueryAll: %w", err)
+		k6ext.Panic(h.ctx, "querying all selector %q: %w", selector, err)
 	}
 
 	return handles
@@ -1079,7 +1079,7 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]api.ElementH
 		parsedSelector,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("querying selector %q: %w", selector, err)
+		return nil, fmt.Errorf("querying all selectors %q: %w", selector, err)
 	}
 	if result == nil {
 		// it is ok to return a nil slice because it means we didn't find any elements.
