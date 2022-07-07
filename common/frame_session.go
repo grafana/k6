@@ -130,7 +130,7 @@ func NewFrameSession(
 			"sid:%v tid:%v err:%v",
 			s.ID(), tid, err)
 
-		return nil, fmt.Errorf("getting window ID: %w", err)
+		return nil, fmt.Errorf("getting browser window ID: %w", err)
 	}
 
 	fs.initEvents()
