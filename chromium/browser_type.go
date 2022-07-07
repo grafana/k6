@@ -447,8 +447,11 @@ func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*log.Log
 		_ = logger.SetLevel("debug")
 	}
 	if el, ok := os.LookupEnv("XK6_BROWSER_LOG"); ok {
-		if err := logger.SetLevel(el); err != nil {
-			return nil, fmt.Errorf("setting logger level to %q: %w", el, err)
+		if logger.SetLevel(el) != nil {
+			return nil, fmt.Errorf(
+				"invalid log level %q, should be one of: panic, fatal, error, warn, warning, info, debug, trace",
+				el,
+			)
 		}
 	}
 	if _, ok := os.LookupEnv("XK6_BROWSER_CALLER"); ok {
