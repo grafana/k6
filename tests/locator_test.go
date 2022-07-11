@@ -184,7 +184,7 @@ func TestLocator(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
-			require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+			require.NotNil(t, p.Goto(tb.staticURL("locators.html"), nil))
 			tt.do(tb, p)
 		})
 	}
@@ -266,7 +266,7 @@ func TestLocator(t *testing.T) {
 
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewPage(nil)
-	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+	require.NotNil(t, p.Goto(tb.staticURL("locators.html"), nil))
 	for _, tt := range sanityTests {
 		t.Run("strict/"+tt.name, func(t *testing.T) {
 			assert.Panics(t, func() { tt.do(p.Locator("a", nil), tb) })
@@ -314,7 +314,7 @@ func TestLocatorElementState(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
-			require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+			require.NotNil(t, p.Goto(tb.staticURL("locators.html"), nil))
 
 			l := p.Locator("#inputText", nil)
 			require.True(t, tt.query(l))
@@ -364,7 +364,7 @@ func TestLocatorElementState(t *testing.T) {
 
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewPage(nil)
-	require.NotNil(t, p.Goto(tb.staticURL("/locators.html"), nil))
+	require.NotNil(t, p.Goto(tb.staticURL("locators.html"), nil))
 	for _, tt := range sanityTests {
 		t.Run("strict/"+tt.name, func(t *testing.T) {
 			assert.Panics(t, func() { tt.do(p.Locator("a", nil), tb) })
