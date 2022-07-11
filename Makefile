@@ -20,7 +20,7 @@ lint :
 	golangci-lint run --out-format=tab --new-from-rev master ./...
 
 tests :
-	go test -race -timeout 210s ./...
+	go test -race -timeout 210s ./... -vet=off
 
 check : ci-like-lint tests
 
