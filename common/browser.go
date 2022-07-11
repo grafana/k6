@@ -488,27 +488,14 @@ func (b *Browser) On(event string) *goja.Promise {
 	if event != EventBrowserDisconnected {
 		k6ext.Panic(b.ctx, "unknown browser event: %q, must be %q", event, EventBrowserDisconnected)
 	}
-
-	rt := b.vu.Runtime()
-	cb := b.vu.RegisterCallback()
-	p, resolve, reject := rt.NewPromise()
-
-	go func() {
+	return k6ext.Promise(b.ctx, func() (interface{}, error) {
 		select {
 		case <-b.browserProc.lostConnection:
-			cb(func() error {
-				resolve(true)
-				return nil
-			})
+			return true, nil
 		case <-b.ctx.Done():
-			cb(func() error {
-				reject(fmt.Errorf("browser.on promise rejected: %w", b.ctx.Err()))
-				return nil
-			})
+			return nil, fmt.Errorf("browser.on promise rejected: %w", b.ctx.Err())
 		}
-	}()
-
-	return p
+	})
 }
 
 // UserAgent returns the controlled browser's user agent string.
