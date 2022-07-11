@@ -487,7 +487,15 @@ func (w *webSocket) send(msg goja.Value) {
 		b := o.Bytes()
 		w.bufferedAmount += len(b)
 		w.writeQueueCh <- message{
-			mtype: websocket.TextMessage,
+			mtype: websocket.BinaryMessage,
+			data:  b,
+			t:     time.Now(),
+		}
+	case goja.ArrayBuffer:
+		b := o.Bytes()
+		w.bufferedAmount += len(b)
+		w.writeQueueCh <- message{
+			mtype: websocket.BinaryMessage,
 			data:  b,
 			t:     time.Now(),
 		}
@@ -498,6 +506,9 @@ func (w *webSocket) send(msg goja.Value) {
 
 // TODO support code and reason
 func (w *webSocket) close(code int, reason string) {
+	if w.readyState == CLOSED || w.readyState == CLOSING {
+		return
+	}
 	w.readyState = CLOSING
 	if code == 0 {
 		code = websocket.CloseNormalClosure
@@ -521,6 +532,9 @@ func (w *webSocket) queueClose() {
 // to be run only on the eventloop
 // from https://websockets.spec.whatwg.org/#feedback-from-the-protocol
 func (w *webSocket) connectionConnected() error {
+	if w.readyState != CONNECTING {
+		return nil
+	}
 	w.readyState = OPEN
 	return w.callOpenListeners(time.Now()) // TODO fix time
 }
@@ -586,9 +600,19 @@ func (w *webSocket) callOpenListeners(timestamp time.Time) error {
 	return nil
 }
 
-func (w *webSocket) callErrorListeners(_ error) error { // TODO use the error even thought it is not by the spec
+func (w *webSocket) callErrorListeners(e error) error { // TODO use the error even thought it is not by the spec
+	rt := w.vu.Runtime()
+	must := func(err error) {
+		if err != nil {
+			common.Throw(rt, err)
+		}
+	}
+	ev := w.newEvent("error", time.Now())
+	must(ev.DefineDataProperty("error",
+		rt.ToValue(e),
+		goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	for _, errorListener := range w.errorListeners {
-		if _, err := errorListener(w.newEvent("error", time.Now())); err != nil { // TODO fix timestamp
+		if _, err := errorListener(ev); err != nil { // TODO fix timestamp
 			return err
 		}
 	}
