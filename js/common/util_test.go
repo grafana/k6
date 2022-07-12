@@ -30,6 +30,7 @@ import (
 )
 
 func TestThrow(t *testing.T) {
+	t.Parallel()
 	rt := goja.New()
 	fn1, ok := goja.AssertFunction(rt.ToValue(func() { Throw(rt, errors.New("aaaa")) }))
 	if assert.True(t, ok, "fn1 is invalid") {
@@ -62,6 +63,7 @@ func TestToBytes(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(fmt.Sprintf("%T", tc.in), func(t *testing.T) {
+			t.Parallel()
 			out, err := ToBytes(tc.in)
 			if tc.expErr != "" {
 				assert.EqualError(t, err, tc.expErr)
@@ -86,7 +88,7 @@ func TestToString(t *testing.T) {
 		{struct{}{}, "", "invalid type struct {}, expected string, []byte or ArrayBuffer"},
 	}
 
-	for _, tc := range testCases { //nolint: paralleltest // false positive: https://github.com/kunwardeep/paralleltest/issues/8
+	for _, tc := range testCases {
 		tc := tc
 		t.Run(fmt.Sprintf("%T", tc.in), func(t *testing.T) {
 			t.Parallel()
