@@ -18,4 +18,4 @@ fi
 SCRIPT_NAME=$1
 TAG_NAME="$(basename -s .js $SCRIPT_NAME)-$(date +%s)"
 
-docker-compose run --rm k6 run -<$SCRIPT_NAME --tag testid=$TAG_NAME
+docker-compose run --rm -T k6 run -<$SCRIPT_NAME --tag testid=$TAG_NAME
