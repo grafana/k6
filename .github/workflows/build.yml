@@ -1,7 +1,14 @@
 name: Build
 on:
-  # Enable manually triggering this workflow via the API or web UI
   workflow_dispatch:
+    inputs:
+      k6_version:
+        description: 'The version of the release, it must use the semantic versioning format with the v prefix. It is a development release so it is suggested to append a build metadata (e.g. v0.38.0-dev).'
+        required: true
+      go_version:
+        description: 'Go version for building binaries'
+        default: '1.x'
+        required: true
   push:
     branches:
       - master
@@ -19,37 +26,54 @@ env:
   LI_DOCKER_IMAGE_ID: "loadimpact/k6"
   DOCKER_IMAGE_ID: "grafana/k6"
   GHCR_IMAGE_ID: ${{ github.repository }}
+  DEFAULT_GO_VERSION: "1.18.x"
 
 jobs:
   configure:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.get_version.outputs.version }}
+      k6_version: ${{ steps.get_k6_version.outputs.k6_version }}
+      go_version: ${{ steps.get_go_version.outputs.go_version }}
     steps:
       - name: Checkout code
-        if: ${{ ! startsWith(github.ref, 'refs/tags/v') }}
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Get version
-        id: get_version
+      - name: Get the k6 version
+        id: get_k6_version
         run: |
-          set -x
-          if [[ "$GITHUB_REF" =~ ^refs/tags/v.+$ ]]; then
+          set -x # Show exactly what commands are executed
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ "${{ github.event.inputs.k6_version }}" != "" ]]; then
+            VERSION="${{ github.event.inputs.k6_version }}"
+            echo "Building custom dev build with version '${VERSION}' from manual workflow_dispatch..."
+          elif [[ "${GITHUB_REF}" =~ ^refs/tags/v.+$ ]]; then
             VERSION="${GITHUB_REF##*/}"
-            echo "Building real version tag '$GITHUB_REF', parsed '$VERSION' as the actual version..."
+            echo "Building real version tag '${GITHUB_REF}', parsed '${VERSION}' as the actual version..."
           else
             VERSION="$(git describe --tags --always --long --dirty)"
-            echo "Building a non-version ref '$GITHUB_REF', use '$VERSION' as the version instead..."
+            echo "Building a non-version ref '${GITHUB_REF}', use '${VERSION}' as the version instead..."
           fi
           echo "VERSION=${VERSION}"
-          echo "::set-output name=version::${VERSION}"
+          echo "::set-output name=k6_version::${VERSION}"
+      - name: Get the used Go version
+        id: get_go_version
+        run: |
+          set -x # Show exactly what commands are executed
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ "${{ github.event.inputs.go_version }}" != "" ]]; then
+            GO_VERSION="${{ github.event.inputs.go_version }}"
+            echo "Using custom Go version '${GO_VERSION}' from manual workflow_dispatch..."
+          else
+            GO_VERSION="${DEFAULT_GO_VERSION}"
+            echo "Using the default Go version '${GO_VERSION}'..."
+          fi
+          echo "GO_VERSION=${GO_VERSION}"
+          echo "::set-output name=go_version::${GO_VERSION}"
 
   build:
     runs-on: ubuntu-latest
     needs: [configure]
     env:
-      VERSION: ${{ needs.configure.outputs.version }}
+      VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -58,7 +82,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.18.x
+          go-version: ${{ needs.configure.outputs.go_version }}
       - name: Install nfpm (dep and rpm package builder)
         run: |
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.16.0
@@ -108,7 +132,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [configure]
     env:
-      VERSION: ${{ needs.configure.outputs.version }}
+      VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -170,7 +194,7 @@ jobs:
         shell: pwsh
     needs: [configure, build]
     env:
-      VERSION: ${{ needs.configure.outputs.version }}
+      VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -206,11 +230,11 @@ jobs:
 
       - name: Sign Windows binary and .msi package
         # GH secrets are unavaileble when building from project forks, so this
-        # will fail for external PRs, even if we wanted to do it. And we
-        # don't. qWe are only only going to sign packages that are built from
-        # master or a version tag, so we have enough assurance that package
-        # signing works, but don't sign every PR build.
-        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
+        # will fail for external PRs, even if we wanted to do it. And we don't.
+        # We are only going to sign packages that are built from master or a
+        # version tag, or manually triggered dev builds, so we have enough
+        # assurance that package signing works, but don't sign every PR build.
+        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
         run: |
           # Convert base64 certificate to PFX
           $bytes = [Convert]::FromBase64String("${{ secrets.WIN_SIGN_CERT }}")
@@ -240,10 +264,10 @@ jobs:
   # Disabled until #1997 and #1998 are addressed.
   # publish-macos:
   #   runs-on: macos-latest
-  #   needs: [deps, lint, test-current-cov, configure, build]
-  #   if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+  #   needs: [configure, build]
+  #   if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
   #   env:
-  #     VERSION: ${{ needs.configure.outputs.version }}
+  #     VERSION: ${{ needs.configure.outputs.k6_version }}
   #     HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
   #   steps:
   #     - name: Download source code archive
@@ -259,9 +283,9 @@ jobs:
   publish-github:
     runs-on: ubuntu-latest
     needs: [configure, build, package-windows]
-    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
     env:
-      VERSION: ${{ needs.configure.outputs.version }}
+      VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -291,9 +315,9 @@ jobs:
   publish-packages:
     runs-on: ubuntu-latest
     needs: [configure, build, package-windows]
-    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
     env:
-      VERSION: ${{ needs.configure.outputs.version }}
+      VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3

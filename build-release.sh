@@ -51,7 +51,7 @@ package() {
     deb|rpm)
         # nfpm can't substitute env vars in file paths, so we have to cd...
         cd "${OUT_DIR}/${NAME}"
-        set -x
+        set -x # Show exactly what command was executed
         nfpm package --config ../../packaging/nfpm.yaml --packager "${FMT}" \
             --target "../k6-${VERSION}-linux-${GOARCH}.${FMT}"
         set +x
