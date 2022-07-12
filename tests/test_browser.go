@@ -251,7 +251,7 @@ func (b *testBrowser) asGojaBool(v interface{}) bool {
 }
 
 // runString in the goja runtime.
-func (b *testBrowser) runString(s string, args ...interface{}) (goja.Value, error) {
+func (b *testBrowser) runString(s string, args ...interface{}) (goja.Value, error) { //nolint:unparam
 	b.t.Helper()
 	v, err := b.runtime().RunString(fmt.Sprintf(s, args...))
 	if err != nil {
