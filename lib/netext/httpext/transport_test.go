@@ -43,20 +43,21 @@ func BenchmarkMeasureAndEmitMetrics(b *testing.B) {
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
 
+	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
 			RunTags:    &metrics.SampleTags{},
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
-		Samples: samples,
-		Logger:  logger,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+		Samples:        samples,
+		Logger:         logger,
 	}
 	t := transport{
 		state: state,
 		ctx:   ctx,
 	}
 
-	b.ResetTimer()
 	unfRequest := &unfinishedRequest{
 		tracer: &Tracer{},
 		response: &http.Response{
