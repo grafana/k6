@@ -334,17 +334,6 @@ jobs:
           # Cleanup signing artifacts
           del k6.pfx
 
-      - name: Prepare Chocolatey package
-        run: |
-          $env:VERSION = $env:VERSION -replace 'v(\d+\.\d+\.\d+).*','$1'
-          cd .\packaging
-          (Get-Content '.\k6.portable.nuspec' -Raw).Replace("<version>__REPLACE__</version>", "<version>$env:VERSION</version>") | Out-File '.\k6.portable.nuspec'
-
-      - name: Create Chocolatey package
-        uses: crazy-max/ghaction-chocolatey@b6061d587628735be315d74358228b83a7dba9a7
-        with:
-          args: pack --verbose --outputdirectory .\packaging .\packaging\k6.portable.nuspec
-
       - name: Rename MSI package
         # To keep it consistent with the other artifacts
         run: move "packaging\k6.msi" "packaging\k6-$env:VERSION-windows-amd64.msi"
@@ -355,7 +344,6 @@ jobs:
           name: binaries-windows
           path: |
             packaging/k6-*.msi
-            packaging/k6.*.nupkg
           retention-days: 7
 
   # Disabled until #1997 and #1998 are addressed.
@@ -396,8 +384,6 @@ jobs:
         with:
           name: binaries-windows
           path: dist
-      - name: Remove Chocolatey package
-        run: rm dist/k6*.nupkg
       - name: Generate checksum file
         run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
       - name: Create release
