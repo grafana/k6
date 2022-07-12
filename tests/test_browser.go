@@ -58,6 +58,7 @@ type testBrowser struct {
 //
 // opts provides a way to customize the newTestBrowser.
 // see: withLaunchOptions for an example.
+//
 //nolint:funlen,cyclop
 func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 	tb.Helper()
@@ -249,6 +250,16 @@ func (b *testBrowser) asGojaBool(v interface{}) bool {
 	return gv.ToBoolean()
 }
 
+// runString in the goja runtime.
+func (b *testBrowser) runString(s string, args ...interface{}) (goja.Value, error) {
+	b.t.Helper()
+	v, err := b.runtime().RunString(fmt.Sprintf(s, args...))
+	if err != nil {
+		err = fmt.Errorf("%w", err)
+	}
+	return v, err
+}
+
 // launchOptions provides a way to customize browser type
 // launch options in tests.
 type launchOptions struct {
@@ -263,10 +274,10 @@ type launchOptions struct {
 //
 // example:
 //
-//    b := TestBrowser(t, withLaunchOptions{
-//        SlowMo:  "100s",
-//        Timeout: "30s",
-//    })
+//	b := TestBrowser(t, withLaunchOptions{
+//	    SlowMo:  "100s",
+//	    Timeout: "30s",
+//	})
 type withLaunchOptions = launchOptions
 
 // defaultLaunchOptions returns defaults for browser type launch options.
@@ -292,7 +303,7 @@ type httpServerOption struct{}
 //
 // example:
 //
-//    b := TestBrowser(t, withHTTPServer())
+//	b := TestBrowser(t, withHTTPServer())
 func withHTTPServer() httpServerOption {
 	return struct{}{}
 }
@@ -308,7 +319,7 @@ type fileServerOption struct{}
 //
 // example:
 //
-//    b := TestBrowser(t, withFileServer())
+//	b := TestBrowser(t, withFileServer())
 func withFileServer() fileServerOption {
 	return struct{}{}
 }
@@ -324,7 +335,7 @@ type logCacheOption struct{}
 //
 // example:
 //
-//    b := TestBrowser(t, withLogCache())
+//	b := TestBrowser(t, withLogCache())
 func withLogCache() logCacheOption {
 	return struct{}{}
 }
@@ -337,7 +348,7 @@ type skipCloseOption struct{}
 //
 // example:
 //
-//    b := TestBrowser(t, withSkipClose())
+//	b := TestBrowser(t, withSkipClose())
 func withSkipClose() skipCloseOption {
 	return struct{}{}
 }
