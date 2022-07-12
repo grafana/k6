@@ -28,9 +28,7 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/gzip"
-
 	"github.com/mailru/easyjson/jwriter"
-
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/metrics"
@@ -52,7 +50,7 @@ type Output struct {
 	out         io.Writer
 	closeFn     func() error
 	seenMetrics map[string]struct{}
-	thresholds  map[string][]*metrics.Threshold
+	thresholds  map[string]metrics.Thresholds
 }
 
 // New returns a new JSON output.
@@ -132,11 +130,13 @@ func (o *Output) Stop() error {
 
 // SetThresholds receives the thresholds before the output is Start()-ed.
 func (o *Output) SetThresholds(thresholds map[string]metrics.Thresholds) {
-	ths := make(map[string][]*metrics.Threshold)
-	for name, t := range thresholds {
-		ths[name] = append(ths[name], t.Thresholds...)
+	if len(thresholds) == 0 {
+		return
 	}
-	o.thresholds = ths
+	o.thresholds = make(map[string]metrics.Thresholds, len(thresholds))
+	for name, t := range thresholds {
+		o.thresholds[name] = t
+	}
 }
 
 func (o *Output) flushMetrics() {
@@ -149,7 +149,6 @@ func (o *Output) flushMetrics() {
 		count += len(samples)
 		for _, sample := range samples {
 			sample := sample
-			sample.Metric.Thresholds.Thresholds = o.thresholds[sample.Metric.Name]
 			o.handleMetric(sample.Metric, jw)
 			wrapSample(sample).MarshalEasyJSON(jw)
 			jw.RawByte('\n')
@@ -171,6 +170,26 @@ func (o *Output) handleMetric(m *metrics.Metric, jw *jwriter.Writer) {
 	}
 	o.seenMetrics[m.Name] = struct{}{}
 
-	wrapMetric(m).MarshalEasyJSON(jw)
+	wrapped := metricEnvelope{
+		Type:   "Metric",
+		Metric: m.Name,
+	}
+	wrapped.Data.Name = m.Name
+	wrapped.Data.Type = m.Type
+	wrapped.Data.Contains = m.Contains
+	wrapped.Data.Submetrics = m.Submetrics
+
+	if ts, ok := o.thresholds[m.Name]; ok {
+		wrapped.Data.Thresholds = ts
+	}
+
+	// TODO: refactor after the other refactors
+	// in the metrics area will be completed.
+	//
+	// This parts can be racy because
+	// they are controlled and written from the metrics.Engine.
+	wrapped.Data.Tainted = m.Tainted
+
+	wrapped.MarshalEasyJSON(jw)
 	jw.RawByte('\n')
 }

@@ -47,7 +47,7 @@ func getValidator(t testing.TB, expected []string) func(io.Reader) {
 				t.Errorf("Read unexpected line number %d, expected only %d entries", i, len(expected))
 				continue
 			}
-			assert.Equal(t, expected[i-1], string(s.Bytes()))
+			assert.JSONEq(t, expected[i-1], string(s.Bytes()))
 		}
 		assert.NoError(t, s.Err())
 		assert.Equal(t, len(expected), i)
@@ -58,6 +58,9 @@ func generateTestMetricSamples(t testing.TB) ([]metrics.SampleContainer, func(io
 	registry := metrics.NewRegistry()
 
 	metric1, err := registry.NewMetric("my_metric1", metrics.Gauge)
+	require.NoError(t, err)
+
+	_, err = metric1.AddSubmetric("a:1,b:2")
 	require.NoError(t, err)
 
 	metric2, err := registry.NewMetric("my_metric2", metrics.Counter, metrics.Data)
@@ -79,7 +82,7 @@ func generateTestMetricSamples(t testing.TB) ([]metrics.SampleContainer, func(io
 		metrics.Sample{Time: time3, Metric: metric2, Value: float64(5), Tags: metrics.NewSampleTags(map[string]string{"tag3": "val3"})},
 	}
 	expected := []string{
-		`{"type":"Metric","data":{"name":"my_metric1","type":"gauge","contains":"default","tainted":null,"thresholds":["rate<0.01","p(99)<250"],"submetrics":null},"metric":"my_metric1"}`,
+		`{"type":"Metric","data":{"name":"my_metric1","type":"gauge","contains":"default","tainted":null,"thresholds":["rate<0.01","p(99)<250"],"submetrics":[{"name":"my_metric1{a:1,b:2}","suffix":"a:1,b:2","tags":{"a":"1","b":"2"}}]},"metric":"my_metric1"}`,
 		`{"type":"Point","data":{"time":"2021-02-24T13:37:10Z","value":1,"tags":{"tag1":"val1"}},"metric":"my_metric1"}`,
 		`{"type":"Point","data":{"time":"2021-02-24T13:37:10Z","value":2,"tags":{"tag2":"val2"}},"metric":"my_metric1"}`,
 		`{"type":"Metric","data":{"name":"my_metric2","type":"counter","contains":"data","tainted":null,"thresholds":[],"submetrics":null},"metric":"my_metric2"}`,
@@ -192,12 +195,6 @@ func TestWrapSampleWithSamplePointer(t *testing.T) {
 	assert.NotEqual(t, out, (*sampleEnvelope)(nil))
 }
 
-func TestWrapMetricWithMetricPointer(t *testing.T) {
-	t.Parallel()
-	out := wrapMetric(&metrics.Metric{})
-	assert.NotEqual(t, out, (*metricEnvelope)(nil))
-}
-
 func setThresholds(t *testing.T, out output.Output) {
 	t.Helper()
 
@@ -205,6 +202,5 @@ func setThresholds(t *testing.T, out output.Output) {
 	require.True(t, ok)
 
 	ts := metrics.NewThresholds([]string{"rate<0.01", "p(99)<250"})
-
 	jout.SetThresholds(map[string]metrics.Thresholds{"my_metric1": ts})
 }
