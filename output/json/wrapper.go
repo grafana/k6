@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"go.k6.io/k6/metrics"
-	"gopkg.in/guregu/null.v3"
 )
 
 //go:generate easyjson -pkg -no_std_marshalers -gen_build_flags -mod=mod .
@@ -60,7 +59,6 @@ type metricEnvelope struct {
 		Name       string               `json:"name"`
 		Type       metrics.MetricType   `json:"type"`
 		Contains   metrics.ValueType    `json:"contains"`
-		Tainted    null.Bool            `json:"tainted"`
 		Thresholds metrics.Thresholds   `json:"thresholds"`
 		Submetrics []*metrics.Submetric `json:"submetrics"`
 	} `json:"data"`
