@@ -183,13 +183,6 @@ func (o *Output) handleMetric(m *metrics.Metric, jw *jwriter.Writer) {
 		wrapped.Data.Thresholds = ts
 	}
 
-	// TODO: refactor after the other refactors
-	// in the metrics area will be completed.
-	//
-	// This parts can be racy because
-	// they are controlled and written from the metrics.Engine.
-	wrapped.Data.Tainted = m.Tainted
-
 	wrapped.MarshalEasyJSON(jw)
 	jw.RawByte('\n')
 }
