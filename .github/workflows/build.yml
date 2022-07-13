@@ -1,7 +1,14 @@
-name: CI
+name: Build
 on:
-  # Enable manually triggering this workflow via the API or web UI
   workflow_dispatch:
+    inputs:
+      k6_version:
+        description: 'The version of the release, it must use the semantic versioning format with the v prefix. It is a development release so it is suggested to append a build metadata (e.g. v0.38.0-dev).'
+        required: true
+      go_version:
+        description: 'Go version for building binaries'
+        default: '1.x'
+        required: true
   push:
     branches:
       - master
@@ -19,165 +26,77 @@ env:
   LI_DOCKER_IMAGE_ID: "loadimpact/k6"
   DOCKER_IMAGE_ID: "grafana/k6"
   GHCR_IMAGE_ID: ${{ github.repository }}
+  DEFAULT_GO_VERSION: "1.18.x"
 
 jobs:
-  test-prev:
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version: [1.17.x]
-        platform: [ubuntu-latest, windows-2019]
-    runs-on: ${{ matrix.platform }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go-version }}
-      - name: Run tests
-        run: |
-          set -x
-          go version
-          export GOMAXPROCS=2
-          args=("-p" "2" "-race")
-          # Run with less concurrency on Windows to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == windows* ]]; then
-            unset args[2]
-            args[1]="1"
-            export GOMAXPROCS=1
-          fi
-          go test "${args[@]}" -timeout 800s ./...
-
-  test-tip:
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.x
-      - name: Install Go tip
-        run: |
-          go install golang.org/dl/gotip@latest
-          gotip download
-          echo "GOROOT=$HOME/sdk/gotip" >> "$GITHUB_ENV"
-          echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
-          echo "$HOME/go/bin" >> "$GITHUB_PATH"
-          echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
-      - name: Run tests
-        run: |
-          set -x
-          which go
-          go version
-          export GOMAXPROCS=2
-          args=("-p" "2" "-race")
-          go test "${args[@]}" -timeout 800s ./...
-
-  test-current-cov:
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version: [1.18.x]
-        platform: [ubuntu-latest, windows-2019]
-    runs-on: ${{ matrix.platform }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go-version }}
-      - name: Run tests with code coverage
-        run: |
-          go version
-          export GOMAXPROCS=2
-          args=("-p" "2" "-race")
-          # Run with less concurrency on Windows to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == windows* ]]; then
-            unset args[2]
-            args[1]="1"
-            export GOMAXPROCS=1
-          fi
-          echo "mode: set" > coverage.txt
-          for pkg in $(go list ./... | grep -v vendor); do
-              list=$(go list -test -f  '{{ join .Deps  "\n"}}' $pkg | grep go.k6.io/k6 | grep -v vendor || true)
-              if [ -n "$list" ]; then
-                  list=$(echo "$list" | cut -f1 -d ' ' | sort -u | paste -sd, -)
-              fi
-
-              go test "${args[@]}" -timeout 800s --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
-          done
-          grep -h -v "^mode:" *.coverage >> coverage.txt
-          rm -f *.coverage
-      - name: Upload coverage to Codecov
-        env:
-          CODECOV_BASH_VERSION: 1.0.1
-          CODECOV_BASH_SHA512SUM: d075b412a362a9a2b7aedfec3b8b9a9a927b3b99e98c7c15a2b76ef09862aeb005e91d76a5fd71b511141496d0fd23d1b42095f722ebcd509d768fba030f159e
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: |
-          curl -fsSLO "https://raw.githubusercontent.com/codecov/codecov-bash/${CODECOV_BASH_VERSION}/codecov"
-          echo "$CODECOV_BASH_SHA512SUM codecov" | sha512sum -c -
-          platform="${{ matrix.platform }}"
-          bash ./codecov -F "${platform%%-*}"
-      - name: Generate coverage HTML report
-        run: go tool cover -html=coverage.txt -o coverage.html
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v2
-        with:
-          name: test-coverage-report-${{ matrix.platform }}
-          path: coverage.html
-
   configure:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.get_version.outputs.version }}
+      k6_version: ${{ steps.get_k6_version.outputs.k6_version }}
+      go_version: ${{ steps.get_go_version.outputs.go_version }}
     steps:
-      - name: Get version
-        id: get_version
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Get the k6 version
+        id: get_k6_version
         run: |
-          VERSION="${GITHUB_REF##*/}"
+          set -x # Show exactly what commands are executed
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ "${{ github.event.inputs.k6_version }}" != "" ]]; then
+            VERSION="${{ github.event.inputs.k6_version }}"
+            echo "Building custom dev build with version '${VERSION}' from manual workflow_dispatch..."
+          elif [[ "${GITHUB_REF}" =~ ^refs/tags/v.+$ ]]; then
+            VERSION="${GITHUB_REF##*/}"
+            echo "Building real version tag '${GITHUB_REF}', parsed '${VERSION}' as the actual version..."
+          else
+            VERSION="$(git describe --tags --always --long --dirty)"
+            echo "Building a non-version ref '${GITHUB_REF}', use '${VERSION}' as the version instead..."
+          fi
           echo "VERSION=${VERSION}"
-          echo "::set-output name=version::${VERSION}"
+          echo "::set-output name=k6_version::${VERSION}"
+      - name: Get the used Go version
+        id: get_go_version
+        run: |
+          set -x # Show exactly what commands are executed
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ "${{ github.event.inputs.go_version }}" != "" ]]; then
+            GO_VERSION="${{ github.event.inputs.go_version }}"
+            echo "Using custom Go version '${GO_VERSION}' from manual workflow_dispatch..."
+          else
+            GO_VERSION="${DEFAULT_GO_VERSION}"
+            echo "Using the default Go version '${GO_VERSION}'..."
+          fi
+          echo "GO_VERSION=${GO_VERSION}"
+          echo "::set-output name=go_version::${GO_VERSION}"
 
   build:
     runs-on: ubuntu-latest
-    needs: [configure, test-current-cov]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [configure]
     env:
-      VERSION: ${{ needs.configure.outputs.version }}
+      VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          # We plan to move to 1.18.x after the release of the first patch.
-          go-version: 1.18.x
-      - name: Install package builders
-        env:
-          GO111MODULE: 'off'
+          go-version: ${{ needs.configure.outputs.go_version }}
+      - name: Install nfpm (dep and rpm package builder)
         run: |
-          gopath="$(go env GOPATH)"
-          go get github.com/Masterminds/glide
-          go get -d github.com/mh-cbon/go-bin-deb \
-              && (cd "$gopath/src/github.com/mh-cbon/go-bin-deb" \
-              && glide install \
-              && go install)
-          go get -d github.com/mh-cbon/go-bin-rpm \
-              && (cd "$gopath/src/github.com/mh-cbon/go-bin-rpm" \
-              && glide install \
-              && go install)
-          sudo apt-get update -y
-          sudo apt-get install -y fakeroot rpm
-      - name: Generate Windows binary metadata
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.16.0
+      - name: Install goversioninfo (.syso file creator)
         run: |
-          (cd && GO111MODULE=on go get github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.2.0)
-          IFS=. read -a version <<< "$(echo $VERSION | sed 's:[^0-9\.]::g')"
+          go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.4.0
+      - name: Generate Windows binary metadata (.syso files)
+        run: |
+          IFS=. read -a version_parts <<< "${VERSION#v}"
+          IFS=- read -a version_patch <<< "${version_parts[2]}"
+
           # Need a blank versioninfo.json for the CLI overrides to work.
           echo '{}' > versioninfo.json
+          set -x
           goversioninfo -64 \
             -platform-specific=true \
             -charset="1200" \
@@ -189,14 +108,19 @@ jobs:
             -original-name="k6.exe" \
             -product-name="k6" \
             -translation="0x0409" \
-            -ver-major="${version[0]}" \
-            -ver-minor="${version[1]}" \
-            -ver-patch="${version[2]}" \
+            -ver-major="${version_parts[0]}" \
+            -ver-minor="${version_parts[1]}" \
+            -ver-patch="${version_patch[0]}" \
+            -special-build=$(IFS='-'; echo "${version_patch[*]:1}";) \
             -product-version="${VERSION#v}"
+
+          set +x
+          ls -lah | grep -i syso
+
       - name: Build
         run: |
           go version
-          ./build-release.sh
+          ./build-release.sh "dist" "${VERSION}"
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
@@ -206,12 +130,14 @@ jobs:
 
   build-docker:
     runs-on: ubuntu-latest
-    needs: [test-current-cov, configure]
+    needs: [configure]
     env:
-      VERSION: ${{ needs.configure.outputs.version }}
+      VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Build
         run: docker build -t $DOCKER_IMAGE_ID .
       - name: Check
@@ -228,9 +154,7 @@ jobs:
             docker run $DOCKER_IMAGE_ID resume --help
 
       - name: Publish
-        if: |
-          github.ref == 'refs/heads/master' ||
-          startsWith(github.ref, 'refs/tags/v')
+        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
         run: |
           VERSION="${VERSION#v}"
           echo "Publish GHCR ($DOCKER_IMAGE_ID:$VERSION)"
@@ -268,13 +192,12 @@ jobs:
     defaults:
       run:
         shell: pwsh
-    needs: [test-current-cov, configure, build]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [configure, build]
     env:
-      VERSION: ${{ needs.configure.outputs.version }}
+      VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install pandoc
         uses: crazy-max/ghaction-chocolatey@b6061d587628735be315d74358228b83a7dba9a7
         with:
@@ -296,51 +219,55 @@ jobs:
           rmdir .\packaging\k6-$env:VERSION-windows-amd64\
       - name: Add signtool to PATH
         run: echo "${env:ProgramFiles(x86)}\Windows Kits\10\bin\x64" | Out-File -FilePath $env:GITHUB_PATH -Append
-      - name: Convert base64 certificate to PFX
-        run: |
-          $bytes = [Convert]::FromBase64String("${{ secrets.WIN_SIGN_CERT }}")
-          [IO.File]::WriteAllBytes("k6.pfx", $bytes)
-      - name: Sign Windows binary
-        run: signtool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.exe"
-      - name: Create MSI package
+
+      - name: Create the MSI package
         run: |
           $env:VERSION = $env:VERSION -replace 'v(\d+\.\d+\.\d+).*','$1'
           pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
           cd .\packaging
           candle.exe -arch x64 "-dVERSION=$env:VERSION" k6.wxs
           light.exe -ext WixUIExtension k6.wixobj
-      - name: Sign MSI package
-        run: signtool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.msi"
-      - name: Cleanup signing artifacts
-        run: del k6.pfx
-      - name: Prepare Chocolatey package
+
+      - name: Sign Windows binary and .msi package
+        # GH secrets are unavaileble when building from project forks, so this
+        # will fail for external PRs, even if we wanted to do it. And we don't.
+        # We are only going to sign packages that are built from master or a
+        # version tag, or manually triggered dev builds, so we have enough
+        # assurance that package signing works, but don't sign every PR build.
+        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
         run: |
-          $env:VERSION = $env:VERSION.TrimStart("v", " ")
-          cd .\packaging
-          (Get-Content '.\k6.portable.nuspec' -Raw).Replace("<version>__REPLACE__</version>", "<version>$env:VERSION</version>") | Out-File '.\k6.portable.nuspec'
-      - name: Create Chocolatey package
-        uses: crazy-max/ghaction-chocolatey@b6061d587628735be315d74358228b83a7dba9a7
-        with:
-          args: pack --verbose --outputdirectory .\packaging .\packaging\k6.portable.nuspec
+          # Convert base64 certificate to PFX
+          $bytes = [Convert]::FromBase64String("${{ secrets.WIN_SIGN_CERT }}")
+          [IO.File]::WriteAllBytes("k6.pfx", $bytes)
+
+          # Sign the Windows binary
+          signtool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.exe"
+
+          # Sign the MSI package
+          signtool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.msi"
+
+          # Cleanup signing artifacts
+          del k6.pfx
+
       - name: Rename MSI package
         # To keep it consistent with the other artifacts
         run: move "packaging\k6.msi" "packaging\k6-$env:VERSION-windows-amd64.msi"
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
           name: binaries-windows
           path: |
             packaging/k6-*.msi
-            packaging/k6.*.nupkg
           retention-days: 7
 
   # Disabled until #1997 and #1998 are addressed.
   # publish-macos:
   #   runs-on: macos-latest
-  #   needs: [deps, lint, test-current-cov, configure, build]
-  #   if: startsWith(github.ref, 'refs/tags/v')
+  #   needs: [configure, build]
+  #   if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
   #   env:
-  #     VERSION: ${{ needs.configure.outputs.version }}
+  #     VERSION: ${{ needs.configure.outputs.k6_version }}
   #     HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
   #   steps:
   #     - name: Download source code archive
@@ -355,13 +282,13 @@ jobs:
 
   publish-github:
     runs-on: ubuntu-latest
-    needs: [configure, test-current-cov, build, package-windows]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [configure, build, package-windows]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
     env:
-      VERSION: ${{ needs.configure.outputs.version }}
+      VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Download binaries
         uses: actions/download-artifact@v2
         with:
@@ -372,8 +299,6 @@ jobs:
         with:
           name: binaries-windows
           path: dist
-      - name: Remove Chocolatey package
-        run: rm dist/k6*.nupkg
       - name: Generate checksum file
         run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
       - name: Create release
@@ -390,12 +315,12 @@ jobs:
   publish-packages:
     runs-on: ubuntu-latest
     needs: [configure, build, package-windows]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
     env:
-      VERSION: ${{ needs.configure.outputs.version }}
+      VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Download binaries
         uses: actions/download-artifact@v2
         with:
