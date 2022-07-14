@@ -304,6 +304,19 @@ func (b *Bundle) Instantiate(logger logrus.FieldLogger, vuID uint64) (*BundleIns
 
 // Instantiates the bundle into an existing runtime. Not public because it also messes with a bunch
 // of other things, will potentially thrash data and makes a mess in it if the operation fails.
+
+func (b *Bundle) initializeProgramObject(rt *goja.Runtime, init *InitContext) programWithSource {
+	pgm := programWithSource{
+		pgm:     b.Program,
+		src:     b.Source,
+		exports: rt.NewObject(),
+		module:  rt.NewObject(),
+	}
+	_ = pgm.module.Set("exports", pgm.exports)
+	init.programs[b.Filename.String()] = pgm
+	return pgm
+}
+
 func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *InitContext, vuID uint64) (err error) {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
@@ -330,13 +343,7 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 	init.moduleVUImpl.ctx = context.Background()
 	init.moduleVUImpl.initEnv = initenv
 	init.moduleVUImpl.eventLoop = eventloop.New(init.moduleVUImpl)
-	pgm := init.programs[b.Filename.String()] // this just initializes the program
-	pgm.pgm = b.Program
-	pgm.src = b.Source
-	exports := rt.NewObject()
-	pgm.module = rt.NewObject()
-	_ = pgm.module.Set("exports", exports)
-	init.programs[b.Filename.String()] = pgm
+	pgm := b.initializeProgramObject(rt, init)
 
 	err = common.RunWithPanicCatching(logger, rt, func() error {
 		return init.moduleVUImpl.eventLoop.Start(func() error {
@@ -345,7 +352,7 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 				return errRun
 			}
 			if call, ok := goja.AssertFunction(f); ok {
-				if _, errRun = call(exports, pgm.module, exports); errRun != nil {
+				if _, errRun = call(pgm.exports, pgm.module, pgm.exports); errRun != nil {
 					return errRun
 				}
 				return nil
