@@ -1367,6 +1367,9 @@ func (r *Runtime) RunProgram(p *Program) (result Value, err error) {
 		if x := recover(); x != nil {
 			if ex, ok := x.(*uncatchableException); ok {
 				err = ex.err
+				if len(r.vm.callStack) == 0 {
+					r.leaveAbrupt()
+				}
 			} else {
 				panic(x)
 			}
@@ -1423,6 +1426,8 @@ func (r *Runtime) CaptureCallStack(depth int, stack []StackFrame) []StackFrame {
 }
 
 // Interrupt a running JavaScript. The corresponding Go call will return an *InterruptedError containing v.
+// If the interrupt propagates until the stack is empty the currently queued promise resolve/reject jobs will be cleared
+// without being executed. This is the same time they would be executed otherwise.
 // Note, it only works while in JavaScript code, it does not interrupt native Go functions (which includes all built-ins).
 // If the runtime is currently not running, it will be immediately interrupted on the next Run*() call.
 // To avoid that use ClearInterrupt()
@@ -2329,6 +2334,9 @@ func AssertFunction(v Value) (Callable, bool) {
 					if x := recover(); x != nil {
 						if ex, ok := x.(*uncatchableException); ok {
 							err = ex.err
+							if len(obj.runtime.vm.callStack) == 0 {
+								obj.runtime.leaveAbrupt()
+							}
 						} else {
 							panic(x)
 						}
@@ -2613,7 +2621,7 @@ func (r *Runtime) getHash() *maphash.Hash {
 	return r.hash
 }
 
-// called when the top level function returns (i.e. control is passed outside the Runtime).
+// called when the top level function returns normally (i.e. control is passed outside the Runtime).
 func (r *Runtime) leave() {
 	for {
 		jobs := r.jobQueue
@@ -2625,6 +2633,12 @@ func (r *Runtime) leave() {
 			job()
 		}
 	}
+}
+
+// called when the top level function returns (i.e. control is passed outside the Runtime) but it was due to an interrupt
+func (r *Runtime) leaveAbrupt() {
+	r.jobQueue = nil
+	r.ClearInterrupt()
 }
 
 func nilSafe(v Value) Value {
