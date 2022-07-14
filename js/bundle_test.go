@@ -761,28 +761,6 @@ func TestBundleInstantiate(t *testing.T) {
 		require.Equal(t, true, v.Export())
 	})
 
-	t.Run("SetAndRun", func(t *testing.T) {
-		t.Parallel()
-		t.Skip("This makes no sense for a test we are basically testing that we can reset global")
-		b, err := getSimpleBundle(t, "/script.js", `
-		export let options = {
-			vus: 5,
-			teardownTimeout: '1s',
-		};
-		let val = true;
-		export default function() { return val; }
-	`)
-		require.NoError(t, err)
-		logger := testutils.NewLogger(t)
-
-		bi, err := b.Instantiate(logger, 0)
-		require.NoError(t, err)
-		bi.Runtime.Set("val", false)
-		v, err := bi.exports[consts.DefaultFn](goja.Undefined())
-		require.NoError(t, err)
-		require.Equal(t, false, v.Export())
-	})
-
 	t.Run("Options", func(t *testing.T) {
 		t.Parallel()
 		b, err := getSimpleBundle(t, "/script.js", `
