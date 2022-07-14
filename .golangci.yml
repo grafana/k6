@@ -16,9 +16,10 @@ issues:
   exclude-use-default: false
 
   exclude-rules:
-    - linters:
-        - funlen
-      source: "^func Test"
+    - path: (.+)_test.go
+      linters:
+      - wrapcheck
+      - funlen
 
 linters:
   disable-all: true
