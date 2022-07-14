@@ -254,7 +254,7 @@ func TestEngineOutput(t *testing.T) {
 	}
 	metric := test.engine.MetricsEngine.ObservedMetrics["test_metric"]
 	if assert.NotNil(t, metric) {
-		sink := metric.Sink.(*metrics.TrendSink) // nolint: forcetypeassert
+		sink := metric.Sink.(*metrics.TrendSink) //nolint: forcetypeassert
 		if assert.NotNil(t, sink) {
 			numOutputSamples := len(cSamples)
 			numEngineSamples := len(sink.Values)

@@ -182,7 +182,7 @@ func (si *SharedIterations) Init(ctx context.Context) error {
 
 // Run executes a specific total number of iterations, which are all shared by
 // the configured VUs.
-// nolint:funlen
+//nolint:funlen
 func (si SharedIterations) Run(parentCtx context.Context, out chan<- metrics.SampleContainer) (err error) {
 	numVUs := si.config.GetVUs(si.executionState.ExecutionTuple)
 	iterations := si.et.ScaleInt64(si.config.Iterations.Int64)

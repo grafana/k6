@@ -88,11 +88,11 @@ var (
 	maxSrcLenForBabelSourceMap     = 250 * 1024 //nolint:gochecknoglobals
 	maxSrcLenForBabelSourceMapOnce sync.Once    //nolint:gochecknoglobals
 
-	onceBabelCode      sync.Once     // nolint:gochecknoglobals
-	globalBabelCode    *goja.Program // nolint:gochecknoglobals
-	globalBabelCodeErr error         // nolint:gochecknoglobals
-	onceBabel          sync.Once     // nolint:gochecknoglobals
-	globalBabel        *babel        // nolint:gochecknoglobals
+	onceBabelCode      sync.Once     //nolint:gochecknoglobals
+	globalBabelCode    *goja.Program //nolint:gochecknoglobals
+	globalBabelCodeErr error         //nolint:gochecknoglobals
+	onceBabel          sync.Once     //nolint:gochecknoglobals
+	globalBabel        *babel        //nolint:gochecknoglobals
 )
 
 const (
