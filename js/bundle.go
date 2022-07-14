@@ -350,7 +350,7 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 				}
 				return nil
 			}
-			panic("we shouldn't be able to get here")
+			panic("Somehow a commonjs main module is not wrapped in a function")
 		})
 	})
 
