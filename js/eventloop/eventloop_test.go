@@ -1,4 +1,4 @@
-package eventloop
+package eventloop_test
 
 import (
 	"errors"
@@ -8,12 +8,13 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/js/eventloop"
 	"go.k6.io/k6/js/modulestest"
 )
 
 func TestBasicEventLoop(t *testing.T) {
 	t.Parallel()
-	loop := New(&modulestest.VU{RuntimeField: goja.New()})
+	loop := eventloop.New(&modulestest.VU{RuntimeField: goja.New()})
 	var ran int
 	f := func() error { //nolint:unparam
 		ran++
@@ -33,7 +34,7 @@ func TestBasicEventLoop(t *testing.T) {
 
 func TestEventLoopRegistered(t *testing.T) {
 	t.Parallel()
-	loop := New(&modulestest.VU{RuntimeField: goja.New()})
+	loop := eventloop.New(&modulestest.VU{RuntimeField: goja.New()})
 	var ran int
 	f := func() error {
 		ran++
@@ -58,7 +59,7 @@ func TestEventLoopRegistered(t *testing.T) {
 func TestEventLoopWaitOnRegistered(t *testing.T) {
 	t.Parallel()
 	var ran int
-	loop := New(&modulestest.VU{RuntimeField: goja.New()})
+	loop := eventloop.New(&modulestest.VU{RuntimeField: goja.New()})
 	f := func() error {
 		ran++
 		r := loop.RegisterCallback()
@@ -85,7 +86,7 @@ func TestEventLoopWaitOnRegistered(t *testing.T) {
 func TestEventLoopReuse(t *testing.T) {
 	t.Parallel()
 	sleepTime := time.Millisecond * 500
-	loop := New(&modulestest.VU{RuntimeField: goja.New()})
+	loop := eventloop.New(&modulestest.VU{RuntimeField: goja.New()})
 	f := func() error {
 		for i := 0; i < 100; i++ {
 			bad := i == 17
@@ -119,7 +120,7 @@ func TestEventLoopReuse(t *testing.T) {
 
 func TestEventLoopPanicOnDoubleCallback(t *testing.T) {
 	t.Parallel()
-	loop := New(&modulestest.VU{RuntimeField: goja.New()})
+	loop := eventloop.New(&modulestest.VU{RuntimeField: goja.New()})
 	var ran int
 	f := func() error {
 		ran++
