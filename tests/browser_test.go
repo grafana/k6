@@ -95,10 +95,8 @@ func TestBrowserOn(t *testing.T) {
 		require.NoError(t, rt.Set("b", b.Browser))
 
 		err := b.vu.Loop.Start(func() error {
-			if _, err := rt.RunString(fmt.Sprintf(script, "wrongevent")); err != nil {
-				return fmt.Errorf("%w", err)
-			}
-			return nil
+			_, err := rt.RunString(fmt.Sprintf(script, "wrongevent"))
+			return err
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
@@ -116,10 +114,8 @@ func TestBrowserOn(t *testing.T) {
 
 		err := b.vu.Loop.Start(func() error {
 			time.AfterFunc(100*time.Millisecond, func() { b.Browser.Close() })
-			if _, err := rt.RunString(fmt.Sprintf(script, "disconnected")); err != nil {
-				return fmt.Errorf("%w", err)
-			}
-			return nil
+			_, err := rt.RunString(fmt.Sprintf(script, "disconnected"))
+			return err
 		})
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: true")
@@ -137,10 +133,8 @@ func TestBrowserOn(t *testing.T) {
 
 		err := b.vu.Loop.Start(func() error {
 			time.AfterFunc(100*time.Millisecond, func() { cancel() })
-			if _, err := rt.RunString(fmt.Sprintf(script, "disconnected")); err != nil {
-				return fmt.Errorf("%w", err)
-			}
-			return nil
+			_, err := rt.RunString(fmt.Sprintf(script, "disconnected"))
+			return err
 		})
 		require.NoError(t, err)
 		assert.Contains(t, log, "err: browser.on promise rejected: context canceled")
