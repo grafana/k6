@@ -42,7 +42,6 @@ import (
 	"go.k6.io/k6/loader"
 )
 
-//nolint: gochecknoglobals, lll
 var (
 	volumeRE  = regexp.MustCompile(`^[/\\]?([a-zA-Z]):(.*)`)
 	sharedRE  = regexp.MustCompile(`^\\\\([^\\]+)`) // matches a shared folder in Windows before backslack replacement. i.e \\VMBOXSVR\k6\script.js

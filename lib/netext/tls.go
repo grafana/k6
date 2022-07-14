@@ -28,7 +28,7 @@ import (
 	"go.k6.io/k6/lib"
 )
 
-//nolint: golint
+//nolint:golint
 const (
 	OCSP_STATUS_GOOD                   = "good"
 	OCSP_STATUS_REVOKED                = "revoked"

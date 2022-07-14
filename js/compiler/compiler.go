@@ -90,7 +90,7 @@ var (
 
 	onceBabelCode      sync.Once     //nolint:gochecknoglobals
 	globalBabelCode    *goja.Program //nolint:gochecknoglobals
-	globalBabelCodeErr error         //nolint:gochecknoglobals
+	errGlobalBabelCode error         //nolint:gochecknoglobals
 	onceBabel          sync.Once     //nolint:gochecknoglobals
 	globalBabel        *babel        //nolint:gochecknoglobals
 )
@@ -265,10 +265,10 @@ type babel struct {
 
 func newBabel() (*babel, error) {
 	onceBabelCode.Do(func() {
-		globalBabelCode, globalBabelCodeErr = goja.Compile("<internal/k6/compiler/lib/babel.min.js>", babelSrc, false)
+		globalBabelCode, errGlobalBabelCode = goja.Compile("<internal/k6/compiler/lib/babel.min.js>", babelSrc, false)
 	})
-	if globalBabelCodeErr != nil {
-		return nil, globalBabelCodeErr
+	if errGlobalBabelCode != nil {
+		return nil, errGlobalBabelCode
 	}
 	vm := goja.New()
 	_, err := vm.RunProgram(globalBabelCode)

@@ -222,10 +222,10 @@ func TestAbortTest(t *testing.T) { //nolint:tparallel
 		require.Equal(t, v.Reason, reason)
 	}
 
-	t.Run("default reason", func(t *testing.T) { //nolint: paralleltest
+	t.Run("default reason", func(t *testing.T) { //nolint:paralleltest
 		prove(t, "exec.test.abort()", errext.AbortTest)
 	})
-	t.Run("custom reason", func(t *testing.T) { //nolint: paralleltest
+	t.Run("custom reason", func(t *testing.T) { //nolint:paralleltest
 		prove(t, `exec.test.abort("mayday")`, fmt.Sprintf("%s: mayday", errext.AbortTest))
 	})
 }

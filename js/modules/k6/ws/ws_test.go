@@ -541,7 +541,7 @@ func TestSession(t *testing.T) {
 	})
 }
 
-func TestSocketSendBinary(t *testing.T) { //nolint: tparallel
+func TestSocketSendBinary(t *testing.T) { //nolint:tparallel
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	sr := tb.Replacer.Replace
@@ -552,10 +552,10 @@ func TestSocketSendBinary(t *testing.T) { //nolint: tparallel
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	samples := make(chan metrics.SampleContainer, 1000)
-	state := &lib.State{ //nolint: exhaustivestruct
+	state := &lib.State{ //nolint:exhaustivestruct
 		Group:  root,
 		Dialer: tb.Dialer,
-		Options: lib.Options{ //nolint: exhaustivestruct
+		Options: lib.Options{ //nolint:exhaustivestruct
 			SystemTags: metrics.NewSystemTagSet(
 				metrics.TagURL,
 				metrics.TagProto,
@@ -619,7 +619,7 @@ func TestSocketSendBinary(t *testing.T) { //nolint: tparallel
 		{"function() {}", "Function"},
 	}
 
-	for _, tc := range errTestCases { //nolint: paralleltest
+	for _, tc := range errTestCases { //nolint:paralleltest
 		tc := tc
 		t.Run(fmt.Sprintf("err_%s", tc.expErrType), func(t *testing.T) {
 			_, err = rt.RunString(fmt.Sprintf(sr(`

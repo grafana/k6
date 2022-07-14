@@ -35,7 +35,7 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
-//nolint: golint, revive
+//nolint:golint, revive
 func getTestModuleInstance(
 	t testing.TB, ctx context.Context, state *lib.State,
 ) (*goja.Runtime, *ModuleInstance) {

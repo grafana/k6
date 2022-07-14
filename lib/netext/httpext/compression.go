@@ -39,7 +39,6 @@ import (
 // CompressionType is used to specify what compression is to be used to compress the body of a
 // request
 // The conversion and validation methods are auto-generated with https://github.com/alvaroloes/enumer:
-//nolint: lll
 //go:generate enumer -type=CompressionType -transform=snake -trimprefix CompressionType -output compression_type_gen.go
 type CompressionType uint
 

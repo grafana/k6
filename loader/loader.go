@@ -47,7 +47,7 @@ type SourceData struct {
 
 type loaderFunc func(logger logrus.FieldLogger, path string, parts []string) (string, error)
 
-//nolint: gochecknoglobals
+//nolint:gochecknoglobals
 var (
 	loaders = []struct {
 		name string

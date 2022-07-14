@@ -188,7 +188,7 @@ func (varr *RampingArrivalRate) Init(ctx context.Context) error {
 	varr.et = et
 	varr.iterSegIndex = lib.NewSegmentedIndex(et)
 
-	return err //nolint: wrapcheck
+	return err //nolint:wrapcheck
 }
 
 // cal calculates the  transtitions between stages and gives the next full value produced by the

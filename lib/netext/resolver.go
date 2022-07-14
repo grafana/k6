@@ -64,7 +64,7 @@ type cacheResolver struct {
 func NewResolver(
 	actRes MultiResolver, ttl time.Duration, sel types.DNSSelect, pol types.DNSPolicy,
 ) Resolver {
-	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint: gosec
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
 	res := resolver{
 		resolve:     actRes,
 		selectIndex: sel,
