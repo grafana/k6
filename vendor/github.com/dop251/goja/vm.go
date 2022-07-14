@@ -419,8 +419,6 @@ func (vm *vm) run() {
 			iface: vm.interruptVal,
 		}
 		v.stack = vm.captureStack(nil, 0)
-		atomic.StoreUint32(&vm.interrupted, 0)
-		vm.interruptVal = nil
 		vm.interruptLock.Unlock()
 		panic(&uncatchableException{
 			err: v,
