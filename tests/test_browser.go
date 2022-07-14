@@ -260,6 +260,13 @@ func (b *testBrowser) runString(s string, args ...interface{}) (goja.Value, erro
 	return v, err
 }
 
+// await runs fn in the event loop and awaits its return.
+// Note: Do not confuse the method name with await in JavaScript.
+func (b *testBrowser) await(fn func() error) error {
+	b.t.Helper()
+	return b.vu.RunLoop(fn) //nolint:wrapcheck
+}
+
 // launchOptions provides a way to customize browser type
 // launch options in tests.
 type launchOptions struct {
