@@ -480,10 +480,8 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, err)
 
 		err = tb.vu.Loop.Start(func() error {
-			if _, err := tb.runtime().RunString(fmt.Sprintf(script, "fn", "{}", "null")); err != nil {
-				return fmt.Errorf("%w", err)
-			}
-			return nil
+			_, err := tb.runtime().RunString(fmt.Sprintf(script, "fn", "{}", "null"))
+			return err
 		})
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: null")
@@ -506,12 +504,8 @@ func TestPageWaitForFunction(t *testing.T) {
 
 		arg := "raf_arg"
 		err = tb.vu.Loop.Start(func() error {
-			if _, err := tb.runtime().RunString(
-				fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("%q", arg)),
-			); err != nil {
-				return fmt.Errorf("%w", err)
-			}
-			return nil
+			_, err := tb.runtime().RunString(fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("%q", arg)))
+			return err
 		})
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: null")
@@ -544,12 +538,8 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, err)
 
 		err = tb.vu.Loop.Start(func() error {
-			if _, err := tb.runtime().RunString(
-				fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("...%s", string(argsJS))),
-			); err != nil {
-				return fmt.Errorf("%w", err)
-			}
-			return nil
+			_, err := tb.runtime().RunString(fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("...%s", string(argsJS))))
+			return err
 		})
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: null")
@@ -573,11 +563,8 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, rt.Set("page", p))
 
 		err := tb.vu.Loop.Start(func() error {
-			if _, err := rt.RunString(fmt.Sprintf(script, "false",
-				"{ polling: 'raf', timeout: 500, }", "null")); err != nil {
-				return fmt.Errorf("%w", err)
-			}
-			return nil
+			_, err := rt.RunString(fmt.Sprintf(script, "false", "{ polling: 'raf', timeout: 500, }", "null"))
+			return err
 		})
 		require.NoError(t, err)
 		require.Len(t, log, 1)
@@ -593,11 +580,8 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, rt.Set("page", p))
 
 		err := tb.vu.Loop.Start(func() error {
-			if _, err := rt.RunString(fmt.Sprintf(script, "false",
-				"{ polling: 'blah' }", "null")); err != nil {
-				return fmt.Errorf("%w", err)
-			}
-			return nil
+			_, err := rt.RunString(fmt.Sprintf(script, "false", "{ polling: 'blah' }", "null"))
+			return err
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
@@ -630,12 +614,9 @@ func TestPageWaitForFunction(t *testing.T) {
 	        });`
 
 		err := tb.vu.Loop.Start(func() error {
-			if _, err := tb.runtime().RunString(fmt.Sprintf(script,
-				fmt.Sprintf("%q", "document.querySelector('h1')"),
-				"{ polling: 100, timeout: 2000, }", "null")); err != nil {
-				return fmt.Errorf("%w", err)
-			}
-			return nil
+			s := fmt.Sprintf(script, `"document.querySelector('h1')"`, "{ polling: 100, timeout: 2000, }", "null")
+			_, err := tb.runtime().RunString(s)
+			return err
 		})
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: Hello")
@@ -664,11 +645,9 @@ func TestPageWaitForFunction(t *testing.T) {
 		}`))
 
 		err = tb.vu.Loop.Start(func() error {
-			if _, err := tb.runtime().RunString(fmt.Sprintf(script, "fn",
-				"{ polling: 'mutation', timeout: 2000, }", "null")); err != nil {
-				return fmt.Errorf("%w", err)
-			}
-			return nil
+			s := fmt.Sprintf(script, "fn", "{ polling: 'mutation', timeout: 2000, }", "null")
+			_, err := tb.runtime().RunString(s)
+			return err
 		})
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: null")
