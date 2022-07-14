@@ -19,7 +19,7 @@
  */
 
 // Package exitcodes contains the constants representing possible k6 exit error codes.
-//nolint: golint
+//nolint:golint
 package exitcodes
 
 // ExitCode is just a type representing a process exit code for k6

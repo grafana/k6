@@ -28,7 +28,7 @@ import (
 )
 
 // CompatibilityMode specifies the JS compatibility mode
-// nolint:lll
+//nolint:lll
 //go:generate enumer -type=CompatibilityMode -transform=snake -trimprefix CompatibilityMode -output compatibility_mode_gen.go
 type CompatibilityMode uint8
 

@@ -112,7 +112,7 @@ func http2ErrCodeOffset(code http2.ErrCode) errCode {
 	return 1 + errCode(code)
 }
 
-//nolint: errorlint,cyclop
+//nolint:errorlint
 func errorCodeForNetOpError(err *net.OpError) (errCode, string) {
 	// TODO: refactor this further - a big switch would be more readable, maybe
 	// we should even check for *os.SyscallError in the main switch body in the
@@ -172,7 +172,7 @@ func errorCodeForNetOpError(err *net.OpError) (errCode, string) {
 }
 
 // errorCodeForError returns the errorCode and a specific error message for given error.
-//nolint: errorlint, cyclop
+//nolint:errorlint
 func errorCodeForError(err error) (errCode, string) {
 	// We explicitly check for `Unwrap()` in the default switch branch, but
 	// checking for the concrete error types first gives us the opportunity to

@@ -144,7 +144,7 @@ const (
 // the smallest common substring, the actual slice order matters.
 // Longer tokens with symbols in common with shorter ones must appear
 // first in the list in order to be effectively matched.
-var operatorTokens = [7]string{ // nolint:gochecknoglobals
+var operatorTokens = [7]string{ //nolint:gochecknoglobals
 	tokenLessEqual,
 	tokenLess,
 	tokenGreaterEqual,
@@ -190,7 +190,7 @@ const (
 // It is meant to be used during the parsing of threshold expressions.
 // Although declared as a `var`, being an array, it is effectively
 // immutable and can be considered constant.
-var aggregationMethodTokens = [8]string{ // nolint:gochecknoglobals
+var aggregationMethodTokens = [8]string{ //nolint:gochecknoglobals
 	tokenValue,
 	tokenCount,
 	tokenRate,

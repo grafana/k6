@@ -198,7 +198,7 @@ func printExecutionDescription(
 	}
 }
 
-//nolint: funlen
+//nolint:funlen
 func renderMultipleBars(
 	nocolor, isTTY, goBack bool, maxLeft, termWidth, widthDelta int, pbs []*pb.ProgressBar,
 ) (string, int) {
@@ -291,7 +291,7 @@ func renderMultipleBars(
 // TODO: show other information here?
 // TODO: add a no-progress option that will disable these
 // TODO: don't use global variables...
-// nolint:funlen,gocognit
+//nolint:funlen,gocognit
 func showProgress(ctx context.Context, gs *globalState, pbs []*pb.ProgressBar, logger *logrus.Logger) {
 	if gs.flags.quiet {
 		return

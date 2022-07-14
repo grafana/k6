@@ -31,7 +31,7 @@ import (
 )
 
 // Config holds all the necessary data and options for sending metrics to the Load Impact cloud.
-//nolint: lll
+//nolint:lll
 type Config struct {
 	// TODO: refactor common stuff between cloud execution and output
 	Token     null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`

@@ -9,7 +9,7 @@ import (
 
 // if a fieldName is the key of this map exactly than the value for the given key should be used as
 // the name of the field in js
-//nolint: gochecknoglobals
+//nolint:gochecknoglobals
 var fieldNameExceptions = map[string]string{
 	"OCSP": "ocsp",
 }
@@ -41,7 +41,7 @@ func FieldName(t reflect.Type, f reflect.StructField) string {
 
 // if a methodName is the key of this map exactly than the value for the given key should be used as
 // the name of the method in js
-//nolint: gochecknoglobals
+//nolint:gochecknoglobals
 var methodNameExceptions = map[string]string{
 	"JSON": "json",
 	"HTML": "html",

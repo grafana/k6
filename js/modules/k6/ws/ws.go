@@ -122,7 +122,7 @@ func (mi *WS) Exports() modules.Exports {
 
 // Connect establishes a WebSocket connection based on the parameters provided.
 // TODO: refactor to reduce the method complexity
-//nolint: funlen,gocognit,gocyclo,cyclop
+//nolint:funlen,gocognit,gocyclo
 func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	ctx := mi.vu.Context()
 	rt := mi.vu.Runtime()
@@ -594,7 +594,7 @@ func (s *Socket) closeConnection(code int) error {
 }
 
 // Wraps conn.ReadMessage in a channel
-func (s *Socket) readPump(readChan chan *message, errorChan chan error, closeChan chan int) { //nolint: cyclop
+func (s *Socket) readPump(readChan chan *message, errorChan chan error, closeChan chan int) {
 	for {
 		messageType, data, err := s.conn.ReadMessage()
 		if err != nil {

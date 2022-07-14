@@ -84,7 +84,7 @@ func TestEncodingAlgorithms(t *testing.T) {
 			}`)
 			assert.NoError(t, err)
 		})
-		t.Run("DefaultArrayBufferDec", func(t *testing.T) { //nolint: paralleltest // weird that it triggers here, and these tests can't be parallel
+		t.Run("DefaultArrayBufferDec", func(t *testing.T) { //nolint:paralleltest // weird that it triggers here, and these tests can't be parallel
 			_, err := rt.RunString(`
 			var exp = "hello";
 			var decBin = encoding.b64decode("aGVsbG8=");

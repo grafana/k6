@@ -61,7 +61,7 @@ var _ lib.Runner = &Runner{}
 // TODO: https://github.com/grafana/k6/issues/2186
 // An advanced TLS support should cover the rid of the warning
 //
-// nolint:gochecknoglobals
+//nolint:gochecknoglobals
 var nameToCertWarning sync.Once
 
 type Runner struct {
@@ -149,7 +149,7 @@ func (r *Runner) NewVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 	return lib.InitializedVU(vu), nil
 }
 
-// nolint:funlen
+//nolint:funlen
 func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.SampleContainer) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
 	bi, err := r.Bundle.Instantiate(r.Logger, idLocal)
@@ -213,7 +213,7 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 				"and let k6 automatically detect from the provided certificate. It follows the Go's NameToCertificate " +
 				"deprecation - https://pkg.go.dev/crypto/tls@go1.17#Config.")
 		})
-		// nolint:staticcheck // ignore SA1019 we can deprecate it but we have to continue to support the previous code.
+		//nolint:staticcheck // ignore SA1019 we can deprecate it but we have to continue to support the previous code.
 		tlsConfig.NameToCertificate = nameToCert
 	}
 	transport := &http.Transport{

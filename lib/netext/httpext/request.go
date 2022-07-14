@@ -130,7 +130,7 @@ func updateK6Response(k6Response *Response, finishedReq *finishedRequest) {
 // MakeRequest makes http request for tor the provided ParsedHTTPRequest.
 //
 // TODO: split apart...
-// nolint: cyclop, gocyclo, funlen, gocognit
+//nolint:cyclop, gocyclo, funlen, gocognit
 func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest) (*Response, error) {
 	respReq := &Request{
 		Method:  preq.Req.Method,

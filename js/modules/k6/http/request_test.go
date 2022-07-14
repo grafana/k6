@@ -1638,7 +1638,7 @@ func TestRequestCancellation(t *testing.T) {
 
 func TestRequestArrayBufferBody(t *testing.T) {
 	t.Parallel()
-	tb, _, _, rt, _ := newRuntime(t) //nolint: dogsled
+	tb, _, _, rt, _ := newRuntime(t) //nolint:dogsled
 	sr := tb.Replacer.Replace
 
 	tb.Mux.HandleFunc("/post-arraybuffer", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
