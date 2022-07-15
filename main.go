@@ -1,14 +1,11 @@
 package browser
 
 import (
-	"errors"
-
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
 
-	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/dop251/goja"
@@ -62,10 +59,15 @@ func (*RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 // Exports returns the exports of the JS module so that it can be used in test
 // scripts.
 func (mi *ModuleInstance) Exports() k6modules.Exports {
-	return k6modules.Exports{Default: mi.mod}
+	return k6modules.Exports{
+		Named: map[string]interface{}{
+			"chromium": mi.mod,
+		},
+	}
 }
 
-func (m *JSModule) Launch(browserName string, opts goja.Value) api.Browser {
+// Launch Chromium with given options.
+func (m *JSModule) Launch(opts goja.Value) api.Browser {
 	/*go func() {
 		f, err := os.Create("./cpu.profile")
 		if err != nil {
@@ -79,14 +81,8 @@ func (m *JSModule) Launch(browserName string, opts goja.Value) api.Browser {
 	ctx := k6ext.WithVU(m.vu.Context(), m.vu)
 	ctx = k6ext.WithCustomMetrics(ctx, m.k6Metrics)
 
-	if browserName == "chromium" {
-		bt := chromium.NewBrowserType(ctx)
-		return bt.Launch(opts)
-	}
-
-	k6common.Throw(m.vu.Runtime(),
-		errors.New("Currently 'chromium' is the only supported browser"))
-	return nil
+	bt := chromium.NewBrowserType(ctx)
+	return bt.Launch(opts)
 }
 
 func init() {
