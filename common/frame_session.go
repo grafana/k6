@@ -53,9 +53,9 @@ import (
 const utilityWorldName = "__k6_browser_utility_world__"
 
 /*
-   FrameSession is used for managing a frame's life-cycle, or in other words its full session.
-   It manages all the event listening while deferring the state storage to the Frame and FrameManager
-   structs.
+FrameSession is used for managing a frame's life-cycle, or in other words its full session.
+It manages all the event listening while deferring the state storage to the Frame and FrameManager
+structs.
 */
 type FrameSession struct {
 	ctx            context.Context
@@ -88,6 +88,7 @@ type FrameSession struct {
 }
 
 // NewFrameSession initializes and returns a new FrameSession.
+//
 //nolint:funlen
 func NewFrameSession(
 	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger,
@@ -500,7 +501,11 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 	action := cdppage.Navigate(url).WithReferrer(referrer).WithFrameID(cdp.FrameID(frame.ID()))
 	_, documentID, errorText, err := action.Do(cdp.WithExecutor(fs.ctx, fs.session))
 	if err != nil {
-		err = fmt.Errorf("%s at %q: %w", errorText, url, err)
+		if errorText == "" {
+			err = fmt.Errorf("%w", err)
+		} else {
+			err = fmt.Errorf("%q: %w", errorText, err)
+		}
 	}
 	return documentID.String(), err
 }
