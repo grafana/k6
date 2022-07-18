@@ -318,7 +318,7 @@ func (f *Frame) document() (*ElementHandle, error) {
 
 	dh, err := f.newDocumentHandle()
 	if err != nil {
-		return nil, fmt.Errorf("newDocumentHandle: %w", err)
+		return nil, fmt.Errorf("getting new document handle: %w", err)
 	}
 
 	// each execution context switch modifies documentHandle.
@@ -389,7 +389,7 @@ func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
 	}
 	dh, ok := result.(*ElementHandle)
 	if !ok {
-		return nil, fmt.Errorf("invalid document handle type: %T", result)
+		return nil, fmt.Errorf("unexpected document handle type: %T", result)
 	}
 
 	return dh, nil
@@ -567,7 +567,7 @@ func (f *Frame) waitForFunction(
 
 	execCtx := f.executionContexts[world]
 	if execCtx == nil {
-		return nil, fmt.Errorf("execution context %q not found", world)
+		return nil, fmt.Errorf("waiting for function: execution context %q not found", world)
 	}
 	injected, err := execCtx.getInjectedScript(apiCtx)
 	if err != nil {
@@ -590,7 +590,7 @@ func (f *Frame) waitForFunction(
 		handle, err := execCtx.eval(apiCtx, opts, js)
 		if err != nil {
 			cb(func() error {
-				reject(fmt.Errorf("waitForFunction promise rejected: %w", err))
+				reject(fmt.Errorf("waiting for function promise rejected: %w", err))
 				return nil
 			})
 			return
@@ -608,7 +608,7 @@ func (f *Frame) waitForFunction(
 			}, args...)...)
 		if err != nil {
 			cb(func() error {
-				reject(fmt.Errorf("waitForFunction promise rejected: %w", err))
+				reject(fmt.Errorf("waiting for function promise rejected: %w", err))
 				return nil
 			})
 			return
@@ -698,10 +698,10 @@ func (f *Frame) Click(selector string, opts goja.Value) {
 
 	popts := NewFrameClickOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "parsing click options %q: %w", selector, err)
 	}
 	if err := f.click(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "click %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "clicking on %q: %w", selector, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -726,10 +726,10 @@ func (f *Frame) Check(selector string, opts goja.Value) {
 
 	popts := NewFrameCheckOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "parsing new frame check options: %w", err)
 	}
 	if err := f.check(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "check %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "checking %q: %w", selector, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -754,10 +754,10 @@ func (f *Frame) Uncheck(selector string, opts goja.Value) {
 
 	popts := NewFrameUncheckOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "parsing frame uncheck options %q: %w", selector, err)
 	}
 	if err := f.uncheck(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "uncheck %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "unchecking %q: %w", selector, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -783,11 +783,11 @@ func (f *Frame) IsChecked(selector string, opts goja.Value) bool {
 
 	popts := NewFrameIsCheckedOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "parsing is checked options: %w", err)
 	}
 	checked, err := f.isChecked(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "isChecked %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "checking element is checked %q: %w", selector, err)
 	}
 
 	return checked
@@ -811,7 +811,7 @@ func (f *Frame) isChecked(selector string, opts *FrameIsCheckedOptions) (bool, e
 
 	bv, ok := v.(bool)
 	if !ok {
-		return false, fmt.Errorf("isChecked returned %T; want bool", v)
+		return false, fmt.Errorf("checking is %q checked: unexpected type %T", selector, v)
 	}
 
 	return bv, nil
@@ -842,10 +842,10 @@ func (f *Frame) Dblclick(selector string, opts goja.Value) {
 
 	popts := NewFrameDblClickOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "parsing double click options: %w", err)
 	}
 	if err := f.dblclick(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "dblclick %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "double clicking on %q: %w", selector, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -872,10 +872,10 @@ func (f *Frame) DispatchEvent(selector, typ string, eventInit, opts goja.Value) 
 
 	popts := NewFrameDispatchEventOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "Frame.dispatchEvent options: %w", err)
+		k6ext.Panic(f.ctx, "parsing dispatch event options: %w", err)
 	}
 	if err := f.dispatchEvent(selector, typ, eventInit, popts); err != nil {
-		k6ext.Panic(f.ctx, "dispatchEvent %q to %q: %w", typ, selector, err)
+		k6ext.Panic(f.ctx, "dispatching event %q to %q: %w", typ, selector, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -951,10 +951,10 @@ func (f *Frame) Fill(selector, value string, opts goja.Value) {
 
 	popts := NewFrameFillOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "parsing fill options: %w", err)
 	}
 	if err := f.fill(selector, value, popts); err != nil {
-		k6ext.Panic(f.ctx, "fill %q with %q: %w", selector, value, err)
+		k6ext.Panic(f.ctx, "filling %q with %q: %w", selector, value, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -981,10 +981,10 @@ func (f *Frame) Focus(selector string, opts goja.Value) {
 
 	popts := NewFrameBaseOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "parsing focus options: %w", err)
 	}
 	if err := f.focus(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "focus %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "focusing %q: %w", selector, err)
 	}
 	applySlowMo(f.ctx)
 }
@@ -1024,7 +1024,7 @@ func (f *Frame) GetAttribute(selector, name string, opts goja.Value) goja.Value 
 	}
 	v, err := f.getAttribute(selector, name, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getAttribute %q of %q: %w", name, selector, err)
+		k6ext.Panic(f.ctx, "getting attribute %q of %q: %w", name, selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1046,7 +1046,7 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goj
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
-		return nil, fmt.Errorf("unexpected type %T", v)
+		return nil, fmt.Errorf("getting %q attribute of %q: unexpected type %T", name, selector, v)
 	}
 
 	return gv, nil
@@ -1065,10 +1065,10 @@ func (f *Frame) Hover(selector string, opts goja.Value) {
 
 	popts := NewFrameHoverOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parse: %w", err)
+		k6ext.Panic(f.ctx, "parsing hover options: %w", err)
 	}
 	if err := f.hover(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "hover %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "hovering %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1095,11 +1095,11 @@ func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
 
 	popts := NewFrameInnerHTMLOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parse: %w", err)
+		k6ext.Panic(f.ctx, "parsing inner HTML options: %w", err)
 	}
 	v, err := f.innerHTML(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "innerHTML of %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "getting inner HTML of %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1124,7 +1124,7 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
-		return "", fmt.Errorf("unexpected type %T", v)
+		return "", fmt.Errorf("getting inner html of %q: unexpected type %T", selector, v)
 	}
 
 	return gv.String(), nil
@@ -1137,11 +1137,11 @@ func (f *Frame) InnerText(selector string, opts goja.Value) string {
 
 	popts := NewFrameInnerTextOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parse: %w", err)
+		k6ext.Panic(f.ctx, "parsing inner text options: %w", err)
 	}
 	v, err := f.innerText(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "innerText of %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "getting inner text of %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1166,7 +1166,7 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
-		return "", fmt.Errorf("unexpected type %T", v)
+		return "", fmt.Errorf("getting inner text of %q: unexpected type %T", selector, v)
 	}
 
 	return gv.String(), nil
@@ -1179,11 +1179,11 @@ func (f *Frame) InputValue(selector string, opts goja.Value) string {
 
 	popts := NewFrameInputValueOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parse: %w", err)
+		k6ext.Panic(f.ctx, "parsing input value options: %w", err)
 	}
 	v, err := f.inputValue(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "inputValue of %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "getting input value of %q: %w", selector, err)
 	}
 
 	return v
@@ -1203,7 +1203,7 @@ func (f *Frame) inputValue(selector string, opts *FrameInputValueOptions) (strin
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
-		return "", fmt.Errorf("unexpected type %T", v)
+		return "", fmt.Errorf("getting input value of %q: unexpected type %T", selector, v)
 	}
 
 	return gv.String(), nil
@@ -1236,7 +1236,7 @@ func (f *Frame) IsEditable(selector string, opts goja.Value) bool {
 	}
 	editable, err := f.isEditable(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "isEditable %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "checking is %q editable: %w", selector, err)
 	}
 
 	return editable
@@ -1260,7 +1260,7 @@ func (f *Frame) isEditable(selector string, opts *FrameIsEditableOptions) (bool,
 
 	bv, ok := v.(bool)
 	if !ok {
-		return false, fmt.Errorf("isEditable returned %T; want bool", v)
+		return false, fmt.Errorf("checking is %q editable: unexpected type %T", selector, v)
 	}
 
 	return bv, nil
@@ -1273,11 +1273,11 @@ func (f *Frame) IsEnabled(selector string, opts goja.Value) bool {
 
 	popts := NewFrameIsEnabledOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "parsing is enabled options: %w", err)
 	}
 	enabled, err := f.isEnabled(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "isEnabled %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "checking is %q enabled: %w", selector, err)
 	}
 
 	return enabled
@@ -1301,7 +1301,7 @@ func (f *Frame) isEnabled(selector string, opts *FrameIsEnabledOptions) (bool, e
 
 	bv, ok := v.(bool)
 	if !ok {
-		return false, fmt.Errorf("isEnabled returned %T; want bool", v)
+		return false, fmt.Errorf("checking is %q enabled: unexpected type %T", selector, v)
 	}
 
 	return bv, nil
@@ -1314,11 +1314,11 @@ func (f *Frame) IsDisabled(selector string, opts goja.Value) bool {
 
 	popts := NewFrameIsDisabledOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "parsing is disabled options: %w", err)
 	}
 	disabled, err := f.isDisabled(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "isDisabled %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "checking is %q disabled: %w", selector, err)
 	}
 
 	return disabled
@@ -1342,7 +1342,7 @@ func (f *Frame) isDisabled(selector string, opts *FrameIsDisabledOptions) (bool,
 
 	bv, ok := v.(bool)
 	if !ok {
-		return false, fmt.Errorf("isDisabled returned %T; want bool", v)
+		return false, fmt.Errorf("checking is %q disabled: unexpected type %T", selector, v)
 	}
 
 	return bv, nil
@@ -1355,11 +1355,11 @@ func (f *Frame) IsHidden(selector string, opts goja.Value) bool {
 
 	popts := NewFrameIsHiddenOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "parsing is hidden options: %w", err)
 	}
 	hidden, err := f.isHidden(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "isHidden %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "checking is %q hidden: %w", selector, err)
 	}
 
 	return hidden
@@ -1383,7 +1383,7 @@ func (f *Frame) isHidden(selector string, opts *FrameIsHiddenOptions) (bool, err
 
 	bv, ok := v.(bool)
 	if !ok {
-		return false, fmt.Errorf("isHidden returned %T; want bool", v)
+		return false, fmt.Errorf("checking is %q hidden: unexpected type %T", selector, v)
 	}
 
 	return bv, nil
@@ -1396,11 +1396,11 @@ func (f *Frame) IsVisible(selector string, opts goja.Value) bool {
 
 	popts := NewFrameIsVisibleOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		k6ext.Panic(f.ctx, "parsing is visible options: %w", err)
 	}
 	visible, err := f.isVisible(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "isVisible %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "checking is %q visible: %w", selector, err)
 	}
 
 	return visible
@@ -1424,7 +1424,7 @@ func (f *Frame) isVisible(selector string, opts *FrameIsVisibleOptions) (bool, e
 
 	bv, ok := v.(bool)
 	if !ok {
-		return false, fmt.Errorf("isVisible returned %T; want bool", v)
+		return false, fmt.Errorf("checking is %q visible: unexpected type %T", selector, v)
 	}
 
 	return bv, nil
@@ -1507,10 +1507,10 @@ func (f *Frame) Press(selector, key string, opts goja.Value) {
 
 	popts := NewFramePressOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parse: %w", err)
+		k6ext.Panic(f.ctx, "parsing press options: %w", err)
 	}
 	if err := f.press(selector, key, popts); err != nil {
-		k6ext.Panic(f.ctx, "press %q on %q: %w", key, selector, err)
+		k6ext.Panic(f.ctx, "pressing %q on %q: %w", key, selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1538,11 +1538,11 @@ func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value
 
 	popts := NewFrameSelectOptionOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parse: %w", err)
+		k6ext.Panic(f.ctx, "parsing select option options: %w", err)
 	}
 	v, err := f.selectOption(selector, values, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "selectOption on %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "selecting option on %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1592,7 +1592,7 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 
 	parsedOpts := NewFrameSetContentOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing setContent options: %w", err)
+		k6ext.Panic(f.ctx, "parsing set content options: %w", err)
 	}
 
 	js := `(html) => {
@@ -1627,10 +1627,10 @@ func (f *Frame) Tap(selector string, opts goja.Value) {
 
 	popts := NewFrameTapOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parse: %w", err)
+		k6ext.Panic(f.ctx, "parsing tap options: %w", err)
 	}
 	if err := f.tap(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "tap %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "tapping on %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1657,11 +1657,11 @@ func (f *Frame) TextContent(selector string, opts goja.Value) string {
 
 	popts := NewFrameTextContentOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parse: %w", err)
+		k6ext.Panic(f.ctx, "parsing text content options: %w", err)
 	}
 	v, err := f.textContent(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "textContent of %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "getting text content of %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1686,7 +1686,7 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
-		return "", fmt.Errorf("unexpected type %T", v)
+		return "", fmt.Errorf("getting text content of %q: unexpected type %T", selector, v)
 	}
 
 	return gv.String(), nil
@@ -1705,10 +1705,10 @@ func (f *Frame) Type(selector, text string, opts goja.Value) {
 
 	popts := NewFrameTypeOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parse: %w", err)
+		k6ext.Panic(f.ctx, "parsing type options: %w", err)
 	}
 	if err := f.typ(selector, text, popts); err != nil {
-		k6ext.Panic(f.ctx, "type %q in %q: %w", text, selector, err)
+		k6ext.Panic(f.ctx, "typing %q in %q: %w", text, selector, err)
 	}
 
 	applySlowMo(f.ctx)
@@ -1801,7 +1801,7 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 	waitUntil := LifecycleEventLoad
 	if state != "" {
 		if err = waitUntil.UnmarshalText([]byte(state)); err != nil {
-			k6ext.Panic(f.ctx, "waitForLoadState: %v", err)
+			k6ext.Panic(f.ctx, "waiting for load state: %v", err)
 		}
 	}
 
@@ -1813,7 +1813,7 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 		return data.(LifecycleEvent) == waitUntil
 	}, parsedOpts.Timeout)
 	if err != nil {
-		k6ext.Panic(f.ctx, "waitForLoadState %q: %v", state, err)
+		k6ext.Panic(f.ctx, "waiting for load state %q: %v", state, err)
 	}
 }
 
@@ -1826,11 +1826,11 @@ func (f *Frame) WaitForNavigation(opts goja.Value) api.Response {
 func (f *Frame) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
 	parsedOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing waitForSelector %q options: %w", selector, err)
+		k6ext.Panic(f.ctx, "parsing wait for selector %q options: %w", selector, err)
 	}
 	handle, err := f.waitForSelectorRetry(selector, parsedOpts, maxRetry)
 	if err != nil {
-		k6ext.Panic(f.ctx, "waitForSelector %q: %w", selector, err)
+		k6ext.Panic(f.ctx, "waiting for selector %q: %w", selector, err)
 	}
 	return handle
 }
