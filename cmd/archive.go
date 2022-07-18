@@ -9,7 +9,8 @@ import (
 type cmdArchive struct {
 	gs *globalState
 
-	archiveOut string
+	archiveOut     string
+	excludeEnvVars bool
 }
 
 func (c *cmdArchive) run(cmd *cobra.Command, args []string) error {
@@ -35,6 +36,12 @@ func (c *cmdArchive) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if c.excludeEnvVars {
+		c.gs.logger.Debug("environment variables will be excluded from the archive")
+
+		arc.Env = nil
+	}
+
 	err = arc.Write(f)
 	if cerr := f.Close(); err == nil && cerr != nil {
 		err = cerr
@@ -48,6 +55,14 @@ func (c *cmdArchive) flagSet() *pflag.FlagSet {
 	flags.AddFlagSet(optionFlagSet())
 	flags.AddFlagSet(runtimeOptionFlagSet(false))
 	flags.StringVarP(&c.archiveOut, "archive-out", "O", c.archiveOut, "archive output filename")
+	flags.BoolVarP(
+		&c.excludeEnvVars,
+		"exclude-env-vars",
+		"",
+		false,
+		"do not embed any environment variables (either from --env or the actual environment) in the archive metadata",
+	)
+
 	return flags
 }
 
