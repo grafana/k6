@@ -52,7 +52,7 @@ func convertBaseJSHandleTypes(ctx context.Context, execCtx *ExecutionContext, ob
 	return &cdpruntime.CallArgument{ObjectID: objHandle.remoteObject.ObjectID}, nil
 }
 
-//nolint: cyclop
+// nolint: cyclop
 func convertArgument(
 	ctx context.Context, execCtx *ExecutionContext, arg interface{},
 ) (*cdpruntime.CallArgument, error) {
@@ -105,21 +105,23 @@ func convertArgument(
 	}
 }
 
-func callApiWithTimeout(ctx context.Context, fn func(context.Context, chan interface{}, chan error), timeout time.Duration) (interface{}, error) {
-	var result interface{}
-	var err error
-	var cancelFn context.CancelFunc
-	resultCh := make(chan interface{})
-	errCh := make(chan error)
-
-	apiCtx := ctx
+func call(
+	ctx context.Context, fn func(context.Context, chan interface{}, chan error), timeout time.Duration,
+) (interface{}, error) {
+	var (
+		result   interface{}
+		err      error
+		cancelFn context.CancelFunc
+		resultCh = make(chan interface{})
+		errCh    = make(chan error)
+		apiCtx   = ctx
+	)
 	if timeout > 0 {
 		apiCtx, cancelFn = context.WithTimeout(ctx, timeout)
 		defer cancelFn()
 	}
 
 	go fn(apiCtx, resultCh, errCh)
-
 	select {
 	case <-apiCtx.Done():
 		err = apiCtx.Err()
