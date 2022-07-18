@@ -33,7 +33,6 @@ import (
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
-	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -582,7 +581,6 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 	defer m.logger.Debugf("FrameManager:NavigateFrame:return",
 		"fmid:%d fid:%v furl:%s url:%s", fmid, fid, furl, url)
 
-	rt := m.vu.Runtime()
 	netMgr := m.page.mainFrameSession.getNetworkManager()
 	defaultReferer := netMgr.extraHTTPHeaders["referer"]
 	parsedOpts := NewFrameGotoOptions(defaultReferer, time.Duration(m.timeoutSettings.navigationTimeout())*time.Second)
@@ -636,6 +634,10 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 			return false
 		}, parsedOpts.Timeout)
 		if err != nil {
+			err = &k6ext.UserFriendlyError{
+				Err:     err,
+				Timeout: parsedOpts.Timeout,
+			}
 			k6ext.Panic(m.ctx, "navigating to %q: %v", url, err)
 		}
 
@@ -648,7 +650,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 			// TODO: A more graceful way of avoiding Throw()?
 			!(netMgr.userReqInterceptionEnabled &&
 				strings.Contains(event.err.Error(), "ERR_BLOCKED_BY_CLIENT")) {
-			k6common.Throw(rt, event.err)
+			k6ext.Panic(m.ctx, "%w", event.err)
 		}
 	} else {
 		m.logger.Debugf("FrameManager:NavigateFrame",
@@ -657,8 +659,12 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 
 		select {
 		case <-timeoutCtx.Done():
-			if timeoutCtx.Err() == context.DeadlineExceeded {
-				k6ext.Panic(m.ctx, "navigating to %q: %s after %s", url, ErrTimedOut, parsedOpts.Timeout)
+			if errors.Is(timeoutCtx.Err(), context.DeadlineExceeded) {
+				err = &k6ext.UserFriendlyError{
+					Err:     err,
+					Timeout: parsedOpts.Timeout,
+				}
+				k6ext.Panic(m.ctx, "navigating to %q: %w", url, err)
 			}
 		case data := <-chSameDoc:
 			event = data.(*NavigationEvent)
@@ -672,8 +678,12 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 
 		select {
 		case <-timeoutCtx.Done():
-			if timeoutCtx.Err() == context.DeadlineExceeded {
-				k6ext.Panic(m.ctx, "navigating to %q: %s after %s", url, ErrTimedOut, parsedOpts.Timeout)
+			if errors.Is(timeoutCtx.Err(), context.DeadlineExceeded) {
+				err = &k6ext.UserFriendlyError{
+					Err:     err,
+					Timeout: parsedOpts.Timeout,
+				}
+				k6ext.Panic(m.ctx, "navigating to %q: %w", url, err)
 			}
 		case <-chWaitUntilCh:
 		}
