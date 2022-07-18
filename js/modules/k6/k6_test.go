@@ -171,7 +171,6 @@ func TestGroup(t *testing.T) {
 		m, ok := New().NewModuleInstance(
 			&modulestest.VU{
 				RuntimeField: rt,
-				InitEnvField: &common.InitEnvironment{},
 				CtxField:     context.Background(),
 				StateField:   state,
 			},
@@ -211,6 +210,12 @@ func TestGroup(t *testing.T) {
 func checkTestRuntime(t testing.TB) (*goja.Runtime, chan metrics.SampleContainer, *metrics.BuiltinMetrics) {
 	rt := goja.New()
 
+	test := modulestest.NewRuntime(t)
+	test.SetInitContext(&common.InitEnvironment{})
+	m, ok := New().NewModuleInstance(test.VU).(*K6)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("k6", m.Exports().Named))
+
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
 	samples := make(chan metrics.SampleContainer, 1000)
@@ -223,19 +228,9 @@ func checkTestRuntime(t testing.TB) (*goja.Runtime, chan metrics.SampleContainer
 		Tags: lib.NewTagMap(map[string]string{
 			"group": root.Path,
 		}),
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
 	}
-
-	state.BuiltinMetrics = metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
-	m, ok := New().NewModuleInstance(
-		&modulestest.VU{
-			RuntimeField: rt,
-			InitEnvField: &common.InitEnvironment{},
-			CtxField:     context.Background(),
-			StateField:   state,
-		},
-	).(*K6)
-	require.True(t, ok)
-	require.NoError(t, rt.Set("k6", m.Exports().Named))
+	test.MoveToVUContext(state)
 
 	return rt, samples, state.BuiltinMetrics
 }
@@ -447,7 +442,6 @@ func TestCheckContextExpiry(t *testing.T) {
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
-			InitEnvField: &common.InitEnvironment{},
 			CtxField:     ctx,
 			StateField:   state,
 		},

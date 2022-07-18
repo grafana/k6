@@ -85,7 +85,7 @@ func TestClient(t *testing.T) {
 				"file": fs,
 			},
 		}
-		testRuntime.InitContext(initEnv)
+		testRuntime.SetInitContext(initEnv)
 
 		rt := goja.New()
 		rt.SetFieldNameMapper(common.FieldNameMapper{})
