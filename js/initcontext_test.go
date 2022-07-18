@@ -70,13 +70,13 @@ func TestInitContextRequire(t *testing.T) {
 			bi, err := b.Instantiate(logger, 0)
 			assert.NoError(t, err, "instance error")
 
-			exports := bi.Runtime.Get("exports").ToObject(bi.Runtime)
+			exports := bi.pgm.exports
 			require.NotNil(t, exports)
 			_, defaultOk := goja.AssertFunction(exports.Get("default"))
 			assert.True(t, defaultOk, "default export is not a function")
 			assert.Equal(t, "abc123", exports.Get("dummy").String())
 
-			k6 := bi.Runtime.Get("_k6").ToObject(bi.Runtime)
+			k6 := exports.Get("_k6").ToObject(bi.Runtime)
 			require.NotNil(t, k6)
 			_, groupOk := goja.AssertFunction(k6.Get("group"))
 			assert.True(t, groupOk, "k6.group is not a function")
@@ -96,7 +96,7 @@ func TestInitContextRequire(t *testing.T) {
 			bi, err := b.Instantiate(logger, 0)
 			require.NoError(t, err)
 
-			exports := bi.Runtime.Get("exports").ToObject(bi.Runtime)
+			exports := bi.pgm.exports
 			require.NotNil(t, exports)
 			_, defaultOk := goja.AssertFunction(exports.Get("default"))
 			assert.True(t, defaultOk, "default export is not a function")
@@ -130,7 +130,7 @@ func TestInitContextRequire(t *testing.T) {
 			require.NoError(t, afero.WriteFile(fs, "/file.js", []byte(`throw new Error("aaaa")`), 0o755))
 			_, err := getSimpleBundle(t, "/script.js", `import "/file.js"; export default function() {}`, fs)
 			assert.EqualError(t, err,
-				"Error: aaaa\n\tat file:///file.js:2:7(3)\n\tat go.k6.io/k6/js.(*InitContext).Require-fm (native)\n\tat file:///script.js:1:0(14)\n")
+				"Error: aaaa\n\tat file:///file.js:2:7(3)\n\tat go.k6.io/k6/js.(*InitContext).Require-fm (native)\n\tat file:///script.js:1:0(15)\n\tat native\n")
 		})
 
 		imports := map[string]struct {
@@ -282,7 +282,7 @@ func TestInitContextOpen(t *testing.T) {
 			t.Parallel()
 			bi, err := createAndReadFile(t, tc.file, tc.content, tc.length, "")
 			require.NoError(t, err)
-			assert.Equal(t, string(tc.content), bi.Runtime.Get("data").Export())
+			assert.Equal(t, string(tc.content), bi.pgm.exports.Get("data").Export())
 		})
 	}
 
@@ -291,7 +291,7 @@ func TestInitContextOpen(t *testing.T) {
 		bi, err := createAndReadFile(t, "/path/to/file.bin", []byte("hi!\x0f\xff\x01"), 6, "b")
 		require.NoError(t, err)
 		buf := bi.Runtime.NewArrayBuffer([]byte{104, 105, 33, 15, 255, 1})
-		assert.Equal(t, buf, bi.Runtime.Get("data").Export())
+		assert.Equal(t, buf, bi.pgm.exports.Get("data").Export())
 	})
 
 	testdata := map[string]string{

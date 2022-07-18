@@ -183,14 +183,15 @@ type compilationState struct {
 	// srcMap is the current full sourceMap that has been generated read so far
 	srcMap      []byte
 	srcMapError error
-	main        bool
+	wrapped     bool // whether the original source is wrapped in a function to make it a commonjs module
 
 	compiler *Compiler
 }
 
 // Compile the program in the given CompatibilityMode, wrapping it between pre and post code
-func (c *Compiler) Compile(src, filename string, main bool) (*goja.Program, string, error) {
-	return c.compileImpl(src, filename, main, c.Options.CompatibilityMode, nil)
+// TODO isESM will be used once goja support ESM modules natively
+func (c *Compiler) Compile(src, filename string, isESM bool) (*goja.Program, string, error) {
+	return c.compileImpl(src, filename, !isESM, c.Options.CompatibilityMode, nil)
 }
 
 // sourceMapLoader is to be used with goja's WithSourceMapLoader
@@ -198,7 +199,7 @@ func (c *Compiler) Compile(src, filename string, main bool) (*goja.Program, stri
 // additioanlly it fixes off by one error in commonjs dependencies due to having to wrap them in a function.
 func (c *compilationState) sourceMapLoader(path string) ([]byte, error) {
 	if path == sourceMapURLFromBabel {
-		if !c.main {
+		if c.wrapped {
 			return c.increaseMappingsByOne(c.srcMap)
 		}
 		return c.srcMap, nil
@@ -214,18 +215,18 @@ func (c *compilationState) sourceMapLoader(path string) ([]byte, error) {
 		c.srcMap = nil
 		return nil, c.srcMapError
 	}
-	if !c.main {
+	if c.wrapped {
 		return c.increaseMappingsByOne(c.srcMap)
 	}
 	return c.srcMap, nil
 }
 
 func (c *Compiler) compileImpl(
-	src, filename string, main bool, compatibilityMode lib.CompatibilityMode, srcMap []byte,
+	src, filename string, wrap bool, compatibilityMode lib.CompatibilityMode, srcMap []byte,
 ) (*goja.Program, string, error) {
 	code := src
-	state := compilationState{srcMap: srcMap, compiler: c, main: main}
-	if !main { // the lines in the sourcemap (if available) will be fixed by increaseMappingsByOne
+	state := compilationState{srcMap: srcMap, compiler: c, wrapped: wrap}
+	if wrap { // the lines in the sourcemap (if available) will be fixed by increaseMappingsByOne
 		code = "(function(module, exports){\n" + code + "\n})\n"
 	}
 	opts := parser.WithDisableSourceMaps
@@ -248,7 +249,7 @@ func (c *Compiler) compileImpl(
 				return nil, code, err
 			}
 			// the compatibility mode "decreases" here as we shouldn't transform twice
-			return c.compileImpl(code, filename, main, lib.CompatibilityModeBase, state.srcMap)
+			return c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
 		}
 		return nil, code, err
 	}

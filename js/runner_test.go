@@ -70,8 +70,8 @@ func TestRunnerNew(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		t.Parallel()
 		r, err := getSimpleRunner(t, "/script.js", `
-			var counter = 0;
-			exports.default = function() { counter++; }
+			exports.counter = 0;
+			exports.default = function() { exports.counter++; }
 		`)
 		require.NoError(t, err)
 
@@ -81,7 +81,7 @@ func TestRunnerNew(t *testing.T) {
 			require.NoError(t, err)
 			vuc, ok := initVU.(*VU)
 			require.True(t, ok)
-			assert.Equal(t, int64(0), vuc.Runtime.Get("counter").Export())
+			assert.Equal(t, int64(0), vuc.pgm.exports.Get("counter").Export())
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -89,7 +89,7 @@ func TestRunnerNew(t *testing.T) {
 			t.Run("RunOnce", func(t *testing.T) {
 				err = vu.RunOnce()
 				require.NoError(t, err)
-				assert.Equal(t, int64(1), vuc.Runtime.Get("counter").Export())
+				assert.Equal(t, int64(1), vuc.pgm.exports.Get("counter").Export())
 			})
 		})
 	})
@@ -97,7 +97,7 @@ func TestRunnerNew(t *testing.T) {
 	t.Run("Invalid", func(t *testing.T) {
 		t.Parallel()
 		_, err := getSimpleRunner(t, "/script.js", `blarg`)
-		assert.EqualError(t, err, "ReferenceError: blarg is not defined\n\tat file:///script.js:1:1(0)\n")
+		assert.EqualError(t, err, "ReferenceError: blarg is not defined\n\tat file:///script.js:2:1(1)\n\tat native\n")
 	})
 }
 
@@ -155,11 +155,8 @@ func TestOptionsSettingToScript(t *testing.T) {
 	t.Parallel()
 
 	optionVariants := []string{
-		"",
-		"var options = null;",
-		"var options = undefined;",
-		"var options = {};",
-		"var options = {teardownTimeout: '1s'};",
+		"export var options = {};",
+		"export var options = {teardownTimeout: '1s'};",
 	}
 
 	for i, variant := range optionVariants {
