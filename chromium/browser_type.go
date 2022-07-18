@@ -129,6 +129,10 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 
 	bp, err := b.launch(launchOpts)
 	if err != nil {
+		err = &k6ext.UserFriendlyError{
+			Err:     err,
+			Timeout: launchOpts.Timeout,
+		}
 		k6ext.Panic(b.Ctx, "%w", err)
 	}
 
