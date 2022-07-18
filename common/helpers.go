@@ -23,7 +23,6 @@ package common
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -114,19 +113,19 @@ func call(
 		cancelFn context.CancelFunc
 		resultCh = make(chan interface{})
 		errCh    = make(chan error)
-		apiCtx   = ctx
 	)
 	if timeout > 0 {
-		apiCtx, cancelFn = context.WithTimeout(ctx, timeout)
+		ctx, cancelFn = context.WithTimeout(ctx, timeout)
 		defer cancelFn()
 	}
 
-	go fn(apiCtx, resultCh, errCh)
+	go fn(ctx, resultCh, errCh)
+
 	select {
-	case <-apiCtx.Done():
-		err = apiCtx.Err()
-		if errors.Is(err, context.DeadlineExceeded) {
-			err = ErrTimedOut
+	case <-ctx.Done():
+		err = &k6ext.UserFriendlyError{
+			Err:     ctx.Err(),
+			Timeout: timeout,
 		}
 	case result = <-resultCh:
 	case err = <-errCh:

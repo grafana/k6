@@ -714,7 +714,7 @@ func (f *Frame) click(selector string, opts *FrameClickOptions) error {
 		selector, DOMElementStateAttached, opts.Strict, click, &opts.ElementHandleBasePointerOptions,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
-		return errorFromDOMError(err.Error())
+		return errorFromDOMError(err)
 	}
 
 	return nil
@@ -742,7 +742,7 @@ func (f *Frame) check(selector string, opts *FrameCheckOptions) error {
 		selector, DOMElementStateAttached, opts.Strict, check, &opts.ElementHandleBasePointerOptions,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
-		return errorFromDOMError(err.Error())
+		return errorFromDOMError(err)
 	}
 
 	return nil
@@ -770,7 +770,7 @@ func (f *Frame) uncheck(selector string, opts *FrameUncheckOptions) error {
 		selector, DOMElementStateAttached, opts.Strict, uncheck, &opts.ElementHandleBasePointerOptions,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
-		return errorFromDOMError(err.Error())
+		return errorFromDOMError(err)
 	}
 
 	return nil
@@ -806,7 +806,7 @@ func (f *Frame) isChecked(selector string, opts *FrameIsCheckedOptions) (bool, e
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return false, errorFromDOMError(err.Error())
+		return false, errorFromDOMError(err)
 	}
 
 	bv, ok := v.(bool)
@@ -860,7 +860,7 @@ func (f *Frame) dblclick(selector string, opts *FrameDblclickOptions) error {
 		selector, DOMElementStateAttached, opts.Strict, dblclick, &opts.ElementHandleBasePointerOptions,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
-		return errorFromDOMError(err.Error())
+		return errorFromDOMError(err)
 	}
 
 	return nil
@@ -895,7 +895,7 @@ func (f *Frame) dispatchEvent(selector, typ string, eventInit goja.Value, opts *
 		force, noWaitAfter, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
-		return errorFromDOMError(err.Error())
+		return errorFromDOMError(err)
 	}
 
 	return nil
@@ -969,7 +969,7 @@ func (f *Frame) fill(selector, value string, opts *FrameFillOptions) error {
 		opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
-		return errorFromDOMError(err.Error())
+		return errorFromDOMError(err)
 	}
 
 	return nil
@@ -998,7 +998,7 @@ func (f *Frame) focus(selector string, opts *FrameBaseOptions) error {
 		[]string{}, false, true, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
-		return errorFromDOMError(err.Error())
+		return errorFromDOMError(err)
 	}
 
 	return nil
@@ -1042,7 +1042,7 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goj
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return nil, errorFromDOMError(err.Error())
+		return nil, errorFromDOMError(err)
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
@@ -1082,7 +1082,7 @@ func (f *Frame) hover(selector string, opts *FrameHoverOptions) error {
 		selector, DOMElementStateAttached, opts.Strict, hover, &opts.ElementHandleBasePointerOptions,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
-		return errorFromDOMError(err.Error())
+		return errorFromDOMError(err)
 	}
 
 	return nil
@@ -1117,7 +1117,7 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return "", errorFromDOMError(err.Error())
+		return "", errorFromDOMError(err)
 	}
 	if v == nil {
 		return "", nil
@@ -1159,7 +1159,7 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return "", errorFromDOMError(err.Error())
+		return "", errorFromDOMError(err)
 	}
 	if v == nil {
 		return "", nil
@@ -1199,7 +1199,7 @@ func (f *Frame) inputValue(selector string, opts *FrameInputValueOptions) (strin
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return "", errorFromDOMError(err.Error())
+		return "", errorFromDOMError(err)
 	}
 	gv, ok := v.(goja.Value)
 	if !ok {
@@ -1255,7 +1255,7 @@ func (f *Frame) isEditable(selector string, opts *FrameIsEditableOptions) (bool,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return false, errorFromDOMError(err.Error())
+		return false, errorFromDOMError(err)
 	}
 
 	bv, ok := v.(bool)
@@ -1296,7 +1296,7 @@ func (f *Frame) isEnabled(selector string, opts *FrameIsEnabledOptions) (bool, e
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return false, errorFromDOMError(err.Error())
+		return false, errorFromDOMError(err)
 	}
 
 	bv, ok := v.(bool)
@@ -1337,7 +1337,7 @@ func (f *Frame) isDisabled(selector string, opts *FrameIsDisabledOptions) (bool,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return false, errorFromDOMError(err.Error())
+		return false, errorFromDOMError(err)
 	}
 
 	bv, ok := v.(bool)
@@ -1378,7 +1378,7 @@ func (f *Frame) isHidden(selector string, opts *FrameIsHiddenOptions) (bool, err
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return false, errorFromDOMError(err.Error())
+		return false, errorFromDOMError(err)
 	}
 
 	bv, ok := v.(bool)
@@ -1419,7 +1419,7 @@ func (f *Frame) isVisible(selector string, opts *FrameIsVisibleOptions) (bool, e
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return false, errorFromDOMError(err.Error())
+		return false, errorFromDOMError(err)
 	}
 
 	bv, ok := v.(bool)
@@ -1525,7 +1525,7 @@ func (f *Frame) press(selector, key string, opts *FramePressOptions) error {
 		[]string{}, false, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
-		return errorFromDOMError(err.Error())
+		return errorFromDOMError(err)
 	}
 
 	return nil
@@ -1560,7 +1560,7 @@ func (f *Frame) selectOption(selector string, values goja.Value, opts *FrameSele
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return nil, errorFromDOMError(err.Error())
+		return nil, errorFromDOMError(err)
 	}
 	selectHandle, ok := v.(jsHandle)
 	if !ok {
@@ -1644,7 +1644,7 @@ func (f *Frame) tap(selector string, opts *FrameTapOptions) error {
 		selector, DOMElementStateAttached, opts.Strict, tap, &opts.ElementHandleBasePointerOptions,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
-		return errorFromDOMError(err.Error())
+		return errorFromDOMError(err)
 	}
 
 	return nil
@@ -1679,7 +1679,7 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return "", errorFromDOMError(err.Error())
+		return "", errorFromDOMError(err)
 	}
 	if v == nil {
 		return "", nil
@@ -1723,7 +1723,7 @@ func (f *Frame) typ(selector, text string, opts *FrameTypeOptions) error {
 		[]string{}, false, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
-		return errorFromDOMError(err.Error())
+		return errorFromDOMError(err)
 	}
 
 	return nil

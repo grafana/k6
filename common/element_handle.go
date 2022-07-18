@@ -667,7 +667,7 @@ func (h *ElementHandle) waitForElementState(
 	}
 	result, err := h.evalWithScript(apiCtx, opts, fn, states, timeout.Milliseconds())
 	if err != nil {
-		return false, errorFromDOMError(err.Error())
+		return false, errorFromDOMError(err)
 	}
 	v, ok := result.(goja.Value)
 	if !ok {
@@ -912,7 +912,7 @@ func (h *ElementHandle) InputValue(opts goja.Value) string {
 // IsChecked checks if a checkbox or radio is checked.
 func (h *ElementHandle) IsChecked() bool {
 	result, err := h.isChecked(h.ctx, 0)
-	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
 		k6ext.Panic(h.ctx, "checking element is checked: %w", err)
 	}
 	return result
@@ -921,7 +921,7 @@ func (h *ElementHandle) IsChecked() bool {
 // IsDisabled checks if the element is disabled.
 func (h *ElementHandle) IsDisabled() bool {
 	result, err := h.isDisabled(h.ctx, 0)
-	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
 		k6ext.Panic(h.ctx, "checking element is disabled: %w", err)
 	}
 	return result
@@ -930,7 +930,7 @@ func (h *ElementHandle) IsDisabled() bool {
 // IsEditable checks if the element is editable.
 func (h *ElementHandle) IsEditable() bool {
 	result, err := h.isEditable(h.ctx, 0)
-	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
 		k6ext.Panic(h.ctx, "checking element is editable: %w", err)
 	}
 	return result
@@ -939,7 +939,7 @@ func (h *ElementHandle) IsEditable() bool {
 // IsEnabled checks if the element is enabled.
 func (h *ElementHandle) IsEnabled() bool {
 	result, err := h.isEnabled(h.ctx, 0)
-	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
 		k6ext.Panic(h.ctx, "checking element is enabled: %w", err)
 	}
 	return result
@@ -948,7 +948,7 @@ func (h *ElementHandle) IsEnabled() bool {
 // IsHidden checks if the element is hidden.
 func (h *ElementHandle) IsHidden() bool {
 	result, err := h.isHidden(h.ctx, 0)
-	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
 		k6ext.Panic(h.ctx, "checking element is hidden: %w", err)
 	}
 	return result
@@ -957,7 +957,7 @@ func (h *ElementHandle) IsHidden() bool {
 // IsVisible checks if the element is visible.
 func (h *ElementHandle) IsVisible() bool {
 	result, err := h.isVisible(h.ctx, 0)
-	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
 		k6ext.Panic(h.ctx, "checking element is visible: %w", err)
 	}
 	return result
@@ -1318,8 +1318,7 @@ func (h *ElementHandle) evalWithScript(
 	if err != nil {
 		return nil, fmt.Errorf("getting injected script: %w", err)
 	}
-	args = append([]interface{}{script}, args...)
-	return h.eval(ctx, opts, js, args...)
+	return h.eval(ctx, opts, js, append([]interface{}{script}, args...)...)
 }
 
 // eval evaluates the given js code in the scope of this ElementHandle and returns the result.
@@ -1328,12 +1327,7 @@ func (h *ElementHandle) eval(
 	opts evalOptions, js string, args ...interface{},
 ) (interface{}, error) {
 	// passing `h` makes it evaluate js code in the element handle's scope.
-	args = append([]interface{}{h}, args...)
-	result, err := h.execCtx.eval(ctx, opts, js, args...)
-	if err != nil {
-		return nil, err
-	}
-	return result, err
+	return h.execCtx.eval(ctx, opts, js, append([]interface{}{h}, args...)...)
 }
 
 func (h *ElementHandle) newAction(
@@ -1490,13 +1484,33 @@ func retryPointerAction(
 	return res, err
 }
 
-func errorFromDOMError(derr string) error {
-	// return the same sentinel error value for the timed out err
-	if strings.Contains(derr, "timed out") {
-		return ErrTimedOut
+func errorFromDOMError(v interface{}) error {
+	var (
+		err  error
+		serr string
+	)
+	switch e := v.(type) {
+	case string:
+		serr = e
+	case error:
+		if e == nil {
+			panic("DOM error is nil")
+		}
+		err, serr = e, e.Error()
+	default:
+		panic(fmt.Errorf("unexpected DOM error type %T", v))
 	}
-	if s := "error:expectednode:"; strings.HasPrefix(derr, s) {
-		return fmt.Errorf("expected node but got %s", strings.TrimPrefix(derr, s))
+	var uerr *k6ext.UserFriendlyError
+	if errors.As(err, &uerr) {
+		return err
+	}
+	if strings.Contains(serr, "timed out") {
+		return &k6ext.UserFriendlyError{
+			Err: ErrTimedOut,
+		}
+	}
+	if s := "error:expectednode:"; strings.HasPrefix(serr, s) {
+		return fmt.Errorf("expected node but got %s", strings.TrimPrefix(serr, s))
 	}
 	errs := map[string]string{
 		"error:notconnected":           "element is not attached to the DOM",
@@ -1516,9 +1530,9 @@ func errorFromDOMError(derr string) error {
 		"error:nthnocapture":           "can't query n-th element in a chained selector with capture",
 		"error:intercept":              "another element is intercepting with pointer action",
 	}
-	if err, ok := errs[derr]; ok {
+	if err, ok := errs[serr]; ok {
 		return errors.New(err)
 	}
 
-	return errors.New(derr)
+	return errors.New(serr)
 }
