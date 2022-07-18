@@ -394,8 +394,11 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		page = b.pages[tid]
 		b.pagesMu.RUnlock()
 	case <-ctx.Done():
-		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, ctx.Err())
-		err = ctx.Err()
+		err = &k6ext.UserFriendlyError{
+			Err:     ctx.Err(),
+			Timeout: b.launchOpts.Timeout,
+		}
+		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, err)
 	}
 	return page, err
 }
