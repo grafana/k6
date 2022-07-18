@@ -208,7 +208,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 
 // getExports validates and extracts exported objects
 func (b *Bundle) getExports(logger logrus.FieldLogger, rt *goja.Runtime, options bool) error {
-	pgm := b.BaseInitContext.programs[b.Filename.String()]
+	pgm := b.BaseInitContext.programs[b.Filename.String()] // this is the main script and it's always present
 	exportsV := pgm.module.Get("exports")
 	if goja.IsNull(exportsV) || goja.IsUndefined(exportsV) {
 		return errors.New("exports must be an object")
@@ -263,7 +263,7 @@ func (b *Bundle) Instantiate(logger logrus.FieldLogger, vuID uint64) (*BundleIns
 	}
 
 	rt := vuImpl.runtime
-	pgm := init.programs[b.Filename.String()]
+	pgm := init.programs[b.Filename.String()] // this is the main script and it's always present
 	bi := &BundleInstance{
 		Runtime:      rt,
 		exports:      make(map[string]goja.Callable),
