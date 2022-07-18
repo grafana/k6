@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	k6common "go.k6.io/k6/js/common"
 )
@@ -20,10 +21,14 @@ func Panic(ctx context.Context, format string, a ...interface{}) {
 		// this should never happen unless a programmer error
 		panic("no k6 JS runtime in context")
 	}
+	// get a user-friendly error if the err is not already so.
 	if len(a) > 0 {
-		err, ok := a[len(a)-1].(error)
-		if ok {
-			a[len(a)-1] = &userFriendlyError{err}
+		var (
+			uerr    *UserFriendlyError
+			err, ok = a[len(a)-1].(error)
+		)
+		if ok && !errors.As(err, &uerr) {
+			a[len(a)-1] = &UserFriendlyError{Err: err}
 		}
 	}
 	defer k6common.Throw(rt, fmt.Errorf(format, a...))
@@ -45,19 +50,28 @@ func Panic(ctx context.Context, format string, a ...interface{}) {
 	_ = p.Kill()
 }
 
-type userFriendlyError struct{ err error }
+// UserFriendlyError maps an internal error to an error that users
+// can easily understand.
+type UserFriendlyError struct {
+	Err     error
+	Timeout time.Duration // prints "timed out after Ns" error
+}
 
-func (e *userFriendlyError) Unwrap() error { return e.err }
+func (e *UserFriendlyError) Unwrap() error { return e.Err }
 
-func (e *userFriendlyError) Error() string {
+func (e *UserFriendlyError) Error() string {
 	switch {
 	default:
-		return e.err.Error()
-	case e.err == nil:
+		return e.Err.Error()
+	case e.Err == nil:
 		return ""
-	case errors.Is(e.err, context.DeadlineExceeded):
-		return strings.ReplaceAll(e.err.Error(), context.DeadlineExceeded.Error(), "timed out")
-	case errors.Is(e.err, context.Canceled):
+	case errors.Is(e.Err, context.DeadlineExceeded):
+		s := "timed out"
+		if t := e.Timeout; t != 0 {
+			s += fmt.Sprintf(" after %s", t)
+		}
+		return strings.ReplaceAll(e.Err.Error(), context.DeadlineExceeded.Error(), s)
+	case errors.Is(e.Err, context.Canceled):
 		return "canceled"
 	}
 }
