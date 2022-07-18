@@ -121,31 +121,37 @@ func (b *BrowserType) ExecutablePath() (execPath string) {
 // Launch allocates a new Chrome browser process and returns a new api.Browser value,
 // which can be used for controlling the Chrome browser.
 func (b *BrowserType) Launch(opts goja.Value) api.Browser {
-	var (
-		rt         = b.vu.Runtime()
-		state      = b.vu.State()
-		launchOpts = common.NewLaunchOptions()
-	)
+	launchOpts := common.NewLaunchOptions()
 	if err := launchOpts.Parse(b.Ctx, opts); err != nil {
-		k6common.Throw(rt, fmt.Errorf("parsing launch options: %w", err))
+		k6ext.Panic(b.Ctx, "parsing launch options: %w", err)
 	}
 	b.Ctx = common.WithLaunchOptions(b.Ctx, launchOpts)
 
-	envs := make([]string, 0, len(launchOpts.Env))
-	for k, v := range launchOpts.Env {
+	bp, err := b.launch(launchOpts)
+	if err != nil {
+		k6ext.Panic(b.Ctx, "%w", err)
+	}
+
+	return bp
+}
+
+func (b *BrowserType) launch(opts *common.LaunchOptions) (*common.Browser, error) {
+	envs := make([]string, 0, len(opts.Env))
+	for k, v := range opts.Env {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	logger, err := makeLogger(b.Ctx, launchOpts)
+	logger, err := makeLogger(b.Ctx, opts)
 	if err != nil {
-		k6common.Throw(rt, fmt.Errorf("setting up logger: %w", err))
+		return nil, fmt.Errorf("setting up logger: %w", err)
 	}
 
-	flags := prepareFlags(launchOpts, &state.Options)
-
-	dataDir := b.storage
+	var (
+		flags   = prepareFlags(opts, &(b.vu.State()).Options)
+		dataDir = b.storage
+	)
 	if err := dataDir.Make("", flags["user-data-dir"]); err != nil {
-		k6common.Throw(rt, err)
+		return nil, fmt.Errorf("%w", err)
 	}
 	flags["user-data-dir"] = dataDir.Dir
 
@@ -163,9 +169,9 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		<-ctx.Done()
 	}(b.Ctx)
 
-	browserProc, err := b.allocate(launchOpts, flags, envs, dataDir, logger)
+	browserProc, err := b.allocate(opts, flags, envs, dataDir, logger)
 	if browserProc == nil {
-		k6ext.Panic(b.Ctx, "launching browser: %s", err)
+		return nil, fmt.Errorf("launching browser: %w", err)
 	}
 
 	browserProc.AttachLogger(logger)
@@ -174,12 +180,12 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 	// so that we can kill it afterward if it lingers
 	// see: k6ext.Panic function.
 	b.Ctx = k6ext.WithProcessID(b.Ctx, browserProc.Pid())
-	browser, err := common.NewBrowser(b.Ctx, b.CancelFn, browserProc, launchOpts, logger)
+	browser, err := common.NewBrowser(b.Ctx, b.CancelFn, browserProc, opts, logger)
 	if err != nil {
-		k6common.Throw(rt, err)
+		return nil, fmt.Errorf("launching browser: %w", err)
 	}
 
-	return browser
+	return browser, nil
 }
 
 // LaunchPersistentContext launches the browser with persistent storage.
