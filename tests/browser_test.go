@@ -22,7 +22,6 @@ package tests
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -80,64 +79,63 @@ func TestTmpDirCleanup(t *testing.T) {
 func TestBrowserOn(t *testing.T) {
 	t.Parallel()
 
-	script := `
-		b.on('%s').then((val) => {
-			log('ok: '+val);
-		}, (val) => {
-			log('err: '+val);
-		});`
+	script := `b.on('%s').then(log).catch(log);`
 
 	t.Run("err_wrong_event", func(t *testing.T) {
 		t.Parallel()
 
 		b := newTestBrowser(t)
-		rt := b.vu.Runtime()
-		require.NoError(t, rt.Set("b", b.Browser))
+		require.NoError(t, b.vu.Runtime().Set("b", b.Browser))
 
-		err := b.vu.Loop.Start(func() error {
-			_, err := rt.RunString(fmt.Sprintf(script, "wrongevent"))
+		err := b.await(func() error {
+			_, err := b.runJavaScript(script, "wrongevent")
 			return err
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(),
-			`unknown browser event: "wrongevent", must be "disconnected"`)
+		assert.ErrorContains(t, err, `unknown browser event: "wrongevent", must be "disconnected"`)
 	})
 
 	t.Run("ok_promise_resolved", func(t *testing.T) {
 		t.Parallel()
 
-		b := newTestBrowser(t, withSkipClose())
-		rt := b.vu.Runtime()
+		var (
+			b   = newTestBrowser(t, withSkipClose())
+			rt  = b.vu.Runtime()
+			log []string
+		)
+
 		require.NoError(t, rt.Set("b", b.Browser))
-		var log []string
 		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
 
-		err := b.vu.Loop.Start(func() error {
-			time.AfterFunc(100*time.Millisecond, func() { b.Browser.Close() })
-			_, err := rt.RunString(fmt.Sprintf(script, "disconnected"))
+		err := b.await(func() error {
+			time.AfterFunc(100*time.Millisecond, b.Browser.Close)
+			_, err := b.runJavaScript(script, "disconnected")
 			return err
 		})
 		require.NoError(t, err)
-		assert.Contains(t, log, "ok: true")
+		assert.Contains(t, log, "true")
 	})
 
 	t.Run("ok_promise_rejected", func(t *testing.T) {
 		t.Parallel()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		b := newTestBrowser(t, ctx)
-		rt := b.vu.Runtime()
+		var (
+			ctx, cancel = context.WithCancel(context.Background())
+			b           = newTestBrowser(t, ctx)
+			rt          = b.vu.Runtime()
+			log         []string
+		)
+
 		require.NoError(t, rt.Set("b", b.Browser))
-		var log []string
 		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
 
-		err := b.vu.Loop.Start(func() error {
-			time.AfterFunc(100*time.Millisecond, func() { cancel() })
-			_, err := rt.RunString(fmt.Sprintf(script, "disconnected"))
+		err := b.await(func() error {
+			time.AfterFunc(100*time.Millisecond, cancel)
+			_, err := b.runJavaScript(script, "disconnected")
 			return err
 		})
 		require.NoError(t, err)
-		assert.Contains(t, log, "err: browser.on promise rejected: context canceled")
+		assert.Contains(t, log, "browser.on promise rejected: context canceled")
 	})
 }
 

@@ -25,8 +25,13 @@ type VU struct {
 	Loop *k6eventloop.EventLoop
 }
 
-// ToGojaValue is a convenient method for converting any value to a goja value.
+// ToGojaValue is a convenience method for converting any value to a goja value.
 func (v *VU) ToGojaValue(i interface{}) goja.Value { return v.Runtime().ToValue(i) }
+
+// RunLoop is a convenience method for running fn in the event loop.
+func (v *VU) RunLoop(fn func() error) error {
+	return v.Loop.Start(fn)
+}
 
 // NewVU returns a mock VU.
 func NewVU(tb testing.TB) *VU {

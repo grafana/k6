@@ -58,7 +58,6 @@ type testBrowser struct {
 //
 // opts provides a way to customize the newTestBrowser.
 // see: withLaunchOptions for an example.
-//nolint:funlen,cyclop
 func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 	tb.Helper()
 
@@ -249,6 +248,19 @@ func (b *testBrowser) asGojaBool(v interface{}) bool {
 	return gv.ToBoolean()
 }
 
+// runJavaScript in the goja runtime.
+func (b *testBrowser) runJavaScript(s string, args ...interface{}) (goja.Value, error) {
+	b.t.Helper()
+	return b.runtime().RunString(fmt.Sprintf(s, args...))
+}
+
+// await runs fn in the event loop and awaits its return.
+// Note: Do not confuse the method name with await in JavaScript.
+func (b *testBrowser) await(fn func() error) error {
+	b.t.Helper()
+	return b.vu.RunLoop(fn)
+}
+
 // launchOptions provides a way to customize browser type
 // launch options in tests.
 type launchOptions struct {
@@ -263,10 +275,10 @@ type launchOptions struct {
 //
 // example:
 //
-//    b := TestBrowser(t, withLaunchOptions{
-//        SlowMo:  "100s",
-//        Timeout: "30s",
-//    })
+//	b := TestBrowser(t, withLaunchOptions{
+//	    SlowMo:  "100s",
+//	    Timeout: "30s",
+//	})
 type withLaunchOptions = launchOptions
 
 // defaultLaunchOptions returns defaults for browser type launch options.
@@ -292,7 +304,7 @@ type httpServerOption struct{}
 //
 // example:
 //
-//    b := TestBrowser(t, withHTTPServer())
+//	b := TestBrowser(t, withHTTPServer())
 func withHTTPServer() httpServerOption {
 	return struct{}{}
 }
@@ -308,7 +320,7 @@ type fileServerOption struct{}
 //
 // example:
 //
-//    b := TestBrowser(t, withFileServer())
+//	b := TestBrowser(t, withFileServer())
 func withFileServer() fileServerOption {
 	return struct{}{}
 }
@@ -324,7 +336,7 @@ type logCacheOption struct{}
 //
 // example:
 //
-//    b := TestBrowser(t, withLogCache())
+//	b := TestBrowser(t, withLogCache())
 func withLogCache() logCacheOption {
 	return struct{}{}
 }
@@ -337,7 +349,7 @@ type skipCloseOption struct{}
 //
 // example:
 //
-//    b := TestBrowser(t, withSkipClose())
+//	b := TestBrowser(t, withSkipClose())
 func withSkipClose() skipCloseOption {
 	return struct{}{}
 }
