@@ -256,18 +256,19 @@ export default function() {
     // Goto front page, find login link and click it
     page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
     const elem = page.$('a[href="/my_messages.php"]');
-    elem.click();
-
-    // Enter login credentials and login
-    page.$('input[name="login"]').type('admin');
-    page.$('input[name="password"]').type('123');
-    page.$('input[type="submit"]').click();
-
-    // Wait for next page to load
-    page.waitForLoadState('networkidle');
-
-    page.close();
-    browser.close();
+    elem.click().then(() => {
+        // Enter login credentials and login
+        page.$('input[name="login"]').type('admin');
+        page.$('input[name="password"]').type('123');
+        return page.$('input[type="submit"]').click();
+    }).then(() => {
+        // Wait for next page to load
+        page.waitForLoadState('networkidle');
+    }).finally(() => {
+        // Release the page and browser.
+        page.close();
+        browser.close();
+    });
 }
 ```
 
