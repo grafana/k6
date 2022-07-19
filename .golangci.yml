@@ -20,6 +20,17 @@ issues:
       linters:
       - wrapcheck
       - funlen
+      - cyclop
+    - path: k6ext/k6test
+      linters:
+      - wrapcheck
+      - funlen
+      - cyclop
+    - path: tests
+      linters:
+      - wrapcheck
+      - funlen
+      - cyclop
 
 linters:
   disable-all: true
