@@ -190,12 +190,12 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 	}
 	require.NotNil(t, p.Goto(tb.staticURL("/concealed_link.html"), nil))
 	require.Equal(t, wantBefore, clickResult())
-	require.NotPanicsf(t,
-		func() {
-			p.Click("#concealed", nil)
-		},
-		"element should be clickable",
-	)
+
+	err := tb.await(func() error {
+		_ = p.Click("#concealed", nil)
+		return nil
+	})
+	require.NoError(t, err, "element should be clickable")
 	require.Equal(t, wantAfter, clickResult())
 }
 
@@ -204,12 +204,11 @@ func TestElementHandleNonClickable(t *testing.T) {
 	p := tb.NewContext(nil).NewPage()
 
 	require.NotNil(t, p.Goto(tb.staticURL("/non_clickable.html"), nil))
-	require.Panicsf(t,
-		func() {
-			p.Click("#non-clickable", nil)
-		},
-		"element should not be clickable",
-	)
+	err := tb.await(func() error {
+		_ = p.Click("#non-clickable", nil)
+		return nil
+	})
+	require.Error(t, err, "element should not be clickable")
 }
 
 func TestElementHandleGetAttribute(t *testing.T) {
