@@ -257,6 +257,7 @@ func TestSSLKEYLOGFILE(t *testing.T) {
 	for _, filePath := range filepaths {
 		filePath := filePath
 		t.Run(filePath, func(t *testing.T) {
+			t.Parallel()
 			// TODO don't use insecureSkipTLSVerify when/if tlsConfig is given to the runner from outside
 			tb := httpmultibin.NewHTTPMultiBin(t)
 			ts := newGlobalTestState(t)

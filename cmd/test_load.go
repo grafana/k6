@@ -127,7 +127,7 @@ func (lt *loadedTest) initializeFirstRunner(gs *globalState) error {
 		}
 		f, err := lt.fs.OpenFile(keylogFilename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
 		if err != nil {
-			return fmt.Errorf("Couldn't get absolute path for keylog file: %w", err)
+			return fmt.Errorf("couldn't get absolute path for keylog file: %w", err)
 		}
 		lt.keywriter = f
 		state.KeyLogger = &syncWriter{w: f}
