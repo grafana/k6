@@ -1,12 +1,12 @@
 import { check, sleep } from 'k6';
-import { chromium } from 'k6/x/browser';
+import { chromium, devices } from 'k6/x/browser';
 
 export default function() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
   });
 
-  const device = chromium.devices['iPhone X'];
+  const device = devices['iPhone X'];
   // The spread operator is currently unsupported by k6's Babel, so use
   // Object.assign instead to merge browser context and device options.
   // See https://github.com/grafana/k6/issues/2296

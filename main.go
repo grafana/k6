@@ -62,6 +62,7 @@ func (mi *ModuleInstance) Exports() k6modules.Exports {
 	return k6modules.Exports{
 		Named: map[string]interface{}{
 			"chromium": mi.mod,
+			"devices":  mi.mod.Devices,
 		},
 	}
 }
