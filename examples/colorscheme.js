@@ -1,10 +1,10 @@
-import launcher from 'k6/x/browser';
 import { check } from 'k6';
+import { chromium } from 'k6/x/browser';
 
 export default function() {
   const preferredColorScheme = 'dark';
 
-  const browser = launcher.launch('chromium', {
+  const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
   });
   
