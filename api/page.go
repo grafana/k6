@@ -29,7 +29,7 @@ type Page interface {
 	AddStyleTag(opts goja.Value)
 	BringToFront()
 	Check(selector string, opts goja.Value)
-	Click(selector string, opts goja.Value)
+	Click(selector string, opts goja.Value) *goja.Promise
 	Close(opts goja.Value)
 	Content() string
 	Context() BrowserContext
