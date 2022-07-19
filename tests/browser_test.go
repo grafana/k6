@@ -88,7 +88,7 @@ func TestBrowserOn(t *testing.T) {
 		require.NoError(t, b.vu.Runtime().Set("b", b.Browser))
 
 		err := b.await(func() error {
-			_, err := b.runString(script, "wrongevent")
+			_, err := b.runJavaScript(script, "wrongevent")
 			return err
 		})
 		require.Error(t, err)
@@ -109,7 +109,7 @@ func TestBrowserOn(t *testing.T) {
 
 		err := b.await(func() error {
 			time.AfterFunc(100*time.Millisecond, b.Browser.Close)
-			_, err := b.runString(script, "disconnected")
+			_, err := b.runJavaScript(script, "disconnected")
 			return err
 		})
 		require.NoError(t, err)
@@ -131,7 +131,7 @@ func TestBrowserOn(t *testing.T) {
 
 		err := b.await(func() error {
 			time.AfterFunc(100*time.Millisecond, cancel)
-			_, err := b.runString(script, "disconnected")
+			_, err := b.runJavaScript(script, "disconnected")
 			return err
 		})
 		require.NoError(t, err)

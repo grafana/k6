@@ -248,8 +248,8 @@ func (b *testBrowser) asGojaBool(v interface{}) bool {
 	return gv.ToBoolean()
 }
 
-// runString in the goja runtime.
-func (b *testBrowser) runString(s string, args ...interface{}) (goja.Value, error) {
+// runJavaScript in the goja runtime.
+func (b *testBrowser) runJavaScript(s string, args ...interface{}) (goja.Value, error) {
 	b.t.Helper()
 	return b.runtime().RunString(fmt.Sprintf(s, args...))
 }
