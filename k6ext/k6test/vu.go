@@ -2,7 +2,6 @@ package k6test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/grafana/xk6-browser/k6ext"
@@ -31,10 +30,7 @@ func (v *VU) ToGojaValue(i interface{}) goja.Value { return v.Runtime().ToValue(
 
 // RunLoop is a convenience method for running fn in the event loop.
 func (v *VU) RunLoop(fn func() error) error {
-	if err := v.Loop.Start(fn); err != nil {
-		return fmt.Errorf("%w", err)
-	}
-	return nil
+	return v.Loop.Start(fn)
 }
 
 // NewVU returns a mock VU.
