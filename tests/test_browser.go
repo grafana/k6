@@ -58,8 +58,6 @@ type testBrowser struct {
 //
 // opts provides a way to customize the newTestBrowser.
 // see: withLaunchOptions for an example.
-//
-//nolint:funlen,cyclop
 func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 	tb.Helper()
 
@@ -251,20 +249,16 @@ func (b *testBrowser) asGojaBool(v interface{}) bool {
 }
 
 // runString in the goja runtime.
-func (b *testBrowser) runString(s string, args ...interface{}) (goja.Value, error) { //nolint:unparam
+func (b *testBrowser) runString(s string, args ...interface{}) (goja.Value, error) {
 	b.t.Helper()
-	v, err := b.runtime().RunString(fmt.Sprintf(s, args...))
-	if err != nil {
-		err = fmt.Errorf("%w", err)
-	}
-	return v, err
+	return b.runtime().RunString(fmt.Sprintf(s, args...))
 }
 
 // await runs fn in the event loop and awaits its return.
 // Note: Do not confuse the method name with await in JavaScript.
 func (b *testBrowser) await(fn func() error) error {
 	b.t.Helper()
-	return b.vu.RunLoop(fn) //nolint:wrapcheck
+	return b.vu.RunLoop(fn)
 }
 
 // launchOptions provides a way to customize browser type
