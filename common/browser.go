@@ -205,7 +205,7 @@ func (b *Browser) initEvents() error {
 
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		return fmt.Errorf("executing setAutoAttach: %w", err)
+		return fmt.Errorf("internal error while auto-attaching to browser pages: %w", err)
 	}
 
 	// Target.setAutoAttach has a bug where it does not wait for new Targets being attached.
@@ -213,7 +213,7 @@ func (b *Browser) initEvents() error {
 	// This can be removed after https://chromium-review.googlesource.com/c/chromium/src/+/2885888 lands in stable.
 	action2 := target.GetTargetInfo()
 	if _, err := action2.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		return fmt.Errorf("executing getTargetInfo: %w", err)
+		return fmt.Errorf("internal error while getting browser target info: %w", err)
 	}
 
 	return nil
@@ -260,7 +260,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 					ev.SessionID, evti.TargetID, b.ctx.Err())
 				return // ignore
 			default:
-				k6ext.Panic(b.ctx, "cannot create NewPage for background_page event: %w", err)
+				k6ext.Panic(b.ctx, "creating a new background page: %w", err)
 			}
 		}
 
@@ -299,7 +299,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 					ev.SessionID, evti.TargetID, b.ctx.Err())
 				return // ignore
 			default:
-				k6ext.Panic(b.ctx, "cannot create NewPage for page event: %w", err)
+				k6ext.Panic(b.ctx, "creating a new page: %w", err)
 			}
 		}
 
@@ -382,7 +382,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 	action := target.CreateTarget("about:blank").WithBrowserContextID(id)
 	tid, err := action.Do(cdp.WithExecutor(ctx, b.conn))
 	if err != nil {
-		return nil, fmt.Errorf("%T: %w", action, err)
+		return nil, fmt.Errorf("creating a new blank page: %w", err)
 	}
 	// let the event handler know about the new page.
 	targetID <- tid
@@ -394,8 +394,11 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		page = b.pages[tid]
 		b.pagesMu.RUnlock()
 	case <-ctx.Done():
-		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, ctx.Err())
-		err = ctx.Err()
+		err = &k6ext.UserFriendlyError{
+			Err:     ctx.Err(),
+			Timeout: b.launchOpts.Timeout,
+		}
+		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, err)
 	}
 	return page, err
 }
@@ -404,7 +407,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 func (b *Browser) Close() {
 	defer func() {
 		if err := b.browserProc.userDataDir.Cleanup(); err != nil {
-			b.logger.Errorf("Browser:Close", "%v", err)
+			b.logger.Errorf("Browser:Close", "cleaning up the user data directory: %v", err)
 		}
 	}()
 
@@ -457,7 +460,7 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 	browserContextID, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
 	if err != nil {
-		k6ext.Panic(b.ctx, "cannot create browser context (%s): %w", browserContextID, err)
+		k6ext.Panic(b.ctx, "creating browser context ID %s: %w", browserContextID, err)
 	}
 
 	browserCtxOpts := NewBrowserContextOptions()

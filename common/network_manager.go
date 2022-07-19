@@ -118,7 +118,7 @@ func NewNetworkManager(
 func newResolver(conf k6types.DNSConfig) (k6netext.Resolver, error) {
 	ttl, err := parseTTL(conf.TTL.String)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse TTL: %w", err)
+		return nil, fmt.Errorf("parsing TTL: %w", err)
 	}
 
 	dnsSel := conf.Select
@@ -458,12 +458,12 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 
 	req, err := NewRequest(m.ctx, event, frame, redirectChain, interceptionID, m.userReqInterceptionEnabled)
 	if err != nil {
-		m.logger.Errorf("NetworkManager", "cannot create Request: %s", err)
+		m.logger.Errorf("NetworkManager", "creating request: %s", err)
 		return
 	}
 	// Skip data and blob URLs, since they're internal to the browser.
 	if isInternalURL(req.url) {
-		m.logger.Debugf("NetworkManager", "skipped request handling of %s URL", req.url.Scheme)
+		m.logger.Debugf("NetworkManager", "skipping request handling of %s URL", req.url.Scheme)
 		return
 	}
 	m.reqsMu.Lock()
@@ -656,7 +656,7 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 	}
 	for _, action := range actions {
 		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-			return fmt.Errorf("cannot execute %T: %w", action, err)
+			return fmt.Errorf("internal error while updating protocol request interception %T: %w", action, err)
 		}
 	}
 

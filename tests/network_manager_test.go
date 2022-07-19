@@ -42,10 +42,10 @@ func TestURLSkipRequest(t *testing.T) {
 	p := tb.NewPage(nil)
 
 	p.Goto("data:text/html,hello", nil)
-	assert.True(t, tb.logCache.contains("skipped request handling of data URL"))
+	assert.True(t, tb.logCache.contains("skipping request handling of data URL"))
 
 	p.Goto("blob:something", nil)
-	assert.True(t, tb.logCache.contains("skipped request handling of blob URL"))
+	assert.True(t, tb.logCache.contains("skipping request handling of blob URL"))
 }
 
 func TestBlockHostnames(t *testing.T) {

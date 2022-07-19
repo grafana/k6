@@ -75,7 +75,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 			return false, err
 		}
 		if box == nil {
-			return false, errors.New("getting bounding box of element")
+			return false, errors.New("missing bounding box of element")
 		}
 		// Translate from viewport coordinates to frame coordinates.
 		point.X -= box.X
@@ -146,7 +146,7 @@ func (h *ElementHandle) checkElementState(_ context.Context, state string) (*boo
 	}
 
 	return nil, fmt.Errorf(
-		"checking state %q of element: %q", state, reflect.TypeOf(result))
+		"checking state %q of element %q", state, reflect.TypeOf(result))
 }
 
 func (h *ElementHandle) click(p *Position, opts *MouseClickOptions) error {
@@ -648,11 +648,9 @@ func (h *ElementHandle) waitAndScrollIntoViewIfNeeded(apiCtx context.Context, fo
 		return h.eval(apiCtx, opts, fn)
 	}
 	actFn := h.newAction([]string{"visible", "stable"}, fn, force, noWaitAfter, timeout)
-	_, err := callApiWithTimeout(h.ctx, actFn, timeout)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := call(h.ctx, actFn, timeout)
+
+	return err
 }
 
 func (h *ElementHandle) waitForElementState(
@@ -669,7 +667,7 @@ func (h *ElementHandle) waitForElementState(
 	}
 	result, err := h.evalWithScript(apiCtx, opts, fn, states, timeout.Milliseconds())
 	if err != nil {
-		return false, errorFromDOMError(err.Error())
+		return false, errorFromDOMError(err)
 	}
 	v, ok := result.(goja.Value)
 	if !ok {
@@ -687,7 +685,7 @@ func (h *ElementHandle) waitForElementState(
 	}
 
 	return false, fmt.Errorf(
-		"checking states %v of element: %q", states, reflect.TypeOf(result))
+		"waiting for states %v of element %q", states, reflect.TypeOf(result))
 }
 
 func (h *ElementHandle) waitForSelector(apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
@@ -745,7 +743,7 @@ func (h *ElementHandle) Click(opts goja.Value) {
 		return nil, handle.click(p, actionOpts.ToMouseClickOptions())
 	}
 	pointerFn := h.newPointerAction(fn, &actionOpts.ElementHandleBasePointerOptions)
-	_, err := callApiWithTimeout(h.ctx, pointerFn, actionOpts.Timeout)
+	_, err := call(h.ctx, pointerFn, actionOpts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "clicking on element: %v", err)
 	}
@@ -777,7 +775,7 @@ func (h *ElementHandle) Dblclick(opts goja.Value) {
 		return nil, handle.dblClick(p, actionOpts.ToMouseClickOptions())
 	}
 	pointerFn := h.newPointerAction(fn, &actionOpts.ElementHandleBasePointerOptions)
-	_, err := callApiWithTimeout(h.ctx, pointerFn, actionOpts.Timeout)
+	_, err := call(h.ctx, pointerFn, actionOpts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "double clicking on element: %w", err)
 	}
@@ -790,7 +788,7 @@ func (h *ElementHandle) DispatchEvent(typ string, eventInit goja.Value) {
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
 	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	_, err := callApiWithTimeout(h.ctx, actFn, opts.Timeout)
+	_, err := call(h.ctx, actFn, opts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "dispatching element event: %w", err)
 	}
@@ -807,7 +805,7 @@ func (h *ElementHandle) Fill(value string, opts goja.Value) {
 	}
 	actFn := h.newAction([]string{"visible", "enabled", "editable"},
 		fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	_, err := callApiWithTimeout(h.ctx, actFn, actionOpts.Timeout)
+	_, err := call(h.ctx, actFn, actionOpts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "handling element fill action: %w", err)
 	}
@@ -821,7 +819,7 @@ func (h *ElementHandle) Focus() {
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
 	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	_, err := callApiWithTimeout(h.ctx, actFn, opts.Timeout)
+	_, err := call(h.ctx, actFn, opts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "focusing on element: %w", err)
 	}
@@ -835,7 +833,7 @@ func (h *ElementHandle) GetAttribute(name string) goja.Value {
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
 	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	v, err := callApiWithTimeout(h.ctx, actFn, opts.Timeout)
+	v, err := call(h.ctx, actFn, opts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "getting attribute of %q: %q", name, err)
 	}
@@ -854,7 +852,7 @@ func (h *ElementHandle) Hover(opts goja.Value) {
 		return nil, handle.hover(apiCtx, p)
 	}
 	pointerFn := h.newPointerAction(fn, &actionOpts.ElementHandleBasePointerOptions)
-	_, err := callApiWithTimeout(h.ctx, pointerFn, actionOpts.Timeout)
+	_, err := call(h.ctx, pointerFn, actionOpts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "hovering on element: %w", err)
 	}
@@ -868,7 +866,7 @@ func (h *ElementHandle) InnerHTML() string {
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
 	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	v, err := callApiWithTimeout(h.ctx, actFn, opts.Timeout)
+	v, err := call(h.ctx, actFn, opts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "getting element's inner HTML: %w", err)
 	}
@@ -884,7 +882,7 @@ func (h *ElementHandle) InnerText() string {
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
 	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	v, err := callApiWithTimeout(h.ctx, actFn, opts.Timeout)
+	v, err := call(h.ctx, actFn, opts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "getting element's inner text: %w", err)
 	}
@@ -902,7 +900,7 @@ func (h *ElementHandle) InputValue(opts goja.Value) string {
 		return handle.inputValue(apiCtx)
 	}
 	actFn := h.newAction([]string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	v, err := callApiWithTimeout(h.ctx, actFn, actionOpts.Timeout)
+	v, err := call(h.ctx, actFn, actionOpts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "getting element's input value: %w", err)
 	}
@@ -914,8 +912,8 @@ func (h *ElementHandle) InputValue(opts goja.Value) string {
 // IsChecked checks if a checkbox or radio is checked.
 func (h *ElementHandle) IsChecked() bool {
 	result, err := h.isChecked(h.ctx, 0)
-	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "element isChecked: %w", err)
+	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
+		k6ext.Panic(h.ctx, "checking element is checked: %w", err)
 	}
 	return result
 }
@@ -923,8 +921,8 @@ func (h *ElementHandle) IsChecked() bool {
 // IsDisabled checks if the element is disabled.
 func (h *ElementHandle) IsDisabled() bool {
 	result, err := h.isDisabled(h.ctx, 0)
-	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "element isDisabled: %w", err)
+	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
+		k6ext.Panic(h.ctx, "checking element is disabled: %w", err)
 	}
 	return result
 }
@@ -932,8 +930,8 @@ func (h *ElementHandle) IsDisabled() bool {
 // IsEditable checks if the element is editable.
 func (h *ElementHandle) IsEditable() bool {
 	result, err := h.isEditable(h.ctx, 0)
-	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "element isEditable: %w", err)
+	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
+		k6ext.Panic(h.ctx, "checking element is editable: %w", err)
 	}
 	return result
 }
@@ -941,8 +939,8 @@ func (h *ElementHandle) IsEditable() bool {
 // IsEnabled checks if the element is enabled.
 func (h *ElementHandle) IsEnabled() bool {
 	result, err := h.isEnabled(h.ctx, 0)
-	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "element isEnabled: %w", err)
+	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
+		k6ext.Panic(h.ctx, "checking element is enabled: %w", err)
 	}
 	return result
 }
@@ -950,8 +948,8 @@ func (h *ElementHandle) IsEnabled() bool {
 // IsHidden checks if the element is hidden.
 func (h *ElementHandle) IsHidden() bool {
 	result, err := h.isHidden(h.ctx, 0)
-	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "element isHidden: %w", err)
+	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
+		k6ext.Panic(h.ctx, "checking element is hidden: %w", err)
 	}
 	return result
 }
@@ -959,8 +957,8 @@ func (h *ElementHandle) IsHidden() bool {
 // IsVisible checks if the element is visible.
 func (h *ElementHandle) IsVisible() bool {
 	result, err := h.isVisible(h.ctx, 0)
-	if err != nil && err != ErrTimedOut { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "element isVisible: %w", err)
+	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
+		k6ext.Panic(h.ctx, "checking element is visible: %w", err)
 	}
 	return result
 }
@@ -1011,7 +1009,7 @@ func (h *ElementHandle) Press(key string, opts goja.Value) {
 		return nil, handle.press(apiCtx, key, NewKeyboardOptions())
 	}
 	actFn := h.newAction([]string{}, fn, false, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
-	_, err := callApiWithTimeout(h.ctx, actFn, parsedOpts.Timeout)
+	_, err := call(h.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "pressing %q: %v", key, err)
 	}
@@ -1061,7 +1059,7 @@ func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
 
 	handles, err := h.queryAll(selector, h.evalWithScript)
 	if err != nil {
-		k6ext.Panic(h.ctx, "QueryAll: %w", err)
+		k6ext.Panic(h.ctx, "querying all selector %q: %w", selector, err)
 	}
 
 	return handles
@@ -1079,7 +1077,7 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]api.ElementH
 		parsedSelector,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("querying selector %q: %w", selector, err)
+		return nil, fmt.Errorf("querying all selectors %q: %w", selector, err)
 	}
 	if result == nil {
 		// it is ok to return a nil slice because it means we didn't find any elements.
@@ -1118,7 +1116,7 @@ func (h *ElementHandle) SetChecked(checked bool, opts goja.Value) {
 		return nil, handle.setChecked(apiCtx, checked, p)
 	}
 	pointerFn := h.newPointerAction(fn, &parsedOpts.ElementHandleBasePointerOptions)
-	_, err = callApiWithTimeout(h.ctx, pointerFn, parsedOpts.Timeout)
+	_, err = call(h.ctx, pointerFn, parsedOpts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "checking element: %w", err)
 	}
@@ -1199,7 +1197,7 @@ func (h *ElementHandle) SelectOption(values goja.Value, opts goja.Value) []strin
 		return handle.selectOption(apiCtx, values)
 	}
 	actFn := h.newAction([]string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	selectedOptions, err := callApiWithTimeout(h.ctx, actFn, actionOpts.Timeout)
+	selectedOptions, err := call(h.ctx, actFn, actionOpts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "selecting options: %w", err)
 	}
@@ -1222,7 +1220,7 @@ func (h *ElementHandle) SelectText(opts goja.Value) {
 		return nil, handle.selectText(apiCtx)
 	}
 	actFn := h.newAction([]string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	_, err := callApiWithTimeout(h.ctx, actFn, actionOpts.Timeout)
+	_, err := call(h.ctx, actFn, actionOpts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "selecting text: %w", err)
 	}
@@ -1245,7 +1243,7 @@ func (h *ElementHandle) Tap(opts goja.Value) {
 		return nil, handle.tap(apiCtx, p)
 	}
 	pointerFn := h.newPointerAction(fn, &parsedOpts.ElementHandleBasePointerOptions)
-	_, err = callApiWithTimeout(h.ctx, pointerFn, parsedOpts.Timeout)
+	_, err = call(h.ctx, pointerFn, parsedOpts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "tapping element: %w", err)
 	}
@@ -1258,7 +1256,7 @@ func (h *ElementHandle) TextContent() string {
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
 	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	v, err := callApiWithTimeout(h.ctx, actFn, opts.Timeout)
+	v, err := call(h.ctx, actFn, opts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "getting text content of element: %w", err)
 	}
@@ -1277,7 +1275,7 @@ func (h *ElementHandle) Type(text string, opts goja.Value) {
 		return nil, handle.typ(apiCtx, text, NewKeyboardOptions())
 	}
 	actFn := h.newAction([]string{}, fn, false, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
-	_, err := callApiWithTimeout(h.ctx, actFn, parsedOpts.Timeout)
+	_, err := call(h.ctx, actFn, parsedOpts.Timeout)
 	if err != nil {
 		k6ext.Panic(h.ctx, "typing text %q: %w", text, err)
 	}
@@ -1320,8 +1318,7 @@ func (h *ElementHandle) evalWithScript(
 	if err != nil {
 		return nil, fmt.Errorf("getting injected script: %w", err)
 	}
-	args = append([]interface{}{script}, args...)
-	return h.eval(ctx, opts, js, args...)
+	return h.eval(ctx, opts, js, append([]interface{}{script}, args...)...)
 }
 
 // eval evaluates the given js code in the scope of this ElementHandle and returns the result.
@@ -1330,12 +1327,7 @@ func (h *ElementHandle) eval(
 	opts evalOptions, js string, args ...interface{},
 ) (interface{}, error) {
 	// passing `h` makes it evaluate js code in the element handle's scope.
-	args = append([]interface{}{h}, args...)
-	result, err := h.execCtx.eval(ctx, opts, js, args...)
-	if err != nil {
-		return nil, err
-	}
-	return result, err
+	return h.execCtx.eval(ctx, opts, js, append([]interface{}{h}, args...)...)
 }
 
 func (h *ElementHandle) newAction(
@@ -1492,13 +1484,33 @@ func retryPointerAction(
 	return res, err
 }
 
-func errorFromDOMError(derr string) error {
-	// return the same sentinel error value for the timed out err
-	if strings.Contains(derr, "timed out") {
-		return ErrTimedOut
+func errorFromDOMError(v interface{}) error {
+	var (
+		err  error
+		serr string
+	)
+	switch e := v.(type) {
+	case string:
+		serr = e
+	case error:
+		if e == nil {
+			panic("DOM error is nil")
+		}
+		err, serr = e, e.Error()
+	default:
+		panic(fmt.Errorf("unexpected DOM error type %T", v))
 	}
-	if s := "error:expectednode:"; strings.HasPrefix(derr, s) {
-		return fmt.Errorf("expected node but got %s", strings.TrimPrefix(derr, s))
+	var uerr *k6ext.UserFriendlyError
+	if errors.As(err, &uerr) {
+		return err
+	}
+	if strings.Contains(serr, "timed out") {
+		return &k6ext.UserFriendlyError{
+			Err: ErrTimedOut,
+		}
+	}
+	if s := "error:expectednode:"; strings.HasPrefix(serr, s) {
+		return fmt.Errorf("expected node but got %s", strings.TrimPrefix(serr, s))
 	}
 	errs := map[string]string{
 		"error:notconnected":           "element is not attached to the DOM",
@@ -1518,9 +1530,9 @@ func errorFromDOMError(derr string) error {
 		"error:nthnocapture":           "can't query n-th element in a chained selector with capture",
 		"error:intercept":              "another element is intercepting with pointer action",
 	}
-	if err, ok := errs[derr]; ok {
+	if err, ok := errs[serr]; ok {
 		return errors.New(err)
 	}
 
-	return errors.New(derr)
+	return errors.New(serr)
 }

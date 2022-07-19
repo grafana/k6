@@ -64,7 +64,7 @@ func TestConnectionClosureAbnormal(t *testing.T) {
 		if assert.NoError(t, err) {
 			action := target.SetDiscoverTargets(true)
 			err := action.Do(cdp.WithExecutor(ctx, conn))
-			require.EqualError(t, err, "websocket: close 1006 (abnormal closure): unexpected EOF")
+			require.ErrorContains(t, err, "websocket: close 1006 (abnormal closure): unexpected EOF")
 		}
 	})
 }

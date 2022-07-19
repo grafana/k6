@@ -39,11 +39,11 @@ func (l *Locator) Click(opts goja.Value) {
 
 	copts := NewFrameClickOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parse: %w", err)
+		err = fmt.Errorf("parsing click options: %w", err)
 		return
 	}
 	if err = l.click(copts); err != nil {
-		err = fmt.Errorf("click %q: %w", l.selector, err)
+		err = fmt.Errorf("clicking on %q: %w", l.selector, err)
 		return
 	}
 }
@@ -64,11 +64,11 @@ func (l *Locator) Dblclick(opts goja.Value) {
 
 	copts := NewFrameDblClickOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parse: %w", err)
+		err = fmt.Errorf("parsing double click options: %w", err)
 		return
 	}
 	if err = l.dblclick(copts); err != nil {
-		err = fmt.Errorf("dblclick %q: %w", l.selector, err)
+		err = fmt.Errorf("double clicking on %q: %w", l.selector, err)
 		return
 	}
 }
@@ -89,11 +89,11 @@ func (l *Locator) Check(opts goja.Value) {
 
 	copts := NewFrameCheckOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parse: %w", err)
+		err = fmt.Errorf("parsing check options: %w", err)
 		return
 	}
 	if err = l.check(copts); err != nil {
-		err = fmt.Errorf("check %q: %w", l.selector, err)
+		err = fmt.Errorf("checking %q: %w", l.selector, err)
 		return
 	}
 }
@@ -114,11 +114,11 @@ func (l *Locator) Uncheck(opts goja.Value) {
 
 	copts := NewFrameUncheckOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parse: %w", err)
+		err = fmt.Errorf("parsing uncheck options: %w", err)
 		return
 	}
 	if err = l.uncheck(copts); err != nil {
-		err = fmt.Errorf("uncheck %q: %w", l.selector, err)
+		err = fmt.Errorf("unchecking %q: %w", l.selector, err)
 		return
 	}
 }
@@ -137,11 +137,11 @@ func (l *Locator) IsChecked(opts goja.Value) bool {
 
 	copts := NewFrameIsCheckedOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parse: %w", err)
+		k6ext.Panic(l.ctx, "parsing is checked options: %w", err)
 	}
 	checked, err := l.isChecked(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "isChecked: %w", err)
+		k6ext.Panic(l.ctx, "checking is %q checked: %w", l.selector, err)
 	}
 
 	return checked
@@ -161,11 +161,11 @@ func (l *Locator) IsEditable(opts goja.Value) bool {
 
 	copts := NewFrameIsEditableOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parse: %w", err)
+		k6ext.Panic(l.ctx, "parsing is editable options: %w", err)
 	}
 	editable, err := l.isEditable(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "isEditable %q: %w", l.selector, err)
+		k6ext.Panic(l.ctx, "checking is %q editable: %w", l.selector, err)
 	}
 
 	return editable
@@ -185,11 +185,11 @@ func (l *Locator) IsEnabled(opts goja.Value) bool {
 
 	copts := NewFrameIsEnabledOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parse: %w", err)
+		k6ext.Panic(l.ctx, "parsing is enabled options: %w", err)
 	}
 	enabled, err := l.isEnabled(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "isEnabled %q: %w", l.selector, err)
+		k6ext.Panic(l.ctx, "checking is %q enabled: %w", l.selector, err)
 	}
 
 	return enabled
@@ -209,11 +209,11 @@ func (l *Locator) IsDisabled(opts goja.Value) bool {
 
 	copts := NewFrameIsDisabledOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parse: %w", err)
+		k6ext.Panic(l.ctx, "parsing is disabled options: %w", err)
 	}
 	disabled, err := l.isDisabled(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "isDisabled %q: %w", l.selector, err)
+		k6ext.Panic(l.ctx, "checking is %q disabled: %w", l.selector, err)
 	}
 
 	return disabled
@@ -233,11 +233,11 @@ func (l *Locator) IsVisible(opts goja.Value) bool {
 
 	copts := NewFrameIsVisibleOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parse: %w", err)
+		k6ext.Panic(l.ctx, "parsing is visible options: %w", err)
 	}
 	visible, err := l.isVisible(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "isVisible %q: %w", l.selector, err)
+		k6ext.Panic(l.ctx, "checking is %q visible: %w", l.selector, err)
 	}
 
 	return visible
@@ -257,11 +257,11 @@ func (l *Locator) IsHidden(opts goja.Value) bool {
 
 	copts := NewFrameIsHiddenOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parse: %w", err)
+		k6ext.Panic(l.ctx, "parsing is hidden options: %w", err)
 	}
 	hidden, err := l.isHidden(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "isHidden %q: %w", l.selector, err)
+		k6ext.Panic(l.ctx, "checking is %q hidden: %w", l.selector, err)
 	}
 
 	return hidden
@@ -286,11 +286,11 @@ func (l *Locator) Fill(value string, opts goja.Value) {
 
 	copts := NewFrameFillOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parse: %w", err)
+		err = fmt.Errorf("parsing fill options: %w", err)
 		return
 	}
 	if err = l.fill(value, copts); err != nil {
-		err = fmt.Errorf("fill %q with %q: %w", l.selector, value, err)
+		err = fmt.Errorf("filling %q with %q: %w", l.selector, value, err)
 		return
 	}
 }
@@ -309,11 +309,11 @@ func (l *Locator) Focus(opts goja.Value) {
 
 	copts := NewFrameBaseOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parse: %w", err)
+		err = fmt.Errorf("parsing focus options: %w", err)
 		return
 	}
 	if err = l.focus(copts); err != nil {
-		err = fmt.Errorf("focus %q: %w", l.selector, err)
+		err = fmt.Errorf("focusing on %q: %w", l.selector, err)
 		return
 	}
 }
@@ -335,12 +335,12 @@ func (l *Locator) GetAttribute(name string, opts goja.Value) goja.Value {
 
 	copts := NewFrameBaseOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parse: %w", err)
+		err = fmt.Errorf("parsing get attribute options: %w", err)
 		return nil
 	}
 	var v goja.Value
 	if v, err = l.getAttribute(name, copts); err != nil {
-		err = fmt.Errorf("getAttribute %q of %q: %w", name, l.selector, err)
+		err = fmt.Errorf("getting attribute %q of %q: %w", name, l.selector, err)
 		return nil
 	}
 
@@ -362,12 +362,12 @@ func (l *Locator) InnerHTML(opts goja.Value) string {
 
 	copts := NewFrameInnerHTMLOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parse: %w", err)
+		err = fmt.Errorf("parsing inner HTML options: %w", err)
 		return ""
 	}
 	var s string
 	if s, err = l.innerHTML(copts); err != nil {
-		err = fmt.Errorf("innerHTML of %q: %w", l.selector, err)
+		err = fmt.Errorf("getting inner HTML of %q: %w", l.selector, err)
 		return ""
 	}
 
@@ -389,12 +389,12 @@ func (l *Locator) InnerText(opts goja.Value) string {
 
 	copts := NewFrameInnerTextOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parse: %w", err)
+		err = fmt.Errorf("parsing inner text options: %w", err)
 		return ""
 	}
 	var s string
 	if s, err = l.innerText(copts); err != nil {
-		err = fmt.Errorf("innerText of %q: %w", l.selector, err)
+		err = fmt.Errorf("getting inner text of %q: %w", l.selector, err)
 		return ""
 	}
 
@@ -416,12 +416,12 @@ func (l *Locator) TextContent(opts goja.Value) string {
 
 	copts := NewFrameTextContentOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parse: %w", err)
+		err = fmt.Errorf("parsing text context options: %w", err)
 		return ""
 	}
 	var s string
 	if s, err = l.textContent(copts); err != nil {
-		err = fmt.Errorf("textContent of %q: %w", l.selector, err)
+		err = fmt.Errorf("getting text content of %q: %w", l.selector, err)
 		return ""
 	}
 
@@ -440,11 +440,11 @@ func (l *Locator) InputValue(opts goja.Value) string {
 
 	copts := NewFrameInputValueOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parse: %w", err)
+		k6ext.Panic(l.ctx, "parsing input value options: %w", err)
 	}
 	v, err := l.inputValue(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "inputValue of %q: %w", l.selector, err)
+		k6ext.Panic(l.ctx, "getting input value of %q: %w", l.selector, err)
 	}
 
 	return v
@@ -463,11 +463,11 @@ func (l *Locator) SelectOption(values goja.Value, opts goja.Value) []string {
 
 	copts := NewFrameSelectOptionOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parse: %w", err)
+		k6ext.Panic(l.ctx, "parsing select option options: %w", err)
 	}
 	v, err := l.selectOption(values, copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "selectOption on %q: %w", l.selector, err)
+		k6ext.Panic(l.ctx, "selecting option on %q: %w", l.selector, err)
 	}
 
 	return v
@@ -491,10 +491,11 @@ func (l *Locator) Press(key string, opts goja.Value) {
 
 	copts := NewFramePressOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parsing press options: %w", err)
 		return
 	}
 	if err = l.press(key, copts); err != nil {
-		err = fmt.Errorf("press %q on %q: %w", key, l.selector, err)
+		err = fmt.Errorf("pressing %q on %q: %w", key, l.selector, err)
 		return
 	}
 }
@@ -517,10 +518,11 @@ func (l *Locator) Type(text string, opts goja.Value) {
 
 	copts := NewFrameTypeOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parsing type options: %w", err)
 		return
 	}
 	if err = l.typ(text, copts); err != nil {
-		err = fmt.Errorf("type %q in %q: %w", text, l.selector, err)
+		err = fmt.Errorf("typing %q in %q: %w", text, l.selector, err)
 		return
 	}
 }
@@ -540,10 +542,11 @@ func (l *Locator) Hover(opts goja.Value) {
 
 	copts := NewFrameHoverOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parsing hover options: %w", err)
 		return
 	}
 	if err = l.hover(copts); err != nil {
-		err = fmt.Errorf("hover %q: %w", l.selector, err)
+		err = fmt.Errorf("hovering on %q: %w", l.selector, err)
 		return
 	}
 }
@@ -562,10 +565,11 @@ func (l *Locator) Tap(opts goja.Value) {
 
 	copts := NewFrameTapOptions(l.frame.defaultTimeout())
 	if err = copts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parsing tap options: %w", err)
 		return
 	}
 	if err = l.tap(copts); err != nil {
-		err = fmt.Errorf("tap %q: %w", l.selector, err)
+		err = fmt.Errorf("tapping on %q: %w", l.selector, err)
 		return
 	}
 }
@@ -588,10 +592,11 @@ func (l *Locator) DispatchEvent(typ string, eventInit, opts goja.Value) {
 
 	popts := NewFrameDispatchEventOptions(l.frame.defaultTimeout())
 	if err = popts.Parse(l.ctx, opts); err != nil {
+		err = fmt.Errorf("parsing dispatch event options: %w", err)
 		return
 	}
 	if err = l.dispatchEvent(typ, eventInit, popts); err != nil {
-		err = fmt.Errorf("dispatchEvent %q to %q: %w", typ, l.selector, err)
+		err = fmt.Errorf("dispatching event %q to %q: %w", typ, l.selector, err)
 		return
 	}
 }
@@ -607,10 +612,10 @@ func (l *Locator) WaitFor(opts goja.Value) {
 
 	popts := NewFrameWaitForSelectorOptions(l.frame.defaultTimeout())
 	if err := popts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parse: %w", err)
+		k6ext.Panic(l.ctx, "parsing wait for options: %w", err)
 	}
 	if err := l.waitFor(popts); err != nil {
-		k6ext.Panic(l.ctx, "waitFor: %w", err)
+		k6ext.Panic(l.ctx, "waiting for %q: %w", l.selector, err)
 	}
 }
 

@@ -24,11 +24,14 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/grafana/xk6-browser/log"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
@@ -38,8 +41,6 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/mailru/easyjson/jlexer"
 	"github.com/mailru/easyjson/jwriter"
-
-	"github.com/grafana/xk6-browser/log"
 )
 
 const wsWriteBufferSize = 1 << 20
@@ -82,13 +83,14 @@ func (f ActionFunc) Do(ctx context.Context) error {
 }
 
 /*
-	Connection represents a WebSocket connection and the root "Browser Session".
+		Connection represents a WebSocket connection and the root "Browser Session".
 
-	                                      ┌───────────────────────────────────────────────────────────────────┐
-                                          │                                                                   │
-                                          │                          Browser Process                          │
-                                          │                                                                   │
-                                          └───────────────────────────────────────────────────────────────────┘
+		                                      ┌───────────────────────────────────────────────────────────────────┐
+	                                          │                                                                   │
+	                                          │                          Browser Process                          │
+	                                          │                                                                   │
+	                                          └───────────────────────────────────────────────────────────────────┘
+
 ┌───────────────────────────┐                                           │      ▲
 │Reads JSON-RPC CDP messages│                                           │      │
 │from WS connection and puts│                                           ▼      │
@@ -106,8 +108,10 @@ func (f ActionFunc) Do(ctx context.Context) error {
 │   messages on outgoing    │             │                    │                         │                    │
 │ channel of WS connection. │             └────────────────────┘                         └────────────────────┘
 └───────────────────────────┘                    │      ▲                                       │      ▲
-                                                 │      │                                       │      │
-                                                 ▼      │                                       ▼      │
+
+	│      │                                       │      │
+	▼      │                                       ▼      │
+
 ┌───────────────────────────┐             ┌────────────────────┐                         ┌────────────────────┐
 │Registers with session as a├─────────────■                    │                         │                    │
 │handler for a specific CDP │             │   Event Listener   │      *  *  *  *  *      │   Event Listener   │
@@ -234,7 +238,7 @@ func (c *Connection) createSession(info *target.Info) (*Session, error) {
 }
 
 func (c *Connection) handleIOError(err error) {
-	c.logger.Errorf("Connection:handleIOError", "err:%v", err)
+	c.logger.Errorf("cdp", "communicating with browser: %v", err)
 
 	if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 		// Report an unexpected closure
@@ -244,15 +248,18 @@ func (c *Connection) handleIOError(err error) {
 			return
 		}
 	}
-	code := websocket.CloseGoingAway
-	if e, ok := err.(*websocket.CloseError); ok {
-		code = e.Code
+	var (
+		cerr *websocket.CloseError
+		code = websocket.CloseGoingAway
+	)
+	if errors.As(err, &cerr) {
+		code = cerr.Code
 	}
 	select {
 	case c.closeCh <- code:
-		c.logger.Debugf("Connection:handleIOError:c.closeCh <-", "code:%d", code)
+		c.logger.Debugf("cdp", "ending browser communication with code %d", code)
 	case <-c.done:
-		c.logger.Debugf("Connection:handleIOError:<-c.done", "")
+		c.logger.Debugf("cdp", "ending browser communication")
 	}
 }
 
@@ -378,20 +385,17 @@ func (c *Connection) send(ctx context.Context, msg *cdproto.Message, recvCh chan
 	case c.sendCh <- msg:
 	case err := <-c.errorCh:
 		c.logger.Debugf("Connection:send:<-c.errorCh", "wsURL:%q sid:%v, err:%v", c.wsURL, msg.SessionID, err)
-		return err
+		return fmt.Errorf("sending a message to browser: %w", err)
 	case code := <-c.closeCh:
 		c.logger.Debugf("Connection:send:<-c.closeCh", "wsURL:%q sid:%v, websocket code:%v", c.wsURL, msg.SessionID, code)
 		_ = c.closeConnection(code)
-		return &websocket.CloseError{Code: code}
+		return fmt.Errorf("closing communication with browser: %w", &websocket.CloseError{Code: code})
+	case <-ctx.Done():
+		c.logger.Debugf("Connection:send:<-ctx.Done", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
+		return nil
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
 		return nil
-	case <-ctx.Done():
-		c.logger.Errorf("Connection:send:<-ctx.Done()", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
-		return ctx.Err()
-	case <-c.ctx.Done():
-		c.logger.Errorf("Connection:send:<-c.ctx.Done()", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
-		return ctx.Err()
 	}
 
 	// Block waiting for response.

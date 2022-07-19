@@ -152,10 +152,10 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 		efid, esid)
 
 	if eh.execCtx == e {
-		panic("cannot adopt handle that already belongs to this execution context")
+		return nil, errors.New("already belongs to the same execution context")
 	}
 	if e.frame == nil {
-		panic("cannot adopt handle without frame owner")
+		return nil, errors.New("does not have a frame owner")
 	}
 
 	var node *cdp.Node
@@ -224,7 +224,7 @@ func (e *ExecutionContext) eval(
 	if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
 		var cdpe *cdproto.Error
 		if errors.As(err, &cdpe) && cdpe.Code == -32000 {
-			err = fmt.Errorf("execution context with ID %d not found", e.id)
+			err = errors.New("execution context changed; most likely because of a navigation")
 		}
 		return nil, err
 	}
@@ -256,6 +256,7 @@ func (e *ExecutionContext) eval(
 }
 
 // Based on: https://github.com/microsoft/playwright/blob/master/src/server/injected/injectedScript.ts
+//
 //go:embed js/injected_script.js
 var injectedScriptSource string
 

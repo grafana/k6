@@ -149,7 +149,7 @@ func NewPage(
 
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return nil, fmt.Errorf("executing CDP action %T: %w", action, err)
+		return nil, fmt.Errorf("internal error while auto attaching to browser pages: %w", err)
 	}
 
 	return &p, nil
