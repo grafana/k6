@@ -1,4 +1,4 @@
-import launcher from "k6/x/browser";
+import { chromium } from 'k6/x/browser';
 
 /*
 Page Object Model is a well-known pattern to abstract a web page.
@@ -37,7 +37,9 @@ export class Bet {
 }
 
 export default function () {
-  const browser = launcher.launch('chromium', { headless: __ENV.XK6_HEADLESS ? true : false });
+  const browser = chromium.launch({ 
+    headless: __ENV.XK6_HEADLESS ? true : false
+  });
   const context = browser.newContext();
   const page = context.newPage();
 

@@ -99,10 +99,10 @@ Then:
 #### Launch options
 
 ```js
-import launcher from "k6/x/browser";
+import { chromium } from 'k6/x/browser';
 
 export default function() {
-    const browser = launcher.launch('chromium', {
+    const browser = chromium.launch({
         args: [],                   // Extra commandline arguments to include when launching browser process
         debug: true,                // Log all CDP messages to k6 logging subsystem
         devtools: true,             // Open up developer tools in the browser by default
@@ -121,10 +121,10 @@ export default function() {
 #### New browser context options
 
 ```js
-import launcher from "k6/x/browser";
+import { chromium } from 'k6/x/browser';
 
 export default function() {
-    const browser = launcher.launch('chromium');
+    const browser = chromium.launch();
     const context = browser.newContext({
         acceptDownloads: false,             // Whether to accept downloading of files by default
         bypassCSP: false,                   // Whether to bypass content-security-policy rules
@@ -153,10 +153,10 @@ export default function() {
 #### Page screenshot
 
 ```js
-import launcher from "k6/x/browser";
+import { chromium } from 'k6/x/browser';
 
 export default function() {
-    const browser = launcher.launch('chromium', { headless: false });
+    const browser = chromium.launch({ headless: false });
     const context = browser.newContext();
     const page = context.newPage();
     page.goto('http://whatsmyuseragent.org/');
@@ -169,10 +169,10 @@ export default function() {
 #### Query DOM for element using CSS, XPath or Text based selectors
 
 ```js
-import launcher from "k6/x/browser";
+import { chromium } from 'k6/x/browser';
 
 export default function() {
-    const browser = launcher.launch('chromium', { headless: false });
+    const browser = chromium.launch({ headless: false });
     const context = browser.newContext();
     const page = context.newPage();
     page.goto('http://whatsmyuseragent.org/');
@@ -197,10 +197,10 @@ export default function() {
 #### Evaluate JS in browser
 
 ```js
-import launcher from "k6/x/browser";
+import { chromium } from 'k6/x/browser';
 
 export default function() {
-    const browser = launcher.launch('chromium', { headless: false });
+    const browser = chromium.launch({ headless: false });
     const context = browser.newContext();
     const page = context.newPage();
     page.goto('http://whatsmyuseragent.org/', { waitUntil: 'load' });
@@ -220,11 +220,11 @@ export default function() {
 #### Set preferred color scheme of browser
 
 ```js
-import launcher from "k6/x/browser";
+import { chromium } from 'k6/x/browser';
 import { sleep } from "k6";
 
 export default function() {
-    const browser = launcher.launch('chromium', {
+    const browser = chromium.launch({
         headless: false
     });
     const context = browser.newContext({
@@ -243,10 +243,10 @@ export default function() {
 #### Fill out a form
 
 ```js
-import launcher from "k6/x/browser";
+import { chromium } from 'k6/x/browser';
 
 export default function() {
-    const browser = launcher.launch('chromium', {
+    const browser = chromium.launch({
         headless: false,
         slowMo: '500ms' // slow down by 500ms
     });
@@ -274,11 +274,11 @@ export default function() {
 #### Check element state
 
 ```js
-import launcher from "k6/x/browser";
+import { chromium } from 'k6/x/browser';
 import { check } from "k6";
 
 export default function() {
-    const browser = launcher.launch('chromium', {
+    const browser = chromium.launch({
         headless: false
     });
     const context = browser.newContext();
@@ -324,10 +324,10 @@ To do that, you can use a pattern called the Page Object Model.
 You can see an example [here](examples/locator_pom.js).
 
 ```js
-import launcher from "k6/x/browser";
+import { chromium } from 'k6/x/browser';
 
 export default function () {
-  const browser = launcher.launch('chromium', {
+  const browser = chromium.launch({
     headless: false,
   });
   const context = browser.newContext();

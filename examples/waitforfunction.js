@@ -1,8 +1,8 @@
 import { check } from 'k6';
-import launcher from 'k6/x/browser';
+import { chromium } from 'k6/x/browser';
 
 export default function() {
-  const browser = launcher.launch('chromium', {
+  const browser = chromium.launch({
     headless: true,
   });
   const context = browser.newContext();

@@ -1,34 +1,11 @@
-/*
- *
- * xk6-browser - a browser automation extension for k6
- * Copyright (C) 2021 Load Impact
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
 package browser
 
 import (
-	"errors"
-
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
 
-	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/dop251/goja"
@@ -82,10 +59,16 @@ func (*RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 // Exports returns the exports of the JS module so that it can be used in test
 // scripts.
 func (mi *ModuleInstance) Exports() k6modules.Exports {
-	return k6modules.Exports{Default: mi.mod}
+	return k6modules.Exports{
+		Named: map[string]interface{}{
+			"chromium": mi.mod,
+			"devices":  mi.mod.Devices,
+		},
+	}
 }
 
-func (m *JSModule) Launch(browserName string, opts goja.Value) api.Browser {
+// Launch Chromium with given options.
+func (m *JSModule) Launch(opts goja.Value) api.Browser {
 	/*go func() {
 		f, err := os.Create("./cpu.profile")
 		if err != nil {
@@ -99,14 +82,8 @@ func (m *JSModule) Launch(browserName string, opts goja.Value) api.Browser {
 	ctx := k6ext.WithVU(m.vu.Context(), m.vu)
 	ctx = k6ext.WithCustomMetrics(ctx, m.k6Metrics)
 
-	if browserName == "chromium" {
-		bt := chromium.NewBrowserType(ctx)
-		return bt.Launch(opts)
-	}
-
-	k6common.Throw(m.vu.Runtime(),
-		errors.New("Currently 'chromium' is the only supported browser"))
-	return nil
+	bt := chromium.NewBrowserType(ctx)
+	return bt.Launch(opts)
 }
 
 func init() {

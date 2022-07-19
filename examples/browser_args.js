@@ -1,8 +1,8 @@
-import launcher from 'k6/x/browser';
 import { check } from 'k6';
+import { chromium } from 'k6/x/browser';
 
 export default function() {
-  const browser = launcher.launch('chromium', {
+  const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
     args: ['host-resolver-rules=MAP test.k6.io 127.0.0.254'],
   });
