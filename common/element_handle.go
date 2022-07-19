@@ -733,21 +733,27 @@ func (h *ElementHandle) BoundingBox() *api.Rect {
 }
 
 // Click scrolls element into view and clicks in the center of the element
-// TODO: look into making more robust using retries (see: https://github.com/microsoft/playwright/blob/master/src/server/dom.ts#L298)
-func (h *ElementHandle) Click(opts goja.Value) {
+// TODO: look into making more robust using retries
+// (see: https://github.com/microsoft/playwright/blob/master/src/server/dom.ts#L298)
+func (h *ElementHandle) Click(opts goja.Value) *goja.Promise {
 	actionOpts := NewElementHandleClickOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
 		k6ext.Panic(h.ctx, "parsing element click options: %v", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
-		return nil, handle.click(p, actionOpts.ToMouseClickOptions())
-	}
-	pointerFn := h.newPointerAction(fn, &actionOpts.ElementHandleBasePointerOptions)
-	_, err := call(h.ctx, pointerFn, actionOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "clicking on element: %v", err)
-	}
-	applySlowMo(h.ctx)
+	return k6ext.Promise(h.ctx, func() (interface{}, error) {
+		click := h.newPointerAction(
+			func(apiCtx context.Context, handle *ElementHandle, p *Position) (interface{}, error) {
+				return nil, handle.click(p, actionOpts.ToMouseClickOptions())
+			},
+			&actionOpts.ElementHandleBasePointerOptions,
+		)
+		if _, err := call(h.ctx, click, actionOpts.Timeout); err != nil {
+			return nil, fmt.Errorf("clicking on element: %w", err)
+		}
+		applySlowMo(h.ctx)
+
+		return nil, nil
+	})
 }
 
 func (h *ElementHandle) ContentFrame() api.Frame {
