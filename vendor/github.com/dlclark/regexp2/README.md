@@ -80,6 +80,8 @@ The default behavior of `regexp2` is to match the .NET regexp engine, however th
 * add support for named ascii character classes (e.g. `[[:foo:]]`)
 * add support for python-style capture groups (e.g. `(P<name>re)`)
 * change singleline behavior for `$` to only match end of string (like RE2) (see [#24](https://github.com/dlclark/regexp2/issues/24))
+* change the character classes `\d` `\s` and `\w` to match the same characters as RE2. NOTE: if you also use the `ECMAScript` option then this will change the `\s` character class to match ECMAScript instead of RE2.  ECMAScript allows more whitespace characters in `\s` than RE2 (but still fewer than the the default behavior).
+* allow character escape sequences to have defaults. For example, by default `\_` isn't a known character escape and will fail to compile, but in RE2 mode it will match the literal character `_`
  
 ```go
 re := regexp2.MustCompile(`Your RE2-compatible pattern`, regexp2.RE2)
@@ -90,6 +92,10 @@ if isMatch, _ := re.MatchString(`Something to match`); isMatch {
 
 This feature is a work in progress and I'm open to ideas for more things to put here (maybe more relaxed character escaping rules?).
 
+## ECMAScript compatibility mode
+In this mode the engine provides compatibility with the [regex engine](https://tc39.es/ecma262/multipage/text-processing.html#sec-regexp-regular-expression-objects) described in the ECMAScript specification.
+
+Additionally a Unicode mode is provided which allows parsing of `\u{CodePoint}` syntax that is only when both are provided.
 
 ## Library features that I'm still working on
 - Regex split

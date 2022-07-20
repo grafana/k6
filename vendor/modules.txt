@@ -19,11 +19,11 @@ github.com/andybalholm/cascadia
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91
-## explicit
+# github.com/dlclark/regexp2 v1.7.0
+## explicit; go 1.13
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
-# github.com/dop251/goja v0.0.0-20220714114325-87952593a54c
+# github.com/dop251/goja v0.0.0-20220719153422-38a3647bcce0
 ## explicit; go 1.14
 github.com/dop251/goja
 github.com/dop251/goja/ast

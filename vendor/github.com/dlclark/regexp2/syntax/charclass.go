@@ -37,6 +37,8 @@ var (
 	ecmaSpace = []rune{0x0009, 0x000e, 0x0020, 0x0021, 0x00a0, 0x00a1, 0x1680, 0x1681, 0x2000, 0x200b, 0x2028, 0x202a, 0x202f, 0x2030, 0x205f, 0x2060, 0x3000, 0x3001, 0xfeff, 0xff00}
 	ecmaWord  = []rune{0x0030, 0x003a, 0x0041, 0x005b, 0x005f, 0x0060, 0x0061, 0x007b}
 	ecmaDigit = []rune{0x0030, 0x003a}
+
+	re2Space = []rune{0x0009, 0x000b, 0x000c, 0x000e, 0x0020, 0x0021}
 )
 
 var (
@@ -56,6 +58,9 @@ var (
 	NotSpaceClass = getCharSetFromCategoryString(true, false, spaceCategoryText)
 	DigitClass    = getCharSetFromCategoryString(false, false, "Nd")
 	NotDigitClass = getCharSetFromCategoryString(false, true, "Nd")
+
+	RE2SpaceClass    = getCharSetFromOldString(re2Space, false)
+	NotRE2SpaceClass = getCharSetFromOldString(re2Space, true)
 )
 
 var unicodeCategories = func() map[string]*unicode.RangeTable {
@@ -401,12 +406,18 @@ func (c *CharSet) addChar(ch rune) {
 	c.addRange(ch, ch)
 }
 
-func (c *CharSet) addSpace(ecma, negate bool) {
+func (c *CharSet) addSpace(ecma, re2, negate bool) {
 	if ecma {
 		if negate {
 			c.addRanges(NotECMASpaceClass().ranges)
 		} else {
 			c.addRanges(ECMASpaceClass().ranges)
+		}
+	} else if re2 {
+		if negate {
+			c.addRanges(NotRE2SpaceClass().ranges)
+		} else {
+			c.addRanges(RE2SpaceClass().ranges)
 		}
 	} else {
 		c.addCategories(category{cat: spaceCategoryText, negate: negate})
@@ -563,7 +574,7 @@ func (c *CharSet) addNamedASCII(name string, negate bool) bool {
 	case "punct": //[!-/:-@[-`{-~]
 		rs = []singleRange{singleRange{'!', '/'}, singleRange{':', '@'}, singleRange{'[', '`'}, singleRange{'{', '~'}}
 	case "space":
-		c.addSpace(true, negate)
+		c.addSpace(true, false, negate)
 	case "upper":
 		rs = []singleRange{singleRange{'A', 'Z'}}
 	case "word":
