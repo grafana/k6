@@ -28,7 +28,7 @@ type ElementHandle interface {
 
 	BoundingBox() *Rect
 	Check(opts goja.Value)
-	Click(opts goja.Value)
+	Click(opts goja.Value) *goja.Promise
 	ContentFrame() Frame
 	Dblclick(opts goja.Value)
 	DispatchEvent(typ string, props goja.Value)

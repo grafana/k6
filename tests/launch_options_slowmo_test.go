@@ -28,6 +28,7 @@ import (
 	"github.com/grafana/xk6-browser/common"
 
 	"github.com/dop251/goja"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,7 +47,11 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 		})
 		t.Run("click", func(t *testing.T) {
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
-				p.Click("button", nil)
+				err := tb.await(func() error {
+					_ = p.Click("button", nil)
+					return nil
+				})
+				assert.NoError(t, err)
 			})
 		})
 		t.Run("dblClick", func(t *testing.T) {
@@ -148,7 +153,11 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 		})
 		t.Run("click", func(t *testing.T) {
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
-				f.Click("button", nil)
+				err := tb.await(func() error {
+					_ = f.Click("button", nil)
+					return nil
+				})
+				assert.NoError(t, err)
 			})
 		})
 		t.Run("dblClick", func(t *testing.T) {
