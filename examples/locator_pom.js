@@ -23,12 +23,12 @@ export class Bet {
 
   heads() {
     this.headsButton.click();
-    this.page.waitForNavigation();
+    return this.page.waitForNavigation();
   }
 
   tails() {
     this.tailsButton.click();
-    this.page.waitForNavigation();
+    return this.page.waitForNavigation();
   }
 
   current() {
@@ -46,18 +46,22 @@ export default function () {
   const bet = new Bet(page);
   bet.goto();
 
-  bet.tails();
-  console.log("Current bet:", bet.current());
-  
-  bet.heads();
-  console.log("Current bet:", bet.current());
-
-  bet.tails();
-  console.log("Current bet:", bet.current());
-
-  bet.heads();
-  console.log("Current bet:", bet.current());
-
-  page.close();
-  browser.close();
+  bet.tails().then(() => {
+    console.log("Current bet:", bet.current());
+  }).then(() =>
+    bet.heads()
+  ).then(() => {
+    console.log("Current bet:", bet.current());
+  }).then(() =>
+    bet.tails()
+  ).then(() => {
+    console.log("Current bet:", bet.current());
+  }).then(() =>
+    bet.heads()
+  ).then(() => {
+    console.log("Current bet:", bet.current());
+  }).finally(() => {
+    page.close();
+    browser.close();
+  })
 }
