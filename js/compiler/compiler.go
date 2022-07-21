@@ -52,8 +52,8 @@ var (
 			// "transform-es2015-function-name", // in goja
 			// []interface{}{"transform-es2015-arrow-functions", map[string]interface{}{"spec": false}}, // in goja
 			// "transform-es2015-block-scoped-functions", // in goja
-			[]interface{}{"transform-es2015-classes", map[string]interface{}{"loose": false}},
-			"transform-es2015-object-super",
+			// []interface{}{"transform-es2015-classes", map[string]interface{}{"loose": false}}, // in goja
+			// "transform-es2015-object-super", // in goja
 			// "transform-es2015-shorthand-properties", // in goja
 			// "transform-es2015-duplicate-keys", // in goja
 			// []interface{}{"transform-es2015-computed-properties", map[string]interface{}{"loose": false}}, // in goja

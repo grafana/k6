@@ -133,41 +133,44 @@ func TestCompile(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
-		pgm, code, err := c.Compile(`class A {nine(){return 9}}; new A().nine()`, "script.js", true)
+		pgm, code, err := c.Compile(`import "something"`, "script.js", true)
 		require.NoError(t, err)
-		assert.Equal(t, `"use strict";var _createClass = function () {function defineProperties(target, props) {for (var i = 0; i < props.length; i++) {var descriptor = props[i];descriptor.enumerable = descriptor.enumerable || false;descriptor.configurable = true;if ("value" in descriptor) descriptor.writable = true;Object.defineProperty(target, descriptor.key, descriptor);}}return function (Constructor, protoProps, staticProps) {if (protoProps) defineProperties(Constructor.prototype, protoProps);if (staticProps) defineProperties(Constructor, staticProps);return Constructor;};}();function _classCallCheck(instance, Constructor) {if (!(instance instanceof Constructor)) {throw new TypeError("Cannot call a class as a function");}}let A = function () {function A() {_classCallCheck(this, A);}_createClass(A, [{ key: "nine", value: function nine() {return 9;} }]);return A;}();;new A().nine();`,
+		assert.Equal(t, `"use strict";require("something");`,
 			code)
-		v, err := goja.New().RunProgram(pgm)
-		if assert.NoError(t, err) {
-			assert.Equal(t, int64(9), v.Export())
-		}
+		rt := goja.New()
+		var requireCalled bool
+		require.NoError(t, rt.Set("require", func(s string) {
+			assert.Equal(t, "something", s)
+			requireCalled = true
+		}))
+		_, err = rt.RunProgram(pgm)
+		require.NoError(t, err)
+		require.True(t, requireCalled)
 	})
 
 	t.Run("Wrap", func(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
-		pgm, code, err := c.Compile(`class A {nine(){return 9}}; exports.fn(new A().nine())`, "script.js", false)
+		pgm, code, err := c.Compile(`import "something";`, "script.js", false)
 		require.NoError(t, err)
 		assert.Equal(t, `(function(module, exports){
-"use strict";var _createClass = function () {function defineProperties(target, props) {for (var i = 0; i < props.length; i++) {var descriptor = props[i];descriptor.enumerable = descriptor.enumerable || false;descriptor.configurable = true;if ("value" in descriptor) descriptor.writable = true;Object.defineProperty(target, descriptor.key, descriptor);}}return function (Constructor, protoProps, staticProps) {if (protoProps) defineProperties(Constructor.prototype, protoProps);if (staticProps) defineProperties(Constructor, staticProps);return Constructor;};}();function _classCallCheck(instance, Constructor) {if (!(instance instanceof Constructor)) {throw new TypeError("Cannot call a class as a function");}}let A = function () {function A() {_classCallCheck(this, A);}_createClass(A, [{ key: "nine", value: function nine() {return 9;} }]);return A;}();;exports.fn(new A().nine());
+"use strict";require("something");
 })
 `, code)
+		var requireCalled bool
 		rt := goja.New()
+		require.NoError(t, rt.Set("require", func(s string) {
+			assert.Equal(t, "something", s)
+			requireCalled = true
+		}))
 		v, err := rt.RunProgram(pgm)
-		if assert.NoError(t, err) {
-			fn, ok := goja.AssertFunction(v)
-			if assert.True(t, ok, "not a function") {
-				exp := make(map[string]goja.Value)
-				var out interface{}
-				exp["fn"] = rt.ToValue(func(v goja.Value) {
-					out = v.Export()
-				})
-				_, err := fn(goja.Undefined(), goja.Undefined(), rt.ToValue(exp))
-				assert.NoError(t, err)
-				assert.Equal(t, int64(9), out)
-			}
-		}
+		require.NoError(t, err)
+		fn, ok := goja.AssertFunction(v)
+		require.True(t, ok, "not a function")
+		_, err = fn(goja.Undefined())
+		assert.NoError(t, err)
+		require.True(t, requireCalled)
 	})
 
 	t.Run("Invalid", func(t *testing.T) {
@@ -232,7 +235,7 @@ func TestCorruptSourceMapOnlyForBabel(t *testing.T) {
 			return corruptSourceMap, nil
 		},
 	}
-	_, _, err := compiler.Compile("class s {};\n//# sourceMappingURL=somefile", "somefile", false)
+	_, _, err := compiler.Compile("import 'something';\n//# sourceMappingURL=somefile", "somefile", false)
 	require.NoError(t, err)
 	entries := hook.Drain()
 	require.Len(t, entries, 1)

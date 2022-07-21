@@ -295,6 +295,12 @@ func (o *lazyObject) setProto(proto *Object, throw bool) bool {
 	return obj.setProto(proto, throw)
 }
 
+func (o *lazyObject) getPrivateEnv(typ *privateEnvType, create bool) *privateElements {
+	obj := o.create(o.val)
+	o.val.self = obj
+	return obj.getPrivateEnv(typ, create)
+}
+
 func (o *lazyObject) sortLen() int {
 	obj := o.create(o.val)
 	o.val.self = obj

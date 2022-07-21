@@ -207,6 +207,7 @@ type objectImpl interface {
 
 	_putProp(name unistring.String, value Value, writable, enumerable, configurable bool) Value
 	_putSym(s *Symbol, prop Value)
+	getPrivateEnv(typ *privateEnvType, create bool) *privateElements
 }
 
 type baseObject struct {
@@ -221,6 +222,8 @@ type baseObject struct {
 	lastSortedPropLen, idxPropCount int
 
 	symValues *orderedMap
+
+	privateElements map[*privateEnvType]*privateElements
 }
 
 type guardedObject struct {
@@ -808,6 +811,23 @@ func (o *baseObject) _putSym(s *Symbol, prop Value) {
 		o.symValues = newOrderedMap(nil)
 	}
 	o.symValues.set(s, prop)
+}
+
+func (o *baseObject) getPrivateEnv(typ *privateEnvType, create bool) *privateElements {
+	env := o.privateElements[typ]
+	if env != nil && create {
+		panic(o.val.runtime.NewTypeError("Private fields for the class have already been set"))
+	}
+	if env == nil && create {
+		env = &privateElements{
+			fields: make([]Value, typ.numFields),
+		}
+		if o.privateElements == nil {
+			o.privateElements = make(map[*privateEnvType]*privateElements)
+		}
+		o.privateElements[typ] = env
+	}
+	return env
 }
 
 func (o *Object) tryPrimitive(methodName unistring.String) Value {
@@ -1775,4 +1795,38 @@ func iterateEnumerableStringProperties(o *Object) iterNextFunc {
 			wrapped: o.self.iterateStringKeys(),
 		}).next,
 	}).next
+}
+
+type privateId struct {
+	typ      *privateEnvType
+	name     unistring.String
+	idx      uint32
+	isMethod bool
+}
+
+type privateEnvType struct {
+	numFields, numMethods uint32
+}
+
+type privateNames map[unistring.String]*privateId
+
+type privateEnv struct {
+	instanceType, staticType *privateEnvType
+
+	names privateNames
+
+	outer *privateEnv
+}
+
+type privateElements struct {
+	methods []Value
+	fields  []Value
+}
+
+func (i *privateId) String() string {
+	return "#" + i.name.String()
+}
+
+func (i *privateId) string() unistring.String {
+	return privateIdString(i.name)
 }
