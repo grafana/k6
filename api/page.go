@@ -92,7 +92,7 @@ type Page interface {
 	WaitForEvent(event string, optsOrPredicate goja.Value) interface{}
 	WaitForFunction(fn, opts goja.Value, args ...goja.Value) *goja.Promise
 	WaitForLoadState(state string, opts goja.Value)
-	WaitForNavigation(opts goja.Value) Response
+	WaitForNavigation(opts goja.Value) *goja.Promise
 	WaitForRequest(urlOrPredicate, opts goja.Value) Request
 	WaitForResponse(urlOrPredicate, opts goja.Value) Response
 	WaitForSelector(selector string, opts goja.Value) ElementHandle
