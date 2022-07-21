@@ -33,35 +33,35 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			tb := newTestBrowser(t, withFileServer())
-			p := tb.NewPage(nil)
+			t.Parallel()
 
-			resp := p.Goto(tb.staticURL("/nav_in_doc.html"), nil)
-			require.NotNil(t, resp)
+			errc := make(chan error, 1)
+			go func() {
+				tb := newTestBrowser(t, withFileServer())
+				p := tb.NewPage(nil)
 
-			// A click right away could possibly trigger navigation before we
-			// had a chance to call WaitForNavigation below, so give it some
-			// time to simulate the JS overhead, waiting for XHR response, etc.
-			time.AfterFunc(timeout*time.Millisecond, func() { //nolint:durationcheck
-				_ = tb.await(func() error {
+				resp := p.Goto(tb.staticURL("/nav_in_doc.html"), nil)
+				require.NotNil(t, resp)
+
+				// A click right away could possibly trigger navigation before we
+				// had a chance to call WaitForNavigation below, so give it some
+				// time to simulate the JS overhead, waiting for XHR
+				// response, etc.
+				<-time.After(timeout * time.Millisecond) //nolint:durationcheck
+
+				// if one of the promises panics, err will contain the error
+				errc <- tb.await(func() error {
 					_ = p.Click(tc.selector, nil)
+					_ = p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+						Timeout: 3 * timeout, // interpreted as ms
+					}))
 					return nil
 				})
-			})
-
-			done := make(chan struct{}, 1)
-			go func() {
-				require.NotPanics(t, func() {
-					p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
-						Timeout: timeout * 3, // interpreted as ms
-					}))
-				})
-				done <- struct{}{}
 			}()
-
 			select {
-			case <-done:
-			case <-time.After(timeout * 5 * time.Millisecond): //nolint:durationcheck
+			case err := <-errc:
+				require.NoError(t, err)
+			case <-time.After(5 * timeout * time.Millisecond): //nolint:durationcheck
 				t.Fatal("Test timed out")
 			}
 		})
