@@ -1,4 +1,4 @@
-# v1.47.1
+# v1.47.2
 # Please don't remove the first line. It uses in CI to determine the golangci version
 run:
   deadline: 5m
