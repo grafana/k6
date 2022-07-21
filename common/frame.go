@@ -1821,12 +1821,10 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-func (f *Frame) WaitForNavigation(opts goja.Value) api.Response {
-	r, err := f.manager.waitForFrameNavigation(f, opts)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
-	}
-	return r
+func (f *Frame) WaitForNavigation(opts goja.Value) *goja.Promise {
+	return k6ext.Promise(f.ctx, func() (result interface{}, reason error) {
+		return f.manager.waitForFrameNavigation(f, opts)
+	})
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
