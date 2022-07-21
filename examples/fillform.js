@@ -15,12 +15,13 @@ export default function() {
     // Enter login credentials and login
     page.$('input[name="login"]').type('admin');
     page.$('input[name="password"]').type('123');
-    return page.$('input[type="submit"]').click();
-  }).then(() => {
+  }).then(() =>
+    page.$('input[type="submit"]').click()
+  ).then(() =>
     // We expect the above form submission to trigger a navigation, so wait for it
     // and the page to be loaded.
-    page.waitForNavigation();
-
+    page.waitForNavigation()
+  ).then(() => {
     check(page, {
       'header': page.$('h2').textContent() == 'Welcome, admin!',
     });
