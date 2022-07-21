@@ -35,19 +35,22 @@ export default function () {
   // Since clicking on each button causes page navigation,
   // waitForNavigation is needed. It's because the page
   // won't be ready until the navigation completes.
-  page.waitForNavigation();
-  console.log(currentBet.innerText());
-
-  // the heads locator clicks on the heads button by using the
-  // locator's selector.
-  heads.click();
-  page.waitForNavigation();
-  console.log(currentBet.innerText());
-
-  tails.click();
-  page.waitForNavigation();
-  console.log(currentBet.innerText());
-
-  page.close();
-  browser.close();
+  page.waitForNavigation().then(() => {
+    console.log(currentBet.innerText());
+  }).then(() => {
+    // the heads locator clicks on the heads button
+    // by using the locator's selector.
+    heads.click();
+    return page.waitForNavigation()
+  }).then(() => {
+    console.log(currentBet.innerText());
+  }).then(() => {
+    tails.click();
+    return page.waitForNavigation()
+  }).then(() => {
+    console.log(currentBet.innerText());
+  }).finally(() => {
+    page.close();
+    browser.close();
+  })
 }
