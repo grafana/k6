@@ -685,8 +685,8 @@ func (m *FrameManager) Page() api.Page {
 	return nil
 }
 
-// WaitForFrameNavigation waits for the given navigation lifecycle event to happen.
-func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api.Response {
+// waitForFrameNavigation waits for the given navigation lifecycle event to happen.
+func (m *FrameManager) waitForFrameNavigation(frame *Frame, opts goja.Value) (api.Response, error) {
 	m.logger.Debugf("FrameManager:WaitForFrameNavigation",
 		"fmid:%d fid:%s furl:%s",
 		m.ID(), frame.ID(), frame.URL())
@@ -696,7 +696,7 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 
 	parsedOpts := NewFrameWaitForNavigationOptions(time.Duration(m.timeoutSettings.timeout()) * time.Second)
 	if err := parsedOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "parsing wait for frame navigation options: %v", err)
+		return nil, fmt.Errorf("parsing wait for frame navigation options: %w", err)
 	}
 
 	ch, evCancelFn := createWaitForEventHandler(m.ctx, frame, []string{EventFrameNavigation},
@@ -712,9 +712,9 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 		m.logger.Warnf("FrameManager:WaitForFrameNavigation:<-ctx.Done",
 			"fmid:%d furl:%s err:%v",
 			m.ID(), frame.URL(), m.ctx.Err())
-		return nil
+		return nil, nil
 	case <-time.After(parsedOpts.Timeout):
-		k6ext.Panic(m.ctx, "waiting for frame navigation timed out after %s", parsedOpts.Timeout)
+		return nil, fmt.Errorf("waiting for frame navigation timed out after %s", parsedOpts.Timeout)
 	case data := <-ch:
 		event = data.(*NavigationEvent)
 	}
@@ -723,7 +723,7 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 		// In case of navigation within the same document (e.g. via an anchor
 		// link or the History API), there is no new document and a
 		// LifecycleEvent will not be fired, so we don't need to wait for it.
-		return nil
+		return nil, nil
 	}
 
 	if frame.hasSubtreeLifecycleEventFired(parsedOpts.WaitUntil) {
@@ -735,7 +735,7 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 			return data.(LifecycleEvent) == parsedOpts.WaitUntil
 		}, parsedOpts.Timeout)
 		if err != nil {
-			k6ext.Panic(m.ctx, "waiting for frame navigation until %q: %v", parsedOpts.WaitUntil, err)
+			return nil, fmt.Errorf("waiting for frame navigation until %q: %w", parsedOpts.WaitUntil, err)
 		}
 	}
 
@@ -743,7 +743,7 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 	req.responseMu.RLock()
 	defer req.responseMu.RUnlock()
 
-	return req.response
+	return req.response, nil
 }
 
 // ID returns the unique ID of a FrameManager value.
