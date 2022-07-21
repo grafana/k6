@@ -874,7 +874,7 @@ func (p *Page) WaitForLoadState(state string, opts goja.Value) {
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-func (p *Page) WaitForNavigation(opts goja.Value) api.Response {
+func (p *Page) WaitForNavigation(opts goja.Value) *goja.Promise {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.sessionID())
 
 	return p.frameManager.MainFrame().WaitForNavigation(opts)
