@@ -42,6 +42,8 @@ const (
 	varTypeConst
 )
 
+const thisBindingName = " this" // must not be a valid identifier
+
 type CompilerError struct {
 	Message string
 	File    *file.File
@@ -75,9 +77,12 @@ type compiler struct {
 	scope *scope
 	block *block
 
+	classScope *classScope
+
 	enumGetExpr compiledEnumGetExpr
 
-	evalVM *vm
+	evalVM *vm // VM used to evaluate constant expressions
+	ctxVM  *vm // VM in which an eval() code is compiled
 }
 
 type binding struct {
@@ -124,18 +129,18 @@ func (b *binding) markAccessPoint() {
 func (b *binding) emitGet() {
 	b.markAccessPoint()
 	if b.isVar && !b.isArg {
-		b.scope.c.emit(loadStash(0))
+		b.scope.c.emit(loadStack(0))
 	} else {
-		b.scope.c.emit(loadStashLex(0))
+		b.scope.c.emit(loadStackLex(0))
 	}
 }
 
 func (b *binding) emitGetAt(pos int) {
 	b.markAccessPointAt(pos)
 	if b.isVar && !b.isArg {
-		b.scope.c.p.code[pos] = loadStash(0)
+		b.scope.c.p.code[pos] = loadStack(0)
 	} else {
-		b.scope.c.p.code[pos] = loadStashLex(0)
+		b.scope.c.p.code[pos] = loadStackLex(0)
 	}
 }
 
@@ -145,7 +150,7 @@ func (b *binding) emitGetP() {
 	} else {
 		// make sure TDZ is checked
 		b.markAccessPoint()
-		b.scope.c.emit(loadStashLex(0), pop)
+		b.scope.c.emit(loadStackLex(0), pop)
 	}
 }
 
@@ -158,9 +163,9 @@ func (b *binding) emitSet() {
 	}
 	b.markAccessPoint()
 	if b.isVar && !b.isArg {
-		b.scope.c.emit(storeStash(0))
+		b.scope.c.emit(storeStack(0))
 	} else {
-		b.scope.c.emit(storeStashLex(0))
+		b.scope.c.emit(storeStackLex(0))
 	}
 }
 
@@ -173,15 +178,55 @@ func (b *binding) emitSetP() {
 	}
 	b.markAccessPoint()
 	if b.isVar && !b.isArg {
-		b.scope.c.emit(storeStashP(0))
+		b.scope.c.emit(storeStackP(0))
 	} else {
-		b.scope.c.emit(storeStashLexP(0))
+		b.scope.c.emit(storeStackLexP(0))
+	}
+}
+
+func (b *binding) emitInitP() {
+	if !b.isVar && b.scope.outer == nil {
+		b.scope.c.emit(initGlobalP(b.name))
+	} else {
+		b.markAccessPoint()
+		b.scope.c.emit(initStackP(0))
 	}
 }
 
 func (b *binding) emitInit() {
-	b.markAccessPoint()
-	b.scope.c.emit(initStash(0))
+	if !b.isVar && b.scope.outer == nil {
+		b.scope.c.emit(initGlobal(b.name))
+	} else {
+		b.markAccessPoint()
+		b.scope.c.emit(initStack(0))
+	}
+}
+
+func (b *binding) emitInitAt(pos int) {
+	if !b.isVar && b.scope.outer == nil {
+		b.scope.c.p.code[pos] = initGlobal(b.name)
+	} else {
+		b.markAccessPointAt(pos)
+		b.scope.c.p.code[pos] = initStack(0)
+	}
+}
+
+func (b *binding) emitInitAtScope(scope *scope, pos int) {
+	if !b.isVar && scope.outer == nil {
+		scope.c.p.code[pos] = initGlobal(b.name)
+	} else {
+		b.markAccessPointAtScope(scope, pos)
+		scope.c.p.code[pos] = initStack(0)
+	}
+}
+
+func (b *binding) emitInitPAtScope(scope *scope, pos int) {
+	if !b.isVar && scope.outer == nil {
+		scope.c.p.code[pos] = initGlobalP(b.name)
+	} else {
+		b.markAccessPointAtScope(scope, pos)
+		scope.c.p.code[pos] = initStackP(0)
+	}
 }
 
 func (b *binding) emitGetVar(callee bool) {
@@ -238,6 +283,9 @@ type scope struct {
 	base       int
 	numArgs    int
 
+	// function type. If not funcNone, this is a function or a top-level lexical environment
+	funcType funcType
+
 	// in strict mode
 	strict bool
 	// eval top-level scope
@@ -247,10 +295,6 @@ type scope struct {
 	// at least one binding has been marked for placement in stash
 	needStash bool
 
-	// is a function or a top-level lexical environment
-	function bool
-	// is an arrow function's top-level lexical environment (functions only)
-	arrow bool
 	// is a variable environment, i.e. the target for dynamically created var bindings
 	variable bool
 	// a function scope that has at least one direct eval() and non-strict, so the variables can be added dynamically
@@ -259,8 +303,6 @@ type scope struct {
 	argsInStash bool
 	// need 'arguments' object (functions only)
 	argsNeeded bool
-	// 'this' is used and non-strict, so need to box it (functions only)
-	thisNeeded bool
 }
 
 type block struct {
@@ -364,12 +406,38 @@ func (p *Program) dumpCode(logger func(format string, args ...interface{})) {
 
 func (p *Program) _dumpCode(indent string, logger func(format string, args ...interface{})) {
 	logger("values: %+v", p.values)
+	dumpInitFields := func(initFields *Program) {
+		i := indent + ">"
+		logger("%s ---- init_fields:", i)
+		initFields._dumpCode(i, logger)
+		logger("%s ----", i)
+	}
 	for pc, ins := range p.code {
 		logger("%s %d: %T(%v)", indent, pc, ins, ins)
-		if f, ok := ins.(*newFunc); ok {
-			f.prg._dumpCode(indent+">", logger)
-		} else if f, ok := ins.(*newArrowFunc); ok {
-			f.prg._dumpCode(indent+">", logger)
+		var prg *Program
+		switch f := ins.(type) {
+		case *newFunc:
+			prg = f.prg
+		case *newArrowFunc:
+			prg = f.prg
+		case *newMethod:
+			prg = f.prg
+		case *newDerivedClass:
+			if f.initFields != nil {
+				dumpInitFields(f.initFields)
+			}
+			prg = f.ctor
+		case *newClass:
+			if f.initFields != nil {
+				dumpInitFields(f.initFields)
+			}
+		case *newStaticFieldInit:
+			if f.initFields != nil {
+				dumpInitFields(f.initFields)
+			}
+		}
+		if prg != nil {
+			prg._dumpCode(indent+">", logger)
 		}
 	}
 }
@@ -411,15 +479,39 @@ func (s *scope) lookupName(name unistring.String) (binding *binding, noDynamics 
 		if curScope.dynamic {
 			noDynamics = false
 		}
-		if name == "arguments" && curScope.function && !curScope.arrow {
+		if name == "arguments" && curScope.funcType != funcNone && curScope.funcType != funcArrow {
+			if curScope.funcType == funcClsInit {
+				s.c.throwSyntaxError(0, "'arguments' is not allowed in class field initializer or static initialization block")
+			}
 			curScope.argsNeeded = true
 			binding, _ = curScope.bindName(name)
 			return
 		}
-		if curScope.function {
+		if curScope.isFunction() {
 			toStash = true
 		}
 	}
+}
+
+func (s *scope) lookupThis() (*binding, bool) {
+	toStash := false
+	for curScope := s; curScope != nil; curScope = curScope.outer {
+		if curScope.outer == nil {
+			if curScope.eval {
+				return nil, true
+			}
+		}
+		if b, exists := curScope.boundNames[thisBindingName]; exists {
+			if toStash && !b.inStash {
+				b.moveToStash()
+			}
+			return b, false
+		}
+		if curScope.isFunction() {
+			toStash = true
+		}
+	}
+	return nil, false
 }
 
 func (s *scope) ensureBoundNamesCreated() {
@@ -453,8 +545,14 @@ func (s *scope) bindNameLexical(name unistring.String, unique bool, offset int) 
 	return b, true
 }
 
+func (s *scope) createThisBinding() *binding {
+	thisBinding, _ := s.bindNameLexical(thisBindingName, false, 0)
+	thisBinding.isVar = true // don't check on load
+	return thisBinding
+}
+
 func (s *scope) bindName(name unistring.String) (*binding, bool) {
-	if !s.function && !s.variable && s.outer != nil {
+	if !s.isFunction() && !s.variable && s.outer != nil {
 		return s.outer.bindName(name)
 	}
 	b, created := s.bindNameLexical(name, false, 0)
@@ -465,7 +563,7 @@ func (s *scope) bindName(name unistring.String) (*binding, bool) {
 }
 
 func (s *scope) bindNameShadow(name unistring.String) (*binding, bool) {
-	if !s.function && s.outer != nil {
+	if !s.isFunction() && s.outer != nil {
 		return s.outer.bindNameShadow(name)
 	}
 
@@ -482,7 +580,16 @@ func (s *scope) bindNameShadow(name unistring.String) (*binding, bool) {
 
 func (s *scope) nearestFunction() *scope {
 	for sc := s; sc != nil; sc = sc.outer {
-		if sc.function {
+		if sc.isFunction() {
+			return sc
+		}
+	}
+	return nil
+}
+
+func (s *scope) nearestThis() *scope {
+	for sc := s; sc != nil; sc = sc.outer {
+		if sc.eval || sc.isFunction() && sc.funcType != funcArrow {
 			return sc
 		}
 	}
@@ -496,7 +603,15 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 	}
 	stackIdx, stashIdx := 0, 0
 	allInStash := s.isDynamic()
+	var derivedCtor bool
+	if fs := s.nearestThis(); fs != nil && fs.funcType == funcDerivedCtor {
+		derivedCtor = true
+	}
 	for i, b := range s.bindings {
+		var this bool
+		if b.name == thisBindingName {
+			this = true
+		}
 		if allInStash || b.inStash {
 			for scope, aps := range b.accessPoints {
 				var level uint32
@@ -511,40 +626,78 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 				idx := (level << 24) | uint32(stashIdx)
 				base := scope.base
 				code := scope.prg.code
-				for _, pc := range *aps {
-					ap := &code[base+pc]
-					switch i := (*ap).(type) {
-					case loadStash:
-						*ap = loadStash(idx)
-					case storeStash:
-						*ap = storeStash(idx)
-					case storeStashP:
-						*ap = storeStashP(idx)
-					case loadStashLex:
-						*ap = loadStashLex(idx)
-					case storeStashLex:
-						*ap = storeStashLex(idx)
-					case storeStashLexP:
-						*ap = storeStashLexP(idx)
-					case initStash:
-						*ap = initStash(idx)
-					case *loadMixed:
-						i.idx = idx
-					case *loadMixedLex:
-						i.idx = idx
-					case *resolveMixed:
-						i.idx = idx
+				if this {
+					if derivedCtor {
+						for _, pc := range *aps {
+							ap := &code[base+pc]
+							switch (*ap).(type) {
+							case loadStack:
+								*ap = loadThisStash(idx)
+							case initStack:
+								*ap = initStash(idx)
+							case resolveThisStack:
+								*ap = resolveThisStash(idx)
+							case _ret:
+								*ap = cret(idx)
+							default:
+								s.c.assert(false, s.c.p.sourceOffset(pc), "Unsupported instruction for 'this'")
+							}
+						}
+					} else {
+						for _, pc := range *aps {
+							ap := &code[base+pc]
+							switch (*ap).(type) {
+							case loadStack:
+								*ap = loadStash(idx)
+							case initStack:
+								*ap = initStash(idx)
+							default:
+								s.c.assert(false, s.c.p.sourceOffset(pc), "Unsupported instruction for 'this'")
+							}
+						}
+					}
+				} else {
+					for _, pc := range *aps {
+						ap := &code[base+pc]
+						switch i := (*ap).(type) {
+						case loadStack:
+							*ap = loadStash(idx)
+						case storeStack:
+							*ap = storeStash(idx)
+						case storeStackP:
+							*ap = storeStashP(idx)
+						case loadStackLex:
+							*ap = loadStashLex(idx)
+						case storeStackLex:
+							*ap = storeStashLex(idx)
+						case storeStackLexP:
+							*ap = storeStashLexP(idx)
+						case initStackP:
+							*ap = initStashP(idx)
+						case initStack:
+							*ap = initStash(idx)
+						case *loadMixed:
+							i.idx = idx
+						case *loadMixedLex:
+							i.idx = idx
+						case *resolveMixed:
+							i.idx = idx
+						default:
+							s.c.assert(false, s.c.p.sourceOffset(pc), "Unsupported instruction for binding: %T", i)
+						}
 					}
 				}
 			}
 			stashIdx++
 		} else {
 			var idx int
-			if i < s.numArgs {
-				idx = -(i + 1)
-			} else {
-				stackIdx++
-				idx = stackIdx + stackOffset
+			if !this {
+				if i < s.numArgs {
+					idx = -(i + 1)
+				} else {
+					stackIdx++
+					idx = stackIdx + stackOffset
+				}
 			}
 			for scope, aps := range b.accessPoints {
 				var level int
@@ -558,23 +711,45 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 				}
 				code := scope.prg.code
 				base := scope.base
-				if argsInStash {
+				if this {
+					if derivedCtor {
+						for _, pc := range *aps {
+							ap := &code[base+pc]
+							switch (*ap).(type) {
+							case loadStack:
+								*ap = loadThisStack{}
+							case initStack:
+								// no-op
+							case resolveThisStack:
+								// no-op
+							case _ret:
+								// no-op, already in the right place
+							default:
+								s.c.assert(false, s.c.p.sourceOffset(pc), "Unsupported instruction for 'this'")
+							}
+						}
+					} /*else {
+						no-op
+					}*/
+				} else if argsInStash {
 					for _, pc := range *aps {
 						ap := &code[base+pc]
 						switch i := (*ap).(type) {
-						case loadStash:
+						case loadStack:
 							*ap = loadStack1(idx)
-						case storeStash:
+						case storeStack:
 							*ap = storeStack1(idx)
-						case storeStashP:
+						case storeStackP:
 							*ap = storeStack1P(idx)
-						case loadStashLex:
+						case loadStackLex:
 							*ap = loadStack1Lex(idx)
-						case storeStashLex:
+						case storeStackLex:
 							*ap = storeStack1Lex(idx)
-						case storeStashLexP:
+						case storeStackLexP:
 							*ap = storeStack1LexP(idx)
-						case initStash:
+						case initStackP:
+							*ap = initStack1P(idx)
+						case initStack:
 							*ap = initStack1(idx)
 						case *loadMixed:
 							*ap = &loadMixedStack1{name: i.name, idx: idx, level: uint8(level), callee: i.callee}
@@ -582,32 +757,38 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 							*ap = &loadMixedStack1Lex{name: i.name, idx: idx, level: uint8(level), callee: i.callee}
 						case *resolveMixed:
 							*ap = &resolveMixedStack1{typ: i.typ, name: i.name, idx: idx, level: uint8(level), strict: i.strict}
+						default:
+							s.c.assert(false, s.c.p.sourceOffset(pc), "Unsupported instruction for binding: %T", i)
 						}
 					}
 				} else {
 					for _, pc := range *aps {
 						ap := &code[base+pc]
 						switch i := (*ap).(type) {
-						case loadStash:
+						case loadStack:
 							*ap = loadStack(idx)
-						case storeStash:
+						case storeStack:
 							*ap = storeStack(idx)
-						case storeStashP:
+						case storeStackP:
 							*ap = storeStackP(idx)
-						case loadStashLex:
+						case loadStackLex:
 							*ap = loadStackLex(idx)
-						case storeStashLex:
+						case storeStackLex:
 							*ap = storeStackLex(idx)
-						case storeStashLexP:
+						case storeStackLexP:
 							*ap = storeStackLexP(idx)
-						case initStash:
+						case initStack:
 							*ap = initStack(idx)
+						case initStackP:
+							*ap = initStackP(idx)
 						case *loadMixed:
 							*ap = &loadMixedStack{name: i.name, idx: idx, level: uint8(level), callee: i.callee}
 						case *loadMixedLex:
 							*ap = &loadMixedStackLex{name: i.name, idx: idx, level: uint8(level), callee: i.callee}
 						case *resolveMixed:
 							*ap = &resolveMixedStack{typ: i.typ, name: i.name, idx: idx, level: uint8(level), strict: i.strict}
+						default:
+							s.c.assert(false, s.c.p.sourceOffset(pc), "Unsupported instruction for binding: %T", i)
 						}
 					}
 				}
@@ -629,6 +810,15 @@ func (s *scope) moveArgsToStash() {
 	}
 	s.argsInStash = true
 	s.needStash = true
+}
+
+func (s *scope) trimCode(delta int) {
+	s.c.p.code = s.c.p.code[delta:]
+	srcMap := s.c.p.srcMap
+	for i := range srcMap {
+		srcMap[i].pc -= delta
+	}
+	s.adjustBase(-delta)
 }
 
 func (s *scope) adjustBase(delta int) {
@@ -664,6 +854,10 @@ func (s *scope) isDynamic() bool {
 	return s.dynLookup || s.dynamic
 }
 
+func (s *scope) isFunction() bool {
+	return s.funcType != funcNone && !s.eval
+}
+
 func (s *scope) deleteBinding(b *binding) {
 	idx := 0
 	for i, bb := range s.bindings {
@@ -681,7 +875,10 @@ found:
 	s.bindings = s.bindings[:l]
 }
 
-func (c *compiler) compile(in *ast.Program, strict, eval, inGlobal bool) {
+func (c *compiler) compile(in *ast.Program, strict, inGlobal bool, evalVm *vm) {
+	c.ctxVM = evalVm
+
+	eval := evalVm != nil
 	c.p.src = in.File
 	c.newScope()
 	scope := c.scope
@@ -696,7 +893,15 @@ func (c *compiler) compile(in *ast.Program, strict, eval, inGlobal bool) {
 	if ownVarScope {
 		c.newBlockScope()
 		scope = c.scope
-		scope.function = true
+		scope.variable = true
+	}
+	if eval && !inGlobal {
+		for s := evalVm.stash; s != nil; s = s.outer {
+			if ft := s.funcType; ft != funcNone && ft != funcArrow {
+				scope.funcType = ft
+				break
+			}
+		}
 	}
 	funcs := c.extractFunctions(in.Body)
 	c.createFunctionBindings(funcs)
@@ -803,7 +1008,7 @@ func (c *compiler) extractFunctions(list []ast.Statement) (funcs []*ast.Function
 func (c *compiler) createFunctionBindings(funcs []*ast.FunctionDeclaration) {
 	s := c.scope
 	if s.outer != nil {
-		unique := !s.function && !s.variable && s.strict
+		unique := !s.isFunction() && !s.variable && s.strict
 		for _, decl := range funcs {
 			s.bindNameLexical(decl.Function.Name.Name, unique, int(decl.Function.Name.Idx1())-1)
 		}
@@ -962,6 +1167,12 @@ func (c *compiler) compileLexicalDeclarations(list []ast.Statement, scopeDeclare
 				scopeDeclared = true
 			}
 			c.createLexicalBindings(lex)
+		} else if cls, ok := st.(*ast.ClassDeclaration); ok {
+			if !scopeDeclared {
+				c.newBlockScope()
+				scopeDeclared = true
+			}
+			c.createLexicalIdBinding(cls.Class.Name.Name, false, int(cls.Class.Name.Idx)-1)
 		}
 	}
 	return scopeDeclared
@@ -991,7 +1202,7 @@ func (c *compiler) compileFunction(v *ast.FunctionDeclaration) {
 		e.emitSetter(c.compileFunctionLiteral(v.Function, false), false)
 	} else {
 		c.compileFunctionLiteral(v.Function, false).emitGetter(true)
-		b.emitInit()
+		b.emitInitP()
 	}
 }
 
@@ -1082,4 +1293,136 @@ func (c *compiler) compileStatementDummy(statement ast.Statement) {
 	leave := c.enterDummyMode()
 	c.compileStatement(statement, false)
 	leave()
+}
+
+func (c *compiler) assert(cond bool, offset int, msg string, args ...interface{}) {
+	if !cond {
+		c.throwSyntaxError(offset, "Compiler bug: "+msg, args...)
+	}
+}
+
+func privateIdString(desc unistring.String) unistring.String {
+	return asciiString("#").concat(stringValueFromRaw(desc)).string()
+}
+
+type privateName struct {
+	idx                  int
+	isStatic             bool
+	isMethod             bool
+	hasGetter, hasSetter bool
+}
+
+type resolvedPrivateName struct {
+	name     unistring.String
+	idx      uint32
+	level    uint8
+	isStatic bool
+	isMethod bool
+}
+
+func (r *resolvedPrivateName) string() unistring.String {
+	return privateIdString(r.name)
+}
+
+type privateEnvRegistry struct {
+	fields, methods []unistring.String
+}
+
+type classScope struct {
+	c            *compiler
+	privateNames map[unistring.String]*privateName
+
+	instanceEnv, staticEnv privateEnvRegistry
+
+	outer *classScope
+}
+
+func (r *privateEnvRegistry) createPrivateMethodId(name unistring.String) int {
+	r.methods = append(r.methods, name)
+	return len(r.methods) - 1
+}
+
+func (r *privateEnvRegistry) createPrivateFieldId(name unistring.String) int {
+	r.fields = append(r.fields, name)
+	return len(r.fields) - 1
+}
+
+func (s *classScope) declarePrivateId(name unistring.String, kind ast.PropertyKind, isStatic bool, offset int) {
+	pn := s.privateNames[name]
+	if pn != nil {
+		if pn.isStatic == isStatic {
+			switch kind {
+			case ast.PropertyKindGet:
+				if pn.hasSetter && !pn.hasGetter {
+					pn.hasGetter = true
+					return
+				}
+			case ast.PropertyKindSet:
+				if pn.hasGetter && !pn.hasSetter {
+					pn.hasSetter = true
+					return
+				}
+			}
+		}
+		s.c.throwSyntaxError(offset, "Identifier '#%s' has already been declared", name)
+		panic("unreachable")
+	}
+	var env *privateEnvRegistry
+	if isStatic {
+		env = &s.staticEnv
+	} else {
+		env = &s.instanceEnv
+	}
+
+	pn = &privateName{
+		isStatic:  isStatic,
+		hasGetter: kind == ast.PropertyKindGet,
+		hasSetter: kind == ast.PropertyKindSet,
+	}
+	if kind != ast.PropertyKindValue {
+		pn.idx = env.createPrivateMethodId(name)
+		pn.isMethod = true
+	} else {
+		pn.idx = env.createPrivateFieldId(name)
+	}
+
+	if s.privateNames == nil {
+		s.privateNames = make(map[unistring.String]*privateName)
+	}
+	s.privateNames[name] = pn
+}
+
+func (s *classScope) getDeclaredPrivateId(name unistring.String) *privateName {
+	if n := s.privateNames[name]; n != nil {
+		return n
+	}
+	s.c.assert(false, 0, "getDeclaredPrivateId() for undeclared id")
+	panic("unreachable")
+}
+
+func (c *compiler) resolvePrivateName(name unistring.String, offset int) (*resolvedPrivateName, *privateId) {
+	level := 0
+	for s := c.classScope; s != nil; s = s.outer {
+		if len(s.privateNames) > 0 {
+			if pn := s.privateNames[name]; pn != nil {
+				return &resolvedPrivateName{
+					name:     name,
+					idx:      uint32(pn.idx),
+					level:    uint8(level),
+					isStatic: pn.isStatic,
+					isMethod: pn.isMethod,
+				}, nil
+			}
+			level++
+		}
+	}
+	if c.ctxVM != nil {
+		for s := c.ctxVM.privEnv; s != nil; s = s.outer {
+			if id := s.names[name]; id != nil {
+				return nil, id
+			}
+		}
+	}
+	c.throwSyntaxError(offset, "Private field '#%s' must be declared in an enclosing class", name)
+	panic("unreachable")
 }

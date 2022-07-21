@@ -298,3 +298,7 @@ func (d *destructKeyedSource) _putProp(name unistring.String, value Value, writa
 func (d *destructKeyedSource) _putSym(s *Symbol, prop Value) {
 	d.w()._putSym(s, prop)
 }
+
+func (d *destructKeyedSource) getPrivateEnv(typ *privateEnvType, create bool) *privateElements {
+	return d.w().getPrivateEnv(typ, create)
+}

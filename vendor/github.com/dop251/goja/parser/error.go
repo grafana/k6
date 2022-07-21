@@ -111,6 +111,8 @@ func (self *_parser) errorUnexpectedToken(tkn token.Token) error {
 	case token.KEYWORD:
 		// TODO Might be a future reserved word
 		return self.error(self.idx, "Unexpected reserved word")
+	case token.ESCAPED_RESERVED_WORD:
+		return self.error(self.idx, "Keyword must not contain escaped characters")
 	case token.NUMBER:
 		return self.error(self.idx, "Unexpected number")
 	case token.STRING:

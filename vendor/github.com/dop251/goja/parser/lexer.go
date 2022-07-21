@@ -245,26 +245,16 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 				tkn, strict = token.IsKeyword(string(parsedLiteral))
 				if hasEscape {
 					self.insertSemicolon = true
-					if tkn != 0 && tkn != token.LET || parsedLiteral == "true" || parsedLiteral == "false" || parsedLiteral == "null" {
-						tkn = token.KEYWORD
-					} else {
+					if tkn == 0 || token.IsUnreservedWord(tkn) {
 						tkn = token.IDENTIFIER
+					} else {
+						tkn = token.ESCAPED_RESERVED_WORD
 					}
 					return
 				}
 				switch tkn {
-
 				case 0: // Not a keyword
-					if parsedLiteral == "true" || parsedLiteral == "false" {
-						self.insertSemicolon = true
-						tkn = token.BOOLEAN
-						return
-					} else if parsedLiteral == "null" {
-						self.insertSemicolon = true
-						tkn = token.NULL
-						return
-					}
-
+					// no-op
 				case token.KEYWORD:
 					if strict {
 						// TODO If strict and in strict mode, then this is not a break
@@ -273,6 +263,8 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 					return
 
 				case
+					token.BOOLEAN,
+					token.NULL,
 					token.THIS,
 					token.BREAK,
 					token.THROW, // A newline after a throw is not allowed, but we need to detect it
@@ -367,7 +359,10 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 					self.skipSingleLineComment()
 					continue
 				} else if self.chr == '*' {
-					self.skipMultiLineComment()
+					if self.skipMultiLineComment() {
+						self.insertSemicolon = false
+						self.implicitSemicolon = true
+					}
 					continue
 				} else {
 					// Could be division, could be RegExp literal
@@ -429,6 +424,16 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 				}
 			case '`':
 				tkn = token.BACKTICK
+			case '#':
+				var err string
+				literal, parsedLiteral, _, err = self.scanIdentifier()
+				if err != "" || literal == "" {
+					tkn = token.ILLEGAL
+					break
+				}
+				self.insertSemicolon = true
+				tkn = token.PRIVATE_IDENTIFIER
+				return
 			default:
 				self.errorUnexpected(idx, chr)
 				tkn = token.ILLEGAL
@@ -533,8 +538,20 @@ func (self *_parser) skipSingleLineComment() {
 	}
 }
 
-func (self *_parser) skipMultiLineComment() {
+func (self *_parser) skipMultiLineComment() (hasLineTerminator bool) {
 	self.read()
+	for self.chr >= 0 {
+		chr := self.chr
+		if chr == '\r' || chr == '\n' || chr == '\u2028' || chr == '\u2029' {
+			hasLineTerminator = true
+			break
+		}
+		self.read()
+		if chr == '*' && self.chr == '/' {
+			self.read()
+			return
+		}
+	}
 	for self.chr >= 0 {
 		chr := self.chr
 		self.read()
@@ -545,6 +562,7 @@ func (self *_parser) skipMultiLineComment() {
 	}
 
 	self.errorUnexpected(0, self.chr)
+	return
 }
 
 func (self *_parser) skipWhiteSpace() {
@@ -663,7 +681,10 @@ func (self *_parser) scanString(offset int, parse bool) (literal string, parsed 
 	isUnicode := false
 	for self.chr != quote {
 		chr := self.chr
-		if chr == '\n' || chr == '\r' || chr == '\u2028' || chr == '\u2029' || chr < 0 {
+		if chr == '\n' || chr == '\r' || chr < 0 {
+			goto newline
+		}
+		if quote == '/' && (self.chr == '\u2028' || self.chr == '\u2029') {
 			goto newline
 		}
 		self.read()
@@ -717,6 +738,10 @@ newline:
 }
 
 func (self *_parser) scanNewline() {
+	if self.chr == '\u2028' || self.chr == '\u2029' {
+		self.read()
+		return
+	}
 	if self.chr == '\r' {
 		self.read()
 		if self.chr != '\n' {
