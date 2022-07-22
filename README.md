@@ -98,7 +98,7 @@ And for rpm-based ones like Fedora and CentOS:
 
 ```bash
 sudo dnf install https://dl.k6.io/rpm/repo.rpm    # use yum instead of dnf for older distros
-sudo dnf install k6    # use yum install --nogpgcheck k6 for older distros (e.g. CentOS 7) without PGP V4 signature support
+sudo dnf install k6    # use yum install --nogpgcheck k6 for older distros (e.g. CentOS 7, Amazon Linux 2) without PGP V4 signature support
 ```
 
 Note that the `gnupg2` package is required for signature verification.
