@@ -66,7 +66,7 @@ func (e *EventLoop) RegisterCallback() func(func() error) { // TODO: remove
 // RegisterPendingCallback signals to the event loop that you are going to do
 // some asynchronous work off the main thread and that you may need to execute
 // some code back on the main thread when you are done. So, once you call this
-// method, the even loop will wait for you to finish and give it the callback it
+// method, the event loop will wait for you to finish and give it the callback it
 // needs to run back on the main thread before it can end the whole iteration.
 //
 // RegisterPendingCallback() *must* be called from the main runtime thread, but
@@ -85,7 +85,7 @@ func (e *EventLoop) RegisterCallback() func(func() error) { // TODO: remove
 // be stuck until the VU itself has been stopped (e.g. because the whole test or
 // scenario has ended).
 //
-// A common patten for async work is something like this:
+// A common pattern for async work is something like this:
 //
 //    func doAsyncWork() *goja.Promise {
 //        addToMainThreadQueue := vu.RegisterPendingCallback()
