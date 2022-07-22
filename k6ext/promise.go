@@ -37,18 +37,20 @@ func promise(ctx context.Context, fn PromisifiedFunc, d eventLoopDirective) *goj
 		cb                 = vu.RegisterCallback()
 		p, resolve, reject = vu.Runtime().NewPromise()
 	)
-	go cb(func() error {
+	go func() {
 		v, err := fn()
-		if err != nil {
-			reject(err)
-		} else {
-			resolve(v)
-		}
-		if d == continueEventLoop {
-			err = nil
-		}
-		return err
-	})
+		cb(func() error {
+			if err != nil {
+				reject(err)
+			} else {
+				resolve(v)
+			}
+			if d == continueEventLoop {
+				err = nil
+			}
+			return err
+		})
+	}()
 
 	return p
 }
