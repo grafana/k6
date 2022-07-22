@@ -1,6 +1,8 @@
 package tests
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -66,4 +68,46 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWaitForFrameNavigation(t *testing.T) {
+	tb := newTestBrowser(t, withHTTPServer())
+	p := tb.NewPage(nil)
+
+	tb.withHandler("/first", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintf(w, `
+		<html>
+			<head>
+				<title>First page</title>
+			</head>
+			<body>
+				<a href="/second">click me</a>
+			</body>
+		</html>
+		`)
+	})
+	tb.withHandler("/second", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintf(w, `
+		<html>
+			<head>
+				<title>Second page</title>
+			</head>
+			<body>
+				<a href="/first">click me</a>
+			</body>
+		</html>
+		`)
+	})
+
+	require.NotNil(t, p.Goto(tb.URL("/first"), tb.toGojaValue(&common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventNetworkIdle,
+		Timeout:   common.DefaultTimeout,
+	})))
+	err := tb.await(func() error {
+		_ = p.Click(`a`, nil)
+		p.WaitForNavigation(nil)
+		return nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, p.Title(), "Second page")
 }
