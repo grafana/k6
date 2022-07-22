@@ -55,9 +55,11 @@ func (e *EventLoop) wakeup() {
 	}
 }
 
+// RegisterCallback is deprecated, see RegisterPendingCallback.
+//
 // Deprecated: due to the confusing name, we renamed this method to
-// RegisterPendingCallback
-func (e *EventLoop) RegisterCallback() func(func() error) {
+// RegisterPendingCallback.
+func (e *EventLoop) RegisterCallback() func(func() error) { // TODO: remove
 	return e.RegisterPendingCallback()
 }
 
