@@ -55,11 +55,60 @@ func (e *EventLoop) wakeup() {
 	}
 }
 
-// RegisterCallback register that a callback will be invoked on the loop, preventing it from returning/finishing.
-// The returned function, upon invocation, will queue its argument and wakeup the loop if needed.
-// If the eventLoop has since stopped, it will not be executed.
-// This function *must* be called from within running on the event loop, but its result can be called from anywhere.
+// Deprecated: due to the confusing name, we renamed this method to
+// RegisterPendingCallback
 func (e *EventLoop) RegisterCallback() func(func() error) {
+	return e.RegisterPendingCallback()
+}
+
+// RegisterPendingCallback signals to the event loop that you are going to do
+// some asynchronous work off the main thread and that you may need to execute
+// some code back on the main thread when you are done. So, once you call this
+// method, the even loop will wait for you to finish and give it the callback it
+// needs to run back on the main thread before it can end the whole iteration.
+//
+// RegisterPendingCallback() *must* be called from the main runtime thread, but
+// its result addToMainThreadQueue() is thread-safe and can be called from any
+// goroutine. addToMainThreadQueue() ensures that its callback parameter is
+// added to the VU runtime's tasks queue, to be executed on the main runtime
+// thread eventually, when the VU is done with the other tasks before it. Unless
+// the whole event loop has been stopped, invoking addToMainThreadQueue() will
+// queue its argument and "wake up" the loop (if it was idle, but not stopped).
+//
+// Keep in mind that once you call RegisterPendingCallback(), you *must* also
+// call addToMainThreadQueue() exactly once, even if don't actually need to run
+// any code on the main thread. If that's the case, you can pass an empty no-op
+// callback to it, but you must call it! The event loop will wait for the
+// addToMainThreadQueue() invocation and the k6 iteration won't finish and will
+// be stuck until the VU itself has been stopped (e.g. because the whole test or
+// scenario has ended).
+//
+// A common patten for async work is something like this:
+//
+//    func doAsyncWork() *goja.Promise {
+//        addToMainThreadQueue := vu.RegisterPendingCallback()
+//        p, resolve, reject := runtime.NewPromise()
+//
+//        go func() {
+//            result, err := doTheActualAsyncWork()
+//            addToMainThreadQueue(func() error {
+//                if err != nil {
+//                    reject(err)
+//                } else {
+//                    resolve(result)
+//                }
+//                return nil
+//            })
+//        }()
+//
+//        return p
+//    }
+//
+// This ensures that the actual work happens asynchronously, while the Promise
+// is immediately returned and the main thread resumes execution. It also
+// ensures that the Promise resolution happens safely back on the main thread
+// once the async work is done, as required by goja and all other JS runtimes.
+func (e *EventLoop) RegisterPendingCallback() (addToMainThreadQueue func(callback func() error)) {
 	e.lock.Lock()
 	var callbackCalled bool
 	e.registeredCallbacks++
