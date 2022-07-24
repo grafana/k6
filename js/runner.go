@@ -435,7 +435,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 func (r *Runner) SetOptions(opts lib.Options) error {
 	r.Bundle.Options = opts
 	r.RPSLimit = nil
-	if rps := opts.RPS; rps.Valid {
+	if rps := opts.RPS; rps.Valid && rps.Int64 > 0 {
 		r.RPSLimit = rate.NewLimiter(rate.Limit(rps.Int64), 1)
 	}
 
