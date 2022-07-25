@@ -1290,7 +1290,7 @@ func TestCookieJar(t *testing.T) {
 	assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(ts.samples), "", sr("WSBIN_URL/ws-echo-someheader"), statusProtocolSwitch, "")
 }
 
-func TestWithoutThrowError(t *testing.T) {
+func TestWsWithThrowOptionError(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	root, err := lib.NewGroup("", nil)
 	require.NoError(t, err)
@@ -1303,7 +1303,6 @@ func TestWithoutThrowError(t *testing.T) {
 		Dialer: tb.Dialer,
 		Options: lib.Options{
 			SystemTags: &metrics.DefaultSystemTagSet,
-			Throw:      null.BoolFrom(false),
 		},
 		Samples:        samples,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
@@ -1317,12 +1316,31 @@ func TestWithoutThrowError(t *testing.T) {
 		StateField:   state,
 	})
 	require.NoError(t, rt.Set("ws", m.Exports().Default))
-	_, err = rt.RunString(`
+
+	t.Run("enable_throw_error", func(t *testing.T) {
+		state.Options.Throw = null.BoolFrom(true)
+		_, err = rt.RunString(`
 		var res = ws.connect("INVALID", function(socket){
 			socket.on("open", function() {
 				socket.close();
 			});
 		});
 		`)
-	assert.NoError(t, err)
+		assert.Error(t, err)
+	})
+
+	t.Run("disable_throw_error", func(t *testing.T) {
+		state.Options.Throw = null.BoolFrom(false)
+		_, err = rt.RunString(`
+		var res = ws.connect("INVALID", function(socket){
+			socket.on("open", function() {
+				socket.close();
+			});
+		});
+		if (res && res.error) {
+			throw new Error(res.error);
+		}
+		`)
+		assert.Error(t, err)
+	})
 }

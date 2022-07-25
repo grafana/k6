@@ -288,12 +288,13 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 		socket.handleEvent("error", rt.ToValue(connErr))
 		if state.Options.Throw.Bool {
 			return nil, connErr
-		} else {
-			if state.Logger != nil {
-				state.Logger.WithField("error", connErr).Warn("Ws Connection Failed")
-			}
-			return &WSHTTPResponse{}, nil
 		}
+		if state.Logger != nil {
+			state.Logger.WithField("error", connErr).Warn("Ws Connection Failed")
+		}
+		return &WSHTTPResponse{
+			Error: connErr.Error(),
+		}, nil
 	}
 
 	// Run the user-provided set up function
