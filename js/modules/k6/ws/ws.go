@@ -292,7 +292,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 			if state.Logger != nil {
 				state.Logger.WithField("error", connErr).Warn("Ws Connection Failed")
 			}
-			return nil, nil
+			return &WSHTTPResponse{}, nil
 		}
 	}
 
