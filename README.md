@@ -46,11 +46,11 @@ Features
 - **Scripting in ES6 JS**: support for [modules](https://k6.io/docs/using-k6/modules) to aid code reusability across an organization
 - **Everything as code**: test logic and [configuration options](https://k6.io/docs/using-k6/options) are both in JS for version control friendliness
 - **Automation-friendly**: [checks](https://k6.io/docs/using-k6/checks) (like asserts) and [thresholds](https://k6.io/docs/using-k6/thresholds) for easy and flexible CI configuration!
-- [**HTTP/1.1**](https://k6.io/docs/using-k6/http-requests), [**HTTP/2**](https://k6.io/docs/using-k6/protocols/http-2), [**WebSocket**](https://k6.io/docs/using-k6/protocols/websockets) and [**gRPC**](https://k6.io/docs/using-k6/protocols/grpc) protocol support
-- **TLS features**: [client certificates](https://k6.io/docs/using-k6/protocols/ssl-tls/ssl-tls-client-certificates), [configurable SSL/TLS versions and ciphers](https://k6.io/docs/using-k6/protocols/ssl-tls/ssl-tls-version-and-ciphers)
+- [**HTTP/1.1**](https://k6.io/docs/using-k6/http-requests), [**HTTP/2**](https://k6.io/docs/using-k6/protocols/http-2), [**WebSocket**](https://k6.io/docs/using-k6/protocols/websockets), and [**gRPC**](https://k6.io/docs/using-k6/protocols/grpc) protocol support
+- **TLS features**: [client certificates](https://k6.io/docs/using-k6/protocols/ssl-tls/ssl-tls-client-certificates), [configurable SSL/TLS versions, and ciphers](https://k6.io/docs/using-k6/protocols/ssl-tls/ssl-tls-version-and-ciphers)
 - **Batteries included**: [Cookies](https://k6.io/docs/using-k6/cookies), [Crypto](https://k6.io/docs/javascript-api/k6-crypto), [Custom metrics](https://k6.io/docs/using-k6/metrics#custom-metrics), [Encodings](https://k6.io/docs/javascript-api/k6-encoding), [Environment variables](https://k6.io/docs/using-k6/environment-variables), JSON, [HTML forms](https://k6.io/docs/using-k6/html/working-with-html-forms), [files](https://k6.io/docs/javascript-api/init-context/open-filepath-mode), [flexible execution control](https://k6.io/docs/getting-started/running-k6#section-stages-ramping-updown-vus), and more.
 - **Built-in HAR converter**: record browser sessions as [`.har` files](https://en.wikipedia.org/wiki/.har) and [directly convert them to k6 scripts](https://k6.io/docs/using-k6/session-recording-har-support)
-- **Flexible metrics storage and visualization**: [InfluxDB](https://k6.io/docs/results-visualization/influxdb-+-grafana) (+Grafana), [JSON](https://k6.io/docs/getting-started/results-output/json) or [k6 Cloud](https://k6.io/docs/cloud/analyzing-results/overview)
+- **Flexible metrics storage and visualization**: [InfluxDB](https://k6.io/docs/results-visualization/influxdb-+-grafana) (+Grafana), [JSON](https://k6.io/docs/getting-started/results-output/json), or [k6 Cloud](https://k6.io/docs/cloud/analyzing-results/overview)
 - [**Cloud execution**](https://k6.io/docs/using-k6/cloud-execution) and distributed tests _(currently only on infrastructure managed by [us k6 cloud](https://k6.io/cloud), with native distributed execution in k6 [planned](https://github.com/grafana/k6/issues/140) for the near future!)_
 
 There's even more! [See all features available in k6.](https://k6.io/docs/)
@@ -92,7 +92,7 @@ If you have issues adding the key from the keyserver, you can instead run:
 curl -s https://dl.k6.io/key.gpg | sudo apt-key add -
 ```
 
-Then confirm that the key with the above ID is shown in the output of `sudo apt-key list`.
+Then confirm that the key with the above ID is shown in the output of the `sudo apt-key list`.
 
 And for rpm-based ones like Fedora and CentOS:
 
@@ -166,7 +166,7 @@ This means that if your script works when it's executed with `k6 run` locally, i
 
 ### Script execution
 
-For simplicity, unlike many other JavaScript runtimes, a lot of the operations in k6 are synchronous. That means that, for example, the `let response = http.get("https://test-api.k6.io/")` call from the [Running k6](#running-k6) example script will block the VU execution until the HTTP request is completed, save the [response information](https://k6.io/docs/javascript-api/k6-http/response-k6-http) in the `response` variable and only then continue executing the rest of the script - no callbacks and promises needed.
+For simplicity, unlike many other JavaScript runtimes, a lot of the operations in k6 are synchronous. That means that, for example, the `let response = http.get("https://test-api.k6.io/")` call from the [Running k6](#running-k6) example script will block the VU execution until the HTTP request is completed, save the [response information](https://k6.io/docs/javascript-api/k6-http/response-k6-http) in the `response` variable and only then continue executing the rest of the script - no callbacks and promises are needed.
 
 This simplification works because k6 isn't just a single JavaScript runtime. Instead, each VU independently executes the supplied script in its own separate and semi-isolated JavaScript runtime, in parallel to all the other running VUs. This allows us to fully utilize modern multi-core hardware while at the same time lowering the script complexity by having mostly synchronous functions. Where it makes sense, we also have in-VU parallelization as well, for example, the [`http.batch()`](https://k6.io/docs/javascript-api/k6-http/batch-requests) function (which allows a single VU to make multiple simultaneous HTTP requests like a browser/real user would) or the [websocket](https://k6.io/docs/javascript-api/k6-ws) support.
 
