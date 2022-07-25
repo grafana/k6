@@ -655,6 +655,7 @@ func TestErrors(t *testing.T) {
 		Dialer: tb.Dialer,
 		Options: lib.Options{
 			SystemTags: &metrics.DefaultSystemTagSet,
+			Throw:      null.BoolFrom(true),
 		},
 		Samples:        samples,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
@@ -1287,4 +1288,41 @@ func TestCookieJar(t *testing.T) {
 	require.NoError(t, err)
 
 	assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(ts.samples), "", sr("WSBIN_URL/ws-echo-someheader"), statusProtocolSwitch, "")
+}
+
+func TestWithoutThrowError(t *testing.T) {
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	root, err := lib.NewGroup("", nil)
+	require.NoError(t, err)
+
+	rt := goja.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	samples := make(chan metrics.SampleContainer, 1000)
+	state := &lib.State{
+		Group:  root,
+		Dialer: tb.Dialer,
+		Options: lib.Options{
+			SystemTags: &metrics.DefaultSystemTagSet,
+			Throw:      null.BoolFrom(false),
+		},
+		Samples:        samples,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
+		Tags:           lib.NewTagMap(nil),
+	}
+
+	m := New().NewModuleInstance(&modulestest.VU{
+		CtxField:     context.Background(),
+		InitEnvField: &common.InitEnvironment{},
+		RuntimeField: rt,
+		StateField:   state,
+	})
+	require.NoError(t, rt.Set("ws", m.Exports().Default))
+	_, err = rt.RunString(`
+		var res = ws.connect("INVALID", function(socket){
+			socket.on("open", function() {
+				socket.close();
+			});
+		});
+		`)
+	assert.NoError(t, err)
 }
