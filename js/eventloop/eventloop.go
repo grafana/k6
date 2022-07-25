@@ -71,19 +71,19 @@ func (e *EventLoop) RegisterCallback() func(func() error) { // TODO: remove
 // script iteration.
 //
 // ReservePendingCallback() *must* be called from the main runtime thread, but
-// its result scheduleOnMainThread() is thread-safe and can be called from any
-// goroutine. scheduleOnMainThread() ensures that its callback parameter is
-// added to the VU runtime's tasks queue, to be executed on the main runtime
-// thread eventually, when the VU is done with the other tasks before it. Unless
-// the whole event loop has been stopped, invoking scheduleOnMainThread() will
-// queue its argument and "wake up" the loop (if it was idle, but not stopped).
+// its result queueCallback() is thread-safe and can be called from any
+// goroutine. queueCallback() ensures that its callback parameter is added to
+// the VU runtime's tasks queue, to be executed on the main runtime thread
+// eventually, when the VU is done with the other tasks before it. Unless the
+// whole event loop has been stopped, invoking queueCallback() will queue its
+// argument and "wake up" the loop (if it was idle, but not stopped).
 //
 // Keep in mind that once you call ReservePendingCallback(), you *must* also
-// call scheduleOnMainThread() exactly once, even if don't actually need to run
-// any code on the main thread. If that's the case, you can pass an empty no-op
+// call queueCallback() exactly once, even if don't actually need to run any
+// code on the main thread. If that's the case, you can pass an empty no-op
 // callback to it, but you must call it! The event loop will wait for the
-// scheduleOnMainThread() invocation and the k6 iteration won't finish and will
-// be stuck until the VU itself has been stopped (e.g. because the whole test or
+// queueCallback() invocation and the k6 iteration won't finish and will be
+// stuck until the VU itself has been stopped (e.g. because the whole test or
 // scenario has ended). Any error returned by any callback on the main thread
 // will abort the current iteration and no further event loop callbacks will be
 // executed this iteration.
@@ -91,7 +91,7 @@ func (e *EventLoop) RegisterCallback() func(func() error) { // TODO: remove
 // A common pattern for async work is something like this:
 //
 //    func doAsyncWork(vu modules.VU) *goja.Promise {
-//        scheduleOnMainThread := vu.ReservePendingCallback()
+//        queueCallback := vu.ReservePendingCallback()
 //        p, resolve, reject := vu.Runtime().NewPromise()
 //
 //        // Do the actual async work in a new independent goroutine, but make
@@ -100,7 +100,7 @@ func (e *EventLoop) RegisterCallback() func(func() error) { // TODO: remove
 //            // Also make sure to abort early if the context is cancelled, so
 //            // the VU is not stuck when the scenario ends or Ctrl+C is used:
 //            result, err := doTheActualAsyncWork(vu.Context())
-//            scheduleOnMainThread(func() error {
+//            queueCallback(func() error {
 //                if err != nil {
 //                    reject(err)
 //                } else {
@@ -117,7 +117,7 @@ func (e *EventLoop) RegisterCallback() func(func() error) { // TODO: remove
 // is immediately returned and the main thread resumes execution. It also
 // ensures that the Promise resolution happens safely back on the main thread
 // once the async work is done, as required by goja and all other JS runtimes.
-func (e *EventLoop) ReservePendingCallback() (scheduleOnMainThread func(callback func() error)) {
+func (e *EventLoop) ReservePendingCallback() (queueCallback func(func() error)) {
 	e.lock.Lock()
 	var callbackCalled bool
 	e.registeredCallbacks++
