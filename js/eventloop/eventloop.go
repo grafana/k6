@@ -89,9 +89,9 @@ func (e *EventLoop) RegisterCallback() func(func() error) { // TODO: remove
 //
 // A common pattern for async work is something like this:
 //
-//    func doAsyncWork() *goja.Promise {
+//    func doAsyncWork(vu modules.VU) *goja.Promise {
 //        addToMainThreadQueue := vu.RegisterPendingCallback()
-//        p, resolve, reject := runtime.NewPromise()
+//        p, resolve, reject := vu.Runtime().NewPromise()
 //
 //        // Do the actual async work in a new independent goroutine, but make
 //        // sure that the Promise resolution is done on the main thread:
