@@ -83,7 +83,9 @@ func (e *EventLoop) RegisterCallback() func(func() error) { // TODO: remove
 // callback to it, but you must call it! The event loop will wait for the
 // addToMainThreadQueue() invocation and the k6 iteration won't finish and will
 // be stuck until the VU itself has been stopped (e.g. because the whole test or
-// scenario has ended).
+// scenario has ended). Any error returned by any callback on the main thread
+// will abort the current iteration and no further event loop callbacks will be
+// executed this iteration.
 //
 // A common pattern for async work is something like this:
 //
@@ -91,6 +93,8 @@ func (e *EventLoop) RegisterCallback() func(func() error) { // TODO: remove
 //        addToMainThreadQueue := vu.RegisterPendingCallback()
 //        p, resolve, reject := runtime.NewPromise()
 //
+//        // Do the actual async work in a new independent goroutine, but make
+//        // sure that the Promise resolution is done on the main thread:
 //        go func() {
 //            result, err := doTheActualAsyncWork()
 //            addToMainThreadQueue(func() error {
@@ -99,7 +103,7 @@ func (e *EventLoop) RegisterCallback() func(func() error) { // TODO: remove
 //                } else {
 //                    resolve(result)
 //                }
-//                return nil
+//                return nil  // do not abort the iteration
 //            })
 //        }()
 //
