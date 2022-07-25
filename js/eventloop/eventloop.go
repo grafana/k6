@@ -96,7 +96,9 @@ func (e *EventLoop) RegisterCallback() func(func() error) { // TODO: remove
 //        // Do the actual async work in a new independent goroutine, but make
 //        // sure that the Promise resolution is done on the main thread:
 //        go func() {
-//            result, err := doTheActualAsyncWork()
+//            // Also make sure to abort early if the context is cancelled, so
+//            // the VU is not stuck when the scenario ends or Ctrl+C is used:
+//            result, err := doTheActualAsyncWork(vu.Context())
 //            addToMainThreadQueue(func() error {
 //                if err != nil {
 //                    reject(err)
