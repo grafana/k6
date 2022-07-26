@@ -1345,8 +1345,11 @@ func TestWSConnectWithThrowErrorOption(t *testing.T) {
 				socket.close();
 			});
 		});
+		if (res == null && res.error == null) {
+			throw new Error("res.error is expected to be not null");
+		}
 		`)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		entries := logHook.Drain()
 		require.Len(t, entries, 1)
 		assert.Contains(t, entries[0].Message, "Attempt to establish a WebSocket connection failed")
