@@ -34,6 +34,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -42,6 +43,7 @@ import (
 	httpModule "go.k6.io/k6/js/modules/k6/http"
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	"go.k6.io/k6/metrics"
 )
@@ -1290,10 +1292,15 @@ func TestCookieJar(t *testing.T) {
 	assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(ts.samples), "", sr("WSBIN_URL/ws-echo-someheader"), statusProtocolSwitch, "")
 }
 
-func TestWsWithThrowOptionError(t *testing.T) {
+func TestWSConnectWithThrowErrorOption(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	root, err := lib.NewGroup("", nil)
 	require.NoError(t, err)
+
+	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+	testLog := logrus.New()
+	testLog.AddHook(logHook)
+	testLog.SetOutput(io.Discard)
 
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
@@ -1307,6 +1314,7 @@ func TestWsWithThrowOptionError(t *testing.T) {
 		Samples:        samples,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
 		Tags:           lib.NewTagMap(nil),
+		Logger:         testLog,
 	}
 
 	m := New().NewModuleInstance(&modulestest.VU{
@@ -1317,7 +1325,7 @@ func TestWsWithThrowOptionError(t *testing.T) {
 	})
 	require.NoError(t, rt.Set("ws", m.Exports().Default))
 
-	t.Run("enable_throw_error", func(t *testing.T) {
+	t.Run("ThrowEnabled", func(t *testing.T) {
 		state.Options.Throw = null.BoolFrom(true)
 		_, err = rt.RunString(`
 		var res = ws.connect("INVALID", function(socket){
@@ -1329,7 +1337,7 @@ func TestWsWithThrowOptionError(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("disable_throw_error", func(t *testing.T) {
+	t.Run("ThrowDisabled", func(t *testing.T) {
 		state.Options.Throw = null.BoolFrom(false)
 		_, err = rt.RunString(`
 		var res = ws.connect("INVALID", function(socket){
@@ -1337,10 +1345,10 @@ func TestWsWithThrowOptionError(t *testing.T) {
 				socket.close();
 			});
 		});
-		if (res && res.error) {
-			throw new Error(res.error);
-		}
 		`)
-		assert.Error(t, err)
+		entries := logHook.Drain()
+		require.Len(t, entries, 1)
+		assert.Contains(t, entries[0].Message, "Ws Connection Failed")
+		assert.NoError(t, err)
 	})
 }
