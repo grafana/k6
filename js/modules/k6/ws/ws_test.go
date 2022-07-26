@@ -1293,6 +1293,7 @@ func TestCookieJar(t *testing.T) {
 }
 
 func TestWSConnectWithThrowErrorOption(t *testing.T) {
+	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	root, err := lib.NewGroup("", nil)
 	require.NoError(t, err)
@@ -1326,6 +1327,7 @@ func TestWSConnectWithThrowErrorOption(t *testing.T) {
 	require.NoError(t, rt.Set("ws", m.Exports().Default))
 
 	t.Run("ThrowEnabled", func(t *testing.T) {
+		t.Parallel()
 		state.Options.Throw = null.BoolFrom(true)
 		_, err = rt.RunString(`
 		var res = ws.connect("INVALID", function(socket){
@@ -1338,6 +1340,7 @@ func TestWSConnectWithThrowErrorOption(t *testing.T) {
 	})
 
 	t.Run("ThrowDisabled", func(t *testing.T) {
+		t.Parallel()
 		state.Options.Throw = null.BoolFrom(false)
 		_, err = rt.RunString(`
 		var res = ws.connect("INVALID", function(socket){
