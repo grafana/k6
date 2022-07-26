@@ -1294,42 +1294,18 @@ func TestCookieJar(t *testing.T) {
 
 func TestWSConnectWithThrowErrorOption(t *testing.T) {
 	t.Parallel()
-	tb := httpmultibin.NewHTTPMultiBin(t)
-	root, err := lib.NewGroup("", nil)
-	require.NoError(t, err)
 
 	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
 	testLog.SetOutput(io.Discard)
 
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-	samples := make(chan metrics.SampleContainer, 1000)
-	state := &lib.State{
-		Group:  root,
-		Dialer: tb.Dialer,
-		Options: lib.Options{
-			SystemTags: &metrics.DefaultSystemTagSet,
-		},
-		Samples:        samples,
-		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
-		Tags:           lib.NewTagMap(nil),
-		Logger:         testLog,
-	}
-
-	m := New().NewModuleInstance(&modulestest.VU{
-		CtxField:     context.Background(),
-		InitEnvField: &common.InitEnvironment{},
-		RuntimeField: rt,
-		StateField:   state,
-	})
-	require.NoError(t, rt.Set("ws", m.Exports().Default))
-
 	t.Run("ThrowEnabled", func(t *testing.T) {
 		t.Parallel()
-		state.Options.Throw = null.BoolFrom(true)
-		_, err = rt.RunString(`
+		ts := newTestState(t)
+		ts.state.Logger = testLog
+		ts.state.Options.Throw = null.BoolFrom(true)
+		_, err := ts.rt.RunString(`
 		var res = ws.connect("INVALID", function(socket){
 			socket.on("open", function() {
 				socket.close();
@@ -1341,8 +1317,10 @@ func TestWSConnectWithThrowErrorOption(t *testing.T) {
 
 	t.Run("ThrowDisabled", func(t *testing.T) {
 		t.Parallel()
-		state.Options.Throw = null.BoolFrom(false)
-		_, err = rt.RunString(`
+		ts := newTestState(t)
+		ts.state.Logger = testLog
+		ts.state.Options.Throw = null.BoolFrom(false)
+		_, err := ts.rt.RunString(`
 		var res = ws.connect("INVALID", function(socket){
 			socket.on("open", function() {
 				socket.close();
