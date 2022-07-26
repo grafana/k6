@@ -1348,7 +1348,7 @@ func TestWSConnectWithThrowErrorOption(t *testing.T) {
 		`)
 		entries := logHook.Drain()
 		require.Len(t, entries, 1)
-		assert.Contains(t, entries[0].Message, "Ws Connection Failed")
+		assert.Contains(t, entries[0].Message, "Attempt to establish a WebSocket connection failed")
 		assert.NoError(t, err)
 	})
 }
