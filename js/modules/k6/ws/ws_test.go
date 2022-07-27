@@ -125,6 +125,7 @@ func newTestState(t testing.TB) testState {
 				metrics.TagSubproto,
 			),
 			UserAgent: null.StringFrom("TestUserAgent"),
+			Throw:     null.BoolFrom(true),
 		},
 		Samples:        samples,
 		TLSConfig:      tb.TLSClientConfig,
@@ -1303,8 +1304,6 @@ func TestWSConnectWithThrowErrorOption(t *testing.T) {
 	t.Run("ThrowEnabled", func(t *testing.T) {
 		t.Parallel()
 		ts := newTestState(t)
-		ts.state.Logger = testLog
-		ts.state.Options.Throw = null.BoolFrom(true)
 		_, err := ts.rt.RunString(`
 		var res = ws.connect("INVALID", function(socket){
 			socket.on("open", function() {
