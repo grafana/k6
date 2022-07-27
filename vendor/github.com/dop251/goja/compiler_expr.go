@@ -1615,10 +1615,10 @@ func (e *compiledFunctionLiteral) compile() (prg *Program, name unistring.String
 
 	stashSize, stackSize := s.finaliseVarAlloc(0)
 
-	if stackSize > 0 && thisBinding != nil && thisBinding.inStash {
+	if thisBinding != nil && thisBinding.inStash && (!s.argsInStash || stackSize > 0) {
 		delta++
 		code[preambleLen-delta] = loadStack(0)
-	}
+	} // otherwise, 'this' will be at stack[sp-1], no need to load
 
 	if !s.strict && thisBinding != nil {
 		delta++
