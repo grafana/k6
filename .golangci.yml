@@ -48,13 +48,6 @@ linters-settings:
   funlen:
     lines: 80
     statements: 60
-  goheader:
-    template-path: ".license-template"
-    values:
-      const:
-        year: "2022"
-      regexp:
-        year-range: (\d\d\d\d|{{year}})
 
 linters:
   enable-all: true
