@@ -134,6 +134,7 @@ var (
 		"test/built-ins/BigInt",
 		"test/built-ins/SharedArrayBuffer",
 		"test/language/eval-code/direct/async",
+		"test/language/eval-code/direct/gen-",
 		"test/language/expressions/await",
 		"test/language/expressions/async",
 		"test/language/expressions/dynamic-import",
