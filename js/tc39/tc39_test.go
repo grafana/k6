@@ -297,6 +297,15 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	_ = _262.Set("createRealm", func(goja.FunctionCall) goja.Value {
 		panic(ignorableTestError)
 	})
+	_ = _262.Set("evalScript", func(call goja.FunctionCall) goja.Value {
+		script := call.Argument(0).String()
+		result, err := vm.RunString(script)
+		if err != nil {
+			panic(err)
+		}
+		return result
+	})
+
 	vm.Set("$262", _262)
 	vm.Set("print", t.Log)
 	_, err := vm.RunProgram(sabStub)
