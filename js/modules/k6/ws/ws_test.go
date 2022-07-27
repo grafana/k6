@@ -1293,33 +1293,37 @@ func TestCookieJar(t *testing.T) {
 	assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(ts.samples), "", sr("WSBIN_URL/ws-echo-someheader"), statusProtocolSwitch, "")
 }
 
-func TestWSConnectWithThrowErrorOption(t *testing.T) {
+func TestWSConnectEnableThrowErrorOption(t *testing.T) {
 	t.Parallel()
-
 	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
 	testLog.SetOutput(io.Discard)
-
-	t.Run("ThrowEnabled", func(t *testing.T) {
-		t.Parallel()
-		ts := newTestState(t)
-		_, err := ts.rt.RunString(`
+	ts := newTestState(t)
+	ts.state.Logger = testLog
+	_, err := ts.rt.RunString(`
 		var res = ws.connect("INVALID", function(socket){
 			socket.on("open", function() {
 				socket.close();
 			});
 		});
 		`)
-		assert.Error(t, err)
-	})
+	entries := logHook.Drain()
+	require.Len(t, entries, 0)
+	assert.Error(t, err)
+}
 
-	t.Run("ThrowDisabled", func(t *testing.T) {
-		t.Parallel()
-		ts := newTestState(t)
-		ts.state.Logger = testLog
-		ts.state.Options.Throw = null.BoolFrom(false)
-		_, err := ts.rt.RunString(`
+func TestWSConnectDisableThrowErrorOption(t *testing.T) {
+	t.Parallel()
+	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+	testLog := logrus.New()
+	testLog.AddHook(logHook)
+	testLog.SetOutput(io.Discard)
+
+	ts := newTestState(t)
+	ts.state.Logger = testLog
+	ts.state.Options.Throw = null.BoolFrom(false)
+	_, err := ts.rt.RunString(`
 		var res = ws.connect("INVALID", function(socket){
 			socket.on("open", function() {
 				socket.close();
@@ -1329,9 +1333,8 @@ func TestWSConnectWithThrowErrorOption(t *testing.T) {
 			throw new Error("res.error is expected to be not null");
 		}
 		`)
-		assert.NoError(t, err)
-		entries := logHook.Drain()
-		require.Len(t, entries, 1)
-		assert.Contains(t, entries[0].Message, "Attempt to establish a WebSocket connection failed")
-	})
+	assert.NoError(t, err)
+	entries := logHook.Drain()
+	require.Len(t, entries, 1)
+	assert.Contains(t, entries[0].Message, "Attempt to establish a WebSocket connection failed")
 }
