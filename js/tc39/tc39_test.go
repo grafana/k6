@@ -85,6 +85,7 @@ var (
 		"SharedArrayBuffer",
 		"error-cause",
 		"resizable-arraybuffer", // stage 3 as of 2021 https://github.com/tc39/proposal-resizablearraybuffer
+		"hashbang",              // #comments in js - not implemented https://github.com/tc39/proposal-hashbang
 
 		"array-find-from-last",    // stage 3 as of 2021 https://github.com/tc39/proposal-array-find-from-last
 		"Array.prototype.at",      // stage 3 as of 2021 https://github.com/tc39/proposal-relative-indexing-method
