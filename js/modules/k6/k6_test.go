@@ -211,7 +211,6 @@ func checkTestRuntime(t testing.TB) (*goja.Runtime, chan metrics.SampleContainer
 	rt := goja.New()
 
 	test := modulestest.NewRuntime(t)
-	test.SetInitContext(&common.InitEnvironment{})
 	m, ok := New().NewModuleInstance(test.VU).(*K6)
 	require.True(t, ok)
 	require.NoError(t, rt.Set("k6", m.Exports().Named))
