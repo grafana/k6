@@ -86,7 +86,7 @@ func (e *EventLoop) RegisterCallback() func(func() error) { // TODO: remove
 // stuck until the VU itself has been stopped (e.g. because the whole test or
 // scenario has ended). Any error returned by any callback on the main thread
 // will abort the current iteration and no further event loop callbacks will be
-// executed this iteration.
+// executed in the same iteration.
 //
 // A common pattern for async work is something like this:
 //
