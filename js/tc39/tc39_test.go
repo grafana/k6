@@ -123,6 +123,7 @@ var (
 		"test/annexB/built-ins/String/prototype/sup",
 
 		"test/annexB/built-ins/RegExp/legacy-accessors/",
+		"test/language/literals/string/legacy-", // legecy string escapes
 
 		// Async/Promise and other totally unsupported functionality
 		"test/built-ins/AsyncArrowFunction",
