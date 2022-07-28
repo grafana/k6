@@ -202,6 +202,8 @@ var (
 
 		"test/built-ins/Object/prototype/__lookup", // AnnexB lookupGetter lookupSetter
 		"test/built-ins/Object/prototype/__define", // AnnexB defineGetter defineSetter
+
+		"test/language/module-code/", // this requires that we rewrite the js package in a way that it can this tests - which is unlikely to ever happen
 	}
 )
 
