@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
-	"os"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -293,6 +292,7 @@ func TestConsoleLevels(t *testing.T) {
 func TestFileConsole(t *testing.T) {
 	t.Parallel()
 	var (
+		afs    = afero.NewOsFs()
 		levels = map[string]logrus.Level{
 			"log":   logrus.InfoLevel,
 			"debug": logrus.DebugLevel,
@@ -325,16 +325,16 @@ func TestFileConsole(t *testing.T) {
 					for msg, deleteFile := range preExisting {
 						t.Run(msg, func(t *testing.T) {
 							t.Parallel()
-							f, err := ioutil.TempFile("", "")
+							f, err := afero.TempFile(afs, "", "")
 							if err != nil {
 								t.Fatalf("Couldn't create temporary file for testing: %s", err)
 							}
 							logFilename := f.Name()
-							defer os.Remove(logFilename)
+							defer afs.Remove(logFilename)
 							// close it as we will want to reopen it and maybe remove it
 							if deleteFile {
 								f.Close()
-								if err := os.Remove(logFilename); err != nil {
+								if err := afs.Remove(logFilename); err != nil {
 									t.Fatalf("Couldn't remove tempfile: %s", err)
 								}
 							} else {
@@ -374,7 +374,7 @@ func TestFileConsole(t *testing.T) {
 							require.NoError(t, err)
 
 							// Test if the file was created.
-							_, err = os.Stat(logFilename)
+							_, err = afs.Stat(logFilename)
 							require.NoError(t, err)
 
 							entry := hook.LastEntry()
@@ -393,7 +393,7 @@ func TestFileConsole(t *testing.T) {
 							entryStr, err := entry.String()
 							require.NoError(t, err)
 
-							f, err = os.Open(logFilename) //nolint:gosec
+							f, err = afs.Open(logFilename) //nolint:gosec
 							require.NoError(t, err)
 
 							fileContent, err := ioutil.ReadAll(f)

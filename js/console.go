@@ -27,6 +27,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 )
 
 // console represents a JS console implemented as a logrus.Logger.
@@ -41,7 +42,8 @@ func newConsole(logger logrus.FieldLogger) *console {
 
 // Creates a console logger with its output set to the file at the provided `filepath`.
 func newFileConsole(filepath string, formatter logrus.Formatter) (*console, error) {
-	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644) //nolint:gosec
+	aferoOs := afero.NewOsFs()
+	f, err := aferoOs.OpenFile(filepath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
