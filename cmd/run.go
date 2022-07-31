@@ -86,12 +86,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	runCtx, runCancel := context.WithCancel(lingerCtx)
 	defer runCancel()
 
-	logger := c.gs.logger
+	logger := test.runtimeState.Logger
 	// Create a local execution scheduler wrapping the runner.
 	logger.Debug("Initializing the execution scheduler...")
-	execScheduler, err := local.NewExecutionScheduler(
-		test.initRunner, test.runtimeState.BuiltinMetrics, logger,
-	)
+	execScheduler, err := local.NewExecutionScheduler(test.initRunner, test.runtimeState)
 	if err != nil {
 		return err
 	}

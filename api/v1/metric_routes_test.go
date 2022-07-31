@@ -26,7 +26,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -34,7 +33,6 @@ import (
 	"go.k6.io/k6/core"
 	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/minirunner"
 	"go.k6.io/k6/metrics"
 )
@@ -42,15 +40,12 @@ import (
 func TestGetMetrics(t *testing.T) {
 	t.Parallel()
 
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	testMetric, err := registry.NewMetric("my_metric", metrics.Trend, metrics.Time)
+	rs := getRuntimeState(t)
+	testMetric, err := rs.Registry.NewMetric("my_metric", metrics.Trend, metrics.Time)
 	require.NoError(t, err)
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, builtinMetrics, logger)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, rs)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, rs.RuntimeOptions, nil, rs.Logger, rs.Registry)
 	require.NoError(t, err)
 
 	engine.MetricsEngine.ObservedMetrics = map[string]*metrics.Metric{
@@ -104,15 +99,12 @@ func TestGetMetrics(t *testing.T) {
 func TestGetMetric(t *testing.T) {
 	t.Parallel()
 
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
-	registry := metrics.NewRegistry()
-	testMetric, err := registry.NewMetric("my_metric", metrics.Trend, metrics.Time)
+	rs := getRuntimeState(t)
+	testMetric, err := rs.Registry.NewMetric("my_metric", metrics.Trend, metrics.Time)
 	require.NoError(t, err)
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, builtinMetrics, logger)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, rs)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, rs.RuntimeOptions, nil, rs.Logger, rs.Registry)
 	require.NoError(t, err)
 
 	engine.MetricsEngine.ObservedMetrics = map[string]*metrics.Metric{

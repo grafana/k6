@@ -53,6 +53,16 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
+func getRuntimeState(tb testing.TB) *lib.RuntimeState {
+	reg := metrics.NewRegistry()
+	return &lib.RuntimeState{
+		Logger:         testutils.NewLogger(tb),
+		RuntimeOptions: lib.RuntimeOptions{},
+		Registry:       reg,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(reg),
+	}
+}
+
 func newTestExecutionScheduler(
 	t *testing.T, runner lib.Runner, logger *logrus.Logger, opts lib.Options,
 ) (ctx context.Context, cancel func(), execScheduler *ExecutionScheduler, samples chan metrics.SampleContainer) {
@@ -68,14 +78,12 @@ func newTestExecutionScheduler(
 
 	require.NoError(t, runner.SetOptions(newOpts))
 
-	if logger == nil {
-		logger = logrus.New()
-		logger.SetOutput(testutils.NewTestOutput(t))
+	rs := getRuntimeState(t)
+	if logger != nil {
+		rs.Logger = logger
 	}
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 
-	execScheduler, err = NewExecutionScheduler(runner, builtinMetrics, logger)
+	execScheduler, err = NewExecutionScheduler(runner, rs)
 	require.NoError(t, err)
 
 	samples = make(chan metrics.SampleContainer, newOpts.MetricSamplesBufferSize.Int64)
@@ -129,21 +137,14 @@ func TestExecutionSchedulerRunNonDefault(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			logger := logrus.New()
-			logger.SetOutput(testutils.NewTestOutput(t))
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			rs := getRuntimeState(t)
 			runner, err := js.New(
-				&lib.RuntimeState{
-					Logger:         logger,
-					BuiltinMetrics: builtinMetrics,
-					Registry:       registry,
-				}, &loader.SourceData{
+				rs, &loader.SourceData{
 					URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script),
 				}, nil)
 			require.NoError(t, err)
 
-			execScheduler, err := NewExecutionScheduler(runner, builtinMetrics, logger)
+			execScheduler, err := NewExecutionScheduler(runner, rs)
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -244,23 +245,17 @@ func TestExecutionSchedulerRunEnv(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			logger := logrus.New()
-			logger.SetOutput(testutils.NewTestOutput(t))
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			rs := getRuntimeState(t)
+			rs.RuntimeOptions = lib.RuntimeOptions{Env: map[string]string{"TESTVAR": "global"}}
 			runner, err := js.New(
-				&lib.RuntimeState{
-					Logger:         logger,
-					BuiltinMetrics: builtinMetrics,
-					Registry:       registry,
-					RuntimeOptions: lib.RuntimeOptions{Env: map[string]string{"TESTVAR": "global"}},
-				}, &loader.SourceData{
+				rs, &loader.SourceData{
 					URL:  &url.URL{Path: "/script.js"},
 					Data: []byte(tc.script),
-				}, nil)
+				}, nil,
+			)
 			require.NoError(t, err)
 
-			execScheduler, err := NewExecutionScheduler(runner, builtinMetrics, logger)
+			execScheduler, err := NewExecutionScheduler(runner, rs)
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -316,16 +311,9 @@ func TestExecutionSchedulerSystemTags(t *testing.T) {
 		http.get("HTTPBIN_IP_URL/");
 	}`)
 
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	rs := getRuntimeState(t)
 	runner, err := js.New(
-		&lib.RuntimeState{
-			Logger:         logger,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, &loader.SourceData{
+		rs, &loader.SourceData{
 			URL:  &url.URL{Path: "/script.js"},
 			Data: []byte(script),
 		}, nil)
@@ -335,7 +323,7 @@ func TestExecutionSchedulerSystemTags(t *testing.T) {
 		SystemTags: &metrics.DefaultSystemTagSet,
 	})))
 
-	execScheduler, err := NewExecutionScheduler(runner, builtinMetrics, logger)
+	execScheduler, err := NewExecutionScheduler(runner, rs)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -460,25 +448,16 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			logger := logrus.New()
-			logger.SetOutput(testutils.NewTestOutput(t))
-
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			rs := getRuntimeState(t)
 			runner, err := js.New(
-				&lib.RuntimeState{
-					Logger:         logger,
-					BuiltinMetrics: builtinMetrics,
-					Registry:       registry,
-				},
-				&loader.SourceData{
+				rs, &loader.SourceData{
 					URL:  &url.URL{Path: "/script.js"},
 					Data: []byte(tc.script),
-				},
-				nil)
+				}, nil,
+			)
 			require.NoError(t, err)
 
-			execScheduler, err := NewExecutionScheduler(runner, builtinMetrics, logger)
+			execScheduler, err := NewExecutionScheduler(runner, rs)
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -629,25 +608,19 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 		});
 	}
 `)
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
 
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	rs := getRuntimeState(t)
+	rs.RuntimeOptions.Env = map[string]string{"TESTGLOBALVAR": "global"}
 	runner, err := js.New(
-		&lib.RuntimeState{
-			Logger:         logger,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-			RuntimeOptions: lib.RuntimeOptions{Env: map[string]string{"TESTGLOBALVAR": "global"}},
-		}, &loader.SourceData{
+		rs, &loader.SourceData{
 			URL:  &url.URL{Path: "/script.js"},
 			Data: []byte(script),
 		},
-		nil)
+		nil,
+	)
 	require.NoError(t, err)
 
-	execScheduler, err := NewExecutionScheduler(runner, builtinMetrics, logger)
+	execScheduler, err := NewExecutionScheduler(runner, rs)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -975,12 +948,8 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
-
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	execScheduler, err := NewExecutionScheduler(runner, builtinMetrics, logger)
+	rs := getRuntimeState(t)
+	execScheduler, err := NewExecutionScheduler(runner, rs)
 	require.NoError(t, err)
 
 	samples := make(chan metrics.SampleContainer, 300)
@@ -1170,17 +1139,8 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		counter.add(6, { place: "defaultAfterSleep" });
 	}`)
 
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
-
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	runner, err := js.New(
-		&lib.RuntimeState{
-			Logger:         logger,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
+	rs := getRuntimeState(t)
+	runner, err := js.New(rs, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
 	require.NoError(t, err)
 
 	options, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions().Apply(lib.Options{
@@ -1193,7 +1153,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, runner.SetOptions(options))
 
-	execScheduler, err := NewExecutionScheduler(runner, builtinMetrics, logger)
+	execScheduler, err := NewExecutionScheduler(runner, rs)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1216,7 +1176,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 			case sampleContainer := <-sampleContainers:
 				gotVus := false
 				for _, s := range sampleContainer.GetSamples() {
-					if s.Metric == builtinMetrics.VUs || s.Metric == builtinMetrics.VUsMax {
+					if s.Metric == rs.BuiltinMetrics.VUs || s.Metric == rs.BuiltinMetrics.VUsMax {
 						gotVus = true
 						break
 					}
@@ -1260,7 +1220,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		}
 		return metrics.IntoSampleTags(&tags)
 	}
-	testCounter, err := registry.NewMetric("test_counter", metrics.Counter)
+	testCounter, err := rs.Registry.NewMetric("test_counter", metrics.Counter)
 	require.NoError(t, err)
 	getSample := func(expValue float64, expMetric *metrics.Metric, expTags ...string) metrics.SampleContainer {
 		return metrics.Sample{
@@ -1277,7 +1237,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 			net.Dialer{},
 			netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
 		).GetTrail(time.Now(), time.Now(),
-			true, emitIterations, getTags(expTags...), builtinMetrics)
+			true, emitIterations, getTags(expTags...), rs.BuiltinMetrics)
 	}
 
 	// Initially give a long time (5s) for the execScheduler to start
@@ -1323,12 +1283,7 @@ func TestSetPaused(t *testing.T) {
 	t.Parallel()
 	t.Run("second pause is an error", func(t *testing.T) {
 		t.Parallel()
-		runner := &minirunner.MiniRunner{}
-		logger := logrus.New()
-		logger.SetOutput(testutils.NewTestOutput(t))
-		registry := metrics.NewRegistry()
-		builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-		sched, err := NewExecutionScheduler(runner, builtinMetrics, logger)
+		sched, err := NewExecutionScheduler(&minirunner.MiniRunner{}, getRuntimeState(t))
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 
@@ -1340,12 +1295,7 @@ func TestSetPaused(t *testing.T) {
 
 	t.Run("unpause at the start is an error", func(t *testing.T) {
 		t.Parallel()
-		runner := &minirunner.MiniRunner{}
-		logger := logrus.New()
-		logger.SetOutput(testutils.NewTestOutput(t))
-		registry := metrics.NewRegistry()
-		builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-		sched, err := NewExecutionScheduler(runner, builtinMetrics, logger)
+		sched, err := NewExecutionScheduler(&minirunner.MiniRunner{}, getRuntimeState(t))
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 		err = sched.SetPaused(false)
@@ -1355,12 +1305,7 @@ func TestSetPaused(t *testing.T) {
 
 	t.Run("second unpause is an error", func(t *testing.T) {
 		t.Parallel()
-		runner := &minirunner.MiniRunner{}
-		logger := logrus.New()
-		logger.SetOutput(testutils.NewTestOutput(t))
-		registry := metrics.NewRegistry()
-		builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-		sched, err := NewExecutionScheduler(runner, builtinMetrics, logger)
+		sched, err := NewExecutionScheduler(&minirunner.MiniRunner{}, getRuntimeState(t))
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 		require.NoError(t, sched.SetPaused(true))
@@ -1372,12 +1317,7 @@ func TestSetPaused(t *testing.T) {
 
 	t.Run("an error on pausing is propagated", func(t *testing.T) {
 		t.Parallel()
-		runner := &minirunner.MiniRunner{}
-		logger := logrus.New()
-		logger.SetOutput(testutils.NewTestOutput(t))
-		registry := metrics.NewRegistry()
-		builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-		sched, err := NewExecutionScheduler(runner, builtinMetrics, logger)
+		sched, err := NewExecutionScheduler(&minirunner.MiniRunner{}, getRuntimeState(t))
 		require.NoError(t, err)
 		expectedErr := errors.New("testing pausable executor error")
 		sched.executors = []lib.Executor{pausableExecutor{err: expectedErr}}
@@ -1396,11 +1336,7 @@ func TestSetPaused(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, runner.SetOptions(options))
 
-		logger := logrus.New()
-		logger.SetOutput(testutils.NewTestOutput(t))
-		registry := metrics.NewRegistry()
-		builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-		sched, err := NewExecutionScheduler(runner, builtinMetrics, logger)
+		sched, err := NewExecutionScheduler(runner, getRuntimeState(t))
 		require.NoError(t, err)
 		err = sched.SetPaused(true)
 		require.Error(t, err)
@@ -1445,24 +1381,16 @@ func TestNewExecutionSchedulerHasWork(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
-
 	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	runner, err := js.New(
-		&lib.RuntimeState{
-			Logger:         logger,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		},
-		&loader.SourceData{
-			URL:  &url.URL{Path: "/script.js"},
-			Data: script,
-		},
-		nil,
-	)
+	rs := &lib.RuntimeState{
+		Logger:         logger,
+		Registry:       registry,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+	}
+	runner, err := js.New(rs, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
 	require.NoError(t, err)
 
-	execScheduler, err := NewExecutionScheduler(runner, builtinMetrics, logger)
+	execScheduler, err := NewExecutionScheduler(runner, rs)
 	require.NoError(t, err)
 
 	assert.Len(t, execScheduler.executors, 2)

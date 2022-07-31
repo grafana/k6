@@ -7,7 +7,10 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
-// RuntimeState represents what is mostly needed during the running of a test
+// RuntimeState represents what is mostly needed during the running of a test.
+//
+// TODO: since this has nothing to do with the goja JS "runtime", maybe we
+// should rename it to something more appropriate? e.g. TestRunState?
 type RuntimeState struct {
 	RuntimeOptions RuntimeOptions
 	// TODO maybe have a struct `Metrics` with `Registry` and `Builtin` ?
