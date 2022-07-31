@@ -142,19 +142,23 @@ func TestSetupData(t *testing.T) {
 				piState, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: testCase.script}, nil,
 			)
 			require.NoError(t, err)
-			runner.SetOptions(lib.Options{
+			require.NoError(t, runner.SetOptions(lib.Options{
 				Paused:          null.BoolFrom(true),
 				VUs:             null.IntFrom(2),
 				Iterations:      null.IntFrom(3),
 				NoSetup:         null.BoolFrom(true),
 				SetupTimeout:    types.NullDurationFrom(5 * time.Second),
 				TeardownTimeout: types.NullDurationFrom(5 * time.Second),
-			})
-			execScheduler, err := local.NewExecutionScheduler(runner, piState)
+			}))
+			testState := &lib.TestRunState{
+				TestPreInitState: piState,
+				Options:          runner.GetOptions(),
+				Runner:           runner,
+			}
+
+			execScheduler, err := local.NewExecutionScheduler(testState)
 			require.NoError(t, err)
-			engine, err := core.NewEngine(
-				execScheduler, runner.GetOptions(), piState.RuntimeOptions, nil, piState.Logger, piState.Registry,
-			)
+			engine, err := core.NewEngine(testState, execScheduler, nil)
 			require.NoError(t, err)
 
 			require.NoError(t, engine.OutputManager.StartOutputs())

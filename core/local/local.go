@@ -40,7 +40,7 @@ import (
 type ExecutionScheduler struct {
 	runner       lib.Runner
 	options      lib.Options
-	preInitState *lib.TestPreInitState
+	testRunState *lib.TestRunState
 
 	initProgress    *pb.ProgressBar
 	executorConfigs []lib.ExecutorConfig // sorted by (startTime, ID)
@@ -62,8 +62,8 @@ var _ lib.ExecutionScheduler = &ExecutionScheduler{}
 // instance, without initializing it beyond the bare minimum. Specifically, it
 // creates the needed executor instances and a lot of state placeholders, but it
 // doesn't initialize the executors and it doesn't initialize or run VUs.
-func NewExecutionScheduler(runner lib.Runner, piState *lib.TestPreInitState) (*ExecutionScheduler, error) {
-	options := runner.GetOptions()
+func NewExecutionScheduler(trs *lib.TestRunState) (*ExecutionScheduler, error) {
+	options := trs.Options
 	et, err := lib.NewExecutionTuple(options.ExecutionSegment, options.ExecutionSegmentSequence)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func NewExecutionScheduler(runner lib.Runner, piState *lib.TestPreInitState) (*E
 	maxPlannedVUs := lib.GetMaxPlannedVUs(executionPlan)
 	maxPossibleVUs := lib.GetMaxPossibleVUs(executionPlan)
 
-	executionState := lib.NewExecutionState(options, et, piState.BuiltinMetrics, maxPlannedVUs, maxPossibleVUs)
+	executionState := lib.NewExecutionState(options, et, trs.BuiltinMetrics, maxPlannedVUs, maxPossibleVUs)
 	maxDuration, _ := lib.GetEndOffset(executionPlan) // we don't care if the end offset is final
 
 	executorConfigs := options.Scenarios.GetSortedConfigs()
@@ -80,13 +80,13 @@ func NewExecutionScheduler(runner lib.Runner, piState *lib.TestPreInitState) (*E
 	// Only take executors which have work.
 	for _, sc := range executorConfigs {
 		if !sc.HasWork(et) {
-			piState.Logger.Warnf(
+			trs.Logger.Warnf(
 				"Executor '%s' is disabled for segment %s due to lack of work!",
 				sc.GetName(), options.ExecutionSegment,
 			)
 			continue
 		}
-		s, err := sc.NewExecutor(executionState, piState.Logger.WithFields(logrus.Fields{
+		s, err := sc.NewExecutor(executionState, trs.Logger.WithFields(logrus.Fields{
 			"scenario": sc.GetName(),
 			"executor": sc.GetType(),
 		}))
@@ -103,9 +103,9 @@ func NewExecutionScheduler(runner lib.Runner, piState *lib.TestPreInitState) (*E
 	}
 
 	return &ExecutionScheduler{
-		runner:       runner,
-		preInitState: piState,
+		runner:       trs.Runner,
 		options:      options,
+		testRunState: trs,
 
 		initProgress:    pb.New(pb.WithConstLeft("Init")),
 		executors:       executors,
@@ -231,7 +231,7 @@ func (e *ExecutionScheduler) initVUsConcurrently(
 }
 
 func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- metrics.SampleContainer) {
-	e.preInitState.Logger.Debug("Starting emission of VUs and VUsMax metrics...")
+	e.testRunState.Logger.Debug("Starting emission of VUs and VUsMax metrics...")
 
 	emitMetrics := func() {
 		t := time.Now()
@@ -259,7 +259,7 @@ func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- me
 	go func() {
 		defer func() {
 			ticker.Stop()
-			e.preInitState.Logger.Debug("Metrics emission of VUs and VUsMax metrics stopped")
+			e.testRunState.Logger.Debug("Metrics emission of VUs and VUsMax metrics stopped")
 			close(e.vusEmissionStopped)
 		}()
 
@@ -281,7 +281,7 @@ func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- me
 func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- metrics.SampleContainer) error {
 	e.emitVUsAndVUsMax(ctx, samplesOut)
 
-	logger := e.preInitState.Logger.WithField("phase", "local-execution-scheduler-init")
+	logger := e.testRunState.Logger.WithField("phase", "local-execution-scheduler-init")
 	vusToInitialize := lib.GetMaxPlannedVUs(e.executionPlan)
 	logger.WithFields(logrus.Fields{
 		"neededVUs":      vusToInitialize,
@@ -348,7 +348,7 @@ func (e *ExecutionScheduler) runExecutor(
 ) {
 	executorConfig := executor.GetConfig()
 	executorStartTime := executorConfig.GetStartTime()
-	executorLogger := e.preInitState.Logger.WithFields(logrus.Fields{
+	executorLogger := e.testRunState.Logger.WithFields(logrus.Fields{
 		"executor":  executorConfig.GetName(),
 		"type":      executorConfig.GetType(),
 		"startTime": executorStartTime,
@@ -400,7 +400,7 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut ch
 	}()
 
 	executorsCount := len(e.executors)
-	logger := e.preInitState.Logger.WithField("phase", "local-execution-scheduler-run")
+	logger := e.testRunState.Logger.WithField("phase", "local-execution-scheduler-run")
 	e.initProgress.Modify(pb.WithConstLeft("Run"))
 	var interrupted bool
 	defer func() {
@@ -497,7 +497,7 @@ func (e *ExecutionScheduler) SetPaused(pause bool) error {
 		if pause {
 			return fmt.Errorf("execution is already paused")
 		}
-		e.preInitState.Logger.Debug("Starting execution")
+		e.testRunState.Logger.Debug("Starting execution")
 		return e.state.Resume()
 	}
 

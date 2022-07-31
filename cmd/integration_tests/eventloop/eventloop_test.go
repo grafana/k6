@@ -50,7 +50,13 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 	require.Empty(t, newOpts.Validate())
 	require.NoError(t, runner.SetOptions(newOpts))
 
-	execScheduler, err := local.NewExecutionScheduler(runner, piState)
+	testState := &lib.TestRunState{
+		TestPreInitState: piState,
+		Options:          newOpts,
+		Runner:           runner,
+	}
+
+	execScheduler, err := local.NewExecutionScheduler(testState)
 	require.NoError(t, err)
 
 	samples := make(chan metrics.SampleContainer, newOpts.MetricSamplesBufferSize.Int64)

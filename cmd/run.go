@@ -90,7 +90,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	logger := testRunState.Logger
 	// Create a local execution scheduler wrapping the runner.
 	logger.Debug("Initializing the execution scheduler...")
-	execScheduler, err := local.NewExecutionScheduler(test.initRunner, test.preInitState)
+	execScheduler, err := local.NewExecutionScheduler(testRunState)
 	if err != nil {
 		return err
 	}
@@ -126,10 +126,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	// TODO: remove this completely
 	// Create the engine.
 	initBar.Modify(pb.WithConstProgress(0, "Init engine"))
-	engine, err := core.NewEngine(
-		execScheduler, conf.Options, testRunState.RuntimeOptions,
-		outputs, logger, testRunState.Registry,
-	)
+	engine, err := core.NewEngine(testRunState, execScheduler, outputs)
 	if err != nil {
 		return err
 	}

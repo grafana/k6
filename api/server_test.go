@@ -81,14 +81,19 @@ func TestWithEngine(t *testing.T) {
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 	registry := metrics.NewRegistry()
-	piState := &lib.TestPreInitState{
-		Logger:         logger,
-		Registry:       registry,
-		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+	testState := &lib.TestRunState{
+		TestPreInitState: &lib.TestPreInitState{
+			Logger:         logger,
+			Registry:       registry,
+			BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+		},
+		Options: lib.Options{},
+		Runner:  &minirunner.MiniRunner{},
 	}
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, piState)
+
+	execScheduler, err := local.NewExecutionScheduler(testState)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, lib.RuntimeOptions{}, nil, logger, registry)
+	engine, err := core.NewEngine(testState, execScheduler, nil)
 	require.NoError(t, err)
 
 	rw := httptest.NewRecorder()

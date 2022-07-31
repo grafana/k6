@@ -71,9 +71,22 @@ func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 	}
 }
 
+func getTestRunState(
+	tb testing.TB, piState *lib.TestPreInitState, options lib.Options, runner lib.Runner,
+) *lib.TestRunState {
+	require.Empty(tb, options.Validate())
+	require.NoError(tb, runner.SetOptions(options))
+	return &lib.TestRunState{
+		TestPreInitState: piState,
+		Options:          options,
+		Runner:           runner,
+	}
+}
+
 // Wrapper around NewEngine that applies a logger and manages the options.
 func newTestEngineWithTestPreInitState( //nolint:golint
-	t *testing.T, runTimeout *time.Duration, runner lib.Runner, outputs []output.Output, opts lib.Options, piState *lib.TestPreInitState,
+	t *testing.T, runTimeout *time.Duration, runner lib.Runner, outputs []output.Output,
+	opts lib.Options, piState *lib.TestPreInitState,
 ) *testStruct {
 	if runner == nil {
 		runner = &minirunner.MiniRunner{}
@@ -83,14 +96,13 @@ func newTestEngineWithTestPreInitState( //nolint:golint
 		MetricSamplesBufferSize: null.NewInt(200, false),
 	}.Apply(runner.GetOptions()).Apply(opts), piState.Logger)
 	require.NoError(t, err)
-	require.Empty(t, newOpts.Validate())
 
-	require.NoError(t, runner.SetOptions(newOpts))
+	testRunState := getTestRunState(t, piState, newOpts, runner)
 
-	execScheduler, err := local.NewExecutionScheduler(runner, piState)
+	execScheduler, err := local.NewExecutionScheduler(testRunState)
 	require.NoError(t, err)
 
-	engine, err := NewEngine(execScheduler, opts, piState.RuntimeOptions, outputs, piState.Logger, piState.Registry)
+	engine, err := NewEngine(testRunState, execScheduler, outputs)
 	require.NoError(t, err)
 	require.NoError(t, engine.OutputManager.StartOutputs())
 
@@ -866,12 +878,12 @@ func TestVuInitException(t *testing.T) {
 
 	opts, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions(), nil)
 	require.NoError(t, err)
-	require.Empty(t, opts.Validate())
-	require.NoError(t, runner.SetOptions(opts))
 
-	execScheduler, err := local.NewExecutionScheduler(runner, piState)
+	testState := getTestRunState(t, piState, opts, runner)
+
+	execScheduler, err := local.NewExecutionScheduler(testState)
 	require.NoError(t, err)
-	engine, err := NewEngine(execScheduler, opts, piState.RuntimeOptions, nil, piState.Logger, piState.Registry)
+	engine, err := NewEngine(testState, execScheduler, nil)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1242,11 +1254,11 @@ func TestActiveVUsCount(t *testing.T) {
 		MetricSamplesBufferSize: null.NewInt(200, false),
 	}.Apply(runner.GetOptions()), nil)
 	require.NoError(t, err)
-	require.Empty(t, opts.Validate())
-	require.NoError(t, runner.SetOptions(opts))
-	execScheduler, err := local.NewExecutionScheduler(runner, piState)
+
+	testState := getTestRunState(t, piState, opts, runner)
+	execScheduler, err := local.NewExecutionScheduler(testState)
 	require.NoError(t, err)
-	engine, err := NewEngine(execScheduler, opts, rtOpts, []output.Output{mockOutput}, logger, registry)
+	engine, err := NewEngine(testState, execScheduler, []output.Output{mockOutput})
 	require.NoError(t, err)
 	require.NoError(t, engine.OutputManager.StartOutputs())
 	run, waitFn, err := engine.Init(ctx, ctx) // no need for 2 different contexts

@@ -63,6 +63,18 @@ func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 	}
 }
 
+func getTestRunState(
+	tb testing.TB, piState *lib.TestPreInitState, options lib.Options, runner lib.Runner,
+) *lib.TestRunState {
+	require.Empty(tb, options.Validate())
+	require.NoError(tb, runner.SetOptions(options))
+	return &lib.TestRunState{
+		TestPreInitState: piState,
+		Options:          options,
+		Runner:           runner,
+	}
+}
+
 func newTestExecutionScheduler(
 	t *testing.T, runner lib.Runner, logger *logrus.Logger, opts lib.Options,
 ) (ctx context.Context, cancel func(), execScheduler *ExecutionScheduler, samples chan metrics.SampleContainer) {
@@ -74,16 +86,13 @@ func newTestExecutionScheduler(
 		MetricSamplesBufferSize: null.NewInt(200, false),
 	}.Apply(runner.GetOptions()).Apply(opts), nil)
 	require.NoError(t, err)
-	require.Empty(t, newOpts.Validate())
 
-	require.NoError(t, runner.SetOptions(newOpts))
-
-	piState := getTestPreInitState(t)
+	testRunState := getTestRunState(t, getTestPreInitState(t), newOpts, runner)
 	if logger != nil {
-		piState.Logger = logger
+		testRunState.Logger = logger
 	}
 
-	execScheduler, err = NewExecutionScheduler(runner, piState)
+	execScheduler, err = NewExecutionScheduler(testRunState)
 	require.NoError(t, err)
 
 	samples = make(chan metrics.SampleContainer, newOpts.MetricSamplesBufferSize.Int64)
@@ -144,7 +153,9 @@ func TestExecutionSchedulerRunNonDefault(t *testing.T) {
 				}, nil)
 			require.NoError(t, err)
 
-			execScheduler, err := NewExecutionScheduler(runner, piState)
+			testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
+
+			execScheduler, err := NewExecutionScheduler(testRunState)
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -185,7 +196,6 @@ func TestExecutionSchedulerRunEnv(t *testing.T) {
 		scenarios: {
 			executor: {
 				executor: "%[1]s",
-				gracefulStop: "0.5s",
 				%[2]s
 			}
 		}
@@ -201,31 +211,37 @@ func TestExecutionSchedulerRunEnv(t *testing.T) {
 	executorConfigs := map[string]string{
 		"constant-arrival-rate": `
 			rate: 1,
-			timeUnit: "0.5s",
-			duration: "0.5s",
+			timeUnit: "1s",
+			duration: "1s",
 			preAllocatedVUs: 1,
-			maxVUs: 2,`,
+			maxVUs: 2,
+			gracefulStop: "0.5s",`,
 		"constant-vus": `
 			vus: 1,
-			duration: "0.5s",`,
+			duration: "1s",
+			gracefulStop: "0.5s",`,
 		"externally-controlled": `
 			vus: 1,
-			duration: "0.5s",`,
+			duration: "1s",`,
 		"per-vu-iterations": `
 			vus: 1,
-			iterations: 1,`,
+			iterations: 1,
+			gracefulStop: "0.5s",`,
 		"shared-iterations": `
 			vus: 1,
-			iterations: 1,`,
+			iterations: 1,
+			gracefulStop: "0.5s",`,
 		"ramping-arrival-rate": `
 			startRate: 1,
 			timeUnit: "0.5s",
 			preAllocatedVUs: 1,
 			maxVUs: 2,
-			stages: [ { target: 1, duration: "0.5s" } ],`,
+			stages: [ { target: 1, duration: "1s" } ],
+			gracefulStop: "0.5s",`,
 		"ramping-vus": `
 			startVUs: 1,
-			stages: [ { target: 1, duration: "0.5s" } ],`,
+			stages: [ { target: 1, duration: "1s" } ],
+			gracefulStop: "0.5s",`,
 	}
 
 	testCases := []struct{ name, script string }{}
@@ -255,7 +271,8 @@ func TestExecutionSchedulerRunEnv(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			execScheduler, err := NewExecutionScheduler(runner, piState)
+			testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
+			execScheduler, err := NewExecutionScheduler(testRunState)
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -323,7 +340,8 @@ func TestExecutionSchedulerSystemTags(t *testing.T) {
 		SystemTags: &metrics.DefaultSystemTagSet,
 	})))
 
-	execScheduler, err := NewExecutionScheduler(runner, piState)
+	testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
+	execScheduler, err := NewExecutionScheduler(testRunState)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -394,7 +412,6 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 		scenarios: {
 			executor: {
 				executor: "%s",
-				gracefulStop: "0.5s",
 				%s
 			}
 		}
@@ -407,31 +424,37 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 	executorConfigs := map[string]string{
 		"constant-arrival-rate": `
 			rate: 1,
-			timeUnit: "0.5s",
-			duration: "0.5s",
+			timeUnit: "1s",
+			duration: "1s",
 			preAllocatedVUs: 1,
-			maxVUs: 2,`,
+			maxVUs: 2,
+			gracefulStop: "0.5s",`,
 		"constant-vus": `
 			vus: 1,
-			duration: "0.5s",`,
+			duration: "1s",
+			gracefulStop: "0.5s",`,
 		"externally-controlled": `
 			vus: 1,
-			duration: "0.5s",`,
+			duration: "1s",`,
 		"per-vu-iterations": `
 			vus: 1,
-			iterations: 1,`,
+			iterations: 1,
+			gracefulStop: "0.5s",`,
 		"shared-iterations": `
 			vus: 1,
-			iterations: 1,`,
+			iterations: 1,
+			gracefulStop: "0.5s",`,
 		"ramping-arrival-rate": `
 			startRate: 5,
 			timeUnit: "0.5s",
 			preAllocatedVUs: 1,
 			maxVUs: 2,
-			stages: [ { target: 10, duration: "1s" } ],`,
+			stages: [ { target: 10, duration: "1s" } ],
+			gracefulStop: "0.5s",`,
 		"ramping-vus": `
 			startVUs: 1,
-			stages: [ { target: 1, duration: "0.5s" } ],`,
+			stages: [ { target: 1, duration: "0.5s" } ],
+			gracefulStop: "0.5s",`,
 	}
 
 	testCases := []struct{ name, script string }{}
@@ -457,7 +480,8 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			execScheduler, err := NewExecutionScheduler(runner, piState)
+			testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
+			execScheduler, err := NewExecutionScheduler(testRunState)
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -620,7 +644,8 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	execScheduler, err := NewExecutionScheduler(runner, piState)
+	testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
+	execScheduler, err := NewExecutionScheduler(testRunState)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -948,8 +973,8 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	piState := getTestPreInitState(t)
-	execScheduler, err := NewExecutionScheduler(runner, piState)
+	testRunState := getTestRunState(t, getTestPreInitState(t), runner.GetOptions(), runner)
+	execScheduler, err := NewExecutionScheduler(testRunState)
 	require.NoError(t, err)
 
 	samples := make(chan metrics.SampleContainer, 300)
@@ -1151,9 +1176,9 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		TeardownTimeout: types.NullDurationFrom(4 * time.Second),
 	}), nil)
 	require.NoError(t, err)
-	require.NoError(t, runner.SetOptions(options))
 
-	execScheduler, err := NewExecutionScheduler(runner, piState)
+	testRunState := getTestRunState(t, piState, options, runner)
+	execScheduler, err := NewExecutionScheduler(testRunState)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1283,7 +1308,8 @@ func TestSetPaused(t *testing.T) {
 	t.Parallel()
 	t.Run("second pause is an error", func(t *testing.T) {
 		t.Parallel()
-		sched, err := NewExecutionScheduler(&minirunner.MiniRunner{}, getTestPreInitState(t))
+		testRunState := getTestRunState(t, getTestPreInitState(t), lib.Options{}, &minirunner.MiniRunner{})
+		sched, err := NewExecutionScheduler(testRunState)
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 
@@ -1295,7 +1321,8 @@ func TestSetPaused(t *testing.T) {
 
 	t.Run("unpause at the start is an error", func(t *testing.T) {
 		t.Parallel()
-		sched, err := NewExecutionScheduler(&minirunner.MiniRunner{}, getTestPreInitState(t))
+		testRunState := getTestRunState(t, getTestPreInitState(t), lib.Options{}, &minirunner.MiniRunner{})
+		sched, err := NewExecutionScheduler(testRunState)
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 		err = sched.SetPaused(false)
@@ -1305,7 +1332,8 @@ func TestSetPaused(t *testing.T) {
 
 	t.Run("second unpause is an error", func(t *testing.T) {
 		t.Parallel()
-		sched, err := NewExecutionScheduler(&minirunner.MiniRunner{}, getTestPreInitState(t))
+		testRunState := getTestRunState(t, getTestPreInitState(t), lib.Options{}, &minirunner.MiniRunner{})
+		sched, err := NewExecutionScheduler(testRunState)
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 		require.NoError(t, sched.SetPaused(true))
@@ -1317,7 +1345,8 @@ func TestSetPaused(t *testing.T) {
 
 	t.Run("an error on pausing is propagated", func(t *testing.T) {
 		t.Parallel()
-		sched, err := NewExecutionScheduler(&minirunner.MiniRunner{}, getTestPreInitState(t))
+		testRunState := getTestRunState(t, getTestPreInitState(t), lib.Options{}, &minirunner.MiniRunner{})
+		sched, err := NewExecutionScheduler(testRunState)
 		require.NoError(t, err)
 		expectedErr := errors.New("testing pausable executor error")
 		sched.executors = []lib.Executor{pausableExecutor{err: expectedErr}}
@@ -1334,9 +1363,9 @@ func TestSetPaused(t *testing.T) {
 			VUs:        null.IntFrom(1),
 		}.Apply(runner.GetOptions()), nil)
 		require.NoError(t, err)
-		require.NoError(t, runner.SetOptions(options))
 
-		sched, err := NewExecutionScheduler(runner, getTestPreInitState(t))
+		testRunState := getTestRunState(t, getTestPreInitState(t), options, runner)
+		sched, err := NewExecutionScheduler(testRunState)
 		require.NoError(t, err)
 		err = sched.SetPaused(true)
 		require.Error(t, err)
@@ -1390,7 +1419,8 @@ func TestNewExecutionSchedulerHasWork(t *testing.T) {
 	runner, err := js.New(piState, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
 	require.NoError(t, err)
 
-	execScheduler, err := NewExecutionScheduler(runner, piState)
+	testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
+	execScheduler, err := NewExecutionScheduler(testRunState)
 	require.NoError(t, err)
 
 	assert.Len(t, execScheduler.executors, 2)

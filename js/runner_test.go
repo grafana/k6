@@ -310,14 +310,17 @@ func TestSetupDataIsolation(t *testing.T) {
 	options := runner.GetOptions()
 	require.Empty(t, options.Validate())
 
-	piState := runner.preInitState
-	execScheduler, err := local.NewExecutionScheduler(runner, piState)
+	testRunState := &lib.TestRunState{
+		TestPreInitState: runner.preInitState,
+		Options:          options,
+		Runner:           runner,
+	}
+
+	execScheduler, err := local.NewExecutionScheduler(testRunState)
 	require.NoError(t, err)
 
 	mockOutput := mockoutput.New()
-	engine, err := core.NewEngine(
-		execScheduler, options, piState.RuntimeOptions, []output.Output{mockOutput}, piState.Logger, piState.Registry,
-	)
+	engine, err := core.NewEngine(testRunState, execScheduler, []output.Output{mockOutput})
 	require.NoError(t, err)
 	require.NoError(t, engine.OutputManager.StartOutputs())
 	defer engine.OutputManager.StopOutputs()
@@ -2437,7 +2440,13 @@ func TestExecutionInfo(t *testing.T) {
 			initVU, err := r.NewVU(1, 10, samples)
 			require.NoError(t, err)
 
-			execScheduler, err := local.NewExecutionScheduler(r, r.preInitState)
+			testRunState := &lib.TestRunState{
+				TestPreInitState: r.preInitState,
+				Options:          r.GetOptions(),
+				Runner:           r,
+			}
+
+			execScheduler, err := local.NewExecutionScheduler(testRunState)
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
