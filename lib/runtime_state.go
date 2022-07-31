@@ -14,5 +14,7 @@ type RuntimeState struct {
 	Registry       *metrics.Registry
 	BuiltinMetrics *metrics.BuiltinMetrics
 	KeyLogger      io.Writer
-	Logger         *logrus.Logger
+
+	// TODO: replace with logrus.FieldLogger when all of the tests can be fixed
+	Logger *logrus.Logger
 }

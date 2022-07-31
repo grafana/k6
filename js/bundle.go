@@ -73,22 +73,19 @@ type BundleInstance struct {
 }
 
 // NewBundle creates a new bundle from a source file and a filesystem.
-func NewBundle(
-	logger logrus.FieldLogger, src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions,
-	registry *metrics.Registry,
-) (*Bundle, error) {
-	compatMode, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String)
+func NewBundle(rs *lib.RuntimeState, src *loader.SourceData, filesystems map[string]afero.Fs) (*Bundle, error) {
+	compatMode, err := lib.ValidateCompatibilityMode(rs.RuntimeOptions.CompatibilityMode.String)
 	if err != nil {
 		return nil, err
 	}
 
 	// Compile sources, both ES5 and ES6 are supported.
 	code := string(src.Data)
-	c := compiler.New(logger)
+	c := compiler.New(rs.Logger)
 	c.Options = compiler.Options{
 		CompatibilityMode: compatMode,
 		Strict:            true,
-		SourceMapLoader:   generateSourceMapLoader(logger, filesystems),
+		SourceMapLoader:   generateSourceMapLoader(rs.Logger, filesystems),
 	}
 	pgm, _, err := c.Compile(code, src.URL.String(), false)
 	if err != nil {
@@ -100,17 +97,17 @@ func NewBundle(
 		Filename:          src.URL,
 		Source:            code,
 		Program:           pgm,
-		BaseInitContext:   NewInitContext(logger, rt, c, compatMode, filesystems, loader.Dir(src.URL)),
-		RuntimeOptions:    rtOpts,
+		BaseInitContext:   NewInitContext(rs.Logger, rt, c, compatMode, filesystems, loader.Dir(src.URL)),
+		RuntimeOptions:    rs.RuntimeOptions,
 		CompatibilityMode: compatMode,
 		exports:           make(map[string]goja.Callable),
-		registry:          registry,
+		registry:          rs.Registry,
 	}
-	if err = bundle.instantiate(logger, rt, bundle.BaseInitContext, 0); err != nil {
+	if err = bundle.instantiate(rs.Logger, rt, bundle.BaseInitContext, 0); err != nil {
 		return nil, err
 	}
 
-	err = bundle.getExports(logger, rt, true)
+	err = bundle.getExports(rs.Logger, rt, true)
 	if err != nil {
 		return nil, err
 	}
@@ -119,13 +116,12 @@ func NewBundle(
 }
 
 // NewBundleFromArchive creates a new bundle from an lib.Archive.
-func NewBundleFromArchive(
-	logger logrus.FieldLogger, arc *lib.Archive, rtOpts lib.RuntimeOptions, registry *metrics.Registry,
-) (*Bundle, error) {
+func NewBundleFromArchive(rs *lib.RuntimeState, arc *lib.Archive) (*Bundle, error) {
 	if arc.Type != "js" {
 		return nil, fmt.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
 
+	rtOpts := rs.RuntimeOptions // copy the struct from the RuntimeState
 	if !rtOpts.CompatibilityMode.Valid {
 		// `k6 run --compatibility-mode=whatever archive.tar` should override
 		// whatever value is in the archive
@@ -136,18 +132,18 @@ func NewBundleFromArchive(
 		return nil, err
 	}
 
-	c := compiler.New(logger)
+	c := compiler.New(rs.Logger)
 	c.Options = compiler.Options{
 		Strict:            true,
 		CompatibilityMode: compatMode,
-		SourceMapLoader:   generateSourceMapLoader(logger, arc.Filesystems),
+		SourceMapLoader:   generateSourceMapLoader(rs.Logger, arc.Filesystems),
 	}
 	pgm, _, err := c.Compile(string(arc.Data), arc.FilenameURL.String(), false)
 	if err != nil {
 		return nil, err
 	}
 	rt := goja.New()
-	initctx := NewInitContext(logger, rt, c, compatMode, arc.Filesystems, arc.PwdURL)
+	initctx := NewInitContext(rs.Logger, rt, c, compatMode, arc.Filesystems, arc.PwdURL)
 
 	env := arc.Env
 	if env == nil {
@@ -168,16 +164,16 @@ func NewBundleFromArchive(
 		RuntimeOptions:    rtOpts,
 		CompatibilityMode: compatMode,
 		exports:           make(map[string]goja.Callable),
-		registry:          registry,
+		registry:          rs.Registry,
 	}
 
-	if err = bundle.instantiate(logger, rt, bundle.BaseInitContext, 0); err != nil {
+	if err = bundle.instantiate(rs.Logger, rt, bundle.BaseInitContext, 0); err != nil {
 		return nil, err
 	}
 
 	// Grab exported objects, but avoid overwriting options, which would
 	// be initialized from the metadata.json at this point.
-	err = bundle.getExports(logger, rt, false)
+	err = bundle.getExports(rs.Logger, rt, false)
 	if err != nil {
 		return nil, err
 	}
