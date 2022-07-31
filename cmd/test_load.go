@@ -28,16 +28,13 @@ const (
 // loadedTest contains all of data, details and dependencies of a fully-loaded
 // and configured k6 test.
 type loadedTest struct {
-	sourceRootPath  string // contains the raw string the user supplied
-	pwd             string
-	source          *loader.SourceData
-	fs              afero.Fs
-	fileSystems     map[string]afero.Fs
-	runtimeOptions  lib.RuntimeOptions
-	metricsRegistry *metrics.Registry
-	builtInMetrics  *metrics.BuiltinMetrics
-	initRunner      lib.Runner // TODO: rename to something more appropriate
-	keywriter       io.Closer
+	sourceRootPath string // contains the raw string the user supplied
+	pwd            string
+	source         *loader.SourceData
+	fs             afero.Fs
+	fileSystems    map[string]afero.Fs
+	runtimeState   *lib.RuntimeState
+	initRunner     lib.Runner // TODO: rename to something more appropriate
 
 	// Only set if cliConfigGetter is supplied to loadAndConfigureTest() or if
 	// consolidateDeriveAndValidateConfig() is manually called.
@@ -73,15 +70,20 @@ func loadAndConfigureTest(
 	}
 
 	registry := metrics.NewRegistry()
+	state := &lib.RuntimeState{
+		Logger:         gs.logger,
+		RuntimeOptions: runtimeOptions,
+		Registry:       registry,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+	}
+
 	test := &loadedTest{
-		pwd:             pwd,
-		sourceRootPath:  sourceRootPath,
-		source:          src,
-		fs:              gs.fs,
-		fileSystems:     fileSystems,
-		runtimeOptions:  runtimeOptions,
-		metricsRegistry: registry,
-		builtInMetrics:  metrics.RegisterBuiltinMetrics(registry),
+		pwd:            pwd,
+		sourceRootPath: sourceRootPath,
+		source:         src,
+		fs:             gs.fs,
+		fileSystems:    fileSystems,
+		runtimeState:   state,
 	}
 
 	gs.logger.Debugf("Initializing k6 runner for '%s' (%s)...", sourceRootPath, resolvedPath)
@@ -103,22 +105,16 @@ func (lt *loadedTest) initializeFirstRunner(gs *globalState) error {
 	testPath := lt.source.URL.String()
 	logger := gs.logger.WithField("test_path", testPath)
 
-	testType := lt.runtimeOptions.TestType.String
+	testType := lt.runtimeState.RuntimeOptions.TestType.String
 	if testType == "" {
 		logger.Debug("Detecting test type for...")
 		testType = detectTestType(lt.source.Data)
 	}
 
-	state := &lib.RuntimeState{
-		Logger:         gs.logger,
-		RuntimeOptions: lt.runtimeOptions,
-		BuiltinMetrics: lt.builtInMetrics,
-		Registry:       lt.metricsRegistry,
-	}
-	if lt.runtimeOptions.KeyWriter.Valid {
+	if lt.runtimeState.RuntimeOptions.KeyWriter.Valid {
 		logger.Warnf("SSLKEYLOGFILE was specified, logging TLS connection keys to '%s'...",
-			lt.runtimeOptions.KeyWriter.String)
-		keylogFilename := lt.runtimeOptions.KeyWriter.String
+			lt.runtimeState.RuntimeOptions.KeyWriter.String)
+		keylogFilename := lt.runtimeState.RuntimeOptions.KeyWriter.String
 		// if path is absolute - no point doing anything
 		if !filepath.IsAbs(keylogFilename) {
 			// filepath.Abs could be used but it will get the pwd from `os` package instead of what is in lt.pwd
@@ -129,13 +125,12 @@ func (lt *loadedTest) initializeFirstRunner(gs *globalState) error {
 		if err != nil {
 			return fmt.Errorf("couldn't get absolute path for keylog file: %w", err)
 		}
-		lt.keywriter = f
-		state.KeyLogger = &syncWriter{w: f}
+		lt.runtimeState.KeyLogger = &syncWriteCloser{w: f}
 	}
 	switch testType {
 	case testTypeJS:
 		logger.Debug("Trying to load as a JS test...")
-		runner, err := js.New(state, lt.source, lt.fileSystems)
+		runner, err := js.New(lt.runtimeState, lt.source, lt.fileSystems)
 		// TODO: should we use common.UnwrapGojaInterruptedError() here?
 		if err != nil {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
@@ -156,7 +151,7 @@ func (lt *loadedTest) initializeFirstRunner(gs *globalState) error {
 		switch arc.Type {
 		case testTypeJS:
 			logger.Debug("Evaluating JS from archive bundle...")
-			lt.initRunner, err = js.NewFromArchive(state, arc)
+			lt.initRunner, err = js.NewFromArchive(lt.runtimeState, arc)
 			if err != nil {
 				return fmt.Errorf("could not load JS from test archive bundle '%s': %w", testPath, err)
 			}
@@ -213,14 +208,14 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	// Parse the thresholds, only if the --no-threshold flag is not set.
 	// If parsing the threshold expressions failed, consider it as an
 	// invalid configuration error.
-	if !lt.runtimeOptions.NoThresholds.Bool {
+	if !lt.runtimeState.RuntimeOptions.NoThresholds.Bool {
 		for metricName, thresholdsDefinition := range consolidatedConfig.Options.Thresholds {
 			err = thresholdsDefinition.Parse()
 			if err != nil {
 				return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 			}
 
-			err = thresholdsDefinition.Validate(metricName, lt.metricsRegistry)
+			err = thresholdsDefinition.Validate(metricName, lt.runtimeState.Registry)
 			if err != nil {
 				return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 			}
@@ -238,13 +233,19 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	return nil
 }
 
-type syncWriter struct {
-	w io.Writer
+type syncWriteCloser struct {
+	w io.WriteCloser
 	m sync.Mutex
 }
 
-func (cw *syncWriter) Write(b []byte) (int, error) {
+func (cw *syncWriteCloser) Write(b []byte) (int, error) {
 	cw.m.Lock()
 	defer cw.m.Unlock()
 	return cw.w.Write(b)
+}
+
+func (cw *syncWriteCloser) Close() error {
+	cw.m.Lock()
+	defer cw.m.Unlock()
+	return cw.w.Close()
 }
