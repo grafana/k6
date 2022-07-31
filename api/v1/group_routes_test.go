@@ -37,9 +37,9 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
-func getRuntimeState(tb testing.TB) *lib.RuntimeState {
+func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 	reg := metrics.NewRegistry()
-	return &lib.RuntimeState{
+	return &lib.TestPreInitState{
 		Logger:         testutils.NewLogger(tb),
 		RuntimeOptions: lib.RuntimeOptions{},
 		Registry:       reg,
@@ -55,10 +55,10 @@ func TestGetGroups(t *testing.T) {
 	g2, err := g1.Group("group 2")
 	assert.NoError(t, err)
 
-	rs := getRuntimeState(t)
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Group: g0}, rs)
+	piState := getTestPreInitState(t)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Group: g0}, piState)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, rs.RuntimeOptions, nil, rs.Logger, rs.Registry)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, piState.RuntimeOptions, nil, piState.Logger, piState.Registry)
 	require.NoError(t, err)
 
 	t.Run("list", func(t *testing.T) {

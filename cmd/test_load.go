@@ -33,7 +33,7 @@ type loadedTest struct {
 	source         *loader.SourceData
 	fs             afero.Fs
 	fileSystems    map[string]afero.Fs
-	runtimeState   *lib.RuntimeState
+	preInitState   *lib.TestPreInitState
 	initRunner     lib.Runner // TODO: rename to something more appropriate
 
 	// Only set if cliConfigGetter is supplied to loadAndConfigureTest() or if
@@ -70,7 +70,7 @@ func loadAndConfigureTest(
 	}
 
 	registry := metrics.NewRegistry()
-	state := &lib.RuntimeState{
+	state := &lib.TestPreInitState{
 		Logger:         gs.logger,
 		RuntimeOptions: runtimeOptions,
 		Registry:       registry,
@@ -83,7 +83,7 @@ func loadAndConfigureTest(
 		source:         src,
 		fs:             gs.fs,
 		fileSystems:    fileSystems,
-		runtimeState:   state,
+		preInitState:   state,
 	}
 
 	gs.logger.Debugf("Initializing k6 runner for '%s' (%s)...", sourceRootPath, resolvedPath)
@@ -105,16 +105,16 @@ func (lt *loadedTest) initializeFirstRunner(gs *globalState) error {
 	testPath := lt.source.URL.String()
 	logger := gs.logger.WithField("test_path", testPath)
 
-	testType := lt.runtimeState.RuntimeOptions.TestType.String
+	testType := lt.preInitState.RuntimeOptions.TestType.String
 	if testType == "" {
 		logger.Debug("Detecting test type for...")
 		testType = detectTestType(lt.source.Data)
 	}
 
-	if lt.runtimeState.RuntimeOptions.KeyWriter.Valid {
+	if lt.preInitState.RuntimeOptions.KeyWriter.Valid {
 		logger.Warnf("SSLKEYLOGFILE was specified, logging TLS connection keys to '%s'...",
-			lt.runtimeState.RuntimeOptions.KeyWriter.String)
-		keylogFilename := lt.runtimeState.RuntimeOptions.KeyWriter.String
+			lt.preInitState.RuntimeOptions.KeyWriter.String)
+		keylogFilename := lt.preInitState.RuntimeOptions.KeyWriter.String
 		// if path is absolute - no point doing anything
 		if !filepath.IsAbs(keylogFilename) {
 			// filepath.Abs could be used but it will get the pwd from `os` package instead of what is in lt.pwd
@@ -125,12 +125,12 @@ func (lt *loadedTest) initializeFirstRunner(gs *globalState) error {
 		if err != nil {
 			return fmt.Errorf("couldn't get absolute path for keylog file: %w", err)
 		}
-		lt.runtimeState.KeyLogger = &syncWriteCloser{w: f}
+		lt.preInitState.KeyLogger = &syncWriteCloser{w: f}
 	}
 	switch testType {
 	case testTypeJS:
 		logger.Debug("Trying to load as a JS test...")
-		runner, err := js.New(lt.runtimeState, lt.source, lt.fileSystems)
+		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems)
 		// TODO: should we use common.UnwrapGojaInterruptedError() here?
 		if err != nil {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
@@ -151,7 +151,7 @@ func (lt *loadedTest) initializeFirstRunner(gs *globalState) error {
 		switch arc.Type {
 		case testTypeJS:
 			logger.Debug("Evaluating JS from archive bundle...")
-			lt.initRunner, err = js.NewFromArchive(lt.runtimeState, arc)
+			lt.initRunner, err = js.NewFromArchive(lt.preInitState, arc)
 			if err != nil {
 				return fmt.Errorf("could not load JS from test archive bundle '%s': %w", testPath, err)
 			}
@@ -208,14 +208,14 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	// Parse the thresholds, only if the --no-threshold flag is not set.
 	// If parsing the threshold expressions failed, consider it as an
 	// invalid configuration error.
-	if !lt.runtimeState.RuntimeOptions.NoThresholds.Bool {
+	if !lt.preInitState.RuntimeOptions.NoThresholds.Bool {
 		for metricName, thresholdsDefinition := range consolidatedConfig.Options.Thresholds {
 			err = thresholdsDefinition.Parse()
 			if err != nil {
 				return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 			}
 
-			err = thresholdsDefinition.Validate(metricName, lt.runtimeState.Registry)
+			err = thresholdsDefinition.Validate(metricName, lt.preInitState.Registry)
 			if err != nil {
 				return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 			}

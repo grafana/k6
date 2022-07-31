@@ -90,7 +90,7 @@ func createOutputs(gs *globalState, test *loadedTest, executionPlan []lib.Execut
 		StdErr:         gs.stdErr,
 		FS:             gs.fs,
 		ScriptOptions:  test.derivedConfig.Options,
-		RuntimeOptions: test.runtimeState.RuntimeOptions,
+		RuntimeOptions: test.preInitState.RuntimeOptions,
 		ExecutionPlan:  executionPlan,
 	}
 	result := make([]output.Output, 0, len(test.derivedConfig.Out))
@@ -120,7 +120,7 @@ func createOutputs(gs *globalState, test *loadedTest, executionPlan []lib.Execut
 		}
 
 		if builtinMetricOut, ok := out.(output.WithBuiltinMetrics); ok {
-			builtinMetricOut.SetBuiltinMetrics(test.runtimeState.BuiltinMetrics)
+			builtinMetricOut.SetBuiltinMetrics(test.preInitState.BuiltinMetrics)
 		}
 
 		result = append(result, out)

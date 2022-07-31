@@ -65,7 +65,7 @@ var nameToCertWarning sync.Once
 
 type Runner struct {
 	Bundle       *Bundle
-	runtimeState *lib.RuntimeState
+	preInitState *lib.TestPreInitState
 	defaultGroup *lib.Group
 
 	BaseDialer net.Dialer
@@ -79,27 +79,27 @@ type Runner struct {
 }
 
 // New returns a new Runner for the provided source
-func New(rs *lib.RuntimeState, src *loader.SourceData, filesystems map[string]afero.Fs) (*Runner, error) {
-	bundle, err := NewBundle(rs, src, filesystems)
+func New(piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]afero.Fs) (*Runner, error) {
+	bundle, err := NewBundle(piState, src, filesystems)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewFromBundle(rs, bundle)
+	return NewFromBundle(piState, bundle)
 }
 
 // NewFromArchive returns a new Runner from the source in the provided archive
-func NewFromArchive(rs *lib.RuntimeState, arc *lib.Archive) (*Runner, error) {
-	bundle, err := NewBundleFromArchive(rs, arc)
+func NewFromArchive(piState *lib.TestPreInitState, arc *lib.Archive) (*Runner, error) {
+	bundle, err := NewBundleFromArchive(piState, arc)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewFromBundle(rs, bundle)
+	return NewFromBundle(piState, bundle)
 }
 
 // NewFromBundle returns a new Runner from the provided Bundle
-func NewFromBundle(rs *lib.RuntimeState, b *Bundle) (*Runner, error) {
+func NewFromBundle(piState *lib.TestPreInitState, b *Bundle) (*Runner, error) {
 	defaultGroup, err := lib.NewGroup("", nil)
 	if err != nil {
 		return nil, err
@@ -108,14 +108,14 @@ func NewFromBundle(rs *lib.RuntimeState, b *Bundle) (*Runner, error) {
 	defDNS := types.DefaultDNSConfig()
 	r := &Runner{
 		Bundle:       b,
-		runtimeState: rs,
+		preInitState: piState,
 		defaultGroup: defaultGroup,
 		BaseDialer: net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		},
-		console: newConsole(rs.Logger),
+		console: newConsole(piState.Logger),
 		Resolver: netext.NewResolver(
 			net.LookupIP, 0, defDNS.Select.DNSSelect, defDNS.Policy.DNSPolicy),
 		ActualResolver: net.LookupIP,
@@ -142,7 +142,7 @@ func (r *Runner) NewVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 //nolint:funlen
 func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.SampleContainer) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
-	bi, err := r.Bundle.Instantiate(r.runtimeState.Logger, idLocal)
+	bi, err := r.Bundle.Instantiate(r.preInitState.Logger, idLocal)
 	if err != nil {
 		return nil, err
 	}
@@ -193,13 +193,13 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 		MaxVersion:         uint16(tlsVersions.Max),
 		Certificates:       certs,
 		Renegotiation:      tls.RenegotiateFreelyAsClient,
-		KeyLogWriter:       r.runtimeState.KeyLogger,
+		KeyLogWriter:       r.preInitState.KeyLogger,
 	}
 	// Follow NameToCertificate in https://pkg.go.dev/crypto/tls@go1.17.6#Config, leave this field nil
 	// when it is empty
 	if len(nameToCert) > 0 {
 		nameToCertWarning.Do(func() {
-			r.runtimeState.Logger.Warn(
+			r.preInitState.Logger.Warn(
 				"tlsAuth.domains option could be removed in the next releases, it's recommended to leave it empty " +
 					"and let k6 automatically detect from the provided certificate. It follows the Go's NameToCertificate " +
 					"deprecation - https://pkg.go.dev/crypto/tls@go1.17#Config.",
@@ -246,7 +246,7 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 	}
 
 	vu.state = &lib.State{
-		Logger:         vu.Runner.runtimeState.Logger,
+		Logger:         vu.Runner.preInitState.Logger,
 		Options:        vu.Runner.Bundle.Options,
 		Transport:      vu.Transport,
 		Dialer:         vu.Dialer,
@@ -259,7 +259,7 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 		Samples:        vu.Samples,
 		Tags:           lib.NewTagMap(vu.Runner.Bundle.Options.RunTags.CloneTags()),
 		Group:          r.defaultGroup,
-		BuiltinMetrics: r.runtimeState.BuiltinMetrics,
+		BuiltinMetrics: r.preInitState.BuiltinMetrics,
 	}
 	vu.moduleVUImpl.state = vu.state
 	_ = vu.Runtime.Set("console", vu.Console)
@@ -434,7 +434,7 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 	// TODO: validate that all exec values are either nil or valid exported methods (or HTTP requests in the future)
 
 	if opts.ConsoleOutput.Valid {
-		c, err := newFileConsole(opts.ConsoleOutput.String, r.runtimeState.Logger.Formatter)
+		c, err := newFileConsole(opts.ConsoleOutput.String, r.preInitState.Logger.Formatter)
 		if err != nil {
 			return err
 		}
@@ -811,7 +811,7 @@ func (u *VU) runFn(
 
 	sampleTags := metrics.NewSampleTags(u.state.CloneTags())
 	u.state.Samples <- u.Dialer.GetTrail(
-		startTime, endTime, isFullIteration, isDefault, sampleTags, u.Runner.runtimeState.BuiltinMetrics)
+		startTime, endTime, isFullIteration, isDefault, sampleTags, u.Runner.preInitState.BuiltinMetrics)
 
 	return v, isFullIteration, endTime.Sub(startTime), err
 }

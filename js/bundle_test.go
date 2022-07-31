@@ -50,7 +50,7 @@ import (
 
 const isWindows = runtime.GOOS == "windows"
 
-func getRuntimeState(tb testing.TB, logger *logrus.Logger, rtOpts *lib.RuntimeOptions) *lib.RuntimeState {
+func getTestPreInitState(tb testing.TB, logger *logrus.Logger, rtOpts *lib.RuntimeOptions) *lib.TestPreInitState {
 	if logger == nil {
 		logger = testutils.NewLogger(tb)
 	}
@@ -58,7 +58,7 @@ func getRuntimeState(tb testing.TB, logger *logrus.Logger, rtOpts *lib.RuntimeOp
 		rtOpts = &lib.RuntimeOptions{}
 	}
 	reg := metrics.NewRegistry()
-	return &lib.RuntimeState{
+	return &lib.TestPreInitState{
 		Logger:         logger,
 		RuntimeOptions: *rtOpts,
 		Registry:       reg,
@@ -82,7 +82,7 @@ func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) 
 	}
 
 	return NewBundle(
-		getRuntimeState(tb, logger, rtOpts),
+		getTestPreInitState(tb, logger, rtOpts),
 		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),
@@ -502,7 +502,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 	}
 
 	checkArchive := func(t *testing.T, arc *lib.Archive, rtOpts lib.RuntimeOptions, expError string) {
-		b, err := NewBundleFromArchive(getRuntimeState(t, logger, &rtOpts), arc)
+		b, err := NewBundleFromArchive(getTestPreInitState(t, logger, &rtOpts), arc)
 		if expError != "" {
 			require.Error(t, err)
 			require.Contains(t, err.Error(), expError)
@@ -585,7 +585,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 			PwdURL:      &url.URL{Scheme: "file", Path: "/"},
 			Filesystems: nil,
 		}
-		b, err := NewBundleFromArchive(getRuntimeState(t, logger, nil), arc)
+		b, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), arc)
 		require.NoError(t, err)
 		bi, err := b.Instantiate(logger, 0)
 		require.NoError(t, err)
@@ -724,7 +724,7 @@ func TestOpen(t *testing.T) {
 					}
 					require.NoError(t, err)
 
-					arcBundle, err := NewBundleFromArchive(getRuntimeState(t, logger, nil), sourceBundle.makeArchive())
+					arcBundle, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), sourceBundle.makeArchive())
 
 					require.NoError(t, err)
 
@@ -824,7 +824,7 @@ func TestBundleEnv(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := testutils.NewLogger(t)
-	b2, err := NewBundleFromArchive(getRuntimeState(t, logger, nil), b1.makeArchive())
+	b2, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), b1.makeArchive())
 	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
@@ -861,7 +861,7 @@ func TestBundleNotSharable(t *testing.T) {
 	require.NoError(t, err)
 	logger := testutils.NewLogger(t)
 
-	b2, err := NewBundleFromArchive(getRuntimeState(t, logger, nil), b1.makeArchive())
+	b2, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), b1.makeArchive())
 	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}

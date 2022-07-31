@@ -78,7 +78,7 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         logger,
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -115,7 +115,7 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	assert.Equal(t, checkModule.vuCtxCalled, 2)
 
 	runnerFromArc, err := js.NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         logger,
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,

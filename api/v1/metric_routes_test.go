@@ -40,12 +40,12 @@ import (
 func TestGetMetrics(t *testing.T) {
 	t.Parallel()
 
-	rs := getRuntimeState(t)
-	testMetric, err := rs.Registry.NewMetric("my_metric", metrics.Trend, metrics.Time)
+	piState := getTestPreInitState(t)
+	testMetric, err := piState.Registry.NewMetric("my_metric", metrics.Trend, metrics.Time)
 	require.NoError(t, err)
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, rs)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, piState)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, rs.RuntimeOptions, nil, rs.Logger, rs.Registry)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, piState.RuntimeOptions, nil, piState.Logger, piState.Registry)
 	require.NoError(t, err)
 
 	engine.MetricsEngine.ObservedMetrics = map[string]*metrics.Metric{
@@ -99,12 +99,12 @@ func TestGetMetrics(t *testing.T) {
 func TestGetMetric(t *testing.T) {
 	t.Parallel()
 
-	rs := getRuntimeState(t)
-	testMetric, err := rs.Registry.NewMetric("my_metric", metrics.Trend, metrics.Time)
+	piState := getTestPreInitState(t)
+	testMetric, err := piState.Registry.NewMetric("my_metric", metrics.Trend, metrics.Time)
 	require.NoError(t, err)
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, rs)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, piState)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, rs.RuntimeOptions, nil, rs.Logger, rs.Registry)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, piState.RuntimeOptions, nil, piState.Logger, piState.Registry)
 	require.NoError(t, err)
 
 	engine.MetricsEngine.ObservedMetrics = map[string]*metrics.Metric{

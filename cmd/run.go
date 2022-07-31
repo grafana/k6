@@ -86,10 +86,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	runCtx, runCancel := context.WithCancel(lingerCtx)
 	defer runCancel()
 
-	logger := test.runtimeState.Logger
+	logger := test.preInitState.Logger
 	// Create a local execution scheduler wrapping the runner.
 	logger.Debug("Initializing the execution scheduler...")
-	execScheduler, err := local.NewExecutionScheduler(test.initRunner, test.runtimeState)
+	execScheduler, err := local.NewExecutionScheduler(test.initRunner, test.preInitState)
 	if err != nil {
 		return err
 	}
@@ -126,8 +126,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	// Create the engine.
 	initBar.Modify(pb.WithConstProgress(0, "Init engine"))
 	engine, err := core.NewEngine(
-		execScheduler, conf.Options, test.runtimeState.RuntimeOptions,
-		outputs, logger, test.runtimeState.Registry,
+		execScheduler, conf.Options, test.preInitState.RuntimeOptions,
+		outputs, logger, test.preInitState.Registry,
 	)
 	if err != nil {
 		return err
@@ -230,7 +230,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Handle the end-of-test summary.
-	if !test.runtimeState.RuntimeOptions.NoSummary.Bool {
+	if !test.preInitState.RuntimeOptions.NoSummary.Bool {
 		engine.MetricsEngine.MetricsLock.Lock() // TODO: refactor so this is not needed
 		summaryResult, err := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
 			Metrics:         engine.MetricsEngine.ObservedMetrics,
@@ -268,8 +268,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	logger.Debug("Waiting for engine processes to finish...")
 	engineWait()
 	logger.Debug("Everything has finished, exiting k6!")
-	if test.runtimeState.KeyLogger != nil {
-		if err := test.runtimeState.KeyLogger.Close(); err != nil {
+	if test.preInitState.KeyLogger != nil {
+		if err := test.preInitState.KeyLogger.Close(); err != nil {
 			logger.WithError(err).Warn("Error while closing the SSLKEYLOGFILE")
 		}
 	}

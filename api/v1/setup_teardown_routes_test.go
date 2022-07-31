@@ -137,9 +137,9 @@ func TestSetupData(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			rs := getRuntimeState(t)
+			piState := getTestPreInitState(t)
 			runner, err := js.New(
-				rs, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: testCase.script}, nil,
+				piState, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: testCase.script}, nil,
 			)
 			require.NoError(t, err)
 			runner.SetOptions(lib.Options{
@@ -150,10 +150,10 @@ func TestSetupData(t *testing.T) {
 				SetupTimeout:    types.NullDurationFrom(5 * time.Second),
 				TeardownTimeout: types.NullDurationFrom(5 * time.Second),
 			})
-			execScheduler, err := local.NewExecutionScheduler(runner, rs)
+			execScheduler, err := local.NewExecutionScheduler(runner, piState)
 			require.NoError(t, err)
 			engine, err := core.NewEngine(
-				execScheduler, runner.GetOptions(), rs.RuntimeOptions, nil, rs.Logger, rs.Registry,
+				execScheduler, runner.GetOptions(), piState.RuntimeOptions, nil, piState.Logger, piState.Registry,
 			)
 			require.NoError(t, err)
 

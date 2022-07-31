@@ -88,7 +88,7 @@ func TestExecutionInfoVUSharing(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         logger,
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -201,7 +201,7 @@ func TestExecutionInfoScenarioIter(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         logger,
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -283,7 +283,7 @@ func TestSharedIterationsStable(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := js.New(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         logger,
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -418,7 +418,7 @@ func TestExecutionInfoAll(t *testing.T) {
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 			runner, err := js.New(
-				&lib.RuntimeState{
+				&lib.TestPreInitState{
 					Logger:         logger,
 					BuiltinMetrics: builtinMetrics,
 					Registry:       registry,

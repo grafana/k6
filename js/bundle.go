@@ -73,19 +73,21 @@ type BundleInstance struct {
 }
 
 // NewBundle creates a new bundle from a source file and a filesystem.
-func NewBundle(rs *lib.RuntimeState, src *loader.SourceData, filesystems map[string]afero.Fs) (*Bundle, error) {
-	compatMode, err := lib.ValidateCompatibilityMode(rs.RuntimeOptions.CompatibilityMode.String)
+func NewBundle(
+	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]afero.Fs,
+) (*Bundle, error) {
+	compatMode, err := lib.ValidateCompatibilityMode(piState.RuntimeOptions.CompatibilityMode.String)
 	if err != nil {
 		return nil, err
 	}
 
 	// Compile sources, both ES5 and ES6 are supported.
 	code := string(src.Data)
-	c := compiler.New(rs.Logger)
+	c := compiler.New(piState.Logger)
 	c.Options = compiler.Options{
 		CompatibilityMode: compatMode,
 		Strict:            true,
-		SourceMapLoader:   generateSourceMapLoader(rs.Logger, filesystems),
+		SourceMapLoader:   generateSourceMapLoader(piState.Logger, filesystems),
 	}
 	pgm, _, err := c.Compile(code, src.URL.String(), false)
 	if err != nil {
@@ -97,17 +99,17 @@ func NewBundle(rs *lib.RuntimeState, src *loader.SourceData, filesystems map[str
 		Filename:          src.URL,
 		Source:            code,
 		Program:           pgm,
-		BaseInitContext:   NewInitContext(rs.Logger, rt, c, compatMode, filesystems, loader.Dir(src.URL)),
-		RuntimeOptions:    rs.RuntimeOptions,
+		BaseInitContext:   NewInitContext(piState.Logger, rt, c, compatMode, filesystems, loader.Dir(src.URL)),
+		RuntimeOptions:    piState.RuntimeOptions,
 		CompatibilityMode: compatMode,
 		exports:           make(map[string]goja.Callable),
-		registry:          rs.Registry,
+		registry:          piState.Registry,
 	}
-	if err = bundle.instantiate(rs.Logger, rt, bundle.BaseInitContext, 0); err != nil {
+	if err = bundle.instantiate(piState.Logger, rt, bundle.BaseInitContext, 0); err != nil {
 		return nil, err
 	}
 
-	err = bundle.getExports(rs.Logger, rt, true)
+	err = bundle.getExports(piState.Logger, rt, true)
 	if err != nil {
 		return nil, err
 	}
@@ -116,12 +118,12 @@ func NewBundle(rs *lib.RuntimeState, src *loader.SourceData, filesystems map[str
 }
 
 // NewBundleFromArchive creates a new bundle from an lib.Archive.
-func NewBundleFromArchive(rs *lib.RuntimeState, arc *lib.Archive) (*Bundle, error) {
+func NewBundleFromArchive(piState *lib.TestPreInitState, arc *lib.Archive) (*Bundle, error) {
 	if arc.Type != "js" {
 		return nil, fmt.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
 
-	rtOpts := rs.RuntimeOptions // copy the struct from the RuntimeState
+	rtOpts := piState.RuntimeOptions // copy the struct from the TestPreInitState
 	if !rtOpts.CompatibilityMode.Valid {
 		// `k6 run --compatibility-mode=whatever archive.tar` should override
 		// whatever value is in the archive
@@ -132,18 +134,18 @@ func NewBundleFromArchive(rs *lib.RuntimeState, arc *lib.Archive) (*Bundle, erro
 		return nil, err
 	}
 
-	c := compiler.New(rs.Logger)
+	c := compiler.New(piState.Logger)
 	c.Options = compiler.Options{
 		Strict:            true,
 		CompatibilityMode: compatMode,
-		SourceMapLoader:   generateSourceMapLoader(rs.Logger, arc.Filesystems),
+		SourceMapLoader:   generateSourceMapLoader(piState.Logger, arc.Filesystems),
 	}
 	pgm, _, err := c.Compile(string(arc.Data), arc.FilenameURL.String(), false)
 	if err != nil {
 		return nil, err
 	}
 	rt := goja.New()
-	initctx := NewInitContext(rs.Logger, rt, c, compatMode, arc.Filesystems, arc.PwdURL)
+	initctx := NewInitContext(piState.Logger, rt, c, compatMode, arc.Filesystems, arc.PwdURL)
 
 	env := arc.Env
 	if env == nil {
@@ -164,16 +166,16 @@ func NewBundleFromArchive(rs *lib.RuntimeState, arc *lib.Archive) (*Bundle, erro
 		RuntimeOptions:    rtOpts,
 		CompatibilityMode: compatMode,
 		exports:           make(map[string]goja.Callable),
-		registry:          rs.Registry,
+		registry:          piState.Registry,
 	}
 
-	if err = bundle.instantiate(rs.Logger, rt, bundle.BaseInitContext, 0); err != nil {
+	if err = bundle.instantiate(piState.Logger, rt, bundle.BaseInitContext, 0); err != nil {
 		return nil, err
 	}
 
 	// Grab exported objects, but avoid overwriting options, which would
 	// be initialized from the metadata.json at this point.
-	err = bundle.getExports(rs.Logger, rt, false)
+	err = bundle.getExports(piState.Logger, rt, false)
 	if err != nil {
 		return nil, err
 	}

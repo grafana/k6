@@ -42,10 +42,10 @@ import (
 func TestGetStatus(t *testing.T) {
 	t.Parallel()
 
-	rs := getRuntimeState(t)
-	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, rs)
+	piState := getTestPreInitState(t)
+	execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{}, piState)
 	require.NoError(t, err)
-	engine, err := core.NewEngine(execScheduler, lib.Options{}, rs.RuntimeOptions, nil, rs.Logger, rs.Registry)
+	engine, err := core.NewEngine(execScheduler, lib.Options{}, piState.RuntimeOptions, nil, piState.Logger, piState.Registry)
 	require.NoError(t, err)
 
 	rw := httptest.NewRecorder()
@@ -130,10 +130,10 @@ func TestPatchStatus(t *testing.T) {
 			require.NoError(t, err)
 			options := lib.Options{Scenarios: scenarios}
 
-			rs := getRuntimeState(t)
-			execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Options: options}, rs)
+			piState := getTestPreInitState(t)
+			execScheduler, err := local.NewExecutionScheduler(&minirunner.MiniRunner{Options: options}, piState)
 			require.NoError(t, err)
-			engine, err := core.NewEngine(execScheduler, options, rs.RuntimeOptions, nil, rs.Logger, rs.Registry)
+			engine, err := core.NewEngine(execScheduler, options, piState.RuntimeOptions, nil, piState.Logger, piState.Registry)
 			require.NoError(t, err)
 
 			require.NoError(t, engine.OutputManager.StartOutputs())

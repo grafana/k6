@@ -29,14 +29,14 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 	logger.AddHook(logHook)
 
 	registry := metrics.NewRegistry()
-	rs := &lib.RuntimeState{
+	piState := &lib.TestPreInitState{
 		Logger:         logger,
 		Registry:       registry,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 
 	script = []byte("import {setTimeout} from 'k6/x/events';\n" + string(script))
-	runner, err := js.New(rs, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
+	runner, err := js.New(piState, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -50,7 +50,7 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 	require.Empty(t, newOpts.Validate())
 	require.NoError(t, runner.SetOptions(newOpts))
 
-	execScheduler, err := local.NewExecutionScheduler(runner, rs)
+	execScheduler, err := local.NewExecutionScheduler(runner, piState)
 	require.NoError(t, err)
 
 	samples := make(chan metrics.SampleContainer, newOpts.MetricSamplesBufferSize.Int64)

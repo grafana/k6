@@ -63,7 +63,7 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	return New(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         logger,
 			RuntimeOptions: rtOpts,
 			BuiltinMetrics: builtinMetrics,

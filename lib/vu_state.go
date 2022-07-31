@@ -47,7 +47,7 @@ type State struct {
 	// TODO: remove them from here, the built-in metrics and the script options
 	// are not part of a VU's unique "state", they are global and the same for
 	// all VUs. Figure out how to thread them some other way, e.g. through the
-	// RuntimeState. The Samples channel might also benefit from that...
+	// TestPreInitState. The Samples channel might also benefit from that...
 	Options        Options
 	BuiltinMetrics *metrics.BuiltinMetrics
 
