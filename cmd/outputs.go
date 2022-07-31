@@ -77,7 +77,9 @@ func getPossibleIDList(constrs map[string]func(output.Params) (output.Output, er
 	return strings.Join(res, ", ")
 }
 
-func createOutputs(gs *globalState, test *loadedTest, executionPlan []lib.ExecutionStep) ([]output.Output, error) {
+func createOutputs(
+	gs *globalState, test *loadedAndConfiguredTest, executionPlan []lib.ExecutionStep,
+) ([]output.Output, error) {
 	outputConstructors, err := getAllOutputConstructors()
 	if err != nil {
 		return nil, err
