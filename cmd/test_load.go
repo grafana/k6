@@ -37,14 +37,6 @@ type loadedTest struct {
 	initRunner     lib.Runner // TODO: rename to something more appropriate
 }
 
-// loadedAndConfiguredTest contains the whole loadedTest, as well as the
-// consolidated test config and the full test run state.
-type loadedAndConfiguredTest struct {
-	*loadedTest
-	consolidatedConfig Config
-	derivedConfig      Config
-}
-
 func loadTest(gs *globalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("k6 needs at least one argument to load the test")
@@ -226,6 +218,14 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	}, nil
 }
 
+// loadedAndConfiguredTest contains the whole loadedTest, as well as the
+// consolidated test config and the full test run state.
+type loadedAndConfiguredTest struct {
+	*loadedTest
+	consolidatedConfig Config
+	derivedConfig      Config
+}
+
 func loadAndConfigureTest(
 	gs *globalState, cmd *cobra.Command, args []string,
 	cliConfigGetter func(flags *pflag.FlagSet) (Config, error),
@@ -236,6 +236,23 @@ func loadAndConfigureTest(
 	}
 
 	return test.consolidateDeriveAndValidateConfig(gs, cmd, cliConfigGetter)
+}
+
+func (lct *loadedAndConfiguredTest) buildTestRunState(
+	configToReinject lib.Options,
+) (*lib.TestRunState, error) {
+	// This might be the full derived or just the consodlidated options
+	if err := lct.initRunner.SetOptions(configToReinject); err != nil {
+		return nil, err
+	}
+
+	// TODO: init atlas root node, etc.
+
+	return &lib.TestRunState{
+		TestPreInitState: lct.preInitState,
+		Runner:           lct.initRunner,
+		Options:          lct.derivedConfig.Options, // we will always run with the derived options
+	}, nil
 }
 
 type syncWriteCloser struct {

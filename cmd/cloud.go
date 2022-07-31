@@ -102,7 +102,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// an execution shortcut option (e.g. `iterations` or `duration`),
 	// we will have multiple conflicting execution options since the
 	// derivation will set `scenarios` as well.
-	err = test.initRunner.SetOptions(test.consolidatedConfig.Options)
+	testRunState, err := test.buildTestRunState(test.consolidatedConfig.Options)
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// TODO: move those validations to a separate function and reuse validateConfig()?
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
-	arc := test.initRunner.MakeArchive()
+	arc := testRunState.Runner.MakeArchive()
 
 	// TODO: Fix this
 	// We reuse cloud.Config for parsing options.ext.loadimpact, but this probably shouldn't be
