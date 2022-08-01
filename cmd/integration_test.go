@@ -436,3 +436,46 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	require.Contains(t, stdOut, `✓ iterations.....................: 5`)
 	require.Contains(t, stdOut, `✓ setup_teardown.................: 2`)
 }
+
+func TestThresholdsFailed(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+
+	script := []byte(tb.Replacer.Replace(`
+		export let options = {
+			scenarios: {
+				sc1: {
+					executor: 'per-vu-iterations',
+					vus: 1, iterations: 1,
+				},
+				sc2: {
+					executor: 'shared-iterations',
+					vus: 1, iterations: 2,
+				},
+			},
+			thresholds: {
+				'iterations': ['count == 3'],
+				'iterations{scenario:sc1}': ['count == 2'],
+				'iterations{scenario:sc2}': ['count == 1'],
+				'iterations{scenario:sc3}': ['count == 0'],
+			},
+		};
+
+		export default function () {};
+	`))
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	ts.args = []string{"k6", "run", "test.js"}
+	ts.expectedExitCode = 99 // ThresholdsHaveFailed
+
+	newRootCommand(ts.globalState).execute()
+
+	assert.True(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, `some thresholds have failed`))
+	stdOut := ts.stdOut.String()
+	t.Logf(stdOut)
+	require.Contains(t, stdOut, `   ✓ iterations...........: 3`)
+	require.Contains(t, stdOut, `     ✗ { scenario:sc1 }...: 1`)
+	require.Contains(t, stdOut, `     ✗ { scenario:sc2 }...: 2`)
+	require.Contains(t, stdOut, `     ✓ { scenario:sc3 }...: 0   0/s`)
+}
