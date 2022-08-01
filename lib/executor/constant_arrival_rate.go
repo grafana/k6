@@ -337,7 +337,7 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 			int64(car.config.TimeUnit.TimeDuration()),
 		)).TimeDuration()
 
-	droppedIterationMetric := car.executionState.BuiltinMetrics.DroppedIterations
+	droppedIterationMetric := car.executionState.Test.BuiltinMetrics.DroppedIterations
 	shownWarning := false
 	metricTags := car.getMetricTags(nil)
 	for li, gi := 0, start; ; li, gi = li+1, gi+offsets[li%len(offsets)] {

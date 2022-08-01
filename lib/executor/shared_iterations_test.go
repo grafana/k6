@@ -34,7 +34,6 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils/minirunner"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 )
@@ -51,21 +50,16 @@ func getTestSharedIterationsConfig() SharedIterationsConfig {
 func TestSharedIterationsRun(t *testing.T) {
 	t.Parallel()
 	var doneIters uint64
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
-	ctx, cancel, executor, _ := setupExecutor(
-		t, getTestSharedIterationsConfig(), es,
-		simpleRunner(func(ctx context.Context, _ *lib.State) error {
-			atomic.AddUint64(&doneIters, 1)
-			return nil
-		}),
-	)
-	defer cancel()
-	err = executor.Run(ctx, nil)
-	require.NoError(t, err)
+
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+		atomic.AddUint64(&doneIters, 1)
+		return nil
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestSharedIterationsConfig())
+	defer test.cancel()
+
+	require.NoError(t, test.executor.Run(test.ctx, nil))
 	assert.Equal(t, uint64(100), doneIters)
 }
 
@@ -77,31 +71,26 @@ func TestSharedIterationsRunVariableVU(t *testing.T) {
 		result   sync.Map
 		slowVUID uint64
 	)
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
-	ctx, cancel, executor, _ := setupExecutor(
-		t, getTestSharedIterationsConfig(), es,
-		simpleRunner(func(ctx context.Context, state *lib.State) error {
-			time.Sleep(10 * time.Millisecond) // small wait to stabilize the test
-			// Pick one VU randomly and always slow it down.
-			sid := atomic.LoadUint64(&slowVUID)
-			if sid == uint64(0) {
-				atomic.StoreUint64(&slowVUID, state.VUID)
-			}
-			if sid == state.VUID {
-				time.Sleep(200 * time.Millisecond)
-			}
-			currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
-			result.Store(state.VUID, currIter.(uint64)+1)
-			return nil
-		}),
-	)
-	defer cancel()
-	err = executor.Run(ctx, nil)
-	require.NoError(t, err)
+
+	runner := simpleRunner(func(ctx context.Context, state *lib.State) error {
+		time.Sleep(10 * time.Millisecond) // small wait to stabilize the test
+		// Pick one VU randomly and always slow it down.
+		sid := atomic.LoadUint64(&slowVUID)
+		if sid == uint64(0) {
+			atomic.StoreUint64(&slowVUID, state.VUID)
+		}
+		if sid == state.VUID {
+			time.Sleep(200 * time.Millisecond)
+		}
+		currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
+		result.Store(state.VUID, currIter.(uint64)+1) //nolint:forcetypeassert
+		return nil
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestSharedIterationsConfig())
+	defer test.cancel()
+
+	require.NoError(t, test.executor.Run(test.ctx, nil))
 
 	var totalIters uint64
 	result.Range(func(key, value interface{}) bool {
@@ -120,8 +109,12 @@ func TestSharedIterationsRunVariableVU(t *testing.T) {
 func TestSharedIterationsEmitDroppedIterations(t *testing.T) {
 	t.Parallel()
 	var count int64
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
+
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+		atomic.AddInt64(&count, 1)
+		<-ctx.Done()
+		return nil
+	})
 
 	config := &SharedIterationsConfig{
 		VUs:         null.IntFrom(5),
@@ -129,22 +122,12 @@ func TestSharedIterationsEmitDroppedIterations(t *testing.T) {
 		MaxDuration: types.NullDurationFrom(1 * time.Second),
 	}
 
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
-	ctx, cancel, executor, logHook := setupExecutor(
-		t, config, es,
-		simpleRunner(func(ctx context.Context, _ *lib.State) error {
-			atomic.AddInt64(&count, 1)
-			<-ctx.Done()
-			return nil
-		}),
-	)
-	defer cancel()
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
+
 	engineOut := make(chan metrics.SampleContainer, 1000)
-	err = executor.Run(ctx, engineOut)
-	require.NoError(t, err)
-	assert.Empty(t, logHook.Drain())
+	require.NoError(t, test.executor.Run(test.ctx, engineOut))
+	assert.Empty(t, test.logHook.Drain())
 	assert.Equal(t, int64(5), count)
 	assert.Equal(t, float64(95), sumMetricValues(engineOut, metrics.DroppedIterationsName))
 }
@@ -171,32 +154,21 @@ func TestSharedIterationsGlobalIters(t *testing.T) {
 		tc := tc
 		t.Run(fmt.Sprintf("%s_%s", tc.seq, tc.seg), func(t *testing.T) {
 			t.Parallel()
-			ess, err := lib.NewExecutionSegmentSequenceFromString(tc.seq)
-			require.NoError(t, err)
-			seg, err := lib.NewExecutionSegmentFromString(tc.seg)
-			require.NoError(t, err)
-			et, err := lib.NewExecutionTuple(seg, &ess)
-			require.NoError(t, err)
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 5, 5)
-
-			runner := &minirunner.MiniRunner{}
-			ctx, cancel, executor, _ := setupExecutor(t, config, es, runner)
-			defer cancel()
 
 			gotIters := []uint64{}
 			var mx sync.Mutex
-			runner.Fn = func(ctx context.Context, state *lib.State, _ chan<- metrics.SampleContainer) error {
+			runner := simpleRunner(func(ctx context.Context, state *lib.State) error {
 				mx.Lock()
 				gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
 				mx.Unlock()
 				return nil
-			}
+			})
+
+			test := setupExecutorTest(t, tc.seg, tc.seq, lib.Options{}, runner, config)
+			defer test.cancel()
 
 			engineOut := make(chan metrics.SampleContainer, 100)
-			err = executor.Run(ctx, engineOut)
-			require.NoError(t, err)
+			require.NoError(t, test.executor.Run(test.ctx, engineOut))
 			sort.Slice(gotIters, func(i, j int) bool { return gotIters[i] < gotIters[j] })
 			assert.Equal(t, tc.expIters, gotIters)
 		})

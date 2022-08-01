@@ -72,7 +72,7 @@ func NewExecutionScheduler(trs *lib.TestRunState) (*ExecutionScheduler, error) {
 	maxPlannedVUs := lib.GetMaxPlannedVUs(executionPlan)
 	maxPossibleVUs := lib.GetMaxPossibleVUs(executionPlan)
 
-	executionState := lib.NewExecutionState(options, et, trs.BuiltinMetrics, maxPlannedVUs, maxPossibleVUs)
+	executionState := lib.NewExecutionState(trs, et, maxPlannedVUs, maxPossibleVUs)
 	maxDuration, _ := lib.GetEndOffset(executionPlan) // we don't care if the end offset is final
 
 	executorConfigs := options.Scenarios.GetSortedConfigs()
@@ -239,12 +239,12 @@ func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- me
 			Samples: []metrics.Sample{
 				{
 					Time:   t,
-					Metric: e.state.BuiltinMetrics.VUs,
+					Metric: e.state.Test.BuiltinMetrics.VUs,
 					Value:  float64(e.state.GetCurrentlyActiveVUsCount()),
 					Tags:   e.options.RunTags,
 				}, {
 					Time:   t,
-					Metric: e.state.BuiltinMetrics.VUsMax,
+					Metric: e.state.Test.BuiltinMetrics.VUsMax,
 					Value:  float64(e.state.GetInitializedVUsCount()),
 					Tags:   e.options.RunTags,
 				},
