@@ -78,6 +78,8 @@ func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) 
 			rtOpts = &opt
 		case *logrus.Logger:
 			logger = opt
+		default:
+			tb.Fatalf("unknown test option %q", opt)
 		}
 	}
 
