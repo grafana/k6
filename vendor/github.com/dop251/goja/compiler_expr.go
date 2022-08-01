@@ -1327,12 +1327,27 @@ func (c *compiler) compileParameterPatternBinding(item ast.Expression) {
 	c.createBindings(item, c.compileParameterPatternIdBinding)
 }
 
+func (c *compiler) newCode(length, minCap int) (buf []instruction) {
+	if c.codeScratchpad != nil {
+		buf = c.codeScratchpad
+		c.codeScratchpad = nil
+	}
+	if cap(buf) < minCap {
+		buf = make([]instruction, length, minCap)
+	} else {
+		buf = buf[:length]
+	}
+	return
+}
+
 func (e *compiledFunctionLiteral) compile() (prg *Program, name unistring.String, length int, strict bool) {
 	e.c.assert(e.typ != funcNone, e.offset, "compiledFunctionLiteral.typ is not set")
 
 	savedPrg := e.c.p
+	preambleLen := 8 // enter, boxThis, loadStack(0), initThis, createArgs, set, loadCallee, init
 	e.c.p = &Program{
-		src: e.c.p.src,
+		src:  e.c.p.src,
+		code: e.c.newCode(preambleLen, 16),
 	}
 	e.c.newScope()
 	s := e.c.scope
@@ -1431,8 +1446,6 @@ func (e *compiledFunctionLiteral) compile() (prg *Program, name unistring.String
 	body := e.body
 	funcs := e.c.extractFunctions(body)
 	var calleeBinding *binding
-	preambleLen := 8 // enter, boxThis, loadStack(0), initThis, createArgs, set, loadCallee, init
-	e.c.p.code = make([]instruction, preambleLen, 16)
 
 	emitArgsRestMark := -1
 	firstForwardRef := -1
@@ -1689,9 +1702,7 @@ func (e *compiledFunctionLiteral) compile() (prg *Program, name unistring.String
 		}
 	}
 	code[delta] = enter
-	if delta != 0 {
-		s.trimCode(delta)
-	}
+	s.trimCode(delta)
 
 	strict = s.strict
 	prg = e.c.p
@@ -2131,7 +2142,7 @@ func (e *compiledClassLiteral) compileFieldsAndStaticBlocks(elements []clsElemen
 	e.c.p = &Program{
 		src:      savedPrg.src,
 		funcName: funcName,
-		code:     make([]instruction, 2, len(elements)*2+3),
+		code:     e.c.newCode(2, 16),
 	}
 
 	e.c.newScope()
@@ -2191,6 +2202,7 @@ func (e *compiledClassLiteral) compileFieldsAndStaticBlocks(elements []clsElemen
 			enter.names = s.makeNamesMap()
 		}
 		e.c.p.code[0] = enter
+		s.trimCode(0)
 	} else {
 		s.trimCode(2)
 	}
