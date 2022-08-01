@@ -389,3 +389,50 @@ func TestSubMetricThresholdNoData(t *testing.T) {
        { tag:xyz }........: 0   0/s
      two..................: 42`)
 }
+
+func TestSetupTeardownThresholds(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+
+	script := []byte(tb.Replacer.Replace(`
+		import http from "k6/http";
+		import { check } from "k6";
+		import { Counter } from "k6/metrics";
+
+		let statusCheck = { "status is 200": (r) => r.status === 200 }
+		let myCounter = new Counter("setup_teardown");
+
+		export let options = {
+			iterations: 5,
+			thresholds: {
+				"setup_teardown": ["count == 2"],
+				"iterations": ["count == 5"],
+				"http_reqs": ["count == 7"],
+			},
+		};
+
+		export function setup() {
+			check(http.get("HTTPBIN_IP_URL"), statusCheck) && myCounter.add(1);
+		};
+
+		export default function () {
+			check(http.get("HTTPBIN_IP_URL"), statusCheck);
+		};
+
+		export function teardown() {
+			check(http.get("HTTPBIN_IP_URL"), statusCheck) && myCounter.add(1);
+		};
+	`))
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	ts.args = []string{"k6", "run", "test.js"}
+
+	newRootCommand(ts.globalState).execute()
+
+	require.Len(t, ts.loggerHook.Drain(), 0)
+	stdOut := ts.stdOut.String()
+	require.Contains(t, stdOut, `✓ http_reqs......................: 7`)
+	require.Contains(t, stdOut, `✓ iterations.....................: 5`)
+	require.Contains(t, stdOut, `✓ setup_teardown.................: 2`)
+}
