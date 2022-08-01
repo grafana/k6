@@ -86,9 +86,7 @@ func NewEngine(testState *lib.TestRunState, ex lib.ExecutionScheduler, outputs [
 		logger:         testState.Logger.WithField("component", "engine"),
 	}
 
-	me, err := engine.NewMetricsEngine(
-		testState.Registry, ex.GetState(), testState.Options, testState.RuntimeOptions, testState.Logger,
-	)
+	me, err := engine.NewMetricsEngine(ex.GetState())
 	if err != nil {
 		return nil, err
 	}
