@@ -60,10 +60,7 @@ func setupExecutor(t testing.TB, config lib.ExecutorConfig, es *lib.ExecutionSta
 	}
 	es.SetInitVUFunc(initVUFunc)
 
-	et, err := lib.NewExecutionTuple(es.Options.ExecutionSegment, es.Options.ExecutionSegmentSequence)
-	require.NoError(t, err)
-
-	maxPlannedVUs := lib.GetMaxPlannedVUs(config.GetExecutionRequirements(et))
+	maxPlannedVUs := lib.GetMaxPlannedVUs(config.GetExecutionRequirements(es.ExecutionTuple))
 	initializeVUs(ctx, t, logEntry, es, maxPlannedVUs, initVUFunc)
 
 	executor, err := config.NewExecutor(es, logEntry)
