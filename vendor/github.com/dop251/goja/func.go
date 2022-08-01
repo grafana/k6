@@ -65,10 +65,6 @@ func (f *nativeFuncObject) export(*objectExportCtx) interface{} {
 	return f.f
 }
 
-func (f *nativeFuncObject) exportType() reflect.Type {
-	return reflect.TypeOf(f.f)
-}
-
 func (f *funcObject) _addProto(n unistring.String) Value {
 	if n == "prototype" {
 		if _, exists := f.values[n]; !exists {
@@ -182,6 +178,10 @@ func (f *classFuncObject) Call(FunctionCall) Value {
 
 func (f *classFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
 	return f.Call, true
+}
+
+func (f *classFuncObject) export(*objectExportCtx) interface{} {
+	return f.Call
 }
 
 func (f *classFuncObject) createInstance(args []Value, newTarget *Object) (instance *Object) {
@@ -315,12 +315,12 @@ func (f *baseJsFuncObject) call(call FunctionCall, newTarget Value) Value {
 	return f._call(call.Arguments, newTarget, nilSafe(call.This))
 }
 
-func (f *funcObject) export(*objectExportCtx) interface{} {
+func (f *baseJsFuncObject) export(*objectExportCtx) interface{} {
 	return f.Call
 }
 
-func (f *funcObject) exportType() reflect.Type {
-	return reflect.TypeOf(f.Call)
+func (f *baseFuncObject) exportType() reflect.Type {
+	return reflectTypeFunc
 }
 
 func (f *baseJsFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
@@ -331,12 +331,12 @@ func (f *funcObject) assertConstructor() func(args []Value, newTarget *Object) *
 	return f.construct
 }
 
-func (f *arrowFuncObject) exportType() reflect.Type {
-	return reflect.TypeOf(f.Call)
-}
-
 func (f *arrowFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
 	return f.Call, true
+}
+
+func (f *arrowFuncObject) export(*objectExportCtx) interface{} {
+	return f.Call
 }
 
 func (f *baseFuncObject) init(name unistring.String, length Value) {

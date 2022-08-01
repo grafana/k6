@@ -83,6 +83,8 @@ type compiler struct {
 
 	evalVM *vm // VM used to evaluate constant expressions
 	ctxVM  *vm // VM in which an eval() code is compiled
+
+	codeScratchpad []instruction
 }
 
 type binding struct {
@@ -813,13 +815,25 @@ func (s *scope) moveArgsToStash() {
 	s.needStash = true
 }
 
-func (s *scope) trimCode(delta int) {
-	s.c.p.code = s.c.p.code[delta:]
-	srcMap := s.c.p.srcMap
-	for i := range srcMap {
-		srcMap[i].pc -= delta
+func (c *compiler) trimCode(delta int) {
+	src := c.p.code[delta:]
+	newCode := make([]instruction, len(src))
+	copy(newCode, src)
+	if cap(c.codeScratchpad) < cap(c.p.code) {
+		c.codeScratchpad = c.p.code[:0]
 	}
-	s.adjustBase(-delta)
+	c.p.code = newCode
+}
+
+func (s *scope) trimCode(delta int) {
+	s.c.trimCode(delta)
+	if delta != 0 {
+		srcMap := s.c.p.srcMap
+		for i := range srcMap {
+			srcMap[i].pc -= delta
+		}
+		s.adjustBase(-delta)
+	}
 }
 
 func (s *scope) adjustBase(delta int) {

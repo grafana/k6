@@ -3616,7 +3616,7 @@ func getHomeObject(v Value) *Object {
 			return getHomeObject(fn.funcObj)
 		}
 	}
-	panic(typeError(fmt.Sprintf("Compiler bug: getHomeObject() on the wrong value: %T", v)))
+	panic(newTypeError("Compiler bug: getHomeObject() on the wrong value: %T", v))
 }
 
 func (n *newArrowFunc) exec(vm *vm) {
@@ -4352,7 +4352,7 @@ func (_typeof) exec(vm *vm) {
 	case *Symbol:
 		r = stringSymbol
 	default:
-		panic(fmt.Errorf("Unknown type: %T", v))
+		panic(newTypeError("Compiler bug: unknown type: %T", v))
 	}
 	vm.stack[vm.sp-1] = r
 	vm.pc++
