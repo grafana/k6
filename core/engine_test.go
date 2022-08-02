@@ -80,6 +80,7 @@ func getTestRunState(
 		TestPreInitState: piState,
 		Options:          options,
 		Runner:           runner,
+		RunTags:          piState.Registry.BranchTagSetRootWith(options.RunTags),
 	}
 }
 
@@ -89,7 +90,9 @@ func newTestEngineWithTestPreInitState( //nolint:golint
 	opts lib.Options, piState *lib.TestPreInitState,
 ) *testStruct {
 	if runner == nil {
-		runner = &minirunner.MiniRunner{}
+		runner = &minirunner.MiniRunner{
+			PreInitState: piState,
+		}
 	}
 
 	newOpts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
@@ -296,7 +299,11 @@ func TestEngine_processSamples(t *testing.T) {
 		done := make(chan struct{})
 		runner := &minirunner.MiniRunner{
 			Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
-				out <- metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1"})}
+				out <- metrics.Sample{
+					Metric: metric,
+					Value:  1.25,
+					Tags:   metrics.NewTagSet(map[string]string{"a": "1"}).SampleTags(),
+				}
 				close(done)
 				return nil
 			},
@@ -332,7 +339,11 @@ func TestEngine_processSamples(t *testing.T) {
 		done := make(chan struct{})
 		runner := &minirunner.MiniRunner{
 			Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
-				out <- metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1", "b": "2"})}
+				out <- metrics.Sample{
+					Metric: metric,
+					Value:  1.25,
+					Tags:   metrics.NewTagSet(map[string]string{"a": "1", "b": "2"}).SampleTags(),
+				}
 				close(done)
 				return nil
 			},
@@ -384,7 +395,11 @@ func TestEngineThresholdsWillAbort(t *testing.T) {
 	done := make(chan struct{})
 	runner := &minirunner.MiniRunner{
 		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
-			out <- metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1"})}
+			out <- metrics.Sample{
+				Metric: metric,
+				Value:  1.25,
+				Tags:   metrics.NewTagSet(map[string]string{"a": "1"}).SampleTags(),
+			}
 			close(done)
 			return nil
 		},
@@ -426,7 +441,11 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 	done := make(chan struct{})
 	runner := &minirunner.MiniRunner{
 		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
-			out <- metrics.Sample{Metric: metric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1"})}
+			out <- metrics.Sample{
+				Metric: metric,
+				Value:  1.25,
+				Tags:   metrics.NewTagSet(map[string]string{"a": "1"}).SampleTags(),
+			}
 			<-ctx.Done()
 			close(done)
 			return nil
@@ -499,15 +518,27 @@ func TestEngine_processThresholds(t *testing.T) {
 				thresholds[m] = ths
 			}
 
-			runner := &minirunner.MiniRunner{}
 			test := newTestEngineWithTestPreInitState(
-				t, nil, runner, nil, lib.Options{Thresholds: thresholds}, piState,
+				t, nil, nil, nil, lib.Options{Thresholds: thresholds}, piState,
 			)
+
+			tag1 := piState.Registry.BranchTagSetRoot()
+			tag1.AddTag("a", "1")
+			tag2 := piState.Registry.BranchTagSetRoot()
+			tag2.AddTag("b", "1")
 
 			test.engine.OutputManager.AddMetricSamples(
 				[]metrics.SampleContainer{
-					metrics.Sample{Metric: gaugeMetric, Value: 1.25, Tags: metrics.IntoSampleTags(&map[string]string{"a": "1"})},
-					metrics.Sample{Metric: counterMetric, Value: 2, Tags: metrics.IntoSampleTags(&map[string]string{"b": "1"})},
+					metrics.Sample{
+						Metric: gaugeMetric,
+						Value:  1.25,
+						Tags:   tag1.SampleTags(),
+					},
+					metrics.Sample{
+						Metric: counterMetric,
+						Value:  2,
+						Tags:   tag2.SampleTags(),
+					},
 				},
 			)
 
@@ -688,7 +719,6 @@ func TestSentReceivedMetrics(t *testing.T) {
 
 func TestRunTags(t *testing.T) {
 	t.Parallel()
-	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	expectedRunTags := map[string]string{"foo": "bar", "test": "mest", "over": "written"}
 
@@ -699,6 +729,7 @@ func TestRunTags(t *testing.T) {
 		runTags[k] = v
 	}
 
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	script := []byte(tb.Replacer.Replace(`
 		import http from "k6/http";
 		import ws from "k6/ws";
@@ -801,7 +832,7 @@ func TestRunTags(t *testing.T) {
 			}
 
 			assert.True(t, ok)
-			assert.Equalf(t, expVal, val, "Wrong tag value in sample for metric %#v", s.Metric)
+			assert.Equalf(t, expVal, val, "Wrong tag value in sample - expected: %v got: %v metric %#v", expVal, val, s.Metric)
 		}
 	}
 }

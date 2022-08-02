@@ -54,6 +54,7 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 		TestPreInitState: piState,
 		Options:          newOpts,
 		Runner:           runner,
+		RunTags:          piState.Registry.BranchTagSetRootWith(newOpts.RunTags),
 	}
 
 	execScheduler, err := local.NewExecutionScheduler(testState)

@@ -72,6 +72,7 @@ func getTestRunState(
 		TestPreInitState: piState,
 		Options:          options,
 		Runner:           runner,
+		RunTags:          piState.Registry.BranchTagSetRootWith(options.RunTags),
 	}
 }
 
@@ -355,29 +356,32 @@ func TestExecutionSchedulerSystemTags(t *testing.T) {
 		require.NoError(t, execScheduler.Run(ctx, ctx, samples))
 	}()
 
-	expCommonTrailTags := metrics.IntoSampleTags(&map[string]string{
-		"group":             "",
-		"method":            "GET",
-		"name":              sr("HTTPBIN_IP_URL/"),
-		"url":               sr("HTTPBIN_IP_URL/"),
-		"proto":             "HTTP/1.1",
-		"status":            "200",
-		"expected_response": "true",
-	})
-	expTrailPVUTagsRaw := expCommonTrailTags.CloneTags()
-	expTrailPVUTagsRaw["scenario"] = "per_vu_test"
-	expTrailPVUTags := metrics.IntoSampleTags(&expTrailPVUTagsRaw)
-	expTrailSITagsRaw := expCommonTrailTags.CloneTags()
-	expTrailSITagsRaw["scenario"] = "shared_test"
-	expTrailSITags := metrics.IntoSampleTags(&expTrailSITagsRaw)
-	expNetTrailPVUTags := metrics.IntoSampleTags(&map[string]string{
-		"group":    "",
-		"scenario": "per_vu_test",
-	})
-	expNetTrailSITags := metrics.IntoSampleTags(&map[string]string{
-		"group":    "",
-		"scenario": "shared_test",
-	})
+	expCommonTrailTags := testRunState.RunTags.BranchOut()
+	expCommonTrailTags.AddTag("group", "")
+	expCommonTrailTags.AddTag("method", "GET")
+	expCommonTrailTags.AddTag("name", sr("HTTPBIN_IP_URL/"))
+	expCommonTrailTags.AddTag("url", sr("HTTPBIN_IP_URL/"))
+	expCommonTrailTags.AddTag("proto", "HTTP/1.1")
+	expCommonTrailTags.AddTag("status", "200")
+	expCommonTrailTags.AddTag("expected_response", "true")
+
+	expTrailPVUTagsRaw := expCommonTrailTags.BranchOut()
+	expTrailPVUTagsRaw.AddTag("scenario", "per_vu_test")
+	expTrailPVUTags := expTrailPVUTagsRaw.SampleTags()
+
+	expTrailSITagsRaw := expCommonTrailTags.BranchOut()
+	expTrailSITagsRaw.AddTag("scenario", "shared_test")
+	expTrailSITags := expTrailSITagsRaw.SampleTags()
+
+	expNetTrailPVUTagsRaw := testRunState.RunTags.BranchOut()
+	expNetTrailPVUTagsRaw.AddTag("group", "")
+	expNetTrailPVUTagsRaw.AddTag("scenario", "per_vu_test")
+	expNetTrailPVUTags := expNetTrailPVUTagsRaw.SampleTags()
+
+	expNetTrailSITagsRaw := testRunState.RunTags.BranchOut()
+	expNetTrailSITagsRaw.AddTag("group", "")
+	expNetTrailSITagsRaw.AddTag("scenario", "shared_test")
+	expNetTrailSITags := expNetTrailSITagsRaw.SampleTags()
 
 	var gotCorrectTags int
 	for {
@@ -393,8 +397,9 @@ func TestExecutionSchedulerSystemTags(t *testing.T) {
 					gotCorrectTags++
 				}
 			}
+
 		case <-done:
-			require.Equal(t, 4, gotCorrectTags, "received wrong amount of samples with expected tags")
+			assert.Equal(t, 4, gotCorrectTags, "received wrong amount of samples with expected tags")
 			return
 		}
 	}
@@ -900,7 +905,7 @@ func TestExecutionSchedulerRuntimeErrors(t *testing.T) {
 	assert.True(t, isFinal)
 
 	startTime := time.Now()
-	assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
+	require.NoError(t, execScheduler.Run(ctx, ctx, samples))
 	runTime := time.Since(startTime)
 	assert.True(t, runTime > 1*time.Second, "test did not take 1s")
 	assert.True(t, runTime < 10*time.Second, "took more than 10 seconds")
@@ -1239,11 +1244,11 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	}
 
 	getTags := func(args ...string) *metrics.SampleTags {
-		tags := map[string]string{}
+		tags := metrics.NewTagSet(nil)
 		for i := 0; i < len(args)-1; i += 2 {
-			tags[args[i]] = args[i+1]
+			tags.AddTag(args[i], args[i+1])
 		}
-		return metrics.IntoSampleTags(&tags)
+		return tags.SampleTags()
 	}
 	testCounter, err := piState.Registry.NewMetric("test_counter", metrics.Counter)
 	require.NoError(t, err)

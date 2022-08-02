@@ -49,10 +49,12 @@ func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 
 func getTestRunState(tb testing.TB, options lib.Options, runner lib.Runner) *lib.TestRunState {
 	require.NoError(tb, runner.SetOptions(runner.GetOptions().Apply(options)))
+	piState := getTestPreInitState(tb)
 	return &lib.TestRunState{
-		TestPreInitState: getTestPreInitState(tb),
+		TestPreInitState: piState,
 		Options:          options,
 		Runner:           runner,
+		RunTags:          piState.Registry.BranchTagSetRootWith(options.RunTags),
 	}
 }
 
