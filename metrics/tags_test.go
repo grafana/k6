@@ -4,9 +4,45 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/mstoykov/atlas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestTagSetBranchOut(t *testing.T) {
+	t.Parallel()
+
+	tm := NewTagSet(nil)
+	tm.AddTag("key1", "val1")
+
+	tm2 := tm.BranchOut()
+	tm2.AddTag("key2", "val2")
+
+	tm.AddTag("key3", "val3")
+
+	assert.Equal(t, map[string]string{"key1": "val1", "key3": "val3"}, tm.Map())
+	assert.Equal(t, map[string]string{
+		"key1": "val1",
+		"key2": "val2",
+	}, tm2.Map())
+}
+
+func TestTagSetFromSampleTags(t *testing.T) {
+	t.Parallel()
+
+	rootNode := atlas.New()
+	rootNode = rootNode.AddLink("key1", "val1")
+	st := &SampleTags{tags: rootNode}
+
+	tm := TagSetFromSampleTags(st)
+	tm.AddTag("key2", "val2")
+
+	assert.Equal(t, map[string]string{"key1": "val1"}, st.CloneTags())
+	assert.Equal(t, map[string]string{
+		"key1": "val1",
+		"key2": "val2",
+	}, tm.Map())
+}
 
 func TestEnabledTagsMarshalJSON(t *testing.T) {
 	t.Parallel()
