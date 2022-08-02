@@ -38,10 +38,6 @@ import (
 
 // ExecutionScheduler is the local implementation of lib.ExecutionScheduler
 type ExecutionScheduler struct {
-	runner       lib.Runner
-	options      lib.Options
-	testRunState *lib.TestRunState
-
 	initProgress    *pb.ProgressBar
 	executorConfigs []lib.ExecutorConfig // sorted by (startTime, ID)
 	executors       []lib.Executor       // sorted by (startTime, ID), excludes executors with no work
@@ -103,10 +99,6 @@ func NewExecutionScheduler(trs *lib.TestRunState) (*ExecutionScheduler, error) {
 	}
 
 	return &ExecutionScheduler{
-		runner:       trs.Runner,
-		options:      options,
-		testRunState: trs,
-
 		initProgress:    pb.New(pb.WithConstLeft("Init")),
 		executors:       executors,
 		executorConfigs: executorConfigs,
@@ -121,8 +113,8 @@ func NewExecutionScheduler(trs *lib.TestRunState) (*ExecutionScheduler, error) {
 }
 
 // GetRunner returns the wrapped lib.Runner instance.
-func (e *ExecutionScheduler) GetRunner() lib.Runner {
-	return e.runner
+func (e *ExecutionScheduler) GetRunner() lib.Runner { // TODO: remove
+	return e.state.Test.Runner
 }
 
 // GetState returns a pointer to the execution state struct for the local
@@ -168,7 +160,7 @@ func (e *ExecutionScheduler) initVU(
 	// Get the VU IDs here, so that the VUs are (mostly) ordered by their
 	// number in the channel buffer
 	vuIDLocal, vuIDGlobal := e.state.GetUniqueVUIdentifiers()
-	vu, err := e.runner.NewVU(vuIDLocal, vuIDGlobal, samplesOut)
+	vu, err := e.state.Test.Runner.NewVU(vuIDLocal, vuIDGlobal, samplesOut)
 	if err != nil {
 		return nil, errext.WithHint(err, fmt.Sprintf("error while initializing VU #%d", vuIDGlobal))
 	}
@@ -231,7 +223,7 @@ func (e *ExecutionScheduler) initVUsConcurrently(
 }
 
 func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- metrics.SampleContainer) {
-	e.testRunState.Logger.Debug("Starting emission of VUs and VUsMax metrics...")
+	e.state.Test.Logger.Debug("Starting emission of VUs and VUsMax metrics...")
 
 	emitMetrics := func() {
 		t := time.Now()
@@ -241,15 +233,15 @@ func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- me
 					Time:   t,
 					Metric: e.state.Test.BuiltinMetrics.VUs,
 					Value:  float64(e.state.GetCurrentlyActiveVUsCount()),
-					Tags:   e.options.RunTags,
+					Tags:   e.state.Test.Options.RunTags,
 				}, {
 					Time:   t,
 					Metric: e.state.Test.BuiltinMetrics.VUsMax,
 					Value:  float64(e.state.GetInitializedVUsCount()),
-					Tags:   e.options.RunTags,
+					Tags:   e.state.Test.Options.RunTags,
 				},
 			},
-			Tags: e.options.RunTags,
+			Tags: e.state.Test.Options.RunTags,
 			Time: t,
 		}
 		metrics.PushIfNotDone(ctx, out, samples)
@@ -259,7 +251,7 @@ func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- me
 	go func() {
 		defer func() {
 			ticker.Stop()
-			e.testRunState.Logger.Debug("Metrics emission of VUs and VUsMax metrics stopped")
+			e.state.Test.Logger.Debug("Metrics emission of VUs and VUsMax metrics stopped")
 			close(e.vusEmissionStopped)
 		}()
 
@@ -281,7 +273,7 @@ func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- me
 func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- metrics.SampleContainer) error {
 	e.emitVUsAndVUsMax(ctx, samplesOut)
 
-	logger := e.testRunState.Logger.WithField("phase", "local-execution-scheduler-init")
+	logger := e.state.Test.Logger.WithField("phase", "local-execution-scheduler-init")
 	vusToInitialize := lib.GetMaxPlannedVUs(e.executionPlan)
 	logger.WithFields(logrus.Fields{
 		"neededVUs":      vusToInitialize,
@@ -348,7 +340,7 @@ func (e *ExecutionScheduler) runExecutor(
 ) {
 	executorConfig := executor.GetConfig()
 	executorStartTime := executorConfig.GetStartTime()
-	executorLogger := e.testRunState.Logger.WithFields(logrus.Fields{
+	executorLogger := e.state.Test.Logger.WithFields(logrus.Fields{
 		"executor":  executorConfig.GetName(),
 		"type":      executorConfig.GetType(),
 		"startTime": executorStartTime,
@@ -400,7 +392,7 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut ch
 	}()
 
 	executorsCount := len(e.executors)
-	logger := e.testRunState.Logger.WithField("phase", "local-execution-scheduler-run")
+	logger := e.state.Test.Logger.WithField("phase", "local-execution-scheduler-run")
 	e.initProgress.Modify(pb.WithConstLeft("Run"))
 	var interrupted bool
 	defer func() {
@@ -434,11 +426,11 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut ch
 	defer cancel() // just in case, and to shut up go vet...
 
 	// Run setup() before any executors, if it's not disabled
-	if !e.options.NoSetup.Bool {
+	if !e.state.Test.Options.NoSetup.Bool {
 		logger.Debug("Running setup()")
 		e.state.SetExecutionStatus(lib.ExecutionStatusSetup)
 		e.initProgress.Modify(pb.WithConstProgress(1, "setup()"))
-		if err := e.runner.Setup(runSubCtx, engineOut); err != nil {
+		if err := e.state.Test.Runner.Setup(runSubCtx, engineOut); err != nil {
 			logger.WithField("error", err).Debug("setup() aborted by error")
 			return err
 		}
@@ -470,14 +462,14 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut ch
 	}
 
 	// Run teardown() after all executors are done, if it's not disabled
-	if !e.options.NoTeardown.Bool {
+	if !e.state.Test.Options.NoTeardown.Bool {
 		logger.Debug("Running teardown()")
 		e.state.SetExecutionStatus(lib.ExecutionStatusTeardown)
 		e.initProgress.Modify(pb.WithConstProgress(1, "teardown()"))
 
 		// We run teardown() with the global context, so it isn't interrupted by
 		// aborts caused by thresholds or even Ctrl+C (unless used twice).
-		if err := e.runner.Teardown(globalCtx, engineOut); err != nil {
+		if err := e.state.Test.Runner.Teardown(globalCtx, engineOut); err != nil {
 			logger.WithField("error", err).Debug("teardown() aborted by error")
 			return err
 		}
@@ -497,7 +489,7 @@ func (e *ExecutionScheduler) SetPaused(pause bool) error {
 		if pause {
 			return fmt.Errorf("execution is already paused")
 		}
-		e.testRunState.Logger.Debug("Starting execution")
+		e.state.Test.Logger.Debug("Starting execution")
 		return e.state.Resume()
 	}
 
