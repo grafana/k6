@@ -102,7 +102,8 @@ func generateTags(i, tagCount int, additionals ...map[string]string) *metrics.Sa
 		}
 	}
 
-	return metrics.IntoSampleTags(&res)
+	// FIXME: optimize
+	return metrics.NewTagSet(res).SampleTags()
 }
 
 func BenchmarkMetricMarshal(b *testing.B) {
@@ -234,6 +235,10 @@ func generateSamples(count int) []*Sample {
 	now := time.Now()
 	for i := range samples {
 		tags := generateTags(i, 200)
+		encodedTags, err := easyjson.Marshal(tags)
+		if err != nil {
+			panic(err)
+		}
 		switch i % 3 {
 		case 0:
 			samples[i] = &Sample{
@@ -242,7 +247,7 @@ func generateSamples(count int) []*Sample {
 				Data: &SampleDataSingle{
 					Time:  toMicroSecond(now),
 					Type:  metrics.Counter,
-					Tags:  tags,
+					Tags:  encodedTags,
 					Value: float64(i),
 				},
 			}
@@ -250,7 +255,7 @@ func generateSamples(count int) []*Sample {
 			aggrData := &SampleDataAggregatedHTTPReqs{
 				Time: toMicroSecond(now),
 				Type: "aggregated_trend",
-				Tags: tags,
+				Tags: encodedTags,
 			}
 			trail := generateHTTPExtTrail(now, time.Duration(i), tags)
 			aggrData.Add(trail)

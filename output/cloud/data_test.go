@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"testing"
 	"time"
 
@@ -53,7 +54,7 @@ func TestSampleMarshaling(t *testing.T) {
 				Data: &SampleDataSingle{
 					Type:  builtinMetrics.VUs.Type,
 					Time:  toMicroSecond(now),
-					Tags:  metrics.IntoSampleTags(&map[string]string{"aaa": "bbb", "ccc": "123"}),
+					Tags:  []byte(`{"aaa":"bbb","ccc":"123"}`),
 					Value: 999,
 				},
 			},
@@ -65,7 +66,7 @@ func TestSampleMarshaling(t *testing.T) {
 				Metric: "iter_li_all",
 				Data: &SampleDataMap{
 					Time: toMicroSecond(now),
-					Tags: metrics.IntoSampleTags(&map[string]string{"test": "mest"}),
+					Tags: []byte(`{"test":"mest"}`),
 					Values: map[string]float64{
 						metrics.DataSentName:          1234.5,
 						metrics.DataReceivedName:      6789.1,
@@ -107,7 +108,7 @@ func TestSampleMarshaling(t *testing.T) {
 				aggrData := &SampleDataAggregatedHTTPReqs{
 					Time: exptoMicroSecond,
 					Type: "aggregated_trend",
-					Tags: metrics.IntoSampleTags(&map[string]string{"test": "mest"}),
+					Tags: []byte(`{"test":"mest"}`),
 				}
 				aggrData.Add(
 					&httpext.Trail{
@@ -149,7 +150,7 @@ func TestSampleMarshaling(t *testing.T) {
 				aggrData := &SampleDataAggregatedHTTPReqs{
 					Time: exptoMicroSecond,
 					Type: "aggregated_trend",
-					Tags: metrics.IntoSampleTags(&map[string]string{"test": "mest"}),
+					Tags: []byte(`{"test": "mest"}`),
 				}
 				aggrData.Add(
 					&httpext.Trail{
@@ -189,13 +190,13 @@ func TestSampleMarshaling(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		sJSON, err := easyjson.Marshal(tc.s)
 		if !assert.NoError(t, err) {
 			continue
 		}
 		t.Logf(string(sJSON))
-		assert.JSONEq(t, tc.json, string(sJSON))
+		assert.JSONEq(t, tc.json, string(sJSON), "testcase"+strconv.Itoa(i))
 
 		var newS Sample
 		assert.NoError(t, json.Unmarshal(sJSON, &newS))

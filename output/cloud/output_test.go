@@ -52,9 +52,17 @@ import (
 	"go.k6.io/k6/output"
 )
 
-func tagEqual(expected, got *metrics.SampleTags) bool {
-	expectedMap := expected.CloneTags()
-	gotMap := got.CloneTags()
+func tagEqual(expected, got json.RawMessage) bool {
+	var expectedMap, gotMap map[string]string
+	err := json.Unmarshal(expected, &expectedMap)
+	if err != nil {
+		panic("tagEqual: " + err.Error())
+	}
+
+	err = json.Unmarshal(got, &gotMap)
+	if err != nil {
+		panic("tagEqual: " + err.Error())
+	}
 
 	if len(expectedMap) != len(gotMap) {
 		return false
@@ -80,9 +88,7 @@ func getSampleChecker(t *testing.T, expSamples <-chan []Sample) http.HandlerFunc
 		assert.NoError(t, json.Unmarshal(body, &receivedSamples))
 
 		expSamples := <-expSamples
-		if !assert.Len(t, receivedSamples, len(expSamples)) {
-			return
-		}
+		require.Len(t, receivedSamples, len(expSamples))
 
 		for i, expSample := range expSamples {
 			receivedSample := receivedSamples[i]
@@ -94,15 +100,13 @@ func getSampleChecker(t *testing.T, expSamples <-chan []Sample) http.HandlerFunc
 				continue
 			}
 
-			if !assert.IsType(t, expSample.Data, receivedSample.Data) {
-				continue
-			}
+			require.IsType(t, expSample.Data, receivedSample.Data)
 
 			switch expData := expSample.Data.(type) {
 			case *SampleDataSingle:
 				receivedData, ok := receivedSample.Data.(*SampleDataSingle)
 				assert.True(t, ok)
-				assert.True(t, expData.Tags.IsEqual(receivedData.Tags))
+				assert.JSONEq(t, string(expData.Tags), string(receivedData.Tags))
 				assert.Equal(t, expData.Time, receivedData.Time)
 				assert.Equal(t, expData.Type, receivedData.Type)
 				assert.Equal(t, expData.Value, receivedData.Value)
@@ -116,7 +120,7 @@ func getSampleChecker(t *testing.T, expSamples <-chan []Sample) http.HandlerFunc
 			case *SampleDataAggregatedHTTPReqs:
 				receivedData, ok := receivedSample.Data.(*SampleDataAggregatedHTTPReqs)
 				assert.True(t, ok)
-				assert.True(t, expData.Tags.IsEqual(receivedData.Tags))
+				assert.JSONEq(t, string(expData.Tags), string(receivedData.Tags))
 				assert.Equal(t, expData.Time, receivedData.Time)
 				assert.Equal(t, expData.Type, receivedData.Type)
 				assert.Equal(t, expData.Values, receivedData.Values)
@@ -209,10 +213,8 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 
 	now := time.Now()
 	tagMap := map[string]string{"test": "mest", "a": "b", "name": "name", "url": "url"}
-	tags := metrics.IntoSampleTags(&tagMap)
-	expectedTagMap := tags.CloneTags()
-	expectedTagMap["url"], _ = tags.Get("name")
-	expectedTags := metrics.IntoSampleTags(&expectedTagMap)
+	tags := metrics.NewTagSet(tagMap).SampleTags()
+	expectedTags := `{"test": "mest", "a": "b", "name": "name", "url": "name"}`
 
 	expSamples := make(chan []Sample)
 	defer close(expSamples)
@@ -227,13 +229,16 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 		Tags:   tags,
 		Value:  1.0,
 	}})
+
+	enctags, err := json.Marshal(tags)
+	require.NoError(t, err)
 	expSamples <- []Sample{{
 		Type:   DataTypeSingle,
 		Metric: metrics.VUsName,
 		Data: &SampleDataSingle{
 			Type:  builtinMetrics.VUs.Type,
 			Time:  toMicroSecond(now),
-			Tags:  tags,
+			Tags:  enctags,
 			Value: 1.0,
 		},
 	}}
@@ -285,7 +290,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 			Data: func(data interface{}) {
 				aggrData, ok := data.(*SampleDataAggregatedHTTPReqs)
 				assert.True(t, ok)
-				assert.True(t, aggrData.Tags.IsEqual(expectedTags))
+				assert.JSONEq(t, expectedTags, string(aggrData.Tags))
 				assert.Equal(t, out.config.AggregationMinSamples.Int64, int64(aggrData.Count))
 				assert.Equal(t, "aggregated_trend", aggrData.Type)
 				assert.InDelta(t, now.UnixNano(), aggrData.Time*1000, float64(out.config.AggregationPeriod.Duration))
@@ -336,7 +341,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, err)
 	now := time.Now()
-	tags := metrics.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
+	tags := metrics.NewTagSet(map[string]string{"test": "mest", "a": "b"}).SampleTags()
 	gotTheLimit := false
 	var m sync.Mutex
 
@@ -359,7 +364,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		Time:   now,
 		Metric: builtinMetrics.VUs,
-		Tags:   metrics.NewSampleTags(tags.CloneTags()),
+		Tags:   metrics.NewTagSet(tags.CloneTags()).SampleTags(),
 		Value:  1.0,
 	}})
 	for j := time.Duration(1); j <= 200; j++ {
@@ -376,7 +381,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 				EndTime:      now.Add(i * 100),
 				ConnDuration: 500 * time.Millisecond,
 				Duration:     j * i * 1500 * time.Millisecond,
-				Tags:         metrics.NewSampleTags(tags.CloneTags()),
+				Tags:         metrics.NewTagSet(tags.CloneTags()).SampleTags(),
 			})
 		}
 		out.AddMetricSamples(container)
@@ -451,7 +456,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	}
 	require.NoError(t, err)
 	now := time.Now()
-	tags := metrics.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
+	tags := metrics.NewTagSet(map[string]string{"test": "mest", "a": "b"}).SampleTags()
 
 	count := 1
 	max := 5
@@ -484,7 +489,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		Time:   now,
 		Metric: builtinMetrics.VUs,
-		Tags:   metrics.NewSampleTags(tags.CloneTags()),
+		Tags:   metrics.NewTagSet(tags.CloneTags()).SampleTags(),
 		Value:  1.0,
 	}})
 	for j := time.Duration(1); j <= 200; j++ {
@@ -501,7 +506,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 				EndTime:      now.Add(i * 100),
 				ConnDuration: 500 * time.Millisecond,
 				Duration:     j * i * 1500 * time.Millisecond,
-				Tags:         metrics.NewSampleTags(tags.CloneTags()),
+				Tags:         metrics.NewTagSet(tags.CloneTags()).SampleTags(),
 			})
 		}
 		out.AddMetricSamples(container)
@@ -524,7 +529,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		Time:   now,
 		Metric: builtinMetrics.VUs,
-		Tags:   metrics.NewSampleTags(tags.CloneTags()),
+		Tags:   metrics.NewTagSet(tags.CloneTags()).SampleTags(),
 		Value:  1.0,
 	}})
 	if nBufferSamples != len(out.bufferSamples) || nBufferHTTPTrails != len(out.bufferHTTPTrails) {
@@ -637,7 +642,9 @@ func TestCloudOutputPushRefID(t *testing.T) {
 	assert.Equal(t, "333", out.referenceID)
 
 	now := time.Now()
-	tags := metrics.IntoSampleTags(&map[string]string{"test": "mest", "a": "b"})
+	tags := metrics.NewTagSet(map[string]string{"test": "mest", "a": "b"}).SampleTags()
+	encodedTags, err := json.Marshal(tags)
+	require.NoError(t, err)
 
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		Time:   now,
@@ -651,7 +658,7 @@ func TestCloudOutputPushRefID(t *testing.T) {
 		Data: &SampleDataSingle{
 			Type:  builtinMetrics.HTTPReqDuration.Type,
 			Time:  toMicroSecond(now),
-			Tags:  tags,
+			Tags:  encodedTags,
 			Value: 123.45,
 		},
 	}}
@@ -879,4 +886,48 @@ func TestNewOutputClientTimeout(t *testing.T) {
 
 	err = out.client.PushMetric("testmetric", nil)
 	assert.True(t, os.IsTimeout(err))
+}
+
+func TestUseCloudTags(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   map[string]string
+		exp  map[string]string
+	}{
+		{
+			name: "without url",
+			in:   map[string]string{"name": "test-name"},
+			exp:  map[string]string{"name": "test-name"},
+		},
+		{
+			name: "without name",
+			in:   map[string]string{"url": "myurl"},
+			exp:  map[string]string{"url": "myurl"},
+		},
+		{
+			name: "url equals name",
+			in:   map[string]string{"name": "thesame", "url": "thesame"},
+			exp:  map[string]string{"name": "thesame", "url": "thesame"},
+		},
+		{
+			name: "url overwritten",
+			in:   map[string]string{"name": "test-name", "url": "myurl"},
+			exp:  map[string]string{"name": "test-name", "url": "test-name"},
+		},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			trail := &httpext.Trail{
+				Tags: metrics.NewTagSet(tc.in).SampleTags(),
+			}
+			newTrail := useCloudTags(trail)
+			assert.Equal(t, tc.exp, newTrail.Tags.CloneTags())
+			assert.Equal(t, tc.in, trail.Tags.CloneTags())
+		})
+	}
 }

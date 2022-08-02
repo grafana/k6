@@ -43,7 +43,7 @@ func TestSampleBufferBasics(t *testing.T) {
 		Time:   time.Now(),
 		Metric: metric,
 		Value:  float64(123),
-		Tags:   metrics.NewSampleTags(map[string]string{"tag1": "val1"}),
+		Tags:   metrics.NewTagSet(map[string]string{"tag1": "val1"}).SampleTags(),
 	}
 	connected := metrics.ConnectedSamples{Samples: []metrics.Sample{single, single}, Time: single.Time}
 	buffer := SampleBuffer{}
@@ -91,7 +91,7 @@ func TestSampleBufferConcurrently(t *testing.T) {
 				Time:   time.Unix(1562324644, 0),
 				Metric: metric,
 				Value:  float64(i),
-				Tags:   metrics.NewSampleTags(map[string]string{"tag1": "val1"}),
+				Tags:   metrics.NewTagSet(map[string]string{"tag1": "val1"}).SampleTags(),
 			}})
 			time.Sleep(time.Duration(i*sleepModifier) * time.Microsecond)
 		}

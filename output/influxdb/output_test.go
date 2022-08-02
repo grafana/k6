@@ -136,11 +136,11 @@ func TestOutput(t *testing.T) {
 			samples[i] = metrics.Sample{
 				Metric: metric,
 				Time:   time.Now(),
-				Tags: metrics.NewSampleTags(map[string]string{
+				Tags: metrics.NewTagSet(map[string]string{
 					"something": "else",
 					"VU":        "21",
 					"else":      "something",
-				}),
+				}).SampleTags(),
 				Value: 2.0,
 			}
 		}

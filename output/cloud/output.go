@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	easyjson "github.com/mailru/easyjson"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
@@ -333,12 +334,12 @@ func useCloudTags(source *httpext.Trail) *httpext.Trail {
 		return source
 	}
 
-	newTags := source.Tags.CloneTags()
-	newTags["url"] = name
+	newTags := metrics.TagSetFromSampleTags(source.Tags)
+	newTags.AddTag("url", name)
 
 	dest := new(httpext.Trail)
 	*dest = *source
-	dest.Tags = metrics.IntoSampleTags(&newTags)
+	dest.Tags = newTags.SampleTags()
 	dest.Samples = nil
 
 	return dest
@@ -383,24 +384,33 @@ func (out *Output) AddMetricSamples(sampleContainers []metrics.SampleContainer) 
 				values[metrics.IterationsName] = 1
 			}
 
+			encodedTags, err := easyjson.Marshal(sc.GetTags())
+			if err != nil {
+				out.logger.Error("Encoding tags failed", err)
+			}
 			newSamples = append(newSamples, &Sample{
 				Type:   DataTypeMap,
 				Metric: "iter_li_all",
 				Data: &SampleDataMap{
 					Time:   toMicroSecond(sc.GetTime()),
-					Tags:   sc.GetTags(),
+					Tags:   encodedTags,
 					Values: values,
 				},
 			})
 		default:
 			for _, sample := range sampleContainer.GetSamples() {
+				encodedTags, err := easyjson.Marshal(sample.Tags)
+				if err != nil {
+					out.logger.Error("Encoding tags failed", err)
+				}
+
 				newSamples = append(newSamples, &Sample{
 					Type:   DataTypeSingle,
 					Metric: sample.Metric.Name,
 					Data: &SampleDataSingle{
 						Type:  sample.Metric.Type,
 						Time:  toMicroSecond(sample.Time),
-						Tags:  sample.Tags,
+						Tags:  encodedTags,
 						Value: sample.Value,
 					},
 				})
@@ -487,11 +497,15 @@ func (out *Output) aggregateHTTPTrails(waitPeriod time.Duration) {
 					}
 					continue
 				}
+				encodedTags, err := easyjson.Marshal(tags)
+				if err != nil {
+					out.logger.Error("Encoding tags failed", err)
+				}
 
 				aggrData := &SampleDataAggregatedHTTPReqs{
 					Time: toMicroSecond(time.Unix(0, bucketID*aggrPeriod+aggrPeriod/2)),
 					Type: "aggregated_trend",
-					Tags: tags,
+					Tags: encodedTags,
 				}
 
 				if out.config.AggregationSkipOutlierDetection.Bool {
