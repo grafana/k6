@@ -718,7 +718,7 @@ func TestClient(t *testing.T) {
 				BuiltinMetrics: metrics.RegisterBuiltinMetrics(
 					metrics.NewRegistry(),
 				),
-				Tags: lib.NewTagMap(nil),
+				Tags: lib.NewTagMap(metrics.NewTagSet(nil)),
 			}
 			ts.MoveToVUContext(state)
 			val, err = replace(tt.vuString.code)

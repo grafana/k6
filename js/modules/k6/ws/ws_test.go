@@ -123,7 +123,7 @@ func newTestState(t testing.TB) testState {
 		Samples:        samples,
 		TLSConfig:      tb.TLSClientConfig,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
-		Tags:           lib.NewTagMap(nil),
+		Tags:           lib.NewTagMap(metrics.NewTagSet(nil)),
 	}
 
 	m := New().NewModuleInstance(testRuntime.VU)

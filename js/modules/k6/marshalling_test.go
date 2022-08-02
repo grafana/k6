@@ -135,16 +135,13 @@ func TestSetupDataMarshalling(t *testing.T) {
 		SetupTimeout: types.NullDurationFrom(5 * time.Second),
 		Hosts:        tb.Dialer.Hosts,
 	})
-
 	require.NoError(t, err)
 
 	samples := make(chan<- metrics.SampleContainer, 100)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	if !assert.NoError(t, runner.Setup(ctx, samples)) {
-		return
-	}
+	require.NoError(t, runner.Setup(ctx, samples))
 	initVU, err := runner.NewVU(1, 1, samples)
 	if assert.NoError(t, err) {
 		vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})

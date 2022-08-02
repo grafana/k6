@@ -138,13 +138,11 @@ func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
 	ret, err := fn(goja.Undefined())
 	t := time.Now()
 
-	tags := state.CloneTags()
-
 	ctx := mi.vu.Context()
 	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
 		Time:   t,
 		Metric: state.BuiltinMetrics.GroupDuration,
-		Tags:   metrics.IntoSampleTags(&tags),
+		Tags:   state.Tags.BranchOut().SampleTags(),
 		Value:  metrics.D(t.Sub(startTime)),
 	})
 
@@ -166,11 +164,11 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 	t := time.Now()
 
 	// Prepare the metric tags
-	commonTags := state.CloneTags()
+	commonTags := state.Tags.BranchOut()
 	if len(extras) > 0 {
 		obj := extras[0].ToObject(rt)
 		for _, k := range obj.Keys() {
-			commonTags[k] = obj.Get(k).String()
+			commonTags.AddTag(k, obj.Get(k).String())
 		}
 	}
 
@@ -180,18 +178,15 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 	for _, name := range obj.Keys() {
 		val := obj.Get(name)
 
-		tags := make(map[string]string, len(commonTags))
-		for k, v := range commonTags {
-			tags[k] = v
-		}
-
 		// Resolve the check record.
 		check, err := state.Group.Check(name)
 		if err != nil {
 			return false, err
 		}
+
+		tags := commonTags.BranchOut()
 		if state.Options.SystemTags.Has(metrics.TagCheck) {
-			tags["check"] = check.Name
+			tags.AddTag("check", check.Name)
 		}
 
 		// Resolve callables into values.
@@ -205,23 +200,26 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 			}
 		}
 
-		sampleTags := metrics.IntoSampleTags(&tags)
-
 		// Emit! (But only if we have a valid context.)
 		select {
 		case <-ctx.Done():
 		default:
+			sample := metrics.Sample{
+				Time:   t,
+				Metric: state.BuiltinMetrics.Checks,
+				Tags:   tags.SampleTags(),
+				Value:  0,
+			}
 			if val.ToBoolean() {
 				atomic.AddInt64(&check.Passes, 1)
-				metrics.PushIfNotDone(ctx, state.Samples,
-					metrics.Sample{Time: t, Metric: state.BuiltinMetrics.Checks, Tags: sampleTags, Value: 1})
+				sample.Value = 1
 			} else {
 				atomic.AddInt64(&check.Fails, 1)
-				metrics.PushIfNotDone(ctx, state.Samples,
-					metrics.Sample{Time: t, Metric: state.BuiltinMetrics.Checks, Tags: sampleTags, Value: 0})
+
 				// A single failure makes the return value false.
 				succ = false
 			}
+			metrics.PushIfNotDone(ctx, state.Samples, sample)
 		}
 
 		if exc != nil {

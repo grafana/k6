@@ -46,11 +46,14 @@ func BenchmarkHTTPRequests(b *testing.B) {
 			}
 		`), lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(b, err)
+
 	err = r.SetOptions(lib.Options{
 		Throw:          null.BoolFrom(true),
 		MaxRedirects:   null.IntFrom(10),
 		Hosts:          tb.Dialer.Hosts,
 		NoCookiesReset: null.BoolFrom(true),
+		SystemTags:     &metrics.DefaultSystemTagSet,
+		RunTags:        map[string]string{"myapp": "myhttpbench"},
 	})
 	require.NoError(b, err)
 

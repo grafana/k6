@@ -46,14 +46,16 @@ func TestConsoleContext(t *testing.T) {
 
 func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) (*Runner, error) {
 	var (
-		fs     = afero.NewMemMapFs()
-		rtOpts = lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)}
-		logger = testutils.NewLogger(tb)
+		rtOpts      = lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)}
+		logger      = testutils.NewLogger(tb)
+		fsResolvers = map[string]afero.Fs{"file": afero.NewMemMapFs(), "https": afero.NewMemMapFs()}
 	)
 	for _, o := range opts {
 		switch opt := o.(type) {
 		case afero.Fs:
-			fs = opt
+			fsResolvers["file"] = opt
+		case map[string]afero.Fs:
+			fsResolvers = opt
 		case lib.RuntimeOptions:
 			rtOpts = opt
 		case *logrus.Logger:
@@ -75,7 +77,7 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),
 		},
-		map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()},
+		fsResolvers,
 	)
 }
 

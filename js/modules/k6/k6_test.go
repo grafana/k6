@@ -161,7 +161,7 @@ func TestGroup(t *testing.T) {
 		state := &lib.State{
 			Group:   root,
 			Samples: make(chan metrics.SampleContainer, 1000),
-			Tags:    lib.NewTagMap(nil),
+			Tags:    lib.NewTagMap(metrics.NewTagSet(nil)),
 			Options: lib.Options{
 				SystemTags: metrics.NewSystemTagSet(metrics.TagGroup),
 			},
@@ -223,10 +223,8 @@ func checkTestRuntime(t testing.TB) (*goja.Runtime, chan metrics.SampleContainer
 		Options: lib.Options{
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
-		Samples: samples,
-		Tags: lib.NewTagMap(map[string]string{
-			"group": root.Path,
-		}),
+		Samples:        samples,
+		Tags:           lib.NewTagMap(metrics.NewTagSet(map[string]string{"group": root.Path})),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
 	}
 	test.MoveToVUContext(state)
@@ -432,9 +430,9 @@ func TestCheckContextExpiry(t *testing.T) {
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Samples: samples,
-		Tags: lib.NewTagMap(map[string]string{
+		Tags: lib.NewTagMap(metrics.NewTagSet(map[string]string{
 			"group": root.Path,
-		}),
+		})),
 	}
 
 	state.BuiltinMetrics = metrics.RegisterBuiltinMetrics(metrics.NewRegistry())

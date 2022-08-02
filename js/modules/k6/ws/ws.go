@@ -154,7 +154,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 
 	enableCompression := false
 
-	tags := state.CloneTags()
+	tags := state.Tags.BranchOut()
 	jar := state.CookieJar
 
 	// Parse the optional second argument (params)
@@ -184,7 +184,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 					continue
 				}
 				for _, key := range tagObj.Keys() {
-					tags[key] = tagObj.Get(key).String()
+					tags.AddTag(key, tagObj.Get(key).String())
 				}
 			case "jar":
 				jarV := params.Get(k)
@@ -216,7 +216,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	}
 
 	if state.Options.SystemTags.Has(metrics.TagURL) {
-		tags["url"] = url
+		tags.AddTag("url", url)
 	}
 
 	// Overriding the NextProtos to avoid talking http2
@@ -247,17 +247,18 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 
 	if state.Options.SystemTags.Has(metrics.TagIP) && conn.RemoteAddr() != nil {
 		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
-			tags["ip"] = ip
+			// TODO: make as a not indexable
+			tags.AddTag("ip", ip)
 		}
 	}
 
 	if httpResponse != nil {
 		if state.Options.SystemTags.Has(metrics.TagStatus) {
-			tags["status"] = strconv.Itoa(httpResponse.StatusCode)
+			tags.AddTag("status", strconv.Itoa(httpResponse.StatusCode))
 		}
 
 		if state.Options.SystemTags.Has(metrics.TagSubproto) {
-			tags["subproto"] = httpResponse.Header.Get("Sec-WebSocket-Protocol")
+			tags.AddTag("subproto", httpResponse.Header.Get("Sec-WebSocket-Protocol"))
 		}
 	}
 
@@ -270,7 +271,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 		scheduled:          make(chan goja.Callable),
 		done:               make(chan struct{}),
 		samplesOutput:      state.Samples,
-		sampleTags:         metrics.IntoSampleTags(&tags),
+		sampleTags:         tags.SampleTags(),
 		builtinMetrics:     state.BuiltinMetrics,
 	}
 
