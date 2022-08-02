@@ -7,7 +7,6 @@ import (
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
-	metrics "go.k6.io/k6/metrics"
 )
 
 // suppress unused package warning
@@ -108,16 +107,8 @@ func easyjson9def2ecdDecodeGoK6IoK6OutputCloud1(in *jlexer.Lexer, out *SampleDat
 				in.AddError((out.Type).UnmarshalText(data))
 			}
 		case "tags":
-			if in.IsNull() {
-				in.Skip()
-				out.Tags = nil
-			} else {
-				if out.Tags == nil {
-					out.Tags = new(metrics.SampleTags)
-				}
-				if data := in.Raw(); in.Ok() {
-					in.AddError((*out.Tags).UnmarshalJSON(data))
-				}
+			if data := in.Raw(); in.Ok() {
+				in.AddError((out.Tags).UnmarshalJSON(data))
 			}
 		case "value":
 			out.Value = float64(in.Float64())
@@ -145,10 +136,10 @@ func easyjson9def2ecdEncodeGoK6IoK6OutputCloud1(out *jwriter.Writer, in SampleDa
 		out.RawString(prefix)
 		out.Raw((in.Type).MarshalJSON())
 	}
-	if in.Tags != nil {
+	if len(in.Tags) != 0 {
 		const prefix string = ",\"tags\":"
 		out.RawString(prefix)
-		(*in.Tags).MarshalEasyJSON(out)
+		out.Raw((in.Tags).MarshalJSON())
 	}
 	{
 		const prefix string = ",\"value\":"
@@ -193,16 +184,8 @@ func easyjson9def2ecdDecodeGoK6IoK6OutputCloud2(in *jlexer.Lexer, out *SampleDat
 				in.AddError((out.Type).UnmarshalText(data))
 			}
 		case "tags":
-			if in.IsNull() {
-				in.Skip()
-				out.Tags = nil
-			} else {
-				if out.Tags == nil {
-					out.Tags = new(metrics.SampleTags)
-				}
-				if data := in.Raw(); in.Ok() {
-					in.AddError((*out.Tags).UnmarshalJSON(data))
-				}
+			if data := in.Raw(); in.Ok() {
+				in.AddError((out.Tags).UnmarshalJSON(data))
 			}
 		case "values":
 			if in.IsNull() {
@@ -248,10 +231,10 @@ func easyjson9def2ecdEncodeGoK6IoK6OutputCloud2(out *jwriter.Writer, in SampleDa
 		out.RawString(prefix)
 		out.Raw((in.Type).MarshalJSON())
 	}
-	if in.Tags != nil {
+	if len(in.Tags) != 0 {
 		const prefix string = ",\"tags\":"
 		out.RawString(prefix)
-		(*in.Tags).MarshalEasyJSON(out)
+		out.Raw((in.Tags).MarshalJSON())
 	}
 	if len(in.Values) != 0 {
 		const prefix string = ",\"values\":"
@@ -310,16 +293,8 @@ func easyjson9def2ecdDecodeGoK6IoK6OutputCloud3(in *jlexer.Lexer, out *SampleDat
 		case "count":
 			out.Count = uint64(in.Uint64())
 		case "tags":
-			if in.IsNull() {
-				in.Skip()
-				out.Tags = nil
-			} else {
-				if out.Tags == nil {
-					out.Tags = new(metrics.SampleTags)
-				}
-				if data := in.Raw(); in.Ok() {
-					in.AddError((*out.Tags).UnmarshalJSON(data))
-				}
+			if data := in.Raw(); in.Ok() {
+				in.AddError((out.Tags).UnmarshalJSON(data))
 			}
 		case "values":
 			easyjson9def2ecdDecode(in, &out.Values)
@@ -352,10 +327,10 @@ func easyjson9def2ecdEncodeGoK6IoK6OutputCloud3(out *jwriter.Writer, in SampleDa
 		out.RawString(prefix)
 		out.Uint64(uint64(in.Count))
 	}
-	if in.Tags != nil {
+	if len(in.Tags) != 0 {
 		const prefix string = ",\"tags\":"
 		out.RawString(prefix)
-		(*in.Tags).MarshalEasyJSON(out)
+		out.Raw((in.Tags).MarshalJSON())
 	}
 	{
 		const prefix string = ",\"values\":"
