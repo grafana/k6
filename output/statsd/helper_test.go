@@ -88,7 +88,7 @@ func baseTest(t *testing.T,
 	newSample := func(m *metrics.Metric, value float64, tags map[string]string) metrics.Sample {
 		return metrics.Sample{
 			Time:   time.Now(),
-			Metric: m, Value: value, Tags: metrics.IntoSampleTags(&tags),
+			Metric: m, Value: value, Tags: metrics.NewTagSet(tags).SampleTags(),
 		}
 	}
 
