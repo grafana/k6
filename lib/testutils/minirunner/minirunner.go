@@ -46,8 +46,11 @@ type MiniRunner struct {
 
 	SetupData []byte
 
-	Group   *lib.Group
-	Options lib.Options
+	Group        *lib.Group
+	Options      lib.Options
+	PreInitState *lib.TestPreInitState
+
+	runTags *metrics.TagSet
 }
 
 // MakeArchive isn't implemented, it always returns nil and is just here to
@@ -59,6 +62,9 @@ func (r MiniRunner) MakeArchive() *lib.Archive {
 // NewVU returns a new VU with an incremental ID.
 func (r *MiniRunner) NewVU(idLocal, idGlobal uint64, out chan<- metrics.SampleContainer) (lib.InitializedVU, error) {
 	state := &lib.State{VUID: idLocal, VUIDGlobal: idGlobal, Iteration: int64(-1)}
+	if r.runTags != nil {
+		state.Tags = lib.NewTagMap(r.runTags)
+	}
 	return &VU{
 		R:            r,
 		Out:          out,
@@ -118,6 +124,11 @@ func (r MiniRunner) GetOptions() lib.Options {
 // SetOptions allows you to override the runner options.
 func (r *MiniRunner) SetOptions(opts lib.Options) error {
 	r.Options = opts
+
+	if r.PreInitState != nil {
+		r.runTags = r.PreInitState.Registry.BranchTagSetRootWith(r.Options.RunTags)
+	}
+
 	return nil
 }
 

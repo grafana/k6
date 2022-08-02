@@ -93,15 +93,12 @@ func (bs *BaseExecutor) GetProgress() *pb.ProgressBar {
 // getMetricTags returns a tag set that can be used to emit metrics by the
 // executor. The VU ID is optional.
 func (bs *BaseExecutor) getMetricTags(vuID *uint64) *metrics.SampleTags {
-	tags := make(map[string]string, len(bs.executionState.Test.Options.RunTags))
-	for k, v := range bs.executionState.Test.Options.RunTags {
-		tags[k] = v
-	}
+	tags := bs.executionState.Test.RunTags.BranchOut()
 	if bs.executionState.Test.Options.SystemTags.Has(metrics.TagScenario) {
-		tags["scenario"] = bs.config.GetName()
+		tags.AddTag("scenario", bs.config.GetName())
 	}
 	if vuID != nil && bs.executionState.Test.Options.SystemTags.Has(metrics.TagVU) {
-		tags["vu"] = strconv.FormatUint(*vuID, 10)
+		tags.AddTag("vu", strconv.FormatUint(*vuID, 10))
 	}
-	return metrics.IntoSampleTags(&tags)
+	return tags.SampleTags()
 }

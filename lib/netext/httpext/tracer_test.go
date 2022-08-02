@@ -149,7 +149,7 @@ func TestTracer(t *testing.T) { //nolint:tparallel
 				time.Sleep(traceDelay)
 			}
 			trail := tracer.Done()
-			trail.SaveSamples(builtinMetrics, metrics.IntoSampleTags(&map[string]string{"tag": "value"}))
+			trail.SaveSamples(builtinMetrics, metrics.NewTagSet(map[string]string{"tag": "value"}).SampleTags())
 			samples := trail.GetSamples()
 
 			assertLaterOrZero(t, tracer.getConn, isReuse)

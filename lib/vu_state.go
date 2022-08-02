@@ -93,35 +93,37 @@ type State struct {
 	GetScenarioGlobalVUIter func() uint64
 }
 
-// CloneTags makes a copy of the tags map and returns it.
-func (s *State) CloneTags() map[string]string {
-	return s.Tags.Clone()
-}
-
 // TagMap is a safe-concurrent Tags lookup.
 type TagMap struct {
-	m     map[string]string
 	mutex sync.RWMutex
+	tags  *metrics.TagSet
 }
 
 // NewTagMap creates a TagMap,
 // if a not-nil map is passed then it will be used as the internal map
 // otherwise a new one will be created.
-func NewTagMap(m map[string]string) *TagMap {
-	if m == nil {
-		m = make(map[string]string)
+func NewTagMap(tags *metrics.TagSet) *TagMap {
+	if tags == nil {
+		panic("the metrics.TagSet must be initialized for creating a new lib.TagMap")
 	}
 	return &TagMap{
-		m:     m,
+		tags:  tags,
 		mutex: sync.RWMutex{},
 	}
+}
+
+// BranchOut creates a TagSet starting from the state of the current Set.
+func (tg *TagMap) BranchOut() *metrics.TagSet {
+	tg.mutex.RLock()
+	defer tg.mutex.RUnlock()
+	return tg.tags.BranchOut()
 }
 
 // Set sets a Tag.
 func (tg *TagMap) Set(k, v string) {
 	tg.mutex.Lock()
 	defer tg.mutex.Unlock()
-	tg.m[k] = v
+	tg.tags.AddTag(k, v)
 }
 
 // Get returns the Tag value and true
@@ -129,22 +131,21 @@ func (tg *TagMap) Set(k, v string) {
 func (tg *TagMap) Get(k string) (string, bool) {
 	tg.mutex.RLock()
 	defer tg.mutex.RUnlock()
-	v, ok := tg.m[k]
-	return v, ok
+	return tg.tags.Get(k)
 }
 
 // Len returns the number of the set keys.
 func (tg *TagMap) Len() int {
 	tg.mutex.RLock()
 	defer tg.mutex.RUnlock()
-	return len(tg.m)
+	return tg.tags.Len()
 }
 
 // Delete deletes a map's item based on the provided key.
 func (tg *TagMap) Delete(k string) {
 	tg.mutex.Lock()
 	defer tg.mutex.Unlock()
-	delete(tg.m, k)
+	tg.tags.Delete(k)
 }
 
 // Clone returns a map with the entire set of items.
@@ -152,9 +153,5 @@ func (tg *TagMap) Clone() map[string]string {
 	tg.mutex.RLock()
 	defer tg.mutex.RUnlock()
 
-	tags := make(map[string]string, len(tg.m))
-	for k, v := range tg.m {
-		tags[k] = v
-	}
-	return tags
+	return tg.tags.Map()
 }

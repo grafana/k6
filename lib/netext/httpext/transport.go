@@ -39,7 +39,7 @@ import (
 type transport struct {
 	ctx              context.Context
 	state            *lib.State
-	tags             map[string]string
+	tags             *metrics.TagSet
 	responseCallback func(int) bool
 
 	lastRequest     *unfinishedRequest
@@ -77,7 +77,7 @@ var _ http.RoundTripper = &transport{}
 func newTransport(
 	ctx context.Context,
 	state *lib.State,
-	tags map[string]string,
+	tags *metrics.TagSet,
 	responseCallback func(int) bool,
 ) *transport {
 	return &transport{
@@ -95,10 +95,7 @@ func newTransport(
 func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRequest {
 	trail := unfReq.tracer.Done()
 
-	tags := map[string]string{}
-	for k, v := range t.tags {
-		tags[k] = v
-	}
+	tags := t.tags.BranchOut()
 
 	result := &finishedRequest{
 		unfinishedRequest: unfReq,
@@ -108,64 +105,64 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 	enabledTags := t.state.Options.SystemTags
 	urlEnabled := enabledTags.Has(metrics.TagURL)
 	var setName bool
-	if _, ok := tags["name"]; !ok && enabledTags.Has(metrics.TagName) {
+	if _, ok := tags.Get("name"); !ok && enabledTags.Has(metrics.TagName) {
 		setName = true
 	}
 	if urlEnabled || setName {
 		cleanURL := URL{u: unfReq.request.URL, URL: unfReq.request.URL.String()}.Clean()
 		if urlEnabled {
-			tags["url"] = cleanURL
+			tags.AddTag("url", cleanURL)
 		}
 		if setName {
-			tags["name"] = cleanURL
+			tags.AddTag("name", cleanURL)
 		}
 	}
 
 	if enabledTags.Has(metrics.TagMethod) {
-		tags["method"] = unfReq.request.Method
+		tags.AddTag("method", unfReq.request.Method)
 	}
 
 	if unfReq.err != nil {
 		result.errorCode, result.errorMsg = errorCodeForError(unfReq.err)
 		if enabledTags.Has(metrics.TagError) {
-			tags["error"] = result.errorMsg
+			tags.AddTag("error", result.errorMsg)
 		}
 
 		if enabledTags.Has(metrics.TagErrorCode) {
-			tags["error_code"] = strconv.Itoa(int(result.errorCode))
+			tags.AddTag("error_code", strconv.Itoa(int(result.errorCode)))
 		}
 
 		if enabledTags.Has(metrics.TagStatus) {
-			tags["status"] = "0"
+			tags.AddTag("status", "0")
 		}
 	} else {
 		if enabledTags.Has(metrics.TagStatus) {
-			tags["status"] = strconv.Itoa(unfReq.response.StatusCode)
+			tags.AddTag("status", strconv.Itoa(unfReq.response.StatusCode))
 		}
 		if unfReq.response.StatusCode >= 400 {
 			if enabledTags.Has(metrics.TagErrorCode) {
 				result.errorCode = errCode(1000 + unfReq.response.StatusCode)
-				tags["error_code"] = strconv.Itoa(int(result.errorCode))
+				tags.AddTag("error_code", strconv.Itoa(int(result.errorCode)))
 			}
 		}
 		if enabledTags.Has(metrics.TagProto) {
-			tags["proto"] = unfReq.response.Proto
+			tags.AddTag("proto", unfReq.response.Proto)
 		}
 
 		if unfReq.response.TLS != nil {
 			tlsInfo, oscp := netext.ParseTLSConnState(unfReq.response.TLS)
 			if enabledTags.Has(metrics.TagTLSVersion) {
-				tags["tls_version"] = tlsInfo.Version
+				tags.AddTag("tls_version", tlsInfo.Version)
 			}
 			if enabledTags.Has(metrics.TagOCSPStatus) {
-				tags["ocsp_status"] = oscp.Status
+				tags.AddTag("ocsp_status", oscp.Status)
 			}
 			result.tlsInfo = tlsInfo
 		}
 	}
 	if enabledTags.Has(metrics.TagIP) && trail.ConnRemoteAddr != nil {
 		if ip, _, err := net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
-			tags["ip"] = ip
+			tags.AddTag("ip", ip)
 		}
 	}
 	var failed float64
@@ -180,13 +177,12 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 		}
 
 		if enabledTags.Has(metrics.TagExpectedResponse) {
-			tags[metrics.TagExpectedResponse.String()] = strconv.FormatBool(expected)
+			tags.AddTag(metrics.TagExpectedResponse.String(), strconv.FormatBool(expected))
 		}
 	}
 
-	finalTags := metrics.IntoSampleTags(&tags)
-	builtinMetrics := t.state.BuiltinMetrics
-	trail.SaveSamples(builtinMetrics, finalTags)
+	sampleTags := tags.SampleTags()
+	trail.SaveSamples(t.state.BuiltinMetrics, sampleTags)
 	if t.responseCallback != nil {
 		trail.Failed.Valid = true
 		if failed == 1 {
@@ -194,12 +190,14 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 		}
 		trail.Samples = append(trail.Samples,
 			metrics.Sample{
-				Metric: builtinMetrics.HTTPReqFailed, Time: trail.EndTime, Tags: finalTags, Value: failed,
+				Metric: t.state.BuiltinMetrics.HTTPReqFailed,
+				Time:   trail.EndTime,
+				Tags:   sampleTags,
+				Value:  failed,
 			},
 		)
 	}
 	metrics.PushIfNotDone(t.ctx, t.state.Samples, trail)
-
 	return result
 }
 

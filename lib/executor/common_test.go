@@ -57,6 +57,7 @@ func getTestRunState(tb testing.TB, options lib.Options, runner lib.Runner) *lib
 		TestPreInitState: piState,
 		Options:          options,
 		Runner:           runner,
+		RunTags:          piState.Registry.BranchTagSetRootWith(options.RunTags),
 	}
 }
 

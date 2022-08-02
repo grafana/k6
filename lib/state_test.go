@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/metrics"
 )
 
 func TestTagMapSet(t *testing.T) {
@@ -15,7 +17,7 @@ func TestTagMapSet(t *testing.T) {
 	t.Run("Sync", func(t *testing.T) {
 		t.Parallel()
 
-		tm := NewTagMap(nil)
+		tm := NewTagMap(metrics.NewTagSet(nil))
 		tm.Set("mytag", "42")
 		v, found := tm.Get("mytag")
 		assert.True(t, found)
@@ -24,10 +26,11 @@ func TestTagMapSet(t *testing.T) {
 
 	t.Run("Safe-Concurrent", func(t *testing.T) {
 		t.Parallel()
-		tm := NewTagMap(nil)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
+		tm := NewTagMap(metrics.NewTagSet(nil))
 
 		go func() {
 			count := 0
@@ -61,9 +64,9 @@ func TestTagMapSet(t *testing.T) {
 
 func TestTagMapGet(t *testing.T) {
 	t.Parallel()
-	tm := NewTagMap(map[string]string{
+	tm := NewTagMap(metrics.NewTagSet(map[string]string{
 		"key1": "value1",
-	})
+	}))
 	v, ok := tm.Get("key1")
 	assert.True(t, ok)
 	assert.Equal(t, "value1", v)
@@ -71,31 +74,36 @@ func TestTagMapGet(t *testing.T) {
 
 func TestTagMapLen(t *testing.T) {
 	t.Parallel()
-	tm := NewTagMap(map[string]string{
+	tm := NewTagMap(metrics.NewTagSet(map[string]string{
 		"key1": "value1",
 		"key2": "value2",
-	})
+	}))
 	assert.Equal(t, 2, tm.Len())
 }
 
 func TestTagMapDelete(t *testing.T) {
 	t.Parallel()
-	m := map[string]string{
+	tm := NewTagMap(metrics.NewTagSet(map[string]string{
 		"key1": "value1",
 		"key2": "value2",
-	}
-	tm := NewTagMap(m)
+	}))
+
+	_, ok := tm.Get("key1")
+	require.True(t, ok)
+
 	tm.Delete("key1")
-	_, ok := m["key1"]
+	_, ok = tm.Get("key1")
 	assert.False(t, ok)
+
+	assert.Equal(t, map[string]string{"key2": "value2"}, tm.Clone())
 }
 
 func TestTagMapClone(t *testing.T) {
 	t.Parallel()
-	tm := NewTagMap(map[string]string{
+	tm := NewTagMap(metrics.NewTagSet(map[string]string{
 		"key1": "value1",
 		"key2": "value2",
-	})
+	}))
 	m := tm.Clone()
 	assert.Equal(t, map[string]string{
 		"key1": "value1",

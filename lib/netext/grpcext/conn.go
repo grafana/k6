@@ -30,7 +30,7 @@ import (
 // Request represents a gRPC request.
 type Request struct {
 	MethodDescriptor protoreflect.MethodDescriptor
-	Tags             map[string]string
+	Tags             *metrics.TagSet
 	Message          []byte
 }
 
@@ -203,28 +203,26 @@ func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	//
 	// In this case, we can reuse the State's Tags.
 	if tags == nil {
-		tags = state.CloneTags()
+		tags = state.Tags.BranchOut()
 	}
 
 	switch s := stat.(type) {
 	case *grpcstats.OutHeader:
 		if state.Options.SystemTags.Has(metrics.TagIP) && s.RemoteAddr != nil {
 			if ip, _, err := net.SplitHostPort(s.RemoteAddr.String()); err == nil {
-				tags["ip"] = ip
+				tags.AddTag("ip", ip)
 			}
 		}
 	case *grpcstats.End:
 		if state.Options.SystemTags.Has(metrics.TagStatus) {
-			tags["status"] = strconv.Itoa(int(status.Code(s.Error)))
+			tags.AddTag("status", strconv.Itoa(int(status.Code(s.Error))))
 		}
 
-		mTags := map[string]string(tags)
-		sampleTags := metrics.IntoSampleTags(&mTags)
 		metrics.PushIfNotDone(ctx, state.Samples, metrics.ConnectedSamples{
 			Samples: []metrics.Sample{
 				{
 					Metric: state.BuiltinMetrics.GRPCReqDuration,
-					Tags:   sampleTags,
+					Tags:   tags.SampleTags(),
 					Value:  metrics.D(s.EndTime.Sub(s.BeginTime)),
 					Time:   s.EndTime,
 				},
@@ -305,21 +303,21 @@ func formatPayload(payload interface{}) string {
 	return string(b)
 }
 
-type ctxKeyTags struct{}
+type contextKey string
 
-type reqtags map[string]string
+var ctxKeyTags = contextKey("tags") //nolint:gochecknoglobals
 
-func withTags(ctx context.Context, tags reqtags) context.Context {
+func withTags(ctx context.Context, tags *metrics.TagSet) context.Context {
 	if tags == nil {
 		return ctx
 	}
-	return context.WithValue(ctx, ctxKeyTags{}, tags)
+	return context.WithValue(ctx, ctxKeyTags, tags)
 }
 
-func getTags(ctx context.Context) reqtags {
-	v := ctx.Value(ctxKeyTags{})
+func getTags(ctx context.Context) *metrics.TagSet {
+	v := ctx.Value(ctxKeyTags)
 	if v == nil {
 		return nil
 	}
-	return v.(reqtags)
+	return v.(*metrics.TagSet) //nolint: forcetypeassert
 }

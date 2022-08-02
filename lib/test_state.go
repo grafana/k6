@@ -26,8 +26,7 @@ type TestRunState struct {
 
 	Options Options
 	Runner  Runner // TODO: rename to something better, see type comment
-
-	// TODO: add atlas root node
+	RunTags *metrics.TagSet
 
 	// TODO: add other properties that are computed or derived after init, e.g.
 	// thresholds?

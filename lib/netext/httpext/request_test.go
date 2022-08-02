@@ -120,7 +120,7 @@ func TestMakeRequestError(t *testing.T) {
 		state := &lib.State{
 			Transport: http.DefaultTransport,
 			Logger:    logrus.New(),
-			Tags:      lib.NewTagMap(nil),
+			Tags:      lib.NewTagMap(metrics.NewTagSet(nil)),
 		}
 		_, err = MakeRequest(ctx, state, preq)
 		require.Error(t, err)
@@ -142,7 +142,7 @@ func TestMakeRequestError(t *testing.T) {
 		state := &lib.State{
 			Transport: srv.Client().Transport,
 			Logger:    logger,
-			Tags:      lib.NewTagMap(nil),
+			Tags:      lib.NewTagMap(metrics.NewTagSet(nil)),
 		}
 		req, _ := http.NewRequest("GET", srv.URL, nil)
 		preq := &ParsedHTTPRequest{
@@ -194,7 +194,7 @@ func TestResponseStatus(t *testing.T) {
 					Logger:         logger,
 					Samples:        samples,
 					BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-					Tags:           lib.NewTagMap(nil),
+					Tags:           lib.NewTagMap(metrics.NewTagSet(nil)),
 				}
 				req, err := http.NewRequest("GET", server.URL, nil)
 				require.NoError(t, err)
@@ -275,7 +275,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		Logger:         logger,
 		BPool:          bpool.NewBufferPool(100),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-		Tags:           lib.NewTagMap(nil),
+		Tags:           lib.NewTagMap(metrics.NewTagSet(nil)),
 	}
 	req, _ := http.NewRequest("GET", srv.URL, nil)
 	preq := &ParsedHTTPRequest{
@@ -351,7 +351,7 @@ func TestTrailFailed(t *testing.T) {
 				Logger:         logger,
 				BPool:          bpool.NewBufferPool(2),
 				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-				Tags:           lib.NewTagMap(nil),
+				Tags:           lib.NewTagMap(metrics.NewTagSet(nil)),
 			}
 			req, _ := http.NewRequest("GET", srv.URL, nil)
 			preq := &ParsedHTTPRequest{
@@ -416,7 +416,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		Logger:         logger,
 		BPool:          bpool.NewBufferPool(100),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-		Tags:           lib.NewTagMap(nil),
+		Tags:           lib.NewTagMap(metrics.NewTagSet(nil)),
 	}
 
 	req, _ := http.NewRequest("GET", "http://"+addr.String(), nil)
@@ -470,7 +470,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		Logger:         logger,
 		BPool:          bpool.NewBufferPool(100),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-		Tags:           lib.NewTagMap(nil),
+		Tags:           lib.NewTagMap(metrics.NewTagSet(nil)),
 	}
 	req, _ := http.NewRequest("GET", srv.URL, nil)
 	preq := &ParsedHTTPRequest{
