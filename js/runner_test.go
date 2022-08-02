@@ -47,7 +47,6 @@ import (
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	"go.k6.io/k6/lib/testutils/mockoutput"
 	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 )
@@ -210,7 +209,9 @@ func TestOptionsSettingToScript(t *testing.T) {
 				lib.RuntimeOptions{Env: map[string]string{"expectedTeardownTimeout": "4s"}})
 			require.NoError(t, err)
 
-			newOptions := lib.Options{TeardownTimeout: types.NullDurationFrom(4 * time.Second)}
+			newOptions := lib.Options{
+				TeardownTimeout: types.NullDurationFrom(4 * time.Second),
+			}
 			r.SetOptions(newOptions)
 			require.Equal(t, newOptions, r.GetOptions())
 
@@ -242,7 +243,9 @@ func TestOptionsPropagationToScript(t *testing.T) {
 				}
 			};`
 
-	expScriptOptions := lib.Options{SetupTimeout: types.NullDurationFrom(1 * time.Second)}
+	expScriptOptions := lib.Options{
+		SetupTimeout: types.NullDurationFrom(1 * time.Second),
+	}
 	r1, err := getSimpleRunner(t, "/script.js", data,
 		lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "1s"}})
 	require.NoError(t, err)
@@ -257,13 +260,9 @@ func TestOptionsPropagationToScript(t *testing.T) {
 			Registry:       registry,
 			RuntimeOptions: lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "3s"}},
 		}, r1.MakeArchive())
-
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r2.GetOptions())
-
-	newOptions := lib.Options{SetupTimeout: types.NullDurationFrom(3 * time.Second)}
-	require.NoError(t, r2.SetOptions(newOptions))
-	require.Equal(t, newOptions, r2.GetOptions())
+	r2.Bundle.Options.SetupTimeout = types.NullDurationFrom(3 * time.Second)
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
@@ -348,6 +347,7 @@ func TestSetupDataIsolation(t *testing.T) {
 		TestPreInitState: runner.preInitState,
 		Options:          options,
 		Runner:           runner,
+		RunTags:          runner.preInitState.Registry.BranchTagSetRootWith(options.RunTags),
 	}
 
 	execScheduler, err := local.NewExecutionScheduler(testRunState)
@@ -1050,12 +1050,9 @@ func TestVUIntegrationBlacklistOption(t *testing.T) {
 	require.NoError(t, err)
 
 	cidr, err := lib.ParseCIDR("10.0.0.0/8")
-
 	require.NoError(t, err)
-	require.NoError(t, r1.SetOptions(lib.Options{
-		Throw:        null.BoolFrom(true),
-		BlacklistIPs: []*lib.IPNet{cidr},
-	}))
+	r1.Bundle.Options.Throw = null.BoolFrom(true)
+	r1.Bundle.Options.BlacklistIPs = []*lib.IPNet{cidr}
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -1136,10 +1133,9 @@ func TestVUIntegrationBlockHostnamesOption(t *testing.T) {
 
 	hostnames, err := types.NewNullHostnameTrie([]string{"*.io"})
 	require.NoError(t, err)
-	require.NoError(t, r1.SetOptions(lib.Options{
-		Throw:            null.BoolFrom(true),
-		BlockedHostnames: hostnames,
-	}))
+
+	r1.Bundle.Options.Throw = null.BoolFrom(true)
+	r1.Bundle.Options.BlockedHostnames = hostnames
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -1332,7 +1328,9 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 					exports.default = function() { http.get("https://sha256-badssl.localhost/"); }
 				`)
 			require.NoError(t, err)
-			require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)))
+
+			opts := lib.Options{Throw: null.BoolFrom(true)}
+			require.NoError(t, r1.SetOptions(opts.Apply(data.opts)))
 
 			r1.Bundle.Options.Hosts = map[string]*lib.HostAddress{
 				"sha256-badssl.localhost": mybadsslHostname,
@@ -1502,11 +1500,9 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 			}
 		`))
 	require.NoError(t, err)
-	r1.SetOptions(lib.Options{
-		Throw:        null.BoolFrom(true),
-		MaxRedirects: null.IntFrom(10),
-		Hosts:        tb.Dialer.Hosts,
-	})
+	r1.Bundle.Options.Throw = null.BoolFrom(true)
+	r1.Bundle.Options.MaxRedirects = null.IntFrom(10)
+	r1.Bundle.Options.Hosts = tb.Dialer.Hosts
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -1606,7 +1602,7 @@ func TestVUIntegrationVUID(t *testing.T) {
 			}`,
 	)
 	require.NoError(t, err)
-	r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)})
+	r1.Bundle.Options.Throw = null.BoolFrom(true)
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -2254,22 +2250,7 @@ type multiFileTestCase struct {
 
 func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.HTTPMultiBin) {
 	t.Helper()
-	logger := testutils.NewLogger(t)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	runner, err := New(
-		&lib.TestPreInitState{
-			Logger:         logger,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-			RuntimeOptions: tc.rtOpts,
-		},
-		&loader.SourceData{
-			URL:  &url.URL{Path: tc.cwd + "/script.js", Scheme: "file"},
-			Data: []byte(tc.script),
-		},
-		tc.fses,
-	)
+	runner, err := getSimpleRunner(t, tc.cwd+"/script.js", tc.script, tc.rtOpts, tc.fses)
 	if tc.expInitErr {
 		require.Error(t, err)
 		return
@@ -2297,6 +2278,10 @@ func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.H
 	} else {
 		require.NoError(t, err)
 	}
+
+	logger := testutils.NewLogger(t)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 
 	arc := runner.MakeArchive()
 	runnerFromArc, err := NewFromArchive(
