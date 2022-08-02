@@ -547,6 +547,7 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 
 func TestLoadingSourceMapsDoesntErrorOut(t *testing.T) {
 	t.Parallel()
+
 	fs := afero.NewMemMapFs()
 	data := `exports.default = function() {}
 //# sourceMappingURL=test.min.js.map`
@@ -559,6 +560,7 @@ func TestLoadingSourceMapsDoesntErrorOut(t *testing.T) {
 	require.NoError(t, arc.Write(buf))
 	arc, err = lib.ReadArchive(buf)
 	require.NoError(t, err)
+
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
