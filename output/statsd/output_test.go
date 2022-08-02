@@ -62,7 +62,7 @@ func TestStatsdOutput(t *testing.T) {
 
 func TestStatsdEnabledTags(t *testing.T) {
 	t.Parallel()
-	tagMap := metrics.TagSet{"tag1": true, "tag2": true}
+	tagMap := metrics.EnabledTags{"tag1": true, "tag2": true}
 
 	baseTest(t, func(
 		logger logrus.FieldLogger, addr, namespace null.String, bufferSize null.Int, pushInterval types.NullDuration,
