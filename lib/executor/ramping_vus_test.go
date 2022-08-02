@@ -82,21 +82,18 @@ func TestRampingVUsRun(t *testing.T) {
 	}
 
 	var iterCount int64
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, nil, 10, 50)
-	ctx, cancel, executor, _ := setupExecutor(
-		t, config, es,
-		simpleRunner(func(ctx context.Context, _ *lib.State) error {
-			// Sleeping for a weird duration somewhat offset from the
-			// executor ticks to hopefully keep race conditions out of
-			// our control from failing the test.
-			time.Sleep(300 * time.Millisecond)
-			atomic.AddInt64(&iterCount, 1)
-			return nil
-		}),
-	)
-	defer cancel()
+
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+		// Sleeping for a weird duration somewhat offset from the
+		// executor ticks to hopefully keep race conditions out of
+		// our control from failing the test.
+		time.Sleep(300 * time.Millisecond)
+		atomic.AddInt64(&iterCount, 1)
+		return nil
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
 
 	sampleTimes := []time.Duration{
 		500 * time.Millisecond,
@@ -105,12 +102,12 @@ func TestRampingVUsRun(t *testing.T) {
 	}
 
 	errCh := make(chan error)
-	go func() { errCh <- executor.Run(ctx, nil) }()
+	go func() { errCh <- test.executor.Run(test.ctx, nil) }()
 
 	result := make([]int64, len(sampleTimes))
 	for i, d := range sampleTimes {
 		time.Sleep(d)
-		result[i] = es.GetCurrentlyActiveVUsCount()
+		result[i] = test.state.GetCurrentlyActiveVUsCount()
 	}
 
 	require.NoError(t, <-errCh)
@@ -139,25 +136,22 @@ func TestRampingVUsGracefulStopWaits(t *testing.T) {
 		stop    = make(chan struct{}) // the itearation should stop
 	)
 
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, nil, 10, 50)
-	ctx, cancel, executor, _ := setupExecutor(
-		t, config, es,
-		simpleRunner(func(ctx context.Context, _ *lib.State) error {
-			close(started)
-			defer close(stopped)
-			select {
-			case <-ctx.Done():
-				t.Fatal("The iterations should've ended before the context")
-			case <-stop:
-			}
-			return nil
-		}),
-	)
-	defer cancel()
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+		close(started)
+		defer close(stopped)
+		select {
+		case <-ctx.Done():
+			t.Fatal("The iterations should've ended before the context")
+		case <-stop:
+		}
+		return nil
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
+
 	errCh := make(chan error)
-	go func() { errCh <- executor.Run(ctx, nil) }()
+	go func() { errCh <- test.executor.Run(test.ctx, nil) }()
 
 	<-started
 	// 500 milliseconds more then the duration and 500 less then the gracefulStop
@@ -188,25 +182,22 @@ func TestRampingVUsGracefulStopStops(t *testing.T) {
 		stop    = make(chan struct{}) // the itearation should stop
 	)
 
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, nil, 10, 50)
-	ctx, cancel, executor, _ := setupExecutor(
-		t, config, es,
-		simpleRunner(func(ctx context.Context, _ *lib.State) error {
-			close(started)
-			defer close(stopped)
-			select {
-			case <-ctx.Done():
-			case <-stop:
-				t.Fatal("The iterations shouldn't have ended before the context")
-			}
-			return nil
-		}),
-	)
-	defer cancel()
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+		close(started)
+		defer close(stopped)
+		select {
+		case <-ctx.Done():
+		case <-stop:
+			t.Fatal("The iterations shouldn't have ended before the context")
+		}
+		return nil
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
+
 	errCh := make(chan error)
-	go func() { errCh <- executor.Run(ctx, nil) }()
+	go func() { errCh <- test.executor.Run(test.ctx, nil) }()
 
 	<-started
 	// 500 milliseconds more then the gracefulStop + duration
@@ -242,29 +233,26 @@ func TestRampingVUsGracefulRampDown(t *testing.T) {
 		stop    = make(chan struct{}) // the itearation should stop
 	)
 
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, nil, 10, 50)
-	ctx, cancel, executor, _ := setupExecutor(
-		t, config, es,
-		simpleRunner(func(ctx context.Context, state *lib.State) error {
-			if state.VUID == 1 { // the first VU will wait here to do stuff
-				close(started)
-				defer close(stopped)
-				select {
-				case <-ctx.Done():
-					t.Fatal("The iterations can't have ended before the context")
-				case <-stop:
-				}
-			} else { // all other (1) VUs will just sleep long enough
-				time.Sleep(2500 * time.Millisecond)
+	runner := simpleRunner(func(ctx context.Context, state *lib.State) error {
+		if state.VUID == 1 { // the first VU will wait here to do stuff
+			close(started)
+			defer close(stopped)
+			select {
+			case <-ctx.Done():
+				t.Fatal("The iterations can't have ended before the context")
+			case <-stop:
 			}
-			return nil
-		}),
-	)
-	defer cancel()
+		} else { // all other (1) VUs will just sleep long enough
+			time.Sleep(2500 * time.Millisecond)
+		}
+		return nil
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
+
 	errCh := make(chan error)
-	go func() { errCh <- executor.Run(ctx, nil) }()
+	go func() { errCh <- test.executor.Run(test.ctx, nil) }()
 
 	<-started
 	// 500 milliseconds more then the gracefulRampDown + duration
@@ -333,7 +321,7 @@ func TestRampingVUsHandleRemainingVUs(t *testing.T) {
 		gotVuInterrupted uint32
 		gotVuFinished    uint32
 	)
-	iteration := func(ctx context.Context, _ *lib.State) error {
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
 		select {
 		case <-time.After(vuSleepDuration):
 			atomic.AddUint32(&gotVuFinished, 1)
@@ -341,19 +329,14 @@ func TestRampingVUsHandleRemainingVUs(t *testing.T) {
 			atomic.AddUint32(&gotVuInterrupted, 1)
 		}
 		return nil
-	}
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, cfg)
+	defer test.cancel()
 
 	// run the executor: this should finish in ~70ms
 	// sum(stages) + GracefulRampDown
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	ctx, cancel, executor, _ := setupExecutor(
-		t, cfg,
-		lib.NewExecutionState(lib.Options{}, et, nil, maxVus, maxVus),
-		simpleRunner(iteration),
-	)
-	defer cancel()
-	require.NoError(t, executor.Run(ctx, nil))
+	require.NoError(t, test.executor.Run(test.ctx, nil))
 
 	assert.Equal(t, wantVuInterrupted, atomic.LoadUint32(&gotVuInterrupted))
 	assert.Equal(t, wantVuFinished, atomic.LoadUint32(&gotVuFinished))
@@ -380,17 +363,13 @@ func TestRampingVUsRampDownNoWobble(t *testing.T) {
 		},
 	}
 
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, nil, 10, 50)
-	ctx, cancel, executor, _ := setupExecutor(
-		t, config, es,
-		simpleRunner(func(ctx context.Context, _ *lib.State) error {
-			time.Sleep(500 * time.Millisecond)
-			return nil
-		}),
-	)
-	defer cancel()
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+		time.Sleep(500 * time.Millisecond)
+		return nil
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
 
 	sampleTimes := []time.Duration{
 		100 * time.Millisecond,
@@ -400,18 +379,18 @@ func TestRampingVUsRampDownNoWobble(t *testing.T) {
 	rampDownSamples := int((config.Stages[len(config.Stages)-1].Duration.TimeDuration() + config.GracefulRampDown.TimeDuration()) / rampDownSampleTime)
 
 	errCh := make(chan error)
-	go func() { errCh <- executor.Run(ctx, nil) }()
+	go func() { errCh <- test.executor.Run(test.ctx, nil) }()
 
 	result := make([]int64, len(sampleTimes)+rampDownSamples)
 	for i, d := range sampleTimes {
 		time.Sleep(d)
-		result[i] = es.GetCurrentlyActiveVUsCount()
+		result[i] = test.state.GetCurrentlyActiveVUsCount()
 	}
 
 	// Sample ramp-down at a higher rate
 	for i := len(sampleTimes); i < rampDownSamples; i++ {
 		time.Sleep(rampDownSampleTime)
-		result[i] = es.GetCurrentlyActiveVUsCount()
+		result[i] = test.state.GetCurrentlyActiveVUsCount()
 	}
 
 	require.NoError(t, <-errCh)

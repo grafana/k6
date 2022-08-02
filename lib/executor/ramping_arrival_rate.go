@@ -457,7 +457,7 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 	shownWarning := false
 	metricTags := varr.getMetricTags(nil)
 	go varr.config.cal(varr.et, ch)
-	droppedIterationMetric := varr.executionState.BuiltinMetrics.DroppedIterations
+	droppedIterationMetric := varr.executionState.Test.BuiltinMetrics.DroppedIterations
 	for nextTime := range ch {
 		select {
 		case <-regDurationDone:

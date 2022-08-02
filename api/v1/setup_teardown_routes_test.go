@@ -31,7 +31,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -40,10 +39,8 @@ import (
 	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
-	"go.k6.io/k6/metrics"
 )
 
 func TestSetupData(t *testing.T) {
@@ -140,32 +137,28 @@ func TestSetupData(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			logger := logrus.New()
-			logger.SetOutput(testutils.NewTestOutput(t))
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-
+			piState := getTestPreInitState(t)
 			runner, err := js.New(
-				&lib.RuntimeState{
-					Logger:         logger,
-					BuiltinMetrics: builtinMetrics,
-					Registry:       registry,
-				},
-				&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: testCase.script},
-				nil,
+				piState, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: testCase.script}, nil,
 			)
 			require.NoError(t, err)
-			runner.SetOptions(lib.Options{
+			require.NoError(t, runner.SetOptions(lib.Options{
 				Paused:          null.BoolFrom(true),
 				VUs:             null.IntFrom(2),
 				Iterations:      null.IntFrom(3),
 				NoSetup:         null.BoolFrom(true),
 				SetupTimeout:    types.NullDurationFrom(5 * time.Second),
 				TeardownTimeout: types.NullDurationFrom(5 * time.Second),
-			})
-			execScheduler, err := local.NewExecutionScheduler(runner, builtinMetrics, logger)
+			}))
+			testState := &lib.TestRunState{
+				TestPreInitState: piState,
+				Options:          runner.GetOptions(),
+				Runner:           runner,
+			}
+
+			execScheduler, err := local.NewExecutionScheduler(testState)
 			require.NoError(t, err)
-			engine, err := core.NewEngine(execScheduler, runner.GetOptions(), lib.RuntimeOptions{}, nil, logger, registry)
+			engine, err := core.NewEngine(testState, execScheduler, nil)
 			require.NoError(t, err)
 
 			require.NoError(t, engine.OutputManager.StartOutputs())

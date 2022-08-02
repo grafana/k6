@@ -43,13 +43,13 @@ func (c *cmdArchive) run(cmd *cobra.Command, args []string) error {
 	// an execution shortcut option (e.g. `iterations` or `duration`),
 	// we will have multiple conflicting execution options since the
 	// derivation will set `scenarios` as well.
-	err = test.initRunner.SetOptions(test.consolidatedConfig.Options)
+	testRunState, err := test.buildTestRunState(test.consolidatedConfig.Options)
 	if err != nil {
 		return err
 	}
 
 	// Archive.
-	arc := test.initRunner.MakeArchive()
+	arc := testRunState.Runner.MakeArchive()
 	f, err := c.gs.fs.Create(c.archiveOut)
 	if err != nil {
 		return err

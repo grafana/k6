@@ -238,7 +238,7 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- metrics.Sam
 		if attemptedIters < totalIters {
 			metrics.PushIfNotDone(parentCtx, out, metrics.Sample{
 				Value:  float64(totalIters - attemptedIters),
-				Metric: si.executionState.BuiltinMetrics.DroppedIterations,
+				Metric: si.executionState.Test.BuiltinMetrics.DroppedIterations,
 				Tags:   si.getMetricTags(nil), Time: time.Now(),
 			})
 		}

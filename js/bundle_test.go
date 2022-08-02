@@ -50,31 +50,46 @@ import (
 
 const isWindows = runtime.GOOS == "windows"
 
+func getTestPreInitState(tb testing.TB, logger *logrus.Logger, rtOpts *lib.RuntimeOptions) *lib.TestPreInitState {
+	if logger == nil {
+		logger = testutils.NewLogger(tb)
+	}
+	if rtOpts == nil {
+		rtOpts = &lib.RuntimeOptions{}
+	}
+	reg := metrics.NewRegistry()
+	return &lib.TestPreInitState{
+		Logger:         logger,
+		RuntimeOptions: *rtOpts,
+		Registry:       reg,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(reg),
+	}
+}
+
 func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) (*Bundle, error) {
-	var (
-		fs                        = afero.NewMemMapFs()
-		rtOpts                    = lib.RuntimeOptions{}
-		logger logrus.FieldLogger = testutils.NewLogger(tb)
-	)
+	fs := afero.NewMemMapFs()
+	var rtOpts *lib.RuntimeOptions
+	var logger *logrus.Logger
 	for _, o := range opts {
 		switch opt := o.(type) {
 		case afero.Fs:
 			fs = opt
 		case lib.RuntimeOptions:
-			rtOpts = opt
-		case logrus.FieldLogger:
+			rtOpts = &opt
+		case *logrus.Logger:
 			logger = opt
+		default:
+			tb.Fatalf("unknown test option %q", opt)
 		}
 	}
+
 	return NewBundle(
-		logger,
+		getTestPreInitState(tb, logger, rtOpts),
 		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),
 		},
 		map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()},
-		rtOpts,
-		metrics.NewRegistry(),
 	)
 }
 
@@ -489,7 +504,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 	}
 
 	checkArchive := func(t *testing.T, arc *lib.Archive, rtOpts lib.RuntimeOptions, expError string) {
-		b, err := NewBundleFromArchive(logger, arc, rtOpts, metrics.NewRegistry())
+		b, err := NewBundleFromArchive(getTestPreInitState(t, logger, &rtOpts), arc)
 		if expError != "" {
 			require.Error(t, err)
 			require.Contains(t, err.Error(), expError)
@@ -572,7 +587,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 			PwdURL:      &url.URL{Scheme: "file", Path: "/"},
 			Filesystems: nil,
 		}
-		b, err := NewBundleFromArchive(logger, arc, lib.RuntimeOptions{}, metrics.NewRegistry())
+		b, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), arc)
 		require.NoError(t, err)
 		bi, err := b.Instantiate(logger, 0)
 		require.NoError(t, err)
@@ -711,7 +726,7 @@ func TestOpen(t *testing.T) {
 					}
 					require.NoError(t, err)
 
-					arcBundle, err := NewBundleFromArchive(logger, sourceBundle.makeArchive(), lib.RuntimeOptions{}, metrics.NewRegistry())
+					arcBundle, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), sourceBundle.makeArchive())
 
 					require.NoError(t, err)
 
@@ -811,7 +826,7 @@ func TestBundleEnv(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := testutils.NewLogger(t)
-	b2, err := NewBundleFromArchive(logger, b1.makeArchive(), lib.RuntimeOptions{}, metrics.NewRegistry())
+	b2, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), b1.makeArchive())
 	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
@@ -848,7 +863,7 @@ func TestBundleNotSharable(t *testing.T) {
 	require.NoError(t, err)
 	logger := testutils.NewLogger(t)
 
-	b2, err := NewBundleFromArchive(logger, b1.makeArchive(), lib.RuntimeOptions{}, metrics.NewRegistry())
+	b2, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), b1.makeArchive())
 	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}

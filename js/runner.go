@@ -38,7 +38,6 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/oxtoacart/bpool"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
@@ -65,11 +64,9 @@ var _ lib.Runner = &Runner{}
 var nameToCertWarning sync.Once
 
 type Runner struct {
-	Bundle         *Bundle
-	Logger         *logrus.Logger
-	defaultGroup   *lib.Group
-	builtinMetrics *metrics.BuiltinMetrics
-	registry       *metrics.Registry
+	Bundle       *Bundle
+	preInitState *lib.TestPreInitState
+	defaultGroup *lib.Group
 
 	BaseDialer net.Dialer
 	Resolver   netext.Resolver
@@ -79,34 +76,30 @@ type Runner struct {
 
 	console   *console
 	setupData []byte
-
-	keylogger io.Writer
 }
 
-// New returns a new Runner for the provide source
-func New(
-	rs *lib.RuntimeState, src *loader.SourceData, filesystems map[string]afero.Fs,
-) (*Runner, error) {
-	bundle, err := NewBundle(rs.Logger, src, filesystems, rs.RuntimeOptions, rs.Registry)
+// New returns a new Runner for the provided source
+func New(piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]afero.Fs) (*Runner, error) {
+	bundle, err := NewBundle(piState, src, filesystems)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewFromBundle(rs, bundle)
+	return NewFromBundle(piState, bundle)
 }
 
 // NewFromArchive returns a new Runner from the source in the provided archive
-func NewFromArchive(rs *lib.RuntimeState, arc *lib.Archive) (*Runner, error) {
-	bundle, err := NewBundleFromArchive(rs.Logger, arc, rs.RuntimeOptions, rs.Registry)
+func NewFromArchive(piState *lib.TestPreInitState, arc *lib.Archive) (*Runner, error) {
+	bundle, err := NewBundleFromArchive(piState, arc)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewFromBundle(rs, bundle)
+	return NewFromBundle(piState, bundle)
 }
 
 // NewFromBundle returns a new Runner from the provided Bundle
-func NewFromBundle(rs *lib.RuntimeState, b *Bundle) (*Runner, error) {
+func NewFromBundle(piState *lib.TestPreInitState, b *Bundle) (*Runner, error) {
 	defaultGroup, err := lib.NewGroup("", nil)
 	if err != nil {
 		return nil, err
@@ -115,20 +108,17 @@ func NewFromBundle(rs *lib.RuntimeState, b *Bundle) (*Runner, error) {
 	defDNS := types.DefaultDNSConfig()
 	r := &Runner{
 		Bundle:       b,
-		Logger:       rs.Logger,
+		preInitState: piState,
 		defaultGroup: defaultGroup,
 		BaseDialer: net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		},
-		console: newConsole(rs.Logger),
+		console: newConsole(piState.Logger),
 		Resolver: netext.NewResolver(
 			net.LookupIP, 0, defDNS.Select.DNSSelect, defDNS.Policy.DNSPolicy),
 		ActualResolver: net.LookupIP,
-		builtinMetrics: rs.BuiltinMetrics,
-		registry:       rs.Registry,
-		keylogger:      rs.KeyLogger,
 	}
 
 	err = r.SetOptions(r.Bundle.Options)
@@ -152,7 +142,7 @@ func (r *Runner) NewVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 //nolint:funlen
 func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.SampleContainer) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
-	bi, err := r.Bundle.Instantiate(r.Logger, idLocal)
+	bi, err := r.Bundle.Instantiate(r.preInitState.Logger, idLocal)
 	if err != nil {
 		return nil, err
 	}
@@ -203,15 +193,17 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 		MaxVersion:         uint16(tlsVersions.Max),
 		Certificates:       certs,
 		Renegotiation:      tls.RenegotiateFreelyAsClient,
-		KeyLogWriter:       r.keylogger,
+		KeyLogWriter:       r.preInitState.KeyLogger,
 	}
 	// Follow NameToCertificate in https://pkg.go.dev/crypto/tls@go1.17.6#Config, leave this field nil
 	// when it is empty
 	if len(nameToCert) > 0 {
 		nameToCertWarning.Do(func() {
-			r.Logger.Warn("tlsAuth.domains option could be removed in the next releases, it's recommended to leave it empty " +
-				"and let k6 automatically detect from the provided certificate. It follows the Go's NameToCertificate " +
-				"deprecation - https://pkg.go.dev/crypto/tls@go1.17#Config.")
+			r.preInitState.Logger.Warn(
+				"tlsAuth.domains option could be removed in the next releases, it's recommended to leave it empty " +
+					"and let k6 automatically detect from the provided certificate. It follows the Go's NameToCertificate " +
+					"deprecation - https://pkg.go.dev/crypto/tls@go1.17#Config.",
+			)
 		})
 		//nolint:staticcheck // ignore SA1019 we can deprecate it but we have to continue to support the previous code.
 		tlsConfig.NameToCertificate = nameToCert
@@ -254,7 +246,7 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 	}
 
 	vu.state = &lib.State{
-		Logger:         vu.Runner.Logger,
+		Logger:         vu.Runner.preInitState.Logger,
 		Options:        vu.Runner.Bundle.Options,
 		Transport:      vu.Transport,
 		Dialer:         vu.Dialer,
@@ -267,7 +259,7 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 		Samples:        vu.Samples,
 		Tags:           lib.NewTagMap(vu.Runner.Bundle.Options.RunTags.CloneTags()),
 		Group:          r.defaultGroup,
-		BuiltinMetrics: r.builtinMetrics,
+		BuiltinMetrics: r.preInitState.BuiltinMetrics,
 	}
 	vu.moduleVUImpl.state = vu.state
 	_ = vu.Runtime.Set("console", vu.Console)
@@ -442,7 +434,7 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 	// TODO: validate that all exec values are either nil or valid exported methods (or HTTP requests in the future)
 
 	if opts.ConsoleOutput.Valid {
-		c, err := newFileConsole(opts.ConsoleOutput.String, r.Logger.Formatter)
+		c, err := newFileConsole(opts.ConsoleOutput.String, r.preInitState.Logger.Formatter)
 		if err != nil {
 			return err
 		}
@@ -819,7 +811,7 @@ func (u *VU) runFn(
 
 	sampleTags := metrics.NewSampleTags(u.state.CloneTags())
 	u.state.Samples <- u.Dialer.GetTrail(
-		startTime, endTime, isFullIteration, isDefault, sampleTags, u.Runner.builtinMetrics)
+		startTime, endTime, isFullIteration, isDefault, sampleTags, u.Runner.preInitState.BuiltinMetrics)
 
 	return v, isFullIteration, endTime.Sub(startTime), err
 }

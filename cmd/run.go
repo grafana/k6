@@ -65,7 +65,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 
 	// Write the full consolidated *and derived* options back to the Runner.
 	conf := test.derivedConfig
-	if err = test.initRunner.SetOptions(conf.Options); err != nil {
+	testRunState, err := test.buildTestRunState(conf.Options)
+	if err != nil {
 		return err
 	}
 
@@ -86,10 +87,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	runCtx, runCancel := context.WithCancel(lingerCtx)
 	defer runCancel()
 
-	logger := c.gs.logger
+	logger := testRunState.Logger
 	// Create a local execution scheduler wrapping the runner.
 	logger.Debug("Initializing the execution scheduler...")
-	execScheduler, err := local.NewExecutionScheduler(test.initRunner, test.builtInMetrics, logger)
+	execScheduler, err := local.NewExecutionScheduler(testRunState)
 	if err != nil {
 		return err
 	}
@@ -125,10 +126,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	// TODO: remove this completely
 	// Create the engine.
 	initBar.Modify(pb.WithConstProgress(0, "Init engine"))
-	engine, err := core.NewEngine(
-		execScheduler, conf.Options, test.runtimeOptions,
-		outputs, logger, test.metricsRegistry,
-	)
+	engine, err := core.NewEngine(testRunState, execScheduler, outputs)
 	if err != nil {
 		return err
 	}
@@ -230,7 +228,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Handle the end-of-test summary.
-	if !test.runtimeOptions.NoSummary.Bool {
+	if !testRunState.RuntimeOptions.NoSummary.Bool {
 		engine.MetricsEngine.MetricsLock.Lock() // TODO: refactor so this is not needed
 		summaryResult, err := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
 			Metrics:         engine.MetricsEngine.ObservedMetrics,
@@ -268,8 +266,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	logger.Debug("Waiting for engine processes to finish...")
 	engineWait()
 	logger.Debug("Everything has finished, exiting k6!")
-	if test.keywriter != nil {
-		if err := test.keywriter.Close(); err != nil {
+	if test.keyLogger != nil {
+		if err := test.keyLogger.Close(); err != nil {
 			logger.WithError(err).Warn("Error while closing the SSLKEYLOGFILE")
 		}
 	}

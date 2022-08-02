@@ -49,23 +49,18 @@ func getTestPerVUIterationsConfig() PerVUIterationsConfig {
 func TestPerVUIterationsRun(t *testing.T) {
 	t.Parallel()
 	var result sync.Map
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
-	ctx, cancel, executor, _ := setupExecutor(
-		t, getTestPerVUIterationsConfig(), es,
-		simpleRunner(func(ctx context.Context, state *lib.State) error {
-			currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
-			result.Store(state.VUID, currIter.(uint64)+1)
-			return nil
-		}),
-	)
-	defer cancel()
+
+	runner := simpleRunner(func(ctx context.Context, state *lib.State) error {
+		currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
+		result.Store(state.VUID, currIter.(uint64)+1) //nolint:forcetypeassert
+		return nil
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestPerVUIterationsConfig())
+	defer test.cancel()
+
 	engineOut := make(chan metrics.SampleContainer, 1000)
-	err = executor.Run(ctx, engineOut)
-	require.NoError(t, err)
+	require.NoError(t, test.executor.Run(test.ctx, engineOut))
 
 	var totalIters uint64
 	result.Range(func(key, value interface{}) bool {
@@ -85,26 +80,21 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 		result   sync.Map
 		slowVUID = uint64(1)
 	)
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
-	ctx, cancel, executor, _ := setupExecutor(
-		t, getTestPerVUIterationsConfig(), es,
-		simpleRunner(func(ctx context.Context, state *lib.State) error {
-			if state.VUID == slowVUID {
-				time.Sleep(200 * time.Millisecond)
-			}
-			currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
-			result.Store(state.VUID, currIter.(uint64)+1)
-			return nil
-		}),
-	)
-	defer cancel()
+
+	runner := simpleRunner(func(ctx context.Context, state *lib.State) error {
+		if state.VUID == slowVUID {
+			time.Sleep(200 * time.Millisecond)
+		}
+		currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
+		result.Store(state.VUID, currIter.(uint64)+1) //nolint:forcetypeassert
+		return nil
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestPerVUIterationsConfig())
+	defer test.cancel()
+
 	engineOut := make(chan metrics.SampleContainer, 1000)
-	err = executor.Run(ctx, engineOut)
-	require.NoError(t, err)
+	require.NoError(t, test.executor.Run(test.ctx, engineOut))
 
 	val, ok := result.Load(slowVUID)
 	assert.True(t, ok)
@@ -128,8 +118,6 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 func TestPerVuIterationsEmitDroppedIterations(t *testing.T) {
 	t.Parallel()
 	var count int64
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
 
 	config := PerVUIterationsConfig{
 		VUs:         null.IntFrom(5),
@@ -137,22 +125,18 @@ func TestPerVuIterationsEmitDroppedIterations(t *testing.T) {
 		MaxDuration: types.NullDurationFrom(1 * time.Second),
 	}
 
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
-	ctx, cancel, executor, logHook := setupExecutor(
-		t, config, es,
-		simpleRunner(func(ctx context.Context, _ *lib.State) error {
-			atomic.AddInt64(&count, 1)
-			<-ctx.Done()
-			return nil
-		}),
-	)
-	defer cancel()
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+		atomic.AddInt64(&count, 1)
+		<-ctx.Done()
+		return nil
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
+
 	engineOut := make(chan metrics.SampleContainer, 1000)
-	err = executor.Run(ctx, engineOut)
-	require.NoError(t, err)
-	assert.Empty(t, logHook.Drain())
+	require.NoError(t, test.executor.Run(test.ctx, engineOut))
+	assert.Empty(t, test.logHook.Drain())
 	assert.Equal(t, int64(5), count)
 	assert.Equal(t, float64(95), sumMetricValues(engineOut, metrics.DroppedIterationsName))
 }

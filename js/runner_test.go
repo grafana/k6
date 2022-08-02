@@ -110,7 +110,7 @@ func TestRunnerGetDefaultGroup(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -127,7 +127,7 @@ func TestRunnerOptions(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -217,7 +217,7 @@ func TestOptionsPropagationToScript(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -310,15 +310,17 @@ func TestSetupDataIsolation(t *testing.T) {
 	options := runner.GetOptions()
 	require.Empty(t, options.Validate())
 
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	execScheduler, err := local.NewExecutionScheduler(runner, builtinMetrics, testutils.NewLogger(t))
+	testRunState := &lib.TestRunState{
+		TestPreInitState: runner.preInitState,
+		Options:          options,
+		Runner:           runner,
+	}
+
+	execScheduler, err := local.NewExecutionScheduler(testRunState)
 	require.NoError(t, err)
 
 	mockOutput := mockoutput.New()
-	engine, err := core.NewEngine(
-		execScheduler, options, lib.RuntimeOptions{}, []output.Output{mockOutput}, testutils.NewLogger(t), registry,
-	)
+	engine, err := core.NewEngine(testRunState, execScheduler, []output.Output{mockOutput})
 	require.NoError(t, err)
 	require.NoError(t, engine.OutputManager.StartOutputs())
 	defer engine.OutputManager.StopOutputs()
@@ -511,7 +513,7 @@ func TestRunnerIntegrationImports(t *testing.T) {
 				registry := metrics.NewRegistry()
 				builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 				r2, err := NewFromArchive(
-					&lib.RuntimeState{
+					&lib.TestPreInitState{
 						Logger:         testutils.NewLogger(t),
 						BuiltinMetrics: builtinMetrics,
 						Registry:       registry,
@@ -548,7 +550,7 @@ func TestVURunContext(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -599,7 +601,7 @@ func TestVURunInterrupt(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -641,7 +643,7 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -706,7 +708,7 @@ func TestVUIntegrationGroups(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -766,7 +768,7 @@ func TestVUIntegrationMetrics(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -849,7 +851,7 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 			r2, err := NewFromArchive(
-				&lib.RuntimeState{
+				&lib.TestPreInitState{
 					Logger:         testutils.NewLogger(t),
 					BuiltinMetrics: builtinMetrics,
 					Registry:       registry,
@@ -860,7 +862,7 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 				r := r
 				t.Run(name, func(t *testing.T) {
 					t.Parallel()
-					r.Logger, _ = logtest.NewNullLogger()
+					r.preInitState.Logger, _ = logtest.NewNullLogger()
 
 					initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
 					require.NoError(t, err)
@@ -900,7 +902,7 @@ func TestVUIntegrationBlacklistOption(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -941,7 +943,7 @@ func TestVUIntegrationBlacklistScript(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -984,7 +986,7 @@ func TestVUIntegrationBlockHostnamesOption(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -1027,7 +1029,7 @@ func TestVUIntegrationBlockHostnamesScript(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -1081,7 +1083,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -1157,7 +1159,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 			require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)))
 
 			r2, err := NewFromArchive(
-				&lib.RuntimeState{
+				&lib.TestPreInitState{
 					Logger:         testutils.NewLogger(t),
 					BuiltinMetrics: builtinMetrics,
 					Registry:       registry,
@@ -1169,7 +1171,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 				r := r
 				t.Run(name, func(t *testing.T) {
 					t.Parallel()
-					r.Logger, _ = logtest.NewNullLogger()
+					r.preInitState.Logger, _ = logtest.NewNullLogger()
 
 					initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
 					require.NoError(t, err)
@@ -1328,7 +1330,7 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -1388,7 +1390,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -1428,7 +1430,7 @@ func TestVUIntegrationVUID(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -1584,7 +1586,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 			}
 			require.NoError(t, r1.SetOptions(opt))
 			r2, err := NewFromArchive(
-				&lib.RuntimeState{
+				&lib.TestPreInitState{
 					Logger:         testutils.NewLogger(t),
 					BuiltinMetrics: builtinMetrics,
 					Registry:       registry,
@@ -1596,7 +1598,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 				r := r
 				t.Run(name, func(t *testing.T) {
 					t.Parallel()
-					r.Logger, _ = logtest.NewNullLogger()
+					r.preInitState.Logger, _ = logtest.NewNullLogger()
 					initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
 					require.NoError(t, err)
 					ctx, cancel := context.WithCancel(context.Background())
@@ -1749,7 +1751,7 @@ func TestArchiveRunningIntegrity(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -1794,7 +1796,7 @@ func TestArchiveNotPanicking(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -2007,7 +2009,7 @@ func TestVUPanic(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -2075,7 +2077,7 @@ func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.H
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	runner, err := New(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         logger,
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -2117,7 +2119,7 @@ func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.H
 
 	arc := runner.MakeArchive()
 	runnerFromArc, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         logger,
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -2342,7 +2344,7 @@ func TestForceHTTP1Feature(t *testing.T) {
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 			r2, err := NewFromArchive(
-				&lib.RuntimeState{
+				&lib.TestPreInitState{
 					Logger:         testutils.NewLogger(t),
 					BuiltinMetrics: builtinMetrics,
 					Registry:       registry,
@@ -2438,9 +2440,13 @@ func TestExecutionInfo(t *testing.T) {
 			initVU, err := r.NewVU(1, 10, samples)
 			require.NoError(t, err)
 
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			execScheduler, err := local.NewExecutionScheduler(r, builtinMetrics, testutils.NewLogger(t))
+			testRunState := &lib.TestRunState{
+				TestPreInitState: r.preInitState,
+				Options:          r.GetOptions(),
+				Runner:           r,
+			}
+
+			execScheduler, err := local.NewExecutionScheduler(testRunState)
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())

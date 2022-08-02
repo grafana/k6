@@ -16,7 +16,6 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/lib/testutils/minirunner"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
@@ -29,30 +28,49 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.WarnLevel, logrus.ErrorLevel}}
 	logger.AddHook(logHook)
 
-	script = []byte(`import {setTimeout} from "k6/x/events";
-  ` + string(script))
 	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	runner, err := js.New(
-		&lib.RuntimeState{
-			Logger:         logger,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		},
-		&loader.SourceData{
-			URL:  &url.URL{Path: "/script.js"},
-			Data: script,
-		},
-		nil,
-	)
+	piState := &lib.TestPreInitState{
+		Logger:         logger,
+		Registry:       registry,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+	}
+
+	script = []byte("import {setTimeout} from 'k6/x/events';\n" + string(script))
+	runner, err := js.New(piState, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
 	require.NoError(t, err)
 
-	ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger,
-		lib.Options{
-			TeardownTimeout: types.NullDurationFrom(time.Second),
-			SetupTimeout:    types.NullDurationFrom(time.Second),
-		}, builtinMetrics)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	newOpts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
+		MetricSamplesBufferSize: null.NewInt(200, false),
+		TeardownTimeout:         types.NullDurationFrom(time.Second),
+		SetupTimeout:            types.NullDurationFrom(time.Second),
+	}.Apply(runner.GetOptions()), nil)
+	require.NoError(t, err)
+	require.Empty(t, newOpts.Validate())
+	require.NoError(t, runner.SetOptions(newOpts))
+
+	testState := &lib.TestRunState{
+		TestPreInitState: piState,
+		Options:          newOpts,
+		Runner:           runner,
+	}
+
+	execScheduler, err := local.NewExecutionScheduler(testState)
+	require.NoError(t, err)
+
+	samples := make(chan metrics.SampleContainer, newOpts.MetricSamplesBufferSize.Int64)
+	go func() {
+		for {
+			select {
+			case <-samples:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	require.NoError(t, execScheduler.Init(ctx, samples))
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
@@ -197,43 +215,4 @@ export default function() {
 			"just error\n\tat /script.js:13:4(15)\n\tat native\n", "1",
 		}, msgs)
 	})
-}
-
-func newTestExecutionScheduler(
-	t *testing.T, runner lib.Runner, logger *logrus.Logger, opts lib.Options, builtinMetrics *metrics.BuiltinMetrics,
-) (ctx context.Context, cancel func(), execScheduler *local.ExecutionScheduler, samples chan metrics.SampleContainer) {
-	if runner == nil {
-		runner = &minirunner.MiniRunner{}
-	}
-	ctx, cancel = context.WithCancel(context.Background())
-	newOpts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
-		MetricSamplesBufferSize: null.NewInt(200, false),
-	}.Apply(runner.GetOptions()).Apply(opts), nil)
-	require.NoError(t, err)
-	require.Empty(t, newOpts.Validate())
-
-	require.NoError(t, runner.SetOptions(newOpts))
-
-	if logger == nil {
-		logger = logrus.New()
-		logger.SetOutput(testutils.NewTestOutput(t))
-	}
-
-	execScheduler, err = local.NewExecutionScheduler(runner, builtinMetrics, logger)
-	require.NoError(t, err)
-
-	samples = make(chan metrics.SampleContainer, newOpts.MetricSamplesBufferSize.Int64)
-	go func() {
-		for {
-			select {
-			case <-samples:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	require.NoError(t, execScheduler.Init(ctx, samples))
-
-	return ctx, cancel, execScheduler, samples
 }

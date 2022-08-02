@@ -42,11 +42,17 @@ type DialContexter interface {
 
 // State provides the volatile state for a VU.
 type State struct {
-	// Global options.
-	Options Options
+	// Global options and built-in metrics.
+	//
+	// TODO: remove them from here, the built-in metrics and the script options
+	// are not part of a VU's unique "state", they are global and the same for
+	// all VUs. Figure out how to thread them some other way, e.g. through the
+	// TestPreInitState. The Samples channel might also benefit from that...
+	Options        Options
+	BuiltinMetrics *metrics.BuiltinMetrics
 
 	// Logger. Avoid using the global logger.
-	// TODO change to logrus.FieldLogger when there is time to fix all the tests
+	// TODO: change to logrus.FieldLogger when there is time to fix all the tests
 	Logger *logrus.Logger
 
 	// Current group; all emitted metrics are tagged with this.
@@ -85,8 +91,6 @@ type State struct {
 	// unique globally across k6 instances (taking into account execution
 	// segments).
 	GetScenarioGlobalVUIter func() uint64
-
-	BuiltinMetrics *metrics.BuiltinMetrics
 }
 
 // CloneTags makes a copy of the tags map and returns it.

@@ -34,7 +34,6 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils/minirunner"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 )
@@ -68,24 +67,18 @@ func getTestConstantArrivalRateConfig() *ConstantArrivalRateConfig {
 
 func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	t.Parallel()
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 
-	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
-	ctx, cancel, executor, logHook := setupExecutor(
-		t, getTestConstantArrivalRateConfig(), es,
-		simpleRunner(func(ctx context.Context, _ *lib.State) error {
-			time.Sleep(time.Second)
-			return nil
-		}),
-	)
-	defer cancel()
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+		time.Sleep(time.Second)
+		return nil
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestConstantArrivalRateConfig())
+	defer test.cancel()
+
 	engineOut := make(chan metrics.SampleContainer, 1000)
-	err = executor.Run(ctx, engineOut)
-	require.NoError(t, err)
-	entries := logHook.Drain()
+	require.NoError(t, test.executor.Run(test.ctx, engineOut))
+	entries := test.logHook.Drain()
 	require.NotEmpty(t, entries)
 	for _, entry := range entries {
 		require.Equal(t,
@@ -97,20 +90,16 @@ func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 
 func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	t.Parallel()
+
 	var count int64
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
-	ctx, cancel, executor, logHook := setupExecutor(
-		t, getTestConstantArrivalRateConfig(), es,
-		simpleRunner(func(ctx context.Context, _ *lib.State) error {
-			atomic.AddInt64(&count, 1)
-			return nil
-		}),
-	)
-	defer cancel()
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+		atomic.AddInt64(&count, 1)
+		return nil
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestConstantArrivalRateConfig())
+	defer test.cancel()
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -125,114 +114,108 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 		}
 	}()
 	engineOut := make(chan metrics.SampleContainer, 1000)
-	err = executor.Run(ctx, engineOut)
+	require.NoError(t, test.executor.Run(test.ctx, engineOut))
 	wg.Wait()
-	require.NoError(t, err)
-	require.Empty(t, logHook.Drain())
+	require.Empty(t, test.logHook.Drain())
 }
 
 //nolint:tparallel,paralleltest // this is flaky if ran with other tests
 func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 	// t.Parallel()
 	tests := []struct {
-		segment  *lib.ExecutionSegment
-		sequence *lib.ExecutionSegmentSequence
+		segment  string
+		sequence string
 		start    time.Duration
 		steps    []int64
 	}{
 		{
-			segment: newExecutionSegmentFromString("0:1/3"),
+			segment: "0:1/3",
 			start:   time.Millisecond * 20,
 			steps:   []int64{40, 60, 60, 60, 60, 60, 60},
 		},
 		{
-			segment: newExecutionSegmentFromString("1/3:2/3"),
+			segment: "1/3:2/3",
 			start:   time.Millisecond * 20,
 			steps:   []int64{60, 60, 60, 60, 60, 60, 40},
 		},
 		{
-			segment: newExecutionSegmentFromString("2/3:1"),
+			segment: "2/3:1",
 			start:   time.Millisecond * 20,
 			steps:   []int64{40, 60, 60, 60, 60, 60, 60},
 		},
 		{
-			segment: newExecutionSegmentFromString("1/6:3/6"),
+			segment: "1/6:3/6",
 			start:   time.Millisecond * 20,
 			steps:   []int64{40, 80, 40, 80, 40, 80, 40},
 		},
 		{
-			segment:  newExecutionSegmentFromString("1/6:3/6"),
-			sequence: newExecutionSegmentSequenceFromString("1/6,3/6"),
+			segment:  "1/6:3/6",
+			sequence: "1/6,3/6",
 			start:    time.Millisecond * 20,
 			steps:    []int64{40, 80, 40, 80, 40, 80, 40},
 		},
 		// sequences
 		{
-			segment:  newExecutionSegmentFromString("0:1/3"),
-			sequence: newExecutionSegmentSequenceFromString("0,1/3,2/3,1"),
+			segment:  "0:1/3",
+			sequence: "0,1/3,2/3,1",
 			start:    time.Millisecond * 0,
 			steps:    []int64{60, 60, 60, 60, 60, 60, 40},
 		},
 		{
-			segment:  newExecutionSegmentFromString("1/3:2/3"),
-			sequence: newExecutionSegmentSequenceFromString("0,1/3,2/3,1"),
+			segment:  "1/3:2/3",
+			sequence: "0,1/3,2/3,1",
 			start:    time.Millisecond * 20,
 			steps:    []int64{60, 60, 60, 60, 60, 60, 40},
 		},
 		{
-			segment:  newExecutionSegmentFromString("2/3:1"),
-			sequence: newExecutionSegmentSequenceFromString("0,1/3,2/3,1"),
+			segment:  "2/3:1",
+			sequence: "0,1/3,2/3,1",
 			start:    time.Millisecond * 40,
 			steps:    []int64{60, 60, 60, 60, 60, 100},
 		},
 	}
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	for _, test := range tests {
 		test := test
 
 		t.Run(fmt.Sprintf("segment %s sequence %s", test.segment, test.sequence), func(t *testing.T) {
 			t.Parallel()
-			et, err := lib.NewExecutionTuple(test.segment, test.sequence)
-			require.NoError(t, err)
-			es := lib.NewExecutionState(lib.Options{
-				ExecutionSegment:         test.segment,
-				ExecutionSegmentSequence: test.sequence,
-			}, et, builtinMetrics, 10, 50)
+
 			var count int64
-			seconds := 2
-			config := getTestConstantArrivalRateConfig()
-			config.Duration.Duration = types.Duration(time.Second * time.Duration(seconds))
-			newET, err := es.ExecutionTuple.GetNewExecutionTupleFromValue(config.MaxVUs.Int64)
-			require.NoError(t, err)
-			rateScaled := newET.ScaleInt64(config.Rate.Int64)
 			startTime := time.Now()
 			expectedTimeInt64 := int64(test.start)
-			ctx, cancel, executor, logHook := setupExecutor(
-				t, config, es,
-				simpleRunner(func(ctx context.Context, _ *lib.State) error {
-					current := atomic.AddInt64(&count, 1)
+			runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+				current := atomic.AddInt64(&count, 1)
 
-					expectedTime := test.start
-					if current != 1 {
-						expectedTime = time.Duration(atomic.AddInt64(&expectedTimeInt64,
-							int64(time.Millisecond)*test.steps[(current-2)%int64(len(test.steps))]))
-					}
+				expectedTime := test.start
+				if current != 1 {
+					expectedTime = time.Duration(atomic.AddInt64(&expectedTimeInt64,
+						int64(time.Millisecond)*test.steps[(current-2)%int64(len(test.steps))]))
+				}
 
-					// FIXME: replace this check with a unit test asserting that the scheduling is correct,
-					// without depending on the execution time itself
-					assert.WithinDuration(t,
-						startTime.Add(expectedTime),
-						time.Now(),
-						time.Millisecond*24,
-						"%d expectedTime %s", current, expectedTime,
-					)
+				// FIXME: replace this check with a unit test asserting that the scheduling is correct,
+				// without depending on the execution time itself
+				assert.WithinDuration(t,
+					startTime.Add(expectedTime),
+					time.Now(),
+					time.Millisecond*24,
+					"%d expectedTime %s", current, expectedTime,
+				)
 
-					return nil
-				}),
+				return nil
+			})
+
+			config := getTestConstantArrivalRateConfig()
+			seconds := 2
+			config.Duration.Duration = types.Duration(time.Second * time.Duration(seconds))
+			execTest := setupExecutorTest(
+				t, test.segment, test.sequence, lib.Options{}, runner, config,
 			)
+			defer execTest.cancel()
 
-			defer cancel()
+			newET, err := execTest.state.ExecutionTuple.GetNewExecutionTupleFromValue(config.MaxVUs.Int64)
+			require.NoError(t, err)
+			rateScaled := newET.ScaleInt64(config.Rate.Int64)
+
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
@@ -248,10 +231,10 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 			}()
 			startTime = time.Now()
 			engineOut := make(chan metrics.SampleContainer, 1000)
-			err = executor.Run(ctx, engineOut)
+			err = execTest.executor.Run(execTest.ctx, engineOut)
 			wg.Wait()
 			require.NoError(t, err)
-			require.Empty(t, logHook.Drain())
+			require.Empty(t, execTest.logHook.Drain())
 		})
 	}
 }
@@ -263,8 +246,6 @@ func TestArrivalRateCancel(t *testing.T) {
 		"constant": getTestConstantArrivalRateConfig(),
 		"ramping":  getTestRampingArrivalRateConfig(),
 	}
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	for name, config := range testCases {
 		config := config
 		t.Run(name, func(t *testing.T) {
@@ -272,32 +253,31 @@ func TestArrivalRateCancel(t *testing.T) {
 			ch := make(chan struct{})
 			errCh := make(chan error, 1)
 			weAreDoneCh := make(chan struct{})
-			et, err := lib.NewExecutionTuple(nil, nil)
-			require.NoError(t, err)
-			es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
-			ctx, cancel, executor, logHook := setupExecutor(
-				t, config, es, simpleRunner(func(ctx context.Context, _ *lib.State) error {
-					select {
-					case <-ch:
-						<-ch
-					default:
-					}
-					return nil
-				}))
-			defer cancel()
+
+			runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+				select {
+				case <-ch:
+					<-ch
+				default:
+				}
+				return nil
+			})
+			test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+			defer test.cancel()
+
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 
 				engineOut := make(chan metrics.SampleContainer, 1000)
-				errCh <- executor.Run(ctx, engineOut)
+				errCh <- test.executor.Run(test.ctx, engineOut)
 				close(weAreDoneCh)
 			}()
 
 			time.Sleep(time.Second)
 			ch <- struct{}{}
-			cancel()
+			test.cancel()
 			time.Sleep(time.Second)
 			select {
 			case <-weAreDoneCh:
@@ -308,7 +288,7 @@ func TestArrivalRateCancel(t *testing.T) {
 			<-weAreDoneCh
 			wg.Wait()
 			require.NoError(t, <-errCh)
-			require.Empty(t, logHook.Drain())
+			require.Empty(t, test.logHook.Drain())
 		})
 	}
 }
@@ -316,8 +296,6 @@ func TestArrivalRateCancel(t *testing.T) {
 func TestConstantArrivalRateDroppedIterations(t *testing.T) {
 	t.Parallel()
 	var count int64
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
 
 	config := &ConstantArrivalRateConfig{
 		BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
@@ -328,22 +306,17 @@ func TestConstantArrivalRateDroppedIterations(t *testing.T) {
 		MaxVUs:          null.IntFrom(5),
 	}
 
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 10, 50)
-	ctx, cancel, executor, logHook := setupExecutor(
-		t, config, es,
-		simpleRunner(func(ctx context.Context, _ *lib.State) error {
-			atomic.AddInt64(&count, 1)
-			<-ctx.Done()
-			return nil
-		}),
-	)
-	defer cancel()
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+		atomic.AddInt64(&count, 1)
+		<-ctx.Done()
+		return nil
+	})
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
+
 	engineOut := make(chan metrics.SampleContainer, 1000)
-	err = executor.Run(ctx, engineOut)
-	require.NoError(t, err)
-	logs := logHook.Drain()
+	require.NoError(t, test.executor.Run(test.ctx, engineOut))
+	logs := test.logHook.Drain()
 	require.Len(t, logs, 1)
 	assert.Contains(t, logs[0].Message, "cannot initialize more")
 	assert.Equal(t, int64(5), count)
@@ -371,36 +344,24 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 		{"0,1/4,3/4,1", "3/4:1", []uint64{3, 8, 13, 18}},
 	}
 
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(fmt.Sprintf("%s_%s", tc.seq, tc.seg), func(t *testing.T) {
 			t.Parallel()
-			ess, err := lib.NewExecutionSegmentSequenceFromString(tc.seq)
-			require.NoError(t, err)
-			seg, err := lib.NewExecutionSegmentFromString(tc.seg)
-			require.NoError(t, err)
-			et, err := lib.NewExecutionTuple(seg, &ess)
-			require.NoError(t, err)
-			es := lib.NewExecutionState(lib.Options{}, et, builtinMetrics, 5, 5)
-
-			runner := &minirunner.MiniRunner{}
-			ctx, cancel, executor, _ := setupExecutor(t, config, es, runner)
-			defer cancel()
 
 			gotIters := []uint64{}
 			var mx sync.Mutex
-			runner.Fn = func(ctx context.Context, state *lib.State, _ chan<- metrics.SampleContainer) error {
+			runner := simpleRunner(func(ctx context.Context, state *lib.State) error {
 				mx.Lock()
 				gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
 				mx.Unlock()
 				return nil
-			}
+			})
+			test := setupExecutorTest(t, tc.seg, tc.seq, lib.Options{}, runner, config)
+			defer test.cancel()
 
 			engineOut := make(chan metrics.SampleContainer, 100)
-			err = executor.Run(ctx, engineOut)
-			require.NoError(t, err)
+			require.NoError(t, test.executor.Run(test.ctx, engineOut))
 			assert.Equal(t, tc.expIters, gotIters)
 		})
 	}

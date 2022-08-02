@@ -72,10 +72,7 @@ type Engine struct {
 }
 
 // NewEngine instantiates a new Engine, without doing any heavy initialization.
-func NewEngine(
-	ex lib.ExecutionScheduler, opts lib.Options, rtOpts lib.RuntimeOptions, outputs []output.Output, logger *logrus.Logger,
-	registry *metrics.Registry,
-) (*Engine, error) {
+func NewEngine(testState *lib.TestRunState, ex lib.ExecutionScheduler, outputs []output.Output) (*Engine, error) {
 	if ex == nil {
 		return nil, errors.New("missing ExecutionScheduler instance")
 	}
@@ -83,26 +80,26 @@ func NewEngine(
 	e := &Engine{
 		ExecutionScheduler: ex,
 
-		runtimeOptions: rtOpts,
-		Samples:        make(chan metrics.SampleContainer, opts.MetricSamplesBufferSize.Int64),
+		runtimeOptions: testState.RuntimeOptions,
+		Samples:        make(chan metrics.SampleContainer, testState.Options.MetricSamplesBufferSize.Int64),
 		stopChan:       make(chan struct{}),
-		logger:         logger.WithField("component", "engine"),
+		logger:         testState.Logger.WithField("component", "engine"),
 	}
 
-	me, err := engine.NewMetricsEngine(registry, ex.GetState(), opts, rtOpts, logger)
+	me, err := engine.NewMetricsEngine(ex.GetState())
 	if err != nil {
 		return nil, err
 	}
 	e.MetricsEngine = me
 
-	if !(rtOpts.NoSummary.Bool && rtOpts.NoThresholds.Bool) {
+	if !(testState.RuntimeOptions.NoSummary.Bool && testState.RuntimeOptions.NoThresholds.Bool) {
 		e.ingester = me.GetIngester()
 		outputs = append(outputs, e.ingester)
 	}
 
-	e.OutputManager = output.NewManager(outputs, logger, func(err error) {
+	e.OutputManager = output.NewManager(outputs, testState.Logger, func(err error) {
 		if err != nil {
-			logger.WithError(err).Error("Received error to stop from output")
+			testState.Logger.WithError(err).Error("Received error to stop from output")
 		}
 		e.Stop()
 	})

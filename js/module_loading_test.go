@@ -109,7 +109,7 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 			arc := r1.MakeArchive()
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			r2, err := NewFromArchive(&lib.RuntimeState{
+			r2, err := NewFromArchive(&lib.TestPreInitState{
 				Logger:         testutils.NewLogger(t),
 				BuiltinMetrics: builtinMetrics,
 				Registry:       registry,
@@ -167,7 +167,7 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -222,7 +222,7 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -275,7 +275,7 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -347,7 +347,7 @@ func TestLoadCycle(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -417,7 +417,7 @@ func TestLoadCycleBinding(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -489,7 +489,7 @@ func TestBrowserified(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -540,7 +540,7 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -582,7 +582,7 @@ func TestLoadingSourceMapsDoesntErrorOut(t *testing.T) {
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
-		&lib.RuntimeState{
+		&lib.TestPreInitState{
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
@@ -642,7 +642,7 @@ func TestOptionsAreGloballyReadable(t *testing.T) {
 	arc := r1.MakeArchive()
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(&lib.RuntimeState{
+	r2, err := NewFromArchive(&lib.TestPreInitState{
 		Logger:         testutils.NewLogger(t),
 		BuiltinMetrics: builtinMetrics,
 		Registry:       registry,
@@ -701,7 +701,7 @@ func TestOptionsAreNotGloballyWritable(t *testing.T) {
 	arc := r1.MakeArchive()
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(&lib.RuntimeState{
+	r2, err := NewFromArchive(&lib.TestPreInitState{
 		Logger:         testutils.NewLogger(t),
 		BuiltinMetrics: builtinMetrics,
 		Registry:       registry,

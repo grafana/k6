@@ -48,20 +48,15 @@ func getTestExternallyControlledConfig() ExternallyControlledConfig {
 func TestExternallyControlledRun(t *testing.T) {
 	t.Parallel()
 
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	es := lib.NewExecutionState(lib.Options{}, et, nil, 10, 50)
-
 	doneIters := new(uint64)
-	ctx, cancel, executor, _ := setupExecutor(
-		t, getTestExternallyControlledConfig(), es,
-		simpleRunner(func(ctx context.Context, _ *lib.State) error {
-			time.Sleep(200 * time.Millisecond)
-			atomic.AddUint64(doneIters, 1)
-			return nil
-		}),
-	)
-	defer cancel()
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+		time.Sleep(200 * time.Millisecond)
+		atomic.AddUint64(doneIters, 1)
+		return nil
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestExternallyControlledConfig())
+	defer test.cancel()
 
 	var (
 		wg     sync.WaitGroup
@@ -71,9 +66,9 @@ func TestExternallyControlledRun(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		es.MarkStarted()
-		errCh <- executor.Run(ctx, nil)
-		es.MarkEnded()
+		test.state.MarkStarted()
+		errCh <- test.executor.Run(test.ctx, nil)
+		test.state.MarkEnded()
 		close(doneCh)
 	}()
 
@@ -83,7 +78,7 @@ func TestExternallyControlledRun(t *testing.T) {
 			MaxVUs:   null.IntFrom(maxVUs),
 			Duration: types.NullDurationFrom(2 * time.Second),
 		}
-		err := executor.(*ExternallyControlled).UpdateConfig(ctx, newConfig)
+		err := test.executor.(*ExternallyControlled).UpdateConfig(test.ctx, newConfig) //nolint:forcetypeassert
 		if errMsg != "" {
 			assert.EqualError(t, err, errMsg)
 		} else {
@@ -94,7 +89,7 @@ func TestExternallyControlledRun(t *testing.T) {
 	var resultVUCount [][]int64
 	snapshot := func() {
 		resultVUCount = append(resultVUCount,
-			[]int64{es.GetCurrentlyActiveVUsCount(), es.GetInitializedVUsCount()})
+			[]int64{test.state.GetCurrentlyActiveVUsCount(), test.state.GetInitializedVUsCount()})
 	}
 
 	wg.Add(1)
