@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mailru/easyjson/jwriter"
+	"github.com/mstoykov/atlas"
 )
 
 // A Sample is a single measurement.
@@ -179,7 +180,7 @@ func parsePercentile(stat string) (float64, error) {
 // All methods should not panic, even if they are called on a nil pointer.
 //easyjson:skip
 type SampleTags struct {
-	tags map[string]string
+	tags *atlas.Node
 	json []byte
 }
 
@@ -189,14 +190,16 @@ func (st *SampleTags) Get(key string) (string, bool) {
 	if st == nil {
 		return "", false
 	}
-	val, ok := st.tags[key]
-	return val, ok
+	return st.tags.ValueByKey(key)
 }
 
 // IsEmpty checks for a nil pointer or zero tags.
 // It's necessary because of this envconfig issue: https://github.com/kelseyhightower/envconfig/issues/113
 func (st *SampleTags) IsEmpty() bool {
-	return st == nil || len(st.tags) == 0
+	if st == nil || st.tags == nil {
+		return true
+	}
+	return st.tags.IsRoot()
 }
 
 // IsEqual tries to compare two tag sets with maximum efficiency.
@@ -204,32 +207,20 @@ func (st *SampleTags) IsEqual(other *SampleTags) bool {
 	if st == other {
 		return true
 	}
-	if st == nil || other == nil || len(st.tags) != len(other.tags) {
+	if st == nil || other == nil {
 		return false
 	}
-	for k, v := range st.tags {
-		if otherv, ok := other.tags[k]; !ok || v != otherv {
-			return false
-		}
-	}
-	return true
+	return st.tags == other.tags
 }
 
 func (st *SampleTags) Contains(other *SampleTags) bool {
 	if st == other || other == nil {
 		return true
 	}
-	if st == nil || len(st.tags) < len(other.tags) {
+	if st == nil {
 		return false
 	}
-
-	for k, v := range other.tags {
-		if myv, ok := st.tags[k]; !ok || myv != v {
-			return false
-		}
-	}
-
-	return true
+	return st.tags.Contains(other.tags)
 }
 
 // MarshalJSON serializes SampleTags to a JSON string and caches
@@ -243,7 +234,7 @@ func (st *SampleTags) MarshalJSON() ([]byte, error) {
 	if st.json != nil {
 		return st.json, nil
 	}
-	res, err := json.Marshal(st.tags)
+	res, err := json.Marshal(st.tags.Path())
 	if err != nil {
 		return res, err
 	}
@@ -255,7 +246,9 @@ func (st *SampleTags) MarshalJSON() ([]byte, error) {
 func (st *SampleTags) MarshalEasyJSON(w *jwriter.Writer) {
 	w.RawByte('{')
 	first := true
-	for k, v := range st.tags {
+	// FIXME: implement an iterator/Range function on Atlas
+	// so we can reduce the mem allocation
+	for k, v := range st.tags.Path() {
 		if first {
 			first = false
 		} else {
@@ -270,10 +263,22 @@ func (st *SampleTags) MarshalEasyJSON(w *jwriter.Writer) {
 
 // UnmarshalJSON deserializes SampleTags from a JSON string.
 func (st *SampleTags) UnmarshalJSON(data []byte) error {
-	if st == nil {
-		*st = SampleTags{}
+	if st == nil || st.tags == nil {
+		// It forces the caller to branch out from a centralized root
+		// before unmarshaling or to initialize a new root if it is required.
+		// It can't handle here the logic for instantiate the TagSet otherwise
+		// it would be very easy to create fragmented trees all around the program.
+		return fmt.Errorf("SampleTags must be initialized before to be unmarshaled, " +
+			"branch out from a centralized root or create a new root")
 	}
-	return json.Unmarshal(data, &st.tags)
+	var raw map[string]string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	for k, v := range raw {
+		st.tags = st.tags.AddLink(k, v)
+	}
+	return nil
 }
 
 // CloneTags copies the underlying set of a sample tags and
@@ -282,37 +287,5 @@ func (st *SampleTags) CloneTags() map[string]string {
 	if st == nil {
 		return map[string]string{}
 	}
-	res := make(map[string]string, len(st.tags))
-	for k, v := range st.tags {
-		res[k] = v
-	}
-	return res
-}
-
-// NewSampleTags *copies* the supplied tag set and returns a new SampleTags
-// instance with the key-value pairs from it.
-func NewSampleTags(data map[string]string) *SampleTags {
-	if len(data) == 0 {
-		return nil
-	}
-
-	tags := map[string]string{}
-	for k, v := range data {
-		tags[k] = v
-	}
-	return &SampleTags{tags: tags}
-}
-
-// IntoSampleTags "consumes" the passed map and creates a new SampleTags
-// struct with the data. The map is set to nil as a hint that it shouldn't
-// be changed after it has been transformed into an "immutable" tag set.
-// Oh, how I miss Rust and move semantics... :)
-func IntoSampleTags(data *map[string]string) *SampleTags {
-	if len(*data) == 0 {
-		return nil
-	}
-
-	res := SampleTags{tags: *data}
-	*data = nil
-	return &res
+	return st.tags.Path()
 }
