@@ -106,6 +106,9 @@ github.com/mattn/go-isatty
 github.com/mccutchen/go-httpbin/httpbin
 github.com/mccutchen/go-httpbin/httpbin/assets
 github.com/mccutchen/go-httpbin/httpbin/digest
+# github.com/mstoykov/atlas v0.0.0-20220727131014-23cc720eb639
+## explicit; go 1.18
+github.com/mstoykov/atlas
 # github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1
 ## explicit
 github.com/mstoykov/envconfig
