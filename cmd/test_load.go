@@ -56,6 +56,7 @@ func loadTest(gs *globalState, cmd *cobra.Command, args []string) (*loadedTest, 
 	)
 
 	gs.logger.Debugf("Gathering k6 runtime options...")
+
 	runtimeOptions, err := getRuntimeOptions(cmd.Flags(), gs.envVars)
 	if err != nil {
 		return nil, err
@@ -248,12 +249,11 @@ func (lct *loadedAndConfiguredTest) buildTestRunState(
 		return nil, err
 	}
 
-	// TODO: init atlas root node, etc.
-
 	return &lib.TestRunState{
 		TestPreInitState: lct.preInitState,
 		Runner:           lct.initRunner,
 		Options:          lct.derivedConfig.Options, // we will always run with the derived options
+		RunTags:          lct.preInitState.Registry.BranchTagSetRootWith(configToReinject.RunTags),
 	}, nil
 }
 
