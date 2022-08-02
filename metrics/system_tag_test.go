@@ -92,11 +92,11 @@ func TestTagSetMarshalJSON(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		tagset   TagSet
+		tagset   EnabledTags
 		expected string
 	}{
-		{tagset: TagSet{"ip": true, "proto": true, "group": true, "custom": true}, expected: `["custom","group","ip","proto"]`},
-		{tagset: TagSet{}, expected: `[]`},
+		{tagset: EnabledTags{"ip": true, "proto": true, "group": true, "custom": true}, expected: `["custom","group","ip","proto"]`},
+		{tagset: EnabledTags{}, expected: `[]`},
 	}
 
 	for _, tc := range tests {
@@ -112,14 +112,14 @@ func TestTagSet_UnmarshalJSON(t *testing.T) {
 
 	tests := []struct {
 		tags []byte
-		sets TagSet
+		sets EnabledTags
 	}{
-		{[]byte(`[]`), TagSet{}},
-		{[]byte(`["ip","custom", "proto"]`), TagSet{"ip": true, "proto": true, "custom": true}},
+		{[]byte(`[]`), EnabledTags{}},
+		{[]byte(`["ip","custom", "proto"]`), EnabledTags{"ip": true, "proto": true, "custom": true}},
 	}
 
 	for _, tc := range tests {
-		ts := new(TagSet)
+		ts := new(EnabledTags)
 		require.Nil(t, json.Unmarshal(tc.tags, ts))
 		for tag := range tc.sets {
 			assert.True(t, (*ts)[tag])
@@ -130,8 +130,8 @@ func TestTagSet_UnmarshalJSON(t *testing.T) {
 func TestTagSetTextUnmarshal(t *testing.T) {
 	t.Parallel()
 
-	testMatrix := map[string]TagSet{
-		"":                           make(TagSet),
+	testMatrix := map[string]EnabledTags{
+		"":                           make(EnabledTags),
 		"ip":                         {"ip": true},
 		"ip,proto":                   {"ip": true, "proto": true},
 		"   ip  ,  proto  ":          {"ip": true, "proto": true},
@@ -141,7 +141,7 @@ func TestTagSetTextUnmarshal(t *testing.T) {
 	}
 
 	for input, expected := range testMatrix {
-		set := new(TagSet)
+		set := new(EnabledTags)
 		err := set.UnmarshalText([]byte(input))
 		require.NoError(t, err)
 		require.Equal(t, expected, *set)

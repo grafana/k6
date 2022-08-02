@@ -32,56 +32,6 @@ import (
 //go:generate enumer -type=SystemTagSet -transform=snake -trimprefix=Tag -output system_tag_set_gen.go
 type SystemTagSet uint32
 
-// TagSet is a string to bool map (for lookup efficiency) that is used to keep track
-// of which system tags and non-system tags to include.
-type TagSet map[string]bool
-
-// UnmarshalText converts the tag list to TagSet.
-func (i *TagSet) UnmarshalText(data []byte) error {
-	list := bytes.Split(data, []byte(","))
-	if *i == nil {
-		*i = make(TagSet, len(list))
-	}
-
-	for _, key := range list {
-		key := strings.TrimSpace(string(key))
-		if key == "" {
-			continue
-		}
-		(*i)[key] = true
-	}
-
-	return nil
-}
-
-// MarshalJSON converts the TagSet to a list (JS array).
-func (i *TagSet) MarshalJSON() ([]byte, error) {
-	var tags []string
-	if *i != nil {
-		tags = make([]string, 0, len(*i))
-		for tag := range *i {
-			tags = append(tags, tag)
-		}
-		sort.Strings(tags)
-	}
-
-	return json.Marshal(tags)
-}
-
-// UnmarshalJSON converts the tag list back to expected tag set.
-func (i *TagSet) UnmarshalJSON(data []byte) error {
-	var tags []string
-	if err := json.Unmarshal(data, &tags); err != nil {
-		return err
-	}
-	*i = make(TagSet, len(tags))
-	for _, tag := range tags {
-		(*i)[tag] = true
-	}
-
-	return nil
-}
-
 // Default system tags includes all of the system tags emitted with metrics by default.
 const (
 	TagProto SystemTagSet = 1 << iota
@@ -128,9 +78,9 @@ func (i *SystemTagSet) Has(tag SystemTagSet) bool {
 	return *i&tag != 0
 }
 
-// Map returns the TagSet with current value from SystemTagSet
-func (i SystemTagSet) Map() TagSet {
-	m := TagSet{}
+// Map returns the EnabledTags with current value from SystemTagSet
+func (i SystemTagSet) Map() EnabledTags {
+	m := EnabledTags{}
 	for _, tag := range SystemTagSetValues() {
 		if i.Has(tag) {
 			m[tag.String()] = true

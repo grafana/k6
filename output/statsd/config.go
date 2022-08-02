@@ -33,15 +33,15 @@ import (
 
 // config defines the StatsD configuration.
 type config struct {
-	Addr         null.String        `json:"addr,omitempty" envconfig:"K6_STATSD_ADDR"`
-	BufferSize   null.Int           `json:"bufferSize,omitempty" envconfig:"K6_STATSD_BUFFER_SIZE"`
-	Namespace    null.String        `json:"namespace,omitempty" envconfig:"K6_STATSD_NAMESPACE"`
-	PushInterval types.NullDuration `json:"pushInterval,omitempty" envconfig:"K6_STATSD_PUSH_INTERVAL"`
-	TagBlocklist metrics.TagSet     `json:"tagBlocklist,omitempty" envconfig:"K6_STATSD_TAG_BLOCKLIST"`
-	EnableTags   null.Bool          `json:"enableTags,omitempty" envconfig:"K6_STATSD_ENABLE_TAGS"`
+	Addr         null.String         `json:"addr,omitempty" envconfig:"K6_STATSD_ADDR"`
+	BufferSize   null.Int            `json:"bufferSize,omitempty" envconfig:"K6_STATSD_BUFFER_SIZE"`
+	Namespace    null.String         `json:"namespace,omitempty" envconfig:"K6_STATSD_NAMESPACE"`
+	PushInterval types.NullDuration  `json:"pushInterval,omitempty" envconfig:"K6_STATSD_PUSH_INTERVAL"`
+	TagBlocklist metrics.EnabledTags `json:"tagBlocklist,omitempty" envconfig:"K6_STATSD_TAG_BLOCKLIST"`
+	EnableTags   null.Bool           `json:"enableTags,omitempty" envconfig:"K6_STATSD_ENABLE_TAGS"`
 }
 
-func processTags(t metrics.TagSet, tags map[string]string) []string {
+func processTags(t metrics.EnabledTags, tags map[string]string) []string {
 	var res []string
 	for key, value := range tags {
 		if value != "" && !t[key] {
