@@ -35,6 +35,7 @@ type loadedTest struct {
 	fileSystems    map[string]afero.Fs
 	preInitState   *lib.TestPreInitState
 	initRunner     lib.Runner // TODO: rename to something more appropriate
+	keyLogger      io.Closer
 }
 
 func loadTest(gs *globalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
@@ -109,7 +110,8 @@ func (lt *loadedTest) initializeFirstRunner(gs *globalState) error {
 		if err != nil {
 			return fmt.Errorf("couldn't get absolute path for keylog file: %w", err)
 		}
-		lt.preInitState.KeyLogger = &syncWriteCloser{w: f}
+		lt.keyLogger = f
+		lt.preInitState.KeyLogger = &syncWriter{w: f}
 	}
 	switch testType {
 	case testTypeJS:
@@ -255,19 +257,13 @@ func (lct *loadedAndConfiguredTest) buildTestRunState(
 	}, nil
 }
 
-type syncWriteCloser struct {
-	w io.WriteCloser
+type syncWriter struct {
+	w io.Writer
 	m sync.Mutex
 }
 
-func (cw *syncWriteCloser) Write(b []byte) (int, error) {
+func (cw *syncWriter) Write(b []byte) (int, error) {
 	cw.m.Lock()
 	defer cw.m.Unlock()
 	return cw.w.Write(b)
-}
-
-func (cw *syncWriteCloser) Close() error {
-	cw.m.Lock()
-	defer cw.m.Unlock()
-	return cw.w.Close()
 }

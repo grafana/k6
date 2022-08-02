@@ -13,7 +13,7 @@ type TestPreInitState struct {
 	RuntimeOptions RuntimeOptions
 	Registry       *metrics.Registry
 	BuiltinMetrics *metrics.BuiltinMetrics
-	KeyLogger      io.WriteCloser
+	KeyLogger      io.Writer
 
 	// TODO: replace with logrus.FieldLogger when all of the tests can be fixed
 	Logger *logrus.Logger

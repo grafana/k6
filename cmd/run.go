@@ -266,8 +266,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	logger.Debug("Waiting for engine processes to finish...")
 	engineWait()
 	logger.Debug("Everything has finished, exiting k6!")
-	if testRunState.KeyLogger != nil {
-		if err := testRunState.KeyLogger.Close(); err != nil {
+	if test.keyLogger != nil {
+		if err := test.keyLogger.Close(); err != nil {
 			logger.WithError(err).Warn("Error while closing the SSLKEYLOGFILE")
 		}
 	}
