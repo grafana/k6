@@ -394,11 +394,13 @@ func TestThresholdsValidate(t *testing.T) {
 		t.Parallel()
 
 		testRegistry := NewRegistry()
+		rootTagSet := NewTagSet(nil)
+
 		testCounter, err := testRegistry.NewMetric("test_counter", Counter)
 		require.NoError(t, err)
-		_, err = testCounter.AddSubmetric("foo:bar")
+		_, err = testCounter.AddSubmetric("foo:bar", rootTagSet)
 		require.NoError(t, err)
-		_, err = testCounter.AddSubmetric("abc:123,easyas:doremi")
+		_, err = testCounter.AddSubmetric("abc:123,easyas:doremi", rootTagSet)
 		require.NoError(t, err)
 
 		_, err = testRegistry.NewMetric("test_rate", Rate)

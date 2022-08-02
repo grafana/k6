@@ -6,85 +6,161 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mstoykov/atlas"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestSampleTags(t *testing.T) {
+func TestSampleTagsIsEqual(t *testing.T) {
 	t.Parallel()
 
 	// Nil pointer to SampleTags
 	var nilTags *SampleTags
+	require.Nil(t, nilTags)
 	assert.True(t, nilTags.IsEqual(nilTags))
-	assert.Equal(t, map[string]string{}, nilTags.CloneTags())
 
+	root := newSampleTagsRoot()
+
+	// Empty set
+	emptyTags := root
+	assert.True(t, emptyTags.IsEqual(root))
+	assert.True(t, emptyTags.IsEqual(emptyTags))
+	assert.False(t, emptyTags.IsEqual(nilTags))
+
+	// Different roots
+	addTagToSampleTags(root, "tag1", "value1")
+
+	root2 := newSampleTagsRoot()
+	addTagToSampleTags(root, "tag1", "value1")
+	assert.False(t, root.IsEqual(root2))
+
+	// When the other tag set is nil
+	assert.False(t, root.IsEqual(nilTags))
+}
+
+func TestSampleTagsIsEmpty(t *testing.T) {
+	t.Parallel()
+
+	st := newSampleTagsRoot()
+	assert.True(t, st.IsEmpty())
+
+	addTagToSampleTags(st, "key1", "val1")
+	assert.False(t, st.IsEmpty())
+}
+
+func TestSampleTagsGet(t *testing.T) {
+	t.Parallel()
+
+	st := newSampleTagsRoot()
+	v, ok := st.Get("key1")
+	assert.False(t, ok)
+	assert.Empty(t, v)
+
+	addTagToSampleTags(st, "key1", "val1")
+	v, ok = st.Get("key1")
+	assert.True(t, ok)
+	assert.Equal(t, "val1", v)
+}
+
+func TestSampleTagsCloneTags(t *testing.T) {
+	t.Parallel()
+
+	st := newSampleTagsRoot()
+	addTagToSampleTags(st, "key1", "val1")
+	addTagToSampleTags(st, "key2", "val2")
+	addTagToSampleTags(st, "key3", "val3")
+
+	expected := map[string]string{
+		"key1": "val1",
+		"key2": "val2",
+		"key3": "val3",
+	}
+	assert.NotNil(t, expected, st.CloneTags())
+}
+
+func TestSampleTagsContains(t *testing.T) {
+	t.Parallel()
+
+	st := newSampleTagsRoot()
+	addTagToSampleTags(st, "maintag", "mainvalue")
+
+	branch := &SampleTags{tags: st.tags}
+	addTagToSampleTags(branch, "tag1", "val1")
+	addTagToSampleTags(branch, "tag2", "val2")
+
+	inner := &SampleTags{tags: st.tags}
+	addTagToSampleTags(inner, "tag1", "val1")
+
+	outer := &SampleTags{tags: st.tags}
+	addTagToSampleTags(outer, "tag3", "val2")
+
+	assert.True(t, st.Contains(st))
+	assert.True(t, branch.Contains(st))
+	assert.True(t, branch.Contains(inner))
+	assert.False(t, branch.Contains(outer))
+	assert.False(t, st.Contains(outer))
+}
+
+func TestSampleTagsJSON(t *testing.T) {
+	t.Parallel()
+
+	var nilTags *SampleTags
 	nilJSON, err := json.Marshal(nilTags)
 	assert.NoError(t, err)
 	assert.Equal(t, "null", string(nilJSON))
 
-	// Empty SampleTags
-	emptyTagMap := map[string]string{}
-	emptyTags := NewSampleTags(emptyTagMap)
-	assert.Nil(t, emptyTags)
-	assert.True(t, emptyTags.IsEqual(emptyTags))
-	assert.True(t, emptyTags.IsEqual(nilTags))
-	assert.Equal(t, emptyTagMap, emptyTags.CloneTags())
+	root := newSampleTagsRoot()
 
+	tags := &SampleTags{tags: root.tags}
+	addTagToSampleTags(tags, "key1", "val1")
+	addTagToSampleTags(tags, "key2", "val2")
+
+	assert.Nil(t, tags.json) // No cache
+	tagsJSON, err := json.Marshal(tags)
+	require.NoError(t, err)
+	expJSON := `{"key1":"val1","key2":"val2"}`
+	assert.JSONEq(t, expJSON, string(tagsJSON))
+	assert.JSONEq(t, expJSON, string(tags.json)) // Populated cache
+
+	emptyTags := newSampleTagsRoot()
 	emptyJSON, err := json.Marshal(emptyTags)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "null", string(emptyJSON))
 
 	var emptyTagsUnmarshaled *SampleTags
 	err = json.Unmarshal(emptyJSON, &emptyTagsUnmarshaled)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, emptyTagsUnmarshaled)
-	assert.True(t, emptyTagsUnmarshaled.IsEqual(emptyTags))
 	assert.True(t, emptyTagsUnmarshaled.IsEqual(nilTags))
-	assert.Equal(t, emptyTagMap, emptyTagsUnmarshaled.CloneTags())
+	assert.Equal(t, map[string]string{}, emptyTagsUnmarshaled.CloneTags())
 
-	// SampleTags with keys and values
-	tagMap := map[string]string{"key1": "val1", "key2": "val2"}
-	tags := NewSampleTags(tagMap)
-	assert.NotNil(t, tags)
-	assert.True(t, tags.IsEqual(tags))
-	assert.False(t, tags.IsEqual(nilTags))
-	assert.False(t, tags.IsEqual(emptyTags))
-	assert.False(t, tags.IsEqual(IntoSampleTags(&map[string]string{"key1": "val1", "key2": "val3"})))
-	assert.True(t, tags.Contains(IntoSampleTags(&map[string]string{"key1": "val1"})))
-	assert.False(t, tags.Contains(IntoSampleTags(&map[string]string{"key3": "val1"})))
-	assert.False(t, tags.Contains(IntoSampleTags(&map[string]string{"nonexistent_key": ""})))
-	assert.Equal(t, tagMap, tags.CloneTags())
-
-	assert.Nil(t, tags.json) // No cache
-	tagsJSON, err := json.Marshal(tags)
-	expJSON := `{"key1":"val1","key2":"val2"}`
-	assert.NoError(t, err)
-	assert.JSONEq(t, expJSON, string(tagsJSON))
-	assert.JSONEq(t, expJSON, string(tags.json)) // Populated cache
-
-	var tagsUnmarshaled *SampleTags
+	tagsUnmarshaled := &SampleTags{tags: root.tags}
 	err = json.Unmarshal(tagsJSON, &tagsUnmarshaled)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, tagsUnmarshaled)
 	assert.True(t, tagsUnmarshaled.IsEqual(tags))
 	assert.False(t, tagsUnmarshaled.IsEqual(nilTags))
-	assert.Equal(t, tagMap, tagsUnmarshaled.CloneTags())
+
+	exp := map[string]string{"key1": "val1", "key2": "val2"}
+	assert.Equal(t, exp, tagsUnmarshaled.CloneTags())
 }
 
 func TestSampleImplementations(t *testing.T) {
-	tagMap := map[string]string{"key1": "val1", "key2": "val2"}
+	tagMap := NewTagSet(map[string]string{"key1": "val1", "key2": "val2"})
+	sampleTags := tagMap.SampleTags()
 	now := time.Now()
 
 	sample := Sample{
 		Metric: newMetric("test_metric", Counter),
 		Time:   now,
-		Tags:   NewSampleTags(tagMap),
+		Tags:   sampleTags,
 		Value:  1.0,
 	}
 	samples := Samples(sample.GetSamples())
 	cSamples := ConnectedSamples{
 		Samples: []Sample{sample},
 		Time:    now,
-		Tags:    NewSampleTags(tagMap),
+		Tags:    sampleTags,
 	}
 	exp := []Sample{sample}
 	assert.Equal(t, exp, sample.GetSamples())
@@ -165,4 +241,14 @@ func createTestTrendSink(count int) *TrendSink {
 	}
 
 	return &sink
+}
+
+func newSampleTagsRoot() *SampleTags {
+	return &SampleTags{
+		tags: atlas.New(),
+	}
+}
+
+func addTagToSampleTags(st *SampleTags, key, value string) {
+	st.tags = st.tags.AddLink(key, value)
 }

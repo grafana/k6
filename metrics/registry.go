@@ -23,19 +23,29 @@ package metrics
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"sync"
+
+	"github.com/mstoykov/atlas"
 )
 
 // Registry is what can create metrics
 type Registry struct {
 	metrics map[string]*Metric
 	l       sync.RWMutex
+
+	tagSetRoot *atlas.Node
 }
 
 // NewRegistry returns a new registry
 func NewRegistry() *Registry {
 	return &Registry{
 		metrics: make(map[string]*Metric),
+		// The Atlas initialization: where the root node is created.
+		// All the new tag sets must branch out from the root,
+		// so the underhood structure can minimize the memory footprint
+		// by allocating the tag pair only once.
+		tagSetRoot: atlas.New(),
 	}
 }
 
@@ -88,4 +98,33 @@ func (r *Registry) MustNewMetric(name string, typ MetricType, t ...ValueType) *M
 // Get() will return a nil value.
 func (r *Registry) Get(name string) *Metric {
 	return r.metrics[name]
+}
+
+// BranchTagSetRoot creates a new TagSet starting from the root.
+func (r *Registry) BranchTagSetRoot() *TagSet {
+	return &TagSet{tags: r.tagSetRoot}
+}
+
+// BranchTagSetRootWith creates a new TagSet starting from the root and
+// adds all the key-value pairs provided with the map to the new TagSet.
+func (r *Registry) BranchTagSetRootWith(m map[string]string) *TagSet {
+	if len(m) < 1 {
+		return r.BranchTagSetRoot()
+	}
+
+	tset := r.BranchTagSetRoot()
+
+	// it sorts the keys so the TagSet generation is consistent
+	// across multiple invocations.
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for i := 0; i < len(keys); i++ {
+		tset.AddTag(keys[i], m[keys[i]])
+	}
+
+	return tset
 }

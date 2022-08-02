@@ -70,3 +70,18 @@ func TestMetricNames(t *testing.T) {
 		})
 	}
 }
+
+func TestRegistryBranchTagSetRootWith(t *testing.T) {
+	t.Parallel()
+
+	raw := map[string]string{
+		"key":  "val",
+		"key2": "val2",
+	}
+
+	r := NewRegistry()
+	tags := r.BranchTagSetRootWith(raw)
+	require.NotNil(t, tags)
+
+	assert.Equal(t, raw, tags.Map())
+}

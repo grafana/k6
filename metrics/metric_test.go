@@ -55,14 +55,14 @@ func TestAddSubmetric(t *testing.T) {
 			t.Parallel()
 
 			m := newMetric("metric", Trend)
-			sm, err := m.AddSubmetric(name)
+			sm, err := m.AddSubmetric(name, NewTagSet(nil))
 			if expected.err {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
 			require.NotNil(t, sm)
-			assert.EqualValues(t, expected.tags, sm.Tags.tags)
+			assert.EqualValues(t, expected.tags, sm.Tags.CloneTags())
 		})
 	}
 }

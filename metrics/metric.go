@@ -76,13 +76,15 @@ type Submetric struct {
 
 // AddSubmetric creates a new submetric from the key:value threshold definition
 // and adds it to the metric's submetrics list.
-func (m *Metric) AddSubmetric(keyValues string) (*Submetric, error) {
+//
+// FIXME: documentation for rootTagSet
+func (m *Metric) AddSubmetric(keyValues string, root *TagSet) (*Submetric, error) {
 	keyValues = strings.TrimSpace(keyValues)
 	if len(keyValues) == 0 {
 		return nil, fmt.Errorf("submetric criteria for metric '%s' cannot be empty", m.Name)
 	}
 	kvs := strings.Split(keyValues, ",")
-	rawTags := make(map[string]string, len(kvs))
+	rawTags := root.BranchOut()
 	for _, kv := range kvs {
 		if kv == "" {
 			continue
@@ -91,15 +93,14 @@ func (m *Metric) AddSubmetric(keyValues string) (*Submetric, error) {
 
 		key := strings.Trim(strings.TrimSpace(parts[0]), `"'`)
 		if len(parts) != 2 {
-			rawTags[key] = ""
+			rawTags.AddTag(key, "")
 			continue
 		}
 
 		value := strings.Trim(strings.TrimSpace(parts[1]), `"'`)
-		rawTags[key] = value
+		rawTags.AddTag(key, value)
 	}
-
-	tags := IntoSampleTags(&rawTags)
+	tags := rawTags.SampleTags()
 
 	for _, sm := range m.Submetrics {
 		if sm.Tags.IsEqual(tags) {
