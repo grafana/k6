@@ -122,9 +122,10 @@ func TestMetrics(t *testing.T) {
 					}
 					test.rt = goja.New()
 					test.rt.SetFieldNameMapper(common.FieldNameMapper{})
+					registry := metrics.NewRegistry()
 					mii := &modulestest.VU{
 						RuntimeField: test.rt,
-						InitEnvField: &common.InitEnvironment{Registry: metrics.NewRegistry()},
+						InitEnvField: &common.InitEnvironment{Registry: registry},
 						CtxField:     context.Background(),
 					}
 					m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
@@ -134,7 +135,7 @@ func TestMetrics(t *testing.T) {
 					state := &lib.State{
 						Options: lib.Options{},
 						Samples: test.samples,
-						Tags: lib.NewTagMap(metrics.NewTagSet(map[string]string{
+						Tags: lib.NewTagMap(registry.BranchTagSetRootWith(map[string]string{
 							"key": "value",
 						})),
 					}

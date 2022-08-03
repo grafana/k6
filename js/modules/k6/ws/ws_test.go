@@ -106,7 +106,7 @@ func newTestState(t testing.TB) testState {
 
 	root, err := lib.NewGroup("", nil)
 	require.NoError(t, err)
-
+	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Group:  root,
 		Dialer: tb.Dialer,
@@ -122,8 +122,8 @@ func newTestState(t testing.TB) testState {
 		},
 		Samples:        samples,
 		TLSConfig:      tb.TLSClientConfig,
-		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
-		Tags:           lib.NewTagMap(metrics.NewTagSet(nil)),
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+		Tags:           lib.NewTagMap(registry.BranchTagSetRoot()),
 	}
 
 	m := New().NewModuleInstance(testRuntime.VU)

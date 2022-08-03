@@ -32,9 +32,10 @@ import (
 )
 
 func benchmarkInfluxdb(b *testing.B, t time.Duration) {
-	metric, err := metrics.NewRegistry().NewMetric("test_gauge", metrics.Gauge)
+	registry := metrics.NewRegistry()
+	metric, err := registry.NewMetric("test_gauge", metrics.Gauge)
 	require.NoError(b, err)
-	tags := metrics.NewTagSet(map[string]string{
+	tags := registry.BranchTagSetRootWith(map[string]string{
 		"something": "else",
 		"VU":        "21",
 		"else":      "something",

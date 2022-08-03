@@ -401,7 +401,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 		BPool:          bpool.NewBufferPool(1),
 		Samples:        make(chan metrics.SampleContainer, 500),
 		BuiltinMetrics: builtinMetrics,
-		Tags:           lib.NewTagMap(metrics.NewTagSet(nil)),
+		Tags:           lib.NewTagMap(registry.BranchTagSetRoot()),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -548,7 +548,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 		BPool:          bpool.NewBufferPool(1),
 		Samples:        make(chan metrics.SampleContainer, 500),
 		BuiltinMetrics: builtinMetrics,
-		Tags:           lib.NewTagMap(metrics.NewTagSet(nil)),
+		Tags:           lib.NewTagMap(registry.BranchTagSetRoot()),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

@@ -1243,8 +1243,8 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		}
 	}
 
-	getTags := func(args ...string) *metrics.SampleTags {
-		tags := metrics.NewTagSet(nil)
+	getTags := func(r *metrics.Registry, args ...string) *metrics.SampleTags {
+		tags := r.BranchTagSetRoot()
 		for i := 0; i < len(args)-1; i += 2 {
 			tags.AddTag(args[i], args[i+1])
 		}
@@ -1256,7 +1256,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		return metrics.Sample{
 			Metric: expMetric,
 			Time:   time.Now(),
-			Tags:   getTags(expTags...),
+			Tags:   getTags(piState.Registry, expTags...),
 			Value:  expValue,
 		}
 	}
@@ -1267,7 +1267,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 			net.Dialer{},
 			netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
 		).GetTrail(time.Now(), time.Now(),
-			true, emitIterations, getTags(expTags...), piState.BuiltinMetrics)
+			true, emitIterations, getTags(piState.Registry, expTags...), piState.BuiltinMetrics)
 	}
 
 	// Initially give a long time (5s) for the execScheduler to start

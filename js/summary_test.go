@@ -99,7 +99,7 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 	t.Parallel()
 
 	registry := metrics.NewRegistry()
-	rootTagSet := metrics.NewTagSet(nil)
+	rootTagSet := registry.BranchTagSetRoot()
 	parentMetric, err := registry.NewMetric("my_parent", metrics.Counter)
 	require.NoError(t, err)
 	parentMetric.Sink.Add(metrics.Sample{Value: 11})

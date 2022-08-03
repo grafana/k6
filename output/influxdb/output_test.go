@@ -108,7 +108,8 @@ func testOutputCycle(t testing.TB, handler http.HandlerFunc, body func(testing.T
 func TestOutput(t *testing.T) {
 	t.Parallel()
 
-	metric, err := metrics.NewRegistry().NewMetric("test_gauge", metrics.Gauge)
+	registry := metrics.NewRegistry()
+	metric, err := registry.NewMetric("test_gauge", metrics.Gauge)
 	require.NoError(t, err)
 
 	var samplesRead int
@@ -136,7 +137,7 @@ func TestOutput(t *testing.T) {
 			samples[i] = metrics.Sample{
 				Metric: metric,
 				Time:   time.Now(),
-				Tags: metrics.NewTagSet(map[string]string{
+				Tags: registry.BranchTagSetRootWith(map[string]string{
 					"something": "else",
 					"VU":        "21",
 					"else":      "something",
