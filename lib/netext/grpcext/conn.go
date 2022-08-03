@@ -92,7 +92,8 @@ func (c *Conn) Invoke(
 	url string,
 	md metadata.MD,
 	req Request,
-	opts ...grpc.CallOption) (*Response, error) {
+	opts ...grpc.CallOption,
+) (*Response, error) {
 	if url == "" {
 		return nil, fmt.Errorf("url is required")
 	}
@@ -196,6 +197,15 @@ func (statsHandler) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context
 func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	state := h.vu.State()
 	tags := getTags(ctx)
+
+	// If the request is done by the reflection handler
+	// then the tags will be nil.
+	//
+	// In this case, we can reuse the State's Tags.
+	if tags == nil {
+		tags = state.CloneTags()
+	}
+
 	switch s := stat.(type) {
 	case *grpcstats.OutHeader:
 		if state.Options.SystemTags.Has(metrics.TagIP) && s.RemoteAddr != nil {
@@ -301,7 +311,7 @@ type reqtags map[string]string
 
 func withTags(ctx context.Context, tags reqtags) context.Context {
 	if tags == nil {
-		tags = make(map[string]string)
+		return ctx
 	}
 	return context.WithValue(ctx, ctxKeyTags{}, tags)
 }
@@ -309,7 +319,7 @@ func withTags(ctx context.Context, tags reqtags) context.Context {
 func getTags(ctx context.Context) reqtags {
 	v := ctx.Value(ctxKeyTags{})
 	if v == nil {
-		return make(map[string]string)
+		return nil
 	}
 	return v.(reqtags)
 }
