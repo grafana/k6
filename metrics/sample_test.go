@@ -146,7 +146,7 @@ func TestSampleTagsJSON(t *testing.T) {
 }
 
 func TestSampleImplementations(t *testing.T) {
-	tagMap := NewTagSet(map[string]string{"key1": "val1", "key2": "val2"})
+	tagMap := newTagSet(map[string]string{"key1": "val1", "key2": "val2"})
 	sampleTags := tagMap.SampleTags()
 	now := time.Now()
 

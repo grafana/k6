@@ -133,6 +133,7 @@ func TestRandSeed(t *testing.T) {
 func TestGroup(t *testing.T) {
 	t.Parallel()
 
+	registry := metrics.NewRegistry()
 	setupGroupTest := func() (*goja.Runtime, *lib.State, *lib.Group) {
 		root, err := lib.NewGroup("", nil)
 		assert.NoError(t, err)
@@ -141,12 +142,12 @@ func TestGroup(t *testing.T) {
 		state := &lib.State{
 			Group:   root,
 			Samples: make(chan metrics.SampleContainer, 1000),
-			Tags:    lib.NewTagMap(metrics.NewTagSet(nil)),
+			Tags:    lib.NewTagMap(registry.BranchTagSetRoot()),
 			Options: lib.Options{
 				SystemTags: metrics.NewSystemTagSet(metrics.TagGroup),
 			},
 		}
-		state.BuiltinMetrics = metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
+		state.BuiltinMetrics = metrics.RegisterBuiltinMetrics(registry)
 
 		m, ok := New().NewModuleInstance(
 			&modulestest.VU{
@@ -195,6 +196,7 @@ func checkTestRuntime(t testing.TB) (*goja.Runtime, chan metrics.SampleContainer
 	require.True(t, ok)
 	require.NoError(t, rt.Set("k6", m.Exports().Named))
 
+	registry := metrics.NewRegistry()
 	root, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
 	samples := make(chan metrics.SampleContainer, 1000)
@@ -204,8 +206,8 @@ func checkTestRuntime(t testing.TB) (*goja.Runtime, chan metrics.SampleContainer
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Samples:        samples,
-		Tags:           lib.NewTagMap(metrics.NewTagSet(map[string]string{"group": root.Path})),
-		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
+		Tags:           lib.NewTagMap(registry.BranchTagSetRootWith(map[string]string{"group": root.Path})),
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 	test.MoveToVUContext(state)
 
@@ -404,18 +406,19 @@ func TestCheckContextExpiry(t *testing.T) {
 	require.NoError(t, err)
 
 	samples := make(chan metrics.SampleContainer, 1000)
+	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Group: root,
 		Options: lib.Options{
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Samples: samples,
-		Tags: lib.NewTagMap(metrics.NewTagSet(map[string]string{
+		Tags: lib.NewTagMap(registry.BranchTagSetRootWith(map[string]string{
 			"group": root.Path,
 		})),
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 
-	state.BuiltinMetrics = metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,

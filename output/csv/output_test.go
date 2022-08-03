@@ -45,7 +45,8 @@ func TestMakeHeader(t *testing.T) {
 }
 
 func TestSampleToRow(t *testing.T) {
-	testMetric, err := metrics.NewRegistry().NewMetric("my_metric", metrics.Gauge)
+	registry := metrics.NewRegistry()
+	testMetric, err := registry.NewMetric("my_metric", metrics.Gauge)
 	require.NoError(t, err)
 
 	testData := []struct {
@@ -61,7 +62,7 @@ func TestSampleToRow(t *testing.T) {
 				Time:   time.Unix(1562324644, 0),
 				Metric: testMetric,
 				Value:  1,
-				Tags: metrics.NewTagSet(map[string]string{
+				Tags: registry.BranchTagSetRootWith(map[string]string{
 					"tag1": "val1",
 					"tag2": "val2",
 					"tag3": "val3",
@@ -77,7 +78,7 @@ func TestSampleToRow(t *testing.T) {
 				Time:   time.Unix(1562324644, 0),
 				Metric: testMetric,
 				Value:  1,
-				Tags: metrics.NewTagSet(map[string]string{
+				Tags: registry.BranchTagSetRootWith(map[string]string{
 					"tag1": "val1",
 					"tag2": "val2",
 					"tag3": "val3",
@@ -95,7 +96,7 @@ func TestSampleToRow(t *testing.T) {
 				Time:   time.Unix(1562324644, 0),
 				Metric: testMetric,
 				Value:  1,
-				Tags: metrics.NewTagSet(map[string]string{
+				Tags: registry.BranchTagSetRootWith(map[string]string{
 					"tag1": "val1",
 					"tag2": "val2",
 					"tag3": "val3",
@@ -204,7 +205,8 @@ func readCompressedFile(fileName string, fs afero.Fs) string {
 func TestRun(t *testing.T) {
 	t.Parallel()
 
-	testMetric, err := metrics.NewRegistry().NewMetric("my_metric", metrics.Gauge)
+	registry := metrics.NewRegistry()
+	testMetric, err := registry.NewMetric("my_metric", metrics.Gauge)
 	require.NoError(t, err)
 
 	testData := []struct {
@@ -220,7 +222,7 @@ func TestRun(t *testing.T) {
 					Time:   time.Unix(1562324643, 0),
 					Metric: testMetric,
 					Value:  1,
-					Tags: metrics.NewTagSet(map[string]string{
+					Tags: registry.BranchTagSetRootWith(map[string]string{
 						"check": "val1",
 						"url":   "val2",
 						"error": "val3",
@@ -230,7 +232,7 @@ func TestRun(t *testing.T) {
 					Time:   time.Unix(1562324644, 0),
 					Metric: testMetric,
 					Value:  1,
-					Tags: metrics.NewTagSet(map[string]string{
+					Tags: registry.BranchTagSetRootWith(map[string]string{
 						"check": "val1",
 						"url":   "val2",
 						"error": "val3",
@@ -249,7 +251,7 @@ func TestRun(t *testing.T) {
 					Time:   time.Unix(1562324643, 0),
 					Metric: testMetric,
 					Value:  1,
-					Tags: metrics.NewTagSet(map[string]string{
+					Tags: registry.BranchTagSetRootWith(map[string]string{
 						"check": "val1",
 						"url":   "val2",
 						"error": "val3",
@@ -259,7 +261,7 @@ func TestRun(t *testing.T) {
 					Time:   time.Unix(1562324644, 0),
 					Metric: testMetric,
 					Value:  1,
-					Tags: metrics.NewTagSet(map[string]string{
+					Tags: registry.BranchTagSetRootWith(map[string]string{
 						"check": "val1",
 						"url":   "val2",
 						"error": "val3",
@@ -278,7 +280,7 @@ func TestRun(t *testing.T) {
 					Time:   time.Unix(1562324644, 0),
 					Metric: testMetric,
 					Value:  1,
-					Tags: metrics.NewTagSet(map[string]string{
+					Tags: registry.BranchTagSetRootWith(map[string]string{
 						"check": "val1",
 						"url":   "val2",
 						"error": "val3",
@@ -288,7 +290,7 @@ func TestRun(t *testing.T) {
 					Time:   time.Unix(1562324644, 0),
 					Metric: testMetric,
 					Value:  1,
-					Tags: metrics.NewTagSet(map[string]string{
+					Tags: registry.BranchTagSetRootWith(map[string]string{
 						"check": "val1",
 						"url":   "val2",
 						"error": "val3",

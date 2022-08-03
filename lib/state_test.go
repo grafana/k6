@@ -17,7 +17,7 @@ func TestTagMapSet(t *testing.T) {
 	t.Run("Sync", func(t *testing.T) {
 		t.Parallel()
 
-		tm := NewTagMap(metrics.NewTagSet(nil))
+		tm := NewTagMap(metrics.NewRegistry().BranchTagSetRoot())
 		tm.Set("mytag", "42")
 		v, found := tm.Get("mytag")
 		assert.True(t, found)
@@ -30,7 +30,7 @@ func TestTagMapSet(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		tm := NewTagMap(metrics.NewTagSet(nil))
+		tm := NewTagMap(metrics.NewRegistry().BranchTagSetRoot())
 
 		go func() {
 			count := 0
@@ -64,7 +64,7 @@ func TestTagMapSet(t *testing.T) {
 
 func TestTagMapGet(t *testing.T) {
 	t.Parallel()
-	tm := NewTagMap(metrics.NewTagSet(map[string]string{
+	tm := NewTagMap(metrics.NewRegistry().BranchTagSetRootWith(map[string]string{
 		"key1": "value1",
 	}))
 	v, ok := tm.Get("key1")
@@ -74,7 +74,7 @@ func TestTagMapGet(t *testing.T) {
 
 func TestTagMapLen(t *testing.T) {
 	t.Parallel()
-	tm := NewTagMap(metrics.NewTagSet(map[string]string{
+	tm := NewTagMap(metrics.NewRegistry().BranchTagSetRootWith(map[string]string{
 		"key1": "value1",
 		"key2": "value2",
 	}))
@@ -83,7 +83,7 @@ func TestTagMapLen(t *testing.T) {
 
 func TestTagMapDelete(t *testing.T) {
 	t.Parallel()
-	tm := NewTagMap(metrics.NewTagSet(map[string]string{
+	tm := NewTagMap(metrics.NewRegistry().BranchTagSetRootWith(map[string]string{
 		"key1": "value1",
 		"key2": "value2",
 	}))
@@ -100,7 +100,7 @@ func TestTagMapDelete(t *testing.T) {
 
 func TestTagMapClone(t *testing.T) {
 	t.Parallel()
-	tm := NewTagMap(metrics.NewTagSet(map[string]string{
+	tm := NewTagMap(metrics.NewRegistry().BranchTagSetRootWith(map[string]string{
 		"key1": "value1",
 		"key2": "value2",
 	}))
