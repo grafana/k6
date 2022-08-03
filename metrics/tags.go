@@ -14,23 +14,6 @@ type TagSet struct {
 	tags *atlas.Node
 }
 
-// NewTagSet creates a TagSet, if a not-nil map is passed
-// then it adds all the pairs to the set, otherwise an empty set is created.
-// Under the hood it initializes an Atlas root node.
-// It should be only used in a centralized place and
-// all the new TagSet should branch from it for getting
-// the optimal performances.
-func NewTagSet(m map[string]string) *TagSet {
-	node := atlas.New()
-	for k, v := range m {
-		node = node.AddLink(k, v)
-	}
-
-	return &TagSet{
-		tags: node,
-	}
-}
-
 // TagSetFromSampleTags creates a TagSet starting
 // from the set defined by SampleTags.
 // Adding a tag on the new set doesn't impact the SampleTags.

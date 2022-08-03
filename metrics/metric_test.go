@@ -55,7 +55,7 @@ func TestAddSubmetric(t *testing.T) {
 			t.Parallel()
 
 			m := newMetric("metric", Trend)
-			sm, err := m.AddSubmetric(name, NewTagSet(nil))
+			sm, err := m.AddSubmetric(name, newTagSet(nil))
 			if expected.err {
 				require.Error(t, err)
 				return
