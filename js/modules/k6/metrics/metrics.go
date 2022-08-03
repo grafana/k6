@@ -92,7 +92,7 @@ func limitValue(v string) string {
 	}, string(omitMsg))
 }
 
-func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
+func (m Metric) add(v goja.Value, addTags goja.Value) (bool, error) {
 	state := m.vu.State()
 	if state == nil {
 		return false, ErrMetricsAddInInitContext
@@ -129,9 +129,10 @@ func (m Metric) add(v goja.Value, addTags ...map[string]string) (bool, error) {
 	}
 
 	tags := state.CloneTags()
-	for _, ts := range addTags {
-		for k, v := range ts {
-			tags[k] = v
+	if addTags != nil {
+		tagsobj := addTags.ToObject(m.vu.Runtime())
+		for _, key := range tagsobj.Keys() {
+			tags[key] = tagsobj.Get(key).String()
 		}
 	}
 
