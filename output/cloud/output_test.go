@@ -163,7 +163,8 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 		require.NoError(t, err)
 	}))
 
-	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	out, err := newOutput(output.Params{
 		Logger:     testutils.NewLogger(t),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s", "noCompress": true}`, tb.ServerHTTP.URL)),
@@ -194,7 +195,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 
 	now := time.Now()
 	tagMap := map[string]string{"test": "mest", "a": "b", "name": "name", "url": "url"}
-	tags := metrics.NewTagSet(tagMap).SampleTags()
+	tags := registry.BranchTagSetRootWith(tagMap).SampleTags()
 	expectedTags := `{"test": "mest", "a": "b", "name": "name", "url": "name"}`
 
 	expSamples := make(chan []Sample)
@@ -292,7 +293,10 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 
 func TestCloudOutputMaxPerPacket(t *testing.T) {
 	t.Parallel()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
+
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	maxMetricSamplesPerPackage := 20
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -322,7 +326,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, err)
 	now := time.Now()
-	tags := metrics.NewTagSet(map[string]string{"test": "mest", "a": "b"}).SampleTags()
+	tags := registry.BranchTagSetRootWith(map[string]string{"test": "mest", "a": "b"})
 	gotTheLimit := false
 	var m sync.Mutex
 
@@ -345,7 +349,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		Time:   now,
 		Metric: builtinMetrics.VUs,
-		Tags:   metrics.NewTagSet(tags.CloneTags()).SampleTags(),
+		Tags:   tags.SampleTags(),
 		Value:  1.0,
 	}})
 	for j := time.Duration(1); j <= 200; j++ {
@@ -362,7 +366,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 				EndTime:      now.Add(i * 100),
 				ConnDuration: 500 * time.Millisecond,
 				Duration:     j * i * 1500 * time.Millisecond,
-				Tags:         metrics.NewTagSet(tags.CloneTags()).SampleTags(),
+				Tags:         tags.SampleTags(),
 			})
 		}
 		out.AddMetricSamples(container)
@@ -386,8 +390,10 @@ func TestCloudOutputStopSendingMetric(t *testing.T) {
 }
 
 func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
-	tb := httpmultibin.NewHTTPMultiBin(t)
+	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
+
+	tb := httpmultibin.NewHTTPMultiBin(t)
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		body, err := ioutil.ReadAll(req.Body)
 		require.NoError(t, err)
@@ -437,7 +443,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	}
 	require.NoError(t, err)
 	now := time.Now()
-	tags := metrics.NewTagSet(map[string]string{"test": "mest", "a": "b"}).SampleTags()
+	tags := registry.BranchTagSetRootWith(map[string]string{"test": "mest", "a": "b"})
 
 	count := 1
 	max := 5
@@ -470,7 +476,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		Time:   now,
 		Metric: builtinMetrics.VUs,
-		Tags:   metrics.NewTagSet(tags.CloneTags()).SampleTags(),
+		Tags:   tags.SampleTags(),
 		Value:  1.0,
 	}})
 	for j := time.Duration(1); j <= 200; j++ {
@@ -487,7 +493,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 				EndTime:      now.Add(i * 100),
 				ConnDuration: 500 * time.Millisecond,
 				Duration:     j * i * 1500 * time.Millisecond,
-				Tags:         metrics.NewTagSet(tags.CloneTags()).SampleTags(),
+				Tags:         tags.SampleTags(),
 			})
 		}
 		out.AddMetricSamples(container)
@@ -510,7 +516,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		Time:   now,
 		Metric: builtinMetrics.VUs,
-		Tags:   metrics.NewTagSet(tags.CloneTags()).SampleTags(),
+		Tags:   tags.SampleTags(),
 		Value:  1.0,
 	}})
 	if nBufferSamples != len(out.bufferSamples) || nBufferHTTPTrails != len(out.bufferHTTPTrails) {
@@ -590,7 +596,10 @@ func TestCloudOutputAggregationPeriodZeroNoBlock(t *testing.T) {
 
 func TestCloudOutputPushRefID(t *testing.T) {
 	t.Parallel()
+
+	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
+
 	expSamples := make(chan []Sample)
 	defer close(expSamples)
 
@@ -623,7 +632,7 @@ func TestCloudOutputPushRefID(t *testing.T) {
 	assert.Equal(t, "333", out.referenceID)
 
 	now := time.Now()
-	tags := metrics.NewTagSet(map[string]string{"test": "mest", "a": "b"}).SampleTags()
+	tags := registry.BranchTagSetRootWith(map[string]string{"test": "mest", "a": "b"}).SampleTags()
 	encodedTags, err := json.Marshal(tags)
 	require.NoError(t, err)
 
@@ -904,7 +913,7 @@ func TestUseCloudTags(t *testing.T) {
 			t.Parallel()
 
 			trail := &httpext.Trail{
-				Tags: metrics.NewTagSet(tc.in).SampleTags(),
+				Tags: metrics.NewRegistry().BranchTagSetRootWith(tc.in).SampleTags(),
 			}
 			newTrail := useCloudTags(trail)
 			assert.Equal(t, tc.exp, newTrail.Tags.CloneTags())
