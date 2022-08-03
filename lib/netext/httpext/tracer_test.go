@@ -130,7 +130,8 @@ func TestTracer(t *testing.T) { //nolint:tparallel
 		}
 		prev = val
 	}
-	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 
 	for tnum, isReuse := range []bool{false, true, true} { //nolint:paralleltest
 		t.Run(fmt.Sprintf("Test #%d", tnum), func(t *testing.T) {
@@ -149,7 +150,7 @@ func TestTracer(t *testing.T) { //nolint:tparallel
 				time.Sleep(traceDelay)
 			}
 			trail := tracer.Done()
-			trail.SaveSamples(builtinMetrics, metrics.NewTagSet(map[string]string{"tag": "value"}).SampleTags())
+			trail.SaveSamples(builtinMetrics, registry.BranchTagSetRootWith(map[string]string{"tag": "value"}).SampleTags())
 			samples := trail.GetSamples()
 
 			assertLaterOrZero(t, tracer.getConn, isReuse)

@@ -302,7 +302,7 @@ func TestEngine_processSamples(t *testing.T) {
 				out <- metrics.Sample{
 					Metric: metric,
 					Value:  1.25,
-					Tags:   metrics.NewTagSet(map[string]string{"a": "1"}).SampleTags(),
+					Tags:   piState.Registry.BranchTagSetRootWith(map[string]string{"a": "1"}).SampleTags(),
 				}
 				close(done)
 				return nil
@@ -342,7 +342,7 @@ func TestEngine_processSamples(t *testing.T) {
 				out <- metrics.Sample{
 					Metric: metric,
 					Value:  1.25,
-					Tags:   metrics.NewTagSet(map[string]string{"a": "1", "b": "2"}).SampleTags(),
+					Tags:   piState.Registry.BranchTagSetRootWith(map[string]string{"a": "1", "b": "2"}).SampleTags(),
 				}
 				close(done)
 				return nil
@@ -398,7 +398,7 @@ func TestEngineThresholdsWillAbort(t *testing.T) {
 			out <- metrics.Sample{
 				Metric: metric,
 				Value:  1.25,
-				Tags:   metrics.NewTagSet(map[string]string{"a": "1"}).SampleTags(),
+				Tags:   piState.Registry.BranchTagSetRootWith(map[string]string{"a": "1"}).SampleTags(),
 			}
 			close(done)
 			return nil
@@ -444,7 +444,7 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 			out <- metrics.Sample{
 				Metric: metric,
 				Value:  1.25,
-				Tags:   metrics.NewTagSet(map[string]string{"a": "1"}).SampleTags(),
+				Tags:   piState.Registry.BranchTagSetRootWith(map[string]string{"a": "1"}).SampleTags(),
 			}
 			<-ctx.Done()
 			close(done)

@@ -85,14 +85,17 @@ func baseTest(t *testing.T,
 	defer func() {
 		require.NoError(t, collector.Stop())
 	}()
+
+	registry := metrics.NewRegistry()
 	newSample := func(m *metrics.Metric, value float64, tags map[string]string) metrics.Sample {
 		return metrics.Sample{
 			Time:   time.Now(),
-			Metric: m, Value: value, Tags: metrics.NewTagSet(tags).SampleTags(),
+			Metric: m,
+			Value:  value,
+			Tags:   registry.BranchTagSetRootWith(tags).SampleTags(),
 		}
 	}
 
-	registry := metrics.NewRegistry()
 	myCounter, err := registry.NewMetric("my_counter", metrics.Counter)
 	require.NoError(t, err)
 	myGauge, err := registry.NewMetric("my_gauge", metrics.Gauge)

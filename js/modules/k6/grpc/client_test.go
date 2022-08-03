@@ -701,8 +701,10 @@ func TestClient(t *testing.T) {
 			val, err := replace(tt.initString.code)
 			assertResponse(t, tt.initString, err, val, ts)
 
+			registry := metrics.NewRegistry()
 			root, err := lib.NewGroup("", nil)
 			require.NoError(t, err)
+
 			state := &lib.State{
 				Group:     root,
 				Dialer:    ts.httpBin.Dialer,
@@ -715,10 +717,8 @@ func TestClient(t *testing.T) {
 					),
 					UserAgent: null.StringFrom("k6-test"),
 				},
-				BuiltinMetrics: metrics.RegisterBuiltinMetrics(
-					metrics.NewRegistry(),
-				),
-				Tags: lib.NewTagMap(metrics.NewTagSet(nil)),
+				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+				Tags:           lib.NewTagMap(registry.BranchTagSetRoot()),
 			}
 			ts.MoveToVUContext(state)
 			val, err = replace(tt.vuString.code)

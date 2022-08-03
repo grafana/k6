@@ -89,6 +89,7 @@ func BenchmarkAggregateHTTP(b *testing.B) {
 }
 
 func generateTags(i, tagCount int, additionals ...map[string]string) *metrics.SampleTags {
+	registry := metrics.NewRegistry()
 	res := map[string]string{
 		"test": "mest", "a": "b",
 		"custom": fmt.Sprintf("group%d", i%tagCount%9),
@@ -102,8 +103,7 @@ func generateTags(i, tagCount int, additionals ...map[string]string) *metrics.Sa
 		}
 	}
 
-	// FIXME: optimize
-	return metrics.NewTagSet(res).SampleTags()
+	return registry.BranchTagSetRootWith(res).SampleTags()
 }
 
 func BenchmarkMetricMarshal(b *testing.B) {
