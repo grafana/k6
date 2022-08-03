@@ -245,7 +245,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 			}
 			parsedRunTags[name] = value
 		}
-		opts.RunTags = metrics.IntoSampleTags(&parsedRunTags)
+		opts.RunTags = parsedRunTags
 	}
 
 	redirectConFile, err := flags.GetString("console-output")

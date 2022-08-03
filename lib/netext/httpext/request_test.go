@@ -118,7 +118,6 @@ func TestMakeRequestError(t *testing.T) {
 			Compressions: []CompressionType{badCompressionType},
 		}
 		state := &lib.State{
-			Options:   lib.Options{RunTags: &metrics.SampleTags{}},
 			Transport: http.DefaultTransport,
 			Logger:    logrus.New(),
 			Tags:      lib.NewTagMap(nil),
@@ -141,7 +140,6 @@ func TestMakeRequestError(t *testing.T) {
 		logger := logrus.New()
 		logger.Level = logrus.DebugLevel
 		state := &lib.State{
-			Options:   lib.Options{RunTags: &metrics.SampleTags{}},
 			Transport: srv.Client().Transport,
 			Logger:    logger,
 			Tags:      lib.NewTagMap(nil),
@@ -192,7 +190,6 @@ func TestResponseStatus(t *testing.T) {
 				samples := make(chan<- metrics.SampleContainer, 1)
 				registry := metrics.NewRegistry()
 				state := &lib.State{
-					Options:        lib.Options{RunTags: &metrics.SampleTags{}},
 					Transport:      server.Client().Transport,
 					Logger:         logger,
 					Samples:        samples,
@@ -271,7 +268,6 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
-			RunTags:    &metrics.SampleTags{},
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Transport:      srv.Client().Transport,
@@ -348,7 +344,6 @@ func TestTrailFailed(t *testing.T) {
 			registry := metrics.NewRegistry()
 			state := &lib.State{
 				Options: lib.Options{
-					RunTags:    &metrics.SampleTags{},
 					SystemTags: &metrics.DefaultSystemTagSet,
 				},
 				Transport:      srv.Client().Transport,
@@ -410,7 +405,6 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
-			RunTags:    &metrics.SampleTags{},
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Transport: &http.Transport{
@@ -469,7 +463,6 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
-			RunTags:    &metrics.SampleTags{},
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Transport:      srv.Client().Transport,

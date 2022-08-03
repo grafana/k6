@@ -411,8 +411,8 @@ type Options struct {
 	// Use pointer for identifying whether user provide any tag or not.
 	SystemTags *metrics.SystemTagSet `json:"systemTags" envconfig:"K6_SYSTEM_TAGS"`
 
-	// Tags to be applied to all samples for this running
-	RunTags *metrics.SampleTags `json:"tags" envconfig:"K6_TAGS"`
+	// Tags are key-value pairs to be applied to all samples for the run.
+	RunTags map[string]string `json:"tags" envconfig:"K6_TAGS"`
 
 	// Buffer size of the channel for metric samples; 0 means unbuffered
 	MetricSamplesBufferSize null.Int `json:"metricSamplesBufferSize" envconfig:"K6_METRIC_SAMPLES_BUFFER_SIZE"`
@@ -567,7 +567,7 @@ func (o Options) Apply(opts Options) Options {
 	if opts.SystemTags != nil {
 		o.SystemTags = opts.SystemTags
 	}
-	if !opts.RunTags.IsEmpty() {
+	if len(opts.RunTags) > 0 {
 		o.RunTags = opts.RunTags
 	}
 	if opts.MetricSamplesBufferSize.Valid {

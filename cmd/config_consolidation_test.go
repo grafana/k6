@@ -370,6 +370,20 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				)
 			},
 		},
+
+		// Test-wide Tags
+		{
+			opts{
+				fs:  defaultConfig(`{"tags": { "codeTagKey": "codeTagValue"}}`),
+				cli: []string{"--tag", "clitagkey=clitagvalue"},
+			},
+			exp{},
+			func(t *testing.T, c Config) {
+				exp := map[string]string{"clitagkey": "clitagvalue"}
+				assert.Equal(t, exp, c.RunTags)
+			},
+		},
+
 		// Test summary trend stats
 		{opts{}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, lib.DefaultSummaryTrendStats, c.Options.SummaryTrendStats)
