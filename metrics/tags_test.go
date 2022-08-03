@@ -12,7 +12,7 @@ import (
 func TestTagSetBranchOut(t *testing.T) {
 	t.Parallel()
 
-	tm := NewTagSet(nil)
+	tm := newTagSet(nil)
 	tm.AddTag("key1", "val1")
 
 	tm2 := tm.BranchOut()
@@ -101,5 +101,16 @@ func TestEnabledTagsTextUnmarshal(t *testing.T) {
 		err := set.UnmarshalText([]byte(input))
 		require.NoError(t, err)
 		require.Equal(t, expected, *set)
+	}
+}
+
+func newTagSet(m map[string]string) *TagSet {
+	node := atlas.New()
+	for k, v := range m {
+		node = node.AddLink(k, v)
+	}
+
+	return &TagSet{
+		tags: node,
 	}
 }
