@@ -23,6 +23,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
@@ -88,7 +89,8 @@ func (k *Keyboard) Press(key string, opts goja.Value) {
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
 		k6ext.Panic(k.ctx, "parsing keyboard options: %w", err)
 	}
-	if err := k.press(key, kbdOpts); err != nil {
+
+	if err := k.comboPress(key, kbdOpts); err != nil {
 		k6ext.Panic(k.ctx, "pressing key: %w", err)
 	}
 }
@@ -190,9 +192,13 @@ func (k *Keyboard) keyDefinitionFromKey(key keyboardlayout.KeyInput) keyboardlay
 		srcKeyDef, ok = k.layout.KeyDefinition(key)
 	}
 	// Try to find with the shift key value
+	// e.g. for `@`, the shift modifier needs to
+	// be used.
+	var foundInShift bool
 	if !ok {
 		srcKeyDef = k.layout.ShiftKeyDefinition(key)
 		shift = k.modifiers | ModifierKeyShift
+		foundInShift = true
 	}
 
 	var keyDef keyboardlayout.KeyDefinition
@@ -217,7 +223,18 @@ func (k *Keyboard) keyDefinitionFromKey(key keyboardlayout.KeyInput) keyboardlay
 	if srcKeyDef.Text != "" {
 		keyDef.Text = srcKeyDef.Text
 	}
-	if shift != 0 && srcKeyDef.ShiftKey != "" {
+	// Shift is only used on keys which are `KeyX`` (where X is
+	// A-Z), or on keys which require shift to be pressed e.g.
+	// `@`, and shift must be pressed as well as a shiftKey
+	// text value present for the key.
+	// Not all keys have a text value when shift is pressed
+	// e.g. `Control`.
+	// When a key such as `2` is pressed, we must ignore shift
+	// otherwise we would type `@`.
+	isKeyXOrOnShiftLayerAndShiftUsed := (strings.HasPrefix(string(key), "Key") || foundInShift) &&
+		shift != 0 &&
+		srcKeyDef.ShiftKey != ""
+	if isKeyXOrOnShiftLayerAndShiftUsed {
 		keyDef.Key = srcKeyDef.ShiftKey
 		keyDef.Text = srcKeyDef.ShiftKey
 	}
@@ -242,13 +259,56 @@ func (k *Keyboard) modifierBitFromKeyName(key string) int64 {
 	return 0
 }
 
+func (k *Keyboard) comboPress(keys string, opts *KeyboardOptions) error {
+	if opts.Delay > 0 {
+		if err := wait(k.ctx, opts.Delay); err != nil {
+			return err
+		}
+	}
+
+	kk := split(keys)
+	for _, key := range kk {
+		if err := k.down(key); err != nil {
+			return fmt.Errorf("cannot do key down: %w", err)
+		}
+	}
+
+	for i := range kk {
+		key := kk[len(kk)-i-1]
+		if err := k.up(key); err != nil {
+			return fmt.Errorf("cannot do key up: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// This splits the string on `+`.
+// If `+` on it's own is passed, it will return ["+"].
+// If `++` is passed in, it will return ["+", ""].
+// If `+++` is passed in, it will return ["+", "+"].
+func split(keys string) []string {
+	var (
+		kk = make([]string, 0)
+		s  strings.Builder
+	)
+	for _, r := range keys {
+		if r == '+' && s.Len() > 0 {
+			kk = append(kk, s.String())
+			s.Reset()
+		} else {
+			s.WriteRune(r)
+		}
+	}
+	kk = append(kk, s.String())
+
+	return kk
+}
+
 func (k *Keyboard) press(key string, opts *KeyboardOptions) error {
-	if opts.Delay != 0 {
-		t := time.NewTimer(time.Duration(opts.Delay) * time.Millisecond)
-		select {
-		case <-k.ctx.Done():
-			t.Stop()
-		case <-t.C:
+	if opts.Delay > 0 {
+		if err := wait(k.ctx, opts.Delay); err != nil {
+			return err
 		}
 	}
 	if err := k.down(key); err != nil {
@@ -260,12 +320,9 @@ func (k *Keyboard) press(key string, opts *KeyboardOptions) error {
 func (k *Keyboard) typ(text string, opts *KeyboardOptions) error {
 	layout := keyboardlayout.GetKeyboardLayout(k.layoutName)
 	for _, c := range text {
-		if opts.Delay != 0 {
-			t := time.NewTimer(time.Duration(opts.Delay) * time.Millisecond)
-			select {
-			case <-k.ctx.Done():
-				t.Stop()
-			case <-t.C:
+		if opts.Delay > 0 {
+			if err := wait(k.ctx, opts.Delay); err != nil {
+				return err
 			}
 		}
 		keyInput := keyboardlayout.KeyInput(c)
@@ -279,5 +336,19 @@ func (k *Keyboard) typ(text string, opts *KeyboardOptions) error {
 			return fmt.Errorf("inserting text: %w", err)
 		}
 	}
+	return nil
+}
+
+func wait(ctx context.Context, delay int64) error {
+	t := time.NewTimer(time.Duration(delay) * time.Millisecond)
+	select {
+	case <-ctx.Done():
+		if !t.Stop() {
+			<-t.C
+		}
+		return fmt.Errorf("%w", ctx.Err())
+	case <-t.C:
+	}
+
 	return nil
 }

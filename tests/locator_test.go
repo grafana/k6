@@ -331,7 +331,6 @@ func TestLocatorElementState(t *testing.T) {
 		name string
 		do   func(api.Locator, *testBrowser)
 	}{
-
 		{
 			"IsChecked", func(l api.Locator, tb *testBrowser) { l.IsChecked(timeout(tb)) },
 		},
