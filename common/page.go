@@ -719,11 +719,13 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 	var resp *Response
 	req := event.newDocument.request
 	if req != nil {
-		if req.response != nil {
-			resp = req.response
-		}
+		req.responseMu.RLock()
+		resp = req.response
+		req.responseMu.RUnlock()
 	}
+
 	applySlowMo(p.ctx)
+
 	return resp
 }
 

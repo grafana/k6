@@ -305,7 +305,9 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 
 func (m *NetworkManager) handleRequestRedirect(req *Request, redirectResponse *network.Response, timestamp *cdp.MonotonicTime) {
 	resp := NewHTTPResponse(m.ctx, req, redirectResponse, timestamp)
+	req.responseMu.Lock()
 	req.response = resp
+	req.responseMu.Unlock()
 	req.redirectChain = append(req.redirectChain, req)
 
 	m.emitResponseMetrics(resp, req)
@@ -421,7 +423,9 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
 	// Skip data and blob URLs when emitting metrics, since they're internal to the browser.
 	if !isInternalURL(req.url) {
+		req.responseMu.RLock()
 		m.emitResponseMetrics(req.response, req)
+		req.responseMu.RUnlock()
 	}
 	m.deleteRequestByID(event.RequestID)
 	m.frameManager.requestFinished(req)
@@ -603,7 +607,9 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 		return
 	}
 	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
+	req.responseMu.Lock()
 	req.response = resp
+	req.responseMu.Unlock()
 	m.frameManager.requestReceivedResponse(resp)
 }
 

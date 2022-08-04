@@ -655,9 +655,12 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 	select {
 	case evt := <-navEvtCh:
 		if e, ok := evt.(*NavigationEvent); ok {
+			req := e.newDocument.request
 			// Request could be nil in case of navigation to e.g. about:blank
-			if e.newDocument.request != nil {
-				resp = e.newDocument.request.response
+			if req != nil {
+				req.responseMu.RLock()
+				resp = req.response
+				req.responseMu.RUnlock()
 			}
 		}
 	case <-timeoutCtx.Done():
@@ -736,7 +739,11 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 		}
 	}
 
-	return event.newDocument.request.response
+	req := event.newDocument.request
+	req.responseMu.RLock()
+	defer req.responseMu.RUnlock()
+
+	return req.response
 }
 
 // ID returns the unique ID of a FrameManager value.
