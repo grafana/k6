@@ -1,4 +1,6 @@
+//go:build race
 // +build race
+
 // Heavily influenced by the fantastic work by @dop251 for https://github.com/dop251/goja
 
 package tc39
