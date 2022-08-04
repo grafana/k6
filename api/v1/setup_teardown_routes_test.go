@@ -58,7 +58,6 @@ func TestSetupData(t *testing.T) {
 				{"GET", "", `{}`},
 			},
 		}, {
-
 			name: "noSetup",
 			script: []byte(`
 			export default function(data) {
