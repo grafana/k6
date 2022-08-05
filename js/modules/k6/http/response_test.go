@@ -168,10 +168,14 @@ func TestResponse(t *testing.T) {
 			if assert.NoError(t, err) {
 				old := state.Group
 				state.Group = g
-				state.Tags.Set("group", g.Path)
+				state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
+					return currentTags.With("group", g.Path)
+				})
 				defer func() {
 					state.Group = old
-					state.Tags.Set("group", old.Path)
+					state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
+						return currentTags.With("group", old.Path)
+					})
 				}()
 			}
 

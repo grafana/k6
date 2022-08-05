@@ -33,6 +33,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/metrics"
 )
 
 type (
@@ -322,7 +323,7 @@ type tagsDynamicObject struct {
 
 // Get a property value for the key. May return nil if the property does not exist.
 func (o *tagsDynamicObject) Get(key string) goja.Value {
-	tag, ok := o.State.Tags.Get(key)
+	tag, ok := o.State.Tags.GetCurrentValues().Get(key)
 	if !ok {
 		return nil
 	}
@@ -346,7 +347,9 @@ func (o *tagsDynamicObject) Set(key string, val goja.Value) bool {
 		reflect.Int64,
 		reflect.Float64:
 
-		o.State.Tags.Set(key, val.String())
+		o.State.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
+			return currentTags.With(key, val.String())
+		})
 		return true
 	default:
 		reason := "only String, Boolean and Number types are accepted as a Tag value"
@@ -360,23 +363,24 @@ func (o *tagsDynamicObject) Set(key string, val goja.Value) bool {
 
 // Has returns true if the property exists.
 func (o *tagsDynamicObject) Has(key string) bool {
-	_, ok := o.State.Tags.Get(key)
+	_, ok := o.State.Tags.GetCurrentValues().Get(key)
 	return ok
 }
 
 // Delete deletes the property for the key. It returns true on success (note, that includes missing property).
 func (o *tagsDynamicObject) Delete(key string) bool {
-	o.State.Tags.Delete(key)
+	o.State.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
+		return currentTags.Without(key)
+	})
 	return true
 }
 
 // Keys returns a slice with all existing property keys. The order is not deterministic.
 func (o *tagsDynamicObject) Keys() []string {
-	if o.State.Tags.Len() < 1 {
+	tags := o.State.Tags.GetCurrentValues().Map()
+	if len(tags) < 1 {
 		return nil
 	}
-
-	tags := o.State.Tags.Clone()
 	keys := make([]string, 0, len(tags))
 	for k := range tags {
 		keys = append(keys, k)

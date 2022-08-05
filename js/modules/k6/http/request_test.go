@@ -70,7 +70,7 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []metrics.Sample
 	seenReceiving := false
 	for _, sampleContainer := range sampleContainers {
 		for _, sample := range sampleContainer.GetSamples() {
-			tags := sample.Tags.CloneTags()
+			tags := sample.Tags.Map()
 			if tags["url"] == url {
 				switch sample.Metric.Name {
 				case metrics.HTTPReqDurationName:
@@ -113,7 +113,7 @@ func assertRequestMetricsEmittedSingle(t *testing.T, sampleContainer metrics.Sam
 		metricMap[m] = false
 	}
 	for _, sample := range sampleContainer.GetSamples() {
-		tags := sample.Tags.CloneTags()
+		tags := sample.Tags.Map()
 		v, ok := metricMap[sample.Metric.Name]
 		assert.True(t, ok, "unexpected metric %s", sample.Metric.Name)
 		assert.False(t, v, "second metric %s", sample.Metric.Name)
@@ -159,7 +159,7 @@ func newRuntime(t testing.TB) (
 		Transport: tb.HTTPTransport,
 		BPool:     bpool.NewBufferPool(1),
 		Samples:   samples,
-		Tags: lib.NewTagMap(registry.BranchTagSetRootWith(map[string]string{
+		Tags: lib.NewVUStateTags(registry.RootTagSet().SortAndAddTags(map[string]string{
 			"group": root.Path,
 		})),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
@@ -1113,7 +1113,7 @@ func TestRequestAndBatch(t *testing.T) {
 			t.Run("tags-precedence", func(t *testing.T) {
 				oldTags := state.Tags
 				defer func() { state.Tags = oldTags }()
-				state.Tags = lib.NewTagMap(metrics.NewRegistry().BranchTagSetRootWith(map[string]string{
+				state.Tags = lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().SortAndAddTags(map[string]string{
 					"runtag1": "val1",
 					"runtag2": "val2",
 				}))
@@ -2005,7 +2005,7 @@ func TestResponseTypes(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func checkErrorCode(t testing.TB, tags *metrics.SampleTags, code int, msg string) {
+func checkErrorCode(t testing.TB, tags *metrics.TagSet, code int, msg string) {
 	errorMsg, ok := tags.Get("error")
 	if msg == "" {
 		assert.False(t, ok)
@@ -2238,7 +2238,7 @@ func TestRedirectMetricTags(t *testing.T) {
 		allSamples := sc.GetSamples()
 		assert.Len(t, allSamples, 9)
 		for _, s := range allSamples {
-			assert.Equal(t, expTags, s.Tags.CloneTags())
+			assert.Equal(t, expTags, s.Tags.Map())
 		}
 	}
 	expPOSTtags := map[string]string{

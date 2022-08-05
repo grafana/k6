@@ -55,12 +55,12 @@ type Trail struct {
 
 	Failed null.Bool
 	// Populated by SaveSamples()
-	Tags    *metrics.SampleTags
+	Tags    *metrics.TagSet
 	Samples []metrics.Sample
 }
 
 // SaveSamples populates the Trail's sample slice so they're accesible via GetSamples()
-func (tr *Trail) SaveSamples(builtinMetrics *metrics.BuiltinMetrics, tags *metrics.SampleTags) {
+func (tr *Trail) SaveSamples(builtinMetrics *metrics.BuiltinMetrics, tags *metrics.TagSet) {
 	tr.Tags = tags
 	tr.Samples = make([]metrics.Sample, 0, 9) // this is with 1 more for a possible HTTPReqFailed
 	tr.Samples = append(tr.Samples, []metrics.Sample{
@@ -81,7 +81,7 @@ func (tr *Trail) GetSamples() []metrics.Sample {
 }
 
 // GetTags implements the metrics.ConnectedSampleContainer interface.
-func (tr *Trail) GetTags() *metrics.SampleTags {
+func (tr *Trail) GetTags() *metrics.TagSet {
 	return tr.Tags
 }
 

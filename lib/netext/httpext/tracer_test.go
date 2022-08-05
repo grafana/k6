@@ -150,7 +150,7 @@ func TestTracer(t *testing.T) { //nolint:tparallel
 				time.Sleep(traceDelay)
 			}
 			trail := tracer.Done()
-			trail.SaveSamples(builtinMetrics, registry.BranchTagSetRootWith(map[string]string{"tag": "value"}).SampleTags())
+			trail.SaveSamples(builtinMetrics, registry.RootTagSet().SortAndAddTags(map[string]string{"tag": "value"}))
 			samples := trail.GetSamples()
 
 			assertLaterOrZero(t, tracer.getConn, isReuse)
@@ -172,7 +172,7 @@ func TestTracer(t *testing.T) { //nolint:tparallel
 				seenMetrics[s.Metric] = true
 
 				assert.False(t, s.Time.IsZero())
-				assert.Equal(t, map[string]string{"tag": "value"}, s.Tags.CloneTags())
+				assert.Equal(t, map[string]string{"tag": "value"}, s.Tags.Map())
 
 				switch s.Metric {
 				case builtinMetrics.HTTPReqs:

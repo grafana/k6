@@ -258,7 +258,7 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 		VUID:           vu.ID,
 		VUIDGlobal:     vu.IDGlobal,
 		Samples:        vu.Samples,
-		Tags:           lib.NewTagMap(vu.Runner.RunTags),
+		Tags:           lib.NewVUStateTags(vu.Runner.RunTags),
 		Group:          r.defaultGroup,
 		BuiltinMetrics: r.preInitState.BuiltinMetrics,
 	}
@@ -458,7 +458,7 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 	}
 
 	// FIXME: add tests
-	r.RunTags = r.preInitState.Registry.BranchTagSetRootWith(r.Bundle.Options.RunTags)
+	r.RunTags = r.preInitState.Registry.RootTagSet().SortAndAddTags(r.Bundle.Options.RunTags)
 
 	return nil
 }
@@ -535,7 +535,9 @@ func (r *Runner) runPart(
 	}
 
 	if r.Bundle.Options.SystemTags.Has(metrics.TagGroup) {
-		vu.state.Tags.Set("group", group.Path)
+		vu.state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
+			return currentTags.With("group", group.Path)
+		})
 	}
 	vu.state.Group = group
 	v, _, _, err := vu.runFn(ctx, false, fn, nil, vu.Runtime.ToValue(arg))
@@ -633,23 +635,23 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 
 	opts := u.Runner.Bundle.Options
 
-	tags := u.state.Tags.BranchOut()
-	for k, v := range params.Tags {
-		tags.AddTag(k, v)
-	}
-	if opts.SystemTags.Has(metrics.TagVU) {
-		tags.AddTag("vu", strconv.FormatUint(u.ID, 10))
-	}
-	if opts.SystemTags.Has(metrics.TagIter) {
-		tags.AddTag("iter", strconv.FormatInt(u.iteration, 10))
-	}
-	if opts.SystemTags.Has(metrics.TagGroup) {
-		tags.AddTag("group", u.state.Group.Path)
-	}
-	if opts.SystemTags.Has(metrics.TagScenario) {
-		tags.AddTag("scenario", params.Scenario)
-	}
-	u.state.Tags = lib.NewTagMap(tags)
+	u.state.Tags.Modify(func(tags *metrics.TagSet) *metrics.TagSet {
+		tags = tags.SortAndAddTags(params.Tags)
+
+		if opts.SystemTags.Has(metrics.TagVU) {
+			tags = tags.With("vu", strconv.FormatUint(u.ID, 10))
+		}
+		if opts.SystemTags.Has(metrics.TagIter) {
+			tags = tags.With("iter", strconv.FormatInt(u.iteration, 10))
+		}
+		if opts.SystemTags.Has(metrics.TagGroup) {
+			tags = tags.With("group", u.state.Group.Path)
+		}
+		if opts.SystemTags.Has(metrics.TagScenario) {
+			tags = tags.With("scenario", params.Scenario)
+		}
+		return tags
+	})
 
 	ctx := params.RunContext
 	u.moduleVUImpl.ctx = ctx
@@ -776,8 +778,11 @@ func (u *VU) runFn(
 	}
 
 	opts := &u.Runner.Bundle.Options
+
 	if opts.SystemTags.Has(metrics.TagIter) {
-		u.state.Tags.Set("iter", strconv.FormatInt(u.state.Iteration, 10))
+		u.state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
+			return currentTags.With("iter", strconv.FormatInt(u.state.Iteration, 10))
+		})
 	}
 
 	startTime := time.Now()
@@ -815,7 +820,7 @@ func (u *VU) runFn(
 
 	u.state.Samples <- u.Dialer.GetTrail(
 		startTime, endTime, isFullIteration,
-		isDefault, u.state.Tags.BranchOut().SampleTags(), u.Runner.preInitState.BuiltinMetrics)
+		isDefault, u.state.Tags.GetCurrentValues(), u.Runner.preInitState.BuiltinMetrics)
 
 	return v, isFullIteration, endTime.Sub(startTime), err
 }

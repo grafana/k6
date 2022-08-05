@@ -32,9 +32,9 @@ import (
 type sampleEnvelope struct {
 	Type string `json:"type"`
 	Data struct {
-		Time  time.Time           `json:"time"`
-		Value float64             `json:"value"`
-		Tags  *metrics.SampleTags `json:"tags"`
+		Time  time.Time       `json:"time"`
+		Value float64         `json:"value"`
+		Tags  *metrics.TagSet `json:"tags"`
 	} `json:"data"`
 	Metric string `json:"metric"`
 }

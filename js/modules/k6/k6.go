@@ -125,12 +125,16 @@ func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
 
 	shouldUpdateTag := state.Options.SystemTags.Has(metrics.TagGroup)
 	if shouldUpdateTag {
-		state.Tags.Set("group", g.Path)
+		state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
+			return currentTags.With("group", g.Path)
+		})
 	}
 	defer func() {
 		state.Group = old
 		if shouldUpdateTag {
-			state.Tags.Set("group", old.Path)
+			state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
+				return currentTags.With("group", old.Path)
+			})
 		}
 	}()
 
@@ -142,7 +146,7 @@ func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
 	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
 		Time:   t,
 		Metric: state.BuiltinMetrics.GroupDuration,
-		Tags:   state.Tags.BranchOut().SampleTags(),
+		Tags:   state.Tags.GetCurrentValues(),
 		Value:  metrics.D(t.Sub(startTime)),
 	})
 
@@ -164,11 +168,11 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 	t := time.Now()
 
 	// Prepare the metric tags
-	commonTags := state.Tags.BranchOut()
+	commonTags := state.Tags.GetCurrentValues()
 	if len(extras) > 0 {
 		obj := extras[0].ToObject(rt)
 		for _, k := range obj.Keys() {
-			commonTags.AddTag(k, obj.Get(k).String())
+			commonTags = commonTags.With(k, obj.Get(k).String())
 		}
 	}
 
@@ -184,9 +188,9 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 			return false, err
 		}
 
-		tags := commonTags.BranchOut()
+		tags := commonTags
 		if state.Options.SystemTags.Has(metrics.TagCheck) {
-			tags.AddTag("check", check.Name)
+			tags = tags.With("check", check.Name)
 		}
 
 		// Resolve callables into values.
@@ -207,7 +211,7 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 			sample := metrics.Sample{
 				Time:   t,
 				Metric: state.BuiltinMetrics.Checks,
-				Tags:   tags.SampleTags(),
+				Tags:   tags,
 				Value:  0,
 			}
 			if val.ToBoolean() {

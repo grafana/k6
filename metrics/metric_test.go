@@ -23,7 +23,8 @@ func TestNewMetric(t *testing.T) {
 		name, data := name, data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			m := newMetric("my_metric", data.Type)
+			r := NewRegistry()
+			m := r.newMetric("my_metric", data.Type)
 			assert.Equal(t, "my_metric", m.Name)
 			assert.IsType(t, data.SinkType, m.Sink)
 		})
@@ -54,15 +55,16 @@ func TestAddSubmetric(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			m := newMetric("metric", Trend)
-			sm, err := m.AddSubmetric(name, newTagSet(nil))
+			r := NewRegistry()
+			m := r.MustNewMetric("metric", Trend)
+			sm, err := m.AddSubmetric(name)
 			if expected.err {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
 			require.NotNil(t, sm)
-			assert.EqualValues(t, expected.tags, sm.Tags.CloneTags())
+			assert.EqualValues(t, expected.tags, sm.Tags.Map())
 		})
 	}
 }

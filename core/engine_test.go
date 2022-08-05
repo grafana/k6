@@ -80,7 +80,7 @@ func getTestRunState(
 		TestPreInitState: piState,
 		Options:          options,
 		Runner:           runner,
-		RunTags:          piState.Registry.BranchTagSetRootWith(options.RunTags),
+		RunTags:          piState.Registry.RootTagSet().SortAndAddTags(options.RunTags),
 	}
 }
 
@@ -302,7 +302,7 @@ func TestEngine_processSamples(t *testing.T) {
 				out <- metrics.Sample{
 					Metric: metric,
 					Value:  1.25,
-					Tags:   piState.Registry.BranchTagSetRootWith(map[string]string{"a": "1"}).SampleTags(),
+					Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1"}),
 				}
 				close(done)
 				return nil
@@ -342,7 +342,7 @@ func TestEngine_processSamples(t *testing.T) {
 				out <- metrics.Sample{
 					Metric: metric,
 					Value:  1.25,
-					Tags:   piState.Registry.BranchTagSetRootWith(map[string]string{"a": "1", "b": "2"}).SampleTags(),
+					Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1", "b": "2"}),
 				}
 				close(done)
 				return nil
@@ -368,7 +368,7 @@ func TestEngine_processSamples(t *testing.T) {
 
 		assert.Len(t, test.engine.MetricsEngine.ObservedMetrics, 2)
 		sms := test.engine.MetricsEngine.ObservedMetrics["my_metric{a:1}"]
-		assert.EqualValues(t, map[string]string{"a": "1"}, sms.Sub.Tags.CloneTags())
+		assert.EqualValues(t, map[string]string{"a": "1"}, sms.Sub.Tags.Map())
 
 		assert.IsType(t, &metrics.GaugeSink{}, test.engine.MetricsEngine.ObservedMetrics["my_metric"].Sink)
 		assert.IsType(t, &metrics.GaugeSink{}, test.engine.MetricsEngine.ObservedMetrics["my_metric{a:1}"].Sink)
@@ -398,7 +398,7 @@ func TestEngineThresholdsWillAbort(t *testing.T) {
 			out <- metrics.Sample{
 				Metric: metric,
 				Value:  1.25,
-				Tags:   piState.Registry.BranchTagSetRootWith(map[string]string{"a": "1"}).SampleTags(),
+				Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1"}),
 			}
 			close(done)
 			return nil
@@ -444,7 +444,7 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 			out <- metrics.Sample{
 				Metric: metric,
 				Value:  1.25,
-				Tags:   piState.Registry.BranchTagSetRootWith(map[string]string{"a": "1"}).SampleTags(),
+				Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1"}),
 			}
 			<-ctx.Done()
 			close(done)
@@ -522,22 +522,20 @@ func TestEngine_processThresholds(t *testing.T) {
 				t, nil, nil, nil, lib.Options{Thresholds: thresholds}, piState,
 			)
 
-			tag1 := piState.Registry.BranchTagSetRoot()
-			tag1.AddTag("a", "1")
-			tag2 := piState.Registry.BranchTagSetRoot()
-			tag2.AddTag("b", "1")
+			tag1 := piState.Registry.RootTagSet().With("a", "1")
+			tag2 := piState.Registry.RootTagSet().With("b", "1")
 
 			test.engine.OutputManager.AddMetricSamples(
 				[]metrics.SampleContainer{
 					metrics.Sample{
 						Metric: gaugeMetric,
 						Value:  1.25,
-						Tags:   tag1.SampleTags(),
+						Tags:   tag1,
 					},
 					metrics.Sample{
 						Metric: counterMetric,
 						Value:  2,
-						Tags:   tag2.SampleTags(),
+						Tags:   tag2,
 					},
 				},
 			)

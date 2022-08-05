@@ -137,11 +137,11 @@ func TestOutput(t *testing.T) {
 			samples[i] = metrics.Sample{
 				Metric: metric,
 				Time:   time.Now(),
-				Tags: registry.BranchTagSetRootWith(map[string]string{
+				Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
 					"something": "else",
 					"VU":        "21",
 					"else":      "something",
-				}).SampleTags(),
+				}),
 				Value: 2.0,
 			}
 		}
@@ -176,7 +176,8 @@ func TestOutputFlushMetricsConcurrency(t *testing.T) {
 		ts.Close()
 	}()
 
-	metric, err := metrics.NewRegistry().NewMetric("test_gauge", metrics.Gauge)
+	registry := metrics.NewRegistry()
+	metric, err := registry.NewMetric("test_gauge", metrics.Gauge)
 	require.NoError(t, err)
 
 	o, err := newOutput(output.Params{
@@ -194,6 +195,7 @@ func TestOutputFlushMetricsConcurrency(t *testing.T) {
 				metrics.Sample{
 					Metric: metric,
 					Value:  2.0,
+					Tags:   registry.RootTagSet(),
 				},
 			}})
 			o.flushMetrics()

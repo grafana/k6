@@ -82,11 +82,11 @@ func TestSampleToRow(t *testing.T) {
 				Time:   time.Unix(1562324644, 0),
 				Metric: testMetric,
 				Value:  1,
-				Tags: registry.BranchTagSetRootWith(map[string]string{
+				Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
 					"tag1": "val1",
 					"tag2": "val2",
 					"tag3": "val3",
-				}).SampleTags(),
+				}),
 			},
 			resTags:     []string{"tag1"},
 			ignoredTags: []string{"tag2"},
@@ -98,13 +98,13 @@ func TestSampleToRow(t *testing.T) {
 				Time:   time.Unix(1562324644, 0),
 				Metric: testMetric,
 				Value:  1,
-				Tags: registry.BranchTagSetRootWith(map[string]string{
+				Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
 					"tag1": "val1",
 					"tag2": "val2",
 					"tag3": "val3",
 					"tag4": "val4",
 					"tag5": "val5",
-				}).SampleTags(),
+				}),
 			},
 			resTags:     []string{"tag1", "tag2"},
 			ignoredTags: []string{},
@@ -116,14 +116,14 @@ func TestSampleToRow(t *testing.T) {
 				Time:   time.Unix(1562324644, 0),
 				Metric: testMetric,
 				Value:  1,
-				Tags: registry.BranchTagSetRootWith(map[string]string{
+				Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
 					"tag1": "val1",
 					"tag2": "val2",
 					"tag3": "val3",
 					"tag4": "val4",
 					"tag5": "val5",
 					"tag6": "val6",
-				}).SampleTags(),
+				}),
 			},
 			resTags:     []string{"tag1", "tag3"},
 			ignoredTags: []string{"tag4", "tag6"},
@@ -242,22 +242,22 @@ func TestRun(t *testing.T) {
 					Time:   time.Unix(1562324643, 0),
 					Metric: testMetric,
 					Value:  1,
-					Tags: registry.BranchTagSetRootWith(map[string]string{
+					Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
 						"check": "val1",
 						"url":   "val2",
 						"error": "val3",
-					}).SampleTags(),
+					}),
 				},
 				metrics.Sample{
 					Time:   time.Unix(1562324644, 0),
 					Metric: testMetric,
 					Value:  1,
-					Tags: registry.BranchTagSetRootWith(map[string]string{
+					Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
 						"check": "val1",
 						"url":   "val2",
 						"error": "val3",
 						"tag4":  "val4",
-					}).SampleTags(),
+					}),
 				},
 			},
 			fileName:       "test",
@@ -271,22 +271,22 @@ func TestRun(t *testing.T) {
 					Time:   time.Unix(1562324643, 0),
 					Metric: testMetric,
 					Value:  1,
-					Tags: registry.BranchTagSetRootWith(map[string]string{
+					Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
 						"check": "val1",
 						"url":   "val2",
 						"error": "val3",
-					}).SampleTags(),
+					}),
 				},
 				metrics.Sample{
 					Time:   time.Unix(1562324644, 0),
 					Metric: testMetric,
 					Value:  1,
-					Tags: registry.BranchTagSetRootWith(map[string]string{
+					Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
 						"check": "val1",
 						"url":   "val2",
 						"error": "val3",
 						"name":  "val4",
-					}).SampleTags(),
+					}),
 				},
 			},
 			fileName:       "test.gz",
@@ -300,22 +300,22 @@ func TestRun(t *testing.T) {
 					Time:   time.Unix(1562324644, 0),
 					Metric: testMetric,
 					Value:  1,
-					Tags: registry.BranchTagSetRootWith(map[string]string{
+					Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
 						"check": "val1",
 						"url":   "val2",
 						"error": "val3",
-					}).SampleTags(),
+					}),
 				},
 				metrics.Sample{
 					Time:   time.Unix(1562324644, 0),
 					Metric: testMetric,
 					Value:  1,
-					Tags: registry.BranchTagSetRootWith(map[string]string{
+					Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
 						"check": "val1",
 						"url":   "val2",
 						"error": "val3",
 						"name":  "val4",
-					}).SampleTags(),
+					}),
 				},
 			},
 			fileName:       "test",

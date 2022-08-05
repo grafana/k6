@@ -313,7 +313,7 @@ func TestSetupDataIsolation(t *testing.T) {
 		TestPreInitState: runner.preInitState,
 		Options:          options,
 		Runner:           runner,
-		RunTags:          runner.preInitState.Registry.BranchTagSetRootWith(options.RunTags),
+		RunTags:          runner.preInitState.Registry.RootTagSet().SortAndAddTags(options.RunTags),
 	}
 
 	execScheduler, err := local.NewExecutionScheduler(testRunState)
@@ -1978,7 +1978,7 @@ func TestSystemTags(t *testing.T) {
 			require.NotEmpty(t, bufSamples)
 			for _, sample := range bufSamples[0].GetSamples() {
 				assert.NotEmpty(t, sample.Tags)
-				for emittedTag, emittedVal := range sample.Tags.CloneTags() {
+				for emittedTag, emittedVal := range sample.Tags.Map() {
 					assert.Equal(t, tc.tag, emittedTag)
 					assert.Equal(t, tc.expVal, emittedVal)
 				}

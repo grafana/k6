@@ -134,7 +134,7 @@ func (o *Output) batchFromSamples(containers []metrics.SampleContainer) (client.
 		tags   map[string]string
 		values map[string]interface{}
 	}
-	cache := map[*metrics.SampleTags]cacheItem{}
+	cache := map[*metrics.TagSet]cacheItem{}
 	for _, container := range containers {
 		samples := container.GetSamples()
 		for _, sample := range samples {
@@ -146,7 +146,7 @@ func (o *Output) batchFromSamples(containers []metrics.SampleContainer) (client.
 					values[k] = v
 				}
 			} else {
-				tags = sample.Tags.CloneTags()
+				tags = sample.Tags.Map()
 				o.extractTagsToValues(tags, values)
 				cache[sample.Tags] = cacheItem{tags, values}
 			}

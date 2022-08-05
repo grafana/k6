@@ -54,7 +54,7 @@ func assertSessionMetricsEmitted(t *testing.T, sampleContainers []metrics.Sample
 
 	for _, sampleContainer := range sampleContainers {
 		for _, sample := range sampleContainer.GetSamples() {
-			tags := sample.Tags.CloneTags()
+			tags := sample.Tags.Map()
 			if tags["url"] == url {
 				switch sample.Metric.Name {
 				case metrics.WSConnectingName:
@@ -123,7 +123,7 @@ func newTestState(t testing.TB) testState {
 		Samples:        samples,
 		TLSConfig:      tb.TLSClientConfig,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-		Tags:           lib.NewTagMap(registry.BranchTagSetRoot()),
+		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 
 	m := New().NewModuleInstance(testRuntime.VU)
@@ -687,8 +687,8 @@ func TestSystemTags(t *testing.T) {
 			for _, sampleContainer := range containers {
 				require.NotEmpty(t, sampleContainer.GetSamples())
 				for _, sample := range sampleContainer.GetSamples() {
-					require.NotEmpty(t, sample.Tags.CloneTags())
-					for emittedTag := range sample.Tags.CloneTags() {
+					require.NotEmpty(t, sample.Tags.Map())
+					for emittedTag := range sample.Tags.Map() {
 						assert.Equal(t, expectedTag, emittedTag)
 					}
 				}

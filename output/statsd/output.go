@@ -66,7 +66,7 @@ type Output struct {
 func (o *Output) dispatch(entry metrics.Sample) error {
 	var tagList []string
 	if o.config.EnableTags.Bool {
-		tagList = processTags(o.config.TagBlocklist, entry.Tags.CloneTags())
+		tagList = processTags(o.config.TagBlocklist, entry.Tags.Map())
 	}
 
 	switch entry.Metric.Type {

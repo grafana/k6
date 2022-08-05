@@ -162,7 +162,7 @@ func TestGroup(t *testing.T) {
 		state := &lib.State{
 			Group:   root,
 			Samples: make(chan metrics.SampleContainer, 1000),
-			Tags:    lib.NewTagMap(registry.BranchTagSetRoot()),
+			Tags:    lib.NewVUStateTags(registry.RootTagSet()),
 			Options: lib.Options{
 				SystemTags: metrics.NewSystemTagSet(metrics.TagGroup),
 			},
@@ -186,7 +186,7 @@ func TestGroup(t *testing.T) {
 		rt, state, root := setupGroupTest()
 		assert.Equal(t, state.Group, root)
 		require.NoError(t, rt.Set("fn", func() {
-			groupTag, ok := state.Tags.Get("group")
+			groupTag, ok := state.Tags.GetCurrentValues().Get("group")
 			require.True(t, ok)
 			assert.Equal(t, groupTag, "::my group")
 			assert.Equal(t, state.Group.Name, "my group")
@@ -195,7 +195,7 @@ func TestGroup(t *testing.T) {
 		_, err := rt.RunString(`k6.group("my group", fn)`)
 		assert.NoError(t, err)
 		assert.Equal(t, state.Group, root)
-		groupTag, ok := state.Tags.Get("group")
+		groupTag, ok := state.Tags.GetCurrentValues().Get("group")
 		require.True(t, ok)
 		assert.Equal(t, groupTag, root.Name)
 	})
@@ -226,7 +226,7 @@ func checkTestRuntime(t testing.TB) (*goja.Runtime, chan metrics.SampleContainer
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Samples:        samples,
-		Tags:           lib.NewTagMap(registry.BranchTagSetRootWith(map[string]string{"group": root.Path})),
+		Tags:           lib.NewVUStateTags(registry.RootTagSet().SortAndAddTags(map[string]string{"group": root.Path})),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 	test.MoveToVUContext(state)
@@ -252,7 +252,7 @@ func TestCheckObject(t *testing.T) {
 		assert.Equal(t, map[string]string{
 			"group": "",
 			"check": "check",
-		}, sample.Tags.CloneTags())
+		}, sample.Tags.Map())
 	}
 
 	t.Run("Multiple", func(t *testing.T) {
@@ -311,7 +311,7 @@ func TestCheckArray(t *testing.T) {
 		assert.Equal(t, map[string]string{
 			"group": "",
 			"check": "0",
-		}, sample.Tags.CloneTags())
+		}, sample.Tags.Map())
 	}
 }
 
@@ -356,7 +356,7 @@ func TestCheckThrows(t *testing.T) {
 		assert.Equal(t, map[string]string{
 			"group": "",
 			"check": "a",
-		}, sample.Tags.CloneTags())
+		}, sample.Tags.Map())
 	}
 }
 
@@ -409,7 +409,7 @@ func TestCheckTypes(t *testing.T) {
 						assert.Equal(t, map[string]string{
 							"group": "",
 							"check": "check",
-						}, sample.Tags.CloneTags())
+						}, sample.Tags.Map())
 					}
 				})
 			}
@@ -433,7 +433,7 @@ func TestCheckContextExpiry(t *testing.T) {
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Samples: samples,
-		Tags: lib.NewTagMap(registry.BranchTagSetRootWith(map[string]string{
+		Tags: lib.NewVUStateTags(registry.RootTagSet().SortAndAddTags(map[string]string{
 			"group": root.Path,
 		})),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
@@ -490,6 +490,6 @@ func TestCheckTags(t *testing.T) {
 			"check": "check",
 			"a":     "1",
 			"b":     "2",
-		}, sample.Tags.CloneTags())
+		}, sample.Tags.Map())
 	}
 }

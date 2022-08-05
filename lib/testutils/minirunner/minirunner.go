@@ -63,7 +63,7 @@ func (r MiniRunner) MakeArchive() *lib.Archive {
 func (r *MiniRunner) NewVU(idLocal, idGlobal uint64, out chan<- metrics.SampleContainer) (lib.InitializedVU, error) {
 	state := &lib.State{VUID: idLocal, VUIDGlobal: idGlobal, Iteration: int64(-1)}
 	if r.runTags != nil {
-		state.Tags = lib.NewTagMap(r.runTags)
+		state.Tags = lib.NewVUStateTags(r.runTags)
 	}
 	return &VU{
 		R:            r,
@@ -126,7 +126,7 @@ func (r *MiniRunner) SetOptions(opts lib.Options) error {
 	r.Options = opts
 
 	if r.PreInitState != nil {
-		r.runTags = r.PreInitState.Registry.BranchTagSetRootWith(r.Options.RunTags)
+		r.runTags = r.PreInitState.Registry.RootTagSet().SortAndAddTags(r.Options.RunTags)
 	}
 
 	return nil

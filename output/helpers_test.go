@@ -43,7 +43,7 @@ func TestSampleBufferBasics(t *testing.T) {
 		Time:   time.Now(),
 		Metric: metric,
 		Value:  float64(123),
-		Tags:   registry.BranchTagSetRootWith(map[string]string{"tag1": "val1"}).SampleTags(),
+		Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag1": "val1"}),
 	}
 	connected := metrics.ConnectedSamples{Samples: []metrics.Sample{single, single}, Time: single.Time}
 	buffer := SampleBuffer{}
@@ -91,7 +91,7 @@ func TestSampleBufferConcurrently(t *testing.T) {
 				Time:   time.Unix(1562324644, 0),
 				Metric: metric,
 				Value:  float64(i),
-				Tags:   registry.BranchTagSetRootWith(map[string]string{"tag1": "val1"}).SampleTags(),
+				Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag1": "val1"}),
 			}})
 			time.Sleep(time.Duration(i*sleepModifier) * time.Microsecond)
 		}

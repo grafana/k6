@@ -99,7 +99,6 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 	t.Parallel()
 
 	registry := metrics.NewRegistry()
-	rootTagSet := registry.BranchTagSetRoot()
 	parentMetric, err := registry.NewMetric("my_parent", metrics.Counter)
 	require.NoError(t, err)
 	parentMetric.Sink.Add(metrics.Sample{Value: 11})
@@ -108,11 +107,11 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 	require.NoError(t, err)
 	parentMetricPost.Sink.Add(metrics.Sample{Value: 22})
 
-	subMetric, err := parentMetric.AddSubmetric("sub:1", rootTagSet)
+	subMetric, err := parentMetric.AddSubmetric("sub:1")
 	require.NoError(t, err)
 	subMetric.Metric.Sink.Add(metrics.Sample{Value: 1})
 
-	subMetricPost, err := parentMetricPost.AddSubmetric("sub:2", rootTagSet)
+	subMetricPost, err := parentMetricPost.AddSubmetric("sub:2")
 	require.NoError(t, err)
 	subMetricPost.Metric.Sink.Add(metrics.Sample{Value: 2})
 

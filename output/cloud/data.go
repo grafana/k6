@@ -131,9 +131,12 @@ func NewSampleFromTrail(trail *httpext.Trail) *Sample {
 		Time:   toMicroSecond(trail.GetTime()),
 		Values: values,
 	}
-	if tags := trail.GetTags(); !tags.IsEmpty() {
-		sdata.Tags, _ = easyjson.Marshal(tags)
+	if !trail.Tags.IsEmpty() {
+		if tagsJSON, err := easyjson.Marshal(trail.Tags); err == nil {
+			sdata.Tags = tagsJSON
+		}
 	}
+
 	return &Sample{
 		Type:   DataTypeMap,
 		Metric: "http_req_li_all",
@@ -237,7 +240,7 @@ func (am *AggregatedMetric) Calc(count float64) {
 	am.Avg = metrics.D(am.sumD) / count
 }
 
-type aggregationBucket map[*metrics.SampleTags][]*httpext.Trail
+type aggregationBucket map[*metrics.TagSet][]*httpext.Trail
 
 type durations []time.Duration
 

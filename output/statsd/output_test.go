@@ -88,7 +88,7 @@ func TestStatsdEnabledTags(t *testing.T) {
 			for j, sample := range container.GetSamples() {
 				lines++
 				var (
-					expectedTagList    = processTags(tagMap, sample.GetTags().CloneTags())
+					expectedTagList    = processTags(tagMap, sample.GetTags().Map())
 					expectedOutputLine = expectedOutputLines[i*j+i]
 					outputLine         = outputLines[i*j+i]
 					outputWithoutTags  = outputLine

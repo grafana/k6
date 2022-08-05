@@ -79,7 +79,7 @@ type State struct {
 
 	VUID, VUIDGlobal uint64
 	Iteration        int64
-	Tags             *TagMap
+	Tags             *VUStateTags
 	// These will be assigned on VU activation.
 	// Returns the iteration number of this VU in the current scenario.
 	GetScenarioVUIter func() uint64
@@ -93,65 +93,39 @@ type State struct {
 	GetScenarioGlobalVUIter func() uint64
 }
 
-// TagMap is a safe-concurrent Tags lookup.
-type TagMap struct {
+// VUStateTags wraps the current VU's tags and ensures a thread-safe way to
+// access and modify them exists. This is necessary because the VU tags and
+// metadata can be modified from the JS scripts via the `vu.tags` API in the
+// `k6/execution` built-in module.
+type VUStateTags struct {
 	mutex sync.RWMutex
 	tags  *metrics.TagSet
+	// TODO: Add metadata map[string]string
 }
 
-// NewTagMap creates a TagMap,
-// if a not-nil map is passed then it will be used as the internal map
-// otherwise a new one will be created.
-func NewTagMap(tags *metrics.TagSet) *TagMap {
+// NewVUStateTags initializes a new VUStateTags and returns it. It's important
+// that tags is not nil and initialized via metrics.Registry.RootTagSet().
+func NewVUStateTags(tags *metrics.TagSet) *VUStateTags {
 	if tags == nil {
-		panic("the metrics.TagSet must be initialized for creating a new lib.TagMap")
+		panic("the metrics.TagSet must be initialized for creating a new lib.VUStateTags")
 	}
-	return &TagMap{
-		tags:  tags,
+	return &VUStateTags{
 		mutex: sync.RWMutex{},
+		tags:  tags,
+		// metadata is intentionally nil by default
 	}
 }
 
-// BranchOut creates a TagSet starting from the state of the current Set.
-func (tg *TagMap) BranchOut() *metrics.TagSet {
+// GetCurrentValues returns the value of the VU tags in a thread-safe way.
+func (tg *VUStateTags) GetCurrentValues() *metrics.TagSet {
 	tg.mutex.RLock()
 	defer tg.mutex.RUnlock()
-	return tg.tags.BranchOut()
+	return tg.tags
 }
 
-// Set sets a Tag.
-func (tg *TagMap) Set(k, v string) {
+// Modify allows the thread-safe modification of the current VU tags.
+func (tg *VUStateTags) Modify(callback func(currentTags *metrics.TagSet) (newTags *metrics.TagSet)) {
 	tg.mutex.Lock()
 	defer tg.mutex.Unlock()
-	tg.tags.AddTag(k, v)
-}
-
-// Get returns the Tag value and true
-// if the provided key has been found.
-func (tg *TagMap) Get(k string) (string, bool) {
-	tg.mutex.RLock()
-	defer tg.mutex.RUnlock()
-	return tg.tags.Get(k)
-}
-
-// Len returns the number of the set keys.
-func (tg *TagMap) Len() int {
-	tg.mutex.RLock()
-	defer tg.mutex.RUnlock()
-	return tg.tags.Len()
-}
-
-// Delete deletes a map's item based on the provided key.
-func (tg *TagMap) Delete(k string) {
-	tg.mutex.Lock()
-	defer tg.mutex.Unlock()
-	tg.tags.Delete(k)
-}
-
-// Clone returns a map with the entire set of items.
-func (tg *TagMap) Clone() map[string]string {
-	tg.mutex.RLock()
-	defer tg.mutex.RUnlock()
-
-	return tg.tags.Map()
+	tg.tags = callback(tg.tags)
 }

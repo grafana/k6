@@ -187,17 +187,17 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		}
 	}
 
-	tags := state.Tags.BranchOut()
+	tags := state.Tags.GetCurrentValues()
 	// Override any global tags with request-specific ones.
 	for _, tag := range preq.Tags {
-		tags.AddTag(tag[0], tag[1])
+		tags = tags.With(tag[0], tag[1])
 	}
 
 	// Only set the name system tag if the user didn't explicitly set it beforehand,
 	// and the Name was generated from a tagged template string (via http.url).
 	if _, ok := tags.Get("name"); !ok && state.Options.SystemTags.Has(metrics.TagName) &&
 		preq.URL.Name != "" && preq.URL.Name != preq.URL.Clean() {
-		tags.AddTag("name", preq.URL.Name)
+		tags = tags.With("name", preq.URL.Name)
 	}
 
 	// Check rate limit *after* we've prepared a request; no need to wait with that part.

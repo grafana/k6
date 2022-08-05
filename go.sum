@@ -113,8 +113,8 @@ github.com/mattn/go-isatty v0.0.14 h1:yVuAays6BHfxijgZPzw+3Zlu5yQgKGP2/hcQbHb7S9
 github.com/mattn/go-isatty v0.0.14/go.mod h1:7GGIvUiUoEMVVmxf/4nioHXj79iQHKdU27kJ6hsGG94=
 github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa h1:lx8ZnNPwjkXSzOROz0cg69RlErRXs+L3eDkggASWKLo=
 github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa/go.mod h1:fhpOYavp5g2K74XDl/ao2y4KvhqVtKlkg1e+0UaQv7I=
-github.com/mstoykov/atlas v0.0.0-20220727131014-23cc720eb639 h1:XMAwXwr7ZJcBhhzLWB2LHHVO028vXuxUeE65iRz1Myw=
-github.com/mstoykov/atlas v0.0.0-20220727131014-23cc720eb639/go.mod h1:9vRHVuLCjoFfE3GT06X0spdOAO+Zzo4AMjdIwUHBvAk=
+github.com/mstoykov/atlas v0.0.0-20220808085829-90340e9998bd h1:x/wQ8/umYu2x0icx5wNNTSK1NlkYVmsgzQ+U6v4ijv0=
+github.com/mstoykov/atlas v0.0.0-20220808085829-90340e9998bd/go.mod h1:9vRHVuLCjoFfE3GT06X0spdOAO+Zzo4AMjdIwUHBvAk=
 github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1 h1:94EkGmhXrVUEal+uLwFUf4fMXPhZpM5tYxuIsxrCCbI=
 github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1/go.mod h1:vk/d9jpexY2Z9Bb0uB4Ndesss1Sr0Z9ZiGUrg5o9VGk=
 github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d h1:VhgPp6v9qf9Agr/56bj7Y/xa04UccTW04VP0Qed4vnQ=

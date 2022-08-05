@@ -457,7 +457,6 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 	shownWarning := false
 	metricTags := varr.getMetricTags(nil)
 	go varr.config.cal(varr.et, ch)
-	droppedIterationMetric := varr.executionState.Test.BuiltinMetrics.DroppedIterations
 	for nextTime := range ch {
 		select {
 		case <-regDurationDone:
@@ -482,8 +481,12 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 
 		// Since there aren't any free VUs available, consider this iteration
 		// dropped - we aren't going to try to recover it, but
-
-		metrics.PushIfNotDone(parentCtx, out, droppedIterationMetric.Sample(time.Now(), metricTags, 1))
+		metrics.PushIfNotDone(parentCtx, out, metrics.Sample{
+			Metric: varr.executionState.Test.BuiltinMetrics.DroppedIterations,
+			Tags:   metricTags,
+			Time:   time.Now(),
+			Value:  1,
+		})
 
 		// We'll try to start allocating another VU in the background,
 		// non-blockingly, if we have remainingUnplannedVUs...

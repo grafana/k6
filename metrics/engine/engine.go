@@ -77,9 +77,7 @@ func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Me
 	if submetricDefinition[len(submetricDefinition)-1] != '}' {
 		return nil, fmt.Errorf("missing ending bracket, sub-metric format needs to be 'metric{key:value}'")
 	}
-	sm, err := metric.AddSubmetric(
-		submetricDefinition[:len(submetricDefinition)-1],
-		me.es.Test.Registry.BranchTagSetRoot())
+	sm, err := metric.AddSubmetric(submetricDefinition[:len(submetricDefinition)-1])
 	if err != nil {
 		return nil, err
 	}

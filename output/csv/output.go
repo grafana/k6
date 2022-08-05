@@ -221,7 +221,7 @@ func SampleToRow(sample *metrics.Sample, resTags []string, ignoredTags []string,
 	}
 
 	row[2] = fmt.Sprintf("%f", sample.Value)
-	sampleTags := sample.Tags.CloneTags()
+	sampleTags := sample.Tags.Map()
 
 	for ind, tag := range resTags {
 		row[ind+3] = sampleTags[tag]

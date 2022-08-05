@@ -95,7 +95,7 @@ type Socket struct {
 	pingSendTimestamps map[string]time.Time
 	pingSendCounter    int
 
-	sampleTags     *metrics.SampleTags
+	sampleTags     *metrics.TagSet
 	samplesOutput  chan<- metrics.SampleContainer
 	builtinMetrics *metrics.BuiltinMetrics
 }
@@ -154,7 +154,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 
 	enableCompression := false
 
-	tags := state.Tags.BranchOut()
+	tags := state.Tags.GetCurrentValues()
 	jar := state.CookieJar
 
 	// Parse the optional second argument (params)
@@ -184,7 +184,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 					continue
 				}
 				for _, key := range tagObj.Keys() {
-					tags.AddTag(key, tagObj.Get(key).String())
+					tags = tags.With(key, tagObj.Get(key).String())
 				}
 			case "jar":
 				jarV := params.Get(k)
@@ -216,7 +216,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	}
 
 	if state.Options.SystemTags.Has(metrics.TagURL) {
-		tags.AddTag("url", url)
+		tags = tags.With("url", url)
 	}
 
 	// Overriding the NextProtos to avoid talking http2
@@ -248,17 +248,17 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	if state.Options.SystemTags.Has(metrics.TagIP) && conn.RemoteAddr() != nil {
 		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
 			// TODO: make as a not indexable
-			tags.AddTag("ip", ip)
+			tags = tags.With("ip", ip)
 		}
 	}
 
 	if httpResponse != nil {
 		if state.Options.SystemTags.Has(metrics.TagStatus) {
-			tags.AddTag("status", strconv.Itoa(httpResponse.StatusCode))
+			tags = tags.With("status", strconv.Itoa(httpResponse.StatusCode))
 		}
 
 		if state.Options.SystemTags.Has(metrics.TagSubproto) {
-			tags.AddTag("subproto", httpResponse.Header.Get("Sec-WebSocket-Protocol"))
+			tags = tags.With("subproto", httpResponse.Header.Get("Sec-WebSocket-Protocol"))
 		}
 	}
 
@@ -271,16 +271,16 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 		scheduled:          make(chan goja.Callable),
 		done:               make(chan struct{}),
 		samplesOutput:      state.Samples,
-		sampleTags:         tags.SampleTags(),
+		sampleTags:         tags,
 		builtinMetrics:     state.BuiltinMetrics,
 	}
 
 	metrics.PushIfNotDone(ctx, state.Samples, metrics.ConnectedSamples{
 		Samples: []metrics.Sample{
-			{Metric: state.BuiltinMetrics.WSSessions, Time: start, Tags: socket.sampleTags, Value: 1},
-			{Metric: state.BuiltinMetrics.WSConnecting, Time: start, Tags: socket.sampleTags, Value: connectionDuration},
+			{Metric: state.BuiltinMetrics.WSSessions, Time: start, Tags: tags, Value: 1},
+			{Metric: state.BuiltinMetrics.WSConnecting, Time: start, Tags: tags, Value: connectionDuration},
 		},
-		Tags: socket.sampleTags,
+		Tags: tags,
 		Time: start,
 	})
 

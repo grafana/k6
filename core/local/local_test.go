@@ -72,7 +72,7 @@ func getTestRunState(
 		TestPreInitState: piState,
 		Options:          options,
 		Runner:           runner,
-		RunTags:          piState.Registry.BranchTagSetRootWith(options.RunTags),
+		RunTags:          piState.Registry.RootTagSet().SortAndAddTags(options.RunTags),
 	}
 }
 
@@ -356,32 +356,19 @@ func TestExecutionSchedulerSystemTags(t *testing.T) {
 		require.NoError(t, execScheduler.Run(ctx, ctx, samples))
 	}()
 
-	expCommonTrailTags := testRunState.RunTags.BranchOut()
-	expCommonTrailTags.AddTag("group", "")
-	expCommonTrailTags.AddTag("method", "GET")
-	expCommonTrailTags.AddTag("name", sr("HTTPBIN_IP_URL/"))
-	expCommonTrailTags.AddTag("url", sr("HTTPBIN_IP_URL/"))
-	expCommonTrailTags.AddTag("proto", "HTTP/1.1")
-	expCommonTrailTags.AddTag("status", "200")
-	expCommonTrailTags.AddTag("expected_response", "true")
+	expCommonTrailTags := testRunState.RunTags.
+		With("group", "").
+		With("method", "GET").
+		With("name", sr("HTTPBIN_IP_URL/")).
+		With("url", sr("HTTPBIN_IP_URL/")).
+		With("proto", "HTTP/1.1").
+		With("status", "200").
+		With("expected_response", "true")
 
-	expTrailPVUTagsRaw := expCommonTrailTags.BranchOut()
-	expTrailPVUTagsRaw.AddTag("scenario", "per_vu_test")
-	expTrailPVUTags := expTrailPVUTagsRaw.SampleTags()
-
-	expTrailSITagsRaw := expCommonTrailTags.BranchOut()
-	expTrailSITagsRaw.AddTag("scenario", "shared_test")
-	expTrailSITags := expTrailSITagsRaw.SampleTags()
-
-	expNetTrailPVUTagsRaw := testRunState.RunTags.BranchOut()
-	expNetTrailPVUTagsRaw.AddTag("group", "")
-	expNetTrailPVUTagsRaw.AddTag("scenario", "per_vu_test")
-	expNetTrailPVUTags := expNetTrailPVUTagsRaw.SampleTags()
-
-	expNetTrailSITagsRaw := testRunState.RunTags.BranchOut()
-	expNetTrailSITagsRaw.AddTag("group", "")
-	expNetTrailSITagsRaw.AddTag("scenario", "shared_test")
-	expNetTrailSITags := expNetTrailSITagsRaw.SampleTags()
+	expTrailPVUTags := expCommonTrailTags.With("scenario", "per_vu_test")
+	expTrailSITags := expCommonTrailTags.With("scenario", "shared_test")
+	expNetTrailPVUTags := testRunState.RunTags.With("group", "").With("scenario", "per_vu_test")
+	expNetTrailSITags := testRunState.RunTags.With("group", "").With("scenario", "shared_test")
 
 	var gotCorrectTags int
 	for {
@@ -389,11 +376,11 @@ func TestExecutionSchedulerSystemTags(t *testing.T) {
 		case sample := <-samples:
 			switch s := sample.(type) {
 			case *httpext.Trail:
-				if s.Tags.IsEqual(expTrailPVUTags) || s.Tags.IsEqual(expTrailSITags) {
+				if s.Tags == expTrailPVUTags || s.Tags == expTrailSITags {
 					gotCorrectTags++
 				}
 			case *netext.NetTrail:
-				if s.Tags.IsEqual(expNetTrailPVUTags) || s.Tags.IsEqual(expNetTrailSITags) {
+				if s.Tags == expNetTrailPVUTags || s.Tags == expNetTrailSITags {
 					gotCorrectTags++
 				}
 			}
@@ -504,13 +491,13 @@ func TestExecutionSchedulerRunCustomTags(t *testing.T) {
 				select {
 				case sample := <-samples:
 					if trail, ok := sample.(*httpext.Trail); ok && !gotTrailTag {
-						tags := trail.Tags.CloneTags()
+						tags := trail.Tags.Map()
 						if v, ok := tags["customTag"]; ok && v == "value" {
 							gotTrailTag = true
 						}
 					}
 					if netTrail, ok := sample.(*netext.NetTrail); ok && !gotNetTrailTag {
-						tags := netTrail.Tags.CloneTags()
+						tags := netTrail.Tags.Map()
 						if v, ok := tags["customTag"]; ok && v == "value" {
 							gotNetTrailTag = true
 						}
@@ -686,7 +673,7 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 				assert.FailNow(t, "received error sample from test")
 			}
 			if s.Metric.Name == "checks" || s.Metric.Name == "group_duration" {
-				tags := s.Tags.CloneTags()
+				tags := s.Tags.Map()
 				for _, expTags := range expectedPlainSampleTags {
 					if reflect.DeepEqual(expTags, tags) {
 						gotSampleTags++
@@ -694,14 +681,14 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 				}
 			}
 		case *httpext.Trail:
-			tags := s.Tags.CloneTags()
+			tags := s.Tags.Map()
 			for _, expTags := range expectedTrailTags {
 				if reflect.DeepEqual(expTags, tags) {
 					gotSampleTags++
 				}
 			}
 		case *netext.NetTrail:
-			tags := s.Tags.CloneTags()
+			tags := s.Tags.Map()
 			for _, expTags := range expectedNetTrailTags {
 				if reflect.DeepEqual(expTags, tags) {
 					gotSampleTags++
@@ -709,7 +696,7 @@ func TestExecutionSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 			}
 		case metrics.ConnectedSamples:
 			for _, sm := range s.Samples {
-				tags := sm.Tags.CloneTags()
+				tags := sm.Tags.Map()
 				if reflect.DeepEqual(expectedConnSampleTags, tags) {
 					gotSampleTags++
 				}
@@ -1231,7 +1218,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 							assert.Equal(t, expS.Value, s.Value)
 						}
 						assert.Equal(t, expS.Metric.Name, s.Metric.Name)
-						assert.Equal(t, expS.Tags.CloneTags(), s.Tags.CloneTags())
+						assert.Equal(t, expS.Tags.Map(), s.Tags.Map())
 						assert.InDelta(t, 0, now.Sub(s.Time), float64(50*time.Millisecond))
 					}
 				}
@@ -1243,12 +1230,12 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		}
 	}
 
-	getTags := func(r *metrics.Registry, args ...string) *metrics.SampleTags {
-		tags := r.BranchTagSetRoot()
+	getTags := func(r *metrics.Registry, args ...string) *metrics.TagSet {
+		tags := r.RootTagSet()
 		for i := 0; i < len(args)-1; i += 2 {
-			tags.AddTag(args[i], args[i+1])
+			tags = tags.With(args[i], args[i+1])
 		}
-		return tags.SampleTags()
+		return tags
 	}
 	testCounter, err := piState.Registry.NewMetric("test_counter", metrics.Counter)
 	require.NoError(t, err)

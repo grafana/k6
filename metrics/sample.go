@@ -2,22 +2,19 @@ package metrics
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/mailru/easyjson/jwriter"
-	"github.com/mstoykov/atlas"
 )
 
 // A Sample is a single measurement.
 type Sample struct {
-	Metric *Metric
-	Time   time.Time
-	Tags   *SampleTags
-	Value  float64
+	Metric   *Metric
+	Tags     *TagSet
+	Time     time.Time
+	Value    float64
+	Metadata map[string]string // could be nil
 }
 
 // SampleContainer is a simple abstraction that allows sample
@@ -40,7 +37,7 @@ func (s Samples) GetSamples() []Sample {
 // are connected and share the same time and tags.
 type ConnectedSampleContainer interface {
 	SampleContainer
-	GetTags() *SampleTags
+	GetTags() *TagSet
 	GetTime() time.Time
 }
 
@@ -49,7 +46,7 @@ type ConnectedSampleContainer interface {
 // extra information
 type ConnectedSamples struct {
 	Samples []Sample
-	Tags    *SampleTags
+	Tags    *TagSet
 	Time    time.Time
 }
 
@@ -60,7 +57,7 @@ func (cs ConnectedSamples) GetSamples() []Sample {
 }
 
 // GetTags implements ConnectedSampleContainer interface and returns stored tags.
-func (cs ConnectedSamples) GetTags() *SampleTags {
+func (cs ConnectedSamples) GetTags() *TagSet {
 	return cs.Tags
 }
 
@@ -77,7 +74,7 @@ func (s Sample) GetSamples() []Sample {
 
 // GetTags implements ConnectedSampleContainer interface
 // and returns the sample's tags.
-func (s Sample) GetTags() *SampleTags {
+func (s Sample) GetTags() *TagSet {
 	return s.Tags
 }
 
@@ -171,121 +168,4 @@ func parsePercentile(stat string) (float64, error) {
 	}
 
 	return percentile, nil
-}
-
-// SampleTags is an immutable string[string] map for tags. Once a tag
-// set is created, direct modification is prohibited. It has
-// copy-on-write semantics and uses pointers for faster comparison
-// between maps, since the same tag set is often used for multiple samples.
-// All methods should not panic, even if they are called on a nil pointer.
-//easyjson:skip
-type SampleTags struct {
-	tags *atlas.Node
-	json []byte
-}
-
-// Get returns an empty string and false if the the requested key is not
-// present or its value and true if it is.
-func (st *SampleTags) Get(key string) (string, bool) {
-	if st == nil {
-		return "", false
-	}
-	return st.tags.ValueByKey(key)
-}
-
-// IsEmpty checks for a nil pointer or zero tags.
-// It's necessary because of this envconfig issue: https://github.com/kelseyhightower/envconfig/issues/113
-func (st *SampleTags) IsEmpty() bool {
-	if st == nil || st.tags == nil {
-		return true
-	}
-	return st.tags.IsRoot()
-}
-
-// IsEqual tries to compare two tag sets with maximum efficiency.
-func (st *SampleTags) IsEqual(other *SampleTags) bool {
-	if st == other {
-		return true
-	}
-	if st == nil || other == nil {
-		return false
-	}
-	return st.tags == other.tags
-}
-
-func (st *SampleTags) Contains(other *SampleTags) bool {
-	if st == other || other == nil {
-		return true
-	}
-	if st == nil {
-		return false
-	}
-	return st.tags.Contains(other.tags)
-}
-
-// MarshalJSON serializes SampleTags to a JSON string and caches
-// the result. It is not thread safe in the sense that the Go race
-// detector will complain if it's used concurrently, but no data
-// should be corrupted.
-func (st *SampleTags) MarshalJSON() ([]byte, error) {
-	if st.IsEmpty() {
-		return []byte("null"), nil
-	}
-	if st.json != nil {
-		return st.json, nil
-	}
-	res, err := json.Marshal(st.tags.Path())
-	if err != nil {
-		return res, err
-	}
-	st.json = res
-	return res, nil
-}
-
-// MarshalEasyJSON supports easyjson.Marshaler interface
-func (st *SampleTags) MarshalEasyJSON(w *jwriter.Writer) {
-	w.RawByte('{')
-	first := true
-	// FIXME: implement an iterator/Range function on Atlas
-	// so we can reduce the mem allocation
-	for k, v := range st.tags.Path() {
-		if first {
-			first = false
-		} else {
-			w.RawByte(',')
-		}
-		w.String(k)
-		w.RawByte(':')
-		w.String(v)
-	}
-	w.RawByte('}')
-}
-
-// UnmarshalJSON deserializes SampleTags from a JSON string.
-func (st *SampleTags) UnmarshalJSON(data []byte) error {
-	if st == nil || st.tags == nil {
-		// It forces the caller to branch out from a centralized root
-		// before unmarshaling or to initialize a new root if it is required.
-		// It can't handle here the logic for instantiate the TagSet otherwise
-		// it would be very easy to create fragmented trees all around the program.
-		return fmt.Errorf("SampleTags must be initialized before to be unmarshaled, " +
-			"branch out from a centralized root or create a new root")
-	}
-	var raw map[string]string
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	for k, v := range raw {
-		st.tags = st.tags.AddLink(k, v)
-	}
-	return nil
-}
-
-// CloneTags copies the underlying set of a sample tags and
-// returns it. If the receiver is nil, it returns an empty non-nil map.
-func (st *SampleTags) CloneTags() map[string]string {
-	if st == nil {
-		return map[string]string{}
-	}
-	return st.tags.Path()
 }

@@ -171,25 +171,23 @@ func (c *Client) Invoke(
 	ctx, cancel := context.WithTimeout(c.vu.Context(), p.Timeout)
 	defer cancel()
 
-	tags := state.Tags.BranchOut()
-	for k, v := range p.Tags {
-		tags.AddTag(k, v)
-	}
+	tags := state.Tags.GetCurrentValues()
+	tags = tags.SortAndAddTags(p.Tags)
 
 	if state.Options.SystemTags.Has(metrics.TagURL) {
-		tags.AddTag("url", fmt.Sprintf("%s%s", c.addr, method))
+		tags = tags.With("url", fmt.Sprintf("%s%s", c.addr, method))
 	}
 	parts := strings.Split(method[1:], "/")
 	if state.Options.SystemTags.Has(metrics.TagService) {
-		tags.AddTag("service", parts[0])
+		tags = tags.With("service", parts[0])
 	}
 	if state.Options.SystemTags.Has(metrics.TagMethod) {
-		tags.AddTag("method", parts[1])
+		tags = tags.With("method", parts[1])
 	}
 
 	// Only set the name system tag if the user didn't explicitly set it beforehand
 	if _, ok := tags.Get("name"); !ok && state.Options.SystemTags.Has(metrics.TagName) {
-		tags.AddTag("name", method)
+		tags = tags.With("name", method)
 	}
 
 	reqmsg := grpcext.Request{

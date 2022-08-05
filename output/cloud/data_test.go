@@ -39,7 +39,8 @@ import (
 func TestSampleMarshaling(t *testing.T) {
 	t.Parallel()
 
-	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	now := time.Now()
 	exptoMicroSecond := now.UnixNano() / 1000
 
@@ -86,6 +87,7 @@ func TestSampleMarshaling(t *testing.T) {
 				Sending:        4000,
 				Waiting:        5000,
 				Receiving:      6000,
+				Tags:           registry.RootTagSet(),
 			}),
 			fmt.Sprintf(`{"type":"Points","metric":"http_req_li_all","data":{"time":"%d","type":"counter","values":{"http_req_blocked":0.001,"http_req_connecting":0.002,"http_req_duration":0.123,"http_req_receiving":0.006,"http_req_sending":0.004,"http_req_tls_handshaking":0.003,"http_req_waiting":0.005,"http_reqs":1}}}`, exptoMicroSecond),
 		},
@@ -100,6 +102,7 @@ func TestSampleMarshaling(t *testing.T) {
 				Waiting:        5000,
 				Receiving:      6000,
 				Failed:         null.NewBool(false, true),
+				Tags:           registry.RootTagSet(),
 			}),
 			fmt.Sprintf(`{"type":"Points","metric":"http_req_li_all","data":{"time":"%d","type":"counter","values":{"http_req_blocked":0.001,"http_req_connecting":0.002,"http_req_duration":0.123,"http_req_failed":0,"http_req_receiving":0.006,"http_req_sending":0.004,"http_req_tls_handshaking":0.003,"http_req_waiting":0.005,"http_reqs":1}}}`, exptoMicroSecond),
 		},
