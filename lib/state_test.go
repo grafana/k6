@@ -3,6 +3,7 @@ package lib
 import (
 	"context"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,100 +12,89 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
-func TestTagMapSet(t *testing.T) {
+func TestVUStateTagsSync(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Sync", func(t *testing.T) {
-		t.Parallel()
+	tm := NewVUStateTags(metrics.NewRegistry().RootTagSet().With("mytag", "42"))
+	v, found := tm.GetCurrentValues().Get("mytag")
+	assert.True(t, found)
+	assert.Equal(t, "42", v)
+}
 
-		tm := NewTagMap(metrics.NewRegistry().BranchTagSetRoot())
-		tm.Set("mytag", "42")
-		v, found := tm.Get("mytag")
-		assert.True(t, found)
-		assert.Equal(t, "42", v)
-	})
+func TestVUStateTagsSafeConcurrent(t *testing.T) {
+	t.Parallel()
 
-	t.Run("Safe-Concurrent", func(t *testing.T) {
-		t.Parallel()
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+	defer wg.Wait()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-		tm := NewTagMap(metrics.NewRegistry().BranchTagSetRoot())
+	tm := NewVUStateTags(metrics.NewRegistry().RootTagSet())
+	go func() {
+		defer wg.Done()
+		count := 0
+		for {
+			select {
+			case <-time.Tick(1 * time.Millisecond):
+				count++
+				tm.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
+					return currentTags.With("mytag", strconv.Itoa(count))
+				})
 
-		go func() {
-			count := 0
-			for {
-				select {
-				case <-time.Tick(1 * time.Millisecond):
-					count++
-					tm.Set("mytag", strconv.Itoa(count))
-
-				case <-ctx.Done():
-					return
-				}
+			case <-ctx.Done():
+				val, ok := tm.GetCurrentValues().Get("mytag")
+				assert.True(t, ok)
+				assert.Equal(t, strconv.Itoa(count), val)
+				return
 			}
-		}()
+		}
+	}()
 
-		go func() {
-			for {
-				select {
-				case <-time.Tick(1 * time.Millisecond):
-					tm.Get("mytag")
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-time.Tick(1 * time.Millisecond):
+				tm.GetCurrentValues().Get("mytag")
 
-				case <-ctx.Done():
-					return
-				}
+			case <-ctx.Done():
+				return
 			}
-		}()
+		}
+	}()
 
-		time.Sleep(100 * time.Millisecond)
-	})
+	time.Sleep(100 * time.Millisecond)
 }
 
-func TestTagMapGet(t *testing.T) {
+func TestVUStateTagsDelete(t *testing.T) {
 	t.Parallel()
-	tm := NewTagMap(metrics.NewRegistry().BranchTagSetRootWith(map[string]string{
-		"key1": "value1",
-	}))
-	v, ok := tm.Get("key1")
-	assert.True(t, ok)
-	assert.Equal(t, "value1", v)
-}
-
-func TestTagMapLen(t *testing.T) {
-	t.Parallel()
-	tm := NewTagMap(metrics.NewRegistry().BranchTagSetRootWith(map[string]string{
-		"key1": "value1",
-		"key2": "value2",
-	}))
-	assert.Equal(t, 2, tm.Len())
-}
-
-func TestTagMapDelete(t *testing.T) {
-	t.Parallel()
-	tm := NewTagMap(metrics.NewRegistry().BranchTagSetRootWith(map[string]string{
+	tm := NewVUStateTags(metrics.NewRegistry().RootTagSet().SortAndAddTags(map[string]string{
 		"key1": "value1",
 		"key2": "value2",
 	}))
 
-	_, ok := tm.Get("key1")
+	val, ok := tm.GetCurrentValues().Get("key1")
 	require.True(t, ok)
+	require.Equal(t, "value1", val)
 
-	tm.Delete("key1")
-	_, ok = tm.Get("key1")
+	tm.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
+		return currentTags.Without("key1")
+	})
+	_, ok = tm.GetCurrentValues().Get("key1")
 	assert.False(t, ok)
 
-	assert.Equal(t, map[string]string{"key2": "value2"}, tm.Clone())
+	assert.Equal(t, map[string]string{"key2": "value2"}, tm.GetCurrentValues().Map())
 }
 
-func TestTagMapClone(t *testing.T) {
+func TestVUStateTagsMap(t *testing.T) {
 	t.Parallel()
-	tm := NewTagMap(metrics.NewRegistry().BranchTagSetRootWith(map[string]string{
+	tm := NewVUStateTags(metrics.NewRegistry().RootTagSet().SortAndAddTags(map[string]string{
 		"key1": "value1",
 		"key2": "value2",
 	}))
-	m := tm.Clone()
+	m := tm.GetCurrentValues().Map()
 	assert.Equal(t, map[string]string{
 		"key1": "value1",
 		"key2": "value2",

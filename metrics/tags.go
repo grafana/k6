@@ -3,70 +3,143 @@ package metrics
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"sort"
 	"strings"
 
+	"github.com/mailru/easyjson"
+	"github.com/mailru/easyjson/jlexer"
+	"github.com/mailru/easyjson/jwriter"
 	"github.com/mstoykov/atlas"
 )
 
-// TagSet represents a set of tags.
-type TagSet struct {
-	tags *atlas.Node
+// A TagSet represents an immutable set of metric tags. For the efficient and
+// thread-safe storage of the key=value tag pairs, it uses the
+// https://github.com/mstoykov/atlas data structure.
+type TagSet atlas.Node
+
+// With returns another TagSet object that contains the combination of the
+// current receiver tags and the name=value tag from its parameters. It doesn't
+// modify the receiver, it will either return an already existing TagSet with
+// these tags, if it exists, or create a new TagSet with them and return it.
+func (ts *TagSet) With(name, value string) *TagSet {
+	return (*TagSet)(((*atlas.Node)(ts)).AddLink(name, value))
 }
 
-// TagSetFromSampleTags creates a TagSet starting
-// from the set defined by SampleTags.
-// Adding a tag on the new set doesn't impact the SampleTags.
-func TagSetFromSampleTags(st *SampleTags) *TagSet {
-	tm := &TagSet{}
-	tm.tags = st.tags
-	return tm
+// Without returns another TagSet, either an already existing one or a newly
+// created one, with all of the tags from the existing TagSet except the one
+// with the given key.
+func (ts *TagSet) Without(name string) *TagSet {
+	return (*TagSet)(((*atlas.Node)(ts)).DeleteKey(name))
 }
 
-// AddTag adds a tag in the set.
-func (tg *TagSet) AddTag(k, v string) {
-	tg.tags = tg.tags.AddLink(k, v)
+// Get returns the value of the tag with the given name and true, if that tag
+// exists in the set, and an empty string and false otherwise.
+func (ts *TagSet) Get(name string) (string, bool) {
+	return ((*atlas.Node)(ts)).ValueByKey(name)
 }
 
-// Get returns the Tag value and true
-// if the provided key has been found.
-func (tg *TagSet) Get(k string) (string, bool) {
-	return tg.tags.ValueByKey(k)
+// Contains checks that each key=value tag pair in the provided TagSet exists in
+// the receiver tag set as well, i.e. that the given set is a sub-set of it.
+func (ts *TagSet) Contains(other *TagSet) bool {
+	return ((*atlas.Node)(ts)).Contains((*atlas.Node)(other))
 }
 
-// Len returns the number of the set keys.
-func (tg *TagSet) Len() int {
-	return tg.tags.Len()
+// IsEmpty checks if the tag set is empty, i.e. if it's the root atlas node.
+func (ts *TagSet) IsEmpty() bool {
+	return ((*atlas.Node)(ts)).IsRoot()
 }
 
-// Delete deletes the item related to the provided key.
-func (tg *TagSet) Delete(k string) {
-	tg.tags = tg.tags.DeleteKey(k)
+// Map returns a {key: value} string map with all of the tags in the set.
+func (ts *TagSet) Map() map[string]string {
+	return ((*atlas.Node)(ts)).Path()
 }
 
-// Map returns a map of string pairs with the items in the TagSet.
-func (tg *TagSet) Map() map[string]string {
-	return tg.tags.Path()
+// SortAndAddTags sorts the given tags by their keys and adds them to the
+// current tag set one by one, without branching out. This is generally
+// discouraged and sequential usage of the AddTag() method should be preferred
+// and used whenever possible.
+//
+// The only place this method should be used is if we already have a
+// map[string]string of tags, e.g. with the test-wide --tags from the root, with
+// scenario.tags, with custom per-reqeust tags from a user, etc. Then it's more
+// efficient to sort their keys before we add them. If we don't, go map
+// iteration happens in pseudo-random order and this will generate a lot of
+// useless dead-end atlas Nodes.
+func (ts *TagSet) SortAndAddTags(m map[string]string) *TagSet {
+	if len(m) == 0 {
+		return ts
+	}
+
+	// We sort the keys so the TagSet generation is consistent across multiple
+	// invocations. This should create fewer dead-end atlas Nodes.
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	tags := ts
+	for i := 0; i < len(keys); i++ {
+		tags = tags.With(keys[i], m[keys[i]])
+	}
+
+	return tags
 }
 
-// BranchOut creates a new TagSet with the same set of items
-// as in the current TagSet.
-// Any new added tag to the new set creates a new dedicated path.
-func (tg *TagSet) BranchOut() *TagSet {
-	tmcopy := &TagSet{}
-	tmcopy.tags = tg.tags
-	return tmcopy
+// MarshalEasyJSON supports easyjson.Marshaler interface for better performance.
+func (ts *TagSet) MarshalEasyJSON(w *jwriter.Writer) {
+	w.RawByte('{')
+	first := true
+
+	n := (*atlas.Node)(ts)
+	for !n.IsRoot() {
+		prev, key, value := n.Data()
+		if first {
+			first = false
+		} else {
+			w.RawByte(',')
+		}
+		w.String(key)
+		w.RawByte(':')
+		w.String(value)
+		n = prev
+	}
+	w.RawByte('}')
 }
 
-// SampleTags creates a SampleTags using the current tag set.
-func (tg *TagSet) SampleTags() *SampleTags {
-	st := &SampleTags{}
-	st.tags = tg.tags
-	return st
+// MarshalJSON serializes the tags to a JSON string.
+func (ts *TagSet) MarshalJSON() ([]byte, error) {
+	w := &jwriter.Writer{NoEscapeHTML: true}
+	ts.MarshalEasyJSON(w)
+	return w.Buffer.Buf, w.Error
 }
+
+// UnmarshalEasyJSON WILL ALWAYS RETURN AN ERROR because a TagSet needs to be
+// started from a common atlas root. This function exists to prevent any
+// automatic reflection-based attempts at unmarshaling.
+func (ts *TagSet) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	l.AddError(errors.New("metrics.TagSet cannot be directly unmarshalled from JSON"))
+}
+
+// UnmarshalJSON WILL ALWAYS RETURN AN ERROR because a TagSet needs to be
+// started from a common atlas root. This function exists to prevent any
+// automatic reflection-based attempts at unmarshaling.
+func (ts *TagSet) UnmarshalJSON([]byte) error {
+	return errors.New("metrics.TagSet cannot be directly unmarshalled from JSON")
+}
+
+var _ interface {
+	easyjson.Marshaler
+	easyjson.Unmarshaler
+	json.Marshaler
+	json.Unmarshaler
+} = &TagSet{}
 
 // EnabledTags is a string to bool map (for lookup efficiency) that is used to keep track
 // of which system tags and non-system tags to include.
+//
+// TODO: move to types.StringSet or something like that, this isn't metrics specific
 type EnabledTags map[string]bool
 
 // UnmarshalText converts the tag list to EnabledTags.

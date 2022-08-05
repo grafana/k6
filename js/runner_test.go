@@ -298,18 +298,30 @@ func TestMetricName(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestSetupDataIsolation(t *testing.T) {
+func TestDataIsolation(t *testing.T) {
 	t.Parallel()
 
 	script := `
+		var exec = require("k6/execution");
 		var Counter = require("k6/metrics").Counter;
+		var sleep = require('k6').sleep;
 
 		exports.options = {
 			scenarios: {
-				shared_iters: {
+				sc1: {
 					executor: "shared-iterations",
-					vus: 5,
-					iterations: 500,
+					vus: 2,
+					iterations: 100,
+					maxDuration: "9s",
+					gracefulStop: 0,
+					exec: "sc1",
+				},
+				sc2: {
+					executor: "per-vu-iterations",
+					vus: 1,
+					iterations: 1,
+					startTime: "11s",
+					exec: "sc2",
 				},
 			},
 			teardownTimeout: "5s",
@@ -321,11 +333,31 @@ func TestSetupDataIsolation(t *testing.T) {
 			return { v: 0 };
 		}
 
-		exports.default = function(data) {
+		exports.sc1 = function(data) {
 			if (data.v !== __ITER) {
-				throw new Error("default: wrong data for iter " + __ITER + ": " + JSON.stringify(data));
+				throw new Error("sc1: wrong data for iter " + __ITER + ": " + JSON.stringify(data));
+			}
+			if (__ITER != 0 && data.v != exec.vu.tags.myiter) {
+				throw new Error("sc1: wrong vu tags for iter " + __ITER + ": " + JSON.stringify(exec.vu.tags));
 			}
 			data.v += 1;
+			exec.vu.tags.myiter = data.v;
+			myCounter.add(1);
+			sleep(0.01);
+		}
+
+		exports.sc2 = function(data) {
+			if (data.v === 0) {
+				throw new Error("sc2: wrong data, expected VU to have modified setup data locally: " + data.v);
+			}
+
+			if (typeof exec.vu.tags.myiter !== "undefined") {
+				throw new Error(
+					"sc2: wrong tags, expected VU to have new tags in new scenario: " +
+					JSON.stringify(exec.vu.tags),
+				);
+			}
+
 			myCounter.add(1);
 		}
 
@@ -347,7 +379,7 @@ func TestSetupDataIsolation(t *testing.T) {
 		TestPreInitState: runner.preInitState,
 		Options:          options,
 		Runner:           runner,
-		RunTags:          runner.preInitState.Registry.BranchTagSetRootWith(options.RunTags),
+		RunTags:          runner.preInitState.Registry.RootTagSet().SortAndAddTags(options.RunTags),
 	}
 
 	execScheduler, err := local.NewExecutionScheduler(testRunState)
@@ -369,7 +401,7 @@ func TestSetupDataIsolation(t *testing.T) {
 	go func() { errC <- run() }()
 
 	select {
-	case <-time.After(10 * time.Second):
+	case <-time.After(20 * time.Second):
 		cancel()
 		t.Fatal("Test timed out")
 	case err := <-errC:
@@ -386,7 +418,7 @@ func TestSetupDataIsolation(t *testing.T) {
 			count += int(s.Value)
 		}
 	}
-	require.Equal(t, 501, count, "mycounter should be the number of iterations + 1 for the teardown")
+	require.Equal(t, 102, count, "mycounter should be the number of iterations + 1 for the teardown")
 }
 
 func testSetupDataHelper(t *testing.T, data string) {
@@ -2159,7 +2191,7 @@ func TestSystemTags(t *testing.T) {
 			require.NotEmpty(t, bufSamples)
 			for _, sample := range bufSamples[0].GetSamples() {
 				assert.NotEmpty(t, sample.Tags)
-				for emittedTag, emittedVal := range sample.Tags.CloneTags() {
+				for emittedTag, emittedVal := range sample.Tags.Map() {
 					assert.Equal(t, tc.tag, emittedTag)
 					assert.Equal(t, tc.expVal, emittedVal)
 				}

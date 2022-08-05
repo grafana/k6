@@ -111,7 +111,7 @@ func (c *Conn) Invoke(
 		return nil, fmt.Errorf("unable to serialise request object to protocol buffer: %w", err)
 	}
 
-	ctx = withTags(ctx, req.Tags)
+	ctx = withRPCState(ctx, &rpcState{tags: req.Tags})
 
 	resp := dynamicpb.NewMessage(req.MethodDescriptor.Output())
 	header, trailer := metadata.New(nil), metadata.New(nil)
@@ -196,37 +196,34 @@ func (statsHandler) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context
 // HandleRPC implements the grpcstats.Handler interface
 func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	state := h.vu.State()
-	tags := getTags(ctx)
+	stateRPC := getRPCState(ctx) //nolint:ifshort
 
-	// If the request is done by the reflection handler
-	// then the tags will be nil.
-	//
-	// In this case, we can reuse the State's Tags.
-	if tags == nil {
-		tags = state.Tags.BranchOut()
+	// If the request is done by the reflection handler then the tags will be
+	// nil. In this case, we can reuse the VU.State's Tags.
+	if stateRPC == nil {
+		// TODO: investigate this more, there has to be a way to fix it :/
+		stateRPC = &rpcState{tags: state.Tags.GetCurrentValues()}
 	}
 
 	switch s := stat.(type) {
 	case *grpcstats.OutHeader:
+		// TODO: figure out something better, e.g. via TagConn() or TagRPC()?
 		if state.Options.SystemTags.Has(metrics.TagIP) && s.RemoteAddr != nil {
+			stateRPC.ip = s.RemoteAddr.String()
 			if ip, _, err := net.SplitHostPort(s.RemoteAddr.String()); err == nil {
-				tags.AddTag("ip", ip)
+				stateRPC.tags = stateRPC.tags.With("ip", ip)
 			}
 		}
 	case *grpcstats.End:
 		if state.Options.SystemTags.Has(metrics.TagStatus) {
-			tags.AddTag("status", strconv.Itoa(int(status.Code(s.Error))))
+			stateRPC.tags = stateRPC.tags.With("status", strconv.Itoa(int(status.Code(s.Error))))
 		}
 
-		metrics.PushIfNotDone(ctx, state.Samples, metrics.ConnectedSamples{
-			Samples: []metrics.Sample{
-				{
-					Metric: state.BuiltinMetrics.GRPCReqDuration,
-					Tags:   tags.SampleTags(),
-					Value:  metrics.D(s.EndTime.Sub(s.BeginTime)),
-					Time:   s.EndTime,
-				},
-			},
+		metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
+			Metric: state.BuiltinMetrics.GRPCReqDuration,
+			Tags:   stateRPC.tags,
+			Value:  metrics.D(s.EndTime.Sub(s.BeginTime)),
+			Time:   s.EndTime,
 		})
 	}
 
@@ -305,19 +302,21 @@ func formatPayload(payload interface{}) string {
 
 type contextKey string
 
-var ctxKeyTags = contextKey("tags") //nolint:gochecknoglobals
+var ctxKeyRPCState = contextKey("rpcState") //nolint:gochecknoglobals
 
-func withTags(ctx context.Context, tags *metrics.TagSet) context.Context {
-	if tags == nil {
-		return ctx
-	}
-	return context.WithValue(ctx, ctxKeyTags, tags)
+type rpcState struct {
+	ip   string
+	tags *metrics.TagSet
 }
 
-func getTags(ctx context.Context) *metrics.TagSet {
-	v := ctx.Value(ctxKeyTags)
+func withRPCState(ctx context.Context, rpcState *rpcState) context.Context {
+	return context.WithValue(ctx, ctxKeyRPCState, rpcState)
+}
+
+func getRPCState(ctx context.Context) *rpcState {
+	v := ctx.Value(ctxKeyRPCState)
 	if v == nil {
 		return nil
 	}
-	return v.(*metrics.TagSet) //nolint: forcetypeassert
+	return v.(*rpcState) //nolint: forcetypeassert
 }

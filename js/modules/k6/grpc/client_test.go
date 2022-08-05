@@ -718,7 +718,7 @@ func TestClient(t *testing.T) {
 					UserAgent: null.StringFrom("k6-test"),
 				},
 				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-				Tags:           lib.NewTagMap(registry.BranchTagSetRoot()),
+				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 			}
 			ts.MoveToVUContext(state)
 			val, err = replace(tt.vuString.code)

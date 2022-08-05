@@ -35,6 +35,11 @@ func (n *Node) IsRoot() bool {
 	return n.root == n
 }
 
+// Data returns the previous node and the key and value of the current one.
+func (n *Node) Data() (prev *Node, key string, value string) {
+	return n.prev, n.linkKey[0], n.linkKey[1]
+}
+
 // ValueByKey gets the value of key written in this Node or any of its ancestor.
 func (n *Node) ValueByKey(k string) (string, bool) {
 	if n.root == n {
