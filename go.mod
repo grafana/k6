@@ -43,7 +43,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/mstoykov/atlas v0.0.0-20220727131014-23cc720eb639
+require github.com/mstoykov/atlas v0.0.0-20220808085829-90340e9998bd
 
 require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect

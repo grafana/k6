@@ -72,7 +72,7 @@ func baseTest(t *testing.T,
 			Time:   time.Now(),
 			Metric: m,
 			Value:  value,
-			Tags:   registry.BranchTagSetRootWith(tags).SampleTags(),
+			Tags:   registry.RootTagSet().SortAndAddTags(tags),
 		}
 	}
 

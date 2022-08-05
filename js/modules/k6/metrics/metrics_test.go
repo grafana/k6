@@ -59,7 +59,7 @@ func (a addTest) run(t *testing.T) {
 
 		assert.NotZero(t, sample.Time)
 		assert.Equal(t, a.val.Float, sample.Value)
-		assert.Equal(t, a.expectedTags, sample.Tags.CloneTags())
+		assert.Equal(t, a.expectedTags, sample.Tags.Map())
 		assert.Equal(t, "my_metric", sample.Metric.Name)
 		assert.Equal(t, a.mtyp, sample.Metric.Type)
 		assert.Equal(t, a.valueType, sample.Metric.Contains)
@@ -115,7 +115,7 @@ func TestMetrics(t *testing.T) {
 					state := &lib.State{
 						Options: lib.Options{},
 						Samples: test.samples,
-						Tags: lib.NewTagMap(registry.BranchTagSetRootWith(map[string]string{
+						Tags: lib.NewVUStateTags(registry.RootTagSet().SortAndAddTags(map[string]string{
 							"key": "value",
 						})),
 					}

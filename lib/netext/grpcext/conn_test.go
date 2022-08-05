@@ -329,3 +329,5 @@ func (invokemock) NewStream(ctx context.Context, desc *grpc.StreamDesc, method s
 func (invokemock) Close() error {
 	return nil
 }
+
+// TODO: add a test for the ip metric tag

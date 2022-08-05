@@ -68,7 +68,7 @@ func BenchmarkAggregateHTTP(b *testing.B) {
 	}
 }
 
-func generateTags(i, tagCount int, additionals ...map[string]string) *metrics.SampleTags {
+func generateTags(i, tagCount int, additionals ...map[string]string) *metrics.TagSet {
 	registry := metrics.NewRegistry()
 	res := map[string]string{
 		"test": "mest", "a": "b",
@@ -83,7 +83,7 @@ func generateTags(i, tagCount int, additionals ...map[string]string) *metrics.Sa
 		}
 	}
 
-	return registry.BranchTagSetRootWith(res).SampleTags()
+	return registry.RootTagSet().SortAndAddTags(res)
 }
 
 func BenchmarkMetricMarshal(b *testing.B) {
@@ -258,7 +258,7 @@ func generateSamples(count int) []*Sample {
 	return samples
 }
 
-func generateHTTPExtTrail(now time.Time, i time.Duration, tags *metrics.SampleTags) *httpext.Trail {
+func generateHTTPExtTrail(now time.Time, i time.Duration, tags *metrics.TagSet) *httpext.Trail {
 	return &httpext.Trail{
 		Blocked:        i % 200 * 100 * time.Millisecond,
 		Connecting:     i % 200 * 200 * time.Millisecond,

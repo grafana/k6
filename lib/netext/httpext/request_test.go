@@ -100,7 +100,7 @@ func TestMakeRequestError(t *testing.T) {
 		state := &lib.State{
 			Transport: http.DefaultTransport,
 			Logger:    logrus.New(),
-			Tags:      lib.NewTagMap(metrics.NewRegistry().BranchTagSetRoot()),
+			Tags:      lib.NewVUStateTags(metrics.NewRegistry().RootTagSet()),
 		}
 		_, err = MakeRequest(ctx, state, preq)
 		require.Error(t, err)
@@ -122,7 +122,7 @@ func TestMakeRequestError(t *testing.T) {
 		state := &lib.State{
 			Transport: srv.Client().Transport,
 			Logger:    logger,
-			Tags:      lib.NewTagMap(metrics.NewRegistry().BranchTagSetRoot()),
+			Tags:      lib.NewVUStateTags(metrics.NewRegistry().RootTagSet()),
 		}
 		req, _ := http.NewRequest("GET", srv.URL, nil)
 		preq := &ParsedHTTPRequest{
@@ -174,7 +174,7 @@ func TestResponseStatus(t *testing.T) {
 					Logger:         logger,
 					Samples:        samples,
 					BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-					Tags:           lib.NewTagMap(registry.BranchTagSetRoot()),
+					Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 				}
 				req, err := http.NewRequest("GET", server.URL, nil)
 				require.NoError(t, err)
@@ -255,7 +255,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		Logger:         logger,
 		BPool:          bpool.NewBufferPool(100),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-		Tags:           lib.NewTagMap(registry.BranchTagSetRoot()),
+		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 	req, _ := http.NewRequest("GET", srv.URL, nil)
 	preq := &ParsedHTTPRequest{
@@ -283,7 +283,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		"name":              srv.URL,
 	}
 	for _, s := range allSamples {
-		assert.Equal(t, expTags, s.Tags.CloneTags())
+		assert.Equal(t, expTags, s.Tags.Map())
 	}
 }
 
@@ -331,7 +331,7 @@ func TestTrailFailed(t *testing.T) {
 				Logger:         logger,
 				BPool:          bpool.NewBufferPool(2),
 				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-				Tags:           lib.NewTagMap(registry.BranchTagSetRoot()),
+				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 			}
 			req, _ := http.NewRequest("GET", srv.URL, nil)
 			preq := &ParsedHTTPRequest{
@@ -396,7 +396,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		Logger:         logger,
 		BPool:          bpool.NewBufferPool(100),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-		Tags:           lib.NewTagMap(registry.BranchTagSetRoot()),
+		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 
 	req, _ := http.NewRequest("GET", "http://"+addr.String(), nil)
@@ -425,7 +425,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		"name":              req.URL.String(),
 	}
 	for _, s := range allSamples {
-		assert.Equal(t, expTags, s.Tags.CloneTags())
+		assert.Equal(t, expTags, s.Tags.Map())
 	}
 }
 
@@ -450,7 +450,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		Logger:         logger,
 		BPool:          bpool.NewBufferPool(100),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-		Tags:           lib.NewTagMap(registry.BranchTagSetRoot()),
+		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 	req, _ := http.NewRequest("GET", srv.URL, nil)
 	preq := &ParsedHTTPRequest{
@@ -478,6 +478,6 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		"name":              srv.URL,
 	}
 	for _, s := range allSamples {
-		assert.Equal(t, expTags, s.Tags.CloneTags())
+		assert.Equal(t, expTags, s.Tags.Map())
 	}
 }
