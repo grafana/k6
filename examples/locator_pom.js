@@ -22,13 +22,17 @@ export class Bet {
   }
 
   heads() {
-    this.headsButton.click();
-    return this.page.waitForNavigation();
+    return Promise.all([
+      this.page.waitForNavigation(),
+      this.headsButton.click(),
+    ]);
   }
 
   tails() {
-    this.tailsButton.click();
-    return this.page.waitForNavigation();
+    return Promise.all([
+      this.page.waitForNavigation(),
+      this.tailsButton.click(),
+    ]);
   }
 
   current() {
