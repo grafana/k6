@@ -172,7 +172,7 @@ func (c *Client) Invoke(
 	defer cancel()
 
 	tags := state.Tags.GetCurrentValues()
-	tags = tags.SortAndAddTags(p.Tags)
+	tags = tags.WithTagsFromMap(p.Tags)
 
 	if state.Options.SystemTags.Has(metrics.TagURL) {
 		tags = tags.With("url", fmt.Sprintf("%s%s", c.addr, method))

@@ -70,7 +70,7 @@ func TestVUStateTagsSafeConcurrent(t *testing.T) {
 
 func TestVUStateTagsDelete(t *testing.T) {
 	t.Parallel()
-	tm := NewVUStateTags(metrics.NewRegistry().RootTagSet().SortAndAddTags(map[string]string{
+	tm := NewVUStateTags(metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{
 		"key1": "value1",
 		"key2": "value2",
 	}))
@@ -90,7 +90,7 @@ func TestVUStateTagsDelete(t *testing.T) {
 
 func TestVUStateTagsMap(t *testing.T) {
 	t.Parallel()
-	tm := NewVUStateTags(metrics.NewRegistry().RootTagSet().SortAndAddTags(map[string]string{
+	tm := NewVUStateTags(metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{
 		"key1": "value1",
 		"key2": "value2",
 	}))

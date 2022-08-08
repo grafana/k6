@@ -60,7 +60,7 @@ func TestRegistryBranchTagSetRootWith(t *testing.T) {
 	}
 
 	r := NewRegistry()
-	tags := r.RootTagSet().SortAndAddTags(raw)
+	tags := r.RootTagSet().WithTagsFromMap(raw)
 	require.NotNil(t, tags)
 
 	assert.Equal(t, raw, tags.Map())

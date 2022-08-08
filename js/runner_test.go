@@ -379,7 +379,7 @@ func TestDataIsolation(t *testing.T) {
 		TestPreInitState: runner.preInitState,
 		Options:          options,
 		Runner:           runner,
-		RunTags:          runner.preInitState.Registry.RootTagSet().SortAndAddTags(options.RunTags),
+		RunTags:          runner.preInitState.Registry.RootTagSet().WithTagsFromMap(options.RunTags),
 	}
 
 	execScheduler, err := local.NewExecutionScheduler(testRunState)

@@ -60,7 +60,7 @@ func getTestRunState(
 		TestPreInitState: piState,
 		Options:          options,
 		Runner:           runner,
-		RunTags:          piState.Registry.RootTagSet().SortAndAddTags(options.RunTags),
+		RunTags:          piState.Registry.RootTagSet().WithTagsFromMap(options.RunTags),
 	}
 }
 
@@ -289,7 +289,7 @@ func TestEngine_processSamples(t *testing.T) {
 				out <- metrics.Sample{
 					TimeSeries: metrics.TimeSeries{
 						Metric: metric,
-						Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1"}),
+						Tags:   piState.Registry.RootTagSet().WithTagsFromMap(map[string]string{"a": "1"}),
 					},
 					Value: 1.25,
 					Time:  time.Now(),
@@ -332,7 +332,7 @@ func TestEngine_processSamples(t *testing.T) {
 				out <- metrics.Sample{
 					TimeSeries: metrics.TimeSeries{
 						Metric: metric,
-						Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1", "b": "2"}),
+						Tags:   piState.Registry.RootTagSet().WithTagsFromMap(map[string]string{"a": "1", "b": "2"}),
 					},
 					Value: 1.25,
 					Time:  time.Now(),
@@ -391,7 +391,7 @@ func TestEngineThresholdsWillAbort(t *testing.T) {
 			out <- metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: metric,
-					Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1"}),
+					Tags:   piState.Registry.RootTagSet().WithTagsFromMap(map[string]string{"a": "1"}),
 				},
 				Time:  time.Now(),
 				Value: 1.25,
@@ -440,7 +440,7 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 			out <- metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: metric,
-					Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1"}),
+					Tags:   piState.Registry.RootTagSet().WithTagsFromMap(map[string]string{"a": "1"}),
 				},
 				Time:  time.Now(),
 				Value: 1.25,

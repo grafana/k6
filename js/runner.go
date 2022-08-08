@@ -438,7 +438,7 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 	}
 
 	// FIXME: add tests
-	r.RunTags = r.preInitState.Registry.RootTagSet().SortAndAddTags(r.Bundle.Options.RunTags)
+	r.RunTags = r.preInitState.Registry.RootTagSet().WithTagsFromMap(r.Bundle.Options.RunTags)
 
 	return nil
 }
@@ -618,7 +618,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	u.state.Tags.Modify(func(_ *metrics.TagSet) *metrics.TagSet {
 		// Deliberately overwrite tags from previous activations, i.e. ones that
 		// might have come from previous scenarios.
-		tags := u.Runner.RunTags.SortAndAddTags(params.Tags)
+		tags := u.Runner.RunTags.WithTagsFromMap(params.Tags)
 
 		if opts.SystemTags.Has(metrics.TagVU) {
 			tags = tags.With("vu", strconv.FormatUint(u.ID, 10))
