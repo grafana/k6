@@ -101,31 +101,39 @@ func (d *Dialer) GetTrail(
 	bytesRead := atomic.SwapInt64(&d.BytesRead, 0)
 	samples := []metrics.Sample{
 		{
-			Time:   endTime,
-			Metric: builtinMetrics.DataSent,
-			Value:  float64(bytesWritten),
-			Tags:   tags,
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.DataSent,
+				Tags:   tags,
+			},
+			Time:  endTime,
+			Value: float64(bytesWritten),
 		},
 		{
-			Time:   endTime,
-			Metric: builtinMetrics.DataReceived,
-			Value:  float64(bytesRead),
-			Tags:   tags,
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.DataReceived,
+				Tags:   tags,
+			},
+			Time:  endTime,
+			Value: float64(bytesRead),
 		},
 	}
 	if fullIteration {
 		samples = append(samples, metrics.Sample{
-			Time:   endTime,
-			Metric: builtinMetrics.IterationDuration,
-			Value:  metrics.D(endTime.Sub(startTime)),
-			Tags:   tags,
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.IterationDuration,
+				Tags:   tags,
+			},
+			Time:  endTime,
+			Value: metrics.D(endTime.Sub(startTime)),
 		})
 		if emitIterations {
 			samples = append(samples, metrics.Sample{
-				Time:   endTime,
-				Metric: builtinMetrics.Iterations,
-				Value:  1,
-				Tags:   tags,
+				TimeSeries: metrics.TimeSeries{
+					Metric: builtinMetrics.Iterations,
+					Tags:   tags,
+				},
+				Time:  endTime,
+				Value: 1,
 			})
 		}
 	}

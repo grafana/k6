@@ -60,9 +60,9 @@ func (j *JSTest) Foo(arg float64) (bool, error) {
 
 	tags := state.Tags.GetCurrentValues().With("foo", "bar")
 	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
-		Time:   time.Now(),
-		Metric: j.foos, Tags: tags,
-		Value: arg,
+		Time:       time.Now(),
+		TimeSeries: metrics.TimeSeries{Metric: j.foos, Tags: tags},
+		Value:      arg,
 	})
 
 	return true, nil

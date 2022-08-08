@@ -137,10 +137,12 @@ func (m Metric) add(v goja.Value, addTags goja.Value) (bool, error) {
 	}
 
 	sample := metrics.Sample{
-		Time:   time.Now(),
-		Metric: m.metric,
-		Value:  vfloat,
-		Tags:   tags,
+		TimeSeries: metrics.TimeSeries{
+			Metric: m.metric,
+			Tags:   tags,
+		},
+		Time:  time.Now(),
+		Value: vfloat,
 	}
 	metrics.PushIfNotDone(m.vu.Context(), state.Samples, sample)
 	return true, nil

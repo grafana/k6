@@ -56,10 +56,12 @@ func benchmarkInfluxdb(b *testing.B, t time.Duration) {
 		samples := make(metrics.Samples, 10)
 		for i := 0; i < len(samples); i++ {
 			samples[i] = metrics.Sample{
-				Metric: metric,
-				Time:   time.Now(),
-				Tags:   tags,
-				Value:  2.0,
+				TimeSeries: metrics.TimeSeries{
+					Metric: metric,
+					Tags:   tags,
+				},
+				Time:  time.Now(),
+				Value: 2.0,
 			}
 		}
 

@@ -188,10 +188,12 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 		}
 		trail.Samples = append(trail.Samples,
 			metrics.Sample{
-				Metric: t.state.BuiltinMetrics.HTTPReqFailed,
-				Time:   trail.EndTime,
-				Tags:   tags,
-				Value:  failed,
+				TimeSeries: metrics.TimeSeries{
+					Metric: t.state.BuiltinMetrics.HTTPReqFailed,
+					Tags:   tags,
+				},
+				Time:  trail.EndTime,
+				Value: failed,
 			},
 		)
 	}

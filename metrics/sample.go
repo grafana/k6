@@ -8,10 +8,17 @@ import (
 	"time"
 )
 
-// A Sample is a single measurement.
+// A TimeSeries uniquely identifies the metric and the set of metric tags that a
+// Sample (i.e. a metric measurement) has. TimeSeries objects are comparable
+// with the == operator and can be used as map indexes.
+type TimeSeries struct {
+	Metric *Metric
+	Tags   *TagSet
+}
+
+// A Sample is a single metric measurement.
 type Sample struct {
-	Metric   *Metric
-	Tags     *TagSet
+	TimeSeries
 	Time     time.Time
 	Value    float64
 	Metadata map[string]string // could be nil

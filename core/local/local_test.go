@@ -939,7 +939,12 @@ func TestExecutionSchedulerEndErrors(t *testing.T) {
 
 func TestExecutionSchedulerEndIterations(t *testing.T) {
 	t.Parallel()
-	metric := &metrics.Metric{Name: "test_metric"}
+	registry := metrics.NewRegistry()
+	metric := registry.MustNewMetric("test_metric", metrics.Counter)
+	ts := metrics.TimeSeries{
+		Metric: metric,
+		Tags:   registry.RootTagSet(),
+	}
 
 	options, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		VUs:        null.IntFrom(1),
@@ -956,7 +961,10 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 			default:
 				atomic.AddInt64(&i, 1)
 			}
-			out <- metrics.Sample{Metric: metric, Value: 1.0}
+			out <- metrics.Sample{
+				TimeSeries: ts,
+				Value:      1.0,
+			}
 			return nil
 		},
 		Options: options,
@@ -980,7 +988,7 @@ func TestExecutionSchedulerEndIterations(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		mySample, ok := <-samples
 		require.True(t, ok)
-		assert.Equal(t, metrics.Sample{Metric: metric, Value: 1.0}, mySample)
+		assert.Equal(t, metrics.Sample{TimeSeries: ts, Value: 1.0}, mySample)
 	}
 }
 
@@ -1241,10 +1249,12 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	require.NoError(t, err)
 	getSample := func(expValue float64, expMetric *metrics.Metric, expTags ...string) metrics.SampleContainer {
 		return metrics.Sample{
-			Metric: expMetric,
-			Time:   time.Now(),
-			Tags:   getTags(piState.Registry, expTags...),
-			Value:  expValue,
+			TimeSeries: metrics.TimeSeries{
+				Metric: expMetric,
+				Tags:   getTags(piState.Registry, expTags...),
+			},
+			Time:  time.Now(),
+			Value: expValue,
 		}
 	}
 	getDummyTrail := func(group string, emitIterations bool, addExpTags ...string) metrics.SampleContainer {

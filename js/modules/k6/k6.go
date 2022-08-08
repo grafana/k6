@@ -144,10 +144,12 @@ func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
 
 	ctx := mi.vu.Context()
 	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
-		Time:   t,
-		Metric: state.BuiltinMetrics.GroupDuration,
-		Tags:   state.Tags.GetCurrentValues(),
-		Value:  metrics.D(t.Sub(startTime)),
+		TimeSeries: metrics.TimeSeries{
+			Metric: state.BuiltinMetrics.GroupDuration,
+			Tags:   state.Tags.GetCurrentValues(),
+		},
+		Time:  t,
+		Value: metrics.D(t.Sub(startTime)),
 	})
 
 	return ret, err
@@ -209,10 +211,12 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 		case <-ctx.Done():
 		default:
 			sample := metrics.Sample{
-				Time:   t,
-				Metric: state.BuiltinMetrics.Checks,
-				Tags:   tags,
-				Value:  0,
+				TimeSeries: metrics.TimeSeries{
+					Metric: state.BuiltinMetrics.Checks,
+					Tags:   tags,
+				},
+				Time:  t,
+				Value: 0,
 			}
 			if val.ToBoolean() {
 				atomic.AddInt64(&check.Passes, 1)

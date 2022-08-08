@@ -89,10 +89,12 @@ func baseTest(t *testing.T,
 	registry := metrics.NewRegistry()
 	newSample := func(m *metrics.Metric, value float64, tags map[string]string) metrics.Sample {
 		return metrics.Sample{
-			Time:   time.Now(),
-			Metric: m,
-			Value:  value,
-			Tags:   registry.RootTagSet().SortAndAddTags(tags),
+			TimeSeries: metrics.TimeSeries{
+				Metric: m,
+				Tags:   registry.RootTagSet().SortAndAddTags(tags),
+			},
+			Time:  time.Now(),
+			Value: value,
 		}
 	}
 

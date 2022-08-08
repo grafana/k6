@@ -231,15 +231,19 @@ func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- me
 		samples := metrics.ConnectedSamples{
 			Samples: []metrics.Sample{
 				{
-					Time:   t,
-					Metric: e.state.Test.BuiltinMetrics.VUs,
-					Value:  float64(e.state.GetCurrentlyActiveVUsCount()),
-					Tags:   tags,
+					TimeSeries: metrics.TimeSeries{
+						Metric: e.state.Test.BuiltinMetrics.VUs,
+						Tags:   tags,
+					},
+					Time:  t,
+					Value: float64(e.state.GetCurrentlyActiveVUsCount()),
 				}, {
-					Time:   t,
-					Metric: e.state.Test.BuiltinMetrics.VUsMax,
-					Value:  float64(e.state.GetInitializedVUsCount()),
-					Tags:   tags,
+					TimeSeries: metrics.TimeSeries{
+						Metric: e.state.Test.BuiltinMetrics.VUsMax,
+						Tags:   tags,
+					},
+					Time:  t,
+					Value: float64(e.state.GetInitializedVUsCount()),
 				},
 			},
 			Tags: tags,

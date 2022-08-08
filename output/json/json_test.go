@@ -73,13 +73,48 @@ func generateTestMetricSamples(t testing.TB) ([]metrics.SampleContainer, func(io
 	connTags := registry.RootTagSet().SortAndAddTags(map[string]string{"key": "val"})
 
 	samples := []metrics.SampleContainer{
-		metrics.Sample{Time: time1, Metric: metric1, Value: float64(1), Tags: registry.RootTagSet().SortAndAddTags(map[string]string{"tag1": "val1"})},
-		metrics.Sample{Time: time1, Metric: metric1, Value: float64(2), Tags: registry.RootTagSet().SortAndAddTags(map[string]string{"tag2": "val2"})},
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: metric1,
+				Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag1": "val1"}),
+			},
+			Time:  time1,
+			Value: float64(1),
+		},
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: metric1,
+				Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag2": "val2"}),
+			},
+			Time:  time1,
+			Value: float64(2),
+		},
 		metrics.ConnectedSamples{Samples: []metrics.Sample{
-			{Time: time2, Metric: metric2, Value: float64(3), Tags: connTags},
-			{Time: time2, Metric: metric1, Value: float64(4), Tags: connTags},
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: metric2,
+					Tags:   connTags,
+				},
+				Time:  time2,
+				Value: float64(3),
+			},
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: metric1,
+					Tags:   connTags,
+				},
+				Time:  time2,
+				Value: float64(4),
+			},
 		}, Time: time2, Tags: connTags},
-		metrics.Sample{Time: time3, Metric: metric2, Value: float64(5), Tags: registry.RootTagSet().SortAndAddTags(map[string]string{"tag3": "val3"})},
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: metric2,
+				Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag3": "val3"}),
+			},
+			Time:  time3,
+			Value: float64(5),
+		},
 	}
 	expected := []string{
 		`{"type":"Metric","data":{"name":"my_metric1","type":"gauge","contains":"default","thresholds":["rate<0.01","p(99)<250"],"submetrics":[{"name":"my_metric1{a:1,b:2}","suffix":"a:1,b:2","tags":{"a":"1","b":"2"}}]},"metric":"my_metric1"}`,
@@ -190,7 +225,9 @@ func TestJsonOutputFileGzipped(t *testing.T) {
 func TestWrapSampleWithSamplePointer(t *testing.T) {
 	t.Parallel()
 	out := wrapSample(metrics.Sample{
-		Metric: &metrics.Metric{},
+		TimeSeries: metrics.TimeSeries{
+			Metric: &metrics.Metric{},
+		},
 	})
 	assert.NotEqual(t, out, (*sampleEnvelope)(nil))
 }

@@ -187,10 +187,17 @@ func TestEngineRun(t *testing.T) {
 
 		runner := &minirunner.MiniRunner{
 			Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
-				metrics.PushIfNotDone(ctx, out, metrics.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
+				metrics.PushIfNotDone(ctx, out, metrics.Sample{
+					TimeSeries: metrics.TimeSeries{Metric: testMetric, Tags: piState.Registry.RootTagSet()},
+					Time:       time.Now(),
+					Value:      1,
+				})
 				close(signalChan)
 				<-ctx.Done()
-				metrics.PushIfNotDone(ctx, out, metrics.Sample{Metric: testMetric, Time: time.Now(), Value: 1})
+				metrics.PushIfNotDone(ctx, out, metrics.Sample{
+					TimeSeries: metrics.TimeSeries{Metric: testMetric, Tags: piState.Registry.RootTagSet()},
+					Time:       time.Now(), Value: 1,
+				})
 				return nil
 			},
 		}
@@ -255,7 +262,7 @@ func TestEngineOutput(t *testing.T) {
 
 	runner := &minirunner.MiniRunner{
 		Fn: func(_ context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
-			out <- metrics.Sample{Metric: testMetric}
+			out <- metrics.Sample{TimeSeries: metrics.TimeSeries{Metric: testMetric}}
 			return nil
 		},
 	}
@@ -300,9 +307,12 @@ func TestEngine_processSamples(t *testing.T) {
 		runner := &minirunner.MiniRunner{
 			Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
 				out <- metrics.Sample{
-					Metric: metric,
-					Value:  1.25,
-					Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1"}),
+					TimeSeries: metrics.TimeSeries{
+						Metric: metric,
+						Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1"}),
+					},
+					Value: 1.25,
+					Time:  time.Now(),
 				}
 				close(done)
 				return nil
@@ -340,9 +350,12 @@ func TestEngine_processSamples(t *testing.T) {
 		runner := &minirunner.MiniRunner{
 			Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
 				out <- metrics.Sample{
-					Metric: metric,
-					Value:  1.25,
-					Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1", "b": "2"}),
+					TimeSeries: metrics.TimeSeries{
+						Metric: metric,
+						Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1", "b": "2"}),
+					},
+					Value: 1.25,
+					Time:  time.Now(),
 				}
 				close(done)
 				return nil
@@ -396,9 +409,12 @@ func TestEngineThresholdsWillAbort(t *testing.T) {
 	runner := &minirunner.MiniRunner{
 		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
 			out <- metrics.Sample{
-				Metric: metric,
-				Value:  1.25,
-				Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1"}),
+				TimeSeries: metrics.TimeSeries{
+					Metric: metric,
+					Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1"}),
+				},
+				Time:  time.Now(),
+				Value: 1.25,
 			}
 			close(done)
 			return nil
@@ -442,9 +458,12 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 	runner := &minirunner.MiniRunner{
 		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
 			out <- metrics.Sample{
-				Metric: metric,
-				Value:  1.25,
-				Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1"}),
+				TimeSeries: metrics.TimeSeries{
+					Metric: metric,
+					Tags:   piState.Registry.RootTagSet().SortAndAddTags(map[string]string{"a": "1"}),
+				},
+				Time:  time.Now(),
+				Value: 1.25,
 			}
 			<-ctx.Done()
 			close(done)
@@ -528,14 +547,20 @@ func TestEngine_processThresholds(t *testing.T) {
 			test.engine.OutputManager.AddMetricSamples(
 				[]metrics.SampleContainer{
 					metrics.Sample{
-						Metric: gaugeMetric,
-						Value:  1.25,
-						Tags:   tag1,
+						TimeSeries: metrics.TimeSeries{
+							Metric: gaugeMetric,
+							Tags:   tag1,
+						},
+						Time:  time.Now(),
+						Value: 1.25,
 					},
 					metrics.Sample{
-						Metric: counterMetric,
-						Value:  2,
-						Tags:   tag2,
+						TimeSeries: metrics.TimeSeries{
+							Metric: counterMetric,
+							Tags:   tag2,
+						},
+						Time:  time.Now(),
+						Value: 2,
 					},
 				},
 			)
@@ -1197,7 +1222,14 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 			return nil
 		},
 		TeardownFn: func(_ context.Context, out chan<- metrics.SampleContainer) error {
-			out <- metrics.Sample{Metric: testMetric, Value: 1}
+			out <- metrics.Sample{
+				TimeSeries: metrics.TimeSeries{
+					Metric: testMetric,
+					Tags:   piState.Registry.RootTagSet(),
+				},
+				Time:  time.Now(),
+				Value: 1,
+			}
 			return nil
 		},
 	}

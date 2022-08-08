@@ -40,10 +40,12 @@ func TestSampleBufferBasics(t *testing.T) {
 	require.NoError(t, err)
 
 	single := metrics.Sample{
-		Time:   time.Now(),
-		Metric: metric,
-		Value:  float64(123),
-		Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag1": "val1"}),
+		TimeSeries: metrics.TimeSeries{
+			Metric: metric,
+			Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag1": "val1"}),
+		},
+		Time:  time.Now(),
+		Value: float64(123),
 	}
 	connected := metrics.ConnectedSamples{Samples: []metrics.Sample{single, single}, Time: single.Time}
 	buffer := SampleBuffer{}
@@ -88,10 +90,12 @@ func TestSampleBufferConcurrently(t *testing.T) {
 	fillBuffer := func() {
 		for i := 0; i < sampleCount; i++ {
 			buffer.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
-				Time:   time.Unix(1562324644, 0),
-				Metric: metric,
-				Value:  float64(i),
-				Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag1": "val1"}),
+				TimeSeries: metrics.TimeSeries{
+					Metric: metric,
+					Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag1": "val1"}),
+				},
+				Time:  time.Unix(1562324644, 0),
+				Value: float64(i),
 			}})
 			time.Sleep(time.Duration(i*sleepModifier) * time.Microsecond)
 		}

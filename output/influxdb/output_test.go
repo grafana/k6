@@ -135,13 +135,15 @@ func TestOutput(t *testing.T) {
 		samples := make(metrics.Samples, 10)
 		for i := 0; i < len(samples); i++ {
 			samples[i] = metrics.Sample{
-				Metric: metric,
-				Time:   time.Now(),
-				Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
-					"something": "else",
-					"VU":        "21",
-					"else":      "something",
-				}),
+				TimeSeries: metrics.TimeSeries{
+					Metric: metric,
+					Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
+						"something": "else",
+						"VU":        "21",
+						"else":      "something",
+					}),
+				},
+				Time:  time.Now(),
 				Value: 2.0,
 			}
 		}
@@ -193,9 +195,12 @@ func TestOutputFlushMetricsConcurrency(t *testing.T) {
 			wg.Add(1)
 			o.AddMetricSamples([]metrics.SampleContainer{metrics.Samples{
 				metrics.Sample{
-					Metric: metric,
-					Value:  2.0,
-					Tags:   registry.RootTagSet(),
+					TimeSeries: metrics.TimeSeries{
+						Metric: metric,
+						Tags:   registry.RootTagSet(),
+					},
+					Time:  time.Now(),
+					Value: 2.0,
 				},
 			}})
 			o.flushMetrics()

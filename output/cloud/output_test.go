@@ -225,10 +225,12 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 	})
 
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
-		Time:   now,
-		Metric: builtinMetrics.VUs,
-		Tags:   tags,
-		Value:  1.0,
+		TimeSeries: metrics.TimeSeries{
+			Metric: builtinMetrics.VUs,
+			Tags:   tags,
+		},
+		Time:  now,
+		Value: 1.0,
 	}})
 
 	enctags, err := json.Marshal(tags)
@@ -366,10 +368,12 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 	require.NoError(t, out.Start())
 
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
-		Time:   now,
-		Metric: builtinMetrics.VUs,
-		Tags:   tags,
-		Value:  1.0,
+		TimeSeries: metrics.TimeSeries{
+			Metric: builtinMetrics.VUs,
+			Tags:   tags,
+		},
+		Time:  now,
+		Value: 1.0,
 	}})
 	for j := time.Duration(1); j <= 200; j++ {
 		container := make([]metrics.SampleContainer, 0, 500)
@@ -493,10 +497,12 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	require.NoError(t, out.Start())
 
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
-		Time:   now,
-		Metric: builtinMetrics.VUs,
-		Tags:   tags,
-		Value:  1.0,
+		TimeSeries: metrics.TimeSeries{
+			Metric: builtinMetrics.VUs,
+			Tags:   tags,
+		},
+		Time:  now,
+		Value: 1.0,
 	}})
 	for j := time.Duration(1); j <= 200; j++ {
 		container := make([]metrics.SampleContainer, 0, 500)
@@ -533,10 +539,12 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	nBufferSamples := len(out.bufferSamples)
 	nBufferHTTPTrails := len(out.bufferHTTPTrails)
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
-		Time:   now,
-		Metric: builtinMetrics.VUs,
-		Tags:   tags,
-		Value:  1.0,
+		TimeSeries: metrics.TimeSeries{
+			Metric: builtinMetrics.VUs,
+			Tags:   tags,
+		},
+		Time:  now,
+		Value: 1.0,
 	}})
 	if nBufferSamples != len(out.bufferSamples) || nBufferHTTPTrails != len(out.bufferHTTPTrails) {
 		t.Errorf("Output still collects data after stop sending metrics")
@@ -656,10 +664,12 @@ func TestCloudOutputPushRefID(t *testing.T) {
 	require.NoError(t, err)
 
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
-		Time:   now,
-		Metric: builtinMetrics.HTTPReqDuration,
-		Tags:   tags,
-		Value:  123.45,
+		TimeSeries: metrics.TimeSeries{
+			Metric: builtinMetrics.HTTPReqDuration,
+			Tags:   tags,
+		},
+		Time:  now,
+		Value: 123.45,
 	}})
 	exp := []Sample{{
 		Type:   DataTypeSingle,
@@ -683,7 +693,8 @@ func TestCloudOutputPushRefID(t *testing.T) {
 
 func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 	t.Parallel()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		body, err := ioutil.ReadAll(req.Body)
@@ -752,19 +763,28 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 		EndTime:       now,
 		Samples: []metrics.Sample{
 			{
-				Time:   now,
-				Metric: builtinMetrics.DataSent,
-				Value:  float64(200),
+				TimeSeries: metrics.TimeSeries{
+					Metric: builtinMetrics.DataSent,
+					Tags:   registry.RootTagSet(),
+				},
+				Time:  now,
+				Value: float64(200),
 			},
 			{
-				Time:   now,
-				Metric: builtinMetrics.DataReceived,
-				Value:  float64(100),
+				TimeSeries: metrics.TimeSeries{
+					Metric: builtinMetrics.DataReceived,
+					Tags:   registry.RootTagSet(),
+				},
+				Time:  now,
+				Value: float64(100),
 			},
 			{
-				Time:   now,
-				Metric: builtinMetrics.Iterations,
-				Value:  1,
+				TimeSeries: metrics.TimeSeries{
+					Metric: builtinMetrics.Iterations,
+					Tags:   registry.RootTagSet(),
+				},
+				Time:  now,
+				Value: 1,
 			},
 		},
 	}
