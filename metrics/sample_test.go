@@ -14,10 +14,12 @@ func TestSampleImplementations(t *testing.T) {
 	now := time.Now()
 
 	sample := Sample{
-		Metric: r.MustNewMetric("test_metric", Counter),
-		Time:   now,
-		Tags:   sampleTags,
-		Value:  1.0,
+		TimeSeries: TimeSeries{
+			Metric: r.MustNewMetric("test_metric", Counter),
+			Tags:   sampleTags,
+		},
+		Time:  now,
+		Value: 1.0,
 	}
 	samples := Samples(sample.GetSamples())
 	cSamples := ConnectedSamples{
