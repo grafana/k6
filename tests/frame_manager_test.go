@@ -9,6 +9,8 @@ import (
 
 	"github.com/grafana/xk6-browser/common"
 
+	"github.com/dop251/goja"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,7 +20,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 	}
 	t.Parallel()
 
-	var timeout time.Duration = 200
+	timeout := 2000 * time.Millisecond
 	if os.Getenv("CI") == "true" {
 		// Increase the timeout on underprovisioned CI machines to minimize
 		// chances of intermittent failures.
@@ -37,7 +39,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			errc := make(chan error, 1)
+			errc := make(chan error)
 			go func() {
 				tb := newTestBrowser(t, withFileServer())
 				p := tb.NewPage(nil)
@@ -45,25 +47,32 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 				resp := p.Goto(tb.staticURL("/nav_in_doc.html"), nil)
 				require.NotNil(t, resp)
 
-				// A click right away could possibly trigger navigation before we
-				// had a chance to call WaitForNavigation below, so give it some
-				// time to simulate the JS overhead, waiting for XHR
-				// response, etc.
-				<-time.After(timeout * time.Millisecond) //nolint:durationcheck
-
-				// if one of the promises panics, err will contain the error
-				errc <- tb.await(func() error {
-					_ = p.Click(tc.selector, nil)
-					_ = p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
-						Timeout: 3 * timeout, // interpreted as ms
+				// Callbacks that are initiated internally by click and WaitForNavigation
+				// need to be called from the event loop itself, otherwise the callback
+				// doesn't work. The await below needs to first return before the callback
+				// will resolve/reject.
+				var wfnPromise, cPromise *goja.Promise
+				err := tb.await(func() error {
+					wfnPromise = p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+						Timeout: timeout, // interpreted as ms
 					}))
+					cPromise = p.Click(tc.selector, nil)
 					return nil
 				})
+				if err != nil {
+					errc <- err
+				}
+
+				assert.Equal(t, goja.PromiseStateFulfilled, wfnPromise.State())
+				assert.Equal(t, goja.PromiseStateFulfilled, cPromise.State())
+
+				errc <- nil
 			}()
+
 			select {
 			case err := <-errc:
-				require.NoError(t, err)
-			case <-time.After(5 * timeout * time.Millisecond): //nolint:durationcheck
+				assert.NoError(t, err)
+			case <-time.After(timeout):
 				t.Fatal("Test timed out")
 			}
 		})
