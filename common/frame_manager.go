@@ -24,7 +24,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -591,15 +590,27 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(m.ctx, parsedOpts.Timeout)
 	defer timeoutCancelFn()
 
-	chSameDoc, evCancelFn := createWaitForEventHandler(timeoutCtx, frame, []string{EventFrameNavigation}, func(data interface{}) bool {
-		return data.(*NavigationEvent).newDocument == nil
-	})
-	defer evCancelFn() // Remove event handler
+	newDocIDCh := make(chan string, 1)
+	navEvtCh, navEvtCancel := createWaitForEventHandler(
+		timeoutCtx, frame, []string{EventFrameNavigation},
+		func(data interface{}) bool {
+			newDocID := <-newDocIDCh
+			if evt, ok := data.(*NavigationEvent); ok {
+				return evt.newDocument.documentID == newDocID
+			}
+			return false
+		})
+	defer navEvtCancel()
 
-	chWaitUntilCh, evCancelFn2 := createWaitForEventHandler(timeoutCtx, frame, []string{EventFrameAddLifecycle}, func(data interface{}) bool {
-		return data.(LifecycleEvent) == parsedOpts.WaitUntil
-	})
-	defer evCancelFn2() // Remove event handler
+	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
+		timeoutCtx, frame, []string{EventFrameAddLifecycle},
+		func(data interface{}) bool {
+			if le, ok := data.(LifecycleEvent); ok {
+				return le == parsedOpts.WaitUntil
+			}
+			return false
+		})
+	defer lifecycleEvtCancel()
 
 	fs := frame.page.getFrameSession(cdp.FrameID(frame.ID()))
 	if fs == nil {
@@ -617,85 +628,52 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 		k6ext.Panic(m.ctx, "navigating to %q: %v", url, err)
 	}
 
-	var event *NavigationEvent
-	if newDocumentID != "" {
-		m.logger.Debugf("FrameManager:NavigateFrame",
-			"fmid:%d fid:%v furl:%s url:%s newDocID:%s",
-			fmid, fid, furl, url, newDocumentID)
+	if newDocumentID == "" {
+		// It's a navigation within the same document (e.g. via anchor links or
+		// the History API), so don't wait for a response nor any lifecycle
+		// events.
+		return nil
+	}
 
-		data, err := waitForEvent(m.ctx, frame, []string{EventFrameNavigation}, func(data interface{}) bool {
-			ev := data.(*NavigationEvent)
+	// unblock the waiter goroutine
+	newDocIDCh <- newDocumentID
 
-			// We are interested either in this specific document, or any other document that
-			// did commit and replaced the expected document.
-			if ev.newDocument != nil && (ev.newDocument.documentID == newDocumentID || ev.err == nil) {
-				return true
-			}
-			return false
-		}, parsedOpts.Timeout)
-		if err != nil {
+	handleTimeoutError := func(err error) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			err = &k6ext.UserFriendlyError{
 				Err:     err,
 				Timeout: parsedOpts.Timeout,
 			}
-			k6ext.Panic(m.ctx, "navigating to %q: %v", url, err)
+			k6ext.Panic(m.ctx, "navigating to %q: %w", url, err)
 		}
-
-		event = data.(*NavigationEvent)
-		if event.newDocument.documentID != newDocumentID {
-			m.logger.Debugf("FrameManager:NavigateFrame:interrupted",
-				"fmid:%d fid:%v furl:%s url:%s docID:%s newDocID:%s",
-				fmid, fid, furl, url, event.newDocument.documentID, newDocumentID)
-		} else if event.err != nil &&
-			// TODO: A more graceful way of avoiding Throw()?
-			!(netMgr.userReqInterceptionEnabled &&
-				strings.Contains(event.err.Error(), "ERR_BLOCKED_BY_CLIENT")) {
-			k6ext.Panic(m.ctx, "%w", event.err)
-		}
-	} else {
 		m.logger.Debugf("FrameManager:NavigateFrame",
-			"fmid:%d fid:%v furl:%s url:%s newDocID:0",
-			fmid, fid, furl, url)
-
-		select {
-		case <-timeoutCtx.Done():
-			if errors.Is(timeoutCtx.Err(), context.DeadlineExceeded) {
-				err = &k6ext.UserFriendlyError{
-					Err:     err,
-					Timeout: parsedOpts.Timeout,
-				}
-				k6ext.Panic(m.ctx, "navigating to %q: %w", url, err)
-			}
-		case data := <-chSameDoc:
-			event = data.(*NavigationEvent)
-		}
-	}
-
-	if !frame.hasSubtreeLifecycleEventFired(parsedOpts.WaitUntil) {
-		m.logger.Debugf("FrameManager:NavigateFrame",
-			"fmid:%d fid:%v furl:%s url:%s hasSubtreeLifecycleEventFired:false",
-			fmid, fid, furl, url)
-
-		select {
-		case <-timeoutCtx.Done():
-			if errors.Is(timeoutCtx.Err(), context.DeadlineExceeded) {
-				err = &k6ext.UserFriendlyError{
-					Err:     err,
-					Timeout: parsedOpts.Timeout,
-				}
-				k6ext.Panic(m.ctx, "navigating to %q: %w", url, err)
-			}
-		case <-chWaitUntilCh:
-		}
+			"fmid:%d fid:%v furl:%s url:%s timeoutCtx done: %v",
+			fmid, fid, furl, url, err)
 	}
 
 	var resp *Response
-	if event.newDocument != nil {
-		req := event.newDocument.request
-		if req != nil && req.response != nil {
-			resp = req.response
+	select {
+	case evt := <-navEvtCh:
+		if e, ok := evt.(*NavigationEvent); ok {
+			req := e.newDocument.request
+			// Request could be nil in case of navigation to e.g. about:blank
+			if req != nil {
+				req.responseMu.RLock()
+				resp = req.response
+				req.responseMu.RUnlock()
+			}
 		}
+	case <-timeoutCtx.Done():
+		handleTimeoutError(timeoutCtx.Err())
+		return nil
 	}
+
+	select {
+	case <-lifecycleEvtCh:
+	case <-timeoutCtx.Done():
+		handleTimeoutError(timeoutCtx.Err())
+	}
+
 	return resp
 }
 
@@ -761,7 +739,11 @@ func (m *FrameManager) WaitForFrameNavigation(frame *Frame, opts goja.Value) api
 		}
 	}
 
-	return event.newDocument.request.response
+	req := event.newDocument.request
+	req.responseMu.RLock()
+	defer req.responseMu.RUnlock()
+
+	return req.response
 }
 
 // ID returns the unique ID of a FrameManager value.

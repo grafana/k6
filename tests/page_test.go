@@ -151,6 +151,7 @@ func TestPageGoto(t *testing.T) {
 
 	url := b.staticURL("empty.html")
 	r := p.Goto(url, nil)
+	require.NotNil(t, r)
 
 	assert.Equal(t, url, r.URL(), `expected URL to be %q, result of navigation was %q`, url, r.URL())
 }

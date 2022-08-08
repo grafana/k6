@@ -183,6 +183,41 @@ func createWaitForEventHandler(
 	return ch, evCancelFn
 }
 
+// Returns a channel that will block until the predicateFn returns true.
+// This is similar to createWaitForEventHandler, except that it doesn't
+// stop waiting after the first received matching event.
+func createWaitForEventPredicateHandler(
+	ctx context.Context, emitter EventEmitter, events []string,
+	predicateFn func(data interface{}) bool,
+) (
+	chan interface{}, context.CancelFunc,
+) {
+	evCancelCtx, evCancelFn := context.WithCancel(ctx)
+	chEvHandler := make(chan Event)
+	ch := make(chan interface{})
+
+	go func() {
+		for {
+			select {
+			case <-evCancelCtx.Done():
+				return
+			case ev := <-chEvHandler:
+				if stringSliceContains(events, ev.typ) &&
+					predicateFn != nil && predicateFn(ev.data) {
+					ch <- ev.data
+					close(ch)
+					evCancelFn()
+					return
+				}
+			}
+		}
+	}()
+
+	emitter.on(evCancelCtx, events, chEvHandler)
+
+	return ch, evCancelFn
+}
+
 func waitForEvent(ctx context.Context, emitter EventEmitter, events []string, predicateFn func(data interface{}) bool, timeout time.Duration) (interface{}, error) {
 	ch, evCancelFn := createWaitForEventHandler(ctx, emitter, events, predicateFn)
 	defer evCancelFn() // Remove event handler

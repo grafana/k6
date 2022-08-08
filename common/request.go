@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
@@ -45,6 +46,7 @@ var _ api.Request = &Request{}
 type Request struct {
 	ctx                 context.Context
 	frame               *Frame
+	responseMu          sync.RWMutex
 	response            *Response
 	redirectChain       []*Request
 	requestID           network.RequestID
