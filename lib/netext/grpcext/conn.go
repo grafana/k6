@@ -220,10 +220,12 @@ func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 		}
 
 		metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
-			Metric: state.BuiltinMetrics.GRPCReqDuration,
-			Tags:   stateRPC.tags,
-			Value:  metrics.D(s.EndTime.Sub(s.BeginTime)),
-			Time:   s.EndTime,
+			TimeSeries: metrics.TimeSeries{
+				Metric: state.BuiltinMetrics.GRPCReqDuration,
+				Tags:   stateRPC.tags,
+			},
+			Time:  s.EndTime,
+			Value: metrics.D(s.EndTime.Sub(s.BeginTime)),
 		})
 	}
 

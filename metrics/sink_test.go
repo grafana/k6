@@ -15,14 +15,14 @@ func TestCounterSink(t *testing.T) {
 	t.Run("add", func(t *testing.T) {
 		t.Run("one value", func(t *testing.T) {
 			sink := CounterSink{}
-			sink.Add(Sample{Metric: &Metric{}, Value: 1.0, Time: now})
+			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 1.0, Time: now})
 			assert.Equal(t, 1.0, sink.Value)
 			assert.Equal(t, now, sink.First)
 		})
 		t.Run("values", func(t *testing.T) {
 			sink := CounterSink{}
 			for _, s := range samples10 {
-				sink.Add(Sample{Metric: &Metric{}, Value: s, Time: now})
+				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s, Time: now})
 			}
 			assert.Equal(t, 145.0, sink.Value)
 			assert.Equal(t, now, sink.First)
@@ -37,7 +37,7 @@ func TestCounterSink(t *testing.T) {
 	t.Run("format", func(t *testing.T) {
 		sink := CounterSink{}
 		for _, s := range samples10 {
-			sink.Add(Sample{Metric: &Metric{}, Value: s, Time: now})
+			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s, Time: now})
 		}
 		assert.Equal(t, map[string]float64{"count": 145, "rate": 145.0}, sink.Format(1*time.Second))
 	})
@@ -49,7 +49,7 @@ func TestGaugeSink(t *testing.T) {
 	t.Run("add", func(t *testing.T) {
 		t.Run("one value", func(t *testing.T) {
 			sink := GaugeSink{}
-			sink.Add(Sample{Metric: &Metric{}, Value: 1.0})
+			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 1.0})
 			assert.Equal(t, 1.0, sink.Value)
 			assert.Equal(t, 1.0, sink.Min)
 			assert.Equal(t, true, sink.minSet)
@@ -58,7 +58,7 @@ func TestGaugeSink(t *testing.T) {
 		t.Run("values", func(t *testing.T) {
 			sink := GaugeSink{}
 			for _, s := range samples6 {
-				sink.Add(Sample{Metric: &Metric{}, Value: s})
+				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 			}
 			assert.Equal(t, 5.0, sink.Value)
 			assert.Equal(t, 1.0, sink.Min)
@@ -77,7 +77,7 @@ func TestGaugeSink(t *testing.T) {
 	t.Run("format", func(t *testing.T) {
 		sink := GaugeSink{}
 		for _, s := range samples6 {
-			sink.Add(Sample{Metric: &Metric{}, Value: s})
+			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 		}
 		assert.Equal(t, map[string]float64{"value": 5.0}, sink.Format(0))
 	})
@@ -90,7 +90,7 @@ func TestTrendSink(t *testing.T) {
 	t.Run("add", func(t *testing.T) {
 		t.Run("one value", func(t *testing.T) {
 			sink := TrendSink{}
-			sink.Add(Sample{Metric: &Metric{}, Value: 7.0})
+			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 7.0})
 			assert.Equal(t, uint64(1), sink.Count)
 			assert.Equal(t, true, sink.jumbled)
 			assert.Equal(t, 7.0, sink.Min)
@@ -101,7 +101,7 @@ func TestTrendSink(t *testing.T) {
 		t.Run("values", func(t *testing.T) {
 			sink := TrendSink{}
 			for _, s := range unsortedSamples10 {
-				sink.Add(Sample{Metric: &Metric{}, Value: s})
+				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 			}
 			assert.Equal(t, uint64(len(unsortedSamples10)), sink.Count)
 			assert.Equal(t, true, sink.jumbled)
@@ -122,7 +122,7 @@ func TestTrendSink(t *testing.T) {
 		t.Run("odd number of samples median", func(t *testing.T) {
 			sink := TrendSink{}
 			for _, s := range unsortedSamples5 {
-				sink.Add(Sample{Metric: &Metric{}, Value: s})
+				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 			}
 			sink.Calc()
 			assert.Equal(t, uint64(len(unsortedSamples5)), sink.Count)
@@ -132,7 +132,7 @@ func TestTrendSink(t *testing.T) {
 		t.Run("sorted", func(t *testing.T) {
 			sink := TrendSink{}
 			for _, s := range unsortedSamples10 {
-				sink.Add(Sample{Metric: &Metric{}, Value: s})
+				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 			}
 			sink.Calc()
 			assert.Equal(t, uint64(len(unsortedSamples10)), sink.Count)
@@ -154,15 +154,15 @@ func TestTrendSink(t *testing.T) {
 		})
 		t.Run("one value", func(t *testing.T) {
 			sink := TrendSink{}
-			sink.Add(Sample{Metric: &Metric{}, Value: 10.0})
+			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 10.0})
 			for i := 1; i <= 100; i++ {
 				assert.Equal(t, 10.0, sink.P(float64(i)/100.0))
 			}
 		})
 		t.Run("two values", func(t *testing.T) {
 			sink := TrendSink{}
-			sink.Add(Sample{Metric: &Metric{}, Value: 5.0})
-			sink.Add(Sample{Metric: &Metric{}, Value: 10.0})
+			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 5.0})
+			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 10.0})
 			assert.Equal(t, 5.0, sink.P(0.0))
 			assert.Equal(t, 7.5, sink.P(0.5))
 			assert.Equal(t, 5+(10-5)*0.95, sink.P(0.95))
@@ -172,7 +172,7 @@ func TestTrendSink(t *testing.T) {
 		t.Run("more than 2", func(t *testing.T) {
 			sink := TrendSink{}
 			for _, s := range unsortedSamples10 {
-				sink.Add(Sample{Metric: &Metric{}, Value: s})
+				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 			}
 			assert.InDelta(t, 0.0, sink.P(0.0), tolerance)
 			assert.InDelta(t, 55.0, sink.P(0.5), tolerance)
@@ -184,7 +184,7 @@ func TestTrendSink(t *testing.T) {
 	t.Run("format", func(t *testing.T) {
 		sink := TrendSink{}
 		for _, s := range unsortedSamples10 {
-			sink.Add(Sample{Metric: &Metric{}, Value: s})
+			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 		}
 		expected := map[string]float64{
 			"min":   0.0,
@@ -209,20 +209,20 @@ func TestRateSink(t *testing.T) {
 	t.Run("add", func(t *testing.T) {
 		t.Run("one true", func(t *testing.T) {
 			sink := RateSink{}
-			sink.Add(Sample{Metric: &Metric{}, Value: 1.0})
+			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 1.0})
 			assert.Equal(t, int64(1), sink.Total)
 			assert.Equal(t, int64(1), sink.Trues)
 		})
 		t.Run("one false", func(t *testing.T) {
 			sink := RateSink{}
-			sink.Add(Sample{Metric: &Metric{}, Value: 0.0})
+			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 0.0})
 			assert.Equal(t, int64(1), sink.Total)
 			assert.Equal(t, int64(0), sink.Trues)
 		})
 		t.Run("values", func(t *testing.T) {
 			sink := RateSink{}
 			for _, s := range samples6 {
-				sink.Add(Sample{Metric: &Metric{}, Value: s})
+				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 			}
 			assert.Equal(t, int64(6), sink.Total)
 			assert.Equal(t, int64(3), sink.Trues)
@@ -237,7 +237,7 @@ func TestRateSink(t *testing.T) {
 	t.Run("format", func(t *testing.T) {
 		sink := RateSink{}
 		for _, s := range samples6 {
-			sink.Add(Sample{Metric: &Metric{}, Value: s})
+			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 		}
 		assert.Equal(t, map[string]float64{"rate": 0.5}, sink.Format(0))
 	})

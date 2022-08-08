@@ -213,8 +213,12 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- metrics.Sam
 			select {
 			case <-regDurationDone:
 				metrics.PushIfNotDone(parentCtx, out, metrics.Sample{
-					Value: float64(iterations - i), Metric: droppedIterationMetric,
-					Tags: pvi.getMetricTags(&vuID), Time: time.Now(),
+					TimeSeries: metrics.TimeSeries{
+						Metric: droppedIterationMetric,
+						Tags:   pvi.getMetricTags(&vuID),
+					},
+					Time:  time.Now(),
+					Value: float64(iterations - i),
 				})
 				return // don't make more iterations
 			default:
