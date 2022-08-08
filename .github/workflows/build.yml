@@ -153,33 +153,52 @@ jobs:
             docker run $DOCKER_IMAGE_ID pause --help
             docker run $DOCKER_IMAGE_ID resume --help
 
-      - name: Publish
+      - name: Log into ghcr.io
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          # Log into GitHub Container Registry
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Publish k6:master image to ghcr.io
+        if: ${{ github.ref == 'refs/heads/master' }}
+        run: |
+          docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$GHCR_IMAGE_ID:master"
+          docker push "ghcr.io/$GHCR_IMAGE_ID:master"
+      - name: Publish tagged version image to ghcr.io
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: |
           VERSION="${VERSION#v}"
           echo "Publish GHCR ($DOCKER_IMAGE_ID:$VERSION)"
-
-          # Log into GitHub Container Registry
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
           docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$GHCR_IMAGE_ID:$VERSION"
           docker push "ghcr.io/$GHCR_IMAGE_ID:$VERSION"
           # We also want to tag the latest stable version as latest
-          if [[ "$VERSION" != "master" ]] && [[ ! "$VERSION" =~ (RC|rc) ]]; then
+          if [[ ! "$VERSION" =~ (RC|rc) ]]; then
             echo 'Publish GHCR (latest)'
             docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$GHCR_IMAGE_ID:latest"
             docker push "ghcr.io/$GHCR_IMAGE_ID:latest"
           fi
 
-          echo "Publish Docker ($DOCKER_IMAGE_ID:$VERSION) and ($LI_DOCKER_IMAGE_ID:$VERSION)"
-
+      - name: Log into Docker Hub
+        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
+        run: |
           # Log into Docker Hub Registry
           echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+      - name: Publish k6:master image to Docker Hub
+        if: ${{ github.ref == 'refs/heads/master' }}
+        run: |
+          docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:master"
+          docker tag "$DOCKER_IMAGE_ID" "$LI_DOCKER_IMAGE_ID:master"
+          docker push "$DOCKER_IMAGE_ID:master"
+          docker push "$LI_DOCKER_IMAGE_ID:master"
+      - name: Publish tagged version image to Docker Hub
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          # We need to push the same image in both the loadimpact and the grafana docker hub orgs
           docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:$VERSION"
           docker tag "$DOCKER_IMAGE_ID" "$LI_DOCKER_IMAGE_ID:$VERSION"
           docker push "$DOCKER_IMAGE_ID:$VERSION"
           docker push "$LI_DOCKER_IMAGE_ID:$VERSION"
           # We also want to tag the latest stable version as latest
-          if [[ "$VERSION" != "master" ]] && [[ ! "$VERSION" =~ (RC|rc) ]]; then
+          if [[ ! "$VERSION" =~ (RC|rc) ]]; then
             echo 'Publish Docker (latest)'
             docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:latest"
             docker tag "$DOCKER_IMAGE_ID" "$LI_DOCKER_IMAGE_ID:latest"
