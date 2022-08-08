@@ -70,13 +70,13 @@ func generateTestMetricSamples(t testing.TB) ([]metrics.SampleContainer, func(io
 	time2 := time1.Add(10 * time.Second)
 	time3 := time2.Add(10 * time.Second)
 
-	connTags := registry.RootTagSet().SortAndAddTags(map[string]string{"key": "val"})
+	connTags := registry.RootTagSet().WithTagsFromMap(map[string]string{"key": "val"})
 
 	samples := []metrics.SampleContainer{
 		metrics.Sample{
 			TimeSeries: metrics.TimeSeries{
 				Metric: metric1,
-				Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag1": "val1"}),
+				Tags:   registry.RootTagSet().WithTagsFromMap(map[string]string{"tag1": "val1"}),
 			},
 			Time:  time1,
 			Value: float64(1),
@@ -84,7 +84,7 @@ func generateTestMetricSamples(t testing.TB) ([]metrics.SampleContainer, func(io
 		metrics.Sample{
 			TimeSeries: metrics.TimeSeries{
 				Metric: metric1,
-				Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag2": "val2"}),
+				Tags:   registry.RootTagSet().WithTagsFromMap(map[string]string{"tag2": "val2"}),
 			},
 			Time:  time1,
 			Value: float64(2),
@@ -110,7 +110,7 @@ func generateTestMetricSamples(t testing.TB) ([]metrics.SampleContainer, func(io
 		metrics.Sample{
 			TimeSeries: metrics.TimeSeries{
 				Metric: metric2,
-				Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag3": "val3"}),
+				Tags:   registry.RootTagSet().WithTagsFromMap(map[string]string{"tag3": "val3"}),
 			},
 			Time:  time3,
 			Value: float64(5),

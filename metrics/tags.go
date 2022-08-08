@@ -16,19 +16,38 @@ import (
 // A TagSet represents an immutable set of metric tags. For the efficient and
 // thread-safe storage of the key=value tag pairs, it uses the
 // https://github.com/mstoykov/atlas data structure.
+//
+// Assuming all tag sets start from the same root (see Registry.RootTagSet()),
+// you can compare *TagSet values of different metric Samples with the `==` to
+// check if they have the same tags, and you can also use *TagSet values for map
+// indexes and caching.
+//
+// See also the TimeSeries type for comparing a Sample's {metric+tags} for
+// equality at the same time.
 type TagSet atlas.Node
 
 // With returns another TagSet object that contains the combination of the
-// current receiver tags and the name=value tag from its parameters. It doesn't
-// modify the receiver, it will either return an already existing TagSet with
-// these tags, if it exists, or create a new TagSet with them and return it.
+// current receiver tags and the name=value tag from its parameters.
+//
+// It doesn't modify the receiver, it will either return an already existing
+// TagSet with these tags, if it exists, or create a new TagSet with them and
+// return it.
+//
+// If a tag with the specified name already exists in the set, it will be
+// overwritten with the new value in the returned set.
 func (ts *TagSet) With(name, value string) *TagSet {
 	return (*TagSet)(((*atlas.Node)(ts)).AddLink(name, value))
 }
 
-// Without returns another TagSet, either an already existing one or a newly
-// created one, with all of the tags from the existing TagSet except the one
-// with the given key.
+// Without returns another TagSet object that contains all of the tags from the
+// existing TagSet except the one with the given key.
+//
+// It doesn't modify the receiver, it will either return an already existing
+// TagSet with these tags, if it exists, or create a new TagSet with them and
+// return it.
+//
+// If a tag with the specified name doesn't exist in the set, it will return the
+// receiver.
 func (ts *TagSet) Without(name string) *TagSet {
 	return (*TagSet)(((*atlas.Node)(ts)).DeleteKey(name))
 }
@@ -55,7 +74,7 @@ func (ts *TagSet) Map() map[string]string {
 	return ((*atlas.Node)(ts)).Path()
 }
 
-// SortAndAddTags sorts the given tags by their keys and adds them to the
+// WithTagsFromMap sorts the given tags by their keys and adds them to the
 // current tag set one by one, without branching out. This is generally
 // discouraged and sequential usage of the AddTag() method should be preferred
 // and used whenever possible.
@@ -65,8 +84,8 @@ func (ts *TagSet) Map() map[string]string {
 // scenario.tags, with custom per-reqeust tags from a user, etc. Then it's more
 // efficient to sort their keys before we add them. If we don't, go map
 // iteration happens in pseudo-random order and this will generate a lot of
-// useless dead-end atlas Nodes.
-func (ts *TagSet) SortAndAddTags(m map[string]string) *TagSet {
+// useless dead-end atlas Nodes on multiple TagSet accretions.
+func (ts *TagSet) WithTagsFromMap(m map[string]string) *TagSet {
 	if len(m) == 0 {
 		return ts
 	}

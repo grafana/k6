@@ -32,6 +32,7 @@ func TestRootTagSet(t *testing.T) {
 	root := r.RootTagSet()
 	require.NotNil(t, root)
 	assert.True(t, root == r.RootTagSet())
+	assert.True(t, root == root.Without("foo"))
 	assert.True(t, root.IsEmpty())
 	assert.Equal(t, map[string]string{}, root.Map())
 
@@ -58,7 +59,7 @@ func TestTagSets(t *testing.T) {
 
 	tags2 := tags.
 		With("tag2", "value2").
-		SortAndAddTags(map[string]string{"tag1": "foo", "tag3": "value3"}).
+		WithTagsFromMap(map[string]string{"tag1": "foo", "tag3": "value3"}).
 		Without("tag3")
 
 	assert.Equal(t, map[string]string{"tag1": "foo", "tag2": "value2"}, tags2.Map())
@@ -70,6 +71,8 @@ func TestTagSets(t *testing.T) {
 	val, ok = tags2.Get("tag1")
 	assert.True(t, ok)
 	assert.Equal(t, val, "foo")
+
+	assert.True(t, tags2 == tags2.Without("foo"))
 
 	rJSON, err := tags2.MarshalJSON()
 	require.NoError(t, err)

@@ -91,7 +91,7 @@ func baseTest(t *testing.T,
 		return metrics.Sample{
 			TimeSeries: metrics.TimeSeries{
 				Metric: m,
-				Tags:   registry.RootTagSet().SortAndAddTags(tags),
+				Tags:   registry.RootTagSet().WithTagsFromMap(tags),
 			},
 			Time:  time.Now(),
 			Value: value,

@@ -103,7 +103,7 @@ func generateTags(i, tagCount int, additionals ...map[string]string) *metrics.Ta
 		}
 	}
 
-	return registry.RootTagSet().SortAndAddTags(res)
+	return registry.RootTagSet().WithTagsFromMap(res)
 }
 
 func BenchmarkMetricMarshal(b *testing.B) {

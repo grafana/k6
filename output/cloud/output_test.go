@@ -214,7 +214,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 
 	now := time.Now()
 	tagMap := map[string]string{"test": "mest", "a": "b", "name": "name", "url": "url"}
-	tags := registry.RootTagSet().SortAndAddTags(tagMap)
+	tags := registry.RootTagSet().WithTagsFromMap(tagMap)
 	expectedTags := `{"test": "mest", "a": "b", "name": "name", "url": "name"}`
 
 	expSamples := make(chan []Sample)
@@ -347,7 +347,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, err)
 	now := time.Now()
-	tags := registry.RootTagSet().SortAndAddTags(map[string]string{"test": "mest", "a": "b"})
+	tags := registry.RootTagSet().WithTagsFromMap(map[string]string{"test": "mest", "a": "b"})
 	gotTheLimit := false
 	var m sync.Mutex
 
@@ -466,7 +466,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	}
 	require.NoError(t, err)
 	now := time.Now()
-	tags := registry.RootTagSet().SortAndAddTags(map[string]string{"test": "mest", "a": "b"})
+	tags := registry.RootTagSet().WithTagsFromMap(map[string]string{"test": "mest", "a": "b"})
 
 	count := 1
 	max := 5
@@ -659,7 +659,7 @@ func TestCloudOutputPushRefID(t *testing.T) {
 	assert.Equal(t, "333", out.referenceID)
 
 	now := time.Now()
-	tags := registry.RootTagSet().SortAndAddTags(map[string]string{"test": "mest", "a": "b"})
+	tags := registry.RootTagSet().WithTagsFromMap(map[string]string{"test": "mest", "a": "b"})
 	encodedTags, err := json.Marshal(tags)
 	require.NoError(t, err)
 
@@ -952,7 +952,7 @@ func TestUseCloudTags(t *testing.T) {
 			t.Parallel()
 
 			trail := &httpext.Trail{
-				Tags: metrics.NewRegistry().RootTagSet().SortAndAddTags(tc.in),
+				Tags: metrics.NewRegistry().RootTagSet().WithTagsFromMap(tc.in),
 			}
 			newTrail := useCloudTags(trail)
 			assert.Equal(t, tc.exp, newTrail.Tags.Map())

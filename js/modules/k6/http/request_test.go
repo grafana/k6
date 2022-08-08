@@ -159,7 +159,7 @@ func newRuntime(t testing.TB) (
 		Transport: tb.HTTPTransport,
 		BPool:     bpool.NewBufferPool(1),
 		Samples:   samples,
-		Tags: lib.NewVUStateTags(registry.RootTagSet().SortAndAddTags(map[string]string{
+		Tags: lib.NewVUStateTags(registry.RootTagSet().WithTagsFromMap(map[string]string{
 			"group": root.Path,
 		})),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
@@ -1113,7 +1113,7 @@ func TestRequestAndBatch(t *testing.T) {
 			t.Run("tags-precedence", func(t *testing.T) {
 				oldTags := state.Tags
 				defer func() { state.Tags = oldTags }()
-				state.Tags = lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().SortAndAddTags(map[string]string{
+				state.Tags = lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{
 					"runtag1": "val1",
 					"runtag2": "val2",
 				}))

@@ -126,7 +126,7 @@ func (r *MiniRunner) SetOptions(opts lib.Options) error {
 	r.Options = opts
 
 	if r.PreInitState != nil {
-		r.runTags = r.PreInitState.Registry.RootTagSet().SortAndAddTags(r.Options.RunTags)
+		r.runTags = r.PreInitState.Registry.RootTagSet().WithTagsFromMap(r.Options.RunTags)
 	}
 
 	return nil

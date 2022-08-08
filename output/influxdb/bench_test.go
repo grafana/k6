@@ -35,7 +35,7 @@ func benchmarkInfluxdb(b *testing.B, t time.Duration) {
 	registry := metrics.NewRegistry()
 	metric, err := registry.NewMetric("test_gauge", metrics.Gauge)
 	require.NoError(b, err)
-	tags := registry.RootTagSet().SortAndAddTags(map[string]string{
+	tags := registry.RootTagSet().WithTagsFromMap(map[string]string{
 		"something": "else",
 		"VU":        "21",
 		"else":      "something",

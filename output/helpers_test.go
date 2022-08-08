@@ -42,7 +42,7 @@ func TestSampleBufferBasics(t *testing.T) {
 	single := metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
 			Metric: metric,
-			Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag1": "val1"}),
+			Tags:   registry.RootTagSet().WithTagsFromMap(map[string]string{"tag1": "val1"}),
 		},
 		Time:  time.Now(),
 		Value: float64(123),
@@ -92,7 +92,7 @@ func TestSampleBufferConcurrently(t *testing.T) {
 			buffer.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: metric,
-					Tags:   registry.RootTagSet().SortAndAddTags(map[string]string{"tag1": "val1"}),
+					Tags:   registry.RootTagSet().WithTagsFromMap(map[string]string{"tag1": "val1"}),
 				},
 				Time:  time.Unix(1562324644, 0),
 				Value: float64(i),

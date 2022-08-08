@@ -137,7 +137,7 @@ func TestOutput(t *testing.T) {
 			samples[i] = metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: metric,
-					Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
+					Tags: registry.RootTagSet().WithTagsFromMap(map[string]string{
 						"something": "else",
 						"VU":        "21",
 						"else":      "something",

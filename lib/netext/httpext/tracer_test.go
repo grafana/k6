@@ -150,7 +150,7 @@ func TestTracer(t *testing.T) { //nolint:tparallel
 				time.Sleep(traceDelay)
 			}
 			trail := tracer.Done()
-			trail.SaveSamples(builtinMetrics, registry.RootTagSet().SortAndAddTags(map[string]string{"tag": "value"}))
+			trail.SaveSamples(builtinMetrics, registry.RootTagSet().WithTagsFromMap(map[string]string{"tag": "value"}))
 			samples := trail.GetSamples()
 
 			assertLaterOrZero(t, tracer.getConn, isReuse)
