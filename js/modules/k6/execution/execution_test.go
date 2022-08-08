@@ -43,7 +43,7 @@ func TestVUTags(t *testing.T) {
 		tenv := setupTagsExecEnv(t)
 		tenv.MoveToVUContext(&lib.State{
 			Tags: lib.NewVUStateTags(
-				metrics.NewRegistry().RootTagSet().SortAndAddTags(map[string]string{"vu": "42"})),
+				metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
 		})
 		tag, err := tenv.VU.Runtime().RunString(`exec.vu.tags["vu"]`)
 		require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestVUTags(t *testing.T) {
 				SystemTags: metrics.NewSystemTagSet(metrics.TagVU),
 			},
 			Tags: lib.NewVUStateTags(
-				metrics.NewRegistry().RootTagSet().SortAndAddTags(map[string]string{"vu": "42"})),
+				metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
 		})
 		state := tenv.VU.State()
 		state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
@@ -97,7 +97,7 @@ func TestVUTags(t *testing.T) {
 			tenv := setupTagsExecEnv(t)
 			tenv.MoveToVUContext(&lib.State{
 				Tags: lib.NewVUStateTags(
-					metrics.NewRegistry().RootTagSet().SortAndAddTags(map[string]string{"vu": "42"})),
+					metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
 			})
 
 			for _, tc := range tests {
@@ -117,7 +117,7 @@ func TestVUTags(t *testing.T) {
 			tenv := setupTagsExecEnv(t)
 			tenv.MoveToVUContext(&lib.State{
 				Tags: lib.NewVUStateTags(
-					metrics.NewRegistry().RootTagSet().SortAndAddTags(map[string]string{"vu": "42"})),
+					metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
 			})
 
 			_, err := tenv.VU.Runtime().RunString(`exec.vu.tags["vu"] = "vu101"`)
@@ -133,7 +133,7 @@ func TestVUTags(t *testing.T) {
 			tenv := setupTagsExecEnv(t)
 			tenv.MoveToVUContext(&lib.State{
 				Tags: lib.NewVUStateTags(
-					metrics.NewRegistry().RootTagSet().SortAndAddTags(map[string]string{"vu": "42"})),
+					metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
 			})
 
 			state := tenv.VU.State()
@@ -166,7 +166,7 @@ func TestVUTags(t *testing.T) {
 					SystemTags: metrics.NewSystemTagSet(metrics.TagVU),
 				},
 				Tags: lib.NewVUStateTags(
-					metrics.NewRegistry().RootTagSet().SortAndAddTags(map[string]string{"vu": "42"})),
+					metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
 				Logger: testLog,
 			})
 			_, err := tenv.VU.Runtime().RunString(`exec.vu.tags["custom-tag"] = [1, 3, 5]`)
@@ -192,7 +192,7 @@ func TestVUTags(t *testing.T) {
 					SystemTags: metrics.NewSystemTagSet(metrics.TagVU),
 				},
 				Tags: lib.NewVUStateTags(
-					metrics.NewRegistry().RootTagSet().SortAndAddTags(map[string]string{"vu": "42"})),
+					metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
 				Logger: testLog,
 			})
 			for _, val := range cases {

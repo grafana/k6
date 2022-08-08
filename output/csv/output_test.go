@@ -61,7 +61,7 @@ func TestSampleToRow(t *testing.T) {
 			sample: &metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: testMetric,
-					Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
+					Tags: registry.RootTagSet().WithTagsFromMap(map[string]string{
 						"tag1": "val1",
 						"tag2": "val2",
 						"tag3": "val3",
@@ -79,7 +79,7 @@ func TestSampleToRow(t *testing.T) {
 			sample: &metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: testMetric,
-					Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
+					Tags: registry.RootTagSet().WithTagsFromMap(map[string]string{
 						"tag1": "val1",
 						"tag2": "val2",
 						"tag3": "val3",
@@ -99,7 +99,7 @@ func TestSampleToRow(t *testing.T) {
 			sample: &metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: testMetric,
-					Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
+					Tags: registry.RootTagSet().WithTagsFromMap(map[string]string{
 						"tag1": "val1",
 						"tag2": "val2",
 						"tag3": "val3",
@@ -227,7 +227,7 @@ func TestRun(t *testing.T) {
 				metrics.Sample{
 					TimeSeries: metrics.TimeSeries{
 						Metric: testMetric,
-						Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
+						Tags: registry.RootTagSet().WithTagsFromMap(map[string]string{
 							"check": "val1",
 							"url":   "val2",
 							"error": "val3",
@@ -239,7 +239,7 @@ func TestRun(t *testing.T) {
 				metrics.Sample{
 					TimeSeries: metrics.TimeSeries{
 						Metric: testMetric,
-						Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
+						Tags: registry.RootTagSet().WithTagsFromMap(map[string]string{
 							"check": "val1",
 							"url":   "val2",
 							"error": "val3",
@@ -260,7 +260,7 @@ func TestRun(t *testing.T) {
 				metrics.Sample{
 					TimeSeries: metrics.TimeSeries{
 						Metric: testMetric,
-						Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
+						Tags: registry.RootTagSet().WithTagsFromMap(map[string]string{
 							"check": "val1",
 							"url":   "val2",
 							"error": "val3",
@@ -272,7 +272,7 @@ func TestRun(t *testing.T) {
 				metrics.Sample{
 					TimeSeries: metrics.TimeSeries{
 						Metric: testMetric,
-						Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
+						Tags: registry.RootTagSet().WithTagsFromMap(map[string]string{
 							"check": "val1",
 							"url":   "val2",
 							"error": "val3",
@@ -293,7 +293,7 @@ func TestRun(t *testing.T) {
 				metrics.Sample{
 					TimeSeries: metrics.TimeSeries{
 						Metric: testMetric,
-						Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
+						Tags: registry.RootTagSet().WithTagsFromMap(map[string]string{
 							"check": "val1",
 							"url":   "val2",
 							"error": "val3",
@@ -305,7 +305,7 @@ func TestRun(t *testing.T) {
 				metrics.Sample{
 					TimeSeries: metrics.TimeSeries{
 						Metric: testMetric,
-						Tags: registry.RootTagSet().SortAndAddTags(map[string]string{
+						Tags: registry.RootTagSet().WithTagsFromMap(map[string]string{
 							"check": "val1",
 							"url":   "val2",
 							"error": "val3",

@@ -209,7 +209,6 @@ func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	case *grpcstats.OutHeader:
 		// TODO: figure out something better, e.g. via TagConn() or TagRPC()?
 		if state.Options.SystemTags.Has(metrics.TagIP) && s.RemoteAddr != nil {
-			stateRPC.ip = s.RemoteAddr.String()
 			if ip, _, err := net.SplitHostPort(s.RemoteAddr.String()); err == nil {
 				stateRPC.tags = stateRPC.tags.With("ip", ip)
 			}
@@ -307,7 +306,6 @@ type contextKey string
 var ctxKeyRPCState = contextKey("rpcState") //nolint:gochecknoglobals
 
 type rpcState struct {
-	ip   string
 	tags *metrics.TagSet
 }
 

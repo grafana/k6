@@ -19,9 +19,9 @@ type TimeSeries struct {
 // A Sample is a single metric measurement.
 type Sample struct {
 	TimeSeries
-	Time     time.Time
-	Value    float64
-	Metadata map[string]string // could be nil
+	Time  time.Time
+	Value float64
+	// TODO: add Metadata map[string]string, which could be nil
 }
 
 // SampleContainer is a simple abstraction that allows sample

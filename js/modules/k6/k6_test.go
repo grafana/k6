@@ -206,7 +206,7 @@ func checkTestRuntime(t testing.TB) (*goja.Runtime, chan metrics.SampleContainer
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Samples:        samples,
-		Tags:           lib.NewVUStateTags(registry.RootTagSet().SortAndAddTags(map[string]string{"group": root.Path})),
+		Tags:           lib.NewVUStateTags(registry.RootTagSet().WithTagsFromMap(map[string]string{"group": root.Path})),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 	test.MoveToVUContext(state)
@@ -413,7 +413,7 @@ func TestCheckContextExpiry(t *testing.T) {
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Samples: samples,
-		Tags: lib.NewVUStateTags(registry.RootTagSet().SortAndAddTags(map[string]string{
+		Tags: lib.NewVUStateTags(registry.RootTagSet().WithTagsFromMap(map[string]string{
 			"group": root.Path,
 		})),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),

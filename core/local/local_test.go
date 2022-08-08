@@ -52,7 +52,7 @@ func getTestRunState(
 		TestPreInitState: piState,
 		Options:          options,
 		Runner:           runner,
-		RunTags:          piState.Registry.RootTagSet().SortAndAddTags(options.RunTags),
+		RunTags:          piState.Registry.RootTagSet().WithTagsFromMap(options.RunTags),
 	}
 }
 

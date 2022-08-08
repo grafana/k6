@@ -21,6 +21,9 @@ type DialContexter interface {
 }
 
 // State provides the volatile state for a VU.
+//
+// TODO: rename to VUState or, better yet, move to some other Go package outside
+// of lib/, where it's more obvious that this is the VU state.
 type State struct {
 	// Global options and built-in metrics.
 	//
@@ -80,7 +83,6 @@ type State struct {
 type VUStateTags struct {
 	mutex sync.RWMutex
 	tags  *metrics.TagSet
-	// TODO: Add metadata map[string]string
 }
 
 // NewVUStateTags initializes a new VUStateTags and returns it. It's important

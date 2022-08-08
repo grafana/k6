@@ -115,7 +115,7 @@ func TestMetrics(t *testing.T) {
 					state := &lib.State{
 						Options: lib.Options{},
 						Samples: test.samples,
-						Tags: lib.NewVUStateTags(registry.RootTagSet().SortAndAddTags(map[string]string{
+						Tags: lib.NewVUStateTags(registry.RootTagSet().WithTagsFromMap(map[string]string{
 							"key": "value",
 						})),
 					}
