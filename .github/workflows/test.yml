@@ -29,6 +29,7 @@ jobs:
           set -x
           go version
           export GOMAXPROCS=2
+          export CGO_ENABLED=0
           args=("-p" "2" "-race")
           # Run with less concurrency on Windows to minimize flakiness.
           if [[ "${{ matrix.platform }}" == windows* ]]; then
@@ -62,6 +63,7 @@ jobs:
           which go
           go version
           export GOMAXPROCS=2
+          export CGO_ENABLED=0
           args=("-p" "2" "-race")
           go test "${args[@]}" -timeout 800s ./...
 
@@ -83,6 +85,7 @@ jobs:
         run: |
           go version
           export GOMAXPROCS=2
+          export CGO_ENABLED=0
           args=("-p" "2" "-race")
           # Run with less concurrency on Windows to minimize flakiness.
           if [[ "${{ matrix.platform }}" == windows* ]]; then
