@@ -20,7 +20,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 	}
 	t.Parallel()
 
-	timeout := 2000 * time.Millisecond
+	var timeout time.Duration = 2000 // interpreted as ms
 	if os.Getenv("CI") == "true" {
 		// Increase the timeout on underprovisioned CI machines to minimize
 		// chances of intermittent failures.
@@ -57,6 +57,10 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 						Timeout: timeout, // interpreted as ms
 					}))
 					cPromise = p.Click(tc.selector, nil)
+
+					assert.Equal(t, goja.PromiseStatePending, wfnPromise.State())
+					assert.Equal(t, goja.PromiseStatePending, cPromise.State())
+
 					return nil
 				})
 				if err != nil {
@@ -72,7 +76,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 			select {
 			case err := <-errc:
 				assert.NoError(t, err)
-			case <-time.After(timeout):
+			case <-time.After(timeout * time.Millisecond):
 				t.Fatal("Test timed out")
 			}
 		})
@@ -112,11 +116,20 @@ func TestWaitForFrameNavigation(t *testing.T) {
 		WaitUntil: common.LifecycleEventNetworkIdle,
 		Timeout:   common.DefaultTimeout,
 	})))
+
+	var wfnPromise, cPromise *goja.Promise
 	err := tb.await(func() error {
-		_ = p.Click(`a`, nil)
-		p.WaitForNavigation(nil)
+		wfnPromise = p.WaitForNavigation(nil)
+		cPromise = p.Click(`a`, nil)
+
+		assert.Equal(t, goja.PromiseStatePending, wfnPromise.State())
+		assert.Equal(t, goja.PromiseStatePending, cPromise.State())
+
 		return nil
 	})
 	require.NoError(t, err)
-	require.Equal(t, p.Title(), "Second page")
+
+	assert.Equal(t, goja.PromiseStateFulfilled, wfnPromise.State())
+	assert.Equal(t, goja.PromiseStateFulfilled, cPromise.State())
+	assert.Equal(t, "Second page", p.Title())
 }
