@@ -21,7 +21,6 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -2348,9 +2347,6 @@ func TestErrorsWithDecompression(t *testing.T) {
 }
 
 func TestRequestAndBatchTLS(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip()
-	}
 	t.Parallel()
 
 	t.Run("cert_expired", func(t *testing.T) {
