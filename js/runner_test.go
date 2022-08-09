@@ -957,8 +957,8 @@ func GetTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.S
 
 func TestVUIntegrationInsecureRequests(t *testing.T) {
 	t.Parallel()
-	cert, key := GenerateTLSCertificate(t, "mybadssl.com", time.Now(), 0)
-	s := GetTestServerWithCertificate(t, cert, key)
+	certPem, keyPem := GenerateTLSCertificate(t, "mybadssl.com", time.Now(), 0)
+	s := GetTestServerWithCertificate(t, certPem, keyPem)
 	go func() {
 		_ = s.Config.Serve(s.Listener)
 	}()
@@ -969,6 +969,8 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 	require.NoError(t, err)
 	ip := net.ParseIP(host)
 	mybadsslHostname, err := lib.NewHostAddress(ip, port)
+	require.NoError(t, err)
+	cert, err := x509.ParseCertificate(s.TLS.Certificates[0].Certificate[0])
 	require.NoError(t, err)
 
 	testdata := map[string]struct {
@@ -1020,6 +1022,8 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 
 					initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
 					require.NoError(t, err)
+					initVU.(*VU).TLSConfig.RootCAs = x509.NewCertPool() //nolint:forcetypeassert
+					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)        //nolint:forcetypeassert
 
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
@@ -1350,9 +1354,8 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 
 					initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
 					require.NoError(t, err)
-					initVU.(*VU).TLSConfig.RootCAs = x509.NewCertPool()             //nolint:forcetypeassert
-					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)                    //nolint:forcetypeassert
-					initVU.(*VU).Transport.TLSClientConfig = initVU.(*VU).TLSConfig //nolint:forcetypeassert
+					initVU.(*VU).TLSConfig.RootCAs = x509.NewCertPool() //nolint:forcetypeassert
+					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)        //nolint:forcetypeassert
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
