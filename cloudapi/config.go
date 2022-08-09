@@ -86,7 +86,7 @@ type Config struct {
 	//       since it could lead to a huge loss of granularity and the masking
 	//       of any outlier samples in the data.
 	//     - By default (since AggregationSkipOutlierDetection is not enabled),
-	//       the collected HTTP trails will be checked for outliers, so we don't loose
+	//       the collected HTTP trails will be checked for outliers, so we don't lose
 	//       granularity by accidentally aggregating them. That happens by finding
 	//       the "quartiles" (by default the 75th and 25th percentiles) in the
 	//       sub-bucket datapoints and using the inter-quartile range (IQR) to find

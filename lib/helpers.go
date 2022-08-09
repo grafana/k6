@@ -103,7 +103,7 @@ func GetEndOffset(steps []ExecutionStep) (lastStepOffset time.Duration, isFinal 
 // ConcatErrors is a a helper function for joining error messages into a single
 // string.
 //
-// TODO: use Go 2.0/xerrors style errors so we don't loose error type information and
+// TODO: use Go 2.0/xerrors style errors so we don't lose error type information and
 // metadata.
 func ConcatErrors(errors []error, separator string) string {
 	errStrings := make([]string, len(errors))
