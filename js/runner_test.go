@@ -1350,8 +1350,9 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 
 					initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
 					require.NoError(t, err)
-					initVU.(*VU).TLSConfig.RootCAs = x509.NewCertPool() //nolint:forcetypeassert
-					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)        //nolint:forcetypeassert
+					initVU.(*VU).TLSConfig.RootCAs = x509.NewCertPool()             //nolint:forcetypeassert
+					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)                    //nolint:forcetypeassert
+					initVU.(*VU).Transport.TLSClientConfig = initVU.(*VU).TLSConfig //nolint:forcetypeassert
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
