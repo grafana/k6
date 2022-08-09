@@ -957,7 +957,7 @@ func GetTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.S
 
 func TestVUIntegrationInsecureRequests(t *testing.T) {
 	t.Parallel()
-	certPem, keyPem := GenerateTLSCertificate(t, "mybadssl.com", time.Now(), 0)
+	certPem, keyPem := GenerateTLSCertificate(t, "mybadssl.localhost", time.Now(), 0)
 	s := GetTestServerWithCertificate(t, certPem, keyPem)
 	go func() {
 		_ = s.Config.Serve(s.Listener)
@@ -996,13 +996,13 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 			t.Parallel()
 			r1, err := getSimpleRunner(t, "/script.js", `
 			  var http = require("k6/http");;
-        exports.default = function() { http.get("https://mybadssl.com/"); }
+        exports.default = function() { http.get("https://mybadssl.localhost/"); }
 				`)
 			require.NoError(t, err)
 			require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)))
 
 			r1.Bundle.Options.Hosts = map[string]*lib.HostAddress{
-				"mybadssl.com": mybadsslHostname,
+				"mybadssl.localhost": mybadsslHostname,
 			}
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -1267,7 +1267,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 
 func TestVUIntegrationTLSConfig(t *testing.T) {
 	t.Parallel()
-	certPem, keyPem := GenerateTLSCertificate(t, "sha256.mybadssl.com", time.Now(), time.Hour)
+	certPem, keyPem := GenerateTLSCertificate(t, "sha256-badssl.localhost", time.Now(), time.Hour)
 	s := GetTestServerWithCertificate(t, certPem, keyPem)
 	go func() {
 		_ = s.Config.Serve(s.Listener)
@@ -1329,13 +1329,13 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 			t.Parallel()
 			r1, err := getSimpleRunner(t, "/script.js", `
 					var http = require("k6/http");;
-					exports.default = function() { http.get("https://sha256.mybadssl.com/"); }
+					exports.default = function() { http.get("https://sha256-badssl.localhost/"); }
 				`)
 			require.NoError(t, err)
 			require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)))
 
 			r1.Bundle.Options.Hosts = map[string]*lib.HostAddress{
-				"sha256.mybadssl.com": mybadsslHostname,
+				"sha256-badssl.localhost": mybadsslHostname,
 			}
 			r2, err := NewFromArchive(
 				&lib.TestPreInitState{

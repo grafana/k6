@@ -2356,7 +2356,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 	t.Run("cert_expired", func(t *testing.T) {
 		t.Parallel()
 		_, state, _, rt, _ := newRuntime(t)
-		cert, key := GenerateTLSCertificate(t, "expired.com", time.Now().Add(-time.Hour), 0)
+		cert, key := GenerateTLSCertificate(t, "expired.localhost", time.Now().Add(-time.Hour), 0)
 		s, client := GetTestServerWithCertificate(t, cert, key)
 		go func() {
 			_ = s.Config.Serve(s.Listener)
@@ -2371,18 +2371,18 @@ func TestRequestAndBatchTLS(t *testing.T) {
 		require.NoError(t, err)
 		state.Transport = client.Transport
 		state.TLSConfig = s.TLS
-		state.Dialer = &netext.Dialer{Hosts: map[string]*lib.HostAddress{"expired.com": mybadsslHostname}}
+		state.Dialer = &netext.Dialer{Hosts: map[string]*lib.HostAddress{"expired.localhost": mybadsslHostname}}
 		client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext //nolint:forcetypeassert
-		_, err = rt.RunString(`throw JSON.stringify(http.get("https://expired.com/"));`)
+		_, err = rt.RunString(`throw JSON.stringify(http.get("https://expired.localhost/"));`)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "x509: certificate has expired or is not yet valid")
 	})
 	tlsVersionTests := []struct {
 		Name, URL, Version string
 	}{
-		{Name: "tls10", URL: "tlsv10.com", Version: "http.TLS_1_0"},
-		{Name: "tls11", URL: "tlsv11.com", Version: "http.TLS_1_1"},
-		{Name: "tls12", URL: "tlsv12.com", Version: "http.TLS_1_2"},
+		{Name: "tls10", URL: "tlsv10.localhost", Version: "http.TLS_1_0"},
+		{Name: "tls11", URL: "tlsv11.localhost", Version: "http.TLS_1_1"},
+		{Name: "tls12", URL: "tlsv12.localhost", Version: "http.TLS_1_2"},
 	}
 	for _, versionTest := range tlsVersionTests {
 		versionTest := versionTest
@@ -2414,9 +2414,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			mybadsslHostname, err := lib.NewHostAddress(ip, port)
 			require.NoError(t, err)
 			state.Dialer = &netext.Dialer{Hosts: map[string]*lib.HostAddress{
-				"tlsv10.com": mybadsslHostname,
-				"tlsv11.com": mybadsslHostname,
-				"tlsv12.com": mybadsslHostname,
+				versionTest.URL: mybadsslHostname,
 			}}
 			state.Transport = client.Transport
 			state.TLSConfig = s.TLS
@@ -2434,8 +2432,8 @@ func TestRequestAndBatchTLS(t *testing.T) {
 		Name, URL, CipherSuite string
 		suite                  uint16
 	}{
-		{Name: "cipher_suite_cbc", URL: "cbc.com", CipherSuite: "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA", suite: tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA}, // TODO fix this to RSA instead of ECDSA
-		{Name: "cipher_suite_ecc384", URL: "ecc384.com", CipherSuite: "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", suite: tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
+		{Name: "cipher_suite_cbc", URL: "cbc.localhost", CipherSuite: "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA", suite: tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA}, // TODO fix this to RSA instead of ECDSA
+		{Name: "cipher_suite_ecc384", URL: "ecc384.localhost", CipherSuite: "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", suite: tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
 	}
 	for _, cipherSuiteTest := range tlsCipherSuiteTests {
 		cipherSuiteTest := cipherSuiteTest
@@ -2456,8 +2454,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			mybadsslHostname, err := lib.NewHostAddress(ip, port)
 			require.NoError(t, err)
 			state.Dialer = &netext.Dialer{Hosts: map[string]*lib.HostAddress{
-				"ecc384.com": mybadsslHostname,
-				"cbc.com":    mybadsslHostname,
+				cipherSuiteTest.URL: mybadsslHostname,
 			}}
 			state.Transport = client.Transport
 			state.TLSConfig = s.TLS
