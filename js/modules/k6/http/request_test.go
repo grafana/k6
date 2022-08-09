@@ -2359,7 +2359,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 		cert, key := GenerateTLSCertificate(t, "expired.com", time.Now().Add(-time.Hour), 0)
 		s, client := GetTestServerWithCertificate(t, cert, key)
 		go func() {
-			s.Config.Serve(s.Listener)
+			_ = s.Config.Serve(s.Listener)
 		}()
 		t.Cleanup(func() {
 			require.NoError(t, s.Config.Close())
@@ -2403,7 +2403,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 				panic(versionTest.Name + " unsupported")
 			}
 			go func() {
-				s.Config.Serve(s.Listener)
+				_ = s.Config.Serve(s.Listener)
 			}()
 			t.Cleanup(func() {
 				require.NoError(t, s.Config.Close())
@@ -2445,7 +2445,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			cert, key := GenerateTLSCertificate(t, cipherSuiteTest.URL, time.Now(), time.Hour)
 			s, client := GetTestServerWithCertificate(t, cert, key, cipherSuiteTest.suite)
 			go func() {
-				s.Config.Serve(s.Listener)
+				_ = s.Config.Serve(s.Listener)
 			}()
 			t.Cleanup(func() {
 				require.NoError(t, s.Config.Close())
@@ -2590,9 +2590,13 @@ func GenerateTLSCertificate(t *testing.T, host string, notBefore time.Time, vali
 }
 
 func GetTestServerWithCertificate(t *testing.T, certPem, key []byte, suitesIds ...uint16) (*httptest.Server, *http.Client) {
-	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-	})}
+	server := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(200)
+		}),
+		ReadHeaderTimeout: time.Second,
+		ReadTimeout:       time.Second,
+	}
 	s := &httptest.Server{}
 	s.Config = server
 
@@ -2633,7 +2637,7 @@ func GetTestServerWithCertificate(t *testing.T, certPem, key []byte, suitesIds .
 	client.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
 			RootCAs:      certpool,
-			MinVersion:   tls.VersionSSL30,
+			MinVersion:   tls.VersionTLS10,
 			MaxVersion:   tls.VersionTLS12, // this so that the ciphersuite work
 			CipherSuites: suitesIds,
 		},

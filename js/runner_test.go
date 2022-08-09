@@ -910,9 +910,13 @@ func GenerateTLSCertificate(t *testing.T, host string, notBefore time.Time, vali
 }
 
 func GetTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.Server {
-	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-	})}
+	server := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(200)
+		}),
+		ReadHeaderTimeout: time.Second,
+		ReadTimeout:       time.Second,
+	}
 	s := &httptest.Server{}
 	s.Config = server
 
@@ -940,7 +944,8 @@ func GetTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.S
 	client := &http.Client{Transport: &http.Transport{}}
 	client.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
-			RootCAs: certpool,
+			RootCAs:    certpool,
+			MinVersion: tls.VersionTLS10,
 		},
 		ForceAttemptHTTP2: s.EnableHTTP2,
 	}
@@ -956,7 +961,7 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 	cert, key := GenerateTLSCertificate(t, "mybadssl.com", time.Now(), 0)
 	s := GetTestServerWithCertificate(t, cert, key)
 	go func() {
-		s.Config.Serve(s.Listener)
+		_ = s.Config.Serve(s.Listener)
 	}()
 	t.Cleanup(func() {
 		require.NoError(t, s.Config.Close())
@@ -1262,7 +1267,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 	certPem, keyPem := GenerateTLSCertificate(t, "sha256.mybadssl.com", time.Now(), time.Hour)
 	s := GetTestServerWithCertificate(t, certPem, keyPem)
 	go func() {
-		s.Config.Serve(s.Listener)
+		_ = s.Config.Serve(s.Listener)
 	}()
 	t.Cleanup(func() {
 		require.NoError(t, s.Config.Close())
@@ -1346,9 +1351,9 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 
 					initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
 					require.NoError(t, err)
-					initVU.(*VU).TLSConfig.RootCAs, err = x509.SystemCertPool()
+					initVU.(*VU).TLSConfig.RootCAs, err = x509.SystemCertPool() //nolint:forcetypeassert
 					require.NoError(t, err)
-					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)
+					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert) //nolint:forcetypeassert
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
