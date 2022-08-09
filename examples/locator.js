@@ -41,7 +41,6 @@ export default function () {
     tails.click(),
   ]).then(() => {
     console.log(currentBet.innerText());
-  }).then(() => {
     // the heads locator clicks on the heads button
     // by using the locator's selector.
     return Promise.all([
@@ -50,14 +49,12 @@ export default function () {
     ]);
   }).then(() => {
     console.log(currentBet.innerText());
-  }).then(() => {
     return Promise.all([
       page.waitForNavigation(),
       tails.click(),
     ]);
-  }).then(() => {
-    console.log(currentBet.innerText());
   }).finally(() => {
+    console.log(currentBet.innerText());
     page.close();
     browser.close();
   })

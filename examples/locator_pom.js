@@ -52,19 +52,15 @@ export default function () {
 
   bet.tails().then(() => {
     console.log("Current bet:", bet.current());
-  }).then(() =>
-    bet.heads()
-  ).then(() => {
+    return bet.heads();
+  }).then(() => {
     console.log("Current bet:", bet.current());
-  }).then(() =>
-    bet.tails()
-  ).then(() => {
+    return bet.tails();
+  }).then(() => {
     console.log("Current bet:", bet.current());
-  }).then(() =>
-    bet.heads()
-  ).then(() => {
-    console.log("Current bet:", bet.current());
+    return bet.heads();
   }).finally(() => {
+    console.log("Current bet:", bet.current());
     page.close();
     browser.close();
   })
