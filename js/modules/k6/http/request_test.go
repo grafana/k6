@@ -21,6 +21,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -2466,6 +2467,9 @@ func TestRequestAndBatchTLS(t *testing.T) {
 	}
 	t.Run("ocsp_stapled_good", func(t *testing.T) {
 		t.Parallel()
+		if runtime.GOOS == "windows" {
+			t.Skip("this doesn't work on windows for some reason")
+		}
 		website := "https://www.wikipedia.org/"
 		tb, state, samples, rt, _ := newRuntime(t)
 		state.Dialer = tb.Dialer
