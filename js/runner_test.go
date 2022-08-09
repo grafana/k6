@@ -943,9 +943,8 @@ func GetTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.S
 	certpool.AddCert(certificate)
 	client := &http.Client{Transport: &http.Transport{}}
 	client.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{
-			RootCAs:    certpool,
-			MinVersion: tls.VersionTLS10,
+		TLSClientConfig: &tls.Config{ //nolint:gosec
+			RootCAs: certpool,
 		},
 		ForceAttemptHTTP2: s.EnableHTTP2,
 	}
