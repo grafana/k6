@@ -39,7 +39,10 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 				tb := newTestBrowser(t, withFileServer())
 				p := tb.NewPage(nil)
 
-				resp := p.Goto(tb.staticURL("/nav_in_doc.html"), nil)
+				resp := p.Goto(tb.staticURL("/nav_in_doc.html"), tb.toGojaValue(&common.FrameGotoOptions{
+					WaitUntil: common.LifecycleEventNetworkIdle,
+					Timeout:   timeout, // interpreted as ms
+				}))
 				require.NotNil(t, resp)
 
 				// Callbacks that are initiated internally by click and WaitForNavigation
