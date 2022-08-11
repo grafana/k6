@@ -20,12 +20,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 	}
 	t.Parallel()
 
-	var timeout time.Duration = 2000 // interpreted as ms
-	if os.Getenv("CI") == "true" {
-		// Increase the timeout on underprovisioned CI machines to minimize
-		// chances of intermittent failures.
-		timeout *= 3
-	}
+	var timeout time.Duration = 5000 // interpreted as ms
 
 	testCases := []struct {
 		name, selector string
@@ -76,7 +71,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 			select {
 			case err := <-errc:
 				assert.NoError(t, err)
-			case <-time.After(timeout * time.Millisecond):
+			case <-time.After(time.Duration(int64(timeout)) * time.Millisecond):
 				t.Fatal("Test timed out")
 			}
 		})
