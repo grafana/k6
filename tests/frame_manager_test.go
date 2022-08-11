@@ -112,9 +112,13 @@ func TestWaitForFrameNavigation(t *testing.T) {
 		Timeout:   common.DefaultTimeout,
 	})))
 
+	var timeout time.Duration = 5000 // interpreted as ms
+
 	var wfnPromise, cPromise *goja.Promise
 	err := tb.await(func() error {
-		wfnPromise = p.WaitForNavigation(nil)
+		wfnPromise = p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+			Timeout: timeout, // interpreted as ms
+		}))
 		cPromise = p.Click(`a`, nil)
 
 		assert.Equal(t, goja.PromiseStatePending, wfnPromise.State())
