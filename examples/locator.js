@@ -29,25 +29,33 @@ export default function () {
 
   const currentBet = page.locator("//p[starts-with(text(),'Your bet: ')]");
 
-  // the tails locator clicks on the tails button by using the
-  // locator's selector.
-  tails.click();
+  // In the following Promise.all the tails locator clicks
+  // on the tails button by using the locator's selector.
   // Since clicking on each button causes page navigation,
-  // waitForNavigation is needed. It's because the page
+  // waitForNavigation is needed -- this is because the page
   // won't be ready until the navigation completes.
-  page.waitForNavigation();
-  console.log(currentBet.innerText());
-
-  // the heads locator clicks on the heads button by using the
-  // locator's selector.
-  heads.click();
-  page.waitForNavigation();
-  console.log(currentBet.innerText());
-
-  tails.click();
-  page.waitForNavigation();
-  console.log(currentBet.innerText());
-
-  page.close();
-  browser.close();
+  // Setting up the waitForNavigation first before the click
+  // is important to avoid race conditions.
+  Promise.all([
+    page.waitForNavigation(),
+    tails.click(),
+  ]).then(() => {
+    console.log(currentBet.innerText());
+    // the heads locator clicks on the heads button
+    // by using the locator's selector.
+    return Promise.all([
+      page.waitForNavigation(),
+      heads.click(),
+    ]);
+  }).then(() => {
+    console.log(currentBet.innerText());
+    return Promise.all([
+      page.waitForNavigation(),
+      tails.click(),
+    ]);
+  }).finally(() => {
+    console.log(currentBet.innerText());
+    page.close();
+    browser.close();
+  })
 }

@@ -15,12 +15,14 @@ export default function() {
     // Enter login credentials and login
     page.$('input[name="login"]').type('admin');
     page.$('input[name="password"]').type('123');
-    return page.$('input[type="submit"]').click();
+    // We expect the form submission to trigger a navigation, so to prevent a
+    // race condition, setup a waiter concurrently while waiting for the click
+    // to resolve.
+    return Promise.all([
+      page.waitForNavigation(),
+      page.$('input[type="submit"]').click(),
+    ]);
   }).then(() => {
-    // We expect the above form submission to trigger a navigation, so wait for it
-    // and the page to be loaded.
-    page.waitForNavigation();
-
     check(page, {
       'header': page.$('h2').textContent() == 'Welcome, admin!',
     });

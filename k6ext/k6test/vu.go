@@ -30,6 +30,7 @@ func (v *VU) ToGojaValue(i interface{}) goja.Value { return v.Runtime().ToValue(
 
 // RunLoop is a convenience method for running fn in the event loop.
 func (v *VU) RunLoop(fn func() error) error {
+	v.Loop.WaitOnRegistered()
 	return v.Loop.Start(fn)
 }
 
