@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "iteration": 1657475182972,
+  "iteration": 1660431009407,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -1562,9 +1562,9 @@
       {
         "allValue": "",
         "current": {
-          "selected": true,
-          "text": "test-1657474791",
-          "value": "test-1657474791"
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
@@ -1581,7 +1581,7 @@
           "query": "label_values(testid)",
           "refId": "StandardVariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
@@ -1624,6 +1624,6 @@
   "timezone": "",
   "title": "Test Result",
   "uid": "a21-pyAWz",
-  "version": 3,
+  "version": 1,
   "weekStart": ""
 }
