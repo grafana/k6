@@ -756,8 +756,9 @@ func (m *FrameManager) waitForFrameNavigation(frame *Frame, opts goja.Value) (ap
 	}
 
 	// A lifecycle event won't be received when navigating within the same
-	// document, so don't wait for it.
-	if !sameDocNav {
+	// document, so don't wait for it. The event might've also already been
+	// fired once we're here, so also skip waiting in that case.
+	if !sameDocNav && !frame.hasSubtreeLifecycleEventFired(parsedOpts.WaitUntil) {
 		select {
 		case <-lifecycleEvtCh:
 		case <-timeoutCtx.Done():
