@@ -28,9 +28,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_BASIC_ENABLED=false
     volumes:
-      - ./example/config-datasources.yaml:/etc/grafana/provisioning/datasources/datasource.yaml
-      - ./example/config-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
-      - ./example/dashboards:/var/lib/grafana/dashboards
+      - ./grafana:/etc/grafana/provisioning/
 
   k6:
     build: .
@@ -43,3 +41,5 @@ services:
       - K6_OUT=output-prometheus-remote
     depends_on:
       - prometheus
+    volumes:
+      - ./samples:/scripts

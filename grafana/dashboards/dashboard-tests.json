@@ -24,6 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
+  "iteration": 1660431147457,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -143,8 +144,8 @@
             "type": "prometheus",
             "uid": "PEDF09670F151C95C"
           },
-          "editorMode": "builder",
-          "expr": "k6_http_reqs",
+          "editorMode": "code",
+          "expr": "k6_http_reqs{testid=~\"$testid\"}",
           "format": "table",
           "legendFormat": "__auto",
           "range": true,
@@ -251,7 +252,31 @@
   "style": "dark",
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "definition": "label_values(testid)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Test ID",
+        "multi": false,
+        "name": "testid",
+        "options": [],
+        "query": {
+          "query": "label_values(testid)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
   },
   "time": {
     "from": "now-1h",
@@ -261,6 +286,6 @@
   "timezone": "",
   "title": "Test Runs List",
   "uid": "UoYDJHJZk",
-  "version": 2,
+  "version": 1,
   "weekStart": ""
 }
