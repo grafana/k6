@@ -244,20 +244,6 @@ func (o *objectGoSlice) defineOwnPropertyStr(name unistring.String, descr Proper
 	return false
 }
 
-func (o *objectGoSlice) toPrimitiveNumber() Value {
-	return o.toPrimitiveString()
-}
-
-func (o *objectGoSlice) toPrimitiveString() Value {
-	return o.val.runtime.arrayproto_join(FunctionCall{
-		This: o.val,
-	})
-}
-
-func (o *objectGoSlice) toPrimitive() Value {
-	return o.toPrimitiveString()
-}
-
 func (o *objectGoSlice) _deleteIdx(idx int64) {
 	if idx < int64(len(*o.data)) {
 		(*o.data)[idx] = nil

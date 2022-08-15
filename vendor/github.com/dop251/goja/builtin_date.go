@@ -476,6 +476,7 @@ func (r *Runtime) dateproto_setTime(call FunctionCall) Value {
 }
 
 // _norm returns nhi, nlo such that
+//
 //	hi * base + lo == nhi * base + nlo
 //	0 <= nlo < base
 func _norm(hi, lo, base int64) (nhi, nlo int64, ok bool) {

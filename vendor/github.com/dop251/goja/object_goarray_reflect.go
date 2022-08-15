@@ -256,16 +256,6 @@ func (o *objectGoArrayReflect) defineOwnPropertyStr(name unistring.String, descr
 	return false
 }
 
-func (o *objectGoArrayReflect) toPrimitiveNumber() Value {
-	return o.toPrimitiveString()
-}
-
-func (o *objectGoArrayReflect) toPrimitiveString() Value {
-	return o.val.runtime.arrayproto_join(FunctionCall{
-		This: o.val,
-	})
-}
-
 func (o *objectGoArrayReflect) toPrimitive() Value {
 	return o.toPrimitiveString()
 }

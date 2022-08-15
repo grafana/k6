@@ -5,7 +5,6 @@ It contains code ported from Rhino (https://github.com/mozilla/rhino/blob/master
 as well as from the original code by David M. Gay.
 
 See LICENSE_LUCENE for the original copyright message and disclaimer.
-
 */
 package ftoa
 

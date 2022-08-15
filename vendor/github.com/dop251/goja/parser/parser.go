@@ -1,35 +1,34 @@
 /*
 Package parser implements a parser for JavaScript.
 
-    import (
-        "github.com/dop251/goja/parser"
-    )
+	import (
+	    "github.com/dop251/goja/parser"
+	)
 
 Parse and return an AST
 
-    filename := "" // A filename is optional
-    src := `
-        // Sample xyzzy example
-        (function(){
-            if (3.14159 > 0) {
-                console.log("Hello, World.");
-                return;
-            }
+	filename := "" // A filename is optional
+	src := `
+	    // Sample xyzzy example
+	    (function(){
+	        if (3.14159 > 0) {
+	            console.log("Hello, World.");
+	            return;
+	        }
 
-            var xyzzy = NaN;
-            console.log("Nothing happens.");
-            return xyzzy;
-        })();
-    `
+	        var xyzzy = NaN;
+	        console.log("Nothing happens.");
+	        return xyzzy;
+	    })();
+	`
 
-    // Parse some JavaScript, yielding a *ast.Program and/or an ErrorList
-    program, err := parser.ParseFile(nil, filename, src, 0)
+	// Parse some JavaScript, yielding a *ast.Program and/or an ErrorList
+	program, err := parser.ParseFile(nil, filename, src, 0)
 
-Warning
+# Warning
 
 The parser and AST interfaces are still works-in-progress (particularly where
 node types are concerned) and may change in the future.
-
 */
 package parser
 
@@ -37,7 +36,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
+	"os"
 
 	"github.com/dop251/goja/ast"
 	"github.com/dop251/goja/file"
@@ -148,7 +147,7 @@ func ReadSource(filename string, src interface{}) ([]byte, error) {
 		}
 		return nil, errors.New("invalid source")
 	}
-	return ioutil.ReadFile(filename)
+	return os.ReadFile(filename)
 }
 
 // ParseFile parses the source code of a single JavaScript/ECMAScript source file and returns
@@ -161,9 +160,8 @@ func ReadSource(filename string, src interface{}) ([]byte, error) {
 //
 // src may be a string, a byte slice, a bytes.Buffer, or an io.Reader, but it MUST always be in UTF-8.
 //
-//      // Parse some JavaScript, yielding a *ast.Program and/or an ErrorList
-//      program, err := parser.ParseFile(nil, "", `if (abc > 1) {}`, 0)
-//
+//	// Parse some JavaScript, yielding a *ast.Program and/or an ErrorList
+//	program, err := parser.ParseFile(nil, "", `if (abc > 1) {}`, 0)
 func ParseFile(fileSet *file.FileSet, filename string, src interface{}, mode Mode, options ...Option) (*ast.Program, error) {
 	str, err := ReadSource(filename, src)
 	if err != nil {
@@ -187,7 +185,6 @@ func ParseFile(fileSet *file.FileSet, filename string, src interface{}, mode Mod
 // corresponding ast.FunctionLiteral node.
 //
 // The parameter list, if any, should be a comma-separated list of identifiers.
-//
 func ParseFunction(parameterList, body string, options ...Option) (*ast.FunctionLiteral, error) {
 
 	src := "(function(" + parameterList + ") {\n" + body + "\n})"

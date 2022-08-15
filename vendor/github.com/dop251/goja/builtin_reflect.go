@@ -124,6 +124,8 @@ func (r *Runtime) createReflect(val *Object) objectImpl {
 	o._putProp("set", r.newNativeFunc(r.builtin_reflect_set, nil, "set", nil, 3), true, false, true)
 	o._putProp("setPrototypeOf", r.newNativeFunc(r.builtin_reflect_setPrototypeOf, nil, "setPrototypeOf", nil, 2), true, false, true)
 
+	o._putSym(SymToStringTag, valueProp(asciiString("Reflect"), false, false, true))
+
 	return o
 }
 

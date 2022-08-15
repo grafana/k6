@@ -822,7 +822,7 @@ func TestParseHTML(t *testing.T) {
 			v, err := rt.RunString(`doc.find("body").children().get(1)`)
 			if assert.NoError(t, err) {
 				elem, _ := v.Export().(Element)
-				assert.Contains(t, elem.InnerHTML(), "Lorem ipsum dolor sit amet")
+				assert.Contains(t, elem.InnerHTML().Export(), "Lorem ipsum dolor sit amet")
 			}
 		})
 		t.Run("-ve index", func(t *testing.T) {

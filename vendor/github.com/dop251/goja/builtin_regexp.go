@@ -125,11 +125,14 @@ func convertRegexpToUtf16(patternStr string) string {
 
 // convert any broken UTF-16 surrogate pairs to \uXXXX
 func escapeInvalidUtf16(s valueString) string {
+	if imported, ok := s.(*importedString); ok {
+		return imported.s
+	}
 	if ascii, ok := s.(asciiString); ok {
 		return ascii.String()
 	}
 	var sb strings.Builder
-	rd := &lenientUtf16Decoder{utf16Reader: s.utf16Reader(0)}
+	rd := &lenientUtf16Decoder{utf16Reader: s.utf16Reader()}
 	pos := 0
 	utf8Size := 0
 	var utf8Buf [utf8.UTFMax]byte
@@ -141,7 +144,7 @@ func escapeInvalidUtf16(s valueString) string {
 		if utf16.IsSurrogate(c) {
 			if sb.Len() == 0 {
 				sb.Grow(utf8Size + 7)
-				hrd := s.reader(0)
+				hrd := s.reader()
 				var c rune
 				for p := 0; p < pos; {
 					var size int
@@ -453,7 +456,7 @@ func (r *regexpObject) writeEscapedSource(sb *valueStringBuilder) bool {
 	}
 	pos := 0
 	lastPos := 0
-	rd := &lenientUtf16Decoder{utf16Reader: r.source.utf16Reader(0)}
+	rd := &lenientUtf16Decoder{utf16Reader: r.source.utf16Reader()}
 L:
 	for {
 		c, size, err := rd.ReadRune()

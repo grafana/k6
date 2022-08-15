@@ -4,7 +4,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/dop251/goja/unistring"
@@ -42,7 +41,6 @@ var (
 	stringGoError        valueString = asciiString("GoError")
 
 	stringObjectNull      valueString = asciiString("[object Null]")
-	stringObjectObject    valueString = asciiString("[object Object]")
 	stringObjectUndefined valueString = asciiString("[object Undefined]")
 	stringInvalidDate     valueString = asciiString("Invalid Date")
 )
@@ -54,8 +52,8 @@ type valueString interface {
 	concat(valueString) valueString
 	substring(start, end int) valueString
 	compareTo(valueString) int
-	reader(start int) io.RuneReader
-	utf16Reader(start int) io.RuneReader
+	reader() io.RuneReader
+	utf16Reader() io.RuneReader
 	utf16Runes() []rune
 	index(valueString, int) int
 	lastIndex(valueString, int) int
@@ -92,16 +90,10 @@ func (si *stringIterObject) next() Value {
 func stringFromRune(r rune) valueString {
 	if r < utf8.RuneSelf {
 		var sb strings.Builder
-		sb.Grow(1)
 		sb.WriteByte(byte(r))
 		return asciiString(sb.String())
 	}
 	var sb unicodeStringBuilder
-	if r <= 0xFFFF {
-		sb.Grow(1)
-	} else {
-		sb.Grow(2)
-	}
 	sb.WriteRune(r)
 	return sb.String()
 }
@@ -110,7 +102,7 @@ func (r *Runtime) createStringIterator(s valueString) Value {
 	o := &Object{runtime: r}
 
 	si := &stringIterObject{
-		reader: &lenientUtf16Decoder{utf16Reader: s.utf16Reader(0)},
+		reader: &lenientUtf16Decoder{utf16Reader: s.utf16Reader()},
 	}
 	si.class = classStringIterator
 	si.val = o
@@ -130,35 +122,10 @@ type stringObject struct {
 }
 
 func newStringValue(s string) valueString {
-	utf16Size := 0
-	ascii := true
-	for _, chr := range s {
-		utf16Size++
-		if chr >= utf8.RuneSelf {
-			ascii = false
-			if chr > 0xFFFF {
-				utf16Size++
-			}
-		}
+	if u := unistring.Scan(s); u != nil {
+		return unicodeString(u)
 	}
-	if ascii {
-		return asciiString(s)
-	}
-	buf := make([]uint16, utf16Size+1)
-	buf[0] = unistring.BOM
-	c := 1
-	for _, chr := range s {
-		if chr <= 0xFFFF {
-			buf[c] = uint16(chr)
-		} else {
-			first, second := utf16.EncodeRune(chr)
-			buf[c] = uint16(first)
-			c++
-			buf[c] = uint16(second)
-		}
-		c++
-	}
-	return unicodeString(buf)
+	return asciiString(s)
 }
 
 func stringValueFromRaw(raw unistring.String) valueString {
@@ -338,4 +305,25 @@ func (s *stringObject) hasOwnPropertyIdx(idx valueInt) bool {
 		return true
 	}
 	return s.baseObject.hasOwnPropertyStr(idx.string())
+}
+
+func devirtualizeString(s valueString) (asciiString, unicodeString) {
+	switch s := s.(type) {
+	case asciiString:
+		return s, nil
+	case unicodeString:
+		return "", s
+	case *importedString:
+		s.ensureScanned()
+		if s.u != nil {
+			return "", s.u
+		}
+		return asciiString(s.s), nil
+	default:
+		panic(unknownStringTypeErr(s))
+	}
+}
+
+func unknownStringTypeErr(v Value) interface{} {
+	return newTypeError("Internal bug: unknown string type: %T", v)
 }

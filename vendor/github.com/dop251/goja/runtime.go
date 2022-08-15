@@ -1300,10 +1300,10 @@ func MustCompile(name, src string, strict bool) *Program {
 // Parse takes a source string and produces a parsed AST. Use this function if you want to pass options
 // to the parser, e.g.:
 //
-//  p, err := Parse("test.js", "var a = true", parser.WithDisableSourceMaps)
-//  if err != nil { /* ... */ }
-//  prg, err := CompileAST(p, true)
-//  // ...
+//	p, err := Parse("test.js", "var a = true", parser.WithDisableSourceMaps)
+//	if err != nil { /* ... */ }
+//	prg, err := CompileAST(p, true)
+//	// ...
 //
 // Otherwise use Compile which combines both steps.
 func Parse(name, src string, options ...parser.Option) (prg *js_ast.Program, err error) {
@@ -1475,32 +1475,32 @@ them in ECMAScript, bear in mind the following caveats:
 1. If a regular JavaScript Object is assigned as an element of a wrapped Go struct, map or array, it is
 Export()'ed and therefore copied. This may result in an unexpected behaviour in JavaScript:
 
- m := map[string]interface{}{}
- vm.Set("m", m)
- vm.RunString(`
- var obj = {test: false};
- m.obj = obj; // obj gets Export()'ed, i.e. copied to a new map[string]interface{} and then this map is set as m["obj"]
- obj.test = true; // note, m.obj.test is still false
- `)
- fmt.Println(m["obj"].(map[string]interface{})["test"]) // prints "false"
+	m := map[string]interface{}{}
+	vm.Set("m", m)
+	vm.RunString(`
+	var obj = {test: false};
+	m.obj = obj; // obj gets Export()'ed, i.e. copied to a new map[string]interface{} and then this map is set as m["obj"]
+	obj.test = true; // note, m.obj.test is still false
+	`)
+	fmt.Println(m["obj"].(map[string]interface{})["test"]) // prints "false"
 
 2. Be careful with nested non-pointer compound types (structs, slices and arrays) if you modify them in
 ECMAScript. Better avoid it at all if possible. One of the fundamental differences between ECMAScript and Go is in
 the former all Objects are references whereas in Go you can have a literal struct or array. Consider the following
 example:
 
- type S struct {
-     Field int
- }
+	type S struct {
+	    Field int
+	}
 
- a := []S{{1}, {2}} // slice of literal structs
- vm.Set("a", &a)
- vm.RunString(`
-     let tmp = {Field: 1};
-     a[0] = tmp;
-     a[1] = tmp;
-     tmp.Field = 2;
- `)
+	a := []S{{1}, {2}} // slice of literal structs
+	vm.Set("a", &a)
+	vm.RunString(`
+	    let tmp = {Field: 1};
+	    a[0] = tmp;
+	    a[1] = tmp;
+	    tmp.Field = 2;
+	`)
 
 In ECMAScript one would expect a[0].Field and a[1].Field to be equal to 2, but this is really not possible
 (or at least non-trivial without some complex reference tracking).
@@ -1516,29 +1516,29 @@ in copying of a[0].
 (e.g. by direct assignment, deletion or shrinking the array) the old a[0] is copied and the earlier returned value
 becomes a reference to the copy:
 
- let tmp = a[0];                      // no copy, tmp is a reference to a[0]
- tmp.Field = 1;                       // a[0].Field === 1 after this
- a[0] = {Field: 2};                   // tmp is now a reference to a copy of the old value (with Field === 1)
- a[0].Field === 2 && tmp.Field === 1; // true
+	let tmp = a[0];                      // no copy, tmp is a reference to a[0]
+	tmp.Field = 1;                       // a[0].Field === 1 after this
+	a[0] = {Field: 2};                   // tmp is now a reference to a copy of the old value (with Field === 1)
+	a[0].Field === 2 && tmp.Field === 1; // true
 
 * Array value swaps caused by in-place sort (using Array.prototype.sort()) do not count as re-assignments, instead
 the references are adjusted to point to the new indices.
 
 * Assignment to an inner compound value always does a copy (and sometimes type conversion):
 
- a[1] = tmp;    // a[1] is now a copy of tmp
- tmp.Field = 3; // does not affect a[1].Field
+	a[1] = tmp;    // a[1] is now a copy of tmp
+	tmp.Field = 3; // does not affect a[1].Field
 
 3. Non-addressable structs, slices and arrays get copied. This sometimes may lead to a confusion as assigning to
 inner fields does not appear to work:
 
- a1 := []interface{}{S{1}, S{2}}
- vm.Set("a1", &a1)
- vm.RunString(`
-    a1[0].Field === 1; // true
-    a1[0].Field = 2;
-    a1[0].Field === 2; // FALSE, because what it really did was copy a1[0] set its Field to 2 and immediately drop it
- `)
+	a1 := []interface{}{S{1}, S{2}}
+	vm.Set("a1", &a1)
+	vm.RunString(`
+	   a1[0].Field === 1; // true
+	   a1[0].Field = 2;
+	   a1[0].Field === 2; // FALSE, because what it really did was copy a1[0] set its Field to 2 and immediately drop it
+	`)
 
 An alternative would be making a1[0].Field a non-writable property which would probably be more in line with
 ECMAScript, however it would require to manually copy the value if it does need to be modified which may be
@@ -1548,29 +1548,33 @@ Note, the same applies to slices. If a slice is passed by value (not as a pointe
 value. Moreover, extending the slice may result in the underlying array being re-allocated and copied.
 For example:
 
- a := []interface{}{1}
- vm.Set("a", a)
- vm.RunString(`a.push(2); a[0] = 0;`)
- fmt.Println(a[0]) // prints "1"
+	a := []interface{}{1}
+	vm.Set("a", a)
+	vm.RunString(`a.push(2); a[0] = 0;`)
+	fmt.Println(a[0]) // prints "1"
 
 Notes on individual types:
 
-Primitive types
+# Primitive types
 
 Primitive types (numbers, string, bool) are converted to the corresponding JavaScript primitives.
 
-Strings
+# Strings
 
 Because of the difference in internal string representation between ECMAScript (which uses UTF-16) and Go (which uses
 UTF-8) conversion from JS to Go may be lossy. In particular, code points that can be part of UTF-16 surrogate pairs
 (0xD800-0xDFFF) cannot be represented in UTF-8 unless they form a valid surrogate pair and are replaced with
 utf8.RuneError.
 
-Nil
+The string value must be a valid UTF-8. If it is not, invalid characters are replaced with utf8.RuneError, but
+the behaviour of a subsequent Export() is unspecified (it may return the original value, or a value with replaced
+invalid characters).
+
+# Nil
 
 Nil is converted to null.
 
-Functions
+# Functions
 
 func(FunctionCall) Value is treated as a native JavaScript function. This increases performance because there are no
 automatic argument and return value type conversions (which involves reflect). Attempting to use
@@ -1581,33 +1585,33 @@ func(FunctionCall, *Runtime) Value is treated as above, except the *Runtime is a
 func(ConstructorCall) *Object is treated as a native constructor, allowing to use it with the new
 operator:
 
- func MyObject(call goja.ConstructorCall) *goja.Object {
-    // call.This contains the newly created object as per http://www.ecma-international.org/ecma-262/5.1/index.html#sec-13.2.2
-    // call.Arguments contain arguments passed to the function
+	func MyObject(call goja.ConstructorCall) *goja.Object {
+	   // call.This contains the newly created object as per http://www.ecma-international.org/ecma-262/5.1/index.html#sec-13.2.2
+	   // call.Arguments contain arguments passed to the function
 
-    call.This.Set("method", method)
+	   call.This.Set("method", method)
 
-    //...
+	   //...
 
-    // If return value is a non-nil *Object, it will be used instead of call.This
-    // This way it is possible to return a Go struct or a map converted
-    // into goja.Value using ToValue(), however in this case
-    // instanceof will not work as expected, unless you set the prototype:
-    //
-    // instance := &myCustomStruct{}
-    // instanceValue := vm.ToValue(instance).(*Object)
-    // instanceValue.SetPrototype(call.This.Prototype())
-    // return instanceValue
-    return nil
- }
+	   // If return value is a non-nil *Object, it will be used instead of call.This
+	   // This way it is possible to return a Go struct or a map converted
+	   // into goja.Value using ToValue(), however in this case
+	   // instanceof will not work as expected, unless you set the prototype:
+	   //
+	   // instance := &myCustomStruct{}
+	   // instanceValue := vm.ToValue(instance).(*Object)
+	   // instanceValue.SetPrototype(call.This.Prototype())
+	   // return instanceValue
+	   return nil
+	}
 
- runtime.Set("MyObject", MyObject)
+	runtime.Set("MyObject", MyObject)
 
 Then it can be used in JS as follows:
 
- var o = new MyObject(arg);
- var o1 = MyObject(arg); // same thing
- o instanceof MyObject && o1 instanceof MyObject; // true
+	var o = new MyObject(arg);
+	var o1 = MyObject(arg); // same thing
+	o instanceof MyObject && o1 instanceof MyObject; // true
 
 When a native constructor is called directly (without the new operator) its behavior depends on
 this value: if it's an Object, it is passed through, otherwise a new one is created exactly as
@@ -1624,7 +1628,7 @@ converted into a JS exception. If the error is *Exception, it is thrown as is, o
 Note that if there are exactly two return values and the last is an `error`, the function returns the first value as is,
 not an Array.
 
-Structs
+# Structs
 
 Structs are converted to Object-like values. Fields and methods are available as properties, their values are
 results of this method (ToValue()) applied to the corresponding Go value.
@@ -1635,29 +1639,29 @@ Attempt to define a new property or delete an existing property will fail (throw
 property. Symbol properties only exist in the wrapper and do not affect the underlying Go value.
 Note that because a wrapper is created every time a property is accessed it may lead to unexpected results such as this:
 
- type Field struct{
- }
- type S struct {
-	Field *Field
- }
- var s = S{
-	Field: &Field{},
- }
- vm := New()
- vm.Set("s", &s)
- res, err := vm.RunString(`
- var sym = Symbol(66);
- var field1 = s.Field;
- field1[sym] = true;
- var field2 = s.Field;
- field1 === field2; // true, because the equality operation compares the wrapped values, not the wrappers
- field1[sym] === true; // true
- field2[sym] === undefined; // also true
- `)
+	 type Field struct{
+	 }
+	 type S struct {
+		Field *Field
+	 }
+	 var s = S{
+		Field: &Field{},
+	 }
+	 vm := New()
+	 vm.Set("s", &s)
+	 res, err := vm.RunString(`
+	 var sym = Symbol(66);
+	 var field1 = s.Field;
+	 field1[sym] = true;
+	 var field2 = s.Field;
+	 field1 === field2; // true, because the equality operation compares the wrapped values, not the wrappers
+	 field1[sym] === true; // true
+	 field2[sym] === undefined; // also true
+	 `)
 
 The same applies to values from maps and slices as well.
 
-Handling of time.Time
+# Handling of time.Time
 
 time.Time does not get special treatment and therefore is converted just like any other `struct` providing access to
 all its methods. This is done deliberately instead of converting it to a `Date` because these two types are not fully
@@ -1666,32 +1670,32 @@ result in a loss of information.
 
 If you need to convert it to a `Date`, it can be done either in JS:
 
- var d = new Date(goval.UnixNano()/1e6);
+	var d = new Date(goval.UnixNano()/1e6);
 
 ... or in Go:
 
- now := time.Now()
- vm := New()
- val, err := vm.New(vm.Get("Date").ToObject(vm), vm.ToValue(now.UnixNano()/1e6))
- if err != nil {
-	...
- }
- vm.Set("d", val)
+	 now := time.Now()
+	 vm := New()
+	 val, err := vm.New(vm.Get("Date").ToObject(vm), vm.ToValue(now.UnixNano()/1e6))
+	 if err != nil {
+		...
+	 }
+	 vm.Set("d", val)
 
 Note that Value.Export() for a `Date` value returns time.Time in local timezone.
 
-Maps
+# Maps
 
 Maps with string or integer key type are converted into host objects that largely behave like a JavaScript Object.
 
-Maps with methods
+# Maps with methods
 
 If a map type has at least one method defined, the properties of the resulting Object represent methods, not map keys.
 This is because in JavaScript there is no distinction between 'object.key` and `object[key]`, unlike Go.
 If access to the map values is required, it can be achieved by defining another method or, if it's not possible, by
 defining an external getter function.
 
-Slices
+# Slices
 
 Slices are converted into host objects that behave largely like JavaScript Array. It has the appropriate
 prototype and all the usual methods should work. There is, however, a caveat: converted Arrays may not contain holes
@@ -1700,7 +1704,7 @@ an index < length will set it to a zero value (but the property will remain). Ni
 `null`. Accessing an element beyond `length` returns `undefined`. Also see the warning above about passing slices as
 values (as opposed to pointers).
 
-Arrays
+# Arrays
 
 Arrays are converted similarly to slices, except the resulting Arrays are not resizable (and therefore the 'length'
 property is non-writable).
@@ -1728,7 +1732,14 @@ func (r *Runtime) ToValue(i interface{}) Value {
 	case Value:
 		return i
 	case string:
-		return newStringValue(i)
+		// return newStringValue(i)
+		if len(i) <= 16 {
+			if u := unistring.Scan(i); u != nil {
+				return &importedString{s: i, u: u, scanned: true}
+			}
+			return asciiString(i)
+		}
+		return &importedString{s: i}
 	case bool:
 		if i {
 			return valueTrue
@@ -2199,16 +2210,16 @@ func (r *Runtime) wrapJSFunc(fn Callable, typ reflect.Type) func(args []reflect.
 //
 // Notes on specific cases:
 //
-// Empty interface
+// # Empty interface
 //
 // Exporting to an interface{} results in a value of the same type as Value.Export() would produce.
 //
-// Numeric types
+// # Numeric types
 //
 // Exporting to numeric types uses the standard ECMAScript conversion operations, same as used when assigning
 // values to non-clamped typed array items, e.g. https://262.ecma-international.org/#sec-toint32.
 //
-// Functions
+// # Functions
 //
 // Exporting to a 'func' creates a strictly typed 'gateway' into an ES function which can be called from Go.
 // The arguments are converted into ES values using Runtime.ToValue(). If the func has no return values,
@@ -2225,7 +2236,7 @@ func (r *Runtime) wrapJSFunc(fn Callable, typ reflect.Type) func(args []reflect.
 //
 // For a more low-level mechanism see AssertFunction().
 //
-// Map types
+// # Map types
 //
 // An ES Map can be exported into a Go map type. If any exported key value is non-hashable, the operation panics
 // (as reflect.Value.SetMapIndex() would). Symbol.iterator is ignored.
@@ -2236,7 +2247,7 @@ func (r *Runtime) wrapJSFunc(fn Callable, typ reflect.Type) func(args []reflect.
 //
 // Any other Object populates the map with own enumerable non-symbol properties.
 //
-// Slice types
+// # Slice types
 //
 // Exporting an ES Set into a slice type results in its elements being exported.
 //
@@ -2250,18 +2261,17 @@ func (r *Runtime) wrapJSFunc(fn Callable, typ reflect.Type) func(args []reflect.
 //
 // For any other Object an error is returned.
 //
-// Array types
+// # Array types
 //
 // Anything that can be exported to a slice type can also be exported to an array type, as long as the lengths
 // match. If they do not, an error is returned.
 //
-// Proxy
+// # Proxy
 //
 // Proxy objects are treated the same way as if they were accessed from ES code in regard to their properties
 // (such as 'length' or [Symbol.iterator]). This means exporting them to slice types works, however
 // exporting a proxied Map into a map type does not produce its contents, because the Proxy is not recognised
 // as a Map. Same applies to a proxied Set.
-//
 func (r *Runtime) ExportTo(v Value, target interface{}) error {
 	tval := reflect.ValueOf(target)
 	if tval.Kind() != reflect.Ptr || tval.IsNil() {
