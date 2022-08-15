@@ -89,6 +89,7 @@ func (so *setObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.Type, c
 }
 
 func (so *setObject) exportToMap(dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
+	dst.Set(reflect.MakeMap(typ))
 	keyTyp := typ.Key()
 	elemTyp := typ.Elem()
 	iter := so.m.newIter()

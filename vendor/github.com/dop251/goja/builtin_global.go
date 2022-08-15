@@ -62,7 +62,7 @@ func (r *Runtime) builtin_isFinite(call FunctionCall) Value {
 }
 
 func (r *Runtime) _encode(uriString valueString, unescaped *[256]bool) valueString {
-	reader := uriString.reader(0)
+	reader := uriString.reader()
 	utf8Buf := make([]byte, utf8.UTFMax)
 	needed := false
 	l := 0
@@ -92,7 +92,7 @@ func (r *Runtime) _encode(uriString valueString, unescaped *[256]bool) valueStri
 
 	buf := make([]byte, l)
 	i := 0
-	reader = uriString.reader(0)
+	reader = uriString.reader()
 	for {
 		rn, _, err := reader.ReadRune()
 		if err == io.EOF {
@@ -263,9 +263,10 @@ func (r *Runtime) builtin_escape(call FunctionCall) Value {
 func (r *Runtime) builtin_unescape(call FunctionCall) Value {
 	s := call.Argument(0).toString()
 	l := s.length()
-	_, unicode := s.(unicodeString)
 	var asciiBuf []byte
 	var unicodeBuf []uint16
+	_, u := devirtualizeString(s)
+	unicode := u != nil
 	if unicode {
 		unicodeBuf = make([]uint16, 1, l+1)
 		unicodeBuf[0] = unistring.BOM

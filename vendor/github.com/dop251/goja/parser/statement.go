@@ -3,7 +3,7 @@ package parser
 import (
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/dop251/goja/ast"
@@ -840,7 +840,7 @@ func (self *_parser) parseSourceMap() *sourcemap.Consumer {
 					data, err = self.opts.sourceMapLoader(sourceURL.String())
 				} else {
 					if sourceURL.Scheme == "" || sourceURL.Scheme == "file" {
-						data, err = ioutil.ReadFile(sourceURL.Path)
+						data, err = os.ReadFile(sourceURL.Path)
 					} else {
 						err = fmt.Errorf("unsupported source map URL scheme: %s", sourceURL.Scheme)
 					}

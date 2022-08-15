@@ -987,9 +987,7 @@ func (o *baseObject) exportType() reflect.Type {
 }
 
 func genericExportToMap(o *Object, dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
-	if dst.IsNil() {
-		dst.Set(reflect.MakeMap(typ))
-	}
+	dst.Set(reflect.MakeMap(typ))
 	ctx.putTyped(o, typ, dst.Interface())
 	keyTyp := typ.Key()
 	elemTyp := typ.Elem()

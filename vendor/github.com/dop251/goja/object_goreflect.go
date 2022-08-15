@@ -105,6 +105,8 @@ type objectGoReflect struct {
 
 	valueCache map[string]reflectValueWrapper
 
+	toString, valueOf func() Value
+
 	toJson func() interface{}
 }
 
@@ -114,15 +116,24 @@ func (o *objectGoReflect) init() {
 	case reflect.Bool:
 		o.class = classBoolean
 		o.prototype = o.val.runtime.global.BooleanPrototype
+		o.toString = o._toStringBool
+		o.valueOf = o._valueOfBool
 	case reflect.String:
 		o.class = classString
 		o.prototype = o.val.runtime.global.StringPrototype
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		reflect.Float32, reflect.Float64:
-
+		o.toString = o._toStringString
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		o.class = classNumber
 		o.prototype = o.val.runtime.global.NumberPrototype
+		o.valueOf = o._valueOfInt
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		o.class = classNumber
+		o.prototype = o.val.runtime.global.NumberPrototype
+		o.valueOf = o._valueOfUint
+	case reflect.Float32, reflect.Float64:
+		o.class = classNumber
+		o.prototype = o.val.runtime.global.NumberPrototype
+		o.valueOf = o._valueOfFloat
 	default:
 		o.class = classObject
 		o.prototype = o.val.runtime.global.ObjectPrototype
@@ -135,8 +146,17 @@ func (o *objectGoReflect) init() {
 	}
 	o.extensible = true
 
-	o.baseObject._putProp("toString", o.val.runtime.newNativeFunc(o.toStringFunc, nil, "toString", nil, 0), true, false, true)
-	o.baseObject._putProp("valueOf", o.val.runtime.newNativeFunc(o.valueOfFunc, nil, "valueOf", nil, 0), true, false, true)
+	switch o.origValue.Interface().(type) {
+	case fmt.Stringer:
+		o.toString = o._toStringStringer
+	case error:
+		o.toString = o._toStringError
+	}
+
+	if o.toString != nil || o.valueOf != nil {
+		o.baseObject._putProp("toString", o.val.runtime.newNativeFunc(o.toStringFunc, nil, "toString", nil, 0), true, false, true)
+		o.baseObject._putProp("valueOf", o.val.runtime.newNativeFunc(o.valueOfFunc, nil, "valueOf", nil, 0), true, false, true)
+	}
 
 	o.valueTypeInfo = o.val.runtime.typeInfo(o.value.Type())
 	o.origValueTypeInfo = o.val.runtime.typeInfo(o.origValue.Type())
@@ -151,7 +171,7 @@ func (o *objectGoReflect) toStringFunc(FunctionCall) Value {
 }
 
 func (o *objectGoReflect) valueOfFunc(FunctionCall) Value {
-	return o.toPrimitive()
+	return o.toPrimitiveNumber()
 }
 
 func (o *objectGoReflect) getStr(name unistring.String, receiver Value) Value {
@@ -354,64 +374,75 @@ func (o *objectGoReflect) hasOwnPropertyStr(name unistring.String) bool {
 	return o._has(name.String())
 }
 
-func (o *objectGoReflect) _toNumber() Value {
-	switch o.value.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return intToValue(o.value.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return intToValue(int64(o.value.Uint()))
-	case reflect.Bool:
-		if o.value.Bool() {
-			return intToValue(1)
-		} else {
-			return intToValue(0)
-		}
-	case reflect.Float32, reflect.Float64:
-		return floatToValue(o.value.Float())
-	}
-	return nil
+func (o *objectGoReflect) _valueOfInt() Value {
+	return intToValue(o.value.Int())
 }
 
-func (o *objectGoReflect) _toString() Value {
-	switch o.value.Kind() {
-	case reflect.String:
-		return newStringValue(o.value.String())
-	case reflect.Bool:
-		if o.value.Interface().(bool) {
-			return stringTrue
-		} else {
-			return stringFalse
-		}
-	}
-	switch v := o.origValue.Interface().(type) {
-	case fmt.Stringer:
-		return newStringValue(v.String())
-	case error:
-		return newStringValue(v.Error())
-	}
+func (o *objectGoReflect) _valueOfUint() Value {
+	return intToValue(int64(o.value.Uint()))
+}
 
-	return stringObjectObject
+func (o *objectGoReflect) _valueOfBool() Value {
+	if o.value.Bool() {
+		return valueTrue
+	} else {
+		return valueFalse
+	}
+}
+
+func (o *objectGoReflect) _valueOfFloat() Value {
+	return floatToValue(o.value.Float())
+}
+
+func (o *objectGoReflect) _toStringStringer() Value {
+	return newStringValue(o.origValue.Interface().(fmt.Stringer).String())
+}
+
+func (o *objectGoReflect) _toStringString() Value {
+	return newStringValue(o.value.String())
+}
+
+func (o *objectGoReflect) _toStringBool() Value {
+	if o.value.Bool() {
+		return stringTrue
+	} else {
+		return stringFalse
+	}
+}
+
+func (o *objectGoReflect) _toStringError() Value {
+	return newStringValue(o.origValue.Interface().(error).Error())
 }
 
 func (o *objectGoReflect) toPrimitiveNumber() Value {
-	if v := o._toNumber(); v != nil {
-		return v
+	if o.valueOf != nil {
+		return o.valueOf()
 	}
-	return o._toString()
+	if o.toString != nil {
+		return o.toString()
+	}
+	return o.baseObject.toPrimitiveNumber()
 }
 
 func (o *objectGoReflect) toPrimitiveString() Value {
-	if v := o._toNumber(); v != nil {
-		return v.toString()
+	if o.toString != nil {
+		return o.toString()
 	}
-	return o._toString()
+	if o.valueOf != nil {
+		return o.valueOf().toString()
+	}
+	return o.baseObject.toPrimitiveString()
 }
 
 func (o *objectGoReflect) toPrimitive() Value {
-	if o.prototype == o.val.runtime.global.NumberPrototype {
-		return o.toPrimitiveNumber()
+	if o.valueOf != nil {
+		return o.valueOf()
 	}
-	return o.toPrimitiveString()
+	if o.toString != nil {
+		return o.toString()
+	}
+
+	return o.baseObject.toPrimitive()
 }
 
 func (o *objectGoReflect) deleteStr(name unistring.String, throw bool) bool {

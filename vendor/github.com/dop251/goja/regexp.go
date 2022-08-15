@@ -95,9 +95,9 @@ func (p *regexpPattern) createRegexp2() {
 	p.regexp2Wrapper = rx
 }
 
-func buildUTF8PosMap(s valueString) (positionMap, string) {
+func buildUTF8PosMap(s unicodeString) (positionMap, string) {
 	pm := make(positionMap, 0, s.length())
-	rd := s.reader(0)
+	rd := s.reader()
 	sPos, utf8Pos := 0, 0
 	var sb strings.Builder
 	for {
@@ -136,11 +136,12 @@ func (p *regexpPattern) findAllSubmatchIndex(s valueString, start int, limit int
 		return p.regexp2Wrapper.findAllSubmatchIndex(s, start, limit, sticky, p.unicode)
 	}
 	if start == 0 {
-		if s, ok := s.(asciiString); ok {
-			return p.regexpWrapper.findAllSubmatchIndex(s.String(), limit, sticky)
+		a, u := devirtualizeString(s)
+		if u == nil {
+			return p.regexpWrapper.findAllSubmatchIndex(string(a), limit, sticky)
 		}
 		if limit == 1 {
-			result := p.regexpWrapper.findSubmatchIndexUnicode(s.(unicodeString), p.unicode)
+			result := p.regexpWrapper.findSubmatchIndexUnicode(u, p.unicode)
 			if result == nil {
 				return nil
 			}
@@ -150,7 +151,7 @@ func (p *regexpPattern) findAllSubmatchIndex(s valueString, start int, limit int
 		// input.
 		if p.unicode {
 			// Try to convert s to UTF-8. If it does not contain any invalid UTF-16 we can do the matching in UTF-8.
-			pm, str := buildUTF8PosMap(s)
+			pm, str := buildUTF8PosMap(u)
 			if pm != nil {
 				res := p.regexpWrapper.findAllSubmatchIndex(str, limit, sticky)
 				for _, result := range res {
@@ -262,7 +263,7 @@ func (r *regexp2Wrapper) findUnicodeCached(s valueString, start int, doCache boo
 		runes, posMap = cache.runes, cache.posMap
 		mappedStart, splitPair = posMapReverseLookup(posMap, start)
 	} else {
-		posMap, runes, mappedStart, splitPair = buildPosMap(&lenientUtf16Decoder{utf16Reader: s.utf16Reader(0)}, s.length(), start)
+		posMap, runes, mappedStart, splitPair = buildPosMap(&lenientUtf16Decoder{utf16Reader: s.utf16Reader()}, s.length(), start)
 		cache = nil
 	}
 	if splitPair {
@@ -436,17 +437,14 @@ func (r *regexp2Wrapper) findAllSubmatchIndexUnicode(s unicodeString, start, lim
 }
 
 func (r *regexp2Wrapper) findAllSubmatchIndex(s valueString, start, limit int, sticky, fullUnicode bool) [][]int {
-	switch s := s.(type) {
-	case asciiString:
-		return r.findAllSubmatchIndexUTF16(s, start, limit, sticky)
-	case unicodeString:
+	a, u := devirtualizeString(s)
+	if u != nil {
 		if fullUnicode {
-			return r.findAllSubmatchIndexUnicode(s, start, limit, sticky)
+			return r.findAllSubmatchIndexUnicode(u, start, limit, sticky)
 		}
-		return r.findAllSubmatchIndexUTF16(s, start, limit, sticky)
-	default:
-		panic("Unsupported string type")
+		return r.findAllSubmatchIndexUTF16(u, start, limit, sticky)
 	}
+	return r.findAllSubmatchIndexUTF16(a, start, limit, sticky)
 }
 
 func (r *regexp2Wrapper) clone() *regexp2Wrapper {
@@ -473,14 +471,11 @@ func (r *regexpWrapper) findAllSubmatchIndex(s string, limit int, sticky bool) (
 }
 
 func (r *regexpWrapper) findSubmatchIndex(s valueString, fullUnicode bool) []int {
-	switch s := s.(type) {
-	case asciiString:
-		return r.findSubmatchIndexASCII(string(s))
-	case unicodeString:
-		return r.findSubmatchIndexUnicode(s, fullUnicode)
-	default:
-		panic("Unsupported string type")
+	a, u := devirtualizeString(s)
+	if u != nil {
+		return r.findSubmatchIndexUnicode(u, fullUnicode)
 	}
+	return r.findSubmatchIndexASCII(string(a))
 }
 
 func (r *regexpWrapper) findSubmatchIndexASCII(s string) []int {
@@ -491,7 +486,7 @@ func (r *regexpWrapper) findSubmatchIndexASCII(s string) []int {
 func (r *regexpWrapper) findSubmatchIndexUnicode(s unicodeString, fullUnicode bool) (result []int) {
 	wrapped := (*regexp.Regexp)(r)
 	if fullUnicode {
-		posMap, runes, _, _ := buildPosMap(&lenientUtf16Decoder{utf16Reader: s.utf16Reader(0)}, s.length(), 0)
+		posMap, runes, _, _ := buildPosMap(&lenientUtf16Decoder{utf16Reader: s.utf16Reader()}, s.length(), 0)
 		res := wrapped.FindReaderSubmatchIndex(&arrayRuneReader{runes: runes})
 		for i, item := range res {
 			if item >= 0 {
@@ -500,7 +495,7 @@ func (r *regexpWrapper) findSubmatchIndexUnicode(s unicodeString, fullUnicode bo
 		}
 		return res
 	}
-	return wrapped.FindReaderSubmatchIndex(s.utf16Reader(0))
+	return wrapped.FindReaderSubmatchIndex(s.utf16Reader())
 }
 
 func (r *regexpWrapper) clone() *regexpWrapper {

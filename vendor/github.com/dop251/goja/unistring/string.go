@@ -21,36 +21,47 @@ const (
 
 type String string
 
-func NewFromString(s string) String {
-	ascii := true
-	size := 0
-	for _, c := range s {
-		if c >= utf8.RuneSelf {
-			ascii = false
-			if c > 0xFFFF {
-				size++
-			}
+// Scan checks if the string contains any unicode characters. If it does, converts to an array suitable for creating
+// a String using FromUtf16, otherwise returns nil.
+func Scan(s string) []uint16 {
+	utf16Size := 0
+	for ; utf16Size < len(s); utf16Size++ {
+		if s[utf16Size] >= utf8.RuneSelf {
+			goto unicode
 		}
-		size++
 	}
-	if ascii {
-		return String(s)
+	return nil
+unicode:
+	for _, chr := range s[utf16Size:] {
+		utf16Size++
+		if chr > 0xFFFF {
+			utf16Size++
+		}
 	}
-	b := make([]uint16, size+1)
-	b[0] = BOM
-	i := 1
-	for _, c := range s {
-		if c <= 0xFFFF {
-			b[i] = uint16(c)
+
+	buf := make([]uint16, utf16Size+1)
+	buf[0] = BOM
+	c := 1
+	for _, chr := range s {
+		if chr <= 0xFFFF {
+			buf[c] = uint16(chr)
 		} else {
-			first, second := utf16.EncodeRune(c)
-			b[i] = uint16(first)
-			i++
-			b[i] = uint16(second)
+			first, second := utf16.EncodeRune(chr)
+			buf[c] = uint16(first)
+			c++
+			buf[c] = uint16(second)
 		}
-		i++
+		c++
 	}
-	return FromUtf16(b)
+
+	return buf
+}
+
+func NewFromString(s string) String {
+	if buf := Scan(s); buf != nil {
+		return FromUtf16(buf)
+	}
+	return String(s)
 }
 
 func NewFromRunes(s []rune) String {

@@ -68,9 +68,7 @@ func (mo *mapObject) export(ctx *objectExportCtx) interface{} {
 }
 
 func (mo *mapObject) exportToMap(dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
-	if dst.IsNil() {
-		dst.Set(reflect.MakeMap(typ))
-	}
+	dst.Set(reflect.MakeMap(typ))
 	ctx.putTyped(mo.val, typ, dst.Interface())
 	keyTyp := typ.Key()
 	elemTyp := typ.Elem()

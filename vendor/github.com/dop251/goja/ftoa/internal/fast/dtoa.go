@@ -30,14 +30,16 @@ const (
 // input than a neighboring representation of the same length.
 //
 // Input: * buffer containing the digits of too_high / 10^kappa
-//        * distance_too_high_w == (too_high - w).f() * unit
-//        * unsafe_interval == (too_high - too_low).f() * unit
-//        * rest = (too_high - buffer * 10^kappa).f() * unit
-//        * ten_kappa = 10^kappa * unit
-//        * unit = the common multiplier
+//   - distance_too_high_w == (too_high - w).f() * unit
+//   - unsafe_interval == (too_high - too_low).f() * unit
+//   - rest = (too_high - buffer * 10^kappa).f() * unit
+//   - ten_kappa = 10^kappa * unit
+//   - unit = the common multiplier
+//
 // Output: returns true if the buffer is guaranteed to contain the closest
-//    representable number to the input.
-//  Modifies the generated digits in the buffer to approach (round towards) w.
+//
+//	  representable number to the input.
+//	Modifies the generated digits in the buffer to approach (round towards) w.
 func roundWeed(buffer []byte, distance_too_high_w, unsafe_interval, rest, ten_kappa, unit uint64) bool {
 	small_distance := distance_too_high_w - unit
 	big_distance := distance_too_high_w + unit
@@ -285,39 +287,50 @@ func biggestPowerTen(number uint32, number_bits int) (power uint32, exponent int
 // w is a floating-point number (DiyFp), consisting of a significand and an
 // exponent. Its exponent is bounded by kMinimalTargetExponent and
 // kMaximalTargetExponent.
-//       Hence -60 <= w.e() <= -32.
+//
+//	Hence -60 <= w.e() <= -32.
 //
 // Returns false if it fails, in which case the generated digits in the buffer
 // should not be used.
 // Preconditions:
-//  * low, w and high are correct up to 1 ulp (unit in the last place). That
-//    is, their error must be less than a unit of their last digits.
-//  * low.e() == w.e() == high.e()
-//  * low < w < high, and taking into account their error: low~ <= high~
-//  * kMinimalTargetExponent <= w.e() <= kMaximalTargetExponent
+//   - low, w and high are correct up to 1 ulp (unit in the last place). That
+//     is, their error must be less than a unit of their last digits.
+//   - low.e() == w.e() == high.e()
+//   - low < w < high, and taking into account their error: low~ <= high~
+//   - kMinimalTargetExponent <= w.e() <= kMaximalTargetExponent
+//
 // Postconditions: returns false if procedure fails.
-//   otherwise:
-//     * buffer is not null-terminated, but len contains the number of digits.
-//     * buffer contains the shortest possible decimal digit-sequence
-//       such that LOW < buffer * 10^kappa < HIGH, where LOW and HIGH are the
-//       correct values of low and high (without their error).
-//     * if more than one decimal representation gives the minimal number of
-//       decimal digits then the one closest to W (where W is the correct value
-//       of w) is chosen.
+//
+//	otherwise:
+//	  * buffer is not null-terminated, but len contains the number of digits.
+//	  * buffer contains the shortest possible decimal digit-sequence
+//	    such that LOW < buffer * 10^kappa < HIGH, where LOW and HIGH are the
+//	    correct values of low and high (without their error).
+//	  * if more than one decimal representation gives the minimal number of
+//	    decimal digits then the one closest to W (where W is the correct value
+//	    of w) is chosen.
+//
 // Remark: this procedure takes into account the imprecision of its input
-//   numbers. If the precision is not enough to guarantee all the postconditions
-//   then false is returned. This usually happens rarely (~0.5%).
+//
+//	numbers. If the precision is not enough to guarantee all the postconditions
+//	then false is returned. This usually happens rarely (~0.5%).
 //
 // Say, for the sake of example, that
-//   w.e() == -48, and w.f() == 0x1234567890ABCDEF
+//
+//	w.e() == -48, and w.f() == 0x1234567890ABCDEF
+//
 // w's value can be computed by w.f() * 2^w.e()
 // We can obtain w's integral digits by simply shifting w.f() by -w.e().
-//  -> w's integral part is 0x1234
-//  w's fractional part is therefore 0x567890ABCDEF.
+//
+//	-> w's integral part is 0x1234
+//	w's fractional part is therefore 0x567890ABCDEF.
+//
 // Printing w's integral part is easy (simply print 0x1234 in decimal).
 // In order to print its fraction we repeatedly multiply the fraction by 10 and
 // get each digit. Example the first digit after the point would be computed by
-//   (0x567890ABCDEF * 10) >> 48. -> 3
+//
+//	(0x567890ABCDEF * 10) >> 48. -> 3
+//
 // The whole thing becomes slightly more complicated because we want to stop
 // once we have enough digits. That is, once the digits inside the buffer
 // represent 'w' we can stop. Everything inside the interval low - high
@@ -408,30 +421,33 @@ func digitGen(low, w, high diyfp, buffer []byte) (kappa int, buf []byte, res boo
 // w is a floating-point number (DiyFp), consisting of a significand and an
 // exponent. Its exponent is bounded by kMinimalTargetExponent and
 // kMaximalTargetExponent.
-//       Hence -60 <= w.e() <= -32.
+//
+//	Hence -60 <= w.e() <= -32.
 //
 // Returns false if it fails, in which case the generated digits in the buffer
 // should not be used.
 // Preconditions:
-//  * w is correct up to 1 ulp (unit in the last place). That
-//    is, its error must be strictly less than a unit of its last digit.
-//  * kMinimalTargetExponent <= w.e() <= kMaximalTargetExponent
+//   - w is correct up to 1 ulp (unit in the last place). That
+//     is, its error must be strictly less than a unit of its last digit.
+//   - kMinimalTargetExponent <= w.e() <= kMaximalTargetExponent
 //
 // Postconditions: returns false if procedure fails.
-//   otherwise:
-//     * buffer is not null-terminated, but length contains the number of
-//       digits.
-//     * the representation in buffer is the most precise representation of
-//       requested_digits digits.
-//     * buffer contains at most requested_digits digits of w. If there are less
-//       than requested_digits digits then some trailing '0's have been removed.
-//     * kappa is such that
-//            w = buffer * 10^kappa + eps with |eps| < 10^kappa / 2.
+//
+//	otherwise:
+//	  * buffer is not null-terminated, but length contains the number of
+//	    digits.
+//	  * the representation in buffer is the most precise representation of
+//	    requested_digits digits.
+//	  * buffer contains at most requested_digits digits of w. If there are less
+//	    than requested_digits digits then some trailing '0's have been removed.
+//	  * kappa is such that
+//	         w = buffer * 10^kappa + eps with |eps| < 10^kappa / 2.
 //
 // Remark: This procedure takes into account the imprecision of its input
-//   numbers. If the precision is not enough to guarantee all the postconditions
-//   then false is returned. This usually happens rarely, but the failure-rate
-//   increases with higher requested_digits.
+//
+//	numbers. If the precision is not enough to guarantee all the postconditions
+//	then false is returned. This usually happens rarely, but the failure-rate
+//	increases with higher requested_digits.
 func digitGenCounted(w diyfp, requested_digits int, buffer []byte) (kappa int, buf []byte, res bool) {
 	_DCHECK(kMinimalTargetExponent <= w.e && w.e <= kMaximalTargetExponent)
 
@@ -505,7 +521,9 @@ func digitGenCounted(w diyfp, requested_digits int, buffer []byte) (kappa int, b
 // Returns true if it succeeds, otherwise the result cannot be trusted.
 // There will be *length digits inside the buffer (not null-terminated).
 // If the function returns true then
-//        v == (double) (buffer * 10^decimal_exponent).
+//
+//	v == (double) (buffer * 10^decimal_exponent).
+//
 // The digits in the buffer are the shortest representation possible: no
 // 0.09999999999999999 instead of 0.1. The shorter representation will even be
 // chosen even if the longer one would be closer to v.
