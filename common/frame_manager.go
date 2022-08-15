@@ -699,51 +699,73 @@ func (m *FrameManager) waitForFrameNavigation(frame *Frame, opts goja.Value) (ap
 		return nil, fmt.Errorf("parsing wait for frame navigation options: %w", err)
 	}
 
-	ch, evCancelFn := createWaitForEventHandler(m.ctx, frame, []string{EventFrameNavigation},
+	timeoutCtx, timeoutCancelFn := context.WithTimeout(m.ctx, parsedOpts.Timeout)
+	defer timeoutCancelFn()
+
+	navEvtCh, navEvtCancel := createWaitForEventHandler(timeoutCtx, frame, []string{EventFrameNavigation},
 		func(data interface{}) bool {
 			return true // Both successful and failed navigations are considered
 		})
-	defer evCancelFn() // Remove event handler
+	defer navEvtCancel() // Remove event handler
 
-	var event *NavigationEvent
+	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
+		timeoutCtx, frame, []string{EventFrameAddLifecycle},
+		func(data interface{}) bool {
+			if le, ok := data.(LifecycleEvent); ok {
+				return le == parsedOpts.WaitUntil
+			}
+			return false
+		})
+	defer lifecycleEvtCancel()
+
+	handleTimeoutError := func(err error) {
+		if errors.Is(err, context.DeadlineExceeded) {
+			err = &k6ext.UserFriendlyError{
+				Err:     err,
+				Timeout: parsedOpts.Timeout,
+			}
+			k6ext.Panic(m.ctx, "waiting for navigation: %w", err)
+		}
+		m.logger.Debugf("FrameManager:waitForFrameNavigation",
+			"fmid:%d fid:%v furl:%s timeoutCtx done: %v",
+			m.ID(), frame.ID(), frame.URL(), err)
+	}
+
+	var (
+		resp       *Response
+		sameDocNav bool
+	)
 	select {
-	case <-m.ctx.Done():
-		// ignore: the extension is shutting down
-		m.logger.Warnf("FrameManager:WaitForFrameNavigation:<-ctx.Done",
-			"fmid:%d furl:%s err:%v",
-			m.ID(), frame.URL(), m.ctx.Err())
+	case evt := <-navEvtCh:
+		if e, ok := evt.(*NavigationEvent); ok {
+			if e.newDocument == nil {
+				sameDocNav = true
+				break
+			}
+			// request could be nil if navigating to e.g. about:blank
+			req := e.newDocument.request
+			if req != nil {
+				req.responseMu.RLock()
+				resp = req.response
+				req.responseMu.RUnlock()
+			}
+		}
+	case <-timeoutCtx.Done():
+		handleTimeoutError(timeoutCtx.Err())
 		return nil, nil
-	case <-time.After(parsedOpts.Timeout):
-		return nil, fmt.Errorf("waiting for frame navigation timed out after %s", parsedOpts.Timeout)
-	case data := <-ch:
-		event = data.(*NavigationEvent)
 	}
 
-	if event.newDocument == nil {
-		// In case of navigation within the same document (e.g. via an anchor
-		// link or the History API), there is no new document and a
-		// LifecycleEvent will not be fired, so we don't need to wait for it.
-		return nil, nil
-	}
-
-	if frame.hasSubtreeLifecycleEventFired(parsedOpts.WaitUntil) {
-		m.logger.Debugf("FrameManager:WaitForFrameNavigation",
-			"fmid:%d furl:%s hasSubtreeLifecycleEventFired:true",
-			m.ID(), frame.URL())
-
-		_, err := waitForEvent(m.ctx, frame, []string{EventFrameAddLifecycle}, func(data interface{}) bool {
-			return data.(LifecycleEvent) == parsedOpts.WaitUntil
-		}, parsedOpts.Timeout)
-		if err != nil {
-			return nil, fmt.Errorf("waiting for frame navigation until %q: %w", parsedOpts.WaitUntil, err)
+	// A lifecycle event won't be received when navigating within the same
+	// document, so don't wait for it.
+	if !sameDocNav {
+		select {
+		case <-lifecycleEvtCh:
+		case <-timeoutCtx.Done():
+			handleTimeoutError(timeoutCtx.Err())
 		}
 	}
 
-	req := event.newDocument.request
-	req.responseMu.RLock()
-	defer req.responseMu.RUnlock()
-
-	return req.response, nil
+	return resp, nil
 }
 
 // ID returns the unique ID of a FrameManager value.
