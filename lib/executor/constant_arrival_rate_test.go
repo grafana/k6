@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -77,9 +78,7 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 		return nil
 	})
 
-	cfg := getTestConstantArrivalRateConfig()
-	cfg.Duration.Duration -= types.Duration(10 * time.Millisecond) // prevent a race for the 251th iteration
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, cfg)
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestConstantArrivalRateConfig())
 	defer test.cancel()
 
 	var wg sync.WaitGroup
@@ -100,7 +99,7 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond) // just in case
 
-		require.Equal(t, int64(250), totalCount+atomic.LoadInt64(&count))
+		assert.InDelta(t, 250, totalCount+atomic.LoadInt64(&count), 2)
 	}()
 	engineOut := make(chan metrics.SampleContainer, 1000)
 	require.NoError(t, test.executor.Run(test.ctx, engineOut))
@@ -110,7 +109,9 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 
 //nolint:tparallel,paralleltest // this is flaky if ran with other tests
 func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
-	// t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skipf("this test is very flaky on the Windows GitHub Action runners...")
+	}
 	tests := []struct {
 		segment  string
 		sequence string
@@ -167,8 +168,6 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 		test := test
 
 		t.Run(fmt.Sprintf("segment %s sequence %s", test.segment, test.sequence), func(t *testing.T) {
-			t.Parallel()
-
 			var count int64
 			startTime := time.Now()
 			expectedTimeInt64 := int64(test.start)
