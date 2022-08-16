@@ -1822,8 +1822,89 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
 func (f *Frame) WaitForNavigation(opts goja.Value) *goja.Promise {
+	f.log.Debugf("Frame:WaitForNavigation",
+		"fid:%s furl:%s", f.ID(), f.URL())
+	defer f.log.Debugf("Frame:WaitForNavigation:return",
+		"fid:%s furl:%s", f.ID(), f.URL())
+
+	parsedOpts := NewFrameWaitForNavigationOptions(
+		time.Duration(f.manager.timeoutSettings.timeout()) * time.Second)
+	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "parsing wait for navigation options: %w", err)
+	}
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, parsedOpts.Timeout)
+
+	navEvtCh, navEvtCancel := createWaitForEventHandler(timeoutCtx, f, []string{EventFrameNavigation},
+		func(data interface{}) bool {
+			return true // Both successful and failed navigations are considered
+		})
+
+	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
+		timeoutCtx, f, []string{EventFrameAddLifecycle},
+		func(data interface{}) bool {
+			if le, ok := data.(LifecycleEvent); ok {
+				return le == parsedOpts.WaitUntil
+			}
+			return false
+		})
+
+	handleTimeoutError := func(err error) {
+		if errors.Is(err, context.DeadlineExceeded) {
+			err = &k6ext.UserFriendlyError{
+				Err:     err,
+				Timeout: parsedOpts.Timeout,
+			}
+			k6ext.Panic(f.ctx, "waiting for navigation: %w", err)
+		}
+		f.log.Debugf("Frame:WaitForNavigation",
+			"fid:%v furl:%s timeoutCtx done: %v",
+			f.ID(), f.URL(), err)
+	}
+
 	return k6ext.Promise(f.ctx, func() (result interface{}, reason error) {
-		return f.manager.waitForFrameNavigation(f, opts)
+		defer func() {
+			timeoutCancel()
+			navEvtCancel()
+			lifecycleEvtCancel()
+		}()
+
+		var (
+			resp       *Response
+			sameDocNav bool
+		)
+		select {
+		case evt := <-navEvtCh:
+			if e, ok := evt.(*NavigationEvent); ok {
+				if e.newDocument == nil {
+					sameDocNav = true
+					break
+				}
+				// request could be nil if navigating to e.g. about:blank
+				req := e.newDocument.request
+				if req != nil {
+					req.responseMu.RLock()
+					resp = req.response
+					req.responseMu.RUnlock()
+				}
+			}
+		case <-timeoutCtx.Done():
+			handleTimeoutError(timeoutCtx.Err())
+			return nil, nil
+		}
+
+		// A lifecycle event won't be received when navigating within the same
+		// document, so don't wait for it. The event might've also already been
+		// fired once we're here, so also skip waiting in that case.
+		if !sameDocNav && !f.hasSubtreeLifecycleEventFired(parsedOpts.WaitUntil) {
+			select {
+			case <-lifecycleEvtCh:
+			case <-timeoutCtx.Done():
+				handleTimeoutError(timeoutCtx.Err())
+			}
+		}
+
+		return resp, nil
 	})
 }
 
