@@ -12,6 +12,9 @@ require (
 	github.com/fatih/color v1.13.0
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/websocket v1.5.0
+	github.com/grafana/xk6-redis v0.1.1
+	github.com/grafana/xk6-timers v0.1.1
+	github.com/grafana/xk6-websockets v0.1.1
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.12.0
 	github.com/klauspost/compress v1.15.7
@@ -41,6 +44,13 @@ require (
 )
 
 require (
+	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
+	github.com/go-redis/redis/v8 v8.11.5 // indirect
+	github.com/mstoykov/k6-taskqueue-lib v0.1.0 // indirect
+)
+
+require (
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.7.0 // indirect
@@ -48,10 +58,8 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1
-	github.com/onsi/ginkgo v1.14.0 // indirect
-	github.com/onsi/gomega v1.10.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect
-	google.golang.org/genproto v0.0.0-20200903010400-9bfcb5116336 // indirect
+	google.golang.org/genproto v0.0.0-20210604141403-392c879c8b08 // indirect
 )
