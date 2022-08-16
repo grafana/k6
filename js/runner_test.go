@@ -700,7 +700,7 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 
 			initVU, err := r.newVU(1, 1, samples)
 			require.NoError(t, err)
-			for i := 0; i < 1000; i++ {
+			for i := 0; i < 100; i++ {
 				wg.Add(1)
 				newCtx, newCancel := context.WithCancel(ctx)
 				vu := initVU.Activate(&lib.VUActivationParams{
