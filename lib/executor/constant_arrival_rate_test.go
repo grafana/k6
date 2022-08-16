@@ -77,7 +77,9 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 		return nil
 	})
 
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestConstantArrivalRateConfig())
+	cfg := getTestConstantArrivalRateConfig()
+	cfg.Duration.Duration -= types.Duration(10 * time.Millisecond) // prevent a race for the 251th iteration
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, cfg)
 	defer test.cancel()
 
 	var wg sync.WaitGroup
@@ -85,13 +87,20 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		// check that we got around the amount of VU iterations as we would expect
-		var currentCount int64
+		var totalCount int64
 
 		for i := 0; i < 5; i++ {
 			time.Sleep(time.Second)
-			currentCount = atomic.SwapInt64(&count, 0)
-			require.InDelta(t, 50, currentCount, 1)
+			currentCount := atomic.SwapInt64(&count, 0)
+			totalCount += currentCount
+			// We have a relatively relaxed constraint here, but we also check
+			// the final iteration count exactly below:
+			assert.InDelta(t, 50, currentCount, 5)
 		}
+
+		time.Sleep(200 * time.Millisecond) // just in case
+
+		require.Equal(t, int64(250), totalCount+atomic.LoadInt64(&count))
 	}()
 	engineOut := make(chan metrics.SampleContainer, 1000)
 	require.NoError(t, test.executor.Run(test.ctx, engineOut))
