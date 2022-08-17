@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sync"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -71,6 +72,7 @@ type ExecutionContext struct {
 	session        session
 	frame          *Frame
 	id             runtime.ExecutionContextID
+	isMutex        sync.RWMutex
 	injectedScript api.JSHandle
 	vu             k6modules.VU
 
@@ -267,9 +269,13 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 		"sid:%s stid:%s fid:%s ectxid:%d efurl:%s",
 		e.sid, e.stid, e.fid, e.id, e.furl)
 
+	e.isMutex.RLock()
 	if e.injectedScript != nil {
-		return e.injectedScript, nil
+		injectedScript := e.injectedScript
+		e.isMutex.RUnlock()
+		return injectedScript, nil
 	}
+	e.isMutex.RUnlock()
 
 	var (
 		suffix                  = `//# sourceURL=` + evaluationScriptURL
@@ -295,9 +301,11 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (api.JSHand
 	if !ok {
 		return nil, ErrJSHandleInvalid
 	}
+	e.isMutex.Lock()
 	e.injectedScript = injectedScript
+	e.isMutex.Unlock()
 
-	return e.injectedScript, nil
+	return injectedScript, nil
 }
 
 // Eval evaluates the provided JavaScript within this execution context and
