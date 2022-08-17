@@ -1,6 +1,11 @@
 package browser
 
 import (
+	"log"
+	"net/http"
+	_ "net/http/pprof" // nolint:gosec
+	"os"
+
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
@@ -37,6 +42,16 @@ var (
 	_ k6modules.Instance = &ModuleInstance{}
 )
 
+func init() {
+	if _, ok := os.LookupEnv("XK6_BROWSER_PPROF"); ok {
+		go func() {
+			address := "localhost:6060"
+			log.Println("Starting http debug server", address)
+			log.Println(http.ListenAndServe(address, nil))
+		}()
+	}
+}
+
 // New returns a pointer to a new RootModule instance.
 func New() *RootModule {
 	return &RootModule{}
@@ -69,16 +84,6 @@ func (mi *ModuleInstance) Exports() k6modules.Exports {
 
 // Launch Chromium with given options.
 func (m *JSModule) Launch(opts goja.Value) api.Browser {
-	/*go func() {
-		f, err := os.Create("./cpu.profile")
-		if err != nil {
-			log.Fatal(err)
-		}
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-		<-ctx.Done()
-	}()*/
-
 	ctx := k6ext.WithVU(m.vu.Context(), m.vu)
 	ctx = k6ext.WithCustomMetrics(ctx, m.k6Metrics)
 
