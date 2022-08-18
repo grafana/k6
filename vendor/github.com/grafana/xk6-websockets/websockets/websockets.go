@@ -64,7 +64,7 @@ type webSocket struct {
 	vu             modules.VU
 	url            *url.URL
 	conn           *websocket.Conn
-	tags           *metrics.SampleTags
+	tags           *metrics.TagSet
 	tq             *taskqueue.TaskQueue
 	builtinMetrics *metrics.BuiltinMetrics
 	obj            *goja.Object // the object that is given to js to interact with the WebSocket
@@ -195,10 +195,10 @@ func (w *webSocket) establishConnection() {
 	conn, httpResponse, connErr := wsd.DialContext(ctx, w.url.String(), header)
 	connectionEnd := time.Now()
 	connectionDuration := metrics.D(connectionEnd.Sub(start))
-	tags := state.CloneTags()
+	tags := state.Tags.GetCurrentValues()
 	if state.Options.SystemTags.Has(metrics.TagIP) && conn.RemoteAddr() != nil {
 		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
-			tags["ip"] = ip
+			tags = tags.With("ip", ip)
 		}
 	}
 
@@ -207,21 +207,38 @@ func (w *webSocket) establishConnection() {
 			_ = httpResponse.Body.Close()
 		}()
 		if state.Options.SystemTags.Has(metrics.TagStatus) {
-			tags["status"] = strconv.Itoa(httpResponse.StatusCode)
+			tags = tags.With("status", strconv.Itoa(httpResponse.StatusCode))
 		}
 
 		if state.Options.SystemTags.Has(metrics.TagSubproto) {
-			tags["subproto"] = httpResponse.Header.Get("Sec-WebSocket-Protocol")
+			tags = tags.With("subproto", httpResponse.Header.Get("Sec-WebSocket-Protocol"))
 		}
 	}
 	w.conn = conn
 
-	tags["url"] = w.url.String()
-	w.tags = metrics.IntoSampleTags(&tags)
+	if state.Options.SystemTags.Has(metrics.TagURL) {
+		tags = tags.With("url", w.url.String())
+	}
+	w.tags = tags
+
 	metrics.PushIfNotDone(ctx, state.Samples, metrics.ConnectedSamples{
 		Samples: []metrics.Sample{
-			{Metric: state.BuiltinMetrics.WSSessions, Time: start, Tags: w.tags, Value: 1},
-			{Metric: state.BuiltinMetrics.WSConnecting, Time: start, Tags: w.tags, Value: connectionDuration},
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: state.BuiltinMetrics.WSSessions,
+					Tags:   w.tags,
+				},
+				Time:  start,
+				Value: 1,
+			},
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: state.BuiltinMetrics.WSConnecting,
+					Tags:   w.tags,
+				},
+				Time:  start,
+				Value: connectionDuration,
+			},
 		},
 		Tags: w.tags,
 		Time: start,
@@ -254,7 +271,14 @@ func (w *webSocket) loop(ctx context.Context) {
 
 		metrics.PushIfNotDone(w.vu.Context(), w.vu.State().Samples, metrics.ConnectedSamples{
 			Samples: []metrics.Sample{
-				{Metric: w.builtinMetrics.WSSessionDuration, Time: now, Tags: w.tags, Value: duration},
+				{
+					TimeSeries: metrics.TimeSeries{
+						Metric: w.builtinMetrics.WSSessionDuration,
+						Tags:   w.tags,
+					},
+					Time:  now,
+					Value: duration,
+				},
 			},
 			Tags: w.tags,
 			Time: now,
@@ -353,10 +377,12 @@ func (w *webSocket) loop(ctx context.Context) {
 					})
 
 					metrics.PushIfNotDone(ctx, samplesOutput, metrics.Sample{
-						Metric: w.builtinMetrics.WSMessagesSent,
-						Time:   time.Now(),
-						Tags:   w.tags,
-						Value:  1,
+						TimeSeries: metrics.TimeSeries{
+							Metric: w.builtinMetrics.WSMessagesSent,
+							Tags:   w.tags,
+						},
+						Time:  time.Now(),
+						Value: 1,
 					})
 				case <-w.done:
 					return
@@ -422,10 +448,12 @@ func (w *webSocket) loop(ctx context.Context) {
 				}
 				// TODO maybe emit after all the listeners have fired and skip it if defaultPrevent was called?!?
 				metrics.PushIfNotDone(ctx, samplesOutput, metrics.Sample{
-					Metric: w.builtinMetrics.WSMessagesReceived,
-					Time:   msg.t,
-					Tags:   w.tags,
-					Value:  1,
+					TimeSeries: metrics.TimeSeries{
+						Metric: w.builtinMetrics.WSMessagesReceived,
+						Tags:   w.tags,
+					},
+					Time:  msg.t,
+					Value: 1,
 				})
 
 				rt := w.vu.Runtime()
