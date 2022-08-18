@@ -1849,17 +1849,18 @@ func (f *Frame) WaitForNavigation(opts goja.Value) *goja.Promise {
 			return false
 		})
 
-	handleTimeoutError := func(err error) {
-		if errors.Is(err, context.DeadlineExceeded) {
-			err = &k6ext.UserFriendlyError{
+	handleTimeoutError := func(err error) error {
+		f.log.Debugf("Frame:WaitForNavigation",
+			"fid:%v furl:%s timeoutCtx done: %v", f.ID(), f.URL(), err)
+		if err != nil {
+			e := &k6ext.UserFriendlyError{
 				Err:     err,
 				Timeout: parsedOpts.Timeout,
 			}
-			k6ext.Panic(f.ctx, "waiting for navigation: %w", err)
+			return fmt.Errorf("waiting for navigation: %w", e)
 		}
-		f.log.Debugf("Frame:WaitForNavigation",
-			"fid:%v furl:%s timeoutCtx done: %v",
-			f.ID(), f.URL(), err)
+
+		return nil
 	}
 
 	return k6ext.Promise(f.ctx, func() (result interface{}, reason error) {
@@ -1889,8 +1890,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) *goja.Promise {
 				}
 			}
 		case <-timeoutCtx.Done():
-			handleTimeoutError(timeoutCtx.Err())
-			return nil, nil
+			return nil, handleTimeoutError(timeoutCtx.Err())
 		}
 
 		// A lifecycle event won't be received when navigating within the same
@@ -1900,7 +1900,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) *goja.Promise {
 			select {
 			case <-lifecycleEvtCh:
 			case <-timeoutCtx.Done():
-				handleTimeoutError(timeoutCtx.Err())
+				return nil, handleTimeoutError(timeoutCtx.Err())
 			}
 		}
 
