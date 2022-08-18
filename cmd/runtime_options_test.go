@@ -3,9 +3,11 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/url"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,7 +31,10 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 	flags := runtimeOptionFlagSet(tc.useSysEnv)
 	require.NoError(t, flags.Parse(tc.cliFlags))
 
-	rtOpts, err := getRuntimeOptions(flags, tc.systemEnv)
+	logger := logrus.New()
+	logger.Out = io.Discard
+
+	rtOpts, err := getRuntimeOptions(logger, flags, tc.systemEnv)
 	if tc.expErr {
 		require.Error(t, err)
 		return
@@ -113,11 +118,12 @@ func TestRuntimeOptions(t *testing.T) {
 	runtimeOptionsTestCases := map[string]runtimeOptionsTestCase{
 		"empty env": {
 			useSysEnv: true,
+			systemEnv: map[string]string{},
 			// everything else is empty
 			expRTOpts: lib.RuntimeOptions{
 				IncludeSystemEnvVars: null.NewBool(true, false),
 				CompatibilityMode:    defaultCompatMode,
-				Env:                  nil,
+				Env:                  map[string]string{},
 			},
 		},
 		"disabled sys env by default": {
@@ -204,6 +210,39 @@ func TestRuntimeOptions(t *testing.T) {
 				IncludeSystemEnvVars: null.NewBool(true, true),
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{"test1": "val1"},
+			},
+		},
+		"ignore invalid name system env var name 1": {
+			useSysEnv: false,
+			systemEnv: map[string]string{"test a": "val1", "valid": "val2"},
+			cliFlags:  []string{"--include-system-env-vars=true"},
+			expErr:    false,
+			expRTOpts: lib.RuntimeOptions{
+				IncludeSystemEnvVars: null.NewBool(true, true),
+				CompatibilityMode:    defaultCompatMode,
+				Env:                  map[string]string{"valid": "val2"},
+			},
+		},
+		"ignore invalid name system env var name 2": {
+			useSysEnv: false,
+			systemEnv: map[string]string{"1var": "val1", "valid": "val2"},
+			cliFlags:  []string{"--include-system-env-vars=true"},
+			expErr:    false,
+			expRTOpts: lib.RuntimeOptions{
+				IncludeSystemEnvVars: null.NewBool(true, true),
+				CompatibilityMode:    defaultCompatMode,
+				Env:                  map[string]string{"valid": "val2"},
+			},
+		},
+		"ignore invalid name system env var name 3": {
+			useSysEnv: false,
+			systemEnv: map[string]string{"уникод": "unicode-disabled", "valid": "val2"},
+			cliFlags:  []string{"--include-system-env-vars=true"},
+			expErr:    false,
+			expRTOpts: lib.RuntimeOptions{
+				IncludeSystemEnvVars: null.NewBool(true, true),
+				CompatibilityMode:    defaultCompatMode,
+				Env:                  map[string]string{"valid": "val2"},
 			},
 		},
 		"run only system env": {
