@@ -315,9 +315,8 @@ func TestThresholdDeprecationWarnings(t *testing.T) {
 	newRootCommand(ts.globalState).execute()
 
 	logs := ts.loggerHook.Drain()
-	assert.True(t, testutils.LogContains(logs, logrus.WarnLevel,
-		"Thresholds like 'http_req_duration{url:https://test.k6.io}', based on the high-cardinality 'url' metric tag, are deprecated",
-	))
+	assert.False(t, testutils.LogContains(logs, logrus.WarnLevel, "http_req_duration{url:https://test.k6.io}"))
+
 	assert.True(t, testutils.LogContains(logs, logrus.WarnLevel,
 		"Thresholds like 'http_req_duration{error:foo}', based on the high-cardinality 'error' metric tag, are deprecated",
 	))
