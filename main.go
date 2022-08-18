@@ -43,7 +43,7 @@ var (
 )
 
 func init() {
-	if _, ok := os.LookupEnv("XK6_BROWSER_PPROF"); ok {
+	if _, ok := os.LookupEnv("K6_BROWSER_PPROF"); ok {
 		go func() {
 			address := "localhost:6060"
 			log.Println("Starting http debug server", address)
