@@ -16,12 +16,20 @@ type TimeSeries struct {
 	Tags   *TagSet
 }
 
-// A Sample is a single metric measurement.
+// A Sample is a single metric measurement at a specific point in time. It can
+// have two sets of string key=value metadata:
+//   - indexed Tags for low-cardinality data that are part of the TimeSeries
+//   - optional non-indexed Metadata that are meant for high-cardinality information
 type Sample struct {
 	TimeSeries
 	Time  time.Time
 	Value float64
-	// TODO: add Metadata map[string]string, which could be nil
+
+	// Optional high-cardinality metadata that won't be indexed in atlas.
+	//
+	// It can be nil if it wasn't explicitly specified, reduce memory
+	// allocations and GC overhead.
+	Metadata map[string]string
 }
 
 // SampleContainer is a simple abstraction that allows sample

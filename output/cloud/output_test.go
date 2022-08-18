@@ -194,9 +194,8 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 	assert.Equal(t, types.Duration(5*time.Millisecond), out.config.AggregationWaitPeriod.Duration)
 
 	now := time.Now()
-	tagMap := map[string]string{"test": "mest", "a": "b", "name": "name", "url": "url"}
+	tagMap := map[string]string{"test": "mest", "a": "b", "name": "name", "url": "name"}
 	tags := registry.RootTagSet().WithTagsFromMap(tagMap)
-	expectedTags := `{"test": "mest", "a": "b", "name": "name", "url": "name"}`
 
 	expSamples := make(chan []Sample)
 	defer close(expSamples)
@@ -274,7 +273,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 			Data: func(data interface{}) {
 				aggrData, ok := data.(*SampleDataAggregatedHTTPReqs)
 				assert.True(t, ok)
-				assert.JSONEq(t, expectedTags, string(aggrData.Tags))
+				assert.JSONEq(t, `{"test": "mest", "a": "b", "name": "name", "url": "name"}`, string(aggrData.Tags))
 				assert.Equal(t, out.config.AggregationMinSamples.Int64, int64(aggrData.Count))
 				assert.Equal(t, "aggregated_trend", aggrData.Type)
 				assert.InDelta(t, now.UnixNano(), aggrData.Time*1000, float64(out.config.AggregationPeriod.Duration))
@@ -896,48 +895,4 @@ func TestNewOutputClientTimeout(t *testing.T) {
 
 	err = out.client.PushMetric("testmetric", nil)
 	assert.True(t, os.IsTimeout(err))
-}
-
-func TestUseCloudTags(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		in   map[string]string
-		exp  map[string]string
-	}{
-		{
-			name: "without url",
-			in:   map[string]string{"name": "test-name"},
-			exp:  map[string]string{"name": "test-name"},
-		},
-		{
-			name: "without name",
-			in:   map[string]string{"url": "myurl"},
-			exp:  map[string]string{"url": "myurl"},
-		},
-		{
-			name: "url equals name",
-			in:   map[string]string{"name": "thesame", "url": "thesame"},
-			exp:  map[string]string{"name": "thesame", "url": "thesame"},
-		},
-		{
-			name: "url overwritten",
-			in:   map[string]string{"name": "test-name", "url": "myurl"},
-			exp:  map[string]string{"name": "test-name", "url": "test-name"},
-		},
-	}
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			trail := &httpext.Trail{
-				Tags: metrics.NewRegistry().RootTagSet().WithTagsFromMap(tc.in),
-			}
-			newTrail := useCloudTags(trail)
-			assert.Equal(t, tc.exp, newTrail.Tags.Map())
-			assert.Equal(t, tc.in, trail.Tags.Map())
-		})
-	}
 }

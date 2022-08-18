@@ -62,7 +62,7 @@ func newConfig() config {
 		BufferSize:   null.NewInt(20, false),
 		Namespace:    null.NewString("k6.", false),
 		PushInterval: types.NewNullDuration(1*time.Second, false),
-		TagBlocklist: (metrics.TagVU | metrics.TagIter | metrics.TagURL).Map(),
+		TagBlocklist: metrics.SystemTagSet(metrics.TagVU | metrics.TagIter | metrics.TagURL).Map(),
 		EnableTags:   null.NewBool(false, false),
 	}
 }

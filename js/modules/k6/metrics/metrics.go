@@ -108,20 +108,19 @@ func (m Metric) add(v goja.Value, addTags goja.Value) (bool, error) {
 		return raiseNan()
 	}
 
-	tags := state.Tags.GetCurrentValues()
-	newTags, err := common.ApplyCustomUserTags(m.vu.Runtime(), tags, addTags)
-	if err != nil {
+	ctm := state.Tags.GetCurrentValues()
+	if err := common.ApplyCustomUserTags(m.vu.Runtime(), &ctm, addTags); err != nil {
 		return false, fmt.Errorf("cannot add tags for the '%s' custom metric: %w", m.metric.Name, err)
 	}
-	tags = newTags
 
 	sample := metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
 			Metric: m.metric,
-			Tags:   tags,
+			Tags:   ctm.Tags,
 		},
-		Time:  time.Now(),
-		Value: vfloat,
+		Time:     time.Now(),
+		Metadata: ctm.Metadata,
+		Value:    vfloat,
 	}
 	metrics.PushIfNotDone(m.vu.Context(), state.Samples, sample)
 	return true, nil

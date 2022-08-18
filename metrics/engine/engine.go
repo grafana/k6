@@ -87,23 +87,19 @@ func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Me
 		return sm.Metric, nil
 	}
 
-	// TODO: reword these from "will be deprecated" to "were deprecated" and
-	// maybe make them errors, not warnings, when we introduce un-indexable tags
-	if _, ok := sm.Tags.Get("error"); ok {
-		me.logger.Warnf("Thresholds like '%s', based on the high-cardinality 'error' metric tag, "+
-			"are deprecated and will not be supported in future k6 releases. "+
-			"To prevent breaking changes and reduce bugs, use the 'error_code' metric tag instead", name,
-		)
-	}
 	if _, ok := sm.Tags.Get("vu"); ok {
-		me.logger.Warnf("Thresholds like '%s', based on the high-cardinality 'vu' metric tag, "+
-			"are deprecated and will not be supported in future k6 releases.", name,
+		me.logger.Warnf(
+			"The high-cardinality 'vu' metric tag was made non-indexable in k6 v0.41.0, so thresholds"+
+				" like '%s' that are based on it won't work correctly.",
+			name,
 		)
 	}
 
 	if _, ok := sm.Tags.Get("iter"); ok {
-		me.logger.Warnf("Thresholds like '%s', based on the high-cardinality 'iter' metric tag, "+
-			"are deprecated and will not be supported in future k6 releases.", name,
+		me.logger.Warnf(
+			"The high-cardinality 'iter' metric tag was made non-indexable in k6 v0.41.0, so thresholds"+
+				" like '%s' that are based on it won't work correctly.",
+			name,
 		)
 	}
 

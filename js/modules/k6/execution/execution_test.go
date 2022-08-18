@@ -61,8 +61,8 @@ func TestVUTagsJSONEncoding(t *testing.T) {
 		},
 		Tags: lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().With("vu", "42")),
 	})
-	tenv.VU.State().Tags.Modify(func(tags *metrics.TagSet) *metrics.TagSet {
-		return tags.With("custom-tag", "mytag1")
+	tenv.VU.State().Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+		tagsAndMeta.SetTag("custom-tag", "mytag1")
 	})
 
 	encoded, err := tenv.VU.Runtime().RunString(`JSON.stringify(exec.vu.tags)`)
@@ -304,7 +304,7 @@ func TestOptionsTestFull(t *testing.T) {
 				SummaryTrendStats: []string{"avg", "min", "max"},
 				SummaryTimeUnit:   null.StringFrom("ms"),
 				SystemTags: func() *metrics.SystemTagSet {
-					sysm := metrics.TagIter | metrics.TagVU
+					sysm := metrics.SystemTagSet(metrics.TagIter | metrics.TagVU)
 					return &sysm
 				}(),
 				RunTags:                 map[string]string{"runtag-key": "runtag-value"},

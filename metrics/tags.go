@@ -18,9 +18,9 @@ import (
 // https://github.com/mstoykov/atlas data structure.
 //
 // Assuming all tag sets start from the same root (see Registry.RootTagSet()),
-// you can compare *TagSet values of different metric Samples with the `==` to
-// check if they have the same tags, and you can also use *TagSet values for map
-// indexes and caching.
+// you can compare *TagSet values of different metric Samples with the `==` Go
+// operator to check if they have the same tags, and you can also use *TagSet
+// values for map indexes and caching.
 //
 // See also the TimeSeries type for comparing a Sample's {metric+tags} for
 // equality at the same time.
@@ -155,6 +155,80 @@ var _ interface {
 	json.Marshaler
 	json.Unmarshaler
 } = &TagSet{}
+
+// TagsAndMeta is a helper type that provides easy group manipulation of the
+// indexed Tags and the non-indexed Metadata values together. While both of them
+// are part of a metric Sample, the TagsAndMeta type isn't used there because
+// the Tags participate in the Sample's TimeSeries and the Metadata does not.
+//
+// Instead, this type is mostly used by the VU and JS code while it assembles
+// the final consolidated Tags and Metadata values to put in the Sample.
+//
+// IMPORTANT: this data structure is not thread safe! The methods of the
+// lib.VUStateTags type are where the synchronization happens.
+type TagsAndMeta struct {
+	Tags     *TagSet
+	Metadata map[string]string // could be nil
+}
+
+// SetTag adds the given key=value tag to the Tags.
+func (tm *TagsAndMeta) SetTag(key, value string) {
+	tm.Tags = tm.Tags.With(key, value)
+}
+
+// SetMetadata adds the given key=value datum to the Metadata.
+func (tm *TagsAndMeta) SetMetadata(key, value string) {
+	if tm.Metadata == nil {
+		tm.Metadata = map[string]string{key: value}
+		return
+	}
+	tm.Metadata[key] = value
+}
+
+// SetSystemTagOrMetaIfEnabled checks if the supplied SystemTag is enabled in
+// this test run (i.e. is in the SystemTagSet) and passes it to
+// SetSystemTagOrMeta() if it is.
+func (tm *TagsAndMeta) SetSystemTagOrMetaIfEnabled(enabledSystemTags *SystemTagSet, tag SystemTag, value string) {
+	if !enabledSystemTags.Has(tag) {
+		return
+	}
+	tm.SetSystemTagOrMeta(tag, value)
+}
+
+// SetSystemTagOrMeta automatically adds the system tag either as an indexed tag
+// or an unindexed one (metadata), based on the NonIndexableSystemTags set.
+func (tm *TagsAndMeta) SetSystemTagOrMeta(tag SystemTag, value string) {
+	if NonIndexableSystemTags.Has(tag) {
+		tm.SetMetadata(tag.String(), value)
+	} else {
+		tm.SetTag(tag.String(), value)
+	}
+}
+
+// DeleteTag removes the given key from tags.
+func (tm *TagsAndMeta) DeleteTag(key string) {
+	tm.Tags = tm.Tags.Without(key)
+}
+
+// DeleteMetadata removes the given key from metadata.
+func (tm *TagsAndMeta) DeleteMetadata(key string) {
+	if tm.Metadata != nil {
+		delete(tm.Metadata, key)
+	}
+}
+
+// Clone makes a complete copy of the current TagsAndMeta object and returns it.
+func (tm TagsAndMeta) Clone() TagsAndMeta {
+	res := TagsAndMeta{Tags: tm.Tags}
+	if tm.Metadata == nil {
+		return res
+	}
+	res.Metadata = make(map[string]string, len(tm.Metadata))
+	for k, v := range tm.Metadata {
+		res.Metadata[k] = v
+	}
+	return res
+}
 
 // EnabledTags is a string to bool map (for lookup efficiency) that is used to keep track
 // of which system tags and non-system tags to include.

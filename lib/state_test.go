@@ -16,7 +16,8 @@ func TestVUStateTagsSync(t *testing.T) {
 	t.Parallel()
 
 	tm := NewVUStateTags(metrics.NewRegistry().RootTagSet().With("mytag", "42"))
-	v, found := tm.GetCurrentValues().Get("mytag")
+	cv := tm.GetCurrentValues()
+	v, found := cv.Tags.Get("mytag")
 	assert.True(t, found)
 	assert.Equal(t, "42", v)
 }
@@ -31,7 +32,7 @@ func TestVUStateTagsSafeConcurrent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tm := NewVUStateTags(metrics.NewRegistry().RootTagSet())
+	stateTags := NewVUStateTags(metrics.NewRegistry().RootTagSet())
 	go func() {
 		defer wg.Done()
 		count := 0
@@ -39,14 +40,22 @@ func TestVUStateTagsSafeConcurrent(t *testing.T) {
 			select {
 			case <-time.Tick(1 * time.Millisecond):
 				count++
-				tm.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
-					return currentTags.With("mytag", strconv.Itoa(count))
+				stateTags.Modify(func(tm *metrics.TagsAndMeta) {
+					val := strconv.Itoa(count)
+					tm.SetMetadata("mymeta", val)
+					tm.SetTag("mytag", val)
 				})
 
 			case <-ctx.Done():
-				val, ok := tm.GetCurrentValues().Get("mytag")
+				exp := strconv.Itoa(count)
+				cv := stateTags.GetCurrentValues()
+				val, ok := cv.Tags.Get("mytag")
 				assert.True(t, ok)
-				assert.Equal(t, strconv.Itoa(count), val)
+				assert.Equal(t, exp, val)
+
+				metaval, metaok := cv.Metadata["mymeta"]
+				assert.True(t, metaok)
+				assert.Equal(t, exp, metaval)
 				return
 			}
 		}
@@ -57,7 +66,9 @@ func TestVUStateTagsSafeConcurrent(t *testing.T) {
 		for {
 			select {
 			case <-time.Tick(1 * time.Millisecond):
-				tm.GetCurrentValues().Get("mytag")
+				cv := stateTags.GetCurrentValues()
+				cv.Tags.Get("mytag")
+				cv.SetMetadata("mymeta", "foo") // just to ensure this won't have any effect
 
 			case <-ctx.Done():
 				return
@@ -70,22 +81,22 @@ func TestVUStateTagsSafeConcurrent(t *testing.T) {
 
 func TestVUStateTagsDelete(t *testing.T) {
 	t.Parallel()
-	tm := NewVUStateTags(metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{
+	stateTags := NewVUStateTags(metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{
 		"key1": "value1",
 		"key2": "value2",
 	}))
 
-	val, ok := tm.GetCurrentValues().Get("key1")
+	val, ok := stateTags.GetCurrentValues().Tags.Get("key1")
 	require.True(t, ok)
 	require.Equal(t, "value1", val)
 
-	tm.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
-		return currentTags.Without("key1")
+	stateTags.Modify(func(tam *metrics.TagsAndMeta) {
+		tam.DeleteTag("key1")
 	})
-	_, ok = tm.GetCurrentValues().Get("key1")
+	_, ok = stateTags.GetCurrentValues().Tags.Get("key1")
 	assert.False(t, ok)
 
-	assert.Equal(t, map[string]string{"key2": "value2"}, tm.GetCurrentValues().Map())
+	assert.Equal(t, map[string]string{"key2": "value2"}, stateTags.GetCurrentValues().Tags.Map())
 }
 
 func TestVUStateTagsMap(t *testing.T) {
@@ -94,7 +105,7 @@ func TestVUStateTagsMap(t *testing.T) {
 		"key1": "value1",
 		"key2": "value2",
 	}))
-	m := tm.GetCurrentValues().Map()
+	m := tm.GetCurrentValues().Tags.Map()
 	assert.Equal(t, map[string]string{
 		"key1": "value1",
 		"key2": "value2",
