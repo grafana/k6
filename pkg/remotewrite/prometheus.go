@@ -76,12 +76,14 @@ func (pm *PrometheusMapping) MapTrend(ms *metricsStorage, sample metrics.Sample,
 
 	// Prometheus metric system does not support Trend so this mapping will
 	// store a counter for the number of reported values and gauges to keep
-	// track of aggregated values.
+	// track of aggregated values. Also store a sum of the values to allow
+	// the calculation of moving averages.
 	// TODO: when Prometheus implements support for sparse histograms, re-visit this implementation
 
 	s := metric.Sink.(*metrics.TrendSink)
 	aggr := map[string]float64{
 		"count": float64(s.Count),
+		"sum":   s.Sum,
 		"min":   s.Min,
 		"max":   s.Max,
 		"avg":   s.Avg,
@@ -99,6 +101,18 @@ func (pm *PrometheusMapping) MapTrend(ms *metricsStorage, sample metrics.Sample,
 			Samples: []prompb.Sample{
 				{
 					Value:     aggr["count"],
+					Timestamp: timestamp.FromTime(sample.Time),
+				},
+			},
+		},
+		{
+			Labels: append(labels, prompb.Label{
+				Name:  "__name__",
+				Value: fmt.Sprintf("%s%s_sum", defaultMetricPrefix, sample.Metric.Name),
+			}),
+			Samples: []prompb.Sample{
+				{
+					Value:     aggr["sum"],
 					Timestamp: timestamp.FromTime(sample.Time),
 				},
 			},
