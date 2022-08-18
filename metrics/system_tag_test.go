@@ -15,8 +15,8 @@ func TestSystemTagSetMarshalJSON(t *testing.T) {
 		tagset   SystemTagSet
 		expected string
 	}{
-		{TagIP, `["ip"]`},
-		{TagIP | TagProto | TagGroup, `["group","ip","proto"]`},
+		{SystemTagSet(TagIP), `["ip"]`},
+		{SystemTagSet(TagIP | TagProto | TagGroup), `["group","ip","proto"]`},
 		{0, `null`},
 	}
 
@@ -33,10 +33,10 @@ func TestSystemTagSet_UnmarshalJSON(t *testing.T) {
 
 	tests := []struct {
 		tags []byte
-		sets []SystemTagSet
+		sets []SystemTag
 	}{
-		{[]byte(`[]`), []SystemTagSet{}},
-		{[]byte(`["ip", "proto"]`), []SystemTagSet{TagIP, TagProto}},
+		{[]byte(`[]`), []SystemTag{}},
+		{[]byte(`["ip", "proto"]`), []SystemTag{TagIP, TagProto}},
 	}
 
 	for _, tc := range tests {
@@ -51,7 +51,7 @@ func TestSystemTagSet_UnmarshalJSON(t *testing.T) {
 func TestSystemTagSetTextUnmarshal(t *testing.T) {
 	t.Parallel()
 
-	testMatrix := map[string]SystemTagSet{
+	testMatrix := map[string]SystemTag{
 		"":                      0,
 		"ip":                    TagIP,
 		"ip,proto":              TagIP | TagProto,
@@ -64,7 +64,7 @@ func TestSystemTagSetTextUnmarshal(t *testing.T) {
 		set := new(SystemTagSet)
 		err := set.UnmarshalText([]byte(input))
 		require.NoError(t, err)
-		require.Equal(t, expected, *set)
+		require.Equal(t, SystemTagSet(expected), *set)
 	}
 }
 

@@ -109,6 +109,8 @@ func TestTagSetContains(t *testing.T) {
 	assert.False(t, st.Contains(outer))
 }
 
+// TODO: Add TagsAndMeta tests
+
 func TestEnabledTagsMarshalJSON(t *testing.T) {
 	t.Parallel()
 

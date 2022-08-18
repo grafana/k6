@@ -47,7 +47,7 @@ import (
 )
 
 // TODO replace this with the Single version
-func assertRequestMetricsEmitted(t *testing.T, sampleContainers []metrics.SampleContainer, method, url string, status int, group string) {
+func assertRequestMetricsEmitted(t *testing.T, sampleContainers []metrics.SampleContainer, method, nameAndURL string, status int, group string) {
 	seenDuration := false
 	seenBlocked := false
 	seenConnecting := false
@@ -58,10 +58,8 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []metrics.Sample
 	for _, sampleContainer := range sampleContainers {
 		for _, sample := range sampleContainer.GetSamples() {
 			tags := sample.Tags.Map()
-			// URL expected to be always equal name
-			// check https://github.com/grafana/k6/issues/2584#issuecomment-1219618111 to know more
 			assert.Equal(t, tags["url"], tags["name"])
-			if tags["url"] == url {
+			if tags["url"] == nameAndURL {
 				switch sample.Metric.Name {
 				case metrics.HTTPReqDurationName:
 					seenDuration = true
@@ -85,13 +83,13 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []metrics.Sample
 			}
 		}
 	}
-	assert.Truef(t, seenDuration, "url %s didn't emit Duration", url)
-	assert.Truef(t, seenBlocked, "url %s didn't emit Blocked", url)
-	assert.Truef(t, seenConnecting, "url %s didn't emit Connecting", url)
-	assert.Truef(t, seenTLSHandshaking, "url %s didn't emit TLSHandshaking", url)
-	assert.Truef(t, seenSending, "url %s didn't emit Sending", url)
-	assert.Truef(t, seenWaiting, "url %s didn't emit Waiting", url)
-	assert.Truef(t, seenReceiving, "url %s didn't emit Receiving", url)
+	assert.True(t, seenDuration, "url %s didn't emit Duration", nameAndURL)
+	assert.True(t, seenBlocked, "url %s didn't emit Blocked", nameAndURL)
+	assert.True(t, seenConnecting, "url %s didn't emit Connecting", nameAndURL)
+	assert.True(t, seenTLSHandshaking, "url %s didn't emit TLSHandshaking", nameAndURL)
+	assert.True(t, seenSending, "url %s didn't emit Sending", nameAndURL)
+	assert.True(t, seenWaiting, "url %s didn't emit Waiting", nameAndURL)
+	assert.True(t, seenReceiving, "url %s didn't emit Receiving", nameAndURL)
 }
 
 func assertRequestMetricsEmittedSingle(t *testing.T, sampleContainer metrics.SampleContainer, expectedTags map[string]string, metrics []string, callback func(sample metrics.Sample)) {
@@ -1991,7 +1989,7 @@ func TestResponseTypes(t *testing.T) {
 }
 
 func checkErrorCode(t testing.TB, sample metrics.Sample, code int, msg string) {
-	errorMsg, ok := sample.Tags.Get("error")
+	errorMsg, ok := sample.Metadata["error"]
 	if msg == "" {
 		assert.False(t, ok)
 	} else {

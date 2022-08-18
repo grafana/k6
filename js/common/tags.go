@@ -8,31 +8,30 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
-// ApplyCustomUserTags modifies the given metrics.TagSet object with the
-// user specified custom tags.
+// ApplyCustomUserTags modifies the given metrics.TagsAndMeta object with the
+// user specified custom tags and metadata (i.e. indexed or non-indexed tags).
 // It expects to receive the `keyValues` object in the `{key1: value1, key2:
 // value2, ...}` format.
-func ApplyCustomUserTags(rt *goja.Runtime, tags *metrics.TagSet, keyValues goja.Value) (*metrics.TagSet, error) {
+func ApplyCustomUserTags(rt *goja.Runtime, tagsAndMeta *metrics.TagsAndMeta, keyValues goja.Value) error {
 	if keyValues == nil || goja.IsNull(keyValues) || goja.IsUndefined(keyValues) {
-		return tags, nil
+		return nil
 	}
 
 	keyValuesObj := keyValues.ToObject(rt)
 
-	newTags := tags
-	var err error
 	for _, key := range keyValuesObj.Keys() {
-		if newTags, err = ApplyCustomUserTag(rt, newTags, key, keyValuesObj.Get(key)); err != nil {
-			return nil, err
+		if err := ApplyCustomUserTag(rt, tagsAndMeta, key, keyValuesObj.Get(key)); err != nil {
+			return err
 		}
 	}
 
-	return newTags, nil
+	return nil
 }
 
-// ApplyCustomUserTag modifies the given metrics.TagSet object with the
-// given custom tag and its value.
-func ApplyCustomUserTag(rt *goja.Runtime, tags *metrics.TagSet, key string, val goja.Value) (*metrics.TagSet, error) {
+// ApplyCustomUserTag modifies the given metrics.TagsAndMeta object with the
+// given custom tag and its value, either as an indexed tag or, if the value is
+// an object in the `{key1: value1, key2: value2, ...}` format, as metadata.
+func ApplyCustomUserTag(rt *goja.Runtime, tagsAndMeta *metrics.TagsAndMeta, key string, val goja.Value) error {
 	kind := reflect.Invalid
 	if typ := val.ExportType(); typ != nil {
 		kind = typ.Kind()
@@ -45,12 +44,35 @@ func ApplyCustomUserTag(rt *goja.Runtime, tags *metrics.TagSet, key string, val 
 		reflect.Int64,
 		reflect.Float64:
 
-		return tags.With(key, val.String()), nil
+		tagsAndMeta.SetTag(key, val.String())
+
+		return nil
+
+	case reflect.Map:
+		objVal := val.ToObject(rt)
+		val = objVal.Get("value")
+		indexed := objVal.Get("index")
+
+		if val == nil || goja.IsUndefined(val) || goja.IsNull(val) ||
+			indexed == nil || goja.IsUndefined(indexed) || goja.IsNull(indexed) {
+			return fmt.Errorf(
+				"setting '%s' metric tag failed; tag value objects need to have the 'value' and 'index' properties",
+				key,
+			)
+		}
+
+		if indexed.ToBoolean() {
+			tagsAndMeta.SetTag(key, val.String())
+		} else {
+			tagsAndMeta.SetMetadata(key, val.String())
+		}
+
+		return nil
 
 	default:
-		return nil, fmt.Errorf(
-			"invalid value for metric tag '%s': "+
-				"only String, Boolean and Number types are accepted as a metric tag values",
+		return fmt.Errorf(
+			"setting '%s' metric tag failed; only String, Boolean and Number types, or objects"+
+				" with the 'value' and 'index' properties, are accepted as a metric tag values",
 			key,
 		)
 	}

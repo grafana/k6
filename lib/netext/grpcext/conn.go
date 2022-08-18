@@ -30,7 +30,7 @@ import (
 // Request represents a gRPC request.
 type Request struct {
 	MethodDescriptor protoreflect.MethodDescriptor
-	Tags             *metrics.TagSet
+	TagsAndMeta      *metrics.TagsAndMeta
 	Message          []byte
 }
 
@@ -111,7 +111,7 @@ func (c *Conn) Invoke(
 		return nil, fmt.Errorf("unable to serialise request object to protocol buffer: %w", err)
 	}
 
-	ctx = withRPCState(ctx, &rpcState{tags: req.Tags})
+	ctx = withRPCState(ctx, &rpcState{tagsAndMeta: req.TagsAndMeta})
 
 	resp := dynamicpb.NewMessage(req.MethodDescriptor.Output())
 	header, trailer := metadata.New(nil), metadata.New(nil)
@@ -202,7 +202,8 @@ func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	// nil. In this case, we can reuse the VU.State's Tags.
 	if stateRPC == nil {
 		// TODO: investigate this more, there has to be a way to fix it :/
-		stateRPC = &rpcState{tags: state.Tags.GetCurrentValues()}
+		ctm := state.Tags.GetCurrentValues()
+		stateRPC = &rpcState{tagsAndMeta: &ctm}
 	}
 
 	switch s := stat.(type) {
@@ -210,21 +211,22 @@ func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 		// TODO: figure out something better, e.g. via TagConn() or TagRPC()?
 		if state.Options.SystemTags.Has(metrics.TagIP) && s.RemoteAddr != nil {
 			if ip, _, err := net.SplitHostPort(s.RemoteAddr.String()); err == nil {
-				stateRPC.tags = stateRPC.tags.With("ip", ip)
+				stateRPC.tagsAndMeta.SetSystemTagOrMeta(metrics.TagIP, ip)
 			}
 		}
 	case *grpcstats.End:
 		if state.Options.SystemTags.Has(metrics.TagStatus) {
-			stateRPC.tags = stateRPC.tags.With("status", strconv.Itoa(int(status.Code(s.Error))))
+			stateRPC.tagsAndMeta.SetSystemTagOrMeta(metrics.TagStatus, strconv.Itoa(int(status.Code(s.Error))))
 		}
 
 		metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
 			TimeSeries: metrics.TimeSeries{
 				Metric: state.BuiltinMetrics.GRPCReqDuration,
-				Tags:   stateRPC.tags,
+				Tags:   stateRPC.tagsAndMeta.Tags,
 			},
-			Time:  s.EndTime,
-			Value: metrics.D(s.EndTime.Sub(s.BeginTime)),
+			Time:     s.EndTime,
+			Metadata: stateRPC.tagsAndMeta.Metadata,
+			Value:    metrics.D(s.EndTime.Sub(s.BeginTime)),
 		})
 	}
 
@@ -306,7 +308,7 @@ type contextKey string
 var ctxKeyRPCState = contextKey("rpcState") //nolint:gochecknoglobals
 
 type rpcState struct {
-	tags *metrics.TagSet
+	tagsAndMeta *metrics.TagsAndMeta
 }
 
 func withRPCState(ctx context.Context, rpcState *rpcState) context.Context {

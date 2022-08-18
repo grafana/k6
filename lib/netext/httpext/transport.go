@@ -19,7 +19,7 @@ import (
 type transport struct {
 	ctx              context.Context
 	state            *lib.State
-	tags             *metrics.TagSet
+	tagsAndMeta      *metrics.TagsAndMeta
 	responseCallback func(int) bool
 
 	lastRequest     *unfinishedRequest
@@ -57,13 +57,13 @@ var _ http.RoundTripper = &transport{}
 func newTransport(
 	ctx context.Context,
 	state *lib.State,
-	tags *metrics.TagSet,
+	ctm *metrics.TagsAndMeta,
 	responseCallback func(int) bool,
 ) *transport {
 	return &transport{
 		ctx:              ctx,
 		state:            state,
-		tags:             tags,
+		tagsAndMeta:      ctm,
 		responseCallback: responseCallback,
 		lastRequestLock:  new(sync.Mutex),
 	}
@@ -80,22 +80,30 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 		trail:             trail,
 	}
 
-	tags := t.tags
+	ctm := t.tagsAndMeta.Clone()
 	enabledTags := t.state.Options.SystemTags
 	cleanURL := URL{u: unfReq.request.URL, URL: unfReq.request.URL.String()}.Clean()
 
-	// After k6 v0.41.0, the `name` and `url` tags have the exact same values:
-	nameTagValue, nameTagManuallySet := tags.Get(metrics.TagName.String())
+	// After k6 v0.41.0, the `name` and `url` tags  have the exact same values:
+	nameTagValue, nameTagManuallySet := ctm.Tags.Get(metrics.TagName.String())
 	if !nameTagManuallySet {
 		// If the user *didn't* manually set a `name` tag value and didn't use
-		// the http.url template literal helper to have k6 automatically set
+		// the http.url`` template literal helper to have k6 automatically set
 		// it (see `lib/netext/httpext.MakeRequest()`), we will use the cleaned
 		// URL value as the value of both `name` and `url` tags.
-		if enabledTags.Has(metrics.TagURL) {
-			tags = tags.With(metrics.TagURL.String(), cleanURL)
-		}
-		if enabledTags.Has(metrics.TagName) {
-			tags = tags.With(metrics.TagName.String(), cleanURL)
+		ctm.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagName, cleanURL)
+		ctm.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagURL, cleanURL)
+	} else {
+		// However, if the user set the `name` tag value somehow, we will use
+		// whatever they set as the value of the `url` tags too, to prevent
+		// high-cardinality values in the indexed tags.
+		ctm.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagURL, nameTagValue)
+
+		// However, if the actual clean-URL value would have been different than
+		// the `name` value, we will also attach it as the `raw_url` non-indexed
+		// tag (i.e. add it to the Sample.Metadata).
+		if nameTagValue != cleanURL {
+			ctm.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagRawURL, cleanURL)
 		}
 	} else if enabledTags.Has(metrics.TagURL) {
 		// However, if the user set the `name` tag value somehow, we will use
@@ -104,51 +112,37 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 		tags = tags.With(metrics.TagURL.String(), nameTagValue)
 	}
 
-	if enabledTags.Has(metrics.TagMethod) {
-		tags = tags.With("method", unfReq.request.Method)
-	}
+	ctm.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagMethod, unfReq.request.Method)
 
 	if unfReq.err != nil {
 		result.errorCode, result.errorMsg = errorCodeForError(unfReq.err)
-		if enabledTags.Has(metrics.TagError) {
-			tags = tags.With("error", result.errorMsg)
-		}
-
+		ctm.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagError, result.errorMsg)
 		if enabledTags.Has(metrics.TagErrorCode) {
-			tags = tags.With("error_code", strconv.Itoa(int(result.errorCode)))
+			ctm.SetSystemTagOrMeta(metrics.TagErrorCode, strconv.Itoa(int(result.errorCode)))
 		}
-
-		if enabledTags.Has(metrics.TagStatus) {
-			tags = tags.With("status", "0")
-		}
+		ctm.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagStatus, "0")
 	} else {
 		if enabledTags.Has(metrics.TagStatus) {
-			tags = tags.With("status", strconv.Itoa(unfReq.response.StatusCode))
+			ctm.SetSystemTagOrMeta(metrics.TagStatus, strconv.Itoa(unfReq.response.StatusCode))
 		}
 		if unfReq.response.StatusCode >= 400 {
+			result.errorCode = errCode(1000 + unfReq.response.StatusCode)
 			if enabledTags.Has(metrics.TagErrorCode) {
-				result.errorCode = errCode(1000 + unfReq.response.StatusCode)
-				tags = tags.With("error_code", strconv.Itoa(int(result.errorCode)))
+				ctm.SetSystemTagOrMeta(metrics.TagErrorCode, strconv.Itoa(int(result.errorCode)))
 			}
 		}
-		if enabledTags.Has(metrics.TagProto) {
-			tags = tags.With("proto", unfReq.response.Proto)
-		}
+		ctm.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagProto, unfReq.response.Proto)
 
 		if unfReq.response.TLS != nil {
 			tlsInfo, oscp := netext.ParseTLSConnState(unfReq.response.TLS)
-			if enabledTags.Has(metrics.TagTLSVersion) {
-				tags = tags.With("tls_version", tlsInfo.Version)
-			}
-			if enabledTags.Has(metrics.TagOCSPStatus) {
-				tags = tags.With("ocsp_status", oscp.Status)
-			}
+			ctm.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagTLSVersion, tlsInfo.Version)
+			ctm.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagOCSPStatus, oscp.Status)
 			result.tlsInfo = tlsInfo
 		}
 	}
 	if enabledTags.Has(metrics.TagIP) && trail.ConnRemoteAddr != nil {
 		if ip, _, err := net.SplitHostPort(trail.ConnRemoteAddr.String()); err == nil {
-			tags = tags.With("ip", ip)
+			ctm.SetSystemTagOrMeta(metrics.TagIP, ip)
 		}
 	}
 	var failed float64
@@ -163,11 +157,11 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 		}
 
 		if enabledTags.Has(metrics.TagExpectedResponse) {
-			tags = tags.With(metrics.TagExpectedResponse.String(), strconv.FormatBool(expected))
+			ctm.SetSystemTagOrMeta(metrics.TagExpectedResponse, strconv.FormatBool(expected))
 		}
 	}
 
-	trail.SaveSamples(t.state.BuiltinMetrics, tags)
+	trail.SaveSamples(t.state.BuiltinMetrics, &ctm)
 	if t.responseCallback != nil {
 		trail.Failed.Valid = true
 		if failed == 1 {
@@ -177,10 +171,11 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 			metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: t.state.BuiltinMetrics.HTTPReqFailed,
-					Tags:   tags,
+					Tags:   ctm.Tags,
 				},
-				Time:  trail.EndTime,
-				Value: failed,
+				Time:     trail.EndTime,
+				Metadata: ctm.Metadata,
+				Value:    failed,
 			},
 		)
 	}

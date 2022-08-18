@@ -515,8 +515,8 @@ func (r *Runner) runPart(
 	}
 
 	if r.Bundle.Options.SystemTags.Has(metrics.TagGroup) {
-		vu.state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
-			return currentTags.With("group", group.Path)
+		vu.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+			tagsAndMeta.SetSystemTagOrMeta(metrics.TagGroup, group.Path)
 		})
 	}
 	vu.state.Group = group
@@ -615,24 +615,21 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 
 	opts := u.Runner.Bundle.Options
 
-	u.state.Tags.Modify(func(_ *metrics.TagSet) *metrics.TagSet {
+	u.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
 		// Deliberately overwrite tags from previous activations, i.e. ones that
-		// might have come from previous scenarios.
-		tags := u.Runner.RunTags.WithTagsFromMap(params.Tags)
+		// might have come from previous scenarios. We also intentionally clear
+		// out the metadata, it cannot survive between scenarios either.
+		tagsAndMeta.Tags = u.Runner.RunTags.WithTagsFromMap(params.Tags)
+		tagsAndMeta.Metadata = nil
 
 		if opts.SystemTags.Has(metrics.TagVU) {
-			tags = tags.With("vu", strconv.FormatUint(u.ID, 10))
+			tagsAndMeta.SetSystemTagOrMeta(metrics.TagVU, strconv.FormatUint(u.ID, 10))
 		}
 		if opts.SystemTags.Has(metrics.TagIter) {
-			tags = tags.With("iter", strconv.FormatInt(u.iteration, 10))
+			tagsAndMeta.SetSystemTagOrMeta(metrics.TagIter, strconv.FormatInt(u.iteration, 10))
 		}
-		if opts.SystemTags.Has(metrics.TagGroup) {
-			tags = tags.With("group", u.state.Group.Path)
-		}
-		if opts.SystemTags.Has(metrics.TagScenario) {
-			tags = tags.With("scenario", params.Scenario)
-		}
-		return tags
+		tagsAndMeta.SetSystemTagOrMetaIfEnabled(opts.SystemTags, metrics.TagGroup, u.state.Group.Path)
+		tagsAndMeta.SetSystemTagOrMetaIfEnabled(opts.SystemTags, metrics.TagScenario, params.Scenario)
 	})
 
 	ctx := params.RunContext
@@ -762,8 +759,8 @@ func (u *VU) runFn(
 	opts := &u.Runner.Bundle.Options
 
 	if opts.SystemTags.Has(metrics.TagIter) {
-		u.state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
-			return currentTags.With("iter", strconv.FormatInt(u.state.Iteration, 10))
+		u.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+			tagsAndMeta.SetSystemTagOrMeta(metrics.TagIter, strconv.FormatInt(u.state.Iteration, 10))
 		})
 	}
 

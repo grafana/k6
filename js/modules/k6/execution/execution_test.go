@@ -61,8 +61,8 @@ func TestVUTagsJSONEncoding(t *testing.T) {
 		},
 		Tags: lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().With("vu", "42")),
 	})
-	tenv.VU.State().Tags.Modify(func(tags *metrics.TagSet) *metrics.TagSet {
-		return tags.With("custom-tag", "mytag1")
+	tenv.VU.State().Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+		tagsAndMeta.SetTag("custom-tag", "mytag1")
 	})
 
 	encoded, err := tenv.VU.Runtime().RunString(`JSON.stringify(exec.vu.tags)`)
@@ -79,10 +79,12 @@ func TestVUTagsSetSuccessAccetedTypes(t *testing.T) {
 		v   interface{}
 		exp string
 	}{
-		"string": {v: `"tag1"`, exp: "tag1"},
-		"bool":   {v: true, exp: "true"},
-		"int":    {v: 101, exp: "101"},
-		"float":  {v: 3.14, exp: "3.14"},
+		"string":  {v: `"tag1"`, exp: "tag1"},
+		"bool":    {v: true, exp: "true"},
+		"int":     {v: 101, exp: "101"},
+		"float":   {v: 3.14, exp: "3.14"},
+		"object1": {v: `{ value: "tag2", index: false }`, exp: "tag2"},
+		"object2": {v: `{ value: "tag3", index: true }`, exp: "tag3"},
 	}
 
 	tenv := setupTagsExecEnv(t)
@@ -100,6 +102,8 @@ func TestVUTagsSetSuccessAccetedTypes(t *testing.T) {
 		assert.Equal(t, tc.exp, val.String())
 	}
 }
+
+// TODO: add tests for vu.tags helper method that returns whether the tag is indexed or not
 
 func TestVUTagsSuccessOverwriteSystemTag(t *testing.T) {
 	t.Parallel()
@@ -132,6 +136,8 @@ func TestVUTagsErrorOutOnInvalidValues(t *testing.T) {
 		`[1, 3, 5]`,
 		`{f1: "value1", f2: 4}`,
 		`{"foo": "bar"}`,
+		`{"value": "foo"}`, // need index as well
+		`{"index": "foo"}`, // need value as well
 	}
 	tenv := setupTagsExecEnv(t)
 	tenv.MoveToVUContext(&lib.State{
@@ -145,7 +151,7 @@ func TestVUTagsErrorOutOnInvalidValues(t *testing.T) {
 		_, err := tenv.VU.Runtime().RunString(`exec.vu.tags["custom-tag"] = ` + val)
 		require.Error(t, err)
 
-		assert.Contains(t, err.Error(), "TypeError: invalid value for metric tag 'custom-tag'")
+		assert.Contains(t, err.Error(), "TypeError: setting 'custom-tag' metric tag failed")
 	}
 }
 
@@ -304,7 +310,7 @@ func TestOptionsTestFull(t *testing.T) {
 				SummaryTrendStats: []string{"avg", "min", "max"},
 				SummaryTimeUnit:   null.StringFrom("ms"),
 				SystemTags: func() *metrics.SystemTagSet {
-					sysm := metrics.TagIter | metrics.TagVU
+					sysm := metrics.SystemTagSet(metrics.TagIter | metrics.TagVU)
 					return &sysm
 				}(),
 				RunTags:                 map[string]string{"runtag-key": "runtag-value"},
