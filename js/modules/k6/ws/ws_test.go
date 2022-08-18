@@ -636,20 +636,18 @@ func TestErrors(t *testing.T) {
 }
 
 func TestSystemTags(t *testing.T) {
-	tb := httpmultibin.NewHTTPMultiBin(t)
-
-	sr := tb.Replacer.Replace
-
-	// TODO: test for actual tag values after removing the dependency on the
-	// external service demos.kaazing.com (https://github.com/k6io/k6/issues/537)
-	// TODO readd group
+	t.Parallel()
 	testedSystemTags := []string{"status", "subproto", "url", "ip"}
-	test := newTestState(t)
-	for _, expectedTag := range testedSystemTags {
-		expectedTag := expectedTag
-		t.Run("only "+expectedTag, func(t *testing.T) {
-			test.VU.StateField.Options.SystemTags = metrics.ToSystemTagSet([]string{expectedTag})
-			_, err := test.VU.Runtime().RunString(sr(`
+	for _, expectedTagStr := range testedSystemTags {
+		expectedTagStr := expectedTagStr
+		t.Run("only "+expectedTagStr, func(t *testing.T) {
+			t.Parallel()
+			test := newTestState(t)
+			expectedTag, err := metrics.SystemTagString(expectedTagStr)
+			require.NoError(t, err)
+			tb := httpmultibin.NewHTTPMultiBin(t)
+			test.VU.StateField.Options.SystemTags = metrics.ToSystemTagSet([]string{expectedTagStr})
+			_, err = test.VU.Runtime().RunString(tb.Replacer.Replace(`
 			var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 				socket.on("open", function() {
 					socket.send("test")
@@ -668,9 +666,16 @@ func TestSystemTags(t *testing.T) {
 			for _, sampleContainer := range containers {
 				require.NotEmpty(t, sampleContainer.GetSamples())
 				for _, sample := range sampleContainer.GetSamples() {
-					require.NotEmpty(t, sample.Tags.Map())
-					for emittedTag := range sample.Tags.Map() {
-						assert.Equal(t, expectedTag, emittedTag)
+					var dataToCheck map[string]string
+					if metrics.NonIndexableSystemTags.Has(expectedTag) {
+						dataToCheck = sample.Metadata
+					} else {
+						dataToCheck = sample.Tags.Map()
+					}
+
+					require.NotEmpty(t, dataToCheck)
+					for emittedTag := range dataToCheck {
+						assert.Equal(t, expectedTagStr, emittedTag)
 					}
 				}
 			}

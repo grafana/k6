@@ -2633,7 +2633,7 @@ func TestExecutionInfo(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			r.Bundle.Options.SystemTags = metrics.NewSystemTagSet(metrics.DefaultSystemTagSet)
+			r.Bundle.Options.SystemTags = &metrics.DefaultSystemTagSet
 			samples := make(chan metrics.SampleContainer, 100)
 			initVU, err := r.NewVU(1, 10, samples)
 			require.NoError(t, err)

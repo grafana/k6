@@ -105,15 +105,15 @@ func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
 
 	shouldUpdateTag := state.Options.SystemTags.Has(metrics.TagGroup)
 	if shouldUpdateTag {
-		state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
-			return currentTags.With("group", g.Path)
+		state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+			tagsAndMeta.SetSystemTagOrMeta(metrics.TagGroup, g.Path)
 		})
 	}
 	defer func() {
 		state.Group = old
 		if shouldUpdateTag {
-			state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
-				return currentTags.With("group", old.Path)
+			state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+				tagsAndMeta.SetSystemTagOrMeta(metrics.TagGroup, old.Path)
 			})
 		}
 	}()
@@ -123,13 +123,15 @@ func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
 	t := time.Now()
 
 	ctx := mi.vu.Context()
+	ctm := state.Tags.GetCurrentValues()
 	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
 			Metric: state.BuiltinMetrics.GroupDuration,
-			Tags:   state.Tags.GetCurrentValues(),
+			Tags:   ctm.Tags,
 		},
-		Time:  t,
-		Value: metrics.D(t.Sub(startTime)),
+		Time:     t,
+		Value:    metrics.D(t.Sub(startTime)),
+		Metadata: ctm.Metadata,
 	})
 
 	return ret, err
@@ -150,11 +152,10 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 	t := time.Now()
 
 	// Prepare the metric tags
-	commonTags := state.Tags.GetCurrentValues()
+	commonTagsAndMeta := state.Tags.GetCurrentValues()
 	if len(extras) > 0 {
-		obj := extras[0].ToObject(rt)
-		for _, k := range obj.Keys() {
-			commonTags = commonTags.With(k, obj.Get(k).String())
+		if err := common.ApplyCustomUserTags(rt, &commonTagsAndMeta, extras[0]); err != nil {
+			return false, err
 		}
 	}
 
@@ -170,7 +171,7 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 			return false, err
 		}
 
-		tags := commonTags
+		tags := commonTagsAndMeta.Tags
 		if state.Options.SystemTags.Has(metrics.TagCheck) {
 			tags = tags.With("check", check.Name)
 		}
@@ -195,8 +196,9 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 					Metric: state.BuiltinMetrics.Checks,
 					Tags:   tags,
 				},
-				Time:  t,
-				Value: 0,
+				Time:     t,
+				Metadata: commonTagsAndMeta.Metadata,
+				Value:    0,
 			}
 			if val.ToBoolean() {
 				atomic.AddInt64(&check.Passes, 1)

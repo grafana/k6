@@ -34,177 +34,125 @@ func setupTagsExecEnv(t *testing.T) *modulestest.Runtime {
 	return testRuntime
 }
 
-func TestVUTags(t *testing.T) {
+func TestVUTagsGet(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Get", func(t *testing.T) {
-		t.Parallel()
+	tenv := setupTagsExecEnv(t)
+	tenv.MoveToVUContext(&lib.State{
+		Tags: lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().With("vu", "42")),
+	})
+	tag, err := tenv.VU.Runtime().RunString(`exec.vu.tags["vu"]`)
+	require.NoError(t, err)
+	assert.Equal(t, "42", tag.String())
 
-		tenv := setupTagsExecEnv(t)
-		tenv.MoveToVUContext(&lib.State{
-			Tags: lib.NewVUStateTags(
-				metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
-		})
-		tag, err := tenv.VU.Runtime().RunString(`exec.vu.tags["vu"]`)
-		require.NoError(t, err)
-		assert.Equal(t, "42", tag.String())
+	// not found
+	tag, err = tenv.VU.Runtime().RunString(`exec.vu.tags["not-existing-tag"]`)
+	require.NoError(t, err)
+	assert.Equal(t, "undefined", tag.String())
+}
 
-		// not found
-		tag, err = tenv.VU.Runtime().RunString(`exec.vu.tags["not-existing-tag"]`)
-		require.NoError(t, err)
-		assert.Equal(t, "undefined", tag.String())
+func TestVUTagsJSONEncoding(t *testing.T) {
+	t.Parallel()
+
+	tenv := setupTagsExecEnv(t)
+	tenv.MoveToVUContext(&lib.State{
+		Options: lib.Options{
+			SystemTags: metrics.NewSystemTagSet(metrics.TagVU),
+		},
+		Tags: lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().With("vu", "42")),
+	})
+	tenv.VU.State().Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+		tagsAndMeta.SetTag("custom-tag", "mytag1")
 	})
 
-	t.Run("JSONEncoding", func(t *testing.T) {
-		t.Parallel()
+	encoded, err := tenv.VU.Runtime().RunString(`JSON.stringify(exec.vu.tags)`)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"vu":"42","custom-tag":"mytag1"}`, encoded.String())
+}
 
-		tenv := setupTagsExecEnv(t)
-		tenv.MoveToVUContext(&lib.State{
-			Options: lib.Options{
-				SystemTags: metrics.NewSystemTagSet(metrics.TagVU),
-			},
-			Tags: lib.NewVUStateTags(
-				metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
-		})
-		state := tenv.VU.State()
-		state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
-			return currentTags.With("custom-tag", "mytag1")
-		})
+func TestVUTagsSetSuccessAccetedTypes(t *testing.T) {
+	t.Parallel()
 
-		encoded, err := tenv.VU.Runtime().RunString(`JSON.stringify(exec.vu.tags)`)
+	// bool and numbers are implicitly converted into string
+
+	tests := map[string]struct {
+		v   interface{}
+		exp string
+	}{
+		"string":  {v: `"tag1"`, exp: "tag1"},
+		"bool":    {v: true, exp: "true"},
+		"int":     {v: 101, exp: "101"},
+		"float":   {v: 3.14, exp: "3.14"},
+		"object1": {v: `{ value: "tag2", index: false }`, exp: "tag2"},
+		"object2": {v: `{ value: "tag3", index: true }`, exp: "tag3"},
+	}
+
+	tenv := setupTagsExecEnv(t)
+	tenv.MoveToVUContext(&lib.State{
+		Tags: lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().With("vu", "42")),
+	})
+
+	for _, tc := range tests {
+		_, err := tenv.VU.Runtime().RunString(fmt.Sprintf(`exec.vu.tags["mytag"] = %v`, tc.v))
 		require.NoError(t, err)
-		assert.JSONEq(t, `{"vu":"42","custom-tag":"mytag1"}`, encoded.String())
+
+		val, err := tenv.VU.Runtime().RunString(`exec.vu.tags["mytag"]`)
+		require.NoError(t, err)
+
+		assert.Equal(t, tc.exp, val.String())
+	}
+}
+
+// TODO: add tests for vu.tags helper method that returns whether the tag is indexed or not
+
+func TestVUTagsSuccessOverwriteSystemTag(t *testing.T) {
+	t.Parallel()
+
+	tenv := setupTagsExecEnv(t)
+	tenv.MoveToVUContext(&lib.State{
+		Tags: lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().With("vu", "42")),
 	})
 
-	t.Run("Set", func(t *testing.T) {
-		t.Parallel()
+	_, err := tenv.VU.Runtime().RunString(`exec.vu.tags["vu"] = "vu101"`)
+	require.NoError(t, err)
+	val, err := tenv.VU.Runtime().RunString(`exec.vu.tags["vu"]`)
+	require.NoError(t, err)
+	assert.Equal(t, "vu101", val.String())
+}
 
-		t.Run("SuccessAccetedTypes", func(t *testing.T) {
-			t.Parallel()
+func TestVUTagsErrorOutOnInvalidValues(t *testing.T) {
+	t.Parallel()
 
-			// bool and numbers are implicitly converted into string
+	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+	testLog := logrus.New()
+	testLog.AddHook(logHook)
+	testLog.SetOutput(ioutil.Discard)
 
-			tests := map[string]struct {
-				v   interface{}
-				exp string
-			}{
-				"string": {v: `"tag1"`, exp: "tag1"},
-				"bool":   {v: true, exp: "true"},
-				"int":    {v: 101, exp: "101"},
-				"float":  {v: 3.14, exp: "3.14"},
-			}
-
-			tenv := setupTagsExecEnv(t)
-			tenv.MoveToVUContext(&lib.State{
-				Tags: lib.NewVUStateTags(
-					metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
-			})
-
-			for _, tc := range tests {
-				_, err := tenv.VU.Runtime().RunString(fmt.Sprintf(`exec.vu.tags["mytag"] = %v`, tc.v))
-				require.NoError(t, err)
-
-				val, err := tenv.VU.Runtime().RunString(`exec.vu.tags["mytag"]`)
-				require.NoError(t, err)
-
-				assert.Equal(t, tc.exp, val.String())
-			}
-		})
-
-		t.Run("SuccessOverwriteSystemTag", func(t *testing.T) {
-			t.Parallel()
-
-			tenv := setupTagsExecEnv(t)
-			tenv.MoveToVUContext(&lib.State{
-				Tags: lib.NewVUStateTags(
-					metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
-			})
-
-			_, err := tenv.VU.Runtime().RunString(`exec.vu.tags["vu"] = "vu101"`)
-			require.NoError(t, err)
-			val, err := tenv.VU.Runtime().RunString(`exec.vu.tags["vu"]`)
-			require.NoError(t, err)
-			assert.Equal(t, "vu101", val.String())
-		})
-
-		t.Run("DiscardWrongTypeAndRaisingError", func(t *testing.T) {
-			t.Parallel()
-
-			tenv := setupTagsExecEnv(t)
-			tenv.MoveToVUContext(&lib.State{
-				Tags: lib.NewVUStateTags(
-					metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
-			})
-
-			state := tenv.VU.State()
-			state.Options.Throw = null.BoolFrom(true)
-			require.NotNil(t, state)
-
-			cases := []string{
-				`[1, 3, 5]`,             // array
-				`{f1: "value1", f2: 4}`, // object
-			}
-
-			for _, val := range cases {
-				_, err := tenv.VU.Runtime().RunString(`exec.vu.tags["custom-tag"] = ` + val)
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), "TypeError:")
-				assert.Contains(t, err.Error(), "only String, Boolean and Number")
-			}
-		})
-
-		t.Run("DiscardWrongTypeOnlyWarning", func(t *testing.T) {
-			t.Parallel()
-			logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
-			testLog := logrus.New()
-			testLog.AddHook(logHook)
-			testLog.SetOutput(ioutil.Discard)
-
-			tenv := setupTagsExecEnv(t)
-			tenv.MoveToVUContext(&lib.State{
-				Options: lib.Options{
-					SystemTags: metrics.NewSystemTagSet(metrics.TagVU),
-				},
-				Tags: lib.NewVUStateTags(
-					metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
-				Logger: testLog,
-			})
-			_, err := tenv.VU.Runtime().RunString(`exec.vu.tags["custom-tag"] = [1, 3, 5]`)
-			require.NoError(t, err)
-
-			entries := logHook.Drain()
-			require.Len(t, entries, 1)
-			assert.Contains(t, entries[0].Message, "discarded")
-		})
-
-		t.Run("DiscardNullOrUndefined", func(t *testing.T) {
-			t.Parallel()
-
-			logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
-			testLog := logrus.New()
-			testLog.AddHook(logHook)
-			testLog.SetOutput(ioutil.Discard)
-
-			cases := []string{"null", "undefined"}
-			tenv := setupTagsExecEnv(t)
-			tenv.MoveToVUContext(&lib.State{
-				Options: lib.Options{
-					SystemTags: metrics.NewSystemTagSet(metrics.TagVU),
-				},
-				Tags: lib.NewVUStateTags(
-					metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{"vu": "42"})),
-				Logger: testLog,
-			})
-			for _, val := range cases {
-				_, err := tenv.VU.Runtime().RunString(`exec.vu.tags["custom-tag"] = ` + val)
-				require.NoError(t, err)
-
-				entries := logHook.Drain()
-				require.Len(t, entries, 1)
-				assert.Contains(t, entries[0].Message, "discarded")
-			}
-		})
+	cases := []string{
+		"null",
+		"undefined",
+		"[]",
+		"{}",
+		`[1, 3, 5]`,
+		`{f1: "value1", f2: 4}`,
+		`{"foo": "bar"}`,
+		`{"value": "foo"}`, // need index as well
+		`{"index": "foo"}`, // need value as well
+	}
+	tenv := setupTagsExecEnv(t)
+	tenv.MoveToVUContext(&lib.State{
+		Options: lib.Options{
+			SystemTags: metrics.NewSystemTagSet(metrics.TagVU),
+		},
+		Tags:   lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().With("vu", "42")),
+		Logger: testLog,
 	})
+	for _, val := range cases {
+		_, err := tenv.VU.Runtime().RunString(`exec.vu.tags["custom-tag"] = ` + val)
+		require.Error(t, err)
+
+		assert.Contains(t, err.Error(), "TypeError: setting 'custom-tag' metric tag failed")
+	}
 }
 
 func TestAbortTest(t *testing.T) { //nolint:tparallel
@@ -362,7 +310,7 @@ func TestOptionsTestFull(t *testing.T) {
 				SummaryTrendStats: []string{"avg", "min", "max"},
 				SummaryTimeUnit:   null.StringFrom("ms"),
 				SystemTags: func() *metrics.SystemTagSet {
-					sysm := metrics.TagIter | metrics.TagVU
+					sysm := metrics.SystemTagSet(metrics.TagIter | metrics.TagVU)
 					return &sysm
 				}(),
 				RunTags:                 map[string]string{"runtag-key": "runtag-value"},

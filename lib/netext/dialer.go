@@ -74,7 +74,7 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 // TODO: Refactor this according to
 // https://github.com/k6io/k6/pull/1203#discussion_r337938370
 func (d *Dialer) GetTrail(
-	startTime, endTime time.Time, fullIteration bool, emitIterations bool, tags *metrics.TagSet,
+	startTime, endTime time.Time, fullIteration bool, emitIterations bool, ctm metrics.TagsAndMeta,
 	builtinMetrics *metrics.BuiltinMetrics,
 ) *NetTrail {
 	bytesWritten := atomic.SwapInt64(&d.BytesWritten, 0)
@@ -83,37 +83,41 @@ func (d *Dialer) GetTrail(
 		{
 			TimeSeries: metrics.TimeSeries{
 				Metric: builtinMetrics.DataSent,
-				Tags:   tags,
+				Tags:   ctm.Tags,
 			},
-			Time:  endTime,
-			Value: float64(bytesWritten),
+			Time:     endTime,
+			Metadata: ctm.Metadata,
+			Value:    float64(bytesWritten),
 		},
 		{
 			TimeSeries: metrics.TimeSeries{
 				Metric: builtinMetrics.DataReceived,
-				Tags:   tags,
+				Tags:   ctm.Tags,
 			},
-			Time:  endTime,
-			Value: float64(bytesRead),
+			Time:     endTime,
+			Metadata: ctm.Metadata,
+			Value:    float64(bytesRead),
 		},
 	}
 	if fullIteration {
 		samples = append(samples, metrics.Sample{
 			TimeSeries: metrics.TimeSeries{
 				Metric: builtinMetrics.IterationDuration,
-				Tags:   tags,
+				Tags:   ctm.Tags,
 			},
-			Time:  endTime,
-			Value: metrics.D(endTime.Sub(startTime)),
+			Time:     endTime,
+			Metadata: ctm.Metadata,
+			Value:    metrics.D(endTime.Sub(startTime)),
 		})
 		if emitIterations {
 			samples = append(samples, metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: builtinMetrics.Iterations,
-					Tags:   tags,
+					Tags:   ctm.Tags,
 				},
-				Time:  endTime,
-				Value: 1,
+				Time:     endTime,
+				Metadata: ctm.Metadata,
+				Value:    1,
 			})
 		}
 	}
@@ -124,7 +128,7 @@ func (d *Dialer) GetTrail(
 		FullIteration: fullIteration,
 		StartTime:     startTime,
 		EndTime:       endTime,
-		Tags:          tags,
+		Tags:          ctm.Tags,
 		Samples:       samples,
 	}
 }

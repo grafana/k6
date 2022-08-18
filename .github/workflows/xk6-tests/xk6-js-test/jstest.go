@@ -58,7 +58,7 @@ func (j *JSTest) Foo(arg float64) (bool, error) {
 
 	ctx := j.vu.Context()
 
-	tags := state.Tags.GetCurrentValues().With("foo", "bar")
+	tags := state.Tags.GetCurrentValues().Tags.With("foo", "bar")
 	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
 		Time:       time.Now(),
 		TimeSeries: metrics.TimeSeries{Metric: j.foos, Tags: tags},

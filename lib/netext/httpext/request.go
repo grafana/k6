@@ -51,7 +51,7 @@ type ParsedHTTPRequest struct {
 	Redirects        null.Int
 	ActiveJar        *cookiejar.Jar
 	Cookies          map[string]*HTTPRequestCookie
-	Tags             [][2]string
+	TagsAndMeta      metrics.TagsAndMeta
 }
 
 // Matches non-compliant io.Closer implementations (e.g. zstd.Decoder)
@@ -167,17 +167,11 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		}
 	}
 
-	tags := state.Tags.GetCurrentValues()
-	// Override any global tags with request-specific ones.
-	for _, tag := range preq.Tags {
-		tags = tags.With(tag[0], tag[1])
-	}
-
 	// Only set the name system tag if the user didn't explicitly set it beforehand,
 	// and the Name was generated from a tagged template string (via http.url).
-	if _, ok := tags.Get("name"); !ok && state.Options.SystemTags.Has(metrics.TagName) &&
-		preq.URL.Name != "" && preq.URL.Name != preq.URL.Clean() {
-		tags = tags.With("name", preq.URL.Name)
+	if _, ok := preq.TagsAndMeta.Tags.Get(metrics.TagName.String()); !ok &&
+		state.Options.SystemTags.Has(metrics.TagName) && preq.URL.Name != "" && preq.URL.Name != preq.URL.Clean() {
+		preq.TagsAndMeta.SetSystemTagOrMeta(metrics.TagName, preq.URL.Name)
 	}
 
 	// Check rate limit *after* we've prepared a request; no need to wait with that part.
@@ -187,13 +181,18 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		}
 	}
 
-	tracerTransport := newTransport(ctx, state, tags, preq.ResponseCallback)
+	tracerTransport := newTransport(ctx, state, &preq.TagsAndMeta, preq.ResponseCallback)
 	var transport http.RoundTripper = tracerTransport
 
 	if state.Options.HTTPDebug.String != "" {
 		// Combine tags with common log fields
 		combinedLogFields := map[string]interface{}{"source": "http-debug", "vu": state.VUID, "iter": state.Iteration}
-		for k, v := range tags.Map() {
+		for k, v := range preq.TagsAndMeta.Tags.Map() {
+			if _, present := combinedLogFields[k]; !present {
+				combinedLogFields[k] = v
+			}
+		}
+		for k, v := range preq.TagsAndMeta.Metadata {
 			if _, present := combinedLogFields[k]; !present {
 				combinedLogFields[k] = v
 			}

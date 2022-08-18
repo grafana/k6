@@ -75,7 +75,7 @@ type Socket struct {
 	pingSendTimestamps map[string]time.Time
 	pingSendCounter    int
 
-	sampleTags     *metrics.TagSet
+	tagsAndMeta    *metrics.TagsAndMeta
 	samplesOutput  chan<- metrics.SampleContainer
 	builtinMetrics *metrics.BuiltinMetrics
 }
@@ -134,7 +134,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 
 	enableCompression := false
 
-	tags := state.Tags.GetCurrentValues()
+	tagsAndMeta := state.Tags.GetCurrentValues()
 	jar := state.CookieJar
 
 	// Parse the optional second argument (params)
@@ -155,16 +155,8 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 					header.Set(key, headersObj.Get(key).String())
 				}
 			case "tags":
-				tagsV := params.Get(k)
-				if goja.IsUndefined(tagsV) || goja.IsNull(tagsV) {
-					continue
-				}
-				tagObj := tagsV.ToObject(rt)
-				if tagObj == nil {
-					continue
-				}
-				for _, key := range tagObj.Keys() {
-					tags = tags.With(key, tagObj.Get(key).String())
+				if err := common.ApplyCustomUserTags(rt, &tagsAndMeta, params.Get(k)); err != nil {
+					return nil, err
 				}
 			case "jar":
 				jarV := params.Get(k)
@@ -195,9 +187,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 
 	}
 
-	if state.Options.SystemTags.Has(metrics.TagURL) {
-		tags = tags.With("url", url)
-	}
+	tagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagURL, url)
 
 	// Overriding the NextProtos to avoid talking http2
 	var tlsConfig *tls.Config
@@ -227,18 +217,17 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 
 	if state.Options.SystemTags.Has(metrics.TagIP) && conn.RemoteAddr() != nil {
 		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
-			// TODO: make as a not indexable
-			tags = tags.With("ip", ip)
+			tagsAndMeta.SetSystemTagOrMeta(metrics.TagIP, ip)
 		}
 	}
 
 	if httpResponse != nil {
 		if state.Options.SystemTags.Has(metrics.TagStatus) {
-			tags = tags.With("status", strconv.Itoa(httpResponse.StatusCode))
+			tagsAndMeta.SetSystemTagOrMeta(metrics.TagStatus, strconv.Itoa(httpResponse.StatusCode))
 		}
 
 		if state.Options.SystemTags.Has(metrics.TagSubproto) {
-			tags = tags.With("subproto", httpResponse.Header.Get("Sec-WebSocket-Protocol"))
+			tagsAndMeta.SetSystemTagOrMeta(metrics.TagSubproto, httpResponse.Header.Get("Sec-WebSocket-Protocol"))
 		}
 	}
 
@@ -251,7 +240,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 		scheduled:          make(chan goja.Callable),
 		done:               make(chan struct{}),
 		samplesOutput:      state.Samples,
-		sampleTags:         tags,
+		tagsAndMeta:        &tagsAndMeta,
 		builtinMetrics:     state.BuiltinMetrics,
 	}
 
@@ -260,21 +249,23 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 			{
 				TimeSeries: metrics.TimeSeries{
 					Metric: state.BuiltinMetrics.WSSessions,
-					Tags:   tags,
+					Tags:   tagsAndMeta.Tags,
 				},
-				Time:  start,
-				Value: 1,
+				Time:     start,
+				Metadata: tagsAndMeta.Metadata,
+				Value:    1,
 			},
 			{
 				TimeSeries: metrics.TimeSeries{
 					Metric: state.BuiltinMetrics.WSConnecting,
-					Tags:   tags,
+					Tags:   tagsAndMeta.Tags,
 				},
-				Time:  start,
-				Value: connectionDuration,
+				Time:     start,
+				Metadata: tagsAndMeta.Metadata,
+				Value:    connectionDuration,
 			},
 		},
-		Tags: tags,
+		Tags: tagsAndMeta.Tags,
 		Time: start,
 	})
 
@@ -335,10 +326,11 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 		metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
 			TimeSeries: metrics.TimeSeries{
 				Metric: socket.builtinMetrics.WSSessionDuration,
-				Tags:   socket.sampleTags,
+				Tags:   socket.tagsAndMeta.Tags,
 			},
-			Time:  start,
-			Value: sessionDuration,
+			Time:     start,
+			Metadata: socket.tagsAndMeta.Metadata,
+			Value:    sessionDuration,
 		})
 	}()
 
@@ -365,10 +357,11 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 			metrics.PushIfNotDone(ctx, socket.samplesOutput, metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: socket.builtinMetrics.WSMessagesReceived,
-					Tags:   socket.sampleTags,
+					Tags:   socket.tagsAndMeta.Tags,
 				},
-				Time:  time.Now(),
-				Value: 1,
+				Time:     time.Now(),
+				Metadata: socket.tagsAndMeta.Metadata,
+				Value:    1,
 			})
 
 			if msg.mtype == websocket.BinaryMessage {
@@ -427,10 +420,11 @@ func (s *Socket) Send(message string) {
 	metrics.PushIfNotDone(s.ctx, s.samplesOutput, metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
 			Metric: s.builtinMetrics.WSMessagesSent,
-			Tags:   s.sampleTags,
+			Tags:   s.tagsAndMeta.Tags,
 		},
-		Time:  time.Now(),
-		Value: 1,
+		Time:     time.Now(),
+		Metadata: s.tagsAndMeta.Metadata,
+		Value:    1,
 	})
 }
 
@@ -459,10 +453,11 @@ func (s *Socket) SendBinary(message goja.Value) {
 	metrics.PushIfNotDone(s.ctx, s.samplesOutput, metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
 			Metric: s.builtinMetrics.WSMessagesSent,
-			Tags:   s.sampleTags,
+			Tags:   s.tagsAndMeta.Tags,
 		},
-		Time:  time.Now(),
-		Value: 1,
+		Time:     time.Now(),
+		Metadata: s.tagsAndMeta.Metadata,
+		Value:    1,
 	})
 }
 
@@ -494,10 +489,11 @@ func (s *Socket) trackPong(pingID string) {
 	metrics.PushIfNotDone(s.ctx, s.samplesOutput, metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
 			Metric: s.builtinMetrics.WSPing,
-			Tags:   s.sampleTags,
+			Tags:   s.tagsAndMeta.Tags,
 		},
-		Time:  pongTimestamp,
-		Value: metrics.D(pongTimestamp.Sub(pingTimestamp)),
+		Time:     pongTimestamp,
+		Metadata: s.tagsAndMeta.Metadata,
+		Value:    metrics.D(pongTimestamp.Sub(pingTimestamp)),
 	})
 }
 

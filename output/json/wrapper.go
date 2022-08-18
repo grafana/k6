@@ -22,6 +22,7 @@ type sampleEnvelope struct {
 // wrapSample is used to package a metric sample in a way that's nice to export
 // to JSON.
 func wrapSample(sample metrics.Sample) sampleEnvelope {
+	// TODO: emit both the Sample's Metadata and Tags as tags
 	s := sampleEnvelope{
 		Type:   "Point",
 		Metric: sample.Metric.Name,
