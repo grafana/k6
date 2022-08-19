@@ -38,12 +38,12 @@ func easyjson42239ddeDecodeGoK6IoK6OutputJson(in *jlexer.Lexer, out *sampleEnvel
 			continue
 		}
 		switch key {
+		case "metric":
+			out.Metric = string(in.String())
 		case "type":
 			out.Type = string(in.String())
 		case "data":
 			easyjson42239ddeDecode(in, &out.Data)
-		case "metric":
-			out.Metric = string(in.String())
 		default:
 			in.SkipRecursive()
 		}
@@ -59,19 +59,19 @@ func easyjson42239ddeEncodeGoK6IoK6OutputJson(out *jwriter.Writer, in sampleEnve
 	first := true
 	_ = first
 	{
-		const prefix string = ",\"type\":"
+		const prefix string = ",\"metric\":"
 		out.RawString(prefix[1:])
+		out.String(string(in.Metric))
+	}
+	{
+		const prefix string = ",\"type\":"
+		out.RawString(prefix)
 		out.String(string(in.Type))
 	}
 	{
 		const prefix string = ",\"data\":"
 		out.RawString(prefix)
 		easyjson42239ddeEncode(out, in.Data)
-	}
-	{
-		const prefix string = ",\"metric\":"
-		out.RawString(prefix)
-		out.String(string(in.Metric))
 	}
 	out.RawByte('}')
 }
@@ -86,9 +86,9 @@ func (v *sampleEnvelope) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson42239ddeDecodeGoK6IoK6OutputJson(l, v)
 }
 func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
-	Time  time.Time       `json:"time"`
-	Value float64         `json:"value"`
-	Tags  *metrics.TagSet `json:"tags"`
+	Time  time.Time           `json:"time"`
+	Value float64             `json:"value"`
+	Tags  tagsAndMetaEnvelope `json:"tags"`
 }) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
@@ -115,15 +115,7 @@ func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
 		case "value":
 			out.Value = float64(in.Float64())
 		case "tags":
-			if in.IsNull() {
-				in.Skip()
-				out.Tags = nil
-			} else {
-				if out.Tags == nil {
-					out.Tags = new(metrics.TagSet)
-				}
-				(*out.Tags).UnmarshalEasyJSON(in)
-			}
+			(out.Tags).UnmarshalEasyJSON(in)
 		default:
 			in.SkipRecursive()
 		}
@@ -135,9 +127,9 @@ func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
 	}
 }
 func easyjson42239ddeEncode(out *jwriter.Writer, in struct {
-	Time  time.Time       `json:"time"`
-	Value float64         `json:"value"`
-	Tags  *metrics.TagSet `json:"tags"`
+	Time  time.Time           `json:"time"`
+	Value float64             `json:"value"`
+	Tags  tagsAndMetaEnvelope `json:"tags"`
 }) {
 	out.RawByte('{')
 	first := true
@@ -155,11 +147,7 @@ func easyjson42239ddeEncode(out *jwriter.Writer, in struct {
 	{
 		const prefix string = ",\"tags\":"
 		out.RawString(prefix)
-		if in.Tags == nil {
-			out.RawString("null")
-		} else {
-			(*in.Tags).MarshalEasyJSON(out)
-		}
+		(in.Tags).MarshalEasyJSON(out)
 	}
 	out.RawByte('}')
 }
