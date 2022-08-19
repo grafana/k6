@@ -246,8 +246,9 @@ func TestRun(t *testing.T) {
 							"tag4":  "val4",
 						}),
 					},
-					Time:  time.Unix(1562324644, 0),
-					Value: 1,
+					Metadata: map[string]string{},
+					Time:     time.Unix(1562324644, 0),
+					Value:    1,
 				},
 			},
 			fileName:       "test",
@@ -266,8 +267,9 @@ func TestRun(t *testing.T) {
 							"error": "val3",
 						}),
 					},
-					Time:  time.Unix(1562324643, 0),
-					Value: 1,
+					Time:     time.Unix(1562324643, 0),
+					Metadata: map[string]string{"y": "1"},
+					Value:    1,
 				},
 				metrics.Sample{
 					TimeSeries: metrics.TimeSeries{
@@ -286,7 +288,9 @@ func TestRun(t *testing.T) {
 			fileName:       "test.gz",
 			fileReaderFunc: readCompressedFile,
 			timeFormat:     "unix",
-			outputContent:  "metric_name,timestamp,metric_value,check,error,extra_tags\n" + "my_metric,1562324643,1.000000,val1,val3,url=val2\n" + "my_metric,1562324644,1.000000,val1,val3,name=val4&url=val2\n",
+			outputContent: "metric_name,timestamp,metric_value,check,error,extra_tags\n" +
+				"my_metric,1562324643,1.000000,val1,val3,url=val2&y=1\n" +
+				"my_metric,1562324644,1.000000,val1,val3,name=val4&url=val2\n",
 		},
 		{
 			samples: []metrics.SampleContainer{
@@ -312,8 +316,9 @@ func TestRun(t *testing.T) {
 							"name":  "val4",
 						}),
 					},
-					Time:  time.Unix(1562324644, 0),
-					Value: 1,
+					Time:     time.Unix(1562324644, 0),
+					Metadata: map[string]string{"y": "2", "z": "3"},
+					Value:    1,
 				},
 			},
 			fileName:       "test",
@@ -321,7 +326,7 @@ func TestRun(t *testing.T) {
 			timeFormat:     "rfc3339",
 			outputContent: "metric_name,timestamp,metric_value,check,error,extra_tags\n" +
 				"my_metric," + time.Unix(1562324644, 0).Format(time.RFC3339) + ",1.000000,val1,val3,url=val2\n" +
-				"my_metric," + time.Unix(1562324644, 0).Format(time.RFC3339) + ",1.000000,val1,val3,name=val4&url=val2\n",
+				"my_metric," + time.Unix(1562324644, 0).Format(time.RFC3339) + ",1.000000,val1,val3,name=val4&url=val2&y=2&z=3\n",
 		},
 	}
 

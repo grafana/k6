@@ -201,36 +201,51 @@ func SampleToRow(sample *metrics.Sample, resTags []string, ignoredTags []string,
 	}
 
 	row[2] = fmt.Sprintf("%f", sample.Value)
+	// TODO: optimize all of this - do not use tags.Map(), flip resTags, fix the
+	// for loops, get rid of IsStringInSlice(), etc.
 	sampleTags := sample.Tags.Map()
-
 	for ind, tag := range resTags {
 		row[ind+3] = sampleTags[tag]
 	}
 
 	extraTags := bytes.Buffer{}
 	prev := false
+	writeTag := func(tag, val string) bool {
+		if IsStringInSlice(resTags, tag) || IsStringInSlice(ignoredTags, tag) {
+			return true // continue
+		}
+		if prev {
+			if _, err := extraTags.WriteString("&"); err != nil {
+				return false
+			}
+		}
+
+		if _, err := extraTags.WriteString(tag); err != nil {
+			return false
+		}
+
+		if _, err := extraTags.WriteString("="); err != nil {
+			return false
+		}
+
+		if _, err := extraTags.WriteString(val); err != nil {
+			return false
+		}
+		prev = true
+		return true
+	}
+
 	for tag, val := range sampleTags {
-		if !IsStringInSlice(resTags, tag) && !IsStringInSlice(ignoredTags, tag) {
-			if prev {
-				if _, err := extraTags.WriteString("&"); err != nil {
-					break
-				}
-			}
-
-			if _, err := extraTags.WriteString(tag); err != nil {
-				break
-			}
-
-			if _, err := extraTags.WriteString("="); err != nil {
-				break
-			}
-
-			if _, err := extraTags.WriteString(val); err != nil {
-				break
-			}
-			prev = true
+		if !writeTag(tag, val) {
+			break
 		}
 	}
+	for tag, val := range sample.Metadata {
+		if !writeTag(tag, val) {
+			break
+		}
+	}
+
 	row[len(row)-1] = extraTags.String()
 
 	return row
