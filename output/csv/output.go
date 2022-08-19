@@ -81,7 +81,7 @@ func newOutput(params output.Params) (*Output, error) {
 			resTags:      resTags,
 			ignoredTags:  ignoredTags,
 			csvWriter:    stdoutWriter,
-			row:          make([]string, 3+len(resTags)+1),
+			row:          make([]string, 3+len(resTags)+2),
 			saveInterval: saveInterval,
 			timeFormat:   timeFormat,
 			closeFn:      func() error { return nil },
@@ -99,7 +99,7 @@ func newOutput(params output.Params) (*Output, error) {
 		fname:        fname,
 		resTags:      resTags,
 		ignoredTags:  ignoredTags,
-		row:          make([]string, 3+len(resTags)+1),
+		row:          make([]string, 3+len(resTags)+2),
 		saveInterval: saveInterval,
 		timeFormat:   timeFormat,
 		logger:       logger,
@@ -184,6 +184,7 @@ func (o *Output) flushMetrics() {
 // MakeHeader creates list of column names for csv file
 func MakeHeader(tags []string) []string {
 	tags = append(tags, "extra_tags")
+	tags = append(tags, "metadata")
 	return append([]string{"metric_name", "timestamp", "metric_value"}, tags...)
 }
 
@@ -201,38 +202,55 @@ func SampleToRow(sample *metrics.Sample, resTags []string, ignoredTags []string,
 	}
 
 	row[2] = fmt.Sprintf("%f", sample.Value)
+	// TODO: optimize all of this - do not use tags.Map(), flip resTags, fix the
+	// for loops, get rid of IsStringInSlice(), etc.
 	sampleTags := sample.Tags.Map()
-
 	for ind, tag := range resTags {
 		row[ind+3] = sampleTags[tag]
 	}
 
 	extraTags := bytes.Buffer{}
 	prev := false
+	writeTag := func(tag, val string) bool {
+		if IsStringInSlice(resTags, tag) || IsStringInSlice(ignoredTags, tag) {
+			return true // continue
+		}
+		if prev {
+			if _, err := extraTags.WriteString("&"); err != nil {
+				return false
+			}
+		}
+
+		if _, err := extraTags.WriteString(tag); err != nil {
+			return false
+		}
+
+		if _, err := extraTags.WriteString("="); err != nil {
+			return false
+		}
+
+		if _, err := extraTags.WriteString(val); err != nil {
+			return false
+		}
+		prev = true
+		return true
+	}
+
 	for tag, val := range sampleTags {
-		if !IsStringInSlice(resTags, tag) && !IsStringInSlice(ignoredTags, tag) {
-			if prev {
-				if _, err := extraTags.WriteString("&"); err != nil {
-					break
-				}
-			}
+		if !writeTag(tag, val) {
+			break
+		}
+	}
+	row[len(row)-2] = extraTags.String()
+	extraTags.Reset()
+	prev = false
 
-			if _, err := extraTags.WriteString(tag); err != nil {
-				break
-			}
-
-			if _, err := extraTags.WriteString("="); err != nil {
-				break
-			}
-
-			if _, err := extraTags.WriteString(val); err != nil {
-				break
-			}
-			prev = true
+	for key, val := range sample.Metadata {
+		if !writeTag(key, val) {
+			break
 		}
 	}
 	row[len(row)-1] = extraTags.String()
-
 	return row
 }
 
