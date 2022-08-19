@@ -24,6 +24,9 @@ type (
 	ModuleInstance struct {
 		vu  modules.VU
 		obj *goja.Object
+
+		vuTags    *tagsDynamicObject
+		vuTagsObj *goja.Object
 	}
 )
 
@@ -61,6 +64,20 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	defProp("vu", mi.newVUInfo)
 
 	mi.obj = o
+	mi.vuTags = &tagsDynamicObject{mi: mi}
+	mi.vuTagsObj = rt.NewDynamicObject(mi.vuTags)
+
+	// We change the prototype of the tags dynamic object, so it has a new
+	// isIndexed(key) method that returns true if the specific tag is indexed
+	// (stored in the TagSet), or false if not (stored in the metadata string
+	// map), or undefined if the tag doesn't exist.
+	proto := rt.NewObject()
+	if err := proto.Set("isIndexed", mi.vuTags.isIndexed); err != nil {
+		common.Throw(rt, err)
+	}
+	if err := mi.vuTagsObj.SetPrototype(proto); err != nil {
+		common.Throw(rt, err)
+	}
 
 	return mi
 }
@@ -212,17 +229,7 @@ func (mi *ModuleInstance) newVUInfo() (*goja.Object, error) {
 		return o, err
 	}
 
-	tags := &tagsDynamicObject{runtime: rt, state: vuState}
-	tagsObj := rt.NewDynamicObject(tags)
-
-	// TODO: change the prototype of the tags dynamic object so it has a new
-	// isIndexed(key) method that returns true if the specific tag is indexed
-	// (stored in the TagSet) or false if not (stored in the metadata string
-	// map) or undefined if the tag doesn't exist?
-	// tagsObj.SetPrototype(...)
-
-	err = o.Set("tags", tagsObj)
-	return o, err
+	return o, o.Set("tags", mi.vuTagsObj)
 }
 
 func newInfoObj(rt *goja.Runtime, props map[string]func() interface{}) (*goja.Object, error) {
@@ -302,18 +309,40 @@ func optionsAsObject(rt *goja.Runtime, options lib.Options) (*goja.Object, error
 }
 
 type tagsDynamicObject struct {
-	runtime *goja.Runtime
-	state   *lib.State
+	mi *ModuleInstance
+}
+
+func (o *tagsDynamicObject) isIndexed(key string) goja.Value {
+	rt := o.mi.vu.Runtime()
+	state := o.mi.vu.State()
+	if state == nil {
+		common.Throw(rt, errors.New("getting VU information in the init context is not supported"))
+	}
+
+	tcv := state.Tags.GetCurrentValues()
+	if _, ok := tcv.Tags.Get(key); ok {
+		return rt.ToValue(true)
+	}
+	if _, ok := tcv.Metadata[key]; ok {
+		return rt.ToValue(false)
+	}
+	return goja.Undefined()
 }
 
 // Get a property value for the key. May return nil if the property does not exist.
 func (o *tagsDynamicObject) Get(key string) goja.Value {
-	tcv := o.state.Tags.GetCurrentValues()
+	rt := o.mi.vu.Runtime()
+	state := o.mi.vu.State()
+	if state == nil {
+		common.Throw(rt, errors.New("getting VU information in the init context is not supported"))
+	}
+
+	tcv := state.Tags.GetCurrentValues()
 	if tag, ok := tcv.Tags.Get(key); ok {
-		return o.runtime.ToValue(tag)
+		return rt.ToValue(tag)
 	}
 	if metadatum, ok := tcv.Metadata[key]; ok {
-		return o.runtime.ToValue(metadatum)
+		return rt.ToValue(metadatum)
 	}
 	return nil
 }
@@ -321,22 +350,32 @@ func (o *tagsDynamicObject) Get(key string) goja.Value {
 // Set a property value for the key. It returns true if succeed. String, Boolean
 // and Number types are implicitly converted to the goja's relative string
 // representation. Objects are checked and accepted if they contain the index
-// and value keys. In any other case, if the Throw option is set then an error
-// is raised otherwise just a Warning is written.
+// and value keys. In any other case, a TypeError is thrown.
 func (o *tagsDynamicObject) Set(key string, val goja.Value) bool {
+	rt := o.mi.vu.Runtime()
+	state := o.mi.vu.State()
+	if state == nil {
+		common.Throw(rt, errors.New("getting VU information in the init context is not supported"))
+	}
+
 	var err error
-	o.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
-		err = common.ApplyCustomUserTag(o.runtime, tagsAndMeta, key, val)
+	state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+		err = common.ApplyCustomUserTag(rt, tagsAndMeta, key, val)
 	})
 	if err == nil {
 		return true
 	}
-	panic(o.runtime.NewTypeError(err.Error()))
+	panic(rt.NewTypeError(err.Error()))
 }
 
 // Has returns true if the property exists.
 func (o *tagsDynamicObject) Has(key string) bool {
-	ctv := o.state.Tags.GetCurrentValues()
+	state := o.mi.vu.State()
+	if state == nil {
+		common.Throw(o.mi.vu.Runtime(), errors.New("getting VU information in the init context is not supported"))
+	}
+
+	ctv := state.Tags.GetCurrentValues()
 	if _, ok := ctv.Tags.Get(key); ok {
 		return true
 	}
@@ -349,7 +388,12 @@ func (o *tagsDynamicObject) Has(key string) bool {
 // Delete deletes the property for the key. It returns true on success (note,
 // that includes missing property).
 func (o *tagsDynamicObject) Delete(key string) bool {
-	o.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+	state := o.mi.vu.State()
+	if state == nil {
+		common.Throw(o.mi.vu.Runtime(), errors.New("getting VU information in the init context is not supported"))
+	}
+
+	state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
 		tagsAndMeta.Delete(key)
 	})
 
@@ -359,7 +403,11 @@ func (o *tagsDynamicObject) Delete(key string) bool {
 // Keys returns a slice with all existing property keys. The order is not
 // deterministic.
 func (o *tagsDynamicObject) Keys() []string {
-	ctv := o.state.Tags.GetCurrentValues()
+	state := o.mi.vu.State()
+	if state == nil {
+		common.Throw(o.mi.vu.Runtime(), errors.New("getting VU information in the init context is not supported"))
+	}
+	ctv := state.Tags.GetCurrentValues()
 
 	tagsMap := ctv.Tags.Map()
 	keys := make([]string, 0, len(tagsMap)+len(ctv.Metadata))

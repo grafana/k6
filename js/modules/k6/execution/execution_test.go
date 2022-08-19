@@ -103,7 +103,35 @@ func TestVUTagsSetSuccessAccetedTypes(t *testing.T) {
 	}
 }
 
-// TODO: add tests for vu.tags helper method that returns whether the tag is indexed or not
+func TestVUTagsIsIndexed(t *testing.T) {
+	t.Parallel()
+
+	tenv := setupTagsExecEnv(t)
+	tenv.MoveToVUContext(&lib.State{
+		Tags: lib.NewVUStateTags(metrics.NewRegistry().RootTagSet()),
+	})
+	run := tenv.VU.Runtime().RunString
+
+	result, err := run(`exec.vu.tags["t"] = 123; exec.vu.tags.isIndexed("t")`)
+	require.NoError(t, err)
+	assert.Equal(t, true, result.Export())
+
+	result, err = run(`exec.vu.tags["t"] = "foo"; exec.vu.tags.isIndexed("t")`)
+	require.NoError(t, err)
+	assert.Equal(t, true, result.Export())
+
+	result, err = run(`exec.vu.tags["t"] = {value: "bar", index: true}; exec.vu.tags.isIndexed("t")`)
+	require.NoError(t, err)
+	assert.Equal(t, true, result.Export())
+
+	result, err = run(`exec.vu.tags["t"] = {value: "baz", index: false}; exec.vu.tags.isIndexed("t")`)
+	require.NoError(t, err)
+	assert.Equal(t, false, result.Export())
+
+	result, err = run(`exec.vu.tags.isIndexed("unknown")`)
+	require.NoError(t, err)
+	assert.True(t, goja.IsUndefined(result))
+}
 
 func TestVUTagsSuccessOverwriteSystemTag(t *testing.T) {
 	t.Parallel()
