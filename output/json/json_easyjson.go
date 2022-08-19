@@ -38,12 +38,12 @@ func easyjson42239ddeDecodeGoK6IoK6OutputJson(in *jlexer.Lexer, out *sampleEnvel
 			continue
 		}
 		switch key {
+		case "metric":
+			out.Metric = string(in.String())
 		case "type":
 			out.Type = string(in.String())
 		case "data":
 			easyjson42239ddeDecode(in, &out.Data)
-		case "metric":
-			out.Metric = string(in.String())
 		default:
 			in.SkipRecursive()
 		}
@@ -59,19 +59,19 @@ func easyjson42239ddeEncodeGoK6IoK6OutputJson(out *jwriter.Writer, in sampleEnve
 	first := true
 	_ = first
 	{
-		const prefix string = ",\"type\":"
+		const prefix string = ",\"metric\":"
 		out.RawString(prefix[1:])
+		out.String(string(in.Metric))
+	}
+	{
+		const prefix string = ",\"type\":"
+		out.RawString(prefix)
 		out.String(string(in.Type))
 	}
 	{
 		const prefix string = ",\"data\":"
 		out.RawString(prefix)
 		easyjson42239ddeEncode(out, in.Data)
-	}
-	{
-		const prefix string = ",\"metric\":"
-		out.RawString(prefix)
-		out.String(string(in.Metric))
 	}
 	out.RawByte('}')
 }
@@ -86,9 +86,10 @@ func (v *sampleEnvelope) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson42239ddeDecodeGoK6IoK6OutputJson(l, v)
 }
 func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
-	Time  time.Time       `json:"time"`
-	Value float64         `json:"value"`
-	Tags  *metrics.TagSet `json:"tags"`
+	Time     time.Time         `json:"time"`
+	Value    float64           `json:"value"`
+	Tags     *metrics.TagSet   `json:"tags"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 }) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
@@ -124,6 +125,26 @@ func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
 				}
 				(*out.Tags).UnmarshalEasyJSON(in)
 			}
+		case "metadata":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				in.Delim('{')
+				if !in.IsDelim('}') {
+					out.Metadata = make(map[string]string)
+				} else {
+					out.Metadata = nil
+				}
+				for !in.IsDelim('}') {
+					key := string(in.String())
+					in.WantColon()
+					var v1 string
+					v1 = string(in.String())
+					(out.Metadata)[key] = v1
+					in.WantComma()
+				}
+				in.Delim('}')
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -135,9 +156,10 @@ func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
 	}
 }
 func easyjson42239ddeEncode(out *jwriter.Writer, in struct {
-	Time  time.Time       `json:"time"`
-	Value float64         `json:"value"`
-	Tags  *metrics.TagSet `json:"tags"`
+	Time     time.Time         `json:"time"`
+	Value    float64           `json:"value"`
+	Tags     *metrics.TagSet   `json:"tags"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 }) {
 	out.RawByte('{')
 	first := true
@@ -159,6 +181,25 @@ func easyjson42239ddeEncode(out *jwriter.Writer, in struct {
 			out.RawString("null")
 		} else {
 			(*in.Tags).MarshalEasyJSON(out)
+		}
+	}
+	if len(in.Metadata) != 0 {
+		const prefix string = ",\"metadata\":"
+		out.RawString(prefix)
+		{
+			out.RawByte('{')
+			v2First := true
+			for v2Name, v2Value := range in.Metadata {
+				if v2First {
+					v2First = false
+				} else {
+					out.RawByte(',')
+				}
+				out.String(string(v2Name))
+				out.RawByte(':')
+				out.String(string(v2Value))
+			}
+			out.RawByte('}')
 		}
 	}
 	out.RawByte('}')
@@ -284,17 +325,17 @@ func easyjson42239ddeDecode1(in *jlexer.Lexer, out *struct {
 					out.Submetrics = (out.Submetrics)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v1 *metrics.Submetric
+					var v3 *metrics.Submetric
 					if in.IsNull() {
 						in.Skip()
-						v1 = nil
+						v3 = nil
 					} else {
-						if v1 == nil {
-							v1 = new(metrics.Submetric)
+						if v3 == nil {
+							v3 = new(metrics.Submetric)
 						}
-						easyjson42239ddeDecodeGoK6IoK6Metrics(in, v1)
+						easyjson42239ddeDecodeGoK6IoK6Metrics(in, v3)
 					}
-					out.Submetrics = append(out.Submetrics, v1)
+					out.Submetrics = append(out.Submetrics, v3)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -346,14 +387,14 @@ func easyjson42239ddeEncode1(out *jwriter.Writer, in struct {
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v2, v3 := range in.Submetrics {
-				if v2 > 0 {
+			for v4, v5 := range in.Submetrics {
+				if v4 > 0 {
 					out.RawByte(',')
 				}
-				if v3 == nil {
+				if v5 == nil {
 					out.RawString("null")
 				} else {
-					easyjson42239ddeEncodeGoK6IoK6Metrics(out, *v3)
+					easyjson42239ddeEncodeGoK6IoK6Metrics(out, *v5)
 				}
 			}
 			out.RawByte(']')

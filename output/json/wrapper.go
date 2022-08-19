@@ -10,17 +10,18 @@ import (
 
 //easyjson:json
 type sampleEnvelope struct {
-	Type string `json:"type"`
-	Data struct {
-		Time  time.Time       `json:"time"`
-		Value float64         `json:"value"`
-		Tags  *metrics.TagSet `json:"tags"`
-	} `json:"data"`
 	Metric string `json:"metric"`
+	Type   string `json:"type"`
+	Data   struct {
+		Time     time.Time         `json:"time"`
+		Value    float64           `json:"value"`
+		Tags     *metrics.TagSet   `json:"tags"`
+		Metadata map[string]string `json:"metadata,omitempty"`
+	} `json:"data"`
 }
 
 // wrapSample is used to package a metric sample in a way that's nice to export
-// to JSON.
+// to JSON and backwards-compatible.
 func wrapSample(sample metrics.Sample) sampleEnvelope {
 	s := sampleEnvelope{
 		Type:   "Point",
@@ -29,6 +30,7 @@ func wrapSample(sample metrics.Sample) sampleEnvelope {
 	s.Data.Time = sample.Time
 	s.Data.Value = sample.Value
 	s.Data.Tags = sample.Tags
+	s.Data.Metadata = sample.Metadata
 	return s
 }
 
