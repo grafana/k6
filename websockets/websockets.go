@@ -249,10 +249,6 @@ func (w *webSocket) loop(ctx context.Context) {
 	samplesOutput := w.vu.State().Samples
 
 	defer func() {
-		_ = w.conn.Close()
-		w.tq.Close()
-	}()
-	defer func() {
 		now := time.Now()
 		duration := metrics.D(time.Since(w.started))
 
@@ -268,9 +264,25 @@ func (w *webSocket) loop(ctx context.Context) {
 			defer close(ch)
 			return w.connectionClosedWithError(nil)
 		})
-		// we need to wait for this to close the connection cleanly
-		// otherwise we might close the task queue before we close which will leave a bunch of goroutines
-		<-ch
+		select {
+		case <-ch:
+		case <-ctx.Done():
+			// unfortunately it is really possible that k6 has been winding down the VU and the above code
+			// to close the connection will just never be called as the event loop no longer executes the callbacks.
+			// This ultimately needs a separate signal for when the eventloop will not execute anything after this.
+			// To try to prevent leaking goroutines here we will try to figure out if we need to close the `done`
+			// channel and wait a bit and close it if it isn't. This might be better off with more mutexes
+			timer := time.NewTimer(time.Millisecond * 250)
+			select {
+			case <-w.done:
+				// everything is fine
+			case <-timer.C:
+				close(w.done) // hopefully this means we won't double close
+			}
+			timer.Stop()
+		}
+		_ = w.conn.Close()
+		w.tq.Close()
 	}()
 	// Wraps a couple of channels around conn.ReadMessage
 	go func() { // copied from k6/ws
