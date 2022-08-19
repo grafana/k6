@@ -235,11 +235,10 @@ func (w *webSocket) establishConnection() {
 		w.tq.Close()
 		return
 	}
+	go w.loop(ctx)
 	w.tq.Queue(func() error {
 		return w.connectionConnected()
 	})
-
-	go w.loop(ctx)
 }
 
 //nolint:funlen,gocognit,cyclop
@@ -269,10 +268,9 @@ func (w *webSocket) loop(ctx context.Context) {
 			defer close(ch)
 			return w.connectionClosedWithError(nil)
 		})
-		select {
-		case <-ch:
-		case <-ctx.Done():
-		}
+		// we need to wait for this to close the connection cleanly
+		// otherwise we might close the task queue before we close which will leave a bunch of goroutines
+		<-ch
 	}()
 	// Wraps a couple of channels around conn.ReadMessage
 	go func() { // copied from k6/ws
@@ -472,7 +470,8 @@ func (w *webSocket) loop(ctx context.Context) {
 }
 
 func (w *webSocket) send(msg goja.Value) {
-	if w.readyState == CONNECTING {
+	if w.readyState != OPEN {
+		// TODO figure out if we should give different error while being closed/closed/connecting
 		common.Throw(w.vu.Runtime(), errors.New("InvalidStateError"))
 	}
 	switch o := msg.Export().(type) {
