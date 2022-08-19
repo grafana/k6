@@ -13,8 +13,8 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/websocket v1.5.0
 	github.com/grafana/xk6-redis v0.1.1
-	github.com/grafana/xk6-timers v0.1.1
-	github.com/grafana/xk6-websockets v0.1.1
+	github.com/grafana/xk6-timers v0.1.2
+	github.com/grafana/xk6-websockets v0.1.3
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.12.0
 	github.com/klauspost/compress v1.15.7

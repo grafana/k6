@@ -95,10 +95,8 @@ func (e *Timers) setTimeout(callback goja.Callable, delay float64, args ...goja.
 	go func() {
 		timer := time.NewTimer(time.Duration(delay * float64(time.Millisecond)))
 		defer func() {
+			timer.Stop()
 			e.stopTimerCh(id)
-			if !timer.Stop() {
-				<-timer.C
-			}
 		}()
 
 		select {
