@@ -3,12 +3,14 @@ package cmd
 import (
 	"archive/tar"
 	"bytes"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sync"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -240,6 +242,13 @@ func loadAndConfigureTest(
 	return test.consolidateDeriveAndValidateConfig(gs, cmd, cliConfigGetter)
 }
 
+// loadSystemCertPool attempts to load system certificates.
+func loadSystemCertPool(logger *logrus.Logger) {
+	if _, err := x509.SystemCertPool(); err != nil {
+		logger.WithError(err).Warning("Unable to load system cert pool")
+	}
+}
+
 func (lct *loadedAndConfiguredTest) buildTestRunState(
 	configToReinject lib.Options,
 ) (*lib.TestRunState, error) {
@@ -247,6 +256,10 @@ func (lct *loadedAndConfiguredTest) buildTestRunState(
 	if err := lct.initRunner.SetOptions(configToReinject); err != nil {
 		return nil, err
 	}
+
+	// it pre-loads system certificates to avoid doing it on the first TLS request.
+	// This is done async to avoid blocking the rest of the loading process as it will not stop if it fails.
+	go loadSystemCertPool(lct.preInitState.Logger)
 
 	return &lib.TestRunState{
 		TestPreInitState: lct.preInitState,
