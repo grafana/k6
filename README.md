@@ -425,3 +425,9 @@ Currently only Chromium is supported, and the [Playwright API](https://playwrigh
 | [Video](https://playwright.dev/docs/api/class-video) | :warning: | All |
 | [WebSocket](https://playwright.dev/docs/api/class-websocket) | :warning: | All |
 | [Worker](https://playwright.dev/docs/api/class-worker) | :warning: | All |
+
+
+Support
+-------
+
+To get help about usage, report bugs, suggest features and discuss xk6-browser with other users see [SUPPORT.md](SUPPORT.md).
