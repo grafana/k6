@@ -156,6 +156,9 @@ type compiledNewTarget struct {
 	baseCompiledExpr
 }
 
+type compiledImportMeta struct {
+	baseCompiledExpr
+}
 type compiledSequenceExpr struct {
 	baseCompiledExpr
 	sequence []compiledExpr
@@ -216,6 +219,9 @@ type compiledOptionalChain struct {
 type compiledOptional struct {
 	baseCompiledExpr
 	expr compiledExpr
+}
+type compiledDynamicImport struct {
+	baseCompiledExpr
 }
 
 func (e *defaultDeleteExpr) emitGetter(putOnStack bool) {
@@ -1346,8 +1352,9 @@ func (e *compiledFunctionLiteral) compile() (prg *Program, name unistring.String
 	savedPrg := e.c.p
 	preambleLen := 8 // enter, boxThis, loadStack(0), initThis, createArgs, set, loadCallee, init
 	e.c.p = &Program{
-		src:  e.c.p.src,
-		code: e.c.newCode(preambleLen, 16),
+		src:            e.c.p.src,
+		code:           e.c.newCode(preambleLen, 16),
+		scriptOrModule: e.c.getScriptOrModule(),
 	}
 	e.c.newScope()
 	s := e.c.scope
@@ -1925,7 +1932,7 @@ func (e *compiledClassLiteral) emitGetter(putOnStack bool) {
 					DeclarationList: elt.DeclarationList,
 				}, true)
 				f.typ = funcClsInit
-				//f.lhsName = "<static_initializer>"
+				// f.lhsName = "<static_initializer>"
 				f.homeObjOffset = 1
 				staticElements = append(staticElements, clsElement{
 					body: f,
@@ -2140,9 +2147,10 @@ func (e *compiledClassLiteral) compileFieldsAndStaticBlocks(elements []clsElemen
 	}
 
 	e.c.p = &Program{
-		src:      savedPrg.src,
-		funcName: funcName,
-		code:     e.c.newCode(2, 16),
+		src:            savedPrg.src,
+		funcName:       funcName,
+		code:           e.c.newCode(2, 16),
+		scriptOrModule: e.c.getScriptOrModule(),
 	}
 
 	e.c.newScope()
@@ -2268,6 +2276,12 @@ func (c *compiler) compileArrowFunctionLiteral(v *ast.ArrowFunctionLiteral) *com
 
 func (c *compiler) emitLoadThis() {
 	b, eval := c.scope.lookupThis()
+
+	if c.module != nil && c.scope.outer != nil && c.scope.outer.outer == nil { // modules don't have this defined
+		// TODO maybe just add isTopLevel and rewrite the rest of the code
+		c.emit(_loadUndef{})
+		return
+	}
 	if b != nil {
 		b.emitGet()
 	} else {
@@ -2348,12 +2362,25 @@ func (e *compiledNewTarget) emitGetter(putOnStack bool) {
 	}
 }
 
+func (e *compiledImportMeta) emitGetter(putOnStack bool) {
+	if putOnStack {
+		e.addSrcMap()
+		e.c.emit(loadImportMeta)
+	}
+}
+
 func (c *compiler) compileMetaProperty(v *ast.MetaProperty) compiledExpr {
-	if v.Meta.Name == "new" || v.Property.Name != "target" {
+	if v.Meta.Name == "new" && v.Property.Name == "target" {
 		r := &compiledNewTarget{}
 		r.init(c, v.Idx0())
 		return r
 	}
+	if v.Meta.Name == "import" && v.Property.Name == "meta" {
+		r := &compiledImportMeta{}
+		r.init(c, v.Idx0())
+		return r
+	}
+
 	c.throwSyntaxError(int(v.Idx)-1, "Unsupported meta property: %s.%s", v.Meta.Name, v.Property.Name)
 	return nil
 }
@@ -2739,7 +2766,6 @@ func (e *compiledBinaryExpr) emitGetter(putOnStack bool) {
 }
 
 func (c *compiler) compileBinaryExpression(v *ast.BinaryExpression) compiledExpr {
-
 	switch v.Operator {
 	case token.LOGICAL_OR:
 		return c.compileLogicalOr(v.Left, v.Right, v.Idx0())
@@ -3119,11 +3145,16 @@ func (c *compiler) compileCallee(v ast.Expression) compiledExpr {
 		c.throwSyntaxError(int(v.Idx0())-1, "'super' keyword unexpected here")
 		panic("unreachable")
 	}
+	if imp, ok := v.(*ast.DynamicImportExpression); ok {
+		r := &compiledDynamicImport{}
+		r.init(c, imp.Idx)
+		return r
+	}
 	return c.compileExpression(v)
 }
 
 func (c *compiler) compileCallExpression(v *ast.CallExpression) compiledExpr {
-
+	// fmt.Printf("%+v %+v %T\n", v, v.Callee, v.Callee)
 	args := make([]compiledExpr, len(v.ArgumentList))
 	isVariadic := false
 	for i, argExpr := range v.ArgumentList {
@@ -3218,8 +3249,6 @@ func (c *compiler) compileBooleanLiteral(v *ast.BooleanLiteral) compiledExpr {
 }
 
 func (c *compiler) compileAssignExpression(v *ast.AssignExpression) compiledExpr {
-	// log.Printf("compileAssignExpression(): %+v", v)
-
 	r := &compiledAssignExpr{
 		left:     c.compileExpression(v.Left),
 		right:    c.compileExpression(v.Right),
@@ -3516,5 +3545,11 @@ func (e *compiledOptional) emitGetter(putOnStack bool) {
 	if putOnStack {
 		e.c.block.breaks = append(e.c.block.breaks, len(e.c.p.code))
 		e.c.emit(nil)
+	}
+}
+
+func (e *compiledDynamicImport) emitGetter(putOnStack bool) {
+	if putOnStack {
+		e.c.emit(dynamicImport)
 	}
 }

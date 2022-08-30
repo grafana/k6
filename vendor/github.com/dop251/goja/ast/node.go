@@ -274,6 +274,9 @@ type (
 	SuperExpression struct {
 		Idx file.Idx
 	}
+	DynamicImportExpression struct {
+		Idx file.Idx
+	}
 
 	UnaryExpression struct {
 		Operator token.Token
@@ -290,35 +293,36 @@ type (
 
 // _expressionNode
 
-func (*ArrayLiteral) _expressionNode()          {}
-func (*AssignExpression) _expressionNode()      {}
-func (*BadExpression) _expressionNode()         {}
-func (*BinaryExpression) _expressionNode()      {}
-func (*BooleanLiteral) _expressionNode()        {}
-func (*BracketExpression) _expressionNode()     {}
-func (*CallExpression) _expressionNode()        {}
-func (*ConditionalExpression) _expressionNode() {}
-func (*DotExpression) _expressionNode()         {}
-func (*PrivateDotExpression) _expressionNode()  {}
-func (*FunctionLiteral) _expressionNode()       {}
-func (*ClassLiteral) _expressionNode()          {}
-func (*ArrowFunctionLiteral) _expressionNode()  {}
-func (*Identifier) _expressionNode()            {}
-func (*NewExpression) _expressionNode()         {}
-func (*NullLiteral) _expressionNode()           {}
-func (*NumberLiteral) _expressionNode()         {}
-func (*ObjectLiteral) _expressionNode()         {}
-func (*RegExpLiteral) _expressionNode()         {}
-func (*SequenceExpression) _expressionNode()    {}
-func (*StringLiteral) _expressionNode()         {}
-func (*TemplateLiteral) _expressionNode()       {}
-func (*ThisExpression) _expressionNode()        {}
-func (*SuperExpression) _expressionNode()       {}
-func (*UnaryExpression) _expressionNode()       {}
-func (*MetaProperty) _expressionNode()          {}
-func (*ObjectPattern) _expressionNode()         {}
-func (*ArrayPattern) _expressionNode()          {}
-func (*Binding) _expressionNode()               {}
+func (*ArrayLiteral) _expressionNode()            {}
+func (*AssignExpression) _expressionNode()        {}
+func (*BadExpression) _expressionNode()           {}
+func (*BinaryExpression) _expressionNode()        {}
+func (*BooleanLiteral) _expressionNode()          {}
+func (*BracketExpression) _expressionNode()       {}
+func (*CallExpression) _expressionNode()          {}
+func (*ConditionalExpression) _expressionNode()   {}
+func (*DotExpression) _expressionNode()           {}
+func (*PrivateDotExpression) _expressionNode()    {}
+func (*FunctionLiteral) _expressionNode()         {}
+func (*ClassLiteral) _expressionNode()            {}
+func (*ArrowFunctionLiteral) _expressionNode()    {}
+func (*Identifier) _expressionNode()              {}
+func (*NewExpression) _expressionNode()           {}
+func (*NullLiteral) _expressionNode()             {}
+func (*NumberLiteral) _expressionNode()           {}
+func (*ObjectLiteral) _expressionNode()           {}
+func (*RegExpLiteral) _expressionNode()           {}
+func (*SequenceExpression) _expressionNode()      {}
+func (*StringLiteral) _expressionNode()           {}
+func (*TemplateLiteral) _expressionNode()         {}
+func (*ThisExpression) _expressionNode()          {}
+func (*SuperExpression) _expressionNode()         {}
+func (*DynamicImportExpression) _expressionNode() {}
+func (*UnaryExpression) _expressionNode()         {}
+func (*MetaProperty) _expressionNode()            {}
+func (*ObjectPattern) _expressionNode()           {}
+func (*ArrayPattern) _expressionNode()            {}
+func (*Binding) _expressionNode()                 {}
 
 func (*PropertyShort) _expressionNode() {}
 func (*PropertyKeyed) _expressionNode() {}
@@ -464,7 +468,71 @@ type (
 	}
 
 	FunctionDeclaration struct {
-		Function *FunctionLiteral
+		Function  *FunctionLiteral
+		IsDefault bool // TODO figure out how to not have to that
+	}
+
+	ImportDeclaration struct {
+		Idx             file.Idx
+		ImportClause    *ImportClause
+		FromClause      *FromClause
+		ModuleSpecifier unistring.String
+	}
+
+	ImportClause struct {
+		ImportedDefaultBinding *Identifier
+		NameSpaceImport        *NameSpaceImport
+		NamedImports           *NamedImports
+	}
+
+	NameSpaceImport struct {
+		ImportedBinding unistring.String
+	}
+
+	NamedImports struct {
+		ImportsList []*ImportSpecifier
+	}
+
+	ImportSpecifier struct {
+		IdentifierName unistring.String
+		Alias          unistring.String
+	}
+
+	ExportDeclaration struct {
+		Idx                  file.Idx
+		Variable             *VariableStatement
+		AssignExpression     Expression
+		LexicalDeclaration   *LexicalDeclaration
+		ClassDeclaration     *ClassDeclaration
+		NamedExports         *NamedExports
+		ExportFromClause     *ExportFromClause
+		FromClause           *FromClause
+		HoistableDeclaration *HoistableDeclaration
+		IsDefault            bool
+	}
+
+	FromClause struct {
+		ModuleSpecifier unistring.String
+	}
+	ExportFromClause struct {
+		IsWildcard   bool
+		Alias        unistring.String
+		NamedExports *NamedExports
+	}
+
+	NamedExports struct {
+		ExportsList []*ExportSpecifier
+	}
+
+	ExportSpecifier struct {
+		IdentifierName unistring.String
+		Alias          unistring.String
+	}
+
+	HoistableDeclaration struct {
+		FunctionDeclaration *FunctionDeclaration
+		// GeneratorDeclaration
+		// AsyncFunc and AsyncGenerator
 	}
 
 	ClassDeclaration struct {
@@ -498,6 +566,9 @@ func (*WithStatement) _statementNode()       {}
 func (*LexicalDeclaration) _statementNode()  {}
 func (*FunctionDeclaration) _statementNode() {}
 func (*ClassDeclaration) _statementNode()    {}
+
+func (*ExportDeclaration) _statementNode() {}
+func (*ImportDeclaration) _statementNode() {}
 
 // =========== //
 // Declaration //
@@ -614,6 +685,8 @@ type Program struct {
 	Body []Statement
 
 	DeclarationList []*VariableDeclaration
+	ImportEntries   []*ImportDeclaration
+	ExportEntries   []*ExportDeclaration
 
 	File *file.File
 }
@@ -622,34 +695,35 @@ type Program struct {
 // Idx0 //
 // ==== //
 
-func (self *ArrayLiteral) Idx0() file.Idx          { return self.LeftBracket }
-func (self *ArrayPattern) Idx0() file.Idx          { return self.LeftBracket }
-func (self *ObjectPattern) Idx0() file.Idx         { return self.LeftBrace }
-func (self *AssignExpression) Idx0() file.Idx      { return self.Left.Idx0() }
-func (self *BadExpression) Idx0() file.Idx         { return self.From }
-func (self *BinaryExpression) Idx0() file.Idx      { return self.Left.Idx0() }
-func (self *BooleanLiteral) Idx0() file.Idx        { return self.Idx }
-func (self *BracketExpression) Idx0() file.Idx     { return self.Left.Idx0() }
-func (self *CallExpression) Idx0() file.Idx        { return self.Callee.Idx0() }
-func (self *ConditionalExpression) Idx0() file.Idx { return self.Test.Idx0() }
-func (self *DotExpression) Idx0() file.Idx         { return self.Left.Idx0() }
-func (self *PrivateDotExpression) Idx0() file.Idx  { return self.Left.Idx0() }
-func (self *FunctionLiteral) Idx0() file.Idx       { return self.Function }
-func (self *ClassLiteral) Idx0() file.Idx          { return self.Class }
-func (self *ArrowFunctionLiteral) Idx0() file.Idx  { return self.Start }
-func (self *Identifier) Idx0() file.Idx            { return self.Idx }
-func (self *NewExpression) Idx0() file.Idx         { return self.New }
-func (self *NullLiteral) Idx0() file.Idx           { return self.Idx }
-func (self *NumberLiteral) Idx0() file.Idx         { return self.Idx }
-func (self *ObjectLiteral) Idx0() file.Idx         { return self.LeftBrace }
-func (self *RegExpLiteral) Idx0() file.Idx         { return self.Idx }
-func (self *SequenceExpression) Idx0() file.Idx    { return self.Sequence[0].Idx0() }
-func (self *StringLiteral) Idx0() file.Idx         { return self.Idx }
-func (self *TemplateLiteral) Idx0() file.Idx       { return self.OpenQuote }
-func (self *ThisExpression) Idx0() file.Idx        { return self.Idx }
-func (self *SuperExpression) Idx0() file.Idx       { return self.Idx }
-func (self *UnaryExpression) Idx0() file.Idx       { return self.Idx }
-func (self *MetaProperty) Idx0() file.Idx          { return self.Idx }
+func (self *ArrayLiteral) Idx0() file.Idx            { return self.LeftBracket }
+func (self *ArrayPattern) Idx0() file.Idx            { return self.LeftBracket }
+func (self *ObjectPattern) Idx0() file.Idx           { return self.LeftBrace }
+func (self *AssignExpression) Idx0() file.Idx        { return self.Left.Idx0() }
+func (self *BadExpression) Idx0() file.Idx           { return self.From }
+func (self *BinaryExpression) Idx0() file.Idx        { return self.Left.Idx0() }
+func (self *BooleanLiteral) Idx0() file.Idx          { return self.Idx }
+func (self *BracketExpression) Idx0() file.Idx       { return self.Left.Idx0() }
+func (self *CallExpression) Idx0() file.Idx          { return self.Callee.Idx0() }
+func (self *ConditionalExpression) Idx0() file.Idx   { return self.Test.Idx0() }
+func (self *DotExpression) Idx0() file.Idx           { return self.Left.Idx0() }
+func (self *PrivateDotExpression) Idx0() file.Idx    { return self.Left.Idx0() }
+func (self *FunctionLiteral) Idx0() file.Idx         { return self.Function }
+func (self *ClassLiteral) Idx0() file.Idx            { return self.Class }
+func (self *ArrowFunctionLiteral) Idx0() file.Idx    { return self.Start }
+func (self *Identifier) Idx0() file.Idx              { return self.Idx }
+func (self *NewExpression) Idx0() file.Idx           { return self.New }
+func (self *NullLiteral) Idx0() file.Idx             { return self.Idx }
+func (self *NumberLiteral) Idx0() file.Idx           { return self.Idx }
+func (self *ObjectLiteral) Idx0() file.Idx           { return self.LeftBrace }
+func (self *RegExpLiteral) Idx0() file.Idx           { return self.Idx }
+func (self *SequenceExpression) Idx0() file.Idx      { return self.Sequence[0].Idx0() }
+func (self *StringLiteral) Idx0() file.Idx           { return self.Idx }
+func (self *TemplateLiteral) Idx0() file.Idx         { return self.OpenQuote }
+func (self *ThisExpression) Idx0() file.Idx          { return self.Idx }
+func (self *SuperExpression) Idx0() file.Idx         { return self.Idx }
+func (self *DynamicImportExpression) Idx0() file.Idx { return self.Idx }
+func (self *UnaryExpression) Idx0() file.Idx         { return self.Idx }
+func (self *MetaProperty) Idx0() file.Idx            { return self.Idx }
 
 func (self *BadStatement) Idx0() file.Idx        { return self.From }
 func (self *BlockStatement) Idx0() file.Idx      { return self.LeftBrace }
@@ -682,6 +756,9 @@ func (self *ForLoopInitializerVarDeclList) Idx0() file.Idx { return self.List[0]
 func (self *PropertyShort) Idx0() file.Idx                 { return self.Name.Idx }
 func (self *PropertyKeyed) Idx0() file.Idx                 { return self.Key.Idx0() }
 func (self *ExpressionBody) Idx0() file.Idx                { return self.Expression.Idx0() }
+
+func (self *ExportDeclaration) Idx0() file.Idx { return self.Idx }
+func (self *ImportDeclaration) Idx0() file.Idx { return self.Idx }
 
 func (self *FieldDefinition) Idx0() file.Idx  { return self.Idx }
 func (self *MethodDefinition) Idx0() file.Idx { return self.Idx }
@@ -717,22 +794,24 @@ func (self *NewExpression) Idx1() file.Idx {
 		return self.Callee.Idx1()
 	}
 }
-func (self *NullLiteral) Idx1() file.Idx        { return file.Idx(int(self.Idx) + 4) } // "null"
-func (self *NumberLiteral) Idx1() file.Idx      { return file.Idx(int(self.Idx) + len(self.Literal)) }
-func (self *ObjectLiteral) Idx1() file.Idx      { return self.RightBrace + 1 }
-func (self *ObjectPattern) Idx1() file.Idx      { return self.RightBrace + 1 }
-func (self *RegExpLiteral) Idx1() file.Idx      { return file.Idx(int(self.Idx) + len(self.Literal)) }
-func (self *SequenceExpression) Idx1() file.Idx { return self.Sequence[len(self.Sequence)-1].Idx1() }
-func (self *StringLiteral) Idx1() file.Idx      { return file.Idx(int(self.Idx) + len(self.Literal)) }
-func (self *TemplateLiteral) Idx1() file.Idx    { return self.CloseQuote + 1 }
-func (self *ThisExpression) Idx1() file.Idx     { return self.Idx + 4 }
-func (self *SuperExpression) Idx1() file.Idx    { return self.Idx + 5 }
+func (self *NullLiteral) Idx1() file.Idx             { return file.Idx(int(self.Idx) + 4) } // "null"
+func (self *NumberLiteral) Idx1() file.Idx           { return file.Idx(int(self.Idx) + len(self.Literal)) }
+func (self *ObjectLiteral) Idx1() file.Idx           { return self.RightBrace + 1 }
+func (self *ObjectPattern) Idx1() file.Idx           { return self.RightBrace + 1 }
+func (self *RegExpLiteral) Idx1() file.Idx           { return file.Idx(int(self.Idx) + len(self.Literal)) }
+func (self *SequenceExpression) Idx1() file.Idx      { return self.Sequence[len(self.Sequence)-1].Idx1() }
+func (self *StringLiteral) Idx1() file.Idx           { return file.Idx(int(self.Idx) + len(self.Literal)) }
+func (self *TemplateLiteral) Idx1() file.Idx         { return self.CloseQuote + 1 }
+func (self *ThisExpression) Idx1() file.Idx          { return self.Idx + 4 }
+func (self *SuperExpression) Idx1() file.Idx         { return self.Idx + 5 }
+func (self *DynamicImportExpression) Idx1() file.Idx { return self.Idx + 6 }
 func (self *UnaryExpression) Idx1() file.Idx {
 	if self.Postfix {
 		return self.Operand.Idx1() + 2 // ++ --
 	}
 	return self.Operand.Idx1()
 }
+
 func (self *MetaProperty) Idx1() file.Idx {
 	return self.Property.Idx1()
 }
@@ -794,6 +873,14 @@ func (self *PropertyShort) Idx1() file.Idx {
 func (self *PropertyKeyed) Idx1() file.Idx { return self.Value.Idx1() }
 
 func (self *ExpressionBody) Idx1() file.Idx { return self.Expression.Idx1() }
+
+func (self *ExportDeclaration) Idx1() file.Idx {
+	return self.Idx + file.Idx(len(token.EXPORT.String()))
+}
+
+func (self *ImportDeclaration) Idx1() file.Idx {
+	return self.Idx + file.Idx(len(token.IMPORT.String()))
+}
 
 func (self *FieldDefinition) Idx1() file.Idx {
 	if self.Initializer != nil {

@@ -67,7 +67,7 @@ func TestRunnerNew(t *testing.T) {
 			require.NoError(t, err)
 			vuc, ok := initVU.(*VU)
 			require.True(t, ok)
-			assert.Equal(t, int64(0), vuc.pgm.exports.Get("counter").Export())
+			assert.Equal(t, int64(0), vuc.getExported("counter").Export())
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -75,7 +75,7 @@ func TestRunnerNew(t *testing.T) {
 			t.Run("RunOnce", func(t *testing.T) {
 				err = vu.RunOnce()
 				require.NoError(t, err)
-				assert.Equal(t, int64(1), vuc.pgm.exports.Get("counter").Export())
+				assert.Equal(t, int64(1), vuc.getExported("counter").Export())
 			})
 		})
 	})
@@ -197,7 +197,7 @@ func TestOptionsSettingToScript(t *testing.T) {
 		t.Run(fmt.Sprintf("Variant#%d", i), func(t *testing.T) {
 			t.Parallel()
 			data := variant + `
-					exports.default = function() {
+					export default function() {
 						if (!options) {
 							throw new Error("Expected options to be defined!");
 						}
@@ -545,7 +545,7 @@ func TestRunnerIntegrationImports(t *testing.T) {
 			mod := mod
 			t.Run(mod, func(t *testing.T) {
 				t.Run("Source", func(t *testing.T) {
-					_, err := getSimpleRunner(t, "/script.js", fmt.Sprintf(`import "%s"; exports.default = function() {}`, mod), rtOpts)
+					_, err := getSimpleRunner(t, "/script.js", fmt.Sprintf(`import "%s"; export default function() {}`, mod), rtOpts)
 					require.NoError(t, err)
 				})
 			})
@@ -572,7 +572,7 @@ func TestRunnerIntegrationImports(t *testing.T) {
 				r1, err := getSimpleRunner(t, data.filename, fmt.Sprintf(`
 					var hi = require("%s").default;
 					exports.default = function() {
-						if (hi != "hi!") { throw new Error("incorrect value"); }
+						if (hi != "hi!") { throw new Error("incorrect value " + JSON.stringify(hi)); }
 					}`, data.path), fs)
 				require.NoError(t, err)
 

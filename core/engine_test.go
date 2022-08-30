@@ -886,8 +886,8 @@ func TestSetupException(t *testing.T) {
 		require.Error(t, err)
 		var exception errext.Exception
 		require.ErrorAs(t, err, &exception)
-		require.Equal(t, "Error: baz\n\tat baz (file:///bar.js:6:16(3))\n"+
-			"\tat file:///bar.js:3:8(3)\n\tat setup (file:///script.js:4:2(4))\n\tat native\n",
+		require.Equal(t, "Error: baz\n\tat baz (file:///bar.js:6:17(3))\n"+
+			"\tat default (file:///bar.js:3:12(3))\n\tat setup (file:///script.js:4:6(3))\n\tat native\n",
 			err.Error())
 	}
 }
@@ -934,7 +934,7 @@ func TestVuInitException(t *testing.T) {
 
 	var exception errext.Exception
 	require.ErrorAs(t, err, &exception)
-	assert.Equal(t, "Error: oops in 2\n\tat file:///script.js:10:9(29)\n\tat native\n", err.Error())
+	assert.Equal(t, "Error: oops in 2\n\tat file:///script.js:10:10(21)\n", err.Error())
 
 	var errWithHint errext.HasHint
 	require.ErrorAs(t, err, &errWithHint)

@@ -248,6 +248,7 @@ type vm struct {
 	pc           int
 	stack        valueStack
 	sp, sb, args int
+	oldsp        int // haxx
 
 	stash     *stash
 	privEnv   *privateEnv
@@ -492,6 +493,13 @@ func (vm *vm) run() {
 		if interrupted = atomic.LoadUint32(&vm.interrupted) != 0; interrupted {
 			break
 		}
+		/*
+			fmt.Printf("code: ")
+			for _, code := range vm.prg.code[vm.pc:] {
+				fmt.Printf("{%T: %#v},", code, code)
+			}
+			fmt.Print("\n")
+			//*/
 		vm.prg.code[vm.pc].exec(vm)
 		ticks++
 		if ticks > 10000 {
@@ -556,6 +564,8 @@ func (vm *vm) try(f func()) (ex *Exception) {
 
 	ctxOffset := len(vm.callStack)
 	sp := vm.sp
+	oldsp := vm.oldsp
+	vm.oldsp = sp
 	iterLen := len(vm.iterStack)
 	refLen := len(vm.refStack)
 
@@ -565,6 +575,7 @@ func (vm *vm) try(f func()) (ex *Exception) {
 				vm.callStack = vm.callStack[:ctxOffset]
 				vm.restoreCtx(&ctx)
 				vm.sp = sp
+				vm.oldsp = oldsp
 
 				// Restore other stacks
 				iterTail := vm.iterStack[iterLen:]
@@ -655,8 +666,7 @@ func (vm *vm) peek() Value {
 }
 
 func (vm *vm) saveCtx(ctx *context) {
-	ctx.prg, ctx.stash, ctx.privEnv, ctx.newTarget, ctx.result, ctx.pc, ctx.sb, ctx.args, ctx.funcName =
-		vm.prg, vm.stash, vm.privEnv, vm.newTarget, vm.result, vm.pc, vm.sb, vm.args, vm.funcName
+	ctx.prg, ctx.stash, ctx.privEnv, ctx.newTarget, ctx.result, ctx.pc, ctx.sb, ctx.args, ctx.funcName = vm.prg, vm.stash, vm.privEnv, vm.newTarget, vm.result, vm.pc, vm.sb, vm.args, vm.funcName
 }
 
 func (vm *vm) pushCtx() {
@@ -673,8 +683,7 @@ func (vm *vm) pushCtx() {
 }
 
 func (vm *vm) restoreCtx(ctx *context) {
-	vm.prg, vm.funcName, vm.stash, vm.privEnv, vm.newTarget, vm.result, vm.pc, vm.sb, vm.args =
-		ctx.prg, ctx.funcName, ctx.stash, ctx.privEnv, ctx.newTarget, ctx.result, ctx.pc, ctx.sb, ctx.args
+	vm.prg, vm.funcName, vm.stash, vm.privEnv, vm.newTarget, vm.result, vm.pc, vm.sb, vm.args = ctx.prg, ctx.funcName, ctx.stash, ctx.privEnv, ctx.newTarget, ctx.result, ctx.pc, ctx.sb, ctx.args
 }
 
 func (vm *vm) popCtx() {
@@ -806,6 +815,7 @@ func (l loadStackLex) exec(vm *vm) {
 	} else {
 		p = &vm.stack[vm.sb+vm.args+int(l)]
 	}
+	// fmt.Println(vm.stack, vm.sb, vm.args, l, p, *p)
 	if *p == nil {
 		panic(errAccessBeforeInit)
 	}
@@ -954,6 +964,66 @@ type initStack1P int
 func (s initStack1P) exec(vm *vm) {
 	vm.initStack1(int(s))
 	vm.sp--
+}
+
+type importNamespace struct {
+	module ModuleRecord
+}
+
+func (i importNamespace) exec(vm *vm) {
+	vm.push(vm.r.NamespaceObjectFor(i.module))
+	vm.pc++
+}
+
+type export struct {
+	idx      uint32
+	callback func(*vm, func() Value)
+}
+
+func (e export) exec(vm *vm) {
+	// from loadStash
+	level := int(e.idx >> 24)
+	idx := uint32(e.idx & 0x00FFFFFF)
+	stash := vm.stash
+	for i := 0; i < level; i++ {
+		stash = stash.outer
+	}
+	e.callback(vm, func() Value {
+		return stash.getByIdx(idx)
+	})
+	vm.pc++
+}
+
+type exportLex struct {
+	idx      uint32
+	callback func(*vm, func() Value)
+}
+
+func (e exportLex) exec(vm *vm) {
+	// from loadStashLex
+	level := int(e.idx >> 24)
+	idx := uint32(e.idx & 0x00FFFFFF)
+	stash := vm.stash
+	for i := 0; i < level; i++ {
+		stash = stash.outer
+	}
+	e.callback(vm, func() Value {
+		v := stash.getByIdx(idx)
+		if v == nil {
+			panic(errAccessBeforeInit)
+		}
+		return v
+	})
+	vm.pc++
+}
+
+type exportIndirect struct {
+	callback func(*vm)
+}
+
+func (e exportIndirect) exec(vm *vm) {
+	e.callback(vm)
+	vm.pc++
 }
 
 type storeStackP int
@@ -1362,6 +1432,26 @@ var halt _halt
 func (_halt) exec(vm *vm) {
 	vm.halt = true
 	vm.pc++
+}
+
+type _notReallyYield struct{}
+
+var notReallyYield _notReallyYield
+
+func (_notReallyYield) exec(vm *vm) {
+	vm.halt = true
+	vm.pc++
+	mi := vm.r.modules[vm.r.GetActiveScriptOrModule().(ModuleRecord)].(*SourceTextModuleInstance)
+	if vm.sp > vm.oldsp {
+		toCopy := vm.stack[vm.oldsp:]
+		mi.stack = make(valueStack, len(toCopy))
+		_ = copy(mi.stack, toCopy)
+		// fmt.Println("yield sb ", vm.sb, vm.args, mi.stack)
+	}
+	// fmt.Println("stack at yield", vm.stack)
+	context := &context{}
+	vm.saveCtx(context)
+	mi.context = context
 }
 
 type jump int32
@@ -2561,6 +2651,15 @@ func (s setGlobalStrict) exec(vm *vm) {
 	vm.pc++
 }
 
+// Load a var indirectly from another module
+type loadIndirect func(vm *vm) Value
+
+func (g loadIndirect) exec(vm *vm) {
+	v := nilSafe(g(vm))
+	vm.push(v)
+	vm.pc++
+}
+
 // Load a var from stash
 type loadStash uint32
 
@@ -3634,6 +3733,12 @@ func (n *newArrowFunc) exec(vm *vm) {
 	vm.pc++
 }
 
+type ambiguousImport unistring.String
+
+func (a ambiguousImport) exec(vm *vm) {
+	panic(vm.r.newError(vm.r.global.SyntaxError, "Ambiguous import for name %s", a))
+}
+
 func (vm *vm) alreadyDeclared(name unistring.String) Value {
 	return vm.r.newError(vm.r.global.SyntaxError, "Identifier '%s' has already been declared", name)
 }
@@ -4005,7 +4110,6 @@ end:
 		return valueTrue
 	}
 	return valueFalse
-
 }
 
 type _op_lt struct{}
@@ -4314,6 +4418,50 @@ func (_loadNewTarget) exec(vm *vm) {
 	} else {
 		vm.push(_undefined)
 	}
+	vm.pc++
+}
+
+type _loadImportMeta struct{}
+
+var loadImportMeta _loadImportMeta
+
+func (_loadImportMeta) exec(vm *vm) {
+	// https://262.ecma-international.org/13.0/#sec-meta-properties-runtime-semantics-evaluation
+	t := vm.r.GetActiveScriptOrModule()
+	m := t.(ModuleRecord) // There should be now way for this to have compiled
+	vm.push(vm.r.getImportMetaFor(m))
+	vm.pc++
+}
+
+type _loadDynamicImport struct{}
+
+var dynamicImport _loadDynamicImport
+
+func (_loadDynamicImport) exec(vm *vm) {
+	// https://262.ecma-international.org/13.0/#sec-import-call-runtime-semantics-evaluation
+	vm.push(vm.r.ToValue(func(specifier Value) Value { // TODO remove this function
+		t := vm.r.GetActiveScriptOrModule()
+
+		pcap := vm.r.newPromiseCapability(vm.r.global.Promise)
+		var specifierStr valueString
+		err := vm.r.runWrapped(func() {
+			specifierStr = specifier.toString()
+		})
+		if err != nil {
+			if ex, ok := err.(*Exception); ok {
+				pcap.reject(vm.r.ToValue(ex.val))
+			} else {
+				pcap.reject(vm.r.ToValue(err))
+			}
+		} else {
+			if vm.r.importModuleDynamically == nil {
+				pcap.reject(asciiString("dynamic modules not enabled in the host program"))
+			} else {
+				vm.r.importModuleDynamically(t, specifierStr, pcap)
+			}
+		}
+		return pcap.promise
+	}))
 	vm.pc++
 }
 

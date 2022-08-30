@@ -122,6 +122,9 @@ const (
 	DEBUGGER
 
 	INSTANCEOF
+	// ES6 Modules
+	EXPORT
+	IMPORT
 
 	ESCAPED_RESERVED_WORD
 	// Non-reserved keywords below
@@ -229,6 +232,8 @@ var token2string = [...]string{
 	CONTINUE:                    "continue",
 	DEBUGGER:                    "debugger",
 	INSTANCEOF:                  "instanceof",
+	EXPORT:                      "export",
+	IMPORT:                      "import",
 }
 
 var keywordTable = map[string]_keyword{
@@ -320,16 +325,14 @@ var keywordTable = map[string]_keyword{
 		token:         KEYWORD,
 		futureKeyword: true,
 	},
-	"export": {
-		token:         KEYWORD,
-		futureKeyword: true,
+	"import": {
+		token: IMPORT,
 	},
 	"extends": {
 		token: EXTENDS,
 	},
-	"import": {
-		token:         KEYWORD,
-		futureKeyword: true,
+	"export": {
+		token: EXPORT,
 	},
 	"super": {
 		token: SUPER,

@@ -42,11 +42,12 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 			}
 		`,
 		"direct export": `
-
 			var globalVar;
 			if (!globalVar) {
 				globalVar = Math.random();
-			}
+			} else {
+                throw "wat"
+            }
 			export function C() {
 				return globalVar;
 			}
@@ -117,7 +118,7 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 	}
 }
 
-func TestLoadExportsIsUsableInModule(t *testing.T) {
+func TestLoadRequireIsUsableInModule(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/A.js", []byte(`
@@ -125,11 +126,13 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 			return "A";
 		}
 		export function B() {
-			return exports.A() + "B";
+			return A() + "B";
 		}
 	`), os.ModePerm))
 	r1, err := getSimpleRunner(t, "/script.js", `
-			import { A, B } from "./A.js";
+			import { A } from "./A.js";
+			let B = require("./A.js").B;
+			let A2 = require("./A.js").A;
 
 			export default function(data) {
 				if (A() != "A") {
@@ -138,6 +141,10 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 
 				if (B() != "AB") {
 					throw new Error("wrong value of B() " + B());
+				}
+
+				if (A !== A2) {
+					throw new Error("A and A2 are not the same");
 				}
 			}
 		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
@@ -295,10 +302,10 @@ func TestLoadCycle(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/counter.js", []byte(`
 			let main = require("./main.js");
-			exports.count = 5;
-			export function a() {
+			exports.a = function() {
 				return main.message;
-			}
+			};
+			exports.count = 5;
 	`), os.ModePerm))
 
 	require.NoError(t, afero.WriteFile(fs, "/main.js", []byte(`
@@ -308,13 +315,13 @@ func TestLoadCycle(t *testing.T) {
 			let message= "Eval complete";
 			exports.message = message;
 
-			export default function() {
+			exports.default = function() {
 				if (count != 5) {
-					throw new Error("Wrong value of count "+ count);
+					throw new Error("Wrong value of count "+ count + " " +JSON.stringify(counter) ); 
 				}
 				let aMessage = a();
 				if (aMessage != message) {
-					throw new Error("Wrong value of a() "+ aMessage);
+					throw new Error("Wrong value of a() "+ aMessage + " " + JSON.stringify(counter));
 				}
 			}
 	`), os.ModePerm))

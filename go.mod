@@ -62,3 +62,5 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20210604141403-392c879c8b08 // indirect
 )
+
+replace github.com/dop251/goja => github.com/mstoykov/goja v0.0.0-20221110141717-df602e6aca88

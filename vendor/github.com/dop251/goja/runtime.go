@@ -184,6 +184,14 @@ type Runtime struct {
 	hash  *maphash.Hash
 	idSeq uint64
 
+	modules          map[ModuleRecord]ModuleInstance
+	moduleNamespaces map[ModuleRecord]*namespaceObject
+	importMetas      map[ModuleRecord]*Object
+
+	getImportMetaProperties func(ModuleRecord) []MetaProperty
+	finalizeImportMeta      func(*Object, ModuleRecord)
+	importModuleDynamically ImportModuleDynamicallyCallback
+
 	jobQueue []func()
 
 	promiseRejectionTracker PromiseRejectionTracker
@@ -1371,7 +1379,6 @@ func (r *Runtime) RunString(str string) (Value, error) {
 // RunScript executes the given string in the global context.
 func (r *Runtime) RunScript(name, src string) (Value, error) {
 	p, err := r.compile(name, src, false, true, nil)
-
 	if err != nil {
 		return nil, err
 	}
@@ -1404,6 +1411,54 @@ func (r *Runtime) RunProgram(p *Program) (result Value, err error) {
 	vm.prg = p
 	vm.pc = 0
 	vm.result = _undefined
+	ex := vm.runTry()
+	if ex == nil {
+		result = r.vm.result
+	} else {
+		err = ex
+	}
+	if recursive {
+		vm.popCtx()
+		vm.halt = false
+		vm.clearStack()
+	} else {
+		vm.stack = nil
+		vm.prg = nil
+		vm.funcName = ""
+		r.leave()
+	}
+	return
+}
+
+// RunProgram executes a pre-compiled (see Compile()) code in the global context.
+func (r *Runtime) continueRunProgram(_ *Program, context *context, stack valueStack) (result Value, err error) {
+	defer func() {
+		if x := recover(); x != nil {
+			if ex, ok := x.(*uncatchableException); ok {
+				err = ex.err
+				if len(r.vm.callStack) == 0 {
+					r.leaveAbrupt()
+				}
+			} else {
+				panic(x)
+			}
+		}
+	}()
+	vm := r.vm
+	recursive := false
+	if len(vm.callStack) > 0 {
+		recursive = true
+		vm.pushCtx()
+		vm.stash = &r.global.stash
+		vm.sb = vm.sp - 1
+	}
+	vm.result = _undefined
+	// sb := vm.sb
+	vm.restoreCtx(context)
+	vm.stack = stack
+	// vm.sb = sb
+	// fmt.Println("continue sb ", vm.sb, vm.callStack)
+	// fmt.Println("stack at continue", vm.stack)
 	ex := vm.runTry()
 	if ex == nil {
 		result = r.vm.result
