@@ -12,8 +12,6 @@ import (
 	"github.com/grafana/xk6-browser/k6ext"
 
 	k6modules "go.k6.io/k6/js/modules"
-
-	"github.com/dop251/goja"
 )
 
 const version = "v0.4.0"
@@ -23,12 +21,11 @@ type (
 	// instances for each VU.
 	RootModule struct{}
 
-	// JSModule is the entrypoint into the browser JS module.
+	// JSModule exposes the properties available to the JS script.
 	JSModule struct {
-		vu        k6modules.VU
-		k6Metrics *k6ext.CustomMetrics
-		Devices   map[string]common.Device
-		Version   string
+		Chromium api.BrowserType
+		Devices  map[string]common.Device
+		Version  string
 	}
 
 	// ModuleInstance represents an instance of the JS module.
@@ -61,12 +58,14 @@ func New() *RootModule {
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 	k6m := k6ext.RegisterCustomMetrics(vu.InitEnv().Registry)
+	ctx := k6ext.WithVU(vu.Context(), vu)
+	ctx = k6ext.WithCustomMetrics(ctx, k6m)
+
 	return &ModuleInstance{
 		mod: &JSModule{
-			vu:        vu,
-			k6Metrics: k6m,
-			Devices:   common.GetDevices(),
-			Version:   version,
+			Chromium: chromium.NewBrowserType(ctx),
+			Devices:  common.GetDevices(),
+			Version:  version,
 		},
 	}
 }
@@ -74,21 +73,7 @@ func (*RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 // Exports returns the exports of the JS module so that it can be used in test
 // scripts.
 func (mi *ModuleInstance) Exports() k6modules.Exports {
-	return k6modules.Exports{
-		Named: map[string]interface{}{
-			"chromium": mi.mod,
-			"devices":  mi.mod.Devices,
-		},
-	}
-}
-
-// Launch Chromium with given options.
-func (m *JSModule) Launch(opts goja.Value) api.Browser {
-	ctx := k6ext.WithVU(m.vu.Context(), m.vu)
-	ctx = k6ext.WithCustomMetrics(ctx, m.k6Metrics)
-
-	bt := chromium.NewBrowserType(ctx)
-	return bt.Launch(opts)
+	return k6modules.Exports{Default: mi.mod}
 }
 
 func init() {
