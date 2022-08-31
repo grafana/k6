@@ -123,7 +123,7 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 	}
 
 	// launch the browser
-	v := chromium.NewBrowserType(vu.Context())
+	v := chromium.NewBrowserType(vu)
 	bt, ok := v.(*chromium.BrowserType)
 	if !ok {
 		panic(fmt.Errorf("testBrowser: unexpected browser type %T", v))

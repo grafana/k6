@@ -9,7 +9,6 @@ import (
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/k6ext"
 
 	k6modules "go.k6.io/k6/js/modules"
 )
@@ -57,13 +56,9 @@ func New() *RootModule {
 // NewModuleInstance implements the k6modules.Module interface to return
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
-	k6m := k6ext.RegisterCustomMetrics(vu.InitEnv().Registry)
-	ctx := k6ext.WithVU(vu.Context(), vu)
-	ctx = k6ext.WithCustomMetrics(ctx, k6m)
-
 	return &ModuleInstance{
 		mod: &JSModule{
-			Chromium: chromium.NewBrowserType(ctx),
+			Chromium: chromium.NewBrowserType(vu),
 			Devices:  common.GetDevices(),
 			Version:  version,
 		},
