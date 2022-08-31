@@ -14,7 +14,7 @@ import (
 	k6modules "go.k6.io/k6/js/modules"
 )
 
-const version = "v0.4.0"
+const version = "0.4.0"
 
 type (
 	// RootModule is the global module instance that will create module
