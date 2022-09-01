@@ -7,7 +7,7 @@ export let options = {
         "TLS_RSA_WITH_AES_128_GCM_SHA256",
     ],
     tlsVersion: {
-        min: "ssl3.0",
+        min: "tls1.0",
         max: "tls1.2"
     }
 };
