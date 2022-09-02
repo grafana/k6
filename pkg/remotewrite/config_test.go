@@ -108,7 +108,6 @@ func TestConstructRemoteConfig(t *testing.T) {
 			env:     nil,
 			arg:     "",
 			config: Config{
-				Mapping:               null.StringFrom("prometheus"),
 				Url:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
 				CACert:                null.NewString("", false),
@@ -138,7 +137,6 @@ func TestConstructRemoteConfig(t *testing.T) {
 			env:     map[string]string{"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "false", "K6_PROMETHEUS_USER": "u"},
 			arg:     "user=user",
 			config: Config{
-				Mapping:               null.StringFrom("raw"),
 				Url:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
 				CACert:                null.NewString("", false),
@@ -187,7 +185,6 @@ func TestConstructRemoteConfig(t *testing.T) {
 			env:     nil,
 			arg:     "",
 			config: Config{
-				Mapping:               null.NewString("mapping", true),
 				Url:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
 				CACert:                null.NewString("", false),
@@ -224,7 +221,6 @@ func TestConstructRemoteConfig(t *testing.T) {
 			},
 			arg: "",
 			config: Config{
-				Mapping:               null.NewString("mapping", true),
 				Url:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
 				CACert:                null.NewString("", false),
@@ -261,7 +257,6 @@ func TestConstructRemoteConfig(t *testing.T) {
 			},
 			arg: "headers.X-Header=value_from_arg",
 			config: Config{
-				Mapping:               null.NewString("mapping", true),
 				Url:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
 				CACert:                null.NewString("", false),
@@ -311,7 +306,6 @@ func TestConstructRemoteConfig(t *testing.T) {
 }
 
 func assertConfig(t *testing.T, actual, expected Config) {
-	assert.Equal(t, expected.Mapping, actual.Mapping)
 	assert.Equal(t, expected.Url, actual.Url)
 	assert.Equal(t, expected.InsecureSkipTLSVerify, actual.InsecureSkipTLSVerify)
 	assert.Equal(t, expected.CACert, actual.CACert)

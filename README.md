@@ -28,12 +28,7 @@ Add TLS and HTTP basic authentication:
 K6_PROMETHEUS_REMOTE_URL=https://localhost:9090/api/v1/write K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY=false K6_CA_CERT_FILE=example/tls.crt K6_PROMETHEUS_USER=foo K6_PROMETHEUS_PASSWORD=bar ./k6 run script.js -o output-prometheus-remote
 ```
 
-Different remote storage agents are supported with mapping option. The default is Prometheus itself but there is a simpler raw mapping that can be used as a starting point for other remote agents:
-```
-K6_PROMETHEUS_MAPPING=raw K6_PROMETHEUS_REMOTE_URL=http://localhost:9090/api/v1/write ./k6 run script.js -o output-prometheus-remote
-```
-
-Note: Prometheus remote client relies on a snappy library for serialization which can panic on [encode operation](https://github.com/golang/snappy/blob/544b4180ac705b7605231d4a4550a1acb22a19fe/encode.go#L22).
+Note: Prometheus remote client relies on a snappy library for serialization which could panic on [encode operations](https://github.com/golang/snappy/blob/544b4180ac705b7605231d4a4550a1acb22a19fe/encode.go#L22).
 
 ### On sample rate
 
