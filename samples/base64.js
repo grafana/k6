@@ -7,7 +7,7 @@ export default function() {
     let enc = "aGVsbG8gd29ybGQ=";
     check(null, {
         "is std encoding correct": () => encoding.b64encode(str) === enc,
-        "is std decoding correct": () => encoding.b64decode(enc) === str
+        "is std decoding correct": () => encoding.b64decode(enc, null, "s") === str
     });
 
     // Standard base64 encoding/decoding without '=' padding
@@ -15,7 +15,7 @@ export default function() {
     enc = "aGVsbG8gd29ybGQ";
     check(null, {
         "is rawstd encoding correct": () => encoding.b64encode(str, 'rawstd') === enc,
-        "is rawstd decoding correct": () => encoding.b64decode(enc, 'rawstd') === str
+        "is rawstd decoding correct": () => encoding.b64decode(enc, 'rawstd', "s") === str
     });
 
     // URL-safe base64 encoding/decoding with '=' padding
@@ -23,7 +23,7 @@ export default function() {
     enc = "5bCP6aO85by-Li4=";
     check(null, {
         "is url encoding correct": () => encoding.b64encode(str, 'url') === enc,
-        "is url decoding correct": () => encoding.b64decode(enc, 'url') === str
+        "is url decoding correct": () => encoding.b64decode(enc, 'url', "s") === str
     });
 
     // URL-safe base64 encoding/decoding without '=' padding
@@ -31,6 +31,6 @@ export default function() {
     enc = "5bCP6aO85by-Li4";
     check(null, {
         "is rawurl encoding correct": () => encoding.b64encode(str, 'rawurl') === enc,
-        "is rawurl decoding correct": () => encoding.b64decode(enc, 'rawurl') === str
+        "is rawurl decoding correct": () => encoding.b64decode(enc, 'rawurl', "s") === str
     });
 };
