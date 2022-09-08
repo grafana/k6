@@ -1,7 +1,6 @@
 package k6test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/grafana/xk6-browser/k6ext"
@@ -10,16 +9,21 @@ import (
 	k6eventloop "go.k6.io/k6/js/eventloop"
 	k6modulestest "go.k6.io/k6/js/modulestest"
 	k6lib "go.k6.io/k6/lib"
+	k6testutils "go.k6.io/k6/lib/testutils"
 	k6metrics "go.k6.io/k6/metrics"
 
 	"github.com/dop251/goja"
 	"github.com/oxtoacart/bpool"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 )
 
 // VU is a k6 VU instance.
+// TODO: Do we still need this VU wrapper?
+// ToGojaValue can be a helper function that takes a goja.Runtime (although it's
+// not much of a helper from calling ToValue(i) directly...), and we can access
+// EventLoop from modulestest.Runtime.EventLoop. I guess we still need the
+// RunLoop() override to call WaitOnRegistered()?
 type VU struct {
 	*k6modulestest.VU
 	Loop *k6eventloop.EventLoop
@@ -34,7 +38,7 @@ func (v *VU) RunLoop(fn func() error) error {
 	return v.Loop.Start(fn)
 }
 
-// NewVU returns a mock VU.
+// NewVU returns a mock k6 VU.
 func NewVU(tb testing.TB) *VU {
 	tb.Helper()
 
@@ -56,28 +60,18 @@ func NewVU(tb testing.TB) *VU {
 			BatchPerHost: null.IntFrom(20),
 			// HTTPDebug:    null.StringFrom("full"),
 		},
-		Logger:         logrus.StandardLogger(),
+		Logger:         k6testutils.NewLogger(tb),
 		Group:          root,
 		BPool:          bpool.NewBufferPool(1),
 		Samples:        samples,
 		Tags:           k6lib.NewTagMap(map[string]string{"group": root.Path}),
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
 	}
-	vu := &VU{
-		VU: &k6modulestest.VU{
-			RuntimeField: rt,
-			InitEnvField: &k6common.InitEnvironment{
-				Registry: k6metrics.NewRegistry(),
-			},
-			StateField: state,
-		},
-	}
-	ctx := k6ext.WithVU(context.Background(), vu)
-	vu.CtxField = ctx
 
-	loop := k6eventloop.New(vu)
-	vu.RegisterCallbackField = loop.RegisterCallback
-	vu.Loop = loop
+	testRT := k6modulestest.NewRuntime(tb)
+	ctx := k6ext.WithVU(testRT.VU.CtxField, testRT.VU)
+	testRT.VU.CtxField = ctx
+	testRT.MoveToVUContext(state)
 
-	return vu
+	return &VU{VU: testRT.VU, Loop: testRT.EventLoop}
 }
