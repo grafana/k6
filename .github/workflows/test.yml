@@ -15,6 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.17.x]
+        check-latest: true
         platform: [ubuntu-latest, windows-2019]
     runs-on: ${{ matrix.platform }}
     steps:
@@ -30,6 +31,7 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
+          check-latest: true
       - name: Run tests
         run: |
           set -x
@@ -54,6 +56,7 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.x
+          check-latest: true
       - name: Install Go tip
         run: |
           go install golang.org/dl/gotip@latest
@@ -76,6 +79,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.18.x]
+        check-latest: true
         platform: [ubuntu-latest, windows-2019]
     runs-on: ${{ matrix.platform }}
     steps:
@@ -85,6 +89,7 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
+          check-latest: true
       - name: Run tests with code coverage
         run: |
           go version

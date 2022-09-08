@@ -83,6 +83,7 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ needs.configure.outputs.go_version }}
+          check-latest: true
       - name: Install nfpm (dep and rpm package builder)
         run: |
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.16.0

@@ -14,6 +14,7 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.18.x
+          check-latest: true
       - name: Run tests
         run: |
           set -x
