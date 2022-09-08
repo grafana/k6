@@ -476,7 +476,7 @@ func (h *ElementHandle) press(apiCtx context.Context, key string, opts *Keyboard
 	if err != nil {
 		return err
 	}
-	err = h.frame.page.Keyboard.press(key, opts)
+	err = h.frame.page.Keyboard.comboPress(key, opts)
 	if err != nil {
 		return err
 	}

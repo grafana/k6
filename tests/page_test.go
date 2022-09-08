@@ -684,6 +684,20 @@ func TestPageWaitForNavigationShouldNotPanic(t *testing.T) {
 	require.NotPanics(t, func() { p.WaitForNavigation(nil) })
 }
 
+func TestPagePress(t *testing.T) {
+	tb := newTestBrowser(t)
+
+	p := tb.NewPage(nil)
+
+	p.SetContent(`<input id="text1">`, nil)
+
+	p.Press("#text1", "Shift+KeyA", nil)
+	p.Press("#text1", "KeyB", nil)
+	p.Press("#text1", "Shift+KeyC", nil)
+
+	require.Equal(t, "AbC", p.InputValue("#text1", nil))
+}
+
 func assertPanicErrorContains(t *testing.T, err interface{}, expErrMsg string) {
 	t.Helper()
 

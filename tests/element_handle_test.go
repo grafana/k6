@@ -359,3 +359,19 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 
 	element.Dispose()
 }
+
+func TestElementHandlePress(t *testing.T) {
+	tb := newTestBrowser(t)
+
+	p := tb.NewPage(nil)
+
+	p.SetContent(`<input>`, nil)
+
+	el := p.Query("input")
+
+	el.Press("Shift+KeyA", nil)
+	el.Press("KeyB", nil)
+	el.Press("Shift+KeyC", nil)
+
+	require.Equal(t, "AbC", el.InputValue(nil))
+}

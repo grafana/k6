@@ -370,3 +370,19 @@ func TestLocatorElementState(t *testing.T) {
 		})
 	}
 }
+
+func TestLocatorPress(t *testing.T) {
+	tb := newTestBrowser(t)
+
+	p := tb.NewPage(nil)
+
+	p.SetContent(`<input id="text1">`, nil)
+
+	l := p.Locator("#text1", nil)
+
+	l.Press("Shift+KeyA", nil)
+	l.Press("KeyB", nil)
+	l.Press("Shift+KeyC", nil)
+
+	require.Equal(t, "AbC", l.InputValue(nil))
+}
