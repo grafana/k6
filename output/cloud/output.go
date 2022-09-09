@@ -366,7 +366,7 @@ func (out *Output) AddMetricSamples(sampleContainers []metrics.SampleContainer) 
 
 			encodedTags, err := easyjson.Marshal(sc.GetTags())
 			if err != nil {
-				out.logger.Error("Encoding tags failed", err)
+				out.logger.WithError(err).Error("Encoding tags failed")
 			}
 			newSamples = append(newSamples, &Sample{
 				Type:   DataTypeMap,
@@ -381,7 +381,7 @@ func (out *Output) AddMetricSamples(sampleContainers []metrics.SampleContainer) 
 			for _, sample := range sampleContainer.GetSamples() {
 				encodedTags, err := easyjson.Marshal(sample.Tags)
 				if err != nil {
-					out.logger.Error("Encoding tags failed", err)
+					out.logger.WithError(err).Error("Encoding tags failed")
 				}
 
 				newSamples = append(newSamples, &Sample{
@@ -457,7 +457,7 @@ func (out *Output) aggregateHTTPTrails(waitPeriod time.Duration) {
 			}
 			encodedTags, err := easyjson.Marshal(tags)
 			if err != nil {
-				out.logger.Error("Encoding tags failed", err)
+				out.logger.WithError(err).Error("Encoding tags failed")
 			}
 
 			aggrData := &SampleDataAggregatedHTTPReqs{
@@ -507,13 +507,6 @@ func (out *Output) aggregateHTTPTrails(waitPeriod time.Duration) {
 			aggrData.CalcAverages()
 
 			if aggrData.Count > 0 {
-				/*
-					out.logger.WithFields(logrus.Fields{
-						"http_samples": aggrData.Count,
-						"ratio":        fmt.Sprintf("%.2f", float64(aggrData.Count)/float64(trailCount)),
-						"t":            time.Since(start),
-					}).Debug("Aggregated HTTP metrics")
-				//*/
 				newSamples = append(newSamples, &Sample{
 					Type:   DataTypeAggregatedHTTPReqs,
 					Metric: "http_req_li_all",
