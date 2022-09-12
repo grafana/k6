@@ -36,16 +36,20 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-
-	tb := newTestBrowser(t, withFileServer())
+	t.Parallel()
 
 	t.Run("Page", func(t *testing.T) {
+		t.Parallel()
 		t.Run("check", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Check(".check", nil)
 			})
 		})
 		t.Run("click", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				err := tb.await(func() error {
 					_ = p.Click("button", nil)
@@ -55,16 +59,22 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 			})
 		})
 		t.Run("dblClick", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Dblclick("button", nil)
 			})
 		})
 		t.Run("dispatchEvent", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.DispatchEvent("button", "click", goja.Null(), nil)
 			})
 		})
 		t.Run("emulateMedia", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.EmulateMedia(tb.toGojaValue(struct {
 					Media string `js:"media"`
@@ -74,46 +84,64 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 			})
 		})
 		t.Run("evaluate", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Evaluate(tb.toGojaValue("() => void 0"))
 			})
 		})
 		t.Run("evaluateHandle", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.EvaluateHandle(tb.toGojaValue("() => window"))
 			})
 		})
 		t.Run("fill", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Fill(".fill", "foo", nil)
 			})
 		})
 		t.Run("focus", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Focus("button", nil)
 			})
 		})
 		t.Run("goto", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Goto("about:blank", nil)
 			})
 		})
 		t.Run("hover", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Hover("button", nil)
 			})
 		})
 		t.Run("press", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Press("button", "Enter", nil)
 			})
 		})
 		t.Run("reload", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Reload(nil)
 			})
 		})
 		t.Run("setContent", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.SetContent("hello world", nil)
 			})
@@ -124,21 +152,29 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 			})
 		})*/
 		t.Run("selectOption", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.SelectOption("select", tb.toGojaValue("foo"), nil)
 			})
 		})
 		t.Run("setViewportSize", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.SetViewportSize(nil)
 			})
 		})
 		t.Run("type", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Type(".fill", "a", nil)
 			})
 		})
 		t.Run("uncheck", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
 				p.Uncheck(".uncheck", nil)
 			})
@@ -146,12 +182,17 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 	})
 
 	t.Run("Frame", func(t *testing.T) {
+		t.Parallel()
 		t.Run("check", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Check(".check", nil)
 			})
 		})
 		t.Run("click", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				err := tb.await(func() error {
 					_ = f.Click("button", nil)
@@ -161,51 +202,71 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 			})
 		})
 		t.Run("dblClick", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Dblclick("button", nil)
 			})
 		})
 		t.Run("dispatchEvent", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.DispatchEvent("button", "click", goja.Null(), nil)
 			})
 		})
 		t.Run("evaluate", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Evaluate(tb.toGojaValue("() => void 0"))
 			})
 		})
 		t.Run("evaluateHandle", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.EvaluateHandle(tb.toGojaValue("() => window"))
 			})
 		})
 		t.Run("fill", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Fill(".fill", "foo", nil)
 			})
 		})
 		t.Run("focus", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Focus("button", nil)
 			})
 		})
 		t.Run("goto", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Goto("about:blank", nil)
 			})
 		})
 		t.Run("hover", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Hover("button", nil)
 			})
 		})
 		t.Run("press", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Press("button", "Enter", nil)
 			})
 		})
 		t.Run("setContent", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.SetContent("hello world", nil)
 			})
@@ -216,22 +277,29 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 			})
 		})*/
 		t.Run("selectOption", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.SelectOption("select", tb.toGojaValue("foo"), nil)
 			})
 		})
 		t.Run("type", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Type(".fill", "a", nil)
 			})
 		})
 		t.Run("uncheck", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
 				f.Uncheck(".uncheck", nil)
 			})
 		})
 	})
 
+	// TODO implement this
 	t.Run("ElementHandle", func(t *testing.T) {
 	})
 }
