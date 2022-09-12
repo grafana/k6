@@ -33,7 +33,6 @@ import (
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 
-	k6common "go.k6.io/k6/js/common"
 	k6http "go.k6.io/k6/js/modules/k6/http"
 	k6httpmultibin "go.k6.io/k6/lib/testutils/httpmultibin"
 	k6metrics "go.k6.io/k6/metrics"
@@ -105,43 +104,28 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 	k6m := k6ext.RegisterCustomMetrics(registry)
 	vu.CtxField = k6ext.WithCustomMetrics(vu.Context(), k6m)
 
-	var (
-		state = vu.StateField
-		rt    = vu.RuntimeField
-	)
-
-	// enable the HTTP test server only when necessary
-	var testServer *k6httpmultibin.HTTPMultiBin
-	if enableHTTPMultiBin {
-		testServer = k6httpmultibin.NewHTTPMultiBin(tb)
-		state.TLSConfig = testServer.TLSClientConfig
-		state.Transport = testServer.HTTPTransport
-	}
-
-	var lc *logCache
-	if enableLogCache {
-		lc = attachLogCache(state.Logger)
-	}
-
-	// launch the browser
-	initEnv := &k6common.InitEnvironment{
-		Logger:   state.Logger,
-		Registry: registry,
-	}
-	// NewBrowserType must be run from the init context, but since the recent
-	// validation introduced in k6/js/modulestest, InitEnvField and StateField
-	// must not be both set at the same time. So we nil StateField, create
-	// the BrowserType, and revert it before running Launch().
-	// See https://github.com/grafana/k6/pull/2602
-	vu.InitEnvField = initEnv
-	vu.StateField = nil
 	v := chromium.NewBrowserType(vu)
 	bt, ok := v.(*chromium.BrowserType)
 	if !ok {
 		panic(fmt.Errorf("testBrowser: unexpected browser type %T", v))
 	}
-	vu.InitEnvField = nil
-	vu.StateField = state
+	vu.MoveToVUContext()
+	// enable the HTTP test server only when necessary
+	var (
+		testServer *k6httpmultibin.HTTPMultiBin
+		state      = vu.StateField
+		rt         = vu.RuntimeField
+		lc         *logCache
+	)
+
+	if enableLogCache {
+		lc = attachLogCache(state.Logger)
+	}
+	if enableHTTPMultiBin {
+		testServer = k6httpmultibin.NewHTTPMultiBin(tb)
+		state.TLSConfig = testServer.TLSClientConfig
+		state.Transport = testServer.HTTPTransport
+	}
 	b := bt.Launch(rt.ToValue(launchOpts))
 	tb.Cleanup(func() {
 		select {

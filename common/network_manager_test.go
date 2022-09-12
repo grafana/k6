@@ -57,6 +57,7 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 	}, nil)
 
 	vu := k6test.NewVU(t)
+	vu.MoveToVUContext()
 	st := vu.State()
 	st.Options = k6opts
 	logger := log.New(st.Logger, false, nil)

@@ -26,7 +26,8 @@ import (
 // RunLoop() override to call WaitOnRegistered()?
 type VU struct {
 	*k6modulestest.VU
-	Loop *k6eventloop.EventLoop
+	Loop      *k6eventloop.EventLoop
+	toBeState *k6lib.State
 }
 
 // ToGojaValue is a convenience method for converting any value to a goja value.
@@ -36,6 +37,13 @@ func (v *VU) ToGojaValue(i interface{}) goja.Value { return v.Runtime().ToValue(
 func (v *VU) RunLoop(fn func() error) error {
 	v.Loop.WaitOnRegistered()
 	return v.Loop.Start(fn)
+}
+
+// MoveToVUContext moves the VU to VU context, adding a predefined k6 lib State and nilling the InitEnv
+// to simulate how that is done in the real k6.
+func (v *VU) MoveToVUContext() {
+	v.VU.StateField = v.toBeState
+	v.VU.InitEnvField = nil
 }
 
 // NewVU returns a mock k6 VU.
@@ -71,7 +79,6 @@ func NewVU(tb testing.TB) *VU {
 	testRT := k6modulestest.NewRuntime(tb)
 	ctx := k6ext.WithVU(testRT.VU.CtxField, testRT.VU)
 	testRT.VU.CtxField = ctx
-	testRT.MoveToVUContext(state)
 
-	return &VU{VU: testRT.VU, Loop: testRT.EventLoop}
+	return &VU{VU: testRT.VU, Loop: testRT.EventLoop, toBeState: state}
 }
