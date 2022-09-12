@@ -256,7 +256,7 @@ func (b *testBrowser) runJavaScript(s string, args ...interface{}) (goja.Value, 
 // Note: Do not confuse the method name with await in JavaScript.
 func (b *testBrowser) await(fn func() error) error {
 	b.t.Helper()
-	return b.vu.RunLoop(fn)
+	return b.vu.Loop.Start(fn)
 }
 
 // launchOptions provides a way to customize browser type
