@@ -104,29 +104,27 @@ func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
 	k6m := k6ext.RegisterCustomMetrics(registry)
 	vu.CtxField = k6ext.WithCustomMetrics(vu.Context(), k6m)
 
-	var (
-		state = vu.StateField
-		rt    = vu.RuntimeField
-	)
-
-	// enable the HTTP test server only when necessary
-	var testServer *k6httpmultibin.HTTPMultiBin
-	if enableHTTPMultiBin {
-		testServer = k6httpmultibin.NewHTTPMultiBin(tb)
-		state.TLSConfig = testServer.TLSClientConfig
-		state.Transport = testServer.HTTPTransport
-	}
-
-	var lc *logCache
-	if enableLogCache {
-		lc = attachLogCache(state.Logger)
-	}
-
-	// launch the browser
 	v := chromium.NewBrowserType(vu)
 	bt, ok := v.(*chromium.BrowserType)
 	if !ok {
 		panic(fmt.Errorf("testBrowser: unexpected browser type %T", v))
+	}
+	vu.MoveToVUContext()
+	// enable the HTTP test server only when necessary
+	var (
+		testServer *k6httpmultibin.HTTPMultiBin
+		state      = vu.StateField
+		rt         = vu.RuntimeField
+		lc         *logCache
+	)
+
+	if enableLogCache {
+		lc = attachLogCache(state.Logger)
+	}
+	if enableHTTPMultiBin {
+		testServer = k6httpmultibin.NewHTTPMultiBin(tb)
+		state.TLSConfig = testServer.TLSClientConfig
+		state.Transport = testServer.HTTPTransport
 	}
 	b := bt.Launch(rt.ToValue(launchOpts))
 	tb.Cleanup(func() {
