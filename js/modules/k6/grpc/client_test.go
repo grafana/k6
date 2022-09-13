@@ -671,6 +671,13 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			name: "ConnectIntegerMaxReceiveSize",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { maxReceiveSize: 1000 });`},
+		},
+		{
 			name: "MaxSendSizeBadParam",
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				reflection.Register(tb.ServerGRPC)
@@ -695,6 +702,13 @@ func TestClient(t *testing.T) {
 				code: `client.connect("GRPCBIN_ADDR", {maxSendSize: -1})`,
 				err:  `invalid maxSendSize value: '-1, it needs to be a positive int`,
 			},
+		},
+		{
+			name: "ConnectIntegerMaxSendSize",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { maxSendSize: 1000 });`},
 		},
 		{
 			name: "Close",
