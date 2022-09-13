@@ -56,7 +56,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"DblClick", func(tb *testBrowser, p api.Page) {
-				p.Locator("#link", nil).Dblclick(nil)
+				p.Locator("#linkdbl", nil).Dblclick(nil)
 				v := p.Evaluate(tb.toGojaValue(`() => window.dblclick`))
 				require.True(t, tb.asGojaBool(v), "cannot not double click the link")
 			},

@@ -7,6 +7,7 @@
 
 <body>
     <a id="link" href="#" onclick="event.preventDefault()">Click</a>
+    <a id="linkdbl" href="#" ondblclick="event.preventDefault()">Dblclick</a>
     <a href="#" onclick="event.preventDefault()">Click</a>
     <input id="inputCheckbox" type="checkbox" />
     <input type="checkbox" />
@@ -24,7 +25,7 @@
         document.querySelector('#link').addEventListener(
             'click', e => { window.result = true; }, false
         );
-        document.querySelector('#link').addEventListener(
+        document.querySelector('#linkdbl').addEventListener(
             'dblclick', e => { window.dblclick = true; }, false
         );
         document.querySelector('#inputCheckbox').addEventListener(
