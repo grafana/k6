@@ -179,6 +179,7 @@ func TestLocator(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -254,6 +255,7 @@ func TestLocator(t *testing.T) {
 		},
 	}
 	for _, tt := range sanityTests {
+		tt := tt
 		t.Run("timeout/"+tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -309,6 +311,7 @@ func TestLocatorElementState(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.state, func(t *testing.T) {
 			t.Parallel()
 
@@ -351,6 +354,7 @@ func TestLocatorElementState(t *testing.T) {
 		},
 	}
 	for _, tt := range sanityTests {
+		tt := tt
 		t.Run("timeout/"+tt.name, func(t *testing.T) {
 			t.Parallel()
 
