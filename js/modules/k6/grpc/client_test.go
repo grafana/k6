@@ -645,6 +645,58 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			name: "MaxReceiveSizeBadParam",
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				reflection.Register(tb.ServerGRPC)
+			},
+			initString: codeBlock{
+				code: `var client = new grpc.Client();`,
+			},
+			vuString: codeBlock{
+				code: `client.connect("GRPCBIN_ADDR", {maxReceiveSize: "error"})`,
+				err:  `invalid maxReceiveSize value: '"error"', it needs to be an int`,
+			},
+		},
+		{
+			name: "MaxReceiveSizeNonPositiveInteger",
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				reflection.Register(tb.ServerGRPC)
+			},
+			initString: codeBlock{
+				code: `var client = new grpc.Client();`,
+			},
+			vuString: codeBlock{
+				code: `client.connect("GRPCBIN_ADDR", {maxReceiveSize: -1})`,
+				err:  `invalid maxReceiveSize value: '-1, it needs to be a positive int`,
+			},
+		},
+		{
+			name: "MaxSendSizeBadParam",
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				reflection.Register(tb.ServerGRPC)
+			},
+			initString: codeBlock{
+				code: `var client = new grpc.Client();`,
+			},
+			vuString: codeBlock{
+				code: `client.connect("GRPCBIN_ADDR", {maxSendSize: "error"})`,
+				err:  `invalid maxSendSize value: '"error"', it needs to be an int`,
+			},
+		},
+		{
+			name: "MaxSendSizeNonPositiveInteger",
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				reflection.Register(tb.ServerGRPC)
+			},
+			initString: codeBlock{
+				code: `var client = new grpc.Client();`,
+			},
+			vuString: codeBlock{
+				code: `client.connect("GRPCBIN_ADDR", {maxSendSize: -1})`,
+				err:  `invalid maxSendSize value: '-1, it needs to be a positive int`,
+			},
+		},
+		{
 			name: "Close",
 			initString: codeBlock{
 				code: `
