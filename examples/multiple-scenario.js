@@ -26,8 +26,7 @@ export function messages() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
   });
-  const context = browser.newContext();
-  const page = context.newPage();
+  const page = browser.newPage();
 
   page.goto('https://test.k6.io/my_messages.php', { waitUntil: 'networkidle' })
 
@@ -39,8 +38,7 @@ export function news() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
   });
-  const context = browser.newContext();
-  const page = context.newPage();
+  const page = browser.newPage();
 
   page.goto('https://test.k6.io/news.php', { waitUntil: 'networkidle' })
 
