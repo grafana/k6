@@ -671,11 +671,28 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
-			name: "ConnectIntegerMaxReceiveSize",
+			name: "ReceivedMessageLargerThanMax",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
-			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { maxReceiveSize: 1000 });`},
+				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+			},
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				tb.GRPCStub.UnaryCallFunc = func(_ context.Context, req *grpc_testing.SimpleRequest) (*grpc_testing.SimpleResponse, error) {
+					response := &grpc_testing.SimpleResponse{}
+					response.Payload = req.Payload
+					return response, nil
+				}
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR", {maxReceiveSize: 1})
+				var resp = client.invoke("grpc.testing.TestService/UnaryCall", { payload: { body: "testMaxReceiveSize"} })
+				if (resp.status == grpc.StatusResourceExhausted) {
+					throw new Error(resp.error.message)
+				}
+				`,
+				err: `received message larger than max`,
+			},
 		},
 		{
 			name: "MaxSendSizeBadParam",
@@ -704,11 +721,26 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
-			name: "ConnectIntegerMaxSendSize",
+			name: "SentMessageLargerThanMax",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
-			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { maxSendSize: 1000 });`},
+				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+			},
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				tb.GRPCStub.UnaryCallFunc = func(context.Context, *grpc_testing.SimpleRequest) (*grpc_testing.SimpleResponse, error) {
+					return &grpc_testing.SimpleResponse{}, nil
+				}
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR", {maxSendSize: 1})
+				var resp = client.invoke("grpc.testing.TestService/UnaryCall", { payload: { body: "testMaxSendSize"} })
+				if (resp.status == grpc.StatusResourceExhausted) {
+					throw new Error(resp.error.message)
+				}
+				`,
+				err: `trying to send message larger than max`,
+			},
 		},
 		{
 			name: "Close",
