@@ -672,7 +672,8 @@ func TestClient(t *testing.T) {
 		},
 		{
 			name: "ReceivedMessageLargerThanMax",
-			initString: codeBlock{code: `
+			initString: codeBlock{
+				code: `
 				var client = new grpc.Client();
 				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
 			},
@@ -722,7 +723,8 @@ func TestClient(t *testing.T) {
 		},
 		{
 			name: "SentMessageLargerThanMax",
-			initString: codeBlock{code: `
+			initString: codeBlock{
+				code: `
 				var client = new grpc.Client();
 				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
 			},
