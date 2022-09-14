@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -431,8 +432,18 @@ func (b *Browser) Close() {
 	// afterwards. this will take a little bit of time, and CDP
 	// will stop emitting events.
 	b.browserProc.GracefulClose()
-	b.browserProc.Terminate()
 	b.conn.Close()
+
+	// Wait for all outstanding events (e.g. Target.detachedFromTarget) to be
+	// processed, and for the process to exit gracefully. Otherwise kill it
+	// forcefully after the timeout.
+	timeout := time.Second
+	select {
+	case <-b.browserProc.processDone:
+	case <-time.After(timeout):
+		b.logger.Debugf("Browser:Close", "killing browser process with PID %d after %s", b.browserProc.Pid(), timeout)
+		b.browserProc.Terminate()
+	}
 }
 
 // Contexts returns list of browser contexts.
