@@ -25,7 +25,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -57,6 +56,7 @@ type executorEmitter interface {
 type connection interface {
 	executorEmitter
 	Close(...goja.Value)
+	IgnoreIOErrors()
 	getSession(target.SessionID) *Session
 }
 
@@ -130,6 +130,7 @@ type Connection struct {
 	closeCh      chan int
 	errorCh      chan error
 	done         chan struct{}
+	closing      chan struct{}
 	shutdownOnce sync.Once
 	msgID        int64
 
@@ -168,6 +169,7 @@ func NewConnection(ctx context.Context, wsURL string, logger *log.Logger) (*Conn
 		closeCh:          make(chan int),
 		errorCh:          make(chan error),
 		done:             make(chan struct{}),
+		closing:          make(chan struct{}),
 		msgID:            0,
 		sessions:         make(map[target.SessionID]*Session),
 	}
@@ -186,16 +188,10 @@ func (c *Connection) close(code int) error {
 	var err error
 	c.shutdownOnce.Do(func() {
 		defer func() {
-			_ = c.conn.Close()
-
 			// Stop the main control loop
 			close(c.done)
+			_ = c.conn.Close()
 		}()
-
-		err = c.conn.WriteControl(websocket.CloseMessage,
-			websocket.FormatCloseMessage(code, ""),
-			time.Now().Add(10*time.Second),
-		)
 
 		c.sessionsMu.Lock()
 		for _, s := range c.sessions {
@@ -203,6 +199,19 @@ func (c *Connection) close(code int) error {
 			delete(c.sessions, s.id)
 		}
 		c.sessionsMu.Unlock()
+
+		err = c.conn.WriteControl(websocket.CloseMessage,
+			websocket.FormatCloseMessage(code, ""),
+			time.Now().Add(time.Second),
+		)
+
+		// According to the WS RFC[1], we might want to wait for a response
+		// Control frame back from the browser here (possibly for the above
+		// timeout duration), but Chrom{e,ium} never sends one, even when
+		// the browser process exits normally after the Browser.close CDP
+		// command. So we don't bother waiting, since it would just needlessly
+		// delay the k6 iteration.
+		// [1]: https://www.rfc-editor.org/rfc/rfc6455#section-1.4
 
 		c.emit(EventConnectionClose, nil)
 	})
@@ -238,15 +247,21 @@ func (c *Connection) createSession(info *target.Info) (*Session, error) {
 }
 
 func (c *Connection) handleIOError(err error) {
-	c.logger.Errorf("cdp", "communicating with browser: %v", err)
+	// It's either a normal closure initiated by the browser, or we stopped the
+	// connection. In either case, disregard the error.
+	if closing := c.isClosing(); websocket.IsCloseError(
+		err, websocket.CloseNormalClosure, websocket.CloseGoingAway,
+	) || closing {
+		c.logger.Debugf("cdp", "received IO error: %v, connection is closing: %v", err, closing)
+		return
+	}
 
-	if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-		// Report an unexpected closure
-		select {
-		case c.errorCh <- err:
-		case <-c.done:
-			return
-		}
+	// Report an unexpected closure
+	c.logger.Errorf("cdp", "communicating with browser: %v", err)
+	select {
+	case c.errorCh <- err:
+	case <-c.done:
+		return
 	}
 	var (
 		cerr *websocket.CloseError
@@ -288,10 +303,7 @@ func (c *Connection) recvLoop() {
 	for {
 		_, buf, err := c.conn.ReadMessage()
 		if err != nil {
-			if !errors.Is(err, net.ErrClosed) {
-				c.logger.Debugf("Connection:recvLoop", "wsURL:%q ioErr:%v", c.wsURL, err)
-				c.handleIOError(err)
-			}
+			c.handleIOError(err)
 			return
 		}
 
@@ -546,4 +558,20 @@ func (c *Connection) Execute(ctx context.Context, method string, params easyjson
 		Params: buf,
 	}
 	return c.send(c.ctx, msg, ch, res)
+}
+
+// IgnoreIOErrors signals that the connection will soon be closed, so that any
+// received IO errors can be disregarded.
+func (c *Connection) IgnoreIOErrors() {
+	close(c.closing)
+}
+
+func (c *Connection) isClosing() (s bool) {
+	select {
+	case <-c.closing:
+		s = true
+	default:
+	}
+
+	return
 }
