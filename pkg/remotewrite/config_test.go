@@ -1,15 +1,15 @@
 package remotewrite
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"testing"
 	"time"
 
-	promConfig "github.com/prometheus/common/config"
-	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/storage/remote"
+	"github.com/grafana/xk6-output-prometheus-remote/pkg/remote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/lib/types"
@@ -81,7 +81,7 @@ func TestConfigParseArg(t *testing.T) {
 	assert.Equal(t, map[string]string{"X-Header": "value"}, c.Headers)
 }
 
-func TestConstructRemoteConfig(t *testing.T) {
+func TestConfigRemoteConfig(t *testing.T) {
 	u, err := url.Parse("https://prometheus.ie/remote")
 	require.NoError(t, err)
 
@@ -95,30 +95,25 @@ func TestConstructRemoteConfig(t *testing.T) {
 		},
 	}
 
-	exprcc := &remote.ClientConfig{
-		URL:     &promConfig.URL{URL: u},
-		Timeout: model.Duration(time.Minute),
-		HTTPClientConfig: promConfig.HTTPClientConfig{
-			FollowRedirects: true,
-			TLSConfig: promConfig.TLSConfig{
-				InsecureSkipVerify: true,
-			},
-			BasicAuth: &promConfig.BasicAuth{
-				Username: "myuser",
-				Password: "mypass",
-			},
+	headers := http.Header{}
+	headers.Set("X-MYCUSTOM-HEADER", "val1")
+	exprcc := &remote.HTTPConfig{
+		Timeout: 5 * time.Second,
+		TLSConfig: &tls.Config{
+			InsecureSkipVerify: true,
 		},
-		RetryOnRateLimit: true,
-		Headers: map[string]string{
-			"X-MYCUSTOM-HEADER": "val1",
+		BasicAuth: &remote.BasicAuth{
+			Username: "myuser",
+			Password: "mypass",
 		},
+		Headers: headers,
 	}
-	rcc, err := config.ConstructRemoteConfig()
+	rcc, err := config.RemoteConfig()
 	require.NoError(t, err)
 	assert.Equal(t, exprcc, rcc)
 }
 
-func TestConifgConsolidation(t *testing.T) {
+func TestConfigConsolidation(t *testing.T) {
 	t.Parallel()
 
 	u, err := url.Parse("https://prometheus.ie/remote")

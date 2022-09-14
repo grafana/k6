@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/prometheus/prompb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	prompb "go.buf.build/grpc/go/prometheus/prometheus"
 	"go.k6.io/k6/metrics"
 	"gopkg.in/guregu/null.v3"
 )
@@ -60,22 +60,22 @@ func TestOutputConvertToPbSeries(t *testing.T) {
 	require.Len(t, o.tsdb, 2)
 
 	unix1sept := int64(1661990400 * 1000) // in ms
-	exp := []prompb.TimeSeries{
+	exp := []*prompb.TimeSeries{
 		{
-			Labels: []prompb.Label{
+			Labels: []*prompb.Label{
 				{Name: "tagk1", Value: "tagv1"},
 				{Name: "__name__", Value: "k6_metric1"},
 			},
-			Samples: []prompb.Sample{
+			Samples: []*prompb.Sample{
 				{Value: 7, Timestamp: unix1sept},
 			},
 		},
 		{
-			Labels: []prompb.Label{
+			Labels: []*prompb.Label{
 				{Name: "tagk1", Value: "tagv1"},
 				{Name: "__name__", Value: "k6_metric2"},
 			},
-			Samples: []prompb.Sample{
+			Samples: []*prompb.Sample{
 				{Value: 2, Timestamp: unix1sept},
 			},
 		},

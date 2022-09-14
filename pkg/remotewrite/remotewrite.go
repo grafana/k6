@@ -7,15 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/xk6-output-prometheus-remote/pkg/remote"
+
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 
-	"github.com/golang/protobuf/proto" //nolint:staticcheck
-	"github.com/golang/snappy"
-	"github.com/prometheus/prometheus/pkg/timestamp"
-	"github.com/prometheus/prometheus/prompb"
-	"github.com/prometheus/prometheus/storage/remote"
 	"github.com/sirupsen/logrus"
+	prompb "go.buf.build/grpc/go/prometheus/prometheus"
 )
 
 var _ output.Output = new(Output)
@@ -26,9 +24,10 @@ type Output struct {
 	config          Config
 	logger          logrus.FieldLogger
 	periodicFlusher *output.PeriodicFlusher
+	tsdb            map[string]*seriesWithMeasure
 
-	client remote.WriteClient
-	tsdb   map[string]*seriesWithMeasure
+	// TODO: copy the prometheus/remote.WriteClient interface and depend on it
+	client *remote.WriteClient
 }
 
 func New(params output.Params) (*Output, error) {
@@ -39,19 +38,18 @@ func New(params output.Params) (*Output, error) {
 		return nil, err
 	}
 
-	remoteConfig, err := config.ConstructRemoteConfig()
+	clientConfig, err := config.RemoteConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	// name is used to differentiate clients in metrics
-	client, err := remote.NewWriteClient("xk6-prwo", remoteConfig)
+	wc, err := remote.NewWriteClient(config.URL.String, clientConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize the client Prometheus remote write client: %w", err)
 	}
 
 	return &Output{
-		client: client,
+		client: wc,
 		config: config,
 		logger: logger,
 		tsdb:   make(map[string]*seriesWithMeasure),
@@ -116,22 +114,13 @@ func (o *Output) flush() {
 	nts = len(promTimeSeries)
 	o.logger.WithField("nts", nts).Debug("Converted samples to Prometheus TimeSeries")
 
-	buf, err := proto.Marshal(&prompb.WriteRequest{
-		Timeseries: promTimeSeries,
-	})
-	if err != nil {
-		o.logger.WithError(err).Fatal("Failed to encode time series as a Protobuf request")
-		return
-	}
-
-	encoded := snappy.Encode(nil, buf) // TODO: this call can panic
-	if err := o.client.Store(context.Background(), encoded); err != nil {
+	if err := o.client.Store(context.Background(), promTimeSeries); err != nil {
 		o.logger.WithError(err).Error("Failed to send the time series data to the endpoint")
 		return
 	}
 }
 
-func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) []prompb.TimeSeries {
+func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) []*prompb.TimeSeries {
 	// The seen map is required because the samples containers
 	// could have several samples for the same time series
 	//  in this way, we can aggregate and flush them in a unique value
@@ -194,7 +183,7 @@ func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) 
 		}
 	}
 
-	pbseries := make([]prompb.TimeSeries, 0, len(seen))
+	pbseries := make([]*prompb.TimeSeries, 0, len(seen))
 	for s := range seen {
 		pbseries = append(pbseries, o.tsdb[s].MapPrompb()...)
 	}
@@ -218,17 +207,17 @@ type seriesWithMeasure struct {
 	// TODO: maybe add some caching for the mapping?
 }
 
-func (swm seriesWithMeasure) MapPrompb() []prompb.TimeSeries {
-	var newts []prompb.TimeSeries
+func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
+	var newts []*prompb.TimeSeries
 
 	mapMonoSeries := func(s TimeSeries, t time.Time) prompb.TimeSeries {
 		return prompb.TimeSeries{
-			Labels: append(MapTagSet(swm.Tags), prompb.Label{
+			Labels: append(MapTagSet(swm.Tags), &prompb.Label{
 				Name:  "__name__",
 				Value: fmt.Sprintf("%s%s", defaultMetricPrefix, swm.Metric.Name),
 			}),
-			Samples: []prompb.Sample{
-				{Timestamp: timestamp.FromTime(t)},
+			Samples: []*prompb.Sample{
+				{Timestamp: t.UnixMilli()},
 			},
 		}
 	}
@@ -236,19 +225,19 @@ func (swm seriesWithMeasure) MapPrompb() []prompb.TimeSeries {
 	case metrics.Counter:
 		ts := mapMonoSeries(swm.TimeSeries, swm.Latest)
 		ts.Samples[0].Value = swm.Measure.(*metrics.CounterSink).Value
-		newts = []prompb.TimeSeries{ts}
+		newts = []*prompb.TimeSeries{&ts}
 
 	case metrics.Gauge:
 		ts := mapMonoSeries(swm.TimeSeries, swm.Latest)
 		ts.Samples[0].Value = swm.Measure.(*metrics.GaugeSink).Value
-		newts = []prompb.TimeSeries{ts}
+		newts = []*prompb.TimeSeries{&ts}
 
 	case metrics.Rate:
 		ts := mapMonoSeries(swm.TimeSeries, swm.Latest)
 		// pass zero duration here because time is useless for formatting rate
 		rateVals := swm.Measure.(*metrics.RateSink).Format(time.Duration(0))
 		ts.Samples[0].Value = rateVals["rate"]
-		newts = []prompb.TimeSeries{ts}
+		newts = []*prompb.TimeSeries{&ts}
 
 	case metrics.Trend:
 		newts = MapTrend(

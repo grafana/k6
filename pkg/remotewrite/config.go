@@ -1,36 +1,45 @@
 package remotewrite
 
 import (
+	"crypto/tls"
 	"encoding/json"
-	"net/url"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/grafana/xk6-output-prometheus-remote/pkg/remote"
 	"github.com/kubernetes/helm/pkg/strvals"
-	promConfig "github.com/prometheus/common/config"
-	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/storage/remote"
+
 	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
 
 const (
-	defaultURL               = "http://localhost:9090/api/v1/write"
-	defaultPrometheusTimeout = time.Minute
-	defaultPushInterval      = 5 * time.Second
-	defaultMetricPrefix      = "k6_"
+	defaultURL          = "http://localhost:9090/api/v1/write"
+	defaultTimeout      = 5 * time.Second
+	defaultPushInterval = 5 * time.Second
+	defaultMetricPrefix = "k6_"
 )
 
 type Config struct {
-	// here, in the name of env variable, we assume that we won't need to distinguish between remote write URL vs remote read URL
-	URL     null.String       `json:"url" envconfig:"K6_PROMETHEUS_REMOTE_URL"`
+	// URL contains the absolute URL for the Write endpoint where to flush the time series.
+	URL null.String `json:"url" envconfig:"K6_PROMETHEUS_REMOTE_URL"`
+
+	// Headers contains additional headers that should be included in the HTTP requests.
 	Headers map[string]string `json:"headers" envconfig:"K6_PROMETHEUS_HEADERS"`
 
-	InsecureSkipTLSVerify null.Bool   `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY"`
-	Username              null.String `json:"username" envconfig:"K6_PROMETHEUS_USERNAME"`
-	Password              null.String `json:"password" envconfig:"K6_PROMETHEUS_PASSWORD"`
+	// InsecureSkipTLSVerify skips TLS client side checks.
+	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY"`
 
+	// Username is the User for Basic Auth.
+	Username null.String `json:"username" envconfig:"K6_PROMETHEUS_USERNAME"`
+
+	// Password is the Password for the Basic Auth.
+	Password null.String `json:"password" envconfig:"K6_PROMETHEUS_PASSWORD"`
+
+	// PushInterval defines the time between flushes. The Output will wait the set time
+	// before push a new set of time series to the endpoint.
 	PushInterval types.NullDuration `json:"pushInterval" envconfig:"K6_PROMETHEUS_PUSH_INTERVAL"`
 }
 
@@ -45,36 +54,33 @@ func NewConfig() Config {
 	}
 }
 
-func (conf Config) ConstructRemoteConfig() (*remote.ClientConfig, error) {
-	httpConfig := promConfig.DefaultHTTPClientConfig
-
-	httpConfig.TLSConfig = promConfig.TLSConfig{
-		InsecureSkipVerify: conf.InsecureSkipTLSVerify.Bool,
+func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
+	hc := remote.HTTPConfig{
+		Timeout: defaultTimeout,
 	}
 
 	// if at least valid user was configured, use basic auth
 	if conf.Username.Valid {
-		httpConfig.BasicAuth = &promConfig.BasicAuth{
+		hc.BasicAuth = &remote.BasicAuth{
 			Username: conf.Username.String,
-			Password: promConfig.Secret(conf.Password.String),
+			Password: conf.Password.String,
 		}
 	}
+
+	hc.TLSConfig = &tls.Config{
+		InsecureSkipVerify: conf.InsecureSkipTLSVerify.Bool,
+	}
+
 	// TODO: consider if the auth logic should be enforced here
 	// (e.g. if insecureSkipTLSVerify is switched off, then check for non-empty certificate file and auth, etc.)
 
-	u, err := url.Parse(conf.URL.String)
-	if err != nil {
-		return nil, err
+	if len(conf.Headers) > 0 {
+		hc.Headers = make(http.Header)
+		for k, v := range conf.Headers {
+			hc.Headers.Add(k, v)
+		}
 	}
-
-	remoteConfig := remote.ClientConfig{
-		URL:              &promConfig.URL{URL: u},
-		Timeout:          model.Duration(defaultPrometheusTimeout),
-		HTTPClientConfig: httpConfig,
-		RetryOnRateLimit: true,
-		Headers:          conf.Headers,
-	}
-	return &remoteConfig, nil
+	return &hc, nil
 }
 
 // From here till the end of the file partial duplicates waiting for config refactor (k6 #883)

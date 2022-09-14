@@ -5,20 +5,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/prometheus/prompb"
+	prompb "go.buf.build/grpc/go/prometheus/prometheus"
 	"go.k6.io/k6/metrics"
 )
 
 // buildTimeSeries creates a TimSeries with the given name, value and timestamp
-func buildTimeSeries(name string, value float64, timestamp time.Time) prompb.TimeSeries {
-	return prompb.TimeSeries{
-		Labels: []prompb.Label{
+func buildTimeSeries(name string, value float64, timestamp time.Time) *prompb.TimeSeries {
+	return &prompb.TimeSeries{
+		Labels: []*prompb.Label{
 			{
 				Name:  "__name__",
 				Value: name,
 			},
 		},
-		Samples: []prompb.Sample{
+		Samples: []*prompb.Sample{
 			{
 				Value:     value,
 				Timestamp: timestamp.Unix(),
@@ -27,8 +27,8 @@ func buildTimeSeries(name string, value float64, timestamp time.Time) prompb.Tim
 	}
 }
 
-// getTimeSeriesName returs the name of the timeseries defined in the '__name__' label
-func getTimeSeriesName(ts prompb.TimeSeries) string {
+// getTimeSeriesName returns the name of the time series defined in the '__name__' label
+func getTimeSeriesName(ts *prompb.TimeSeries) string {
 	for _, l := range ts.Labels {
 		if l.Name == "__name__" {
 			return l.Value
@@ -39,7 +39,7 @@ func getTimeSeriesName(ts prompb.TimeSeries) string {
 
 // assertTimeSeriesEqual compares if two TimeSeries has the same name and value.
 // Assumes only one sample per TimeSeries
-func assertTimeSeriesEqual(t *testing.T, expected prompb.TimeSeries, actual prompb.TimeSeries) {
+func assertTimeSeriesEqual(t *testing.T, expected *prompb.TimeSeries, actual *prompb.TimeSeries) {
 	expectedName := getTimeSeriesName(expected)
 	actualName := getTimeSeriesName(actual)
 	if expectedName != actualName {
@@ -54,18 +54,17 @@ func assertTimeSeriesEqual(t *testing.T, expected prompb.TimeSeries, actual prom
 }
 
 // sortTimeSeries sorts an array of TimeSeries by name
-func sortTimeSeries(ts []prompb.TimeSeries) []prompb.TimeSeries {
-	sorted := make([]prompb.TimeSeries, len(ts))
+func sortTimeSeries(ts []*prompb.TimeSeries) []*prompb.TimeSeries {
+	sorted := make([]*prompb.TimeSeries, 0, len(ts))
 	copy(sorted, ts)
 	sort.Slice(sorted, func(i int, j int) bool {
 		return getTimeSeriesName(sorted[i]) < getTimeSeriesName(sorted[j])
 	})
-
 	return sorted
 }
 
 // assertTimeSeriesMatch asserts if the elements of two arrays of TimeSeries match not considering order
-func assertTimeSeriesMatch(t *testing.T, expected []prompb.TimeSeries, actual []prompb.TimeSeries) {
+func assertTimeSeriesMatch(t *testing.T, expected []*prompb.TimeSeries, actual []*prompb.TimeSeries) {
 	if len(expected) != len(actual) {
 		t.Errorf("timeseries length does not match. expected %d actual: %d", len(expected), len(actual))
 	}
@@ -88,7 +87,7 @@ func TestMapTrend(t *testing.T) {
 	testCases := []struct {
 		sample   metrics.Sample
 		labels   []prompb.Label
-		expected []prompb.TimeSeries
+		expected []*prompb.TimeSeries
 	}{
 		{
 			sample: metrics.Sample{
@@ -100,7 +99,7 @@ func TestMapTrend(t *testing.T) {
 				Value: 1.0,
 				Time:  now,
 			},
-			expected: []prompb.TimeSeries{
+			expected: []*prompb.TimeSeries{
 				buildTimeSeries("k6_test_count", 1.0, now),
 				buildTimeSeries("k6_test_sum", 1.0, now),
 				buildTimeSeries("k6_test_min", 1.0, now),

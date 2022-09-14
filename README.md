@@ -32,8 +32,6 @@ K6_PROMETHEUS_PASSWORD=bar \
 ./k6 run script.js -o output-prometheus-remote
 ```
 
-Note: Prometheus remote client relies on a snappy library for serialization which could panic on [encode operations](https://github.com/golang/snappy/blob/544b4180ac705b7605231d4a4550a1acb22a19fe/encode.go#L22).
-
 ### On sample rate
 
 k6 processes its outputs once per second and that is also a default flush period in this extension. The number of k6 builtin metrics is 26 and they are collected at the rate of 50ms. In practice it means that there will be around 1000-1500 samples on average per each flush period in case of raw mapping. If custom metrics are configured, that estimate will have to be adjusted.
