@@ -2024,11 +2024,17 @@ func (f *Frame) newAction(
 		waitOpts.Strict = strict
 		handle, err := f.waitForSelector(selector, waitOpts)
 		if err != nil {
-			errCh <- err
+			select {
+			case <-apiCtx.Done():
+			case errCh <- err:
+			}
 			return
 		}
 		if handle == nil {
-			resultCh <- nil
+			select {
+			case <-apiCtx.Done():
+			case resultCh <- nil:
+			}
 			return
 		}
 		f := handle.newAction(states, fn, false, false, timeout)
@@ -2051,11 +2057,17 @@ func (f *Frame) newPointerAction(
 		waitOpts.Strict = strict
 		handle, err := f.waitForSelector(selector, waitOpts)
 		if err != nil {
-			errCh <- err
+			select {
+			case <-apiCtx.Done():
+			case errCh <- err:
+			}
 			return
 		}
 		if handle == nil {
-			resultCh <- nil
+			select {
+			case <-apiCtx.Done():
+			case resultCh <- nil:
+			}
 			return
 		}
 		f := handle.newPointerAction(fn, opts)

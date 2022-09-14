@@ -80,7 +80,11 @@ func NewBrowserProcess(
 	go func() {
 		// If we lose connection to the browser and we're not in-progress with clean
 		// browser-initiated termination then cancel the context to clean up.
-		<-p.lostConnection
+		select {
+		case <-p.lostConnection:
+		case <-ctx.Done():
+		}
+
 		select {
 		case <-p.processIsGracefullyClosing:
 		default:
