@@ -383,19 +383,19 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 			var ok bool
 			params.MaxReceiveSize, ok = v.(int64)
 			if !ok {
-				return params, fmt.Errorf("invalid maxReceiveSize value: '%#v', it needs to be an int", v)
+				return params, fmt.Errorf("invalid maxReceiveSize value: '%#v', it needs to be an integer", v)
 			}
 			if params.MaxReceiveSize < 0 {
-				return params, fmt.Errorf("invalid maxReceiveSize value: '%#v, it needs to be a positive int", v)
+				return params, fmt.Errorf("invalid maxReceiveSize value: '%#v, it needs to be a positive integer", v)
 			}
 		case "maxSendSize":
 			var ok bool
 			params.MaxSendSize, ok = v.(int64)
 			if !ok {
-				return params, fmt.Errorf("invalid maxSendSize value: '%#v', it needs to be an int", v)
+				return params, fmt.Errorf("invalid maxSendSize value: '%#v', it needs to be an integer", v)
 			}
 			if params.MaxSendSize < 0 {
-				return params, fmt.Errorf("invalid maxSendSize value: '%#v, it needs to be a positive int", v)
+				return params, fmt.Errorf("invalid maxSendSize value: '%#v, it needs to be a positive integer", v)
 			}
 
 		default:

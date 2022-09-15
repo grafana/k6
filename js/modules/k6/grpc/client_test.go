@@ -654,7 +654,7 @@ func TestClient(t *testing.T) {
 			},
 			vuString: codeBlock{
 				code: `client.connect("GRPCBIN_ADDR", {maxReceiveSize: "error"})`,
-				err:  `invalid maxReceiveSize value: '"error"', it needs to be an int`,
+				err:  `invalid maxReceiveSize value: '"error"', it needs to be an integer`,
 			},
 		},
 		{
@@ -667,7 +667,7 @@ func TestClient(t *testing.T) {
 			},
 			vuString: codeBlock{
 				code: `client.connect("GRPCBIN_ADDR", {maxReceiveSize: -1})`,
-				err:  `invalid maxReceiveSize value: '-1, it needs to be a positive int`,
+				err:  `invalid maxReceiveSize value: '-1, it needs to be a positive integer`,
 			},
 		},
 		{
@@ -705,7 +705,7 @@ func TestClient(t *testing.T) {
 			},
 			vuString: codeBlock{
 				code: `client.connect("GRPCBIN_ADDR", {maxSendSize: "error"})`,
-				err:  `invalid maxSendSize value: '"error"', it needs to be an int`,
+				err:  `invalid maxSendSize value: '"error"', it needs to be an integer`,
 			},
 		},
 		{
@@ -718,7 +718,7 @@ func TestClient(t *testing.T) {
 			},
 			vuString: codeBlock{
 				code: `client.connect("GRPCBIN_ADDR", {maxSendSize: -1})`,
-				err:  `invalid maxSendSize value: '-1, it needs to be a positive int`,
+				err:  `invalid maxSendSize value: '-1, it needs to be a positive integer`,
 			},
 		},
 		{
