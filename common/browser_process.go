@@ -174,23 +174,15 @@ func execute(
 		// TODO: How to handle these errors?
 		defer func() {
 			if err := dataDir.Cleanup(); err != nil {
-				logger.Errorf("BrowserType:Close", "cleaning up the user data directory: %v", err)
+				logger.Errorf("browser", "cleaning up the user data directory: %v", err)
 			}
 			close(done)
 		}()
 
 		if err := cmd.Wait(); err != nil {
-			logErr := logger.Errorf
-			if s := err.Error(); strings.Contains(s, "signal: killed") || strings.Contains(s, "exit status 1") {
-				// The browser process is killed when the context is cancelled
-				// after a k6 iteration ends, so silence the log message until
-				// we can stop it gracefully. See #https://github.com/grafana/xk6-browser/issues/423
-				logErr = logger.Debugf
-			}
-			logErr(
-				"browser", "process with PID %d unexpectedly ended: %v",
-				cmd.Process.Pid, err,
-			)
+			logger.Errorf("browser",
+				"process with PID %d unexpectedly ended: %v",
+				cmd.Process.Pid, err)
 		}
 	}()
 
