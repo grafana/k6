@@ -441,14 +441,11 @@ func (b *Browser) Close() {
 		}
 	}
 
-	// Close all sessions and try to cleanly close the WS connection, but
-	// we'll disregard any errors in the case the connection has already
-	// been closed by the browser.
-	b.conn.Close()
-
 	// Wait for all outstanding events (e.g. Target.detachedFromTarget) to be
 	// processed, and for the process to exit gracefully. Otherwise kill it
 	// forcefully after the timeout.
+	// We don't bother closing the WS connection, since it will be closed by
+	// the browser.
 	timeout := time.Second
 	select {
 	case <-b.browserProc.processDone:

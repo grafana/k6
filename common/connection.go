@@ -180,8 +180,6 @@ func NewConnection(ctx context.Context, wsURL string, logger *log.Logger) (*Conn
 	return &c, nil
 }
 
-// close cleanly closes the WebSocket connection.
-// Returns an error if sending the close control frame fails.
 func (c *Connection) close(code int) error {
 	c.logger.Debugf("Connection:close", "code:%d", code)
 
@@ -193,12 +191,7 @@ func (c *Connection) close(code int) error {
 			_ = c.conn.Close()
 		}()
 
-		c.sessionsMu.Lock()
-		for _, s := range c.sessions {
-			s.close()
-			delete(c.sessions, s.id)
-		}
-		c.sessionsMu.Unlock()
+		c.closeAllSessions()
 
 		err = c.conn.WriteControl(websocket.CloseMessage,
 			websocket.FormatCloseMessage(code, ""),
@@ -226,6 +219,17 @@ func (c *Connection) closeSession(sid target.SessionID, tid target.ID) {
 		session.close()
 	}
 	delete(c.sessions, sid)
+	c.sessionsMu.Unlock()
+}
+
+func (c *Connection) closeAllSessions() {
+	c.logger.Debugf("Connection:closeAllSessions", "wsURL:%v", c.wsURL)
+
+	c.sessionsMu.Lock()
+	for _, s := range c.sessions {
+		s.close()
+		delete(c.sessions, s.id)
+	}
 	c.sessionsMu.Unlock()
 }
 
@@ -500,6 +504,8 @@ func (c *Connection) sendLoop() {
 	}
 }
 
+// Close cleanly closes the WebSocket connection.
+// It returns an error if sending the Close control frame fails.
 func (c *Connection) Close(args ...goja.Value) {
 	code := websocket.CloseGoingAway
 	if len(args) > 0 {
