@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mailru/easyjson"
+	easyjson "github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -44,6 +44,7 @@ func BenchmarkAggregateHTTP(b *testing.B) {
 	for _, tagCount := range []int{1, 5, 35, 315, 3645} {
 		tagCount := tagCount
 		b.Run(fmt.Sprintf("tags:%d", tagCount), func(b *testing.B) {
+			registry := metrics.NewRegistry()
 			b.ResetTimer()
 			for s := 0; s < b.N; s++ {
 				b.StopTimer()
@@ -56,7 +57,7 @@ func BenchmarkAggregateHTTP(b *testing.B) {
 						status = "500"
 					}
 
-					tags := generateTags(i, tagCount, map[string]string{"status": status})
+					tags := generateTags(registry, i, tagCount, "status", status)
 					container[i-1] = generateHTTPExtTrail(now, time.Duration(i), tags)
 				}
 				out.AddMetricSamples(container)
@@ -68,31 +69,30 @@ func BenchmarkAggregateHTTP(b *testing.B) {
 	}
 }
 
-func generateTags(i, tagCount int, additionals ...map[string]string) *metrics.TagSet {
-	registry := metrics.NewRegistry()
-	res := map[string]string{
-		"test": "mest", "a": "b",
-		"custom": fmt.Sprintf("group%d", i%tagCount%9),
-		"group":  fmt.Sprintf("group%d", i%tagCount%5),
-		"url":    fmt.Sprintf("something%d", i%tagCount%11),
-		"name":   fmt.Sprintf("else%d", i%tagCount%11),
-	}
-	for _, a := range additionals {
-		for k, v := range a {
-			res[k] = v
-		}
+func generateTags(registry *metrics.Registry, i, tagCount int, additionalPairs ...string) *metrics.TagSet {
+	tags := registry.RootTagSet().
+		With("test", "mest").
+		With("a", "b").
+		With("custom", fmt.Sprintf("group%d", i%tagCount%9)).
+		With("group", fmt.Sprintf("group%d", i%tagCount%5)).
+		With("url", fmt.Sprintf("something%d", i%tagCount%11)).
+		With("name", fmt.Sprintf("else%d", i%tagCount%11))
+
+	for j := 0; j < len(additionalPairs); j += 2 {
+		tags.With(additionalPairs[j], additionalPairs[j+1])
 	}
 
-	return registry.RootTagSet().WithTagsFromMap(res)
+	return tags
 }
 
 func BenchmarkMetricMarshal(b *testing.B) {
 	for _, count := range []int{10000, 100000, 500000} {
 		count := count
+		registry := metrics.NewRegistry()
 		b.Run(fmt.Sprintf("%d", count), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
-				s := generateSamples(count)
+				s := generateSamples(registry, count)
 				b.StartTimer()
 				r, err := easyjson.Marshal(samples(s))
 				require.NoError(b, err)
@@ -105,10 +105,11 @@ func BenchmarkMetricMarshal(b *testing.B) {
 func BenchmarkMetricMarshalWriter(b *testing.B) {
 	for _, count := range []int{10000, 100000, 500000} {
 		count := count
+		registry := metrics.NewRegistry()
 		b.Run(fmt.Sprintf("%d", count), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
-				s := generateSamples(count)
+				s := generateSamples(registry, count)
 				b.StartTimer()
 				n, err := easyjson.MarshalToWriter(samples(s), ioutil.Discard)
 				require.NoError(b, err)
@@ -127,8 +128,9 @@ func BenchmarkMetricMarshalGzip(b *testing.B) {
 		} {
 			count := count
 			level := level
+			registry := metrics.NewRegistry()
 			b.Run(fmt.Sprintf("%d_%s", count, name), func(b *testing.B) {
-				s := generateSamples(count)
+				s := generateSamples(registry, count)
 				r, err := easyjson.Marshal(samples(s))
 				require.NoError(b, err)
 				b.ResetTimer()
@@ -156,11 +158,12 @@ func BenchmarkMetricMarshalGzipAll(b *testing.B) {
 		} {
 			count := count
 			level := level
+			registry := metrics.NewRegistry()
 			b.Run(fmt.Sprintf("%d_%s", count, name), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
 
-					s := generateSamples(count)
+					s := generateSamples(registry, count)
 					var buf bytes.Buffer
 					g, err := gzip.NewWriterLevel(&buf, level)
 					require.NoError(b, err)
@@ -185,13 +188,14 @@ func BenchmarkMetricMarshalGzipAllWriter(b *testing.B) {
 		} {
 			count := count
 			level := level
+			registry := metrics.NewRegistry()
 			b.Run(fmt.Sprintf("%d_%s", count, name), func(b *testing.B) {
 				var buf bytes.Buffer
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
 					buf.Reset()
 
-					s := generateSamples(count)
+					s := generateSamples(registry, count)
 					g, err := gzip.NewWriterLevel(&buf, level)
 					require.NoError(b, err)
 					pr, pw := io.Pipe()
@@ -210,11 +214,11 @@ func BenchmarkMetricMarshalGzipAllWriter(b *testing.B) {
 	}
 }
 
-func generateSamples(count int) []*Sample {
+func generateSamples(registry *metrics.Registry, count int) []*Sample {
 	samples := make([]*Sample, count)
 	now := time.Now()
 	for i := range samples {
-		tags := generateTags(i, 200)
+		tags := generateTags(registry, i, 200)
 		encodedTags, err := easyjson.Marshal(tags)
 		if err != nil {
 			panic(err)
@@ -277,8 +281,8 @@ func BenchmarkHTTPPush(b *testing.B) {
 	tb := httpmultibin.NewHTTPMultiBin(b)
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := fmt.Fprint(w, `{
-			"reference_id": "fake",
-		}`)
+"reference_id": "fake",
+}`)
 		require.NoError(b, err)
 	}))
 	tb.Mux.HandleFunc("/v1/metrics/fake",
@@ -291,11 +295,11 @@ func BenchmarkHTTPPush(b *testing.B) {
 	out, err := newOutput(output.Params{
 		Logger: testutils.NewLogger(b),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{
-			"host": "%s",
-			"noCompress": false,
-			"aggregationCalcInterval": "200ms",
-			"aggregationPeriod": "200ms"
-		}`, tb.ServerHTTP.URL)),
+"host": "%s",
+"noCompress": false,
+"aggregationCalcInterval": "200ms",
+"aggregationPeriod": "200ms"
+}`, tb.ServerHTTP.URL)),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
 			SystemTags: &metrics.DefaultSystemTagSet,
@@ -308,8 +312,9 @@ func BenchmarkHTTPPush(b *testing.B) {
 
 	for _, count := range []int{1000, 5000, 50000, 100000, 250000} {
 		count := count
+		registry := metrics.NewRegistry()
 		b.Run(fmt.Sprintf("count:%d", count), func(b *testing.B) {
-			samples := generateSamples(count)
+			samples := generateSamples(registry, count)
 			b.ResetTimer()
 			for s := 0; s < b.N; s++ {
 				b.StopTimer()
@@ -322,7 +327,8 @@ func BenchmarkHTTPPush(b *testing.B) {
 }
 
 func BenchmarkNewSampleFromTrail(b *testing.B) {
-	tags := generateTags(1, 200)
+	registry := metrics.NewRegistry()
+	tags := generateTags(registry, 1, 200)
 	now := time.Now()
 	trail := &httpext.Trail{
 		Blocked:        200 * 100 * time.Millisecond,
@@ -342,8 +348,8 @@ func BenchmarkNewSampleFromTrail(b *testing.B) {
 			_ = NewSampleFromTrail(trail)
 		}
 	})
-	trail.Failed = null.BoolFrom(true)
 
+	trail.Failed = null.BoolFrom(true)
 	b.Run("failed", func(b *testing.B) {
 		for s := 0; s < b.N; s++ {
 			_ = NewSampleFromTrail(trail)
