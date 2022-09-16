@@ -178,10 +178,10 @@ func NewConnection(ctx context.Context, wsURL string, logger *log.Logger) (*Conn
 	return &c, nil
 }
 
-// closeConnection cleanly closes the WebSocket connection.
+// close cleanly closes the WebSocket connection.
 // Returns an error if sending the close control frame fails.
-func (c *Connection) closeConnection(code int) error {
-	c.logger.Debugf("Connection:closeConnection", "code:%d", code)
+func (c *Connection) close(code int) error {
+	c.logger.Debugf("Connection:close", "code:%d", code)
 
 	var err error
 	c.shutdownOnce.Do(func() {
@@ -355,7 +355,7 @@ func (c *Connection) recvLoop() {
 			case session.readCh <- &msg:
 			case code := <-c.closeCh:
 				c.logger.Debugf("Connection:recvLoop:<-c.closeCh", "sid:%v tid:%v wsURL:%v crashed:%t", session.id, session.targetID, c.wsURL, session.crashed)
-				_ = c.closeConnection(code)
+				_ = c.close(code)
 			case <-c.done:
 				c.logger.Debugf("Connection:recvLoop:<-c.done", "sid:%v tid:%v wsURL:%v crashed:%t", session.id, session.targetID, c.wsURL, session.crashed)
 				return
@@ -388,7 +388,7 @@ func (c *Connection) send(ctx context.Context, msg *cdproto.Message, recvCh chan
 		return fmt.Errorf("sending a message to browser: %w", err)
 	case code := <-c.closeCh:
 		c.logger.Debugf("Connection:send:<-c.closeCh", "wsURL:%q sid:%v, websocket code:%v", c.wsURL, msg.SessionID, code)
-		_ = c.closeConnection(code)
+		_ = c.close(code)
 		return fmt.Errorf("closing communication with browser: %w", &websocket.CloseError{Code: code})
 	case <-ctx.Done():
 		c.logger.Debugf("Connection:send:<-ctx.Done", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
@@ -426,7 +426,7 @@ func (c *Connection) send(ctx context.Context, msg *cdproto.Message, recvCh chan
 		return err
 	case code := <-c.closeCh:
 		c.logger.Debugf("Connection:send:<-c.closeCh #2", "sid:%v tid:%v wsURL:%q, websocket code:%v", msg.SessionID, tid, c.wsURL, code)
-		_ = c.closeConnection(code)
+		_ = c.close(code)
 		return &websocket.CloseError{Code: code}
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done #2", "sid:%v tid:%v wsURL:%q", msg.SessionID, tid, c.wsURL)
@@ -476,7 +476,7 @@ func (c *Connection) sendLoop() {
 			}
 		case code := <-c.closeCh:
 			c.logger.Debugf("Connection:sendLoop:<-c.closeCh", "wsURL:%q code:%d", c.wsURL, code)
-			_ = c.closeConnection(code)
+			_ = c.close(code)
 			return
 		case <-c.done:
 			c.logger.Debugf("Connection:sendLoop:<-c.done#2", "wsURL:%q", c.wsURL)
@@ -494,7 +494,7 @@ func (c *Connection) Close(args ...goja.Value) {
 		code = int(args[0].ToInteger())
 	}
 	c.logger.Debugf("connection:Close", "wsURL:%q code:%d", c.wsURL, code)
-	_ = c.closeConnection(code)
+	_ = c.close(code)
 }
 
 // Execute implements cdproto.Executor and performs a synchronous send and receive.
