@@ -1,7 +1,7 @@
 //go:build linux
 // +build linux
 
-package chromium
+package common
 
 import (
 	"os/exec"

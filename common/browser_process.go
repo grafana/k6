@@ -21,8 +21,13 @@
 package common
 
 import (
+	"bufio"
 	"context"
+	"fmt"
+	"io"
 	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/grafana/xk6-browser/log"
 	"github.com/grafana/xk6-browser/storage"
@@ -49,17 +54,29 @@ type BrowserProcess struct {
 }
 
 func NewBrowserProcess(
-	ctx context.Context, cancel context.CancelFunc, process *os.Process, wsURL string, dataDir *storage.Dir,
-) *BrowserProcess {
+	ctx context.Context, path string, args, env []string, dataDir *storage.Dir,
+	cancel context.CancelFunc, logger *log.Logger,
+) (*BrowserProcess, error) {
+	cmd, stdout, err := execute(ctx, path, args, env, dataDir, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	wsURL, err := parseDevToolsURL(ctx, stdout)
+	if err != nil {
+		return nil, fmt.Errorf("getting DevTools URL: %w", err)
+	}
+
 	p := BrowserProcess{
 		ctx:                        ctx,
 		cancel:                     cancel,
-		process:                    process,
+		process:                    cmd.Process,
 		lostConnection:             make(chan struct{}),
 		processIsGracefullyClosing: make(chan struct{}),
 		wsURL:                      wsURL,
 		userDataDir:                dataDir,
 	}
+
 	go func() {
 		// If we lose connection to the browser and we're not in-progress with clean
 		// browser-initiated termination then cancel the context to clean up.
@@ -70,7 +87,8 @@ func NewBrowserProcess(
 			p.cancel()
 		}
 	}()
-	return &p
+
+	return &p, nil
 }
 
 func (p *BrowserProcess) didLoseConnection() {
@@ -112,4 +130,93 @@ func (p *BrowserProcess) Pid() int {
 // AttachLogger attaches a logger to the browser process.
 func (p *BrowserProcess) AttachLogger(logger *log.Logger) {
 	p.logger = logger
+}
+
+func execute(
+	ctx context.Context, path string, args, env []string, dataDir *storage.Dir,
+	logger *log.Logger,
+) (*exec.Cmd, io.Reader, error) {
+	cmd := exec.CommandContext(ctx, path, args...)
+	killAfterParent(cmd)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w", err)
+	}
+	cmd.Stderr = cmd.Stdout
+
+	// Set up environment variable for process
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
+
+	// We must start the cmd before calling cmd.Wait, as otherwise the two
+	// can run into a data race.
+	err = cmd.Start()
+	if os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("file does not exist: %s", path)
+	}
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w", err)
+	}
+	if ctx.Err() != nil {
+		return nil, nil, fmt.Errorf("%w", ctx.Err())
+	}
+
+	go func() {
+		// TODO: How to handle these errors?
+		defer func() {
+			if err := dataDir.Cleanup(); err != nil {
+				logger.Errorf("BrowserType:Close", "cleaning up the user data directory: %v", err)
+			}
+		}()
+
+		if err := cmd.Wait(); err != nil {
+			logErr := logger.Errorf
+			if s := err.Error(); strings.Contains(s, "signal: killed") || strings.Contains(s, "exit status 1") {
+				// The browser process is killed when the context is cancelled
+				// after a k6 iteration ends, so silence the log message until
+				// we can stop it gracefully. See #https://github.com/grafana/xk6-browser/issues/423
+				logErr = logger.Debugf
+			}
+			logErr(
+				"browser", "process with PID %d unexpectedly ended: %v",
+				cmd.Process.Pid, err,
+			)
+		}
+	}()
+
+	return cmd, stdout, nil
+}
+
+// parseDevToolsURL grabs the websocket address from chrome's output and returns it.
+func parseDevToolsURL(ctx context.Context, rc io.Reader) (wsURL string, _ error) {
+	type result struct {
+		devToolsURL string
+		err         error
+	}
+	c := make(chan result, 1)
+	go func() {
+		const prefix = "DevTools listening on "
+
+		scanner := bufio.NewScanner(rc)
+		for scanner.Scan() {
+			if s := scanner.Text(); strings.HasPrefix(s, prefix) {
+				c <- result{
+					strings.TrimPrefix(strings.TrimSpace(s), prefix),
+					nil,
+				}
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			c <- result{"", err}
+		}
+	}()
+	select {
+	case r := <-c:
+		return r.devToolsURL, r.err
+	case <-ctx.Done():
+		return "", fmt.Errorf("%w", ctx.Err())
+	}
 }
