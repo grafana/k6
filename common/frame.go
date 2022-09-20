@@ -537,7 +537,7 @@ func (f *Frame) waitForExecutionContext(world executionWorld) {
 	f.log.Debugf("Frame:waitForExecutionContext", "fid:%s furl:%q world:%s",
 		f.ID(), f.URL(), world)
 
-	t := time.NewTimer(50 * time.Millisecond)
+	t := time.NewTicker(50 * time.Millisecond)
 	defer t.Stop()
 	for {
 		select {
