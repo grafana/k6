@@ -441,6 +441,7 @@ func (b *Browser) Close() {
 		}
 	}
 
+	b.conn.Close()
 	// Wait for all outstanding events (e.g. Target.detachedFromTarget) to be
 	// processed, and for the process to exit gracefully. Otherwise kill it
 	// forcefully after the timeout.
