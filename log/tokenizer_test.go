@@ -62,9 +62,6 @@ func TestTokenizerInvalid(t *testing.T) {
 			t.Parallel()
 
 			_, err := tokenize(test.input)
-			if err == nil {
-				t.Fatal("expected an error but got none")
-			}
 			require.EqualError(t, err, test.errorMsg)
 		})
 	}
