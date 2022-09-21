@@ -108,6 +108,14 @@ func (c *Client) Connect(addr string, params map[string]interface{}) (bool, erro
 	ctx, cancel := context.WithTimeout(c.vu.Context(), p.Timeout)
 	defer cancel()
 
+	if p.MaxReceiveSize > 0 {
+		opts = append(opts, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(p.MaxReceiveSize))))
+	}
+
+	if p.MaxSendSize > 0 {
+		opts = append(opts, grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(int(p.MaxSendSize))))
+	}
+
 	c.addr = addr
 	c.conn, err = grpcext.Dial(ctx, addr, opts...)
 	if err != nil {
@@ -339,6 +347,8 @@ type connectParams struct {
 	IsPlaintext           bool
 	UseReflectionProtocol bool
 	Timeout               time.Duration
+	MaxReceiveSize        int64
+	MaxSendSize           int64
 }
 
 func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, error) {
@@ -346,6 +356,8 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 		IsPlaintext:           false,
 		UseReflectionProtocol: false,
 		Timeout:               time.Minute,
+		MaxReceiveSize:        0,
+		MaxSendSize:           0,
 	}
 	for k, v := range raw {
 		switch k {
@@ -366,6 +378,24 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 			params.UseReflectionProtocol, ok = v.(bool)
 			if !ok {
 				return params, fmt.Errorf("invalid reflect value: '%#v', it needs to be boolean", v)
+			}
+		case "maxReceiveSize":
+			var ok bool
+			params.MaxReceiveSize, ok = v.(int64)
+			if !ok {
+				return params, fmt.Errorf("invalid maxReceiveSize value: '%#v', it needs to be an integer", v)
+			}
+			if params.MaxReceiveSize < 0 {
+				return params, fmt.Errorf("invalid maxReceiveSize value: '%#v, it needs to be a positive integer", v)
+			}
+		case "maxSendSize":
+			var ok bool
+			params.MaxSendSize, ok = v.(int64)
+			if !ok {
+				return params, fmt.Errorf("invalid maxSendSize value: '%#v', it needs to be an integer", v)
+			}
+			if params.MaxSendSize < 0 {
+				return params, fmt.Errorf("invalid maxSendSize value: '%#v, it needs to be a positive integer", v)
 			}
 
 		default:
