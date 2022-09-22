@@ -430,10 +430,7 @@ func (b *Browser) Close() {
 	b.browserProc.GracefulClose()
 
 	// Send the Browser.close CDP command, which triggers the browser process to
-	// exit. The WS connection will also be closed if this succeeds, so we don't
-	// need to do it ourselves here, but note that we *don't* receive a Close
-	// control frame from Chrom{e,ium} as per the RFC[1].
-	// [1]: https://www.rfc-editor.org/rfc/rfc6455#section-1.4
+	// exit.
 	action := cdpbrowser.Close()
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
 		if _, ok := err.(*websocket.CloseError); !ok {
@@ -441,12 +438,9 @@ func (b *Browser) Close() {
 		}
 	}
 
-	b.conn.Close()
 	// Wait for all outstanding events (e.g. Target.detachedFromTarget) to be
 	// processed, and for the process to exit gracefully. Otherwise kill it
 	// forcefully after the timeout.
-	// We don't bother closing the WS connection, since it will be closed by
-	// the browser.
 	timeout := time.Second
 	select {
 	case <-b.browserProc.processDone:
@@ -454,6 +448,16 @@ func (b *Browser) Close() {
 		b.logger.Debugf("Browser:Close", "killing browser process with PID %d after %s", b.browserProc.Pid(), timeout)
 		b.browserProc.Terminate()
 	}
+
+	// This is unintuitive, since the process exited, so the connection would've
+	// been closed as well. The reason we still call conn.Close() here is to
+	// close all sessions and emit the EventConnectionClose event, which will
+	// trigger the cancellation of the main browser context. We don't call it
+	// before the process is done to avoid disconnecting too early, since we
+	// expect some CDP events to arrive after Browser.close, and we can't know
+	// for sure when that has finished. This will error writing to the socket,
+	// but we ignore it.
+	b.conn.Close()
 }
 
 // Contexts returns list of browser contexts.

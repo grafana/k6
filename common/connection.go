@@ -251,8 +251,6 @@ func (c *Connection) createSession(info *target.Info) (*Session, error) {
 }
 
 func (c *Connection) handleIOError(err error) {
-	// It's either a normal closure initiated by the browser, or we stopped the
-	// connection. In either case, disregard the error.
 	if closing := c.isClosing(); websocket.IsCloseError(
 		err, websocket.CloseNormalClosure, websocket.CloseGoingAway,
 	) || closing {
