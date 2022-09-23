@@ -137,6 +137,8 @@ func TestPatchStatus(t *testing.T) {
 			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "PATCH", "/v1/status", bytes.NewReader(testCase.Payload)))
 			res := rw.Result()
 
+			require.Equal(t, "application/json; charset=utf-8", rw.Header().Get("Content-Type"))
+
 			require.Equal(t, testCase.ExpectedStatusCode, res.StatusCode)
 
 			if testCase.ExpectedStatusCode != 200 {

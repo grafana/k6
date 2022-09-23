@@ -20,6 +20,7 @@ func handleGetStatus(rw http.ResponseWriter, r *http.Request) {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
 		return
 	}
+	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_, _ = rw.Write(data)
 }
 
@@ -36,6 +37,7 @@ func getFirstExternallyControlledExecutor(
 }
 
 func handlePatchStatus(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 	engine := common.GetEngine(r.Context())
 
 	body, err := ioutil.ReadAll(r.Body)
