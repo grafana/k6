@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -420,6 +421,16 @@ func (b *Browser) Close() {
 
 	atomic.CompareAndSwapInt64(&b.state, b.state, BrowserStateClosed)
 
+	// Signal to the connection and the process that we're gracefully closing.
+	// We ignore any IO errors reading from the WS connection, because the below
+	// CDP Browser.close command ends the connection unexpectedly, which causes
+	// `websocket.ReadMessage()` to return `close 1006 (abnormal closure):
+	// unexpected EOF`.
+	b.conn.IgnoreIOErrors()
+	b.browserProc.GracefulClose()
+
+	// Send the Browser.close CDP command, which triggers the browser process to
+	// exit.
 	action := cdpbrowser.Close()
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
 		if _, ok := err.(*websocket.CloseError); !ok {
@@ -427,11 +438,25 @@ func (b *Browser) Close() {
 		}
 	}
 
-	// terminate the browser process early on, then tell the CDP
-	// afterwards. this will take a little bit of time, and CDP
-	// will stop emitting events.
-	b.browserProc.GracefulClose()
-	b.browserProc.Terminate()
+	// Wait for all outstanding events (e.g. Target.detachedFromTarget) to be
+	// processed, and for the process to exit gracefully. Otherwise kill it
+	// forcefully after the timeout.
+	timeout := time.Second
+	select {
+	case <-b.browserProc.processDone:
+	case <-time.After(timeout):
+		b.logger.Debugf("Browser:Close", "killing browser process with PID %d after %s", b.browserProc.Pid(), timeout)
+		b.browserProc.Terminate()
+	}
+
+	// This is unintuitive, since the process exited, so the connection would've
+	// been closed as well. The reason we still call conn.Close() here is to
+	// close all sessions and emit the EventConnectionClose event, which will
+	// trigger the cancellation of the main browser context. We don't call it
+	// before the process is done to avoid disconnecting too early, since we
+	// expect some CDP events to arrive after Browser.close, and we can't know
+	// for sure when that has finished. This will error writing to the socket,
+	// but we ignore it.
 	b.conn.Close()
 }
 

@@ -43,6 +43,7 @@ type BrowserProcess struct {
 	// Channels for managing termination.
 	lostConnection             chan struct{}
 	processIsGracefullyClosing chan struct{}
+	processDone                chan struct{}
 
 	// Browser's WebSocket URL to speak CDP
 	wsURL string
@@ -55,9 +56,9 @@ type BrowserProcess struct {
 
 func NewBrowserProcess(
 	ctx context.Context, path string, args, env []string, dataDir *storage.Dir,
-	cancel context.CancelFunc, logger *log.Logger,
+	ctxCancel context.CancelFunc, logger *log.Logger,
 ) (*BrowserProcess, error) {
-	cmd, stdout, err := execute(ctx, path, args, env, dataDir, logger)
+	cmd, stdout, procDone, err := execute(ctx, path, args, env, dataDir, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -69,10 +70,11 @@ func NewBrowserProcess(
 
 	p := BrowserProcess{
 		ctx:                        ctx,
-		cancel:                     cancel,
+		cancel:                     ctxCancel,
 		process:                    cmd.Process,
 		lostConnection:             make(chan struct{}),
 		processIsGracefullyClosing: make(chan struct{}),
+		processDone:                procDone,
 		wsURL:                      wsURL,
 		userDataDir:                dataDir,
 	}
@@ -139,13 +141,13 @@ func (p *BrowserProcess) AttachLogger(logger *log.Logger) {
 func execute(
 	ctx context.Context, path string, args, env []string, dataDir *storage.Dir,
 	logger *log.Logger,
-) (*exec.Cmd, io.Reader, error) {
+) (*exec.Cmd, io.Reader, chan struct{}, error) {
 	cmd := exec.CommandContext(ctx, path, args...)
 	killAfterParent(cmd)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w", err)
+		return nil, nil, nil, fmt.Errorf("%w", err)
 	}
 	cmd.Stderr = cmd.Stdout
 
@@ -158,39 +160,33 @@ func execute(
 	// can run into a data race.
 	err = cmd.Start()
 	if os.IsNotExist(err) {
-		return nil, nil, fmt.Errorf("file does not exist: %s", path)
+		return nil, nil, nil, fmt.Errorf("file does not exist: %s", path)
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w", err)
+		return nil, nil, nil, fmt.Errorf("%w", err)
 	}
 	if ctx.Err() != nil {
-		return nil, nil, fmt.Errorf("%w", ctx.Err())
+		return nil, nil, nil, fmt.Errorf("%w", ctx.Err())
 	}
 
+	done := make(chan struct{})
 	go func() {
 		// TODO: How to handle these errors?
 		defer func() {
 			if err := dataDir.Cleanup(); err != nil {
-				logger.Errorf("BrowserType:Close", "cleaning up the user data directory: %v", err)
+				logger.Errorf("browser", "cleaning up the user data directory: %v", err)
 			}
+			close(done)
 		}()
 
 		if err := cmd.Wait(); err != nil {
-			logErr := logger.Errorf
-			if s := err.Error(); strings.Contains(s, "signal: killed") || strings.Contains(s, "exit status 1") {
-				// The browser process is killed when the context is cancelled
-				// after a k6 iteration ends, so silence the log message until
-				// we can stop it gracefully. See #https://github.com/grafana/xk6-browser/issues/423
-				logErr = logger.Debugf
-			}
-			logErr(
-				"browser", "process with PID %d unexpectedly ended: %v",
-				cmd.Process.Pid, err,
-			)
+			logger.Errorf("browser",
+				"process with PID %d unexpectedly ended: %v",
+				cmd.Process.Pid, err)
 		}
 	}()
 
-	return cmd, stdout, nil
+	return cmd, stdout, done, nil
 }
 
 // parseDevToolsURL grabs the websocket address from chrome's output and returns it.
