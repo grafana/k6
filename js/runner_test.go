@@ -2655,3 +2655,52 @@ func TestExecutionInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestPromiseRejectionIsCleared(t *testing.T) {
+	t.Parallel()
+
+	r1, err := getSimpleRunner(t, "/script.js", `
+exports.default = () => {
+    let p = new Promise((res) => {
+        if (__ITER == 1) {
+            throw "oops"
+        }
+        res("yes");
+    })
+    p.then((r) => {
+        console.log(r);
+    })
+}`)
+	require.NoError(t, err)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	r2, err := NewFromArchive(
+		&lib.TestPreInitState{
+			Logger:         testutils.NewLogger(t),
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		}, r1.MakeArchive())
+	require.NoError(t, err)
+
+	runners := map[string]*Runner{"Source": r1, "Archive": r2}
+	for name, r := range runners {
+		r := r
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+			err = vu.RunOnce()
+			require.NoError(t, err)
+
+			err = vu.RunOnce()
+			require.ErrorContains(t, err, "Uncaught (in promise) oops")
+
+			err = vu.RunOnce()
+			require.NoError(t, err)
+		})
+	}
+}

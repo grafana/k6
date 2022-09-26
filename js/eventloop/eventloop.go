@@ -154,6 +154,7 @@ func (e *EventLoop) popAll() (queue []func() error, awaiting bool) {
 // or a queued function returns an error. The provided firstCallback will be the first thing executed.
 // After Start returns the event loop can be reused as long as waitOnRegistered is called.
 func (e *EventLoop) Start(firstCallback func() error) error {
+	e.pendingPromiseRejections = make(map[*goja.Promise]struct{})
 	e.queue = []func() error{firstCallback}
 	for {
 		queue, awaiting := e.popAll()
