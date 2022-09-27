@@ -18,7 +18,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     env:
-        GOLANG_CI_VERSION: "1.49.0"
+      GOLANG_CI_VERSION: v1.49.0
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -31,7 +31,7 @@ jobs:
       - name: golangci-lint on Go
         uses: golangci/golangci-lint-action@v3
         with:
-          version: ${{ $GOLANG_CI_VERSION }}
+          version: ${{ env.GOLANG_CI_VERSION }}
 
   test-prev:
     strategy:
