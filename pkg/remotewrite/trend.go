@@ -20,6 +20,8 @@ type trendSink struct {
 	Med      float64
 }
 
+func (t *trendSink) IsEmpty() bool { return t.Count == 0 }
+
 func (t *trendSink) Add(s metrics.Sample) {
 	// insert into sorted array instead of sorting anew on each addition
 	index := sort.Search(len(t.Values), func(i int) bool {
