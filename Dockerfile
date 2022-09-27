@@ -1,4 +1,4 @@
-FROM golang:1.19.1-alpine as builder
+FROM golang:1.19-alpine as builder
 WORKDIR $GOPATH/src/go.k6.io/k6
 ADD . .
 RUN apk --no-cache add git
