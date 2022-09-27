@@ -34,6 +34,15 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 			expChangedVal: true,
 		},
 		{
+			flag:       "hide-scrollbars",
+			changeOpts: &common.LaunchOptions{IgnoreDefaultArgs: []string{"hide-scrollbars"}, Headless: true},
+		},
+		{
+			flag:          "hide-scrollbars",
+			changeOpts:    &common.LaunchOptions{Headless: true},
+			expChangedVal: true,
+		},
+		{
 			flag:          "browser-arg",
 			expInitVal:    nil,
 			changeOpts:    &common.LaunchOptions{Args: []string{"browser-arg=value"}},

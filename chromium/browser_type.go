@@ -312,11 +312,19 @@ func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) map[string
 		f["mute-audio"] = true
 		f["blink-settings"] = "primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4"
 	}
+	ignoreDefaultArgsFlags(f, lopts.IgnoreDefaultArgs)
 
 	setFlagsFromArgs(f, lopts.Args)
 	setFlagsFromK6Options(f, k6opts)
 
 	return f
+}
+
+// ignoreDefaultArgsFlags ignores any flags in the provided slice.
+func ignoreDefaultArgsFlags(flags map[string]interface{}, toIgnore []string) {
+	for _, name := range toIgnore {
+		delete(flags, strings.TrimPrefix(name, "--"))
+	}
 }
 
 // setFlagsFromArgs fills flags by parsing the args slice.
