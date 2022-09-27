@@ -288,8 +288,8 @@ github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1
 go.k6.io/k6 v0.37.1-0.20220426072701-d105f5474bc3/go.mod h1:1bTdDsXTT2V3in3ZgdR15MDW6SQQh5nWni59tirqNB8=
 go.k6.io/k6 v0.38.2/go.mod h1:1bTdDsXTT2V3in3ZgdR15MDW6SQQh5nWni59tirqNB8=
 go.k6.io/k6 v0.39.0/go.mod h1:dpZO1ElDx3BxuliF/u+Rnp7jUntRssN2MmOFSda+Ugw=
-go.k6.io/k6 v0.40.0 h1:Hb6VVg6mByxJvU9UnpQVhoCE1mXFOXoss9+y21apYgs=
-go.k6.io/k6 v0.40.0/go.mod h1:cjDBWjCZ8K9Sq0UoGWx/NcJaw5k20PU4OPh7QlBWD0s=
+go.k6.io/k6 v0.40.1-0.20220927101031-b5bbf7e96050 h1:1BWrdrdM5f3Lsul3lFYLWaHw1jxOUqxhs1hl35bPr3c=
+go.k6.io/k6 v0.40.1-0.20220927101031-b5bbf7e96050/go.mod h1:cjDBWjCZ8K9Sq0UoGWx/NcJaw5k20PU4OPh7QlBWD0s=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
