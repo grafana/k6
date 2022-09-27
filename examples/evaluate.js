@@ -10,6 +10,7 @@ export const options = {
 export default function() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
+    ignoreDefaultArgs: ['--hide-scrollbars']
   });
   const context = browser.newContext();
   const page = context.newPage();
