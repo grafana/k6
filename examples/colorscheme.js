@@ -1,13 +1,19 @@
 import { check } from 'k6';
 import { chromium } from 'k6/x/browser';
 
+export const options = {
+  thresholds: {
+    checks: ["rate==1.0"]
+  }
+}
+
 export default function() {
   const preferredColorScheme = 'dark';
 
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
   });
-  
+
   const context = browser.newContext({
     // valid values are "light", "dark" or "no-preference"
     colorScheme: preferredColorScheme,

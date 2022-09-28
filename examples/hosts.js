@@ -2,7 +2,10 @@ import { check } from 'k6';
 import { chromium } from 'k6/x/browser';
 
 export const options = {
-  hosts: {'test.k6.io': '127.0.0.254'},
+  hosts: { 'test.k6.io': '127.0.0.254' },
+  thresholds: {
+    checks: ["rate==1.0"]
+  }
 };
 
 export default function() {

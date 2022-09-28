@@ -1,5 +1,11 @@
 import { chromium } from 'k6/x/browser';
 
+export const options = {
+  thresholds: {
+    checks: ["rate==1.0"]
+  }
+}
+
 /*
 Page Object Model is a well-known pattern to abstract a web page.
 
@@ -40,8 +46,8 @@ export class Bet {
   }
 }
 
-export default function () {
-  const browser = chromium.launch({ 
+export default function() {
+  const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false
   });
   const context = browser.newContext();

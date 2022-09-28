@@ -1,5 +1,11 @@
 import { chromium } from 'k6/x/browser';
 
+export const options = {
+  thresholds: {
+    checks: ["rate==1.0"]
+  }
+}
+
 export default function() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
