@@ -102,11 +102,12 @@ func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value) error {
 				l.Headless = opts.Get(k).ToBoolean()
 			case "ignoreDefaultArgs":
 				v := opts.Get(k)
-				switch v.ExportType() {
-				case reflect.TypeOf(goja.Object{}):
-					args := v.Export().([]string)
-					l.IgnoreDefaultArgs = append(l.IgnoreDefaultArgs, args...)
+				var args []string
+				err := rt.ExportTo(v, &args)
+				if err != nil {
+					return fmt.Errorf("ignoreDefaultArgs should be an array of strings: %w", err)
 				}
+				l.IgnoreDefaultArgs = append(l.IgnoreDefaultArgs, args...)
 			case "logCategoryFilter":
 				l.LogCategoryFilter = opts.Get(k).String()
 			case "proxy":
