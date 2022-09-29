@@ -157,6 +157,42 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			name: "LoadProtosetNotFound",
+			initString: codeBlock{
+				code: `
+			var client = new grpc.Client();
+			client.loadProtoset("./does_not_exist.protoset");`,
+				err: "couldn't open protoset",
+			},
+		},
+		{
+			name: "LoadProtosetWrongFormat",
+			initString: codeBlock{
+				code: `
+			var client = new grpc.Client();
+			client.loadProtoset("../../../../lib/testutils/httpmultibin/grpc_protoset_testing/test1.proto");`,
+				err: "couldn't unmarshal protoset",
+			},
+		},
+		{
+			name: "LoadProtoset",
+			initString: codeBlock{
+				code: `
+			var client = new grpc.Client();
+			client.loadProtoset("../../../../lib/testutils/httpmultibin/grpc_protoset_testing/test.protoset");`,
+				val: []MethodInfo{
+					{
+						MethodInfo: grpc.MethodInfo{Name: "Test2", IsClientStream: false, IsServerStream: false},
+						Package:    "grpc.protoset.testing", Service: "Test2Service", FullMethod: "/grpc.protoset.testing.Test2Service/Test2",
+					},
+					{
+						MethodInfo: grpc.MethodInfo{Name: "Test1", IsClientStream: false, IsServerStream: false},
+						Package:    "grpc.protoset.testing", Service: "Test1Service", FullMethod: "/grpc.protoset.testing.Test1Service/Test1",
+					},
+				},
+			},
+		},
+		{
 			name: "ConnectInit",
 			initString: codeBlock{
 				code: `

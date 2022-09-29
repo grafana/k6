@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package grpc.protoset.testing;
+
+option go_package ="./grpc_protoset_testing";
+
+service Test1Service {
+	rpc Test1 (Test1Request) returns (Test1Reply) {}
+}
+
+message Test1Request {
+	string data = 1;
+}
+
+message Test1Reply {
+	string response = 1;
+}
