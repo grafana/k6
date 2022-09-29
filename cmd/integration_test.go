@@ -317,9 +317,7 @@ func TestThresholdDeprecationWarnings(t *testing.T) {
 
 	// We no longer warn about this
 	assert.False(t, testutils.LogContains(logs, logrus.WarnLevel, "http_req_duration{url:https://test.k6.io}"))
-	assert.True(t, testutils.LogContains(logs, logrus.WarnLevel,
-		"The high-cardinality 'error' metric tag was made non-indexable in k6 v0.41.0, so thresholds like 'http_req_duration{error:foo}'",
-	))
+	assert.False(t, testutils.LogContains(logs, logrus.WarnLevel, "http_req_duration{error:foo}"))
 	assert.True(t, testutils.LogContains(logs, logrus.WarnLevel,
 		"The high-cardinality 'vu' metric tag was made non-indexable in k6 v0.41.0, so thresholds like 'iterations{vu:1,iter:0}'",
 	))

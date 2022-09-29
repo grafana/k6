@@ -26,7 +26,7 @@ const (
 	TagName
 	TagGroup
 	TagCheck
-	TagError // non-indexable
+	TagError
 	TagErrorCode
 	TagTLSVersion
 	TagScenario
@@ -49,7 +49,7 @@ var DefaultSystemTagSet = SystemTagSet(
 
 // NonIndexableSystemTags are high cardinality system tags (i.e. metadata).
 //nolint:gochecknoglobals
-var NonIndexableSystemTags = SystemTagSet(TagRawURL | TagError | TagIter | TagVU)
+var NonIndexableSystemTags = SystemTagSet(TagRawURL | TagIter | TagVU)
 
 // Add adds a tag to tag set.
 func (i *SystemTagSet) Add(tag SystemTag) {

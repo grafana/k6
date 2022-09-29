@@ -284,13 +284,11 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		"method":            "GET",
 		"url":               srv.URL,
 		"name":              srv.URL,
-	}
-	expMetadata := map[string]string{
-		"error": "request timeout",
+		"error":             "request timeout",
 	}
 	for _, s := range allSamples {
 		assert.Equal(t, expTags, s.Tags.Map())
-		assert.Equal(t, expMetadata, s.Metadata)
+		assert.Nil(t, s.Metadata)
 	}
 }
 
@@ -431,13 +429,11 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		"method":            "GET",
 		"url":               req.URL.String(),
 		"name":              req.URL.String(),
-	}
-	expMetadata := map[string]string{
-		"error": "dial: i/o timeout",
+		"error":             "dial: i/o timeout",
 	}
 	for _, s := range allSamples {
 		assert.Equal(t, expTags, s.Tags.Map())
-		assert.Equal(t, expMetadata, s.Metadata)
+		assert.Nil(t, s.Metadata)
 	}
 }
 
@@ -488,13 +484,11 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		"method":            "GET",
 		"url":               srv.URL,
 		"name":              srv.URL,
-	}
-	expMetadata := map[string]string{
-		"error": "request timeout",
+		"error":             "request timeout",
 	}
 	for _, s := range allSamples {
 		assert.Equal(t, expTags, s.Tags.Map())
-		assert.Equal(t, expMetadata, s.Metadata)
+		assert.Nil(t, s.Metadata)
 	}
 }
 

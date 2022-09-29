@@ -1989,7 +1989,7 @@ func TestResponseTypes(t *testing.T) {
 }
 
 func checkErrorCode(t testing.TB, sample metrics.Sample, code int, msg string) {
-	errorMsg, ok := sample.Metadata["error"]
+	errorMsg, ok := sample.Tags.Get("error")
 	if msg == "" {
 		assert.False(t, ok)
 	} else {

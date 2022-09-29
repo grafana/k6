@@ -87,13 +87,6 @@ func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Me
 		return sm.Metric, nil
 	}
 
-	if _, ok := sm.Tags.Get("error"); ok {
-		me.logger.Warnf(
-			"The high-cardinality 'error' metric tag was made non-indexable in k6 v0.41.0, so thresholds"+
-				" like '%s' that are based on it won't work correctly. Use the 'error_code' metric tag instead",
-			name,
-		)
-	}
 	if _, ok := sm.Tags.Get("vu"); ok {
 		me.logger.Warnf(
 			"The high-cardinality 'vu' metric tag was made non-indexable in k6 v0.41.0, so thresholds"+
