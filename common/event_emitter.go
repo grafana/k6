@@ -22,6 +22,7 @@ package common
 
 import (
 	"context"
+	"sync"
 )
 
 // Ensure BaseEventEmitter implements the EventEmitter interface.
@@ -97,8 +98,10 @@ type NavigationEvent struct {
 }
 
 type eventHandler struct {
-	ctx context.Context
-	ch  chan Event
+	ctx        context.Context
+	ch         chan Event
+	queueMutex *sync.Mutex
+	queue      []Event
 }
 
 // EventEmitter that all event emitters need to implement.
@@ -166,8 +169,12 @@ func (e *BaseEventEmitter) sync(fn func()) {
 
 func (e *BaseEventEmitter) emit(event string, data interface{}) {
 	emitEvent := func(eh eventHandler) {
+		eh.queueMutex.Lock()
+		defer eh.queueMutex.Unlock()
+
 		select {
-		case eh.ch <- Event{event, data}:
+		case eh.ch <- eh.queue[0]:
+			eh.queue = eh.queue[1:]
 		case <-eh.ctx.Done():
 			// TODO: handle the error
 		}
@@ -180,6 +187,17 @@ func (e *BaseEventEmitter) emit(event string, data interface{}) {
 				handlers = append(handlers[:i], handlers[i+1:]...)
 				continue
 			default:
+				// To ensure that goroutines don't break the ordering
+				// of the emitted events, we will need the goroutine to synchronize.
+				// This means that the events need to be stored in a queue per handler. The
+				// goroutine responsible for the the first popped element must complete
+				// publishing the event before the next goroutine can pop and work with
+				// the next event for that one handler. Each handler can process events concurrently still.
+
+				handler.queueMutex.Lock()
+				handler.queue = append(handler.queue, Event{typ: event, data: data})
+				handler.queueMutex.Unlock()
+
 				go emitEvent(handler)
 				i++
 			}
@@ -200,7 +218,7 @@ func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Even
 			if !ok {
 				e.handlers[event] = make([]eventHandler, 0)
 			}
-			eh := eventHandler{ctx, ch}
+			eh := eventHandler{ctx, ch, &sync.Mutex{}, make([]Event, 0)}
 			e.handlers[event] = append(e.handlers[event], eh)
 		}
 	})
@@ -209,6 +227,6 @@ func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Even
 // OnAll registers a handler for all events.
 func (e *BaseEventEmitter) onAll(ctx context.Context, ch chan Event) {
 	e.sync(func() {
-		e.handlersAll = append(e.handlersAll, eventHandler{ctx, ch})
+		e.handlersAll = append(e.handlersAll, eventHandler{ctx, ch, &sync.Mutex{}, make([]Event, 0)})
 	})
 }
