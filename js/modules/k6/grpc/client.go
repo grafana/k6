@@ -144,6 +144,10 @@ func (c *Client) Invoke(
 	params map[string]interface{},
 ) (*grpcext.Response, error) {
 	state := c.vu.State()
+
+	if req == nil {
+		return nil, errors.New("request cannot be nil")
+	}
 	if state == nil {
 		return nil, common.NewInitContextError("invoking RPC methods in the init context is not supported")
 	}
