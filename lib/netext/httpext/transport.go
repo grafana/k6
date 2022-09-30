@@ -82,19 +82,26 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 
 	tags := t.tags
 	enabledTags := t.state.Options.SystemTags
-	urlEnabled := enabledTags.Has(metrics.TagURL)
-	var setName bool
-	if _, ok := tags.Get("name"); !ok && enabledTags.Has(metrics.TagName) {
-		setName = true
-	}
-	if urlEnabled || setName {
-		cleanURL := URL{u: unfReq.request.URL, URL: unfReq.request.URL.String()}.Clean()
-		if urlEnabled {
-			tags = tags.With("url", cleanURL)
+	cleanURL := URL{u: unfReq.request.URL, URL: unfReq.request.URL.String()}.Clean()
+
+	// After k6 v0.41.0, the `name` and `url` tags have the exact same values:
+	nameTagValue, nameTagManuallySet := tags.Get(metrics.TagName.String())
+	if !nameTagManuallySet {
+		// If the user *didn't* manually set a `name` tag value and didn't use
+		// the http.url template literal helper to have k6 automatically set
+		// it (see `lib/netext/httpext.MakeRequest()`), we will use the cleaned
+		// URL value as the value of both `name` and `url` tags.
+		if enabledTags.Has(metrics.TagURL) {
+			tags = tags.With(metrics.TagURL.String(), cleanURL)
 		}
-		if setName {
-			tags = tags.With("name", cleanURL)
+		if enabledTags.Has(metrics.TagName) {
+			tags = tags.With(metrics.TagName.String(), cleanURL)
 		}
+	} else if enabledTags.Has(metrics.TagURL) {
+		// However, if the user set the `name` tag value somehow, we will use
+		// whatever they set as the value of the `url` tags too, to prevent
+		// high-cardinality values in the indexed tags.
+		tags = tags.With(metrics.TagURL.String(), nameTagValue)
 	}
 
 	if enabledTags.Has(metrics.TagMethod) {
