@@ -810,13 +810,18 @@ func TestClientInvokeHeadersDeprecated(t *testing.T) {
 	testLog.AddHook(logHook)
 	testLog.SetOutput(ioutil.Discard)
 
+	registry := metrics.NewRegistry()
 	c := Client{
 		vu: &modulestest.VU{
 			StateField: &lib.State{
-				Logger: testLog,
+				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+				Logger:         testLog,
+				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 			},
+			RuntimeField: goja.New(),
 		},
 	}
+
 	params := map[string]interface{}{
 		"headers": map[string]interface{}{
 			"X-HEADER-FOO": "bar",
