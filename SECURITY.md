@@ -4,7 +4,9 @@ If you think you have found a security vulnerability, please send a report to [s
 
 Please encrypt your message to us; please use our PGP key. The key fingerprint is:
 
+```
 F988 7BEA 027A 049F AE8E 5CAA D125 8932 BE24 C5CA
+```
 
 The key is available from [keyserver.ubuntu.com](https://keyserver.ubuntu.com/pks/lookup?search=0xF9887BEA027A049FAE8E5CAAD1258932BE24C5CA&fingerprint=on&op=index).
 
