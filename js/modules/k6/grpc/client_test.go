@@ -262,6 +262,18 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			name: "InvokeNilRequest",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+				client.invoke("grpc.testing.TestService/EmptyCall")`,
+				err: `request cannot be nil`,
+			},
+		},
+		{
 			name: "InvokeInvalidTimeoutType",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();

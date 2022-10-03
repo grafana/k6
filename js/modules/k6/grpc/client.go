@@ -166,6 +166,9 @@ func (c *Client) Invoke(
 		return nil, err
 	}
 
+	if req == nil {
+		return nil, errors.New("request cannot be nil")
+	}
 	b, err := req.ToObject(c.vu.Runtime()).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("unable to serialise request object: %w", err)
