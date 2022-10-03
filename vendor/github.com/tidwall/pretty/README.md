@@ -59,7 +59,7 @@ Will format the json to:
 
 Color will colorize the json for outputing to the screen. 
 
-```json
+```go
 result = pretty.Color(json, nil)
 ```
 

@@ -134,7 +134,7 @@ func (r *ImportResolver) resolveImport(source, importPath string) string {
 		return r.importPaths[importPath]
 	}
 	var car, cdr string
-	idx := strings.IndexRune(source, filepath.Separator)
+	idx := strings.IndexRune(source, '/')
 	if idx < 0 {
 		car, cdr = source, ""
 	} else {
@@ -205,7 +205,7 @@ func (r *ImportResolver) registerImportPathFrom(registerPath, importPath, source
 		return
 	}
 	var car, cdr string
-	idx := strings.IndexRune(source, filepath.Separator)
+	idx := strings.IndexRune(source, '/')
 	if idx < 0 {
 		car, cdr = source, ""
 	} else {
@@ -299,13 +299,13 @@ func (r *ImportResolver) CreateFileDescriptorsFromSet(fds *dpb.FileDescriptorSet
 	return createFileDescriptorsFromSet(fds, r)
 }
 
-const dotPrefix = "." + string(filepath.Separator)
+const dotPrefix = "./"
 
 func clean(path string) string {
 	if path == "" {
 		return ""
 	}
-	path = filepath.Clean(path)
+	path = filepath.ToSlash(filepath.Clean(path))
 	if path == "." {
 		return ""
 	}

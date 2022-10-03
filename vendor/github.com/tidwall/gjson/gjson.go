@@ -775,7 +775,7 @@ func parseArrayPath(path string) (r arrayPathResult) {
 		}
 		if path[i] == '.' {
 			r.part = path[:i]
-			if !r.arrch && i < len(path)-1 && isDotPiperChar(path[i+1]) {
+			if !r.arrch && i < len(path)-1 && isDotPiperChar(path[i+1:]) {
 				r.pipe = path[i+1:]
 				r.piped = true
 			} else {
@@ -936,8 +936,23 @@ right:
 }
 
 // peek at the next byte and see if it's a '@', '[', or '{'.
-func isDotPiperChar(c byte) bool {
-	return !DisableModifiers && (c == '@' || c == '[' || c == '{')
+func isDotPiperChar(s string) bool {
+	if DisableModifiers {
+		return false
+	}
+	c := s[0]
+	if c == '@' {
+		// check that the next component is *not* a modifier.
+		i := 1
+		for ; i < len(s); i++ {
+			if s[i] == '.' || s[i] == '|' || s[i] == ':' {
+				break
+			}
+		}
+		_, ok := modifiers[s[1:i]]
+		return ok
+	}
+	return c == '[' || c == '{'
 }
 
 type objectPathResult struct {
@@ -959,7 +974,7 @@ func parseObjectPath(path string) (r objectPathResult) {
 		}
 		if path[i] == '.' {
 			r.part = path[:i]
-			if i < len(path)-1 && isDotPiperChar(path[i+1]) {
+			if i < len(path)-1 && isDotPiperChar(path[i+1:]) {
 				r.pipe = path[i+1:]
 				r.piped = true
 			} else {
@@ -989,7 +1004,7 @@ func parseObjectPath(path string) (r objectPathResult) {
 						continue
 					} else if path[i] == '.' {
 						r.part = string(epart)
-						if i < len(path)-1 && isDotPiperChar(path[i+1]) {
+						if i < len(path)-1 && isDotPiperChar(path[i+1:]) {
 							r.pipe = path[i+1:]
 							r.piped = true
 						} else {

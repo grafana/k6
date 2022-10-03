@@ -3,8 +3,11 @@ package protoparse
 import (
 	"bytes"
 	"fmt"
+	"google.golang.org/protobuf/types/descriptorpb"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
@@ -72,6 +75,10 @@ func (l *linker) linkFiles() (map[string]*desc.FileDescriptor, error) {
 		// we should now have any message_set_wire_format options parsed
 		// and can do further validation on tag ranges
 		if err := l.checkExtensionsInFile(fd, r); err != nil {
+			return nil, err
+		}
+		// and final check for json name conflicts
+		if err := l.checkJsonNamesInFile(fd, r); err != nil {
 			return nil, err
 		}
 	}
@@ -146,7 +153,13 @@ func (l *linker) createDescriptorPool() error {
 					desc1, desc2 = desc2, desc1
 				}
 				node := l.files[file2].getNode(desc2)
-				if err := l.errs.handleErrorWithPos(node.Start(), "duplicate symbol %s: already defined as %s in %q", k, descriptorType(desc1), file1); err != nil {
+				if node == nil {
+					// TODO: this should never happen, but in case there is a bug where
+					// we get back a nil node, we'd rather fail to report line+column
+					// info than panic with a nil dereference below
+					node = ast.NewNoSourceNode(file2)
+				}
+				if err := l.errs.handleErrorWithPos(node.Start(), "duplicate symbol %s: already defined as %s in %q", k, descriptorTypeWithArticle(desc1), file1); err != nil {
 					return err
 				}
 			}
@@ -261,7 +274,7 @@ func addToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler
 			suffix = "; protobuf uses C++ scoping rules for enum values, so they exist in the scope enclosing the enum"
 		}
 		// TODO: also include the source location for the conflicting symbol
-		if err := errs.handleErrorWithPos(node.Start(), "duplicate symbol %s: already defined as %s%s", fqn, descriptorType(d), suffix); err != nil {
+		if err := errs.handleErrorWithPos(node.Start(), "duplicate symbol %s: already defined as %s%s", fqn, descriptorTypeWithArticle(d), suffix); err != nil {
 			return err
 		}
 	}
@@ -296,6 +309,36 @@ func descriptorType(m proto.Message) string {
 	default:
 		// shouldn't be possible
 		return fmt.Sprintf("%T", m)
+	}
+}
+
+func descriptorTypeWithArticle(m proto.Message) string {
+	switch m := m.(type) {
+	case *dpb.DescriptorProto:
+		return "a message"
+	case *dpb.DescriptorProto_ExtensionRange:
+		return "an extension range"
+	case *dpb.FieldDescriptorProto:
+		if m.GetExtendee() == "" {
+			return "a field"
+		} else {
+			return "an extension"
+		}
+	case *dpb.EnumDescriptorProto:
+		return "an enum"
+	case *dpb.EnumValueDescriptorProto:
+		return "an enum value"
+	case *dpb.ServiceDescriptorProto:
+		return "a service"
+	case *dpb.MethodDescriptorProto:
+		return "a method"
+	case *dpb.FileDescriptorProto:
+		return "a file"
+	case *dpb.OneofDescriptorProto:
+		return "a oneof"
+	default:
+		// shouldn't be possible
+		return fmt.Sprintf("a %T", m)
 	}
 }
 
@@ -363,7 +406,7 @@ func (l *linker) resolveMessageTypes(r *parseResult, fd *dpb.FileDescriptorProto
 	// Strangely, when protoc resolves extension names, it uses the *enclosing* scope
 	// instead of the message's scope. So if the message contains an extension named "i",
 	// an option cannot refer to it as simply "i" but must qualify it (at a minimum "Msg.i").
-	// So we don't add this messages scope to our scopes slice until *after* we do options.
+	// So we don't add this message's scope to our scopes slice until *after* we do options.
 	if md.Options != nil {
 		if err := l.resolveOptions(r, fd, "message", fqn, md.Options.UninterpretedOption, scopes); err != nil {
 			return err
@@ -429,8 +472,7 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 		}
 		extd, ok := dsc.(*dpb.DescriptorProto)
 		if !ok {
-			otherType := descriptorType(dsc)
-			return l.errs.handleErrorWithPos(node.FieldExtendee().Start(), "extendee is invalid: %s is a %s, not a message", fqn, otherType)
+			return l.errs.handleErrorWithPos(node.FieldExtendee().Start(), "extendee is invalid: %s is %s, not a message", fqn, descriptorTypeWithArticle(dsc))
 		}
 		fld.Extendee = proto.String("." + fqn)
 		// make sure the tag number is in range
@@ -483,6 +525,24 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 	}
 	switch dsc := dsc.(type) {
 	case *dpb.DescriptorProto:
+		if dsc.GetOptions().GetMapEntry() {
+			isValid := false
+			switch node.(type) {
+			case *ast.MapFieldNode:
+				// We have an AST for this file and can see this field is from a map declaration
+				isValid = true
+			case ast.NoSourceNode:
+				// We don't have an AST for the file (it came from a provided descriptor). So we
+				// need to validate that it's not an illegal reference. To be valid, the field
+				// must be repeated and the entry type must be nested in the same enclosing
+				// message as the field.
+				expectFqn := prefix + dsc.GetName()
+				isValid = expectFqn == fqn && fld.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REPEATED
+			}
+			if !isValid {
+				return l.errs.handleErrorWithPos(node.FieldType().Start(), "%s: %s is a synthetic map entry and may not be referenced explicitly", scope, fqn)
+			}
+		}
 		fld.TypeName = proto.String("." + fqn)
 		// if type was tentatively unset, we now know it's actually a message
 		if fld.Type == nil {
@@ -497,8 +557,7 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 		// the type was tentatively unset, but now we know it's actually an enum
 		fld.Type = dpb.FieldDescriptorProto_TYPE_ENUM.Enum()
 	default:
-		otherType := descriptorType(dsc)
-		return l.errs.handleErrorWithPos(node.FieldType().Start(), "%s: invalid type: %s is a %s, not a message or enum", scope, fqn, otherType)
+		return l.errs.handleErrorWithPos(node.FieldType().Start(), "%s: invalid type: %s is %s, not a message or enum", scope, fqn, descriptorTypeWithArticle(dsc))
 	}
 	return nil
 }
@@ -533,8 +592,7 @@ func (l *linker) resolveServiceTypes(r *parseResult, fd *dpb.FileDescriptorProto
 				return err
 			}
 		} else if _, ok := dsc.(*dpb.DescriptorProto); !ok {
-			otherType := descriptorType(dsc)
-			if err := l.errs.handleErrorWithPos(node.GetInputType().Start(), "%s: invalid request type: %s is a %s, not a message", scope, fqn, otherType); err != nil {
+			if err := l.errs.handleErrorWithPos(node.GetInputType().Start(), "%s: invalid request type: %s is %s, not a message", scope, fqn, descriptorTypeWithArticle(dsc)); err != nil {
 				return err
 			}
 		} else {
@@ -552,8 +610,7 @@ func (l *linker) resolveServiceTypes(r *parseResult, fd *dpb.FileDescriptorProto
 				return err
 			}
 		} else if _, ok := dsc.(*dpb.DescriptorProto); !ok {
-			otherType := descriptorType(dsc)
-			if err := l.errs.handleErrorWithPos(node.GetOutputType().Start(), "%s: invalid response type: %s is a %s, not a message", scope, fqn, otherType); err != nil {
+			if err := l.errs.handleErrorWithPos(node.GetOutputType().Start(), "%s: invalid response type: %s is %s, not a message", scope, fqn, descriptorTypeWithArticle(dsc)); err != nil {
 				return err
 			}
 		} else {
@@ -657,8 +714,7 @@ func (l *linker) resolveExtensionName(name string, fd *dpb.FileDescriptorProto, 
 		return "", fmt.Errorf("unknown extension %s; resolved to %s which is not defined; consider using a leading dot", name, fqn)
 	}
 	if ext, ok := dsc.(*dpb.FieldDescriptorProto); !ok {
-		otherType := descriptorType(dsc)
-		return "", fmt.Errorf("invalid extension: %s is a %s, not an extension", name, otherType)
+		return "", fmt.Errorf("invalid extension: %s is %s, not an extension", name, descriptorTypeWithArticle(dsc))
 	} else if ext.GetExtendee() == "" {
 		return "", fmt.Errorf("invalid extension: %s is a field but not an extension", name)
 	}
@@ -687,7 +743,13 @@ func (l *linker) resolve(fd *dpb.FileDescriptorProto, name string, onlyTypes boo
 	for i := len(scopes) - 1; i >= 0; i-- {
 		fqn, d, proto3 := scopes[i](firstName, name)
 		if d != nil {
-			if !onlyTypes || isType(d) {
+			// In `protoc`, it will skip a match of the wrong type and move on
+			// to the next scope, but only if the reference is unqualified. So
+			// we mirror that behavior here. When we skip and move on, we go
+			// ahead and save the match of the wrong type so we can at least use
+			// it to construct a better error in the event that we don't find
+			// any match of the right type.
+			if !onlyTypes || isType(d) || firstName != name {
 				return fqn, d, proto3
 			} else if bestGuess == nil {
 				bestGuess = d
@@ -995,7 +1057,7 @@ func (l *linker) checkForUnusedImports(filename string) {
 			if pos == nil {
 				pos = ast.UnknownPos(r.fd.GetName())
 			}
-			l.errs.warn(pos, errUnusedImport(dep))
+			l.errs.warnWithPos(pos, errUnusedImport(dep))
 		}
 	}
 }
@@ -1054,4 +1116,209 @@ func (l *linker) checkExtension(fld *desc.FieldDescriptor, res *parseResult) err
 	}
 
 	return nil
+}
+
+func (l *linker) checkJsonNamesInFile(fd *desc.FileDescriptor, res *parseResult) error {
+	for _, md := range fd.GetMessageTypes() {
+		if err := l.checkJsonNamesInMessage(md, res); err != nil {
+			return err
+		}
+	}
+	for _, ed := range fd.GetEnumTypes() {
+		if err := l.checkJsonNamesInEnum(ed, res); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l *linker) checkJsonNamesInMessage(md *desc.MessageDescriptor, res *parseResult) error {
+	if err := checkFieldJsonNames(md, res, false); err != nil {
+		return err
+	}
+	if err := checkFieldJsonNames(md, res, true); err != nil {
+		return err
+	}
+
+	for _, nmd := range md.GetNestedMessageTypes() {
+		if err := l.checkJsonNamesInMessage(nmd, res); err != nil {
+			return err
+		}
+	}
+	for _, ed := range md.GetNestedEnumTypes() {
+		if err := l.checkJsonNamesInEnum(ed, res); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l *linker) checkJsonNamesInEnum(ed *desc.EnumDescriptor, res *parseResult) error {
+	seen := map[string]*dpb.EnumValueDescriptorProto{}
+	for _, evd := range ed.GetValues() {
+		scope := "enum value " + ed.GetName() + "." + evd.GetName()
+
+		name := canonicalEnumValueName(evd.GetName(), ed.GetName())
+		if existing, ok := seen[name]; ok && evd.GetNumber() != existing.GetNumber() {
+			fldNode := res.getEnumValueNode(evd.AsEnumValueDescriptorProto())
+			existingNode := res.getEnumValueNode(existing)
+			isProto3 := ed.GetFile().IsProto3()
+			conflictErr := errorWithPos(fldNode.Start(), "%s: camel-case name (with optional enum name prefix removed) %q conflicts with camel-case name of enum value %s, defined at %v",
+				scope, name, existing.GetName(), existingNode.Start())
+
+			// Since proto2 did not originally have a JSON format, we report conflicts as just warnings
+			if !isProto3 {
+				res.errs.warn(conflictErr)
+			} else if err := res.errs.handleError(conflictErr); err != nil {
+				return err
+			}
+		} else {
+			seen[name] = evd.AsEnumValueDescriptorProto()
+		}
+	}
+	return nil
+}
+
+func canonicalEnumValueName(enumValueName, enumName string) string {
+	return enumValCamelCase(removePrefix(enumValueName, enumName))
+}
+
+// removePrefix is used to remove the given prefix from the given str. It does not require
+// an exact match and ignores case and underscores. If the all non-underscore characters
+// would be removed from str, str is returned unchanged. If str does not have the given
+// prefix (even with the very lenient matching, in regard to case and underscores), then
+// str is returned unchanged.
+//
+// The algorithm is adapted from the protoc source:
+//   https://github.com/protocolbuffers/protobuf/blob/v21.3/src/google/protobuf/descriptor.cc#L922
+func removePrefix(str, prefix string) string {
+	j := 0
+	for i, r := range str {
+		if r == '_' {
+			// skip underscores in the input
+			continue
+		}
+
+		p, sz := utf8.DecodeRuneInString(prefix[j:])
+		for p == '_' {
+			j += sz // consume/skip underscore
+			p, sz = utf8.DecodeRuneInString(prefix[j:])
+		}
+
+		if j == len(prefix) {
+			// matched entire prefix; return rest of str
+			// but skipping any leading underscores
+			result := strings.TrimLeft(str[i:], "_")
+			if len(result) == 0 {
+				// result can't be empty string
+				return str
+			}
+			return result
+		}
+		if unicode.ToLower(r) != unicode.ToLower(p) {
+			// does not match prefix
+			return str
+		}
+		j += sz // consume matched rune of prefix
+	}
+	return str
+}
+
+// enumValCamelCase converts the given string to upper-camel-case.
+//
+// The algorithm is adapted from the protoc source:
+//  https://github.com/protocolbuffers/protobuf/blob/v21.3/src/google/protobuf/descriptor.cc#L887
+func enumValCamelCase(name string) string {
+	var js []rune
+	nextUpper := true
+	for _, r := range name {
+		if r == '_' {
+			nextUpper = true
+			continue
+		}
+		if nextUpper {
+			nextUpper = false
+			js = append(js, unicode.ToUpper(r))
+		} else {
+			js = append(js, unicode.ToLower(r))
+		}
+	}
+	return string(js)
+}
+
+func checkFieldJsonNames(md *desc.MessageDescriptor, res *parseResult, useCustom bool) error {
+	type jsonName struct {
+		source *dpb.FieldDescriptorProto
+		// field's original JSON nane (which can differ in case from map key)
+		orig string
+		// true if orig is a custom JSON name (vs. the field's default JSON name)
+		custom bool
+	}
+	seen := map[string]jsonName{}
+
+	for _, fd := range md.GetFields() {
+		scope := "field " + md.GetName() + "." + fd.GetName()
+		defaultName := internal.JsonName(fd.GetName())
+		name := defaultName
+		custom := false
+		if useCustom {
+			n := fd.GetJSONName()
+			if n != defaultName || hasCustomJsonName(res, fd) {
+				name = n
+				custom = true
+			}
+		}
+		lcaseName := strings.ToLower(name)
+		if existing, ok := seen[lcaseName]; ok {
+			// When useCustom is true, we'll only report an issue when a conflict is
+			// due to a custom name. That way, we don't double report conflicts on
+			// non-custom names.
+			if !useCustom || custom || existing.custom {
+				fldNode := res.getFieldNode(fd.AsFieldDescriptorProto())
+				customStr, srcCustomStr := "custom", "custom"
+				if !custom {
+					customStr = "default"
+				}
+				if !existing.custom {
+					srcCustomStr = "default"
+				}
+				otherName := ""
+				if name != existing.orig {
+					otherName = fmt.Sprintf(" %q", existing.orig)
+				}
+				conflictErr := errorWithPos(fldNode.Start(), "%s: %s JSON name %q conflicts with %s JSON name%s of field %s, defined at %v",
+					scope, customStr, name, srcCustomStr, otherName, existing.source.GetName(), res.getFieldNode(existing.source).Start())
+
+				// Since proto2 did not originally have default JSON names, we report conflicts involving
+				// default names as just warnings.
+				if !md.IsProto3() && (!custom || !existing.custom) {
+					res.errs.warn(conflictErr)
+				} else if err := res.errs.handleError(conflictErr); err != nil {
+					return err
+				}
+			}
+		} else {
+			seen[lcaseName] = jsonName{source: fd.AsFieldDescriptorProto(), orig: name, custom: custom}
+		}
+	}
+	return nil
+}
+
+func hasCustomJsonName(res *parseResult, fd *desc.FieldDescriptor) bool {
+	// if we have the AST, we can more precisely determine if there was a custom
+	// JSON named defined, even if it is explicitly configured to tbe the same
+	// as the default JSON name for the field.
+	fdProto := fd.AsFieldDescriptorProto()
+	opts := res.getFieldNode(fdProto).GetOptions()
+	if opts == nil {
+		return false
+	}
+	for _, opt := range opts.Options {
+		if len(opt.Name.Parts) == 1 &&
+			opt.Name.Parts[0].Name.AsIdentifier() == "json_name" &&
+			!opt.Name.Parts[0].IsExtension() {
+			return true
+		}
+	}
+	return false
 }

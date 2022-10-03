@@ -18,6 +18,8 @@ Also check out [SJSON](https://github.com/tidwall/sjson) for modifying json, and
 
 This README is a quick overview of how to use GJSON, for more information check out [GJSON Syntax](SYNTAX.md).
 
+GJSON is also available for [Python](https://github.com/volans-/gjson-py) and [Rust](https://github.com/tidwall/gjson.rs)
+
 Getting Started
 ===============
 
