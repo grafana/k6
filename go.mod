@@ -33,10 +33,10 @@ require (
 	github.com/stretchr/testify v1.8.0
 	github.com/tidwall/gjson v1.14.1
 	github.com/tidwall/pretty v1.2.0
-	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
-	golang.org/x/net v0.0.0-20220630215102-69896b714898
-	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
-	golang.org/x/time v0.0.0-20220609170525-579cf78fd858
+	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
+	golang.org/x/net v0.0.0-20221002022538-bcab6841153b
+	golang.org/x/term v0.0.0-20220919170432-7a66f970e087
+	golang.org/x/time v0.0.0-20220922220347-f3bd1da661af
 	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/guregu/null.v3 v3.3.0
@@ -59,7 +59,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1
 	github.com/tidwall/match v1.1.1 // indirect
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
+	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20210604141403-392c879c8b08 // indirect
 )
