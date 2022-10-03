@@ -131,7 +131,8 @@ func (d *compressor) fillDeflate(b []byte) int {
 	s := d.state
 	if s.index >= 2*windowSize-(minMatchLength+maxMatchLength) {
 		// shift the window by windowSize
-		copy(d.window[:], d.window[windowSize:2*windowSize])
+		//copy(d.window[:], d.window[windowSize:2*windowSize])
+		*(*[windowSize]byte)(d.window) = *(*[windowSize]byte)(d.window[windowSize:])
 		s.index -= windowSize
 		d.windowEnd -= windowSize
 		if d.blockStart >= windowSize {
@@ -371,6 +372,12 @@ func (d *compressor) writeStoredBlock(buf []byte) error {
 // The caller must ensure that len(b) >= 4.
 func hash4(b []byte) uint32 {
 	return hash4u(binary.LittleEndian.Uint32(b), hashBits)
+}
+
+// hash4 returns the hash of u to fit in a hash table with h bits.
+// Preferably h should be a constant and should always be <32.
+func hash4u(u uint32, h uint8) uint32 {
+	return (u * prime4bytes) >> (32 - h)
 }
 
 // bulkHash4 will compute hashes using the same

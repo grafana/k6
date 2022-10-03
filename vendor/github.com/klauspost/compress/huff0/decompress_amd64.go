@@ -14,12 +14,14 @@ import (
 
 // decompress4x_main_loop_x86 is an x86 assembler implementation
 // of Decompress4X when tablelog > 8.
+//
 //go:noescape
 func decompress4x_main_loop_amd64(ctx *decompress4xContext)
 
 // decompress4x_8b_loop_x86 is an x86 assembler implementation
 // of Decompress4X when tablelog <= 8 which decodes 4 entries
 // per loop.
+//
 //go:noescape
 func decompress4x_8b_main_loop_amd64(ctx *decompress4xContext)
 
@@ -27,10 +29,7 @@ func decompress4x_8b_main_loop_amd64(ctx *decompress4xContext)
 const fallback8BitSize = 800
 
 type decompress4xContext struct {
-	pbr0     *bitReaderShifted
-	pbr1     *bitReaderShifted
-	pbr2     *bitReaderShifted
-	pbr3     *bitReaderShifted
+	pbr      *[4]bitReaderShifted
 	peekBits uint8
 	out      *byte
 	dstEvery int
@@ -89,10 +88,7 @@ func (d *Decoder) Decompress4X(dst, src []byte) ([]byte, error) {
 
 	if len(out) > 4*4 && !(br[0].off < 4 || br[1].off < 4 || br[2].off < 4 || br[3].off < 4) {
 		ctx := decompress4xContext{
-			pbr0:     &br[0],
-			pbr1:     &br[1],
-			pbr2:     &br[2],
-			pbr3:     &br[3],
+			pbr:      &br,
 			peekBits: uint8((64 - d.actualTableLog) & 63), // see: bitReaderShifted.peekBitsFast()
 			out:      &out[0],
 			dstEvery: dstEvery,
@@ -151,11 +147,13 @@ func (d *Decoder) Decompress4X(dst, src []byte) ([]byte, error) {
 
 // decompress4x_main_loop_x86 is an x86 assembler implementation
 // of Decompress1X when tablelog > 8.
+//
 //go:noescape
 func decompress1x_main_loop_amd64(ctx *decompress1xContext)
 
 // decompress4x_main_loop_x86 is an x86 with BMI2 assembler implementation
 // of Decompress1X when tablelog > 8.
+//
 //go:noescape
 func decompress1x_main_loop_bmi2(ctx *decompress1xContext)
 
