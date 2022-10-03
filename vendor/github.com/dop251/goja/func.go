@@ -56,6 +56,11 @@ type nativeFuncObject struct {
 	construct func(args []Value, newTarget *Object) *Object
 }
 
+type wrappedFuncObject struct {
+	nativeFuncObject
+	wrapped reflect.Value
+}
+
 type boundFuncObject struct {
 	nativeFuncObject
 	wrapped *Object
@@ -63,6 +68,14 @@ type boundFuncObject struct {
 
 func (f *nativeFuncObject) export(*objectExportCtx) interface{} {
 	return f.f
+}
+
+func (f *wrappedFuncObject) exportType() reflect.Type {
+	return f.wrapped.Type()
+}
+
+func (f *wrappedFuncObject) export(*objectExportCtx) interface{} {
+	return f.wrapped.Interface()
 }
 
 func (f *funcObject) _addProto(n unistring.String) Value {
