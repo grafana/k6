@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -533,13 +532,13 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 	} else if d, lookupErr := lookupImport(filename); lookupErr == nil {
 		// This is a user-provided descriptor, which is acting similarly to a
 		// well-known import.
-		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
+		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto), errs: errs}
 	} else if d, ok := standardImports[filename]; ok {
 		// it's a well-known import
 		// (we clone it to make sure we're not sharing state with other
 		//  parsers, which could result in unsafe races if multiple
 		//  parsers are trying to access it concurrently)
-		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
+		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto), errs: errs}
 	} else {
 		if !strings.Contains(err.Error(), filename) {
 			// an error message that doesn't indicate the file is awful!
@@ -739,7 +738,7 @@ func (r *parseResult) putFieldNode(f *dpb.FieldDescriptorProto, n ast.FieldDeclN
 	r.nodes[f] = n
 }
 
-func (r *parseResult) putOneOfNode(o *dpb.OneofDescriptorProto, n *ast.OneOfNode) {
+func (r *parseResult) putOneOfNode(o *dpb.OneofDescriptorProto, n ast.OneOfDeclNode) {
 	r.nodes[o] = n
 }
 
@@ -815,56 +814,6 @@ func checkTag(pos *SourcePos, v uint64, maxTag int32) error {
 		return errorWithPos(pos, "tag number %d is in disallowed reserved range %d-%d", v, internal.SpecialReservedStart, internal.SpecialReservedEnd)
 	}
 	return nil
-}
-
-func aggToString(agg []*ast.MessageFieldNode, buf *bytes.Buffer) {
-	buf.WriteString("{")
-	for _, a := range agg {
-		buf.WriteString(" ")
-		buf.WriteString(a.Name.Value())
-		if v, ok := a.Val.(*ast.MessageLiteralNode); ok {
-			aggToString(v.Elements, buf)
-		} else {
-			buf.WriteString(": ")
-			elementToString(a.Val.Value(), buf)
-		}
-	}
-	buf.WriteString(" }")
-}
-
-func elementToString(v interface{}, buf *bytes.Buffer) {
-	switch v := v.(type) {
-	case bool, int64, uint64, ast.Identifier:
-		_, _ = fmt.Fprintf(buf, "%v", v)
-	case float64:
-		if math.IsInf(v, 1) {
-			buf.WriteString(": inf")
-		} else if math.IsInf(v, -1) {
-			buf.WriteString(": -inf")
-		} else if math.IsNaN(v) {
-			buf.WriteString(": nan")
-		} else {
-			_, _ = fmt.Fprintf(buf, ": %v", v)
-		}
-	case string:
-		buf.WriteRune('"')
-		writeEscapedBytes(buf, []byte(v))
-		buf.WriteRune('"')
-	case []ast.ValueNode:
-		buf.WriteString(": [")
-		first := true
-		for _, e := range v {
-			if first {
-				first = false
-			} else {
-				buf.WriteString(", ")
-			}
-			elementToString(e.Value(), buf)
-		}
-		buf.WriteString("]")
-	case []*ast.MessageFieldNode:
-		aggToString(v, buf)
-	}
 }
 
 func writeEscapedBytes(buf *bytes.Buffer, b []byte) {

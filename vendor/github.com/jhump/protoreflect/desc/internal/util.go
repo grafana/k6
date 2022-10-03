@@ -219,17 +219,17 @@ const (
 )
 
 // JsonName returns the default JSON name for a field with the given name.
+// This mirrors the algorithm in protoc:
+//  https://github.com/protocolbuffers/protobuf/blob/v21.3/src/google/protobuf/descriptor.cc#L95
 func JsonName(name string) string {
 	var js []rune
 	nextUpper := false
-	for i, r := range name {
+	for _, r := range name {
 		if r == '_' {
 			nextUpper = true
 			continue
 		}
-		if i == 0 {
-			js = append(js, r)
-		} else if nextUpper {
+		if nextUpper {
 			nextUpper = false
 			js = append(js, unicode.ToUpper(r))
 		} else {

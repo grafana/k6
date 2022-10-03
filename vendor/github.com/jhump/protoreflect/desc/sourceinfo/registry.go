@@ -29,7 +29,11 @@
 package sourceinfo
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
+	"github.com/golang/protobuf/proto"
+	"io/ioutil"
 	"sync"
 
 	"google.golang.org/protobuf/reflect/protodesc"
@@ -60,12 +64,37 @@ type Resolver interface {
 // RegisterSourceInfo registers the given source code info for the file descriptor
 // with the given path/name.
 //
-// This is automatically used from generated code if using the protoc-gen-gosrcinfo
-// plugin.
+// This is automatically used from older generated code if using a previous release of
+// the protoc-gen-gosrcinfo plugin.
 func RegisterSourceInfo(file string, srcInfo *descriptorpb.SourceCodeInfo) {
 	mu.Lock()
 	defer mu.Unlock()
 	sourceInfoByFile[file] = srcInfo
+}
+
+// RegisterEncodedSourceInfo registers the given source code info, which is a serialized
+// and gzipped form of a google.protobuf.SourceCodeInfo message.
+//
+// This is automatically used from generated code if using the protoc-gen-gosrcinfo
+// plugin.
+func RegisterEncodedSourceInfo(file string, data []byte) error {
+	zipReader, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = zipReader.Close()
+	}()
+	unzipped, err := ioutil.ReadAll(zipReader)
+	if err != nil {
+		return err
+	}
+	var srcInfo descriptorpb.SourceCodeInfo
+	if err := proto.Unmarshal(unzipped, &srcInfo); err != nil {
+		return err
+	}
+	RegisterSourceInfo(file, &srcInfo)
+	return nil
 }
 
 // SourceInfoForFile queries for any registered source code info for the file

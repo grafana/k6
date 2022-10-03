@@ -16,7 +16,7 @@ require (
 	github.com/grafana/xk6-timers v0.1.2
 	github.com/grafana/xk6-websockets v0.1.3
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
-	github.com/jhump/protoreflect v1.12.0
+	github.com/jhump/protoreflect v1.13.0
 	github.com/klauspost/compress v1.15.11
 	github.com/mailru/easyjson v0.7.7
 	github.com/mattn/go-colorable v0.1.13

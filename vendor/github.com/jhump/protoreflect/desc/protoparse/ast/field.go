@@ -8,6 +8,7 @@ import "fmt"
 //  - *FieldNode
 //  - *GroupNode
 //  - *MapFieldNode
+//  - *SyntheticMapField
 // This also allows NoSourceNode to be used in place of one of the above
 // for some usages.
 type FieldDeclNode interface {
@@ -306,6 +307,17 @@ func (n *GroupNode) MessageName() Node {
 	return n.Name
 }
 
+// OneOfDeclNode is a node in the AST that defines a oneof. There are
+// multiple types of AST nodes that declare oneofs:
+//  - *OneOfNode
+//  - *SyntheticOneOf
+// This also allows NoSourceNode to be used in place of one of the above
+// for some usages.
+type OneOfDeclNode interface {
+	Node
+	OneOfName() Node
+}
+
 // OneOfNode represents a one-of declaration. Example:
 //
 //  oneof query {
@@ -371,6 +383,43 @@ func NewOneOfNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, de
 		Decls:      decls,
 		CloseBrace: closeBrace,
 	}
+}
+
+func (n *OneOfNode) OneOfName() Node {
+	return n.Name
+}
+
+// SyntheticOneOf is not an actual node in the AST but a synthetic node
+// that implements OneOfDeclNode. These are used to represent the implicit
+// oneof declarations that enclose "proto3 optional" fields.
+type SyntheticOneOf struct {
+	Field *FieldNode
+}
+
+// NewSyntheticOneOf creates a new *SyntheticOneOf that corresponds to the
+// given proto3 optional field.
+func NewSyntheticOneOf(field *FieldNode) *SyntheticOneOf {
+	return &SyntheticOneOf{Field: field}
+}
+
+func (n *SyntheticOneOf) Start() *SourcePos {
+	return n.Field.Start()
+}
+
+func (n *SyntheticOneOf) End() *SourcePos {
+	return n.Field.End()
+}
+
+func (n *SyntheticOneOf) LeadingComments() []Comment {
+	return nil
+}
+
+func (n *SyntheticOneOf) TrailingComments() []Comment {
+	return nil
+}
+
+func (n *SyntheticOneOf) OneOfName() Node {
+	return n.Field.FieldName()
 }
 
 // OneOfElement is an interface implemented by all AST nodes that can

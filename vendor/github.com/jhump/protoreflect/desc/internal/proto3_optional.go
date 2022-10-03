@@ -68,8 +68,9 @@ func SetProto3Optional(fd *dpb.FieldDescriptorProto) {
 
 // ProcessProto3OptionalFields adds synthetic oneofs to the given message descriptor
 // for each proto3 optional field. It also updates the fields to have the correct
-// oneof index reference.
-func ProcessProto3OptionalFields(msgd *dpb.DescriptorProto) {
+// oneof index reference. The given callback, if not nil, is called for each synthetic
+// oneof created.
+func ProcessProto3OptionalFields(msgd *dpb.DescriptorProto, callback func(*dpb.FieldDescriptorProto, *dpb.OneofDescriptorProto)) {
 	var allNames map[string]struct{}
 	for _, fd := range msgd.Field {
 		if GetProto3Optional(fd) {
@@ -79,8 +80,17 @@ func ProcessProto3OptionalFields(msgd *dpb.DescriptorProto) {
 				for _, fd := range msgd.Field {
 					allNames[fd.GetName()] = struct{}{}
 				}
-				for _, fd := range msgd.Extension {
-					allNames[fd.GetName()] = struct{}{}
+				for _, od := range msgd.OneofDecl {
+					allNames[od.GetName()] = struct{}{}
+				}
+				// NB: protoc only considers names of other fields and oneofs
+				// when computing the synthetic oneof name. But that feels like
+				// a bug, since it means it could generate a name that conflicts
+				// with some other symbol defined in the message. If it's decided
+				// that's NOT a bug and is desirable, then we should remove the
+				// following four loops to mimic protoc's behavior.
+				for _, xd := range msgd.Extension {
+					allNames[xd.GetName()] = struct{}{}
 				}
 				for _, ed := range msgd.EnumType {
 					allNames[ed.GetName()] = struct{}{}
@@ -114,7 +124,11 @@ func ProcessProto3OptionalFields(msgd *dpb.DescriptorProto) {
 			}
 
 			fd.OneofIndex = proto.Int32(int32(len(msgd.OneofDecl)))
-			msgd.OneofDecl = append(msgd.OneofDecl, &dpb.OneofDescriptorProto{Name: proto.String(ooName)})
+			ood := &dpb.OneofDescriptorProto{Name: proto.String(ooName)}
+			msgd.OneofDecl = append(msgd.OneofDecl, ood)
+			if callback != nil {
+				callback(fd, ood)
+			}
 		}
 	}
 }

@@ -76,9 +76,15 @@ func (h *errorHandler) handleError(err error) error {
 	return err
 }
 
-func (h *errorHandler) warn(pos *SourcePos, err error) {
+func (h *errorHandler) warnWithPos(pos *SourcePos, err error) {
 	if h.warnReporter != nil {
 		h.warnReporter(ErrorWithSourcePos{Pos: pos, Underlying: err})
+	}
+}
+
+func (h *errorHandler) warn(err ErrorWithSourcePos) {
+	if h.warnReporter != nil {
+		h.warnReporter(err)
 	}
 }
 
@@ -138,7 +144,7 @@ func (e ErrorWithSourcePos) Unwrap() error {
 
 var _ ErrorWithPos = ErrorWithSourcePos{}
 
-func errorWithPos(pos *SourcePos, format string, args ...interface{}) ErrorWithPos {
+func errorWithPos(pos *SourcePos, format string, args ...interface{}) ErrorWithSourcePos {
 	return ErrorWithSourcePos{Pos: pos, Underlying: fmt.Errorf(format, args...)}
 }
 
