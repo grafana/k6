@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package grpc.protoset.testing;
+
+option go_package ="./grpc_protoset_testing";
+
+message TestMessage {
+	string data = 1;
+	int32 other_data = 2;
+}

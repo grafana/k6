@@ -170,7 +170,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 			var client = new grpc.Client();
-			client.loadProtoset("../../../../lib/testutils/httpmultibin/grpc_protoset_testing/test1.proto");`,
+			client.loadProtoset("../../../../lib/testutils/httpmultibin/grpc_protoset_testing/test_message.proto");`,
 				err: "couldn't unmarshal protoset",
 			},
 		},
@@ -182,12 +182,8 @@ func TestClient(t *testing.T) {
 			client.loadProtoset("../../../../lib/testutils/httpmultibin/grpc_protoset_testing/test.protoset");`,
 				val: []MethodInfo{
 					{
-						MethodInfo: grpc.MethodInfo{Name: "Test2", IsClientStream: false, IsServerStream: false},
-						Package:    "grpc.protoset.testing", Service: "Test2Service", FullMethod: "/grpc.protoset.testing.Test2Service/Test2",
-					},
-					{
-						MethodInfo: grpc.MethodInfo{Name: "Test1", IsClientStream: false, IsServerStream: false},
-						Package:    "grpc.protoset.testing", Service: "Test1Service", FullMethod: "/grpc.protoset.testing.Test1Service/Test1",
+						MethodInfo: grpc.MethodInfo{Name: "Test", IsClientStream: false, IsServerStream: false},
+						Package:    "grpc.protoset.testing", Service: "TestService", FullMethod: "/grpc.protoset.testing.TestService/Test",
 					},
 				},
 			},
