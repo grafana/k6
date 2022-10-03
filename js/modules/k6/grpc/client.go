@@ -144,10 +144,6 @@ func (c *Client) Invoke(
 	params map[string]interface{},
 ) (*grpcext.Response, error) {
 	state := c.vu.State()
-
-	if req == nil {
-		return nil, errors.New("request cannot be nil")
-	}
 	if state == nil {
 		return nil, common.NewInitContextError("invoking RPC methods in the init context is not supported")
 	}
@@ -170,6 +166,9 @@ func (c *Client) Invoke(
 		return nil, err
 	}
 
+	if req == nil {
+		return nil, errors.New("request cannot be nil")
+	}
 	b, err := req.ToObject(c.vu.Runtime()).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("unable to serialise request object: %w", err)
