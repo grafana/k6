@@ -26,7 +26,7 @@ require (
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/afero v1.1.2
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
