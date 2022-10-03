@@ -425,6 +425,11 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 			case '`':
 				tkn = token.BACKTICK
 			case '#':
+				if self.chrOffset == 1 && self.chr == '!' {
+					self.skipSingleLineComment()
+					continue
+				}
+
 				var err string
 				literal, parsedLiteral, _, err = self.scanIdentifier()
 				if err != "" || literal == "" {

@@ -19,46 +19,46 @@ func (o *objectGoSliceReflect) init() {
 }
 
 func (o *objectGoSliceReflect) _putIdx(idx int, v Value, throw bool) bool {
-	if idx >= o.value.Len() {
+	if idx >= o.fieldsValue.Len() {
 		o.grow(idx + 1)
 	}
 	return o.objectGoArrayReflect._putIdx(idx, v, throw)
 }
 
 func (o *objectGoSliceReflect) grow(size int) {
-	oldcap := o.value.Cap()
+	oldcap := o.fieldsValue.Cap()
 	if oldcap < size {
-		n := reflect.MakeSlice(o.value.Type(), size, growCap(size, o.value.Len(), oldcap))
-		reflect.Copy(n, o.value)
-		o.value.Set(n)
+		n := reflect.MakeSlice(o.fieldsValue.Type(), size, growCap(size, o.fieldsValue.Len(), oldcap))
+		reflect.Copy(n, o.fieldsValue)
+		o.fieldsValue.Set(n)
 		l := len(o.valueCache)
 		if l > size {
 			l = size
 		}
 		for i, w := range o.valueCache[:l] {
 			if w != nil {
-				w.setReflectValue(o.value.Index(i))
+				w.setReflectValue(o.fieldsValue.Index(i))
 			}
 		}
 	} else {
-		tail := o.value.Slice(o.value.Len(), size)
-		zero := reflect.Zero(o.value.Type().Elem())
+		tail := o.fieldsValue.Slice(o.fieldsValue.Len(), size)
+		zero := reflect.Zero(o.fieldsValue.Type().Elem())
 		for i := 0; i < tail.Len(); i++ {
 			tail.Index(i).Set(zero)
 		}
-		o.value.SetLen(size)
+		o.fieldsValue.SetLen(size)
 	}
 	o.updateLen()
 }
 
 func (o *objectGoSliceReflect) shrink(size int) {
 	o.valueCache.shrink(size)
-	tail := o.value.Slice(size, o.value.Len())
-	zero := reflect.Zero(o.value.Type().Elem())
+	tail := o.fieldsValue.Slice(size, o.fieldsValue.Len())
+	zero := reflect.Zero(o.fieldsValue.Type().Elem())
 	for i := 0; i < tail.Len(); i++ {
 		tail.Index(i).Set(zero)
 	}
-	o.value.SetLen(size)
+	o.fieldsValue.SetLen(size)
 	o.updateLen()
 }
 
@@ -67,7 +67,7 @@ func (o *objectGoSliceReflect) putLength(v uint32, throw bool) bool {
 		panic(rangeError("Integer value overflows 32-bit int"))
 	}
 	newLen := int(v)
-	curLen := o.value.Len()
+	curLen := o.fieldsValue.Len()
 	if newLen > curLen {
 		o.grow(newLen)
 	} else if newLen < curLen {
