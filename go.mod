@@ -8,7 +8,6 @@ require (
 	github.com/mstoykov/k6-taskqueue-lib v0.1.0
 	github.com/stretchr/testify v1.7.1
 	go.k6.io/k6 v0.39.0
-	golang.org/x/net v0.0.0-20220531201128-c960675eff93
 	gopkg.in/guregu/null.v3 v3.3.0
 )
 
@@ -31,6 +30,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/afero v1.1.2 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
+	golang.org/x/net v0.0.0-20220531201128-c960675eff93 // indirect
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect

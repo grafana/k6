@@ -17,7 +17,6 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/metrics"
-	"golang.org/x/net/context"
 )
 
 // RootModule is the root module for the websockets API
@@ -235,24 +234,25 @@ func (w *webSocket) establishConnection() {
 		w.tq.Close()
 		return
 	}
-	go w.loop(ctx)
+	go w.loop()
 	w.tq.Queue(func() error {
 		return w.connectionConnected()
 	})
 }
 
 //nolint:funlen,gocognit,cyclop
-func (w *webSocket) loop(ctx context.Context) {
+func (w *webSocket) loop() {
 	readDataChan := make(chan *message)
 	// readCloseChan := make(chan int)
 	// readErrChan := make(chan error)
 	samplesOutput := w.vu.State().Samples
+	ctx := w.vu.Context()
 
 	defer func() {
 		now := time.Now()
 		duration := metrics.D(time.Since(w.started))
 
-		metrics.PushIfNotDone(w.vu.Context(), w.vu.State().Samples, metrics.ConnectedSamples{
+		metrics.PushIfNotDone(ctx, w.vu.State().Samples, metrics.ConnectedSamples{
 			Samples: []metrics.Sample{
 				{Metric: w.builtinMetrics.WSSessionDuration, Time: now, Tags: w.tags, Value: duration},
 			},
