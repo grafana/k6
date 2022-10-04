@@ -14,7 +14,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/grafana/xk6-redis v0.1.1
 	github.com/grafana/xk6-timers v0.1.2
-	github.com/grafana/xk6-websockets v0.1.4
+	github.com/grafana/xk6-websockets v0.1.5-0.20221004160222-74a76327d26c
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.13.0
 	github.com/klauspost/compress v1.15.11
