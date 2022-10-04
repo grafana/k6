@@ -624,11 +624,14 @@ func (c *compiler) emitBlockExitCode(label *ast.Identifier, idx file.Idx, isBrea
 		c.throwSyntaxError(int(idx)-1, "Could not find block")
 		panic("unreachable")
 	}
+	contForLoop := !isBreak && block.typ == blockLoop
 L:
 	for b := c.block; b != block; b = b.outer {
 		switch b.typ {
 		case blockIterScope:
-			if !isBreak && b.outer == block {
+			// blockIterScope in 'for' loops is shared across iterations, so
+			// continue should not pop it.
+			if contForLoop && b.outer == block {
 				break L
 			}
 			fallthrough
