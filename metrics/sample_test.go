@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -9,82 +8,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSampleTags(t *testing.T) {
-	t.Parallel()
-
-	// Nil pointer to SampleTags
-	var nilTags *SampleTags
-	assert.True(t, nilTags.IsEqual(nilTags))
-	assert.Equal(t, map[string]string{}, nilTags.CloneTags())
-
-	nilJSON, err := json.Marshal(nilTags)
-	assert.NoError(t, err)
-	assert.Equal(t, "null", string(nilJSON))
-
-	// Empty SampleTags
-	emptyTagMap := map[string]string{}
-	emptyTags := NewSampleTags(emptyTagMap)
-	assert.Nil(t, emptyTags)
-	assert.True(t, emptyTags.IsEqual(emptyTags))
-	assert.True(t, emptyTags.IsEqual(nilTags))
-	assert.Equal(t, emptyTagMap, emptyTags.CloneTags())
-
-	emptyJSON, err := json.Marshal(emptyTags)
-	assert.NoError(t, err)
-	assert.Equal(t, "null", string(emptyJSON))
-
-	var emptyTagsUnmarshaled *SampleTags
-	err = json.Unmarshal(emptyJSON, &emptyTagsUnmarshaled)
-	assert.NoError(t, err)
-	assert.Nil(t, emptyTagsUnmarshaled)
-	assert.True(t, emptyTagsUnmarshaled.IsEqual(emptyTags))
-	assert.True(t, emptyTagsUnmarshaled.IsEqual(nilTags))
-	assert.Equal(t, emptyTagMap, emptyTagsUnmarshaled.CloneTags())
-
-	// SampleTags with keys and values
-	tagMap := map[string]string{"key1": "val1", "key2": "val2"}
-	tags := NewSampleTags(tagMap)
-	assert.NotNil(t, tags)
-	assert.True(t, tags.IsEqual(tags))
-	assert.False(t, tags.IsEqual(nilTags))
-	assert.False(t, tags.IsEqual(emptyTags))
-	assert.False(t, tags.IsEqual(IntoSampleTags(&map[string]string{"key1": "val1", "key2": "val3"})))
-	assert.True(t, tags.Contains(IntoSampleTags(&map[string]string{"key1": "val1"})))
-	assert.False(t, tags.Contains(IntoSampleTags(&map[string]string{"key3": "val1"})))
-	assert.False(t, tags.Contains(IntoSampleTags(&map[string]string{"nonexistent_key": ""})))
-	assert.Equal(t, tagMap, tags.CloneTags())
-
-	assert.Nil(t, tags.json) // No cache
-	tagsJSON, err := json.Marshal(tags)
-	expJSON := `{"key1":"val1","key2":"val2"}`
-	assert.NoError(t, err)
-	assert.JSONEq(t, expJSON, string(tagsJSON))
-	assert.JSONEq(t, expJSON, string(tags.json)) // Populated cache
-
-	var tagsUnmarshaled *SampleTags
-	err = json.Unmarshal(tagsJSON, &tagsUnmarshaled)
-	assert.NoError(t, err)
-	assert.NotNil(t, tagsUnmarshaled)
-	assert.True(t, tagsUnmarshaled.IsEqual(tags))
-	assert.False(t, tagsUnmarshaled.IsEqual(nilTags))
-	assert.Equal(t, tagMap, tagsUnmarshaled.CloneTags())
-}
-
 func TestSampleImplementations(t *testing.T) {
-	tagMap := map[string]string{"key1": "val1", "key2": "val2"}
+	r := NewRegistry()
+	sampleTags := r.RootTagSet().With("key1", "val1").With("key2", "val2")
 	now := time.Now()
 
 	sample := Sample{
-		Metric: newMetric("test_metric", Counter),
-		Time:   now,
-		Tags:   NewSampleTags(tagMap),
-		Value:  1.0,
+		TimeSeries: TimeSeries{
+			Metric: r.MustNewMetric("test_metric", Counter),
+			Tags:   sampleTags,
+		},
+		Time:  now,
+		Value: 1.0,
 	}
 	samples := Samples(sample.GetSamples())
 	cSamples := ConnectedSamples{
 		Samples: []Sample{sample},
 		Time:    now,
-		Tags:    NewSampleTags(tagMap),
+		Tags:    sampleTags,
 	}
 	exp := []Sample{sample}
 	assert.Equal(t, exp, sample.GetSamples())
@@ -92,7 +33,7 @@ func TestSampleImplementations(t *testing.T) {
 	assert.Equal(t, exp, cSamples.GetSamples())
 	assert.Equal(t, now, sample.GetTime())
 	assert.Equal(t, now, cSamples.GetTime())
-	assert.Equal(t, sample.GetTags(), sample.GetTags())
+	assert.Equal(t, sample.GetTags(), cSamples.GetTags())
 }
 
 func TestGetResolversForTrendColumnsValidation(t *testing.T) {

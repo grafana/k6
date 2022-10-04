@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	easyjson "github.com/mailru/easyjson"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
@@ -52,7 +53,7 @@ type Output struct {
 	// aggregation buckets. This should save us a some time, since it would make the lookups and WaitPeriod
 	// checks basically O(1). And even if for some reason there are occasional metrics with past times that
 	// don't fit in the chosen ring buffer size, we could just send them along to the buffer unaggregated
-	aggrBuckets map[int64]map[[3]string]aggregationBucket
+	aggrBuckets map[int64]aggregationBucket
 
 	stopSendingMetrics chan struct{}
 	stopAggregation    chan struct{}
@@ -130,7 +131,7 @@ func newOutput(params output.Params) (*Output, error) {
 		executionPlan: params.ExecutionPlan,
 		duration:      int64(duration / time.Second),
 		opts:          params.ScriptOptions,
-		aggrBuckets:   map[int64]map[[3]string]aggregationBucket{},
+		aggrBuckets:   map[int64]aggregationBucket{},
 		logger:        logger,
 
 		stopSendingMetrics: make(chan struct{}),
@@ -313,12 +314,12 @@ func useCloudTags(source *httpext.Trail) *httpext.Trail {
 		return source
 	}
 
-	newTags := source.Tags.CloneTags()
-	newTags["url"] = name
+	// TODO: remove this hack to not send high-cardinality metric tags
+	newTags := source.Tags.With("url", name)
 
 	dest := new(httpext.Trail)
 	*dest = *source
-	dest.Tags = metrics.IntoSampleTags(&newTags)
+	dest.Tags = newTags
 	dest.Samples = nil
 
 	return dest
@@ -363,24 +364,33 @@ func (out *Output) AddMetricSamples(sampleContainers []metrics.SampleContainer) 
 				values[metrics.IterationsName] = 1
 			}
 
+			encodedTags, err := easyjson.Marshal(sc.GetTags())
+			if err != nil {
+				out.logger.WithError(err).Error("Encoding tags failed")
+			}
 			newSamples = append(newSamples, &Sample{
 				Type:   DataTypeMap,
 				Metric: "iter_li_all",
 				Data: &SampleDataMap{
 					Time:   toMicroSecond(sc.GetTime()),
-					Tags:   sc.GetTags(),
+					Tags:   encodedTags,
 					Values: values,
 				},
 			})
 		default:
 			for _, sample := range sampleContainer.GetSamples() {
+				encodedTags, err := easyjson.Marshal(sample.Tags)
+				if err != nil {
+					out.logger.WithError(err).Error("Encoding tags failed")
+				}
+
 				newSamples = append(newSamples, &Sample{
 					Type:   DataTypeSingle,
 					Metric: sample.Metric.Name,
 					Data: &SampleDataSingle{
 						Type:  sample.Metric.Type,
 						Time:  toMicroSecond(sample.Time),
-						Tags:  sample.Tags,
+						Tags:  encodedTags,
 						Value: sample.Value,
 					},
 				})
@@ -406,42 +416,21 @@ func (out *Output) aggregateHTTPTrails(waitPeriod time.Duration) {
 	aggrPeriod := int64(out.config.AggregationPeriod.Duration)
 
 	// Distribute all newly buffered HTTP trails into buckets and sub-buckets
-
-	// this key is here specifically to not incur more allocations then necessary
-	// if you change this code please run the benchmarks and add the results to the commit message
-	var subBucketKey [3]string
 	for _, trail := range newHTTPTrails {
-		trailTags := trail.GetTags()
 		bucketID := trail.GetTime().UnixNano() / aggrPeriod
 
 		// Get or create a time bucket for that trail period
 		bucket, ok := out.aggrBuckets[bucketID]
 		if !ok {
-			bucket = make(map[[3]string]aggregationBucket)
+			bucket = aggregationBucket{}
 			out.aggrBuckets[bucketID] = bucket
 		}
-		subBucketKey[0], _ = trailTags.Get("name")
-		subBucketKey[1], _ = trailTags.Get("group")
-		subBucketKey[2], _ = trailTags.Get("status")
 
-		subBucket, ok := bucket[subBucketKey]
+		subBucket, ok := bucket[trail.Tags]
 		if !ok {
-			subBucket = aggregationBucket{}
-			bucket[subBucketKey] = subBucket
+			subBucket = make([]*httpext.Trail, 0, 100)
 		}
-		// Either use an existing subbucket key or use the trail tags as a new one
-		subSubBucketKey := trailTags
-		subSubBucket, ok := subBucket[subSubBucketKey]
-		if !ok {
-			for sbTags, sb := range subBucket {
-				if trailTags.IsEqual(sbTags) {
-					subSubBucketKey = sbTags
-					subSubBucket = sb
-					break
-				}
-			}
-		}
-		subBucket[subSubBucketKey] = append(subSubBucket, trail)
+		bucket[trail.Tags] = append(subBucket, trail)
 	}
 
 	// Which buckets are still new and we'll wait for trails to accumulate before aggregating
@@ -452,82 +441,77 @@ func (out *Output) aggregateHTTPTrails(waitPeriod time.Duration) {
 	newSamples := []*Sample{}
 
 	// Handle all aggregation buckets older than bucketCutoffID
-	for bucketID, subBuckets := range out.aggrBuckets {
+	for bucketID, subBucket := range out.aggrBuckets {
 		if bucketID > bucketCutoffID {
 			continue
 		}
 
-		for _, subBucket := range subBuckets {
-			for tags, httpTrails := range subBucket {
-				// start := time.Now() // this is in a combination with the log at the end
-				trailCount := int64(len(httpTrails))
-				if trailCount < out.config.AggregationMinSamples.Int64 {
-					for _, trail := range httpTrails {
+		for tags, httpTrails := range subBucket {
+			// start := time.Now() // this is in a combination with the log at the end
+			trailCount := int64(len(httpTrails))
+			if trailCount < out.config.AggregationMinSamples.Int64 {
+				for _, trail := range httpTrails {
+					newSamples = append(newSamples, NewSampleFromTrail(trail))
+				}
+				continue
+			}
+			encodedTags, err := easyjson.Marshal(tags)
+			if err != nil {
+				out.logger.WithError(err).Error("Encoding tags failed")
+			}
+
+			aggrData := &SampleDataAggregatedHTTPReqs{
+				Time: toMicroSecond(time.Unix(0, bucketID*aggrPeriod+aggrPeriod/2)),
+				Type: "aggregated_trend",
+				Tags: encodedTags,
+			}
+
+			if out.config.AggregationSkipOutlierDetection.Bool {
+				// Simply add up all HTTP trails, no outlier detection
+				for _, trail := range httpTrails {
+					aggrData.Add(trail)
+				}
+			} else {
+				connDurations := make(durations, trailCount)
+				reqDurations := make(durations, trailCount)
+				for i, trail := range httpTrails {
+					connDurations[i] = trail.ConnDuration
+					reqDurations[i] = trail.Duration
+				}
+
+				var minConnDur, maxConnDur, minReqDur, maxReqDur time.Duration
+				if trailCount < out.config.AggregationOutlierAlgoThreshold.Int64 {
+					// Since there are fewer samples, we'll use the interpolation-enabled and
+					// more precise sorting-based algorithm
+					minConnDur, maxConnDur = connDurations.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef, true)
+					minReqDur, maxReqDur = reqDurations.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef, true)
+				} else {
+					minConnDur, maxConnDur = connDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
+					minReqDur, maxReqDur = reqDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
+				}
+
+				for _, trail := range httpTrails {
+					if trail.ConnDuration < minConnDur ||
+						trail.ConnDuration > maxConnDur ||
+						trail.Duration < minReqDur ||
+						trail.Duration > maxReqDur {
+						// Seems like an outlier, add it as a standalone metric
 						newSamples = append(newSamples, NewSampleFromTrail(trail))
-					}
-					continue
-				}
-
-				aggrData := &SampleDataAggregatedHTTPReqs{
-					Time: toMicroSecond(time.Unix(0, bucketID*aggrPeriod+aggrPeriod/2)),
-					Type: "aggregated_trend",
-					Tags: tags,
-				}
-
-				if out.config.AggregationSkipOutlierDetection.Bool {
-					// Simply add up all HTTP trails, no outlier detection
-					for _, trail := range httpTrails {
+					} else {
+						// Aggregate the trail
 						aggrData.Add(trail)
 					}
-				} else {
-					connDurations := make(durations, trailCount)
-					reqDurations := make(durations, trailCount)
-					for i, trail := range httpTrails {
-						connDurations[i] = trail.ConnDuration
-						reqDurations[i] = trail.Duration
-					}
-
-					var minConnDur, maxConnDur, minReqDur, maxReqDur time.Duration
-					if trailCount < out.config.AggregationOutlierAlgoThreshold.Int64 {
-						// Since there are fewer samples, we'll use the interpolation-enabled and
-						// more precise sorting-based algorithm
-						minConnDur, maxConnDur = connDurations.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef, true)
-						minReqDur, maxReqDur = reqDurations.SortGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef, true)
-					} else {
-						minConnDur, maxConnDur = connDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
-						minReqDur, maxReqDur = reqDurations.SelectGetNormalBounds(iqrRadius, iqrLowerCoef, iqrUpperCoef)
-					}
-
-					for _, trail := range httpTrails {
-						if trail.ConnDuration < minConnDur ||
-							trail.ConnDuration > maxConnDur ||
-							trail.Duration < minReqDur ||
-							trail.Duration > maxReqDur {
-							// Seems like an outlier, add it as a standalone metric
-							newSamples = append(newSamples, NewSampleFromTrail(trail))
-						} else {
-							// Aggregate the trail
-							aggrData.Add(trail)
-						}
-					}
 				}
+			}
 
-				aggrData.CalcAverages()
+			aggrData.CalcAverages()
 
-				if aggrData.Count > 0 {
-					/*
-						out.logger.WithFields(logrus.Fields{
-							"http_samples": aggrData.Count,
-							"ratio":        fmt.Sprintf("%.2f", float64(aggrData.Count)/float64(trailCount)),
-							"t":            time.Since(start),
-						}).Debug("Aggregated HTTP metrics")
-					//*/
-					newSamples = append(newSamples, &Sample{
-						Type:   DataTypeAggregatedHTTPReqs,
-						Metric: "http_req_li_all",
-						Data:   aggrData,
-					})
-				}
+			if aggrData.Count > 0 {
+				newSamples = append(newSamples, &Sample{
+					Type:   DataTypeAggregatedHTTPReqs,
+					Metric: "http_req_li_all",
+					Data:   aggrData,
+				})
 			}
 		}
 		delete(out.aggrBuckets, bucketID)
@@ -550,16 +534,14 @@ func (out *Output) flushHTTPTrails() {
 	}
 	for _, bucket := range out.aggrBuckets {
 		for _, subBucket := range bucket {
-			for _, trails := range subBucket {
-				for _, trail := range trails {
-					newSamples = append(newSamples, NewSampleFromTrail(trail))
-				}
+			for _, trail := range subBucket {
+				newSamples = append(newSamples, NewSampleFromTrail(trail))
 			}
 		}
 	}
 
 	out.bufferHTTPTrails = nil
-	out.aggrBuckets = map[int64]map[[3]string]aggregationBucket{}
+	out.aggrBuckets = map[int64]aggregationBucket{}
 	out.bufferSamples = append(out.bufferSamples, newSamples...)
 }
 

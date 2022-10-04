@@ -59,7 +59,7 @@ func (a addTest) run(t *testing.T) {
 
 		assert.NotZero(t, sample.Time)
 		assert.Equal(t, a.val.Float, sample.Value)
-		assert.Equal(t, a.expectedTags, sample.Tags.CloneTags())
+		assert.Equal(t, a.expectedTags, sample.Tags.Map())
 		assert.Equal(t, "my_metric", sample.Metric.Name)
 		assert.Equal(t, a.mtyp, sample.Metric.Type)
 		assert.Equal(t, a.valueType, sample.Metric.Contains)
@@ -102,9 +102,10 @@ func TestMetrics(t *testing.T) {
 					}
 					test.rt = goja.New()
 					test.rt.SetFieldNameMapper(common.FieldNameMapper{})
+					registry := metrics.NewRegistry()
 					mii := &modulestest.VU{
 						RuntimeField: test.rt,
-						InitEnvField: &common.InitEnvironment{Registry: metrics.NewRegistry()},
+						InitEnvField: &common.InitEnvironment{Registry: registry},
 						CtxField:     context.Background(),
 					}
 					m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
@@ -114,9 +115,9 @@ func TestMetrics(t *testing.T) {
 					state := &lib.State{
 						Options: lib.Options{},
 						Samples: test.samples,
-						Tags: lib.NewTagMap(map[string]string{
+						Tags: lib.NewVUStateTags(registry.RootTagSet().WithTagsFromMap(map[string]string{
 							"key": "value",
-						}),
+						})),
 					}
 
 					isTimeString := ""

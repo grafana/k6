@@ -333,8 +333,12 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 			// dropped - we aren't going to try to recover it, but
 
 			metrics.PushIfNotDone(parentCtx, out, metrics.Sample{
-				Value: 1, Metric: droppedIterationMetric,
-				Tags: metricTags, Time: time.Now(),
+				TimeSeries: metrics.TimeSeries{
+					Metric: droppedIterationMetric,
+					Tags:   metricTags,
+				},
+				Time:  time.Now(),
+				Value: 1,
 			})
 
 			// We'll try to start allocating another VU in the background,

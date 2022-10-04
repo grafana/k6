@@ -47,7 +47,6 @@ import (
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	"go.k6.io/k6/lib/testutils/mockoutput"
 	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 )
@@ -210,7 +209,9 @@ func TestOptionsSettingToScript(t *testing.T) {
 				lib.RuntimeOptions{Env: map[string]string{"expectedTeardownTimeout": "4s"}})
 			require.NoError(t, err)
 
-			newOptions := lib.Options{TeardownTimeout: types.NullDurationFrom(4 * time.Second)}
+			newOptions := lib.Options{
+				TeardownTimeout: types.NullDurationFrom(4 * time.Second),
+			}
 			r.SetOptions(newOptions)
 			require.Equal(t, newOptions, r.GetOptions())
 
@@ -242,7 +243,9 @@ func TestOptionsPropagationToScript(t *testing.T) {
 				}
 			};`
 
-	expScriptOptions := lib.Options{SetupTimeout: types.NullDurationFrom(1 * time.Second)}
+	expScriptOptions := lib.Options{
+		SetupTimeout: types.NullDurationFrom(1 * time.Second),
+	}
 	r1, err := getSimpleRunner(t, "/script.js", data,
 		lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "1s"}})
 	require.NoError(t, err)
@@ -257,13 +260,9 @@ func TestOptionsPropagationToScript(t *testing.T) {
 			Registry:       registry,
 			RuntimeOptions: lib.RuntimeOptions{Env: map[string]string{"expectedSetupTimeout": "3s"}},
 		}, r1.MakeArchive())
-
 	require.NoError(t, err)
 	require.Equal(t, expScriptOptions, r2.GetOptions())
-
-	newOptions := lib.Options{SetupTimeout: types.NullDurationFrom(3 * time.Second)}
-	require.NoError(t, r2.SetOptions(newOptions))
-	require.Equal(t, newOptions, r2.GetOptions())
+	r2.Bundle.Options.SetupTimeout = types.NullDurationFrom(3 * time.Second)
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
@@ -299,18 +298,30 @@ func TestMetricName(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestSetupDataIsolation(t *testing.T) {
+func TestDataIsolation(t *testing.T) {
 	t.Parallel()
 
 	script := `
+		var exec = require("k6/execution");
 		var Counter = require("k6/metrics").Counter;
+		var sleep = require('k6').sleep;
 
 		exports.options = {
 			scenarios: {
-				shared_iters: {
+				sc1: {
 					executor: "shared-iterations",
-					vus: 5,
-					iterations: 500,
+					vus: 2,
+					iterations: 100,
+					maxDuration: "9s",
+					gracefulStop: 0,
+					exec: "sc1",
+				},
+				sc2: {
+					executor: "per-vu-iterations",
+					vus: 1,
+					iterations: 1,
+					startTime: "11s",
+					exec: "sc2",
 				},
 			},
 			teardownTimeout: "5s",
@@ -322,11 +333,31 @@ func TestSetupDataIsolation(t *testing.T) {
 			return { v: 0 };
 		}
 
-		exports.default = function(data) {
+		exports.sc1 = function(data) {
 			if (data.v !== __ITER) {
-				throw new Error("default: wrong data for iter " + __ITER + ": " + JSON.stringify(data));
+				throw new Error("sc1: wrong data for iter " + __ITER + ": " + JSON.stringify(data));
+			}
+			if (__ITER != 0 && data.v != exec.vu.tags.myiter) {
+				throw new Error("sc1: wrong vu tags for iter " + __ITER + ": " + JSON.stringify(exec.vu.tags));
 			}
 			data.v += 1;
+			exec.vu.tags.myiter = data.v;
+			myCounter.add(1);
+			sleep(0.01);
+		}
+
+		exports.sc2 = function(data) {
+			if (data.v === 0) {
+				throw new Error("sc2: wrong data, expected VU to have modified setup data locally: " + data.v);
+			}
+
+			if (typeof exec.vu.tags.myiter !== "undefined") {
+				throw new Error(
+					"sc2: wrong tags, expected VU to have new tags in new scenario: " +
+					JSON.stringify(exec.vu.tags),
+				);
+			}
+
 			myCounter.add(1);
 		}
 
@@ -348,6 +379,7 @@ func TestSetupDataIsolation(t *testing.T) {
 		TestPreInitState: runner.preInitState,
 		Options:          options,
 		Runner:           runner,
+		RunTags:          runner.preInitState.Registry.RootTagSet().WithTagsFromMap(options.RunTags),
 	}
 
 	execScheduler, err := local.NewExecutionScheduler(testRunState)
@@ -369,7 +401,7 @@ func TestSetupDataIsolation(t *testing.T) {
 	go func() { errC <- run() }()
 
 	select {
-	case <-time.After(10 * time.Second):
+	case <-time.After(20 * time.Second):
 		cancel()
 		t.Fatal("Test timed out")
 	case err := <-errC:
@@ -386,7 +418,7 @@ func TestSetupDataIsolation(t *testing.T) {
 			count += int(s.Value)
 		}
 	}
-	require.Equal(t, 501, count, "mycounter should be the number of iterations + 1 for the teardown")
+	require.Equal(t, 102, count, "mycounter should be the number of iterations + 1 for the teardown")
 }
 
 func testSetupDataHelper(t *testing.T, data string) {
@@ -1050,12 +1082,9 @@ func TestVUIntegrationBlacklistOption(t *testing.T) {
 	require.NoError(t, err)
 
 	cidr, err := lib.ParseCIDR("10.0.0.0/8")
-
 	require.NoError(t, err)
-	require.NoError(t, r1.SetOptions(lib.Options{
-		Throw:        null.BoolFrom(true),
-		BlacklistIPs: []*lib.IPNet{cidr},
-	}))
+	r1.Bundle.Options.Throw = null.BoolFrom(true)
+	r1.Bundle.Options.BlacklistIPs = []*lib.IPNet{cidr}
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -1136,10 +1165,9 @@ func TestVUIntegrationBlockHostnamesOption(t *testing.T) {
 
 	hostnames, err := types.NewNullHostnameTrie([]string{"*.io"})
 	require.NoError(t, err)
-	require.NoError(t, r1.SetOptions(lib.Options{
-		Throw:            null.BoolFrom(true),
-		BlockedHostnames: hostnames,
-	}))
+
+	r1.Bundle.Options.Throw = null.BoolFrom(true)
+	r1.Bundle.Options.BlockedHostnames = hostnames
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -1332,7 +1360,9 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 					exports.default = function() { http.get("https://sha256-badssl.localhost/"); }
 				`)
 			require.NoError(t, err)
-			require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)))
+
+			opts := lib.Options{Throw: null.BoolFrom(true)}
+			require.NoError(t, r1.SetOptions(opts.Apply(data.opts)))
 
 			r1.Bundle.Options.Hosts = map[string]*lib.HostAddress{
 				"sha256-badssl.localhost": mybadsslHostname,
@@ -1502,11 +1532,9 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 			}
 		`))
 	require.NoError(t, err)
-	r1.SetOptions(lib.Options{
-		Throw:        null.BoolFrom(true),
-		MaxRedirects: null.IntFrom(10),
-		Hosts:        tb.Dialer.Hosts,
-	})
+	r1.Bundle.Options.Throw = null.BoolFrom(true)
+	r1.Bundle.Options.MaxRedirects = null.IntFrom(10)
+	r1.Bundle.Options.Hosts = tb.Dialer.Hosts
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -1606,7 +1634,7 @@ func TestVUIntegrationVUID(t *testing.T) {
 			}`,
 	)
 	require.NoError(t, err)
-	r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)})
+	r1.Bundle.Options.Throw = null.BoolFrom(true)
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -2163,7 +2191,7 @@ func TestSystemTags(t *testing.T) {
 			require.NotEmpty(t, bufSamples)
 			for _, sample := range bufSamples[0].GetSamples() {
 				assert.NotEmpty(t, sample.Tags)
-				for emittedTag, emittedVal := range sample.Tags.CloneTags() {
+				for emittedTag, emittedVal := range sample.Tags.Map() {
 					assert.Equal(t, tc.tag, emittedTag)
 					assert.Equal(t, tc.expVal, emittedVal)
 				}
@@ -2254,22 +2282,7 @@ type multiFileTestCase struct {
 
 func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.HTTPMultiBin) {
 	t.Helper()
-	logger := testutils.NewLogger(t)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	runner, err := New(
-		&lib.TestPreInitState{
-			Logger:         logger,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-			RuntimeOptions: tc.rtOpts,
-		},
-		&loader.SourceData{
-			URL:  &url.URL{Path: tc.cwd + "/script.js", Scheme: "file"},
-			Data: []byte(tc.script),
-		},
-		tc.fses,
-	)
+	runner, err := getSimpleRunner(t, tc.cwd+"/script.js", tc.script, tc.rtOpts, tc.fses)
 	if tc.expInitErr {
 		require.Error(t, err)
 		return
@@ -2297,6 +2310,10 @@ func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.H
 	} else {
 		require.NoError(t, err)
 	}
+
+	logger := testutils.NewLogger(t)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 
 	arc := runner.MakeArchive()
 	runnerFromArc, err := NewFromArchive(

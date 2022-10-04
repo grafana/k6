@@ -2,21 +2,26 @@ package metrics
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/mailru/easyjson/jwriter"
 )
 
-// A Sample is a single measurement.
-type Sample struct {
+// A TimeSeries uniquely identifies the metric and the set of metric tags that a
+// Sample (i.e. a metric measurement) has. TimeSeries objects are comparable
+// with the == operator and can be used as map indexes.
+type TimeSeries struct {
 	Metric *Metric
-	Time   time.Time
-	Tags   *SampleTags
-	Value  float64
+	Tags   *TagSet
+}
+
+// A Sample is a single metric measurement.
+type Sample struct {
+	TimeSeries
+	Time  time.Time
+	Value float64
+	// TODO: add Metadata map[string]string, which could be nil
 }
 
 // SampleContainer is a simple abstraction that allows sample
@@ -39,7 +44,7 @@ func (s Samples) GetSamples() []Sample {
 // are connected and share the same time and tags.
 type ConnectedSampleContainer interface {
 	SampleContainer
-	GetTags() *SampleTags
+	GetTags() *TagSet
 	GetTime() time.Time
 }
 
@@ -48,7 +53,7 @@ type ConnectedSampleContainer interface {
 // extra information
 type ConnectedSamples struct {
 	Samples []Sample
-	Tags    *SampleTags
+	Tags    *TagSet
 	Time    time.Time
 }
 
@@ -59,7 +64,7 @@ func (cs ConnectedSamples) GetSamples() []Sample {
 }
 
 // GetTags implements ConnectedSampleContainer interface and returns stored tags.
-func (cs ConnectedSamples) GetTags() *SampleTags {
+func (cs ConnectedSamples) GetTags() *TagSet {
 	return cs.Tags
 }
 
@@ -76,7 +81,7 @@ func (s Sample) GetSamples() []Sample {
 
 // GetTags implements ConnectedSampleContainer interface
 // and returns the sample's tags.
-func (s Sample) GetTags() *SampleTags {
+func (s Sample) GetTags() *TagSet {
 	return s.Tags
 }
 
@@ -170,149 +175,4 @@ func parsePercentile(stat string) (float64, error) {
 	}
 
 	return percentile, nil
-}
-
-// SampleTags is an immutable string[string] map for tags. Once a tag
-// set is created, direct modification is prohibited. It has
-// copy-on-write semantics and uses pointers for faster comparison
-// between maps, since the same tag set is often used for multiple samples.
-// All methods should not panic, even if they are called on a nil pointer.
-//easyjson:skip
-type SampleTags struct {
-	tags map[string]string
-	json []byte
-}
-
-// Get returns an empty string and false if the the requested key is not
-// present or its value and true if it is.
-func (st *SampleTags) Get(key string) (string, bool) {
-	if st == nil {
-		return "", false
-	}
-	val, ok := st.tags[key]
-	return val, ok
-}
-
-// IsEmpty checks for a nil pointer or zero tags.
-// It's necessary because of this envconfig issue: https://github.com/kelseyhightower/envconfig/issues/113
-func (st *SampleTags) IsEmpty() bool {
-	return st == nil || len(st.tags) == 0
-}
-
-// IsEqual tries to compare two tag sets with maximum efficiency.
-func (st *SampleTags) IsEqual(other *SampleTags) bool {
-	if st == other {
-		return true
-	}
-	if st == nil || other == nil || len(st.tags) != len(other.tags) {
-		return false
-	}
-	for k, v := range st.tags {
-		if otherv, ok := other.tags[k]; !ok || v != otherv {
-			return false
-		}
-	}
-	return true
-}
-
-func (st *SampleTags) Contains(other *SampleTags) bool {
-	if st == other || other == nil {
-		return true
-	}
-	if st == nil || len(st.tags) < len(other.tags) {
-		return false
-	}
-
-	for k, v := range other.tags {
-		if myv, ok := st.tags[k]; !ok || myv != v {
-			return false
-		}
-	}
-
-	return true
-}
-
-// MarshalJSON serializes SampleTags to a JSON string and caches
-// the result. It is not thread safe in the sense that the Go race
-// detector will complain if it's used concurrently, but no data
-// should be corrupted.
-func (st *SampleTags) MarshalJSON() ([]byte, error) {
-	if st.IsEmpty() {
-		return []byte("null"), nil
-	}
-	if st.json != nil {
-		return st.json, nil
-	}
-	res, err := json.Marshal(st.tags)
-	if err != nil {
-		return res, err
-	}
-	st.json = res
-	return res, nil
-}
-
-// MarshalEasyJSON supports easyjson.Marshaler interface
-func (st *SampleTags) MarshalEasyJSON(w *jwriter.Writer) {
-	w.RawByte('{')
-	first := true
-	for k, v := range st.tags {
-		if first {
-			first = false
-		} else {
-			w.RawByte(',')
-		}
-		w.String(k)
-		w.RawByte(':')
-		w.String(v)
-	}
-	w.RawByte('}')
-}
-
-// UnmarshalJSON deserializes SampleTags from a JSON string.
-func (st *SampleTags) UnmarshalJSON(data []byte) error {
-	if st == nil {
-		*st = SampleTags{}
-	}
-	return json.Unmarshal(data, &st.tags)
-}
-
-// CloneTags copies the underlying set of a sample tags and
-// returns it. If the receiver is nil, it returns an empty non-nil map.
-func (st *SampleTags) CloneTags() map[string]string {
-	if st == nil {
-		return map[string]string{}
-	}
-	res := make(map[string]string, len(st.tags))
-	for k, v := range st.tags {
-		res[k] = v
-	}
-	return res
-}
-
-// NewSampleTags *copies* the supplied tag set and returns a new SampleTags
-// instance with the key-value pairs from it.
-func NewSampleTags(data map[string]string) *SampleTags {
-	if len(data) == 0 {
-		return nil
-	}
-
-	tags := map[string]string{}
-	for k, v := range data {
-		tags[k] = v
-	}
-	return &SampleTags{tags: tags}
-}
-
-// IntoSampleTags "consumes" the passed map and creates a new SampleTags
-// struct with the data. The map is set to nil as a hint that it shouldn't
-// be changed after it has been transformed into an "immutable" tag set.
-// Oh, how I miss Rust and move semantics... :)
-func IntoSampleTags(data *map[string]string) *SampleTags {
-	if len(*data) == 0 {
-		return nil
-	}
-
-	res := SampleTags{tags: *data}
-	*data = nil
-	return &res
 }

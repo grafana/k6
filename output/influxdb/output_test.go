@@ -88,7 +88,8 @@ func testOutputCycle(t testing.TB, handler http.HandlerFunc, body func(testing.T
 func TestOutput(t *testing.T) {
 	t.Parallel()
 
-	metric, err := metrics.NewRegistry().NewMetric("test_gauge", metrics.Gauge)
+	registry := metrics.NewRegistry()
+	metric, err := registry.NewMetric("test_gauge", metrics.Gauge)
 	require.NoError(t, err)
 
 	var samplesRead int
@@ -114,13 +115,15 @@ func TestOutput(t *testing.T) {
 		samples := make(metrics.Samples, 10)
 		for i := 0; i < len(samples); i++ {
 			samples[i] = metrics.Sample{
-				Metric: metric,
-				Time:   time.Now(),
-				Tags: metrics.NewSampleTags(map[string]string{
-					"something": "else",
-					"VU":        "21",
-					"else":      "something",
-				}),
+				TimeSeries: metrics.TimeSeries{
+					Metric: metric,
+					Tags: registry.RootTagSet().WithTagsFromMap(map[string]string{
+						"something": "else",
+						"VU":        "21",
+						"else":      "something",
+					}),
+				},
+				Time:  time.Now(),
 				Value: 2.0,
 			}
 		}
@@ -155,7 +158,8 @@ func TestOutputFlushMetricsConcurrency(t *testing.T) {
 		ts.Close()
 	}()
 
-	metric, err := metrics.NewRegistry().NewMetric("test_gauge", metrics.Gauge)
+	registry := metrics.NewRegistry()
+	metric, err := registry.NewMetric("test_gauge", metrics.Gauge)
 	require.NoError(t, err)
 
 	o, err := newOutput(output.Params{
@@ -171,8 +175,12 @@ func TestOutputFlushMetricsConcurrency(t *testing.T) {
 			wg.Add(1)
 			o.AddMetricSamples([]metrics.SampleContainer{metrics.Samples{
 				metrics.Sample{
-					Metric: metric,
-					Value:  2.0,
+					TimeSeries: metrics.TimeSeries{
+						Metric: metric,
+						Tags:   registry.RootTagSet(),
+					},
+					Time:  time.Now(),
+					Value: 2.0,
 				},
 			}})
 			o.flushMetrics()

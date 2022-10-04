@@ -78,7 +78,7 @@ github.com/grafana/xk6-redis/redis
 # github.com/grafana/xk6-timers v0.1.2
 ## explicit; go 1.17
 github.com/grafana/xk6-timers/timers
-# github.com/grafana/xk6-websockets v0.1.3
+# github.com/grafana/xk6-websockets v0.1.4
 ## explicit; go 1.17
 github.com/grafana/xk6-websockets/websockets
 # github.com/inconshreveable/mousetrap v1.0.0
@@ -131,6 +131,9 @@ github.com/mattn/go-isatty
 github.com/mccutchen/go-httpbin/httpbin
 github.com/mccutchen/go-httpbin/httpbin/assets
 github.com/mccutchen/go-httpbin/httpbin/digest
+# github.com/mstoykov/atlas v0.0.0-20220808085829-90340e9998bd
+## explicit; go 1.18
+github.com/mstoykov/atlas
 # github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1
 ## explicit
 github.com/mstoykov/envconfig
@@ -183,7 +186,6 @@ golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
 # golang.org/x/net v0.0.0-20221002022538-bcab6841153b
 ## explicit; go 1.17
-golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/http/httpguts

@@ -35,23 +35,79 @@ type Trail struct {
 
 	Failed null.Bool
 	// Populated by SaveSamples()
-	Tags    *metrics.SampleTags
+	Tags    *metrics.TagSet
 	Samples []metrics.Sample
 }
 
 // SaveSamples populates the Trail's sample slice so they're accesible via GetSamples()
-func (tr *Trail) SaveSamples(builtinMetrics *metrics.BuiltinMetrics, tags *metrics.SampleTags) {
+func (tr *Trail) SaveSamples(builtinMetrics *metrics.BuiltinMetrics, tags *metrics.TagSet) {
 	tr.Tags = tags
 	tr.Samples = make([]metrics.Sample, 0, 9) // this is with 1 more for a possible HTTPReqFailed
 	tr.Samples = append(tr.Samples, []metrics.Sample{
-		{Metric: builtinMetrics.HTTPReqs, Time: tr.EndTime, Tags: tags, Value: 1},
-		{Metric: builtinMetrics.HTTPReqDuration, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.Duration)},
-		{Metric: builtinMetrics.HTTPReqBlocked, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.Blocked)},
-		{Metric: builtinMetrics.HTTPReqConnecting, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.Connecting)},
-		{Metric: builtinMetrics.HTTPReqTLSHandshaking, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.TLSHandshaking)},
-		{Metric: builtinMetrics.HTTPReqSending, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.Sending)},
-		{Metric: builtinMetrics.HTTPReqWaiting, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.Waiting)},
-		{Metric: builtinMetrics.HTTPReqReceiving, Time: tr.EndTime, Tags: tags, Value: metrics.D(tr.Receiving)},
+		{
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.HTTPReqs,
+				Tags:   tags,
+			},
+			Time:  tr.EndTime,
+			Value: 1,
+		},
+		{
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.HTTPReqDuration,
+				Tags:   tags,
+			},
+			Time:  tr.EndTime,
+			Value: metrics.D(tr.Duration),
+		},
+		{
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.HTTPReqBlocked,
+				Tags:   tags,
+			},
+			Time:  tr.EndTime,
+			Value: metrics.D(tr.Blocked),
+		},
+		{
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.HTTPReqConnecting,
+				Tags:   tags,
+			},
+			Time:  tr.EndTime,
+			Value: metrics.D(tr.Connecting),
+		},
+		{
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.HTTPReqTLSHandshaking,
+				Tags:   tags,
+			},
+			Time:  tr.EndTime,
+			Value: metrics.D(tr.TLSHandshaking),
+		},
+		{
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.HTTPReqSending,
+				Tags:   tags,
+			},
+			Time:  tr.EndTime,
+			Value: metrics.D(tr.Sending),
+		},
+		{
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.HTTPReqWaiting,
+				Tags:   tags,
+			},
+			Time:  tr.EndTime,
+			Value: metrics.D(tr.Waiting),
+		},
+		{
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.HTTPReqReceiving,
+				Tags:   tags,
+			},
+			Time:  tr.EndTime,
+			Value: metrics.D(tr.Receiving),
+		},
 	}...)
 }
 
@@ -61,7 +117,7 @@ func (tr *Trail) GetSamples() []metrics.Sample {
 }
 
 // GetTags implements the metrics.ConnectedSampleContainer interface.
-func (tr *Trail) GetTags() *metrics.SampleTags {
+func (tr *Trail) GetTags() *metrics.TagSet {
 	return tr.Tags
 }
 

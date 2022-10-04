@@ -53,6 +53,7 @@ type Runner struct {
 	// TODO: Remove ActualResolver, it's a hack to simplify mocking in tests.
 	ActualResolver netext.MultiResolver
 	RPSLimit       *rate.Limiter
+	RunTags        *metrics.TagSet
 
 	console   *console
 	setupData []byte
@@ -237,7 +238,7 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 		VUID:           vu.ID,
 		VUIDGlobal:     vu.IDGlobal,
 		Samples:        vu.Samples,
-		Tags:           lib.NewTagMap(copyStringMap(vu.Runner.Bundle.Options.RunTags)),
+		Tags:           lib.NewVUStateTags(vu.Runner.RunTags),
 		Group:          r.defaultGroup,
 		BuiltinMetrics: r.preInitState.BuiltinMetrics,
 	}
@@ -436,6 +437,9 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 		return err
 	}
 
+	// FIXME: add tests
+	r.RunTags = r.preInitState.Registry.RootTagSet().WithTagsFromMap(r.Bundle.Options.RunTags)
+
 	return nil
 }
 
@@ -511,10 +515,11 @@ func (r *Runner) runPart(
 	}
 
 	if r.Bundle.Options.SystemTags.Has(metrics.TagGroup) {
-		vu.state.Tags.Set("group", group.Path)
+		vu.state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
+			return currentTags.With("group", group.Path)
+		})
 	}
 	vu.state.Group = group
-
 	v, _, _, err := vu.runFn(ctx, false, fn, nil, vu.Runtime.ToValue(arg))
 
 	// deadline is reached so we have timeouted but this might've not been registered correctly
@@ -609,23 +614,26 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	u.Runtime.Set("__ENV", env)
 
 	opts := u.Runner.Bundle.Options
-	// TODO: maybe we can cache the original tags only clone them and add (if any) new tags on top ?
-	u.state.Tags = lib.NewTagMap(copyStringMap(opts.RunTags))
-	for k, v := range params.Tags {
-		u.state.Tags.Set(k, v)
-	}
-	if opts.SystemTags.Has(metrics.TagVU) {
-		u.state.Tags.Set("vu", strconv.FormatUint(u.ID, 10))
-	}
-	if opts.SystemTags.Has(metrics.TagIter) {
-		u.state.Tags.Set("iter", strconv.FormatInt(u.iteration, 10))
-	}
-	if opts.SystemTags.Has(metrics.TagGroup) {
-		u.state.Tags.Set("group", u.state.Group.Path)
-	}
-	if opts.SystemTags.Has(metrics.TagScenario) {
-		u.state.Tags.Set("scenario", params.Scenario)
-	}
+
+	u.state.Tags.Modify(func(_ *metrics.TagSet) *metrics.TagSet {
+		// Deliberately overwrite tags from previous activations, i.e. ones that
+		// might have come from previous scenarios.
+		tags := u.Runner.RunTags.WithTagsFromMap(params.Tags)
+
+		if opts.SystemTags.Has(metrics.TagVU) {
+			tags = tags.With("vu", strconv.FormatUint(u.ID, 10))
+		}
+		if opts.SystemTags.Has(metrics.TagIter) {
+			tags = tags.With("iter", strconv.FormatInt(u.iteration, 10))
+		}
+		if opts.SystemTags.Has(metrics.TagGroup) {
+			tags = tags.With("group", u.state.Group.Path)
+		}
+		if opts.SystemTags.Has(metrics.TagScenario) {
+			tags = tags.With("scenario", params.Scenario)
+		}
+		return tags
+	})
 
 	ctx := params.RunContext
 	u.moduleVUImpl.ctx = ctx
@@ -752,8 +760,11 @@ func (u *VU) runFn(
 	}
 
 	opts := &u.Runner.Bundle.Options
+
 	if opts.SystemTags.Has(metrics.TagIter) {
-		u.state.Tags.Set("iter", strconv.FormatInt(u.state.Iteration, 10))
+		u.state.Tags.Modify(func(currentTags *metrics.TagSet) *metrics.TagSet {
+			return currentTags.With("iter", strconv.FormatInt(u.state.Iteration, 10))
+		})
 	}
 
 	startTime := time.Now()
@@ -789,9 +800,9 @@ func (u *VU) runFn(
 		u.Transport.CloseIdleConnections()
 	}
 
-	sampleTags := metrics.NewSampleTags(u.state.CloneTags())
 	u.state.Samples <- u.Dialer.GetTrail(
-		startTime, endTime, isFullIteration, isDefault, sampleTags, u.Runner.preInitState.BuiltinMetrics)
+		startTime, endTime, isFullIteration,
+		isDefault, u.state.Tags.GetCurrentValues(), u.Runner.preInitState.BuiltinMetrics)
 
 	return v, isFullIteration, endTime.Sub(startTime), err
 }

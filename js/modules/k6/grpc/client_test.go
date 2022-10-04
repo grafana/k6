@@ -813,8 +813,10 @@ func TestClient(t *testing.T) {
 			val, err := replace(tt.initString.code)
 			assertResponse(t, tt.initString, err, val, ts)
 
+			registry := metrics.NewRegistry()
 			root, err := lib.NewGroup("", nil)
 			require.NoError(t, err)
+
 			state := &lib.State{
 				Group:     root,
 				Dialer:    ts.httpBin.Dialer,
@@ -827,10 +829,8 @@ func TestClient(t *testing.T) {
 					),
 					UserAgent: null.StringFrom("k6-test"),
 				},
-				BuiltinMetrics: metrics.RegisterBuiltinMetrics(
-					metrics.NewRegistry(),
-				),
-				Tags: lib.NewTagMap(nil),
+				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 			}
 			ts.MoveToVUContext(state)
 			val, err = replace(tt.vuString.code)
@@ -922,13 +922,18 @@ func TestClientInvokeHeadersDeprecated(t *testing.T) {
 	testLog.AddHook(logHook)
 	testLog.SetOutput(ioutil.Discard)
 
+	registry := metrics.NewRegistry()
 	c := Client{
 		vu: &modulestest.VU{
 			StateField: &lib.State{
-				Logger: testLog,
+				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+				Logger:         testLog,
+				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 			},
+			RuntimeField: goja.New(),
 		},
 	}
+
 	params := map[string]interface{}{
 		"headers": map[string]interface{}{
 			"X-HEADER-FOO": "bar",

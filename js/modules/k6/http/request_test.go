@@ -47,11 +47,7 @@ import (
 )
 
 // TODO replace this with the Single version
-func assertRequestMetricsEmitted(t *testing.T, sampleContainers []metrics.SampleContainer, method, url, name string, status int, group string) {
-	if name == "" {
-		name = url
-	}
-
+func assertRequestMetricsEmitted(t *testing.T, sampleContainers []metrics.SampleContainer, method, url string, status int, group string) {
 	seenDuration := false
 	seenBlocked := false
 	seenConnecting := false
@@ -61,7 +57,10 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []metrics.Sample
 	seenReceiving := false
 	for _, sampleContainer := range sampleContainers {
 		for _, sample := range sampleContainer.GetSamples() {
-			tags := sample.Tags.CloneTags()
+			tags := sample.Tags.Map()
+			// URL expected to be always equal name
+			// check https://github.com/grafana/k6/issues/2584#issuecomment-1219618111 to know more
+			assert.Equal(t, tags["url"], tags["name"])
 			if tags["url"] == url {
 				switch sample.Metric.Name {
 				case metrics.HTTPReqDurationName:
@@ -83,17 +82,16 @@ func assertRequestMetricsEmitted(t *testing.T, sampleContainers []metrics.Sample
 				assert.Equal(t, strconv.Itoa(status), tags["status"])
 				assert.Equal(t, method, tags["method"])
 				assert.Equal(t, group, tags["group"])
-				assert.Equal(t, name, tags["name"])
 			}
 		}
 	}
-	assert.True(t, seenDuration, "url %s didn't emit Duration", url)
-	assert.True(t, seenBlocked, "url %s didn't emit Blocked", url)
-	assert.True(t, seenConnecting, "url %s didn't emit Connecting", url)
-	assert.True(t, seenTLSHandshaking, "url %s didn't emit TLSHandshaking", url)
-	assert.True(t, seenSending, "url %s didn't emit Sending", url)
-	assert.True(t, seenWaiting, "url %s didn't emit Waiting", url)
-	assert.True(t, seenReceiving, "url %s didn't emit Receiving", url)
+	assert.Truef(t, seenDuration, "url %s didn't emit Duration", url)
+	assert.Truef(t, seenBlocked, "url %s didn't emit Blocked", url)
+	assert.Truef(t, seenConnecting, "url %s didn't emit Connecting", url)
+	assert.Truef(t, seenTLSHandshaking, "url %s didn't emit TLSHandshaking", url)
+	assert.Truef(t, seenSending, "url %s didn't emit Sending", url)
+	assert.Truef(t, seenWaiting, "url %s didn't emit Waiting", url)
+	assert.Truef(t, seenReceiving, "url %s didn't emit Receiving", url)
 }
 
 func assertRequestMetricsEmittedSingle(t *testing.T, sampleContainer metrics.SampleContainer, expectedTags map[string]string, metrics []string, callback func(sample metrics.Sample)) {
@@ -104,7 +102,7 @@ func assertRequestMetricsEmittedSingle(t *testing.T, sampleContainer metrics.Sam
 		metricMap[m] = false
 	}
 	for _, sample := range sampleContainer.GetSamples() {
-		tags := sample.Tags.CloneTags()
+		tags := sample.Tags.Map()
 		v, ok := metricMap[sample.Metric.Name]
 		assert.True(t, ok, "unexpected metric %s", sample.Metric.Name)
 		assert.False(t, v, "second metric %s", sample.Metric.Name)
@@ -150,9 +148,9 @@ func newRuntime(t testing.TB) (
 		Transport: tb.HTTPTransport,
 		BPool:     bpool.NewBufferPool(1),
 		Samples:   samples,
-		Tags: lib.NewTagMap(map[string]string{
+		Tags: lib.NewVUStateTags(registry.RootTagSet().WithTagsFromMap(map[string]string{
 			"group": root.Path,
-		}),
+		})),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 
@@ -190,12 +188,12 @@ func TestRequestAndBatch(t *testing.T) {
 			}
 
 			assert.Equal(t, 10, reqsCount)
-			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/redirect/9"), sr("HTTPBIN_URL/redirect/9"), 302, "")
+			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/redirect/9"), 302, "")
 			for i := 8; i > 0; i-- {
 				url := sr(fmt.Sprintf("HTTPBIN_URL/relative-redirect/%d", i))
-				assertRequestMetricsEmitted(t, bufSamples, "GET", url, url, 302, "")
+				assertRequestMetricsEmitted(t, bufSamples, "GET", url, 302, "")
 			}
-			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get"), sr("HTTPBIN_URL/get"), 200, "")
+			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get"), 200, "")
 		})
 
 		t.Run("10", func(t *testing.T) {
@@ -480,7 +478,7 @@ func TestRequestAndBatch(t *testing.T) {
 		assert.NoError(t, err)
 
 		bufSamples := metrics.GetBufferedSamples(samples)
-		assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTP2BIN_URL/get"), "", 200, "")
+		assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTP2BIN_URL/get"), 200, "")
 		for _, sampleC := range bufSamples {
 			for _, sample := range sampleC.GetSamples() {
 				proto, ok := sample.Tags.Get("proto")
@@ -608,7 +606,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				`), literal))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), 200, "")
 			})
 		}
 
@@ -632,7 +630,7 @@ func TestRequestAndBatch(t *testing.T) {
 				}
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies/set?key=value"), "", 302, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies/set?key=value"), 302, "")
 			})
 
 			t.Run("vuJar", func(t *testing.T) {
@@ -650,7 +648,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (jarCookies.key2 != undefined) { throw new Error("unexpected cookie in jar"); }
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), 200, "")
 			})
 
 			t.Run("requestScope", func(t *testing.T) {
@@ -665,7 +663,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (jarCookies.key != undefined) { throw new Error("unexpected cookie in jar"); }
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), 200, "")
 			})
 
 			t.Run("requestScopeReplace", func(t *testing.T) {
@@ -681,7 +679,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (jarCookies.key[0] != "value") { throw new Error("wrong cookie value in jar"); }
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), 200, "")
 			})
 
 			t.Run("redirect", func(t *testing.T) {
@@ -718,7 +716,6 @@ func TestRequestAndBatch(t *testing.T) {
 						metrics.GetBufferedSamples(samples),
 						"GET",
 						sr("HTTPSBIN_URL/set-cookie-without-redirect"),
-						sr("HTTPSBIN_URL/set-cookie-without-redirect"),
 						200,
 						"",
 					)
@@ -744,7 +741,6 @@ func TestRequestAndBatch(t *testing.T) {
 						t,
 						metrics.GetBufferedSamples(samples),
 						"GET",
-						sr("HTTPSBIN_URL/cookies"),
 						sr("HTTPSBIN_URL/cookies"),
 						200,
 						"",
@@ -792,7 +788,6 @@ func TestRequestAndBatch(t *testing.T) {
 						metrics.GetBufferedSamples(samples),
 						"GET",
 						sr("HTTPBIN_IP_URL/get"),
-						sr("HTTPBIN_IP_URL/get"),
 						200,
 						"",
 					)
@@ -820,7 +815,7 @@ func TestRequestAndBatch(t *testing.T) {
 				}
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), 200, "")
 			})
 
 			t.Run("path", func(t *testing.T) {
@@ -844,7 +839,7 @@ func TestRequestAndBatch(t *testing.T) {
 				}
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), 200, "")
 			})
 
 			t.Run("expires", func(t *testing.T) {
@@ -865,7 +860,7 @@ func TestRequestAndBatch(t *testing.T) {
 				}
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), 200, "")
 			})
 
 			t.Run("secure", func(t *testing.T) {
@@ -881,7 +876,7 @@ func TestRequestAndBatch(t *testing.T) {
 				}
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPSBIN_IP_URL/cookies"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPSBIN_IP_URL/cookies"), 200, "")
 			})
 
 			t.Run("localJar", func(t *testing.T) {
@@ -899,7 +894,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (jarCookies.key2 != undefined) { throw new Error("unexpected cookie in jar"); }
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), 200, "")
 			})
 
 			//nolint:paralleltest
@@ -917,7 +912,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res.json().key == "value") { throw new Error("wrong clean: unexpected cookie in jar"); }
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), 200, "")
 			})
 
 			//nolint:paralleltest
@@ -936,7 +931,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res.json().key1 == "value1" || res.json().key2 != "value2"  ) { throw new Error("wrong clean: unexpected cookie in jar"); }
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), 200, "")
 			})
 		})
 
@@ -950,7 +945,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				`, url))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", urlExpected, urlExpected, 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", urlExpected, 200, "")
 			})
 			t.Run("digest", func(t *testing.T) {
 				t.Run("success", func(t *testing.T) {
@@ -965,10 +960,8 @@ func TestRequestAndBatch(t *testing.T) {
 					assert.NoError(t, err)
 
 					sampleContainers := metrics.GetBufferedSamples(samples)
-					assertRequestMetricsEmitted(t, sampleContainers[0:1], "GET",
-						urlRaw, urlRaw, 401, "")
-					assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET",
-						urlRaw, urlRaw, 200, "")
+					assertRequestMetricsEmitted(t, sampleContainers[0:1], "GET", urlRaw, 401, "")
+					assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET", urlRaw, 200, "")
 				})
 				t.Run("failure", func(t *testing.T) {
 					url := sr("http://bob:pass@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/failure")
@@ -989,7 +982,7 @@ func TestRequestAndBatch(t *testing.T) {
 					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 					`), literal))
 					assert.NoError(t, err)
-					assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), "", 200, "")
+					assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), 200, "")
 				})
 			}
 
@@ -1002,7 +995,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res.json().headers["X-My-Header"] != "value") { throw new Error("wrong X-My-Header: " + res.json().headers["X-My-Header"]); }
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), 200, "")
 			})
 
 			t.Run("Host", func(t *testing.T) {
@@ -1014,7 +1007,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res.json().headers["Host"] != "HTTPBIN_DOMAIN") { throw new Error("wrong Host: " + res.json().headers["Host"]); }
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), 200, "")
 			})
 
 			t.Run("response_request", func(t *testing.T) {
@@ -1026,7 +1019,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res.request.headers["Host"] != "HTTPBIN_DOMAIN") { throw new Error("wrong Host: " + res.request.headers["Host"]); }
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), 200, "")
 			})
 
 			t.Run("differentHost", func(t *testing.T) {
@@ -1039,7 +1032,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res.request.headers["Host"] != custHost) { throw new Error("wrong Host: " + res.request.headers["Host"]); }
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), 200, "")
 			})
 		})
 
@@ -1051,7 +1044,7 @@ func TestRequestAndBatch(t *testing.T) {
 					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 					`), literal))
 					assert.NoError(t, err)
-					assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), "", 200, "")
+					assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), 200, "")
 				})
 			}
 
@@ -1061,8 +1054,7 @@ func TestRequestAndBatch(t *testing.T) {
 					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET",
-					sr("HTTPBIN_URL/headers"), sr("HTTPBIN_URL/headers"), 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/headers"), 200, "")
 			})
 
 			t.Run("name/request", func(t *testing.T) {
@@ -1071,8 +1063,8 @@ func TestRequestAndBatch(t *testing.T) {
 					if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				`))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET",
-					sr("HTTPBIN_URL/headers"), "myReq", 200, "")
+				// setting name will overwrite both name and url tags
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", "myReq", 200, "")
 			})
 
 			t.Run("name/template", func(t *testing.T) {
@@ -1080,8 +1072,9 @@ func TestRequestAndBatch(t *testing.T) {
 				assert.NoError(t, err)
 				// There's no /anything endpoint in the go-httpbin library we're using, hence the 404,
 				// but it doesn't matter for this test.
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET",
-					sr("HTTPBIN_URL/anything/2"), sr("HTTPBIN_URL/anything/${}"), 404, "")
+				//
+				// Setting name will overwrite both name and url tags
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/anything/${}"), 404, "")
 			})
 
 			t.Run("object", func(t *testing.T) {
@@ -1091,7 +1084,7 @@ func TestRequestAndBatch(t *testing.T) {
 				`))
 				assert.NoError(t, err)
 				bufSamples := metrics.GetBufferedSamples(samples)
-				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/headers"), "", 200, "")
+				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/headers"), 200, "")
 				for _, sampleC := range bufSamples {
 					for _, sample := range sampleC.GetSamples() {
 						tagValue, ok := sample.Tags.Get("tag")
@@ -1104,10 +1097,10 @@ func TestRequestAndBatch(t *testing.T) {
 			t.Run("tags-precedence", func(t *testing.T) {
 				oldTags := state.Tags
 				defer func() { state.Tags = oldTags }()
-				state.Tags = lib.NewTagMap(map[string]string{
+				state.Tags = lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().WithTagsFromMap(map[string]string{
 					"runtag1": "val1",
 					"runtag2": "val2",
-				})
+				}))
 
 				_, err := rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL/headers", null, { tags: { method: "test", name: "myName", runtag1: "fromreq" } });
@@ -1116,7 +1109,8 @@ func TestRequestAndBatch(t *testing.T) {
 				assert.NoError(t, err)
 
 				bufSamples := metrics.GetBufferedSamples(samples)
-				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/headers"), "myName", 200, "")
+				// Setting the name tag will also overwrite the url tag
+				assertRequestMetricsEmitted(t, bufSamples, "GET", "myName", 200, "")
 				for _, sampleC := range bufSamples {
 					for _, sample := range sampleC.GetSamples() {
 						tagValue, ok := sample.Tags.Get("method")
@@ -1149,7 +1143,7 @@ func TestRequestAndBatch(t *testing.T) {
 		if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
 		`))
 		require.NoError(t, err)
-		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get?a=1&b=2"), "", 200, "")
+		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get?a=1&b=2"), 200, "")
 
 		t.Run("Tagged", func(t *testing.T) {
 			_, err := rt.RunString(`
@@ -1161,7 +1155,7 @@ func TestRequestAndBatch(t *testing.T) {
 			if (res.json().args.b != b) { throw new Error("wrong ?b: " + res.json().args.b); }
 			`)
 			assert.NoError(t, err)
-			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get?a=1&b=2"), sr("HTTPBIN_URL/get?a=${}&b=${}"), 200, "")
+			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get?a=${}&b=${}"), 200, "")
 		})
 	})
 	t.Run("HEAD", func(t *testing.T) {
@@ -1173,7 +1167,7 @@ func TestRequestAndBatch(t *testing.T) {
 		if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
 		`))
 		assert.NoError(t, err)
-		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "HEAD", sr("HTTPBIN_URL/get?a=1&b=2"), "", 200, "")
+		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "HEAD", sr("HTTPBIN_URL/get?a=1&b=2"), 200, "")
 	})
 
 	t.Run("OPTIONS", func(t *testing.T) {
@@ -1184,7 +1178,7 @@ func TestRequestAndBatch(t *testing.T) {
 		if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
 		`))
 		require.NoError(t, err)
-		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "OPTIONS", sr("HTTPBIN_URL/?a=1&b=2"), "", 200, "")
+		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "OPTIONS", sr("HTTPBIN_URL/?a=1&b=2"), 200, "")
 	})
 
 	// DELETE HTTP requests shouldn't usually send a request body, they should use url parameters instead; references:
@@ -1199,7 +1193,7 @@ func TestRequestAndBatch(t *testing.T) {
 		if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
 		`))
 		require.NoError(t, err)
-		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "DELETE", sr("HTTPBIN_URL/delete?test=mest"), "", 200, "")
+		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "DELETE", sr("HTTPBIN_URL/delete?test=mest"), 200, "")
 	})
 
 	postMethods := map[string]string{
@@ -1217,7 +1211,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
 				`), fn, strings.ToLower(method)))
 			require.NoError(t, err)
-			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), method, sr("HTTPBIN_URL/")+strings.ToLower(method), "", 200, "")
+			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), method, sr("HTTPBIN_URL/")+strings.ToLower(method), 200, "")
 
 			t.Run("object", func(t *testing.T) {
 				_, err := rt.RunString(fmt.Sprintf(sr(`
@@ -1232,7 +1226,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res.json().headers["Content-Type"] != "application/x-www-form-urlencoded") { throw new Error("wrong content type: " + res.json().headers["Content-Type"]); }
 				`), fn, strings.ToLower(method)))
 				assert.NoError(t, err)
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), method, sr("HTTPBIN_URL/")+strings.ToLower(method), "", 200, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), method, sr("HTTPBIN_URL/")+strings.ToLower(method), 200, "")
 				t.Run("Content-Type", func(t *testing.T) {
 					_, err := rt.RunString(fmt.Sprintf(sr(`
 						var res = http.%s("HTTPBIN_URL/%s", {a: "a", b: 2}, {headers: {"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"}});
@@ -1242,7 +1236,7 @@ func TestRequestAndBatch(t *testing.T) {
 						if (res.json().headers["Content-Type"] != "application/x-www-form-urlencoded; charset=utf-8") { throw new Error("wrong content type: " + res.json().headers["Content-Type"]); }
 						`), fn, strings.ToLower(method)))
 					assert.NoError(t, err)
-					assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), method, sr("HTTPBIN_URL/")+strings.ToLower(method), "", 200, "")
+					assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), method, sr("HTTPBIN_URL/")+strings.ToLower(method), 200, "")
 				})
 			})
 		})
@@ -1408,8 +1402,8 @@ func TestRequestAndBatch(t *testing.T) {
 		}`))
 			require.NoError(t, err)
 			bufSamples := metrics.GetBufferedSamples(samples)
-			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/"), "", 200, "")
-			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")
+			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/"), 200, "")
+			assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), 200, "")
 
 			t.Run("Tagged", func(t *testing.T) {
 				_, err := rt.RunString(sr(`
@@ -1427,8 +1421,8 @@ func TestRequestAndBatch(t *testing.T) {
 			}`))
 				assert.NoError(t, err)
 				bufSamples := metrics.GetBufferedSamples(samples)
-				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get"), sr("HTTPBIN_URL/${}"), 200, "")
-				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")
+				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/${}"), 200, "")
+				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), 200, "")
 			})
 
 			t.Run("Shorthand", func(t *testing.T) {
@@ -1446,8 +1440,8 @@ func TestRequestAndBatch(t *testing.T) {
 			}`))
 				assert.NoError(t, err)
 				bufSamples := metrics.GetBufferedSamples(samples)
-				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/"), "", 200, "")
-				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")
+				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/"), 200, "")
+				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), 200, "")
 
 				t.Run("Tagged", func(t *testing.T) {
 					_, err := rt.RunString(sr(`
@@ -1465,8 +1459,8 @@ func TestRequestAndBatch(t *testing.T) {
 				}`))
 					assert.NoError(t, err)
 					bufSamples := metrics.GetBufferedSamples(samples)
-					assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get"), sr("HTTPBIN_URL/${}"), 200, "")
-					assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")
+					assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/${}"), 200, "")
+					assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), 200, "")
 				})
 			})
 
@@ -1485,8 +1479,8 @@ func TestRequestAndBatch(t *testing.T) {
 			}`))
 				assert.NoError(t, err)
 				bufSamples := metrics.GetBufferedSamples(samples)
-				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/"), "", 200, "")
-				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), "", 200, "")
+				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/"), 200, "")
+				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_IP_URL/"), 200, "")
 			})
 
 			t.Run("ObjectKeys", func(t *testing.T) {
@@ -1504,10 +1498,10 @@ func TestRequestAndBatch(t *testing.T) {
 				}`))
 				assert.NoError(t, err)
 				bufSamples := metrics.GetBufferedSamples(samples)
-				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get?r=shorthand"), "", 200, "")
-				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get?r=arr"), "arr", 200, "")
-				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get?r=obj1"), "", 200, "")
-				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get?r=obj2"), "obj2", 200, "")
+				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get?r=shorthand"), 200, "")
+				assertRequestMetricsEmitted(t, bufSamples, "GET", "arr", 200, "")
+				assertRequestMetricsEmitted(t, bufSamples, "GET", sr("HTTPBIN_URL/get?r=obj1"), 200, "")
+				assertRequestMetricsEmitted(t, bufSamples, "GET", "obj2", 200, "")
 			})
 
 			t.Run("BodyAndParams", func(t *testing.T) {
@@ -1549,8 +1543,8 @@ func TestRequestAndBatch(t *testing.T) {
 					}`))
 				assert.NoError(t, err)
 				bufSamples := metrics.GetBufferedSamples(samples)
-				assertRequestMetricsEmitted(t, bufSamples, "POST", sr("HTTPBIN_URL/post"), "", 200, "")
-				assertRequestMetricsEmitted(t, bufSamples, "POST", sr("HTTPBIN_IP_URL/post"), "myname", 200, "")
+				assertRequestMetricsEmitted(t, bufSamples, "POST", sr("HTTPBIN_URL/post"), 200, "")
+				assertRequestMetricsEmitted(t, bufSamples, "POST", "myname", 200, "")
 			})
 		})
 		t.Run("POST", func(t *testing.T) {
@@ -1561,7 +1555,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res[key].json().form.key != "value") { throw new Error("wrong form: " + key + ": " + JSON.stringify(res[key].json().form)); }
 			}`))
 			assert.NoError(t, err)
-			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "POST", sr("HTTPBIN_URL/post"), "", 200, "")
+			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "POST", sr("HTTPBIN_URL/post"), 200, "")
 		})
 		t.Run("PUT", func(t *testing.T) {
 			_, err := rt.RunString(sr(`
@@ -1571,7 +1565,7 @@ func TestRequestAndBatch(t *testing.T) {
 				if (res[key].json().form.key != "value") { throw new Error("wrong form: " + key + ": " + JSON.stringify(res[key].json().form)); }
 			}`))
 			assert.NoError(t, err)
-			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "PUT", sr("HTTPBIN_URL/put"), "", 200, "")
+			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "PUT", sr("HTTPBIN_URL/put"), 200, "")
 		})
 	})
 
@@ -1996,14 +1990,14 @@ func TestResponseTypes(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func checkErrorCode(t testing.TB, tags *metrics.SampleTags, code int, msg string) {
-	errorMsg, ok := tags.Get("error")
+func checkErrorCode(t testing.TB, sample metrics.Sample, code int, msg string) {
+	errorMsg, ok := sample.Tags.Get("error")
 	if msg == "" {
 		assert.False(t, ok)
 	} else {
 		assert.Contains(t, errorMsg, msg)
 	}
-	errorCodeStr, ok := tags.Get("error_code")
+	errorCodeStr, ok := sample.Tags.Get("error_code")
 	if code == 0 {
 		assert.False(t, ok)
 	} else {
@@ -2110,7 +2104,7 @@ func TestErrorCodes(t *testing.T) {
 			for _, c := range cs[len(cs)-1:] {
 				assert.NotZero(t, len(c.GetSamples()))
 				for _, sample := range c.GetSamples() {
-					checkErrorCode(t, sample.GetTags(), testCase.expectedErrorCode, testCase.expectedErrorMsg)
+					checkErrorCode(t, sample, testCase.expectedErrorCode, testCase.expectedErrorMsg)
 				}
 			}
 		})
@@ -2229,7 +2223,7 @@ func TestRedirectMetricTags(t *testing.T) {
 		allSamples := sc.GetSamples()
 		assert.Len(t, allSamples, 9)
 		for _, s := range allSamples {
-			assert.Equal(t, expTags, s.Tags.CloneTags())
+			assert.Equal(t, expTags, s.Tags.Map())
 		}
 	}
 	expPOSTtags := map[string]string{
@@ -2422,7 +2416,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 					if (res.tls_version != %s) { throw new Error("wrong TLS version: " + res.tls_version); }
 				`, realURL, versionTest.Version))
 			assert.NoError(t, err)
-			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", realURL, "", 200, "")
+			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", realURL, 200, "")
 		})
 	}
 	tlsCipherSuiteTests := []struct {
@@ -2462,7 +2456,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 					if (res.tls_cipher_suite != "%s") { throw new Error("wrong TLS cipher suite: " + res.tls_cipher_suite); }
 				`, realURL, cipherSuiteTest.CipherSuite))
 			assert.NoError(t, err)
-			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", realURL, "", 200, "")
+			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", realURL, 200, "")
 		})
 	}
 	t.Run("ocsp_stapled_good", func(t *testing.T) {
@@ -2478,7 +2472,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			if (res.ocsp.status != http.OCSP_STATUS_GOOD) { throw new Error("wrong ocsp stapled response status: " + res.ocsp.status); }
 			`, website))
 		assert.NoError(t, err)
-		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", website, "", 200, "")
+		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", website, 200, "")
 	})
 }
 
@@ -2512,8 +2506,8 @@ func TestDigestAuthWithBody(t *testing.T) {
 		"http://HTTPBIN_IP:HTTPBIN_PORT/digest-auth-with-post/auth/testuser/testpwd")
 
 	sampleContainers := metrics.GetBufferedSamples(samples)
-	assertRequestMetricsEmitted(t, sampleContainers[0:1], "POST", urlRaw, urlRaw, 401, "")
-	assertRequestMetricsEmitted(t, sampleContainers[1:2], "POST", urlRaw, urlRaw, 200, "")
+	assertRequestMetricsEmitted(t, sampleContainers[0:1], "POST", urlRaw, 401, "")
+	assertRequestMetricsEmitted(t, sampleContainers[1:2], "POST", urlRaw, 200, "")
 }
 
 func TestBinaryResponseWithStatus0(t *testing.T) {

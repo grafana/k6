@@ -4,18 +4,25 @@ import (
 	"fmt"
 	"regexp"
 	"sync"
+
+	"github.com/mstoykov/atlas"
 )
 
 // Registry is what can create metrics
 type Registry struct {
 	metrics map[string]*Metric
 	l       sync.RWMutex
+
+	rootTagSet *atlas.Node
 }
 
 // NewRegistry returns a new registry
 func NewRegistry() *Registry {
 	return &Registry{
 		metrics: make(map[string]*Metric),
+		// All the new TagSts must branch out from this root, otherwise
+		// comparing them and using their Equals() method won't work correctly.
+		rootTagSet: atlas.New(),
 	}
 }
 
@@ -39,7 +46,7 @@ func (r *Registry) NewMetric(name string, typ MetricType, t ...ValueType) (*Metr
 	oldMetric, ok := r.metrics[name]
 
 	if !ok {
-		m := newMetric(name, typ, t...)
+		m := r.newMetric(name, typ, t...)
 		r.metrics[name] = m
 		return m, nil
 	}
@@ -64,8 +71,42 @@ func (r *Registry) MustNewMetric(name string, typ MetricType, t ...ValueType) *M
 	return m
 }
 
+func (r *Registry) newMetric(name string, mt MetricType, vt ...ValueType) *Metric {
+	valueType := Default
+	if len(vt) > 0 {
+		valueType = vt[0]
+	}
+
+	var sink Sink
+	switch mt {
+	case Counter:
+		sink = &CounterSink{}
+	case Gauge:
+		sink = &GaugeSink{}
+	case Trend:
+		sink = &TrendSink{}
+	case Rate:
+		sink = &RateSink{}
+	default:
+		return nil
+	}
+
+	return &Metric{
+		registry: r,
+		Name:     name,
+		Type:     mt,
+		Contains: valueType,
+		Sink:     sink,
+	}
+}
+
 // Get returns the Metric with the given name. If that metric doesn't exist,
 // Get() will return a nil value.
 func (r *Registry) Get(name string) *Metric {
 	return r.metrics[name]
+}
+
+// RootTagSet is the empty root set that all other TagSets must originate from.
+func (r *Registry) RootTagSet() *TagSet {
+	return (*TagSet)(r.rootTagSet)
 }

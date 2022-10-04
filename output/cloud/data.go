@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	easyjson "github.com/mailru/easyjson"
 	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/metrics"
 )
@@ -69,10 +70,10 @@ func (ct *Sample) UnmarshalJSON(p []byte) error {
 // SampleDataSingle is used in all simple un-aggregated single-value samples.
 //easyjson:json
 type SampleDataSingle struct {
-	Time  int64               `json:"time,string"`
-	Type  metrics.MetricType  `json:"type"`
-	Tags  *metrics.SampleTags `json:"tags,omitempty"`
-	Value float64             `json:"value"`
+	Time  int64              `json:"time,string"`
+	Type  metrics.MetricType `json:"type"`
+	Tags  json.RawMessage    `json:"tags,omitempty"`
+	Value float64            `json:"value"`
 }
 
 // SampleDataMap is used by samples that contain multiple values, currently
@@ -80,10 +81,10 @@ type SampleDataSingle struct {
 // requests (`http_req_li_all`).
 //easyjson:json
 type SampleDataMap struct {
-	Time   int64               `json:"time,string"`
-	Type   metrics.MetricType  `json:"type"`
-	Tags   *metrics.SampleTags `json:"tags,omitempty"`
-	Values map[string]float64  `json:"values,omitempty"`
+	Time   int64              `json:"time,string"`
+	Type   metrics.MetricType `json:"type"`
+	Tags   json.RawMessage    `json:"tags,omitempty"`
+	Values map[string]float64 `json:"values,omitempty"`
 }
 
 // NewSampleFromTrail just creates a ready-to-send Sample instance
@@ -106,24 +107,30 @@ func NewSampleFromTrail(trail *httpext.Trail) *Sample {
 	if trail.Failed.Valid { // this is done so the adding of 1 map element doesn't reexpand the map as this is a hotpath
 		values[metrics.HTTPReqFailedName] = metrics.B(trail.Failed.Bool)
 	}
+	sdata := &SampleDataMap{
+		Time:   toMicroSecond(trail.GetTime()),
+		Values: values,
+	}
+	if !trail.Tags.IsEmpty() {
+		if tagsJSON, err := easyjson.Marshal(trail.Tags); err == nil {
+			sdata.Tags = tagsJSON
+		}
+	}
+
 	return &Sample{
 		Type:   DataTypeMap,
 		Metric: "http_req_li_all",
-		Data: &SampleDataMap{
-			Time:   toMicroSecond(trail.GetTime()),
-			Tags:   trail.GetTags(),
-			Values: values,
-		},
+		Data:   sdata,
 	}
 }
 
 // SampleDataAggregatedHTTPReqs is used in aggregated samples for HTTP requests.
 //easyjson:json
 type SampleDataAggregatedHTTPReqs struct {
-	Time   int64               `json:"time,string"`
-	Type   string              `json:"type"`
-	Count  uint64              `json:"count"`
-	Tags   *metrics.SampleTags `json:"tags,omitempty"`
+	Time   int64           `json:"time,string"`
+	Type   string          `json:"type"`
+	Count  uint64          `json:"count"`
+	Tags   json.RawMessage `json:"tags,omitempty"`
 	Values struct {
 		Duration       AggregatedMetric `json:"http_req_duration"`
 		Blocked        AggregatedMetric `json:"http_req_blocked"`
@@ -213,7 +220,7 @@ func (am *AggregatedMetric) Calc(count float64) {
 	am.Avg = metrics.D(am.sumD) / count
 }
 
-type aggregationBucket map[*metrics.SampleTags][]*httpext.Trail
+type aggregationBucket map[*metrics.TagSet][]*httpext.Trail
 
 type durations []time.Duration
 

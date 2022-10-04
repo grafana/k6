@@ -12,9 +12,14 @@ import (
 )
 
 func benchmarkInfluxdb(b *testing.B, t time.Duration) {
-	metric, err := metrics.NewRegistry().NewMetric("test_gauge", metrics.Gauge)
+	registry := metrics.NewRegistry()
+	metric, err := registry.NewMetric("test_gauge", metrics.Gauge)
 	require.NoError(b, err)
-
+	tags := registry.RootTagSet().WithTagsFromMap(map[string]string{
+		"something": "else",
+		"VU":        "21",
+		"else":      "something",
+	})
 	testOutputCycle(b, func(rw http.ResponseWriter, r *http.Request) {
 		for {
 			time.Sleep(t)
@@ -31,13 +36,11 @@ func benchmarkInfluxdb(b *testing.B, t time.Duration) {
 		samples := make(metrics.Samples, 10)
 		for i := 0; i < len(samples); i++ {
 			samples[i] = metrics.Sample{
-				Metric: metric,
-				Time:   time.Now(),
-				Tags: metrics.NewSampleTags(map[string]string{
-					"something": "else",
-					"VU":        "21",
-					"else":      "something",
-				}),
+				TimeSeries: metrics.TimeSeries{
+					Metric: metric,
+					Tags:   tags,
+				},
+				Time:  time.Now(),
 				Value: 2.0,
 			}
 		}

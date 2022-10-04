@@ -86,9 +86,9 @@ func (v *sampleEnvelope) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson42239ddeDecodeGoK6IoK6OutputJson(l, v)
 }
 func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
-	Time  time.Time           `json:"time"`
-	Value float64             `json:"value"`
-	Tags  *metrics.SampleTags `json:"tags"`
+	Time  time.Time       `json:"time"`
+	Value float64         `json:"value"`
+	Tags  *metrics.TagSet `json:"tags"`
 }) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
@@ -120,11 +120,9 @@ func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
 				out.Tags = nil
 			} else {
 				if out.Tags == nil {
-					out.Tags = new(metrics.SampleTags)
+					out.Tags = new(metrics.TagSet)
 				}
-				if data := in.Raw(); in.Ok() {
-					in.AddError((*out.Tags).UnmarshalJSON(data))
-				}
+				(*out.Tags).UnmarshalEasyJSON(in)
 			}
 		default:
 			in.SkipRecursive()
@@ -137,9 +135,9 @@ func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
 	}
 }
 func easyjson42239ddeEncode(out *jwriter.Writer, in struct {
-	Time  time.Time           `json:"time"`
-	Value float64             `json:"value"`
-	Tags  *metrics.SampleTags `json:"tags"`
+	Time  time.Time       `json:"time"`
+	Value float64         `json:"value"`
+	Tags  *metrics.TagSet `json:"tags"`
 }) {
 	out.RawByte('{')
 	first := true
@@ -392,11 +390,9 @@ func easyjson42239ddeDecodeGoK6IoK6Metrics(in *jlexer.Lexer, out *metrics.Submet
 				out.Tags = nil
 			} else {
 				if out.Tags == nil {
-					out.Tags = new(metrics.SampleTags)
+					out.Tags = new(metrics.TagSet)
 				}
-				if data := in.Raw(); in.Ok() {
-					in.AddError((*out.Tags).UnmarshalJSON(data))
-				}
+				(*out.Tags).UnmarshalEasyJSON(in)
 			}
 		default:
 			in.SkipRecursive()

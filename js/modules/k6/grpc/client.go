@@ -182,25 +182,23 @@ func (c *Client) Invoke(
 	ctx, cancel := context.WithTimeout(c.vu.Context(), p.Timeout)
 	defer cancel()
 
-	tags := state.CloneTags()
-	for k, v := range p.Tags {
-		tags[k] = v
-	}
+	tags := state.Tags.GetCurrentValues()
+	tags = tags.WithTagsFromMap(p.Tags)
 
 	if state.Options.SystemTags.Has(metrics.TagURL) {
-		tags["url"] = fmt.Sprintf("%s%s", c.addr, method)
+		tags = tags.With("url", fmt.Sprintf("%s%s", c.addr, method))
 	}
 	parts := strings.Split(method[1:], "/")
 	if state.Options.SystemTags.Has(metrics.TagService) {
-		tags["service"] = parts[0]
+		tags = tags.With("service", parts[0])
 	}
 	if state.Options.SystemTags.Has(metrics.TagMethod) {
-		tags["method"] = parts[1]
+		tags = tags.With("method", parts[1])
 	}
 
 	// Only set the name system tag if the user didn't explicitly set it beforehand
-	if _, ok := tags["name"]; !ok && state.Options.SystemTags.Has(metrics.TagName) {
-		tags["name"] = method
+	if _, ok := tags.Get("name"); !ok && state.Options.SystemTags.Has(metrics.TagName) {
+		tags = tags.With("name", method)
 	}
 
 	reqmsg := grpcext.Request{

@@ -248,12 +248,11 @@ func (lct *loadedAndConfiguredTest) buildTestRunState(
 		return nil, err
 	}
 
-	// TODO: init atlas root node, etc.
-
 	return &lib.TestRunState{
 		TestPreInitState: lct.preInitState,
 		Runner:           lct.initRunner,
 		Options:          lct.derivedConfig.Options, // we will always run with the derived options
+		RunTags:          lct.preInitState.Registry.RootTagSet().WithTagsFromMap(configToReinject.RunTags),
 	}, nil
 }
 

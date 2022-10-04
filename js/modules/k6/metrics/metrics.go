@@ -108,15 +108,22 @@ func (m Metric) add(v goja.Value, addTags goja.Value) (bool, error) {
 		return raiseNan()
 	}
 
-	tags := state.CloneTags()
+	tags := state.Tags.GetCurrentValues()
 	if addTags != nil {
 		tagsobj := addTags.ToObject(m.vu.Runtime())
 		for _, key := range tagsobj.Keys() {
-			tags[key] = tagsobj.Get(key).String()
+			tags = tags.With(key, tagsobj.Get(key).String())
 		}
 	}
 
-	sample := metrics.Sample{Time: time.Now(), Metric: m.metric, Value: vfloat, Tags: metrics.IntoSampleTags(&tags)}
+	sample := metrics.Sample{
+		TimeSeries: metrics.TimeSeries{
+			Metric: m.metric,
+			Tags:   tags,
+		},
+		Time:  time.Now(),
+		Value: vfloat,
+	}
 	metrics.PushIfNotDone(m.vu.Context(), state.Samples, sample)
 	return true, nil
 }
