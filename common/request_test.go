@@ -50,7 +50,10 @@ func TestRequest(t *testing.T) {
 		WallTime:  &wt,
 	}
 	vu := k6test.NewVU(t)
-	req, err := NewRequest(vu.Context(), evt, nil, nil, "intercept", false)
+	req, err := NewRequest(vu.Context(), NewRequestParams{
+		event:          evt,
+		interceptionID: "intercept",
+	})
 	require.NoError(t, err)
 
 	t.Run("error_parse_url", func(t *testing.T) {
@@ -67,7 +70,10 @@ func TestRequest(t *testing.T) {
 			WallTime:  &wt,
 		}
 		vu := k6test.NewVU(t)
-		req, err := NewRequest(vu.Context(), evt, nil, nil, "intercept", false)
+		req, err := NewRequest(vu.Context(), NewRequestParams{
+			event:          evt,
+			interceptionID: "intercept",
+		})
 		require.EqualError(t, err, `parsing URL ":": missing protocol scheme`)
 		require.Nil(t, req)
 	})

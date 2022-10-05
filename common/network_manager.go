@@ -460,7 +460,13 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 			event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
 	}
 
-	req, err := NewRequest(m.ctx, event, frame, redirectChain, interceptionID, m.userReqInterceptionEnabled)
+	req, err := NewRequest(m.ctx, NewRequestParams{
+		event:             event,
+		frame:             frame,
+		redirectChain:     redirectChain,
+		interceptionID:    interceptionID,
+		allowInterception: m.userReqInterceptionEnabled,
+	})
 	if err != nil {
 		m.logger.Errorf("NetworkManager", "creating request: %s", err)
 		return
