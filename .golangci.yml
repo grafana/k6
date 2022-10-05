@@ -1,4 +1,4 @@
-# v1.46.2
+# v1.50.0
 # Please don't remove the first line. It's used in CI to determine the
 # golangci-lint version. See the lint step in .github/workflows/all.yaml
 run:
