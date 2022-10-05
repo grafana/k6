@@ -117,6 +117,7 @@ func (c *Client) parseRequest(
 		Redirects:        state.Options.MaxRedirects,
 		Cookies:          make(map[string]*httpext.HTTPRequestCookie),
 		ResponseCallback: c.responseCallback,
+		Tags:             c.moduleInstance.vu.State().Tags.GetCurrentValues(),
 	}
 
 	if state.Options.DiscardResponseBodies.Bool {
@@ -307,19 +308,11 @@ func (c *Client) parseRequest(
 			case "redirects":
 				result.Redirects = null.IntFrom(params.Get(k).ToInteger())
 			case "tags":
-				tagsV := params.Get(k)
-				if goja.IsUndefined(tagsV) || goja.IsNull(tagsV) {
-					continue
+				newTags, err := common.ApplyCustomUserTags(rt, result.Tags, params.Get(k))
+				if err != nil {
+					return nil, fmt.Errorf("invalid HTTP request metric tags: %w", err)
 				}
-				tagObj := tagsV.ToObject(rt)
-				if tagObj == nil {
-					continue
-				}
-				tagKeys := tagObj.Keys()
-				result.Tags = make([][2]string, 0, len(tagKeys))
-				for _, key := range tagKeys {
-					result.Tags = append(result.Tags, [2]string{key, tagObj.Get(key).String()})
-				}
+				result.Tags = newTags
 			case "auth":
 				result.Auth = params.Get(k).String()
 			case "timeout":
