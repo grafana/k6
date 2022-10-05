@@ -98,10 +98,12 @@ type NavigationEvent struct {
 }
 
 type eventHandler struct {
-	ctx        context.Context
-	ch         chan Event
-	queueMutex *sync.Mutex
-	queue      []Event
+	ctx           context.Context
+	ch            chan Event
+	queueMutex    *sync.Mutex
+	queue         []Event
+	curQueueMutex *sync.Mutex
+	curQueue      []Event
 }
 
 // EventEmitter that all event emitters need to implement.
@@ -169,12 +171,25 @@ func (e *BaseEventEmitter) sync(fn func()) {
 
 func (e *BaseEventEmitter) emit(event string, data interface{}) {
 	emitEvent := func(eh *eventHandler) {
-		eh.queueMutex.Lock()
-		defer eh.queueMutex.Unlock()
+		eh.curQueueMutex.Lock()
+		defer eh.curQueueMutex.Unlock()
+
+		// We try to read from the current queue (curQueue)
+		// If there isn't anything on curQueue then there must
+		// be something being populated by the synched emitTo
+		// func below. Swap around curQueue with queue. Queue
+		// is now being populated again by emitTo, and all
+		// emitEvent goroutines can continue to consume from
+		// curQueue until that is again depleted.
+		if len(eh.curQueue) == 0 {
+			eh.queueMutex.Lock()
+			eh.curQueue, eh.queue = eh.queue, eh.curQueue
+			eh.queueMutex.Unlock()
+		}
 
 		select {
-		case eh.ch <- eh.queue[0]:
-			eh.queue = eh.queue[1:]
+		case eh.ch <- eh.curQueue[0]:
+			eh.curQueue = eh.curQueue[1:]
 		case <-eh.ctx.Done():
 			// TODO: handle the error
 		}
@@ -187,13 +202,6 @@ func (e *BaseEventEmitter) emit(event string, data interface{}) {
 				handlers = append(handlers[:i], handlers[i+1:]...)
 				continue
 			default:
-				// To ensure that goroutines don't break the ordering
-				// of the emitted events, we will need the goroutine to synchronize.
-				// This means that the events need to be stored in a queue per handler. The
-				// goroutine responsible for the the first popped element must complete
-				// publishing the event before the next goroutine can pop and work with
-				// the next event for that one handler. Each handler can process events concurrently still.
-
 				handler.queueMutex.Lock()
 				handler.queue = append(handler.queue, Event{typ: event, data: data})
 				handler.queueMutex.Unlock()
@@ -218,7 +226,14 @@ func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Even
 			if !ok {
 				e.handlers[event] = make([]*eventHandler, 0)
 			}
-			eh := eventHandler{ctx, ch, &sync.Mutex{}, make([]Event, 0)}
+			eh := eventHandler{
+				ctx,
+				ch,
+				&sync.Mutex{},
+				make([]Event, 0),
+				&sync.Mutex{},
+				make([]Event, 0),
+			}
 			e.handlers[event] = append(e.handlers[event], &eh)
 		}
 	})
@@ -227,6 +242,14 @@ func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Even
 // OnAll registers a handler for all events.
 func (e *BaseEventEmitter) onAll(ctx context.Context, ch chan Event) {
 	e.sync(func() {
-		e.handlersAll = append(e.handlersAll, &eventHandler{ctx, ch, &sync.Mutex{}, make([]Event, 0)})
+		e.handlersAll = append(e.handlersAll,
+			&eventHandler{
+				ctx,
+				ch,
+				&sync.Mutex{},
+				make([]Event, 0),
+				&sync.Mutex{},
+				make([]Event, 0),
+			})
 	})
 }

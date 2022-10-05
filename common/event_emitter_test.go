@@ -22,9 +22,11 @@ package common
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/chromedp/cdproto"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -123,5 +125,137 @@ func TestEventEmitterAllEvents(t *testing.T) {
 			require.Equal(t, cdproto.EventTargetTargetCreated, msg.typ)
 			require.Equal(t, "hello world", msg.data)
 		})
+	})
+}
+
+func TestBaseEventEmitter(t *testing.T) {
+	t.Parallel()
+
+	t.Run("order of emitted events kept", func(t *testing.T) {
+		// Test description
+		//
+		// 1. Emit many events from the emitWorker.
+		// 2. Handler receives the emitted events.
+		//
+		// Success criteria: Ensure that the ordering of events is
+		//                   received in the order they're emitted.
+
+		t.Parallel()
+
+		eventName := "AtomicIntEvent"
+		maxInt := 100
+
+		ctx, cancel := context.WithCancel(context.Background())
+		emitter := NewBaseEventEmitter(ctx)
+		ch := make(chan Event)
+		emitter.on(ctx, []string{eventName}, ch)
+
+		wg := sync.WaitGroup{}
+
+		var expectedI int
+		wg.Add(1)
+		handler := func() {
+			defer wg.Done()
+
+			for expectedI != maxInt {
+				e := <-ch
+
+				i, ok := e.data.(int)
+				if !ok {
+					assert.Fail(t, "unexpected type read from channel", e.data)
+				}
+
+				assert.Equal(t, eventName, e.typ)
+				assert.Equal(t, expectedI, i)
+
+				expectedI++
+			}
+
+			cancel()
+			close(ch)
+		}
+		go handler()
+
+		wg.Add(1)
+		emitWorker := func() {
+			defer wg.Done()
+
+			for i := 0; i < maxInt; i++ {
+				i := i
+				emitter.emit(eventName, i)
+			}
+		}
+		go emitWorker()
+
+		wg.Wait()
+	})
+
+	t.Run("handler can emit without deadlocking", func(t *testing.T) {
+		// Test description
+		//
+		// 1. Emit many events from the emitWorker.
+		// 2. Handler receives emitted events (AtomicIntEvent1).
+		// 3. Handler emits event as AtomicIntEvent2.
+		// 4. Handler received emitted events again (AtomicIntEvent2).
+		//
+		// Success criteria: No deadlock should occur between receiving,
+		//                   emitting, and receiving of events.
+
+		t.Parallel()
+
+		eventName1 := "AtomicIntEvent1"
+		eventName2 := "AtomicIntEvent2"
+		maxInt := 100
+
+		ctx, cancel := context.WithCancel(context.Background())
+		emitter := NewBaseEventEmitter(ctx)
+		ch := make(chan Event)
+		emitter.on(ctx, []string{eventName1, eventName2}, ch)
+
+		wg := sync.WaitGroup{}
+
+		var expectedI2 int
+		wg.Add(1)
+		handler := func() {
+			defer wg.Done()
+
+			for {
+				if expectedI2 == maxInt {
+					break
+				}
+
+				e := <-ch
+
+				switch e.typ {
+				case eventName1:
+					i, ok := e.data.(int)
+					if !ok {
+						assert.Fail(t, "unexpected type read from channel", e.data)
+					}
+					emitter.emit(eventName2, i)
+				case eventName2:
+					expectedI2++
+				default:
+					assert.Fail(t, "unexpected event type received")
+				}
+			}
+
+			cancel()
+			close(ch)
+		}
+		go handler()
+
+		wg.Add(1)
+		emitWorker := func() {
+			defer wg.Done()
+
+			for i := 0; i < maxInt; i++ {
+				i := i
+				emitter.emit(eventName1, i)
+			}
+		}
+		go emitWorker()
+
+		wg.Wait()
 	})
 }
