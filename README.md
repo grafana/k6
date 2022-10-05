@@ -96,6 +96,10 @@ Then:
 
    Note: You can place it somewhere in your `PATH` so that it can be run from anywhere on your system.
 
+### Troubleshooting
+
+If you're having issues installing or running xk6-browser, please see the [troubleshooting document](/TROUBLESHOOTING.md).
+
 ## Examples
 
 #### Launch options
