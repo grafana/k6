@@ -165,25 +165,23 @@ func (m *NetworkManager) deleteRequestByID(reqID network.RequestID) {
 func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	state := m.vu.State()
 
-	tags := state.CloneTags()
+	tags := state.Tags.GetCurrentValues()
 	if state.Options.SystemTags.Has(k6metrics.TagGroup) {
-		tags["group"] = state.Group.Path
+		tags = tags.With("group", state.Group.Path)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
-		tags["method"] = req.method
+		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags["url"] = req.URL()
+		tags = tags.With("url", req.URL())
 	}
 
-	sampleTags := k6metrics.IntoSampleTags(&tags)
 	k6metrics.PushIfNotDone(m.ctx, state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
-				Metric: state.BuiltinMetrics.DataSent,
-				Tags:   sampleTags,
-				Value:  float64(req.Size().Total()),
-				Time:   req.timestamp,
+				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.DataSent, Tags: tags},
+				Value:      float64(req.Size().Total()),
+				Time:       req.timestamp,
 			},
 		},
 	})
@@ -217,42 +215,39 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 			"response is nil url:%s method:%s", req.url, req.method)
 	}
 
-	tags := state.CloneTags()
+	tags := state.Tags.GetCurrentValues()
 	if state.Options.SystemTags.Has(k6metrics.TagGroup) {
-		tags["group"] = state.Group.Path
+		tags = tags.With("group", state.Group.Path)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
-		tags["method"] = req.method
+		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags["url"] = url
+		tags = tags.With("url", url)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagIP) {
-		tags["ip"] = ipAddress
+		tags = tags.With("ip", ipAddress)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagStatus) {
-		tags["status"] = strconv.Itoa(int(status))
+		tags = tags.With("status", strconv.Itoa(int(status)))
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagProto) {
-		tags["proto"] = protocol
+		tags = tags.With("proto", protocol)
 	}
 
-	tags["from_cache"] = strconv.FormatBool(fromCache)
-	tags["from_prefetch_cache"] = strconv.FormatBool(fromPreCache)
-	tags["from_service_worker"] = strconv.FormatBool(fromSvcWrk)
+	tags = tags.With("from_cache", strconv.FormatBool(fromCache))
+	tags = tags.With("from_prefetch_cache", strconv.FormatBool(fromPreCache))
+	tags = tags.With("from_service_worker", strconv.FormatBool(fromSvcWrk))
 
-	sampleTags := k6metrics.IntoSampleTags(&tags)
 	k6metrics.PushIfNotDone(m.ctx, state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
-				Metric: state.BuiltinMetrics.HTTPReqs,
-				Tags:   sampleTags,
-				Value:  1,
-				Time:   timestamp,
+				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqs, Tags: tags},
+				Value:      1,
+				Time:       timestamp,
 			},
 			{
-				Metric: state.BuiltinMetrics.HTTPReqDuration,
-				Tags:   sampleTags,
+				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqDuration, Tags: tags},
 
 				// We're using diff between CDP protocol message timestamps here because the `Network.responseReceived.responseTime`
 				// value seems to be in milliseconds rather than seconds as specified in the protocol docs and that causes
@@ -263,10 +258,9 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 				Time:  timestamp,
 			},
 			{
-				Metric: state.BuiltinMetrics.DataReceived,
-				Tags:   sampleTags,
-				Value:  float64(bodySize),
-				Time:   timestamp,
+				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.DataReceived, Tags: tags},
+				Value:      float64(bodySize),
+				Time:       timestamp,
 			},
 		},
 	})
@@ -275,28 +269,24 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		k6metrics.PushIfNotDone(m.ctx, state.Samples, k6metrics.ConnectedSamples{
 			Samples: []k6metrics.Sample{
 				{
-					Metric: state.BuiltinMetrics.HTTPReqConnecting,
-					Tags:   sampleTags,
-					Value:  k6metrics.D(time.Duration(resp.timing.ConnectEnd-resp.timing.ConnectStart) * time.Millisecond),
-					Time:   resp.timestamp,
+					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqConnecting, Tags: tags},
+					Value:      k6metrics.D(time.Duration(resp.timing.ConnectEnd-resp.timing.ConnectStart) * time.Millisecond),
+					Time:       resp.timestamp,
 				},
 				{
-					Metric: state.BuiltinMetrics.HTTPReqTLSHandshaking,
-					Tags:   sampleTags,
-					Value:  k6metrics.D(time.Duration(resp.timing.SslEnd-resp.timing.SslStart) * time.Millisecond),
-					Time:   resp.timestamp,
+					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqTLSHandshaking, Tags: tags},
+					Value:      k6metrics.D(time.Duration(resp.timing.SslEnd-resp.timing.SslStart) * time.Millisecond),
+					Time:       resp.timestamp,
 				},
 				{
-					Metric: state.BuiltinMetrics.HTTPReqSending,
-					Tags:   sampleTags,
-					Value:  k6metrics.D(time.Duration(resp.timing.SendEnd-resp.timing.SendStart) * time.Millisecond),
-					Time:   resp.timestamp,
+					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqSending, Tags: tags},
+					Value:      k6metrics.D(time.Duration(resp.timing.SendEnd-resp.timing.SendStart) * time.Millisecond),
+					Time:       resp.timestamp,
 				},
 				{
-					Metric: state.BuiltinMetrics.HTTPReqReceiving,
-					Tags:   sampleTags,
-					Value:  k6metrics.D(time.Duration(resp.timing.ReceiveHeadersEnd-resp.timing.SendEnd) * time.Millisecond),
-					Time:   resp.timestamp,
+					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqReceiving, Tags: tags},
+					Value:      k6metrics.D(time.Duration(resp.timing.ReceiveHeadersEnd-resp.timing.SendEnd) * time.Millisecond),
+					Time:       resp.timestamp,
 				},
 			},
 		})

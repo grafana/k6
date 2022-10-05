@@ -354,18 +354,16 @@ func (f *Frame) emitMetric(m *k6metrics.Metric, t time.Time) {
 	}
 
 	state := f.vu.State()
-	tags := state.CloneTags()
+	tags := state.Tags.GetCurrentValues()
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags["url"] = f.URL()
+		tags = tags.With("url", f.URL())
 	}
-	sampleTags := k6metrics.IntoSampleTags(&tags)
 	k6metrics.PushIfNotDone(f.ctx, state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
-				Metric: m,
-				Tags:   sampleTags,
-				Value:  value,
-				Time:   time.Now(),
+				TimeSeries: k6metrics.TimeSeries{Metric: m, Tags: tags},
+				Value:      value,
+				Time:       time.Now(),
 			},
 		},
 	})

@@ -50,6 +50,8 @@ func NewVU(tb testing.TB) *VU {
 
 	root, err := k6lib.NewGroup("", nil)
 	require.NoError(tb, err)
+	testRT := k6modulestest.NewRuntime(tb)
+	tags := testRT.VU.InitEnvField.Registry.RootTagSet()
 
 	state := &k6lib.State{
 		Options: k6lib.Options{
@@ -65,11 +67,10 @@ func NewVU(tb testing.TB) *VU {
 		Group:          root,
 		BPool:          bpool.NewBufferPool(1),
 		Samples:        samples,
-		Tags:           k6lib.NewTagMap(map[string]string{"group": root.Path}),
+		Tags:           k6lib.NewVUStateTags(tags.With("group", root.Path)),
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
 	}
 
-	testRT := k6modulestest.NewRuntime(tb)
 	ctx := k6ext.WithVU(testRT.VU.CtxField, testRT.VU)
 	testRT.VU.CtxField = ctx
 
