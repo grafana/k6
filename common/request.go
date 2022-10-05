@@ -67,56 +67,60 @@ type Request struct {
 	vu                  k6modules.VU
 }
 
+// NewRequestParams are input parameters for NewRequest.
+type NewRequestParams struct {
+	event             *network.EventRequestWillBeSent
+	frame             *Frame
+	redirectChain     []*Request
+	interceptionID    string
+	allowInterception bool
+}
+
 // NewRequest creates a new HTTP request.
-func NewRequest(
-	ctx context.Context, event *network.EventRequestWillBeSent, f *Frame,
-	redirectChain []*Request, interceptionID string, allowInterception bool,
-) (*Request, error) {
+func NewRequest(ctx context.Context, rp NewRequestParams) (*Request, error) {
+	ev := rp.event
+
 	documentID := cdp.LoaderID("")
-	if event.RequestID == network.RequestID(event.LoaderID) && event.Type == "Document" {
-		documentID = event.LoaderID
+	if ev.RequestID == network.RequestID(ev.LoaderID) && ev.Type == "Document" {
+		documentID = ev.LoaderID
 	}
 
-	u, err := url.Parse(event.Request.URL)
+	u, err := url.Parse(ev.Request.URL)
 	if err != nil {
 		var uerr *url.Error
 		if errors.As(err, &uerr) {
 			err = uerr.Err
 		}
-		return nil, fmt.Errorf("parsing URL %q: %w", event.Request.URL, err)
+		return nil, fmt.Errorf("parsing URL %q: %w", ev.Request.URL, err)
 	}
 
+	isNavigationRequest := string(ev.RequestID) == string(ev.LoaderID) &&
+		ev.Type == network.ResourceTypeDocument
+
 	r := Request{
-		ctx:                 ctx,
-		frame:               f,
-		response:            nil,
-		redirectChain:       redirectChain,
-		requestID:           event.RequestID,
-		documentID:          documentID.String(),
 		url:                 u,
-		method:              event.Request.Method,
+		frame:               rp.frame,
+		redirectChain:       rp.redirectChain,
+		requestID:           ev.RequestID,
+		method:              ev.Request.Method,
+		postData:            ev.Request.PostData,
+		resourceType:        ev.Type.String(),
+		isNavigationRequest: isNavigationRequest,
+		allowInterception:   rp.allowInterception,
+		interceptionID:      rp.interceptionID,
+		timestamp:           ev.Timestamp.Time(),
+		wallTime:            ev.WallTime.Time(),
+		documentID:          documentID.String(),
 		headers:             make(map[string][]string),
-		postData:            event.Request.PostData,
-		resourceType:        event.Type.String(),
-		isNavigationRequest: string(event.RequestID) == string(event.LoaderID) && event.Type == network.ResourceTypeDocument,
-		allowInterception:   allowInterception,
-		interceptionID:      interceptionID,
-		fromMemoryCache:     false,
-		errorText:           "",
-		timestamp:           event.Timestamp.Time(),
-		wallTime:            event.WallTime.Time(),
+		ctx:                 ctx,
 		vu:                  k6ext.GetVU(ctx),
 	}
-	for n, v := range event.Request.Headers {
-		switch v := v.(type) {
-		case string:
-			if _, ok := r.headers[n]; !ok {
-				r.headers[n] = []string{v}
-			} else {
-				r.headers[n] = append(r.headers[n], v)
-			}
+	for n, v := range ev.Request.Headers {
+		if s, ok := v.(string); ok {
+			r.headers[n] = append(r.headers[n], s)
 		}
 	}
+
 	return &r, nil
 }
 
