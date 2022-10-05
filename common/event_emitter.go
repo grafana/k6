@@ -117,8 +117,8 @@ type syncFunc func() (done chan struct{})
 
 // BaseEventEmitter emits events to registered handlers.
 type BaseEventEmitter struct {
-	handlers    map[string][]eventHandler
-	handlersAll []eventHandler
+	handlers    map[string][]*eventHandler
+	handlersAll []*eventHandler
 
 	syncCh chan syncFunc
 	ctx    context.Context
@@ -127,7 +127,7 @@ type BaseEventEmitter struct {
 // NewBaseEventEmitter creates a new instance of a base event emitter.
 func NewBaseEventEmitter(ctx context.Context) BaseEventEmitter {
 	bem := BaseEventEmitter{
-		handlers: make(map[string][]eventHandler),
+		handlers: make(map[string][]*eventHandler),
 		syncCh:   make(chan syncFunc),
 		ctx:      ctx,
 	}
@@ -168,7 +168,7 @@ func (e *BaseEventEmitter) sync(fn func()) {
 }
 
 func (e *BaseEventEmitter) emit(event string, data interface{}) {
-	emitEvent := func(eh eventHandler) {
+	emitEvent := func(eh *eventHandler) {
 		eh.queueMutex.Lock()
 		defer eh.queueMutex.Unlock()
 
@@ -179,7 +179,7 @@ func (e *BaseEventEmitter) emit(event string, data interface{}) {
 			// TODO: handle the error
 		}
 	}
-	emitTo := func(handlers []eventHandler) (updated []eventHandler) {
+	emitTo := func(handlers []*eventHandler) (updated []*eventHandler) {
 		for i := 0; i < len(handlers); {
 			handler := handlers[i]
 			select {
@@ -216,10 +216,10 @@ func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Even
 		for _, event := range events {
 			_, ok := e.handlers[event]
 			if !ok {
-				e.handlers[event] = make([]eventHandler, 0)
+				e.handlers[event] = make([]*eventHandler, 0)
 			}
 			eh := eventHandler{ctx, ch, &sync.Mutex{}, make([]Event, 0)}
-			e.handlers[event] = append(e.handlers[event], eh)
+			e.handlers[event] = append(e.handlers[event], &eh)
 		}
 	})
 }
@@ -227,6 +227,6 @@ func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Even
 // OnAll registers a handler for all events.
 func (e *BaseEventEmitter) onAll(ctx context.Context, ch chan Event) {
 	e.sync(func() {
-		e.handlersAll = append(e.handlersAll, eventHandler{ctx, ch, &sync.Mutex{}, make([]Event, 0)})
+		e.handlersAll = append(e.handlersAll, &eventHandler{ctx, ch, &sync.Mutex{}, make([]Event, 0)})
 	})
 }
