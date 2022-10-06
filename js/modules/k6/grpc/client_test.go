@@ -947,6 +947,8 @@ func TestDebugStat(t *testing.T) {
 func TestClientInvokeHeadersDeprecated(t *testing.T) {
 	t.Parallel()
 
+	registry := metrics.NewRegistry()
+
 	logHook := &testutils.SimpleLogrusHook{
 		HookedLevels: []logrus.Level{logrus.WarnLevel},
 	}
@@ -954,7 +956,7 @@ func TestClientInvokeHeadersDeprecated(t *testing.T) {
 	testLog.AddHook(logHook)
 	testLog.SetOutput(ioutil.Discard)
 
-	registry := metrics.NewRegistry()
+	rt := goja.New()
 	c := Client{
 		vu: &modulestest.VU{
 			StateField: &lib.State{
@@ -962,16 +964,16 @@ func TestClientInvokeHeadersDeprecated(t *testing.T) {
 				Logger:         testLog,
 				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 			},
-			RuntimeField: goja.New(),
+			RuntimeField: rt,
 		},
 	}
 
-	params := map[string]interface{}{
+	params := rt.ToValue(map[string]interface{}{
 		"headers": map[string]interface{}{
 			"X-HEADER-FOO": "bar",
 		},
-	}
-	_, err := c.parseParams(params)
+	})
+	_, err := c.parseInvokeParams(params)
 	require.NoError(t, err)
 
 	entries := logHook.Drain()
