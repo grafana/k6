@@ -123,10 +123,11 @@ func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
 	t := time.Now()
 
 	ctx := mi.vu.Context()
+	ctm := state.Tags.GetCurrentValues()
 	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
 			Metric: state.BuiltinMetrics.GroupDuration,
-			Tags:   state.Tags.GetCurrentValues(),
+			Tags:   ctm,
 		},
 		Time:  t,
 		Value: metrics.D(t.Sub(startTime)),
@@ -152,10 +153,11 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 	// Prepare the metric tags
 	commonTags := state.Tags.GetCurrentValues()
 	if len(extras) > 0 {
-		obj := extras[0].ToObject(rt)
-		for _, k := range obj.Keys() {
-			commonTags = commonTags.With(k, obj.Get(k).String())
+		newTags, err := common.ApplyCustomUserTags(rt, commonTags, extras[0])
+		if err != nil {
+			return false, err
 		}
+		commonTags = newTags
 	}
 
 	succ := true
