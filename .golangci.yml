@@ -36,7 +36,6 @@ linters:
   disable-all: true
   enable:
     - cyclop
-    - deadcode
     - dogsled
     - dupl
     - durationcheck
@@ -61,7 +60,6 @@ linters:
     - gosec
     - gosimple
     - govet
-    - ifshort
     - importas
     - ineffassign
     - lll
@@ -77,7 +75,6 @@ linters:
     - prealloc
     - revive
     - staticcheck
-    - structcheck
     - tagliatelle
     - thelper
     - tparallel
@@ -85,7 +82,6 @@ linters:
     - unconvert
     - unparam
     - unused
-    - varcheck
     - wastedassign
     - whitespace
     - wrapcheck
