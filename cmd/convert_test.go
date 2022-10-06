@@ -147,7 +147,7 @@ func TestConvertCmdStdout(t *testing.T) {
 	testState.args = []string{"k6", "convert", "stdout.har"}
 
 	newRootCommand(testState.globalState).execute()
-	assert.Equal(t, testHARConvertResult, testState.stdOut.String())
+	assert.Equal(t, "Command \"convert\" is deprecated, please use har-to-k6 (https://github.com/grafana/har-to-k6) instead.\n"+testHARConvertResult, testState.stdOut.String())
 }
 
 func TestConvertCmdOutputFile(t *testing.T) {

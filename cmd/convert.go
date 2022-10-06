@@ -29,9 +29,10 @@ func getCmdConvert(globalState *globalState) *cobra.Command {
 		skip                []string
 	)
 	convertCmd := &cobra.Command{
-		Use:   "convert",
-		Short: "Convert a HAR file to a k6 script",
-		Long:  "Convert a HAR (HTTP Archive) file to a k6 script",
+		Use:        "convert",
+		Short:      "Convert a HAR file to a k6 script",
+		Long:       "Convert a HAR (HTTP Archive) file to a k6 script",
+		Deprecated: "please use har-to-k6 (https://github.com/grafana/har-to-k6) instead.",
 		Example: `
   # Convert a HAR file to a k6 script.
   k6 convert -O har-session.js session.har
