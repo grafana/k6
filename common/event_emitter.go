@@ -100,9 +100,9 @@ type NavigationEvent struct {
 type eventHandler struct {
 	ctx           context.Context
 	ch            chan Event
-	queueMutex    *sync.Mutex
+	queueMutex    sync.Mutex
 	queue         []Event
-	curQueueMutex *sync.Mutex
+	curQueueMutex sync.Mutex
 	curQueue      []Event
 }
 
@@ -222,19 +222,7 @@ func (e *BaseEventEmitter) emit(event string, data interface{}) {
 func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Event) {
 	e.sync(func() {
 		for _, event := range events {
-			_, ok := e.handlers[event]
-			if !ok {
-				e.handlers[event] = make([]*eventHandler, 0)
-			}
-			eh := eventHandler{
-				ctx,
-				ch,
-				&sync.Mutex{},
-				make([]Event, 0),
-				&sync.Mutex{},
-				make([]Event, 0),
-			}
-			e.handlers[event] = append(e.handlers[event], &eh)
+			e.handlers[event] = append(e.handlers[event], &eventHandler{ctx: ctx, ch: ch})
 		}
 	})
 }
@@ -242,14 +230,6 @@ func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Even
 // OnAll registers a handler for all events.
 func (e *BaseEventEmitter) onAll(ctx context.Context, ch chan Event) {
 	e.sync(func() {
-		e.handlersAll = append(e.handlersAll,
-			&eventHandler{
-				ctx,
-				ch,
-				&sync.Mutex{},
-				make([]Event, 0),
-				&sync.Mutex{},
-				make([]Event, 0),
-			})
+		e.handlersAll = append(e.handlersAll, &eventHandler{ctx: ctx, ch: ch})
 	})
 }
