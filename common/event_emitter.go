@@ -97,13 +97,17 @@ type NavigationEvent struct {
 	err         error
 }
 
+type queue struct {
+	writeMutex sync.Mutex
+	write      []Event
+	readMutex  sync.Mutex
+	read       []Event
+}
+
 type eventHandler struct {
-	ctx           context.Context
-	ch            chan Event
-	queueMutex    sync.Mutex
-	queue         []Event
-	curQueueMutex sync.Mutex
-	curQueue      []Event
+	ctx   context.Context
+	ch    chan Event
+	queue *queue
 }
 
 // EventEmitter that all event emitters need to implement.
@@ -122,6 +126,8 @@ type BaseEventEmitter struct {
 	handlers    map[string][]*eventHandler
 	handlersAll []*eventHandler
 
+	queues map[chan Event]*queue
+
 	syncCh chan syncFunc
 	ctx    context.Context
 }
@@ -132,6 +138,7 @@ func NewBaseEventEmitter(ctx context.Context) BaseEventEmitter {
 		handlers: make(map[string][]*eventHandler),
 		syncCh:   make(chan syncFunc),
 		ctx:      ctx,
+		queues:   make(map[chan Event]*queue),
 	}
 	go bem.syncAll(ctx)
 	return bem
@@ -171,8 +178,8 @@ func (e *BaseEventEmitter) sync(fn func()) {
 
 func (e *BaseEventEmitter) emit(event string, data interface{}) {
 	emitEvent := func(eh *eventHandler) {
-		eh.curQueueMutex.Lock()
-		defer eh.curQueueMutex.Unlock()
+		eh.queue.readMutex.Lock()
+		defer eh.queue.readMutex.Unlock()
 
 		// We try to read from the current queue (curQueue)
 		// If there isn't anything on curQueue then there must
@@ -181,15 +188,15 @@ func (e *BaseEventEmitter) emit(event string, data interface{}) {
 		// is now being populated again by emitTo, and all
 		// emitEvent goroutines can continue to consume from
 		// curQueue until that is again depleted.
-		if len(eh.curQueue) == 0 {
-			eh.queueMutex.Lock()
-			eh.curQueue, eh.queue = eh.queue, eh.curQueue
-			eh.queueMutex.Unlock()
+		if len(eh.queue.read) == 0 {
+			eh.queue.writeMutex.Lock()
+			eh.queue.read, eh.queue.write = eh.queue.write, eh.queue.read
+			eh.queue.writeMutex.Unlock()
 		}
 
 		select {
-		case eh.ch <- eh.curQueue[0]:
-			eh.curQueue = eh.curQueue[1:]
+		case eh.ch <- eh.queue.read[0]:
+			eh.queue.read = eh.queue.read[1:]
 		case <-eh.ctx.Done():
 			// TODO: handle the error
 		}
@@ -202,9 +209,9 @@ func (e *BaseEventEmitter) emit(event string, data interface{}) {
 				handlers = append(handlers[:i], handlers[i+1:]...)
 				continue
 			default:
-				handler.queueMutex.Lock()
-				handler.queue = append(handler.queue, Event{typ: event, data: data})
-				handler.queueMutex.Unlock()
+				handler.queue.writeMutex.Lock()
+				handler.queue.write = append(handler.queue.write, Event{typ: event, data: data})
+				handler.queue.writeMutex.Unlock()
 
 				go emitEvent(handler)
 				i++
@@ -221,8 +228,14 @@ func (e *BaseEventEmitter) emit(event string, data interface{}) {
 // On registers a handler for a specific event.
 func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Event) {
 	e.sync(func() {
+		q, ok := e.queues[ch]
+		if !ok {
+			q = &queue{}
+			e.queues[ch] = q
+		}
+
 		for _, event := range events {
-			e.handlers[event] = append(e.handlers[event], &eventHandler{ctx: ctx, ch: ch})
+			e.handlers[event] = append(e.handlers[event], &eventHandler{ctx: ctx, ch: ch, queue: q})
 		}
 	})
 }
@@ -230,6 +243,12 @@ func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Even
 // OnAll registers a handler for all events.
 func (e *BaseEventEmitter) onAll(ctx context.Context, ch chan Event) {
 	e.sync(func() {
-		e.handlersAll = append(e.handlersAll, &eventHandler{ctx: ctx, ch: ch})
+		q, ok := e.queues[ch]
+		if !ok {
+			q = &queue{}
+			e.queues[ch] = q
+		}
+
+		e.handlersAll = append(e.handlersAll, &eventHandler{ctx: ctx, ch: ch, queue: q})
 	})
 }

@@ -128,6 +128,7 @@ func TestEventEmitterAllEvents(t *testing.T) {
 	})
 }
 
+//nolint:gocognit
 func TestBaseEventEmitter(t *testing.T) {
 	t.Parallel()
 
@@ -176,6 +177,67 @@ func TestBaseEventEmitter(t *testing.T) {
 			for i := 0; i < maxInt; i++ {
 				i := i
 				emitter.emit(eventName, i)
+			}
+		}
+		go emitWorker()
+
+		select {
+		case <-ctx.Done():
+		case <-time.After(time.Second * 2):
+			assert.FailNow(t, "test timed out, deadlock?")
+		}
+	})
+
+	t.Run("order of emitted different event types kept", func(t *testing.T) {
+		// Test description
+		//
+		// 1. Emit many different event types from the emitWorker.
+		// 2. Handler receives the emitted events.
+		//
+		// Success criteria: Ensure that the ordering of events is
+		//                   received in the order they're emitted.
+
+		t.Parallel()
+
+		eventName1 := "AtomicIntEvent1"
+		eventName2 := "AtomicIntEvent2"
+		eventName3 := "AtomicIntEvent3"
+		eventName4 := "AtomicIntEvent4"
+		maxInt := 100
+
+		ctx, cancel := context.WithCancel(context.Background())
+		emitter := NewBaseEventEmitter(ctx)
+		ch := make(chan Event)
+		emitter.on(ctx, []string{eventName1, eventName2, eventName3, eventName4}, ch)
+
+		var expectedI int
+		handler := func() {
+			defer cancel()
+
+			for expectedI != maxInt {
+				e := <-ch
+
+				i, ok := e.data.(int)
+				if !ok {
+					assert.FailNow(t, "unexpected type read from channel", e.data)
+				}
+
+				assert.Equal(t, expectedI, i)
+
+				expectedI++
+			}
+
+			close(ch)
+		}
+		go handler()
+
+		emitWorker := func() {
+			for i := 0; i < maxInt; i += 4 {
+				i := i
+				emitter.emit(eventName1, i)
+				emitter.emit(eventName2, i+1)
+				emitter.emit(eventName3, i+2)
+				emitter.emit(eventName4, i+3)
 			}
 		}
 		go emitWorker()
