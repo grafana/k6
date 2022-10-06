@@ -22,8 +22,8 @@ package common
 
 import (
 	"context"
-	"sync"
 	"testing"
+	"time"
 
 	"github.com/chromedp/cdproto"
 	"github.com/stretchr/testify/assert"
@@ -150,19 +150,16 @@ func TestBaseEventEmitter(t *testing.T) {
 		ch := make(chan Event)
 		emitter.on(ctx, []string{eventName}, ch)
 
-		wg := sync.WaitGroup{}
-
 		var expectedI int
-		wg.Add(1)
 		handler := func() {
-			defer wg.Done()
+			defer cancel()
 
 			for expectedI != maxInt {
 				e := <-ch
 
 				i, ok := e.data.(int)
 				if !ok {
-					assert.Fail(t, "unexpected type read from channel", e.data)
+					assert.FailNow(t, "unexpected type read from channel", e.data)
 				}
 
 				assert.Equal(t, eventName, e.typ)
@@ -171,15 +168,11 @@ func TestBaseEventEmitter(t *testing.T) {
 				expectedI++
 			}
 
-			cancel()
 			close(ch)
 		}
 		go handler()
 
-		wg.Add(1)
 		emitWorker := func() {
-			defer wg.Done()
-
 			for i := 0; i < maxInt; i++ {
 				i := i
 				emitter.emit(eventName, i)
@@ -187,7 +180,11 @@ func TestBaseEventEmitter(t *testing.T) {
 		}
 		go emitWorker()
 
-		wg.Wait()
+		select {
+		case <-ctx.Done():
+		case <-time.After(time.Second * 2):
+			assert.FailNow(t, "test timed out, deadlock?")
+		}
 	})
 
 	t.Run("handler can emit without deadlocking", func(t *testing.T) {
@@ -212,43 +209,32 @@ func TestBaseEventEmitter(t *testing.T) {
 		ch := make(chan Event)
 		emitter.on(ctx, []string{eventName1, eventName2}, ch)
 
-		wg := sync.WaitGroup{}
-
 		var expectedI2 int
-		wg.Add(1)
 		handler := func() {
-			defer wg.Done()
+			defer cancel()
 
-			for {
-				if expectedI2 == maxInt {
-					break
-				}
-
+			for expectedI2 != maxInt {
 				e := <-ch
 
 				switch e.typ {
 				case eventName1:
 					i, ok := e.data.(int)
 					if !ok {
-						assert.Fail(t, "unexpected type read from channel", e.data)
+						assert.FailNow(t, "unexpected type read from channel", e.data)
 					}
 					emitter.emit(eventName2, i)
 				case eventName2:
 					expectedI2++
 				default:
-					assert.Fail(t, "unexpected event type received")
+					assert.FailNow(t, "unexpected event type received")
 				}
 			}
 
-			cancel()
 			close(ch)
 		}
 		go handler()
 
-		wg.Add(1)
 		emitWorker := func() {
-			defer wg.Done()
-
 			for i := 0; i < maxInt; i++ {
 				i := i
 				emitter.emit(eventName1, i)
@@ -256,6 +242,10 @@ func TestBaseEventEmitter(t *testing.T) {
 		}
 		go emitWorker()
 
-		wg.Wait()
+		select {
+		case <-ctx.Done():
+		case <-time.After(time.Second * 2):
+			assert.FailNow(t, "test timed out, deadlock?")
+		}
 	})
 }
