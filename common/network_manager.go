@@ -198,7 +198,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		ipAddress, protocol                 string
 		fromCache, fromPreCache, fromSvcWrk bool
 		url                                 = req.url.String()
-		timestamp                           = time.Now()
+		wallTime                            = time.Now()
 	)
 	if resp != nil {
 		status = resp.status
@@ -208,7 +208,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		fromCache = resp.fromDiskCache
 		fromPreCache = resp.fromPrefetchCache
 		fromSvcWrk = resp.fromServiceWorker
-		timestamp = resp.timestamp
+		wallTime = resp.wallTime
 		url = resp.url
 	} else {
 		m.logger.Debugf("NetworkManager:emitResponseMetrics",
@@ -244,23 +244,17 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqs, Tags: tags},
 				Value:      1,
-				Time:       timestamp,
+				Time:       wallTime,
 			},
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqDuration, Tags: tags},
-
-				// We're using diff between CDP protocol message timestamps here because the `Network.responseReceived.responseTime`
-				// value seems to be in milliseconds rather than seconds as specified in the protocol docs and that causes
-				// issues with the parsing and conversion to `time.Time`.
-				// Have not spent time looking for the root cause of this in the Chromium source to file a bug report, and neither
-				// Puppeteer nor Playwright seems to care about the `responseTime` value and don't use/expose it.
-				Value: k6metrics.D(timestamp.Sub(req.timestamp)),
-				Time:  timestamp,
+				Value:      k6metrics.D(wallTime.Sub(req.wallTime)),
+				Time:       wallTime,
 			},
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.DataReceived, Tags: tags},
 				Value:      float64(bodySize),
-				Time:       timestamp,
+				Time:       wallTime,
 			},
 		},
 	})
@@ -271,22 +265,22 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 				{
 					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqConnecting, Tags: tags},
 					Value:      k6metrics.D(time.Duration(resp.timing.ConnectEnd-resp.timing.ConnectStart) * time.Millisecond),
-					Time:       resp.timestamp,
+					Time:       wallTime,
 				},
 				{
 					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqTLSHandshaking, Tags: tags},
 					Value:      k6metrics.D(time.Duration(resp.timing.SslEnd-resp.timing.SslStart) * time.Millisecond),
-					Time:       resp.timestamp,
+					Time:       wallTime,
 				},
 				{
 					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqSending, Tags: tags},
 					Value:      k6metrics.D(time.Duration(resp.timing.SendEnd-resp.timing.SendStart) * time.Millisecond),
-					Time:       resp.timestamp,
+					Time:       wallTime,
 				},
 				{
 					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqReceiving, Tags: tags},
 					Value:      k6metrics.D(time.Duration(resp.timing.ReceiveHeadersEnd-resp.timing.SendEnd) * time.Millisecond),
-					Time:       resp.timestamp,
+					Time:       wallTime,
 				},
 			},
 		})
