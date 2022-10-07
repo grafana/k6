@@ -22,6 +22,7 @@ package common
 
 import (
 	"context"
+	"sync"
 )
 
 // Ensure BaseEventEmitter implements the EventEmitter interface.
@@ -96,9 +97,17 @@ type NavigationEvent struct {
 	err         error
 }
 
+type queue struct {
+	writeMutex sync.Mutex
+	write      []Event
+	readMutex  sync.Mutex
+	read       []Event
+}
+
 type eventHandler struct {
-	ctx context.Context
-	ch  chan Event
+	ctx   context.Context
+	ch    chan Event
+	queue *queue
 }
 
 // EventEmitter that all event emitters need to implement.
@@ -114,8 +123,10 @@ type syncFunc func() (done chan struct{})
 
 // BaseEventEmitter emits events to registered handlers.
 type BaseEventEmitter struct {
-	handlers    map[string][]eventHandler
-	handlersAll []eventHandler
+	handlers    map[string][]*eventHandler
+	handlersAll []*eventHandler
+
+	queues map[chan Event]*queue
 
 	syncCh chan syncFunc
 	ctx    context.Context
@@ -124,9 +135,10 @@ type BaseEventEmitter struct {
 // NewBaseEventEmitter creates a new instance of a base event emitter.
 func NewBaseEventEmitter(ctx context.Context) BaseEventEmitter {
 	bem := BaseEventEmitter{
-		handlers: make(map[string][]eventHandler),
+		handlers: make(map[string][]*eventHandler),
 		syncCh:   make(chan syncFunc),
 		ctx:      ctx,
+		queues:   make(map[chan Event]*queue),
 	}
 	go bem.syncAll(ctx)
 	return bem
@@ -165,14 +177,32 @@ func (e *BaseEventEmitter) sync(fn func()) {
 }
 
 func (e *BaseEventEmitter) emit(event string, data interface{}) {
-	emitEvent := func(eh eventHandler) {
+	emitEvent := func(eh *eventHandler) {
+		eh.queue.readMutex.Lock()
+		defer eh.queue.readMutex.Unlock()
+
+		// We try to read from the read queue (queue.read).
+		// If there isn't anything on the read queue, then there must
+		// be something being populated by the synched emitTo
+		// func below.
+		// Swap around the read queue with the write queue.
+		// Queue is now being populated again by emitTo, and all
+		// emitEvent goroutines can continue to consume from
+		// the read queue until that is again depleted.
+		if len(eh.queue.read) == 0 {
+			eh.queue.writeMutex.Lock()
+			eh.queue.read, eh.queue.write = eh.queue.write, eh.queue.read
+			eh.queue.writeMutex.Unlock()
+		}
+
 		select {
-		case eh.ch <- Event{event, data}:
+		case eh.ch <- eh.queue.read[0]:
+			eh.queue.read = eh.queue.read[1:]
 		case <-eh.ctx.Done():
 			// TODO: handle the error
 		}
 	}
-	emitTo := func(handlers []eventHandler) (updated []eventHandler) {
+	emitTo := func(handlers []*eventHandler) (updated []*eventHandler) {
 		for i := 0; i < len(handlers); {
 			handler := handlers[i]
 			select {
@@ -180,6 +210,10 @@ func (e *BaseEventEmitter) emit(event string, data interface{}) {
 				handlers = append(handlers[:i], handlers[i+1:]...)
 				continue
 			default:
+				handler.queue.writeMutex.Lock()
+				handler.queue.write = append(handler.queue.write, Event{typ: event, data: data})
+				handler.queue.writeMutex.Unlock()
+
 				go emitEvent(handler)
 				i++
 			}
@@ -195,13 +229,14 @@ func (e *BaseEventEmitter) emit(event string, data interface{}) {
 // On registers a handler for a specific event.
 func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Event) {
 	e.sync(func() {
+		q, ok := e.queues[ch]
+		if !ok {
+			q = &queue{}
+			e.queues[ch] = q
+		}
+
 		for _, event := range events {
-			_, ok := e.handlers[event]
-			if !ok {
-				e.handlers[event] = make([]eventHandler, 0)
-			}
-			eh := eventHandler{ctx, ch}
-			e.handlers[event] = append(e.handlers[event], eh)
+			e.handlers[event] = append(e.handlers[event], &eventHandler{ctx: ctx, ch: ch, queue: q})
 		}
 	})
 }
@@ -209,6 +244,12 @@ func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Even
 // OnAll registers a handler for all events.
 func (e *BaseEventEmitter) onAll(ctx context.Context, ch chan Event) {
 	e.sync(func() {
-		e.handlersAll = append(e.handlersAll, eventHandler{ctx, ch})
+		q, ok := e.queues[ch]
+		if !ok {
+			q = &queue{}
+			e.queues[ch] = q
+		}
+
+		e.handlersAll = append(e.handlersAll, &eventHandler{ctx: ctx, ch: ch, queue: q})
 	})
 }
