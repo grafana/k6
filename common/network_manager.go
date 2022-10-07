@@ -181,7 +181,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.DataSent, Tags: tags},
 				Value:      float64(req.Size().Total()),
-				Time:       req.timestamp,
+				Time:       req.wallTime,
 			},
 		},
 	})
