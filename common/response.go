@@ -76,7 +76,7 @@ type Response struct {
 	fromServiceWorker bool
 	fromPrefetchCache bool
 	timestamp         time.Time
-	responseTime      time.Time
+	wallTime          time.Time
 	timing            *network.ResourceTiming
 	vu                k6modules.VU
 
@@ -105,7 +105,7 @@ func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, 
 		fromServiceWorker: resp.FromServiceWorker,
 		fromPrefetchCache: resp.FromPrefetchCache,
 		timestamp:         timestamp.Time(),
-		responseTime:      time.Time{},
+		wallTime:          timestamp.Time().Add(req.offset),
 		timing:            resp.Timing,
 		vu:                vu,
 	}
@@ -119,10 +119,6 @@ func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, 
 				r.headers[n] = append(r.headers[n], v)
 			}
 		}
-	}
-
-	if resp.ResponseTime != nil {
-		r.responseTime = resp.ResponseTime.Time()
 	}
 
 	if resp.SecurityDetails != nil {
