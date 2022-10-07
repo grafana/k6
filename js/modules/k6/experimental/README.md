@@ -9,7 +9,7 @@ Although [accessible in k6 scripts](../../../initcontext.go) under the `k6/exper
 
 While we intend to keep these modules as stable as possible, we may need to add features or introduce breaking changes. This could happen at any time until we release the module as stable. **use them at your own risk**.
 
-## Upgrade version
+## Upgrading
 
 Experimental modules are based on xk6-extensions, and they introduce a cycle dependency between k6 and the extension. When upgrading an extension's version, it's required to run the following steps:
 
