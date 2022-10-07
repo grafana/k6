@@ -208,7 +208,10 @@ func TestBaseEventEmitter(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event)
-		emitter.on(ctx, []string{eventName1, eventName2, eventName3, eventName4}, ch)
+		// Calling on twice to ensure that the same queue is used
+		// internally for the same channel and handler.
+		emitter.on(ctx, []string{eventName1, eventName2}, ch)
+		emitter.on(ctx, []string{eventName3, eventName4}, ch)
 
 		var expectedI int
 		handler := func() {
