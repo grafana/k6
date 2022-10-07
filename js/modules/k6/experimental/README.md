@@ -11,7 +11,7 @@ While we intend to keep these modules as stable as possible, we may need to add 
 
 ## Upgrade version
 
-Experimental modules are based on xk6-extensions, and they introduce a cycle dependency between k6 and the extension. Upgrading an extension's version is required to run the following steps:
+Experimental modules are based on xk6-extensions, and they introduce a cycle dependency between k6 and the extension. When upgrading an extension's version, it's required to run the following steps:
 
 1. Get the feature branch ready to be merged. Note: from the next step rebasing of the feature branch should be denied; otherwise, the commit will be lost and the relative dependencies will be broken.
 2. Make a commit in the feature branch that removes the extension package (and any other problematic experimental modules).
