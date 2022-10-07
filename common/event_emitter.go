@@ -181,13 +181,14 @@ func (e *BaseEventEmitter) emit(event string, data interface{}) {
 		eh.queue.readMutex.Lock()
 		defer eh.queue.readMutex.Unlock()
 
-		// We try to read from the current queue (curQueue)
-		// If there isn't anything on curQueue then there must
+		// We try to read from the read queue (queue.read).
+		// If there isn't anything on the read queue, then there must
 		// be something being populated by the synched emitTo
-		// func below. Swap around curQueue with queue. Queue
-		// is now being populated again by emitTo, and all
+		// func below.
+		// Swap around the read queue with the write queue.
+		// Queue is now being populated again by emitTo, and all
 		// emitEvent goroutines can continue to consume from
-		// curQueue until that is again depleted.
+		// the read queue until that is again depleted.
 		if len(eh.queue.read) == 0 {
 			eh.queue.writeMutex.Lock()
 			eh.queue.read, eh.queue.write = eh.queue.write, eh.queue.read

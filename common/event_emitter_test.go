@@ -175,7 +175,6 @@ func TestBaseEventEmitter(t *testing.T) {
 
 		emitWorker := func() {
 			for i := 0; i < maxInt; i++ {
-				i := i
 				emitter.emit(eventName, i)
 			}
 		}
@@ -236,7 +235,6 @@ func TestBaseEventEmitter(t *testing.T) {
 
 		emitWorker := func() {
 			for i := 0; i < maxInt; i += 4 {
-				i := i
 				emitter.emit(eventName1, i)
 				emitter.emit(eventName2, i+1)
 				emitter.emit(eventName3, i+2)
@@ -301,7 +299,6 @@ func TestBaseEventEmitter(t *testing.T) {
 
 		emitWorker := func() {
 			for i := 0; i < maxInt; i++ {
-				i := i
 				emitter.emit(eventName1, i)
 			}
 		}
