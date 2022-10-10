@@ -391,7 +391,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 			reqFromParent := m.parent.requestFromID(event.RequestID)
 
 			// Main requests have matching loaderID and requestID.
-			if reqFromParent != nil || reqFromParent.getDocumentID() == event.RequestID.String() {
+			if reqFromParent != nil && reqFromParent.getDocumentID() == event.RequestID.String() {
 				m.reqsMu.Lock()
 				m.reqIDToRequest[event.RequestID] = reqFromParent
 				m.reqsMu.Unlock()
