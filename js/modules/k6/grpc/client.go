@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -72,6 +73,38 @@ func (c *Client) Load(importPaths []string, filenames ...string) ([]MethodInfo, 
 	for _, fd := range fds {
 		fdset.File = append(fdset.File, walkFileDescriptors(seen, fd)...)
 	}
+	return c.convertToMethodInfo(fdset)
+}
+
+// LoadProtoset will parse the given protoset file (serialized FileDescriptorSet) and make the file
+// descriptors available to request.
+func (c *Client) LoadProtoset(protosetPath string) ([]MethodInfo, error) {
+	if c.vu.State() != nil {
+		return nil, errors.New("load must be called in the init context")
+	}
+
+	initEnv := c.vu.InitEnv()
+	if initEnv == nil {
+		return nil, errors.New("missing init environment")
+	}
+
+	absFilePath := initEnv.GetAbsFilePath(protosetPath)
+	fdsetFile, err := initEnv.FileSystems["file"].Open(absFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't open protoset: %w", err)
+	}
+
+	defer func() { _ = fdsetFile.Close() }()
+	fdsetBytes, err := io.ReadAll(fdsetFile)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read protoset: %w", err)
+	}
+
+	fdset := &descriptorpb.FileDescriptorSet{}
+	if err = proto.Unmarshal(fdsetBytes, fdset); err != nil {
+		return nil, fmt.Errorf("couldn't unmarshal protoset file %s: %w", protosetPath, err)
+	}
+
 	return c.convertToMethodInfo(fdset)
 }
 
