@@ -27,6 +27,7 @@ type VU struct {
 	*k6modulestest.VU
 	Loop      *k6eventloop.EventLoop
 	toBeState *k6lib.State
+	samples   chan k6metrics.SampleContainer
 }
 
 // ToGojaValue is a convenience method for converting any value to a goja value.
@@ -37,6 +38,19 @@ func (v *VU) ToGojaValue(i interface{}) goja.Value { return v.Runtime().ToValue(
 func (v *VU) MoveToVUContext() {
 	v.VU.StateField = v.toBeState
 	v.VU.InitEnvField = nil
+}
+
+// AssertSamples asserts each sample VU received since AssertSamples
+// is last called, then it returns the number of received samples.
+func (v *VU) AssertSamples(assertSample func(s k6metrics.Sample)) int {
+	var n int
+	for _, bs := range k6metrics.GetBufferedSamples(v.samples) {
+		for _, s := range bs.GetSamples() {
+			assertSample(s)
+			n++
+		}
+	}
+	return n
 }
 
 // NewVU returns a mock k6 VU.
@@ -74,5 +88,5 @@ func NewVU(tb testing.TB) *VU {
 	ctx := k6ext.WithVU(testRT.VU.CtxField, testRT.VU)
 	testRT.VU.CtxField = ctx
 
-	return &VU{VU: testRT.VU, Loop: testRT.EventLoop, toBeState: state}
+	return &VU{VU: testRT.VU, Loop: testRT.EventLoop, toBeState: state, samples: samples}
 }

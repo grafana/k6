@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 	"github.com/grafana/xk6-browser/log"
@@ -12,7 +13,9 @@ import (
 	k6lib "go.k6.io/k6/lib"
 	k6mockresolver "go.k6.io/k6/lib/testutils/mockresolver"
 	k6types "go.k6.io/k6/lib/types"
+	k6metrics "go.k6.io/k6/metrics"
 
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/mailru/easyjson"
@@ -196,6 +199,95 @@ func TestOnRequestPausedBlockedIPs(t *testing.T) {
 			nm.onRequestPaused(ev)
 
 			assert.Equal(t, tc.expCDPCalls, session.cdpCalls)
+		})
+	}
+}
+
+func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	type tm struct{ ts, wt time.Time }
+	tests := []struct {
+		name                       string
+		req, res, wantReq, wantRes tm
+	}{
+		{
+			name:    "ok",
+			req:     tm{ts: now, wt: now},
+			res:     tm{ts: now, wt: now},
+			wantReq: tm{wt: now},
+			wantRes: tm{wt: now},
+		},
+		{
+			name:    "ok2",
+			req:     tm{ts: now, wt: now},
+			res:     tm{ts: now.Add(time.Minute)},
+			wantReq: tm{wt: now},
+			wantRes: tm{wt: now.Add(time.Minute)},
+		},
+		{
+			name:    "ts_past",
+			req:     tm{ts: now.Add(-time.Hour), wt: now},
+			res:     tm{ts: now.Add(-time.Hour).Add(time.Minute)},
+			wantReq: tm{wt: now},
+			wantRes: tm{wt: now.Add(time.Minute)},
+		},
+		{
+			name:    "ts_future",
+			req:     tm{ts: now.Add(time.Hour), wt: now},
+			res:     tm{ts: now.Add(time.Hour).Add(time.Minute)},
+			wantReq: tm{wt: now},
+			wantRes: tm{wt: now.Add(time.Minute)},
+		},
+		{
+			name:    "wt_past",
+			req:     tm{ts: now, wt: now.Add(-time.Hour)},
+			res:     tm{ts: now.Add(time.Minute)},
+			wantReq: tm{wt: now.Add(-time.Hour)},
+			wantRes: tm{wt: now.Add(-time.Hour).Add(time.Minute)},
+		},
+		{
+			name:    "wt_future",
+			req:     tm{ts: now, wt: now.Add(time.Hour)},
+			res:     tm{ts: now.Add(time.Minute)},
+			wantReq: tm{wt: now.Add(time.Hour)},
+			wantRes: tm{wt: now.Add(time.Hour).Add(time.Minute)},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				vu = k6test.NewVU(t)
+				nm = &NetworkManager{ctx: vu.Context(), vu: vu}
+			)
+			vu.MoveToVUContext()
+
+			req, err := NewRequest(vu.Context(), NewRequestParams{
+				event: &network.EventRequestWillBeSent{
+					Request:   &network.Request{},
+					Timestamp: (*cdp.MonotonicTime)(&tt.req.ts),
+					WallTime:  (*cdp.TimeSinceEpoch)(&tt.req.wt),
+				},
+			})
+			require.NoError(t, err)
+			nm.emitRequestMetrics(req)
+			n := vu.AssertSamples(func(s k6metrics.Sample) {
+				assert.Equalf(t, tt.wantReq.wt, s.Time, "timing skew in %s", s.Metric.Name)
+			})
+			assert.Equalf(t, 1, n, "should emit %d request metric", 1)
+			res := NewHTTPResponse(vu.Context(), req,
+				&network.Response{Timing: &network.ResourceTiming{}},
+				(*cdp.MonotonicTime)(&tt.res.ts),
+			)
+			nm.emitResponseMetrics(res, req)
+			n = vu.AssertSamples(func(s k6metrics.Sample) {
+				assert.Equalf(t, tt.wantRes.wt, s.Time, "timing skew in %s", s.Metric.Name)
+			})
+			assert.Equalf(t, 7, n, "should emit 7 response metrics")
 		})
 	}
 }

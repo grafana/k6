@@ -61,10 +61,22 @@ type Request struct {
 	interceptionID      string
 	fromMemoryCache     bool
 	errorText           string
-	timestamp           time.Time
-	wallTime            time.Time
-	responseEndTiming   float64
-	vu                  k6modules.VU
+	// offset is the difference between the timestamp and wallTime fields.
+	//
+	// The cdp package (and the CDP protocol) uses the monotonic time
+	// when calculating timestamps. And the cdp package does so by
+	// getting it from the local machine's last boot time. This causes
+	// a time skew between the timestamp and the machine's walltime.
+	//
+	// Since the cdp package uses monotonic time in timestamp fields, we
+	// need to calculate the timestamp with the monotonic difference.
+	//
+	// See issue #533 for more details.
+	offset            time.Duration
+	timestamp         time.Time
+	wallTime          time.Time
+	responseEndTiming float64
+	vu                k6modules.VU
 }
 
 // NewRequestParams are input parameters for NewRequest.
@@ -110,6 +122,7 @@ func NewRequest(ctx context.Context, rp NewRequestParams) (*Request, error) {
 		interceptionID:      rp.interceptionID,
 		timestamp:           ev.Timestamp.Time(),
 		wallTime:            ev.WallTime.Time(),
+		offset:              ev.WallTime.Time().Sub(ev.Timestamp.Time()),
 		documentID:          documentID.String(),
 		headers:             make(map[string][]string),
 		ctx:                 ctx,
