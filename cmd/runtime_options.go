@@ -111,7 +111,7 @@ func getRuntimeOptions(
 	if opts.IncludeSystemEnvVars.Bool { // If enabled, gather the actual system environment variables
 		for k, v := range environment {
 			if !userEnvVarName.MatchString(k) {
-				logger.Debugf("invalid system environment variable name '%s', will be ignored", k)
+				logger.Debugf("Invalid system environment variable name '%s', will be ignored", k)
 
 				continue
 			}
