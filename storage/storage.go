@@ -15,18 +15,21 @@ const k6BrowserDataDirPattern = "xk6-browser-data-*"
 // on the local filesystem.
 type Dir struct {
 	Dir    string // path to the data storage directory
-	remove bool   // whether to remove the temporary directory in cleanup
+	mu     sync.Mutex
+	remove bool // whether to remove the temporary directory in cleanup
 
 	// FS abstractions
-	fsMkdirTemp   func(dir, pattern string) (string, error)
-	fsRemoveAll   func(path string) error
-	fsRemoveAllMu sync.Mutex
+	fsMkdirTemp func(dir, pattern string) (string, error)
+	fsRemoveAll func(path string) error
 }
 
 // Make creates a new temporary directory in tmpDir, and stores the path to
 // the directory in the Dir field. When the dir argument is not empty, no
 // directory will be created and it will not be deleted if Cleanup is called.
 func (d *Dir) Make(tmpDir string, dir interface{}) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	// use the provided dir.
 	if ud, ok := dir.(string); ok && ud != "" {
 		d.Dir = ud
@@ -60,12 +63,12 @@ func (d *Dir) Make(tmpDir string, dir interface{}) error {
 // It is named as Cleanup because it can be used for other features in the
 // future.
 func (d *Dir) Cleanup() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	if !d.remove {
 		return nil
 	}
-
-	d.fsRemoveAllMu.Lock()
-	defer d.fsRemoveAllMu.Unlock()
 
 	if d.fsRemoveAll == nil {
 		d.fsRemoveAll = os.RemoveAll
