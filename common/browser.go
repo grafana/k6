@@ -242,6 +242,12 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	}
 
 	session := b.conn.getSession(ev.SessionID)
+	if session == nil {
+		b.logger.Warnf("Browser:onAttachedToTarget",
+			"session closed before attachToTarget is handled. sid:%v tid:%v",
+			ev.SessionID, evti.TargetID)
+		return // ignore
+	}
 
 	switch evti.Type {
 	case "background_page":
