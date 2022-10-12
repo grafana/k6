@@ -265,6 +265,7 @@ func (b *testBrowser) awaitWithTimeout(timeout time.Duration, fn func() error) e
 	b.t.Helper()
 	errC := make(chan error)
 	go func() {
+		defer close(errC)
 		errC <- b.await(fn)
 	}()
 
