@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
@@ -56,11 +55,7 @@ func saveBoolFromEnv(env map[string]string, varName string, placeholder *null.Bo
 	return nil
 }
 
-func getRuntimeOptions(
-	logger *logrus.Logger,
-	flags *pflag.FlagSet,
-	environment map[string]string,
-) (lib.RuntimeOptions, error) {
+func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib.RuntimeOptions, error) {
 	// TODO: refactor with composable helpers as a part of #883, to reduce copy-paste
 	// TODO: get these options out of the JSON config file as well?
 	opts := lib.RuntimeOptions{
@@ -109,15 +104,7 @@ func getRuntimeOptions(
 	}
 
 	if opts.IncludeSystemEnvVars.Bool { // If enabled, gather the actual system environment variables
-		for k, v := range environment {
-			if !userEnvVarName.MatchString(k) {
-				logger.Warnf("invalid system environment variable name '%s'", k)
-
-				continue
-			}
-
-			opts.Env[k] = v
-		}
+		opts.Env = environment
 	}
 
 	// Set/overwrite environment variables with custom user-supplied values
