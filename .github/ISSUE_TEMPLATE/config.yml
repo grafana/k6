@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: xk6-browser Community Forum
+    url: https://community.k6.io/c/xk6-browser/14
+    about: Please ask and answer questions here.
+  - name: xk6-browser Documentation
+    url: https://github.com/grafana/k6-docs
+    about: Please add any documentation related issues here.

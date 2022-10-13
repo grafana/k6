@@ -1,0 +1,51 @@
+name: Bug report
+description: Use this template for reporting bugs. Please search existing issues first.
+labels: bug
+body:
+  - type: textarea
+    attributes:
+      label: Brief summary
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: '## Environment'
+  - type: input
+    attributes:
+      label: xk6-browser version
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: OS
+      description: e.g. Windows 10, Arch Linux, macOS 11, etc.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Chrome version
+      description: e.g. 105.0.5195.102.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Docker version and image (if applicable)
+  - type: markdown
+    attributes:
+      value: '## Detailed issue description'
+  - type: textarea
+    attributes:
+      label: Steps to reproduce the problem
+      description: Please include a small k6 test script if possible.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
