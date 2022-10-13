@@ -1054,10 +1054,20 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goj
 }
 
 // Goto will navigate the frame to the specified URL and return a HTTP response object.
-func (f *Frame) Goto(url string, opts goja.Value) api.Response {
-	resp := f.manager.NavigateFrame(f, url, opts)
-	applySlowMo(f.ctx)
-	return resp
+func (f *Frame) Goto(url string, opts goja.Value) *goja.Promise {
+	netMgr := f.manager.page.mainFrameSession.getNetworkManager()
+	defaultReferer := netMgr.extraHTTPHeaders["referer"]
+	parsedOpts := NewFrameGotoOptions(
+		defaultReferer, time.Duration(f.manager.timeoutSettings.navigationTimeout())*time.Second)
+	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "parsing frame navigation options to %q: %w", url, err)
+		return nil
+	}
+	return k6ext.Promise(f.ctx, func() (interface{}, error) {
+		resp, err := f.manager.NavigateFrame(f, url, parsedOpts)
+		applySlowMo(f.ctx)
+		return resp, err
+	})
 }
 
 // Hover moves the pointer over the first element that matches the selector.

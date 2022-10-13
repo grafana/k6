@@ -15,12 +15,12 @@ export default function() {
   const context = browser.newContext();
   const page = context.newPage();
 
-  const res = page.goto('http://test.k6.io/', { waitUntil: 'load' });
+  page.goto('http://test.k6.io/', { waitUntil: 'load' }).then((res) => {
+    check(res, {
+      'null response': r => r === null,
+    });
 
-  check(res, {
-    'null response': r => r === null,
+    page.close();
+    browser.close();
   });
-
-  page.close();
-  browser.close();
 }

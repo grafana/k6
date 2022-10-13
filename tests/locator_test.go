@@ -185,8 +185,13 @@ func TestLocator(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
-			require.NotNil(t, p.Goto(tb.staticURL("locators.html"), nil))
-			tt.do(tb, p)
+			require.NoError(t, tb.await(func() error {
+				tb.promiseThen(p.Goto(tb.staticURL("locators.html"), nil), func() {
+					tt.do(tb, p)
+				})
+
+				return nil
+			}))
 		})
 	}
 
@@ -266,12 +271,21 @@ func TestLocator(t *testing.T) {
 		})
 	}
 
-	tb := newTestBrowser(t, withFileServer())
-	p := tb.NewPage(nil)
-	require.NotNil(t, p.Goto(tb.staticURL("locators.html"), nil))
 	for _, tt := range sanityTests {
+		tt := tt
 		t.Run("strict/"+tt.name, func(t *testing.T) {
-			assert.Panics(t, func() { tt.do(p.Locator("a", nil), tb) })
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			require.NoError(t, tb.await(func() error {
+				tb.promiseThen(
+					p.Goto(tb.staticURL("locators.html"), nil),
+					func() {
+						assert.Panics(t, func() { tt.do(p.Locator("a", nil), tb) })
+					})
+
+				return nil
+			}))
 		})
 	}
 }
@@ -317,13 +331,18 @@ func TestLocatorElementState(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
-			require.NotNil(t, p.Goto(tb.staticURL("locators.html"), nil))
+			require.NoError(t, tb.await(func() error {
+				tb.promiseThen(
+					p.Goto(tb.staticURL("locators.html"), nil),
+					func() {
+						l := p.Locator("#inputText", nil)
+						require.True(t, tt.query(l))
 
-			l := p.Locator("#inputText", nil)
-			require.True(t, tt.query(l))
-
-			p.Evaluate(tb.toGojaValue(tt.eval))
-			require.False(t, tt.query(l))
+						p.Evaluate(tb.toGojaValue(tt.eval))
+						require.False(t, tt.query(l))
+					})
+				return nil
+			}))
 		})
 	}
 
@@ -365,12 +384,19 @@ func TestLocatorElementState(t *testing.T) {
 		})
 	}
 
-	tb := newTestBrowser(t, withFileServer())
-	p := tb.NewPage(nil)
-	require.NotNil(t, p.Goto(tb.staticURL("locators.html"), nil))
 	for _, tt := range sanityTests {
+		tt := tt
 		t.Run("strict/"+tt.name, func(t *testing.T) {
-			assert.Panics(t, func() { tt.do(p.Locator("a", nil), tb) })
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			require.NoError(t, tb.await(func() error {
+				tb.promiseThen(p.Goto(tb.staticURL("locators.html"), nil),
+					func() {
+						assert.Panics(t, func() { tt.do(p.Locator("a", nil), tb) })
+					})
+				return nil
+			}))
 		})
 	}
 }

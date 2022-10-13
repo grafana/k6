@@ -29,10 +29,10 @@ export function messages() {
   });
   const page = browser.newPage();
 
-  page.goto('https://test.k6.io/my_messages.php', { waitUntil: 'networkidle' })
-
-  page.close();
-  browser.close();
+  page.goto('https://test.k6.io/my_messages.php', { waitUntil: 'networkidle' }).then(() => {
+    page.close();
+    browser.close();
+  });
 }
 
 export function news() {
@@ -41,8 +41,8 @@ export function news() {
   });
   const page = browser.newPage();
 
-  page.goto('https://test.k6.io/news.php', { waitUntil: 'networkidle' })
-
-  page.close();
-  browser.close();
+  page.goto('https://test.k6.io/news.php', { waitUntil: 'networkidle' }).then(() => {
+    page.close();
+    browser.close();
+  });
 }

@@ -16,12 +16,13 @@ export default function() {
 
   page.goto('https://googlechromelabs.github.io/dark-mode-toggle/demo/', {
     waitUntil: 'load',
-  });
-  let el = page.$('#dark-mode-toggle-3')
-  check(el, {
-    "GetAttribute('mode')": e => e.getAttribute('mode') == 'light',
-  });
+  }).then(() => {
+    let el = page.$('#dark-mode-toggle-3')
+    check(el, {
+      "GetAttribute('mode')": e => e.getAttribute('mode') == 'light',
+    });
 
-  page.close();
-  browser.close();
+    page.close();
+    browser.close();
+  });
 }

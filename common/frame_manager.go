@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -36,7 +35,6 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
-	"github.com/dop251/goja"
 )
 
 // FrameManager manages all frames in a page and their life-cycles, it's a purely internal component.
@@ -569,7 +567,8 @@ func (m *FrameManager) setMainFrame(f *Frame) {
 }
 
 // NavigateFrame will navigate specified frame to specified URL.
-func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) api.Response {
+//nolint:funlen,cyclop
+func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *FrameGotoOptions) (api.Response, error) {
 	var (
 		fmid = m.ID()
 		fid  = frame.ID()
@@ -579,13 +578,6 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 		"fmid:%d fid:%v furl:%s url:%s", fmid, fid, furl, url)
 	defer m.logger.Debugf("FrameManager:NavigateFrame:return",
 		"fmid:%d fid:%v furl:%s url:%s", fmid, fid, furl, url)
-
-	netMgr := m.page.mainFrameSession.getNetworkManager()
-	defaultReferer := netMgr.extraHTTPHeaders["referer"]
-	parsedOpts := NewFrameGotoOptions(defaultReferer, time.Duration(m.timeoutSettings.navigationTimeout())*time.Second)
-	if err := parsedOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "parsing frame navigation options to %q: %v", url, err)
-	}
 
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(m.ctx, parsedOpts.Timeout)
 	defer timeoutCancelFn()
@@ -620,35 +612,38 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 
 		// Attaching an iframe to an existing page doesn't seem to trigger a "Target.attachedToTarget" event
 		// from the browser even when "Target.setAutoAttach" is true. If this is the case fallback to the
+
 		// main frame's session.
 		fs = frame.page.mainFrameSession
 	}
 	newDocumentID, err := fs.navigateFrame(frame, url, parsedOpts.Referer)
 	if err != nil {
-		k6ext.Panic(m.ctx, "navigating to %q: %v", url, err)
+		return nil, fmt.Errorf("navigating to %q: %w", url, err)
 	}
 
 	if newDocumentID == "" {
 		// It's a navigation within the same document (e.g. via anchor links or
 		// the History API), so don't wait for a response nor any lifecycle
 		// events.
-		return nil
+		return nil, nil
 	}
 
 	// unblock the waiter goroutine
 	newDocIDCh <- newDocumentID
 
-	handleTimeoutError := func(err error) {
+	wrapTimeoutError := func(err error) error {
 		if errors.Is(err, context.DeadlineExceeded) {
 			err = &k6ext.UserFriendlyError{
 				Err:     err,
 				Timeout: parsedOpts.Timeout,
 			}
-			k6ext.Panic(m.ctx, "navigating to %q: %w", url, err)
+			return fmt.Errorf("navigating to %q: %w", url, err)
 		}
 		m.logger.Debugf("FrameManager:NavigateFrame",
 			"fmid:%d fid:%v furl:%s url:%s timeoutCtx done: %v",
 			fmid, fid, furl, url, err)
+
+		return err // TODO maybe wrap this as well?
 	}
 
 	var resp *Response
@@ -664,17 +659,16 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, opts goja.Value) 
 			}
 		}
 	case <-timeoutCtx.Done():
-		handleTimeoutError(timeoutCtx.Err())
-		return nil
+		return nil, wrapTimeoutError(timeoutCtx.Err())
 	}
 
 	select {
 	case <-lifecycleEvtCh:
 	case <-timeoutCtx.Done():
-		handleTimeoutError(timeoutCtx.Err())
+		return nil, wrapTimeoutError(timeoutCtx.Err())
 	}
 
-	return resp
+	return resp, nil
 }
 
 // Page returns the page that this frame manager belongs to.

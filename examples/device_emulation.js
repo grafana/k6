@@ -20,26 +20,26 @@ export default function() {
   const context = browser.newContext(options);
   const page = context.newPage();
 
-  page.goto('https://k6.io/', { waitUntil: 'networkidle' });
+  page.goto('https://k6.io/', { waitUntil: 'networkidle' }).then(() => {
+    const dimensions = page.evaluate(() => {
+      return {
+        width: document.documentElement.clientWidth,
+        height: document.documentElement.clientHeight,
+        deviceScaleFactor: window.devicePixelRatio
+      };
+    });
 
-  const dimensions = page.evaluate(() => {
-    return {
-      width: document.documentElement.clientWidth,
-      height: document.documentElement.clientHeight,
-      deviceScaleFactor: window.devicePixelRatio
-    };
+    check(dimensions, {
+      'width': d => d.width === device.viewport.width,
+      'height': d => d.height === device.viewport.height,
+      'scale': d => d.deviceScaleFactor === device.deviceScaleFactor,
+    });
+
+    if (!__ENV.XK6_HEADLESS) {
+      sleep(10);
+    }
+
+    page.close();
+    browser.close();
   });
-
-  check(dimensions, {
-    'width': d => d.width === device.viewport.width,
-    'height': d => d.height === device.viewport.height,
-    'scale': d => d.deviceScaleFactor === device.deviceScaleFactor,
-  });
-
-  if (!__ENV.XK6_HEADLESS) {
-    sleep(10);
-  }
-
-  page.close();
-  browser.close();
 }

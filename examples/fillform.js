@@ -15,11 +15,12 @@ export default function() {
   const page = context.newPage();
 
   // Goto front page, find login link and click it
-  page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
-  Promise.all([
-    page.waitForNavigation(),
-    page.locator('a[href="/my_messages.php"]').click(),
-  ]).then(() => {
+  page.goto('https://test.k6.io/', { waitUntil: 'networkidle' }).then(() => {
+    return Promise.all([
+      page.waitForNavigation(),
+      page.locator('a[href="/my_messages.php"]').click(),
+    ]);
+  }).then(() => {
     // Enter login credentials and login
     page.locator('input[name="login"]').type('admin');
     page.locator('input[name="password"]').type('123');

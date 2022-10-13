@@ -24,11 +24,13 @@ import (
 	_ "embed"
 	"encoding/json"
 	"testing"
-
-	"github.com/grafana/xk6-browser/common"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common"
 )
 
 func TestBrowserContextOptionsDefaultValues(t *testing.T) {
@@ -92,15 +94,20 @@ func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
 		},
 	}))
 	t.Cleanup(bctx.Close)
-
 	p := bctx.NewPage()
-	resp := p.Goto(tb.URL("/get"), nil)
 
-	require.NotNil(t, resp)
-	var body struct{ Headers map[string][]string }
-	err := json.Unmarshal(resp.Body().Bytes(), &body)
+	err := tb.awaitWithTimeout(time.Second*5, func() error {
+		tb.promiseThen(p.Goto(tb.URL("/get"), nil),
+			func(resp api.Response) {
+				require.NotNil(t, resp)
+				var body struct{ Headers map[string][]string }
+				require.NoError(t, json.Unmarshal(resp.Body().Bytes(), &body))
+				h := body.Headers["Some-Header"]
+				require.NotEmpty(t, h)
+				assert.Equal(t, "Some-Value", h[0])
+			})
+		return nil
+	})
+
 	require.NoError(t, err)
-	h := body.Headers["Some-Header"]
-	require.NotEmpty(t, h)
-	assert.Equal(t, "Some-Value", h[0])
 }

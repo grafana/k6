@@ -24,7 +24,7 @@ export class Bet {
   }
 
   goto() {
-    this.page.goto("https://test.k6.io/flip_coin.php", { waitUntil: "networkidle" });
+    return this.page.goto("https://test.k6.io/flip_coin.php", { waitUntil: "networkidle" });
   }
 
   heads() {
@@ -54,9 +54,9 @@ export default function() {
   const page = context.newPage();
 
   const bet = new Bet(page);
-  bet.goto();
-
-  bet.tails().then(() => {
+  bet.goto().then(() => {
+    return bet.tails();
+  }).then(() => {
     console.log("Current bet:", bet.current());
     return bet.heads();
   }).then(() => {

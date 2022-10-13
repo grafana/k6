@@ -23,17 +23,17 @@ export default function() {
   page.goto(
     'https://googlechromelabs.github.io/dark-mode-toggle/demo/',
     { waitUntil: 'load' },
-  );
+  ).then(() => {
+    const colorScheme = page.evaluate(() => {
+      return {
+        isDarkColorScheme: window.matchMedia('(prefers-color-scheme: dark)').matches
+      };
+    });
+    check(colorScheme, {
+      'isDarkColorScheme': cs => cs.isDarkColorScheme
+    });
 
-  const colorScheme = page.evaluate(() => {
-    return {
-      isDarkColorScheme: window.matchMedia('(prefers-color-scheme: dark)').matches
-    };
+    page.close();
+    browser.close();
   });
-  check(colorScheme, {
-    'isDarkColorScheme': cs => cs.isDarkColorScheme
-  });
-
-  page.close();
-  browser.close();
 }

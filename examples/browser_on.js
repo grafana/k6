@@ -25,7 +25,7 @@ export default function() {
         'should be disconnected on event': !browser.isConnected(),
       });
       return handlerCalled;
-    // The promise reject/failure handler
+      // The promise reject/failure handler
     }, (val) => {
       console.error(`promise rejected: ${val}`);
     });

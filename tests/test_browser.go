@@ -281,7 +281,9 @@ func (b *testBrowser) awaitWithTimeout(timeout time.Duration, fn func() error) e
 	}
 }
 
-func (b *testBrowser) promiseThen(promise *goja.Promise, onFulfilled, onRejected func(goja.Value)) *goja.Promise {
+func (b *testBrowser) promiseThen(
+	promise *goja.Promise, onFulfilled interface{}, onRejected ...interface{},
+) testPromise {
 	b.t.Helper()
 	rt := b.runtime()
 	val, err := rt.RunString(
@@ -289,16 +291,33 @@ func (b *testBrowser) promiseThen(promise *goja.Promise, onFulfilled, onRejected
 	require.NoError(b.t, err)
 	cal, ok := goja.AssertFunction(val)
 	require.True(b.t, ok)
-	if onRejected == nil {
+
+	switch len(onRejected) {
+	case 0:
 		val, err = cal(goja.Undefined(), rt.ToValue(promise), rt.ToValue(onFulfilled))
-	} else {
-		val, err = cal(goja.Undefined(), rt.ToValue(promise), rt.ToValue(onFulfilled), rt.ToValue(onRejected))
+	case 1:
+		val, err = cal(goja.Undefined(), rt.ToValue(promise), rt.ToValue(onFulfilled), rt.ToValue(onRejected[0]))
+	default:
+		panic("too many arguments to promiseThen")
 	}
 	require.NoError(b.t, err)
 	newPromise, ok := val.Export().(*goja.Promise)
 	require.True(b.t, ok)
 
-	return newPromise
+	return testPromise{
+		Promise: newPromise,
+		tb:      b,
+	}
+}
+
+type testPromise struct {
+	*goja.Promise
+	tb *testBrowser
+}
+
+//nolint:unparam // the result will be used in future tests
+func (t testPromise) then(onFulfilled interface{}, onRejected ...interface{}) testPromise {
+	return t.tb.promiseThen(t.Promise, onFulfilled, onRejected...)
 }
 
 func (b *testBrowser) promiseAll(promises ...*goja.Promise) *goja.Promise {
