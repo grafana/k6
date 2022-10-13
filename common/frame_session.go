@@ -495,9 +495,11 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 		WithTime(event.Timestamp.Time()).
 		WithField("source", "browser-console-api")
 
-	if s := fs.vu.State(); s.Group.Path != "" {
-		l = l.WithField("group", s.Group.Path)
-	}
+		/* accessing the state Group while not on the eventloop is racy
+		if s := fs.vu.State(); s.Group.Path != "" {
+			l = l.WithField("group", s.Group.Path)
+		}
+		*/
 
 	var parsedObjects []interface{}
 	for _, robj := range event.Args {
@@ -668,9 +670,11 @@ func (fs *FrameSession) onLogEntryAdded(event *cdplog.EventEntryAdded) {
 		WithField("url", event.Entry.URL).
 		WithField("browser_source", event.Entry.Source.String()).
 		WithField("line_number", event.Entry.LineNumber)
-	if s := fs.vu.State(); s.Group.Path != "" {
-		l = l.WithField("group", s.Group.Path)
-	}
+		/* accessing the state Group while not on the eventloop is racy
+		if s := fs.vu.State(); s.Group.Path != "" {
+			l = l.WithField("group", s.Group.Path)
+		}
+		*/
 	switch event.Entry.Level {
 	case "info":
 		l.Info(event.Entry.Text)

@@ -146,9 +146,6 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	state := m.vu.State()
 
 	tags := state.Tags.GetCurrentValues()
-	if state.Options.SystemTags.Has(k6metrics.TagGroup) {
-		tags = tags.With("group", state.Group.Path)
-	}
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
 		tags = tags.With("method", req.method)
 	}
@@ -196,9 +193,6 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	}
 
 	tags := state.Tags.GetCurrentValues()
-	if state.Options.SystemTags.Has(k6metrics.TagGroup) {
-		tags = tags.With("group", state.Group.Path)
-	}
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
 		tags = tags.With("method", req.method)
 	}
