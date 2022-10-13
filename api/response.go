@@ -26,7 +26,7 @@ import "github.com/dop251/goja"
 type Response interface {
 	AllHeaders() map[string]string
 	Body() goja.ArrayBuffer
-	Finished() bool // TODO: should return nil|Error
+	Finished() *goja.Promise
 	Frame() Frame
 	HeaderValue(string) goja.Value
 	HeaderValues(string) []string

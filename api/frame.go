@@ -4,8 +4,8 @@ import "github.com/dop251/goja"
 
 // Frame is the interface of a CDP target frame.
 type Frame interface {
-	AddScriptTag(opts goja.Value)
-	AddStyleTag(opts goja.Value)
+	AddScriptTag(opts goja.Value) *goja.Promise
+	AddStyleTag(opts goja.Value) *goja.Promise
 	Check(selector string, opts goja.Value)
 	ChildFrames() []Frame
 	Click(selector string, opts goja.Value) *goja.Promise
@@ -42,7 +42,7 @@ type Frame interface {
 	Press(selector string, key string, opts goja.Value)
 	SelectOption(selector string, values goja.Value, opts goja.Value) []string
 	SetContent(html string, opts goja.Value)
-	SetInputFiles(selector string, files goja.Value, opts goja.Value)
+	SetInputFiles(selector string, files goja.Value, opts goja.Value) *goja.Promise
 	Tap(selector string, opts goja.Value)
 	TextContent(selector string, opts goja.Value) string
 	Title() string

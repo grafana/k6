@@ -24,9 +24,9 @@ import "github.com/dop251/goja"
 
 // Page is the interface of a single browser tab.
 type Page interface {
-	AddInitScript(script goja.Value, arg goja.Value)
-	AddScriptTag(opts goja.Value)
-	AddStyleTag(opts goja.Value)
+	AddInitScript(script goja.Value, arg goja.Value) *goja.Promise
+	AddScriptTag(opts goja.Value) *goja.Promise
+	AddStyleTag(opts goja.Value) *goja.Promise
 	BringToFront()
 	Check(selector string, opts goja.Value)
 	Click(selector string, opts goja.Value) *goja.Promise
@@ -35,20 +35,20 @@ type Page interface {
 	Context() BrowserContext
 	Dblclick(selector string, opts goja.Value)
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
-	DragAndDrop(source string, target string, opts goja.Value)
+	DragAndDrop(source string, target string, opts goja.Value) *goja.Promise
 	EmulateMedia(opts goja.Value)
 	EmulateVisionDeficiency(typ string)
 	Evaluate(pageFunc goja.Value, arg ...goja.Value) interface{}
 	EvaluateHandle(pageFunc goja.Value, arg ...goja.Value) JSHandle
-	ExposeBinding(name string, callback goja.Callable, opts goja.Value)
-	ExposeFunction(name string, callback goja.Callable)
+	ExposeBinding(name string, callback goja.Callable, opts goja.Value) *goja.Promise
+	ExposeFunction(name string, callback goja.Callable) *goja.Promise
 	Fill(selector string, value string, opts goja.Value)
 	Focus(selector string, opts goja.Value)
-	Frame(frameSelector goja.Value) Frame
+	Frame(frameSelector goja.Value) *goja.Promise
 	Frames() []Frame
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
-	GoBack(opts goja.Value) Response
-	GoForward(opts goja.Value) Response
+	GoBack(opts goja.Value) *goja.Promise
+	GoForward(opts goja.Value) *goja.Promise
 	Goto(url string, opts goja.Value) *goja.Promise
 	Hover(selector string, opts goja.Value)
 	InnerHTML(selector string, opts goja.Value) string
@@ -65,36 +65,36 @@ type Page interface {
 	Locator(selector string, opts goja.Value) Locator
 	MainFrame() Frame
 	Opener() Page
-	Pause()
-	Pdf(opts goja.Value) goja.ArrayBuffer
+	Pause() *goja.Promise
+	Pdf(opts goja.Value) *goja.Promise
 	Press(selector string, key string, opts goja.Value)
 	Query(selector string) ElementHandle
 	QueryAll(selector string) []ElementHandle
 	Reload(opts goja.Value) Response
-	Route(url goja.Value, handler goja.Callable)
+	Route(url goja.Value, handler goja.Callable) *goja.Promise
 	Screenshot(opts goja.Value) goja.ArrayBuffer
 	SelectOption(selector string, values goja.Value, opts goja.Value) []string
 	SetContent(html string, opts goja.Value)
 	SetDefaultNavigationTimeout(timeout int64)
 	SetDefaultTimeout(timeout int64)
 	SetExtraHTTPHeaders(headers map[string]string)
-	SetInputFiles(selector string, files goja.Value, opts goja.Value)
+	SetInputFiles(selector string, files goja.Value, opts goja.Value) *goja.Promise
 	SetViewportSize(viewportSize goja.Value)
 	Tap(selector string, opts goja.Value)
 	TextContent(selector string, opts goja.Value) string
 	Title() string
 	Type(selector string, text string, opts goja.Value)
 	Uncheck(selector string, opts goja.Value)
-	Unroute(url goja.Value, handler goja.Callable)
+	Unroute(url goja.Value, handler goja.Callable) *goja.Promise
 	URL() string
-	Video() Video
+	Video() *goja.Promise
 	ViewportSize() map[string]float64
-	WaitForEvent(event string, optsOrPredicate goja.Value) interface{}
+	WaitForEvent(event string, optsOrPredicate goja.Value) *goja.Promise
 	WaitForFunction(fn, opts goja.Value, args ...goja.Value) *goja.Promise
 	WaitForLoadState(state string, opts goja.Value)
 	WaitForNavigation(opts goja.Value) *goja.Promise
-	WaitForRequest(urlOrPredicate, opts goja.Value) Request
-	WaitForResponse(urlOrPredicate, opts goja.Value) Response
+	WaitForRequest(urlOrPredicate, opts goja.Value) *goja.Promise
+	WaitForResponse(urlOrPredicate, opts goja.Value) *goja.Promise
 	WaitForSelector(selector string, opts goja.Value) ElementHandle
 	WaitForTimeout(timeout int64)
 	Workers() []Worker
