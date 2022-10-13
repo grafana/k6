@@ -115,10 +115,11 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
-				require.NoError(t, tb.await(func() error {
+				err := tb.await(func() error {
 					p.Goto("about:blank", nil)
 					return nil
-				}))
+				})
+				require.NoError(t, err)
 			})
 		})
 		t.Run("hover", func(t *testing.T) {

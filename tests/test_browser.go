@@ -281,46 +281,7 @@ func (b *testBrowser) awaitWithTimeout(timeout time.Duration, fn func() error) e
 	}
 }
 
-func (b *testBrowser) promiseThen(
-	promise *goja.Promise, onFulfilled interface{}, onRejected ...interface{},
-) testPromise {
-	b.t.Helper()
-	rt := b.runtime()
-	val, err := rt.RunString(
-		`(function(promise, onFulfilled, onRejected) { return promise.then(onFulfilled, onRejected) })`)
-	require.NoError(b.t, err)
-	cal, ok := goja.AssertFunction(val)
-	require.True(b.t, ok)
-
-	switch len(onRejected) {
-	case 0:
-		val, err = cal(goja.Undefined(), rt.ToValue(promise), rt.ToValue(onFulfilled))
-	case 1:
-		val, err = cal(goja.Undefined(), rt.ToValue(promise), rt.ToValue(onFulfilled), rt.ToValue(onRejected[0]))
-	default:
-		panic("too many arguments to promiseThen")
-	}
-	require.NoError(b.t, err)
-	newPromise, ok := val.Export().(*goja.Promise)
-	require.True(b.t, ok)
-
-	return testPromise{
-		Promise: newPromise,
-		tb:      b,
-	}
-}
-
-type testPromise struct {
-	*goja.Promise
-	tb *testBrowser
-}
-
-//nolint:unparam // the result will be used in future tests
-func (t testPromise) then(onFulfilled interface{}, onRejected ...interface{}) testPromise {
-	return t.tb.promiseThen(t.Promise, onFulfilled, onRejected...)
-}
-
-func (b *testBrowser) promiseAll(promises ...*goja.Promise) *goja.Promise {
+func (b *testBrowser) promiseAll(promises ...*goja.Promise) testPromise {
 	b.t.Helper()
 	rt := b.runtime()
 	val, err := rt.RunString(`(function(...promises) { return Promise.all(...promises) })`)
@@ -336,7 +297,58 @@ func (b *testBrowser) promiseAll(promises ...*goja.Promise) *goja.Promise {
 	newPromise, ok := val.Export().(*goja.Promise)
 	require.True(b.t, ok)
 
-	return newPromise
+	return testPromise{
+		Promise: newPromise,
+		call:    cal,
+		tb:      b,
+	}
+}
+
+func (b *testBrowser) promise(promise *goja.Promise) testPromise {
+	b.t.Helper()
+	rt := b.runtime()
+	val, err := rt.RunString(`
+		(function(promise, resolve, reject) {
+			return promise.then(resolve, reject)
+		})
+	`)
+	require.NoError(b.t, err)
+	cal, ok := goja.AssertFunction(val)
+	require.True(b.t, ok)
+
+	return testPromise{
+		Promise: promise,
+		call:    cal,
+		tb:      b,
+	}
+}
+
+type testPromise struct {
+	*goja.Promise
+	tb   *testBrowser
+	call goja.Callable
+}
+
+func (t testPromise) then(resolve interface{}, reject ...interface{}) testPromise {
+	var (
+		val goja.Value
+		err error
+		rt  = t.tb.runtime()
+	)
+	switch len(reject) {
+	case 0:
+		val, err = t.call(goja.Undefined(), rt.ToValue(t.Promise), rt.ToValue(resolve))
+	case 1:
+		val, err = t.call(goja.Undefined(), rt.ToValue(t.Promise), rt.ToValue(resolve), rt.ToValue(reject[0]))
+	default:
+		panic("too many arguments to promiseThen")
+	}
+	require.NoError(t.tb.t, err)
+
+	p, ok := val.Export().(*goja.Promise)
+	require.True(t.tb.t, ok)
+
+	return t.tb.promise(p)
 }
 
 // launchOptions provides a way to customize browser type
