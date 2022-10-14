@@ -152,30 +152,28 @@ func TestPageGoto(t *testing.T) {
 	p := b.NewPage(nil)
 
 	url := b.staticURL("empty.html")
-	require.NoError(t, b.await(func() error {
-		b.promiseThen(p.Goto(url, nil),
-			func(r api.Response) {
-				require.NotNil(t, r)
-				assert.Equal(t, url, r.URL(), `expected URL to be %q, result of navigation was %q`, url, r.URL())
-			})
-
+	err := b.await(func() error {
+		b.promise(p.Goto(url, nil)).then(func(r api.Response) {
+			require.NotNil(t, r)
+			assert.Equal(t, url, r.URL(), `expected URL to be %q, result of navigation was %q`, url, r.URL())
+		})
 		return nil
-	}))
+	})
+	require.NoError(t, err)
 }
 
 func TestPageGotoDataURI(t *testing.T) {
 	b := newTestBrowser(t)
 	p := b.NewPage(nil)
 
-	require.NoError(t, b.await(func() error {
-		b.promiseThen(
-			p.Goto("data:text/html,hello", nil),
-			func(r api.Response) {
-				assert.Nil(t, r, `expected response to be nil`)
-			})
+	err := b.await(func() error {
+		b.promise(p.Goto("data:text/html,hello", nil)).then(func(r api.Response) {
+			assert.Nil(t, r, `expected response to be nil`)
+		})
 
 		return nil
-	}))
+	})
+	require.NoError(t, err)
 }
 
 func TestPageGotoWaitUntilLoad(t *testing.T) {
@@ -183,22 +181,25 @@ func TestPageGotoWaitUntilLoad(t *testing.T) {
 
 	p := b.NewPage(nil)
 
-	require.NoError(t, b.await(func() error {
-		b.promiseThen(
-			p.Goto(b.staticURL("wait_until.html"), b.toGojaValue(struct {
-				WaitUntil string `js:"waitUntil"`
-			}{WaitUntil: "load"})), func() {
-				var (
-					results = p.Evaluate(b.toGojaValue("() => window.results"))
-					actual  []string
-				)
-				_ = b.runtime().ExportTo(b.asGojaValue(results), &actual)
+	err := b.await(func() error {
+		opts := b.toGojaValue(struct {
+			WaitUntil string `js:"waitUntil"`
+		}{
+			WaitUntil: "load",
+		})
+		b.promise(p.Goto(b.staticURL("wait_until.html"), opts)).then(func() {
+			var (
+				results = p.Evaluate(b.toGojaValue("() => window.results"))
+				actual  []string
+			)
+			_ = b.runtime().ExportTo(b.asGojaValue(results), &actual)
 
-				assert.EqualValues(t, []string{"DOMContentLoaded", "load"}, actual, `expected "load" event to have fired`)
-			})
+			assert.EqualValues(t, []string{"DOMContentLoaded", "load"}, actual, `expected "load" event to have fired`)
+		})
 
 		return nil
-	}))
+	})
+	require.NoError(t, err)
 }
 
 func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
@@ -206,22 +207,25 @@ func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 
 	p := b.NewPage(nil)
 
-	require.NoError(t, b.await(func() error {
-		b.promiseThen(
-			p.Goto(b.staticURL("wait_until.html"), b.toGojaValue(struct {
-				WaitUntil string `js:"waitUntil"`
-			}{WaitUntil: "domcontentloaded"})), func() {
-				var (
-					results = p.Evaluate(b.toGojaValue("() => window.results"))
-					actual  []string
-				)
-				_ = b.runtime().ExportTo(b.asGojaValue(results), &actual)
+	err := b.await(func() error {
+		opts := b.toGojaValue(struct {
+			WaitUntil string `js:"waitUntil"`
+		}{
+			WaitUntil: "domcontentloaded",
+		})
+		b.promise(p.Goto(b.staticURL("wait_until.html"), opts)).then(func() {
+			var (
+				results = p.Evaluate(b.toGojaValue("() => window.results"))
+				actual  []string
+			)
+			_ = b.runtime().ExportTo(b.asGojaValue(results), &actual)
 
-				assert.EqualValues(t, "DOMContentLoaded", actual[0], `expected "DOMContentLoaded" event to have fired`)
-			})
+			assert.EqualValues(t, "DOMContentLoaded", actual[0], `expected "DOMContentLoaded" event to have fired`)
+		})
 
 		return nil
-	}))
+	})
+	require.NoError(t, err)
 }
 
 func TestPageInnerHTML(t *testing.T) {
@@ -466,22 +470,20 @@ func TestPageSetExtraHTTPHeaders(t *testing.T) {
 	}
 	p.SetExtraHTTPHeaders(headers)
 
-	require.NoError(t, b.await(func() error {
-		b.promiseThen(
-			p.Goto(b.URL("/get"), nil),
-
-			func(resp api.Response) {
-				require.NotNil(t, resp)
-				var body struct{ Headers map[string][]string }
-				err := json.Unmarshal(resp.Body().Bytes(), &body)
-				require.NoError(t, err)
-				h := body.Headers["Some-Header"]
-				require.NotEmpty(t, h)
-				assert.Equal(t, "Some-Value", h[0])
-			})
+	err := b.await(func() error {
+		b.promise(p.Goto(b.URL("/get"), nil)).then(func(resp api.Response) {
+			require.NotNil(t, resp)
+			var body struct{ Headers map[string][]string }
+			err := json.Unmarshal(resp.Body().Bytes(), &body)
+			require.NoError(t, err)
+			h := body.Headers["Some-Header"]
+			require.NotEmpty(t, h)
+			assert.Equal(t, "Some-Value", h[0])
+		})
 
 		return nil
-	}))
+	})
+	require.NoError(t, err)
 }
 
 func TestPageWaitForFunction(t *testing.T) {

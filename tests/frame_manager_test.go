@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -37,28 +36,28 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 
 			var done bool
 			tb := newTestBrowser(t, withFileServer())
-			err := tb.awaitWithTimeout(timeout,
-				func() error {
-					p := tb.NewPage(nil)
+			err := tb.awaitWithTimeout(timeout, func() error {
+				p := tb.NewPage(nil)
 
-					gotoPromise := p.Goto(tb.staticURL("/nav_in_doc.html"), tb.toGojaValue(&common.FrameGotoOptions{
-						WaitUntil: common.LifecycleEventNetworkIdle,
-						Timeout:   time.Duration(timeout.Milliseconds()), // interpreted as ms
-					}))
-
-					tb.promiseThen(gotoPromise, func(resp api.Response) *goja.Promise {
+				opts := tb.toGojaValue(&common.FrameGotoOptions{
+					WaitUntil: common.LifecycleEventNetworkIdle,
+					Timeout:   time.Duration(timeout.Milliseconds()), // interpreted as ms
+				})
+				tb.promise(p.Goto(tb.staticURL("/nav_in_doc.html"), opts)).
+					then(func(resp api.Response) testPromise {
 						require.NotNil(t, resp)
-						wfnPromise := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+						waitForNav := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
 							Timeout: time.Duration(timeout.Milliseconds()), // interpreted as ms
 						}))
-						cPromise := p.Click(tc.selector, nil)
-						return tb.promiseAll(wfnPromise, cPromise)
-					}).then(func() {
+						click := p.Click(tc.selector, nil)
+						return tb.promiseAll(waitForNav, click)
+					}).
+					then(func() {
 						done = true
 					})
 
-					return nil
-				})
+				return nil
+			})
 			require.NoError(t, err)
 			require.True(t, done)
 		})
@@ -96,20 +95,23 @@ func TestWaitForFrameNavigation(t *testing.T) {
 
 	var done bool
 	require.NoError(t, tb.await(func() error {
-		tb.promiseThen(p.Goto(tb.URL("/first"), tb.toGojaValue(&common.FrameGotoOptions{
+		opts := tb.toGojaValue(&common.FrameGotoOptions{
 			WaitUntil: common.LifecycleEventNetworkIdle,
 			Timeout:   common.DefaultTimeout,
-		})), func() *goja.Promise {
-			var timeout time.Duration = 5000 // interpreted as ms
-			wfnPromise := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
-				Timeout: timeout, // interpreted as ms
-			}))
-			cPromise := p.Click(`a`, nil)
-			return tb.promiseAll(wfnPromise, cPromise)
-		}).then(func() {
-			assert.Equal(t, "Second page", p.Title())
-			done = true
 		})
+		tb.promise(p.Goto(tb.URL("/first"), opts)).
+			then(func() testPromise {
+				var timeout time.Duration = 5000 // interpreted as ms
+				wfnPromise := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+					Timeout: timeout, // interpreted as ms
+				}))
+				cPromise := p.Click(`a`, nil)
+				return tb.promiseAll(wfnPromise, cPromise)
+			}).
+			then(func() {
+				assert.Equal(t, "Second page", p.Title())
+				done = true
+			})
 
 		return nil
 	}))
