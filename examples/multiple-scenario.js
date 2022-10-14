@@ -1,4 +1,4 @@
-import { chromium } from 'k6/x/browser'
+import { chromium } from 'k6/x/browser';
 
 export const options = {
   scenarios: {
@@ -41,7 +41,7 @@ export function news() {
   });
   const page = browser.newPage();
 
-  page.goto('https://test.k6.io/news.php', { waitUntil: 'networkidle' }).then(() => {
+  page.goto('https://test.k6.io/news.php', { waitUntil: 'networkidle' }).finally(() => {
     page.close();
     browser.close();
   });

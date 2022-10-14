@@ -16,6 +16,7 @@ export default function() {
     page.screenshot({ path: 'screenshot.png' });
     // TODO: Assert this somehow. Upload as CI artifact or just an external `ls`?
     // Maybe even do a fuzzy image comparison against a preset known good screenshot?
+  }).finally(() => {
     page.close();
     browser.close();
   });

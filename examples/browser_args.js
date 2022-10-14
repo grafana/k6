@@ -19,8 +19,8 @@ export default function() {
     check(res, {
       'null response': r => r === null,
     });
-
+  }).finally(() => {
     page.close();
     browser.close();
-  })
+  });
 }

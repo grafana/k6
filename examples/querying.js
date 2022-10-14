@@ -21,7 +21,7 @@ export default function() {
       'Title with XPath selector':
         p => p.$(`//header//h1[@class="title"]`).textContent() == 'test.k6.io',
     });
-
+  }).finally(() => {
     page.close();
     browser.close();
   });

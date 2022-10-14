@@ -27,6 +27,7 @@ export default function() {
     timeout: 2000,
   }).then(ok => {
     check(ok, { 'waitForFunction successfully resolved': ok.innerHTML() == 'Hello' });
+  }).finally(() => {
     page.close();
     browser.close();
   });

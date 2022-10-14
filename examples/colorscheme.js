@@ -32,7 +32,7 @@ export default function() {
     check(colorScheme, {
       'isDarkColorScheme': cs => cs.isDarkColorScheme
     });
-
+  }).finally(() => {
     page.close();
     browser.close();
   });

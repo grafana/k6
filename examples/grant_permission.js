@@ -20,8 +20,8 @@ export default function() {
   const page = context.newPage();
   page.goto('http://whatsmyuseragent.org/').then(() => {
     page.screenshot({ path: `example-chromium.png` });
-
+  }).finally(() => {
     page.close();
     browser.close();
-  })
+  });
 }

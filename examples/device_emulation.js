@@ -38,7 +38,7 @@ export default function() {
     if (!__ENV.XK6_HEADLESS) {
       sleep(10);
     }
-
+  }).finally(() => {
     page.close();
     browser.close();
   });

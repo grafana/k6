@@ -21,7 +21,7 @@ export default function() {
     check(el, {
       "GetAttribute('mode')": e => e.getAttribute('mode') == 'light',
     });
-
+  }).finally(() => {
     page.close();
     browser.close();
   });

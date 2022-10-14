@@ -31,7 +31,7 @@ export default function() {
       'height': d => d.height === 720,
       'scale': d => d.deviceScaleFactor === 1,
     });
-
+  }).finally(() => {
     page.close();
     browser.close();
   });
