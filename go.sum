@@ -99,8 +99,8 @@ github.com/grafana/xk6-redis v0.1.1 h1:rvWnLanRB2qzDwuY6NMBe6PXei3wJ3kjYvfCwRJ+q
 github.com/grafana/xk6-redis v0.1.1/go.mod h1:z7el1Tz8advY+ex419KfLbENzSQYgaA2lQYwMlt9yMM=
 github.com/grafana/xk6-timers v0.1.2 h1:YVM6hPDgvy4SkdZQpd+/r9M0kDi1g+QdbSxW5ClfwDk=
 github.com/grafana/xk6-timers v0.1.2/go.mod h1:XHmDIXAKe30NJMXrxKIKMFXx98etsCl0jBYktjsSURc=
-github.com/grafana/xk6-websockets v0.1.4 h1:OVqNZ3rIXFjY+MEeBf2lhOYJMfIbKT1Bppm4XnDQQWU=
-github.com/grafana/xk6-websockets v0.1.4/go.mod h1:MAvkRFMyyRaxn1AG0sU33dujRlWdlNm++qpTblQESkg=
+github.com/grafana/xk6-websockets v0.1.5 h1:jOAkQqB88m+osXagOr7TwP+ZB/u637UpysxCZd7B84E=
+github.com/grafana/xk6-websockets v0.1.5/go.mod h1:+vlArhLMFFvNFgs5GUsw3RtzlDxli1G5SFMdC/QEUxU=
 github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFbcEtjT1g+wF4CSlocrBnw=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
@@ -204,7 +204,7 @@ github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9dec
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 go.k6.io/k6 v0.37.1-0.20220426072701-d105f5474bc3/go.mod h1:1bTdDsXTT2V3in3ZgdR15MDW6SQQh5nWni59tirqNB8=
 go.k6.io/k6 v0.38.2/go.mod h1:1bTdDsXTT2V3in3ZgdR15MDW6SQQh5nWni59tirqNB8=
-go.k6.io/k6 v0.40.1-0.20221004102444-50bc9af81f3a/go.mod h1:/NkhZeFQazmfRxuD05zoqG2pUd5Wxa1D78IiSEq4Huk=
+go.k6.io/k6 v0.40.1-0.20221017105932-3c97ec7d1231/go.mod h1:vaSQ1A2rnC+wrKRJ4ExZCT6kKLfAEYoaIY9UR0uAjjk=
 go.opentelemetry.io/proto/otlp v0.7.0/go.mod h1:PqfVotwruBrMGOCsRd/89rSnXhoiJIqeYNgFYFoEGnI=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=

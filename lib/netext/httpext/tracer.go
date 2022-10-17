@@ -40,73 +40,81 @@ type Trail struct {
 }
 
 // SaveSamples populates the Trail's sample slice so they're accesible via GetSamples()
-func (tr *Trail) SaveSamples(builtinMetrics *metrics.BuiltinMetrics, tags *metrics.TagSet) {
-	tr.Tags = tags
+func (tr *Trail) SaveSamples(builtinMetrics *metrics.BuiltinMetrics, ctm *metrics.TagsAndMeta) {
+	tr.Tags = ctm.Tags
 	tr.Samples = make([]metrics.Sample, 0, 9) // this is with 1 more for a possible HTTPReqFailed
 	tr.Samples = append(tr.Samples, []metrics.Sample{
 		{
 			TimeSeries: metrics.TimeSeries{
 				Metric: builtinMetrics.HTTPReqs,
-				Tags:   tags,
+				Tags:   ctm.Tags,
 			},
-			Time:  tr.EndTime,
-			Value: 1,
+			Time:     tr.EndTime,
+			Metadata: ctm.Metadata,
+			Value:    1,
 		},
 		{
 			TimeSeries: metrics.TimeSeries{
 				Metric: builtinMetrics.HTTPReqDuration,
-				Tags:   tags,
+				Tags:   ctm.Tags,
 			},
-			Time:  tr.EndTime,
-			Value: metrics.D(tr.Duration),
+			Time:     tr.EndTime,
+			Metadata: ctm.Metadata,
+			Value:    metrics.D(tr.Duration),
 		},
 		{
 			TimeSeries: metrics.TimeSeries{
 				Metric: builtinMetrics.HTTPReqBlocked,
-				Tags:   tags,
+				Tags:   ctm.Tags,
 			},
-			Time:  tr.EndTime,
-			Value: metrics.D(tr.Blocked),
+			Time:     tr.EndTime,
+			Metadata: ctm.Metadata,
+			Value:    metrics.D(tr.Blocked),
 		},
 		{
 			TimeSeries: metrics.TimeSeries{
 				Metric: builtinMetrics.HTTPReqConnecting,
-				Tags:   tags,
+				Tags:   ctm.Tags,
 			},
-			Time:  tr.EndTime,
-			Value: metrics.D(tr.Connecting),
+			Time:     tr.EndTime,
+			Metadata: ctm.Metadata,
+			Value:    metrics.D(tr.Connecting),
 		},
 		{
 			TimeSeries: metrics.TimeSeries{
 				Metric: builtinMetrics.HTTPReqTLSHandshaking,
-				Tags:   tags,
+				Tags:   ctm.Tags,
 			},
-			Time:  tr.EndTime,
-			Value: metrics.D(tr.TLSHandshaking),
+			Time:     tr.EndTime,
+			Metadata: ctm.Metadata,
+			Value:    metrics.D(tr.TLSHandshaking),
 		},
 		{
 			TimeSeries: metrics.TimeSeries{
 				Metric: builtinMetrics.HTTPReqSending,
-				Tags:   tags,
+				Tags:   ctm.Tags,
 			},
-			Time:  tr.EndTime,
-			Value: metrics.D(tr.Sending),
+			Time:     tr.EndTime,
+			Metadata: ctm.Metadata,
+			Value:    metrics.D(tr.Sending),
 		},
 		{
 			TimeSeries: metrics.TimeSeries{
 				Metric: builtinMetrics.HTTPReqWaiting,
-				Tags:   tags,
+				Tags:   ctm.Tags,
 			},
-			Time:  tr.EndTime,
-			Value: metrics.D(tr.Waiting),
+			Time:     tr.EndTime,
+			Metadata: ctm.Metadata,
+			Value:    metrics.D(tr.Waiting),
 		},
 		{
 			TimeSeries: metrics.TimeSeries{
 				Metric: builtinMetrics.HTTPReqReceiving,
-				Tags:   tags,
+				Tags:   ctm.Tags,
 			},
-			Time:  tr.EndTime,
-			Value: metrics.D(tr.Receiving),
+			Time:     tr.EndTime,
+			Metadata: ctm.Metadata,
+			Value:    metrics.D(tr.Receiving),
 		},
 	}...)
 }

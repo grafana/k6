@@ -166,7 +166,7 @@ func TestGroup(t *testing.T) {
 		rt, state, root := setupGroupTest()
 		assert.Equal(t, state.Group, root)
 		require.NoError(t, rt.Set("fn", func() {
-			groupTag, ok := state.Tags.GetCurrentValues().Get("group")
+			groupTag, ok := state.Tags.GetCurrentValues().Tags.Get("group")
 			require.True(t, ok)
 			assert.Equal(t, groupTag, "::my group")
 			assert.Equal(t, state.Group.Name, "my group")
@@ -175,7 +175,7 @@ func TestGroup(t *testing.T) {
 		_, err := rt.RunString(`k6.group("my group", fn)`)
 		assert.NoError(t, err)
 		assert.Equal(t, state.Group, root)
-		groupTag, ok := state.Tags.GetCurrentValues().Get("group")
+		groupTag, ok := state.Tags.GetCurrentValues().Tags.Get("group")
 		require.True(t, ok)
 		assert.Equal(t, groupTag, root.Name)
 	})

@@ -62,7 +62,11 @@ type State struct {
 
 	VUID, VUIDGlobal uint64
 	Iteration        int64
-	Tags             *VUStateTags
+
+	// TODO: rename this field with one more representative
+	// because it includes now also the metadata.
+	Tags *VUStateTags
+
 	// These will be assigned on VU activation.
 	// Returns the iteration number of this VU in the current scenario.
 	GetScenarioVUIter func() uint64
@@ -81,8 +85,8 @@ type State struct {
 // metadata can be modified from the JS scripts via the `vu.tags` API in the
 // `k6/execution` built-in module.
 type VUStateTags struct {
-	mutex sync.RWMutex
-	tags  *metrics.TagSet
+	mutex       sync.RWMutex
+	tagsAndMeta *metrics.TagsAndMeta
 }
 
 // NewVUStateTags initializes a new VUStateTags and returns it. It's important
@@ -93,21 +97,24 @@ func NewVUStateTags(tags *metrics.TagSet) *VUStateTags {
 	}
 	return &VUStateTags{
 		mutex: sync.RWMutex{},
-		tags:  tags,
-		// metadata is intentionally nil by default
+		tagsAndMeta: &metrics.TagsAndMeta{
+			Tags: tags,
+			// metadata is intentionally nil by default
+		},
 	}
 }
 
-// GetCurrentValues returns the value of the VU tags in a thread-safe way.
-func (tg *VUStateTags) GetCurrentValues() *metrics.TagSet {
+// GetCurrentValues returns the current value of the VU tags and a copy of the
+// metadata (if any) in a thread-safe way.
+func (tg *VUStateTags) GetCurrentValues() metrics.TagsAndMeta {
 	tg.mutex.RLock()
 	defer tg.mutex.RUnlock()
-	return tg.tags
+	return tg.tagsAndMeta.Clone()
 }
 
-// Modify allows the thread-safe modification of the current VU tags.
-func (tg *VUStateTags) Modify(callback func(currentTags *metrics.TagSet) (newTags *metrics.TagSet)) {
+// Modify allows the thread-safe modification of the current VU tags and metadata.
+func (tg *VUStateTags) Modify(callback func(tagsAndMeta *metrics.TagsAndMeta)) {
 	tg.mutex.Lock()
 	defer tg.mutex.Unlock()
-	tg.tags = callback(tg.tags)
+	callback(tg.tagsAndMeta)
 }

@@ -7,14 +7,18 @@ import (
 	"strings"
 )
 
-// SystemTagSet is a bitmask that is used to keep track
-// which system tags should be included with which metrics.
-//go:generate enumer -type=SystemTagSet -transform=snake -trimprefix=Tag -output system_tag_set_gen.go
-type SystemTagSet uint32
+// SystemTag values are bit-shifted identifiers of all of the various system tags that k6 has.
+//
+//go:generate enumer -type=SystemTag -transform=snake -trimprefix=Tag -output system_tag_gen.go
+type SystemTag uint32
+
+// SystemTagSet is a bitmask that is used to keep track which system tags should
+// be included in metric Samples.
+type SystemTagSet SystemTag
 
 // Default system tags includes all of the system tags emitted with metrics by default.
 const (
-	TagProto SystemTagSet = 1 << iota
+	TagProto SystemTag = 1 << iota
 	TagSubproto
 	TagStatus
 	TagMethod
@@ -30,38 +34,45 @@ const (
 	TagExpectedResponse
 
 	// System tags not enabled by default.
-	TagIter
-	TagVU
+	TagIter // non-indexable
+	TagVU   // non-indexable
 	TagOCSPStatus
 	TagIP
 )
 
 // DefaultSystemTagSet includes all of the system tags emitted with metrics by default.
 // Other tags that are not enabled by default include: iter, vu, ocsp_status, ip
+//
 //nolint:gochecknoglobals
-var DefaultSystemTagSet = TagProto | TagSubproto | TagStatus | TagMethod | TagURL | TagName | TagGroup |
-	TagCheck | TagError | TagErrorCode | TagTLSVersion | TagScenario | TagService | TagExpectedResponse
+var DefaultSystemTagSet = SystemTagSet(
+	TagProto | TagSubproto | TagStatus | TagMethod | TagURL | TagName | TagGroup |
+		TagCheck | TagError | TagErrorCode | TagTLSVersion | TagScenario | TagService | TagExpectedResponse)
+
+// NonIndexableSystemTags are high cardinality system tags (i.e. metadata).
+//
+//nolint:gochecknoglobals
+var NonIndexableSystemTags = SystemTagSet(TagIter | TagVU)
 
 // Add adds a tag to tag set.
-func (i *SystemTagSet) Add(tag SystemTagSet) {
+func (i *SystemTagSet) Add(tag SystemTag) {
 	if i == nil {
 		i = new(SystemTagSet)
 	}
-	*i |= tag
+	*i |= SystemTagSet(tag)
 }
 
 // Has checks a tag included in tag set.
-func (i *SystemTagSet) Has(tag SystemTagSet) bool {
+func (i *SystemTagSet) Has(tag SystemTag) bool {
 	if i == nil {
 		return false
 	}
-	return *i&tag != 0
+	return *i&SystemTagSet(tag) != 0
 }
 
 // Map returns the EnabledTags with current value from SystemTagSet
 func (i SystemTagSet) Map() EnabledTags {
 	m := EnabledTags{}
-	for _, tag := range SystemTagSetValues() {
+	for _, tag := range SystemTagValues() {
 		if i.Has(tag) {
 			m[tag.String()] = true
 		}
@@ -72,7 +83,7 @@ func (i SystemTagSet) Map() EnabledTags {
 // SetString returns comma separated list of the string representation of all values in the set
 func (i SystemTagSet) SetString() string {
 	var keys []string
-	for _, tag := range SystemTagSetValues() {
+	for _, tag := range SystemTagValues() {
 		if i.Has(tag) {
 			keys = append(keys, tag.String())
 		}
@@ -85,7 +96,7 @@ func (i SystemTagSet) SetString() string {
 func ToSystemTagSet(tags []string) *SystemTagSet {
 	ts := new(SystemTagSet)
 	for _, tag := range tags {
-		if v, err := SystemTagSetString(tag); err == nil {
+		if v, err := SystemTagString(tag); err == nil {
 			ts.Add(v)
 		}
 	}
@@ -93,7 +104,7 @@ func ToSystemTagSet(tags []string) *SystemTagSet {
 }
 
 // NewSystemTagSet returns a SystemTagSet from input.
-func NewSystemTagSet(tags ...SystemTagSet) *SystemTagSet {
+func NewSystemTagSet(tags ...SystemTag) *SystemTagSet {
 	ts := new(SystemTagSet)
 	for _, tag := range tags {
 		ts.Add(tag)
@@ -104,7 +115,7 @@ func NewSystemTagSet(tags ...SystemTagSet) *SystemTagSet {
 // MarshalJSON converts the SystemTagSet to a list (JS array).
 func (i *SystemTagSet) MarshalJSON() ([]byte, error) {
 	var tags []string
-	for _, tag := range SystemTagSetValues() {
+	for _, tag := range SystemTagValues() {
 		if i.Has(tag) {
 			tags = append(tags, tag.String())
 		}
@@ -136,7 +147,7 @@ func (i *SystemTagSet) UnmarshalText(data []byte) error {
 		if key == "" {
 			continue
 		}
-		if v, err := SystemTagSetString(key); err == nil {
+		if v, err := SystemTagString(key); err == nil {
 			i.Add(v)
 		}
 	}

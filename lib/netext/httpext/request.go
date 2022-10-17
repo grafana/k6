@@ -51,7 +51,7 @@ type ParsedHTTPRequest struct {
 	Redirects        null.Int
 	ActiveJar        *cookiejar.Jar
 	Cookies          map[string]*HTTPRequestCookie
-	Tags             *metrics.TagSet
+	TagsAndMeta      metrics.TagsAndMeta
 }
 
 // Matches non-compliant io.Closer implementations (e.g. zstd.Decoder)
@@ -169,9 +169,9 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 
 	// Only set the name system tag if the user didn't explicitly set it beforehand,
 	// and the Name was generated from a tagged template string (via http.url).
-	if _, ok := preq.Tags.Get(metrics.TagName.String()); !ok &&
+	if _, ok := preq.TagsAndMeta.Tags.Get(metrics.TagName.String()); !ok &&
 		state.Options.SystemTags.Has(metrics.TagName) && preq.URL.Name != "" && preq.URL.Name != preq.URL.Clean() {
-		preq.Tags = preq.Tags.With(metrics.TagName.String(), preq.URL.Name)
+		preq.TagsAndMeta.SetSystemTagOrMeta(metrics.TagName, preq.URL.Name)
 	}
 
 	// Check rate limit *after* we've prepared a request; no need to wait with that part.
@@ -181,13 +181,18 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		}
 	}
 
-	tracerTransport := newTransport(ctx, state, preq.Tags, preq.ResponseCallback)
+	tracerTransport := newTransport(ctx, state, &preq.TagsAndMeta, preq.ResponseCallback)
 	var transport http.RoundTripper = tracerTransport
 
 	if state.Options.HTTPDebug.String != "" {
 		// Combine tags with common log fields
 		combinedLogFields := map[string]interface{}{"source": "http-debug", "vu": state.VUID, "iter": state.Iteration}
-		for k, v := range preq.Tags.Map() {
+		for k, v := range preq.TagsAndMeta.Metadata {
+			if _, present := combinedLogFields[k]; !present {
+				combinedLogFields[k] = v
+			}
+		}
+		for k, v := range preq.TagsAndMeta.Tags.Map() {
 			if _, present := combinedLogFields[k]; !present {
 				combinedLogFields[k] = v
 			}

@@ -117,7 +117,7 @@ func (c *Client) parseRequest(
 		Redirects:        state.Options.MaxRedirects,
 		Cookies:          make(map[string]*httpext.HTTPRequestCookie),
 		ResponseCallback: c.responseCallback,
-		Tags:             c.moduleInstance.vu.State().Tags.GetCurrentValues(),
+		TagsAndMeta:      c.moduleInstance.vu.State().Tags.GetCurrentValues(),
 	}
 
 	if state.Options.DiscardResponseBodies.Bool {
@@ -308,11 +308,9 @@ func (c *Client) parseRequest(
 			case "redirects":
 				result.Redirects = null.IntFrom(params.Get(k).ToInteger())
 			case "tags":
-				newTags, err := common.ApplyCustomUserTags(rt, result.Tags, params.Get(k))
-				if err != nil {
+				if err := common.ApplyCustomUserTags(rt, &result.TagsAndMeta, params.Get(k)); err != nil {
 					return nil, fmt.Errorf("invalid HTTP request metric tags: %w", err)
 				}
-				result.Tags = newTags
 			case "auth":
 				result.Auth = params.Get(k).String()
 			case "timeout":

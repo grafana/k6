@@ -303,8 +303,11 @@ type tagsDynamicObject struct {
 // Get a property value for the key. May return nil if the property does not exist.
 func (o *tagsDynamicObject) Get(key string) goja.Value {
 	tcv := o.state.Tags.GetCurrentValues()
-	if tag, ok := tcv.Get(key); ok {
+	if tag, ok := tcv.Tags.Get(key); ok {
 		return o.runtime.ToValue(tag)
+	}
+	if metadatum, ok := tcv.Metadata[key]; ok {
+		return o.runtime.ToValue(metadatum)
 	}
 	return nil
 }
@@ -314,24 +317,22 @@ func (o *tagsDynamicObject) Get(key string) goja.Value {
 // representation. An exception is raised in case a denied type is provided.
 func (o *tagsDynamicObject) Set(key string, val goja.Value) bool {
 	var err error
-	o.state.Tags.Modify(func(tags *metrics.TagSet) *metrics.TagSet {
-		newTags, applyErr := common.ApplyCustomUserTag(o.runtime, tags, key, val)
-		if applyErr != nil {
-			err = applyErr
-			return tags
+	o.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+		err = common.ApplyCustomUserTag(o.runtime, tagsAndMeta, key, val)
+		if err != nil {
+			panic(o.runtime.NewTypeError(err.Error()))
 		}
-		return newTags
 	})
-	if err == nil {
-		return true
-	}
-	panic(o.runtime.NewTypeError(err.Error()))
+	return true
 }
 
 // Has returns true if the property exists.
 func (o *tagsDynamicObject) Has(key string) bool {
 	ctv := o.state.Tags.GetCurrentValues()
-	if _, ok := ctv.Get(key); ok {
+	if _, ok := ctv.Tags.Get(key); ok {
+		return true
+	}
+	if _, ok := ctv.Metadata[key]; ok {
 		return true
 	}
 	return false
@@ -340,10 +341,9 @@ func (o *tagsDynamicObject) Has(key string) bool {
 // Delete deletes the property for the key. It returns true on success (note,
 // that includes missing property).
 func (o *tagsDynamicObject) Delete(key string) bool {
-	o.state.Tags.Modify(func(tags *metrics.TagSet) *metrics.TagSet {
-		return tags.Without(key)
+	o.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+		tagsAndMeta.DeleteTag(key)
 	})
-
 	return true
 }
 
@@ -352,9 +352,12 @@ func (o *tagsDynamicObject) Delete(key string) bool {
 func (o *tagsDynamicObject) Keys() []string {
 	ctv := o.state.Tags.GetCurrentValues()
 
-	tagsMap := ctv.Map()
-	keys := make([]string, 0, len(tagsMap))
+	tagsMap := ctv.Tags.Map()
+	keys := make([]string, 0, len(tagsMap)+len(ctv.Metadata))
 	for k := range tagsMap {
+		keys = append(keys, k)
+	}
+	for k := range ctv.Metadata {
 		keys = append(keys, k)
 	}
 	return keys

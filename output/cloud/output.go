@@ -89,11 +89,6 @@ func newOutput(params output.Params) (*Output, error) {
 
 	logger := params.Logger.WithFields(logrus.Fields{"output": "cloud"})
 
-	if conf.AggregationPeriod.Duration > 0 &&
-		(params.ScriptOptions.SystemTags.Has(metrics.TagVU) || params.ScriptOptions.SystemTags.Has(metrics.TagIter)) {
-		return nil, errors.New("aggregation cannot be enabled if the 'vu' or 'iter' system tag is also enabled")
-	}
-
 	if !conf.Name.Valid || conf.Name.String == "" {
 		scriptPath := params.ScriptPath.String()
 		if scriptPath == "" {
@@ -145,13 +140,13 @@ func newOutput(params output.Params) (*Output, error) {
 // validateRequiredSystemTags checks if all required tags are present.
 func validateRequiredSystemTags(scriptTags *metrics.SystemTagSet) error {
 	missingRequiredTags := []string{}
-	requiredTags := metrics.TagName |
+	requiredTags := metrics.SystemTagSet(metrics.TagName |
 		metrics.TagMethod |
 		metrics.TagStatus |
 		metrics.TagError |
 		metrics.TagCheck |
-		metrics.TagGroup
-	for _, tag := range metrics.SystemTagSetValues() {
+		metrics.TagGroup)
+	for _, tag := range metrics.SystemTagValues() {
 		if requiredTags.Has(tag) && !scriptTags.Has(tag) {
 			missingRequiredTags = append(missingRequiredTags, tag.String())
 		}
@@ -307,24 +302,6 @@ func (out *Output) SetTestRunStopCallback(stopFunc func(error)) {
 	out.engineStopFunc = stopFunc
 }
 
-func useCloudTags(source *httpext.Trail) *httpext.Trail {
-	name, nameExist := source.Tags.Get("name")
-	url, urlExist := source.Tags.Get("url")
-	if !nameExist || !urlExist || name == url {
-		return source
-	}
-
-	// TODO: remove this hack to not send high-cardinality metric tags
-	newTags := source.Tags.With("url", name)
-
-	dest := new(httpext.Trail)
-	*dest = *source
-	dest.Tags = newTags
-	dest.Samples = nil
-
-	return dest
-}
-
 // AddMetricSamples receives a set of metric samples. This method is never
 // called concurrently, so it defers as much of the work as possible to the
 // asynchronous goroutines initialized in Start().
@@ -345,7 +322,6 @@ func (out *Output) AddMetricSamples(sampleContainers []metrics.SampleContainer) 
 	for _, sampleContainer := range sampleContainers {
 		switch sc := sampleContainer.(type) {
 		case *httpext.Trail:
-			sc = useCloudTags(sc)
 			// Check if aggregation is enabled,
 			if out.config.AggregationPeriod.Duration > 0 {
 				newHTTPTrails = append(newHTTPTrails, sc)

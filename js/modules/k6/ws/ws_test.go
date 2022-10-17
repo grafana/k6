@@ -643,9 +643,11 @@ func TestSystemTags(t *testing.T) {
 		t.Run("only "+expectedTagStr, func(t *testing.T) {
 			t.Parallel()
 			test := newTestState(t)
+			expectedTag, err := metrics.SystemTagString(expectedTagStr)
+			require.NoError(t, err)
 			tb := httpmultibin.NewHTTPMultiBin(t)
 			test.VU.StateField.Options.SystemTags = metrics.ToSystemTagSet([]string{expectedTagStr})
-			_, err := test.VU.Runtime().RunString(tb.Replacer.Replace(`
+			_, err = test.VU.Runtime().RunString(tb.Replacer.Replace(`
 			var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 				socket.on("open", function() {
 					socket.send("test")
@@ -664,7 +666,12 @@ func TestSystemTags(t *testing.T) {
 			for _, sampleContainer := range containers {
 				require.NotEmpty(t, sampleContainer.GetSamples())
 				for _, sample := range sampleContainer.GetSamples() {
-					dataToCheck := sample.Tags.Map()
+					var dataToCheck map[string]string
+					if metrics.NonIndexableSystemTags.Has(expectedTag) {
+						dataToCheck = sample.Metadata
+					} else {
+						dataToCheck = sample.Tags.Map()
+					}
 
 					require.NotEmpty(t, dataToCheck)
 					for emittedTag := range dataToCheck {

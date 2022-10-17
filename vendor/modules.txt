@@ -42,6 +42,8 @@ github.com/dop251/goja/unistring
 # github.com/fatih/color v1.13.0
 ## explicit; go 1.13
 github.com/fatih/color
+# github.com/fsnotify/fsnotify v1.5.4
+## explicit; go 1.16
 # github.com/go-redis/redis/v8 v8.11.5
 ## explicit; go 1.17
 github.com/go-redis/redis/v8
@@ -78,7 +80,7 @@ github.com/grafana/xk6-redis/redis
 # github.com/grafana/xk6-timers v0.1.2
 ## explicit; go 1.17
 github.com/grafana/xk6-timers/timers
-# github.com/grafana/xk6-websockets v0.1.4
+# github.com/grafana/xk6-websockets v0.1.5
 ## explicit; go 1.17
 github.com/grafana/xk6-websockets/websockets
 # github.com/inconshreveable/mousetrap v1.0.0

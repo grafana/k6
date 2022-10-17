@@ -216,25 +216,21 @@ func (c *Client) Invoke(
 	defer cancel()
 
 	if state.Options.SystemTags.Has(metrics.TagURL) {
-		p.Tags = p.Tags.With("url", fmt.Sprintf("%s%s", c.addr, method))
+		p.TagsAndMeta.SetSystemTagOrMeta(metrics.TagURL, fmt.Sprintf("%s%s", c.addr, method))
 	}
 	parts := strings.Split(method[1:], "/")
-	if state.Options.SystemTags.Has(metrics.TagService) {
-		p.Tags = p.Tags.With("service", parts[0])
-	}
-	if state.Options.SystemTags.Has(metrics.TagMethod) {
-		p.Tags = p.Tags.With("method", parts[1])
-	}
+	p.TagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagService, parts[0])
+	p.TagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagMethod, parts[1])
 
 	// Only set the name system tag if the user didn't explicitly set it beforehand
-	if _, ok := p.Tags.Get("name"); !ok && state.Options.SystemTags.Has(metrics.TagName) {
-		p.Tags = p.Tags.With("name", method)
+	if _, ok := p.TagsAndMeta.Tags.Get("name"); !ok {
+		p.TagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagName, method)
 	}
 
 	reqmsg := grpcext.Request{
 		MethodDescriptor: methodDesc,
 		Message:          b,
-		Tags:             p.Tags,
+		TagsAndMeta:      &p.TagsAndMeta,
 	}
 
 	return c.conn.Invoke(ctx, method, md, reqmsg)
@@ -318,15 +314,15 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 }
 
 type invokeParams struct {
-	Metadata map[string]string
-	Tags     *metrics.TagSet
-	Timeout  time.Duration
+	Metadata    map[string]string
+	TagsAndMeta metrics.TagsAndMeta
+	Timeout     time.Duration
 }
 
 func (c *Client) parseInvokeParams(paramsVal goja.Value) (*invokeParams, error) {
 	result := &invokeParams{
-		Timeout: 1 * time.Minute,
-		Tags:    c.vu.State().Tags.GetCurrentValues(),
+		Timeout:     1 * time.Minute,
+		TagsAndMeta: c.vu.State().Tags.GetCurrentValues(),
 	}
 	if paramsVal == nil || goja.IsUndefined(paramsVal) || goja.IsNull(paramsVal) {
 		return result, nil
@@ -354,11 +350,9 @@ func (c *Client) parseInvokeParams(paramsVal goja.Value) (*invokeParams, error) 
 				result.Metadata[hk] = strval
 			}
 		case "tags":
-			newTags, err := common.ApplyCustomUserTags(rt, result.Tags, params.Get(k))
-			if err != nil {
+			if err := common.ApplyCustomUserTags(rt, &result.TagsAndMeta, params.Get(k)); err != nil {
 				return result, fmt.Errorf("metric tags: %w", err)
 			}
-			result.Tags = newTags
 		case "timeout":
 			var err error
 			v := params.Get(k).Export()

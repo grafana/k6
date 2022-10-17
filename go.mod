@@ -14,7 +14,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/grafana/xk6-redis v0.1.1
 	github.com/grafana/xk6-timers v0.1.2
-	github.com/grafana/xk6-websockets v0.1.4
+	github.com/grafana/xk6-websockets v0.1.5
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.13.0
 	github.com/klauspost/compress v1.15.11
@@ -50,6 +50,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dlclark/regexp2 v1.7.0 // indirect
+	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/go-redis/redis/v8 v8.11.5 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect

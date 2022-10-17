@@ -296,16 +296,15 @@ func testSSLKEYLOGFILE(t *testing.T, ts *globalTestState, filePath string) {
 func TestThresholdDeprecationWarnings(t *testing.T) {
 	t.Parallel()
 
-	// TODO: adjust this test after we actually make url, error, iter and vu non-indexable
-
 	ts := newGlobalTestState(t)
-	ts.args = []string{"k6", "run", "--system-tags", "url,error,vu,iter", "-"}
+	ts.args = []string{"k6", "run", "--system-tags", "url,error,vu,iter,scenario", "-"}
 	ts.stdIn = bytes.NewReader([]byte(`
 		export const options = {
 			thresholds: {
 				'http_req_duration{url:https://test.k6.io}': ['p(95)<500', 'p(99)<1000'],
 				'http_req_duration{error:foo}': ['p(99)<1000'],
-				'iterations{vu:1,iter:0}': ['count == 1'],
+				'iterations{scenario:default}': ['count == 1'],
+				'iterations{vu:1,iter:0}': ['count == 0'], // iter and vu are now unindexable
 			},
 		};
 
@@ -315,16 +314,15 @@ func TestThresholdDeprecationWarnings(t *testing.T) {
 	newRootCommand(ts.globalState).execute()
 
 	logs := ts.loggerHook.Drain()
-	assert.False(t, testutils.LogContains(logs, logrus.WarnLevel, "http_req_duration{url:https://test.k6.io}"))
 
+	// We no longer warn about this
+	assert.False(t, testutils.LogContains(logs, logrus.WarnLevel, "http_req_duration{url:https://test.k6.io}"))
+	assert.False(t, testutils.LogContains(logs, logrus.WarnLevel, "http_req_duration{error:foo}"))
 	assert.True(t, testutils.LogContains(logs, logrus.WarnLevel,
-		"Thresholds like 'http_req_duration{error:foo}', based on the high-cardinality 'error' metric tag, are deprecated",
+		"The high-cardinality 'vu' metric tag was made non-indexable in k6 v0.41.0, so thresholds like 'iterations{vu:1,iter:0}'",
 	))
 	assert.True(t, testutils.LogContains(logs, logrus.WarnLevel,
-		"Thresholds like 'iterations{vu:1,iter:0}', based on the high-cardinality 'vu' metric tag, are deprecated",
-	))
-	assert.True(t, testutils.LogContains(logs, logrus.WarnLevel,
-		"Thresholds like 'iterations{vu:1,iter:0}', based on the high-cardinality 'iter' metric tag, are deprecated",
+		"The high-cardinality 'iter' metric tag was made non-indexable in k6 v0.41.0, so thresholds like 'iterations{vu:1,iter:0}'",
 	))
 }
 
@@ -478,3 +476,7 @@ func TestThresholdsFailed(t *testing.T) {
 	require.Contains(t, stdOut, `     ✗ { scenario:sc2 }...: 2`)
 	require.Contains(t, stdOut, `     ✓ { scenario:sc3 }...: 0   0/s`)
 }
+
+// TODO: add an integration test that verifies that unindexable tags work as
+// expected and that VU tags from different scenarios don't cross between
+// scenarios and pollute other metrics.

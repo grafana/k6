@@ -63,7 +63,7 @@ type webSocket struct {
 	vu             modules.VU
 	url            *url.URL
 	conn           *websocket.Conn
-	tags           *metrics.TagSet
+	tagsAndMeta    metrics.TagsAndMeta
 	tq             *taskqueue.TaskQueue
 	builtinMetrics *metrics.BuiltinMetrics
 	obj            *goja.Object // the object that is given to js to interact with the WebSocket
@@ -193,10 +193,10 @@ func (w *webSocket) establishConnection() {
 	conn, httpResponse, connErr := wsd.DialContext(ctx, w.url.String(), header)
 	connectionEnd := time.Now()
 	connectionDuration := metrics.D(connectionEnd.Sub(start))
-	tags := state.Tags.GetCurrentValues()
+	ctm := state.Tags.GetCurrentValues()
 	if state.Options.SystemTags.Has(metrics.TagIP) && conn.RemoteAddr() != nil {
 		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
-			tags = tags.With("ip", ip)
+			ctm.SetTag("ip", ip)
 		}
 	}
 
@@ -205,31 +205,34 @@ func (w *webSocket) establishConnection() {
 			_ = httpResponse.Body.Close()
 		}()
 		if state.Options.SystemTags.Has(metrics.TagStatus) {
-			tags = tags.With("status", strconv.Itoa(httpResponse.StatusCode))
+			ctm.SetTag("status", strconv.Itoa(httpResponse.StatusCode))
 		}
 		if state.Options.SystemTags.Has(metrics.TagSubproto) {
-			tags = tags.With("subproto", httpResponse.Header.Get("Sec-WebSocket-Protocol"))
+			ctm.SetTag("subproto", httpResponse.Header.Get("Sec-WebSocket-Protocol"))
 		}
 	}
 	w.conn = conn
 	if state.Options.SystemTags.Has(metrics.TagURL) {
-		tags = tags.With("url", w.url.String())
+		ctm.SetTag("url", w.url.String())
 	}
-	w.tags = tags
+	w.tagsAndMeta = ctm
+
 	metrics.PushIfNotDone(ctx, state.Samples, metrics.ConnectedSamples{
 		Samples: []metrics.Sample{
 			{
-				TimeSeries: metrics.TimeSeries{Metric: state.BuiltinMetrics.WSSessions, Tags: w.tags},
+				TimeSeries: metrics.TimeSeries{Metric: state.BuiltinMetrics.WSSessions, Tags: w.tagsAndMeta.Tags},
 				Time:       start,
+				Metadata:   w.tagsAndMeta.Metadata,
 				Value:      1,
 			},
 			{
-				TimeSeries: metrics.TimeSeries{Metric: state.BuiltinMetrics.WSConnecting, Tags: w.tags},
+				TimeSeries: metrics.TimeSeries{Metric: state.BuiltinMetrics.WSConnecting, Tags: w.tagsAndMeta.Tags},
 				Time:       start,
+				Metadata:   w.tagsAndMeta.Metadata,
 				Value:      connectionDuration,
 			},
 		},
-		Tags: w.tags,
+		Tags: w.tagsAndMeta.Tags,
 		Time: start,
 	})
 	if connErr != nil {
@@ -258,19 +261,14 @@ func (w *webSocket) loop() {
 		now := time.Now()
 		duration := metrics.D(time.Since(w.started))
 
-		metrics.PushIfNotDone(ctx, w.vu.State().Samples, metrics.ConnectedSamples{
-			Samples: []metrics.Sample{
-				{
-					TimeSeries: metrics.TimeSeries{
-						Metric: w.builtinMetrics.WSSessionDuration,
-						Tags:   w.tags,
-					},
-					Time:  now,
-					Value: duration,
-				},
+		metrics.PushIfNotDone(ctx, w.vu.State().Samples, metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: w.builtinMetrics.WSSessionDuration,
+				Tags:   w.tagsAndMeta.Tags,
 			},
-			Tags: w.tags,
-			Time: now,
+			Time:     now,
+			Metadata: w.tagsAndMeta.Metadata,
+			Value:    duration,
 		})
 		ch := make(chan struct{})
 		w.tq.Queue(func() error {
@@ -368,10 +366,11 @@ func (w *webSocket) loop() {
 					metrics.PushIfNotDone(ctx, samplesOutput, metrics.Sample{
 						TimeSeries: metrics.TimeSeries{
 							Metric: w.builtinMetrics.WSMessagesSent,
-							Tags:   w.tags,
+							Tags:   w.tagsAndMeta.Tags,
 						},
-						Time:  time.Now(),
-						Value: 1,
+						Time:     time.Now(),
+						Metadata: w.tagsAndMeta.Metadata,
+						Value:    1,
 					})
 				case <-w.done:
 					return
@@ -439,10 +438,11 @@ func (w *webSocket) loop() {
 				metrics.PushIfNotDone(ctx, samplesOutput, metrics.Sample{
 					TimeSeries: metrics.TimeSeries{
 						Metric: w.builtinMetrics.WSMessagesReceived,
-						Tags:   w.tags,
+						Tags:   w.tagsAndMeta.Tags,
 					},
-					Time:  msg.t,
-					Value: 1,
+					Time:     msg.t,
+					Metadata: w.tagsAndMeta.Metadata,
+					Value:    1,
 				})
 
 				rt := w.vu.Runtime()

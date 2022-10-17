@@ -109,6 +109,119 @@ func TestTagSetContains(t *testing.T) {
 	assert.False(t, st.Contains(outer))
 }
 
+func TestTagsAndMetaSetTag(t *testing.T) {
+	t.Parallel()
+
+	r := NewRegistry()
+	tm := TagsAndMeta{Tags: r.RootTagSet()}
+	tm.SetTag("k1", "v1")
+	_, ok := tm.Tags.Get("k1")
+	assert.True(t, ok)
+}
+
+func TestTagsAndMetaDeleteTag(t *testing.T) {
+	t.Parallel()
+
+	r := NewRegistry()
+	tm := TagsAndMeta{Tags: r.RootTagSet()}
+	tm.Tags = tm.Tags.With("k1", "v1")
+	_, ok := tm.Tags.Get("k1")
+	assert.True(t, ok)
+
+	tm.DeleteTag("k1")
+	_, ok = tm.Tags.Get("k1")
+	assert.False(t, ok)
+}
+
+func TestTagsAndMetaSetMetadata(t *testing.T) {
+	t.Parallel()
+
+	t.Run("WhenNil", func(t *testing.T) {
+		t.Parallel()
+		tm := TagsAndMeta{}
+		tm.SetMetadata("k1", "v1")
+		_, ok := tm.Metadata["k1"]
+		assert.True(t, ok)
+	})
+
+	t.Run("WhenNotNil", func(t *testing.T) {
+		t.Parallel()
+		tm := TagsAndMeta{Metadata: make(map[string]string)}
+		tm.SetMetadata("k2", "v2")
+		_, ok := tm.Metadata["k2"]
+		assert.True(t, ok)
+	})
+}
+
+func TestTagsAndMetaDeleteMetadata(t *testing.T) {
+	t.Parallel()
+
+	tm := TagsAndMeta{Metadata: make(map[string]string)}
+	tm.Metadata["k1"] = "v1"
+	_, ok := tm.Metadata["k1"]
+	assert.True(t, ok)
+
+	tm.DeleteMetadata("k1")
+	_, ok = tm.Metadata["k1"]
+	assert.False(t, ok)
+}
+
+func TestTagsAndMetaSetSystemTagOrMetaIfEnabled(t *testing.T) {
+	t.Parallel()
+	tm := TagsAndMeta{}
+
+	tm.SetSystemTagOrMetaIfEnabled(&DefaultSystemTagSet, TagIter, "10")
+	_, ok := tm.Metadata["iter"]
+	assert.False(t, ok)
+
+	tm.SetSystemTagOrMetaIfEnabled(&NonIndexableSystemTags, TagIter, "10")
+	_, ok = tm.Metadata["iter"]
+	assert.True(t, ok)
+}
+
+func TestTagsAndMetaSetSystemTagOrMeta(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Tag", func(t *testing.T) {
+		t.Parallel()
+		r := NewRegistry()
+		tm := TagsAndMeta{Tags: r.RootTagSet()}
+		tm.SetSystemTagOrMeta(TagIter, "10")
+
+		_, ok := tm.Metadata["iter"]
+		assert.True(t, ok)
+		_, ok = tm.Tags.Get("iter")
+		assert.False(t, ok)
+	})
+
+	t.Run("Metadata", func(t *testing.T) {
+		t.Parallel()
+		r := NewRegistry()
+		tm := TagsAndMeta{Tags: r.RootTagSet()}
+		tm.SetSystemTagOrMeta(TagName, "hello-request")
+
+		_, ok := tm.Tags.Get("name")
+		assert.True(t, ok)
+		_, ok = tm.Metadata["name"]
+		assert.False(t, ok)
+	})
+}
+
+func TestTagsAndMetaClone(t *testing.T) {
+	t.Parallel()
+
+	r := NewRegistry()
+	tags := r.RootTagSet().With("k1", "v1")
+	meta := map[string]string{"k2": "v2"}
+	tm := TagsAndMeta{Tags: tags, Metadata: meta}
+
+	tm2 := tm.Clone()
+	require.NotNil(t, tm2.Tags)
+	require.NotNil(t, tm2.Metadata)
+	assert.Equal(t, tm, tm2)
+	assert.False(t, &tm.Metadata == &tm2.Metadata)
+}
+
 func TestEnabledTagsMarshalJSON(t *testing.T) {
 	t.Parallel()
 
