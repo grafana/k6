@@ -1,3 +1,5 @@
+// Package ws implements a k6/ws for k6. It provides basic functionality to communicate over websockets
+// that *blocks* the event loop while the connection is opened.
 package ws
 
 import (
@@ -5,7 +7,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -63,9 +65,10 @@ func (*RootModule) NewModuleInstance(m modules.VU) modules.Instance {
 // ErrWSInInitContext is returned when websockets are using in the init context
 var ErrWSInInitContext = common.NewInitContextError("using websockets in the init context is not supported")
 
+// Socket is the representation of the websocket returned to the js.
 type Socket struct {
 	rt            *goja.Runtime
-	ctx           context.Context
+	ctx           context.Context //nolint:containedctx
 	conn          *websocket.Conn
 	eventHandlers map[string][]goja.Callable
 	scheduled     chan goja.Callable
@@ -80,7 +83,8 @@ type Socket struct {
 	builtinMetrics *metrics.BuiltinMetrics
 }
 
-type WSHTTPResponse struct {
+// HTTPResponse is the http response returned by ws.connect.
+type HTTPResponse struct {
 	URL     string            `json:"url"`
 	Status  int               `json:"status"`
 	Headers map[string]string `json:"headers"`
@@ -102,8 +106,9 @@ func (mi *WS) Exports() modules.Exports {
 
 // Connect establishes a WebSocket connection based on the parameters provided.
 // TODO: refactor to reduce the method complexity
-//nolint:funlen,gocognit,gocyclo
-func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
+//
+//nolint:funlen,gocognit,gocyclo,cyclop
+func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 	ctx := mi.vu.Context()
 	rt := mi.vu.Runtime()
 	state := mi.vu.State()
@@ -138,7 +143,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	jar := state.CookieJar
 
 	// Parse the optional second argument (params)
-	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
+	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) { //nolint:nestif
 		params := paramsV.ToObject(rt)
 		for _, k := range params.Keys() {
 			switch k {
@@ -184,7 +189,6 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 				enableCompression = true
 			}
 		}
-
 	}
 
 	tagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagURL, url)
@@ -276,7 +280,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 			return nil, connErr
 		}
 		state.Logger.WithError(connErr).Warn("Attempt to establish a WebSocket connection failed")
-		return &WSHTTPResponse{
+		return &HTTPResponse{
 			Error: connErr.Error(),
 		}, nil
 	}
@@ -395,6 +399,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*WSHTTPResponse, error) {
 	}
 }
 
+// On is used to configure what the websocket should do on each event.
 func (s *Socket) On(event string, handler goja.Value) {
 	if handler, ok := goja.AssertFunction(handler); ok {
 		s.eventHandlers[event] = append(s.eventHandlers[event], handler)
@@ -461,6 +466,7 @@ func (s *Socket) SendBinary(message goja.Value) {
 	})
 }
 
+// Ping sends a ping message over the websocket.
 func (s *Socket) Ping() {
 	deadline := time.Now().Add(writeWait)
 	pingID := strconv.Itoa(s.pingSendCounter)
@@ -560,6 +566,7 @@ func (s *Socket) SetInterval(fn goja.Callable, intervalMs float64) error {
 	return nil
 }
 
+// Close closes the webscocket. If providede the first argument will be used as the code for the close message.
 func (s *Socket) Close(args ...goja.Value) {
 	code := websocket.CloseGoingAway
 	if len(args) > 0 {
@@ -614,9 +621,12 @@ func (s *Socket) readPump(readChan chan *message, errorChan chan error, closeCha
 				}
 			}
 			code := websocket.CloseGoingAway
-			if e, ok := err.(*websocket.CloseError); ok {
+			e := new(websocket.CloseError)
+
+			if errors.As(err, &e) {
 				code = e.Code
 			}
+
 			select {
 			case closeChan <- code:
 			case <-s.done:
@@ -633,12 +643,12 @@ func (s *Socket) readPump(readChan chan *message, errorChan chan error, closeCha
 }
 
 // Wrap the raw HTTPResponse we received to a WSHTTPResponse we can pass to the user
-func wrapHTTPResponse(httpResponse *http.Response) (*WSHTTPResponse, error) {
-	wsResponse := WSHTTPResponse{
+func wrapHTTPResponse(httpResponse *http.Response) (*HTTPResponse, error) {
+	wsResponse := HTTPResponse{
 		Status: httpResponse.StatusCode,
 	}
 
-	body, err := ioutil.ReadAll(httpResponse.Body)
+	body, err := io.ReadAll(httpResponse.Body)
 	if err != nil {
 		return nil, err
 	}
