@@ -48,7 +48,7 @@ func NewBrowserProcess(
 	wsURL, err := parseDevToolsURL(procCtx, stdout)
 	if err != nil {
 		procCtxCancel()
-		return nil, fmt.Errorf("getting DevTools URL: %w", err)
+		return nil, err
 	}
 
 	p := BrowserProcess{
