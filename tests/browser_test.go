@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -140,4 +141,24 @@ func TestBrowserUserAgent(t *testing.T) {
 		t.Errorf("UserAgent should start with %q, but got: %q", prefix, ua)
 	}
 	assert.Contains(t, ua, "Headless")
+}
+
+func TestBrowserCrashErr(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		robj := recover()
+		require.IsType(t, &goja.Object{}, robj)
+		gobj, _ := robj.(*goja.Object)
+		err, ok := gobj.Export().(error)
+		require.Truef(t, ok, "recovered object wasn't an error, but %T", err)
+		assert.Equal(t, "launching browser: Invalid devtools server port", err.Error())
+	}()
+
+	lopts := defaultLaunchOpts()
+	lopts.Args = []any{"remote-debugging-port=99999"}
+
+	newTestBrowser(t, lopts)
+
+	t.Error("did not panic")
 }

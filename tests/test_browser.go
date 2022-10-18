@@ -334,6 +334,7 @@ func (t testPromise) then(resolve any, reject ...any) testPromise {
 // launchOptions provides a way to customize browser type
 // launch options in tests.
 type launchOptions struct {
+	Args     []any  `js:"args"`
 	Debug    bool   `js:"debug"`
 	Headless bool   `js:"headless"`
 	SlowMo   string `js:"slowMo"`

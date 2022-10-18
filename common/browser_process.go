@@ -3,10 +3,12 @@ package common
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/grafana/xk6-browser/log"
@@ -38,14 +40,14 @@ func NewBrowserProcess(
 	ctxCancel context.CancelFunc, logger *log.Logger,
 ) (*BrowserProcess, error) {
 	procCtx, procCtxCancel := context.WithCancel(ctx)
-	cmd, stdout, err := execute(
+	cmd, err := execute(
 		procCtx, procCtxCancel, path, args, env, dataDir, logger)
 	if err != nil {
 		procCtxCancel()
 		return nil, err
 	}
 
-	wsURL, err := parseDevToolsURL(procCtx, stdout)
+	wsURL, err := parseDevToolsURL(cmd)
 	if err != nil {
 		procCtxCancel()
 		return nil, err
@@ -120,18 +122,27 @@ func (p *BrowserProcess) AttachLogger(logger *log.Logger) {
 	p.logger = logger
 }
 
+type command struct {
+	*exec.Cmd
+	ctx            context.Context
+	stdout, stderr io.Reader
+}
+
 func execute(
 	ctx context.Context, ctxCancel func(), path string, args, env []string,
 	dataDir *storage.Dir, logger *log.Logger,
-) (*exec.Cmd, io.Reader, error) {
+) (command, error) {
 	cmd := exec.CommandContext(ctx, path, args...)
 	killAfterParent(cmd)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w", err)
+		return command{}, fmt.Errorf("%w", err)
 	}
-	cmd.Stderr = cmd.Stdout
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return command{}, fmt.Errorf("%w", err)
+	}
 
 	// Set up environment variable for process
 	if len(env) > 0 {
@@ -142,13 +153,13 @@ func execute(
 	// can run into a data race.
 	err = cmd.Start()
 	if os.IsNotExist(err) {
-		return nil, nil, fmt.Errorf("file does not exist: %s", path)
+		return command{}, fmt.Errorf("file does not exist: %s", path)
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w", err)
+		return command{}, fmt.Errorf("%w", err)
 	}
 	if ctx.Err() != nil {
-		return nil, nil, fmt.Errorf("%w", ctx.Err())
+		return command{}, fmt.Errorf("%w", ctx.Err())
 	}
 
 	go func() {
@@ -167,26 +178,41 @@ func execute(
 		}
 	}()
 
-	return cmd, stdout, nil
+	return command{cmd, ctx, stdout, stderr}, nil
 }
 
 // parseDevToolsURL grabs the websocket address from chrome's output and returns it.
-func parseDevToolsURL(ctx context.Context, rc io.Reader) (wsURL string, _ error) {
+func parseDevToolsURL(cmd command) (wsURL string, _ error) {
 	type result struct {
 		devToolsURL string
 		err         error
 	}
 	c := make(chan result, 1)
 	go func() {
-		const prefix = "DevTools listening on "
+		const urlPrefix = "DevTools listening on "
+		errRx := regexp.MustCompile(`^\[.*:ERROR:.*\] (?P<errStr>.*)$`)
+		errTmpl := []byte("$errStr")
+		scanner := bufio.NewScanner(cmd.stderr)
 
-		scanner := bufio.NewScanner(rc)
 		for scanner.Scan() {
-			if s := scanner.Text(); strings.HasPrefix(s, prefix) {
+			line := scanner.Text()
+			if strings.HasPrefix(line, urlPrefix) {
 				c <- result{
-					strings.TrimPrefix(strings.TrimSpace(s), prefix),
+					strings.TrimPrefix(strings.TrimSpace(line), urlPrefix),
 					nil,
 				}
+				return
+			}
+			errM := []byte{}
+			// Golang's regexp module doesn't support backreferences, so do this
+			// workaround. We need to use regex, unfortunately, to extract the
+			// error message properly. It would be awkward to do otherwise, and
+			// this isn't a hot path, so it shouldn't impact performance.
+			for _, submatches := range errRx.FindAllSubmatchIndex([]byte(line), -1) {
+				errM = errRx.Expand(errM, errTmpl, []byte(line), submatches)
+			}
+			if len(errM) > 0 {
+				c <- result{"", errors.New(string(errM))}
 				return
 			}
 		}
@@ -197,7 +223,7 @@ func parseDevToolsURL(ctx context.Context, rc io.Reader) (wsURL string, _ error)
 	select {
 	case r := <-c:
 		return r.devToolsURL, r.err
-	case <-ctx.Done():
-		return "", fmt.Errorf("%w", ctx.Err())
+	case <-cmd.ctx.Done():
+		return "", fmt.Errorf("%w", cmd.ctx.Err())
 	}
 }
