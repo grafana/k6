@@ -11,6 +11,7 @@ import (
 
 func TestThrow(t *testing.T) {
 	t.Parallel()
+	t.Skip("Until we remove GoError")
 	rt := goja.New()
 	fn1, ok := goja.AssertFunction(rt.ToValue(func() { Throw(rt, errors.New("aaaa")) }))
 	if assert.True(t, ok, "fn1 is invalid") {
