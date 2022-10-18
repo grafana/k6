@@ -23,7 +23,6 @@ type BrowserProcess struct {
 	// Channels for managing termination.
 	lostConnection             chan struct{}
 	processIsGracefullyClosing chan struct{}
-	processDone                chan struct{}
 
 	// Browser's WebSocket URL to speak CDP
 	wsURL string
@@ -38,23 +37,26 @@ func NewBrowserProcess(
 	ctx context.Context, path string, args, env []string, dataDir *storage.Dir,
 	ctxCancel context.CancelFunc, logger *log.Logger,
 ) (*BrowserProcess, error) {
-	cmd, stdout, procDone, err := execute(ctx, path, args, env, dataDir, logger)
+	procCtx, procCtxCancel := context.WithCancel(ctx)
+	cmd, stdout, err := execute(
+		procCtx, procCtxCancel, path, args, env, dataDir, logger)
 	if err != nil {
+		procCtxCancel()
 		return nil, err
 	}
 
-	wsURL, err := parseDevToolsURL(ctx, stdout)
+	wsURL, err := parseDevToolsURL(procCtx, stdout)
 	if err != nil {
+		procCtxCancel()
 		return nil, fmt.Errorf("getting DevTools URL: %w", err)
 	}
 
 	p := BrowserProcess{
-		ctx:                        ctx,
+		ctx:                        procCtx,
 		cancel:                     ctxCancel,
 		process:                    cmd.Process,
 		lostConnection:             make(chan struct{}),
 		processIsGracefullyClosing: make(chan struct{}),
-		processDone:                procDone,
 		wsURL:                      wsURL,
 		userDataDir:                dataDir,
 	}
@@ -64,7 +66,7 @@ func NewBrowserProcess(
 		// browser-initiated termination then cancel the context to clean up.
 		select {
 		case <-p.lostConnection:
-		case <-ctx.Done():
+		case <-procCtx.Done():
 		}
 
 		select {
@@ -119,15 +121,15 @@ func (p *BrowserProcess) AttachLogger(logger *log.Logger) {
 }
 
 func execute(
-	ctx context.Context, path string, args, env []string, dataDir *storage.Dir,
-	logger *log.Logger,
-) (*exec.Cmd, io.Reader, chan struct{}, error) {
+	ctx context.Context, ctxCancel func(), path string, args, env []string,
+	dataDir *storage.Dir, logger *log.Logger,
+) (*exec.Cmd, io.Reader, error) {
 	cmd := exec.CommandContext(ctx, path, args...)
 	killAfterParent(cmd)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("%w", err)
+		return nil, nil, fmt.Errorf("%w", err)
 	}
 	cmd.Stderr = cmd.Stdout
 
@@ -140,23 +142,22 @@ func execute(
 	// can run into a data race.
 	err = cmd.Start()
 	if os.IsNotExist(err) {
-		return nil, nil, nil, fmt.Errorf("file does not exist: %s", path)
+		return nil, nil, fmt.Errorf("file does not exist: %s", path)
 	}
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("%w", err)
+		return nil, nil, fmt.Errorf("%w", err)
 	}
 	if ctx.Err() != nil {
-		return nil, nil, nil, fmt.Errorf("%w", ctx.Err())
+		return nil, nil, fmt.Errorf("%w", ctx.Err())
 	}
 
-	done := make(chan struct{})
 	go func() {
 		// TODO: How to handle these errors?
 		defer func() {
 			if err := dataDir.Cleanup(); err != nil {
 				logger.Errorf("browser", "cleaning up the user data directory: %v", err)
 			}
-			close(done)
+			ctxCancel()
 		}()
 
 		if err := cmd.Wait(); err != nil {
@@ -166,7 +167,7 @@ func execute(
 		}
 	}()
 
-	return cmd, stdout, done, nil
+	return cmd, stdout, nil
 }
 
 // parseDevToolsURL grabs the websocket address from chrome's output and returns it.
