@@ -8,6 +8,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/eventloop"
 	"go.k6.io/k6/js/modulestest"
 )
@@ -142,4 +143,73 @@ func TestEventLoopPanicOnDoubleCallback(t *testing.T) {
 	require.Equal(t, 2, ran)
 	require.Less(t, time.Second, took)
 	require.Greater(t, time.Second+time.Millisecond*100, took)
+}
+
+func TestEventLoopRejectUndefined(t *testing.T) {
+	t.Parallel()
+	vu := &modulestest.VU{RuntimeField: goja.New()}
+	loop := eventloop.New(vu)
+	err := loop.Start(func() error {
+		_, err := vu.Runtime().RunString("Promise.reject()")
+		return err
+	})
+	loop.WaitOnRegistered()
+	require.EqualError(t, err, "Uncaught (in promise) undefined")
+}
+
+func TestEventLoopRejectString(t *testing.T) {
+	t.Parallel()
+	vu := &modulestest.VU{RuntimeField: goja.New()}
+	loop := eventloop.New(vu)
+	err := loop.Start(func() error {
+		_, err := vu.Runtime().RunString("Promise.reject('some string')")
+		return err
+	})
+	loop.WaitOnRegistered()
+	require.EqualError(t, err, "Uncaught (in promise) some string")
+}
+
+func TestEventLoopRejectSyntaxError(t *testing.T) {
+	t.Parallel()
+	vu := &modulestest.VU{RuntimeField: goja.New()}
+	loop := eventloop.New(vu)
+	err := loop.Start(func() error {
+		_, err := vu.Runtime().RunString("Promise.resolve().then(()=> {some.syntax.error})")
+		return err
+	})
+	loop.WaitOnRegistered()
+	require.EqualError(t, err, "Uncaught (in promise) ReferenceError: some is not defined: ReferenceError\n\tat <eval>:1:30(1)\n\tat native\n\n")
+}
+
+func TestEventLoopRejectGoError(t *testing.T) {
+	t.Parallel()
+	vu := &modulestest.VU{RuntimeField: goja.New()}
+	loop := eventloop.New(vu)
+	rt := vu.Runtime()
+	require.NoError(t, rt.Set("f", rt.ToValue(func() error {
+		return errors.New("some error")
+	})))
+	err := loop.Start(func() error {
+		_, err := vu.Runtime().RunString("Promise.resolve().then(()=> {f()})")
+		return err
+	})
+	loop.WaitOnRegistered()
+	require.EqualError(t, err, "Uncaught (in promise) GoError: some error: GoError\n\tat go.k6.io/k6/js/eventloop_test.TestEventLoopRejectGoError.func1 (native)\n\tat <eval>:1:30(1)\n\tat native\n\n")
+}
+
+func TestEventLoopRejectThrow(t *testing.T) {
+	t.Parallel()
+	vu := &modulestest.VU{RuntimeField: goja.New()}
+	loop := eventloop.New(vu)
+	rt := vu.Runtime()
+	require.NoError(t, rt.Set("f", rt.ToValue(func() error {
+		common.Throw(rt, errors.New("throw error"))
+		return nil
+	})))
+	err := loop.Start(func() error {
+		_, err := vu.Runtime().RunString("Promise.resolve().then(()=> {f()})")
+		return err
+	})
+	loop.WaitOnRegistered()
+	require.EqualError(t, err, "Uncaught (in promise) throw error")
 }
