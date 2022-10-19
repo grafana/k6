@@ -276,6 +276,7 @@ func TestSessionBadTimeout(t *testing.T) {
 		`))
 	require.ErrorContains(t, err, "setTimeout requires a >0 timeout parameter, received 0.00 ")
 	// TODO SessionDuration is not emitted if the "open" handler returns an error - which is what happens here
+	// see https://github.com/grafana/k6/issues/2734
 	// assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
 }
 
