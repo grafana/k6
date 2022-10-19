@@ -41,27 +41,33 @@ func New(logger *logrus.Logger, debugOverride bool, categoryFilter *regexp.Regex
 	}
 }
 
-func (l *Logger) Tracef(category string, msg string, args ...interface{}) {
+// Tracef logs a trace message.
+func (l *Logger) Tracef(category string, msg string, args ...any) {
 	l.Logf(logrus.TraceLevel, category, msg, args...)
 }
 
-func (l *Logger) Debugf(category string, msg string, args ...interface{}) {
+// Debugf logs a debug message.
+func (l *Logger) Debugf(category string, msg string, args ...any) {
 	l.Logf(logrus.DebugLevel, category, msg, args...)
 }
 
-func (l *Logger) Errorf(category string, msg string, args ...interface{}) {
+// Errorf logs an error message.
+func (l *Logger) Errorf(category string, msg string, args ...any) {
 	l.Logf(logrus.ErrorLevel, category, msg, args...)
 }
 
-func (l *Logger) Infof(category string, msg string, args ...interface{}) {
+// Infof logs an info message.
+func (l *Logger) Infof(category string, msg string, args ...any) {
 	l.Logf(logrus.InfoLevel, category, msg, args...)
 }
 
-func (l *Logger) Warnf(category string, msg string, args ...interface{}) {
+// Warnf logs an warning message.
+func (l *Logger) Warnf(category string, msg string, args ...any) {
 	l.Logf(logrus.WarnLevel, category, msg, args...)
 }
 
-func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...interface{}) {
+// Logf logs a message.
+func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...any) {
 	if l == nil {
 		return
 	}
@@ -103,14 +109,14 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...i
 
 // SetLevel sets the logger level from a level string.
 // Accepted values:
-//  - "panic"
-//  - "fatal"
-//  - "error"
-//  - "warn"
-//  - "warning"
-//  - "info"
-//  - "debug"
-//  - "trace"
+//   - "panic"
+//   - "fatal"
+//   - "error"
+//   - "warn"
+//   - "warning"
+//   - "info"
+//   - "debug"
+//   - "trace"
 func (l *Logger) SetLevel(level string) error {
 	pl, err := logrus.ParseLevel(level)
 	if err != nil {
@@ -171,7 +177,7 @@ type consoleLogFormatter struct {
 // Format assembles a message from marshalling elements in the "objects" field
 // to JSON separated by space, and deletes the field when done.
 func (f *consoleLogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	if objects, ok := entry.Data["objects"].([]interface{}); ok {
+	if objects, ok := entry.Data["objects"].([]any); ok {
 		var msg []string
 		for _, obj := range objects {
 			// TODO: Log error?

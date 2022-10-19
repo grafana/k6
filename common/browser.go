@@ -353,7 +353,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		ctx,
 		browserCtx, // browser context will emit the following event:
 		[]string{EventBrowserContextPage},
-		func(e interface{}) bool {
+		func(e any) bool {
 			tid := <-targetID
 
 			b.logger.Debugf("Browser:newPageInContext:createWaitForEventHandler",
@@ -499,7 +499,7 @@ func (b *Browser) On(event string) *goja.Promise {
 	if event != EventBrowserDisconnected {
 		k6ext.Panic(b.ctx, "unknown browser event: %q, must be %q", event, EventBrowserDisconnected)
 	}
-	return k6ext.Promise(b.ctx, func() (interface{}, error) {
+	return k6ext.Promise(b.ctx, func() (any, error) {
 		select {
 		case <-b.browserProc.lostConnection:
 			return true, nil

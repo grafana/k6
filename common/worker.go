@@ -63,7 +63,7 @@ func (w *Worker) initEvents() error {
 }
 
 // Evaluate evaluates a page function in the context of the web worker.
-func (w *Worker) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
+func (w *Worker) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 	// TODO: implement
 	return nil
 }

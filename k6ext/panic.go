@@ -15,7 +15,7 @@ import (
 // the application down. Before panicking, it will find the
 // browser process from the context and kill it if it still exists.
 // TODO: test.
-func Panic(ctx context.Context, format string, a ...interface{}) {
+func Panic(ctx context.Context, format string, a ...any) {
 	rt := Runtime(ctx)
 	if rt == nil {
 		// this should never happen unless a programmer error

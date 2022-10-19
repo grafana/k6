@@ -58,7 +58,7 @@ func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value) error {
 			switch k {
 			case "args":
 				v := opts.Get(k)
-				if args, ok := v.Export().([]interface{}); ok {
+				if args, ok := v.Export().([]any); ok {
 					for _, argv := range args {
 						l.Args = append(l.Args, fmt.Sprintf("%v", argv))
 					}

@@ -39,7 +39,7 @@ type testBrowser struct {
 //
 // opts provides a way to customize the newTestBrowser.
 // see: withLaunchOptions for an example.
-func newTestBrowser(tb testing.TB, opts ...interface{}) *testBrowser {
+func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	tb.Helper()
 
 	// set default options and then customize them
@@ -209,10 +209,10 @@ func (b *testBrowser) attachFrame(page api.Page, frameID string, url string) api
 func (b *testBrowser) runtime() *goja.Runtime { return b.vu.Runtime() }
 
 // toGojaValue converts a value to goja value.
-func (b *testBrowser) toGojaValue(i interface{}) goja.Value { return b.runtime().ToValue(i) }
+func (b *testBrowser) toGojaValue(i any) goja.Value { return b.runtime().ToValue(i) }
 
 // asGojaValue asserts that v is a goja value and returns v as a goja.value.
-func (b *testBrowser) asGojaValue(v interface{}) goja.Value {
+func (b *testBrowser) asGojaValue(v any) goja.Value {
 	b.t.Helper()
 	gv, ok := v.(goja.Value)
 	require.Truef(b.t, ok, "want goja.Value; got %T", v)
@@ -220,7 +220,7 @@ func (b *testBrowser) asGojaValue(v interface{}) goja.Value {
 }
 
 // asGojaBool asserts that v is a boolean goja value and returns v as a boolean.
-func (b *testBrowser) asGojaBool(v interface{}) bool {
+func (b *testBrowser) asGojaBool(v any) bool {
 	b.t.Helper()
 	gv := b.asGojaValue(v)
 	require.IsType(b.t, b.toGojaValue(true), gv)
@@ -228,7 +228,7 @@ func (b *testBrowser) asGojaBool(v interface{}) bool {
 }
 
 // runJavaScript in the goja runtime.
-func (b *testBrowser) runJavaScript(s string, args ...interface{}) (goja.Value, error) {
+func (b *testBrowser) runJavaScript(s string, args ...any) (goja.Value, error) {
 	b.t.Helper()
 	return b.runtime().RunString(fmt.Sprintf(s, args...))
 }
@@ -309,7 +309,7 @@ type testPromise struct {
 	call goja.Callable
 }
 
-func (t testPromise) then(resolve interface{}, reject ...interface{}) testPromise {
+func (t testPromise) then(resolve any, reject ...any) testPromise {
 	var (
 		val goja.Value
 		err error

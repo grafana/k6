@@ -99,7 +99,7 @@ func (b *BrowserContextOptions) Parse(ctx context.Context, opts goja.Value) erro
 			case "offline":
 				b.Offline = opts.Get(k).ToBoolean()
 			case "permissions":
-				if ps, ok := opts.Get(k).Export().([]interface{}); ok {
+				if ps, ok := opts.Get(k).Export().([]any); ok {
 					for _, p := range ps {
 						b.Permissions = append(b.Permissions, fmt.Sprintf("%v", p))
 					}

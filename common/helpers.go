@@ -33,7 +33,7 @@ func convertBaseJSHandleTypes(ctx context.Context, execCtx *ExecutionContext, ob
 
 // nolint: cyclop
 func convertArgument(
-	ctx context.Context, execCtx *ExecutionContext, arg interface{},
+	ctx context.Context, execCtx *ExecutionContext, arg any,
 ) (*cdpruntime.CallArgument, error) {
 	if gojaVal, ok := arg.(goja.Value); ok {
 		arg = gojaVal.Export()
@@ -85,13 +85,13 @@ func convertArgument(
 }
 
 func call(
-	ctx context.Context, fn func(context.Context, chan interface{}, chan error), timeout time.Duration,
-) (interface{}, error) {
+	ctx context.Context, fn func(context.Context, chan any, chan error), timeout time.Duration,
+) (any, error) {
 	var (
-		result   interface{}
+		result   any
 		err      error
 		cancelFn context.CancelFunc
-		resultCh = make(chan interface{})
+		resultCh = make(chan any)
 		errCh    = make(chan error)
 	)
 	if timeout > 0 {
@@ -126,13 +126,13 @@ func stringSliceContains(s []string, e string) bool {
 func createWaitForEventHandler(
 	ctx context.Context,
 	emitter EventEmitter, events []string,
-	predicateFn func(data interface{}) bool,
+	predicateFn func(data any) bool,
 ) (
-	chan interface{}, context.CancelFunc,
+	chan any, context.CancelFunc,
 ) {
 	evCancelCtx, evCancelFn := context.WithCancel(ctx)
 	chEvHandler := make(chan Event)
-	ch := make(chan interface{})
+	ch := make(chan any)
 
 	go func() {
 		for {
@@ -168,13 +168,13 @@ func createWaitForEventHandler(
 // stop waiting after the first received matching event.
 func createWaitForEventPredicateHandler(
 	ctx context.Context, emitter EventEmitter, events []string,
-	predicateFn func(data interface{}) bool,
+	predicateFn func(data any) bool,
 ) (
-	chan interface{}, context.CancelFunc,
+	chan any, context.CancelFunc,
 ) {
 	evCancelCtx, evCancelFn := context.WithCancel(ctx)
 	chEvHandler := make(chan Event)
-	ch := make(chan interface{})
+	ch := make(chan any)
 
 	go func() {
 		for {
@@ -198,7 +198,12 @@ func createWaitForEventPredicateHandler(
 	return ch, evCancelFn
 }
 
-func waitForEvent(ctx context.Context, emitter EventEmitter, events []string, predicateFn func(data interface{}) bool, timeout time.Duration) (interface{}, error) {
+func waitForEvent(
+	ctx context.Context,
+	emitter EventEmitter, events []string,
+	predicateFn func(data any) bool,
+	timeout time.Duration,
+) (any, error) { //nolint:unparam
 	ch, evCancelFn := createWaitForEventHandler(ctx, emitter, events, predicateFn)
 	defer evCancelFn() // Remove event handler
 
@@ -242,7 +247,7 @@ func gojaValueExists(v goja.Value) bool {
 
 // asGojaValue return v as a goja value.
 // panics if v is not a goja value.
-func asGojaValue(ctx context.Context, v interface{}) goja.Value {
+func asGojaValue(ctx context.Context, v any) goja.Value {
 	gv, ok := v.(goja.Value)
 	if !ok {
 		k6ext.Panic(ctx, "unexpected type %T", v)
@@ -252,6 +257,6 @@ func asGojaValue(ctx context.Context, v interface{}) goja.Value {
 
 // gojaValueToString returns v as string.
 // panics if v is not a goja value.
-func gojaValueToString(ctx context.Context, v interface{}) string {
+func gojaValueToString(ctx context.Context, v any) string {
 	return asGojaValue(ctx, v).String()
 }

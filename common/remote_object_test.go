@@ -87,28 +87,28 @@ func TestValueFromRemoteObject(t *testing.T) {
 	t.Run("primitive types", func(t *testing.T) {
 		primitiveTypes := []struct {
 			typ   runtime.Type
-			value interface{}
-			toFn  func(goja.Value) interface{}
+			value any
+			toFn  func(goja.Value) any
 		}{
 			{
 				typ:   "number",
 				value: int64(777),
-				toFn:  func(v goja.Value) interface{} { return v.ToInteger() },
+				toFn:  func(v goja.Value) any { return v.ToInteger() },
 			},
 			{
 				typ:   "number",
 				value: float64(777.0),
-				toFn:  func(v goja.Value) interface{} { return v.ToFloat() },
+				toFn:  func(v goja.Value) any { return v.ToFloat() },
 			},
 			{
 				typ:   "string",
 				value: "hello world",
-				toFn:  func(v goja.Value) interface{} { return v.String() },
+				toFn:  func(v goja.Value) any { return v.String() },
 			},
 			{
 				typ:   "boolean",
 				value: true,
-				toFn:  func(v goja.Value) interface{} { return v.ToBoolean() },
+				toFn:  func(v goja.Value) any { return v.ToBoolean() },
 			},
 		}
 
@@ -143,7 +143,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 		vu := k6test.NewVU(t)
 		val, err := valueFromRemoteObject(vu.Context(), remoteObject)
 		require.NoError(t, err)
-		assert.Equal(t, vu.ToGojaValue(map[string]interface{}{"num": float64(1)}), val)
+		assert.Equal(t, vu.ToGojaValue(map[string]any{"num": float64(1)}), val)
 	})
 }
 
@@ -154,7 +154,7 @@ func TestParseRemoteObject(t *testing.T) {
 		name     string
 		preview  *runtime.ObjectPreview
 		value    string
-		expected map[string]interface{}
+		expected map[string]any
 		expErr   string
 	}{
 		{
@@ -171,7 +171,7 @@ func TestParseRemoteObject(t *testing.T) {
 					{Name: "sym", Type: runtime.TypeSymbol, Value: "Symbol()"},
 				},
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"accessor": "accessor",
 				"bigint":   int64(100),
 				"bool":     true,
@@ -192,14 +192,14 @@ func TestParseRemoteObject(t *testing.T) {
 					{Name: "nested", Type: runtime.TypeObject, Value: "Object"},
 				},
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"nested": "Object",
 			},
 		},
 		{
 			name:     "err_overflow",
 			preview:  &runtime.ObjectPreview{Overflow: true},
-			expected: map[string]interface{}{},
+			expected: map[string]any{},
 			expErr:   "object is too large and will be parsed partially",
 		},
 		{
@@ -209,7 +209,7 @@ func TestParseRemoteObject(t *testing.T) {
 					{Name: "failprop", Type: runtime.TypeObject, Value: "some"},
 				},
 			},
-			expected: map[string]interface{}{},
+			expected: map[string]any{},
 			expErr:   "parsing object property",
 		},
 	}

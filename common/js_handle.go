@@ -90,7 +90,7 @@ func (h *BaseJSHandle) dispose() error {
 }
 
 // Evaluate will evaluate provided page function within an execution context.
-func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) interface{} {
+func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 	rt := h.execCtx.vu.Runtime()
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
 	res, err := h.execCtx.Eval(h.ctx, pageFunc, args...)

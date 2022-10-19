@@ -40,8 +40,8 @@ func (pe *objectPropertyParseError) Unwrap() error {
 	return pe.error
 }
 
-func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview) (map[string]interface{}, error) {
-	obj := make(map[string]interface{})
+func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview) (map[string]any, error) {
+	obj := make(map[string]any)
 	var result error
 	if op.Overflow {
 		result = multierror.Append(result, &objectOverflowError{})
@@ -59,7 +59,8 @@ func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview) (map[string]interfac
 	return obj, result
 }
 
-func parseRemoteObjectValue(t cdpruntime.Type, val string, op *cdpruntime.ObjectPreview) (interface{}, error) {
+//nolint:cyclop
+func parseRemoteObjectValue(t cdpruntime.Type, val string, op *cdpruntime.ObjectPreview) (any, error) {
 	switch t {
 	case cdpruntime.TypeAccessor:
 		return "accessor", nil
@@ -88,7 +89,7 @@ func parseRemoteObjectValue(t cdpruntime.Type, val string, op *cdpruntime.Object
 		return "undefined", nil
 	}
 
-	var v interface{}
+	var v any
 	if err := json.Unmarshal([]byte(val), &v); err != nil {
 		return nil, err
 	}
@@ -112,7 +113,7 @@ func parseExceptionDetails(exc *cdpruntime.ExceptionDetails) string {
 	return errMsg
 }
 
-func parseRemoteObject(obj *cdpruntime.RemoteObject) (interface{}, error) {
+func parseRemoteObject(obj *cdpruntime.RemoteObject) (any, error) {
 	if obj.UnserializableValue == "" {
 		return parseRemoteObjectValue(obj.Type, string(obj.Value), obj.Preview)
 	}
