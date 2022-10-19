@@ -3,6 +3,7 @@ package tests
 import (
 	"fmt"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -65,6 +66,96 @@ func TestLifecycleNetworkIdle(t *testing.T) {
 			tb.promise(p.Goto(tb.URL("/home"), opts)).then(
 				func() {
 					result := p.TextContent("#serverMsg", nil)
+					assert.EqualValues(t, "ping.js loaded from server", result)
+
+					resolved = true
+				},
+				func() {
+					rejected = true
+				},
+			)
+
+			return nil
+		})
+		require.NoError(t, err)
+
+		assert.True(t, resolved)
+		assert.False(t, rejected)
+	})
+
+	t.Run("doesn't unblock wait for networkIdle too early", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		p := tb.NewPage(nil)
+
+		counterMu := sync.RWMutex{}
+		var counter int
+
+		tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+			fmt.Fprintf(w, `
+			<html>
+				<head></head>
+				<body>
+					<div id="prolongNetworkIdleLoad">Waiting...</div>
+					<div id="serverMsg">Waiting...</div>
+
+					<script>
+						var prolongNetworkIdleLoadOutput = document.getElementById("prolongNetworkIdleLoad");
+
+						var p = prolongNetworkIdleLoad();
+						p.then(() => {
+							prolongNetworkIdleLoadOutput.innerText += ' - for loop complete';
+						})
+
+						async function prolongNetworkIdleLoad() {
+							for (var i = 0; i < 4; i++) {
+								await fetch('/ping')
+								.then(response => response.text())
+								.then((data) => {
+									prolongNetworkIdleLoadOutput.innerText = 'Waiting... ' + data;
+								});
+							}
+						}
+					</script>
+					<script src="/ping.js" async></script>
+				</body>
+			</html>
+			`)
+		})
+		ch := make(chan bool)
+		tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
+			<-ch
+
+			counterMu.Lock()
+			defer counterMu.Unlock()
+
+			time.Sleep(time.Millisecond * 50)
+
+			counter++
+			fmt.Fprintf(w, "pong %d", counter)
+		})
+		tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
+			fmt.Fprintf(w, `
+				var serverMsgOutput = document.getElementById("serverMsg");
+				serverMsgOutput.innerText = "ping.js loaded from server";
+			`)
+
+			close(ch)
+		})
+
+		var resolved, rejected bool
+		err := tb.await(func() error {
+			opts := tb.toGojaValue(common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventNetworkIdle,
+				Timeout:   30 * time.Second,
+			})
+			tb.promise(p.Goto(tb.URL("/home"), opts)).then(
+				func() {
+					result := p.TextContent("#prolongNetworkIdleLoad", nil)
+					assert.EqualValues(t, "Waiting... pong 4 - for loop complete", result)
+
+					result = p.TextContent("#serverMsg", nil)
 					assert.EqualValues(t, "ping.js loaded from server", result)
 
 					resolved = true

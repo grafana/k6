@@ -152,11 +152,7 @@ func (f *Frame) clearLifecycle() {
 
 	// clear lifecycle events
 	f.lifecycleEventsMu.Lock()
-	{
-		for e := range f.lifecycleEvents {
-			f.lifecycleEvents[e] = false
-		}
-	}
+	f.lifecycleEvents = make(map[LifecycleEvent]bool)
 	f.lifecycleEventsMu.Unlock()
 
 	f.page.frameManager.MainFrame().recalculateLifecycle()
