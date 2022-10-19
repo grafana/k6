@@ -145,7 +145,7 @@ func (m *NetworkManager) deleteRequestByID(reqID network.RequestID) {
 func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	state := m.vu.State()
 
-	tags := state.Tags.GetCurrentValues()
+	tags := state.Tags.GetCurrentValues().Tags
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
 		tags = tags.With("method", req.method)
 	}
@@ -192,7 +192,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 			"response is nil url:%s method:%s", req.url, req.method)
 	}
 
-	tags := state.Tags.GetCurrentValues()
+	tags := state.Tags.GetCurrentValues().Tags
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
 		tags = tags.With("method", req.method)
 	}

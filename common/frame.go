@@ -354,7 +354,7 @@ func (f *Frame) emitMetric(m *k6metrics.Metric, t time.Time) {
 	}
 
 	state := f.vu.State()
-	tags := state.Tags.GetCurrentValues()
+	tags := state.Tags.GetCurrentValues().Tags
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
 		tags = tags.With("url", f.URL())
 	}
