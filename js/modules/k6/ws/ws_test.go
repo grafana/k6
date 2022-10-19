@@ -118,38 +118,46 @@ func newTestState(t testing.TB) testState {
 	}
 }
 
-func TestSession(t *testing.T) {
+func TestSessionConnectWs(t *testing.T) {
 	// TODO: split and paralelize tests
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	sr := tb.Replacer.Replace
 
 	test := newTestState(t)
-
-	t.Run("connect_ws", func(t *testing.T) {
-		_, err := test.VU.Runtime().RunString(sr(`
+	_, err := test.VU.Runtime().RunString(sr(`
 		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.close()
 		});
 		if (res.status != 101) { throw new Error("connection failed with status: " + res.status); }
 		`))
-		require.NoError(t, err)
-		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
-	})
+	require.NoError(t, err)
+	assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+}
 
-	t.Run("connect_wss", func(t *testing.T) {
-		_, err := test.VU.Runtime().RunString(sr(`
+func TestSessionConnectWss(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
 		var res = ws.connect("WSSBIN_URL/ws-echo", function(socket){
 			socket.close()
 		});
 		if (res.status != 101) { throw new Error("TLS connection failed with status: " + res.status); }
 		`))
-		require.NoError(t, err)
-		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSSBIN_URL/ws-echo"), statusProtocolSwitch, "")
-	})
+	require.NoError(t, err)
+	assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+}
 
-	t.Run("open", func(t *testing.T) {
-		_, err := test.VU.Runtime().RunString(sr(`
+func TestSessionOpen(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
 		var opened = false;
 		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.on("open", function() {
@@ -159,12 +167,17 @@ func TestSession(t *testing.T) {
 		});
 		if (!opened) { throw new Error ("open event not fired"); }
 		`))
-		require.NoError(t, err)
-		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
-	})
+	require.NoError(t, err)
+	assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+}
 
-	t.Run("send_receive", func(t *testing.T) {
-		_, err := test.VU.Runtime().RunString(sr(`
+func TestSessionSendReceive(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
 		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.on("open", function() {
 				socket.send("test")
@@ -177,15 +190,20 @@ func TestSession(t *testing.T) {
 			});
 		});
 		`))
-		require.NoError(t, err)
-		samplesBuf := metrics.GetBufferedSamples(test.samples)
-		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
-		assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
-		assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
-	})
+	require.NoError(t, err)
+	samplesBuf := metrics.GetBufferedSamples(test.samples)
+	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+	assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
+	assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
+}
 
-	t.Run("interval", func(t *testing.T) {
-		_, err := test.VU.Runtime().RunString(sr(`
+func TestSessionInterval(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
 		var counter = 0;
 		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.setInterval(function () {
@@ -195,11 +213,17 @@ func TestSession(t *testing.T) {
 		});
 		if (counter < 3) {throw new Error ("setInterval should have been called at least 3 times, counter=" + counter);}
 		`))
-		require.NoError(t, err)
-		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
-	})
-	t.Run("bad interval", func(t *testing.T) {
-		_, err := test.VU.Runtime().RunString(sr(`
+	require.NoError(t, err)
+	assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+}
+
+func TestSessionBadInterval(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
 		var counter = 0;
 		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.setInterval(function () {
@@ -208,12 +232,17 @@ func TestSession(t *testing.T) {
 			}, -1.23);
 		});
 		`))
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "setInterval requires a >0 timeout parameter, received -1.23 ")
-	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "setInterval requires a >0 timeout parameter, received -1.23 ")
+}
 
-	t.Run("timeout", func(t *testing.T) {
-		_, err := test.VU.Runtime().RunString(sr(`
+func TestSessionTimeout(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
 		var start = new Date().getTime();
 		var ellapsed = new Date().getTime() - start;
 		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
@@ -226,11 +255,16 @@ func TestSession(t *testing.T) {
 			throw new Error ("setTimeout occurred after " + ellapsed + "ms, expected 500<T<3000");
 		}
 		`))
-		require.NoError(t, err)
-	})
+	require.NoError(t, err)
+}
 
-	t.Run("bad timeout", func(t *testing.T) {
-		_, err := test.VU.Runtime().RunString(sr(`
+func TestSessionBadTimeout(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
 		var start = new Date().getTime();
 		var ellapsed = new Date().getTime() - start;
 		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
@@ -240,13 +274,19 @@ func TestSession(t *testing.T) {
 			}, 0);
 		});
 		`))
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "setTimeout requires a >0 timeout parameter, received 0.00 ")
-		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
-	})
+	require.ErrorContains(t, err, "setTimeout requires a >0 timeout parameter, received 0.00 ")
+	// TODO SessionDuration is not emitted if the "open" handler returns an error - which is what happens here
+	// see https://github.com/grafana/k6/issues/2734
+	// assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+}
 
-	t.Run("ping", func(t *testing.T) {
-		_, err := test.VU.Runtime().RunString(sr(`
+func TestSessionPing(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
 		var pongReceived = false;
 		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.on("open", function(data) {
@@ -262,14 +302,19 @@ func TestSession(t *testing.T) {
 			throw new Error ("sent ping but didn't get pong back");
 		}
 		`))
-		require.NoError(t, err)
-		samplesBuf := metrics.GetBufferedSamples(test.samples)
-		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
-		assertMetricEmittedCount(t, metrics.WSPingName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
-	})
+	require.NoError(t, err)
+	samplesBuf := metrics.GetBufferedSamples(test.samples)
+	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+	assertMetricEmittedCount(t, metrics.WSPingName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
+}
 
-	t.Run("multiple_handlers", func(t *testing.T) {
-		_, err := test.VU.Runtime().RunString(sr(`
+func TestSessionMultipleHandlers(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
 		var pongReceived = false;
 		var otherPongReceived = false;
 
@@ -295,14 +340,19 @@ func TestSession(t *testing.T) {
 			throw new Error ("sent ping but didn't get pong back");
 		}
 		`))
-		require.NoError(t, err)
-		samplesBuf := metrics.GetBufferedSamples(test.samples)
-		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
-		assertMetricEmittedCount(t, metrics.WSPingName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
-	})
+	require.NoError(t, err)
+	samplesBuf := metrics.GetBufferedSamples(test.samples)
+	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+	assertMetricEmittedCount(t, metrics.WSPingName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
+}
 
-	t.Run("client_close", func(t *testing.T) {
-		_, err := test.VU.Runtime().RunString(sr(`
+func TestSessionClientClose(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
 		var closed = false;
 		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.on("open", function() {
@@ -314,10 +364,12 @@ func TestSession(t *testing.T) {
 		});
 		if (!closed) { throw new Error ("close event not fired"); }
 		`))
-		require.NoError(t, err)
-		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
-	})
+	require.NoError(t, err)
+	assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+}
 
+func TestSessionClose(t *testing.T) {
+	t.Parallel()
 	serverCloseTests := []struct {
 		name     string
 		endpoint string
@@ -332,6 +384,11 @@ func TestSession(t *testing.T) {
 	for _, tc := range serverCloseTests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tb := httpmultibin.NewHTTPMultiBin(t)
+			sr := tb.Replacer.Replace
+
+			test := newTestState(t)
 			_, err := test.VU.Runtime().RunString(sr(fmt.Sprintf(`
 			var closed = false;
 			var res = ws.connect("WSBIN_URL%s", function(socket){
@@ -347,10 +404,12 @@ func TestSession(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
 
-	t.Run("multi_message", func(t *testing.T) {
-		t.Parallel()
+func TestMultiMessage(t *testing.T) {
+	t.Parallel()
 
+	registerMultiMessage := func(tb *httpmultibin.HTTPMultiBin) {
 		tb.Mux.HandleFunc("/ws-echo-multi", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
 			if err != nil {
@@ -375,9 +434,16 @@ func TestSession(t *testing.T) {
 				}
 			}
 		}))
+	}
 
-		t.Run("send_receive_multiple_ws", func(t *testing.T) {
-			_, err := test.VU.Runtime().RunString(sr(`
+	t.Run("send_receive_multiple_ws", func(t *testing.T) {
+		t.Parallel()
+		tb := httpmultibin.NewHTTPMultiBin(t)
+		registerMultiMessage(tb)
+		sr := tb.Replacer.Replace
+
+		test := newTestState(t)
+		_, err := test.VU.Runtime().RunString(sr(`
 			var msg1 = "test1"
 			var msg2 = "test2"
 			var msg3 = "test3"
@@ -404,15 +470,21 @@ func TestSession(t *testing.T) {
 				throw new Error ("messages 1,2,3 in sequence, was not received from server");
 			}
 			`))
-			require.NoError(t, err)
-			samplesBuf := metrics.GetBufferedSamples(test.samples)
-			assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo-multi"), statusProtocolSwitch, "")
-			assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 3)
-			assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 3)
-		})
+		require.NoError(t, err)
+		samplesBuf := metrics.GetBufferedSamples(test.samples)
+		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo-multi"), statusProtocolSwitch, "")
+		assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 3)
+		assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 3)
+	})
 
-		t.Run("send_receive_multiple_wss", func(t *testing.T) {
-			_, err := test.VU.Runtime().RunString(sr(`
+	t.Run("send_receive_multiple_wss", func(t *testing.T) {
+		t.Parallel()
+		tb := httpmultibin.NewHTTPMultiBin(t)
+		registerMultiMessage(tb)
+		sr := tb.Replacer.Replace
+
+		test := newTestState(t)
+		_, err := test.VU.Runtime().RunString(sr(`
 			var msg1 = "test1"
 			var msg2 = "test2"
 			var secondMsgReceived = false
@@ -435,15 +507,21 @@ func TestSession(t *testing.T) {
 				throw new Error ("second test message was not received from server!");
 			}
 			`))
-			require.NoError(t, err)
-			samplesBuf := metrics.GetBufferedSamples(test.samples)
-			assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSSBIN_URL/ws-echo-multi"), statusProtocolSwitch, "")
-			assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSSBIN_URL/ws-echo-multi"), 2)
-			assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSSBIN_URL/ws-echo-multi"), 2)
-		})
+		require.NoError(t, err)
+		samplesBuf := metrics.GetBufferedSamples(test.samples)
+		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSSBIN_URL/ws-echo-multi"), statusProtocolSwitch, "")
+		assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSSBIN_URL/ws-echo-multi"), 2)
+		assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSSBIN_URL/ws-echo-multi"), 2)
+	})
 
-		t.Run("send_receive_text_binary", func(t *testing.T) {
-			_, err := test.VU.Runtime().RunString(sr(`
+	t.Run("send_receive_text_binary", func(t *testing.T) {
+		t.Parallel()
+		tb := httpmultibin.NewHTTPMultiBin(t)
+		registerMultiMessage(tb)
+		sr := tb.Replacer.Replace
+
+		test := newTestState(t)
+		_, err := test.VU.Runtime().RunString(sr(`
 			var msg1 = "test1"
 			var msg2 = new Uint8Array([116, 101, 115, 116, 50]); // 'test2'
 			var secondMsgReceived = false
@@ -469,12 +547,11 @@ func TestSession(t *testing.T) {
 				throw new Error ("second test message was not received from server!");
 			}
 			`))
-			require.NoError(t, err)
-			samplesBuf := metrics.GetBufferedSamples(test.samples)
-			assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo-multi"), statusProtocolSwitch, "")
-			assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 2)
-			assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 2)
-		})
+		require.NoError(t, err)
+		samplesBuf := metrics.GetBufferedSamples(test.samples)
+		assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo-multi"), statusProtocolSwitch, "")
+		assertMetricEmittedCount(t, metrics.WSMessagesSentName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 2)
+		assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samplesBuf, sr("WSBIN_URL/ws-echo-multi"), 2)
 	})
 }
 
@@ -549,12 +626,11 @@ func TestSocketSendBinary(t *testing.T) { //nolint:tparallel
 
 func TestErrors(t *testing.T) {
 	t.Parallel()
-	tb := httpmultibin.NewHTTPMultiBin(t)
-	sr := tb.Replacer.Replace
-
-	test := newTestState(t)
 
 	t.Run("invalid_url", func(t *testing.T) {
+		t.Parallel()
+
+		test := newTestState(t)
 		_, err := test.VU.Runtime().RunString(`
 		var res = ws.connect("INVALID", function(socket){
 			socket.on("open", function() {
@@ -566,6 +642,9 @@ func TestErrors(t *testing.T) {
 	})
 
 	t.Run("invalid_url_message_panic", func(t *testing.T) {
+		t.Parallel()
+
+		test := newTestState(t)
 		// Attempting to send a message to a non-existent socket shouldn't panic
 		_, err := test.VU.Runtime().RunString(`
 		var res = ws.connect("INVALID", function(socket){
@@ -576,6 +655,11 @@ func TestErrors(t *testing.T) {
 	})
 
 	t.Run("error_in_setup", func(t *testing.T) {
+		t.Parallel()
+		tb := httpmultibin.NewHTTPMultiBin(t)
+		sr := tb.Replacer.Replace
+
+		test := newTestState(t)
 		_, err := test.VU.Runtime().RunString(sr(`
 		var res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
 			throw new Error("error in setup");
@@ -585,6 +669,11 @@ func TestErrors(t *testing.T) {
 	})
 
 	t.Run("send_after_close", func(t *testing.T) {
+		t.Parallel()
+		tb := httpmultibin.NewHTTPMultiBin(t)
+		sr := tb.Replacer.Replace
+
+		test := newTestState(t)
 		_, err := test.VU.Runtime().RunString(sr(`
 		var hasError = false;
 		var res = ws.connect("WSBIN_URL/ws-echo-invalid", function(socket){
@@ -606,6 +695,11 @@ func TestErrors(t *testing.T) {
 	})
 
 	t.Run("error on close", func(t *testing.T) {
+		t.Parallel()
+		tb := httpmultibin.NewHTTPMultiBin(t)
+		sr := tb.Replacer.Replace
+
+		test := newTestState(t)
 		_, err := test.VU.Runtime().RunString(sr(`
 		var closed = false;
 		var res = ws.connect("WSBIN_URL/ws-close", function(socket){
@@ -684,14 +778,15 @@ func TestSystemTags(t *testing.T) {
 }
 
 func TestTLSConfig(t *testing.T) {
-	tb := httpmultibin.NewHTTPMultiBin(t)
-
-	sr := tb.Replacer.Replace
-
-	test := newTestState(t)
+	t.Parallel()
 	t.Run("insecure skip verify", func(t *testing.T) {
+		t.Parallel()
+		tb := httpmultibin.NewHTTPMultiBin(t)
+		sr := tb.Replacer.Replace
+
+		test := newTestState(t)
 		test.VU.StateField.TLSConfig = &tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, //nolint:gosec
 		}
 
 		_, err := test.VU.Runtime().RunString(sr(`
@@ -705,6 +800,11 @@ func TestTLSConfig(t *testing.T) {
 	})
 
 	t.Run("custom certificates", func(t *testing.T) {
+		t.Parallel()
+		tb := httpmultibin.NewHTTPMultiBin(t)
+		sr := tb.Replacer.Replace
+
+		test := newTestState(t)
 		test.VU.StateField.TLSConfig = tb.TLSClientConfig
 
 		_, err := test.VU.Runtime().RunString(sr(`
@@ -721,25 +821,26 @@ func TestTLSConfig(t *testing.T) {
 }
 
 func TestReadPump(t *testing.T) {
-	var closeCode int
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, err := (&websocket.Upgrader{}).Upgrade(w, r, w.Header())
-		require.NoError(t, err)
-		closeMsg := websocket.FormatCloseMessage(closeCode, "")
-		_ = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
-	}))
-	defer srv.Close()
+	t.Parallel()
 
 	closeCodes := []int{websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseInternalServerErr}
-
-	numAsserts := 0
-	srvURL := "ws://" + srv.Listener.Addr().String()
 
 	// Ensure readPump returns the response close code sent by the server
 	for _, code := range closeCodes {
 		code := code
 		t.Run(strconv.Itoa(code), func(t *testing.T) {
-			closeCode = code
+			t.Parallel()
+			closeCode := code
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				conn, err := (&websocket.Upgrader{}).Upgrade(w, r, w.Header())
+				require.NoError(t, err)
+				closeMsg := websocket.FormatCloseMessage(closeCode, "")
+				_ = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
+			}))
+			numAsserts := 0
+
+			t.Cleanup(srv.Close)
+			srvURL := "ws://" + srv.Listener.Addr().String()
 			conn, resp, err := websocket.DefaultDialer.Dial(srvURL, nil)
 			require.NoError(t, err)
 			defer func() {
@@ -767,11 +868,11 @@ func TestReadPump(t *testing.T) {
 					break readChans
 				}
 			}
+			assert.Equal(t, numAsserts, 1)
 		})
 	}
 
 	// Ensure all close code asserts passed
-	assert.Equal(t, numAsserts, len(closeCodes))
 }
 
 func TestUserAgent(t *testing.T) {
