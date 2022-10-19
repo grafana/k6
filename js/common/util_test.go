@@ -7,22 +7,21 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestThrow(t *testing.T) {
 	t.Parallel()
 	rt := goja.New()
 	fn1, ok := goja.AssertFunction(rt.ToValue(func() { Throw(rt, errors.New("aaaa")) }))
-	if assert.True(t, ok, "fn1 is invalid") {
-		_, err := fn1(goja.Undefined())
-		assert.EqualError(t, err, "aaaa")
+	require.True(t, ok, "fn1 is invalid")
+	_, err := fn1(goja.Undefined())
+	assert.EqualError(t, err, "GoError: aaaa")
 
-		fn2, ok := goja.AssertFunction(rt.ToValue(func() { Throw(rt, err) }))
-		if assert.True(t, ok, "fn1 is invalid") {
-			_, err := fn2(goja.Undefined())
-			assert.EqualError(t, err, "aaaa")
-		}
-	}
+	fn2, ok := goja.AssertFunction(rt.ToValue(func() { Throw(rt, err) }))
+	require.True(t, ok, "fn2 is invalid")
+	_, err = fn2(goja.Undefined())
+	assert.EqualError(t, err, "GoError: aaaa")
 }
 
 func TestToBytes(t *testing.T) {

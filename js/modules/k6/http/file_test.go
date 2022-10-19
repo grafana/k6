@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -41,23 +40,24 @@ func TestHTTPFile(t *testing.T) {
 			FileData{Data: input, Filename: "test-ab.bin", ContentType: "application/octet-stream"},
 			"",
 		},
-		{struct{}{}, []string{}, FileData{}, "invalid type struct {}, expected string, []byte or ArrayBuffer"},
+		{struct{}{}, []string{}, FileData{}, "GoError: invalid type struct {}, expected string, []byte or ArrayBuffer"},
 	}
 
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(fmt.Sprintf("%T", tc.input), func(t *testing.T) {
-			if tc.expErr != "" {
-				defer func() {
-					err := recover()
-					require.NotNil(t, err)
-					require.IsType(t, &goja.Object{}, err)
-					val := err.(*goja.Object).Export()
-					require.EqualError(t, val.(error), tc.expErr)
-				}()
+			cal, _ := goja.AssertFunction(rt.ToValue(mi.file))
+			args := make([]goja.Value, 1, len(tc.args)+1)
+			args[0] = rt.ToValue(tc.input)
+			for _, arg := range tc.args {
+				args = append(args, rt.ToValue(arg))
 			}
-			out := mi.file(tc.input, tc.args...)
-			assert.Equal(t, tc.expected, out)
+			_, err := cal(goja.Undefined(), args...)
+			if tc.expErr != "" {
+				require.EqualError(t, err, tc.expErr)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

@@ -17,7 +17,7 @@ func Throw(rt *goja.Runtime, err error) {
 	if e, ok := err.(*goja.Exception); ok { //nolint:errorlint // we don't really want to unwrap here
 		panic(e)
 	}
-	panic(rt.ToValue(err))
+	panic(rt.NewGoError(err)) // this catches the stack unlike rt.ToValue
 }
 
 // GetReader tries to return an io.Reader value from an exported goja value.

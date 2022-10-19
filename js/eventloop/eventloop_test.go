@@ -211,5 +211,5 @@ func TestEventLoopRejectThrow(t *testing.T) {
 		return err
 	})
 	loop.WaitOnRegistered()
-	require.EqualError(t, err, "Uncaught (in promise) throw error")
+	require.EqualError(t, err, "Uncaught (in promise) GoError: throw error: GoError\n\tat go.k6.io/k6/js/eventloop_test.TestEventLoopRejectThrow.func1 (native)\n\tat <eval>:1:30(1)\n\tat native\n\n")
 }
