@@ -24,7 +24,9 @@ func (b *Barrier) AddFrameNavigation(frame *Frame) {
 	if frame.parentFrame != nil {
 		return // We only care about top-frame navigation
 	}
-	ch, evCancelFn := createWaitForEventHandler(frame.ctx, frame, []string{EventFrameNavigation}, func(data any) bool { return true })
+	ch, evCancelFn := createWaitForEventHandler(frame.ctx, frame, []string{EventFrameNavigation}, func(data any) bool {
+		return true
+	})
 	go func() {
 		defer evCancelFn() // Remove event handler
 		atomic.AddInt64(&b.count, 1)

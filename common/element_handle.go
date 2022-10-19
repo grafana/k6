@@ -483,6 +483,7 @@ func (h *ElementHandle) press(apiCtx context.Context, key string, opts *Keyboard
 	return nil
 }
 
+//nolint:funlen,gocognit,cyclop
 func (h *ElementHandle) selectOption(apiCtx context.Context, values goja.Value) (any, error) {
 	convertSelectOptionValues := func(values goja.Value) ([]any, error) {
 		if goja.IsNull(values) || goja.IsUndefined(values) {

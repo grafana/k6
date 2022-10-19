@@ -59,6 +59,7 @@ func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview) (map[string]any, err
 	return obj, result
 }
 
+//nolint:cyclop
 func parseRemoteObjectValue(t cdpruntime.Type, val string, op *cdpruntime.ObjectPreview) (any, error) {
 	switch t {
 	case cdpruntime.TypeAccessor:

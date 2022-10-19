@@ -687,9 +687,12 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 		k6ext.Panic(p.ctx, "parsing reload options: %w", err)
 	}
 
-	ch, evCancelFn := createWaitForEventHandler(p.ctx, p.frameManager.MainFrame(), []string{EventFrameNavigation}, func(data any) bool {
-		return true // Both successful and failed navigations are considered
-	})
+	ch, evCancelFn := createWaitForEventHandler(p.ctx,
+		p.frameManager.MainFrame(),
+		[]string{EventFrameNavigation}, func(data any) bool {
+			return true // Both successful and failed navigations are considered
+		},
+	)
 	defer evCancelFn() // Remove event handler
 
 	action := cdppage.Reload()

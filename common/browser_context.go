@@ -331,20 +331,21 @@ func (b *BrowserContext) Unroute(url goja.Value, handler goja.Callable) *goja.Pr
 	return nil
 }
 
+// WaitForEvent waits for event.
 func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) any {
 	// TODO: This public API needs Promise support (as return value) to be useful in JS!
 	b.logger.Debugf("BrowserContext:WaitForEvent", "bctxid:%v event:%q", b.id, event)
 
-	rt := b.vu.Runtime()
-
-	var isCallable bool
-	var predicateFn goja.Callable = nil
-	timeout := time.Duration(b.browser.launchOpts.Timeout * time.Second)
-
-	if optsOrPredicate != nil && !goja.IsUndefined(optsOrPredicate) && !goja.IsNull(optsOrPredicate) {
+	var (
+		isCallable  bool
+		predicateFn goja.Callable
+		// TODO: Find out whether * time.Second is necessary.
+		timeout = b.browser.launchOpts.Timeout * time.Second //nolint:durationcheck
+	)
+	if gojaValueExists(optsOrPredicate) {
 		switch optsOrPredicate.ExportType() {
 		case reflect.TypeOf(goja.Object{}):
-			opts := optsOrPredicate.ToObject(rt)
+			opts := optsOrPredicate.ToObject(b.vu.Runtime())
 			for _, k := range opts.Keys() {
 				switch k {
 				case "predicate":
@@ -364,46 +365,15 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 		}
 	}
 
+	return b.waitForEvent(event, predicateFn, timeout)
+}
+
+func (b *BrowserContext) waitForEvent(event string, predicateFn goja.Callable, timeout time.Duration) any {
 	evCancelCtx, evCancelFn := context.WithCancel(b.ctx)
 	chEvHandler := make(chan Event)
 	ch := make(chan any)
 
-	go func() {
-		b.logger.Debugf("BrowserContext:WaitForEvent:go():starts", "bctxid:%v", b.id)
-		defer b.logger.Debugf("BrowserContext:WaitForEvent:go():returns", "bctxid:%v", b.id)
-		for {
-			select {
-			case <-evCancelCtx.Done():
-				b.logger.Debugf("BrowserContext:WaitForEvent:go():evCancelCtx:done", "bctxid:%v", b.id)
-				return
-			case ev := <-chEvHandler:
-				if ev.typ == EventBrowserContextClose {
-					b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextClose:return", "bctxid:%v", b.id)
-					ch <- nil
-					close(ch)
-
-					// We wait for one matching event only,
-					// then remove event handler by cancelling context and stopping goroutine.
-					evCancelFn()
-					return
-				}
-				if ev.typ == EventBrowserContextPage {
-					b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage", "bctxid:%v", b.id)
-					p, _ := ev.data.(*Page)
-					if retVal, err := predicateFn(rt.ToValue(p)); err == nil && retVal.ToBoolean() {
-						b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage:return", "bctxid:%v", b.id)
-						ch <- p
-						close(ch)
-
-						// We wait for one matching event only,
-						// then remove event handler by cancelling context and stopping goroutine.
-						evCancelFn()
-						return
-					}
-				}
-			}
-		}
-	}()
+	go b.runWaitForEventHandler(evCancelCtx, evCancelFn, chEvHandler, ch, predicateFn)
 
 	b.on(evCancelCtx, []string{EventBrowserContextPage}, chEvHandler)
 	defer evCancelFn() // Remove event handler
@@ -418,7 +388,47 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 		return evData
 	}
 	b.logger.Debugf("BrowserContext:WaitForEvent:return nil", "bctxid:%v event:%q", b.id, event)
+
 	return nil
+}
+
+func (b *BrowserContext) runWaitForEventHandler(
+	ctx context.Context, evCancelFn func(), chEvHandler chan Event, out chan any, predicateFn goja.Callable,
+) {
+	b.logger.Debugf("BrowserContext:WaitForEvent:go():starts", "bctxid:%v", b.id)
+	defer b.logger.Debugf("BrowserContext:WaitForEvent:go():returns", "bctxid:%v", b.id)
+	for {
+		select {
+		case <-ctx.Done():
+			b.logger.Debugf("BrowserContext:WaitForEvent:go():ctx:done", "bctxid:%v", b.id)
+			return
+		case ev := <-chEvHandler:
+			if ev.typ == EventBrowserContextClose {
+				b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextClose:return", "bctxid:%v", b.id)
+				out <- nil
+				close(out)
+
+				// We wait for one matching event only,
+				// then remove event handler by cancelling context and stopping goroutine.
+				evCancelFn()
+				return
+			}
+			if ev.typ == EventBrowserContextPage {
+				b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage", "bctxid:%v", b.id)
+				p, _ := ev.data.(*Page)
+				if retVal, err := predicateFn(b.vu.Runtime().ToValue(p)); err == nil && retVal.ToBoolean() {
+					b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage:return", "bctxid:%v", b.id)
+					out <- p
+					close(out)
+
+					// We wait for one matching event only,
+					// then remove event handler by cancelling context and stopping goroutine.
+					evCancelFn()
+					return
+				}
+			}
+		}
+	}
 }
 
 func (b *BrowserContext) getSession(id target.SessionID) *Session {
