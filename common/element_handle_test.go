@@ -44,43 +44,43 @@ func TestQueryAll(t *testing.T) {
 
 	for name, tt := range map[string]struct {
 		selector                      string
-		returnHandle                  func() interface{}
+		returnHandle                  func() any
 		returnErr                     error
 		wantErr                       bool
 		wantHandles, wantDisposeCalls int
 	}{
 		"invalid_selector": {
 			selector:     "*=*>>*=*",
-			returnHandle: func() interface{} { return nil },
+			returnHandle: func() any { return nil },
 			returnErr:    errors.New("any"),
 			wantErr:      true,
 		},
 		"cannot_evaluate": {
 			selector:     "*",
-			returnHandle: func() interface{} { return nil },
+			returnHandle: func() any { return nil },
 			returnErr:    errors.New("any"),
 			wantErr:      true,
 		},
 		"nil_handles_no_err": {
 			selector:     "*",
-			returnHandle: func() interface{} { return nil },
+			returnHandle: func() any { return nil },
 			returnErr:    nil,
 			wantErr:      false,
 		},
 		"invalid_js_handle": {
 			selector:     "*",
-			returnHandle: func() interface{} { return "an invalid handle" },
+			returnHandle: func() any { return "an invalid handle" },
 			wantErr:      true,
 		},
 		"disposes_main_handle": {
 			selector:         "*",
-			returnHandle:     func() interface{} { return &jsHandleStub{} },
+			returnHandle:     func() any { return &jsHandleStub{} },
 			wantDisposeCalls: 1,
 		},
 		// disposes the main handle and all its nil children
 		"disposes_handles": {
 			selector: "*",
-			returnHandle: func() interface{} {
+			returnHandle: func() any {
 				handles := &jsHandleStub{
 					asElementFn: nilHandle,
 				}
@@ -98,7 +98,7 @@ func TestQueryAll(t *testing.T) {
 		// only returns non-nil handles
 		"returns_elems": {
 			selector: "*",
-			returnHandle: func() interface{} {
+			returnHandle: func() any {
 				childHandles := map[string]api.JSHandle{
 					"1": &jsHandleStub{asElementFn: nonNilHandle},
 					"2": &jsHandleStub{asElementFn: nonNilHandle},
@@ -120,7 +120,7 @@ func TestQueryAll(t *testing.T) {
 
 			var (
 				returnHandle = tt.returnHandle()
-				evalFunc     = func(_ context.Context, _ evalOptions, _ string, _ ...interface{}) (interface{}, error) {
+				evalFunc     = func(_ context.Context, _ evalOptions, _ string, _ ...any) (any, error) {
 					return returnHandle, tt.returnErr
 				}
 			)
@@ -148,7 +148,7 @@ func TestQueryAll(t *testing.T) {
 
 		_, _ = (&ElementHandle{}).queryAll(
 			selector,
-			func(_ context.Context, opts evalOptions, jsFunc string, args ...interface{}) (interface{}, error) {
+			func(_ context.Context, opts evalOptions, jsFunc string, args ...any) (any, error) {
 				assert.Equal(t, js.QueryAll, jsFunc)
 
 				assert.Equal(t, opts.forceCallable, true)

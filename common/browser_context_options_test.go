@@ -13,9 +13,9 @@ func TestBrowserContextOptionsPermissions(t *testing.T) {
 
 	var opts BrowserContextOptions
 	err := opts.Parse(vu.Context(), vu.ToGojaValue((struct {
-		Permissions []interface{} `js:"permissions"`
+		Permissions []any `js:"permissions"`
 	}{
-		Permissions: []interface{}{"camera", "microphone"},
+		Permissions: []any{"camera", "microphone"},
 	})))
 	assert.NoError(t, err)
 	assert.Len(t, opts.Permissions, 2)

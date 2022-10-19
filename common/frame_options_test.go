@@ -17,7 +17,7 @@ func TestFrameGotoOptionsParse(t *testing.T) {
 		t.Parallel()
 
 		vu := k6test.NewVU(t)
-		opts := vu.ToGojaValue(map[string]interface{}{
+		opts := vu.ToGojaValue(map[string]any{
 			"timeout":   "1000",
 			"waitUntil": "networkidle",
 		})
@@ -34,7 +34,7 @@ func TestFrameGotoOptionsParse(t *testing.T) {
 		t.Parallel()
 
 		vu := k6test.NewVU(t)
-		opts := vu.ToGojaValue(map[string]interface{}{
+		opts := vu.ToGojaValue(map[string]any{
 			"waitUntil": "none",
 		})
 		navOpts := NewFrameGotoOptions("", 0)
@@ -54,7 +54,7 @@ func TestFrameSetContentOptionsParse(t *testing.T) {
 		t.Parallel()
 
 		vu := k6test.NewVU(t)
-		opts := vu.ToGojaValue(map[string]interface{}{
+		opts := vu.ToGojaValue(map[string]any{
 			"waitUntil": "networkidle",
 		})
 		scOpts := NewFrameSetContentOptions(30 * time.Second)
@@ -69,7 +69,7 @@ func TestFrameSetContentOptionsParse(t *testing.T) {
 		t.Parallel()
 
 		vu := k6test.NewVU(t)
-		opts := vu.ToGojaValue(map[string]interface{}{
+		opts := vu.ToGojaValue(map[string]any{
 			"waitUntil": "none",
 		})
 		navOpts := NewFrameSetContentOptions(0)
@@ -89,7 +89,7 @@ func TestFrameWaitForNavigationOptionsParse(t *testing.T) {
 		t.Parallel()
 
 		vu := k6test.NewVU(t)
-		opts := vu.ToGojaValue(map[string]interface{}{
+		opts := vu.ToGojaValue(map[string]any{
 			"url":       "https://example.com/",
 			"timeout":   "1000",
 			"waitUntil": "networkidle",
@@ -107,7 +107,7 @@ func TestFrameWaitForNavigationOptionsParse(t *testing.T) {
 		t.Parallel()
 
 		vu := k6test.NewVU(t)
-		opts := vu.ToGojaValue(map[string]interface{}{
+		opts := vu.ToGojaValue(map[string]any{
 			"waitUntil": "none",
 		})
 		navOpts := NewFrameWaitForNavigationOptions(0)

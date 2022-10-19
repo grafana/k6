@@ -62,7 +62,7 @@ const (
 // Event as emitted by an EventEmiter.
 type Event struct {
 	typ  string
-	data interface{}
+	data any
 }
 
 // NavigationEvent is emitted when we receive a Page.frameNavigated or
@@ -92,7 +92,7 @@ type eventHandler struct {
 
 // EventEmitter that all event emitters need to implement.
 type EventEmitter interface {
-	emit(event string, data interface{})
+	emit(event string, data any)
 	on(ctx context.Context, events []string, ch chan Event)
 	onAll(ctx context.Context, ch chan Event)
 }
@@ -156,7 +156,7 @@ func (e *BaseEventEmitter) sync(fn func()) {
 	<-done
 }
 
-func (e *BaseEventEmitter) emit(event string, data interface{}) {
+func (e *BaseEventEmitter) emit(event string, data any) {
 	emitEvent := func(eh *eventHandler) {
 		eh.queue.readMutex.Lock()
 		defer eh.queue.readMutex.Unlock()

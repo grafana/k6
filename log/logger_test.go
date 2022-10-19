@@ -18,14 +18,14 @@ func TestConsoleLogFormatter(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		objects  []interface{}
+		objects  []any
 		expected string
 	}{
 		{objects: nil, expected: ""},
 		{
-			objects: []interface{}{
-				map[string]interface{}{"one": 1, "two": "two"},
-				map[string]interface{}{"nested": map[string]interface{}{
+			objects: []any{
+				map[string]any{"one": 1, "two": "two"},
+				map[string]any{"nested": map[string]any{
 					"sub": float64(7.777),
 				}},
 			},
@@ -34,16 +34,16 @@ func TestConsoleLogFormatter(t *testing.T) {
 		{
 			// The first object can't be serialized to JSON, so it will be
 			// skipped in the output.
-			objects: []interface{}{
-				map[string]interface{}{"one": 1, "fail": make(chan int)},
-				map[string]interface{}{"two": 2},
+			objects: []any{
+				map[string]any{"one": 1, "fail": make(chan int)},
+				map[string]any{"two": 2},
 			},
 			expected: `{"two":2}`,
 		},
 		{
 			// Mixed objects and primitive values
-			objects: []interface{}{
-				map[string]interface{}{"one": 1},
+			objects: []any{
+				map[string]any{"one": 1},
 				"someString",
 				42,
 			},

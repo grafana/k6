@@ -23,9 +23,9 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 		flag                      string
 		changeOpts                *common.LaunchOptions
 		changeK6Opts              *k6lib.Options
-		expInitVal, expChangedVal interface{}
+		expInitVal, expChangedVal any
 		pre                       func(t *testing.T)
-		post                      func(t *testing.T, flags map[string]interface{})
+		post                      func(t *testing.T, flags map[string]any)
 	}{
 		{
 			flag:          "auto-open-devtools-for-tabs",
@@ -76,7 +76,7 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 			changeOpts: &common.LaunchOptions{Args: []string{
 				"browser-arg1='value1", "browser-arg2=''value2''", "browser-flag",
 			}},
-			post: func(t *testing.T, flags map[string]interface{}) {
+			post: func(t *testing.T, flags map[string]any) {
 				t.Helper()
 
 				assert.Equal(t, "'value1", flags["browser-arg1"])
@@ -122,7 +122,7 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 			expInitVal:    false,
 			changeOpts:    &common.LaunchOptions{Headless: true},
 			expChangedVal: true,
-			post: func(t *testing.T, flags map[string]interface{}) {
+			post: func(t *testing.T, flags map[string]any) {
 				t.Helper()
 
 				extraFlags := []string{"hide-scrollbars", "mute-audio", "blink-settings"}

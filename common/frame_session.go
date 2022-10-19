@@ -501,7 +501,7 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 		}
 		*/
 
-	var parsedObjects []interface{}
+	var parsedObjects []any
 	for _, robj := range event.Args {
 		i, err := parseRemoteObject(robj)
 		if err != nil {

@@ -25,7 +25,7 @@ func TestFrameNilDocument(t *testing.T) {
 
 	// frame should not panic with a nil document
 	stub := &executionContextTestStub{
-		evalFn: func(apiCtx context.Context, opts evalOptions, js string, args ...interface{}) (res interface{}, err error) {
+		evalFn: func(apiCtx context.Context, opts evalOptions, js string, args ...any) (res any, err error) {
 			// return nil to test for panic
 			return nil, nil
 		},
@@ -51,8 +51,8 @@ func TestFrameNilDocument(t *testing.T) {
 	// frame gets the document from the evaluate call
 	want := &ElementHandle{}
 	stub.evalFn = func(
-		apiCtx context.Context, opts evalOptions, js string, args ...interface{},
-	) (res interface{}, err error) {
+		apiCtx context.Context, opts evalOptions, js string, args ...any,
+	) (res any, err error) {
 		return want, nil
 	}
 	got, err := frame.document()
@@ -101,12 +101,12 @@ func TestFrameManagerFrameAbortedNavigationShouldEmitANonNilPendingDocument(t *t
 type executionContextTestStub struct {
 	ExecutionContext
 	evalFn func(
-		apiCtx context.Context, opts evalOptions, js string, args ...interface{},
-	) (res interface{}, err error)
+		apiCtx context.Context, opts evalOptions, js string, args ...any,
+	) (res any, err error)
 }
 
 func (e executionContextTestStub) eval(
-	apiCtx context.Context, opts evalOptions, js string, args ...interface{},
-) (res interface{}, err error) {
+	apiCtx context.Context, opts evalOptions, js string, args ...any,
+) (res any, err error) {
 	return e.evalFn(apiCtx, opts, js, args...)
 }

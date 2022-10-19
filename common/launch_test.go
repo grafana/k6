@@ -14,14 +14,14 @@ func TestLaunchOptionsParse(t *testing.T) {
 
 	testCases := []struct {
 		name   string
-		opts   map[string]interface{}
+		opts   map[string]any
 		assert func(*testing.T, *LaunchOptions)
 	}{
 		// TODO: Check other options.
 		{
 			name: "args",
-			opts: map[string]interface{}{
-				"args": []interface{}{"browser-arg1='value1", "browser-arg2=value2", "browser-flag"},
+			opts: map[string]any{
+				"args": []any{"browser-arg1='value1", "browser-arg2=value2", "browser-flag"},
 			},
 			assert: func(t *testing.T, lopts *LaunchOptions) {
 				require.Len(t, lopts.Args, 3)

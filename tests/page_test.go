@@ -711,7 +711,7 @@ func TestPagePress(t *testing.T) {
 	require.Equal(t, "AbC", p.InputValue("#text1", nil))
 }
 
-func assertPanicErrorContains(t *testing.T, err interface{}, expErrMsg string) {
+func assertPanicErrorContains(t *testing.T, err any, expErrMsg string) {
 	t.Helper()
 
 	require.NotNil(t, err)

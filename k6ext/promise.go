@@ -16,7 +16,7 @@ const (
 )
 
 // PromisifiedFunc is a type of the function to run as a promise.
-type PromisifiedFunc func() (result interface{}, reason error)
+type PromisifiedFunc func() (result any, reason error)
 
 // Promise runs fn in a goroutine and returns a new goja.Promise.
 //   - If fn returns a nil error, resolves the promise with the
