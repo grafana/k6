@@ -1,9 +1,15 @@
 package tests
 
 import (
+	"fmt"
+	"net/http"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/common"
 )
 
 func TestFramePress(t *testing.T) {
@@ -20,4 +26,59 @@ func TestFramePress(t *testing.T) {
 	f.Press("#text1", "Shift+KeyC", nil)
 
 	require.Equal(t, "AbC", f.InputValue("#text1", nil))
+}
+
+func TestLifecycleNetworkIdle(t *testing.T) {
+	t.Parallel()
+
+	t.Run("doesn't timeout waiting for networkIdle", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		p := tb.NewPage(nil)
+
+		tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+			fmt.Fprintf(w, `
+			<html>
+				<head></head>
+				<body>
+					<div id="serverMsg">Waiting...</div>
+					
+					<script src="/ping.js" async></script>
+				</body>
+			</html>
+			`)
+		})
+		tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
+			fmt.Fprintf(w, `
+				var serverMsgOutput = document.getElementById("serverMsg");
+				serverMsgOutput.innerText = "ping.js loaded from server";
+			`)
+		})
+
+		var resolved, rejected bool
+		err := tb.await(func() error {
+			opts := tb.toGojaValue(common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventNetworkIdle,
+				Timeout:   30 * time.Second,
+			})
+			tb.promise(p.Goto(tb.URL("/home"), opts)).then(
+				func() {
+					result := p.TextContent("#serverMsg", nil)
+					assert.EqualValues(t, "ping.js loaded from server", result)
+
+					resolved = true
+				},
+				func() {
+					rejected = true
+				},
+			)
+
+			return nil
+		})
+		require.NoError(t, err)
+
+		assert.True(t, resolved)
+		assert.False(t, rejected)
+	})
 }

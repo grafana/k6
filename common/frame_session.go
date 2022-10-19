@@ -705,6 +705,8 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventLoad)
 	case "DOMContentLoaded":
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventDOMContentLoad)
+	case "networkIdle":
+		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventNetworkIdle)
 	}
 
 	eventToMetric := map[string]*k6metrics.Metric{
