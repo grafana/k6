@@ -172,4 +172,78 @@ func TestLifecycleNetworkIdle(t *testing.T) {
 		assert.True(t, resolved)
 		assert.False(t, rejected)
 	})
+
+	t.Run("doesn't unblock wait on networkIdle early when load and domcontentloaded complete at once", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		p := tb.NewPage(nil)
+
+		counterMu := sync.RWMutex{}
+		var counter int
+
+		tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+			fmt.Fprintf(w, `
+			<html>
+				<head></head>
+				<body>
+					<div id="prolongNetworkIdleLoad">Waiting...</div>
+
+					<script>
+						var prolongNetworkIdleLoadOutput = document.getElementById("prolongNetworkIdleLoad");
+
+						var p = prolongNetworkIdleLoad();
+						p.then(() => {
+							prolongNetworkIdleLoadOutput.innerText += ' - for loop complete';
+						})
+
+						async function prolongNetworkIdleLoad() {
+							for (var i = 0; i < 10; i++) {
+								await fetch('/ping')
+								.then(response => response.text())
+								.then((data) => {
+									prolongNetworkIdleLoadOutput.innerText = 'Waiting... ' + data;
+								});
+							}
+						}
+					</script>
+				</body>
+			</html>
+			`)
+		})
+		tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
+			counterMu.Lock()
+			defer counterMu.Unlock()
+
+			time.Sleep(time.Millisecond * 50)
+
+			counter++
+			fmt.Fprintf(w, "pong %d", counter)
+		})
+
+		var resolved, rejected bool
+		err := tb.await(func() error {
+			opts := tb.toGojaValue(common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventNetworkIdle,
+				Timeout:   30 * time.Second,
+			})
+			tb.promise(p.Goto(tb.URL("/home"), opts)).then(
+				func() {
+					result := p.TextContent("#prolongNetworkIdleLoad", nil)
+					assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
+
+					resolved = true
+				},
+				func() {
+					rejected = true
+				},
+			)
+
+			return nil
+		})
+		require.NoError(t, err)
+
+		assert.True(t, resolved)
+		assert.False(t, rejected)
+	})
 }

@@ -458,12 +458,16 @@ func (f *Frame) onLoadingStarted() {
 func (f *Frame) onLoadingStopped() {
 	f.log.Debugf("Frame:onLoadingStopped", "fid:%s furl:%q", f.ID(), f.URL())
 
-	f.lifecycleEventsMu.Lock()
-	defer f.lifecycleEventsMu.Unlock()
-
-	f.lifecycleEvents[LifecycleEventDOMContentLoad] = true
-	f.lifecycleEvents[LifecycleEventLoad] = true
-	f.lifecycleEvents[LifecycleEventNetworkIdle] = true
+	// TODO: We should start a timer here and allow the user
+	//       to set how long to wait until after onLoadingStopped
+	//       has occurred. The reason we may want a timeout here
+	//       are for websites where they perform many network
+	//       requests so it may take a long time for us to see
+	//       a networkIdle event or we may never see one if the
+	//       website never stops performing network requests.
+	//       NOTE: This is a different timeout to networkIdleTimer,
+	//              which only works once there are no more network
+	//              requests and we don't see a networkIdle event.
 }
 
 func (f *Frame) position() *Position {
