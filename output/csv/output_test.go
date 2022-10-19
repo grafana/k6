@@ -358,7 +358,6 @@ func TestRun(t *testing.T) {
 
 			require.NoError(t, output.Start())
 			output.AddMetricSamples(data.samples)
-			time.Sleep(1 * time.Second)
 			require.NoError(t, output.Stop())
 
 			finalOutput := data.fileReaderFunc(data.fileName, mem)
