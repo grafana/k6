@@ -32,7 +32,7 @@ func GetReader(data interface{}) (io.Reader, error) {
 	case goja.ArrayBuffer:
 		return bytes.NewBuffer(r.Bytes()), nil
 	default:
-		return nil, fmt.Errorf("invalid type %T, it needs to be a string, byte array or an ArrayBuffer", data)
+		return nil, fmt.Errorf("invalid type %T, it needs to be a string or ArrayBuffer", data)
 	}
 }
 
