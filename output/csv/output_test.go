@@ -376,6 +376,9 @@ func sortExtraTagsForTest(t *testing.T, input string) string {
 		extraTags := strings.Split(line[len(line)-2], "&")
 		sort.Strings(extraTags)
 		lines[i+1][len(line)-2] = strings.Join(extraTags, "&")
+		extraMetadata := strings.Split(line[len(line)-1], "&")
+		sort.Strings(extraMetadata)
+		lines[i+1][len(line)-1] = strings.Join(extraMetadata, "&")
 	}
 	var b bytes.Buffer
 	w := csv.NewWriter(&b)
