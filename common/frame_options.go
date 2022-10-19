@@ -39,7 +39,7 @@ type FrameFillOptions struct {
 type FrameGotoOptions struct {
 	Referer   string         `json:"referer"`
 	Timeout   time.Duration  `json:"timeout"`
-	WaitUntil LifecycleEvent `json:"waitUntil"`
+	WaitUntil LifecycleEvent `json:"waitUntil" js:"waitUntil"`
 }
 
 type FrameHoverOptions struct {
@@ -95,7 +95,7 @@ type FrameSelectOptionOptions struct {
 
 type FrameSetContentOptions struct {
 	Timeout   time.Duration  `json:"timeout"`
-	WaitUntil LifecycleEvent `json:"waitUntil"`
+	WaitUntil LifecycleEvent `json:"waitUntil" js:"waitUntil"`
 }
 
 type FrameTapOptions struct {
@@ -130,7 +130,7 @@ type FrameWaitForLoadStateOptions struct {
 
 type FrameWaitForNavigationOptions struct {
 	URL       string         `json:"url"`
-	WaitUntil LifecycleEvent `json:"waitUntil"`
+	WaitUntil LifecycleEvent `json:"waitUntil" js:"waitUntil"`
 	Timeout   time.Duration  `json:"timeout"`
 }
 

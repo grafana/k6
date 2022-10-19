@@ -19,7 +19,7 @@ type PageEmulateMediaOptions struct {
 }
 
 type PageReloadOptions struct {
-	WaitUntil LifecycleEvent `json:"waitUntil"`
+	WaitUntil LifecycleEvent `json:"waitUntil" js:"waitUntil"`
 	Timeout   time.Duration  `json:"timeout"`
 }
 
