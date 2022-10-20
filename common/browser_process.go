@@ -3,6 +3,7 @@ package common
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -23,7 +24,6 @@ type BrowserProcess struct {
 	// Channels for managing termination.
 	lostConnection             chan struct{}
 	processIsGracefullyClosing chan struct{}
-	processDone                chan struct{}
 
 	// Browser's WebSocket URL to speak CDP
 	wsURL string
@@ -38,23 +38,26 @@ func NewBrowserProcess(
 	ctx context.Context, path string, args, env []string, dataDir *storage.Dir,
 	ctxCancel context.CancelFunc, logger *log.Logger,
 ) (*BrowserProcess, error) {
-	cmd, stdout, procDone, err := execute(ctx, path, args, env, dataDir, logger)
+	procCtx, procCtxCancel := context.WithCancel(ctx)
+	cmd, err := execute(
+		procCtx, procCtxCancel, path, args, env, dataDir, logger)
 	if err != nil {
+		procCtxCancel()
 		return nil, err
 	}
 
-	wsURL, err := parseDevToolsURL(ctx, stdout)
+	wsURL, err := parseDevToolsURL(cmd)
 	if err != nil {
-		return nil, fmt.Errorf("getting DevTools URL: %w", err)
+		procCtxCancel()
+		return nil, err
 	}
 
 	p := BrowserProcess{
-		ctx:                        ctx,
+		ctx:                        procCtx,
 		cancel:                     ctxCancel,
 		process:                    cmd.Process,
 		lostConnection:             make(chan struct{}),
 		processIsGracefullyClosing: make(chan struct{}),
-		processDone:                procDone,
 		wsURL:                      wsURL,
 		userDataDir:                dataDir,
 	}
@@ -64,7 +67,7 @@ func NewBrowserProcess(
 		// browser-initiated termination then cancel the context to clean up.
 		select {
 		case <-p.lostConnection:
-		case <-ctx.Done():
+		case <-procCtx.Done():
 		}
 
 		select {
@@ -118,18 +121,27 @@ func (p *BrowserProcess) AttachLogger(logger *log.Logger) {
 	p.logger = logger
 }
 
+type command struct {
+	*exec.Cmd
+	ctx            context.Context
+	stdout, stderr io.Reader
+}
+
 func execute(
-	ctx context.Context, path string, args, env []string, dataDir *storage.Dir,
-	logger *log.Logger,
-) (*exec.Cmd, io.Reader, chan struct{}, error) {
+	ctx context.Context, ctxCancel func(), path string, args, env []string,
+	dataDir *storage.Dir, logger *log.Logger,
+) (command, error) {
 	cmd := exec.CommandContext(ctx, path, args...)
 	killAfterParent(cmd)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("%w", err)
+		return command{}, fmt.Errorf("%w", err)
 	}
-	cmd.Stderr = cmd.Stdout
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return command{}, fmt.Errorf("%w", err)
+	}
 
 	// Set up environment variable for process
 	if len(env) > 0 {
@@ -140,23 +152,22 @@ func execute(
 	// can run into a data race.
 	err = cmd.Start()
 	if os.IsNotExist(err) {
-		return nil, nil, nil, fmt.Errorf("file does not exist: %s", path)
+		return command{}, fmt.Errorf("file does not exist: %s", path)
 	}
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("%w", err)
+		return command{}, fmt.Errorf("%w", err)
 	}
 	if ctx.Err() != nil {
-		return nil, nil, nil, fmt.Errorf("%w", ctx.Err())
+		return command{}, fmt.Errorf("%w", ctx.Err())
 	}
 
-	done := make(chan struct{})
 	go func() {
 		// TODO: How to handle these errors?
 		defer func() {
 			if err := dataDir.Cleanup(); err != nil {
 				logger.Errorf("browser", "cleaning up the user data directory: %v", err)
 			}
-			close(done)
+			ctxCancel()
 		}()
 
 		if err := cmd.Wait(); err != nil {
@@ -166,27 +177,34 @@ func execute(
 		}
 	}()
 
-	return cmd, stdout, done, nil
+	return command{cmd, ctx, stdout, stderr}, nil
 }
 
 // parseDevToolsURL grabs the websocket address from chrome's output and returns it.
-func parseDevToolsURL(ctx context.Context, rc io.Reader) (wsURL string, _ error) {
+func parseDevToolsURL(cmd command) (wsURL string, _ error) {
 	type result struct {
 		devToolsURL string
 		err         error
 	}
 	c := make(chan result, 1)
 	go func() {
-		const prefix = "DevTools listening on "
+		const urlPrefix = "DevTools listening on "
+		scanner := bufio.NewScanner(cmd.stderr)
 
-		scanner := bufio.NewScanner(rc)
 		for scanner.Scan() {
-			if s := scanner.Text(); strings.HasPrefix(s, prefix) {
+			line := scanner.Text()
+			if strings.HasPrefix(line, urlPrefix) {
 				c <- result{
-					strings.TrimPrefix(strings.TrimSpace(s), prefix),
+					strings.TrimPrefix(strings.TrimSpace(line), urlPrefix),
 					nil,
 				}
 				return
+			}
+			if strings.Contains(line, ":ERROR:") {
+				if i := strings.Index(line, "] "); i > 0 {
+					c <- result{"", errors.New(line[i+2:])}
+					return
+				}
 			}
 		}
 		if err := scanner.Err(); err != nil {
@@ -196,7 +214,7 @@ func parseDevToolsURL(ctx context.Context, rc io.Reader) (wsURL string, _ error)
 	select {
 	case r := <-c:
 		return r.devToolsURL, r.err
-	case <-ctx.Done():
-		return "", fmt.Errorf("%w", ctx.Err())
+	case <-cmd.ctx.Done():
+		return "", fmt.Errorf("%w", cmd.ctx.Err())
 	}
 }

@@ -141,3 +141,18 @@ func TestBrowserUserAgent(t *testing.T) {
 	}
 	assert.Contains(t, ua, "Headless")
 }
+
+func TestBrowserCrashErr(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		assertPanicErrorContains(t, recover(), "launching browser: Invalid devtools server port")
+	}()
+
+	lopts := defaultLaunchOpts()
+	lopts.Args = []any{"remote-debugging-port=99999"}
+
+	newTestBrowser(t, lopts)
+
+	t.Error("did not panic")
+}
