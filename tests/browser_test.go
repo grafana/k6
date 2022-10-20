@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -147,12 +146,7 @@ func TestBrowserCrashErr(t *testing.T) {
 	t.Parallel()
 
 	defer func() {
-		robj := recover()
-		require.IsType(t, &goja.Object{}, robj)
-		gobj, _ := robj.(*goja.Object)
-		err, ok := gobj.Export().(error)
-		require.Truef(t, ok, "recovered object wasn't an error, but %T", err)
-		assert.Equal(t, "launching browser: Invalid devtools server port", err.Error())
+		assertPanicErrorContains(t, recover(), "launching browser: Invalid devtools server port")
 	}()
 
 	lopts := defaultLaunchOpts()
