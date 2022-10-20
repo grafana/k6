@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 
 	"github.com/grafana/xk6-browser/log"
@@ -190,8 +189,6 @@ func parseDevToolsURL(cmd command) (wsURL string, _ error) {
 	c := make(chan result, 1)
 	go func() {
 		const urlPrefix = "DevTools listening on "
-		errRx := regexp.MustCompile(`^\[.*:ERROR:.*\] (?P<errStr>.*)$`)
-		errTmpl := []byte("$errStr")
 		scanner := bufio.NewScanner(cmd.stderr)
 
 		for scanner.Scan() {
@@ -203,17 +200,11 @@ func parseDevToolsURL(cmd command) (wsURL string, _ error) {
 				}
 				return
 			}
-			errM := []byte{}
-			// Golang's regexp module doesn't support backreferences, so do this
-			// workaround. We need to use regex, unfortunately, to extract the
-			// error message properly. It would be awkward to do otherwise, and
-			// this isn't a hot path, so it shouldn't impact performance.
-			for _, submatches := range errRx.FindAllSubmatchIndex([]byte(line), -1) {
-				errM = errRx.Expand(errM, errTmpl, []byte(line), submatches)
-			}
-			if len(errM) > 0 {
-				c <- result{"", errors.New(string(errM))}
-				return
+			if strings.Contains(line, ":ERROR:") {
+				if i := strings.Index(line, "] "); i > 0 {
+					c <- result{"", errors.New(line[i+2:])}
+					return
+				}
 			}
 		}
 		if err := scanner.Err(); err != nil {
