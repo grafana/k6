@@ -35,13 +35,15 @@ type Trail struct {
 
 	Failed null.Bool
 	// Populated by SaveSamples()
-	Tags    *metrics.TagSet
-	Samples []metrics.Sample
+	Tags     *metrics.TagSet
+	Metadata map[string]string
+	Samples  []metrics.Sample
 }
 
 // SaveSamples populates the Trail's sample slice so they're accesible via GetSamples()
 func (tr *Trail) SaveSamples(builtinMetrics *metrics.BuiltinMetrics, ctm *metrics.TagsAndMeta) {
 	tr.Tags = ctm.Tags
+	tr.Metadata = ctm.Metadata
 	tr.Samples = make([]metrics.Sample, 0, 9) // this is with 1 more for a possible HTTPReqFailed
 	tr.Samples = append(tr.Samples, []metrics.Sample{
 		{
