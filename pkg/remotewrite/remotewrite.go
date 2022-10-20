@@ -63,7 +63,7 @@ func (*Output) Description() string {
 }
 
 func (o *Output) Start() error {
-	d := o.config.FlushPeriod.TimeDuration()
+	d := o.config.PushInterval.TimeDuration()
 	periodicFlusher, err := output.NewPeriodicFlusher(d, o.flush)
 	if err != nil {
 		return err
@@ -89,11 +89,11 @@ func (o *Output) flush() {
 	defer func() {
 		d := time.Since(start)
 		okmsg := "Successful flushed time series to remote write endpoint"
-		if d > time.Duration(o.config.FlushPeriod.Duration) {
+		if d > time.Duration(o.config.PushInterval.Duration) {
 			// There is no intermediary storage so warn if writing to remote write endpoint becomes too slow
 			o.logger.WithField("nts", nts).
 				Warnf("%s but it took %s while flush period is %s. Some samples may be dropped.",
-					okmsg, d.String(), o.config.FlushPeriod.String())
+					okmsg, d.String(), o.config.PushInterval.String())
 		} else {
 			o.logger.WithField("nts", nts).WithField("took", d).Debug(okmsg)
 		}

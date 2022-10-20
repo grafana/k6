@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/storage/remote"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
@@ -19,12 +20,11 @@ func TestApply(t *testing.T) {
 	t.Parallel()
 
 	fullConfig := Config{
-		Url:                   null.StringFrom("some-url"),
+		URL:                   null.StringFrom("some-url"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
-		CACert:                null.StringFrom("some-file"),
-		User:                  null.StringFrom("user"),
+		Username:              null.StringFrom("user"),
 		Password:              null.StringFrom("pass"),
-		FlushPeriod:           types.NullDurationFrom(10 * time.Second),
+		PushInterval:          types.NullDurationFrom(10 * time.Second),
 		Headers: map[string]string{
 			"X-Header": "value",
 		},
@@ -33,22 +33,16 @@ func TestApply(t *testing.T) {
 	// Defaults should be overwritten by valid values
 	c := NewConfig()
 	c = c.Apply(fullConfig)
-	assert.Equal(t, fullConfig.Url, c.Url)
-	assert.Equal(t, fullConfig.InsecureSkipTLSVerify, c.InsecureSkipTLSVerify)
-	assert.Equal(t, fullConfig.CACert, c.CACert)
-	assert.Equal(t, fullConfig.User, c.User)
-	assert.Equal(t, fullConfig.Password, c.Password)
-	assert.Equal(t, fullConfig.FlushPeriod, c.FlushPeriod)
-	assert.Equal(t, fullConfig.Headers, c.Headers)
+	assert.Equal(t, fullConfig, c)
 
 	// Defaults shouldn't be impacted by invalid values
 	c = NewConfig()
 	c = c.Apply(Config{
-		User:                  null.NewString("user", false),
+		Username:              null.NewString("user", false),
 		Password:              null.NewString("pass", false),
 		InsecureSkipTLSVerify: null.NewBool(false, false),
 	})
-	assert.Equal(t, false, c.User.Valid)
+	assert.Equal(t, false, c.Username.Valid)
 	assert.Equal(t, false, c.Password.Valid)
 	assert.Equal(t, true, c.InsecureSkipTLSVerify.Valid)
 }
@@ -58,78 +52,109 @@ func TestConfigParseArg(t *testing.T) {
 
 	c, err := ParseArg("url=http://prometheus.remote:3412/write")
 	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.Url)
+	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.URL)
 
 	c, err = ParseArg("url=http://prometheus.remote:3412/write,insecureSkipTLSVerify=false")
 	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.Url)
+	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.URL)
 	assert.Equal(t, null.BoolFrom(false), c.InsecureSkipTLSVerify)
 
-	c, err = ParseArg("url=https://prometheus.remote:3412/write,caCertFile=f.crt")
+	c, err = ParseArg("url=https://prometheus.remote:3412/write")
 	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("https://prometheus.remote:3412/write"), c.Url)
-	assert.Equal(t, null.StringFrom("f.crt"), c.CACert)
+	assert.Equal(t, null.StringFrom("https://prometheus.remote:3412/write"), c.URL)
 
-	c, err = ParseArg("url=https://prometheus.remote:3412/write,insecureSkipTLSVerify=false,caCertFile=f.crt,user=user,password=pass")
+	c, err = ParseArg("url=https://prometheus.remote:3412/write,insecureSkipTLSVerify=false,user=user,password=pass")
 	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("https://prometheus.remote:3412/write"), c.Url)
+	assert.Equal(t, null.StringFrom("https://prometheus.remote:3412/write"), c.URL)
 	assert.Equal(t, null.BoolFrom(false), c.InsecureSkipTLSVerify)
-	assert.Equal(t, null.StringFrom("f.crt"), c.CACert)
-	assert.Equal(t, null.StringFrom("user"), c.User)
+	assert.Equal(t, null.StringFrom("user"), c.Username)
 	assert.Equal(t, null.StringFrom("pass"), c.Password)
 
-	c, err = ParseArg("url=http://prometheus.remote:3412/write,flushPeriod=2s")
+	c, err = ParseArg("url=http://prometheus.remote:3412/write,pushInterval=2s")
 	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.Url)
-	assert.Equal(t, types.NullDurationFrom(time.Second*2), c.FlushPeriod)
+	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.URL)
+	assert.Equal(t, types.NullDurationFrom(time.Second*2), c.PushInterval)
 
 	c, err = ParseArg("url=http://prometheus.remote:3412/write,headers.X-Header=value")
 	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.Url)
+	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.URL)
 	assert.Equal(t, map[string]string{"X-Header": "value"}, c.Headers)
 }
 
-// testing both GetConsolidatedConfig and ConstructRemoteConfig here until it's future config refactor takes shape (k6 #883)
 func TestConstructRemoteConfig(t *testing.T) {
-	u, _ := url.Parse("https://prometheus.ie/remote")
+	u, err := url.Parse("https://prometheus.ie/remote")
+	require.NoError(t, err)
 
+	config := Config{
+		URL:                   null.StringFrom(u.String()),
+		InsecureSkipTLSVerify: null.BoolFrom(true),
+		Username:              null.StringFrom("myuser"),
+		Password:              null.StringFrom("mypass"),
+		Headers: map[string]string{
+			"X-MYCUSTOM-HEADER": "val1",
+		},
+	}
+
+	exprcc := &remote.ClientConfig{
+		URL:     &promConfig.URL{URL: u},
+		Timeout: model.Duration(time.Minute),
+		HTTPClientConfig: promConfig.HTTPClientConfig{
+			FollowRedirects: true,
+			TLSConfig: promConfig.TLSConfig{
+				InsecureSkipVerify: true,
+			},
+			BasicAuth: &promConfig.BasicAuth{
+				Username: "myuser",
+				Password: "mypass",
+			},
+		},
+		RetryOnRateLimit: true,
+		Headers: map[string]string{
+			"X-MYCUSTOM-HEADER": "val1",
+		},
+	}
+	rcc, err := config.ConstructRemoteConfig()
+	require.NoError(t, err)
+	assert.Equal(t, exprcc, rcc)
+}
+
+func TestConifgConsolidation(t *testing.T) {
 	t.Parallel()
 
+	u, err := url.Parse("https://prometheus.ie/remote")
+	require.NoError(t, err)
+
 	testCases := map[string]struct {
-		jsonRaw      json.RawMessage
-		env          map[string]string
-		arg          string
-		config       Config
-		errString    string
-		remoteConfig *remote.ClientConfig
+		jsonRaw   json.RawMessage
+		env       map[string]string
+		arg       string
+		config    Config
+		errString string
 	}{
+		"default": {
+			jsonRaw: nil,
+			env:     nil,
+			arg:     "",
+			config: Config{
+				URL:                   null.StringFrom("http://localhost:9090/api/v1/write"),
+				InsecureSkipTLSVerify: null.BoolFrom(true),
+				Username:              null.NewString("", false),
+				Password:              null.NewString("", false),
+				PushInterval:          types.NullDurationFrom(5 * time.Second),
+				Headers:               make(map[string]string),
+			},
+		},
 		"json_success": {
 			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
 			env:     nil,
 			arg:     "",
 			config: Config{
-				Url:                   null.StringFrom(u.String()),
+				URL:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
-				CACert:                null.NewString("", false),
-				User:                  null.NewString("", false),
+				Username:              null.NewString("", false),
 				Password:              null.NewString("", false),
-				FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
-				KeepTags:              null.BoolFrom(true),
-				KeepNameTag:           null.BoolFrom(false),
-				KeepUrlTag:            null.BoolFrom(true),
+				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers:               make(map[string]string),
-			},
-			errString: "",
-			remoteConfig: &remote.ClientConfig{
-				URL:     &promConfig.URL{URL: u},
-				Timeout: model.Duration(defaultPrometheusTimeout),
-				HTTPClientConfig: promConfig.HTTPClientConfig{
-					FollowRedirects: true,
-					TLSConfig: promConfig.TLSConfig{
-						InsecureSkipVerify: true,
-					},
-				},
-				RetryOnRateLimit: false,
 			},
 		},
 		"mixed_success": {
@@ -137,82 +162,44 @@ func TestConstructRemoteConfig(t *testing.T) {
 			env:     map[string]string{"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "false", "K6_PROMETHEUS_USER": "u"},
 			arg:     "user=user",
 			config: Config{
-				Url:                   null.StringFrom(u.String()),
+				URL:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
-				CACert:                null.NewString("", false),
-				User:                  null.NewString("user", true),
+				Username:              null.NewString("user", true),
 				Password:              null.NewString("", false),
-				FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
-				KeepTags:              null.BoolFrom(true),
-				KeepNameTag:           null.BoolFrom(false),
-				KeepUrlTag:            null.BoolFrom(true),
+				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers:               make(map[string]string),
 			},
 			errString: "",
-			remoteConfig: &remote.ClientConfig{
-				URL:     &promConfig.URL{URL: u},
-				Timeout: model.Duration(defaultPrometheusTimeout),
-				HTTPClientConfig: promConfig.HTTPClientConfig{
-					FollowRedirects: true,
-					TLSConfig: promConfig.TLSConfig{
-						InsecureSkipVerify: false,
-					},
-					BasicAuth: &promConfig.BasicAuth{
-						Username: "user",
-					},
-				},
-				RetryOnRateLimit: false,
-			},
 		},
 		"invalid_duration": {
-			jsonRaw:      json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
-			env:          map[string]string{"K6_PROMETHEUS_FLUSH_PERIOD": "d"},
-			arg:          "",
-			config:       Config{},
-			errString:    "strconv.ParseInt",
-			remoteConfig: nil,
+			jsonRaw:   json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
+			env:       map[string]string{"K6_PROMETHEUS_PUSH_INTERVAL": "d"},
+			arg:       "",
+			config:    Config{},
+			errString: "strconv.ParseInt",
 		},
 		"invalid_insecureSkipTLSVerify": {
-			jsonRaw:      json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
-			env:          map[string]string{"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "d"},
-			arg:          "",
-			config:       Config{},
-			errString:    "strconv.ParseBool",
-			remoteConfig: nil,
+			jsonRaw:   json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
+			env:       map[string]string{"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "d"},
+			arg:       "",
+			config:    Config{},
+			errString: "strconv.ParseBool",
 		},
 		"remote_write_with_headers_json": {
 			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s","mapping":"mapping", "headers":{"X-Header":"value"}}`, u.String())),
 			env:     nil,
 			arg:     "",
 			config: Config{
-				Url:                   null.StringFrom(u.String()),
+				URL:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
-				CACert:                null.NewString("", false),
-				User:                  null.NewString("", false),
+				Username:              null.NewString("", false),
 				Password:              null.NewString("", false),
-				FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
-				KeepTags:              null.BoolFrom(true),
-				KeepNameTag:           null.BoolFrom(false),
-				KeepUrlTag:            null.BoolFrom(true),
+				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers: map[string]string{
 					"X-Header": "value",
 				},
 			},
 			errString: "",
-			remoteConfig: &remote.ClientConfig{
-				URL:     &promConfig.URL{URL: u},
-				Timeout: model.Duration(defaultPrometheusTimeout),
-				HTTPClientConfig: promConfig.HTTPClientConfig{
-					FollowRedirects: true,
-					TLSConfig: promConfig.TLSConfig{
-						InsecureSkipVerify: false,
-					},
-				},
-				RetryOnRateLimit: false,
-				Headers: map[string]string{
-					"X-Header": "value",
-				},
-			},
 		},
 		"remote_write_with_headers_env": {
 			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s","mapping":"mapping", "headers":{"X-Header":"value"}}`, u.String())),
@@ -221,34 +208,16 @@ func TestConstructRemoteConfig(t *testing.T) {
 			},
 			arg: "",
 			config: Config{
-				Url:                   null.StringFrom(u.String()),
+				URL:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
-				CACert:                null.NewString("", false),
-				User:                  null.NewString("", false),
+				Username:              null.NewString("", false),
 				Password:              null.NewString("", false),
-				FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
-				KeepTags:              null.BoolFrom(true),
-				KeepNameTag:           null.BoolFrom(false),
-				KeepUrlTag:            null.BoolFrom(true),
+				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers: map[string]string{
 					"X-Header": "value_from_env",
 				},
 			},
 			errString: "",
-			remoteConfig: &remote.ClientConfig{
-				URL:     &promConfig.URL{URL: u},
-				Timeout: model.Duration(defaultPrometheusTimeout),
-				HTTPClientConfig: promConfig.HTTPClientConfig{
-					FollowRedirects: true,
-					TLSConfig: promConfig.TLSConfig{
-						InsecureSkipVerify: false,
-					},
-				},
-				RetryOnRateLimit: false,
-				Headers: map[string]string{
-					"X-Header": "value_from_env",
-				},
-			},
 		},
 		"remote_write_with_headers_arg": {
 			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s","mapping":"mapping", "headers":{"X-Header":"value"}}`, u.String())),
@@ -257,34 +226,16 @@ func TestConstructRemoteConfig(t *testing.T) {
 			},
 			arg: "headers.X-Header=value_from_arg",
 			config: Config{
-				Url:                   null.StringFrom(u.String()),
+				URL:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
-				CACert:                null.NewString("", false),
-				User:                  null.NewString("", false),
+				Username:              null.NewString("", false),
 				Password:              null.NewString("", false),
-				FlushPeriod:           types.NullDurationFrom(defaultFlushPeriod),
-				KeepTags:              null.BoolFrom(true),
-				KeepNameTag:           null.BoolFrom(false),
-				KeepUrlTag:            null.BoolFrom(true),
+				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers: map[string]string{
 					"X-Header": "value_from_arg",
 				},
 			},
 			errString: "",
-			remoteConfig: &remote.ClientConfig{
-				URL:     &promConfig.URL{URL: u},
-				Timeout: model.Duration(defaultPrometheusTimeout),
-				HTTPClientConfig: promConfig.HTTPClientConfig{
-					FollowRedirects: true,
-					TLSConfig: promConfig.TLSConfig{
-						InsecureSkipVerify: false,
-					},
-				},
-				RetryOnRateLimit: false,
-				Headers: map[string]string{
-					"X-Header": "value_from_arg",
-				},
-			},
 		},
 	}
 
@@ -293,39 +244,11 @@ func TestConstructRemoteConfig(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c, err := GetConsolidatedConfig(testCase.jsonRaw, testCase.env, testCase.arg)
 			if len(testCase.errString) > 0 {
+				require.NotNil(t, err)
 				assert.Contains(t, err.Error(), testCase.errString)
 				return
 			}
-			assertConfig(t, c, testCase.config)
-
-			// there can be error only on url.Parse at the moment so skipping that
-			remoteConfig, _ := c.ConstructRemoteConfig()
-			assertRemoteConfig(t, remoteConfig, testCase.remoteConfig)
+			assert.Equal(t, c, testCase.config)
 		})
-	}
-}
-
-func assertConfig(t *testing.T, actual, expected Config) {
-	assert.Equal(t, expected.Url, actual.Url)
-	assert.Equal(t, expected.InsecureSkipTLSVerify, actual.InsecureSkipTLSVerify)
-	assert.Equal(t, expected.CACert, actual.CACert)
-	assert.Equal(t, expected.User, actual.User)
-	assert.Equal(t, expected.Password, actual.Password)
-	assert.Equal(t, expected.FlushPeriod, actual.FlushPeriod)
-	assert.Equal(t, expected.KeepTags, actual.KeepTags)
-	assert.Equal(t, expected.KeepNameTag, expected.KeepNameTag)
-	assert.Equal(t, expected.KeepUrlTag, expected.KeepUrlTag)
-	assert.Equal(t, expected.Headers, actual.Headers)
-}
-
-func assertRemoteConfig(t *testing.T, actual, expected *remote.ClientConfig) {
-	assert.Equal(t, expected.URL, actual.URL)
-	assert.Equal(t, expected.Timeout, actual.Timeout)
-	assert.Equal(t, expected.HTTPClientConfig.TLSConfig.CAFile, actual.HTTPClientConfig.TLSConfig.CAFile)
-	if expected.HTTPClientConfig.BasicAuth == nil {
-		assert.Nil(t, actual.HTTPClientConfig.BasicAuth)
-	} else {
-		assert.Equal(t, expected.HTTPClientConfig.BasicAuth.Username, actual.HTTPClientConfig.BasicAuth.Username)
-		assert.Equal(t, expected.HTTPClientConfig.BasicAuth.Password, actual.HTTPClientConfig.BasicAuth.Password)
 	}
 }
