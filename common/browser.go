@@ -429,7 +429,7 @@ func (b *Browser) Close() {
 	// forcefully after the timeout.
 	timeout := time.Second
 	select {
-	case <-b.browserProc.ctx.Done():
+	case <-b.browserProc.processDone:
 	case <-time.After(timeout):
 		b.logger.Debugf("Browser:Close", "killing browser process with PID %d after %s", b.browserProc.Pid(), timeout)
 		b.browserProc.Terminate()
