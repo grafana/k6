@@ -58,8 +58,8 @@ func New(params output.Params) (*Output, error) {
 	}, nil
 }
 
-func (*Output) Description() string {
-	return "Prometheus remote write"
+func (o *Output) Description() string {
+	return fmt.Sprintf("Prometheus remote write (%s)", o.config.URL.String)
 }
 
 func (o *Output) Start() error {

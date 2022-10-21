@@ -9,7 +9,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/metrics"
+	"gopkg.in/guregu/null.v3"
 )
+
+func TestOutputDescription(t *testing.T) {
+	t.Parallel()
+	o := Output{
+		config: Config{
+			URL: null.StringFrom("http://remote-url.fake"),
+		},
+	}
+	exp := "Prometheus remote write (http://remote-url.fake)"
+	assert.Equal(t, exp, o.Description())
+}
 
 func TestOutputConvertToPbSeries(t *testing.T) {
 	t.Parallel()
