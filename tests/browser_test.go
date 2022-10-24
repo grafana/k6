@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -145,14 +146,10 @@ func TestBrowserUserAgent(t *testing.T) {
 func TestBrowserCrashErr(t *testing.T) {
 	t.Parallel()
 
-	defer func() {
-		assertPanicErrorContains(t, recover(), "launching browser: Invalid devtools server port")
-	}()
+	assertExceptionContains(t, goja.New(), func() {
+		lopts := defaultLaunchOpts()
+		lopts.Args = []any{"remote-debugging-port=99999"}
 
-	lopts := defaultLaunchOpts()
-	lopts.Args = []any{"remote-debugging-port=99999"}
-
-	newTestBrowser(t, lopts)
-
-	t.Error("did not panic")
+		newTestBrowser(t, lopts)
+	}, "launching browser: Invalid devtools server port")
 }
