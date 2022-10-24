@@ -5,7 +5,6 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"image/png"
 	"testing"
@@ -111,16 +110,11 @@ func TestPageEvaluate(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
-				defer func() {
-					assertPanicErrorContains(t, recover(), tc.errMsg)
-				}()
-
 				tb := newTestBrowser(t)
-				p := tb.NewPage(nil)
-
-				p.Evaluate(tb.toGojaValue(tc.js))
-
-				t.Error("did not panic")
+				assertExceptionContains(t, tb.runtime(), func() {
+					p := tb.NewPage(nil)
+					p.Evaluate(tb.toGojaValue(tc.js))
+				}, tc.errMsg)
 			})
 		}
 	})
@@ -223,12 +217,13 @@ func TestPageInnerHTML(t *testing.T) {
 		t.Parallel()
 
 		defer func() {
-			assertPanicErrorContains(t, recover(), "The provided selector is empty")
 		}()
 
-		p := newTestBrowser(t).NewPage(nil)
-		p.InnerHTML("", nil)
-		t.Error("did not panic")
+		tb := newTestBrowser(t)
+		assertExceptionContains(t, tb.runtime(), func() {
+			p := tb.NewPage(nil)
+			p.InnerHTML("", nil)
+		}, "The provided selector is empty")
 	})
 
 	t.Run("err_wrong_selector", func(t *testing.T) {
@@ -255,13 +250,11 @@ func TestPageInnerText(t *testing.T) {
 	t.Run("err_empty_selector", func(t *testing.T) {
 		t.Parallel()
 
-		defer func() {
-			assertPanicErrorContains(t, recover(), "The provided selector is empty")
-		}()
-
-		p := newTestBrowser(t).NewPage(nil)
-		p.InnerText("", nil)
-		t.Error("did not panic")
+		tb := newTestBrowser(t)
+		assertExceptionContains(t, tb.runtime(), func() {
+			p := tb.NewPage(nil)
+			p.InnerText("", nil)
+		}, "The provided selector is empty")
 	})
 
 	t.Run("err_wrong_selector", func(t *testing.T) {
@@ -288,13 +281,11 @@ func TestPageTextContent(t *testing.T) {
 	t.Run("err_empty_selector", func(t *testing.T) {
 		t.Parallel()
 
-		defer func() {
-			assertPanicErrorContains(t, recover(), "The provided selector is empty")
-		}()
-
-		p := newTestBrowser(t).NewPage(nil)
-		p.TextContent("", nil)
-		t.Error("did not panic")
+		tb := newTestBrowser(t)
+		assertExceptionContains(t, tb.runtime(), func() {
+			p := tb.NewPage(nil)
+			p.TextContent("", nil)
+		}, "The provided selector is empty")
 	})
 
 	t.Run("err_wrong_selector", func(t *testing.T) {
@@ -676,15 +667,11 @@ func TestPageWaitForLoadState(t *testing.T) {
 	t.Run("err_wrong_event", func(t *testing.T) {
 		t.Parallel()
 
-		defer func() {
-			assertPanicErrorContains(t, recover(),
-				`invalid lifecycle event: "none"; `+
-					`must be one of: load, domcontentloaded, networkidle`)
-		}()
-
-		p := newTestBrowser(t).NewPage(nil)
-		p.WaitForLoadState("none", nil)
-		t.Error("did not panic")
+		tb := newTestBrowser(t)
+		assertExceptionContains(t, tb.runtime(), func() {
+			p := tb.NewPage(nil)
+			p.WaitForLoadState("none", nil)
+		}, `invalid lifecycle event: "none"; must be one of: load, domcontentloaded, networkidle`)
 	})
 }
 
@@ -711,15 +698,11 @@ func TestPagePress(t *testing.T) {
 	require.Equal(t, "AbC", p.InputValue("#text1", nil))
 }
 
-func assertPanicErrorContains(t *testing.T, err any, expErrMsg string) {
+func assertExceptionContains(t *testing.T, rt *goja.Runtime, fn func(), expErrMsg string) {
 	t.Helper()
 
-	require.NotNil(t, err)
-	require.IsType(t, &goja.Object{}, err)
-	gotObj, _ := err.(*goja.Object)
-	got := gotObj.Export()
-	expErr := errors.New(expErrMsg)
-	gotErr, ok := got.(error)
-	require.True(t, ok)
-	assert.Contains(t, gotErr.Error(), expErr.Error())
+	cal, _ := goja.AssertFunction(rt.ToValue(fn))
+
+	_, err := cal(goja.Undefined())
+	require.ErrorContains(t, err, expErrMsg)
 }
