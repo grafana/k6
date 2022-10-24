@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
 )
 
@@ -31,6 +32,31 @@ func TestFramePress(t *testing.T) {
 
 func TestLifecycleNetworkIdle(t *testing.T) {
 	t.Parallel()
+
+	assertHome := func(tb *testBrowser, p api.Page, check func()) {
+		var resolved, rejected bool
+		err := tb.await(func() error {
+			opts := tb.toGojaValue(common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventNetworkIdle,
+				Timeout:   30 * time.Second,
+			})
+			tb.promise(p.Goto(tb.URL("/home"), opts)).then(
+				func() {
+					check()
+					resolved = true
+				},
+				func() {
+					rejected = true
+				},
+			)
+
+			return nil
+		})
+		require.NoError(t, err)
+
+		assert.True(t, resolved)
+		assert.False(t, rejected)
+	}
 
 	t.Run("doesn't timeout waiting for networkIdle", func(t *testing.T) {
 		t.Parallel()
@@ -56,31 +82,10 @@ func TestLifecycleNetworkIdle(t *testing.T) {
 				serverMsgOutput.innerText = "ping.js loaded from server";
 			`)
 		})
-
-		var resolved, rejected bool
-		err := tb.await(func() error {
-			opts := tb.toGojaValue(common.FrameGotoOptions{
-				WaitUntil: common.LifecycleEventNetworkIdle,
-				Timeout:   30 * time.Second,
-			})
-			tb.promise(p.Goto(tb.URL("/home"), opts)).then(
-				func() {
-					result := p.TextContent("#serverMsg", nil)
-					assert.EqualValues(t, "ping.js loaded from server", result)
-
-					resolved = true
-				},
-				func() {
-					rejected = true
-				},
-			)
-
-			return nil
+		assertHome(tb, p, func() {
+			result := p.TextContent("#serverMsg", nil)
+			assert.EqualValues(t, "ping.js loaded from server", result)
 		})
-		require.NoError(t, err)
-
-		assert.True(t, resolved)
-		assert.False(t, rejected)
 	})
 
 	t.Run("doesn't unblock wait for networkIdle too early", func(t *testing.T) {
@@ -143,34 +148,13 @@ func TestLifecycleNetworkIdle(t *testing.T) {
 
 			close(ch)
 		})
+		assertHome(tb, p, func() {
+			result := p.TextContent("#prolongNetworkIdleLoad", nil)
+			assert.EqualValues(t, "Waiting... pong 4 - for loop complete", result)
 
-		var resolved, rejected bool
-		err := tb.await(func() error {
-			opts := tb.toGojaValue(common.FrameGotoOptions{
-				WaitUntil: common.LifecycleEventNetworkIdle,
-				Timeout:   30 * time.Second,
-			})
-			tb.promise(p.Goto(tb.URL("/home"), opts)).then(
-				func() {
-					result := p.TextContent("#prolongNetworkIdleLoad", nil)
-					assert.EqualValues(t, "Waiting... pong 4 - for loop complete", result)
-
-					result = p.TextContent("#serverMsg", nil)
-					assert.EqualValues(t, "ping.js loaded from server", result)
-
-					resolved = true
-				},
-				func() {
-					rejected = true
-				},
-			)
-
-			return nil
+			result = p.TextContent("#serverMsg", nil)
+			assert.EqualValues(t, "ping.js loaded from server", result)
 		})
-		require.NoError(t, err)
-
-		assert.True(t, resolved)
-		assert.False(t, rejected)
 	})
 
 	t.Run("doesn't unblock wait on networkIdle early when load and domcontentloaded complete at once", func(t *testing.T) {
@@ -220,30 +204,9 @@ func TestLifecycleNetworkIdle(t *testing.T) {
 			counter++
 			fmt.Fprintf(w, "pong %d", counter)
 		})
-
-		var resolved, rejected bool
-		err := tb.await(func() error {
-			opts := tb.toGojaValue(common.FrameGotoOptions{
-				WaitUntil: common.LifecycleEventNetworkIdle,
-				Timeout:   30 * time.Second,
-			})
-			tb.promise(p.Goto(tb.URL("/home"), opts)).then(
-				func() {
-					result := p.TextContent("#prolongNetworkIdleLoad", nil)
-					assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
-
-					resolved = true
-				},
-				func() {
-					rejected = true
-				},
-			)
-
-			return nil
+		assertHome(tb, p, func() {
+			result := p.TextContent("#prolongNetworkIdleLoad", nil)
+			assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
 		})
-		require.NoError(t, err)
-
-		assert.True(t, resolved)
-		assert.False(t, rejected)
 	})
 }
