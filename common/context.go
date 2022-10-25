@@ -9,6 +9,7 @@ type ctxKey int
 const (
 	ctxKeyLaunchOptions ctxKey = iota
 	ctxKeyHooks
+	ctxKeyTraceID
 )
 
 func WithHooks(ctx context.Context, hooks *Hooks) context.Context {
@@ -21,6 +22,21 @@ func GetHooks(ctx context.Context) *Hooks {
 		return nil
 	}
 	return v.(*Hooks)
+}
+
+// WithTraceID adds a random unique hexadecimal trace ID to the context.
+func WithTraceID(ctx context.Context, traceID string) context.Context {
+	return context.WithValue(ctx, ctxKeyTraceID, traceID)
+}
+
+// GetTraceID returns the unique trace ID attached to the context.
+func GetTraceID(ctx context.Context) string {
+	v := ctx.Value(ctxKeyTraceID)
+	val, ok := v.(string)
+	if v == nil || !ok {
+		return ""
+	}
+	return val
 }
 
 func WithLaunchOptions(ctx context.Context, opts *LaunchOptions) context.Context {
