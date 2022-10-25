@@ -375,7 +375,7 @@ func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*log.Log
 	var (
 		k6Logger            = k6ext.GetVU(ctx).State().Logger
 		reCategoryFilter, _ = regexp.Compile(launchOpts.LogCategoryFilter)
-		logger              = log.New(k6Logger, launchOpts.Debug, reCategoryFilter)
+		logger              = log.New(k6Logger, common.GetTraceID(ctx), launchOpts.Debug, reCategoryFilter)
 	)
 
 	// set the log level from the launch options (usually from a script's options).
