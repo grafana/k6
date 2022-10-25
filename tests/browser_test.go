@@ -156,25 +156,25 @@ func TestBrowserCrashErr(t *testing.T) {
 	}, "launching browser: Invalid devtools server port")
 }
 
-func TestBrowserLogTraceID(t *testing.T) {
+func TestBrowserLogIterationID(t *testing.T) {
 	t.Parallel()
 
 	tb := newTestBrowser(t, withLogCache())
 
 	var (
-		traceID    = common.GetTraceID(tb.ctx)
+		iterID     = common.GetIterationID(tb.ctx)
 		tracedEvts int
 	)
 
-	require.NotEmpty(t, traceID)
+	require.NotEmpty(t, iterID)
 	require.NotEmpty(t, tb.logCache.entries)
 
 	tb.logCache.mu.RLock()
 	defer tb.logCache.mu.RUnlock()
 	for _, evt := range tb.logCache.entries {
 		for k, v := range evt.Data {
-			if k == "trace_id" {
-				assert.Equal(t, traceID, v)
+			if k == "iteration_id" {
+				assert.Equal(t, iterID, v)
 				tracedEvts++
 			}
 		}

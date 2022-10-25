@@ -118,7 +118,7 @@ func (b *BrowserType) initContext() context.Context {
 	ctx := k6ext.WithVU(b.vu.Context(), b.vu)
 	ctx = k6ext.WithCustomMetrics(ctx, b.k6Metrics)
 	ctx = common.WithHooks(ctx, b.hooks)
-	ctx = common.WithTraceID(ctx, fmt.Sprintf("%x", b.randSrc.Uint64()))
+	ctx = common.WithIterationID(ctx, fmt.Sprintf("%x", b.randSrc.Uint64()))
 	return ctx
 }
 
@@ -375,7 +375,7 @@ func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*log.Log
 	var (
 		k6Logger            = k6ext.GetVU(ctx).State().Logger
 		reCategoryFilter, _ = regexp.Compile(launchOpts.LogCategoryFilter)
-		logger              = log.New(k6Logger, common.GetTraceID(ctx), launchOpts.Debug, reCategoryFilter)
+		logger              = log.New(k6Logger, common.GetIterationID(ctx), launchOpts.Debug, reCategoryFilter)
 	)
 
 	// set the log level from the launch options (usually from a script's options).
