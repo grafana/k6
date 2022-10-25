@@ -3,8 +3,8 @@ module github.com/grafana/xk6-browser
 go 1.19
 
 require (
-	github.com/chromedp/cdproto v0.0.0-20221011223153-490dc4d81f7c
-	github.com/dop251/goja v0.0.0-20221003171542-5ea1285e6c91
+	github.com/chromedp/cdproto v0.0.0-20221023212508-67ada9507fb2
+	github.com/dop251/goja v0.0.0-20221025095645-e66ebd086f45
 	github.com/fatih/color v1.13.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -14,7 +14,7 @@ require (
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0
 	go.k6.io/k6 v0.40.1-0.20221019120653-b60fe887f035
-	golang.org/x/net v0.0.0-20221002022538-bcab6841153b
+	golang.org/x/net v0.1.0
 	gopkg.in/guregu/null.v3 v3.5.0
 )
 
@@ -44,7 +44,7 @@ require (
 	github.com/tidwall/gjson v1.14.3 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
-	golang.org/x/crypto v0.0.0-20221012134737-56aed061732a // indirect
+	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
 	golang.org/x/time v0.1.0 // indirect
