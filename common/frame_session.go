@@ -475,8 +475,8 @@ func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree) {
 
 func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (string, error) {
 	fs.logger.Debugf("FrameSession:navigateFrame",
-		"sid:%v tid:%v url:%q referrer:%q",
-		fs.session.ID(), fs.targetID, url, referrer)
+		"sid:%v fid:%s tid:%v url:%q referrer:%q",
+		fs.session.ID(), frame.ID(), fs.targetID, url, referrer)
 
 	action := cdppage.Navigate(url).WithReferrer(referrer).WithFrameID(cdp.FrameID(frame.ID()))
 	_, documentID, errorText, err := action.Do(cdp.WithExecutor(fs.ctx, fs.session))
@@ -705,6 +705,8 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventLoad)
 	case "DOMContentLoaded":
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventDOMContentLoad)
+	case "networkIdle":
+		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventNetworkIdle)
 	}
 
 	eventToMetric := map[string]*k6metrics.Metric{
