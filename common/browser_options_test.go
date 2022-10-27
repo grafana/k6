@@ -30,6 +30,23 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 				}, lo)
 			},
 		},
+		"nulls": { // don't override the defaults on `null`
+			opts: map[string]any{
+				"env":               nil,
+				"headless":          nil,
+				"logCategoryFilter": nil,
+				"timeout":           nil,
+			},
+			assert: func(tb testing.TB, lo *LaunchOptions) {
+				tb.Helper()
+				assert.Equal(tb, &LaunchOptions{
+					Env:               make(map[string]string),
+					Headless:          true,
+					LogCategoryFilter: ".*",
+					Timeout:           DefaultTimeout,
+				}, lo)
+			},
+		},
 		"args": {
 			opts: map[string]any{
 				"args": []any{"browser-arg1='value1", "browser-arg2=value2", "browser-flag"},

@@ -60,10 +60,11 @@ func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value) error { //no
 		o  = opts.ToObject(rt)
 	)
 	for _, k := range o.Keys() {
-		var (
-			err error
-			v   = o.Get(k)
-		)
+		v := o.Get(k)
+		if v.Export() == nil {
+			continue // don't override the defaults on `null``
+		}
+		var err error
 		switch k {
 		case "args":
 			err = exportOpt(rt, k, v, &l.Args)
