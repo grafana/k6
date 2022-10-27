@@ -2,8 +2,7 @@ package common
 
 import (
 	"context"
-	"fmt"
-	"reflect"
+	"errors"
 	"time"
 
 	"github.com/dop251/goja"
@@ -50,68 +49,47 @@ func NewLaunchOptions() *LaunchOptions {
 }
 
 // Parse parses launch options from a JS object.
-func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "args":
-				v := opts.Get(k)
-				if args, ok := v.Export().([]any); ok {
-					for _, argv := range args {
-						l.Args = append(l.Args, fmt.Sprintf("%v", argv))
-					}
-				}
-			case "debug":
-				l.Debug = opts.Get(k).ToBoolean()
-			case "devtools":
-				l.Devtools = opts.Get(k).ToBoolean()
-			case "env":
-				v := opts.Get(k)
-				switch v.ExportType() {
-				case reflect.TypeOf(goja.Object{}):
-					env := v.ToObject(rt)
-					for _, k := range env.Keys() {
-						l.Env[k] = env.Get(k).String()
-					}
-				}
-			case "executablePath":
-				l.ExecutablePath = opts.Get(k).String()
-			case "headless":
-				l.Headless = opts.Get(k).ToBoolean()
-			case "ignoreDefaultArgs":
-				v := opts.Get(k)
-				var args []string
-				err := rt.ExportTo(v, &args)
-				if err != nil {
-					return fmt.Errorf("ignoreDefaultArgs should be an array of strings: %w", err)
-				}
-				l.IgnoreDefaultArgs = append(l.IgnoreDefaultArgs, args...)
-			case "logCategoryFilter":
-				l.LogCategoryFilter = opts.Get(k).String()
-			case "proxy":
-				v := opts.Get(k)
-				switch v.ExportType() {
-				case reflect.TypeOf(goja.Object{}):
-					env := v.ToObject(rt)
-					switch k {
-					case "server":
-						l.Proxy.Server = env.Get(k).String()
-					case "bypass":
-						l.Proxy.Bypass = env.Get(k).String()
-					case "username":
-						l.Proxy.Username = env.Get(k).String()
-					case "password":
-						l.Proxy.Password = env.Get(k).String()
-					}
-				}
-			case "slowMo":
-				l.SlowMo, _ = time.ParseDuration(opts.Get(k).String())
-			case "timeout":
-				l.Timeout, _ = time.ParseDuration(opts.Get(k).String())
-			}
+func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value) error { //nolint:cyclop
+	if !gojaValueExists(opts) {
+		return errors.New("LaunchOptions does not exist in the runtime")
+	}
+	var (
+		rt = k6ext.Runtime(ctx)
+		o  = opts.ToObject(rt)
+	)
+	for _, k := range o.Keys() {
+		var (
+			err error
+			v   = o.Get(k)
+		)
+		switch k {
+		case "args":
+			err = exportOpt(rt, k, v, &l.Args)
+		case "debug":
+			l.Debug, err = parseBoolOpt(k, v)
+		case "devtools":
+			l.Devtools, err = parseBoolOpt(k, v)
+		case "env":
+			err = exportOpt(rt, k, v, &l.Env)
+		case "executablePath":
+			l.ExecutablePath, err = parseStrOpt(k, v)
+		case "headless":
+			l.Headless, err = parseBoolOpt(k, v)
+		case "ignoreDefaultArgs":
+			err = exportOpt(rt, k, v, &l.IgnoreDefaultArgs)
+		case "logCategoryFilter":
+			l.LogCategoryFilter, err = parseStrOpt(k, v)
+		case "proxy":
+			err = exportOpt(rt, k, v, &l.Proxy)
+		case "slowMo":
+			l.SlowMo, err = parseTimeOpt(k, v)
+		case "timeout":
+			l.Timeout, err = parseTimeOpt(k, v)
+		}
+		if err != nil {
+			return err
 		}
 	}
+
 	return nil
 }
