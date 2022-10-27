@@ -399,7 +399,7 @@ func TestPageScreenshotFullpage(t *testing.T) {
 
 		const div = document.createElement('div');
 		div.style.width = '1280px';
-		div.style.height = '8000px';
+		div.style.height = '800px';
 		div.style.background = 'linear-gradient(red, blue)';
 
 		document.body.appendChild(div);
@@ -415,12 +415,12 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, 1280, img.Bounds().Max.X, "screenshot width is not 1280px as expected, but %dpx", img.Bounds().Max.X)
-	assert.Equal(t, 8000, img.Bounds().Max.Y, "screenshot height is not 8000px as expected, but %dpx", img.Bounds().Max.Y)
+	assert.Equal(t, 800, img.Bounds().Max.Y, "screenshot height is not 800px as expected, but %dpx", img.Bounds().Max.Y)
 
 	r, _, b, _ := img.At(0, 0).RGBA()
 	assert.Greater(t, r, uint32(128))
 	assert.Less(t, b, uint32(128))
-	r, _, b, _ = img.At(0, 7999).RGBA()
+	r, _, b, _ = img.At(0, 799).RGBA()
 	assert.Less(t, r, uint32(128))
 	assert.Greater(t, b, uint32(128))
 }
