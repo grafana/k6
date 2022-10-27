@@ -31,12 +31,8 @@ func WithIterationID(ctx context.Context, iterID string) context.Context {
 
 // GetIterationID returns the iteration identifier attached to the context.
 func GetIterationID(ctx context.Context) string {
-	v := ctx.Value(ctxKeyIterationID)
-	val, ok := v.(string)
-	if v == nil || !ok {
-		return ""
-	}
-	return val
+	s, _ := ctx.Value(ctxKeyIterationID).(string)
+	return s
 }
 
 func WithLaunchOptions(ctx context.Context, opts *LaunchOptions) context.Context {
