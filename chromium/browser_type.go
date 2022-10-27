@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
@@ -39,6 +41,7 @@ type BrowserType struct {
 	k6Metrics *k6ext.CustomMetrics
 	execPath  string       // path to the Chromium executable
 	storage   *storage.Dir // stores temporary data for the extension and user
+	randSrc   *rand.Rand
 }
 
 // NewBrowserType registers our custom k6 metrics, creates method mappings on
@@ -57,6 +60,7 @@ func NewBrowserType(vu k6modules.VU) api.BrowserType {
 		hooks:     hooks,
 		k6Metrics: k6m,
 		storage:   &storage.Dir{},
+		randSrc:   rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
 	}
 	rt.SetFieldNameMapper(common.NewFieldNameMapper())
 
@@ -114,6 +118,7 @@ func (b *BrowserType) initContext() context.Context {
 	ctx := k6ext.WithVU(b.vu.Context(), b.vu)
 	ctx = k6ext.WithCustomMetrics(ctx, b.k6Metrics)
 	ctx = common.WithHooks(ctx, b.hooks)
+	ctx = common.WithIterationID(ctx, fmt.Sprintf("%x", b.randSrc.Uint64()))
 	return ctx
 }
 
@@ -370,7 +375,7 @@ func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*log.Log
 	var (
 		k6Logger            = k6ext.GetVU(ctx).State().Logger
 		reCategoryFilter, _ = regexp.Compile(launchOpts.LogCategoryFilter)
-		logger              = log.New(k6Logger, launchOpts.Debug, reCategoryFilter)
+		logger              = log.New(k6Logger, common.GetIterationID(ctx), launchOpts.Debug, reCategoryFilter)
 	)
 
 	// set the log level from the launch options (usually from a script's options).

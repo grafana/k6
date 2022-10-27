@@ -19,6 +19,7 @@ type Logger struct {
 	*logrus.Logger
 	mu             sync.Mutex
 	lastLogCall    int64
+	iterID         string
 	debugOverride  bool
 	categoryFilter *regexp.Regexp
 }
@@ -29,13 +30,14 @@ func NewNullLogger() *Logger {
 	log := logrus.New()
 	log.SetOutput(ioutil.Discard)
 
-	return New(log, false, nil)
+	return New(log, "", false, nil)
 }
 
 // New creates a new logger.
-func New(logger *logrus.Logger, debugOverride bool, categoryFilter *regexp.Regexp) *Logger {
+func New(logger *logrus.Logger, iterID string, debugOverride bool, categoryFilter *regexp.Regexp) *Logger {
 	return &Logger{
 		Logger:         logger,
+		iterID:         iterID,
 		debugOverride:  debugOverride,
 		categoryFilter: categoryFilter,
 	}
@@ -95,11 +97,15 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...a
 		fmt.Printf("%s [%d]: %s - %s ms\n", magenta(category), goRoutineID(), string(msg), magenta(elapsed))
 		return
 	}
-	entry := l.WithFields(logrus.Fields{
+	fields := logrus.Fields{
 		"category":  category,
 		"elapsed":   fmt.Sprintf("%d ms", elapsed),
 		"goroutine": goRoutineID(),
-	})
+	}
+	if l.iterID != "" && l.GetLevel() > logrus.InfoLevel {
+		fields["iteration_id"] = l.iterID
+	}
+	entry := l.WithFields(fields)
 	if l.GetLevel() < level && l.debugOverride {
 		entry.Printf(msg, args...)
 		return

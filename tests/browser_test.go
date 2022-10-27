@@ -12,6 +12,8 @@ import (
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/common"
 )
 
 func TestBrowserNewPage(t *testing.T) {
@@ -152,4 +154,31 @@ func TestBrowserCrashErr(t *testing.T) {
 
 		newTestBrowser(t, lopts)
 	}, "launching browser: Invalid devtools server port")
+}
+
+func TestBrowserLogIterationID(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withLogCache())
+
+	var (
+		iterID     = common.GetIterationID(tb.ctx)
+		tracedEvts int
+	)
+
+	require.NotEmpty(t, iterID)
+	require.NotEmpty(t, tb.logCache.entries)
+
+	tb.logCache.mu.RLock()
+	defer tb.logCache.mu.RUnlock()
+	for _, evt := range tb.logCache.entries {
+		for k, v := range evt.Data {
+			if k == "iteration_id" {
+				assert.Equal(t, iterID, v)
+				tracedEvts++
+			}
+		}
+	}
+
+	assert.Equal(t, len(tb.logCache.entries), tracedEvts)
 }

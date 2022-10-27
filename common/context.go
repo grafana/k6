@@ -9,6 +9,7 @@ type ctxKey int
 const (
 	ctxKeyLaunchOptions ctxKey = iota
 	ctxKeyHooks
+	ctxKeyIterationID
 )
 
 func WithHooks(ctx context.Context, hooks *Hooks) context.Context {
@@ -21,6 +22,17 @@ func GetHooks(ctx context.Context) *Hooks {
 		return nil
 	}
 	return v.(*Hooks)
+}
+
+// WithIterationID adds an identifier for the current iteration to the context.
+func WithIterationID(ctx context.Context, iterID string) context.Context {
+	return context.WithValue(ctx, ctxKeyIterationID, iterID)
+}
+
+// GetIterationID returns the iteration identifier attached to the context.
+func GetIterationID(ctx context.Context) string {
+	s, _ := ctx.Value(ctxKeyIterationID).(string)
+	return s
 }
 
 func WithLaunchOptions(ctx context.Context, opts *LaunchOptions) context.Context {
