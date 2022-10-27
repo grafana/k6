@@ -16,8 +16,8 @@ func TestLaunchOptionsParse(t *testing.T) {
 	for name, tt := range map[string]struct {
 		opts   map[string]any
 		assert func(testing.TB, *LaunchOptions)
+		err    string
 	}{
-		// TODO: Check parsing errors
 		"defaults": {
 			opts: map[string]any{},
 			assert: func(tb testing.TB, lo *LaunchOptions) {
@@ -42,12 +42,22 @@ func TestLaunchOptionsParse(t *testing.T) {
 				assert.Equal(tb, "browser-flag", lo.Args[2])
 			},
 		},
+		"args_err": {
+			opts: map[string]any{
+				"args": 1,
+			},
+			err: "args should be an array of strings",
+		},
 		"debug": {
 			opts: map[string]any{"debug": true},
 			assert: func(tb testing.TB, lo *LaunchOptions) {
 				tb.Helper()
 				assert.True(t, lo.Debug)
 			},
+		},
+		"debug_err": {
+			opts: map[string]any{"debug": "hello"},
+			err:  "debug should be a boolean",
 		},
 		"devtools": {
 			opts: map[string]any{
@@ -58,6 +68,10 @@ func TestLaunchOptionsParse(t *testing.T) {
 				assert.True(t, lo.Devtools)
 			},
 		},
+		"devtools_err": {
+			opts: map[string]any{"devtools": "hello"},
+			err:  "devtools should be a boolean",
+		},
 		"env": {
 			opts: map[string]any{
 				"env": map[string]string{"key": "value"},
@@ -66,6 +80,10 @@ func TestLaunchOptionsParse(t *testing.T) {
 				tb.Helper()
 				assert.Equal(t, map[string]string{"key": "value"}, lo.Env)
 			},
+		},
+		"env_err": {
+			opts: map[string]any{"env": 1},
+			err:  "env should be a map",
 		},
 		"executablePath": {
 			opts: map[string]any{
@@ -76,6 +94,10 @@ func TestLaunchOptionsParse(t *testing.T) {
 				assert.Equal(t, "cmd/somewhere", lo.ExecutablePath)
 			},
 		},
+		"executablePath_err": {
+			opts: map[string]any{"executablePath": 1},
+			err:  "executablePath should be a string",
+		},
 		"headless": {
 			opts: map[string]any{
 				"headless": false,
@@ -84,6 +106,10 @@ func TestLaunchOptionsParse(t *testing.T) {
 				tb.Helper()
 				assert.False(t, lo.Headless)
 			},
+		},
+		"headless_err": {
+			opts: map[string]any{"headless": "ABC"},
+			err:  "headless should be a boolean",
 		},
 		"ignoreDefaultArgs": {
 			opts: map[string]any{
@@ -96,6 +122,10 @@ func TestLaunchOptionsParse(t *testing.T) {
 				assert.Equal(t, "--hide-something", lo.IgnoreDefaultArgs[1])
 			},
 		},
+		"ignoreDefaultArgs_err": {
+			opts: map[string]any{"ignoreDefaultArgs": "ABC"},
+			err:  "ignoreDefaultArgs should be an array of strings",
+		},
 		"logCategoryFilter": {
 			opts: map[string]any{
 				"logCategoryFilter": "**",
@@ -104,6 +134,10 @@ func TestLaunchOptionsParse(t *testing.T) {
 				tb.Helper()
 				assert.Equal(t, "**", lo.LogCategoryFilter)
 			},
+		},
+		"logCategoryFilter_err": {
+			opts: map[string]any{"logCategoryFilter": 1},
+			err:  "logCategoryFilter should be a string",
 		},
 		"proxy": {
 			opts: map[string]any{
@@ -124,6 +158,10 @@ func TestLaunchOptionsParse(t *testing.T) {
 				}, lo.Proxy)
 			},
 		},
+		"proxy_err": {
+			opts: map[string]any{"proxy": 1},
+			err:  "proxy should be an object",
+		},
 		"slowMo": {
 			opts: map[string]any{
 				"slowMo": "5s",
@@ -132,6 +170,10 @@ func TestLaunchOptionsParse(t *testing.T) {
 				tb.Helper()
 				assert.Equal(t, 5*time.Second, lo.SlowMo)
 			},
+		},
+		"slowMo_err": {
+			opts: map[string]any{"slowMo": "ABC"},
+			err:  "slowMo should be a time duration value",
 		},
 		"timeout": {
 			opts: map[string]any{
@@ -142,6 +184,10 @@ func TestLaunchOptionsParse(t *testing.T) {
 				assert.Equal(t, 10*time.Second, lo.Timeout)
 			},
 		},
+		"timeout_err": {
+			opts: map[string]any{"timeout": "ABC"},
+			err:  "timeout should be a time duration value",
+		},
 	} {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
@@ -150,8 +196,12 @@ func TestLaunchOptionsParse(t *testing.T) {
 				vu = k6test.NewVU(t)
 				lo = NewLaunchOptions()
 			)
-			require.NoError(t, lo.Parse(vu.Context(), vu.ToGojaValue(tt.opts)))
-			tt.assert(t, lo)
+			if err := lo.Parse(vu.Context(), vu.ToGojaValue(tt.opts)); tt.err != "" {
+				require.ErrorContains(t, err, tt.err)
+			} else {
+				require.NoError(t, err)
+				tt.assert(t, lo)
+			}
 		})
 	}
 }
