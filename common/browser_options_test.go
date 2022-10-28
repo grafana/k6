@@ -10,7 +10,7 @@ import (
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 )
 
-func TestLaunchOptionsParse(t *testing.T) {
+func TestBrowserLaunchOptionsParse(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
@@ -56,7 +56,7 @@ func TestLaunchOptionsParse(t *testing.T) {
 			},
 		},
 		"debug_err": {
-			opts: map[string]any{"debug": "hello"},
+			opts: map[string]any{"debug": "true"},
 			err:  "debug should be a boolean",
 		},
 		"devtools": {
@@ -69,7 +69,7 @@ func TestLaunchOptionsParse(t *testing.T) {
 			},
 		},
 		"devtools_err": {
-			opts: map[string]any{"devtools": "hello"},
+			opts: map[string]any{"devtools": "true"},
 			err:  "devtools should be a boolean",
 		},
 		"env": {
@@ -108,7 +108,7 @@ func TestLaunchOptionsParse(t *testing.T) {
 			},
 		},
 		"headless_err": {
-			opts: map[string]any{"headless": "ABC"},
+			opts: map[string]any{"headless": "true"},
 			err:  "headless should be a boolean",
 		},
 		"ignoreDefaultArgs": {
@@ -196,7 +196,8 @@ func TestLaunchOptionsParse(t *testing.T) {
 				vu = k6test.NewVU(t)
 				lo = NewLaunchOptions()
 			)
-			if err := lo.Parse(vu.Context(), vu.ToGojaValue(tt.opts)); tt.err != "" {
+			err := lo.Parse(vu.Context(), vu.ToGojaValue(tt.opts))
+			if tt.err != "" {
 				require.ErrorContains(t, err, tt.err)
 			} else {
 				require.NoError(t, err)

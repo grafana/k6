@@ -3,17 +3,19 @@ package common
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 	"time"
 
 	"github.com/dop251/goja"
+
+	"go.k6.io/k6/lib/types"
 )
 
 func parseBoolOpt(key string, val goja.Value) (b bool, err error) {
-	if b, err = strconv.ParseBool(val.String()); err != nil {
-		return false, fmt.Errorf("%s should be a boolean: %w", key, err)
+	if val.ExportType().Kind() != reflect.Bool {
+		return false, fmt.Errorf("%s should be a boolean", key)
 	}
-	return
+	b, _ = val.Export().(bool)
+	return b, nil
 }
 
 func parseStrOpt(key string, val goja.Value) (s string, err error) {
@@ -24,7 +26,7 @@ func parseStrOpt(key string, val goja.Value) (s string, err error) {
 }
 
 func parseTimeOpt(key string, val goja.Value) (t time.Duration, err error) {
-	if t, err = time.ParseDuration(val.String()); err != nil {
+	if t, err = types.GetDurationValue(val.String()); err != nil {
 		return time.Duration(0), fmt.Errorf("%s should be a time duration value: %w", key, err)
 	}
 	return
@@ -45,7 +47,7 @@ func exportOpt[T any](rt *goja.Runtime, key string, src goja.Value, dst T) error
 		reflect.Slice:  "an array of",
 	}[kind]
 	if !ok {
-		panic("src should be one of: map, struct, slice")
+		panic("dst should be one of: map, struct, slice")
 	}
 	if err := rt.ExportTo(src, dst); err != nil {
 		if kind == reflect.Slice {

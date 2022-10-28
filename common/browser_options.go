@@ -10,6 +10,7 @@ import (
 	"github.com/grafana/xk6-browser/k6ext"
 )
 
+// ProxyOptions allows configuring a proxy server.
 type ProxyOptions struct {
 	Server   string
 	Bypass   string
@@ -38,6 +39,7 @@ type LaunchPersistentContextOptions struct {
 	BrowserContextOptions
 }
 
+// NewLaunchOptions returns a new LaunchOptions.
 func NewLaunchOptions() *LaunchOptions {
 	launchOpts := LaunchOptions{
 		Env:               make(map[string]string),
