@@ -179,41 +179,51 @@ func execute(
 	return command{cmd, done, stdout, stderr}, nil
 }
 
-// parseDevToolsURL grabs the websocket address from chrome's output and returns it.
-func parseDevToolsURL(ctx context.Context, cmd command) (wsURL string, _ error) {
-	type result struct {
-		devToolsURL string
-		err         error
-	}
-	c := make(chan result, 1)
+// parseDevToolsURL grabs the WebSocket address from Chrome's output and returns
+// it. If the process ends abruptly, it will return the first error from stderr.
+func parseDevToolsURL(ctx context.Context, cmd command) (string, error) { //nolint: cyclop
+	var (
+		lines = make(chan string)
+		errCh = make(chan error)
+	)
 	go func() {
-		const urlPrefix = "DevTools listening on "
 		scanner := bufio.NewScanner(cmd.stderr)
-
 		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.HasPrefix(line, urlPrefix) {
-				c <- result{
-					strings.TrimPrefix(strings.TrimSpace(line), urlPrefix),
-					nil,
-				}
-				return
-			}
-			if strings.Contains(line, ":ERROR:") {
-				if i := strings.Index(line, "] "); i > 0 {
-					c <- result{"", errors.New(line[i+2:])}
-					return
-				}
-			}
+			lines <- scanner.Text()
 		}
 		if err := scanner.Err(); err != nil {
-			c <- result{"", err}
+			errCh <- err
 		}
 	}()
-	select {
-	case r := <-c:
-		return r.devToolsURL, r.err
-	case <-ctx.Done():
-		return "", fmt.Errorf("%w", ctx.Err())
+
+	const urlPrefix = "DevTools listening on "
+	var stdErr error
+
+	preferStdErr := func(e error) error {
+		if stdErr != nil {
+			return stdErr
+		}
+		return e
+	}
+
+	for {
+		select {
+		case line := <-lines:
+			if strings.HasPrefix(line, urlPrefix) {
+				return strings.TrimPrefix(strings.TrimSpace(line), urlPrefix), nil
+			}
+			// TODO: Capture more than one error?
+			if stdErr == nil && strings.Contains(line, ":ERROR:") {
+				if i := strings.Index(line, "] "); i > 0 {
+					stdErr = errors.New(line[i+2:])
+				}
+			}
+		case err := <-errCh:
+			return "", preferStdErr(err)
+		case <-cmd.done:
+			return "", preferStdErr(errors.New("browser process ended unexpectedly"))
+		case <-ctx.Done():
+			return "", preferStdErr(fmt.Errorf("%w", ctx.Err()))
+		}
 	}
 }
