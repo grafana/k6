@@ -33,8 +33,9 @@ func BenchmarkMeasureAndEmitMetrics(b *testing.B) {
 		Logger:         logger,
 	}
 	t := transport{
-		state: state,
-		ctx:   ctx,
+		state:       state,
+		ctx:         ctx,
+		tagsAndMeta: &metrics.TagsAndMeta{Tags: registry.RootTagSet()},
 	}
 
 	unfRequest := &unfinishedRequest{
