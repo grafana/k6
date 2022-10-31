@@ -186,9 +186,7 @@ func (c *Client) Invoke(
 	if method == "" {
 		return nil, errors.New("method to invoke cannot be empty")
 	}
-	if method[0] != '/' {
-		method = "/" + method
-	}
+
 	methodDesc := c.mds[method]
 	if methodDesc == nil {
 		return nil, fmt.Errorf("method %q not found in file descriptors", method)
