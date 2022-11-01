@@ -56,13 +56,22 @@ func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value, logger *log.
 		return errors.New("LaunchOptions does not exist in the runtime")
 	}
 	var (
-		rt = k6ext.Runtime(ctx)
-		o  = opts.ToObject(rt)
+		rt       = k6ext.Runtime(ctx)
+		o        = opts.ToObject(rt)
+		defaults = map[string]any{
+			"env":               l.Env,
+			"headless":          l.Headless,
+			"logCategoryFilter": l.LogCategoryFilter,
+			"timeout":           l.Timeout,
+		}
 	)
 	for _, k := range o.Keys() {
 		v := o.Get(k)
 		if v.Export() == nil {
-			continue // don't override the defaults on `null``
+			if dv, ok := defaults[k]; ok {
+				logger.Warnf("LaunchOptions", "%s was null and set to its default: %v", k, dv)
+			}
+			continue
 		}
 		var err error
 		switch k {
