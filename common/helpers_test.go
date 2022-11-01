@@ -18,7 +18,7 @@ import (
 
 func newExecCtx() (*ExecutionContext, context.Context, *goja.Runtime) {
 	ctx := context.Background()
-	logger := log.New(logrus.New(), "", false, nil)
+	logger := log.New(logrus.New(), "", nil)
 	execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789), logger)
 
 	return execCtx, ctx, goja.New()
