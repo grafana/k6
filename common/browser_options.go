@@ -8,6 +8,7 @@ import (
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/k6ext"
+	"github.com/grafana/xk6-browser/log"
 )
 
 // ProxyOptions allows configuring a proxy server.
@@ -41,17 +42,16 @@ type LaunchPersistentContextOptions struct {
 
 // NewLaunchOptions returns a new LaunchOptions.
 func NewLaunchOptions() *LaunchOptions {
-	launchOpts := LaunchOptions{
+	return &LaunchOptions{
 		Env:               make(map[string]string),
 		Headless:          true,
 		LogCategoryFilter: ".*",
 		Timeout:           DefaultTimeout,
 	}
-	return &launchOpts
 }
 
 // Parse parses launch options from a JS object.
-func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value) error { //nolint:cyclop
+func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value, logger *log.Logger) error { //nolint:cyclop
 	if !gojaValueExists(opts) {
 		return errors.New("LaunchOptions does not exist in the runtime")
 	}
