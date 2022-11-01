@@ -149,9 +149,15 @@ func (b *BrowserType) launch(ctx context.Context, opts *common.LaunchOptions) (*
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	logger, err := makeLogger(ctx, opts)
+	logger, err := makeLogger(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("setting up logger: %w", err)
+	}
+	if err := logger.SetCategoryFilter(opts.LogCategoryFilter); err != nil {
+		return nil, fmt.Errorf("%w", err)
+	}
+	if opts.Debug {
+		_ = logger.SetLevel("debug")
 	}
 
 	var (
@@ -370,18 +376,11 @@ func setFlagsFromK6Options(flags map[string]any, k6opts *k6lib.Options) {
 }
 
 // makeLogger makes and returns an extension wide logger.
-func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*log.Logger, error) {
+func makeLogger(ctx context.Context) (*log.Logger, error) {
 	var (
 		k6Logger = k6ext.GetVU(ctx).State().Logger
 		logger   = log.New(k6Logger, common.GetIterationID(ctx))
 	)
-	if err := logger.SetCategoryFilter(launchOpts.LogCategoryFilter); err != nil {
-		return nil, fmt.Errorf("making logger: %w", err)
-	}
-	// set the log level from the launch options (usually from a script's options).
-	if launchOpts.Debug {
-		_ = logger.SetLevel("debug")
-	}
 	if el, ok := os.LookupEnv("XK6_BROWSER_LOG"); ok {
 		if logger.SetLevel(el) != nil {
 			return nil, fmt.Errorf(
