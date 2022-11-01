@@ -181,49 +181,69 @@ func execute(
 
 // parseDevToolsURL grabs the WebSocket address from Chrome's output and returns
 // it. If the process ends abruptly, it will return the first error from stderr.
-func parseDevToolsURL(ctx context.Context, cmd command) (string, error) { //nolint: cyclop
-	var (
-		lines = make(chan string)
-		errCh = make(chan error)
-	)
+func parseDevToolsURL(ctx context.Context, cmd command) (_ string, err error) {
+	parser := &devToolsURLParser{
+		sc: bufio.NewScanner(cmd.stderr),
+	}
+	done := make(chan struct{})
 	go func() {
-		scanner := bufio.NewScanner(cmd.stderr)
-		for scanner.Scan() {
-			lines <- scanner.Text()
+		for parser.scan() {
 		}
-		if err := scanner.Err(); err != nil {
-			errCh <- err
-		}
+		close(done)
 	}()
+	for err == nil {
+		select {
+		case <-done:
+			err = parser.err()
+		case <-ctx.Done():
+			err = ctx.Err()
+		case <-cmd.done:
+			err = errors.New("browser process ended unexpectedly")
+		}
+	}
+	if parser.url != "" {
+		err = nil
+	}
+
+	return parser.url, err
+}
+
+type devToolsURLParser struct {
+	sc *bufio.Scanner
+
+	errs []error
+	url  string
+}
+
+func (p *devToolsURLParser) scan() bool {
+	if !p.sc.Scan() {
+		return false
+	}
 
 	const urlPrefix = "DevTools listening on "
-	var stdErr error
 
-	preferStdErr := func(e error) error {
-		if stdErr != nil {
-			return stdErr
-		}
-		return e
+	line := p.sc.Text()
+	if strings.HasPrefix(line, urlPrefix) {
+		p.url = strings.TrimPrefix(strings.TrimSpace(line), urlPrefix)
 	}
-
-	for {
-		select {
-		case line := <-lines:
-			if strings.HasPrefix(line, urlPrefix) {
-				return strings.TrimPrefix(strings.TrimSpace(line), urlPrefix), nil
-			}
-			// TODO: Capture more than one error?
-			if stdErr == nil && strings.Contains(line, ":ERROR:") {
-				if i := strings.Index(line, "] "); i > 0 {
-					stdErr = errors.New(line[i+2:])
-				}
-			}
-		case err := <-errCh:
-			return "", preferStdErr(err)
-		case <-cmd.done:
-			return "", preferStdErr(errors.New("browser process ended unexpectedly"))
-		case <-ctx.Done():
-			return "", preferStdErr(fmt.Errorf("%w", ctx.Err()))
+	if strings.Contains(line, ":ERROR:") {
+		if i := strings.Index(line, "] "); i > 0 {
+			p.errs = append(p.errs, errors.New(line[i+2:]))
 		}
 	}
+
+	return p.url == ""
+}
+
+func (p *devToolsURLParser) err() error {
+	if p.url != "" {
+		return io.EOF
+	}
+	if len(p.errs) > 0 {
+		return p.errs[0]
+	}
+	if err := p.sc.Err(); err != nil {
+		return fmt.Errorf("%w", err)
+	}
+	return nil
 }
