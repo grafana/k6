@@ -74,7 +74,7 @@ func NewNetworkManager(
 		ctx:              ctx,
 		// TODO: Pass an internal logger instead of basing it on k6's logger?
 		// See https://github.com/grafana/xk6-browser/issues/54
-		logger:           log.New(state.Logger, GetIterationID(ctx), nil),
+		logger:           log.New(state.Logger, GetIterationID(ctx)),
 		session:          s,
 		parent:           parent,
 		frameManager:     fm,

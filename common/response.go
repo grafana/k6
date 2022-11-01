@@ -71,7 +71,7 @@ func NewHTTPResponse(ctx context.Context, req *Request, resp *network.Response, 
 		ctx: ctx,
 		// TODO: Pass an internal logger instead of basing it on k6's logger?
 		// See https://github.com/grafana/xk6-browser/issues/54
-		logger:            log.New(state.Logger, GetIterationID(ctx), nil),
+		logger:            log.New(state.Logger, GetIterationID(ctx)),
 		request:           req,
 		remoteAddress:     &RemoteAddress{IPAddress: resp.RemoteIPAddress, Port: resp.RemotePort},
 		securityDetails:   nil,

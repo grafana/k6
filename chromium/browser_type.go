@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -373,11 +372,12 @@ func setFlagsFromK6Options(flags map[string]any, k6opts *k6lib.Options) {
 // makeLogger makes and returns an extension wide logger.
 func makeLogger(ctx context.Context, launchOpts *common.LaunchOptions) (*log.Logger, error) {
 	var (
-		k6Logger            = k6ext.GetVU(ctx).State().Logger
-		reCategoryFilter, _ = regexp.Compile(launchOpts.LogCategoryFilter)
-		logger              = log.New(k6Logger, common.GetIterationID(ctx), reCategoryFilter)
+		k6Logger = k6ext.GetVU(ctx).State().Logger
+		logger   = log.New(k6Logger, common.GetIterationID(ctx))
 	)
-
+	if err := logger.SetCategoryFilter(launchOpts.LogCategoryFilter); err != nil {
+		return nil, fmt.Errorf("making logger: %w", err)
+	}
 	// set the log level from the launch options (usually from a script's options).
 	if launchOpts.Debug {
 		_ = logger.SetLevel("debug")
