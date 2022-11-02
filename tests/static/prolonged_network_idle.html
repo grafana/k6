@@ -9,12 +9,12 @@
     <script>
         var pingRequestTextOutput = document.getElementById("pingRequestText");
 
-        var p = pingRequestText();
+        var p = requestPings();
         p.then(() => {
             pingRequestTextOutput.innerText += ' - for loop complete';
         })
 
-        async function pingRequestText() {
+        async function requestPings() {
             for (var i = 0; i < 4; i++) {
                 await fetch('/ping')
                     .then(response => response.text())
