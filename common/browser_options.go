@@ -8,6 +8,7 @@ import (
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/k6ext"
+	"github.com/grafana/xk6-browser/log"
 )
 
 // ProxyOptions allows configuring a proxy server.
@@ -41,28 +42,36 @@ type LaunchPersistentContextOptions struct {
 
 // NewLaunchOptions returns a new LaunchOptions.
 func NewLaunchOptions() *LaunchOptions {
-	launchOpts := LaunchOptions{
+	return &LaunchOptions{
 		Env:               make(map[string]string),
 		Headless:          true,
 		LogCategoryFilter: ".*",
 		Timeout:           DefaultTimeout,
 	}
-	return &launchOpts
 }
 
 // Parse parses launch options from a JS object.
-func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value) error { //nolint:cyclop
+func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value, logger *log.Logger) error { //nolint:cyclop
 	if !gojaValueExists(opts) {
 		return errors.New("LaunchOptions does not exist in the runtime")
 	}
 	var (
-		rt = k6ext.Runtime(ctx)
-		o  = opts.ToObject(rt)
+		rt       = k6ext.Runtime(ctx)
+		o        = opts.ToObject(rt)
+		defaults = map[string]any{
+			"env":               l.Env,
+			"headless":          l.Headless,
+			"logCategoryFilter": l.LogCategoryFilter,
+			"timeout":           l.Timeout,
+		}
 	)
 	for _, k := range o.Keys() {
 		v := o.Get(k)
 		if v.Export() == nil {
-			continue // don't override the defaults on `null``
+			if dv, ok := defaults[k]; ok {
+				logger.Warnf("LaunchOptions", "%s was null and set to its default: %v", k, dv)
+			}
+			continue
 		}
 		var err error
 		switch k {

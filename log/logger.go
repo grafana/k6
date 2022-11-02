@@ -20,7 +20,6 @@ type Logger struct {
 	mu             sync.Mutex
 	lastLogCall    int64
 	iterID         string
-	debugOverride  bool
 	categoryFilter *regexp.Regexp
 }
 
@@ -29,17 +28,14 @@ type Logger struct {
 func NewNullLogger() *Logger {
 	log := logrus.New()
 	log.SetOutput(ioutil.Discard)
-
-	return New(log, "", false, nil)
+	return New(log, "")
 }
 
 // New creates a new logger.
-func New(logger *logrus.Logger, iterID string, debugOverride bool, categoryFilter *regexp.Regexp) *Logger {
+func New(logger *logrus.Logger, iterID string) *Logger {
 	return &Logger{
-		Logger:         logger,
-		iterID:         iterID,
-		debugOverride:  debugOverride,
-		categoryFilter: categoryFilter,
+		Logger: logger,
+		iterID: iterID,
 	}
 }
 
@@ -89,7 +85,7 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...a
 		l.lastLogCall = now
 	}()
 
-	if l.categoryFilter != nil && !l.categoryFilter.Match([]byte(category)) {
+	if l.categoryFilter != nil && !l.categoryFilter.MatchString(category) {
 		return
 	}
 	if l.Logger == nil {
@@ -106,7 +102,7 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...a
 		fields["iteration_id"] = l.iterID
 	}
 	entry := l.WithFields(fields)
-	if l.GetLevel() < level && l.debugOverride {
+	if l.GetLevel() < level {
 		entry.Printf(msg, args...)
 		return
 	}
@@ -163,6 +159,17 @@ func (l *Logger) ConsoleLogFormatterSerializer() *Logger {
 			Formatter: &consoleLogFormatter{l.Formatter},
 		},
 	}
+}
+
+// SetCategoryFilter enables filtering logs by the filter regex.
+func (l *Logger) SetCategoryFilter(filter string) (err error) {
+	if filter == "" {
+		return nil
+	}
+	if l.categoryFilter, err = regexp.Compile(filter); err != nil {
+		return fmt.Errorf("invalid category filter %q: %w", filter, err)
+	}
+	return nil
 }
 
 func goRoutineID() int {

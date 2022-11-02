@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/xk6-browser/k6ext/k6test"
+	"github.com/grafana/xk6-browser/log"
 )
 
 func TestBrowserLaunchOptionsParse(t *testing.T) {
@@ -213,7 +214,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 				vu = k6test.NewVU(t)
 				lo = NewLaunchOptions()
 			)
-			err := lo.Parse(vu.Context(), vu.ToGojaValue(tt.opts))
+			err := lo.Parse(vu.Context(), vu.ToGojaValue(tt.opts), log.NewNullLogger())
 			if tt.err != "" {
 				require.ErrorContains(t, err, tt.err)
 			} else {
