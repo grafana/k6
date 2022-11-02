@@ -3,22 +3,22 @@
 <head></head>
 
 <body>
-    <div id="prolongNetworkIdleLoad">Waiting...</div>
+    <div id="pingRequestText">Waiting...</div>
 
     <script>
-        var prolongNetworkIdleLoadOutput = document.getElementById("prolongNetworkIdleLoad");
+        var pingRequestTextOutput = document.getElementById("pingRequestText");
 
-        var p = prolongNetworkIdleLoad();
+        var p = pingRequestText();
         p.then(() => {
-            prolongNetworkIdleLoadOutput.innerText += ' - for loop complete';
+            pingRequestTextOutput.innerText += ' - for loop complete';
         })
 
-        async function prolongNetworkIdleLoad() {
+        async function pingRequestText() {
             for (var i = 0; i < 10; i++) {
                 await fetch('/ping')
                     .then(response => response.text())
                     .then((data) => {
-                        prolongNetworkIdleLoadOutput.innerText = 'Waiting... ' + data;
+                        pingRequestTextOutput.innerText = 'Waiting... ' + data;
                     });
             }
         }
