@@ -70,8 +70,9 @@ type Frame struct {
 	inflightRequestsMu sync.RWMutex
 	inflightRequests   map[network.RequestID]bool
 
-	currentDocument *DocumentInfo
-	pendingDocument *DocumentInfo
+	currentDocument   *DocumentInfo
+	pendingDocumentMu sync.RWMutex
+	pendingDocument   *DocumentInfo
 
 	log *log.Logger
 }

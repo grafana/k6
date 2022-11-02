@@ -117,7 +117,14 @@ func (m *FrameManager) frameAbortedNavigation(frameID cdp.FrameID, errorText, do
 	defer m.framesMu.Unlock()
 
 	frame := m.frames[frameID]
-	if frame == nil || frame.pendingDocument == nil {
+	if frame == nil {
+		return
+	}
+
+	frame.pendingDocumentMu.Lock()
+	defer frame.pendingDocumentMu.Unlock()
+
+	if frame.pendingDocument == nil {
 		return
 	}
 	if documentID != "" && frame.pendingDocument.documentID != documentID {
@@ -266,6 +273,9 @@ func (m *FrameManager) frameNavigated(frameID cdp.FrameID, parentFrameID cdp.Fra
 
 	frame.navigated(name, url, documentID)
 
+	frame.pendingDocumentMu.Lock()
+	defer frame.pendingDocumentMu.Unlock()
+
 	var (
 		keepPending     *DocumentInfo
 		pendingDocument = frame.pendingDocument
@@ -362,6 +372,9 @@ func (m *FrameManager) frameRequestedNavigation(frameID cdp.FrameID, url string,
 		b.AddFrameNavigation(frame)
 	}
 
+	frame.pendingDocumentMu.Lock()
+	defer frame.pendingDocumentMu.Unlock()
+
 	if frame.pendingDocument != nil && frame.pendingDocument.documentID == documentID {
 		m.logger.Debugf("FrameManager:frameRequestedNavigation:return",
 			"fmid:%d fid:%v furl:%s url:%s docid:%s pdocid:%s pdoc:dontSet",
@@ -446,16 +459,22 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 		}
 	}
 
+	frame.pendingDocumentMu.RLock()
 	if frame.pendingDocument == nil || frame.pendingDocument.request != req {
 		m.logger.Debugf("FrameManager:requestFailed:return", "fmid:%d pdoc:nil", m.ID())
+		frame.pendingDocumentMu.RUnlock()
 		return
 	}
+
 	errorText := req.errorText
 	if canceled {
 		errorText += "; maybe frame was detached?"
 	}
-	m.frameAbortedNavigation(cdp.FrameID(frame.ID()), errorText,
-		frame.pendingDocument.documentID)
+
+	docID := frame.pendingDocument.documentID
+	frame.pendingDocumentMu.RUnlock()
+
+	m.frameAbortedNavigation(cdp.FrameID(frame.ID()), errorText, docID)
 }
 
 func (m *FrameManager) requestFinished(req *Request) {
@@ -510,7 +529,9 @@ func (m *FrameManager) requestStarted(req *Request) {
 		frame.stopNetworkIdleTimer()
 	}
 	if req.documentID != "" {
+		frame.pendingDocumentMu.Lock()
 		frame.pendingDocument = &DocumentInfo{documentID: req.documentID, request: req}
+		frame.pendingDocumentMu.Unlock()
 	}
 	m.logger.Debugf("FrameManager:requestStarted", "fmid:%d rurl:%s pdoc:nil", m.ID(), req.URL())
 }
