@@ -1,6 +1,7 @@
 package remotewrite
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -161,4 +162,61 @@ func TestOutputConvertToPbSeries_WithPreviousState(t *testing.T) {
 			assert.Equal(t, tc.expLatest, swm.Latest)
 		})
 	}
+}
+
+func TestNewSeriesWithK6SinkMeasure(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		expSink    metrics.Sink
+		metricType metrics.MetricType
+	}{
+		{
+			metricType: metrics.Counter,
+			expSink:    &metrics.CounterSink{},
+		},
+		{
+			metricType: metrics.Gauge,
+			expSink:    &metrics.GaugeSink{},
+		},
+		{
+			metricType: metrics.Rate,
+			expSink:    &metrics.RateSink{},
+		},
+		{
+			metricType: metrics.Trend,
+			expSink:    &extendedTrendSink{},
+		},
+	}
+
+	registry := metrics.NewRegistry()
+	for i, tt := range tests {
+		s := metrics.TimeSeries{
+			Metric: registry.MustNewMetric(fmt.Sprintf("metric%d", i), tt.metricType),
+		}
+
+		swm := newSeriesWithMeasure(s, false)
+		require.NotNil(t, swm)
+		assert.Equal(t, s, swm.TimeSeries)
+		require.NotNil(t, swm.Measure)
+		assert.IsType(t, tt.expSink, swm.Measure)
+	}
+}
+
+func TestNewSeriesWithNativeHistogramMeasure(t *testing.T) {
+	t.Parallel()
+
+	registry := metrics.NewRegistry()
+	s := metrics.TimeSeries{
+		Metric: registry.MustNewMetric("metric1", metrics.Trend),
+	}
+
+	swm := newSeriesWithMeasure(s, true)
+	require.NotNil(t, swm)
+	assert.Equal(t, s, swm.TimeSeries)
+	require.NotNil(t, swm.Measure)
+
+	nhs, ok := swm.Measure.(*nativeHistogramSink)
+	require.True(t, ok)
+	assert.NotNil(t, nhs.H)
 }

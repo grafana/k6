@@ -138,7 +138,7 @@ func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) 
 			truncTime := sample.Time.Truncate(time.Millisecond)
 			swm, ok := o.tsdb[sample.TimeSeries]
 			if !ok {
-				swm = newSeriesWithMeasure(sample.TimeSeries)
+				swm = newSeriesWithMeasure(sample.TimeSeries, o.config.TrendAsNativeHistogram.Bool)
 				swm.Latest = truncTime
 				o.tsdb[sample.TimeSeries] = swm
 				seen[sample.TimeSeries] = struct{}{}
@@ -236,7 +236,6 @@ func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 			panic("Measure for Trend types must implement MapPromPb")
 		}
 		newts = trend.MapPrompb(swm.TimeSeries, swm.Latest)
-
 	default:
 		panic(fmt.Sprintf("Something is really off, as I cannot recognize the type of metric %s: `%s`", swm.Metric.Name, swm.Metric.Type))
 	}
@@ -247,7 +246,7 @@ type prompbMapper interface {
 	MapPrompb(series metrics.TimeSeries, t time.Time) []*prompb.TimeSeries
 }
 
-func newSeriesWithMeasure(series metrics.TimeSeries) *seriesWithMeasure {
+func newSeriesWithMeasure(series metrics.TimeSeries, trendAsNativeHistogram bool) *seriesWithMeasure {
 	var sink metrics.Sink
 	switch series.Metric.Type {
 	case metrics.Counter:
@@ -255,7 +254,11 @@ func newSeriesWithMeasure(series metrics.TimeSeries) *seriesWithMeasure {
 	case metrics.Gauge:
 		sink = &metrics.GaugeSink{}
 	case metrics.Trend:
-		sink = newExtendedTrendSink()
+		if trendAsNativeHistogram {
+			sink = newNativeHistogramSink(series.Metric)
+		} else {
+			sink = newExtendedTrendSink()
+		}
 	case metrics.Rate:
 		sink = &metrics.RateSink{}
 	default:

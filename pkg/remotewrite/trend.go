@@ -1,9 +1,12 @@
 package remotewrite
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	prompb "go.buf.build/grpc/go/prometheus/prometheus"
 	"go.k6.io/k6/metrics"
 )
@@ -106,4 +109,109 @@ func (tg *trendAsGauges) CacheNameIndex() {
 	if i < len(tg.labels) && tg.labels[i].Name == namelbl {
 		tg.ixname = uint16(i)
 	}
+}
+
+type nativeHistogramSink struct {
+	H prometheus.Histogram
+}
+
+func newNativeHistogramSink(m *metrics.Metric) *nativeHistogramSink {
+	return &nativeHistogramSink{
+		H: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name: m.Name,
+			// 1.1 is the starting value suggested by Prometheus'
+			// It sounds good considering the general purpose
+			// it have to address.
+			// In the future, we could consider to add more tuning
+			// if it will be required.
+			NativeHistogramBucketFactor: 1.1,
+		}),
+	}
+}
+
+func (sink *nativeHistogramSink) Add(s metrics.Sample) {
+	if s.Metric.Contains == metrics.Time {
+		// The Prometheus' convention is to use seconds
+		// as time unit.
+		//
+		// It isn't a requirement but having the current factor fixed to 1.1 then
+		// have seconds is beneficial for having a better resolution.
+		//
+		// The assumption is that an higher precision is required
+		// in case of under-second and more relaxed in case of higher values.
+		sink.H.Observe(s.Value / 1000)
+	} else {
+		// If the Value type is not defined any assumption can be done
+		// because the Sample's Value could contains any unit.
+		sink.H.Observe(s.Value)
+	}
+}
+
+// TODO: create a smaller Sink interface for this Output.
+// Sink with only Add and MapPrompb methods should be enough.
+// One method interfaces could be even better, to be checked.
+
+// P implements metrics.Sink.
+func (*nativeHistogramSink) P(pct float64) float64 {
+	panic("Native Histogram Sink has no support of percentile (P)")
+}
+
+// Format implements metrics.Sink.
+func (*nativeHistogramSink) Format(td time.Duration) map[string]float64 {
+	panic("Native Histogram Sink has no support of formatting (Format)")
+}
+
+// IsEmpty implements metrics.Sink.
+func (*nativeHistogramSink) IsEmpty() bool {
+	panic("Native Histogram Sink has no support of emptiness check (IsEmpty)")
+}
+
+// MapPrompb maps the Trend type to the experimental Native Histogram.
+func (sink *nativeHistogramSink) MapPrompb(series metrics.TimeSeries, t time.Time) []*prompb.TimeSeries {
+	labels := MapSeries(series)
+	timestamp := t.UnixMilli()
+
+	return []*prompb.TimeSeries{
+		{
+			// TODO: should we map the builtin metrics
+			// with the Prometheus' convention?
+			//
+			// e.g. k6_http_reqs_duration_seconds
+			// instead of k6_http_reqs_duration
+			Labels: labels,
+			Histograms: []*prompb.Histogram{
+				histogramToHistogramProto(timestamp, sink.H),
+			},
+		},
+	}
+}
+
+func histogramToHistogramProto(timestamp int64, h prometheus.Histogram) *prompb.Histogram {
+	// TODO: research more if a better way is possible.
+	metric := &dto.Metric{}
+	if err := h.Write(metric); err != nil {
+		panic(fmt.Errorf("failed to convert Native Histogram to the related Protobuf: %w", err))
+	}
+	hmetric := metric.Histogram
+
+	return &prompb.Histogram{
+		Count:          &prompb.Histogram_CountInt{CountInt: *hmetric.SampleCount},
+		Sum:            *hmetric.SampleSum,
+		Schema:         *hmetric.Schema,
+		ZeroThreshold:  *hmetric.ZeroThreshold,
+		ZeroCount:      &prompb.Histogram_ZeroCountInt{ZeroCountInt: *hmetric.ZeroCount},
+		NegativeSpans:  toBucketSpanProto(hmetric.NegativeSpan),
+		NegativeDeltas: hmetric.NegativeDelta,
+		PositiveSpans:  toBucketSpanProto(hmetric.PositiveSpan),
+		PositiveDeltas: hmetric.PositiveDelta,
+		Timestamp:      timestamp,
+	}
+}
+
+func toBucketSpanProto(s []*dto.BucketSpan) []*prompb.BucketSpan {
+	spans := make([]*prompb.BucketSpan, len(s))
+	for i := 0; i < len(s); i++ {
+		spans[i] = &prompb.BucketSpan{Offset: *s[i].Offset, Length: *s[i].Length}
+	}
+	return spans
 }

@@ -10,9 +10,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	prompb "go.buf.build/grpc/go/prometheus/prometheus"
+	"google.golang.org/protobuf/proto"
 )
 
 type HTTPConfig struct {

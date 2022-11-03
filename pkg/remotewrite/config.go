@@ -40,6 +40,10 @@ type Config struct {
 	// PushInterval defines the time between flushes. The Output will wait the set time
 	// before push a new set of time series to the endpoint.
 	PushInterval types.NullDuration `json:"pushInterval" envconfig:"K6_PROMETHEUS_PUSH_INTERVAL"`
+
+	// TrendAsNativeHistogram defines if the mapping for metrics defined as Trend type
+	// should map to a Prometheus' Native Histogram.
+	TrendAsNativeHistogram null.Bool `json:"trendAsNativeHistogram" envconfig:"K6_PROMETHEUS_TREND_AS_NATIVE_HISTOGRAM"`
 }
 
 // NewConfig creates an Output's configuration.
@@ -106,6 +110,10 @@ func (base Config) Apply(applied Config) Config {
 		base.PushInterval = applied.PushInterval
 	}
 
+	if applied.TrendAsNativeHistogram.Valid {
+		base.TrendAsNativeHistogram = applied.TrendAsNativeHistogram
+	}
+
 	if len(applied.Headers) > 0 {
 		for k, v := range applied.Headers {
 			base.Headers[k] = v
@@ -143,6 +151,10 @@ func ParseArg(arg string) (Config, error) {
 		if err := c.PushInterval.UnmarshalText([]byte(v)); err != nil {
 			return c, err
 		}
+	}
+
+	if v, ok := params["trendAsNativeHistogram"].(bool); ok {
+		c.TrendAsNativeHistogram = null.BoolFrom(v)
 	}
 
 	c.Headers = make(map[string]string)
@@ -206,7 +218,6 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 		return result, err
 	} else {
 		if b.Valid {
-			// apply only if valid, to keep default option otherwise
 			result.InsecureSkipTLSVerify = b
 		}
 	}
@@ -222,6 +233,14 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 	envHeaders := getEnvMap(env, "K6_PROMETHEUS_HEADERS_")
 	for k, v := range envHeaders {
 		result.Headers[k] = v
+	}
+
+	if b, err := getEnvBool(env, "K6_PROMETHEUS_TREND_AS_NATIVE_HISTOGRAM"); err != nil {
+		return result, err
+	} else {
+		if b.Valid {
+			result.TrendAsNativeHistogram = b
+		}
 	}
 
 	if arg != "" {

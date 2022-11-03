@@ -7,8 +7,11 @@ networks:
 
 services:
   prometheus:
-    image: prom/prometheus:v2.35.0
-    command: --web.enable-remote-write-receiver --config.file=/etc/prometheus/prometheus.yml
+    image: prom/prometheus:v2.40.1
+    command:
+      - --web.enable-remote-write-receiver
+      - --enable-feature=native-histograms
+      - --config.file=/etc/prometheus/prometheus.yml
     networks:
       - k6
       - grafana
@@ -17,7 +20,7 @@ services:
       - "9090:9090"
 
   grafana:
-    image: grafana/grafana:8.5.3
+    image: grafana/grafana:9.2.4
     networks:
       - grafana
       - prometheus
@@ -38,6 +41,7 @@ services:
       - "6565:6565"
     environment:
       - K6_PROMETHEUS_REMOTE_URL=http://prometheus:9090/api/v1/write
+      - K6_PROMETHEUS_TREND_AS_NATIVE_HISTOGRAM=true
       - K6_OUT=output-prometheus-remote
     depends_on:
       - prometheus

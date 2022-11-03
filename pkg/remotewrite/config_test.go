@@ -16,6 +16,14 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
+// TODO: create an issue?
+// TODO: refactor, it should have the 3 way tested in general
+// and each option should be tested in a specific table test
+// for all the methods at the same time, it should prevent the possibility
+// we forget to support or test an option in one of the available ways.
+// It also should keep the single test shorter.
+// Check the TestConfigTrendAsNativeHistogram as an example.
+
 func TestApply(t *testing.T) {
 	t.Parallel()
 
@@ -266,6 +274,40 @@ func TestConfigBasicAuth(t *testing.T) {
 		Password:              null.StringFrom("pass1"),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
+func TestConfigTrendAsNativeHistogram(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"trendAsNativeHistogram":true}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_TREND_AS_NATIVE_HISTOGRAM": "true"}},
+		"Arg":  {arg: "trendAsNativeHistogram=true"},
+	}
+
+	expconfig := Config{
+		URL:                    null.StringFrom("http://localhost:9090/api/v1/write"),
+		InsecureSkipTLSVerify:  null.BoolFrom(true),
+		Username:               null.NewString("", false),
+		Password:               null.NewString("", false),
+		PushInterval:           types.NullDurationFrom(5 * time.Second),
+		Headers:                make(map[string]string),
+		TrendAsNativeHistogram: null.BoolFrom(true),
 	}
 
 	for name, tc := range cases {

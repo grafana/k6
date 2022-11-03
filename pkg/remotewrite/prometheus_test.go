@@ -11,6 +11,8 @@ import (
 )
 
 func TestMapSeries(t *testing.T) {
+	t.Parallel()
+
 	r := metrics.NewRegistry()
 	series := metrics.TimeSeries{
 		Metric: &metrics.Metric{
