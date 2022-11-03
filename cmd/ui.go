@@ -17,6 +17,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/output"
@@ -81,7 +82,13 @@ func getColor(noColor bool, attributes ...color.Attribute) *color.Color {
 
 func getBanner(noColor bool) string {
 	c := getColor(noColor, color.FgCyan)
-	return c.Sprint(consts.Banner())
+	banner := make([]string, 0, len(modules.GetJSModuleVersions())+1)
+
+	banner = append(banner, consts.Banner())
+	for pkg, version := range modules.GetJSModuleVersions() {
+		banner = append(banner, fmt.Sprintf("extension  %s %s", pkg, version))
+	}
+	return c.Sprint(strings.Join(banner, "\n"))
 }
 
 func printBanner(gs *globalState) {
