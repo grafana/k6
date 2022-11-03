@@ -198,26 +198,6 @@ func createWaitForEventPredicateHandler(
 	return ch, evCancelFn
 }
 
-func waitForEvent(
-	ctx context.Context,
-	emitter EventEmitter, events []string,
-	predicateFn func(data any) bool,
-	timeout time.Duration,
-) (any, error) { //nolint:unparam
-	ch, evCancelFn := createWaitForEventHandler(ctx, emitter, events, predicateFn)
-	defer evCancelFn() // Remove event handler
-
-	select {
-	case <-ctx.Done():
-	case <-time.After(timeout):
-		return nil, fmt.Errorf("%w after %s", ErrTimedOut, timeout)
-	case evData := <-ch:
-		return evData, nil
-	}
-
-	return nil, nil
-}
-
 // panicOrSlowMo panics if err is not nil, otherwise applies slow motion.
 func panicOrSlowMo(ctx context.Context, err error) {
 	if err != nil {
