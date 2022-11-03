@@ -21,8 +21,6 @@ import (
 // testSetup is a helper struct holding components
 // necessary to test the redis client, in the context
 // of the execution of a k6 script.
-//
-//nolint:unused
 type testSetup struct {
 	rt      *goja.Runtime
 	state   *lib.State
@@ -34,8 +32,6 @@ type testSetup struct {
 // It prepares a test setup with a mocked redis server and a goja runtime,
 // and event loop, ready to execute scripts as if being executed in the
 // main context of k6.
-//
-//nolint:deadcode,unused
 func newTestSetup(t testing.TB) testSetup {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
