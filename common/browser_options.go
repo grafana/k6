@@ -44,12 +44,13 @@ type LaunchPersistentContextOptions struct {
 }
 
 // NewLaunchOptions returns a new LaunchOptions.
-func NewLaunchOptions() *LaunchOptions {
+func NewLaunchOptions(onCloud bool) *LaunchOptions {
 	return &LaunchOptions{
 		Env:               make(map[string]string),
 		Headless:          true,
 		LogCategoryFilter: ".*",
 		Timeout:           DefaultTimeout,
+		onCloud:           onCloud,
 	}
 }
 

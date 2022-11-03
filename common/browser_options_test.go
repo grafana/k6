@@ -212,7 +212,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			t.Parallel()
 			var (
 				vu = k6test.NewVU(t)
-				lo = NewLaunchOptions()
+				lo = NewLaunchOptions(false)
 			)
 			err := lo.Parse(vu.Context(), vu.ToGojaValue(tt.opts), log.NewNullLogger())
 			if tt.err != "" {
