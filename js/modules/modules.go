@@ -3,6 +3,8 @@ package modules
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"runtime/debug"
 	"strings"
 	"sync"
 
@@ -15,8 +17,9 @@ const extPrefix string = "k6/x/"
 
 //nolint:gochecknoglobals
 var (
-	modules = make(map[string]interface{})
-	mx      sync.RWMutex
+	modules        = make(map[string]interface{})
+	moduleVersions = make(map[string]string)
+	mx             sync.RWMutex
 )
 
 // Register the given mod as an external JavaScript module that can be imported
@@ -34,6 +37,38 @@ func Register(name string, mod interface{}) {
 		panic(fmt.Sprintf("module already registered: %s", name))
 	}
 	modules[name] = mod
+	getPackageVersion(mod)
+}
+
+func getPackageVersion(mod interface{}) {
+	t := reflect.TypeOf(mod)
+	p := t.PkgPath()
+	if p == "" {
+		if t.Kind() != reflect.Ptr {
+			return
+		}
+		if t.Elem() != nil {
+			p = t.Elem().PkgPath()
+		}
+	}
+	buildInfo, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+	for _, dep := range buildInfo.Deps {
+		packagePath := strings.TrimSpace(dep.Path)
+		if strings.HasPrefix(p, packagePath) {
+			if _, ok := moduleVersions[packagePath]; ok {
+				return
+			}
+			if dep.Replace != nil {
+				moduleVersions[packagePath] = dep.Replace.Version
+			} else {
+				moduleVersions[packagePath] = dep.Version
+			}
+			break
+		}
+	}
 }
 
 // Module is the interface js modules should implement in order to get access to the VU
@@ -51,6 +86,19 @@ func GetJSModules() map[string]interface{} {
 
 	for name, module := range modules {
 		result[name] = module
+	}
+
+	return result
+}
+
+// GetJSModuleVersions returns a map of all registered js modules package and their versions
+func GetJSModuleVersions() map[string]string {
+	mx.Lock()
+	defer mx.Unlock()
+	result := make(map[string]string, len(moduleVersions))
+
+	for name, version := range moduleVersions {
+		result[name] = version
 	}
 
 	return result
