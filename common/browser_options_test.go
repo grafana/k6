@@ -15,9 +15,10 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		opts   map[string]any
-		assert func(testing.TB, *LaunchOptions)
-		err    string
+		opts    map[string]any
+		assert  func(testing.TB, *LaunchOptions)
+		err     string
+		onCloud bool
 	}{
 		"defaults": {
 			opts: map[string]any{},
@@ -28,6 +29,24 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 					Headless:          true,
 					LogCategoryFilter: ".*",
 					Timeout:           DefaultTimeout,
+				}, lo)
+			},
+		},
+		"defaults_on_cloud": {
+			onCloud: true,
+			opts: map[string]any{
+				"headless":       false,
+				"devtools":       true,
+				"executablePath": "something else",
+			},
+			assert: func(tb testing.TB, lo *LaunchOptions) {
+				tb.Helper()
+				assert.Equal(t, &LaunchOptions{
+					Env:               make(map[string]string),
+					Headless:          true,
+					LogCategoryFilter: ".*",
+					Timeout:           DefaultTimeout,
+					onCloud:           true,
 				}, lo)
 			},
 		},
@@ -212,7 +231,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			t.Parallel()
 			var (
 				vu = k6test.NewVU(t)
-				lo = NewLaunchOptions(false)
+				lo = NewLaunchOptions(tt.onCloud)
 			)
 			err := lo.Parse(vu.Context(), vu.ToGojaValue(tt.opts), log.NewNullLogger())
 			if tt.err != "" {
