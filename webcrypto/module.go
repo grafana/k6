@@ -31,7 +31,13 @@ func New() *RootModule {
 // NewModuleInstance implements the modules.Module interface and returns
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	return &ModuleInstance{vu: vu, Crypto: &Crypto{vu: vu, Subtle: &SubtleCrypto{vu: vu}}}
+	return &ModuleInstance{
+		vu: vu,
+		Crypto: &Crypto{
+			vu:     vu,
+			Subtle: &SubtleCrypto{vu: vu},
+		},
+	}
 }
 
 // Exports implements the modules.Instance interface and returns
