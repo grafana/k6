@@ -446,11 +446,12 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	}
 	frame.deleteRequest(req.getID())
 
-	switch rc := frame.inflightRequestsLen(); {
+	ifr := frame.getInflightRequest()
+	switch rc := len(ifr); {
 	case rc == 0:
 		frame.startNetworkIdleTimer()
 	case rc <= 10:
-		for reqID := range frame.inflightRequests {
+		for reqID := range ifr {
 			req := frame.requestByID(reqID)
 
 			m.logger.Debugf("FrameManager:requestFailed:rc<=10",

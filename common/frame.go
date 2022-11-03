@@ -148,6 +148,18 @@ func (f *Frame) inflightRequestsLen() int {
 	return len(f.inflightRequests)
 }
 
+func (f *Frame) getInflightRequest() map[network.RequestID]bool {
+	f.inflightRequestsMu.Lock()
+	defer f.inflightRequestsMu.Unlock()
+
+	ifr := make(map[network.RequestID]bool)
+	for k, v := range f.inflightRequests {
+		ifr[k] = v
+	}
+
+	return ifr
+}
+
 func (f *Frame) clearLifecycle() {
 	f.log.Debugf("Frame:clearLifecycle", "fid:%s furl:%q", f.ID(), f.URL())
 
