@@ -1818,6 +1818,7 @@ func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.V
 }
 
 // WaitForLoadState waits for the given load state to be reached.
+// This will unblock if that lifecycle event has already been received.
 func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 	f.log.Debugf("Frame:WaitForLoadState", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 	defer f.log.Debugf("Frame:WaitForLoadState:return", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
@@ -1828,6 +1829,9 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 		k6ext.Panic(f.ctx, "parsing waitForLoadState %q options: %v", state, err)
 	}
 
+	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, parsedOpts.Timeout)
+	defer timeoutCancel()
+
 	waitUntil := LifecycleEventLoad
 	if state != "" {
 		if err = waitUntil.UnmarshalText([]byte(state)); err != nil {
@@ -1835,14 +1839,23 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 		}
 	}
 
+	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
+		timeoutCtx, f, []string{EventFrameAddLifecycle},
+		func(data any) bool {
+			if le, ok := data.(LifecycleEvent); ok {
+				return le == waitUntil
+			}
+			return false
+		})
+	defer lifecycleEvtCancel()
+
 	if f.hasLifecycleEventFired(waitUntil) {
 		return
 	}
 
-	_, err = waitForEvent(f.ctx, f, []string{EventFrameAddLifecycle}, func(data any) bool {
-		return data.(LifecycleEvent) == waitUntil
-	}, parsedOpts.Timeout)
-	if err != nil {
+	select {
+	case <-lifecycleEvtCh:
+	case <-timeoutCtx.Done():
 		k6ext.Panic(f.ctx, "waiting for load state %q: %v", state, err)
 	}
 }
