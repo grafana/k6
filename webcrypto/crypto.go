@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/dop251/goja"
+	"github.com/google/uuid"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
@@ -110,6 +111,6 @@ const maxRandomValuesLength = 65536
 //
 // [RFC4122]: https://tools.ietf.org/html/rfc4122
 // [Web Crypto API's specification]: https://w3c.github.io/webcrypto/#Crypto-method-randomUUID
-func (c *Crypto) RandomUUID() {
-	// TODO
+func (c *Crypto) RandomUUID() string {
+	return uuid.New().String()
 }
