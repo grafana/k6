@@ -662,8 +662,6 @@ func TestPageWaitForFunction(t *testing.T) {
 func TestPageWaitForLoadState(t *testing.T) {
 	t.Parallel()
 
-	// TODO: Add happy path tests once WaitForLoadState is not racy.
-
 	t.Run("err_wrong_event", func(t *testing.T) {
 		t.Parallel()
 

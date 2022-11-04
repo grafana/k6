@@ -14,6 +14,215 @@ import (
 	"github.com/grafana/xk6-browser/common"
 )
 
+func TestLifecycleWaitForLoadStateLoad(t *testing.T) {
+	// Test description
+	//
+	// 1. goto /home and wait for the load lifecycle event.
+	// 2. use WaitForLoadState with load to ensure that load
+	//    lifecycle event has already fired.
+	//
+	// Success criteria: We don't wait for all network requests to
+	//                   complete, but we are interested in waiting
+	//                   for all async scripts to have fully loaded
+	//                   (which is when load is fired). We also want
+	//                   to ensure that the load event is stored
+	//                   internally, and we don't block on WaitForLoadState.
+
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.staticURL("wait_for_nav_lifecycle.html"), http.StatusMovedPermanently)
+	})
+
+	var counter int64
+	var counterMu sync.Mutex
+	tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
+		counterMu.Lock()
+		defer counterMu.Unlock()
+
+		time.Sleep(time.Millisecond * 100)
+
+		counter++
+		fmt.Fprintf(w, "pong %d", counter)
+	})
+
+	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintf(w, `
+				var pingJSTextOutput = document.getElementById("pingJSText");
+				pingJSTextOutput.innerText = "ping.js loaded from server";
+			`)
+	})
+
+	waitUntil := common.LifecycleEventLoad
+	assertHome(t, tb, p, waitUntil, func() {
+		result := p.TextContent("#pingRequestText", nil)
+		assert.NotEqualValues(t, "Waiting... pong 10 - for loop complete", result)
+
+		result = p.TextContent("#pingJSText", nil)
+		assert.EqualValues(t, "ping.js loaded from server", result)
+
+		// This shouldn't block and return after calling hasLifecycleEventFired.
+		p.WaitForLoadState(waitUntil.String(), nil)
+	})
+}
+
+func TestLifecycleWaitForLoadStateDOMContentLoaded(t *testing.T) {
+	// Test description
+	//
+	// 1. goto /home and wait for the domcontentloaded lifecycle event.
+	// 2. use WaitForLoadState with domcontentloaded to ensure that
+	//    domcontentloaded lifecycle event has already fired.
+	//
+	// Success criteria: We don't wait for all network requests or the
+	//                   async scripts to complete, and we're only
+	//                   interested in the html file being loaded. We
+	//                   also want to ensure that the domcontentloaded
+	//                   event is stored internally, and we don't block
+	//                   on WaitForLoadState.
+
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.staticURL("wait_for_nav_lifecycle.html"), http.StatusMovedPermanently)
+	})
+
+	var counter int64
+	var counterMu sync.Mutex
+	tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
+		counterMu.Lock()
+		defer counterMu.Unlock()
+
+		time.Sleep(time.Millisecond * 100)
+
+		counter++
+		fmt.Fprintf(w, "pong %d", counter)
+	})
+
+	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintf(w, `
+				await new Promise(resolve => setTimeout(resolve, 1000));
+
+				var pingJSTextOutput = document.getElementById("pingJSText");
+				pingJSTextOutput.innerText = "ping.js loaded from server";
+			`)
+	})
+
+	waitUntil := common.LifecycleEventDOMContentLoad
+	assertHome(t, tb, p, waitUntil, func() {
+		result := p.TextContent("#pingRequestText", nil)
+		assert.NotEqualValues(t, "Waiting... pong 10 - for loop complete", result)
+
+		result = p.TextContent("#pingJSText", nil)
+		assert.EqualValues(t, "Waiting...", result)
+
+		// This shouldn't block and return after calling hasLifecycleEventFired.
+		p.WaitForLoadState(waitUntil.String(), nil)
+	})
+}
+
+func TestLifecycleWaitForLoadStateNetworkIdle(t *testing.T) {
+	// Test description
+	//
+	// 1. goto /home and wait for the networkidle lifecycle event.
+	// 2. use WaitForLoadState with networkidle to ensure that
+	//    networkidle lifecycle event has already fired.
+	//
+	// Success criteria: We wait for all network requests and async
+	//                   scripts to complete. We also want to ensure
+	//                   that the networkidle event is stored internally,
+	//                   and we don't block on WaitForLoadState.
+
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.staticURL("wait_for_nav_lifecycle.html"), http.StatusMovedPermanently)
+	})
+
+	var counter int64
+	var counterMu sync.Mutex
+	tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
+		counterMu.Lock()
+		defer counterMu.Unlock()
+
+		counter++
+		fmt.Fprintf(w, "pong %d", counter)
+	})
+
+	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintf(w, `
+				var pingJSTextOutput = document.getElementById("pingJSText");
+				pingJSTextOutput.innerText = "ping.js loaded from server";
+			`)
+	})
+
+	waitUntil := common.LifecycleEventNetworkIdle
+	assertHome(t, tb, p, waitUntil, func() {
+		result := p.TextContent("#pingRequestText", nil)
+		assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
+
+		result = p.TextContent("#pingJSText", nil)
+		assert.EqualValues(t, "ping.js loaded from server", result)
+
+		// This shouldn't block and return after calling hasLifecycleEventFired.
+		p.WaitForLoadState(waitUntil.String(), nil)
+	})
+}
+
+func TestLifecycleWaitForLoadStateDOMContentLoadedThenNetworkIdle(t *testing.T) {
+	// Test description
+	//
+	// 1. goto /home and wait for the domcontentloaded lifecycle event.
+	// 2. use WaitForLoadState with networkidle to now wait for the
+	//    lifecycle event from the browser.
+	//
+	// Success criteria: We want to quickly move to calling WaitForLoadState
+	//                   so that we block until a networkidle lifecycle
+	//                   event is received from the browser.
+
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.staticURL("wait_for_nav_lifecycle.html"), http.StatusMovedPermanently)
+	})
+
+	var counter int64
+	var counterMu sync.Mutex
+	tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
+		counterMu.Lock()
+		defer counterMu.Unlock()
+
+		time.Sleep(time.Millisecond * 100)
+
+		counter++
+		fmt.Fprintf(w, "pong %d", counter)
+	})
+
+	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintf(w, `
+				var pingJSTextOutput = document.getElementById("pingJSText");
+				pingJSTextOutput.innerText = "ping.js loaded from server";
+			`)
+	})
+
+	assertHome(t, tb, p, common.LifecycleEventDOMContentLoad, func() {
+		p.WaitForLoadState(common.LifecycleEventNetworkIdle.String(), nil)
+
+		result := p.TextContent("#pingRequestText", nil)
+		assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
+
+		result = p.TextContent("#pingJSText", nil)
+		assert.EqualValues(t, "ping.js loaded from server", result)
+	})
+}
+
 func TestLifecycleReloadLoad(t *testing.T) {
 	t.Parallel()
 
