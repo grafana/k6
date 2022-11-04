@@ -687,32 +687,52 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 		k6ext.Panic(p.ctx, "parsing reload options: %w", err)
 	}
 
-	ch, evCancelFn := createWaitForEventHandler(p.ctx,
-		p.frameManager.MainFrame(),
-		[]string{EventFrameNavigation}, func(data any) bool {
+	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, parsedOpts.Timeout)
+	defer timeoutCancelFn()
+
+	ch, evCancelFn := createWaitForEventHandler(
+		timeoutCtx, p.frameManager.MainFrame(), []string{EventFrameNavigation},
+		func(data any) bool {
 			return true // Both successful and failed navigations are considered
 		},
 	)
 	defer evCancelFn() // Remove event handler
+
+	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
+		timeoutCtx, p.frameManager.MainFrame(), []string{EventFrameAddLifecycle},
+		func(data any) bool {
+			if le, ok := data.(LifecycleEvent); ok {
+				return le == parsedOpts.WaitUntil
+			}
+			return false
+		})
+	defer lifecycleEvtCancel()
 
 	action := cdppage.Reload()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
 		k6ext.Panic(p.ctx, "reloading page: %w", err)
 	}
 
+	wrapTimeoutError := func(err error) error {
+		if errors.Is(err, context.DeadlineExceeded) {
+			err = &k6ext.UserFriendlyError{
+				Err:     err,
+				Timeout: parsedOpts.Timeout,
+			}
+			return fmt.Errorf("reloading page: %w", err)
+		}
+		p.logger.Debugf("Page:Reload", "timeoutCtx done: %v", err)
+
+		return err // TODO maybe wrap this as well?
+	}
+
 	var event *NavigationEvent
 	select {
 	case <-p.ctx.Done():
-	case <-time.After(parsedOpts.Timeout):
-		k6ext.Panic(p.ctx, "%w", ErrTimedOut)
+	case <-timeoutCtx.Done():
+		k6ext.Panic(p.ctx, "%w", wrapTimeoutError(timeoutCtx.Err()))
 	case data := <-ch:
 		event = data.(*NavigationEvent)
-	}
-
-	if p.frameManager.mainFrame.hasSubtreeLifecycleEventFired(parsedOpts.WaitUntil) {
-		_, _ = waitForEvent(p.ctx, p.frameManager.MainFrame(), []string{EventFrameAddLifecycle}, func(data any) bool {
-			return data.(LifecycleEvent) == parsedOpts.WaitUntil
-		}, parsedOpts.Timeout)
 	}
 
 	var resp *Response
@@ -721,6 +741,12 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 		req.responseMu.RLock()
 		resp = req.response
 		req.responseMu.RUnlock()
+	}
+
+	select {
+	case <-lifecycleEvtCh:
+	case <-timeoutCtx.Done():
+		k6ext.Panic(p.ctx, "%w", wrapTimeoutError(timeoutCtx.Err()))
 	}
 
 	applySlowMo(p.ctx)
