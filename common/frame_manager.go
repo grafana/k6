@@ -454,6 +454,13 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 		for reqID := range ifr {
 			req := frame.requestByID(reqID)
 
+			if req == nil {
+				m.logger.Debugf("FrameManager:requestFailed:rc<=10 request is nil",
+					"reqID:%s frameID:%s",
+					reqID, frame.ID())
+				continue
+			}
+
 			m.logger.Debugf("FrameManager:requestFailed:rc<=10",
 				"reqID:%s inflightURL:%s frameID:%s",
 				reqID, req.URL(), frame.ID())
