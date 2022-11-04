@@ -149,8 +149,8 @@ func (f *Frame) inflightRequestsLen() int {
 }
 
 func (f *Frame) getInflightRequest() map[network.RequestID]bool {
-	f.inflightRequestsMu.Lock()
-	defer f.inflightRequestsMu.Unlock()
+	f.inflightRequestsMu.RLock()
+	defer f.inflightRequestsMu.RUnlock()
 
 	ifr := make(map[network.RequestID]bool)
 	for k, v := range f.inflightRequests {
