@@ -70,8 +70,9 @@ type Frame struct {
 	inflightRequestsMu sync.RWMutex
 	inflightRequests   map[network.RequestID]bool
 
-	currentDocument *DocumentInfo
-	pendingDocument *DocumentInfo
+	currentDocument   *DocumentInfo
+	pendingDocumentMu sync.RWMutex
+	pendingDocument   *DocumentInfo
 
 	log *log.Logger
 }
@@ -145,6 +146,18 @@ func (f *Frame) inflightRequestsLen() int {
 	defer f.inflightRequestsMu.RUnlock()
 
 	return len(f.inflightRequests)
+}
+
+func (f *Frame) cloneInflightRequests() map[network.RequestID]bool {
+	f.inflightRequestsMu.RLock()
+	defer f.inflightRequestsMu.RUnlock()
+
+	ifr := make(map[network.RequestID]bool)
+	for k, v := range f.inflightRequests {
+		ifr[k] = v
+	}
+
+	return ifr
 }
 
 func (f *Frame) clearLifecycle() {
