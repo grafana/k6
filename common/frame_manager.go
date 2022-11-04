@@ -446,7 +446,7 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	}
 	frame.deleteRequest(req.getID())
 
-	ifr := frame.getInflightRequest()
+	ifr := frame.cloneInflightRequests()
 	switch rc := len(ifr); {
 	case rc == 0:
 		frame.startNetworkIdleTimer()

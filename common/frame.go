@@ -148,7 +148,7 @@ func (f *Frame) inflightRequestsLen() int {
 	return len(f.inflightRequests)
 }
 
-func (f *Frame) getInflightRequest() map[network.RequestID]bool {
+func (f *Frame) cloneInflightRequests() map[network.RequestID]bool {
 	f.inflightRequestsMu.RLock()
 	defer f.inflightRequestsMu.RUnlock()
 
