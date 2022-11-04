@@ -122,12 +122,13 @@ func (m *FrameManager) frameAbortedNavigation(frameID cdp.FrameID, errorText, do
 	}
 
 	frame.pendingDocumentMu.Lock()
-	defer frame.pendingDocumentMu.Unlock()
 
 	if frame.pendingDocument == nil {
+		frame.pendingDocumentMu.Unlock()
 		return
 	}
 	if documentID != "" && frame.pendingDocument.documentID != documentID {
+		frame.pendingDocumentMu.Unlock()
 		return
 	}
 
@@ -142,6 +143,9 @@ func (m *FrameManager) frameAbortedNavigation(frameID cdp.FrameID, errorText, do
 		err:         errors.New(errorText),
 	}
 	frame.pendingDocument = nil
+
+	frame.pendingDocumentMu.Unlock()
+
 	frame.emit(EventFrameNavigation, ne)
 }
 
