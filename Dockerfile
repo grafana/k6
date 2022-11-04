@@ -6,10 +6,8 @@ RUN  xk6 build --output "/tmp/k6" --with github.com/grafana/xk6-browser
 
 FROM debian:bullseye
 
-ARG CHROMIUM_VERSION=106.0.5249.61-1~deb11u1
-
 RUN apt-get update && \
-    apt-get install -y chromium=${CHROMIUM_VERSION}
+    apt-get install -y chromium
 
 COPY --from=builder /tmp/k6 /usr/bin/k6
 
