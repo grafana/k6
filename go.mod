@@ -13,7 +13,7 @@ require (
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0
-	go.k6.io/k6 v0.40.1-0.20221019120653-b60fe887f035
+	go.k6.io/k6 v0.41.0
 	golang.org/x/net v0.1.0
 	gopkg.in/guregu/null.v3 v3.5.0
 )
