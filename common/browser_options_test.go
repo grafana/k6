@@ -35,18 +35,38 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 		"defaults_on_cloud": {
 			onCloud: true,
 			opts: map[string]any{
+				// disallow changing the following opts
 				"headless":       false,
 				"devtools":       true,
 				"executablePath": "something else",
+				// allow changing the following opts
+				"args":              []string{"any"},
+				"debug":             true,
+				"env":               map[string]string{"some": "thing"},
+				"ignoreDefaultArgs": []string{"any"},
+				"logCategoryFilter": "...",
+				"proxy":             ProxyOptions{Server: "srv"},
+				"slowMo":            time.Second,
+				"timeout":           time.Second,
 			},
 			assert: func(tb testing.TB, lo *LaunchOptions) {
 				tb.Helper()
 				assert.Equal(t, &LaunchOptions{
-					Env:               make(map[string]string),
-					Headless:          true,
-					LogCategoryFilter: ".*",
-					Timeout:           DefaultTimeout,
-					onCloud:           true,
+					// disallowed:
+					Headless:       true,
+					Devtools:       false,
+					ExecutablePath: "",
+					// allowed:
+					Args:              []string{"any"},
+					Debug:             true,
+					Env:               map[string]string{"some": "thing"},
+					IgnoreDefaultArgs: []string{"any"},
+					LogCategoryFilter: "...",
+					Proxy:             ProxyOptions{Server: "srv"},
+					SlowMo:            time.Second,
+					Timeout:           time.Second,
+
+					onCloud: true,
 				}, lo)
 			},
 		},
