@@ -24,7 +24,7 @@
 
 **xk6-browser** is a [k6](https://k6.io/) extension adding support for automation of browsers via the [Chrome Devtools Protocol](https://chromedevtools.github.io/devtools-protocol/) (CDP).
 
-https://user-images.githubusercontent.com/10811379/188889687-660ce8f9-264d-4dd0-905c-41a909102be8.mp4
+https://user-images.githubusercontent.com/10811379/200350050-f346931f-6402-487e-bf4d-eff808ac2190.mp4
 
 Special acknowledgment to the authors of [Playwright](https://playwright.dev/) and [Puppeteer](https://github.com/puppeteer/puppeteer) for their trailblazing work in this area. This project is heavily influenced and in some regards based on the code of those projects.
 
