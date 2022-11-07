@@ -1114,6 +1114,46 @@ func (r *Runtime) arrayproto_findIndex(call FunctionCall) Value {
 	return intToValue(-1)
 }
 
+func (r *Runtime) arrayproto_findLast(call FunctionCall) Value {
+	o := call.This.ToObject(r)
+	l := toLength(o.self.getStr("length", nil))
+	predicate := r.toCallable(call.Argument(0))
+	fc := FunctionCall{
+		This:      call.Argument(1),
+		Arguments: []Value{nil, nil, o},
+	}
+	for k := int64(l - 1); k >= 0; k-- {
+		idx := valueInt(k)
+		kValue := o.self.getIdx(idx, nil)
+		fc.Arguments[0], fc.Arguments[1] = kValue, idx
+		if predicate(fc).ToBoolean() {
+			return kValue
+		}
+	}
+
+	return _undefined
+}
+
+func (r *Runtime) arrayproto_findLastIndex(call FunctionCall) Value {
+	o := call.This.ToObject(r)
+	l := toLength(o.self.getStr("length", nil))
+	predicate := r.toCallable(call.Argument(0))
+	fc := FunctionCall{
+		This:      call.Argument(1),
+		Arguments: []Value{nil, nil, o},
+	}
+	for k := int64(l - 1); k >= 0; k-- {
+		idx := valueInt(k)
+		kValue := o.self.getIdx(idx, nil)
+		fc.Arguments[0], fc.Arguments[1] = kValue, idx
+		if predicate(fc).ToBoolean() {
+			return idx
+		}
+	}
+
+	return intToValue(-1)
+}
+
 func (r *Runtime) arrayproto_flat(call FunctionCall) Value {
 	o := call.This.ToObject(r)
 	l := toLength(o.self.getStr("length", nil))
@@ -1369,6 +1409,8 @@ func (r *Runtime) createArrayProto(val *Object) objectImpl {
 	o._putProp("filter", r.newNativeFunc(r.arrayproto_filter, nil, "filter", nil, 1), true, false, true)
 	o._putProp("find", r.newNativeFunc(r.arrayproto_find, nil, "find", nil, 1), true, false, true)
 	o._putProp("findIndex", r.newNativeFunc(r.arrayproto_findIndex, nil, "findIndex", nil, 1), true, false, true)
+	o._putProp("findLast", r.newNativeFunc(r.arrayproto_findLast, nil, "findLast", nil, 1), true, false, true)
+	o._putProp("findLastIndex", r.newNativeFunc(r.arrayproto_findLastIndex, nil, "findLastIndex", nil, 1), true, false, true)
 	o._putProp("flat", r.newNativeFunc(r.arrayproto_flat, nil, "flat", nil, 0), true, false, true)
 	o._putProp("flatMap", r.newNativeFunc(r.arrayproto_flatMap, nil, "flatMap", nil, 1), true, false, true)
 	o._putProp("forEach", r.newNativeFunc(r.arrayproto_forEach, nil, "forEach", nil, 1), true, false, true)
@@ -1401,6 +1443,8 @@ func (r *Runtime) createArrayProto(val *Object) objectImpl {
 	bl.setOwnStr("fill", valueTrue, true)
 	bl.setOwnStr("find", valueTrue, true)
 	bl.setOwnStr("findIndex", valueTrue, true)
+	bl.setOwnStr("findLast", valueTrue, true)
+	bl.setOwnStr("findLastIndex", valueTrue, true)
 	bl.setOwnStr("flat", valueTrue, true)
 	bl.setOwnStr("flatMap", valueTrue, true)
 	bl.setOwnStr("includes", valueTrue, true)

@@ -209,19 +209,31 @@ func (r *Runtime) builtin_newSet(args []Value, newTarget *Object) *Object {
 	if len(args) > 0 {
 		if arg := args[0]; arg != nil && arg != _undefined && arg != _null {
 			adder := so.getStr("add", nil)
-			iter := r.getIterator(arg, nil)
+			stdArr := r.checkStdArrayIter(arg)
 			if adder == r.global.setAdder {
-				iter.iterate(func(item Value) {
-					so.m.set(item, nil)
-				})
+				if stdArr != nil {
+					for _, v := range stdArr.values {
+						so.m.set(v, nil)
+					}
+				} else {
+					r.getIterator(arg, nil).iterate(func(item Value) {
+						so.m.set(item, nil)
+					})
+				}
 			} else {
 				adderFn := toMethod(adder)
 				if adderFn == nil {
 					panic(r.NewTypeError("Set.add in missing"))
 				}
-				iter.iterate(func(item Value) {
-					adderFn(FunctionCall{This: o, Arguments: []Value{item}})
-				})
+				if stdArr != nil {
+					for _, item := range stdArr.values {
+						adderFn(FunctionCall{This: o, Arguments: []Value{item}})
+					}
+				} else {
+					r.getIterator(arg, nil).iterate(func(item Value) {
+						adderFn(FunctionCall{This: o, Arguments: []Value{item}})
+					})
+				}
 			}
 		}
 	}

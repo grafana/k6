@@ -574,6 +574,54 @@ func (r *Runtime) typedArrayProto_findIndex(call FunctionCall) Value {
 	panic(r.NewTypeError("Method TypedArray.prototype.findIndex called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
+func (r *Runtime) typedArrayProto_findLast(call FunctionCall) Value {
+	if ta, ok := r.toObject(call.This).self.(*typedArrayObject); ok {
+		ta.viewedArrayBuf.ensureNotDetached(true)
+		predicate := r.toCallable(call.Argument(0))
+		fc := FunctionCall{
+			This:      call.Argument(1),
+			Arguments: []Value{nil, nil, call.This},
+		}
+		for k := ta.length - 1; k >= 0; k-- {
+			var val Value
+			if ta.isValidIntegerIndex(k) {
+				val = ta.typedArray.get(ta.offset + k)
+			}
+			fc.Arguments[0] = val
+			fc.Arguments[1] = intToValue(int64(k))
+			if predicate(fc).ToBoolean() {
+				return val
+			}
+		}
+		return _undefined
+	}
+	panic(r.NewTypeError("Method TypedArray.prototype.findLast called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
+}
+
+func (r *Runtime) typedArrayProto_findLastIndex(call FunctionCall) Value {
+	if ta, ok := r.toObject(call.This).self.(*typedArrayObject); ok {
+		ta.viewedArrayBuf.ensureNotDetached(true)
+		predicate := r.toCallable(call.Argument(0))
+		fc := FunctionCall{
+			This:      call.Argument(1),
+			Arguments: []Value{nil, nil, call.This},
+		}
+		for k := ta.length - 1; k >= 0; k-- {
+			if ta.isValidIntegerIndex(k) {
+				fc.Arguments[0] = ta.typedArray.get(ta.offset + k)
+			} else {
+				fc.Arguments[0] = _undefined
+			}
+			fc.Arguments[1] = intToValue(int64(k))
+			if predicate(fc).ToBoolean() {
+				return fc.Arguments[1]
+			}
+		}
+		return intToValue(-1)
+	}
+	panic(r.NewTypeError("Method TypedArray.prototype.findLastIndex called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
+}
+
 func (r *Runtime) typedArrayProto_forEach(call FunctionCall) Value {
 	if ta, ok := r.toObject(call.This).self.(*typedArrayObject); ok {
 		ta.viewedArrayBuf.ensureNotDetached(true)
@@ -1447,6 +1495,8 @@ func (r *Runtime) createTypedArrayProto(val *Object) objectImpl {
 	b._putProp("filter", r.newNativeFunc(r.typedArrayProto_filter, nil, "filter", nil, 1), true, false, true)
 	b._putProp("find", r.newNativeFunc(r.typedArrayProto_find, nil, "find", nil, 1), true, false, true)
 	b._putProp("findIndex", r.newNativeFunc(r.typedArrayProto_findIndex, nil, "findIndex", nil, 1), true, false, true)
+	b._putProp("findLast", r.newNativeFunc(r.typedArrayProto_findLast, nil, "findLast", nil, 1), true, false, true)
+	b._putProp("findLastIndex", r.newNativeFunc(r.typedArrayProto_findLastIndex, nil, "findLastIndex", nil, 1), true, false, true)
 	b._putProp("forEach", r.newNativeFunc(r.typedArrayProto_forEach, nil, "forEach", nil, 1), true, false, true)
 	b._putProp("includes", r.newNativeFunc(r.typedArrayProto_includes, nil, "includes", nil, 1), true, false, true)
 	b._putProp("indexOf", r.newNativeFunc(r.typedArrayProto_indexOf, nil, "indexOf", nil, 1), true, false, true)

@@ -48,17 +48,12 @@ var (
 		"BigInt",                      // not supported at all
 		"IsHTMLDDA",                   // not supported at all
 		"generators",                  // not supported in a meaningful way IMO
-		"Array.prototype.item",        // not even standard yet
 		"async-iteration",             // not supported at all
-		"TypedArray.prototype.item",   // not even standard yet
 		"String.prototype.replaceAll", // not supported at all, Stage 4 since 2020
 
 		// from goja
 		"Symbol.asyncIterator",
 		"async-functions",
-		"class-static-block",
-		"class-fields-private",
-		"class-fields-private-in",
 		"regexp-named-groups",
 		"regexp-dotall",
 		"regexp-unicode-property-escapes",
@@ -70,27 +65,20 @@ var (
 		"import-assertions",
 		"dynamic-import",
 		"logical-assignment-operators",
-		"coalesce-expression",
 		"import.meta",
 		"Atomics",
 		"Atomics.waitAsync",
 		"FinalizationRegistry",
 		"WeakRef",
 		"numeric-separator-literal",
-		"Object.fromEntries",
-		"Object.hasOwn",
 		"__getter__",
 		"__setter__",
 		"ShadowRealm",
 		"SharedArrayBuffer",
 		"error-cause",
 		"resizable-arraybuffer", // stage 3 as of 2021 https://github.com/tc39/proposal-resizablearraybuffer
-		"hashbang",              // #comments in js - not implemented https://github.com/tc39/proposal-hashbang
 
-		"array-find-from-last",    // stage 3 as of 2021 https://github.com/tc39/proposal-array-find-from-last
-		"Array.prototype.at",      // stage 3 as of 2021 https://github.com/tc39/proposal-relative-indexing-method
-		"String.prototype.at",     // stage 3 as of 2021 https://github.com/tc39/proposal-relative-indexing-method
-		"TypedArray.prototype.at", // stage 3 as of 2021 https://github.com/tc39/proposal-relative-indexing-method
+		"array-find-from-last", // stage 3 as of 2021 https://github.com/tc39/proposal-array-find-from-last
 	}
 	skipWords = []string{"yield", "generator", "Generator", "async", "await"}
 	skipList  = map[string]bool{

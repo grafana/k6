@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"path"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/go-sourcemap/sourcemap"
@@ -158,8 +159,14 @@ func (fl *File) Position(offset int) Position {
 
 	if fl.sourceMap != nil {
 		if source, _, row, col, ok := fl.sourceMap.Source(row, col); ok {
+			sourceUrlStr := source
+			sourceURL := ResolveSourcemapURL(fl.Name(), source)
+			if sourceURL != nil {
+				sourceUrlStr = sourceURL.String()
+			}
+
 			return Position{
-				Filename: ResolveSourcemapURL(fl.Name(), source).String(),
+				Filename: sourceUrlStr,
 				Line:     row,
 				Column:   col,
 			}
@@ -175,14 +182,14 @@ func (fl *File) Position(offset int) Position {
 
 func ResolveSourcemapURL(basename, source string) *url.URL {
 	// if the url is absolute(has scheme) there is nothing to do
-	smURL, err := url.Parse(source)
+	smURL, err := url.Parse(strings.TrimSpace(source))
 	if err == nil && !smURL.IsAbs() {
-		baseURL, err1 := url.Parse(basename)
+		baseURL, err1 := url.Parse(strings.TrimSpace(basename))
 		if err1 == nil && path.IsAbs(baseURL.Path) {
 			smURL = baseURL.ResolveReference(smURL)
 		} else {
-			// pathological case where both are not absolute paths and using Resolve as above will produce an absolute
-			// one
+			// pathological case where both are not absolute paths and using Resolve
+			// as above will produce an absolute one
 			smURL, _ = url.Parse(path.Join(path.Dir(basename), smURL.Path))
 		}
 	}
