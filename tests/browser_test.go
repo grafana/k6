@@ -167,10 +167,12 @@ func TestBrowserLogIterationID(t *testing.T) {
 	)
 
 	require.NotEmpty(t, iterID)
-	require.NotEmpty(t, tb.logCache.entries)
 
 	tb.logCache.mu.RLock()
 	defer tb.logCache.mu.RUnlock()
+
+	require.NotEmpty(t, tb.logCache.entries)
+
 	for _, evt := range tb.logCache.entries {
 		for k, v := range evt.Data {
 			if k == "iteration_id" {
