@@ -1789,9 +1789,6 @@ func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.V
 		k6ext.Panic(f.ctx, "parsing waitForFunction options: %w", err)
 	}
 
-	f.executionContextMu.RLock()
-	defer f.executionContextMu.RUnlock()
-
 	js := fn.ToString().String()
 	_, isCallable := goja.AssertFunction(fn)
 	if !isCallable {
