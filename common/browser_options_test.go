@@ -15,9 +15,10 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		opts   map[string]any
-		assert func(testing.TB, *LaunchOptions)
-		err    string
+		opts    map[string]any
+		assert  func(testing.TB, *LaunchOptions)
+		err     string
+		onCloud bool
 	}{
 		"defaults": {
 			opts: map[string]any{},
@@ -28,6 +29,44 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 					Headless:          true,
 					LogCategoryFilter: ".*",
 					Timeout:           DefaultTimeout,
+				}, lo)
+			},
+		},
+		"defaults_on_cloud": {
+			onCloud: true,
+			opts: map[string]any{
+				// disallow changing the following opts
+				"headless":       false,
+				"devtools":       true,
+				"executablePath": "something else",
+				// allow changing the following opts
+				"args":              []string{"any"},
+				"debug":             true,
+				"env":               map[string]string{"some": "thing"},
+				"ignoreDefaultArgs": []string{"any"},
+				"logCategoryFilter": "...",
+				"proxy":             ProxyOptions{Server: "srv"},
+				"slowMo":            time.Second,
+				"timeout":           time.Second,
+			},
+			assert: func(tb testing.TB, lo *LaunchOptions) {
+				tb.Helper()
+				assert.Equal(t, &LaunchOptions{
+					// disallowed:
+					Headless:       true,
+					Devtools:       false,
+					ExecutablePath: "",
+					// allowed:
+					Args:              []string{"any"},
+					Debug:             true,
+					Env:               map[string]string{"some": "thing"},
+					IgnoreDefaultArgs: []string{"any"},
+					LogCategoryFilter: "...",
+					Proxy:             ProxyOptions{Server: "srv"},
+					SlowMo:            time.Second,
+					Timeout:           time.Second,
+
+					onCloud: true,
 				}, lo)
 			},
 		},
@@ -212,7 +251,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			t.Parallel()
 			var (
 				vu = k6test.NewVU(t)
-				lo = NewLaunchOptions()
+				lo = NewLaunchOptions(tt.onCloud)
 			)
 			err := lo.Parse(vu.Context(), vu.ToGojaValue(tt.opts), log.NewNullLogger())
 			if tt.err != "" {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"golang.org/x/exp/slices"
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
@@ -32,6 +33,8 @@ type LaunchOptions struct {
 	Proxy             ProxyOptions
 	SlowMo            time.Duration
 	Timeout           time.Duration
+
+	onCloud bool // some options will be ignored when running in the cloud
 }
 
 // LaunchPersistentContextOptions stores browser launch options for persistent context.
@@ -41,12 +44,13 @@ type LaunchPersistentContextOptions struct {
 }
 
 // NewLaunchOptions returns a new LaunchOptions.
-func NewLaunchOptions() *LaunchOptions {
+func NewLaunchOptions(onCloud bool) *LaunchOptions {
 	return &LaunchOptions{
 		Env:               make(map[string]string),
 		Headless:          true,
 		LogCategoryFilter: ".*",
 		Timeout:           DefaultTimeout,
+		onCloud:           onCloud,
 	}
 }
 
@@ -66,6 +70,10 @@ func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value, logger *log.
 		}
 	)
 	for _, k := range o.Keys() {
+		if l.shouldIgnoreOnCloud(k) {
+			logger.Warnf("LaunchOptions", "setting %s option is disallowed on cloud.", k)
+			continue
+		}
 		v := o.Get(k)
 		if v.Export() == nil {
 			if dv, ok := defaults[k]; ok {
@@ -104,4 +112,11 @@ func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value, logger *log.
 	}
 
 	return nil
+}
+
+func (l *LaunchOptions) shouldIgnoreOnCloud(opt string) bool {
+	if !l.onCloud {
+		return false
+	}
+	return slices.Contains([]string{"devtools", "executablePath", "headless"}, opt)
 }

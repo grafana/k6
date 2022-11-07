@@ -132,7 +132,7 @@ func (b *BrowserType) Launch(opts goja.Value) api.Browser {
 		k6ext.Panic(ctx, "setting up logger: %w", err)
 	}
 
-	launchOpts := common.NewLaunchOptions()
+	launchOpts := common.NewLaunchOptions(k6ext.OnCloud())
 	if err := launchOpts.Parse(ctx, opts, b.logger); err != nil {
 		k6ext.Panic(ctx, "parsing launch options: %w", err)
 	}
