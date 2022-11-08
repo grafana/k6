@@ -54,9 +54,8 @@ type Frame struct {
 
 	// A life cycle event is only considered triggered for a frame if the entire
 	// frame subtree has also had the life cycle event triggered.
-	lifecycleEventsMu      sync.RWMutex
-	lifecycleEvents        map[LifecycleEvent]bool
-	subtreeLifecycleEvents map[LifecycleEvent]bool
+	lifecycleEventsMu sync.RWMutex
+	lifecycleEvents   map[LifecycleEvent]bool
 
 	documentHandle *ElementHandle
 
@@ -92,20 +91,19 @@ func NewFrame(
 	}
 
 	return &Frame{
-		BaseEventEmitter:       NewBaseEventEmitter(ctx),
-		ctx:                    ctx,
-		page:                   m.page,
-		manager:                m,
-		parentFrame:            parentFrame,
-		childFrames:            make(map[api.Frame]bool),
-		id:                     frameID,
-		vu:                     k6ext.GetVU(ctx),
-		lifecycleEvents:        make(map[LifecycleEvent]bool),
-		subtreeLifecycleEvents: make(map[LifecycleEvent]bool),
-		inflightRequests:       make(map[network.RequestID]bool),
-		executionContexts:      make(map[executionWorld]frameExecutionContext),
-		currentDocument:        &DocumentInfo{},
-		log:                    log,
+		BaseEventEmitter:  NewBaseEventEmitter(ctx),
+		ctx:               ctx,
+		page:              m.page,
+		manager:           m,
+		parentFrame:       parentFrame,
+		childFrames:       make(map[api.Frame]bool),
+		id:                frameID,
+		vu:                k6ext.GetVU(ctx),
+		lifecycleEvents:   make(map[LifecycleEvent]bool),
+		inflightRequests:  make(map[network.RequestID]bool),
+		executionContexts: make(map[executionWorld]frameExecutionContext),
+		currentDocument:   &DocumentInfo{},
+		log:               log,
 	}
 }
 
@@ -163,7 +161,6 @@ func (f *Frame) clearLifecycle() {
 	// clear lifecycle events
 	f.lifecycleEventsMu.Lock()
 	f.lifecycleEvents = make(map[LifecycleEvent]bool)
-	f.subtreeLifecycleEvents = make(map[LifecycleEvent]bool)
 	f.lifecycleEventsMu.Unlock()
 
 	// keep the request related to the document if present
@@ -190,25 +187,6 @@ func (f *Frame) recalculateLifecycle(event LifecycleEvent) {
 	f.log.Debugf("Frame:recalculateLifecycle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.emit(EventFrameAddLifecycle, event)
-
-	// Start with triggered events.
-	events := make(map[LifecycleEvent]bool)
-	f.lifecycleEventsMu.RLock()
-	{
-		for k, v := range f.lifecycleEvents {
-			events[k] = v
-		}
-	}
-	f.lifecycleEventsMu.RUnlock()
-
-	f.lifecycleEventsMu.Lock()
-	{
-		f.subtreeLifecycleEvents = make(map[LifecycleEvent]bool)
-		for k, v := range events {
-			f.subtreeLifecycleEvents[k] = v
-		}
-	}
-	f.lifecycleEventsMu.Unlock()
 }
 
 func (f *Frame) detach() {
@@ -329,13 +307,6 @@ func (f *Frame) hasLifecycleEventFired(event LifecycleEvent) bool {
 	defer f.lifecycleEventsMu.RUnlock()
 
 	return f.lifecycleEvents[event]
-}
-
-func (f *Frame) hasSubtreeLifecycleEventFired(event LifecycleEvent) bool {
-	f.lifecycleEventsMu.RLock()
-	defer f.lifecycleEventsMu.RUnlock()
-
-	return f.subtreeLifecycleEvents[event]
 }
 
 func (f *Frame) navigated(name string, url string, loaderID string) {
@@ -1848,7 +1819,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) *goja.Promise {
 		// A lifecycle event won't be received when navigating within the same
 		// document, so don't wait for it. The event might've also already been
 		// fired once we're here, so also skip waiting in that case.
-		if !sameDocNav && !f.hasSubtreeLifecycleEventFired(parsedOpts.WaitUntil) {
+		if !sameDocNav && !f.hasLifecycleEventFired(parsedOpts.WaitUntil) {
 			select {
 			case <-lifecycleEvtCh:
 			case <-timeoutCtx.Done():
