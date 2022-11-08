@@ -186,8 +186,10 @@ func (f *Frame) clearLifecycle() {
 	f.inflightRequestsMu.Unlock()
 }
 
-func (f *Frame) recalculateLifecycle() {
+func (f *Frame) recalculateLifecycle(event LifecycleEvent) {
 	f.log.Debugf("Frame:recalculateLifecycle", "fid:%s furl:%q", f.ID(), f.URL())
+
+	f.emit(EventFrameAddLifecycle, event)
 
 	// Start with triggered events.
 	events := make(map[LifecycleEvent]bool)
@@ -198,14 +200,6 @@ func (f *Frame) recalculateLifecycle() {
 		}
 	}
 	f.lifecycleEventsMu.RUnlock()
-
-	// Check if any of the fired events should be considered fired when looking at the entire subtree.
-	for k := range events {
-		if f.hasSubtreeLifecycleEventFired(k) {
-			continue
-		}
-		f.emit(EventFrameAddLifecycle, k)
-	}
 
 	f.lifecycleEventsMu.Lock()
 	{

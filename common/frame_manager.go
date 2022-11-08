@@ -195,7 +195,7 @@ func (m *FrameManager) frameLifecycleEvent(frameID cdp.FrameID, event LifecycleE
 	frame := m.getFrameByID(frameID)
 	if frame != nil {
 		frame.onLifecycleEvent(event)
-		frame.recalculateLifecycle() // Recalculate life cycle state from the top
+		frame.recalculateLifecycle(event)
 	}
 }
 
