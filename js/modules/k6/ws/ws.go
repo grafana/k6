@@ -279,7 +279,6 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 		if state.Options.Throw.Bool {
 			return nil, connErr
 		}
-
 		if httpResponse != nil {
 			return wrapHTTPResponse(httpResponse)
 		}

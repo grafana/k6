@@ -729,7 +729,7 @@ func TestErrors(t *testing.T) {
 	})
 }
 
-func TestWrongStatusCode(t *testing.T) {
+func TestConnectWrongStatusCode(t *testing.T) {
 	t.Parallel()
 	test := newTestState(t)
 	tb := httpmultibin.NewHTTPMultiBin(t)
@@ -1248,7 +1248,7 @@ func TestWSConnectDisableThrowErrorOption(t *testing.T) {
 			throw new Error("res.error is expected to be not null");
 		}
 		`)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	entries := logHook.Drain()
-	require.Len(t, entries, 0)
+	assert.Empty(t, entries)
 }
