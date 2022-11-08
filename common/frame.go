@@ -65,8 +65,6 @@ type Frame struct {
 
 	loadingStartedTime time.Time
 
-	networkIdleCh chan struct{}
-
 	inflightRequestsMu sync.RWMutex
 	inflightRequests   map[network.RequestID]bool
 
@@ -107,7 +105,6 @@ func NewFrame(
 		inflightRequests:       make(map[network.RequestID]bool),
 		executionContexts:      make(map[executionWorld]frameExecutionContext),
 		currentDocument:        &DocumentInfo{},
-		networkIdleCh:          make(chan struct{}),
 		log:                    log,
 	}
 }
@@ -188,11 +185,6 @@ func (f *Frame) clearLifecycle() {
 		f.inflightRequests = inflightRequests
 	}
 	f.inflightRequestsMu.Unlock()
-
-	f.stopNetworkIdleTimer()
-	if f.inflightRequestsLen() == 0 {
-		f.startNetworkIdleTimer()
-	}
 }
 
 func (f *Frame) recalculateLifecycle() {
@@ -267,38 +259,9 @@ func (f *Frame) recalculateLifecycle() {
 	f.lifecycleEventsMu.Unlock()
 }
 
-func (f *Frame) stopNetworkIdleTimer() {
-	f.log.Debugf("Frame:stopNetworkIdleTimer", "fid:%s furl:%q", f.ID(), f.URL())
-
-	select {
-	case f.networkIdleCh <- struct{}{}:
-	default:
-	}
-}
-
-func (f *Frame) startNetworkIdleTimer() {
-	f.log.Debugf("Frame:startNetworkIdleTimer", "fid:%s furl:%q", f.ID(), f.URL())
-
-	if f.hasLifecycleEventFired(LifecycleEventNetworkIdle) || f.IsDetached() {
-		return
-	}
-
-	f.stopNetworkIdleTimer()
-
-	go func() {
-		select {
-		case <-f.ctx.Done():
-		case <-f.networkIdleCh:
-		case <-time.After(LifeCycleNetworkIdleTimeout):
-			f.manager.frameLifecycleEvent(cdp.FrameID(f.ID()), LifecycleEventNetworkIdle)
-		}
-	}()
-}
-
 func (f *Frame) detach() {
 	f.log.Debugf("Frame:detach", "fid:%s furl:%q", f.ID(), f.URL())
 
-	f.stopNetworkIdleTimer()
 	f.setDetached(true)
 	if f.parentFrame != nil {
 		f.parentFrame.removeChildFrame(f)

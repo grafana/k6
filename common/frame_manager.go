@@ -100,12 +100,6 @@ func (m *FrameManager) removeBarrier(b *Barrier) {
 
 func (m *FrameManager) dispose() {
 	m.logger.Debugf("FrameManager:dispose", "fmid:%d", m.ID())
-
-	m.framesMu.RLock()
-	defer m.framesMu.RUnlock()
-	for _, f := range m.frames {
-		f.stopNetworkIdleTimer()
-	}
 }
 
 func (m *FrameManager) frameAbortedNavigation(frameID cdp.FrameID, errorText, documentID string) {
@@ -452,8 +446,6 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 
 	ifr := frame.cloneInflightRequests()
 	switch rc := len(ifr); {
-	case rc == 0:
-		frame.startNetworkIdleTimer()
 	case rc <= 10:
 		for reqID := range ifr {
 			req := frame.requestByID(reqID)
@@ -503,9 +495,6 @@ func (m *FrameManager) requestFinished(req *Request) {
 		return
 	}
 	frame.deleteRequest(req.getID())
-	if frame.inflightRequestsLen() == 0 {
-		frame.startNetworkIdleTimer()
-	}
 	/*
 		else if frame.inflightRequestsLen() <= 10 {
 			for reqID, _ := range frame.inflightRequests {
@@ -537,9 +526,6 @@ func (m *FrameManager) requestStarted(req *Request) {
 	}
 
 	frame.addRequest(req.getID())
-	if frame.inflightRequestsLen() == 1 {
-		frame.stopNetworkIdleTimer()
-	}
 	if req.documentID != "" {
 		frame.pendingDocumentMu.Lock()
 		frame.pendingDocument = &DocumentInfo{documentID: req.documentID, request: req}
