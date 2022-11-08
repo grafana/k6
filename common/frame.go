@@ -364,9 +364,6 @@ func (f *Frame) onLoadingStopped() {
 	//       requests so it may take a long time for us to see
 	//       a networkIdle event or we may never see one if the
 	//       website never stops performing network requests.
-	//       NOTE: This is a different timeout to networkIdleTimer,
-	//              which only works once there are no more network
-	//              requests and we don't see a networkIdle event.
 }
 
 func (f *Frame) position() *Position {
