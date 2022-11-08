@@ -163,9 +163,8 @@ func (f *Frame) clearLifecycle() {
 	// clear lifecycle events
 	f.lifecycleEventsMu.Lock()
 	f.lifecycleEvents = make(map[LifecycleEvent]bool)
+	f.subtreeLifecycleEvents = make(map[LifecycleEvent]bool)
 	f.lifecycleEventsMu.Unlock()
-
-	f.page.frameManager.MainFrame().recalculateLifecycle()
 
 	// keep the request related to the document if present
 	// in f.inflightRequests
