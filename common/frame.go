@@ -183,12 +183,6 @@ func (f *Frame) clearLifecycle() {
 	f.inflightRequestsMu.Unlock()
 }
 
-func (f *Frame) recalculateLifecycle(event LifecycleEvent) {
-	f.log.Debugf("Frame:recalculateLifecycle", "fid:%s furl:%q", f.ID(), f.URL())
-
-	f.emit(EventFrameAddLifecycle, event)
-}
-
 func (f *Frame) detach() {
 	f.log.Debugf("Frame:detach", "fid:%s furl:%q", f.ID(), f.URL())
 
@@ -340,12 +334,10 @@ func (f *Frame) onLifecycleEvent(event LifecycleEvent) {
 	f.log.Debugf("Frame:onLifecycleEvent", "fid:%s furl:%q event:%s", f.ID(), f.URL(), event)
 
 	f.lifecycleEventsMu.Lock()
-	defer f.lifecycleEventsMu.Unlock()
-
-	if ok := f.lifecycleEvents[event]; ok {
-		return
-	}
 	f.lifecycleEvents[event] = true
+	f.lifecycleEventsMu.Unlock()
+
+	f.emit(EventFrameAddLifecycle, event)
 }
 
 func (f *Frame) onLoadingStarted() {
