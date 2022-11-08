@@ -179,9 +179,8 @@ func (e *EventLoop) Start(firstCallback func() error) error {
 			value := promise.Result()
 			if !goja.IsNull(value) && !goja.IsUndefined(value) {
 				if o := value.ToObject(e.vu.Runtime()); o != nil {
-					stack := o.Get("stack")
-					if stack != nil {
-						value = e.vu.Runtime().ToValue(fmt.Sprintf("%s: %s\n", value, stack))
+					if stack := o.Get("stack"); stack != nil {
+						value = stack
 					}
 				}
 			}

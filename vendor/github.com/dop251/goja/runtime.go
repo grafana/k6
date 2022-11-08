@@ -870,34 +870,6 @@ func (r *Runtime) builtin_newBoolean(args []Value, proto *Object) *Object {
 	return r.newPrimitiveObject(v, proto, classBoolean)
 }
 
-func (r *Runtime) error_toString(call FunctionCall) Value {
-	var nameStr, msgStr valueString
-	obj := r.toObject(call.This)
-	name := obj.self.getStr("name", nil)
-	if name == nil || name == _undefined {
-		nameStr = asciiString("Error")
-	} else {
-		nameStr = name.toString()
-	}
-	msg := obj.self.getStr("message", nil)
-	if msg == nil || msg == _undefined {
-		msgStr = stringEmpty
-	} else {
-		msgStr = msg.toString()
-	}
-	if nameStr.length() == 0 {
-		return msgStr
-	}
-	if msgStr.length() == 0 {
-		return nameStr
-	}
-	var sb valueStringBuilder
-	sb.WriteString(nameStr)
-	sb.WriteString(asciiString(": "))
-	sb.WriteString(msgStr)
-	return sb.String()
-}
-
 func (r *Runtime) builtin_new(construct *Object, args []Value) *Object {
 	return r.toConstructor(construct)(args, nil)
 }
@@ -2625,7 +2597,15 @@ func (r *Runtime) getIterator(obj Value, method func(FunctionCall) Value) *itera
 	iter := r.toObject(method(FunctionCall{
 		This: obj,
 	}))
-	next := toMethod(iter.self.getStr("next", nil))
+
+	var next func(FunctionCall) Value
+
+	if obj, ok := iter.self.getStr("next", nil).(*Object); ok {
+		if call, ok := obj.self.assertCallable(); ok {
+			next = call
+		}
+	}
+
 	return &iteratorRecord{
 		iterator: iter,
 		next:     next,
@@ -2635,6 +2615,9 @@ func (r *Runtime) getIterator(obj Value, method func(FunctionCall) Value) *itera
 func (ir *iteratorRecord) iterate(step func(Value)) {
 	r := ir.iterator.runtime
 	for {
+		if ir.next == nil {
+			panic(r.NewTypeError("iterator.next is missing or not a function"))
+		}
 		res := r.toObject(ir.next(FunctionCall{This: ir.iterator}))
 		if nilSafe(res.self.getStr("done", nil)).ToBoolean() {
 			break

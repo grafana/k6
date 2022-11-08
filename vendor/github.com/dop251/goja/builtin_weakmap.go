@@ -118,6 +118,10 @@ func (r *Runtime) builtin_newWeakMap(args []Value, newTarget *Object) *Object {
 	if len(args) > 0 {
 		if arg := args[0]; arg != nil && arg != _undefined && arg != _null {
 			adder := wmo.getStr("set", nil)
+			adderFn := toMethod(adder)
+			if adderFn == nil {
+				panic(r.NewTypeError("WeakMap.set in missing"))
+			}
 			iter := r.getIterator(arg, nil)
 			i0 := valueInt(0)
 			i1 := valueInt(1)
@@ -129,10 +133,6 @@ func (r *Runtime) builtin_newWeakMap(args []Value, newTarget *Object) *Object {
 					wmo.m.set(r.toObject(k), v)
 				})
 			} else {
-				adderFn := toMethod(adder)
-				if adderFn == nil {
-					panic(r.NewTypeError("WeakMap.set in missing"))
-				}
 				iter.iterate(func(item Value) {
 					itemObj := r.toObject(item)
 					k := itemObj.self.getIdx(i0, nil)
