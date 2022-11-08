@@ -98,10 +98,6 @@ func (m *FrameManager) removeBarrier(b *Barrier) {
 	m.barriers = append(m.barriers[:index], m.barriers[index+1:]...)
 }
 
-func (m *FrameManager) dispose() {
-	m.logger.Debugf("FrameManager:dispose", "fmid:%d", m.ID())
-}
-
 func (m *FrameManager) frameAbortedNavigation(frameID cdp.FrameID, errorText, documentID string) {
 	m.logger.Debugf("FrameManager:frameAbortedNavigation",
 		"fmid:%d fid:%v err:%s docid:%s",
