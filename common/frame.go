@@ -199,25 +199,6 @@ func (f *Frame) recalculateLifecycle() {
 	}
 	f.lifecycleEventsMu.RUnlock()
 
-	// Only consider a life cycle event as fired if it has triggered for all of subtree.
-	f.childFramesMu.RLock()
-	{
-		for child := range f.childFrames {
-			cf := child.(*Frame)
-			// a precaution for preventing a deadlock in *Frame.childFramesMu
-			if cf == f {
-				continue
-			}
-			cf.recalculateLifecycle()
-			for k := range events {
-				if !cf.hasSubtreeLifecycleEventFired(k) {
-					delete(events, k)
-				}
-			}
-		}
-	}
-	f.childFramesMu.RUnlock()
-
 	// Check if any of the fired events should be considered fired when looking at the entire subtree.
 	for k := range events {
 		if f.hasSubtreeLifecycleEventFired(k) {
