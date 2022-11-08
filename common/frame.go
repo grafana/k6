@@ -238,17 +238,6 @@ func (f *Frame) recalculateLifecycle() {
 		}
 	}
 
-	// Emit removal events
-	f.lifecycleEventsMu.RLock()
-	{
-		for k := range f.subtreeLifecycleEvents {
-			if ok := events[k]; !ok {
-				f.emit(EventFrameRemoveLifecycle, k)
-			}
-		}
-	}
-	f.lifecycleEventsMu.RUnlock()
-
 	f.lifecycleEventsMu.Lock()
 	{
 		f.subtreeLifecycleEvents = make(map[LifecycleEvent]bool)

@@ -24,9 +24,8 @@ const (
 
 	// Frame
 
-	EventFrameNavigation      string = "navigation"
-	EventFrameAddLifecycle    string = "addlifecycle"
-	EventFrameRemoveLifecycle string = "removelifecycle"
+	EventFrameNavigation   string = "navigation"
+	EventFrameAddLifecycle string = "addlifecycle"
 
 	// Page
 
