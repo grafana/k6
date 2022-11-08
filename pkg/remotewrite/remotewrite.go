@@ -3,8 +3,6 @@ package remotewrite
 import (
 	"context"
 	"fmt"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/grafana/xk6-output-prometheus-remote/pkg/remote"
@@ -24,7 +22,7 @@ type Output struct {
 	config          Config
 	logger          logrus.FieldLogger
 	periodicFlusher *output.PeriodicFlusher
-	tsdb            map[string]*seriesWithMeasure
+	tsdb            map[metrics.TimeSeries]*seriesWithMeasure
 
 	// TODO: copy the prometheus/remote.WriteClient interface and depend on it
 	client *remote.WriteClient
@@ -45,14 +43,14 @@ func New(params output.Params) (*Output, error) {
 
 	wc, err := remote.NewWriteClient(config.URL.String, clientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize the client Prometheus remote write client: %w", err)
+		return nil, fmt.Errorf("failed to initialize the Prometheus remote write client: %w", err)
 	}
 
 	return &Output{
 		client: wc,
 		config: config,
 		logger: logger,
-		tsdb:   make(map[string]*seriesWithMeasure),
+		tsdb:   make(map[metrics.TimeSeries]*seriesWithMeasure),
 	}, nil
 }
 
@@ -131,33 +129,29 @@ func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) 
 	// so we need to aggregate all the samples in the same time bucket.
 	// More context can be found in the issue
 	// https://github.com/grafana/xk6-output-prometheus-remote/issues/11
-	seen := make(map[string]struct{})
+	seen := make(map[metrics.TimeSeries]struct{})
 
 	for _, samplesContainer := range samplesContainers {
 		samples := samplesContainer.GetSamples()
 
 		for _, sample := range samples {
 			truncTime := sample.Time.Truncate(time.Millisecond)
-			timeSeriesKey := timeSeriesKey(sample.Metric, sample.Tags)
-			swm, ok := o.tsdb[timeSeriesKey]
+			swm, ok := o.tsdb[sample.TimeSeries]
 			if !ok {
 				swm = &seriesWithMeasure{
-					TimeSeries: TimeSeries{
-						Metric: sample.Metric,
-						Tags:   sample.Tags,
-					},
-					Measure: sinkByType(sample.Metric.Type),
-					Latest:  truncTime,
+					TimeSeries: sample.TimeSeries,
+					Measure:    sinkByType(sample.Metric.Type),
+					Latest:     truncTime,
 				}
-				o.tsdb[timeSeriesKey] = swm
-				seen[timeSeriesKey] = struct{}{}
+				o.tsdb[sample.TimeSeries] = swm
+				seen[sample.TimeSeries] = struct{}{}
 			} else {
 				// save as a seen item only when the samples have a time greater than
 				// the previous saved, otherwise some implementations
 				// could see it as a duplicate and generate warnings (e.g. Mimir)
 				if truncTime.After(swm.Latest) {
 					swm.Latest = truncTime
-					seen[timeSeriesKey] = struct{}{}
+					seen[sample.TimeSeries] = struct{}{}
 				}
 
 				// If current == previous:
@@ -191,6 +185,7 @@ func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) 
 }
 
 type seriesWithMeasure struct {
+	metrics.TimeSeries
 	Measure metrics.Sink
 
 	// Latest tracks the latest time
@@ -200,17 +195,13 @@ type seriesWithMeasure struct {
 	// in a method in struct
 	Latest time.Time
 
-	// TimeSeries will be replaced with the native k6 version
-	// when it will be available.
-	TimeSeries
-
 	// TODO: maybe add some caching for the mapping?
 }
 
 func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 	var newts []*prompb.TimeSeries
 
-	mapMonoSeries := func(s TimeSeries, t time.Time) prompb.TimeSeries {
+	mapMonoSeries := func(s metrics.TimeSeries, t time.Time) prompb.TimeSeries {
 		return prompb.TimeSeries{
 			Labels: append(MapTagSet(swm.Tags), &prompb.Label{
 				Name:  "__name__",
@@ -265,37 +256,4 @@ func sinkByType(mt metrics.MetricType) metrics.Sink {
 		panic(fmt.Sprintf("metric type %q unsupported", mt.String()))
 	}
 	return sink
-}
-
-// the code below will be removed
-// when TimeSeries will be a native k6's concept.
-
-type TimeSeries struct {
-	Metric *metrics.Metric
-	Tags   *metrics.SampleTags
-}
-
-var bytesep = []byte{0xff}
-
-func timeSeriesKey(m *metrics.Metric, sampleTags *metrics.SampleTags) string {
-	if sampleTags.IsEmpty() {
-		return m.Name
-	}
-
-	tmap := sampleTags.CloneTags()
-	keys := make([]string, 0, len(tmap))
-	for k := range tmap {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	var b strings.Builder
-	b.WriteString(m.Name)
-	for i := 0; i < len(keys); i++ {
-		b.Write(bytesep)
-		b.WriteString(keys[i])
-		b.Write(bytesep)
-		b.WriteString(tmap[keys[i]])
-	}
-	return b.String()
 }

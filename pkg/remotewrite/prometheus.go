@@ -4,21 +4,26 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mstoykov/atlas"
 	prompb "go.buf.build/grpc/go/prometheus/prometheus"
 	"go.k6.io/k6/metrics"
 )
 
-func MapTagSet(t *metrics.SampleTags) []*prompb.Label {
-	tags := t.CloneTags()
-
-	labels := make([]*prompb.Label, 0, len(tags))
-	for k, v := range tags {
-		labels = append(labels, &prompb.Label{Name: k, Value: v})
+func MapTagSet(t *metrics.TagSet) []*prompb.Label {
+	n := (*atlas.Node)(t)
+	if n.Len() < 1 {
+		return nil
+	}
+	labels := make([]*prompb.Label, 0, n.Len())
+	for !n.IsRoot() {
+		prev, key, value := n.Data()
+		labels = append(labels, &prompb.Label{Name: key, Value: value})
+		n = prev
 	}
 	return labels
 }
 
-func MapSeries(ts TimeSeries) prompb.TimeSeries {
+func MapSeries(ts metrics.TimeSeries) prompb.TimeSeries {
 	return prompb.TimeSeries{
 		Labels: append(MapTagSet(ts.Tags), &prompb.Label{
 			Name:  "__name__",
@@ -27,7 +32,7 @@ func MapSeries(ts TimeSeries) prompb.TimeSeries {
 	}
 }
 
-func MapTrend(series TimeSeries, t time.Time, sink *trendSink) []*prompb.TimeSeries {
+func MapTrend(series metrics.TimeSeries, t time.Time, sink *trendSink) []*prompb.TimeSeries {
 	// Prometheus metric system does not support Trend so this mapping will
 	// store a counter for the number of reported values and gauges to keep
 	// track of aggregated values. Also store a sum of the values to allow

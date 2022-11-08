@@ -55,11 +55,12 @@ func assertTimeSeriesEqual(t *testing.T, expected *prompb.TimeSeries, actual *pr
 
 // sortTimeSeries sorts an array of TimeSeries by name
 func sortTimeSeries(ts []*prompb.TimeSeries) []*prompb.TimeSeries {
-	sorted := make([]*prompb.TimeSeries, 0, len(ts))
+	sorted := make([]*prompb.TimeSeries, len(ts))
 	copy(sorted, ts)
 	sort.Slice(sorted, func(i int, j int) bool {
 		return getTimeSeriesName(sorted[i]) < getTimeSeriesName(sorted[j])
 	})
+
 	return sorted
 }
 
@@ -83,6 +84,7 @@ func TestMapTrend(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
+	r := metrics.NewRegistry()
 
 	testCases := []struct {
 		sample   metrics.Sample
@@ -91,11 +93,13 @@ func TestMapTrend(t *testing.T) {
 	}{
 		{
 			sample: metrics.Sample{
-				Metric: &metrics.Metric{
-					Name: "test",
-					Type: metrics.Trend,
+				TimeSeries: metrics.TimeSeries{
+					Metric: &metrics.Metric{
+						Name: "test",
+						Type: metrics.Trend,
+					},
+					Tags: r.RootTagSet().With("tagk1", "tagv1"),
 				},
-				Tags:  metrics.NewSampleTags(map[string]string{"tagk1": "tagv1"}),
 				Value: 1.0,
 				Time:  now,
 			},
@@ -116,7 +120,7 @@ func TestMapTrend(t *testing.T) {
 		st := &trendSink{}
 		st.Add(tc.sample)
 
-		ts := MapTrend(TimeSeries{tc.sample.Metric, tc.sample.Tags}, tc.sample.Time, st)
+		ts := MapTrend(tc.sample.TimeSeries, tc.sample.Time, st)
 		assertTimeSeriesMatch(t, tc.expected, ts)
 	}
 }
