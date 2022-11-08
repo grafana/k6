@@ -219,22 +219,11 @@ func (f *Frame) recalculateLifecycle() {
 	f.childFramesMu.RUnlock()
 
 	// Check if any of the fired events should be considered fired when looking at the entire subtree.
-	mainFrame := f.manager.MainFrame()
 	for k := range events {
 		if f.hasSubtreeLifecycleEventFired(k) {
 			continue
 		}
 		f.emit(EventFrameAddLifecycle, k)
-
-		if f != mainFrame {
-			continue
-		}
-		switch k {
-		case LifecycleEventLoad:
-			f.page.emit(EventPageLoad, nil)
-		case LifecycleEventDOMContentLoad:
-			f.page.emit(EventPageDOMContentLoaded, nil)
-		}
 	}
 
 	f.lifecycleEventsMu.Lock()
