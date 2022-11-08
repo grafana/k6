@@ -729,6 +729,21 @@ func TestErrors(t *testing.T) {
 	})
 }
 
+func TestConnectWrongStatusCode(t *testing.T) {
+	t.Parallel()
+	test := newTestState(t)
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+	test.VU.StateField.Options.Throw = null.BoolFrom(false)
+	_, err := test.VU.Runtime().RunString(sr(`
+	var res = ws.connect("WSBIN_URL/status/404", function(socket){});
+	if (res.status != 404) {
+		throw new Error ("no status code set for invalid response");
+	}
+	`))
+	assert.NoError(t, err)
+}
+
 func TestSystemTags(t *testing.T) {
 	t.Parallel()
 	testedSystemTags := []string{"status", "subproto", "url", "ip"}
@@ -1233,8 +1248,7 @@ func TestWSConnectDisableThrowErrorOption(t *testing.T) {
 			throw new Error("res.error is expected to be not null");
 		}
 		`)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	entries := logHook.Drain()
-	require.Len(t, entries, 1)
-	assert.Contains(t, entries[0].Message, "Attempt to establish a WebSocket connection failed")
+	assert.Empty(t, entries)
 }

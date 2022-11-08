@@ -279,7 +279,9 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 		if state.Options.Throw.Bool {
 			return nil, connErr
 		}
-		state.Logger.WithError(connErr).Warn("Attempt to establish a WebSocket connection failed")
+		if httpResponse != nil {
+			return wrapHTTPResponse(httpResponse)
+		}
 		return &HTTPResponse{
 			Error: connErr.Error(),
 		}, nil
