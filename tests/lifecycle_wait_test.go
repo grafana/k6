@@ -36,17 +36,7 @@ func TestLifecycleWaitForLoadStateLoad(t *testing.T) {
 		http.Redirect(w, r, tb.staticURL("wait_for_nav_lifecycle.html"), http.StatusMovedPermanently)
 	})
 
-	var counter int64
-	var counterMu sync.Mutex
-	tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
-		counterMu.Lock()
-		defer counterMu.Unlock()
-
-		time.Sleep(time.Millisecond * 100)
-
-		counter++
-		fmt.Fprintf(w, "pong %d", counter)
-	})
+	withPingHandler(t, tb, time.Millisecond*100, nil)
 
 	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintf(w, `
@@ -90,17 +80,7 @@ func TestLifecycleWaitForLoadStateDOMContentLoaded(t *testing.T) {
 		http.Redirect(w, r, tb.staticURL("wait_for_nav_lifecycle.html"), http.StatusMovedPermanently)
 	})
 
-	var counter int64
-	var counterMu sync.Mutex
-	tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
-		counterMu.Lock()
-		defer counterMu.Unlock()
-
-		time.Sleep(time.Millisecond * 100)
-
-		counter++
-		fmt.Fprintf(w, "pong %d", counter)
-	})
+	withPingHandler(t, tb, time.Millisecond*100, nil)
 
 	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintf(w, `
@@ -144,15 +124,7 @@ func TestLifecycleWaitForLoadStateNetworkIdle(t *testing.T) {
 		http.Redirect(w, r, tb.staticURL("wait_for_nav_lifecycle.html"), http.StatusMovedPermanently)
 	})
 
-	var counter int64
-	var counterMu sync.Mutex
-	tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
-		counterMu.Lock()
-		defer counterMu.Unlock()
-
-		counter++
-		fmt.Fprintf(w, "pong %d", counter)
-	})
+	withPingHandler(t, tb, 0, nil)
 
 	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintf(w, `
@@ -193,17 +165,7 @@ func TestLifecycleWaitForLoadStateDOMContentLoadedThenNetworkIdle(t *testing.T) 
 		http.Redirect(w, r, tb.staticURL("wait_for_nav_lifecycle.html"), http.StatusMovedPermanently)
 	})
 
-	var counter int64
-	var counterMu sync.Mutex
-	tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
-		counterMu.Lock()
-		defer counterMu.Unlock()
-
-		time.Sleep(time.Millisecond * 100)
-
-		counter++
-		fmt.Fprintf(w, "pong %d", counter)
-	})
+	withPingHandler(t, tb, time.Millisecond*100, nil)
 
 	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintf(w, `
@@ -232,17 +194,7 @@ func TestLifecycleReloadLoad(t *testing.T) {
 		http.Redirect(w, r, tb.staticURL("reload_lifecycle.html"), http.StatusMovedPermanently)
 	})
 
-	var counter int64
-	var counterMu sync.Mutex
-	tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
-		counterMu.Lock()
-		defer counterMu.Unlock()
-
-		time.Sleep(time.Millisecond * 100)
-
-		counter++
-		fmt.Fprintf(w, "pong %d", counter)
-	})
+	withPingHandler(t, tb, time.Millisecond*100, nil)
 
 	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintf(w, `
@@ -282,17 +234,7 @@ func TestLifecycleReloadDOMContentLoaded(t *testing.T) {
 		http.Redirect(w, r, tb.staticURL("reload_lifecycle.html"), http.StatusMovedPermanently)
 	})
 
-	var counter int64
-	var counterMu sync.Mutex
-	tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
-		counterMu.Lock()
-		defer counterMu.Unlock()
-
-		time.Sleep(time.Millisecond * 100)
-
-		counter++
-		fmt.Fprintf(w, "pong %d", counter)
-	})
+	withPingHandler(t, tb, time.Millisecond*100, nil)
 
 	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintf(w, `
@@ -334,15 +276,7 @@ func TestLifecycleReloadNetworkIdle(t *testing.T) {
 		http.Redirect(w, r, tb.staticURL("reload_lifecycle.html"), http.StatusMovedPermanently)
 	})
 
-	var counter int64
-	var counterMu sync.Mutex
-	tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
-		counterMu.Lock()
-		defer counterMu.Unlock()
-
-		counter++
-		fmt.Fprintf(w, "pong %d", counter)
-	})
+	withPingHandler(t, tb, 0, nil)
 
 	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintf(w, `
@@ -415,20 +349,8 @@ func TestLifecycleNetworkIdle(t *testing.T) {
 			http.Redirect(w, r, tb.staticURL("prolonged_network_idle.html"), http.StatusMovedPermanently)
 		})
 
-		var counter int64
 		ch := make(chan bool)
-		var counterMu sync.Mutex
-		tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
-			<-ch
-
-			counterMu.Lock()
-			defer counterMu.Unlock()
-
-			time.Sleep(time.Millisecond * 50)
-
-			counter++
-			fmt.Fprintf(w, "pong %d", counter)
-		})
+		withPingHandler(t, tb, time.Millisecond*50, ch)
 
 		tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
 			fmt.Fprintf(w, `
@@ -456,22 +378,32 @@ func TestLifecycleNetworkIdle(t *testing.T) {
 			http.Redirect(w, r, tb.staticURL("prolonged_network_idle_10.html"), http.StatusMovedPermanently)
 		})
 
-		var counterMu sync.Mutex
-		var counter int64
-		tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
-			counterMu.Lock()
-			defer counterMu.Unlock()
-
-			time.Sleep(time.Millisecond * 50)
-
-			counter++
-			fmt.Fprintf(w, "pong %d", counter)
-		})
+		withPingHandler(t, tb, time.Millisecond*50, nil)
 
 		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() {
 			result := p.TextContent("#pingRequestText", nil)
 			assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
 		})
+	})
+}
+
+func withPingHandler(t *testing.T, tb *testBrowser, slow time.Duration, ch chan bool) {
+	t.Helper()
+
+	var counter int64
+	var counterMu sync.Mutex
+	tb.withHandler("/ping", func(w http.ResponseWriter, _ *http.Request) {
+		if ch != nil {
+			<-ch
+		}
+
+		counterMu.Lock()
+		defer counterMu.Unlock()
+
+		time.Sleep(slow)
+
+		counter++
+		fmt.Fprintf(w, "pong %d", counter)
 	})
 }
 
