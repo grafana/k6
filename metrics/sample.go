@@ -142,7 +142,7 @@ func GetResolversForTrendColumns(trendColumns []string) (map[string]func(s *Tren
 	staticResolvers := map[string]func(s *TrendSink) float64{
 		"avg":   func(s *TrendSink) float64 { return s.Avg },
 		"min":   func(s *TrendSink) float64 { return s.Min },
-		"med":   func(s *TrendSink) float64 { return s.Med },
+		"med":   func(s *TrendSink) float64 { return s.P(0.5) },
 		"max":   func(s *TrendSink) float64 { return s.Max },
 		"count": func(s *TrendSink) float64 { return float64(s.Count) },
 	}
