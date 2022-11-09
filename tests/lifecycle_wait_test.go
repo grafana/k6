@@ -37,13 +37,7 @@ func TestLifecycleWaitForLoadStateLoad(t *testing.T) {
 	})
 
 	withPingHandler(t, tb, time.Millisecond*100, nil)
-
-	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintf(w, `
-				var pingJSTextOutput = document.getElementById("pingJSText");
-				pingJSTextOutput.innerText = "ping.js loaded from server";
-			`)
-	})
+	withPingJSHandler(t, tb, false, nil)
 
 	waitUntil := common.LifecycleEventLoad
 	assertHome(t, tb, p, waitUntil, func() {
@@ -81,15 +75,7 @@ func TestLifecycleWaitForLoadStateDOMContentLoaded(t *testing.T) {
 	})
 
 	withPingHandler(t, tb, time.Millisecond*100, nil)
-
-	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintf(w, `
-				await new Promise(resolve => setTimeout(resolve, 1000));
-
-				var pingJSTextOutput = document.getElementById("pingJSText");
-				pingJSTextOutput.innerText = "ping.js loaded from server";
-			`)
-	})
+	withPingJSHandler(t, tb, true, nil)
 
 	waitUntil := common.LifecycleEventDOMContentLoad
 	assertHome(t, tb, p, waitUntil, func() {
@@ -125,13 +111,7 @@ func TestLifecycleWaitForLoadStateNetworkIdle(t *testing.T) {
 	})
 
 	withPingHandler(t, tb, 0, nil)
-
-	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintf(w, `
-				var pingJSTextOutput = document.getElementById("pingJSText");
-				pingJSTextOutput.innerText = "ping.js loaded from server";
-			`)
-	})
+	withPingJSHandler(t, tb, false, nil)
 
 	waitUntil := common.LifecycleEventNetworkIdle
 	assertHome(t, tb, p, waitUntil, func() {
@@ -166,13 +146,7 @@ func TestLifecycleWaitForLoadStateDOMContentLoadedThenNetworkIdle(t *testing.T) 
 	})
 
 	withPingHandler(t, tb, time.Millisecond*100, nil)
-
-	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintf(w, `
-				var pingJSTextOutput = document.getElementById("pingJSText");
-				pingJSTextOutput.innerText = "ping.js loaded from server";
-			`)
-	})
+	withPingJSHandler(t, tb, false, nil)
 
 	assertHome(t, tb, p, common.LifecycleEventDOMContentLoad, func() {
 		p.WaitForLoadState(common.LifecycleEventNetworkIdle.String(), nil)
@@ -195,13 +169,7 @@ func TestLifecycleReloadLoad(t *testing.T) {
 	})
 
 	withPingHandler(t, tb, time.Millisecond*100, nil)
-
-	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintf(w, `
-				var pingJSTextOutput = document.getElementById("pingJSText");
-				pingJSTextOutput.innerText = "ping.js loaded from server";
-			`)
-	})
+	withPingJSHandler(t, tb, false, nil)
 
 	waitUntil := common.LifecycleEventLoad
 	assertHome(t, tb, p, waitUntil, func() {
@@ -235,15 +203,7 @@ func TestLifecycleReloadDOMContentLoaded(t *testing.T) {
 	})
 
 	withPingHandler(t, tb, time.Millisecond*100, nil)
-
-	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintf(w, `
-				await new Promise(resolve => setTimeout(resolve, 1000));
-
-				var pingJSTextOutput = document.getElementById("pingJSText");
-				pingJSTextOutput.innerText = "ping.js loaded from server";
-			`)
-	})
+	withPingJSHandler(t, tb, true, nil)
 
 	waitUntil := common.LifecycleEventDOMContentLoad
 	assertHome(t, tb, p, waitUntil, func() {
@@ -277,13 +237,7 @@ func TestLifecycleReloadNetworkIdle(t *testing.T) {
 	})
 
 	withPingHandler(t, tb, 0, nil)
-
-	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintf(w, `
-				var pingJSTextOutput = document.getElementById("pingJSText");
-				pingJSTextOutput.innerText = "ping.js loaded from server";
-			`)
-	})
+	withPingJSHandler(t, tb, false, nil)
 
 	waitUntil := common.LifecycleEventNetworkIdle
 	assertHome(t, tb, p, waitUntil, func() {
@@ -327,12 +281,7 @@ func TestLifecycleNetworkIdle(t *testing.T) {
 			`)
 		})
 
-		tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
-			fmt.Fprintf(w, `
-				var pingJSTextOutput = document.getElementById("pingJSText");
-				pingJSTextOutput.innerText = "ping.js loaded from server";
-			`)
-		})
+		withPingJSHandler(t, tb, false, nil)
 
 		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() {
 			result := p.TextContent("#pingJSText", nil)
@@ -351,14 +300,7 @@ func TestLifecycleNetworkIdle(t *testing.T) {
 
 		ch := make(chan bool)
 		withPingHandler(t, tb, time.Millisecond*50, ch)
-
-		tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
-			fmt.Fprintf(w, `
-				var pingJSTextOutput = document.getElementById("pingJSText");
-				pingJSTextOutput.innerText = "ping.js loaded from server";
-			`)
-			close(ch)
-		})
+		withPingJSHandler(t, tb, false, ch)
 
 		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() {
 			result := p.TextContent("#pingRequestText", nil)
@@ -404,6 +346,28 @@ func withPingHandler(t *testing.T, tb *testBrowser, slow time.Duration, ch chan 
 
 		counter++
 		fmt.Fprintf(w, "pong %d", counter)
+	})
+}
+
+func withPingJSHandler(t *testing.T, tb *testBrowser, slow bool, ch chan bool) {
+	t.Helper()
+
+	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
+		script := `
+			var pingJSTextOutput = document.getElementById("pingJSText");
+			pingJSTextOutput.innerText = "ping.js loaded from server";
+		`
+		if slow {
+			script = `
+			await new Promise(resolve => setTimeout(resolve, 1000));
+
+			` + script
+		}
+		fmt.Fprint(w, script)
+
+		if ch != nil {
+			close(ch)
+		}
 	})
 }
 
