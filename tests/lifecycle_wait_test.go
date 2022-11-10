@@ -157,100 +157,108 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 	}
 }
 
-func TestLifecycleReloadLoad(t *testing.T) {
+func TestLifecycleReload(t *testing.T) {
 	t.Parallel()
 
-	tb := newTestBrowser(t, withFileServer())
-	p := tb.NewPage(nil)
+	tests := []struct {
+		name                  string
+		pingSlowness          time.Duration
+		pingJSSlow            bool
+		waitUntil             common.LifecycleEvent
+		pingRequestTextAssert func(result string, pingCount int)
+		pingJSTextAssert      func(result string)
+	}{
+		{
+			// Test description
+			//
+			// 1. goto /home and wait for the load lifecycle event.
+			// 2. reload the page and wait with for the load lifecycle event.
+			//
+			// Success criteria: The resulting page after reload is the same as
+			//                   the initial navigation with goto.
+			name:         "load",
+			pingSlowness: time.Millisecond * 100,
+			pingJSSlow:   false,
+			waitUntil:    common.LifecycleEventLoad,
+			pingRequestTextAssert: func(result string, pingCount int) {
+				assert.NotEqualValues(t, fmt.Sprintf("Waiting... pong %d - for loop complete", pingCount), result)
+			},
+			pingJSTextAssert: func(result string) {
+				assert.EqualValues(t, "ping.js loaded from server", result)
+			},
+		},
+		{
+			// Test description
+			//
+			// 1. goto /home and wait for the domcontentloaded lifecycle event.
+			// 2. reload the page and wait with for the domcontentloaded lifecycle event.
+			//
+			// Success criteria: The resulting page after reload is the same as
+			//                   the initial navigation with goto.
+			name:         "domcontentloaded",
+			pingSlowness: time.Millisecond * 100,
+			pingJSSlow:   true,
+			waitUntil:    common.LifecycleEventDOMContentLoad,
+			pingRequestTextAssert: func(result string, pingCount int) {
+				assert.NotEqualValues(t, fmt.Sprintf("Waiting... pong %d - for loop complete", pingCount), result)
+			},
+			pingJSTextAssert: func(result string) {
+				assert.EqualValues(t, "Waiting...", result)
+			},
+		},
+		{
+			// Test description
+			//
+			// 1. goto /home and wait for the networkidle lifecycle event.
+			// 2. reload the page and wait with for the networkidle lifecycle event.
+			//
+			// Success criteria: The resulting page after reload is the same as
+			//                   the initial navigation with goto.
+			name:         "networkidle",
+			pingSlowness: 0,
+			pingJSSlow:   false,
+			waitUntil:    common.LifecycleEventNetworkIdle,
+			pingRequestTextAssert: func(result string, pingCount int) {
+				assert.EqualValues(t, fmt.Sprintf("Waiting... pong %d - for loop complete", pingCount), result)
+			},
+			pingJSTextAssert: func(result string) {
+				assert.EqualValues(t, "ping.js loaded from server", result)
+			},
+		},
+	}
 
-	withHomeHandler(t, tb, "reload_lifecycle.html")
-	withPingHandler(t, tb, time.Millisecond*100, nil)
-	withPingJSHandler(t, tb, false, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	waitUntil := common.LifecycleEventLoad
-	assertHome(t, tb, p, waitUntil, func() {
-		result := p.TextContent("#pingRequestText", nil)
-		assert.NotEqualValues(t, "Waiting... pong 10 - for loop complete", result)
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
 
-		result = p.TextContent("#pingJSText", nil)
-		assert.EqualValues(t, "ping.js loaded from server", result)
+			withHomeHandler(t, tb, "reload_lifecycle.html")
+			withPingHandler(t, tb, tt.pingSlowness, nil)
+			withPingJSHandler(t, tb, tt.pingJSSlow, nil)
 
-		opts := tb.toGojaValue(common.PageReloadOptions{
-			WaitUntil: waitUntil,
-			Timeout:   30 * time.Second,
+			assertHome(t, tb, p, tt.waitUntil, func() {
+				result := p.TextContent("#pingRequestText", nil)
+				tt.pingRequestTextAssert(result, 10)
+
+				result = p.TextContent("#pingJSText", nil)
+				tt.pingJSTextAssert(result)
+
+				opts := tb.toGojaValue(common.PageReloadOptions{
+					WaitUntil: tt.waitUntil,
+					Timeout:   30 * time.Second,
+				})
+				p.Reload(opts)
+
+				result = p.TextContent("#pingRequestText", nil)
+				tt.pingRequestTextAssert(result, 20)
+
+				result = p.TextContent("#pingJSText", nil)
+				tt.pingJSTextAssert(result)
+			})
 		})
-		p.Reload(opts)
-
-		result = p.TextContent("#pingRequestText", nil)
-		assert.NotEqualValues(t, "Waiting... pong 20 - for loop complete", result)
-
-		result = p.TextContent("#pingJSText", nil)
-		assert.EqualValues(t, "ping.js loaded from server", result)
-	})
-}
-
-func TestLifecycleReloadDOMContentLoaded(t *testing.T) {
-	t.Parallel()
-
-	tb := newTestBrowser(t, withFileServer())
-	p := tb.NewPage(nil)
-
-	withHomeHandler(t, tb, "reload_lifecycle.html")
-	withPingHandler(t, tb, time.Millisecond*100, nil)
-	withPingJSHandler(t, tb, true, nil)
-
-	waitUntil := common.LifecycleEventDOMContentLoad
-	assertHome(t, tb, p, waitUntil, func() {
-		result := p.TextContent("#pingRequestText", nil)
-		assert.NotEqualValues(t, "Waiting... pong 10 - for loop complete", result)
-
-		result = p.TextContent("#pingJSText", nil)
-		assert.EqualValues(t, "Waiting...", result)
-
-		opts := tb.toGojaValue(common.PageReloadOptions{
-			WaitUntil: waitUntil,
-			Timeout:   30 * time.Second,
-		})
-		p.Reload(opts)
-
-		result = p.TextContent("#pingRequestText", nil)
-		assert.NotEqualValues(t, "Waiting... pong 20 - for loop complete", result)
-
-		result = p.TextContent("#pingJSText", nil)
-		assert.EqualValues(t, "Waiting...", result)
-	})
-}
-
-func TestLifecycleReloadNetworkIdle(t *testing.T) {
-	t.Parallel()
-
-	tb := newTestBrowser(t, withFileServer())
-	p := tb.NewPage(nil)
-
-	withHomeHandler(t, tb, "reload_lifecycle.html")
-	withPingHandler(t, tb, 0, nil)
-	withPingJSHandler(t, tb, false, nil)
-
-	waitUntil := common.LifecycleEventNetworkIdle
-	assertHome(t, tb, p, waitUntil, func() {
-		result := p.TextContent("#pingRequestText", nil)
-		assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
-
-		result = p.TextContent("#pingJSText", nil)
-		assert.EqualValues(t, "ping.js loaded from server", result)
-
-		opts := tb.toGojaValue(common.PageReloadOptions{
-			WaitUntil: waitUntil,
-			Timeout:   30 * time.Second,
-		})
-		p.Reload(opts)
-
-		result = p.TextContent("#pingRequestText", nil)
-		assert.EqualValues(t, "Waiting... pong 20 - for loop complete", result)
-
-		result = p.TextContent("#pingJSText", nil)
-		assert.EqualValues(t, "ping.js loaded from server", result)
-	})
+	}
 }
 
 func TestLifecycleNetworkIdle(t *testing.T) {
