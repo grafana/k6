@@ -14,6 +14,111 @@ import (
 	"github.com/grafana/xk6-browser/common"
 )
 
+func TestLifecycleWaitForNavigation(t *testing.T) {
+	// Test description
+	//
+	// 1. goto /home and wait for the specified lifecycle event.
+	// 2. click on a link that navigates to a page, and wait on
+	//    the specified lifecycle event.
+	//
+	// Success criteria: The click will perform a navigation away
+	//                   from the current page, it should wait for
+	//                   the specified lifecycle event and the result
+	//                   of the page should match the original nav.
+
+	t.Parallel()
+
+	tests := []struct {
+		name                  string
+		pingSlowness          time.Duration
+		pingJSSlow            bool
+		waitUntil             common.LifecycleEvent
+		pingRequestTextAssert func(result string, pingCount int)
+		pingJSTextAssert      func(result string)
+		assertFunc            func(p api.Page)
+	}{
+		{
+			name:         "load",
+			pingSlowness: time.Millisecond * 100,
+			pingJSSlow:   false,
+			waitUntil:    common.LifecycleEventLoad,
+			pingRequestTextAssert: func(result string, pingCount int) {
+				assert.NotEqualValues(t, fmt.Sprintf("Waiting... pong %d - for loop complete", pingCount), result)
+			},
+			pingJSTextAssert: func(result string) {
+				assert.EqualValues(t, "ping.js loaded from server", result)
+			},
+		},
+		{
+			name:         "domcontentloaded",
+			pingSlowness: time.Millisecond * 100,
+			pingJSSlow:   true,
+			waitUntil:    common.LifecycleEventDOMContentLoad,
+			pingRequestTextAssert: func(result string, pingCount int) {
+				assert.NotEqualValues(t, fmt.Sprintf("Waiting... pong %d - for loop complete", pingCount), result)
+			},
+			pingJSTextAssert: func(result string) {
+				assert.EqualValues(t, "Waiting...", result)
+			},
+		},
+		{
+			name:         "networkidle",
+			pingSlowness: 0,
+			pingJSSlow:   false,
+			waitUntil:    common.LifecycleEventNetworkIdle,
+			pingRequestTextAssert: func(result string, pingCount int) {
+				assert.EqualValues(t, fmt.Sprintf("Waiting... pong %d - for loop complete", pingCount), result)
+			},
+			pingJSTextAssert: func(result string) {
+				assert.EqualValues(t, "ping.js loaded from server", result)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+
+			withHomeHandler(t, tb, "wait_for_nav_lifecycle.html")
+			withPingHandler(t, tb, tt.pingSlowness, nil)
+			withPingJSHandler(t, tb, tt.pingJSSlow, nil)
+
+			if tt.assertFunc != nil {
+				assertHome(t, tb, p, tt.waitUntil, func() testPromise {
+					tt.assertFunc(p)
+					return testPromise{}
+				}, nil)
+				return
+			}
+
+			assertHome(t, tb, p, tt.waitUntil, func() testPromise {
+				result := p.TextContent("#pingRequestText", nil)
+				tt.pingRequestTextAssert(result, 10)
+
+				result = p.TextContent("#pingJSText", nil)
+				tt.pingJSTextAssert(result)
+
+				waitForNav := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+					Timeout:   30000,
+					WaitUntil: tt.waitUntil,
+				}))
+				click := p.Click("#homeLink", nil)
+
+				return tb.promiseAll(waitForNav, click)
+			}, func() {
+				result := p.TextContent("#pingRequestText", nil)
+				tt.pingRequestTextAssert(result, 20)
+
+				result = p.TextContent("#pingJSText", nil)
+				tt.pingJSTextAssert(result)
+			})
+		})
+	}
+}
+
 // General guidelines on lifecycle events:
 //
 // - load: This lifecycle event is emitted by the browser once:
