@@ -273,6 +273,21 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 		Time: start,
 	})
 
+	defer func() {
+		end := time.Now()
+		sessionDuration := metrics.D(end.Sub(start))
+
+		metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: socket.builtinMetrics.WSSessionDuration,
+				Tags:   socket.tagsAndMeta.Tags,
+			},
+			Time:     start,
+			Metadata: socket.tagsAndMeta.Metadata,
+			Value:    sessionDuration,
+		})
+	}()
+
 	if connErr != nil {
 		// Pass the error to the user script before exiting immediately
 		socket.handleEvent("error", rt.ToValue(connErr))
@@ -287,6 +302,8 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 		}, nil
 	}
 
+	defer socket.Close()
+
 	// Run the user-provided set up function
 	if _, err := setupFn(goja.Undefined(), rt.ToValue(&socket)); err != nil {
 		_ = socket.closeConnection(websocket.CloseGoingAway)
@@ -297,8 +314,6 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 		return nil, wsRespErr
 	}
 	wsResponse.URL = url
-
-	defer func() { _ = conn.Close() }()
 
 	// The connection is now open, emit the event
 	socket.handleEvent("open")
@@ -322,23 +337,6 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 
 	// Wraps a couple of channels around conn.ReadMessage
 	go socket.readPump(readDataChan, readErrChan, readCloseChan)
-
-	// we do it here as below we can panic, which translates to an exception in js code
-	defer func() {
-		socket.Close() // just in case
-		end := time.Now()
-		sessionDuration := metrics.D(end.Sub(start))
-
-		metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: socket.builtinMetrics.WSSessionDuration,
-				Tags:   socket.tagsAndMeta.Tags,
-			},
-			Time:     start,
-			Metadata: socket.tagsAndMeta.Metadata,
-			Value:    sessionDuration,
-		})
-	}()
 
 	// This is the main control loop. All JS code (including error handlers)
 	// should only be executed by this thread to avoid race conditions
