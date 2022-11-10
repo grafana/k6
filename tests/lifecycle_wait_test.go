@@ -235,7 +235,73 @@ func TestLifecycleReload(t *testing.T) {
 	}
 }
 
-func TestLifecycleNetworkIdle(t *testing.T) {
+func TestLifecycleGoto(t *testing.T) {
+	t.Parallel()
+
+	// Test description
+	//
+	// 1. goto /home and wait for the specified lifecycle event.
+	//
+	// Success criteria: The web page is in the expected state once we receive
+	//                   the specified lifecycle event from the browser.
+
+	tests := []struct {
+		name                  string
+		pingSlowness          time.Duration
+		pingJSSlow            bool
+		waitUntil             common.LifecycleEvent
+		pingRequestTextAssert func(result string)
+		pingJSTextAssert      func(result string)
+	}{
+		{
+			name:         "load",
+			pingSlowness: time.Millisecond * 100,
+			pingJSSlow:   false,
+			waitUntil:    common.LifecycleEventLoad,
+			pingRequestTextAssert: func(result string) {
+				assert.NotEqualValues(t, "Waiting... pong 10 - for loop complete", result)
+			},
+			pingJSTextAssert: func(result string) {
+				assert.EqualValues(t, "ping.js loaded from server", result)
+			},
+		},
+		{
+			name:         "domcontentloaded",
+			pingSlowness: time.Millisecond * 100,
+			pingJSSlow:   true,
+			waitUntil:    common.LifecycleEventDOMContentLoad,
+			pingRequestTextAssert: func(result string) {
+				assert.NotEqualValues(t, "Waiting... pong 10 - for loop complete", result)
+			},
+			pingJSTextAssert: func(result string) {
+				assert.EqualValues(t, "Waiting...", result)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+
+			withHomeHandler(t, tb, "wait_for_nav_lifecycle.html")
+			withPingHandler(t, tb, tt.pingSlowness, nil)
+			withPingJSHandler(t, tb, tt.pingJSSlow, nil)
+
+			assertHome(t, tb, p, tt.waitUntil, func() {
+				result := p.TextContent("#pingRequestText", nil)
+				tt.pingRequestTextAssert(result)
+
+				result = p.TextContent("#pingJSText", nil)
+				tt.pingJSTextAssert(result)
+			})
+		})
+	}
+}
+
+func TestLifecycleGotoNetworkIdle(t *testing.T) {
 	t.Parallel()
 
 	t.Run("doesn't timeout waiting for networkIdle", func(t *testing.T) {
