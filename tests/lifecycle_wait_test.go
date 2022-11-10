@@ -126,11 +126,14 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil)
 
 			if tt.assertFunc != nil {
-				assertHome(t, tb, p, tt.waitUntil, func() { tt.assertFunc(p) })
+				assertHome(t, tb, p, tt.waitUntil, func() testPromise {
+					tt.assertFunc(p)
+					return testPromise{}
+				}, nil)
 				return
 			}
 
-			assertHome(t, tb, p, tt.waitUntil, func() {
+			assertHome(t, tb, p, tt.waitUntil, func() testPromise {
 				result := p.TextContent("#pingRequestText", nil)
 				tt.pingRequestTextAssert(result)
 
@@ -139,7 +142,9 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 
 				// This shouldn't block and return after calling hasLifecycleEventFired.
 				p.WaitForLoadState(tt.waitUntil.String(), nil)
-			})
+
+				return testPromise{}
+			}, nil)
 		})
 	}
 }
@@ -212,7 +217,7 @@ func TestLifecycleReload(t *testing.T) {
 			withPingHandler(t, tb, tt.pingSlowness, nil)
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil)
 
-			assertHome(t, tb, p, tt.waitUntil, func() {
+			assertHome(t, tb, p, tt.waitUntil, func() testPromise {
 				result := p.TextContent("#pingRequestText", nil)
 				tt.pingRequestTextAssert(result, 10)
 
@@ -230,7 +235,9 @@ func TestLifecycleReload(t *testing.T) {
 
 				result = p.TextContent("#pingJSText", nil)
 				tt.pingJSTextAssert(result)
-			})
+
+				return testPromise{}
+			}, nil)
 		})
 	}
 }
@@ -304,13 +311,15 @@ func TestLifecycleGotoWithSubFrame(t *testing.T) {
 			withPingHandler(t, tb, tt.pingSlowness, nil)
 			withPingJSSubFrameHandler(t, tb, tt.pingJSSlow, nil)
 
-			assertHome(t, tb, p, tt.waitUntil, func() {
+			assertHome(t, tb, p, tt.waitUntil, func() testPromise {
 				result := p.TextContent("#subFramePingRequestText", nil)
 				tt.pingRequestTextAssert(result)
 
 				result = p.TextContent("#subFramePingJSText", nil)
 				tt.pingJSTextAssert(result)
-			})
+
+				return testPromise{}
+			}, nil)
 		})
 	}
 }
@@ -370,13 +379,15 @@ func TestLifecycleGoto(t *testing.T) {
 			withPingHandler(t, tb, tt.pingSlowness, nil)
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil)
 
-			assertHome(t, tb, p, tt.waitUntil, func() {
+			assertHome(t, tb, p, tt.waitUntil, func() testPromise {
 				result := p.TextContent("#pingRequestText", nil)
 				tt.pingRequestTextAssert(result)
 
 				result = p.TextContent("#pingJSText", nil)
 				tt.pingJSTextAssert(result)
-			})
+
+				return testPromise{}
+			}, nil)
 		})
 	}
 }
@@ -403,10 +414,12 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 
 		withPingJSHandler(t, tb, false, nil)
 
-		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() {
+		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() testPromise {
 			result := p.TextContent("#pingJSText", nil)
 			assert.EqualValues(t, "ping.js loaded from server", result)
-		})
+
+			return testPromise{}
+		}, nil)
 	})
 
 	t.Run("doesn't unblock wait for networkIdle too early", func(t *testing.T) {
@@ -420,13 +433,15 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 		withPingHandler(t, tb, time.Millisecond*50, ch)
 		withPingJSHandler(t, tb, false, ch)
 
-		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() {
+		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() testPromise {
 			result := p.TextContent("#pingRequestText", nil)
 			assert.EqualValues(t, "Waiting... pong 4 - for loop complete", result)
 
 			result = p.TextContent("#pingJSText", nil)
 			assert.EqualValues(t, "ping.js loaded from server", result)
-		})
+
+			return testPromise{}
+		}, nil)
 	})
 
 	t.Run("doesn't unblock wait on networkIdle early when load and domcontentloaded complete at once", func(t *testing.T) {
@@ -438,10 +453,12 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 		withHomeHandler(t, tb, "prolonged_network_idle_10.html")
 		withPingHandler(t, tb, time.Millisecond*50, nil)
 
-		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() {
+		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() testPromise {
 			result := p.TextContent("#pingRequestText", nil)
 			assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
-		})
+
+			return testPromise{}
+		}, nil)
 	})
 }
 
@@ -530,10 +547,9 @@ func withPingJSSubFrameHandler(t *testing.T, tb *testBrowser, slow bool, ch chan
 
 func assertHome(
 	t *testing.T,
-	tb *testBrowser,
-	p api.Page,
+	tb *testBrowser, p api.Page,
 	waitUntil common.LifecycleEvent,
-	check func(),
+	check func() testPromise, secondCheck func(),
 ) {
 	t.Helper()
 
@@ -543,15 +559,20 @@ func assertHome(
 			WaitUntil: waitUntil,
 			Timeout:   30 * time.Second,
 		})
-		tb.promise(p.Goto(tb.URL("/home"), opts)).then(
-			func() {
-				check()
+		prm := tb.promise(p.Goto(tb.URL("/home"), opts)).then(
+			func() testPromise {
 				resolved = true
+				return check()
 			},
 			func() {
 				rejected = true
 			},
 		)
+		if secondCheck != nil {
+			prm.then(func() {
+				secondCheck()
+			})
+		}
 
 		return nil
 	})
