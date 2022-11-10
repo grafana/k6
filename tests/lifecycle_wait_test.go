@@ -235,6 +235,86 @@ func TestLifecycleReload(t *testing.T) {
 	}
 }
 
+func TestLifecycleGotoWithSubFrame(t *testing.T) {
+	t.Parallel()
+
+	// Test description
+	//
+	// 1. goto /home (with iframe to /sub) and wait for the specified lifecycle event.
+	//
+	// Success criteria: The web page (all frames) is in the expected state
+	//                   once we receive the specified lifecycle event from
+	//                   the browser.
+
+	tests := []struct {
+		name                  string
+		pingSlowness          time.Duration
+		pingJSSlow            bool
+		waitUntil             common.LifecycleEvent
+		pingRequestTextAssert func(result string)
+		pingJSTextAssert      func(result string)
+	}{
+		{
+			name:         "load",
+			pingSlowness: time.Millisecond * 100,
+			pingJSSlow:   false,
+			waitUntil:    common.LifecycleEventLoad,
+			pingRequestTextAssert: func(result string) {
+				assert.NotEqualValues(t, "Waiting... pong 10 - for loop complete", result)
+			},
+			pingJSTextAssert: func(result string) {
+				assert.EqualValues(t, "ping.js loaded from server", result)
+			},
+		},
+		{
+			name:         "domcontentloaded",
+			pingSlowness: time.Millisecond * 100,
+			pingJSSlow:   true,
+			waitUntil:    common.LifecycleEventDOMContentLoad,
+			pingRequestTextAssert: func(result string) {
+				assert.NotEqualValues(t, "Waiting... pong 10 - for loop complete", result)
+			},
+			pingJSTextAssert: func(result string) {
+				assert.EqualValues(t, "Waiting...", result)
+			},
+		},
+		{
+			name:         "networkidle",
+			pingSlowness: 0,
+			pingJSSlow:   false,
+			waitUntil:    common.LifecycleEventNetworkIdle,
+			pingRequestTextAssert: func(result string) {
+				assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
+			},
+			pingJSTextAssert: func(result string) {
+				assert.EqualValues(t, "ping.js loaded from server", result)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+
+			withHomeHandler(t, tb, "lifecycle_main_frame.html")
+			withSubHandler(t, tb, "lifecycle_subframe.html")
+			withPingHandler(t, tb, tt.pingSlowness, nil)
+			withPingJSSubFrameHandler(t, tb, tt.pingJSSlow, nil)
+
+			assertHome(t, tb, p, tt.waitUntil, func() {
+				result := p.TextContent("#subFramePingRequestText", nil)
+				tt.pingRequestTextAssert(result)
+
+				result = p.TextContent("#subFramePingJSText", nil)
+				tt.pingJSTextAssert(result)
+			})
+		})
+	}
+}
+
 func TestLifecycleGoto(t *testing.T) {
 	t.Parallel()
 
@@ -373,6 +453,14 @@ func withHomeHandler(t *testing.T, tb *testBrowser, htmlFile string) {
 	})
 }
 
+func withSubHandler(t *testing.T, tb *testBrowser, htmlFile string) {
+	t.Helper()
+
+	tb.withHandler("/sub", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.staticURL(htmlFile), http.StatusMovedPermanently)
+	})
+}
+
 func withPingHandler(t *testing.T, tb *testBrowser, slow time.Duration, ch chan bool) {
 	t.Helper()
 
@@ -400,6 +488,31 @@ func withPingJSHandler(t *testing.T, tb *testBrowser, slow bool, ch chan bool) {
 		script := `
 			var pingJSTextOutput = document.getElementById("pingJSText");
 			pingJSTextOutput.innerText = "ping.js loaded from server";
+		`
+		if slow {
+			script = `
+			await new Promise(resolve => setTimeout(resolve, 1000));
+
+			` + script
+		}
+		fmt.Fprint(w, script)
+
+		if ch != nil {
+			close(ch)
+		}
+	})
+}
+
+func withPingJSSubFrameHandler(t *testing.T, tb *testBrowser, slow bool, ch chan bool) {
+	t.Helper()
+
+	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
+		script := `
+			var pingJSTextOutput = document.getElementById("pingJSText");
+			var parentOutputServerMsg = window.parent.document.getElementById('subFramePingJSText');
+			
+			pingJSTextOutput.innerText = "ping.js loaded from server";
+			parentOutputServerMsg.innerText = pingJSTextOutput.innerText;
 		`
 		if slow {
 			script = `
