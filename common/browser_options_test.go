@@ -253,7 +253,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 				vu = k6test.NewVU(t)
 				lo = NewLaunchOptions(tt.onCloud)
 			)
-			err := lo.Parse(vu.Context(), vu.ToGojaValue(tt.opts), log.NewNullLogger())
+			err := lo.Parse(vu.Context(), log.NewNullLogger(), vu.ToGojaValue(tt.opts))
 			if tt.err != "" {
 				require.ErrorContains(t, err, tt.err)
 			} else {
