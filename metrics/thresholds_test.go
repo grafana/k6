@@ -685,7 +685,7 @@ func TestThresholdsRun(t *testing.T) {
 		{
 			name: "Running threshold on trend sink with no values and passing med statement succeeds",
 			args: args{
-				sink:                 &TrendSink{Values: []float64{}, Med: 0},
+				sink:                 &TrendSink{Values: []float64{}},
 				thresholdExpressions: []string{"med<39"},
 				duration:             0,
 			},
@@ -695,7 +695,7 @@ func TestThresholdsRun(t *testing.T) {
 		{
 			name: "Running threshold on trend sink with no values and non passing med statement fails",
 			args: args{
-				sink:                 &TrendSink{Values: []float64{}, Med: 0},
+				sink:                 &TrendSink{Values: []float64{}},
 				thresholdExpressions: []string{"med>39"},
 				duration:             0,
 			},

@@ -74,7 +74,6 @@ type TrendSink struct {
 	Count    uint64
 	Min, Max float64
 	Sum, Avg float64
-	Med      float64
 }
 
 // IsEmpty indicates whether the TrendSink is empty.
