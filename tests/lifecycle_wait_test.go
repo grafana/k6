@@ -36,6 +36,14 @@ import (
 func TestLifecycleWaitForLoadState(t *testing.T) {
 	t.Parallel()
 
+	// Test description
+	//
+	// 1. goto /home and wait for the specified lifecycle event.
+	// 2. use WaitForLoadState with the same specified lifecycle event.
+	//
+	// Success criteria: We want to ensure that the specified event is persisted in
+	//                   memory, and we don't block on WaitForLoadState.
+
 	tests := []struct {
 		name                  string
 		pingSlowness          time.Duration
@@ -46,13 +54,6 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 		assertFunc            func(p api.Page)
 	}{
 		{
-			// Test description
-			//
-			// 1. goto /home and wait for the load lifecycle event.
-			// 2. use WaitForLoadState with load.
-			//
-			// Success criteria: We want to ensure that the load event is persisted in
-			//                   memory, and we don't block on WaitForLoadState.
 			name:         "load",
 			pingSlowness: time.Millisecond * 100,
 			pingJSSlow:   false,
@@ -65,13 +66,6 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 			},
 		},
 		{
-			// Test description
-			//
-			// 1. goto /home and wait for the domcontentloaded lifecycle event.
-			// 2. use WaitForLoadState with domcontentloaded.
-			//
-			// Success criteria: We want to ensure that the domcontentloaded event is
-			//                   persisted in memory, and we don't block on WaitForLoadState.
 			name:         "domcontentloaded",
 			pingSlowness: time.Millisecond * 100,
 			pingJSSlow:   true,
@@ -84,13 +78,6 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 			},
 		},
 		{
-			// Test description
-			//
-			// 1. goto /home and wait for the networkidle lifecycle event.
-			// 2. use WaitForLoadState with networkidle.
-			//
-			// Success criteria: We want to ensure that the networkidle event is
-			//                   persisted in memory, and we don't block on WaitForLoadState.
 			name:         "networkidle",
 			pingSlowness: 0,
 			pingJSSlow:   false,
@@ -110,7 +97,7 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 			//
 			// Success criteria: We want to quickly move to calling WaitForLoadState
 			//                   so that we wait until networkidle is received from
-			//                   the browser. So not relying on the persisted state in memory.
+			//                   the browser -- not relying on the persisted state in memory.
 			name:         "domcontentloaded then networkidle",
 			pingSlowness: time.Millisecond * 100,
 			pingJSSlow:   false,
@@ -160,6 +147,14 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 func TestLifecycleReload(t *testing.T) {
 	t.Parallel()
 
+	// Test description
+	//
+	// 1. goto /home and wait for the specified lifecycle event.
+	// 2. reload the page and wait for the specified lifecycle event.
+	//
+	// Success criteria: The resulting page after reload is the same as
+	//                   the initial navigation with goto.
+
 	tests := []struct {
 		name                  string
 		pingSlowness          time.Duration
@@ -169,13 +164,6 @@ func TestLifecycleReload(t *testing.T) {
 		pingJSTextAssert      func(result string)
 	}{
 		{
-			// Test description
-			//
-			// 1. goto /home and wait for the load lifecycle event.
-			// 2. reload the page and wait with for the load lifecycle event.
-			//
-			// Success criteria: The resulting page after reload is the same as
-			//                   the initial navigation with goto.
 			name:         "load",
 			pingSlowness: time.Millisecond * 100,
 			pingJSSlow:   false,
@@ -188,13 +176,6 @@ func TestLifecycleReload(t *testing.T) {
 			},
 		},
 		{
-			// Test description
-			//
-			// 1. goto /home and wait for the domcontentloaded lifecycle event.
-			// 2. reload the page and wait with for the domcontentloaded lifecycle event.
-			//
-			// Success criteria: The resulting page after reload is the same as
-			//                   the initial navigation with goto.
 			name:         "domcontentloaded",
 			pingSlowness: time.Millisecond * 100,
 			pingJSSlow:   true,
@@ -207,13 +188,6 @@ func TestLifecycleReload(t *testing.T) {
 			},
 		},
 		{
-			// Test description
-			//
-			// 1. goto /home and wait for the networkidle lifecycle event.
-			// 2. reload the page and wait with for the networkidle lifecycle event.
-			//
-			// Success criteria: The resulting page after reload is the same as
-			//                   the initial navigation with goto.
 			name:         "networkidle",
 			pingSlowness: 0,
 			pingJSSlow:   false,
