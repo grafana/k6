@@ -23,13 +23,13 @@
 <img src="assets/github-hr.png" alt="---" />
 <br/>
 
-**k6** is a modern load-testing tool, building on [our](https://k6.io/about) years of experience in the load and performance testing industries.
+**k6** is a modern load-testing tool, building on [our years of experience](https://k6.io/about) in the load and performance testing industries.
 k6 is built to be simple, powerful, and extensible. Every commit to this repo was intended to create an application with **high performance and excellent developer experience**.
 Some key features include:
 
 - **Configurable load generation.** Even lower-end machines can simulate lots of traffic.
 - **Tests as code.** Reuse scripts, modularize logic, version control, and integrate tests with your CI.
-- **A full-featured API.** The scripting API is packed with features designed to simulate real application traffic.
+- **A full-featured API.** The scripting API is packed with features that help you simulate real application traffic.
 - **An embedded JavaScript engine.** The performance of Go, the scripting simplicity of vanilla ECMAscript (without baggage from the wider JS ecosystem).
 - **Multiple Protocol support**. HTTP, WebSockets, gRPC, and more.
 - **Large extension ecosystem**. You can extend k6 to support your needs. Many already have done so and shared their extensions with the community!
@@ -53,7 +53,7 @@ The docs cover all aspects of using k6. Some highlights include:
 - [Javascript API](https://k6.io/docs/javascript-api). Reference and examples of all k6 modules.
 
 
-The docs have much more! And if you want more conceptual information, you can read about [Test types](https://k6.io/docs/test-types/introduction/), [Test strategies](https://k6.io/docs/testing-guides/api-load-testing/), or one of the many informative [Blog posts](https://k6.io/blog)
+These links barely scratch the surface! If you're looking for conceptual information, you can read about [Test types](https://k6.io/docs/test-types/introduction/), [Test strategies](https://k6.io/docs/testing-guides/), or one of the many informative [Blog posts](https://k6.io/blog)
 
 ## Contribute
 
