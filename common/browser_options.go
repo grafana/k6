@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/dop251/goja"
@@ -55,9 +54,10 @@ func NewLaunchOptions(onCloud bool) *LaunchOptions {
 }
 
 // Parse parses launch options from a JS object.
-func (l *LaunchOptions) Parse(ctx context.Context, opts goja.Value, logger *log.Logger) error { //nolint:cyclop
+func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja.Value) error { //nolint:cyclop
+	// when opts is nil, we just return the default options without error.
 	if !gojaValueExists(opts) {
-		return errors.New("LaunchOptions does not exist in the runtime")
+		return nil
 	}
 	var (
 		rt       = k6ext.Runtime(ctx)
