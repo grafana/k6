@@ -66,7 +66,8 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 		waitUntil             common.LifecycleEvent
 		pingRequestTextAssert func(result string, pingCount int)
 		pingJSTextAssert      func(result string)
-		assertFunc            func(p api.Page)
+		assertFunc            func(tb *testBrowser, p api.Page) testPromise
+		wantError             string
 	}{
 		{
 			name:         "load",
@@ -104,6 +105,35 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 				assert.EqualValues(t, "ping.js loaded from server", result)
 			},
 		},
+		{
+			// Test description
+			//
+			// Steps:
+			//   1. goto /home and wait for the specified lifecycle event.
+			//   2. call WaitForNavigation without clicking on the link.
+			//    the specified lifecycle event.
+			//
+			// Success criteria:
+			//   We want this test to timeout since the navigation has
+			//   completed, a new one hasn't started but we "accidentally"
+			//   call WaitForNavigation.
+			name:         "timeout",
+			pingSlowness: 0,
+			pingJSSlow:   false,
+			waitUntil:    common.LifecycleEventNetworkIdle,
+			assertFunc: func(tb *testBrowser, p api.Page) testPromise {
+				result := p.TextContent("#pingRequestText", nil)
+				assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
+
+				waitForNav := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+					Timeout:   1000,
+					WaitUntil: common.LifecycleEventNetworkIdle,
+				}))
+
+				return tb.promise(waitForNav)
+			},
+			wantError: "Uncaught (in promise) waiting for navigation: timed out after 1s",
+		},
 	}
 
 	for _, tt := range tests {
@@ -119,9 +149,8 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 
 			if tt.assertFunc != nil {
 				assertHome(t, tb, p, tt.waitUntil, func() testPromise {
-					tt.assertFunc(p)
-					return testPromise{}
-				}, nil)
+					return tt.assertFunc(tb, p)
+				}, nil, tt.wantError)
 				return
 			}
 
@@ -145,64 +174,9 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 
 				result = p.TextContent("#pingJSText", nil)
 				tt.pingJSTextAssert(result)
-			})
+			}, "")
 		})
 	}
-}
-
-func TestLifecycleWaitForNavigationTimeout(t *testing.T) {
-	t.Parallel()
-
-	// Test description
-	//
-	// Steps:
-	//   1. goto /home and wait for the networkidle lifecycle event.
-	//   2. use WaitForNavigation with networkidle.
-	//
-	// Success criteria:
-	//   Time out reached after navigation completed and
-	//   wait for lifecycle event set, to signify that
-	//   WaitForNavigation must be set before we navigate
-	//   to a new page.
-
-	tb := newTestBrowser(t, withFileServer())
-	p := tb.NewPage(nil)
-
-	withHomeHandler(t, tb, "lifecycle_no_ping_js.html")
-	withPingHandler(t, tb, 0, nil)
-
-	waitUntil := common.LifecycleEventNetworkIdle
-	var resolved, rejected bool
-	err := tb.await(func() error {
-		opts := tb.toGojaValue(common.FrameGotoOptions{
-			WaitUntil: waitUntil,
-			Timeout:   30 * time.Second,
-		})
-		prm := tb.promise(p.Goto(tb.URL("/home"), opts)).then(
-			func() testPromise {
-				result := p.TextContent("#pingRequestText", nil)
-				assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
-
-				waitForNav := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
-					Timeout:   1000,
-					WaitUntil: waitUntil,
-				}))
-
-				return tb.promise(waitForNav)
-			},
-		)
-		prm.then(func() {
-			resolved = true
-		}, func() {
-			rejected = true
-		})
-
-		return nil
-	})
-	require.NoError(t, err)
-
-	assert.False(t, resolved)
-	assert.True(t, rejected)
 }
 
 func TestLifecycleWaitForLoadState(t *testing.T) {
@@ -305,7 +279,7 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 				assertHome(t, tb, p, tt.waitUntil, func() testPromise {
 					tt.assertFunc(p)
 					return testPromise{}
-				}, nil)
+				}, nil, "")
 				return
 			}
 
@@ -320,7 +294,7 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 				p.WaitForLoadState(tt.waitUntil.String(), nil)
 
 				return testPromise{}
-			}, nil)
+			}, nil, "")
 		})
 	}
 }
@@ -415,7 +389,7 @@ func TestLifecycleReload(t *testing.T) {
 				tt.pingJSTextAssert(result)
 
 				return testPromise{}
-			}, nil)
+			}, nil, "")
 		})
 	}
 }
@@ -499,7 +473,7 @@ func TestLifecycleGotoWithSubFrame(t *testing.T) {
 				tt.pingJSTextAssert(result)
 
 				return testPromise{}
-			}, nil)
+			}, nil, "")
 		})
 	}
 }
@@ -569,7 +543,7 @@ func TestLifecycleGoto(t *testing.T) {
 				tt.pingJSTextAssert(result)
 
 				return testPromise{}
-			}, nil)
+			}, nil, "")
 		})
 	}
 }
@@ -601,7 +575,7 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 			assert.EqualValues(t, "ping.js loaded from server", result)
 
 			return testPromise{}
-		}, nil)
+		}, nil, "")
 	})
 
 	t.Run("doesn't unblock wait for networkIdle too early", func(t *testing.T) {
@@ -623,7 +597,7 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 			assert.EqualValues(t, "ping.js loaded from server", result)
 
 			return testPromise{}
-		}, nil)
+		}, nil, "")
 	})
 
 	t.Run("doesn't unblock wait on networkIdle early when load and domcontentloaded complete at once", func(t *testing.T) {
@@ -640,7 +614,7 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 			assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
 
 			return testPromise{}
-		}, nil)
+		}, nil, "")
 	})
 }
 
@@ -713,7 +687,7 @@ func assertHome(
 	t *testing.T,
 	tb *testBrowser, p api.Page,
 	waitUntil common.LifecycleEvent,
-	check func() testPromise, secondCheck func(),
+	check func() testPromise, secondCheck func(), wantError string,
 ) {
 	t.Helper()
 
@@ -738,6 +712,12 @@ func assertHome(
 
 		return nil
 	})
+
+	if wantError != "" {
+		require.EqualError(t, err, wantError)
+		return
+	}
+
 	require.NoError(t, err)
 
 	assert.True(t, resolved)
