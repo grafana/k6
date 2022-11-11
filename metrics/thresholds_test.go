@@ -638,12 +638,13 @@ func TestThresholdsRunAll(t *testing.T) {
 	}
 }
 
-func TestThresholds_Run(t *testing.T) {
+func TestThresholdsRun(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
-		sink     Sink
-		duration time.Duration
+		sink                 Sink
+		thresholdExpressions []string
+		duration             time.Duration
 	}
 	tests := []struct {
 		name    string
@@ -652,30 +653,83 @@ func TestThresholds_Run(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "Running thresholds of existing sink",
-			args:    args{DummySink{"p(95)": 1234.5}, 0},
+			name: "Running thresholds of existing sink",
+			args: args{
+				sink:                 DummySink{"p(95)": 1234.5},
+				thresholdExpressions: []string{"p(95)<2000"},
+				duration:             0,
+			},
 			want:    true,
 			wantErr: false,
 		},
 		{
-			name:    "Running thresholds of existing sink but failing threshold",
-			args:    args{DummySink{"p(95)": 3000}, 0},
+			name: "Running thresholds of existing sink but failing threshold",
+			args: args{
+				sink:                 DummySink{"p(95)": 3000},
+				thresholdExpressions: []string{"p(95)<2000"},
+				duration:             0,
+			},
 			want:    false,
 			wantErr: false,
 		},
 		{
-			name:    "Running threshold on non existing sink does not fail",
-			args:    args{DummySink{"dummy": 0}, 0},
+			name: "Running threshold on non existing sink does not fail",
+			args: args{
+				sink:                 DummySink{"dummy": 0},
+				thresholdExpressions: []string{"p(95)<2000"},
+				duration:             0,
+			},
 			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "Running threshold on trend sink with no values and passing med statement succeeds",
+			args: args{
+				sink:                 &TrendSink{Values: []float64{}},
+				thresholdExpressions: []string{"med<39"},
+				duration:             0,
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "Running threshold on trend sink with no values and non passing med statement fails",
+			args: args{
+				sink:                 &TrendSink{Values: []float64{}},
+				thresholdExpressions: []string{"med>39"},
+				duration:             0,
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "Running threshold on trend sink with values and passing med statement succeeds",
+			args: args{
+				sink:                 &TrendSink{Values: []float64{70, 80, 90}, Count: 3},
+				thresholdExpressions: []string{"med>39"},
+				duration:             0,
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "Running threshold on trend sink with values and failing med statement fails",
+			args: args{
+				sink:                 &TrendSink{Values: []float64{70, 80, 90}, Count: 3},
+				thresholdExpressions: []string{"med<39"},
+				duration:             0,
+			},
+			want:    false,
 			wantErr: false,
 		},
 	}
 	for _, testCase := range tests {
 		testCase := testCase
+
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			thresholds := NewThresholds([]string{"p(95)<2000"})
+			thresholds := NewThresholds(testCase.args.thresholdExpressions)
 			gotParseErr := thresholds.Parse()
 			require.NoError(t, gotParseErr)
 

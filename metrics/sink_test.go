@@ -28,12 +28,6 @@ func TestCounterSink(t *testing.T) {
 			assert.Equal(t, now, sink.First)
 		})
 	})
-	t.Run("calc", func(t *testing.T) {
-		sink := CounterSink{}
-		sink.Calc()
-		assert.Equal(t, 0.0, sink.Value)
-		assert.Equal(t, time.Time{}, sink.First)
-	})
 	t.Run("format", func(t *testing.T) {
 		sink := CounterSink{}
 		for _, s := range samples10 {
@@ -66,14 +60,6 @@ func TestGaugeSink(t *testing.T) {
 			assert.Equal(t, 10.0, sink.Max)
 		})
 	})
-	t.Run("calc", func(t *testing.T) {
-		sink := GaugeSink{}
-		sink.Calc()
-		assert.Equal(t, 0.0, sink.Value)
-		assert.Equal(t, 0.0, sink.Min)
-		assert.Equal(t, false, sink.minSet)
-		assert.Equal(t, 0.0, sink.Max)
-	})
 	t.Run("format", func(t *testing.T) {
 		sink := GaugeSink{}
 		for _, s := range samples6 {
@@ -84,7 +70,6 @@ func TestGaugeSink(t *testing.T) {
 }
 
 func TestTrendSink(t *testing.T) {
-	unsortedSamples5 := []float64{0.0, 5.0, 10.0, 3.0, 1.0}
 	unsortedSamples10 := []float64{0.0, 100.0, 30.0, 80.0, 70.0, 60.0, 50.0, 40.0, 90.0, 20.0}
 
 	t.Run("add", func(t *testing.T) {
@@ -92,11 +77,10 @@ func TestTrendSink(t *testing.T) {
 			sink := TrendSink{}
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 7.0})
 			assert.Equal(t, uint64(1), sink.Count)
-			assert.Equal(t, true, sink.jumbled)
+			assert.Equal(t, false, sink.sorted)
 			assert.Equal(t, 7.0, sink.Min)
 			assert.Equal(t, 7.0, sink.Max)
 			assert.Equal(t, 7.0, sink.Avg)
-			assert.Equal(t, 0.0, sink.Med) // calculated in Calc()
 		})
 		t.Run("values", func(t *testing.T) {
 			sink := TrendSink{}
@@ -104,40 +88,7 @@ func TestTrendSink(t *testing.T) {
 				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 			}
 			assert.Equal(t, uint64(len(unsortedSamples10)), sink.Count)
-			assert.Equal(t, true, sink.jumbled)
-			assert.Equal(t, 0.0, sink.Min)
-			assert.Equal(t, 100.0, sink.Max)
-			assert.Equal(t, 54.0, sink.Avg)
-			assert.Equal(t, 0.0, sink.Med) // calculated in Calc()
-		})
-	})
-	t.Run("calc", func(t *testing.T) {
-		t.Run("no values", func(t *testing.T) {
-			sink := TrendSink{}
-			sink.Calc()
-			assert.Equal(t, uint64(0), sink.Count)
-			assert.Equal(t, false, sink.jumbled)
-			assert.Equal(t, 0.0, sink.Med)
-		})
-		t.Run("odd number of samples median", func(t *testing.T) {
-			sink := TrendSink{}
-			for _, s := range unsortedSamples5 {
-				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
-			}
-			sink.Calc()
-			assert.Equal(t, uint64(len(unsortedSamples5)), sink.Count)
-			assert.Equal(t, false, sink.jumbled)
-			assert.Equal(t, 3.0, sink.Med)
-		})
-		t.Run("sorted", func(t *testing.T) {
-			sink := TrendSink{}
-			for _, s := range unsortedSamples10 {
-				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
-			}
-			sink.Calc()
-			assert.Equal(t, uint64(len(unsortedSamples10)), sink.Count)
-			assert.Equal(t, false, sink.jumbled)
-			assert.Equal(t, 55.0, sink.Med)
+			assert.Equal(t, false, sink.sorted)
 			assert.Equal(t, 0.0, sink.Min)
 			assert.Equal(t, 100.0, sink.Max)
 			assert.Equal(t, 54.0, sink.Avg)
@@ -163,11 +114,13 @@ func TestTrendSink(t *testing.T) {
 			sink := TrendSink{}
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 5.0})
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 10.0})
+			assert.Equal(t, false, sink.sorted)
 			assert.Equal(t, 5.0, sink.P(0.0))
 			assert.Equal(t, 7.5, sink.P(0.5))
 			assert.Equal(t, 5+(10-5)*0.95, sink.P(0.95))
 			assert.Equal(t, 5+(10-5)*0.99, sink.P(0.99))
 			assert.Equal(t, 10.0, sink.P(1.0))
+			assert.Equal(t, true, sink.sorted)
 		})
 		t.Run("more than 2", func(t *testing.T) {
 			sink := TrendSink{}
@@ -179,6 +132,7 @@ func TestTrendSink(t *testing.T) {
 			assert.InDelta(t, 95.5, sink.P(0.95), tolerance)
 			assert.InDelta(t, 99.1, sink.P(0.99), tolerance)
 			assert.InDelta(t, 100.0, sink.P(1.0), tolerance)
+			assert.Equal(t, true, sink.sorted)
 		})
 	})
 	t.Run("format", func(t *testing.T) {
@@ -228,12 +182,6 @@ func TestRateSink(t *testing.T) {
 			assert.Equal(t, int64(3), sink.Trues)
 		})
 	})
-	t.Run("calc", func(t *testing.T) {
-		sink := RateSink{}
-		sink.Calc()
-		assert.Equal(t, int64(0), sink.Total)
-		assert.Equal(t, int64(0), sink.Trues)
-	})
 	t.Run("format", func(t *testing.T) {
 		sink := RateSink{}
 		for _, s := range samples6 {
@@ -247,12 +195,6 @@ func TestDummySinkAddPanics(t *testing.T) {
 	assert.Panics(t, func() {
 		DummySink{}.Add(Sample{})
 	})
-}
-
-func TestDummySinkCalcDoesNothing(t *testing.T) {
-	sink := DummySink{"a": 1}
-	sink.Calc()
-	assert.Equal(t, 1.0, sink["a"])
 }
 
 func TestDummySinkFormatReturnsItself(t *testing.T) {
