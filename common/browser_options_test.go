@@ -14,6 +14,13 @@ import (
 func TestBrowserLaunchOptionsParse(t *testing.T) {
 	t.Parallel()
 
+	defaultOptions := &LaunchOptions{
+		Env:               make(map[string]string),
+		Headless:          true,
+		LogCategoryFilter: ".*",
+		Timeout:           DefaultTimeout,
+	}
+
 	for name, tt := range map[string]struct {
 		opts    map[string]any
 		assert  func(testing.TB, *LaunchOptions)
@@ -24,24 +31,14 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			opts: map[string]any{},
 			assert: func(tb testing.TB, lo *LaunchOptions) {
 				tb.Helper()
-				assert.Equal(t, &LaunchOptions{
-					Env:               make(map[string]string),
-					Headless:          true,
-					LogCategoryFilter: ".*",
-					Timeout:           DefaultTimeout,
-				}, lo)
+				assert.Equal(t, defaultOptions, lo)
 			},
 		},
 		"defaults_nil": { // providing nil option returns default options
 			opts: nil,
 			assert: func(tb testing.TB, lo *LaunchOptions) {
 				tb.Helper()
-				assert.Equal(t, &LaunchOptions{
-					Env:               make(map[string]string),
-					Headless:          true,
-					LogCategoryFilter: ".*",
-					Timeout:           DefaultTimeout,
-				}, lo)
+				assert.Equal(t, defaultOptions, lo)
 			},
 		},
 		"defaults_on_cloud": {
