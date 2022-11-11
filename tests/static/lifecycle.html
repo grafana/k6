@@ -3,6 +3,7 @@
 <head></head>
 
 <body>
+    <a href="/home" id="homeLink">Home</a>
     <div id="pingRequestText">Waiting...</div>
     <div id="pingJSText">Waiting...</div>
 
@@ -19,7 +20,11 @@
         })
 
         async function pingRequestText() {
-            for (var i = 0; i < 10; i++) {
+            const queryString = window.location.search;
+            const urlParams = new URLSearchParams(queryString);
+            const pingCount = urlParams.get('pingCount')
+
+            for (var i = 0; i < pingCount; i++) {
                 await fetch('/ping')
                     .then(response => response.text())
                     .then((data) => {

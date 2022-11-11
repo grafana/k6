@@ -113,7 +113,7 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
 
-			withHomeHandler(t, tb, "wait_for_nav_lifecycle.html")
+			withHomeHandler(t, tb, "lifecycle.html?pingCount=10")
 			withPingHandler(t, tb, tt.pingSlowness, nil)
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
@@ -168,7 +168,7 @@ func TestLifecycleWaitForNavigationTimeout(t *testing.T) {
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewPage(nil)
 
-	withHomeHandler(t, tb, "prolonged_network_idle_10.html")
+	withHomeHandler(t, tb, "lifecycle_no_ping_js.html")
 	withPingHandler(t, tb, 0, nil)
 
 	waitUntil := common.LifecycleEventNetworkIdle
@@ -297,7 +297,7 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
 
-			withHomeHandler(t, tb, "wait_for_nav_lifecycle.html")
+			withHomeHandler(t, tb, "lifecycle.html?pingCount=10")
 			withPingHandler(t, tb, tt.pingSlowness, nil)
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
@@ -391,7 +391,7 @@ func TestLifecycleReload(t *testing.T) {
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
 
-			withHomeHandler(t, tb, "reload_lifecycle.html")
+			withHomeHandler(t, tb, "lifecycle.html?pingCount=10")
 			withPingHandler(t, tb, tt.pingSlowness, nil)
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
@@ -487,7 +487,7 @@ func TestLifecycleGotoWithSubFrame(t *testing.T) {
 			p := tb.NewPage(nil)
 
 			withHomeHandler(t, tb, "lifecycle_main_frame.html")
-			withSubHandler(t, tb, "lifecycle_subframe.html")
+			withSubHandler(t, tb, "lifecycle.html?pingCount=10")
 			withPingHandler(t, tb, tt.pingSlowness, nil)
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil, true)
 
@@ -557,7 +557,7 @@ func TestLifecycleGoto(t *testing.T) {
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
 
-			withHomeHandler(t, tb, "wait_for_nav_lifecycle.html")
+			withHomeHandler(t, tb, "lifecycle.html?pingCount=10")
 			withPingHandler(t, tb, tt.pingSlowness, nil)
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
@@ -610,7 +610,7 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 		tb := newTestBrowser(t, withFileServer())
 		p := tb.NewPage(nil)
 
-		withHomeHandler(t, tb, "prolonged_network_idle.html")
+		withHomeHandler(t, tb, "lifecycle.html?pingCount=4")
 		ch := make(chan bool)
 		withPingHandler(t, tb, 50*time.Millisecond, ch)
 		withPingJSHandler(t, tb, false, ch, false)
@@ -632,7 +632,7 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 		tb := newTestBrowser(t, withFileServer())
 		p := tb.NewPage(nil)
 
-		withHomeHandler(t, tb, "prolonged_network_idle_10.html")
+		withHomeHandler(t, tb, "lifecycle_no_ping_js.html")
 		withPingHandler(t, tb, 50*time.Millisecond, nil)
 
 		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() testPromise {
