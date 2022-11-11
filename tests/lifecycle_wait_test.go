@@ -103,7 +103,7 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 
 			withHomeHandler(t, tb, "wait_for_nav_lifecycle.html")
 			withPingHandler(t, tb, tt.pingSlowness, nil)
-			withPingJSHandler(t, tb, tt.pingJSSlow, nil)
+			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
 			if tt.assertFunc != nil {
 				assertHome(t, tb, p, tt.waitUntil, func() testPromise {
@@ -284,7 +284,7 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 
 			withHomeHandler(t, tb, "wait_for_nav_lifecycle.html")
 			withPingHandler(t, tb, tt.pingSlowness, nil)
-			withPingJSHandler(t, tb, tt.pingJSSlow, nil)
+			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
 			if tt.assertFunc != nil {
 				assertHome(t, tb, p, tt.waitUntil, func() testPromise {
@@ -376,7 +376,7 @@ func TestLifecycleReload(t *testing.T) {
 
 			withHomeHandler(t, tb, "reload_lifecycle.html")
 			withPingHandler(t, tb, tt.pingSlowness, nil)
-			withPingJSHandler(t, tb, tt.pingJSSlow, nil)
+			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
 			assertHome(t, tb, p, tt.waitUntil, func() testPromise {
 				result := p.TextContent("#pingRequestText", nil)
@@ -470,7 +470,7 @@ func TestLifecycleGotoWithSubFrame(t *testing.T) {
 			withHomeHandler(t, tb, "lifecycle_main_frame.html")
 			withSubHandler(t, tb, "lifecycle_subframe.html")
 			withPingHandler(t, tb, tt.pingSlowness, nil)
-			withPingJSSubFrameHandler(t, tb, tt.pingJSSlow, nil)
+			withPingJSHandler(t, tb, tt.pingJSSlow, nil, true)
 
 			assertHome(t, tb, p, tt.waitUntil, func() testPromise {
 				result := p.TextContent("#subFramePingRequestText", nil)
@@ -538,7 +538,7 @@ func TestLifecycleGoto(t *testing.T) {
 
 			withHomeHandler(t, tb, "wait_for_nav_lifecycle.html")
 			withPingHandler(t, tb, tt.pingSlowness, nil)
-			withPingJSHandler(t, tb, tt.pingJSSlow, nil)
+			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
 			assertHome(t, tb, p, tt.waitUntil, func() testPromise {
 				result := p.TextContent("#pingRequestText", nil)
@@ -573,7 +573,7 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 			`)
 		})
 
-		withPingJSHandler(t, tb, false, nil)
+		withPingJSHandler(t, tb, false, nil, false)
 
 		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() testPromise {
 			result := p.TextContent("#pingJSText", nil)
@@ -592,7 +592,7 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 		withHomeHandler(t, tb, "prolonged_network_idle.html")
 		ch := make(chan bool)
 		withPingHandler(t, tb, time.Millisecond*50, ch)
-		withPingJSHandler(t, tb, false, ch)
+		withPingJSHandler(t, tb, false, ch, false)
 
 		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() testPromise {
 			result := p.TextContent("#pingRequestText", nil)
@@ -659,7 +659,7 @@ func withPingHandler(t *testing.T, tb *testBrowser, slow time.Duration, ch chan 
 	})
 }
 
-func withPingJSHandler(t *testing.T, tb *testBrowser, slow bool, ch chan bool) {
+func withPingJSHandler(t *testing.T, tb *testBrowser, slow bool, ch chan bool, withSubFrame bool) {
 	t.Helper()
 
 	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
@@ -667,31 +667,13 @@ func withPingJSHandler(t *testing.T, tb *testBrowser, slow bool, ch chan bool) {
 			var pingJSTextOutput = document.getElementById("pingJSText");
 			pingJSTextOutput.innerText = "ping.js loaded from server";
 		`
-		if slow {
-			script = `
-			await new Promise(resolve => setTimeout(resolve, 1000));
+		if withSubFrame {
+			script += `
 
-			` + script
-		}
-		fmt.Fprint(w, script)
-
-		if ch != nil {
-			close(ch)
-		}
-	})
-}
-
-func withPingJSSubFrameHandler(t *testing.T, tb *testBrowser, slow bool, ch chan bool) {
-	t.Helper()
-
-	tb.withHandler("/ping.js", func(w http.ResponseWriter, _ *http.Request) {
-		script := `
-			var pingJSTextOutput = document.getElementById("pingJSText");
 			var parentOutputServerMsg = window.parent.document.getElementById('subFramePingJSText');
-			
-			pingJSTextOutput.innerText = "ping.js loaded from server";
 			parentOutputServerMsg.innerText = pingJSTextOutput.innerText;
-		`
+			`
+		}
 		if slow {
 			script = `
 			await new Promise(resolve => setTimeout(resolve, 1000));
