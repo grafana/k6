@@ -16,34 +16,46 @@ import (
 
 // General guidelines on lifecycle events:
 //
-// - load: This lifecycle event is emitted by the browser once:
-//            1. The HTML is loaded;
-//            2. The async scripts have loaded;
-//         It does not wait for the other network requests to
-//         complete.
+// load
 //
-// - domcontentloaded: This lifecycle event is emitted by the
-//                     browser once:
-//                         1. The HTML is loaded;
-//                     It does not wait for the async scripts or
-//                     the other network requests to complete.
+//   The load event is fired when the initial HTML document has been completely
+//   loaded. It does not wait for the other network requests to complete.
 //
-// - networkidle: This lifecycle event is emitted by the browser once:
-//            1. The HTML is loaded;
-//            2. The async scripts have loaded;
-//            3. All other network requests have completed;
+//   Emitted by the browser once:
+//   1. The HTML is loaded.
+//   2. The async scripts have loaded.
+//
+// domcontentloaded
+//
+//   The DOMContentLoaded event is fired when the initial HTML document has been
+//   completely loaded and parsed. It does not wait for the async scripts or the
+//   other network requests to complete.
+//
+//   Emitted by the browser once:
+//   1. The HTML is loaded.
+//
+// networkidle
+//
+//   The networkidle event is fired when there are no network connections for at
+//   least 500ms.
+//
+//   Emitted by the browser once:
+//   1. The HTML is loaded.
+//   2. The async scripts have loaded.
+//   3. All other network requests have completed.
 
 func TestLifecycleWaitForNavigation(t *testing.T) {
 	// Test description
 	//
-	// 1. goto /home and wait for the specified lifecycle event.
-	// 2. click on a link that navigates to a page, and wait on
+	// Steps:
+	//   1. goto /home and wait for the specified lifecycle event.
+	//   2. click on a link that navigates to a page, and wait on
 	//    the specified lifecycle event.
 	//
-	// Success criteria: The click will perform a navigation away
-	//                   from the current page, it should wait for
-	//                   the specified lifecycle event and the result
-	//                   of the page should match the original nav.
+	// Success criteria:
+	//   The click will perform a navigation away from the current page,
+	//   it should wait for the specified lifecycle event and the result
+	//   of the page should match the original nav.
 
 	t.Parallel()
 
@@ -143,13 +155,15 @@ func TestLifecycleWaitForNavigationTimeout(t *testing.T) {
 
 	// Test description
 	//
-	// 1. goto /home and wait for the networkidle lifecycle event.
-	// 2. use WaitForNavigation with networkidle.
+	// Steps:
+	//   1. goto /home and wait for the networkidle lifecycle event.
+	//   2. use WaitForNavigation with networkidle.
 	//
-	// Success criteria: Time out reached after navigation completed and
-	//                   wait for lifecycle event set, to signify that
-	//                   WaitForNavigation must be set before we navigate
-	//                   to a new page.
+	// Success criteria:
+	//   Time out reached after navigation completed and
+	//   wait for lifecycle event set, to signify that
+	//   WaitForNavigation must be set before we navigate
+	//   to a new page.
 
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewPage(nil)
@@ -177,14 +191,11 @@ func TestLifecycleWaitForNavigationTimeout(t *testing.T) {
 				return tb.promise(waitForNav)
 			},
 		)
-		prm.then(
-			func() {
-				resolved = true
-			},
-			func() {
-				rejected = true
-			},
-		)
+		prm.then(func() {
+			resolved = true
+		}, func() {
+			rejected = true
+		})
 
 		return nil
 	})
@@ -199,11 +210,13 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 
 	// Test description
 	//
-	// 1. goto /home and wait for the specified lifecycle event.
-	// 2. use WaitForLoadState with the same specified lifecycle event.
+	// Steps:
+	//   1. goto /home and wait for the specified lifecycle event.
+	//   2. use WaitForLoadState with the same specified lifecycle event.
 	//
-	// Success criteria: We want to ensure that the specified event is persisted in
-	//                   memory, and we don't block on WaitForLoadState.
+	// Success criteria:
+	//   We want to ensure that the specified event is persisted in
+	//   memory, and we don't block on WaitForLoadState.
 
 	tests := []struct {
 		name                  string
@@ -253,12 +266,14 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 		{
 			// Test description
 			//
-			// 1. goto /home and wait for the domcontentloaded lifecycle event.
-			// 2. use WaitForLoadState with networkidle.
+			// Steps:
+			//   1. goto /home and wait for the domcontentloaded lifecycle event.
+			//   2. use WaitForLoadState with networkidle.
 			//
-			// Success criteria: We want to quickly move to calling WaitForLoadState
-			//                   so that we wait until networkidle is received from
-			//                   the browser -- not relying on the persisted state in memory.
+			// Success criteria:
+			//   We want to quickly move to calling WaitForLoadState
+			//   so that we wait until networkidle is received from
+			//   the browser -- not relying on the persisted state in memory.
 			name:         "domcontentloaded then networkidle",
 			pingSlowness: 100 * time.Millisecond,
 			pingJSSlow:   false,
@@ -315,11 +330,13 @@ func TestLifecycleReload(t *testing.T) {
 
 	// Test description
 	//
-	// 1. goto /home and wait for the specified lifecycle event.
-	// 2. reload the page and wait for the specified lifecycle event.
+	// Steps:
+	//   1. goto /home and wait for the specified lifecycle event.
+	//   2. reload the page and wait for the specified lifecycle event.
 	//
-	// Success criteria: The resulting page after reload is the same as
-	//                   the initial navigation with goto.
+	// Success criteria:
+	//   The resulting page after reload is the same as
+	//   the initial navigation with goto.
 
 	tests := []struct {
 		name                  string
@@ -408,11 +425,13 @@ func TestLifecycleGotoWithSubFrame(t *testing.T) {
 
 	// Test description
 	//
-	// 1. goto /home (with iframe to /sub) and wait for the specified lifecycle event.
+	// Steps:
+	//   1. goto /home (with iframe to /sub) and wait for the specified lifecycle event.
 	//
-	// Success criteria: The web page (all frames) is in the expected state
-	//                   once we receive the specified lifecycle event from
-	//                   the browser.
+	// Success criteria:
+	//   The web page (all frames) is in the expected state
+	//   once we receive the specified lifecycle event from
+	//   the browser.
 
 	tests := []struct {
 		name                  string
@@ -490,10 +509,12 @@ func TestLifecycleGoto(t *testing.T) {
 
 	// Test description
 	//
-	// 1. goto /home and wait for the specified lifecycle event.
+	// Steps:
+	//   1. goto /home and wait for the specified lifecycle event.
 	//
-	// Success criteria: The web page is in the expected state once we receive
-	//                   the specified lifecycle event from the browser.
+	// Success criteria:
+	//   The web page is in the expected state once we receive
+	//   the specified lifecycle event from the browser.
 
 	tests := []struct {
 		name                  string
@@ -712,9 +733,7 @@ func assertHome(
 			},
 		)
 		if secondCheck != nil {
-			prm.then(func() {
-				secondCheck()
-			})
+			prm.then(secondCheck)
 		}
 
 		return nil
