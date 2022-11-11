@@ -14,6 +14,25 @@ import (
 	"github.com/grafana/xk6-browser/common"
 )
 
+// General guidelines on lifecycle events:
+//
+// - load: This lifecycle event is emitted by the browser once:
+//            1. The HTML is loaded;
+//            2. The async scripts have loaded;
+//         It does not wait for the other network requests to
+//         complete.
+//
+// - domcontentloaded: This lifecycle event is emitted by the
+//                     browser once:
+//                         1. The HTML is loaded;
+//                     It does not wait for the async scripts or
+//                     the other network requests to complete.
+//
+// - networkidle: This lifecycle event is emitted by the browser once:
+//            1. The HTML is loaded;
+//            2. The async scripts have loaded;
+//            3. All other network requests have completed;
+
 func TestLifecycleWaitForNavigation(t *testing.T) {
 	// Test description
 	//
@@ -119,24 +138,61 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 	}
 }
 
-// General guidelines on lifecycle events:
-//
-// - load: This lifecycle event is emitted by the browser once:
-//            1. The HTML is loaded;
-//            2. The async scripts have loaded;
-//         It does not wait for the other network requests to
-//         complete.
-//
-// - domcontentloaded: This lifecycle event is emitted by the
-//                     browser once:
-//                         1. The HTML is loaded;
-//                     It does not wait for the async scripts or
-//                     the other network requests to complete.
-//
-// - networkidle: This lifecycle event is emitted by the browser once:
-//            1. The HTML is loaded;
-//            2. The async scripts have loaded;
-//            3. All other network requests have completed;
+func TestLifecycleWaitForNavigationTimeout(t *testing.T) {
+	t.Parallel()
+
+	// Test description
+	//
+	// 1. goto /home and wait for the networkidle lifecycle event.
+	// 2. use WaitForNavigation with networkidle.
+	//
+	// Success criteria: Time out reached after navigation completed and
+	//                   wait for lifecycle event set, to signify that
+	//                   WaitForNavigation must be set before we navigate
+	//                   to a new page.
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+
+	withHomeHandler(t, tb, "prolonged_network_idle_10.html")
+	withPingHandler(t, tb, 0, nil)
+
+	waitUntil := common.LifecycleEventNetworkIdle
+	var resolved, rejected bool
+	err := tb.await(func() error {
+		opts := tb.toGojaValue(common.FrameGotoOptions{
+			WaitUntil: waitUntil,
+			Timeout:   30 * time.Second,
+		})
+		prm := tb.promise(p.Goto(tb.URL("/home"), opts)).then(
+			func() testPromise {
+				result := p.TextContent("#pingRequestText", nil)
+				assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
+
+				waitForNav := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+					Timeout:   1000,
+					WaitUntil: waitUntil,
+				}))
+
+				return tb.promise(waitForNav)
+			},
+		)
+		prm.then(
+			func() {
+				resolved = true
+			},
+			func() {
+				rejected = true
+			},
+		)
+
+		return nil
+	})
+	require.NoError(t, err)
+
+	assert.False(t, resolved)
+	assert.True(t, rejected)
+}
 
 func TestLifecycleWaitForLoadState(t *testing.T) {
 	t.Parallel()
