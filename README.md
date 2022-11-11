@@ -61,7 +61,7 @@ If you want to contribute or help with the development of k6, start by reading [
 
 ## Support
 
-To get help about usage, report bugs, suggest features and discuss k6 with other users see [SUPPORT.md](SUPPORT.md).
+To get help, report bugs, suggest features, and discuss k6 with others, refer to [SUPPORT.md](SUPPORT.md).
 
 ## License
 
