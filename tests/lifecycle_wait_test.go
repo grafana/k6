@@ -58,7 +58,7 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 	}{
 		{
 			name:         "load",
-			pingSlowness: time.Millisecond * 100,
+			pingSlowness: 100 * time.Millisecond,
 			pingJSSlow:   false,
 			waitUntil:    common.LifecycleEventLoad,
 			pingRequestTextAssert: func(result string, pingCount int) {
@@ -70,7 +70,7 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 		},
 		{
 			name:         "domcontentloaded",
-			pingSlowness: time.Millisecond * 100,
+			pingSlowness: 100 * time.Millisecond,
 			pingJSSlow:   true,
 			waitUntil:    common.LifecycleEventDOMContentLoad,
 			pingRequestTextAssert: func(result string, pingCount int) {
@@ -216,7 +216,7 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 	}{
 		{
 			name:         "load",
-			pingSlowness: time.Millisecond * 100,
+			pingSlowness: 100 * time.Millisecond,
 			pingJSSlow:   false,
 			waitUntil:    common.LifecycleEventLoad,
 			pingRequestTextAssert: func(result string) {
@@ -228,7 +228,7 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 		},
 		{
 			name:         "domcontentloaded",
-			pingSlowness: time.Millisecond * 100,
+			pingSlowness: 100 * time.Millisecond,
 			pingJSSlow:   true,
 			waitUntil:    common.LifecycleEventDOMContentLoad,
 			pingRequestTextAssert: func(result string) {
@@ -260,7 +260,7 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 			//                   so that we wait until networkidle is received from
 			//                   the browser -- not relying on the persisted state in memory.
 			name:         "domcontentloaded then networkidle",
-			pingSlowness: time.Millisecond * 100,
+			pingSlowness: 100 * time.Millisecond,
 			pingJSSlow:   false,
 			waitUntil:    common.LifecycleEventDOMContentLoad,
 			assertFunc: func(p api.Page) {
@@ -331,7 +331,7 @@ func TestLifecycleReload(t *testing.T) {
 	}{
 		{
 			name:         "load",
-			pingSlowness: time.Millisecond * 100,
+			pingSlowness: 100 * time.Millisecond,
 			pingJSSlow:   false,
 			waitUntil:    common.LifecycleEventLoad,
 			pingRequestTextAssert: func(result string, pingCount int) {
@@ -343,7 +343,7 @@ func TestLifecycleReload(t *testing.T) {
 		},
 		{
 			name:         "domcontentloaded",
-			pingSlowness: time.Millisecond * 100,
+			pingSlowness: 100 * time.Millisecond,
 			pingJSSlow:   true,
 			waitUntil:    common.LifecycleEventDOMContentLoad,
 			pingRequestTextAssert: func(result string, pingCount int) {
@@ -424,7 +424,7 @@ func TestLifecycleGotoWithSubFrame(t *testing.T) {
 	}{
 		{
 			name:         "load",
-			pingSlowness: time.Millisecond * 100,
+			pingSlowness: 100 * time.Millisecond,
 			pingJSSlow:   false,
 			waitUntil:    common.LifecycleEventLoad,
 			pingRequestTextAssert: func(result string) {
@@ -436,7 +436,7 @@ func TestLifecycleGotoWithSubFrame(t *testing.T) {
 		},
 		{
 			name:         "domcontentloaded",
-			pingSlowness: time.Millisecond * 100,
+			pingSlowness: 100 * time.Millisecond,
 			pingJSSlow:   true,
 			waitUntil:    common.LifecycleEventDOMContentLoad,
 			pingRequestTextAssert: func(result string) {
@@ -505,7 +505,7 @@ func TestLifecycleGoto(t *testing.T) {
 	}{
 		{
 			name:         "load",
-			pingSlowness: time.Millisecond * 100,
+			pingSlowness: 100 * time.Millisecond,
 			pingJSSlow:   false,
 			waitUntil:    common.LifecycleEventLoad,
 			pingRequestTextAssert: func(result string) {
@@ -517,7 +517,7 @@ func TestLifecycleGoto(t *testing.T) {
 		},
 		{
 			name:         "domcontentloaded",
-			pingSlowness: time.Millisecond * 100,
+			pingSlowness: 100 * time.Millisecond,
 			pingJSSlow:   true,
 			waitUntil:    common.LifecycleEventDOMContentLoad,
 			pingRequestTextAssert: func(result string) {
@@ -591,7 +591,7 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 
 		withHomeHandler(t, tb, "prolonged_network_idle.html")
 		ch := make(chan bool)
-		withPingHandler(t, tb, time.Millisecond*50, ch)
+		withPingHandler(t, tb, 50*time.Millisecond, ch)
 		withPingJSHandler(t, tb, false, ch, false)
 
 		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() testPromise {
@@ -612,7 +612,7 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 		p := tb.NewPage(nil)
 
 		withHomeHandler(t, tb, "prolonged_network_idle_10.html")
-		withPingHandler(t, tb, time.Millisecond*50, nil)
+		withPingHandler(t, tb, 50*time.Millisecond, nil)
 
 		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() testPromise {
 			result := p.TextContent("#pingRequestText", nil)
