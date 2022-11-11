@@ -32,6 +32,18 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 				}, lo)
 			},
 		},
+		"defaults_nil": { // providing nil option returns default options
+			opts: nil,
+			assert: func(tb testing.TB, lo *LaunchOptions) {
+				tb.Helper()
+				assert.Equal(t, &LaunchOptions{
+					Env:               make(map[string]string),
+					Headless:          true,
+					LogCategoryFilter: ".*",
+					Timeout:           DefaultTimeout,
+				}, lo)
+			},
+		},
 		"defaults_on_cloud": {
 			onCloud: true,
 			opts: map[string]any{
