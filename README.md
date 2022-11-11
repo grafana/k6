@@ -23,7 +23,7 @@
 <img src="assets/github-hr.png" alt="---" />
 <br/>
 
-**k6** is a modern load-testing tool, building on [our years of experience](https://k6.io/about) in the load and performance testing industries.
+**k6** is a modern load-testing tool, building on [our years of experience](https://k6.io/about) in the performance and testing industries.
 k6 is built to be simple, powerful, and extensible. Every commit to this repo aims to help create an application with **high performance and excellent developer experience**.
 Some key features include:
 
