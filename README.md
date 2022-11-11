@@ -24,7 +24,7 @@
 <br/>
 
 **k6** is a modern load-testing tool, building on [our years of experience](https://k6.io/about) in the load and performance testing industries.
-k6 is built to be simple, powerful, and extensible. Every commit to this repo was intended to create an application with **high performance and excellent developer experience**.
+k6 is built to be simple, powerful, and extensible. Every commit to this repo aims to help create an application with **high performance and excellent developer experience**.
 Some key features include:
 
 - **Configurable load generation.** Even lower-end machines can simulate lots of traffic.
@@ -32,7 +32,7 @@ Some key features include:
 - **A full-featured API.** The scripting API is packed with features that help you simulate real application traffic.
 - **An embedded JavaScript engine.** The performance of Go, the scripting simplicity of vanilla ECMAscript (without baggage from the wider JS ecosystem).
 - **Multiple Protocol support**. HTTP, WebSockets, gRPC, and more.
-- **Large extension ecosystem**. You can extend k6 to support your needs. Many already have done so and shared their extensions with the community!
+- **Large extension ecosystem.** You can extend k6 to support your needs. And many people have already shared their extensions with the community!
 - **Flexible metrics storage and visualization**. Summary statistics or granular metrics, exported to the service of your choice.
 
 This is what load testing looks like in the 21st century.
