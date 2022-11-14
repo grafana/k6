@@ -59,6 +59,8 @@ These links barely scratch the surface! If you're looking for conceptual informa
 
 If you want to contribute or help with the development of k6, start by reading [CONTRIBUTING.md](CONTRIBUTING.md). Before you start coding, it might be a good idea to first discuss your plans and implementation details with the k6 maintainers-especially when it comes to big changes and features. You can do this in the [GitHub issue](https://github.com/grafana/k6/issues) for the problem you're solving (create one if it doesn't exist).
 
+> **Note:** To disclose security issues, refer to [SECURITY.md](SECURITY.md).
+
 ## Support
 
 To get help, report bugs, suggest features, and discuss k6 with others, refer to [SUPPORT.md](SUPPORT.md).
