@@ -1,20 +1,19 @@
 <p align="center"><a href="https://k6.io/"><img src="assets/k6-logo-with-grafana.svg" alt="k6" width="258" height="210" /></a></p>
 
 <h3 align="center">Like unit testing, for performance</h3>
-<p align="center">A modern load testing tool for developers and testers in the DevOps era.</p>
+<p align="center">Modern load testing for developers and testers in the DevOps era.</p>
 
 <p align="center">
   <a href="https://github.com/grafana/k6/releases"><img src="https://img.shields.io/github/release/grafana/k6.svg" alt="Github release"></a>
   <a href="https://github.com/grafana/k6/actions/workflows/all.yml"><img src="https://github.com/grafana/k6/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
   <a href="https://goreportcard.com/report/github.com/grafana/k6"><img src="https://goreportcard.com/badge/github.com/grafana/k6" alt="Go Report Card"></a>
-  <a href="https://codecov.io/gh/grafana/k6"><img src="https://img.shields.io/codecov/c/github/grafana/k6/master.svg" alt="Codecov branch"></a>
+ <a href="https://codecov.io/gh/grafana/k6"><img src="https://img.shields.io/codecov/c/github/grafana/k6/master.svg" alt="Codecov branch"></a>
   <br>
   <a href="https://twitter.com/k6_io"><img src="https://img.shields.io/badge/twitter-@k6_io-55acee.svg" alt="@k6_io on Twitter"></a>
   <a href="https://k6.io/slack"><img src="https://img.shields.io/badge/Slack-k6-ff69b4.svg" alt="Slack channel"></a>
 </p>
 <p align="center">
     <a href="https://github.com/grafana/k6/releases">Download</a> ·
-    <a href="#install">Install</a> ·
     <a href="https://k6.io/docs">Documentation</a> ·
     <a href="https://community.k6.io/">Community Forum</a>
 </p>
@@ -23,7 +22,7 @@
 <img src="assets/github-hr.png" alt="---" />
 <br/>
 
-**k6** is a modern load-testing tool, building on [our years of experience](https://k6.io/about) in the performance and testing industries.
+**k6** is a modern load-testing tool, built on [our years of experience](https://k6.io/about) in the performance and testing industries.
 k6 is built to be simple, powerful, and extensible. Every commit to this repo aims to help create an application with **high performance and excellent developer experience**.
 Some key features include:
 
@@ -37,21 +36,52 @@ Some key features include:
 
 This is what load testing looks like in the 21st century.
 
-<p align="center">
-  <img width="600" src="assets/k6-demo.gif">
-</p>
+## Example script
 
-## Get started
+Here's a basic k6 script.
+Besides simulating a user getting a resource, the test also verifies response data and response time over changing load.
+
+```js
+import http from "k6/http";
+import { check, sleep } from "k6";
+
+export const options = {
+  thresholds: {
+    // Test that 99% of requests finish within 3000ms.
+    http_req_duration: ["p(99) < 3000"],
+  },
+  // Ramp the number virtual users up and down
+  stages: [
+    { duration: "30s", target: 15 },
+    { duration: "1m", target: 15 },
+    { duration: "20s", target: 0 },
+  ],
+};
+
+// code the user logic
+export default function () {
+  let res = http.get("https://test-api.k6.io/public/crocodiles/1/");
+  //validate response  status
+  check(res, { "status was 200": (r) => r.status == 200 });
+  sleep(1);
+}
+```
+
+You can run scripts like this on the CLI, or in your CI, or across a Kubernetes cluster.
+
+## Documentation
 
 The docs cover all aspects of using k6. Some highlights include:
 - [Get Started](https://k6.io/docs). Install, run a test, inspect results.
-- [HTTP requests](https://k6.io/docs/using-k6/http-requests/). Have your virtual users use HTTP methods. Or, check the other [Protocols](https://k6.io/docs).
+- [HTTP requests](https://k6.io/docs/using-k6/http-requests/). Have your virtual users use HTTP methods.
+  Or, check the other [Protocols](https://k6.io/docs).
 - [Thresholds](https://k6.io/docs/using-k6/thresholds). Set goals for your test, and codify your SLOs.
 - [Options](https://k6.io/docs/using-k6/k6-options). Configure your load, duration, TLS certificates, and much, much more
-- [Scenarios](https://k6.io/docs/using-k6/scenarios). Choose how to model your workload: open models, closed models, constant RPS, fixed iterations, and more.
+- [Scenarios](https://k6.io/docs/using-k6/scenarios).
+  Choose how to model your workload: open models, closed models, constant RPS, fixed iterations, and more.
 - [Results output](https://k6.io/docs/results-output). Study, filter, and export your test results.
 - [JavaScript API](https://k6.io/docs/javascript-api). Reference and examples of all k6 modules.
-
+- [Extensions](https://k6.io/docs/extensions). Extend k6 for new protocols and use cases.
 
 These links barely scratch the surface! If you're looking for conceptual information, you can read about [Test types](https://k6.io/docs/test-types/introduction/), [Test strategies](https://k6.io/docs/testing-guides/), or one of the many informative [Blog posts](https://k6.io/blog).
 
@@ -68,3 +98,4 @@ To get help, report bugs, suggest features, and discuss k6 with others, refer to
 ## License
 
 k6 is distributed under the [AGPL-3.0 license](https://github.com/grafana/k6/blob/master/LICENSE.md).
+
