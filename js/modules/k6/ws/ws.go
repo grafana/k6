@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,6 +22,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	httpModule "go.k6.io/k6/js/modules/k6/http"
+	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 )
 
@@ -97,6 +99,14 @@ type message struct {
 	data  []byte
 }
 
+type wsConnectArgs struct {
+	setupFn           goja.Callable
+	headers           http.Header
+	enableCompression bool
+	cookieJar         *cookiejar.Jar
+	tagsAndMeta       *metrics.TagsAndMeta
+}
+
 const writeWait = 10 * time.Second
 
 // Exports returns the exports of the ws module.
@@ -105,9 +115,7 @@ func (mi *WS) Exports() modules.Exports {
 }
 
 // Connect establishes a WebSocket connection based on the parameters provided.
-// TODO: refactor to reduce the method complexity
-//
-//nolint:funlen,gocognit,gocyclo,cyclop
+//nolint:funlen
 func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 	ctx := mi.vu.Context()
 	rt := mi.vu.Runtime()
@@ -116,196 +124,31 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 		return nil, ErrWSInInitContext
 	}
 
-	// The params argument is optional
-	var callableV, paramsV goja.Value
-	switch len(args) {
-	case 2:
-		paramsV = args[0]
-		callableV = args[1]
-	case 1:
-		paramsV = goja.Undefined()
-		callableV = args[0]
-	default:
-		return nil, errors.New("invalid number of arguments to ws.connect")
-	}
-	// Get the callable (required)
-	setupFn, isFunc := goja.AssertFunction(callableV)
-	if !isFunc {
-		return nil, errors.New("last argument to ws.connect must be a function")
+	parsedArgs, err := parseConnectArgs(state, rt, args...)
+	if err != nil {
+		return nil, err
 	}
 
-	header := make(http.Header)
-	header.Set("User-Agent", state.Options.UserAgent.String)
+	parsedArgs.tagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagURL, url)
 
-	enableCompression := false
-
-	tagsAndMeta := state.Tags.GetCurrentValues()
-	jar := state.CookieJar
-
-	// Parse the optional second argument (params)
-	if !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) { //nolint:nestif
-		params := paramsV.ToObject(rt)
-		for _, k := range params.Keys() {
-			switch k {
-			case "headers":
-				headersV := params.Get(k)
-				if goja.IsUndefined(headersV) || goja.IsNull(headersV) {
-					continue
-				}
-				headersObj := headersV.ToObject(rt)
-				if headersObj == nil {
-					continue
-				}
-				for _, key := range headersObj.Keys() {
-					header.Set(key, headersObj.Get(key).String())
-				}
-			case "tags":
-				if err := common.ApplyCustomUserTags(rt, &tagsAndMeta, params.Get(k)); err != nil {
-					return nil, fmt.Errorf("invalid ws.connect() metric tags: %w", err)
-				}
-			case "jar":
-				jarV := params.Get(k)
-				if goja.IsUndefined(jarV) || goja.IsNull(jarV) {
-					continue
-				}
-				if v, ok := jarV.Export().(*httpModule.CookieJar); ok {
-					jar = v.Jar
-				}
-			case "compression":
-				// deflate compression algorithm is supported - as defined in RFC7692
-				// compression here relies on the implementation in gorilla/websocket package, usage is
-				// experimental and may result in decreased performance. package supports
-				// only "no context takeover" scenario
-
-				algoString := strings.TrimSpace(params.Get(k).ToString().String())
-				if algoString == "" {
-					continue
-				}
-
-				if algoString != "deflate" {
-					return nil, fmt.Errorf("unsupported compression algorithm '%s', supported algorithm is 'deflate'", algoString)
-				}
-
-				enableCompression = true
-			}
-		}
-	}
-
-	tagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagURL, url)
-
-	// Overriding the NextProtos to avoid talking http2
-	var tlsConfig *tls.Config
-	if state.TLSConfig != nil {
-		tlsConfig = state.TLSConfig.Clone()
-		tlsConfig.NextProtos = []string{"http/1.1"}
-	}
-
-	wsd := websocket.Dialer{
-		HandshakeTimeout: time.Second * 60, // TODO configurable
-		// Pass a custom net.DialContext function to websocket.Dialer that will substitute
-		// the underlying net.Conn with our own tracked netext.Conn
-		NetDialContext:    state.Dialer.DialContext,
-		Proxy:             http.ProxyFromEnvironment,
-		TLSClientConfig:   tlsConfig,
-		EnableCompression: enableCompression,
-		Jar:               jar,
-	}
-	if jar == nil { // this is needed because of how interfaces work and that wsd.Jar is http.Cookiejar
-		wsd.Jar = nil
-	}
-
-	start := time.Now()
-	conn, httpResponse, connErr := wsd.DialContext(ctx, url, header)
-	connectionEnd := time.Now()
-	connectionDuration := metrics.D(connectionEnd.Sub(start))
-
-	if state.Options.SystemTags.Has(metrics.TagIP) && conn.RemoteAddr() != nil {
-		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
-			tagsAndMeta.SetSystemTagOrMeta(metrics.TagIP, ip)
-		}
-	}
-
-	if httpResponse != nil {
-		if state.Options.SystemTags.Has(metrics.TagStatus) {
-			tagsAndMeta.SetSystemTagOrMeta(metrics.TagStatus, strconv.Itoa(httpResponse.StatusCode))
-		}
-
-		if state.Options.SystemTags.Has(metrics.TagSubproto) {
-			tagsAndMeta.SetSystemTagOrMeta(metrics.TagSubproto, httpResponse.Header.Get("Sec-WebSocket-Protocol"))
-		}
-	}
-
-	socket := Socket{
-		ctx:                ctx,
-		rt:                 rt,
-		conn:               conn,
-		eventHandlers:      make(map[string][]goja.Callable),
-		pingSendTimestamps: make(map[string]time.Time),
-		scheduled:          make(chan goja.Callable),
-		done:               make(chan struct{}),
-		samplesOutput:      state.Samples,
-		tagsAndMeta:        &tagsAndMeta,
-		builtinMetrics:     state.BuiltinMetrics,
-	}
-
-	metrics.PushIfNotDone(ctx, state.Samples, metrics.ConnectedSamples{
-		Samples: []metrics.Sample{
-			{
-				TimeSeries: metrics.TimeSeries{
-					Metric: state.BuiltinMetrics.WSSessions,
-					Tags:   tagsAndMeta.Tags,
-				},
-				Time:     start,
-				Metadata: tagsAndMeta.Metadata,
-				Value:    1,
-			},
-			{
-				TimeSeries: metrics.TimeSeries{
-					Metric: state.BuiltinMetrics.WSConnecting,
-					Tags:   tagsAndMeta.Tags,
-				},
-				Time:     start,
-				Metadata: tagsAndMeta.Metadata,
-				Value:    connectionDuration,
-			},
-		},
-		Tags: tagsAndMeta.Tags,
-		Time: start,
-	})
-
-	defer func() {
-		end := time.Now()
-		sessionDuration := metrics.D(end.Sub(start))
-
-		metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: socket.builtinMetrics.WSSessionDuration,
-				Tags:   socket.tagsAndMeta.Tags,
-			},
-			Time:     start,
-			Metadata: socket.tagsAndMeta.Metadata,
-			Value:    sessionDuration,
-		})
-	}()
-
-	if connErr != nil {
+	socket, httpResponse, connEndHook, err := mi.dial(ctx, state, rt, url, parsedArgs)
+	defer connEndHook()
+	if err != nil {
 		// Pass the error to the user script before exiting immediately
-		socket.handleEvent("error", rt.ToValue(connErr))
+		socket.handleEvent("error", rt.ToValue(err))
 		if state.Options.Throw.Bool {
-			return nil, connErr
+			return nil, err
 		}
 		if httpResponse != nil {
 			return wrapHTTPResponse(httpResponse)
 		}
-		return &HTTPResponse{
-			Error: connErr.Error(),
-		}, nil
+		return &HTTPResponse{Error: err.Error()}, nil
 	}
 
 	defer socket.Close()
 
 	// Run the user-provided set up function
-	if _, err := setupFn(goja.Undefined(), rt.ToValue(&socket)); err != nil {
+	if _, err := parsedArgs.setupFn(goja.Undefined(), rt.ToValue(&socket)); err != nil {
 		_ = socket.closeConnection(websocket.CloseGoingAway)
 		return nil, err
 	}
@@ -323,13 +166,13 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 	// handlers and for cleanup. See closeConnection.
 	// closeConnection is not set directly as a handler here to
 	// avoid race conditions when calling the Goja runtime.
-	conn.SetCloseHandler(func(code int, text string) error { return nil })
+	socket.conn.SetCloseHandler(func(code int, text string) error { return nil })
 
 	// Pass ping/pong events through the main control loop
 	pingChan := make(chan string)
 	pongChan := make(chan string)
-	conn.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
-	conn.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
+	socket.conn.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
+	socket.conn.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
 
 	readDataChan := make(chan *message)
 	readCloseChan := make(chan int)
@@ -397,6 +240,71 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 			return wsResponse, nil
 		}
 	}
+}
+
+func (mi *WS) dial(
+	ctx context.Context, state *lib.State, rt *goja.Runtime, url string,
+	args *wsConnectArgs,
+) (*Socket, *http.Response, func(), error) {
+	// Overriding the NextProtos to avoid talking http2
+	var tlsConfig *tls.Config
+	if state.TLSConfig != nil {
+		tlsConfig = state.TLSConfig.Clone()
+		tlsConfig.NextProtos = []string{"http/1.1"}
+	}
+
+	wsd := websocket.Dialer{
+		HandshakeTimeout: time.Second * 60, // TODO configurable
+		// Pass a custom net.DialContext function to websocket.Dialer that will substitute
+		// the underlying net.Conn with our own tracked netext.Conn
+		NetDialContext:    state.Dialer.DialContext,
+		Proxy:             http.ProxyFromEnvironment,
+		TLSClientConfig:   tlsConfig,
+		EnableCompression: args.enableCompression,
+	}
+	// this is needed because of how interfaces work and that wsd.Jar is http.Cookiejar
+	if args.cookieJar != nil {
+		wsd.Jar = args.cookieJar
+	}
+
+	connStart := time.Now()
+	conn, httpResponse, dialErr := wsd.DialContext(ctx, url, args.headers)
+	connEnd := time.Now()
+
+	if state.Options.SystemTags.Has(metrics.TagIP) && conn.RemoteAddr() != nil {
+		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
+			args.tagsAndMeta.SetSystemTagOrMeta(metrics.TagIP, ip)
+		}
+	}
+
+	if httpResponse != nil {
+		if state.Options.SystemTags.Has(metrics.TagStatus) {
+			args.tagsAndMeta.SetSystemTagOrMeta(
+				metrics.TagStatus, strconv.Itoa(httpResponse.StatusCode))
+		}
+
+		if state.Options.SystemTags.Has(metrics.TagSubproto) {
+			args.tagsAndMeta.SetSystemTagOrMeta(
+				metrics.TagSubproto, httpResponse.Header.Get("Sec-WebSocket-Protocol"))
+		}
+	}
+
+	socket := Socket{
+		ctx:                ctx,
+		rt:                 rt,
+		conn:               conn,
+		eventHandlers:      make(map[string][]goja.Callable),
+		pingSendTimestamps: make(map[string]time.Time),
+		scheduled:          make(chan goja.Callable),
+		done:               make(chan struct{}),
+		samplesOutput:      state.Samples,
+		tagsAndMeta:        args.tagsAndMeta,
+		builtinMetrics:     state.BuiltinMetrics,
+	}
+
+	connEndHook := socket.pushSessionMetrics(connStart, connEnd)
+
+	return &socket, httpResponse, connEndHook, dialErr
 }
 
 // On is used to configure what the websocket should do on each event.
@@ -606,6 +514,50 @@ func (s *Socket) closeConnection(code int) error {
 	return err
 }
 
+func (s *Socket) pushSessionMetrics(connStart, connEnd time.Time) func() {
+	connDuration := metrics.D(connEnd.Sub(connStart))
+
+	metrics.PushIfNotDone(s.ctx, s.samplesOutput, metrics.ConnectedSamples{
+		Samples: []metrics.Sample{
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: s.builtinMetrics.WSSessions,
+					Tags:   s.tagsAndMeta.Tags,
+				},
+				Time:     connStart,
+				Metadata: s.tagsAndMeta.Metadata,
+				Value:    1,
+			},
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: s.builtinMetrics.WSConnecting,
+					Tags:   s.tagsAndMeta.Tags,
+				},
+				Time:     connStart,
+				Metadata: s.tagsAndMeta.Metadata,
+				Value:    connDuration,
+			},
+		},
+		Tags: s.tagsAndMeta.Tags,
+		Time: connStart,
+	})
+
+	return func() {
+		end := time.Now()
+		sessionDuration := metrics.D(end.Sub(connStart))
+
+		metrics.PushIfNotDone(s.ctx, s.samplesOutput, metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: s.builtinMetrics.WSSessionDuration,
+				Tags:   s.tagsAndMeta.Tags,
+			},
+			Time:     connStart,
+			Metadata: s.tagsAndMeta.Metadata,
+			Value:    sessionDuration,
+		})
+	}
+}
+
 // Wraps conn.ReadMessage in a channel
 func (s *Socket) readPump(readChan chan *message, errorChan chan error, closeChan chan int) {
 	for {
@@ -666,4 +618,88 @@ func wrapHTTPResponse(httpResponse *http.Response) (*HTTPResponse, error) {
 	}
 
 	return &wsResponse, nil
+}
+
+//nolint:gocognit
+func parseConnectArgs(state *lib.State, rt *goja.Runtime, args ...goja.Value) (*wsConnectArgs, error) {
+	// The params argument is optional
+	var callableV, paramsV goja.Value
+	switch len(args) {
+	case 2:
+		paramsV = args[0]
+		callableV = args[1]
+	case 1:
+		paramsV = goja.Undefined()
+		callableV = args[0]
+	default:
+		return nil, errors.New("invalid number of arguments to ws.connect")
+	}
+	// Get the callable (required)
+	setupFn, isFunc := goja.AssertFunction(callableV)
+	if !isFunc {
+		return nil, errors.New("last argument to ws.connect must be a function")
+	}
+
+	headers := make(http.Header)
+	headers.Set("User-Agent", state.Options.UserAgent.String)
+	tagsAndMeta := state.Tags.GetCurrentValues()
+	parsedArgs := &wsConnectArgs{
+		setupFn:     setupFn,
+		headers:     headers,
+		cookieJar:   state.CookieJar,
+		tagsAndMeta: &tagsAndMeta,
+	}
+
+	if goja.IsUndefined(paramsV) || goja.IsNull(paramsV) {
+		return parsedArgs, nil
+	}
+
+	// Parse the optional second argument (params)
+	params := paramsV.ToObject(rt)
+	for _, k := range params.Keys() {
+		switch k {
+		case "headers":
+			headersV := params.Get(k)
+			if goja.IsUndefined(headersV) || goja.IsNull(headersV) {
+				continue
+			}
+			headersObj := headersV.ToObject(rt)
+			if headersObj == nil {
+				continue
+			}
+			for _, key := range headersObj.Keys() {
+				parsedArgs.headers.Set(key, headersObj.Get(key).String())
+			}
+		case "tags":
+			if err := common.ApplyCustomUserTags(rt, parsedArgs.tagsAndMeta, params.Get(k)); err != nil {
+				return nil, fmt.Errorf("invalid ws.connect() metric tags: %w", err)
+			}
+		case "jar":
+			jarV := params.Get(k)
+			if goja.IsUndefined(jarV) || goja.IsNull(jarV) {
+				continue
+			}
+			if v, ok := jarV.Export().(*httpModule.CookieJar); ok {
+				parsedArgs.cookieJar = v.Jar
+			}
+		case "compression":
+			// deflate compression algorithm is supported - as defined in RFC7692
+			// compression here relies on the implementation in gorilla/websocket package, usage is
+			// experimental and may result in decreased performance. package supports
+			// only "no context takeover" scenario
+
+			algoString := strings.TrimSpace(params.Get(k).ToString().String())
+			if algoString == "" {
+				continue
+			}
+
+			if algoString != "deflate" {
+				return nil, fmt.Errorf("unsupported compression algorithm '%s', supported algorithm is 'deflate'", algoString)
+			}
+
+			parsedArgs.enableCompression = true
+		}
+	}
+
+	return parsedArgs, nil
 }
