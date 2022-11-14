@@ -43,6 +43,7 @@ This is what load testing looks like in the 21st century.
 import http from "k6/http";
 import { check, sleep } from "k6";
 
+// test configuration
 export const options = {
   thresholds: {
     // Test that 99% of requests finish within 3000ms.
@@ -56,7 +57,7 @@ export const options = {
   ],
 };
 
-// code the user logic
+// Simulated user behavior
 export default function () {
   let res = http.get("https://test-api.k6.io/public/crocodiles/1/");
   //validate response  status
