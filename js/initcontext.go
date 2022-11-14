@@ -15,26 +15,10 @@ import (
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/compiler"
-	"go.k6.io/k6/js/eventloop"
 	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/modules/k6"
-	"go.k6.io/k6/js/modules/k6/crypto"
-	"go.k6.io/k6/js/modules/k6/crypto/x509"
-	"go.k6.io/k6/js/modules/k6/data"
-	"go.k6.io/k6/js/modules/k6/encoding"
-	"go.k6.io/k6/js/modules/k6/execution"
-	"go.k6.io/k6/js/modules/k6/grpc"
-	"go.k6.io/k6/js/modules/k6/html"
-	"go.k6.io/k6/js/modules/k6/http"
-	"go.k6.io/k6/js/modules/k6/metrics"
-	"go.k6.io/k6/js/modules/k6/ws"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/loader"
-
-	"github.com/grafana/xk6-redis/redis"
-	"github.com/grafana/xk6-timers/timers"
-	expws "github.com/grafana/xk6-websockets/websockets"
 )
 
 type programWithSource struct {
@@ -135,53 +119,6 @@ func (i *InitContext) Require(arg string) goja.Value {
 		return v
 	}
 }
-
-type moduleVUImpl struct {
-	ctx       context.Context
-	initEnv   *common.InitEnvironment
-	state     *lib.State
-	runtime   *goja.Runtime
-	eventLoop *eventloop.EventLoop
-}
-
-func (m *moduleVUImpl) Context() context.Context {
-	return m.ctx
-}
-
-func (m *moduleVUImpl) InitEnv() *common.InitEnvironment {
-	return m.initEnv
-}
-
-func (m *moduleVUImpl) State() *lib.State {
-	return m.state
-}
-
-func (m *moduleVUImpl) Runtime() *goja.Runtime {
-	return m.runtime
-}
-
-func (m *moduleVUImpl) RegisterCallback() func(func() error) {
-	return m.eventLoop.RegisterCallback()
-}
-
-/* This is here to illustrate how to use RegisterCallback to get a promise to work with the event loop
-// TODO move this to a common function or remove before merging
-
-// MakeHandledPromise will create and promise and return it's resolve, reject methods as well wrapped in such a way that
-// it will block the eventloop from exiting before they are called even if the promise isn't resolved by the time the
-// current script ends executing
-func (m *moduleVUImpl) MakeHandledPromise() (*goja.Promise, func(interface{}), func(interface{})) {
-	callback := m.eventLoop.registerCallback()
-	p, resolve, reject := m.runtime.NewPromise()
-	return p, func(i interface{}) {
-			// more stuff
-			callback(func() { resolve(i) })
-		}, func(i interface{}) {
-			// more stuff
-			callback(func() { reject(i) })
-		}
-}
-*/
 
 func toESModuleExports(exp modules.Exports) interface{} {
 	if exp.Named == nil {
@@ -350,35 +287,4 @@ func (i *InitContext) allowOnlyOpenedFiles() {
 	}
 
 	alreadyOpenedFS.AllowOnlyCached()
-}
-
-func getInternalJSModules() map[string]interface{} {
-	return map[string]interface{}{
-		"k6":                         k6.New(),
-		"k6/crypto":                  crypto.New(),
-		"k6/crypto/x509":             x509.New(),
-		"k6/data":                    data.New(),
-		"k6/encoding":                encoding.New(),
-		"k6/execution":               execution.New(),
-		"k6/experimental/redis":      redis.New(),
-		"k6/experimental/websockets": &expws.RootModule{},
-		"k6/experimental/timers":     timers.New(),
-		"k6/net/grpc":                grpc.New(),
-		"k6/html":                    html.New(),
-		"k6/http":                    http.New(),
-		"k6/metrics":                 metrics.New(),
-		"k6/ws":                      ws.New(),
-	}
-}
-
-func getJSModules() map[string]interface{} {
-	result := getInternalJSModules()
-	external := modules.GetJSModules()
-
-	// external is always prefixed with `k6/x`
-	for k, v := range external {
-		result[k] = v
-	}
-
-	return result
 }

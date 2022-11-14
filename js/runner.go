@@ -699,8 +699,8 @@ func (u *ActiveVU) RunOnce() error {
 		}
 	}
 
-	fn, ok := u.exports[u.Exec]
-	if !ok {
+	fn := u.getCallableExport(u.Exec)
+	if fn == nil {
 		// Shouldn't happen; this is validated in cmd.validateScenarioConfig()
 		panic(fmt.Sprintf("function '%s' not found in exports", u.Exec))
 	}
@@ -741,7 +741,7 @@ func (u *ActiveVU) RunOnce() error {
 }
 
 func (u *VU) getExported(name string) goja.Value {
-	return u.BundleInstance.pgm.module.Get("exports").ToObject(u.Runtime).Get(name)
+	return u.BundleInstance.getExported(name)
 }
 
 // if isDefault is true, cancel also needs to be provided and it should cancel the provided context
