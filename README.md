@@ -50,7 +50,7 @@ The docs cover all aspects of using k6. Some highlights include:
 - [Options](https://k6.io/docs/using-k6/k6-options). Configure your load, duration, TLS certificates, and much, much more
 - [Scenarios](https://k6.io/docs/using-k6/scenarios). Choose how to model your workload: open models, closed models, constant RPS, fixed iterations, and more.
 - [Results output](https://k6.io/docs/results-output). Study, filter, and export your test results.
-- [Javascript API](https://k6.io/docs/javascript-api). Reference and examples of all k6 modules.
+- [JavaScript API](https://k6.io/docs/javascript-api). Reference and examples of all k6 modules.
 
 
 These links barely scratch the surface! If you're looking for conceptual information, you can read about [Test types](https://k6.io/docs/test-types/introduction/), [Test strategies](https://k6.io/docs/testing-guides/), or one of the many informative [Blog posts](https://k6.io/blog)
