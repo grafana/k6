@@ -1,6 +1,10 @@
 package webcrypto
 
 import (
+	"crypto"
+	"errors"
+	"hash"
+
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/modules"
 )
@@ -137,8 +141,78 @@ func (sc *SubtleCrypto) Verify(
 //   - SHA-512
 //
 // The `data` parameter should contain the data to be digested.
-func (sc *SubtleCrypto) Digest(algorithm goja.Value, data interface{}) *goja.Promise {
-	return nil
+func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Promise {
+	promise, resolve, reject := sc.makeHandledPromise()
+	rt := sc.vu.Runtime()
+
+	// Validate that the value we received is either an ArrayBuffer, TypedArray, or DataView
+	// This uses the technique described in https://github.com/dop251/goja/issues/379#issuecomment-1164441879
+	if !IsInstanceOf(sc.vu.Runtime(), data, ArrayBufferConstructor, DataViewConstructor) &&
+		!IsTypedArray(sc.vu.Runtime(), data) {
+		reject(errors.New("data must be an ArrayBuffer, TypedArray, or DataView"))
+		return promise
+	}
+
+	// 2.
+	// Cast the data to a Goja Object, and, as we're now sure it's
+	// either an ArrayBuffer, or a view on an ArrayBuffer, we can
+	// get the underlying ArrayBuffer by exporting its buffer property
+	// to a Goja ArrayBuffer, and then getting its underlying Go slice
+	// by calling the `Bytes()` method.
+	//
+	// Doing so conviniently also copies the underlying buffer, which
+	// is required by the specification.
+	// See https://www.w3.org/TR/WebCryptoAPI/#SubtleCrypto-method-digest
+	asObject := data.ToObject(rt)
+	arrayBuffer, ok := asObject.Get("buffer").Export().(goja.ArrayBuffer)
+	if !ok {
+		reject(errors.New("could not get ArrayBuffer from data"))
+		return promise
+	}
+
+	bytes := arrayBuffer.Bytes()
+
+	// The specification explicitly requires us to copy the underlying
+	// bytes held by the array buffer
+	bytesCopy := make([]byte, len(bytes))
+	copy(bytesCopy, bytes)
+
+	// 3.
+	alg, err := NormalizeAlgorithm(rt, algorithm, OperationIdentifierDigest)
+	if err != nil {
+		// "if an error occurred, return a Promise rejected with NormalizedAlgorithm"
+		reject(err)
+		return promise
+	}
+
+	// 6.
+	go func() {
+		var hash hash.Hash
+
+		switch alg.NormalizedName() {
+		case Sha1:
+			hash = crypto.SHA1.New()
+		case Sha256:
+			hash = crypto.SHA256.New()
+		case Sha384:
+			hash = crypto.SHA384.New()
+		case Sha512:
+			hash = crypto.SHA512.New()
+		default:
+			// 7.
+			reject(NotSupportedError)
+			return
+		}
+
+		// 8.
+		hash.Write(bytes)
+		digest := hash.Sum(nil)
+
+		// 9.
+		resolve(rt.NewArrayBuffer(digest))
+	}()
+
+	return promise
 }
 
 // GenerateKey generate a new key (for symmetric algorithms) or key pair (for public-key algorithms).
