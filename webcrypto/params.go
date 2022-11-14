@@ -87,7 +87,7 @@ type AESGcmParams struct {
 // of AES-CBC, AES-CTR, AES-GCM, or AES-KW.
 type AESKeyGenParams struct {
 	// Name should be set to `AES-CBC`, `AES-CTR`, `AES-GCM`, or `AES-KW`.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 
 	// Length holds (a Number) the length of the key, in bits.
 	Length int
@@ -95,7 +95,7 @@ type AESKeyGenParams struct {
 
 type AESKwParams struct {
 	// Name should be set to AlgorithmKindAesKw.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 }
 
 // The ECDSAParams represents the object that should be passed as the algorithm
@@ -103,14 +103,14 @@ type AESKwParams struct {
 // ECDSA algorithm.
 type ECDSAParams struct {
 	// Name should be set to AlgorithmKindEcdsa.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 
 	// Hash identifies the name of the digest algorithm to use.
 	// You can use any of the following:
-	//   * DigestKindSha256
-	//   * DigestKindSha384
-	//   * DigestKindSha512
-	Hash DigestKind
+	//   * [Sha256]
+	//   * [Sha384]
+	//   * [Sha512]
+	Hash AlgorithmIdentifier
 }
 
 // ECKeyGenParams  represents the object that should be passed as the algorithm
@@ -119,7 +119,7 @@ type ECDSAParams struct {
 // as either of AlgorithmKindEcdsa or AlgorithmKindEcdh.
 type ECKeyGenParams struct {
 	// Name should be set to AlgorithmKindEcdsa or AlgorithmKindEcdh.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 
 	// NamedCurve holds (a String) the name of the curve to use.
 	// You can use any of the following: CurveKindP256, CurveKindP384, or CurveKindP521.
@@ -131,7 +131,7 @@ type ECKeyGenParams struct {
 // key pair: that is, when the algorithm is identified as either of ECDSA or ECDH.
 type ECKeyImportParams struct {
 	// Name should be set to AlgorithmKindEcdsa or AlgorithmKindEcdh.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 
 	// NamedCurve holds (a String) the name of the elliptic curve to use.
 	NamedCurve EllipticCurveKind
@@ -141,7 +141,7 @@ type ECKeyImportParams struct {
 // parameter into `SubtleCrypto.DeriveKey`, when using the ECDH algorithm.
 type ECDHKeyDeriveParams[A CryptoKeyAlgorithm] struct {
 	// Name should be set to AlgorithmKindEcdh.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 
 	// Public holds (a CryptoKey) the public key of the other party.
 	Public CryptoKey
@@ -151,14 +151,14 @@ type ECDHKeyDeriveParams[A CryptoKeyAlgorithm] struct {
 // into `SubtleCrypto.DeriveKey`, when using the HKDF algorithm.
 type HKDFParams struct {
 	// Name should be set to AlgorithmKindHkdf.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 
 	// Hash should be set to the name of the digest algorithm to use.
 	// You can use any of the following:
-	//   * `DigestKindSha256`
-	//   * `DigestKindSha384`
-	//   * `DigestKindSha512`
-	Hash DigestKind
+	//   * [Sha256]
+	//   * [Sha384]
+	//   * [Sha512]
+	Hash AlgorithmIdentifier
 
 	// Salt to use. The HKDF specification states that adding
 	// salt "adds significantly to the strength of HKDF".
@@ -180,18 +180,18 @@ type HKDFParams struct {
 
 type HMACSignatureParams struct {
 	// Name should be set to AlgorithmKindHmac.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 }
 
 type HMACKeyGenParams struct {
 	// Name should be set to AlgorithmKindHmac.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 
 	// FIXME: SHA-1 should be supported here
 	// Hash represents the name of the digest function to use. You can
-	// use any of the following: DigestKindSha256, DigestKindSha384,
-	// or DigestKindSha512.
-	Hash DigestKind
+	// use any of the following: [Sha256], [Sha384],
+	// or [Sha512].
+	Hash AlgorithmIdentifier
 
 	// FIXME: what's the default value?
 	// Length holds (a Number) the length of the key, in bits.
@@ -207,25 +207,25 @@ type HMACKeyGenParams struct {
 // generating a key for the HMAC algorithm.
 type HMACImportParams struct {
 	// Name should be set to AlgorithmKindHmac.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 
 	// Hash represents the name of the digest function to use.
-	Hash DigestKind
+	Hash AlgorithmIdentifier
 }
 
 // PBKDF2Params represents the object that should be passed as the algorithm
 // parameter into `SubtleCrypto.DeriveKey`, when using the PBKDF2 algorithm.
 type PBKDF2Params struct {
 	// Name should be set to AlgorithmKindPbkdf2.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 
 	// FIXME: should also include SHA-1, unfortunately
 	// Hash identifies the name of the digest algorithm to use.
 	// You can use any of the following:
-	//   * DigestKindSha256
-	//   * DigestKindSha384
-	//   * DigestKindSha512
-	Hash DigestKind
+	//   * [Sha256]
+	//   * [Sha384]
+	//   * [Sha512]
+	Hash AlgorithmIdentifier
 
 	// Salt should hold a random or pseudo-random value of at
 	// least 16 bytes. Unlike the input key material passed into
@@ -246,7 +246,7 @@ type PBKDF2Params struct {
 type RSAHashedKeyGenParams struct {
 	// Name should be set to AlgorithmKindRsassPkcs1v15,
 	// AlgorithmKindRsaPss, or AlgorithmKindRsaOaep.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 
 	// ModulusLength holds (a Number) the length of the RSA modulus, in bits.
 	// This should be at least 2048. Some organizations are now recommending
@@ -276,7 +276,7 @@ type RSAHashedImportParams struct {
 	// Hash represents the name of the digest function to use.
 	// Note that although you can technically pass SHA-1 here, this is strongly
 	//discouraged as it is considered vulnerable.
-	Hash DigestKind
+	Hash AlgorithmIdentifier
 }
 
 // RSAOaepParams represents the object that should be passed as the algorithm parameter
@@ -300,7 +300,7 @@ type RSAOaepParams struct {
 // RSA-PSS algorithm.
 type RSAPssParams struct {
 	// Name should be set to AlgorithmKindRsaPss.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 
 	// SaltLength holds (a Number) the length of the random salt to use, in bytes.
 	// RFC 3447 says that "typical salt lengths" are either 0 or the lenght of the output
@@ -311,58 +311,8 @@ type RSAPssParams struct {
 
 type RSASsaPkcs1v15Params struct {
 	// Name should be set to AlgorithmKindRsassaPkcs1v15.
-	Name AlgorithmKind
+	Name AlgorithmIdentifier
 }
-
-// FIXME: There should be dedicated types for each kind of algorithms.
-// AlgorithmKind represents the kind of algorithm that is being used.
-type AlgorithmKind string
-
-const (
-	// AlgorithmKindRSASsaPkcs1V15 represents the RSA-SHA1 algorithm.
-	AlgorithmKindRSASsaPkcs1V15 AlgorithmKind = "RSASSA-PKCS1-v1_5"
-
-	// AlgorithmKindRSAPss represents the RSA-PSS algorithm.
-	AlgorithmKindRSAPss AlgorithmKind = "RSA-PSS"
-
-	// AlgorithmKindRSAOaep represents the RSA-OAEP algorithm.
-	AlgorithmKindRSAOaep AlgorithmKind = "RSA-OAEP"
-
-	// AlgorithmKindAESCtr represents the AES-CTR algorithm.
-	AlgorithmKindAESCtr AlgorithmKind = "AES-CTR"
-
-	// AlgorithmKindAESCbc represents the AES-CBC algorithm.
-	AlgorithmKindAESCbc AlgorithmKind = "AES-CBC"
-
-	// AlgorithmKindAESGcm represents the AES-GCM algorithm.
-	AlgorithmKindAESGcm AlgorithmKind = "AES-GCM"
-
-	// AlgorithmKindAESKw represents the AES-KW algorithm.
-	AlgorithmKindAESKw AlgorithmKind = "AES-KW"
-
-	// AlgorithmKindECDSA represents the ECDSA algorithm.
-	AlgorithmKindECDSA AlgorithmKind = "ECDSA"
-
-	// AlgorithmKindECDH represents the ECDH algorithm.
-	AlgorithmKindECDH AlgorithmKind = "ECDH"
-)
-
-// DigestKind represents the kind of digest that is being used.
-type DigestKind string
-
-const (
-	// DigestKindSHA1 represents the SHA-1 digest.
-	DigestKindSHA1 DigestKind = "SHA-1"
-
-	// DigestKindSHA256 represents the SHA256 algorithm.
-	DigestKindSHA256 DigestKind = "SHA-256"
-
-	// DigestKindSHA384 represents the SHA384 algorithm.
-	DigestKindSHA384 DigestKind = "SHA-384"
-
-	// DigestKindSHA512 represents the SHA512 algorithm.
-	DigestKindSHA512 DigestKind = "SHA-512"
-)
 
 // KeyLength holds the length of the key, in bits.
 type KeyLength uint16
