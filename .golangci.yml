@@ -81,4 +81,5 @@ linters:
   - decorder
   - nonamedreturns
   - nosnakecase
+  - containedctx
   fast: false
