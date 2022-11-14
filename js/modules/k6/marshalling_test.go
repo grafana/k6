@@ -123,9 +123,7 @@ func TestSetupDataMarshalling(t *testing.T) {
 	defer cancel()
 	require.NoError(t, runner.Setup(ctx, samples))
 	initVU, err := runner.NewVU(1, 1, samples)
-	if assert.NoError(t, err) {
-		vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
-		err := vu.RunOnce()
-		assert.NoError(t, err)
-	}
+	require.NoError(t, err)
+	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+	assert.NoError(t, vu.RunOnce())
 }

@@ -478,7 +478,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 		require.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b.Options)
 		bi, err := b.Instantiate(logger, 0)
 		require.NoError(t, err)
-		val, err := bi.exports[consts.DefaultFn](goja.Undefined())
+		val, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 		require.NoError(t, err)
 		require.Equal(t, "hi!", val.Export())
 	}
@@ -571,7 +571,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 		require.NoError(t, err)
 		bi, err := b.Instantiate(logger, 0)
 		require.NoError(t, err)
-		val, err := bi.exports[consts.DefaultFn](goja.Undefined())
+		val, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 		require.NoError(t, err)
 		require.Equal(t, int64(999), val.Export())
 	})
@@ -715,7 +715,7 @@ func TestOpen(t *testing.T) {
 						t.Run(source, func(t *testing.T) {
 							bi, err := b.Instantiate(logger, 0)
 							require.NoError(t, err)
-							v, err := bi.exports[consts.DefaultFn](goja.Undefined())
+							v, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 							require.NoError(t, err)
 							require.Equal(t, "hi", v.Export())
 						})
@@ -751,7 +751,7 @@ func TestBundleInstantiate(t *testing.T) {
 
 		bi, err := b.Instantiate(logger, 0)
 		require.NoError(t, err)
-		v, err := bi.exports[consts.DefaultFn](goja.Undefined())
+		v, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 		require.NoError(t, err)
 		require.Equal(t, true, v.Export())
 	})
@@ -772,7 +772,7 @@ func TestBundleInstantiate(t *testing.T) {
 		bi, err := b.Instantiate(logger, 0)
 		require.NoError(t, err)
 		// Ensure `options` properties are correctly marshalled
-		jsOptions := bi.pgm.exports.Get("options").ToObject(bi.Runtime)
+		jsOptions := bi.getExported("options").ToObject(bi.Runtime)
 		vus := jsOptions.Get("vus").Export()
 		require.Equal(t, int64(5), vus)
 		tdt := jsOptions.Get("teardownTimeout").Export()
@@ -783,7 +783,7 @@ func TestBundleInstantiate(t *testing.T) {
 		b.Options.VUs = null.IntFrom(10)
 		bi2, err := b.Instantiate(logger, 0)
 		require.NoError(t, err)
-		jsOptions = bi2.pgm.exports.Get("options").ToObject(bi2.Runtime)
+		jsOptions = bi2.getExported("options").ToObject(bi2.Runtime)
 		vus = jsOptions.Get("vus").Export()
 		require.Equal(t, int64(10), vus)
 		b.Options.VUs = optOrig
@@ -819,7 +819,7 @@ func TestBundleEnv(t *testing.T) {
 
 			bi, err := b.Instantiate(logger, 0)
 			require.NoError(t, err)
-			_, err = bi.exports[consts.DefaultFn](goja.Undefined())
+			_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 			require.NoError(t, err)
 		})
 	}
@@ -857,7 +857,7 @@ func TestBundleNotSharable(t *testing.T) {
 				require.NoError(t, err)
 				for j := 0; j < iters; j++ {
 					bi.Runtime.Set("__ITER", j)
-					_, err := bi.exports[consts.DefaultFn](goja.Undefined())
+					_, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 					require.NoError(t, err)
 				}
 			}

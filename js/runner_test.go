@@ -67,7 +67,7 @@ func TestRunnerNew(t *testing.T) {
 			require.NoError(t, err)
 			vuc, ok := initVU.(*VU)
 			require.True(t, ok)
-			assert.Equal(t, int64(0), vuc.pgm.exports.Get("counter").Export())
+			assert.Equal(t, int64(0), vuc.getExported("counter").Export())
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -75,7 +75,7 @@ func TestRunnerNew(t *testing.T) {
 			t.Run("RunOnce", func(t *testing.T) {
 				err = vu.RunOnce()
 				require.NoError(t, err)
-				assert.Equal(t, int64(1), vuc.pgm.exports.Get("counter").Export())
+				assert.Equal(t, int64(1), vuc.getExported("counter").Export())
 			})
 		})
 	})

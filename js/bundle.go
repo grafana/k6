@@ -52,6 +52,14 @@ type BundleInstance struct {
 	pgm          programWithSource
 }
 
+func (bi *BundleInstance) getCallableExport(name string) goja.Callable {
+	return bi.exports[name]
+}
+
+func (bi *BundleInstance) getExported(name string) goja.Value {
+	return bi.pgm.exports.Get(name)
+}
+
 // NewBundle creates a new bundle from a source file and a filesystem.
 func NewBundle(
 	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]afero.Fs,
