@@ -38,8 +38,6 @@ This is what load testing looks like in the 21st century.
 
 ## Example script
 
-Here's a basic k6 script.
-Besides simulating a user getting a resource, the test also verifies response data and response time over changing load.
 
 ```js
 import http from "k6/http";
