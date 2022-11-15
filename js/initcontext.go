@@ -46,6 +46,7 @@ type InitContext struct {
 
 	// Cache of loaded programs and files.
 	programs map[string]programWithSource
+	exports  map[string]goja.Value
 
 	compatibilityMode lib.CompatibilityMode
 
@@ -99,7 +100,17 @@ func newBoundInitContext(base *InitContext, vuImpl *moduleVUImpl) *InitContext {
 }
 
 // Require is called when a module/file needs to be loaded by a script
-func (i *InitContext) Require(arg string) goja.Value {
+func (i *InitContext) Require(arg string) (export goja.Value) {
+	var ok bool
+	if export, ok = i.exports[arg]; ok {
+		return export
+	}
+	defer func() {
+		if i.exports == nil {
+			i.exports = make(map[string]goja.Value)
+		}
+		i.exports[arg] = export
+	}()
 	switch {
 	case arg == "k6", strings.HasPrefix(arg, "k6/"):
 		// Builtin or external modules ("k6", "k6/*", or "k6/x/*") are handled

@@ -687,3 +687,34 @@ export default function () {
 	// likely settings in the transpilers
 	require.Equal(t, "cool is cool\n\tat webpack:///./test1.ts:2:4(2)\n\tat r (webpack:///./test1.ts:5:4(3))\n\tat file:///script.js:4:2(4)\n\tat native\n", exception.String())
 }
+
+func TestImportModificationsAreConsistentBetweenFiles(t *testing.T) {
+	t.Parallel()
+	logger := testutils.NewLogger(t)
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/notk6.js", []byte(`export function group() {}`), 0o644))
+	require.NoError(t, afero.WriteFile(fs, "/instrument.js", []byte(`
+    import k6 from "k6";
+    k6.newKey = 5;
+    k6.group = 3;
+
+    import * as notk6 from "./notk6.js";
+    notk6.group = 3;
+    notk6.newKey = 5;
+    `), 0o644))
+
+	b, err := getSimpleBundle(t, "/script.js", `
+    import k6 from "k6";
+    import * as notk6 from "./notk6.js";
+    import "./instrument.js";
+    if (k6.newKey != 5) { throw "k6.newKey is wrong "+ k6.newKey}
+    if (k6.group != 3) { throw "k6.group is wrong "+ k6.group}
+    if (notk6.newKey != 5) { throw "notk6.newKey is wrong "+ notk6.newKey}
+    if (notk6.group != 3) { throw "notk6.group is wrong "+ notk6.group}
+    export default () => { throw "this shouldn't be ran" }
+`, fs)
+	require.NoError(t, err, "bundle error")
+
+	_, err = b.Instantiate(logger, 0)
+	require.NoError(t, err)
+}
