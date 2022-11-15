@@ -23,7 +23,7 @@
 <br/>
 
 **k6** is a modern load-testing tool, built on [our years of experience](https://k6.io/about) in the performance and testing industries.
-k6 is built to be powerful, extensible, and full-featured. The key design strive to for **high performance and the best developer experience**.
+k6 is built to be powerful, extensible, and full-featured. The key design goals are **high performance and the best developer experience**.
 
 k6 features include:
 
