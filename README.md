@@ -30,7 +30,7 @@ k6 features include:
 - **Configurable load generation.** Even lower-end machines can simulate lots of traffic.
 - **Tests as code.** Reuse scripts, modularize logic, version control, and integrate tests with your CI.
 - **A full-featured API.** The scripting API is packed with features that help you simulate real application traffic.
-- **An embedded JavaScript engine.** The performance of Go, the scripting simplicity of JavaScript.
+- **An embedded JavaScript engine.** The performance of Go, the scripting familiarity of JavaScript.
 - **Multiple Protocol support**. HTTP, WebSockets, gRPC, and more.
 - **Large extension ecosystem.** You can extend k6 to support your needs. And many people have already shared their extensions with the community!
 - **Flexible metrics storage and visualization**. Summary statistics or granular metrics, exported to the service of your choice.
@@ -47,10 +47,10 @@ import { check, sleep } from "k6";
 // test configuration
 export const options = {
   thresholds: {
-    // Test that 99% of requests finish within 3000ms.
+    // Assert that 99% of requests finish within 3000ms.
     http_req_duration: ["p(99) < 3000"],
   },
-  // Ramp the number virtual users up and down
+  // Ramp the number of virtual users up and down
   stages: [
     { duration: "30s", target: 15 },
     { duration: "1m", target: 15 },
@@ -61,7 +61,7 @@ export const options = {
 // Simulated user behavior
 export default function () {
   let res = http.get("https://test-api.k6.io/public/crocodiles/1/");
-  //validate response  status
+  // validate response status
   check(res, { "status was 200": (r) => r.status == 200 });
   sleep(1);
 }
@@ -76,7 +76,7 @@ The docs cover all aspects of using k6. Some highlights include:
 - [HTTP requests](https://k6.io/docs/using-k6/http-requests/). Have your virtual users use HTTP methods.
   Or, check the other [Protocols](https://k6.io/docs).
 - [Thresholds](https://k6.io/docs/using-k6/thresholds). Set goals for your test, and codify your SLOs.
-- [Options](https://k6.io/docs/using-k6/k6-options). Configure your load, duration, TLS certificates, and much, much more
+- [Options](https://k6.io/docs/using-k6/k6-options). Configure your load, duration, TLS certificates, and much, much more.
 - [Scenarios](https://k6.io/docs/using-k6/scenarios).
   Choose how to model your workload: open models, closed models, constant RPS, fixed iterations, and more.
 - [Results output](https://k6.io/docs/results-output). Study, filter, and export your test results.
@@ -87,7 +87,7 @@ These links barely scratch the surface! If you're looking for conceptual informa
 
 ## Contribute
 
-If you want to contribute or help with the development of k6, start by reading [CONTRIBUTING.md](CONTRIBUTING.md). Before you start coding, it might be a good idea to first discuss your plans and implementation details with the k6 maintainers-especially when it comes to big changes and features. You can do this in the [GitHub issue](https://github.com/grafana/k6/issues) for the problem you're solving (create one if it doesn't exist).
+If you want to contribute or help with the development of k6, start by reading [CONTRIBUTING.md](CONTRIBUTING.md). Before you start coding, it might be a good idea to first discuss your plans and implementation details with the k6 maintainers—especially when it comes to big changes and features. You can do this in the [GitHub issue](https://github.com/grafana/k6/issues) for the problem you're solving (create one if it doesn't exist).
 
 > **Note:** To disclose security issues, refer to [SECURITY.md](SECURITY.md).
 
