@@ -7,7 +7,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/mstoykov/k6-taskqueue-lib v0.1.0
 	github.com/stretchr/testify v1.8.0
-	go.k6.io/k6 v0.40.1-0.20221017105932-3c97ec7d1231
+	go.k6.io/k6 v0.41.0
 	gopkg.in/guregu/null.v3 v3.3.0
 )
 
