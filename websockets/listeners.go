@@ -49,11 +49,9 @@ func (l *eventListener) add(fn func(goja.Value) (goja.Value, error)) {
 }
 
 // setOn sets a listener for the on* properties, like onopen, onmessage, etc.
-func (l *eventListener) setOn(fn func(goja.Value) (goja.Value, error)) error {
+func (l *eventListener) setOn(fn func(goja.Value) (goja.Value, error)) {
 	// TODO: tread safe?
 	l.on = fn
-
-	return nil
 }
 
 // return all possible listeners for a certain event type

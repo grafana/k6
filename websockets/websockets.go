@@ -176,9 +176,7 @@ func defineWebsocket(rt *goja.Runtime, w *webSocket) {
 					common.Throw(rt, fmt.Errorf("a value for '%s' should be callable", property))
 				}
 
-				el.setOn(func(v goja.Value) (goja.Value, error) {
-					return fn(v)
-				})
+				el.setOn(func(v goja.Value) (goja.Value, error) { return fn(goja.Undefined(), v) })
 
 				return nil
 			}), goja.FLAG_FALSE, goja.FLAG_TRUE))

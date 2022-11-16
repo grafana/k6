@@ -20,7 +20,14 @@ import (
 )
 
 // copied from k6/ws
-func assertSessionMetricsEmitted(t *testing.T, sampleContainers []metrics.SampleContainer, subprotocol, url string, status int, group string) {
+func assertSessionMetricsEmitted(
+	t *testing.T,
+	sampleContainers []metrics.SampleContainer,
+	subprotocol, //nolint:unparam // TODO: check why it always same in tests
+	url string,
+	status int, //nolint:unparam // TODO: check why it always same in tests
+	group string, //nolint:unparam // TODO: check why it always same in tests
+) {
 	t.Helper()
 	seenSessions := false
 	seenSessionDuration := false
@@ -355,8 +362,6 @@ func TestTwoTalking(t *testing.T) {
 }
 
 func TestTwoTalkingUsingOn(t *testing.T) {
-	t.Skip()
-
 	t.Parallel()
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
@@ -417,7 +422,7 @@ func TestTwoTalkingUsingOn(t *testing.T) {
       ws1.send("I am 1");
     }
 
-    ws1.onmessage = (e) =>{
+    ws1.onmessage = (e) => {
       if (e.data != "I am 2") {
         throw "oops";
       }
@@ -431,7 +436,7 @@ func TestTwoTalkingUsingOn(t *testing.T) {
     ws2.onopen = () => {
       ws2.send("I am 2");
     }
-    ws2.onmessage = (e) =>{
+    ws2.onmessage = (e) => {
       if (e.data != "I am 1") {
         throw "oops";
       }
