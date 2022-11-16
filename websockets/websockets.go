@@ -72,13 +72,8 @@ type webSocket struct {
 
 	done         chan struct{}
 	writeQueueCh chan message
-	// listeners
-	// this return goja.value *and* error in order to return error on exception instead of panic
-	// https://pkg.go.dev/github.com/dop251/goja#hdr-Functions
-	openListeners    []func(goja.Value) (goja.Value, error)
-	messageListeners []func(goja.Value) (goja.Value, error)
-	errorListeners   []func(goja.Value) (goja.Value, error)
-	closeListeners   []func(goja.Value) (goja.Value, error)
+
+	eventListeners *eventListeners
 
 	// fields that should be seen by js only be updated on the event loop
 	readyState     ReadyState
@@ -112,6 +107,7 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 		builtinMetrics: r.vu.State().BuiltinMetrics,
 		done:           make(chan struct{}),
 		writeQueueCh:   make(chan message, 10),
+		eventListeners: newEventListeners(),
 		obj:            rt.NewObject(),
 	}
 
@@ -148,7 +144,6 @@ func parseURL(c goja.ConstructorCall) (*url.URL, error) {
 func defineWebsocket(rt *goja.Runtime, w *webSocket) {
 	must(rt, w.obj.DefineDataProperty(
 		"addEventListener", rt.ToValue(w.addEventListener), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
-	// TODO add onmessage,onclose and so on.
 	must(rt, w.obj.DefineDataProperty(
 		"send", rt.ToValue(w.send), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	must(rt, w.obj.DefineDataProperty(
@@ -170,6 +165,29 @@ func defineWebsocket(rt *goja.Runtime, w *webSocket) {
 			common.Throw(rt, errors.New("binaryType is not settable in k6 as it doesn't support Blob"))
 			return nil // it never gets to here
 		}), goja.FLAG_FALSE, goja.FLAG_TRUE))
+
+	setOn := func(property string, el *eventListener) {
+		must(rt, w.obj.DefineAccessorProperty(
+			property, rt.ToValue(func() goja.Value {
+				return rt.ToValue(el.on)
+			}), rt.ToValue(func(call goja.FunctionCall) goja.Value {
+				fn, isFunc := goja.AssertFunction(call.Argument(0))
+				if !isFunc {
+					common.Throw(rt, fmt.Errorf("a value for '%s' should be callable", property))
+				}
+
+				el.setOn(func(v goja.Value) (goja.Value, error) {
+					return fn(v)
+				})
+
+				return nil
+			}), goja.FLAG_FALSE, goja.FLAG_TRUE))
+	}
+
+	setOn("onmessage", w.eventListeners.message)
+	setOn("onerror", w.eventListeners.error)
+	setOn("onopen", w.eventListeners.open)
+	setOn("onclose", w.eventListeners.close)
 }
 
 type message struct {
@@ -476,8 +494,7 @@ func (w *webSocket) loop() {
 					ev.DefineDataProperty("origin", rt.ToValue(w.url.String()), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE),
 				)
 
-				// fmt.Println("messagelisteners", len(w.messageListeners))
-				for _, messageListener := range w.messageListeners {
+				for _, messageListener := range w.eventListeners.Message() {
 					if _, err := messageListener(ev); err != nil {
 						// fmt.Println("message listener err", err)
 						_ = w.conn.Close()                   // TODO log it?
@@ -630,7 +647,7 @@ func (w *webSocket) newEvent(eventType string, t time.Time) *goja.Object {
 }
 
 func (w *webSocket) callOpenListeners(timestamp time.Time) error {
-	for _, openListener := range w.openListeners {
+	for _, openListener := range w.eventListeners.Open() {
 		if _, err := openListener(w.newEvent(events.OPEN, timestamp)); err != nil {
 			_ = w.conn.Close()                   // TODO log it?
 			_ = w.connectionClosedWithError(err) // TODO log it?
@@ -647,7 +664,7 @@ func (w *webSocket) callErrorListeners(e error) error { // TODO use the error ev
 	must(rt, ev.DefineDataProperty("error",
 		rt.ToValue(e),
 		goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
-	for _, errorListener := range w.errorListeners {
+	for _, errorListener := range w.eventListeners.Error() {
 		if _, err := errorListener(ev); err != nil { // TODO fix timestamp
 			return err
 		}
@@ -656,7 +673,7 @@ func (w *webSocket) callErrorListeners(e error) error { // TODO use the error ev
 }
 
 func (w *webSocket) callCloseListeners() error {
-	for _, closeListener := range w.closeListeners {
+	for _, closeListener := range w.eventListeners.Close() {
 		// TODO the event here needs to be different and have an error
 		if _, err := closeListener(w.newEvent(events.CLOSE, time.Now())); err != nil { // TODO fix timestamp
 			return err
@@ -667,18 +684,8 @@ func (w *webSocket) callCloseListeners() error {
 
 func (w *webSocket) addEventListener(event string, listener func(goja.Value) (goja.Value, error)) {
 	// TODO support options https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters
-	// TODO implement `onerror` and co as well
-	switch event {
-	case events.OPEN:
-		w.openListeners = append(w.openListeners, listener)
-	case events.ERROR:
-		w.errorListeners = append(w.errorListeners, listener)
-	case events.MESSAGE:
-		w.messageListeners = append(w.messageListeners, listener)
-	case events.CLOSE:
-		w.closeListeners = append(w.closeListeners, listener)
-	default:
-		w.vu.State().Logger.Warnf("Unknown event for websocket %s", event)
+	if err := w.eventListeners.add(event, listener); err != nil {
+		w.vu.State().Logger.Warnf("can't add event listener: %s", err)
 	}
 }
 

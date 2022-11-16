@@ -354,6 +354,101 @@ func TestTwoTalking(t *testing.T) {
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws/couple/2"), http.StatusSwitchingProtocols, "")
 }
 
+func TestTwoTalkingUsingOn(t *testing.T) {
+	t.Skip()
+
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	ch1 := make(chan message)
+	ch2 := make(chan message)
+
+	ts.tb.Mux.HandleFunc("/ws/couple/", func(w http.ResponseWriter, req *http.Request) {
+		path := strings.TrimPrefix(req.URL.Path, "/ws/couple/")
+		var wch chan message
+		var rch chan message
+
+		switch path {
+		case "1":
+			wch = ch1
+			rch = ch2
+		case "2":
+			wch = ch2
+			rch = ch1
+		default:
+			w.WriteHeader(http.StatusTeapot)
+		}
+
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+		if err != nil {
+			return
+		}
+		defer func() {
+			_ = conn.Close()
+		}()
+
+		go func() {
+			defer close(wch)
+			for {
+				msgT, msg, err := conn.ReadMessage()
+				if err != nil {
+					return
+				}
+				wch <- message{
+					data:  msg,
+					mtype: msgT,
+				}
+			}
+		}()
+		for msg := range rch {
+			err := conn.WriteMessage(msg.mtype, msg.data)
+			if err != nil {
+				return
+			}
+		}
+	})
+
+	err := ts.ev.Start(func() error {
+		_, err := ts.rt.RunString(sr(`
+    var count = 0;
+    var ws1 = new WebSocket("WSBIN_URL/ws/couple/1");
+    ws1.onopen = () => {
+      ws1.send("I am 1");
+    }
+
+    ws1.onmessage = (e) =>{
+      if (e.data != "I am 2") {
+        throw "oops";
+      }
+      count++;
+      if (count == 2) {
+        ws1.close();
+      }
+    }
+
+    var ws2 = new WebSocket("WSBIN_URL/ws/couple/2");
+    ws2.onopen = () => {
+      ws2.send("I am 2");
+    }
+    ws2.onmessage = (e) =>{
+      if (e.data != "I am 1") {
+        throw "oops";
+      }
+      count++;
+      if (count == 2) {
+        ws2.close();
+      }
+    }
+	`))
+		return err
+	})
+	require.NoError(t, err)
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws/couple/1"), http.StatusSwitchingProtocols, "")
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws/couple/2"), http.StatusSwitchingProtocols, "")
+}
+
 func TestDialError(t *testing.T) {
 	t.Parallel()
 	ts := newTestState(t)
@@ -381,4 +476,24 @@ func TestDialError(t *testing.T) {
 		return runErr
 	})
 	assert.Error(t, err)
+}
+
+func TestOnError(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	ts.ev.WaitOnRegistered()
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+		var ws = new WebSocket("ws://127.0.0.2");
+		ws.onerror = (e) => {
+			ws.close();
+			throw new Error("lorem ipsum")
+		}
+	`))
+		return runErr
+	})
+	assert.Error(t, err)
+	assert.Equal(t, "Error: lorem ipsum at <eval>:5:10(7)", err.Error())
 }
