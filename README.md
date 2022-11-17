@@ -25,7 +25,7 @@
 **k6** is a modern load-testing tool, built on [our years of experience](https://k6.io/about) in the performance and testing industries.
 It's built to be powerful, extensible, and full-featured. The key design goal is to provide **the best developer experience**.
 
-k6 comes with the batteries included:
+Its core features are:
 
 - **Configurable load generation.** Even lower-end machines can simulate lots of traffic.
 - **Tests as code.** Reuse scripts, modularize logic, version control, and integrate tests with your CI.
