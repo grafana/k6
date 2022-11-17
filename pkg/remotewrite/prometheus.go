@@ -32,7 +32,7 @@ func MapSeries(ts metrics.TimeSeries) prompb.TimeSeries {
 	}
 }
 
-func MapTrend(series metrics.TimeSeries, t time.Time, sink *trendSink) []*prompb.TimeSeries {
+func MapTrendAsGauges(series metrics.TimeSeries, t time.Time, sink *metrics.TrendSink) []*prompb.TimeSeries {
 	// Prometheus metric system does not support Trend so this mapping will
 	// store a counter for the number of reported values and gauges to keep
 	// track of aggregated values. Also store a sum of the values to allow
@@ -110,7 +110,7 @@ func MapTrend(series metrics.TimeSeries, t time.Time, sink *trendSink) []*prompb
 			}),
 			Samples: []*prompb.Sample{
 				{
-					Value:     sink.Med,
+					Value:     sink.P(0.5),
 					Timestamp: timestamp,
 				},
 			},

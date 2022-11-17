@@ -231,8 +231,8 @@ func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 		newts = []*prompb.TimeSeries{&ts}
 
 	case metrics.Trend:
-		newts = MapTrend(
-			swm.TimeSeries, swm.Latest, swm.Measure.(*trendSink))
+		newts = MapTrendAsGauges(
+			swm.TimeSeries, swm.Latest, swm.Measure.(*metrics.TrendSink))
 
 	default:
 		panic(fmt.Sprintf("Something is really off, as I cannot recognize the type of metric %s: `%s`", swm.Metric.Name, swm.Metric.Type))
@@ -249,7 +249,7 @@ func sinkByType(mt metrics.MetricType) metrics.Sink {
 	case metrics.Gauge:
 		sink = &metrics.GaugeSink{}
 	case metrics.Trend:
-		sink = &trendSink{}
+		sink = &metrics.TrendSink{}
 	case metrics.Rate:
 		sink = &metrics.RateSink{}
 	default:
