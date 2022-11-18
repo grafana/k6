@@ -8,46 +8,69 @@ type trieNode struct {
 }
 
 func (t *trieNode) insert(s string) {
-	if len(s) == 0 {
-		t.isLeaf = true
-		return
-	}
+	runes := []rune(s)
 
-	// mask creation of the trie by initializing the root here
 	if t.children == nil {
-		t.children = make(map[rune]*trieNode)
+		t.children = map[rune]*trieNode{}
 	}
 
-	rStr := []rune(s) // need to iterate by runes for intl' names
-	last := len(rStr) - 1
-	if c, ok := t.children[rStr[last]]; ok {
-		c.insert(string(rStr[:last]))
-		return
+	ptr := t
+	for i := len(runes) - 1; i >= 0; i-- {
+		r := runes[i]
+		c, ok := ptr.children[r]
+
+		if !ok {
+			ptr.children[r] = &trieNode{children: map[rune]*trieNode{}}
+			c = ptr.children[r]
+		}
+
+		ptr = c
 	}
 
-	t.children[rStr[last]] = &trieNode{children: make(map[rune]*trieNode)}
-	t.children[rStr[last]].insert(string(rStr[:last]))
+	ptr.isLeaf = true
 }
 
-func (t *trieNode) contains(s string) (matchedPattern string, matchFound bool) {
-	s = strings.ToLower(s)
-	if len(s) == 0 {
-		if t.isLeaf {
-			return "", true
+func (t *trieNode) contains(s string) (string, bool) {
+	rs := []rune(strings.ToLower(s))
+
+	builder, wMatch := strings.Builder{}, ""
+	found := true
+
+	ptr := t
+	for i := len(rs) - 1; i >= 0; i-- {
+		child, ok := ptr.children[rs[i]]
+		_, wOk := ptr.children['*']
+
+		if wOk {
+			wMatch = builder.String() + string('*')
 		}
-	} else {
-		rStr := []rune(s)
-		last := len(rStr) - 1
-		if c, ok := t.children[rStr[last]]; ok {
-			if match, matched := c.contains(string(rStr[:last])); matched {
-				return match + string(rStr[last]), true
-			}
+
+		if !ok {
+			found = false
+			break
 		}
+
+		builder.WriteRune(rs[i])
+		ptr = child
 	}
 
-	if _, wild := t.children['*']; wild {
-		return "*", true
+	if found && ptr.isLeaf {
+		return reverse(builder.String()), true
 	}
 
-	return "", false
+	if _, ok := ptr.children['*']; ok {
+		builder.WriteRune('*')
+		return reverse(builder.String()), true
+	}
+
+	return reverse(wMatch), wMatch != ""
+}
+
+func reverse(s string) string {
+	rs := []rune(s)
+	for i, j := 0, len(rs)-1; i < len(rs)/2; i, j = i+1, j-1 {
+		rs[i], rs[j] = rs[j], rs[i]
+	}
+
+	return string(rs)
 }

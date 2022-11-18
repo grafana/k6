@@ -1,8 +1,9 @@
 package types
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTrieInsert(t *testing.T) {
@@ -61,7 +62,27 @@ func TestTrieContains(t *testing.T) {
 			require.Equal(t, tc.expVal, val)
 		})
 	}
+}
 
+func TestReverse(t *testing.T) {
+	t.Parallel()
+
+	tcs := []struct{ str, rev string }{
+		{str: "even", rev: "neve"},
+		{str: "odd", rev: "ddo"},
+		{str: "", rev: ""},
+	}
+
+	for _, tc := range tcs {
+		tc := tc
+
+		t.Run(tc.str, func(t *testing.T) {
+			t.Parallel()
+			val := reverse(tc.str)
+
+			require.Equal(t, tc.rev, val)
+		})
+	}
 }
 
 func BenchmarkTrieInsert(b *testing.B) {
