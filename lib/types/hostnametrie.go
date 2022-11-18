@@ -127,7 +127,8 @@ func (t *HostnameTrie) insert(s string) error {
 		return err
 	}
 
-	return t.trieNode.insert(s)
+	t.trieNode.insert(s)
+	return nil
 }
 
 // Contains returns whether s matches a pattern in the HostnameTrie

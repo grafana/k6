@@ -7,10 +7,10 @@ type trieNode struct {
 	children map[rune]*trieNode
 }
 
-func (t *trieNode) insert(s string) error {
+func (t *trieNode) insert(s string) {
 	if len(s) == 0 {
 		t.isLeaf = true
-		return nil
+		return
 	}
 
 	// mask creation of the trie by initializing the root here
@@ -21,11 +21,12 @@ func (t *trieNode) insert(s string) error {
 	rStr := []rune(s) // need to iterate by runes for intl' names
 	last := len(rStr) - 1
 	if c, ok := t.children[rStr[last]]; ok {
-		return c.insert(string(rStr[:last]))
+		c.insert(string(rStr[:last]))
+		return
 	}
 
 	t.children[rStr[last]] = &trieNode{children: make(map[rune]*trieNode)}
-	return t.children[rStr[last]].insert(string(rStr[:last]))
+	t.children[rStr[last]].insert(string(rStr[:last]))
 }
 
 func (t *trieNode) contains(s string) (matchedPattern string, matchFound bool) {
