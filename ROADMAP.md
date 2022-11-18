@@ -9,7 +9,7 @@ Status updates
 ----------------
 
 - **Is this production ready?**<br>
-    No, not yet. We're focused on making the extension stable and reliable, as that's our top priority, before adding more features.
+   xk6-browser is ready to be used in production. However, be warned that our API is still undergoing a few changes so expect a few breaking changes and bugs 🐞.
 
 - **Is this extension supported in k6 Cloud?**<br>
     No, not yet. We take the security of our customer data very seriously and currently, we are analyzing the implications of running browser instances in the cloud.
