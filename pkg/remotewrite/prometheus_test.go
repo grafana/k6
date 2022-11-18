@@ -10,32 +10,25 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
-// buildTimeSeries creates a TimSeries with the given name, value and timestamp
-func buildTimeSeries(name string, value float64, timestamp time.Time) *prompb.TimeSeries {
-	return &prompb.TimeSeries{
-		Labels: []*prompb.Label{
-			{
-				Name:  "__name__",
-				Value: name,
-			},
+func TestMapSeries(t *testing.T) {
+	r := metrics.NewRegistry()
+	series := metrics.TimeSeries{
+		Metric: &metrics.Metric{
+			Name: "test",
+			Type: metrics.Counter,
 		},
-		Samples: []*prompb.Sample{
-			{
-				Value:     value,
-				Timestamp: timestamp.UnixMilli(),
-			},
-		},
+		Tags: r.RootTagSet().With("tagk1", "tagv1").With("b1", "v1"),
 	}
-}
 
-// assertTimeSeriesMatch asserts if the elements of two slices of TimeSeries matches.
-func assertTimeSeriesEqual(t *testing.T, expected []*prompb.TimeSeries, actual []*prompb.TimeSeries) {
-	t.Helper()
-	require.Len(t, actual, len(expected))
+	lbls := MapSeries(series)
+	require.Len(t, lbls, 3)
 
-	for i := 0; i < len(expected); i++ {
-		assert.Equal(t, expected[i], actual[i])
+	exp := []*prompb.Label{
+		{Name: "__name__", Value: "k6_test"},
+		{Name: "b1", Value: "v1"},
+		{Name: "tagk1", Value: "tagv1"},
 	}
+	assert.Equal(t, exp, lbls)
 }
 
 func TestMapTrendAsGauges(t *testing.T) {
@@ -76,34 +69,66 @@ func TestMapTrendAsGauges(t *testing.T) {
 	assertTimeSeriesEqual(t, expected, ts)
 }
 
-// TODO: the sorting logic for labels must be moved and tested as a shared
-// and centralized concept.
-func TestMapTrendAsGaugesMustBeSorted(t *testing.T) {
-	r := metrics.NewRegistry()
-	series := metrics.TimeSeries{
-		Metric: &metrics.Metric{
-			Name: "test",
-			Type: metrics.Trend,
+func TestTrendAsGaugesFindIxName(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		// they have to be sorted
+		labels   []string
+		expIndex uint16
+	}{
+		{
+			labels:   []string{"tag1", "tag2"},
+			expIndex: 0,
 		},
-		Tags: r.RootTagSet().With("tagk1", "tagv1").With("b1", "v1"),
+		{
+			labels:   []string{"2", "__name__"},
+			expIndex: 1,
+		},
+		{
+			labels:   []string{"__name__", "tag1", "__name__"},
+			expIndex: 0,
+		},
+		{
+			labels:   []string{"1", "__name__", "__name__1"},
+			expIndex: 1,
+		},
 	}
-
-	sample := metrics.Sample{
-		TimeSeries: series,
-		Value:      1.52,
-		Time:       time.Unix(1, 0),
-	}
-	st := &metrics.TrendSink{}
-	st.Add(sample)
-
-	ts := MapTrendAsGauges(sample.TimeSeries, sample.Time, st)
-	require.Len(t, ts, 8)
-	require.Len(t, ts[0].Labels, 3)
-	assert.Equal(t, []string{"__name__", "b1", "tagk1"}, func() []string {
-		labels := make([]string, 0, len(ts[0].Labels))
-		for _, l := range ts[0].Labels {
-			labels = append(labels, l.Name)
+	for _, tc := range cases {
+		lbls := make([]*prompb.Label, 0, len(tc.labels))
+		for _, l := range tc.labels {
+			lbls = append(lbls, &prompb.Label{Name: l})
 		}
-		return labels
-	}())
+		tg := trendAsGauges{labels: lbls}
+		tg.FindNameIndex()
+		assert.Equal(t, tc.expIndex, tg.ixname)
+	}
+}
+
+// buildTimeSeries creates a TimSeries with the given name, value and timestamp
+func buildTimeSeries(name string, value float64, timestamp time.Time) *prompb.TimeSeries {
+	return &prompb.TimeSeries{
+		Labels: []*prompb.Label{
+			{
+				Name:  "__name__",
+				Value: name,
+			},
+		},
+		Samples: []*prompb.Sample{
+			{
+				Value:     value,
+				Timestamp: timestamp.UnixMilli(),
+			},
+		},
+	}
+}
+
+// assertTimeSeriesMatch asserts if the elements of two slices of TimeSeries matches.
+func assertTimeSeriesEqual(t *testing.T, expected []*prompb.TimeSeries, actual []*prompb.TimeSeries) {
+	t.Helper()
+	require.Len(t, actual, len(expected))
+
+	for i := 0; i < len(expected); i++ {
+		assert.Equal(t, expected[i], actual[i])
+	}
 }

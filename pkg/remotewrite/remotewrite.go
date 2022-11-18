@@ -140,7 +140,7 @@ func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) 
 			if !ok {
 				swm = &seriesWithMeasure{
 					TimeSeries: sample.TimeSeries,
-					Measure:    sinkByType(sample.Metric.Type),
+					Measure:    newSinkByType(sample.Metric.Type),
 					Latest:     truncTime,
 				}
 				o.tsdb[sample.TimeSeries] = swm
@@ -198,20 +198,19 @@ type seriesWithMeasure struct {
 	// TODO: maybe add some caching for the mapping?
 }
 
+// TODO: unit test this
 func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 	var newts []*prompb.TimeSeries
 
 	mapMonoSeries := func(s metrics.TimeSeries, t time.Time) prompb.TimeSeries {
 		return prompb.TimeSeries{
-			Labels: append(MapTagSet(swm.Tags), &prompb.Label{
-				Name:  "__name__",
-				Value: fmt.Sprintf("%s%s", defaultMetricPrefix, swm.Metric.Name),
-			}),
+			Labels: MapSeries(s),
 			Samples: []*prompb.Sample{
 				{Timestamp: t.UnixMilli()},
 			},
 		}
 	}
+
 	switch swm.Metric.Type {
 	case metrics.Counter:
 		ts := mapMonoSeries(swm.TimeSeries, swm.Latest)
@@ -241,7 +240,7 @@ func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 	return newts
 }
 
-func sinkByType(mt metrics.MetricType) metrics.Sink {
+func newSinkByType(mt metrics.MetricType) metrics.Sink {
 	var sink metrics.Sink
 	switch mt {
 	case metrics.Counter:

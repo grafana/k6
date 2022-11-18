@@ -68,8 +68,8 @@ func TestOutputConvertToPbSeries(t *testing.T) {
 	exp := []*prompb.TimeSeries{
 		{
 			Labels: []*prompb.Label{
-				{Name: "tagk1", Value: "tagv1"},
 				{Name: "__name__", Value: "k6_metric1"},
+				{Name: "tagk1", Value: "tagv1"},
 			},
 			Samples: []*prompb.Sample{
 				{Value: 7, Timestamp: unix1sept},
@@ -77,8 +77,8 @@ func TestOutputConvertToPbSeries(t *testing.T) {
 		},
 		{
 			Labels: []*prompb.Label{
-				{Name: "tagk1", Value: "tagv1"},
 				{Name: "__name__", Value: "k6_metric2"},
+				{Name: "tagk1", Value: "tagv1"},
 			},
 			Samples: []*prompb.Sample{
 				{Value: 2, Timestamp: unix1sept},
