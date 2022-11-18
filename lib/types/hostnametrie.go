@@ -108,6 +108,7 @@ func NewHostnameTrie(source []string) (*HostnameTrie, error) {
 // Regex description of hostname pattern to enforce blocks by. Global var
 // to avoid compilation penalty at runtime.
 // based on regex from https://stackoverflow.com/a/106223/5427244
+//
 //nolint:lll
 var validHostnamePattern *regexp.Regexp = regexp.MustCompile(`^(\*\.?)?((([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]))?$`)
 
@@ -133,53 +134,4 @@ func (t *HostnameTrie) insert(s string) error {
 // along with the matching pattern, if one was found.
 func (t *HostnameTrie) Contains(s string) (matchedPattern string, matchFound bool) {
 	return t.trieNode.contains(s)
-}
-
-type trieNode struct {
-	isLeaf   bool
-	children map[rune]*trieNode
-}
-
-func (t *trieNode) insert(s string) error {
-	if len(s) == 0 {
-		t.isLeaf = true
-		return nil
-	}
-
-	// mask creation of the trie by initializing the root here
-	if t.children == nil {
-		t.children = make(map[rune]*trieNode)
-	}
-
-	rStr := []rune(s) // need to iterate by runes for intl' names
-	last := len(rStr) - 1
-	if c, ok := t.children[rStr[last]]; ok {
-		return c.insert(string(rStr[:last]))
-	}
-
-	t.children[rStr[last]] = &trieNode{children: make(map[rune]*trieNode)}
-	return t.children[rStr[last]].insert(string(rStr[:last]))
-}
-
-func (t *trieNode) contains(s string) (matchedPattern string, matchFound bool) {
-	s = strings.ToLower(s)
-	if len(s) == 0 {
-		if t.isLeaf {
-			return "", true
-		}
-	} else {
-		rStr := []rune(s)
-		last := len(rStr) - 1
-		if c, ok := t.children[rStr[last]]; ok {
-			if match, matched := c.contains(string(rStr[:last])); matched {
-				return match + string(rStr[last]), true
-			}
-		}
-	}
-
-	if _, wild := t.children['*']; wild {
-		return "*", true
-	}
-
-	return "", false
 }
