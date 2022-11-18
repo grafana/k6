@@ -3,11 +3,29 @@ xk6-browser roadmap
 
 xk6-browser is a [k6](https://k6.io/) extension that will become part of the k6 core once it reaches its stability goals. The project adds browser automation support to k6, expanding the testing capabilities of the k6 ecosystem to include real-world user simulation in addition to API/performance testing. This allows web developers to test their applications fully end-to-end in a way that previously wasn't possible with k6 alone.
 
-We consider browser automation to be an important part of web-application testing, and we have big goals in mind for xk6-browser. In the spirit of transparency, we'd like to share our roadmap for the project with the k6 community.
-We hope that users can plan ahead, trusting the k6 and Grafana's commitment to its success.
+We consider browser automation to be an important part of web-application testing, and we have big goals in mind for xk6-browser. In the spirit of transparency, we'd like to share our roadmap for the project with the k6 community. We hope that users can plan ahead, trusting the k6 and Grafana's commitment to its success. With that in mind, we'll detail some of our important status updates, our short, mid and long-term goals. Most of these will be worked on concurrently, and reaching them will be a gradual process. The timeframes are also not set in stone, but rather serve as tentative targets that the team is aiming for.
 
-With that in mind, we'll detail some of our short, mid and long-term goals. Most of these will be worked on concurrently, and reaching them will be a gradual process. The timeframes are also not set in stone, but rather serve as tentative targets that the team is aiming for.
+Status updates
+----------------
 
+- **Is this production ready?**<br>
+    No, not yet. We're focused on making the extension stable and reliable, as that's our top priority, before adding more features.
+
+- **Is this extension supported in k6 Cloud?**<br>
+    No, not yet. We take the security of our customer data very seriously and currently, we are analyzing the implications of running browser instances in the cloud.
+
+- **It doesn't work with my Chromium/Chrome version, why?**<br>
+    CDP evolves and there are differences between different versions of Chromium, sometimes quite subtle. The codebase is continuously tested with the two latest major releases of Google Chrome.
+
+- **Are Firefox or WebKit-based browsers supported?**<br>
+    Not yet. There are differences in CDP coverage between Chromium, Firefox, and WebKit-based browsers. xk6-browser is initially only targetting Chromium-based browsers.
+
+- **Are all features of Playwright supported?**<br>
+    No. Playwright's API is pretty large and some of the functionality only makes sense if it's implemented using async operations: event listening, request interception, waiting for events, etc. This requires the existence of an event loop per VU in k6, which was only [recently added](https://github.com/grafana/k6/issues/882). Most of the current xk6-browser API is synchronous and thus lacks some of the functionality that requires asynchronicity, but we're gradually migrating existing methods to return a `Promise`, and adding new ones that will follow the same API.
+
+    Expect breaking changes during this transition. We'll point them out in the release notes as well as proposed migration plan.
+
+    Note that `async`/`await` is still under development and is not supported in k6 scripts. If you wish to use this syntax you'll have to transform your script beforehand with an updated Babel version. See the [k6-template-es6 project](https://github.com/grafana/k6-template-es6) and [this comment](https://github.com/grafana/k6/issues/779#issuecomment-964027280) for details.
 
 Short-term goals
 ----------------
@@ -32,16 +50,6 @@ These are goals achievable within 3-6 months, tentatively done by Q3 2022.
 
   *Definition of Done*<br>
   When the extension is usable in k6 Cloud; i.e. scripts can run and test results are shown. Frontend changes are not required at this stage.
-
-
-- **Update [API documentation](https://k6.io/docs/javascript-api/xk6-browser/).**<br>
-  The current documentation is not up-to-date, which makes using xk6-browser outside of the examples quite difficult.
-
-  *How will we achieve this?*<br>
-  We are prioritizing documentation work in all upcoming development cycles.
-
-  *Definition of Done*<br>
-  When the documentation reflects the state of the current API.
 
 
 Mid-term goals
