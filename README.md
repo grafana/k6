@@ -22,7 +22,7 @@
 <img src="assets/github-hr.svg" height="32" alt="---" />
 <br/>
 
-**xk6-browser** is a [k6](https://k6.io/) extension adding support for automation of browsers via the [Chrome Devtools Protocol](https://chromedevtools.github.io/devtools-protocol/) (CDP). It adds browser-level APIs to interact with browsers and collect frontend performance metrics as part of your k6 tests.
+**xk6-browser** is a [k6](https://k6.io/) extension that supports browser automation through the [Chrome Devtools Protocol](https://chromedevtools.github.io/devtools-protocol/) (CDP). It adds browser-level APIs to interact with browsers and collect frontend performance metrics as part of your k6 tests.
 
 https://user-images.githubusercontent.com/10811379/200350050-f346931f-6402-487e-bf4d-eff808ac2190.mp4
 
@@ -37,7 +37,7 @@ Special acknowledgment to the authors of [Playwright](https://playwright.dev/) a
 
 See our [project roadmap](ROADMAP.md) for more details.
 
-## Getting Started
+## Get started
 
 - [Getting Started](https://k6.io/docs/javascript-api/xk6-browser/)
 - [Installing xk6-browser](https://k6.io/docs/javascript-api/xk6-browser/get-started/installation/)
@@ -55,22 +55,22 @@ See our [project roadmap](ROADMAP.md) for more details.
 docker-compose run -T xk6-browser run - <examples/browser_on.js
 ```
 
-## Getting Help
+## Get help
 
 - Go to our [FAQ](/FAQ.md) to answer your most asked questions about xk6-browser.
-- If you're having issues installing or running xk6-browser, please see the [troubleshooting document](/TROUBLESHOOTING.md).
-- To get help about usage, report bugs, suggest features and discuss xk6-browser with other users see [SUPPORT.md](SUPPORT.md).
+- If you're having issues installing or running xk6-browser, refer to [TROUBLESHOOTING](/TROUBLESHOOTING.md).
+- To get help about usage, report bugs, suggest features, and discuss xk6-browser with other users see [SUPPORT.md](SUPPORT.md).
 
 ## Additional Resources
 
 To find out more about xk6-browser or browser testing in general, check out the following links. 
 
-**Note:** since our API is still transitioning, some of the code snippets from the links below may not be as accurate, though the concept should remain similar. Please refer to our up-to-date [API documentation](https://k6.io/docs/javascript-api/xk6-browser/api/) for details.
+**Note:** since our API is still transitioning, some of the code snippets from the links below might be inaccurate, though the concepts should still be correct. For the latest, refer to our up-to-date [API documentation](https://k6.io/docs/javascript-api/xk6-browser/api/).
 
 - [Introducing browser automation and end-to-end web testing with k6](https://k6.io/blog/announcing-xk6-browser-testing/) - A blog post from our CEO, Robin Gustafsson, where he introduced xk6-browser.
 - [Real Browser Testing with xk6-browser](https://youtu.be/y04wavsZxSs) - A video tutorial from our Developer Advocate, Nicole van der Hoeven, where she demonstrated how to get started with xk6-browser.
 - [Browser testing and API load testing in the same script with k6](https://youtu.be/Y4qDAaJgxV0) - Office Hours episode where we first introduced xk6-browser.
-- [What is Browser Testing](https://youtu.be/ieQwRy9UVo4) - An introductory chat with our DevRel team about what browser testing is and why do we need to test with browsers.
+- [What is Browser Testing](https://youtu.be/ieQwRy9UVo4) - An introductory chat with our DevRel team about what browser testing is and why we need to test with browsers.
 - [Getting started with xk6-browser](https://youtu.be/CRSTQ6n05hM) - Office Hours episode where our DevRel team shared insights on how to get started with xk6-browser and the state of browser testing with k6
 - [Hybrid Performance Testing with k6](https://www.youtube.com/watch?v=nZlleGaf5Ro) - Office Hours episode where our DevRel team talked about what a hybrid performance testing is and how xk6-browser can help.
 - [A Medley of Frontend and Backend Performance Testing](https://youtu.be/Pa2FBI2k1qc) - A talk from our Developer Advocate, Marie Cruz, where she explained what frontend and backend performance testing and also features xk6-browser.
