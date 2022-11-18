@@ -31,7 +31,7 @@ func (t *trieNode) insert(s string) {
 }
 
 func (t *trieNode) contains(s string) (string, bool) {
-	rs := []rune(strings.ToLower(s))
+	rs := []rune(s)
 
 	builder, wMatch := strings.Builder{}, ""
 	found := true
