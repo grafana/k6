@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -63,6 +64,41 @@ type testState struct {
 	state   *lib.State
 	samples chan metrics.SampleContainer
 	ev      *eventloop.EventLoop
+
+	callRecorder *callRecorder
+}
+
+// callRecorder a helper type that records all calls
+type callRecorder struct {
+	sync.Mutex
+	calls []string
+}
+
+// Call records a call
+func (r *callRecorder) Call(text string) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.calls = append(r.calls, text)
+}
+
+// Len just returns the length of the calls
+func (r *callRecorder) Len() int {
+	r.Lock()
+	defer r.Unlock()
+
+	return len(r.calls)
+}
+
+// Len just returns the length of the calls
+func (r *callRecorder) Recorded() []string {
+	r.Lock()
+	defer r.Unlock()
+
+	result := []string{}
+	result = append(result, r.calls...)
+
+	return result
 }
 
 func newTestState(t testing.TB) testState {
@@ -94,6 +130,10 @@ func newTestState(t testing.TB) testState {
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 
+	recorder := &callRecorder{
+		calls: make([]string, 0),
+	}
+
 	vu := &modulestest.VU{
 		CtxField:     tb.Context,
 		RuntimeField: rt,
@@ -101,15 +141,18 @@ func newTestState(t testing.TB) testState {
 	}
 	m := new(RootModule).NewModuleInstance(vu)
 	require.NoError(t, rt.Set("WebSocket", m.Exports().Named["WebSocket"]))
+	require.NoError(t, rt.Set("call", recorder.Call))
+
 	ev := eventloop.New(vu)
 	vu.RegisterCallbackField = ev.RegisterCallback
 
 	return testState{
-		rt:      rt,
-		tb:      tb,
-		state:   state,
-		samples: samples,
-		ev:      ev,
+		rt:           rt,
+		tb:           tb,
+		state:        state,
+		samples:      samples,
+		ev:           ev,
+		callRecorder: recorder,
 	}
 }
 
@@ -124,6 +167,26 @@ func TestBasic(t *testing.T) {
       ws.send("something")
       ws.close()
     })
+	`))
+		return err
+	})
+	require.NoError(t, err)
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
+}
+
+func TestBasicWithOn(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+	err := ts.ev.Start(func() error {
+		_, err := ts.rt.RunString(sr(`
+    var ws = new WebSocket("WSBIN_URL/ws-echo")
+    ws.onopen = () => {
+      ws.send("something")
+      ws.close()
+    }
 	`))
 		return err
 	})
@@ -200,12 +263,29 @@ func TestExceptionDontPanic(t *testing.T) {
     })`,
 			expectedError: "oops is not defined at <eval>:4:7",
 		},
+		"onopen": {
+			script: `
+    var ws = new WebSocket("WSBIN_URL/ws/echo")
+    ws.onopen = () => {
+      oops
+    }`,
+			expectedError: "oops is not defined at <eval>:4:7",
+		},
 		"error": {
 			script: `
     var ws = new WebSocket("WSBIN_URL/badurl")
-    ws.addEventListener("error", ()=>{
+    ws.addEventListener("error", () =>{
       inerroridf
     })
+    `,
+			expectedError: "inerroridf is not defined at <eval>:4:7",
+		},
+		"onerror": {
+			script: `
+    var ws = new WebSocket("WSBIN_URL/badurl")
+    ws.onerror = () => {
+      inerroridf
+    }
     `,
 			expectedError: "inerroridf is not defined at <eval>:4:7",
 		},
@@ -220,6 +300,17 @@ func TestExceptionDontPanic(t *testing.T) {
     })`,
 			expectedError: "incloseidf is not defined at <eval>:7:7",
 		},
+		"onclose": {
+			script: `
+    var ws = new WebSocket("WSBIN_URL/ws/echo")
+    ws.onopen = () => {
+        ws.close()
+    }
+    ws.onclose = () =>{
+      incloseidf
+    }`,
+			expectedError: "incloseidf is not defined at <eval>:7:7",
+		},
 		"message": {
 			script: `
     var ws = new WebSocket("WSBIN_URL/ws/echo")
@@ -229,6 +320,17 @@ func TestExceptionDontPanic(t *testing.T) {
     ws.addEventListener("message", ()=>{
       inmessageidf
     })`,
+			expectedError: "inmessageidf is not defined at <eval>:7:7",
+		},
+		"onmessage": {
+			script: `
+    var ws = new WebSocket("WSBIN_URL/ws/echo")
+    ws.onopen = () => {
+        ws.send("something")
+    }
+    ws.onmessage = () =>{
+      inmessageidf
+    }`,
 			expectedError: "inmessageidf is not defined at <eval>:7:7",
 		},
 	}
@@ -501,4 +603,121 @@ func TestOnError(t *testing.T) {
 	})
 	assert.Error(t, err)
 	assert.Equal(t, "Error: lorem ipsum at <eval>:5:10(7)", err.Error())
+}
+
+func TestOnClose(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	ts.ev.WaitOnRegistered()
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws/echo")
+		ws.onopen = () => {
+			ws.close()
+		}
+		ws.onclose = () =>{
+			call("from close")
+		}
+	`))
+		return runErr
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"from close"}, ts.callRecorder.Recorded())
+}
+
+func TestMixingOnAndAddHandlers(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	ts.ev.WaitOnRegistered()
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws/echo")
+		ws.onopen = () => {
+			ws.close()
+		}
+		ws.addEventListener("close", () => {
+			call("from addEventListener")
+		})
+		ws.onclose = () =>{
+			call("from onclose")
+		}
+	`))
+		return runErr
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, ts.callRecorder.Len())
+	assert.Contains(t, ts.callRecorder.Recorded(), "from addEventListener")
+	assert.Contains(t, ts.callRecorder.Recorded(), "from onclose")
+}
+
+func TestOncloseRedefineListener(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	ts.ev.WaitOnRegistered()
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws/echo")
+		ws.onopen = () => {
+			ws.close()
+		}
+		ws.onclose = () =>{
+			call("from onclose")
+		}
+		ws.onclose = () =>{
+			call("from onclose 2")
+		}
+	`))
+		return runErr
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"from onclose 2"}, ts.callRecorder.Recorded())
+}
+
+func TestOncloseRedefineWithNull(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	ts.ev.WaitOnRegistered()
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws/echo")
+		ws.onopen = () => {
+			ws.close()
+		}
+		ws.onclose = () =>{
+			call("from onclose")
+		}
+		ws.onclose = null
+	`))
+		return runErr
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 0, ts.callRecorder.Len())
+}
+
+func TestOncloseDefineWithInvalidValue(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	ts.ev.WaitOnRegistered()
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws/echo")
+		ws.onclose = 1
+	`))
+		return runErr
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "a value for 'onclose' should be callable")
 }

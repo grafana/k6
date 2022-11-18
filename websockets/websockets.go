@@ -171,7 +171,16 @@ func defineWebsocket(rt *goja.Runtime, w *webSocket) {
 			property, rt.ToValue(func() goja.Value {
 				return rt.ToValue(el.on)
 			}), rt.ToValue(func(call goja.FunctionCall) goja.Value {
-				fn, isFunc := goja.AssertFunction(call.Argument(0))
+				arg := call.Argument(0)
+
+				// it's possible to unset handlers by setting them to null
+				if arg == nil || goja.IsUndefined(arg) || goja.IsNull(arg) {
+					el.setOn(nil)
+
+					return nil
+				}
+
+				fn, isFunc := goja.AssertFunction(arg)
 				if !isFunc {
 					common.Throw(rt, fmt.Errorf("a value for '%s' should be callable", property))
 				}
