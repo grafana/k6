@@ -1,8 +1,6 @@
 package webcrypto
 
 import (
-	"crypto"
-
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/modules"
 )
@@ -133,32 +131,8 @@ func (sc *SubtleCrypto) Verify(algorithm goja.Value, key CryptoKey[[]byte], sign
 //   - SHA-512
 //
 // The `data` parameter should contain the data to be digested.
-func (sc *SubtleCrypto) Digest(algorithm DigestKind, data interface{}) *goja.Promise {
-	promise, resolve, reject := sc.makeHandledPromise()
-
-	bytes, err := ToBytes(data)
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	go func() {
-		switch DigestKind(algorithm) {
-		case DigestKindSHA1:
-			resolve(crypto.SHA1.New().Sum(bytes))
-		case DigestKindSHA256:
-			resolve(crypto.SHA256.New().Sum(bytes))
-		case DigestKindSHA384:
-			resolve(crypto.SHA384.New().Sum(bytes))
-		case DigestKindSHA512:
-			resolve(crypto.SHA512.New().Sum(bytes))
-		default:
-			reject(NotSupportedError)
-			return
-		}
-	}()
-
-	return promise
+func (sc *SubtleCrypto) Digest(algorithm goja.Value, data interface{}) *goja.Promise {
+	return nil
 }
 
 // GenerateKey generate a new key (for symmetric algorithms) or key pair (for public-key algorithms).
