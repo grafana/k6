@@ -1,6 +1,7 @@
 package webcrypto
 
 import (
+	"github.com/dop251/goja"
 	"go.k6.io/k6/js/modules"
 )
 
@@ -31,11 +32,14 @@ func New() *RootModule {
 // NewModuleInstance implements the modules.Module interface and returns
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+	vu.Runtime().SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
+
 	return &ModuleInstance{
 		vu: vu,
 		Crypto: &Crypto{
-			vu:     vu,
-			Subtle: &SubtleCrypto{vu: vu},
+			vu:        vu,
+			Subtle:    &SubtleCrypto{vu: vu},
+			CryptoKey: &CryptoKey[[]byte]{},
 		},
 	}
 }

@@ -5,7 +5,8 @@ import "go.k6.io/k6/js/modules"
 type Crypto struct {
 	vu modules.VU
 
-	Subtle *SubtleCrypto
+	Subtle    *SubtleCrypto      `json:"subtle"`
+	CryptoKey *CryptoKey[[]byte] `json:"CryptoKey"`
 }
 
 func (c *Crypto) GetRandomValues() {

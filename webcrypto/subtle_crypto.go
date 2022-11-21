@@ -32,7 +32,7 @@ type SubtleCrypto struct {
 // The `key` parameter should be a `CryptoKey` to be used for encryption.
 //
 // The `data` parameter should contain the data to be encryption.
-func (sc *SubtleCrypto) Encrypt(algorithm goja.Value, key CryptoKey, data []byte) *goja.Promise {
+func (sc *SubtleCrypto) Encrypt(algorithm goja.Value, key CryptoKey[[]byte], data []byte) *goja.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -57,7 +57,7 @@ func (sc *SubtleCrypto) Encrypt(algorithm goja.Value, key CryptoKey, data []byte
 // The `key` parameter should be a `CryptoKey` to be used for decryption.
 //
 // The `data` parameter should contain the data to be decrypted.
-func (sc *SubtleCrypto) Decrypt(algorithm goja.Value, key CryptoKey, data []byte) *goja.Promise {
+func (sc *SubtleCrypto) Decrypt(algorithm goja.Value, key CryptoKey[[]byte], data []byte) *goja.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -82,7 +82,7 @@ func (sc *SubtleCrypto) Decrypt(algorithm goja.Value, key CryptoKey, data []byte
 // `algorithm` identifies a public-key cryptosystem, this is the private key.
 //
 // The `data` parameter should contain the data to be signed.
-func (sc *SubtleCrypto) Sign(algorithm goja.Value, key CryptoKey, data []byte) *goja.Promise {
+func (sc *SubtleCrypto) Sign(algorithm goja.Value, key CryptoKey[[]byte], data []byte) *goja.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -110,7 +110,7 @@ func (sc *SubtleCrypto) Sign(algorithm goja.Value, key CryptoKey, data []byte) *
 // The `signature` parameter should contain the signature to be verified.
 //
 // The `data` parameter should contain the original signed data.
-func (sc *SubtleCrypto) Verify(algorithm goja.Value, key CryptoKey, signature []byte, data []byte) *goja.Promise {
+func (sc *SubtleCrypto) Verify(algorithm goja.Value, key CryptoKey[[]byte], signature []byte, data []byte) *goja.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -217,7 +217,7 @@ func (sc *SubtleCrypto) GenerateKey(algorithm goja.Value, extractable bool, keyU
 // The `keyUsages` parameter is an array of strings indicating what the key can be used for.
 func (sc *SubtleCrypto) DeriveKey(
 	algorithm goja.Value,
-	baseKey CryptoKey,
+	baseKey CryptoKey[[]byte],
 	derivedKeyAlgorithm goja.Value,
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
@@ -252,7 +252,7 @@ func (sc *SubtleCrypto) DeriveKey(
 // using `SubtleCrypto.ImportKey`.
 //
 // The `length` parameter is the number of bits to derive. The number should be a multiple of 8.
-func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey CryptoKey, length int) *goja.Promise {
+func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey CryptoKey[[]byte], length int) *goja.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -298,7 +298,7 @@ func (sc *SubtleCrypto) ImportKey(
 //
 // The `format` parameter identifies the format of the key data.
 // The `key` parameter is the key to export, as a CryptoKey object.
-func (sc *SubtleCrypto) ExportKey(format KeyFormat, key CryptoKey) *goja.Promise {
+func (sc *SubtleCrypto) ExportKey(format KeyFormat, key CryptoKey[[]byte]) *goja.Promise {
 	// TODO
 	return nil
 }
@@ -330,7 +330,7 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key CryptoKey) *goja.Promise
 //   - an `SubtleCrypto.AesCbcParams` object
 //   - an `SubtleCrypto.AesGcmParams` object
 //   - for the AES-KW algorithm, pass the string "AES-KW", or an object of the form `{ name: "AES-KW" }`
-func (sc *SubtleCrypto) WrapKey(format KeyFormat, key CryptoKey, wrappingKey CryptoKey, wrapAlgorithm goja.Value) *goja.Promise {
+func (sc *SubtleCrypto) WrapKey(format KeyFormat, key CryptoKey[[]byte], wrappingKey CryptoKey[[]byte], wrapAlgorithm goja.Value) *goja.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -380,7 +380,7 @@ func (sc *SubtleCrypto) WrapKey(format KeyFormat, key CryptoKey, wrappingKey Cry
 func (sc *SubtleCrypto) UnwrapKey(
 	format KeyFormat,
 	wrappedKey []byte,
-	unwrappingKey CryptoKey,
+	unwrappingKey CryptoKey[[]byte],
 	unwrapAlgo goja.Value,
 	unwrappedKeyAlgo goja.Value,
 	extractable bool,

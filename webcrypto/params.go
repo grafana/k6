@@ -1,5 +1,15 @@
 package webcrypto
 
+// From is an interface representing the ability to produce
+// an instance from a given generic input. It is an attempt
+// to create a contract around construction of objects from
+// others.
+type From[Input, Output any] interface {
+	// From produces an output of type Output from the
+	// content of the given input.
+	From(Input) (Output, error)
+}
+
 // AESCbcParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.Encrypt`, `SubtleCrypto.Decrypt`, `SubtleCrypto.WrapKey`, or
 // `SubtleCrypto.UnwrapKey`, when using the AES-CBC algorithm.
@@ -139,12 +149,12 @@ type ECKeyImportParams struct {
 
 // ECDHKeyDeriveParams represents the object that should be passed as the algorithm
 // parameter into `SubtleCrypto.DeriveKey`, when using the ECDH algorithm.
-type ECDHKeyDeriveParams[A CryptoKeyAlgorithm] struct {
+type ECDHKeyDeriveParams[Handle []byte] struct {
 	// Name should be set to AlgorithmKindEcdh.
 	Name AlgorithmIdentifier
 
 	// Public holds (a CryptoKey) the public key of the other party.
-	Public CryptoKey
+	Public CryptoKey[Handle]
 }
 
 // HKDFParams represents the object that should be passed as the algorithm parameter
@@ -313,31 +323,3 @@ type RSASsaPkcs1v15Params struct {
 	// Name should be set to AlgorithmKindRsassaPkcs1v15.
 	Name AlgorithmIdentifier
 }
-
-// KeyLength holds the length of the key, in bits.
-type KeyLength uint16
-
-const (
-	// KeyLength128 represents a 128 bits key length.
-	KeyLength128 KeyLength = 128
-
-	// KeyLength192 represents a 192 bits key length.
-	KeyLength192 KeyLength = 192
-
-	// KeyLength256 represents a 256 bits key length.
-	KeyLength256 KeyLength = 256
-)
-
-// EllipticCurve represents the kind of elliptic curve that is being used.
-type EllipticCurveKind string
-
-const (
-	// EllipticCurveKindP256 represents the P-256 curve.
-	EllipticCurveKindP256 EllipticCurveKind = "P-256"
-
-	// EllipticCurveKindP384 represents the P-384 curve.
-	EllipticCurveKindP384 EllipticCurveKind = "P-384"
-
-	// EllipticCurveKindP521 represents the P-521 curve.
-	EllipticCurveKindP521 EllipticCurveKind = "P-521"
-)
