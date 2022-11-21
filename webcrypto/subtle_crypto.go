@@ -2,7 +2,6 @@ package webcrypto
 
 import (
 	"crypto"
-	"errors"
 
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/modules"
@@ -16,21 +15,6 @@ import (
 type SubtleCrypto struct {
 	vu modules.VU
 }
-
-// InvalidAccessError is an error returned when the requested operation is not valid for the provided key
-// (invalid encryption algorithm, or invalid key for the specified encryption algorithm)
-var InvalidAccessError = errors.New("the requested operation is not valid for the provided key")
-
-// OperationError is an error returned when the operation failed for an operation specific reason
-// (algorithm parameters of invalid sizes, or AES-GCM plaintext longer than 2³⁹−256 bytes)
-var OperationError = errors.New("the operation failed for an operation specific reason")
-
-// NotSupportedError is an error returned when trying to use an algorithm that is either unknown or isn't
-// suitable for derivation, or if the algorithm requested for the derived key doesn't define a key length.
-var NotSupportedError = errors.New("the operation failed as the requested algorithm isn't suited for derivation")
-
-// The TypeError object represents an error when an operation could not be performed, typically (but not exclusively) when a value is not of the expected type.
-var TypeError = errors.New("the operation failed as it attempted to use an invalid format")
 
 // Encrypt encrypts data.
 //
