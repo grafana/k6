@@ -1,7 +1,9 @@
 package webcrypto
 
 import (
-	"context"
+	"io"
+	"os"
+	"path"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -33,7 +35,7 @@ func newTestSetup(t testing.TB) testSetup {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	rt.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 
 	root, err := lib.NewGroup("", nil)
 	require.NoError(t, err)
@@ -79,35 +81,26 @@ func newTestSetup(t testing.TB) testSetup {
 	}
 }
 
-// newInitContextTestSetup initializes a new test setup.
-// It prepares a test setup with a mocked redis server and a goja runtime,
-// and event loop, ready to execute scripts as if being executed in the
-// main context of k6.
-func newInitContextTestSetup(t testing.TB) testSetup {
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
+// CompileFile compiles a javascript file as a goja.Program.
+func CompileFile(base, name string) (*goja.Program, error) {
+	fname := path.Join(base, name)
 
-	samples := make(chan metrics.SampleContainer, 1000)
+	f, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-	var state *lib.State
-
-	vu := &modulestest.VU{
-		CtxField:     context.Background(),
-		InitEnvField: &common.InitEnvironment{},
-		RuntimeField: rt,
-		StateField:   state,
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
 	}
 
-	m := new(RootModule).NewModuleInstance(vu)
-	require.NoError(t, rt.Set("crypto", m.Exports().Named["crypto"]))
-
-	ev := eventloop.New(vu)
-	vu.RegisterCallbackField = ev.RegisterCallback
-
-	return testSetup{
-		rt:      rt,
-		state:   state,
-		samples: samples,
-		ev:      ev,
+	str := string(b)
+	program, err := goja.Compile(name, str, false)
+	if err != nil {
+		return nil, err
 	}
+
+	return program, nil
 }
