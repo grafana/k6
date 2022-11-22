@@ -2,6 +2,7 @@
 package websockets
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/grafana/xk6-websockets/websockets/events"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/metrics"
@@ -83,7 +85,12 @@ type webSocket struct {
 func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 	rt := r.vu.Runtime()
 
-	url, err := parseURL(c)
+	url, err := parseURL(c.Argument(0))
+	if err != nil {
+		common.Throw(rt, err)
+	}
+
+	params, err := buildParams(r.vu.State(), rt, c.Argument(2))
 	if err != nil {
 		common.Throw(rt, err)
 	}
@@ -114,17 +121,17 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 	// Maybe have this after the goroutine below ?!?
 	defineWebsocket(rt, w)
 
-	go w.establishConnection()
+	go w.establishConnection(params)
 	return w.obj
 }
 
-// parseURL parses the url from the constructor call or returns an error
-func parseURL(c goja.ConstructorCall) (*url.URL, error) {
-	urlValue := c.Argument(0)
-
+// parseURL parses the url from the first constructor calls argument or returns an error
+func parseURL(urlValue goja.Value) (*url.URL, error) {
 	if urlValue == nil || goja.IsUndefined(urlValue) {
 		return nil, errors.New("WebSocket requires a url")
 	}
+
+	// TODO: throw the SyntaxError (https://websockets.spec.whatwg.org/#dom-websocket-websocket)
 	urlString := urlValue.String()
 	url, err := url.Parse(urlString)
 	if err != nil {
@@ -204,7 +211,7 @@ type message struct {
 }
 
 // documented https://websockets.spec.whatwg.org/#concept-websocket-establish
-func (w *webSocket) establishConnection() {
+func (w *webSocket) establishConnection(params *wsParams) {
 	state := w.vu.State()
 	w.started = time.Now()
 	var tlsConfig *tls.Config
@@ -223,12 +230,10 @@ func (w *webSocket) establishConnection() {
 		// EnableCompression: enableCompression,
 		// Jar:               jar,
 	}
-	// TODO figure out cookie jar given the specification
-	header := make(http.Header)
-	header.Set("User-Agent", state.Options.UserAgent.String)
+
 	ctx := w.vu.Context()
 	start := time.Now()
-	conn, httpResponse, connErr := wsd.DialContext(ctx, w.url.String(), header)
+	conn, httpResponse, connErr := wsd.DialContext(ctx, w.url.String(), params.headers)
 	connectionEnd := time.Now()
 	connectionDuration := metrics.D(connectionEnd.Sub(start))
 	ctm := state.Tags.GetCurrentValues()
@@ -255,6 +260,25 @@ func (w *webSocket) establishConnection() {
 	}
 	w.tagsAndMeta = ctm
 
+	w.emitConnectionMetrics(ctx, start, connectionDuration)
+	if connErr != nil {
+		// Pass the error to the user script before exiting immediately
+		w.tq.Queue(func() error {
+			return w.connectionClosedWithError(connErr)
+		})
+		w.tq.Close()
+		return
+	}
+	go w.loop()
+	w.tq.Queue(func() error {
+		return w.connectionConnected()
+	})
+}
+
+// emitConnectionMetrics emits the metrics for a websocket connection.
+func (w *webSocket) emitConnectionMetrics(ctx context.Context, start time.Time, duration float64) {
+	state := w.vu.State()
+
 	metrics.PushIfNotDone(ctx, state.Samples, metrics.ConnectedSamples{
 		Samples: []metrics.Sample{
 			{
@@ -267,23 +291,11 @@ func (w *webSocket) establishConnection() {
 				TimeSeries: metrics.TimeSeries{Metric: state.BuiltinMetrics.WSConnecting, Tags: w.tagsAndMeta.Tags},
 				Time:       start,
 				Metadata:   w.tagsAndMeta.Metadata,
-				Value:      connectionDuration,
+				Value:      duration,
 			},
 		},
 		Tags: w.tagsAndMeta.Tags,
 		Time: start,
-	})
-	if connErr != nil {
-		// Pass the error to the user script before exiting immediately
-		w.tq.Queue(func() error {
-			return w.connectionClosedWithError(connErr)
-		})
-		w.tq.Close()
-		return
-	}
-	go w.loop()
-	w.tq.Queue(func() error {
-		return w.connectionConnected()
 	})
 }
 

@@ -11,13 +11,14 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
+
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/eventloop"
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	"go.k6.io/k6/metrics"
-	"gopkg.in/guregu/null.v3"
 )
 
 // copied from k6/ws
@@ -61,6 +62,7 @@ func assertSessionMetricsEmitted(
 type testState struct {
 	rt      *goja.Runtime
 	tb      *httpmultibin.HTTPMultiBin
+	vu      *modulestest.VU
 	state   *lib.State
 	samples chan metrics.SampleContainer
 	ev      *eventloop.EventLoop
@@ -149,6 +151,7 @@ func newTestState(t testing.TB) testState {
 	return testState{
 		rt:           rt,
 		tb:           tb,
+		vu:           vu,
 		state:        state,
 		samples:      samples,
 		ev:           ev,
@@ -720,4 +723,50 @@ func TestOncloseDefineWithInvalidValue(t *testing.T) {
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "a value for 'onclose' should be callable")
+}
+
+func TestCustomHeaders(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	mu := &sync.Mutex{}
+	collected := make(http.Header)
+
+	ts.tb.Mux.HandleFunc("/ws-echo-someheader", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		responseHeaders := w.Header().Clone()
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, responseHeaders)
+		if err != nil {
+			t.Fatalf("/ws-echo-someheader cannot upgrade request: %v", err)
+		}
+
+		mu.Lock()
+		collected = req.Header.Clone()
+		mu.Unlock()
+
+		err = conn.Close()
+		if err != nil {
+			t.Logf("error while closing connection in /ws-echo-someheader: %v", err)
+		}
+	}))
+
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo-someheader", null, {headers: {"x-lorem": "ipsum"}})
+		ws.onopen = () => {
+			ws.close()
+		}
+	`))
+		return runErr
+	})
+	assert.NoError(t, err)
+
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo-someheader"), http.StatusSwitchingProtocols, "")
+
+	mu.Lock()
+	assert.True(t, len(collected) > 0)
+	assert.Equal(t, "ipsum", collected.Get("x-lorem"))
+	assert.Equal(t, "TestUserAgent", collected.Get("User-Agent"))
+	mu.Unlock()
 }
