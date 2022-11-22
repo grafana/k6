@@ -2,6 +2,7 @@ package websockets
 
 import (
 	"net/http"
+	"net/http/cookiejar"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/eventloop"
+	httpModule "go.k6.io/k6/js/modules/k6/http"
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
@@ -768,5 +770,112 @@ func TestCustomHeaders(t *testing.T) {
 	assert.True(t, len(collected) > 0)
 	assert.Equal(t, "ipsum", collected.Get("x-lorem"))
 	assert.Equal(t, "TestUserAgent", collected.Get("User-Agent"))
+	mu.Unlock()
+}
+
+func TestCookies(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	mu := &sync.Mutex{}
+	collected := make(map[string]string)
+
+	ts.tb.Mux.HandleFunc("/ws-echo-someheader", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		responseHeaders := w.Header().Clone()
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, responseHeaders)
+		if err != nil {
+			t.Fatalf("/ws-echo-someheader cannot upgrade request: %v", err)
+		}
+
+		mu.Lock()
+		for _, v := range req.Cookies() {
+			collected[v.Name] = v.Value
+		}
+		mu.Unlock()
+
+		err = conn.Close()
+		if err != nil {
+			t.Logf("error while closing connection in /ws-echo-someheader: %v", err)
+		}
+	}))
+
+	err := ts.rt.Set("http", httpModule.New().NewModuleInstance(ts.vu).Exports().Default)
+	require.NoError(t, err)
+
+	ts.state.CookieJar, _ = cookiejar.New(nil)
+	err = ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+		var jar = new http.CookieJar();
+		jar.set("HTTPBIN_URL/ws-echo-someheader", "someheader", "customjar")
+
+		var ws = new WebSocket("WSBIN_URL/ws-echo-someheader", null, {jar: jar})
+		ws.onopen = () => {
+			ws.close()
+		}
+	`))
+		return runErr
+	})
+	assert.NoError(t, err)
+
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo-someheader"), http.StatusSwitchingProtocols, "")
+
+	mu.Lock()
+	assert.True(t, len(collected) > 0)
+	assert.Equal(t, map[string]string{"someheader": "customjar"}, collected)
+	mu.Unlock()
+}
+
+func TestCookiesDefaultJar(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	mu := &sync.Mutex{}
+	collected := make(map[string]string)
+
+	ts.tb.Mux.HandleFunc("/ws-echo-someheader", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		responseHeaders := w.Header().Clone()
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, responseHeaders)
+		if err != nil {
+			t.Fatalf("/ws-echo-someheader cannot upgrade request: %v", err)
+		}
+
+		mu.Lock()
+		for _, v := range req.Cookies() {
+			collected[v.Name] = v.Value
+		}
+		mu.Unlock()
+
+		err = conn.Close()
+		if err != nil {
+			t.Logf("error while closing connection in /ws-echo-someheader: %v", err)
+		}
+	}))
+
+	err := ts.rt.Set("http", httpModule.New().NewModuleInstance(ts.vu).Exports().Default)
+	require.NoError(t, err)
+
+	ts.state.CookieJar, _ = cookiejar.New(nil)
+	err = ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+		http.cookieJar().set("HTTPBIN_URL/ws-echo-someheader", "someheader", "defaultjar")		
+
+		var ws = new WebSocket("WSBIN_URL/ws-echo-someheader", null)
+		ws.onopen = () => {
+			ws.close()
+		}
+	`))
+		return runErr
+	})
+	assert.NoError(t, err)
+
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo-someheader"), http.StatusSwitchingProtocols, "")
+
+	mu.Lock()
+	assert.True(t, len(collected) > 0)
+	assert.Equal(t, map[string]string{"someheader": "defaultjar"}, collected)
 	mu.Unlock()
 }

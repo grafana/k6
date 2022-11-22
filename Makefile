@@ -2,7 +2,7 @@ GOLANGCI_LINT_VERSION = $(shell head -n 1 .golangci.yml | tr -d '\# ')
 TMPDIR ?= /tmp
 
 test:
-	go test -race -timeout 800s ./...
+	go test -race -timeout 30s ./...
 
 ci-like-lint:
 	@docker run --rm -t -v $(shell pwd):/app \

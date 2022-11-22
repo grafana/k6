@@ -228,7 +228,11 @@ func (w *webSocket) establishConnection(params *wsParams) {
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
 		// EnableCompression: enableCompression,
-		// Jar:               jar,
+	}
+
+	// this is needed because of how interfaces work and that wsd.Jar is http.Cookiejar
+	if params.cookieJar != nil {
+		wsd.Jar = params.cookieJar
 	}
 
 	ctx := w.vu.Context()
