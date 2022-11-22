@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"runtime"
 
 	"github.com/dop251/goja"
@@ -26,16 +27,18 @@ import (
 // You can use this to produce identical BundleInstance objects.
 type Bundle struct {
 	Filename *url.URL
-	Source   string
-	Program  *goja.Program
+	Source   []byte
 	Options  lib.Options
-
-	BaseInitContext *InitContext
+	logger   *logrus.Logger
 
 	CompatibilityMode lib.CompatibilityMode // parsed value
 	preInitState      *lib.TestPreInitState
 
-	exports map[string]goja.Callable
+	filesystems map[string]afero.Fs
+	pwd         *url.URL
+
+	callableExports map[string]struct{}
+	modResolution   *modulesResolution
 }
 
 // A BundleInstance is a self-contained instance of a Bundle.
@@ -45,17 +48,18 @@ type BundleInstance struct {
 	// TODO: maybe just have a reference to the Bundle? or save and pass rtOpts?
 	env map[string]string
 
-	exports      map[string]goja.Callable
-	moduleVUImpl *moduleVUImpl
-	pgm          programWithSource
+	mainModuleInstance moduleInstance
+	moduleVUImpl       *moduleVUImpl
 }
 
 func (bi *BundleInstance) getCallableExport(name string) goja.Callable {
-	return bi.exports[name]
+	fn, ok := goja.AssertFunction(bi.mainModuleInstance.exports().Get(name))
+	_ = ok // TODO maybe return it
+	return fn
 }
 
 func (bi *BundleInstance) getExported(name string) goja.Value {
-	return bi.pgm.exports.Get(name)
+	return bi.mainModuleInstance.exports().ToObject(bi.Runtime).Get(name)
 }
 
 // NewBundle creates a new bundle from a source file and a filesystem.
@@ -74,35 +78,34 @@ func newBundle(
 		return nil, err
 	}
 
-	// Compile sources, both ES5 and ES6 are supported.
-	code := string(src.Data)
-	c := compiler.New(piState.Logger)
-	c.Options = compiler.Options{
+	// Make a bundle, instantiate it into a throwaway VM to populate caches.
+	bundle := Bundle{
+		Filename:          src.URL,
+		Source:            src.Data,
+		Options:           options,
 		CompatibilityMode: compatMode,
-		Strict:            true,
-		SourceMapLoader:   generateSourceMapLoader(piState.Logger, filesystems),
+		callableExports:   make(map[string]struct{}),
+		modResolution:     newModuleResolution(getJSModules()),
+		filesystems:       filesystems,
+		pwd:               loader.Dir(src.URL),
+		logger:            piState.Logger,
+		preInitState:      piState,
 	}
-	pgm, _, err := c.Compile(code, src.URL.String(), false)
+	c := bundle.newCompiler(piState.Logger)
+	if err = bundle.modResolution.setMain(src, c); err != nil {
+		return nil, err
+	}
+	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
+	// runtime, but no state, to allow module-provided types to function within the init context.
+	// TODO use a real context
+	vuImpl := &moduleVUImpl{ctx: context.Background(), runtime: goja.New()}
+	vuImpl.eventLoop = eventloop.New(vuImpl)
+	instance, err := bundle.instantiate(vuImpl, 0, c)
 	if err != nil {
 		return nil, err
 	}
-	// Make a bundle, instantiate it into a throwaway VM to populate caches.
-	rt := goja.New()
-	bundle := Bundle{
-		Filename:          src.URL,
-		Source:            code,
-		Program:           pgm,
-		BaseInitContext:   NewInitContext(piState.Logger, rt, c, compatMode, filesystems, loader.Dir(src.URL)),
-		Options:           options,
-		CompatibilityMode: compatMode,
-		exports:           make(map[string]goja.Callable),
-		preInitState:      piState,
-	}
-	if err = bundle.instantiate(bundle.BaseInitContext, 0); err != nil {
-		return nil, err
-	}
 
-	err = bundle.getExports(piState.Logger, rt, updateOptions)
+	err = bundle.populateExports(piState.Logger, updateOptions, instance)
 	if err != nil {
 		return nil, err
 	}
@@ -140,11 +143,11 @@ func NewBundleFromArchive(piState *lib.TestPreInitState, arc *lib.Archive) (*Bun
 func (b *Bundle) makeArchive() *lib.Archive {
 	arc := &lib.Archive{
 		Type:              "js",
-		Filesystems:       b.BaseInitContext.filesystems,
+		Filesystems:       b.filesystems,
 		Options:           b.Options,
 		FilenameURL:       b.Filename,
-		Data:              []byte(b.Source),
-		PwdURL:            b.BaseInitContext.pwd,
+		Data:              b.Source,
+		PwdURL:            b.pwd,
 		Env:               make(map[string]string, len(b.preInitState.RuntimeOptions.Env)),
 		CompatibilityMode: b.CompatibilityMode.String(),
 		K6Version:         consts.Version,
@@ -158,19 +161,16 @@ func (b *Bundle) makeArchive() *lib.Archive {
 	return arc
 }
 
-// getExports validates and extracts exported objects
-func (b *Bundle) getExports(logger logrus.FieldLogger, rt *goja.Runtime, updateOptions bool) error {
-	pgm := b.BaseInitContext.programs[b.Filename.String()] // this is the main script and it's always present
-	exportsV := pgm.module.Get("exports")
-	if goja.IsNull(exportsV) || goja.IsUndefined(exportsV) {
+// populateExports validates and extracts exported objects
+func (b *Bundle) populateExports(logger logrus.FieldLogger, updateOptions bool, instance moduleInstance) error {
+	exports := instance.exports()
+	if exports == nil {
 		return errors.New("exports must be an object")
 	}
-	exports := exportsV.ToObject(rt)
-
 	for _, k := range exports.Keys() {
 		v := exports.Get(k)
-		if fn, ok := goja.AssertFunction(v); ok && k != consts.Options {
-			b.exports[k] = fn
+		if _, ok := goja.AssertFunction(v); ok && k != consts.Options {
+			b.callableExports[k] = struct{}{}
 			continue
 		}
 		switch k {
@@ -197,7 +197,7 @@ func (b *Bundle) getExports(logger logrus.FieldLogger, rt *goja.Runtime, updateO
 		}
 	}
 
-	if len(b.exports) == 0 {
+	if len(b.callableExports) == 0 {
 		return errors.New("no exported functions in script")
 	}
 
@@ -208,43 +208,34 @@ func (b *Bundle) getExports(logger logrus.FieldLogger, rt *goja.Runtime, updateO
 func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance, error) {
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
-	rt := goja.New()
-	vuImpl := &moduleVUImpl{
-		ctx:     ctx,
-		runtime: rt,
-	}
-	init := newBoundInitContext(b.BaseInitContext, vuImpl)
-	if err := b.instantiate(init, vuID); err != nil {
+	vuImpl := &moduleVUImpl{ctx: ctx, runtime: goja.New()}
+	vuImpl.eventLoop = eventloop.New(vuImpl)
+	instance, err := b.instantiate(vuImpl, vuID, b.newCompiler(b.logger))
+	if err != nil {
 		return nil, err
 	}
 
-	pgm := init.programs[b.Filename.String()] // this is the main script and it's always present
 	bi := &BundleInstance{
-		Runtime:      rt,
-		exports:      make(map[string]goja.Callable),
-		env:          b.preInitState.RuntimeOptions.Env,
-		moduleVUImpl: vuImpl,
-		pgm:          pgm,
+		Runtime:            vuImpl.runtime,
+		env:                b.preInitState.RuntimeOptions.Env,
+		moduleVUImpl:       vuImpl,
+		mainModuleInstance: instance,
 	}
 
 	// Grab any exported functions that could be executed. These were
 	// already pre-validated in cmd.validateScenarioConfig(), just get them here.
-	exports := pgm.module.Get("exports").ToObject(rt)
-	for k := range b.exports {
-		fn, _ := goja.AssertFunction(exports.Get(k))
-		bi.exports[k] = fn
-	}
+	exports := instance.exports()
 
 	jsOptions := exports.Get("options")
 	var jsOptionsObj *goja.Object
 	if jsOptions == nil || goja.IsNull(jsOptions) || goja.IsUndefined(jsOptions) {
-		jsOptionsObj = rt.NewObject()
+		jsOptionsObj = vuImpl.runtime.NewObject()
 		err := exports.Set("options", jsOptionsObj)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't set exported options with merged values: %w", err)
 		}
 	} else {
-		jsOptionsObj = jsOptions.ToObject(rt)
+		jsOptionsObj = jsOptions.ToObject(vuImpl.runtime)
 	}
 
 	var instErr error
@@ -257,25 +248,90 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 	return bi, instErr
 }
 
-// Instantiates the bundle into an existing runtime. Not public because it also messes with a bunch
-// of other things, will potentially thrash data and makes a mess in it if the operation fails.
-
-func (b *Bundle) initializeProgramObject(rt *goja.Runtime, init *InitContext) programWithSource {
-	pgm := programWithSource{
-		pgm:     b.Program,
-		src:     b.Source,
-		exports: rt.NewObject(),
-		module:  rt.NewObject(),
+func (b *Bundle) newCompiler(logger logrus.FieldLogger) *compiler.Compiler {
+	c := compiler.New(logger)
+	c.Options = compiler.Options{
+		CompatibilityMode: b.CompatibilityMode,
+		Strict:            true,
+		SourceMapLoader:   generateSourceMapLoader(logger, b.filesystems),
 	}
-	_ = pgm.module.Set("exports", pgm.exports)
-	init.programs[b.Filename.String()] = pgm
-	return pgm
+	return c
 }
 
-//nolint:funlen
-func (b *Bundle) instantiate(init *InitContext, vuID uint64) (err error) {
-	rt := init.moduleVUImpl.runtime
-	logger := init.logger
+func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64, c *compiler.Compiler) (moduleInstance, error) {
+	rt := vuImpl.runtime
+	err := b.setupJSRuntime(rt, int64(vuID), b.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	initenv := &common.InitEnvironment{
+		Logger:      b.logger,
+		FileSystems: b.filesystems,
+		CWD:         b.pwd,
+		Registry:    b.preInitState.Registry,
+		LookupEnv:   b.preInitState.LookupEnv,
+	}
+
+	cjsLoad := generateCJSLoad(b, c)
+	modSys := newModuleSystem(b.modResolution, vuImpl, cjsLoad)
+	unbindInit := b.setInitGlobals(rt, modSys)
+	vuImpl.initEnv = initenv
+	defer func() {
+		unbindInit()
+		vuImpl.initEnv = nil
+	}()
+
+	// TODO: make something cleaner for interrupting scripts, and more unified
+	// (e.g. as a part of the event loop or RunWithPanicCatching()?
+	initDone := make(chan struct{})
+	go func() {
+		select {
+		case <-vuImpl.ctx.Done():
+			rt.Interrupt(vuImpl.ctx.Err())
+		case initDone <- struct{}{}: // do nothing
+		}
+		close(initDone)
+	}()
+
+	var instance moduleInstance
+	err = common.RunWithPanicCatching(b.logger, rt, func() error {
+		return vuImpl.eventLoop.Start(func() error {
+			//nolint:shadow,govet // here we shadow err on purpose
+			mod, err := b.modResolution.resolve(b.pwd, b.Filename.String(), cjsLoad)
+			if err != nil {
+				return err // TODO wrap as this should never happen
+			}
+			instance = mod.Instantiate(vuImpl)
+			return instance.execute()
+		})
+	})
+
+	<-initDone
+
+	if err != nil {
+		var exception *goja.Exception
+		if errors.As(err, &exception) {
+			err = &scriptException{inner: exception}
+		}
+		return nil, err
+	}
+	if exports := instance.exports(); exports == nil {
+		return nil, errors.New("exports must be an object")
+	}
+
+	// If we've already initialized the original VU init context, forbid
+	// any subsequent VUs to open new files
+	if vuID == 0 {
+		allowOnlyOpenedFiles(b.filesystems["file"])
+	}
+
+	rt.SetRandSource(common.NewRandSource())
+
+	return instance, nil
+}
+
+func (b *Bundle) setupJSRuntime(rt *goja.Runtime, vuID int64, logger logrus.FieldLogger) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
@@ -283,111 +339,70 @@ func (b *Bundle) instantiate(init *InitContext, vuID uint64) (err error) {
 	for key, value := range b.preInitState.RuntimeOptions.Env {
 		env[key] = value
 	}
-	rt.Set("__ENV", env)
-	rt.Set("__VU", vuID)
-	_ = rt.Set("console", newConsole(logger))
-
-	if init.compatibilityMode == lib.CompatibilityModeExtended {
-		rt.Set("global", rt.GlobalObject())
-	}
-
-	initenv := &common.InitEnvironment{
-		Logger:      logger,
-		FileSystems: init.filesystems,
-		CWD:         init.pwd,
-		Registry:    b.preInitState.Registry,
-		LookupEnv:   b.preInitState.LookupEnv,
-	}
-	unbindInit := b.setInitGlobals(rt, init)
-	init.moduleVUImpl.initEnv = initenv
-	init.moduleVUImpl.eventLoop = eventloop.New(init.moduleVUImpl)
-	pgm := b.initializeProgramObject(rt, init)
-
-	// TODO: make something cleaner for interrupting scripts, and more unified
-	// (e.g. as a part of the event loop or RunWithPanicCatching()?
-	initCtxDone := init.moduleVUImpl.ctx.Done()
-	initDone := make(chan struct{})
-	watchDone := make(chan struct{})
-	go func() {
-		select {
-		case <-initCtxDone:
-			rt.Interrupt(init.moduleVUImpl.ctx.Err())
-		case <-initDone: // do nothing
-		}
-		close(watchDone)
-	}()
-
-	err = common.RunWithPanicCatching(logger, rt, func() error {
-		return init.moduleVUImpl.eventLoop.Start(func() error {
-			f, errRun := rt.RunProgram(b.Program)
-			if errRun != nil {
-				return errRun
-			}
-			if call, ok := goja.AssertFunction(f); ok {
-				if _, errRun = call(pgm.exports, pgm.module, pgm.exports); errRun != nil {
-					return errRun
-				}
-				return nil
-			}
-			panic("Somehow a commonjs main module is not wrapped in a function")
-		})
-	})
-	close(initDone)
-	<-watchDone
-
+	err := rt.Set("__ENV", env)
 	if err != nil {
-		var exception *goja.Exception
-		if errors.As(err, &exception) {
-			err = &scriptException{inner: exception}
-		}
 		return err
 	}
-	exportsV := pgm.module.Get("exports")
-	if goja.IsNull(exportsV) {
-		return errors.New("exports must be an object")
+	err = rt.Set("__VU", vuID)
+	if err != nil {
+		return err
 	}
-	pgm.exports = exportsV.ToObject(rt)
-	init.programs[b.Filename.String()] = pgm
-	unbindInit()
-	init.moduleVUImpl.ctx = nil
-	init.moduleVUImpl.initEnv = nil
-
-	// If we've already initialized the original VU init context, forbid
-	// any subsequent VUs to open new files
-	if vuID == 0 {
-		init.allowOnlyOpenedFiles()
+	err = rt.Set("console", newConsole(logger))
+	if err != nil {
+		return err
 	}
 
-	rt.SetRandSource(common.NewRandSource())
-
+	if b.CompatibilityMode == lib.CompatibilityModeExtended {
+		err = rt.Set("global", rt.GlobalObject())
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-func (b *Bundle) setInitGlobals(rt *goja.Runtime, init *InitContext) (unset func()) {
+func (b *Bundle) setInitGlobals(rt *goja.Runtime, modSys *moduleSystem) (unset func()) {
 	mustSet := func(k string, v interface{}) {
 		if err := rt.Set(k, v); err != nil {
 			panic(fmt.Errorf("failed to set '%s' global object: %w", k, err))
 		}
 	}
-	mustSet("require", init.Require)
-	mustSet("open", init.Open)
+	r := requireImpl{
+		vu:      modSys.vu,
+		modules: modSys,
+		pwd:     b.pwd,
+	}
+	mustSet("require", r.require)
+
+	mustSet("open", func(filename string, args ...string) (goja.Value, error) {
+		if modSys.vu.State() != nil { // fix
+			return nil, fmt.Errorf(cantBeUsedOutsideInitContextMsg, "open")
+		}
+
+		if filename == "" {
+			return nil, errors.New("open() can't be used with an empty filename")
+		}
+		// This uses the pwd from the requireImpl
+		return openImpl(rt, b.filesystems["file"], r.pwd, filename, args...)
+	})
 	return func() {
 		mustSet("require", goja.Undefined())
 		mustSet("open", goja.Undefined())
 	}
 }
 
-func generateSourceMapLoader(logger logrus.FieldLogger, filesystems map[string]afero.Fs,
-) func(path string) ([]byte, error) {
-	return func(path string) ([]byte, error) {
-		u, err := url.Parse(path)
+func generateCJSLoad(b *Bundle, c *compiler.Compiler) cjsModuleLoader {
+	return func(specifier *url.URL, name string) (*cjsModule, error) {
+		if filepath.IsAbs(name) && runtime.GOOS == "windows" {
+			b.logger.Warnf("'%s' was imported with an absolute path - this won't be cross-platform and won't work if"+
+				" you move the script between machines or run it with `k6 cloud`; if absolute paths are required,"+
+				" import them with the `file://` schema for slightly better compatibility",
+				name)
+		}
+		d, err := loader.Load(b.logger, b.filesystems, specifier, name)
 		if err != nil {
 			return nil, err
 		}
-		data, err := loader.Load(logger, filesystems, u, path)
-		if err != nil {
-			return nil, err
-		}
-		return data.Data, nil
+		return cjsmoduleFromString(specifier, d.Data, c)
 	}
 }
