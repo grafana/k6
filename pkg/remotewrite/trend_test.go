@@ -79,7 +79,7 @@ func TestTrendAsGaugesFindIxName(t *testing.T) {
 			lbls = append(lbls, &prompb.Label{Name: l})
 		}
 		tg := trendAsGauges{labels: lbls}
-		tg.FindNameIndex()
+		tg.CacheNameIndex()
 		assert.Equal(t, tc.expIndex, tg.ixname)
 	}
 }

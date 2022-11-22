@@ -33,7 +33,7 @@ func (sink *extendedTrendSink) MapPrompb(series metrics.TimeSeries, t time.Time)
 		labels:    MapSeries(series),
 		timestamp: t.UnixMilli(),
 	}
-	tg.FindNameIndex()
+	tg.CacheNameIndex()
 
 	tg.Append("count", float64(sink.Count))
 	tg.Append("sum", sink.Sum)
@@ -85,11 +85,11 @@ func (tg *trendAsGauges) Append(suffix string, v float64) {
 	tg.series = append(tg.series, ts)
 }
 
-// FindNameIndex finds the __name__ label's index
+// CacheNameIndex finds the __name__ label's index
 // if it is different from the most common expected case
 // then it caches the value.
 // The labels slice is expected to be sorted.
-func (tg *trendAsGauges) FindNameIndex() {
+func (tg *trendAsGauges) CacheNameIndex() {
 	if tg.labels[0].Name == namelbl {
 		// ixname is expected to be the first in most of the cases
 		// the default value is already 0
