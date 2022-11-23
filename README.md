@@ -32,22 +32,36 @@ K6_PROMETHEUS_PASSWORD=bar \
 ./k6 run script.js -o output-prometheus-remote
 ```
 
-### On sample rate
+### Metric types conversions
 
-k6 processes its outputs once per second and that is also a default flush period in this extension. The number of k6 builtin metrics is 26 and they are collected at the rate of 50ms. In practice it means that there will be around 1000-1500 samples on average per each flush period in case of raw mapping. If custom metrics are configured, that estimate will have to be adjusted.
+All the k6 metric types are converted into an equivalent Prometheus' type:
 
-Depending on exact setup, it may be necessary to configure Prometheus and / or remote-write agent to handle the load. For example, see [`queue_config` parameter](https://prometheus.io/docs/practices/remote_write/) of Prometheus.
+| k6 | Prometheus |
+|----|------------|
+| Counter | Counter |
+| Gauge | Gauge |
+| Rate | Gauge |
+| Trend | Gauges / Native Histogram |
 
-If remote endpoint responds too slowly or the k6 test run generates too many metrics, extension may start discarding samples in order to continue to adhere to the flush period.
+The obvious conversion with a classic Prometheus Histogram is not convenient because k6 can't determine the fixed buckets in advance, so the Output maps a Trend metric by default into 8 Gauges where each value represents a math function (count, sum, min, max, avg, med, p95).
+Mapping Trend by Gauges has the following cons:
+* It is impossible to aggregate some Gauge's value (especially the percentiles).
+* It uses a memory-expensive k6's data structure.
+
+The previous points can be resolved by mapping Trend as [Prometheus Native Histogram](https://prometheus.io/docs/concepts/metric_types/#histogram). Enabling the conversion by the `K6_PROMETHEUS_TREND_AS_NATIVE_HISTOGRAM=true` environment variable (or one of the other ways), then the Output converts all the Trend types into a dedicated Native Histogram.
+
+Native Histogram is a Prometheus' experimental feature, so it has to be enabled (`--enable-feature=native-histograms`). Note that other Remote-write implementations don't support it yet.
 
 ### Prometheus as remote-write agent
 
 To enable remote write in Prometheus 2.x use `--enable-feature=remote-write-receiver` option. See docker-compose samples in `example/`. Options for remote write storage can be found [here](https://prometheus.io/docs/operating/integrations/). 
 
 
-# Docker Compose
+### Docker Compose
 
 This repo includes a [docker-compose.yml](./docker-compose.yml) file that starts _Prometheus_, _Grafana_, and a custom build of _k6_ having the `xk6-output-prometheus-remote` extension.
+
+Note: the `docker-compose.yml` file has the Native Histogram mapping set as enabled.
 
 > This is just a quick setup to show the usage. For a real use case, you will want to deploy outside of docker.
 
@@ -77,3 +91,4 @@ Clone the repo to get started and follow these steps:
     ```
 
 3. Visit http://localhost:3000/ to view results in Grafana.
+
