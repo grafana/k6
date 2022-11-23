@@ -44,7 +44,7 @@ This is what load testing looks like in the 21st century.
 import http from "k6/http";
 import { check, sleep } from "k6";
 
-// test configuration
+// Test configuration
 export const options = {
   thresholds: {
     // Assert that 99% of requests finish within 3000ms.
