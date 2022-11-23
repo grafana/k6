@@ -68,6 +68,7 @@ func NewInitContext(
 		compatibilityMode: compatMode,
 		logger:            logger,
 		modules:           getJSModules(),
+		exports:           make(map[string]goja.Value),
 		moduleVUImpl: &moduleVUImpl{
 			ctx:     context.Background(),
 			runtime: rt,
@@ -93,6 +94,7 @@ func newBoundInitContext(base *InitContext, vuImpl *moduleVUImpl) *InitContext {
 
 		programs:          programs,
 		compatibilityMode: base.compatibilityMode,
+		exports:           make(map[string]goja.Value),
 		logger:            base.logger,
 		modules:           base.modules,
 		moduleVUImpl:      vuImpl,
@@ -105,12 +107,7 @@ func (i *InitContext) Require(arg string) (export goja.Value) {
 	if export, ok = i.exports[arg]; ok {
 		return export
 	}
-	defer func() {
-		if i.exports == nil {
-			i.exports = make(map[string]goja.Value)
-		}
-		i.exports[arg] = export
-	}()
+	defer func() { i.exports[arg] = export }()
 	switch {
 	case arg == "k6", strings.HasPrefix(arg, "k6/"):
 		// Builtin or external modules ("k6", "k6/*", or "k6/x/*") are handled
