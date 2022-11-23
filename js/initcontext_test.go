@@ -692,20 +692,20 @@ func TestImportModificationsAreConsistentBetweenFiles(t *testing.T) {
 	t.Parallel()
 	logger := testutils.NewLogger(t)
 	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/notk6.js", []byte(`export function group() {}`), 0o644))
+	require.NoError(t, afero.WriteFile(fs, "/notk6.js", []byte(`export default {group}; function group() {}`), 0o644))
 	require.NoError(t, afero.WriteFile(fs, "/instrument.js", []byte(`
     import k6 from "k6";
     k6.newKey = 5;
     k6.group = 3;
 
-    import * as notk6 from "./notk6.js";
+    import notk6 from "./notk6.js";
     notk6.group = 3;
     notk6.newKey = 5;
     `), 0o644))
 
 	b, err := getSimpleBundle(t, "/script.js", `
     import k6 from "k6";
-    import * as notk6 from "./notk6.js";
+    import notk6 from "./notk6.js";
     import "./instrument.js";
     if (k6.newKey != 5) { throw "k6.newKey is wrong "+ k6.newKey}
     if (k6.group != 3) { throw "k6.group is wrong "+ k6.group}
