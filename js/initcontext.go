@@ -45,13 +45,14 @@ type InitContext struct {
 	pwd         *url.URL
 
 	// Cache of loaded programs and files.
-	programs map[string]programWithSource
+	programs     map[string]programWithSource
+	exportsCache map[string]goja.Value
 
 	compatibilityMode lib.CompatibilityMode
 
 	logger logrus.FieldLogger
 
-	modules map[string]interface{}
+	moduleRegistry map[string]interface{}
 }
 
 // NewInitContext creates a new initcontext with the provided arguments
@@ -66,7 +67,8 @@ func NewInitContext(
 		programs:          make(map[string]programWithSource),
 		compatibilityMode: compatMode,
 		logger:            logger,
-		modules:           getJSModules(),
+		moduleRegistry:    getJSModules(),
+		exportsCache:      make(map[string]goja.Value),
 		moduleVUImpl: &moduleVUImpl{
 			ctx:     context.Background(),
 			runtime: rt,
@@ -92,14 +94,20 @@ func newBoundInitContext(base *InitContext, vuImpl *moduleVUImpl) *InitContext {
 
 		programs:          programs,
 		compatibilityMode: base.compatibilityMode,
+		exportsCache:      make(map[string]goja.Value),
 		logger:            base.logger,
-		modules:           base.modules,
+		moduleRegistry:    base.moduleRegistry,
 		moduleVUImpl:      vuImpl,
 	}
 }
 
 // Require is called when a module/file needs to be loaded by a script
-func (i *InitContext) Require(arg string) goja.Value {
+func (i *InitContext) Require(arg string) (export goja.Value) {
+	var ok bool
+	if export, ok = i.exportsCache[arg]; ok {
+		return export
+	}
+	defer func() { i.exportsCache[arg] = export }()
 	switch {
 	case arg == "k6", strings.HasPrefix(arg, "k6/"):
 		// Builtin or external modules ("k6", "k6/*", or "k6/x/*") are handled
@@ -144,7 +152,7 @@ func toESModuleExports(exp modules.Exports) interface{} {
 }
 
 func (i *InitContext) requireModule(name string) (goja.Value, error) {
-	mod, ok := i.modules[name]
+	mod, ok := i.moduleRegistry[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown module: %s", name)
 	}
