@@ -8,6 +8,8 @@ Before you begin, make sure to familiarize yourself with the [Code of Conduct](C
 
 If you want to chat with the team or the community, you can [join our community forums](https://community.k6.io/).
 
+> **Note:** To disclose security issues, refer to [SECURITY.md](SECURITY.md).
+
 ## Filing issues
 
 Don't be afraid to file issues! Nobody can fix a bug we don't know exists, or add a feature we didn't think of.
