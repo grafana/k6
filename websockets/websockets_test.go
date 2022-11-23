@@ -72,6 +72,8 @@ type testState struct {
 
 	callRecorder *callRecorder
 	errors       chan error
+
+	t testing.TB
 }
 
 // callRecorder a helper type that records all calls
@@ -161,7 +163,45 @@ func newTestState(t testing.TB) testState {
 		ev:           ev,
 		callRecorder: recorder,
 		errors:       make(chan error, 50),
+		t:            t,
 	}
+}
+
+func (ts *testState) addHandler(uri string, upgrader *websocket.Upgrader, message *testMessage) {
+	ts.tb.Mux.HandleFunc(uri, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// when upgrader not passed we should use default one
+		if upgrader == nil {
+			upgrader = &websocket.Upgrader{}
+		}
+
+		conn, err := upgrader.Upgrade(w, req, w.Header())
+		if err != nil {
+			ts.errors <- fmt.Errorf("%s cannot upgrade request: %w", uri, err)
+			return
+		}
+
+		defer func() {
+			err = conn.Close()
+			if err != nil {
+				ts.t.Logf("error while closing connection in %s: %v", uri, err)
+				return
+			}
+		}()
+
+		if message == nil {
+			return
+		}
+
+		if err = conn.WriteMessage(message.kind, message.data); err != nil {
+			ts.errors <- fmt.Errorf("%s cannot write message: %w", uri, err)
+			return
+		}
+	}))
+}
+
+type testMessage struct {
+	kind int
+	data []byte
 }
 
 func TestBasic(t *testing.T) {
@@ -374,7 +414,7 @@ func TestExceptionDontPanic(t *testing.T) {
 				return err
 			})
 			require.Error(t, err)
-			require.Contains(t, err.Error(), testcase.expectedError)
+			require.ErrorContains(t, err, testcase.expectedError)
 		})
 	}
 }
@@ -975,5 +1015,152 @@ func TestCustomTags(t *testing.T) {
 			assert.Equal(t, "13", dataToCheck["version"])
 			assert.NotEmpty(t, dataToCheck["url"])
 		}
+	}
+}
+
+func TestCompressionSession(t *testing.T) {
+	t.Parallel()
+	const text string = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas sed pharetra sapien. Nunc laoreet molestie ante ac gravida. Etiam interdum dui viverra posuere egestas. Pellentesque at dolor tristique, mattis turpis eget, commodo purus. Nunc orci aliquam.`
+
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	ts.addHandler("/ws-compression", &websocket.Upgrader{
+		EnableCompression: true,
+		ReadBufferSize:    1024,
+		WriteBufferSize:   1024,
+	}, &testMessage{websocket.TextMessage, []byte(text)})
+
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+		var params = {
+			"compression": "deflate"
+		}
+		var ws = new WebSocket("WSBIN_URL/ws-compression", null, params)
+		ws.onmessage = (data) => {
+			if (data != "` + text + `"){
+				throw new Error("wrong message received from server: ", data)
+			}
+
+			ws.close()
+		}
+		`))
+		return runErr
+	})
+
+	require.NoError(t, err)
+
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-compression"), http.StatusSwitchingProtocols, "")
+
+	assert.Len(t, ts.errors, 0)
+}
+
+func TestServerWithoutCompression(t *testing.T) {
+	t.Parallel()
+	const text string = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas sed pharetra sapien. Nunc laoreet molestie ante ac gravida. Etiam interdum dui viverra posuere egestas. Pellentesque at dolor tristique, mattis turpis eget, commodo purus. Nunc orci aliquam.`
+
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	ts.addHandler("/ws-compression", &websocket.Upgrader{}, &testMessage{websocket.TextMessage, []byte(text)})
+
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+		var params = {
+			"compression": "deflate"
+		}
+		var ws = new WebSocket("WSBIN_URL/ws-compression", null, params)
+		ws.onmessage = (data) => {
+			if (data != "` + text + `"){
+				throw new Error("wrong message received from server: ", data)
+			}
+
+			ws.close()
+		}
+		`))
+		return runErr
+	})
+
+	require.NoError(t, err)
+
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-compression"), http.StatusSwitchingProtocols, "")
+
+	assert.Len(t, ts.errors, 0)
+}
+
+func TestCompressionParams(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		compression   string
+		expectedError string
+	}{
+		{
+			compression:   `""`,
+			expectedError: `unsupported compression algorithm '', supported algorithm is 'deflate'`,
+		},
+		{
+			compression:   `null`,
+			expectedError: `unsupported compression algorithm 'null', supported algorithm is 'deflate'`,
+		},
+		{
+			compression:   `undefined`,
+			expectedError: `unsupported compression algorithm 'undefined', supported algorithm is 'deflate'`,
+		},
+		{
+			compression:   `" "`,
+			expectedError: `unsupported compression algorithm '', supported algorithm is 'deflate'`,
+		},
+		{compression: `"deflate"`},
+		{compression: `"deflate "`},
+		{
+			compression:   `"gzip"`,
+			expectedError: `unsupported compression algorithm 'gzip', supported algorithm is 'deflate'`,
+		},
+		{
+			compression:   `"deflate, gzip"`,
+			expectedError: `unsupported compression algorithm 'deflate, gzip', supported algorithm is 'deflate'`,
+		},
+		{
+			compression:   `"deflate, deflate"`,
+			expectedError: `unsupported compression algorithm 'deflate, deflate', supported algorithm is 'deflate'`,
+		},
+		{
+			compression:   `"deflate, "`,
+			expectedError: `unsupported compression algorithm 'deflate,', supported algorithm is 'deflate'`,
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(testCase.compression, func(t *testing.T) {
+			t.Parallel()
+			ts := newTestState(t)
+			sr := ts.tb.Replacer.Replace
+
+			ts.addHandler("/ws-compression-param", &websocket.Upgrader{
+				EnableCompression: true,
+				ReadBufferSize:    1024,
+				WriteBufferSize:   1024,
+			}, nil)
+
+			err := ts.ev.Start(func() error {
+				_, runErr := ts.rt.RunString(sr(`
+					var ws = new WebSocket("WSBIN_URL/ws-compression-param", null, {"compression":` + testCase.compression + `})
+					ws.onopen = () => {
+						ws.close()
+					}
+					`))
+				return runErr
+			})
+
+			if testCase.expectedError == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), testCase.expectedError)
+			}
+		})
 	}
 }

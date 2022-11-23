@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
+	"strings"
 
 	"github.com/dop251/goja"
 
@@ -15,9 +16,10 @@ import (
 
 // wsParams represent the parameters bag for websocket
 type wsParams struct {
-	headers     http.Header
-	cookieJar   *cookiejar.Jar
-	tagsAndMeta *metrics.TagsAndMeta
+	headers           http.Header
+	cookieJar         *cookiejar.Jar
+	tagsAndMeta       *metrics.TagsAndMeta
+	enableCompression bool
 }
 
 // buildParams builds WebSocket params and configure some of them
@@ -29,6 +31,8 @@ func buildParams(state *lib.State, rt *goja.Runtime, raw goja.Value) (*wsParams,
 		cookieJar:   state.CookieJar,
 		tagsAndMeta: &tagsAndMeta,
 	}
+
+	parsed.headers.Set("User-Agent", state.Options.UserAgent.String)
 
 	if raw == nil || goja.IsUndefined(raw) {
 		return parsed, nil
@@ -61,12 +65,22 @@ func buildParams(state *lib.State, rt *goja.Runtime, raw goja.Value) (*wsParams,
 			if v, ok := jarV.Export().(*httpModule.CookieJar); ok {
 				parsed.cookieJar = v.Jar
 			}
+		case "compression":
+			// deflate compression algorithm is supported - as defined in RFC7692
+			// compression here relies on the implementation in gorilla/websocket package, usage is
+			// experimental and may result in decreased performance. package supports
+			// only "no context takeover" scenario
+
+			algoString := strings.TrimSpace(params.Get(k).ToString().String())
+			if algoString != "deflate" {
+				return nil, fmt.Errorf("unsupported compression algorithm '%s', supported algorithm is 'deflate'", algoString)
+			}
+
+			parsed.enableCompression = true
 		default:
-			return nil, fmt.Errorf("unknown option %s", k)
+			return nil, fmt.Errorf("unknown WebSocket's option %s", k)
 		}
 	}
-
-	parsed.headers.Set("User-Agent", state.Options.UserAgent.String)
 
 	return parsed, nil
 }
