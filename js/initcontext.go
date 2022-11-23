@@ -45,8 +45,8 @@ type InitContext struct {
 	pwd         *url.URL
 
 	// Cache of loaded programs and files.
-	programs map[string]programWithSource
-	exports  map[string]goja.Value
+	programs     map[string]programWithSource
+	exportsCache map[string]goja.Value
 
 	compatibilityMode lib.CompatibilityMode
 
@@ -68,7 +68,7 @@ func NewInitContext(
 		compatibilityMode: compatMode,
 		logger:            logger,
 		modules:           getJSModules(),
-		exports:           make(map[string]goja.Value),
+		exportsCache:      make(map[string]goja.Value),
 		moduleVUImpl: &moduleVUImpl{
 			ctx:     context.Background(),
 			runtime: rt,
@@ -94,7 +94,7 @@ func newBoundInitContext(base *InitContext, vuImpl *moduleVUImpl) *InitContext {
 
 		programs:          programs,
 		compatibilityMode: base.compatibilityMode,
-		exports:           make(map[string]goja.Value),
+		exportsCache:      make(map[string]goja.Value),
 		logger:            base.logger,
 		modules:           base.modules,
 		moduleVUImpl:      vuImpl,
@@ -104,10 +104,10 @@ func newBoundInitContext(base *InitContext, vuImpl *moduleVUImpl) *InitContext {
 // Require is called when a module/file needs to be loaded by a script
 func (i *InitContext) Require(arg string) (export goja.Value) {
 	var ok bool
-	if export, ok = i.exports[arg]; ok {
+	if export, ok = i.exportsCache[arg]; ok {
 		return export
 	}
-	defer func() { i.exports[arg] = export }()
+	defer func() { i.exportsCache[arg] = export }()
 	switch {
 	case arg == "k6", strings.HasPrefix(arg, "k6/"):
 		// Builtin or external modules ("k6", "k6/*", or "k6/x/*") are handled
