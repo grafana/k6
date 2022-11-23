@@ -1,6 +1,7 @@
 package remotewrite
 
 import (
+	"math/rand"
 	"testing"
 	"time"
 
@@ -145,4 +146,42 @@ func TestNativeHistogramSinkMapPrompb(t *testing.T) {
 
 	expected := `{"labels":[{"name":"__name__","value":"k6_test"},{"name":"tagk1","value":"tagv1"}],"histograms":[{"countInt":"2","positiveDeltas":["1","0"],"positiveSpans":[{"length":1,"offset":5},{"length":1,"offset":8}],"schema":3,"sum":4.66,"timestamp":"3000","zeroCountInt":"0","zeroThreshold":2.938735877055719e-39}]}`
 	assert.JSONEq(t, expected, string(b))
+}
+
+func BenchmarkK6TrendSinkAdd(b *testing.B) {
+	m := &metrics.Metric{
+		Type: metrics.Trend,
+		Sink: &metrics.TrendSink{},
+	}
+	s := metrics.Sample{
+		TimeSeries: metrics.TimeSeries{
+			Metric: m,
+		},
+		Value: rand.Float64(),
+		Time:  time.Now(),
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Sink.Add(s)
+	}
+}
+
+func BenchmarkHistogramSinkAdd(b *testing.B) {
+	m := &metrics.Metric{
+		Name:     "bench",
+		Type:     metrics.Trend,
+		Contains: metrics.Time,
+	}
+	ts := newNativeHistogramSink(m)
+	s := metrics.Sample{
+		TimeSeries: metrics.TimeSeries{
+			Metric: m,
+		},
+		Value: rand.Float64(),
+		Time:  time.Now(),
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ts.Add(s)
+	}
 }
