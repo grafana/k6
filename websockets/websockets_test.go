@@ -879,3 +879,90 @@ func TestCookiesDefaultJar(t *testing.T) {
 	assert.Equal(t, map[string]string{"someheader": "defaultjar"}, collected)
 	mu.Unlock()
 }
+
+func TestSystemTags(t *testing.T) {
+	t.Parallel()
+
+	testedSystemTags := []string{"status", "subproto", "url", "ip"}
+	for _, expectedTagStr := range testedSystemTags {
+		expectedTagStr := expectedTagStr
+		t.Run("only "+expectedTagStr, func(t *testing.T) {
+			t.Parallel()
+			expectedTag, err := metrics.SystemTagString(expectedTagStr)
+			require.NoError(t, err)
+
+			ts := newTestState(t)
+			sr := ts.tb.Replacer.Replace
+			ts.vu.StateField.Options.SystemTags = metrics.ToSystemTagSet([]string{expectedTagStr})
+
+			err = ts.ev.Start(func() error {
+				_, runErr := ts.rt.RunString(sr(`
+				var ws = new WebSocket("WSBIN_URL/ws-echo")
+				ws.onopen = () => {
+					ws.send("test")
+				}
+				ws.onmesage = (data) => {
+					if (!data=="test") {
+						throw new Error ("echo'd data doesn't match our message!");
+					}
+					ws.close()
+				}
+			`))
+				return runErr
+			})
+			require.NoError(t, err)
+
+			containers := metrics.GetBufferedSamples(ts.samples)
+			require.NotEmpty(t, containers)
+			for _, sampleContainer := range containers {
+				require.NotEmpty(t, sampleContainer.GetSamples())
+				for _, sample := range sampleContainer.GetSamples() {
+					var dataToCheck map[string]string
+					if metrics.NonIndexableSystemTags.Has(expectedTag) {
+						dataToCheck = sample.Metadata
+					} else {
+						dataToCheck = sample.Tags.Map()
+					}
+
+					require.NotEmpty(t, dataToCheck)
+					for emittedTag := range dataToCheck {
+						assert.Equal(t, expectedTagStr, emittedTag)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestCustomTags(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+	err := ts.ev.Start(func() error {
+		_, err := ts.rt.RunString(sr(`
+    var ws = new WebSocket("WSBIN_URL/ws-echo", null, {tags: {lorem: "ipsum", version: 13}})
+    ws.onopen = () => {
+      ws.send("something")
+      ws.close()
+    }
+	`))
+		return err
+	})
+	require.NoError(t, err)
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
+
+	for _, sampleContainer := range samples {
+		require.NotEmpty(t, sampleContainer.GetSamples())
+		for _, sample := range sampleContainer.GetSamples() {
+			dataToCheck := sample.Tags.Map()
+
+			require.NotEmpty(t, dataToCheck)
+
+			assert.Equal(t, "ipsum", dataToCheck["lorem"])
+			assert.Equal(t, "13", dataToCheck["version"])
+			assert.NotEmpty(t, dataToCheck["url"])
+		}
+	}
+}

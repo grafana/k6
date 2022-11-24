@@ -66,7 +66,7 @@ type webSocket struct {
 	vu             modules.VU
 	url            *url.URL
 	conn           *websocket.Conn
-	tagsAndMeta    metrics.TagsAndMeta
+	tagsAndMeta    *metrics.TagsAndMeta
 	tq             *taskqueue.TaskQueue
 	builtinMetrics *metrics.BuiltinMetrics
 	obj            *goja.Object // the object that is given to js to interact with the WebSocket
@@ -116,6 +116,7 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 		writeQueueCh:   make(chan message, 10),
 		eventListeners: newEventListeners(),
 		obj:            rt.NewObject(),
+		tagsAndMeta:    params.tagsAndMeta,
 	}
 
 	// Maybe have this after the goroutine below ?!?
@@ -240,10 +241,12 @@ func (w *webSocket) establishConnection(params *wsParams) {
 	conn, httpResponse, connErr := wsd.DialContext(ctx, w.url.String(), params.headers)
 	connectionEnd := time.Now()
 	connectionDuration := metrics.D(connectionEnd.Sub(start))
-	ctm := state.Tags.GetCurrentValues()
-	if state.Options.SystemTags.Has(metrics.TagIP) && conn.RemoteAddr() != nil {
+
+	systemTags := state.Options.SystemTags
+
+	if conn != nil && conn.RemoteAddr() != nil {
 		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
-			ctm.SetTag("ip", ip)
+			w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagIP, ip)
 		}
 	}
 
@@ -251,18 +254,14 @@ func (w *webSocket) establishConnection(params *wsParams) {
 		defer func() {
 			_ = httpResponse.Body.Close()
 		}()
-		if state.Options.SystemTags.Has(metrics.TagStatus) {
-			ctm.SetTag("status", strconv.Itoa(httpResponse.StatusCode))
-		}
-		if state.Options.SystemTags.Has(metrics.TagSubproto) {
-			ctm.SetTag("subproto", httpResponse.Header.Get("Sec-WebSocket-Protocol"))
-		}
+
+		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagStatus, strconv.Itoa(httpResponse.StatusCode))
+		subProtocol := httpResponse.Header.Get("Sec-WebSocket-Protocol")
+		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagSubproto, subProtocol)
 	}
 	w.conn = conn
-	if state.Options.SystemTags.Has(metrics.TagURL) {
-		ctm.SetTag("url", w.url.String())
-	}
-	w.tagsAndMeta = ctm
+
+	w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagURL, w.url.String())
 
 	w.emitConnectionMetrics(ctx, start, connectionDuration)
 	if connErr != nil {
