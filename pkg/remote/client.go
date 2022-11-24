@@ -92,10 +92,7 @@ func (c *WriteClient) Store(ctx context.Context, series []*prompb.TimeSeries) er
 	defer resp.Body.Close()
 	io.Copy(io.Discard, resp.Body) //nolint:errcheck
 
-	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("got status code: %s instead expected: 204 No Content", resp.Status)
-	}
-	return nil
+	return validateResponseStatus(resp.StatusCode)
 }
 
 func newWriteRequestBody(series []*prompb.TimeSeries) ([]byte, error) {
@@ -110,4 +107,12 @@ func newWriteRequestBody(series []*prompb.TimeSeries) ([]byte, error) {
 			"size: %d, limit: %d", len(b), 0xffffffff)
 	}
 	return snappy.Encode(nil, b), nil
+}
+
+func validateResponseStatus(code int) error {
+	if code >= http.StatusOK && code < 300 {
+		return nil
+	}
+
+	return fmt.Errorf("got status code: %d instead expected a 2xx successful status code", code)
 }

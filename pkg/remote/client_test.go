@@ -128,7 +128,7 @@ func TestClientStoreHTTPBasic(t *testing.T) {
 			},
 		},
 	}
-	assert.Error(t, c.Store(context.Background(), nil))
+	assert.NoError(t, c.Store(context.Background(), nil))
 }
 
 func TestClientStoreHeaders(t *testing.T) {
@@ -155,7 +155,7 @@ func TestClientStoreHeaders(t *testing.T) {
 			}),
 		},
 	}
-	assert.Error(t, c.Store(context.Background(), nil))
+	assert.NoError(t, c.Store(context.Background(), nil))
 }
 
 func TestNewWriteRequestBody(t *testing.T) {
@@ -169,4 +169,24 @@ func TestNewWriteRequestBody(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, string(b))
 	assert.Contains(t, string(b), `label1`)
+}
+
+func TestValidateStatusCode(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		status int
+		expErr bool
+	}{
+		{status: http.StatusOK, expErr: false},        // Mimir
+		{status: http.StatusNoContent, expErr: false}, // Prometheus
+		{status: http.StatusBadRequest, expErr: true},
+	}
+	for _, tt := range tests {
+		err := validateResponseStatus(tt.status)
+		if tt.expErr {
+			assert.Error(t, err)
+			continue
+		}
+		assert.NoError(t, err)
+	}
 }
