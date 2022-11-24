@@ -1,6 +1,7 @@
 package websockets
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
@@ -70,6 +71,7 @@ type testState struct {
 	ev      *eventloop.EventLoop
 
 	callRecorder *callRecorder
+	errors       chan error
 }
 
 // callRecorder a helper type that records all calls
@@ -158,6 +160,7 @@ func newTestState(t testing.TB) testState {
 		samples:      samples,
 		ev:           ev,
 		callRecorder: recorder,
+		errors:       make(chan error, 50),
 	}
 }
 
@@ -739,7 +742,8 @@ func TestCustomHeaders(t *testing.T) {
 		responseHeaders := w.Header().Clone()
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, responseHeaders)
 		if err != nil {
-			t.Fatalf("/ws-echo-someheader cannot upgrade request: %v", err)
+			ts.errors <- fmt.Errorf("/ws-echo-someheader cannot upgrade request: %w", err)
+			return
 		}
 
 		mu.Lock()
@@ -771,6 +775,7 @@ func TestCustomHeaders(t *testing.T) {
 	assert.Equal(t, "ipsum", collected.Get("x-lorem"))
 	assert.Equal(t, "TestUserAgent", collected.Get("User-Agent"))
 	mu.Unlock()
+	assert.Len(t, ts.errors, 0)
 }
 
 func TestCookies(t *testing.T) {
@@ -785,7 +790,8 @@ func TestCookies(t *testing.T) {
 		responseHeaders := w.Header().Clone()
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, responseHeaders)
 		if err != nil {
-			t.Fatalf("/ws-echo-someheader cannot upgrade request: %v", err)
+			ts.errors <- fmt.Errorf("/ws-echo-someheader cannot upgrade request: %w", err)
+			return
 		}
 
 		mu.Lock()
@@ -825,6 +831,8 @@ func TestCookies(t *testing.T) {
 	assert.True(t, len(collected) > 0)
 	assert.Equal(t, map[string]string{"someheader": "customjar"}, collected)
 	mu.Unlock()
+
+	assert.Len(t, ts.errors, 0)
 }
 
 func TestCookiesDefaultJar(t *testing.T) {
@@ -839,7 +847,8 @@ func TestCookiesDefaultJar(t *testing.T) {
 		responseHeaders := w.Header().Clone()
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, responseHeaders)
 		if err != nil {
-			t.Fatalf("/ws-echo-someheader cannot upgrade request: %v", err)
+			ts.errors <- fmt.Errorf("/ws-echo-someheader cannot upgrade request: %w", err)
+			return
 		}
 
 		mu.Lock()
@@ -878,6 +887,8 @@ func TestCookiesDefaultJar(t *testing.T) {
 	assert.True(t, len(collected) > 0)
 	assert.Equal(t, map[string]string{"someheader": "defaultjar"}, collected)
 	mu.Unlock()
+
+	assert.Len(t, ts.errors, 0)
 }
 
 func TestSystemTags(t *testing.T) {
