@@ -63,7 +63,7 @@ These are goals achievable within 3-6 months, tentatively done by Q2 2023.
 Mid-term goals
 --------------
 
-These are goals achievable within 6-12 months, tentatively done by mid 2023.
+These are goals achievable within 6-12 months, tentatively done by Q1 2024.
 
 - **Global availability of the extension in k6 Cloud for all users.**<br>
 
