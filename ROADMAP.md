@@ -32,17 +32,6 @@ Short-term goals
 
 These are goals achievable within 3-6 months, tentatively done by Q3 2022.
 
-- **Stabilize the existing functionality and fix any major, high-impact, and blocking bugs.**<br>
-  Tool stability is something we take very seriously and users shouldn't run into any major showstopping issues.
-
-  *How will we achieve this?*<br>
-  By manually testing the application in different scenarios, adding more automated tests, and addressing reports from internal and external users.
-  Any issues found that have a considerable user impact will be given highest priority and fixed ASAP.
-
-  *Definition of Done*<br>
-  This is difficult to gauge, but at some point we should stop running into any major issues on a frequent basis and should consider this goal as reached.
-
-
 - **Limited Alpha deployment and testing of the extension in k6 Cloud.**<br>
 
   *How will we achieve this?*<br>
