@@ -201,7 +201,9 @@ func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 
 	mapMonoSeries := func(s metrics.TimeSeries, t time.Time) prompb.TimeSeries {
 		return prompb.TimeSeries{
-			Labels: MapSeries(s),
+			// TODO: should we add the suffix for
+			// Counter, Rate and Gauge?
+			Labels: MapSeries(s, ""),
 			Samples: []*prompb.Sample{
 				{Timestamp: t.UnixMilli()},
 			},

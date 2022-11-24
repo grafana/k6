@@ -1,7 +1,6 @@
 package remotewrite
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/mstoykov/atlas"
@@ -34,10 +33,14 @@ func MapTagSet(t *metrics.TagSet) []*prompb.Label {
 //
 // The labels are lexicographic sorted as required
 // from the Remote write's specification.
-func MapSeries(series metrics.TimeSeries) []*prompb.Label {
+func MapSeries(series metrics.TimeSeries, suffix string) []*prompb.Label {
+	v := defaultMetricPrefix + series.Metric.Name
+	if suffix != "" {
+		v += "_" + suffix
+	}
 	lbls := append(MapTagSet(series.Tags), &prompb.Label{
 		Name:  namelbl,
-		Value: fmt.Sprintf("%s%s", defaultMetricPrefix, series.Metric.Name),
+		Value: v,
 	})
 	sort.Slice(lbls, func(i int, j int) bool {
 		return lbls[i].Name < lbls[j].Name

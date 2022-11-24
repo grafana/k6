@@ -10,6 +10,8 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
+// TODO: test MapSeries with suffix
+
 func TestMapSeries(t *testing.T) {
 	t.Parallel()
 
@@ -22,7 +24,7 @@ func TestMapSeries(t *testing.T) {
 		Tags: r.RootTagSet().With("tagk1", "tagv1").With("b1", "v1"),
 	}
 
-	lbls := MapSeries(series)
+	lbls := MapSeries(series, "")
 	require.Len(t, lbls, 3)
 
 	exp := []*prompb.Label{

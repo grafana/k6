@@ -166,6 +166,46 @@ func BenchmarkK6TrendSinkAdd(b *testing.B) {
 	}
 }
 
+func TestNativeHistogramSinkMapPrompbWithValueType(t *testing.T) {
+	t.Parallel()
+
+	r := metrics.NewRegistry()
+	series := metrics.TimeSeries{
+		Metric: &metrics.Metric{
+			Name:     "test",
+			Type:     metrics.Trend,
+			Contains: metrics.Time,
+		},
+		Tags: r.RootTagSet(),
+	}
+
+	st := newNativeHistogramSink(series.Metric)
+	st.Add(metrics.Sample{
+		TimeSeries: series,
+		Value:      1.52,
+		Time:       time.Unix(1, 0),
+	})
+	ts := st.MapPrompb(series, time.Unix(2, 0))
+	require.Len(t, ts, 1)
+	assert.Equal(t, "k6_test_seconds", ts[0].Labels[0].Value)
+}
+
+func TestBaseUnit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		in  metrics.ValueType
+		exp string
+	}{
+		{in: metrics.Default, exp: ""},
+		{in: metrics.Time, exp: "seconds"},
+		{in: metrics.Data, exp: "bytes"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.exp, baseUnit(tt.in))
+	}
+}
+
 func BenchmarkHistogramSinkAdd(b *testing.B) {
 	m := &metrics.Metric{
 		Name:     "bench",

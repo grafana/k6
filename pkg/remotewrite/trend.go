@@ -32,8 +32,11 @@ func (sink *extendedTrendSink) MapPrompb(series metrics.TimeSeries, t time.Time)
 	// TODO: when Prometheus implements support for sparse histograms, re-visit this implementation
 
 	tg := &trendAsGauges{
-		series:    make([]*prompb.TimeSeries, 0, 8),
-		labels:    MapSeries(series),
+		series: make([]*prompb.TimeSeries, 0, 8),
+		// TODO: should we add the base unit suffix?
+		// It could depends from the decision for other metric types
+		// Does k6_http_req_duration_seconds_count make sense?
+		labels:    MapSeries(series, ""),
 		timestamp: t.UnixMilli(),
 	}
 	tg.CacheNameIndex()
@@ -168,16 +171,12 @@ func (*nativeHistogramSink) IsEmpty() bool {
 
 // MapPrompb maps the Trend type to the experimental Native Histogram.
 func (sink *nativeHistogramSink) MapPrompb(series metrics.TimeSeries, t time.Time) []*prompb.TimeSeries {
-	labels := MapSeries(series)
+	suffix := baseUnit(series.Metric.Contains)
+	labels := MapSeries(series, suffix)
 	timestamp := t.UnixMilli()
 
 	return []*prompb.TimeSeries{
 		{
-			// TODO: should we map the builtin metrics
-			// with the Prometheus' convention?
-			//
-			// e.g. k6_http_reqs_duration_seconds
-			// instead of k6_http_reqs_duration
 			Labels: labels,
 			Histograms: []*prompb.Histogram{
 				histogramToHistogramProto(timestamp, sink.H),
@@ -214,4 +213,15 @@ func toBucketSpanProto(s []*dto.BucketSpan) []*prompb.BucketSpan {
 		spans[i] = &prompb.BucketSpan{Offset: *s[i].Offset, Length: *s[i].Length}
 	}
 	return spans
+}
+
+func baseUnit(vt metrics.ValueType) string {
+	switch vt {
+	case metrics.Time:
+		return "seconds"
+	case metrics.Data:
+		return "bytes"
+	default:
+		return ""
+	}
 }
