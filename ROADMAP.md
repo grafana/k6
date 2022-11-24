@@ -48,13 +48,8 @@ These are goals achievable within 3-6 months, tentatively done by Q2 2023.
   *Definition of Done*<br>
   Load test executed in Cloud can use xk6-browser API by importing `k6/x/browser`.
 
-Mid-term goals
---------------
-
-These are goals achievable within 6-12 months, tentatively done by mid 2023.
-
 - **Transition our API to be async/`Promise` based.**<br>
-  Currently (April 2022), most of our API is synchronous. This is due to the historical fact that k6 didn't support async behavior because of a missing per-VU event loop.
+  At the moment, most of our API is synchronous. This is due to the historical fact that k6 didn't support async behavior because of a missing per-VU event loop.
 [This event loop is now available](https://github.com/grafana/k6/pull/2228).
   Async APIs are important for a browser-testing tool, since most browser behavior and [CDP](https://chromedevtools.github.io/devtools-protocol/) (the protocol we use to communicate with the browser) is event-based. We need to expose an async API to implement this missing functionality and reach feature parity with tools like Playwright or Puppeteer.
 
@@ -65,7 +60,12 @@ These are goals achievable within 6-12 months, tentatively done by mid 2023.
   When most of the API can be used asynchronously.
 
 
-- **Beta availability of the extension in k6 Cloud for all users.**<br>
+Mid-term goals
+--------------
+
+These are goals achievable within 6-12 months, tentatively done by mid 2023.
+
+- **Global availability of the extension in k6 Cloud for all users.**<br>
 
   *How will we achieve this?*<br>
   The deployment should be optimized and the extension thoroughly tested before making it available to all users. Frontend changes should be done at this point, and usage costs (CPU, RAM, storage) and pricing details should be determined, followed by public announcements of the availability. Features such as screen capture, video recording, downloading, and file uploading should be available.
