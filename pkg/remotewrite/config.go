@@ -10,7 +10,6 @@ import (
 
 	"github.com/grafana/xk6-output-prometheus-remote/pkg/remote"
 	"github.com/kubernetes/helm/pkg/strvals"
-
 	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
@@ -43,6 +42,7 @@ type Config struct {
 	PushInterval types.NullDuration `json:"pushInterval" envconfig:"K6_PROMETHEUS_PUSH_INTERVAL"`
 }
 
+// NewConfig creates an Output's configuration.
 func NewConfig() Config {
 	return Config{
 		URL:                   null.StringFrom(defaultURL),
@@ -54,6 +54,7 @@ func NewConfig() Config {
 	}
 }
 
+// RemoteConfig creates a configuration for the HTTP Remote-write client.
 func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 	hc := remote.HTTPConfig{
 		Timeout: defaultTimeout,
@@ -83,8 +84,7 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 	return &hc, nil
 }
 
-// From here till the end of the file partial duplicates waiting for config refactor (k6 #883)
-
+// Apply merges applied Config into base.
 func (base Config) Apply(applied Config) Config {
 	if applied.URL.Valid {
 		base.URL = applied.URL
@@ -115,7 +115,7 @@ func (base Config) Apply(applied Config) Config {
 	return base
 }
 
-// ParseArg takes an arg string and converts it to a config
+// ParseArg creates a Config parsing an arg string.
 func ParseArg(arg string) (Config, error) {
 	var c Config
 	params, err := strvals.Parse(arg)
@@ -131,7 +131,7 @@ func ParseArg(arg string) (Config, error) {
 		c.InsecureSkipTLSVerify = null.BoolFrom(v)
 	}
 
-	if v, ok := params["user"].(string); ok {
+	if v, ok := params["username"].(string); ok {
 		c.Username = null.StringFrom(v)
 	}
 
@@ -158,7 +158,7 @@ func ParseArg(arg string) (Config, error) {
 }
 
 // GetConsolidatedConfig combines {default config values + JSON config +
-// environment vars + arg config values}, and returns the final result.
+// environment vars + arg config values}, and returns the final merged configuration.
 func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, arg string) (Config, error) {
 	result := NewConfig()
 	if jsonRawConf != nil {
@@ -211,7 +211,7 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 		}
 	}
 
-	if user, userDefined := env["K6_PROMETHEUS_USER"]; userDefined {
+	if user, userDefined := env["K6_PROMETHEUS_USERNAME"]; userDefined {
 		result.Username = null.StringFrom(user)
 	}
 

@@ -63,12 +63,10 @@ func TestConfigParseArg(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, null.StringFrom("https://prometheus.remote:3412/write"), c.URL)
 
-	c, err = ParseArg("url=https://prometheus.remote:3412/write,insecureSkipTLSVerify=false,user=user,password=pass")
+	c, err = ParseArg("url=https://prometheus.remote:3412/write,insecureSkipTLSVerify=false")
 	assert.Nil(t, err)
 	assert.Equal(t, null.StringFrom("https://prometheus.remote:3412/write"), c.URL)
 	assert.Equal(t, null.BoolFrom(false), c.InsecureSkipTLSVerify)
-	assert.Equal(t, null.StringFrom("user"), c.Username)
-	assert.Equal(t, null.StringFrom("pass"), c.Password)
 
 	c, err = ParseArg("url=http://prometheus.remote:3412/write,pushInterval=2s")
 	assert.Nil(t, err)
@@ -153,9 +151,9 @@ func TestConfigConsolidation(t *testing.T) {
 			},
 		},
 		"mixed_success": {
-			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s","mapping":"raw"}`, u.String())),
+			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
 			env:     map[string]string{"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "false", "K6_PROMETHEUS_USER": "u"},
-			arg:     "user=user",
+			arg:     "username=user",
 			config: Config{
 				URL:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
@@ -244,6 +242,39 @@ func TestConfigConsolidation(t *testing.T) {
 				return
 			}
 			assert.Equal(t, c, testCase.config)
+		})
+	}
+}
+
+func TestConfigBasicAuth(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"username":"user1","password":"pass1"}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_USERNAME": "user1", "K6_PROMETHEUS_PASSWORD": "pass1"}},
+		"Arg":  {arg: "username=user1,password=pass1"},
+	}
+
+	expconfig := Config{
+		URL:                   null.StringFrom("http://localhost:9090/api/v1/write"),
+		InsecureSkipTLSVerify: null.BoolFrom(true),
+		Username:              null.StringFrom("user1"),
+		Password:              null.StringFrom("pass1"),
+		PushInterval:          types.NullDurationFrom(5 * time.Second),
+		Headers:               make(map[string]string),
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
 		})
 	}
 }
