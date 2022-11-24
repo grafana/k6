@@ -32,14 +32,21 @@ Short-term goals
 
 These are goals achievable within 3-6 months, tentatively done by Q3 2022.
 
-- **Limited Alpha deployment and testing of the extension in k6 Cloud.**<br>
+- **Make xk6-browser a part of standard distribution of k6.**<br>
 
   *How will we achieve this?*<br>
-  Soon we will create a small-scale deployment for internal use and specific customers, meant to test the basic integration of the extension in k6 Cloud.
+  xk6-browser will become an [experimental module](https://k6.io/docs/javascript-api/k6-experimental/) of k6, and thus available to use in load tests that utilize standard k6 release builds.
 
   *Definition of Done*<br>
-  When the extension is usable in k6 Cloud; i.e. scripts can run and test results are shown. Frontend changes are not required at this stage.
+  A load test script that imports `k6/x/browser` can be executed using the latest release build of k6. The browser-level APIs provided by xk6-browser are available for use within this script.
 
+- **Public beta in k6 Cloud.**
+
+  *How will we achieve this?*<br>
+  Cloud builds will start using k6 releases that include xk6-browser as an experimental module.
+
+  *Definition of Done*<br>
+  Load test executed in Cloud can use xk6-browser API by importing `k6/x/browser`.
 
 Mid-term goals
 --------------
