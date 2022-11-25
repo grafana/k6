@@ -5,7 +5,7 @@ import "errors"
 // Possible values for ValueType.
 const (
 	Default = ValueType(iota) // Values are presented as-is
-	Time                      // Values are timestamps (nanoseconds)
+	Time                      // Values are time durations (milliseconds)
 	Data                      // Values are data amounts (bytes)
 )
 
