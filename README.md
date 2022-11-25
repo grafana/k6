@@ -1,5 +1,5 @@
 # xk6-output-prometheus-remote
-k6 extension for publishing test-run metrics to Prometheus via Remote Write endpoint.
+[k6](https://github.com/grafana/k6) extension for publishing test-run metrics to Prometheus via Remote Write endpoint.
 
 > :warning: Not to be confused with [Prometheus Remote Write **client** extension](https://github.com/grafana/xk6-client-prometheus-remote) which is for load testing _Prometheus_ itself.
 
