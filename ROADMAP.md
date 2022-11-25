@@ -68,7 +68,7 @@ These are goals achievable within 6-12 months, tentatively done by Q1 2024.
 - **Global availability of the extension in k6 Cloud for all users.**<br>
 
   *How will we achieve this?*<br>
-  The deployment should be optimized and the extension thoroughly tested before making it available to all users. Frontend changes should be done at this point, and usage costs (CPU, RAM, storage) and pricing details should be determined, followed by public announcements of the availability. Features such as screen capture, video recording, downloading, and file uploading should be available.
+  The deployment should be optimized and the extension thoroughly tested before making it available to all users. Frontend changes should be done at this point, and usage costs (CPU, RAM, storage) and pricing details should be determined, followed by public announcements of the availability.
 
   *Definition of Done*<br>
   When all users are eligible to upgrade to a plan that includes browser testing.
@@ -100,10 +100,10 @@ These are goals achievable after a year, and don't have a clear date of delivery
 
 
 - **Feature parity with Playwright and Puppeteer.**<br>
-  Currently, our functionality is limited compared to more mature projects like Playwright and Puppeteer. We plan to expand this gradually and reach or exceed the features offered by other browser automation tools.
+  Currently, our functionality is limited compared to more mature projects like Playwright and Puppeteer. We plan to expand this gradually and reach or exceed the features offered by other browser automation tools, such as screen capture, video recording, downloading, and file uploading.
 
   *How will we achieve this?*<br>
-  By prioritizing new features to add based on API importance and user feedback. After the short-term stability improvements are made, our main focus will be to add more missing features and close the current feature gap.
+  By prioritizing new features to add based on API importance and user feedback. Once our standalone and Cloud users are able to execute feasible complex scenarios, our main focus will be to add more missing features and close the current feature gap.
 
   *Definition of Done*<br>
   When we implement all of the functionality found in other tools that makes sense for xk6-browser. This is intentionally vague at the moment, and we'll refine it as we make progress.
