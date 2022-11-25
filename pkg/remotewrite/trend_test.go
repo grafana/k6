@@ -32,22 +32,34 @@ func TestExtendedTrendSinkMapPrompb(t *testing.T) {
 	}
 
 	expected := []*prompb.TimeSeries{
-		buildTimeSeries("k6_test_count", 1.0, now),
-		buildTimeSeries("k6_test_sum", 1.0, now),
-		buildTimeSeries("k6_test_min", 1.0, now),
-		buildTimeSeries("k6_test_max", 1.0, now),
 		buildTimeSeries("k6_test_avg", 1.0, now),
+		buildTimeSeries("k6_test_count", 1.0, now),
+		buildTimeSeries("k6_test_max", 1.0, now),
 		buildTimeSeries("k6_test_med", 1.0, now),
+		buildTimeSeries("k6_test_min", 1.0, now),
+		buildTimeSeries("k6_test_p095", 1.0, now),
 		buildTimeSeries("k6_test_p90", 1.0, now),
-		buildTimeSeries("k6_test_p95", 1.0, now),
+		buildTimeSeries("k6_test_sum", 1.0, now),
+	}
+	resolver, err := metrics.GetResolversForTrendColumns([]string{"count", "min", "max", "avg", "med", "p(90)", "p(95)"})
+	require.NoError(t, err)
+	resolver["p90"] = resolver["p(90)"]
+	delete(resolver, "p(90)")
+	resolver["p095"] = resolver["p(95)"]
+	delete(resolver, "p(95)")
+	resolver["sum"] = func(t *metrics.TrendSink) float64 {
+		return t.Sum
 	}
 
-	st := newExtendedTrendSink()
+	st, err := newExtendedTrendSink(resolver)
+	require.NoError(t, err)
 	st.Add(sample)
 	require.Equal(t, st.Count, uint64(1))
 
 	ts := st.MapPrompb(sample.TimeSeries, sample.Time)
 	require.Len(t, ts, 8)
+
+	sortByNameLabel(ts)
 	assertTimeSeriesEqual(t, expected, ts)
 }
 

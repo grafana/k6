@@ -21,6 +21,8 @@ const (
 	defaultMetricPrefix = "k6_"
 )
 
+var defaultTrendStats = []string{"p(99)"}
+
 type Config struct {
 	// URL contains the absolute URL for the Write endpoint where to flush the time series.
 	URL null.String `json:"url" envconfig:"K6_PROMETHEUS_REMOTE_URL"`
@@ -44,6 +46,11 @@ type Config struct {
 	// TrendAsNativeHistogram defines if the mapping for metrics defined as Trend type
 	// should map to a Prometheus' Native Histogram.
 	TrendAsNativeHistogram null.Bool `json:"trendAsNativeHistogram" envconfig:"K6_PROMETHEUS_TREND_AS_NATIVE_HISTOGRAM"`
+
+	// TrendStats defines the stats to flush for Trend metrics.
+	//
+	// TODO: should we support K6_SUMMARY_TREND_STATS?
+	TrendStats []string `json:"trendStats" envconfig:"K6_PROMETHEUS_TREND_STATS"`
 }
 
 // NewConfig creates an Output's configuration.
@@ -55,6 +62,7 @@ func NewConfig() Config {
 		Password:              null.NewString("", false),
 		PushInterval:          types.NullDurationFrom(defaultPushInterval),
 		Headers:               make(map[string]string),
+		TrendStats:            defaultTrendStats,
 	}
 }
 
@@ -115,6 +123,11 @@ func (base Config) Apply(applied Config) Config {
 		for k, v := range applied.Headers {
 			base.Headers[k] = v
 		}
+	}
+
+	if len(applied.TrendStats) > 0 {
+		base.TrendStats = make([]string, len(applied.TrendStats))
+		copy(base.TrendStats, applied.TrendStats)
 	}
 
 	return base
@@ -222,6 +235,11 @@ func parseEnvs(env map[string]string) (Config, error) {
 			c.TrendAsNativeHistogram = b
 		}
 	}
+
+	if trendStats, trendStatsDefined := env["K6_PROMETHEUS_TREND_STATS"]; trendStatsDefined {
+		c.TrendStats = strings.Split(trendStats, ",")
+	}
+
 	return c, nil
 }
 
@@ -262,6 +280,16 @@ func parseArg(text string) (Config, error) {
 			if err := c.TrendAsNativeHistogram.UnmarshalText([]byte(v)); err != nil {
 				return c, fmt.Errorf("trendAsNativeHistogram value must be true or false, not %q", v)
 			}
+
+		// TODO: add the support for trendStats
+		// strvals doesn't support the same format used by --summary-trend-stats
+		// using the comma as the separator, because it is already used for
+		// dividing the keys.
+		//
+		//if v, ok := params["trendStats"].(string); ok && len(v) > 0 {
+		//c.TrendStats = strings.Split(v, ",")
+		//}
+
 		default:
 			if !strings.HasPrefix(key, "headers.") {
 				return c, fmt.Errorf("%q is an unknown option's key", r[0])

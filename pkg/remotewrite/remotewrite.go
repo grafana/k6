@@ -3,6 +3,7 @@ package remotewrite
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/grafana/xk6-output-prometheus-remote/pkg/remote"
@@ -19,10 +20,11 @@ var _ output.Output = new(Output)
 type Output struct {
 	output.SampleBuffer
 
-	config          Config
-	logger          logrus.FieldLogger
-	periodicFlusher *output.PeriodicFlusher
-	tsdb            map[metrics.TimeSeries]*seriesWithMeasure
+	config             Config
+	logger             logrus.FieldLogger
+	periodicFlusher    *output.PeriodicFlusher
+	tsdb               map[metrics.TimeSeries]*seriesWithMeasure
+	trendStatsResolver map[string]func(*metrics.TrendSink) float64
 
 	// TODO: copy the prometheus/remote.WriteClient interface and depend on it
 	client *remote.WriteClient
@@ -46,12 +48,19 @@ func New(params output.Params) (*Output, error) {
 		return nil, fmt.Errorf("failed to initialize the Prometheus remote write client: %w", err)
 	}
 
-	return &Output{
+	o := &Output{
 		client: wc,
 		config: config,
 		logger: logger,
 		tsdb:   make(map[metrics.TimeSeries]*seriesWithMeasure),
-	}, nil
+	}
+
+	if len(config.TrendStats) > 0 {
+		if err := o.setTrendStatsResolver(config.TrendStats); err != nil {
+			return nil, err
+		}
+	}
+	return o, nil
 }
 
 func (o *Output) Description() string {
@@ -73,6 +82,50 @@ func (o *Output) Stop() error {
 	o.logger.Debug("Stopping the output")
 	o.periodicFlusher.Stop()
 	o.logger.Debug("Output stopped")
+	return nil
+}
+
+// setTrendStatsResolver sets the resolver for the Trend stats.
+//
+// TODO: refactor, the code can be improved
+func (o *Output) setTrendStatsResolver(trendStats []string) error {
+	var trendStatsCopy []string
+	hasSum := false
+	// copy excluding sum
+	for _, stat := range trendStats {
+		if stat == "sum" {
+			hasSum = true
+			continue
+		}
+		trendStatsCopy = append(trendStatsCopy, stat)
+	}
+	resolvers, err := metrics.GetResolversForTrendColumns(trendStatsCopy)
+	if err != nil {
+		return err
+	}
+	// sum is not supported from GetResolversForTrendColumns
+	// so if it has been requested
+	// it adds it specifically
+	if hasSum {
+		resolvers["sum"] = func(t *metrics.TrendSink) float64 {
+			return t.Sum
+		}
+	}
+	o.trendStatsResolver = make(TrendStatsResolver, len(resolvers))
+	for stat, fn := range resolvers {
+		statKey := stat
+
+		// the config passes percentiles with p(x) form, for example p(95),
+		// but the mapping generates series name in the form p95.
+		//
+		// TODO: maybe decoupling mapping from the stat resolver keys?
+		if strings.HasPrefix(statKey, "p(") {
+			statKey = stat[2 : len(statKey)-1]             // trim the parenthesis
+			statKey = strings.ReplaceAll(statKey, ".", "") // remove dots, p(0.95) => p095
+			statKey = "p" + statKey
+		}
+		o.trendStatsResolver[statKey] = fn
+	}
 	return nil
 }
 
@@ -138,7 +191,8 @@ func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) 
 			truncTime := sample.Time.Truncate(time.Millisecond)
 			swm, ok := o.tsdb[sample.TimeSeries]
 			if !ok {
-				swm = newSeriesWithMeasure(sample.TimeSeries, o.config.TrendAsNativeHistogram.Bool)
+				// TODO: encapsulate the trend arguments into a Trend Mapping factory
+				swm = newSeriesWithMeasure(sample.TimeSeries, o.config.TrendAsNativeHistogram.Bool, o.trendStatsResolver)
 				swm.Latest = truncTime
 				o.tsdb[sample.TimeSeries] = swm
 				seen[sample.TimeSeries] = struct{}{}
@@ -248,7 +302,7 @@ type prompbMapper interface {
 	MapPrompb(series metrics.TimeSeries, t time.Time) []*prompb.TimeSeries
 }
 
-func newSeriesWithMeasure(series metrics.TimeSeries, trendAsNativeHistogram bool) *seriesWithMeasure {
+func newSeriesWithMeasure(series metrics.TimeSeries, trendAsNativeHistogram bool, tsr TrendStatsResolver) *seriesWithMeasure {
 	var sink metrics.Sink
 	switch series.Metric.Type {
 	case metrics.Counter:
@@ -256,10 +310,16 @@ func newSeriesWithMeasure(series metrics.TimeSeries, trendAsNativeHistogram bool
 	case metrics.Gauge:
 		sink = &metrics.GaugeSink{}
 	case metrics.Trend:
+		// TODO: refactor encapsulating in a factory method
 		if trendAsNativeHistogram {
 			sink = newNativeHistogramSink(series.Metric)
 		} else {
-			sink = newExtendedTrendSink()
+			var err error
+			sink, err = newExtendedTrendSink(tsr)
+			if err != nil {
+				// the resolver must be already validated
+				panic(err)
+			}
 		}
 	case metrics.Rate:
 		sink = &metrics.RateSink{}

@@ -16,7 +16,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-func TestConifgApply(t *testing.T) {
+func TestConfigApply(t *testing.T) {
 	t.Parallel()
 
 	fullConfig := Config{
@@ -28,6 +28,7 @@ func TestConifgApply(t *testing.T) {
 		Headers: map[string]string{
 			"X-Header": "value",
 		},
+		TrendStats: []string{"p(99)"},
 	}
 
 	// Defaults should be overwritten by valid values
@@ -103,6 +104,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 				Password:              null.NewString("", false),
 				PushInterval:          types.NullDurationFrom(5 * time.Second),
 				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
 			},
 		},
 		"JSONSuccess": {
@@ -114,6 +116,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 				Password:              null.NewString("", false),
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
 			},
 		},
 		"MixedSuccess": {
@@ -130,6 +133,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 				Password:              null.NewString("", false),
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
 			},
 		},
 		"OrderOfPrecedence": {
@@ -146,6 +150,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 				Password:              null.StringFrom("env"),
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
 			},
 		},
 		"InvalidJSON": {
@@ -214,8 +219,8 @@ func TestOptionURL(t *testing.T) {
 		Password:              null.NewString("", false),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),
+		TrendStats:            []string{"p(99)"},
 	}
-
 	for name, tc := range cases {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
@@ -248,6 +253,7 @@ func TestOptionHeaders(t *testing.T) {
 			"X-MY-HEADER1": "hval1",
 			"X-MY-HEADER2": "hval2",
 		},
+		TrendStats: []string{"p(99)"},
 	}
 	for name, tc := range cases {
 		tc := tc
@@ -278,6 +284,7 @@ func TestOptionInsecureSkipTLSVerify(t *testing.T) {
 		InsecureSkipTLSVerify: null.BoolFrom(false),
 		PushInterval:          types.NullDurationFrom(defaultPushInterval),
 		Headers:               make(map[string]string),
+		TrendStats:            []string{"p(99)"},
 	}
 	for name, tc := range cases {
 		tc := tc
@@ -310,6 +317,7 @@ func TestOptionBasicAuth(t *testing.T) {
 		Password:              null.StringFrom("pass1"),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),
+		TrendStats:            []string{"p(99)"},
 	}
 
 	for name, tc := range cases {
@@ -344,6 +352,7 @@ func TestOptionTrendAsNativeHistogram(t *testing.T) {
 		PushInterval:           types.NullDurationFrom(5 * time.Second),
 		Headers:                make(map[string]string),
 		TrendAsNativeHistogram: null.BoolFrom(true),
+		TrendStats:             []string{"p(99)"},
 	}
 
 	for name, tc := range cases {
@@ -377,6 +386,40 @@ func TestOptionPushInterval(t *testing.T) {
 		Password:              null.NewString("", false),
 		PushInterval:          types.NullDurationFrom((1 * time.Minute) + (2 * time.Second)),
 		Headers:               make(map[string]string),
+		TrendStats:            []string{"p(99)"},
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
+func TestConfigTrendStats(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"trendStats":["max","p(95)"]}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_TREND_STATS": "max,p(95)"}},
+		// TODO: support arg, check the comment in the code
+		//"Arg":  {arg: "trendStats=max,p(95)"},
+	}
+
+	expconfig := Config{
+		URL:                   null.StringFrom("http://localhost:9090/api/v1/write"),
+		InsecureSkipTLSVerify: null.BoolFrom(true),
+		PushInterval:          types.NullDurationFrom(5 * time.Second),
+		Headers:               make(map[string]string),
+		TrendStats:            []string{"max", "p(95)"},
 	}
 
 	for name, tc := range cases {

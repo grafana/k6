@@ -194,8 +194,9 @@ func TestNewSeriesWithK6SinkMeasure(t *testing.T) {
 		s := metrics.TimeSeries{
 			Metric: registry.MustNewMetric(fmt.Sprintf("metric%d", i), tt.metricType),
 		}
-
-		swm := newSeriesWithMeasure(s, false)
+		resolvers, err := metrics.GetResolversForTrendColumns([]string{"avg"})
+		require.NoError(t, err)
+		swm := newSeriesWithMeasure(s, false, resolvers)
 		require.NotNil(t, swm)
 		assert.Equal(t, s, swm.TimeSeries)
 		require.NotNil(t, swm.Measure)
@@ -211,7 +212,7 @@ func TestNewSeriesWithNativeHistogramMeasure(t *testing.T) {
 		Metric: registry.MustNewMetric("metric1", metrics.Trend),
 	}
 
-	swm := newSeriesWithMeasure(s, true)
+	swm := newSeriesWithMeasure(s, true, nil)
 	require.NotNil(t, swm)
 	assert.Equal(t, s, swm.TimeSeries)
 	require.NotNil(t, swm.Measure)
@@ -219,4 +220,56 @@ func TestNewSeriesWithNativeHistogramMeasure(t *testing.T) {
 	nhs, ok := swm.Measure.(*nativeHistogramSink)
 	require.True(t, ok)
 	assert.NotNil(t, nhs.H)
+}
+
+func TestOutputSetTrendStatsResolver(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		stats           []string
+		expResolverKeys []string
+	}{
+		{
+			stats:           []string{},
+			expResolverKeys: []string{},
+		},
+		{
+			stats:           []string{"sum"},
+			expResolverKeys: []string{"sum"},
+		},
+		{
+			stats:           []string{"avg"},
+			expResolverKeys: []string{"avg"},
+		},
+		{
+			stats:           []string{"p(27)", "p(0.999)", "p(1)", "p(0)"},
+			expResolverKeys: []string{"p27", "p0999", "p1", "p0"},
+		},
+		{
+			stats: []string{
+				"count", "sum",
+				"max", "min", "med", "avg", "p(90)", "p(99)",
+			},
+			expResolverKeys: []string{
+				"count", "sum",
+				"max", "min", "med", "avg", "p90", "p99",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		o := Output{}
+		err := o.setTrendStatsResolver(tt.stats)
+		require.NoError(t, err)
+		require.NotNil(t, o.trendStatsResolver)
+
+		assert.Len(t, o.trendStatsResolver, len(tt.expResolverKeys))
+		assert.ElementsMatch(t, tt.expResolverKeys, func() []string {
+			var keys []string
+			for statKey := range o.trendStatsResolver {
+				keys = append(keys, statKey)
+			}
+			return keys
+		}())
+	}
 }

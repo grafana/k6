@@ -11,14 +11,22 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
+type TrendStatsResolver map[string]func(*metrics.TrendSink) float64
+
 type extendedTrendSink struct {
 	*metrics.TrendSink
+
+	trendStats map[string]func(*metrics.TrendSink) float64
 }
 
-func newExtendedTrendSink() *extendedTrendSink {
-	return &extendedTrendSink{
-		TrendSink: &metrics.TrendSink{},
+func newExtendedTrendSink(tsr TrendStatsResolver) (*extendedTrendSink, error) {
+	if len(tsr) < 1 {
+		return nil, fmt.Errorf("trend stats resolver is empty")
 	}
+	return &extendedTrendSink{
+		TrendSink:  &metrics.TrendSink{},
+		trendStats: tsr,
+	}, nil
 }
 
 // MapPrompb converts a k6 time series and its relative
@@ -32,7 +40,7 @@ func (sink *extendedTrendSink) MapPrompb(series metrics.TimeSeries, t time.Time)
 	// TODO: when Prometheus implements support for sparse histograms, re-visit this implementation
 
 	tg := &trendAsGauges{
-		series: make([]*prompb.TimeSeries, 0, 8),
+		series: make([]*prompb.TimeSeries, 0, len(sink.trendStats)),
 		// TODO: should we add the base unit suffix?
 		// It could depends from the decision for other metric types
 		// Does k6_http_req_duration_seconds_count make sense?
@@ -41,14 +49,9 @@ func (sink *extendedTrendSink) MapPrompb(series metrics.TimeSeries, t time.Time)
 	}
 	tg.CacheNameIndex()
 
-	tg.Append("count", float64(sink.Count))
-	tg.Append("sum", sink.Sum)
-	tg.Append("min", sink.Min)
-	tg.Append("max", sink.Max)
-	tg.Append("avg", sink.Avg)
-	tg.Append("med", sink.P(0.5))
-	tg.Append("p90", sink.P(0.9))
-	tg.Append("p95", sink.P(0.95))
+	for stat, statfn := range sink.trendStats {
+		tg.Append(stat, statfn(sink.TrendSink))
+	}
 	return tg.series
 }
 

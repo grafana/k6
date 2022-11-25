@@ -1,6 +1,7 @@
 package remotewrite
 
 import (
+	"sort"
 	"testing"
 	"time"
 
@@ -61,4 +62,13 @@ func assertTimeSeriesEqual(t *testing.T, expected []*prompb.TimeSeries, actual [
 	for i := 0; i < len(expected); i++ {
 		assert.Equal(t, expected[i], actual[i])
 	}
+}
+
+// sortByLabelName sorts a slice of time series by Name label.
+//
+// TODO: remove the assumption that Name label is the first.
+func sortByNameLabel(s []*prompb.TimeSeries) {
+	sort.Slice(s, func(i, j int) bool {
+		return s[i].Labels[0].Value <= s[j].Labels[0].Value
+	})
 }
