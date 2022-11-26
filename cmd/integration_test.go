@@ -1488,3 +1488,21 @@ func TestRunTags(t *testing.T) {
 	expTags["check"] = "status is 101"
 	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "checks", expTags)))
 }
+
+func TestPrometheusRemoteWriteOutput(t *testing.T) {
+	t.Parallel()
+
+	ts := newGlobalTestState(t)
+	ts.args = []string{"k6", "run", "--out", "experimental-prometheus-rw", "-"}
+	ts.stdIn = bytes.NewBufferString(`
+		import exec from 'k6/execution';
+		export default function () {};
+	`)
+
+	newRootCommand(ts.globalState).execute()
+	ts.outMutex.Lock()
+	stdOut := ts.stdOut.String()
+	ts.outMutex.Unlock()
+
+	assert.Contains(t, stdOut, "output: Prometheus remote write")
+}
