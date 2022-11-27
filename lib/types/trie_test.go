@@ -64,7 +64,7 @@ func TestTrieContains(t *testing.T) {
 	}
 }
 
-func TestReverse(t *testing.T) {
+func TestReverseString(t *testing.T) {
 	t.Parallel()
 
 	tcs := []struct{ str, rev string }{
@@ -78,7 +78,7 @@ func TestReverse(t *testing.T) {
 
 		t.Run(tc.str, func(t *testing.T) {
 			t.Parallel()
-			val := reverse(tc.str)
+			val := reverseString(tc.str)
 
 			require.Equal(t, tc.rev, val)
 		})

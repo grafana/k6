@@ -1,3 +1,6 @@
+// Package types contains types used in the codebase
+// Most of the types have a Null prefix like gopkg.in/guregu/null.v3
+// and UnmarshalJSON and MarshalJSON methods.
 package types
 
 import (

@@ -16,12 +16,11 @@ func (t *trieNode) insert(s string) {
 
 	ptr := t
 	for i := len(runes) - 1; i >= 0; i-- {
-		r := runes[i]
-		c, ok := ptr.children[r]
+		c, ok := ptr.children[runes[i]]
 
 		if !ok {
-			ptr.children[r] = &trieNode{children: map[rune]*trieNode{}}
-			c = ptr.children[r]
+			ptr.children[runes[i]] = &trieNode{children: map[rune]*trieNode{}}
+			c = ptr.children[runes[i]]
 		}
 
 		ptr = c
@@ -39,9 +38,8 @@ func (t *trieNode) contains(s string) (string, bool) {
 	ptr := t
 	for i := len(rs) - 1; i >= 0; i-- {
 		child, ok := ptr.children[rs[i]]
-		_, wOk := ptr.children['*']
 
-		if wOk {
+		if _, wOk := ptr.children['*']; wOk {
 			wMatch = builder.String() + string('*')
 		}
 
@@ -55,18 +53,18 @@ func (t *trieNode) contains(s string) (string, bool) {
 	}
 
 	if found && ptr.isLeaf {
-		return reverse(builder.String()), true
+		return reverseString(builder.String()), true
 	}
 
 	if _, ok := ptr.children['*']; ok {
 		builder.WriteRune('*')
-		return reverse(builder.String()), true
+		return reverseString(builder.String()), true
 	}
 
-	return reverse(wMatch), wMatch != ""
+	return reverseString(wMatch), wMatch != ""
 }
 
-func reverse(s string) string {
+func reverseString(s string) string {
 	rs := []rune(s)
 	for i, j := 0, len(rs)-1; i < len(rs)/2; i, j = i+1, j-1 {
 		rs[i], rs[j] = rs[j], rs[i]
