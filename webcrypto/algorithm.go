@@ -15,6 +15,8 @@ type Algorithm struct {
 // Ensure AesKeyGenParams implements the From interface.
 var _ From[map[string]interface{}, Algorithm] = Algorithm{}
 
+// From implements the From interface for Algorithm, and initializes the
+// Algorithm instance from a map[string]interface{}.
 func (a Algorithm) From(dict map[string]interface{}) (Algorithm, error) {
 	algorithm := Algorithm{}
 	nameFound := false
@@ -23,23 +25,23 @@ func (a Algorithm) From(dict map[string]interface{}) (Algorithm, error) {
 		if strings.EqualFold(key, "name") {
 			name, ok := value.(string)
 			if !ok {
-				return Algorithm{}, NewWebCryptoError(0, NotSupportedError, "algorithm name is not a string")
+				return Algorithm{}, NewError(0, NotSupportedError, "algorithm name is not a string")
 			}
 
 			name = strings.ToUpper(name)
 
 			if !IsAlgorithm(name) && !IsHashAlgorithm(name) {
-				return Algorithm{}, NewWebCryptoError(0, NotSupportedError, "algorithm name is not supported")
+				return Algorithm{}, NewError(0, NotSupportedError, "algorithm name is not supported")
 			}
 
-			algorithm.Name = AlgorithmIdentifier(name)
+			algorithm.Name = name
 			nameFound = true
 			break
 		}
 	}
 
 	if !nameFound {
-		return Algorithm{}, NewWebCryptoError(0, NotSupportedError, "algorithm name is not found")
+		return Algorithm{}, NewError(0, NotSupportedError, "algorithm name is not found")
 	}
 
 	return algorithm, nil
@@ -84,9 +86,6 @@ const (
 
 	// ECDH represents the ECDH algorithm.
 	ECDH = "ECDH"
-
-	// ECDH represents the ECDH algorithm.
-	AlgorithmIdentifierECDH = "ECDH"
 )
 
 // NormalizeAlgorithmName returns the normalized algorithm name.
@@ -147,7 +146,7 @@ const (
 
 // Hasher returns the appropriate hash.Hash for the given algorithm.
 func Hasher(algorithm HashAlgorithmIdentifier) (func() hash.Hash, error) {
-	switch HashAlgorithmIdentifier(algorithm) {
+	switch algorithm {
 	case Sha1:
 		return crypto.SHA1.New, nil
 	case Sha256:
@@ -158,7 +157,7 @@ func Hasher(algorithm HashAlgorithmIdentifier) (func() hash.Hash, error) {
 		return crypto.SHA512.New, nil
 	}
 
-	return nil, NewWebCryptoError(0, ImplementationError, fmt.Sprintf("unsupported hash algorithm: %s", algorithm))
+	return nil, NewError(0, ImplementationError, fmt.Sprintf("unsupported hash algorithm: %s", algorithm))
 }
 
 // normalize algorithm
@@ -177,32 +176,35 @@ func NormalizeAlgorithm(algorithm interface{}, op OperationIdentifier) (interfac
 	case map[string]interface{}:
 		// FIXME: this should call the NewAlgorithmFrom method instead
 		if _, ok := alg["name"]; !ok {
-			return Algorithm{}, NewWebCryptoError(0, SyntaxError, "algorithm name is not found")
+			return Algorithm{}, NewError(0, SyntaxError, "algorithm name is not found")
 		}
 
 		if _, ok := alg["name"].(string); !ok {
-			return Algorithm{}, NewWebCryptoError(0, SyntaxError, "algorithm name is not a string")
+			return Algorithm{}, NewError(0, SyntaxError, "algorithm name is not a string")
 		}
 
 		initialAlg = alg
 	default:
-		return Algorithm{}, NewWebCryptoError(0, ImplementationError, "unsupported algorithm type")
+		return Algorithm{}, NewError(0, ImplementationError, "unsupported algorithm type")
 	}
 
 	// 1.
 	registeredAlgorithms, ok := supportedAlgorithms[op]
 	if !ok {
-		return Algorithm{}, NewWebCryptoError(0, ImplementationError, fmt.Sprintf("unsupported operation: %s", op))
+		return Algorithm{}, NewError(0, ImplementationError, fmt.Sprintf("unsupported operation: %s", op))
 	}
 
 	// 2. 3. 4.
-	algName := AlgorithmIdentifier(initialAlg["name"].(string))
+	algName, ok := initialAlg["name"].(string)
+	if !ok {
+		return Algorithm{}, NewError(0, SyntaxError, "algorithm name is not a string")
+	}
 
 	// 5.
 	var desiredType string
 	algNameRegistered := false
 	for key, value := range registeredAlgorithms {
-		if strings.EqualFold(string(key), string(algName)) {
+		if strings.EqualFold(key, algName) {
 			algName = key
 			desiredType = value
 			algNameRegistered = true
@@ -211,7 +213,7 @@ func NormalizeAlgorithm(algorithm interface{}, op OperationIdentifier) (interfac
 	}
 
 	if !algNameRegistered {
-		return Algorithm{}, NewWebCryptoError(0, NotSupportedError, fmt.Sprintf("unsupported algorithm name: %s", algName))
+		return Algorithm{}, NewError(0, NotSupportedError, fmt.Sprintf("unsupported algorithm name: %s", algName))
 	}
 
 	// No further operation is needed if the algorithm does not have a desired type.
@@ -220,13 +222,37 @@ func NormalizeAlgorithm(algorithm interface{}, op OperationIdentifier) (interfac
 	}
 
 	// 6.
-	// FIXME: the case strings should be constants
-	switch desiredType {
-	default:
-		return Algorithm{}, NewWebCryptoError(0, ImplementationError, fmt.Sprintf("unsupported algorithm type: %s", desiredType))
-	}
+	// FIXME: handle this case in later versions
+	err := NewError(0, ImplementationError, fmt.Sprintf("unsupported algorithm type: %s", desiredType))
+	return Algorithm{}, err
 }
 
+// As defined by the [specification]
+// [specification]: https://w3c.github.io/webcrypto/#algorithm-normalization-internal
+//
+//nolint:gochecknoglobals
+var supportedAlgorithms = map[OperationIdentifier]map[AlgorithmIdentifier]string{
+	OperationIdentifierDigest: {
+		Sha1:   "",
+		Sha256: "",
+		Sha384: "",
+		Sha512: "",
+	},
+	OperationIdentifierGenerateKey: {
+		RSASsaPkcs1v15: "RsaHashedKeyGenParams",
+		RSAPss:         "RsaHashedKeyGenParams",
+		RSAOaep:        "RsaHashedKeyGenParams",
+		ECDSA:          "EcKeyGenParams",
+		ECDH:           "EcKeyGenParams",
+		HMAC:           "HmacKeyGenParams",
+		AESCtr:         "AesKeyGenParams",
+		AESCbc:         "AesKeyGenParams",
+		AESGcm:         "AesKeyGenParams",
+		AESKw:          "AesKeyGenParams",
+	},
+}
+
+// IsAlgorithm returns true if the given algorithm is supported by the library.
 func IsAlgorithm(algorithm string) bool {
 	algorithms := [...]AlgorithmIdentifier{
 		// RSA
@@ -251,7 +277,7 @@ func IsAlgorithm(algorithm string) bool {
 	}
 
 	for _, alg := range algorithms {
-		if strings.EqualFold(string(alg), algorithm) {
+		if strings.EqualFold(alg, algorithm) {
 			return true
 		}
 	}
@@ -259,6 +285,8 @@ func IsAlgorithm(algorithm string) bool {
 	return false
 }
 
+// IsHashAlgorithm returns true if the given cryptographic hash algorithm
+// name is valid and supported by the library.
 func IsHashAlgorithm(algorithm string) bool {
 	algorithms := [...]HashAlgorithmIdentifier{
 		Sha1,
@@ -268,35 +296,12 @@ func IsHashAlgorithm(algorithm string) bool {
 	}
 
 	for _, alg := range algorithms {
-		if strings.EqualFold(string(alg), algorithm) {
+		if strings.EqualFold(alg, algorithm) {
 			return true
 		}
 	}
 
 	return false
-}
-
-// As defined by the [specification]
-// [specification]: https://w3c.github.io/webcrypto/#algorithm-normalization-internal
-var supportedAlgorithms = map[OperationIdentifier]map[AlgorithmIdentifier]string{
-	OperationIdentifierDigest: {
-		AlgorithmIdentifier(Sha1):   "",
-		AlgorithmIdentifier(Sha256): "",
-		AlgorithmIdentifier(Sha384): "",
-		AlgorithmIdentifier(Sha512): "",
-	},
-	OperationIdentifierGenerateKey: {
-		RSASsaPkcs1v15: "RsaHashedKeyGenParams",
-		RSAPss:         "RsaHashedKeyGenParams",
-		RSAOaep:        "RsaHashedKeyGenParams",
-		ECDSA:          "EcKeyGenParams",
-		ECDH:           "EcKeyGenParams",
-		HMAC:           "HmacKeyGenParams",
-		AESCtr:         "AesKeyGenParams",
-		AESCbc:         "AesKeyGenParams",
-		AESGcm:         "AesKeyGenParams",
-		AESKw:          "AesKeyGenParams",
-	},
 }
 
 // OperationIdentifier represents the name of an operation.

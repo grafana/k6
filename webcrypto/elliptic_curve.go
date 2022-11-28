@@ -1,6 +1,6 @@
 package webcrypto
 
-// ECKeyImportParams represents the object that should be passed as the algorithm parameter
+// EcKeyImportParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.ImportKey` or `SubtleCrypto.UnwrapKey`, when generating any elliptic-curve-based
 // key pair: that is, when the algorithm is identified as either of ECDSA or ECDH.
 type EcKeyImportParams struct {
@@ -11,7 +11,7 @@ type EcKeyImportParams struct {
 	NamedCurve EllipticCurveKind `json:"namedCurve"`
 }
 
-// EllipticCurve represents the kind of elliptic curve that is being used.
+// EllipticCurveKind represents the kind of elliptic curve that is being used.
 type EllipticCurveKind string
 
 const (
@@ -25,6 +25,8 @@ const (
 	EllipticCurveKindP521 EllipticCurveKind = "P-521"
 )
 
+// IsEllipticCurve returns true if the given string is a valid EllipticCurveKind,
+// false otherwise.
 func IsEllipticCurve(name string) bool {
 	switch name {
 	case string(EllipticCurveKindP256):

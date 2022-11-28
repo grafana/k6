@@ -10,6 +10,7 @@ import (
 
 // FIXME: Make sure we cover the complete range of errors, and that their value makes sense
 
+// SubtleCrypto represents the SubtleCrypto interface of the Web Crypto API.
 type SubtleCrypto struct {
 	vu modules.VU
 }
@@ -108,7 +109,12 @@ func (sc *SubtleCrypto) Sign(algorithm goja.Value, key CryptoKey[[]byte], data [
 // The `signature` parameter should contain the signature to be verified.
 //
 // The `data` parameter should contain the original signed data.
-func (sc *SubtleCrypto) Verify(algorithm goja.Value, key CryptoKey[[]byte], signature []byte, data []byte) *goja.Promise {
+func (sc *SubtleCrypto) Verify(
+	algorithm goja.Value,
+	key CryptoKey[[]byte],
+	signature []byte,
+	data []byte,
+) *goja.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -165,7 +171,7 @@ func (sc *SubtleCrypto) GenerateKey(algorithm goja.Value, extractable bool, keyU
 // It returns a Promise which will be fulfilled with a CryptoKey object
 // representing the new key.
 //
-// Note that if the `algorithm` parameter is ECDH, the the `baseKey` parameter
+// Note that if the `algorithm` parameter is ECDH, the `baseKey` parameter
 // should be a private key. Otherwise, it should be the initial key material for
 // the derivation function: for example, for PBKDF2 it might be a password, imported
 // as a CryptoKey using `SubtleCrypto.ImportKey`.
@@ -231,8 +237,8 @@ func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey CryptoKey[[]byt
 	return nil
 }
 
-// ImportKey imports a key: that is, it takes as input a key in an external, portable format and gives you a CryptoKey object that
-// you can use in the Web Crypto API. returns a Promise that fulfills with a CryptoKey corresponding
+// ImportKey imports a key: that is, it takes as input a key in an external, portable
+// format and gives you a CryptoKey object that you can use in the Web Crypto API.
 //
 // It returns a Promise that fulfills with the imported key as a CryptoKey object.
 //
@@ -260,11 +266,13 @@ func (sc *SubtleCrypto) ImportKey(
 	return nil
 }
 
-// ExportKey exports a key: that is, it takes as input a CryptoKey object and gives you the key in an external, portable format.
+// ExportKey exports a key: that is, it takes as input a CryptoKey object and gives
+// you the key in an external, portable format.
 //
 // To export a key, the key must have CryptoKey.extractable set to true.
 //
-// Keys are not exported in an encrypted format: to encrypt keys when exporting them use the SubtleCrypto.wrapKey() API instead.
+// Keys are not exported in an encrypted format: to encrypt keys when exporting
+// them use the SubtleCrypto.wrapKey() API instead.
 //
 // It returns A Promise:
 //   - If format was jwk, then the promise fulfills with a JSON object containing the key.
@@ -304,7 +312,12 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key CryptoKey[[]byte]) *goja
 //   - an `SubtleCrypto.AesCbcParams` object
 //   - an `SubtleCrypto.AesGcmParams` object
 //   - for the AES-KW algorithm, pass the string "AES-KW", or an object of the form `{ name: "AES-KW" }`
-func (sc *SubtleCrypto) WrapKey(format KeyFormat, key CryptoKey[[]byte], wrappingKey CryptoKey[[]byte], wrapAlgorithm goja.Value) *goja.Promise {
+func (sc *SubtleCrypto) WrapKey(
+	format KeyFormat,
+	key CryptoKey[[]byte],
+	wrappingKey CryptoKey[[]byte],
+	wrapAlgorithm goja.Value,
+) *goja.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -341,7 +354,8 @@ func (sc *SubtleCrypto) WrapKey(format KeyFormat, key CryptoKey[[]byte], wrappin
 //   - an `SubtleCrypto.AesGcmParams` object
 //   - for the AES-KW algorithm, pass the string "AES-KW", or an object of the form `{ name: "AES-KW" }`
 //
-// The `unwrappedKeyAlgorithm` parameter identifies the algorithm to use to import the unwrapped key, and should be one of:
+// The `unwrappedKeyAlgorithm` parameter identifies the algorithm to use to import the unwrapped
+// key, and should be one of:
 //   - for RSASSA-PKCS1-v1_5, RSA-PSS or RSA-OAEP: pass an `SubtleCrypto.RSAHashedImportParams` object
 //   - for ECDSA or ECDH: pass an `SubtleCrypto.EcKeyImportParams` object
 //   - for HMAC: pass an `SubtleCrypto.HMACImportParams` object
@@ -358,31 +372,8 @@ func (sc *SubtleCrypto) UnwrapKey(
 	unwrapAlgo goja.Value,
 	unwrappedKeyAlgo goja.Value,
 	extractable bool,
-	keyUsages []CryptoKeyUsage) *goja.Promise {
+	keyUsages []CryptoKeyUsage,
+) *goja.Promise {
 	// TODO: implementation
 	return nil
-}
-
-// makeHandledPromise will create a promise and return its resolve and reject methods,
-// wrapped in such a way that it will block the eventloop from exiting before they are
-// called even if the promise isn't resolved by the time the current script ends executing.
-// func (sc *SubtleCrypto[C, E, D, S, DK, KD, W]) makeHandledPromise() (*goja.Promise, func(interface{}), func(interface{})) {
-func (sc *SubtleCrypto) makeHandledPromise() (*goja.Promise, func(interface{}), func(interface{})) {
-	runtime := sc.vu.Runtime()
-	callback := sc.vu.RegisterCallback()
-	p, resolve, reject := runtime.NewPromise()
-
-	return p, func(i interface{}) {
-			// more stuff
-			callback(func() error {
-				resolve(i)
-				return nil
-			})
-		}, func(i interface{}) {
-			// more stuff
-			callback(func() error {
-				reject(i)
-				return nil
-			})
-		}
 }

@@ -1,3 +1,4 @@
+// Package webcrypto exports the webcrypto API.
 package webcrypto
 
 import (

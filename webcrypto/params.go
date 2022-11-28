@@ -77,14 +77,17 @@ type AESGcmParams struct {
 	//
 	// The bit length of additionalData must be smaller than 2^64 - 1.
 	//
-	// The additionalData property is optional and may be omitted without compromising the security of the encryption operation.
+	// The additionalData property is optional and may be omitted without compromising the
+	// security of the encryption operation.
 	AdditionalData []byte
 
 	// TagLength (a Number) determines the size in bits of the authentication tag generated in
 	// the encryption operation and used for authentication in the corresponding decryption.
 	//
-	// According to the Web Crypto specification this must have one of the following values: 32, 64, 96, 104, 112, 120, or 128.
-	// The AES-GCM specification recommends that it should be 96, 104, 112, 120 or 128, although 32 or 64 bits may be acceptable
+	// According to the Web Crypto specification this must have one of the
+	// following values: 32, 64, 96, 104, 112, 120, or 128.
+	// The AES-GCM specification recommends that it should be 96, 104, 112, 120 or 128, although
+	// 32 or 64 bits may be acceptable
 	// in some applications: Appendix C of the specification provides additional guidance here.
 	//
 	// tagLength is optional and defaults to 128 if it is not specified.
@@ -103,6 +106,9 @@ type AESKeyGenParams struct {
 	Length int
 }
 
+// AESKwParams represents the object that should be passed as the algorithm parameter
+// into `SubtleCrypto.Encrypt`, `SubtleCrypto.Decrypt`, `SubtleCrypto.WrapKey`, or
+// `SubtleCrypto.UnwrapKey`, when using the AES-KW algorithm.
 type AESKwParams struct {
 	// Name should be set to AlgorithmKindAesKw.
 	Name AlgorithmIdentifier
@@ -188,11 +194,15 @@ type HKDFParams struct {
 	Info []byte
 }
 
+// HMACSignatureParams represents the object that should be passed as the algorithm parameter
+// into `SubtleCrypto.Sign`, when using the HMAC algorithm.
 type HMACSignatureParams struct {
 	// Name should be set to AlgorithmKindHmac.
 	Name AlgorithmIdentifier
 }
 
+// HMACKeyGenParams represents the object that should be passed as the algorithm parameter
+// into `SubtleCrypto.GenerateKey`, when generating an HMAC key.
 type HMACKeyGenParams struct {
 	// Name should be set to AlgorithmKindHmac.
 	Name AlgorithmIdentifier
@@ -253,6 +263,8 @@ type PBKDF2Params struct {
 	Iterations int
 }
 
+// RSAHashedKeyGenParams represents the object that should be passed as the algorithm
+// parameter into `SubtleCrypto.GenerateKey`, when generating an RSA key pair.
 type RSAHashedKeyGenParams struct {
 	// Name should be set to AlgorithmKindRsassPkcs1v15,
 	// AlgorithmKindRsaPss, or AlgorithmKindRsaOaep.
@@ -285,7 +297,7 @@ type RSAHashedImportParams struct {
 
 	// Hash represents the name of the digest function to use.
 	// Note that although you can technically pass SHA-1 here, this is strongly
-	//discouraged as it is considered vulnerable.
+	// discouraged as it is considered vulnerable.
 	Hash AlgorithmIdentifier
 }
 
@@ -313,12 +325,13 @@ type RSAPssParams struct {
 	Name AlgorithmIdentifier
 
 	// SaltLength holds (a Number) the length of the random salt to use, in bytes.
-	// RFC 3447 says that "typical salt lengths" are either 0 or the lenght of the output
+	// RFC 3447 says that "typical salt lengths" are either 0 or the length of the output
 	// of the digest algorithm selected whe this key was generated. For instance,
 	// when using the SHA256 digest algorithm, the salt length could be 32.
 	SaltLength int
 }
 
+// RSASsaPkcs1v15Params represents the object that should be passed as the algorithm
 type RSASsaPkcs1v15Params struct {
 	// Name should be set to AlgorithmKindRsassaPkcs1v15.
 	Name AlgorithmIdentifier

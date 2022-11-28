@@ -56,6 +56,7 @@ type CryptoKey[H KeyHandle] struct {
 
 	// handle is an internal slot, holding the underlying key data.
 	// See [specification](https://www.w3.org/TR/WebCryptoAPI/#dfnReturnLink-0).
+	//nolint:unused
 	handle H
 }
 
@@ -138,7 +139,7 @@ func UsageIntersection(a, b []CryptoKeyUsage) []CryptoKeyUsage {
 
 	for _, usage := range a {
 		// Note that the intersection algorithm is case-sensitive.
-		// It is also expected to return the occurence in the a slice "as-is".
+		// It is also expected to return the occurrence in the a slice "as-is".
 		if containsUsage(b, usage) && !containsUsage(intersection, usage) {
 			intersection = append(intersection, usage)
 		}
