@@ -30,7 +30,7 @@ Status updates
 Short-term goals
 ----------------
 
-These are goals achievable within 3-6 months, tentatively done by Q2 2023.
+These are goals tenratively achievable by Q2 2023.
 
 - **Make xk6-browser a part of standard distribution of k6.**<br>
 
@@ -63,7 +63,7 @@ These are goals achievable within 3-6 months, tentatively done by Q2 2023.
 Mid-term goals
 --------------
 
-These are goals achievable within 6-12 months, tentatively done by Q1 2024.
+These are goals tentatively achievable by Q1 2024.
 
 - **Global availability of the extension in k6 Cloud for all users.**<br>
 
