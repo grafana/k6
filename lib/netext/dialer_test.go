@@ -14,15 +14,16 @@ import (
 func TestDialerAddr(t *testing.T) {
 	t.Parallel()
 	dialer := NewDialer(net.Dialer{}, newResolver())
-	dialer.Hosts = map[string]*types.HostAddress{
-		"example.com":                {IP: net.ParseIP("3.4.5.6")},
-		"example.com:443":            {IP: net.ParseIP("3.4.5.6"), Port: 8443},
-		"example.com:8080":           {IP: net.ParseIP("3.4.5.6"), Port: 9090},
-		"example-deny-host.com":      {IP: net.ParseIP("8.9.10.11")},
-		"example-ipv6.com":           {IP: net.ParseIP("2001:db8::68")},
-		"example-ipv6.com:443":       {IP: net.ParseIP("2001:db8::68"), Port: 8443},
-		"example-ipv6-deny-host.com": {IP: net.ParseIP("::1")},
-	}
+	dialer.Hosts = types.NewAddressTrie(
+		map[string]types.HostAddress{
+			"example.com":                {IP: net.ParseIP("3.4.5.6")},
+			"example.com:443":            {IP: net.ParseIP("3.4.5.6"), Port: 8443},
+			"example.com:8080":           {IP: net.ParseIP("3.4.5.6"), Port: 9090},
+			"example-deny-host.com":      {IP: net.ParseIP("8.9.10.11")},
+			"example-ipv6.com":           {IP: net.ParseIP("2001:db8::68")},
+			"example-ipv6.com:443":       {IP: net.ParseIP("2001:db8::68"), Port: 8443},
+			"example-ipv6-deny-host.com": {IP: net.ParseIP("::1")},
+		})
 
 	ipNet, err := lib.ParseCIDR("8.9.10.0/24")
 	require.NoError(t, err)
@@ -75,9 +76,9 @@ func TestDialerAddr(t *testing.T) {
 func TestDialerAddrBlockHostnamesStar(t *testing.T) {
 	t.Parallel()
 	dialer := NewDialer(net.Dialer{}, newResolver())
-	dialer.Hosts = map[string]*types.HostAddress{
+	dialer.Hosts = types.NewAddressTrie(map[string]types.HostAddress{
 		"example.com": {IP: net.ParseIP("3.4.5.6")},
-	}
+	})
 
 	blocked, err := types.NewHostnameTrie([]string{"*"})
 	require.NoError(t, err)
@@ -111,12 +112,12 @@ func TestDialerAddrBlockHostnamesStar(t *testing.T) {
 
 // Benchmarks /etc/hosts like hostname mapping
 func BenchmarkDialerHosts(b *testing.B) {
-	hosts := map[string]*types.HostAddress{
+	hosts := types.NewAddressTrie(map[string]types.HostAddress{
 		"k6.io":                {IP: []byte("192.168.1.1"), Port: 80},
 		"specific.k6.io":       {IP: []byte("192.168.1.2"), Port: 80},
 		"grafana.com":          {IP: []byte("aa::ff"), Port: 80},
 		"specific.grafana.com": {IP: []byte("aa:bb:::ff"), Port: 80},
-	}
+	})
 
 	dialer := Dialer{
 		Dialer: net.Dialer{},
@@ -128,6 +129,7 @@ func BenchmarkDialerHosts(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, tc := range tcs {
+			//nolint:errcheck
 			dialer.getDialAddr(tc)
 		}
 	}

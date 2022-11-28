@@ -656,7 +656,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 		test := newTestEngine(t, nil, r, []output.Output{mockOutput}, lib.Options{
 			Iterations:            null.IntFrom(tc.Iterations),
 			VUs:                   null.IntFrom(tc.VUs),
-			Hosts:                 tb.Dialer.Hosts,
+			Hosts:                 types.NullAddressTrie{Trie: tb.Dialer.Hosts, Valid: true},
 			InsecureSkipTLSVerify: null.BoolFrom(true),
 			NoVUConnectionReuse:   null.BoolFrom(noConnReuse),
 			Batch:                 null.IntFrom(20),
@@ -795,7 +795,7 @@ func TestRunTags(t *testing.T) {
 	test := newTestEngine(t, nil, r, []output.Output{mockOutput}, lib.Options{
 		Iterations:            null.IntFrom(3),
 		VUs:                   null.IntFrom(2),
-		Hosts:                 tb.Dialer.Hosts,
+		Hosts:                 types.NullAddressTrie{Trie: tb.Dialer.Hosts, Valid: true},
 		RunTags:               runTags,
 		SystemTags:            &metrics.DefaultSystemTagSet,
 		InsecureSkipTLSVerify: null.BoolFrom(true),

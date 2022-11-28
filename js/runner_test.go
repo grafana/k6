@@ -1033,9 +1033,9 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)))
 
-			r1.Bundle.Options.Hosts = map[string]*types.HostAddress{
-				"mybadssl.localhost": mybadsslHostname,
-			}
+			r1.Bundle.Options.Hosts = types.NewNullAddressTrie(map[string]types.HostAddress{
+				"mybadssl.localhost": *mybadsslHostname,
+			})
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 			r2, err := NewFromArchive(
@@ -1261,9 +1261,9 @@ func TestVUIntegrationHosts(t *testing.T) {
 
 	r1.SetOptions(lib.Options{
 		Throw: null.BoolFrom(true),
-		Hosts: map[string]*types.HostAddress{
+		Hosts: types.NewNullAddressTrie(map[string]types.HostAddress{
 			"test.loadimpact.com": {IP: net.ParseIP("127.0.0.1")},
-		},
+		}),
 	})
 
 	registry := metrics.NewRegistry()
@@ -1364,9 +1364,9 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 			opts := lib.Options{Throw: null.BoolFrom(true)}
 			require.NoError(t, r1.SetOptions(opts.Apply(data.opts)))
 
-			r1.Bundle.Options.Hosts = map[string]*types.HostAddress{
-				"sha256-badssl.localhost": mybadsslHostname,
-			}
+			r1.Bundle.Options.Hosts = types.NewNullAddressTrie(map[string]types.HostAddress{
+				"sha256-badssl.localhost": *mybadsslHostname,
+			})
 			r2, err := NewFromArchive(
 				&lib.TestPreInitState{
 					Logger:         testutils.NewLogger(t),
@@ -1534,7 +1534,7 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 	require.NoError(t, err)
 	r1.Bundle.Options.Throw = null.BoolFrom(true)
 	r1.Bundle.Options.MaxRedirects = null.IntFrom(10)
-	r1.Bundle.Options.Hosts = tb.Dialer.Hosts
+	r1.Bundle.Options.Hosts = types.NullAddressTrie{Trie: tb.Dialer.Hosts}
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -1592,7 +1592,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 	r1.SetOptions(lib.Options{
 		Throw:          null.BoolFrom(true),
 		MaxRedirects:   null.IntFrom(10),
-		Hosts:          tb.Dialer.Hosts,
+		Hosts:          types.NullAddressTrie{Trie: tb.Dialer.Hosts},
 		NoCookiesReset: null.BoolFrom(true),
 	})
 
@@ -2531,7 +2531,7 @@ func TestForceHTTP1Feature(t *testing.T) {
 			require.NoError(t, err)
 
 			err = r1.SetOptions(lib.Options{
-				Hosts: tb.Dialer.Hosts,
+				Hosts: types.NullAddressTrie{Trie: tb.Dialer.Hosts},
 				// We disable TLS verify so that we don't get a TLS handshake error since
 				// the certificates on the endpoint are not certified by a certificate authority
 				InsecureSkipTLSVerify: null.BoolFrom(true),

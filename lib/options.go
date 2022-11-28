@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"net"
+	"reflect"
+
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 	"gopkg.in/guregu/null.v3"
-	"net"
-	"reflect"
 )
 
 // DefaultScenarioName is used as the default key/ID of the scenario config entries
@@ -284,7 +285,7 @@ type Options struct {
 	BlockedHostnames types.NullHostnameTrie `json:"blockHostnames" envconfig:"K6_BLOCK_HOSTNAMES"`
 
 	// Hosts overrides dns entries for given hosts
-	Hosts map[string]*types.HostAddress `json:"hosts" envconfig:"K6_HOSTS"`
+	Hosts types.NullAddressTrie `json:"hosts" envconfig:"K6_HOSTS"`
 
 	// Disable keep-alive connections
 	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"K6_NO_CONNECTION_REUSE"`
@@ -442,7 +443,7 @@ func (o Options) Apply(opts Options) Options {
 	if opts.BlockedHostnames.Valid {
 		o.BlockedHostnames = opts.BlockedHostnames
 	}
-	if opts.Hosts != nil {
+	if opts.Hosts.Valid {
 		o.Hosts = opts.Hosts
 	}
 	if opts.NoConnectionReuse.Valid {

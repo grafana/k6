@@ -21,7 +21,7 @@ type Dialer struct {
 	Resolver         Resolver
 	Blacklist        []*lib.IPNet
 	BlockedHostnames *types.HostnameTrie
-	Hosts            map[string]*types.HostAddress
+	Hosts            *types.AddressTrie
 
 	BytesRead    int64
 	BytesWritten int64
@@ -161,9 +161,11 @@ func (d *Dialer) findRemote(addr string) (*types.HostAddress, error) {
 		}
 	}
 
-	remote, err := d.getConfiguredHost(addr, host, port)
-	if err != nil || remote != nil {
-		return remote, err
+	if d.Hosts != nil {
+		remote, e := d.getConfiguredHost(addr, host, port)
+		if e != nil || remote != nil {
+			return remote, e
+		}
 	}
 
 	if ip != nil {
@@ -183,11 +185,11 @@ func (d *Dialer) findRemote(addr string) (*types.HostAddress, error) {
 }
 
 func (d *Dialer) getConfiguredHost(addr, host, port string) (*types.HostAddress, error) {
-	if remote, ok := d.Hosts[addr]; ok {
+	if remote := d.Hosts.Match(addr); remote != nil {
 		return remote, nil
 	}
 
-	if remote, ok := d.Hosts[host]; ok {
+	if remote := d.Hosts.Match(host); remote != nil {
 		if remote.Port != 0 || port == "" {
 			return remote, nil
 		}

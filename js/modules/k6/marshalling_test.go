@@ -113,7 +113,7 @@ func TestSetupDataMarshalling(t *testing.T) {
 
 	err = runner.SetOptions(lib.Options{
 		SetupTimeout: types.NullDurationFrom(5 * time.Second),
-		Hosts:        tb.Dialer.Hosts,
+		Hosts:        types.NullAddressTrie{Trie: tb.Dialer.Hosts},
 	})
 	require.NoError(t, err)
 

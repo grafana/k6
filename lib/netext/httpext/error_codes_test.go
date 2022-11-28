@@ -215,7 +215,11 @@ func TestX509HostnameError(t *testing.T) {
 	}
 	var err error
 	badHostname := "somewhere.else"
-	tb.Dialer.Hosts[badHostname], err = types.NewHostAddress(net.ParseIP(tb.Replacer.Replace("HTTPSBIN_IP")), "")
+	badHostAddress, err := types.NewHostAddress(net.ParseIP(tb.Replacer.Replace("HTTPSBIN_IP")), "")
+
+	tb.Dialer.Hosts = types.NewAddressTrie(map[string]types.HostAddress{
+		badHostname: *badHostAddress,
+	})
 	require.NoError(t, err)
 	req, err := http.NewRequestWithContext(context.Background(), "GET", tb.Replacer.Replace("https://"+badHostname+":HTTPSBIN_PORT/get"), nil)
 	require.NoError(t, err)
@@ -355,9 +359,9 @@ func getHTTP2ServerWithCustomConnContext(t *testing.T) *httpmultibin.HTTPMultiBi
 		KeepAlive: 10 * time.Second,
 		DualStack: true,
 	}, netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4))
-	dialer.Hosts = map[string]*types.HostAddress{
-		http2Domain: http2DomainValue,
-	}
+	dialer.Hosts = types.NewAddressTrie(map[string]types.HostAddress{
+		http2Domain: *http2DomainValue,
+	})
 
 	transport := &http.Transport{
 		DialContext:     dialer.DialContext,

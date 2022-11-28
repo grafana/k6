@@ -318,10 +318,10 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 		KeepAlive: 10 * time.Second,
 		DualStack: true,
 	}, netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4))
-	dialer.Hosts = map[string]*types.HostAddress{
-		httpDomain:  httpDomainValue,
-		httpsDomain: httpsDomainValue,
-	}
+	dialer.Hosts = types.NewAddressTrie(map[string]types.HostAddress{
+		httpDomain:  *httpDomainValue,
+		httpsDomain: *httpsDomainValue,
+	})
 
 	// Pre-configure the HTTP client transport with the dialer and TLS config (incl. HTTP2 support)
 	transport := &http.Transport{
