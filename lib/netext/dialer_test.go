@@ -109,6 +109,30 @@ func TestDialerAddrBlockHostnamesStar(t *testing.T) {
 	}
 }
 
+// Benchmarks /etc/hosts like hostname mapping
+func BenchmarkDialerHosts(b *testing.B) {
+	hosts := map[string]*types.HostAddress{
+		"k6.io":                {IP: []byte("192.168.1.1"), Port: 80},
+		"specific.k6.io":       {IP: []byte("192.168.1.2"), Port: 80},
+		"grafana.com":          {IP: []byte("aa::ff"), Port: 80},
+		"specific.grafana.com": {IP: []byte("aa:bb:::ff"), Port: 80},
+	}
+
+	dialer := Dialer{
+		Dialer: net.Dialer{},
+		Hosts:  hosts,
+	}
+
+	tcs := []string{"k6.io", "specific.k6.io", "grafana.com", "specific.grafana.com", "not.exists.com"}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, tc := range tcs {
+			dialer.getDialAddr(tc)
+		}
+	}
+}
+
 func newResolver() *mockresolver.MockResolver {
 	return mockresolver.New(
 		map[string][]net.IP{
