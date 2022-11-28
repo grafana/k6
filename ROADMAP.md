@@ -38,7 +38,7 @@ These are goals achievable within 3-6 months, tentatively done by Q2 2023.
   xk6-browser will become an [experimental module](https://k6.io/docs/javascript-api/k6-experimental/) of k6, and thus available to use in load tests that utilize standard k6 release builds.
 
   *Definition of Done*<br>
-  A load test script that imports `k6/x/browser` can be executed using the latest release build of k6. The browser-level APIs provided by xk6-browser are available for use within this script.
+  A load test script that imports `k6/experimental/browser` can be executed using the latest release build of k6. The browser-level APIs provided by xk6-browser are available for use within this script.
 
 - **Public beta in k6 Cloud.**
 
@@ -46,7 +46,7 @@ These are goals achievable within 3-6 months, tentatively done by Q2 2023.
   Cloud builds will start using k6 releases that include xk6-browser as an experimental module.
 
   *Definition of Done*<br>
-  Load test executed in Cloud can use xk6-browser API by importing `k6/x/browser`.
+  Load tests executed in Cloud can use xk6-browser API by importing `k6/experimental/browser`.
 
 - **Transition our API to be async/`Promise` based.**<br>
   At the moment, most of our API is synchronous. This is due to the historical fact that k6 didn't support async behavior because of a missing per-VU event loop.
