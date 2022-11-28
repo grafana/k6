@@ -13,6 +13,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"go.k6.io/k6/lib/types"
 	"io"
 	"io/ioutil"
 	"math/big"
@@ -2358,11 +2359,11 @@ func TestRequestAndBatchTLS(t *testing.T) {
 		host, port, err := net.SplitHostPort(s.Listener.Addr().String())
 		require.NoError(t, err)
 		ip := net.ParseIP(host)
-		mybadsslHostname, err := lib.NewHostAddress(ip, port)
+		mybadsslHostname, err := types.NewHostAddress(ip, port)
 		require.NoError(t, err)
 		state.Transport = client.Transport
 		state.TLSConfig = s.TLS
-		state.Dialer = &netext.Dialer{Hosts: map[string]*lib.HostAddress{"expired.localhost": mybadsslHostname}}
+		state.Dialer = &netext.Dialer{Hosts: map[string]*types.HostAddress{"expired.localhost": mybadsslHostname}}
 		client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext //nolint:forcetypeassert
 		_, err = rt.RunString(`throw JSON.stringify(http.get("https://expired.localhost/"));`)
 		require.Error(t, err)
@@ -2402,9 +2403,9 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			host, port, err := net.SplitHostPort(s.Listener.Addr().String())
 			require.NoError(t, err)
 			ip := net.ParseIP(host)
-			mybadsslHostname, err := lib.NewHostAddress(ip, port)
+			mybadsslHostname, err := types.NewHostAddress(ip, port)
 			require.NoError(t, err)
-			state.Dialer = &netext.Dialer{Hosts: map[string]*lib.HostAddress{
+			state.Dialer = &netext.Dialer{Hosts: map[string]*types.HostAddress{
 				versionTest.URL: mybadsslHostname,
 			}}
 			state.Transport = client.Transport
@@ -2442,9 +2443,9 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			host, port, err := net.SplitHostPort(s.Listener.Addr().String())
 			require.NoError(t, err)
 			ip := net.ParseIP(host)
-			mybadsslHostname, err := lib.NewHostAddress(ip, port)
+			mybadsslHostname, err := types.NewHostAddress(ip, port)
 			require.NoError(t, err)
-			state.Dialer = &netext.Dialer{Hosts: map[string]*lib.HostAddress{
+			state.Dialer = &netext.Dialer{Hosts: map[string]*types.HostAddress{
 				cipherSuiteTest.URL: mybadsslHostname,
 			}}
 			state.Transport = client.Transport

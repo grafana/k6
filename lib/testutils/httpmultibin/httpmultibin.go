@@ -28,7 +28,6 @@ import (
 	"google.golang.org/grpc/status"
 	grpctest "google.golang.org/grpc/test/grpc_testing"
 
-	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/netext"
 	grpcanytesting "go.k6.io/k6/lib/testutils/httpmultibin/grpc_any_testing"
 	"go.k6.io/k6/lib/types"
@@ -251,6 +250,7 @@ func (s *GRPCAnyStub) Sum(ctx context.Context, req *grpcanytesting.SumRequest) (
 }
 
 // NewHTTPMultiBin returns a fully configured and running HTTPMultiBin
+//
 //nolint:funlen
 func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	// Create a http.ServeMux and set the httpbin handler as the default
@@ -307,9 +307,9 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	http2IP := net.ParseIP(http2URL.Hostname())
 	require.NotNil(t, http2IP)
 
-	httpDomainValue, err := lib.NewHostAddress(httpIP, "")
+	httpDomainValue, err := types.NewHostAddress(httpIP, "")
 	require.NoError(t, err)
-	httpsDomainValue, err := lib.NewHostAddress(httpsIP, "")
+	httpsDomainValue, err := types.NewHostAddress(httpsIP, "")
 	require.NoError(t, err)
 
 	// Set up the dialer with shorter timeouts and the custom domains
@@ -318,7 +318,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 		KeepAlive: 10 * time.Second,
 		DualStack: true,
 	}, netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4))
-	dialer.Hosts = map[string]*lib.HostAddress{
+	dialer.Hosts = map[string]*types.HostAddress{
 		httpDomain:  httpDomainValue,
 		httpsDomain: httpsDomainValue,
 	}

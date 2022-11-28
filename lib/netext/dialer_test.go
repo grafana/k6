@@ -14,7 +14,7 @@ import (
 func TestDialerAddr(t *testing.T) {
 	t.Parallel()
 	dialer := NewDialer(net.Dialer{}, newResolver())
-	dialer.Hosts = map[string]*lib.HostAddress{
+	dialer.Hosts = map[string]*types.HostAddress{
 		"example.com":                {IP: net.ParseIP("3.4.5.6")},
 		"example.com:443":            {IP: net.ParseIP("3.4.5.6"), Port: 8443},
 		"example.com:8080":           {IP: net.ParseIP("3.4.5.6"), Port: 9090},
@@ -75,7 +75,7 @@ func TestDialerAddr(t *testing.T) {
 func TestDialerAddrBlockHostnamesStar(t *testing.T) {
 	t.Parallel()
 	dialer := NewDialer(net.Dialer{}, newResolver())
-	dialer.Hosts = map[string]*lib.HostAddress{
+	dialer.Hosts = map[string]*types.HostAddress{
 		"example.com": {IP: net.ParseIP("3.4.5.6")},
 	}
 

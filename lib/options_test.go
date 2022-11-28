@@ -456,10 +456,10 @@ func TestOptions(t *testing.T) {
 
 	t.Run("Hosts", func(t *testing.T) {
 		t.Parallel()
-		host, err := NewHostAddress(net.ParseIP("192.0.2.1"), "80")
+		host, err := types.NewHostAddress(net.ParseIP("192.0.2.1"), "80")
 		assert.NoError(t, err)
 
-		opts := Options{}.Apply(Options{Hosts: map[string]*HostAddress{
+		opts := Options{}.Apply(Options{Hosts: map[string]*types.HostAddress{
 			"test.loadimpact.com": host,
 		}})
 		assert.NotNil(t, opts.Hosts)
@@ -730,17 +730,17 @@ func TestHostAddressUnmarshal(t *testing.T) {
 	t.Parallel()
 	testData := []struct {
 		input          string
-		expectedOutput *HostAddress
+		expectedOutput *types.HostAddress
 		expectFailure  string
 	}{
 		{
 			"1.2.3.4",
-			&HostAddress{IP: net.ParseIP("1.2.3.4")},
+			&types.HostAddress{IP: net.ParseIP("1.2.3.4")},
 			"",
 		},
 		{
 			"1.2.3.4:80",
-			&HostAddress{IP: net.ParseIP("1.2.3.4"), Port: 80},
+			&types.HostAddress{IP: net.ParseIP("1.2.3.4"), Port: 80},
 			"",
 		},
 		{
@@ -750,17 +750,17 @@ func TestHostAddressUnmarshal(t *testing.T) {
 		},
 		{
 			"2001:0db8:0000:0000:0000:ff00:0042:8329",
-			&HostAddress{IP: net.ParseIP("2001:0db8:0000:0000:0000:ff00:0042:8329")},
+			&types.HostAddress{IP: net.ParseIP("2001:0db8:0000:0000:0000:ff00:0042:8329")},
 			"",
 		},
 		{
 			"2001:db8::68",
-			&HostAddress{IP: net.ParseIP("2001:db8::68")},
+			&types.HostAddress{IP: net.ParseIP("2001:db8::68")},
 			"",
 		},
 		{
 			"[2001:db8::68]:80",
-			&HostAddress{IP: net.ParseIP("2001:db8::68"), Port: 80},
+			&types.HostAddress{IP: net.ParseIP("2001:db8::68"), Port: 80},
 			"",
 		},
 		{
@@ -774,7 +774,7 @@ func TestHostAddressUnmarshal(t *testing.T) {
 		data := data
 		t.Run(data.input, func(t *testing.T) {
 			t.Parallel()
-			actualHost := &HostAddress{}
+			actualHost := &types.HostAddress{}
 			err := actualHost.UnmarshalText([]byte(data.input))
 
 			if data.expectFailure != "" {

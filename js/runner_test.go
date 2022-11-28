@@ -1000,7 +1000,7 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 	host, port, err := net.SplitHostPort(s.Listener.Addr().String())
 	require.NoError(t, err)
 	ip := net.ParseIP(host)
-	mybadsslHostname, err := lib.NewHostAddress(ip, port)
+	mybadsslHostname, err := types.NewHostAddress(ip, port)
 	require.NoError(t, err)
 	cert, err := x509.ParseCertificate(s.TLS.Certificates[0].Certificate[0])
 	require.NoError(t, err)
@@ -1033,7 +1033,7 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)))
 
-			r1.Bundle.Options.Hosts = map[string]*lib.HostAddress{
+			r1.Bundle.Options.Hosts = map[string]*types.HostAddress{
 				"mybadssl.localhost": mybadsslHostname,
 			}
 			registry := metrics.NewRegistry()
@@ -1261,7 +1261,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 
 	r1.SetOptions(lib.Options{
 		Throw: null.BoolFrom(true),
-		Hosts: map[string]*lib.HostAddress{
+		Hosts: map[string]*types.HostAddress{
 			"test.loadimpact.com": {IP: net.ParseIP("127.0.0.1")},
 		},
 	})
@@ -1306,7 +1306,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 	host, port, err := net.SplitHostPort(s.Listener.Addr().String())
 	require.NoError(t, err)
 	ip := net.ParseIP(host)
-	mybadsslHostname, err := lib.NewHostAddress(ip, port)
+	mybadsslHostname, err := types.NewHostAddress(ip, port)
 	require.NoError(t, err)
 	unsupportedVersionErrorMsg := "remote error: tls: handshake failure"
 	for _, tag := range build.Default.ReleaseTags {
@@ -1364,7 +1364,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 			opts := lib.Options{Throw: null.BoolFrom(true)}
 			require.NoError(t, r1.SetOptions(opts.Apply(data.opts)))
 
-			r1.Bundle.Options.Hosts = map[string]*lib.HostAddress{
+			r1.Bundle.Options.Hosts = map[string]*types.HostAddress{
 				"sha256-badssl.localhost": mybadsslHostname,
 			}
 			r2, err := NewFromArchive(

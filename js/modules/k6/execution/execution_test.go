@@ -292,7 +292,7 @@ func TestOptionsTestFull(t *testing.T) {
 					require.NoError(t, err)
 					return bh
 				}(),
-				Hosts: map[string]*lib.HostAddress{
+				Hosts: map[string]*types.HostAddress{
 					"test.k6.io": {
 						IP:   []byte{0x01, 0x02, 0x03, 0x04},
 						Port: 8443,

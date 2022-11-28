@@ -21,7 +21,7 @@ type Dialer struct {
 	Resolver         Resolver
 	Blacklist        []*lib.IPNet
 	BlockedHostnames *types.HostnameTrie
-	Hosts            map[string]*lib.HostAddress
+	Hosts            map[string]*types.HostAddress
 
 	BytesRead    int64
 	BytesWritten int64
@@ -148,7 +148,7 @@ func (d *Dialer) getDialAddr(addr string) (string, error) {
 	return remote.String(), nil
 }
 
-func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
+func (d *Dialer) findRemote(addr string) (*types.HostAddress, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
@@ -167,7 +167,7 @@ func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
 	}
 
 	if ip != nil {
-		return lib.NewHostAddress(ip, port)
+		return types.NewHostAddress(ip, port)
 	}
 
 	ip, err = d.Resolver.LookupIP(host)
@@ -179,10 +179,10 @@ func (d *Dialer) findRemote(addr string) (*lib.HostAddress, error) {
 		return nil, fmt.Errorf("lookup %s: no such host", host)
 	}
 
-	return lib.NewHostAddress(ip, port)
+	return types.NewHostAddress(ip, port)
 }
 
-func (d *Dialer) getConfiguredHost(addr, host, port string) (*lib.HostAddress, error) {
+func (d *Dialer) getConfiguredHost(addr, host, port string) (*types.HostAddress, error) {
 	if remote, ok := d.Hosts[addr]; ok {
 		return remote, nil
 	}
