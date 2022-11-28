@@ -21,12 +21,12 @@
       }
     ]
   },
+  "description": "List of k6 test",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "iteration": 1660431147457,
   "links": [],
-  "liveNow": false,
+  "liveNow": true,
   "panels": [
     {
       "datasource": {
@@ -42,7 +42,7 @@
             "align": "auto",
             "displayMode": "auto",
             "filterable": true,
-            "inspect": true
+            "inspect": false
           },
           "mappings": [],
           "thresholds": {
@@ -91,7 +91,7 @@
                   {
                     "targetBlank": true,
                     "title": "",
-                    "url": "http://localhost:3000/d/a21-pyAWz/test-result?orgId=1&var-testid=${__value.raw}&from=${__data.fields['start'].numeric}&to=${__data.fields['end'].numeric}\n"
+                    "url": "http://localhost:3000/d/01npcT44k/prometheus-result?orgId=1&var-testid=${__value.raw}&from=${__data.fields['start'].numeric}&to=${__data.fields['end'].numeric}\n"
                   }
                 ]
               },
@@ -114,6 +114,42 @@
               {
                 "id": "unit",
                 "value": "time: YYYY-MM-DD HH:mm:ss"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "start"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 179
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P95 Response Time(AVG)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RPS(AVG)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "reqps"
               }
             ]
           }
@@ -145,32 +181,70 @@
             "uid": "PEDF09670F151C95C"
           },
           "editorMode": "code",
-          "expr": "k6_http_reqs{testid=~\"$testid\"}",
+          "expr": "k6_http_reqs",
           "format": "table",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PEDF09670F151C95C"
+          },
+          "editorMode": "code",
+          "expr": "sum(k6_http_reqs{})",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PEDF09670F151C95C"
+          },
+          "editorMode": "code",
+          "expr": "avg(k6_http_req_duration_p95{expected_response=\"true\"})",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PEDF09670F151C95C"
+          },
+          "editorMode": "code",
+          "expr": "avg (rate(k6_http_reqs{}[10s]))",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PEDF09670F151C95C"
+          },
+          "editorMode": "code",
+          "expr": "sum (k6_http_reqs{expected_response=\"false\"})",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "E"
         }
       ],
       "title": "Test runs",
       "transformations": [
         {
-          "id": "filterByValue",
-          "options": {
-            "filters": [
-              {
-                "config": {
-                  "id": "equal",
-                  "options": {
-                    "value": ""
-                  }
-                },
-                "fieldName": "testFileName"
-              }
-            ],
-            "match": "all",
-            "type": "exclude"
-          }
+          "id": "merge",
+          "options": {}
         },
         {
           "id": "groupBy",
@@ -185,6 +259,30 @@
               },
               "Value": {
                 "aggregations": []
+              },
+              "Value #B": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #C": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #D": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #E": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
               },
               "artifact": {
                 "aggregations": [],
@@ -226,21 +324,71 @@
           }
         },
         {
+          "id": "calculateField",
+          "options": {
+            "alias": "",
+            "binary": {
+              "left": "Time (min)",
+              "operator": "-",
+              "reducer": "sum",
+              "right": "60000"
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "binary": {
+              "left": "Time (max)",
+              "operator": "+",
+              "reducer": "sum",
+              "right": "60000"
+            },
+            "mode": "binary",
+            "reduce": {
+              "include": [
+                "Time (max)"
+              ],
+              "reducer": "sum"
+            }
+          }
+        },
+        {
           "id": "organize",
           "options": {
-            "excludeByName": {},
-            "indexByName": {
-              "artifact": 4,
-              "branch": 6,
-              "build": 8,
-              "commit": 7,
-              "team": 1,
-              "testFileName": 2,
-              "testid": 0,
-              "typeArtifact": 3,
-              "version": 5
+            "excludeByName": {
+              "Time (max)": true,
+              "Time (max) + 60": true,
+              "Time (min)": true,
+              "Time (min) - 60": true
             },
-            "renameByName": {}
+            "indexByName": {
+              "Time (max)": 3,
+              "Time (max) + 60000": 4,
+              "Time (min)": 2,
+              "Time (min) - 60000": 1,
+              "Value #B (lastNotNull)": 5,
+              "Value #C (lastNotNull)": 6,
+              "Value #D (lastNotNull)": 7,
+              "testid": 0
+            },
+            "renameByName": {
+              "Time (max) + 10000": "Time (max)",
+              "Time (max) + 60": "Time (max)",
+              "Time (max) + 60000": "Time (max)",
+              "Time (min) - 60": "Time (min)",
+              "Time (min) - 60000": "Time (min)",
+              "Time (min) 2": "",
+              "Value #B (lastNotNull)": "Request Count",
+              "Value #C (lastNotNull)": "P95 Response Time(AVG)",
+              "Value #D (lastNotNull)": "RPS(AVG)",
+              "Value #E (lastNotNull)": "Failed Request Count",
+              "testid": ""
+            }
           }
         }
       ],
@@ -250,33 +398,12 @@
   "refresh": "",
   "schemaVersion": 36,
   "style": "dark",
-  "tags": [],
+  "tags": [
+    "prometheus",
+    "k6"
+  ],
   "templating": {
-    "list": [
-      {
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
-        },
-        "definition": "label_values(testid)",
-        "hide": 0,
-        "includeAll": true,
-        "label": "Test ID",
-        "multi": false,
-        "name": "testid",
-        "options": [],
-        "query": {
-          "query": "label_values(testid)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      }
-    ]
+    "list": []
   },
   "time": {
     "from": "now-1h",
@@ -284,8 +411,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Test Runs List",
-  "uid": "UoYDJHJZk",
+  "title": "Tests List",
+  "uid": "UoYDJHJhk",
   "version": 1,
   "weekStart": ""
 }
