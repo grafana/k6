@@ -71,7 +71,7 @@ These are goals tentatively achievable by Q1 2024.
   The deployment should be optimized and the extension thoroughly tested before making it available to all users. Frontend changes should be done at this point, and usage costs (CPU, RAM, storage) and pricing details should be determined, followed by public announcements of the availability.
 
   *Definition of Done*<br>
-  When all users are eligible to upgrade to a plan that includes browser testing.
+  The import path for xk6-browser is updated to `k6/browser` and the API is considered to be stable.
 
 
 - **Increase test code coverage; refactor problematic areas of the codebase; fix "flaky" tests, linter issues, etc.**<br>
