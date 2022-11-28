@@ -20,6 +20,8 @@ import (
 
 //go:embed lib/babel.min.js
 var babelSrc string //nolint:gochecknoglobals
+//go:embed regenerator/runtime.js
+var regeneratorSrc string
 
 var (
 	DefaultOpts = map[string]interface{}{
@@ -48,14 +50,14 @@ var (
 			// "transform-es2015-typeof-symbol", // in goja
 			// all the other module plugins are just dropped
 			[]interface{}{"transform-es2015-modules-commonjs", map[string]interface{}{"loose": false}},
-			// "transform-regenerator", // Doesn't really work unless regeneratorRuntime is also added
+			"transform-regenerator",
 
 			// es2016 https://github.com/babel/babel/blob/v6.26.0/packages/babel-preset-es2016/src/index.js
 			// "transform-exponentiation-operator",
 
 			// es2017 https://github.com/babel/babel/blob/v6.26.0/packages/babel-preset-es2017/src/index.js
 			// "syntax-trailing-function-commas", // in goja
-			// "transform-async-to-generator", // Doesn't really work unless regeneratorRuntime is also added
+			"transform-async-to-generator",
 		},
 		"ast":           false,
 		"sourceMaps":    false,
@@ -73,6 +75,10 @@ var (
 	errGlobalBabelCode error         //nolint:gochecknoglobals
 	onceBabel          sync.Once     //nolint:gochecknoglobals
 	globalBabel        *babel        //nolint:gochecknoglobals
+
+	onceRegenerator          sync.Once     //nolint:gochecknoglobals
+	globalRegeneratorCode    *goja.Program //nolint:gochecknoglobals
+	errGlobalRegeneratorCode error         //nolint:gochecknoglobals
 )
 
 const (
@@ -417,4 +423,18 @@ func verifySourceMapForBabel(srcMap []byte) error {
 		return fmt.Errorf("source map missing required 'sources' field")
 	}
 	return nil
+}
+
+// InitRegenerator inits the facebook regenerator runtime inside the goja runtime.
+// This allows using babel transformations to support async/await and generators.
+func InitRegenerator(rt *goja.Runtime) error {
+	onceRegenerator.Do(func() {
+		globalRegeneratorCode, errGlobalRegeneratorCode = goja.Compile(
+			"<internal/k6/compiler/regenerator/runtime.js>", regeneratorSrc, true)
+	})
+	if errGlobalRegeneratorCode != nil {
+		return errGlobalRegeneratorCode
+	}
+	_, err := rt.RunProgram(globalRegeneratorCode)
+	return err
 }

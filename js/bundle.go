@@ -304,6 +304,10 @@ func (b *Bundle) initializeProgramObject(rt *goja.Runtime, init *InitContext) pr
 }
 
 func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *InitContext, vuID uint64) (err error) {
+	if err = compiler.InitRegenerator(rt); err != nil {
+		return err
+	}
+
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
