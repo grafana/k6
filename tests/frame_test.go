@@ -56,8 +56,8 @@ func TestFrameDismissDialogBox(t *testing.T) {
 					WaitUntil: "networkidle",
 				})
 				b.promise(p.Goto(b.staticURL("dialog.html?dialogType="+tt.name), opts)).then(func() {
-					result := p.TextContent("#text", nil)
-					assert.EqualValues(t, "Hello World", result)
+					result := p.TextContent("#textField", nil)
+					assert.EqualValues(t, tt.name+" dismissed", result)
 				})
 
 				return nil

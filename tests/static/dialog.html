@@ -1,22 +1,30 @@
 <html lang="en">
-    <head>
+    <head></head>
+    <body>
+        <div id='textField'>Hello World</div>
+        <br />
+        <a href="/">click here</a>
+
         <script>
             const queryString = window.location.search;
             const urlParams = new URLSearchParams(queryString);
-            const dialogType = urlParams.get('dialogType')
+            const dialogType = urlParams.get('dialogType');
+            const div = document.getElementById('textField');
 
             switch(dialogType) {
                 case "alert":
                     alert("Click accept");
+                    div.textContent = 'alert dismissed';
                     break;
                 case "confirm":
-                    confirm("Click accept")
+                    confirm("Click accept");
+                    div.textContent = 'confirm dismissed';
+                    break;
                 case "prompt":
-                    prompt("Add text and then click accept")
+                    prompt("Add text and then click accept");
+                    div.textContent = 'prompt dismissed';
+                    break;
             }
         </script>
-    </head>
-    <body>
-        <div id='text'>Hello World</div>
     </body>
 </html>
