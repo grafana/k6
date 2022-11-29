@@ -337,9 +337,13 @@ func (b *babel) transformImpl(
 	v, err := b.transform(b.this, b.vm.ToValue(src), b.vm.ToValue(opts))
 	if err != nil {
 		if strings.Contains(err.Error(), "await is a reserved word") {
-			return "", nil, errors.New(strings.Replace(err.Error(),
+			msg := strings.Replace(err.Error(),
 				"await is a reserved word",
-				"await can be used only inside an async function", 1))
+				"await can be used only inside an async function", 1)
+			msg = strings.TrimPrefix(msg, "SyntaxError:") // the below adds it back
+
+			// TODO maybe try to add the file and particular place the error happens
+			return "", nil, &goja.CompilerSyntaxError{CompilerError: goja.CompilerError{Message: msg}}
 		}
 		return "", nil, err
 	}
