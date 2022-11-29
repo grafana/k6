@@ -48,6 +48,7 @@ var (
 		"BigInt",                      // not supported at all
 		"IsHTMLDDA",                   // not supported at all
 		"async-iteration",             // not supported at all
+		"top-level-await",             // not supported at all
 		"String.prototype.replaceAll", // not supported at all, Stage 4 since 2020
 
 		// from goja
