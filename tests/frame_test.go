@@ -33,6 +33,9 @@ func TestFrameDismissDialogBox(t *testing.T) {
 		{
 			name: "alert",
 		},
+		{
+			name: "confirm",
+		},
 	}
 
 	for _, tt := range tests {
