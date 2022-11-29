@@ -30,7 +30,7 @@ Status updates
 Short-term goals
 ----------------
 
-These are goals tenratively achievable by Q2 2023.
+These are goals tentatively achievable by Q2 2023.
 
 - **Make xk6-browser a part of standard distribution of k6.**<br>
 
