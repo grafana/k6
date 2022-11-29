@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -335,6 +336,11 @@ func (b *babel) transformImpl(
 	startTime := time.Now()
 	v, err := b.transform(b.this, b.vm.ToValue(src), b.vm.ToValue(opts))
 	if err != nil {
+		if strings.Contains(err.Error(), "await is a reserved word") {
+			return "", nil, errors.New(strings.Replace(err.Error(),
+				"await is a reserved word",
+				"await can be used only inside an async function", 1))
+		}
 		return "", nil, err
 	}
 	logger.WithField("t", time.Since(startTime)).Debug("Babel: Transformed")
