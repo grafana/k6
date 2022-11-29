@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +25,6 @@ func TestFramePress(t *testing.T) {
 }
 
 func TestFrameDismissDialogBox(t *testing.T) {
-
 	t.Parallel()
 
 	tests := []struct {
@@ -38,6 +38,9 @@ func TestFrameDismissDialogBox(t *testing.T) {
 		},
 		{
 			name: "prompt",
+		},
+		{
+			name: "beforeunload",
 		},
 	}
 
@@ -55,7 +58,16 @@ func TestFrameDismissDialogBox(t *testing.T) {
 				}{
 					WaitUntil: "networkidle",
 				})
-				b.promise(p.Goto(b.staticURL("dialog.html?dialogType="+tt.name), opts)).then(func() {
+				b.promise(p.Goto(b.staticURL("dialog.html?dialogType="+tt.name), opts)).then(func() *goja.Promise {
+					if tt.name == "beforeunload" {
+						return p.Click("#clickHere", nil)
+					}
+
+					result := p.TextContent("#textField", nil)
+					assert.EqualValues(t, tt.name+" dismissed", result)
+
+					return nil
+				}).then(func() {
 					result := p.TextContent("#textField", nil)
 					assert.EqualValues(t, tt.name+" dismissed", result)
 				})

@@ -3,7 +3,7 @@
     <body>
         <div id='textField'>Hello World</div>
         <br />
-        <a href="/">click here</a>
+        <button id="clickHere" onclick="window.location.reload();">click here</button>
 
         <script>
             const queryString = window.location.search;
@@ -23,6 +23,12 @@
                 case "prompt":
                     prompt("Add text and then click accept");
                     div.textContent = 'prompt dismissed';
+                    break;
+                case "beforeunload":
+                    window.addEventListener('beforeunload', (event) => {
+                        event.returnValue = "Are you sure you want to leave?";
+                    });
+                    div.textContent = 'beforeunload dismissed';
                     break;
             }
         </script>
