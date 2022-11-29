@@ -273,6 +273,10 @@ func (fs *FrameSession) onEventJavascriptDialogOpening(event *cdppage.EventJavas
 		fs.session.ID(), fs.targetID, event.URL, event.Type)
 
 	action := cdppage.HandleJavaScriptDialog(false)
+	if event.Type == cdppage.DialogTypeBeforeunload {
+		action = cdppage.HandleJavaScriptDialog(true)
+	}
+
 	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		fs.logger.Errorf("FrameSession:onEventJavascriptDialogOpening", "failed to dismiss dialog box: %v", err)
 	}
