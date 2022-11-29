@@ -16,15 +16,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-// TODO: create an issue?
-// TODO: refactor, it should have the 3 way tested in general
-// and each option should be tested in a specific table test
-// for all the methods at the same time, it should prevent the possibility
-// we forget to support or test an option in one of the available ways.
-// It also should keep the single test shorter.
-// Check the TestConfigTrendAsNativeHistogram as an example.
-
-func TestApply(t *testing.T) {
+func TestConifgApply(t *testing.T) {
 	t.Parallel()
 
 	fullConfig := Config{
@@ -53,38 +45,6 @@ func TestApply(t *testing.T) {
 	assert.Equal(t, false, c.Username.Valid)
 	assert.Equal(t, false, c.Password.Valid)
 	assert.Equal(t, true, c.InsecureSkipTLSVerify.Valid)
-}
-
-func TestConfigParseArg(t *testing.T) {
-	t.Parallel()
-
-	c, err := ParseArg("url=http://prometheus.remote:3412/write")
-	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.URL)
-
-	c, err = ParseArg("url=http://prometheus.remote:3412/write,insecureSkipTLSVerify=false")
-	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.URL)
-	assert.Equal(t, null.BoolFrom(false), c.InsecureSkipTLSVerify)
-
-	c, err = ParseArg("url=https://prometheus.remote:3412/write")
-	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("https://prometheus.remote:3412/write"), c.URL)
-
-	c, err = ParseArg("url=https://prometheus.remote:3412/write,insecureSkipTLSVerify=false")
-	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("https://prometheus.remote:3412/write"), c.URL)
-	assert.Equal(t, null.BoolFrom(false), c.InsecureSkipTLSVerify)
-
-	c, err = ParseArg("url=http://prometheus.remote:3412/write,pushInterval=2s")
-	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.URL)
-	assert.Equal(t, types.NullDurationFrom(time.Second*2), c.PushInterval)
-
-	c, err = ParseArg("url=http://prometheus.remote:3412/write,headers.X-Header=value")
-	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.URL)
-	assert.Equal(t, map[string]string{"X-Header": "value"}, c.Headers)
 }
 
 func TestConfigRemoteConfig(t *testing.T) {
@@ -119,7 +79,7 @@ func TestConfigRemoteConfig(t *testing.T) {
 	assert.Equal(t, exprcc, rcc)
 }
 
-func TestConfigConsolidation(t *testing.T) {
+func TestGetConsolidatedConfig(t *testing.T) {
 	t.Parallel()
 
 	u, err := url.Parse("https://prometheus.ie/remote")
@@ -132,7 +92,7 @@ func TestConfigConsolidation(t *testing.T) {
 		config    Config
 		errString string
 	}{
-		"default": {
+		"Defaults": {
 			jsonRaw: nil,
 			env:     nil,
 			arg:     "",
@@ -145,10 +105,8 @@ func TestConfigConsolidation(t *testing.T) {
 				Headers:               make(map[string]string),
 			},
 		},
-		"json_success": {
+		"JSONSuccess": {
 			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
-			env:     nil,
-			arg:     "",
 			config: Config{
 				URL:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
@@ -158,10 +116,13 @@ func TestConfigConsolidation(t *testing.T) {
 				Headers:               make(map[string]string),
 			},
 		},
-		"mixed_success": {
+		"MixedSuccess": {
 			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
-			env:     map[string]string{"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "false", "K6_PROMETHEUS_USER": "u"},
-			arg:     "username=user",
+			env: map[string]string{
+				"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "false",
+				"K6_PROMETHEUS_USER":                     "u",
+			},
+			arg: "username=user",
 			config: Config{
 				URL:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
@@ -170,73 +131,34 @@ func TestConfigConsolidation(t *testing.T) {
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers:               make(map[string]string),
 			},
-			errString: "",
 		},
-		"invalid_duration": {
-			jsonRaw:   json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
-			env:       map[string]string{"K6_PROMETHEUS_PUSH_INTERVAL": "d"},
-			arg:       "",
-			config:    Config{},
-			errString: "strconv.ParseInt",
+		"OrderOfPrecedence": {
+			jsonRaw: json.RawMessage(`{"url":"http://json:9090","username":"json","password":"json"}`),
+			env: map[string]string{
+				"K6_PROMETHEUS_USERNAME": "env",
+				"K6_PROMETHEUS_PASSWORD": "env",
+			},
+			arg: "password=arg",
+			config: Config{
+				URL:                   null.StringFrom("http://json:9090"),
+				InsecureSkipTLSVerify: null.BoolFrom(true),
+				Username:              null.StringFrom("env"),
+				Password:              null.StringFrom("arg"),
+				PushInterval:          types.NullDurationFrom(defaultPushInterval),
+				Headers:               make(map[string]string),
+			},
 		},
-		"invalid_insecureSkipTLSVerify": {
-			jsonRaw:   json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
+		"InvalidJSON": {
+			jsonRaw:   json.RawMessage(`{"invalid-json "astring"}`),
+			errString: "parse JSON options failed",
+		},
+		"InvalidEnv": {
 			env:       map[string]string{"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "d"},
-			arg:       "",
-			config:    Config{},
-			errString: "strconv.ParseBool",
+			errString: "parse environment variables options failed",
 		},
-		"remote_write_with_headers_json": {
-			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s","mapping":"mapping", "headers":{"X-Header":"value"}}`, u.String())),
-			env:     nil,
-			arg:     "",
-			config: Config{
-				URL:                   null.StringFrom(u.String()),
-				InsecureSkipTLSVerify: null.BoolFrom(true),
-				Username:              null.NewString("", false),
-				Password:              null.NewString("", false),
-				PushInterval:          types.NullDurationFrom(defaultPushInterval),
-				Headers: map[string]string{
-					"X-Header": "value",
-				},
-			},
-			errString: "",
-		},
-		"remote_write_with_headers_env": {
-			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s","mapping":"mapping", "headers":{"X-Header":"value"}}`, u.String())),
-			env: map[string]string{
-				"K6_PROMETHEUS_HEADERS_X-Header": "value_from_env",
-			},
-			arg: "",
-			config: Config{
-				URL:                   null.StringFrom(u.String()),
-				InsecureSkipTLSVerify: null.BoolFrom(true),
-				Username:              null.NewString("", false),
-				Password:              null.NewString("", false),
-				PushInterval:          types.NullDurationFrom(defaultPushInterval),
-				Headers: map[string]string{
-					"X-Header": "value_from_env",
-				},
-			},
-			errString: "",
-		},
-		"remote_write_with_headers_arg": {
-			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s","mapping":"mapping", "headers":{"X-Header":"value"}}`, u.String())),
-			env: map[string]string{
-				"K6_PROMETHEUS_HEADERS_X-Header": "value_from_env",
-			},
-			arg: "headers.X-Header=value_from_arg",
-			config: Config{
-				URL:                   null.StringFrom(u.String()),
-				InsecureSkipTLSVerify: null.BoolFrom(true),
-				Username:              null.NewString("", false),
-				Password:              null.NewString("", false),
-				PushInterval:          types.NullDurationFrom(defaultPushInterval),
-				Headers: map[string]string{
-					"X-Header": "value_from_arg",
-				},
-			},
-			errString: "",
+		"InvalidArg": {
+			arg:       "insecureSkipTLSVerify=wrongtime",
+			errString: "parse argument string options failed",
 		},
 	}
 
@@ -249,12 +171,126 @@ func TestConfigConsolidation(t *testing.T) {
 				assert.Contains(t, err.Error(), testCase.errString)
 				return
 			}
-			assert.Equal(t, c, testCase.config)
+			assert.Equal(t, testCase.config, c)
 		})
 	}
 }
 
-func TestConfigBasicAuth(t *testing.T) {
+func TestParseURL(t *testing.T) {
+	t.Parallel()
+
+	c, err := parseArg("url=http://prometheus.remote:3412/write")
+	assert.Nil(t, err)
+	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.URL)
+
+	c, err = parseArg("url=http://prometheus.remote:3412/write,insecureSkipTLSVerify=false,pushInterval=2s")
+	assert.Nil(t, err)
+	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.URL)
+	assert.Equal(t, null.BoolFrom(false), c.InsecureSkipTLSVerify)
+	assert.Equal(t, types.NullDurationFrom(time.Second*2), c.PushInterval)
+
+	c, err = parseArg("headers.X-Header=value")
+	assert.Nil(t, err)
+	assert.Equal(t, map[string]string{"X-Header": "value"}, c.Headers)
+}
+
+func TestOptionURL(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"url":"http://prometheus:9090/api/v1/write"}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_REMOTE_URL": "http://prometheus:9090/api/v1/write"}},
+		"Arg":  {arg: "url=http://prometheus:9090/api/v1/write"},
+	}
+
+	expconfig := Config{
+		URL:                   null.StringFrom("http://prometheus:9090/api/v1/write"),
+		InsecureSkipTLSVerify: null.BoolFrom(true),
+		Username:              null.NewString("", false),
+		Password:              null.NewString("", false),
+		PushInterval:          types.NullDurationFrom(5 * time.Second),
+		Headers:               make(map[string]string),
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
+func TestOptionHeaders(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"headers":{"X-MY-HEADER1":"hval1","X-MY-HEADER2":"hval2"}}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_HEADERS_X-MY-HEADER1": "hval1", "K6_PROMETHEUS_HEADERS_X-MY-HEADER2": "hval2"}},
+		"Arg":  {arg: "headers.X-MY-HEADER1=hval1,headers.X-MY-HEADER2=hval2"},
+	}
+
+	expconfig := Config{
+		URL:                   null.StringFrom("http://localhost:9090/api/v1/write"),
+		InsecureSkipTLSVerify: null.BoolFrom(true),
+		PushInterval:          types.NullDurationFrom(5 * time.Second),
+		Headers: map[string]string{
+			"X-MY-HEADER1": "hval1",
+			"X-MY-HEADER2": "hval2",
+		},
+	}
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
+func TestOptionInsecureSkipTLSVerify(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"insecureSkipTLSVerify":false}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "false"}},
+		"Arg":  {arg: "insecureSkipTLSVerify=false"},
+	}
+
+	expconfig := Config{
+		URL:                   null.StringFrom(defaultURL),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
+		PushInterval:          types.NullDurationFrom(defaultPushInterval),
+		Headers:               make(map[string]string),
+	}
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
+func TestOptionBasicAuth(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
@@ -287,7 +323,7 @@ func TestConfigBasicAuth(t *testing.T) {
 	}
 }
 
-func TestConfigTrendAsNativeHistogram(t *testing.T) {
+func TestOptionTrendAsNativeHistogram(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
@@ -308,6 +344,39 @@ func TestConfigTrendAsNativeHistogram(t *testing.T) {
 		PushInterval:           types.NullDurationFrom(5 * time.Second),
 		Headers:                make(map[string]string),
 		TrendAsNativeHistogram: null.BoolFrom(true),
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
+func TestOptionPushInterval(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"pushInterval":"1m2s"}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_PUSH_INTERVAL": "1m2s"}},
+		"Arg":  {arg: "pushInterval=1m2s"},
+	}
+
+	expconfig := Config{
+		URL:                   null.StringFrom("http://localhost:9090/api/v1/write"),
+		InsecureSkipTLSVerify: null.BoolFrom(true),
+		Username:              null.NewString("", false),
+		Password:              null.NewString("", false),
+		PushInterval:          types.NullDurationFrom((1 * time.Minute) + (2 * time.Second)),
+		Headers:               make(map[string]string),
 	}
 
 	for name, tc := range cases {
