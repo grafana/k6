@@ -141,13 +141,16 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, u
 		result = result.Apply(envConf)
 	}
 
-	if url != "" {
-		urlConf, err := parseArg(url)
-		if err != nil {
-			return result, fmt.Errorf("parse argument string options failed: %w", err)
-		}
-		result = result.Apply(urlConf)
-	}
+	// TODO: define a way for defining Output's options
+	// then support them.
+	//
+	//if url != "" {
+	//urlConf, err := parseArg(url)
+	//if err != nil {
+	//return result, fmt.Errorf("parse argument string options failed: %w", err)
+	//}
+	//result = result.Apply(urlConf)
+	//}
 
 	return result, nil
 }

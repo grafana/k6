@@ -120,13 +120,13 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
 			env: map[string]string{
 				"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "false",
-				"K6_PROMETHEUS_USER":                     "u",
+				"K6_PROMETHEUS_USERNAME":                 "u",
 			},
-			arg: "username=user",
+			// arg: "username=user",
 			config: Config{
 				URL:                   null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
-				Username:              null.NewString("user", true),
+				Username:              null.NewString("u", true),
 				Password:              null.NewString("", false),
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers:               make(map[string]string),
@@ -138,12 +138,12 @@ func TestGetConsolidatedConfig(t *testing.T) {
 				"K6_PROMETHEUS_USERNAME": "env",
 				"K6_PROMETHEUS_PASSWORD": "env",
 			},
-			arg: "password=arg",
+			// arg: "password=arg",
 			config: Config{
 				URL:                   null.StringFrom("http://json:9090"),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
 				Username:              null.StringFrom("env"),
-				Password:              null.StringFrom("arg"),
+				Password:              null.StringFrom("env"),
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers:               make(map[string]string),
 			},
@@ -156,10 +156,10 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			env:       map[string]string{"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "d"},
 			errString: "parse environment variables options failed",
 		},
-		"InvalidArg": {
-			arg:       "insecureSkipTLSVerify=wrongtime",
-			errString: "parse argument string options failed",
-		},
+		//"InvalidArg": {
+		//arg:       "insecureSkipTLSVerify=wrongtime",
+		//errString: "parse argument string options failed",
+		//},
 	}
 
 	for name, testCase := range testCases {
@@ -204,7 +204,7 @@ func TestOptionURL(t *testing.T) {
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"url":"http://prometheus:9090/api/v1/write"}`)},
 		"Env":  {env: map[string]string{"K6_PROMETHEUS_REMOTE_URL": "http://prometheus:9090/api/v1/write"}},
-		"Arg":  {arg: "url=http://prometheus:9090/api/v1/write"},
+		//"Arg":  {arg: "url=http://prometheus:9090/api/v1/write"},
 	}
 
 	expconfig := Config{
@@ -237,7 +237,7 @@ func TestOptionHeaders(t *testing.T) {
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"headers":{"X-MY-HEADER1":"hval1","X-MY-HEADER2":"hval2"}}`)},
 		"Env":  {env: map[string]string{"K6_PROMETHEUS_HEADERS_X-MY-HEADER1": "hval1", "K6_PROMETHEUS_HEADERS_X-MY-HEADER2": "hval2"}},
-		"Arg":  {arg: "headers.X-MY-HEADER1=hval1,headers.X-MY-HEADER2=hval2"},
+		//"Arg":  {arg: "headers.X-MY-HEADER1=hval1,headers.X-MY-HEADER2=hval2"},
 	}
 
 	expconfig := Config{
@@ -270,7 +270,7 @@ func TestOptionInsecureSkipTLSVerify(t *testing.T) {
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"insecureSkipTLSVerify":false}`)},
 		"Env":  {env: map[string]string{"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "false"}},
-		"Arg":  {arg: "insecureSkipTLSVerify=false"},
+		//"Arg":  {arg: "insecureSkipTLSVerify=false"},
 	}
 
 	expconfig := Config{
@@ -300,7 +300,7 @@ func TestOptionBasicAuth(t *testing.T) {
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"username":"user1","password":"pass1"}`)},
 		"Env":  {env: map[string]string{"K6_PROMETHEUS_USERNAME": "user1", "K6_PROMETHEUS_PASSWORD": "pass1"}},
-		"Arg":  {arg: "username=user1,password=pass1"},
+		//"Arg":  {arg: "username=user1,password=pass1"},
 	}
 
 	expconfig := Config{
@@ -333,7 +333,7 @@ func TestOptionTrendAsNativeHistogram(t *testing.T) {
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"trendAsNativeHistogram":true}`)},
 		"Env":  {env: map[string]string{"K6_PROMETHEUS_TREND_AS_NATIVE_HISTOGRAM": "true"}},
-		"Arg":  {arg: "trendAsNativeHistogram=true"},
+		//"Arg":  {arg: "trendAsNativeHistogram=true"},
 	}
 
 	expconfig := Config{
@@ -367,7 +367,7 @@ func TestOptionPushInterval(t *testing.T) {
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"pushInterval":"1m2s"}`)},
 		"Env":  {env: map[string]string{"K6_PROMETHEUS_PUSH_INTERVAL": "1m2s"}},
-		"Arg":  {arg: "pushInterval=1m2s"},
+		//"Arg":  {arg: "pushInterval=1m2s"},
 	}
 
 	expconfig := Config{
