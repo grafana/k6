@@ -1,0 +1,18 @@
+<html lang="en">
+    <head>
+        <script>
+            const queryString = window.location.search;
+            const urlParams = new URLSearchParams(queryString);
+            const dialogType = urlParams.get('dialogType')
+
+            switch(dialogType) {
+                case "alert":
+                    alert("Click accept");
+                    break;
+            }
+        </script>
+    </head>
+    <body>
+        <div id='text'>Hello World</div>
+    </body>
+</html>
