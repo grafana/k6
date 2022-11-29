@@ -1164,3 +1164,61 @@ func TestCompressionParams(t *testing.T) {
 		})
 	}
 }
+
+func TestSessionPing(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	ts := newTestState(t)
+
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+			var ws = new WebSocket("WSBIN_URL/ws-echo")
+			ws.onopen = () => {
+				ws.ping()
+			}
+
+			ws.onpong = () => {
+				call("from onpong")
+				ws.close()
+			}
+		`))
+		return runErr
+	})
+
+	require.NoError(t, err)
+
+	samplesBuf := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
+	assert.Equal(t, []string{"from onpong"}, ts.callRecorder.Recorded())
+}
+
+func TestSessionPingAdd(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	ts := newTestState(t)
+
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+			var ws = new WebSocket("WSBIN_URL/ws-echo")			
+			ws.addEventListener("open", () => {
+				ws.ping()
+			})
+
+			 ws.addEventListener("pong", () => {
+				call("from onpong")
+				ws.close()
+			})
+		`))
+		return runErr
+	})
+
+	require.NoError(t, err)
+
+	samplesBuf := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
+	assert.Equal(t, []string{"from onpong"}, ts.callRecorder.Recorded())
+}

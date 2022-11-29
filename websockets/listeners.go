@@ -2,6 +2,7 @@ package websockets
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-websockets/websockets/events"
@@ -9,18 +10,19 @@ import (
 
 // eventListeners keeps track of the eventListeners for each event type
 type eventListeners struct {
-	open    *eventListener
-	message *eventListener
-	error   *eventListener
-	close   *eventListener
+	list map[string]*eventListener
 }
 
 func newEventListeners() *eventListeners {
 	return &eventListeners{
-		open:    newListener(events.OPEN),
-		message: newListener(events.MESSAGE),
-		error:   newListener(events.ERROR),
-		close:   newListener(events.CLOSE),
+		list: map[string]*eventListener{
+			events.OPEN:    newListener(events.OPEN),
+			events.MESSAGE: newListener(events.MESSAGE),
+			events.ERROR:   newListener(events.ERROR),
+			events.CLOSE:   newListener(events.CLOSE),
+			events.PING:    newListener(events.PING),
+			events.PONG:    newListener(events.PONG),
+		},
 	}
 }
 
@@ -28,6 +30,7 @@ func newEventListeners() *eventListeners {
 // property on represents the eventListener that serves for the on* properties, like onopen, onmessage, etc.
 // property list keeps any other listeners that were added with addEventListener
 type eventListener struct {
+	*sync.Mutex
 	eventType string
 
 	// this return goja.value *and* error in order to return error on exception instead of panic
@@ -39,6 +42,7 @@ type eventListener struct {
 // newListener creates a new listener of a certain type
 func newListener(eventType string) *eventListener {
 	return &eventListener{
+		Mutex:     &sync.Mutex{},
 		eventType: eventType,
 	}
 }
@@ -50,12 +54,24 @@ func (l *eventListener) add(fn func(goja.Value) (goja.Value, error)) {
 
 // setOn sets a listener for the on* properties, like onopen, onmessage, etc.
 func (l *eventListener) setOn(fn func(goja.Value) (goja.Value, error)) {
-	// TODO: tread safe?
+	l.Lock()
 	l.on = fn
+	l.Unlock()
+}
+
+// getOn returns the on* property for a certain event type
+func (l *eventListener) getOn() func(goja.Value) (goja.Value, error) {
+	l.Lock()
+	defer l.Unlock()
+
+	return l.on
 }
 
 // return all possible listeners for a certain event type
 func (l *eventListener) all() []func(goja.Value) (goja.Value, error) {
+	l.Lock()
+	defer l.Unlock()
+
 	if l.on == nil {
 		return l.list
 	}
@@ -65,37 +81,19 @@ func (l *eventListener) all() []func(goja.Value) (goja.Value, error) {
 
 // add adds a listener to the listeners
 func (l *eventListeners) add(t string, f func(goja.Value) (goja.Value, error)) error {
-	switch t {
-	case events.OPEN:
-		l.open.add(f)
-	case events.MESSAGE:
-		l.message.add(f)
-	case events.ERROR:
-		l.error.add(f)
-	case events.CLOSE:
-		l.close.add(f)
-	default:
+	if _, ok := l.list[t]; !ok {
 		return fmt.Errorf("unknown event type: %s", t)
 	}
+
+	l.list[t].add(f)
+
 	return nil
 }
 
-// Message returns all event listeners that listen for the message event
-func (l *eventListeners) Message() []func(goja.Value) (goja.Value, error) {
-	return l.message.all()
-}
+func (l *eventListeners) all(t string) []func(goja.Value) (goja.Value, error) {
+	if _, ok := l.list[t]; !ok {
+		return []func(goja.Value) (goja.Value, error){}
+	}
 
-// Error returns all event listeners that listen for the error event
-func (l *eventListeners) Error() []func(goja.Value) (goja.Value, error) {
-	return l.error.all()
-}
-
-// Close returns all event listeners that listen for the close event
-func (l *eventListeners) Close() []func(goja.Value) (goja.Value, error) {
-	return l.close.all()
-}
-
-// Open returns all event listeners that listen for the open event
-func (l *eventListeners) Open() []func(goja.Value) (goja.Value, error) {
-	return l.open.all()
+	return l.list[t].all()
 }

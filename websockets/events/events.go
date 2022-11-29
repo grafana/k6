@@ -11,4 +11,8 @@ const (
 	MESSAGE = "message"
 	// ERROR is the event name for the error event
 	ERROR = "error"
+	// PING is the event name for the ping event
+	PING = "ping"
+	// PONG is the event name for the pong event
+	PONG = "pong"
 )
