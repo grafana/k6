@@ -12,7 +12,7 @@ require (
 	go.buf.build/grpc/go/prometheus/prometheus v1.4.4
 	go.k6.io/k6 v0.41.1-0.20221116104224-5fa71b761185
 	google.golang.org/protobuf v1.28.1
-	gopkg.in/guregu/null.v3 v3.5.0
+	gopkg.in/guregu/null.v3 v3.3.0
 )
 
 require (
