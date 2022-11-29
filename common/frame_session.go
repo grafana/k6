@@ -259,10 +259,23 @@ func (fs *FrameSession) initEvents() {
 					fs.onAttachedToTarget(ev)
 				case *target.EventDetachedFromTarget:
 					fs.onDetachedFromTarget(ev)
+				case *cdppage.EventJavascriptDialogOpening:
+					fs.onEventJavascriptDialogOpening(ev)
 				}
 			}
 		}
 	}()
+}
+
+func (fs *FrameSession) onEventJavascriptDialogOpening(event *cdppage.EventJavascriptDialogOpening) {
+	fs.logger.Debugf("FrameSession:onEventJavascriptDialogOpening",
+		"sid:%v tid:%v url:%v dialogType:%s",
+		fs.session.ID(), fs.targetID, event.URL, event.Type)
+
+	action := cdppage.HandleJavaScriptDialog(false)
+	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		fs.logger.Errorf("FrameSession:onEventJavascriptDialogOpening", "failed to dismiss dialog box: %v", err)
+	}
 }
 
 func (fs *FrameSession) initFrameTree() error {
