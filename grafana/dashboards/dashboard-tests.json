@@ -137,7 +137,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "ms"
+                "value": "s"
               }
             ]
           },
@@ -152,6 +152,52 @@
                 "value": "reqps"
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failed Request Count"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "blue",
+                        "index": 0,
+                        "text": "0"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
           }
         ]
       },
@@ -162,6 +208,7 @@
         "y": 0
       },
       "id": 2,
+      "interval": "5s",
       "options": {
         "footer": {
           "fields": "",
@@ -173,7 +220,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "8.5.3",
+      "pluginVersion": "9.2.4",
       "targets": [
         {
           "datasource": {
@@ -206,7 +253,7 @@
             "uid": "PEDF09670F151C95C"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_duration_p95{expected_response=\"true\"})",
+          "expr": "histogram_quantile(0.95, sum(rate(k6_http_req_duration_seconds{expected_response=\"true\"}[$__range])))",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -219,7 +266,7 @@
             "uid": "PEDF09670F151C95C"
           },
           "editorMode": "code",
-          "expr": "avg (rate(k6_http_reqs{}[10s]))",
+          "expr": "sum(irate(k6_http_reqs{}[$__range]))",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -390,13 +437,29 @@
               "testid": ""
             }
           }
+        },
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "config": {
+                  "id": "isNull",
+                  "options": {}
+                },
+                "fieldName": "Request Count"
+              }
+            ],
+            "match": "all",
+            "type": "exclude"
+          }
         }
       ],
       "type": "table"
     }
   ],
   "refresh": "",
-  "schemaVersion": 36,
+  "schemaVersion": 37,
   "style": "dark",
   "tags": [
     "prometheus",
@@ -406,7 +469,7 @@
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},

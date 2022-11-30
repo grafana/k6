@@ -25,7 +25,6 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "iteration": 1665493527572,
   "links": [],
   "liveNow": true,
   "panels": [
@@ -53,7 +52,18 @@
             "fixedColor": "text",
             "mode": "fixed"
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "index": 0,
+                  "text": "0"
+                }
+              },
+              "type": "special"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -94,7 +104,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.5.3",
+      "pluginVersion": "9.2.4",
       "targets": [
         {
           "datasource": {
@@ -103,7 +113,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max(k6_http_reqs{testid=~\"$testid\"})",
+          "expr": "sum(k6_http_reqs{testid=~\"$testid\"})",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -125,19 +135,30 @@
         "defaults": {
           "color": {
             "fixedColor": "red",
-            "mode": "fixed"
+            "mode": "thresholds"
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "index": 0,
+                  "text": "0"
+                }
+              },
+              "type": "special"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "dark-blue",
                 "value": null
               },
               {
                 "color": "red",
-                "value": 80
+                "value": 0
               }
             ]
           },
@@ -166,7 +187,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.5.3",
+      "pluginVersion": "9.2.4",
       "targets": [
         {
           "datasource": {
@@ -175,7 +196,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max(k6_http_reqs{testid=~\"$testid\",expected_response=\"false\"}*k6_http_req_failed{testid=~\"$testid\",expected_response=\"false\"})",
+          "expr": "sum(k6_http_reqs{testid=~\"$testid\",expected_response=\"false\"})",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -200,7 +221,18 @@
             "mode": "fixed"
           },
           "decimals": 2,
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "index": 0,
+                  "text": "0"
+                }
+              },
+              "type": "special"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -225,7 +257,7 @@
         "y": 1
       },
       "id": 51,
-      "interval": "1s",
+      "interval": "5s",
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -241,16 +273,16 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.5.3",
+      "pluginVersion": "9.2.4",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "PEDF09670F151C95C"
           },
-          "editorMode": "builder",
+          "editorMode": "code",
           "exemplar": false,
-          "expr": "max(irate(k6_http_reqs{testid=~\"$testid\"}[1m]))",
+          "expr": "max(sum(irate(k6_http_reqs{testid=~\"$testid\"}[$__range])))",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -260,7 +292,7 @@
           "refId": "A"
         }
       ],
-      "title": "Peak RPS WIP",
+      "title": "Peak RPS",
       "type": "stat"
     },
     {
@@ -275,7 +307,18 @@
             "mode": "fixed"
           },
           "decimals": 2,
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "index": 0,
+                  "text": "0"
+                }
+              },
+              "type": "special"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -289,7 +332,7 @@
               }
             ]
           },
-          "unit": "ms"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -300,6 +343,7 @@
         "y": 1
       },
       "id": 52,
+      "interval": "5",
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -315,7 +359,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.5.3",
+      "pluginVersion": "9.2.4",
       "targets": [
         {
           "datasource": {
@@ -324,7 +368,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max(k6_http_req_duration_p95{testid=~\"$testid\"})",
+          "expr": "histogram_quantile(0.95, sum(rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__range])))",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -335,6 +379,7 @@
         }
       ],
       "title": "P95 Response Time",
+      "transformations": [],
       "type": "stat"
     },
     {
@@ -349,7 +394,18 @@
             "mode": "fixed"
           },
           "decimals": 2,
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "index": 0,
+                  "text": "0"
+                }
+              },
+              "type": "special"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -389,7 +445,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.5.3",
+      "pluginVersion": "9.2.4",
       "targets": [
         {
           "datasource": {
@@ -423,7 +479,18 @@
             "mode": "fixed"
           },
           "decimals": 2,
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "index": 0,
+                  "text": "0"
+                }
+              },
+              "type": "special"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -463,7 +530,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.5.3",
+      "pluginVersion": "9.2.4",
       "targets": [
         {
           "datasource": {
@@ -497,6 +564,8 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisGridShow": false,
             "axisLabel": "",
             "axisPlacement": "auto",
@@ -596,7 +665,7 @@
               },
               {
                 "id": "unit",
-                "value": "ms"
+                "value": "s"
               },
               {
                 "id": "custom.fillOpacity",
@@ -615,10 +684,15 @@
               },
               {
                 "id": "custom.showPoints",
-                "value": "never"
+                "value": "auto"
               },
               {
-                "id": "custom.transform"
+                "id": "custom.axisLabel",
+                "value": "Response Time"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -668,9 +742,12 @@
               {
                 "id": "custom.scaleDistribution",
                 "value": {
-                  "log": 10,
-                  "type": "log"
+                  "type": "linear"
                 }
+              },
+              {
+                "id": "decimals",
+                "value": 0
               }
             ]
           },
@@ -687,8 +764,7 @@
               {
                 "id": "custom.scaleDistribution",
                 "value": {
-                  "log": 10,
-                  "type": "log"
+                  "type": "linear"
                 }
               },
               {
@@ -704,7 +780,7 @@
               },
               {
                 "id": "unit",
-                "value": "ms"
+                "value": "s"
               }
             ]
           },
@@ -746,8 +822,7 @@
               {
                 "id": "custom.scaleDistribution",
                 "value": {
-                  "log": 10,
-                  "type": "log"
+                  "type": "linear"
                 }
               },
               {
@@ -757,6 +832,10 @@
               {
                 "id": "custom.axisPlacement",
                 "value": "hidden"
+              },
+              {
+                "id": "decimals",
+                "value": 0
               }
             ]
           }
@@ -769,7 +848,7 @@
         "y": 6
       },
       "id": 14,
-      "interval": "1s",
+      "interval": "5",
       "options": {
         "legend": {
           "calcs": [
@@ -786,7 +865,7 @@
           "browser"
         ],
         "tooltip": {
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
@@ -813,7 +892,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "avg(irate(k6_http_reqs{testid=~\"$testid\"}[1m]))",
+          "expr": "avg(sum(irate(k6_http_reqs{testid=~\"$testid\"}[$__range])))",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -829,7 +908,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(rate(k6_http_reqs{testid=~\"$testid\", expected_response=\"false\"}[$__interval])*k6_http_req_failed{testid=~\"$testid\",expected_response=\"false\"})",
+          "expr": "avg(sum(irate(k6_http_reqs{testid=~\"$testid\", expected_response=\"false\"}[$__range])))",
           "hide": false,
           "instant": false,
           "legendFormat": "Failed Requests Rate",
@@ -842,7 +921,8 @@
             "uid": "PEDF09670F151C95C"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_duration_avg{testid=~\"$testid\"})",
+          "exemplar": false,
+          "expr": "avg(histogram_sum(rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__range]))\n/\nhistogram_count(rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__range])))",
           "hide": false,
           "legendFormat": "Response  Time",
           "range": true,
@@ -862,7 +942,18 @@
             "fixedColor": "text",
             "mode": "fixed"
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "index": 0,
+                  "text": "0"
+                }
+              },
+              "type": "special"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -903,7 +994,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.5.3",
+      "pluginVersion": "9.2.4",
       "targets": [
         {
           "datasource": {
@@ -936,11 +1027,13 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 0,
+            "fillOpacity": 25,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -957,7 +1050,7 @@
             "spanNulls": false,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -977,7 +1070,7 @@
               }
             ]
           },
-          "unit": "decbytes"
+          "unit": "binBps"
         },
         "overrides": []
       },
@@ -988,7 +1081,7 @@
         "y": 19
       },
       "id": 18,
-      "interval": "1s",
+      "interval": "5s",
       "options": {
         "legend": {
           "calcs": [],
@@ -997,7 +1090,7 @@
           "showLegend": true
         },
         "tooltip": {
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
@@ -1009,7 +1102,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(k6_data_received{testid=~\"$testid\"}[$__rate_interval]))",
+          "expr": "avg(sum(irate(k6_data_received{testid=~\"$testid\"}[$__range])))",
           "interval": "",
           "legendFormat": "Received",
           "range": true,
@@ -1022,7 +1115,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(k6_data_sent{testid=~\"$testid\"}[$__rate_interval]))",
+          "expr": "avg(sum(irate(k6_data_sent{testid=~\"$testid\"}[$__range])))",
           "hide": false,
           "interval": "",
           "legendFormat": "Sent",
@@ -1040,43 +1133,19 @@
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "fixedColor": "red",
-            "mode": "fixed"
-          },
-          "custom": {
-            "axisGridShow": true,
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineStyle": {
-              "fill": "solid"
-            },
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
+          "mappings": [
+            {
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "color": "blue",
+                  "index": 0,
+                  "text": "0"
+                }
+              },
+              "type": "special"
             }
-          },
-          "mappings": [],
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1086,7 +1155,7 @@
               }
             ]
           },
-          "unit": "none"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -1097,40 +1166,39 @@
         "y": 19
       },
       "id": 78,
-      "interval": "2s",
+      "interval": "5",
       "options": {
-        "legend": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
           "calcs": [
-            "sum"
+            "lastNotNull"
           ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
+          "fields": "",
+          "values": false
         },
-        "timezones": [
-          "browser"
-        ],
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
+        "textMode": "auto"
       },
+      "pluginVersion": "9.2.4",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "PEDF09670F151C95C"
           },
-          "editorMode": "code",
-          "expr": "sum by(error_code) (rate(k6_http_reqs{testid=~\"$testid\", expected_response=\"false\"}[$__interval])*k6_http_req_failed{testid=~\"$testid\",expected_response=\"false\"})",
+          "editorMode": "builder",
+          "expr": "k6_http_reqs{testid=~\"$testid\", expected_response=\"false\"}",
           "hide": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{status}}",
           "range": true,
           "refId": "D"
         }
       ],
       "title": "Error Code Rate",
-      "type": "timeseries"
+      "transformations": [],
+      "type": "stat"
     },
     {
       "datasource": {
@@ -1141,19 +1209,26 @@
         "defaults": {
           "color": {
             "fixedColor": "red",
-            "mode": "fixed"
+            "mode": "continuous-BlYlRd"
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "index": 0,
+                  "text": "0"
+                }
+              },
+              "type": "special"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "dark-blue",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
@@ -1171,7 +1246,7 @@
       "interval": "1s",
       "options": {
         "colorMode": "value",
-        "graphMode": "none",
+        "graphMode": "area",
         "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
@@ -1184,7 +1259,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.5.3",
+      "pluginVersion": "9.2.4",
       "targets": [
         {
           "datasource": {
@@ -1203,7 +1278,7 @@
           "refId": "A"
         }
       ],
-      "title": "Dropped Iteration WIP",
+      "title": "Dropped Iteration ",
       "type": "stat"
     },
     {
@@ -1214,17 +1289,16 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
           "custom": {
             "align": "auto",
-            "displayMode": "color-text",
-            "filterable": true,
+            "displayMode": "auto",
             "inspect": false
           },
           "mappings": [],
           "thresholds": {
-            "mode": "absolute",
+            "mode": "percentage",
             "steps": [
               {
                 "color": "green",
@@ -1237,36 +1311,42 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Request Count"
+              "options": "Success Rate "
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "none"
+                "value": "percent"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "P95 Response Time"
+              "options": "Scenario"
             },
             "properties": [
               {
-                "id": "unit",
-                "value": "ms"
+                "id": "custom.width",
+                "value": 284
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "AVG RPS"
+              "options": "check"
             },
             "properties": [
               {
-                "id": "unit",
-                "value": "reqps"
+                "id": "custom.width",
+                "value": 273
               }
             ]
           }
@@ -1274,7 +1354,7 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 24,
+        "w": 13,
         "x": 0,
         "y": 29
       },
@@ -1288,24 +1368,26 @@
           ],
           "show": false
         },
-        "frameIndex": 1,
-        "showHeader": true
+        "showHeader": true,
+        "sortBy": []
       },
-      "pluginVersion": "8.5.3",
+      "pluginVersion": "9.2.4",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "PEDF09670F151C95C"
           },
-          "editorMode": "code",
+          "editorMode": "builder",
+          "exemplar": false,
           "expr": "k6_checks{testid=~\"$testid\"}",
           "format": "time_series",
+          "instant": false,
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Checks WIP",
+      "title": "Checks",
       "transformations": [
         {
           "id": "labelsToFields",
@@ -1321,8 +1403,7 @@
             "fields": {
               "Value": {
                 "aggregations": [
-                  "sum",
-                  "count"
+                  "last"
                 ],
                 "operation": "aggregate"
               },
@@ -1382,17 +1463,34 @@
           }
         },
         {
-          "disabled": true,
+          "id": "calculateField",
+          "options": {
+            "alias": "Success Rate ",
+            "binary": {
+              "left": "Value (last)",
+              "operator": "*",
+              "reducer": "sum",
+              "right": "100"
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            },
+            "replaceFields": false
+          }
+        },
+        {
           "id": "organize",
           "options": {
-            "excludeByName": {},
+            "excludeByName": {
+              "Value (last)": true,
+              "testid": true
+            },
             "indexByName": {
-              "Value #A (lastNotNull)": 4,
-              "Value #B (lastNotNull)": 3,
-              "Value #C (lastNotNull)": 5,
-              "Value #D (lastNotNull)": 1,
-              "Value #E (lastNotNull)": 2,
-              "scenario": 0
+              "Value (last)": 3,
+              "check": 0,
+              "scenario": 1,
+              "testid": 2
             },
             "renameByName": {
               "Value #A (lastNotNull)": "P95 Response Time",
@@ -1400,6 +1498,7 @@
               "Value #C (lastNotNull)": "AVG RPS",
               "Value #D (lastNotNull)": "Iterations",
               "Value #E (lastNotNull)": "Request Count",
+              "Value (last)": "",
               "Value (lastNotNull)": "",
               "scenario": "Scenario"
             }
@@ -1476,9 +1575,9 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 24,
-        "x": 0,
-        "y": 36
+        "w": 11,
+        "x": 13,
+        "y": 29
       },
       "id": 107,
       "interval": "1",
@@ -1499,20 +1598,7 @@
           }
         ]
       },
-      "pluginVersion": "8.5.3",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
-          },
-          "editorMode": "code",
-          "expr": "",
-          "format": "table",
-          "range": true,
-          "refId": "A"
-        }
-      ],
+      "pluginVersion": "9.2.4",
       "title": "Thresholds WIP",
       "transformations": [
         {
@@ -1618,7 +1704,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 36
       },
       "id": 32,
       "panels": [],
@@ -1657,44 +1743,16 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "green",
-                "value": 200
-              },
-              {
-                "color": "yellow",
-                "value": 300
-              },
-              {
-                "color": "orange",
-                "value": 400
-              },
-              {
-                "color": "red",
-                "value": 500
               }
             ]
           },
-          "unit": "ms"
+          "unit": "none"
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "URL"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 487
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "STATUS"
+              "options": "status"
             },
             "properties": [
               {
@@ -1704,18 +1762,141 @@
               {
                 "id": "unit",
                 "value": "short"
+              },
+              {
+                "id": "custom.width",
+                "value": 72
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "COUNT"
+              "options": "count"
             },
             "properties": [
               {
                 "id": "unit",
                 "value": "short"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 81
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "min "
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.width",
+                "value": 101
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mean"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.width",
+                "value": 97
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "max"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p95"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.width",
+                "value": 92
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "testid"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 132
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 554
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "scenario"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 283
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "method"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
               }
             ]
           }
@@ -1725,7 +1906,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 44
+        "y": 37
       },
       "id": 43,
       "interval": "5s",
@@ -1737,11 +1918,11 @@
           ],
           "show": false
         },
-        "frameIndex": 0,
+        "frameIndex": 1,
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "8.5.3",
+      "pluginVersion": "9.2.4",
       "targets": [
         {
           "datasource": {
@@ -1751,6 +1932,9 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "k6_http_reqs{testid=~\"$testid\"}",
+          "format": "table",
+          "hide": false,
+          "instant": false,
           "interval": "",
           "legendFormat": "",
           "range": true,
@@ -1761,17 +1945,12 @@
             "type": "prometheus",
             "uid": "PEDF09670F151C95C"
           },
-          "expr": "k6_http_req_duration_min{testid=~\"$testid\"}",
+          "editorMode": "code",
+          "expr": "histogram_quantile(0, sum(rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__range])))",
+          "format": "table",
           "hide": false,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
-          },
-          "expr": "k6_http_req_duration_avg{testid=~\"$testid\"}",
-          "hide": false,
+          "legendFormat": "",
+          "range": true,
           "refId": "C"
         },
         {
@@ -1779,8 +1958,12 @@
             "type": "prometheus",
             "uid": "PEDF09670F151C95C"
           },
-          "expr": "k6_http_req_duration_p95{testid=~\"$testid\"}",
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.5, sum(rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__range])))",
+          "format": "table",
           "hide": false,
+          "legendFormat": "",
+          "range": true,
           "refId": "D"
         },
         {
@@ -1788,20 +1971,30 @@
             "type": "prometheus",
             "uid": "PEDF09670F151C95C"
           },
-          "expr": "k6_http_req_duration_max{testid=~\"$testid\"}",
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum(rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__range])))",
+          "format": "table",
           "hide": false,
-          "refId": "E"
+          "legendFormat": "",
+          "range": true,
+          "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PEDF09670F151C95C"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(1, sum(rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__range])))",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "Requests by URL",
       "transformations": [
-        {
-          "id": "labelsToFields",
-          "options": {
-            "mode": "columns",
-            "valueLabel": "__name__"
-          }
-        },
         {
           "id": "merge",
           "options": {}
@@ -1810,40 +2003,52 @@
           "id": "groupBy",
           "options": {
             "fields": {
-              "error_code": {
-                "aggregations": []
+              "Value": {
+                "aggregations": [
+                  "min",
+                  "max"
+                ],
+                "operation": "aggregate"
               },
-              "k6_http_req_duration_avg": {
+              "Value #A": {
                 "aggregations": [
                   "lastNotNull"
                 ],
                 "operation": "aggregate"
               },
-              "k6_http_req_duration_max": {
+              "Value #B": {
                 "aggregations": [
                   "lastNotNull"
                 ],
                 "operation": "aggregate"
               },
-              "k6_http_req_duration_min": {
+              "Value #C": {
                 "aggregations": [
                   "lastNotNull"
                 ],
                 "operation": "aggregate"
               },
-              "k6_http_req_duration_p95": {
+              "Value #D": {
                 "aggregations": [
                   "lastNotNull"
                 ],
                 "operation": "aggregate"
               },
-              "k6_http_reqs": {
+              "Value #E": {
+                "aggregations": [],
+                "operation": "aggregate"
+              },
+              "Value #F": {
                 "aggregations": [
                   "lastNotNull"
                 ],
                 "operation": "aggregate"
               },
               "method": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "name": {
                 "aggregations": [],
                 "operation": "groupby"
               },
@@ -1859,9 +2064,8 @@
                 "aggregations": [],
                 "operation": "groupby"
               },
-              "url": {
-                "aggregations": [],
-                "operation": "groupby"
+              "tls_version": {
+                "aggregations": []
               }
             }
           }
@@ -1871,29 +2075,42 @@
           "options": {
             "excludeByName": {},
             "indexByName": {
-              "k6_http_req_duration_avg (lastNotNull)": 7,
-              "k6_http_req_duration_max (lastNotNull)": 9,
-              "k6_http_req_duration_min (lastNotNull)": 6,
-              "k6_http_req_duration_p95 (lastNotNull)": 8,
-              "k6_http_reqs (lastNotNull)": 5,
+              "Value #A (lastNotNull)": 5,
+              "Value #C (lastNotNull)": 6,
+              "Value #D (lastNotNull)": 7,
               "method": 3,
+              "name": 1,
               "scenario": 2,
               "status": 4,
-              "testid": 0,
-              "url": 1
+              "testid": 0
             },
             "renameByName": {
-              "k6_http_req_duration_avg (lastNotNull)": "AVG",
-              "k6_http_req_duration_max (lastNotNull)": "MAX",
-              "k6_http_req_duration_min (lastNotNull)": "MIN",
-              "k6_http_req_duration_p95 (lastNotNull)": "P95",
-              "k6_http_reqs (lastNotNull)": "COUNT",
-              "method": "METHOD",
-              "scenario": "SCENARIO",
-              "status": "STATUS",
-              "testid": "TESTID",
-              "url": "URL"
+              "Value": "",
+              "Value #A (lastNotNull)": "count",
+              "Value #B (lastNotNull)": "max",
+              "Value #B (min)": "min",
+              "Value #C (lastNotNull)": "min ",
+              "Value #C (mean)": "",
+              "Value #D (lastNotNull)": "mean",
+              "Value #E (max)": "max",
+              "Value #F (lastNotNull)": "p95"
             }
+          }
+        },
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "config": {
+                  "id": "isNull",
+                  "options": {}
+                },
+                "fieldName": "count"
+              }
+            ],
+            "match": "any",
+            "type": "exclude"
           }
         }
       ],
@@ -1910,6 +2127,8 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -1925,7 +2144,8 @@
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
-              "type": "linear"
+              "log": 10,
+              "type": "log"
             },
             "showPoints": "never",
             "spanNulls": true,
@@ -1951,7 +2171,7 @@
               }
             ]
           },
-          "unit": "ms"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -1959,7 +2179,7 @@
         "h": 11,
         "w": 24,
         "x": 0,
-        "y": 53
+        "y": 46
       },
       "id": 41,
       "interval": "1s",
@@ -1969,7 +2189,10 @@
             "lastNotNull"
           ],
           "displayMode": "table",
-          "placement": "right"
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -1985,7 +2208,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(k6_http_req_blocked_avg{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"})",
+          "expr": "avg(histogram_sum(rate(k6_http_req_blocked_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range]))\n/\nhistogram_count(rate(k6_http_req_blocked_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range])))",
           "hide": false,
           "interval": "",
           "legendFormat": "Blocked",
@@ -1999,7 +2222,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(k6_http_req_connecting_avg{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"})",
+          "expr": "avg(histogram_sum(rate(k6_http_req_connecting_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range]))\n/\nhistogram_count(rate(k6_http_req_connecting_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range])))",
           "hide": false,
           "interval": "",
           "legendFormat": "Connecting",
@@ -2013,7 +2236,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(k6_http_req_duration_avg{testid=~\"$testid\",url=~\"$url\",scenario=~\"$scenario\"})",
+          "expr": "avg(histogram_sum(rate(k6_http_req_duration_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range]))\n/\nhistogram_count(rate(k6_http_req_duration_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range])))",
           "hide": false,
           "interval": "",
           "legendFormat": "Duration",
@@ -2027,7 +2250,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(k6_http_req_receiving_avg{testid=~\"$testid\",url=~\"$url\",scenario=~\"$scenario\"})",
+          "expr": "avg(histogram_sum(rate(k6_http_req_receiving_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range]))\n/\nhistogram_count(rate(k6_http_req_receiving_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range])))",
           "hide": false,
           "interval": "",
           "legendFormat": "Receiving",
@@ -2041,7 +2264,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(k6_http_req_sending_avg{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"})",
+          "expr": "avg(histogram_sum(rate(k6_http_req_sending_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range]))\n/\nhistogram_count(rate(k6_http_req_sending_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range])))",
           "hide": false,
           "interval": "",
           "legendFormat": "Sending",
@@ -2055,7 +2278,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(k6_http_req_tls_handshaking_avg{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"})",
+          "expr": "avg(histogram_sum(rate(k6_http_req_tls_handshaking_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range]))\n/\nhistogram_count(rate(k6_http_req_tls_handshaking_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range])))",
           "hide": false,
           "interval": "",
           "legendFormat": "TLS Handshaking",
@@ -2069,7 +2292,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(k6_http_req_waiting_avg{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"})",
+          "expr": "avg(histogram_sum(rate(k6_http_req_waiting_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range]))\n/\nhistogram_count(rate(k6_http_req_waiting_seconds{testid=~\"$testid\", url=~\"$url\",scenario=~\"$scenario\"}[$__range])))",
           "hide": false,
           "interval": "",
           "legendFormat": "Waiting",
@@ -2128,7 +2351,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "ms"
+                "value": "s"
               }
             ]
           },
@@ -2150,7 +2373,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 64
+        "y": 57
       },
       "id": 54,
       "interval": "5s",
@@ -2165,7 +2388,7 @@
         "frameIndex": 1,
         "showHeader": true
       },
-      "pluginVersion": "8.5.3",
+      "pluginVersion": "9.2.4",
       "targets": [
         {
           "datasource": {
@@ -2173,7 +2396,7 @@
             "uid": "PEDF09670F151C95C"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario) (k6_http_req_duration_p95{testid=~\"$testid\",scenario=~\"$scenario\", expected_response=\"true\"})",
+          "expr": "histogram_quantile(0.95, sum(rate(k6_http_req_duration_seconds{scenario=~\"$scenario\", expected_response=\"true\", testid=~\"$testid\"}[$__range])))",
           "format": "table",
           "hide": false,
           "legendFormat": "",
@@ -2199,7 +2422,7 @@
             "uid": "PEDF09670F151C95C"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario) (rate(k6_http_reqs{testid=~\"$testid\",scenario=~\"$scenario\"}[$__interval]))",
+          "expr": "avg by(scenario) (sum(irate(k6_http_reqs{testid=~\"$testid\"}[$__range])))",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -2225,7 +2448,7 @@
             "uid": "PEDF09670F151C95C"
           },
           "editorMode": "code",
-          "expr": "sum by(scenario) ( k6_http_reqs{testid=~\"$testid\", scenario=~\"$scenario\",expected_response=\"false\"}*k6_http_req_failed{testid=~\"$testid\", scenario=~\"$scenario\",expected_response=\"false\"})",
+          "expr": "sum by(scenario) ( k6_http_reqs{testid=~\"$testid\",scenario=~\"$scenario\",expected_response=\"false\"})\n",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -2263,7 +2486,7 @@
               },
               "Value #C": {
                 "aggregations": [
-                  "max"
+                  "lastNotNull"
                 ],
                 "operation": "aggregate"
               },
@@ -2322,6 +2545,22 @@
               "scenario": "Scenario"
             }
           }
+        },
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "config": {
+                  "id": "isNull",
+                  "options": {}
+                },
+                "fieldName": "Request Count"
+              }
+            ],
+            "match": "any",
+            "type": "exclude"
+          }
         }
       ],
       "type": "table"
@@ -2336,7 +2575,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 71
+        "y": 64
       },
       "id": 35,
       "panels": [
@@ -2357,7 +2596,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2387,7 +2627,7 @@
                 "properties": [
                   {
                     "id": "unit",
-                    "value": "ms"
+                    "value": "s"
                   }
                 ]
               },
@@ -2406,12 +2646,12 @@
             ]
           },
           "gridPos": {
-            "h": 3,
+            "h": 7,
             "w": 24,
             "x": 0,
-            "y": 30
+            "y": 65
           },
-          "id": 105,
+          "id": 116,
           "interval": "5s",
           "options": {
             "footer": {
@@ -2424,7 +2664,7 @@
             "frameIndex": 1,
             "showHeader": true
           },
-          "pluginVersion": "8.5.3",
+          "pluginVersion": "9.2.4",
           "targets": [
             {
               "datasource": {
@@ -2432,7 +2672,7 @@
                 "uid": "PEDF09670F151C95C"
               },
               "editorMode": "code",
-              "expr": "avg by(scenario) (k6_http_req_duration_p95{testid=~\"$testid\",scenario=~\"$scenario\", expected_response=\"true\"})",
+              "expr": "histogram_quantile(0.95, sum(rate(k6_http_req_duration_seconds{scenario=~\"$scenario\", expected_response=\"true\", testid=~\"$testid\"}[$__range])))",
               "format": "table",
               "hide": false,
               "legendFormat": "",
@@ -2458,7 +2698,7 @@
                 "uid": "PEDF09670F151C95C"
               },
               "editorMode": "code",
-              "expr": "avg by(scenario) (rate(k6_http_reqs{testid=~\"$testid\",scenario=~\"$scenario\"}[$__interval]))",
+              "expr": "avg by(scenario) (sum(irate(k6_http_reqs{testid=~\"$testid\"}[$__range])))",
               "format": "table",
               "hide": false,
               "legendFormat": "__auto",
@@ -2484,7 +2724,7 @@
                 "uid": "PEDF09670F151C95C"
               },
               "editorMode": "code",
-              "expr": "sum by(scenario) ( k6_http_reqs{testid=~\"$testid\", scenario=~\"$scenario\",expected_response=\"false\"}*k6_http_req_failed{testid=~\"$testid\", scenario=~\"$scenario\",expected_response=\"false\"})",
+              "expr": "sum by(scenario) ( k6_http_reqs{testid=~\"$testid\",scenario=~\"$scenario\",expected_response=\"false\"})\n",
               "format": "table",
               "hide": false,
               "legendFormat": "__auto",
@@ -2492,7 +2732,7 @@
               "refId": "B"
             }
           ],
-          "title": "Scenario $scenario",
+          "title": "Scenarios",
           "transformations": [
             {
               "id": "merge",
@@ -2522,7 +2762,7 @@
                   },
                   "Value #C": {
                     "aggregations": [
-                      "max"
+                      "lastNotNull"
                     ],
                     "operation": "aggregate"
                   },
@@ -2581,6 +2821,22 @@
                   "scenario": "Scenario"
                 }
               }
+            },
+            {
+              "id": "filterByValue",
+              "options": {
+                "filters": [
+                  {
+                    "config": {
+                      "id": "isNull",
+                      "options": {}
+                    },
+                    "fieldName": "Request Count"
+                  }
+                ],
+                "match": "all",
+                "type": "exclude"
+              }
             }
           ],
           "type": "table"
@@ -2597,6 +2853,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisGridShow": false,
                 "axisLabel": "",
                 "axisPlacement": "auto",
@@ -2633,7 +2891,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   }
                 ]
               }
@@ -2695,7 +2954,7 @@
                   },
                   {
                     "id": "unit",
-                    "value": "ms"
+                    "value": "s"
                   },
                   {
                     "id": "custom.fillOpacity",
@@ -2714,10 +2973,15 @@
                   },
                   {
                     "id": "custom.showPoints",
-                    "value": "never"
+                    "value": "auto"
                   },
                   {
-                    "id": "custom.transform"
+                    "id": "custom.axisLabel",
+                    "value": "Response Time"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 2
                   }
                 ]
               },
@@ -2767,9 +3031,12 @@
                   {
                     "id": "custom.scaleDistribution",
                     "value": {
-                      "log": 10,
-                      "type": "log"
+                      "type": "linear"
                     }
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 0
                   }
                 ]
               },
@@ -2786,8 +3053,7 @@
                   {
                     "id": "custom.scaleDistribution",
                     "value": {
-                      "log": 10,
-                      "type": "log"
+                      "type": "linear"
                     }
                   },
                   {
@@ -2803,7 +3069,7 @@
                   },
                   {
                     "id": "unit",
-                    "value": "ms"
+                    "value": "s"
                   }
                 ]
               },
@@ -2845,8 +3111,7 @@
                   {
                     "id": "custom.scaleDistribution",
                     "value": {
-                      "log": 10,
-                      "type": "log"
+                      "type": "linear"
                     }
                   },
                   {
@@ -2856,6 +3121,10 @@
                   {
                     "id": "custom.axisPlacement",
                     "value": "hidden"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 0
                   }
                 ]
               }
@@ -2865,16 +3134,17 @@
             "h": 13,
             "w": 24,
             "x": 0,
-            "y": 33
+            "y": 72
           },
-          "id": 106,
-          "interval": "1s",
+          "id": 115,
+          "interval": "5",
           "options": {
             "legend": {
               "calcs": [
                 "min",
                 "mean",
-                "max"
+                "max",
+                "lastNotNull"
               ],
               "displayMode": "table",
               "placement": "bottom",
@@ -2884,7 +3154,7 @@
               "browser"
             ],
             "tooltip": {
-              "mode": "single",
+              "mode": "multi",
               "sort": "none"
             }
           },
@@ -2910,10 +3180,12 @@
                 "uid": "PEDF09670F151C95C"
               },
               "editorMode": "code",
-              "exemplar": false,
-              "expr": "avg(irate(k6_http_reqs{testid=~\"$testid\",scenario=~\"$scenario\"}[1m]))",
+              "exemplar": true,
+              "expr": "avg(sum(irate(k6_http_reqs{testid=~\"$testid\",scenario=~\"$scenario\"}[$__range])))",
+              "format": "time_series",
               "hide": false,
               "instant": false,
+              "interval": "",
               "legendFormat": "Requests Rate",
               "range": true,
               "refId": "B"
@@ -2925,7 +3197,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "avg(rate(k6_http_reqs{testid=~\"$testid\", expected_response=\"false\",scenario=~\"$scenario\"}[$__interval])*k6_http_req_failed{testid=~\"$testid\",expected_response=\"false\",scenario=~\"$scenario\"})",
+              "expr": "avg(sum(irate(k6_http_reqs{testid=~\"$testid\", expected_response=\"false\",scenario=~\"$scenario\"}[$__range])))",
               "hide": false,
               "instant": false,
               "legendFormat": "Failed Requests Rate",
@@ -2938,7 +3210,8 @@
                 "uid": "PEDF09670F151C95C"
               },
               "editorMode": "code",
-              "expr": "avg(k6_http_req_duration_avg{testid=~\"$testid\",scenario=~\"$scenario\"})",
+              "exemplar": false,
+              "expr": "avg(histogram_sum(rate(k6_http_req_duration_seconds{testid=~\"$testid\",scenario=~\"$scenario\"}[$__range]))\n/\nhistogram_count(rate(k6_http_req_duration_seconds{testid=~\"$testid\",scenario=~\"$scenario\"}[$__range])))",
               "hide": false,
               "legendFormat": "Response  Time",
               "range": true,
@@ -2963,383 +3236,390 @@
       "type": "row"
     },
     {
-      "collapsed": false,
+      "collapsed": true,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 72
+        "y": 65
       },
       "id": 109,
-      "panels": [],
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PEDF09670F151C95C"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 86
+          },
+          "id": 111,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "9.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PEDF09670F151C95C"
+              },
+              "expr": "k6_my_counter{testid=~\"$testid\"}",
+              "refId": "A"
+            }
+          ],
+          "title": "Counter",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PEDF09670F151C95C"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 86
+          },
+          "id": 112,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "8.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PEDF09670F151C95C"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "k6_my_gauge{testid=~\"$testid\"}",
+              "format": "time_series",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "gouge",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PEDF09670F151C95C"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "continuous-GrYlRd"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "percentage",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 94
+          },
+          "id": 113,
+          "options": {
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "mean"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "pluginVersion": "9.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PEDF09670F151C95C"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "avg(k6_my_rate{testid=~\"$testid\"})",
+              "instant": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Rate",
+          "type": "gauge"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PEDF09670F151C95C"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 94
+          },
+          "id": 114,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "8.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PEDF09670F151C95C"
+              },
+              "editorMode": "code",
+              "expr": "k6_my_trend_avg{testid=~\"$testid\"}",
+              "hide": false,
+              "legendFormat": "avg",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PEDF09670F151C95C"
+              },
+              "editorMode": "code",
+              "expr": "k6_my_trend_max{testid=~\"$testid\"}",
+              "hide": false,
+              "legendFormat": "max",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PEDF09670F151C95C"
+              },
+              "editorMode": "code",
+              "expr": "k6_my_trend_med{testid=~\"$testid\"}",
+              "hide": false,
+              "legendFormat": "med",
+              "range": true,
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PEDF09670F151C95C"
+              },
+              "editorMode": "code",
+              "expr": "k6_my_trend_min{testid=~\"$testid\"}",
+              "hide": false,
+              "legendFormat": "min",
+              "range": true,
+              "refId": "D"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PEDF09670F151C95C"
+              },
+              "editorMode": "code",
+              "expr": "k6_my_trend_p90{testid=~\"$testid\"}",
+              "hide": false,
+              "legendFormat": "p90",
+              "range": true,
+              "refId": "E"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PEDF09670F151C95C"
+              },
+              "editorMode": "code",
+              "expr": "k6_my_trend_p95{testid=~\"$testid\"}",
+              "hide": false,
+              "legendFormat": "p95",
+              "range": true,
+              "refId": "F"
+            }
+          ],
+          "title": "trends wip",
+          "type": "timeseries"
+        }
+      ],
       "title": "Example Custom Metrics",
       "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PEDF09670F151C95C"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 73
-      },
-      "id": 111,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "8.5.3",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
-          },
-          "expr": "k6_my_counter{testid=~\"$testid\"}",
-          "refId": "A"
-        }
-      ],
-      "title": "Counter",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PEDF09670F151C95C"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 73
-      },
-      "id": 112,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "8.5.3",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "k6_my_gauge{testid=~\"$testid\"}",
-          "format": "time_series",
-          "instant": false,
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "gouge",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PEDF09670F151C95C"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "continuous-GrYlRd"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              }
-            ]
-          },
-          "unit": "percentunit"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 81
-      },
-      "id": 113,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "mean"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "pluginVersion": "8.5.3",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "avg(k6_my_rate{testid=~\"$testid\"})",
-          "instant": false,
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Rate",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PEDF09670F151C95C"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 81
-      },
-      "id": 114,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "8.5.3",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
-          },
-          "editorMode": "code",
-          "expr": "k6_my_trend_avg{testid=~\"$testid\"}",
-          "hide": false,
-          "legendFormat": "avg",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
-          },
-          "editorMode": "code",
-          "expr": "k6_my_trend_max{testid=~\"$testid\"}",
-          "hide": false,
-          "legendFormat": "max",
-          "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
-          },
-          "editorMode": "code",
-          "expr": "k6_my_trend_med{testid=~\"$testid\"}",
-          "hide": false,
-          "legendFormat": "med",
-          "range": true,
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
-          },
-          "editorMode": "code",
-          "expr": "k6_my_trend_min{testid=~\"$testid\"}",
-          "hide": false,
-          "legendFormat": "min",
-          "range": true,
-          "refId": "D"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
-          },
-          "editorMode": "code",
-          "expr": "k6_my_trend_p90{testid=~\"$testid\"}",
-          "hide": false,
-          "legendFormat": "p90",
-          "range": true,
-          "refId": "E"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
-          },
-          "editorMode": "code",
-          "expr": "k6_my_trend_p95{testid=~\"$testid\"}",
-          "hide": false,
-          "legendFormat": "p95",
-          "range": true,
-          "refId": "F"
-        }
-      ],
-      "title": "trends",
-      "type": "timeseries"
     }
   ],
   "refresh": "5s",
-  "schemaVersion": 36,
+  "schemaVersion": 37,
   "style": "dark",
   "tags": [
     "prometheus",
