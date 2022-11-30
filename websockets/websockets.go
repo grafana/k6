@@ -226,9 +226,10 @@ func defineWebsocket(rt *goja.Runtime, w *webSocket) {
 }
 
 type message struct {
-	mtype int // message type consts as defined in gorilla/websocket/conn.go
-	data  []byte
-	t     time.Time
+	mtype    int // message type consts as defined in gorilla/websocket/conn.go
+	data     []byte
+	t        time.Time
+	deadline time.Time
 }
 
 // documented https://websockets.spec.whatwg.org/#concept-websocket-establish
@@ -428,7 +429,15 @@ func (w *webSocket) loop() {
 						return
 					}
 					size := len(msg.data)
-					err := w.conn.WriteMessage(msg.mtype, msg.data)
+
+					err := func() error {
+						if msg.deadline.IsZero() {
+							return w.conn.WriteMessage(msg.mtype, msg.data)
+						}
+
+						// WriteControl is concurrently okay
+						return w.conn.WriteControl(msg.mtype, msg.data, msg.deadline)
+					}()
 					if err != nil {
 						w.tq.Queue(func() error {
 							_ = w.conn.Close() // TODO fix
@@ -620,15 +629,13 @@ func (w *webSocket) send(msg goja.Value) {
 
 // Ping sends a ping message over the websocket.
 func (w *webSocket) ping() {
-	deadline := time.Now().Add(writeWait)
 	pingID := strconv.Itoa(w.sendPings.counter)
 
-	data := []byte(pingID)
-
-	err := w.conn.WriteControl(websocket.PingMessage, data, deadline)
-	if err != nil {
-		_ = w.callErrorListeners(err)
-		return
+	w.writeQueueCh <- message{
+		mtype:    websocket.PingMessage,
+		data:     []byte(pingID),
+		t:        time.Now(),
+		deadline: time.Now().Add(writeWait),
 	}
 
 	w.sendPings.timestamps[pingID] = time.Now()
