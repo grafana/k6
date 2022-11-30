@@ -5,38 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
-)
-
-//nolint:gochecknoglobals
-var (
-	colorFaint   = color.New(color.Faint)
-	statusColors = map[Status]*color.Color{
-		Interrupted: color.New(color.FgRed),
-		Done:        color.New(color.FgGreen),
-		Waiting:     colorFaint,
-	}
-)
-
-const (
-	// DefaultWidth of the progress bar
-	DefaultWidth = 40
-	// threshold below which progress should be rendered as
-	// percentages instead of filling bars
-	minWidth = 8
-)
-
-// Status of the progress bar
-type Status rune
-
-// Progress bar status symbols
-const (
-	Running     Status = ' '
-	Waiting     Status = '•'
-	Stopping    Status = '↓'
-	Interrupted Status = '✗'
-	Done        Status = '✓'
 )
 
 // ProgressBar is a simple thread-safe progressbar implementation with

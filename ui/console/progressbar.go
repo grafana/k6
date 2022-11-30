@@ -10,7 +10,7 @@ import (
 	"unicode/utf8"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/ui/pb"
+	"go.k6.io/k6/ui/console/pb"
 	"golang.org/x/term"
 )
 

@@ -20,7 +20,7 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/ui/pb"
+	"go.k6.io/k6/ui/console/pb"
 )
 
 // cmdCloud handles the `k6 cloud` sub-command

@@ -12,7 +12,7 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/ui/pb"
+	"go.k6.io/k6/ui/console/pb"
 )
 
 func sumStagesDuration(stages []Stage) (result time.Duration) {

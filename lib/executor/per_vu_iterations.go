@@ -13,7 +13,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/ui/pb"
+	"go.k6.io/k6/ui/console/pb"
 )
 
 const perVUIterationsType = "per-vu-iterations"
