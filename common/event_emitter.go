@@ -24,31 +24,28 @@ const (
 
 	// Frame
 
-	EventFrameNavigation      string = "navigation"
-	EventFrameAddLifecycle    string = "addlifecycle"
-	EventFrameRemoveLifecycle string = "removelifecycle"
+	EventFrameNavigation   string = "navigation"
+	EventFrameAddLifecycle string = "addlifecycle"
 
 	// Page
 
-	EventPageClose            string = "close"
-	EventPageConsole          string = "console"
-	EventPageCrash            string = "crash"
-	EventPageDialog           string = "dialog"
-	EventPageDOMContentLoaded string = "domcontentloaded"
-	EventPageDownload         string = "download"
-	EventPageFilechooser      string = "filechooser"
-	EventPageFrameAttached    string = "frameattached"
-	EventPageFrameDetached    string = "framedetached"
-	EventPageFrameNavigated   string = "framenavigated"
-	EventPageLoad             string = "load"
-	EventPageError            string = "pageerror"
-	EventPagePopup            string = "popup"
-	EventPageRequest          string = "request"
-	EventPageRequestFailed    string = "requestfailed"
-	EventPageRequestFinished  string = "requestfinished"
-	EventPageResponse         string = "response"
-	EventPageWebSocket        string = "websocket"
-	EventPageWorker           string = "worker"
+	EventPageClose           string = "close"
+	EventPageConsole         string = "console"
+	EventPageCrash           string = "crash"
+	EventPageDialog          string = "dialog"
+	EventPageDownload        string = "download"
+	EventPageFilechooser     string = "filechooser"
+	EventPageFrameAttached   string = "frameattached"
+	EventPageFrameDetached   string = "framedetached"
+	EventPageFrameNavigated  string = "framenavigated"
+	EventPageError           string = "pageerror"
+	EventPagePopup           string = "popup"
+	EventPageRequest         string = "request"
+	EventPageRequestFailed   string = "requestfailed"
+	EventPageRequestFinished string = "requestfinished"
+	EventPageResponse        string = "response"
+	EventPageWebSocket       string = "websocket"
+	EventPageWorker          string = "worker"
 
 	// Session
 

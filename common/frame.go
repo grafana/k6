@@ -54,9 +54,8 @@ type Frame struct {
 
 	// A life cycle event is only considered triggered for a frame if the entire
 	// frame subtree has also had the life cycle event triggered.
-	lifecycleEventsMu      sync.RWMutex
-	lifecycleEvents        map[LifecycleEvent]bool
-	subtreeLifecycleEvents map[LifecycleEvent]bool
+	lifecycleEventsMu sync.RWMutex
+	lifecycleEvents   map[LifecycleEvent]bool
 
 	documentHandle *ElementHandle
 
@@ -64,8 +63,6 @@ type Frame struct {
 	executionContexts  map[executionWorld]frameExecutionContext
 
 	loadingStartedTime time.Time
-
-	networkIdleCh chan struct{}
 
 	inflightRequestsMu sync.RWMutex
 	inflightRequests   map[network.RequestID]bool
@@ -94,21 +91,19 @@ func NewFrame(
 	}
 
 	return &Frame{
-		BaseEventEmitter:       NewBaseEventEmitter(ctx),
-		ctx:                    ctx,
-		page:                   m.page,
-		manager:                m,
-		parentFrame:            parentFrame,
-		childFrames:            make(map[api.Frame]bool),
-		id:                     frameID,
-		vu:                     k6ext.GetVU(ctx),
-		lifecycleEvents:        make(map[LifecycleEvent]bool),
-		subtreeLifecycleEvents: make(map[LifecycleEvent]bool),
-		inflightRequests:       make(map[network.RequestID]bool),
-		executionContexts:      make(map[executionWorld]frameExecutionContext),
-		currentDocument:        &DocumentInfo{},
-		networkIdleCh:          make(chan struct{}),
-		log:                    log,
+		BaseEventEmitter:  NewBaseEventEmitter(ctx),
+		ctx:               ctx,
+		page:              m.page,
+		manager:           m,
+		parentFrame:       parentFrame,
+		childFrames:       make(map[api.Frame]bool),
+		id:                frameID,
+		vu:                k6ext.GetVU(ctx),
+		lifecycleEvents:   make(map[LifecycleEvent]bool),
+		inflightRequests:  make(map[network.RequestID]bool),
+		executionContexts: make(map[executionWorld]frameExecutionContext),
+		currentDocument:   &DocumentInfo{},
+		log:               log,
 	}
 }
 
@@ -168,8 +163,6 @@ func (f *Frame) clearLifecycle() {
 	f.lifecycleEvents = make(map[LifecycleEvent]bool)
 	f.lifecycleEventsMu.Unlock()
 
-	f.page.frameManager.MainFrame().recalculateLifecycle()
-
 	// keep the request related to the document if present
 	// in f.inflightRequests
 	f.inflightRequestsMu.Lock()
@@ -188,117 +181,11 @@ func (f *Frame) clearLifecycle() {
 		f.inflightRequests = inflightRequests
 	}
 	f.inflightRequestsMu.Unlock()
-
-	f.stopNetworkIdleTimer()
-	if f.inflightRequestsLen() == 0 {
-		f.startNetworkIdleTimer()
-	}
-}
-
-func (f *Frame) recalculateLifecycle() {
-	f.log.Debugf("Frame:recalculateLifecycle", "fid:%s furl:%q", f.ID(), f.URL())
-
-	// Start with triggered events.
-	events := make(map[LifecycleEvent]bool)
-	f.lifecycleEventsMu.RLock()
-	{
-		for k, v := range f.lifecycleEvents {
-			events[k] = v
-		}
-	}
-	f.lifecycleEventsMu.RUnlock()
-
-	// Only consider a life cycle event as fired if it has triggered for all of subtree.
-	f.childFramesMu.RLock()
-	{
-		for child := range f.childFrames {
-			cf := child.(*Frame)
-			// a precaution for preventing a deadlock in *Frame.childFramesMu
-			if cf == f {
-				continue
-			}
-			cf.recalculateLifecycle()
-			for k := range events {
-				if !cf.hasSubtreeLifecycleEventFired(k) {
-					delete(events, k)
-				}
-			}
-		}
-	}
-	f.childFramesMu.RUnlock()
-
-	// Check if any of the fired events should be considered fired when looking at the entire subtree.
-	mainFrame := f.manager.MainFrame()
-	for k := range events {
-		if f.hasSubtreeLifecycleEventFired(k) {
-			continue
-		}
-		f.emit(EventFrameAddLifecycle, k)
-
-		if f != mainFrame {
-			continue
-		}
-		switch k {
-		case LifecycleEventLoad:
-			f.page.emit(EventPageLoad, nil)
-		case LifecycleEventDOMContentLoad:
-			f.page.emit(EventPageDOMContentLoaded, nil)
-		}
-	}
-
-	// Emit removal events
-	f.lifecycleEventsMu.RLock()
-	{
-		for k := range f.subtreeLifecycleEvents {
-			if ok := events[k]; !ok {
-				f.emit(EventFrameRemoveLifecycle, k)
-			}
-		}
-	}
-	f.lifecycleEventsMu.RUnlock()
-
-	f.lifecycleEventsMu.Lock()
-	{
-		f.subtreeLifecycleEvents = make(map[LifecycleEvent]bool)
-		for k, v := range events {
-			f.subtreeLifecycleEvents[k] = v
-		}
-	}
-	f.lifecycleEventsMu.Unlock()
-}
-
-func (f *Frame) stopNetworkIdleTimer() {
-	f.log.Debugf("Frame:stopNetworkIdleTimer", "fid:%s furl:%q", f.ID(), f.URL())
-
-	select {
-	case f.networkIdleCh <- struct{}{}:
-	default:
-	}
-}
-
-func (f *Frame) startNetworkIdleTimer() {
-	f.log.Debugf("Frame:startNetworkIdleTimer", "fid:%s furl:%q", f.ID(), f.URL())
-
-	if f.hasLifecycleEventFired(LifecycleEventNetworkIdle) || f.IsDetached() {
-		return
-	}
-
-	f.stopNetworkIdleTimer()
-
-	go func() {
-		select {
-		case <-f.ctx.Done():
-		case <-f.networkIdleCh:
-		case <-time.After(LifeCycleNetworkIdleTimeout):
-			f.manager.frameLifecycleEvent(cdp.FrameID(f.ID()), LifecycleEventNetworkIdle)
-		}
-	}()
 }
 
 func (f *Frame) detach() {
 	f.log.Debugf("Frame:detach", "fid:%s furl:%q", f.ID(), f.URL())
 
-	f.stopNetworkIdleTimer()
 	f.setDetached(true)
 	if f.parentFrame != nil {
 		f.parentFrame.removeChildFrame(f)
@@ -416,13 +303,6 @@ func (f *Frame) hasLifecycleEventFired(event LifecycleEvent) bool {
 	return f.lifecycleEvents[event]
 }
 
-func (f *Frame) hasSubtreeLifecycleEventFired(event LifecycleEvent) bool {
-	f.lifecycleEventsMu.RLock()
-	defer f.lifecycleEventsMu.RUnlock()
-
-	return f.subtreeLifecycleEvents[event]
-}
-
 func (f *Frame) navigated(name string, url string, loaderID string) {
 	f.log.Debugf("Frame:navigated", "fid:%s furl:%q lid:%s name:%q url:%q", f.ID(), f.URL(), loaderID, name, url)
 
@@ -454,12 +334,10 @@ func (f *Frame) onLifecycleEvent(event LifecycleEvent) {
 	f.log.Debugf("Frame:onLifecycleEvent", "fid:%s furl:%q event:%s", f.ID(), f.URL(), event)
 
 	f.lifecycleEventsMu.Lock()
-	defer f.lifecycleEventsMu.Unlock()
-
-	if ok := f.lifecycleEvents[event]; ok {
-		return
-	}
 	f.lifecycleEvents[event] = true
+	f.lifecycleEventsMu.Unlock()
+
+	f.emit(EventFrameAddLifecycle, event)
 }
 
 func (f *Frame) onLoadingStarted() {
@@ -478,9 +356,6 @@ func (f *Frame) onLoadingStopped() {
 	//       requests so it may take a long time for us to see
 	//       a networkIdle event or we may never see one if the
 	//       website never stops performing network requests.
-	//       NOTE: This is a different timeout to networkIdleTimer,
-	//              which only works once there are no more network
-	//              requests and we don't see a networkIdle event.
 }
 
 func (f *Frame) position() *Position {
@@ -1933,7 +1808,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) *goja.Promise {
 		// A lifecycle event won't be received when navigating within the same
 		// document, so don't wait for it. The event might've also already been
 		// fired once we're here, so also skip waiting in that case.
-		if !sameDocNav && !f.hasSubtreeLifecycleEventFired(parsedOpts.WaitUntil) {
+		if !sameDocNav && !f.hasLifecycleEventFired(parsedOpts.WaitUntil) {
 			select {
 			case <-lifecycleEvtCh:
 			case <-timeoutCtx.Done():

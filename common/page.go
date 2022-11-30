@@ -163,7 +163,6 @@ func (p *Page) didClose() {
 func (p *Page) didCrash() {
 	p.logger.Debugf("Page:didCrash", "sid:%v", p.sessionID())
 
-	p.frameManager.dispose()
 	p.emit(EventPageCrash, p)
 }
 
