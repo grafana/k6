@@ -188,6 +188,11 @@ func defineWebsocket(rt *goja.Runtime, w *webSocket) {
 		}), goja.FLAG_FALSE, goja.FLAG_TRUE))
 
 	setOn := func(property string, el *eventListener) {
+		if el == nil {
+			// this is generally should not happen, but we're being defensive
+			common.Throw(rt, fmt.Errorf("not supported on-handler '%s'", property))
+		}
+
 		must(rt, w.obj.DefineAccessorProperty(
 			property, rt.ToValue(func() goja.Value {
 				return rt.ToValue(el.getOn)
@@ -212,12 +217,12 @@ func defineWebsocket(rt *goja.Runtime, w *webSocket) {
 			}), goja.FLAG_FALSE, goja.FLAG_TRUE))
 	}
 
-	setOn("onmessage", w.eventListeners.list[events.MESSAGE])
-	setOn("onerror", w.eventListeners.list[events.ERROR])
-	setOn("onopen", w.eventListeners.list[events.OPEN])
-	setOn("onclose", w.eventListeners.list[events.CLOSE])
-	setOn("onping", w.eventListeners.list[events.PING])
-	setOn("onpong", w.eventListeners.list[events.PONG])
+	setOn("onmessage", w.eventListeners.getType(events.MESSAGE))
+	setOn("onerror", w.eventListeners.getType(events.ERROR))
+	setOn("onopen", w.eventListeners.getType(events.OPEN))
+	setOn("onclose", w.eventListeners.getType(events.CLOSE))
+	setOn("onping", w.eventListeners.getType(events.PING))
+	setOn("onpong", w.eventListeners.getType(events.PONG))
 }
 
 type message struct {
@@ -582,7 +587,7 @@ func (w *webSocket) loop() {
 }
 
 func (w *webSocket) send(msg goja.Value) {
-	w.isStateOpen()
+	w.assertStateOpen()
 
 	switch o := msg.Export().(type) {
 	case string:
@@ -637,6 +642,8 @@ func (w *webSocket) trackPong(pingID string) {
 	if !ok {
 		// We received a pong for a ping we didn't send; ignore
 		// (this shouldn't happen with a compliant server)
+		w.vu.State().Logger.Warnf("received pong for unknown ping ID %s", pingID)
+
 		return
 	}
 
@@ -651,9 +658,9 @@ func (w *webSocket) trackPong(pingID string) {
 	})
 }
 
-// isStateOpen checks if the websocket is in the OPEN state
+// assertStateOpen checks if the websocket is in the OPEN state
 // otherwise it throws an error (panic)
-func (w *webSocket) isStateOpen() {
+func (w *webSocket) assertStateOpen() {
 	if w.readyState == OPEN {
 		return
 	}

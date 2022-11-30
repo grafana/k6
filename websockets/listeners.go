@@ -9,19 +9,22 @@ import (
 
 // eventListeners keeps track of the eventListeners for each event type
 type eventListeners struct {
-	list map[string]*eventListener
+	open    *eventListener
+	message *eventListener
+	error   *eventListener
+	close   *eventListener
+	ping    *eventListener
+	pong    *eventListener
 }
 
 func newEventListeners() *eventListeners {
 	return &eventListeners{
-		list: map[string]*eventListener{
-			events.OPEN:    newListener(events.OPEN),
-			events.MESSAGE: newListener(events.MESSAGE),
-			events.ERROR:   newListener(events.ERROR),
-			events.CLOSE:   newListener(events.CLOSE),
-			events.PING:    newListener(events.PING),
-			events.PONG:    newListener(events.PONG),
-		},
+		open:    newListener(events.OPEN),
+		message: newListener(events.MESSAGE),
+		error:   newListener(events.ERROR),
+		close:   newListener(events.CLOSE),
+		ping:    newListener(events.PING),
+		pong:    newListener(events.PONG),
 	}
 }
 
@@ -68,21 +71,46 @@ func (l *eventListener) all() []func(goja.Value) (goja.Value, error) {
 	return append([]func(goja.Value) (goja.Value, error){l.on}, l.list...)
 }
 
+// getTypes return event listener of a certain type
+func (l *eventListeners) getType(t string) *eventListener {
+	switch t {
+	case events.OPEN:
+		return l.open
+	case events.MESSAGE:
+		return l.message
+	case events.ERROR:
+		return l.error
+	case events.CLOSE:
+		return l.close
+	case events.PING:
+		return l.ping
+	case events.PONG:
+		return l.pong
+	default:
+		return nil
+	}
+}
+
 // add adds a listener to the listeners
 func (l *eventListeners) add(t string, f func(goja.Value) (goja.Value, error)) error {
-	if _, ok := l.list[t]; !ok {
+	list := l.getType(t)
+
+	if list == nil {
 		return fmt.Errorf("unknown event type: %s", t)
 	}
 
-	l.list[t].add(f)
+	list.add(f)
 
 	return nil
 }
 
+// all returns all possible listeners for a certain event type or an empty array
 func (l *eventListeners) all(t string) []func(goja.Value) (goja.Value, error) {
-	if _, ok := l.list[t]; !ok {
+	list := l.getType(t)
+
+	if list == nil {
 		return []func(goja.Value) (goja.Value, error){}
 	}
 
-	return l.list[t].all()
+	return list.all()
 }
