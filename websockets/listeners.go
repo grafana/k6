@@ -2,7 +2,6 @@ package websockets
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/dop251/goja"
 	"github.com/grafana/xk6-websockets/websockets/events"
@@ -30,7 +29,6 @@ func newEventListeners() *eventListeners {
 // property on represents the eventListener that serves for the on* properties, like onopen, onmessage, etc.
 // property list keeps any other listeners that were added with addEventListener
 type eventListener struct {
-	*sync.Mutex
 	eventType string
 
 	// this return goja.value *and* error in order to return error on exception instead of panic
@@ -42,7 +40,6 @@ type eventListener struct {
 // newListener creates a new listener of a certain type
 func newListener(eventType string) *eventListener {
 	return &eventListener{
-		Mutex:     &sync.Mutex{},
 		eventType: eventType,
 	}
 }
@@ -54,24 +51,16 @@ func (l *eventListener) add(fn func(goja.Value) (goja.Value, error)) {
 
 // setOn sets a listener for the on* properties, like onopen, onmessage, etc.
 func (l *eventListener) setOn(fn func(goja.Value) (goja.Value, error)) {
-	l.Lock()
 	l.on = fn
-	l.Unlock()
 }
 
 // getOn returns the on* property for a certain event type
 func (l *eventListener) getOn() func(goja.Value) (goja.Value, error) {
-	l.Lock()
-	defer l.Unlock()
-
 	return l.on
 }
 
 // return all possible listeners for a certain event type
 func (l *eventListener) all() []func(goja.Value) (goja.Value, error) {
-	l.Lock()
-	defer l.Unlock()
-
 	if l.on == nil {
 		return l.list
 	}

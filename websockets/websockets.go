@@ -10,8 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/dop251/goja"
@@ -87,9 +85,7 @@ type webSocket struct {
 }
 
 type ping struct {
-	counter uint64
-
-	*sync.Mutex
+	counter    int
 	timestamps map[string]time.Time
 }
 
@@ -129,7 +125,6 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 		obj:            rt.NewObject(),
 		tagsAndMeta:    params.tagsAndMeta,
 		sendPings: ping{
-			Mutex:      &sync.Mutex{},
 			timestamps: make(map[string]time.Time),
 			counter:    0,
 		},
@@ -621,7 +616,7 @@ func (w *webSocket) send(msg goja.Value) {
 // Ping sends a ping message over the websocket.
 func (w *webSocket) ping() {
 	deadline := time.Now().Add(writeWait)
-	pingID := strconv.FormatUint(atomic.AddUint64(&w.sendPings.counter, 1), 10)
+	pingID := strconv.Itoa(w.sendPings.counter)
 
 	data := []byte(pingID)
 
@@ -631,17 +626,14 @@ func (w *webSocket) ping() {
 		return
 	}
 
-	w.sendPings.Lock()
 	w.sendPings.timestamps[pingID] = time.Now()
-	w.sendPings.Unlock()
+	w.sendPings.counter++
 }
 
 func (w *webSocket) trackPong(pingID string) {
 	pongTimestamp := time.Now()
 
-	w.sendPings.Lock()
 	pingTimestamp, ok := w.sendPings.timestamps[pingID]
-	w.sendPings.Unlock()
 	if !ok {
 		// We received a pong for a ping we didn't send; ignore
 		// (this shouldn't happen with a compliant server)
