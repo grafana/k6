@@ -3,6 +3,7 @@ package remotewrite
 import (
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	"github.com/grafana/xk6-output-prometheus-remote/pkg/remote"
 	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
-	"helm.sh/helm/v3/pkg/strvals"
 )
 
 const (
@@ -76,9 +76,6 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 		InsecureSkipVerify: conf.InsecureSkipTLSVerify.Bool,
 	}
 
-	// TODO: consider if the auth logic should be enforced here
-	// (e.g. if insecureSkipTLSVerify is switched off, then check for non-empty certificate file and auth, etc.)
-
 	if len(conf.Headers) > 0 {
 		hc.Headers = make(http.Header)
 		for k, v := range conf.Headers {
@@ -123,63 +120,40 @@ func (base Config) Apply(applied Config) Config {
 	return base
 }
 
-// ParseArg creates a Config parsing an arg string.
-func ParseArg(arg string) (Config, error) {
-	var c Config
-	params, err := strvals.Parse(arg)
-	if err != nil {
-		return c, err
-	}
-
-	if v, ok := params["url"].(string); ok {
-		c.URL = null.StringFrom(v)
-	}
-
-	if v, ok := params["insecureSkipTLSVerify"].(bool); ok {
-		c.InsecureSkipTLSVerify = null.BoolFrom(v)
-	}
-
-	if v, ok := params["username"].(string); ok {
-		c.Username = null.StringFrom(v)
-	}
-
-	if v, ok := params["password"].(string); ok {
-		c.Password = null.StringFrom(v)
-	}
-
-	if v, ok := params["pushInterval"].(string); ok {
-		if err := c.PushInterval.UnmarshalText([]byte(v)); err != nil {
-			return c, err
-		}
-	}
-
-	if v, ok := params["trendAsNativeHistogram"].(bool); ok {
-		c.TrendAsNativeHistogram = null.BoolFrom(v)
-	}
-
-	c.Headers = make(map[string]string)
-	if v, ok := params["headers"].(map[string]interface{}); ok {
-		for k, v := range v {
-			if v, ok := v.(string); ok {
-				c.Headers[k] = v
-			}
-		}
-	}
-
-	return c, nil
-}
-
-// GetConsolidatedConfig combines {default config values + JSON config +
-// environment vars + arg config values}, and returns the final merged configuration.
-func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, arg string) (Config, error) {
+// GetConsolidatedConfig combines the options' values from the different sources
+// and returns the merged options. The Order of precedence used is documented
+// in the k6 Documentation https://k6.io/docs/using-k6/k6-options/how-to/#order-of-precedence.
+func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, url string) (Config, error) {
 	result := NewConfig()
 	if jsonRawConf != nil {
-		jsonConf := Config{}
-		if err := json.Unmarshal(jsonRawConf, &jsonConf); err != nil {
-			return result, err
+		jsonConf, err := parseJSON(jsonRawConf)
+		if err != nil {
+			return result, fmt.Errorf("parse JSON options failed: %w", err)
 		}
 		result = result.Apply(jsonConf)
 	}
+
+	if len(env) > 0 {
+		envConf, err := parseEnvs(env)
+		if err != nil {
+			return result, fmt.Errorf("parse environment variables options failed: %w", err)
+		}
+		result = result.Apply(envConf)
+	}
+
+	if url != "" {
+		urlConf, err := parseArg(url)
+		if err != nil {
+			return result, fmt.Errorf("parse argument string options failed: %w", err)
+		}
+		result = result.Apply(urlConf)
+	}
+
+	return result, nil
+}
+
+func parseEnvs(env map[string]string) (Config, error) {
+	var c Config
 
 	getEnvBool := func(env map[string]string, name string) (null.Bool, error) {
 		if v, vDefined := env[name]; vDefined {
@@ -205,52 +179,96 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, a
 
 	// envconfig is not processing some undefined vars (at least duration) so apply them manually
 	if pushInterval, pushIntervalDefined := env["K6_PROMETHEUS_PUSH_INTERVAL"]; pushIntervalDefined {
-		if err := result.PushInterval.UnmarshalText([]byte(pushInterval)); err != nil {
-			return result, err
+		if err := c.PushInterval.UnmarshalText([]byte(pushInterval)); err != nil {
+			return c, err
 		}
 	}
 
 	if url, urlDefined := env["K6_PROMETHEUS_REMOTE_URL"]; urlDefined {
-		result.URL = null.StringFrom(url)
+		c.URL = null.StringFrom(url)
 	}
 
 	if b, err := getEnvBool(env, "K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY"); err != nil {
-		return result, err
+		return c, err
 	} else {
 		if b.Valid {
-			result.InsecureSkipTLSVerify = b
+			c.InsecureSkipTLSVerify = b
 		}
 	}
 
 	if user, userDefined := env["K6_PROMETHEUS_USERNAME"]; userDefined {
-		result.Username = null.StringFrom(user)
+		c.Username = null.StringFrom(user)
 	}
 
 	if password, passwordDefined := env["K6_PROMETHEUS_PASSWORD"]; passwordDefined {
-		result.Password = null.StringFrom(password)
+		c.Password = null.StringFrom(password)
 	}
 
 	envHeaders := getEnvMap(env, "K6_PROMETHEUS_HEADERS_")
 	for k, v := range envHeaders {
-		result.Headers[k] = v
+		if c.Headers == nil {
+			c.Headers = make(map[string]string)
+		}
+		c.Headers[k] = v
 	}
 
 	if b, err := getEnvBool(env, "K6_PROMETHEUS_TREND_AS_NATIVE_HISTOGRAM"); err != nil {
-		return result, err
+		return c, err
 	} else {
 		if b.Valid {
-			result.TrendAsNativeHistogram = b
+			c.TrendAsNativeHistogram = b
+		}
+	}
+	return c, nil
+}
+
+// parseJSON parses the supplied JSON into a Config.
+func parseJSON(data json.RawMessage) (Config, error) {
+	var c Config
+	err := json.Unmarshal(data, &c)
+	return c, err
+}
+
+// parseURL parses the supplied string of arguments into a Config.
+func parseArg(text string) (Config, error) {
+	var c Config
+	opts := strings.Split(text, ",")
+
+	for _, opt := range opts {
+		r := strings.SplitN(opt, "=", 2)
+		if len(r) != 2 {
+			return c, fmt.Errorf("couldn't parse argument %q as option", opt)
+		}
+		key, v := r[0], r[1]
+		switch key {
+		case "url":
+			c.URL = null.StringFrom(v)
+		case "insecureSkipTLSVerify":
+			if err := c.InsecureSkipTLSVerify.UnmarshalText([]byte(v)); err != nil {
+				return c, fmt.Errorf("insecureSkipTLSVerify value must be true or false, not %q", v)
+			}
+		case "username":
+			c.Username = null.StringFrom(v)
+		case "password":
+			c.Password = null.StringFrom(v)
+		case "pushInterval":
+			if err := c.PushInterval.UnmarshalText([]byte(v)); err != nil {
+				return c, err
+			}
+		case "trendAsNativeHistogram":
+			if err := c.TrendAsNativeHistogram.UnmarshalText([]byte(v)); err != nil {
+				return c, fmt.Errorf("trendAsNativeHistogram value must be true or false, not %q", v)
+			}
+		default:
+			if !strings.HasPrefix(key, "headers.") {
+				return c, fmt.Errorf("%q is an unknown option's key", r[0])
+			}
+			if c.Headers == nil {
+				c.Headers = make(map[string]string)
+			}
+			c.Headers[strings.TrimPrefix(key, "headers.")] = v
 		}
 	}
 
-	if arg != "" {
-		argConf, err := ParseArg(arg)
-		if err != nil {
-			return result, err
-		}
-
-		result = result.Apply(argConf)
-	}
-
-	return result, nil
+	return c, nil
 }
