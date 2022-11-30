@@ -272,6 +272,11 @@ func (fs *FrameSession) onEventJavascriptDialogOpening(event *cdppage.EventJavas
 		"sid:%v tid:%v url:%v dialogType:%s",
 		fs.session.ID(), fs.targetID, event.URL, event.Type)
 
+	// Dialog type of beforeunload needs to accept the
+	// dialog, instead of dismissing it. We're unable to
+	// dismiss beforeunload dialog boxes at the moment as
+	// it seems to pause the exec of any other action on
+	// the page. I believe this is an issue in Chromium.
 	action := cdppage.HandleJavaScriptDialog(false)
 	if event.Type == cdppage.DialogTypeBeforeunload {
 		action = cdppage.HandleJavaScriptDialog(true)
