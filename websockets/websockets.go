@@ -226,10 +226,9 @@ func defineWebsocket(rt *goja.Runtime, w *webSocket) {
 }
 
 type message struct {
-	mtype    int // message type consts as defined in gorilla/websocket/conn.go
-	data     []byte
-	t        time.Time
-	deadline time.Time
+	mtype int // message type consts as defined in gorilla/websocket/conn.go
+	data  []byte
+	t     time.Time
 }
 
 // documented https://websockets.spec.whatwg.org/#concept-websocket-establish
@@ -431,12 +430,12 @@ func (w *webSocket) loop() {
 					size := len(msg.data)
 
 					err := func() error {
-						if msg.deadline.IsZero() {
+						if msg.mtype != websocket.PingMessage {
 							return w.conn.WriteMessage(msg.mtype, msg.data)
 						}
 
 						// WriteControl is concurrently okay
-						return w.conn.WriteControl(msg.mtype, msg.data, msg.deadline)
+						return w.conn.WriteControl(msg.mtype, msg.data, msg.t.Add(writeWait))
 					}()
 					if err != nil {
 						w.tq.Queue(func() error {
@@ -503,7 +502,7 @@ func (w *webSocket) loop() {
 			// Handle pings received from the server
 			// - trigger the `ping` event
 			// - reply with pong (needed when `SetPingHandler` is overwritten)
-            // WriteControl is okay to be concurrent so we don't need to gsend this over writeChannel
+			// WriteControl is okay to be concurrent so we don't need to gsend this over writeChannel
 			err := w.conn.WriteControl(websocket.PongMessage, []byte(pingData), time.Now().Add(writeWait))
 			w.tq.Queue(func() error {
 				if err != nil {
@@ -633,10 +632,9 @@ func (w *webSocket) ping() {
 	pingID := strconv.Itoa(w.sendPings.counter)
 
 	w.writeQueueCh <- message{
-		mtype:    websocket.PingMessage,
-		data:     []byte(pingID),
-		t:        time.Now(),
-		deadline: time.Now().Add(writeWait),
+		mtype: websocket.PingMessage,
+		data:  []byte(pingID),
+		t:     time.Now(),
 	}
 
 	w.sendPings.timestamps[pingID] = time.Now()
