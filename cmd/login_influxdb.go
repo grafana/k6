@@ -72,7 +72,7 @@ This will set the default server used when just "-o influxdb" is passed.`,
 			if !term.IsTerminal(int(syscall.Stdin)) { //nolint:unconvert
 				globalState.logger.Warn("Stdin is not a terminal, falling back to plain text input")
 			}
-			vals, err := form.Run(globalState.stdIn, globalState.stdOut)
+			vals, err := form.Run(globalState.console.Stdin, globalState.console.Stdout)
 			if err != nil {
 				return err
 			}

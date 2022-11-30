@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -64,13 +63,13 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, args []string) error {
 // TODO: split apart some more
 //nolint:funlen,gocognit,cyclop
 func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
-	printBanner(c.gs)
+	maybePrintBanner(c.gs)
 
 	progressBar := pb.New(
 		pb.WithConstLeft("Init"),
 		pb.WithConstProgress(0, "Loading test script..."),
 	)
-	printBar(c.gs, progressBar)
+	maybePrintBar(c.gs, progressBar)
 
 	test, err := loadAndConfigureTest(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
@@ -91,7 +90,8 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// TODO: validate for externally controlled executor (i.e. executors that aren't distributable)
 	// TODO: move those validations to a separate function and reuse validateConfig()?
 
-	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
+	progressBar.Modify(pb.WithConstProgress(0, "Building the archive..."))
+	maybePrintBar(c.gs, progressBar)
 	arc := testRunState.Runner.MakeArchive()
 
 	// TODO: Fix this
@@ -152,14 +152,16 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	logger := c.gs.logger
 
 	// Start cloud test run
-	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
+	progressBar.Modify(pb.WithConstProgress(0, "Validating script options"))
+	maybePrintBar(c.gs, progressBar)
 	client := cloudapi.NewClient(
 		logger, cloudConfig.Token.String, cloudConfig.Host.String, consts.Version, cloudConfig.Timeout.TimeDuration())
 	if err = client.ValidateOptions(arc.Options); err != nil {
 		return err
 	}
 
-	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
+	progressBar.Modify(pb.WithConstProgress(0, "Uploading archive"))
+	maybePrintBar(c.gs, progressBar)
 	refID, err := client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
 	if err != nil {
 		return err
@@ -192,24 +194,34 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 	testURL := cloudapi.URLForResults(refID, cloudConfig)
 	executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
-	printExecutionDescription(
-		c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
-	)
 
-	modifyAndPrintBar(
-		c.gs, progressBar,
-		pb.WithConstLeft("Run "), pb.WithConstProgress(0, "Initializing the cloud test"),
+	execDesc := getExecutionDescription(
+		c.gs.console.ApplyTheme, "cloud", test.sourceRootPath, testURL, test.derivedConfig,
+		et, executionPlan, nil,
 	)
+	if c.gs.flags.quiet {
+		c.gs.logger.Debug(execDesc)
+	} else {
+		c.gs.console.Print(execDesc)
+	}
+
+	progressBar.Modify(
+		pb.WithConstLeft("Run "),
+		pb.WithConstProgress(0, "Initializing the cloud test"),
+	)
+	maybePrintBar(c.gs, progressBar)
 
 	progressCtx, progressCancel := context.WithCancel(globalCtx)
-	progressBarWG := &sync.WaitGroup{}
-	progressBarWG.Add(1)
-	defer progressBarWG.Wait()
 	defer progressCancel()
-	go func() {
-		showProgress(progressCtx, c.gs, []*pb.ProgressBar{progressBar}, logger)
-		progressBarWG.Done()
-	}()
+	if !c.gs.flags.quiet {
+		progressBarWG := &sync.WaitGroup{}
+		progressBarWG.Add(1)
+		defer progressBarWG.Wait()
+		go func() {
+			c.gs.console.ShowProgress(progressCtx, []*pb.ProgressBar{progressBar})
+			progressBarWG.Done()
+		}()
+	}
 
 	var (
 		startTime   time.Time
@@ -282,10 +294,8 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 
 	if !c.gs.flags.quiet {
-		valueColor := getColor(c.gs.flags.noColor || !c.gs.stdOut.isTTY, color.FgCyan)
-		printToStdout(c.gs, fmt.Sprintf(
-			"     test status: %s\n", valueColor.Sprint(testProgress.RunStatusText),
-		))
+		c.gs.console.Printf("     test status: %s\n",
+			c.gs.console.ApplyTheme(testProgress.RunStatusText))
 	} else {
 		logger.WithField("run_status", testProgress.RunStatusText).Debug("Test finished")
 	}

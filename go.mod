@@ -20,7 +20,6 @@ require (
 	github.com/jhump/protoreflect v1.13.0
 	github.com/klauspost/compress v1.15.11
 	github.com/mailru/easyjson v0.7.7
-	github.com/mattn/go-colorable v0.1.13
 	github.com/mattn/go-isatty v0.0.16
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/mstoykov/atlas v0.0.0-20220808085829-90340e9998bd
@@ -45,6 +44,8 @@ require (
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+require github.com/mattn/go-colorable v0.1.13 // indirect
 
 require (
 	github.com/andybalholm/cascadia v1.3.1 // indirect

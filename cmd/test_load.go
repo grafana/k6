@@ -161,7 +161,7 @@ func readSource(globalState *globalState, filename string) (*loader.SourceData, 
 	}
 
 	filesystems := loader.CreateFilesystems(globalState.fs)
-	src, err := loader.ReadSource(globalState.logger, filename, pwd, filesystems, globalState.stdIn)
+	src, err := loader.ReadSource(globalState.logger, filename, pwd, filesystems, globalState.console.Stdin)
 	return src, filesystems, pwd, err
 }
 

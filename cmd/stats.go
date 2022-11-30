@@ -24,7 +24,7 @@ func getCmdStats(globalState *globalState) *cobra.Command {
 				return err
 			}
 
-			return yamlPrint(globalState.stdOut, metrics)
+			return globalState.console.PrintYAML(metrics)
 		},
 	}
 	return statsCmd
