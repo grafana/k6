@@ -58,7 +58,11 @@ func TestFrameDismissDialogBox(t *testing.T) {
 				}{
 					WaitUntil: "networkidle",
 				})
-				b.promise(p.Goto(b.staticURL("dialog.html?dialogType="+tt.name), opts)).then(func() *goja.Promise {
+				pageGoto := p.Goto(
+					b.staticURL("dialog.html?dialogType="+tt.name),
+					opts,
+				)
+				b.promise(pageGoto).then(func() *goja.Promise {
 					if tt.name == "beforeunload" {
 						return p.Click("#clickHere", nil)
 					}
