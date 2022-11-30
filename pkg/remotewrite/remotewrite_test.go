@@ -2,6 +2,7 @@ package remotewrite
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -289,5 +290,52 @@ func TestOutputSetTrendStatsResolver(t *testing.T) {
 			}
 			return keys
 		}())
+	}
+}
+
+func TestOutputStaleMarkers(t *testing.T) {
+	t.Parallel()
+
+	registry := metrics.NewRegistry()
+	trendSinkSeries := metrics.TimeSeries{
+		Metric: registry.MustNewMetric("metric1", metrics.Trend),
+		Tags:   registry.RootTagSet(),
+	}
+	counterSinkSeries := metrics.TimeSeries{
+		Metric: registry.MustNewMetric("metric2", metrics.Counter),
+		Tags:   registry.RootTagSet(),
+	}
+
+	o := Output{}
+	err := o.setTrendStatsResolver([]string{"p(99)"})
+	require.NoError(t, err)
+	trendSink, err := newExtendedTrendSink(o.trendStatsResolver)
+	require.NoError(t, err)
+
+	o.tsdb = map[metrics.TimeSeries]*seriesWithMeasure{
+		trendSinkSeries: {
+			TimeSeries: trendSinkSeries,
+			Latest:     time.Now(),
+			// TODO: if Measure would be a lighter interface
+			// then it could be just a mapper mock.
+			Measure: trendSink,
+		},
+		counterSinkSeries: {
+			TimeSeries: counterSinkSeries,
+			Latest:     time.Now(),
+			Measure:    &metrics.CounterSink{},
+		},
+	}
+
+	now := time.Now()
+	markers := o.staleMarkers(now)
+	require.Len(t, markers, 2)
+
+	sortByNameLabel(markers)
+	expNameLabels := []string{"k6_metric1_p99", "k6_metric2_total"}
+	for i, expName := range expNameLabels {
+		assert.Equal(t, expName, markers[i].Labels[0].Value)
+		assert.Equal(t, now.UnixMilli(), markers[i].Samples[0].Timestamp)
+		assert.True(t, math.IsNaN(markers[i].Samples[0].Value), "it isn't a StaleNaN value")
 	}
 }
