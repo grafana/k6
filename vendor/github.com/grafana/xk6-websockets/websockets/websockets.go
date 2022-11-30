@@ -2,6 +2,7 @@
 package websockets
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -13,7 +14,9 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+	"github.com/grafana/xk6-websockets/websockets/events"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/metrics"
@@ -63,7 +66,7 @@ type webSocket struct {
 	vu             modules.VU
 	url            *url.URL
 	conn           *websocket.Conn
-	tagsAndMeta    metrics.TagsAndMeta
+	tagsAndMeta    *metrics.TagsAndMeta
 	tq             *taskqueue.TaskQueue
 	builtinMetrics *metrics.BuiltinMetrics
 	obj            *goja.Object // the object that is given to js to interact with the WebSocket
@@ -71,36 +74,34 @@ type webSocket struct {
 
 	done         chan struct{}
 	writeQueueCh chan message
-	// listeners
-	// this return goja.value *and* error in order to return error on exception instead of panic
-	// https://pkg.go.dev/github.com/dop251/goja#hdr-Functions
-	openListeners    []func(goja.Value) (goja.Value, error)
-	messageListeners []func(goja.Value) (goja.Value, error)
-	errorListeners   []func(goja.Value) (goja.Value, error)
-	closeListeners   []func(goja.Value) (goja.Value, error)
+
+	eventListeners *eventListeners
+
+	sendPings ping
 
 	// fields that should be seen by js only be updated on the event loop
 	readyState     ReadyState
 	bufferedAmount int
 }
 
+type ping struct {
+	counter    int
+	timestamps map[string]time.Time
+}
+
 func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
-	urlValue := c.Argument(0)
 	rt := r.vu.Runtime()
-	if urlValue == nil || goja.IsUndefined(urlValue) {
-		common.Throw(rt, errors.New("WebSocket requires a url"))
-	}
-	urlString := urlValue.String()
-	url, err := url.Parse(urlString)
+
+	url, err := parseURL(c.Argument(0))
 	if err != nil {
-		common.Throw(rt, fmt.Errorf("WebSocket requires valid url, but got %q which resulted in %w", urlString, err))
+		common.Throw(rt, err)
 	}
-	if url.Scheme != "ws" && url.Scheme != "wss" {
-		common.Throw(rt, fmt.Errorf("WebSocket requires url with scheme ws or wss, but got %q", url.Scheme))
+
+	params, err := buildParams(r.vu.State(), rt, c.Argument(2))
+	if err != nil {
+		common.Throw(rt, err)
 	}
-	if url.Fragment != "" {
-		common.Throw(rt, fmt.Errorf("WebSocket requires no url fragment, but got %q", url.Fragment))
-	}
+
 	// TODO implement protocols
 	registerCallback := func() func(func() error) {
 		// fmt.Println("RegisterCallback called")
@@ -120,34 +121,65 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 		builtinMetrics: r.vu.State().BuiltinMetrics,
 		done:           make(chan struct{}),
 		writeQueueCh:   make(chan message, 10),
+		eventListeners: newEventListeners(),
 		obj:            rt.NewObject(),
+		tagsAndMeta:    params.tagsAndMeta,
+		sendPings: ping{
+			timestamps: make(map[string]time.Time),
+			counter:    0,
+		},
 	}
 
 	// Maybe have this after the goroutine below ?!?
+	defineWebsocket(rt, w)
 
-	must := func(err error) {
-		if err != nil {
-			common.Throw(rt, err)
-		}
+	go w.establishConnection(params)
+	return w.obj
+}
+
+// parseURL parses the url from the first constructor calls argument or returns an error
+func parseURL(urlValue goja.Value) (*url.URL, error) {
+	if urlValue == nil || goja.IsUndefined(urlValue) {
+		return nil, errors.New("WebSocket requires a url")
 	}
-	must(w.obj.DefineDataProperty(
+
+	// TODO: throw the SyntaxError (https://websockets.spec.whatwg.org/#dom-websocket-websocket)
+	urlString := urlValue.String()
+	url, err := url.Parse(urlString)
+	if err != nil {
+		return nil, fmt.Errorf("WebSocket requires valid url, but got %q which resulted in %w", urlString, err)
+	}
+	if url.Scheme != "ws" && url.Scheme != "wss" {
+		return nil, fmt.Errorf("WebSocket requires url with scheme ws or wss, but got %q", url.Scheme)
+	}
+	if url.Fragment != "" {
+		return nil, fmt.Errorf("WebSocket requires no url fragment, but got %q", url.Fragment)
+	}
+
+	return url, nil
+}
+
+// defineWebsocket defines all properties and methods for the WebSocket
+func defineWebsocket(rt *goja.Runtime, w *webSocket) {
+	must(rt, w.obj.DefineDataProperty(
 		"addEventListener", rt.ToValue(w.addEventListener), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
-	// TODO add onmessage,onclose and so on.
-	must(w.obj.DefineDataProperty(
+	must(rt, w.obj.DefineDataProperty(
 		"send", rt.ToValue(w.send), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
-	must(w.obj.DefineDataProperty(
+	must(rt, w.obj.DefineDataProperty(
+		"ping", rt.ToValue(w.ping), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+	must(rt, w.obj.DefineDataProperty(
 		"close", rt.ToValue(w.close), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
-	must(w.obj.DefineDataProperty(
-		"url", rt.ToValue(urlString), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
-	must(w.obj.DefineAccessorProperty( // this needs to be with an accessor as we change the value
+	must(rt, w.obj.DefineDataProperty(
+		"url", rt.ToValue(w.url.String()), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+	must(rt, w.obj.DefineAccessorProperty( // this needs to be with an accessor as we change the value
 		"readyState", rt.ToValue(func() ReadyState {
 			return w.readyState
 		}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
-	must(w.obj.DefineDataProperty(
+	must(rt, w.obj.DefineDataProperty(
 		"bufferedAmount", rt.ToValue(w.bufferedAmount), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	// extensions
 	// protocol
-	must(w.obj.DefineAccessorProperty(
+	must(rt, w.obj.DefineAccessorProperty(
 		"binaryType", rt.ToValue(func() goja.Value {
 			return rt.ToValue("ArrayBuffer")
 		}), rt.ToValue(func() goja.Value {
@@ -155,8 +187,42 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 			return nil // it never gets to here
 		}), goja.FLAG_FALSE, goja.FLAG_TRUE))
 
-	go w.establishConnection()
-	return w.obj
+	setOn := func(property string, el *eventListener) {
+		if el == nil {
+			// this is generally should not happen, but we're being defensive
+			common.Throw(rt, fmt.Errorf("not supported on-handler '%s'", property))
+		}
+
+		must(rt, w.obj.DefineAccessorProperty(
+			property, rt.ToValue(func() goja.Value {
+				return rt.ToValue(el.getOn)
+			}), rt.ToValue(func(call goja.FunctionCall) goja.Value {
+				arg := call.Argument(0)
+
+				// it's possible to unset handlers by setting them to null
+				if arg == nil || goja.IsUndefined(arg) || goja.IsNull(arg) {
+					el.setOn(nil)
+
+					return nil
+				}
+
+				fn, isFunc := goja.AssertFunction(arg)
+				if !isFunc {
+					common.Throw(rt, fmt.Errorf("a value for '%s' should be callable", property))
+				}
+
+				el.setOn(func(v goja.Value) (goja.Value, error) { return fn(goja.Undefined(), v) })
+
+				return nil
+			}), goja.FLAG_FALSE, goja.FLAG_TRUE))
+	}
+
+	setOn("onmessage", w.eventListeners.getType(events.MESSAGE))
+	setOn("onerror", w.eventListeners.getType(events.ERROR))
+	setOn("onopen", w.eventListeners.getType(events.OPEN))
+	setOn("onclose", w.eventListeners.getType(events.CLOSE))
+	setOn("onping", w.eventListeners.getType(events.PING))
+	setOn("onpong", w.eventListeners.getType(events.PONG))
 }
 
 type message struct {
@@ -166,7 +232,7 @@ type message struct {
 }
 
 // documented https://websockets.spec.whatwg.org/#concept-websocket-establish
-func (w *webSocket) establishConnection() {
+func (w *webSocket) establishConnection(params *wsParams) {
 	state := w.vu.State()
 	w.started = time.Now()
 	var tlsConfig *tls.Config
@@ -179,24 +245,28 @@ func (w *webSocket) establishConnection() {
 		HandshakeTimeout: time.Second * 60, // TODO configurable
 		// Pass a custom net.DialContext function to websocket.Dialer that will substitute
 		// the underlying net.Conn with our own tracked netext.Conn
-		NetDialContext:  state.Dialer.DialContext,
-		Proxy:           http.ProxyFromEnvironment,
-		TLSClientConfig: tlsConfig,
-		// EnableCompression: enableCompression,
-		// Jar:               jar,
+		NetDialContext:    state.Dialer.DialContext,
+		Proxy:             http.ProxyFromEnvironment,
+		TLSClientConfig:   tlsConfig,
+		EnableCompression: params.enableCompression,
 	}
-	// TODO figure out cookie jar given the specification
-	header := make(http.Header)
-	header.Set("User-Agent", state.Options.UserAgent.String)
+
+	// this is needed because of how interfaces work and that wsd.Jar is http.Cookiejar
+	if params.cookieJar != nil {
+		wsd.Jar = params.cookieJar
+	}
+
 	ctx := w.vu.Context()
 	start := time.Now()
-	conn, httpResponse, connErr := wsd.DialContext(ctx, w.url.String(), header)
+	conn, httpResponse, connErr := wsd.DialContext(ctx, w.url.String(), params.headers)
 	connectionEnd := time.Now()
 	connectionDuration := metrics.D(connectionEnd.Sub(start))
-	ctm := state.Tags.GetCurrentValues()
-	if state.Options.SystemTags.Has(metrics.TagIP) && conn.RemoteAddr() != nil {
+
+	systemTags := state.Options.SystemTags
+
+	if conn != nil && conn.RemoteAddr() != nil {
 		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
-			ctm.SetTag("ip", ip)
+			w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagIP, ip)
 		}
 	}
 
@@ -204,37 +274,16 @@ func (w *webSocket) establishConnection() {
 		defer func() {
 			_ = httpResponse.Body.Close()
 		}()
-		if state.Options.SystemTags.Has(metrics.TagStatus) {
-			ctm.SetTag("status", strconv.Itoa(httpResponse.StatusCode))
-		}
-		if state.Options.SystemTags.Has(metrics.TagSubproto) {
-			ctm.SetTag("subproto", httpResponse.Header.Get("Sec-WebSocket-Protocol"))
-		}
+
+		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagStatus, strconv.Itoa(httpResponse.StatusCode))
+		subProtocol := httpResponse.Header.Get("Sec-WebSocket-Protocol")
+		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagSubproto, subProtocol)
 	}
 	w.conn = conn
-	if state.Options.SystemTags.Has(metrics.TagURL) {
-		ctm.SetTag("url", w.url.String())
-	}
-	w.tagsAndMeta = ctm
 
-	metrics.PushIfNotDone(ctx, state.Samples, metrics.ConnectedSamples{
-		Samples: []metrics.Sample{
-			{
-				TimeSeries: metrics.TimeSeries{Metric: state.BuiltinMetrics.WSSessions, Tags: w.tagsAndMeta.Tags},
-				Time:       start,
-				Metadata:   w.tagsAndMeta.Metadata,
-				Value:      1,
-			},
-			{
-				TimeSeries: metrics.TimeSeries{Metric: state.BuiltinMetrics.WSConnecting, Tags: w.tagsAndMeta.Tags},
-				Time:       start,
-				Metadata:   w.tagsAndMeta.Metadata,
-				Value:      connectionDuration,
-			},
-		},
-		Tags: w.tagsAndMeta.Tags,
-		Time: start,
-	})
+	w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagURL, w.url.String())
+
+	w.emitConnectionMetrics(ctx, start, connectionDuration)
 	if connErr != nil {
 		// Pass the error to the user script before exiting immediately
 		w.tq.Queue(func() error {
@@ -249,9 +298,42 @@ func (w *webSocket) establishConnection() {
 	})
 }
 
+// emitConnectionMetrics emits the metrics for a websocket connection.
+func (w *webSocket) emitConnectionMetrics(ctx context.Context, start time.Time, duration float64) {
+	state := w.vu.State()
+
+	metrics.PushIfNotDone(ctx, state.Samples, metrics.ConnectedSamples{
+		Samples: []metrics.Sample{
+			{
+				TimeSeries: metrics.TimeSeries{Metric: state.BuiltinMetrics.WSSessions, Tags: w.tagsAndMeta.Tags},
+				Time:       start,
+				Metadata:   w.tagsAndMeta.Metadata,
+				Value:      1,
+			},
+			{
+				TimeSeries: metrics.TimeSeries{Metric: state.BuiltinMetrics.WSConnecting, Tags: w.tagsAndMeta.Tags},
+				Time:       start,
+				Metadata:   w.tagsAndMeta.Metadata,
+				Value:      duration,
+			},
+		},
+		Tags: w.tagsAndMeta.Tags,
+		Time: start,
+	})
+}
+
+const writeWait = 10 * time.Second
+
 //nolint:funlen,gocognit,cyclop
 func (w *webSocket) loop() {
 	readDataChan := make(chan *message)
+
+	// Pass ping/pong events through the main control loop
+	pingChan := make(chan string)
+	pongChan := make(chan string)
+	w.conn.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
+	w.conn.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
+
 	// readCloseChan := make(chan int)
 	// readErrChan := make(chan error)
 	samplesOutput := w.vu.State().Samples
@@ -346,7 +428,15 @@ func (w *webSocket) loop() {
 						return
 					}
 					size := len(msg.data)
-					err := w.conn.WriteMessage(msg.mtype, msg.data)
+
+					err := func() error {
+						if msg.mtype != websocket.PingMessage {
+							return w.conn.WriteMessage(msg.mtype, msg.data)
+						}
+
+						// WriteControl is concurrently okay
+						return w.conn.WriteControl(msg.mtype, msg.data, msg.t.Add(writeWait))
+					}()
 					if err != nil {
 						w.tq.Queue(func() error {
 							_ = w.conn.Close() // TODO fix
@@ -407,23 +497,29 @@ func (w *webSocket) loop() {
 	ctxDone := ctx.Done()
 	for {
 		select {
-		/* FIX this later
 		case pingData := <-pingChan:
+
 			// Handle pings received from the server
 			// - trigger the `ping` event
 			// - reply with pong (needed when `SetPingHandler` is overwritten)
-			err := socket.conn.WriteControl(websocket.PongMessage, []byte(pingData), time.Now().Add(writeWait))
-			if err != nil {
-				socket.handleEvent("error", rt.ToValue(err))
-			}
-			socket.handleEvent("ping")
+			// WriteControl is okay to be concurrent so we don't need to gsend this over writeChannel
+			err := w.conn.WriteControl(websocket.PongMessage, []byte(pingData), time.Now().Add(writeWait))
+			w.tq.Queue(func() error {
+				if err != nil {
+					return w.callErrorListeners(err)
+				}
+
+				return w.callEventListeners(events.PING)
+			})
 
 		case pingID := <-pongChan:
-			// Handle pong responses to our pings
-			socket.trackPong(pingID)
-			socket.handleEvent("pong")
+			w.tq.Queue(func() error {
+				// Handle pong responses to our pings
+				w.trackPong(pingID)
 
-		*/
+				return w.callEventListeners(events.PONG)
+			})
+
 		case msg, ok := <-readDataChan:
 			if !ok {
 				return
@@ -446,23 +542,24 @@ func (w *webSocket) loop() {
 				})
 
 				rt := w.vu.Runtime()
-				ev := w.newEvent("message", msg.t)
-				must := func(err error) {
-					if err != nil {
-						common.Throw(rt, err)
-					}
-				}
+				ev := w.newEvent(events.MESSAGE, msg.t)
+
 				if msg.mtype == websocket.BinaryMessage {
 					// TODO this technically could be BLOB , but we don't support that
 					ab := rt.NewArrayBuffer(msg.data)
-					must(ev.DefineDataProperty("data", rt.ToValue(ab), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+					must(rt, ev.DefineDataProperty("data", rt.ToValue(ab), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
 				} else {
-					must(ev.DefineDataProperty("data", rt.ToValue(string(msg.data)), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+					must(
+						rt,
+						ev.DefineDataProperty("data", rt.ToValue(string(msg.data)), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE),
+					)
 				}
-				must(ev.DefineDataProperty("origin", rt.ToValue(w.url.String()), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+				must(
+					rt,
+					ev.DefineDataProperty("origin", rt.ToValue(w.url.String()), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE),
+				)
 
-				// fmt.Println("messagelisteners", len(w.messageListeners))
-				for _, messageListener := range w.messageListeners {
+				for _, messageListener := range w.eventListeners.all(events.MESSAGE) {
 					if _, err := messageListener(ev); err != nil {
 						// fmt.Println("message listener err", err)
 						_ = w.conn.Close()                   // TODO log it?
@@ -499,10 +596,8 @@ func (w *webSocket) loop() {
 }
 
 func (w *webSocket) send(msg goja.Value) {
-	if w.readyState != OPEN {
-		// TODO figure out if we should give different error while being closed/closed/connecting
-		common.Throw(w.vu.Runtime(), errors.New("InvalidStateError"))
-	}
+	w.assertStateOpen()
+
 	switch o := msg.Export().(type) {
 	case string:
 		w.bufferedAmount += len(o)
@@ -530,6 +625,54 @@ func (w *webSocket) send(msg goja.Value) {
 	default:
 		common.Throw(w.vu.Runtime(), fmt.Errorf("unsupported send type %T", o))
 	}
+}
+
+// Ping sends a ping message over the websocket.
+func (w *webSocket) ping() {
+	pingID := strconv.Itoa(w.sendPings.counter)
+
+	w.writeQueueCh <- message{
+		mtype: websocket.PingMessage,
+		data:  []byte(pingID),
+		t:     time.Now(),
+	}
+
+	w.sendPings.timestamps[pingID] = time.Now()
+	w.sendPings.counter++
+}
+
+func (w *webSocket) trackPong(pingID string) {
+	pongTimestamp := time.Now()
+
+	pingTimestamp, ok := w.sendPings.timestamps[pingID]
+	if !ok {
+		// We received a pong for a ping we didn't send; ignore
+		// (this shouldn't happen with a compliant server)
+		w.vu.State().Logger.Warnf("received pong for unknown ping ID %s", pingID)
+
+		return
+	}
+
+	metrics.PushIfNotDone(w.vu.Context(), w.vu.State().Samples, metrics.Sample{
+		TimeSeries: metrics.TimeSeries{
+			Metric: w.builtinMetrics.WSPing,
+			Tags:   w.tagsAndMeta.Tags,
+		},
+		Time:     pongTimestamp,
+		Metadata: w.tagsAndMeta.Metadata,
+		Value:    metrics.D(pongTimestamp.Sub(pingTimestamp)),
+	})
+}
+
+// assertStateOpen checks if the websocket is in the OPEN state
+// otherwise it throws an error (panic)
+func (w *webSocket) assertStateOpen() {
+	if w.readyState == OPEN {
+		return
+	}
+
+	// TODO figure out if we should give different error while being closed/closed/connecting
+	common.Throw(w.vu.Runtime(), errors.New("InvalidStateError"))
 }
 
 // TODO support code and reason
@@ -582,23 +725,20 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 			return errList // TODO ... still call the close listeners ?!?
 		}
 	}
-	return w.callCloseListeners()
+	return w.callEventListeners(events.CLOSE)
 }
 
 // newEvent return an event implementing "implements" https://dom.spec.whatwg.org/#event
 // needs to be called on the event loop
+// TODO: move to events
 func (w *webSocket) newEvent(eventType string, t time.Time) *goja.Object {
 	rt := w.vu.Runtime()
 	o := rt.NewObject()
-	must := func(err error) {
-		if err != nil {
-			common.Throw(rt, err)
-		}
-	}
-	must(o.DefineAccessorProperty("type", rt.ToValue(func() string {
+
+	must(rt, o.DefineAccessorProperty("type", rt.ToValue(func() string {
 		return eventType
 	}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
-	must(o.DefineAccessorProperty("target", rt.ToValue(func() interface{} {
+	must(rt, o.DefineAccessorProperty("target", rt.ToValue(func() interface{} {
 		return w.obj
 	}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	// skip srcElement
@@ -609,7 +749,7 @@ func (w *webSocket) newEvent(eventType string, t time.Time) *goja.Object {
 	// skip stopImmediatePropagation
 	// skip a bunch more
 
-	must(o.DefineAccessorProperty("timestamp", rt.ToValue(func() float64 {
+	must(rt, o.DefineAccessorProperty("timestamp", rt.ToValue(func() float64 {
 		return float64(t.UnixNano()) / 1_000_000 // milliseconds as double as per the spec
 		// https://w3c.github.io/hr-time/#dom-domhighrestimestamp
 	}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
@@ -618,8 +758,8 @@ func (w *webSocket) newEvent(eventType string, t time.Time) *goja.Object {
 }
 
 func (w *webSocket) callOpenListeners(timestamp time.Time) error {
-	for _, openListener := range w.openListeners {
-		if _, err := openListener(w.newEvent("open", timestamp)); err != nil {
+	for _, openListener := range w.eventListeners.all(events.OPEN) {
+		if _, err := openListener(w.newEvent(events.OPEN, timestamp)); err != nil {
 			_ = w.conn.Close()                   // TODO log it?
 			_ = w.connectionClosedWithError(err) // TODO log it?
 			return err
@@ -630,16 +770,12 @@ func (w *webSocket) callOpenListeners(timestamp time.Time) error {
 
 func (w *webSocket) callErrorListeners(e error) error { // TODO use the error even thought it is not by the spec
 	rt := w.vu.Runtime()
-	must := func(err error) {
-		if err != nil {
-			common.Throw(rt, err)
-		}
-	}
-	ev := w.newEvent("error", time.Now())
-	must(ev.DefineDataProperty("error",
-		rt.ToValue(e),
+
+	ev := w.newEvent(events.ERROR, time.Now())
+	must(rt, ev.DefineDataProperty("error",
+		rt.ToValue(e.Error()),
 		goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
-	for _, errorListener := range w.errorListeners {
+	for _, errorListener := range w.eventListeners.all(events.ERROR) {
 		if _, err := errorListener(ev); err != nil { // TODO fix timestamp
 			return err
 		}
@@ -647,10 +783,10 @@ func (w *webSocket) callErrorListeners(e error) error { // TODO use the error ev
 	return nil
 }
 
-func (w *webSocket) callCloseListeners() error {
-	for _, closeListener := range w.closeListeners {
-		// TODO the event here needs to be different and have an error
-		if _, err := closeListener(w.newEvent("close", time.Now())); err != nil { // TODO fix timestamp
+func (w *webSocket) callEventListeners(eventType string) error {
+	for _, listener := range w.eventListeners.all(eventType) {
+		// TODO the event here needs to be different and have an error (figure out it was for the close listeners)
+		if _, err := listener(w.newEvent(eventType, time.Now())); err != nil { // TODO fix timestamp
 			return err
 		}
 	}
@@ -659,19 +795,8 @@ func (w *webSocket) callCloseListeners() error {
 
 func (w *webSocket) addEventListener(event string, listener func(goja.Value) (goja.Value, error)) {
 	// TODO support options https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters
-	// TODO implement `onerror` and co as well
-	switch event {
-	case "open":
-		w.openListeners = append(w.openListeners, listener)
-	case "error":
-		w.errorListeners = append(w.errorListeners, listener)
-	case "message":
-		// fmt.Println("!!!!!!!!!!!!! message added!!!!!!")
-		w.messageListeners = append(w.messageListeners, listener)
-	case "close":
-		w.closeListeners = append(w.closeListeners, listener)
-	default:
-		w.vu.State().Logger.Warnf("Unknown event for websocket %s", event)
+	if err := w.eventListeners.add(event, listener); err != nil {
+		w.vu.State().Logger.Warnf("can't add event listener: %s", err)
 	}
 }
 
