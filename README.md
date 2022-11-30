@@ -83,11 +83,11 @@ Clone the repo to get started and follow these steps:
 
 2. Use the k6 Docker image to run the k6 script and send metrics to the Prometheus container started on the previous step. You must [set the `testid` tag](https://k6.io/docs/using-k6/tags-and-groups/#test-wide-tags) with a unique identifier to segment the metrics into discrete test runs for the Grafana dashboards.
     ```shell
-    docker-compose run --rm -T k6 run -<example/test.js --tag testid=<SOME-ID>
+    docker-compose run --rm -T k6 run -<samples/test.js --tag testid=<SOME-ID>
     ```
     For convenience, the `docker-run.sh` can be used to simply:
     ```shell
-    ./docker-run.sh example/test.js
+    ./docker-run.sh samples/test.js
     ```
 
 3. Visit http://localhost:3000/ to view results in Grafana.
