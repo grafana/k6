@@ -503,6 +503,7 @@ func (w *webSocket) loop() {
 			// Handle pings received from the server
 			// - trigger the `ping` event
 			// - reply with pong (needed when `SetPingHandler` is overwritten)
+            // WriteControl is okay to be concurrent so we don't need to gsend this over writeChannel
 			err := w.conn.WriteControl(websocket.PongMessage, []byte(pingData), time.Now().Add(writeWait))
 			w.tq.Queue(func() error {
 				if err != nil {
