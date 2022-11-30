@@ -27,25 +27,15 @@ func TestFramePress(t *testing.T) {
 func TestFrameDismissDialogBox(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name string
-	}{
-		{
-			name: "alert",
-		},
-		{
-			name: "confirm",
-		},
-		{
-			name: "prompt",
-		},
-		{
-			name: "beforeunload",
-		},
+	tests := []string{
+		"alert",
+		"confirm",
+		"prompt",
+		"beforeunload",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test, func(t *testing.T) {
 			t.Parallel()
 
 			b := newTestBrowser(t, withFileServer())
@@ -59,21 +49,21 @@ func TestFrameDismissDialogBox(t *testing.T) {
 					WaitUntil: "networkidle",
 				})
 				pageGoto := p.Goto(
-					b.staticURL("dialog.html?dialogType="+tt.name),
+					b.staticURL("dialog.html?dialogType="+test),
 					opts,
 				)
 				b.promise(pageGoto).then(func() *goja.Promise {
-					if tt.name == "beforeunload" {
+					if test == "beforeunload" {
 						return p.Click("#clickHere", nil)
 					}
 
 					result := p.TextContent("#textField", nil)
-					assert.EqualValues(t, tt.name+" dismissed", result)
+					assert.EqualValues(t, test+" dismissed", result)
 
 					return nil
 				}).then(func() {
 					result := p.TextContent("#textField", nil)
-					assert.EqualValues(t, tt.name+" dismissed", result)
+					assert.EqualValues(t, test+" dismissed", result)
 				})
 
 				return nil
