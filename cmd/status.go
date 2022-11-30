@@ -24,7 +24,7 @@ func getCmdStatus(globalState *globalState) *cobra.Command {
 				return err
 			}
 
-			return yamlPrint(globalState.stdOut, status)
+			return globalState.console.PrintYAML(status)
 		},
 	}
 	return statusCmd

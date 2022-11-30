@@ -3,10 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"syscall"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"gopkg.in/guregu/null.v3"
@@ -67,7 +65,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			switch {
 			case reset.Valid:
 				newCloudConf.Token = null.StringFromPtr(nil)
-				printToStdout(globalState, "  token reset\n")
+				globalState.console.Print("  token reset\n")
 			case show.Bool:
 			case token.Valid:
 				newCloudConf.Token = token
@@ -88,7 +86,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 					globalState.logger.Warn("Stdin is not a terminal, falling back to plain text input")
 				}
 				var vals map[string]string
-				vals, err = form.Run(globalState.stdIn, globalState.stdOut)
+				vals, err = form.Run(globalState.console.Stdin, globalState.console.Stdout)
 				if err != nil {
 					return err
 				}
@@ -127,13 +125,12 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			}
 
 			if newCloudConf.Token.Valid {
-				valueColor := getColor(globalState.flags.noColor || !globalState.stdOut.isTTY, color.FgCyan)
 				if !globalState.flags.quiet {
-					printToStdout(globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
+					globalState.console.Printf(
+						"  token: %s\n", globalState.console.ApplyTheme(newCloudConf.Token.String))
 				}
-				printToStdout(globalState, fmt.Sprintf(
-					"Logged in successfully, token saved in %s\n", globalState.flags.configFilePath,
-				))
+				globalState.console.Printf(
+					"Logged in successfully, token saved in %s\n", globalState.flags.configFilePath)
 			}
 			return nil
 		},
