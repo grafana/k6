@@ -50,7 +50,7 @@ func (sink *extendedTrendSink) MapPrompb(series metrics.TimeSeries, t time.Time)
 	tg.CacheNameIndex()
 
 	for stat, statfn := range sink.trendStats {
-		tg.Append(stat, statfn(sink.TrendSink))
+		tg.Append(stat, adaptUnit(series.Metric.Contains, statfn(sink.TrendSink)))
 	}
 	return tg.series
 }
@@ -136,21 +136,17 @@ func newNativeHistogramSink(m *metrics.Metric) *nativeHistogramSink {
 }
 
 func (sink *nativeHistogramSink) Add(s metrics.Sample) {
-	if s.Metric.Contains == metrics.Time {
-		// The Prometheus' convention is to use seconds
-		// as time unit.
-		//
-		// It isn't a requirement but having the current factor fixed to 1.1 then
-		// have seconds is beneficial for having a better resolution.
-		//
-		// The assumption is that an higher precision is required
-		// in case of under-second and more relaxed in case of higher values.
-		sink.H.Observe(s.Value / 1000)
-	} else {
-		// If the Value type is not defined any assumption can be done
-		// because the Sample's Value could contains any unit.
-		sink.H.Observe(s.Value)
-	}
+	// The Prometheus' convention is to use seconds
+	// as time unit.
+	//
+	// It isn't a requirement but having the current factor fixed to 1.1 then
+	// have seconds is beneficial for having a better resolution.
+	//
+	// The assumption is that an higher precision is required
+	// in case of under-second and more relaxed in case of higher values.
+	// If the Value type is not defined any assumption can be done
+	// because the Sample's Value could contains any unit.
+	sink.H.Observe(adaptUnit(s.Metric.Contains, s.Value))
 }
 
 // TODO: create a smaller Sink interface for this Output.
@@ -227,4 +223,17 @@ func baseUnit(vt metrics.ValueType) string {
 	default:
 		return ""
 	}
+}
+
+// adaptUnit converts the generated value into the expected base unit
+// as requested by the Prometheus convention.
+//
+// Time: converted to seconds from milliseconds.
+// Data: k6 emits it in Bytes so it already fine.
+// Other: use the submitted unit.
+func adaptUnit(vt metrics.ValueType, v float64) float64 {
+	if vt == metrics.Time {
+		return v / 1000
+	}
+	return v
 }
