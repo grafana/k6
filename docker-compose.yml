@@ -7,7 +7,7 @@ networks:
 
 services:
   prometheus:
-    image: prom/prometheus:v2.40.4
+    image: prom/prometheus:v2.40.5
     command:
       - --web.enable-remote-write-receiver
       - --enable-feature=native-histograms
