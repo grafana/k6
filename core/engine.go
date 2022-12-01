@@ -125,6 +125,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 			// do nothing, the test run was aborted somehow
 		default:
 			resultCh <- err // we finished normally, so send the result
+			<-resultCh      // the result was processed
 		}
 
 		// Make the background jobs process the currently buffered metrics and
@@ -164,7 +165,7 @@ func (e *Engine) setRunStatusFromError(err error) {
 // and that the remaining metrics samples in the pipeline should be processed as the background
 // process is about to exit.
 func (e *Engine) startBackgroundProcesses(
-	globalCtx, runCtx context.Context, runResult <-chan error, runSubCancel func(), processMetricsAfterRun chan struct{},
+	globalCtx, runCtx context.Context, runResult chan error, runSubCancel func(), processMetricsAfterRun chan struct{},
 ) (wait func()) {
 	processes := new(sync.WaitGroup)
 
@@ -189,6 +190,7 @@ func (e *Engine) startBackgroundProcesses(
 				e.logger.Debug("run: execution scheduler terminated")
 				e.OutputManager.SetRunStatus(lib.RunStatusFinished)
 			}
+			close(runResult) // signal that the run result was processed
 		case <-runCtx.Done():
 			e.logger.Debug("run: context expired; exiting...")
 			e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
