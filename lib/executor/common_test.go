@@ -55,7 +55,7 @@ func setupExecutor(t testing.TB, config lib.ExecutorConfig, es *lib.ExecutionSta
 
 	initVUFunc := func(_ context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
 		idl, idg := es.GetUniqueVUIdentifiers()
-		return es.Test.Runner.NewVU(idl, idg, engineOut)
+		return es.Test.Runner.NewVU(ctx, idl, idg, engineOut)
 	}
 	es.SetInitVUFunc(initVUFunc)
 

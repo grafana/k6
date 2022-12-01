@@ -112,8 +112,10 @@ func (r *Runner) MakeArchive() *lib.Archive {
 }
 
 // NewVU returns a new initialized VU.
-func (r *Runner) NewVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.SampleContainer) (lib.InitializedVU, error) {
-	vu, err := r.newVU(idLocal, idGlobal, samplesOut)
+func (r *Runner) NewVU(
+	ctx context.Context, idLocal, idGlobal uint64, samplesOut chan<- metrics.SampleContainer,
+) (lib.InitializedVU, error) {
+	vu, err := r.newVU(ctx, idLocal, idGlobal, samplesOut)
 	if err != nil {
 		return nil, err
 	}
@@ -121,9 +123,11 @@ func (r *Runner) NewVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 }
 
 //nolint:funlen
-func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.SampleContainer) (*VU, error) {
+func (r *Runner) newVU(
+	ctx context.Context, idLocal, idGlobal uint64, samplesOut chan<- metrics.SampleContainer,
+) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
-	bi, err := r.Bundle.Instantiate(r.preInitState.Logger, idLocal)
+	bi, err := r.Bundle.Instantiate(ctx, r.preInitState.Logger, idLocal)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +358,7 @@ func (r *Runner) IsExecutable(name string) bool {
 }
 
 // HandleSummary calls the specified summary callback, if supplied.
-func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[string]io.Reader, error) {
+func (r *Runner) HandleSummary(parentCtx context.Context, summary *lib.Summary) (map[string]io.Reader, error) {
 	summaryDataForJS := summarizeMetricsToObject(summary, r.Bundle.Options, r.setupData)
 
 	out := make(chan metrics.SampleContainer, 100)
@@ -365,7 +369,10 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 		}
 	}()
 
-	vu, err := r.newVU(0, 0, out)
+	ctx, cancel := context.WithTimeout(parentCtx, r.getTimeoutFor(consts.HandleSummaryFn))
+	defer cancel()
+
+	vu, err := r.newVU(ctx, 0, 0, out)
 	if err != nil {
 		return nil, err
 	}
@@ -378,8 +385,6 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 		return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.HandleSummaryFn))
-	defer cancel()
 	go func() {
 		<-ctx.Done()
 		vu.Runtime.Interrupt(context.Canceled)
@@ -503,12 +508,15 @@ func parseTTL(ttlS string) (time.Duration, error) {
 // Runs an exported function in its own temporary VU, optionally with an argument. Execution is
 // interrupted if the context expires. No error is returned if the part does not exist.
 func (r *Runner) runPart(
-	ctx context.Context,
+	parentCtx context.Context,
 	out chan<- metrics.SampleContainer,
 	name string,
 	arg interface{},
 ) (goja.Value, error) {
-	vu, err := r.newVU(0, 0, out)
+	ctx, cancel := context.WithCancel(parentCtx)
+	defer cancel()
+
+	vu, err := r.newVU(ctx, 0, 0, out)
 	if err != nil {
 		return goja.Undefined(), err
 	}
@@ -517,8 +525,6 @@ func (r *Runner) runPart(
 		return goja.Undefined(), nil
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	go func() {
 		<-ctx.Done()
 		vu.Runtime.Interrupt(context.Canceled)

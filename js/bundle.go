@@ -239,10 +239,13 @@ func (b *Bundle) getExports(logger logrus.FieldLogger, rt *goja.Runtime, options
 }
 
 // Instantiate creates a new runtime from this bundle.
-func (b *Bundle) Instantiate(logger logrus.FieldLogger, vuID uint64) (*BundleInstance, error) {
+func (b *Bundle) Instantiate(ctx context.Context, logger logrus.FieldLogger, vuID uint64) (*BundleInstance, error) {
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
-	vuImpl := &moduleVUImpl{runtime: goja.New()}
+	vuImpl := &moduleVUImpl{
+		ctx:     ctx,
+		runtime: goja.New(),
+	}
 	init := newBoundInitContext(b.BaseInitContext, vuImpl)
 	if err := b.instantiate(logger, vuImpl.runtime, init, vuID); err != nil {
 		return nil, err
@@ -326,7 +329,6 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 		Registry:    b.registry,
 	}
 	unbindInit := b.setInitGlobals(rt, init)
-	init.moduleVUImpl.ctx = context.Background()
 	init.moduleVUImpl.initEnv = initenv
 	init.moduleVUImpl.eventLoop = eventloop.New(init.moduleVUImpl)
 	pgm := b.initializeProgramObject(rt, init)

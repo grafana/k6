@@ -1,6 +1,7 @@
 package js
 
 import (
+	"context"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -26,7 +27,7 @@ func TestOpenPathResolution(t *testing.T) {
 		b, err := getSimpleBundle(t, "/path/scripts/script.js", data, fs)
 		require.NoError(t, err)
 
-		_, err = b.Instantiate(testutils.NewLogger(t), 0)
+		_, err = b.Instantiate(context.Background(), testutils.NewLogger(t), 0)
 		require.NoError(t, err)
 	})
 
@@ -47,7 +48,7 @@ func TestOpenPathResolution(t *testing.T) {
 		b, err := getSimpleBundle(t, "/path/totally/different/directory/script.js", data, fs)
 		require.NoError(t, err)
 
-		_, err = b.Instantiate(testutils.NewLogger(t), 0)
+		_, err = b.Instantiate(context.Background(), testutils.NewLogger(t), 0)
 		require.NoError(t, err)
 	})
 
@@ -71,7 +72,7 @@ func TestOpenPathResolution(t *testing.T) {
 		b, err := getSimpleBundle(t, "/path/totally/different/directory/script.js", data, fs)
 		require.NoError(t, err)
 
-		_, err = b.Instantiate(testutils.NewLogger(t), 0)
+		_, err = b.Instantiate(context.Background(), testutils.NewLogger(t), 0)
 		require.NoError(t, err)
 	})
 }
@@ -92,7 +93,7 @@ func TestRequirePathResolution(t *testing.T) {
 		b, err := getSimpleBundle(t, "/path/scripts/script.js", data, fs)
 		require.NoError(t, err)
 
-		_, err = b.Instantiate(testutils.NewLogger(t), 0)
+		_, err = b.Instantiate(context.Background(), testutils.NewLogger(t), 0)
 		require.NoError(t, err)
 	})
 
@@ -113,7 +114,7 @@ func TestRequirePathResolution(t *testing.T) {
 		b, err := getSimpleBundle(t, "/path/totally/different/directory/script.js", data, fs)
 		require.NoError(t, err)
 
-		_, err = b.Instantiate(testutils.NewLogger(t), 0)
+		_, err = b.Instantiate(context.Background(), testutils.NewLogger(t), 0)
 		require.NoError(t, err)
 	})
 
@@ -137,7 +138,7 @@ func TestRequirePathResolution(t *testing.T) {
 		b, err := getSimpleBundle(t, "/path/totally/different/directory/script.js", data, fs)
 		require.NoError(t, err)
 
-		_, err = b.Instantiate(testutils.NewLogger(t), 0)
+		_, err = b.Instantiate(context.Background(), testutils.NewLogger(t), 0)
 		require.NoError(t, err)
 	})
 }

@@ -47,7 +47,7 @@ func TestInitContextRequire(t *testing.T) {
 			`)
 			require.NoError(t, err, "bundle error")
 
-			bi, err := b.Instantiate(logger, 0)
+			bi, err := b.Instantiate(context.Background(), logger, 0)
 			assert.NoError(t, err, "instance error")
 
 			exports := bi.pgm.exports
@@ -73,7 +73,7 @@ func TestInitContextRequire(t *testing.T) {
 				`)
 			require.NoError(t, err)
 
-			bi, err := b.Instantiate(logger, 0)
+			bi, err := b.Instantiate(context.Background(), logger, 0)
 			require.NoError(t, err)
 
 			exports := bi.pgm.exports
@@ -183,7 +183,7 @@ func TestInitContextRequire(t *testing.T) {
 							assert.Contains(t, b.BaseInitContext.programs, "file://"+constPath)
 						}
 
-						_, err = b.Instantiate(logger, 0)
+						_, err = b.Instantiate(context.Background(), logger, 0)
 						require.NoError(t, err)
 					})
 				}
@@ -207,7 +207,7 @@ func TestInitContextRequire(t *testing.T) {
 			b, err := getSimpleBundle(t, "/script.js", data, fs)
 			require.NoError(t, err)
 
-			bi, err := b.Instantiate(logger, 0)
+			bi, err := b.Instantiate(context.Background(), logger, 0)
 			require.NoError(t, err)
 			_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 			assert.NoError(t, err)
@@ -236,7 +236,7 @@ func createAndReadFile(t *testing.T, file string, content []byte, expectedLength
 		return nil, err
 	}
 
-	bi, err := b.Instantiate(testutils.NewLogger(t), 0)
+	bi, err := b.Instantiate(context.Background(), testutils.NewLogger(t), 0)
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +352,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 			`, srv.URL), fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(testutils.NewLogger(t), 0)
+	bi, err := b.Instantiate(context.Background(), testutils.NewLogger(t), 0)
 	require.NoError(t, err)
 
 	root, err := lib.NewGroup("", nil)
@@ -499,7 +499,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 			`, srv.URL), fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(testutils.NewLogger(t), 0)
+	bi, err := b.Instantiate(context.Background(), testutils.NewLogger(t), 0)
 	require.NoError(t, err)
 
 	root, err := lib.NewGroup("", nil)
@@ -550,7 +550,7 @@ func TestInitContextVU(t *testing.T) {
 		export default function() { return vu; }
 	`)
 	require.NoError(t, err)
-	bi, err := b.Instantiate(testutils.NewLogger(t), 5)
+	bi, err := b.Instantiate(context.Background(), testutils.NewLogger(t), 5)
 	require.NoError(t, err)
 	v, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 	require.NoError(t, err)
@@ -583,7 +583,7 @@ export default function(){
 	b, err := getSimpleBundle(t, "/script.js", data, fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(logger, 0)
+	bi, err := b.Instantiate(context.Background(), logger, 0)
 	require.NoError(t, err)
 	_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 	require.Error(t, err)
@@ -614,7 +614,7 @@ export default function () {
 	b, err := getSimpleBundle(t, "/script.js", data, fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(logger, 0)
+	bi, err := b.Instantiate(context.Background(), logger, 0)
 	require.NoError(t, err)
 	_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 	require.Error(t, err)
@@ -646,7 +646,7 @@ export default function () {
 	b, err := getSimpleBundle(t, "/script.js", data, fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(logger, 0)
+	bi, err := b.Instantiate(context.Background(), logger, 0)
 	require.NoError(t, err)
 	_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 	require.Error(t, err)
@@ -677,7 +677,7 @@ export default function () {
 	b, err := getSimpleBundle(t, "/script.js", data, fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(logger, 0)
+	bi, err := b.Instantiate(context.Background(), logger, 0)
 	require.NoError(t, err)
 	_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 	require.Error(t, err)
@@ -715,6 +715,6 @@ func TestImportModificationsAreConsistentBetweenFiles(t *testing.T) {
 `, fs)
 	require.NoError(t, err, "bundle error")
 
-	_, err = b.Instantiate(logger, 0)
+	_, err = b.Instantiate(context.Background(), logger, 0)
 	require.NoError(t, err)
 }

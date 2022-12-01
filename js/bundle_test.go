@@ -1,6 +1,7 @@
 package js
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
@@ -476,7 +477,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 	logger := testutils.NewLogger(t)
 	checkBundle := func(t *testing.T, b *Bundle) {
 		require.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b.Options)
-		bi, err := b.Instantiate(logger, 0)
+		bi, err := b.Instantiate(context.Background(), logger, 0)
 		require.NoError(t, err)
 		val, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 		require.NoError(t, err)
@@ -569,7 +570,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 		}
 		b, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), arc)
 		require.NoError(t, err)
-		bi, err := b.Instantiate(logger, 0)
+		bi, err := b.Instantiate(context.Background(), logger, 0)
 		require.NoError(t, err)
 		val, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 		require.NoError(t, err)
@@ -713,7 +714,7 @@ func TestOpen(t *testing.T) {
 					for source, b := range map[string]*Bundle{"source": sourceBundle, "archive": arcBundle} {
 						b := b
 						t.Run(source, func(t *testing.T) {
-							bi, err := b.Instantiate(logger, 0)
+							bi, err := b.Instantiate(context.Background(), logger, 0)
 							require.NoError(t, err)
 							v, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 							require.NoError(t, err)
@@ -749,7 +750,7 @@ func TestBundleInstantiate(t *testing.T) {
 		require.NoError(t, err)
 		logger := testutils.NewLogger(t)
 
-		bi, err := b.Instantiate(logger, 0)
+		bi, err := b.Instantiate(context.Background(), logger, 0)
 		require.NoError(t, err)
 		v, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 		require.NoError(t, err)
@@ -769,7 +770,7 @@ func TestBundleInstantiate(t *testing.T) {
 		require.NoError(t, err)
 		logger := testutils.NewLogger(t)
 
-		bi, err := b.Instantiate(logger, 0)
+		bi, err := b.Instantiate(context.Background(), logger, 0)
 		require.NoError(t, err)
 		// Ensure `options` properties are correctly marshalled
 		jsOptions := bi.getExported("options").ToObject(bi.Runtime)
@@ -781,7 +782,7 @@ func TestBundleInstantiate(t *testing.T) {
 		// Ensure options propagate correctly from outside to the script
 		optOrig := b.Options.VUs
 		b.Options.VUs = null.IntFrom(10)
-		bi2, err := b.Instantiate(logger, 0)
+		bi2, err := b.Instantiate(context.Background(), logger, 0)
 		require.NoError(t, err)
 		jsOptions = bi2.getExported("options").ToObject(bi2.Runtime)
 		vus = jsOptions.Get("vus").Export()
@@ -817,7 +818,7 @@ func TestBundleEnv(t *testing.T) {
 			require.Equal(t, "1", b.RuntimeOptions.Env["TEST_A"])
 			require.Equal(t, "", b.RuntimeOptions.Env["TEST_B"])
 
-			bi, err := b.Instantiate(logger, 0)
+			bi, err := b.Instantiate(context.Background(), logger, 0)
 			require.NoError(t, err)
 			_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 			require.NoError(t, err)
@@ -853,7 +854,7 @@ func TestBundleNotSharable(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			for i := 0; i < vus; i++ {
-				bi, err := b.Instantiate(logger, uint64(i))
+				bi, err := b.Instantiate(context.Background(), logger, uint64(i))
 				require.NoError(t, err)
 				for j := 0; j < iters; j++ {
 					bi.Runtime.Set("__ITER", j)
