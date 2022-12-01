@@ -87,6 +87,7 @@ func TestOutputConvertToPbSeries(t *testing.T) {
 		},
 	}
 
+	sortByNameLabel(pbseries)
 	assert.Equal(t, exp, pbseries)
 }
 
