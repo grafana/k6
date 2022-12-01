@@ -3,9 +3,12 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"net"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -25,6 +28,26 @@ type globalTestState struct {
 	cwd string
 
 	expectedExitCode int
+}
+
+var portRangeStart uint64 = 6565 //nolint:gochecknoglobals
+
+func getFreeBindAddr(t *testing.T) string {
+	for i := 0; i < 100; i++ {
+		port := atomic.AddUint64(&portRangeStart, 1)
+		addr := net.JoinHostPort("localhost", strconv.FormatUint(port, 10))
+
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			continue // port was busy for some reason
+		}
+		defer func() {
+			assert.NoError(t, listener.Close())
+		}()
+		return addr
+	}
+	t.Fatal("could not get a free port")
+	return ""
 }
 
 func newGlobalTestState(t *testing.T) *globalTestState {
@@ -69,11 +92,7 @@ func newGlobalTestState(t *testing.T) *globalTestState {
 
 	outMutex := &sync.Mutex{}
 	defaultFlags := getDefaultFlags(".config")
-
-	// Set an empty REST API address by default so that `k6 run` dosen't try to
-	// bind to it, which will result in parallel integration tests trying to use
-	// the same port and a warning message in every one.
-	defaultFlags.address = ""
+	defaultFlags.address = getFreeBindAddr(t)
 
 	ts.globalState = &globalState{
 		ctx:            ctx,

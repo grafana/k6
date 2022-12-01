@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -645,6 +646,70 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 	t.Log(stdOut)
 	require.Contains(t, stdOut, `✓ iterations`)
 	require.Contains(t, stdOut, `Stopping k6 in response to signal`)
+	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+}
+
+func TestAbortedByUserWithRestAPI(t *testing.T) {
+	t.Parallel()
+	script := []byte(`
+		import { sleep } from 'k6';
+		export default function () {
+			console.log('a simple iteration')
+			sleep(1);
+		};
+	`)
+
+	srv, cleanup := getCloudTestEndChecker(t, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed)
+	defer cleanup()
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
+	ts.args = []string{"k6", "-v", "run", "--iterations=20", "--out", "cloud", "--log-output=stdout", "test.js"}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		newRootCommand(ts.globalState).execute()
+	}()
+
+	reachedIteration := false
+	for i := 0; i <= 10 && reachedIteration == false; i++ {
+		time.Sleep(1 * time.Second)
+		ts.outMutex.Lock()
+		stdOut := ts.stdOut.String()
+		ts.outMutex.Unlock()
+
+		if !strings.Contains(stdOut, "a simple iteration") {
+			t.Logf("did not see an iteration on try %d at t=%s", i, time.Now())
+			continue
+		}
+
+		reachedIteration = true
+		req, err := http.NewRequestWithContext(
+			ts.ctx, http.MethodPatch, fmt.Sprintf("http://%s/v1/status", ts.flags.address),
+			bytes.NewBufferString(`{"data":{"type":"status","id":"default","attributes":{"stopped":true}}}`),
+		)
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		t.Logf("Response body: %s", body)
+		assert.NoError(t, resp.Body.Close())
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	}
+
+	assert.True(t, reachedIteration)
+
+	wg.Wait()
+	stdOut := ts.stdOut.String()
+	t.Log(stdOut)
+	require.Contains(t, stdOut, `a simple iteration`)
+	require.Contains(t, stdOut, `PATCH /v1/status`)
+	require.Contains(t, stdOut, `run: stopped by user; exiting...`)
 	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 }
 
