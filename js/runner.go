@@ -127,7 +127,7 @@ func (r *Runner) newVU(
 	ctx context.Context, idLocal, idGlobal uint64, samplesOut chan<- metrics.SampleContainer,
 ) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
-	bi, err := r.Bundle.Instantiate(ctx, r.preInitState.Logger, idLocal)
+	bi, err := r.Bundle.Instantiate(ctx, idLocal)
 	if err != nil {
 		return nil, err
 	}
