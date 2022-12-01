@@ -52,9 +52,19 @@ func newGlobalTestState(t *testing.T) *globalTestState {
 		stdErr:     new(bytes.Buffer),
 	}
 
+	osExitCalled := false
 	defaultOsExitHandle := func(exitCode int) {
 		cancel()
+		osExitCalled = true
 		require.Equal(t, ts.expectedExitCode, exitCode)
+	}
+
+	if ts.expectedExitCode > 0 {
+		// Ensure that, if we expected to receive an error, our `os.Exit()` mock
+		// function was actually called.
+		t.Cleanup(func() {
+			assert.True(t, osExitCalled)
+		})
 	}
 
 	outMutex := &sync.Mutex{}
