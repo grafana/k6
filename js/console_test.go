@@ -209,12 +209,12 @@ func TestConsoleLog(t *testing.T) {
 				`exports.default = function() { console.log(%s); }`, tt.in))
 			require.NoError(t, err)
 
-			samples := make(chan metrics.SampleContainer, 100)
-			initVU, err := r.newVU(1, 1, samples)
-			require.NoError(t, err)
-
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			samples := make(chan metrics.SampleContainer, 100)
+			initVU, err := r.newVU(ctx, 1, 1, samples)
+			require.NoError(t, err)
+
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 
 			logger := extractLogger(vu.(*ActiveVU).Console.logger)
@@ -266,12 +266,13 @@ func TestConsoleLevels(t *testing.T) {
 					))
 					require.NoError(t, err)
 
-					samples := make(chan metrics.SampleContainer, 100)
-					initVU, err := r.newVU(1, 1, samples)
-					require.NoError(t, err)
-
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
+
+					samples := make(chan metrics.SampleContainer, 100)
+					initVU, err := r.newVU(ctx, 1, 1, samples)
+					require.NoError(t, err)
+
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 
 					logger := extractLogger(vu.(*ActiveVU).Console.logger)
@@ -363,12 +364,13 @@ func TestFileConsole(t *testing.T) {
 							})
 							require.NoError(t, err)
 
-							samples := make(chan metrics.SampleContainer, 100)
-							initVU, err := r.newVU(1, 1, samples)
-							require.NoError(t, err)
-
 							ctx, cancel := context.WithCancel(context.Background())
 							defer cancel()
+
+							samples := make(chan metrics.SampleContainer, 100)
+							initVU, err := r.newVU(ctx, 1, 1, samples)
+							require.NoError(t, err)
+
 							vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 							logger := extractLogger(vu.(*ActiveVU).Console.logger)
 

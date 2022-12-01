@@ -63,14 +63,16 @@ func TestRunnerNew(t *testing.T) {
 
 		t.Run("NewVU", func(t *testing.T) {
 			t.Parallel()
-			initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
 			require.NoError(t, err)
 			vuc, ok := initVU.(*VU)
 			require.True(t, ok)
 			assert.Equal(t, int64(0), vuc.getExported("counter").Export())
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			t.Run("RunOnce", func(t *testing.T) {
 				err = vu.RunOnce()
@@ -216,10 +218,10 @@ func TestOptionsSettingToScript(t *testing.T) {
 			require.Equal(t, newOptions, r.GetOptions())
 
 			samples := make(chan metrics.SampleContainer, 100)
-			initVU, err := r.NewVU(1, 1, samples)
-			require.NoError(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			initVU, err := r.NewVU(ctx, 1, 1, samples)
+			require.NoError(t, err)
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			require.NoError(t, vu.RunOnce())
 		})
@@ -271,10 +273,10 @@ func TestOptionsPropagationToScript(t *testing.T) {
 			t.Parallel()
 			samples := make(chan metrics.SampleContainer, 100)
 
-			initVU, err := r.NewVU(1, 1, samples)
-			require.NoError(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			initVU, err := r.NewVU(ctx, 1, 1, samples)
+			require.NoError(t, err)
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			require.NoError(t, vu.RunOnce())
 		})
@@ -441,7 +443,7 @@ func testSetupDataHelper(t *testing.T, data string) {
 			samples := make(chan metrics.SampleContainer, 100)
 
 			require.NoError(t, r.Setup(ctx, samples))
-			initVU, err := r.NewVU(1, 1, samples)
+			initVU, err := r.NewVU(ctx, 1, 1, samples)
 			require.NoError(t, err)
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			require.NoError(t, vu.RunOnce())
@@ -502,10 +504,10 @@ func TestConsoleInInitContext(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			samples := make(chan metrics.SampleContainer, 100)
-			initVU, err := r.NewVU(1, 1, samples)
-			require.NoError(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			initVU, err := r.NewVU(ctx, 1, 1, samples)
+			require.NoError(t, err)
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			require.NoError(t, vu.RunOnce())
 		})
@@ -590,10 +592,10 @@ func TestRunnerIntegrationImports(t *testing.T) {
 				for name, r := range testdata {
 					r := r
 					t.Run(name, func(t *testing.T) {
-						initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
-						require.NoError(t, err)
 						ctx, cancel := context.WithCancel(context.Background())
 						defer cancel()
+						initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+						require.NoError(t, err)
 						vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 						err = vu.RunOnce()
 						require.NoError(t, err)
@@ -628,7 +630,10 @@ func TestVURunContext(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			vu, err := r.newVU(1, 1, make(chan metrics.SampleContainer, 100))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			vu, err := r.newVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
 			require.NoError(t, err)
 
 			fnCalled := false
@@ -646,8 +651,7 @@ func TestVURunContext(t *testing.T) {
 				assert.Equal(t, r.GetDefaultGroup(), state.Group)
 				assert.Equal(t, vu.Transport, state.Transport)
 			})
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+
 			activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = activeVU.RunOnce()
 			require.NoError(t, err)
@@ -685,11 +689,11 @@ func TestVURunInterrupt(t *testing.T) {
 				}
 			}()
 
-			vu, err := r.newVU(1, 1, samples)
-			require.NoError(t, err)
-
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 			defer cancel()
+
+			vu, err := r.newVU(ctx, 1, 1, samples)
+			require.NoError(t, err)
 			activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = activeVU.RunOnce()
 			require.Error(t, err)
@@ -730,7 +734,7 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 			}()
 			var wg sync.WaitGroup
 
-			initVU, err := r.newVU(1, 1, samples)
+			initVU, err := r.newVU(ctx, 1, 1, samples)
 			require.NoError(t, err)
 			for i := 0; i < 100; i++ {
 				wg.Add(1)
@@ -786,7 +790,10 @@ func TestVUIntegrationGroups(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			vu, err := r.newVU(1, 1, make(chan metrics.SampleContainer, 100))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			vu, err := r.newVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
 			require.NoError(t, err)
 
 			fnOuterCalled := false
@@ -809,8 +816,7 @@ func TestVUIntegrationGroups(t *testing.T) {
 				assert.Equal(t, "my group", g.Parent.Name)
 				assert.Equal(t, r.GetDefaultGroup(), g.Parent.Parent)
 			})
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+
 			activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = activeVU.RunOnce()
 			require.NoError(t, err)
@@ -848,11 +854,12 @@ func TestVUIntegrationMetrics(t *testing.T) {
 			t.Parallel()
 			samples := make(chan metrics.SampleContainer, 100)
 			defer close(samples)
-			vu, err := r.newVU(1, 1, samples)
-			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
+			vu, err := r.newVU(ctx, 1, 1, samples)
+			require.NoError(t, err)
 			activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = activeVU.RunOnce()
 			require.NoError(t, err)
@@ -1053,13 +1060,13 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 					t.Parallel()
 					r.preInitState.Logger, _ = logtest.NewNullLogger()
 
-					initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
 					require.NoError(t, err)
 					initVU.(*VU).TLSConfig.RootCAs = x509.NewCertPool() //nolint:forcetypeassert
 					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)        //nolint:forcetypeassert
 
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 					err = vu.RunOnce()
 					if data.errMsg != "" {
@@ -1102,10 +1109,10 @@ func TestVUIntegrationBlacklistOption(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
-			require.NoError(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+			require.NoError(t, err)
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
 			require.Error(t, err)
@@ -1144,10 +1151,10 @@ func TestVUIntegrationBlacklistScript(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
-			require.NoError(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+			require.NoError(t, err)
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
 			require.Error(t, err)
@@ -1186,11 +1193,12 @@ func TestVUIntegrationBlockHostnamesOption(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			initVu, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
-			require.NoError(t, err)
-
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
+			initVu, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+			require.NoError(t, err)
+
 			vu := initVu.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
 			require.Error(t, err)
@@ -1229,10 +1237,10 @@ func TestVUIntegrationBlockHostnamesScript(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			initVu, err := r.NewVU(0, 0, make(chan metrics.SampleContainer, 100))
-			require.NoError(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			initVu, err := r.NewVU(ctx, 0, 0, make(chan metrics.SampleContainer, 100))
+			require.NoError(t, err)
 			vu := initVu.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
 			require.Error(t, err)
@@ -1287,11 +1295,11 @@ func TestVUIntegrationHosts(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
-			require.NoError(t, err)
-
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+			require.NoError(t, err)
+
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
 			require.NoError(t, err)
@@ -1389,12 +1397,12 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 					t.Parallel()
 					r.preInitState.Logger, _ = logtest.NewNullLogger()
 
-					initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
 					require.NoError(t, err)
 					initVU.(*VU).TLSConfig.RootCAs = x509.NewCertPool() //nolint:forcetypeassert
 					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)        //nolint:forcetypeassert
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 					err = vu.RunOnce()
 					if data.errMsg != "" {
@@ -1416,10 +1424,10 @@ func TestVUIntegrationOpenFunctionError(t *testing.T) {
 		`)
 	require.NoError(t, err)
 
-	initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
-	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+	require.NoError(t, err)
 	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 	err = vu.RunOnce()
 	require.Error(t, err)
@@ -1434,10 +1442,10 @@ func TestVUIntegrationOpenFunctionErrorWhenSneaky(t *testing.T) {
 		`)
 	require.NoError(t, err)
 
-	initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
-	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+	require.NoError(t, err)
 	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 	err = vu.RunOnce()
 	require.Error(t, err)
@@ -1464,7 +1472,7 @@ func TestVUDoesOpenUnderV0Condition(t *testing.T) {
 	r, err := getSimpleRunner(t, "/script.js", data, fs)
 	require.NoError(t, err)
 
-	_, err = r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
+	_, err = r.NewVU(context.Background(), 1, 1, make(chan metrics.SampleContainer, 100))
 	require.NoError(t, err)
 }
 
@@ -1488,7 +1496,7 @@ func TestVUDoesNotOpenUnderConditions(t *testing.T) {
 	r, err := getSimpleRunner(t, "/script.js", data, fs)
 	require.NoError(t, err)
 
-	_, err = r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
+	_, err = r.NewVU(context.Background(), 1, 1, make(chan metrics.SampleContainer, 100))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "open() can't be used with files that weren't previously opened during initialization (__VU==0)")
 }
@@ -1512,7 +1520,7 @@ func TestVUDoesNonExistingPathnUnderConditions(t *testing.T) {
 	r, err := getSimpleRunner(t, "/script.js", data, fs)
 	require.NoError(t, err)
 
-	_, err = r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
+	_, err = r.NewVU(context.Background(), 1, 1, make(chan metrics.SampleContainer, 100))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "open() can't be used with files that weren't previously opened during initialization (__VU==0)")
 }
@@ -1558,10 +1566,10 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
-			require.NoError(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+			require.NoError(t, err)
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			for i := 0; i < 2; i++ {
 				require.NoError(t, vu.RunOnce())
@@ -1618,11 +1626,12 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
-			require.NoError(t, err)
-
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
+			initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+			require.NoError(t, err)
+
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
 			require.NoError(t, err)
@@ -1658,11 +1667,12 @@ func TestVUIntegrationVUID(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			initVU, err := r.NewVU(1234, 1234, make(chan metrics.SampleContainer, 100))
-			require.NoError(t, err)
-
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
+			initVU, err := r.NewVU(ctx, 1234, 1234, make(chan metrics.SampleContainer, 100))
+			require.NoError(t, err)
+
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
 			require.NoError(t, err)
@@ -1815,10 +1825,10 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					t.Parallel()
 					r.preInitState.Logger, _ = logtest.NewNullLogger()
-					initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
-					require.NoError(t, err)
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
+					initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+					require.NoError(t, err)
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 					err = vu.RunOnce()
 					if len(data.errMsg) > 0 {
@@ -1986,10 +1996,10 @@ func TestArchiveRunningIntegrity(t *testing.T) {
 			err = r.Setup(ctx, ch)
 			cancel()
 			require.NoError(t, err)
-			initVU, err := r.NewVU(1, 1, ch)
-			require.NoError(t, err)
 			ctx, cancel = context.WithCancel(context.Background())
 			defer cancel()
+			initVU, err := r.NewVU(ctx, 1, 1, ch)
+			require.NoError(t, err)
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
 			require.NoError(t, err)
@@ -2068,11 +2078,12 @@ func TestStuffNotPanicking(t *testing.T) {
 		`))
 	require.NoError(t, err)
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	ch := make(chan metrics.SampleContainer, 1000)
-	initVU, err := r.NewVU(1, 1, ch)
+	initVU, err := r.NewVU(ctx, 1, 1, ch)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
 	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 	errC := make(chan error)
 	go func() { errC <- vu.RunOnce() }()
@@ -2102,11 +2113,12 @@ func TestPanicOnSimpleHTML(t *testing.T) {
 		`)
 	require.NoError(t, err)
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	ch := make(chan metrics.SampleContainer, 1000)
-	initVU, err := r.NewVU(1, 1, ch)
+	initVU, err := r.NewVU(ctx, 1, 1, ch)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
 	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 	errC := make(chan error)
 	go func() { errC <- vu.RunOnce() }()
@@ -2185,7 +2197,7 @@ func TestSystemTags(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			vu, err := r.NewVU(uint64(num), 0, samples)
+			vu, err := r.NewVU(ctx, uint64(num), 0, samples)
 			require.NoError(t, err)
 			activeVU := vu.Activate(&lib.VUActivationParams{
 				RunContext: ctx,
@@ -2237,7 +2249,10 @@ func TestVUPanic(t *testing.T) {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			initVU, err := r.NewVU(1, 1234, make(chan metrics.SampleContainer, 100))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			initVU, err := r.NewVU(ctx, 1, 1234, make(chan metrics.SampleContainer, 100))
 			require.NoError(t, err)
 
 			logger := logrus.New()
@@ -2248,8 +2263,6 @@ func TestVUPanic(t *testing.T) {
 			}
 			logger.AddHook(&hook)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			vu.(*ActiveVU).Runtime.Set("panic", func(str string) { panic(str) })
 			vu.(*ActiveVU).state.Logger = logger
@@ -2299,7 +2312,10 @@ func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.H
 	options := runner.GetOptions()
 	require.Empty(t, options.Validate())
 
-	vu, err := runner.NewVU(1, 1, tc.samples)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	vu, err := runner.NewVU(ctx, 1, 1, tc.samples)
 	require.NoError(t, err)
 
 	jsVU, ok := vu.(*VU)
@@ -2307,8 +2323,6 @@ func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.H
 	jsVU.state.Dialer = tb.Dialer
 	jsVU.state.TLSConfig = tb.TLSClientConfig
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
 
 	err = activeVU.RunOnce()
@@ -2331,7 +2345,7 @@ func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.H
 			RuntimeOptions: tc.rtOpts,
 		}, arc)
 	require.NoError(t, err)
-	vuFromArc, err := runnerFromArc.NewVU(2, 2, tc.samples)
+	vuFromArc, err := runnerFromArc.NewVU(ctx, 2, 2, tc.samples)
 	require.NoError(t, err)
 	jsVUFromArc, ok := vuFromArc.(*VU)
 	require.True(t, ok)
@@ -2467,10 +2481,10 @@ func TestMinIterationDurationIsCancellable(t *testing.T) {
 	require.NoError(t, err)
 
 	ch := make(chan metrics.SampleContainer, 1000)
-	initVU, err := r.NewVU(1, 1, ch)
+	ctx, cancel := context.WithCancel(context.Background())
+	initVU, err := r.NewVU(ctx, 1, 1, ch)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
 	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 	errC := make(chan error)
 	go func() { errC <- vu.RunOnce() }()
@@ -2560,11 +2574,12 @@ func TestForceHTTP1Feature(t *testing.T) {
 			for name, r := range runners {
 				r := r
 				t.Run(name, func(t *testing.T) {
-					initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
-					require.NoError(t, err)
-
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
+
+					initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+					require.NoError(t, err)
+
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 					err = vu.RunOnce()
 					require.NoError(t, err)
@@ -2642,7 +2657,11 @@ func TestExecutionInfo(t *testing.T) {
 
 			r.Bundle.Options.SystemTags = &metrics.DefaultSystemTagSet
 			samples := make(chan metrics.SampleContainer, 100)
-			initVU, err := r.NewVU(1, 10, samples)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			initVU, err := r.NewVU(ctx, 1, 10, samples)
 			require.NoError(t, err)
 
 			testRunState := &lib.TestRunState{
@@ -2653,9 +2672,6 @@ func TestExecutionInfo(t *testing.T) {
 
 			execScheduler, err := local.NewExecutionScheduler(testRunState)
 			require.NoError(t, err)
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 
 			ctx = lib.WithExecutionState(ctx, execScheduler.GetState())
 			ctx = lib.WithScenarioState(ctx, &lib.ScenarioState{
@@ -2711,11 +2727,12 @@ exports.default = () => {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			initVU, err := r.NewVU(1, 1, make(chan metrics.SampleContainer, 100))
-			require.NoError(t, err)
-
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
+			initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+			require.NoError(t, err)
+
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
 			require.NoError(t, err)

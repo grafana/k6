@@ -70,7 +70,7 @@ func NewInitContext(
 		moduleRegistry:    getJSModules(),
 		exportsCache:      make(map[string]goja.Value),
 		moduleVUImpl: &moduleVUImpl{
-			ctx:     context.Background(),
+			ctx:     context.Background(), // TODO: pass a real context here as well?
 			runtime: rt,
 		},
 	}

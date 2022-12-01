@@ -81,12 +81,13 @@ exports.default = function() {
 		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			samples := make(chan metrics.SampleContainer, 100)
-			initVU, err := r.NewVU(1, 1, samples)
-			require.NoError(t, err)
-
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
+			samples := make(chan metrics.SampleContainer, 100)
+			initVU, err := r.NewVU(ctx, 1, 1, samples)
+			require.NoError(t, err)
+
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = vu.RunOnce()
 			require.NoError(t, err)
