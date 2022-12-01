@@ -3,26 +3,39 @@
 This extension adds a PoC [Websockets API](https://websockets.spec.whatwg.org) implementation to [k6](https://www.k6.io).
 
 This is meant to try to implement the specification as close as possible without doing stuff that don't make sense in k6 like:
+
 1. not reporting errors
 2. not allowing some ports and other security workarounds
 3. supporting Blob as message
 
-It likely in the future will support additional k6 specific features such as:
-1. adding additional tags
-2. support for ping/pong which isn't part of the specification
+It supports additional k6 specific features such as:
+
+* Custom metrics tags
+* Cookie jar
+* Headers customization
+* Support for ping/pong which isn't part of the specification
+* Compression Support (The only supported algorithm currently is `deflate`)
 
 It is implemented using the [xk6](https://k6.io/blog/extending-k6-with-xk6/) system.
 
+## Requirements
+
+* [Golang 1.17+](https://go.dev/)
+* [Git](https://git-scm.com/)
+* [xk6](https://github.com/grafana/xk6) (`go install go.k6.io/xk6/cmd/xk6@latest`)
+
 ## Getting started  
 
-1. Install `xk6`:
+1. Build the k6's binary:
+
   ```shell
-  $ go install go.k6.io/xk6/cmd/xk6@latest
+  $ make build
   ```
 
-2. Build the binary:
+2. Run an example:
+
   ```shell
-  $ xk6 build --with github.com/grafana/xk6-websockets
+  $ ./k6 run ./examples/test-api.k6.io.js
   ```
 
 ## Discrepancies with the specifications

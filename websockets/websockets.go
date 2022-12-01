@@ -773,7 +773,7 @@ func (w *webSocket) callErrorListeners(e error) error { // TODO use the error ev
 
 	ev := w.newEvent(events.ERROR, time.Now())
 	must(rt, ev.DefineDataProperty("error",
-		rt.ToValue(e),
+		rt.ToValue(e.Error()),
 		goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	for _, errorListener := range w.eventListeners.all(events.ERROR) {
 		if _, err := errorListener(ev); err != nil { // TODO fix timestamp
