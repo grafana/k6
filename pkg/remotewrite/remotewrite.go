@@ -253,11 +253,9 @@ type seriesWithMeasure struct {
 func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 	var newts []*prompb.TimeSeries
 
-	mapMonoSeries := func(s metrics.TimeSeries, t time.Time) prompb.TimeSeries {
+	mapMonoSeries := func(s metrics.TimeSeries, suffix string, t time.Time) prompb.TimeSeries {
 		return prompb.TimeSeries{
-			// TODO: should we add the suffix for
-			// Counter, Rate and Gauge?
-			Labels: MapSeries(s, ""),
+			Labels: MapSeries(s, suffix),
 			Samples: []*prompb.Sample{
 				{Timestamp: t.UnixMilli()},
 			},
@@ -266,17 +264,17 @@ func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 
 	switch swm.Metric.Type {
 	case metrics.Counter:
-		ts := mapMonoSeries(swm.TimeSeries, swm.Latest)
+		ts := mapMonoSeries(swm.TimeSeries, "total", swm.Latest)
 		ts.Samples[0].Value = swm.Measure.(*metrics.CounterSink).Value
 		newts = []*prompb.TimeSeries{&ts}
 
 	case metrics.Gauge:
-		ts := mapMonoSeries(swm.TimeSeries, swm.Latest)
+		ts := mapMonoSeries(swm.TimeSeries, "", swm.Latest)
 		ts.Samples[0].Value = swm.Measure.(*metrics.GaugeSink).Value
 		newts = []*prompb.TimeSeries{&ts}
 
 	case metrics.Rate:
-		ts := mapMonoSeries(swm.TimeSeries, swm.Latest)
+		ts := mapMonoSeries(swm.TimeSeries, "rate", swm.Latest)
 		// pass zero duration here because time is useless for formatting rate
 		rateVals := swm.Measure.(*metrics.RateSink).Format(time.Duration(0))
 		ts.Samples[0].Value = rateVals["rate"]

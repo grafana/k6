@@ -55,6 +55,14 @@ func TestOutputConvertToPbSeries(t *testing.T) {
 			Time:  time.Date(2022, time.September, 1, 0, 0, 0, 0, time.UTC),
 			Value: 2,
 		},
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: registry.MustNewMetric("metric3", metrics.Rate),
+				Tags:   tagset,
+			},
+			Time:  time.Date(2022, time.September, 1, 0, 0, 0, 0, time.UTC),
+			Value: 7,
+		},
 	}
 
 	o := Output{
@@ -62,14 +70,14 @@ func TestOutputConvertToPbSeries(t *testing.T) {
 	}
 
 	pbseries := o.convertToPbSeries(samples)
-	require.Len(t, pbseries, 2)
-	require.Len(t, o.tsdb, 2)
+	require.Len(t, pbseries, 3)
+	require.Len(t, o.tsdb, 3)
 
 	unix1sept := int64(1661990400 * 1000) // in ms
 	exp := []*prompb.TimeSeries{
 		{
 			Labels: []*prompb.Label{
-				{Name: "__name__", Value: "k6_metric1"},
+				{Name: "__name__", Value: "k6_metric1_total"},
 				{Name: "tagk1", Value: "tagv1"},
 			},
 			Samples: []*prompb.Sample{
@@ -78,11 +86,20 @@ func TestOutputConvertToPbSeries(t *testing.T) {
 		},
 		{
 			Labels: []*prompb.Label{
-				{Name: "__name__", Value: "k6_metric2"},
+				{Name: "__name__", Value: "k6_metric2_total"},
 				{Name: "tagk1", Value: "tagv1"},
 			},
 			Samples: []*prompb.Sample{
 				{Value: 2, Timestamp: unix1sept},
+			},
+		},
+		{
+			Labels: []*prompb.Label{
+				{Name: "__name__", Value: "k6_metric3_rate"},
+				{Name: "tagk1", Value: "tagv1"},
+			},
+			Samples: []*prompb.Sample{
+				{Value: 1, Timestamp: unix1sept},
 			},
 		},
 	}
