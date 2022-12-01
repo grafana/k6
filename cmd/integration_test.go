@@ -735,7 +735,14 @@ func TestAbortedByScriptSetupError(t *testing.T) {
 
 	newRootCommand(ts.globalState).execute()
 
+	// FIXME: remove this locking after VU initialization accepts a context and
+	// is properly synchronized: currently when a test is aborted during the
+	// init phase, some logs might be emitted after the above command returns...
+	// see: https://github.com/grafana/k6/issues/2790
+	ts.outMutex.Lock()
 	stdOut := ts.stdOut.String()
+	ts.outMutex.Unlock()
+
 	t.Log(stdOut)
 	require.Contains(t, stdOut, `wonky setup`)
 	require.Contains(t, stdOut, `Error: foo`)
@@ -794,7 +801,14 @@ func TestAbortedByScriptInitError(t *testing.T) {
 
 	newRootCommand(ts.globalState).execute()
 
+	// FIXME: remove this locking after VU initialization accepts a context and
+	// is properly synchronized: currently when a test is aborted during the
+	// init phase, some logs might be emitted after the above command returns...
+	// see: https://github.com/grafana/k6/issues/2790
+	ts.outMutex.Lock()
 	stdOut := ts.stdOut.String()
+	ts.outMutex.Unlock()
+
 	t.Log(stdOut)
 	require.Contains(t, stdOut, `Error: foo`)
 	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
