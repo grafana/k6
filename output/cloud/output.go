@@ -634,15 +634,16 @@ func (out *Output) testFinished() error {
 		}
 	}
 
-	out.logger.WithFields(logrus.Fields{
-		"ref":     out.referenceID,
-		"tainted": testTainted,
-	}).Debug("Sending test finished")
-
 	runStatus := lib.RunStatusFinished
 	if out.runStatus != lib.RunStatusQueued {
 		runStatus = out.runStatus
 	}
+
+	out.logger.WithFields(logrus.Fields{
+		"ref":        out.referenceID,
+		"tainted":    testTainted,
+		"run_status": runStatus,
+	}).Debug("Sending test finished")
 
 	return out.client.TestFinished(out.referenceID, thresholdResults, testTainted, runStatus)
 }
