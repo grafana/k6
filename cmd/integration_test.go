@@ -418,9 +418,7 @@ func getTestServer(t *testing.T, routes map[string]http.Handler) *httptest.Serve
 	return httptest.NewServer(mux)
 }
 
-func getCloudTestEndChecker(
-	t *testing.T, expRunStatus lib.RunStatus, expResultStatus cloudapi.ResultStatus,
-) (*httptest.Server, func()) {
+func getCloudTestEndChecker(t *testing.T, expRunStatus lib.RunStatus, expResultStatus cloudapi.ResultStatus) *httptest.Server {
 	testFinished := false
 	srv := getTestServer(t, map[string]http.Handler{
 		"POST ^/v1/tests$": http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
@@ -455,12 +453,12 @@ func getCloudTestEndChecker(
 		}),
 	})
 
-	waitFn := func() {
-		assert.True(t, testFinished)
+	t.Cleanup(func() {
+		assert.Truef(t, testFinished, "expected test to have called the cloud API endpoint to finish the test")
 		srv.Close()
-	}
+	})
 
-	return srv, waitFn
+	return srv
 }
 
 func TestSetupTeardownThresholds(t *testing.T) {
@@ -497,8 +495,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		};
 	`))
 
-	srv, cleanup := getCloudTestEndChecker(t, lib.RunStatusFinished, cloudapi.ResultStatusPassed)
-	defer cleanup()
+	srv := getCloudTestEndChecker(t, lib.RunStatusFinished, cloudapi.ResultStatusPassed)
 
 	ts := newGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
@@ -541,8 +538,7 @@ func TestThresholdsFailed(t *testing.T) {
 
 	// Since these thresholds don't have an abortOnFail property, the run_status
 	// in the cloud will still be Finished, even if the test itself failed.
-	srv, cleanup := getCloudTestEndChecker(t, lib.RunStatusFinished, cloudapi.ResultStatusFailed)
-	defer cleanup()
+	srv := getCloudTestEndChecker(t, lib.RunStatusFinished, cloudapi.ResultStatusFailed)
 
 	ts := newGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
@@ -584,8 +580,7 @@ func TestAbortedByThreshold(t *testing.T) {
 		export default function () {};
 	`)
 
-	srv, cleanup := getCloudTestEndChecker(t, lib.RunStatusAbortedThreshold, cloudapi.ResultStatusFailed)
-	defer cleanup()
+	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedThreshold, cloudapi.ResultStatusFailed)
 
 	ts := newGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
@@ -622,8 +617,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 		export default function () {};
 	`)
 
-	srv, cleanup := getCloudTestEndChecker(t, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed)
-	defer cleanup()
+	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed)
 
 	ts := newGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
@@ -659,8 +653,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 		};
 	`)
 
-	srv, cleanup := getCloudTestEndChecker(t, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed)
-	defer cleanup()
+	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed)
 
 	ts := newGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
@@ -724,8 +717,7 @@ func TestAbortedByScriptSetupError(t *testing.T) {
 		export default function () {};
 	`)
 
-	srv, cleanup := getCloudTestEndChecker(t, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
-	defer cleanup()
+	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
 
 	ts := newGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
@@ -758,8 +750,7 @@ func TestAbortedByScriptAbort(t *testing.T) {
 		};
 	`)
 
-	srv, cleanup := getCloudTestEndChecker(t, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed)
-	defer cleanup()
+	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed)
 
 	ts := newGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
@@ -790,8 +781,7 @@ func TestAbortedByScriptInitError(t *testing.T) {
 		export default function () {};
 	`)
 
-	srv, cleanup := getCloudTestEndChecker(t, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
-	defer cleanup()
+	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
 
 	ts := newGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
