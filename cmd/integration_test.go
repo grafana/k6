@@ -768,6 +768,38 @@ func TestAbortedByScriptAbort(t *testing.T) {
 	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 }
 
+func TestAbortedByScriptInitError(t *testing.T) {
+	t.Parallel()
+	script := []byte(`
+		export const options = {
+			vus: 5,
+			iterations: 10,
+		};
+
+		if (__VU > 3) {
+			throw new Error('foo');
+		}
+
+		export default function () {};
+	`)
+
+	srv, cleanup := getCloudTestEndChecker(t, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
+	defer cleanup()
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
+	ts.args = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
+	ts.expectedExitCode = int(exitcodes.ScriptException)
+
+	newRootCommand(ts.globalState).execute()
+
+	stdOut := ts.stdOut.String()
+	t.Log(stdOut)
+	require.Contains(t, stdOut, `Error: foo`)
+	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
+}
+
 // TODO: add an integration test that verifies that unindexable tags work as
 // expected and that VU tags from different scenarios don't cross between
 // scenarios and pollute other metrics.
