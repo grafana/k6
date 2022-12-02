@@ -306,6 +306,7 @@ func (b *Bundle) initializeProgramObject(rt *goja.Runtime, init *InitContext) pr
 	return pgm
 }
 
+//nolint:funlen
 func (b *Bundle) instantiate(init *InitContext, vuID uint64) (err error) {
 	rt := init.moduleVUImpl.runtime
 	logger := init.logger
@@ -335,6 +336,20 @@ func (b *Bundle) instantiate(init *InitContext, vuID uint64) (err error) {
 	init.moduleVUImpl.eventLoop = eventloop.New(init.moduleVUImpl)
 	pgm := b.initializeProgramObject(rt, init)
 
+	// TODO: make something cleaner for interrupting scripts, and more unified
+	// (e.g. as a part of the event loop or RunWithPanicCatching()?
+	initCtxDone := init.moduleVUImpl.ctx.Done()
+	initDone := make(chan struct{})
+	watchDone := make(chan struct{})
+	go func() {
+		select {
+		case <-initCtxDone:
+			rt.Interrupt(init.moduleVUImpl.ctx.Err())
+		case <-initDone: // do nothing
+		}
+		close(watchDone)
+	}()
+
 	err = common.RunWithPanicCatching(logger, rt, func() error {
 		return init.moduleVUImpl.eventLoop.Start(func() error {
 			f, errRun := rt.RunProgram(b.Program)
@@ -350,6 +365,8 @@ func (b *Bundle) instantiate(init *InitContext, vuID uint64) (err error) {
 			panic("Somehow a commonjs main module is not wrapped in a function")
 		})
 	})
+	close(initDone)
+	<-watchDone
 
 	if err != nil {
 		var exception *goja.Exception
