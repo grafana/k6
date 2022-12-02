@@ -29,16 +29,6 @@ import (
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 )
 
-const (
-	noopDefaultFunc   = `export default function() {};`
-	fooLogDefaultFunc = `export default function() { console.log('foo'); };`
-	noopHandleSummary = `
-		export function handleSummary(data) {
-			return {}; // silence the end of test summary
-		};
-	`
-)
-
 func TestVersion(t *testing.T) {
 	t.Parallel()
 
@@ -62,7 +52,7 @@ func TestSimpleTestStdin(t *testing.T) {
 
 	ts := newGlobalTestState(t)
 	ts.args = []string{"k6", "run", "-"}
-	ts.stdIn = bytes.NewBufferString(noopDefaultFunc)
+	ts.stdIn = bytes.NewBufferString(`export default function() {};`)
 	newRootCommand(ts.globalState).execute()
 
 	stdOut := ts.stdOut.String()
@@ -77,7 +67,12 @@ func TestStdoutAndStderrAreEmptyWithQuietAndHandleSummary(t *testing.T) {
 
 	ts := newGlobalTestState(t)
 	ts.args = []string{"k6", "--quiet", "run", "-"}
-	ts.stdIn = bytes.NewBufferString(noopDefaultFunc + noopHandleSummary)
+	ts.stdIn = bytes.NewBufferString(`
+		export default function() {};
+		export function handleSummary(data) {
+			return {}; // silence the end of test summary
+		};
+	`)
 	newRootCommand(ts.globalState).execute()
 
 	assert.Empty(t, ts.stdErr.Bytes())
@@ -97,7 +92,10 @@ func TestStdoutAndStderrAreEmptyWithQuietAndLogsForwarded(t *testing.T) {
 		"k6", "--quiet", "--log-output", "file=" + logFilePath,
 		"--log-format", "raw", "run", "--no-summary", "-",
 	}
-	ts.stdIn = bytes.NewBufferString(fooLogDefaultFunc)
+	ts.stdIn = bytes.NewBufferString(`
+		console.log('init');
+		export default function() { console.log('foo'); };
+	`)
 	newRootCommand(ts.globalState).execute()
 
 	// The test state hook still catches this message
@@ -110,7 +108,7 @@ func TestStdoutAndStderrAreEmptyWithQuietAndLogsForwarded(t *testing.T) {
 	// Instead it should be in the log file
 	logContents, err := afero.ReadFile(ts.fs, logFilePath)
 	require.NoError(t, err)
-	assert.Equal(t, "foo\n", string(logContents))
+	assert.Equal(t, "init\ninit\ninit\nfoo\ninit\n", string(logContents)) //nolint:dupword
 }
 
 func TestRelativeLogPathWithSetupAndTeardown(t *testing.T) {
@@ -119,7 +117,9 @@ func TestRelativeLogPathWithSetupAndTeardown(t *testing.T) {
 	ts := newGlobalTestState(t)
 
 	ts.args = []string{"k6", "--log-output", "file=test.log", "--log-format", "raw", "run", "-i", "2", "-"}
-	ts.stdIn = bytes.NewBufferString(fooLogDefaultFunc + `
+	ts.stdIn = bytes.NewBufferString(`
+		console.log('init');
+		export default function() { console.log('foo'); };
 		export function setup() { console.log('bar'); };
 		export function teardown() { console.log('baz'); };
 	`)
@@ -134,7 +134,7 @@ func TestRelativeLogPathWithSetupAndTeardown(t *testing.T) {
 	// And check that the log file also contains everything
 	logContents, err := afero.ReadFile(ts.fs, filepath.Join(ts.cwd, "test.log"))
 	require.NoError(t, err)
-	assert.Equal(t, "bar\nfoo\nfoo\nbaz\n", string(logContents))
+	assert.Equal(t, "init\ninit\ninit\nbar\nfoo\nfoo\ninit\nbaz\ninit\n", string(logContents)) //nolint:dupword
 }
 
 func TestWrongCliFlagIterations(t *testing.T) {
@@ -142,7 +142,7 @@ func TestWrongCliFlagIterations(t *testing.T) {
 
 	ts := newGlobalTestState(t)
 	ts.args = []string{"k6", "run", "--iterations", "foo", "-"}
-	ts.stdIn = bytes.NewBufferString(noopDefaultFunc)
+	ts.stdIn = bytes.NewBufferString(`export default function() {};`)
 	// TODO: check for exitcodes.InvalidConfig after https://github.com/loadimpact/k6/issues/883 is done...
 	ts.expectedExitCode = -1
 	newRootCommand(ts.globalState).execute()
@@ -155,7 +155,7 @@ func TestWrongEnvVarIterations(t *testing.T) {
 	ts := newGlobalTestState(t)
 	ts.args = []string{"k6", "run", "--vus", "2", "-"}
 	ts.envVars = map[string]string{"K6_ITERATIONS": "4"}
-	ts.stdIn = bytes.NewBufferString(noopDefaultFunc)
+	ts.stdIn = bytes.NewBufferString(`export default function() {};`)
 
 	newRootCommand(ts.globalState).execute()
 
