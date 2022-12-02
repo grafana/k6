@@ -274,6 +274,14 @@ func forceHTTP1() bool {
 
 // Setup runs the setup function if there is one and sets the setupData to the returned value
 func (r *Runner) Setup(ctx context.Context, out chan<- metrics.SampleContainer) error {
+	if !r.IsExecutable(consts.SetupFn) {
+		// do not init a new transient VU or execute setup() if it wasn't
+		// actually defined and exported in the script
+		r.preInitState.Logger.Debugf("%s() is not defined or not exported, skipping!", consts.SetupFn)
+		return nil
+	}
+	r.preInitState.Logger.Debugf("Running %s()...", consts.SetupFn)
+
 	setupCtx, setupCancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.SetupFn))
 	defer setupCancel()
 
@@ -307,6 +315,14 @@ func (r *Runner) SetSetupData(data []byte) {
 
 // Teardown runs the teardown function if there is one.
 func (r *Runner) Teardown(ctx context.Context, out chan<- metrics.SampleContainer) error {
+	if !r.IsExecutable(consts.TeardownFn) {
+		// do not init a new transient VU or execute teardown() if it wasn't
+		// actually defined and exported in the script
+		r.preInitState.Logger.Debugf("%s() is not defined or not exported, skipping!", consts.TeardownFn)
+		return nil
+	}
+	r.preInitState.Logger.Debugf("Running %s()...", consts.TeardownFn)
+
 	teardownCtx, teardownCancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.TeardownFn))
 	defer teardownCancel()
 
