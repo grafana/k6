@@ -8,7 +8,7 @@ import (
 	"net"
 	"net/url"
 	"reflect"
-	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1047,10 +1047,6 @@ func TestDNSResolver(t *testing.T) {
 			},
 		}
 
-		expErr := sr(`dial tcp 127.0.0.254:HTTPBIN_PORT: connect: connection refused`)
-		if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
-			expErr = "request timeout"
-		}
 		for name, tc := range testCases {
 			tc := tc
 			t.Run(name, func(t *testing.T) {
@@ -1095,7 +1091,13 @@ func TestDNSResolver(t *testing.T) {
 					require.Len(t, entries, tc.expLogEntries)
 					for _, entry := range entries {
 						require.IsType(t, &url.Error{}, entry.Data["error"])
-						assert.EqualError(t, entry.Data["error"].(*url.Error).Err, expErr)
+						err, ok := entry.Data["error"].(*url.Error)
+						assert.True(t, ok)
+						errMsg := err.Error()
+						contains := strings.Contains(errMsg, "connection refused") ||
+							strings.Contains(errMsg, "request timeout") ||
+							strings.Contains(errMsg, "dial: i/o timeout")
+						assert.Truef(t, contains, "expected error to contain one of the list of messages")
 					}
 				case <-time.After(10 * time.Second):
 					t.Fatal("timed out")
