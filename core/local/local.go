@@ -420,7 +420,6 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut ch
 
 	// Run setup() before any executors, if it's not disabled
 	if !e.state.Test.Options.NoSetup.Bool {
-		logger.Debug("Running setup()")
 		e.state.SetExecutionStatus(lib.ExecutionStatusSetup)
 		e.initProgress.Modify(pb.WithConstProgress(1, "setup()"))
 		if err := e.state.Test.Runner.Setup(runSubCtx, engineOut); err != nil {
@@ -456,7 +455,6 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut ch
 
 	// Run teardown() after all executors are done, if it's not disabled
 	if !e.state.Test.Options.NoTeardown.Bool {
-		logger.Debug("Running teardown()")
 		e.state.SetExecutionStatus(lib.ExecutionStatusTeardown)
 		e.initProgress.Modify(pb.WithConstProgress(1, "teardown()"))
 

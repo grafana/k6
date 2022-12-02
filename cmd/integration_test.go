@@ -108,7 +108,7 @@ func TestStdoutAndStderrAreEmptyWithQuietAndLogsForwarded(t *testing.T) {
 	// Instead it should be in the log file
 	logContents, err := afero.ReadFile(ts.fs, logFilePath)
 	require.NoError(t, err)
-	assert.Equal(t, "init\ninit\ninit\nfoo\ninit\n", string(logContents)) //nolint:dupword
+	assert.Equal(t, "init\ninit\nfoo\n", string(logContents)) //nolint:dupword
 }
 
 func TestRelativeLogPathWithSetupAndTeardown(t *testing.T) {
