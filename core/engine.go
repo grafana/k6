@@ -106,6 +106,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 	// TODO: if we ever need metrics processing in the init context, we can move
 	// this below the other components... or even start them concurrently?
 	if err := e.ExecutionScheduler.Init(runCtx, e.Samples); err != nil {
+		e.setRunStatusFromError(err)
 		return nil, nil, err
 	}
 
@@ -124,6 +125,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 			// do nothing, the test run was aborted somehow
 		default:
 			resultCh <- err // we finished normally, so send the result
+			<-resultCh      // the result was processed
 		}
 
 		// Make the background jobs process the currently buffered metrics and
@@ -141,6 +143,18 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 	return runFn, waitFn, nil
 }
 
+func (e *Engine) setRunStatusFromError(err error) {
+	var serr errext.Exception
+	switch {
+	case errors.As(err, &serr):
+		e.OutputManager.SetRunStatus(lib.RunStatusAbortedScriptError)
+	case errext.IsInterruptError(err):
+		e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
+	default:
+		e.OutputManager.SetRunStatus(lib.RunStatusAbortedSystem)
+	}
+}
+
 // This starts a bunch of goroutines to process metrics, thresholds, and set the
 // test run status when it ends. It returns a function that can be used after
 // the provided context is called, to wait for the complete winding down of all
@@ -151,7 +165,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 // and that the remaining metrics samples in the pipeline should be processed as the background
 // process is about to exit.
 func (e *Engine) startBackgroundProcesses(
-	globalCtx, runCtx context.Context, runResult <-chan error, runSubCancel func(), processMetricsAfterRun chan struct{},
+	globalCtx, runCtx context.Context, runResult chan error, runSubCancel func(), processMetricsAfterRun chan struct{},
 ) (wait func()) {
 	processes := new(sync.WaitGroup)
 
@@ -171,19 +185,12 @@ func (e *Engine) startBackgroundProcesses(
 		case err := <-runResult:
 			if err != nil {
 				e.logger.WithError(err).Debug("run: execution scheduler returned an error")
-				var serr errext.Exception
-				switch {
-				case errors.As(err, &serr):
-					e.OutputManager.SetRunStatus(lib.RunStatusAbortedScriptError)
-				case errext.IsInterruptError(err):
-					e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
-				default:
-					e.OutputManager.SetRunStatus(lib.RunStatusAbortedSystem)
-				}
+				e.setRunStatusFromError(err)
 			} else {
 				e.logger.Debug("run: execution scheduler terminated")
 				e.OutputManager.SetRunStatus(lib.RunStatusFinished)
 			}
+			close(runResult) // signal that the run result was processed
 		case <-runCtx.Done():
 			e.logger.Debug("run: context expired; exiting...")
 			e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)

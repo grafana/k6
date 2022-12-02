@@ -34,6 +34,7 @@ type cmdRun struct {
 }
 
 // TODO: split apart some more
+//
 //nolint:funlen,gocognit,gocyclo,cyclop
 func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	printBanner(c.gs)
@@ -75,6 +76,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	progressBarWG := &sync.WaitGroup{}
+	progressBarWG.Add(1)
+	defer progressBarWG.Wait()
+
 	// This is manually triggered after the Engine's Run() has completed,
 	// and things like a single Ctrl+C don't affect it. We use it to make
 	// sure that the progressbars finish updating with the latest execution
@@ -82,15 +87,13 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	progressCtx, progressCancel := context.WithCancel(globalCtx)
 	defer progressCancel()
 	initBar := execScheduler.GetInitProgressBar()
-	progressBarWG := &sync.WaitGroup{}
-	progressBarWG.Add(1)
 	go func() {
-		pbs := []*pb.ProgressBar{execScheduler.GetInitProgressBar()}
+		defer progressBarWG.Done()
+		pbs := []*pb.ProgressBar{initBar}
 		for _, s := range execScheduler.GetExecutors() {
 			pbs = append(pbs, s.GetProgress())
 		}
 		showProgress(progressCtx, c.gs, pbs, logger)
-		progressBarWG.Done()
 	}()
 
 	// Create all outputs.

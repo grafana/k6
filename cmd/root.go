@@ -256,6 +256,7 @@ func (c *rootCommand) execute() {
 	if err == nil {
 		cancel()
 		c.waitRemoteLogger()
+		// TODO: explicitly call c.globalState.osExit(0), for simpler tests and clarity?
 		return
 	}
 

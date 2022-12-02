@@ -179,6 +179,9 @@ func (e *ExecutionScheduler) initVUsConcurrently(
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			for range limiter {
+				// TODO: actually pass the context when we initialize VUs here,
+				// so we can cancel that initialization if there is an error,
+				// see https://github.com/grafana/k6/issues/2790
 				newVU, err := e.initVU(samplesOut, logger)
 				if err == nil {
 					e.state.AddInitializedVU(newVU)
@@ -281,6 +284,10 @@ func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- metrics
 		}),
 	)
 
+	// TODO: once VU initialization accepts a context, when a VU init fails,
+	// cancel the context and actually wait for all VUs to finish before this
+	// function returns - that way we won't have any trailing logs, see
+	// https://github.com/grafana/k6/issues/2790
 	for vuNum := uint64(0); vuNum < vusToInitialize; vuNum++ {
 		select {
 		case err := <-doneInits:
@@ -369,6 +376,7 @@ func (e *ExecutionScheduler) runExecutor(
 
 // Run the ExecutionScheduler, funneling all generated metric samples through the supplied
 // out channel.
+//
 //nolint:funlen
 func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- metrics.SampleContainer) error {
 	defer func() {
