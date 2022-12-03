@@ -958,29 +958,7 @@ func TestAbortedByTestAbortInNonFirstInitCode(t *testing.T) {
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
 	`)
 
-	// FIXME: when VU initialization is properly synchronized, replace the
-	// following lines with this line only:
-	//
-	//   ts := testAbortedByScriptTestAbort(t, false, script, runTestWithNoLinger)
-	//
-	// See https://github.com/grafana/k6/issues/2790 for details. Right now we
-	// need the stdOut locking because VU initialization is not properly synchronized:
-	// when a test is aborted during the init phase, some logs might be emitted
-	// after the root command returns...
-
-	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, int(exitcodes.ScriptAborted),
-	)
-	newRootCommand(ts.globalState).execute()
-
-	ts.outMutex.Lock()
-	stdOut := ts.stdOut.String()
-	ts.outMutex.Unlock()
-	t.Log(stdOut)
-	assert.Contains(t, stdOut, "test aborted: foo")
-	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
-	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
-	assert.NotContains(t, stdOut, "bogus summary")
+	testAbortedByScriptTestAbort(t, false, script, runTestWithNoLinger)
 }
 
 func TestAbortedByScriptAbortInVUCode(t *testing.T) {
@@ -1090,14 +1068,7 @@ func TestAbortedByScriptInitError(t *testing.T) {
 	)
 	newRootCommand(ts.globalState).execute()
 
-	// FIXME: remove this locking after VU initialization accepts a context and
-	// is properly synchronized: currently when a test is aborted during the
-	// init phase, some logs might be emitted after the above command returns...
-	// see: https://github.com/grafana/k6/issues/2790
-	ts.outMutex.Lock()
 	stdOut := ts.stdOut.String()
-	ts.outMutex.Unlock()
-
 	t.Log(stdOut)
 	assert.Contains(t, stdOut, `level=error msg="Error: oops in 2\n\tat file:///`)
 	assert.Contains(t, stdOut, `hint="error while initializing VU #2 (script exception)"`)
