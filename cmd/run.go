@@ -185,35 +185,27 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 
 	// Start the test run
 	initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
-	var interrupt error
 	err = engineRun()
 	if err != nil {
-		err = common.UnwrapGojaInterruptedError(err)
-		if errext.IsInterruptError(err) {
-			// Don't return here since we need to work with --linger,
-			// show the end-of-test summary and exit cleanly.
-			interrupt = err
-		}
-		if !conf.Linger.Bool && interrupt == nil {
-			return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
-		}
+		logger.WithError(err).Debug("Engine terminated with an error")
+	} else {
+		logger.Debug("Engine run terminated cleanly")
 	}
 	runCancel()
-	logger.Debug("Engine run terminated cleanly")
 
 	progressCancel()
 	progressBarWG.Wait()
 
 	executionState := execScheduler.GetState()
 	// Warn if no iterations could be completed.
-	if executionState.GetFullIterationCount() == 0 {
+	if err == nil && executionState.GetFullIterationCount() == 0 {
 		logger.Warn("No script iterations finished, consider making the test duration longer")
 	}
 
 	// Handle the end-of-test summary.
 	if !testRunState.RuntimeOptions.NoSummary.Bool {
 		engine.MetricsEngine.MetricsLock.Lock() // TODO: refactor so this is not needed
-		summaryResult, err := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
+		summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
 			Metrics:         engine.MetricsEngine.ObservedMetrics,
 			RootGroup:       execScheduler.GetRunner().GetDefaultGroup(),
 			TestRunDuration: executionState.GetCurrentTestRunDuration(),
@@ -224,11 +216,11 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 			},
 		})
 		engine.MetricsEngine.MetricsLock.Unlock()
-		if err == nil {
-			err = handleSummaryResult(c.gs.fs, c.gs.stdOut, c.gs.stdErr, summaryResult)
+		if hsErr == nil {
+			hsErr = handleSummaryResult(c.gs.fs, c.gs.stdOut, c.gs.stdErr, summaryResult)
 		}
-		if err != nil {
-			logger.WithError(err).Error("failed to handle the end-of-test summary")
+		if hsErr != nil {
+			logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
 		}
 	}
 
@@ -250,12 +242,12 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	engineWait()
 	logger.Debug("Everything has finished, exiting k6!")
 	if test.keyLogger != nil {
-		if err := test.keyLogger.Close(); err != nil {
-			logger.WithError(err).Warn("Error while closing the SSLKEYLOGFILE")
+		if klErr := test.keyLogger.Close(); klErr != nil {
+			logger.WithError(klErr).Warn("Error while closing the SSLKEYLOGFILE")
 		}
 	}
-	if interrupt != nil {
-		return interrupt
+	if err != nil {
+		return errext.WithExitCodeIfNone(common.UnwrapGojaInterruptedError(err), exitcodes.GenericEngine)
 	}
 	if engine.IsTainted() {
 		return errext.WithExitCodeIfNone(errors.New("some thresholds have failed"), exitcodes.ThresholdsHaveFailed)
