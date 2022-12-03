@@ -263,6 +263,7 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 			e.thresholdsTainted = thresholdsTainted
 			e.thresholdsTaintedLock.Unlock()
 		}
+		e.logger.Debug("Metrics processing finished!")
 	}()
 
 	ticker := time.NewTicker(collectRate)

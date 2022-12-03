@@ -258,8 +258,14 @@ func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- me
 
 // Init concurrently initializes all of the planned VUs and then sequentially
 // initializes all of the configured executors.
-func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- metrics.SampleContainer) error {
+func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- metrics.SampleContainer) (err error) {
 	e.emitVUsAndVUsMax(ctx, samplesOut)
+	defer func() {
+		if err != nil {
+			close(e.stopVUsEmission)
+			<-e.vusEmissionStopped
+		}
+	}()
 
 	logger := e.state.Test.Logger.WithField("phase", "local-execution-scheduler-init")
 	vusToInitialize := lib.GetMaxPlannedVUs(e.executionPlan)
