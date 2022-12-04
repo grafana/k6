@@ -32,7 +32,7 @@ func BenchmarkHTTPRequests(b *testing.B) {
 	err = r.SetOptions(lib.Options{
 		Throw:          null.BoolFrom(true),
 		MaxRedirects:   null.IntFrom(10),
-		Hosts:          types.NullAddressTrie{Trie: tb.Dialer.Hosts},
+		Hosts:          types.NullHosts{Trie: tb.Dialer.Hosts},
 		NoCookiesReset: null.BoolFrom(true),
 		SystemTags:     &metrics.DefaultSystemTagSet,
 		RunTags:        map[string]string{"myapp": "myhttpbench"},
@@ -72,7 +72,7 @@ func BenchmarkHTTPRequestsBase(b *testing.B) {
 	err = r.SetOptions(lib.Options{
 		Throw:          null.BoolFrom(true),
 		MaxRedirects:   null.IntFrom(10),
-		Hosts:          types.NullAddressTrie{Trie: tb.Dialer.Hosts},
+		Hosts:          types.NullHosts{Trie: tb.Dialer.Hosts},
 		NoCookiesReset: null.BoolFrom(true),
 	})
 	require.NoError(b, err)

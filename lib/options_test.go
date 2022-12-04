@@ -456,12 +456,14 @@ func TestOptions(t *testing.T) {
 
 	t.Run("Hosts", func(t *testing.T) {
 		t.Parallel()
-		host, err := types.NewHostAddress(net.ParseIP("192.0.2.1"), "80")
+		host, err := types.NewHost(net.ParseIP("192.0.2.1"), "80")
 		assert.NoError(t, err)
 
-		opts := Options{}.Apply(Options{Hosts: types.NewNullAddressTrie(map[string]types.HostAddress{
+		hosts, err := types.NewNullHosts(map[string]types.Host{
 			"test.loadimpact.com": *host,
-		})})
+		})
+		assert.NoError(t, err)
+		opts := Options{}.Apply(Options{Hosts: hosts})
 		assert.NotNil(t, opts.Hosts)
 		assert.NotEmpty(t, opts.Hosts)
 
@@ -727,21 +729,21 @@ func TestCIDRUnmarshal(t *testing.T) {
 	}
 }
 
-func TestHostAddressUnmarshal(t *testing.T) {
+func TestHost(t *testing.T) {
 	t.Parallel()
 	testData := []struct {
 		input          string
-		expectedOutput *types.HostAddress
+		expectedOutput *types.Host
 		expectFailure  string
 	}{
 		{
 			"1.2.3.4",
-			&types.HostAddress{IP: net.ParseIP("1.2.3.4")},
+			&types.Host{IP: net.ParseIP("1.2.3.4")},
 			"",
 		},
 		{
 			"1.2.3.4:80",
-			&types.HostAddress{IP: net.ParseIP("1.2.3.4"), Port: 80},
+			&types.Host{IP: net.ParseIP("1.2.3.4"), Port: 80},
 			"",
 		},
 		{
@@ -751,17 +753,17 @@ func TestHostAddressUnmarshal(t *testing.T) {
 		},
 		{
 			"2001:0db8:0000:0000:0000:ff00:0042:8329",
-			&types.HostAddress{IP: net.ParseIP("2001:0db8:0000:0000:0000:ff00:0042:8329")},
+			&types.Host{IP: net.ParseIP("2001:0db8:0000:0000:0000:ff00:0042:8329")},
 			"",
 		},
 		{
 			"2001:db8::68",
-			&types.HostAddress{IP: net.ParseIP("2001:db8::68")},
+			&types.Host{IP: net.ParseIP("2001:db8::68")},
 			"",
 		},
 		{
 			"[2001:db8::68]:80",
-			&types.HostAddress{IP: net.ParseIP("2001:db8::68"), Port: 80},
+			&types.Host{IP: net.ParseIP("2001:db8::68"), Port: 80},
 			"",
 		},
 		{
@@ -775,7 +777,7 @@ func TestHostAddressUnmarshal(t *testing.T) {
 		data := data
 		t.Run(data.input, func(t *testing.T) {
 			t.Parallel()
-			actualHost := &types.HostAddress{}
+			actualHost := &types.Host{}
 			err := actualHost.UnmarshalText([]byte(data.input))
 
 			if data.expectFailure != "" {

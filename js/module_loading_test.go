@@ -199,7 +199,7 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
-	require.NoError(t, r1.SetOptions(lib.Options{Hosts: types.NullAddressTrie{Trie: tb.Dialer.Hosts}}))
+	require.NoError(t, r1.SetOptions(lib.Options{Hosts: types.NullHosts{Trie: tb.Dialer.Hosts}}))
 	arc := r1.MakeArchive()
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)

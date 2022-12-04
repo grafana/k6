@@ -215,10 +215,11 @@ func TestX509HostnameError(t *testing.T) {
 	}
 	var err error
 	badHostname := "somewhere.else"
-	badHostAddress, err := types.NewHostAddress(net.ParseIP(tb.Replacer.Replace("HTTPSBIN_IP")), "")
+	badHost, err := types.NewHost(net.ParseIP(tb.Replacer.Replace("HTTPSBIN_IP")), "")
+	require.NoError(t, err)
 
-	tb.Dialer.Hosts = types.NewAddressTrie(map[string]types.HostAddress{
-		badHostname: *badHostAddress,
+	tb.Dialer.Hosts, err = types.NewHosts(map[string]types.Host{
+		badHostname: *badHost,
 	})
 	require.NoError(t, err)
 	req, err := http.NewRequestWithContext(context.Background(), "GET", tb.Replacer.Replace("https://"+badHostname+":HTTPSBIN_PORT/get"), nil)
@@ -350,7 +351,7 @@ func getHTTP2ServerWithCustomConnContext(t *testing.T) *httpmultibin.HTTPMultiBi
 	require.NoError(t, err)
 	http2IP := net.ParseIP(http2URL.Hostname())
 	require.NotNil(t, http2IP)
-	http2DomainValue, err := types.NewHostAddress(http2IP, "")
+	http2DomainValue, err := types.NewHost(http2IP, "")
 	require.NoError(t, err)
 
 	// Set up the dialer with shorter timeouts and the custom domains
@@ -359,9 +360,10 @@ func getHTTP2ServerWithCustomConnContext(t *testing.T) *httpmultibin.HTTPMultiBi
 		KeepAlive: 10 * time.Second,
 		DualStack: true,
 	}, netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4))
-	dialer.Hosts = types.NewAddressTrie(map[string]types.HostAddress{
+	dialer.Hosts, err = types.NewHosts(map[string]types.Host{
 		http2Domain: *http2DomainValue,
 	})
+	require.NoError(t, err)
 
 	transport := &http.Transport{
 		DialContext:     dialer.DialContext,

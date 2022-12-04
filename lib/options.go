@@ -285,7 +285,7 @@ type Options struct {
 	BlockedHostnames types.NullHostnameTrie `json:"blockHostnames" envconfig:"K6_BLOCK_HOSTNAMES"`
 
 	// Hosts overrides dns entries for given hosts
-	Hosts types.NullAddressTrie `json:"hosts" envconfig:"K6_HOSTS"`
+	Hosts types.NullHosts `json:"hosts" envconfig:"K6_HOSTS"`
 
 	// Disable keep-alive connections
 	NoConnectionReuse null.Bool `json:"noConnectionReuse" envconfig:"K6_NO_CONNECTION_REUSE"`
