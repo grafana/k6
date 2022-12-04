@@ -901,3 +901,145 @@ func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 	t.Log(stdOut)
 	require.Equal(t, 12, strings.Count(stdOut, "✓"))
 }
+
+func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[string]string) []float64 {
+	jsonLines := bytes.Split(jsonOutput, []byte("\n"))
+	result := []float64{}
+
+	tagsMatch := func(rawTags interface{}) bool {
+		sampleTags, ok := rawTags.(map[string]interface{})
+		require.True(t, ok)
+		for k, v := range tags {
+			rv, sok := sampleTags[k]
+			if !sok {
+				return false
+			}
+			rvs, sok := rv.(string)
+			require.True(t, sok)
+			if v != rvs {
+				return false
+			}
+		}
+		return true
+	}
+
+	for _, jsonLine := range jsonLines {
+		if len(jsonLine) == 0 {
+			continue
+		}
+		var line map[string]interface{}
+		require.NoError(t, json.Unmarshal(jsonLine, &line))
+		sampleType, ok := line["type"].(string)
+		require.True(t, ok)
+		if sampleType != "Point" {
+			continue
+		}
+		sampleMetric, ok := line["metric"].(string)
+		require.True(t, ok)
+		if sampleMetric != metric {
+			continue
+		}
+		sampleData, ok := line["data"].(map[string]interface{})
+		require.True(t, ok)
+
+		if !tagsMatch(sampleData["tags"]) {
+			continue
+		}
+
+		samplValue, ok := sampleData["value"].(float64)
+		require.True(t, ok)
+		result = append(result, samplValue)
+	}
+
+	return result
+}
+
+func sum(vals []float64) (sum float64) {
+	for _, val := range vals {
+		sum += val
+	}
+	return sum
+}
+
+func max(vals []float64) float64 {
+	max := vals[0]
+	for _, val := range vals {
+		if max < val {
+			max = val
+		}
+	}
+	return max
+}
+
+func TestActiveVUsCount(t *testing.T) {
+	t.Parallel()
+
+	script := []byte(`
+		var sleep = require('k6').sleep;
+
+		exports.options = {
+			scenarios: {
+				carr1: {
+					executor: 'constant-arrival-rate',
+					rate: 10,
+					preAllocatedVUs: 1,
+					maxVUs: 10,
+					startTime: '0s',
+					duration: '3s',
+					gracefulStop: '0s',
+				},
+				carr2: {
+					executor: 'constant-arrival-rate',
+					rate: 10,
+					preAllocatedVUs: 1,
+					maxVUs: 10,
+					duration: '3s',
+					startTime: '3s',
+					gracefulStop: '0s',
+				},
+				rarr: {
+					executor: 'ramping-arrival-rate',
+					startRate: 5,
+					stages: [
+						{ target: 10, duration: '2s' },
+						{ target: 0, duration: '2s' },
+					],
+					preAllocatedVUs: 1,
+					maxVUs: 10,
+					startTime: '6s',
+					gracefulStop: '0s',
+				},
+			}
+		}
+
+		exports.default = function () {
+			sleep(5);
+		}
+	`)
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	ts.args = []string{"k6", "run", "--compatibility-mode", "base", "--out", "json=results.json", "test.js"}
+	newRootCommand(ts.globalState).execute()
+
+	stdOut := ts.stdOut.String()
+	t.Log(stdOut)
+
+	jsonResults, err := afero.ReadFile(ts.fs, "results.json")
+	require.NoError(t, err)
+	// t.Log(string(jsonResults))
+	assert.Equal(t, float64(10), max(getSampleValues(t, jsonResults, "vus_max", nil)))
+	assert.Equal(t, float64(10), max(getSampleValues(t, jsonResults, "vus", nil)))
+	assert.Equal(t, float64(0), sum(getSampleValues(t, jsonResults, "iterations", nil)))
+
+	logEntries := ts.loggerHook.Drain()
+	assert.Len(t, logEntries, 4)
+	for i, logEntry := range logEntries {
+		assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+		if i < 3 {
+			assert.Equal(t, "Insufficient VUs, reached 10 active VUs and cannot initialize more", logEntry.Message)
+		} else {
+			assert.Equal(t, "No script iterations finished, consider making the test duration longer", logEntry.Message)
+		}
+	}
+}

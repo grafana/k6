@@ -1231,6 +1231,7 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 	assert.Equal(t, 1.0, count)
 }
 
+// TODO: delete, functionality duplicated in cmd/integration_test.go
 func TestActiveVUsCount(t *testing.T) {
 	t.Parallel()
 
