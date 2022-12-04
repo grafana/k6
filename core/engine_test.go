@@ -720,6 +720,7 @@ func TestSentReceivedMetrics(t *testing.T) {
 	})
 }
 
+// TODO: delete, functionality duplicated in cmd/integration_test.go
 func TestRunTags(t *testing.T) {
 	t.Parallel()
 

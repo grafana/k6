@@ -1124,3 +1124,112 @@ func TestMinIterationDuration(t *testing.T) {
 	t.Log(stdOut)
 	assert.Contains(t, stdOut, "✓ test_counter.........: 3")
 }
+
+func TestRunTags(t *testing.T) {
+	t.Parallel()
+
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	script := []byte(tb.Replacer.Replace(`
+		import http from 'k6/http';
+		import ws from 'k6/ws';
+		import { Counter } from 'k6/metrics';
+		import { group, check, fail } from 'k6';
+
+		let customTags =  { 'over': 'the rainbow' };
+		let params = { 'tags': customTags};
+		let statusCheck = { 'status is 200': (r) => r.status === 200 }
+
+		let myCounter = new Counter('mycounter');
+
+		export const options = {
+			hosts: {
+				"HTTPBIN_DOMAIN": "HTTPBIN_IP",
+				"HTTPSBIN_DOMAIN": "HTTPSBIN_IP",
+			}
+		}
+
+		export default function() {
+			group('http', function() {
+				check(http.get('HTTPSBIN_URL', params), statusCheck, customTags);
+				check(http.get('HTTPBIN_URL/status/418', params), statusCheck, customTags);
+			})
+
+			group('websockets', function() {
+				var response = ws.connect('WSBIN_URL/ws-echo', params, function (socket) {
+					socket.on('open', function open() {
+						console.log('ws open and say hello');
+						socket.send('hello');
+					});
+
+					socket.on('message', function (message) {
+						console.log('ws got message ' + message);
+						if (message != 'hello') {
+							fail('Expected to receive "hello" but got "' + message + '" instead !');
+						}
+						console.log('ws closing socket...');
+						socket.close();
+					});
+
+					socket.on('close', function () {
+						console.log('ws close');
+					});
+
+					socket.on('error', function (e) {
+						console.log('ws error: ' + e.error());
+					});
+				});
+				console.log('connect returned');
+				check(response, { 'status is 101': (r) => r && r.status === 101 }, customTags);
+			})
+
+			myCounter.add(1, customTags);
+		}
+	`))
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	ts.args = []string{
+		"k6", "run", "-u", "2", "--tag", "foo=bar", "--tag", "test=mest", "--tag", "over=written",
+		"--log-output=stdout", "--out", "json=results.json", "test.js",
+	}
+	ts.envVars = map[string]string{"K6_ITERATIONS": "3", "K6_INSECURE_SKIP_TLS_VERIFY": "true"}
+	newRootCommand(ts.globalState).execute()
+
+	stdOut := ts.stdOut.String()
+	t.Log(stdOut)
+
+	jsonResults, err := afero.ReadFile(ts.fs, "results.json")
+	require.NoError(t, err)
+
+	expTags := map[string]string{"foo": "bar", "test": "mest", "over": "written", "scenario": "default"}
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "iterations", expTags)))
+	assert.Less(t, float64(0), sum(getSampleValues(t, jsonResults, "iteration_duration", expTags)))
+	assert.Less(t, float64(0), sum(getSampleValues(t, jsonResults, "data_received", expTags)))
+	assert.Less(t, float64(0), sum(getSampleValues(t, jsonResults, "data_sent", expTags)))
+
+	expTags["over"] = "the rainbow" // we overwrite this in most with custom tags in the script
+	assert.Equal(t, float64(6), sum(getSampleValues(t, jsonResults, "checks", expTags)))
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "mycounter", expTags)))
+
+	expTags["group"] = "::http"
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "checks", expTags)))
+	assert.Equal(t, float64(6), sum(getSampleValues(t, jsonResults, "http_reqs", expTags)))
+	assert.Equal(t, 6, len(getSampleValues(t, jsonResults, "http_req_duration", expTags)))
+	expTags["expected_response"] = "true"
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "http_reqs", expTags)))
+	assert.Equal(t, 3, len(getSampleValues(t, jsonResults, "http_req_duration", expTags)))
+	expTags["expected_response"] = "false"
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "http_reqs", expTags)))
+	assert.Equal(t, 3, len(getSampleValues(t, jsonResults, "http_req_duration", expTags)))
+	delete(expTags, "expected_response")
+
+	expTags["group"] = "::websockets"
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "checks", expTags)))
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "ws_sessions", expTags)))
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "ws_msgs_sent", expTags)))
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "ws_msgs_received", expTags)))
+	assert.Equal(t, 3, len(getSampleValues(t, jsonResults, "ws_session_duration", expTags)))
+	assert.Equal(t, 0, len(getSampleValues(t, jsonResults, "http_req_duration", expTags)))
+	expTags["check"] = "status is 101"
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "checks", expTags)))
+}
