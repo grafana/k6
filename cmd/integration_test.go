@@ -804,6 +804,100 @@ func TestAbortedByScriptInitError(t *testing.T) {
 	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
 }
 
-// TODO: add an integration test that verifies that unindexable tags work as
-// expected and that VU tags from different scenarios don't cross between
-// scenarios and pollute other metrics.
+func TestMetricTagAndSetupDataIsolation(t *testing.T) {
+	t.Parallel()
+	script := []byte(`
+		import exec from 'k6/execution';
+		import { Counter } from 'k6/metrics';
+		import { sleep } from 'k6';
+
+		export const options = {
+			scenarios: {
+				sc1: {
+					executor: 'shared-iterations',
+					vus: 2,
+					iterations: 20,
+					maxDuration: '7s',
+					gracefulStop: 0,
+					exec: 'sc1',
+				},
+				sc2: {
+					executor: 'per-vu-iterations',
+					vus: 1,
+					iterations: 1,
+					startTime: '7s',
+					exec: 'sc2',
+				},
+			},
+			thresholds: {
+				'iterations': ['count == 21'],
+				'iterations{scenario:sc1}': ['count == 20'],
+				'iterations{sc:1}': ['count == 20'],
+				'iterations{scenario:sc2}': ['count == 1'],
+				'mycounter': ['count == 23'],
+				'mycounter{sc:1}': ['count == 20'],
+				'mycounter{setup:true}': ['count == 1'],
+				'mycounter{myiter:1}': ['count >= 1', 'count <= 2'],
+				'mycounter{myiter:2}': ['count >= 1', 'count <= 2'],
+				'mycounter{scenario:sc2}': ['count == 1'],
+				'mycounter{scenario:sc2,sc:1}': ['count == 0'],
+				'vus_max': ['value == 2'],
+			},
+		};
+		let myCounter = new Counter('mycounter');
+
+		export function setup() {
+			exec.vu.tags.setup = 'true';
+			myCounter.add(1);
+			return { v: 0 };
+		}
+
+		export function sc1(data) {
+			if (data.v !== __ITER) {
+				throw new Error('sc1: wrong data for iter ' + __ITER + ': ' + JSON.stringify(data));
+			}
+			if (__ITER != 0 && data.v != exec.vu.tags.myiter) {
+				throw new Error('sc1: wrong vu tags for iter ' + __ITER + ': ' + JSON.stringify(exec.vu.tags));
+			}
+			data.v += 1;
+			exec.vu.tags.myiter = data.v;
+			exec.vu.tags.sc = 1;
+			myCounter.add(1);
+			sleep(0.02); // encourage using both of the VUs
+		}
+
+		export function sc2(data) {
+			if (data.v === 0) {
+				throw new Error('sc2: wrong data, expected VU to have modified setup data locally: ' + data.v);
+			}
+
+			if (typeof exec.vu.tags.myiter !== 'undefined') {
+				throw new Error(
+					'sc2: wrong tags, expected VU to have new tags in new scenario: ' + JSON.stringify(exec.vu.tags),
+				);
+			}
+
+			myCounter.add(1);
+		}
+
+		export function teardown(data) {
+			if (data.v !== 0) {
+				throw new Error('teardown: wrong data: ' + data.v);
+			}
+			myCounter.add(1);
+		}
+	`)
+
+	srv := getCloudTestEndChecker(t, lib.RunStatusFinished, cloudapi.ResultStatusPassed)
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
+	ts.args = []string{"k6", "run", "--quiet", "--log-output=stdout", "--out", "cloud", "test.js"}
+
+	newRootCommand(ts.globalState).execute()
+
+	stdOut := ts.stdOut.String()
+	t.Log(stdOut)
+	require.Equal(t, 12, strings.Count(stdOut, "✓"))
+}
