@@ -840,6 +840,7 @@ func TestRunTags(t *testing.T) {
 	}
 }
 
+// TODO: delete, functionality duplicated in cmd/integration_test.go
 func TestSetupException(t *testing.T) {
 	t.Parallel()
 
@@ -892,6 +893,7 @@ func TestSetupException(t *testing.T) {
 	}
 }
 
+// TODO: delete, functionality duplicated in cmd/integration_test.go
 func TestVuInitException(t *testing.T) {
 	t.Parallel()
 

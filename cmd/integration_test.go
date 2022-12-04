@@ -730,19 +730,29 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 
 func TestAbortedByScriptSetupError(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	depScript := []byte(`
+		export default function () {
+			baz();
+		}
+		function baz() {
+			throw new Error("baz");
+		}
+	`)
+	mainScript := []byte(`
+		import bar from "./bar.js";
 		export function setup() {
 			console.log('wonky setup');
-			throw new Error('foo');
-		}
-
-		export default function () {};
+			bar();
+		};
+		export default function() {};
 	`)
 
 	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
 
 	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), mainScript, 0o644))
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "bar.js"), depScript, 0o644))
+
 	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
 	ts.args = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
 	ts.expectedExitCode = int(exitcodes.ScriptException)
@@ -759,7 +769,13 @@ func TestAbortedByScriptSetupError(t *testing.T) {
 
 	t.Log(stdOut)
 	assert.Contains(t, stdOut, `wonky setup`)
-	assert.Contains(t, stdOut, `Error: foo`)
+
+	rootPath := "file:///"
+	if runtime.GOOS == "windows" {
+		rootPath += "c:/"
+	}
+	assert.Contains(t, stdOut, `level=error msg="Error: baz\n\tat baz (`+rootPath+`test/bar.js:6:9(3))\n\tat `+
+		rootPath+`test/bar.js:3:3(3)\n\tat setup (`+rootPath+`test/test.js:5:3(9))\n\tat native\n" hint="script exception"`)
 	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
 }
 
@@ -796,8 +812,8 @@ func TestAbortedByScriptInitError(t *testing.T) {
 			iterations: 10,
 		};
 
-		if (__VU > 3) {
-			throw new Error('foo');
+		if (__VU == 2) {
+			throw new Error('oops in ' + __VU);
 		}
 
 		export default function () {};
@@ -822,7 +838,8 @@ func TestAbortedByScriptInitError(t *testing.T) {
 	ts.outMutex.Unlock()
 
 	t.Log(stdOut)
-	assert.Contains(t, stdOut, `Error: foo`)
+	assert.Contains(t, stdOut, `level=error msg="Error: oops in 2\n\tat file:///`)
+	assert.Contains(t, stdOut, `hint="error while initializing VU #2 (script exception)"`)
 	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
 }
 
