@@ -302,7 +302,7 @@ func testSSLKEYLOGFILE(t *testing.T, ts *globalTestState, filePath string) {
 	sslloglines, err := afero.ReadFile(ts.fs, filepath.Join(ts.cwd, "ssl.log"))
 	require.NoError(t, err)
 	// TODO maybe have multiple depending on the ciphers used as that seems to change it
-	require.Regexp(t, "^CLIENT_[A-Z_]+ [0-9a-f]+ [0-9a-f]+\n", string(sslloglines))
+	assert.Regexp(t, "^CLIENT_[A-Z_]+ [0-9a-f]+ [0-9a-f]+\n", string(sslloglines))
 }
 
 func TestThresholdDeprecationWarnings(t *testing.T) {
@@ -392,8 +392,8 @@ func TestSubMetricThresholdNoData(t *testing.T) {
 
 	newRootCommand(ts.globalState).execute()
 
-	require.Len(t, ts.loggerHook.Drain(), 0)
-	require.Contains(t, ts.stdOut.String(), `
+	assert.Len(t, ts.loggerHook.Drain(), 0)
+	assert.Contains(t, ts.stdOut.String(), `
      one..................: 0   0/s
        { tag:xyz }........: 0   0/s
      two..................: 42`)
@@ -424,7 +424,7 @@ func getCloudTestEndChecker(t *testing.T, expRunStatus lib.RunStatus, expResultS
 		"POST ^/v1/tests$": http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 			resp.WriteHeader(http.StatusOK)
 			_, err := fmt.Fprintf(resp, `{"reference_id": "111"}`)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}),
 		"POST ^/v1/tests/111$": http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 			require.NotNil(t, req.Body)
@@ -504,11 +504,11 @@ func TestSetupTeardownThresholds(t *testing.T) {
 
 	newRootCommand(ts.globalState).execute()
 
-	require.Len(t, ts.loggerHook.Drain(), 0)
+	assert.Len(t, ts.loggerHook.Drain(), 0)
 	stdOut := ts.stdOut.String()
-	require.Contains(t, stdOut, `✓ http_reqs......................: 7`)
-	require.Contains(t, stdOut, `✓ iterations.....................: 5`)
-	require.Contains(t, stdOut, `✓ setup_teardown.................: 2`)
+	assert.Contains(t, stdOut, `✓ http_reqs......................: 7`)
+	assert.Contains(t, stdOut, `✓ iterations.....................: 5`)
+	assert.Contains(t, stdOut, `✓ setup_teardown.................: 2`)
 }
 
 func TestThresholdsFailed(t *testing.T) {
@@ -551,10 +551,10 @@ func TestThresholdsFailed(t *testing.T) {
 	assert.True(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, `some thresholds have failed`))
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
-	require.Contains(t, stdOut, `   ✓ iterations...........: 3`)
-	require.Contains(t, stdOut, `     ✗ { scenario:sc1 }...: 1`)
-	require.Contains(t, stdOut, `     ✗ { scenario:sc2 }...: 2`)
-	require.Contains(t, stdOut, `     ✓ { scenario:sc3 }...: 0   0/s`)
+	assert.Contains(t, stdOut, `   ✓ iterations...........: 3`)
+	assert.Contains(t, stdOut, `     ✗ { scenario:sc1 }...: 1`)
+	assert.Contains(t, stdOut, `     ✗ { scenario:sc2 }...: 2`)
+	assert.Contains(t, stdOut, `     ✓ { scenario:sc3 }...: 0   0/s`)
 }
 
 func TestAbortedByThreshold(t *testing.T) {
@@ -653,11 +653,11 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 	assert.False(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, `some thresholds have failed`))
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
-	require.Contains(t, stdOut, `✓ iterations`)
-	require.Contains(t, stdOut, `✓ tc`)
-	require.Contains(t, stdOut, `✓ { group:::teardown }`)
-	require.Contains(t, stdOut, `Stopping k6 in response to signal`)
-	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdOut, `✓ iterations`)
+	assert.Contains(t, stdOut, `✓ tc`)
+	assert.Contains(t, stdOut, `✓ { group:::teardown }`)
+	assert.Contains(t, stdOut, `Stopping k6 in response to signal`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 }
 
 func TestAbortedByUserWithRestAPI(t *testing.T) {
@@ -721,11 +721,11 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 	wg.Wait()
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
-	require.Contains(t, stdOut, `a simple iteration`)
-	require.Contains(t, stdOut, `teardown() called`)
-	require.Contains(t, stdOut, `PATCH /v1/status`)
-	require.Contains(t, stdOut, `run: stopped by user; exiting...`)
-	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdOut, `a simple iteration`)
+	assert.Contains(t, stdOut, `teardown() called`)
+	assert.Contains(t, stdOut, `PATCH /v1/status`)
+	assert.Contains(t, stdOut, `run: stopped by user; exiting...`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 }
 
 func TestAbortedByScriptSetupError(t *testing.T) {
@@ -758,9 +758,9 @@ func TestAbortedByScriptSetupError(t *testing.T) {
 	ts.outMutex.Unlock()
 
 	t.Log(stdOut)
-	require.Contains(t, stdOut, `wonky setup`)
-	require.Contains(t, stdOut, `Error: foo`)
-	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
+	assert.Contains(t, stdOut, `wonky setup`)
+	assert.Contains(t, stdOut, `Error: foo`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
 }
 
 func TestAbortedByScriptAbort(t *testing.T) {
@@ -784,8 +784,8 @@ func TestAbortedByScriptAbort(t *testing.T) {
 
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
-	require.Contains(t, stdOut, "test aborted: foo")
-	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdOut, "test aborted: foo")
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 }
 
 func TestAbortedByScriptInitError(t *testing.T) {
@@ -822,8 +822,8 @@ func TestAbortedByScriptInitError(t *testing.T) {
 	ts.outMutex.Unlock()
 
 	t.Log(stdOut)
-	require.Contains(t, stdOut, `Error: foo`)
-	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
+	assert.Contains(t, stdOut, `Error: foo`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
 }
 
 func TestMetricTagAndSetupDataIsolation(t *testing.T) {
@@ -921,7 +921,7 @@ func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
-	require.Equal(t, 12, strings.Count(stdOut, "✓"))
+	assert.Equal(t, 12, strings.Count(stdOut, "✓"))
 }
 
 func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[string]string) []float64 {
