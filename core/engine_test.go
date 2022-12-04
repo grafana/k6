@@ -1188,6 +1188,7 @@ func TestMinIterationDurationInSetupTeardownStage(t *testing.T) {
 	}
 }
 
+// TODO: delete, functionality duplicated in cmd/integration_test.go
 func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 	t.Parallel()
 

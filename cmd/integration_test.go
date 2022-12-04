@@ -578,6 +578,10 @@ func TestAbortedByThreshold(t *testing.T) {
 		};
 
 		export default function () {};
+
+		export function teardown() {
+			console.log('teardown() called');
+		}
 	`)
 
 	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedThreshold, cloudapi.ResultStatusFailed)
@@ -593,13 +597,16 @@ func TestAbortedByThreshold(t *testing.T) {
 	assert.True(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, `some thresholds have failed`))
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
-	require.Contains(t, stdOut, `✗ iterations...........: `)
-	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=8 tainted=true`)
+	assert.Contains(t, stdOut, `✗ iterations`)
+	assert.Contains(t, stdOut, `teardown() called`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=8 tainted=true`)
 }
 
 func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 	t.Parallel()
 	script := []byte(`
+		import { Counter } from 'k6/metrics';
+
 		export const options = {
 			scenarios: {
 				sc1: {
@@ -611,8 +618,16 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 			},
 			thresholds: {
 				'iterations': ['count >= 1'],
+				'tc': ['count == 1'],
+				'tc{group:::setup}': ['count == 0'],
+				'tc{group:::teardown}': ['count == 1'],
 			},
 		};
+
+		let tc = new Counter('tc');
+		export function teardown() {
+			tc.add(1);
+		}
 
 		export default function () {};
 	`)
@@ -639,6 +654,8 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
 	require.Contains(t, stdOut, `✓ iterations`)
+	require.Contains(t, stdOut, `✓ tc`)
+	require.Contains(t, stdOut, `✓ { group:::teardown }`)
 	require.Contains(t, stdOut, `Stopping k6 in response to signal`)
 	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 }
@@ -651,6 +668,10 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 			console.log('a simple iteration')
 			sleep(1);
 		};
+
+		export function teardown() {
+			console.log('teardown() called');
+		}
 	`)
 
 	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed)
@@ -701,6 +722,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
 	require.Contains(t, stdOut, `a simple iteration`)
+	require.Contains(t, stdOut, `teardown() called`)
 	require.Contains(t, stdOut, `PATCH /v1/status`)
 	require.Contains(t, stdOut, `run: stopped by user; exiting...`)
 	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
