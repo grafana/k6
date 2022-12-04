@@ -1065,3 +1065,45 @@ func TestActiveVUsCount(t *testing.T) {
 		}
 	}
 }
+
+func TestMinIterationDuration(t *testing.T) {
+	t.Parallel()
+	script := []byte(`
+		import { Counter } from 'k6/metrics';
+
+		export let options = {
+			minIterationDuration: '5s',
+			setupTimeout: '2s',
+			teardownTimeout: '2s',
+			thresholds: {
+				'test_counter': ['count == 3'],
+			},
+		};
+
+		var c = new Counter('test_counter');
+
+		export function setup() { c.add(1); };
+		export default function () { c.add(1); };
+		export function teardown() { c.add(1); };
+	`)
+
+	srv := getCloudTestEndChecker(t, lib.RunStatusFinished, cloudapi.ResultStatusPassed)
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
+	ts.args = []string{"k6", "run", "--quiet", "--log-output=stdout", "--out", "cloud", "test.js"}
+
+	start := time.Now()
+	newRootCommand(ts.globalState).execute()
+	elapsed := time.Since(start)
+	assert.Greater(t, elapsed, 5*time.Second, "expected more time to have passed because of minIterationDuration")
+	assert.Less(
+		t, elapsed, 10*time.Second,
+		"expected less time to have passed because minIterationDuration should not affect setup() and teardown() ",
+	)
+
+	stdOut := ts.stdOut.String()
+	t.Log(stdOut)
+	assert.Contains(t, stdOut, "✓ test_counter.........: 3")
+}

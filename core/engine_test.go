@@ -1108,6 +1108,7 @@ func TestMetricsEmission(t *testing.T) {
 	}
 }
 
+// TODO: delete, functionality duplicated in cmd/integration_test.go
 func TestMinIterationDurationInSetupTeardownStage(t *testing.T) {
 	t.Parallel()
 	setupScript := `
