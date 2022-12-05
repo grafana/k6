@@ -39,7 +39,7 @@ type HostTestCase struct {
 func TestHosts(t *testing.T) {
 	t.Parallel()
 
-	at, err := NewHosts(map[string]Host{
+	hosts, err := NewHosts(map[string]Host{
 		// IPv4
 		"simple.io":              {IP: net.ParseIP("1.2.3.4")},
 		"simple.io:80":           {IP: net.ParseIP("1.2.3.4"), Port: 80},
@@ -78,7 +78,7 @@ func TestHosts(t *testing.T) {
 				{"only-port.io:443", "5.6.7.8:8443", DifferentPortMapping},
 				{"only-port.io:9999", "", NotGivenPortMapping},
 			}
-			runTcs(t, at, tcs)
+			runTcs(t, hosts, tcs)
 		})
 
 		t.Run("trie functionality", func(t *testing.T) {
@@ -92,7 +92,7 @@ func TestHosts(t *testing.T) {
 					{"specific.wildcard.io", "90.100.110.120:0", ExactMatch},
 					{"not.specific.wildcard.io", "9.10.11.12:0", FallBackWildcardEvenMatch},
 				}
-				runTcs(t, at, tcs)
+				runTcs(t, hosts, tcs)
 			})
 
 			t.Run("*sub usage", func(t *testing.T) {
@@ -105,7 +105,7 @@ func TestHosts(t *testing.T) {
 					{"specific.wildcard-2.io", "130.140.150.160:0", ExactMatch},
 					{"not.specific.wildcard-2.io", "13.14.15.16:0", FallBackWildcardEvenMatch},
 				}
-				runTcs(t, at, tcs)
+				runTcs(t, hosts, tcs)
 			})
 		})
 	})
@@ -125,7 +125,7 @@ func TestHosts(t *testing.T) {
 				{"only-port-ipv6.io:443", "[cc::dd]:8443", DifferentPortMapping},
 				{"only-port-ipv6.io:9999", "", NotGivenPortMapping},
 			}
-			runTcs(t, at, tcs)
+			runTcs(t, hosts, tcs)
 		})
 
 		t.Run("trie functionality", func(t *testing.T) {
@@ -139,7 +139,7 @@ func TestHosts(t *testing.T) {
 					{"specific.wildcard-ipv6.io", "[ee:11::ff]:0", ExactMatch},
 					{"not.specific.wildcard-ipv6.io", "[ee::ff]:0", FallBackWildcardEvenMatch},
 				}
-				runTcs(t, at, tcs)
+				runTcs(t, hosts, tcs)
 			})
 
 			t.Run("*sub usage", func(t *testing.T) {
@@ -152,7 +152,7 @@ func TestHosts(t *testing.T) {
 					{"specific.wildcard-2-ipv6.io", "[a1::a1]:0", ExactMatch},
 					{"not.specific.wildcard-2-ipv6.io", "[aa::aa]:0", FallBackWildcardEvenMatch},
 				}
-				runTcs(t, at, tcs)
+				runTcs(t, hosts, tcs)
 			})
 		})
 	})
@@ -167,7 +167,7 @@ func TestHosts(t *testing.T) {
 			{"*", "", "no match should happen"},
 			{"*********************", "", "no match should happen"},
 		}
-		runTcs(t, at, tcs)
+		runTcs(t, hosts, tcs)
 	})
 }
 

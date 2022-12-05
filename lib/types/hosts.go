@@ -94,23 +94,23 @@ type Hosts struct {
 	source map[string]Host
 }
 
-// NewHosts returns new Address Trie from given addresses
+// NewHosts returns new Hosts from given addresses.
 func NewHosts(source map[string]Host) (*Hosts, error) {
-	at := &Hosts{
+	h := &Hosts{
 		source: source,
 		n: &trieNode{
 			children: make(map[rune]*trieNode),
 		},
 	}
 
-	for k := range at.source {
-		err := at.insert(k)
+	for k := range h.source {
+		err := h.insert(k)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return at, nil
+	return h, nil
 }
 
 // Regex description of domain(:port)? pattern to enforce blocks by.
