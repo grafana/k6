@@ -461,6 +461,25 @@ func getCloudTestEndChecker(t *testing.T, expRunStatus lib.RunStatus, expResultS
 	return srv
 }
 
+func getSimpleCloudOutputTestState(
+	t *testing.T, script []byte, cliFlags []string,
+	expRunStatus lib.RunStatus, expResultStatus cloudapi.ResultStatus, expExitCode int,
+) *globalTestState {
+	srv := getCloudTestEndChecker(t, expRunStatus, expResultStatus)
+
+	if cliFlags == nil {
+		cliFlags = []string{"-v", "--log-output=stdout"}
+	}
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
+	ts.args = append([]string{"k6", "run", "--out", "cloud", "test.js"}, cliFlags...)
+	ts.expectedExitCode = expExitCode
+
+	return ts
+}
+
 func TestSetupTeardownThresholds(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
@@ -495,13 +514,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		};
 	`))
 
-	srv := getCloudTestEndChecker(t, lib.RunStatusFinished, cloudapi.ResultStatusPassed)
-
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
-	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
-	ts.args = []string{"k6", "run", "--out", "cloud", "test.js"}
-
+	ts := getSimpleCloudOutputTestState(t, script, []string{}, lib.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
 	newRootCommand(ts.globalState).execute()
 
 	assert.Len(t, ts.loggerHook.Drain(), 0)
@@ -538,14 +551,9 @@ func TestThresholdsFailed(t *testing.T) {
 
 	// Since these thresholds don't have an abortOnFail property, the run_status
 	// in the cloud will still be Finished, even if the test itself failed.
-	srv := getCloudTestEndChecker(t, lib.RunStatusFinished, cloudapi.ResultStatusFailed)
-
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
-	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
-	ts.args = []string{"k6", "run", "--out", "cloud", "test.js"}
-	ts.expectedExitCode = int(exitcodes.ThresholdsHaveFailed)
-
+	ts := getSimpleCloudOutputTestState(
+		t, script, nil, lib.RunStatusFinished, cloudapi.ResultStatusFailed, int(exitcodes.ThresholdsHaveFailed),
+	)
 	newRootCommand(ts.globalState).execute()
 
 	assert.True(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, `some thresholds have failed`))
@@ -584,14 +592,9 @@ func TestAbortedByThreshold(t *testing.T) {
 		}
 	`)
 
-	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedThreshold, cloudapi.ResultStatusFailed)
-
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
-	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
-	ts.args = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
-	ts.expectedExitCode = int(exitcodes.ThresholdsHaveFailed)
-
+	ts := getSimpleCloudOutputTestState(
+		t, script, nil, lib.RunStatusAbortedThreshold, cloudapi.ResultStatusFailed, int(exitcodes.ThresholdsHaveFailed),
+	)
 	newRootCommand(ts.globalState).execute()
 
 	assert.True(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, `some thresholds have failed`))
@@ -632,13 +635,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 		export default function () {};
 	`)
 
-	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed)
-
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
-	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
-	ts.args = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
-
+	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, 0)
 	ts.globalState.signalNotify = func(c chan<- os.Signal, s ...os.Signal) {
 		go func() {
 			// simulate a Ctrl+C after 3 seconds
@@ -674,12 +671,10 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 		}
 	`)
 
-	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed)
-
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
-	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
-	ts.args = []string{"k6", "-v", "run", "--iterations=20", "--out", "cloud", "--log-output=stdout", "test.js"}
+	ts := getSimpleCloudOutputTestState(
+		t, script, []string{"-v", "--log-output=stdout", "--iterations", "20"},
+		lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, 0,
+	)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -788,14 +783,9 @@ func TestAbortedByScriptAbort(t *testing.T) {
 		};
 	`)
 
-	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed)
-
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
-	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
-	ts.args = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
-	ts.expectedExitCode = int(exitcodes.ScriptAborted)
-
+	ts := getSimpleCloudOutputTestState(
+		t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, int(exitcodes.ScriptAborted),
+	)
 	newRootCommand(ts.globalState).execute()
 
 	stdOut := ts.stdOut.String()
@@ -819,14 +809,9 @@ func TestAbortedByScriptInitError(t *testing.T) {
 		export default function () {};
 	`)
 
-	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
-
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
-	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
-	ts.args = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
-	ts.expectedExitCode = int(exitcodes.ScriptException)
-
+	ts := getSimpleCloudOutputTestState(
+		t, script, nil, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, int(exitcodes.ScriptException),
+	)
 	newRootCommand(ts.globalState).execute()
 
 	// FIXME: remove this locking after VU initialization accepts a context and
@@ -927,13 +912,10 @@ func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 		}
 	`)
 
-	srv := getCloudTestEndChecker(t, lib.RunStatusFinished, cloudapi.ResultStatusPassed)
-
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
-	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
-	ts.args = []string{"k6", "run", "--quiet", "--log-output=stdout", "--out", "cloud", "test.js"}
-
+	ts := getSimpleCloudOutputTestState(
+		t, script, []string{"--quiet", "--log-output", "stdout"},
+		lib.RunStatusFinished, cloudapi.ResultStatusPassed, 0,
+	)
 	newRootCommand(ts.globalState).execute()
 
 	stdOut := ts.stdOut.String()
@@ -1104,12 +1086,7 @@ func TestMinIterationDuration(t *testing.T) {
 		export function teardown() { c.add(1); };
 	`)
 
-	srv := getCloudTestEndChecker(t, lib.RunStatusFinished, cloudapi.ResultStatusPassed)
-
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
-	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
-	ts.args = []string{"k6", "run", "--quiet", "--log-output=stdout", "--out", "cloud", "test.js"}
+	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
 
 	start := time.Now()
 	newRootCommand(ts.globalState).execute()
