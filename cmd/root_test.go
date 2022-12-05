@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/lib/testutils"
+	"go.uber.org/goleak"
 )
 
 type blockingTransport struct {
@@ -59,7 +60,15 @@ func TestMain(m *testing.M) {
 		}
 	}()
 
-	// TODO: add https://github.com/uber-go/goleak
+	defer func() {
+		// TODO: figure out why logrus' `Entry.WriterLevel` goroutine sticks
+		// around and remove this exception.
+		opt := goleak.IgnoreTopFunction("io.(*pipe).read")
+		if err := goleak.Find(opt); err != nil {
+			fmt.Println(err) //nolint:forbidigo
+			exitCode = 3
+		}
+	}()
 
 	exitCode = m.Run()
 }

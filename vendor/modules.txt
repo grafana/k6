@@ -218,11 +218,17 @@ go.buf.build/grpc/go/gogo/protobuf/gogoproto
 # go.buf.build/grpc/go/prometheus/prometheus v1.4.4
 ## explicit
 go.buf.build/grpc/go/prometheus/prometheus
+# go.uber.org/goleak v1.2.0
+## explicit; go 1.18
+go.uber.org/goleak
+go.uber.org/goleak/internal/stack
 # golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
 ## explicit; go 1.17
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
+# golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
+## explicit; go 1.11
 # golang.org/x/net v0.0.0-20221002022538-bcab6841153b
 ## explicit; go 1.17
 golang.org/x/net/html
