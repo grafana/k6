@@ -720,7 +720,8 @@ func TestSentReceivedMetrics(t *testing.T) {
 	})
 }
 
-// TODO: delete, functionality duplicated in cmd/integration_test.go
+// TODO: delete when implementing https://github.com/grafana/k6/issues/1889, the
+// test functionality was duplicated in cmd/integration_test.go
 func TestRunTags(t *testing.T) {
 	t.Parallel()
 
@@ -841,7 +842,8 @@ func TestRunTags(t *testing.T) {
 	}
 }
 
-// TODO: delete, functionality duplicated in cmd/integration_test.go
+// TODO: delete when implementing https://github.com/grafana/k6/issues/1889, the
+// test functionality was duplicated in cmd/integration_test.go
 func TestSetupException(t *testing.T) {
 	t.Parallel()
 
@@ -894,7 +896,8 @@ func TestSetupException(t *testing.T) {
 	}
 }
 
-// TODO: delete, functionality duplicated in cmd/integration_test.go
+// TODO: delete when implementing https://github.com/grafana/k6/issues/1889, the
+// test functionality was duplicated in cmd/integration_test.go
 func TestVuInitException(t *testing.T) {
 	t.Parallel()
 
@@ -1111,7 +1114,8 @@ func TestMetricsEmission(t *testing.T) {
 	}
 }
 
-// TODO: delete, functionality duplicated in cmd/integration_test.go
+// TODO: delete when implementing https://github.com/grafana/k6/issues/1889, the
+// test functionality was duplicated in cmd/integration_test.go
 func TestMinIterationDurationInSetupTeardownStage(t *testing.T) {
 	t.Parallel()
 	setupScript := `
@@ -1192,7 +1196,8 @@ func TestMinIterationDurationInSetupTeardownStage(t *testing.T) {
 	}
 }
 
-// TODO: delete, functionality duplicated in cmd/integration_test.go
+// TODO: delete when implementing https://github.com/grafana/k6/issues/1889, the
+// test functionality was duplicated in cmd/integration_test.go
 func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 	t.Parallel()
 
@@ -1236,7 +1241,8 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 	assert.Equal(t, 1.0, count)
 }
 
-// TODO: delete, functionality duplicated in cmd/integration_test.go
+// TODO: delete when implementing https://github.com/grafana/k6/issues/1889, the
+// test functionality was duplicated in cmd/integration_test.go
 func TestActiveVUsCount(t *testing.T) {
 	t.Parallel()
 
