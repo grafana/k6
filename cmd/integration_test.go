@@ -958,8 +958,29 @@ func TestAbortedByTestAbortInNonFirstInitCode(t *testing.T) {
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
 	`)
 
-	ts := testAbortedByScriptTestAbort(t, false, script, runTestWithNoLinger)
-	assert.NotContains(t, ts.stdOut.String(), "bogus summary")
+	// FIXME: when VU initialization is properly synchronized, replace the
+	// following lines with this line only:
+	//
+	//   ts := testAbortedByScriptTestAbort(t, false, script, runTestWithNoLinger)
+	//
+	// See https://github.com/grafana/k6/issues/2790 for details. Right now we
+	// need the stdOut locking because VU initialization is not properly synchronized:
+	// when a test is aborted during the init phase, some logs might be emitted
+	// after the root command returns...
+
+	ts := getSimpleCloudOutputTestState(
+		t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, int(exitcodes.ScriptAborted),
+	)
+	newRootCommand(ts.globalState).execute()
+
+	ts.outMutex.Lock()
+	stdOut := ts.stdOut.String()
+	ts.outMutex.Unlock()
+	t.Log(stdOut)
+	assert.Contains(t, stdOut, "test aborted: foo")
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
+	assert.NotContains(t, stdOut, "bogus summary")
 }
 
 func TestAbortedByScriptAbortInVUCode(t *testing.T) {
@@ -1436,7 +1457,7 @@ func TestRunTags(t *testing.T) {
 
 	expTags := map[string]string{"foo": "bar", "test": "mest", "over": "written", "scenario": "default"}
 	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "iterations", expTags)))
-	assert.Less(t, float64(0), sum(getSampleValues(t, jsonResults, "iteration_duration", expTags)))
+	assert.Equal(t, 3, len(getSampleValues(t, jsonResults, "iteration_duration", expTags)))
 	assert.Less(t, float64(0), sum(getSampleValues(t, jsonResults, "data_received", expTags)))
 	assert.Less(t, float64(0), sum(getSampleValues(t, jsonResults, "data_sent", expTags)))
 
