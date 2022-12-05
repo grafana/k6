@@ -302,7 +302,7 @@ func testSSLKEYLOGFILE(t *testing.T, ts *globalTestState, filePath string) {
 	sslloglines, err := afero.ReadFile(ts.fs, filepath.Join(ts.cwd, "ssl.log"))
 	require.NoError(t, err)
 	// TODO maybe have multiple depending on the ciphers used as that seems to change it
-	require.Regexp(t, "^CLIENT_[A-Z_]+ [0-9a-f]+ [0-9a-f]+\n", string(sslloglines))
+	assert.Regexp(t, "^CLIENT_[A-Z_]+ [0-9a-f]+ [0-9a-f]+\n", string(sslloglines))
 }
 
 func TestThresholdDeprecationWarnings(t *testing.T) {
@@ -392,8 +392,8 @@ func TestSubMetricThresholdNoData(t *testing.T) {
 
 	newRootCommand(ts.globalState).execute()
 
-	require.Len(t, ts.loggerHook.Drain(), 0)
-	require.Contains(t, ts.stdOut.String(), `
+	assert.Len(t, ts.loggerHook.Drain(), 0)
+	assert.Contains(t, ts.stdOut.String(), `
      one..................: 0   0/s
        { tag:xyz }........: 0   0/s
      two..................: 42`)
@@ -424,7 +424,7 @@ func getCloudTestEndChecker(t *testing.T, expRunStatus lib.RunStatus, expResultS
 		"POST ^/v1/tests$": http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 			resp.WriteHeader(http.StatusOK)
 			_, err := fmt.Fprintf(resp, `{"reference_id": "111"}`)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}),
 		"POST ^/v1/tests/111$": http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 			require.NotNil(t, req.Body)
@@ -504,11 +504,11 @@ func TestSetupTeardownThresholds(t *testing.T) {
 
 	newRootCommand(ts.globalState).execute()
 
-	require.Len(t, ts.loggerHook.Drain(), 0)
+	assert.Len(t, ts.loggerHook.Drain(), 0)
 	stdOut := ts.stdOut.String()
-	require.Contains(t, stdOut, `✓ http_reqs......................: 7`)
-	require.Contains(t, stdOut, `✓ iterations.....................: 5`)
-	require.Contains(t, stdOut, `✓ setup_teardown.................: 2`)
+	assert.Contains(t, stdOut, `✓ http_reqs......................: 7`)
+	assert.Contains(t, stdOut, `✓ iterations.....................: 5`)
+	assert.Contains(t, stdOut, `✓ setup_teardown.................: 2`)
 }
 
 func TestThresholdsFailed(t *testing.T) {
@@ -551,10 +551,10 @@ func TestThresholdsFailed(t *testing.T) {
 	assert.True(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, `some thresholds have failed`))
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
-	require.Contains(t, stdOut, `   ✓ iterations...........: 3`)
-	require.Contains(t, stdOut, `     ✗ { scenario:sc1 }...: 1`)
-	require.Contains(t, stdOut, `     ✗ { scenario:sc2 }...: 2`)
-	require.Contains(t, stdOut, `     ✓ { scenario:sc3 }...: 0   0/s`)
+	assert.Contains(t, stdOut, `   ✓ iterations...........: 3`)
+	assert.Contains(t, stdOut, `     ✗ { scenario:sc1 }...: 1`)
+	assert.Contains(t, stdOut, `     ✗ { scenario:sc2 }...: 2`)
+	assert.Contains(t, stdOut, `     ✓ { scenario:sc3 }...: 0   0/s`)
 }
 
 func TestAbortedByThreshold(t *testing.T) {
@@ -578,6 +578,10 @@ func TestAbortedByThreshold(t *testing.T) {
 		};
 
 		export default function () {};
+
+		export function teardown() {
+			console.log('teardown() called');
+		}
 	`)
 
 	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedThreshold, cloudapi.ResultStatusFailed)
@@ -593,13 +597,16 @@ func TestAbortedByThreshold(t *testing.T) {
 	assert.True(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, `some thresholds have failed`))
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
-	require.Contains(t, stdOut, `✗ iterations...........: `)
-	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=8 tainted=true`)
+	assert.Contains(t, stdOut, `✗ iterations`)
+	assert.Contains(t, stdOut, `teardown() called`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=8 tainted=true`)
 }
 
 func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 	t.Parallel()
 	script := []byte(`
+		import { Counter } from 'k6/metrics';
+
 		export const options = {
 			scenarios: {
 				sc1: {
@@ -611,8 +618,16 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 			},
 			thresholds: {
 				'iterations': ['count >= 1'],
+				'tc': ['count == 1'],
+				'tc{group:::setup}': ['count == 0'],
+				'tc{group:::teardown}': ['count == 1'],
 			},
 		};
+
+		let tc = new Counter('tc');
+		export function teardown() {
+			tc.add(1);
+		}
 
 		export default function () {};
 	`)
@@ -638,9 +653,11 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 	assert.False(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, `some thresholds have failed`))
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
-	require.Contains(t, stdOut, `✓ iterations`)
-	require.Contains(t, stdOut, `Stopping k6 in response to signal`)
-	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdOut, `✓ iterations`)
+	assert.Contains(t, stdOut, `✓ tc`)
+	assert.Contains(t, stdOut, `✓ { group:::teardown }`)
+	assert.Contains(t, stdOut, `Stopping k6 in response to signal`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 }
 
 func TestAbortedByUserWithRestAPI(t *testing.T) {
@@ -651,6 +668,10 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 			console.log('a simple iteration')
 			sleep(1);
 		};
+
+		export function teardown() {
+			console.log('teardown() called');
+		}
 	`)
 
 	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed)
@@ -700,27 +721,38 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 	wg.Wait()
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
-	require.Contains(t, stdOut, `a simple iteration`)
-	require.Contains(t, stdOut, `PATCH /v1/status`)
-	require.Contains(t, stdOut, `run: stopped by user; exiting...`)
-	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdOut, `a simple iteration`)
+	assert.Contains(t, stdOut, `teardown() called`)
+	assert.Contains(t, stdOut, `PATCH /v1/status`)
+	assert.Contains(t, stdOut, `run: stopped by user; exiting...`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 }
 
 func TestAbortedByScriptSetupError(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	depScript := []byte(`
+		export default function () {
+			baz();
+		}
+		function baz() {
+			throw new Error("baz");
+		}
+	`)
+	mainScript := []byte(`
+		import bar from "./bar.js";
 		export function setup() {
 			console.log('wonky setup');
-			throw new Error('foo');
-		}
-
-		export default function () {};
+			bar();
+		};
+		export default function() {};
 	`)
 
 	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
 
 	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), mainScript, 0o644))
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "bar.js"), depScript, 0o644))
+
 	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
 	ts.args = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
 	ts.expectedExitCode = int(exitcodes.ScriptException)
@@ -736,9 +768,15 @@ func TestAbortedByScriptSetupError(t *testing.T) {
 	ts.outMutex.Unlock()
 
 	t.Log(stdOut)
-	require.Contains(t, stdOut, `wonky setup`)
-	require.Contains(t, stdOut, `Error: foo`)
-	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
+	assert.Contains(t, stdOut, `wonky setup`)
+
+	rootPath := "file:///"
+	if runtime.GOOS == "windows" {
+		rootPath += "c:/"
+	}
+	assert.Contains(t, stdOut, `level=error msg="Error: baz\n\tat baz (`+rootPath+`test/bar.js:6:9(3))\n\tat `+
+		rootPath+`test/bar.js:3:3(3)\n\tat setup (`+rootPath+`test/test.js:5:3(9))\n\tat native\n" hint="script exception"`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
 }
 
 func TestAbortedByScriptAbort(t *testing.T) {
@@ -762,8 +800,8 @@ func TestAbortedByScriptAbort(t *testing.T) {
 
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
-	require.Contains(t, stdOut, "test aborted: foo")
-	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdOut, "test aborted: foo")
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 }
 
 func TestAbortedByScriptInitError(t *testing.T) {
@@ -774,8 +812,8 @@ func TestAbortedByScriptInitError(t *testing.T) {
 			iterations: 10,
 		};
 
-		if (__VU > 3) {
-			throw new Error('foo');
+		if (__VU == 2) {
+			throw new Error('oops in ' + __VU);
 		}
 
 		export default function () {};
@@ -800,10 +838,398 @@ func TestAbortedByScriptInitError(t *testing.T) {
 	ts.outMutex.Unlock()
 
 	t.Log(stdOut)
-	require.Contains(t, stdOut, `Error: foo`)
-	require.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
+	assert.Contains(t, stdOut, `level=error msg="Error: oops in 2\n\tat file:///`)
+	assert.Contains(t, stdOut, `hint="error while initializing VU #2 (script exception)"`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
 }
 
-// TODO: add an integration test that verifies that unindexable tags work as
-// expected and that VU tags from different scenarios don't cross between
-// scenarios and pollute other metrics.
+func TestMetricTagAndSetupDataIsolation(t *testing.T) {
+	t.Parallel()
+	script := []byte(`
+		import exec from 'k6/execution';
+		import { Counter } from 'k6/metrics';
+		import { sleep } from 'k6';
+
+		export const options = {
+			scenarios: {
+				sc1: {
+					executor: 'shared-iterations',
+					vus: 2,
+					iterations: 20,
+					maxDuration: '7s',
+					gracefulStop: 0,
+					exec: 'sc1',
+				},
+				sc2: {
+					executor: 'per-vu-iterations',
+					vus: 1,
+					iterations: 1,
+					startTime: '7s',
+					exec: 'sc2',
+				},
+			},
+			thresholds: {
+				'iterations': ['count == 21'],
+				'iterations{scenario:sc1}': ['count == 20'],
+				'iterations{sc:1}': ['count == 20'],
+				'iterations{scenario:sc2}': ['count == 1'],
+				'mycounter': ['count == 23'],
+				'mycounter{sc:1}': ['count == 20'],
+				'mycounter{setup:true}': ['count == 1'],
+				'mycounter{myiter:1}': ['count >= 1', 'count <= 2'],
+				'mycounter{myiter:2}': ['count >= 1', 'count <= 2'],
+				'mycounter{scenario:sc2}': ['count == 1'],
+				'mycounter{scenario:sc2,sc:1}': ['count == 0'],
+				'vus_max': ['value == 2'],
+			},
+		};
+		let myCounter = new Counter('mycounter');
+
+		export function setup() {
+			exec.vu.tags.setup = 'true';
+			myCounter.add(1);
+			return { v: 0 };
+		}
+
+		export function sc1(data) {
+			if (data.v !== __ITER) {
+				throw new Error('sc1: wrong data for iter ' + __ITER + ': ' + JSON.stringify(data));
+			}
+			if (__ITER != 0 && data.v != exec.vu.tags.myiter) {
+				throw new Error('sc1: wrong vu tags for iter ' + __ITER + ': ' + JSON.stringify(exec.vu.tags));
+			}
+			data.v += 1;
+			exec.vu.tags.myiter = data.v;
+			exec.vu.tags.sc = 1;
+			myCounter.add(1);
+			sleep(0.02); // encourage using both of the VUs
+		}
+
+		export function sc2(data) {
+			if (data.v === 0) {
+				throw new Error('sc2: wrong data, expected VU to have modified setup data locally: ' + data.v);
+			}
+
+			if (typeof exec.vu.tags.myiter !== 'undefined') {
+				throw new Error(
+					'sc2: wrong tags, expected VU to have new tags in new scenario: ' + JSON.stringify(exec.vu.tags),
+				);
+			}
+
+			myCounter.add(1);
+		}
+
+		export function teardown(data) {
+			if (data.v !== 0) {
+				throw new Error('teardown: wrong data: ' + data.v);
+			}
+			myCounter.add(1);
+		}
+	`)
+
+	srv := getCloudTestEndChecker(t, lib.RunStatusFinished, cloudapi.ResultStatusPassed)
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
+	ts.args = []string{"k6", "run", "--quiet", "--log-output=stdout", "--out", "cloud", "test.js"}
+
+	newRootCommand(ts.globalState).execute()
+
+	stdOut := ts.stdOut.String()
+	t.Log(stdOut)
+	assert.Equal(t, 12, strings.Count(stdOut, "✓"))
+}
+
+func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[string]string) []float64 {
+	jsonLines := bytes.Split(jsonOutput, []byte("\n"))
+	result := []float64{}
+
+	tagsMatch := func(rawTags interface{}) bool {
+		sampleTags, ok := rawTags.(map[string]interface{})
+		require.True(t, ok)
+		for k, v := range tags {
+			rv, sok := sampleTags[k]
+			if !sok {
+				return false
+			}
+			rvs, sok := rv.(string)
+			require.True(t, sok)
+			if v != rvs {
+				return false
+			}
+		}
+		return true
+	}
+
+	for _, jsonLine := range jsonLines {
+		if len(jsonLine) == 0 {
+			continue
+		}
+		var line map[string]interface{}
+		require.NoError(t, json.Unmarshal(jsonLine, &line))
+		sampleType, ok := line["type"].(string)
+		require.True(t, ok)
+		if sampleType != "Point" {
+			continue
+		}
+		sampleMetric, ok := line["metric"].(string)
+		require.True(t, ok)
+		if sampleMetric != metric {
+			continue
+		}
+		sampleData, ok := line["data"].(map[string]interface{})
+		require.True(t, ok)
+
+		if !tagsMatch(sampleData["tags"]) {
+			continue
+		}
+
+		samplValue, ok := sampleData["value"].(float64)
+		require.True(t, ok)
+		result = append(result, samplValue)
+	}
+
+	return result
+}
+
+func sum(vals []float64) (sum float64) {
+	for _, val := range vals {
+		sum += val
+	}
+	return sum
+}
+
+func max(vals []float64) float64 {
+	max := vals[0]
+	for _, val := range vals {
+		if max < val {
+			max = val
+		}
+	}
+	return max
+}
+
+func TestActiveVUsCount(t *testing.T) {
+	t.Parallel()
+
+	script := []byte(`
+		var sleep = require('k6').sleep;
+
+		exports.options = {
+			scenarios: {
+				carr1: {
+					executor: 'constant-arrival-rate',
+					rate: 10,
+					preAllocatedVUs: 1,
+					maxVUs: 10,
+					startTime: '0s',
+					duration: '3s',
+					gracefulStop: '0s',
+				},
+				carr2: {
+					executor: 'constant-arrival-rate',
+					rate: 10,
+					preAllocatedVUs: 1,
+					maxVUs: 10,
+					duration: '3s',
+					startTime: '3s',
+					gracefulStop: '0s',
+				},
+				rarr: {
+					executor: 'ramping-arrival-rate',
+					startRate: 5,
+					stages: [
+						{ target: 10, duration: '2s' },
+						{ target: 0, duration: '2s' },
+					],
+					preAllocatedVUs: 1,
+					maxVUs: 10,
+					startTime: '6s',
+					gracefulStop: '0s',
+				},
+			}
+		}
+
+		exports.default = function () {
+			sleep(5);
+		}
+	`)
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	ts.args = []string{"k6", "run", "--compatibility-mode", "base", "--out", "json=results.json", "test.js"}
+	newRootCommand(ts.globalState).execute()
+
+	stdOut := ts.stdOut.String()
+	t.Log(stdOut)
+
+	jsonResults, err := afero.ReadFile(ts.fs, "results.json")
+	require.NoError(t, err)
+	// t.Log(string(jsonResults))
+	assert.Equal(t, float64(10), max(getSampleValues(t, jsonResults, "vus_max", nil)))
+	assert.Equal(t, float64(10), max(getSampleValues(t, jsonResults, "vus", nil)))
+	assert.Equal(t, float64(0), sum(getSampleValues(t, jsonResults, "iterations", nil)))
+
+	logEntries := ts.loggerHook.Drain()
+	assert.Len(t, logEntries, 4)
+	for i, logEntry := range logEntries {
+		assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+		if i < 3 {
+			assert.Equal(t, "Insufficient VUs, reached 10 active VUs and cannot initialize more", logEntry.Message)
+		} else {
+			assert.Equal(t, "No script iterations finished, consider making the test duration longer", logEntry.Message)
+		}
+	}
+}
+
+func TestMinIterationDuration(t *testing.T) {
+	t.Parallel()
+	script := []byte(`
+		import { Counter } from 'k6/metrics';
+
+		export let options = {
+			minIterationDuration: '5s',
+			setupTimeout: '2s',
+			teardownTimeout: '2s',
+			thresholds: {
+				'test_counter': ['count == 3'],
+			},
+		};
+
+		var c = new Counter('test_counter');
+
+		export function setup() { c.add(1); };
+		export default function () { c.add(1); };
+		export function teardown() { c.add(1); };
+	`)
+
+	srv := getCloudTestEndChecker(t, lib.RunStatusFinished, cloudapi.ResultStatusPassed)
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
+	ts.args = []string{"k6", "run", "--quiet", "--log-output=stdout", "--out", "cloud", "test.js"}
+
+	start := time.Now()
+	newRootCommand(ts.globalState).execute()
+	elapsed := time.Since(start)
+	assert.Greater(t, elapsed, 5*time.Second, "expected more time to have passed because of minIterationDuration")
+	assert.Less(
+		t, elapsed, 10*time.Second,
+		"expected less time to have passed because minIterationDuration should not affect setup() and teardown() ",
+	)
+
+	stdOut := ts.stdOut.String()
+	t.Log(stdOut)
+	assert.Contains(t, stdOut, "✓ test_counter.........: 3")
+}
+
+func TestRunTags(t *testing.T) {
+	t.Parallel()
+
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	script := []byte(tb.Replacer.Replace(`
+		import http from 'k6/http';
+		import ws from 'k6/ws';
+		import { Counter } from 'k6/metrics';
+		import { group, check, fail } from 'k6';
+
+		let customTags =  { 'over': 'the rainbow' };
+		let params = { 'tags': customTags};
+		let statusCheck = { 'status is 200': (r) => r.status === 200 }
+
+		let myCounter = new Counter('mycounter');
+
+		export const options = {
+			hosts: {
+				"HTTPBIN_DOMAIN": "HTTPBIN_IP",
+				"HTTPSBIN_DOMAIN": "HTTPSBIN_IP",
+			}
+		}
+
+		export default function() {
+			group('http', function() {
+				check(http.get('HTTPSBIN_URL', params), statusCheck, customTags);
+				check(http.get('HTTPBIN_URL/status/418', params), statusCheck, customTags);
+			})
+
+			group('websockets', function() {
+				var response = ws.connect('WSBIN_URL/ws-echo', params, function (socket) {
+					socket.on('open', function open() {
+						console.log('ws open and say hello');
+						socket.send('hello');
+					});
+
+					socket.on('message', function (message) {
+						console.log('ws got message ' + message);
+						if (message != 'hello') {
+							fail('Expected to receive "hello" but got "' + message + '" instead !');
+						}
+						console.log('ws closing socket...');
+						socket.close();
+					});
+
+					socket.on('close', function () {
+						console.log('ws close');
+					});
+
+					socket.on('error', function (e) {
+						console.log('ws error: ' + e.error());
+					});
+				});
+				console.log('connect returned');
+				check(response, { 'status is 101': (r) => r && r.status === 101 }, customTags);
+			})
+
+			myCounter.add(1, customTags);
+		}
+	`))
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	ts.args = []string{
+		"k6", "run", "-u", "2", "--tag", "foo=bar", "--tag", "test=mest", "--tag", "over=written",
+		"--log-output=stdout", "--out", "json=results.json", "test.js",
+	}
+	ts.envVars = map[string]string{"K6_ITERATIONS": "3", "K6_INSECURE_SKIP_TLS_VERIFY": "true"}
+	newRootCommand(ts.globalState).execute()
+
+	stdOut := ts.stdOut.String()
+	t.Log(stdOut)
+
+	jsonResults, err := afero.ReadFile(ts.fs, "results.json")
+	require.NoError(t, err)
+
+	expTags := map[string]string{"foo": "bar", "test": "mest", "over": "written", "scenario": "default"}
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "iterations", expTags)))
+	assert.Less(t, float64(0), sum(getSampleValues(t, jsonResults, "iteration_duration", expTags)))
+	assert.Less(t, float64(0), sum(getSampleValues(t, jsonResults, "data_received", expTags)))
+	assert.Less(t, float64(0), sum(getSampleValues(t, jsonResults, "data_sent", expTags)))
+
+	expTags["over"] = "the rainbow" // we overwrite this in most with custom tags in the script
+	assert.Equal(t, float64(6), sum(getSampleValues(t, jsonResults, "checks", expTags)))
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "mycounter", expTags)))
+
+	expTags["group"] = "::http"
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "checks", expTags)))
+	assert.Equal(t, float64(6), sum(getSampleValues(t, jsonResults, "http_reqs", expTags)))
+	assert.Equal(t, 6, len(getSampleValues(t, jsonResults, "http_req_duration", expTags)))
+	expTags["expected_response"] = "true"
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "http_reqs", expTags)))
+	assert.Equal(t, 3, len(getSampleValues(t, jsonResults, "http_req_duration", expTags)))
+	expTags["expected_response"] = "false"
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "http_reqs", expTags)))
+	assert.Equal(t, 3, len(getSampleValues(t, jsonResults, "http_req_duration", expTags)))
+	delete(expTags, "expected_response")
+
+	expTags["group"] = "::websockets"
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "checks", expTags)))
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "ws_sessions", expTags)))
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "ws_msgs_sent", expTags)))
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "ws_msgs_received", expTags)))
+	assert.Equal(t, 3, len(getSampleValues(t, jsonResults, "ws_session_duration", expTags)))
+	assert.Equal(t, 0, len(getSampleValues(t, jsonResults, "http_req_duration", expTags)))
+	expTags["check"] = "status is 101"
+	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "checks", expTags)))
+}

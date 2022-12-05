@@ -79,16 +79,16 @@ func newGlobalTestState(t *testing.T) *globalTestState {
 	defaultOsExitHandle := func(exitCode int) {
 		cancel()
 		osExitCalled = true
-		require.Equal(t, ts.expectedExitCode, exitCode)
+		assert.Equal(t, ts.expectedExitCode, exitCode)
 	}
 
-	if ts.expectedExitCode > 0 {
-		// Ensure that, if we expected to receive an error, our `os.Exit()` mock
-		// function was actually called.
-		t.Cleanup(func() {
-			assert.True(t, osExitCalled)
-		})
-	}
+	t.Cleanup(func() {
+		if ts.expectedExitCode > 0 {
+			// Ensure that, if we expected to receive an error, our `os.Exit()` mock
+			// function was actually called.
+			assert.Truef(t, osExitCalled, "expected exit code %d, but the os.Exit() mock was not called", ts.expectedExitCode)
+		}
+	})
 
 	outMutex := &sync.Mutex{}
 	defaultFlags := getDefaultFlags(".config")
