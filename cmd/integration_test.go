@@ -154,7 +154,7 @@ func TestWrongEnvVarIterations(t *testing.T) {
 
 	ts := newGlobalTestState(t)
 	ts.args = []string{"k6", "run", "--vus", "2", "-"}
-	ts.envVars = map[string]string{"K6_ITERATIONS": "4"}
+	ts.envVars["K6_ITERATIONS"] = "4"
 	ts.stdIn = bytes.NewBufferString(`export default function() {};`)
 
 	newRootCommand(ts.globalState).execute()
@@ -280,7 +280,7 @@ func testSSLKEYLOGFILE(t *testing.T, ts *globalTestState, filePath string) {
 	// TODO don't use insecureSkipTLSVerify when/if tlsConfig is given to the runner from outside
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	ts.args = []string{"k6", "run", "-"}
-	ts.envVars = map[string]string{"SSLKEYLOGFILE": filePath}
+	ts.envVars["SSLKEYLOGFILE"] = filePath
 	ts.stdIn = bytes.NewReader([]byte(tb.Replacer.Replace(`
     import http from "k6/http"
     export const options = {
@@ -473,7 +473,7 @@ func getSimpleCloudOutputTestState(
 
 	ts := newGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
-	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
+	ts.envVars["K6_CLOUD_HOST"] = srv.URL
 	ts.args = append([]string{"k6", "run", "--out", "cloud", "test.js"}, cliFlags...)
 	ts.expectedExitCode = expExitCode
 
@@ -765,7 +765,7 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), mainScript, 0o644))
 	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "bar.js"), depScript, 0o644))
 
-	ts.envVars = map[string]string{"K6_CLOUD_HOST": srv.URL}
+	ts.envVars["K6_CLOUD_HOST"] = srv.URL
 	ts.args = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
 	ts.expectedExitCode = int(exitcodes.ScriptException)
 
@@ -1446,7 +1446,8 @@ func TestRunTags(t *testing.T) {
 		"k6", "run", "-u", "2", "--tag", "foo=bar", "--tag", "test=mest", "--tag", "over=written",
 		"--log-output=stdout", "--out", "json=results.json", "test.js",
 	}
-	ts.envVars = map[string]string{"K6_ITERATIONS": "3", "K6_INSECURE_SKIP_TLS_VERIFY": "true"}
+	ts.envVars["K6_ITERATIONS"] = "3"
+	ts.envVars["K6_INSECURE_SKIP_TLS_VERIFY"] = "true"
 	newRootCommand(ts.globalState).execute()
 
 	stdOut := ts.stdOut.String()
