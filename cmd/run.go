@@ -117,10 +117,20 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	// Spin up the REST API server, if not disabled.
 	if c.gs.flags.address != "" {
 		initBar.Modify(pb.WithConstProgress(0, "Init API server"))
+
+		apiWG := &sync.WaitGroup{}
+		apiWG.Add(2)
+		defer apiWG.Wait()
+
+		srvCtx, srvCancel := context.WithCancel(globalCtx)
+		defer srvCancel()
+
+		// TODO: send the ExecutionState and MetricsEngine instead of the Engine
+		srv := api.GetServer(c.gs.flags.address, engine, logger)
 		go func() {
+			defer apiWG.Done()
 			logger.Debugf("Starting the REST API server on %s", c.gs.flags.address)
-			// TODO: send the ExecutionState and MetricsEngine instead of the Engine
-			if aerr := api.ListenAndServe(c.gs.flags.address, engine, logger); aerr != nil {
+			if aerr := srv.ListenAndServe(); aerr != nil && !errors.Is(aerr, http.ErrServerClosed) {
 				// Only exit k6 if the user has explicitly set the REST API address
 				if cmd.Flags().Lookup("address").Changed {
 					logger.WithError(aerr).Error("Error from API server")
@@ -128,6 +138,13 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 				} else {
 					logger.WithError(aerr).Warn("Error from API server")
 				}
+			}
+		}()
+		go func() {
+			defer apiWG.Done()
+			<-srvCtx.Done()
+			if aerr := srv.Close(); aerr != nil {
+				logger.WithError(aerr).Debug("REST API server did not shut down correctly")
 			}
 		}()
 	}
