@@ -105,9 +105,9 @@ func NewHostnameTrie(source []string) (*HostnameTrie, error) {
 	return h, nil
 }
 
-// Regex description of hostname pattern to enforce blocks by. Global var
-// to avoid compilation penalty at runtime.
-// based on regex from https://stackoverflow.com/a/106223/5427244
+// Regex description of hostname pattern to enforce blocks by.
+// Global var to avoid compilation penalty at runtime.
+// Based on regex from https://stackoverflow.com/a/106223/5427244
 //
 //nolint:lll
 var validHostnamePattern *regexp.Regexp = regexp.MustCompile(`^(\*\.?)?((([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]))?$`)

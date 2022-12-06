@@ -157,7 +157,7 @@ func (r *Runner) newVU(idLocal, idGlobal uint64, samplesOut chan<- metrics.Sampl
 		Resolver:         r.Resolver,
 		Blacklist:        r.Bundle.Options.BlacklistIPs,
 		BlockedHostnames: r.Bundle.Options.BlockedHostnames.Trie,
-		Hosts:            r.Bundle.Options.Hosts,
+		Hosts:            r.Bundle.Options.Hosts.Trie,
 	}
 	if r.Bundle.Options.LocalIPs.Valid {
 		var ipIndex uint64

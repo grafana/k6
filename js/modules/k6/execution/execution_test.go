@@ -292,12 +292,16 @@ func TestOptionsTestFull(t *testing.T) {
 					require.NoError(t, err)
 					return bh
 				}(),
-				Hosts: map[string]*lib.HostAddress{
-					"test.k6.io": {
-						IP:   []byte{0x01, 0x02, 0x03, 0x04},
-						Port: 8443,
-					},
-				},
+				Hosts: func() types.NullHosts {
+					hs, err := types.NewNullHosts(map[string]types.Host{
+						"test.k6.io": {
+							IP:   []byte{0x01, 0x02, 0x03, 0x04},
+							Port: 8443,
+						},
+					})
+					require.NoError(t, err)
+					return hs
+				}(),
 				External: map[string]json.RawMessage{
 					"ext-one": json.RawMessage(`{"rawkey":"rawvalue"}`),
 				},

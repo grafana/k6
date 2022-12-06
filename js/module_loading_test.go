@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"go.k6.io/k6/lib/types"
+
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -197,7 +199,7 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
 
-	require.NoError(t, r1.SetOptions(lib.Options{Hosts: tb.Dialer.Hosts}))
+	require.NoError(t, r1.SetOptions(lib.Options{Hosts: types.NullHosts{Trie: tb.Dialer.Hosts}}))
 	arc := r1.MakeArchive()
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)

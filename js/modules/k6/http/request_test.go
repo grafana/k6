@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"go.k6.io/k6/lib/types"
+
 	"github.com/andybalholm/brotli"
 	"github.com/dop251/goja"
 	"github.com/klauspost/compress/zstd"
@@ -2358,11 +2360,17 @@ func TestRequestAndBatchTLS(t *testing.T) {
 		host, port, err := net.SplitHostPort(s.Listener.Addr().String())
 		require.NoError(t, err)
 		ip := net.ParseIP(host)
-		mybadsslHostname, err := lib.NewHostAddress(ip, port)
+		mybadsslHostname, err := types.NewHost(ip, port)
 		require.NoError(t, err)
 		state.Transport = client.Transport
 		state.TLSConfig = s.TLS
-		state.Dialer = &netext.Dialer{Hosts: map[string]*lib.HostAddress{"expired.localhost": mybadsslHostname}}
+		state.Dialer = &netext.Dialer{
+			Hosts: func() *types.Hosts {
+				hosts, er := types.NewHosts(map[string]types.Host{"expired.localhost": *mybadsslHostname})
+				require.NoError(t, er)
+				return hosts
+			}(),
+		}
 		client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext //nolint:forcetypeassert
 		_, err = rt.RunString(`throw JSON.stringify(http.get("https://expired.localhost/"));`)
 		require.Error(t, err)
@@ -2402,11 +2410,13 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			host, port, err := net.SplitHostPort(s.Listener.Addr().String())
 			require.NoError(t, err)
 			ip := net.ParseIP(host)
-			mybadsslHostname, err := lib.NewHostAddress(ip, port)
+			mybadsslHostname, err := types.NewHost(ip, port)
 			require.NoError(t, err)
-			state.Dialer = &netext.Dialer{Hosts: map[string]*lib.HostAddress{
-				versionTest.URL: mybadsslHostname,
-			}}
+			hosts, err := types.NewHosts(map[string]types.Host{
+				versionTest.URL: *mybadsslHostname,
+			})
+			require.NoError(t, err)
+			state.Dialer = &netext.Dialer{Hosts: hosts}
 			state.Transport = client.Transport
 			state.TLSConfig = s.TLS
 			client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext //nolint:forcetypeassert
@@ -2442,11 +2452,13 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			host, port, err := net.SplitHostPort(s.Listener.Addr().String())
 			require.NoError(t, err)
 			ip := net.ParseIP(host)
-			mybadsslHostname, err := lib.NewHostAddress(ip, port)
+			mybadsslHostname, err := types.NewHost(ip, port)
 			require.NoError(t, err)
-			state.Dialer = &netext.Dialer{Hosts: map[string]*lib.HostAddress{
-				cipherSuiteTest.URL: mybadsslHostname,
-			}}
+			hosts, err := types.NewHosts(map[string]types.Host{
+				cipherSuiteTest.URL: *mybadsslHostname,
+			})
+			require.NoError(t, err)
+			state.Dialer = &netext.Dialer{Hosts: hosts}
 			state.Transport = client.Transport
 			state.TLSConfig = s.TLS
 			client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext //nolint:forcetypeassert

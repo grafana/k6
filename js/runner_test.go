@@ -1000,7 +1000,7 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 	host, port, err := net.SplitHostPort(s.Listener.Addr().String())
 	require.NoError(t, err)
 	ip := net.ParseIP(host)
-	mybadsslHostname, err := lib.NewHostAddress(ip, port)
+	mybadsslHostname, err := types.NewHost(ip, port)
 	require.NoError(t, err)
 	cert, err := x509.ParseCertificate(s.TLS.Certificates[0].Certificate[0])
 	require.NoError(t, err)
@@ -1033,9 +1033,10 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)))
 
-			r1.Bundle.Options.Hosts = map[string]*lib.HostAddress{
-				"mybadssl.localhost": mybadsslHostname,
-			}
+			r1.Bundle.Options.Hosts, err = types.NewNullHosts(map[string]types.Host{
+				"mybadssl.localhost": *mybadsslHostname,
+			})
+			require.NoError(t, err)
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 			r2, err := NewFromArchive(
@@ -1261,9 +1262,14 @@ func TestVUIntegrationHosts(t *testing.T) {
 
 	r1.SetOptions(lib.Options{
 		Throw: null.BoolFrom(true),
-		Hosts: map[string]*lib.HostAddress{
-			"test.loadimpact.com": {IP: net.ParseIP("127.0.0.1")},
-		},
+		Hosts: func() types.NullHosts {
+			hosts, er := types.NewNullHosts(map[string]types.Host{
+				"test.loadimpact.com": {IP: net.ParseIP("127.0.0.1")},
+			})
+			require.NoError(t, er)
+
+			return hosts
+		}(),
 	})
 
 	registry := metrics.NewRegistry()
@@ -1306,7 +1312,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 	host, port, err := net.SplitHostPort(s.Listener.Addr().String())
 	require.NoError(t, err)
 	ip := net.ParseIP(host)
-	mybadsslHostname, err := lib.NewHostAddress(ip, port)
+	mybadsslHostname, err := types.NewHost(ip, port)
 	require.NoError(t, err)
 	unsupportedVersionErrorMsg := "remote error: tls: handshake failure"
 	for _, tag := range build.Default.ReleaseTags {
@@ -1364,9 +1370,10 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 			opts := lib.Options{Throw: null.BoolFrom(true)}
 			require.NoError(t, r1.SetOptions(opts.Apply(data.opts)))
 
-			r1.Bundle.Options.Hosts = map[string]*lib.HostAddress{
-				"sha256-badssl.localhost": mybadsslHostname,
-			}
+			r1.Bundle.Options.Hosts, err = types.NewNullHosts(map[string]types.Host{
+				"sha256-badssl.localhost": *mybadsslHostname,
+			})
+			require.NoError(t, err)
 			r2, err := NewFromArchive(
 				&lib.TestPreInitState{
 					Logger:         testutils.NewLogger(t),
@@ -1534,7 +1541,7 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 	require.NoError(t, err)
 	r1.Bundle.Options.Throw = null.BoolFrom(true)
 	r1.Bundle.Options.MaxRedirects = null.IntFrom(10)
-	r1.Bundle.Options.Hosts = tb.Dialer.Hosts
+	r1.Bundle.Options.Hosts = types.NullHosts{Trie: tb.Dialer.Hosts}
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -1592,7 +1599,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 	r1.SetOptions(lib.Options{
 		Throw:          null.BoolFrom(true),
 		MaxRedirects:   null.IntFrom(10),
-		Hosts:          tb.Dialer.Hosts,
+		Hosts:          types.NullHosts{Trie: tb.Dialer.Hosts},
 		NoCookiesReset: null.BoolFrom(true),
 	})
 
@@ -2531,7 +2538,7 @@ func TestForceHTTP1Feature(t *testing.T) {
 			require.NoError(t, err)
 
 			err = r1.SetOptions(lib.Options{
-				Hosts: tb.Dialer.Hosts,
+				Hosts: types.NullHosts{Trie: tb.Dialer.Hosts},
 				// We disable TLS verify so that we don't get a TLS handshake error since
 				// the certificates on the endpoint are not certified by a certificate authority
 				InsecureSkipTLSVerify: null.BoolFrom(true),
