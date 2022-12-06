@@ -167,6 +167,19 @@ func TestWrongEnvVarIterations(t *testing.T) {
 	assert.Empty(t, ts.loggerHook.Drain())
 }
 
+func getSingleFileTestState(t *testing.T, script string, cliFlags []string, expExitCode exitcodes.ExitCode) *globalTestState {
+	if cliFlags == nil {
+		cliFlags = []string{"-v", "--log-output=stdout"}
+	}
+
+	ts := newGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), []byte(script), 0o644))
+	ts.args = append(append([]string{"k6", "run"}, cliFlags...), "test.js")
+	ts.expectedExitCode = int(expExitCode)
+
+	return ts
+}
+
 func TestMetricsAndThresholds(t *testing.T) {
 	t.Parallel()
 	script := `
@@ -227,10 +240,7 @@ func TestMetricsAndThresholds(t *testing.T) {
 			return { stdout: JSON.stringify(data, null, 4) }
 		}
 	`
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), []byte(script), 0o644))
-	ts.args = []string{"k6", "run", "--quiet", "--log-format=raw", "test.js"}
-
+	ts := getSingleFileTestState(t, script, []string{"--quiet", "--log-format=raw"}, 0)
 	newRootCommand(ts.globalState).execute()
 
 	expLogLines := []string{
@@ -355,10 +365,7 @@ func TestExecutionTestOptionsDefaultValues(t *testing.T) {
 		}
 	`
 
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), []byte(script), 0o644))
-	ts.args = []string{"k6", "run", "--iterations", "1", "test.js"}
-
+	ts := getSingleFileTestState(t, script, []string{"--iterations", "1"}, 0)
 	newRootCommand(ts.globalState).execute()
 
 	loglines := ts.loggerHook.Drain()
@@ -386,10 +393,7 @@ func TestSubMetricThresholdNoData(t *testing.T) {
 			counter2.add(42);
 		}
 	`
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), []byte(script), 0o644))
-	ts.args = []string{"k6", "run", "--quiet", "test.js"}
-
+	ts := getSingleFileTestState(t, script, []string{"--quiet"}, 0)
 	newRootCommand(ts.globalState).execute()
 
 	assert.Len(t, ts.loggerHook.Drain(), 0)
@@ -462,21 +466,17 @@ func getCloudTestEndChecker(t *testing.T, expRunStatus lib.RunStatus, expResultS
 }
 
 func getSimpleCloudOutputTestState(
-	t *testing.T, script []byte, cliFlags []string,
-	expRunStatus lib.RunStatus, expResultStatus cloudapi.ResultStatus, expExitCode int,
+	t *testing.T, script string, cliFlags []string,
+	expRunStatus lib.RunStatus, expResultStatus cloudapi.ResultStatus, expExitCode exitcodes.ExitCode,
 ) *globalTestState {
-	srv := getCloudTestEndChecker(t, expRunStatus, expResultStatus)
-
 	if cliFlags == nil {
 		cliFlags = []string{"-v", "--log-output=stdout"}
 	}
+	cliFlags = append(cliFlags, "--out", "cloud")
 
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
+	srv := getCloudTestEndChecker(t, expRunStatus, expResultStatus)
+	ts := getSingleFileTestState(t, script, cliFlags, expExitCode)
 	ts.envVars["K6_CLOUD_HOST"] = srv.URL
-	ts.args = append([]string{"k6", "run", "--out", "cloud", "test.js"}, cliFlags...)
-	ts.expectedExitCode = expExitCode
-
 	return ts
 }
 
@@ -484,7 +484,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
-	script := []byte(tb.Replacer.Replace(`
+	script := tb.Replacer.Replace(`
 		import http from "k6/http";
 		import { check } from "k6";
 		import { Counter } from "k6/metrics";
@@ -512,7 +512,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		export function teardown() {
 			check(http.get("HTTPBIN_IP_URL"), statusCheck) && myCounter.add(1);
 		};
-	`))
+	`)
 
 	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
 	newRootCommand(ts.globalState).execute()
@@ -534,7 +534,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 
 func TestThresholdsFailed(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		export let options = {
 			scenarios: {
 				sc1: {
@@ -555,12 +555,12 @@ func TestThresholdsFailed(t *testing.T) {
 		};
 
 		export default function () {};
-	`)
+	`
 
 	// Since these thresholds don't have an abortOnFail property, the run_status
 	// in the cloud will still be Finished, even if the test itself failed.
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusFinished, cloudapi.ResultStatusFailed, int(exitcodes.ThresholdsHaveFailed),
+		t, script, nil, lib.RunStatusFinished, cloudapi.ResultStatusFailed, exitcodes.ThresholdsHaveFailed,
 	)
 	newRootCommand(ts.globalState).execute()
 
@@ -575,7 +575,7 @@ func TestThresholdsFailed(t *testing.T) {
 
 func TestAbortedByThreshold(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		export const options = {
 			scenarios: {
 				sc1: {
@@ -598,10 +598,10 @@ func TestAbortedByThreshold(t *testing.T) {
 		export function teardown() {
 			console.log('teardown() called');
 		}
-	`)
+	`
 
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedThreshold, cloudapi.ResultStatusFailed, int(exitcodes.ThresholdsHaveFailed),
+		t, script, nil, lib.RunStatusAbortedThreshold, cloudapi.ResultStatusFailed, exitcodes.ThresholdsHaveFailed,
 	)
 	newRootCommand(ts.globalState).execute()
 
@@ -617,7 +617,7 @@ func TestAbortedByThreshold(t *testing.T) {
 
 func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		import { Counter } from 'k6/metrics';
 		import exec from 'k6/execution';
 
@@ -646,7 +646,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 		export default function () {
 			console.log('simple iter ' + exec.scenario.iterationInTest);
 		};
-	`)
+	`
 
 	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, 0)
 
@@ -757,7 +757,7 @@ func asyncWaitForStdoutAndStopTestFromRESTAPI(
 
 func TestAbortedByUserWithRestAPI(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		import { sleep } from 'k6';
 		export default function () {
 			console.log('a simple iteration')
@@ -767,7 +767,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 		export function teardown() {
 			console.log('teardown() called');
 		}
-	`)
+	`
 
 	ts := getSimpleCloudOutputTestState(
 		t, script, []string{"-v", "--log-output=stdout", "--iterations", "20"},
@@ -791,7 +791,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 
 func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 	t.Parallel()
-	depScript := []byte(`
+	depScript := `
 		export default function () {
 			baz();
 		}
@@ -799,8 +799,8 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 			throw new Error("baz");
 		}
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
-	`)
-	mainScript := []byte(`
+	`
+	mainScript := `
 		import bar from "./bar.js";
 		export function setup() {
 			console.log('wonky setup');
@@ -809,13 +809,13 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 		export default function() {};
 
 		export { handleSummary } from "./bar.js";
-	`)
+	`
 
 	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
 
 	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), mainScript, 0o644))
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "bar.js"), depScript, 0o644))
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), []byte(mainScript), 0o644))
+	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "bar.js"), []byte(depScript), 0o644))
 
 	ts.envVars["K6_CLOUD_HOST"] = srv.URL
 	ts.args = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
@@ -849,7 +849,7 @@ func runTestWithLinger(t *testing.T, ts *globalTestState) {
 
 func TestAbortedByScriptSetupError(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		export function setup() {
 			console.log('wonky setup');
 			throw new Error('foo');
@@ -862,7 +862,7 @@ func TestAbortedByScriptSetupError(t *testing.T) {
 		export default function () {};
 
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
-	`)
+	`
 
 	doChecks := func(t *testing.T, ts *globalTestState) {
 		stdOut := ts.stdOut.String()
@@ -887,7 +887,8 @@ func TestAbortedByScriptSetupError(t *testing.T) {
 
 func TestAbortedByScriptTeardownError(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+
+	script := `
 		export function setup() {
 			console.log('nice setup');
 		}
@@ -900,7 +901,7 @@ func TestAbortedByScriptTeardownError(t *testing.T) {
 		export default function () {};
 
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
-	`)
+	`
 
 	doChecks := func(t *testing.T, ts *globalTestState) {
 		stdOut := ts.stdOut.String()
@@ -923,9 +924,9 @@ func TestAbortedByScriptTeardownError(t *testing.T) {
 	})
 }
 
-func testAbortedByScriptError(t *testing.T, script []byte, runTest func(*testing.T, *globalTestState)) *globalTestState {
+func testAbortedByScriptError(t *testing.T, script string, runTest func(*testing.T, *globalTestState)) *globalTestState {
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, int(exitcodes.ScriptException),
+		t, script, nil, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, exitcodes.ScriptException,
 	)
 	runTest(t, ts)
 
@@ -940,20 +941,16 @@ func testAbortedByScriptError(t *testing.T, script []byte, runTest func(*testing
 
 func TestAbortedByTestAbortFirstInitCode(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		import exec from 'k6/execution';
 		exec.test.abort('foo');
 		export default function () {};
 
 		// Should not be called, since error is in the init context
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
-	`)
+	`
 
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
-	ts.args = []string{"k6", "run", "-v", "--log-output=stdout", "test.js"}
-	ts.expectedExitCode = int(exitcodes.ScriptAborted)
-
+	ts := getSingleFileTestState(t, script, nil, exitcodes.ScriptAborted)
 	newRootCommand(ts.globalState).execute()
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
@@ -963,7 +960,7 @@ func TestAbortedByTestAbortFirstInitCode(t *testing.T) {
 
 func TestAbortedByTestAbortInNonFirstInitCode(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		import exec from 'k6/execution';
 
 		export const options = {vus: 3, duration: '5s'};
@@ -976,20 +973,20 @@ func TestAbortedByTestAbortInNonFirstInitCode(t *testing.T) {
 
 		// Should not be called, since error is in the init context
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
-	`)
+	`
 
 	testAbortedByScriptTestAbort(t, false, script, runTestWithNoLinger)
 }
 
 func TestAbortedByScriptAbortInVUCode(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		import exec from 'k6/execution';
 		export default function () {
 			exec.test.abort('foo');
 		};
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
-	`)
+	`
 
 	t.Run("noLinger", func(t *testing.T) {
 		t.Parallel()
@@ -1004,14 +1001,14 @@ func TestAbortedByScriptAbortInVUCode(t *testing.T) {
 
 func TestAbortedByScriptAbortInSetup(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		import exec from 'k6/execution';
 		export function setup() {
 			exec.test.abort('foo');
 		}
 		export default function () {};
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
-	`)
+	`
 
 	t.Run("noLinger", func(t *testing.T) {
 		t.Parallel()
@@ -1026,14 +1023,14 @@ func TestAbortedByScriptAbortInSetup(t *testing.T) {
 
 func TestAbortedByScriptAbortInTeardown(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		import exec from 'k6/execution';
 		export function teardown() {
 			exec.test.abort('foo');
 		}
 		export default function () {};
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
-	`)
+	`
 
 	t.Run("noLinger", func(t *testing.T) {
 		t.Parallel()
@@ -1047,10 +1044,10 @@ func TestAbortedByScriptAbortInTeardown(t *testing.T) {
 }
 
 func testAbortedByScriptTestAbort(
-	t *testing.T, shouldHaveMetrics bool, script []byte, runTest func(*testing.T, *globalTestState),
+	t *testing.T, shouldHaveMetrics bool, script string, runTest func(*testing.T, *globalTestState),
 ) *globalTestState {
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, int(exitcodes.ScriptAborted),
+		t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptAborted,
 	)
 	runTest(t, ts)
 
@@ -1070,7 +1067,7 @@ func testAbortedByScriptTestAbort(
 
 func TestAbortedByInterruptDuringVUInit(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		import { sleep } from 'k6';
 		export const options = {
 			vus: 5,
@@ -1083,7 +1080,7 @@ func TestAbortedByInterruptDuringVUInit(t *testing.T) {
 		}
 
 		export default function () {};
-	`)
+	`
 
 	// TODO: fix this to exect lib.RunStatusAbortedUser and
 	// exitcodes.ExternalAbort
@@ -1091,7 +1088,7 @@ func TestAbortedByInterruptDuringVUInit(t *testing.T) {
 	// This is testing the current behavior, which is expected, but it's not
 	// actually the desired one! See https://github.com/grafana/k6/issues/2804
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedSystem, cloudapi.ResultStatusPassed, int(exitcodes.GenericEngine),
+		t, script, nil, lib.RunStatusAbortedSystem, cloudapi.ResultStatusPassed, exitcodes.GenericEngine,
 	)
 	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "VU init sleeping for a while")
 	newRootCommand(ts.globalState).execute()
@@ -1109,7 +1106,7 @@ func TestAbortedByInterruptDuringVUInit(t *testing.T) {
 
 func TestAbortedByScriptInitError(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		export const options = {
 			vus: 5,
 			iterations: 10,
@@ -1120,10 +1117,10 @@ func TestAbortedByScriptInitError(t *testing.T) {
 		}
 
 		export default function () {};
-	`)
+	`
 
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, int(exitcodes.ScriptException),
+		t, script, nil, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, exitcodes.ScriptException,
 	)
 	newRootCommand(ts.globalState).execute()
 
@@ -1137,7 +1134,7 @@ func TestAbortedByScriptInitError(t *testing.T) {
 
 func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		import exec from 'k6/execution';
 		import { Counter } from 'k6/metrics';
 		import { sleep } from 'k6';
@@ -1217,7 +1214,7 @@ func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 			}
 			myCounter.add(1);
 		}
-	`)
+	`
 
 	ts := getSimpleCloudOutputTestState(
 		t, script, []string{"--quiet", "--log-output", "stdout"},
@@ -1302,7 +1299,7 @@ func max(vals []float64) float64 {
 func TestActiveVUsCount(t *testing.T) {
 	t.Parallel()
 
-	script := []byte(`
+	script := `
 		var sleep = require('k6').sleep;
 
 		exports.options = {
@@ -1343,11 +1340,9 @@ func TestActiveVUsCount(t *testing.T) {
 		exports.default = function () {
 			sleep(5);
 		}
-	`)
+	`
 
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
-	ts.args = []string{"k6", "run", "--compatibility-mode", "base", "--out", "json=results.json", "test.js"}
+	ts := getSingleFileTestState(t, script, []string{"--compatibility-mode", "base", "--out", "json=results.json"}, 0)
 	newRootCommand(ts.globalState).execute()
 
 	stdOut := ts.stdOut.String()
@@ -1374,7 +1369,7 @@ func TestActiveVUsCount(t *testing.T) {
 
 func TestMinIterationDuration(t *testing.T) {
 	t.Parallel()
-	script := []byte(`
+	script := `
 		import { Counter } from 'k6/metrics';
 
 		export let options = {
@@ -1391,7 +1386,7 @@ func TestMinIterationDuration(t *testing.T) {
 		export function setup() { c.add(1); };
 		export default function () { c.add(1); };
 		export function teardown() { c.add(1); };
-	`)
+	`
 
 	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
 
@@ -1413,7 +1408,7 @@ func TestRunTags(t *testing.T) {
 	t.Parallel()
 
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	script := []byte(tb.Replacer.Replace(`
+	script := tb.Replacer.Replace(`
 		import http from 'k6/http';
 		import ws from 'k6/ws';
 		import { Counter } from 'k6/metrics';
@@ -1468,14 +1463,12 @@ func TestRunTags(t *testing.T) {
 
 			myCounter.add(1, customTags);
 		}
-	`))
+	`)
 
-	ts := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), script, 0o644))
-	ts.args = []string{
-		"k6", "run", "-u", "2", "--tag", "foo=bar", "--tag", "test=mest", "--tag", "over=written",
-		"--log-output=stdout", "--out", "json=results.json", "test.js",
-	}
+	ts := getSingleFileTestState(t, script, []string{
+		"-u", "2", "--log-output=stdout", "--out", "json=results.json",
+		"--tag", "foo=bar", "--tag", "test=mest", "--tag", "over=written",
+	}, 0)
 	ts.envVars["K6_ITERATIONS"] = "3"
 	ts.envVars["K6_INSECURE_SKIP_TLS_VERIFY"] = "true"
 	newRootCommand(ts.globalState).execute()
