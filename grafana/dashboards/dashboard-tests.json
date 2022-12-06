@@ -228,7 +228,7 @@
             "uid": "PEDF09670F151C95C"
           },
           "editorMode": "code",
-          "expr": "k6_http_reqs",
+          "expr": "k6_http_reqs_total",
           "format": "table",
           "legendFormat": "__auto",
           "range": true,
@@ -240,7 +240,7 @@
             "uid": "PEDF09670F151C95C"
           },
           "editorMode": "code",
-          "expr": "sum(k6_http_reqs{})",
+          "expr": "sum(k6_http_reqs_total{})",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -266,7 +266,7 @@
             "uid": "PEDF09670F151C95C"
           },
           "editorMode": "code",
-          "expr": "sum(irate(k6_http_reqs{}[$__range]))",
+          "expr": "sum(irate(k6_http_reqs_total{}[$__range]))",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
@@ -279,7 +279,7 @@
             "uid": "PEDF09670F151C95C"
           },
           "editorMode": "code",
-          "expr": "sum (k6_http_reqs{expected_response=\"false\"})",
+          "expr": "sum (k6_http_reqs_total{expected_response=\"false\"})",
           "format": "table",
           "hide": false,
           "legendFormat": "__auto",
