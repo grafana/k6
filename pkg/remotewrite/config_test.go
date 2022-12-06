@@ -20,7 +20,7 @@ func TestConfigApply(t *testing.T) {
 	t.Parallel()
 
 	fullConfig := Config{
-		URL:                   null.StringFrom("some-url"),
+		ServerURL:             null.StringFrom("some-url"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
 		Username:              null.StringFrom("user"),
 		Password:              null.StringFrom("pass"),
@@ -53,7 +53,7 @@ func TestConfigRemoteConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	config := Config{
-		URL:                   null.StringFrom(u.String()),
+		ServerURL:             null.StringFrom(u.String()),
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 		Username:              null.StringFrom("myuser"),
 		Password:              null.StringFrom("mypass"),
@@ -98,7 +98,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			env:     nil,
 			arg:     "",
 			config: Config{
-				URL:                   null.StringFrom("http://localhost:9090/api/v1/write"),
+				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
 				Username:              null.NewString("", false),
 				Password:              null.NewString("", false),
@@ -110,7 +110,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 		"JSONSuccess": {
 			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
 			config: Config{
-				URL:                   null.StringFrom(u.String()),
+				ServerURL:             null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
 				Username:              null.NewString("", false),
 				Password:              null.NewString("", false),
@@ -127,7 +127,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			},
 			// arg: "username=user",
 			config: Config{
-				URL:                   null.StringFrom(u.String()),
+				ServerURL:             null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
 				Username:              null.NewString("u", true),
 				Password:              null.NewString("", false),
@@ -144,7 +144,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			},
 			// arg: "password=arg",
 			config: Config{
-				URL:                   null.StringFrom("http://json:9090"),
+				ServerURL:             null.StringFrom("http://json:9090"),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
 				Username:              null.StringFrom("env"),
 				Password:              null.StringFrom("env"),
@@ -181,16 +181,16 @@ func TestGetConsolidatedConfig(t *testing.T) {
 	}
 }
 
-func TestParseURL(t *testing.T) {
+func TestParseServerURL(t *testing.T) {
 	t.Parallel()
 
 	c, err := parseArg("url=http://prometheus.remote:3412/write")
 	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.URL)
+	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.ServerURL)
 
 	c, err = parseArg("url=http://prometheus.remote:3412/write,insecureSkipTLSVerify=false,pushInterval=2s")
 	assert.Nil(t, err)
-	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.URL)
+	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.ServerURL)
 	assert.Equal(t, null.BoolFrom(false), c.InsecureSkipTLSVerify)
 	assert.Equal(t, types.NullDurationFrom(time.Second*2), c.PushInterval)
 
@@ -199,7 +199,7 @@ func TestParseURL(t *testing.T) {
 	assert.Equal(t, map[string]string{"X-Header": "value"}, c.Headers)
 }
 
-func TestOptionURL(t *testing.T) {
+func TestOptionServerURL(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
@@ -213,7 +213,7 @@ func TestOptionURL(t *testing.T) {
 	}
 
 	expconfig := Config{
-		URL:                   null.StringFrom("http://prometheus:9090/api/v1/write"),
+		ServerURL:             null.StringFrom("http://prometheus:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 		Username:              null.NewString("", false),
 		Password:              null.NewString("", false),
@@ -246,7 +246,7 @@ func TestOptionHeaders(t *testing.T) {
 	}
 
 	expconfig := Config{
-		URL:                   null.StringFrom("http://localhost:9090/api/v1/write"),
+		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers: map[string]string{
@@ -280,7 +280,7 @@ func TestOptionInsecureSkipTLSVerify(t *testing.T) {
 	}
 
 	expconfig := Config{
-		URL:                   null.StringFrom(defaultURL),
+		ServerURL:             null.StringFrom(defaultServerURL),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
 		PushInterval:          types.NullDurationFrom(defaultPushInterval),
 		Headers:               make(map[string]string),
@@ -311,7 +311,7 @@ func TestOptionBasicAuth(t *testing.T) {
 	}
 
 	expconfig := Config{
-		URL:                   null.StringFrom("http://localhost:9090/api/v1/write"),
+		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 		Username:              null.StringFrom("user1"),
 		Password:              null.StringFrom("pass1"),
@@ -345,7 +345,7 @@ func TestOptionTrendAsNativeHistogram(t *testing.T) {
 	}
 
 	expconfig := Config{
-		URL:                    null.StringFrom("http://localhost:9090/api/v1/write"),
+		ServerURL:              null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify:  null.BoolFrom(true),
 		Username:               null.NewString("", false),
 		Password:               null.NewString("", false),
@@ -380,7 +380,7 @@ func TestOptionPushInterval(t *testing.T) {
 	}
 
 	expconfig := Config{
-		URL:                   null.StringFrom("http://localhost:9090/api/v1/write"),
+		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 		Username:              null.NewString("", false),
 		Password:              null.NewString("", false),
@@ -415,7 +415,7 @@ func TestConfigTrendStats(t *testing.T) {
 	}
 
 	expconfig := Config{
-		URL:                   null.StringFrom("http://localhost:9090/api/v1/write"),
+		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),

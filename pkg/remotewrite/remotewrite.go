@@ -52,7 +52,7 @@ func New(params output.Params) (*Output, error) {
 		return nil, err
 	}
 
-	wc, err := remote.NewWriteClient(config.URL.String, clientConfig)
+	wc, err := remote.NewWriteClient(config.ServerURL.String, clientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize the Prometheus remote write client: %w", err)
 	}
@@ -73,7 +73,7 @@ func New(params output.Params) (*Output, error) {
 }
 
 func (o *Output) Description() string {
-	return fmt.Sprintf("Prometheus remote write (%s)", o.config.URL.String)
+	return fmt.Sprintf("Prometheus remote write (%s)", o.config.ServerURL.String)
 }
 
 func (o *Output) Start() error {

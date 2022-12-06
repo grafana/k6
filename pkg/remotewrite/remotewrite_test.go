@@ -17,7 +17,7 @@ func TestOutputDescription(t *testing.T) {
 	t.Parallel()
 	o := Output{
 		config: Config{
-			URL: null.StringFrom("http://remote-url.fake"),
+			ServerURL: null.StringFrom("http://remote-url.fake"),
 		},
 	}
 	exp := "Prometheus remote write (http://remote-url.fake)"

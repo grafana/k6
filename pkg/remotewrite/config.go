@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultURL          = "http://localhost:9090/api/v1/write"
+	defaultServerURL    = "http://localhost:9090/api/v1/write"
 	defaultTimeout      = 5 * time.Second
 	defaultPushInterval = 5 * time.Second
 	defaultMetricPrefix = "k6_"
@@ -24,8 +24,8 @@ const (
 var defaultTrendStats = []string{"p(99)"}
 
 type Config struct {
-	// URL contains the absolute URL for the Write endpoint where to flush the time series.
-	URL null.String `json:"url" envconfig:"K6_PROMETHEUS_RW_SERVER_URL"`
+	// ServerURL contains the absolute ServerURL for the Write endpoint where to flush the time series.
+	ServerURL null.String `json:"url" envconfig:"K6_PROMETHEUS_RW_SERVER_URL"`
 
 	// Headers contains additional headers that should be included in the HTTP requests.
 	Headers map[string]string `json:"headers" envconfig:"K6_PROMETHEUS_RW_HEADERS"`
@@ -56,7 +56,7 @@ type Config struct {
 // NewConfig creates an Output's configuration.
 func NewConfig() Config {
 	return Config{
-		URL:                   null.StringFrom(defaultURL),
+		ServerURL:             null.StringFrom(defaultServerURL),
 		InsecureSkipTLSVerify: null.BoolFrom(true),
 		Username:              null.NewString("", false),
 		Password:              null.NewString("", false),
@@ -95,8 +95,8 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 
 // Apply merges applied Config into base.
 func (base Config) Apply(applied Config) Config {
-	if applied.URL.Valid {
-		base.URL = applied.URL
+	if applied.ServerURL.Valid {
+		base.ServerURL = applied.ServerURL
 	}
 
 	if applied.InsecureSkipTLSVerify.Valid {
@@ -201,7 +201,7 @@ func parseEnvs(env map[string]string) (Config, error) {
 	}
 
 	if url, urlDefined := env["K6_PROMETHEUS_RW_SERVER_URL"]; urlDefined {
-		c.URL = null.StringFrom(url)
+		c.ServerURL = null.StringFrom(url)
 	}
 
 	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"); err != nil {
@@ -250,7 +250,7 @@ func parseJSON(data json.RawMessage) (Config, error) {
 	return c, err
 }
 
-// parseURL parses the supplied string of arguments into a Config.
+// parseArg parses the supplied string of arguments into a Config.
 func parseArg(text string) (Config, error) {
 	var c Config
 	opts := strings.Split(text, ",")
@@ -263,7 +263,7 @@ func parseArg(text string) (Config, error) {
 		key, v := r[0], r[1]
 		switch key {
 		case "url":
-			c.URL = null.StringFrom(v)
+			c.ServerURL = null.StringFrom(v)
 		case "insecureSkipTLSVerify":
 			if err := c.InsecureSkipTLSVerify.UnmarshalText([]byte(v)); err != nil {
 				return c, fmt.Errorf("insecureSkipTLSVerify value must be true or false, not %q", v)
