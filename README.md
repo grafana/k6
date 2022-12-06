@@ -93,13 +93,11 @@ Clone the repo to get started and follow these steps:
 3. Visit http://localhost:3000/ to view results in Grafana.
 
 ## Dashboards
-
-The docker-compose setup comes with two pre-built dashboards. One for listing the discrete test runs as a list, and the other for visualizing the results of a specific test run.
-
-### Test list dashboard
-
-![Prometheus dashboard of k6 test runs](./images/prometheus-dashboard-k6-test-runs.png)
+The docker-compose setup comes with two pre-built Grafana dashboards. One for listing the discrete test runs as a list, and the other for visualizing the results of a specific test run.
 
 ### Test result dashboard
-
 ![Prometheus dashboard of k6 test result](./images/prometheus-dashboard-k6-test-result.png)
+
+### Test list dashboard
+![Prometheus dashboard of k6 test runs](./images/prometheus-dashboard-k6-test-runs.png)
+
