@@ -41,7 +41,7 @@ func TestVersion(t *testing.T) {
 	assert.Contains(t, stdOut, runtime.Version())
 	assert.Contains(t, stdOut, runtime.GOOS)
 	assert.Contains(t, stdOut, runtime.GOARCH)
-	assert.NotContains(t, stdOut[:len(stdOut)-1], "\n")
+	assert.Contains(t, stdOut, "k6/x/alarmist")
 
 	assert.Empty(t, ts.stdErr.Bytes())
 	assert.Empty(t, ts.loggerHook.Drain())
