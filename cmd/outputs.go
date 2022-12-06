@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"go.k6.io/k6/ext"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/output/cloud"
@@ -16,9 +17,9 @@ import (
 )
 
 // TODO: move this to an output sub-module after we get rid of the old collectors?
-func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, error), error) {
+func getAllOutputConstructors() (map[string]output.Constructor, error) {
 	// Start with the built-in outputs
-	result := map[string]func(output.Params) (output.Output, error){
+	result := map[string]output.Constructor{
 		"json":     json.New,
 		"cloud":    cloud.New,
 		"influxdb": influxdb.New,
@@ -34,18 +35,22 @@ func getAllOutputConstructors() (map[string]func(output.Params) (output.Output, 
 		"csv": csv.New,
 	}
 
-	exts := output.GetExtensions()
-	for k, v := range exts {
-		if _, ok := result[k]; ok {
-			return nil, fmt.Errorf("invalid output extension %s, built-in output with the same type already exists", k)
+	exts := ext.Get(ext.OutputExtension)
+	for _, e := range exts {
+		if _, ok := result[e.Name]; ok {
+			return nil, fmt.Errorf("invalid output extension %s, built-in output with the same type already exists", e.Name)
 		}
-		result[k] = v
+		m, ok := e.Mod.(output.Constructor)
+		if !ok {
+			return nil, fmt.Errorf("unexpected output extension type %T", e.Mod)
+		}
+		result[e.Name] = m
 	}
 
 	return result, nil
 }
 
-func getPossibleIDList(constrs map[string]func(output.Params) (output.Output, error)) string {
+func getPossibleIDList(constrs map[string]output.Constructor) string {
 	res := make([]string, 0, len(constrs))
 	for k := range constrs {
 		if k == "kafka" || k == "datadog" {
