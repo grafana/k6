@@ -20,7 +20,7 @@ xk6 build --with github.com/grafana/xk6-output-prometheus-remote@latest
 
 Then run new k6 binary with:
 ```
-K6_PROMETHEUS_RW_SERVER_URL=http://localhost:9090/api/v1/write ./k6 run script.js -o output-prometheus-remote
+K6_PROMETHEUS_RW_SERVER_URL=http://localhost:9090/api/v1/write ./k6 run -o xk6-prometheus-rw script.js 
 ```
 
 Add TLS and HTTP basic authentication:
@@ -29,7 +29,7 @@ K6_PROMETHEUS_RW_SERVER_URL=https://localhost:9090/api/v1/write \
 K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY=false \
 K6_PROMETHEUS_RW_USERNAME=foo \
 K6_PROMETHEUS_RW_PASSWORD=bar \
-./k6 run script.js -o output-prometheus-remote
+./k6 run -o xk6-prometheus-rw script.js 
 ```
 
 ### Metric types conversions
