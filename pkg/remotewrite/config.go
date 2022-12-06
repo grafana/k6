@@ -25,32 +25,32 @@ var defaultTrendStats = []string{"p(99)"}
 
 type Config struct {
 	// URL contains the absolute URL for the Write endpoint where to flush the time series.
-	URL null.String `json:"url" envconfig:"K6_PROMETHEUS_REMOTE_URL"`
+	URL null.String `json:"url" envconfig:"K6_PROMETHEUS_RW_REMOTE_URL"`
 
 	// Headers contains additional headers that should be included in the HTTP requests.
-	Headers map[string]string `json:"headers" envconfig:"K6_PROMETHEUS_HEADERS"`
+	Headers map[string]string `json:"headers" envconfig:"K6_PROMETHEUS_RW_HEADERS"`
 
 	// InsecureSkipTLSVerify skips TLS client side checks.
-	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY"`
+	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"`
 
 	// Username is the User for Basic Auth.
-	Username null.String `json:"username" envconfig:"K6_PROMETHEUS_USERNAME"`
+	Username null.String `json:"username" envconfig:"K6_PROMETHEUS_RW_USERNAME"`
 
 	// Password is the Password for the Basic Auth.
-	Password null.String `json:"password" envconfig:"K6_PROMETHEUS_PASSWORD"`
+	Password null.String `json:"password" envconfig:"K6_PROMETHEUS_RW_PASSWORD"`
 
 	// PushInterval defines the time between flushes. The Output will wait the set time
 	// before push a new set of time series to the endpoint.
-	PushInterval types.NullDuration `json:"pushInterval" envconfig:"K6_PROMETHEUS_PUSH_INTERVAL"`
+	PushInterval types.NullDuration `json:"pushInterval" envconfig:"K6_PROMETHEUS_RW_PUSH_INTERVAL"`
 
 	// TrendAsNativeHistogram defines if the mapping for metrics defined as Trend type
 	// should map to a Prometheus' Native Histogram.
-	TrendAsNativeHistogram null.Bool `json:"trendAsNativeHistogram" envconfig:"K6_PROMETHEUS_TREND_AS_NATIVE_HISTOGRAM"`
+	TrendAsNativeHistogram null.Bool `json:"trendAsNativeHistogram" envconfig:"K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM"`
 
 	// TrendStats defines the stats to flush for Trend metrics.
 	//
 	// TODO: should we support K6_SUMMARY_TREND_STATS?
-	TrendStats []string `json:"trendStats" envconfig:"K6_PROMETHEUS_TREND_STATS"`
+	TrendStats []string `json:"trendStats" envconfig:"K6_PROMETHEUS_RW_TREND_STATS"`
 }
 
 // NewConfig creates an Output's configuration.
@@ -194,17 +194,17 @@ func parseEnvs(env map[string]string) (Config, error) {
 	}
 
 	// envconfig is not processing some undefined vars (at least duration) so apply them manually
-	if pushInterval, pushIntervalDefined := env["K6_PROMETHEUS_PUSH_INTERVAL"]; pushIntervalDefined {
+	if pushInterval, pushIntervalDefined := env["K6_PROMETHEUS_RW_PUSH_INTERVAL"]; pushIntervalDefined {
 		if err := c.PushInterval.UnmarshalText([]byte(pushInterval)); err != nil {
 			return c, err
 		}
 	}
 
-	if url, urlDefined := env["K6_PROMETHEUS_REMOTE_URL"]; urlDefined {
+	if url, urlDefined := env["K6_PROMETHEUS_RW_REMOTE_URL"]; urlDefined {
 		c.URL = null.StringFrom(url)
 	}
 
-	if b, err := getEnvBool(env, "K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY"); err != nil {
+	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"); err != nil {
 		return c, err
 	} else {
 		if b.Valid {
@@ -212,15 +212,15 @@ func parseEnvs(env map[string]string) (Config, error) {
 		}
 	}
 
-	if user, userDefined := env["K6_PROMETHEUS_USERNAME"]; userDefined {
+	if user, userDefined := env["K6_PROMETHEUS_RW_USERNAME"]; userDefined {
 		c.Username = null.StringFrom(user)
 	}
 
-	if password, passwordDefined := env["K6_PROMETHEUS_PASSWORD"]; passwordDefined {
+	if password, passwordDefined := env["K6_PROMETHEUS_RW_PASSWORD"]; passwordDefined {
 		c.Password = null.StringFrom(password)
 	}
 
-	envHeaders := getEnvMap(env, "K6_PROMETHEUS_HEADERS_")
+	envHeaders := getEnvMap(env, "K6_PROMETHEUS_RW_HEADERS_")
 	for k, v := range envHeaders {
 		if c.Headers == nil {
 			c.Headers = make(map[string]string)
@@ -228,7 +228,7 @@ func parseEnvs(env map[string]string) (Config, error) {
 		c.Headers[k] = v
 	}
 
-	if b, err := getEnvBool(env, "K6_PROMETHEUS_TREND_AS_NATIVE_HISTOGRAM"); err != nil {
+	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM"); err != nil {
 		return c, err
 	} else {
 		if b.Valid {
@@ -236,7 +236,7 @@ func parseEnvs(env map[string]string) (Config, error) {
 		}
 	}
 
-	if trendStats, trendStatsDefined := env["K6_PROMETHEUS_TREND_STATS"]; trendStatsDefined {
+	if trendStats, trendStatsDefined := env["K6_PROMETHEUS_RW_TREND_STATS"]; trendStatsDefined {
 		c.TrendStats = strings.Split(trendStats, ",")
 	}
 

@@ -40,8 +40,8 @@ services:
     ports:
       - "6565:6565"
     environment:
-      - K6_PROMETHEUS_REMOTE_URL=http://prometheus:9090/api/v1/write
-      - K6_PROMETHEUS_TREND_AS_NATIVE_HISTOGRAM=true
+      - K6_PROMETHEUS_RW_REMOTE_URL=http://prometheus:9090/api/v1/write
+      - K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=true
       - K6_OUT=output-prometheus-remote
     depends_on:
       - prometheus

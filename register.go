@@ -6,7 +6,7 @@ import (
 )
 
 func init() {
-	output.RegisterExtension("output-prometheus-remote", func(p output.Params) (output.Output, error) {
+	output.RegisterExtension("xk6-prometheus-rw", func(p output.Params) (output.Output, error) {
 		return remotewrite.New(p)
 	})
 }

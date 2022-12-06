@@ -20,15 +20,15 @@ xk6 build --with github.com/grafana/xk6-output-prometheus-remote@latest
 
 Then run new k6 binary with:
 ```
-K6_PROMETHEUS_REMOTE_URL=http://localhost:9090/api/v1/write ./k6 run script.js -o output-prometheus-remote
+K6_PROMETHEUS_RW_REMOTE_URL=http://localhost:9090/api/v1/write ./k6 run script.js -o output-prometheus-remote
 ```
 
 Add TLS and HTTP basic authentication:
 ```
-K6_PROMETHEUS_REMOTE_URL=https://localhost:9090/api/v1/write \
-K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY=false \
-K6_PROMETHEUS_USERNAME=foo \
-K6_PROMETHEUS_PASSWORD=bar \
+K6_PROMETHEUS_RW_REMOTE_URL=https://localhost:9090/api/v1/write \
+K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY=false \
+K6_PROMETHEUS_RW_USERNAME=foo \
+K6_PROMETHEUS_RW_PASSWORD=bar \
 ./k6 run script.js -o output-prometheus-remote
 ```
 
@@ -48,7 +48,7 @@ Mapping Trend by Gauges has the following cons:
 * It is impossible to aggregate some Gauge's value (especially the percentiles).
 * It uses a memory-expensive k6's data structure.
 
-The previous points can be resolved by mapping Trend as [Prometheus Native Histogram](https://prometheus.io/docs/concepts/metric_types/#histogram). Enabling the conversion by the `K6_PROMETHEUS_TREND_AS_NATIVE_HISTOGRAM=true` environment variable (or one of the other ways), then the Output converts all the Trend types into a dedicated Native Histogram.
+The previous points can be resolved by mapping Trend as [Prometheus Native Histogram](https://prometheus.io/docs/concepts/metric_types/#histogram). Enabling the conversion by the `K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=true` environment variable (or one of the other ways), then the Output converts all the Trend types into a dedicated Native Histogram.
 
 Native Histogram is a Prometheus' experimental feature, so it has to be enabled (`--enable-feature=native-histograms`). Note that other Remote-write implementations don't support it yet.
 

@@ -122,8 +122,8 @@ func TestGetConsolidatedConfig(t *testing.T) {
 		"MixedSuccess": {
 			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
 			env: map[string]string{
-				"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "false",
-				"K6_PROMETHEUS_USERNAME":                 "u",
+				"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY": "false",
+				"K6_PROMETHEUS_RW_USERNAME":                 "u",
 			},
 			// arg: "username=user",
 			config: Config{
@@ -139,8 +139,8 @@ func TestGetConsolidatedConfig(t *testing.T) {
 		"OrderOfPrecedence": {
 			jsonRaw: json.RawMessage(`{"url":"http://json:9090","username":"json","password":"json"}`),
 			env: map[string]string{
-				"K6_PROMETHEUS_USERNAME": "env",
-				"K6_PROMETHEUS_PASSWORD": "env",
+				"K6_PROMETHEUS_RW_USERNAME": "env",
+				"K6_PROMETHEUS_RW_PASSWORD": "env",
 			},
 			// arg: "password=arg",
 			config: Config{
@@ -158,7 +158,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			errString: "parse JSON options failed",
 		},
 		"InvalidEnv": {
-			env:       map[string]string{"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "d"},
+			env:       map[string]string{"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY": "d"},
 			errString: "parse environment variables options failed",
 		},
 		//"InvalidArg": {
@@ -208,7 +208,7 @@ func TestOptionURL(t *testing.T) {
 		jsonRaw json.RawMessage
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"url":"http://prometheus:9090/api/v1/write"}`)},
-		"Env":  {env: map[string]string{"K6_PROMETHEUS_REMOTE_URL": "http://prometheus:9090/api/v1/write"}},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_REMOTE_URL": "http://prometheus:9090/api/v1/write"}},
 		//"Arg":  {arg: "url=http://prometheus:9090/api/v1/write"},
 	}
 
@@ -241,7 +241,7 @@ func TestOptionHeaders(t *testing.T) {
 		jsonRaw json.RawMessage
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"headers":{"X-MY-HEADER1":"hval1","X-MY-HEADER2":"hval2"}}`)},
-		"Env":  {env: map[string]string{"K6_PROMETHEUS_HEADERS_X-MY-HEADER1": "hval1", "K6_PROMETHEUS_HEADERS_X-MY-HEADER2": "hval2"}},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_HEADERS_X-MY-HEADER1": "hval1", "K6_PROMETHEUS_RW_HEADERS_X-MY-HEADER2": "hval2"}},
 		//"Arg":  {arg: "headers.X-MY-HEADER1=hval1,headers.X-MY-HEADER2=hval2"},
 	}
 
@@ -275,7 +275,7 @@ func TestOptionInsecureSkipTLSVerify(t *testing.T) {
 		jsonRaw json.RawMessage
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"insecureSkipTLSVerify":false}`)},
-		"Env":  {env: map[string]string{"K6_PROMETHEUS_INSECURE_SKIP_TLS_VERIFY": "false"}},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY": "false"}},
 		//"Arg":  {arg: "insecureSkipTLSVerify=false"},
 	}
 
@@ -306,7 +306,7 @@ func TestOptionBasicAuth(t *testing.T) {
 		jsonRaw json.RawMessage
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"username":"user1","password":"pass1"}`)},
-		"Env":  {env: map[string]string{"K6_PROMETHEUS_USERNAME": "user1", "K6_PROMETHEUS_PASSWORD": "pass1"}},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_USERNAME": "user1", "K6_PROMETHEUS_RW_PASSWORD": "pass1"}},
 		//"Arg":  {arg: "username=user1,password=pass1"},
 	}
 
@@ -340,7 +340,7 @@ func TestOptionTrendAsNativeHistogram(t *testing.T) {
 		jsonRaw json.RawMessage
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"trendAsNativeHistogram":true}`)},
-		"Env":  {env: map[string]string{"K6_PROMETHEUS_TREND_AS_NATIVE_HISTOGRAM": "true"}},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM": "true"}},
 		//"Arg":  {arg: "trendAsNativeHistogram=true"},
 	}
 
@@ -375,7 +375,7 @@ func TestOptionPushInterval(t *testing.T) {
 		jsonRaw json.RawMessage
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"pushInterval":"1m2s"}`)},
-		"Env":  {env: map[string]string{"K6_PROMETHEUS_PUSH_INTERVAL": "1m2s"}},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_PUSH_INTERVAL": "1m2s"}},
 		//"Arg":  {arg: "pushInterval=1m2s"},
 	}
 
@@ -409,7 +409,7 @@ func TestConfigTrendStats(t *testing.T) {
 		jsonRaw json.RawMessage
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"trendStats":["max","p(95)"]}`)},
-		"Env":  {env: map[string]string{"K6_PROMETHEUS_TREND_STATS": "max,p(95)"}},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_TREND_STATS": "max,p(95)"}},
 		// TODO: support arg, check the comment in the code
 		//"Arg":  {arg: "trendStats=max,p(95)"},
 	}
