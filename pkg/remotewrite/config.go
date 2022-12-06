@@ -25,7 +25,7 @@ var defaultTrendStats = []string{"p(99)"}
 
 type Config struct {
 	// URL contains the absolute URL for the Write endpoint where to flush the time series.
-	URL null.String `json:"url" envconfig:"K6_PROMETHEUS_RW_REMOTE_URL"`
+	URL null.String `json:"url" envconfig:"K6_PROMETHEUS_RW_SERVER_URL"`
 
 	// Headers contains additional headers that should be included in the HTTP requests.
 	Headers map[string]string `json:"headers" envconfig:"K6_PROMETHEUS_RW_HEADERS"`
@@ -200,7 +200,7 @@ func parseEnvs(env map[string]string) (Config, error) {
 		}
 	}
 
-	if url, urlDefined := env["K6_PROMETHEUS_RW_REMOTE_URL"]; urlDefined {
+	if url, urlDefined := env["K6_PROMETHEUS_RW_SERVER_URL"]; urlDefined {
 		c.URL = null.StringFrom(url)
 	}
 

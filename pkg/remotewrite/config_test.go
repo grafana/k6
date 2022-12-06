@@ -208,7 +208,7 @@ func TestOptionURL(t *testing.T) {
 		jsonRaw json.RawMessage
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"url":"http://prometheus:9090/api/v1/write"}`)},
-		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_REMOTE_URL": "http://prometheus:9090/api/v1/write"}},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_SERVER_URL": "http://prometheus:9090/api/v1/write"}},
 		//"Arg":  {arg: "url=http://prometheus:9090/api/v1/write"},
 	}
 
