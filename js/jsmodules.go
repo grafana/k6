@@ -1,7 +1,7 @@
 package js
 
 import (
-	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/ext"
 	"go.k6.io/k6/js/modules/k6"
 	"go.k6.io/k6/js/modules/k6/crypto"
 	"go.k6.io/k6/js/modules/k6/crypto/x509"
@@ -40,11 +40,11 @@ func getInternalJSModules() map[string]interface{} {
 
 func getJSModules() map[string]interface{} {
 	result := getInternalJSModules()
-	external := modules.GetJSModules()
+	external := ext.Get(ext.JSExtension)
 
 	// external is always prefixed with `k6/x`
-	for k, v := range external {
-		result[k] = v
+	for _, e := range external {
+		result[e.Name] = e.Module
 	}
 
 	return result

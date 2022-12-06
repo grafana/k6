@@ -4,20 +4,14 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/dop251/goja"
+	"go.k6.io/k6/ext"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 )
 
 const extPrefix string = "k6/x/"
-
-//nolint:gochecknoglobals
-var (
-	modules = make(map[string]interface{})
-	mx      sync.RWMutex
-)
 
 // Register the given mod as an external JavaScript module that can be imported
 // by name. The name must be unique across all registered modules and must be
@@ -27,13 +21,7 @@ func Register(name string, mod interface{}) {
 		panic(fmt.Errorf("external module names must be prefixed with '%s', tried to register: %s", extPrefix, name))
 	}
 
-	mx.Lock()
-	defer mx.Unlock()
-
-	if _, ok := modules[name]; ok {
-		panic(fmt.Sprintf("module already registered: %s", name))
-	}
-	modules[name] = mod
+	ext.Register(name, ext.JSExtension, mod)
 }
 
 // Module is the interface js modules should implement in order to get access to the VU
@@ -41,19 +29,6 @@ type Module interface {
 	// NewModuleInstance will get modules.VU that should provide the module with a way to interact with the VU
 	// This method will be called for *each* require/import and should return an unique instance for each call
 	NewModuleInstance(VU) Instance
-}
-
-// GetJSModules returns a map of all registered js modules
-func GetJSModules() map[string]interface{} {
-	mx.Lock()
-	defer mx.Unlock()
-	result := make(map[string]interface{}, len(modules))
-
-	for name, module := range modules {
-		result[name] = module
-	}
-
-	return result
 }
 
 // Instance is what a module needs to return
