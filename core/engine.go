@@ -8,6 +8,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
@@ -151,11 +152,11 @@ func (e *Engine) setRunStatusFromError(err error) {
 	var serr errext.Exception
 	switch {
 	case errors.As(err, &serr):
-		e.OutputManager.SetRunStatus(lib.RunStatusAbortedScriptError)
+		e.OutputManager.SetRunStatus(cloudapi.RunStatusAbortedScriptError)
 	case errext.IsInterruptError(err):
-		e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
+		e.OutputManager.SetRunStatus(cloudapi.RunStatusAbortedUser)
 	default:
-		e.OutputManager.SetRunStatus(lib.RunStatusAbortedSystem)
+		e.OutputManager.SetRunStatus(cloudapi.RunStatusAbortedSystem)
 	}
 }
 
@@ -198,23 +199,23 @@ func (e *Engine) startBackgroundProcesses(
 				e.setRunStatusFromError(err)
 			} else {
 				e.logger.Debug("run: execution scheduler finished nominally")
-				e.OutputManager.SetRunStatus(lib.RunStatusFinished)
+				e.OutputManager.SetRunStatus(cloudapi.RunStatusFinished)
 			}
 			// do nothing, return the same err value we got from the Run()
 			// ExecutionScheduler result, we just set the run_status based on it
 		case <-runCtx.Done():
 			e.logger.Debug("run: context expired; exiting...")
-			e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
+			e.OutputManager.SetRunStatus(cloudapi.RunStatusAbortedUser)
 			err = errext.WithExitCodeIfNone(errors.New("test run aborted by signal"), exitcodes.ExternalAbort)
 		case <-e.stopChan:
 			runSubCancel()
 			e.logger.Debug("run: stopped by user via REST API; exiting...")
-			e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
+			e.OutputManager.SetRunStatus(cloudapi.RunStatusAbortedUser)
 			err = errext.WithExitCodeIfNone(errors.New("test run stopped from the REST API"), exitcodes.ScriptStoppedFromRESTAPI)
 		case <-thresholdAbortChan:
 			e.logger.Debug("run: stopped by thresholds; exiting...")
 			runSubCancel()
-			e.OutputManager.SetRunStatus(lib.RunStatusAbortedThreshold)
+			e.OutputManager.SetRunStatus(cloudapi.RunStatusAbortedThreshold)
 			err = errext.WithExitCodeIfNone(errors.New("test run aborted by failed thresholds"), exitcodes.ThresholdsHaveFailed)
 		}
 	}()

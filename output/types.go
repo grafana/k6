@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
+	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 )
@@ -78,7 +79,7 @@ type WithTestRunStop interface {
 // WithRunStatusUpdates means the output can receive test run status updates.
 type WithRunStatusUpdates interface {
 	Output
-	SetRunStatus(latestStatus lib.RunStatus)
+	SetRunStatus(latestStatus cloudapi.RunStatus)
 }
 
 // WithBuiltinMetrics means the output can receive the builtin metrics.

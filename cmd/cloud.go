@@ -230,9 +230,9 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 			statusText := testProgress.RunStatusText
 
-			if testProgress.RunStatus == lib.RunStatusFinished {
+			if testProgress.RunStatus == cloudapi.RunStatusFinished {
 				testProgress.Progress = 1
-			} else if testProgress.RunStatus == lib.RunStatusRunning {
+			} else if testProgress.RunStatus == cloudapi.RunStatusRunning {
 				if startTime.IsZero() {
 					startTime = time.Now()
 				}
@@ -269,8 +269,8 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		testProgress = newTestProgress
 		testProgressLock.Unlock()
 
-		if (newTestProgress.RunStatus > lib.RunStatusRunning) ||
-			(c.exitOnRunning && newTestProgress.RunStatus == lib.RunStatusRunning) {
+		if (newTestProgress.RunStatus > cloudapi.RunStatusRunning) ||
+			(c.exitOnRunning && newTestProgress.RunStatus == cloudapi.RunStatusRunning) {
 			globalCancel()
 			break
 		}

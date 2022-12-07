@@ -506,7 +506,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 
 	require.NoError(t, out.Stop())
 
-	require.Equal(t, lib.RunStatusQueued, out.runStatus)
+	require.Equal(t, cloudapi.RunStatusQueued, out.runStatus)
 	select {
 	case <-out.stopSendingMetrics:
 		// all is fine
@@ -598,7 +598,7 @@ func TestCloudOutputAggregationPeriodZeroNoBlock(t *testing.T) {
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", out.referenceID), getSampleChecker(t, expSamples))
 
 	require.NoError(t, out.Stop())
-	require.Equal(t, lib.RunStatusQueued, out.runStatus)
+	require.Equal(t, cloudapi.RunStatusQueued, out.runStatus)
 }
 
 func TestCloudOutputPushRefID(t *testing.T) {

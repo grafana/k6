@@ -23,7 +23,6 @@ import (
 	"github.com/tidwall/gjson"
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
@@ -422,7 +421,7 @@ func getTestServer(t *testing.T, routes map[string]http.Handler) *httptest.Serve
 	return httptest.NewServer(mux)
 }
 
-func getCloudTestEndChecker(t *testing.T, expRunStatus lib.RunStatus, expResultStatus cloudapi.ResultStatus) *httptest.Server {
+func getCloudTestEndChecker(t *testing.T, expRunStatus cloudapi.RunStatus, expResultStatus cloudapi.ResultStatus) *httptest.Server {
 	testFinished := false
 	srv := getTestServer(t, map[string]http.Handler{
 		"POST ^/v1/tests$": http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
@@ -443,7 +442,7 @@ func getCloudTestEndChecker(t *testing.T, expRunStatus lib.RunStatus, expResultS
 			runStatus := gjson.GetBytes(body, "run_status")
 			require.True(t, runStatus.Exists()) // important to check, since run_status can be 0
 			assert.Equalf(
-				t, expRunStatus, lib.RunStatus(runStatus.Int()),
+				t, expRunStatus, cloudapi.RunStatus(runStatus.Int()),
 				"received wrong run_status value",
 			)
 
@@ -467,7 +466,7 @@ func getCloudTestEndChecker(t *testing.T, expRunStatus lib.RunStatus, expResultS
 
 func getSimpleCloudOutputTestState(
 	t *testing.T, script string, cliFlags []string,
-	expRunStatus lib.RunStatus, expResultStatus cloudapi.ResultStatus, expExitCode exitcodes.ExitCode,
+	expRunStatus cloudapi.RunStatus, expResultStatus cloudapi.ResultStatus, expExitCode exitcodes.ExitCode,
 ) *globalTestState {
 	if cliFlags == nil {
 		cliFlags = []string{"-v", "--log-output=stdout"}
@@ -514,7 +513,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		};
 	`)
 
-	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
+	ts := getSimpleCloudOutputTestState(t, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
 	newRootCommand(ts.globalState).execute()
 
 	stdOut := ts.stdOut.String()
@@ -560,7 +559,7 @@ func TestThresholdsFailed(t *testing.T) {
 	// Since these thresholds don't have an abortOnFail property, the run_status
 	// in the cloud will still be Finished, even if the test itself failed.
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusFinished, cloudapi.ResultStatusFailed, exitcodes.ThresholdsHaveFailed,
+		t, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusFailed, exitcodes.ThresholdsHaveFailed,
 	)
 	newRootCommand(ts.globalState).execute()
 
@@ -601,7 +600,7 @@ func TestAbortedByThreshold(t *testing.T) {
 	`
 
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedThreshold, cloudapi.ResultStatusFailed, exitcodes.ThresholdsHaveFailed,
+		t, script, nil, cloudapi.RunStatusAbortedThreshold, cloudapi.ResultStatusFailed, exitcodes.ThresholdsHaveFailed,
 	)
 	newRootCommand(ts.globalState).execute()
 
@@ -648,7 +647,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 		};
 	`
 
-	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ExternalAbort)
+	ts := getSimpleCloudOutputTestState(t, script, nil, cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ExternalAbort)
 
 	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "simple iter 2")
 
@@ -776,7 +775,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 
 	ts := getSimpleCloudOutputTestState(
 		t, script, []string{"-v", "--log-output=stdout", "--iterations", "20"},
-		lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptStoppedFromRESTAPI,
+		cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptStoppedFromRESTAPI,
 	)
 
 	asyncWaitForStdoutAndStopTestFromRESTAPI(t, ts, 15, time.Second, "a simple iteration")
@@ -816,7 +815,7 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 		export { handleSummary } from "./bar.js";
 	`
 
-	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
+	srv := getCloudTestEndChecker(t, cloudapi.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
 
 	ts := newGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.fs, filepath.Join(ts.cwd, "test.js"), []byte(mainScript), 0o644))
@@ -931,7 +930,7 @@ func TestAbortedByScriptTeardownError(t *testing.T) {
 
 func testAbortedByScriptError(t *testing.T, script string, runTest func(*testing.T, *globalTestState)) *globalTestState {
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, exitcodes.ScriptException,
+		t, script, nil, cloudapi.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, exitcodes.ScriptException,
 	)
 	runTest(t, ts)
 
@@ -1052,7 +1051,7 @@ func testAbortedByScriptTestAbort(
 	t *testing.T, shouldHaveMetrics bool, script string, runTest func(*testing.T, *globalTestState),
 ) *globalTestState {
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptAborted,
+		t, script, nil, cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptAborted,
 	)
 	runTest(t, ts)
 
@@ -1086,7 +1085,7 @@ func TestAbortedByScriptInitError(t *testing.T) {
 	`
 
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, exitcodes.ScriptException,
+		t, script, nil, cloudapi.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, exitcodes.ScriptException,
 	)
 	newRootCommand(ts.globalState).execute()
 
@@ -1184,7 +1183,7 @@ func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 
 	ts := getSimpleCloudOutputTestState(
 		t, script, []string{"--quiet", "--log-output", "stdout"},
-		lib.RunStatusFinished, cloudapi.ResultStatusPassed, 0,
+		cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0,
 	)
 	newRootCommand(ts.globalState).execute()
 
@@ -1354,7 +1353,7 @@ func TestMinIterationDuration(t *testing.T) {
 		export function teardown() { c.add(1); };
 	`
 
-	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
+	ts := getSimpleCloudOutputTestState(t, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
 
 	start := time.Now()
 	newRootCommand(ts.globalState).execute()

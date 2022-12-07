@@ -1,10 +1,7 @@
-package lib
+package cloudapi
 
-// TODO: move to some other package - types? models?
-
-// RunStatus values can be used by k6 to denote how a script run ends
-// and by the cloud executor and collector so that k6 knows the current
-// status of a particular script run.
+// RunStatus values are used to tell the cloud output how a local test run
+// ended, and to get that information from the cloud for cloud tests.
 type RunStatus int
 
 // Possible run status values; iota isn't used intentionally
