@@ -1,11 +1,7 @@
+// Package browser provides an entry point to the browser extension.
 package browser
 
 import (
-	"log"
-	"net/http"
-	_ "net/http/pprof" // nolint:gosec
-	"os"
-
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
@@ -38,16 +34,6 @@ var (
 	_ k6modules.Instance = &ModuleInstance{}
 )
 
-func init() {
-	if _, ok := os.LookupEnv("K6_BROWSER_PPROF"); ok {
-		go func() {
-			address := "localhost:6060"
-			log.Println("Starting http debug server", address)
-			log.Println(http.ListenAndServe(address, nil))
-		}()
-	}
-}
-
 // New returns a pointer to a new RootModule instance.
 func New() *RootModule {
 	return &RootModule{}
@@ -69,8 +55,4 @@ func (*RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 // scripts.
 func (mi *ModuleInstance) Exports() k6modules.Exports {
 	return k6modules.Exports{Default: mi.mod}
-}
-
-func init() {
-	k6modules.Register("k6/x/browser", New())
 }
