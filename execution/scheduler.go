@@ -11,7 +11,6 @@ import (
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/ui/pb"
 )
@@ -451,7 +450,7 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- metr
 	// this context effectively stopping all executions.
 	//
 	// This is for addressing test.abort().
-	execCtx := executor.Context(runSubCtx)
+	execCtx, _ := NewTestRunContext(runSubCtx, logger)
 	for _, exec := range e.executors {
 		go e.runExecutor(execCtx, runResults, engineOut, exec)
 	}
@@ -479,7 +478,7 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- metr
 			return err
 		}
 	}
-	if err := executor.CancelReason(execCtx); err != nil && errext.IsInterruptError(err) {
+	if err := GetCancelReasonIfTestAborted(execCtx); err != nil && errext.IsInterruptError(err) {
 		interrupted = true
 		return err
 	}
