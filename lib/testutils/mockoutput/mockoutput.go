@@ -1,9 +1,7 @@
 package mockoutput
 
 import (
-	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
 )
 
 // New exists so that the usage from tests avoids repetition, i.e. is
@@ -16,14 +14,11 @@ func New() *MockOutput {
 type MockOutput struct {
 	SampleContainers []metrics.SampleContainer
 	Samples          []metrics.Sample
-	RunStatus        lib.RunStatus
 
 	DescFn  func() string
 	StartFn func() error
 	StopFn  func() error
 }
-
-var _ output.WithRunStatusUpdates = &MockOutput{}
 
 // AddMetricSamples just saves the results in memory.
 func (mo *MockOutput) AddMetricSamples(scs []metrics.SampleContainer) {
@@ -31,11 +26,6 @@ func (mo *MockOutput) AddMetricSamples(scs []metrics.SampleContainer) {
 	for _, sc := range scs {
 		mo.Samples = append(mo.Samples, sc.GetSamples()...)
 	}
-}
-
-// SetRunStatus updates the RunStatus property.
-func (mo *MockOutput) SetRunStatus(latestStatus lib.RunStatus) {
-	mo.RunStatus = latestStatus
 }
 
 // Description calls the supplied DescFn callback, if available.

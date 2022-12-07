@@ -2,7 +2,7 @@ package output
 
 import (
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/lib"
+	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/metrics"
 )
 
@@ -58,7 +58,7 @@ func (om *Manager) stopOutputs(upToID int) {
 
 // SetRunStatus checks which outputs implement the WithRunStatusUpdates
 // interface and sets the provided RunStatus to them.
-func (om *Manager) SetRunStatus(status lib.RunStatus) {
+func (om *Manager) SetRunStatus(status cloudapi.RunStatus) {
 	for _, out := range om.outputs {
 		if statUpdOut, ok := out.(WithRunStatusUpdates); ok {
 			statUpdOut.SetRunStatus(status)

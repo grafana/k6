@@ -36,7 +36,7 @@ type Output struct {
 	thresholds    map[string][]*metrics.Threshold
 	client        *MetricsClient
 
-	runStatus lib.RunStatus
+	runStatus cloudapi.RunStatus
 
 	bufferMutex      sync.Mutex
 	bufferHTTPTrails []*httpext.Trail
@@ -284,7 +284,7 @@ func (out *Output) Description() string {
 }
 
 // SetRunStatus receives the latest run status from the Engine.
-func (out *Output) SetRunStatus(status lib.RunStatus) {
+func (out *Output) SetRunStatus(status cloudapi.RunStatus) {
 	out.runStatus = status
 }
 
@@ -634,8 +634,8 @@ func (out *Output) testFinished() error {
 		}
 	}
 
-	runStatus := lib.RunStatusFinished
-	if out.runStatus != lib.RunStatusQueued {
+	runStatus := cloudapi.RunStatusFinished
+	if out.runStatus != cloudapi.RunStatusQueued {
 		runStatus = out.runStatus
 	}
 
