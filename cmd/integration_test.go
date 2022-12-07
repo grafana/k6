@@ -605,7 +605,7 @@ func TestAbortedByThreshold(t *testing.T) {
 	)
 	newRootCommand(ts.globalState).execute()
 
-	assert.True(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, `some thresholds have failed`))
+	assert.True(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, `test run aborted by failed thresholds`))
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
 	assert.Contains(t, stdOut, `✗ iterations`)
@@ -648,13 +648,15 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 		};
 	`
 
-	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, 0)
+	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ExternalAbort)
 
 	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "simple iter 2")
 
 	newRootCommand(ts.globalState).execute()
 
-	assert.False(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, `some thresholds have failed`))
+	logs := ts.loggerHook.Drain()
+	assert.False(t, testutils.LogContains(logs, logrus.ErrorLevel, `some thresholds have failed`))
+	assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, `test run aborted by signal`))
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
 	assert.Contains(t, stdOut, `✓ iterations`)
@@ -755,6 +757,9 @@ func asyncWaitForStdoutAndStopTestFromRESTAPI(
 	})
 }
 
+// TODO: add more abort scenario tests, see
+// https://github.com/grafana/k6/issues/2804
+
 func TestAbortedByUserWithRestAPI(t *testing.T) {
 	t.Parallel()
 	script := `
@@ -771,7 +776,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 
 	ts := getSimpleCloudOutputTestState(
 		t, script, []string{"-v", "--log-output=stdout", "--iterations", "20"},
-		lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, 0,
+		lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptStoppedFromRESTAPI,
 	)
 
 	asyncWaitForStdoutAndStopTestFromRESTAPI(t, ts, 15, time.Second, "a simple iteration")
@@ -783,7 +788,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 	assert.Contains(t, stdOut, `a simple iteration`)
 	assert.Contains(t, stdOut, `teardown() called`)
 	assert.Contains(t, stdOut, `PATCH /v1/status`)
-	assert.Contains(t, stdOut, `run: stopped by user; exiting...`)
+	assert.Contains(t, stdOut, `run: stopped by user via REST API; exiting...`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics processing finished!"`)
 	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)

@@ -1,4 +1,5 @@
 // Package exitcodes contains the constants representing possible k6 exit error codes.
+//
 //nolint:golint
 package exitcodes
 
@@ -13,10 +14,11 @@ const (
 	SetupTimeout             ExitCode = 100
 	TeardownTimeout          ExitCode = 101
 	GenericTimeout           ExitCode = 102 // TODO: remove?
-	GenericEngine            ExitCode = 103
+	GenericEngine            ExitCode = 103 // TODO: remove after https://github.com/grafana/k6/issues/2804
 	InvalidConfig            ExitCode = 104
 	ExternalAbort            ExitCode = 105
 	CannotStartRESTAPI       ExitCode = 106
 	ScriptException          ExitCode = 107
 	ScriptAborted            ExitCode = 108
+	ScriptStoppedFromRESTAPI ExitCode = 109
 )

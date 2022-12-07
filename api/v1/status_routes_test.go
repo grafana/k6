@@ -128,7 +128,7 @@ func TestPatchStatus(t *testing.T) {
 			}()
 
 			go func() {
-				assert.NoError(t, run())
+				assert.ErrorContains(t, run(), "test run aborted by signal")
 			}()
 			// wait for the executor to initialize to avoid a potential data race below
 			time.Sleep(200 * time.Millisecond)

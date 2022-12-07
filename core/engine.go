@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/metrics/engine"
@@ -95,12 +96,12 @@ func NewEngine(testState *lib.TestRunState, ex lib.ExecutionScheduler, outputs [
 // wait() functions.
 //
 // Things to note:
-//  - The first lambda, Run(), synchronously executes the actual load test.
-//  - It can be prematurely aborted by cancelling the runCtx - this won't stop
-//    the metrics collection by the Engine.
-//  - Stopping the metrics collection can be done at any time after Run() has
-//    returned by cancelling the globalCtx
-//  - The second returned lambda can be used to wait for that process to finish.
+//   - The first lambda, Run(), synchronously executes the actual load test.
+//   - It can be prematurely aborted by cancelling the runCtx - this won't stop
+//     the metrics collection by the Engine.
+//   - Stopping the metrics collection can be done at any time after Run() has
+//     returned by cancelling the globalCtx
+//   - The second returned lambda can be used to wait for that process to finish.
 func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait func(), err error) {
 	e.logger.Debug("Initialization starting...")
 	// TODO: if we ever need metrics processing in the init context, we can move
@@ -113,7 +114,8 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 	// TODO: move all of this in a separate struct? see main TODO above
 	runSubCtx, runSubCancel := context.WithCancel(runCtx)
 
-	resultCh := make(chan error)
+	execRunResult := make(chan error)
+	engineRunResult := make(chan error)
 	processMetricsAfterRun := make(chan struct{})
 	runFn := func() error {
 		e.logger.Debug("Execution scheduler starting...")
@@ -124,9 +126,9 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 		case <-runSubCtx.Done():
 			// do nothing, the test run was aborted somehow
 		default:
-			resultCh <- err // we finished normally, so send the result
-			<-resultCh      // the result was processed
+			execRunResult <- err // we finished normally, so send the result
 		}
+		result := <-engineRunResult // get the final result
 
 		// Make the background jobs process the currently buffered metrics and
 		// run the thresholds, then wait for that to be done.
@@ -136,10 +138,12 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 		case <-globalCtx.Done():
 		}
 
-		return err
+		return result
 	}
 
-	waitFn := e.startBackgroundProcesses(globalCtx, runCtx, resultCh, runSubCancel, processMetricsAfterRun)
+	waitFn := e.startBackgroundProcesses(
+		globalCtx, runCtx, execRunResult, engineRunResult, runSubCancel, processMetricsAfterRun,
+	)
 	return runFn, waitFn, nil
 }
 
@@ -165,7 +169,8 @@ func (e *Engine) setRunStatusFromError(err error) {
 // and that the remaining metrics samples in the pipeline should be processed as the background
 // process is about to exit.
 func (e *Engine) startBackgroundProcesses(
-	globalCtx, runCtx context.Context, runResult chan error, runSubCancel func(), processMetricsAfterRun chan struct{},
+	globalCtx, runCtx context.Context, execRunResult, engineRunResult chan error,
+	runSubCancel func(), processMetricsAfterRun chan struct{},
 ) (wait func()) {
 	processes := new(sync.WaitGroup)
 
@@ -181,27 +186,36 @@ func (e *Engine) startBackgroundProcesses(
 	thresholdAbortChan := make(chan struct{})
 	go func() {
 		defer processes.Done()
+		var err error
+		defer func() {
+			e.logger.WithError(err).Debug("Final Engine.Run() result")
+			engineRunResult <- err
+		}()
 		select {
-		case err := <-runResult:
+		case err = <-execRunResult:
 			if err != nil {
 				e.logger.WithError(err).Debug("run: execution scheduler returned an error")
 				e.setRunStatusFromError(err)
 			} else {
-				e.logger.Debug("run: execution scheduler terminated")
+				e.logger.Debug("run: execution scheduler finished nominally")
 				e.OutputManager.SetRunStatus(lib.RunStatusFinished)
 			}
-			close(runResult) // signal that the run result was processed
+			// do nothing, return the same err value we got from the Run()
+			// ExecutionScheduler result, we just set the run_status based on it
 		case <-runCtx.Done():
 			e.logger.Debug("run: context expired; exiting...")
 			e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
+			err = errext.WithExitCodeIfNone(errors.New("test run aborted by signal"), exitcodes.ExternalAbort)
 		case <-e.stopChan:
 			runSubCancel()
-			e.logger.Debug("run: stopped by user; exiting...")
+			e.logger.Debug("run: stopped by user via REST API; exiting...")
 			e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
+			err = errext.WithExitCodeIfNone(errors.New("test run stopped from the REST API"), exitcodes.ScriptStoppedFromRESTAPI)
 		case <-thresholdAbortChan:
 			e.logger.Debug("run: stopped by thresholds; exiting...")
 			runSubCancel()
 			e.OutputManager.SetRunStatus(lib.RunStatusAbortedThreshold)
+			err = errext.WithExitCodeIfNone(errors.New("test run aborted by failed thresholds"), exitcodes.ThresholdsHaveFailed)
 		}
 	}()
 

@@ -141,7 +141,7 @@ func TestEngineRun(t *testing.T) {
 		defer test.wait()
 
 		startTime := time.Now()
-		assert.NoError(t, test.run())
+		assert.ErrorContains(t, test.run(), "test run aborted by signal")
 		assert.WithinDuration(t, startTime.Add(duration), time.Now(), 100*time.Millisecond)
 		<-done
 	})
@@ -192,7 +192,7 @@ func TestEngineRun(t *testing.T) {
 		go func() { errC <- test.run() }()
 		<-signalChan
 		test.runCancel()
-		assert.NoError(t, <-errC)
+		assert.ErrorContains(t, <-errC, "test run aborted by signal")
 		test.wait()
 
 		found := 0
@@ -455,7 +455,7 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 	defer test.wait()
 
 	go func() {
-		assert.NoError(t, test.run())
+		require.ErrorContains(t, test.run(), "aborted by failed thresholds")
 	}()
 
 	select {
@@ -1229,7 +1229,7 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 		VUs: null.IntFrom(1), Iterations: null.IntFrom(1),
 	}, piState)
 
-	assert.NoError(t, test.run())
+	assert.ErrorContains(t, test.run(), "test run aborted by signal")
 	test.wait()
 
 	var count float64

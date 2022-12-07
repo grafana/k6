@@ -204,6 +204,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
 	err = engineRun()
 	if err != nil {
+		err = errext.WithExitCodeIfNone(common.UnwrapGojaInterruptedError(err), exitcodes.GenericEngine)
 		logger.WithError(err).Debug("Engine terminated with an error")
 	} else {
 		logger.Debug("Engine run terminated cleanly")
@@ -263,13 +264,16 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 			logger.WithError(klErr).Warn("Error while closing the SSLKEYLOGFILE")
 		}
 	}
-	if err != nil {
-		return errext.WithExitCodeIfNone(common.UnwrapGojaInterruptedError(err), exitcodes.GenericEngine)
-	}
+
 	if engine.IsTainted() {
-		return errext.WithExitCodeIfNone(errors.New("some thresholds have failed"), exitcodes.ThresholdsHaveFailed)
+		if err == nil {
+			err = errors.New("some thresholds have failed")
+		} else {
+			logger.Error("some thresholds have failed") // log this, even if there was already a previous error
+		}
+		err = errext.WithExitCodeIfNone(err, exitcodes.ThresholdsHaveFailed)
 	}
-	return nil
+	return err
 }
 
 func (c *cmdRun) flagSet() *pflag.FlagSet {
