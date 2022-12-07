@@ -36,7 +36,7 @@ type cmdRun struct {
 // TODO: split apart some more
 //
 //nolint:funlen,gocognit,gocyclo,cyclop
-func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
+func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	printBanner(c.gs)
 
 	test, err := loadAndConfigureTest(c.gs, cmd, args, getConfig)
@@ -156,7 +156,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer engine.OutputManager.StopOutputs()
+	defer func() {
+		engine.OutputManager.StopOutputs(err)
+	}()
 
 	printExecutionDescription(
 		c.gs, "local", args[0], "", conf, execScheduler.GetState().ExecutionTuple, executionPlan, outputs,
@@ -271,7 +273,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 		} else {
 			logger.Error("some thresholds have failed") // log this, even if there was already a previous error
 		}
-		err = errext.WithExitCodeIfNone(err, exitcodes.ThresholdsHaveFailed)
+		err = errext.WithAbortReasonIfNone(
+			errext.WithExitCodeIfNone(err, exitcodes.ThresholdsHaveFailed), errext.AbortedByThresholdsAfterTestEnd,
+		)
 	}
 	return err
 }

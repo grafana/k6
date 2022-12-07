@@ -11,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
-	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 )
@@ -76,10 +75,17 @@ type WithTestRunStop interface {
 	SetTestRunStopCallback(func(error))
 }
 
-// WithRunStatusUpdates means the output can receive test run status updates.
-type WithRunStatusUpdates interface {
+// WithStopWithTestError allows output to receive the error value that the test
+// finished with. It could be nil, if the test finished nominally.
+//
+// If this interface is implemented by the output, StopWithError() will be
+// called instead of Stop().
+//
+// TODO: refactor the main interface to use this method instead of Stop()? Or
+// something else along the lines of https://github.com/grafana/k6/issues/2430 ?
+type WithStopWithTestError interface {
 	Output
-	SetRunStatus(latestStatus cloudapi.RunStatus)
+	StopWithTestError(testRunErr error) error // nil testRunErr means error-free test run
 }
 
 // WithBuiltinMetrics means the output can receive the builtin metrics.

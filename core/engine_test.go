@@ -109,7 +109,7 @@ func newTestEngineWithTestPreInitState( //nolint:golint
 			test.runCancel()
 			globalCancel()
 			waitFn()
-			engine.OutputManager.StopOutputs()
+			engine.OutputManager.StopOutputs(nil)
 		},
 		piState: piState,
 	}
@@ -1333,7 +1333,7 @@ func TestActiveVUsCount(t *testing.T) {
 		require.NoError(t, err)
 		cancel()
 		waitFn()
-		engine.OutputManager.StopOutputs()
+		engine.OutputManager.StopOutputs(nil)
 		require.False(t, engine.IsTainted())
 	}
 

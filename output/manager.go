@@ -2,7 +2,6 @@ package output
 
 import (
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/metrics"
 )
 
@@ -35,7 +34,7 @@ func (om *Manager) StartOutputs() error {
 		}
 
 		if err := out.Start(); err != nil {
-			om.stopOutputs(i)
+			om.stopOutputs(err, i)
 			return err
 		}
 	}
@@ -43,25 +42,23 @@ func (om *Manager) StartOutputs() error {
 }
 
 // StopOutputs stops all configured outputs.
-func (om *Manager) StopOutputs() {
-	om.stopOutputs(len(om.outputs))
+func (om *Manager) StopOutputs(testErr error) {
+	om.stopOutputs(testErr, len(om.outputs))
 }
 
-func (om *Manager) stopOutputs(upToID int) {
+func (om *Manager) stopOutputs(testErr error, upToID int) {
 	om.logger.Debugf("Stopping %d outputs...", upToID)
 	for i := 0; i < upToID; i++ {
-		if err := om.outputs[i].Stop(); err != nil {
-			om.logger.WithError(err).Errorf("Stopping output %d failed", i)
+		out := om.outputs[i]
+		var err error
+		if sout, ok := out.(WithStopWithTestError); ok {
+			err = sout.StopWithTestError(testErr)
+		} else {
+			err = out.Stop()
 		}
-	}
-}
 
-// SetRunStatus checks which outputs implement the WithRunStatusUpdates
-// interface and sets the provided RunStatus to them.
-func (om *Manager) SetRunStatus(status cloudapi.RunStatus) {
-	for _, out := range om.outputs {
-		if statUpdOut, ok := out.(WithRunStatusUpdates); ok {
-			statUpdOut.SetRunStatus(status)
+		if err != nil {
+			om.logger.WithError(err).Errorf("Stopping output %d failed", i)
 		}
 	}
 }

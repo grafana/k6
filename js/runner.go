@@ -845,11 +845,12 @@ type scriptException struct {
 	inner *goja.Exception
 }
 
-var (
-	_ errext.Exception   = &scriptException{}
-	_ errext.HasExitCode = &scriptException{}
-	_ errext.HasHint     = &scriptException{}
-)
+var _ interface {
+	errext.Exception
+	errext.HasExitCode
+	errext.HasHint
+	errext.HasAbortReason
+} = &scriptException{}
 
 func (s *scriptException) Error() string {
 	// this calls String instead of error so that by default if it's printed to print the stacktrace
@@ -866,6 +867,10 @@ func (s *scriptException) Unwrap() error {
 
 func (s *scriptException) Hint() string {
 	return "script exception"
+}
+
+func (s *scriptException) AbortReason() errext.AbortReason {
+	return errext.AbortedByScriptError
 }
 
 func (s *scriptException) ExitCode() exitcodes.ExitCode {

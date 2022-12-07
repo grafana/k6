@@ -391,7 +391,7 @@ func TestDataIsolation(t *testing.T) {
 	engine, err := core.NewEngine(testRunState, execScheduler, []output.Output{mockOutput})
 	require.NoError(t, err)
 	require.NoError(t, engine.OutputManager.StartOutputs())
-	defer engine.OutputManager.StopOutputs()
+	defer engine.OutputManager.StopOutputs(nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	run, wait, err := engine.Init(ctx, ctx)

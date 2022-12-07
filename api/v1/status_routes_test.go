@@ -116,7 +116,7 @@ func TestPatchStatus(t *testing.T) {
 			require.NoError(t, err)
 
 			require.NoError(t, engine.OutputManager.StartOutputs())
-			defer engine.OutputManager.StopOutputs()
+			defer engine.OutputManager.StopOutputs(nil)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			run, wait, err := engine.Init(ctx, ctx)
