@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 
 	protov1 "github.com/golang/protobuf/proto" //nolint:staticcheck,nolintlint // this is the old v1 version
@@ -55,16 +55,16 @@ type Conn struct {
 
 // DefaultOptions generates an option set
 // with common options for requests from a VU.
-func DefaultOptions(vu modules.VU) []grpc.DialOption {
+func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 	dialer := func(ctx context.Context, addr string) (net.Conn, error) {
-		return vu.State().Dialer.DialContext(ctx, "tcp", addr)
+		return getState().Dialer.DialContext(ctx, "tcp", addr)
 	}
 
 	return []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithReturnConnectionError(),
-		grpc.WithStatsHandler(statsHandler{vu: vu}),
+		grpc.WithStatsHandler(statsHandler{getState: getState}),
 		grpc.WithContextDialer(dialer),
 	}
 }
@@ -174,7 +174,7 @@ func (c *Conn) Close() error {
 }
 
 type statsHandler struct {
-	vu modules.VU
+	getState func() *lib.State
 }
 
 // TagConn implements the grpcstats.Handler interface
@@ -195,7 +195,7 @@ func (statsHandler) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context
 
 // HandleRPC implements the grpcstats.Handler interface
 func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
-	state := h.vu.State()
+	state := h.getState()
 	stateRPC := getRPCState(ctx) //nolint:ifshort
 
 	// If the request is done by the reflection handler then the tags will be
