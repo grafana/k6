@@ -120,7 +120,7 @@ func (c *Client) Connect(addr string, params map[string]interface{}) (bool, erro
 		return false, fmt.Errorf("invalid grpc.connect() parameters: %w", err)
 	}
 
-	opts := grpcext.DefaultOptions(c.vu)
+	opts := grpcext.DefaultOptions(c.vu.State)
 
 	var tcred credentials.TransportCredentials
 	if !p.IsPlaintext {
