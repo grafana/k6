@@ -42,7 +42,7 @@ func (e ExtensionType) String() string {
 type Extension struct {
 	Name, Path, Version string
 	Type                ExtensionType
-	Mod                 interface{}
+	Module              interface{}
 }
 
 func (e Extension) String() string {
@@ -70,7 +70,7 @@ func Register(name string, typ ExtensionType, mod interface{}) {
 	exts[name] = &Extension{
 		Name:    name,
 		Type:    typ,
-		Mod:     mod,
+		Module:  mod,
 		Path:    path,
 		Version: version,
 	}

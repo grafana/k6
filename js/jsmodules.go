@@ -44,7 +44,7 @@ func getJSModules() map[string]interface{} {
 
 	// external is always prefixed with `k6/x`
 	for _, e := range external {
-		result[e.Name] = e.Mod
+		result[e.Name] = e.Module
 	}
 
 	return result

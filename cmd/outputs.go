@@ -40,9 +40,9 @@ func getAllOutputConstructors() (map[string]output.Constructor, error) {
 		if _, ok := result[e.Name]; ok {
 			return nil, fmt.Errorf("invalid output extension %s, built-in output with the same type already exists", e.Name)
 		}
-		m, ok := e.Mod.(output.Constructor)
+		m, ok := e.Module.(output.Constructor)
 		if !ok {
-			return nil, fmt.Errorf("unexpected output extension type %T", e.Mod)
+			return nil, fmt.Errorf("unexpected output extension type %T", e.Module)
 		}
 		result[e.Name] = m
 	}
