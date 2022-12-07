@@ -1,4 +1,4 @@
-package local
+package execution
 
 import (
 	"encoding/json"
@@ -18,6 +18,8 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
+// TODO: rewrite and/or move these as integration tests to reduce boilerplate
+// and improve reliability?
 func TestExecutionInfoVUSharing(t *testing.T) {
 	t.Parallel()
 	script := []byte(`
@@ -81,7 +83,7 @@ func TestExecutionInfoVUSharing(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, lib.Options{})
+	ctx, cancel, execScheduler, samples := newTestScheduler(t, runner, logger, lib.Options{})
 	defer cancel()
 
 	type vuStat struct {
@@ -194,7 +196,7 @@ func TestExecutionInfoScenarioIter(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, lib.Options{})
+	ctx, cancel, execScheduler, samples := newTestScheduler(t, runner, logger, lib.Options{})
 	defer cancel()
 
 	errCh := make(chan error, 1)
@@ -276,7 +278,7 @@ func TestSharedIterationsStable(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, lib.Options{})
+	ctx, cancel, execScheduler, samples := newTestScheduler(t, runner, logger, lib.Options{})
 	defer cancel()
 
 	errCh := make(chan error, 1)
@@ -409,7 +411,7 @@ func TestExecutionInfoAll(t *testing.T) {
 				}, nil)
 			require.NoError(t, err)
 
-			ctx, cancel, execScheduler, samples := newTestExecutionScheduler(t, runner, logger, lib.Options{})
+			ctx, cancel, execScheduler, samples := newTestScheduler(t, runner, logger, lib.Options{})
 			defer cancel()
 
 			errCh := make(chan error, 1)

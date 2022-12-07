@@ -9,61 +9,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-
-	"go.k6.io/k6/metrics"
 )
-
-// An ExecutionScheduler is in charge of initializing executors and using them
-// to initialize and schedule VUs created by a wrapped Runner. It decouples how
-// a swarm of VUs is controlled from the details of how or even where they're
-// scheduled.
-//
-// The core/local execution scheduler schedules VUs on the local machine, but
-// the same interface may be implemented to control a test running on a cluster
-// or in the cloud.
-//
-// TODO: flesh out the interface after actually having more than one
-// implementation...
-type ExecutionScheduler interface {
-	// Returns the wrapped runner. May return nil if not applicable, eg.
-	// if we're remote controlling a test running on another machine.
-	GetRunner() Runner
-
-	// Return the ExecutionState instance from which different statistics for the
-	// current state of the runner could be retrieved.
-	GetState() *ExecutionState
-
-	// Return the instances of the configured executors
-	GetExecutors() []Executor
-
-	// Init initializes all executors, including all of their needed VUs.
-	Init(ctx context.Context, samplesOut chan<- metrics.SampleContainer) error
-
-	// Run the ExecutionScheduler, funneling the generated metric samples
-	// through the supplied out channel.
-	Run(globalCtx, runCtx context.Context, samplesOut chan<- metrics.SampleContainer) error
-
-	// Pause a test, or start/resume it. To check if a test is paused, use
-	// GetState().IsPaused().
-	//
-	// Currently, any executor, so any test, can be started in a paused state.
-	// This will cause k6 to initialize all needed VUs, but it won't actually
-	// start the test. Later, the test can be started for real by
-	// resuming/unpausing it from the REST API.
-	//
-	// After a test is actually started, it may become impossible to pause it
-	// again. That is denoted by having SetPaused(true) return an error. The
-	// likely cause is that some of the executors for the test don't support
-	// pausing after the test has been started.
-	//
-	// IMPORTANT: Currently only the externally controlled executor can be
-	// paused and resumed multiple times in the middle of the test execution!
-	// Even then, "pausing" is a bit misleading, since k6 won't pause in the
-	// middle of the currently executing iterations. It will allow the currently
-	// in progress iterations to finish, and it just won't start any new ones
-	// nor will it increment the value returned by GetCurrentTestRunDuration().
-	SetPaused(paused bool) error
-}
 
 // MaxTimeToWaitForPlannedVU specifies the maximum allowable time for an executor
 // to wait for a planned VU to be retrieved from the ExecutionState.PlannedVUs
@@ -82,8 +28,9 @@ const MaxTimeToWaitForPlannedVU = 400 * time.Millisecond
 // MaxTimeToWaitForPlannedVU before we actually return an error.
 const MaxRetriesGetPlannedVU = 5
 
-// ExecutionStatus is similar to RunStatus, but more fine grained and concerns
-// only local execution.
+// ExecutionStatus is used to mark the possible states of a test run at any
+// given time in its execution, from its start to its finish.
+//
 //go:generate enumer -type=ExecutionStatus -trimprefix ExecutionStatus -output execution_status_gen.go
 type ExecutionStatus uint32
 
@@ -103,13 +50,13 @@ const (
 )
 
 // ExecutionState contains a few different things:
-//  -  Some convenience items, that are needed by all executors, like the
+//   - Some convenience items, that are needed by all executors, like the
 //     execution segment and the unique VU ID generator. By keeping those here,
 //     we can just pass the ExecutionState to the different executors, instead of
 //     individually passing them each item.
-//  -  Mutable counters that different executors modify and other parts of
+//   - Mutable counters that different executors modify and other parts of
 //     k6 can read, e.g. for the vus and vus_max metrics k6 emits every second.
-//  -  Pausing controls and statistics.
+//   - Pausing controls and statistics.
 //
 // The counters and timestamps here are primarily meant to be used for
 // information extraction and avoidance of ID collisions. Using many of the
@@ -498,9 +445,10 @@ func (es *ExecutionState) Resume() error {
 //
 // And, since tests won't be paused most of the time, it's
 // probably better to check for that like this:
-//   if executionState.IsPaused() {
-//       <-executionState.ResumeNotify()
-//   }
+//
+//	if executionState.IsPaused() {
+//	    <-executionState.ResumeNotify()
+//	}
 func (es *ExecutionState) ResumeNotify() <-chan struct{} {
 	es.pauseStateLock.RLock()
 	defer es.pauseStateLock.RUnlock()

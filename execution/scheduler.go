@@ -1,4 +1,4 @@
-package local
+package execution
 
 import (
 	"context"
@@ -16,8 +16,10 @@ import (
 	"go.k6.io/k6/ui/pb"
 )
 
-// ExecutionScheduler is the local implementation of lib.ExecutionScheduler
-type ExecutionScheduler struct {
+// A Scheduler is in charge of most of the test execution - initializing VUs and
+// executors, running setup() and teardown(), and actually starting the
+// executors for the different scenarios at the appropriate times.
+type Scheduler struct {
 	initProgress    *pb.ProgressBar
 	executorConfigs []lib.ExecutorConfig // sorted by (startTime, ID)
 	executors       []lib.Executor       // sorted by (startTime, ID), excludes executors with no work
@@ -31,14 +33,11 @@ type ExecutionScheduler struct {
 	stopVUsEmission, vusEmissionStopped chan struct{}
 }
 
-// Check to see if we implement the lib.ExecutionScheduler interface
-var _ lib.ExecutionScheduler = &ExecutionScheduler{}
-
-// NewExecutionScheduler creates and returns a new local lib.ExecutionScheduler
-// instance, without initializing it beyond the bare minimum. Specifically, it
-// creates the needed executor instances and a lot of state placeholders, but it
-// doesn't initialize the executors and it doesn't initialize or run VUs.
-func NewExecutionScheduler(trs *lib.TestRunState) (*ExecutionScheduler, error) {
+// NewScheduler creates and returns a new Scheduler instance, without
+// initializing it beyond the bare minimum. Specifically, it creates the needed
+// executor instances and a lot of state placeholders, but it doesn't initialize
+// the executors and it doesn't initialize or run VUs.
+func NewScheduler(trs *lib.TestRunState) (*Scheduler, error) {
 	options := trs.Options
 	et, err := lib.NewExecutionTuple(options.ExecutionSegment, options.ExecutionSegmentSequence)
 	if err != nil {
@@ -78,7 +77,7 @@ func NewExecutionScheduler(trs *lib.TestRunState) (*ExecutionScheduler, error) {
 		}
 	}
 
-	return &ExecutionScheduler{
+	return &Scheduler{
 		initProgress:    pb.New(pb.WithConstLeft("Init")),
 		executors:       executors,
 		executorConfigs: executorConfigs,
@@ -93,48 +92,48 @@ func NewExecutionScheduler(trs *lib.TestRunState) (*ExecutionScheduler, error) {
 }
 
 // GetRunner returns the wrapped lib.Runner instance.
-func (e *ExecutionScheduler) GetRunner() lib.Runner { // TODO: remove
+func (e *Scheduler) GetRunner() lib.Runner { // TODO: remove
 	return e.state.Test.Runner
 }
 
-// GetState returns a pointer to the execution state struct for the local
-// execution scheduler. It's guaranteed to be initialized and present, though
-// see the documentation in lib/execution.go for caveats about its usage. The
-// most important one is that none of the methods beyond the pause-related ones
+// GetState returns a pointer to the execution state struct for the execution
+// scheduler. It's guaranteed to be initialized and present, though see the
+// documentation in lib/execution.go for caveats about its usage. The most
+// important one is that none of the methods beyond the pause-related ones
 // should be used for synchronization.
-func (e *ExecutionScheduler) GetState() *lib.ExecutionState {
+func (e *Scheduler) GetState() *lib.ExecutionState {
 	return e.state
 }
 
 // GetExecutors returns the slice of configured executor instances which
 // have work, sorted by their (startTime, name) in an ascending order.
-func (e *ExecutionScheduler) GetExecutors() []lib.Executor {
+func (e *Scheduler) GetExecutors() []lib.Executor {
 	return e.executors
 }
 
 // GetExecutorConfigs returns the slice of all executor configs, sorted by
 // their (startTime, name) in an ascending order.
-func (e *ExecutionScheduler) GetExecutorConfigs() []lib.ExecutorConfig {
+func (e *Scheduler) GetExecutorConfigs() []lib.ExecutorConfig {
 	return e.executorConfigs
 }
 
 // GetInitProgressBar returns the progress bar associated with the Init
 // function. After the Init is done, it is "hijacked" to display real-time
 // execution statistics as a text bar.
-func (e *ExecutionScheduler) GetInitProgressBar() *pb.ProgressBar {
+func (e *Scheduler) GetInitProgressBar() *pb.ProgressBar {
 	return e.initProgress
 }
 
 // GetExecutionPlan is a helper method so users of the local execution scheduler
 // don't have to calculate the execution plan again.
-func (e *ExecutionScheduler) GetExecutionPlan() []lib.ExecutionStep {
+func (e *Scheduler) GetExecutionPlan() []lib.ExecutionStep {
 	return e.executionPlan
 }
 
 // initVU is a helper method that's used to both initialize the planned VUs
 // in the Init() method, and also passed to executors so they can initialize
 // any unplanned VUs themselves.
-func (e *ExecutionScheduler) initVU(
+func (e *Scheduler) initVU(
 	ctx context.Context, samplesOut chan<- metrics.SampleContainer, logger logrus.FieldLogger,
 ) (lib.InitializedVU, error) {
 	// Get the VU IDs here, so that the VUs are (mostly) ordered by their
@@ -151,7 +150,7 @@ func (e *ExecutionScheduler) initVU(
 
 // getRunStats is a helper function that can be used as the execution
 // scheduler's progressbar substitute (i.e. hijack).
-func (e *ExecutionScheduler) getRunStats() string {
+func (e *Scheduler) getRunStats() string {
 	status := "running"
 	if e.state.IsPaused() {
 		status = "paused"
@@ -169,7 +168,7 @@ func (e *ExecutionScheduler) getRunStats() string {
 	)
 }
 
-func (e *ExecutionScheduler) initVUsConcurrently(
+func (e *Scheduler) initVUsConcurrently(
 	ctx context.Context, samplesOut chan<- metrics.SampleContainer, count uint64,
 	concurrency int, logger logrus.FieldLogger,
 ) chan error {
@@ -206,7 +205,7 @@ func (e *ExecutionScheduler) initVUsConcurrently(
 	return doneInits
 }
 
-func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- metrics.SampleContainer) {
+func (e *Scheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- metrics.SampleContainer) {
 	e.state.Test.Logger.Debug("Starting emission of VUs and VUsMax metrics...")
 	tags := e.state.Test.RunTags
 
@@ -259,7 +258,7 @@ func (e *ExecutionScheduler) emitVUsAndVUsMax(ctx context.Context, out chan<- me
 
 // Init concurrently initializes all of the planned VUs and then sequentially
 // initializes all of the configured executors.
-func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- metrics.SampleContainer) (err error) {
+func (e *Scheduler) Init(ctx context.Context, samplesOut chan<- metrics.SampleContainer) (err error) {
 	e.emitVUsAndVUsMax(ctx, samplesOut)
 	defer func() {
 		if err != nil {
@@ -268,7 +267,7 @@ func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- metrics
 		}
 	}()
 
-	logger := e.state.Test.Logger.WithField("phase", "local-execution-scheduler-init")
+	logger := e.state.Test.Logger.WithField("phase", "execution-scheduler-init")
 	vusToInitialize := lib.GetMaxPlannedVUs(e.executionPlan)
 	logger.WithFields(logrus.Fields{
 		"neededVUs":      vusToInitialize,
@@ -342,7 +341,7 @@ func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- metrics
 // executor, each time in a new goroutine. It is responsible for waiting out the
 // configured startTime for the specific executor and then running its Run()
 // method.
-func (e *ExecutionScheduler) runExecutor(
+func (e *Scheduler) runExecutor(
 	runCtx context.Context, runResults chan<- error, engineOut chan<- metrics.SampleContainer, executor lib.Executor,
 ) {
 	executorConfig := executor.GetConfig()
@@ -389,18 +388,18 @@ func (e *ExecutionScheduler) runExecutor(
 	runResults <- err
 }
 
-// Run the ExecutionScheduler, funneling all generated metric samples through the supplied
+// Run the Scheduler, funneling all generated metric samples through the supplied
 // out channel.
 //
 //nolint:funlen
-func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- metrics.SampleContainer) error {
+func (e *Scheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- metrics.SampleContainer) error {
 	defer func() {
 		close(e.stopVUsEmission)
 		<-e.vusEmissionStopped
 	}()
 
 	executorsCount := len(e.executors)
-	logger := e.state.Test.Logger.WithField("phase", "local-execution-scheduler-run")
+	logger := e.state.Test.Logger.WithField("phase", "execution-scheduler-run")
 	e.initProgress.Modify(pb.WithConstLeft("Run"))
 	var interrupted bool
 	defer func() {
@@ -487,10 +486,26 @@ func (e *ExecutionScheduler) Run(globalCtx, runCtx context.Context, engineOut ch
 	return firstErr
 }
 
-// SetPaused pauses a test, if called with true. And if called with false, tries
-// to start/resume it. See the lib.ExecutionScheduler interface documentation of
-// the methods for the various caveats about its usage.
-func (e *ExecutionScheduler) SetPaused(pause bool) error {
+// SetPaused pauses the test, or start/resumes it. To check if a test is paused,
+// use GetState().IsPaused().
+//
+// Currently, any executor, so any test, can be started in a paused state. This
+// will cause k6 to initialize all needed VUs, but it won't actually start the
+// test. Later, the test can be started for real by resuming/unpausing it from
+// the REST API.
+//
+// After a test is actually started, it may become impossible to pause it again.
+// That is signaled by having SetPaused(true) return an error. The likely cause
+// is that some of the executors for the test don't support pausing after the
+// test has been started.
+//
+// IMPORTANT: Currently only the externally controlled executor can be paused
+// and resumed multiple times in the middle of the test execution! Even then,
+// "pausing" is a bit misleading, since k6 won't pause in the middle of the
+// currently executing iterations. It will allow the currently in-progress
+// iterations to finish, and it just won't start any new ones nor will it
+// increment the value returned by GetCurrentTestRunDuration().
+func (e *Scheduler) SetPaused(pause bool) error {
 	if !e.state.HasStarted() && e.state.IsPaused() {
 		if pause {
 			return fmt.Errorf("execution is already paused")

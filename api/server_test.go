@@ -13,7 +13,7 @@ import (
 
 	"go.k6.io/k6/api/common"
 	"go.k6.io/k6/core"
-	"go.k6.io/k6/core/local"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/minirunner"
@@ -71,7 +71,7 @@ func TestWithEngine(t *testing.T) {
 		Runner:  &minirunner.MiniRunner{},
 	}
 
-	execScheduler, err := local.NewExecutionScheduler(testState)
+	execScheduler, err := execution.NewScheduler(testState)
 	require.NoError(t, err)
 	engine, err := core.NewEngine(testState, execScheduler, nil)
 	require.NoError(t, err)
