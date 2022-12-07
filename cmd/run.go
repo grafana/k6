@@ -19,9 +19,9 @@ import (
 
 	"go.k6.io/k6/api"
 	"go.k6.io/k6/core"
-	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
@@ -71,7 +71,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	logger := testRunState.Logger
 	// Create a local execution scheduler wrapping the runner.
 	logger.Debug("Initializing the execution scheduler...")
-	execScheduler, err := local.NewExecutionScheduler(testRunState)
+	execScheduler, err := execution.NewScheduler(testRunState)
 	if err != nil {
 		return err
 	}
@@ -329,7 +329,7 @@ a commandline interface for interacting with it.`,
 	return runCmd
 }
 
-func reportUsage(execScheduler *local.ExecutionScheduler) error {
+func reportUsage(execScheduler *execution.Scheduler) error {
 	execState := execScheduler.GetState()
 	executorConfigs := execScheduler.GetExecutorConfigs()
 

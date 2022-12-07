@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"go.k6.io/k6/api/common"
-	"go.k6.io/k6/lib"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib/executor"
 )
 
@@ -24,9 +24,7 @@ func handleGetStatus(rw http.ResponseWriter, r *http.Request) {
 	_, _ = rw.Write(data)
 }
 
-func getFirstExternallyControlledExecutor(
-	execScheduler lib.ExecutionScheduler,
-) (*executor.ExternallyControlled, error) {
+func getFirstExternallyControlledExecutor(execScheduler *execution.Scheduler) (*executor.ExternallyControlled, error) {
 	executors := execScheduler.GetExecutors()
 	for _, s := range executors {
 		if mex, ok := s.(*executor.ExternallyControlled); ok {

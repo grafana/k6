@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd/integration_tests/testmodules/events"
-	"go.k6.io/k6/core/local"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
@@ -57,7 +57,7 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 		RunTags:          piState.Registry.RootTagSet().WithTagsFromMap(newOpts.RunTags),
 	}
 
-	execScheduler, err := local.NewExecutionScheduler(testState)
+	execScheduler, err := execution.NewScheduler(testState)
 	require.NoError(t, err)
 
 	samples := make(chan metrics.SampleContainer, newOpts.MetricSamplesBufferSize.Int64)

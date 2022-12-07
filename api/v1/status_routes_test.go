@@ -14,7 +14,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/core"
-	"go.k6.io/k6/core/local"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils/minirunner"
 )
@@ -23,7 +23,7 @@ func TestGetStatus(t *testing.T) {
 	t.Parallel()
 
 	testState := getTestRunState(t, lib.Options{}, &minirunner.MiniRunner{})
-	execScheduler, err := local.NewExecutionScheduler(testState)
+	execScheduler, err := execution.NewScheduler(testState)
 	require.NoError(t, err)
 	engine, err := core.NewEngine(testState, execScheduler, nil)
 	require.NoError(t, err)
@@ -110,7 +110,7 @@ func TestPatchStatus(t *testing.T) {
 			require.NoError(t, err)
 
 			testState := getTestRunState(t, lib.Options{Scenarios: scenarios}, &minirunner.MiniRunner{})
-			execScheduler, err := local.NewExecutionScheduler(testState)
+			execScheduler, err := execution.NewScheduler(testState)
 			require.NoError(t, err)
 			engine, err := core.NewEngine(testState, execScheduler, nil)
 			require.NoError(t, err)

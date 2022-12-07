@@ -34,8 +34,8 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/core"
-	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/errext"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js/modules/k6"
 	k6http "go.k6.io/k6/js/modules/k6/http"
 	k6metrics "go.k6.io/k6/js/modules/k6/metrics"
@@ -384,7 +384,7 @@ func TestDataIsolation(t *testing.T) {
 		RunTags:          runner.preInitState.Registry.RootTagSet().WithTagsFromMap(options.RunTags),
 	}
 
-	execScheduler, err := local.NewExecutionScheduler(testRunState)
+	execScheduler, err := execution.NewScheduler(testRunState)
 	require.NoError(t, err)
 
 	mockOutput := mockoutput.New()
@@ -2670,7 +2670,7 @@ func TestExecutionInfo(t *testing.T) {
 				Runner:           r,
 			}
 
-			execScheduler, err := local.NewExecutionScheduler(testRunState)
+			execScheduler, err := execution.NewScheduler(testRunState)
 			require.NoError(t, err)
 
 			ctx = lib.WithExecutionState(ctx, execScheduler.GetState())
