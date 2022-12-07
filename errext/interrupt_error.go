@@ -11,7 +11,10 @@ type InterruptError struct {
 	Reason string
 }
 
-var _ HasExitCode = &InterruptError{}
+var _ interface {
+	HasExitCode
+	HasAbortReason
+} = &InterruptError{}
 
 // Error returns the reason of the interruption.
 func (i *InterruptError) Error() string {
@@ -21,6 +24,12 @@ func (i *InterruptError) Error() string {
 // ExitCode returns the status code used when the k6 process exits.
 func (i *InterruptError) ExitCode() exitcodes.ExitCode {
 	return exitcodes.ScriptAborted
+}
+
+// AbortReason is used to signal that an InterruptError is caused by the
+// test.abort() functin in k6/execution.
+func (i *InterruptError) AbortReason() AbortReason {
+	return AbortedByScriptAbort
 }
 
 // AbortTest is the reason emitted when a test script calls test.abort()

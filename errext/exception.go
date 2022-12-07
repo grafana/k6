@@ -5,5 +5,6 @@ package errext
 // a stack trace that lead to them.
 type Exception interface {
 	error
+	HasAbortReason
 	StackTrace() string
 }

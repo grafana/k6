@@ -63,6 +63,7 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, args []string) error {
 }
 
 // TODO: split apart some more
+//
 //nolint:funlen,gocognit,cyclop
 func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	printBanner(c.gs)

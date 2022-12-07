@@ -15,10 +15,11 @@ type timeoutError struct {
 	d     time.Duration
 }
 
-var (
-	_ errext.HasExitCode = timeoutError{}
-	_ errext.HasHint     = timeoutError{}
-)
+var _ interface {
+	errext.HasExitCode
+	errext.HasHint
+	errext.HasAbortReason
+} = timeoutError{}
 
 // newTimeoutError returns a new timeout error, reporting that a timeout has
 // happened at the given place and given duration.
@@ -42,6 +43,10 @@ func (t timeoutError) Hint() string {
 		hint = "You can increase the time limit via the teardownTimeout option"
 	}
 	return hint
+}
+
+func (t timeoutError) AbortReason() errext.AbortReason {
+	return errext.AbortedByTimeout
 }
 
 // ExitCode returns the coresponding exit code value to the place.
