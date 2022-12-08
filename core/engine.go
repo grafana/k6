@@ -95,11 +95,6 @@ func NewEngine(testState *lib.TestRunState, ex *execution.Scheduler, outputs []o
 //   - The second returned lambda can be used to wait for that process to finish.
 func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait func(), err error) {
 	e.logger.Debug("Initialization starting...")
-	// TODO: if we ever need metrics processing in the init context, we can move
-	// this below the other components... or even start them concurrently?
-	if err := e.ExecutionScheduler.Init(runCtx, e.Samples); err != nil {
-		return nil, nil, err
-	}
 
 	// TODO: move all of this in a separate struct? see main TODO above
 	processMetricsAfterRun := make(chan struct{})
