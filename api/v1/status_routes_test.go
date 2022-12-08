@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -119,16 +121,24 @@ func TestPatchStatus(t *testing.T) {
 			defer engine.OutputManager.StopOutputs(nil)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-			run, wait, err := engine.Init(ctx, ctx)
+			defer cancel()
+			runSubCtx, runSubAbort := execution.NewTestRunContext(ctx, testState.Logger)
+			engine.AbortFn = runSubAbort
+
+			run, wait, err := engine.Init(ctx, runSubCtx)
 			require.NoError(t, err)
 
+			wg := &sync.WaitGroup{}
+			wg.Add(1)
 			defer func() {
-				cancel()
+				runSubAbort(fmt.Errorf("custom cancel signal"))
 				wait()
+				wg.Wait()
 			}()
 
 			go func() {
-				assert.ErrorContains(t, run(), "test run aborted by signal")
+				assert.ErrorContains(t, run(), "custom cancel signal")
+				wg.Done()
 			}()
 			// wait for the executor to initialize to avoid a potential data race below
 			time.Sleep(200 * time.Millisecond)

@@ -656,7 +656,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 
 	logs := ts.loggerHook.Drain()
 	assert.False(t, testutils.LogContains(logs, logrus.ErrorLevel, `some thresholds have failed`))
-	assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, `test run aborted by signal`))
+	assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, `test run was aborted because k6 received a 'interrupt' signal`))
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
 	assert.Contains(t, stdOut, `✓ iterations`)

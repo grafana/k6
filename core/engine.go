@@ -43,7 +43,7 @@ type Engine struct {
 	logger   *logrus.Entry
 	stopOnce sync.Once
 	stopChan chan struct{}
-	abortFn  func(error) // temporary
+	AbortFn  func(error) // temporary
 
 	Samples chan metrics.SampleContainer
 }
@@ -107,24 +107,19 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 	}
 
 	// TODO: move all of this in a separate struct? see main TODO above
-	runSubCtx, runSubAbort := execution.NewTestRunContext(runCtx, e.logger)
-	e.abortFn = runSubAbort
-
-	execRunResult := make(chan error)
-	engineRunResult := make(chan error)
 	processMetricsAfterRun := make(chan struct{})
 	runFn := func() error {
 		e.logger.Debug("Execution scheduler starting...")
-		err := e.ExecutionScheduler.Run(globalCtx, runSubCtx, e.Samples)
-		e.logger.WithError(err).Debug("Execution scheduler terminated")
-
-		select {
-		case <-runCtx.Done():
-			// do nothing, the test run was aborted somehow
-		default:
-			execRunResult <- err // we finished normally, so send the result
+		err := e.ExecutionScheduler.Run(globalCtx, runCtx, e.Samples)
+		if err == nil {
+			e.logger.Debug("Execution scheduler finished nominally")
+			err = runCtx.Err()
 		}
-		result := <-engineRunResult // get the final result
+		if err != nil {
+			e.logger.WithError(err).Debug("Engine run returned an error")
+		} else {
+			e.logger.Debug("Execution scheduler and engine finished nominally")
+		}
 
 		// Make the background jobs process the currently buffered metrics and
 		// run the thresholds, then wait for that to be done.
@@ -134,12 +129,10 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 		case <-globalCtx.Done():
 		}
 
-		return result
+		return err
 	}
 
-	waitFn := e.startBackgroundProcesses(
-		globalCtx, runCtx, execRunResult, engineRunResult, runSubAbort, processMetricsAfterRun,
-	)
+	waitFn := e.startBackgroundProcesses(globalCtx, processMetricsAfterRun)
 	return runFn, waitFn, nil
 }
 
@@ -153,8 +146,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 // and that the remaining metrics samples in the pipeline should be processed as the background
 // process is about to exit.
 func (e *Engine) startBackgroundProcesses(
-	globalCtx, runCtx context.Context, execRunResult, engineRunResult chan error,
-	runSubAbort func(error), processMetricsAfterRun chan struct{},
+	globalCtx context.Context, processMetricsAfterRun chan struct{},
 ) (wait func()) {
 	processes := new(sync.WaitGroup)
 
@@ -162,32 +154,7 @@ func (e *Engine) startBackgroundProcesses(
 	processes.Add(1)
 	go func() {
 		defer processes.Done()
-		e.processMetrics(globalCtx, processMetricsAfterRun, runSubAbort)
-	}()
-
-	// Update the test run status when the test finishes
-	processes.Add(1)
-	go func() {
-		defer processes.Done()
-		var err error
-		defer func() {
-			e.logger.WithError(err).Debug("Final Engine.Run() result")
-			engineRunResult <- err
-		}()
-		select {
-		case err = <-execRunResult:
-			if err != nil {
-				e.logger.WithError(err).Debug("run: execution scheduler returned an error")
-			} else {
-				e.logger.Debug("run: execution scheduler finished nominally")
-			}
-		case <-runCtx.Done():
-			e.logger.Debug("run: context expired; exiting...")
-			err = errext.WithAbortReasonIfNone(
-				errext.WithExitCodeIfNone(errors.New("test run aborted by signal"), exitcodes.ExternalAbort),
-				errext.AbortedByUser,
-			)
-		}
+		e.processMetrics(globalCtx, processMetricsAfterRun)
 	}()
 
 	return processes.Wait
@@ -200,15 +167,13 @@ func (e *Engine) startBackgroundProcesses(
 // The `processMetricsAfterRun` channel argument is used by the caller to signal
 // that the test run is finished, no more metric samples will be produced, and that
 // the metrics samples remaining in the pipeline should be should be processed.
-func (e *Engine) processMetrics(
-	globalCtx context.Context, processMetricsAfterRun chan struct{}, runSubAbort func(error),
-) {
+func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRun chan struct{}) {
 	sampleContainers := []metrics.SampleContainer{}
 
 	// Run thresholds, if not disabled.
 	var finalizeThresholds func() (breached []string)
 	if !e.runtimeOptions.NoThresholds.Bool {
-		finalizeThresholds = e.MetricsEngine.StartThresholdCalculations(runSubAbort)
+		finalizeThresholds = e.MetricsEngine.StartThresholdCalculations(e.AbortFn)
 	}
 
 	ticker := time.NewTicker(collectRate)
@@ -275,7 +240,7 @@ func (e *Engine) Stop() {
 			errext.WithExitCodeIfNone(errors.New("test run stopped from the REST API"), exitcodes.ScriptStoppedFromRESTAPI),
 			errext.AbortedByUser,
 		)
-		e.abortFn(err)
+		e.AbortFn(err)
 		close(e.stopChan)
 	})
 }
