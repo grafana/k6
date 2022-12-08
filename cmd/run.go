@@ -273,8 +273,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if engine.IsTainted() {
 		if err == nil {
 			err = errors.New("some thresholds have failed")
-		} else {
-			logger.Error("some thresholds have failed") // log this, even if there was already a previous error
 		}
 		err = errext.WithAbortReasonIfNone(
 			errext.WithExitCodeIfNone(err, exitcodes.ThresholdsHaveFailed), errext.AbortedByThresholdsAfterTestEnd,

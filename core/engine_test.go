@@ -43,8 +43,10 @@ type testStruct struct {
 
 func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 	reg := metrics.NewRegistry()
+	logger := testutils.NewLogger(tb)
+	logger.SetLevel(logrus.DebugLevel)
 	return &lib.TestPreInitState{
-		Logger:         testutils.NewLogger(tb),
+		Logger:         logger,
 		RuntimeOptions: lib.RuntimeOptions{},
 		Registry:       reg,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(reg),
@@ -413,7 +415,7 @@ func TestEngineThresholdsWillAbort(t *testing.T) {
 		assert.Fail(t, "Test should have completed within 10 seconds")
 	}
 	test.wait()
-	assert.True(t, test.engine.thresholdsTainted)
+	assert.True(t, test.engine.IsTainted())
 }
 
 func TestEngineAbortedByThresholds(t *testing.T) {
@@ -434,7 +436,8 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 
 	thresholds := map[string]metrics.Thresholds{metric.Name: ths}
 
-	done := make(chan struct{})
+	doneIter := make(chan struct{})
+	doneRun := make(chan struct{})
 	runner := &minirunner.MiniRunner{
 		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
 			out <- metrics.Sample{
@@ -446,7 +449,7 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 				Value: 1.25,
 			}
 			<-ctx.Done()
-			close(done)
+			close(doneIter)
 			return nil
 		},
 	}
@@ -455,12 +458,18 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 	defer test.wait()
 
 	go func() {
-		require.ErrorContains(t, test.run(), "aborted by failed thresholds")
+		defer close(doneRun)
+		t.Logf("test run done with err '%s'", err)
+		assert.ErrorContains(t, test.run(), "thresholds on metrics 'my_metric' were breached")
 	}()
 
 	select {
-	case <-done:
-		return
+	case <-doneIter:
+	case <-time.After(10 * time.Second):
+		assert.Fail(t, "Iteration should have completed within 10 seconds")
+	}
+	select {
+	case <-doneRun:
 	case <-time.After(10 * time.Second):
 		assert.Fail(t, "Test should have completed within 10 seconds")
 	}
