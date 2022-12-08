@@ -17,10 +17,6 @@ func TestGetRandomValues(t *testing.T) {
 		var input = new Uint8Array(10);
 		var output = crypto.getRandomValues(input);
 
-		if (input.length != 10) {
-			throw new Error("input.length != 10");
-		}
-
 		if (output.length != 10) {
 			throw new Error("output.length != 10");
 		}

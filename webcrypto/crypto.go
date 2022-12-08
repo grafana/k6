@@ -35,24 +35,18 @@ type Crypto struct {
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#Crypto-method-getRandomValues
 func (c *Crypto) GetRandomValues(typedArray goja.Value) goja.Value {
-	var (
-		isInt8Array         = IsInstanceOf(c.vu.Runtime(), typedArray, Int8ArrayConstructor)
-		isUint8Array        = IsInstanceOf(c.vu.Runtime(), typedArray, Uint8ArrayConstructor)
-		isUint8ClampedArray = IsInstanceOf(c.vu.Runtime(), typedArray, Uint8ClampedArrayConstructor)
-		isInt16Array        = IsInstanceOf(c.vu.Runtime(), typedArray, Int16ArrayConstructor)
-		isUint16Array       = IsInstanceOf(c.vu.Runtime(), typedArray, Uint16ArrayConstructor)
-		isInt32Array        = IsInstanceOf(c.vu.Runtime(), typedArray, Int32ArrayConstructor)
-		isUint32Array       = IsInstanceOf(c.vu.Runtime(), typedArray, Uint32ArrayConstructor)
-	)
+	acceptedTypes := []JSType{
+		Int8ArrayConstructor,
+		Uint8ArrayConstructor,
+		Uint8ClampedArrayConstructor,
+		Int16ArrayConstructor,
+		Uint16ArrayConstructor,
+		Int32ArrayConstructor,
+		Uint32ArrayConstructor,
+	}
 
 	// 1.
-	if !isInt8Array &&
-		!isUint8Array &&
-		!isInt16Array &&
-		!isUint16Array &&
-		!isInt32Array &&
-		!isUint32Array &&
-		!isUint8ClampedArray {
+	if !IsInstanceOf(c.vu.Runtime(), typedArray, acceptedTypes...) {
 		common.Throw(c.vu.Runtime(), NewError(0, TypeMismatchError, "typedArray parameter isn't a TypedArray instance"))
 	}
 
