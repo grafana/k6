@@ -446,13 +446,8 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- metr
 	logger.Debug("Start all executors...")
 	e.state.SetExecutionStatus(lib.ExecutionStatusRunning)
 
-	// We are using this context to allow lib.Executor implementations to cancel
-	// this context effectively stopping all executions.
-	//
-	// This is for addressing test.abort().
-	execCtx, _ := NewTestRunContext(runSubCtx, logger)
 	for _, exec := range e.executors {
-		go e.runExecutor(execCtx, runResults, engineOut, exec)
+		go e.runExecutor(runSubCtx, runResults, engineOut, exec)
 	}
 
 	// Wait for all executors to finish
@@ -478,7 +473,7 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, engineOut chan<- metr
 			return err
 		}
 	}
-	if err := GetCancelReasonIfTestAborted(execCtx); err != nil && errext.IsInterruptError(err) {
+	if err := GetCancelReasonIfTestAborted(runSubCtx); err != nil {
 		interrupted = true
 		return err
 	}

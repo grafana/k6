@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,10 +18,7 @@ import (
 	"go.k6.io/k6/output"
 )
 
-const (
-	collectRate    = 50 * time.Millisecond
-	thresholdsRate = 2 * time.Second
-)
+const collectRate = 50 * time.Millisecond
 
 // The Engine is the beating heart of k6.
 type Engine struct {
@@ -47,10 +45,6 @@ type Engine struct {
 	stopChan chan struct{}
 
 	Samples chan metrics.SampleContainer
-
-	// Are thresholds tainted?
-	thresholdsTaintedLock sync.Mutex
-	thresholdsTainted     bool
 }
 
 // NewEngine instantiates a new Engine, without doing any heavy initialization.
@@ -75,7 +69,7 @@ func NewEngine(testState *lib.TestRunState, ex *execution.Scheduler, outputs []o
 	e.MetricsEngine = me
 
 	if !(testState.RuntimeOptions.NoSummary.Bool && testState.RuntimeOptions.NoThresholds.Bool) {
-		e.ingester = me.GetIngester()
+		e.ingester = me.CreateIngester()
 		outputs = append(outputs, e.ingester)
 	}
 
@@ -112,7 +106,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 	}
 
 	// TODO: move all of this in a separate struct? see main TODO above
-	runSubCtx, runSubCancel := context.WithCancel(runCtx)
+	runSubCtx, runSubAbort := execution.NewTestRunContext(runCtx, e.logger)
 
 	execRunResult := make(chan error)
 	engineRunResult := make(chan error)
@@ -123,7 +117,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 		e.logger.WithError(err).Debug("Execution scheduler terminated")
 
 		select {
-		case <-runSubCtx.Done():
+		case <-runCtx.Done():
 			// do nothing, the test run was aborted somehow
 		default:
 			execRunResult <- err // we finished normally, so send the result
@@ -142,7 +136,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 	}
 
 	waitFn := e.startBackgroundProcesses(
-		globalCtx, runCtx, execRunResult, engineRunResult, runSubCancel, processMetricsAfterRun,
+		globalCtx, runCtx, execRunResult, engineRunResult, runSubAbort, processMetricsAfterRun,
 	)
 	return runFn, waitFn, nil
 }
@@ -158,7 +152,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 // process is about to exit.
 func (e *Engine) startBackgroundProcesses(
 	globalCtx, runCtx context.Context, execRunResult, engineRunResult chan error,
-	runSubCancel func(), processMetricsAfterRun chan struct{},
+	runSubAbort func(error), processMetricsAfterRun chan struct{},
 ) (wait func()) {
 	processes := new(sync.WaitGroup)
 
@@ -166,12 +160,11 @@ func (e *Engine) startBackgroundProcesses(
 	processes.Add(1)
 	go func() {
 		defer processes.Done()
-		e.processMetrics(globalCtx, processMetricsAfterRun)
+		e.processMetrics(globalCtx, processMetricsAfterRun, runSubAbort)
 	}()
 
 	// Update the test run status when the test finishes
 	processes.Add(1)
-	thresholdAbortChan := make(chan struct{})
 	go func() {
 		defer processes.Done()
 		var err error
@@ -186,57 +179,31 @@ func (e *Engine) startBackgroundProcesses(
 			} else {
 				e.logger.Debug("run: execution scheduler finished nominally")
 			}
-			// do nothing, return the same err value we got from the Run()
-			// ExecutionScheduler result, we just set the run_status based on it
 		case <-runCtx.Done():
 			e.logger.Debug("run: context expired; exiting...")
 			err = errext.WithAbortReasonIfNone(
 				errext.WithExitCodeIfNone(errors.New("test run aborted by signal"), exitcodes.ExternalAbort),
 				errext.AbortedByUser,
 			)
-		case <-e.stopChan:
-			runSubCancel()
-			e.logger.Debug("run: stopped by user via REST API; exiting...")
-			err = errext.WithAbortReasonIfNone(
-				errext.WithExitCodeIfNone(errors.New("test run stopped from the REST API"), exitcodes.ScriptStoppedFromRESTAPI),
-				errext.AbortedByUser,
-			)
-		case <-thresholdAbortChan:
-			e.logger.Debug("run: stopped by thresholds; exiting...")
-			runSubCancel()
-			err = errext.WithAbortReasonIfNone(
-				errext.WithExitCodeIfNone(errors.New("test run aborted by failed thresholds"), exitcodes.ThresholdsHaveFailed),
-				errext.AbortedByThreshold,
-			)
 		}
 	}()
 
-	// Run thresholds, if not disabled.
-	if !e.runtimeOptions.NoThresholds.Bool {
-		processes.Add(1)
-		go func() {
-			defer processes.Done()
-			defer e.logger.Debug("Engine: Thresholds terminated")
-			ticker := time.NewTicker(thresholdsRate)
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-ticker.C:
-					thresholdsTainted, shouldAbort := e.MetricsEngine.EvaluateThresholds(true)
-					e.thresholdsTaintedLock.Lock()
-					e.thresholdsTainted = thresholdsTainted
-					e.thresholdsTaintedLock.Unlock()
-					if shouldAbort {
-						close(thresholdAbortChan)
-						return
-					}
-				case <-runCtx.Done():
-					return
-				}
-			}
-		}()
-	}
+	// Listen for stop calls from the REST API
+	processes.Add(1)
+	go func() {
+		defer processes.Done()
+		select {
+		case <-e.stopChan:
+			e.logger.Debug("run: stopped by user via REST API; exiting...")
+			err := errext.WithAbortReasonIfNone(
+				errext.WithExitCodeIfNone(errors.New("test run stopped from the REST API"), exitcodes.ScriptStoppedFromRESTAPI),
+				errext.AbortedByUser,
+			)
+			runSubAbort(err)
+		case <-runCtx.Done():
+			// do nothing
+		}
+	}()
 
 	return processes.Wait
 }
@@ -248,29 +215,16 @@ func (e *Engine) startBackgroundProcesses(
 // The `processMetricsAfterRun` channel argument is used by the caller to signal
 // that the test run is finished, no more metric samples will be produced, and that
 // the metrics samples remaining in the pipeline should be should be processed.
-func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRun chan struct{}) {
+func (e *Engine) processMetrics(
+	globalCtx context.Context, processMetricsAfterRun chan struct{}, runSubAbort func(error),
+) {
 	sampleContainers := []metrics.SampleContainer{}
 
-	defer func() {
-		// Process any remaining metrics in the pipeline, by this point Run()
-		// has already finished and nothing else should be producing metrics.
-		e.logger.Debug("Metrics processing winding down...")
-
-		close(e.Samples)
-		for sc := range e.Samples {
-			sampleContainers = append(sampleContainers, sc)
-		}
-		e.OutputManager.AddMetricSamples(sampleContainers)
-
-		if !e.runtimeOptions.NoThresholds.Bool {
-			// Process the thresholds one final time
-			thresholdsTainted, _ := e.MetricsEngine.EvaluateThresholds(false)
-			e.thresholdsTaintedLock.Lock()
-			e.thresholdsTainted = thresholdsTainted
-			e.thresholdsTaintedLock.Unlock()
-		}
-		e.logger.Debug("Metrics processing finished!")
-	}()
+	// Run thresholds, if not disabled.
+	var finalizeThresholds func() (breached []string)
+	if !e.runtimeOptions.NoThresholds.Bool {
+		finalizeThresholds = e.MetricsEngine.StartThresholdCalculations(runSubAbort)
+	}
 
 	ticker := time.NewTicker(collectRate)
 	defer ticker.Stop()
@@ -285,44 +239,47 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 			sampleContainers = make([]metrics.SampleContainer, 0, cap(sampleContainers))
 		}
 	}
+
+	finalize := func() {
+		// Process any remaining metrics in the pipeline, by this point Run()
+		// has already finished and nothing else should be producing metrics.
+		e.logger.Debug("Metrics processing winding down...")
+
+		close(e.Samples)
+		for sc := range e.Samples {
+			sampleContainers = append(sampleContainers, sc)
+		}
+		processSamples()
+
+		if finalizeThresholds != nil {
+			// Ensure the ingester flushes any buffered metrics
+			_ = e.ingester.Stop()
+			breached := finalizeThresholds()
+			e.logger.Debugf("Engine: thresholds done, breached: '%s'", strings.Join(breached, ", "))
+		}
+		e.logger.Debug("Metrics processing finished!")
+	}
+
 	for {
 		select {
 		case <-ticker.C:
 			processSamples()
 		case <-processMetricsAfterRun:
-		getCachedMetrics:
-			for {
-				select {
-				case sc := <-e.Samples:
-					sampleContainers = append(sampleContainers, sc)
-				default:
-					break getCachedMetrics
-				}
-			}
 			e.logger.Debug("Processing metrics and thresholds after the test run has ended...")
-			processSamples()
-			if !e.runtimeOptions.NoThresholds.Bool {
-				// Ensure the ingester flushes any buffered metrics
-				_ = e.ingester.Stop()
-				thresholdsTainted, _ := e.MetricsEngine.EvaluateThresholds(false)
-				e.thresholdsTaintedLock.Lock()
-				e.thresholdsTainted = thresholdsTainted
-				e.thresholdsTaintedLock.Unlock()
-			}
+			finalize()
 			processMetricsAfterRun <- struct{}{}
-
+			return
 		case sc := <-e.Samples:
 			sampleContainers = append(sampleContainers, sc)
 		case <-globalCtx.Done():
+			finalize()
 			return
 		}
 	}
 }
 
 func (e *Engine) IsTainted() bool {
-	e.thresholdsTaintedLock.Lock()
-	defer e.thresholdsTaintedLock.Unlock()
-	return e.thresholdsTainted
+	return e.MetricsEngine.GetMetricsWithBreachedThresholdsCount() > 0
 }
 
 // Stop closes a signal channel, forcing a running Engine to return

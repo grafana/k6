@@ -604,7 +604,8 @@ func TestAbortedByThreshold(t *testing.T) {
 	)
 	newRootCommand(ts.globalState).execute()
 
-	assert.True(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, `test run aborted by failed thresholds`))
+	expErr := "thresholds on metrics 'iterations' were breached; at least one has abortOnFail enabled, stopping test prematurely"
+	assert.True(t, testutils.LogContains(ts.loggerHook.Drain(), logrus.ErrorLevel, expErr))
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
 	assert.Contains(t, stdOut, `✗ iterations`)
