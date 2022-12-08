@@ -8,6 +8,8 @@ import (
 	"github.com/grafana/xk6-browser/common"
 
 	k6lib "go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/types"
+	k6types "go.k6.io/k6/lib/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,8 +18,14 @@ import (
 func TestBrowserTypePrepareFlags(t *testing.T) {
 	t.Parallel()
 
-	host, err := k6lib.NewHostAddress(net.ParseIP("127.0.0.1"), "8000")
-	require.NoError(t, err)
+	// to be used by the tests below
+	host, err := k6types.NewHost(net.ParseIP("127.0.0.1"), "8000")
+	require.NoError(t, err, "failed to set up test host")
+	hosts, err := k6types.NewHosts(map[string]k6types.Host{
+		"test.k6.io":         *host,
+		"httpbin.test.k6.io": *host,
+	})
+	require.NoError(t, err, "failed to set up test hosts")
 
 	testCases := []struct {
 		flag                      string
@@ -91,10 +99,7 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 				`host-resolver-rules="MAP * www.example.com, EXCLUDE *.youtube.*"`,
 			}},
 			changeK6Opts: &k6lib.Options{
-				Hosts: map[string]*k6lib.HostAddress{
-					"test.k6.io":         host,
-					"httpbin.test.k6.io": host,
-				},
+				Hosts: types.NullHosts{Trie: hosts, Valid: true},
 			},
 			expChangedVal: "MAP * www.example.com, EXCLUDE *.youtube.*," +
 				"MAP httpbin.test.k6.io 127.0.0.1:8000,MAP test.k6.io 127.0.0.1:8000",
@@ -141,7 +146,8 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 				tc.pre(t)
 			}
 
-			flags := prepareFlags(&common.LaunchOptions{}, nil)
+			flags, err := prepareFlags(&common.LaunchOptions{}, nil)
+			require.NoError(t, err, "failed to prepare flags")
 
 			if tc.expInitVal != nil {
 				require.Contains(t, flags, tc.flag)
@@ -151,7 +157,8 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 			}
 
 			if tc.changeOpts != nil || tc.changeK6Opts != nil {
-				flags = prepareFlags(tc.changeOpts, tc.changeK6Opts)
+				flags, err = prepareFlags(tc.changeOpts, tc.changeK6Opts)
+				require.NoError(t, err, "failed to prepare flags")
 				if tc.expChangedVal != nil {
 					assert.Equal(t, tc.expChangedVal, flags[tc.flag])
 				} else {
