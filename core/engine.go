@@ -43,6 +43,7 @@ type Engine struct {
 	logger   *logrus.Entry
 	stopOnce sync.Once
 	stopChan chan struct{}
+	abortFn  func(error) // temporary
 
 	Samples chan metrics.SampleContainer
 }
@@ -107,6 +108,7 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 
 	// TODO: move all of this in a separate struct? see main TODO above
 	runSubCtx, runSubAbort := execution.NewTestRunContext(runCtx, e.logger)
+	e.abortFn = runSubAbort
 
 	execRunResult := make(chan error)
 	engineRunResult := make(chan error)
@@ -185,23 +187,6 @@ func (e *Engine) startBackgroundProcesses(
 				errext.WithExitCodeIfNone(errors.New("test run aborted by signal"), exitcodes.ExternalAbort),
 				errext.AbortedByUser,
 			)
-		}
-	}()
-
-	// Listen for stop calls from the REST API
-	processes.Add(1)
-	go func() {
-		defer processes.Done()
-		select {
-		case <-e.stopChan:
-			e.logger.Debug("run: stopped by user via REST API; exiting...")
-			err := errext.WithAbortReasonIfNone(
-				errext.WithExitCodeIfNone(errors.New("test run stopped from the REST API"), exitcodes.ScriptStoppedFromRESTAPI),
-				errext.AbortedByUser,
-			)
-			runSubAbort(err)
-		case <-runCtx.Done():
-			// do nothing
 		}
 	}()
 
@@ -285,6 +270,12 @@ func (e *Engine) IsTainted() bool {
 // Stop closes a signal channel, forcing a running Engine to return
 func (e *Engine) Stop() {
 	e.stopOnce.Do(func() {
+		e.logger.Debug("run: stopped by user via REST API; exiting...")
+		err := errext.WithAbortReasonIfNone(
+			errext.WithExitCodeIfNone(errors.New("test run stopped from the REST API"), exitcodes.ScriptStoppedFromRESTAPI),
+			errext.AbortedByUser,
+		)
+		e.abortFn(err)
 		close(e.stopChan)
 	})
 }
