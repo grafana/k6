@@ -976,11 +976,18 @@ func TestAbortedByTestAbortInNonFirstInitCode(t *testing.T) {
 
 		export default function () {};
 
-		// Should not be called, since error is in the init context
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
 	`
 
-	testAbortedByScriptTestAbort(t, false, script, runTestWithNoLinger)
+	t.Run("noLinger", func(t *testing.T) {
+		t.Parallel()
+		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
+	})
+
+	t.Run("withLinger", func(t *testing.T) {
+		t.Parallel()
+		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
+	})
 }
 
 func TestAbortedByScriptAbortInVUCode(t *testing.T) {
@@ -995,12 +1002,12 @@ func TestAbortedByScriptAbortInVUCode(t *testing.T) {
 
 	t.Run("noLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithNoLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
 	})
 
 	t.Run("withLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
 	})
 }
 
@@ -1017,12 +1024,12 @@ func TestAbortedByScriptAbortInSetup(t *testing.T) {
 
 	t.Run("noLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithNoLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
 	})
 
 	t.Run("withLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
 	})
 }
 
@@ -1039,18 +1046,16 @@ func TestAbortedByScriptAbortInTeardown(t *testing.T) {
 
 	t.Run("noLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithNoLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
 	})
 
 	t.Run("withLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
 	})
 }
 
-func testAbortedByScriptTestAbort(
-	t *testing.T, shouldHaveMetrics bool, script string, runTest func(*testing.T, *globalTestState),
-) *globalTestState {
+func testAbortedByScriptTestAbort(t *testing.T, script string, runTest func(*testing.T, *globalTestState)) {
 	ts := getSimpleCloudOutputTestState(
 		t, script, nil, cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptAborted,
 	)
@@ -1061,13 +1066,8 @@ func testAbortedByScriptTestAbort(
 	assert.Contains(t, stdOut, "test aborted: foo")
 	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
-	if shouldHaveMetrics {
-		assert.Contains(t, stdOut, `level=debug msg="Metrics processing finished!"`)
-		assert.Contains(t, stdOut, "bogus summary")
-	} else {
-		assert.NotContains(t, stdOut, "bogus summary")
-	}
-	return ts
+	assert.Contains(t, stdOut, `level=debug msg="Metrics processing finished!"`)
+	assert.Contains(t, stdOut, "bogus summary")
 }
 
 func TestAbortedByScriptInitError(t *testing.T) {

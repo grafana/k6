@@ -71,8 +71,6 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(context.Context,
 		}
 	}()
 
-	require.NoError(t, execScheduler.Init(ctx, samples))
-
 	errCh := make(chan error, 1)
 	go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
 
