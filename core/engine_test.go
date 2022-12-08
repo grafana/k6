@@ -223,21 +223,6 @@ func TestEngineAtTime(t *testing.T) {
 	assert.NoError(t, test.run())
 }
 
-func TestEngineStopped(t *testing.T) {
-	t.Parallel()
-	test := newTestEngine(t, nil, nil, nil, lib.Options{
-		VUs:      null.IntFrom(1),
-		Duration: types.NullDurationFrom(20 * time.Second),
-	})
-	defer test.wait()
-
-	assert.NoError(t, test.run())
-	assert.Equal(t, false, test.engine.IsStopped(), "engine should be running")
-	test.engine.Stop()
-	assert.Equal(t, true, test.engine.IsStopped(), "engine should be stopped")
-	test.engine.Stop() // test that a second stop doesn't panic
-}
-
 func TestEngineOutput(t *testing.T) {
 	t.Parallel()
 

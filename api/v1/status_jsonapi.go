@@ -1,9 +1,5 @@
 package v1
 
-import (
-	"go.k6.io/k6/core"
-)
-
 // StatusJSONAPI is JSON API envelop for metrics
 type StatusJSONAPI struct {
 	Data statusData `json:"data"`
@@ -31,6 +27,6 @@ type statusData struct {
 	Attributes Status `json:"attributes"`
 }
 
-func newStatusJSONAPIFromEngine(engine *core.Engine) StatusJSONAPI {
-	return NewStatusJSONAPI(NewStatus(engine))
+func newStatusJSONAPIFromEngine(cs *ControlSurface) StatusJSONAPI {
+	return NewStatusJSONAPI(newStatus(cs))
 }

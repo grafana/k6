@@ -9,8 +9,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
@@ -40,10 +38,8 @@ type Engine struct {
 
 	ingester output.Output
 
-	logger   *logrus.Entry
-	stopOnce sync.Once
-	stopChan chan struct{}
-	AbortFn  func(error) // temporary
+	logger  *logrus.Entry
+	AbortFn func(error) // temporary
 
 	Samples chan metrics.SampleContainer
 }
@@ -59,7 +55,6 @@ func NewEngine(testState *lib.TestRunState, ex *execution.Scheduler, outputs []o
 
 		runtimeOptions: testState.RuntimeOptions,
 		Samples:        make(chan metrics.SampleContainer, testState.Options.MetricSamplesBufferSize.Int64),
-		stopChan:       make(chan struct{}),
 		logger:         testState.Logger.WithField("component", "engine"),
 	}
 
@@ -78,7 +73,7 @@ func NewEngine(testState *lib.TestRunState, ex *execution.Scheduler, outputs []o
 		if err != nil {
 			testState.Logger.WithError(err).Error("Received error to stop from output")
 		}
-		e.Stop()
+		e.AbortFn(err)
 	})
 
 	return e, nil
@@ -230,27 +225,4 @@ func (e *Engine) processMetrics(globalCtx context.Context, processMetricsAfterRu
 
 func (e *Engine) IsTainted() bool {
 	return e.MetricsEngine.GetMetricsWithBreachedThresholdsCount() > 0
-}
-
-// Stop closes a signal channel, forcing a running Engine to return
-func (e *Engine) Stop() {
-	e.stopOnce.Do(func() {
-		e.logger.Debug("run: stopped by user via REST API; exiting...")
-		err := errext.WithAbortReasonIfNone(
-			errext.WithExitCodeIfNone(errors.New("test run stopped from the REST API"), exitcodes.ScriptStoppedFromRESTAPI),
-			errext.AbortedByUser,
-		)
-		e.AbortFn(err)
-		close(e.stopChan)
-	})
-}
-
-// IsStopped returns a bool indicating whether the Engine has been stopped
-func (e *Engine) IsStopped() bool {
-	select {
-	case <-e.stopChan:
-		return true
-	default:
-		return false
-	}
 }

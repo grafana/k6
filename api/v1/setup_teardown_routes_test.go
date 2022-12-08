@@ -141,25 +141,34 @@ func TestSetupData(t *testing.T) {
 			engine, err := core.NewEngine(testState, execScheduler, nil)
 			require.NoError(t, err)
 
+			globalCtx, globalCancel := context.WithCancel(context.Background())
+			t.Cleanup(globalCancel)
+			runCtx, runAbort := execution.NewTestRunContext(globalCtx, testState.Logger)
+			defer runAbort(fmt.Errorf("unexpected abort"))
+
 			require.NoError(t, engine.OutputManager.StartOutputs())
 			defer engine.OutputManager.StopOutputs(nil)
 
-			globalCtx, globalCancel := context.WithCancel(context.Background())
-			runCtx, runCancel := context.WithCancel(globalCtx)
+			cs := &ControlSurface{
+				RunCtx:        runCtx,
+				Samples:       engine.Samples,
+				MetricsEngine: engine.MetricsEngine,
+				Scheduler:     execScheduler,
+				RunState:      testState,
+			}
 			run, wait, err := engine.Init(globalCtx, runCtx)
 			require.NoError(t, err)
 
 			defer wait()
-			defer globalCancel()
 
 			errC := make(chan error)
 			go func() { errC <- run() }()
 
-			handler := NewHandler()
+			handler := NewHandler(cs)
 
 			checkSetup := func(method, body, expResult string) {
 				rw := httptest.NewRecorder()
-				handler.ServeHTTP(rw, newRequestWithEngine(engine, method, "/v1/setup", bytes.NewBufferString(body)))
+				handler.ServeHTTP(rw, httptest.NewRequest(method, "/v1/setup", bytes.NewBufferString(body)))
 				res := rw.Result()
 				if !assert.Equal(t, http.StatusOK, res.StatusCode) {
 					t.Logf("body: %s\n", rw.Body.String())
@@ -179,14 +188,12 @@ func TestSetupData(t *testing.T) {
 				checkSetup(setupRun[0], setupRun[1], setupRun[2])
 			}
 
-			require.NoError(t, engine.ExecutionScheduler.SetPaused(false))
+			require.NoError(t, cs.Scheduler.SetPaused(false))
 
 			select {
 			case <-time.After(10 * time.Second):
-				runCancel()
 				t.Fatal("Test timed out")
 			case err := <-errC:
-				runCancel()
 				require.NoError(t, err)
 			}
 		})

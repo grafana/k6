@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,12 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/core"
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/minirunner"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/metrics/engine"
 )
 
 func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
@@ -41,6 +42,26 @@ func getTestRunState(tb testing.TB, options lib.Options, runner lib.Runner) *lib
 	}
 }
 
+func getControlSurface(tb testing.TB, testState *lib.TestRunState) *ControlSurface {
+	execScheduler, err := execution.NewScheduler(testState)
+	require.NoError(tb, err)
+
+	me, err := engine.NewMetricsEngine(execScheduler.GetState())
+	require.NoError(tb, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	tb.Cleanup(cancel)
+	ctx, _ = execution.NewTestRunContext(ctx, testState.Logger)
+
+	return &ControlSurface{
+		RunCtx:        ctx,
+		Samples:       make(chan metrics.SampleContainer, 1000),
+		MetricsEngine: me,
+		Scheduler:     execScheduler,
+		RunState:      testState,
+	}
+}
+
 func TestGetGroups(t *testing.T) {
 	g0, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
@@ -49,15 +70,11 @@ func TestGetGroups(t *testing.T) {
 	g2, err := g1.Group("group 2")
 	assert.NoError(t, err)
 
-	testState := getTestRunState(t, lib.Options{}, &minirunner.MiniRunner{Group: g0})
-	execScheduler, err := execution.NewScheduler(testState)
-	require.NoError(t, err)
-	engine, err := core.NewEngine(testState, execScheduler, nil)
-	require.NoError(t, err)
+	cs := getControlSurface(t, getTestRunState(t, lib.Options{}, &minirunner.MiniRunner{Group: g0}))
 
 	t.Run("list", func(t *testing.T) {
 		rw := httptest.NewRecorder()
-		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/groups", nil))
+		NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/groups", nil))
 		res := rw.Result()
 		body := rw.Body.Bytes()
 		assert.Equal(t, http.StatusOK, res.StatusCode)
@@ -105,7 +122,7 @@ func TestGetGroups(t *testing.T) {
 	for _, gp := range []*lib.Group{g0, g1, g2} {
 		t.Run(gp.Name, func(t *testing.T) {
 			rw := httptest.NewRecorder()
-			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/groups/"+gp.ID, nil))
+			NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/groups/"+gp.ID, nil))
 			res := rw.Result()
 			assert.Equal(t, http.StatusOK, res.StatusCode)
 		})

@@ -794,7 +794,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 	assert.Contains(t, stdout, `a simple iteration`)
 	assert.Contains(t, stdout, `teardown() called`)
 	assert.Contains(t, stdout, `PATCH /v1/status`)
-	assert.Contains(t, stdout, `run: stopped by user via REST API; exiting...`)
+	assert.Contains(t, stdout, `level=error msg="test run stopped from REST API`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics processing finished!"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
