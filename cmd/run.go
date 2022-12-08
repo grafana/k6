@@ -129,7 +129,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		defer srvCancel()
 
 		// TODO: send the ExecutionState and MetricsEngine instead of the Engine
-		srv := api.GetServer(c.gs.flags.address, engine, logger)
+		srv := api.GetServer(runSubCtx, c.gs.flags.address, testRunState, engine.Samples, engine.MetricsEngine, execScheduler)
 		go func() {
 			defer apiWG.Done()
 			logger.Debugf("Starting the REST API server on %s", c.gs.flags.address)
@@ -236,7 +236,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		engine.MetricsEngine.MetricsLock.Lock() // TODO: refactor so this is not needed
 		summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
 			Metrics:         engine.MetricsEngine.ObservedMetrics,
-			RootGroup:       execScheduler.GetRunner().GetDefaultGroup(),
+			RootGroup:       testRunState.Runner.GetDefaultGroup(),
 			TestRunDuration: executionState.GetCurrentTestRunDuration(),
 			NoColor:         c.gs.flags.noColor,
 			UIState: lib.UIState{

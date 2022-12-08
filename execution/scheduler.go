@@ -90,11 +90,6 @@ func NewScheduler(trs *lib.TestRunState) (*Scheduler, error) {
 	}, nil
 }
 
-// GetRunner returns the wrapped lib.Runner instance.
-func (e *Scheduler) GetRunner() lib.Runner { // TODO: remove
-	return e.state.Test.Runner
-}
-
 // GetState returns a pointer to the execution state struct for the execution
 // scheduler. It's guaranteed to be initialized and present, though see the
 // documentation in lib/execution.go for caveats about its usage. The most

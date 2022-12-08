@@ -25,13 +25,10 @@ func TestGetStatus(t *testing.T) {
 	t.Parallel()
 
 	testState := getTestRunState(t, lib.Options{}, &minirunner.MiniRunner{})
-	execScheduler, err := execution.NewScheduler(testState)
-	require.NoError(t, err)
-	engine, err := core.NewEngine(testState, execScheduler, nil)
-	require.NoError(t, err)
+	cs := getControlSurface(t, testState)
 
 	rw := httptest.NewRecorder()
-	NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/status", nil))
+	NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
 	res := rw.Result()
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
@@ -120,18 +117,27 @@ func TestPatchStatus(t *testing.T) {
 			require.NoError(t, engine.OutputManager.StartOutputs())
 			defer engine.OutputManager.StopOutputs(nil)
 
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-			defer cancel()
-			runSubCtx, runSubAbort := execution.NewTestRunContext(ctx, testState.Logger)
-			engine.AbortFn = runSubAbort
+			globalCtx, globalCancel := context.WithCancel(context.Background())
+			t.Cleanup(globalCancel)
+			runCtx, runAbort := execution.NewTestRunContext(globalCtx, testState.Logger)
+			defer runAbort(fmt.Errorf("unexpected abort"))
+			engine.AbortFn = runAbort
 
-			run, wait, err := engine.Init(ctx, runSubCtx)
+			cs := &ControlSurface{
+				RunCtx:        runCtx,
+				Samples:       engine.Samples,
+				MetricsEngine: engine.MetricsEngine,
+				Scheduler:     execScheduler,
+				RunState:      testState,
+			}
+
+			run, wait, err := engine.Init(globalCtx, runCtx)
 			require.NoError(t, err)
 
 			wg := &sync.WaitGroup{}
 			wg.Add(1)
 			defer func() {
-				runSubAbort(fmt.Errorf("custom cancel signal"))
+				runAbort(fmt.Errorf("custom cancel signal"))
 				wait()
 				wg.Wait()
 			}()
@@ -144,7 +150,7 @@ func TestPatchStatus(t *testing.T) {
 			time.Sleep(200 * time.Millisecond)
 
 			rw := httptest.NewRecorder()
-			NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "PATCH", "/v1/status", bytes.NewReader(testCase.Payload)))
+			NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodPatch, "/v1/status", bytes.NewReader(testCase.Payload)))
 			res := rw.Result()
 
 			require.Equal(t, "application/json; charset=utf-8", rw.Header().Get("Content-Type"))
@@ -155,7 +161,7 @@ func TestPatchStatus(t *testing.T) {
 				return
 			}
 
-			status := NewStatus(engine)
+			status := newStatus(cs)
 			if testCase.ExpectedStatus.Paused.Valid {
 				assert.Equal(t, testCase.ExpectedStatus.Paused, status.Paused)
 			}
