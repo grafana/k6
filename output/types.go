@@ -76,7 +76,7 @@ type WithTestRunStop interface {
 }
 
 // WithStopWithTestError allows output to receive the error value that the test
-// finished with. It could be nil, if the test finished nominally.
+// finished with. It could be nil, if the test finished normally.
 //
 // If this interface is implemented by the output, StopWithError() will be
 // called instead of Stop().
