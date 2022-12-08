@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	k6lib "go.k6.io/k6/lib"
 	k6netext "go.k6.io/k6/lib/netext"
 	k6types "go.k6.io/k6/lib/types"
 
@@ -49,7 +48,7 @@ func NewServer(t testing.TB, opts ...func(*Server)) *Server {
 	require.NoError(t, err)
 	ip := net.ParseIP(url.Hostname())
 	require.NotNil(t, ip)
-	domain, err := k6lib.NewHostAddress(ip, "")
+	domain, err := k6types.NewHost(ip, "")
 	require.NoError(t, err)
 
 	// Set up the dialer with shorter timeouts and the custom domains
@@ -60,9 +59,10 @@ func NewServer(t testing.TB, opts ...func(*Server)) *Server {
 	}, k6netext.NewResolver(net.LookupIP, 0, k6types.DNSfirst, k6types.DNSpreferIPv4))
 
 	const wsURL = "wsbin.local"
-	dialer.Hosts = map[string]*k6lib.HostAddress{
-		wsURL: domain,
-	}
+	dialer.Hosts, err = k6types.NewHosts(map[string]k6types.Host{
+		wsURL: *domain,
+	})
+	require.NoError(t, err, "failed to set up dialer hosts")
 
 	// Pre-configure the HTTP client transport with the dialer and TLS config (incl. HTTP2 support)
 	transport := &http.Transport{

@@ -2,6 +2,7 @@ package chromium
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -161,10 +162,11 @@ func (b *BrowserType) launch(ctx context.Context, opts *common.LaunchOptions) (*
 	for k, v := range opts.Env {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
-	var (
-		flags   = prepareFlags(opts, &(b.vu.State()).Options)
-		dataDir = b.storage
-	)
+	flags, err := prepareFlags(opts, &(b.vu.State()).Options)
+	if err != nil {
+		return nil, fmt.Errorf("%w", err)
+	}
+	dataDir := b.storage
 	if err := dataDir.Make("", flags["user-data-dir"]); err != nil {
 		return nil, fmt.Errorf("%w", err)
 	}
@@ -279,7 +281,7 @@ func parseArgs(flags map[string]any) ([]string, error) {
 	return args, nil
 }
 
-func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) map[string]any {
+func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) (map[string]any, error) {
 	// After Puppeteer's and Playwright's default behavior.
 	f := map[string]any{
 		"disable-background-networking":                      true,
@@ -327,9 +329,11 @@ func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) map[string
 	ignoreDefaultArgsFlags(f, lopts.IgnoreDefaultArgs)
 
 	setFlagsFromArgs(f, lopts.Args)
-	setFlagsFromK6Options(f, k6opts)
+	if err := setFlagsFromK6Options(f, k6opts); err != nil {
+		return nil, err
+	}
 
-	return f
+	return f, nil
 }
 
 // ignoreDefaultArgsFlags ignores any flags in the provided slice.
@@ -356,9 +360,9 @@ func setFlagsFromArgs(flags map[string]any, args []string) {
 
 // setFlagsFromK6Options adds additional data to flags considering the k6 options.
 // Such as: "host-resolver-rules" for blocking requests.
-func setFlagsFromK6Options(flags map[string]any, k6opts *k6lib.Options) {
+func setFlagsFromK6Options(flags map[string]any, k6opts *k6lib.Options) error {
 	if k6opts == nil {
-		return
+		return nil
 	}
 
 	hostResolver := []string{}
@@ -366,14 +370,34 @@ func setFlagsFromK6Options(flags map[string]any, k6opts *k6lib.Options) {
 		hostResolver = append(hostResolver, fmt.Sprintf("%s", currHostResolver))
 	}
 
-	for k, v := range k6opts.Hosts {
+	// Add the host resolver rules.
+	//
+	// This is done by marshaling the k6 hosts option to JSON and then
+	// unmarshaling it to a map[string]string. This is done because the
+	// k6 v0.42 changed Hosts from a map to types.NullHosts and doesn't
+	// expose the map anymore.
+	//
+	// TODO: A better way to do this would be to handle the resolver
+	// rules by communicating with Chromium (and then using Hosts's
+	// Match method) instead of passing the rules via the command line
+	// to Chromium.
+	var rules map[string]string
+	b, err := json.Marshal(k6opts.Hosts)
+	if err != nil {
+		return fmt.Errorf("marshaling hosts option: %w", err)
+	}
+	if err := json.Unmarshal(b, &rules); err != nil {
+		return fmt.Errorf("unmarshaling hosts option: %w", err)
+	}
+	for k, v := range rules {
 		hostResolver = append(hostResolver, fmt.Sprintf("MAP %s %s", k, v))
 	}
-
 	if len(hostResolver) > 0 {
 		sort.Strings(hostResolver)
 		flags["host-resolver-rules"] = strings.Join(hostResolver, ",")
 	}
+
+	return nil
 }
 
 // makeLogger makes and returns an extension wide logger.
