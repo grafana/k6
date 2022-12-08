@@ -35,6 +35,10 @@ const (
 
 	// TypeError represents the TypeError error.
 	TypeError = "TypeError"
+
+	// QuotaExceededError is the error thrown if the byteLength of a typedArray
+	// exceeds 65,536.
+	QuotaExceededError = "QuotaExceededError"
 )
 
 // Error represents a custom error emitted by the

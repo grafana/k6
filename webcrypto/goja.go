@@ -4,26 +4,38 @@ import "github.com/dop251/goja"
 
 // IsInstanceOf returns true if the given value is an instance of the given constructor
 // This uses the technique described in https://github.com/dop251/goja/issues/379#issuecomment-1164441879
-func IsInstanceOf(rt *goja.Runtime, v goja.Value, instanceOf JSType) bool {
-	instanceOfConstructor := rt.Get(string(instanceOf))
-	return v.ToObject(rt).Get("constructor").SameAs(instanceOfConstructor)
+func IsInstanceOf(rt *goja.Runtime, v goja.Value, instanceOf ...JSType) bool {
+	var valid bool
+
+	for _, t := range instanceOf {
+		instanceOfConstructor := rt.Get(string(t))
+		if valid = v.ToObject(rt).Get("constructor").SameAs(instanceOfConstructor); valid {
+			break
+		}
+	}
+
+	return valid
 }
 
 // IsTypedArray returns true if the given value is an instance of a Typed Array
 func IsTypedArray(rt *goja.Runtime, v goja.Value) bool {
 	asObject := v.ToObject(rt)
 
-	return IsInstanceOf(rt, asObject, Int8ArrayConstructor) ||
-		IsInstanceOf(rt, asObject, Uint8ArrayConstructor) ||
-		IsInstanceOf(rt, asObject, Uint8ClampedArrayConstructor) ||
-		IsInstanceOf(rt, asObject, Int16ArrayConstructor) ||
-		IsInstanceOf(rt, asObject, Uint16ArrayConstructor) ||
-		IsInstanceOf(rt, asObject, Int32ArrayConstructor) ||
-		IsInstanceOf(rt, asObject, Uint32ArrayConstructor) ||
-		IsInstanceOf(rt, asObject, Float32ArrayConstructor) ||
-		IsInstanceOf(rt, asObject, Float64ArrayConstructor) ||
-		IsInstanceOf(rt, asObject, BigInt64ArrayConstructor) ||
-		IsInstanceOf(rt, asObject, BigUint64ArrayConstructor)
+	typedArrayTypes := []JSType{
+		Int8ArrayConstructor,
+		Uint8ArrayConstructor,
+		Uint8ClampedArrayConstructor,
+		Int16ArrayConstructor,
+		Uint16ArrayConstructor,
+		Int32ArrayConstructor,
+		Uint32ArrayConstructor,
+		Float32ArrayConstructor,
+		Float64ArrayConstructor,
+		BigInt64ArrayConstructor,
+		BigUint64ArrayConstructor,
+	}
+
+	return IsInstanceOf(rt, asObject, typedArrayTypes...)
 }
 
 // JSType is a string representing a JavaScript type
