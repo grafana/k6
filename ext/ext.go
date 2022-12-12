@@ -65,7 +65,7 @@ func Register(name string, typ ExtensionType, mod interface{}) {
 		panic(fmt.Sprintf("extension already registered: %s", name))
 	}
 
-	path, version := getModuleInfo(mod)
+	path, version := extractModuleInfo(mod)
 
 	exts[name] = &Extension{
 		Name:    name,
@@ -120,9 +120,9 @@ func GetAll() []*Extension {
 	return result
 }
 
-// getModuleInfo attempts to return the package path and version of the Go
+// extractModuleInfo attempts to return the package path and version of the Go
 // module that created the given value.
-func getModuleInfo(mod interface{}) (path, version string) {
+func extractModuleInfo(mod interface{}) (path, version string) {
 	t := reflect.TypeOf(mod)
 
 	switch t.Kind() {
