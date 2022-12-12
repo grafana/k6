@@ -43,8 +43,8 @@ All the k6 metric types are converted into an equivalent Prometheus' type:
 | Rate | Gauge |
 | Trend | Gauges / Native Histogram |
 
-The obvious conversion with a classic Prometheus Histogram is not convenient because k6 can't determine the fixed buckets in advance, so the Output maps a Trend metric by default into 8 Gauges where each value represents a math function (count, sum, min, max, avg, med, p95).
-Mapping Trend by Gauges has the following cons:
+The obvious conversion with a classic Prometheus Histogram is not convenient because k6 can't determine the fixed buckets in advance, so the Output maps a Trend metric by default into a Gauge representing p(99). It is possible to map the same Trend to multiple stats at the same time (count, sum, min, max, avg, med, p(x)), it is possible to specify them via the `K6_PROMETHEUS_RW_TREND_STATS` environment variable (e.g `K6_PROMETHEUS_RW_TREND_STATS=avg,p(90),p(99),min,max`). Note that for each added stat a new time series will be generated.
+Mapping Trend by stats has the following cons:
 * It is impossible to aggregate some Gauge's value (especially the percentiles).
 * It uses a memory-expensive k6's data structure.
 
@@ -94,6 +94,7 @@ Clone the repo to get started and follow these steps:
 
 ## Dashboards
 The docker-compose setup comes with two pre-built Grafana dashboards. One for listing the discrete test runs as a list, and the other for visualizing the results of a specific test run.
+>Note: The dashboards work with the Native Histogram mapping so it is required to enable it.
 
 ### Test result dashboard
 ![Prometheus dashboard of k6 test result](./images/prometheus-dashboard-k6-test-result.png)
