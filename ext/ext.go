@@ -33,7 +33,7 @@ func (e ExtensionType) String() string {
 	case JSExtension:
 		s = "js"
 	case OutputExtension:
-		s = "out"
+		s = "output"
 	}
 	return s
 }
