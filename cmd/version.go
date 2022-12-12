@@ -20,7 +20,7 @@ func getCmdVersion(globalState *globalState) *cobra.Command {
 			printToStdout(globalState, fmt.Sprintf("k6 v%s\n", consts.FullVersion()))
 
 			if exts := ext.GetAll(); len(exts) > 0 {
-				extsDesc := getExtensionsDescription(exts, 2, 0)
+				extsDesc := formatExtensionsDescription(exts, 2, 0)
 				printToStdout(globalState, fmt.Sprintf("Extensions:\n%s\n",
 					strings.Join(extsDesc, "\n")))
 			}

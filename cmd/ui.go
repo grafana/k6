@@ -139,7 +139,7 @@ func printExecutionDescription(
 	fmt.Fprintf(buf, "     script: %s\n", valueColor.Sprint(filename))
 
 	if exts := ext.GetAll(); len(exts) > 0 {
-		extsDesc := getExtensionsDescription(exts, 13, 1)
+		extsDesc := formatExtensionsDescription(exts, 13, 1)
 		fmt.Fprintf(buf, " extensions: %s\n",
 			valueColor.Sprint(strings.Join(extsDesc, "\n")))
 	}
@@ -409,7 +409,7 @@ func yamlPrint(w io.Writer, v interface{}) error {
 	return nil
 }
 
-func getExtensionsDescription(exts []*ext.Extension, leftPad, padStart int) []string {
+func formatExtensionsDescription(exts []*ext.Extension, leftPad, padStart int) []string {
 	extsDesc := make([]string, 0, len(exts))
 	for i, e := range exts {
 		desc := e.String()
