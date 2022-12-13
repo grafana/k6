@@ -169,7 +169,7 @@ func BenchmarkK6TrendSinkAdd(b *testing.B) {
 		TimeSeries: metrics.TimeSeries{
 			Metric: m,
 		},
-		Value: rand.Float64(),
+		Value: rand.Float64(), //nolint:gosec
 		Time:  time.Now(),
 	}
 	b.ResetTimer()
@@ -229,7 +229,7 @@ func BenchmarkHistogramSinkAdd(b *testing.B) {
 		TimeSeries: metrics.TimeSeries{
 			Metric: m,
 		},
-		Value: rand.Float64(),
+		Value: rand.Float64(), //nolint:gosec
 		Time:  time.Now(),
 	}
 	b.ResetTimer()

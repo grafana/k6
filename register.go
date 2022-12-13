@@ -1,3 +1,4 @@
+// Package remotewrite registers the xk6-output-prometheus-remote extension
 package remotewrite
 
 import (

@@ -37,7 +37,7 @@ func TestMapSeries(t *testing.T) {
 }
 
 // buildTimeSeries creates a TimSeries with the given name, value and timestamp
-func buildTimeSeries(name string, value float64, timestamp time.Time) *prompb.TimeSeries {
+func buildTimeSeries(name string, value float64, timestamp time.Time) *prompb.TimeSeries { //nolint:unparam
 	return &prompb.TimeSeries{
 		Labels: []*prompb.Label{
 			{

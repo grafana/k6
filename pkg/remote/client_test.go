@@ -88,7 +88,7 @@ func TestClientStore(t *testing.T) {
 func TestClientStoreHTTPError(t *testing.T) {
 	t.Parallel()
 	h := func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "bad bad", http.StatusUnauthorized)
+		http.Error(w, "bad", http.StatusUnauthorized)
 	}
 	ts := httptest.NewServer(http.HandlerFunc(h))
 	defer ts.Close()
@@ -159,6 +159,7 @@ func TestClientStoreHeaders(t *testing.T) {
 }
 
 func TestNewWriteRequestBody(t *testing.T) {
+	t.Parallel()
 	ts := []*prompb.TimeSeries{
 		{
 			Labels:  []*prompb.Label{{Name: "label1", Value: "val1"}},

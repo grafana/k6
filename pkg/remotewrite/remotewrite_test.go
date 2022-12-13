@@ -109,6 +109,7 @@ func TestOutputConvertToPbSeries(t *testing.T) {
 	assert.Equal(t, exp, pbseries)
 }
 
+//nolint:paralleltest,tparallel
 func TestOutputConvertToPbSeries_WithPreviousState(t *testing.T) {
 	t.Parallel()
 
@@ -164,6 +165,7 @@ func TestOutputConvertToPbSeries_WithPreviousState(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			pbseries := o.convertToPbSeries([]metrics.SampleContainer{
 				metrics.Sample{
@@ -177,7 +179,7 @@ func TestOutputConvertToPbSeries_WithPreviousState(t *testing.T) {
 			})
 			require.Len(t, o.tsdb, 1)
 			require.Equal(t, tc.expSeries, len(pbseries))
-			assert.Equal(t, tc.expCount, swm.Measure.(*metrics.CounterSink).Value)
+			assert.Equal(t, tc.expCount, swm.Measure.(*metrics.CounterSink).Value) //nolint:forcetypeassert
 			assert.Equal(t, tc.expLatest, swm.Latest)
 		})
 	}
