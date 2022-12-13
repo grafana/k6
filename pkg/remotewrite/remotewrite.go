@@ -25,6 +25,7 @@ type Output struct {
 
 	config             Config
 	logger             logrus.FieldLogger
+	now                func() time.Time
 	periodicFlusher    *output.PeriodicFlusher
 	tsdb               map[metrics.TimeSeries]*seriesWithMeasure
 	trendStatsResolver map[string]func(*metrics.TrendSink) float64
@@ -55,6 +56,10 @@ func New(params output.Params) (*Output, error) {
 	o := &Output{
 		client: wc,
 		config: config,
+		// TODO: consider to do this function millisecond-based
+		// so we don't need to truncate all the time we invoke it.
+		// Before we should analyze if in some cases is it useful to have it in ns.
+		now:    time.Now,
 		logger: logger,
 		tsdb:   make(map[metrics.TimeSeries]*seriesWithMeasure),
 	}
@@ -93,8 +98,7 @@ func (o *Output) Stop() error {
 	if !o.config.StaleMarkers.Bool {
 		return nil
 	}
-
-	staleMarkers := o.staleMarkers(time.Now())
+	staleMarkers := o.staleMarkers()
 	if len(staleMarkers) < 1 {
 		o.logger.Debug("No time series to mark as stale")
 		return nil
@@ -109,10 +113,18 @@ func (o *Output) Stop() error {
 }
 
 // staleMarkers maps all the seen time series with a stale marker.
-func (o *Output) staleMarkers(t time.Time) []*prompb.TimeSeries {
-	timestamp := t.UnixMilli()
-	staleMarkers := make([]*prompb.TimeSeries, 0, len(o.tsdb))
+func (o *Output) staleMarkers() []*prompb.TimeSeries {
+	// Add 1ms so in the extreme case that the time frame
+	// between the last and the next flush operation is under-millisecond,
+	// we can avoid the sample being seen as a duplicate,
+	// if we force it in the future.
+	// It is essential because if it overlaps, the remote write discards the last sample,
+	// so the stale marker and the metric will remain active for the next 5 min
+	// as the default logic without stale markers.
+	timestamp := o.now().
+		Truncate(time.Millisecond).Add(1 * time.Millisecond).UnixMilli()
 
+	staleMarkers := make([]*prompb.TimeSeries, 0, len(o.tsdb))
 	for _, swm := range o.tsdb {
 		series := swm.MapPrompb()
 		// series' length is expected to be equal to 1 for most of the cases

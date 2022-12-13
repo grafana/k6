@@ -16,5 +16,9 @@ import "math"
 // The value is the same used by the Prometheus package.
 // https://pkg.go.dev/github.com/prometheus/prometheus/pkg/value#pkg-constants
 //
+// It isn't imported directly to avoid the direct dependency
+// from the big Prometheus project that would bring more
+// dependencies.
+//
 //nolint:gochecknoglobals
 var Marker = math.Float64frombits(0x7ff0000000000002)

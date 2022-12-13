@@ -312,7 +312,11 @@ func TestOutputStaleMarkers(t *testing.T) {
 		Tags:   registry.RootTagSet(),
 	}
 
-	o := Output{}
+	o := Output{
+		now: func() time.Time {
+			return time.Unix(1, 0)
+		},
+	}
 	err := o.setTrendStatsResolver([]string{"p(99)"})
 	require.NoError(t, err)
 	trendSink, err := newExtendedTrendSink(o.trendStatsResolver)
@@ -321,27 +325,25 @@ func TestOutputStaleMarkers(t *testing.T) {
 	o.tsdb = map[metrics.TimeSeries]*seriesWithMeasure{
 		trendSinkSeries: {
 			TimeSeries: trendSinkSeries,
-			Latest:     time.Now(),
-			// TODO: if Measure would be a lighter interface
-			// then it could be just a mapper mock.
+			// TODO: if Measure is a lighter interface
+			// then it can be just a mapper mock.
 			Measure: trendSink,
 		},
 		counterSinkSeries: {
 			TimeSeries: counterSinkSeries,
-			Latest:     time.Now(),
 			Measure:    &metrics.CounterSink{},
 		},
 	}
 
-	now := time.Now()
-	markers := o.staleMarkers(now)
+	markers := o.staleMarkers()
 	require.Len(t, markers, 2)
 
 	sortByNameLabel(markers)
 	expNameLabels := []string{"k6_metric1_p99", "k6_metric2_total"}
+	expTimestamp := time.Unix(1, int64(1*time.Millisecond)).UnixMilli()
 	for i, expName := range expNameLabels {
 		assert.Equal(t, expName, markers[i].Labels[0].Value)
-		assert.Equal(t, now.UnixMilli(), markers[i].Samples[0].Timestamp)
+		assert.Equal(t, expTimestamp, markers[i].Samples[0].Timestamp)
 		assert.True(t, math.IsNaN(markers[i].Samples[0].Value), "it isn't a StaleNaN value")
 	}
 }
@@ -360,9 +362,12 @@ func TestOutputStopWithStaleMarkers(t *testing.T) {
 			logger: logger,
 			config: Config{
 				// setting a large interval so it does not trigger
+				// and the trigger can be inoked only when Stop is
+				// invoked.
 				PushInterval: types.NullDurationFrom(1 * time.Hour),
 				StaleMarkers: null.BoolFrom(tc),
 			},
+			now: time.Now,
 		}
 
 		err := o.Start()

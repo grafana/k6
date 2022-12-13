@@ -10,8 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/snappy"
 	"github.com/grafana/xk6-output-prometheus-remote/pkg/stale"
+
+	"github.com/golang/snappy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	prompb "go.buf.build/grpc/go/prometheus/prometheus"
