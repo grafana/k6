@@ -1068,6 +1068,45 @@ func testAbortedByScriptTestAbort(
 	return ts
 }
 
+func TestAbortedByInterruptDuringVUInit(t *testing.T) {
+	t.Parallel()
+	script := []byte(`
+		import { sleep } from 'k6';
+		export const options = {
+			vus: 5,
+			duration: '10s',
+		};
+
+		if (__VU > 1) {
+			console.log('VU init sleeping for a while');
+			sleep(100);
+		}
+
+		export default function () {};
+	`)
+
+	// TODO: fix this to exect lib.RunStatusAbortedUser and
+	// exitcodes.ExternalAbort
+	//
+	// This is testing the current behavior, which is expected, but it's not
+	// actually the desired one! See https://github.com/grafana/k6/issues/2804
+	ts := getSimpleCloudOutputTestState(
+		t, script, nil, lib.RunStatusAbortedSystem, cloudapi.ResultStatusPassed, int(exitcodes.GenericEngine),
+	)
+	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "VU init sleeping for a while")
+	newRootCommand(ts.globalState).execute()
+
+	stdOut := ts.stdOut.String()
+	t.Log(stdOut)
+
+	assert.Contains(t, stdOut, `level=debug msg="Stopping k6 in response to signal..." sig=interrupt`)
+	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
+
+	// TODO: same as above, fix expected error message and run_status to 5
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=6 tainted=false`)
+	assert.Contains(t, stdOut, `level=error msg="context canceled`)
+}
+
 func TestAbortedByScriptInitError(t *testing.T) {
 	t.Parallel()
 	script := []byte(`
