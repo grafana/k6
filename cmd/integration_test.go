@@ -619,6 +619,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 	t.Parallel()
 	script := []byte(`
 		import { Counter } from 'k6/metrics';
+		import exec from 'k6/execution';
 
 		export const options = {
 			scenarios: {
@@ -642,18 +643,14 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 			tc.add(1);
 		}
 
-		export default function () {};
+		export default function () {
+			console.log('simple iter ' + exec.scenario.iterationInTest);
+		};
 	`)
 
 	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, 0)
-	ts.globalState.signalNotify = func(c chan<- os.Signal, s ...os.Signal) {
-		go func() {
-			// simulate a Ctrl+C after 3 seconds
-			time.Sleep(3 * time.Second)
-			c <- os.Interrupt
-		}()
-	}
-	ts.globalState.signalStop = func(c chan<- os.Signal) { /* noop */ }
+
+	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "simple iter 2")
 
 	newRootCommand(ts.globalState).execute()
 
@@ -667,6 +664,95 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics processing finished!"`)
 	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+}
+
+func asyncWaitForStdoutAndRun(
+	t *testing.T, ts *globalTestState, attempts int, interval time.Duration, expText string, callback func(),
+) {
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		reachedCondition := false
+		for i := 0; i < attempts; i++ {
+			ts.outMutex.Lock()
+			stdOut := ts.stdOut.String()
+			ts.outMutex.Unlock()
+
+			if strings.Contains(stdOut, expText) {
+				t.Logf("found '%s' in the process stdout on try %d at t=%s", expText, i, time.Now())
+				reachedCondition = true
+				break
+			}
+
+			t.Logf("did not find the text '%s' in the process stdout on try %d at t=%s", expText, i, time.Now())
+			time.Sleep(interval)
+		}
+		if reachedCondition {
+			callback()
+			return // everything is fine
+		}
+
+		ts.outMutex.Lock()
+		stdOut := ts.stdOut.String()
+		ts.outMutex.Unlock()
+		t.Log(stdOut)
+		require.FailNow(
+			t, "did not find the text '%s' in the process stdout after %d attempts (%s)",
+			expText, attempts, time.Duration(attempts)*interval,
+		)
+	}()
+
+	t.Cleanup(wg.Wait) // ensure the test waits for the goroutine to finish
+}
+
+func asyncWaitForStdoutAndStopTestWithInterruptSignal(
+	t *testing.T, ts *globalTestState, attempts int, interval time.Duration, expText string,
+) {
+	sendSignal := make(chan struct{})
+	ts.globalState.signalNotify = func(c chan<- os.Signal, signals ...os.Signal) {
+		isAbortNotify := false
+		for _, s := range signals {
+			if s == os.Interrupt {
+				isAbortNotify = true
+				break
+			}
+		}
+		if !isAbortNotify {
+			return
+		}
+		go func() {
+			<-sendSignal
+			c <- os.Interrupt
+			close(sendSignal)
+		}()
+	}
+	ts.globalState.signalStop = func(c chan<- os.Signal) { /* noop */ }
+
+	asyncWaitForStdoutAndRun(t, ts, attempts, interval, expText, func() {
+		t.Log("expected stdout text was found, sending interrupt signal...")
+		sendSignal <- struct{}{}
+		<-sendSignal
+	})
+}
+
+func asyncWaitForStdoutAndStopTestFromRESTAPI(
+	t *testing.T, ts *globalTestState, attempts int, interval time.Duration, expText string,
+) {
+	asyncWaitForStdoutAndRun(t, ts, attempts, interval, expText, func() {
+		req, err := http.NewRequestWithContext(
+			ts.ctx, http.MethodPatch, fmt.Sprintf("http://%s/v1/status", ts.flags.address),
+			bytes.NewBufferString(`{"data":{"type":"status","id":"default","attributes":{"stopped":true}}}`),
+		)
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		t.Logf("Response body: %s", body)
+		assert.NoError(t, resp.Body.Close())
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
 }
 
 func TestAbortedByUserWithRestAPI(t *testing.T) {
@@ -688,44 +774,10 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 		lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, 0,
 	)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	asyncWaitForStdoutAndStopTestFromRESTAPI(t, ts, 15, time.Second, "a simple iteration")
 
-	go func() {
-		defer wg.Done()
-		newRootCommand(ts.globalState).execute()
-	}()
+	newRootCommand(ts.globalState).execute()
 
-	reachedIteration := false
-	for i := 0; i <= 10 && reachedIteration == false; i++ {
-		time.Sleep(1 * time.Second)
-		ts.outMutex.Lock()
-		stdOut := ts.stdOut.String()
-		ts.outMutex.Unlock()
-
-		if !strings.Contains(stdOut, "a simple iteration") {
-			t.Logf("did not see an iteration on try %d at t=%s", i, time.Now())
-			continue
-		}
-
-		reachedIteration = true
-		req, err := http.NewRequestWithContext(
-			ts.ctx, http.MethodPatch, fmt.Sprintf("http://%s/v1/status", ts.flags.address),
-			bytes.NewBufferString(`{"data":{"type":"status","id":"default","attributes":{"stopped":true}}}`),
-		)
-		require.NoError(t, err)
-		resp, err := http.DefaultClient.Do(req)
-		require.NoError(t, err)
-		body, err := io.ReadAll(resp.Body)
-		assert.NoError(t, err)
-		t.Logf("Response body: %s", body)
-		assert.NoError(t, resp.Body.Close())
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-	}
-
-	assert.True(t, reachedIteration)
-
-	wg.Wait()
 	stdOut := ts.stdOut.String()
 	t.Log(stdOut)
 	assert.Contains(t, stdOut, `a simple iteration`)
@@ -791,40 +843,8 @@ func runTestWithNoLinger(t *testing.T, ts *globalTestState) {
 
 func runTestWithLinger(t *testing.T, ts *globalTestState) {
 	ts.args = append(ts.args, "--linger")
-
-	sendSignal := make(chan struct{})
-	ts.globalState.signalNotify = func(c chan<- os.Signal, s ...os.Signal) {
-		go func() {
-			<-sendSignal
-			c <- os.Interrupt
-		}()
-	}
-	ts.globalState.signalStop = func(c chan<- os.Signal) { /* noop */ }
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		newRootCommand(ts.globalState).execute()
-	}()
-
-	testFinished := false
-	for i := 0; i <= 15 && testFinished == false; i++ {
-		time.Sleep(1 * time.Second)
-		ts.outMutex.Lock()
-		stdOut := ts.stdOut.String()
-		ts.outMutex.Unlock()
-
-		if !strings.Contains(stdOut, "Linger set; waiting for Ctrl+C") {
-			t.Logf("test wasn't finished on try %d at t=%s", i, time.Now())
-			continue
-		}
-		testFinished = true
-		close(sendSignal)
-	}
-
-	require.True(t, testFinished)
-	wg.Wait()
+	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "Linger set; waiting for Ctrl+C")
+	newRootCommand(ts.globalState).execute()
 }
 
 func TestAbortedByScriptSetupError(t *testing.T) {
