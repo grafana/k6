@@ -40,51 +40,134 @@ func mapBrowserToGoja(vu k6modules.VU) *goja.Object {
 	return obj
 }
 
+// mapFrame to the JS module.
+//
+//nolint:funlen
+func mapFrame(rt *goja.Runtime, f api.Frame) mapping {
+	maps := mapping{
+		"addScriptTag": f.AddScriptTag,
+		"addStyleTag":  f.AddStyleTag,
+		"check":        f.Check,
+		"childFrames": func() *goja.Object {
+			var (
+				mcfs []mapping
+				cfs  = f.ChildFrames()
+			)
+			for _, fr := range cfs {
+				mcfs = append(mcfs, mapFrame(rt, fr))
+			}
+			return rt.ToValue(mcfs).ToObject(rt)
+		},
+		"click":          f.Click,
+		"content":        f.Content,
+		"dblclick":       f.Dblclick,
+		"dispatchEvent":  f.DispatchEvent,
+		"evaluate":       f.Evaluate,
+		"evaluateHandle": f.EvaluateHandle,
+		"fill":           f.Fill,
+		"focus":          f.Focus,
+		"frameElement":   f.FrameElement,
+		"getAttribute":   f.GetAttribute,
+		"goto":           f.Goto,
+		"hover":          f.Hover,
+		"innerHTML":      f.InnerHTML,
+		"innerText":      f.InnerText,
+		"inputValue":     f.InputValue,
+		"isChecked":      f.IsChecked,
+		"isDetached":     f.IsDetached,
+		"isDisabled":     f.IsDisabled,
+		"isEditable":     f.IsEditable,
+		"isEnabled":      f.IsEnabled,
+		"isHidden":       f.IsHidden,
+		"isVisible":      f.IsVisible,
+		"iD":             f.ID,
+		"loaderID":       f.LoaderID,
+		"locator":        f.Locator,
+		"name":           f.Name,
+		"page": func() *goja.Object {
+			mp := mapPage(rt, f.Page())
+			return rt.ToValue(mp).ToObject(rt)
+		},
+		"parentFrame": func() *goja.Object {
+			mf := mapFrame(rt, f.ParentFrame())
+			return rt.ToValue(mf).ToObject(rt)
+		},
+		"press":             f.Press,
+		"selectOption":      f.SelectOption,
+		"setContent":        f.SetContent,
+		"setInputFiles":     f.SetInputFiles,
+		"tap":               f.Tap,
+		"textContent":       f.TextContent,
+		"title":             f.Title,
+		"type":              f.Type,
+		"uncheck":           f.Uncheck,
+		"url":               f.URL,
+		"waitForFunction":   f.WaitForFunction,
+		"waitForLoadState":  f.WaitForLoadState,
+		"waitForNavigation": f.WaitForNavigation,
+		"waitForSelector":   f.WaitForSelector,
+		"waitForTimeout":    f.WaitForTimeout,
+	}
+
+	return maps
+}
+
 // mapPage to the JS module.
 //
 //nolint:funlen
 func mapPage(rt *goja.Runtime, p api.Page) mapping {
-	_ = rt
 	maps := mapping{
-		"addInitScript":               p.AddInitScript,
-		"addScriptTag":                p.AddScriptTag,
-		"addStyleTag":                 p.AddStyleTag,
-		"bringToFront":                p.BringToFront,
-		"check":                       p.Check,
-		"click":                       p.Click,
-		"close":                       p.Close,
-		"content":                     p.Content,
-		"context":                     p.Context,
-		"dblclick":                    p.Dblclick,
-		"dispatchEvent":               p.DispatchEvent,
-		"dragAndDrop":                 p.DragAndDrop,
-		"emulateMedia":                p.EmulateMedia,
-		"emulateVisionDeficiency":     p.EmulateVisionDeficiency,
-		"evaluate":                    p.Evaluate,
-		"evaluateHandle":              p.EvaluateHandle,
-		"exposeBinding":               p.ExposeBinding,
-		"exposeFunction":              p.ExposeFunction,
-		"fill":                        p.Fill,
-		"focus":                       p.Focus,
-		"frame":                       p.Frame,
-		"frames":                      p.Frames,
-		"getAttribute":                p.GetAttribute,
-		"goBack":                      p.GoBack,
-		"goForward":                   p.GoForward,
-		"goto":                        p.Goto,
-		"hover":                       p.Hover,
-		"innerHTML":                   p.InnerHTML,
-		"innerText":                   p.InnerText,
-		"inputValue":                  p.InputValue,
-		"isChecked":                   p.IsChecked,
-		"isClosed":                    p.IsClosed,
-		"isDisabled":                  p.IsDisabled,
-		"isEditable":                  p.IsEditable,
-		"isEnabled":                   p.IsEnabled,
-		"isHidden":                    p.IsHidden,
-		"isVisible":                   p.IsVisible,
-		"locator":                     p.Locator,
-		"mainFrame":                   p.MainFrame,
+		"addInitScript":           p.AddInitScript,
+		"addScriptTag":            p.AddScriptTag,
+		"addStyleTag":             p.AddStyleTag,
+		"bringToFront":            p.BringToFront,
+		"check":                   p.Check,
+		"click":                   p.Click,
+		"close":                   p.Close,
+		"content":                 p.Content,
+		"context":                 p.Context,
+		"dblclick":                p.Dblclick,
+		"dispatchEvent":           p.DispatchEvent,
+		"dragAndDrop":             p.DragAndDrop,
+		"emulateMedia":            p.EmulateMedia,
+		"emulateVisionDeficiency": p.EmulateVisionDeficiency,
+		"evaluate":                p.Evaluate,
+		"evaluateHandle":          p.EvaluateHandle,
+		"exposeBinding":           p.ExposeBinding,
+		"exposeFunction":          p.ExposeFunction,
+		"fill":                    p.Fill,
+		"focus":                   p.Focus,
+		"frame":                   p.Frame,
+		"frames": func() *goja.Object {
+			var (
+				mfrs []mapping
+				frs  = p.Frames()
+			)
+			for _, fr := range frs {
+				mfrs = append(mfrs, mapFrame(rt, fr))
+			}
+			return rt.ToValue(mfrs).ToObject(rt)
+		},
+		"getAttribute": p.GetAttribute,
+		"goBack":       p.GoBack,
+		"goForward":    p.GoForward,
+		"goto":         p.Goto,
+		"hover":        p.Hover,
+		"innerHTML":    p.InnerHTML,
+		"innerText":    p.InnerText,
+		"inputValue":   p.InputValue,
+		"isChecked":    p.IsChecked,
+		"isClosed":     p.IsClosed,
+		"isDisabled":   p.IsDisabled,
+		"isEditable":   p.IsEditable,
+		"isEnabled":    p.IsEnabled,
+		"isHidden":     p.IsHidden,
+		"isVisible":    p.IsVisible,
+		"locator":      p.Locator,
+		"mainFrame": func() *goja.Object {
+			mf := mapFrame(rt, p.MainFrame())
+			return rt.ToValue(mf).ToObject(rt)
+		},
 		"opener":                      p.Opener,
 		"pause":                       p.Pause,
 		"pdf":                         p.Pdf,
