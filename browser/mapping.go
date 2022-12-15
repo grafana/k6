@@ -40,9 +40,90 @@ func mapBrowserToGoja(vu k6modules.VU) *goja.Object {
 	return obj
 }
 
+// mapPage to the JS module.
+//
+//nolint:funlen
+func mapPage(rt *goja.Runtime, p api.Page) mapping {
+	_ = rt
+	maps := mapping{
+		"addInitScript":               p.AddInitScript,
+		"addScriptTag":                p.AddScriptTag,
+		"addStyleTag":                 p.AddStyleTag,
+		"bringToFront":                p.BringToFront,
+		"check":                       p.Check,
+		"click":                       p.Click,
+		"close":                       p.Close,
+		"content":                     p.Content,
+		"context":                     p.Context,
+		"dblclick":                    p.Dblclick,
+		"dispatchEvent":               p.DispatchEvent,
+		"dragAndDrop":                 p.DragAndDrop,
+		"emulateMedia":                p.EmulateMedia,
+		"emulateVisionDeficiency":     p.EmulateVisionDeficiency,
+		"evaluate":                    p.Evaluate,
+		"evaluateHandle":              p.EvaluateHandle,
+		"exposeBinding":               p.ExposeBinding,
+		"exposeFunction":              p.ExposeFunction,
+		"fill":                        p.Fill,
+		"focus":                       p.Focus,
+		"frame":                       p.Frame,
+		"frames":                      p.Frames,
+		"getAttribute":                p.GetAttribute,
+		"goBack":                      p.GoBack,
+		"goForward":                   p.GoForward,
+		"goto":                        p.Goto,
+		"hover":                       p.Hover,
+		"innerHTML":                   p.InnerHTML,
+		"innerText":                   p.InnerText,
+		"inputValue":                  p.InputValue,
+		"isChecked":                   p.IsChecked,
+		"isClosed":                    p.IsClosed,
+		"isDisabled":                  p.IsDisabled,
+		"isEditable":                  p.IsEditable,
+		"isEnabled":                   p.IsEnabled,
+		"isHidden":                    p.IsHidden,
+		"isVisible":                   p.IsVisible,
+		"locator":                     p.Locator,
+		"mainFrame":                   p.MainFrame,
+		"opener":                      p.Opener,
+		"pause":                       p.Pause,
+		"pdf":                         p.Pdf,
+		"press":                       p.Press,
+		"reload":                      p.Reload,
+		"route":                       p.Route,
+		"screenshot":                  p.Screenshot,
+		"selectOption":                p.SelectOption,
+		"setContent":                  p.SetContent,
+		"setDefaultNavigationTimeout": p.SetDefaultNavigationTimeout,
+		"setDefaultTimeout":           p.SetDefaultTimeout,
+		"setExtraHTTPHeaders":         p.SetExtraHTTPHeaders,
+		"setInputFiles":               p.SetInputFiles,
+		"setViewportSize":             p.SetViewportSize,
+		"tap":                         p.Tap,
+		"textContent":                 p.TextContent,
+		"title":                       p.Title,
+		"type":                        p.Type,
+		"uncheck":                     p.Uncheck,
+		"unroute":                     p.Unroute,
+		"url":                         p.URL,
+		"video":                       p.Video,
+		"viewportSize":                p.ViewportSize,
+		"waitForEvent":                p.WaitForEvent,
+		"waitForFunction":             p.WaitForFunction,
+		"waitForLoadState":            p.WaitForLoadState,
+		"waitForNavigation":           p.WaitForNavigation,
+		"waitForRequest":              p.WaitForRequest,
+		"waitForResponse":             p.WaitForResponse,
+		"waitForSelector":             p.WaitForSelector,
+		"waitForTimeout":              p.WaitForTimeout,
+		"workers":                     p.Workers,
+	}
+
+	return maps
+}
+
 // mapBrowserContext to the JS module.
 func mapBrowserContext(rt *goja.Runtime, bc api.BrowserContext) mapping {
-	_ = rt
 	return mapping{
 		"addCookies":                  bc.AddCookies,
 		"addInitScript":               bc.AddInitScript,
@@ -65,8 +146,26 @@ func mapBrowserContext(rt *goja.Runtime, bc api.BrowserContext) mapping {
 		"storageState":                bc.StorageState,
 		"unroute":                     bc.Unroute,
 		"waitForEvent":                bc.WaitForEvent,
-		"pages":                       bc.Pages,
-		"newPage":                     bc.NewPage,
+		"pages": func() *goja.Object {
+			var (
+				mpages []mapping
+				pages  = bc.Pages()
+			)
+			for _, page := range pages {
+				if page == nil {
+					continue
+				}
+				m := mapPage(rt, page)
+				mpages = append(mpages, m)
+			}
+
+			return rt.ToValue(mpages).ToObject(rt)
+		},
+		"newPage": func() *goja.Object {
+			page := bc.NewPage()
+			m := mapPage(rt, page)
+			return rt.ToValue(m).ToObject(rt)
+		},
 	}
 }
 
@@ -84,7 +183,11 @@ func mapBrowser(rt *goja.Runtime, b api.Browser) mapping {
 			m := mapBrowserContext(rt, bctx)
 			return rt.ToValue(m).ToObject(rt)
 		},
-		"newPage": b.NewPage,
+		"newPage": func(opts goja.Value) *goja.Object {
+			page := b.NewPage(opts)
+			m := mapPage(rt, page)
+			return rt.ToValue(m).ToObject(rt)
+		},
 	}
 }
 
