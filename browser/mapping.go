@@ -40,6 +40,34 @@ func mapBrowserToGoja(vu k6modules.VU) *goja.Object {
 	return obj
 }
 
+// mapResponse to the JS module.
+func mapResponse(rt *goja.Runtime, r api.Response) mapping {
+	maps := mapping{
+		"allHeaders": r.AllHeaders,
+		"body":       r.Body,
+		"finished":   r.Finished,
+		"frame": func() *goja.Object {
+			mf := mapFrame(rt, r.Frame())
+			return rt.ToValue(mf).ToObject(rt)
+		},
+		"headerValue":     r.HeaderValue,
+		"headerValues":    r.HeaderValues,
+		"headers":         r.Headers,
+		"headersArray":    r.HeadersArray,
+		"jSON":            r.JSON,
+		"ok":              r.Ok,
+		"request":         r.Request,
+		"securityDetails": r.SecurityDetails,
+		"serverAddr":      r.ServerAddr,
+		"size":            r.Size,
+		"status":          r.Status,
+		"statusText":      r.StatusText,
+		"url":             r.URL,
+	}
+
+	return maps
+}
+
 // mapElementHandle to the JS module.
 func mapElementHandle(rt *goja.Runtime, eh api.ElementHandle) mapping {
 	maps := mapping{
@@ -238,11 +266,14 @@ func mapPage(rt *goja.Runtime, p api.Page) mapping {
 			mf := mapFrame(rt, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
-		"opener":                      p.Opener,
-		"pause":                       p.Pause,
-		"pdf":                         p.Pdf,
-		"press":                       p.Press,
-		"reload":                      p.Reload,
+		"opener": p.Opener,
+		"pause":  p.Pause,
+		"pdf":    p.Pdf,
+		"press":  p.Press,
+		"reload": func(opts goja.Value) *goja.Object {
+			r := mapResponse(rt, p.Reload(opts))
+			return rt.ToValue(r).ToObject(rt)
+		},
 		"route":                       p.Route,
 		"screenshot":                  p.Screenshot,
 		"selectOption":                p.SelectOption,
