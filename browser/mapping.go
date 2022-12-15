@@ -40,9 +40,38 @@ func mapBrowserToGoja(vu k6modules.VU) *goja.Object {
 	return obj
 }
 
+// mapBrowserContext to the JS module.
+func mapBrowserContext(rt *goja.Runtime, bc api.BrowserContext) mapping {
+	_ = rt
+	return mapping{
+		"addCookies":                  bc.AddCookies,
+		"addInitScript":               bc.AddInitScript,
+		"browser":                     bc.Browser,
+		"clearCookies":                bc.ClearCookies,
+		"clearPermissions":            bc.ClearPermissions,
+		"close":                       bc.Close,
+		"cookies":                     bc.Cookies,
+		"exposeBinding":               bc.ExposeBinding,
+		"exposeFunction":              bc.ExposeFunction,
+		"grantPermissions":            bc.GrantPermissions,
+		"newCDPSession":               bc.NewCDPSession,
+		"route":                       bc.Route,
+		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
+		"setDefaultTimeout":           bc.SetDefaultTimeout,
+		"setExtraHTTPHeaders":         bc.SetExtraHTTPHeaders,
+		"setGeolocation":              bc.SetGeolocation,
+		"setHTTPCredentials":          bc.SetHTTPCredentials, //nolint:staticcheck
+		"setOffline":                  bc.SetOffline,
+		"storageState":                bc.StorageState,
+		"unroute":                     bc.Unroute,
+		"waitForEvent":                bc.WaitForEvent,
+		"pages":                       bc.Pages,
+		"newPage":                     bc.NewPage,
+	}
+}
+
 // mapBrowser to the JS module.
 func mapBrowser(rt *goja.Runtime, b api.Browser) mapping {
-	_ = rt
 	return mapping{
 		"close":       b.Close,
 		"contexts":    b.Contexts,
@@ -50,8 +79,12 @@ func mapBrowser(rt *goja.Runtime, b api.Browser) mapping {
 		"on":          b.On,
 		"userAgent":   b.UserAgent,
 		"version":     b.Version,
-		"newContext":  b.NewContext,
-		"newPage":     b.NewPage,
+		"newContext": func(opts goja.Value) *goja.Object {
+			bctx := b.NewContext(opts)
+			m := mapBrowserContext(rt, bctx)
+			return rt.ToValue(m).ToObject(rt)
+		},
+		"newPage": b.NewPage,
 	}
 }
 
