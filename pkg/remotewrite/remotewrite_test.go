@@ -2,13 +2,17 @@ package remotewrite
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	prompb "go.buf.build/grpc/go/prometheus/prometheus"
+	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 	"gopkg.in/guregu/null.v3"
 )
@@ -339,5 +343,54 @@ func TestOutputStaleMarkers(t *testing.T) {
 		assert.Equal(t, expName, markers[i].Labels[0].Value)
 		assert.Equal(t, now.UnixMilli(), markers[i].Samples[0].Timestamp)
 		assert.True(t, math.IsNaN(markers[i].Samples[0].Value), "it isn't a StaleNaN value")
+	}
+}
+
+func TestOutputStopWithStaleMarkers(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []bool{true, false} {
+		logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
+		logger := logrus.New()
+		logger.SetLevel(logrus.DebugLevel)
+		logger.AddHook(logHook)
+		logger.SetOutput(io.Discard)
+
+		o := Output{
+			logger: logger,
+			config: Config{
+				// setting a large interval so it does not trigger
+				PushInterval: types.NullDurationFrom(1 * time.Hour),
+				StaleMarkers: null.BoolFrom(tc),
+			},
+		}
+
+		err := o.Start()
+		require.NoError(t, err)
+		err = o.Stop()
+		require.NoError(t, err)
+
+		// TODO: it isn't optimal to maintain
+		// if a new logline is added in Start or flushMetrics
+		// then this test will break
+		// A mock of the client and check if Store is invoked
+		// should be a more stable method.
+		entries := logHook.Drain()
+		require.NotEmpty(t, entries)
+
+		messages := func() []string {
+			s := make([]string, 0, len(entries))
+			for _, e := range entries {
+				s = append(s, e.Message)
+			}
+			return s
+		}()
+
+		msg := "No time series to mark as stale"
+		assertfn := assert.Contains
+		if !tc {
+			assertfn = assert.NotContains
+		}
+		assertfn(t, messages, msg)
 	}
 }

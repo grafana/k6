@@ -4,11 +4,11 @@ package remotewrite
 import (
 	"context"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
 	"github.com/grafana/xk6-output-prometheus-remote/pkg/remote"
+	"github.com/grafana/xk6-output-prometheus-remote/pkg/stale"
 
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
@@ -17,16 +17,7 @@ import (
 	prompb "go.buf.build/grpc/go/prometheus/prometheus"
 )
 
-var (
-	_ output.Output = new(Output)
-
-	// staleNaN is the Prometheus special value for marking
-	// a time series as stale.
-	//
-	// https://pkg.go.dev/github.com/prometheus/prometheus/pkg/value#pkg-constants
-	//nolint:gochecknoglobals
-	staleNaN = math.Float64frombits(0x7ff0000000000002)
-)
+var _ output.Output = new(Output)
 
 // Output is a k6 output that sends metrics to a Prometheus remote write endpoint.
 type Output struct {
@@ -99,8 +90,11 @@ func (o *Output) Stop() error {
 	defer o.logger.Debug("Output stopped")
 	o.periodicFlusher.Stop()
 
-	staleMarkers := o.staleMarkers(time.Now())
+	if !o.config.StaleMarkers.Bool {
+		return nil
+	}
 
+	staleMarkers := o.staleMarkers(time.Now())
 	if len(staleMarkers) < 1 {
 		o.logger.Debug("No time series to mark as stale")
 		return nil
@@ -133,7 +127,7 @@ func (o *Output) staleMarkers(t time.Time) []*prompb.TimeSeries {
 				s.Samples = append(s.Samples, &prompb.Sample{})
 			}
 
-			s.Samples[0].Value = staleNaN
+			s.Samples[0].Value = stale.Marker
 			s.Samples[0].Timestamp = timestamp
 		}
 		staleMarkers = append(staleMarkers, series...)

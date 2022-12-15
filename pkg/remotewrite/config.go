@@ -53,6 +53,8 @@ type Config struct {
 	//
 	// TODO: should we support K6_SUMMARY_TREND_STATS?
 	TrendStats []string `json:"trendStats"`
+
+	StaleMarkers null.Bool `json:"staleMarkers"`
 }
 
 // NewConfig creates an Output's configuration.
@@ -65,6 +67,7 @@ func NewConfig() Config {
 		PushInterval:          types.NullDurationFrom(defaultPushInterval),
 		Headers:               make(map[string]string),
 		TrendStats:            defaultTrendStats,
+		StaleMarkers:          null.BoolFrom(false),
 	}
 }
 
@@ -119,6 +122,10 @@ func (conf Config) Apply(applied Config) Config {
 
 	if applied.TrendAsNativeHistogram.Valid {
 		conf.TrendAsNativeHistogram = applied.TrendAsNativeHistogram
+	}
+
+	if applied.StaleMarkers.Valid {
+		conf.StaleMarkers = applied.StaleMarkers
 	}
 
 	if len(applied.Headers) > 0 {
@@ -233,6 +240,12 @@ func parseEnvs(env map[string]string) (Config, error) {
 		return c, err
 	} else if b.Valid {
 		c.TrendAsNativeHistogram = b
+	}
+
+	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_STALE_MARKERS"); err != nil {
+		return c, err
+	} else if b.Valid {
+		c.StaleMarkers = b
 	}
 
 	if trendStats, trendStatsDefined := env["K6_PROMETHEUS_RW_TREND_STATS"]; trendStatsDefined {

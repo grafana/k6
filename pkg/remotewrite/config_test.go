@@ -28,7 +28,8 @@ func TestConfigApply(t *testing.T) {
 		Headers: map[string]string{
 			"X-Header": "value",
 		},
-		TrendStats: []string{"p(99)"},
+		TrendStats:   []string{"p(99)"},
+		StaleMarkers: null.BoolFrom(true),
 	}
 
 	// Defaults should be overwritten by valid values
@@ -106,6 +107,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 				PushInterval:          types.NullDurationFrom(5 * time.Second),
 				Headers:               make(map[string]string),
 				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
 			},
 		},
 		"JSONSuccess": {
@@ -118,6 +120,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers:               make(map[string]string),
 				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
 			},
 		},
 		"MixedSuccess": {
@@ -135,6 +138,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers:               make(map[string]string),
 				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
 			},
 		},
 		"OrderOfPrecedence": {
@@ -152,6 +156,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers:               make(map[string]string),
 				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
 			},
 		},
 		"InvalidJSON": {
@@ -224,6 +229,7 @@ func TestOptionServerURL(t *testing.T) {
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"p(99)"},
+		StaleMarkers:          null.BoolFrom(false),
 	}
 	for name, tc := range cases {
 		tc := tc
@@ -259,7 +265,8 @@ func TestOptionHeaders(t *testing.T) {
 			"X-MY-HEADER1": "hval1",
 			"X-MY-HEADER2": "hval2",
 		},
-		TrendStats: []string{"p(99)"},
+		TrendStats:   []string{"p(99)"},
+		StaleMarkers: null.BoolFrom(false),
 	}
 	for name, tc := range cases {
 		tc := tc
@@ -293,6 +300,7 @@ func TestOptionInsecureSkipTLSVerify(t *testing.T) {
 		PushInterval:          types.NullDurationFrom(defaultPushInterval),
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"p(99)"},
+		StaleMarkers:          null.BoolFrom(false),
 	}
 	for name, tc := range cases {
 		tc := tc
@@ -328,6 +336,7 @@ func TestOptionBasicAuth(t *testing.T) {
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"p(99)"},
+		StaleMarkers:          null.BoolFrom(false),
 	}
 
 	for name, tc := range cases {
@@ -365,6 +374,7 @@ func TestOptionTrendAsNativeHistogram(t *testing.T) {
 		Headers:                make(map[string]string),
 		TrendAsNativeHistogram: null.BoolFrom(true),
 		TrendStats:             []string{"p(99)"},
+		StaleMarkers:           null.BoolFrom(false),
 	}
 
 	for name, tc := range cases {
@@ -401,6 +411,7 @@ func TestOptionPushInterval(t *testing.T) {
 		PushInterval:          types.NullDurationFrom((1 * time.Minute) + (2 * time.Second)),
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"p(99)"},
+		StaleMarkers:          null.BoolFrom(false),
 	}
 
 	for name, tc := range cases {
@@ -436,6 +447,40 @@ func TestConfigTrendStats(t *testing.T) {
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"max", "p(95)"},
+		StaleMarkers:          null.BoolFrom(false),
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
+func TestOptionStaleMarker(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"staleMarkers":true}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_STALE_MARKERS": "true"}},
+	}
+
+	expconfig := Config{
+		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+		InsecureSkipTLSVerify: null.BoolFrom(true),
+		PushInterval:          types.NullDurationFrom(5 * time.Second),
+		Headers:               make(map[string]string),
+		TrendStats:            []string{"p(99)"},
+		StaleMarkers:          null.BoolFrom(true),
 	}
 
 	for name, tc := range cases {
