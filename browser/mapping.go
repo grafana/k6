@@ -40,6 +40,69 @@ func mapBrowserToGoja(vu k6modules.VU) *goja.Object {
 	return obj
 }
 
+// mapElementHandle to the JS module.
+func mapElementHandle(rt *goja.Runtime, eh api.ElementHandle) mapping {
+	maps := mapping{
+		"asElement": func() *goja.Object {
+			m := mapElementHandle(rt, eh.AsElement())
+			return rt.ToValue(m).ToObject(rt)
+		},
+		"dispose":        eh.Dispose,
+		"evaluate":       eh.Evaluate,
+		"evaluateHandle": eh.EvaluateHandle,
+		"getProperties":  eh.GetProperties,
+		"getProperty":    eh.GetProperty,
+		"jSONValue":      eh.JSONValue,
+		"objectID":       eh.ObjectID,
+		"boundingBox":    eh.BoundingBox,
+		"check":          eh.Check,
+		"click":          eh.Click,
+		"contentFrame": func() *goja.Object {
+			f := eh.ContentFrame()
+			mf := mapFrame(rt, f)
+			return rt.ToValue(mf).ToObject(rt)
+		},
+		"dblclick":      eh.Dblclick,
+		"dispatchEvent": eh.DispatchEvent,
+		"fill":          eh.Fill,
+		"focus":         eh.Focus,
+		"getAttribute":  eh.GetAttribute,
+		"hover":         eh.Hover,
+		"innerHTML":     eh.InnerHTML,
+		"innerText":     eh.InnerText,
+		"inputValue":    eh.InputValue,
+		"isChecked":     eh.IsChecked,
+		"isDisabled":    eh.IsDisabled,
+		"isEditable":    eh.IsEditable,
+		"isEnabled":     eh.IsEnabled,
+		"isHidden":      eh.IsHidden,
+		"isVisible":     eh.IsVisible,
+		"ownerFrame": func() *goja.Object {
+			f := eh.OwnerFrame()
+			mf := mapFrame(rt, f)
+			return rt.ToValue(mf).ToObject(rt)
+		},
+		"press":                  eh.Press,
+		"screenshot":             eh.Screenshot,
+		"scrollIntoViewIfNeeded": eh.ScrollIntoViewIfNeeded,
+		"selectOption":           eh.SelectOption,
+		"selectText":             eh.SelectText,
+		"setInputFiles":          eh.SetInputFiles,
+		"tap":                    eh.Tap,
+		"textContent":            eh.TextContent,
+		"type":                   eh.Type,
+		"uncheck":                eh.Uncheck,
+		"waitForElementState":    eh.WaitForElementState,
+		"waitForSelector": func(selector string, opts goja.Value) *goja.Object {
+			eh := eh.WaitForSelector(selector, opts)
+			ehm := mapElementHandle(rt, eh)
+			return rt.ToValue(ehm).ToObject(rt)
+		},
+	}
+
+	return maps
+}
+
 // mapFrame to the JS module.
 //
 //nolint:funlen
@@ -66,24 +129,27 @@ func mapFrame(rt *goja.Runtime, f api.Frame) mapping {
 		"evaluateHandle": f.EvaluateHandle,
 		"fill":           f.Fill,
 		"focus":          f.Focus,
-		"frameElement":   f.FrameElement,
-		"getAttribute":   f.GetAttribute,
-		"goto":           f.Goto,
-		"hover":          f.Hover,
-		"innerHTML":      f.InnerHTML,
-		"innerText":      f.InnerText,
-		"inputValue":     f.InputValue,
-		"isChecked":      f.IsChecked,
-		"isDetached":     f.IsDetached,
-		"isDisabled":     f.IsDisabled,
-		"isEditable":     f.IsEditable,
-		"isEnabled":      f.IsEnabled,
-		"isHidden":       f.IsHidden,
-		"isVisible":      f.IsVisible,
-		"iD":             f.ID,
-		"loaderID":       f.LoaderID,
-		"locator":        f.Locator,
-		"name":           f.Name,
+		"frameElement": func() *goja.Object {
+			eh := mapElementHandle(rt, f.FrameElement())
+			return rt.ToValue(eh).ToObject(rt)
+		},
+		"getAttribute": f.GetAttribute,
+		"goto":         f.Goto,
+		"hover":        f.Hover,
+		"innerHTML":    f.InnerHTML,
+		"innerText":    f.InnerText,
+		"inputValue":   f.InputValue,
+		"isChecked":    f.IsChecked,
+		"isDetached":   f.IsDetached,
+		"isDisabled":   f.IsDisabled,
+		"isEditable":   f.IsEditable,
+		"isEnabled":    f.IsEnabled,
+		"isHidden":     f.IsHidden,
+		"isVisible":    f.IsVisible,
+		"iD":           f.ID,
+		"loaderID":     f.LoaderID,
+		"locator":      f.Locator,
+		"name":         f.Name,
 		"page": func() *goja.Object {
 			mp := mapPage(rt, f.Page())
 			return rt.ToValue(mp).ToObject(rt)
@@ -105,8 +171,12 @@ func mapFrame(rt *goja.Runtime, f api.Frame) mapping {
 		"waitForFunction":   f.WaitForFunction,
 		"waitForLoadState":  f.WaitForLoadState,
 		"waitForNavigation": f.WaitForNavigation,
-		"waitForSelector":   f.WaitForSelector,
-		"waitForTimeout":    f.WaitForTimeout,
+		"waitForSelector": func(selector string, opts goja.Value) *goja.Object {
+			eh := f.WaitForSelector(selector, opts)
+			ehm := mapElementHandle(rt, eh)
+			return rt.ToValue(ehm).ToObject(rt)
+		},
+		"waitForTimeout": f.WaitForTimeout,
 	}
 
 	return maps
