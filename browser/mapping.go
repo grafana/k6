@@ -40,6 +40,44 @@ func mapBrowserToGoja(vu k6modules.VU) *goja.Object {
 	return obj
 }
 
+// mapRequest to the JS module.
+func mapRequest(rt *goja.Runtime, r api.Request) mapping {
+	maps := mapping{
+		"allHeaders": r.AllHeaders,
+		"failure":    r.Failure,
+		"frame": func() *goja.Object {
+			mf := mapFrame(rt, r.Frame())
+			return rt.ToValue(mf).ToObject(rt)
+		},
+		"headerValue":         r.HeaderValue,
+		"headers":             r.Headers,
+		"headersArray":        r.HeadersArray,
+		"isNavigationRequest": r.IsNavigationRequest,
+		"method":              r.Method,
+		"postData":            r.PostData,
+		"postDataBuffer":      r.PostDataBuffer,
+		"postDataJSON":        r.PostDataJSON,
+		"redirectedFrom": func() *goja.Object {
+			mr := mapRequest(rt, r.RedirectedFrom())
+			return rt.ToValue(mr).ToObject(rt)
+		},
+		"redirectedTo": func() *goja.Object {
+			mr := mapRequest(rt, r.RedirectedTo())
+			return rt.ToValue(mr).ToObject(rt)
+		},
+		"resourceType": r.ResourceType,
+		"response": func() *goja.Object {
+			mr := mapResponse(rt, r.Response())
+			return rt.ToValue(mr).ToObject(rt)
+		},
+		"size":   r.Size,
+		"timing": r.Timing,
+		"url":    r.URL,
+	}
+
+	return maps
+}
+
 // mapResponse to the JS module.
 func mapResponse(rt *goja.Runtime, r api.Response) mapping {
 	maps := mapping{
@@ -50,13 +88,16 @@ func mapResponse(rt *goja.Runtime, r api.Response) mapping {
 			mf := mapFrame(rt, r.Frame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
-		"headerValue":     r.HeaderValue,
-		"headerValues":    r.HeaderValues,
-		"headers":         r.Headers,
-		"headersArray":    r.HeadersArray,
-		"jSON":            r.JSON,
-		"ok":              r.Ok,
-		"request":         r.Request,
+		"headerValue":  r.HeaderValue,
+		"headerValues": r.HeaderValues,
+		"headers":      r.Headers,
+		"headersArray": r.HeadersArray,
+		"jSON":         r.JSON,
+		"ok":           r.Ok,
+		"request": func() *goja.Object {
+			mr := mapRequest(rt, r.Request())
+			return rt.ToValue(mr).ToObject(rt)
+		},
 		"securityDetails": r.SecurityDetails,
 		"serverAddr":      r.ServerAddr,
 		"size":            r.Size,
