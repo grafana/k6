@@ -12,8 +12,6 @@ import (
 	k6modules "go.k6.io/k6/js/modules"
 )
 
-var _ = mapBrowserToGoja(nil)
-
 // mapping is a type of mapping between our API (api/) and the JS
 // module. It acts like a bridge and allows adding wildcard methods
 // and customization over our API.
