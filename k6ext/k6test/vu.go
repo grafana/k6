@@ -5,7 +5,6 @@ import (
 
 	"github.com/grafana/xk6-browser/k6ext"
 
-	k6common "go.k6.io/k6/js/common"
 	k6eventloop "go.k6.io/k6/js/eventloop"
 	k6modulestest "go.k6.io/k6/js/modulestest"
 	k6lib "go.k6.io/k6/lib"
@@ -56,9 +55,6 @@ func (v *VU) AssertSamples(assertSample func(s k6metrics.Sample)) int {
 // NewVU returns a mock k6 VU.
 func NewVU(tb testing.TB) *VU {
 	tb.Helper()
-
-	rt := goja.New()
-	rt.SetFieldNameMapper(k6common.FieldNameMapper{})
 
 	samples := make(chan k6metrics.SampleContainer, 1000)
 
