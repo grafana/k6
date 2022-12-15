@@ -74,7 +74,7 @@ You can run scripts like this on the CLI, or in your CI, or across a Kubernetes 
 The docs cover all aspects of using k6. Some highlights include:
 - [Get Started](https://k6.io/docs). Install, run a test, inspect results.
 - [HTTP requests](https://k6.io/docs/using-k6/http-requests/). Have your virtual users use HTTP methods.
-  Or, check the other [Protocols](https://k6.io/docs).
+  Or, check the other [Protocols](https://k6.io/docs/using-k6/protocols/).
 - [Thresholds](https://k6.io/docs/using-k6/thresholds). Set goals for your test, and codify your SLOs.
 - [Options](https://k6.io/docs/using-k6/k6-options). Configure your load, duration, TLS certificates, and much, much more.
 - [Scenarios](https://k6.io/docs/using-k6/scenarios).
