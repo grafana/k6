@@ -40,14 +40,31 @@ func mapBrowserToGoja(vu k6modules.VU) *goja.Object {
 	return obj
 }
 
+// mapBrowser to the JS module.
+func mapBrowser(rt *goja.Runtime, b api.Browser) mapping {
+	_ = rt
+	return mapping{
+		"close":       b.Close,
+		"contexts":    b.Contexts,
+		"isConnected": b.IsConnected,
+		"on":          b.On,
+		"userAgent":   b.UserAgent,
+		"version":     b.Version,
+		"newContext":  b.NewContext,
+		"newPage":     b.NewPage,
+	}
+}
+
 // mapBrowserType to the JS module.
 func mapBrowserType(rt *goja.Runtime, bt api.BrowserType) mapping {
-	_ = rt
 	return mapping{
 		"connect":                 bt.Connect,
 		"executablePath":          bt.ExecutablePath,
 		"launchPersistentContext": bt.LaunchPersistentContext,
 		"name":                    bt.Name,
-		"launch":                  bt.Launch,
+		"launch": func(opts goja.Value) *goja.Object {
+			m := mapBrowser(rt, bt.Launch(opts))
+			return rt.ToValue(m).ToObject(rt)
+		},
 	}
 }
