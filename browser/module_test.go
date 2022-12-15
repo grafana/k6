@@ -29,7 +29,7 @@ func TestModuleNew(t *testing.T) {
 	require.NotNil(t, m.mod, "Module should be set")
 	require.NotNil(t, m.mod.Chromium, "Chromium should be set")
 	require.NotNil(t, m.mod.Devices, "Devices should be set")
-	require.Equal(t, m.mod.Version, version, "Incorrect version")
+	require.Equal(t, version, m.mod.Version, "Incorrect version")
 }
 
 func TestModuleNewDisabled(t *testing.T) {
