@@ -48,16 +48,22 @@ type BrowserType struct {
 // NewBrowserType registers our custom k6 metrics, creates method mappings on
 // the goja runtime, and returns a new Chrome browser type.
 func NewBrowserType(vu k6modules.VU) api.BrowserType {
+	var (
+		rt    = vu.Runtime()
+		hooks = common.NewHooks()
+	)
+
 	// NOTE: vu.InitEnv() *must* be called from the script init scope,
 	// otherwise it will return nil.
 	k6m := k6ext.RegisterCustomMetrics(vu.InitEnv().Registry)
 	b := BrowserType{
 		vu:        vu,
-		hooks:     common.NewHooks(),
+		hooks:     hooks,
 		k6Metrics: k6m,
 		storage:   &storage.Dir{},
 		randSrc:   rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
 	}
+	rt.SetFieldNameMapper(common.NewFieldNameMapper())
 
 	return &b
 }

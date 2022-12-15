@@ -5,8 +5,8 @@ import (
 	"errors"
 	"os"
 
-	"github.com/dop251/goja"
-
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
 
 	k6common "go.k6.io/k6/js/common"
@@ -22,7 +22,7 @@ type (
 
 	// JSModule exposes the properties available to the JS script.
 	JSModule struct {
-		Chromium *goja.Object
+		Chromium api.BrowserType
 		Devices  map[string]common.Device
 		Version  string
 	}
@@ -57,7 +57,7 @@ func (*RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 
 	return &ModuleInstance{
 		mod: &JSModule{
-			Chromium: mapBrowserToGoja(vu),
+			Chromium: chromium.NewBrowserType(vu),
 			Devices:  common.GetDevices(),
 			Version:  version,
 		},

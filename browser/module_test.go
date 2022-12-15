@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/xk6-browser/chromium"
+
 	k6common "go.k6.io/k6/js/common"
 	k6modulestest "go.k6.io/k6/js/modulestest"
 	k6metrics "go.k6.io/k6/metrics"
@@ -27,9 +29,9 @@ func TestModuleNew(t *testing.T) {
 	m, ok := New().NewModuleInstance(vu).(*ModuleInstance)
 	require.True(t, ok, "NewModuleInstance should return a ModuleInstance")
 	require.NotNil(t, m.mod, "Module should be set")
-	require.NotNil(t, m.mod.Chromium, "Chromium should be set")
+	require.IsType(t, m.mod.Chromium, &chromium.BrowserType{})
 	require.NotNil(t, m.mod.Devices, "Devices should be set")
-	require.Equal(t, version, m.mod.Version, "Incorrect version")
+	require.Equal(t, m.mod.Version, version, "Incorrect version")
 }
 
 func TestModuleNewDisabled(t *testing.T) {
