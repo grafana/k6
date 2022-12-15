@@ -110,6 +110,8 @@ func mapResponse(rt *goja.Runtime, r api.Response) mapping {
 }
 
 // mapElementHandle to the JS module.
+//
+//nolint:funlen
 func mapElementHandle(rt *goja.Runtime, eh api.ElementHandle) mapping {
 	maps := mapping{
 		"asElement": func() *goja.Object {
@@ -167,6 +169,22 @@ func mapElementHandle(rt *goja.Runtime, eh api.ElementHandle) mapping {
 			ehm := mapElementHandle(rt, eh)
 			return rt.ToValue(ehm).ToObject(rt)
 		},
+	}
+	maps["$"] = func(selector string) *goja.Object {
+		eh := eh.Query(selector)
+		ehm := mapElementHandle(rt, eh)
+		return rt.ToValue(ehm).ToObject(rt)
+	}
+	maps["$$"] = func(selector string) *goja.Object {
+		var (
+			mehs []mapping
+			ehs  = eh.QueryAll(selector)
+		)
+		for _, eh := range ehs {
+			ehm := mapElementHandle(rt, eh)
+			mehs = append(mehs, ehm)
+		}
+		return rt.ToValue(mehs).ToObject(rt)
 	}
 
 	return maps
@@ -246,6 +264,22 @@ func mapFrame(rt *goja.Runtime, f api.Frame) mapping {
 			return rt.ToValue(ehm).ToObject(rt)
 		},
 		"waitForTimeout": f.WaitForTimeout,
+	}
+	maps["$"] = func(selector string) *goja.Object {
+		eh := f.Query(selector)
+		ehm := mapElementHandle(rt, eh)
+		return rt.ToValue(ehm).ToObject(rt)
+	}
+	maps["$$"] = func(selector string) *goja.Object {
+		var (
+			mehs []mapping
+			ehs  = f.QueryAll(selector)
+		)
+		for _, eh := range ehs {
+			ehm := mapElementHandle(rt, eh)
+			mehs = append(mehs, ehm)
+		}
+		return rt.ToValue(mehs).ToObject(rt)
 	}
 
 	return maps
@@ -342,6 +376,22 @@ func mapPage(rt *goja.Runtime, p api.Page) mapping {
 		"waitForSelector":             p.WaitForSelector,
 		"waitForTimeout":              p.WaitForTimeout,
 		"workers":                     p.Workers,
+	}
+	maps["$"] = func(selector string) *goja.Object {
+		eh := p.Query(selector)
+		ehm := mapElementHandle(rt, eh)
+		return rt.ToValue(ehm).ToObject(rt)
+	}
+	maps["$$"] = func(selector string) *goja.Object {
+		var (
+			mehs []mapping
+			ehs  = p.QueryAll(selector)
+		)
+		for _, eh := range ehs {
+			ehm := mapElementHandle(rt, eh)
+			mehs = append(mehs, ehm)
+		}
+		return rt.ToValue(mehs).ToObject(rt)
 	}
 
 	return maps
