@@ -131,6 +131,13 @@ func Execute() {
 	newRootCommand(gs).execute()
 }
 
+// ExecuteWithGlobalState runs the root command with an existing GlobalState.
+// This is needed by integration tests, and we don't want to modify the
+// Execute() signature to avoid breaking k6 extensions.
+func ExecuteWithGlobalState(gs *state.GlobalState) {
+	newRootCommand(gs).execute()
+}
+
 func (c *rootCommand) waitRemoteLogger() {
 	if c.loggerIsRemote {
 		select {

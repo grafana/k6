@@ -11,6 +11,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/types"
@@ -486,7 +487,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 func runTestCase(t *testing.T, testCase configConsolidationTestCase, subCmd string) {
 	t.Logf("Test for `k6 %s` with opts=%#v and exp=%#v\n", subCmd, testCase.options, testCase.expected)
 
-	ts := state.NewGlobalTestState(t)
+	ts := tests.NewGlobalTestState(t)
 	ts.CmdArgs = append([]string{"k6", subCmd}, testCase.options.cli...)
 	ts.Env = state.BuildEnvMap(testCase.options.env)
 	if testCase.options.fs != nil {

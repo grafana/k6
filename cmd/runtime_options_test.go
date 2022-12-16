@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
@@ -59,7 +59,7 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/script.js", jsCode.Bytes(), 0o644))
 
-	ts := state.NewGlobalTestState(t) // TODO: move upwards, make this into an almost full integration test
+	ts := tests.NewGlobalTestState(t) // TODO: move upwards, make this into an almost full integration test
 	registry := metrics.NewRegistry()
 	test := &loadedTest{
 		sourceRootPath: "script.js",

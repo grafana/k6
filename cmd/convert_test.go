@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/cmd/tests"
 )
 
 const testHAR = `
@@ -108,7 +108,7 @@ func TestConvertCmdCorrelate(t *testing.T) {
 	expectedTestPlan, err := ioutil.ReadFile("testdata/example.js")
 	require.NoError(t, err)
 
-	ts := state.NewGlobalTestState(t)
+	ts := tests.NewGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.FS, "correlate.har", har, 0o644))
 	ts.CmdArgs = []string{
 		"k6", "convert", "--output=result.js", "--correlate=true", "--no-batch=true",
@@ -143,7 +143,7 @@ func TestConvertCmdCorrelate(t *testing.T) {
 
 func TestConvertCmdStdout(t *testing.T) {
 	t.Parallel()
-	ts := state.NewGlobalTestState(t)
+	ts := tests.NewGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.FS, "stdout.har", []byte(testHAR), 0o644))
 	ts.CmdArgs = []string{"k6", "convert", "stdout.har"}
 
@@ -154,7 +154,7 @@ func TestConvertCmdStdout(t *testing.T) {
 func TestConvertCmdOutputFile(t *testing.T) {
 	t.Parallel()
 
-	ts := state.NewGlobalTestState(t)
+	ts := tests.NewGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.FS, "output.har", []byte(testHAR), 0o644))
 	ts.CmdArgs = []string{"k6", "convert", "--output", "result.js", "output.har"}
 

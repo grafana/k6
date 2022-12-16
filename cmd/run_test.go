@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/fsext"
@@ -201,7 +201,7 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			testScript, err := ioutil.ReadFile(path.Join("testdata", tc.testFilename))
 			require.NoError(t, err)
 
-			ts := state.NewGlobalTestState(t)
+			ts := tests.NewGlobalTestState(t)
 			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
 			ts.CmdArgs = append([]string{"k6", "run", tc.testFilename}, tc.extraArgs...)
 
@@ -256,7 +256,7 @@ func TestInvalidOptionsThresholdErrExitCode(t *testing.T) {
 			testScript, err := ioutil.ReadFile(path.Join("testdata", tc.testFilename))
 			require.NoError(t, err)
 
-			ts := state.NewGlobalTestState(t)
+			ts := tests.NewGlobalTestState(t)
 			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
 			ts.CmdArgs = append([]string{"k6", "run", tc.testFilename}, tc.extraArgs...)
 
@@ -306,7 +306,7 @@ func TestThresholdsRuntimeBehavior(t *testing.T) {
 			testScript, err := ioutil.ReadFile(path.Join("testdata", tc.testFilename))
 			require.NoError(t, err)
 
-			ts := state.NewGlobalTestState(t)
+			ts := tests.NewGlobalTestState(t)
 			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
 
 			ts.CmdArgs = []string{"k6", "run", tc.testFilename}

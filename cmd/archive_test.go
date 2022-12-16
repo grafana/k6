@@ -13,7 +13,7 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/errext/exitcodes"
 )
 
@@ -79,7 +79,7 @@ func TestArchiveThresholds(t *testing.T) {
 			testScript, err := ioutil.ReadFile(testCase.testFilename)
 			require.NoError(t, err)
 
-			ts := state.NewGlobalTestState(t)
+			ts := tests.NewGlobalTestState(t)
 			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, testCase.testFilename), testScript, 0o644))
 			ts.CmdArgs = []string{"k6", "archive", testCase.testFilename}
 			if testCase.noThresholds {
@@ -100,7 +100,7 @@ func TestArchiveContainsEnv(t *testing.T) {
 	// given some script that will be archived
 	fileName := "script.js"
 	testScript := []byte(`export default function () {}`)
-	ts := state.NewGlobalTestState(t)
+	ts := tests.NewGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, fileName), testScript, 0o644))
 
 	// when we do archiving and passing the `--env` flags
@@ -133,7 +133,7 @@ func TestArchiveNotContainsEnv(t *testing.T) {
 	// given some script that will be archived
 	fileName := "script.js"
 	testScript := []byte(`export default function () {}`)
-	ts := state.NewGlobalTestState(t)
+	ts := tests.NewGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, fileName), testScript, 0o644))
 
 	// when we do archiving and passing the `--env` flags altogether with `--exclude-env-vars` flag

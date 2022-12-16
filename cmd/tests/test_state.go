@@ -1,9 +1,8 @@
-package state
+package tests
 
 import (
 	"bytes"
 	"context"
-	"io"
 	"net"
 	"os/signal"
 	"runtime"
@@ -16,13 +15,14 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/ui/console"
 )
 
 // GlobalTestState is a wrapper around GlobalState for use in tests.
 type GlobalTestState struct {
-	*GlobalState
+	*state.GlobalState
 	Cancel func()
 
 	Stdout, Stderr *bytes.Buffer
@@ -80,10 +80,10 @@ func NewGlobalTestState(t *testing.T) *GlobalTestState {
 	})
 
 	outMutex := &sync.Mutex{}
-	defaultFlags := GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultFlags(".config")
 	defaultFlags.Address = getFreeBindAddr(t)
 
-	ts.GlobalState = &GlobalState{
+	ts.GlobalState = &state.GlobalState{
 		Ctx:          ctx,
 		FS:           fs,
 		Getwd:        func() (string, error) { return ts.Cwd, nil },
@@ -111,26 +111,6 @@ func NewGlobalTestState(t *testing.T) *GlobalTestState {
 	}
 
 	return ts
-}
-
-// TestOSFileW is the mock implementation of stdout/stderr.
-type TestOSFileW struct {
-	io.Writer
-}
-
-// Fd returns a mock file descriptor ID.
-func (f *TestOSFileW) Fd() uintptr {
-	return 0
-}
-
-// TestOSFileR is the mock implementation of stdin.
-type TestOSFileR struct {
-	io.Reader
-}
-
-// Fd returns a mock file descriptor ID.
-func (f *TestOSFileR) Fd() uintptr {
-	return 0
 }
 
 var portRangeStart uint64 = 6565 //nolint:gochecknoglobals

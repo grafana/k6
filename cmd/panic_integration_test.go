@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/testutils"
@@ -85,7 +85,7 @@ func TestRunScriptPanicsErrorsAndAbort(t *testing.T) {
 			t.Parallel()
 
 			testFilename := "script.js"
-			ts := state.NewGlobalTestState(t)
+			ts := tests.NewGlobalTestState(t)
 			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, testFilename), []byte(tc.testScript), 0o644))
 			ts.CmdArgs = []string{"k6", "run", testFilename}
 
