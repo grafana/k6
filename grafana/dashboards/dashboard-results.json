@@ -96,7 +96,7 @@
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
-            "max"
+            "last"
           ],
           "fields": "",
           "values": false
@@ -104,7 +104,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
           "datasource": {
@@ -116,10 +116,10 @@
           "expr": "sum(k6_http_reqs_total{testid=~\"$testid\"})",
           "format": "time_series",
           "hide": false,
-          "instant": false,
+          "instant": true,
           "interval": "",
           "legendFormat": "__auto",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
@@ -187,7 +187,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
           "datasource": {
@@ -273,7 +273,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
           "datasource": {
@@ -359,7 +359,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
           "datasource": {
@@ -445,7 +445,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
           "datasource": {
@@ -530,7 +530,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
           "datasource": {
@@ -892,7 +892,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "avg(sum(irate(k6_http_reqs_total{testid=~\"$testid\"}[$__range])))",
+          "expr": "sum(rate(k6_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -908,7 +908,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(sum(irate(k6_http_reqs_total{testid=~\"$testid\", expected_response=\"false\"}[$__range])))",
+          "expr": "avg(sum(rate(k6_http_reqs_total{testid=~\"$testid\", expected_response=\"false\"}[$__rate_interval])))",
           "hide": false,
           "instant": false,
           "legendFormat": "Failed Requests Rate",
@@ -922,9 +922,9 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(histogram_sum(rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__range]))\n/\nhistogram_count(rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__range])))",
+          "expr": "avg(histogram_sum(rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval]))\n/\nhistogram_count(rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "hide": false,
-          "legendFormat": "Response  Time",
+          "legendFormat": "Response  Time (avg)",
           "range": true,
           "refId": "C"
         }
@@ -994,7 +994,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
           "datasource": {
@@ -1006,10 +1006,10 @@
           "expr": "sum(k6_iterations_total{testid=~\"$testid\"})",
           "format": "time_series",
           "hide": false,
-          "instant": false,
+          "instant": true,
           "interval": "",
           "legendFormat": "__auto",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
@@ -1181,7 +1181,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
           "datasource": {
@@ -1259,7 +1259,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
           "datasource": {
@@ -1371,7 +1371,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
           "datasource": {
@@ -1598,7 +1598,7 @@
           }
         ]
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.3.2",
       "title": "Thresholds WIP",
       "transformations": [
         {
@@ -1922,7 +1922,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
           "datasource": {
@@ -2388,7 +2388,7 @@
         "frameIndex": 1,
         "showHeader": true
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
           "datasource": {
@@ -2596,8 +2596,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2891,8 +2890,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -3257,8 +3255,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -3346,8 +3343,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3413,8 +3409,7 @@
                 "mode": "percentage",
                 "steps": [
                   {
-                    "color": "red",
-                    "value": null
+                    "color": "red"
                   }
                 ]
               },
@@ -3504,8 +3499,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
