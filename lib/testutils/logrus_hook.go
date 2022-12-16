@@ -37,6 +37,16 @@ func (smh *SimpleLogrusHook) Drain() []logrus.Entry {
 	return res
 }
 
+// Lines returns the logged lines.
+func (smh *SimpleLogrusHook) Lines() []string {
+	entries := smh.Drain()
+	lines := make([]string, len(entries))
+	for i, entry := range entries {
+		lines[i] = entry.Message
+	}
+	return lines
+}
+
 var _ logrus.Hook = &SimpleLogrusHook{}
 
 // LogContains is a helper function that checks the provided list of log entries
