@@ -1,13 +1,14 @@
+// Package remotewrite is a k6 output that sends metrics to a Prometheus remote write endpoint.
 package remotewrite
 
 import (
 	"context"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
 	"github.com/grafana/xk6-output-prometheus-remote/pkg/remote"
+	"github.com/grafana/xk6-output-prometheus-remote/pkg/stale"
 
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
@@ -16,21 +17,15 @@ import (
 	prompb "go.buf.build/grpc/go/prometheus/prometheus"
 )
 
-var (
-	_ output.Output = new(Output)
+var _ output.Output = new(Output)
 
-	// staleNaN is the Prometheus special value for marking
-	// a time series as stale.
-	//
-	// https://pkg.go.dev/github.com/prometheus/prometheus/pkg/value#pkg-constants
-	staleNaN = math.Float64frombits(0x7ff0000000000002)
-)
-
+// Output is a k6 output that sends metrics to a Prometheus remote write endpoint.
 type Output struct {
 	output.SampleBuffer
 
 	config             Config
 	logger             logrus.FieldLogger
+	now                func() time.Time
 	periodicFlusher    *output.PeriodicFlusher
 	tsdb               map[metrics.TimeSeries]*seriesWithMeasure
 	trendStatsResolver map[string]func(*metrics.TrendSink) float64
@@ -39,6 +34,7 @@ type Output struct {
 	client *remote.WriteClient
 }
 
+// New creates a new Output instance.
 func New(params output.Params) (*Output, error) {
 	logger := params.Logger.WithFields(logrus.Fields{"output": "Prometheus remote write"})
 
@@ -60,6 +56,10 @@ func New(params output.Params) (*Output, error) {
 	o := &Output{
 		client: wc,
 		config: config,
+		// TODO: consider to do this function millisecond-based
+		// so we don't need to truncate all the time we invoke it.
+		// Before we should analyze if in some cases is it useful to have it in ns.
+		now:    time.Now,
 		logger: logger,
 		tsdb:   make(map[metrics.TimeSeries]*seriesWithMeasure),
 	}
@@ -72,10 +72,12 @@ func New(params output.Params) (*Output, error) {
 	return o, nil
 }
 
+// Description returns a short human-readable description of the output.
 func (o *Output) Description() string {
 	return fmt.Sprintf("Prometheus remote write (%s)", o.config.ServerURL.String)
 }
 
+// Start initializes the output.
 func (o *Output) Start() error {
 	d := o.config.PushInterval.TimeDuration()
 	periodicFlusher, err := output.NewPeriodicFlusher(d, o.flush)
@@ -87,13 +89,16 @@ func (o *Output) Start() error {
 	return nil
 }
 
+// Stop stops the output.
 func (o *Output) Stop() error {
 	o.logger.Debug("Stopping the output")
 	defer o.logger.Debug("Output stopped")
 	o.periodicFlusher.Stop()
 
-	staleMarkers := o.staleMarkers(time.Now())
-
+	if !o.config.StaleMarkers.Bool {
+		return nil
+	}
+	staleMarkers := o.staleMarkers()
 	if len(staleMarkers) < 1 {
 		o.logger.Debug("No time series to mark as stale")
 		return nil
@@ -108,10 +113,18 @@ func (o *Output) Stop() error {
 }
 
 // staleMarkers maps all the seen time series with a stale marker.
-func (o *Output) staleMarkers(t time.Time) []*prompb.TimeSeries {
-	timestamp := t.UnixMilli()
-	staleMarkers := make([]*prompb.TimeSeries, 0, len(o.tsdb))
+func (o *Output) staleMarkers() []*prompb.TimeSeries {
+	// Add 1ms so in the extreme case that the time frame
+	// between the last and the next flush operation is under-millisecond,
+	// we can avoid the sample being seen as a duplicate,
+	// if we force it in the future.
+	// It is essential because if it overlaps, the remote write discards the last sample,
+	// so the stale marker and the metric will remain active for the next 5 min
+	// as the default logic without stale markers.
+	timestamp := o.now().
+		Truncate(time.Millisecond).Add(1 * time.Millisecond).UnixMilli()
 
+	staleMarkers := make([]*prompb.TimeSeries, 0, len(o.tsdb))
 	for _, swm := range o.tsdb {
 		series := swm.MapPrompb()
 		// series' length is expected to be equal to 1 for most of the cases
@@ -126,7 +139,7 @@ func (o *Output) staleMarkers(t time.Time) []*prompb.TimeSeries {
 				s.Samples = append(s.Samples, &prompb.Sample{})
 			}
 
-			s.Samples[0].Value = staleNaN
+			s.Samples[0].Value = stale.Marker
 			s.Samples[0].Timestamp = timestamp
 		}
 		staleMarkers = append(staleMarkers, series...)
@@ -138,7 +151,7 @@ func (o *Output) staleMarkers(t time.Time) []*prompb.TimeSeries {
 //
 // TODO: refactor, the code can be improved
 func (o *Output) setTrendStatsResolver(trendStats []string) error {
-	var trendStatsCopy []string
+	trendStatsCopy := make([]string, 0, len(trendStats))
 	hasSum := false
 	// copy excluding sum
 	for _, stat := range trendStats {
@@ -245,7 +258,8 @@ func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) 
 				swm.Latest = truncTime
 				o.tsdb[sample.TimeSeries] = swm
 				seen[sample.TimeSeries] = struct{}{}
-			} else {
+			} else { //nolint:gocritic
+				// FIXME: remove the gocritic linter inhibition as soon as the rest of the todo are done
 				// save as a seen item only when the samples have a time greater than
 				// the previous saved, otherwise some implementations
 				// could see it as a duplicate and generate warnings (e.g. Mimir)
@@ -269,7 +283,7 @@ func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) 
 				//   TODO: We should evaluate if it would be better to have a defensive condition
 				//   for handling it, logging a warning or returning an error
 				//   and avoid aggregating the value.
-				// - in the case case current is in the same operation but across sample containers
+				// - in the case current is in the same operation but across sample containers
 				//   it's fine to aggregate
 				//   but same as for the equal condition it can rely on the previous seen value.
 			}
@@ -311,6 +325,7 @@ func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 		}
 	}
 
+	//nolint:forcetypeassert
 	switch swm.Metric.Type {
 	case metrics.Counter:
 		ts := mapMonoSeries(swm.TimeSeries, "total", swm.Latest)
@@ -341,7 +356,13 @@ func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 		newts = trend.MapPrompb(swm.TimeSeries, swm.Latest)
 
 	default:
-		panic(fmt.Sprintf("Something is really off, as I cannot recognize the type of metric %s: `%s`", swm.Metric.Name, swm.Metric.Type))
+		panic(
+			fmt.Sprintf(
+				"the output reached an unrecoverable state; unable to recognize processed metric %s's type `%s`",
+				swm.Metric.Name,
+				swm.Metric.Type,
+			),
+		)
 	}
 	return newts
 }
@@ -350,7 +371,11 @@ type prompbMapper interface {
 	MapPrompb(series metrics.TimeSeries, t time.Time) []*prompb.TimeSeries
 }
 
-func newSeriesWithMeasure(series metrics.TimeSeries, trendAsNativeHistogram bool, tsr TrendStatsResolver) *seriesWithMeasure {
+func newSeriesWithMeasure(
+	series metrics.TimeSeries,
+	trendAsNativeHistogram bool,
+	tsr TrendStatsResolver,
+) *seriesWithMeasure {
 	var sink metrics.Sink
 	switch series.Metric.Type {
 	case metrics.Counter:

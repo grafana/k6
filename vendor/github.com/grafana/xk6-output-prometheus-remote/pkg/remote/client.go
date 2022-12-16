@@ -1,3 +1,4 @@
+// Package remote implements the Prometheus remote write protocol.
 package remote
 
 import (
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// HTTPConfig holds the config for the HTTP client.
 type HTTPConfig struct {
 	Timeout   time.Duration
 	TLSConfig *tls.Config
@@ -22,6 +24,7 @@ type HTTPConfig struct {
 	Headers   http.Header
 }
 
+// BasicAuth holds the config for basic authentication.
 type BasicAuth struct {
 	Username, Password string
 }
@@ -35,6 +38,7 @@ type WriteClient struct {
 	cfg *HTTPConfig
 }
 
+// NewWriteClient creates a new WriteClient.
 func NewWriteClient(endpoint string, cfg *HTTPConfig) (*WriteClient, error) {
 	if cfg == nil {
 		cfg = &HTTPConfig{}
@@ -89,8 +93,17 @@ func (c *WriteClient) Store(ctx context.Context, series []*prompb.TimeSeries) er
 	if err != nil {
 		return fmt.Errorf("HTTP POST request failed: %w", err)
 	}
-	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body) //nolint:errcheck
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	_, err = io.Copy(io.Discard, resp.Body)
+	if err != nil {
+		return err
+	}
 
 	return validateResponseStatus(resp.StatusCode)
 }

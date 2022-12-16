@@ -11,6 +11,7 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
+// TrendStatsResolver is a map of trend stats name and their relative resolver function
 type TrendStatsResolver map[string]func(*metrics.TrendSink) float64
 
 type extendedTrendSink struct {
