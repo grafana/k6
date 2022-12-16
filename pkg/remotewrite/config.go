@@ -61,7 +61,7 @@ type Config struct {
 func NewConfig() Config {
 	return Config{
 		ServerURL:             null.StringFrom(defaultServerURL),
-		InsecureSkipTLSVerify: null.BoolFrom(true),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
 		Username:              null.NewString("", false),
 		Password:              null.NewString("", false),
 		PushInterval:          types.NullDurationFrom(defaultPushInterval),

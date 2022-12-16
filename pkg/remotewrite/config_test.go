@@ -101,7 +101,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			arg:     "",
 			config: Config{
 				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
-				InsecureSkipTLSVerify: null.BoolFrom(true),
+				InsecureSkipTLSVerify: null.BoolFrom(false),
 				Username:              null.NewString("", false),
 				Password:              null.NewString("", false),
 				PushInterval:          types.NullDurationFrom(5 * time.Second),
@@ -114,7 +114,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			jsonRaw: json.RawMessage(fmt.Sprintf(`{"url":"%s"}`, u.String())),
 			config: Config{
 				ServerURL:             null.StringFrom(u.String()),
-				InsecureSkipTLSVerify: null.BoolFrom(true),
+				InsecureSkipTLSVerify: null.BoolFrom(false),
 				Username:              null.NewString("", false),
 				Password:              null.NewString("", false),
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
@@ -150,7 +150,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			// arg: "password=arg",
 			config: Config{
 				ServerURL:             null.StringFrom("http://json:9090"),
-				InsecureSkipTLSVerify: null.BoolFrom(true),
+				InsecureSkipTLSVerify: null.BoolFrom(false),
 				Username:              null.StringFrom("env"),
 				Password:              null.StringFrom("env"),
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
@@ -207,6 +207,10 @@ func TestParseServerURL(t *testing.T) {
 	assert.Equal(t, map[string]string{"X-Header": "value"}, c.Headers)
 }
 
+// TODO: replace all the expconfigs below
+// with a function that returns the expected default values,
+// then override only the values to expect differently.
+
 func TestOptionServerURL(t *testing.T) {
 	t.Parallel()
 
@@ -223,7 +227,7 @@ func TestOptionServerURL(t *testing.T) {
 
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://prometheus:9090/api/v1/write"),
-		InsecureSkipTLSVerify: null.BoolFrom(true),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
 		Username:              null.NewString("", false),
 		Password:              null.NewString("", false),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
@@ -259,7 +263,7 @@ func TestOptionHeaders(t *testing.T) {
 
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
-		InsecureSkipTLSVerify: null.BoolFrom(true),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers: map[string]string{
 			"X-MY-HEADER1": "hval1",
@@ -330,7 +334,7 @@ func TestOptionBasicAuth(t *testing.T) {
 
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
-		InsecureSkipTLSVerify: null.BoolFrom(true),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
 		Username:              null.StringFrom("user1"),
 		Password:              null.StringFrom("pass1"),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
@@ -367,7 +371,7 @@ func TestOptionTrendAsNativeHistogram(t *testing.T) {
 
 	expconfig := Config{
 		ServerURL:              null.StringFrom("http://localhost:9090/api/v1/write"),
-		InsecureSkipTLSVerify:  null.BoolFrom(true),
+		InsecureSkipTLSVerify:  null.BoolFrom(false),
 		Username:               null.NewString("", false),
 		Password:               null.NewString("", false),
 		PushInterval:           types.NullDurationFrom(5 * time.Second),
@@ -405,7 +409,7 @@ func TestOptionPushInterval(t *testing.T) {
 
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
-		InsecureSkipTLSVerify: null.BoolFrom(true),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
 		Username:              null.NewString("", false),
 		Password:              null.NewString("", false),
 		PushInterval:          types.NullDurationFrom((1 * time.Minute) + (2 * time.Second)),
@@ -443,7 +447,7 @@ func TestConfigTrendStats(t *testing.T) {
 
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
-		InsecureSkipTLSVerify: null.BoolFrom(true),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"max", "p(95)"},
@@ -476,7 +480,7 @@ func TestOptionStaleMarker(t *testing.T) {
 
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
-		InsecureSkipTLSVerify: null.BoolFrom(true),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"p(99)"},
