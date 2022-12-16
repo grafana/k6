@@ -21,8 +21,10 @@ const (
 	defaultMetricPrefix = "k6_"
 )
 
+//nolint:gochecknoglobals
 var defaultTrendStats = []string{"p(99)"}
 
+// Config contains the configuration for the Output.
 type Config struct {
 	// ServerURL contains the absolute ServerURL for the Write endpoint where to flush the time series.
 	ServerURL null.String `json:"url"`
@@ -51,18 +53,21 @@ type Config struct {
 	//
 	// TODO: should we support K6_SUMMARY_TREND_STATS?
 	TrendStats []string `json:"trendStats"`
+
+	StaleMarkers null.Bool `json:"staleMarkers"`
 }
 
 // NewConfig creates an Output's configuration.
 func NewConfig() Config {
 	return Config{
 		ServerURL:             null.StringFrom(defaultServerURL),
-		InsecureSkipTLSVerify: null.BoolFrom(true),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
 		Username:              null.NewString("", false),
 		Password:              null.NewString("", false),
 		PushInterval:          types.NullDurationFrom(defaultPushInterval),
 		Headers:               make(map[string]string),
 		TrendStats:            defaultTrendStats,
+		StaleMarkers:          null.BoolFrom(false),
 	}
 }
 
@@ -81,7 +86,7 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 	}
 
 	hc.TLSConfig = &tls.Config{
-		InsecureSkipVerify: conf.InsecureSkipTLSVerify.Bool,
+		InsecureSkipVerify: conf.InsecureSkipTLSVerify.Bool, //nolint:gosec
 	}
 
 	if len(conf.Headers) > 0 {
@@ -94,43 +99,47 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 }
 
 // Apply merges applied Config into base.
-func (base Config) Apply(applied Config) Config {
+func (conf Config) Apply(applied Config) Config {
 	if applied.ServerURL.Valid {
-		base.ServerURL = applied.ServerURL
+		conf.ServerURL = applied.ServerURL
 	}
 
 	if applied.InsecureSkipTLSVerify.Valid {
-		base.InsecureSkipTLSVerify = applied.InsecureSkipTLSVerify
+		conf.InsecureSkipTLSVerify = applied.InsecureSkipTLSVerify
 	}
 
 	if applied.Username.Valid {
-		base.Username = applied.Username
+		conf.Username = applied.Username
 	}
 
 	if applied.Password.Valid {
-		base.Password = applied.Password
+		conf.Password = applied.Password
 	}
 
 	if applied.PushInterval.Valid {
-		base.PushInterval = applied.PushInterval
+		conf.PushInterval = applied.PushInterval
 	}
 
 	if applied.TrendAsNativeHistogram.Valid {
-		base.TrendAsNativeHistogram = applied.TrendAsNativeHistogram
+		conf.TrendAsNativeHistogram = applied.TrendAsNativeHistogram
+	}
+
+	if applied.StaleMarkers.Valid {
+		conf.StaleMarkers = applied.StaleMarkers
 	}
 
 	if len(applied.Headers) > 0 {
 		for k, v := range applied.Headers {
-			base.Headers[k] = v
+			conf.Headers[k] = v
 		}
 	}
 
 	if len(applied.TrendStats) > 0 {
-		base.TrendStats = make([]string, len(applied.TrendStats))
-		copy(base.TrendStats, applied.TrendStats)
+		conf.TrendStats = make([]string, len(applied.TrendStats))
+		copy(conf.TrendStats, applied.TrendStats)
 	}
 
-	return base
+	return conf
 }
 
 // GetConsolidatedConfig combines the options' values from the different sources
@@ -156,6 +165,7 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, u
 
 	// TODO: define a way for defining Output's options
 	// then support them.
+	//nolint:gocritic
 	//
 	//if url != "" {
 	//urlConf, err := parseArg(url)
@@ -173,11 +183,12 @@ func parseEnvs(env map[string]string) (Config, error) {
 
 	getEnvBool := func(env map[string]string, name string) (null.Bool, error) {
 		if v, vDefined := env[name]; vDefined {
-			if b, err := strconv.ParseBool(v); err != nil {
+			b, err := strconv.ParseBool(v)
+			if err != nil {
 				return null.NewBool(false, false), err
-			} else {
-				return null.BoolFrom(b), nil
 			}
+
+			return null.BoolFrom(b), nil
 		}
 		return null.NewBool(false, false), nil
 	}
@@ -205,10 +216,8 @@ func parseEnvs(env map[string]string) (Config, error) {
 
 	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"); err != nil {
 		return c, err
-	} else {
-		if b.Valid {
-			c.InsecureSkipTLSVerify = b
-		}
+	} else if b.Valid {
+		c.InsecureSkipTLSVerify = b
 	}
 
 	if user, userDefined := env["K6_PROMETHEUS_RW_USERNAME"]; userDefined {
@@ -229,10 +238,14 @@ func parseEnvs(env map[string]string) (Config, error) {
 
 	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM"); err != nil {
 		return c, err
-	} else {
-		if b.Valid {
-			c.TrendAsNativeHistogram = b
-		}
+	} else if b.Valid {
+		c.TrendAsNativeHistogram = b
+	}
+
+	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_STALE_MARKERS"); err != nil {
+		return c, err
+	} else if b.Valid {
+		c.StaleMarkers = b
 	}
 
 	if trendStats, trendStatsDefined := env["K6_PROMETHEUS_RW_TREND_STATS"]; trendStatsDefined {
@@ -284,6 +297,7 @@ func parseArg(text string) (Config, error) {
 		// strvals doesn't support the same format used by --summary-trend-stats
 		// using the comma as the separator, because it is already used for
 		// dividing the keys.
+		//nolint:gocritic
 		//
 		//if v, ok := params["trendStats"].(string); ok && len(v) > 0 {
 		//c.TrendStats = strings.Split(v, ",")

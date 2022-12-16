@@ -12,7 +12,7 @@ require (
 	github.com/fatih/color v1.13.0
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/websocket v1.5.0
-	github.com/grafana/xk6-output-prometheus-remote v0.0.8
+	github.com/grafana/xk6-output-prometheus-remote v0.0.9
 	github.com/grafana/xk6-redis v0.1.1
 	github.com/grafana/xk6-timers v0.1.2
 	github.com/grafana/xk6-websockets v0.1.6
