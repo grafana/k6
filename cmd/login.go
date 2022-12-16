@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+
+	"go.k6.io/k6/cmd/state"
 )
 
 // getCmdLogin returns the `k6 login` sub-command, together with its children.
-func getCmdLogin(gs *globalState) *cobra.Command {
+func getCmdLogin(gs *state.GlobalState) *cobra.Command {
 	loginCmd := &cobra.Command{
 		Use:   "login",
 		Short: "Authenticate with a service",

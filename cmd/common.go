@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/types"
 )
@@ -65,17 +66,17 @@ func exactArgsWithMsg(n int, msg string) cobra.PositionalArgs {
 	}
 }
 
-func printToStdout(gs *globalState, s string) {
-	if _, err := fmt.Fprint(gs.stdOut, s); err != nil {
-		gs.logger.Errorf("could not print '%s' to stdout: %s", s, err.Error())
+func printToStdout(gs *state.GlobalState, s string) {
+	if _, err := fmt.Fprint(gs.Stdout, s); err != nil {
+		gs.Logger.Errorf("could not print '%s' to stdout: %s", s, err.Error())
 	}
 }
 
 // Trap Interrupts, SIGINTs and SIGTERMs and call the given.
-func handleTestAbortSignals(gs *globalState, gracefulStopHandler, onHardStop func(os.Signal)) (stop func()) {
+func handleTestAbortSignals(gs *state.GlobalState, gracefulStopHandler, onHardStop func(os.Signal)) (stop func()) {
 	sigC := make(chan os.Signal, 2)
 	done := make(chan struct{})
-	gs.signalNotify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	gs.SignalNotify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		select {
@@ -92,7 +93,7 @@ func handleTestAbortSignals(gs *globalState, gracefulStopHandler, onHardStop fun
 			}
 			// If we get a second signal, we immediately exit, so something like
 			// https://github.com/k6io/k6/issues/971 never happens again
-			gs.osExit(int(exitcodes.ExternalAbort))
+			gs.OSExit(int(exitcodes.ExternalAbort))
 		case <-done:
 			return
 		}
@@ -100,6 +101,6 @@ func handleTestAbortSignals(gs *globalState, gracefulStopHandler, onHardStop fun
 
 	return func() {
 		close(done)
-		gs.signalStop(sigC)
+		gs.SignalStop(sigC)
 	}
 }

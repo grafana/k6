@@ -7,9 +7,10 @@ import (
 
 	v1 "go.k6.io/k6/api/v1"
 	"go.k6.io/k6/api/v1/client"
+	"go.k6.io/k6/cmd/state"
 )
 
-func getCmdScale(globalState *globalState) *cobra.Command {
+func getCmdScale(gs *state.GlobalState) *cobra.Command {
 	// scaleCmd represents the scale command
 	scaleCmd := &cobra.Command{
 		Use:   "scale",
@@ -24,16 +25,16 @@ func getCmdScale(globalState *globalState) *cobra.Command {
 				return errors.New("Specify either -u/--vus or -m/--max") //nolint:golint,stylecheck
 			}
 
-			c, err := client.New(globalState.flags.address)
+			c, err := client.New(gs.Flags.Address)
 			if err != nil {
 				return err
 			}
-			status, err := c.SetStatus(globalState.ctx, v1.Status{VUs: vus, VUsMax: max})
+			status, err := c.SetStatus(gs.Ctx, v1.Status{VUs: vus, VUsMax: max})
 			if err != nil {
 				return err
 			}
 
-			return yamlPrint(globalState.stdOut, status)
+			return yamlPrint(gs.Stdout, status)
 		},
 	}
 

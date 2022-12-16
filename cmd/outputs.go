@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/output"
@@ -68,7 +69,7 @@ func getPossibleIDList(constrs map[string]output.Constructor) string {
 }
 
 func createOutputs(
-	gs *globalState, test *loadedAndConfiguredTest, executionPlan []lib.ExecutionStep,
+	gs *state.GlobalState, test *loadedAndConfiguredTest, executionPlan []lib.ExecutionStep,
 ) ([]output.Output, error) {
 	outputConstructors, err := getAllOutputConstructors()
 	if err != nil {
@@ -76,11 +77,11 @@ func createOutputs(
 	}
 	baseParams := output.Params{
 		ScriptPath:     test.source.URL,
-		Logger:         gs.logger,
-		Environment:    gs.envVars,
-		StdOut:         gs.stdOut,
-		StdErr:         gs.stdErr,
-		FS:             gs.fs,
+		Logger:         gs.Logger,
+		Environment:    gs.Env,
+		StdOut:         gs.Stdout,
+		StdErr:         gs.Stderr,
+		FS:             gs.FS,
 		ScriptOptions:  test.derivedConfig.Options,
 		RuntimeOptions: test.preInitState.RuntimeOptions,
 		ExecutionPlan:  executionPlan,

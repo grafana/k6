@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/js"
@@ -40,32 +41,32 @@ type loadedTest struct {
 	keyLogger      io.Closer
 }
 
-func loadTest(gs *globalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
+func loadTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("k6 needs at least one argument to load the test")
 	}
 
 	sourceRootPath := args[0]
-	gs.logger.Debugf("Resolving and reading test '%s'...", sourceRootPath)
+	gs.Logger.Debugf("Resolving and reading test '%s'...", sourceRootPath)
 	src, fileSystems, pwd, err := readSource(gs, sourceRootPath)
 	if err != nil {
 		return nil, err
 	}
 	resolvedPath := src.URL.String()
-	gs.logger.Debugf(
+	gs.Logger.Debugf(
 		"'%s' resolved to '%s' and successfully loaded %d bytes!",
 		sourceRootPath, resolvedPath, len(src.Data),
 	)
 
-	gs.logger.Debugf("Gathering k6 runtime options...")
-	runtimeOptions, err := getRuntimeOptions(cmd.Flags(), gs.envVars)
+	gs.Logger.Debugf("Gathering k6 runtime options...")
+	runtimeOptions, err := getRuntimeOptions(cmd.Flags(), gs.Env)
 	if err != nil {
 		return nil, err
 	}
 
 	registry := metrics.NewRegistry()
 	state := &lib.TestPreInitState{
-		Logger:         gs.logger,
+		Logger:         gs.Logger,
 		RuntimeOptions: runtimeOptions,
 		Registry:       registry,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
@@ -75,22 +76,22 @@ func loadTest(gs *globalState, cmd *cobra.Command, args []string) (*loadedTest, 
 		pwd:            pwd,
 		sourceRootPath: sourceRootPath,
 		source:         src,
-		fs:             gs.fs,
+		fs:             gs.FS,
 		fileSystems:    fileSystems,
 		preInitState:   state,
 	}
 
-	gs.logger.Debugf("Initializing k6 runner for '%s' (%s)...", sourceRootPath, resolvedPath)
+	gs.Logger.Debugf("Initializing k6 runner for '%s' (%s)...", sourceRootPath, resolvedPath)
 	if err := test.initializeFirstRunner(gs); err != nil {
 		return nil, fmt.Errorf("could not initialize '%s': %w", sourceRootPath, err)
 	}
-	gs.logger.Debug("Runner successfully initialized!")
+	gs.Logger.Debug("Runner successfully initialized!")
 	return test, nil
 }
 
-func (lt *loadedTest) initializeFirstRunner(gs *globalState) error {
+func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	testPath := lt.source.URL.String()
-	logger := gs.logger.WithField("test_path", testPath)
+	logger := gs.Logger.WithField("test_path", testPath)
 
 	testType := lt.preInitState.RuntimeOptions.TestType.String
 	if testType == "" {
@@ -154,14 +155,14 @@ func (lt *loadedTest) initializeFirstRunner(gs *globalState) error {
 
 // readSource is a small wrapper around loader.ReadSource returning
 // result of the load and filesystems map
-func readSource(globalState *globalState, filename string) (*loader.SourceData, map[string]afero.Fs, string, error) {
-	pwd, err := globalState.getwd()
+func readSource(gs *state.GlobalState, filename string) (*loader.SourceData, map[string]afero.Fs, string, error) {
+	pwd, err := gs.Getwd()
 	if err != nil {
 		return nil, nil, "", err
 	}
 
-	filesystems := loader.CreateFilesystems(globalState.fs)
-	src, err := loader.ReadSource(globalState.logger, filename, pwd, filesystems, globalState.stdIn)
+	filesystems := loader.CreateFilesystems(gs.FS)
+	src, err := loader.ReadSource(gs.Logger, filename, pwd, filesystems, gs.Stdin)
 	return src, filesystems, pwd, err
 }
 
@@ -173,12 +174,12 @@ func detectTestType(data []byte) string {
 }
 
 func (lt *loadedTest) consolidateDeriveAndValidateConfig(
-	gs *globalState, cmd *cobra.Command,
+	gs *state.GlobalState, cmd *cobra.Command,
 	cliConfGetter func(flags *pflag.FlagSet) (Config, error), // TODO: obviate
 ) (*loadedAndConfiguredTest, error) {
 	var cliConfig Config
 	if cliConfGetter != nil {
-		gs.logger.Debug("Parsing CLI flags...")
+		gs.Logger.Debug("Parsing CLI flags...")
 		var err error
 		cliConfig, err = cliConfGetter(cmd.Flags())
 		if err != nil {
@@ -186,13 +187,13 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		}
 	}
 
-	gs.logger.Debug("Consolidating config layers...")
+	gs.Logger.Debug("Consolidating config layers...")
 	consolidatedConfig, err := getConsolidatedConfig(gs, cliConfig, lt.initRunner.GetOptions())
 	if err != nil {
 		return nil, err
 	}
 
-	gs.logger.Debug("Parsing thresholds and validating config...")
+	gs.Logger.Debug("Parsing thresholds and validating config...")
 	// Parse the thresholds, only if the --no-threshold flag is not set.
 	// If parsing the threshold expressions failed, consider it as an
 	// invalid configuration error.
@@ -210,7 +211,7 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		}
 	}
 
-	derivedConfig, err := deriveAndValidateConfig(consolidatedConfig, lt.initRunner.IsExecutable, gs.logger)
+	derivedConfig, err := deriveAndValidateConfig(consolidatedConfig, lt.initRunner.IsExecutable, gs.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +232,7 @@ type loadedAndConfiguredTest struct {
 }
 
 func loadAndConfigureTest(
-	gs *globalState, cmd *cobra.Command, args []string,
+	gs *state.GlobalState, cmd *cobra.Command, args []string,
 	cliConfigGetter func(flags *pflag.FlagSet) (Config, error),
 ) (*loadedAndConfiguredTest, error) {
 	test, err := loadTest(gs, cmd, args)
