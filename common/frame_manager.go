@@ -169,11 +169,8 @@ func (m *FrameManager) frameAttached(frameID cdp.FrameID, parentFrameID cdp.Fram
 func (m *FrameManager) frameDetached(frameID cdp.FrameID) {
 	m.logger.Debugf("FrameManager:frameDetached", "fmid:%d fid:%v", m.ID(), frameID)
 
-	// TODO: use getFrameByID here
-	m.framesMu.RLock()
-	frame, ok := m.frames[frameID]
-	m.framesMu.RUnlock()
-	if !ok {
+	frame := m.getFrameByID(frameID)
+	if frame == nil {
 		m.logger.Debugf("FrameManager:frameDetached:return",
 			"fmid:%d fid:%v cannot find frame",
 			m.ID(), frameID)
