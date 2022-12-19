@@ -72,3 +72,36 @@ func TestFrameDismissDialogBox(t *testing.T) {
 		})
 	}
 }
+
+func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
+	// This test only works when headless mode is false.
+	t.SkipNow()
+
+	t.Parallel()
+
+	b := newTestBrowser(t, withFileServer())
+	p := b.NewPage(nil)
+
+	var result string
+	err := b.await(func() error {
+		opts := b.toGojaValue(struct {
+			WaitUntil string `js:"waitUntil"`
+		}{
+			WaitUntil: "load",
+		})
+		pageGoto := p.Goto(
+			b.staticURL("embedded_iframe.html"),
+			opts,
+		)
+
+		b.promise(pageGoto).
+			then(func() {
+				result = p.TextContent("#doneDiv", nil)
+			})
+
+		return nil
+	})
+	require.NoError(t, err)
+
+	assert.EqualValues(t, "Done!", result)
+}
