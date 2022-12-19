@@ -52,7 +52,7 @@ func TestSimpleTestStdin(t *testing.T) {
 
 	ts := newGlobalTestState(t)
 	ts.args = []string{"k6", "run", "-"}
-	ts.stdIn = bytes.NewBufferString(`export default function() {};`)
+	ts.console.Stdin = &testOSFileR{bytes.NewBufferString(`export default function() {};`)}
 	newRootCommand(ts.globalState).execute()
 
 	stdOut := ts.stdOut.String()
@@ -67,17 +67,12 @@ func TestStdoutAndStderrAreEmptyWithQuietAndHandleSummary(t *testing.T) {
 
 	ts := newGlobalTestState(t)
 	ts.args = []string{"k6", "--quiet", "run", "-"}
-	ts.stdIn = bytes.NewBufferString(`
+	ts.console.Stdin = &testOSFileR{bytes.NewBufferString(`
 		export default function() {};
 		export function handleSummary(data) {
 			return {}; // silence the end of test summary
 		};
-	`)
-	newRootCommand(ts.globalState).execute()
-
-	assert.Empty(t, ts.stdErr.Bytes())
-	assert.Empty(t, ts.stdOut.Bytes())
-	assert.Empty(t, ts.loggerHook.Drain())
+	`)}
 }
 
 func TestStdoutAndStderrAreEmptyWithQuietAndLogsForwarded(t *testing.T) {
@@ -92,10 +87,10 @@ func TestStdoutAndStderrAreEmptyWithQuietAndLogsForwarded(t *testing.T) {
 		"k6", "--quiet", "--log-output", "file=" + logFilePath,
 		"--log-format", "raw", "run", "--no-summary", "-",
 	}
-	ts.stdIn = bytes.NewBufferString(`
+	ts.console.Stdin = &testOSFileR{bytes.NewBufferString(`
 		console.log('init');
 		export default function() { console.log('foo'); };
-	`)
+	`)}
 	newRootCommand(ts.globalState).execute()
 
 	// The test state hook still catches this message
@@ -117,12 +112,12 @@ func TestRelativeLogPathWithSetupAndTeardown(t *testing.T) {
 	ts := newGlobalTestState(t)
 
 	ts.args = []string{"k6", "--log-output", "file=test.log", "--log-format", "raw", "run", "-i", "2", "-"}
-	ts.stdIn = bytes.NewBufferString(`
+	ts.console.Stdin = &testOSFileR{bytes.NewBufferString(`
 		console.log('init');
 		export default function() { console.log('foo'); };
 		export function setup() { console.log('bar'); };
 		export function teardown() { console.log('baz'); };
-	`)
+	`)}
 	newRootCommand(ts.globalState).execute()
 
 	// The test state hook still catches these messages
@@ -142,7 +137,7 @@ func TestWrongCliFlagIterations(t *testing.T) {
 
 	ts := newGlobalTestState(t)
 	ts.args = []string{"k6", "run", "--iterations", "foo", "-"}
-	ts.stdIn = bytes.NewBufferString(`export default function() {};`)
+	ts.console.Stdin = &testOSFileR{bytes.NewBufferString(`export default function() {};`)}
 	// TODO: check for exitcodes.InvalidConfig after https://github.com/loadimpact/k6/issues/883 is done...
 	ts.expectedExitCode = -1
 	newRootCommand(ts.globalState).execute()
@@ -155,7 +150,7 @@ func TestWrongEnvVarIterations(t *testing.T) {
 	ts := newGlobalTestState(t)
 	ts.args = []string{"k6", "run", "--vus", "2", "-"}
 	ts.envVars["K6_ITERATIONS"] = "4"
-	ts.stdIn = bytes.NewBufferString(`export default function() {};`)
+	ts.console.Stdin = &testOSFileR{bytes.NewBufferString(`export default function() {};`)}
 
 	newRootCommand(ts.globalState).execute()
 
@@ -281,7 +276,7 @@ func testSSLKEYLOGFILE(t *testing.T, ts *globalTestState, filePath string) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	ts.args = []string{"k6", "run", "-"}
 	ts.envVars["SSLKEYLOGFILE"] = filePath
-	ts.stdIn = bytes.NewReader([]byte(tb.Replacer.Replace(`
+	ts.console.Stdin = &testOSFileR{bytes.NewReader([]byte(tb.Replacer.Replace(`
     import http from "k6/http"
     export const options = {
       hosts: {
@@ -293,7 +288,7 @@ func testSSLKEYLOGFILE(t *testing.T, ts *globalTestState, filePath string) {
     export default () => {
       http.get("HTTPSBIN_URL/get");
     }
-  `)))
+  `)))}
 
 	newRootCommand(ts.globalState).execute()
 
@@ -310,7 +305,7 @@ func TestThresholdDeprecationWarnings(t *testing.T) {
 
 	ts := newGlobalTestState(t)
 	ts.args = []string{"k6", "run", "--system-tags", "url,error,vu,iter,scenario", "-"}
-	ts.stdIn = bytes.NewReader([]byte(`
+	ts.console.Stdin = &testOSFileR{bytes.NewReader([]byte(`
 		export const options = {
 			thresholds: {
 				'http_req_duration{url:https://test.k6.io}': ['p(95)<500', 'p(99)<1000'],
@@ -321,7 +316,7 @@ func TestThresholdDeprecationWarnings(t *testing.T) {
 		};
 
 		export default function () { }`,
-	))
+	))}
 
 	newRootCommand(ts.globalState).execute()
 
@@ -699,9 +694,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 	reachedIteration := false
 	for i := 0; i <= 10 && reachedIteration == false; i++ {
 		time.Sleep(1 * time.Second)
-		ts.outMutex.Lock()
 		stdOut := ts.stdOut.String()
-		ts.outMutex.Unlock()
 
 		if !strings.Contains(stdOut, "a simple iteration") {
 			t.Logf("did not see an iteration on try %d at t=%s", i, time.Now())
@@ -811,9 +804,7 @@ func runTestWithLinger(t *testing.T, ts *globalTestState) {
 	testFinished := false
 	for i := 0; i <= 15 && testFinished == false; i++ {
 		time.Sleep(1 * time.Second)
-		ts.outMutex.Lock()
 		stdOut := ts.stdOut.String()
-		ts.outMutex.Unlock()
 
 		if !strings.Contains(stdOut, "Linger set; waiting for Ctrl+C") {
 			t.Logf("test wasn't finished on try %d at t=%s", i, time.Now())
@@ -973,9 +964,7 @@ func TestAbortedByTestAbortInNonFirstInitCode(t *testing.T) {
 	)
 	newRootCommand(ts.globalState).execute()
 
-	ts.outMutex.Lock()
 	stdOut := ts.stdOut.String()
-	ts.outMutex.Unlock()
 	t.Log(stdOut)
 	assert.Contains(t, stdOut, "test aborted: foo")
 	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
@@ -1090,13 +1079,7 @@ func TestAbortedByScriptInitError(t *testing.T) {
 	)
 	newRootCommand(ts.globalState).execute()
 
-	// FIXME: remove this locking after VU initialization accepts a context and
-	// is properly synchronized: currently when a test is aborted during the
-	// init phase, some logs might be emitted after the above command returns...
-	// see: https://github.com/grafana/k6/issues/2790
-	ts.outMutex.Lock()
 	stdOut := ts.stdOut.String()
-	ts.outMutex.Unlock()
 
 	t.Log(stdOut)
 	assert.Contains(t, stdOut, `level=error msg="Error: oops in 2\n\tat file:///`)
@@ -1494,15 +1477,13 @@ func TestPrometheusRemoteWriteOutput(t *testing.T) {
 
 	ts := newGlobalTestState(t)
 	ts.args = []string{"k6", "run", "--out", "experimental-prometheus-rw", "-"}
-	ts.stdIn = bytes.NewBufferString(`
+	ts.console.Stdin = &testOSFileR{bytes.NewBufferString(`
 		import exec from 'k6/execution';
 		export default function () {};
-	`)
+	`)}
 
 	newRootCommand(ts.globalState).execute()
-	ts.outMutex.Lock()
-	stdOut := ts.stdOut.String()
-	ts.outMutex.Unlock()
 
+	stdOut := ts.stdOut.String()
 	assert.Contains(t, stdOut, "output: Prometheus remote write")
 }

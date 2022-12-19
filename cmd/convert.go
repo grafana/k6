@@ -84,7 +84,7 @@ func getCmdConvert(globalState *globalState) *cobra.Command {
 
 			// Write script content to stdout or file
 			if convertOutput == "" || convertOutput == "-" { //nolint:nestif
-				if _, err := io.WriteString(globalState.stdOut, script); err != nil {
+				if _, err := io.WriteString(globalState.console.Stdout, script); err != nil {
 					return err
 				}
 			} else {
