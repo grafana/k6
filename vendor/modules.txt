@@ -80,7 +80,7 @@ github.com/golang/snappy
 # github.com/gorilla/websocket v1.5.0
 ## explicit; go 1.12
 github.com/gorilla/websocket
-# github.com/grafana/xk6-output-prometheus-remote v0.0.9
+# github.com/grafana/xk6-output-prometheus-remote v0.1.0
 ## explicit; go 1.18
 github.com/grafana/xk6-output-prometheus-remote/pkg/remote
 github.com/grafana/xk6-output-prometheus-remote/pkg/remotewrite
