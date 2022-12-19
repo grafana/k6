@@ -639,7 +639,7 @@ func (fs *FrameSession) onFrameDetached(frameID cdp.FrameID, reason cdppage.Fram
 		"sid:%v tid:%v fid:%v reason:%s",
 		fs.session.ID(), fs.targetID, frameID, reason)
 
-	fs.manager.frameDetached(frameID)
+	fs.manager.frameDetached(frameID, reason)
 }
 
 func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {

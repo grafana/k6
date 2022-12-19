@@ -15,6 +15,7 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
+	cdppage "github.com/chromedp/cdproto/page"
 )
 
 // FrameManager manages all frames in a page and their life-cycles, it's a purely internal component.
@@ -166,7 +167,7 @@ func (m *FrameManager) frameAttached(frameID cdp.FrameID, parentFrameID cdp.Fram
 	}
 }
 
-func (m *FrameManager) frameDetached(frameID cdp.FrameID) {
+func (m *FrameManager) frameDetached(frameID cdp.FrameID, reason cdppage.FrameDetachedReason) {
 	m.logger.Debugf("FrameManager:frameDetached", "fmid:%d fid:%v", m.ID(), frameID)
 
 	frame := m.getFrameByID(frameID)
@@ -176,7 +177,16 @@ func (m *FrameManager) frameDetached(frameID cdp.FrameID) {
 			m.ID(), frameID)
 		return
 	}
-	// TODO: possible data race? the frame may have gone.
+
+	if reason == cdppage.FrameDetachedReasonSwap {
+		// When a local frame is swapped out for a remote
+		// frame, we want to keep the current frame which is
+		// still referenced by the (incoming) remote frame, but
+		// remove all its child frames.
+		m.removeChildFramesRecursively(frame)
+		return
+	}
+
 	m.removeFramesRecursively(frame)
 }
 
