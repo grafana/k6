@@ -21,7 +21,6 @@ type Metric struct {
 	Thresholds Thresholds   `json:"thresholds"`
 	Submetrics []*Submetric `json:"submetrics"`
 	Sub        *Submetric   `json:"-"`
-	Sink       Sink         `json:"-"`
 	Observed   bool         `json:"-"`
 }
 

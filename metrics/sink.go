@@ -21,6 +21,23 @@ type Sink interface {
 	IsEmpty() bool                             // Check if the Sink is empty.
 }
 
+// TODO: add a test
+func NewSinkByType(mt MetricType) Sink {
+	var sink Sink
+	switch mt {
+	case Counter:
+		sink = &CounterSink{}
+	case Gauge:
+		sink = &GaugeSink{}
+	case Trend:
+		sink = &TrendSink{}
+	case Rate:
+		sink = &RateSink{}
+	default:
+	}
+	return sink
+}
+
 type CounterSink struct {
 	Value float64
 	First time.Time
