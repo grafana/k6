@@ -14,6 +14,7 @@ import (
 )
 
 // Copied from https://github.com/k6io/jslib.k6.io/tree/master/lib/k6-summary
+//
 //go:embed summary.js
 var jslibSummaryCode string //nolint:gochecknoglobals
 
@@ -76,11 +77,12 @@ func summarizeMetricsToObject(data *lib.Summary, options lib.Options, setupData 
 	getMetricValues := metricValueGetter(options.SummaryTrendStats)
 
 	metricsData := make(map[string]interface{})
-	for name, m := range data.Metrics {
+	for name, sinkWithMetric := range data.Metrics {
+		m := sinkWithMetric.Metric
 		metricData := map[string]interface{}{
 			"type":     m.Type.String(),
 			"contains": m.Contains.String(),
-			"values":   getMetricValues(m.Sink, data.TestRunDuration),
+			"values":   getMetricValues(sinkWithMetric.Sink, data.TestRunDuration),
 		}
 
 		if len(m.Thresholds.Thresholds) > 0 {
