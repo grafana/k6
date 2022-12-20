@@ -75,17 +75,19 @@ func (oi *outputIngester) flushMetrics() {
 		}
 
 		for _, sample := range samples {
-			m := sample.Metric               // this should have come from the Registry, no need to look it up
-			oi.metricsEngine.markObserved(m) // mark it as observed so it shows in the end-of-test summary
-			m.Sink.Add(sample)               // finally, add its value to its own sink
+			// this should have come from the Registry, no need to look it up
+			m := sample.Metric
+
+			// mark it as observed so it shows in the end-of-test summary
+			// an dfinally, add its value to its own sink
+			oi.metricsEngine.AddSample(sample)
 
 			// and also to the same for any submetrics that match the metric sample
 			for _, sm := range m.Submetrics {
 				if !sample.Tags.Contains(sm.Tags) {
 					continue
 				}
-				oi.metricsEngine.markObserved(sm.Metric)
-				sm.Metric.Sink.Add(sample)
+				oi.metricsEngine.AddSample(sample)
 			}
 		}
 	}

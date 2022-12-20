@@ -35,6 +35,8 @@ type MetricsEngine struct {
 
 	breachedThresholdsCount uint32
 
+	sinks map[*metrics.Metric]metrics.Sink
+
 	// TODO: completely refactor:
 	//   - make these private, add a method to export the raw data
 	//   - do not use an unnecessary map for the observed metrics
@@ -225,14 +227,15 @@ func (me *MetricsEngine) evaluateThresholds(ignoreEmptySinks bool) (breachedTher
 
 	me.logger.Debugf("Running thresholds on %d metrics...", len(me.metricsWithThresholds))
 	for _, m := range me.metricsWithThresholds {
+		sink := me.sinks[m]
 		// If either the metric has no thresholds defined, or its sinks
 		// are empty, let's ignore its thresholds execution at this point.
-		if len(m.Thresholds.Thresholds) == 0 || (ignoreEmptySinks && m.Sink.IsEmpty()) {
+		if len(m.Thresholds.Thresholds) == 0 || (ignoreEmptySinks && sink.IsEmpty()) {
 			continue
 		}
 		m.Tainted = null.BoolFrom(false)
 
-		succ, err := m.Thresholds.Run(m.Sink, t)
+		succ, err := m.Thresholds.Run(sink, t)
 		if err != nil {
 			me.logger.WithField("metric_name", m.Name).WithError(err).Error("Threshold error")
 			continue
@@ -259,4 +262,15 @@ func (me *MetricsEngine) evaluateThresholds(ignoreEmptySinks bool) (breachedTher
 // API is safe to use concurrently.
 func (me *MetricsEngine) GetMetricsWithBreachedThresholdsCount() uint32 {
 	return atomic.LoadUint32(&me.breachedThresholdsCount)
+}
+
+func (me *MetricsEngine) AddSample(s metrics.Sample) {
+	sink, ok := me.sinks[s.Metric]
+	if !ok {
+		sink = metrics.NewSinkByType(s.Metric.Type)
+		me.sinks[s.Metric] = sink
+	}
+
+	sink.Add(s)
+	me.markObserved(s.Metric)
 }
