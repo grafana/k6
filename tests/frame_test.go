@@ -1,6 +1,8 @@
 package tests
 
 import (
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -74,12 +76,22 @@ func TestFrameDismissDialogBox(t *testing.T) {
 }
 
 func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
-	// This test only works when headless mode is false.
-	t.SkipNow()
+	if strValue, ok := os.LookupEnv("XK6_HEADLESS"); ok {
+		if value, err := strconv.ParseBool(strValue); err == nil && value {
+			// We're skipping this when running in headless
+			// environments since the bug that the test fixes
+			// only surfaces when in headfull mode.
+			// Remove this skip once we have headfull mode in
+			// CI: https://github.com/grafana/xk6-browser/issues/678
+			t.Skip("skipped when in headless mode")
+		}
+	}
 
 	t.Parallel()
 
-	b := newTestBrowser(t, withFileServer())
+	opts := defaultLaunchOpts()
+	opts.Headless = false
+	b := newTestBrowser(t, withFileServer(), opts)
 	p := b.NewPage(nil)
 
 	var result string
