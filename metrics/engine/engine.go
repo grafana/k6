@@ -267,11 +267,11 @@ func (me *MetricsEngine) GetMetricsWithBreachedThresholdsCount() uint32 {
 	return atomic.LoadUint32(&me.breachedThresholdsCount)
 }
 
-func (me *MetricsEngine) AddSample(s metrics.Sample) {
-	sink, ok := me.sinks[s.Metric]
+func (me *MetricsEngine) AddSample(m *metrics.Metric, s metrics.Sample) {
+	sink, ok := me.sinks[m]
 	if !ok {
-		sink = metrics.NewSinkWithMetric(s.Metric)
-		me.sinks[s.Metric] = sink
+		sink = metrics.NewSinkWithMetric(m)
+		me.sinks[m] = sink
 	}
 
 	sink.Add(s)

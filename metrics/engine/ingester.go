@@ -80,14 +80,14 @@ func (oi *outputIngester) flushMetrics() {
 
 			// mark it as observed so it shows in the end-of-test summary
 			// and finally, add its value to its own sink
-			oi.metricsEngine.AddSample(sample)
+			oi.metricsEngine.AddSample(m, sample)
 
 			// and also to the same for any submetrics that match the metric sample
 			for _, sm := range m.Submetrics {
 				if !sample.Tags.Contains(sm.Tags) {
 					continue
 				}
-				oi.metricsEngine.AddSample(sample)
+				oi.metricsEngine.AddSample(sm.Metric, sample)
 			}
 		}
 	}
