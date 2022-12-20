@@ -52,6 +52,10 @@ func (d *destructKeyedSource) className() string {
 	return d.w().className()
 }
 
+func (d *destructKeyedSource) typeOf() valueString {
+	return d.w().typeOf()
+}
+
 func (d *destructKeyedSource) getStr(p unistring.String, receiver Value) Value {
 	d.recordKey(stringValueFromRaw(p))
 	return d.w().getStr(p, receiver)
@@ -168,6 +172,10 @@ func (d *destructKeyedSource) toPrimitive() Value {
 
 func (d *destructKeyedSource) assertCallable() (call func(FunctionCall) Value, ok bool) {
 	return d.w().assertCallable()
+}
+
+func (d *destructKeyedSource) vmCall(vm *vm, n int) {
+	d.w().vmCall(vm, n)
 }
 
 func (d *destructKeyedSource) assertConstructor() func(args []Value, newTarget *Object) *Object {

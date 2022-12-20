@@ -245,7 +245,7 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 				tkn, strict = token.IsKeyword(string(parsedLiteral))
 				if hasEscape {
 					self.insertSemicolon = true
-					if tkn == 0 || token.IsUnreservedWord(tkn) {
+					if tkn == 0 || self.isBindingId(tkn) {
 						tkn = token.IDENTIFIER
 					} else {
 						tkn = token.ESCAPED_RESERVED_WORD
@@ -274,6 +274,13 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 					self.insertSemicolon = true
 					return
 
+				case token.ASYNC:
+					// async only has special meaning if not followed by a LineTerminator
+					if self.skipWhiteSpaceCheckLineTerminator() {
+						self.insertSemicolon = true
+						tkn = token.IDENTIFIER
+					}
+					return
 				default:
 					return
 
@@ -568,6 +575,31 @@ func (self *_parser) skipMultiLineComment() (hasLineTerminator bool) {
 
 	self.errorUnexpected(0, self.chr)
 	return
+}
+
+func (self *_parser) skipWhiteSpaceCheckLineTerminator() bool {
+	for {
+		switch self.chr {
+		case ' ', '\t', '\f', '\v', '\u00a0', '\ufeff':
+			self.read()
+			continue
+		case '\r':
+			if self._peek() == '\n' {
+				self.read()
+			}
+			fallthrough
+		case '\u2028', '\u2029', '\n':
+			return true
+		}
+		if self.chr >= utf8.RuneSelf {
+			if unicode.IsSpace(self.chr) {
+				self.read()
+				continue
+			}
+		}
+		break
+	}
+	return false
 }
 
 func (self *_parser) skipWhiteSpace() {

@@ -91,7 +91,7 @@ func TestNewBundle(t *testing.T) {
 		_, err := getSimpleBundle(t, "/script.js", `throw new Error("aaaa");`)
 		exception := new(scriptException)
 		require.ErrorAs(t, err, &exception)
-		require.EqualError(t, err, "Error: aaaa\n\tat file:///script.js:2:7(3)\n\tat native\n")
+		require.EqualError(t, err, "Error: aaaa\n\tat file:///script.js:2:7(3)\n")
 	})
 	t.Run("InvalidExports", func(t *testing.T) {
 		t.Parallel()
@@ -170,7 +170,7 @@ func TestNewBundle(t *testing.T) {
 				{
 					"BigInt", "base",
 					`module.exports.default = function() {}; BigInt(1231412444)`,
-					"ReferenceError: BigInt is not defined\n\tat file:///script.js:2:47(7)\n\tat native\n",
+					"ReferenceError: BigInt is not defined\n\tat file:///script.js:2:47(7)\n",
 				},
 			}
 

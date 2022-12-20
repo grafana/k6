@@ -865,6 +865,20 @@ func (p *proxyObject) assertCallable() (call func(FunctionCall) Value, ok bool) 
 	return nil, false
 }
 
+func (p *proxyObject) vmCall(vm *vm, n int) {
+	vm.pushCtx()
+	vm.prg = nil
+	vm.sb = vm.sp - n // so that [sb-1] points to the callee
+	ret := p.apply(FunctionCall{This: vm.stack[vm.sp-n-2], Arguments: vm.stack[vm.sp-n : vm.sp]})
+	if ret == nil {
+		ret = _undefined
+	}
+	vm.stack[vm.sp-n-2] = ret
+	vm.popCtx()
+	vm.sp -= n + 1
+	vm.pc++
+}
+
 func (p *proxyObject) assertConstructor() func(args []Value, newTarget *Object) *Object {
 	if p.ctor != nil {
 		return p.construct
@@ -1034,6 +1048,14 @@ func (p *proxyObject) className() string {
 		return classFunction
 	}
 	return classObject
+}
+
+func (p *proxyObject) typeOf() valueString {
+	if p.call == nil {
+		return stringObjectC
+	}
+
+	return stringFunction
 }
 
 func (p *proxyObject) exportType() reflect.Type {

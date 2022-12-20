@@ -10,24 +10,25 @@ import (
 )
 
 const (
-	classObject   = "Object"
-	classArray    = "Array"
-	classWeakSet  = "WeakSet"
-	classWeakMap  = "WeakMap"
-	classMap      = "Map"
-	classMath     = "Math"
-	classSet      = "Set"
-	classFunction = "Function"
-	classNumber   = "Number"
-	classString   = "String"
-	classBoolean  = "Boolean"
-	classError    = "Error"
-	classAggError = "AggregateError"
-	classRegExp   = "RegExp"
-	classDate     = "Date"
-	classJSON     = "JSON"
-	classGlobal   = "global"
-	classPromise  = "Promise"
+	classObject        = "Object"
+	classArray         = "Array"
+	classWeakSet       = "WeakSet"
+	classWeakMap       = "WeakMap"
+	classMap           = "Map"
+	classMath          = "Math"
+	classSet           = "Set"
+	classFunction      = "Function"
+	classAsyncFunction = "AsyncFunction"
+	classNumber        = "Number"
+	classString        = "String"
+	classBoolean       = "Boolean"
+	classError         = "Error"
+	classAggError      = "AggregateError"
+	classRegExp        = "RegExp"
+	classDate          = "Date"
+	classJSON          = "JSON"
+	classGlobal        = "global"
+	classPromise       = "Promise"
 
 	classArrayIterator        = "Array Iterator"
 	classMapIterator          = "Map Iterator"
@@ -148,6 +149,7 @@ type objectExportCtx struct {
 type objectImpl interface {
 	sortable
 	className() string
+	typeOf() valueString
 	getStr(p unistring.String, receiver Value) Value
 	getIdx(p valueInt, receiver Value) Value
 	getSym(p *Symbol, receiver Value) Value
@@ -184,6 +186,7 @@ type objectImpl interface {
 	toPrimitiveString() Value
 	toPrimitive() Value
 	assertCallable() (call func(FunctionCall) Value, ok bool)
+	vmCall(vm *vm, n int)
 	assertConstructor() func(args []Value, newTarget *Object) *Object
 	proto() *Object
 	setProto(proto *Object, throw bool) bool
@@ -275,6 +278,10 @@ func (o *baseObject) init() {
 
 func (o *baseObject) className() string {
 	return o.class
+}
+
+func (o *baseObject) typeOf() valueString {
+	return stringObjectC
 }
 
 func (o *baseObject) hasPropertyStr(name unistring.String) bool {
@@ -924,6 +931,10 @@ func (o *Object) toPrimitive() Value {
 
 func (o *baseObject) assertCallable() (func(FunctionCall) Value, bool) {
 	return nil, false
+}
+
+func (o *baseObject) vmCall(vm *vm, n int) {
+	vm.r.typeErrorResult(true, "Not a function: %s", o.val.toString())
 }
 
 func (o *baseObject) assertConstructor() func(args []Value, newTarget *Object) *Object {

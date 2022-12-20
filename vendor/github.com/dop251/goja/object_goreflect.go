@@ -234,17 +234,13 @@ func (o *objectGoReflect) _getMethod(jsName string) reflect.Value {
 
 func (o *objectGoReflect) elemToValue(ev reflect.Value) (Value, reflectValueWrapper) {
 	if isContainer(ev.Kind()) {
-		if ev.Type() == reflectTypeArray {
-			a := o.val.runtime.newObjectGoSlice(ev.Addr().Interface().(*[]interface{}))
-			return a.val, a
-		}
-		ret := o.val.runtime.reflectValueToValue(ev)
+		ret := o.val.runtime.toValue(ev.Interface(), ev)
 		if obj, ok := ret.(*Object); ok {
 			if w, ok := obj.self.(reflectValueWrapper); ok {
 				return ret, w
 			}
 		}
-		panic("reflectValueToValue() returned a value which is not a reflectValueWrapper")
+		return ret, nil
 	}
 
 	for ev.Kind() == reflect.Interface {
@@ -255,7 +251,7 @@ func (o *objectGoReflect) elemToValue(ev reflect.Value) (Value, reflectValueWrap
 		return _null, nil
 	}
 
-	return o.val.runtime.ToValue(ev.Interface()), nil
+	return o.val.runtime.toValue(ev.Interface(), ev), nil
 }
 
 func (o *objectGoReflect) _getFieldValue(name string) Value {
@@ -283,7 +279,7 @@ func (o *objectGoReflect) _get(name string) Value {
 	}
 
 	if v := o._getMethod(name); v.IsValid() {
-		return o.val.runtime.reflectValueToValue(v)
+		return o.val.runtime.toValue(v.Interface(), v)
 	}
 
 	return nil
@@ -303,7 +299,7 @@ func (o *objectGoReflect) getOwnPropStr(name unistring.String) Value {
 
 	if v := o._getMethod(n); v.IsValid() {
 		return &valueProperty{
-			value:      o.val.runtime.reflectValueToValue(v),
+			value:      o.val.runtime.toValue(v.Interface(), v),
 			enumerable: true,
 		}
 	}

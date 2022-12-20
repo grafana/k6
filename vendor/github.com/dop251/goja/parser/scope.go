@@ -12,6 +12,8 @@ type _scope struct {
 	inIteration     bool
 	inSwitch        bool
 	inFunction      bool
+	inAsync         bool
+	allowAwait      bool
 	declarationList []*ast.VariableDeclaration
 
 	labels []unistring.String

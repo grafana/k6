@@ -87,13 +87,17 @@ func (self *_parser) parsePrimaryExpression() ast.Expression {
 		}
 	case token.SUPER:
 		return self.parseSuperProperty()
+	case token.ASYNC:
+		if f := self.parseMaybeAsyncFunction(false); f != nil {
+			return f
+		}
 	case token.FUNCTION:
-		return self.parseFunction(false)
+		return self.parseFunction(false, false, idx)
 	case token.CLASS:
 		return self.parseClass(false)
 	}
 
-	if isBindingId(self.token, parsedLiteral) {
+	if self.isBindingId(self.token) {
 		self.next()
 		return &ast.Identifier{
 			Name: parsedLiteral,
@@ -144,10 +148,10 @@ func (self *_parser) parseSuperProperty() ast.Expression {
 	}
 }
 
-func (self *_parser) reinterpretSequenceAsArrowFuncParams(seq *ast.SequenceExpression) *ast.ParameterList {
+func (self *_parser) reinterpretSequenceAsArrowFuncParams(list []ast.Expression) *ast.ParameterList {
 	firstRestIdx := -1
-	params := make([]*ast.Binding, 0, len(seq.Sequence))
-	for i, item := range seq.Sequence {
+	params := make([]*ast.Binding, 0, len(list))
+	for i, item := range list {
 		if _, ok := item.(*ast.SpreadElement); ok {
 			if firstRestIdx == -1 {
 				firstRestIdx = i
@@ -155,14 +159,14 @@ func (self *_parser) reinterpretSequenceAsArrowFuncParams(seq *ast.SequenceExpre
 			}
 		}
 		if firstRestIdx != -1 {
-			self.error(seq.Sequence[firstRestIdx].Idx0(), "Rest parameter must be last formal parameter")
+			self.error(list[firstRestIdx].Idx0(), "Rest parameter must be last formal parameter")
 			return &ast.ParameterList{}
 		}
 		params = append(params, self.reinterpretAsBinding(item))
 	}
 	var rest ast.Expression
 	if firstRestIdx != -1 {
-		rest = self.reinterpretAsBindingRestElement(seq.Sequence[firstRestIdx])
+		rest = self.reinterpretAsBindingRestElement(list[firstRestIdx])
 	}
 	return &ast.ParameterList{
 		List: params,
@@ -253,24 +257,22 @@ func (self *_parser) parseRegExpLiteral() *ast.RegExpLiteral {
 	}
 }
 
-func isBindingId(tok token.Token, parsedLiteral unistring.String) bool {
+func (self *_parser) isBindingId(tok token.Token) bool {
 	if tok == token.IDENTIFIER {
 		return true
 	}
-	if token.IsId(tok) {
-		switch parsedLiteral {
-		case "yield", "await":
-			return true
-		}
-		if token.IsUnreservedWord(tok) {
-			return true
-		}
+
+	if tok == token.AWAIT {
+		return !self.scope.allowAwait
+	}
+	if token.IsUnreservedWord(tok) {
+		return true
 	}
 	return false
 }
 
 func (self *_parser) tokenToBindingId() {
-	if isBindingId(self.token, self.parsedLiteral) {
+	if self.isBindingId(self.token) {
 		self.token = token.IDENTIFIER
 	}
 }
@@ -297,7 +299,7 @@ func (self *_parser) parseBindingTarget() (target ast.BindingTarget) {
 	return
 }
 
-func (self *_parser) parseVariableDeclaration(declarationList *[]*ast.Binding) ast.Expression {
+func (self *_parser) parseVariableDeclaration(declarationList *[]*ast.Binding) *ast.Binding {
 	node := &ast.Binding{
 		Target: self.parseBindingTarget(),
 	}
@@ -401,22 +403,13 @@ func (self *_parser) parseObjectProperty() ast.Property {
 	if token.IsId(tkn) || tkn == token.STRING || tkn == token.ILLEGAL {
 		switch {
 		case self.token == token.LEFT_PARENTHESIS:
-			parameterList := self.parseFunctionParameterList()
-
-			node := &ast.FunctionLiteral{
-				Function:      keyStartIdx,
-				ParameterList: parameterList,
-			}
-			node.Body, node.DeclarationList = self.parseFunctionBlock()
-			node.Source = self.slice(keyStartIdx, node.Body.Idx1())
-
 			return &ast.PropertyKeyed{
 				Key:   value,
 				Kind:  ast.PropertyKindMethod,
-				Value: node,
+				Value: self.parseMethodDefinition(keyStartIdx, ast.PropertyKindMethod, false),
 			}
 		case self.token == token.COMMA || self.token == token.RIGHT_BRACE || self.token == token.ASSIGN: // shorthand property
-			if isBindingId(tkn, parsedLiteral) {
+			if self.isBindingId(tkn) {
 				var initializer ast.Expression
 				if self.token == token.ASSIGN {
 					// allow the initializer syntax here in case the object literal
@@ -434,14 +427,18 @@ func (self *_parser) parseObjectProperty() ast.Property {
 			} else {
 				self.errorUnexpectedToken(self.token)
 			}
-		case (literal == "get" || literal == "set") && self.token != token.COLON:
+		case (literal == "get" || literal == "set" || tkn == token.ASYNC) && self.token != token.COLON:
 			_, _, keyValue, _ := self.parseObjectPropertyKey()
 			if keyValue == nil {
 				return nil
 			}
 
 			var kind ast.PropertyKind
-			if literal == "get" {
+			var async bool
+			if tkn == token.ASYNC {
+				async = true
+				kind = ast.PropertyKindMethod
+			} else if literal == "get" {
 				kind = ast.PropertyKindGet
 			} else {
 				kind = ast.PropertyKindSet
@@ -450,7 +447,7 @@ func (self *_parser) parseObjectProperty() ast.Property {
 			return &ast.PropertyKeyed{
 				Key:   keyValue,
 				Kind:  kind,
-				Value: self.parseMethodDefinition(keyStartIdx, kind),
+				Value: self.parseMethodDefinition(keyStartIdx, kind, async),
 			}
 		}
 	}
@@ -464,8 +461,14 @@ func (self *_parser) parseObjectProperty() ast.Property {
 	}
 }
 
-func (self *_parser) parseMethodDefinition(keyStartIdx file.Idx, kind ast.PropertyKind) *ast.FunctionLiteral {
+func (self *_parser) parseMethodDefinition(keyStartIdx file.Idx, kind ast.PropertyKind, async bool) *ast.FunctionLiteral {
 	idx1 := self.idx
+	if async != self.scope.allowAwait {
+		self.scope.allowAwait = async
+		defer func() {
+			self.scope.allowAwait = !async
+		}()
+	}
 	parameterList := self.parseFunctionParameterList()
 	switch kind {
 	case ast.PropertyKindGet:
@@ -480,8 +483,9 @@ func (self *_parser) parseMethodDefinition(keyStartIdx file.Idx, kind ast.Proper
 	node := &ast.FunctionLiteral{
 		Function:      keyStartIdx,
 		ParameterList: parameterList,
+		Async:         async,
 	}
-	node.Body, node.DeclarationList = self.parseFunctionBlock()
+	node.Body, node.DeclarationList = self.parseFunctionBlock(async, async)
 	node.Source = self.slice(keyStartIdx, node.Body.Idx1())
 	return node
 }
@@ -834,6 +838,22 @@ func (self *_parser) parseUnaryExpression() ast.Expression {
 			Idx:      idx,
 			Operand:  operand,
 		}
+	case token.AWAIT:
+		if self.scope.allowAwait {
+			idx := self.idx
+			self.next()
+			if !self.scope.inAsync {
+				self.errorUnexpectedToken(token.AWAIT)
+				return &ast.BadExpression{
+					From: idx,
+					To:   self.idx,
+				}
+			}
+			return &ast.AwaitExpression{
+				Await:    idx,
+				Argument: self.parseUnaryExpression(),
+			}
+		}
 	}
 
 	return self.parsePostfixExpression()
@@ -1132,14 +1152,68 @@ func (self *_parser) parseConditionalExpression() ast.Expression {
 	return left
 }
 
+func (self *_parser) parseArrowFunction(start file.Idx, paramList *ast.ParameterList, async bool) ast.Expression {
+	self.expect(token.ARROW)
+	node := &ast.ArrowFunctionLiteral{
+		Start:         start,
+		ParameterList: paramList,
+		Async:         async,
+	}
+	node.Body, node.DeclarationList = self.parseArrowFunctionBody(async)
+	node.Source = self.slice(start, node.Body.Idx1())
+	return node
+}
+
+func (self *_parser) parseSingleArgArrowFunction(start file.Idx, async bool) ast.Expression {
+	if async != self.scope.allowAwait {
+		self.scope.allowAwait = async
+		defer func() {
+			self.scope.allowAwait = !async
+		}()
+	}
+	self.tokenToBindingId()
+	if self.token != token.IDENTIFIER {
+		self.errorUnexpectedToken(self.token)
+		self.next()
+		return &ast.BadExpression{
+			From: start,
+			To:   self.idx,
+		}
+	}
+
+	id := self.parseIdentifier()
+
+	paramList := &ast.ParameterList{
+		Opening: id.Idx,
+		Closing: id.Idx1(),
+		List: []*ast.Binding{{
+			Target: id,
+		}},
+	}
+
+	return self.parseArrowFunction(start, paramList, async)
+}
+
 func (self *_parser) parseAssignmentExpression() ast.Expression {
 	start := self.idx
 	parenthesis := false
+	async := false
 	var state parserState
-	if self.token == token.LEFT_PARENTHESIS {
+	switch self.token {
+	case token.LEFT_PARENTHESIS:
 		self.mark(&state)
 		parenthesis = true
-	} else {
+	case token.ASYNC:
+		tok := self.peek()
+		if self.isBindingId(tok) {
+			// async x => ...
+			self.next()
+			return self.parseSingleArgArrowFunction(start, true)
+		} else if tok == token.LEFT_PARENTHESIS {
+			self.mark(&state)
+			async = true
+		}
+	default:
 		self.tokenToBindingId()
 	}
 	left := self.parseConditionalExpression()
@@ -1176,30 +1250,37 @@ func (self *_parser) parseAssignmentExpression() ast.Expression {
 		if id, ok := left.(*ast.Identifier); ok {
 			paramList = &ast.ParameterList{
 				Opening: id.Idx,
-				Closing: id.Idx1(),
+				Closing: id.Idx1() - 1,
 				List: []*ast.Binding{{
 					Target: id,
 				}},
 			}
 		} else if parenthesis {
 			if seq, ok := left.(*ast.SequenceExpression); ok && len(self.errors) == 0 {
-				paramList = self.reinterpretSequenceAsArrowFuncParams(seq)
+				paramList = self.reinterpretSequenceAsArrowFuncParams(seq.Sequence)
 			} else {
 				self.restore(&state)
 				paramList = self.parseFunctionParameterList()
 			}
-		} else {
+		} else if async {
+			// async (x, y) => ...
+			if !self.scope.allowAwait {
+				self.scope.allowAwait = true
+				defer func() {
+					self.scope.allowAwait = false
+				}()
+			}
+			if _, ok := left.(*ast.CallExpression); ok {
+				self.restore(&state)
+				self.next() // skip "async"
+				paramList = self.parseFunctionParameterList()
+			}
+		}
+		if paramList == nil {
 			self.error(left.Idx0(), "Malformed arrow function parameter list")
 			return &ast.BadExpression{From: left.Idx0(), To: left.Idx1()}
 		}
-		self.expect(token.ARROW)
-		node := &ast.ArrowFunctionLiteral{
-			Start:         start,
-			ParameterList: paramList,
-		}
-		node.Body, node.DeclarationList = self.parseArrowFunctionBody()
-		node.Source = self.slice(node.Start, node.Body.Idx1())
-		return node
+		return self.parseArrowFunction(start, paramList, async)
 	}
 
 	if operator != 0 {
@@ -1490,7 +1571,9 @@ func (self *_parser) reinterpretAsDestructBindingTarget(item ast.Expression) ast
 	case *ast.ObjectLiteral:
 		return self.reinterpretAsObjectBindingPattern(item)
 	case *ast.Identifier:
-		return item
+		if !self.scope.allowAwait || item.Name != "await" {
+			return item
+		}
 	}
 	self.error(item.Idx0(), "Invalid destructuring binding target")
 	return &ast.BadExpression{From: item.Idx0(), To: item.Idx1()}

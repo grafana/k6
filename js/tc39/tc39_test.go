@@ -49,11 +49,11 @@ var (
 		"IsHTMLDDA",                   // not supported at all
 		"generators",                  // not supported in a meaningful way IMO
 		"async-iteration",             // not supported at all
+		"top-level-await",             // not supported at all
 		"String.prototype.replaceAll", // not supported at all, Stage 4 since 2020
 
 		// from goja
 		"Symbol.asyncIterator",
-		"async-functions",
 		"regexp-named-groups",
 		"regexp-dotall",
 		"regexp-unicode-property-escapes",
@@ -80,10 +80,9 @@ var (
 
 		"array-find-from-last", // stage 3 as of 2021 https://github.com/tc39/proposal-array-find-from-last
 	}
-	skipWords = []string{"yield", "generator", "Generator", "async", "await", "module"}
+	skipWords = []string{"yield", "generator", "Generator", "module"}
 	skipList  = map[string]bool{
-		"test/built-ins/Function/prototype/toString/AsyncFunction.js": true,
-		"test/built-ins/Object/seal/seal-generatorfunction.js":        true,
+		"test/built-ins/Object/seal/seal-generatorfunction.js": true,
 
 		"test/built-ins/Date/parse/without-utc-offset.js": true, // some other reason ?!? depending on local time
 
@@ -161,23 +160,29 @@ var (
 		"test/language/literals/string/legacy-", // legecy string escapes
 
 		// Async/Promise and other totally unsupported functionality
-		"test/built-ins/AsyncArrowFunction",
 		"test/built-ins/AsyncFromSyncIteratorPrototype",
-		"test/built-ins/AsyncFunction",
 		"test/built-ins/AsyncGeneratorFunction",
 		"test/built-ins/AsyncGeneratorPrototype",
 		"test/built-ins/AsyncIteratorPrototype",
 		"test/built-ins/Atomics",
 		"test/built-ins/BigInt",
 		"test/built-ins/SharedArrayBuffer",
-		"test/language/eval-code/direct/async",
-		"test/language/eval-code/direct/gen-",
-		"test/language/expressions/await",
-		"test/language/expressions/async",
 		"test/language/expressions/dynamic-import",
-		"test/language/expressions/object/dstr/async",
 		"test/language/module-code/top-level-await",
-		"test/language/statements/async-function",
+
+		// generator methods seem to just not work at all
+		"test/language/arguments-object/cls-decl-gen-met",
+		"test/language/arguments-object/cls-decl-private-gen-meth",
+		"test/language/arguments-object/cls-expr-gen-meth",
+		"test/language/arguments-object/cls-expr-private-gen-meth",
+		"test/language/expressions/class/gen-method",
+		"test/language/expressions/class/dstr/gen-meth",
+		"test/language/expressions/class/dstr/private-gen-meth",
+		"test/language/expressions/object/dstr/gen-meth",
+		"test/language/statements/class/gen-method",
+		"test/language/statements/class/dstr/gen-meth",
+		"test/language/statements/class/dstr/private-gen-meth",
+
 		"test/built-ins/Function/prototype/toString/async",
 		"test/built-ins/Function/prototype/toString/async",
 		"test/built-ins/Function/prototype/toString/generator",
@@ -503,9 +508,10 @@ func (ctx *tc39TestCtx) runTC39File(name string, t testing.TB) {
 		// t.Logf("Running strict test: %s", name)
 		ctx.runTC39Test(t, name, src, meta, true)
 	} else { // Run test in non strict mode only if we won't run them in strict
+		// NOTE: in practice k6 does not run non strict code at all so this tests make no sense
 		// TODO uncomment the if above and delete this else so we run both parts when the tests
 		// don't take forever
-		ctx.runTC39Test(t, name, src, meta, false)
+		// ctx.runTC39Test(t, name, src, meta, false)
 	}
 
 	if ctx.enableBench {
