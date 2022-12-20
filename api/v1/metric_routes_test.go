@@ -23,10 +23,13 @@ func TestGetMetrics(t *testing.T) {
 	require.NoError(t, err)
 	cs := getControlSurface(t, testState)
 
-	cs.MetricsEngine.ObservedMetrics = map[string]*metrics.Metric{
-		"my_metric": testMetric,
-	}
-	cs.MetricsEngine.ObservedMetrics["my_metric"].Tainted = null.BoolFrom(true)
+	testMetric.Tainted = null.BoolFrom(true)
+
+	cs.MetricsEngine.AddSample(metrics.Sample{
+		TimeSeries: metrics.TimeSeries{
+			Metric: testMetric,
+		},
+	})
 
 	rw := httptest.NewRecorder()
 	NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/metrics", nil))
@@ -79,10 +82,13 @@ func TestGetMetric(t *testing.T) {
 	require.NoError(t, err)
 	cs := getControlSurface(t, testState)
 
-	cs.MetricsEngine.ObservedMetrics = map[string]*metrics.Metric{
-		"my_metric": testMetric,
-	}
-	cs.MetricsEngine.ObservedMetrics["my_metric"].Tainted = null.BoolFrom(true)
+	testMetric.Tainted = null.BoolFrom(true)
+
+	cs.MetricsEngine.AddSample(metrics.Sample{
+		TimeSeries: metrics.TimeSeries{
+			Metric: testMetric,
+		},
+	})
 
 	t.Run("nonexistent", func(t *testing.T) {
 		t.Parallel()
