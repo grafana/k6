@@ -1,6 +1,8 @@
 package tests
 
 import (
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -71,4 +73,47 @@ func TestFrameDismissDialogBox(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
+	if strValue, ok := os.LookupEnv("XK6_HEADLESS"); ok {
+		if value, err := strconv.ParseBool(strValue); err == nil && value {
+			// We're skipping this when running in headless
+			// environments since the bug that the test fixes
+			// only surfaces when in headfull mode.
+			// Remove this skip once we have headfull mode in
+			// CI: https://github.com/grafana/xk6-browser/issues/678
+			t.Skip("skipped when in headless mode")
+		}
+	}
+
+	t.Parallel()
+
+	opts := defaultLaunchOpts()
+	opts.Headless = false
+	b := newTestBrowser(t, withFileServer(), opts)
+	p := b.NewPage(nil)
+
+	var result string
+	err := b.await(func() error {
+		opts := b.toGojaValue(struct {
+			WaitUntil string `js:"waitUntil"`
+		}{
+			WaitUntil: "load",
+		})
+		pageGoto := p.Goto(
+			b.staticURL("embedded_iframe.html"),
+			opts,
+		)
+
+		b.promise(pageGoto).
+			then(func() {
+				result = p.TextContent("#doneDiv", nil)
+			})
+
+		return nil
+	})
+	require.NoError(t, err)
+
+	assert.EqualValues(t, "Done!", result)
 }
