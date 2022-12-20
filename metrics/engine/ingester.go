@@ -55,8 +55,8 @@ func (oi *outputIngester) flushMetrics() {
 		return
 	}
 
-	oi.metricsEngine.MetricsLock.Lock()
-	defer oi.metricsEngine.MetricsLock.Unlock()
+	oi.metricsEngine.metricsLock.Lock()
+	defer oi.metricsEngine.metricsLock.Unlock()
 
 	// TODO: split metric samples in buckets with a *metrics.Metric key; this will
 	// allow us to have a per-bucket lock, instead of one global one, and it
@@ -79,7 +79,7 @@ func (oi *outputIngester) flushMetrics() {
 			m := sample.Metric
 
 			// mark it as observed so it shows in the end-of-test summary
-			// an dfinally, add its value to its own sink
+			// and finally, add its value to its own sink
 			oi.metricsEngine.AddSample(sample)
 
 			// and also to the same for any submetrics that match the metric sample

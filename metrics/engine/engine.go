@@ -42,17 +42,17 @@ type MetricsEngine struct {
 	//   - do not use an unnecessary map for the observed metrics
 	//   - have one lock per metric instead of a a global one, when
 	//     the metrics are decoupled from their types
-	MetricsLock     sync.Mutex
-	ObservedMetrics map[string]*metrics.Metric
+	metricsLock     sync.Mutex
+	observedMetrics map[string]*metrics.Metric
 }
 
 // NewMetricsEngine creates a new metrics Engine with the given parameters.
 func NewMetricsEngine(es *lib.ExecutionState) (*MetricsEngine, error) {
 	me := &MetricsEngine{
-		es:     es,
-		logger: es.Test.Logger.WithField("component", "metrics-engine"),
-
-		ObservedMetrics: make(map[string]*metrics.Metric),
+		es:              es,
+		logger:          es.Test.Logger.WithField("component", "metrics-engine"),
+		observedMetrics: make(map[string]*metrics.Metric),
+		sinks:           make(map[*metrics.Metric]metrics.Sink),
 	}
 
 	if !(me.es.Test.RuntimeOptions.NoSummary.Bool && me.es.Test.RuntimeOptions.NoThresholds.Bool) {
@@ -123,7 +123,7 @@ func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Me
 func (me *MetricsEngine) markObserved(metric *metrics.Metric) {
 	if !metric.Observed {
 		metric.Observed = true
-		me.ObservedMetrics[metric.Name] = metric
+		me.observedMetrics[metric.Name] = metric
 	}
 }
 
@@ -144,6 +144,9 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 
 		metric.Thresholds = thresholds
 		me.metricsWithThresholds = append(me.metricsWithThresholds, metric)
+
+		swm := metrics.NewSinkWithMetric(metric) // maybe better just SinkByType?
+		me.sinks[metric] = swm.Sink
 
 		// Mark the metric (and the parent metric, if we're dealing with a
 		// submetric) as observed, so they are shown in the end-of-test summary,
@@ -220,8 +223,8 @@ func (me *MetricsEngine) StartThresholdCalculations(abortRun func(error)) (
 //
 // TODO: refactor, optimize
 func (me *MetricsEngine) evaluateThresholds(ignoreEmptySinks bool) (breachedThersholds []string, shouldAbort bool) {
-	me.MetricsLock.Lock()
-	defer me.MetricsLock.Unlock()
+	me.metricsLock.Lock()
+	defer me.metricsLock.Unlock()
 
 	t := me.es.GetCurrentTestRunDuration()
 
@@ -267,10 +270,36 @@ func (me *MetricsEngine) GetMetricsWithBreachedThresholdsCount() uint32 {
 func (me *MetricsEngine) AddSample(s metrics.Sample) {
 	sink, ok := me.sinks[s.Metric]
 	if !ok {
-		sink = metrics.NewSinkByType(s.Metric.Type)
+		sink = metrics.NewSinkWithMetric(s.Metric)
 		me.sinks[s.Metric] = sink
 	}
 
 	sink.Add(s)
 	me.markObserved(s.Metric)
+}
+
+func (me *MetricsEngine) ObservedMetrics() map[string]metrics.SinkWithMetric {
+	me.metricsLock.Lock()
+	defer me.metricsLock.Unlock()
+
+	swm := make(map[string]metrics.SinkWithMetric) //], 0, len(me.observedMetrics))
+	for id, om := range me.observedMetrics {
+		swm[id] = metrics.SinkWithMetric{
+			Sink:   me.sinks[om],
+			Metric: om,
+		}
+	}
+	return swm
+}
+
+func (me *MetricsEngine) ObservedMetricByID(id string) (metrics.SinkWithMetric, bool) {
+	me.metricsLock.Lock()
+	defer me.metricsLock.Unlock()
+	m, ok := me.observedMetrics[id]
+	if !ok {
+		return metrics.SinkWithMetric{}, false
+	}
+	return metrics.SinkWithMetric{
+		Sink: me.sinks[m], Metric: m,
+	}, true
 }

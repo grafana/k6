@@ -63,12 +63,12 @@ type Metric struct {
 }
 
 // NewMetric constructs a new Metric
-func NewMetric(m *metrics.Metric, t time.Duration) Metric {
+func NewMetric(swm *metrics.SinkWithMetric, t time.Duration) Metric {
 	return Metric{
-		Name:     m.Name,
-		Type:     NullMetricType{m.Type, true},
-		Contains: NullValueType{m.Contains, true},
-		Tainted:  m.Tainted,
-		Sample:   m.Sink.Format(t),
+		Name:     swm.Metric.Name,
+		Type:     NullMetricType{swm.Metric.Type, true},
+		Contains: NullValueType{swm.Metric.Contains, true},
+		Tainted:  swm.Metric.Tainted,
+		Sample:   swm.Format(t),
 	}
 }

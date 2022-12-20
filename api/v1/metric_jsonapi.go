@@ -21,17 +21,17 @@ type metricData struct {
 	Attributes Metric `json:"attributes"`
 }
 
-func newMetricEnvelope(m *metrics.Metric, t time.Duration) metricJSONAPI {
+func newMetricEnvelope(m *metrics.SinkWithMetric, t time.Duration) metricJSONAPI {
 	return metricJSONAPI{
 		Data: newMetricData(m, t),
 	}
 }
 
-func newMetricsJSONAPI(list map[string]*metrics.Metric, t time.Duration) MetricsJSONAPI {
+func newMetricsJSONAPI(list map[string]metrics.SinkWithMetric, t time.Duration) MetricsJSONAPI {
 	metrics := make([]metricData, 0, len(list))
 
 	for _, m := range list {
-		metrics = append(metrics, newMetricData(m, t))
+		metrics = append(metrics, newMetricData(&m, t))
 	}
 
 	return MetricsJSONAPI{
@@ -39,7 +39,7 @@ func newMetricsJSONAPI(list map[string]*metrics.Metric, t time.Duration) Metrics
 	}
 }
 
-func newMetricData(m *metrics.Metric, t time.Duration) metricData {
+func newMetricData(m *metrics.SinkWithMetric, t time.Duration) metricData {
 	metric := NewMetric(m, t)
 
 	return metricData{
