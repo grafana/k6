@@ -368,7 +368,7 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	} else {
 		_ = vm.Set("print", t.Log)
 	}
-	early, origErr, err := ctx.runTC39Script(name, src, meta.Includes, vm)
+	early, origErr, err := ctx.runTC39Script(name, src, meta.Includes, vm, meta.Negative.Type != "")
 
 	if err == nil {
 		if meta.Negative.Type != "" {
@@ -577,7 +577,7 @@ func (ctx *tc39TestCtx) runFile(base, name string, vm *goja.Runtime) error {
 	return err
 }
 
-func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *goja.Runtime) (early bool, origErr, err error) {
+func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *goja.Runtime, expectsError bool) (early bool, origErr, err error) {
 	early = true
 	err = ctx.runFile(ctx.base, path.Join("harness", "assert.js"), vm)
 	if err != nil {
@@ -600,14 +600,13 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *g
 	comp := ctx.compilerPool.Get()
 	defer ctx.compilerPool.Put(comp)
 	comp.Options = compiler.Options{Strict: false, CompatibilityMode: lib.CompatibilityModeBase}
-	p, _, origErr = comp.Compile(src, name, true)
-	if origErr != nil {
+	p, _, err = comp.Compile(src, name, true)
+	origErr = err
+	if err != nil && !expectsError {
 		src, _, err = comp.Transform(src, name, nil)
 		if err == nil {
 			p, _, err = comp.Compile(src, name, true)
 		}
-	} else {
-		err = origErr
 	}
 
 	if err != nil {
@@ -617,7 +616,7 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *g
 	early = false
 	_, err = vm.RunProgram(p)
 
-	return
+	return early, origErr, err
 }
 
 func (ctx *tc39TestCtx) runTC39Tests(name string) {
