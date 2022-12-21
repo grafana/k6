@@ -80,7 +80,7 @@ var (
 
 		"array-find-from-last", // stage 3 as of 2021 https://github.com/tc39/proposal-array-find-from-last
 	}
-	skipWords = []string{"yield", "generator", "Generator", "async", "await"}
+	skipWords = []string{"yield", "generator", "Generator", "async", "await", "module"}
 	skipList  = map[string]bool{
 		"test/built-ins/Function/prototype/toString/AsyncFunction.js": true,
 		"test/built-ins/Object/seal/seal-generatorfunction.js":        true,
