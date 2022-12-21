@@ -48,6 +48,20 @@ func newOutput(params output.Params) (*Output, error) {
 	ignoredTags := []string{}
 	tags := params.ScriptOptions.SystemTags.Map()
 	for tag, flag := range tags {
+		systemTag, err := metrics.SystemTagString(tag)
+		if err != nil {
+			return nil, err
+		}
+
+		// The non-indexable system tags are neither a "resTag"
+		// nor an "ignoreTag". They aren't a "resTag" as they
+		// aren't added as a column in the CSV. Yet they also
+		// shouldn't be ignored as they are added to the
+		// "metadata" column
+		if metrics.NonIndexableSystemTags.Has(systemTag) {
+			continue
+		}
+
 		if flag {
 			resTags = append(resTags, tag)
 		} else {

@@ -245,6 +245,7 @@ func TestRun(t *testing.T) {
 							"url":   "val2",
 							"error": "val3",
 							"tag4":  "val4",
+							"vu":    "1",
 						}),
 					},
 					Metadata: map[string]string{},
@@ -257,7 +258,7 @@ func TestRun(t *testing.T) {
 			timeFormat:     "",
 			outputContent: "metric_name,timestamp,metric_value,check,error,extra_tags,metadata\n" +
 				"my_metric,1562324643,1.000000,val1,val3,url=val2,\n" +
-				"my_metric,1562324644,1.000000,val1,val3,tag4=val4&url=val2,\n",
+				"my_metric,1562324644,1.000000,val1,val3,tag4=val4&url=val2&vu=1,\n",
 		},
 		{
 			samples: []metrics.SampleContainer{
@@ -350,7 +351,7 @@ func TestRun(t *testing.T) {
 				Environment:    env,
 				ConfigArgument: data.fileName,
 				ScriptOptions: lib.Options{
-					SystemTags: metrics.NewSystemTagSet(metrics.TagError | metrics.TagCheck),
+					SystemTags: metrics.NewSystemTagSet(metrics.TagError | metrics.TagCheck | metrics.TagVU),
 				},
 			})
 			require.NoError(t, err)
