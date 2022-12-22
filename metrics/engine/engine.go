@@ -153,6 +153,8 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 		// even if they don't have any metric samples during the test run
 		me.markObserved(metric)
 		if metric.Sub != nil {
+			subswm := metrics.NewSinkWithMetric(metric.Sub.Parent)
+			me.sinks[subswm.Metric] = subswm.Sink
 			me.markObserved(metric.Sub.Parent)
 		}
 	}
@@ -267,10 +269,12 @@ func (me *MetricsEngine) GetMetricsWithBreachedThresholdsCount() uint32 {
 	return atomic.LoadUint32(&me.breachedThresholdsCount)
 }
 
+// TODO: remove the metric, it used for passing the submetric
+// but it is a mess because it will be different frome the Sample's metric
 func (me *MetricsEngine) AddSample(m *metrics.Metric, s metrics.Sample) {
 	sink, ok := me.sinks[m]
 	if !ok {
-		sink = metrics.NewSinkWithMetric(m)
+		sink = metrics.NewSinkWithMetric(m).Sink
 		me.sinks[m] = sink
 	}
 

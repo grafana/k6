@@ -88,10 +88,6 @@ func getFreeBindAddr(t *testing.T) string {
 	for i := 0; i < 100; i++ {
 		port := atomic.AddUint64(&portRangeStart, 1)
 		addr := net.JoinHostPort("localhost", strconv.FormatUint(port, 10))
-        :q
-        :q
-        :q
-        :q
 
 		listener, err := net.Listen("tcp", addr)
 		if err != nil {

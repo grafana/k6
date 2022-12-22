@@ -25,7 +25,7 @@ func TestGetMetrics(t *testing.T) {
 
 	testMetric.Tainted = null.BoolFrom(true)
 
-	cs.MetricsEngine.AddSample(metrics.Sample{
+	cs.MetricsEngine.AddSample(testMetric, metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
 			Metric: testMetric,
 		},
@@ -84,11 +84,12 @@ func TestGetMetric(t *testing.T) {
 
 	testMetric.Tainted = null.BoolFrom(true)
 
-	cs.MetricsEngine.AddSample(metrics.Sample{
-		TimeSeries: metrics.TimeSeries{
-			Metric: testMetric,
-		},
-	})
+	cs.MetricsEngine.AddSample(testMetric,
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: testMetric,
+			},
+		})
 
 	t.Run("nonexistent", func(t *testing.T) {
 		t.Parallel()
