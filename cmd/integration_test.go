@@ -1482,10 +1482,8 @@ func TestPrometheusRemoteWriteOutput(t *testing.T) {
 
 	ts := newGlobalTestState(t)
 	ts.args = []string{"k6", "run", "--out", "experimental-prometheus-rw", "-"}
-	ts.stdIn = bytes.NewBufferString(`
-		import exec from 'k6/execution';
-		export default function () {};
-	`)
+	ts.envVars["K6_PROMETHEUS_RW_SERVER_URL"] = "http://a-fake-url-for-fail"
+	ts.stdIn = bytes.NewBufferString(`export default function () {};`)
 
 	newRootCommand(ts.globalState).execute()
 	ts.outMutex.Lock()

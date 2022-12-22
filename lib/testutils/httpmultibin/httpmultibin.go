@@ -88,12 +88,15 @@ type jsonBody struct {
 	Compression string      `json:"compression"`
 }
 
-func getWebsocketHandler(echo bool, closePrematurely bool) http.Handler {
+func getWebsocketHandler(t testing.TB, echo bool, closePrematurely bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
-		if err != nil {
-			return
-		}
+		require.NoError(t, err)
+
+		defer func() {
+			_ = conn.Close()
+		}()
+
 		if echo {
 			messageType, r, e := conn.NextReader()
 			if e != nil {
@@ -116,12 +119,6 @@ func getWebsocketHandler(echo bool, closePrematurely bool) http.Handler {
 		if !closePrematurely {
 			closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
 			_ = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
-			// Wait for response control frame
-			<-time.After(time.Second)
-		}
-		err = conn.Close()
-		if err != nil {
-			return
 		}
 	})
 }
@@ -256,10 +253,10 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	// Create a http.ServeMux and set the httpbin handler as the default
 	mux := http.NewServeMux()
 	mux.Handle("/brotli", getEncodedHandler(t, "br"))
-	mux.Handle("/ws-echo", getWebsocketHandler(true, false))
-	mux.Handle("/ws-echo-invalid", getWebsocketHandler(true, true))
-	mux.Handle("/ws-close", getWebsocketHandler(false, false))
-	mux.Handle("/ws-close-invalid", getWebsocketHandler(false, true))
+	mux.Handle("/ws-echo", getWebsocketHandler(t, true, false))
+	mux.Handle("/ws-echo-invalid", getWebsocketHandler(t, true, true))
+	mux.Handle("/ws-close", getWebsocketHandler(t, false, false))
+	mux.Handle("/ws-close-invalid", getWebsocketHandler(t, false, true))
 	mux.Handle("/zstd", getEncodedHandler(t, "zstd"))
 	mux.Handle("/zstd-br", getZstdBrHandler(t))
 	mux.Handle("/", httpbin.New().Handler())
