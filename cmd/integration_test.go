@@ -517,9 +517,9 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	newRootCommand(ts.globalState).execute()
 
 	stdOut := ts.stdOut.String()
-	assert.Contains(t, stdOut, `✓ http_reqs......................: 7`)
-	assert.Contains(t, stdOut, `✓ iterations.....................: 5`)
-	assert.Contains(t, stdOut, `✓ setup_teardown.................: 2`)
+	assert.Contains(t, stdOut, `✓ http_reqs..................: 7`)
+	assert.Contains(t, stdOut, `✓ iterations.................: 5`)
+	assert.Contains(t, stdOut, `✓ setup_teardown.............: 2`)
 
 	logMsgs := ts.loggerHook.Drain()
 	for _, msg := range logMsgs {

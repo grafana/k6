@@ -29,8 +29,11 @@ func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Durat
 		panic(err.Error()) // this should have been validated already
 	}
 
-	return func(sink metrics.Sink, t time.Duration) (result map[string]float64) {
-		switch sink := sink.(type) {
+	return func(s metrics.Sink, t time.Duration) (result map[string]float64) {
+		if s == nil {
+			panic("got an unexpected null Sink")
+		}
+		switch sink := s.(type) {
 		case *metrics.CounterSink:
 			result = sink.Format(t)
 			rate := 0.0
@@ -51,6 +54,7 @@ func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Durat
 			for _, col := range summaryTrendStats {
 				result[col] = trendResolvers[col](sink)
 			}
+		default:
 		}
 
 		return result

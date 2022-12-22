@@ -69,6 +69,6 @@ func NewMetric(swm *metrics.SinkWithMetric, t time.Duration) Metric {
 		Type:     NullMetricType{swm.Metric.Type, true},
 		Contains: NullValueType{swm.Metric.Contains, true},
 		Tainted:  swm.Metric.Tainted,
-		Sample:   swm.Format(t),
+		Sample:   swm.Sink.Format(t),
 	}
 }

@@ -22,8 +22,12 @@ type Sink interface {
 }
 
 type SinkWithMetric struct {
-	Sink
+	Sink   Sink
 	Metric *Metric
+}
+
+func (swm SinkWithMetric) Add(s Sample) {
+	swm.Sink.Add(s)
 }
 
 // TODO: add a test
