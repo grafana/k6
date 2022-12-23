@@ -242,7 +242,18 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error
 		c.loggerIsRemote = true
 	}
 
-	stdlog.SetOutput(c.globalState.logger.Writer())
+	// Sometimes the Go runtime uses the standard log output to
+	// log some messages directly.
+	// It does when an invalid char is found in a Cookie.
+	// Check for details https://github.com/grafana/k6/issues/711#issue-341414887
+	stdlog.SetOutput(func() io.Writer {
+		w := c.globalState.logger.Writer()
+		go func() {
+			<-c.globalState.ctx.Done()
+			_ = w.Close()
+		}()
+		return w
+	}())
 	c.globalState.logger.Debugf("k6 version: v%s", consts.FullVersion())
 	return nil
 }

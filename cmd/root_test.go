@@ -61,10 +61,7 @@ func TestMain(m *testing.M) {
 	}()
 
 	defer func() {
-		// TODO: figure out why logrus' `Entry.WriterLevel` goroutine sticks
-		// around and remove this exception.
-		opt := goleak.IgnoreTopFunction("io.(*pipe).read")
-		if err := goleak.Find(opt); err != nil {
+		if err := goleak.Find(); err != nil {
 			fmt.Println(err) //nolint:forbidigo
 			exitCode = 3
 		}
@@ -91,6 +88,10 @@ func getFreeBindAddr(t *testing.T) string {
 	for i := 0; i < 100; i++ {
 		port := atomic.AddUint64(&portRangeStart, 1)
 		addr := net.JoinHostPort("localhost", strconv.FormatUint(port, 10))
+        :q
+        :q
+        :q
+        :q
 
 		listener, err := net.Listen("tcp", addr)
 		if err != nil {
