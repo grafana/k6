@@ -31,7 +31,7 @@ _Format as `<number> <present_verb> <object>. <credit>`_:
 - `#pr` `<description>`
 - `#pr` `<description>`
 
-## Bugs fixes
+## Bug fixes
 
 _Format as `<number> <present_verb> <object>. <credit>`_:
 - _`#111` fixes race condition in runtime_
