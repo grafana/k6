@@ -3,7 +3,7 @@
 
 > :warning: Not to be confused with [Prometheus Remote Write **client** extension](https://github.com/grafana/xk6-client-prometheus-remote) which is for load testing _Prometheus_ itself.
 
-> :note: As of k6 v0.42.0, this extension is available within k6 as an _experimental module_. 
+> :bookmark: As of k6 v0.42.0, this extension is available within k6 as an _experimental module_. 
 > This means that the extension has entered the process of being fully merged into the core of k6 and does not require a special build with xk6 to utilize this feature.
 > 
 > See the [Prometheus remote write guide](https://k6.io/docs/results-output/real-time/prometheus-remote-write/) to utilize this feature.
