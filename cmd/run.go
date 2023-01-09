@@ -25,7 +25,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/ui/console/pb"
+	"go.k6.io/k6/ui/pb"
 )
 
 // cmdRun handles the `k6 run` sub-command
