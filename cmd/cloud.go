@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -20,7 +21,7 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/ui/console/pb"
+	"go.k6.io/k6/ui/pb"
 )
 
 // cmdCloud handles the `k6 cloud` sub-command
@@ -63,13 +64,13 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, args []string) error {
 // TODO: split apart some more
 //nolint:funlen,gocognit,cyclop
 func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
-	maybePrintBanner(c.gs)
+	printBanner(c.gs)
 
 	progressBar := pb.New(
 		pb.WithConstLeft("Init"),
 		pb.WithConstProgress(0, "Loading test script..."),
 	)
-	maybePrintBar(c.gs, progressBar)
+	printBar(c.gs, progressBar)
 
 	test, err := loadAndConfigureTest(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
@@ -90,8 +91,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// TODO: validate for externally controlled executor (i.e. executors that aren't distributable)
 	// TODO: move those validations to a separate function and reuse validateConfig()?
 
-	progressBar.Modify(pb.WithConstProgress(0, "Building the archive..."))
-	maybePrintBar(c.gs, progressBar)
+	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
 	arc := testRunState.Runner.MakeArchive()
 
 	// TODO: Fix this
@@ -152,16 +152,14 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	logger := c.gs.logger
 
 	// Start cloud test run
-	progressBar.Modify(pb.WithConstProgress(0, "Validating script options"))
-	maybePrintBar(c.gs, progressBar)
+	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
 	client := cloudapi.NewClient(
 		logger, cloudConfig.Token.String, cloudConfig.Host.String, consts.Version, cloudConfig.Timeout.TimeDuration())
 	if err = client.ValidateOptions(arc.Options); err != nil {
 		return err
 	}
 
-	progressBar.Modify(pb.WithConstProgress(0, "Uploading archive"))
-	maybePrintBar(c.gs, progressBar)
+	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
 	refID, err := client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
 	if err != nil {
 		return err
@@ -194,34 +192,24 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 	testURL := cloudapi.URLForResults(refID, cloudConfig)
 	executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
-
-	execDesc := getExecutionDescription(
-		c.gs.console.ApplyTheme, "cloud", test.sourceRootPath, testURL, test.derivedConfig,
-		et, executionPlan, nil,
+	printExecutionDescription(
+		c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
 	)
-	if c.gs.flags.quiet {
-		c.gs.logger.Debug(execDesc)
-	} else {
-		c.gs.console.Print(execDesc)
-	}
 
-	progressBar.Modify(
-		pb.WithConstLeft("Run "),
-		pb.WithConstProgress(0, "Initializing the cloud test"),
+	modifyAndPrintBar(
+		c.gs, progressBar,
+		pb.WithConstLeft("Run "), pb.WithConstProgress(0, "Initializing the cloud test"),
 	)
-	maybePrintBar(c.gs, progressBar)
 
 	progressCtx, progressCancel := context.WithCancel(globalCtx)
+	progressBarWG := &sync.WaitGroup{}
+	progressBarWG.Add(1)
+	defer progressBarWG.Wait()
 	defer progressCancel()
-	if !c.gs.flags.quiet {
-		progressBarWG := &sync.WaitGroup{}
-		progressBarWG.Add(1)
-		defer progressBarWG.Wait()
-		go func() {
-			c.gs.console.ShowProgress(progressCtx, []*pb.ProgressBar{progressBar})
-			progressBarWG.Done()
-		}()
-	}
+	go func() {
+		showProgress(progressCtx, c.gs, []*pb.ProgressBar{progressBar}, logger)
+		progressBarWG.Done()
+	}()
 
 	var (
 		startTime   time.Time
@@ -294,8 +282,10 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 
 	if !c.gs.flags.quiet {
-		c.gs.console.Printf("     test status: %s\n",
-			c.gs.console.ApplyTheme(testProgress.RunStatusText))
+		valueColor := getColor(c.gs.flags.noColor || !c.gs.stdOut.isTTY, color.FgCyan)
+		printToStdout(c.gs, fmt.Sprintf(
+			"     test status: %s\n", valueColor.Sprint(testProgress.RunStatusText),
+		))
 	} else {
 		logger.WithField("run_status", testProgress.RunStatusText).Debug("Test finished")
 	}

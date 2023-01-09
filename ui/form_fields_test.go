@@ -1,4 +1,4 @@
-package form
+package ui
 
 import (
 	"testing"

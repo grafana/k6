@@ -20,6 +20,7 @@ require (
 	github.com/jhump/protoreflect v1.13.0
 	github.com/klauspost/compress v1.15.11
 	github.com/mailru/easyjson v0.7.7
+	github.com/mattn/go-colorable v0.1.13
 	github.com/mattn/go-isatty v0.0.16
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/mstoykov/atlas v0.0.0-20220808085829-90340e9998bd
@@ -58,7 +59,6 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/mstoykov/k6-taskqueue-lib v0.1.0 // indirect
 	github.com/prometheus/client_golang v1.14.1-0.20221122130035-8b6e68085b10 // indirect

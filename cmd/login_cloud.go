@@ -3,15 +3,17 @@ package cmd
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"syscall"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/ui/console/form"
+	"go.k6.io/k6/ui"
 )
 
 //nolint:funlen,gocognit
@@ -65,18 +67,18 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			switch {
 			case reset.Valid:
 				newCloudConf.Token = null.StringFromPtr(nil)
-				globalState.console.Print("  token reset\n")
+				printToStdout(globalState, "  token reset\n")
 			case show.Bool:
 			case token.Valid:
 				newCloudConf.Token = token
 			default:
-				f := form.Form{
-					Fields: []form.Field{
-						form.StringField{
+				form := ui.Form{
+					Fields: []ui.Field{
+						ui.StringField{
 							Key:   "Email",
 							Label: "Email",
 						},
-						form.PasswordField{
+						ui.PasswordField{
 							Key:   "Password",
 							Label: "Password",
 						},
@@ -86,7 +88,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 					globalState.logger.Warn("Stdin is not a terminal, falling back to plain text input")
 				}
 				var vals map[string]string
-				vals, err = f.Run(globalState.console.Stdin, globalState.console.Stdout)
+				vals, err = form.Run(globalState.stdIn, globalState.stdOut)
 				if err != nil {
 					return err
 				}
@@ -125,12 +127,13 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			}
 
 			if newCloudConf.Token.Valid {
+				valueColor := getColor(globalState.flags.noColor || !globalState.stdOut.isTTY, color.FgCyan)
 				if !globalState.flags.quiet {
-					globalState.console.Printf(
-						"  token: %s\n", globalState.console.ApplyTheme(newCloudConf.Token.String))
+					printToStdout(globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
 				}
-				globalState.console.Printf(
-					"Logged in successfully, token saved in %s\n", globalState.flags.configFilePath)
+				printToStdout(globalState, fmt.Sprintf(
+					"Logged in successfully, token saved in %s\n", globalState.flags.configFilePath,
+				))
 			}
 			return nil
 		},

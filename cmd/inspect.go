@@ -42,7 +42,7 @@ func getCmdInspect(gs *globalState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			gs.console.Print(string(data))
+			printToStdout(gs, string(data))
 
 			return nil
 		},

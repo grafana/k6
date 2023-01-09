@@ -27,8 +27,7 @@ func getCmdPause(globalState *globalState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-
-			return globalState.console.PrintYAML(status)
+			return yamlPrint(globalState.stdOut, status)
 		},
 	}
 	return pauseCmd

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	stdlog "log"
 	"os"
@@ -11,8 +12,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/mattn/go-colorable"
+	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -21,7 +25,6 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/log"
-	"go.k6.io/k6/ui/console"
 )
 
 const (
@@ -63,13 +66,16 @@ type globalState struct {
 
 	defaultFlags, flags globalFlags
 
-	console *console.Console
+	outMutex       *sync.Mutex
+	stdOut, stdErr *consoleWriter
+	stdIn          io.Reader
 
 	osExit       func(int)
 	signalNotify func(chan<- os.Signal, ...os.Signal)
 	signalStop   func(chan<- os.Signal)
 
-	logger *logrus.Logger
+	logger         *logrus.Logger
+	fallbackLogger logrus.FieldLogger
 }
 
 // Ideally, this should be the only function in the whole codebase where we use
@@ -77,42 +83,55 @@ type globalState struct {
 // like os.Stdout, os.Stderr, os.Stdin, os.Getenv(), etc. should be removed and
 // the respective properties of globalState used instead.
 func newGlobalState(ctx context.Context) *globalState {
-	var logger *logrus.Logger
+	isDumbTerm := os.Getenv("TERM") == "dumb"
+	stdoutTTY := !isDumbTerm && (isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()))
+	stderrTTY := !isDumbTerm && (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()))
+	outMutex := &sync.Mutex{}
+	stdOut := &consoleWriter{os.Stdout, colorable.NewColorable(os.Stdout), stdoutTTY, outMutex, nil}
+	stdErr := &consoleWriter{os.Stderr, colorable.NewColorable(os.Stderr), stderrTTY, outMutex, nil}
+
+	envVars := buildEnvMap(os.Environ())
+	_, noColorsSet := envVars["NO_COLOR"] // even empty values disable colors
+	logger := &logrus.Logger{
+		Out: stdErr,
+		Formatter: &logrus.TextFormatter{
+			ForceColors:   stderrTTY,
+			DisableColors: !stderrTTY || noColorsSet || envVars["K6_NO_COLOR"] != "",
+		},
+		Hooks: make(logrus.LevelHooks),
+		Level: logrus.InfoLevel,
+	}
+
 	confDir, err := os.UserConfigDir()
 	if err != nil {
-		// The logger is initialized in the Console constructor, so defer
-		// logging of this error.
-		defer func() {
-			logger.WithError(err).Warn("could not get config directory")
-		}()
+		logger.WithError(err).Warn("could not get config directory")
 		confDir = ".config"
 	}
 
-	env := buildEnvMap(os.Environ())
 	defaultFlags := getDefaultFlags(confDir)
-	flags := getFlags(defaultFlags, env)
-
-	signalNotify := signal.Notify
-	signalStop := signal.Stop
-
-	cons := console.New(
-		os.Stdout, os.Stderr, os.Stdin,
-		!flags.noColor, env["TERM"], signalNotify, signalStop)
-	logger = cons.GetLogger()
 
 	return &globalState{
 		ctx:          ctx,
 		fs:           afero.NewOsFs(),
 		getwd:        os.Getwd,
 		args:         append(make([]string, 0, len(os.Args)), os.Args...), // copy
-		envVars:      env,
+		envVars:      envVars,
 		defaultFlags: defaultFlags,
-		flags:        flags,
-		console:      cons,
+		flags:        getFlags(defaultFlags, envVars),
+		outMutex:     outMutex,
+		stdOut:       stdOut,
+		stdErr:       stdErr,
+		stdIn:        os.Stdin,
 		osExit:       os.Exit,
 		signalNotify: signal.Notify,
 		signalStop:   signal.Stop,
 		logger:       logger,
+		fallbackLogger: &logrus.Logger{ // we may modify the other one
+			Out:       stdErr,
+			Formatter: new(logrus.TextFormatter), // no fancy formatting here
+			Hooks:     make(logrus.LevelHooks),
+			Level:     logrus.InfoLevel,
+		},
 	}
 }
 
@@ -183,7 +202,7 @@ func newRootCommand(gs *globalState) *rootCommand {
 	rootCmd := &cobra.Command{
 		Use:               "k6",
 		Short:             "a next-generation load generator",
-		Long:              "\n" + gs.console.Banner(),
+		Long:              "\n" + getBanner(c.globalState.flags.noColor || !c.globalState.stdOut.isTTY),
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
@@ -191,9 +210,9 @@ func newRootCommand(gs *globalState) *rootCommand {
 
 	rootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet(gs))
 	rootCmd.SetArgs(gs.args[1:])
-	rootCmd.SetOut(gs.console.Stdout)
-	rootCmd.SetErr(gs.console.Stderr) // TODO: use gs.logger.WriterLevel(logrus.ErrorLevel)?
-	rootCmd.SetIn(gs.console.Stdin)
+	rootCmd.SetOut(gs.stdOut)
+	rootCmd.SetErr(gs.stdErr) // TODO: use gs.logger.WriterLevel(logrus.ErrorLevel)?
+	rootCmd.SetIn(gs.stdIn)
 
 	subCommands := []func(*globalState) *cobra.Command{
 		getCmdArchive, getCmdCloud, getCmdConvert, getCmdInspect,
@@ -260,7 +279,7 @@ func (c *rootCommand) execute() {
 
 	c.globalState.logger.WithFields(fields).Error(errText)
 	if c.loggerIsRemote {
-		c.globalState.logger.WithFields(fields).Error(errText)
+		c.globalState.fallbackLogger.WithFields(fields).Error(errText)
 		cancel()
 		c.waitRemoteLogger()
 	}
@@ -281,7 +300,7 @@ func (c *rootCommand) waitRemoteLogger() {
 		select {
 		case <-c.loggerStopped:
 		case <-time.After(waitRemoteLoggerTimeout):
-			c.globalState.logger.Errorf("Remote logger didn't stop in %s", waitRemoteLoggerTimeout)
+			c.globalState.fallbackLogger.Errorf("Remote logger didn't stop in %s", waitRemoteLoggerTimeout)
 		}
 	}
 }
@@ -347,17 +366,20 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 		c.globalState.logger.SetLevel(logrus.DebugLevel)
 	}
 
+	loggerForceColors := false // disable color by default
 	switch line := c.globalState.flags.logOutput; {
 	case line == "stderr":
-		c.globalState.logger.SetOutput(c.globalState.console.Stderr)
+		loggerForceColors = !c.globalState.flags.noColor && c.globalState.stdErr.isTTY
+		c.globalState.logger.SetOutput(c.globalState.stdErr)
 	case line == "stdout":
-		c.globalState.logger.SetOutput(c.globalState.console.Stdout)
+		loggerForceColors = !c.globalState.flags.noColor && c.globalState.stdOut.isTTY
+		c.globalState.logger.SetOutput(c.globalState.stdOut)
 	case line == "none":
 		c.globalState.logger.SetOutput(ioutil.Discard)
 
 	case strings.HasPrefix(line, "loki"):
 		ch = make(chan struct{}) // TODO: refactor, get it from the constructor
-		hook, err := log.LokiFromConfigLine(c.globalState.ctx, c.globalState.logger, line, ch)
+		hook, err := log.LokiFromConfigLine(c.globalState.ctx, c.globalState.fallbackLogger, line, ch)
 		if err != nil {
 			return nil, err
 		}
@@ -369,7 +391,7 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 		ch = make(chan struct{}) // TODO: refactor, get it from the constructor
 		hook, err := log.FileHookFromConfigLine(
 			c.globalState.ctx, c.globalState.fs, c.globalState.getwd,
-			c.globalState.logger, line, ch,
+			c.globalState.fallbackLogger, line, ch,
 		)
 		if err != nil {
 			return nil, err
@@ -390,6 +412,9 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 		c.globalState.logger.SetFormatter(&logrus.JSONFormatter{})
 		c.globalState.logger.Debug("Logger format: JSON")
 	default:
+		c.globalState.logger.SetFormatter(&logrus.TextFormatter{
+			ForceColors: loggerForceColors, DisableColors: c.globalState.flags.noColor,
+		})
 		c.globalState.logger.Debug("Logger format: TEXT")
 	}
 	return ch, nil

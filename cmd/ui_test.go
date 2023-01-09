@@ -1,4 +1,4 @@
-package console
+package cmd
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"go.k6.io/k6/ui/console/pb"
+	"go.k6.io/k6/ui/pb"
 )
 
 // Return progressbars with different content lengths, to test for
