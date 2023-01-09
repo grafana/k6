@@ -213,3 +213,22 @@ func TestEventLoopRejectThrow(t *testing.T) {
 	loop.WaitOnRegistered()
 	require.EqualError(t, err, "Uncaught (in promise) GoError: throw error\n\tat go.k6.io/k6/js/eventloop_test.TestEventLoopRejectThrow.func1 (native)\n\tat <eval>:1:31(2)\n")
 }
+
+func TestEventLoopAsyncAwait(t *testing.T) {
+	t.Parallel()
+	vu := &modulestest.VU{RuntimeField: goja.New()}
+	loop := eventloop.New(vu)
+	err := loop.Start(func() error {
+		_, err := vu.Runtime().RunString(`
+        async function a() {
+            some.error.here
+        }
+        Promise.resolve().then(async () => {
+            await a();
+        })
+        `)
+		return err
+	})
+	loop.WaitOnRegistered()
+	require.EqualError(t, err, "Uncaught (in promise) ReferenceError: some is not defined\n\tat a (<eval>:3:13(1))\n\tat <eval>:6:20(2)\n")
+}
