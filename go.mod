@@ -59,7 +59,6 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/mstoykov/k6-taskqueue-lib v0.1.0 // indirect
 	github.com/prometheus/client_golang v1.14.1-0.20221122130035-8b6e68085b10 // indirect
