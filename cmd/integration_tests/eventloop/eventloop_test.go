@@ -213,7 +213,7 @@ export default function() {
 		}
 		require.Equal(t, []string{
 			"setTimeout 1 was stopped because the VU iteration was interrupted",
-			"just error\n\tat /script.js:13:4(15)\n\tat native\n", "1",
+			"just error\n\tat /script.js:13:4(15)\n", "1",
 		}, msgs)
 	})
 }

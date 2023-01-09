@@ -1,10 +1,36 @@
 package goja
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/dop251/goja/unistring"
 )
+
+type resultType uint8
+
+const (
+	resultNormal resultType = iota
+	resultYield
+	resultAwait
+)
+
+var (
+	resultAwaitMarker = NewSymbol("await")
+)
+
+// AsyncContextTracker is a handler that allows to track async function's execution context. Every time an async
+// function is suspended on 'await', Suspended() is called. The trackingObject it returns is remembered and
+// the next time just before the context is resumed, Resumed is called with the same trackingObject as argument.
+// To register it call Runtime.SetAsyncContextTracker().
+type AsyncContextTracker interface {
+	Suspended() (trackingObject interface{})
+	Resumed(trackingObject interface{})
+}
+
+type funcObjectImpl interface {
+	source() valueString
+}
 
 type baseFuncObject struct {
 	baseObject
@@ -27,6 +53,10 @@ type funcObject struct {
 	baseJsFuncObject
 }
 
+type asyncFuncObject struct {
+	baseJsFuncObject
+}
+
 type classFuncObject struct {
 	baseJsFuncObject
 	initFields   *Program
@@ -43,10 +73,18 @@ type methodFuncObject struct {
 	homeObject *Object
 }
 
+type asyncMethodFuncObject struct {
+	methodFuncObject
+}
+
 type arrowFuncObject struct {
 	baseJsFuncObject
 	funcObj   *Object
 	newTarget Value
+}
+
+type asyncArrowFuncObject struct {
+	arrowFuncObject
 }
 
 type nativeFuncObject struct {
@@ -64,6 +102,10 @@ type wrappedFuncObject struct {
 type boundFuncObject struct {
 	nativeFuncObject
 	wrapped *Object
+}
+
+func (f *nativeFuncObject) source() valueString {
+	return newStringValue(fmt.Sprintf("function %s() { [native code] }", nilSafe(f.getStr("name", nil)).toString()))
 }
 
 func (f *nativeFuncObject) export(*objectExportCtx) interface{} {
@@ -161,6 +203,10 @@ func (f *baseFuncObject) createInstance(newTarget *Object) *Object {
 	return f.val.runtime.newBaseObject(proto, classObject).val
 }
 
+func (f *baseJsFuncObject) source() valueString {
+	return newStringValue(f.src)
+}
+
 func (f *baseJsFuncObject) construct(args []Value, newTarget *Object) *Object {
 	if newTarget == nil {
 		newTarget = f.val
@@ -191,6 +237,10 @@ func (f *classFuncObject) Call(FunctionCall) Value {
 
 func (f *classFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
 	return f.Call, true
+}
+
+func (f *classFuncObject) vmCall(vm *vm, n int) {
+	f.Call(FunctionCall{})
 }
 
 func (f *classFuncObject) export(*objectExportCtx) interface{} {
@@ -229,10 +279,12 @@ func (f *classFuncObject) _initFields(instance *Object) {
 		vm.sb = vm.sp
 		vm.push(instance)
 		vm.pc = 0
-		vm.run()
+		ex := vm.runTry()
 		vm.popCtx()
+		if ex != nil {
+			panic(ex)
+		}
 		vm.sp -= 2
-		vm.halt = false
 	}
 }
 
@@ -284,7 +336,7 @@ func (f *arrowFuncObject) Call(call FunctionCall) Value {
 	return f._call(call.Arguments, f.newTarget, nil)
 }
 
-func (f *baseJsFuncObject) _call(args []Value, newTarget, this Value) Value {
+func (f *baseJsFuncObject) __call(args []Value, newTarget, this Value) (Value, *Exception) {
 	vm := f.val.runtime.vm
 
 	vm.stack.expand(vm.sp + len(args) + 1)
@@ -301,27 +353,47 @@ func (f *baseJsFuncObject) _call(args []Value, newTarget, this Value) Value {
 		vm.sp++
 	}
 
-	pc := vm.pc
-	if pc != -1 {
-		vm.pc++ // fake "return address" so that captureStack() records the correct call location
+	vm.pushTryFrame(tryPanicMarker, -1)
+	defer vm.popTryFrame()
+
+	var needPop bool
+	if vm.prg != nil {
 		vm.pushCtx()
-		vm.callStack = append(vm.callStack, context{pc: -1}) // extra frame so that run() halts after ret
+		vm.callStack = append(vm.callStack, context{pc: -2}) // extra frame so that run() halts after ret
+		needPop = true
 	} else {
+		vm.pc = -2
 		vm.pushCtx()
 	}
+
 	vm.args = len(args)
 	vm.prg = f.prg
 	vm.stash = f.stash
 	vm.privEnv = f.privEnv
 	vm.newTarget = newTarget
 	vm.pc = 0
-	vm.run()
-	if pc != -1 {
+	for {
+		ex := vm.runTryInner()
+		if ex != nil {
+			return nil, ex
+		}
+		if vm.halted() {
+			break
+		}
+	}
+	if needPop {
 		vm.popCtx()
 	}
-	vm.pc = pc
-	vm.halt = false
-	return vm.pop()
+
+	return vm.pop(), nil
+}
+
+func (f *baseJsFuncObject) _call(args []Value, newTarget, this Value) Value {
+	res, ex := f.__call(args, newTarget, this)
+	if ex != nil {
+		panic(ex)
+	}
+	return res
 }
 
 func (f *baseJsFuncObject) call(call FunctionCall, newTarget Value) Value {
@@ -336,6 +408,10 @@ func (f *baseFuncObject) exportType() reflect.Type {
 	return reflectTypeFunc
 }
 
+func (f *baseFuncObject) typeOf() valueString {
+	return stringFunction
+}
+
 func (f *baseJsFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
 	return f.Call, true
 }
@@ -344,8 +420,29 @@ func (f *funcObject) assertConstructor() func(args []Value, newTarget *Object) *
 	return f.construct
 }
 
+func (f *baseJsFuncObject) vmCall(vm *vm, n int) {
+	vm.pushCtx()
+	vm.args = n
+	vm.prg = f.prg
+	vm.stash = f.stash
+	vm.privEnv = f.privEnv
+	vm.pc = 0
+	vm.stack[vm.sp-n-1], vm.stack[vm.sp-n-2] = vm.stack[vm.sp-n-2], vm.stack[vm.sp-n-1]
+}
+
 func (f *arrowFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
 	return f.Call, true
+}
+
+func (f *arrowFuncObject) vmCall(vm *vm, n int) {
+	vm.pushCtx()
+	vm.args = n
+	vm.prg = f.prg
+	vm.stash = f.stash
+	vm.privEnv = f.privEnv
+	vm.pc = 0
+	vm.stack[vm.sp-n-1], vm.stack[vm.sp-n-2] = nil, vm.stack[vm.sp-n-1]
+	vm.newTarget = f.newTarget
 }
 
 func (f *arrowFuncObject) export(*objectExportCtx) interface{} {
@@ -404,41 +501,259 @@ func (f *nativeFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
 	return nil, false
 }
 
+func (f *nativeFuncObject) vmCall(vm *vm, n int) {
+	if f.f != nil {
+		vm.pushCtx()
+		vm.prg = nil
+		vm.sb = vm.sp - n // so that [sb-1] points to the callee
+		ret := f.f(FunctionCall{
+			Arguments: vm.stack[vm.sp-n : vm.sp],
+			This:      vm.stack[vm.sp-n-2],
+		})
+		if ret == nil {
+			ret = _undefined
+		}
+		vm.stack[vm.sp-n-2] = ret
+		vm.popCtx()
+	} else {
+		vm.stack[vm.sp-n-2] = _undefined
+	}
+	vm.sp -= n + 1
+	vm.pc++
+}
+
 func (f *nativeFuncObject) assertConstructor() func(args []Value, newTarget *Object) *Object {
 	return f.construct
 }
 
-/*func (f *boundFuncObject) getStr(p unistring.String, receiver Value) Value {
-	return f.getStrWithOwnProp(f.getOwnPropStr(p), p, receiver)
-}
-
-func (f *boundFuncObject) getOwnPropStr(name unistring.String) Value {
-	if name == "caller" || name == "arguments" {
-		return f.val.runtime.global.throwerProperty
-	}
-
-	return f.nativeFuncObject.getOwnPropStr(name)
-}
-
-func (f *boundFuncObject) deleteStr(name unistring.String, throw bool) bool {
-	if name == "caller" || name == "arguments" {
-		return true
-	}
-	return f.nativeFuncObject.deleteStr(name, throw)
-}
-
-func (f *boundFuncObject) setOwnStr(name unistring.String, val Value, throw bool) bool {
-	if name == "caller" || name == "arguments" {
-		panic(f.val.runtime.NewTypeError("'caller' and 'arguments' are restricted function properties and cannot be accessed in this context."))
-	}
-	return f.nativeFuncObject.setOwnStr(name, val, throw)
-}
-
-func (f *boundFuncObject) setForeignStr(name unistring.String, val, receiver Value, throw bool) (bool, bool) {
-	return f._setForeignStr(name, f.getOwnPropStr(name), val, receiver, throw)
-}
-*/
-
 func (f *boundFuncObject) hasInstance(v Value) bool {
 	return instanceOfOperator(v, f.wrapped)
+}
+
+func (f *baseJsFuncObject) asyncCall(call FunctionCall, vmCall func(*vm, int)) Value {
+	vm := f.val.runtime.vm
+	args := call.Arguments
+	vm.stack.expand(vm.sp + len(args) + 1)
+	vm.stack[vm.sp] = call.This
+	vm.sp++
+	vm.stack[vm.sp] = f.val
+	vm.sp++
+	for _, arg := range args {
+		if arg != nil {
+			vm.stack[vm.sp] = arg
+		} else {
+			vm.stack[vm.sp] = _undefined
+		}
+		vm.sp++
+	}
+	ar := &asyncRunner{
+		f:      f.val,
+		vmCall: vmCall,
+	}
+	ar.start(len(args))
+	return ar.promiseCap.promise
+}
+
+func (f *asyncFuncObject) Call(call FunctionCall) Value {
+	return f.asyncCall(call, f.baseJsFuncObject.vmCall)
+}
+
+func (f *asyncFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
+	return f.Call, true
+}
+
+func (f *asyncArrowFuncObject) Call(call FunctionCall) Value {
+	return f.asyncCall(call, f.arrowFuncObject.vmCall)
+}
+
+func (f *asyncArrowFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
+	return f.Call, true
+}
+
+func (f *asyncArrowFuncObject) vmCall(vm *vm, n int) {
+	f.asyncVmCall(vm, n, f.arrowFuncObject.vmCall)
+}
+
+func (f *asyncMethodFuncObject) Call(call FunctionCall) Value {
+	return f.asyncCall(call, f.methodFuncObject.vmCall)
+}
+
+func (f *asyncMethodFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
+	return f.Call, true
+}
+
+func (f *asyncMethodFuncObject) vmCall(vm *vm, n int) {
+	f.asyncVmCall(vm, n, f.methodFuncObject.vmCall)
+}
+
+func (f *baseJsFuncObject) asyncVmCall(vm *vm, n int, vmCall func(*vm, int)) {
+	ar := &asyncRunner{
+		f:      f.val,
+		vmCall: vmCall,
+	}
+	ar.start(n)
+	vm.push(ar.promiseCap.promise)
+	vm.pc++
+}
+
+func (f *asyncFuncObject) vmCall(vm *vm, n int) {
+	f.asyncVmCall(vm, n, f.baseJsFuncObject.vmCall)
+}
+
+type asyncRunner struct {
+	gen        generator
+	promiseCap *promiseCapability
+	f          *Object
+	vmCall     func(*vm, int)
+
+	trackingObj interface{}
+}
+
+func (ar *asyncRunner) onFulfilled(call FunctionCall) Value {
+	if tracker := ar.f.runtime.asyncContextTracker; tracker != nil {
+		tracker.Resumed(ar.trackingObj)
+		ar.trackingObj = nil
+	}
+	ar.gen.vm.curAsyncRunner = ar
+	defer func() {
+		ar.gen.vm.curAsyncRunner = nil
+	}()
+	arg := call.Argument(0)
+	res, resType, ex := ar.gen.next(arg)
+	ar.step(res, resType == resultNormal, ex)
+	return _undefined
+}
+
+func (ar *asyncRunner) onRejected(call FunctionCall) Value {
+	if tracker := ar.f.runtime.asyncContextTracker; tracker != nil {
+		tracker.Resumed(ar.trackingObj)
+		ar.trackingObj = nil
+	}
+	ar.gen.vm.curAsyncRunner = ar
+	defer func() {
+		ar.gen.vm.curAsyncRunner = nil
+	}()
+	reason := call.Argument(0)
+	res, resType, ex := ar.gen.nextThrow(reason)
+	ar.step(res, resType == resultNormal, ex)
+	return _undefined
+}
+
+func (ar *asyncRunner) step(res Value, done bool, ex *Exception) {
+	if ex != nil {
+		ar.promiseCap.reject(ex.val)
+		return
+	}
+	if done {
+		ar.promiseCap.resolve(res)
+	} else {
+		// await
+		r := ar.f.runtime
+		if tracker := r.asyncContextTracker; tracker != nil {
+			ar.trackingObj = tracker.Suspended()
+		}
+		promise := r.promiseResolve(r.global.Promise, res)
+		promise.self.(*Promise).addReactions(&promiseReaction{
+			typ:         promiseReactionFulfill,
+			handler:     &jobCallback{callback: ar.onFulfilled},
+			asyncRunner: ar,
+		}, &promiseReaction{
+			typ:         promiseReactionReject,
+			handler:     &jobCallback{callback: ar.onRejected},
+			asyncRunner: ar,
+		})
+	}
+}
+
+func (ar *asyncRunner) start(nArgs int) {
+	r := ar.f.runtime
+	ar.gen.vm = r.vm
+	ar.promiseCap = r.newPromiseCapability(r.global.Promise)
+	sp := r.vm.sp
+	ar.gen.enter()
+	ar.vmCall(r.vm, nArgs)
+	res, resType, ex := ar.gen.step()
+	ar.step(res, resType == resultNormal, ex)
+	if ex != nil {
+		r.vm.sp = sp - nArgs - 2
+	}
+	r.vm.popTryFrame()
+	r.vm.popCtx()
+}
+
+type generator struct {
+	ctx execCtx
+	vm  *vm
+
+	tryStackLen, iterStackLen, refStackLen uint32
+}
+
+func (g *generator) storeLengths() {
+	g.tryStackLen, g.iterStackLen, g.refStackLen = uint32(len(g.vm.tryStack)), uint32(len(g.vm.iterStack)), uint32(len(g.vm.refStack))
+}
+
+func (g *generator) enter() {
+	g.vm.pushCtx()
+	g.vm.pushTryFrame(tryPanicMarker, -1)
+	g.vm.prg, g.vm.sb, g.vm.pc = nil, -1, -2 // so that vm.run() halts after ret
+	g.storeLengths()
+}
+
+func (g *generator) step() (res Value, resultType resultType, ex *Exception) {
+	for {
+		ex = g.vm.runTryInner()
+		if ex != nil {
+			return
+		}
+		if g.vm.halted() {
+			break
+		}
+	}
+	res = g.vm.pop()
+	if res == resultAwaitMarker {
+		resultType = resultAwait
+		g.ctx = execCtx{}
+		g.vm.pc = -g.vm.pc + 1
+		res = g.vm.pop()
+		g.vm.suspend(&g.ctx, uint32(len(g.vm.tryStack))-g.tryStackLen,
+			uint32(len(g.vm.iterStack))-g.iterStackLen,
+			uint32(len(g.vm.refStack))-g.refStackLen)
+		g.vm.sp = g.vm.sb - 1
+		g.vm.callStack = g.vm.callStack[:len(g.vm.callStack)-1] // remove the frame with pc == -2, as ret would do
+	}
+	return
+}
+
+func (g *generator) enterNext() {
+	g.vm.pushCtx()
+	g.vm.pushTryFrame(tryPanicMarker, -1)
+	g.vm.callStack = append(g.vm.callStack, context{pc: -2}) // extra frame so that vm.run() halts after ret
+	g.storeLengths()
+	g.vm.resume(&g.ctx)
+}
+
+func (g *generator) next(v Value) (Value, resultType, *Exception) {
+	g.enterNext()
+	if v != nil {
+		g.vm.push(v)
+	}
+	res, done, ex := g.step()
+	g.vm.popTryFrame()
+	g.vm.popCtx()
+	return res, done, ex
+}
+
+func (g *generator) nextThrow(v Value) (Value, resultType, *Exception) {
+	g.enterNext()
+	ex := g.vm.handleThrow(v)
+	if ex != nil {
+		g.vm.popTryFrame()
+		g.vm.popCtx()
+		return nil, resultNormal, ex
+	}
+
+	res, resType, ex := g.step()
+	g.vm.popTryFrame()
+	g.vm.popCtx()
+	return res, resType, ex
 }

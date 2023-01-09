@@ -447,6 +447,10 @@ func (o *baseDynamicObject) assertCallable() (call func(FunctionCall) Value, ok 
 	return nil, false
 }
 
+func (o *baseDynamicObject) vmCall(vm *vm, n int) {
+	panic(vm.r.NewTypeError("Dynamic object is not callable"))
+}
+
 func (*baseDynamicObject) assertConstructor() func(args []Value, newTarget *Object) *Object {
 	return nil
 }
@@ -561,6 +565,10 @@ func (*baseDynamicObject) _putSym(s *Symbol, prop Value) {
 
 func (o *baseDynamicObject) getPrivateEnv(*privateEnvType, bool) *privateElements {
 	panic(newTypeError("Dynamic objects cannot have private elements"))
+}
+
+func (o *baseDynamicObject) typeOf() valueString {
+	return stringObjectC
 }
 
 func (a *dynamicArray) sortLen() int {

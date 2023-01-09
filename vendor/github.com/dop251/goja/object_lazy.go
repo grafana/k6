@@ -17,6 +17,12 @@ func (o *lazyObject) className() string {
 	return obj.className()
 }
 
+func (o *lazyObject) typeOf() valueString {
+	obj := o.create(o.val)
+	o.val.self = obj
+	return obj.typeOf()
+}
+
 func (o *lazyObject) getIdx(p valueInt, receiver Value) Value {
 	obj := o.create(o.val)
 	o.val.self = obj
@@ -185,6 +191,12 @@ func (o *lazyObject) assertCallable() (call func(FunctionCall) Value, ok bool) {
 	obj := o.create(o.val)
 	o.val.self = obj
 	return obj.assertCallable()
+}
+
+func (o *lazyObject) vmCall(vm *vm, n int) {
+	obj := o.create(o.val)
+	o.val.self = obj
+	obj.vmCall(vm, n)
 }
 
 func (o *lazyObject) assertConstructor() func(args []Value, newTarget *Object) *Object {

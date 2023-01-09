@@ -178,7 +178,7 @@ func TestEventLoopRejectSyntaxError(t *testing.T) {
 		return err
 	})
 	loop.WaitOnRegistered()
-	require.EqualError(t, err, "Uncaught (in promise) ReferenceError: some is not defined\n\tat <eval>:1:30(1)\n\tat native\n")
+	require.EqualError(t, err, "Uncaught (in promise) ReferenceError: some is not defined\n\tat <eval>:1:30(1)\n")
 }
 
 func TestEventLoopRejectGoError(t *testing.T) {
@@ -194,7 +194,7 @@ func TestEventLoopRejectGoError(t *testing.T) {
 		return err
 	})
 	loop.WaitOnRegistered()
-	require.EqualError(t, err, "Uncaught (in promise) GoError: some error\n\tat go.k6.io/k6/js/eventloop_test.TestEventLoopRejectGoError.func1 (native)\n\tat <eval>:1:30(1)\n\tat native\n")
+	require.EqualError(t, err, "Uncaught (in promise) GoError: some error\n\tat go.k6.io/k6/js/eventloop_test.TestEventLoopRejectGoError.func1 (native)\n\tat <eval>:1:31(2)\n")
 }
 
 func TestEventLoopRejectThrow(t *testing.T) {
@@ -211,5 +211,24 @@ func TestEventLoopRejectThrow(t *testing.T) {
 		return err
 	})
 	loop.WaitOnRegistered()
-	require.EqualError(t, err, "Uncaught (in promise) GoError: throw error\n\tat go.k6.io/k6/js/eventloop_test.TestEventLoopRejectThrow.func1 (native)\n\tat <eval>:1:30(1)\n\tat native\n")
+	require.EqualError(t, err, "Uncaught (in promise) GoError: throw error\n\tat go.k6.io/k6/js/eventloop_test.TestEventLoopRejectThrow.func1 (native)\n\tat <eval>:1:31(2)\n")
+}
+
+func TestEventLoopAsyncAwait(t *testing.T) {
+	t.Parallel()
+	vu := &modulestest.VU{RuntimeField: goja.New()}
+	loop := eventloop.New(vu)
+	err := loop.Start(func() error {
+		_, err := vu.Runtime().RunString(`
+        async function a() {
+            some.error.here
+        }
+        Promise.resolve().then(async () => {
+            await a();
+        })
+        `)
+		return err
+	})
+	loop.WaitOnRegistered()
+	require.EqualError(t, err, "Uncaught (in promise) ReferenceError: some is not defined\n\tat a (<eval>:3:13(1))\n\tat <eval>:6:20(2)\n")
 }

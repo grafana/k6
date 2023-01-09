@@ -127,11 +127,10 @@ func (c *compiler) compileTryStatement(v *ast.TryStatement, needResult bool) {
 		c.emit(clearResult)
 	}
 	c.compileBlockStatement(v.Body, bodyNeedResult)
-	c.emit(halt)
-	lbl2 := len(c.p.code)
-	c.emit(nil)
 	var catchOffset int
 	if v.Catch != nil {
+		lbl2 := len(c.p.code) // jump over the catch block
+		c.emit(nil)
 		catchOffset = len(c.p.code) - lbl
 		if v.Catch.Parameter != nil {
 			c.block = &block{
@@ -183,23 +182,21 @@ func (c *compiler) compileTryStatement(v *ast.TryStatement, needResult bool) {
 			c.emit(pop)
 			c.compileBlockStatement(v.Catch.Body, bodyNeedResult)
 		}
-		c.emit(halt)
+		c.p.code[lbl2] = jump(len(c.p.code) - lbl2)
 	}
 	var finallyOffset int
 	if v.Finally != nil {
-		lbl1 := len(c.p.code)
-		c.emit(nil)
-		finallyOffset = len(c.p.code) - lbl
+		c.emit(enterFinally{})
+		finallyOffset = len(c.p.code) - lbl // finallyOffset should not include enterFinally
 		if bodyNeedResult && finallyBreaking != nil && lp == -1 {
 			c.emit(clearResult)
 		}
 		c.compileBlockStatement(v.Finally, false)
-		c.emit(halt, retFinally)
-
-		c.p.code[lbl1] = jump(len(c.p.code) - lbl1)
+		c.emit(leaveFinally{})
+	} else {
+		c.emit(leaveTry{})
 	}
 	c.p.code[lbl] = try{catchOffset: int32(catchOffset), finallyOffset: int32(finallyOffset)}
-	c.p.code[lbl2] = jump(len(c.p.code) - lbl2)
 	c.leaveBlock()
 }
 
@@ -639,7 +636,7 @@ L:
 			b.breaks = append(b.breaks, len(c.p.code))
 			c.emit(nil)
 		case blockTry:
-			c.emit(halt)
+			c.emit(leaveTry{})
 		case blockWith:
 			c.emit(leaveWith)
 		case blockLoopEnum:
@@ -663,7 +660,7 @@ func (c *compiler) compileContinue(label *ast.Identifier, idx file.Idx) {
 
 func (c *compiler) compileIfBody(s ast.Statement, needResult bool) {
 	if !c.scope.strict {
-		if s, ok := s.(*ast.FunctionDeclaration); ok {
+		if s, ok := s.(*ast.FunctionDeclaration); ok && !s.Function.Async {
 			c.compileFunction(s)
 			if needResult {
 				c.emit(clearResult)
@@ -742,7 +739,7 @@ func (c *compiler) compileReturnStatement(v *ast.ReturnStatement) {
 	for b := c.block; b != nil; b = b.outer {
 		switch b.typ {
 		case blockTry:
-			c.emit(halt)
+			c.emit(leaveTry{})
 		case blockLoopEnum:
 			c.emit(enumPopClose)
 		}

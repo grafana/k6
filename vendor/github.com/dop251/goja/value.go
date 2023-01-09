@@ -1172,7 +1172,6 @@ func typeErrorResult(throw bool, args ...interface{}) {
 
 func init() {
 	for i := 0; i < 256; i++ {
-		intCache[i] = valueInt(i - 128)
+		intCache[i] = valueInt(i - 256)
 	}
-	_positiveZero = intToValue(0)
 }

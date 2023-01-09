@@ -60,6 +60,8 @@ type global struct {
 	Proxy    *Object
 	Promise  *Object
 
+	AsyncFunction *Object
+
 	ArrayBuffer       *Object
 	DataView          *Object
 	TypedArray        *Object
@@ -107,6 +109,8 @@ type global struct {
 	MapPrototype         *Object
 	SetPrototype         *Object
 	PromisePrototype     *Object
+
+	AsyncFunctionPrototype *Object
 
 	IteratorPrototype             *Object
 	ArrayIteratorPrototype        *Object
@@ -187,6 +191,7 @@ type Runtime struct {
 	jobQueue []func()
 
 	promiseRejectionTracker PromiseRejectionTracker
+	asyncContextTracker     AsyncContextTracker
 }
 
 type StackFrame struct {
@@ -417,6 +422,7 @@ func (r *Runtime) init() {
 
 	r.initObject()
 	r.initFunction()
+	r.initAsyncFunction()
 	r.initArray()
 	r.initString()
 	r.initGlobalObject()
@@ -482,7 +488,11 @@ func (r *Runtime) newError(typ *Object, format string, args ...interface{}) Valu
 }
 
 func (r *Runtime) throwReferenceError(name unistring.String) {
-	panic(r.newError(r.global.ReferenceError, "%s is not defined", name))
+	panic(r.newReferenceError(name))
+}
+
+func (r *Runtime) newReferenceError(name unistring.String) Value {
+	return r.newError(r.global.ReferenceError, "%s is not defined", name)
 }
 
 func (r *Runtime) newSyntaxError(msg string, offset int) Value {
@@ -558,15 +568,19 @@ func (r *Runtime) NewGoError(err error) *Object {
 }
 
 func (r *Runtime) newFunc(name unistring.String, length int, strict bool) (f *funcObject) {
-	v := &Object{runtime: r}
-
 	f = &funcObject{}
-	f.class = classFunction
-	f.val = v
-	f.extensible = true
-	f.strict = strict
-	v.self = f
-	f.prototype = r.global.FunctionPrototype
+	r.initBaseJsFunction(&f.baseJsFuncObject, strict)
+	f.val.self = f
+	f.init(name, intToValue(int64(length)))
+	return
+}
+
+func (r *Runtime) newAsyncFunc(name unistring.String, length int, strict bool) (f *asyncFuncObject) {
+	f = &asyncFuncObject{}
+	r.initBaseJsFunction(&f.baseJsFuncObject, strict)
+	f.class = classAsyncFunction
+	f.prototype = r.global.AsyncFunctionPrototype
+	f.val.self = f
 	f.init(name, intToValue(int64(length)))
 	return
 }
@@ -586,34 +600,51 @@ func (r *Runtime) newClassFunc(name unistring.String, length int, proto *Object,
 	return
 }
 
-func (r *Runtime) newMethod(name unistring.String, length int, strict bool) (f *methodFuncObject) {
+func (r *Runtime) initBaseJsFunction(f *baseJsFuncObject, strict bool) {
 	v := &Object{runtime: r}
 
-	f = &methodFuncObject{}
 	f.class = classFunction
 	f.val = v
 	f.extensible = true
 	f.strict = strict
-	v.self = f
 	f.prototype = r.global.FunctionPrototype
+}
+
+func (r *Runtime) newMethod(name unistring.String, length int, strict bool) (f *methodFuncObject) {
+	f = &methodFuncObject{}
+	r.initBaseJsFunction(&f.baseJsFuncObject, strict)
+	f.val.self = f
 	f.init(name, intToValue(int64(length)))
 	return
 }
 
+func (r *Runtime) newAsyncMethod(name unistring.String, length int, strict bool) (f *asyncMethodFuncObject) {
+	f = &asyncMethodFuncObject{}
+	r.initBaseJsFunction(&f.baseJsFuncObject, strict)
+	f.val.self = f
+	f.init(name, intToValue(int64(length)))
+	return
+}
+
+func (r *Runtime) initArrowFunc(f *arrowFuncObject, strict bool) {
+	r.initBaseJsFunction(&f.baseJsFuncObject, strict)
+	f.newTarget = r.vm.newTarget
+}
+
 func (r *Runtime) newArrowFunc(name unistring.String, length int, strict bool) (f *arrowFuncObject) {
-	v := &Object{runtime: r}
-
 	f = &arrowFuncObject{}
-	f.class = classFunction
-	f.val = v
-	f.extensible = true
-	f.strict = strict
+	r.initArrowFunc(f, strict)
+	f.val.self = f
+	f.init(name, intToValue(int64(length)))
+	return
+}
 
-	vm := r.vm
-
-	f.newTarget = vm.newTarget
-	v.self = f
-	f.prototype = r.global.FunctionPrototype
+func (r *Runtime) newAsyncArrowFunc(name unistring.String, length int, strict bool) (f *asyncArrowFuncObject) {
+	f = &asyncArrowFuncObject{}
+	r.initArrowFunc(&f.arrowFuncObject, strict)
+	f.class = classAsyncFunction
+	f.prototype = r.global.AsyncFunctionPrototype
+	f.val.self = f
 	f.init(name, intToValue(int64(length)))
 	return
 }
@@ -919,10 +950,12 @@ func (r *Runtime) eval(srcVal valueString, direct, strict bool) Value {
 	vm.push(funcObj)
 	vm.sb = vm.sp
 	vm.push(nil) // this
-	vm.run()
+	ex := vm.runTry()
 	retval := vm.result
 	vm.popCtx()
-	vm.halt = false
+	if ex != nil {
+		panic(ex)
+	}
 	vm.sp -= 2
 	return retval
 }
@@ -1381,11 +1414,18 @@ func (r *Runtime) RunScript(name, src string) (Value, error) {
 
 // RunProgram executes a pre-compiled (see Compile()) code in the global context.
 func (r *Runtime) RunProgram(p *Program) (result Value, err error) {
+	vm := r.vm
+	recursive := len(vm.callStack) > 0
 	defer func() {
+		if recursive {
+			vm.popCtx()
+		} else {
+			vm.callStack = vm.callStack[:len(vm.callStack)-1]
+		}
 		if x := recover(); x != nil {
 			if ex, ok := x.(*uncatchableException); ok {
 				err = ex.err
-				if len(r.vm.callStack) == 0 {
+				if len(vm.callStack) == 0 {
 					r.leaveAbrupt()
 				}
 			} else {
@@ -1393,13 +1433,12 @@ func (r *Runtime) RunProgram(p *Program) (result Value, err error) {
 			}
 		}
 	}()
-	vm := r.vm
-	recursive := false
-	if len(vm.callStack) > 0 {
-		recursive = true
+	if recursive {
 		vm.pushCtx()
 		vm.stash = &r.global.stash
 		vm.sb = vm.sp - 1
+	} else {
+		vm.callStack = append(vm.callStack, context{})
 	}
 	vm.prg = p
 	vm.pc = 0
@@ -1411,13 +1450,10 @@ func (r *Runtime) RunProgram(p *Program) (result Value, err error) {
 		err = ex
 	}
 	if recursive {
-		vm.popCtx()
-		vm.halt = false
 		vm.clearStack()
 	} else {
-		vm.stack = nil
 		vm.prg = nil
-		vm.funcName = ""
+		vm.sb = -1
 		r.leave()
 	}
 	return
@@ -1714,6 +1750,10 @@ Note that the underlying type is not lost, calling Export() returns the original
 reflect based types.
 */
 func (r *Runtime) ToValue(i interface{}) Value {
+	return r.toValue(i, reflect.Value{})
+}
+
+func (r *Runtime) toValue(i interface{}, origValue reflect.Value) Value {
 	switch i := i.(type) {
 	case nil:
 		return _null
@@ -1730,7 +1770,6 @@ func (r *Runtime) ToValue(i interface{}) Value {
 	case Value:
 		return i
 	case string:
-		// return newStringValue(i)
 		if len(i) <= 16 {
 			if u := unistring.Scan(i); u != nil {
 				return &importedString{s: i, u: u, scanned: true}
@@ -1807,9 +1846,6 @@ func (r *Runtime) ToValue(i interface{}) Value {
 		m.init()
 		return obj
 	case []interface{}:
-		if i == nil {
-			return _null
-		}
 		return r.newObjectGoSlice(&i).val
 	case *[]interface{}:
 		if i == nil {
@@ -1818,10 +1854,10 @@ func (r *Runtime) ToValue(i interface{}) Value {
 		return r.newObjectGoSlice(i).val
 	}
 
-	return r.reflectValueToValue(reflect.ValueOf(i))
-}
+	if !origValue.IsValid() {
+		origValue = reflect.ValueOf(i)
+	}
 
-func (r *Runtime) reflectValueToValue(origValue reflect.Value) Value {
 	value := origValue
 	for value.Kind() == reflect.Ptr {
 		value = value.Elem()
@@ -2414,9 +2450,10 @@ func (r *Runtime) runWrapped(f func()) (err error) {
 	if ex != nil {
 		err = ex
 	}
-	r.vm.clearStack()
 	if len(r.vm.callStack) == 0 {
 		r.leave()
+	} else {
+		r.vm.clearStack()
 	}
 	return
 }
@@ -2692,16 +2729,15 @@ func (r *Runtime) getHash() *maphash.Hash {
 
 // called when the top level function returns normally (i.e. control is passed outside the Runtime).
 func (r *Runtime) leave() {
-	for {
-		jobs := r.jobQueue
-		r.jobQueue = nil
-		if len(jobs) == 0 {
-			break
-		}
+	var jobs []func()
+	for len(r.jobQueue) > 0 {
+		jobs, r.jobQueue = r.jobQueue, jobs[:0]
 		for _, job := range jobs {
 			job()
 		}
 	}
+	r.jobQueue = nil
+	r.vm.stack = nil
 }
 
 // called when the top level function returns (i.e. control is passed outside the Runtime) but it was due to an interrupt

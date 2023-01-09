@@ -38,9 +38,10 @@ type promiseCapability struct {
 }
 
 type promiseReaction struct {
-	capability *promiseCapability
-	typ        promiseReactionType
-	handler    *jobCallback
+	capability  *promiseCapability
+	typ         promiseReactionType
+	handler     *jobCallback
+	asyncRunner *asyncRunner
 }
 
 var typePromise = reflect.TypeOf((*Promise)(nil))
@@ -145,6 +146,24 @@ func (p *Promise) exportType() reflect.Type {
 
 func (p *Promise) export(*objectExportCtx) interface{} {
 	return p
+}
+
+func (p *Promise) addReactions(fulfillReaction *promiseReaction, rejectReaction *promiseReaction) {
+	r := p.val.runtime
+	switch p.state {
+	case PromiseStatePending:
+		p.fulfillReactions = append(p.fulfillReactions, fulfillReaction)
+		p.rejectReactions = append(p.rejectReactions, rejectReaction)
+	case PromiseStateFulfilled:
+		r.enqueuePromiseJob(r.newPromiseReactionJob(fulfillReaction, p.result))
+	default:
+		reason := p.result
+		if !p.handled {
+			r.trackPromiseRejection(p, PromiseRejectionHandle)
+		}
+		r.enqueuePromiseJob(r.newPromiseReactionJob(rejectReaction, reason))
+	}
+	p.handled = true
 }
 
 func (r *Runtime) newPromiseResolveThenableJob(p *Promise, thenable Value, then *jobCallback) func() {
@@ -297,20 +316,7 @@ func (r *Runtime) performPromiseThen(p *Promise, onFulfilled, onRejected Value, 
 		typ:        promiseReactionReject,
 		handler:    onRejectedJobCallback,
 	}
-	switch p.state {
-	case PromiseStatePending:
-		p.fulfillReactions = append(p.fulfillReactions, fulfillReaction)
-		p.rejectReactions = append(p.rejectReactions, rejectReaction)
-	case PromiseStateFulfilled:
-		r.enqueuePromiseJob(r.newPromiseReactionJob(fulfillReaction, p.result))
-	default:
-		reason := p.result
-		if !p.handled {
-			r.trackPromiseRejection(p, PromiseRejectionHandle)
-		}
-		r.enqueuePromiseJob(r.newPromiseReactionJob(rejectReaction, reason))
-	}
-	p.handled = true
+	p.addReactions(fulfillReaction, rejectReaction)
 	if resultCapability == nil {
 		return _undefined
 	}
@@ -577,19 +583,19 @@ func (r *Runtime) wrapPromiseReaction(fObj *Object) func(interface{}) {
 // In order to make use of this method you need an event loop such as the one in goja_nodejs (https://github.com/dop251/goja_nodejs)
 // where it can be used like this:
 //
-//	 loop := NewEventLoop()
-//	 loop.Start()
-//	 defer loop.Stop()
-//	 loop.RunOnLoop(func(vm *goja.Runtime) {
-//			p, resolve, _ := vm.NewPromise()
-//			vm.Set("p", p)
-//	     go func() {
-//	  		time.Sleep(500 * time.Millisecond)   // or perform any other blocking operation
-//				loop.RunOnLoop(func(*goja.Runtime) { // resolve() must be called on the loop, cannot call it here
-//					resolve(result)
-//				})
-//			}()
-//	 }
+//	loop := NewEventLoop()
+//	loop.Start()
+//	defer loop.Stop()
+//	loop.RunOnLoop(func(vm *goja.Runtime) {
+//	    p, resolve, _ := vm.NewPromise()
+//	    vm.Set("p", p)
+//	    go func() {
+//	        time.Sleep(500 * time.Millisecond)   // or perform any other blocking operation
+//	        loop.RunOnLoop(func(*goja.Runtime) { // resolve() must be called on the loop, cannot call it here
+//	            resolve(result)
+//	        })
+//	    }()
+//	}
 func (r *Runtime) NewPromise() (promise *Promise, resolve func(result interface{}), reject func(reason interface{})) {
 	p := r.newPromise(r.global.PromisePrototype)
 	resolveF, rejectF := p.createResolvingFunctions()
@@ -605,4 +611,11 @@ func (r *Runtime) NewPromise() (promise *Promise, resolve func(result interface{
 // See https://tc39.es/ecma262/#sec-host-promise-rejection-tracker for more details.
 func (r *Runtime) SetPromiseRejectionTracker(tracker PromiseRejectionTracker) {
 	r.promiseRejectionTracker = tracker
+}
+
+// SetAsyncContextTracker registers a handler that allows to track async execution contexts. See AsyncContextTracker
+// documentation for more details. Setting it to nil disables the functionality.
+// This method (as Runtime in general) is not goroutine-safe.
+func (r *Runtime) SetAsyncContextTracker(tracker AsyncContextTracker) {
+	r.asyncContextTracker = tracker
 }
