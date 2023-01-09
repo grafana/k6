@@ -3,6 +3,7 @@ package http
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -85,7 +86,6 @@ func TestResponseCallbackInAction(t *testing.T) {
 	ts := newTestCase(t)
 	tb := ts.tb
 	samples := ts.samples
-	rt := ts.runtime.VU.Runtime()
 
 	sr := tb.Replacer.Replace
 
@@ -138,7 +138,7 @@ func TestResponseCallbackInAction(t *testing.T) {
 		"overwrite per request": {
 			code: `
 			http.setResponseCallback(http.expectedStatuses(200));
-			res = http.request("GET", "HTTPBIN_URL/redirect/1");
+			http.request("GET", "HTTPBIN_URL/redirect/1");
 			`,
 			expectedSamples: []expectedSample{
 				{
@@ -227,7 +227,7 @@ func TestResponseCallbackInAction(t *testing.T) {
 		"global overwrite with null": {
 			code: `
 			http.setResponseCallback(null);
-			res = http.request("GET", "HTTPBIN_URL/redirect/1");
+			http.request("GET", "HTTPBIN_URL/redirect/1");
 			`,
 			expectedSamples: []expectedSample{
 				{
@@ -257,10 +257,16 @@ func TestResponseCallbackInAction(t *testing.T) {
 	}
 	for name, testCase := range testCases {
 		testCase := testCase
-		t.Run(name, func(t *testing.T) {
+
+		runCode := func(code string) {
+			t.Helper()
 			ts.instance.defaultClient.responseCallback = defaultExpectedStatuses.match
 
-			_, err := rt.RunString(sr(testCase.code))
+			err := ts.runtime.EventLoop.Start(func() error {
+				_, err := ts.runtime.VU.Runtime().RunString(sr(code))
+				return err
+			})
+			ts.runtime.EventLoop.WaitOnRegistered()
 			assert.NoError(t, err)
 			bufSamples := metrics.GetBufferedSamples(samples)
 
@@ -278,6 +284,12 @@ func TestResponseCallbackInAction(t *testing.T) {
 			for i, expectedSample := range testCase.expectedSamples {
 				assertRequestMetricsEmittedSingle(t, bufSamples[i], expectedSample.tags, expectedSample.metrics, nil)
 			}
+		}
+		t.Run(name, func(t *testing.T) {
+			runCode(testCase.code)
+		})
+		t.Run("async_"+name, func(t *testing.T) {
+			runCode(strings.ReplaceAll(testCase.code, "http.request", "http.asyncRequest"))
 		})
 	}
 }
