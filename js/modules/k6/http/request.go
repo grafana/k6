@@ -39,30 +39,11 @@ func (c *Client) Request(method string, url goja.Value, args ...goja.Value) (*Re
 	if state == nil {
 		return nil, ErrHTTPForbiddenInInitContext
 	}
-
-	var body interface{}
-	var params goja.Value
-
-	if len(args) > 0 {
-		body = args[0].Export()
-	}
-	if len(args) > 1 {
-		params = args[1]
-	}
+	body, params := splitRequestArgs(args)
 
 	req, err := c.parseRequest(method, url, body, params)
 	if err != nil {
-		if state.Options.Throw.Bool {
-			return nil, err
-		}
-		state.Logger.WithField("error", err).Warn("Request Failed")
-		r := httpext.NewResponse()
-		r.Error = err.Error()
-		var k6e httpext.K6Error
-		if errors.As(err, &k6e) {
-			r.ErrorCode = int(k6e.Code)
-		}
-		return &Response{Response: r, client: c}, nil
+		return c.handleParseRequestError(err)
 	}
 
 	resp, err := httpext.MakeRequest(c.moduleInstance.vu.Context(), state, req)
@@ -71,6 +52,72 @@ func (c *Client) Request(method string, url goja.Value, args ...goja.Value) (*Re
 	}
 	c.processResponse(resp, req.ResponseType)
 	return c.responseFromHTTPext(resp), nil
+}
+
+func splitRequestArgs(args []goja.Value) (body interface{}, params goja.Value) {
+	if len(args) > 0 {
+		body = args[0].Export()
+	}
+	if len(args) > 1 {
+		params = args[1]
+	}
+	return body, params
+}
+
+func (c *Client) handleParseRequestError(err error) (*Response, error) {
+	state := c.moduleInstance.vu.State()
+
+	if state.Options.Throw.Bool {
+		return nil, err
+	}
+	state.Logger.WithField("error", err).Warn("Request Failed")
+	r := httpext.NewResponse()
+	r.Error = err.Error()
+	var k6e httpext.K6Error
+	if errors.As(err, &k6e) {
+		r.ErrorCode = int(k6e.Code)
+	}
+	return &Response{Response: r, client: c}, nil
+}
+
+// asyncRequest makes an http request of the provided `method` and returns a promise. All the networking is done off
+// the event loop and the returned promise will be resolved with the response or rejected with an error
+func (c *Client) asyncRequest(method string, url goja.Value, args ...goja.Value) (*goja.Promise, error) {
+	state := c.moduleInstance.vu.State()
+	if c.moduleInstance.vu.State() == nil {
+		return nil, ErrHTTPForbiddenInInitContext
+	}
+
+	body, params := splitRequestArgs(args)
+	rt := c.moduleInstance.vu.Runtime()
+	req, err := c.parseRequest(method, url, body, params)
+	p, resolve, reject := rt.NewPromise()
+	if err != nil {
+		var resp *Response
+		if resp, err = c.handleParseRequestError(err); err != nil {
+			reject(err)
+		} else {
+			resolve(resp)
+		}
+		return p, nil
+	}
+
+	callback := c.moduleInstance.vu.RegisterCallback()
+
+	go func() {
+		resp, err := httpext.MakeRequest(c.moduleInstance.vu.Context(), state, req)
+		callback(func() error {
+			if err != nil {
+				reject(err)
+				return nil //nolint:nilerr // we want to reject the promise in this case
+			}
+			c.processResponse(resp, req.ResponseType)
+			resolve(c.responseFromHTTPext(resp))
+			return nil
+		})
+	}()
+
+	return p, nil
 }
 
 // processResponse stores the body as an ArrayBuffer if indicated by
@@ -87,6 +134,7 @@ func (c *Client) responseFromHTTPext(resp *httpext.Response) *Response {
 }
 
 // TODO: break this function up
+//
 //nolint:gocyclo, cyclop, funlen, gocognit
 func (c *Client) parseRequest(
 	method string, reqURL, body interface{}, params goja.Value,
