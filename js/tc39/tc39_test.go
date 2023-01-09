@@ -175,6 +175,8 @@ var (
 		"test/language/arguments-object/cls-decl-private-gen-meth",
 		"test/language/arguments-object/cls-expr-gen-meth",
 		"test/language/arguments-object/cls-expr-private-gen-meth",
+		"test/language/eval-code/direct/gen-",
+		"test/language/eval-code/direct/async-gen-",
 		"test/language/expressions/class/gen-method",
 		"test/language/expressions/class/dstr/gen-meth",
 		"test/language/expressions/class/dstr/private-gen-meth",
@@ -511,7 +513,7 @@ func (ctx *tc39TestCtx) runTC39File(name string, t testing.TB) {
 		// NOTE: in practice k6 does not run non strict code at all so this tests make no sense
 		// TODO uncomment the if above and delete this else so we run both parts when the tests
 		// don't take forever
-		// ctx.runTC39Test(t, name, src, meta, false)
+		ctx.runTC39Test(t, name, src, meta, false)
 	}
 
 	if ctx.enableBench {
