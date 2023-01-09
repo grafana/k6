@@ -10,7 +10,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/output/influxdb"
-	"go.k6.io/k6/ui/console/form"
+	"go.k6.io/k6/ui"
 )
 
 //nolint:funlen
@@ -46,24 +46,24 @@ This will set the default server used when just "-o influxdb" is passed.`,
 				conf = conf.Apply(urlConf)
 			}
 
-			f := form.Form{
-				Fields: []form.Field{
-					form.StringField{
+			form := ui.Form{
+				Fields: []ui.Field{
+					ui.StringField{
 						Key:     "Addr",
 						Label:   "Address",
 						Default: conf.Addr.String,
 					},
-					form.StringField{
+					ui.StringField{
 						Key:     "DB",
 						Label:   "Database",
 						Default: conf.DB.String,
 					},
-					form.StringField{
+					ui.StringField{
 						Key:     "Username",
 						Label:   "Username",
 						Default: conf.Username.String,
 					},
-					form.PasswordField{
+					ui.PasswordField{
 						Key:   "Password",
 						Label: "Password",
 					},
@@ -72,7 +72,7 @@ This will set the default server used when just "-o influxdb" is passed.`,
 			if !term.IsTerminal(int(syscall.Stdin)) { //nolint:unconvert
 				globalState.logger.Warn("Stdin is not a terminal, falling back to plain text input")
 			}
-			vals, err := f.Run(globalState.console.Stdin, globalState.console.Stdout)
+			vals, err := form.Run(globalState.console.Stdin, globalState.console.Stdout)
 			if err != nil {
 				return err
 			}
