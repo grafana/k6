@@ -120,3 +120,38 @@ jobs:
         with:
           name: test-coverage-report-${{ matrix.platform }}
           path: coverage.html
+
+  test-current-latest-k6:
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [1.19.x]
+        platform: [ubuntu-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go-version }}
+          check-latest: true
+      - name: Run tests with latest k6
+        run: |
+          set -x
+          go version
+          export GOMAXPROCS=2
+          args=("-p" "2" "-race")
+          # Run with less concurrency on Windows to minimize flakiness.
+          if [[ "${{ matrix.platform }}" == windows* ]]; then
+            unset args[2]
+            args[1]="1"
+            export GOMAXPROCS=1
+          fi
+          cat go.mod | grep go.k6.io/k6
+          # Get the latest master version of k6
+          go get go.k6.io/k6@master
+          go mod tidy
+          cat go.mod | grep go.k6.io/k6
+          export XK6_HEADLESS=true
+          go test "${args[@]}" -timeout 5m ./...
