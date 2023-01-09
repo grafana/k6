@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -20,7 +19,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/ui/console"
 )
 
 type blockingTransport struct {
@@ -66,68 +64,16 @@ func TestMain(m *testing.M) {
 	exitCode = m.Run()
 }
 
-type bufferStringer interface {
-	io.ReadWriter
-	fmt.Stringer
-	Bytes() []byte
-}
-
 type globalTestState struct {
 	*globalState
 	cancel func()
 
-	stdOut, stdErr bufferStringer
+	stdOut, stdErr *bytes.Buffer
 	loggerHook     *testutils.SimpleLogrusHook
 
 	cwd string
 
 	expectedExitCode int
-}
-
-// A thread-safe buffer implementation.
-type safeBuffer struct {
-	b bytes.Buffer
-	m sync.RWMutex
-}
-
-func (b *safeBuffer) Read(p []byte) (n int, err error) {
-	b.m.RLock()
-	defer b.m.RUnlock()
-	return b.b.Read(p)
-}
-
-func (b *safeBuffer) Write(p []byte) (n int, err error) {
-	b.m.Lock()
-	defer b.m.Unlock()
-	return b.b.Write(p)
-}
-
-func (b *safeBuffer) String() string {
-	b.m.RLock()
-	defer b.m.RUnlock()
-	return b.b.String()
-}
-
-func (b *safeBuffer) Bytes() []byte {
-	b.m.RLock()
-	defer b.m.RUnlock()
-	return b.b.Bytes()
-}
-
-type testOSFileW struct {
-	io.Writer
-}
-
-func (f *testOSFileW) Fd() uintptr {
-	return 0
-}
-
-type testOSFileR struct {
-	io.Reader
-}
-
-func (f *testOSFileR) Fd() uintptr {
-	return 0
 }
 
 var portRangeStart uint64 = 6565 //nolint:gochecknoglobals
@@ -171,8 +117,8 @@ func newGlobalTestState(t *testing.T) *globalTestState {
 		cwd:        cwd,
 		cancel:     cancel,
 		loggerHook: hook,
-		stdOut:     &safeBuffer{},
-		stdErr:     &safeBuffer{},
+		stdOut:     new(bytes.Buffer),
+		stdErr:     new(bytes.Buffer),
 	}
 
 	osExitCalled := false
@@ -190,27 +136,27 @@ func newGlobalTestState(t *testing.T) *globalTestState {
 		}
 	})
 
+	outMutex := &sync.Mutex{}
 	defaultFlags := getDefaultFlags(".config")
 	defaultFlags.address = getFreeBindAddr(t)
 
-	cons := console.New(
-		&testOSFileW{ts.stdOut}, &testOSFileW{ts.stdErr},
-		&testOSFileR{&safeBuffer{}}, false, "", signal.Notify, signal.Stop)
-	cons.SetLogger(logger)
-
 	ts.globalState = &globalState{
-		ctx:          ctx,
-		fs:           fs,
-		console:      cons,
-		getwd:        func() (string, error) { return ts.cwd, nil },
-		args:         []string{},
-		envVars:      map[string]string{"K6_NO_USAGE_REPORT": "true"},
-		defaultFlags: defaultFlags,
-		flags:        defaultFlags,
-		osExit:       defaultOsExitHandle,
-		signalNotify: signal.Notify,
-		signalStop:   signal.Stop,
-		logger:       logger,
+		ctx:            ctx,
+		fs:             fs,
+		getwd:          func() (string, error) { return ts.cwd, nil },
+		args:           []string{},
+		envVars:        map[string]string{"K6_NO_USAGE_REPORT": "true"},
+		defaultFlags:   defaultFlags,
+		flags:          defaultFlags,
+		outMutex:       outMutex,
+		stdOut:         &consoleWriter{nil, ts.stdOut, false, outMutex, nil},
+		stdErr:         &consoleWriter{nil, ts.stdErr, false, outMutex, nil},
+		stdIn:          new(bytes.Buffer),
+		osExit:         defaultOsExitHandle,
+		signalNotify:   signal.Notify,
+		signalStop:     signal.Stop,
+		logger:         logger,
+		fallbackLogger: testutils.NewLogger(t).WithField("fallback", true),
 	}
 	return ts
 }
@@ -220,10 +166,10 @@ func TestDeprecatedOptionWarning(t *testing.T) {
 
 	ts := newGlobalTestState(t)
 	ts.args = []string{"k6", "--logformat", "json", "run", "-"}
-	ts.console.Stdin = &testOSFileR{bytes.NewBuffer([]byte(`
+	ts.stdIn = bytes.NewBuffer([]byte(`
 		console.log('foo');
 		export default function() { console.log('bar'); };
-	`))}
+	`))
 
 	newRootCommand(ts.globalState).execute()
 

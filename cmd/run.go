@@ -37,7 +37,7 @@ type cmdRun struct {
 //
 //nolint:funlen,gocognit,gocyclo,cyclop
 func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
-	maybePrintBanner(c.gs)
+	printBanner(c.gs)
 
 	test, err := loadAndConfigureTest(c.gs, cmd, args, getConfig)
 	if err != nil {
@@ -76,26 +76,25 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	initBar := execScheduler.GetInitProgressBar()
+	progressBarWG := &sync.WaitGroup{}
+	progressBarWG.Add(1)
+	defer progressBarWG.Wait()
+
+	// This is manually triggered after the Engine's Run() has completed,
+	// and things like a single Ctrl+C don't affect it. We use it to make
+	// sure that the progressbars finish updating with the latest execution
+	// state one last time, after the test run has finished.
 	progressCtx, progressCancel := context.WithCancel(globalCtx)
 	defer progressCancel()
-	progressBarWG := &sync.WaitGroup{}
-	if !c.gs.flags.quiet {
-		progressBarWG.Add(1)
-
-		// This is manually triggered after the Engine's Run() has completed,
-		// and things like a single Ctrl+C don't affect it. We use it to make
-		// sure that the progressbars finish updating with the latest execution
-		// state one last time, after the test run has finished.
-		go func() {
-			defer progressBarWG.Done()
-			pbs := []*pb.ProgressBar{initBar}
-			for _, s := range execScheduler.GetExecutors() {
-				pbs = append(pbs, s.GetProgress())
-			}
-			c.gs.console.ShowProgress(progressCtx, pbs)
-		}()
-	}
+	initBar := execScheduler.GetInitProgressBar()
+	go func() {
+		defer progressBarWG.Done()
+		pbs := []*pb.ProgressBar{initBar}
+		for _, s := range execScheduler.GetExecutors() {
+			pbs = append(pbs, s.GetProgress())
+		}
+		showProgress(progressCtx, c.gs, pbs, logger)
+	}()
 
 	// Create all outputs.
 	executionPlan := execScheduler.GetExecutionPlan()
@@ -142,15 +141,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 	}
 	defer engine.OutputManager.StopOutputs()
 
-	execDesc := getExecutionDescription(
-		c.gs.console.ApplyTheme, "local", args[0], "", conf,
-		execScheduler.GetState().ExecutionTuple, executionPlan, outputs,
+	printExecutionDescription(
+		c.gs, "local", args[0], "", conf, execScheduler.GetState().ExecutionTuple, executionPlan, outputs,
 	)
-	if c.gs.flags.quiet {
-		c.gs.logger.Debug(execDesc)
-	} else {
-		c.gs.console.Print(execDesc)
-	}
 
 	// Trap Interrupts, SIGINTs and SIGTERMs.
 	gracefulStop := func(sig os.Signal) {
@@ -218,13 +211,13 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 			TestRunDuration: executionState.GetCurrentTestRunDuration(),
 			NoColor:         c.gs.flags.noColor,
 			UIState: lib.UIState{
-				IsStdOutTTY: c.gs.console.IsTTY,
-				IsStdErrTTY: c.gs.console.IsTTY,
+				IsStdOutTTY: c.gs.stdOut.isTTY,
+				IsStdErrTTY: c.gs.stdErr.isTTY,
 			},
 		})
 		engine.MetricsEngine.MetricsLock.Unlock()
 		if hsErr == nil {
-			hsErr = handleSummaryResult(c.gs.fs, c.gs.console.Stdout, c.gs.console.Stderr, summaryResult)
+			hsErr = handleSummaryResult(c.gs.fs, c.gs.stdOut, c.gs.stdErr, summaryResult)
 		}
 		if hsErr != nil {
 			logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
@@ -238,7 +231,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) error {
 		default:
 			logger.Debug("Linger set; waiting for Ctrl+C...")
 			if !c.gs.flags.quiet {
-				c.gs.console.Print("Linger set; waiting for Ctrl+C...")
+				printToStdout(c.gs, "Linger set; waiting for Ctrl+C...")
 			}
 			<-lingerCtx.Done()
 			logger.Debug("Ctrl+C received, exiting...")

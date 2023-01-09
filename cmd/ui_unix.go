@@ -1,7 +1,7 @@
 //go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
 // +build darwin dragonfly freebsd linux netbsd openbsd
 
-package console
+package cmd
 
 import (
 	"os"
