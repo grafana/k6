@@ -14,7 +14,8 @@ import (
 
 func TestExpectedStatuses(t *testing.T) {
 	t.Parallel()
-	rt, _, _ := getTestModuleInstance(t)
+	runtime, _ := getTestModuleInstance(t)
+	rt := runtime.VU.RuntimeField
 
 	cases := map[string]struct {
 		code, err string
