@@ -358,7 +358,7 @@ func (r *Runner) IsExecutable(name string) bool {
 }
 
 // HandleSummary calls the specified summary callback, if supplied.
-func (r *Runner) HandleSummary(parentCtx context.Context, summary *lib.Summary) (map[string]io.Reader, error) {
+func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[string]io.Reader, error) {
 	summaryDataForJS := summarizeMetricsToObject(summary, r.Bundle.Options, r.setupData)
 
 	out := make(chan metrics.SampleContainer, 100)
@@ -369,10 +369,10 @@ func (r *Runner) HandleSummary(parentCtx context.Context, summary *lib.Summary) 
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(parentCtx, r.getTimeoutFor(consts.HandleSummaryFn))
+	summaryCtx, cancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.HandleSummaryFn))
 	defer cancel()
 
-	vu, err := r.newVU(ctx, 0, 0, out)
+	vu, err := r.newVU(summaryCtx, 0, 0, out)
 	if err != nil {
 		return nil, err
 	}
@@ -386,10 +386,10 @@ func (r *Runner) HandleSummary(parentCtx context.Context, summary *lib.Summary) 
 	}
 
 	go func() {
-		<-ctx.Done()
+		<-summaryCtx.Done()
 		vu.Runtime.Interrupt(context.Canceled)
 	}()
-	vu.moduleVUImpl.ctx = ctx
+	vu.moduleVUImpl.ctx = summaryCtx
 
 	wrapper := strings.Replace(summaryWrapperLambdaCode, "/*JSLIB_SUMMARY_CODE*/", jslibSummaryCode, 1)
 	handleSummaryWrapperRaw, err := vu.Runtime.RunString(wrapper)
@@ -406,11 +406,11 @@ func (r *Runner) HandleSummary(parentCtx context.Context, summary *lib.Summary) 
 		vu.Runtime.ToValue(r.Bundle.RuntimeOptions.SummaryExport.String),
 		vu.Runtime.ToValue(summaryDataForJS),
 	}
-	rawResult, _, _, err := vu.runFn(ctx, false, handleSummaryWrapper, nil, wrapperArgs...)
+	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)
 
 	// TODO: refactor the whole JS runner to avoid copy-pasting these complicated bits...
 	// deadline is reached so we have timeouted but this might've not been registered correctly
-	if deadline, ok := ctx.Deadline(); ok && time.Now().After(deadline) {
+	if deadline, ok := summaryCtx.Deadline(); ok && time.Now().After(deadline) {
 		// we could have an error that is not context.Canceled in which case we should return it instead
 		if err, ok := err.(*goja.InterruptedError); ok && rawResult != nil && err.Value() != context.Canceled {
 			// TODO: silence this error?
