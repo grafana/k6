@@ -13,7 +13,10 @@ import (
 )
 
 func TestTLS13Support(t *testing.T) {
-	tb, state, _, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
 
 	tb.Mux.HandleFunc("/tls-version", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		ver := req.TLS.Version

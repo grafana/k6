@@ -105,7 +105,11 @@ func invalidJSONHandler(w http.ResponseWriter, r *http.Request) {
 
 //nolint:paralleltest
 func TestResponse(t *testing.T) {
-	tb, state, samples, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
 	root := state.Group
 	sr := tb.Replacer.Replace
 

@@ -82,7 +82,11 @@ type expectedSample struct {
 
 func TestResponseCallbackInAction(t *testing.T) {
 	t.Parallel()
-	tb, _, samples, rt, mii := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+
 	sr := tb.Replacer.Replace
 
 	HTTPMetricsWithoutFailed := []string{
@@ -254,7 +258,7 @@ func TestResponseCallbackInAction(t *testing.T) {
 	for name, testCase := range testCases {
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			mii.defaultClient.responseCallback = defaultExpectedStatuses.match
+			ts.instance.defaultClient.responseCallback = defaultExpectedStatuses.match
 
 			_, err := rt.RunString(sr(testCase.code))
 			assert.NoError(t, err)
@@ -280,7 +284,11 @@ func TestResponseCallbackInAction(t *testing.T) {
 
 func TestResponseCallbackBatch(t *testing.T) {
 	t.Parallel()
-	tb, _, samples, rt, mii := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+
 	sr := tb.Replacer.Replace
 
 	HTTPMetricsWithoutFailed := []string{
@@ -363,7 +371,7 @@ func TestResponseCallbackBatch(t *testing.T) {
 	for name, testCase := range testCases {
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			mii.defaultClient.responseCallback = defaultExpectedStatuses.match
+			ts.instance.defaultClient.responseCallback = defaultExpectedStatuses.match
 
 			_, err := rt.RunString(sr(testCase.code))
 			assert.NoError(t, err)
@@ -394,7 +402,11 @@ func TestResponseCallbackBatch(t *testing.T) {
 
 func TestResponseCallbackInActionWithoutPassedTag(t *testing.T) {
 	t.Parallel()
-	tb, state, samples, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
 	sr := tb.Replacer.Replace
 	allHTTPMetrics := []string{
 		metrics.HTTPReqsName,
@@ -449,7 +461,10 @@ func TestResponseCallbackInActionWithoutPassedTag(t *testing.T) {
 
 func TestDigestWithResponseCallback(t *testing.T) {
 	t.Parallel()
-	tb, _, samples, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
 
 	urlWithCreds := tb.Replacer.Replace(
 		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/testuser/testpwd",
