@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/chromedp/cdproto v0.0.0-20221023212508-67ada9507fb2
-	github.com/dop251/goja v0.0.0-20221106173738-3b8a68ca89b4
+	github.com/dop251/goja v0.0.0-20221229151140-b95230a9dbad
 	github.com/fatih/color v1.13.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -13,7 +13,7 @@ require (
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0
-	go.k6.io/k6 v0.42.0
+	go.k6.io/k6 v0.42.1-0.20230109152238-8418147fa630
 	golang.org/x/exp v0.0.0-20221106115401-f9659909a136
 	golang.org/x/net v0.1.0
 	gopkg.in/guregu/null.v3 v3.5.0

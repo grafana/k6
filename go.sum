@@ -74,8 +74,8 @@ github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91/go.mod h1:2pZnwu
 github.com/dlclark/regexp2 v1.7.0 h1:7lJfhqlPssTb1WQx4yvTHN0uElPEv52sbaECrAQxjAo=
 github.com/dlclark/regexp2 v1.7.0/go.mod h1:DHkYz0B9wPfa6wondMfaivmHpzrQ3v9q8cnmRbL6yW8=
 github.com/dop251/goja v0.0.0-20211022113120-dc8c55024d06/go.mod h1:R9ET47fwRVRPZnOGvHxxhuZcbrMCuiqOz3Rlrh4KSnk=
-github.com/dop251/goja v0.0.0-20221106173738-3b8a68ca89b4 h1:arM6Tq1Ba+a9FWuq3S6Qgrfd5MD0slQdMnCKI2VclFg=
-github.com/dop251/goja v0.0.0-20221106173738-3b8a68ca89b4/go.mod h1:yRkwfj0CBpOGre+TwBsqPV0IH0Pk73e4PXJOeNDboGs=
+github.com/dop251/goja v0.0.0-20221229151140-b95230a9dbad h1:EikyYzLzjRNW8lz9VAIUcmrwDAU6PsMRnwblYXb6Ysg=
+github.com/dop251/goja v0.0.0-20221229151140-b95230a9dbad/go.mod h1:yRkwfj0CBpOGre+TwBsqPV0IH0Pk73e4PXJOeNDboGs=
 github.com/dop251/goja_nodejs v0.0.0-20210225215109-d91c329300e7/go.mod h1:hn7BA7c8pLvoGndExHudxTDKZ84Pyvv+90pbBjbTz0Y=
 github.com/dop251/goja_nodejs v0.0.0-20211022123610-8dd9abb0616d/go.mod h1:DngW8aVqWbuLRMHItjPUyqdj+HWPvnQe8V8y1nDpIbM=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
@@ -255,8 +255,8 @@ github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
-go.k6.io/k6 v0.42.0 h1:TXYyaNPI5GuX2k+r0EDqawdAkdU2Kuxl68GpBbwSkUk=
-go.k6.io/k6 v0.42.0/go.mod h1:BY6vVmsNSaetHmPqQ8D6VMJJRptzwevdSpURQmSkrMQ=
+go.k6.io/k6 v0.42.1-0.20230109152238-8418147fa630 h1:0MtQL0OzBWHA9FHmyUxTE5lUGUROhIAbdhBCLt9IQGA=
+go.k6.io/k6 v0.42.1-0.20230109152238-8418147fa630/go.mod h1:0/VY8Sd4WTsIkncZFLDQIv7u8wjBtGlBXF3YPrDxK+E=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
