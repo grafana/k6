@@ -14,7 +14,6 @@ import (
 	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/chromedp/cdproto/cdp"
-	"github.com/chromedp/cdproto/network"
 	cdppage "github.com/chromedp/cdproto/page"
 )
 
@@ -35,8 +34,6 @@ type FrameManager struct {
 	// the main VU/JS go routine and the Go routine listening for CDP messages.
 	framesMu sync.RWMutex
 	frames   map[cdp.FrameID]*Frame
-
-	inflightRequests map[network.RequestID]bool
 
 	barriersMu sync.RWMutex
 	barriers   []*Barrier
@@ -59,16 +56,15 @@ func NewFrameManager(
 	l *log.Logger,
 ) *FrameManager {
 	m := &FrameManager{
-		ctx:              ctx,
-		session:          s,
-		page:             p,
-		timeoutSettings:  ts,
-		frames:           make(map[cdp.FrameID]*Frame),
-		inflightRequests: make(map[network.RequestID]bool),
-		barriers:         make([]*Barrier, 0),
-		vu:               k6ext.GetVU(ctx),
-		logger:           l,
-		id:               atomic.AddInt64(&frameManagerID, 1),
+		ctx:             ctx,
+		session:         s,
+		page:            p,
+		timeoutSettings: ts,
+		frames:          make(map[cdp.FrameID]*Frame),
+		barriers:        make([]*Barrier, 0),
+		vu:              k6ext.GetVU(ctx),
+		logger:          l,
+		id:              atomic.AddInt64(&frameManagerID, 1),
 	}
 
 	m.logger.Debugf("FrameManager:New", "fmid:%d", m.ID())
@@ -436,7 +432,6 @@ func (m *FrameManager) removeFramesRecursively(frame *Frame) {
 func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	m.logger.Debugf("FrameManager:requestFailed", "fmid:%d rurl:%s", m.ID(), req.URL())
 
-	delete(m.inflightRequests, req.getID())
 	defer m.page.emit(EventPageRequestFailed, req)
 
 	frame := req.getFrame()
@@ -487,7 +482,6 @@ func (m *FrameManager) requestFinished(req *Request) {
 	m.logger.Debugf("FrameManager:requestFinished", "fmid:%d rurl:%s",
 		m.ID(), req.URL())
 
-	delete(m.inflightRequests, req.getID())
 	defer m.page.emit(EventPageRequestFinished, req)
 
 	frame := req.getFrame()
@@ -519,7 +513,6 @@ func (m *FrameManager) requestStarted(req *Request) {
 	defer m.framesMu.Unlock()
 	defer m.page.emit(EventPageRequest, req)
 
-	m.inflightRequests[req.getID()] = true
 	frame := req.getFrame()
 	if frame == nil {
 		m.logger.Debugf("FrameManager:requestStarted:return",
