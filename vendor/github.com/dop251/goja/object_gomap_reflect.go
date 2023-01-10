@@ -35,28 +35,27 @@ func (o *objectGoMapReflect) strToKey(name string, throw bool) reflect.Value {
 	return o.toKey(newStringValue(name), throw)
 }
 
-func (o *objectGoMapReflect) _get(n Value) Value {
-	key := o.toKey(n, false)
+func (o *objectGoMapReflect) _getKey(key reflect.Value) Value {
 	if !key.IsValid() {
 		return nil
 	}
 	if v := o.fieldsValue.MapIndex(key); v.IsValid() {
-		return o.val.runtime.toValue(v.Interface(), v)
+		rv := v
+		if rv.Kind() == reflect.Interface {
+			rv = rv.Elem()
+		}
+		return o.val.runtime.toValue(v.Interface(), rv)
 	}
 
 	return nil
 }
 
-func (o *objectGoMapReflect) _getStr(name string) Value {
-	key := o.strToKey(name, false)
-	if !key.IsValid() {
-		return nil
-	}
-	if v := o.fieldsValue.MapIndex(key); v.IsValid() {
-		return o.val.runtime.toValue(v.Interface(), v)
-	}
+func (o *objectGoMapReflect) _get(n Value) Value {
+	return o._getKey(o.toKey(n, false))
+}
 
-	return nil
+func (o *objectGoMapReflect) _getStr(name string) Value {
+	return o._getKey(o.strToKey(name, false))
 }
 
 func (o *objectGoMapReflect) getStr(name unistring.String, receiver Value) Value {
