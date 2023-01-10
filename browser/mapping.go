@@ -15,6 +15,11 @@ import (
 // mapping is a type of mapping between our API (api/) and the JS
 // module. It acts like a bridge and allows adding wildcard methods
 // and customization over our API.
+//
+// TODO
+// We should put this type back in when the following issue is resolved
+// on the Goja side:
+// https://github.com/dop251/goja/issues/469
 type mapping = map[string]any
 
 // wildcards is a list of extra mappings for our API (api/).
