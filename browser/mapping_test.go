@@ -25,7 +25,7 @@ func TestMappings(t *testing.T) {
 
 	type test struct {
 		apiInterface any
-		mapp         func() map[string]any
+		mapp         func() mapping
 	}
 
 	var (
@@ -77,49 +77,49 @@ func TestMappings(t *testing.T) {
 	for name, tt := range map[string]test{
 		"browserType": {
 			apiInterface: (*api.BrowserType)(nil),
-			mapp: func() map[string]any {
+			mapp: func() mapping {
 				return mapBrowserType(rt, &chromium.BrowserType{})
 			},
 		},
 		"browser": {
 			apiInterface: (*api.Browser)(nil),
-			mapp: func() map[string]any {
+			mapp: func() mapping {
 				return mapBrowser(rt, &chromium.Browser{})
 			},
 		},
 		"browserContext": {
 			apiInterface: (*api.BrowserContext)(nil),
-			mapp: func() map[string]any {
+			mapp: func() mapping {
 				return mapBrowserContext(rt, &common.BrowserContext{})
 			},
 		},
 		"page": {
 			apiInterface: (*api.Page)(nil),
-			mapp: func() map[string]any {
+			mapp: func() mapping {
 				return mapPage(rt, &common.Page{})
 			},
 		},
 		"elementHandle": {
 			apiInterface: (*api.ElementHandle)(nil),
-			mapp: func() map[string]any {
+			mapp: func() mapping {
 				return mapElementHandle(rt, &common.ElementHandle{})
 			},
 		},
 		"frame": {
 			apiInterface: (*api.Frame)(nil),
-			mapp: func() map[string]any {
+			mapp: func() mapping {
 				return mapFrame(rt, &common.Frame{})
 			},
 		},
 		"mapRequest": {
 			apiInterface: (*api.Request)(nil),
-			mapp: func() map[string]any {
+			mapp: func() mapping {
 				return mapRequest(rt, &common.Request{})
 			},
 		},
 		"mapResponse": {
 			apiInterface: (*api.Response)(nil),
-			mapp: func() map[string]any {
+			mapp: func() mapping {
 				return mapResponse(rt, &common.Response{})
 			},
 		},
