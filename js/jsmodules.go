@@ -8,6 +8,7 @@ import (
 	"go.k6.io/k6/js/modules/k6/data"
 	"go.k6.io/k6/js/modules/k6/encoding"
 	"go.k6.io/k6/js/modules/k6/execution"
+	"go.k6.io/k6/js/modules/k6/experimental/tracing"
 	"go.k6.io/k6/js/modules/k6/grpc"
 	"go.k6.io/k6/js/modules/k6/html"
 	"go.k6.io/k6/js/modules/k6/http"
@@ -30,6 +31,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/experimental/redis":      redis.New(),
 		"k6/experimental/websockets": &expws.RootModule{},
 		"k6/experimental/timers":     timers.New(),
+		"k6/experimental/tracing":    tracing.New(),
 		"k6/net/grpc":                grpc.New(),
 		"k6/html":                    html.New(),
 		"k6/http":                    http.New(),
