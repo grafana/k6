@@ -30,7 +30,6 @@ import (
 	"go.k6.io/k6/lib/types"
 
 	"github.com/andybalholm/brotli"
-	"github.com/dop251/goja"
 	"github.com/klauspost/compress/zstd"
 	"github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/oxtoacart/bpool"
@@ -119,9 +118,14 @@ func assertRequestMetricsEmittedSingle(t *testing.T, sampleContainer metrics.Sam
 	}
 }
 
-func newRuntime(t testing.TB) (
-	*httpmultibin.HTTPMultiBin, *lib.State, chan metrics.SampleContainer, *goja.Runtime, *ModuleInstance,
-) {
+type httpTestCase struct {
+	tb       *httpmultibin.HTTPMultiBin
+	runtime  *modulestest.Runtime
+	samples  chan metrics.SampleContainer
+	instance *ModuleInstance
+}
+
+func newTestCase(t testing.TB) *httpTestCase {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	root, err := lib.NewGroup("", nil)
@@ -159,12 +163,22 @@ func newRuntime(t testing.TB) (
 	runtime, mi := getTestModuleInstance(t)
 
 	runtime.MoveToVUContext(state)
-	return tb, state, samples, runtime.VU.RuntimeField, mi
+	return &httpTestCase{
+		tb:       tb,
+		samples:  samples,
+		runtime:  runtime,
+		instance: mi,
+	}
 }
 
 func TestRequest(t *testing.T) {
 	t.Parallel()
-	tb, state, samples, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
+
 	sr := tb.Replacer.Replace
 
 	// Handle paths with custom logic
@@ -1280,7 +1294,11 @@ func TestRequest(t *testing.T) {
 
 func TestRequestCancellation(t *testing.T) {
 	t.Parallel()
-	tb, state, _, rt, mi := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
+	mi := ts.instance
 	sr := tb.Replacer.Replace
 
 	hook := logtest.NewLocal(state.Logger)
@@ -1300,7 +1318,9 @@ func TestRequestCancellation(t *testing.T) {
 
 func TestRequestArrayBufferBody(t *testing.T) {
 	t.Parallel()
-	tb, _, _, rt, _ := newRuntime(t) //nolint:dogsled
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
 	sr := tb.Replacer.Replace
 
 	tb.Mux.HandleFunc("/post-arraybuffer", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1349,7 +1369,10 @@ func TestRequestArrayBufferBody(t *testing.T) {
 
 func TestRequestCompression(t *testing.T) {
 	t.Parallel()
-	tb, state, _, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
 
 	logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
 	state.Logger.AddHook(&logHook)
@@ -1536,7 +1559,10 @@ func TestRequestCompression(t *testing.T) {
 
 func TestResponseTypes(t *testing.T) {
 	t.Parallel()
-	tb, state, _, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
 
 	// We don't expect any failed requests
 	state.Options.Throw = null.BoolFrom(true)
@@ -1684,7 +1710,12 @@ func checkErrorCode(t testing.TB, sample metrics.Sample, code int, msg string) {
 
 func TestErrorCodes(t *testing.T) {
 	t.Parallel()
-	tb, state, samples, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
+
 	state.Options.Throw = null.BoolFrom(false)
 	sr := tb.Replacer.Replace
 
@@ -1788,7 +1819,10 @@ func TestErrorCodes(t *testing.T) {
 
 func TestResponseWaitingAndReceivingTimings(t *testing.T) {
 	t.Parallel()
-	tb, state, _, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
 
 	// We don't expect any failed requests
 	state.Options.Throw = null.BoolFrom(true)
@@ -1830,7 +1864,10 @@ func TestResponseWaitingAndReceivingTimings(t *testing.T) {
 
 func TestResponseTimingsWhenTimeout(t *testing.T) {
 	t.Parallel()
-	tb, state, _, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
 
 	// We expect a failed request
 	state.Options.Throw = null.BoolFrom(false)
@@ -1851,7 +1888,10 @@ func TestResponseTimingsWhenTimeout(t *testing.T) {
 
 func TestNoResponseBodyMangling(t *testing.T) {
 	t.Parallel()
-	tb, state, _, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
 
 	// We don't expect any failed requests
 	state.Options.Throw = null.BoolFrom(true)
@@ -1878,7 +1918,10 @@ func TestNoResponseBodyMangling(t *testing.T) {
 }
 
 func TestRedirectMetricTags(t *testing.T) {
-	tb, _, samples, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
 
 	tb.Mux.HandleFunc("/redirect/post", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/get", http.StatusMovedPermanently)
@@ -1924,7 +1967,11 @@ func TestRedirectMetricTags(t *testing.T) {
 }
 
 func BenchmarkHandlingOfResponseBodies(b *testing.B) {
-	tb, state, samples, rt, _ := newRuntime(b)
+	ts := newTestCase(b)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
 
 	state.BPool = bpool.NewBufferPool(100)
 
@@ -1993,7 +2040,10 @@ func BenchmarkHandlingOfResponseBodies(b *testing.B) {
 
 func TestErrorsWithDecompression(t *testing.T) {
 	t.Parallel()
-	tb, state, _, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
 
 	state.Options.Throw = null.BoolFrom(false)
 
@@ -2021,7 +2071,10 @@ func TestRequestAndBatchTLS(t *testing.T) {
 
 	t.Run("cert_expired", func(t *testing.T) {
 		t.Parallel()
-		_, state, _, rt, _ := newRuntime(t)
+		ts := newTestCase(t)
+		rt := ts.runtime.VU.Runtime()
+		state := ts.runtime.VU.State()
+
 		cert, key := GenerateTLSCertificate(t, "expired.localhost", time.Now().Add(-time.Hour), 0)
 		s, client := GetTestServerWithCertificate(t, cert, key)
 		go func() {
@@ -2060,7 +2113,11 @@ func TestRequestAndBatchTLS(t *testing.T) {
 		versionTest := versionTest
 		t.Run(versionTest.Name, func(t *testing.T) {
 			t.Parallel()
-			_, state, samples, rt, _ := newRuntime(t)
+			ts := newTestCase(t)
+			samples := ts.samples
+			rt := ts.runtime.VU.Runtime()
+			state := ts.runtime.VU.State()
+
 			cert, key := GenerateTLSCertificate(t, versionTest.URL, time.Now(), time.Hour)
 			s, client := GetTestServerWithCertificate(t, cert, key)
 
@@ -2113,7 +2170,10 @@ func TestRequestAndBatchTLS(t *testing.T) {
 		cipherSuiteTest := cipherSuiteTest
 		t.Run(cipherSuiteTest.Name, func(t *testing.T) {
 			t.Parallel()
-			_, state, samples, rt, _ := newRuntime(t)
+			ts := newTestCase(t)
+			samples := ts.samples
+			rt := ts.runtime.VU.Runtime()
+			state := ts.runtime.VU.State()
 			cert, key := GenerateTLSCertificate(t, cipherSuiteTest.URL, time.Now(), time.Hour)
 			s, client := GetTestServerWithCertificate(t, cert, key, cipherSuiteTest.suite)
 			go func() {
@@ -2150,7 +2210,11 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			t.Skip("this doesn't work on windows for some reason")
 		}
 		website := "https://www.wikipedia.org/"
-		tb, state, samples, rt, _ := newRuntime(t)
+		ts := newTestCase(t)
+		tb := ts.tb
+		samples := ts.samples
+		rt := ts.runtime.VU.Runtime()
+		state := ts.runtime.VU.State()
 		state.Dialer = tb.Dialer
 		_, err := rt.RunString(fmt.Sprintf(`
 			var res = http.request("GET", "%s");
@@ -2163,7 +2227,11 @@ func TestRequestAndBatchTLS(t *testing.T) {
 
 func TestDigestAuthWithBody(t *testing.T) {
 	t.Parallel()
-	tb, state, samples, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
 
 	state.Options.Throw = null.BoolFrom(true)
 	state.Options.HTTPDebug = null.StringFrom("full")
@@ -2197,7 +2265,9 @@ func TestDigestAuthWithBody(t *testing.T) {
 
 func TestBinaryResponseWithStatus0(t *testing.T) {
 	t.Parallel()
-	_, state, _, rt, _ := newRuntime(t) //nolint:dogsled
+	ts := newTestCase(t)
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
 	state.Options.Throw = null.BoolFrom(false)
 	_, err := rt.RunString(`
 		var res = http.get("https://asdajkdahdqiuwhejkasdnakjdnadasdlkas.com", { responseType: "binary" });

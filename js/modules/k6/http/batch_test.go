@@ -13,7 +13,11 @@ import (
 
 func TestBatch(t *testing.T) {
 	t.Parallel()
-	tb, state, samples, rt, _ := newRuntime(t)
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	state := ts.runtime.VU.State()
+	rt := ts.runtime.VU.Runtime()
 	sr := tb.Replacer.Replace
 	t.Run("error", func(t *testing.T) {
 		invalidURLerr := `invalid URL: parse "https:// invalidurl.com": invalid character " " in host name`
