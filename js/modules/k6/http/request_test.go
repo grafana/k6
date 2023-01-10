@@ -156,10 +156,10 @@ func newRuntime(t testing.TB) (
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 
-	rt, mi, mockVU := getTestModuleInstance(t)
-	mockVU.InitEnvField = nil
-	mockVU.StateField = state
-	return tb, state, samples, rt, mi
+	runtime, mi := getTestModuleInstance(t)
+
+	runtime.MoveToVUContext(state)
+	return tb, state, samples, runtime.VU.RuntimeField, mi
 }
 
 func TestRequest(t *testing.T) {

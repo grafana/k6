@@ -10,7 +10,8 @@ import (
 
 func TestHTTPFile(t *testing.T) {
 	t.Parallel()
-	rt, mi, _ := getTestModuleInstance(t)
+	runtime, mi := getTestModuleInstance(t)
+	rt := runtime.VU.RuntimeField
 	input := []byte{104, 101, 108, 108, 111}
 
 	testCases := []struct {
