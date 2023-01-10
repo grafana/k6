@@ -105,7 +105,9 @@ func TestBatch(t *testing.T) {
 					logEntry := hook.LastEntry()
 					require.NotNil(t, logEntry)
 					assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-					assert.Contains(t, logEntry.Data["error"].(error).Error(), tc.expErr)
+					e, ok := logEntry.Data["error"].(error)
+					require.True(t, ok)
+					assert.ErrorContains(t, e, tc.expErr)
 					assert.Equal(t, "A batch request failed", logEntry.Message)
 				}
 			})
@@ -154,7 +156,9 @@ func TestBatch(t *testing.T) {
 				logEntry := hook.LastEntry()
 				require.NotNil(t, logEntry)
 				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-				assert.Contains(t, logEntry.Data["error"].(error).Error(), invalidURLerr)
+				e, ok := logEntry.Data["error"].(error)
+				require.True(t, ok)
+				assert.ErrorContains(t, e, invalidURLerr)
 				assert.Equal(t, "A batch request failed", logEntry.Message)
 			})
 		}
