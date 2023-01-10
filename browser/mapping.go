@@ -15,7 +15,13 @@ import (
 // mapping is a type of mapping between our API (api/) and the JS
 // module. It acts like a bridge and allows adding wildcard methods
 // and customization over our API.
-type mapping map[string]any
+//
+// TODO
+// We should put this type back in when the following issue is resolved
+// on the Goja side:
+// https://github.com/dop251/goja/issues/469
+//
+// type mapping map[string]any
 
 // wildcards is a list of extra mappings for our API (api/).
 func wildcards() map[string]string {
@@ -51,8 +57,8 @@ func mapBrowserToGoja(vu k6modules.VU) *goja.Object {
 }
 
 // mapRequest to the JS module.
-func mapRequest(rt *goja.Runtime, r api.Request) mapping {
-	maps := mapping{
+func mapRequest(rt *goja.Runtime, r api.Request) map[string]any {
+	maps := map[string]any{
 		"allHeaders": r.AllHeaders,
 		"failure":    r.Failure,
 		"frame": func() *goja.Object {
@@ -89,8 +95,8 @@ func mapRequest(rt *goja.Runtime, r api.Request) mapping {
 }
 
 // mapResponse to the JS module.
-func mapResponse(rt *goja.Runtime, r api.Response) mapping {
-	maps := mapping{
+func mapResponse(rt *goja.Runtime, r api.Response) map[string]any {
+	maps := map[string]any{
 		"allHeaders": r.AllHeaders,
 		"body":       r.Body,
 		"finished":   r.Finished,
@@ -122,8 +128,8 @@ func mapResponse(rt *goja.Runtime, r api.Response) mapping {
 // mapElementHandle to the JS module.
 //
 //nolint:funlen
-func mapElementHandle(rt *goja.Runtime, eh api.ElementHandle) mapping {
-	maps := mapping{
+func mapElementHandle(rt *goja.Runtime, eh api.ElementHandle) map[string]any {
+	maps := map[string]any{
 		"asElement": func() *goja.Object {
 			m := mapElementHandle(rt, eh.AsElement())
 			return rt.ToValue(m).ToObject(rt)
@@ -187,7 +193,7 @@ func mapElementHandle(rt *goja.Runtime, eh api.ElementHandle) mapping {
 	}
 	maps["$$"] = func(selector string) *goja.Object {
 		var (
-			mehs []mapping
+			mehs []map[string]any
 			ehs  = eh.QueryAll(selector)
 		)
 		for _, eh := range ehs {
@@ -203,14 +209,14 @@ func mapElementHandle(rt *goja.Runtime, eh api.ElementHandle) mapping {
 // mapFrame to the JS module.
 //
 //nolint:funlen
-func mapFrame(rt *goja.Runtime, f api.Frame) mapping {
-	maps := mapping{
+func mapFrame(rt *goja.Runtime, f api.Frame) map[string]any {
+	maps := map[string]any{
 		"addScriptTag": f.AddScriptTag,
 		"addStyleTag":  f.AddStyleTag,
 		"check":        f.Check,
 		"childFrames": func() *goja.Object {
 			var (
-				mcfs []mapping
+				mcfs []map[string]any
 				cfs  = f.ChildFrames()
 			)
 			for _, fr := range cfs {
@@ -282,7 +288,7 @@ func mapFrame(rt *goja.Runtime, f api.Frame) mapping {
 	}
 	maps["$$"] = func(selector string) *goja.Object {
 		var (
-			mehs []mapping
+			mehs []map[string]any
 			ehs  = f.QueryAll(selector)
 		)
 		for _, eh := range ehs {
@@ -298,8 +304,8 @@ func mapFrame(rt *goja.Runtime, f api.Frame) mapping {
 // mapPage to the JS module.
 //
 //nolint:funlen
-func mapPage(rt *goja.Runtime, p api.Page) mapping {
-	maps := mapping{
+func mapPage(rt *goja.Runtime, p api.Page) map[string]any {
+	maps := map[string]any{
 		"addInitScript":           p.AddInitScript,
 		"addScriptTag":            p.AddScriptTag,
 		"addStyleTag":             p.AddStyleTag,
@@ -323,7 +329,7 @@ func mapPage(rt *goja.Runtime, p api.Page) mapping {
 		"frame":                   p.Frame,
 		"frames": func() *goja.Object {
 			var (
-				mfrs []mapping
+				mfrs []map[string]any
 				frs  = p.Frames()
 			)
 			for _, fr := range frs {
@@ -394,7 +400,7 @@ func mapPage(rt *goja.Runtime, p api.Page) mapping {
 	}
 	maps["$$"] = func(selector string) *goja.Object {
 		var (
-			mehs []mapping
+			mehs []map[string]any
 			ehs  = p.QueryAll(selector)
 		)
 		for _, eh := range ehs {
@@ -408,8 +414,8 @@ func mapPage(rt *goja.Runtime, p api.Page) mapping {
 }
 
 // mapBrowserContext to the JS module.
-func mapBrowserContext(rt *goja.Runtime, bc api.BrowserContext) mapping {
-	return mapping{
+func mapBrowserContext(rt *goja.Runtime, bc api.BrowserContext) map[string]any {
+	return map[string]any{
 		"addCookies":                  bc.AddCookies,
 		"addInitScript":               bc.AddInitScript,
 		"browser":                     bc.Browser,
@@ -433,7 +439,7 @@ func mapBrowserContext(rt *goja.Runtime, bc api.BrowserContext) mapping {
 		"waitForEvent":                bc.WaitForEvent,
 		"pages": func() *goja.Object {
 			var (
-				mpages []mapping
+				mpages []map[string]any
 				pages  = bc.Pages()
 			)
 			for _, page := range pages {
@@ -455,8 +461,8 @@ func mapBrowserContext(rt *goja.Runtime, bc api.BrowserContext) mapping {
 }
 
 // mapBrowser to the JS module.
-func mapBrowser(rt *goja.Runtime, b api.Browser) mapping {
-	return mapping{
+func mapBrowser(rt *goja.Runtime, b api.Browser) map[string]any {
+	return map[string]any{
 		"close":       b.Close,
 		"contexts":    b.Contexts,
 		"isConnected": b.IsConnected,
@@ -477,8 +483,8 @@ func mapBrowser(rt *goja.Runtime, b api.Browser) mapping {
 }
 
 // mapBrowserType to the JS module.
-func mapBrowserType(rt *goja.Runtime, bt api.BrowserType) mapping {
-	return mapping{
+func mapBrowserType(rt *goja.Runtime, bt api.BrowserType) map[string]any {
+	return map[string]any{
 		"connect":                 bt.Connect,
 		"executablePath":          bt.ExecutablePath,
 		"launchPersistentContext": bt.LaunchPersistentContext,
