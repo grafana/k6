@@ -7,22 +7,23 @@ export const options = {
   }
 }
 
-export default function() {
+export default async function() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
   });
   const context = browser.newContext();
   const page = context.newPage();
 
-  page.goto('https://test.k6.io/').then(() => {
+  try {
+    await page.goto('https://test.k6.io/');
     check(page, {
       'Title with CSS selector':
         p => p.$('header h1.title').textContent() == 'test.k6.io',
       'Title with XPath selector':
         p => p.$(`//header//h1[@class="title"]`).textContent() == 'test.k6.io',
     });
-  }).finally(() => {
+  } finally {
     page.close();
     browser.close();
-  });
+  }
 }
