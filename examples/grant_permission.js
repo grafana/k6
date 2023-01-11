@@ -6,7 +6,7 @@ export const options = {
   }
 }
 
-export default function() {
+export default async function() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
   });
@@ -18,10 +18,12 @@ export default function() {
   });
 
   const page = context.newPage();
-  page.goto('http://whatsmyuseragent.org/').then(() => {
+
+  try {
+    await page.goto('http://whatsmyuseragent.org/');
     page.screenshot({ path: `example-chromium.png` });
-  }).finally(() => {
+  } finally {
     page.close();
     browser.close();
-  });
+  }
 }
