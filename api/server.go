@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -19,11 +20,10 @@ func newHandler(logger logrus.FieldLogger) http.Handler {
 	return mux
 }
 
-// ListenAndServe is analogous to the stdlib one but also takes a core.Engine and logrus.FieldLogger
-func ListenAndServe(addr string, engine *core.Engine, logger logrus.FieldLogger) error {
-	mux := newHandler(logger)
-
-	return http.ListenAndServe(addr, withEngine(engine, newLogger(logger, mux)))
+// GetServer returns a http.Server instance that can serve k6's REST API.
+func GetServer(addr string, engine *core.Engine, logger logrus.FieldLogger) *http.Server {
+	mux := withEngine(engine, newLogger(logger, newHandler(logger)))
+	return &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 }
 
 type wrappedResponseWriter struct {
