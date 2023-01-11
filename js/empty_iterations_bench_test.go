@@ -22,7 +22,7 @@ func BenchmarkEmptyIteration(b *testing.B) {
 		for range ch {
 		}
 	}()
-	initVU, err := r.NewVU(1, 1, ch)
+	initVU, err := r.NewVU(context.Background(), 1, 1, ch)
 	require.NoError(b, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

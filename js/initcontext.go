@@ -70,6 +70,8 @@ func NewInitContext(
 		moduleRegistry:    getJSModules(),
 		exportsCache:      make(map[string]goja.Value),
 		moduleVUImpl: &moduleVUImpl{
+			// TODO: pass a real context as we did for https://github.com/grafana/k6/pull/2800,
+			// also see https://github.com/grafana/k6/issues/2804
 			ctx:     context.Background(),
 			runtime: rt,
 		},

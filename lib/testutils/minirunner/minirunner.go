@@ -40,7 +40,9 @@ func (r MiniRunner) MakeArchive() *lib.Archive {
 }
 
 // NewVU returns a new VU with an incremental ID.
-func (r *MiniRunner) NewVU(idLocal, idGlobal uint64, out chan<- metrics.SampleContainer) (lib.InitializedVU, error) {
+func (r *MiniRunner) NewVU(
+	_ context.Context, idLocal, idGlobal uint64, out chan<- metrics.SampleContainer,
+) (lib.InitializedVU, error) {
 	state := &lib.State{VUID: idLocal, VUIDGlobal: idGlobal, Iteration: int64(-1)}
 	if r.runTags != nil {
 		state.Tags = lib.NewVUStateTags(r.runTags)

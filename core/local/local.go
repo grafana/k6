@@ -135,12 +135,12 @@ func (e *ExecutionScheduler) GetExecutionPlan() []lib.ExecutionStep {
 // in the Init() method, and also passed to executors so they can initialize
 // any unplanned VUs themselves.
 func (e *ExecutionScheduler) initVU(
-	samplesOut chan<- metrics.SampleContainer, logger logrus.FieldLogger,
+	ctx context.Context, samplesOut chan<- metrics.SampleContainer, logger logrus.FieldLogger,
 ) (lib.InitializedVU, error) {
 	// Get the VU IDs here, so that the VUs are (mostly) ordered by their
 	// number in the channel buffer
 	vuIDLocal, vuIDGlobal := e.state.GetUniqueVUIdentifiers()
-	vu, err := e.state.Test.Runner.NewVU(vuIDLocal, vuIDGlobal, samplesOut)
+	vu, err := e.state.Test.Runner.NewVU(ctx, vuIDLocal, vuIDGlobal, samplesOut)
 	if err != nil {
 		return nil, errext.WithHint(err, fmt.Sprintf("error while initializing VU #%d", vuIDGlobal))
 	}
@@ -173,16 +173,13 @@ func (e *ExecutionScheduler) initVUsConcurrently(
 	ctx context.Context, samplesOut chan<- metrics.SampleContainer, count uint64,
 	concurrency int, logger logrus.FieldLogger,
 ) chan error {
-	doneInits := make(chan error, count) // poor man's early-return waitgroup
+	doneInits := make(chan error, count) // poor man's waitgroup with results
 	limiter := make(chan struct{})
 
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			for range limiter {
-				// TODO: actually pass the context when we initialize VUs here,
-				// so we can cancel that initialization if there is an error,
-				// see https://github.com/grafana/k6/issues/2790
-				newVU, err := e.initVU(samplesOut, logger)
+				newVU, err := e.initVU(ctx, samplesOut, logger)
 				if err == nil {
 					e.state.AddInitializedVU(newVU)
 				}
@@ -197,6 +194,10 @@ func (e *ExecutionScheduler) initVUsConcurrently(
 			select {
 			case limiter <- struct{}{}:
 			case <-ctx.Done():
+				for skipVu := vuNum; skipVu < count; skipVu++ {
+					// do not even start initializing the remaining VUs
+					doneInits <- ctx.Err()
+				}
 				return
 			}
 		}
@@ -290,27 +291,35 @@ func (e *ExecutionScheduler) Init(ctx context.Context, samplesOut chan<- metrics
 		}),
 	)
 
-	// TODO: once VU initialization accepts a context, when a VU init fails,
-	// cancel the context and actually wait for all VUs to finish before this
-	// function returns - that way we won't have any trailing logs, see
-	// https://github.com/grafana/k6/issues/2790
+	var initErr error
 	for vuNum := uint64(0); vuNum < vusToInitialize; vuNum++ {
+		var err error
 		select {
-		case err := <-doneInits:
-			if err != nil {
-				logger.WithError(err).Debug("VU initialization returned with an error, aborting...")
-				// the context's cancel() is called in a defer above and will
-				// abort any in-flight VU initializations
-				return err
+		case err = <-doneInits:
+			if err == nil {
+				atomic.AddUint64(initializedVUs, 1)
 			}
-			atomic.AddUint64(initializedVUs, 1)
 		case <-ctx.Done():
-			return ctx.Err()
+			err = ctx.Err()
 		}
+
+		if err == nil || initErr != nil {
+			// No error or a previous init error was already saved and we are
+			// just waiting for VUs to finish aborting
+			continue
+		}
+
+		logger.WithError(err).Debug("VU initialization returned with an error, aborting...")
+		initErr = err
+		cancel()
+	}
+
+	if initErr != nil {
+		return initErr
 	}
 
 	e.state.SetInitVUFunc(func(ctx context.Context, logger *logrus.Entry) (lib.InitializedVU, error) {
-		return e.initVU(samplesOut, logger)
+		return e.initVU(ctx, samplesOut, logger)
 	})
 
 	e.state.SetExecutionStatus(lib.ExecutionStatusInitExecutors)

@@ -1,11 +1,11 @@
 package js
 
 import (
+	"context"
 	"testing"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/lib/testutils"
 )
 
 // This whole file is about tests around https://github.com/grafana/k6/issues/2674
@@ -26,7 +26,7 @@ func TestOpenPathResolution(t *testing.T) {
 		b, err := getSimpleBundle(t, "/path/scripts/script.js", data, fs)
 		require.NoError(t, err)
 
-		_, err = b.Instantiate(testutils.NewLogger(t), 0)
+		_, err = b.Instantiate(context.Background(), 0)
 		require.NoError(t, err)
 	})
 
@@ -47,7 +47,7 @@ func TestOpenPathResolution(t *testing.T) {
 		b, err := getSimpleBundle(t, "/path/totally/different/directory/script.js", data, fs)
 		require.NoError(t, err)
 
-		_, err = b.Instantiate(testutils.NewLogger(t), 0)
+		_, err = b.Instantiate(context.Background(), 0)
 		require.NoError(t, err)
 	})
 
@@ -71,7 +71,7 @@ func TestOpenPathResolution(t *testing.T) {
 		b, err := getSimpleBundle(t, "/path/totally/different/directory/script.js", data, fs)
 		require.NoError(t, err)
 
-		_, err = b.Instantiate(testutils.NewLogger(t), 0)
+		_, err = b.Instantiate(context.Background(), 0)
 		require.NoError(t, err)
 	})
 }
@@ -92,7 +92,7 @@ func TestRequirePathResolution(t *testing.T) {
 		b, err := getSimpleBundle(t, "/path/scripts/script.js", data, fs)
 		require.NoError(t, err)
 
-		_, err = b.Instantiate(testutils.NewLogger(t), 0)
+		_, err = b.Instantiate(context.Background(), 0)
 		require.NoError(t, err)
 	})
 
@@ -113,7 +113,7 @@ func TestRequirePathResolution(t *testing.T) {
 		b, err := getSimpleBundle(t, "/path/totally/different/directory/script.js", data, fs)
 		require.NoError(t, err)
 
-		_, err = b.Instantiate(testutils.NewLogger(t), 0)
+		_, err = b.Instantiate(context.Background(), 0)
 		require.NoError(t, err)
 	})
 
@@ -137,7 +137,7 @@ func TestRequirePathResolution(t *testing.T) {
 		b, err := getSimpleBundle(t, "/path/totally/different/directory/script.js", data, fs)
 		require.NoError(t, err)
 
-		_, err = b.Instantiate(testutils.NewLogger(t), 0)
+		_, err = b.Instantiate(context.Background(), 0)
 		require.NoError(t, err)
 	})
 }

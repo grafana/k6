@@ -93,7 +93,7 @@ func NewBundle(
 		exports:           make(map[string]goja.Callable),
 		registry:          piState.Registry,
 	}
-	if err = bundle.instantiate(piState.Logger, rt, bundle.BaseInitContext, 0); err != nil {
+	if err = bundle.instantiate(bundle.BaseInitContext, 0); err != nil {
 		return nil, err
 	}
 
@@ -157,7 +157,7 @@ func NewBundleFromArchive(piState *lib.TestPreInitState, arc *lib.Archive) (*Bun
 		registry:          piState.Registry,
 	}
 
-	if err = bundle.instantiate(piState.Logger, rt, bundle.BaseInitContext, 0); err != nil {
+	if err = bundle.instantiate(bundle.BaseInitContext, 0); err != nil {
 		return nil, err
 	}
 
@@ -239,16 +239,19 @@ func (b *Bundle) getExports(logger logrus.FieldLogger, rt *goja.Runtime, options
 }
 
 // Instantiate creates a new runtime from this bundle.
-func (b *Bundle) Instantiate(logger logrus.FieldLogger, vuID uint64) (*BundleInstance, error) {
+func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance, error) {
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
-	vuImpl := &moduleVUImpl{runtime: goja.New()}
+	rt := goja.New()
+	vuImpl := &moduleVUImpl{
+		ctx:     ctx,
+		runtime: rt,
+	}
 	init := newBoundInitContext(b.BaseInitContext, vuImpl)
-	if err := b.instantiate(logger, vuImpl.runtime, init, vuID); err != nil {
+	if err := b.instantiate(init, vuID); err != nil {
 		return nil, err
 	}
 
-	rt := vuImpl.runtime
 	pgm := init.programs[b.Filename.String()] // this is the main script and it's always present
 	bi := &BundleInstance{
 		Runtime:      rt,
@@ -303,7 +306,10 @@ func (b *Bundle) initializeProgramObject(rt *goja.Runtime, init *InitContext) pr
 	return pgm
 }
 
-func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *InitContext, vuID uint64) (err error) {
+//nolint:funlen
+func (b *Bundle) instantiate(init *InitContext, vuID uint64) (err error) {
+	rt := init.moduleVUImpl.runtime
+	logger := init.logger
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
@@ -326,10 +332,23 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 		Registry:    b.registry,
 	}
 	unbindInit := b.setInitGlobals(rt, init)
-	init.moduleVUImpl.ctx = context.Background()
 	init.moduleVUImpl.initEnv = initenv
 	init.moduleVUImpl.eventLoop = eventloop.New(init.moduleVUImpl)
 	pgm := b.initializeProgramObject(rt, init)
+
+	// TODO: make something cleaner for interrupting scripts, and more unified
+	// (e.g. as a part of the event loop or RunWithPanicCatching()?
+	initCtxDone := init.moduleVUImpl.ctx.Done()
+	initDone := make(chan struct{})
+	watchDone := make(chan struct{})
+	go func() {
+		select {
+		case <-initCtxDone:
+			rt.Interrupt(init.moduleVUImpl.ctx.Err())
+		case <-initDone: // do nothing
+		}
+		close(watchDone)
+	}()
 
 	err = common.RunWithPanicCatching(logger, rt, func() error {
 		return init.moduleVUImpl.eventLoop.Start(func() error {
@@ -346,6 +365,8 @@ func (b *Bundle) instantiate(logger logrus.FieldLogger, rt *goja.Runtime, init *
 			panic("Somehow a commonjs main module is not wrapped in a function")
 		})
 	})
+	close(initDone)
+	<-watchDone
 
 	if err != nil {
 		var exception *goja.Exception
