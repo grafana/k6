@@ -46,7 +46,7 @@ export class Bet {
   }
 }
 
-export default function() {
+export default async function() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false
   });
@@ -54,20 +54,18 @@ export default function() {
   const page = context.newPage();
 
   const bet = new Bet(page);
-  bet.goto().then(() => {
-    return bet.tails();
-  }).then(() => {
+  try {
+    await bet.goto()
+    await bet.tails();
     console.log("Current bet:", bet.current());
-    return bet.heads();
-  }).then(() => {
+    await bet.heads();
     console.log("Current bet:", bet.current());
-    return bet.tails();
-  }).then(() => {
+    await bet.tails();
     console.log("Current bet:", bet.current());
-    return bet.heads();
-  }).finally(() => {
+    await bet.heads();
     console.log("Current bet:", bet.current());
+  } finally {
     page.close();
     browser.close();
-  })
+  }
 }
