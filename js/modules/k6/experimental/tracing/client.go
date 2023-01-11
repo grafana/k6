@@ -23,7 +23,7 @@ type Client struct {
 	// propagator holds the client's trace propagator, used
 	// to produce trace context headers for each supported
 	// formats: w3c, b3, jaeger.
-	propagator Propagator
+	propagator SampledPropagator
 
 	// requestFunc holds the http module's request function
 	// used to emit HTTP requests in k6 script. The client
@@ -79,11 +79,18 @@ func (c *Client) Configure(opts options) error {
 		return fmt.Errorf("invalid options: %w", err)
 	}
 
+	// If the sampling option wasn't provided
+	// we default to 100% sampling rate.
+	samplingRate := 100
+	if opts.Sampling != nil {
+		samplingRate = *opts.Sampling
+	}
+
 	switch opts.Propagator {
 	case "w3c":
-		c.propagator = &W3CPropagator{}
+		c.propagator = NewW3CPropagator(samplingRate)
 	case "jaeger":
-		c.propagator = &JaegerPropagator{}
+		c.propagator = NewJaegerPropagator(samplingRate)
 	default:
 		return fmt.Errorf("unknown propagator: %s", opts.Propagator)
 	}

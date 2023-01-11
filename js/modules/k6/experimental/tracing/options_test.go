@@ -5,11 +5,19 @@ import "testing"
 func TestOptionsValidate(t *testing.T) {
 	t.Parallel()
 
-	testFloat := 10.0
+	// Note that we prefer variables over constants here
+	// as we need to be able to address them.
+	var (
+		validSampling            = 10
+		lowerBoundSampling       = 0
+		upperBoundSampling       = 100
+		lowerOutOfBoundsSampling = -1
+		upperOutOfBoundsSampling = 101
+	)
 
 	type fields struct {
 		Propagator string
-		Sampling   *float64
+		Sampling   *int
 		Baggage    map[string]string
 	}
 	testCases := []struct {
@@ -39,16 +47,58 @@ func TestOptionsValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "sampling is not yet supported",
+			name: "sampling rate is valid",
 			fields: fields{
-				Sampling: &testFloat,
+				Propagator: "w3c",
+				Sampling:   &validSampling,
+			},
+			wantErr: false,
+		},
+		{
+			name: "no sampling is valid",
+			fields: fields{
+				Propagator: "w3c",
+				Sampling:   nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "sampling rate = 0 is valid",
+			fields: fields{
+				Propagator: "w3c",
+				Sampling:   &lowerBoundSampling,
+			},
+			wantErr: false,
+		},
+		{
+			name: "sampling rate = 100 is valid",
+			fields: fields{
+				Propagator: "w3c",
+				Sampling:   &upperBoundSampling,
+			},
+			wantErr: false,
+		},
+		{
+			name: "sampling rate < 0 is invalid",
+			fields: fields{
+				Propagator: "w3c",
+				Sampling:   &lowerOutOfBoundsSampling,
+			},
+			wantErr: true,
+		},
+		{
+			name: "sampling rater > 100 is invalid",
+			fields: fields{
+				Propagator: "w3c",
+				Sampling:   &upperOutOfBoundsSampling,
 			},
 			wantErr: true,
 		},
 		{
 			name: "baggage is not yet supported",
 			fields: fields{
-				Baggage: map[string]string{"key": "value"},
+				Propagator: "w3c",
+				Baggage:    map[string]string{"key": "value"},
 			},
 			wantErr: true,
 		},

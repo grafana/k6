@@ -11,8 +11,9 @@ type options struct {
 	// Propagation is the propagation format to use for the tracer.
 	Propagator string `js:"propagator"`
 
-	// Sampling is the sampling rate to use for the tracer.
-	Sampling *float64 `js:"sampling"`
+	// Sampling is the sampling rate to use for the
+	// tracer, expressed in percents: 0 <= n <= 100.
+	Sampling *int `json:"sampling"`
 
 	// Baggage is a map of baggage items to add to the tracer.
 	Baggage map[string]string `js:"baggage"`
@@ -27,9 +28,8 @@ func (i *options) validate() error {
 		return fmt.Errorf("unknown propagator: %s", i.Propagator)
 	}
 
-	// TODO: implement sampling support
-	if i.Sampling != nil {
-		return errors.New("sampling is not yet supported")
+	if i.Sampling != nil && (*i.Sampling < 0 || *i.Sampling > 100) {
+		return errors.New("sampling rate must be between 0 and 100")
 	}
 
 	// TODO: implement baggage support
