@@ -23,26 +23,30 @@ export const options = {
   }
 }
 
-export function messages() {
+export async function messages() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
   });
   const page = browser.newPage();
 
-  page.goto('https://test.k6.io/my_messages.php', { waitUntil: 'networkidle' }).then(() => {
+  try {
+    await page.goto('https://test.k6.io/my_messages.php', { waitUntil: 'networkidle' });
+  } finally {
     page.close();
     browser.close();
-  });
+  }
 }
 
-export function news() {
+export async function news() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
   });
   const page = browser.newPage();
 
-  page.goto('https://test.k6.io/news.php', { waitUntil: 'networkidle' }).finally(() => {
+  try {
+    await page.goto('https://test.k6.io/news.php', { waitUntil: 'networkidle' });
+  } finally {
     page.close();
     browser.close();
-  });
+  }
 }
