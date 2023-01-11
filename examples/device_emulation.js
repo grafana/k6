@@ -7,7 +7,7 @@ export const options = {
   }
 }
 
-export default function() {
+export default async function() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
   });
@@ -20,7 +20,8 @@ export default function() {
   const context = browser.newContext(options);
   const page = context.newPage();
 
-  page.goto('https://k6.io/', { waitUntil: 'networkidle' }).then(() => {
+  try {
+    await page.goto('https://k6.io/', { waitUntil: 'networkidle' });
     const dimensions = page.evaluate(() => {
       return {
         width: document.documentElement.clientWidth,
@@ -38,8 +39,8 @@ export default function() {
     if (!__ENV.XK6_HEADLESS) {
       sleep(10);
     }
-  }).finally(() => {
+  } finally {
     page.close();
     browser.close();
-  });
+  }
 }
