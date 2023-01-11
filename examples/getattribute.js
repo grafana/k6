@@ -7,22 +7,23 @@ export const options = {
   }
 }
 
-export default function() {
+export default async function() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
   });
   const context = browser.newContext();
   const page = context.newPage();
 
-  page.goto('https://googlechromelabs.github.io/dark-mode-toggle/demo/', {
-    waitUntil: 'load',
-  }).then(() => {
+  try {
+    await page.goto('https://googlechromelabs.github.io/dark-mode-toggle/demo/', {
+      waitUntil: 'load',
+    });
     let el = page.$('#dark-mode-toggle-3')
     check(el, {
       "GetAttribute('mode')": e => e.getAttribute('mode') == 'light',
     });
-  }).finally(() => {
+  } finally {
     page.close();
     browser.close();
-  });
+  }
 }

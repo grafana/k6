@@ -7,28 +7,29 @@ export const options = {
   }
 }
 
-export default function() {
+export default async function() {
   const browser = chromium.launch({
     headless: true,
   });
   const context = browser.newContext();
   const page = context.newPage();
 
-  page.evaluate(() => {
-    setTimeout(() => {
-      const el = document.createElement('h1');
-      el.innerHTML = 'Hello';
-      document.body.appendChild(el);
-    }, 1000);
-  });
+  try {
+    page.evaluate(() => {
+      setTimeout(() => {
+        const el = document.createElement('h1');
+        el.innerHTML = 'Hello';
+        document.body.appendChild(el);
+      }, 1000);
+    });
 
-  page.waitForFunction("document.querySelector('h1')", {
-    polling: 'mutation',
-    timeout: 2000,
-  }).then(ok => {
+    const ok = await page.waitForFunction("document.querySelector('h1')", {
+      polling: 'mutation',
+      timeout: 2000,
+    });
     check(ok, { 'waitForFunction successfully resolved': ok.innerHTML() == 'Hello' });
-  }).finally(() => {
+  } finally {
     page.close();
     browser.close();
-  });
+  }
 }

@@ -7,7 +7,7 @@ export const options = {
   }
 }
 
-export default function() {
+export default async function() {
   const preferredColorScheme = 'dark';
 
   const browser = chromium.launch({
@@ -20,10 +20,11 @@ export default function() {
   });
   const page = context.newPage();
 
-  page.goto(
-    'https://googlechromelabs.github.io/dark-mode-toggle/demo/',
-    { waitUntil: 'load' },
-  ).then(() => {
+  try {
+    await page.goto(
+      'https://googlechromelabs.github.io/dark-mode-toggle/demo/',
+      { waitUntil: 'load' },
+    )  
     const colorScheme = page.evaluate(() => {
       return {
         isDarkColorScheme: window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -32,8 +33,8 @@ export default function() {
     check(colorScheme, {
       'isDarkColorScheme': cs => cs.isDarkColorScheme
     });
-  }).finally(() => {
+  } finally {
     page.close();
     browser.close();
-  });
+  }
 }

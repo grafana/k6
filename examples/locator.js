@@ -6,15 +6,18 @@ export const options = {
   }
 }
 
-export default function() {
+export default async function() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
   });
   const context = browser.newContext();
   const page = context.newPage();
-  page.goto("https://test.k6.io/flip_coin.php", {
-    waitUntil: "networkidle",
-  }).then(() => {
+  
+  try {
+    await page.goto("https://test.k6.io/flip_coin.php", {
+      waitUntil: "networkidle",
+    })
+
     /*
     In this example, we will use two locators, matching a
     different betting button on the page. If you were to query
@@ -41,27 +44,25 @@ export default function() {
     // won't be ready until the navigation completes.
     // Setting up the waitForNavigation first before the click
     // is important to avoid race conditions.
-    Promise.all([
+    await Promise.all([
       page.waitForNavigation(),
       tails.click(),
-    ]).then(() => {
-      console.log(currentBet.innerText());
-      // the heads locator clicks on the heads button
-      // by using the locator's selector.
-      return Promise.all([
-        page.waitForNavigation(),
-        heads.click(),
-      ]);
-    }).then(() => {
-      console.log(currentBet.innerText());
-      return Promise.all([
-        page.waitForNavigation(),
-        tails.click(),
-      ]);
-    }).finally(() => {
-      console.log(currentBet.innerText());
-      page.close();
-      browser.close();
-    })
-  });
+    ]);
+    console.log(currentBet.innerText());
+    // the heads locator clicks on the heads button
+    // by using the locator's selector.
+    await Promise.all([
+      page.waitForNavigation(),
+      heads.click(),
+    ]);
+    console.log(currentBet.innerText());
+    await Promise.all([
+      page.waitForNavigation(),
+      tails.click(),
+    ]);
+    console.log(currentBet.innerText());
+  } finally {
+    page.close();
+    browser.close();
+  }
 }
