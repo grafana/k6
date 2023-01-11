@@ -10,12 +10,10 @@ import (
 
 func TestHTTPFile(t *testing.T) {
 	t.Parallel()
-	runtime, mi := getTestModuleInstance(t)
-	rt := runtime.VU.RuntimeField
 	input := []byte{104, 101, 108, 108, 111}
 
 	testCases := []struct {
-		input    interface{}
+		input    func(rt *goja.Runtime) interface{}
 		args     []string
 		expected FileData
 		expErr   string
@@ -24,32 +22,35 @@ func TestHTTPFile(t *testing.T) {
 		// as File() calls time.Now(), so we'd need some time freezing/mocking
 		// or refactoring, or to exclude the field from the assertion.
 		{
-			input,
+			func(*goja.Runtime) interface{} { return input },
 			[]string{"test.bin"},
 			FileData{Data: input, Filename: "test.bin", ContentType: "application/octet-stream"},
 			"",
 		},
 		{
-			string(input),
+			func(*goja.Runtime) interface{} { return string(input) },
 			[]string{"test.txt", "text/plain"},
 			FileData{Data: input, Filename: "test.txt", ContentType: "text/plain"},
 			"",
 		},
 		{
-			rt.NewArrayBuffer(input),
+			func(rt *goja.Runtime) interface{} { return rt.NewArrayBuffer(input) },
 			[]string{"test-ab.bin"},
 			FileData{Data: input, Filename: "test-ab.bin", ContentType: "application/octet-stream"},
 			"",
 		},
-		{struct{}{}, []string{}, FileData{}, "GoError: invalid type struct {}, expected string, []byte or ArrayBuffer"},
+		{func(*goja.Runtime) interface{} { return struct{}{} }, []string{}, FileData{}, "GoError: invalid type struct {}, expected string, []byte or ArrayBuffer"},
 	}
 
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		tc := tc
-		t.Run(fmt.Sprintf("%T", tc.input), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			t.Parallel()
+			runtime, mi := getTestModuleInstance(t)
+			rt := runtime.VU.RuntimeField
 			cal, _ := goja.AssertFunction(rt.ToValue(mi.file))
 			args := make([]goja.Value, 1, len(tc.args)+1)
-			args[0] = rt.ToValue(tc.input)
+			args[0] = rt.ToValue(tc.input(rt))
 			for _, arg := range tc.args {
 				args = append(args, rt.ToValue(arg))
 			}
@@ -65,11 +66,9 @@ func TestHTTPFile(t *testing.T) {
 
 func TestHTTPFileDataInRequest(t *testing.T) {
 	t.Parallel()
-
 	ts := newTestCase(t)
-	tb := ts.tb
-	rt := ts.runtime.VU.Runtime()
-	_, err := rt.RunString(tb.Replacer.Replace(`
+
+	_, err := ts.runtime.VU.Runtime().RunString(ts.tb.Replacer.Replace(`
     let f = http.file("something");
     let res = http.request("POST", "HTTPBIN_URL/post", f.data);
     if (res.status != 200) {
