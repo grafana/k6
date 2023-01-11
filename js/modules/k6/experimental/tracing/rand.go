@@ -17,3 +17,11 @@ func randHexString(n int) string {
 
 	return string(b)
 }
+
+// chance returns true with a `percentage` chance, otherwise false.
+// the `percentage` argument is expected to be
+// within 0 <= percentage <= 100 range.
+func chance(percentage int) bool {
+	//nolint:gosec
+	return rand.Intn(100) < percentage
+}
