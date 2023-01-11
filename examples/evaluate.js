@@ -7,7 +7,7 @@ export const options = {
   }
 }
 
-export default function() {
+export default async function() {
   const browser = chromium.launch({
     headless: __ENV.XK6_HEADLESS ? true : false,
     ignoreDefaultArgs: ['--hide-scrollbars']
@@ -15,7 +15,8 @@ export default function() {
   const context = browser.newContext();
   const page = context.newPage();
 
-  page.goto('https://test.k6.io/', { waitUntil: 'load' }).then(() => {
+  try {
+    await page.goto('https://test.k6.io/', { waitUntil: 'load' });
     const dimensions = page.evaluate(() => {
       const obj = {
         width: document.documentElement.clientWidth,
@@ -31,8 +32,8 @@ export default function() {
       'height': d => d.height === 720,
       'scale': d => d.deviceScaleFactor === 1,
     });
-  }).finally(() => {
+  } finally {
     page.close();
     browser.close();
-  });
+  }
 }
