@@ -13,12 +13,11 @@ import (
 )
 
 func TestTLS13Support(t *testing.T) {
+	t.Parallel()
 	ts := newTestCase(t)
-	tb := ts.tb
-	rt := ts.runtime.VU.Runtime()
 	state := ts.runtime.VU.State()
 
-	tb.Mux.HandleFunc("/tls-version", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+	ts.tb.Mux.HandleFunc("/tls-version", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		ver := req.TLS.Version
 		fmt.Fprint(resp, lib.SupportedTLSVersionsToString[lib.TLSVersion(ver)])
 	}))
@@ -27,7 +26,7 @@ func TestTLS13Support(t *testing.T) {
 	state.Options.Throw = null.BoolFrom(true)
 	state.Options.Apply(lib.Options{TLSVersion: &lib.TLSVersions{Max: tls.VersionTLS13}})
 
-	_, err := rt.RunString(tb.Replacer.Replace(`
+	_, err := ts.runtime.VU.Runtime().RunString(ts.tb.Replacer.Replace(`
 		var resp = http.get("HTTPSBIN_URL/tls-version");
 		if (resp.body != "tls1.3") {
 			throw new Error("unexpected tls version: " + resp.body);
