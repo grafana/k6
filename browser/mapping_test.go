@@ -35,7 +35,6 @@ func TestMappings(t *testing.T) {
 				Registry: k6metrics.NewRegistry(),
 			},
 		}
-		rt        = vu.Runtime()
 		wildcards = wildcards()
 	)
 
@@ -78,49 +77,49 @@ func TestMappings(t *testing.T) {
 		"browserType": {
 			apiInterface: (*api.BrowserType)(nil),
 			mapp: func() mapping {
-				return mapBrowserType(rt, &chromium.BrowserType{})
+				return mapBrowserType(vu, &chromium.BrowserType{})
 			},
 		},
 		"browser": {
 			apiInterface: (*api.Browser)(nil),
 			mapp: func() mapping {
-				return mapBrowser(rt, &chromium.Browser{})
+				return mapBrowser(vu, &chromium.Browser{})
 			},
 		},
 		"browserContext": {
 			apiInterface: (*api.BrowserContext)(nil),
 			mapp: func() mapping {
-				return mapBrowserContext(rt, &common.BrowserContext{})
+				return mapBrowserContext(vu, &common.BrowserContext{})
 			},
 		},
 		"page": {
 			apiInterface: (*api.Page)(nil),
 			mapp: func() mapping {
-				return mapPage(rt, &common.Page{})
+				return mapPage(vu, &common.Page{})
 			},
 		},
 		"elementHandle": {
 			apiInterface: (*api.ElementHandle)(nil),
 			mapp: func() mapping {
-				return mapElementHandle(rt, &common.ElementHandle{})
+				return mapElementHandle(vu, &common.ElementHandle{})
 			},
 		},
 		"frame": {
 			apiInterface: (*api.Frame)(nil),
 			mapp: func() mapping {
-				return mapFrame(rt, &common.Frame{})
+				return mapFrame(vu, &common.Frame{})
 			},
 		},
 		"mapRequest": {
 			apiInterface: (*api.Request)(nil),
 			mapp: func() mapping {
-				return mapRequest(rt, &common.Request{})
+				return mapRequest(vu, &common.Request{})
 			},
 		},
 		"mapResponse": {
 			apiInterface: (*api.Response)(nil),
 			mapp: func() mapping {
-				return mapResponse(rt, &common.Response{})
+				return mapResponse(vu, &common.Response{})
 			},
 		},
 	} {
