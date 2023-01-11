@@ -2745,3 +2745,35 @@ exports.default = () => {
 		})
 	}
 }
+
+func TestArchivingAnArchiveWorks(t *testing.T) {
+	t.Parallel()
+	r1, err := getSimpleRunner(t, "/script.js", `
+			exports.default = function() {}
+		`)
+	require.NoError(t, err)
+
+	arc := r1.MakeArchive()
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	r2, err := NewFromArchive(
+		&lib.TestPreInitState{
+			Logger:         testutils.NewLogger(t),
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+		}, arc)
+	require.NoError(t, err)
+	require.NotNil(t, r2)
+
+	arc2 := r2.MakeArchive()
+	registry3 := metrics.NewRegistry()
+	builtinMetrics3 := metrics.RegisterBuiltinMetrics(registry)
+	r3, err := NewFromArchive(
+		&lib.TestPreInitState{
+			Logger:         testutils.NewLogger(t),
+			BuiltinMetrics: builtinMetrics3,
+			Registry:       registry3,
+		}, arc2)
+	require.NoError(t, err)
+	require.NotNil(t, r3)
+}

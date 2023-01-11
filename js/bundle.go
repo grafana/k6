@@ -64,6 +64,13 @@ func (bi *BundleInstance) getExported(name string) goja.Value {
 func NewBundle(
 	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]afero.Fs,
 ) (*Bundle, error) {
+	return newBundle(piState, src, filesystems, lib.Options{}, true)
+}
+
+func newBundle(
+	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]afero.Fs,
+	options lib.Options, updateOptions bool, // TODO: try to figure out a way to not need both
+) (*Bundle, error) {
 	compatMode, err := lib.ValidateCompatibilityMode(piState.RuntimeOptions.CompatibilityMode.String)
 	if err != nil {
 		return nil, err
@@ -89,6 +96,7 @@ func NewBundle(
 		Program:           pgm,
 		BaseInitContext:   NewInitContext(piState.Logger, rt, c, compatMode, filesystems, loader.Dir(src.URL)),
 		RuntimeOptions:    piState.RuntimeOptions,
+		Options:           options,
 		CompatibilityMode: compatMode,
 		exports:           make(map[string]goja.Callable),
 		registry:          piState.Registry,
@@ -97,7 +105,7 @@ func NewBundle(
 		return nil, err
 	}
 
-	err = bundle.getExports(piState.Logger, rt, true)
+	err = bundle.getExports(piState.Logger, rt, updateOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -111,64 +119,25 @@ func NewBundleFromArchive(piState *lib.TestPreInitState, arc *lib.Archive) (*Bun
 		return nil, fmt.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
 
-	rtOpts := piState.RuntimeOptions // copy the struct from the TestPreInitState
-	if !rtOpts.CompatibilityMode.Valid {
+	if !piState.RuntimeOptions.CompatibilityMode.Valid {
 		// `k6 run --compatibility-mode=whatever archive.tar` should override
 		// whatever value is in the archive
-		rtOpts.CompatibilityMode = null.StringFrom(arc.CompatibilityMode)
+		piState.RuntimeOptions.CompatibilityMode = null.StringFrom(arc.CompatibilityMode)
 	}
-	compatMode, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String)
-	if err != nil {
-		return nil, err
-	}
-
-	c := compiler.New(piState.Logger)
-	c.Options = compiler.Options{
-		Strict:            true,
-		CompatibilityMode: compatMode,
-		SourceMapLoader:   generateSourceMapLoader(piState.Logger, arc.Filesystems),
-	}
-	pgm, _, err := c.Compile(string(arc.Data), arc.FilenameURL.String(), false)
-	if err != nil {
-		return nil, err
-	}
-	rt := goja.New()
-	initctx := NewInitContext(piState.Logger, rt, c, compatMode, arc.Filesystems, arc.PwdURL)
-
 	env := arc.Env
 	if env == nil {
 		// Older archives (<=0.20.0) don't have an "env" property
 		env = make(map[string]string)
 	}
-	for k, v := range rtOpts.Env {
+	for k, v := range piState.RuntimeOptions.Env {
 		env[k] = v
 	}
-	rtOpts.Env = env
+	piState.RuntimeOptions.Env = env
 
-	bundle := &Bundle{
-		Filename:          arc.FilenameURL,
-		Source:            string(arc.Data),
-		Program:           pgm,
-		Options:           arc.Options,
-		BaseInitContext:   initctx,
-		RuntimeOptions:    rtOpts,
-		CompatibilityMode: compatMode,
-		exports:           make(map[string]goja.Callable),
-		registry:          piState.Registry,
-	}
-
-	if err = bundle.instantiate(bundle.BaseInitContext, 0); err != nil {
-		return nil, err
-	}
-
-	// Grab exported objects, but avoid overwriting options, which would
-	// be initialized from the metadata.json at this point.
-	err = bundle.getExports(piState.Logger, rt, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return bundle, nil
+	return newBundle(piState, &loader.SourceData{
+		Data: arc.Data,
+		URL:  arc.FilenameURL,
+	}, arc.Filesystems, arc.Options, false)
 }
 
 func (b *Bundle) makeArchive() *lib.Archive {
@@ -193,7 +162,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 }
 
 // getExports validates and extracts exported objects
-func (b *Bundle) getExports(logger logrus.FieldLogger, rt *goja.Runtime, options bool) error {
+func (b *Bundle) getExports(logger logrus.FieldLogger, rt *goja.Runtime, updateOptions bool) error {
 	pgm := b.BaseInitContext.programs[b.Filename.String()] // this is the main script and it's always present
 	exportsV := pgm.module.Get("exports")
 	if goja.IsNull(exportsV) || goja.IsUndefined(exportsV) {
@@ -209,7 +178,7 @@ func (b *Bundle) getExports(logger logrus.FieldLogger, rt *goja.Runtime, options
 		}
 		switch k {
 		case consts.Options:
-			if !options {
+			if !updateOptions {
 				continue
 			}
 			data, err := json.Marshal(v.Export())
