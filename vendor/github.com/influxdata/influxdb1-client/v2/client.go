@@ -104,7 +104,7 @@ func NewHTTPClient(conf HTTPConfig) (Client, error) {
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: conf.InsecureSkipVerify,
 		},
 		Proxy: conf.Proxy,
 	}
