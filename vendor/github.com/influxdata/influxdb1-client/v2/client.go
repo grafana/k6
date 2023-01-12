@@ -104,7 +104,7 @@ func NewHTTPClient(conf HTTPConfig) (Client, error) {
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: conf.InsecureSkipVerify,
+			InsecureSkipVerify: true,
 		},
 		Proxy: conf.Proxy,
 	}
@@ -380,6 +380,10 @@ func (c *client) Write(bp BatchPoints) error {
 	}
 
 	u := c.url
+	splitPaths := strings.Split(bp.Database(), "/")
+	for i := 0; i < len(splitPaths) - 1 ; i++ {
+		u.Path = path.Join(u.Path, splitPaths[i])
+	}
 	u.Path = path.Join(u.Path, "write")
 
 	req, err := http.NewRequest("POST", u.String(), &b)
@@ -393,7 +397,7 @@ func (c *client) Write(bp BatchPoints) error {
 	}
 
 	params := req.URL.Query()
-	params.Set("db", bp.Database())
+	params.Set("db", splitPaths[len(splitPaths)-1])
 	params.Set("rp", bp.RetentionPolicy())
 	params.Set("precision", bp.Precision())
 	params.Set("consistency", bp.WriteConsistency())
