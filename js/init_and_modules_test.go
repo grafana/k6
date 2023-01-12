@@ -35,10 +35,11 @@ func (cm *CheckModule) VuCtx(ctx context.Context) {
 	cm.vuCtxCalled++
 }
 
+var uniqueModuleNumber int64 //nolint // we need this so multiple test can register differently named modules
+
 func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	t.Parallel()
 
-	var uniqueModuleNumber int64
 	checkModule := &CheckModule{t: t}
 	moduleName := fmt.Sprintf("k6/x/check-%d", atomic.AddInt64(&uniqueModuleNumber, 1))
 	modules.Register(moduleName, checkModule)
