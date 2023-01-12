@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"context"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -23,6 +24,7 @@ func TestModuleNew(t *testing.T) {
 		InitEnvField: &k6common.InitEnvironment{
 			Registry: k6metrics.NewRegistry(),
 		},
+		CtxField: context.Background(),
 	}
 	m, ok := New().NewModuleInstance(vu).(*ModuleInstance)
 	require.True(t, ok, "NewModuleInstance should return a ModuleInstance")

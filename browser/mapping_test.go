@@ -77,49 +77,49 @@ func TestMappings(t *testing.T) {
 		"browserType": {
 			apiInterface: (*api.BrowserType)(nil),
 			mapp: func() mapping {
-				return mapBrowserType(vu, &chromium.BrowserType{})
+				return mapBrowserType(vu.Context(), vu, &chromium.BrowserType{})
 			},
 		},
 		"browser": {
 			apiInterface: (*api.Browser)(nil),
 			mapp: func() mapping {
-				return mapBrowser(vu, &chromium.Browser{})
+				return mapBrowser(vu.Context(), vu, &chromium.Browser{})
 			},
 		},
 		"browserContext": {
 			apiInterface: (*api.BrowserContext)(nil),
 			mapp: func() mapping {
-				return mapBrowserContext(vu, &common.BrowserContext{})
+				return mapBrowserContext(vu.Context(), vu, &common.BrowserContext{})
 			},
 		},
 		"page": {
 			apiInterface: (*api.Page)(nil),
 			mapp: func() mapping {
-				return mapPage(vu, &common.Page{})
+				return mapPage(vu.Context(), vu, &common.Page{})
 			},
 		},
 		"elementHandle": {
 			apiInterface: (*api.ElementHandle)(nil),
 			mapp: func() mapping {
-				return mapElementHandle(vu, &common.ElementHandle{})
+				return mapElementHandle(vu.Context(), vu, &common.ElementHandle{})
 			},
 		},
 		"frame": {
 			apiInterface: (*api.Frame)(nil),
 			mapp: func() mapping {
-				return mapFrame(vu, &common.Frame{})
+				return mapFrame(vu.Context(), vu, &common.Frame{})
 			},
 		},
 		"mapRequest": {
 			apiInterface: (*api.Request)(nil),
 			mapp: func() mapping {
-				return mapRequest(vu, &common.Request{})
+				return mapRequest(vu.Context(), vu, &common.Request{})
 			},
 		},
 		"mapResponse": {
 			apiInterface: (*api.Response)(nil),
 			mapp: func() mapping {
-				return mapResponse(vu, &common.Response{})
+				return mapResponse(vu.Context(), vu, &common.Response{})
 			},
 		},
 	} {
