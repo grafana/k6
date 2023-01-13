@@ -3,6 +3,7 @@ package k6
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync/atomic"
 	"time"
@@ -29,7 +30,8 @@ type (
 
 	// K6 represents an instance of the k6 module.
 	K6 struct {
-		vu modules.VU
+		vu            modules.VU
+		groupInstance *groupInstance // TODO this basically is a second copy of lib.State.Group + time info
 	}
 )
 
@@ -46,7 +48,45 @@ func New() *RootModule {
 // NewModuleInstance implements the modules.Module interface to return
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	return &K6{vu: vu}
+	k := &K6{vu: vu}
+	// TODO this is not ideal, it should probably be done through some compositable
+	// k6 specific API that we can add multiple trackers with
+	vu.Runtime().SetAsyncContextTracker(k)
+	return k
+}
+
+// Suspended implements goja.AsyncContextTracker and is not part of the external API of the module
+func (mi *K6) Suspended() interface{} {
+	if state := mi.vu.State(); state != nil {
+		setGroup(rootGroup(state.Group), state)
+		result := mi.groupInstance
+		mi.groupInstance = nil
+		return result
+	}
+	return nil
+}
+
+// Completed implements goja.AsyncContextTracker and is not part of the external API of the module
+func (mi *K6) Completed() {
+	if state := mi.vu.State(); state != nil {
+		mi.groupInstance.finalize(mi.vu.Context(), state)
+		setGroup(rootGroup(mi.groupInstance.Group), state)
+		mi.groupInstance = nil
+	}
+}
+
+// Resumed implements goja.AsyncContextTracker and is not part of the external API of the module
+func (mi *K6) Resumed(i interface{}) {
+	if state := mi.vu.State(); state != nil && i != nil {
+		gi, ok := i.(*groupInstance)
+		if !ok {
+			panic(fmt.Sprintf(
+				"couldn't cast %+v to groupInstance on async resume",
+				i))
+		}
+		setGroup(gi.Group, state)
+		mi.groupInstance = gi
+	}
 }
 
 // Exports returns the exports of the k6 module.
@@ -85,16 +125,25 @@ func (mi *K6) RandomSeed(seed int64) {
 }
 
 // Group wraps a function call and executes it within the provided group name.
-func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
+func (mi *K6) Group(name string, val goja.Value) (goja.Value, error) {
 	state := mi.vu.State()
 	if state == nil {
 		return nil, ErrGroupInInitContext
 	}
 
-	if fn == nil {
+	if val == nil || goja.IsNull(val) {
 		return nil, errors.New("group() requires a callback as a second argument")
 	}
-
+	fn, ok := goja.AssertFunction(val)
+	if !ok {
+		return nil, errors.New("group() requires a callback as a second argument")
+	}
+	rt := mi.vu.Runtime()
+	o := val.ToObject(rt)
+	async := o.ClassName() == "AsyncFunction"
+	if async {
+		return mi.asyncGroup(name, fn)
+	}
 	g, err := state.Group.Group(name)
 	if err != nil {
 		return goja.Undefined(), err
@@ -138,7 +187,6 @@ func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
 }
 
 // Check will emit check metrics for the provided checks.
-//nolint:cyclop
 func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
 	state := mi.vu.State()
 	if state == nil {
