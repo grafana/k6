@@ -1004,6 +1004,30 @@ func TestAbortedByScriptAbortInVUCode(t *testing.T) {
 	})
 }
 
+func TestAbortedByScriptAbortInVUCodeInGroup(t *testing.T) {
+	t.Parallel()
+	script := `
+		import exec from 'k6/execution';
+        import { group } from 'k6';
+		export default function () {
+            group("here", () => {
+                exec.test.abort('foo');
+            });
+		};
+		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
+	`
+
+	t.Run("noLinger", func(t *testing.T) {
+		t.Parallel()
+		testAbortedByScriptTestAbort(t, true, script, runTestWithNoLinger)
+	})
+
+	t.Run("withLinger", func(t *testing.T) {
+		t.Parallel()
+		testAbortedByScriptTestAbort(t, true, script, runTestWithLinger)
+	})
+}
+
 func TestAbortedByScriptAbortInSetup(t *testing.T) {
 	t.Parallel()
 	script := `
