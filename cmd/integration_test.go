@@ -700,7 +700,7 @@ func asyncWaitForStdoutAndRun(
 		ts.outMutex.Unlock()
 		t.Log(stdOut)
 		require.FailNow(
-			t, "did not find the text '%s' in the process stdout after %d attempts (%s)",
+			t, "expected output not found", "did not find the text '%s' in the process stdout after %d attempts (%s)",
 			expText, attempts, time.Duration(attempts)*interval,
 		)
 	}()
