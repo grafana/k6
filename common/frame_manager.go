@@ -563,7 +563,7 @@ func (m *FrameManager) setMainFrame(f *Frame) {
 // NavigateFrame will navigate specified frame to specified URL.
 //
 //nolint:funlen,cyclop
-func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *FrameGotoOptions) (api.Response, error) {
+func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *FrameGotoOptions) (*Response, error) {
 	var (
 		fmid = m.ID()
 		fid  = frame.ID()
