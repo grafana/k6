@@ -400,7 +400,7 @@ func (self *_parser) parseObjectProperty() ast.Property {
 	if value == nil {
 		return nil
 	}
-	if token.IsId(tkn) || tkn == token.STRING || tkn == token.ILLEGAL {
+	if token.IsId(tkn) || tkn == token.STRING || tkn == token.NUMBER || tkn == token.ILLEGAL {
 		switch {
 		case self.token == token.LEFT_PARENTHESIS:
 			return &ast.PropertyKeyed{

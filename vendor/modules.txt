@@ -32,7 +32,7 @@ github.com/dgryski/go-rendezvous
 ## explicit; go 1.13
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
-# github.com/dop251/goja v0.0.0-20230110123741-af048f025cbb
+# github.com/dop251/goja v0.0.0-20230113101057-bf9ef13dd7b1
 ## explicit; go 1.16
 github.com/dop251/goja
 github.com/dop251/goja/ast
