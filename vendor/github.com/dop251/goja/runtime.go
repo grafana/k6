@@ -1992,11 +1992,17 @@ func (r *Runtime) wrapReflectFunc(value reflect.Value) func(FunctionCall) Value 
 
 		if last := out[len(out)-1]; last.Type().Name() == "error" {
 			if !last.IsNil() {
-				err := last.Interface()
+				err := last.Interface().(error)
 				if _, ok := err.(*Exception); ok {
 					panic(err)
 				}
-				panic(r.NewGoError(last.Interface().(error)))
+				var intErr *InterruptedError
+				if errors.As(err, &intErr) {
+					panic(&uncatchableException{
+						err: err,
+					})
+				}
+				panic(r.NewGoError(err))
 			}
 			out = out[:len(out)-1]
 		}
