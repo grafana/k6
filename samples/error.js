@@ -23,7 +23,7 @@ export const options = {
 };
 
 export default function () {
-  let res = http.get("http://httpbin.org/");
+  let res = http.get("https://httpbin.test.k6.io/");
  
 
 //for test error on dashboard
