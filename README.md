@@ -113,8 +113,7 @@ The docker-compose setup comes with two pre-built Grafana dashboards. One for li
 
 ### Test result dashboard
 
-
-[<img src="./images/prometheus-dashboard-k6-test-result.png" width="500" height="200" object-fit="scale-down"/>](./images/prometheus-dashboard-k6-test-result.png)
+[<img src="./images/prometheus-dashboard-k6-test-result.png" width="500"/>](./images/prometheus-dashboard-k6-test-result.png)
 
 Results can be filtered by:
 
