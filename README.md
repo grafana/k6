@@ -102,9 +102,47 @@ Clone the repo to get started and follow these steps:
 The docker-compose setup comes with two pre-built Grafana dashboards. One for listing the discrete test runs as a list, and the other for visualizing the results of a specific test run.
 >Note: The dashboards work with the Native Histogram mapping so it is required to enable it.
 
-### Test result dashboard
-![Prometheus dashboard of k6 test result](./images/prometheus-dashboard-k6-test-result.png)
 
 ### Test list dashboard
 ![Prometheus dashboard of k6 test runs](./images/prometheus-dashboard-k6-test-runs.png)
 
+>Note: This dashboard depends on the use of testid tag
+### Test result dashboard
+
+![Prometheus dashboard of k6 test result](./images/prometheus-dashboard-k6-test-result.png)
+
+
+Results can be filtered by:
+- testid
+- scenario
+- url
+
+![Prometheus dashboard of k6 test result apdex](./images/prometheus-dashboard-k6-test-result-variables.png)
+
+Response time metrics are based on the **metrics** variable, and the values can be:
+- k6_http_req_duration_seconds (default)
+- k6_http_req_waiting_seconds
+
+
+
+The board is structured into 4 sections
+#### Apex Overview
+![Prometheus dashboard of k6 test result apdex](./images/prometheus-dashboard-k6-test-result-apdex.png)
+
+The Apdex score is calculated based on your SLA ```([T]target time (seconds) Apdex
+    variable, default 0.3 sec)``` required where you can define a response time threshold of T seconds, where all responses handled in T seconds or less satisfy the end user.
+
+If you want to know more
+
+<https://medium.com/@tristan_96324/prometheus-apdex-alerting-d17a065e39d0>
+
+<https://en.wikipedia.org/wiki/Apdex>
+
+
+#### Performance Overview
+![Prometheus dashboard of k6 test result apdex](./images/prometheus-dashboard-k6-test-result-performance.png)
+
+#### HTTP
+![Prometheus dashboard of k6 test result apdex](./images/prometheus-dashboard-k6-test-result-http.png)
+#### Scenarios
+![Prometheus dashboard of k6 test result apdex](./images/prometheus-dashboard-k6-test-result-scenarios.png)
