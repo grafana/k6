@@ -94,16 +94,13 @@ func TestElementHandleClick(t *testing.T) {
 	p.SetContent(htmlInputButton, nil)
 
 	button := p.Query("button")
-	err := tb.await(func() error {
-		_ = button.Click(tb.toGojaValue(struct {
-			NoWaitAfter bool `js:"noWaitAfter"`
-		}{
-			// FIX: this is just a workaround because navigation is never triggered
-			// and we'd be waiting for it to happen otherwise!
-			NoWaitAfter: true,
-		}))
-		return nil
-	})
+	err := button.Click(tb.toGojaValue(struct {
+		NoWaitAfter bool `js:"noWaitAfter"`
+	}{
+		// FIX: this is just a workaround because navigation is never triggered
+		// and we'd be waiting for it to happen otherwise!
+		NoWaitAfter: true,
+	}))
 	require.NoError(t, err)
 
 	res := tb.asGojaValue(p.Evaluate(tb.toGojaValue("() => window['result']")))
@@ -120,16 +117,13 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 	p.Evaluate(tb.toGojaValue("() => delete window['Node']"))
 
 	button := p.Query("button")
-	err := tb.await(func() error {
-		_ = button.Click(tb.toGojaValue(struct {
-			NoWaitAfter bool `js:"noWaitAfter"`
-		}{
-			// FIX: this is just a workaround because navigation is never triggered
-			// and we'd be waiting for it to happen otherwise!
-			NoWaitAfter: true,
-		}))
-		return nil
-	})
+	err := button.Click(tb.toGojaValue(struct {
+		NoWaitAfter bool `js:"noWaitAfter"`
+	}{
+		// FIX: this is just a workaround because navigation is never triggered
+		// and we'd be waiting for it to happen otherwise!
+		NoWaitAfter: true,
+	}))
 	require.NoError(t, err)
 
 	res := tb.asGojaValue(p.Evaluate(tb.toGojaValue("() => window['result']")))
@@ -146,16 +140,13 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	// Detach node to panic when clicked
 	p.Evaluate(tb.toGojaValue("button => button.remove()"), tb.toGojaValue(button))
 
-	err := tb.await(func() error {
-		_ = button.Click(tb.toGojaValue(struct {
-			NoWaitAfter bool `js:"noWaitAfter"`
-		}{
-			// FIX: this is just a workaround because navigation is never triggered and we'd be waiting for
-			// it to happen otherwise!
-			NoWaitAfter: true,
-		}))
-		return nil
-	})
+	err := button.Click(tb.toGojaValue(struct {
+		NoWaitAfter bool `js:"noWaitAfter"`
+	}{
+		// FIX: this is just a workaround because navigation is never triggered and we'd be waiting for
+		// it to happen otherwise!
+		NoWaitAfter: true,
+	}))
 	assert.ErrorContains(
 		t, err,
 		"element is not attached to the DOM",
@@ -193,14 +184,9 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, wantBefore, clickResult())
 
-	err = tb.await(func() error {
-		tb.promise(p.Click("#concealed", nil)).
-			then(func() {
-				require.Equal(t, wantAfter, clickResult())
-			})
-		return nil
-	})
+	err = p.Click("#concealed", nil)
 	require.NoError(t, err)
+	require.Equal(t, wantAfter, clickResult())
 }
 
 func TestElementHandleNonClickable(t *testing.T) {
@@ -211,18 +197,8 @@ func TestElementHandleNonClickable(t *testing.T) {
 	require.NotNil(t, resp)
 	require.NoError(t, err)
 
-	var notClickable bool
-	err = tb.await(func() error {
-		tb.promise(p.Click("#non-clickable", nil)).
-			then(
-				func() { t.Fatal("element should not be clickable") },
-				func() { notClickable = true },
-			)
-
-		return nil
-	})
-	require.NoError(t, err)
-	require.True(t, notClickable, "element should not be clickable")
+	err = p.Click("#non-clickable", nil)
+	require.Errorf(t, err, "element should not be clickable")
 }
 
 func TestElementHandleGetAttribute(t *testing.T) {

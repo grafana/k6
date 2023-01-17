@@ -5,11 +5,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/grafana/xk6-browser/k6ext"
 )
 
 func TestFramePress(t *testing.T) {
@@ -57,29 +54,13 @@ func TestFrameDismissDialogBox(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			err = tb.await(func() error {
-				// TODO
-				// remove this once we have finished our work on the mapping layer.
-				// for now: provide a fake promise
-				fakePromise := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
-					return nil, nil
-				})
-				tb.promise(fakePromise).then(func() *goja.Promise {
-					if tt == "beforeunload" {
-						return p.Click("#clickHere", nil)
-					}
-					result := p.TextContent("#textField", nil)
-					assert.EqualValues(t, tt+" dismissed", result)
+			if tt == "beforeunload" {
+				err = p.Click("#clickHere", nil)
+				require.NoError(t, err)
+			}
 
-					return nil
-				}).then(func() {
-					result := p.TextContent("#textField", nil)
-					assert.EqualValues(t, tt+" dismissed", result)
-				})
-
-				return nil
-			})
-			require.NoError(t, err)
+			result := p.TextContent("#textField", nil)
+			assert.EqualValues(t, tt+" dismissed", result)
 		})
 	}
 }

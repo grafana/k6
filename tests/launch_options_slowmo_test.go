@@ -4,19 +4,20 @@ import (
 	"context"
 	"testing"
 
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/common"
-
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common"
 )
 
 func TestLaunchOptionsSlowMo(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip()
 	}
-	t.Parallel()
 
 	t.Run("Page", func(t *testing.T) {
 		t.Parallel()
@@ -31,10 +32,7 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p api.Page) {
-				err := tb.await(func() error {
-					_ = p.Click("button", nil)
-					return nil
-				})
+				err := p.Click("button", nil)
 				assert.NoError(t, err)
 			})
 		})
@@ -178,10 +176,7 @@ func TestLaunchOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f api.Frame) {
-				err := tb.await(func() error {
-					_ = f.Click("button", nil)
-					return nil
-				})
+				err := f.Click("button", nil)
 				assert.NoError(t, err)
 			})
 		})

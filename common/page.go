@@ -395,10 +395,10 @@ func (p *Page) IsChecked(selector string, opts goja.Value) bool {
 }
 
 // Click clicks an element matching provided selector.
-func (p *Page) Click(selector string, opts goja.Value) *goja.Promise {
+func (p *Page) Click(selector string, opts goja.Value) error {
 	p.logger.Debugf("Page:Click", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Click(selector, opts)
+	return p.MainFrame().Click(selector, opts) //nolint:wrapcheck
 }
 
 // Close closes the page.

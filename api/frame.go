@@ -8,7 +8,7 @@ type Frame interface {
 	AddStyleTag(opts goja.Value) *goja.Promise
 	Check(selector string, opts goja.Value)
 	ChildFrames() []Frame
-	Click(selector string, opts goja.Value) *goja.Promise
+	Click(selector string, opts goja.Value) error
 	Content() string
 	Dblclick(selector string, opts goja.Value)
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)

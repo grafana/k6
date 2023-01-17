@@ -167,7 +167,9 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 					Timeout:   30000,
 					WaitUntil: tt.waitUntil,
 				}))
-				click := p.Click("#homeLink", nil)
+				click := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
+					return nil, p.Click(`a`, nil)
+				})
 
 				return tb.promiseAll(waitForNav, click)
 			}, func() {
