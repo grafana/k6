@@ -149,7 +149,12 @@ func mapElementHandle(ctx context.Context, vu k6modules.VU, eh api.ElementHandle
 		"objectID":       eh.ObjectID,
 		"boundingBox":    eh.BoundingBox,
 		"check":          eh.Check,
-		"click":          eh.Click,
+		"click": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(ctx, func() (any, error) {
+				err := eh.Click(opts)
+				return nil, fmt.Errorf("%w", err)
+			})
+		},
 		"contentFrame": func() *goja.Object {
 			f := eh.ContentFrame()
 			mf := mapFrame(ctx, vu, f)

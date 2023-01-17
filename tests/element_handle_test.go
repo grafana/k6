@@ -94,16 +94,13 @@ func TestElementHandleClick(t *testing.T) {
 	p.SetContent(htmlInputButton, nil)
 
 	button := p.Query("button")
-	err := tb.await(func() error {
-		_ = button.Click(tb.toGojaValue(struct {
-			NoWaitAfter bool `js:"noWaitAfter"`
-		}{
-			// FIX: this is just a workaround because navigation is never triggered
-			// and we'd be waiting for it to happen otherwise!
-			NoWaitAfter: true,
-		}))
-		return nil
-	})
+	err := button.Click(tb.toGojaValue(struct {
+		NoWaitAfter bool `js:"noWaitAfter"`
+	}{
+		// FIX: this is just a workaround because navigation is never triggered
+		// and we'd be waiting for it to happen otherwise!
+		NoWaitAfter: true,
+	}))
 	require.NoError(t, err)
 
 	res := tb.asGojaValue(p.Evaluate(tb.toGojaValue("() => window['result']")))
@@ -120,16 +117,13 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 	p.Evaluate(tb.toGojaValue("() => delete window['Node']"))
 
 	button := p.Query("button")
-	err := tb.await(func() error {
-		_ = button.Click(tb.toGojaValue(struct {
-			NoWaitAfter bool `js:"noWaitAfter"`
-		}{
-			// FIX: this is just a workaround because navigation is never triggered
-			// and we'd be waiting for it to happen otherwise!
-			NoWaitAfter: true,
-		}))
-		return nil
-	})
+	err := button.Click(tb.toGojaValue(struct {
+		NoWaitAfter bool `js:"noWaitAfter"`
+	}{
+		// FIX: this is just a workaround because navigation is never triggered
+		// and we'd be waiting for it to happen otherwise!
+		NoWaitAfter: true,
+	}))
 	require.NoError(t, err)
 
 	res := tb.asGojaValue(p.Evaluate(tb.toGojaValue("() => window['result']")))
@@ -146,16 +140,13 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	// Detach node to panic when clicked
 	p.Evaluate(tb.toGojaValue("button => button.remove()"), tb.toGojaValue(button))
 
-	err := tb.await(func() error {
-		_ = button.Click(tb.toGojaValue(struct {
-			NoWaitAfter bool `js:"noWaitAfter"`
-		}{
-			// FIX: this is just a workaround because navigation is never triggered and we'd be waiting for
-			// it to happen otherwise!
-			NoWaitAfter: true,
-		}))
-		return nil
-	})
+	err := button.Click(tb.toGojaValue(struct {
+		NoWaitAfter bool `js:"noWaitAfter"`
+	}{
+		// FIX: this is just a workaround because navigation is never triggered and we'd be waiting for
+		// it to happen otherwise!
+		NoWaitAfter: true,
+	}))
 	assert.ErrorContains(
 		t, err,
 		"element is not attached to the DOM",
