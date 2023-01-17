@@ -8,6 +8,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
+	"github.com/grafana/xk6-browser/k6ext"
 
 	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
@@ -243,22 +244,31 @@ func mapFrame(ctx context.Context, vu k6modules.VU, f api.Frame) mapping {
 			return rt.ToValue(eh).ToObject(rt)
 		},
 		"getAttribute": f.GetAttribute,
-		"goto":         f.Goto,
-		"hover":        f.Hover,
-		"innerHTML":    f.InnerHTML,
-		"innerText":    f.InnerText,
-		"inputValue":   f.InputValue,
-		"isChecked":    f.IsChecked,
-		"isDetached":   f.IsDetached,
-		"isDisabled":   f.IsDisabled,
-		"isEditable":   f.IsEditable,
-		"isEnabled":    f.IsEnabled,
-		"isHidden":     f.IsHidden,
-		"isVisible":    f.IsVisible,
-		"iD":           f.ID,
-		"loaderID":     f.LoaderID,
-		"locator":      f.Locator,
-		"name":         f.Name,
+		"goto": func(url string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(ctx, func() (any, error) {
+				resp, err := f.Goto(url, opts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+
+				return mapResponse(ctx, vu, resp), nil
+			})
+		},
+		"hover":      f.Hover,
+		"innerHTML":  f.InnerHTML,
+		"innerText":  f.InnerText,
+		"inputValue": f.InputValue,
+		"isChecked":  f.IsChecked,
+		"isDetached": f.IsDetached,
+		"isDisabled": f.IsDisabled,
+		"isEditable": f.IsEditable,
+		"isEnabled":  f.IsEnabled,
+		"isHidden":   f.IsHidden,
+		"isVisible":  f.IsVisible,
+		"iD":         f.ID,
+		"loaderID":   f.LoaderID,
+		"locator":    f.Locator,
+		"name":       f.Name,
 		"page": func() *goja.Object {
 			mp := mapPage(ctx, vu, f.Page())
 			return rt.ToValue(mp).ToObject(rt)
@@ -347,19 +357,28 @@ func mapPage(ctx context.Context, vu k6modules.VU, p api.Page) mapping {
 		"getAttribute": p.GetAttribute,
 		"goBack":       p.GoBack,
 		"goForward":    p.GoForward,
-		"goto":         p.Goto,
-		"hover":        p.Hover,
-		"innerHTML":    p.InnerHTML,
-		"innerText":    p.InnerText,
-		"inputValue":   p.InputValue,
-		"isChecked":    p.IsChecked,
-		"isClosed":     p.IsClosed,
-		"isDisabled":   p.IsDisabled,
-		"isEditable":   p.IsEditable,
-		"isEnabled":    p.IsEnabled,
-		"isHidden":     p.IsHidden,
-		"isVisible":    p.IsVisible,
-		"locator":      p.Locator,
+		"goto": func(url string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(ctx, func() (any, error) {
+				resp, err := p.Goto(url, opts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+
+				return mapResponse(ctx, vu, resp), nil
+			})
+		},
+		"hover":      p.Hover,
+		"innerHTML":  p.InnerHTML,
+		"innerText":  p.InnerText,
+		"inputValue": p.InputValue,
+		"isChecked":  p.IsChecked,
+		"isClosed":   p.IsClosed,
+		"isDisabled": p.IsDisabled,
+		"isEditable": p.IsEditable,
+		"isEnabled":  p.IsEnabled,
+		"isHidden":   p.IsHidden,
+		"isVisible":  p.IsVisible,
+		"locator":    p.Locator,
 		"mainFrame": func() *goja.Object {
 			mf := mapFrame(ctx, vu, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)

@@ -3,11 +3,11 @@ package tests
 import (
 	"testing"
 
-	"github.com/grafana/xk6-browser/api"
-
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/api"
 )
 
 // Strict mode:
@@ -185,12 +185,8 @@ func TestLocator(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
-			err := tb.await(func() error {
-				tb.promise(p.Goto(tb.staticURL("locators.html"), nil)).then(func() {
-					tt.do(tb, p)
-				})
-				return nil
-			})
+			_, err := p.Goto(tb.staticURL("locators.html"), nil)
+			tt.do(tb, p)
 			require.NoError(t, err)
 		})
 	}
@@ -277,13 +273,13 @@ func TestLocator(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
-			err := tb.await(func() error {
-				tb.promise(p.Goto(tb.staticURL("locators.html"), nil)).then(func() {
-					assert.Panics(t, func() { tt.do(p.Locator("a", nil), tb) })
-				})
-				return nil
-			})
+
+			_, err := p.Goto(tb.staticURL("locators.html"), nil)
 			require.NoError(t, err)
+
+			assert.Panics(t, func() {
+				tt.do(p.Locator("a", nil), tb)
+			})
 		})
 	}
 }
@@ -329,16 +325,15 @@ func TestLocatorElementState(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
-			err := tb.await(func() error {
-				tb.promise(p.Goto(tb.staticURL("locators.html"), nil)).then(func() {
-					l := p.Locator("#inputText", nil)
-					require.True(t, tt.query(l))
 
-					p.Evaluate(tb.toGojaValue(tt.eval))
-					require.False(t, tt.query(l))
-				})
-				return nil
-			})
+			_, err := p.Goto(tb.staticURL("locators.html"), nil)
+			require.NoError(t, err)
+
+			l := p.Locator("#inputText", nil)
+			require.True(t, tt.query(l))
+
+			p.Evaluate(tb.toGojaValue(tt.eval))
+			require.False(t, tt.query(l))
 			require.NoError(t, err)
 		})
 	}
@@ -388,11 +383,10 @@ func TestLocatorElementState(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
-			err := tb.await(func() error {
-				tb.promise(p.Goto(tb.staticURL("locators.html"), nil)).then(func() {
-					assert.Panics(t, func() { tt.do(p.Locator("a", nil), tb) })
-				})
-				return nil
+
+			_, err := p.Goto(tb.staticURL("locators.html"), nil)
+			assert.Panics(t, func() {
+				tt.do(p.Locator("a", nil), tb)
 			})
 			require.NoError(t, err)
 		})

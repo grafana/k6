@@ -12,6 +12,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/k6ext"
 )
 
 // General guidelines on lifecycle events:
@@ -702,15 +703,20 @@ func assertHome(
 			WaitUntil: waitUntil,
 			Timeout:   30 * time.Second,
 		})
-		prm := tb.promise(p.Goto(tb.URL("/home"), opts)).then(
-			func() testPromise {
-				resolved = true
-				return check()
-			},
-			func() {
-				rejected = true
-			},
-		)
+		_, err := p.Goto(tb.URL("/home"), opts)
+		if err == nil {
+			resolved = true
+		} else {
+			rejected = true
+		}
+
+		// TODO
+		// remove this once we have finished our work on the mapping layer.
+		// for now: provide a fake promise
+		fakePromise := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
+			return nil, nil
+		})
+		prm := tb.promise(fakePromise).then(check)
 		if secondCheck != nil {
 			prm.then(secondCheck)
 		}

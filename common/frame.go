@@ -946,20 +946,31 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goj
 }
 
 // Goto will navigate the frame to the specified URL and return a HTTP response object.
-func (f *Frame) Goto(url string, opts goja.Value) *goja.Promise {
-	netMgr := f.manager.page.mainFrameSession.getNetworkManager()
-	defaultReferer := netMgr.extraHTTPHeaders["referer"]
-	parsedOpts := NewFrameGotoOptions(
-		defaultReferer, time.Duration(f.manager.timeoutSettings.navigationTimeout())*time.Second)
+func (f *Frame) Goto(url string, opts goja.Value) (api.Response, error) {
+	var (
+		netMgr         = f.manager.page.mainFrameSession.getNetworkManager()
+		defaultReferer = netMgr.extraHTTPHeaders["referer"]
+		parsedOpts     = NewFrameGotoOptions(
+			defaultReferer,
+			time.Duration(f.manager.timeoutSettings.navigationTimeout())*time.Second,
+		)
+	)
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing frame navigation options to %q: %w", url, err)
-		return nil
+		return nil, fmt.Errorf("parsing frame navigation options to %q: %w", url, err)
 	}
-	return k6ext.Promise(f.ctx, func() (any, error) {
-		resp, err := f.manager.NavigateFrame(f, url, parsedOpts)
-		applySlowMo(f.ctx)
-		return resp, err
-	})
+	resp, err := f.manager.NavigateFrame(f, url, parsedOpts)
+	if err != nil {
+		return nil, fmt.Errorf("navigating frame to %q: %w", url, err)
+	}
+	applySlowMo(f.ctx)
+
+	// Since response will be in an interface, it will never be nil,
+	// so we need to return nil explicitly.
+	if resp == nil {
+		return nil, nil
+	}
+
+	return resp, nil
 }
 
 // Hover moves the pointer over the first element that matches the selector.

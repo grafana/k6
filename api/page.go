@@ -29,7 +29,7 @@ type Page interface {
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	GoBack(opts goja.Value) *goja.Promise
 	GoForward(opts goja.Value) *goja.Promise
-	Goto(url string, opts goja.Value) *goja.Promise
+	Goto(url string, opts goja.Value) (Response, error)
 	Hover(selector string, opts goja.Value)
 	InnerHTML(selector string, opts goja.Value) string
 	InnerText(selector string, opts goja.Value) string

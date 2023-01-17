@@ -553,7 +553,7 @@ func (p *Page) GoForward(opts goja.Value) *goja.Promise {
 }
 
 // Goto will navigate the page to the specified URL and return a HTTP response object.
-func (p *Page) Goto(url string, opts goja.Value) *goja.Promise {
+func (p *Page) Goto(url string, opts goja.Value) (api.Response, error) {
 	p.logger.Debugf("Page:Goto", "sid:%v url:%q", p.sessionID(), url)
 
 	return p.MainFrame().Goto(url, opts)

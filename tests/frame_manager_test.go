@@ -10,17 +10,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/k6ext"
 )
 
 func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
+	t.Parallel()
+
 	if os.Getenv("SKIP_FLAKY") == "true" {
 		t.SkipNow()
 	}
-	t.Parallel()
 
-	timeout := 5 * time.Second
+	const timeout = 5 * time.Second
 
 	testCases := []struct {
 		name, selector string
@@ -34,18 +35,27 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			var done bool
 			tb := newTestBrowser(t, withFileServer())
-			err := tb.awaitWithTimeout(timeout, func() error {
-				p := tb.NewPage(nil)
+			p := tb.NewPage(nil)
 
-				opts := tb.toGojaValue(&common.FrameGotoOptions{
-					WaitUntil: common.LifecycleEventNetworkIdle,
-					Timeout:   time.Duration(timeout.Milliseconds()), // interpreted as ms
+			opts := tb.toGojaValue(&common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventNetworkIdle,
+				Timeout:   time.Duration(timeout.Milliseconds()), // interpreted as ms
+			})
+			resp, err := p.Goto(tb.staticURL("/nav_in_doc.html"), opts)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+
+			var done bool
+			err = tb.awaitWithTimeout(timeout, func() error {
+				// TODO
+				// remove this once we have finished our work on the mapping layer.
+				// for now: provide a fake promise
+				fakePromise := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
+					return nil, nil
 				})
-				tb.promise(p.Goto(tb.staticURL("/nav_in_doc.html"), opts)).
-					then(func(resp api.Response) testPromise {
-						require.NotNil(t, resp)
+				tb.promise(fakePromise).
+					then(func() testPromise {
 						waitForNav := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
 							Timeout: time.Duration(timeout.Milliseconds()), // interpreted as ms
 						}))
@@ -93,13 +103,22 @@ func TestWaitForFrameNavigation(t *testing.T) {
 		`)
 	})
 
+	opts := tb.toGojaValue(&common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventNetworkIdle,
+		Timeout:   common.DefaultTimeout,
+	})
+	_, err := p.Goto(tb.URL("/first"), opts)
+	require.NoError(t, err)
+
 	var done bool
-	require.NoError(t, tb.await(func() error {
-		opts := tb.toGojaValue(&common.FrameGotoOptions{
-			WaitUntil: common.LifecycleEventNetworkIdle,
-			Timeout:   common.DefaultTimeout,
+	err = tb.await(func() error {
+		// TODO
+		// remove this once we have finished our work on the mapping layer.
+		// for now: provide a fake promise
+		fakePromise := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
+			return nil, nil
 		})
-		tb.promise(p.Goto(tb.URL("/first"), opts)).
+		tb.promise(fakePromise).
 			then(func() testPromise {
 				var timeout time.Duration = 5000 // interpreted as ms
 				wfnPromise := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
@@ -114,6 +133,7 @@ func TestWaitForFrameNavigation(t *testing.T) {
 			})
 
 		return nil
-	}))
+	})
+	require.NoError(t, err)
 	require.True(t, done)
 }

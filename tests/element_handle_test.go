@@ -188,12 +188,13 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 		cr := p.Evaluate(tb.toGojaValue(cmd))
 		return tb.asGojaValue(cr).String()
 	}
-	err := tb.await(func() error {
-		tb.promise(p.Goto(tb.staticURL("/concealed_link.html"), nil)).
-			then(func() *goja.Promise {
-				require.Equal(t, wantBefore, clickResult())
-				return p.Click("#concealed", nil)
-			}).
+	resp, err := p.Goto(tb.staticURL("/concealed_link.html"), nil)
+	require.NotNil(t, resp)
+	require.NoError(t, err)
+	require.Equal(t, wantBefore, clickResult())
+
+	err = tb.await(func() error {
+		tb.promise(p.Click("#concealed", nil)).
 			then(func() {
 				require.Equal(t, wantAfter, clickResult())
 			})
@@ -206,12 +207,13 @@ func TestElementHandleNonClickable(t *testing.T) {
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewContext(nil).NewPage()
 
+	resp, err := p.Goto(tb.staticURL("/non_clickable.html"), nil)
+	require.NotNil(t, resp)
+	require.NoError(t, err)
+
 	var notClickable bool
-	err := tb.await(func() error {
-		tb.promise(p.Goto(tb.staticURL("/non_clickable.html"), nil)).
-			then(func() *goja.Promise {
-				return p.Click("#non-clickable", nil)
-			}).
+	err = tb.await(func() error {
+		tb.promise(p.Click("#non-clickable", nil)).
 			then(
 				func() { t.Fatal("element should not be clickable") },
 				func() { notClickable = true },

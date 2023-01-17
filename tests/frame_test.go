@@ -8,6 +8,8 @@ import (
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/k6ext"
 )
 
 func TestFramePress(t *testing.T) {
@@ -29,44 +31,50 @@ func TestFramePress(t *testing.T) {
 func TestFrameDismissDialogBox(t *testing.T) {
 	t.Parallel()
 
-	tests := []string{
+	for _, tt := range []string{
 		"alert",
 		"confirm",
 		"prompt",
 		"beforeunload",
-	}
-
-	for _, test := range tests {
-		test := test
-		t.Run(test, func(t *testing.T) {
+	} {
+		tt := tt
+		t.Run(tt, func(t *testing.T) {
 			t.Parallel()
 
-			b := newTestBrowser(t, withFileServer())
+			var (
+				tb = newTestBrowser(t, withFileServer())
+				p  = tb.NewPage(nil)
+			)
 
-			p := b.NewPage(nil)
+			opts := tb.toGojaValue(struct {
+				WaitUntil string `js:"waitUntil"`
+			}{
+				WaitUntil: "networkidle",
+			})
+			_, err := p.Goto(
+				tb.staticURL("dialog.html?dialogType="+tt),
+				opts,
+			)
+			require.NoError(t, err)
 
-			err := b.await(func() error {
-				opts := b.toGojaValue(struct {
-					WaitUntil string `js:"waitUntil"`
-				}{
-					WaitUntil: "networkidle",
+			err = tb.await(func() error {
+				// TODO
+				// remove this once we have finished our work on the mapping layer.
+				// for now: provide a fake promise
+				fakePromise := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
+					return nil, nil
 				})
-				pageGoto := p.Goto(
-					b.staticURL("dialog.html?dialogType="+test),
-					opts,
-				)
-				b.promise(pageGoto).then(func() *goja.Promise {
-					if test == "beforeunload" {
+				tb.promise(fakePromise).then(func() *goja.Promise {
+					if tt == "beforeunload" {
 						return p.Click("#clickHere", nil)
 					}
-
 					result := p.TextContent("#textField", nil)
-					assert.EqualValues(t, test+" dismissed", result)
+					assert.EqualValues(t, tt+" dismissed", result)
 
 					return nil
 				}).then(func() {
 					result := p.TextContent("#textField", nil)
-					assert.EqualValues(t, test+" dismissed", result)
+					assert.EqualValues(t, tt+" dismissed", result)
 				})
 
 				return nil
@@ -76,9 +84,14 @@ func TestFrameDismissDialogBox(t *testing.T) {
 	}
 }
 
+// FIX
+// This test does not work on my machine. It fails with:
+// "" != "Done!".
+//
+// OSX: 13.1 (22C65).
 func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
-	if strValue, ok := os.LookupEnv("XK6_HEADLESS"); ok {
-		if value, err := strconv.ParseBool(strValue); err == nil && value {
+	if s, ok := os.LookupEnv("XK6_HEADLESS"); ok {
+		if v, err := strconv.ParseBool(s); err == nil && v {
 			// We're skipping this when running in headless
 			// environments since the bug that the test fixes
 			// only surfaces when in headfull mode.
@@ -92,29 +105,19 @@ func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 
 	opts := defaultLaunchOpts()
 	opts.Headless = false
-	b := newTestBrowser(t, withFileServer(), opts)
-	p := b.NewPage(nil)
+	tb := newTestBrowser(t, withFileServer(), opts)
+	p := tb.NewPage(nil)
 
-	var result string
-	err := b.await(func() error {
-		opts := b.toGojaValue(struct {
+	_, err := p.Goto(
+		tb.staticURL("embedded_iframe.html"),
+		tb.toGojaValue(struct {
 			WaitUntil string `js:"waitUntil"`
 		}{
 			WaitUntil: "load",
-		})
-		pageGoto := p.Goto(
-			b.staticURL("embedded_iframe.html"),
-			opts,
-		)
-
-		b.promise(pageGoto).
-			then(func() {
-				result = p.TextContent("#doneDiv", nil)
-			})
-
-		return nil
-	})
+		}),
+	)
 	require.NoError(t, err)
 
+	result := p.TextContent("#doneDiv", nil)
 	assert.EqualValues(t, "Done!", result)
 }
