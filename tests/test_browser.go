@@ -20,6 +20,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 // testBrowser is a test testBrowser for integration testing.
@@ -238,6 +239,30 @@ func (b *testBrowser) runJavaScript(s string, args ...any) (goja.Value, error) {
 func (b *testBrowser) await(fn func() error) error {
 	b.t.Helper()
 	return b.vu.Loop.Start(fn)
+}
+
+// Run the given functions in parallel and waits for them to finish.
+func (b *testBrowser) run(ctx context.Context, fs ...func() error) error { //nolint:unused,deadcode
+	b.t.Helper()
+
+	g, ctx := errgroup.WithContext(ctx)
+	for _, f := range fs {
+		f := f
+		g.Go(func() error {
+			errc := make(chan error, 1)
+			go func() {
+				errc <- f()
+			}()
+			select {
+			case err := <-errc:
+				return err
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		})
+	}
+
+	return g.Wait()
 }
 
 // awaitWithTimeout is the same as await but takes a timeout and times out the function after the time runs out.

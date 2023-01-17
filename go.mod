@@ -16,6 +16,7 @@ require (
 	go.k6.io/k6 v0.42.1-0.20230109152238-8418147fa630
 	golang.org/x/exp v0.0.0-20221106115401-f9659909a136
 	golang.org/x/net v0.1.0
+	golang.org/x/sync v0.1.0
 	gopkg.in/guregu/null.v3 v3.5.0
 )
 
