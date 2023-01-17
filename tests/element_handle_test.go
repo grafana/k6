@@ -184,14 +184,9 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, wantBefore, clickResult())
 
-	err = tb.await(func() error {
-		tb.promise(p.Click("#concealed", nil)).
-			then(func() {
-				require.Equal(t, wantAfter, clickResult())
-			})
-		return nil
-	})
+	err = p.Click("#concealed", nil)
 	require.NoError(t, err)
+	require.Equal(t, wantAfter, clickResult())
 }
 
 func TestElementHandleNonClickable(t *testing.T) {
@@ -202,18 +197,8 @@ func TestElementHandleNonClickable(t *testing.T) {
 	require.NotNil(t, resp)
 	require.NoError(t, err)
 
-	var notClickable bool
-	err = tb.await(func() error {
-		tb.promise(p.Click("#non-clickable", nil)).
-			then(
-				func() { t.Fatal("element should not be clickable") },
-				func() { notClickable = true },
-			)
-
-		return nil
-	})
-	require.NoError(t, err)
-	require.True(t, notClickable, "element should not be clickable")
+	err = p.Click("#non-clickable", nil)
+	require.Errorf(t, err, "element should not be clickable")
 }
 
 func TestElementHandleGetAttribute(t *testing.T) {

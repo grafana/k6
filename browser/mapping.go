@@ -152,7 +152,7 @@ func mapElementHandle(ctx context.Context, vu k6modules.VU, eh api.ElementHandle
 		"click": func(opts goja.Value) *goja.Promise {
 			return k6ext.Promise(ctx, func() (any, error) {
 				err := eh.Click(opts)
-				return nil, fmt.Errorf("%w", err)
+				return nil, err //nolint:wrapcheck
 			})
 		},
 		"contentFrame": func() *goja.Object {
@@ -236,7 +236,12 @@ func mapFrame(ctx context.Context, vu k6modules.VU, f api.Frame) mapping {
 			}
 			return rt.ToValue(mcfs).ToObject(rt)
 		},
-		"click":          f.Click,
+		"click": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(ctx, func() (any, error) {
+				err := f.Click(selector, opts)
+				return nil, err //nolint:wrapcheck
+			})
+		},
 		"content":        f.Content,
 		"dblclick":       f.Dblclick,
 		"dispatchEvent":  f.DispatchEvent,
@@ -328,12 +333,17 @@ func mapFrame(ctx context.Context, vu k6modules.VU, f api.Frame) mapping {
 func mapPage(ctx context.Context, vu k6modules.VU, p api.Page) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
-		"addInitScript":           p.AddInitScript,
-		"addScriptTag":            p.AddScriptTag,
-		"addStyleTag":             p.AddStyleTag,
-		"bringToFront":            p.BringToFront,
-		"check":                   p.Check,
-		"click":                   p.Click,
+		"addInitScript": p.AddInitScript,
+		"addScriptTag":  p.AddScriptTag,
+		"addStyleTag":   p.AddStyleTag,
+		"bringToFront":  p.BringToFront,
+		"check":         p.Check,
+		"click": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(ctx, func() (any, error) {
+				err := p.Click(selector, opts)
+				return nil, err //nolint:wrapcheck
+			})
+		},
 		"close":                   p.Close,
 		"content":                 p.Content,
 		"context":                 p.Context,

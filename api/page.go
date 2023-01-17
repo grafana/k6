@@ -9,7 +9,7 @@ type Page interface {
 	AddStyleTag(opts goja.Value) *goja.Promise
 	BringToFront()
 	Check(selector string, opts goja.Value)
-	Click(selector string, opts goja.Value) *goja.Promise
+	Click(selector string, opts goja.Value) error
 	Close(opts goja.Value)
 	Content() string
 	Context() BrowserContext

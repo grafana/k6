@@ -54,17 +54,18 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 				fakePromise := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
 					return nil, nil
 				})
-				tb.promise(fakePromise).
-					then(func() testPromise {
-						waitForNav := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
-							Timeout: time.Duration(timeout.Milliseconds()), // interpreted as ms
-						}))
-						click := p.Click(tc.selector, nil)
-						return tb.promiseAll(waitForNav, click)
-					}).
-					then(func() {
-						done = true
+				tb.promise(fakePromise).then(func() testPromise {
+					opts := tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+						Timeout: time.Duration(timeout.Milliseconds()), // interpreted as ms
 					})
+					waitForNav := p.WaitForNavigation(opts)
+					click := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
+						return nil, p.Click(tc.selector, nil)
+					})
+					return tb.promiseAll(waitForNav, click)
+				}).then(func() {
+					done = true
+				})
 
 				return nil
 			})
@@ -120,12 +121,14 @@ func TestWaitForFrameNavigation(t *testing.T) {
 		})
 		tb.promise(fakePromise).
 			then(func() testPromise {
-				var timeout time.Duration = 5000 // interpreted as ms
-				wfnPromise := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
-					Timeout: timeout, // interpreted as ms
-				}))
-				cPromise := p.Click(`a`, nil)
-				return tb.promiseAll(wfnPromise, cPromise)
+				opts := tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+					Timeout: 5000, // interpreted as ms
+				})
+				waitForNav := p.WaitForNavigation(opts)
+				click := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
+					return nil, p.Click(`a`, nil)
+				})
+				return tb.promiseAll(waitForNav, click)
 			}).
 			then(func() {
 				assert.Equal(t, "Second page", p.Title())
