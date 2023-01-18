@@ -123,7 +123,7 @@ jobs:
           go version
           ./build-release.sh "dist" "${VERSION}"
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: binaries
           path: dist/
@@ -232,7 +232,7 @@ jobs:
           Expand-Archive -Path .\wix311-binaries.zip -DestinationPath .\wix311\
           echo "$pwd\wix311" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Download binaries
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: binaries
           path: dist
@@ -278,7 +278,7 @@ jobs:
         run: move "packaging\k6.msi" "packaging\k6-$env:VERSION-windows-amd64.msi"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: binaries-windows
           path: |
@@ -314,12 +314,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Download binaries
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: binaries
           path: dist
       - name: Download Windows binaries
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: binaries-windows
           path: dist
@@ -346,12 +346,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Download binaries
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: binaries
           path: dist
       - name: Download Windows binaries
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: binaries-windows
           path: dist
