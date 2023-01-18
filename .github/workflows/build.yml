@@ -54,7 +54,7 @@ jobs:
             echo "Building a non-version ref '${GITHUB_REF}', use '${VERSION}' as the version instead..."
           fi
           echo "VERSION=${VERSION}"
-          echo "::set-output name=k6_version::${VERSION}"
+          echo "k6_version=${VERSION}" >> $GITHUB_OUTPUT
       - name: Get the used Go version
         id: get_go_version
         run: |
@@ -67,7 +67,7 @@ jobs:
             echo "Using the default Go version '${GO_VERSION}'..."
           fi
           echo "GO_VERSION=${GO_VERSION}"
-          echo "::set-output name=go_version::${GO_VERSION}"
+          echo "go_version=${GO_VERSION}" >> $GITHUB_OUTPUT
 
   build:
     runs-on: ubuntu-latest
